@@ -51,7 +51,7 @@ jobs:
             --icon-file assets/branding/sculptforge-256.png --icon-filename org.sculptforge.SculptForge \
             --output appimage
           mv SculptForge-*.AppImage build/SculptForge-${TAG#v}-linux-${{ matrix.arch }}.AppImage
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: linux-${{ matrix.arch }}
           path: |
@@ -94,7 +94,7 @@ jobs:
           cd build
           cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME=SculptForge-${TAG#v}-linux-${{ matrix.arch }}-${{ matrix.suffix }}
           if [ "${{ matrix.generators }}" = "RPM;TGZ" ]; then cpack -G RPM; fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: vfx-${{ matrix.suffix }}-${{ matrix.arch }}
           path: |
@@ -116,7 +116,7 @@ jobs:
           ctest --test-dir build --output-on-failure -LE ui
       - name: Package (signed ad-hoc inside CPack, see cmake/MacSign.cmake)
         run: cd build && cpack -G DragNDrop
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: macos
           path: build/*.dmg
@@ -135,7 +135,7 @@ jobs:
           ctest --test-dir build -C Release --output-on-failure -LE ui
       - name: Package
         run: cd build && cpack -C Release -G "NSIS;ZIP"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows
           path: |
