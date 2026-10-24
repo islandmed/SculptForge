@@ -26,7 +26,7 @@ jobs:
           - { arch: x86_64, os: ubuntu-22.04, ld: x86_64 }
           - { arch: arm64, os: ubuntu-22.04-arm, ld: aarch64 }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { ref: '${{ env.TAG }}' }
       - run: sudo ./packaging/linux/install-build-deps.sh
       - name: Build and test
@@ -74,7 +74,7 @@ jobs:
           - { label: 'VFX CY2027', suffix: vfx2027, generators: 'TGZ', image: 'rockylinux:9', arch: arm64, os: ubuntu-24.04-arm }
     steps:
       - run: dnf -y install git
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { ref: '${{ env.TAG }}' }
       - run: ./packaging/linux/install-build-deps.sh
       - name: Python 3.13
@@ -105,7 +105,7 @@ jobs:
     name: macOS (universal .dmg)
     runs-on: macos-14
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { ref: '${{ env.TAG }}' }
       - name: Build and test
         run: |
@@ -125,7 +125,7 @@ jobs:
     name: Windows x64 (installer, .zip)
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { ref: '${{ env.TAG }}' }
       - name: Build and test
         run: |
@@ -147,7 +147,7 @@ jobs:
     needs: [linux, vfx, macos, windows]
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { ref: '${{ env.TAG }}' }
       - uses: actions/download-artifact@v4
         with: { path: dist, merge-multiple: true }
