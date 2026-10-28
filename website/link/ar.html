@@ -272,6 +272,13 @@ if (!token || !frag.get("o")) {
     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
     for (const t of stream.getTracks()) t.stop();
   } catch (e) { /* refused: try anyway (works when the computer has no firewall) */ }
+  // Chrome's Local Network Access: a website may only reach home-network devices once the person allows it.
+  // A request to the computer (its address is private, so Chrome lets this https page make it) brings up
+  // Chrome's "access devices on your local network" prompt; the direct link below needs that permission too.
+  $("waitText").textContent = "If Chrome asks to let this page reach devices on your local network, tap Allow.";
+  try {
+    await fetch(`${desktop}/api/hello`, { mode: "no-cors", cache: "no-store", targetAddressSpace: "local" });
+  } catch (e) { /* refused or unreachable: the direct link may still work */ }
   $("waitText").textContent = "Connecting to your computer...";
   connectRtc().catch((e) => note($("liveMsg"), "Couldn't connect: " + esc(e.message || e), "bad"));
 }

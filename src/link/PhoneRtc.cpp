@@ -1,5 +1,6 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include <cstdio>
 #include <cstdlib>
 #include "link/PhoneRtc.h"
 
@@ -189,10 +190,12 @@ rtc::Configuration localConfiguration(uint16_t port = 0) {
 
 FaceRtc::FaceRtc(Mode mode, uint16_t icePort) : impl_(std::make_unique<Impl>()), mode_(mode), icePort_(icePort) {
     static std::once_flag logging;
-    // SCULPTFORGE_RTC_LOG=1: WebRTC's own log (ICE candidates and checks) on stderr, for connection problems.
+    // SCULPTFORGE_RTC_LOG=1 (2: every packet): WebRTC's own log (ICE candidates and checks) on stderr, for connection problems.
     std::call_once(logging, [] {
         const char* log = std::getenv("SCULPTFORGE_RTC_LOG");
-        rtc::InitLogger(log && *log && *log != '0' ? rtc::LogLevel::Debug : rtc::LogLevel::None);
+        rtc::InitLogger(!log || !*log || *log == '0' ? rtc::LogLevel::None
+                        : *log == '2'                    ? rtc::LogLevel::Verbose
+                                                         : rtc::LogLevel::Debug);
     });
 }
 
@@ -257,6 +260,8 @@ bool FaceRtc::createOffer(std::string& sdp, std::string& error, int timeoutMs) {
             return false;
         }
         sdp = std::string(*description);
+        if (const char* log = std::getenv("SCULPTFORGE_RTC_LOG"); log && *log && *log != '0')
+            std::fprintf(stderr, "Offer:\n%s\n", sdp.c_str());
         if (sdp.find("a=candidate:") == std::string::npos) {
             error = "This computer has no network address the phone could reach";
             return false;
@@ -280,6 +285,8 @@ bool FaceRtc::setAnswer(const std::string& sdp, std::string& error) {
         }
         impl_->state = State::Connecting;
     }
+    if (const char* log = std::getenv("SCULPTFORGE_RTC_LOG"); log && *log && *log != '0')
+        std::fprintf(stderr, "Phone's answer:\n%s\n", sdp.c_str());
     try {
         pc->setRemoteDescription(rtc::Description(sdp, rtc::Description::Type::Answer));
         return true;
