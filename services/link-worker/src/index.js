@@ -59,6 +59,19 @@ export class Topic {
     }
 }
 
+// What a person sees who opens link.sculptforge.app in a browser (a phone may save plain text as a file instead).
+const HOME_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>SculptForge link relay</title>
+<style>body{font:17px/1.5 system-ui,sans-serif;max-width:34rem;margin:15vh auto;padding:0 16px;color:#222;background:#fafafa}
+@media (prefers-color-scheme:dark){body{color:#eee;background:#161616}a{color:#f90}}</style></head><body>
+<h1>SculptForge link relay</h1>
+<p>This address passes one small encrypted message between your phone and SculptForge on your computer when you
+connect them (File &gt; Capture from phone). There is nothing to do here.</p>
+<p><a href="https://sculptforge.app/">sculptforge.app</a> &middot;
+<a href="https://github.com/islandmed/SculptForge/blob/main/docs/phone-link.md">how it works</a></p>
+</body></html>
+`;
+
 function allowedOrigin(request, env) {
     const origin = request.headers.get("Origin");
     if (!origin) return null;
@@ -86,8 +99,7 @@ export default {
         if (origin === undefined) return json({ error: "origin not allowed" }, 403, null);
         if (request.method === "OPTIONS") return respond(null, 204, origin);
         if (url.pathname === "/" || url.pathname === "/relay" || url.pathname === "/relay/")
-            return respond("SculptForge link relay. See https://github.com/islandmed/SculptForge/blob/main/docs/phone-link.md\n",
-                           200, origin, "text/plain; charset=utf-8");
+            return respond(HOME_PAGE, 200, origin, "text/html; charset=utf-8");
 
         const match = url.pathname.match(/^\/relay\/([^/]+)(\/json)?$/);
         if (!match) return json({ error: "not found" }, 404, origin);
