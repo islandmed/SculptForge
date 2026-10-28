@@ -636,7 +636,8 @@ def main() -> int:
     # The site's sitemap (website/sitemap.xml, named in website/robots.txt): the homepage, the brushes page and
     # every guide page. Only for the real site, not --out folders.
     if out.resolve() == (ROOT / "website" / "guide").resolve():
-        urls = [SITE, SITE + "brushes.html", SITE + "mudbox-alternative.html"] + [f"{SITE}guide/{p.name[:-3]}.html" for p in pages]
+        urls = [SITE, SITE + "brushes.html", SITE + "mudbox-alternative.html",
+                SITE + "zbrush-alternative.html", SITE + "zbrush-linux.html"] + [f"{SITE}guide/{p.name[:-3]}.html" for p in pages]
         (ROOT / "website" / "sitemap.xml").write_text(
             '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
             + "".join(f"  <url><loc>{html.escape(u)}</loc></url>\n" for u in urls) + "</urlset>\n", encoding="utf-8")

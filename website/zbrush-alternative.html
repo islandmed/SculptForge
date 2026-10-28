@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>A free ZBrush alternative with ZBrush's keys - SculptForge</title>
+  <meta name="description" content="SculptForge is a free, open-source ZBrush alternative for Windows, macOS and Linux. ZBrush's keys and gestures, SubTools, subdivision levels, layers, dynamic topology, QRemesh-style retopology, VDM brushes, GoZ and a plug-in that brings your ZTools over.">
+  <meta name="theme-color" content="#111114">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" type="image/svg+xml" href="img/favicon.svg?v=2">
+  <link rel="icon" type="image/png" href="img/favicon-64.png?v=2">
+  <link rel="apple-touch-icon" href="img/icon-256.png?v=2">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="A free ZBrush alternative: SculptForge">
+  <meta property="og:description" content="ZBrush's keys and gestures, SubTools, subdivision levels, layers, dynamic topology and GoZ, free and open source on Windows, macOS and Linux.">
+  <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=3">
+  <meta property="og:url" content="https://sculptforge.app/zbrush-alternative.html">
+  <link rel="canonical" href="https://sculptforge.app/zbrush-alternative.html">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="style.css?v=17">
+  <script src="motion.js?v=10" defer></script>
+  <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+  <script type="application/ld+json">
+  {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Is there a free alternative to ZBrush?", "acceptedAnswer": {"@type": "Answer", "text": "SculptForge is free and open source (GPL-3.0) for Windows, macOS and Linux. It follows ZBrush's keys and gestures and has SubTools, subdivision levels, sculpt layers, dynamic topology, quad remeshing, polypaint, texture painting, baking and VDM brushes."}}, {"@type": "Question", "name": "Can SculptForge open ZBrush ZTL files?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, through a free plug-in that runs inside ZBrush and converts each ZTool once; SculptForge then opens the .ZTL with its SubTools, names, polygroups, polypaint, mask and UVs. Lower subdivision levels, layers and ZBrush materials don't come over, and .ZPR projects can't be converted."}}, {"@type": "Question", "name": "Does SculptForge use the same shortcuts as ZBrush?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, by default: B plus two letters picks a brush, S, U, I and O set size and intensities, Ctrl masks, Ctrl+Shift hides and isolates, D and Shift+D step subdivision levels, and navigation follows ZBrush."}}]}
+  </script>
+</head>
+<body>
+  <div class="scroll-progress" aria-hidden="true"></div>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="index.html"><img src="img/logo.svg?v=2" alt="" width="34" height="34"><span>SculptForge</span></a>
+      <nav aria-label="Main">
+        <a href="index.html#features">Features</a>
+        <a href="index.html#demos">Demos</a>
+        <a href="brushes.html">Brushes</a>
+        <a href="guide/index.html">Guide</a>
+        <a class="nav-dl" href="index.html#download">Download</a>
+        <a class="gh" href="https://github.com/islandmed/SculptForge">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="wrap">
+        <p class="eyebrow">ZBrush alternative</p>
+        <h1>Your ZBrush hands, <span class="accent">a free app.</span></h1>
+        <p class="lede">SculptForge is a free, open-source sculpting app that follows ZBrush's keys, gestures and
+          palettes, so you can start sculpting instead of relearning. It brings your ZTools over, exchanges models
+          with ZBrush through GoZ, and runs natively on Windows, macOS and Linux. No subscription, no account.</p>
+        <div class="ctas">
+          <a class="btn primary" href="index.html#download">Download free</a>
+          <a class="btn" href="guide/coming-from-zbrush.html">Coming from ZBrush</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt">
+      <div class="wrap">
+        <h2>What works the way you expect</h2>
+        <p class="section-lede">The defaults are ZBrush's. Where SculptForge had keys of its own, they're a
+          preference you can switch on.</p>
+        <div class="grid">
+          <article class="card">
+            <h3>Keys and gestures</h3>
+            <p>B then two letters for brushes (B S T, B C B, B D S), S U I O sliders under the cursor, Alt for Zsub,
+              Shift to smooth, free rotation with Shift to snap. <a href="guide/shortcuts.html">Shortcuts</a></p>
+          </article>
+          <article class="card">
+            <h3>Masking and visibility</h3>
+            <p>Ctrl to mask, Ctrl+Alt to erase, click to blur or sharpen, MaskLasso and MaskRect, Ctrl+Shift to
+              hide and isolate polygroups, Ctrl+W to group. <a href="guide/masking.html">Masking</a></p>
+          </article>
+          <article class="card">
+            <h3>SubTools and levels</h3>
+            <p>SubTools with Alt+click, subdivision levels on Ctrl+D, D and Shift+D, Reconstruct Subdiv, sculpt
+              layers on any level, PolyFrame and QuickSave. <a href="guide/subtools.html">SubTools</a></p>
+          </article>
+          <article class="card">
+            <h3>Remeshing</h3>
+            <p>Voxel Remesh for DynaMesh-style blocking, QRemesh with guides for clean quad loops, and ProjectAll
+              to carry the detail back. <a href="guide/retopology.html">Retopology</a></p>
+          </article>
+          <article class="card">
+            <h3>Dynamic topology</h3>
+            <p>Sculptris Pro-style detail where the brush goes: switch on Dynamic in the top shelf and set the
+              Detail. <a href="guide/dynamic-topology.html">Dynamic topology</a></p>
+          </article>
+          <article class="card">
+            <h3>VDM brushes and alphas</h3>
+            <p>Vector displacement brushes with DragRect and DragDot, your own made from a VDM plane, plus alphas,
+              strokes and a community brush gallery. <a href="brushes.html">Brushes</a></p>
+          </article>
+          <article class="card">
+            <h3>Polypaint, textures and baking</h3>
+            <p>Polypaint with layers and blend modes, texture painting on UVs, and normal, displacement and AO
+              bakes. <a href="guide/texture-painting.html">Texture painting</a></p>
+          </article>
+          <article class="card">
+            <h3>Things ZBrush doesn't have</h3>
+            <p>Native Linux, Send to Unreal built in, phone scanning to a sculptable mesh, and free built-in AI
+              that makes a brush from a sentence or a model from a sketch. <a href="index.html#features">Features</a></p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <h2>Bring your ZTools over</h2>
+        <p class="section-lede">ZBrush's .ZTL format is closed, so a free plug-in converts each ZTool once, inside
+          ZBrush. The plug-in is new: if your ZBrush version trips it up, export OBJ or GoZ meanwhile and
+          <a href="https://github.com/islandmed/SculptForge/issues">tell us</a>.</p>
+        <div class="grid">
+          <article class="card">
+            <h3>1. Install the plug-in</h3>
+            <p>Copy <a href="https://github.com/islandmed/SculptForge/blob/main/integrations/zbrush/SculptForgeZToolExport.txt">SculptForgeZToolExport.txt</a>
+              into ZBrush's ZStartup/ZPlugs64 folder and restart ZBrush.</p>
+          </article>
+          <article class="card">
+            <h3>2. Convert</h3>
+            <p>ZPlugin &gt; SculptForge &gt; Convert ZTL, then pick your .ZTL. Each SubTool is written beside it.</p>
+          </article>
+          <article class="card">
+            <h3>3. Open it</h3>
+            <p>Open the .ZTL in SculptForge: SubTools, names, polygroups, polypaint, mask and UVs come over.</p>
+          </article>
+          <article class="card">
+            <h3>Or use GoZ</h3>
+            <p>Send single models back and forth with GoZ, or export OBJ or .GoZ from ZBrush's Tool palette.
+              <a href="guide/exporting.html#exchange-models-with-zbrush-goz">GoZ</a></p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt">
+      <div class="wrap">
+        <h2>SculptForge and ZBrush side by side</h2>
+        <div class="table-wrap">
+          <table class="compare">
+            <thead><tr><th></th><th>SculptForge</th><th>ZBrush</th></tr></thead>
+            <tbody>
+              <tr><td>Price</td><td class="yes">Free</td><td>Subscription</td></tr>
+              <tr><td>Open source</td><td class="yes">GPL-3.0</td><td>No</td></tr>
+              <tr><td>Linux</td><td class="yes">Native</td><td>No</td></tr>
+              <tr><td>ZBrush keys and gestures</td><td class="yes">By default</td><td>Yes</td></tr>
+              <tr><td>SubTools, levels, layers</td><td class="yes">Yes</td><td>Yes</td></tr>
+              <tr><td>DynaMesh / ZRemesher</td><td>Voxel Remesh / QRemesh</td><td>Yes</td></tr>
+              <tr><td>Sculptris Pro</td><td>Dynamic topology</td><td>Yes</td></tr>
+              <tr><td>Transpose line</td><td>Gizmo 3D on W E R</td><td>Yes</td></tr>
+              <tr><td>Send to Unreal</td><td class="yes">Built in</td><td>Plug-in</td></tr>
+              <tr><td>Image or text to 3D</td><td class="yes">Built in, free</td><td>No</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap faq">
+        <h2>Honest answers</h2>
+        <details open><summary>What's missing compared with ZBrush?</summary>
+          <p>ZBrush has had more than twenty years of features, and SculptForge is young. There's no 2.5D canvas,
+            no Transpose action line (the Gizmo 3D does that job), no stroke replay and no ZModeler yet. ZTools
+            come over at their highest subdivision level, without sculpt layers or ZBrush materials, and .ZPR
+            projects can't be converted. The <a href="guide/coming-from-zbrush.html">Coming from ZBrush</a>
+            chapter lists every difference.</p></details>
+        <details><summary>Is it really free for commercial work?</summary>
+          <p>Yes. SculptForge is free under the GPL-3.0 and you own what you make. The licence covers the program,
+            not your models.</p></details>
+        <details><summary>Can I keep ZBrush and use both?</summary>
+          <p>Yes. GoZ and the ZTool plug-in move models between them, and SculptForge doesn't change anything in
+            ZBrush.</p></details>
+        <details><summary>Does it run on Linux?</summary>
+          <p>Natively, with .deb, .rpm and AppImage builds for x86_64 and ARM64.
+            <a href="zbrush-linux.html">Sculpting on Linux</a></p></details>
+      </div>
+    </section>
+
+    <section class="section alt">
+      <div class="wrap">
+        <h2>Try it with the keys you already know</h2>
+        <p class="section-lede">Free for Windows 10 and 11, macOS 11 and later, and Linux.</p>
+        <div class="ctas">
+          <a class="btn primary" href="index.html#download">Download SculptForge</a>
+          <a class="btn" href="guide/coming-from-zbrush.html">Coming from ZBrush</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-grid">
+      <div>
+        <a class="brand" href="index.html"><img src="img/logo.svg?v=2" alt="" width="28" height="28"><span>SculptForge</span></a>
+        <p class="fine">Copyright © 2026 The SculptForge contributors. SculptForge is licensed under the
+          <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
+      </div>
+      <div class="links">
+        <a href="guide/index.html">User Guide</a>
+        <a href="brushes.html">Community brushes</a>
+        <a href="zbrush-alternative.html">For ZBrush users</a>
+        <a href="mudbox-alternative.html">For Mudbox users</a>
+        <a href="zbrush-linux.html">Sculpting on Linux</a>
+        <a href="https://github.com/islandmed/SculptForge">Source code</a>
+      </div>
+      <p class="fine trademarks">SculptForge is an independent project, not affiliated with or endorsed by Autodesk or
+        Maxon. Mudbox and Maya are trademarks of Autodesk; ZBrush is a trademark of Maxon. The site uses no cookies.
+        Visits are counted anonymously with <a href="https://www.goatcounter.com/">GoatCounter</a>.</p>
+    </div>
+  </footer>
+</body>
+</html>
