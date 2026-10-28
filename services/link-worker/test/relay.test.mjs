@@ -48,6 +48,7 @@ test("topics, messages, sizes and origins are checked", async () => {
     const pre = await worker.fetch(new Request(`${BASE}/relay/${TOPIC}`, { method: "OPTIONS", headers: { Origin: PAGE } }), env);
     assert.equal(pre.status, 204);
     assert.equal(pre.headers.get("Access-Control-Allow-Origin"), PAGE);
+    assert.equal(pre.headers.get("Access-Control-Allow-Headers"), "Content-Type");
     assert.equal((await worker.fetch(new Request(`${BASE}/`), env)).status, 200);
 });
 

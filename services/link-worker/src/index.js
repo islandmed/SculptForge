@@ -123,6 +123,7 @@ function respond(body, status, origin, type = "application/json") {
     if (origin) {
         headers["Access-Control-Allow-Origin"] = origin;
         headers["Access-Control-Allow-Methods"] = "GET, POST, HEAD";
+        headers["Access-Control-Allow-Headers"] = "Content-Type"; // the AR page posts model/gltf-binary
         headers["Access-Control-Expose-Headers"] = "X-Version";
         headers["Access-Control-Max-Age"] = "86400";
         headers["Vary"] = "Origin";
