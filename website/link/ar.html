@@ -221,7 +221,10 @@ function receive(data) {
     incoming = null;
   }
 }
+// While the camera view is open a new model waits: swapping the model mid-session loses it in WebXR.
+let inAr = false, waiting = null;
 function showModel(blob, version, summary) {
+  if (inAr) { waiting = [blob, version, summary]; shownVersion = version; return; }
   const first = !shownVersion;
   shownVersion = version;
   if (modelUrl) URL.revokeObjectURL(modelUrl);
@@ -265,6 +268,8 @@ mv.addEventListener("load", () => {
   else note($("liveMsg"), "Chrome can't start AR on this phone. AR needs Google Play Services for AR: install or update it from the Play Store, then reload this page.", "bad");
 });
 mv.addEventListener("ar-status", (e) => {
+  inAr = e.detail.status === "session-started" || e.detail.status === "object-placed";
+  if (e.detail.status === "not-presenting" && waiting) { const w = waiting; waiting = null; shownVersion = 0; showModel(...w); }
   if (e.detail.status === "failed") note($("liveMsg"), "AR couldn't start. Check that Google Play Services for AR is installed and up to date, and that Chrome may use the camera.", "bad");
 });
 $("enter").onclick = () => mv.activateAR();

@@ -269,6 +269,13 @@ bool FaceRtc::createOffer(std::string& sdp, std::string& error, int timeoutMs) {
         impl->state = State::Offered;
         return true;
     } catch (const std::exception& e) {
+        if (icePort_) { // the fixed port is taken (another SculptForge): any port
+            const uint16_t port = icePort_;
+            icePort_ = 0;
+            const bool ok = createOffer(sdp, error, timeoutMs);
+            icePort_ = port;
+            return ok;
+        }
         error = std::string("WebRTC: ") + e.what();
         return false;
     }

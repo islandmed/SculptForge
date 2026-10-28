@@ -1085,7 +1085,7 @@ bool PhoneLink::createFaceLink(std::string& faceUrl, std::string& error, bool ar
     // Everything after '#' stays on the phone: the website never sees the offer, the token or the key.
     std::string page = options_.siteUrl;
     // ?v= changes with each page change that SculptForge depends on, so phones don't use a cached older copy.
-    if (ar) page = page.substr(0, page.rfind('/') + 1) + "ar.html?v=3";
+    if (ar) page = page.substr(0, page.rfind('/') + 1) + "ar.html?v=4";
     // AR: the model also goes through our relay (its /blob/ path), for phones whose browser can't reach this computer.
     std::string blobUrl;
     if (ar)
@@ -1106,11 +1106,14 @@ bool PhoneLink::createFaceLink(std::string& faceUrl, std::string& error, bool ar
         arBlobVersion_ = 0;
         if (!blobUrl.empty()) {
             faceUrl += "&b=" + percentEncode(blobUrl);
-            // A fresh model for the relay now (over the direct link the page asks for one itself once connected).
-            PhoneEvent e = PhoneEvent::make(PhoneEvent::Type::ArRequested);
-            e.wholeScene = arScope == "scene";
-            e.sizeCm = arSizeCm;
-            pushEvent(e);
+            // The model for the relay: the one already made (the capture page's Get the model), else a new one.
+            // (Over the direct link the page asks for one itself once connected.)
+            if (arVersion_ == 0) {
+                PhoneEvent e = PhoneEvent::make(PhoneEvent::Type::ArRequested);
+                e.wholeScene = arScope == "scene";
+                e.sizeCm = arSizeCm;
+                pushEvent(e);
+            }
             arBlobUntil_ = Clock::now() + std::chrono::minutes(10);
             arViewed_ = Clock::now();
             arViewedEver_ = true;
@@ -1123,6 +1126,7 @@ bool PhoneLink::createFaceLink(std::string& faceUrl, std::string& error, bool ar
         relayStop_ = false;
         relayThread_ = std::thread([this, topic, key, since] { relayLoop(topic, key, since); });
     }
+    if (ar) uploadArModel(); // the current model, if there is one
     return true;
 }
 

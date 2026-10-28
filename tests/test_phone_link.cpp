@@ -588,7 +588,7 @@ TEST(ar_link_sends_the_model_over_webrtc) {
     HttpRequest r = request("GET", "/api/face-link", link.token());
     r.query = "mode=ar&scope=scene&size=35";
     const std::string url = parseJson(link.handle(r).body)["url"].asString();
-    CHECK(url.rfind("https://example.org/link/ar.html?v=3#v=1&", 0) == 0);
+    CHECK(url.rfind("https://example.org/link/ar.html?v=4#v=1&", 0) == 0);
     const std::string fragment = url.substr(url.find('#') + 1);
     CHECK(queryParameter(fragment, "m") == "ar");
     CHECK(queryParameter(fragment, "s") == "scene");
