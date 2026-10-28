@@ -190,9 +190,11 @@ export default {
             if (request.method !== "GET" && request.method !== "HEAD") return json({ error: "method not allowed" }, 405, origin);
             const r = await stub.fetch(new Request("https://topic/share?data=1"));
             if (r.status === 404) return json({ error: "no model" }, 404, origin);
-            return new Response(request.method === "HEAD" ? null : await r.arrayBuffer(), {
-                headers: { "Content-Type": "model/gltf-binary", "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*",
-                           "X-Content-Type-Options": "nosniff" },
+            const model = await r.arrayBuffer();
+            return new Response(request.method === "HEAD" ? null : model, {
+                headers: { "Content-Type": "model/gltf-binary", "Content-Length": String(model.byteLength),
+                           "Content-Disposition": 'inline; filename="model.glb"', "Cache-Control": "private, max-age=60",
+                           "Access-Control-Allow-Origin": "*", "X-Content-Type-Options": "nosniff" },
             });
         }
 
