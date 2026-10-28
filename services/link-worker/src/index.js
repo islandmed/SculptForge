@@ -15,6 +15,8 @@ export const TOPIC_PATTERN = /^sculptforge-[0-9a-f]{24}$/;
 export const MAX_MESSAGE_BYTES = 8192;
 export const MAX_MESSAGES = 4;          // per topic: the answer, and a few retries
 export const TTL_MS = 10 * 60 * 1000;
+export const MAX_BLOB_BYTES = 48 * 1024 * 1024; // an AR model (encrypted GLB), usually a few MB
+const BLOB_CHUNK = 1024 * 1024;                     // Durable Object storage values are limited to 2 MB
 const MESSAGE_PATTERN = /^[A-Za-z0-9_-]+$/; // base64url: the relay carries opaque ciphertext only
 
 export class Topic {
@@ -46,6 +48,32 @@ export class Topic {
         return messages.filter((m) => m.time >= since && m.time >= fresh);
     }
 
+    // The AR model for Android Chrome, which can't reach the computer on the home network: the desktop posts it
+    // encrypted (AES-GCM, key only in the AR page's #fragment), the page polls the version and downloads it. A newer
+    // version replaces an older one; posting keeps the topic alive for another TTL.
+    async putBlob(version, bytes) {
+        const meta = await this.ctx.storage.get("blob");
+        if (meta && meta.version >= version) return { version: meta.version, stale: true };
+        const chunks = Math.ceil(bytes.byteLength / BLOB_CHUNK);
+        for (let i = 0; i < chunks; ++i) await this.ctx.storage.put(`blob:${i}`, bytes.slice(i * BLOB_CHUNK, (i + 1) * BLOB_CHUNK));
+        await this.ctx.storage.put("blob", { version, bytes: bytes.byteLength, chunks });
+        await this.ctx.storage.setAlarm(Date.now() + TTL_MS);
+        return { version };
+    }
+
+    async getBlob(withData) {
+        const meta = await this.ctx.storage.get("blob");
+        if (!meta) return null;
+        if (!withData) return { meta };
+        const data = new Uint8Array(meta.bytes);
+        for (let i = 0, at = 0; i < meta.chunks; ++i) {
+            const chunk = new Uint8Array(await this.ctx.storage.get(`blob:${i}`));
+            data.set(chunk, at);
+            at += chunk.byteLength;
+        }
+        return { meta, data };
+    }
+
     async alarm() {
         await this.ctx.storage.deleteAll();
     }
@@ -54,6 +82,14 @@ export class Topic {
     // "cloudflare:workers", which plain Node can't import, and the tests run this file under plain Node.
     async fetch(request) {
         const url = new URL(request.url);
+        if (url.pathname === "/blob") {
+            if (request.method === "POST")
+                return Response.json(await this.putBlob(Number(url.searchParams.get("v")), await request.arrayBuffer()));
+            const blob = await this.getBlob(url.searchParams.has("data"));
+            if (!blob) return Response.json({ error: "no model yet" }, { status: 404 });
+            if (!blob.data) return Response.json(blob.meta);
+            return new Response(blob.data, { headers: { "X-Version": String(blob.meta.version) } });
+        }
         if (request.method === "POST") return Response.json(await this.post(url.searchParams.get("topic"), await request.text()));
         return Response.json(await this.poll(Number(url.searchParams.get("since"))));
     }
@@ -84,6 +120,7 @@ function respond(body, status, origin, type = "application/json") {
     if (origin) {
         headers["Access-Control-Allow-Origin"] = origin;
         headers["Access-Control-Allow-Methods"] = "GET, POST";
+        headers["Access-Control-Expose-Headers"] = "X-Version";
         headers["Access-Control-Max-Age"] = "86400";
         headers["Vary"] = "Origin";
     }
@@ -100,6 +137,32 @@ export default {
         if (request.method === "OPTIONS") return respond(null, 204, origin);
         if (url.pathname === "/" || url.pathname === "/relay" || url.pathname === "/relay/")
             return respond(HOME_PAGE, 200, origin, "text/html; charset=utf-8");
+
+        const blobMatch = url.pathname.match(/^\/blob\/([^/]+)$/);
+        if (blobMatch) {
+            const topic = blobMatch[1];
+            if (!TOPIC_PATTERN.test(topic)) return json({ error: "bad topic" }, 400, origin);
+            const stub = env.TOPICS.get(env.TOPICS.idFromName(topic));
+            if (request.method === "POST") {
+                if (origin) return json({ error: "only SculptForge posts models" }, 403, origin); // not from a page
+                const version = Number(url.searchParams.get("v"));
+                if (!Number.isSafeInteger(version) || version < 1) return json({ error: "bad version" }, 400, origin);
+                if (Number(request.headers.get("Content-Length") ?? "0") > MAX_BLOB_BYTES) return json({ error: "too large" }, 413, origin);
+                const body = await request.arrayBuffer();
+                if (body.byteLength > MAX_BLOB_BYTES) return json({ error: "too large" }, 413, origin);
+                if (body.byteLength < 12 + 16) return json({ error: "not an encrypted model" }, 400, origin);
+                const r = await stub.fetch(new Request(`https://topic/blob?v=${version}`, { method: "POST", body }));
+                return json(await r.json(), 200, origin);
+            }
+            if (request.method !== "GET") return json({ error: "method not allowed" }, 405, origin);
+            const data = url.searchParams.has("data");
+            const r = await stub.fetch(new Request(`https://topic/blob${data ? "?data=1" : ""}`));
+            if (r.status === 404) return json({ error: "no model yet" }, 404, origin);
+            if (!data) return respond(await r.text(), 200, origin);
+            const out = respond(await r.arrayBuffer(), 200, origin, "application/octet-stream");
+            out.headers.set("X-Version", r.headers.get("X-Version"));
+            return out;
+        }
 
         const match = url.pathname.match(/^\/relay\/([^/]+)(\/json)?$/);
         if (!match) return json({ error: "not found" }, 404, origin);

@@ -222,6 +222,7 @@ private:
     HttpResponse serveArModel(bool usdz);
     HttpResponse faceLink(const HttpRequest& request);
     void sendArModelToPage(); // the latest model (or error) to the AR page, if one is connected
+    void uploadArModel();     // the latest model, encrypted, to the relay for the AR page (Android Chrome)
     HttpResponse directAnswer(const HttpRequest& request);
     void relayLoop(std::string topic, std::string key, int64_t sinceUnix);
     std::vector<std::string> relayUrls() const;
@@ -257,6 +258,11 @@ private:
     std::mutex faceLinkMutex_; // createFaceLink
     std::mutex rtcMutex_;      // rtc_: creating / answering the peer connection
     uint64_t arSentVersion_ = 0; // the model version the AR page has (rtcMutex_)
+    // The AR page's copy on the relay (mutex_): Android Chrome can't reach this computer at all, so the model goes
+    // through the internet, encrypted with a key only the page has.
+    std::string arBlobUrl_, arBlobKey_;
+    uint64_t arBlobVersion_ = 0;
+    Clock::time_point arBlobUntil_{};
     std::string faceTransport_;
     bool faceConnected_ = false;
     FaceFrame face_;

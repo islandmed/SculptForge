@@ -830,6 +830,26 @@ void PhoneLink::publishArModel(std::string glb, std::string usdz, std::string su
         }
     }
     sendArModelToPage();
+    uploadArModel();
+}
+
+void PhoneLink::uploadArModel() {
+    std::string url, key, glb;
+    uint64_t version;
+    {
+        std::lock_guard lock(mutex_);
+        if (arBlobUrl_.empty() || arGlb_.empty() || arVersion_ == arBlobVersion_ || Clock::now() > arBlobUntil_) return;
+        url = arBlobUrl_;
+        key = arBlobKey_;
+        glb = arGlb_;
+        version = arBlobVersion_ = arVersion_;
+    }
+    std::thread([url, key, glb = std::move(glb), version] {
+        std::string packed, bytes, error;
+        if (!aesGcmEncrypt(key, glb, packed, error) || !base64UrlDecode(packed, bytes)) return;
+        // The relay keeps the newest version; an older upload finishing late is ignored there.
+        ai::httpRequest("POST", url + "?v=" + std::to_string(version), {"Content-Type: application/octet-stream"}, bytes, 120);
+    }).detach();
 }
 
 void PhoneLink::setArError(std::string error) {
@@ -1065,12 +1085,35 @@ bool PhoneLink::createFaceLink(std::string& faceUrl, std::string& error, bool ar
     // Everything after '#' stays on the phone: the website never sees the offer, the token or the key.
     std::string page = options_.siteUrl;
     if (ar) page = page.substr(0, page.rfind('/') + 1) + "ar.html";
+    // AR: the model also goes through our relay (its /blob/ path), for phones whose browser can't reach this computer.
+    std::string blobUrl;
+    if (ar)
+        for (const std::string& relay : relays)
+            if (const size_t at = relay.rfind("/relay/"); at != std::string::npos && at + 7 == relay.size()) {
+                blobUrl = relay.substr(0, at) + "/blob/" + topic;
+                break;
+            }
     faceUrl = page + "#v=1&k=" + token + "&d=" + percentEncode(desktop) + "&o=" + base64UrlEncode(sdp) +
               "&n=" + percentEncode(options_.desktopName) + "&x=" + base64UrlEncode(key);
     if (ar) {
         char size[32];
         std::snprintf(size, sizeof size, "%g", double(arSizeCm));
         faceUrl += std::string("&m=ar&s=") + (arScope == "scene" ? "scene" : "subtool") + "&z=" + size;
+        std::lock_guard lock(mutex_);
+        arBlobUrl_ = blobUrl;
+        arBlobKey_ = key;
+        arBlobVersion_ = 0;
+        if (!blobUrl.empty()) {
+            faceUrl += "&b=" + percentEncode(blobUrl);
+            // A fresh model for the relay now (over the direct link the page asks for one itself once connected).
+            PhoneEvent e = PhoneEvent::make(PhoneEvent::Type::ArRequested);
+            e.wholeScene = arScope == "scene";
+            e.sizeCm = arSizeCm;
+            pushEvent(e);
+            arBlobUntil_ = Clock::now() + std::chrono::minutes(10);
+            arViewed_ = Clock::now();
+            arViewedEver_ = true;
+        }
     }
     for (const std::string& relay : relays) faceUrl += "&r=" + percentEncode(relay + topic); // the page tries them in order
     if (!relays.empty()) {

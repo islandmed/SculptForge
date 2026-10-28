@@ -654,6 +654,58 @@ TEST(ar_link_sends_the_model_over_webrtc) {
     link.stop();
 }
 
+// Android Chrome may not reach the computer at all: the AR link also carries a relay URL, and each model goes
+// there encrypted with the link's key (only the page can read it).
+TEST(ar_link_uploads_the_model_encrypted_to_the_relay) {
+    if (!webrtcAvailable()) return;
+    std::mutex m;
+    std::vector<std::pair<std::string, std::string>> posted; // query, body
+    HttpServer relay;
+    HttpServer::Options ro;
+    ro.port = 0;
+    ro.bindAddress = "127.0.0.1";
+    std::string err;
+    CHECK(relay.start(ro, [&](const HttpRequest& r) {
+        std::lock_guard lock(m);
+        if (r.method == "POST" && r.path.rfind("/blob/sculptforge-", 0) == 0) posted.emplace_back(r.query, r.body);
+        return HttpResponse::json(200, "{}");
+    }, err));
+    if (ai::httpRequest("GET", "http://127.0.0.1:" + std::to_string(relay.port()) + "/blob/x", {}, {}, 5).status != 200) {
+        relay.stop(); // no HTTP client in this build
+        return;
+    }
+    const fs::path inbox = freshDir("sf_phone_ar_blob");
+    PhoneLinkOptions o = testOptions(inbox);
+    o.relayUrl = "http://127.0.0.1:" + std::to_string(relay.port()) + "/relay/";
+    PhoneLink link;
+    CHECK(link.start(o, err));
+    std::string url;
+    CHECK(link.createFaceLink(url, err, true, "subtool", 20.0f));
+    const std::string fragment = url.substr(url.find('#') + 1);
+    const std::string blobUrl = percentDecode(queryParameter(fragment, "b"));
+    CHECK(blobUrl.rfind("http://127.0.0.1:" + std::to_string(relay.port()) + "/blob/sculptforge-", 0) == 0);
+    std::string key;
+    CHECK(base64UrlDecode(queryParameter(fragment, "x"), key));
+    bool asked = false;
+    for (const PhoneEvent& e : link.takeEvents()) asked = asked || e.type == PhoneEvent::Type::ArRequested;
+    CHECK(asked); // the app makes a fresh model for the page
+    std::string glb = "glTF";
+    for (int i = 0; glb.size() < 200000; ++i) glb += char(i * 37 % 253);
+    link.publishArModel(glb, "usdz", "summary");
+    std::string query, body;
+    for (int i = 0; i < 200 && body.empty(); ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(25));
+        std::lock_guard lock(m);
+        if (!posted.empty()) std::tie(query, body) = posted.front();
+    }
+    CHECK(query == "v=1");
+    std::string plain;
+    CHECK(aesGcmDecrypt(key, base64UrlEncode(body), plain, err));
+    CHECK(plain == glb);
+    link.stop();
+    relay.stop();
+}
+
 // The phone's answer through the relays (services/link-worker's protocol, which ntfy.sh also speaks): the first
 // relay is down, the second, a fake one here, carries the message; the desktop polls both and connects.
 TEST(face_link_answer_through_the_relays) {

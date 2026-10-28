@@ -95,6 +95,7 @@ const token = frag.get("k"), desktop = frag.get("d");
 const desktopName = frag.get("n") || "your computer";
 const scope = frag.get("s") === "scene" ? "scene" : "subtool";
 const sizeCm = Number(frag.get("z")) || 20;
+const blobUrl = frag.get("b"); // the model through our relay, encrypted (for browsers that can't reach the computer)
 history.replaceState(null, "", location.pathname); // keep the secrets out of history
 if (desktop && token) {
   $("back").href = `${desktop}/?k=${encodeURIComponent(token)}`;
@@ -216,16 +217,45 @@ function receive(data) {
     incoming = { version: msg.version, bytes: msg.bytes, summary: msg.summary || "", parts: [], got: 0 };
     if (!shownVersion) { $("waitText").textContent = "Receiving the model..."; $("bar").classList.remove("hidden"); }
   } else if (msg.type === "end" && incoming && incoming.version === msg.version) {
-    const blob = new Blob(incoming.parts, { type: "model/gltf-binary" });
-    const first = !shownVersion;
-    shownVersion = incoming.version;
-    const summary = incoming.summary;
+    showModel(new Blob(incoming.parts, { type: "model/gltf-binary" }), incoming.version, incoming.summary);
     incoming = null;
-    if (modelUrl) URL.revokeObjectURL(modelUrl);
-    modelUrl = URL.createObjectURL(blob);
-    $("mv").src = modelUrl;
-    $("wait").classList.add("hidden");
-    note($("liveMsg"), first ? (summary ? "Ready: " + esc(summary) : "") : "Updated from your sculpt.", first ? "" : "ok");
+  }
+}
+function showModel(blob, version, summary) {
+  const first = !shownVersion;
+  shownVersion = version;
+  if (modelUrl) URL.revokeObjectURL(modelUrl);
+  modelUrl = URL.createObjectURL(blob);
+  $("mv").src = modelUrl;
+  $("wait").classList.add("hidden");
+  note($("liveMsg"), first ? (summary ? "Ready: " + esc(summary) : "") : "Updated from your sculpt.", first ? "" : "ok");
+}
+
+// Through the relay: SculptForge uploads each version encrypted (AES-GCM, iv | ciphertext | tag) with the key from
+// this link; the page checks for a newer one every few seconds. Works whatever network the phone is on.
+async function followRelay() {
+  const key = await crypto.subtle.importKey("raw", b64u.dec(frag.get("x")), "AES-GCM", false, ["decrypt"]);
+  setConn("ok", "Via the internet");
+  $("waitText").textContent = "Preparing the model on your computer...";
+  let failures = 0;
+  for (;;) {
+    try {
+      const r = await fetch(blobUrl, { cache: "no-store" });
+      if (r.ok) {
+        const meta = await r.json();
+        if (meta.version > shownVersion) {
+          if (!shownVersion) { $("waitText").textContent = "Receiving the model..."; }
+          const data = await (await fetch(blobUrl + "?data=1", { cache: "no-store" })).arrayBuffer();
+          const bytes = new Uint8Array(data);
+          const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: bytes.slice(0, 12) }, key, bytes.slice(12));
+          showModel(new Blob([plain], { type: "model/gltf-binary" }), meta.version, "");
+        }
+      } else if (r.status !== 404) throw new Error("HTTP " + r.status);
+      failures = 0;
+    } catch (e) {
+      if (++failures >= 3 && !shownVersion) return false; // no internet: try the direct link
+    }
+    await new Promise((resolve) => setTimeout(resolve, document.hidden ? 8000 : 2500));
   }
 }
 
@@ -262,6 +292,8 @@ if (!token || !frag.get("o")) {
     try { await navigator.clipboard.writeText(fullUrl); $("copy").textContent = "Copied"; }
     catch (e) { prompt("Copy this link:", fullUrl); }
   };
+} else if (blobUrl && await followRelay().catch(() => false) !== false) {
+  // (followRelay runs for as long as the page is open)
 } else {
   // The camera first, as on the face page: until a page may use it, Chrome hides this phone's network address
   // behind a random name the computer can't look up, and a firewall on the computer then keeps the phone's own
