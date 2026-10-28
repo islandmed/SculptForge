@@ -51,23 +51,25 @@ export class Topic {
     // The AR model for Android Chrome, which can't reach the computer on the home network: the desktop posts it
     // encrypted (AES-GCM, key only in the AR page's #fragment), the page polls the version and downloads it. A newer
     // version replaces an older one; posting keeps the topic alive for another TTL.
-    async putBlob(version, bytes) {
-        const meta = await this.ctx.storage.get("blob");
+    // `name` "blob": the encrypted model; "share": a readable copy the AR page posts when the person picks Google's
+    // AR viewer (Scene Viewer), which can only load a model from a public HTTPS address.
+    async putBlob(version, bytes, name = "blob") {
+        const meta = await this.ctx.storage.get(name);
         if (meta && meta.version >= version) return { version: meta.version, stale: true };
         const chunks = Math.ceil(bytes.byteLength / BLOB_CHUNK);
-        for (let i = 0; i < chunks; ++i) await this.ctx.storage.put(`blob:${i}`, bytes.slice(i * BLOB_CHUNK, (i + 1) * BLOB_CHUNK));
-        await this.ctx.storage.put("blob", { version, bytes: bytes.byteLength, chunks });
-        await this.ctx.storage.setAlarm(Date.now() + TTL_MS);
+        for (let i = 0; i < chunks; ++i) await this.ctx.storage.put(`${name}:${i}`, bytes.slice(i * BLOB_CHUNK, (i + 1) * BLOB_CHUNK));
+        await this.ctx.storage.put(name, { version, bytes: bytes.byteLength, chunks });
+        if (name === "blob" || (await this.ctx.storage.getAlarm()) === null) await this.ctx.storage.setAlarm(Date.now() + TTL_MS);
         return { version };
     }
 
-    async getBlob(withData) {
-        const meta = await this.ctx.storage.get("blob");
+    async getBlob(withData, name = "blob") {
+        const meta = await this.ctx.storage.get(name);
         if (!meta) return null;
         if (!withData) return { meta };
         const data = new Uint8Array(meta.bytes);
         for (let i = 0, at = 0; i < meta.chunks; ++i) {
-            const chunk = new Uint8Array(await this.ctx.storage.get(`blob:${i}`));
+            const chunk = new Uint8Array(await this.ctx.storage.get(`${name}:${i}`));
             data.set(chunk, at);
             at += chunk.byteLength;
         }
@@ -82,10 +84,11 @@ export class Topic {
     // "cloudflare:workers", which plain Node can't import, and the tests run this file under plain Node.
     async fetch(request) {
         const url = new URL(request.url);
-        if (url.pathname === "/blob") {
+        if (url.pathname === "/blob" || url.pathname === "/share") {
+            const name = url.pathname.slice(1);
             if (request.method === "POST")
-                return Response.json(await this.putBlob(Number(url.searchParams.get("v")), await request.arrayBuffer()));
-            const blob = await this.getBlob(url.searchParams.has("data"));
+                return Response.json(await this.putBlob(Number(url.searchParams.get("v")), await request.arrayBuffer(), name));
+            const blob = await this.getBlob(url.searchParams.has("data"), name);
             if (!blob) return Response.json({ error: "no model yet" }, { status: 404 });
             if (!blob.data) return Response.json(blob.meta);
             return new Response(blob.data, { headers: { "X-Version": String(blob.meta.version) } });
@@ -119,7 +122,7 @@ function respond(body, status, origin, type = "application/json") {
     const headers = { "Content-Type": type, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
     if (origin) {
         headers["Access-Control-Allow-Origin"] = origin;
-        headers["Access-Control-Allow-Methods"] = "GET, POST";
+        headers["Access-Control-Allow-Methods"] = "GET, POST, HEAD";
         headers["Access-Control-Expose-Headers"] = "X-Version";
         headers["Access-Control-Max-Age"] = "86400";
         headers["Vary"] = "Origin";
@@ -162,6 +165,34 @@ export default {
             const out = respond(await r.arrayBuffer(), 200, origin, "application/octet-stream");
             out.headers.set("X-Version", r.headers.get("X-Version"));
             return out;
+        }
+
+        // A readable copy for Scene Viewer: posted by the AR page (after the person taps Google's AR viewer), read by
+        // Google's app, which fetches it itself. Deleted with the topic, 10 minutes after the first model.
+        const shareMatch = url.pathname.match(/^\/share\/([^/]+)\/model\.glb$/);
+        if (shareMatch) {
+            const topic = shareMatch[1];
+            if (!TOPIC_PATTERN.test(topic)) return json({ error: "bad topic" }, 400, origin);
+            const stub = env.TOPICS.get(env.TOPICS.idFromName(topic));
+            if (request.method === "POST") {
+                if (!origin) return json({ error: "posted by the AR page only" }, 403, origin);
+                const version = Number(url.searchParams.get("v"));
+                if (!Number.isSafeInteger(version) || version < 1) return json({ error: "bad version" }, 400, origin);
+                const body = await request.arrayBuffer();
+                if (body.byteLength > MAX_BLOB_BYTES) return json({ error: "too large" }, 413, origin);
+                if (new TextDecoder().decode(new Uint8Array(body, 0, Math.min(4, body.byteLength))) !== "glTF")
+                    return json({ error: "not a GLB model" }, 400, origin);
+                if (!(await stub.fetch(new Request("https://topic/blob"))).ok) return json({ error: "no model for this link" }, 404, origin);
+                const r = await stub.fetch(new Request(`https://topic/share?v=${version}`, { method: "POST", body }));
+                return json(await r.json(), 200, origin);
+            }
+            if (request.method !== "GET" && request.method !== "HEAD") return json({ error: "method not allowed" }, 405, origin);
+            const r = await stub.fetch(new Request("https://topic/share?data=1"));
+            if (r.status === 404) return json({ error: "no model" }, 404, origin);
+            return new Response(request.method === "HEAD" ? null : await r.arrayBuffer(), {
+                headers: { "Content-Type": "model/gltf-binary", "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*",
+                           "X-Content-Type-Options": "nosniff" },
+            });
         }
 
         const match = url.pathname.match(/^\/relay\/([^/]+)(\/json)?$/);

@@ -73,8 +73,11 @@ footer { text-align:center; color:#6f6f78; font-size:12px; padding:20px 18px 30p
       <div class="wait" id="wait"><div><div id="waitText">Connecting to your computer...</div><div class="bar hidden" id="bar"><b id="barFill"></b></div></div></div>
     </div>
     <div id="liveMsg"></div>
-    <button class="primary hidden" id="enter">Place it in your room</button>
-    <p class="muted small hidden" id="hint" style="margin-top:10px">Move the phone slowly over a table or the floor until it finds the surface, then tap to place. It's shown at real size; pinch to rescale is off so the size stays true.</p>
+    <button class="primary hidden" id="google">View in your room</button>
+    <a class="primary hidden" id="googleOpen" href="#">Open Google's AR viewer</a>
+    <p class="muted small hidden" id="googleNote" style="margin-top:8px">Opens in Google's AR viewer. It can only load a model from the internet, so a readable copy is put on SculptForge's relay at a secret address and deleted within 10 minutes.</p>
+    <button class="secondary hidden" id="enter">Place it with Chrome's AR instead</button>
+    <p class="muted small hidden" id="hint" style="margin-top:10px">Use a well-lit room. Move the phone slowly over a table or the floor until it finds the surface. The model is shown at real size.</p>
     <button class="secondary hidden" id="direct">Connect without internet</button>
   </section>
   <a class="secondary hidden" id="back" href="#">Back to capture</a>
@@ -221,6 +224,32 @@ function receive(data) {
     incoming = null;
   }
 }
+// Google's AR viewer (Scene Viewer), the most dependable AR on Android: it only loads a model from a public HTTPS
+// address, so on request the page posts a readable copy to the relay (deleted with the link) and opens the viewer.
+// Two taps: Chrome only opens another app from a fresh tap, and the upload takes a moment.
+let currentModel = null;
+const shareUrl = blobUrl ? blobUrl.replace("/blob/", "/share/") + "/model.glb" : "";
+$("google").onclick = async () => {
+  if (!currentModel) return;
+  $("google").disabled = true;
+  $("google").textContent = "Preparing...";
+  try {
+    const r = await fetch(`${shareUrl}?v=${shownVersion}`, { method: "POST", body: currentModel });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "HTTP " + r.status);
+    const page = location.href.split("#")[0];
+    $("googleOpen").href = "intent://arvr.google.com/scene-viewer/1.0?file=" + encodeURIComponent(`${shareUrl}?v=${shownVersion}`) +
+      "&mode=ar_preferred&resizable=false&title=" + encodeURIComponent("Your sculpt") +
+      "#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;S.browser_fallback_url=" +
+      encodeURIComponent(page) + ";end;";
+    $("google").classList.add("hidden");
+    $("googleOpen").classList.remove("hidden");
+  } catch (e) {
+    note($("liveMsg"), "Couldn't prepare it: " + esc(e.message || e), "bad");
+  }
+  $("google").disabled = false;
+  $("google").textContent = "View in your room";
+};
+
 // While the camera view is open a new model waits: swapping the model mid-session loses it in WebXR.
 let inAr = false, waiting = null;
 function showModel(blob, version, summary) {
@@ -229,7 +258,13 @@ function showModel(blob, version, summary) {
   shownVersion = version;
   if (modelUrl) URL.revokeObjectURL(modelUrl);
   modelUrl = URL.createObjectURL(blob);
+  currentModel = blob;
   $("mv").src = modelUrl;
+  $("googleOpen").classList.add("hidden");
+  if (shareUrl) {
+    $("google").classList.remove("hidden");
+    $("googleNote").classList.remove("hidden");
+  }
   $("wait").classList.add("hidden");
   note($("liveMsg"), first ? (summary ? "Ready: " + esc(summary) : "") : "Updated from your sculpt.", first ? "" : "ok");
 }

@@ -90,3 +90,21 @@ test("an encrypted AR model: SculptForge posts it, the page reads the version an
     await env.fireAlarms(Date.now() + TTL_MS + 1000);
     assert.equal((await blob("", { headers: { Origin: PAGE } })).status, 404);
 });
+
+test("a readable copy for Google's AR viewer: only the page posts it, only for a live link, anyone with the URL reads it", async () => {
+    const env = fakeEnv();
+    const share = (query = "", init = {}) => worker.fetch(new Request(`${BASE}/share/${TOPIC}/model.glb${query}`, init), env);
+    const glb = new Uint8Array([0x67, 0x6c, 0x54, 0x46, 1, 2, 3, 4, 5, 6, 7, 8]); // "glTF..."
+    assert.equal((await share("?v=1", { method: "POST", body: glb, headers: { Origin: PAGE } })).status, 404); // no link yet
+    await worker.fetch(new Request(`${BASE}/blob/${TOPIC}?v=1`, { method: "POST", body: new Uint8Array(64) }), env);
+    assert.equal((await share("?v=1", { method: "POST", body: glb })).status, 403); // not from the page
+    assert.equal((await share("?v=1", { method: "POST", body: new Uint8Array(40), headers: { Origin: PAGE } })).status, 400);
+    assert.equal((await share("?v=1", { method: "POST", body: glb, headers: { Origin: PAGE } })).status, 200);
+    const got = await share();
+    assert.equal(got.status, 200);
+    assert.equal(got.headers.get("Content-Type"), "model/gltf-binary");
+    assert.equal(got.headers.get("Access-Control-Allow-Origin"), "*");
+    assert.deepEqual(new Uint8Array(await got.arrayBuffer()), glb);
+    await env.fireAlarms(Date.now() + TTL_MS + 1000);
+    assert.equal((await share()).status, 404);
+});

@@ -1085,7 +1085,7 @@ bool PhoneLink::createFaceLink(std::string& faceUrl, std::string& error, bool ar
     // Everything after '#' stays on the phone: the website never sees the offer, the token or the key.
     std::string page = options_.siteUrl;
     // ?v= changes with each page change that SculptForge depends on, so phones don't use a cached older copy.
-    if (ar) page = page.substr(0, page.rfind('/') + 1) + "ar.html?v=4";
+    if (ar) page = page.substr(0, page.rfind('/') + 1) + "ar.html?v=5";
     // AR: the model also goes through our relay (its /blob/ path), for phones whose browser can't reach this computer.
     std::string blobUrl;
     if (ar)
