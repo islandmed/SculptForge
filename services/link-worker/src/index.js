@@ -49,6 +49,14 @@ export class Topic {
     async alarm() {
         await this.ctx.storage.deleteAll();
     }
+
+    // The Worker reaches a topic through fetch, not RPC: RPC needs `extends DurableObject` from
+    // "cloudflare:workers", which plain Node can't import, and the tests run this file under plain Node.
+    async fetch(request) {
+        const url = new URL(request.url);
+        if (request.method === "POST") return Response.json(await this.post(url.searchParams.get("topic"), await request.text()));
+        return Response.json(await this.poll(Number(url.searchParams.get("since"))));
+    }
 }
 
 function allowedOrigin(request, env) {
@@ -86,13 +94,14 @@ export default {
         const [, topic, poll] = match;
         if (!TOPIC_PATTERN.test(topic)) return json({ error: "bad topic" }, 400, origin);
         const stub = env.TOPICS.get(env.TOPICS.idFromName(topic));
+        const call = async (query, init) => (await stub.fetch(new Request(`https://topic/?${query}`, init))).json();
 
         if (poll) {
             if (request.method !== "GET") return json({ error: "method not allowed" }, 405, origin);
             const sinceText = url.searchParams.get("since") ?? "0";
             const since = sinceText === "all" ? 0 : Number(sinceText);
             if (!Number.isFinite(since)) return json({ error: "bad since" }, 400, origin);
-            const messages = await stub.poll(since);
+            const messages = await call(`since=${since}`);
             return respond(messages.map((m) => JSON.stringify(m) + "\n").join(""), 200, origin, "application/x-ndjson");
         }
 
@@ -102,7 +111,7 @@ export default {
         const message = (await request.text()).trim();
         if (message.length > MAX_MESSAGE_BYTES) return json({ error: "too large" }, 413, origin);
         if (!MESSAGE_PATTERN.test(message)) return json({ error: "the message must be base64url" }, 400, origin);
-        const result = await stub.post(topic, message);
+        const result = await call(`topic=${topic}`, { method: "POST", body: message });
         if (result.error) return json({ error: "too many messages for this topic" }, 429, origin);
         return json({ id: result.id, time: result.time, event: "message", topic }, 200, origin);
     },
