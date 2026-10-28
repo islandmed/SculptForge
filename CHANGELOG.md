@@ -6,6 +6,25 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-10-28
+
+View in AR on Android works again, through the website instead of Google's viewer being handed a home-network
+address.
+
+### Fixed
+- Android View in AR: it handed Google's Scene Viewer the model's address on your computer, which Scene Viewer
+  can't load (it only takes public HTTPS addresses), so the phone just downloaded the file. It now opens an AR page
+  on sculptforge.app in Chrome. The model goes there encrypted through SculptForge's relay (link.sculptforge.app;
+  the key is only in the link, the copy is deleted after 10 minutes), so it also works on phones whose Chrome can't
+  reach the home network at all; without internet it comes straight over the Wi-Fi link instead. Show it with
+  Chrome's AR, or with Google's AR viewer, which needs a readable copy on the relay (only when you choose it, also
+  deleted after 10 minutes). It updates by itself as you sculpt. From Firefox, the page offers Open in Chrome
+  (Firefox has no AR).
+- Phone link (face capture, AR): one network port for everything (the page's port, now for UDP too), so a firewall
+  needs one rule: allow the port for TCP and UDP from your home network (the window and the guide say how).
+  `SCULPTFORGE_RTC_LOG=1` (or `2` for every packet) logs the connection for troubleshooting.
+
+
 ## [0.9.1] - 2026-10-27
 
 Help for phone capture when the phone can't open the page, and bigger text in the guide and the update banner.
@@ -791,7 +810,8 @@ First public release.
 - Rez package (`packaging/rez`).
 - Headless thumbnail/turntable rendering and scripted demo recording.
 
-[Unreleased]: https://github.com/islandmed/SculptForge/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/islandmed/SculptForge/compare/v0.9.2...HEAD
+[0.9.2]: https://github.com/islandmed/SculptForge/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/islandmed/SculptForge/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/islandmed/SculptForge/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/islandmed/SculptForge/compare/v0.8.0...v0.8.1

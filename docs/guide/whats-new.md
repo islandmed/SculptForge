@@ -5,6 +5,20 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.9.2
+
+### View in AR on Android
+
+On Android, **View in AR** used to just download a file. It now opens an AR page in **Chrome**: your sculpt comes
+to it encrypted through SculptForge's relay, so it works even when Chrome can't reach your computer, and it updates
+as you sculpt. Show it with Chrome's AR or with Google's AR viewer. If the capture page is open in Firefox, tap
+**Open in Chrome**. See [Phone capture and AR](phone-capture.md).
+
+### One port for the phone link
+
+Face capture and AR now use the same network port as the capture page. On Linux with a firewall, allow that port
+for both TCP and UDP from your home network.
+
 ## Version 0.9.1
 
 Fixes from the first day of 0.9.
