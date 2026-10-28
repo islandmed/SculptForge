@@ -1,10 +1,10 @@
-# Every hour: GitHub release download totals -> a per-day history for the stats page (sculptforge.app/stats/),
+# Every hour (at :41; GitHub delays schedules at busy minutes): GitHub release download totals -> a per-day history for the stats page (sculptforge.app/stats/),
 # by tools/download-stats.py. counts.json (last totals) and history.json live on the download-stats branch.
 name: Download stats
 
 on:
   schedule:
-    - cron: "17 * * * *"
+    - cron: "41 * * * *"
   workflow_dispatch:
 
 permissions:
