@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>A free Mudbox alternative, still in development - SculptForge</title>
+  <meta name="description" content="Autodesk ends Mudbox sales on 7 November 2026. SculptForge is a free, open-source replacement with subdivision levels, sculpt layers, texture painting with paint layers, normal and displacement baking and Maya-friendly FBX and USD, on Windows, macOS and Linux.">
+  <meta name="theme-color" content="#111114">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" type="image/svg+xml" href="img/favicon.svg?v=2">
+  <link rel="icon" type="image/png" href="img/favicon-64.png?v=2">
+  <link rel="apple-touch-icon" href="img/icon-256.png?v=2">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="A free Mudbox alternative: SculptForge">
+  <meta property="og:description" content="Mudbox sales end on 7 November 2026. SculptForge keeps the Mudbox way of working: subdivision levels, sculpt layers, paint layers, baking, FBX and USD. Free and open source.">
+  <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=3">
+  <meta property="og:url" content="https://sculptforge.app/mudbox-alternative.html">
+  <link rel="canonical" href="https://sculptforge.app/mudbox-alternative.html">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="style.css?v=17">
+  <script src="motion.js?v=10" defer></script>
+  <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+  <script type="application/ld+json">
+  {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [
+    {"@type": "Question", "name": "Is Mudbox being discontinued?",
+     "acceptedAnswer": {"@type": "Answer", "text": "Autodesk ends new Mudbox subscription sales on 7 November 2026, and Mudbox releases since 2019 have added no new features."}},
+    {"@type": "Question", "name": "Is there a free alternative to Mudbox?",
+     "acceptedAnswer": {"@type": "Answer", "text": "SculptForge is free and open source (GPL-3.0) for Windows, macOS and Linux. It has subdivision levels, sculpt layers, texture painting with paint layers and blend modes, normal and displacement baking, quad retopology, and FBX, USD and OBJ with UVs for Maya and game engines."}},
+    {"@type": "Question", "name": "Can SculptForge open Mudbox files?",
+     "acceptedAnswer": {"@type": "Answer", "text": "Not .mud files. Export from Mudbox as FBX or OBJ (and your textures as PNG or PSD) and open those; Reconstruct Subdiv rebuilds the lower subdivision levels of a dense mesh."}}
+  ]}
+  </script>
+</head>
+<body>
+  <div class="scroll-progress" aria-hidden="true"></div>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="index.html"><img src="img/logo.svg?v=2" alt="" width="34" height="34"><span>SculptForge</span></a>
+      <nav aria-label="Main">
+        <a href="index.html#features">Features</a>
+        <a href="index.html#demos">Demos</a>
+        <a href="brushes.html">Brushes</a>
+        <a href="guide/index.html">Guide</a>
+        <a class="nav-dl" href="index.html#download">Download</a>
+        <a class="gh" href="https://github.com/islandmed/SculptForge">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="wrap">
+        <p class="eyebrow">Mudbox alternative</p>
+        <h1>Mudbox is ending. <span class="accent">Keep sculpting, for free.</span></h1>
+        <p class="lede">Autodesk ends new Mudbox subscription sales on <strong>7 November 2026</strong>, and Mudbox
+          hasn't had a new feature since 2019. SculptForge is a free, open-source sculpting app that keeps the way
+          Mudbox users work: subdivision levels, sculpt layers, painting on textures with layers, and baking maps
+          for Maya and game engines. It runs natively on Windows, macOS and Linux, and it's updated every few
+          days.</p>
+        <div class="ctas">
+          <a class="btn primary" href="index.html#download">Download free</a>
+          <a class="btn" href="#compare">Compare with Mudbox</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt">
+      <div class="wrap">
+        <h2>What you keep from Mudbox</h2>
+        <p class="section-lede">The parts of Mudbox people actually use every day, and where to find them in
+          SculptForge.</p>
+        <div class="grid">
+          <article class="card">
+            <h3>Subdivision levels</h3>
+            <p>Divide, step up and down between levels, and sculpt big shapes low and pores high; changes carry to
+              every level. Reconstruct Subdiv rebuilds the lower levels of a dense mesh you exported.
+              <a href="guide/subdivision-levels.html">Subdivision levels</a></p>
+          </article>
+          <article class="card">
+            <h3>Sculpt layers</h3>
+            <p>Sculpt into layers with a weight slider, preview them on and off, and keep them on any subdivision
+              level. Layers export as blend shapes to FBX and USD. <a href="guide/layers.html">Sculpt layers</a></p>
+          </article>
+          <article class="card">
+            <h3>Paint layers on textures</h3>
+            <p>Auto UV in one click, then paint a 1K to 8K texture with layers, blend modes, opacity and locks,
+              like Mudbox and Photoshop. Import PNG, JPEG, TGA or PSD. <a href="guide/texture-painting.html">Texture
+              painting</a></p>
+          </article>
+          <article class="card">
+            <h3>Normal and displacement maps</h3>
+            <p>Bake normal, displacement (PNG and 32-bit EXR), ambient occlusion and cavity maps from the high-res
+              sculpt onto a low-poly mesh. <a href="guide/baking.html">Baking</a></p>
+          </article>
+          <article class="card">
+            <h3>Clean quads</h3>
+            <p>QRemesh turns any sculpt into clean quads, with guides for where the edge loops go, and ProjectAll
+              carries the detail back. <a href="guide/retopology.html">Retopology</a></p>
+          </article>
+          <article class="card">
+            <h3>Maya-friendly files</h3>
+            <p>OBJ, FBX and USD in and out, with quads, UVs and blend shapes kept. Choose Turntable rotation in
+              Preferences to orbit the way Maya does. <a href="guide/exporting.html">Exporting</a></p>
+          </article>
+          <article class="card">
+            <h3>Linux, including Rocky and RHEL</h3>
+            <p>Native builds for Windows, macOS and every major Linux, plus VFX Reference Platform CY2026 and CY2027
+              builds for studio pipelines. <a href="guide/studios.html">For studios</a></p>
+          </article>
+          <article class="card">
+            <h3>Free, for good</h3>
+            <p>No subscription and no account. SculptForge is GPL open source: nobody can take it away, and you own
+              everything you make, commercial work included.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="compare">
+      <div class="wrap">
+        <h2>SculptForge and Mudbox side by side</h2>
+        <div class="table-wrap">
+          <table class="compare">
+            <thead><tr><th></th><th>SculptForge</th><th>Mudbox</th></tr></thead>
+            <tbody>
+              <tr><td>Price</td><td class="yes">Free</td><td>Subscription, sales end 7 Nov 2026</td></tr>
+              <tr><td>Still being developed</td><td class="yes">Yes, weekly releases</td><td>No new features since 2019</td></tr>
+              <tr><td>Windows / macOS / Linux</td><td class="yes">All three</td><td>Windows, macOS, RHEL / Rocky</td></tr>
+              <tr><td>Subdivision levels</td><td class="yes">Yes</td><td>Yes</td></tr>
+              <tr><td>Sculpt layers</td><td class="yes">Yes</td><td>Yes</td></tr>
+              <tr><td>Paint layers with blend modes</td><td class="yes">Yes</td><td>Yes</td></tr>
+              <tr><td>Texture channels</td><td>One colour texture per object</td><td>Many (diffuse, specular, gloss...)</td></tr>
+              <tr><td>UDIMs / Ptex</td><td>Not yet</td><td>Yes</td></tr>
+              <tr><td>Quad retopology</td><td class="yes">QRemesh with guides</td><td>Retopology tools</td></tr>
+              <tr><td>Normal / displacement baking</td><td class="yes">Yes (EXR)</td><td>Yes</td></tr>
+              <tr><td>Send to Unreal</td><td class="yes">Built in</td><td>FBX export</td></tr>
+              <tr><td>Image or text to 3D, phone scanning</td><td class="yes">Built in, free</td><td>No</td></tr>
+              <tr><td>Open source</td><td class="yes">GPL-3.0</td><td>No</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt">
+      <div class="wrap">
+        <h2>Bring your Mudbox work over</h2>
+        <div class="grid">
+          <article class="card">
+            <h3>1. Export from Mudbox</h3>
+            <p>Export the mesh as FBX or OBJ. For a model with levels, export the highest level, or every level as
+              its own OBJ.</p>
+          </article>
+          <article class="card">
+            <h3>2. Open in SculptForge</h3>
+            <p>File &gt; Open, or drop the file on the window. Quads and UVs come through. Tool &gt; Geometry &gt;
+              Reconstruct Subdiv rebuilds the lower levels.</p>
+          </article>
+          <article class="card">
+            <h3>3. Bring the textures</h3>
+            <p>Export your paint layers from Mudbox as PNG or PSD and load them with Tool &gt; Texture Map &gt;
+              Import Texture, then keep painting in layers.</p>
+          </article>
+          <article class="card">
+            <h3>4. Feel at home</h3>
+            <p>Set Preferences &gt; Interface &gt; Rotation to Turntable for Maya-style orbiting. The
+              <a href="guide/index.html">User Guide</a> is in the app under Help.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap faq">
+        <h2>Honest answers</h2>
+        <details open><summary>What can't SculptForge do yet that Mudbox can?</summary>
+          <p>It can't open .mud files (export FBX or OBJ instead). Each object has one colour texture rather than
+            separate specular, gloss or other channels. UVs outside the 0 to 1 square (UDIMs) aren't painted, and
+            there's no Ptex or painting through image stencils yet. If one of these stops you, tell us at
+            <a href="mailto:hello@sculptforge.app">hello@sculptforge.app</a>: it helps us decide what comes
+            next.</p></details>
+        <details><summary>Is it really free for commercial work?</summary>
+          <p>Yes. SculptForge is free under the GPL-3.0 and you own everything you make with it. The licence covers
+            the program, not your models.</p></details>
+        <details><summary>Will my Mudbox keep working?</summary>
+          <p>Autodesk stops selling new Mudbox subscriptions on 7 November 2026. What happens to a subscription you
+            already have is Autodesk's decision, so check your Autodesk account. SculptForge doesn't depend on
+            Mudbox, so you can try it alongside.</p></details>
+        <details><summary>Is it like ZBrush instead?</summary>
+          <p>The interface follows ZBrush's palettes and keys, because many sculptors know them. Mudbox users
+            mostly need the Maya-style orbit (above), the brush picker (B) and the Layers sub-palette. The
+            <a href="guide/navigation.html">navigation guide</a> covers the rest.</p></details>
+      </div>
+    </section>
+
+    <section class="section alt">
+      <div class="wrap">
+        <h2>Try it before your Mudbox runs out</h2>
+        <p class="section-lede">Free for Windows 10 and 11, macOS 11 and later, and Linux.</p>
+        <div class="ctas">
+          <a class="btn primary" href="index.html#download">Download SculptForge</a>
+          <a class="btn" href="guide/index.html">Read the guide</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-grid">
+      <div>
+        <a class="brand" href="index.html"><img src="img/logo.svg?v=2" alt="" width="28" height="28"><span>SculptForge</span></a>
+        <p class="fine">Copyright © 2026 The SculptForge contributors. SculptForge is licensed under the
+          <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
+      </div>
+      <div class="links">
+        <a href="guide/index.html">User Guide</a>
+        <a href="brushes.html">Community brushes</a>
+        <a href="https://github.com/islandmed/SculptForge">Source code</a>
+      </div>
+      <p class="fine trademarks">SculptForge is an independent project, not affiliated with or endorsed by Autodesk or
+        Maxon. Mudbox and Maya are trademarks of Autodesk; ZBrush is a trademark of Maxon. The site uses no cookies.
+        Visits are counted anonymously with <a href="https://www.goatcounter.com/">GoatCounter</a>.</p>
+    </div>
+  </footer>
+</body>
+</html>
