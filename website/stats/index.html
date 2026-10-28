@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>SculptForge Downloads</title>
+  <!-- Unlisted maintainer page: GitHub release downloads by day. Data: history.json on the download-stats
+       branch, kept hourly by tools/download-stats.py (.github/workflows/download-stats.yml). -->
+  <style>
+    @font-face { font-family: "Inter"; src: url("../fonts/Inter-Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+    @font-face { font-family: "Inter"; src: url("../fonts/Inter-SemiBold.ttf") format("truetype"); font-weight: 600 700; font-display: swap; }
+    :root {
+      color-scheme: dark;
+      --bg: #0f0f12; --panel: #1b1b21; --border: #2a2a31; --grid: #24242b;
+      --text: #ececf1; --muted: #a3a3ad; --accent: #f28c3c; --accent-2: #ffb06a;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text);
+           font: 400 16px/1.5 "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    main { max-width: 960px; margin: 0 auto; padding: 32px 16px 64px; }
+    h1 { font-size: 1.9rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+    h2 { font-size: 1.1rem; margin: 0 0 12px; }
+    a { color: var(--accent-2); }
+    .muted { color: var(--muted); }
+    .small { font-size: 0.85rem; }
+    .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 24px 0; }
+    .tile { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+    .tile .label { color: var(--muted); font-size: 0.9rem; }
+    .tile .value { font-size: 2.4rem; font-weight: 700; line-height: 1.1; margin: 4px 0; font-variant-numeric: tabular-nums; }
+    .tile .sub { color: var(--muted); font-size: 0.8rem; }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    .chart { position: relative; height: 200px; display: flex; align-items: flex-end; gap: 2px;
+             border-bottom: 1px solid var(--border); padding-top: 20px; }
+    .bar { flex: 1 1 0; max-width: 48px; display: flex; align-items: flex-end; height: 100%; cursor: default; }
+    .bar i { display: block; width: 100%; background: var(--accent); border-radius: 4px 4px 0 0; min-height: 2px; }
+    .bar:hover i, .bar:focus i { background: var(--accent-2); }
+    .axis { display: flex; justify-content: space-between; color: var(--muted); font-size: 0.75rem; margin-top: 6px; }
+    .tip { position: absolute; pointer-events: none; background: #000; border: 1px solid var(--border); border-radius: 8px;
+           padding: 6px 10px; font-size: 0.85rem; white-space: nowrap; transform: translate(-50%, -100%); display: none; }
+    .seg { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+    .seg button { background: transparent; color: var(--text); border: 1px solid var(--border); border-radius: 999px;
+                  padding: 6px 14px; font: inherit; font-size: 0.9rem; cursor: pointer; }
+    .seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #111; font-weight: 600; }
+    .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+    th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--grid); font-size: 0.92rem; }
+    th { color: var(--muted); font-weight: 400; }
+    td.n, th.n { text-align: right; }
+    td.file { word-break: break-all; }
+    .err { color: #ff8a80; }
+    @media (max-width: 720px) {
+      .tiles { grid-template-columns: repeat(2, 1fr); }
+      .cols { grid-template-columns: 1fr; }
+      .tile .value { font-size: 2rem; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Downloads</h1>
+  <p class="muted small" id="status">Loading…</p>
+
+  <div class="tiles" id="tiles"></div>
+
+  <section class="card">
+    <h2>App downloads per day</h2>
+    <div class="chart" id="chart" role="img" aria-label="App downloads per day"><div class="tip" id="tip"></div></div>
+    <div class="axis" id="axis"></div>
+  </section>
+
+  <section class="card">
+    <div class="seg" id="seg" role="group" aria-label="Period">
+      <button data-p="today" aria-pressed="true">Today</button>
+      <button data-p="yesterday" aria-pressed="false">Yesterday</button>
+      <button data-p="week" aria-pressed="false">Last 7 days</button>
+      <button data-p="all" aria-pressed="false">All time</button>
+    </div>
+    <div class="cols">
+      <div><h2>By platform</h2><table id="by-platform"></table></div>
+      <div><h2>By version</h2><table id="by-version"></table></div>
+    </div>
+    <h2 style="margin-top:20px">By file</h2>
+    <table id="by-file"></table>
+  </section>
+
+  <p class="muted small">Counts are GitHub release downloads (checksum files left out), refreshed every hour; "today"
+    is Pacific time. A download is not an install: someone who grabs two formats counts twice. Days are known from
+    <span id="since"></span>; earlier downloads are in "All time" only.</p>
+</main>
+<script>
+const DATA = "https://raw.githubusercontent.com/islandmed/SculptForge/download-stats/history.json";
+const ZONE = "America/Vancouver";
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => n.toLocaleString("en-US");
+
+function platform(file) {
+  if (/bridge/i.test(file)) return "Blender add-on";
+  if (/ZToolExport/i.test(file)) return "ZBrush plug-in";
+  if (/windows|\.exe$/i.test(file)) return "Windows";
+  if (/darwin|macos|\.dmg$/i.test(file)) return "macOS";
+  return "Linux";
+}
+const isApp = (file) => ["Windows", "macOS", "Linux"].includes(platform(file));
+
+function dayString(d) { return new Intl.DateTimeFormat("en-CA", { timeZone: ZONE }).format(d); } // YYYY-MM-DD
+function addDays(day, n) { const d = new Date(day + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+function label(day, opts = { month: "short", day: "numeric" }) {
+  return new Date(day + "T12:00:00Z").toLocaleDateString("en-US", { ...opts, timeZone: "UTC" });
+}
+
+// Rows of [key, count] for a period: key is "<tag>/<file>".
+function rows(h, period) {
+  const today = dayString(new Date());
+  const days = { today: [today], yesterday: [addDays(today, -1)],
+                 week: [...Array(7)].map((_, i) => addDays(today, -i)), all: Object.keys(h.days) }[period];
+  const sum = new Map();
+  const add = (obj) => { for (const [k, n] of Object.entries(obj || {})) sum.set(k, (sum.get(k) || 0) + n); };
+  days.forEach((d) => add(h.days[d]));
+  if (period === "all") add(h.before);
+  return [...sum];
+}
+const appTotal = (rs) => rs.filter(([k]) => isApp(k)).reduce((s, [, n]) => s + n, 0);
+const otherTotal = (rs) => rs.filter(([k]) => !isApp(k)).reduce((s, [, n]) => s + n, 0);
+
+function table(el, head, list) {
+  el.replaceChildren();
+  const tr = (cells, tag) => { const r = document.createElement("tr");
+    cells.forEach((c, i) => { const td = document.createElement(tag); td.textContent = c;
+      if (i === cells.length - 1) td.className = "n"; else if (head[0] === "File") td.className = "file"; r.append(td); });
+    return r; };
+  el.append(tr(head, "th"));
+  if (!list.length) { el.append(tr(["Nothing yet", ""], "td")); return; }
+  list.forEach((cells) => el.append(tr(cells, "td")));
+}
+
+function group(rs, keyOf) {
+  const m = new Map();
+  for (const [k, n] of rs) { const g = keyOf(k); m.set(g, (m.get(g) || 0) + n); }
+  return [...m].sort((a, b) => b[1] - a[1]).map(([g, n]) => [g, fmt(n)]);
+}
+
+function render(h) {
+  // A period that starts before tracking began is partly unknown: say so rather than show a 0.
+  const tracked = dayString(new Date(h.tracking_since)), today0 = dayString(new Date());
+  const starts = { today: today0, yesterday: addDays(today0, -1), week: addDays(today0, -6), all: null };
+  const tiles = [["Today", "today"], ["Yesterday", "yesterday"], ["Last 7 days", "week"], ["All time", "all"]];
+  $("tiles").replaceChildren(...tiles.map(([name, p]) => {
+    const rs = rows(h, p), t = document.createElement("div");
+    t.className = "tile";
+    t.innerHTML = `<div class="label"></div><div class="value"></div><div class="sub"></div>`;
+    t.children[0].textContent = name;
+    const o = otherTotal(rs), early = starts[p] && starts[p] < tracked;
+    if (p === "yesterday" && early) {
+      t.children[1].textContent = "—";
+      t.children[2].textContent = `not tracked yet (began ${label(tracked)})`;
+    } else {
+      t.children[1].textContent = fmt(appTotal(rs));
+      t.children[2].textContent = (early ? `since ${label(tracked)} · ` : "") + "app downloads" + (o ? ` · +${fmt(o)} add-ons` : "");
+    }
+    return t;
+  }));
+
+  // Chart: every day since tracking began (at most the last 60), app downloads.
+  const today = dayString(new Date());
+  let first = Object.keys(h.days).sort()[0] || today;
+  if (first < addDays(today, -59)) first = addDays(today, -59);
+  const days = []; for (let d = first; d <= today; d = addDays(d, 1)) days.push(d);
+  const values = days.map((d) => appTotal(Object.entries(h.days[d] || {})));
+  const max = Math.max(1, ...values);
+  const chart = $("chart"), tip = $("tip");
+  chart.querySelectorAll(".bar").forEach((b) => b.remove());
+  days.forEach((d, i) => {
+    const b = document.createElement("div"), fill = document.createElement("i");
+    b.className = "bar"; b.tabIndex = 0;
+    b.setAttribute("aria-label", `${label(d)}: ${values[i]} app downloads`);
+    fill.style.height = (values[i] / max * 100) + "%";
+    b.append(fill);
+    const show = () => { tip.textContent = `${label(d, { weekday: "short", month: "short", day: "numeric" })}: ${fmt(values[i])}`;
+      tip.style.display = "block"; tip.style.left = (b.offsetLeft + b.offsetWidth / 2) + "px";
+      tip.style.top = (b.offsetTop + b.offsetHeight - fill.offsetHeight - 6) + "px"; };
+    b.addEventListener("mouseenter", show); b.addEventListener("focus", show);
+    b.addEventListener("mouseleave", () => tip.style.display = "none"); b.addEventListener("blur", () => tip.style.display = "none");
+    chart.append(b);
+  });
+  $("axis").replaceChildren(...[days[0], days.length > 1 ? days[days.length - 1] : null].filter(Boolean)
+    .map((d) => Object.assign(document.createElement("span"), { textContent: label(d) })));
+
+  const period = document.querySelector('#seg [aria-pressed="true"]').dataset.p;
+  const rs = rows(h, period);
+  table($("by-platform"), ["Platform", "Downloads"], group(rs, (k) => platform(k)));
+  table($("by-version"), ["Version", "Downloads"], group(rs, (k) => k.split("/")[0].replace(/^v/, "")));
+  table($("by-file"), ["File", "Downloads"],
+        rs.sort((a, b) => b[1] - a[1]).slice(0, 25).map(([k, n]) => [k.replace("/", "  "), fmt(n)]));
+
+  const ago = Math.round((Date.now() - Date.parse(h.updated)) / 60000);
+  $("status").textContent = `GitHub release downloads · updated ${ago < 1 ? "just now" : ago + " min ago"}`;
+  $("since").textContent = label(dayString(new Date(h.tracking_since)), { month: "long", day: "numeric", year: "numeric" });
+}
+
+let history = null;
+$("seg").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b || !history) return;
+  document.querySelectorAll("#seg button").forEach((x) => x.setAttribute("aria-pressed", x === b));
+  render(history);
+});
+async function load() {
+  try {
+    const r = await fetch(DATA + "?t=" + Math.floor(Date.now() / 300000), { cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    history = await r.json();
+    render(history);
+  } catch (e) {
+    $("status").innerHTML = `<span class="err">Couldn't load the numbers (${e.message}).</span> Try again in a minute.`;
+  }
+}
+load();
+setInterval(load, 10 * 60 * 1000);
+</script>
+</body>
+</html>

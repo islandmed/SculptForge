@@ -1,16 +1,11 @@
-# Every hour: new GitHub release downloads -> GoatCounter events "github download: <file> (<version>)"
-# (tools/download-stats.py). The last totals are kept in counts.json on the download-stats branch.
+# Every hour: GitHub release download totals -> a per-day history for the stats page (sculptforge.app/stats/),
+# by tools/download-stats.py. counts.json (last totals) and history.json live on the download-stats branch.
 name: Download stats
 
 on:
   schedule:
     - cron: "17 * * * *"
   workflow_dispatch:
-    inputs:
-      backfill:
-        description: "Date new downloads at their release's publish time (on a first run: send every download so far)"
-        type: boolean
-        default: false
 
 permissions:
   contents: write
@@ -27,22 +22,23 @@ jobs:
         with:
           sparse-checkout: tools/download-stats.py
           sparse-checkout-cone-mode: false
-      - name: Saved totals
+      - name: Saved totals and history
         run: |
+          mkdir -p "$RUNNER_TEMP/state"
           if git fetch --depth=1 origin download-stats 2>/dev/null; then
-            git show FETCH_HEAD:counts.json > "$RUNNER_TEMP/counts.json"
+            for f in counts.json history.json; do
+              git show "FETCH_HEAD:$f" > "$RUNNER_TEMP/state/$f" 2>/dev/null || rm -f "$RUNNER_TEMP/state/$f"
+            done
           fi
-      - name: Send new downloads to GoatCounter
+      - name: Count new downloads
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          GOATCOUNTER_KEY: ${{ secrets.GOATCOUNTER_KEY }}
-        run: python3 tools/download-stats.py --state "$RUNNER_TEMP/counts.json" ${{ inputs.backfill && '--backfill' || '' }}
-      - name: Save totals
+        run: python3 tools/download-stats.py --dir "$RUNNER_TEMP/state"
+      - name: Save
         run: |
-          cd "$RUNNER_TEMP" && rm -rf state && mkdir state && cd state
+          cd "$RUNNER_TEMP/state"
           git init -q -b download-stats
-          cp ../counts.json .
-          git add counts.json
+          git add counts.json history.json
           git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
             commit -qm "Download totals $(date -u +%FT%RZ)"
           git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" download-stats

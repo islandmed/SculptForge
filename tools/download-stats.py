@@ -1,108 +1,106 @@
 #!/usr/bin/env python3
-"""Copy GitHub release downloads into GoatCounter, so the dashboard shows every download, not only clicks on the
-website's buttons (most people download straight from GitHub, Reddit links or package managers).
+"""Keep a per-day history of GitHub release downloads for the stats page (website/stats/).
 
-GitHub keeps only an all-time total per release file. This compares the totals with the ones saved last run and
-sends each new download to GoatCounter as an event "github download: <file> (<version>)", next to the website's
-"download: <file>" click events. Run hourly by .github/workflows/download-stats.yml; the totals live in a JSON file
-on the download-stats branch.
+GitHub keeps only an all-time total per release file. Run hourly by .github/workflows/download-stats.yml, this
+compares the totals with the ones saved last run and adds the difference to today's entry (Pacific time) in
+history.json, which lives on the download-stats branch next to counts.json (the last totals).
 
-    GOATCOUNTER_KEY=... python3 tools/download-stats.py --state counts.json [--dry-run] [--backfill]
+    python3 tools/download-stats.py --dir <folder with counts.json / history.json> [--dry-run]
 
---backfill: dates the new downloads at their release's publish time instead of now. On a first run (no saved
-totals) it sends every download so far; without it the first run only saves the totals.
+history.json:
+    {"updated": "<UTC time>", "tracking_since": "<UTC time>",
+     "before": {"<tag>/<file>": n},          downloads before tracking began, by file (dates unknown)
+     "days": {"YYYY-MM-DD": {"<tag>/<file>": n}}}
+When history.json is first created, downloads of releases published today are counted as today's (they can only
+have happened today); everything older goes to "before".
 """
 import argparse
 import json
 import os
-import secrets
-import sys
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 REPO = "islandmed/SculptForge"
-GOATCOUNTER = "https://sculptforge.goatcounter.com/api/v0/count"
+ZONE = ZoneInfo("America/Vancouver")
 SKIP = {"SHA256SUMS.txt"}  # checksums are not a download of the app
 
 
-def api(url, token=None, data=None):
-    headers = {"Accept": "application/json", "User-Agent": "sculptforge-download-stats"}
+def get(url, token=None):
+    headers = {"Accept": "application/vnd.github+json", "User-Agent": "sculptforge-download-stats"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
-    if data is not None:
-        headers["Content-Type"] = "application/json"
-        data = json.dumps(data).encode()
     try:
-        with urllib.request.urlopen(urllib.request.Request(url, data=data, headers=headers), timeout=60) as r:
-            return json.load(r) if r.status != 202 else None
+        with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=60) as r:
+            return json.load(r)
     except urllib.error.HTTPError as e:
-        sys.exit(f"{url}: HTTP {e.code}: {e.read().decode(errors='replace')[:500]}")
+        raise SystemExit(f"{url}: HTTP {e.code}: {e.read().decode(errors='replace')[:500]}")
 
 
-def release_totals(github_token):
-    """{"<tag>/<file>": {"count", "version", "file", "published"}} for every release file."""
-    totals, page = {}, 1
-    while True:
-        releases = api(f"https://api.github.com/repos/{REPO}/releases?per_page=100&page={page}", github_token)
-        if not releases:
-            return totals
+def release_files(token):
+    """{"<tag>/<file>": (count, published_at)} for every published release file."""
+    files, page = {}, 1
+    while releases := get(f"https://api.github.com/repos/{REPO}/releases?per_page=100&page={page}", token):
         for rel in releases:
             if rel["draft"]:
                 continue
             for asset in rel["assets"]:
-                if asset["name"] in SKIP:
-                    continue
-                totals[f"{rel['tag_name']}/{asset['name']}"] = {
-                    "count": asset["download_count"],
-                    "version": rel["tag_name"].lstrip("v"),
-                    "file": asset["name"],
-                    "published": rel["published_at"],
-                }
+                if asset["name"] not in SKIP:
+                    files[f"{rel['tag_name']}/{asset['name']}"] = (asset["download_count"], rel["published_at"])
         page += 1
+    return files
+
+
+def load(path, default):
+    return json.load(open(path)) if os.path.exists(path) else default
+
+
+def save(path, value):
+    with open(path, "w") as f:
+        json.dump(value, f, indent=1, sort_keys=True)
+        f.write("\n")
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--state", required=True)
+    ap.add_argument("--dir", required=True)
     ap.add_argument("--dry-run", action="store_true")
-    ap.add_argument("--backfill", action="store_true")
     args = ap.parse_args()
+    counts_path, history_path = (os.path.join(args.dir, n) for n in ("counts.json", "history.json"))
 
-    totals = release_totals(os.environ.get("GITHUB_TOKEN"))
-    first_run = not os.path.exists(args.state)
-    saved = {} if first_run else json.load(open(args.state))
+    files = release_files(os.environ.get("GITHUB_TOKEN"))
+    now = datetime.now(timezone.utc)
+    stamp = now.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    today = now.astimezone(ZONE).date().isoformat()
+    saved = load(counts_path, {})
+    history = load(history_path, None)
 
-    now = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-    hits = []
-    for key, t in sorted(totals.items()):
-        new = t["count"] - saved.get(key, 0)
-        if first_run and not args.backfill:
-            new = 0
-        when = t["published"] if args.backfill else now
-        # Each download its own session: GoatCounter counts one visit per session and path, so repeats of one
-        # file in a shared session would show as a single download.
-        hits += [{
-            "path": f"github download: {t['file']} ({t['version']})",
-            "title": f"Downloaded from GitHub, SculptForge {t['version']}",
-            "event": True,
-            "created_at": when,
-            "session": secrets.token_hex(16),
-        } for _ in range(max(new, 0))]
+    if history is None:  # first run: split what's there into "before" and today
+        history = {"tracking_since": stamp, "before": {}, "days": {}}
+        for key, (count, published) in files.items():
+            day = datetime.fromisoformat(published.replace("Z", "+00:00")).astimezone(ZONE).date().isoformat()
+            bucket = history["days"].setdefault(today, {}) if day == today else history["before"]
+            if count:
+                bucket[key] = count
+        saved = {key: count for key, (count, _) in files.items()}
+        print(f"history started: {sum(history['days'].get(today, {}).values())} today, "
+              f"{sum(history['before'].values())} before")
+
+    added = 0
+    for key, (count, _) in sorted(files.items()):
+        new = count - saved.get(key, 0)
         if new > 0:
+            day = history["days"].setdefault(today, {})
+            day[key] = day.get(key, 0) + new
+            added += new
             print(f"{new:4d}  {key}")
-    print(f"{len(hits)} new downloads" + (" (first run)" if first_run else ""))
+    history["updated"] = stamp
+    print(f"{added} new downloads; today {sum(history['days'].get(today, {}).values())}")
 
-    if args.dry_run:
-        return
-    key = os.environ.get("GOATCOUNTER_KEY")
-    if hits and not key:
-        sys.exit("GOATCOUNTER_KEY is not set")
-    for i in range(0, len(hits), 100):  # the count API takes at most 100 hits per call
-        api(GOATCOUNTER, key, {"hits": hits[i:i + 100]})
-    with open(args.state, "w") as f:  # saved only after GoatCounter took every hit
-        json.dump({k: t["count"] for k, t in totals.items()}, f, indent=1, sort_keys=True)
-        f.write("\n")
+    if not args.dry_run:
+        save(history_path, history)
+        save(counts_path, {key: count for key, (count, _) in files.items()})
 
 
 if __name__ == "__main__":
