@@ -16,6 +16,7 @@ import argparse
 import json
 import os
 import sys
+import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
@@ -31,8 +32,11 @@ def api(url, token=None, data=None):
     if data is not None:
         headers["Content-Type"] = "application/json"
         data = json.dumps(data).encode()
-    with urllib.request.urlopen(urllib.request.Request(url, data=data, headers=headers), timeout=60) as r:
-        return json.load(r) if r.status != 202 else None
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, data=data, headers=headers), timeout=60) as r:
+            return json.load(r) if r.status != 202 else None
+    except urllib.error.HTTPError as e:
+        sys.exit(f"{url}: HTTP {e.code}: {e.read().decode(errors='replace')[:500]}")
 
 
 def release_totals(github_token):
