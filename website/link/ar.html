@@ -263,6 +263,16 @@ if (!token || !frag.get("o")) {
     catch (e) { prompt("Copy this link:", fullUrl); }
   };
 } else {
+  // The camera first, as on the face page: until a page may use it, Chrome hides this phone's network address
+  // behind a random name the computer can't look up, and a firewall on the computer then keeps the phone's own
+  // connection attempts out. With the address, the computer connects to the phone itself. (AR needs the camera
+  // anyway.)
+  $("waitText").textContent = "Allow the camera: AR needs it, and it lets this phone find your computer.";
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+    for (const t of stream.getTracks()) t.stop();
+  } catch (e) { /* refused: try anyway (works when the computer has no firewall) */ }
+  $("waitText").textContent = "Connecting to your computer...";
   connectRtc().catch((e) => note($("liveMsg"), "Couldn't connect: " + esc(e.message || e), "bad"));
 }
 window.addEventListener("pagehide", () => { try { send(JSON.stringify({ type: "bye" })); } catch (e) {} });
