@@ -11,6 +11,9 @@
 //    desktop's own page);
 //  - then the data channel runs directly over the local network (unordered, no retransmits: a late face frame is
 //    useless).
+// The same link carries a sculpt to the phone's AR page (website/link/ar.html, Mode::Ar): then the channel is
+// reliable and ordered, and the model goes down it as binary chunks (Android's Scene Viewer can't load a model from
+// this computer's plain-HTTP address, so the page shows it in AR itself, with WebXR).
 // Built with libdatachannel and Mbed TLS (cmake/WebRTC.cmake, -DSCULPTFORGE_WEBRTC=ON); without them
 // webrtcAvailable() is false and FaceRtc refuses to start.
 #pragma once
@@ -27,8 +30,9 @@ bool webrtcAvailable();
 class FaceRtc {
 public:
     enum class State { Idle, Offered, Connecting, Connected, Closed, Failed };
+    enum class Mode { Face, Ar }; // Face: the "face" channel, unordered and lossy; Ar: the "ar" channel, reliable
 
-    FaceRtc();
+    explicit FaceRtc(Mode mode = Mode::Face);
     ~FaceRtc();
     FaceRtc(const FaceRtc&) = delete;
     FaceRtc& operator=(const FaceRtc&) = delete;
@@ -43,15 +47,21 @@ public:
     bool setAnswer(const std::string& sdp, std::string& error);
     // Sends a text message on the data channel (when connected).
     bool send(const std::string& text);
+    // Sends binary data (Mode::Ar: queued, delivered in order). False when the channel isn't open.
+    bool sendBinary(const std::string& bytes);
+    Mode mode() const { return mode_; }
     State state() const;
     void close();
 
     // A second peer for tests: answers `offerSdp` like the phone's page does.
     bool answerForTest(const std::string& offerSdp, std::string& answerSdp, std::string& error, int timeoutMs = 3000);
     bool sendFromTestPeer(const std::string& text); // once its channel is open
+    // What the test peer receives (set before answerForTest): the message and whether it was binary.
+    std::function<void(const std::string&, bool)> onTestMessage;
 
 private:
     struct Impl;
+    Mode mode_;
     std::unique_ptr<Impl> impl_;
 };
 

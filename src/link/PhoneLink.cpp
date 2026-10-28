@@ -493,7 +493,7 @@ HttpResponse PhoneLink::route(const HttpRequest& request) {
         j.set("accepted", double(accepted));
         return jsonOk(j);
     }
-    if (get && path == "/api/face-link") return faceLink();
+    if (get && path == "/api/face-link") return faceLink(request);
     if (get && path == "/rtc-answer") return directAnswer(request);
     return jsonError(404, "Unknown request");
 }
@@ -815,24 +815,93 @@ void PhoneLink::setArBusy(bool busy) {
 }
 
 void PhoneLink::publishArModel(std::string glb, std::string usdz, std::string summary) {
-    std::lock_guard lock(mutex_);
-    if (glb.size() > kMaxArModelBytes || usdz.size() > kMaxArModelBytes) {
-        arError_ = "The model is too big for a phone";
-        arBusy_ = false;
-        return;
+    {
+        std::lock_guard lock(mutex_);
+        if (glb.size() > kMaxArModelBytes || usdz.size() > kMaxArModelBytes) {
+            arError_ = "The model is too big for a phone";
+            arBusy_ = false;
+        } else {
+            arGlb_ = std::move(glb);
+            arUsdz_ = std::move(usdz);
+            arSummary_ = std::move(summary);
+            arError_.clear();
+            arBusy_ = false;
+            ++arVersion_;
+        }
     }
-    arGlb_ = std::move(glb);
-    arUsdz_ = std::move(usdz);
-    arSummary_ = std::move(summary);
-    arError_.clear();
-    arBusy_ = false;
-    ++arVersion_;
+    sendArModelToPage();
 }
 
 void PhoneLink::setArError(std::string error) {
+    {
+        std::lock_guard lock(mutex_);
+        arError_ = std::move(error);
+        arBusy_ = false;
+    }
+    sendArModelToPage();
+}
+
+// The AR page's protocol, on its reliable channel: {"type":"model","version","bytes","summary"}, the GLB in
+// binary chunks, {"type":"end","version"}; or {"type":"error","text"}.
+void PhoneLink::sendArModelToPage() {
+    std::lock_guard rtcLock(rtcMutex_);
+    if (!rtc_ || rtc_->mode() != FaceRtc::Mode::Ar || rtc_->state() != FaceRtc::State::Connected) return;
+    std::string glb, summary, error;
+    uint64_t version;
+    {
+        std::lock_guard lock(mutex_);
+        version = arVersion_;
+        error = arError_;
+        if (error.empty() && version != arSentVersion_) {
+            glb = arGlb_;
+            summary = arSummary_;
+        }
+    }
+    Json msg = Json::object();
+    if (!error.empty()) {
+        msg.set("type", "error");
+        msg.set("text", error);
+        rtc_->send(msg.dump());
+        return;
+    }
+    if (glb.empty()) return;
+    msg.set("type", "model");
+    msg.set("version", double(version));
+    msg.set("bytes", double(glb.size()));
+    msg.set("summary", summary);
+    if (!rtc_->send(msg.dump()) && rtc_->state() != FaceRtc::State::Connected) return;
+    constexpr size_t kChunk = 64 * 1024; // well under every browser's message limit (256 KB)
+    for (size_t pos = 0; pos < glb.size(); pos += kChunk)
+        if (!rtc_->sendBinary(glb.substr(pos, kChunk))) return;
+    Json end = Json::object();
+    end.set("type", "end");
+    end.set("version", double(version));
+    rtc_->send(end.dump());
+    arSentVersion_ = version;
+}
+
+bool PhoneLink::receiveArMessage(const std::string& text, std::string& error) {
+    Json msg;
+    if (!Json::parse(text, msg, error)) return false;
+    const std::string type = msg["type"].asString();
+    if (type == "ar-ping") {
+        std::lock_guard lock(mutex_);
+        arViewed_ = Clock::now();
+        arViewedEver_ = true;
+        return true;
+    }
+    if (type != "ar") {
+        error = "Unknown AR message";
+        return false;
+    }
+    PhoneEvent e = PhoneEvent::make(PhoneEvent::Type::ArRequested);
+    e.wholeScene = msg["scope"].asString() == "scene";
+    e.sizeCm = std::clamp(float(msg["size"].asNumber(20.0)), 2.0f, 200.0f);
     std::lock_guard lock(mutex_);
-    arError_ = std::move(error);
-    arBusy_ = false;
+    arViewed_ = Clock::now();
+    arViewedEver_ = true;
+    pushEvent(e);
+    return true;
 }
 
 double PhoneLink::secondsSinceArViewed() const {
@@ -953,21 +1022,30 @@ void PhoneLink::onFaceState(int state) {
     }
 }
 
-bool PhoneLink::createFaceLink(std::string& faceUrl, std::string& error) {
+bool PhoneLink::createFaceLink(std::string& faceUrl, std::string& error, bool ar, const std::string& arScope, float arSizeCm) {
     if (!webrtcAvailable()) {
-        error = "This SculptForge was built without WebRTC, so the live face feed is not available.";
+        error = ar ? "This SculptForge was built without WebRTC, so AR on Android is not available (use Download)."
+                   : "This SculptForge was built without WebRTC, so the live face feed is not available.";
         return false;
     }
     std::lock_guard linkLock(faceLinkMutex_); // one new face link at a time
     stopRelay();                               // (outside rtcMutex_: the relay thread takes it to answer)
     std::lock_guard rtcLock(rtcMutex_);
     if (rtc_) rtc_->close();
-    rtc_ = std::make_unique<FaceRtc>();
-    rtc_->onMessage = [this](const std::string& text) {
-        std::string err;
-        receiveFaceMessage(text, "WebRTC", err);
-    };
-    rtc_->onState = [this](FaceRtc::State s) { onFaceState(int(s)); };
+    rtc_ = std::make_unique<FaceRtc>(ar ? FaceRtc::Mode::Ar : FaceRtc::Mode::Face);
+    arSentVersion_ = 0;
+    if (ar) {
+        rtc_->onMessage = [this](const std::string& text) {
+            std::string err;
+            receiveArMessage(text, err);
+        };
+    } else {
+        rtc_->onMessage = [this](const std::string& text) {
+            std::string err;
+            receiveFaceMessage(text, "WebRTC", err);
+        };
+        rtc_->onState = [this](FaceRtc::State s) { onFaceState(int(s)); };
+    }
     std::string sdp;
     if (!rtc_->createOffer(sdp, error)) {
         rtc_.reset();
@@ -985,8 +1063,15 @@ bool PhoneLink::createFaceLink(std::string& faceUrl, std::string& error) {
     }
     const std::vector<std::string> relays = relayUrls();
     // Everything after '#' stays on the phone: the website never sees the offer, the token or the key.
-    faceUrl = options_.siteUrl + "#v=1&k=" + token + "&d=" + percentEncode(desktop) + "&o=" + base64UrlEncode(sdp) +
+    std::string page = options_.siteUrl;
+    if (ar) page = page.substr(0, page.rfind('/') + 1) + "ar.html";
+    faceUrl = page + "#v=1&k=" + token + "&d=" + percentEncode(desktop) + "&o=" + base64UrlEncode(sdp) +
               "&n=" + percentEncode(options_.desktopName) + "&x=" + base64UrlEncode(key);
+    if (ar) {
+        char size[32];
+        std::snprintf(size, sizeof size, "%g", double(arSizeCm));
+        faceUrl += std::string("&m=ar&s=") + (arScope == "scene" ? "scene" : "subtool") + "&z=" + size;
+    }
     for (const std::string& relay : relays) faceUrl += "&r=" + percentEncode(relay + topic); // the page tries them in order
     if (!relays.empty()) {
         const int64_t since = int64_t(std::chrono::duration_cast<std::chrono::seconds>(
@@ -997,9 +1082,12 @@ bool PhoneLink::createFaceLink(std::string& faceUrl, std::string& error) {
     return true;
 }
 
-HttpResponse PhoneLink::faceLink() {
+HttpResponse PhoneLink::faceLink(const HttpRequest& request) {
     std::string url, error;
-    if (!createFaceLink(url, error)) return jsonError(webrtcAvailable() ? 500 : 501, error);
+    const bool ar = request.param("mode") == "ar";
+    float size = 20.0f;
+    try { size = std::clamp(std::stof(request.param("size", "20")), 2.0f, 200.0f); } catch (...) {}
+    if (!createFaceLink(url, error, ar, request.param("scope", "subtool"), size)) return jsonError(webrtcAvailable() ? 500 : 501, error);
     Json j = Json::object();
     j.set("url", url);
     return jsonOk(j);

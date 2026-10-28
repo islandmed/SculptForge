@@ -162,14 +162,18 @@ struct FaceRtc::Impl {
 
 namespace {
 
-rtc::DataChannelInit faceChannelInit() {
+rtc::DataChannelInit channelInit(FaceRtc::Mode mode) {
     rtc::DataChannelInit init;
     init.negotiated = true; // both sides open channel 0 themselves: no in-band announcement to lose
     init.id = 0;
-    init.reliability.unordered = true;
-    init.reliability.maxRetransmits = 0;
+    if (mode == FaceRtc::Mode::Face) {
+        init.reliability.unordered = true;
+        init.reliability.maxRetransmits = 0;
+    }
     return init;
 }
+
+const char* channelLabel(FaceRtc::Mode mode) { return mode == FaceRtc::Mode::Ar ? "ar" : "face"; }
 
 rtc::Configuration localConfiguration() {
     return rtc::Configuration(); // no STUN or TURN servers: the phone and this computer share a network
@@ -177,7 +181,7 @@ rtc::Configuration localConfiguration() {
 
 } // namespace
 
-FaceRtc::FaceRtc() : impl_(std::make_unique<Impl>()) {
+FaceRtc::FaceRtc(Mode mode) : impl_(std::make_unique<Impl>()), mode_(mode) {
     static std::once_flag logging;
     std::call_once(logging, [] { rtc::InitLogger(rtc::LogLevel::None); });
 }
@@ -214,7 +218,7 @@ bool FaceRtc::createOffer(std::string& sdp, std::string& error, int timeoutMs) {
             else if (s == S::Failed) setState(State::Failed);
             else if (s == S::Disconnected || s == S::Closed) setState(State::Closed);
         });
-        auto channel = pc->createDataChannel("face", faceChannelInit());
+        auto channel = pc->createDataChannel(channelLabel(mode_), channelInit(mode_));
         channel->onOpen([setState] { setState(State::Connected); });
         channel->onClosed([setState] { setState(State::Closed); });
         channel->onMessage([this](rtc::message_variant m) {
@@ -284,6 +288,21 @@ bool FaceRtc::send(const std::string& text) {
     }
 }
 
+bool FaceRtc::sendBinary(const std::string& bytes) {
+    std::shared_ptr<rtc::DataChannel> channel;
+    {
+        std::lock_guard lock(impl_->mutex);
+        channel = impl_->channel;
+    }
+    try {
+        if (!channel || !channel->isOpen()) return false;
+        channel->send(reinterpret_cast<const std::byte*>(bytes.data()), bytes.size()); // false = queued, still sent
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
 void FaceRtc::close() {
     std::shared_ptr<rtc::PeerConnection> pc, testPc;
     std::shared_ptr<rtc::DataChannel> channel, testChannel;
@@ -319,7 +338,13 @@ bool FaceRtc::answerForTest(const std::string& offerSdp, std::string& answerSdp,
         pc->onGatheringStateChange([done, once](rtc::PeerConnection::GatheringState s) {
             if (s == rtc::PeerConnection::GatheringState::Complete) std::call_once(*once, [&] { done->set_value(); });
         });
-        auto channel = pc->createDataChannel("face", faceChannelInit());
+        auto channel = pc->createDataChannel(channelLabel(mode_), channelInit(mode_));
+        if (onTestMessage)
+            channel->onMessage([handler = onTestMessage](rtc::message_variant m) {
+                if (const auto* text = std::get_if<std::string>(&m)) handler(*text, false);
+                else if (const auto* binary = std::get_if<rtc::binary>(&m))
+                    handler(std::string(reinterpret_cast<const char*>(binary->data()), binary->size()), true);
+            });
         pc->setRemoteDescription(rtc::Description(offerSdp, rtc::Description::Type::Offer));
         done->get_future().wait_for(std::chrono::milliseconds(timeoutMs));
         const auto description = pc->localDescription();
@@ -357,7 +382,7 @@ bool webrtcAvailable() { return false; }
 
 struct FaceRtc::Impl {};
 
-FaceRtc::FaceRtc() : impl_(std::make_unique<Impl>()) {}
+FaceRtc::FaceRtc(Mode mode) : impl_(std::make_unique<Impl>()), mode_(mode) {}
 FaceRtc::~FaceRtc() = default;
 FaceRtc::State FaceRtc::state() const { return State::Idle; }
 
@@ -370,6 +395,7 @@ bool FaceRtc::setAnswer(const std::string&, std::string& error) {
     return false;
 }
 bool FaceRtc::send(const std::string&) { return false; }
+bool FaceRtc::sendBinary(const std::string&) { return false; }
 void FaceRtc::close() {}
 bool FaceRtc::answerForTest(const std::string&, std::string&, std::string& error, int) {
     error = "Built without WebRTC";

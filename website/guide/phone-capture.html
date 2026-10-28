@@ -98,10 +98,10 @@ the whole object in the middle of the screen, at about the same distance all the
 <strong>iPhone and iPad</strong> open it in AR Quick Look (a USDZ file).
 </li>
 <li>
-<strong>Android</strong> opens it in Google&#x27;s Scene Viewer (a GLB file; needs Google Play Services for AR). <strong>Download the model</strong> saves the file instead.
+<strong>Android</strong> opens an AR page in <strong>Chrome</strong> that gets the model straight from your computer over Wi-Fi (it needs Google Play Services for AR, which most phones have). Tap <strong>Place it in your room</strong>, move the phone slowly over the desk until it finds the surface, and tap to place. Firefox can&#x27;t show AR: if the capture page is open in Firefox, the AR page offers <strong>Copy the link</strong>: paste it into Chrome. <strong>Download the model</strong> saves the file instead.
 </li>
 </ul>
-<p>Keep sculpting: while the phone is looking, every few seconds after a stroke SculptForge exports the model again and the page says <strong>Updated from your sculpt</strong>. Tap <strong>View in AR</strong> again to see the change. Turn off <strong>Update after each stroke</strong> in the window to stop that.</p>
+<p>Keep sculpting: while the phone is looking, every few seconds after a stroke SculptForge exports the model again and the page says <strong>Updated from your sculpt</strong>. On iPhone, tap <strong>View in AR</strong> again to see the change; Android&#x27;s AR page updates by itself. Turn off <strong>Update after each stroke</strong> in the window to stop that.</p>
 <h2 id="face-capture">Face capture<a class="anchor" href="#face-capture" aria-label="Link to this section">#</a></h2>
 <p>Tap <strong>Face capture</strong>, then <strong>Start face capture</strong>. Your phone&#x27;s front camera tracks your face with MediaPipe Face Landmarker, which runs on the phone: the video never leaves it. About 30 times a second only the 52 expression weights (the ARKit set: jawOpen, eyeBlinkLeft, mouthSmileRight...) and the head&#x27;s rotation go to SculptForge.</p>
 <p>Prop the phone up at eye level, about an arm&#x27;s length away, with light on your face. The window&#x27;s <strong>Face</strong> section shows a little face following yours and the frame rate.</p>

@@ -1,0 +1,263 @@
+<!doctype html>
+<!-- SculptForge AR for Android (docs/phone-link.md). Google's Scene Viewer only loads models from public HTTPS
+     addresses, so it can't open one served by SculptForge on the local network. This page (HTTPS, on the website)
+     gets the model straight from the computer over a WebRTC data channel - the same link the face page uses, set up
+     through this URL's #fragment, which browsers never send to the website - and shows it in AR itself with WebXR
+     (<model-viewer>, Apache-2.0). The model never leaves the local network. GPL-3.0-or-later. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f0f12">
+<meta name="color-scheme" content="dark">
+<meta name="robots" content="noindex">
+<title>SculptForge AR</title>
+<style>
+:root { --bg:#0f0f12; --bg2:#15151a; --panel:#1b1b21; --panel2:#22222a; --border:#2a2a31; --text:#ececf1; --muted:#a3a3ad;
+        --accent:#f28c3c; --accent2:#ffb06a; --ok:#4ad295; --bad:#ff6b6b; }
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body { margin:0; background:var(--bg); color:var(--text); }
+body { font:400 16px/1.5 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing:antialiased;
+       min-height:100vh; padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+header { display:flex; align-items:center; gap:10px; padding:14px 18px; border-bottom:1px solid var(--border); }
+header .brand { font-weight:650; flex:1; display:flex; gap:9px; align-items:center; }
+.pill { font-size:13px; padding:4px 10px 4px 8px; border-radius:999px; background:var(--panel); border:1px solid var(--border);
+        color:var(--muted); display:flex; align-items:center; gap:6px; white-space:nowrap; max-width:58vw; overflow:hidden; text-overflow:ellipsis; }
+.dot { width:8px; height:8px; border-radius:50%; background:var(--muted); flex:none; }
+.pill.ok .dot { background:var(--ok); box-shadow:0 0 8px var(--ok); } .pill.bad .dot { background:var(--bad); } .pill.wait .dot { background:#ffcf5a; }
+main { padding:16px 18px; max-width:560px; margin:0 auto; }
+h1 { font-size:26px; line-height:1.15; margin:4px 0 8px; letter-spacing:-.02em; }
+p { margin:0 0 12px; } .muted { color:var(--muted); } .small { font-size:14px; }
+.stage { position:relative; border-radius:18px; overflow:hidden; background:radial-gradient(circle at 50% 40%, #2a2a33, #111115); aspect-ratio:3/4; border:1px solid var(--border); }
+model-viewer { width:100%; height:100%; --poster-color:transparent; }
+.stage .wait { position:absolute; inset:0; display:grid; place-items:center; color:var(--muted); font-size:15px; text-align:center; padding:20px; }
+.bar { height:6px; border-radius:99px; background:var(--bg2); overflow:hidden; margin:10px 0 0; } .bar b { display:block; height:100%; width:0; background:linear-gradient(90deg,#e2742a,#ffb06a); }
+.note.ok { background:rgba(74,210,149,.08); border-color:rgba(74,210,149,.3); color:#bff0d8; }
+.stage video, .stage canvas { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }
+.stage .hud { position:absolute; left:10px; top:10px; right:10px; display:flex; justify-content:space-between; font-size:13px; }
+.stage .hud span { background:rgba(0,0,0,.55); padding:3px 9px; border-radius:999px; }
+.meters { display:grid; grid-template-columns:1fr 1fr; gap:8px 14px; margin:14px 0; }
+.meter { font-size:13px; color:var(--muted); }
+.meter i { display:block; height:6px; border-radius:99px; background:var(--bg2); margin-top:3px; overflow:hidden; }
+.meter i b { display:block; height:100%; width:0; background:linear-gradient(90deg,#e2742a,#ffb06a); }
+button.primary, a.primary { display:flex; align-items:center; justify-content:center; width:100%; min-height:52px; border:none; border-radius:14px;
+        font:600 17px/1 inherit; font-family:inherit; color:#1a0d04; background:linear-gradient(180deg,#f6994d,#e2742a); margin-top:10px; cursor:pointer; text-decoration:none; }
+button.secondary, a.secondary { display:flex; align-items:center; justify-content:center; width:100%; min-height:48px; border:1px solid var(--border);
+        border-radius:14px; font:600 16px/1 inherit; font-family:inherit; color:var(--text); background:var(--panel2); margin-top:10px; cursor:pointer; text-decoration:none; }
+.note { border-radius:12px; padding:11px 13px; font-size:14px; margin:10px 0; background:rgba(255,207,90,.08); border:1px solid rgba(255,207,90,.25); color:#ffe2a0; }
+.note.bad { background:rgba(255,107,107,.08); border-color:rgba(255,107,107,.3); color:#ffc2c2; }
+.hidden { display:none !important; }
+footer { text-align:center; color:#6f6f78; font-size:12px; padding:20px 18px 30px; }
+</style>
+<script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
+</head>
+<body>
+<header>
+  <div class="brand"><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l8.5 4.8v9.4L12 21.5l-8.5-4.8V7.3z" fill="none" stroke="#f28c3c" stroke-width="1.6" stroke-linejoin="round"/><path d="M3.8 7.4L12 12l8.2-4.6M12 12v9.2" fill="none" stroke="#ffb06a" stroke-width="1.6" stroke-linejoin="round"/></svg>View in AR</div>
+  <div id="conn" class="pill"><span class="dot"></span><span id="connText">Not connected</span></div>
+</header>
+<main>
+  <section id="unsupported" class="hidden">
+    <h1>Open this in Chrome</h1>
+    <p class="muted" id="unsupportedText">This browser can't show AR. On Android, AR works in Chrome (with Google Play Services for AR, which most phones have).</p>
+    <button class="primary" id="copy">Copy the link</button>
+    <p class="muted small" style="margin-top:12px">Then open Chrome, paste the link in the address bar and go. The link only works on your Wi-Fi, for 10 minutes.</p>
+  </section>
+  <section id="viewer">
+    <div class="stage">
+      <model-viewer id="mv" ar ar-modes="webxr" ar-scale="fixed" ar-placement="floor" camera-controls touch-action="pan-y"
+                    shadow-intensity="1" exposure="1" alt="Your sculpt">
+        <button slot="ar-button" class="hidden" aria-hidden="true"></button>
+      </model-viewer>
+      <div class="wait" id="wait"><div><div id="waitText">Connecting to your computer...</div><div class="bar hidden" id="bar"><b id="barFill"></b></div></div></div>
+    </div>
+    <div id="liveMsg"></div>
+    <button class="primary hidden" id="enter">Place it in your room</button>
+    <p class="muted small hidden" id="hint" style="margin-top:10px">Move the phone slowly over a table or the floor until it finds the surface, then tap to place. It's shown at real size; pinch to rescale is off so the size stays true.</p>
+    <button class="secondary hidden" id="direct">Connect without internet</button>
+  </section>
+  <a class="secondary hidden" id="back" href="#">Back to capture</a>
+</main>
+<footer>AR view: &lt;model-viewer&gt; (Apache-2.0) with WebXR, on this phone. The model comes straight from your computer over your Wi-Fi.</footer>
+
+<script type="module">
+"use strict";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const note = (el, text, kind) => { el.innerHTML = text ? `<div class="note ${kind || ""}">${text}</div>` : ""; };
+const setConn = (state, text) => { $("conn").className = "pill " + state; $("connText").textContent = text; };
+
+// Connection details, as for the face page: #v=1&k=token&d=desktop&o=offer&n=name&x=key&m=ar&s=scope&z=sizeCm&r=relay...
+const fullUrl = location.href;
+const frag = new URLSearchParams(location.hash.slice(1));
+const token = frag.get("k"), desktop = frag.get("d");
+const desktopName = frag.get("n") || "your computer";
+const scope = frag.get("s") === "scene" ? "scene" : "subtool";
+const sizeCm = Number(frag.get("z")) || 20;
+history.replaceState(null, "", location.pathname); // keep the secrets out of history
+if (desktop && token) {
+  $("back").href = `${desktop}/?k=${encodeURIComponent(token)}`;
+  $("back").classList.remove("hidden");
+}
+
+const b64u = {
+  enc: (bytes) => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""),
+  dec: (text) => Uint8Array.from(atob(text.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((text.length + 3) % 4)), (c) => c.charCodeAt(0)),
+  str: (text) => new TextDecoder().decode(b64u.dec(text)),
+};
+
+// --- Transport ---
+let send = () => false;
+let pc = null, channel = null, answerSdp = "";
+
+async function connectHttp() {
+  // Frames are posted to the page's own computer; one request in flight at a time, the newest frame wins.
+  let pending = null, inFlight = false;
+  const pump = async () => {
+    if (inFlight || !pending) return;
+    inFlight = true;
+    const body = pending; pending = null;
+    try {
+      const r = await fetch("/api/face", { method: "POST", headers: { "X-SF-Token": token, "Content-Type": "application/json" }, body });
+      setConn(r.ok ? "ok" : "bad", r.ok ? "Sending" : "Refused");
+    } catch (e) { setConn("bad", "Not connected"); }
+    inFlight = false;
+    pump();
+  };
+  send = (text) => { pending = text; pump(); return true; };
+  setConn("ok", "Wi-Fi");
+}
+
+async function connectRtc() {
+  setConn("wait", "Connecting...");
+  pc = new RTCPeerConnection({ iceServers: [] });
+  channel = pc.createDataChannel("ar", { negotiated: true, id: 0 }); // reliable and ordered: the model comes in chunks
+  channel.binaryType = "arraybuffer";
+  channel.onmessage = (e) => receive(e.data);
+  channel.onopen = () => { setConn("ok", "Connected to " + desktopName); $("direct").classList.add("hidden"); note($("liveMsg"), ""); opened(); };
+  channel.onclose = () => { setConn("bad", "Disconnected"); clearInterval(pinger); };
+  pc.onconnectionstatechange = () => {
+    if (pc.connectionState === "failed") {
+      setConn("bad", "Couldn't connect");
+      note($("liveMsg"), "The phone couldn't reach your computer over Wi-Fi. Both must be on the same network (no guest Wi-Fi, no VPN), and the computer's firewall must allow SculptForge.", "bad");
+    }
+  };
+  await pc.setRemoteDescription({ type: "offer", sdp: b64u.str(frag.get("o")) });
+  await pc.setLocalDescription(await pc.createAnswer());
+  await new Promise((resolve) => {
+    if (pc.iceGatheringState === "complete") return resolve();
+    const done = () => { if (pc.iceGatheringState === "complete") resolve(); };
+    pc.addEventListener("icegatheringstatechange", done);
+    setTimeout(resolve, 2500); // what we have by then is enough on a local network
+  });
+  answerSdp = pc.localDescription.sdp;
+  send = (text) => {
+    if (!channel || channel.readyState !== "open") return false;
+    channel.send(text);
+    return true;
+  };
+  // The answer goes back through the relay, encrypted with the key from the fragment (the relay can't read it).
+  // Several relays (ours, then ntfy.sh): the first that takes the message wins; the desktop polls them all.
+  const relays = frag.getAll("r");
+  if (relays.length) {
+    let sent = false;
+    try {
+      const key = await crypto.subtle.importKey("raw", b64u.dec(frag.get("x")), "AES-GCM", false, ["encrypt"]);
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const plain = new TextEncoder().encode(JSON.stringify({ k: token, sdp: answerSdp }));
+      const cipher = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plain));
+      const packed = new Uint8Array(iv.length + cipher.length);
+      packed.set(iv); packed.set(cipher, iv.length);
+      for (const relay of relays) {
+        try {
+          const ctl = new AbortController();
+          const timer = setTimeout(() => ctl.abort(), 5000);
+          const r = await fetch(relay, { method: "POST", body: b64u.enc(packed), signal: ctl.signal });
+          clearTimeout(timer);
+          if (r.ok) { sent = true; break; }
+        } catch (e) { /* unreachable: try the next one */ }
+      }
+    } catch (e) { /* no Web Crypto: only the direct way is left */ }
+    if (!sent) note($("liveMsg"), "No internet to set up the connection: tap Connect without internet.", "");
+  }
+  // Without internet (or if the relay is slow): a tab on the computer's own page delivers the answer.
+  setTimeout(() => { if (!channel || channel.readyState !== "open") $("direct").classList.remove("hidden"); }, relays.length ? 6000 : 0);
+}
+
+$("direct").onclick = () => {
+  const url = `${desktop}/rtc-answer?k=${encodeURIComponent(token)}&a=${b64u.enc(new TextEncoder().encode(answerSdp))}`;
+  window.open(url, "_blank");
+};
+
+// --- The model ---
+// From the computer: {"type":"model","version","bytes","summary"}, the GLB in binary chunks, {"type":"end"};
+// or {"type":"error","text"}. A new version arrives by itself after each edit while this page is open.
+let pinger = 0, incoming = null, shownVersion = 0, modelUrl = "";
+function opened() {
+  send(JSON.stringify({ type: "ar", scope, size: sizeCm }));
+  $("waitText").textContent = "Preparing the model on your computer...";
+  pinger = setInterval(() => send(JSON.stringify({ type: "ar-ping" })), 3000); // "still looking": edits keep coming
+}
+function receive(data) {
+  if (typeof data !== "string") {
+    if (!incoming) return;
+    incoming.parts.push(data);
+    incoming.got += data.byteLength;
+    $("barFill").style.width = Math.min(100, (100 * incoming.got) / incoming.bytes).toFixed(0) + "%";
+    return;
+  }
+  let msg;
+  try { msg = JSON.parse(data); } catch (e) { return; }
+  if (msg.type === "error") {
+    note($("liveMsg"), esc(msg.text), "bad");
+    $("waitText").textContent = "Couldn't prepare the model";
+  } else if (msg.type === "model") {
+    incoming = { version: msg.version, bytes: msg.bytes, summary: msg.summary || "", parts: [], got: 0 };
+    if (!shownVersion) { $("waitText").textContent = "Receiving the model..."; $("bar").classList.remove("hidden"); }
+  } else if (msg.type === "end" && incoming && incoming.version === msg.version) {
+    const blob = new Blob(incoming.parts, { type: "model/gltf-binary" });
+    const first = !shownVersion;
+    shownVersion = incoming.version;
+    const summary = incoming.summary;
+    incoming = null;
+    if (modelUrl) URL.revokeObjectURL(modelUrl);
+    modelUrl = URL.createObjectURL(blob);
+    $("mv").src = modelUrl;
+    $("wait").classList.add("hidden");
+    note($("liveMsg"), first ? (summary ? "Ready: " + esc(summary) : "") : "Updated from your sculpt.", first ? "" : "ok");
+  }
+}
+
+const mv = $("mv");
+mv.addEventListener("load", () => {
+  if (mv.canActivateAR) { $("enter").classList.remove("hidden"); $("hint").classList.remove("hidden"); }
+  else note($("liveMsg"), "Chrome can't start AR on this phone. AR needs Google Play Services for AR: install or update it from the Play Store, then reload this page.", "bad");
+});
+mv.addEventListener("ar-status", (e) => {
+  if (e.detail.status === "failed") note($("liveMsg"), "AR couldn't start. Check that Google Play Services for AR is installed and up to date, and that Chrome may use the camera.", "bad");
+});
+$("enter").onclick = () => mv.activateAR();
+
+// --- Start ---
+async function arSupported() {
+  try { return !!(navigator.xr && await navigator.xr.isSessionSupported("immersive-ar")); } catch (e) { return false; }
+}
+if (!token || !frag.get("o")) {
+  $("waitText").textContent = "Open this page from SculptForge: File > Capture from phone on your computer, scan the QR code, then View in AR.";
+} else if (!(await arSupported())) {
+  // Don't answer the offer here: the same link still works in Chrome.
+  $("viewer").classList.add("hidden");
+  $("unsupported").classList.remove("hidden");
+  if (/Chrome\//.test(navigator.userAgent) && !/Firefox|SamsungBrowser|EdgA|OPR/.test(navigator.userAgent))
+    $("unsupportedText").textContent = "Chrome can't start AR on this phone. AR needs Google Play Services for AR: install or update it from the Play Store, then reload this page.";
+  $("copy").onclick = async () => {
+    try { await navigator.clipboard.writeText(fullUrl); $("copy").textContent = "Copied"; }
+    catch (e) { prompt("Copy this link:", fullUrl); }
+  };
+} else {
+  connectRtc().catch((e) => note($("liveMsg"), "Couldn't connect: " + esc(e.message || e), "bad"));
+}
+window.addEventListener("pagehide", () => { try { send(JSON.stringify({ type: "bye" })); } catch (e) {} });
+</script>
+</body>
+</html>

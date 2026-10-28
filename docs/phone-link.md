@@ -34,7 +34,12 @@ Phone browsers give `getUserMedia` (live camera) only to secure contexts: HTTPS 
 
 1. **Capture and AR: an HTTP page served by the desktop** (`assets/phone/capture.html`, embedded in the app), LAN
    only, while the window is open. File inputs record video and photos; uploads are chunked and resumable; AR
-   models are plain links (`<a rel="ar">` for AR Quick Look, an intent URL for Scene Viewer), which work over HTTP.
+   models are plain links for iPhone (`<a rel="ar">` for AR Quick Look), which work over HTTP. Android's Scene
+   Viewer does not: it is a separate app that downloads the model itself and only accepts public HTTPS addresses,
+   so on a plain-HTTP LAN address Chrome just downloads the file. Android AR therefore uses the website's AR page
+   (`website/link/ar.html`): the same WebRTC link as the face page (`/api/face-link?mode=ar`, a reliable ordered
+   channel), the GLB sent down it in 64 KB binary chunks, shown with WebXR by `<model-viewer>`. Chrome only:
+   Firefox for Android has no WebXR, so the page offers to copy the link for Chrome (the offer stays unanswered).
 2. **Live face: an HTTPS page on our website** (`website/link/index.html`, published by GitHub Pages at
    `https://sculptforge.app/link/`; base URL in `kPhoneLinkSiteUrl`, overridable with `SCULPTFORGE_LINK_URL`) running MediaPipe Face Landmarker on the phone,
    connected to the desktop by a **WebRTC data channel** (DTLS: WebRTC is allowed from HTTPS pages to LAN peers).

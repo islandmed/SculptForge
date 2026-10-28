@@ -84,11 +84,14 @@ triangles, its polypaint or texture baked into one texture, standing on its base
 AR** and point the phone at a desk or the floor.
 
 - **iPhone and iPad** open it in AR Quick Look (a USDZ file).
-- **Android** opens it in Google's Scene Viewer (a GLB file; needs Google Play Services for AR). **Download the
-  model** saves the file instead.
+- **Android** opens an AR page in **Chrome** that gets the model straight from your computer over Wi-Fi (it needs
+  Google Play Services for AR, which most phones have). Tap **Place it in your room**, move the phone slowly over
+  the desk until it finds the surface, and tap to place. Firefox can't show AR: if the capture page is open in
+  Firefox, the AR page offers **Copy the link**: paste it into Chrome. **Download the model** saves the file instead.
 
 Keep sculpting: while the phone is looking, every few seconds after a stroke SculptForge exports the model again
-and the page says **Updated from your sculpt**. Tap **View in AR** again to see the change. Turn off **Update after
+and the page says **Updated from your sculpt**. On iPhone, tap **View in AR** again to see the change; Android's AR
+page updates by itself. Turn off **Update after
 each stroke** in the window to stop that.
 
 ## Face capture
