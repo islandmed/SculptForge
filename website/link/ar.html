@@ -60,8 +60,9 @@ footer { text-align:center; color:#6f6f78; font-size:12px; padding:20px 18px 30p
   <section id="unsupported" class="hidden">
     <h1>Open this in Chrome</h1>
     <p class="muted" id="unsupportedText">This browser can't show AR. On Android, AR works in Chrome (with Google Play Services for AR, which most phones have).</p>
-    <button class="primary" id="copy">Copy the link</button>
-    <p class="muted small" style="margin-top:12px">Then open Chrome, paste the link in the address bar and go. The link only works on your Wi-Fi, for 10 minutes.</p>
+    <a class="primary hidden" id="chrome" href="#">Open in Chrome</a>
+    <button class="secondary" id="copy">Copy the link</button>
+    <p class="muted small" style="margin-top:12px">If Chrome doesn't open, copy the link, open Chrome, paste it in the address bar and go. The link only works on your Wi-Fi, for 10 minutes.</p>
   </section>
   <section id="viewer">
     <div class="stage">
@@ -250,6 +251,13 @@ if (!token || !frag.get("o")) {
   $("unsupported").classList.remove("hidden");
   if (/Chrome\//.test(navigator.userAgent) && !/Firefox|SamsungBrowser|EdgA|OPR/.test(navigator.userAgent))
     $("unsupportedText").textContent = "Chrome can't start AR on this phone. AR needs Google Play Services for AR: install or update it from the Play Store, then reload this page.";
+  const ua = navigator.userAgent;
+  if (/Android/.test(ua) && (!/Chrome\//.test(ua) || /SamsungBrowser|EdgA|OPR/.test(ua))) { // another browser
+    // An Android intent link: Chrome opens the whole URL, #fragment included (Android keeps everything before the
+    // last '#', which starts the intent's own fields).
+    $("chrome").href = "intent://" + fullUrl.replace(/^https:\/\//, "") + "#Intent;scheme=https;package=com.android.chrome;end";
+    $("chrome").classList.remove("hidden");
+  }
   $("copy").onclick = async () => {
     try { await navigator.clipboard.writeText(fullUrl); $("copy").textContent = "Copied"; }
     catch (e) { prompt("Copy this link:", fullUrl); }
