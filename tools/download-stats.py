@@ -9,12 +9,13 @@ on the download-stats branch.
 
     GOATCOUNTER_KEY=... python3 tools/download-stats.py --state counts.json [--dry-run] [--backfill]
 
---backfill (first run only, no saved totals): sends every download so far, dated at its release's publish time.
-Without it the first run only saves the totals.
+--backfill: dates the new downloads at their release's publish time instead of now. On a first run (no saved
+totals) it sends every download so far; without it the first run only saves the totals.
 """
 import argparse
 import json
 import os
+import secrets
 import sys
 import urllib.error
 import urllib.request
@@ -78,13 +79,16 @@ def main():
         new = t["count"] - saved.get(key, 0)
         if first_run and not args.backfill:
             new = 0
-        when = t["published"] if first_run else now
+        when = t["published"] if args.backfill else now
+        # Each download its own session: GoatCounter counts one visit per session and path, so repeats of one
+        # file in a shared session would show as a single download.
         hits += [{
             "path": f"github download: {t['file']} ({t['version']})",
             "title": f"Downloaded from GitHub, SculptForge {t['version']}",
             "event": True,
             "created_at": when,
-        }] * max(new, 0)
+            "session": secrets.token_hex(16),
+        } for _ in range(max(new, 0))]
         if new > 0:
             print(f"{new:4d}  {key}")
     print(f"{len(hits)} new downloads" + (" (first run)" if first_run else ""))
@@ -95,7 +99,7 @@ def main():
     if hits and not key:
         sys.exit("GOATCOUNTER_KEY is not set")
     for i in range(0, len(hits), 100):  # the count API takes at most 100 hits per call
-        api(GOATCOUNTER, key, {"no_sessions": True, "hits": hits[i:i + 100]})
+        api(GOATCOUNTER, key, {"hits": hits[i:i + 100]})
     with open(args.state, "w") as f:  # saved only after GoatCounter took every hit
         json.dump({k: t["count"] for k, t in totals.items()}, f, indent=1, sort_keys=True)
         f.write("\n")

@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       backfill:
-        description: "First run only: also send every download so far, dated at each release's publish time"
+        description: "Date new downloads at their release's publish time (on a first run: send every download so far)"
         type: boolean
         default: false
 
