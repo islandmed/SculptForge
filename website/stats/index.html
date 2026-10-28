@@ -90,6 +90,8 @@
 </main>
 <script>
 const DATA = "https://raw.githubusercontent.com/islandmed/SculptForge/download-stats/history.json";
+const COUNTS = "https://raw.githubusercontent.com/islandmed/SculptForge/download-stats/counts.json";
+const RELEASES = "https://api.github.com/repos/islandmed/SculptForge/releases?per_page=100";
 const ZONE = "America/Vancouver";
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => n.toLocaleString("en-US");
@@ -204,11 +206,33 @@ $("seg").addEventListener("click", (e) => {
   document.querySelectorAll("#seg button").forEach((x) => x.setAttribute("aria-pressed", x === b));
   render(history);
 });
+// Live: GitHub's current totals minus the ones the last hourly run saved go to today, so the page is current even
+// when GitHub runs the hourly job late (its schedules can lag for hours). Same rules as tools/download-stats.py.
+async function addLive(h) {
+  const t = "?t=" + Math.floor(Date.now() / 300000);
+  const [saved, releases] = await Promise.all([
+    fetch(COUNTS + t, { cache: "no-store" }).then((r) => r.ok ? r.json() : Promise.reject()),
+    fetch(RELEASES, { headers: { Accept: "application/vnd.github+json" } }).then((r) => r.ok ? r.json() : Promise.reject()),
+  ]);
+  const today = (h.days[dayString(new Date())] ||= {});
+  for (const rel of releases) {
+    if (rel.draft) continue;
+    for (const a of rel.assets) {
+      if (a.name === "SHA256SUMS.txt") continue;
+      const key = `${rel.tag_name}/${a.name}`;
+      const extra = a.download_count - (saved[key] || 0);
+      if (extra > 0) today[key] = (today[key] || 0) + extra;
+    }
+  }
+  h.updated = new Date().toISOString();
+}
+
 async function load() {
   try {
     const r = await fetch(DATA + "?t=" + Math.floor(Date.now() / 300000), { cache: "no-store" });
     if (!r.ok) throw new Error("HTTP " + r.status);
     history = await r.json();
+    try { await addLive(history); } catch (e) { /* GitHub's limit (60 an hour) or offline: the hourly numbers */ }
     render(history);
   } catch (e) {
     $("status").innerHTML = `<span class="err">Couldn't load the numbers (${e.message}).</span> Try again in a minute.`;
