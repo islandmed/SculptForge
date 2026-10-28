@@ -633,6 +633,13 @@ def main() -> int:
     (out / "search-index.js").write_text("window.GUIDE_INDEX=" + json.dumps(entries, ensure_ascii=False,
                                                                              separators=(",", ":")) + ";\n",
                                          encoding="utf-8")
+    # The site's sitemap (website/sitemap.xml, named in website/robots.txt): the homepage, the brushes page and
+    # every guide page. Only for the real site, not --out folders.
+    if out.resolve() == (ROOT / "website" / "guide").resolve():
+        urls = [SITE, SITE + "brushes.html"] + [f"{SITE}guide/{p.name[:-3]}.html" for p in pages]
+        (ROOT / "website" / "sitemap.xml").write_text(
+            '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+            + "".join(f"  <url><loc>{html.escape(u)}</loc></url>\n" for u in urls) + "</urlset>\n", encoding="utf-8")
     print(f"wrote {len(pages)} pages and {len(list(images.glob('*')))} images to {out}")
     return 0
 
