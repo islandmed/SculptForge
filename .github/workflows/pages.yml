@@ -29,3 +29,13 @@ jobs:
           path: website
       - id: deployment
         uses: actions/deploy-pages@v4
+      # Tell Bing and the other IndexNow search engines about the pages straight away (key file in website/).
+      - name: IndexNow
+        continue-on-error: true
+        run: |
+          key=$(basename website/[0-9a-f]*.txt .txt)
+          urls=$(grep -o '<loc>[^<]*' website/sitemap.xml | sed 's/<loc>//' | python3 -c "import sys,json; print(json.dumps(sys.stdin.read().split()))")
+          sleep 60   # let Pages publish the new files first
+          curl -sS -o /dev/null -w 'IndexNow: HTTP %{http_code}\n' -X POST https://api.indexnow.org/indexnow \
+            -H 'Content-Type: application/json; charset=utf-8' \
+            -d "{\"host\":\"sculptforge.app\",\"key\":\"$key\",\"keyLocation\":\"https://sculptforge.app/$key.txt\",\"urlList\":$urls}"
