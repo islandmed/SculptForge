@@ -1,0 +1,48 @@
+# Every hour: new GitHub release downloads -> GoatCounter events "github download: <file> (<version>)"
+# (tools/download-stats.py). The last totals are kept in counts.json on the download-stats branch.
+name: Download stats
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+    inputs:
+      backfill:
+        description: "First run only: also send every download so far, dated at each release's publish time"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: download-stats
+
+jobs:
+  stats:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: tools/download-stats.py
+          sparse-checkout-cone-mode: false
+      - name: Saved totals
+        run: |
+          if git fetch --depth=1 origin download-stats 2>/dev/null; then
+            git show FETCH_HEAD:counts.json > "$RUNNER_TEMP/counts.json"
+          fi
+      - name: Send new downloads to GoatCounter
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GOATCOUNTER_KEY: ${{ secrets.GOATCOUNTER_KEY }}
+        run: python3 tools/download-stats.py --state "$RUNNER_TEMP/counts.json" ${{ inputs.backfill && '--backfill' || '' }}
+      - name: Save totals
+        run: |
+          cd "$RUNNER_TEMP" && rm -rf state && mkdir state && cd state
+          git init -q -b download-stats
+          cp ../counts.json .
+          git add counts.json
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -qm "Download totals $(date -u +%FT%RZ)"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" download-stats
