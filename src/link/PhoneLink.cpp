@@ -1032,7 +1032,7 @@ bool PhoneLink::createFaceLink(std::string& faceUrl, std::string& error, bool ar
     stopRelay();                               // (outside rtcMutex_: the relay thread takes it to answer)
     std::lock_guard rtcLock(rtcMutex_);
     if (rtc_) rtc_->close();
-    rtc_ = std::make_unique<FaceRtc>(ar ? FaceRtc::Mode::Ar : FaceRtc::Mode::Face);
+    rtc_ = std::make_unique<FaceRtc>(ar ? FaceRtc::Mode::Ar : FaceRtc::Mode::Face, uint16_t(port()));
     arSentVersion_ = 0;
     if (ar) {
         rtc_->onMessage = [this](const std::string& text) {

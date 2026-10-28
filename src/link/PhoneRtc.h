@@ -32,7 +32,9 @@ public:
     enum class State { Idle, Offered, Connecting, Connected, Closed, Failed };
     enum class Mode { Face, Ar }; // Face: the "face" channel, unordered and lossy; Ar: the "ar" channel, reliable
 
-    explicit FaceRtc(Mode mode = Mode::Face);
+    // `icePort`: the local UDP port for every link (0 = any), shared through ICE UDP multiplexing, so a firewall
+    // needs one rule (the phone link uses its HTTP port number). Falls back to any port if it is taken.
+    explicit FaceRtc(Mode mode = Mode::Face, uint16_t icePort = 0);
     ~FaceRtc();
     FaceRtc(const FaceRtc&) = delete;
     FaceRtc& operator=(const FaceRtc&) = delete;
@@ -62,6 +64,7 @@ public:
 private:
     struct Impl;
     Mode mode_;
+    uint16_t icePort_;
     std::unique_ptr<Impl> impl_;
 };
 

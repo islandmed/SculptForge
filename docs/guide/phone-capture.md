@@ -33,14 +33,15 @@ camera's QR links open there.
 ### Linux firewall
 
 Many Linux desktops (Omarchy, Ubuntu with ufw enabled, Fedora with firewalld) block incoming connections, so the
-phone's request never arrives. Allow SculptForge's port from your home network only, for example with ufw:
+phone's request never arrives. Allow SculptForge's port from your home network only, TCP for the page and UDP for
+the direct link that AR on Android and face capture use, for example with ufw:
 
 ```
-sudo ufw allow from 10.0.0.0/24 to any port 8765 proto tcp comment 'SculptForge phone capture'
+sudo ufw allow from 10.0.0.0/24 to any port 8765 comment 'SculptForge phone capture'
 ```
 
 Use your own network's range (the first three numbers of the address under the QR code, then `.0/24`). With
-firewalld: `sudo firewall-cmd --add-port=8765/tcp` (add `--permanent` to keep it).
+firewalld: `sudo firewall-cmd --add-port=8765/tcp --add-port=8765/udp` (add `--permanent` to keep it).
 
 ## Scan an object
 

@@ -461,7 +461,7 @@ void App::drawPhoneWindow() {
             ImGui::BulletText("Android Chrome says \"This site can't be reached\"\n(ERR_TOO_MANY_RETRIES)? Recent Chrome versions can\n"
                               "block every home-network address, even your router.\nUse Firefox on the phone instead and allow it to\n"
                               "reach local devices when it asks.");
-            ImGui::BulletText("Linux: allow port %d through the firewall, e.g.\nsudo ufw allow from <your network>/24 to any\nport %d proto tcp",
+            ImGui::BulletText("Linux: allow port %d (TCP and UDP) through the\nfirewall, e.g. sudo ufw allow from\n<your network>/24 to any port %d",
                               int(phone_->port()), int(phone_->port()));
             ImGui::TreePop();
         }

@@ -1,5 +1,6 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include <cstdlib>
 #include "link/PhoneRtc.h"
 
 #include <condition_variable>
@@ -175,15 +176,24 @@ rtc::DataChannelInit channelInit(FaceRtc::Mode mode) {
 
 const char* channelLabel(FaceRtc::Mode mode) { return mode == FaceRtc::Mode::Ar ? "ar" : "face"; }
 
-rtc::Configuration localConfiguration() {
-    return rtc::Configuration(); // no STUN or TURN servers: the phone and this computer share a network
+rtc::Configuration localConfiguration(uint16_t port = 0) {
+    rtc::Configuration config; // no STUN or TURN servers: the phone and this computer share a network
+    if (port) {
+        config.portRangeBegin = config.portRangeEnd = port;
+        config.enableIceUdpMux = true;
+    }
+    return config;
 }
 
 } // namespace
 
-FaceRtc::FaceRtc(Mode mode) : impl_(std::make_unique<Impl>()), mode_(mode) {
+FaceRtc::FaceRtc(Mode mode, uint16_t icePort) : impl_(std::make_unique<Impl>()), mode_(mode), icePort_(icePort) {
     static std::once_flag logging;
-    std::call_once(logging, [] { rtc::InitLogger(rtc::LogLevel::None); });
+    // SCULPTFORGE_RTC_LOG=1: WebRTC's own log (ICE candidates and checks) on stderr, for connection problems.
+    std::call_once(logging, [] {
+        const char* log = std::getenv("SCULPTFORGE_RTC_LOG");
+        rtc::InitLogger(log && *log && *log != '0' ? rtc::LogLevel::Debug : rtc::LogLevel::None);
+    });
 }
 
 FaceRtc::~FaceRtc() { close(); }
@@ -196,7 +206,13 @@ FaceRtc::State FaceRtc::state() const {
 bool FaceRtc::createOffer(std::string& sdp, std::string& error, int timeoutMs) {
     close();
     try {
-        auto pc = std::make_shared<rtc::PeerConnection>(localConfiguration());
+        std::shared_ptr<rtc::PeerConnection> pc;
+        try {
+            pc = std::make_shared<rtc::PeerConnection>(localConfiguration(icePort_));
+        } catch (const std::exception&) {
+            if (!icePort_) throw;
+            pc = std::make_shared<rtc::PeerConnection>(localConfiguration()); // the port is taken: any port
+        }
         Impl* impl = impl_.get();
         auto setState = [this, impl](State s) {
             {
@@ -382,7 +398,7 @@ bool webrtcAvailable() { return false; }
 
 struct FaceRtc::Impl {};
 
-FaceRtc::FaceRtc(Mode mode) : impl_(std::make_unique<Impl>()), mode_(mode) {}
+FaceRtc::FaceRtc(Mode mode, uint16_t icePort) : impl_(std::make_unique<Impl>()), mode_(mode), icePort_(icePort) {}
 FaceRtc::~FaceRtc() = default;
 FaceRtc::State FaceRtc::state() const { return State::Idle; }
 
