@@ -22,7 +22,11 @@ namespace {
 
 constexpr float kClickSlopPx = 4.0f; // movement that turns an Alt+click into a drag
 constexpr int kListRows = 6;         // the list scrolls beyond this many SubTools
-constexpr float kRowTint = 0.15f;    // accent alpha of the active row; should become a theme token (Theme.h)
+// The SubTool list's colours; should become theme tokens (Theme.h).
+constexpr ImVec4 kListWell = theme::rgb(0x1c1c1f);          // the recessed area behind the rows, a step below panelBg
+constexpr ImVec4 kRowSelected = theme::rgb(0xffffff, 0.09f); // the active row: lighter neutral, plus the accent bar
+constexpr ImVec4 kRowHover = theme::rgb(0xffffff, 0.11f);
+constexpr ImVec4 kRowPressed = theme::rgb(0xffffff, 0.14f);
 
 const SDL_DialogFileFilter kAppendFilters[] = {
     {"Models and projects", "obj;fbx;glb;gltf;ply;stl;GoZ;goz;usda;usd;usdz;sfproj"}, {"All files", "*"}};
@@ -128,12 +132,17 @@ void App::drawSubToolsContents() {
     const float rowH = ImGui::GetTextLineHeight() + 2.0f * cellPad.y;
     const float listH = rowH * float(std::min(count, kListRows)) + 2.0f;
     ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, cellPad);
-    // The active row is a tint with an accent bar at its left edge, not a solid accent fill (docs/ui-design.md §10).
-    ImGui::PushStyleColor(ImGuiCol_Header, theme::rgb(0xf0882e, kRowTint));
-    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, theme::rgb(0xf0882e, kRowTint + 0.06f));
-    ImGui::PushStyleColor(ImGuiCol_HeaderActive, theme::rgb(0xf0882e, kRowTint + 0.12f));
-    if (ImGui::BeginTable("##subtools", 4, ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersOuter,
-                          ImVec2(-1, listH))) {
+    // The list sits in a recessed well, no outline. The active row is a lighter neutral with the accent only as the
+    // 2 px bar at its left edge (docs/ui-design.md §10), so it doesn't read as a dimmed orange fill.
+    {
+        const ImVec2 w0 = ImGui::GetCursorScreenPos();
+        ImGui::GetWindowDrawList()->AddRectFilled(w0, ImVec2(w0.x + ImGui::GetContentRegionAvail().x, w0.y + listH),
+                                                  ImGui::ColorConvertFloat4ToU32(kListWell), style.FrameRounding);
+    }
+    ImGui::PushStyleColor(ImGuiCol_Header, kRowSelected);
+    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, kRowHover);
+    ImGui::PushStyleColor(ImGuiCol_HeaderActive, kRowPressed);
+    if (ImGui::BeginTable("##subtools", 4, ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg | ImGuiTableFlags_PadOuterX, ImVec2(-1, listH))) {
         const float eyeW = ImGui::GetTextLineHeight() * 1.2f;
         ImGui::TableSetupColumn("name", ImGuiTableColumnFlags_WidthStretch);
         // Subdivision levels, as ZBrush lists them ("SDiv 3/5"); empty for meshes without levels.

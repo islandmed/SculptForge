@@ -6,6 +6,7 @@
 // bake for export).
 #include "app/App.h"
 #include "app/Demo.h"
+#include "app/Palettes.h"
 #include "app/Ui.h"
 #include "core/Face.h"
 
@@ -299,7 +300,7 @@ void App::drawFaceContents() {
                  kFacePath);
 
     // Landmarks.
-    ImGui::SeparatorText("Landmarks");
+    tray::GroupLabel(*this, "Landmarks");
     const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
     actionButton(*this, "face.landmarks", half);
     ImGui::SameLine();
@@ -315,7 +316,7 @@ void App::drawFaceContents() {
     }
 
     // Face test.
-    ImGui::SeparatorText("Face test");
+    tray::GroupLabel(*this, "Face test");
     const bool shapes = hasFaceShapes();
     if (!shapes) dimText("Generate the shapes first.");
     ImGui::BeginDisabled(!shapes);
@@ -328,7 +329,7 @@ void App::drawFaceContents() {
         ui::HelpText(presets[i].name, nullptr, presets[i].help, kFacePath);
     }
     ImGui::SetNextItemWidth(-1);
-    ImGui::SliderFloat("##faceamount", &facePresetAmount_, 0.0f, 1.0f, "preset amount %.2f");
+    ui::SliderInside("##faceamount", &facePresetAmount_, 0.0f, 1.0f, "preset amount %.2f");
     ui::HelpText("Preset amount", nullptr, "How strongly the presets above are applied (click a preset again to see it).",
                  kFacePath);
     // A slider per shape, by region.
@@ -341,7 +342,7 @@ void App::drawFaceContents() {
             if (!mine) continue;
             float w = l.weight;
             ImGui::SetNextItemWidth(-1);
-            if (ImGui::SliderFloat(("##" + l.name).c_str(), &w, 0.0f, 1.0f, (l.name + " %.2f").c_str())) {
+            if (ui::SliderInside(("##" + l.name).c_str(), &w, 0.0f, 1.0f, (l.name + " %.2f").c_str())) {
                 faceTakePlaying_ = false;
                 applyFaceWeights(doc_, {{l.name, w}});
             }
@@ -355,7 +356,7 @@ void App::drawFaceContents() {
     ImGui::EndDisabled();
 
     // Takes.
-    ImGui::SeparatorText("Take");
+    tray::GroupLabel(*this, "Take");
     actionButton(*this, "face.take_load");
     if (!faceTake_.empty()) {
         ImGui::TextDisabled("%s: %.1f / %.1f s", faceTake_.name.c_str(), double(faceTakeTime_), double(faceTake_.duration()));

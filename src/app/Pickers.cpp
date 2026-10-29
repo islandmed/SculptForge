@@ -41,6 +41,9 @@ constexpr ImU32 kFieldHairline = IM_COL32(255, 255, 255, 28); // inner highlight
 constexpr ImU32 kFieldHover = IM_COL32(255, 255, 255, 90);    // outline of the swatch under the mouse
 constexpr ImU32 kMarkerLight = IM_COL32(255, 255, 255, 245);  // SV ring and hue notch
 constexpr ImU32 kMarkerDark = IM_COL32(0, 0, 0, 150);         // their outline, readable on white
+constexpr float kFieldGap = 4.0f;   // one gap between every part of the colour field (square, strip, swatches, Fill)
+constexpr float kHueStripW = 10.0f; // wide enough to read as a control next to the square
+constexpr float kSwatchH = 18.0f;
 
 const SDL_DialogFileFilter kAlphaFilters[] = {{"Images", "png;jpg;jpeg;bmp;tga;psd;gif"}, {"All files", "*"}};
 
@@ -1205,7 +1208,7 @@ void App::drawColorWidget(float width) {
     if (sat <= 1e-4f || val <= 1e-4f) h = store->GetFloat(hueKey, h);
     if (val <= 1e-4f) sat = store->GetFloat(satKey, sat);
 
-    const float stripW = 8.0f * s, gap = 6.0f * s;
+    const float stripW = kHueStripW * s, gap = kFieldGap * s;
     const float squareW = width - stripW - gap, squareH = squareW;
     bool changed = false;
 
@@ -1222,7 +1225,7 @@ void App::drawColorWidget(float width) {
     if (ImGui::IsItemHovered() || ImGui::IsItemActive()) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
     ImGui::SameLine(0.0f, gap * 0.5f);
 
-    // Hue, red at the top. The strip is slim; its hit area takes the half of the gap beside it too.
+    // Hue, red at the top. Its hit area takes the half of the gap beside it too.
     const ImVec2 hs(ImGui::GetCursorScreenPos().x + gap * 0.5f, ImGui::GetCursorScreenPos().y);
     const ImVec2 hsMax(hs.x + stripW, hs.y + squareH);
     ImGui::InvisibleButton("hue", ImVec2(stripW + gap * 0.5f, squareH));
@@ -1249,7 +1252,7 @@ void App::drawColorWidget(float width) {
     dl->AddRect(sq, sqMax, kFieldEdge, rounding, 0, 1.0f * s);
     ringMarker(dl, ImVec2(sq.x + sat * squareW, sq.y + (1.0f - val) * squareH), 4.0f * s, s);
 
-    // The strip: six bands, the end ones rounded, and a thin pill notch a little wider than it.
+    // The strip: six bands, the end ones rounded, and a thin bar across it that stays inside its ends.
     const float band = squareH / 6.0f;
     for (int i = 0; i < 6; ++i) {
         float r0, g0, b0, r1, g1, b1;
@@ -1261,24 +1264,23 @@ void App::drawColorWidget(float width) {
                      i == 0 ? ImDrawFlags_RoundCornersTop : i == 5 ? ImDrawFlags_RoundCornersBottom : ImDrawFlags_RoundCornersNone);
     }
     dl->AddRect(hs, hsMax, kFieldEdge, stripW * 0.5f, 0, 1.0f * s);
-    const float ny = std::clamp(hs.y + h * squareH, hs.y + 2.0f * s, hsMax.y - 2.0f * s);
-    const ImVec2 na(hs.x - 2.0f * s, ny - 1.5f * s), nb(hsMax.x + 2.0f * s, ny + 1.5f * s);
-    dl->AddRect(ImVec2(na.x - 1.0f * s, na.y - 1.0f * s), ImVec2(nb.x + 1.0f * s, nb.y + 1.0f * s), kMarkerDark, 3.0f * s, 0,
+    const float ny = std::clamp(hs.y + h * squareH, hs.y + 2.5f * s, hsMax.y - 2.5f * s);
+    const ImVec2 na(hs.x - 1.0f * s, ny - 1.5f * s), nb(hsMax.x + 1.0f * s, ny + 1.5f * s);
+    dl->AddRect(ImVec2(na.x - 1.0f * s, na.y - 1.0f * s), ImVec2(nb.x + 1.0f * s, nb.y + 1.0f * s), kMarkerDark, 2.0f * s, 0,
                 1.0f * s);
-    dl->AddRectFilled(na, nb, kMarkerLight, 2.0f * s);
+    dl->AddRectFilled(na, nb, kMarkerLight, 1.5f * s);
 
     ImGui::PopStyleVar();
     ImGui::PopID();
     ImGui::EndGroup();
     ui::HelpText("Colour", "C", "The polypaint colour (C over the model picks one).", "Left shelf");
 
-    // Two swatches, like ZBrush's main and secondary colour: clicking either swaps them ("Alternate"). The main one is
-    // wide, the second a small square beside it.
-    ImGui::Dummy(ImVec2(0.0f, 2.0f * s));
-    const float swH = 20.0f * s, secondW = 20.0f * s;
-    const float mainW = width - secondW - gap;
+    // Two swatches, like ZBrush's main and secondary colour: clicking either swaps them ("Alternate"). Equal halves of
+    // the column, main on the left, the same gap as between the square and the strip.
+    const float swH = kSwatchH * s;
+    const float mainW = std::floor((width - gap) * 0.5f), secondW = width - gap - mainW;
     const glm::vec3 second = linearToSrgb(secondaryColor_);
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(gap, ImGui::GetStyle().ItemSpacing.y));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(gap, gap));
     const ImVec2 pa = ImGui::GetCursorScreenPos();
     bool swap = ImGui::InvisibleButton("##primary", ImVec2(mainW, swH));
     swatch(dl, pa, ImVec2(pa.x + mainW, pa.y + swH), ImVec4(srgb.x, srgb.y, srgb.z, 1.0f), rounding, s, ImGui::IsItemHovered());
@@ -1289,10 +1291,9 @@ void App::drawColorWidget(float width) {
     swatch(dl, pb, ImVec2(pb.x + secondW, pb.y + swH), ImVec4(second.x, second.y, second.z, 1.0f),
            rounding, s, ImGui::IsItemHovered());
     ui::HelpText("Second colour", nullptr, "Click to swap it with the main colour (ZBrush Alternate).", "Left shelf");
-    ImGui::PopStyleVar();
     if (swap) std::swap(doc_.paintColor, secondaryColor_);
-    ImGui::Dummy(ImVec2(0.0f, 2.0f * s));
     ui::ActionButton(*this, "color.fill", ImVec2(width, 0), ui::Look::IconLabel);
+    ImGui::PopStyleVar();
     ui::HelpAction(*this, "color.fill");
     ImGui::EndGroup();
 }

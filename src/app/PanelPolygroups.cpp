@@ -77,7 +77,7 @@ void App::drawPolygroupsSection() {
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("New group wherever the surface turns more than the angle");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(-1);
-    ImGui::SliderFloat("##pgangle", &polygroupAngle_, 1.0f, 90.0f, "%.0f deg");
+    ui::SliderInside("##pgangle", &polygroupAngle_, 1.0f, 90.0f, "Angle %.0f deg");
     if (ImGui::Button("By pieces", ImVec2(half, 0))) group("polygroup_by_connectivity");
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("One group per disconnected piece");
     ImGui::SameLine();

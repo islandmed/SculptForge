@@ -11,6 +11,7 @@
 // shows each run as splat_to_mesh / face_guides script lines.
 #include "app/App.h"
 #include "app/Demo.h"
+#include "app/Palettes.h"
 #include "app/Ui.h"
 
 #include "core/Sculptable.h"
@@ -306,7 +307,8 @@ void App::drawSculptableSection() {
     if (!sculptable_) sculptable_ = std::make_shared<SculptableUiState>();
     SculptableUiState& s = *sculptable_;
     const ImGuiStyle& style = ImGui::GetStyle();
-    ImGui::SeparatorText("From scan");
+    const float x0 = ImGui::GetCursorPosX(); // line start, inside the section indent
+    tray::GroupLabel(*this, "From scan");
     Demo::pushScope("Make sculptable"); // UI tests: "Make sculptable/<label>"
     struct PopScope {
         ~PopScope() { Demo::popScope(); }
@@ -353,7 +355,7 @@ void App::drawSculptableSection() {
 
     ImGui::BeginDisabled(s.job != nullptr || s.reviewing);
     ImGui::SetNextItemWidth(-1);
-    ImGui::SliderInt("##sculptdetail", &s.detail, 96, 512, "Detail %d");
+    tray::SliderInt("##sculptdetail", &s.detail, 96, 512, "Detail %d");
     ui::HelpText("Detail", nullptr,
                  "How finely the surface follows the capture: voxels across the subject. Higher keeps thinner parts and "
                  "more detail but takes longer (about 5 s at 384 for a million splats).",
@@ -377,7 +379,8 @@ void App::drawSculptableSection() {
                  "give QRemesh edge loops round the eyes and mouth and along the nasolabial folds, mirrored across "
                  "the face (animation topology). Turn the view to face it first.",
                  kPath);
-    ImGui::SameLine(half + style.ItemSpacing.x);
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(x0 + half + style.ItemSpacing.x); // the right column, inside the section indent
     ImGui::BeginDisabled(!s.faceLoops);
     ImGui::Checkbox("Review##sculptable", &s.review);
     ImGui::EndDisabled();
@@ -387,7 +390,8 @@ void App::drawSculptableSection() {
                  kPath);
     ImGui::RadioButton("Polypaint##sculptcolor", &s.color, 0);
     ui::HelpText("Polypaint", nullptr, "The capture's colours go into the vertices (polypaint): more polygons, more colour detail.", kPath);
-    ImGui::SameLine(half + style.ItemSpacing.x);
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(x0 + half + style.ItemSpacing.x); // the right column, inside the section indent
     ImGui::RadioButton("Texture##sculptcolor", &s.color, 1);
     ui::HelpText("Texture", nullptr,
                  "Auto UV the result and bake the capture's colours into a 2K texture (sharp colour on a light mesh, "
@@ -397,21 +401,23 @@ void App::drawSculptableSection() {
     ui::HelpText("Keep scan", nullptr,
                  "Keep the dense voxel surface as a hidden \"<name> Scan\" SubTool, to ProjectAll more detail from later.",
                  kPath);
-    ImGui::SameLine(half + style.ItemSpacing.x);
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(x0 + half + style.ItemSpacing.x); // the right column, inside the section indent
     ui::ActionButton(*this, "splats.sculptable_crop", ImVec2(-1, 0));
     if (ImGui::TreeNode("More##sculptable")) {
         ImGui::SetNextItemWidth(-1);
         ui::SliderInside("##sculptopacity", &s.minOpacity, 0.0f, 0.9f, "Min Opacity %.2f");
         ui::HelpText("Min Opacity", nullptr, "Splats fainter than this are ignored (haze and floaters are usually faint).", kPath);
         ImGui::SetNextItemWidth(-1);
-        ImGui::SliderInt("##sculptclose", &s.close, 0, 8, "Close Gaps %d");
+        tray::SliderInt("##sculptclose", &s.close, 0, 8, "Close Gaps %d");
         ui::HelpText("Close Gaps", nullptr, "Seal gaps up to this many voxels between splats.", kPath);
         ImGui::Checkbox("Fill holes", &s.fillHoles);
         ui::HelpText("Fill holes", nullptr,
                      "Fill big holes such as the open bottom of a subject standing on a table (space boxed in on five "
                      "sides counts as inside). Turn off for open cavities like a cup.",
                      kPath);
-        ImGui::SameLine(half + style.ItemSpacing.x);
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(x0 + half + style.ItemSpacing.x); // the right column, inside the section indent
         ImGui::Checkbox("All pieces", &s.keepParts);
         ui::HelpText("All pieces", nullptr, "Keep every solid piece instead of only the largest (floaters come back too).", kPath);
         ImGui::TreePop();

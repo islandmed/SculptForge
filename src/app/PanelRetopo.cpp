@@ -8,6 +8,7 @@
 // ZRemesher Guides, core/QRemeshGuides.h) draws the curves QRemesh follows.
 #include "app/App.h"
 #include "app/Demo.h"
+#include "app/Palettes.h"
 #include "app/Ui.h"
 
 #include "core/TextureTransfer.h"
@@ -265,7 +266,8 @@ void App::pollQRemesh() {
 
 void App::drawQRemeshContents() {
     const ImGuiStyle& style = ImGui::GetStyle();
-    ImGui::SeparatorText("QRemesh");
+    const float x0 = ImGui::GetCursorPosX(); // line start, inside the section indent
+    tray::GroupLabel(*this, "QRemesh");
     const float full = ImGui::GetContentRegionAvail().x;
     const float half = (full - style.ItemSpacing.x) * 0.5f;
     const float third = (full - 2.0f * style.ItemSpacing.x) / 3.0f;
@@ -285,7 +287,7 @@ void App::drawQRemeshContents() {
     }
 
     ImGui::SetNextItemWidth(-1);
-    ImGui::SliderInt("##qtarget", &retopo_.target, 100, 200000, "Target Polygons %d", ImGuiSliderFlags_Logarithmic);
+    tray::SliderInt("##qtarget", &retopo_.target, 100, 200000, "Target Polygons %d", ImGuiSliderFlags_Logarithmic);
     ui::HelpText("Target Polygons", nullptr,
                  "About how many quads QRemesh makes (Ctrl+click to type a number). Half / Same / Double set it from "
                  "the SubTool's current polygon count.",
@@ -314,7 +316,8 @@ void App::drawQRemeshContents() {
                  "Edge loops follow the polygroup borders exactly and the result keeps the polygroups. Paint groups "
                  "where you want loops (around the eyes, the mouth) to guide the flow.",
                  kQRemeshPath);
-    ImGui::SameLine(half + style.ItemSpacing.x);
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(x0 + half + style.ItemSpacing.x); // the right column, inside the section indent
     ImGui::Checkbox("Detect Edges", &retopo_.detectEdges);
     ui::HelpText("Detect Edges", nullptr, "Hard edges (faces meeting at more than 50 degrees) get an edge loop, so they stay sharp.",
                  kQRemeshPath);
@@ -323,7 +326,8 @@ void App::drawQRemeshContents() {
                  "Paint where you want density: red areas get up to 4 times the quads, blue areas down to a quarter, "
                  "white is unchanged.",
                  kQRemeshPath);
-    ImGui::SameLine(half + style.ItemSpacing.x);
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(x0 + half + style.ItemSpacing.x); // the right column, inside the section indent
     ImGui::Checkbox("Symmetry", &retopo_.symmetry);
     const char axis = char('X' + symmetryAxis(symmetry_));
     const std::string symHelp = std::string("Mirror the topology across ") + axis +
@@ -337,7 +341,8 @@ void App::drawQRemeshContents() {
                  "ProjectAll its detail back. Off: replace it, as ZBrush does (undo brings it back).",
                  kQRemeshPath);
     if (hasTexture(doc_.mesh)) { // only matters for a painted SubTool
-        ImGui::SameLine(half + style.ItemSpacing.x);
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(x0 + half + style.ItemSpacing.x); // the right column, inside the section indent
         drawKeepTextureCheckbox("Keep Texture##qremesh", kQRemeshPath);
     }
     drawQRemeshGuideControls();
@@ -351,7 +356,7 @@ void App::drawQRemeshGuideControls() {
     const ImGuiStyle& style = ImGui::GetStyle();
     const float full = ImGui::GetContentRegionAvail().x;
     const float half = (full - style.ItemSpacing.x) * 0.5f;
-    ImGui::SeparatorText("Guides");
+    tray::GroupLabel(*this, "Guides");
     ui::ActionButton(*this, "brush.qremesh_guides", ImVec2(half, 0));
     ImGui::SameLine();
     ImGui::AlignTextToFramePadding();
@@ -573,7 +578,8 @@ void App::drawQRemeshGuides() {
 
 void App::drawProjectContents() {
     const ImGuiStyle& style = ImGui::GetStyle();
-    ImGui::SeparatorText("Project");
+    const float x0 = ImGui::GetCursorPosX(); // line start, inside the section indent
+    tray::GroupLabel(*this, "Project");
     const float half = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) * 0.5f;
     ui::ActionButton(*this, "subtool.project_all", ImVec2(half, 0));
     ImGui::SameLine();
@@ -584,7 +590,7 @@ void App::drawProjectContents() {
                  "size. Raise it if parts don't pick up the detail; lower it where surfaces are close together.",
                  kProjectPath);
     ImGui::SetNextItemWidth(half);
-    ImGui::SliderInt("##pblur", &retopo_.projectBlur, 0, 10, "PA Blur %d");
+    tray::SliderInt("##pblur", &retopo_.projectBlur, 0, 10, "PA Blur %d");
     ui::HelpText("PA Blur", nullptr, "Smooth the projected result this many times (softens noise from the source).",
                  kProjectPath);
     ImGui::SameLine();
@@ -594,7 +600,8 @@ void App::drawProjectContents() {
                  kProjectPath);
     ImGui::Checkbox("Geometry", &retopo_.projectGeometry);
     ui::HelpText("Geometry", nullptr, "Project the shape (into the active sculpt layer).", kProjectPath);
-    ImGui::SameLine(half + style.ItemSpacing.x);
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(x0 + half + style.ItemSpacing.x); // the right column, inside the section indent
     ImGui::Checkbox("Polypaint", &retopo_.projectPolypaint);
     ui::HelpText("Polypaint", nullptr, "Project the polypaint (into the active paint layer) when a source has any.",
                  kProjectPath);
