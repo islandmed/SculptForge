@@ -123,7 +123,9 @@ if(MSVC)
   target_compile_options(sculptforge_core PRIVATE /W4 /utf-8 /permissive-)
   target_compile_definitions(sculptforge_core PUBLIC NOMINMAX _USE_MATH_DEFINES)
 else()
-  target_compile_options(sculptforge_core PRIVATE -Wall -Wextra -Wno-unused-parameter)
+  # -ffp-contract=off: no fused multiply-adds, so a result doesn't depend on the optimisation level (distro
+  # packages build at -O2; face_weights' fast path is tested to match a full evaluation exactly).
+  target_compile_options(sculptforge_core PRIVATE -Wall -Wextra -Wno-unused-parameter -ffp-contract=off)
 endif()
 
 # --- Bring-your-own-AI (brush assistant). HTTPS via WinHTTP or libcurl. ---

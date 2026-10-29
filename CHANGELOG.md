@@ -6,6 +6,9 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Builds at other optimisation levels (Arch and Omarchy packages build at -O2) failed two face-shape tests: the core library no longer fuses multiply-adds, so results are the same at any level.
+
 ### Changed
 - Exports without a material of their own (FBX, USD) and splats made from an unpainted sculpt use the Soft Clay grey instead of the old peach.
 
