@@ -6,6 +6,22 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+A cleaner look: the default material is a matte Soft Clay on a charcoal background, orange marks only the
+current tool, and the bottom shelf's brush tiles are bigger, with a size you can choose.
+
+### Added
+- Bottom shelf tile sizes: Small, Medium (the new default, bigger than before) and Large. Right-click a brush on
+  the shelf and choose **Tile size**, or use **Preferences > Interface > Shelf tiles**.
+- **File > Export STL...** as its own menu item (it was inside the ZBrush (GoZ) submenu).
+
+### Changed
+- Soft Clay is the default material: matte, with a clear light and shadow side and a soft rim, so sculpted
+  detail reads at a glance. It is first in the material picker; a material you picked before is kept.
+- Orange now marks only the current tool or mode (Draw, Sculpt...). Options that are on (Zadd, symmetry X,
+  Pressure > Strength, Mask, Paint...) are a lighter grey with a thin orange line.
+- Every brush icon is drawn the same way, with a mark showing what the brush does.
+- The right tray's sections, the selected SubTool and the colour picker have a calmer, tidier style.
+
 ## [0.9.2] - 2026-10-28
 
 View in AR on Android works again, through the website instead of Google's viewer being handed a home-network

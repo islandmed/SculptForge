@@ -88,6 +88,17 @@ expect_not "Clay##brush.clay"
 click "##addbrush"
 click "Clay"
 expect "Clay##brush.clay"
+# Its tile size from the same menu (also Preferences > Interface > Shelf tiles).
+right_click "Clay##brush.clay"
+hover "Tile size"
+wait 0.2
+expect "Small"
+click "Large"
+expect "Clay##brush.clay"
+right_click "Clay##brush.clay"
+hover "Tile size"
+wait 0.2
+click "Medium"
 
 # Layout presets (title strip 1 2 3).
 click "2##ui.preset.2"

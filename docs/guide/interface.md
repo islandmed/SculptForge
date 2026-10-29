@@ -163,7 +163,7 @@ unmasked area with the main colour.
 - **Solo**: shows only the active SubTool (available with two or more SubTools).
 - **Splats**: shows or hides a Gaussian splat capture (only shown while one is loaded).
 
-Toggles that are on have an orange background. See [Navigating the view](navigation.md) for the camera.
+Options that are on are a lighter grey with a thin orange line; orange fill marks only the current tool or mode. See [Navigating the view](navigation.md) for the camera.
 
 ### Bottom shelf
 
@@ -178,6 +178,9 @@ The active brush has an orange outline.
   right-click a brush in the brush picker and choose **Add to bottom shelf**. Custom brushes show a small
   sparkle in the corner.
 - **Remove a brush**: right-click its tile and choose **Remove from shelf**.
+- **Bigger or smaller tiles**: right-click any brush on the shelf and choose **Tile size**: Small, Medium (the
+  default) or Large. The same setting is in **Preferences > Interface > Shelf tiles**. Small leaves the most
+  room for the model on a laptop screen.
 
 ## Pop-up pickers
 

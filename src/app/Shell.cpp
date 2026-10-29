@@ -1396,6 +1396,12 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
             if (index < int(list.size()) && list[size_t(index)] == item) list.erase(list.begin() + index);
             noteLayoutChanged();
         }
+        if (shelf == kShelfBottom && ImGui::BeginMenu("Tile size")) { // also in Preferences > Interface
+            static const char* kTiles[] = {"Small", "Medium", "Large"};
+            for (int i = 0; i < 3; ++i)
+                if (ImGui::MenuItem(kTiles[i], nullptr, layout_.shelfTiles == i)) layout_.shelfTiles = i;
+            ImGui::EndMenu();
+        }
         ImGui::EndPopup();
     }
     // Customize mode: widgets (sliders, tiles, readouts) are Ctrl+Alt drag sources too.
