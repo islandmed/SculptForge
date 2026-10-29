@@ -57,6 +57,9 @@ const PaletteDef* findPalette(std::string_view id) {
 
 namespace {
 
+// The hairline under each sub-palette header. Should become a theme token (Theme.h): a step above shellBg.
+constexpr ImU32 kSectionRule = IM_COL32(58, 58, 63, 160);
+
 // A row of equal-width action buttons filling the line.
 void actionRow(App& app, std::initializer_list<const char*> ids) {
     std::vector<const char*> present;
@@ -91,10 +94,13 @@ void menuAction(App& app, const char* id) {
     ui::HelpAction(app, id);
 }
 
-void hint(const char* text) {
+// Helper text under a palette's controls: small and dim, so it doesn't compete with them.
+void hint(const App& app, const char* text) {
+    if (app.smallFont()) ImGui::PushFont(app.smallFont());
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
     ImGui::TextWrapped("%s", text);
     ImGui::PopStyleColor();
+    if (app.smallFont()) ImGui::PopFont();
 }
 
 } // namespace
@@ -103,19 +109,25 @@ bool App::subpalette(const char* id, const char* title) {
     auto& open = layout_.openSubpalettes;
     bool isOpen = std::find(open.begin(), open.end(), id) != open.end();
     const float s = uiScale_;
-    const float h = 22.0f * s;
+    const float h = 24.0f * s;
     const ImVec2 p = ImGui::GetCursorScreenPos();
     const float w = ImGui::GetContentRegionAvail().x;
     const bool clicked = ImGui::InvisibleButton((std::string(title) + "##" + id).c_str(), ImVec2(w, h));
     const bool hovered = ImGui::IsItemHovered();
+    // A quiet section header: no fill until hovered or open, a hairline under it, a small chevron. The accent is
+    // kept for the current tool (docs/ui-design.md §10), so an open section is told apart by its fill and text only.
     ImDrawList* dl = ImGui::GetWindowDrawList();
-    dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), theme::u32(hovered ? theme::headerHover : theme::header, isOpen ? 1.0f : 0.75f),
-                      2.0f * s);
-    if (isOpen) dl->AddRectFilled(p, ImVec2(p.x + 2.0f * s, p.y + h), theme::u32(theme::accent), 0.0f);
-    const float ty = p.y + (h - ImGui::GetFontSize()) * 0.5f;
-    dl->AddText(ImVec2(p.x + 6.0f * s, ty), theme::u32(isOpen ? theme::accent : theme::textDim),
+    if (isOpen || hovered)
+        dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), theme::u32(hovered ? theme::headerHover : theme::header, isOpen ? 0.9f : 0.6f),
+                          2.0f * s);
+    dl->AddLine(ImVec2(p.x, p.y + h - 0.5f * s), ImVec2(p.x + w, p.y + h - 0.5f * s), kSectionRule, 1.0f * s);
+    ImFont* font = ImGui::GetFont();
+    const float chevronSize = ImGui::GetFontSize() * 0.8f;
+    dl->AddText(font, chevronSize, ImVec2(p.x + 6.0f * s, p.y + (h - chevronSize) * 0.5f),
+                theme::u32(isOpen || hovered ? theme::text : theme::textDim, isOpen ? 0.9f : 1.0f),
                 isOpen ? ICON_LC_CHEVRON_DOWN : ICON_LC_CHEVRON_RIGHT);
-    dl->AddText(ImVec2(p.x + 24.0f * s, ty), theme::u32(isOpen || hovered ? theme::text : theme::text, isOpen ? 1.0f : 0.85f), title);
+    const float ty = p.y + (h - ImGui::GetFontSize()) * 0.5f;
+    dl->AddText(ImVec2(p.x + 22.0f * s, ty), theme::u32(theme::text, isOpen || hovered ? 1.0f : 0.78f), title);
     ImGui::LogText("%s", title);
     ui::HelpText(title, nullptr,
                  "Click to open or close. Opening one closes the others (Shift+click keeps them open; Preferences > "
@@ -135,7 +147,7 @@ bool App::subpalette(const char* id, const char* title) {
         }
         isOpen = !isOpen;
     }
-    if (isOpen) ImGui::Dummy(ImVec2(0, 1.0f * s));
+    if (isOpen) ImGui::Dummy(ImVec2(0, 2.0f * s));
     return isOpen;
 }
 
@@ -200,7 +212,7 @@ void App::drawPalette_Draw() {
                  "size for the whole mesh, set by Detail. A preference (Store Config keeps it).",
                  "Draw > Dynamic topology");
     if (doc_.sculptor.dyntopo.enabled && !dyntopoBlocker(doc_.mesh).empty())
-        hint("This SubTool has subdivision levels, so strokes don't remesh it: delete the lower (or higher) levels "
+        hint(*this, "This SubTool has subdivision levels, so strokes don't remesh it: delete the lower (or higher) levels "
              "first.");
     ImGui::SeparatorText("Tablet");
     ImGui::Checkbox("Pressure > strength", &pressureStrength_);
@@ -251,7 +263,7 @@ void App::drawPalette_File() {
 
 void App::drawPalette_Generate() {
     actionRow(*this, {"ui.generate3d"});
-    hint("Image or text to a sculptable 3D model: Hugging Face (free), fal.ai, Meshy, your ComfyUI server, your own "
+    hint(*this, "Image or text to a sculptable 3D model: Hugging Face (free), fal.ai, Meshy, your ComfyUI server, your own "
          "command, or an offline blockout.");
     ImGui::SeparatorText("From an image");
     if (ImGui::Button(refImage_.empty() ? "Choose image...##generate" : "Change image...##generate", ImVec2(-1, 0))) {
@@ -348,7 +360,7 @@ void App::drawPalette_Script() {
     actionRow(*this, {"script.run_file"});
     actionRow(*this, {"script.copy_session", "script.clear_console"});
     if (!any)
-        hint("Every action is a script command: run them with --script \"subdivide; remesh resolution=200\" or the "
+        hint(*this, "Every action is a script command: run them with --script \"subdivide; remesh resolution=200\" or the "
              "sculptforge-cli tool.");
 }
 
