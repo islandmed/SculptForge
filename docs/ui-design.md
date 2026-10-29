@@ -476,18 +476,21 @@ Clicking a preset applies it (layout only). Store Config makes it stick.
 
 ## 10. Theme
 
-Keep the existing orange accent. Make it denser and greyer, like ZBrush. Put this in `applyStyle()` (to be moved to `src/app/Theme.cpp`) as named constants:
+Keep the existing orange accent, but only for **one thing per group**: the current tool or mode (`ui::IsModeAction`). Everything else is charcoal grey. Put this in `applyStyle()` (to be moved to `src/app/Theme.cpp`) as named constants:
 
 | Token | Value | Use |
 |---|---|---|
-| `shellBg` | `#1e1e20` | shelves, trays, title strip, area around the canvas |
-| `panelBg` | `#252528` | palette drop-downs, tray contents, pop-ups (`WindowBg`, `PopupBg` at 98%) |
-| `header` | `#2e2e32` / hover `#3a3a3f` | palette and sub-palette headers |
-| `frame` | `#2b2b2f` / hover `#36363b` | slider and input frames |
-| `button` | `#38383c` / hover `#47474c` / pressed `#e8812a` | buttons |
-| `accent` | `#f0882e` (hover `#ff9a45`) | toggled-on buttons (bg accent, text `#ffffff`), slider grab, check marks, selected outline, LightBox active tab |
+| `shellBg` | `#1b1b1d` | shelves, trays, title strip, area around the canvas |
+| `panelBg` | `#222225` | palette drop-downs, tray contents, pop-ups (`WindowBg`, `PopupBg` at 98%) |
+| `header` | `#2b2b2f` / hover `#37373c` | palette and sub-palette headers |
+| `frame` | `#28282c` / hover `#323237` | slider and input frames |
+| `button` | `#333337` / hover `#414146` / pressed `#4e4e55` | buttons |
+| `accent` | `#f0882e` (hover `#ff9a45`) | the **current tool or mode** of a group (bg accent, text `#ffffff`): Draw/Move/Scale/Rotate, Sculpt/Paint, the brush, MaskPen/MaskLasso...; slider grab and bar, check marks, LightBox active tab |
+| `toggleOn` | `#4a4a50` (hover `#56565c`), text `textBright` `#f2f2f2` | options that are on (Zadd, X, Pressure > Strength, Mask, Menus): raised grey with a 2 px accent underline (a side bar on the right shelf), never a solid accent fill |
+| `trough` | `#242428` | unselected segments of a mode group; the 1 2 3 presets |
+| `selection` | accent at 18% | selected list rows (`ImGuiCol_Header`), with a 2 px accent bar on the left |
 | `text` / `textDim` | `#d8d8d8` / `#8c8c90` | |
-| `border` | `#121214` | 1 px between regions |
+| `border` | `#111113` | 1 px between regions |
 | `danger` | `#e5604a` | errors |
 | canvas | the existing gradient; 1 px `#0e0e10` frame | |
 
@@ -495,6 +498,7 @@ Style:
 - Rounding: `WindowRounding 0` (shells), `PopupRounding 6`, `FrameRounding 3`, `GrabRounding 2`.
 - Spacing: `FramePadding (6,3)`, `ItemSpacing (4,4)`, `ItemInnerSpacing (4,4)`.
 - `ScrollbarSize 10`, `GrabMinSize 6`.
+- Top shelf hierarchy: mode groups full size on a trough; options 12 px, 22 px high, dim until on; LightBox / AI Brush plain buttons. The title strip's QuickSave, 1 2 3 and Menus have no fill until hovered; its readout is 12 px.
 - Font: Inter Regular 15 x scale (as now). Shelf labels and tile captions 12 px (a second Inter size), help titles Inter SemiBold 15, console ProggyClean 13.
 
 ---

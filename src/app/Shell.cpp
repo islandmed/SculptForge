@@ -163,6 +163,7 @@ std::string elide(ImFont* font, const std::string& text, float width) {
 bool segmentPair(const std::string& a, const std::string& b) {
     auto group = [](const std::string& id) {
         if (id == "draw.sculpt" || id == "draw.paint") return 1;
+        if (id == "tool.draw" || id == "tool.move" || id == "tool.scale" || id == "tool.rotate") return 5;
         if (id == "draw.zadd" || id == "draw.zsub") return 2;
         if (id.rfind("transform.symmetry_", 0) == 0) return 3;
         if (id.rfind("draw.pressure_", 0) == 0) return 4;
@@ -201,10 +202,14 @@ bool drawShelfTile(App& app, const Action& a, ImVec2 size) {
     ImFont* caption = look == int(ui::Look::IconLabel) ? app.fontTiny_ : app.fontSmall_;
     const float capH = caption ? caption->FontSize + 2.0f * s : 14.0f * s;
     if (look == int(ui::Look::IconLabel)) {
-        const ImVec4 bg = on ? (hovered ? theme::accentHover : theme::accent)
+        // Right-shelf toggles are options (Mask, Paint, PolyF): on is a raised grey with an accent bar down the
+        // side that faces the canvas, off is quiet; only a mode action gets the accent fill.
+        const bool mode = ui::IsModeAction(a.id);
+        const ImVec4 bg = on ? (mode ? (hovered ? theme::accentHover : theme::accent) : hovered ? theme::toggleOnHover : theme::toggleOn)
                              : held ? theme::buttonPressed : hovered ? theme::buttonHover : theme::frame;
         dl->AddRectFilled(p0, p1, theme::u32(bg, alpha), 4.0f * s);
-        const ImU32 fg = theme::u32(on ? theme::textOnAccent : theme::text, alpha);
+        if (on && !mode) ui::DrawOnMark(dl, p0, p1, true);
+        const ImU32 fg = theme::u32(on ? (mode ? theme::textOnAccent : theme::textBright) : hovered || !a.checked ? theme::text : theme::textDim, alpha);
         centredText(dl, app.fontIcons_, p0, ImVec2(p1.x, p1.y - capH + 2.0f * s), fg, a.icon ? a.icon : "?");
         centredText(dl, caption, ImVec2(p0.x, p1.y - capH), ImVec2(p1.x, p1.y - 1.0f * s), fg,
                     elide(caption ? caption : ImGui::GetFont(), a.label, size.x - 2.0f * s).c_str());
@@ -691,10 +696,11 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     if (quickSave) rightW += buttonW("QuickSave") + 8.0f * s;
     const float rightX = g.title.w - 8.0f * s - rightW;
 
-    // Info readout and the status message, elided to fit.
+    // Info readout and the status message, elided to fit: secondary, so in the 12 px font.
     ImGui::SameLine(0.0f, 14.0f * s);
     const float infoX = ImGui::GetCursorPosX();
-    ImGui::SetCursorPosY(textY);
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
+    ImGui::SetCursorPosY(std::floor((h - ImGui::GetTextLineHeight()) * 0.5f));
     size_t tris = 0, verts = 0;
     for (int i = 0; i < doc_.subtoolCount(); ++i) {
         tris += doc_.subtoolMesh(i).triangleCount();
@@ -739,11 +745,23 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     } else {
         ImGui::TextDisabled("%s", elide(ImGui::GetFont(), info, std::max(0.0f, avail)).c_str());
     }
+    if (fontSmall_) ImGui::PopFont();
 
+    // QuickSave, the layout presets and Menus are quiet: no fill until hovered, dim labels, so the title strip
+    // doesn't compete with the shelves (Menus on is an option: raised grey with an underline).
     ImGui::SetCursorPos(ImVec2(rightX, (h - buttonH) * 0.5f));
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme::headerHover);
+    ImGui::PushStyleColor(ImGuiCol_Text, theme::textDim);
     if (quickSave) {
         ui::ActionButton(*this, "file.quicksave", ImVec2(0, buttonH));
         ImGui::SameLine(0.0f, 8.0f * s);
+    }
+    {
+        // 1 2 3 read as one control on a trough.
+        const ImVec2 p = ImGui::GetCursorScreenPos();
+        const float segW = buttonH + 2.0f * s;
+        dl->AddRectFilled(p, ImVec2(p.x + 3.0f * segW + 2.0f * 2.0f * s, p.y + buttonH), theme::u32(theme::trough), 3.0f * s);
     }
     for (int i = 1; i <= 3; ++i) {
         ui::ActionButton(*this, ("ui.preset." + std::to_string(i)).c_str(), ImVec2(buttonH + 2.0f * s, buttonH));
@@ -752,6 +770,7 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     }
     ImGui::SameLine(0.0f, 8.0f * s);
     ui::ActionButton(*this, "ui.menus", ImVec2(0, buttonH), ui::Look::IconLabel);
+    ImGui::PopStyleColor(3);
     ImGui::SameLine(0.0f, 8.0f * s);
     // Search: a field-looking button that opens the command palette (F3).
     {
@@ -883,7 +902,7 @@ bool App::paletteHeader(const char* id, bool inTray, bool right) {
     else
         ui::HelpText("Move to the tray", nullptr,
                      "Keep this palette in the right tray (Shift+click: left tray), or drag the icon onto a tray.", def->name);
-    centredText(dl, nullptr, p, ImVec2(p.x + h, p.y + h), theme::u32(iconHovered ? theme::accentHover : theme::accent),
+    centredText(dl, nullptr, p, ImVec2(p.x + h, p.y + h), theme::u32(iconHovered ? theme::accentHover : theme::textDim),
                 inTray ? (right ? ICON_LC_PANEL_RIGHT : ICON_LC_PANEL_LEFT) : ICON_LC_PANEL_RIGHT);
     ImGui::SameLine();
     const bool titleClicked = ImGui::InvisibleButton("##title", ImVec2(std::max(1.0f, w - 2.0f * h), h));
@@ -1324,10 +1343,41 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
                             : shelf == kShelfBottom ? ImVec2(bottomTileW_, 54.0f * s)
                                                     : ImVec2(winW - 2.0f * padX, 60.0f * s);
         centre(size.x);
-        if (shelf == kShelfTop) ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f * s, (rowH - ImGui::GetFontSize()) * 0.5f));
+        // Top shelf hierarchy: the mode groups (Draw | Move | Scale | Rotate, Sculpt | Paint) are full-size
+        // segments on a dark trough with the current one in the accent; options (Zadd, X, Pressure...) are
+        // smaller, dimmer and in the 12 px font; the rest (LightBox, AI Brush) are plain buttons.
+        const bool mode = ui::IsModeAction(a->id);
+        const bool option = !mode && a->checked && a->id.rfind("ui.", 0) != 0;
+        ImVec2 itemSize = size;
+        int colors = 0;
+        bool small = false;
+        if (shelf == kShelfTop) {
+            if (option) {
+                itemSize.y = rowH - 4.0f * s;
+                ImGui::BeginGroup(); // centred in the row; the group keeps the next item on the row's top line
+                ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 2.0f * s);
+                small = fontSmall_ != nullptr;
+                if (small) ImGui::PushFont(fontSmall_);
+                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f * s, (itemSize.y - ImGui::GetFontSize()) * 0.5f));
+                ImGui::PushStyleColor(ImGuiCol_Button, theme::frame);
+                ImGui::PushStyleColor(ImGuiCol_Text, theme::textDim);
+                colors = 2;
+            } else {
+                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f * s, (rowH - ImGui::GetFontSize()) * 0.5f));
+                if (mode) {
+                    ImGui::PushStyleColor(ImGuiCol_Button, theme::trough);
+                    colors = 1;
+                }
+            }
+        }
         ui::SetNextItemOrigin(shelf, index); // ActionButton is the Ctrl+Alt drag source, from this shelf slot
-        ui::ActionButton(*this, a->id.c_str(), size, look);
-        if (shelf == kShelfTop) ImGui::PopStyleVar();
+        ui::ActionButton(*this, a->id.c_str(), itemSize, look);
+        if (shelf == kShelfTop) {
+            ImGui::PopStyleColor(colors);
+            ImGui::PopStyleVar();
+            if (small) ImGui::PopFont();
+            if (option) ImGui::EndGroup();
+        }
     } else {
         ImGui::Dummy(ImVec2(0, 0)); // an id this version doesn't know: keep its place in the list
     }

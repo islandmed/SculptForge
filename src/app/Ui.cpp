@@ -4,6 +4,7 @@
 
 #include "app/App.h"
 #include "app/Shell.h"
+#include "app/Theme.h"
 
 #include <imgui_internal.h>
 
@@ -105,6 +106,20 @@ void HelpText(const char* title, const char* shortcut, const char* description, 
     g_help.description = description ? description : "";
     g_help.path = path ? path : "";
     g_help.disabled = (ImGui::GetItemFlags() & ImGuiItemFlags_Disabled) != 0;
+}
+
+bool IsModeAction(std::string_view id) {
+    auto starts = [&](std::string_view p) { return id.substr(0, p.size()) == p; };
+    if (id == "tool.draw" || id == "tool.move" || id == "tool.scale" || id == "tool.rotate") return true;
+    if (id == "draw.sculpt" || id == "draw.paint") return true;
+    return starts("brush.") || starts("mask.") || starts("select.");
+}
+
+void DrawOnMark(ImDrawList* dl, ImVec2 a, ImVec2 b, bool side) {
+    const float w = std::max(1.0f, std::floor(theme::markWidth * uiScale() + 0.5f));
+    const float r = ImGui::GetStyle().FrameRounding;
+    if (side) dl->AddRectFilled(a, ImVec2(a.x + w, b.y), theme::u32(theme::accent), r, ImDrawFlags_RoundCornersLeft);
+    else dl->AddRectFilled(ImVec2(a.x, b.y - w), b, theme::u32(theme::accent), r, ImDrawFlags_RoundCornersBottom);
 }
 
 void Segmented(App& app, std::initializer_list<const char*> actionIds, float width) {
@@ -229,11 +244,13 @@ bool ActionButton(App& app, const char* actionId, ImVec2 size, Look look) {
     if (look == Look::Icon && size.x <= 0.0f) size = ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight());
     if (look == Look::Tile && size.x <= 0.0f) size = ImVec2(44.0f * s, 40.0f * s);
 
+    // On: the accent fill for the current mode, a raised grey with an accent underline for an option.
+    const bool mode = IsModeAction(id);
     int colors = 0;
     if (checked) {
-        ImGui::PushStyleColor(ImGuiCol_Button, rgba(color::accent));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, rgba(color::accentHover));
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 1));
+        ImGui::PushStyleColor(ImGuiCol_Button, mode ? theme::accent : theme::toggleOn);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, mode ? theme::accentHover : theme::toggleOnHover);
+        ImGui::PushStyleColor(ImGuiCol_Text, mode ? theme::textOnAccent : theme::textBright);
         colors = 3;
     }
     ImGui::BeginDisabled(!enabled);
@@ -269,7 +286,8 @@ bool ActionButton(App& app, const char* actionId, ImVec2 size, Look look) {
         ImGui::PopStyleColor();
         const ImRect r(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
         ImDrawList* dl = ImGui::GetWindowDrawList();
-        const ImU32 fg = !enabled ? color::textDim : checked ? IM_COL32_WHITE : color::text;
+        const ImU32 fg = !enabled ? color::textDim : checked ? theme::u32(mode ? theme::textOnAccent : theme::textBright)
+                                                              : ImGui::GetColorU32(ImGuiCol_Text);
         if (look == Look::Icon) {
             const ImVec2 is = ImGui::CalcTextSize(icon);
             dl->AddText(ImVec2(std::floor(r.GetCenter().x - is.x * 0.5f), std::floor(r.GetCenter().y - is.y * 0.5f)), fg, icon);
@@ -295,6 +313,8 @@ bool ActionButton(App& app, const char* actionId, ImVec2 size, Look look) {
     }
     ImGui::EndDisabled();
     if (colors) ImGui::PopStyleColor(colors);
+    if (checked && !mode && look != Look::Tile)
+        DrawOnMark(ImGui::GetWindowDrawList(), ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
 
     const bool customize = app.layout().customize;
     dragSource(app, id.c_str(), label.c_str(), shelf, index);
@@ -340,7 +360,7 @@ bool SliderInside(const char* id, float* v, float lo, float hi, const char* form
     t = std::clamp(t, 0.0f, 1.0f);
     const float rounding = ImGui::GetStyle().FrameRounding;
     dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), ImGui::GetColorU32(ImGuiCol_FrameBg), rounding);
-    dl->AddRectFilled(p, ImVec2(p.x + w * t, p.y + h), IM_COL32(0xf0, 0x88, 0x2e, active ? 0x48 : 0x30), rounding);
+    dl->AddRectFilled(p, ImVec2(p.x + w * t, p.y + h), theme::u32(theme::sliderFill, active ? 1.6f : 1.0f), rounding);
     const float bar = std::max(2.0f, std::floor(h * 0.1f));
     dl->AddRectFilled(ImVec2(p.x, p.y + h - bar), ImVec2(p.x + w * t, p.y + h), active ? color::accentHover : color::accent,
                       rounding, ImDrawFlags_RoundCornersBottomLeft);

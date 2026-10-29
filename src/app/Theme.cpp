@@ -32,9 +32,9 @@ void applyStyle() {
     ImVec4* c = s.Colors;
     c[ImGuiCol_Text] = text;
     c[ImGuiCol_TextDisabled] = textDim;
-    c[ImGuiCol_WindowBg] = rgb(0x252528, 0.98f);
+    c[ImGuiCol_WindowBg] = ImVec4(panelBg.x, panelBg.y, panelBg.z, 0.98f);
     c[ImGuiCol_ChildBg] = ImVec4(0, 0, 0, 0);
-    c[ImGuiCol_PopupBg] = rgb(0x252528, 0.98f);
+    c[ImGuiCol_PopupBg] = ImVec4(panelBg.x, panelBg.y, panelBg.z, 0.98f);
     c[ImGuiCol_Border] = rgb(0x3a3a3f, 0.9f);
     c[ImGuiCol_BorderShadow] = ImVec4(0, 0, 0, 0);
     c[ImGuiCol_FrameBg] = frame;
@@ -54,9 +54,9 @@ void applyStyle() {
     c[ImGuiCol_Button] = button;
     c[ImGuiCol_ButtonHovered] = buttonHover;
     c[ImGuiCol_ButtonActive] = buttonPressed;
-    c[ImGuiCol_Header] = rgb(0xf0882e, 0.55f);
+    c[ImGuiCol_Header] = selection; // selected rows: a tint, not a solid bar (the accent is for the current tool)
     c[ImGuiCol_HeaderHovered] = headerHover;
-    c[ImGuiCol_HeaderActive] = rgb(0xf0882e, 0.75f);
+    c[ImGuiCol_HeaderActive] = rgb(0xf0882e, 0.28f);
     c[ImGuiCol_Separator] = rgb(0x3a3a3f);
     c[ImGuiCol_SeparatorHovered] = accentHover;
     c[ImGuiCol_SeparatorActive] = accent;
@@ -76,7 +76,7 @@ void applyStyle() {
     c[ImGuiCol_TableBorderLight] = rgb(0x323236);
     c[ImGuiCol_TableRowBg] = ImVec4(0, 0, 0, 0);
     c[ImGuiCol_TableRowBgAlt] = rgb(0xffffff, 0.025f);
-    c[ImGuiCol_TextSelectedBg] = rgb(0xf0882e, 0.35f);
+    c[ImGuiCol_TextSelectedBg] = rgb(0xf0882e, 0.30f);
     c[ImGuiCol_DragDropTarget] = accentHover;
     c[ImGuiCol_NavCursor] = accent;
     c[ImGuiCol_ModalWindowDimBg] = rgb(0x000000, 0.45f);

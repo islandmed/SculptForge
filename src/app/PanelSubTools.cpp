@@ -6,6 +6,7 @@
 // the ZBrush viewport gesture Alt+click to select a SubTool. Every action goes
 // through the subtool_* commands (core/SubTools.cpp).
 #include "app/App.h"
+#include "app/Ui.h"
 #include "core/Multires.h"
 
 #include <algorithm>
@@ -164,6 +165,8 @@ void App::drawSubToolsContents() {
                                           ImGuiSelectableFlags_AllowDoubleClick | ImGuiSelectableFlags_NoAutoClosePopups) &&
                     !isActive)
                     selectIndex = i;
+                if (isActive) // the selected row: a tint (ImGuiCol_Header) and a 2 px accent bar
+                    ui::DrawOnMark(ImGui::GetWindowDrawList(), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), true);
                 if (!s.visible) ImGui::PopStyleColor();
                 if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
                     renamingSubtool_ = s.id;
