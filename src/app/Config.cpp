@@ -241,6 +241,11 @@ void App::initActions() {
     add("file.export_glb", "Export GLB...", "File > Export", "Ctrl+E", [this] { saveFileDialog(FileAction::ExportGlb); },
         ICON_LC_PACKAGE, nullptr, nullptr, nullptr,
         "Export the model as glTF binary, with sculpt layers as blend shapes (morph targets).");
+    add("file.export_stl", "Export STL...", "File > Export", nullptr, [this] {
+            static const SDL_DialogFileFilter filters[] = {{"STL", "stl"}, {"All files", "*"}};
+            SDL_ShowSaveFileDialog(onGozFileChosen, &gozDialogs_[int(GozFile::ExportStl)], window_, filters, 2, nullptr);
+        },
+        nullptr, nullptr, nullptr, nullptr, "Save the visible SubTools as one binary STL, for 3D printing.");
     add("file.send_unreal", "Send to Unreal", "File > Export", "Ctrl+U", [this] { sendToUnreal(); }, ICON_LC_SEND, nullptr,
         nullptr, [this] { return !pendingUnreal_.valid(); },
         "Export a game-ready FBX and import it into the running Unreal Editor (Python remote execution).");

@@ -234,6 +234,7 @@ void App::drawPalette_File() {
     ImGui::SeparatorText("Import / Export");
     menuAction(*this, "file.import");
     menuAction(*this, "file.export_obj");
+    menuAction(*this, "file.export_stl");
     menuAction(*this, "file.export_glb");
     menuAction(*this, "file.export_lods");
     menuAction(*this, "file.export_usd");

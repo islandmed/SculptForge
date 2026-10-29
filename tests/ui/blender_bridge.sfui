@@ -16,6 +16,7 @@ shot received
 
 # The menu: File > Blender, with Ctrl-hover help on its items.
 click "File##palette.file"
+expect "Export STL...##file.export_stl"
 hover "Blender"
 wait 0.2
 expect "Send to Blender##file.send_blender"

@@ -13,7 +13,6 @@ namespace sf {
 namespace {
 
 const SDL_DialogFileFilter kGozFilters[] = {{"ZBrush GoZ", "GoZ;goz"}, {"All files", "*"}};
-const SDL_DialogFileFilter kStlFilters[] = {{"STL", "stl"}, {"All files", "*"}};
 
 long long fileTime(const std::string& path) {
     if (path.empty()) return 0;
@@ -69,8 +68,6 @@ void App::drawGozMenu() {
         SDL_ShowOpenFileDialog(onGozFileChosen, &gozDialogs_[int(GozFile::Import)], window_, kGozFilters, 2, nullptr, false);
     if (ImGui::MenuItem("Export GoZ..."))
         SDL_ShowSaveFileDialog(onGozFileChosen, &gozDialogs_[int(GozFile::Export)], window_, kGozFilters, 2, nullptr);
-    if (ImGui::MenuItem("Export STL..."))
-        SDL_ShowSaveFileDialog(onGozFileChosen, &gozDialogs_[int(GozFile::ExportStl)], window_, kStlFilters, 2, nullptr);
     ImGui::EndMenu();
 }
 
