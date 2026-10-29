@@ -27,8 +27,17 @@ struct ShellGeometry {
 // Logical sizes at scale 1 (docs/ui-design.md §2.1).
 namespace shell {
 constexpr float kTitleH = 24, kPaletteBarH = 22, kTopShelfH = 64, kLeftShelfW = 88, kLeftShelfNarrowW = 72;
-constexpr float kRightShelfW = 52, kBottomShelfH = 60, kDividerW = 8, kTrayMinW = 240, kTrayMaxW = 480;
+constexpr float kRightShelfW = 52, kDividerW = 8, kTrayMinW = 240, kTrayMaxW = 480;
 constexpr float kConsoleMinH = 100, kConsoleMaxH = 400, kNarrowWidth = 1280, kWideWidth = 1920;
+
+// The bottom shelf for a Shelf tiles setting (UiLayout::shelfTiles): its height and its brush tiles' height and
+// width range (tiles shrink to the minimum, the same for every size, before the shelf scrolls), logical px.
+struct BottomShelfSize {
+    float shelfH, tileH, tileMinW, tileMaxW;
+};
+constexpr BottomShelfSize bottomShelfSize(int tiles) {
+    return tiles <= 0 ? BottomShelfSize{60, 54, 44, 58} : tiles == 1 ? BottomShelfSize{78, 72, 44, 78} : BottomShelfSize{96, 90, 44, 96};
+}
 } // namespace shell
 
 // Effective tray width in logical px: the stored width, except that the standard 300 grows to 320 on

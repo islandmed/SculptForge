@@ -1110,7 +1110,8 @@ void App::drawShelf(int shelf, const CanvasRect& r) {
     if (shelf == kShelfBottom) {
         const int tiles = int(std::count_if(list.begin(), list.end(), [](const std::string& id) { return id != "sep" && id != "row"; }));
         const float avail = r.w - 2.0f * pad.x - 48.0f * s; // the [+] tile is narrower
-        bottomTileW_ = std::clamp(avail / float(std::max(tiles - 1, 1)) - 4.0f * s, 44.0f * s, 58.0f * s);
+        const shell::BottomShelfSize size = shell::bottomShelfSize(layout_.shelfTiles);
+        bottomTileW_ = std::clamp(avail / float(std::max(tiles - 1, 1)) - 4.0f * s, size.tileMinW * s, size.tileMaxW * s);
     }
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f * s, 4.0f * s));
     bool lineStart = true;
@@ -1307,7 +1308,7 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
                         mode == 0 ? ICON_LC_HAND : mode == 1 ? ICON_LC_ZOOM_IN : ICON_LC_ROTATE_3D,
                         mode == 0 ? "Move" : mode == 1 ? "Zoom" : "Rotate", mode);
     } else if (item == "widget.add_brush") {
-        const ImVec2 size(48.0f * s, 54.0f * s);
+        const ImVec2 size(48.0f * s, shell::bottomShelfSize(layout_.shelfTiles).tileH * s);
         if (ImGui::InvisibleButton("##addbrush", size)) // the brush picker in "add to shelf" mode (Pickers.cpp)
             openBrushPickerForShelf(ImVec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMin().y - 8.0f * s));
         const bool hovered = ImGui::IsItemHovered();
@@ -1324,7 +1325,7 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         int found = -1;
         for (int i = 0; i < int(doc_.brushes.size()); ++i)
             if (doc_.brushes[size_t(i)].name == name) found = i;
-        const ImVec2 size(bottomTileW_, 54.0f * s);
+        const ImVec2 size(bottomTileW_, shell::bottomShelfSize(layout_.shelfTiles).tileH * s);
         const bool clicked = ImGui::InvisibleButton((name + "##" + item).c_str(), size);
         const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
         ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -1354,7 +1355,7 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         const ui::Look look = shelf != kShelfTop ? ui::Look::Tile : a->icon ? ui::Look::IconLabel : ui::Look::Label;
         const ImVec2 size = shelf == kShelfTop      ? ImVec2(0.0f, rowH)
                             : shelf == kShelfRight  ? ImVec2(44.0f * s, 40.0f * s)
-                            : shelf == kShelfBottom ? ImVec2(bottomTileW_, 54.0f * s)
+                            : shelf == kShelfBottom ? ImVec2(bottomTileW_, shell::bottomShelfSize(layout_.shelfTiles).tileH * s)
                                                     : ImVec2(winW - 2.0f * padX, 60.0f * s);
         centre(size.x);
         // Top shelf hierarchy, by meaning (docs/ui-design.md §10). Every item is the full row height in the same

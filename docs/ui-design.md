@@ -62,7 +62,7 @@ All sizes are logical px at `uiScale_ = 1` and get multiplied by `uiScale_`. She
 | Top shelf | h 64 (two rows of 26 + padding) | from left-tray edge to right-tray edge |
 | Left shelf | w 88 (tiles 76x76 + 12 label) | between top and bottom shelf |
 | Right shelf | w 52 (buttons 44x40, icon + 10 px label) | between top and bottom shelf |
-| Bottom shelf | h 60 (tiles 40 icon + 12 label) | same span as top shelf |
+| Bottom shelf | h 78 (Medium tiles; Small h 60, Large h 96 - Preferences > Interface > Shelf tiles) | same span as top shelf |
 | Console (closed by default) | h 160, drag 100-400 | above bottom shelf, same span |
 | Tray divider | w 8 each side, always visible | top of palette bar to bottom |
 | Right tray | w 300 (1600 wide) / 320 (>=1920), drag 240-480 | palette bar bottom to window bottom |
@@ -219,7 +219,7 @@ Icon + tiny label, 44x40 each. Groups are separated by 8 px.
 
 Toggles that are on get an accent background.
 
-### 3.6 Bottom shelf (h 60): quick brushes (ZBrush Core / Blender asset shelf)
+### 3.6 Bottom shelf (h 78, Medium tiles): quick brushes (ZBrush Core / Blender asset shelf)
 Default contents, in order: Standard, Clay, ClayBuildup, DamStandard, Move, Smooth, Inflate, Pinch, Flatten, Crease, Trim, SnakeHook, Layer, Nudge, Paint. Then any custom brushes the user adds, and a `[+]` tile that opens the brush picker in "add to shelf" mode.
 
 Tiles are 40 px brush thumbnails with the name under them. The active brush gets an accent outline. Hotkey digits (1-9, 0) are drawn small in the tile's top-left. Right-click a tile: "Remove from shelf", "Assign shortcut...". Right-click in the brush picker: "Add to bottom shelf".

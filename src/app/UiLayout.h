@@ -34,6 +34,7 @@ struct UiLayout {
     int lightboxRows = 1;
     std::string lightboxTab = "project";
     bool lightboxBottom = false;
+    int shelfTiles = 1; // bottom shelf brush tiles: 0 small, 1 medium, 2 large (shell::bottomShelfSize)
     bool customize = false; // runtime only, never stored
 };
 

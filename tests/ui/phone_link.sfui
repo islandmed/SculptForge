@@ -61,7 +61,7 @@ phone_request GET /ar/model.usdz 200
 phone_request GET /ar/model.glb 200
 expect_text "On the phone:"
 wait 3
-stroke 0.3 0.88 0.7 0.88   # (below the window)
+stroke 0.3 0.93 0.7 0.93   # (below the window)
 wait 0.3
 wait_idle 120
 expect_value phone_ar_version == 2

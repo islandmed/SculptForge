@@ -47,7 +47,7 @@ ShellGeometry computeShell(const UiLayout& l, float W, float H, float s, float t
     const float span = std::max(0.0f, right - left);
 
     const float topH = g.shelves ? kTopShelfH * s : 0.0f;
-    const float bottomH = g.shelves ? kBottomShelfH * s : 0.0f;
+    const float bottomH = g.shelves ? bottomShelfSize(l.shelfTiles).shelfH * s : 0.0f;
     g.topShelf = {left, top, span, topH};
     g.bottomShelf = {left, H - bottomH, span, bottomH};
     const float consoleH = l.consoleOpen ? std::clamp(l.consoleHeight, kConsoleMinH, kConsoleMaxH) * s : 0.0f;

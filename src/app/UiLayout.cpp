@@ -69,6 +69,7 @@ Json toJson(const UiLayout& l) {
     j.set("lightboxRows", double(l.lightboxRows));
     j.set("lightboxTab", l.lightboxTab);
     j.set("lightboxBottom", l.lightboxBottom);
+    j.set("shelfTiles", double(l.shelfTiles));
     return j;
 }
 
@@ -106,6 +107,7 @@ bool fromJson(const Json& j, UiLayout& l, std::string& error) {
     out.lightboxRows = int(j["lightboxRows"].asNumber(out.lightboxRows));
     if (j["lightboxTab"].isString()) out.lightboxTab = j["lightboxTab"].asString();
     flag("lightboxBottom", out.lightboxBottom);
+    out.shelfTiles = std::clamp(int(j["shelfTiles"].asNumber(out.shelfTiles)), 0, 2);
     l = std::move(out);
     return true;
 }

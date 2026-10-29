@@ -25,26 +25,38 @@ bool rectIs(const CanvasRect& r, float x, float y, float w, float h) {
 TEST(shell_standard_layout_1600x960) {
     const ShellGeometry g = computeShell(standardLayout(), 1600, 960, 1.0f);
     CHECK(!g.narrow);
-    CHECK(rectIs(g.canvas, 96, 110, 1144, 790));             // §2.2
+    CHECK(rectIs(g.canvas, 96, 110, 1144, 772));             // §2.2 (medium shelf tiles)
     CHECK(rectIs(g.rightTray, 1300, 46, 300, 914));
     CHECK(rectIs(g.rightDivider, 1292, 46, 8, 914));
-    CHECK(rectIs(g.rightShelf, 1240, 110, 52, 790));
-    CHECK(rectIs(g.leftShelf, 8, 110, 88, 790));
+    CHECK(rectIs(g.rightShelf, 1240, 110, 52, 772));
+    CHECK(rectIs(g.leftShelf, 8, 110, 88, 772));
     CHECK(rectIs(g.topShelf, 8, 46, 1284, 64));
-    CHECK(rectIs(g.bottomShelf, 8, 900, 1284, 60));
+    CHECK(rectIs(g.bottomShelf, 8, 882, 1284, 78));
     CHECK(near(g.leftTray.w, 0));
+}
+
+TEST(shell_bottom_shelf_tile_sizes) {
+    UiLayout l = standardLayout();
+    l.shelfTiles = 0; // small: the canvas gets the height back
+    CHECK(rectIs(computeShell(l, 1600, 960, 1.0f).bottomShelf, 8, 900, 1284, 60));
+    CHECK(near(computeShell(l, 1600, 960, 1.0f).canvas.h, 790));
+    l.shelfTiles = 2;
+    CHECK(near(computeShell(l, 1600, 960, 1.0f).bottomShelf.h, 96));
+    UiLayout back;
+    std::string err;
+    CHECK(fromJson(toJson(l), back, err) && back.shelfTiles == 2);
 }
 
 TEST(shell_standard_layout_1920x1080) {
     const ShellGeometry g = computeShell(standardLayout(), 1920, 1080, 1.0f);
-    CHECK(rectIs(g.canvas, 96, 110, 1444, 910)); // §2.3: the extra width goes to the canvas
+    CHECK(rectIs(g.canvas, 96, 110, 1444, 892)); // §2.3: the extra width goes to the canvas
     CHECK(near(g.rightTray.w, 320));
     CHECK(near(g.rightDivider.x, 1592));
 }
 
 TEST(shell_scales_with_the_ui) {
     const ShellGeometry g = computeShell(standardLayout(), 3200, 1920, 2.0f);
-    CHECK(rectIs(g.canvas, 192, 220, 2288, 1580));
+    CHECK(rectIs(g.canvas, 192, 220, 2288, 1544));
 }
 
 TEST(shell_hidden_shelves_console_and_trays) {
@@ -57,8 +69,8 @@ TEST(shell_hidden_shelves_console_and_trays) {
     l.consoleOpen = true;
     l.consoleHeight = 160;
     g = computeShell(l, 1600, 960, 1.0f);
-    CHECK(near(g.canvas.y + g.canvas.h, 740)); // §2.2: the console pushes the canvas bottom up
-    CHECK(rectIs(g.console, 8, 740, 1284, 160));
+    CHECK(near(g.canvas.y + g.canvas.h, 722)); // §2.2: the console pushes the canvas bottom up
+    CHECK(rectIs(g.console, 8, 722, 1284, 160));
     l.consoleHeight = 9000;
     CHECK(near(computeShell(l, 1600, 960, 1.0f).console.h, 400)); // clamped
 
@@ -84,7 +96,7 @@ TEST(shell_narrow_and_left_handed) {
     g = computeShell(l, 1600, 960, 1.0f);
     CHECK(rectIs(g.rightTray, 0, 46, 300, 914)); // the tray swaps sides
     CHECK(near(g.rightShelf.x, 308));
-    CHECK(rectIs(g.canvas, 360, 110, 1144, 790));
+    CHECK(rectIs(g.canvas, 360, 110, 1144, 772));
 }
 
 TEST(shell_tray_width_and_layout_json) {
