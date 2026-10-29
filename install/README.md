@@ -8,6 +8,7 @@ Pick your system and click the link. It always downloads the newest version.
 | **macOS 11+** (Apple Silicon and Intel) | [SculptForge.dmg](https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-macos.dmg) |
 | **Ubuntu / Debian / Mint / Pop!_OS** | [.deb for PCs (x86_64)](https://github.com/islandmed/SculptForge/releases/latest/download/sculptforge_amd64.deb) · [.deb for ARM64](https://github.com/islandmed/SculptForge/releases/latest/download/sculptforge_arm64.deb) |
 | **Fedora / RHEL / Rocky / Alma** | [.rpm for PCs (x86_64)](https://github.com/islandmed/SculptForge/releases/latest/download/sculptforge.x86_64.rpm) · [.rpm for ARM64](https://github.com/islandmed/SculptForge/releases/latest/download/sculptforge.aarch64.rpm) |
+| **macOS (Homebrew)** | `brew install --cask islandmed/tap/sculptforge` |
 | **Any Linux** | [AppImage for PCs (x86_64)](https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-linux-x86_64.AppImage) · [AppImage for ARM64](https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-linux-arm64.AppImage) |
 | **Arch Linux** | `yay -S sculptforge` |
 
