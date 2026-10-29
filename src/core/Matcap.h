@@ -19,6 +19,8 @@ const char* matcapName(int index);
 int findMatcap(const std::string& name);
 // The material new documents (and thumbnails) start with: Soft Clay, a matte warm clay.
 int defaultMatcap();
+// The order the pickers list the MatCaps in: k = 0 is the default, then the others in index order.
+int matcapInListOrder(int k);
 
 // How strongly the viewport darkens creases and lifts ridges on top of this matcap (the
 // curvature term in the mesh shader); the Sculpt material leans on it more than the others.

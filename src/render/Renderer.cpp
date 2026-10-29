@@ -217,8 +217,10 @@ void main() {
         vec3 by = cross(v, bx);
         vec2 uv = vec2(dot(bx, n), dot(by, n)) * 0.495 + 0.5;
         vec3 mc = pow(texture(uMatcapTex, uv).rgb, vec3(2.2));
-        float mcrease = smoothstep(0.0, 0.16, curvature);
-        float mridge = smoothstep(0.0, 0.2, -curvature);
+        // Starts above the curvature of a smooth sphere's own facets, so only real creases darken and a broad
+        // stroke doesn't pool into a smear.
+        float mcrease = smoothstep(0.03, 0.18, curvature);
+        float mridge = smoothstep(0.03, 0.2, -curvature);
         vec3 c = mc * tint * (1.0 - uMatcapCavity.x * mcrease) * (1.0 + uMatcapCavity.y * mridge);
         if (uShowMask == 1) c *= 1.0 - 0.75 * clamp(V_MASK, 0.0, 1.0);
         fragColor = finish(c);
@@ -293,10 +295,11 @@ const char* kBgFS = R"(#version 330 core
 in vec2 vUv;
 out vec4 fragColor;
 // Neutral charcoal, lightest a little above the middle (behind the model) and falling off in a soft
-// radial vignette, so the model reads against it without a coloured cast. A little noise hides banding.
+// radial vignette down to the shade of the shelves around it, so the model reads against it without a
+// coloured cast and the canvas meets the shell without a darker band. A little noise hides banding.
 void main() {
     vec3 centre = vec3(0.215, 0.215, 0.222);
-    vec3 edge = vec3(0.075, 0.075, 0.08);
+    vec3 edge = vec3(0.106, 0.106, 0.114); // the shell's shade (Theme shellBg #1b1b1d): no step at the seams
     float d = length((vUv - vec2(0.5, 0.56)) * vec2(1.0, 1.15));
     float t = smoothstep(0.05, 0.85, d);
     vec3 c = mix(centre, edge, t);

@@ -29,6 +29,9 @@ namespace {
 constexpr size_t kMaxJobs = 3;       // worker threads at a time
 constexpr int kRendersPerFrame = 2;  // GL renders per frame
 constexpr double kStatSeconds = 2.0; // how long a file's size / time stamp is trusted
+// Alpha previews: the colour of no effect (the tile's charcoal) and of full effect (Soft Clay's lit grey), sRGB.
+constexpr float kAlphaNone[3] = {30.0f, 30.0f, 33.0f};
+constexpr float kAlphaFull[3] = {214.0f, 208.0f, 198.0f};
 
 std::filesystem::path fsPath(const std::string& p) { return std::filesystem::path(std::u8string(p.begin(), p.end())); }
 
@@ -72,7 +75,7 @@ std::unique_ptr<Mesh> sceneMesh(Document& doc) {
 constexpr float kBallRadius = 0.9f;
 constexpr int kBallDetail = 6; // ~82k triangles: fine enough for crisp strokes at preview size
 constexpr float kBallPitch = -8.0f; // degrees; a touch from above
-constexpr float kBallFill = 0.84f;  // the ball's share of the tile's height
+constexpr float kBallFill = 0.97f;  // the ball's share of the tile's height: framed tight, so the mark reads at shelf size
 
 // Brush previews: the camera distance at which the ball fills kBallFill of the tile.
 float ballDistance() {
@@ -90,6 +93,15 @@ std::vector<glm::vec3> frontCurve(float width = 1.0f) {
     return pts;
 }
 std::vector<glm::vec3> line(glm::vec3 a, glm::vec3 b) { return {a, b}; }
+// Points on a circle of radius `r` around (cx, cy) on the front of the ball, from angle a0 to a1 (radians).
+std::vector<glm::vec3> arc(float cx, float cy, float r, float a0, float a1, int n = 24) {
+    std::vector<glm::vec3> pts;
+    for (int i = 0; i <= n; ++i) {
+        const float a = a0 + (a1 - a0) * float(i) / float(n);
+        pts.emplace_back(cx + r * std::cos(a), cy + r * std::sin(a), 2.0f);
+    }
+    return pts;
+}
 
 void stroke(Document& d, const BrushRecipe* recipe, BrushType type, std::vector<glm::vec3> pts, float radius,
             float strength, bool curve = true) {
@@ -128,49 +140,85 @@ std::unique_ptr<Mesh> sculptBrushPreview(const BrushRecipe* recipe, int type) {
         stroke(d, recipe, BrushType::Standard, frontCurve(), r, 0.9f);
         return sceneMesh(d);
     }
+    // Each brush gets a mark of its own shape that shows what it does, so the shelf tells them apart at a glance
+    // (the same S everywhere left only a few pixels of difference between Standard, Clay, Inflate and Pinch).
+    constexpr float kPi = 3.14159265f;
     const auto bt = BrushType(type);
     switch (bt) {
-    case BrushType::Move:
-        stroke(d, nullptr, bt, line({-0.1f, -0.1f, 2.0f}, {0.45f, 0.38f, 2.0f}), 0.45f, 1.0f, false);
+    case BrushType::Clay: // three parallel strips laid on like clay
+        for (int i = -1; i <= 1; ++i) {
+            const float dx = 0.3f * float(i);
+            stroke(d, nullptr, bt, line({dx - 0.28f, -0.42f, 2.0f}, {dx + 0.12f, 0.42f, 2.0f}), 0.15f, 1.0f, false);
+        }
+        break;
+    case BrushType::ClayBuildup: // a hash of square, flat-topped bars, built up in two directions
+        for (float o : {-0.2f, 0.2f}) {
+            stroke(d, nullptr, bt, line({-0.5f, o, 2.0f}, {0.5f, o, 2.0f}), 0.13f, 0.1f, false);
+            stroke(d, nullptr, bt, line({o, -0.5f, 2.0f}, {o, 0.5f, 2.0f}), 0.13f, 0.1f, false);
+        }
+        break;
+    case BrushType::DamStandard: // one deep, sharp diagonal cut
+        stroke(d, nullptr, bt, line({-0.55f, 0.45f, 2.0f}, {0.55f, -0.45f, 2.0f}), 0.2f, 1.0f, false);
+        stroke(d, nullptr, bt, line({-0.55f, 0.45f, 2.0f}, {0.55f, -0.45f, 2.0f}), 0.2f, 1.0f, false);
+        break;
+    case BrushType::Crease: // a curved groove, like a smile line
+        stroke(d, nullptr, bt, arc(0.0f, 0.42f, 0.62f, kPi * 1.18f, kPi * 1.82f), 0.17f, 1.0f);
+        stroke(d, nullptr, bt, arc(0.0f, 0.42f, 0.62f, kPi * 1.18f, kPi * 1.82f), 0.17f, 1.0f);
+        break;
+    case BrushType::Move: // the silhouette pulled out into a broad soft lobe on the upper left
+        stroke(d, nullptr, bt, line({-0.5f, 0.45f, 2.0f}, {-0.78f, 0.72f, 2.0f}), 0.5f, 1.0f, false);
         break;
     case BrushType::SnakeHook:
         // SnakeHook pulls out along the stroke; the path heads out past the silhouette to the side.
-        stroke(d, nullptr, bt, line({0.2f, 0.12f, 2.0f}, {0.72f, 0.4f, 2.0f}), 0.24f, 1.0f, false);
+        stroke(d, nullptr, bt, line({0.15f, 0.05f, 2.0f}, {0.95f, 0.5f, 2.0f}), 0.26f, 1.0f, false);
         break;
-    case BrushType::Inflate:
-        stroke(d, nullptr, bt, frontCurve(), 0.2f, 0.8f);
+    case BrushType::Inflate: // a ring, puffed up
+        stroke(d, nullptr, bt, arc(0.0f, 0.0f, 0.38f, 0.0f, 2.0f * kPi, 32), 0.2f, 1.0f);
         break;
-    case BrushType::Smooth:
-    case BrushType::Flatten:
-    case BrushType::Trim:
-    case BrushType::Nudge: {
-        // These change existing form: raise a ridge first, then cross it with the brush.
-        const auto ridge = line({-0.75f, 0.0f, 2.0f}, {0.75f, 0.0f, 2.0f});
-        stroke(d, nullptr, BrushType::Standard, ridge, 0.22f, 1.0f, false);
-        stroke(d, nullptr, BrushType::Clay, ridge, 0.22f, 1.0f, false);
-        const auto across = bt == BrushType::Nudge ? line({-0.12f, -0.3f, 2.0f}, {0.12f, 0.3f, 2.0f})
-                                                   : line({0.0f, -0.65f, 2.0f}, {0.0f, 0.65f, 2.0f});
-        const float strength = bt == BrushType::Nudge ? 0.05f : bt == BrushType::Trim ? 0.5f : 1.0f;
-        const int passes = bt == BrushType::Smooth ? 3 : 1;
-        for (int pass = 0; pass < passes; ++pass)
-            stroke(d, nullptr, bt, across, bt == BrushType::Nudge ? 0.22f : 0.2f, strength, false);
+    case BrushType::Pinch: // a raised chevron pinched to a sharp crest
+        stroke(d, nullptr, BrushType::Standard, {{-0.5f, 0.35f, 2.0f}, {0.0f, -0.3f, 2.0f}, {0.5f, 0.35f, 2.0f}}, 0.22f, 1.0f, false);
+        for (int pass = 0; pass < 2; ++pass)
+            stroke(d, nullptr, bt, {{-0.5f, 0.35f, 2.0f}, {0.0f, -0.3f, 2.0f}, {0.5f, 0.35f, 2.0f}}, 0.22f, 1.0f, false);
+        break;
+    case BrushType::Smooth: { // a bumpy ridge, its right half smoothed away
+        for (int i = 0; i < 7; ++i)
+            for (int pass = 0; pass < 4; ++pass)
+                stroke(d, nullptr, BrushType::Standard, {glm::vec3(-0.6f + 0.2f * float(i), 0.0f, 2.0f)}, 0.13f, 1.0f, false);
+        for (int pass = 0; pass < 3; ++pass)
+            stroke(d, nullptr, bt, line({0.12f, 0.0f, 2.0f}, {0.8f, 0.0f, 2.0f}), 0.26f, 1.0f, false);
         break;
     }
-    case BrushType::Pinch:
-        stroke(d, nullptr, BrushType::Standard, frontCurve(), r * 1.2f, 0.9f);
-        stroke(d, nullptr, bt, frontCurve(), r * 1.2f, 1.0f);
+    case BrushType::Flatten: // a dome with a flat facet planed across its top
+        for (int pass = 0; pass < 3; ++pass)
+            stroke(d, nullptr, BrushType::Standard, {glm::vec3(0.0f, 0.0f, 2.0f)}, 0.5f, 1.0f, false);
+        for (int pass = 0; pass < 3; ++pass)
+            stroke(d, nullptr, bt, line({-0.15f, 0.05f, 2.0f}, {0.15f, -0.05f, 2.0f}), 0.32f, 1.0f, false);
         break;
-    case BrushType::ClayBuildup:
-        stroke(d, nullptr, bt, frontCurve(), r, 0.12f);
+    case BrushType::Trim: { // a ridge cut down to hard planes along its length
+        const auto ridge = line({-0.6f, -0.35f, 2.0f}, {0.6f, 0.35f, 2.0f});
+        stroke(d, nullptr, BrushType::Standard, ridge, 0.24f, 1.0f, false);
+        stroke(d, nullptr, BrushType::Clay, ridge, 0.24f, 1.0f, false);
+        stroke(d, nullptr, bt, line({-0.3f, -0.17f, 2.0f}, {0.3f, 0.17f, 2.0f}), 0.24f, 1.0f, false);
         break;
-    case BrushType::Layer:
-        stroke(d, nullptr, bt, frontCurve(), 0.38f, 1.0f); // its height scales with the radius
+    }
+    case BrushType::Nudge: { // an upright ridge slid sideways in the middle
+        const auto ridge = line({0.0f, -0.6f, 2.0f}, {0.0f, 0.6f, 2.0f});
+        stroke(d, nullptr, BrushType::Standard, ridge, 0.2f, 1.0f, false);
+        stroke(d, nullptr, BrushType::Clay, ridge, 0.2f, 1.0f, false);
+        stroke(d, nullptr, bt, line({-0.05f, 0.0f, 2.0f}, {0.3f, 0.0f, 2.0f}), 0.3f, 0.15f, false);
+        break;
+    }
+    case BrushType::Layer: // a square frame raised to one flat height per stroke; two strokes, two steps
+        for (int pass = 0; pass < 2; ++pass)
+            stroke(d, nullptr, bt,
+                   {{-0.38f, -0.38f, 2.0f}, {0.38f, -0.38f, 2.0f}, {0.38f, 0.38f, 2.0f}, {-0.38f, 0.38f, 2.0f}, {-0.38f, -0.38f, 2.0f}},
+                   0.24f, 1.0f, false);
         break;
     case BrushType::Vdm: // one stamp of the built-in Horn
         stroke(d, nullptr, bt, {glm::vec3(0.0f, -0.05f, 2.0f)}, 0.45f, 0.5f, false);
         break;
-    default:
-        stroke(d, nullptr, bt, frontCurve(), r, 1.0f);
+    default: // Standard: a soft rounded S
+        stroke(d, nullptr, bt, frontCurve(1.15f), 0.19f, 1.0f);
         break;
     }
     return sceneMesh(d);
@@ -332,7 +380,8 @@ ImTextureID ThumbnailCache::alpha(const BrushAlpha& alpha) {
     return request(
         "alpha|" + hex64(h),
         [alpha] {
-            // The stamp as ZBrush shows alphas: white = full effect on black.
+            // The stamp as a height map: full effect light, none dark. Clay grey on the tile's charcoal rather than
+            // pure white on black, so it doesn't outshine the model and the rest of the tray.
             Result r;
             constexpr int S = 128;
             r.image.width = r.image.height = S;
@@ -342,9 +391,9 @@ ImTextureID ThumbnailCache::alpha(const BrushAlpha& alpha) {
                 for (int x = 0; x < S; ++x) {
                     const float u = (float(x) + 0.5f) / S * 2.0f - 1.0f, v = 1.0f - (float(y) + 0.5f) / S * 2.0f;
                     float g = shown.empty() ? brushFalloff(std::sqrt(u * u + v * v), 1.0f) : shown.sample(u, v);
-                    const auto c = uint8_t(std::clamp(g, 0.0f, 1.0f) * 255.0f + 0.5f);
+                    const float t = std::clamp(g, 0.0f, 1.0f);
                     uint8_t* p = &r.image.rgba[(size_t(y) * S + size_t(x)) * 4];
-                    p[0] = p[1] = p[2] = c;
+                    for (int k = 0; k < 3; ++k) p[k] = uint8_t(kAlphaNone[k] + (kAlphaFull[k] - kAlphaNone[k]) * t + 0.5f);
                     p[3] = 255;
                 }
             return r;
@@ -360,10 +409,11 @@ ImTextureID ThumbnailCache::material(int matcap) {
         hex64(fnv1a64(key)),
         [matcap] {
             Result r;
-            r.mesh = std::make_unique<Mesh>(makeIcosphere(5, 1.0f));
+            r.mesh = std::make_unique<Mesh>(makeIcosphere(5, kBallRadius));
             r.matcap = matcap;
             r.yaw = 0.0f;
             r.pitch = 0.0f;
+            r.distance = ballDistance(); // the same ball, framed as the brush previews are
             return r;
         },
         true);

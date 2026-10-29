@@ -326,6 +326,13 @@ TEST(matcap_builtin_materials) {
     for (size_t k = 0; k < clay.size(); k += 4) brightest = std::max(brightest, int(clay[k]));
     CHECK(brightest < 225);
     CHECK(matcapCavity(-1).crease > 0.0f && matcapCavity(matcapCount()).crease == matcapCavity(-1).crease);
+    // The pickers list the default first, then every other MatCap once, in index order.
+    CHECK(matcapInListOrder(0) == defaultMatcap() && matcapInListOrder(1) == 0);
+    CHECK(matcapInListOrder(-1) == -1 && matcapInListOrder(matcapCount()) == -1);
+    std::vector<int> listed;
+    for (int k = 0; k < matcapCount(); ++k) listed.push_back(matcapInListOrder(k));
+    std::sort(listed.begin(), listed.end());
+    for (int i = 0; i < matcapCount(); ++i) CHECK(listed[size_t(i)] == i);
 }
 
 TEST(polypaint_restore_stroke_marks_colors_dirty) {

@@ -112,7 +112,7 @@ private:
 
 // --- Thumbnail cache keys (spec: fnv1a64(kind|absPath|size|mtime|version)) ---
 
-constexpr int kThumbnailVersion = 2; // bump when thumbnails are rendered differently
+constexpr int kThumbnailVersion = 3; // bump when thumbnails are rendered differently
 uint64_t fnv1a64(std::string_view data, uint64_t seed = 0xcbf29ce484222325ull);
 std::string hex64(uint64_t v); // 16 lower-case hex digits
 // Key of a file's thumbnail: changes when the file is rewritten (size or time) or the renderer changes.

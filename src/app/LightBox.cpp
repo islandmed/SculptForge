@@ -241,8 +241,8 @@ void LightBox::rootEntries(App& app, std::vector<AssetEntry>& out) {
         break;
     }
     case LibraryTab::Material:
-        for (int k = 0; k <= matcapCount(); ++k) { // the MatCaps (Sculpt first), then Studio
-            const int i = k < matcapCount() ? k : -1;
+        for (int k = 0; k <= matcapCount(); ++k) { // the MatCaps (the default first), then Studio
+            const int i = k < matcapCount() ? matcapInListOrder(k) : -1;
             AssetEntry e;
             e.kind = AssetKind::Material;
             e.index = i;

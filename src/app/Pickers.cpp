@@ -137,9 +137,23 @@ void quickInfo(ImTextureID tex, const char* glyph, const std::string& title, con
     if (!ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort | ImGuiHoveredFlags_NoSharedDelay) ||
         ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId) || ImGui::GetIO().KeyCtrl)
         return;
+    // Beside the window the tile is in (right of it, else left), level with the tile: at the mouse it covered
+    // the grid it describes, clipping the labels and the next rows.
+    const float big = 192.0f * 0.75f;
+    {
+        constexpr float kCardW = 356.0f, kCardH = 300.0f, kGap = 6.0f; // the card's largest size, with padding
+        const ImGuiWindow* host = ImGui::GetCurrentWindow()->RootWindow;
+        const ImGuiViewport* vp = ImGui::GetMainViewport();
+        ImVec2 pos(host->Pos.x + host->Size.x + kGap, ImGui::GetItemRectMin().y), pivot(0.0f, 0.0f);
+        if (pos.x + kCardW > vp->Pos.x + vp->Size.x && host->Pos.x - kGap - kCardW >= vp->Pos.x) {
+            pos.x = host->Pos.x - kGap;
+            pivot.x = 1.0f;
+        }
+        pos.y = std::clamp(pos.y, vp->Pos.y + 4.0f, std::max(vp->Pos.y + 4.0f, vp->Pos.y + vp->Size.y - kCardH));
+        ImGui::SetNextWindowPos(pos, ImGuiCond_Always, pivot);
+    }
     ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(340, FLT_MAX));
     ImGui::BeginTooltip();
-    const float big = 192.0f * 0.75f;
     if (tex)
         ImGui::Image(tex, ImVec2(big, big));
     else if (glyph) {
@@ -862,7 +876,7 @@ void drawMaterialGrid(App& app, GridMode mode) {
     int hovered = -2;
     const int active = s.previewing ? s.savedMatcap : app.renderSettings_.matcap;
     for (int k = 0; k <= matcapCount(); ++k) {
-        const int i = k < matcapCount() ? k : -1; // the MatCaps (Sculpt first), then Studio
+        const int i = k < matcapCount() ? matcapInListOrder(k) : -1; // the MatCaps (the default first), then Studio
         tileGrid(column, columns);
         const char* name = i < 0 ? "Studio" : matcapName(i);
         const ImTextureID tex = app.thumbs_.material(i);
@@ -874,9 +888,11 @@ void drawMaterialGrid(App& app, GridMode mode) {
         }
         if (ImGui::IsItemHovered()) hovered = i;
         ui::HelpText(name, nullptr,
-                     i < 0    ? "Soft studio lighting with cavity shading, in the Base colour."
-                     : i == 0 ? "Made for sculpting (the default): a strong key light, crisp highlights and deep "
-                                "cavities so every stroke reads."
+                     i < 0                ? "Soft studio lighting with cavity shading, in the Base colour."
+                     : i == defaultMatcap() ? "The default: a matte warm clay with a clear key light and a soft "
+                                              "rim, so strokes read without glare."
+                     : i == 0 ? "Made for sculpting: a strong key light, crisp highlights and deep cavities so "
+                                "every stroke reads."
                               : "MatCap material: the whole lit look in one image.",
                      "Material");
     }

@@ -18,7 +18,7 @@ namespace sf {
 
 struct RenderSettings {
     bool wireframe = false;
-    glm::vec3 baseColor{0.80f, 0.55f, 0.45f}; // clay
+    glm::vec3 baseColor{0.62f, 0.58f, 0.53f}; // Studio's colour: a warm clay grey, like the default Soft Clay
     bool showPolypaint = true;   // vertex colours replace baseColor when the mesh has them
     bool showTexture = true;     // with showPolypaint: a SubTool's painted texture (core/Texture.h) multiplies in
     bool showMask = true;        // masked areas render darker (ZBrush style)

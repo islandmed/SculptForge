@@ -308,9 +308,9 @@ Each tab shows a "Built-in" and a "User" folder at its root, as ZBrush shows Max
 - **Meshes and projects**: rendered offscreen. Use `Renderer::renderToImage`, or a new `Renderer::renderMeshThumbnail(const Mesh&, matcap, size, rgba&)` if `renderToImage` is tied to the synced scene. Size 192x192 (displayed at 96, crisp on HiDPI), the default material (Soft Clay), transparent background, camera framed on the bounds from a 3/4 front view (yaw 30, pitch 15).
   - Mesh loading uses the existing importers on a worker thread. GL rendering happens on the main thread, **at most 2 thumbnails per frame**.
   - Projects: `saveProject` also writes `thumbnail.png` (256x256, current camera) into the `.sfproj` ZIP. The LightBox reads that instead of loading the whole project. Older projects without it are loaded on the worker and rendered once.
-- **Brushes**: on a worker, sculpt one S-curve stroke (or a ridge crossed by the brush, for Smooth/Flatten/Trim/Nudge) on the front of a fresh clay ball (icosphere sdiv 6) using the same `Sculptor`/recipe code as real strokes. Every brush, Paint included, is the same ball, camera and material (Soft Clay), so the shelf reads as one icon set. Key = brush type or recipe JSON hash plus `kThumbnailVersion` (bump it whenever thumbnails are made differently, so stale disk-cached ones are remade).
-- **Alphas**: the alpha's grayscale samples straight into a texture.
-- **Materials**: a sphere rendered with that matcap.
+- **Brushes**: on a worker, sculpt a mark of each brush's own shape on the front of a fresh clay ball (icosphere sdiv 6) using the same `Sculptor`/recipe code as real strokes, so brushes tell apart at shelf size: Standard an S, Clay three strips, ClayBuildup a hash of bars, DamStandard a diagonal cut, Crease a curved groove, Inflate a puffed ring, Pinch a sharp chevron, Smooth a bumpy ridge smoothed on one half, Flatten a planed dome, Trim a cut-down ridge, Layer a raised square frame, Nudge an upright ridge slid sideways, Move and SnakeHook pulls at the silhouette, recipes an S. The ball fills 97% of the tile. Every brush, Paint included, is the same ball, camera and material (Soft Clay), so the shelf reads as one icon set. Key = brush type or recipe JSON hash plus `kThumbnailVersion` (bump it whenever thumbnails are made differently, so stale disk-cached ones are remade).
+- **Alphas**: the alpha's samples, from the tile's charcoal (none) to the clay's lit grey (full effect), not white on black.
+- **Materials**: the same ball as the brushes, rendered with that matcap. Pickers list the default (Soft Clay) first (`matcapInListOrder`), then the others, then Studio.
 - **Images**: stb-decoded, downscaled to 192.
 - **Disk cache**: `<prefDir>/thumbs/<fnv1a64(kind|absPath|size|mtime|version)>.png` (stb_image_write is in third_party). In-memory LRU of 256 GL textures.
 - **Placeholder**: while a thumbnail is pending, the tile shows the Lucide glyph for its kind (`box`, `brush`, `circle-dashed`, `palette`, `image`, `sparkles`, `folder`) on `#2a2a2e`.
@@ -492,7 +492,7 @@ Keep the existing orange accent, but only for **one thing per group**: the curre
 | `text` / `textDim` | `#d8d8d8` / `#8c8c90` | |
 | `border` | `#111113` | 1 px between regions |
 | `danger` | `#e5604a` | errors |
-| canvas | neutral charcoal, soft radial vignette (`kBgFS`); 1 px `#0e0e10` frame; default material Soft Clay (matte warm grey) | |
+| canvas | neutral charcoal, soft radial vignette (`kBgFS`); 1 px `#0e0e10` frame; vignette down to `shellBg` at the edges (no step at the seams); default material Soft Clay (matte warm grey: a steep upper-left key, a fill from the right, a warm ground bounce, a broad sheen along ridges and a cool rim on the lower right; light cavity, only above a smooth sphere's own curvature) | |
 
 Style:
 - Rounding: `WindowRounding 0` (shells), `PopupRounding 6`, `FrameRounding 3`, `GrabRounding 2`.
