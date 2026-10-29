@@ -8,6 +8,7 @@
 
 #include <initializer_list>
 #include <string>
+#include <string_view>
 
 namespace sf {
 class App;
@@ -21,6 +22,13 @@ enum class Look { Label, Icon, IconLabel, Tile };
 // is a Ctrl+Alt drag source in customize mode. Ctrl+Alt+click (outside customize mode) assigns
 // a shortcut, as in ZBrush. Returns true when the action ran.
 bool ActionButton(App& app, const char* actionId, ImVec2 size = {}, Look look = Look::Label);
+// How a toggle that is on looks (docs/ui-design.md §10). A mode action picks the current tool or mode of its
+// group (Draw/Move/Scale/Rotate, Sculpt/Paint, a brush, MaskPen/MaskLasso...) and gets the accent fill; every
+// other toggle is an option (Zadd, X, Pressure > Strength, Mask, Menus) and gets a raised grey with an accent
+// underline, so the accent marks one thing per group.
+bool IsModeAction(std::string_view actionId);
+// The 2 px accent mark of an option that is on: along the bottom of the rect, or down its left side.
+void DrawOnMark(ImDrawList* drawList, ImVec2 min, ImVec2 max, bool side = false);
 // Adjacent toggle buttons that read as one control (Zadd | Zsub, X | Y | Z); width -1 fills the line.
 void Segmented(App& app, std::initializer_list<const char*> actionIds, float width = -1.0f);
 // Ctrl-hover help for the last item.
@@ -63,10 +71,10 @@ inline constexpr ImU32 accentHover = IM_COL32(0xff, 0x9a, 0x45, 0xff);
 inline constexpr ImU32 text = IM_COL32(0xd8, 0xd8, 0xd8, 0xff);
 inline constexpr ImU32 textDim = IM_COL32(0x8c, 0x8c, 0x90, 0xff);
 inline constexpr ImU32 danger = IM_COL32(0xe5, 0x60, 0x4a, 0xff);
-inline constexpr ImU32 panelBg = IM_COL32(0x25, 0x25, 0x28, 0xff);
-inline constexpr ImU32 shellBg = IM_COL32(0x1e, 0x1e, 0x20, 0xff);
-inline constexpr ImU32 header = IM_COL32(0x2e, 0x2e, 0x32, 0xff);
-inline constexpr ImU32 border = IM_COL32(0x12, 0x12, 0x14, 0xff);
+inline constexpr ImU32 panelBg = IM_COL32(0x22, 0x22, 0x25, 0xff);
+inline constexpr ImU32 shellBg = IM_COL32(0x1b, 0x1b, 0x1d, 0xff);
+inline constexpr ImU32 header = IM_COL32(0x2b, 0x2b, 0x2f, 0xff);
+inline constexpr ImU32 border = IM_COL32(0x11, 0x11, 0x13, 0xff);
 } // namespace color
 
 } // namespace sf::ui
