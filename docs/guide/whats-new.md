@@ -5,6 +5,24 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.9.3
+
+### A cleaner look
+
+The default material is now **Soft Clay**: matte, with a clear light and shadow side, so sculpted detail reads at
+a glance. Orange marks only the current tool; options that are on are a lighter grey with a thin orange line.
+Every brush icon is drawn the same way, with a mark that shows what the brush does. A material you picked
+before is kept: choose **Soft Clay** in the Material menu to see the new look. See [The interface](interface.md).
+
+### Bigger brush tiles, your size
+
+The brush tiles on the bottom shelf are bigger. Right-click any brush on the shelf and choose **Tile size**:
+Small, Medium or Large (also in **Preferences > Interface > Shelf tiles**).
+
+### Export STL from the File menu
+
+**File > Export STL...** is its own menu item, for 3D printing.
+
 ## Version 0.9.2
 
 ### View in AR on Android

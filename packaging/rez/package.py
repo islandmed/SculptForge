@@ -5,7 +5,7 @@
 #   rez-env sculptforge python-3.13 -- python -c "import sculptforge"
 name = "sculptforge"
 
-version = "0.9.2"
+version = "0.9.3"
 
 description = "Free, open-source digital sculpting with game and animation pipelines (OpenUSD, FBX, glTF, Send to Unreal)."
 

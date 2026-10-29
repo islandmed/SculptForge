@@ -6,6 +6,8 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-10-28
+
 A cleaner look: the default material is a matte Soft Clay on a charcoal background, orange marks only the
 current tool, and the bottom shelf's brush tiles are bigger, with a size you can choose.
 
@@ -21,6 +23,9 @@ current tool, and the bottom shelf's brush tiles are bigger, with a size you can
   Pressure > Strength, Mask, Paint...) are a lighter grey with a thin orange line.
 - Every brush icon is drawn the same way, with a mark showing what the brush does.
 - The right tray's sections, the selected SubTool and the colour picker have a calmer, tidier style.
+
+### Fixed
+- The Alpha palette showed **Load image...** and **Invert loaded image** twice.
 
 ## [0.9.2] - 2026-10-28
 

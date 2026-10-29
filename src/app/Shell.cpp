@@ -92,7 +92,7 @@ void dashedRect(ImDrawList* dl, ImVec2 a, ImVec2 b, ImU32 col, float dash) {
 // A shaded clay ball with a mark that hints at what the brush does: the placeholder until a rendered
 // thumbnail is ready (ThumbnailCache).
 void drawBrushIcon(ImDrawList* dl, ImVec2 c, float r, int type) {
-    const ImVec4 clay(0.80f, 0.55f, 0.45f, 1.0f);
+    const ImVec4 clay(0.62f, 0.57f, 0.52f, 1.0f); // the Soft Clay look, while the rendered thumbnail is pending
     constexpr int kLayers = 14;
     for (int k = 0; k < kLayers; ++k) {
         const float t = float(k) / float(kLayers - 1);
@@ -102,7 +102,7 @@ void drawBrushIcon(ImDrawList* dl, ImVec2 c, float r, int type) {
         dl->AddCircleFilled(o, rr, theme::u32(ImVec4(clay.x * shade, clay.y * shade, clay.z * shade, 1.0f)), 32);
     }
     if (type < 0) return;
-    const ImU32 hi = IM_COL32(255, 236, 222, 150), lo = IM_COL32(60, 30, 20, 150);
+    const ImU32 hi = IM_COL32(245, 240, 232, 150), lo = IM_COL32(40, 36, 32, 150);
     auto curve = [&](float dy, ImU32 col, float thick) {
         ImVec2 pts[12];
         for (int i = 0; i < 12; ++i) {

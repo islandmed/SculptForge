@@ -13,11 +13,6 @@
 
 namespace sf {
 
-namespace {
-
-const SDL_DialogFileFilter kAlphaFilters[] = {{"Images", "png;jpg;jpeg;bmp;tga;psd;gif"}, {"All files", "*"}};
-
-} // namespace
 
 void SDLCALL App::onAlphaChosen(void* userdata, const char* const* files, int) {
     if (!files || !files[0]) return;
@@ -69,12 +64,8 @@ void App::drawAlphaSection() {
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (ImGui::GetContentRegionAvail().x - nameSize.x) * 0.5f);
     ImGui::TextUnformatted(alpha.name.c_str());
 
-    drawAlphaGrid(*this, GridMode::Palette); // built-in and library alphas (Pickers.cpp), as in the alpha picker
-    if (ImGui::Button("Load image...##alpha", ImVec2(-1, 0)))
-        SDL_ShowOpenFileDialog(onAlphaChosen, this, window_, kAlphaFilters, 2, nullptr, false);
-    ui::HelpText("Load image", nullptr, "Use a grayscale image as the alpha: white = full effect, black = none.", "Alpha");
-    ImGui::Checkbox("Invert loaded image", &alphaInvert_);
-    ui::HelpText("Invert loaded image", nullptr, "Swap black and white when loading an image as an alpha.", "Alpha");
+    // Built-in and library alphas, then Load image... and Invert loaded image (Pickers.cpp), as in the alpha picker.
+    drawAlphaGrid(*this, GridMode::Palette);
 }
 
 // SnakeHook: pull the region under the click along with the cursor, like Move,
