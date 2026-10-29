@@ -97,10 +97,23 @@
     <section id="whats-new" class="section alt">
       <div class="wrap">
         <h2>What's new in 0.9</h2>
-        <p class="section-lede">Maquette to performance: scan a clay maquette with your phone, sculpt on the scan,
+        <p class="section-lede">New in 0.9.3: a cleaner look, made for reading your sculpt. Before that, maquette to performance: scan a clay maquette with your phone, sculpt on the scan,
           give the head its facial shapes and drive them with your own face. <a href="guide/whats-new.html">Everything that changed</a> ·
           <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">changelog</a></p>
         <div class="grid">
+          <article class="card">
+            <h3>A cleaner look <small>new in 0.9.3</small></h3>
+            <p>The new default material, Soft Clay, is matte with a clear light and shadow side, so every stroke reads
+              at a glance. Orange now marks only the tool you're using, and every brush has its own icon.
+              <a href="press.html">See the screenshots</a></p>
+          </article>
+          <article class="card">
+            <h3>Your shelf, your size <small>new in 0.9.3</small></h3>
+            <p>Bigger brush tiles on the bottom shelf. Right-click a brush and choose Tile size: Small, Medium or
+              Large. Plus File &gt; Export STL for 3D printing, and one-command install on a Mac:
+              <code>brew install --cask islandmed/tap/sculptforge</code>.
+              <a href="guide/interface.html#bottom-shelf">The bottom shelf</a></p>
+          </article>
           <article class="card">
             <h3>Your phone is the scanner <small>new in 0.9</small></h3>
             <p>Scan the QR code in File &gt; Capture from phone, walk round an object for half a minute, and the
@@ -501,7 +514,8 @@ rez-env sculptforge -- sculptforge troll.usda \
         </div>
         <p class="fine">Each button downloads the newest version.
           <a href="https://github.com/islandmed/SculptForge/tree/main/install#install-sculptforge">All downloads</a>
-          (ARM64, portable .zip, one-command install) ·
+          (ARM64, portable .zip, one-command install) · on macOS also
+          <code>brew install --cask islandmed/tap/sculptforge</code> ·
           <a href="https://github.com/islandmed/SculptForge/releases">older versions</a>.</p>
         <p class="fine">The builds aren't code-signed yet. On macOS, right-click the app and choose <em>Open</em>
           the first time. On Windows, if SmartScreen appears, choose <em>More info → Run anyway</em>.

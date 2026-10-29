@@ -2,7 +2,7 @@
 pkgname=sculptforge
 pkgver=0.9.3
 pkgrel=1
-pkgdesc="Free and open-source digital sculpting with game-engine pipelines and free built-in AI"
+pkgdesc="Free, open-source digital sculpting app with ZBrush-style tools, for artists and game pipelines"
 arch=('x86_64' 'aarch64')
 url="https://sculptforge.app/"
 license=('GPL-3.0-or-later')
@@ -15,7 +15,7 @@ _glm=1.0.1
 source=("$pkgname-$pkgver.tar.gz::https://github.com/islandmed/SculptForge/archive/refs/tags/v$pkgver.tar.gz"
         "imgui-$_imgui.tar.gz::https://github.com/ocornut/imgui/archive/refs/tags/v$_imgui.tar.gz"
         "glm-$_glm.tar.gz::https://github.com/g-truc/glm/archive/refs/tags/$_glm.tar.gz")
-sha256sums=('SKIP'
+sha256sums=('f443b5c093c0d82a0d15d0760e7665e046c73abe9c8e53c455b895d65aa07b7e'
             '3872a5f90df78fced023c1945f4466b654fd74573370b77b17742149763a7a7c'
             '9f3174561fd26904b23f0db5e560971cbf9b3cbda0b280f04d5c379d03bf234c')
 
@@ -25,6 +25,7 @@ build() {
     -DCMAKE_INSTALL_PREFIX=/usr \
     -DSCULPTFORGE_USE_SYSTEM_SDL=ON \
     -DSCULPTFORGE_UPDATE_CHECK=OFF \
+    -DSCULPTFORGE_WEBRTC=OFF \
     -DFETCHCONTENT_FULLY_DISCONNECTED=ON \
     -DFETCHCONTENT_SOURCE_DIR_IMGUI="$srcdir/imgui-$_imgui" \
     -DFETCHCONTENT_SOURCE_DIR_GLM="$srcdir/glm-$_glm"
