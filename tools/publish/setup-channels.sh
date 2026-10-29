@@ -8,7 +8,7 @@
 #   winget   winget install SculptForge.SculptForge          (a pull request to microsoft/winget-pkgs)
 # Run with no arguments for all three, or name the steps: tools/publish/setup-channels.sh brew winget
 # Version and checksums come from the latest GitHub release, so `brew` and `winget` also update for a new release.
-# Needs gh logged in as islandmed (gh auth status), git and ssh-keygen.
+# YES=1 answers yes to every question (e.g. when run without a terminal). Needs gh logged in as islandmed (gh auth status), git and ssh-keygen.
 set -euo pipefail
 
 REPO=islandmed/SculptForge
@@ -30,7 +30,7 @@ exe_sha=$(sum "$exe")
 [ -n "$dmg_sha" ] && [ -n "$exe_sha" ] || { echo "No checksums for $dmg / $exe in $tag's SHA256SUMS.txt" >&2; exit 1; }
 echo "Release $tag: $dmg $dmg_sha, $exe $exe_sha"
 
-confirm() { read -r -p "$1 [y/N] " a; [ "$a" = y ] || [ "$a" = Y ]; }
+confirm() { [ -n "${YES:-}" ] && return 0; read -r -p "$1 [y/N] " a; [ "$a" = y ] || [ "$a" = Y ]; }  # YES=1: no questions
 
 mirror() {
     local site=$OWNER/$OWNER.github.io
