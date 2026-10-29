@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include "core/Matcap.h"
 #include "core/Mesh.h"
 #include "core/Splats.h"
 #include "core/UploadOrder.h"
@@ -22,7 +23,7 @@ struct RenderSettings {
     bool showTexture = true;     // with showPolypaint: a SubTool's painted texture (core/Texture.h) multiplies in
     bool showMask = true;        // masked areas render darker (ZBrush style)
     bool showPolygroups = false; // colour each polygroup (see polygroupColor)
-    int matcap = 0;              // built-in MatCap material (core/Matcap.h), 0 = Sculpt; -1 = studio clay lighting
+    int matcap = defaultMatcap(); // built-in MatCap material (core/Matcap.h), Soft Clay; -1 = studio clay lighting
     bool showMesh = true;
     bool showSplats = true;
     float splatOpacity = 1.0f; // global fade for using a capture as reference

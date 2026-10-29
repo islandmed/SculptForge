@@ -292,12 +292,16 @@ void main() {
 const char* kBgFS = R"(#version 330 core
 in vec2 vUv;
 out vec4 fragColor;
+// Neutral charcoal, lightest a little above the middle (behind the model) and falling off in a soft
+// radial vignette, so the model reads against it without a coloured cast. A little noise hides banding.
 void main() {
-    vec3 top = vec3(0.20, 0.21, 0.24);
-    vec3 bottom = vec3(0.08, 0.08, 0.09);
-    float d = length(vUv - vec2(0.5, 0.55));
-    vec3 c = mix(bottom, top, clamp(vUv.y, 0.0, 1.0)) * (1.0 - 0.35 * d);
-    fragColor = vec4(c, 1.0);
+    vec3 centre = vec3(0.215, 0.215, 0.222);
+    vec3 edge = vec3(0.075, 0.075, 0.08);
+    float d = length((vUv - vec2(0.5, 0.56)) * vec2(1.0, 1.15));
+    float t = smoothstep(0.05, 0.85, d);
+    vec3 c = mix(centre, edge, t);
+    float noise = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
+    fragColor = vec4(c + (noise - 0.5) / 255.0, 1.0);
 }
 )";
 
@@ -1968,7 +1972,7 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
     }
     const int fbWidth = inset ? viewport.w : targetWidth, fbHeight = inset ? viewport.h : targetHeight;
     if (thumbnailPass_) gl::ClearColor(0.0f, 0.0f, 0.0f, 0.0f); // renderMeshThumbnail: transparent background
-    else gl::ClearColor(0.1f, 0.1f, 0.11f, 1.0f);
+    else gl::ClearColor(0.075f, 0.075f, 0.08f, 1.0f);
     gl::Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     gl::Enable(GL_MULTISAMPLE);
     struct ScissorOff {
@@ -1978,7 +1982,7 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
         }
     } scissorOff{inset};
 
-    // Background gradient.
+    // Background: charcoal with a radial vignette.
     gl::Disable(GL_DEPTH_TEST);
     gl::UseProgram(bgProgram_);
     gl::BindVertexArray(emptyVao_);

@@ -130,7 +130,7 @@ CanvasRect canvasRect() const;                     // from Layout, recomputed ev
 - `pick`, `onMouseDown/Move`, the brush cursor, `onScreen`, `hide_rect` and polygroup overlays all convert window -> canvas coordinates in one helper.
 - Mouse events outside the canvas never start strokes or orbits, even when ImGui doesn't capture them (e.g. on gaps between shelf items).
 - Recording, `--render`, demos and `hideUi_` keep using the full window (`canvasRect()` returns the whole viewport when `hideUi_` is set).
-- The area outside the canvas is cleared to `shellBg`. The canvas itself keeps the current gradient background and gets a 1 px `#0e0e10` border.
+- The area outside the canvas is cleared to `shellBg`. The canvas itself has a neutral charcoal background with a soft radial vignette (no coloured gradient) and gets a 1 px `#0e0e10` border.
 
 ---
 
@@ -305,10 +305,10 @@ Each tab shows a "Built-in" and a "User" folder at its root, as ZBrush shows Max
 
 `ThumbnailCache` gives every visual asset an `ImTextureID`:
 
-- **Meshes and projects**: rendered offscreen. Use `Renderer::renderToImage`, or a new `Renderer::renderMeshThumbnail(const Mesh&, matcap, size, rgba&)` if `renderToImage` is tied to the synced scene. Size 192x192 (displayed at 96, crisp on HiDPI), studio material, transparent background, camera framed on the bounds from a 3/4 front view (yaw 30, pitch 15).
+- **Meshes and projects**: rendered offscreen. Use `Renderer::renderToImage`, or a new `Renderer::renderMeshThumbnail(const Mesh&, matcap, size, rgba&)` if `renderToImage` is tied to the synced scene. Size 192x192 (displayed at 96, crisp on HiDPI), the default material (Soft Clay), transparent background, camera framed on the bounds from a 3/4 front view (yaw 30, pitch 15).
   - Mesh loading uses the existing importers on a worker thread. GL rendering happens on the main thread, **at most 2 thumbnails per frame**.
   - Projects: `saveProject` also writes `thumbnail.png` (256x256, current camera) into the `.sfproj` ZIP. The LightBox reads that instead of loading the whole project. Older projects without it are loaded on the worker and rendered once.
-- **Brushes**: on a worker, sculpt one S-curve stroke with the brush on a fresh `makePlane(96)` (or an icosphere sdiv 4 for Inflate/Pinch-type brushes) using the same `Sculptor`/recipe code as real strokes. Then render it with clay material, side-lit. Key = brush type or recipe JSON hash.
+- **Brushes**: on a worker, sculpt one S-curve stroke (or a ridge crossed by the brush, for Smooth/Flatten/Trim/Nudge) on the front of a fresh clay ball (icosphere sdiv 6) using the same `Sculptor`/recipe code as real strokes. Every brush, Paint included, is the same ball, camera and material (Soft Clay), so the shelf reads as one icon set. Key = brush type or recipe JSON hash plus `kThumbnailVersion` (bump it whenever thumbnails are made differently, so stale disk-cached ones are remade).
 - **Alphas**: the alpha's grayscale samples straight into a texture.
 - **Materials**: a sphere rendered with that matcap.
 - **Images**: stb-decoded, downscaled to 192.
@@ -489,7 +489,7 @@ Keep the existing orange accent. Make it denser and greyer, like ZBrush. Put thi
 | `text` / `textDim` | `#d8d8d8` / `#8c8c90` | |
 | `border` | `#121214` | 1 px between regions |
 | `danger` | `#e5604a` | errors |
-| canvas | the existing gradient; 1 px `#0e0e10` frame | |
+| canvas | neutral charcoal, soft radial vignette (`kBgFS`); 1 px `#0e0e10` frame; default material Soft Clay (matte warm grey) | |
 
 Style:
 - Rounding: `WindowRounding 0` (shells), `PopupRounding 6`, `FrameRounding 3`, `GrabRounding 2`.
