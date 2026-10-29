@@ -103,6 +103,30 @@ void hint(const App& app, const char* text) {
     if (app.smallFont()) ImGui::PopFont();
 }
 
+// A row of option toggles drawn like the top shelf's (Rgb, Front, Dynamic, Pressure > ...): dark chips with a readable
+// label, raised with an accent underline when on (ui::ActionButton).
+void drawOptionRow(App& app, std::initializer_list<const char*> ids) {
+    ImGui::PushStyleColor(ImGuiCol_Button, theme::toggleOff);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme::toggleOffHover);
+    ImGui::PushStyleColor(ImGuiCol_Text, theme::textOff);
+    actionRow(app, ids);
+    ImGui::PopStyleColor(3);
+}
+
+// A section inside a palette ("Dynamic topology", "Tablet"): a small dim label and a hairline to the right edge,
+// with a little air above, instead of ImGui's SeparatorText.
+void sectionLabel(const App& app, const char* text) {
+    const float s = ImGui::GetFontSize() / 15.0f;
+    ImGui::Dummy(ImVec2(0, 3.0f * s));
+    if (app.smallFont()) ImGui::PushFont(app.smallFont());
+    const ImVec2 p = ImGui::GetCursorScreenPos();
+    ImGui::TextColored(theme::textDim, "%s", text);
+    const float x = ImGui::GetItemRectMax().x + 8.0f * s, y = std::floor((ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f);
+    const float right = p.x + ImGui::GetContentRegionAvail().x;
+    if (right > x) ImGui::GetWindowDrawList()->AddLine(ImVec2(x, y + 0.5f), ImVec2(right, y + 0.5f), theme::u32(theme::sectionRule));
+    if (app.smallFont()) ImGui::PopFont();
+}
+
 } // namespace
 
 bool App::subpalette(const char* id, const char* title) {
@@ -198,14 +222,17 @@ void App::drawPalette_Draw() {
                  "The brush falloff: below 0 a broad, hard tip, above 0 a soft point. The brush cursor's inner ring shows "
                  "where the brush works at half strength.",
                  "Draw");
+    // The same looks as the top shelf: Sculpt | Paint is a mode (the accent), Zadd | Zsub a choice (raised grey),
+    // the rest options (dark chips, an underline when on). Sliders stay neutral, so the accent marks one thing.
+    ImGui::Dummy(ImVec2(0, 2.0f * uiScale_));
     segmented(*this, {"draw.sculpt", "draw.paint"});
     segmented(*this, {"draw.zadd", "draw.zsub"});
-    actionRow(*this, {"draw.rgb", "draw.front_faces"});
-    ImGui::SeparatorText("Dynamic topology");
-    actionRow(*this, {"draw.dynamic"});
+    drawOptionRow(*this, {"draw.rgb", "draw.front_faces"});
+    sectionLabel(*this, "Dynamic topology");
+    drawOptionRow(*this, {"draw.dynamic"});
     ImGui::SetNextItemWidth(-1);
     drawDetailSlider("##dyntopo_detail_palette");
-    if (ImGui::Checkbox("Constant detail", &uiPrefs_.dyntopoConstantDetail))
+    if (ui::Checkbox("Constant detail", &uiPrefs_.dyntopoConstantDetail))
         doc_.sculptor.dyntopo.constantDetail = uiPrefs_.dyntopoConstantDetail;
     ui::HelpText("Constant detail", nullptr,
                  "Off (the default): the triangle size follows the brush size on screen, as in Sculptris Pro. On: one "
@@ -214,13 +241,17 @@ void App::drawPalette_Draw() {
     if (doc_.sculptor.dyntopo.enabled && !dyntopoBlocker(doc_.mesh).empty())
         hint(*this, "This SubTool has subdivision levels, so strokes don't remesh it: delete the lower (or higher) levels "
              "first.");
-    ImGui::SeparatorText("Tablet");
-    ImGui::Checkbox("Pressure > strength", &pressureStrength_);
-    ui::HelpAction(*this, "draw.pressure_strength");
-    ImGui::Checkbox("Pressure > size", &pressureSize_);
-    ui::HelpAction(*this, "draw.pressure_size");
-    if (penSeen_) ImGui::Text("Pen pressure: %.2f", uiPrefs_.tablet.curve.apply(penTracker_.raw()));
-    else ImGui::TextDisabled("No pen detected");
+    // Tablet: the same Pressure > Strength / Size toggles as the top shelf (not checkboxes), and the pen state as
+    // a hint line.
+    sectionLabel(*this, "Tablet");
+    drawOptionRow(*this, {"draw.pressure_strength", "draw.pressure_size"});
+    if (penSeen_) {
+        char pen[48];
+        std::snprintf(pen, sizeof pen, "Pen pressure: %.2f", uiPrefs_.tablet.curve.apply(penTracker_.raw()));
+        hint(*this, pen);
+    } else {
+        hint(*this, "No pen detected");
+    }
 }
 
 void App::drawPalette_Edit() {

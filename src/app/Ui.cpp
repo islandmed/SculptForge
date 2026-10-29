@@ -115,6 +115,19 @@ bool IsModeAction(std::string_view id) {
     return starts("brush.") || starts("mask.") || starts("select.");
 }
 
+bool IsChoiceAction(std::string_view id) { return id == "draw.zadd" || id == "draw.zsub"; }
+
+bool Checkbox(const char* label, bool* v) {
+    const bool changed = ImGui::Checkbox(label, v);
+    if (!*v) {
+        const ImVec2 a = ImGui::GetItemRectMin();
+        const float sz = ImGui::GetFrameHeight();
+        ImGui::GetWindowDrawList()->AddRect(a, ImVec2(a.x + sz, a.y + sz), theme::u32(theme::checkBorder),
+                                            ImGui::GetStyle().FrameRounding, 0, std::max(1.0f, std::floor(uiScale())));
+    }
+    return changed;
+}
+
 void DrawOnMark(ImDrawList* dl, ImVec2 a, ImVec2 b, bool side) {
     const float w = std::max(1.0f, std::floor(theme::markWidth * uiScale() + 0.5f));
     const float r = ImGui::GetStyle().FrameRounding;
@@ -244,8 +257,9 @@ bool ActionButton(App& app, const char* actionId, ImVec2 size, Look look) {
     if (look == Look::Icon && size.x <= 0.0f) size = ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight());
     if (look == Look::Tile && size.x <= 0.0f) size = ImVec2(44.0f * s, 40.0f * s);
 
-    // On: the accent fill for the current mode, a raised grey with an accent underline for an option.
-    const bool mode = IsModeAction(id);
+    // On: the accent fill for the current mode, a raised grey for the chosen side of a choice (Zadd | Zsub), a
+    // raised grey with an accent underline for an option.
+    const bool mode = IsModeAction(id), choice = IsChoiceAction(id);
     int colors = 0;
     if (checked) {
         ImGui::PushStyleColor(ImGuiCol_Button, mode ? theme::accent : theme::toggleOn);
@@ -313,7 +327,7 @@ bool ActionButton(App& app, const char* actionId, ImVec2 size, Look look) {
     }
     ImGui::EndDisabled();
     if (colors) ImGui::PopStyleColor(colors);
-    if (checked && !mode && look != Look::Tile)
+    if (checked && !mode && !choice && look != Look::Tile)
         DrawOnMark(ImGui::GetWindowDrawList(), ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
 
     const bool customize = app.layout().customize;
@@ -360,10 +374,18 @@ bool SliderInside(const char* id, float* v, float lo, float hi, const char* form
     t = std::clamp(t, 0.0f, 1.0f);
     const float rounding = ImGui::GetStyle().FrameRounding;
     dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), ImGui::GetColorU32(ImGuiCol_FrameBg), rounding);
-    dl->AddRectFilled(p, ImVec2(p.x + w * t, p.y + h), theme::u32(theme::sliderFill, active ? 1.6f : 1.0f), rounding);
-    const float bar = std::max(2.0f, std::floor(h * 0.1f));
-    dl->AddRectFilled(ImVec2(p.x, p.y + h - bar), ImVec2(p.x + w * t, p.y + h), active ? color::accentHover : color::accent,
-                      rounding, ImDrawFlags_RoundCornersBottomLeft);
+    // The position: a quiet fill and a thin neutral bar along the bottom, the accent only while dragging, so a
+    // palette of sliders isn't a stack of orange lines (docs/ui-design.md §10). Nothing at the very start, where a
+    // rounded sliver would show as a stray stub.
+    const float fillW = std::floor(w * t);
+    if (fillW >= 1.0f) {
+        const bool full = fillW >= w - 0.5f;
+        dl->AddRectFilled(p, ImVec2(p.x + fillW, p.y + h), theme::u32(theme::sliderFill, active ? 1.5f : 1.0f), rounding,
+                          full ? ImDrawFlags_RoundCornersAll : ImDrawFlags_RoundCornersLeft);
+        const float bar = std::max(1.0f, std::floor(2.0f * uiScale()));
+        dl->AddRectFilled(ImVec2(p.x, p.y + h - bar), ImVec2(p.x + fillW, p.y + h), active ? color::accent : theme::u32(theme::sliderBar),
+                          std::min(rounding, bar), full ? ImDrawFlags_RoundCornersBottom : ImDrawFlags_RoundCornersBottomLeft);
+    }
     dl->ChannelsMerge();
     return changed;
 }
