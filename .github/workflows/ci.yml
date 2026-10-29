@@ -26,7 +26,7 @@ jobs:
           - { name: macOS, os: macos-14 }
           - { name: Windows, os: windows-2022 }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
@@ -65,7 +65,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: UI test screenshots
         if: always() && runner.os != 'macOS'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ui-shots-${{ matrix.os }}
           path: build/ui-shots
@@ -83,7 +83,7 @@ jobs:
           - { bpy: '4.2.0', python: '3.11' }
           - { bpy: '5.2.3', python: '3.13' }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
@@ -115,7 +115,7 @@ jobs:
           - { cy: CY2027, image: 'rockylinux:9', glibc: '2.34' }
     steps:
       - run: dnf -y install git
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: ./packaging/linux/install-build-deps.sh
       - name: Python 3.13 (python-build-standalone via uv)
         run: |
