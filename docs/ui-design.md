@@ -485,11 +485,14 @@ Keep the existing orange accent, but only for **one thing per group**: the curre
 | `header` | `#2b2b2f` / hover `#37373c` | palette and sub-palette headers |
 | `frame` | `#28282c` / hover `#323237` | slider and input frames |
 | `button` | `#333337` / hover `#414146` / pressed `#4e4e55` | buttons |
-| `accent` | `#f0882e` (hover `#ff9a45`) | the **current tool or mode** of a group (bg accent, text `#ffffff`): Draw/Move/Scale/Rotate, Sculpt/Paint, the brush, MaskPen/MaskLasso...; slider grab and bar, check marks, LightBox active tab |
-| `toggleOn` | `#4a4a50` (hover `#56565c`), text `textBright` `#f2f2f2` | options that are on (Zadd, X, Pressure > Strength, Mask, Menus): raised grey with a 2 px accent underline (a side bar on the right shelf), never a solid accent fill |
-| `trough` | `#242428` | unselected segments of a mode group; the 1 2 3 presets |
-| `selection` | accent at 18% | selected list rows (`ImGuiCol_Header`), with a 2 px accent bar on the left |
-| `text` / `textDim` | `#d8d8d8` / `#8c8c90` | |
+| `accent` | `#f0882e` (hover `#ff9a45`) | the **current tool or mode** of a group (bg accent, text `#ffffff`): Draw/Move/Scale/Rotate, Sculpt/Paint, the brush, MaskPen/MaskLasso...; the 2 px underline of an option that is on; a slider bar only while dragging; LightBox active tab |
+| `toggleOff` | `#29292e` (hover `#36363c`), text `textOff` `#b4b4b9` (6.9:1) | options that are off: a dark chip with a readable label, so off never looks disabled (disabled is faded by alpha) |
+| `toggleOn` | `#4c4c53` (hover `#58585f`), text `textBright` `#f2f2f2` | options that are on (X, Rgb, Pressure > Strength, Mask, Menus): raised grey with a 2 px accent underline (a side bar on the right shelf), never a solid accent fill. Also the chosen side of a **choice** (`ui::IsChoiceAction`: Zadd \| Zsub), without the underline |
+| `trough` | `#2c2c31` | unselected segments of a mode or choice group |
+| `selection` | `#3a3a41` (active `#45454c`) | selected list rows (`ImGuiCol_Header`): a lighter neutral row, with a 2 px accent bar on the left where the list draws one |
+| `sliderFill` / `sliderBar` | white 9% / `#85858c` | the filled part of a `SliderInside` and the thin bar along its bottom (accent while dragging); plain slider grabs are `sliderBar` too |
+| `checkMark` / `checkBorder` | `#e6e6e8` / `#55555c` | check marks (neutral); the outline of an unchecked box (`ui::Checkbox`) |
+| `text` / `textOff` / `textDim` | `#d8d8d8` / `#b4b4b9` / `#8c8c90` | |
 | `border` | `#111113` | 1 px between regions |
 | `danger` | `#e5604a` | errors |
 | canvas | neutral charcoal, soft radial vignette (`kBgFS`); 1 px `#0e0e10` frame; vignette down to `shellBg` at the edges (no step at the seams); default material Soft Clay (matte warm grey: a steep upper-left key, a fill from the right, a warm ground bounce, a broad sheen along ridges and a cool rim on the lower right; light cavity, only above a smooth sphere's own curvature) | |
@@ -498,7 +501,9 @@ Style:
 - Rounding: `WindowRounding 0` (shells), `PopupRounding 6`, `FrameRounding 3`, `GrabRounding 2`.
 - Spacing: `FramePadding (6,3)`, `ItemSpacing (4,4)`, `ItemInnerSpacing (4,4)`.
 - `ScrollbarSize 10`, `GrabMinSize 6`.
-- Top shelf hierarchy: mode groups full size on a trough; options 12 px, 22 px high, dim until on; LightBox / AI Brush plain buttons. The title strip's QuickSave, 1 2 3 and Menus have no fill until hovered; its readout is 12 px.
+- Top shelf hierarchy, by meaning: every item is the full row height in the 15 px font, so both rows share one baseline. Modes (Draw \| Move \| Scale \| Rotate, Sculpt \| Paint) and choices (Zadd \| Zsub) are 1 px-gap segments on `trough`; options (Front, Dynamic, X/Y/Z, Rgb, Pressure...) are separate `toggleOff` chips; LightBox / AI Brush plain buttons. The ActiveTris / TotalTris readout is one 12 px line on the row's centre line. The Draw palette uses the same looks (Pressure toggles are buttons there too) and 12 px dim section labels with a hairline.
+- Title strip: QuickSave, 1 2 3 and Menus are `toggleOff` chips; the readout is 12 px `textDim`, the status message 15 px `textBright` so it stands out.
+- Palette drop-downs open below the top shelf (under the palette bar when Tab hides the shelves), never over the tool rows.
 - Font: Inter Regular 15 x scale (as now). Shelf labels and tile captions 12 px (a second Inter size), help titles Inter SemiBold 15, console ProggyClean 13.
 - Trays: sub-palette headers are quiet (no fill until hovered or open, a small chevron, a hairline under each); the accent is not used on them. The active row of a list (SubTools) is the accent at ~15% with a 2 px accent bar on its left, not a solid fill. Helper text is 12 px `textDim`.
 - The left tray's colour field is drawn by hand (`App::drawColorWidget`, Pickers.cpp): a rounded saturation/value square with a ring marker, an 8 px hue strip with a thin pill notch, and the main/second swatches with a 1 px edge.

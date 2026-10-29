@@ -27,14 +27,20 @@ bool ActionButton(App& app, const char* actionId, ImVec2 size = {}, Look look = 
 // other toggle is an option (Zadd, X, Pressure > Strength, Mask, Menus) and gets a raised grey with an accent
 // underline, so the accent marks one thing per group.
 bool IsModeAction(std::string_view actionId);
+// One side of a secondary either/or pair (Zadd | Zsub): always drawn as segments, the chosen one a raised grey with a
+// bright label and no underline, so it reads as a selector rather than as two on/off options.
+bool IsChoiceAction(std::string_view actionId);
 // The 2 px accent mark of an option that is on: along the bottom of the rect, or down its left side.
 void DrawOnMark(ImDrawList* drawList, ImVec2 min, ImVec2 max, bool side = false);
 // Adjacent toggle buttons that read as one control (Zadd | Zsub, X | Y | Z); width -1 fills the line.
 void Segmented(App& app, std::initializer_list<const char*> actionIds, float width = -1.0f);
+// ImGui::Checkbox with an outline round the box while it is unchecked, so an off box doesn't vanish on panelBg.
+bool Checkbox(const char* label, bool* v);
 // Ctrl-hover help for the last item.
 void HelpText(const char* title, const char* shortcut, const char* description, const char* path = nullptr);
 void HelpAction(App& app, const char* actionId);
-// ZBrush-style slider with its label drawn inside the frame ("Draw Size 60") and a thin accent grab.
+// ZBrush-style slider with its label drawn inside the frame ("Draw Size 60"), a quiet fill and a thin neutral bar
+// along the bottom (the accent only while dragging).
 bool SliderInside(const char* id, float* v, float lo, float hi, const char* format, ImGuiSliderFlags flags = 0);
 
 // Customize mode: shelves this payload ("SF_UIITEM") is dragged from and dropped on.
