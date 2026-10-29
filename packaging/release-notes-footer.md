@@ -17,7 +17,7 @@ Each file is also attached without its version number (e.g. `SculptForge-macos.d
 | Ubuntu / Debian / Mint / Pop!_OS | `sculptforge_…_amd64.deb` or `…_arm64.deb` |
 | Fedora / RHEL / Rocky / Alma 8+ | `sculptforge-…x86_64.rpm` or `…aarch64.rpm` |
 | Studio pipelines ([VFX Reference Platform](https://vfxplatform.com)) | `SculptForge-…-linux-…-vfx2026.tar.gz` (GCC 14.2, glibc 2.28) or `…-vfx2027.tar.gz` (glibc 2.34), with the Python 3.13 module |
-| Any Linux | `SculptForge-…-linux-x86_64.AppImage` or `…-arm64.AppImage` |
+| Any Linux | `SculptForge-…-x86_64.AppImage` or `…-aarch64.AppImage` (they update themselves with AppImageUpdate) |
 | Arch Linux | `yay -S sculptforge` (AUR) |
 
 The builds are not code-signed yet. **macOS:** right-click the app → **Open** the first time.

@@ -46,11 +46,15 @@ jobs:
           DESTDIR=$PWD/AppDir cmake --install build
           curl -fsSLo linuxdeploy https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${{ matrix.ld }}.AppImage
           chmod +x linuxdeploy
+          # Named the AppImage way (SculptForge-1.2.3-x86_64.AppImage, no "linux"), with update information so
+          # AppImageUpdate and similar tools can update it from the newest GitHub release (the .zsync file).
+          export LDAI_OUTPUT="SculptForge-${TAG#v}-${{ matrix.ld }}.AppImage"
+          export LDAI_UPDATE_INFORMATION="gh-releases-zsync|islandmed|SculptForge|latest|SculptForge-*-${{ matrix.ld }}.AppImage.zsync"
           VERSION=${TAG#v} ./linuxdeploy --appimage-extract-and-run --appdir AppDir \
             --desktop-file AppDir/usr/share/applications/org.sculptforge.SculptForge.desktop \
             --icon-file assets/branding/sculptforge-256.png --icon-filename org.sculptforge.SculptForge \
             --output appimage
-          mv SculptForge-*.AppImage build/SculptForge-${TAG#v}-linux-${{ matrix.arch }}.AppImage
+          mv "$LDAI_OUTPUT" "$LDAI_OUTPUT.zsync" build/
       - uses: actions/upload-artifact@v7
         with:
           name: linux-${{ matrix.arch }}
@@ -58,6 +62,7 @@ jobs:
             build/*.deb
             build/*.tar.gz
             build/*.AppImage
+            build/*.AppImage.zsync
 
   vfx:
     name: ${{ matrix.label }} ${{ matrix.arch }}
@@ -158,8 +163,8 @@ jobs:
           cp "SculptForge-$V-windows-x86_64.exe" SculptForge-windows-x86_64-setup.exe
           cp "SculptForge-$V-windows-x86_64.zip" SculptForge-windows-x86_64-portable.zip
           cp "SculptForge-$V-darwin-universal.dmg" SculptForge-macos.dmg
-          cp "SculptForge-$V-linux-x86_64.AppImage" SculptForge-linux-x86_64.AppImage
-          cp "SculptForge-$V-linux-arm64.AppImage" SculptForge-linux-arm64.AppImage
+          cp "SculptForge-$V-x86_64.AppImage" SculptForge-linux-x86_64.AppImage
+          cp "SculptForge-$V-aarch64.AppImage" SculptForge-linux-arm64.AppImage
           cp "sculptforge_${V}_amd64.deb" sculptforge_amd64.deb
           cp "sculptforge_${V}_arm64.deb" sculptforge_arm64.deb
           cp "sculptforge-$V-1.x86_64.rpm" sculptforge.x86_64.rpm
