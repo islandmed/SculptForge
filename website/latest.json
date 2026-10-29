@@ -1,11 +1,11 @@
 {
-  "version": "0.9.1",
+  "version": "0.9.2",
   "download": "https://sculptforge.app/#download",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
+    "View your sculpt in AR on Android: scan the QR code and it opens on your phone, even off your Wi-Fi",
     "Capture from phone: scan an object and the splat trains live on your graphics card",
     "Make sculptable: a scan becomes a clean quad mesh with colours and face loops",
-    "Generate the 52 ARKit facial shapes on any sculpted head",
-    "Drive the face live with your phone's camera, and see your sculpt on your desk in AR"
+    "Generate the 52 ARKit facial shapes on any sculpted head"
   ]
 }
