@@ -24,7 +24,7 @@ namespace sf {
 struct FbxExportOptions {
     float scale = 1.0f;                  // applied to positions and layer offsets
     std::string materialName = "M_Clay"; // becomes the engine's material slot
-    glm::vec3 color{0.80f, 0.55f, 0.45f};
+    glm::vec3 color{0.72f, 0.68f, 0.62f}; // Soft Clay grey
     bool layers = true;                  // export sculpt layers as blend shapes (on LOD0)
 };
 

@@ -66,14 +66,14 @@
           </ul>
         </div>
         <figure class="hero-video">
-          <video id="hero-video" poster="media/poster-showcase.jpg?v=2" autoplay muted loop playsinline preload="metadata"
+          <video id="hero-video" poster="media/poster-showcase.jpg?v=3" autoplay muted loop playsinline preload="metadata"
                  aria-label="Weathering a detailed lion head and turning it to stone in SculptForge">
-            <source src="media/showcase-mobile.mp4?v=2" type="video/mp4" media="(max-width: 620px)">
-            <source src="media/showcase.mp4?v=2" type="video/mp4">
+            <source src="media/showcase-mobile.mp4?v=3" type="video/mp4" media="(max-width: 620px)">
+            <source src="media/showcase.mp4?v=3" type="video/mp4">
           </video>
           <script>
             if (matchMedia("(max-width: 620px)").matches)
-              document.getElementById("hero-video").poster = "media/poster-showcase-mobile.jpg?v=2";
+              document.getElementById("hero-video").poster = "media/poster-showcase-mobile.jpg?v=3";
           </script>
           <figcaption>Real recording of SculptForge, scripted demo at 1080p.</figcaption>
         </figure>
@@ -419,7 +419,7 @@ rez-env sculptforge -- sculptforge troll.usda \
         </div>
 
         <div class="demo">
-          <video aria-label="Sculpting a snarl on a lion as a blend shape, generating LODs and sending to Unreal" src="media/game-ready.mp4?v=2" poster="media/poster-game-ready.jpg?v=2" muted loop playsinline preload="none" data-inview tabindex="0"></video>
+          <video aria-label="Sculpting a snarl on a lion as a blend shape, generating LODs and sending to Unreal" src="media/game-ready.mp4?v=3" poster="media/poster-game-ready.jpg?v=3" muted loop playsinline preload="none" data-inview tabindex="0"></video>
           <div>
             <h3>Blend shapes, LODs and Unreal</h3>
             <p>Sculpt a snarl on its own layer and play it back. Generate a LOD chain in one click: even the
@@ -429,7 +429,7 @@ rez-env sculptforge -- sculptforge troll.usda \
         </div>
 
         <div class="demo reverse">
-          <video aria-label="Converting between a sculpt and Gaussian splats" src="media/splats.mp4" poster="media/poster-splats.jpg" muted loop playsinline preload="none" data-inview tabindex="0"></video>
+          <video aria-label="Converting between a sculpt and Gaussian splats" src="media/splats.mp4?v=2" poster="media/poster-splats.jpg?v=2" muted loop playsinline preload="none" data-inview tabindex="0"></video>
           <div>
             <h3>Gaussian splats, both ways</h3>
             <p>Turn a sculpt into Gaussian splats for web viewers and engines, and turn splat captures into

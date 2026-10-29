@@ -290,7 +290,7 @@ void writeMaterial(Writer& w, const std::string& path, const std::string& name, 
     w.open("def Shader \"PreviewSurface\"");
     w.line("uniform token info:id = \"UsdPreviewSurface\"");
     if (painted) w.line("color3f inputs:diffuseColor.connect = <" + path + "/Polypaint.outputs:result>");
-    else w.line("color3f inputs:diffuseColor = (0.8, 0.55, 0.45)");
+    else w.line("color3f inputs:diffuseColor = (0.72, 0.68, 0.62)");
     w.line("float inputs:metallic = 0");
     w.line("float inputs:roughness = 0.65");
     w.line("token outputs:surface");

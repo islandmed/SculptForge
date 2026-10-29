@@ -86,7 +86,7 @@ Mesh splatsToMesh(const SplatCloud& cloud, const SplatToMeshOptions& options, st
 
 struct MeshToSplatsOptions {
     size_t count = 250'000;
-    glm::vec3 color{0.80f, 0.55f, 0.45f}; // clay
+    glm::vec3 color{0.72f, 0.68f, 0.62f}; // Soft Clay grey
     bool shading = true;                  // bake soft light and cavity darkening into the colour
 };
 // Covers the surface with flat, oriented splats (surfels).

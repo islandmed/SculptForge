@@ -6,6 +6,9 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Exports without a material of their own (FBX, USD) and splats made from an unpainted sculpt use the Soft Clay grey instead of the old peach.
+
 ## [0.9.3] - 2026-10-28
 
 A cleaner look: the default material is a matte Soft Clay on a charcoal background, orange marks only the
