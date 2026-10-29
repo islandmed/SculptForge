@@ -17,6 +17,8 @@ int matcapCount();
 const char* matcapName(int index);
 // Case-insensitive; also accepts names without spaces ("redwax"). -1 if unknown.
 int findMatcap(const std::string& name);
+// The material new documents (and thumbnails) start with: Soft Clay, a matte warm clay.
+int defaultMatcap();
 
 // How strongly the viewport darkens creases and lifts ridges on top of this matcap (the
 // curvature term in the mesh shader); the Sculpt material leans on it more than the others.

@@ -306,7 +306,7 @@ TEST(matcap_builtin_materials) {
     // Deterministic.
     CHECK(generateMatcap(findMatcap("Chrome"), size) == chrome);
 
-    // Sculpt, the default material, comes first: a neutral warm clay with a strong key from the upper
+    // Sculpt, the readability-first material, comes first: a neutral warm clay with a strong key from the upper
     // left (a clear light-to-shadow range, so slopes read), and the deepest cavity shading of them all.
     CHECK(findMatcap("sculpt") == 0);
     const std::vector<uint8_t> sculpt = generateMatcap(0, size);
@@ -314,6 +314,17 @@ TEST(matcap_builtin_materials) {
     CHECK(sc.x >= sc.z && sc.x - sc.z < 60);
     CHECK(pixel(sculpt, size / 4, size * 3 / 4).x > pixel(sculpt, size * 3 / 4, size / 4).x + 60);
     for (int i = 1; i < matcapCount(); ++i) CHECK(matcapCavity(0).crease > matcapCavity(i).crease);
+
+    // Soft Clay, the default (last, so the others keep their indices): a matte warm light grey, lit
+    // from the upper left, with no highlight anywhere near white.
+    CHECK(defaultMatcap() == findMatcap("soft clay") && defaultMatcap() == matcapCount() - 1);
+    const std::vector<uint8_t> clay = generateMatcap(defaultMatcap(), size);
+    const glm::ivec4 cl = pixel(clay, size / 2, size / 2);
+    CHECK(cl.x >= cl.z && cl.x - cl.z < 30 && cl.x > 120);
+    CHECK(pixel(clay, size / 4, size * 3 / 4).x > pixel(clay, size * 3 / 4, size / 4).x + 40);
+    int brightest = 0;
+    for (size_t k = 0; k < clay.size(); k += 4) brightest = std::max(brightest, int(clay[k]));
+    CHECK(brightest < 225);
     CHECK(matcapCavity(-1).crease > 0.0f && matcapCavity(matcapCount()).crease == matcapCavity(-1).crease);
 }
 

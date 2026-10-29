@@ -24,18 +24,23 @@ struct MatcapStyle {
     glm::vec3 rim;
     float metal; // 0 = dielectric, 1 = pure environment reflection
     float roughness; // blurs the environment for metals
-    bool sculpt = false; // the readability-first sculpting light (shadeSculpt) instead of the shared model
+    // The shared model (shade), or a light of its own: shadeSculpt (readability first) or shadeSoftClay.
+    enum class Light { Shared, Sculpt, SoftClay } light = Light::Shared;
     MatcapCavity cavity{};
 };
 
 const MatcapStyle kStyles[] = {
-    {"Sculpt", {0.56f, 0.44f, 0.36f}, 0.0f, {0.0f, 0.0f, 0.0f}, 0.0f, 0.0f, {0.0f, 0.0f, 0.0f}, 0.0f, 0.0f, true, {0.8f, 0.35f}},
+    {"Sculpt", {0.56f, 0.44f, 0.36f}, 0.0f, {0.0f, 0.0f, 0.0f}, 0.0f, 0.0f, {0.0f, 0.0f, 0.0f}, 0.0f, 0.0f,
+     MatcapStyle::Light::Sculpt, {0.8f, 0.35f}},
     {"Red Wax", {0.50f, 0.045f, 0.03f}, 0.55f, {0.55f, 0.06f, 0.03f}, 0.55f, 70.0f, {0.25f, 0.08f, 0.06f}, 0.0f, 0.0f},
     {"Clay", {0.46f, 0.38f, 0.33f}, 0.25f, {0.05f, 0.03f, 0.02f}, 0.06f, 10.0f, {0.10f, 0.10f, 0.11f}, 0.0f, 0.0f},
     {"Skin", {0.68f, 0.38f, 0.28f}, 0.6f, {0.6f, 0.16f, 0.08f}, 0.16f, 28.0f, {0.22f, 0.16f, 0.15f}, 0.0f, 0.0f},
     {"Chrome", {0.95f, 0.96f, 1.0f}, 0.0f, {0.0f, 0.0f, 0.0f}, 0.0f, 1.0f, {0.0f, 0.0f, 0.0f}, 1.0f, 0.05f},
     {"White", {0.78f, 0.78f, 0.76f}, 0.3f, {0.04f, 0.04f, 0.05f}, 0.3f, 45.0f, {0.12f, 0.13f, 0.15f}, 0.0f, 0.0f},
     {"Bronze", {0.80f, 0.50f, 0.25f}, 0.0f, {0.0f, 0.0f, 0.0f}, 0.0f, 1.0f, {0.0f, 0.0f, 0.0f}, 1.0f, 0.35f},
+    // The default (defaultMatcap()). Last, so the indices of the others stay put.
+    {"Soft Clay", {0.50f, 0.455f, 0.41f}, 0.0f, {0.0f, 0.0f, 0.0f}, 0.0f, 0.0f, {0.0f, 0.0f, 0.0f}, 0.0f, 0.0f,
+     MatcapStyle::Light::SoftClay, {0.62f, 0.3f}},
 };
 constexpr int kStyleCount = int(sizeof kStyles / sizeof kStyles[0]);
 
@@ -79,8 +84,29 @@ glm::vec3 shadeSculpt(const MatcapStyle& m, const glm::vec3& n) {
     return m.albedo * light + glm::vec3(spec) + glm::vec3(0.8f, 0.85f, 0.95f) * (fillSpec + rim);
 }
 
+// The default: matte studio clay, a warm light grey. One broad key from the upper left wrapped far round
+// the form, a cool fill and a sky/ground ambient so nothing goes black, and only a wide, faint sheen: no
+// hot spot to blow out, so the form reads from the shading gradient and the cavity term (kStyles).
+glm::vec3 shadeSoftClay(const MatcapStyle& m, const glm::vec3& n) {
+    const glm::vec3 v(0.0f, 0.0f, 1.0f);
+    const glm::vec3 key = glm::normalize(glm::vec3(-0.45f, 0.6f, 0.7f));
+    const glm::vec3 fill = glm::normalize(glm::vec3(0.8f, -0.2f, 0.5f));
+    const float k = std::max((glm::dot(n, key) + 0.2f) / 1.2f, 0.0f);
+    const float diff = std::pow(k, 1.7f); // falls off steadily, so slopes and strokes read everywhere
+    const float fd = std::max(glm::dot(n, fill), 0.0f);
+    const float up = 0.5f + 0.5f * n.y;
+    const glm::vec3 ambient = glm::mix(glm::vec3(0.05f, 0.046f, 0.043f), glm::vec3(0.11f, 0.115f, 0.125f), up);
+    const glm::vec3 light = 1.2f * diff * glm::vec3(1.0f, 0.97f, 0.93f) + 0.2f * fd * fd * glm::vec3(0.8f, 0.86f, 1.0f) + ambient;
+    const float nh = std::max(glm::dot(n, glm::normalize(key + v)), 0.0f);
+    const float sheen = 0.05f * std::pow(nh, 8.0f);
+    // Grazing angles fall off a little, like a dry surface, which keeps the silhouette crisp on dark grey.
+    const float edge = 1.0f - 0.18f * std::pow(1.0f - std::max(n.z, 0.0f), 2.0f);
+    return (m.albedo * light + glm::vec3(sheen)) * edge;
+}
+
 glm::vec3 shade(const MatcapStyle& m, const glm::vec3& n) {
-    if (m.sculpt) return shadeSculpt(m, n);
+    if (m.light == MatcapStyle::Light::Sculpt) return shadeSculpt(m, n);
+    if (m.light == MatcapStyle::Light::SoftClay) return shadeSoftClay(m, n);
     const glm::vec3 v(0.0f, 0.0f, 1.0f);
     const float nv = std::max(n.z, 0.0f);
     if (m.metal > 0.0f) {
@@ -114,6 +140,11 @@ std::string squash(const std::string& s) {
 } // namespace
 
 int matcapCount() { return kStyleCount; }
+
+int defaultMatcap() {
+    static const int index = findMatcap("Soft Clay");
+    return index;
+}
 
 const char* matcapName(int index) { return index >= 0 && index < kStyleCount ? kStyles[index].name : ""; }
 

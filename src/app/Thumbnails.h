@@ -5,15 +5,16 @@
 // cached in memory and on disk. Calls never block: they return 0 until the
 // image is ready, and pump() does a little work each frame.
 //
-// Workers sculpt the brush previews (one S-stroke with the real brush code on a
-// fresh plane or sphere), load meshes and decode images; the main thread then
-// renders at most two meshes per frame. Finished thumbnails are written to
+// Workers sculpt the brush previews (one S-stroke with the real brush code on the
+// front of a fresh clay ball, every brush framed and lit alike), load meshes and
+// decode images; the main thread then renders at most two meshes per frame. Finished thumbnails are written to
 // <cache dir>/<fnv1a64 key>.png, and at most 256 textures stay in GPU memory.
 #pragma once
 
 #include "core/BrushAlpha.h"
 #include "core/BrushRecipe.h"
 #include "core/Image.h"
+#include "core/Matcap.h"
 #include "core/Mesh.h"
 #include "core/Vdm.h"
 
@@ -62,7 +63,7 @@ private:
     struct Result {
         Image image;                // ready to upload (cache hit, image file, alpha, project thumbnail)
         std::unique_ptr<Mesh> mesh; // needs a render
-        int matcap = -1;
+        int matcap = defaultMatcap(); // -1 = Studio
         float yaw = 30.0f, pitch = -15.0f; // degrees
         float zoom = 0.92f;                // camera distance relative to framing the whole mesh
         float distance = 0.0f;             // > 0: this camera distance from the origin instead
