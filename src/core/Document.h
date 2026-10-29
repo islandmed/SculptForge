@@ -55,7 +55,7 @@ struct Document {
     std::vector<BrushRecipe> brushes = builtinBrushRecipes();
     int activeBrush = -1; // index into `brushes`, -1 = use a built-in brush type
     BrushAlpha brushAlpha; // stamp shaping every brush's falloff (empty = round); brush_set_alpha
-    glm::vec3 paintColor{0.6f, 0.03f, 0.02f}; // current polypaint colour (linear RGB; see set_color)
+    glm::vec3 paintColor{0.22f, 0.22f, 0.22f}; // current polypaint colour (linear RGB; see set_color); a mid grey
     // Vector displacement maps for the VDM brush (core/Vdm.h): the built-ins, then the studio and user
     // library's .sfvdm files and any loaded this session. `brushVdm` is the one the VDM brush stamps.
     std::vector<std::shared_ptr<const VectorDisplacement>> vdms = builtinVdms();

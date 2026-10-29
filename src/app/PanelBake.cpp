@@ -336,6 +336,7 @@ void App::drawBakeContents() {
     BakeUiState& b = *bake_;
     const Mesh& m = doc_.mesh;
     const ImGuiStyle& style = ImGui::GetStyle();
+    const float x0 = ImGui::GetCursorPosX(); // line start, inside the section indent
     const float half = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) * 0.5f;
 
     // What the maps go onto.
@@ -390,7 +391,10 @@ void App::drawBakeContents() {
         "Colour transfer: the source's polypaint, or its painted texture.",
     };
     for (int i = 0; i < kBakeMapCount; ++i) {
-        if (i % 2) ImGui::SameLine(half + style.ItemSpacing.x + style.WindowPadding.x);
+        if (i % 2) {
+            ImGui::SameLine();
+            ImGui::SetCursorPosX(x0 + half + style.ItemSpacing.x); // the right column, inside the section indent
+        }
         bool on = (b.settings.maps & (1u << i)) != 0;
         if (ImGui::Checkbox(bakeMapLabel(BakeMap(i)), &on)) b.settings.maps = on ? b.settings.maps | (1u << i) : b.settings.maps & ~(1u << i);
         ui::HelpText(bakeMapLabel(BakeMap(i)), nullptr, kMapHelp[i], kPath);

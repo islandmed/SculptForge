@@ -6,6 +6,7 @@
 // "Masking" section of the Tools panel. The operations themselves are the
 // mask_* commands (core/Masking.cpp).
 #include "app/App.h"
+#include "app/Palettes.h"
 #include "app/Pickers.h"
 #include "app/Ui.h"
 
@@ -175,20 +176,23 @@ void App::drawMaskingSection() {
     ImGui::SameLine();
     if (ImGui::Button("Shrink##mask", ImVec2(half, 0))) runCommand("mask_shrink", passes);
     ImGui::SetNextItemWidth(-1);
-    ImGui::SliderInt("##maskpasses", &maskIterations_, 1, 20, "passes %d");
+    tray::SliderInt("##maskpasses", &maskIterations_, 1, 20, "Passes %d");
 
     if (ImGui::Button("By cavity", ImVec2(half, 0)))
         runCommand("mask_by_cavity", {{"strength", double(maskStrength_)}, {"threshold", double(cavityThreshold_)}});
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Mask creases and folds (replaces the mask; uses the mask strength)");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(-1);
-    ImGui::SliderFloat("##cavitythreshold", &cavityThreshold_, -0.2f, 0.5f, "threshold %.2f");
+    ui::SliderInside("##cavitythreshold", &cavityThreshold_, -0.2f, 0.5f, "Threshold %.2f");
     if (ImGui::Button("By polygroup", ImVec2(half, 0)))
         runCommand("mask_by_polygroup", {{"group", double(maskGroup_)}});
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Mask one polygroup (replaces the mask)");
     ImGui::SameLine();
+    // The group id as a drag field the size of the button beside it (Ctrl+click or double-click types a number),
+    // rather than an input with tiny - and + buttons.
     ImGui::SetNextItemWidth(-1);
-    if (ImGui::InputInt("##maskgroup", &maskGroup_)) maskGroup_ = std::max(0, maskGroup_);
+    if (ImGui::DragInt("##maskgroup", &maskGroup_, 0.1f, 0, 1 << 30, "Group %d", ImGuiSliderFlags_AlwaysClamp))
+        maskGroup_ = std::max(0, maskGroup_);
 }
 
 } // namespace sf
