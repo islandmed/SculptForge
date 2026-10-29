@@ -39,3 +39,28 @@ jobs:
           curl -sS -o /dev/null -w 'IndexNow: HTTP %{http_code}\n' -X POST https://api.indexnow.org/indexnow \
             -H 'Content-Type: application/json; charset=utf-8' \
             -d "{\"host\":\"sculptforge.app\",\"key\":\"$key\",\"keyLocation\":\"https://sculptforge.app/$key.txt\",\"urlList\":$urls}"
+
+  # A copy at https://islandmed.github.io/ for workplace networks that block domains less than about a month old.
+  # It points search engines at sculptforge.app (canonical links, robots.txt) and is skipped until the
+  # MIRROR_DEPLOY_KEY secret exists (tools/publish/setup-channels.sh sets it up).
+  mirror:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Push website/ to islandmed/islandmed.github.io
+        env:
+          KEY: ${{ secrets.MIRROR_DEPLOY_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then echo "No MIRROR_DEPLOY_KEY secret: skipped"; exit 0; fi
+          mkdir -p ~/.ssh && printf '%s\n' "$KEY" > ~/.ssh/mirror && chmod 600 ~/.ssh/mirror
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/mirror -o StrictHostKeyChecking=accept-new"
+          git clone -q --depth 1 git@github.com:islandmed/islandmed.github.io.git mirror
+          rsync -a --delete --exclude .git website/ mirror/
+          cd mirror
+          rm -f sitemap.xml [0-9a-f]*.txt               # sculptforge.app's sitemap and IndexNow key
+          printf 'User-agent: *\nDisallow: /\n' > robots.txt   # the original is sculptforge.app
+          touch .nojekyll
+          git add -A
+          git -c user.name="SculptForge website" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -qm "Mirror of website/ at ${GITHUB_SHA::7}" || { echo "No changes"; exit 0; }
+          git push -q origin HEAD:main

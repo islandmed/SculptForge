@@ -12,6 +12,8 @@
 namespace sf {
 
 inline constexpr const char* kUpdateFeedUrl = "https://sculptforge.app/latest.json";
+// The same file on the website's GitHub copy, for networks that block sculptforge.app (new domains often are).
+inline constexpr const char* kUpdateFeedMirrorUrl = "https://islandmed.github.io/latest.json";
 inline constexpr int64_t kUpdateCheckInterval = 24 * 60 * 60; // seconds
 
 struct UpdateInfo {

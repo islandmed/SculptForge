@@ -493,7 +493,9 @@ void App::startUpdateCheck(bool manual) {
     std::thread([job, source] {
         std::string body;
         if (source.rfind("https://", 0) == 0 || source.rfind("http://", 0) == 0) {
-            const ai::HttpResponse r = ai::httpRequest("GET", source, {"Accept: application/json"}, {}, 15);
+            ai::HttpResponse r = ai::httpRequest("GET", source, {"Accept: application/json"}, {}, 15);
+            if (r.status != 200 && source == kUpdateFeedUrl)
+                r = ai::httpRequest("GET", kUpdateFeedMirrorUrl, {"Accept: application/json"}, {}, 15);
             if (r.status == 200) body = r.body;
             else job->error = r.status ? "the server answered " + std::to_string(r.status) : (r.error.empty() ? "no connection" : r.error);
         } else {

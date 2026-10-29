@@ -26,6 +26,8 @@ current tool, and the bottom shelf's brush tiles are bigger, with a size you can
 
 ### Fixed
 - The Alpha palette showed **Load image...** and **Invert loaded image** twice.
+- The update check also asks the website's GitHub copy (islandmed.github.io), so it works on networks that
+  block sculptforge.app.
 
 ## [0.9.2] - 2026-10-28
 
