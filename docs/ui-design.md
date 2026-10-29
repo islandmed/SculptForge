@@ -496,6 +496,8 @@ Style:
 - Spacing: `FramePadding (6,3)`, `ItemSpacing (4,4)`, `ItemInnerSpacing (4,4)`.
 - `ScrollbarSize 10`, `GrabMinSize 6`.
 - Font: Inter Regular 15 x scale (as now). Shelf labels and tile captions 12 px (a second Inter size), help titles Inter SemiBold 15, console ProggyClean 13.
+- Trays: sub-palette headers are quiet (no fill until hovered or open, a small chevron, a hairline under each); the accent is not used on them. The active row of a list (SubTools) is the accent at ~15% with a 2 px accent bar on its left, not a solid fill. Helper text is 12 px `textDim`.
+- The left tray's colour field is drawn by hand (`App::drawColorWidget`, Pickers.cpp): a rounded saturation/value square with a ring marker, an 8 px hue strip with a thin pill notch, and the main/second swatches with a 1 px edge.
 
 ---
 

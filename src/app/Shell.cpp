@@ -1630,29 +1630,6 @@ void App::drawMaterialTile(const char* id, ImVec2 size) {
     ui::HelpText("Material", "M", "How the model is shaded in the view. Click for the material picker.", "Left shelf");
 }
 
-void App::drawColorWidget(float width) {
-    const float s = uiScale_;
-    ImGui::BeginGroup();
-    glm::vec3 srgb = linearToSrgb(doc_.paintColor);
-    ImGui::SetNextItemWidth(width);
-    if (ImGui::ColorPicker3("##shelfcolor", glm::value_ptr(srgb),
-                            ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel |
-                                ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_PickerHueBar))
-        doc_.paintColor = srgbToLinear(srgb);
-    ui::HelpText("Colour", "C", "The polypaint colour (C over the model picks one).", "Left shelf");
-    // Two swatches, like ZBrush's main and secondary colour: clicking swaps them ("Alternate").
-    const float sw = (width - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
-    const glm::vec3 second = linearToSrgb(secondaryColor_);
-    bool swap = ImGui::ColorButton("##primary", ImVec4(srgb.x, srgb.y, srgb.z, 1.0f), ImGuiColorEditFlags_NoTooltip, ImVec2(sw, 22.0f * s));
-    ui::HelpText("Main colour", nullptr, "Click to swap with the second colour.", "Left shelf");
-    ImGui::SameLine();
-    swap |= ImGui::ColorButton("##secondary", ImVec4(second.x, second.y, second.z, 1.0f), ImGuiColorEditFlags_NoTooltip,
-                               ImVec2(sw, 22.0f * s));
-    ui::HelpText("Second colour", nullptr, "Click to swap it with the main colour (ZBrush Alternate).", "Left shelf");
-    if (swap) std::swap(doc_.paintColor, secondaryColor_);
-    ui::ActionButton(*this, "color.fill", ImVec2(width, 0), ui::Look::IconLabel);
-    ui::HelpAction(*this, "color.fill");
-    ImGui::EndGroup();
-}
+// drawColorWidget (the left tray's colour field) is in Pickers.cpp.
 
 } // namespace sf
