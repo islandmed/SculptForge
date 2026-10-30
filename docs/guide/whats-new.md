@@ -5,6 +5,15 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.9.4
+
+### Fixes and packaging
+
+Exports without a material of their own (FBX, USD) and splats made from an unpainted sculpt use the Soft Clay
+grey instead of the old peach. Linux AppImages are now named `SculptForge-0.9.4-x86_64.AppImage` (and
+`-aarch64`) and carry update information for AppImageUpdate. On macOS you can install with Homebrew:
+`brew install --cask islandmed/tap/sculptforge`.
+
 ## Version 0.9.3
 
 ### A cleaner look

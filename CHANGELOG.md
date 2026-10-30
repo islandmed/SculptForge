@@ -6,6 +6,8 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-10-29
+
 ### Fixed
 - Builds at other optimisation levels (Arch and Omarchy packages build at -O2) failed two face-shape tests: the core library no longer fuses multiply-adds, so results are the same at any level.
 
