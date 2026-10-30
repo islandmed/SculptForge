@@ -1,11 +1,11 @@
 {
-  "version": "0.9.3",
+  "version": "0.9.4",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "A cleaner look: matte Soft Clay material, orange only on the current tool",
-    "Bigger brush tiles on the bottom shelf, with Small / Medium / Large (right-click the shelf)",
-    "File > Export STL... for 3D printing",
-    "Update checks work on networks that block sculptforge.app"
+    "Exports without a material (FBX, USD) and splats from an unpainted sculpt use the Soft Clay grey, not peach",
+    "Linux AppImages update themselves with AppImageUpdate",
+    "From 0.9.3: a cleaner look with the matte Soft Clay material, orange only on the current tool",
+    "From 0.9.3: bigger brush tiles with Small / Medium / Large, and File > Export STL..."
   ]
 }

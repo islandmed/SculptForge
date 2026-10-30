@@ -17,7 +17,7 @@
   <meta property="og:url" content="https://sculptforge.app/">
   <link rel="canonical" href="https://sculptforge.app/">
   <script type="application/ld+json">
-  {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "SculptForge", "url": "https://sculptforge.app/", "applicationCategory": "MultimediaApplication", "applicationSubCategory": "3D sculpting", "operatingSystem": "Windows 10, Windows 11, macOS, Linux", "softwareVersion": "0.9.3", "description": "Free, open-source digital sculpting: an alternative to ZBrush and Mudbox for VFX, animation and game studios.", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "downloadUrl": "https://github.com/islandmed/SculptForge/releases/latest", "image": "https://sculptforge.app/img/social-preview.png?v=3", "sameAs": ["https://github.com/islandmed/SculptForge"]}
+  {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "SculptForge", "url": "https://sculptforge.app/", "applicationCategory": "MultimediaApplication", "applicationSubCategory": "3D sculpting", "operatingSystem": "Windows 10, Windows 11, macOS, Linux", "softwareVersion": "0.9.4", "description": "Free, open-source digital sculpting: an alternative to ZBrush and Mudbox for VFX, animation and game studios.", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "downloadUrl": "https://github.com/islandmed/SculptForge/releases/latest", "image": "https://sculptforge.app/img/social-preview.png?v=3", "sameAs": ["https://github.com/islandmed/SculptForge"]}
   </script>
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="style.css?v=17">
@@ -97,10 +97,17 @@
     <section id="whats-new" class="section alt">
       <div class="wrap">
         <h2>What's new in 0.9</h2>
-        <p class="section-lede">New in 0.9.3: a cleaner look, made for reading your sculpt. Before that, maquette to performance: scan a clay maquette with your phone, sculpt on the scan,
+        <p class="section-lede">New in 0.9.4: Soft Clay grey exports and self-updating AppImages. New in 0.9.3: a cleaner look, made for reading your sculpt. Before that, maquette to performance: scan a clay maquette with your phone, sculpt on the scan,
           give the head its facial shapes and drive them with your own face. <a href="guide/whats-new.html">Everything that changed</a> ·
           <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">changelog</a></p>
         <div class="grid">
+          <article class="card">
+            <h3>Soft Clay everywhere, AppImages that update <small>new in 0.9.4</small></h3>
+            <p>FBX and USD exports without a material of their own, and splats made from an unpainted sculpt, use the
+              Soft Clay grey instead of the old peach. The Linux AppImages are now named
+              <code>SculptForge-0.9.4-x86_64.AppImage</code> (and <code>-aarch64</code>) and update themselves with
+              AppImageUpdate. <a href="guide/whats-new.html">What's new</a></p>
+          </article>
           <article class="card">
             <h3>A cleaner look <small>new in 0.9.3</small></h3>
             <p>The new default material, Soft Clay, is matte with a clear light and shadow side, so every stroke reads
@@ -489,7 +496,7 @@ rez-env sculptforge -- sculptforge troll.usda \
     <section id="download" class="section alt">
       <div class="wrap">
         <h2>Download</h2>
-        <p class="section-lede">Version 0.9.3. All builds come from the
+        <p class="section-lede">Version 0.9.4. All builds come from the
           <a href="https://github.com/islandmed/SculptForge/releases/latest">latest GitHub release</a>, with
           SHA-256 checksums.</p>
         <div class="downloads">
