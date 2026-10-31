@@ -129,7 +129,9 @@ spacemouse 0 0 0 0 0 0.8 0.5
 expect_value spacemouse_connected == 1
 expect_value camera_yaw > 25
 
-# Every input style: SculptForge and Blender navigate the same way.
+# Every input style: SculptForge and Blender navigate the same way. (Lift the pen out of range first: while it is in
+# range the interface follows only the pen, #13.)
+pen_out
 click "Preferences##palette.preferences"
 click "SculptForge##input.style_sculptforge"
 key escape
