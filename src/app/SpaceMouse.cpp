@@ -93,6 +93,14 @@ void App::spaceMouseClose() {
     spaceMouseMoving_ = false;
 }
 
+bool App::spaceMouseDeflected() const {
+    if (!spaceMouse_) return false;
+    std::array<float, kSmAxes> axes{};
+    for (int i = 0; i < kSmAxes; ++i)
+        axes[size_t(i)] = std::clamp(float(SDL_GetJoystickAxis(spaceMouse_, i)) / 32767.0f, -1.0f, 1.0f);
+    return spaceMouseMotion(axes, 1.0f / 60.0f, uiPrefs_.spaceMouse).any();
+}
+
 void App::spaceMouseEvent(const SDL_Event& e) {
     switch (e.type) {
     case SDL_EVENT_JOYSTICK_ADDED:

@@ -660,8 +660,9 @@ int App::run() {
             handleEvent(ev);
             if (ev.type == SDL_EVENT_KEYMAP_CHANGED || ev.type == SDL_EVENT_KEYBOARD_ADDED ||
                 ev.type == SDL_EVENT_KEYBOARD_REMOVED || ev.type == SDL_EVENT_MOUSE_ADDED ||
-                ev.type == SDL_EVENT_MOUSE_REMOVED || ev.type == SDL_EVENT_CLIPBOARD_UPDATE)
-                return; // nothing on screen changes
+                ev.type == SDL_EVENT_MOUSE_REMOVED || ev.type == SDL_EVENT_CLIPBOARD_UPDATE ||
+                (ev.type == SDL_EVENT_JOYSTICK_AXIS_MOTION && !spaceMouseDeflected()))
+                return; // nothing on screen changes (a hand resting on a SpaceMouse: inside its dead zone)
             draw = true;
             if (logRedraw) SDL_Log("redraw: event 0x%x", unsigned(ev.type));
             const bool input = (ev.type >= SDL_EVENT_KEY_DOWN && ev.type < SDL_EVENT_JOYSTICK_AXIS_MOTION) ||
