@@ -62,6 +62,7 @@ void isolateSettings() {
 #else
     setenv("XDG_DATA_HOME", d.c_str(), 1);
     setenv("XDG_CONFIG_HOME", d.c_str(), 1);
+    setenv("HOST_XDG_DATA_HOME", d.c_str(), 1); // in a Flatpak, the Blender bridge folder (io/BlenderBridge.h)
 #if defined(__APPLE__)
     setenv("HOME", d.c_str(), 1);
 #endif

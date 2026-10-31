@@ -11,3 +11,6 @@ imgui.ini
 *.user
 Testing/
 __pycache__/
+build-flatpak/
+.flatpak-builder/
+*.flatpak

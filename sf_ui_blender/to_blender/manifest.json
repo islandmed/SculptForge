@@ -1,0 +1,12 @@
+{
+  "format": "sculptforge-bridge",
+  "version": 1,
+  "revision": 1,
+  "sender": "sculptforge",
+  "sender_version": "0.9.5",
+  "time": 1793488889.7197189,
+  "objects": [
+    {"name": "Box", "file": "r1_000.GoZ"},
+    {"name": "Rock", "file": "r1_001.GoZ"}
+  ]
+}

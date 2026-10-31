@@ -71,6 +71,24 @@ jobs:
           path: build/ui-shots
           if-no-files-found: ignore
 
+  # The Flatpak (packaging/flatpak), built as the release builds it, installed, and a UI test run inside the sandbox.
+  flatpak:
+    name: Flatpak x86_64
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - run: sudo apt-get update && sudo apt-get install -y flatpak flatpak-builder xvfb
+      - name: Build the bundle
+        run: packaging/flatpak/build.sh dist
+      - name: Install it and run UI tests inside the sandbox (Xvfb, Mesa from the runtime)
+        run: |
+          flatpak install --user -y --noninteractive dist/*.flatpak
+          for t in sculpt_basics blender_bridge spacemouse; do
+            xvfb-run -a -s "-screen 0 1920x1080x24" \
+              flatpak run --env=LIBGL_ALWAYS_SOFTWARE=1 org.sculptforge.SculptForge \
+                --ui-test "$PWD/tests/ui/$t.sfui" --ui-out "$PWD/flatpak-ui/$t"
+          done
+
   # The Blender add-on inside Blender itself (the bpy wheel is Blender as a Python module), against
   # sculptforge-cli: the oldest supported Blender (4.2 LTS, Python 3.11) and the newest.
   blender-addon:

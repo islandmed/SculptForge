@@ -30,6 +30,7 @@ Each link below downloads the newest version. Pick the one for your system:
 | Ubuntu, Debian, Mint, Pop!_OS | [.deb for x86_64](https://github.com/islandmed/SculptForge/releases/latest/download/sculptforge_amd64.deb) or [ARM64](https://github.com/islandmed/SculptForge/releases/latest/download/sculptforge_arm64.deb) | `sudo apt install ./sculptforge_amd64.deb` |
 | Fedora, RHEL, Rocky, Alma 8+ | [.rpm for x86_64](https://github.com/islandmed/SculptForge/releases/latest/download/sculptforge.x86_64.rpm) or [ARM64](https://github.com/islandmed/SculptForge/releases/latest/download/sculptforge.aarch64.rpm) | `sudo dnf install ./sculptforge.x86_64.rpm` |
 | Any Linux | [AppImage for x86_64](https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-linux-x86_64.AppImage) or [ARM64](https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-linux-arm64.AppImage) | `chmod +x` the file, then run it |
+| Any Linux, sandboxed | [Flatpak for x86_64](https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-linux-x86_64.flatpak) or [ARM64](https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-linux-arm64.flatpak) | `flatpak install --user ./SculptForge-linux-x86_64.flatpak` (see [Flatpak](#flatpak)) |
 | Arch Linux | `packaging/arch/PKGBUILD` in the source | `makepkg -si` in that folder (an AUR package is planned) |
 | Studio pipelines | `SculptForge-<version>-...-vfx2026.tar.gz` or `...-vfx2027.tar.gz` | See [SculptForge for studios](studios.md) |
 
@@ -61,6 +62,42 @@ Each package contains two programs: **SculptForge**, the desktop application, an
 headless command-line tool for scripts, build farms and AI agents (see [Scripting and
 automation](scripting.md)). On macOS the command-line tool sits inside the app bundle, at
 `SculptForge.app/Contents/MacOS/sculptforge-cli`.
+
+### Flatpak
+
+The Flatpak runs SculptForge in Flatpak's sandbox and works on any distribution that has Flatpak (most do; see
+[flatpak.org/setup](https://flatpak.org/setup/) if yours doesn't). It is a single file: download it, then
+
+```sh
+flatpak install --user ./SculptForge-linux-x86_64.flatpak     # or ...-linux-arm64.flatpak
+flatpak run org.sculptforge.SculptForge
+```
+
+SculptForge then appears in your application menu. The first install also downloads the freedesktop runtime it
+runs on (a few hundred MB, shared with other Flatpak apps) from Flathub; the file adds Flathub for that if it isn't
+set up. Only the runtime comes from Flathub: SculptForge itself is not published there.
+
+- **Updating**: SculptForge tells you when there is a new version, as the other packages do. Download the new
+  `.flatpak` and install it the same way; your settings are kept. `flatpak update` updates the runtime but not
+  a SculptForge installed from a file.
+- **Uninstalling**: `flatpak uninstall org.sculptforge.SculptForge` (add `--delete-data` to remove its
+  settings too).
+- **Files**: the sandbox can read and write your home folder, so projects, models and the textures beside them
+  open as they would without it. Files elsewhere (another drive under `/mnt` or `/media`) open through the file
+  dialog; to let SculptForge see a whole drive, run
+  `flatpak override --user --filesystem=/mnt/data org.sculptforge.SculptForge`.
+- **Settings** live in `~/.var/app/org.sculptforge.SculptForge/`, not `~/.local/share/SculptForge`, so a
+  Flatpak and another install of SculptForge on the same computer keep separate settings and brushes. Your
+  library in Documents/SculptForge is shared.
+- **SpaceMouse**: works with Flatpak 1.15.6 or newer. With an older Flatpak, allow input devices with
+  `flatpak override --user --device=all org.sculptforge.SculptForge`.
+- **Blender bridge**: the add-on finds the Flatpak by itself and exchanges models through the usual folder.
+- **Not in the sandbox**: programs SculptForge starts on your computer, such as `ffmpeg` for recording demo
+  videos and the splat trainer (**Splat > Train**), are not visible to it. Use another package for those.
+  Ollama, ComfyUI and other local AI servers work, because SculptForge talks to them over the network.
+
+To build the Flatpak yourself from the source, install `flatpak` and `flatpak-builder` and run
+`packaging/flatpak/build.sh`; it writes `SculptForge-<version>-<arch>.flatpak`.
 
 ## Opening SculptForge for the first time
 
@@ -118,7 +155,8 @@ kept: they live in your user folders, not next to the program (see [Troubleshoot
 for where).
 
 To uninstall, use your system's usual method (Settings > Apps on Windows, dragging the app to the Bin on
-macOS, `sudo apt remove sculptforge` or `sudo dnf remove sculptforge` on Linux, or delete the AppImage).
+macOS, `sudo apt remove sculptforge` or `sudo dnf remove sculptforge` on Linux, `flatpak uninstall
+org.sculptforge.SculptForge` for the Flatpak, or delete the AppImage).
 Delete the settings and library folders as well if you want to remove everything.
 
 ## Building from source

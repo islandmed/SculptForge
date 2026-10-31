@@ -15,6 +15,7 @@
 
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 
@@ -223,4 +224,34 @@ TEST(blender_bridge_names_and_app_info) {
     writeBridgeHeartbeat(folder, true);
     CHECK(!fs::exists(root / "alive.json"));
     fs::remove_all(root);
+}
+
+TEST(blender_bridge_flatpak_launcher) {
+    // A per-user install: the add-on starts ~/.local/share/flatpak/exports/bin/<id>.
+    const std::string user = "[Application]\nname=org.sculptforge.SculptForge\nruntime=runtime/org.freedesktop.Platform/x86_64/26.08\n\n"
+                             "[Instance]\ninstance-id=12345\n"
+                             "app-path=/home/ana/.local/share/flatpak/app/org.sculptforge.SculptForge/x86_64/master/abc123/files\n"
+                             "branch=master\n";
+    CHECK(flatpakHostLauncher(user) == "/home/ana/.local/share/flatpak/exports/bin/org.sculptforge.SculptForge");
+    // System-wide, with Windows line ends for good measure.
+    const std::string system = "[Application]\r\nname=org.sculptforge.SculptForge\r\n[Instance]\r\n"
+                               "app-path=/var/lib/flatpak/app/org.sculptforge.SculptForge/aarch64/stable/def/files\r\n";
+    CHECK(flatpakHostLauncher(system) == "/var/lib/flatpak/exports/bin/org.sculptforge.SculptForge");
+    // Not a Flatpak, or a path that doesn't name the app: nothing.
+    CHECK(flatpakHostLauncher("").empty());
+    CHECK(flatpakHostLauncher("[Application]\nname=org.sculptforge.SculptForge\n").empty());
+    CHECK(flatpakHostLauncher("[Application]\nname=org.other.App\n[Instance]\napp-path=/var/lib/flatpak/app/x/files\n").empty());
+
+#if !defined(_WIN32) && !defined(__APPLE__)
+    // Inside the sandbox the exchange folder is the host's, where the Blender add-on looks.
+    const char* oldCustom = std::getenv("SCULPTFORGE_BLENDER_EXCHANGE");
+    const std::string keepCustom = oldCustom ? oldCustom : "";
+    unsetenv("SCULPTFORGE_BLENDER_EXCHANGE");
+    setenv("FLATPAK_ID", "org.sculptforge.SculptForge", 1);
+    setenv("HOST_XDG_DATA_HOME", "/home/ana/.local/share", 1);
+    CHECK(blenderExchangeRoot() == "/home/ana/.local/share/SculptForge/SculptForge/blender");
+    unsetenv("HOST_XDG_DATA_HOME");
+    unsetenv("FLATPAK_ID");
+    if (oldCustom) setenv("SCULPTFORGE_BLENDER_EXCHANGE", keepCustom.c_str(), 1);
+#endif
 }

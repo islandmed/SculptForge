@@ -100,8 +100,37 @@ glm::dmat4 axesBlenderToSf() {
 std::string blenderExchangeRoot() {
     const std::string custom = envValue("SCULPTFORGE_BLENDER_EXCHANGE");
     if (!custom.empty()) return custom;
-    const std::string base = appDataDir();
+    std::string base = appDataDir();
+#if !defined(_WIN32) && !defined(__APPLE__)
+    if (!envValue("FLATPAK_ID").empty()) {
+        const std::string host = envValue("HOST_XDG_DATA_HOME");
+        const std::string home = envValue("HOME");
+        if (!host.empty() || !home.empty()) base = (host.empty() ? home + "/.local/share" : host) + "/SculptForge/SculptForge";
+    }
+#endif
     return base.empty() ? std::string() : pathUtf8(utf8Path(base) / "blender");
+}
+
+std::string flatpakHostLauncher(const std::string& flatpakInfo) {
+    // [Application] name=<id>, [Instance] app-path=<installation>/app/<id>/<arch>/<branch>/<commit>/files
+    std::string section, id, appPath;
+    std::istringstream in(flatpakInfo);
+    for (std::string line; std::getline(in, line);) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (line.size() > 2 && line.front() == '[' && line.back() == ']') {
+            section = line.substr(1, line.size() - 2);
+            continue;
+        }
+        const size_t eq = line.find('=');
+        if (eq == std::string::npos) continue;
+        const std::string key = line.substr(0, eq), value = line.substr(eq + 1);
+        if (section == "Application" && key == "name") id = value;
+        else if (section == "Instance" && key == "app-path") appPath = value;
+    }
+    if (id.empty() || appPath.empty()) return {};
+    const size_t at = appPath.rfind("/app/" + id + "/");
+    if (at == std::string::npos || at == 0) return {};
+    return appPath.substr(0, at) + "/exports/bin/" + id;
 }
 
 std::string blenderInbox(const std::string& root) { return pathUtf8(utf8Path(root) / "to_sculptforge"); }
