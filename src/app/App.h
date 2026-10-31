@@ -74,6 +74,8 @@ struct AppOptions {
     std::string uiTest;   // run this .sfui UI test script headless and exit (see UiTest.cpp)
     std::string uiOutDir; // where UI tests save screenshots
     bool fullscreen = false; // start fullscreen (F11 toggles)
+    float measureStroke = 0.0f; // --measure-stroke S: a scripted fast circle stroke, report its path and frame times
+    float measureStrokeRadius = 0.0f; // --measure-stroke S,R: the brush radius in screen pixels
     float measureIdle = 0.0f; // --measure-idle S: after a settling pause, count the frames drawn in S idle seconds, exit
 };
 
@@ -214,6 +216,8 @@ private:
     StrokePath strokePath_;
     DabQueue dabQueue_;
     std::vector<PathDab> strokeScratch_;
+    std::vector<glm::vec2>* strokeProbe_ = nullptr; // --measure-stroke: where each dab went (screen)
+    double dabSeconds_ = 0.0;         // what a dab of this stroke costs (running average), for the backlog limit
     bool interactiveStrokes_ = false; // App::run(): budgeted dabs and curved long gaps; other loops dab at once
     void drainStrokeDabs(double budgetSeconds); // places queued dabs; budget <= 0: all of them
     bool lastInputPen_ = false; // the last mouse event came from a pen (SDL_PEN_MOUSEID)

@@ -578,6 +578,7 @@ constexpr int kIdleTickMs = 250;       // asleep: wake this often to run the pol
 constexpr int kCaretTickMs = 530;      // a text field has the keyboard: redraw for the caret's blink
 constexpr double kAfterChangeSeconds = 0.25; // a poller changed something: draw for this long
 constexpr double kStrokeBudgetSeconds = 0.010; // a frame's share of placing a stroke's dabs; the rest waits for the next
+constexpr double kStrokeBacklogSeconds = 0.05; // queued dabs beyond this much work are thinned (strokeTo)
 
 } // namespace
 
@@ -601,8 +602,9 @@ void App::redrawIn(double seconds) {
 }
 
 bool App::wantsFrames(double now) const {
-    return now < activeUntil_ || drag_ != Drag::None || doc_.sculptor.strokeActive() || backgroundBusy() ||
-           playingLayer_ >= 0 || faceTakePlaying_ ||
+    return now < activeUntil_ || drag_ != Drag::None || doc_.sculptor.strokeActive() ||
+           !dabQueue_.empty() || // a stroke's dabs still waiting (drainStrokeDabs) are placed a few each frame
+           backgroundBusy() || playingLayer_ >= 0 || faceTakePlaying_ ||
            spaceMouseMoving() || // a held SpaceMouse cap sends no events, but the view keeps moving (SpaceMouse.cpp)
            perf_.framesStill < 10; // the view just moved: Fast Navigation's full-quality frame comes after it stops
 }
@@ -619,7 +621,10 @@ int App::run() {
     if (!options_.renderPath.empty()) return renderHeadless();
     if (!options_.recordPath.empty() || !options_.uiTest.empty()) return runRecording();
     if (g_wakeEvent == 0) g_wakeEvent = SDL_RegisterEvents(1);
-    interactiveStrokes_ = true; // dabs are queued and placed within a time budget each frame (strokeTo)
+    // Dabs are queued and placed within a time budget each frame (strokeTo). SF_STROKE_IMMEDIATE=1 places them all
+    // as each pointer sample arrives, as before 0.9.6 (for comparison).
+    const char* immediateEnv = std::getenv("SF_STROKE_IMMEDIATE");
+    interactiveStrokes_ = !(immediateEnv && *immediateEnv && *immediateEnv != '0');
     // SF_CONTINUOUS_REDRAW=1 draws every frame as before 0.9.5 (for comparison, or a driver that misbehaves).
     const char* continuousEnv = std::getenv("SF_CONTINUOUS_REDRAW");
     const bool continuous = continuousEnv && *continuousEnv && *continuousEnv != '0';
@@ -635,6 +640,15 @@ int App::run() {
     uint64_t lastKey = frameKey();
     bool draw = true;
     activeUntil_ = started + 1.0;
+    // --measure-stroke: two turns of a circle over the model in S seconds. The pointer is read once per pass of the loop, as a busy program gets it (the window system hands
+    // over only the latest position), so a pass that places many dabs makes the next gap longer.
+    struct StrokeMeasure {
+        bool started = false, moving = false; // moving: the press's first frame is on screen, the pointer moves
+        double pressMs = 0.0, start = 0.0, lastFrame = 0.0, maxFrame = 0.0, sumFrames = 0.0, maxLag = 0.0, sumLag = 0.0;
+        uint64_t frames = 0, samples = 0, lagSamples = 0;
+        float cx = 0.0f, cy = 0.0f, r = 0.0f;
+        std::vector<glm::vec2> dabs;
+    } sm;
     while (running_) {
         const double t0 = seconds();
         if (options_.measureIdle > 0.0f) {
@@ -659,6 +673,9 @@ int App::run() {
         // Input keeps the frames coming a little while (hover highlights, tooltips after their delay); other
         // events (the window shown, moved, focused) need a frame or two.
         const auto onEvent = [&](const SDL_Event& ev) {
+            if (strokeProbe_ && ((ev.type >= SDL_EVENT_MOUSE_MOTION && ev.type <= SDL_EVENT_MOUSE_WHEEL) ||
+                                 (ev.type >= SDL_EVENT_PEN_PROXIMITY_IN && ev.type <= SDL_EVENT_PEN_AXIS)))
+                return; // --measure-stroke: the real pointer stays out of the scripted stroke
             handleEvent(ev);
             if (ev.type == SDL_EVENT_KEYMAP_CHANGED || ev.type == SDL_EVENT_KEYBOARD_ADDED ||
                 ev.type == SDL_EVENT_KEYBOARD_REMOVED || ev.type == SDL_EVENT_MOUSE_ADDED ||
@@ -686,6 +703,50 @@ int App::run() {
             ++wakeUps;
         }
         while (SDL_PollEvent(&e)) onEvent(e);
+        if (options_.measureStroke > 0.0f && !sm.started && t0 - started >= kMeasureSettle && !backgroundBusy()) {
+            const CanvasRect c = canvasRect();
+            sm.cx = c.x + c.w * 0.5f;
+            sm.cy = c.y + c.h * 0.5f;
+            sm.r = 0.25f * std::min(c.w, c.h);
+            sm.started = true;
+            sm.start = sm.lastFrame = seconds();
+            strokeProbe_ = &sm.dabs;
+            if (options_.measureStrokeRadius > 0.0f) radiusPx_ = std::clamp(options_.measureStrokeRadius, 2.0f, 800.0f);
+            onMouseDown(sm.cx + sm.r, sm.cy, SDL_BUTTON_LEFT);
+            if (drag_ != Drag::Stroke) {
+                std::printf("Stroke: no stroke began (nothing to sculpt under the circle's start)\n");
+                return 1;
+            }
+        } else if (sm.moving) {
+            const double u = std::min(1.0, (seconds() - sm.start) / double(options_.measureStroke));
+            const double a = u * 4.0 * 3.14159265358979;
+            onMouseMove(sm.cx + sm.r * float(std::cos(a)), sm.cy + sm.r * float(std::sin(a)), 0.0f, 0.0f, false);
+            ++sm.samples;
+            if (u >= 1.0) {
+                const double releaseStart = seconds();
+                onMouseUp(); // places the dabs still waiting
+                const double releaseMs = (seconds() - releaseStart) * 1000.0;
+                strokeProbe_ = nullptr;
+                std::vector<float> off;
+                for (const glm::vec2& d : sm.dabs) off.push_back(std::abs(std::hypot(d.x - sm.cx, d.y - sm.cy) - sm.r));
+                std::sort(off.begin(), off.end());
+                const auto pct = [&](double q) { return off.empty() ? 0.0f : off[std::min(off.size() - 1, size_t(q * off.size()))]; };
+                std::printf("Stroke (%s): %zu dabs from %llu pointer samples in %.1f s, circle radius %.0f px, brush radius %.0f px\n"
+                            "  off the circle: median %.1f px, 95%% %.1f px, worst %.1f px\n"
+                            "  press %.0f ms; then frames: %llu, mean %.1f ms, worst %.1f ms; brush behind the pointer: mean %.0f px, "
+                            "worst %.0f px; release %.0f ms\n",
+                            interactiveStrokes_ ? "queued" : "immediate", sm.dabs.size(), (unsigned long long)sm.samples,
+                            double(options_.measureStroke), double(sm.r), double(radiusPx_), double(pct(0.5)), double(pct(0.95)),
+                            double(off.empty() ? 0.0f : off.back()), sm.pressMs, (unsigned long long)sm.frames,
+                            sm.frames ? sm.sumFrames / double(sm.frames) * 1000.0 : 0.0, sm.maxFrame * 1000.0,
+                            sm.lagSamples ? sm.sumLag / double(sm.lagSamples) : 0.0, sm.maxLag, releaseMs);
+                std::fflush(stdout);
+                // The test (ui_stroke_path, a light sphere): every dab placed, all of them on the circle.
+                const float spacing = std::max(1.0f, radiusPx_ * 0.15f);
+                const double expected = 4.0 * 3.14159265358979 * double(sm.r) / double(spacing);
+                return double(sm.dabs.size()) >= 0.9 * expected && !off.empty() && off.back() < spacing ? 0 : 1;
+            }
+        }
         drainStrokeDabs(kStrokeBudgetSeconds); // the stroke's queued dabs, for a limited time: then look at the pointer again
         Uint64 now = SDL_GetTicksNS();
         float dt = float(double(now - lastTicks) * 1e-9);
@@ -746,6 +807,28 @@ int App::run() {
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window_);
         ++framesDrawn;
+        if (sm.started && !sm.moving) { // the press is on screen: start moving round the circle
+            sm.moving = true;
+            sm.pressMs = (seconds() - sm.start) * 1000.0;
+            sm.start = sm.lastFrame = seconds();
+        } else if (sm.moving) {
+            const double now = seconds();
+            sm.maxFrame = std::max(sm.maxFrame, now - sm.lastFrame);
+            sm.sumFrames += now - sm.lastFrame;
+            sm.lastFrame = now;
+            ++sm.frames;
+            if (!sm.dabs.empty()) { // how far round the circle the brush is behind the pointer, on screen now
+                const double u = std::min(1.0, (now - sm.start) / double(options_.measureStroke));
+                const double pointer = std::fmod(u * 4.0 * 3.14159265358979, 2.0 * 3.14159265358979);
+                const glm::vec2 d = sm.dabs.back();
+                double behind = pointer - std::atan2(double(d.y - sm.cy), double(d.x - sm.cx));
+                behind = std::remainder(behind, 2.0 * 3.14159265358979);
+                const double px = std::abs(behind) * double(sm.r);
+                sm.maxLag = std::max(sm.maxLag, px);
+                sm.sumLag += px;
+                ++sm.lagSamples;
+            }
+        }
         lastKey = frameKey(); // what this frame changed is on screen already
         draw = continuous || wantsFrames(seconds());
         if (logRedraw && draw && !continuous)
@@ -1051,6 +1134,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     lastY_ = y;
     strokePath_.reset(x, y);
     dabQueue_.clear();
+    dabSeconds_ = 0.0; // measured again: the mesh and the brush may have changed
 
     if (strokeBrush_ == BrushType::Move && !recipe && strokeSculpt_) {
         const float pressure = pressureSize_ ? std::max(strokePressure(), 0.05f) : 1.0f;
@@ -1146,18 +1230,25 @@ void App::strokeTo(float x, float y) {
     const float spacing = std::max(1.0f, radiusPx_ * (recipe ? recipe->spacing : 0.15f));
     const float p0 = lastStrokePressure_, p1 = strokePressure();
     strokeScratch_.clear();
-    strokePath_.addSample(x, y, p0, p1, spacing, interactiveStrokes_, strokeScratch_);
+    // (a Shift line stays straight: no curve through its corner)
+    strokePath_.addSample(x, y, p0, p1, spacing, interactiveStrokes_ && !straight_.active, strokeScratch_);
     for (const PathDab& d : strokeScratch_) dabQueue_.push(d);
     lastX_ = x;
     lastY_ = y;
     lastStrokePressure_ = p1;
     if (interactiveStrokes_) {
-        // Too far behind the pointer: place every second waiting dab only (a wider spacing under load). Set
-        // SF_STROKE_BACKLOG=0 to never drop dabs, or a number to change the limit (default 24).
-        static const size_t limit = [] {
+        // Too far behind the pointer: place every second waiting dab only (a wider spacing under load). The limit
+        // is in time, not dabs: what the last dabs cost says how many are kStrokeBacklogSeconds of work, and never
+        // fewer than 24. A light mesh places hundreds of dabs a frame, so a small brush moved fast keeps its spacing
+        // (several input samples arrive before each frame). SF_STROKE_BACKLOG=0 never drops dabs; a number is a
+        // fixed limit in dabs.
+        static const long fixedLimit = [] {
             const char* env = std::getenv("SF_STROKE_BACKLOG");
-            return env && *env ? size_t(std::max(0L, std::strtol(env, nullptr, 10))) : size_t(24);
+            return env && *env ? std::max(0L, std::strtol(env, nullptr, 10)) : -1L;
         }();
+        size_t limit = fixedLimit >= 0 ? size_t(fixedLimit) : size_t(24);
+        if (fixedLimit < 0 && dabSeconds_ > 0.0)
+            limit = std::max(limit, size_t(std::min(kStrokeBacklogSeconds / dabSeconds_, 1e6)));
         dabQueue_.thin(limit);
     } else {
         drainStrokeDabs(0.0); // scripts, UI tests and recordings place every dab at once, as before
@@ -1172,8 +1263,12 @@ void App::drainStrokeDabs(double budgetSeconds) {
     size_t placed = 0;
     while (!dabQueue_.empty()) {
         const PathDab d = dabQueue_.pop();
+        const auto dabStart = std::chrono::steady_clock::now();
         dabAt(d.x, d.y, d.pressure);
         ++placed;
+        // what a dab costs on this mesh with this brush (the backlog limit in strokeTo)
+        const double cost = std::chrono::duration<double>(std::chrono::steady_clock::now() - dabStart).count();
+        dabSeconds_ = dabSeconds_ > 0.0 ? dabSeconds_ * 0.8 + cost * 0.2 : cost;
         if (budgetSeconds > 0.0 &&
             std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() >= budgetSeconds)
             break; // at least one dab per call, so a stroke always moves on
@@ -1186,6 +1281,7 @@ void App::drainStrokeDabs(double budgetSeconds) {
 }
 
 void App::dabAt(float x, float y, float pressure) {
+    if (strokeProbe_) strokeProbe_->emplace_back(x, y);
     const BrushRecipe* recipe = strokeRecipe();
     if (recipe && recipe->jitter > 0.0f) {
         // Deterministic per-stroke scatter (xorshift).

@@ -538,6 +538,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Idle, the app draws nothing (#14): --measure-idle fails when it keeps drawing frames.
     add_test(NAME ui_idle_redraw COMMAND sculptforge --measure-idle 4)
     set_tests_properties(ui_idle_redraw PROPERTIES LABELS ui TIMEOUT 60 ENVIRONMENT "SF_NO_UPDATE_CHECK=1")
+    # A fast stroke in the interactive loop (dabs queued, placed a few milliseconds a frame): every dab lands on the
+    # pointer's circle (#19).
+    add_test(NAME ui_stroke_path COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
+    set_tests_properties(ui_stroke_path PROPERTIES LABELS ui TIMEOUT 60 ENVIRONMENT "SF_NO_UPDATE_CHECK=1")
     # The guide's keyboard table must match the app's default shortcuts (tools/guide/update_shortcuts.py).
     if(Python3_Interpreter_FOUND)
       sculptforge_runner(SCULPTFORGE_APP_RUNNER sculptforge)

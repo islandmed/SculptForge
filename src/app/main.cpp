@@ -24,6 +24,9 @@ void usage() {
         "  --size WxH               Render size (default 1024x1024)\n"
         "  --measure-idle S         Sit idle, print the frames drawn per second over S seconds, exit\n"
         "                           (SF_CONTINUOUS_REDRAW=1 draws every frame, as before 0.9.5)\n"
+        "  --measure-stroke S[,R]   Draw a fast scripted circle stroke for S seconds (brush radius R px),\n"
+        "                           e.g. after --run \"new_sphere\"; print how far the dabs left the circle and the frame times, exit\n"
+        "                           (SF_STROKE_IMMEDIATE=1 places every dab at once, as before 0.9.6)\n"
         "  --view YAW,PITCH         Camera angles in degrees (default -30,-15)\n"
         "  --zoom F                 Move the camera F times closer than the framed view (default 1)\n"
         "  --wireframe              Render with wireframe overlay\n"
@@ -105,6 +108,12 @@ int main(int argc, char** argv) {
         else if (a == "--blender") options.blender = true;
         else if (a == "--ui-out") options.uiOutDir = next();
         else if (a == "--measure-idle") options.measureIdle = std::max(0.5f, float(std::atof(next().c_str())));
+        else if (a == "--measure-stroke") {
+            const std::string v = next(); // S or S,RADIUS
+            options.measureStroke = std::max(0.5f, float(std::atof(v.c_str())));
+            if (const size_t comma = v.find(','); comma != std::string::npos)
+                options.measureStrokeRadius = float(std::atof(v.c_str() + comma + 1));
+        }
         else if (a == "-h" || a == "--help") {
             usage();
             return 0;
@@ -120,7 +129,7 @@ int main(int argc, char** argv) {
         if (!sizeGiven) options.width = 1600, options.height = 960;
         isolateSettings();
     }
-    if (options.measureIdle > 0.0f) isolateSettings(); // a fresh start, no restore prompt, the user's files untouched
+    if (options.measureIdle > 0.0f || options.measureStroke > 0.0f) isolateSettings(); // a fresh start, no restore prompt, the user's files untouched
     if (!options.recordPath.empty() && options.supersample > 1) { // the app renders large; the video keeps --size
         options.width *= options.supersample;
         options.height *= options.supersample;
