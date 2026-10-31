@@ -193,6 +193,35 @@ TEST(project_commands_and_open) {
     std::filesystem::remove(path);
 }
 
+TEST(project_subtool_shading) {
+    // Smooth / Flat per SubTool (#11): an optional key, so files without it (and older readers) are unaffected.
+    CommandRegistry reg;
+    Document doc = makeDoc(makeIcosphere(1));
+    CHECK(reg.execute(doc, "subtool_append", {{"type", std::string("cube")}}).ok);
+    CHECK(doc.activeSubtoolInfo().shading == Shading::Default);
+    CHECK(reg.execute(doc, "subtool_shading", {{"mode", std::string("flat")}}).ok);
+    CHECK(reg.execute(doc, "subtool_shading", {{"mode", std::string("Smooth")}, {"index", 0.0}}).ok);
+    CHECK(!reg.execute(doc, "subtool_shading", {{"mode", std::string("faceted")}}).ok);
+    CHECK(doc.subtools[0].shading == Shading::Smooth && doc.subtools[1].shading == Shading::Flat);
+    CHECK(reg.execute(doc, "subtool_duplicate").ok); // the copy keeps it
+    CHECK(doc.subtoolCount() == 3 && doc.activeSubtoolInfo().shading == Shading::Flat);
+
+    const std::string path = tempPath("sf_project_shading.sfproj");
+    std::string err;
+    CHECK(saveProject(path, doc, err));
+    Document back;
+    CHECK(loadProject(path, back, err));
+    CHECK(back.subtoolCount() == 3);
+    CHECK(back.subtools[0].shading == Shading::Smooth && back.subtools[1].shading == Shading::Flat &&
+          back.subtools[2].shading == Shading::Flat);
+
+    // Unknown values load as Default rather than failing the file.
+    Shading s = Shading::Flat;
+    CHECK(!parseShading("phong", s) && s == Shading::Flat);
+    CHECK(parseShading("DEFAULT", s) && s == Shading::Default);
+    std::filesystem::remove(path);
+}
+
 TEST(project_version_handling) {
     Document doc = makeDoc(makeIcosphere(1));
     const std::string path = tempPath("sf_project_version.sfproj");

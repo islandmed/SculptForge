@@ -366,6 +366,27 @@ void App::registerShellActions() {
     flag("view.mask", "Mask", ICON_LC_DROPLET, "Render", "", &renderSettings_.showMask, "Darken masked areas.");
     flag("view.polypaint", "Paint", ICON_LC_PALETTE, "Render", "", &renderSettings_.showPolypaint,
          "Show polypaint colours (off: plain material).");
+    // Shading (Material palette, Tool > Display): the scene's, and the active SubTool's own.
+    add({"material.smooth", "Smooth", nullptr,
+         "Smooth shading (the default): normals blend across polygons, so the surface reads as one form.", "Material", "",
+         "", [this] { runCommand("set_shading", {{"mode", std::string("smooth")}}); },
+         [this] { return !renderSettings_.flatShading; }, nullptr});
+    add({"material.flat", "Flat", nullptr,
+         "Flat shading: every polygon shows its own face, so the mesh's structure and each stroke's effect on it read "
+         "clearly (as in ZBrush). SubTools set to Smooth or Flat keep their own. A preference: Store Config keeps it.",
+         "Material", "", "", [this] { runCommand("set_shading", {{"mode", std::string("flat")}}); },
+         [this] { return renderSettings_.flatShading; }, nullptr});
+    auto subtoolShading = [this, &add](const char* id, const char* label, Shading mode, const char* description) {
+        add({id, label, nullptr, description, "Material > This SubTool", "", "subtool_shading",
+             [this, mode] { runCommand("subtool_shading", {{"mode", std::string(shadingName(mode))}}); },
+             [this, mode] { return doc_.activeSubtoolInfo().shading == mode; }, nullptr});
+    };
+    subtoolShading("subtool.shading_default", "Scene", Shading::Default,
+                   "The active SubTool follows the scene's shading (Smooth | Flat above).");
+    subtoolShading("subtool.shading_smooth", "Smooth", Shading::Smooth,
+                   "The active SubTool always shades smooth, whatever the scene's shading. Saved in the project.");
+    subtoolShading("subtool.shading_flat", "Flat", Shading::Flat,
+                   "The active SubTool always shades flat (faceted), whatever the scene's shading. Saved in the project.");
     flag("view.mesh", "Show Mesh", ICON_LC_BOX, "Render", "", &renderSettings_.showMesh, "Draw the sculpt.");
     add({"view.fullscreen", "Fullscreen", ICON_LC_MAXIMIZE, "Fill the screen with SculptForge (again: back to a window).",
          "Render", "F11", "",

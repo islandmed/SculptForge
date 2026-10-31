@@ -1071,7 +1071,8 @@ void App::runCommand(const std::string& name, const Args& args) {
     if (r.ok && name != "export_glb" && name != "export_lods" && name != "export_usd" && name != "export_fbx" &&
         name != "export_unreal" && name.rfind("unreal_", 0) != 0 && name != "save_obj" && name != "save_project" &&
         name != "mesh_info" && name.rfind("brush_", 0) != 0 && name.rfind("splat_", 0) != 0 && name != "mesh_to_splats" &&
-        name != "set_color" && name != "set_material" && name != "export_ply" && name != "face_weights" &&
+        name != "set_color" && name != "set_material" && name != "set_shading" && name != "subtool_shading" &&
+        name != "export_ply" && name != "face_weights" &&
         name != "face_preset" && name.rfind("face_take", 0) != 0 && name != "face_landmarks_detect") {
         clearLods();
         playingLayer_ = -1;
@@ -1247,7 +1248,8 @@ void App::syncScene() {
         SubTool& s = doc_.subtools[size_t(i)];
         const bool active = i == doc_.activeSubtool;
         Mesh* mesh = active ? &shown : &s.mesh;
-        scene.push_back({s.id, mesh, active, s.visible, bakeNormalMap(s.id, *mesh), renderSettings_.wireframe});
+        const bool flat = s.shading == Shading::Flat || (s.shading == Shading::Default && renderSettings_.flatShading);
+        scene.push_back({s.id, mesh, active, s.visible, bakeNormalMap(s.id, *mesh), renderSettings_.wireframe, flat});
     }
     renderer_.syncScene(scene);
     renderer_.syncSplats(doc_.splats, doc_.splatsVersion);

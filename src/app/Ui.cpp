@@ -115,7 +115,10 @@ bool IsModeAction(std::string_view id) {
     return starts("brush.") || starts("mask.") || starts("select.");
 }
 
-bool IsChoiceAction(std::string_view id) { return id == "draw.zadd" || id == "draw.zsub"; }
+bool IsChoiceAction(std::string_view id) {
+    return id == "draw.zadd" || id == "draw.zsub" || id == "material.smooth" || id == "material.flat" ||
+           id.substr(0, 16) == "subtool.shading_";
+}
 
 bool Checkbox(const char* label, bool* v) {
     const bool changed = ImGui::Checkbox(label, v);

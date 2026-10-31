@@ -332,3 +332,20 @@ shot sculptable-result
 click "PolyF##view.polyf"
 click "Make sculptable/Review##sculptable"
 run splat_clear
+
+# Smooth and Flat shading (polypaint.md): the template head, smooth, then flat with its eyes kept smooth.
+run new_head
+camera 25 5
+zoom 1.6
+wait 0.2
+shot shading-smooth
+click "Material##palette.material"
+click "Flat##material.flat"
+run subtool_shading name=Eyes mode=smooth
+wait 0.2
+shot shading-palette
+key escape
+hover "Tool/SubTool"
+wait 0.2
+shot shading-flat
+run set_shading mode=smooth

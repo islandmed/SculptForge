@@ -716,6 +716,7 @@ struct LoadedSubtool {
     std::string name, gozName;
     std::vector<QRemeshGuide> qremeshGuides;
     bool visible = true;
+    Shading shading = Shading::Default;
     int activeLayer = -1;
     Mesh mesh;
     // A big mesh's BVH is built on its own thread once the positions and triangles are read (they don't change
@@ -763,6 +764,7 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
         Json st = Json::object();
         st.set("name", s.name);
         st.set("visible", s.visible);
+        if (s.shading != Shading::Default) st.set("shading", shadingName(s.shading)); // (no format change: optional)
         writeMesh(w, "subtools/" + std::to_string(i) + "/", doc.subtoolMesh(i), st);
         st.set("active_layer", active ? doc.activeLayer : s.activeLayer);
         if (hasPaintLayers(doc.subtoolMesh(i)))
@@ -880,6 +882,7 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
             s.name = sj["name"].asString();
             if (s.name.empty()) s.name = "SubTool";
             s.visible = sj["visible"].asBool(true);
+            if (sj["shading"].isString()) parseShading(sj["shading"].asString(), s.shading); // unknown: Default
             s.gozName = sj["goz_name"].asString();
             s.qremeshGuides = qremeshGuidesFromJson(sj["qremesh_guides"]);
             if (!readMesh(r, sj["mesh"], sj["layers"], s.mesh, error, false, false)) return false;
@@ -933,11 +936,13 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
     doc.gozName = subtools[0].gozName;
     doc.qremeshGuides = std::move(subtools[0].qremeshGuides);
     doc.subtools[0].visible = subtools[0].visible;
+    doc.subtools[0].shading = subtools[0].shading;
     for (size_t i = 1; i < subtools.size(); ++i) {
         BVH* builtI = subtools[i].finishBvh();
         const int at = doc.addSubtool(std::move(subtools[i].mesh), subtools[i].name, false, -1, builtI);
         SubTool& s = doc.subtools[size_t(at)];
         s.visible = subtools[i].visible;
+        s.shading = subtools[i].shading;
         s.activeLayer = validLayer(subtools[i].activeLayer, s.mesh);
         s.gozName = subtools[i].gozName;
         s.qremeshGuides = std::move(subtools[i].qremeshGuides);

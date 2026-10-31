@@ -217,6 +217,7 @@ void App::storeProjectSettings() {
     render.set("show_mesh", renderSettings_.showMesh);
     render.set("show_splats", renderSettings_.showSplats);
     render.set("splat_opacity", double(renderSettings_.splatOpacity));
+    render.set("flat_shading", renderSettings_.flatShading);
     render.set("matcap", renderSettings_.matcap < 0 ? std::string() : std::string(matcapName(renderSettings_.matcap)));
     s.set("render", std::move(render));
 
@@ -278,6 +279,8 @@ void App::applyProjectSettings() {
         readBool(r, "show_mesh", renderSettings_.showMesh);
         readBool(r, "show_splats", renderSettings_.showSplats);
         readFloat(r, "splat_opacity", renderSettings_.splatOpacity);
+        // Projects from before the setting: the preferred shading.
+        renderSettings_.flatShading = r["flat_shading"].asBool(uiPrefs_.flatShading);
         // Unknown, empty or missing (projects from before MatCaps): studio lighting, as they were saved.
         renderSettings_.matcap = -1;
         for (int i = 0; i < matcapCount(); ++i)

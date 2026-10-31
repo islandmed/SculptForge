@@ -45,6 +45,7 @@
 //                            hold alt to select it); U V: fractions of its on-screen bounds
 //   expect_value NAME OP N   triangles, vertices, layers, brushes, masked, hidden, groups, colored,
 //                            can_undo, dirty, splats, show_polygroups, show_mask, show_mesh, wireframe,
+//                            flat_shading (the scene's: 1 Flat), subtool_shading (0 Scene, 1 Smooth, 2 Flat),
 //                            subtools (count), active_subtool (index, 0 = top), visible_subtools,
 //                            edited_subtools (SubTools with undo history), user_brushes (brushes in the
 //                            user library), library_files (.sfbrush files in it; UI tests get an empty
@@ -363,6 +364,8 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "show_mask") return app_.renderSettings_.showMask ? 1.0 : 0.0;
     if (name == "show_mesh") return app_.renderSettings_.showMesh ? 1.0 : 0.0;
     if (name == "wireframe") return app_.renderSettings_.wireframe ? 1.0 : 0.0;
+    if (name == "flat_shading") return app_.renderSettings_.flatShading ? 1.0 : 0.0;
+    if (name == "subtool_shading") return double(int(app_.doc_.activeSubtoolInfo().shading));
     if (name == "shelves") return app_.layout_.shelvesVisible ? 1.0 : 0.0;
     if (name == "left_tray") return app_.layout_.leftTrayOpen ? double(app_.layout_.leftTray.size()) : -1.0;
     if (name == "right_tray") return app_.layout_.rightTrayOpen ? double(app_.layout_.rightTray.size()) : -1.0;

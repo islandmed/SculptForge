@@ -37,6 +37,23 @@ void App::registerPaintUiCommands() {
                        renderSettings_.matcap = index;
                        return {true, std::string("Material: ") + matcapName(index)};
                    }});
+    // The scene's shading; SubTools can override it (subtool_shading). Also the preference for new sessions.
+    commands_.add({"set_shading",
+                   "Viewport shading for every SubTool that doesn't set its own (subtool_shading): smooth (the "
+                   "default) or flat, where each polygon shows its own face, so the mesh's structure reads.",
+                   {{"mode", ParamSpec::Type::String, "smooth or flat.", true}},
+                   [this](Document&, const Args& a) -> CommandResult {
+                       Shading mode;
+                       if (!parseShading(argString(a, "mode"), mode) || mode == Shading::Default)
+                           return {false, "Unknown shading '" + argString(a, "mode") + "' (smooth, flat)"};
+                       setFlatShading(mode == Shading::Flat);
+                       return {true, mode == Shading::Flat ? "Shading: Flat" : "Shading: Smooth"};
+                   }});
+}
+
+void App::setFlatShading(bool flat) {
+    renderSettings_.flatShading = flat;
+    uiPrefs_.flatShading = flat; // the default for the next session (Store Config keeps it)
 }
 
 const BrushRecipe* App::strokeRecipe() const {
@@ -178,11 +195,20 @@ void App::drawPalette_Color() {
     }
 }
 
-// Material palette: the material grid and the studio material's colour.
+// Material palette: the material grid, the studio material's colour and the shading (the scene's and the active
+// SubTool's own).
 void App::drawPalette_Material() {
     sf::drawMaterialGrid(*this, GridMode::Palette); // Pickers.cpp, as in the material picker (M)
     ImGui::ColorEdit3("Base colour", &renderSettings_.baseColor.x, ImGuiColorEditFlags_NoInputs);
     ui::HelpText("Base colour", nullptr, "Colour of the Studio material (the clay colour).", "Material");
+    drawShadingControls();
+}
+
+void App::drawShadingControls() {
+    ImGui::TextDisabled("Shading");
+    ui::Segmented(*this, {"material.smooth", "material.flat"});
+    ImGui::TextDisabled("This SubTool");
+    ui::Segmented(*this, {"subtool.shading_default", "subtool.shading_smooth", "subtool.shading_flat"});
 }
 
 } // namespace sf

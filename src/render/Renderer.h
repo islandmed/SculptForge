@@ -29,6 +29,7 @@ struct RenderSettings {
     float splatOpacity = 1.0f; // global fade for using a capture as reference
     bool dimInactive = true;   // SubTools other than the active one render slightly darker (ZBrush style)
     bool motionProxy = false;  // the view is moving (Fast Navigation): draw big meshes' lighter proxy (render/Clusters.h)
+    bool flatShading = false;  // the scene's shading (Material palette): faceted; SubTools can override (core/Document.h)
 };
 
 // A baked tangent-space normal map to preview on a mesh (core/Bake.h): RGB8 rows bottom-up, with the
@@ -50,6 +51,7 @@ struct SceneMesh {
     const NormalMapView* normalMap = nullptr; // shade with this normal map (needs the mesh's UVs)
     bool wireframe = false; // keep the wireframe's edges on the GPU (built on first need; draw() falls back to
                             // outlining the triangles, quad diagonals included, until they are)
+    bool flat = false;      // flat shading: each triangle shows its own face normal (faceted)
 };
 
 // Part of the target the 3D view is drawn into (framebuffer pixels, origin bottom-left); the rest is
@@ -234,7 +236,7 @@ private:
     // The clusters of `s` to draw this frame: in full (drawClusters_), and with `proxy` as their motion proxy
     // where it is built (proxyClusters_).
     void cull(const MeshSlot& s, const CullView& view, bool proxy = false);
-    void drawSlot(const MeshSlot& s, bool active, const RenderSettings& settings);
+    void drawSlot(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings);
     enum class Part { Triangles, Lines, Proxy };
     void drawPatches(const MeshSlot& s, GLenum mode, Part part, GLint primBaseLocation);
     void drawClusters(const MeshSlot& s, const std::vector<uint32_t>& clusters, GLenum mode, Part part, GLint primBaseLocation);
@@ -250,15 +252,15 @@ private:
     glm::mat4 frameView_{1.0f}, frameProj_{1.0f};
     glm::vec4 frameViewport_{0.0f};
     CullView frameCull_;
-    // Mesh shader variants by feature bits (kPaint, kPrim, kTextured, kNormalMap), compiled on first use.
+    // Mesh shader variants by feature bits (kPaint, kPrim, kTextured, kNormalMap, kFlat), compiled on first use.
     struct MeshProgram {
         GLuint id = 0;
         GLint view = -1, proj = -1, gridOrigin = -1, gridStep = -1, viewport = -1, projScale = -1, baseColor = -1, paint = -1,
               showMask = -1, groups = -1, matcap = -1, matcapCavity = -1, dim = -1, primBase = -1, hasPaint = -1,
               normalFlipY = -1, twoSided = -1;
     };
-    static constexpr int kPaint = 1, kPrim = 2, kTextured = 4, kNormalMap = 8;
-    MeshProgram programs_[16];
+    static constexpr int kPaint = 1, kPrim = 2, kTextured = 4, kNormalMap = 8, kFlat = 16;
+    MeshProgram programs_[32];
     std::string programError_;
     const MeshProgram* meshProgram(int features);
     bool vertexIdHasBase_ = true; // gl_VertexID includes the base vertex (checked at init; else per-cluster draws)
@@ -267,6 +269,7 @@ private:
     struct DrawItem {
         uint32_t id;
         bool active;
+        bool flat;
     };
     std::vector<DrawItem> drawList_;      // visible meshes, in scene order
     std::vector<uint32_t> visibleGroups_; // scratch for uploadFaces

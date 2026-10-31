@@ -4,6 +4,7 @@
 
 #include "core/Multires.h"
 
+#include <cctype>
 #include <filesystem>
 #include <memory>
 
@@ -148,6 +149,26 @@ int Document::addBrush(BrushRecipe recipe) {
     }
     brushes.push_back(std::move(recipe));
     return int(brushes.size()) - 1;
+}
+
+const char* shadingName(Shading s) {
+    switch (s) {
+    case Shading::Smooth: return "smooth";
+    case Shading::Flat: return "flat";
+    default: return "default";
+    }
+}
+
+bool parseShading(const std::string& name, Shading& out) {
+    for (Shading s : {Shading::Default, Shading::Smooth, Shading::Flat}) {
+        std::string lower = name;
+        for (char& c : lower) c = char(std::tolower(static_cast<unsigned char>(c)));
+        if (lower == shadingName(s)) {
+            out = s;
+            return true;
+        }
+    }
+    return false;
 }
 
 std::string Document::assetName() const {

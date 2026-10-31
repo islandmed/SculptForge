@@ -6,6 +6,13 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Smooth / Flat shading (#11): **Material** palette (and **Tool > Display**) > **Shading** switches the whole
+  scene to flat, faceted shading, where every polygon shows its own face; **This SubTool** keeps one SubTool smooth
+  or flat whatever the scene says. Both are saved in projects (no format change; older files open with your
+  preferred shading) and the scene's choice is a preference (Store Config). Smooth stays the default. Scripts:
+  `set_shading mode=flat`, `subtool_shading mode=smooth name=Eyes`.
+
 ## [0.9.4] - 2026-10-29
 
 ### Fixed

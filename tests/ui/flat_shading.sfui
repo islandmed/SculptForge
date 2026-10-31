@@ -1,0 +1,55 @@
+# Smooth / Flat shading (#11): the scene's shading in the Material palette, each SubTool's own override, both
+# saved in projects. Smooth stays the default. Files are written to the working directory (the build folder).
+run new_sphere subdivisions=2
+run subtool_append type=sphere size=0.6
+expect_value subtools == 2
+expect_value flat_shading == 0
+expect_value subtool_shading == 0
+camera 20 10
+shot smooth
+
+# The Material palette: Smooth | Flat for the scene, then Scene | Smooth | Flat for the active SubTool.
+click "Material##palette.material"
+expect "Smooth##material.smooth"
+expect "Flat##material.flat"
+expect "Scene##subtool.shading_default"
+click "Flat##material.flat"
+expect_status "Shading: Flat"
+expect_value flat_shading == 1
+shot material-palette
+key escape
+shot flat
+
+# The appended sphere (active) keeps smooth whatever the scene says.
+click "Material##palette.material"
+click "Smooth##subtool.shading_smooth"
+expect_value subtool_shading == 1
+expect_status "shading: smooth"
+key escape
+expect_value flat_shading == 1
+shot flat-scene-smooth-subtool
+
+# Back to a smooth scene with the other SubTool flat (scripted, as a Python or MCP client would).
+run set_shading mode=smooth
+run subtool_shading index=0 mode=flat
+expect_value flat_shading == 0
+shot smooth-scene-flat-subtool
+
+# Tool > Display has the same controls.
+click "Display##tool.display"
+expect "Flat##subtool.shading_flat"
+
+# Projects keep both, and a fresh scene keeps the scene's shading.
+run save_project path=sf_ui_flat_shading.sfproj
+run new_sphere subdivisions=2
+expect_value subtool_shading == 0
+run set_shading mode=flat
+run open path=sf_ui_flat_shading.sfproj
+expect_value flat_shading == 0
+expect_value subtools == 2
+expect_value subtool_shading == 1
+run subtool_select index=0
+expect_value subtool_shading == 2
+run subtool_shading mode=default
+expect_value subtool_shading == 0
+expect_value dirty == 1
