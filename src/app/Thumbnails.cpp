@@ -404,7 +404,7 @@ ImTextureID ThumbnailCache::alpha(const BrushAlpha& alpha) {
 ImTextureID ThumbnailCache::material(int matcap) {
     // By name: the built-in list can grow or change order between versions.
     const std::string key =
-        "material|" + std::string(matcap < 0 ? "Studio" : matcapName(matcap)) + "|" + std::to_string(kThumbnailVersion);
+        "material|" + (matcap < 0 ? std::string("Studio") : matcapKey(matcap)) + "|" + std::to_string(kThumbnailVersion);
     return request(
         hex64(fnv1a64(key)),
         [matcap] {

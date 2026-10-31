@@ -108,6 +108,7 @@ on first use with these sub-folders:
 | `Tools` | Tool | Models to open or append as SubTools |
 | `Brushes` | Brush | `.sfbrush` files |
 | `Alphas` | Alpha | Grayscale images for brush alphas |
+| `MatCaps` | Material | MatCap images, loaded as materials at start-up |
 | `Images` | Image | Sketches and concept art for Generate 3D |
 | `Splats` | Splats | Gaussian splat captures |
 | `QuickSave` | QuickSave | QuickSave copies |

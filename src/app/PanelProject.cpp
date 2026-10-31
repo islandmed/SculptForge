@@ -59,6 +59,13 @@ void readBool(const Json& j, const char* key, bool& v) { v = j[key].asBool(v); }
 
 // Save As dialog: a cancelled dialog is reported as an empty path so a pending
 // "save, then quit/open/new" is dropped instead of firing on a later save.
+// "matcaps/<name>.png" with the characters project attachment names allow.
+std::string matcapAttachmentName(const std::string& name) {
+    std::string safe;
+    for (unsigned char c : name) safe += std::isalnum(c) || c == ' ' || c == '_' || c == '-' || c >= 0x80 ? char(c) : '_';
+    return "matcaps/" + (safe.empty() ? std::string("MatCap") : safe) + ".png";
+}
+
 void SDLCALL onProjectChosen(void* userdata, const char* const* files, int) {
     auto* req = static_cast<App::DialogRequest*>(userdata);
     req->app->queueFile(req->action, files && files[0] ? std::string(files[0]) : std::string());
@@ -219,6 +226,14 @@ void App::storeProjectSettings() {
     render.set("splat_opacity", double(renderSettings_.splatOpacity));
     render.set("flat_shading", renderSettings_.flatShading);
     render.set("matcap", renderSettings_.matcap < 0 ? std::string() : std::string(matcapName(renderSettings_.matcap)));
+    // A custom MatCap travels inside the project (a PNG attachment), so the project opens with it on any machine.
+    for (auto it = doc_.projectFiles.begin(); it != doc_.projectFiles.end();)
+        it = it->first.rfind("matcaps/", 0) == 0 ? doc_.projectFiles.erase(it) : std::next(it);
+    if (std::vector<uint8_t> png; isCustomMatcap(renderSettings_.matcap) && encodeMatcapPng(renderSettings_.matcap, png)) {
+        const std::string file = matcapAttachmentName(matcapName(renderSettings_.matcap));
+        doc_.projectFiles[file] = std::move(png);
+        render.set("matcap_file", file);
+    }
     s.set("render", std::move(render));
 
     Json brush = Json::object();
@@ -283,8 +298,24 @@ void App::applyProjectSettings() {
         renderSettings_.flatShading = r["flat_shading"].asBool(uiPrefs_.flatShading);
         // Unknown, empty or missing (projects from before MatCaps): studio lighting, as they were saved.
         renderSettings_.matcap = -1;
+        const std::string name = r["matcap"].isString() ? r["matcap"].asString() : std::string();
         for (int i = 0; i < matcapCount(); ++i)
-            if (r["matcap"].isString() && r["matcap"].asString() == matcapName(i)) renderSettings_.matcap = i;
+            if (!name.empty() && name == matcapName(i)) renderSettings_.matcap = i;
+        // A custom MatCap the project carries: the one with the same pixels if this machine has it, else added for
+        // the session (renamed when a different MatCap here already has its name).
+        const auto file = r["matcap_file"].isString() ? doc_.projectFiles.find(r["matcap_file"].asString())
+                                                      : doc_.projectFiles.end();
+        CustomMatcap m;
+        std::string err;
+        if (file != doc_.projectFiles.end() && decodeMatcapImage(file->second.data(), file->second.size(), m, err)) {
+            int index = findMatcapByHash(m.hash);
+            if (index < 0) {
+                m.name = name.empty() ? std::string("MatCap") : name;
+                for (int n = 2; findMatcap(m.name) >= 0; ++n) m.name = name + " " + std::to_string(n);
+                index = addCustomMatcap(std::move(m));
+            }
+            renderSettings_.matcap = index;
+        }
     }
     if (const Json& b = s["brush"]; b.isObject()) {
         for (int i = 0; i < int(BrushType::Count); ++i)

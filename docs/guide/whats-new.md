@@ -26,6 +26,12 @@ also import a keymap you exported from Blender. See [Blender keys](shortcuts.md#
 check exactly what a brush did; **This SubTool** keeps one SubTool smooth or flat whatever the scene says. See
 [Polypaint and materials](polypaint.md).
 
+### Your own MatCaps
+
+**Material > Load MatCap...** turns any lit-sphere image (PNG, JPG or EXR) into a material, and images you put in
+**Documents/SculptForge/MatCaps** load at start-up. Projects carry the MatCap they use, so they look the same on
+any computer. See [Your own MatCaps](polypaint.md#your-own-matcaps).
+
 ### Fixes
 
 - Pens whose drivers send stray mouse events (a Ugee M708 on Linux) can rotate, pan and zoom on the background

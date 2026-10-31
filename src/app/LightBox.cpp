@@ -947,6 +947,7 @@ void App::initLightBox() {
             library_.user.clear();
         }
     }
+    loadMatcapLibrary(); // custom MatCaps (PanelPolypaint.cpp): the library's MatCaps folder exists by now
     // Thumbnails are cached on disk for the artist; tests and recordings render fresh ones.
     if (interactive() && options_.uiTest.empty() && !prefDir_.empty()) thumbs_.setCacheDir(prefDir_ + "thumbs");
     if (const char* dir = SDL_getenv("SCULPTFORGE_THUMBNAIL_CACHE")) thumbs_.setCacheDir(dir); // to look at them

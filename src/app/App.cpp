@@ -1104,7 +1104,7 @@ void App::runCommand(const std::string& name, const Args& args) {
     if (r.ok && name != "export_glb" && name != "export_lods" && name != "export_usd" && name != "export_fbx" &&
         name != "export_unreal" && name.rfind("unreal_", 0) != 0 && name != "save_obj" && name != "save_project" &&
         name != "mesh_info" && name.rfind("brush_", 0) != 0 && name.rfind("splat_", 0) != 0 && name != "mesh_to_splats" &&
-        name != "set_color" && name != "set_material" && name != "set_shading" && name != "subtool_shading" &&
+        name != "set_color" && name != "set_material" && name != "load_matcap" && name != "set_shading" && name != "subtool_shading" &&
         name != "export_ply" && name != "face_weights" &&
         name != "face_preset" && name.rfind("face_take", 0) != 0 && name != "face_landmarks_detect") {
         clearLods();
@@ -1154,6 +1154,13 @@ void App::queueFile(FileAction action, std::string path) {
         path += kProjectExtension; // as save_project does, so the recent list gets the real name
     std::lock_guard lock(pendingMutex_);
     pendingFiles_.push_back({action, std::move(path)});
+}
+
+void App::loadMatcapDialog() {
+    static const SDL_DialogFileFilter kMatcapFilters[] = {{"MatCap images", "png;jpg;jpeg;exr"}, {"All files", "*"}};
+    const std::string folder = matcapFolder();
+    SDL_ShowOpenFileDialog(onFileChosen, &dialogRequests_[int(FileAction::LoadMatcap)], window_, kMatcapFilters, 2,
+                           folder.empty() ? nullptr : folder.c_str(), false);
 }
 
 void App::openFileDialog() {
@@ -1257,6 +1264,7 @@ void App::processPendingFiles() {
             if (lastCommandOk_) camera_.frame(sceneBounds()); // a model can be any size, anywhere
             break;
         case FileAction::ComfyWorkflow: setComfyWorkflow(f.path, comfyPickingText_); break;
+        case FileAction::LoadMatcap: runCommand("load_matcap", {{"path", f.path}}); break;
         case FileAction::Count: break;
         }
     }

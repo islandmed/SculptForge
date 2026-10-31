@@ -11,31 +11,87 @@
 
 #include <glm/gtc/type_ptr.hpp>
 
+#include <SDL3/SDL.h>
+
 #include <cfloat>
+#include <filesystem>
 #include <iterator>
 
 namespace sf {
 
-void App::registerPaintUiCommands() {
-    // A view setting, so it lives with the app (scripts: --script "set_material name=Chrome").
+namespace {
+
+// Every material name set_material takes (custom MatCaps included, so it is built when needed).
+std::string materialNames() {
     std::string names;
     for (int i = 0; i < matcapCount(); ++i) names += std::string(matcapName(i)) + ", ";
-    names += "studio";
+    return names + "studio";
+}
+
+std::filesystem::path u8path(const std::string& s) { return std::filesystem::path(std::u8string(s.begin(), s.end())); }
+
+} // namespace
+
+std::string App::matcapFolder() const { return library_.user.empty() ? std::string() : library_.user + "/MatCaps"; }
+
+// Custom MatCaps (#15): the studio folders (SCULPTFORGE_MATCAP_PATH), then the library's MatCaps folder.
+void App::loadMatcapLibrary() {
+    std::vector<std::string> dirs = studioMatcapDirs();
+    if (!matcapFolder().empty()) dirs.push_back(matcapFolder());
+    for (const std::string& m : loadMatcapFolders(dirs)) SDL_Log("MatCaps: %s", m.c_str());
+}
+
+void App::registerPaintUiCommands() {
+    // A view setting, so it lives with the app (scripts: --script "set_material name=Chrome").
     commands_.add({"set_material",
-                   "Viewport material: a built-in MatCap (Sculpt, the default, is made for reading strokes) or "
-                   "studio (soft clay lighting in the Base colour). Polypaint multiplies the matcap; cavity "
-                   "shading stays on.",
-                   {{"name", ParamSpec::Type::String, "One of: " + names + ".", true}},
-                   [this, names](Document&, const Args& a) -> CommandResult {
+                   "Viewport material: a built-in MatCap (Sculpt, the default, is made for reading strokes), one of "
+                   "your own (load_matcap) or studio (soft clay lighting in the Base colour). Polypaint multiplies "
+                   "the matcap; cavity shading stays on.",
+                   {{"name", ParamSpec::Type::String, "A MatCap's name (Soft Clay, Sculpt, Red Wax, Clay, Skin, Chrome, "
+                                                      "White, Bronze or a custom one) or studio.", true}},
+                   [this](Document&, const Args& a) -> CommandResult {
                        const std::string name = argString(a, "name");
                        if (name == "studio" || name == "Studio") {
                            renderSettings_.matcap = -1;
                            return {true, "Material: Studio"};
                        }
                        const int index = findMatcap(name);
-                       if (index < 0) return {false, "Unknown material '" + name + "' (" + names + ")"};
+                       if (index < 0) return {false, "Unknown material '" + name + "' (" + materialNames() + ")"};
                        renderSettings_.matcap = index;
                        return {true, std::string("Material: ") + matcapName(index)};
+                   }});
+    commands_.add({"load_matcap",
+                   "Load a MatCap: a lit-sphere image (PNG, JPG or EXR; a non-square image is cropped to its centre) "
+                   "becomes a viewport material named after the file, and the view uses it. It is copied into the "
+                   "library's MatCaps folder (Documents/SculptForge/MatCaps), so it is there next time; projects "
+                   "that use it carry a copy.",
+                   {{"path", ParamSpec::Type::String, "The image file.", true},
+                    {"keep", ParamSpec::Type::Bool, "Copy it into the MatCaps folder (default true).", false}},
+                   [this](Document&, const Args& a) -> CommandResult {
+                       CustomMatcap m;
+                       std::string err;
+                       if (!readMatcapImage(argString(a, "path"), m, err)) return {false, err};
+                       std::string kept;
+                       if (argBool(a, "keep", true) && !matcapFolder().empty()) {
+                           namespace fs = std::filesystem;
+                           const fs::path from = u8path(m.path), to = u8path(matcapFolder()) / from.filename();
+                           std::error_code ec;
+                           fs::create_directories(to.parent_path(), ec);
+                           if (!fs::equivalent(from, to, ec)) {
+                               ec.clear();
+                               fs::copy_file(from, to, fs::copy_options::overwrite_existing, ec);
+                           }
+                           if (ec) {
+                               kept = " (not kept: " + ec.message() + ")";
+                           } else {
+                               const std::u8string s = to.u8string();
+                               m.path.assign(s.begin(), s.end());
+                               kept = " (kept in MatCaps)";
+                           }
+                       }
+                       const int index = addCustomMatcap(std::move(m));
+                       renderSettings_.matcap = index;
+                       return {true, std::string("Material: ") + matcapName(index) + kept};
                    }});
     // The scene's shading; SubTools can override it (subtool_shading). Also the preference for new sessions.
     commands_.add({"set_shading",
@@ -199,6 +255,11 @@ void App::drawPalette_Color() {
 // SubTool's own).
 void App::drawPalette_Material() {
     sf::drawMaterialGrid(*this, GridMode::Palette); // Pickers.cpp, as in the material picker (M)
+    if (ImGui::Button("Load MatCap...", ImVec2(-1, 0))) loadMatcapDialog();
+    ui::HelpText("Load MatCap", nullptr,
+                 "Use a MatCap image of your own: a lit sphere filling a square PNG, JPG or EXR. It joins the list "
+                 "and is kept in Documents/SculptForge/MatCaps; images you put in that folder load at start-up.",
+                 "Material");
     ImGui::ColorEdit3("Base colour", &renderSettings_.baseColor.x, ImGuiColorEditFlags_NoInputs);
     ui::HelpText("Base colour", nullptr, "Colour of the Studio material (the clay colour).", "Material");
     drawShadingControls();

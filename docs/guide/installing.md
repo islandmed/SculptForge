@@ -95,8 +95,8 @@ file manager's properties).
 SculptForge opens a 1600 x 960 window with a sphere ready to sculpt and the **LightBox** open along the top of
 the canvas on its **Project** tab, so you can reopen recent work with a double-click. Press <kbd>,</kbd>
 (comma) to close it, or turn off **Preferences > LightBox > Show at startup**. The first start also creates
-your library folder (**Documents/SculptForge**, with Projects, Tools, Brushes, Alphas, Images, Splats and
-QuickSave sub-folders), which the LightBox shows as **User**.
+your library folder (**Documents/SculptForge**, with Projects, Tools, Brushes, Alphas, MatCaps, Images, Splats
+and QuickSave sub-folders), which the LightBox shows as **User**.
 
 You can open a file directly from the command line, too: `sculptforge model.obj` (or a `.glb`, `.sfproj`,
 splat capture or image). `sculptforge --fullscreen` starts filling the screen; `sculptforge --help` lists

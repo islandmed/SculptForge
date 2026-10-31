@@ -49,9 +49,20 @@ ProjectThumbnailProvider& thumbnailProvider() {
 // version 1); every other key belongs to
 // Document::projectSettings (camera, render, brush, symmetry, ...).
 const char* const kCoreKeys[] = {"format", "version", "app_version", "mesh", "layers", "active_layer",
-                                 "subtools", "active_subtool", "brushes", "active_brush", "splats"};
+                                 "subtools", "active_subtool", "brushes", "active_brush", "splats", "attachments"};
 
 std::filesystem::path fsPath(const std::string& p) { return std::filesystem::path(std::u8string(p.begin(), p.end())); }
+
+constexpr size_t kMaxAttachmentSize = size_t(64) << 20;
+
+// Document::projectFiles names: "matcaps/Gold.png" - letters, digits, space . _ - and '/' between parts.
+bool validAttachmentName(const std::string& name) {
+    if (name.empty() || name.size() > 200 || name.front() == '/' || name.back() == '/' || name.find("..") != std::string::npos)
+        return false;
+    return std::all_of(name.begin(), name.end(), [](unsigned char c) {
+        return std::isalnum(c) || c == ' ' || c == '.' || c == '_' || c == '-' || c == '/' || c >= 0x80;
+    });
+}
 
 bool isCoreKey(const std::string& key) {
     return std::any_of(std::begin(kCoreKeys), std::end(kCoreKeys), [&](const char* k) { return key == k; });
@@ -815,6 +826,18 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
         manifest.set("splats", std::move(splats));
     }
 
+    if (!doc.projectFiles.empty()) { // (no format change: optional, older readers ignore it)
+        Json files = Json::array();
+        for (const auto& [name, bytes] : doc.projectFiles) {
+            if (!validAttachmentName(name)) continue;
+            Json f = Json::object();
+            f.set("name", name);
+            f.set("data", w.bytes("attachments/" + name, bytes));
+            files.push(std::move(f));
+        }
+        manifest.set("attachments", std::move(files));
+    }
+
     if (doc.projectSettings.isObject())
         for (const auto& [key, value] : doc.projectSettings.members())
             if (!isCoreKey(key)) manifest.set(key, value);
@@ -976,6 +999,17 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
     doc.projectSettings = Json::object();
     for (const auto& [key, value] : manifest.members())
         if (!isCoreKey(key)) doc.projectSettings.set(key, value);
+    // Attachments are extras (an embedded MatCap): one that can't be read is left out rather than failing the file.
+    doc.projectFiles.clear();
+    for (const Json& f : manifest["attachments"].items()) {
+        const std::string name = f["name"].asString();
+        const size_t n = countOf(f["data"]["count"]);
+        if (!validAttachmentName(name) || n == size_t(-1) || n > kMaxAttachmentSize || doc.projectFiles.size() >= 64) continue;
+        std::vector<uint8_t> bytes;
+        r.error.clear();
+        if (r.bytes(f["data"], "attachment", n, bytes)) doc.projectFiles[name] = std::move(bytes);
+    }
+    r.error.clear();
     doc.path = path;
     doc.markClean();
     return true;

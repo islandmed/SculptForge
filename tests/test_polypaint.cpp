@@ -6,9 +6,11 @@
 #include "TestHarness.h"
 
 #include "core/Commands.h"
+#include "core/Image.h"
 #include "core/Matcap.h"
 #include "core/Polypaint.h"
 #include "core/Primitives.h"
+#include "core/Vdm.h"
 #include "io/PlyIO.h"
 
 #include <algorithm>
@@ -275,15 +277,15 @@ TEST(polypaint_commands_in_schema) {
 }
 
 TEST(matcap_builtin_materials) {
-    CHECK(matcapCount() >= 4 && matcapCount() <= 8);
-    for (int i = 0; i < matcapCount(); ++i) {
+    CHECK(builtinMatcapCount() >= 4 && builtinMatcapCount() <= 8);
+    for (int i = 0; i < builtinMatcapCount(); ++i) {
         CHECK(std::string(matcapName(i)).size() > 0);
         CHECK(findMatcap(matcapName(i)) == i);
         for (int j = 0; j < i; ++j) CHECK(std::string(matcapName(i)) != matcapName(j));
     }
     CHECK(findMatcap("red wax") >= 0 && findMatcap("RedWax") == findMatcap("Red Wax"));
     CHECK(findMatcap("chrome") >= 0 && findMatcap("unobtainium") == -1);
-    CHECK(generateMatcap(-1).empty() && generateMatcap(matcapCount()).empty() && generateMatcap(0, 0).empty());
+    CHECK(generateMatcap(-1).empty() && generateMatcap(builtinMatcapCount()).empty() && generateMatcap(0, 0).empty());
 
     const int size = 64;
     auto pixel = [&](const std::vector<uint8_t>& img, int i, int j) {
@@ -313,11 +315,11 @@ TEST(matcap_builtin_materials) {
     const glm::ivec4 sc = pixel(sculpt, size / 2, size / 2);
     CHECK(sc.x >= sc.z && sc.x - sc.z < 60);
     CHECK(pixel(sculpt, size / 4, size * 3 / 4).x > pixel(sculpt, size * 3 / 4, size / 4).x + 60);
-    for (int i = 1; i < matcapCount(); ++i) CHECK(matcapCavity(0).crease > matcapCavity(i).crease);
+    for (int i = 1; i < builtinMatcapCount(); ++i) CHECK(matcapCavity(0).crease > matcapCavity(i).crease);
 
     // Soft Clay, the default (last, so the others keep their indices): a matte warm light grey, lit
     // from the upper left, with no highlight anywhere near white.
-    CHECK(defaultMatcap() == findMatcap("soft clay") && defaultMatcap() == matcapCount() - 1);
+    CHECK(defaultMatcap() == findMatcap("soft clay") && defaultMatcap() == builtinMatcapCount() - 1);
     const std::vector<uint8_t> clay = generateMatcap(defaultMatcap(), size);
     const glm::ivec4 cl = pixel(clay, size / 2, size / 2);
     CHECK(cl.x >= cl.z && cl.x - cl.z < 30 && cl.x > 120);
@@ -325,14 +327,88 @@ TEST(matcap_builtin_materials) {
     int brightest = 0;
     for (size_t k = 0; k < clay.size(); k += 4) brightest = std::max(brightest, int(clay[k]));
     CHECK(brightest < 225);
-    CHECK(matcapCavity(-1).crease > 0.0f && matcapCavity(matcapCount()).crease == matcapCavity(-1).crease);
+    CHECK(matcapCavity(-1).crease > 0.0f && matcapCavity(builtinMatcapCount()).crease == matcapCavity(-1).crease);
     // The pickers list the default first, then every other MatCap once, in index order.
     CHECK(matcapInListOrder(0) == defaultMatcap() && matcapInListOrder(1) == 0);
-    CHECK(matcapInListOrder(-1) == -1 && matcapInListOrder(matcapCount()) == -1);
+    CHECK(matcapInListOrder(-1) == -1 && matcapInListOrder(builtinMatcapCount()) == -1);
     std::vector<int> listed;
-    for (int k = 0; k < matcapCount(); ++k) listed.push_back(matcapInListOrder(k));
+    for (int k = 0; k < builtinMatcapCount(); ++k) listed.push_back(matcapInListOrder(k));
     std::sort(listed.begin(), listed.end());
-    for (int i = 0; i < matcapCount(); ++i) CHECK(listed[size_t(i)] == i);
+    for (int i = 0; i < builtinMatcapCount(); ++i) CHECK(listed[size_t(i)] == i);
+}
+
+TEST(matcap_custom_images) {
+    // A lit-sphere image of our own (#15): a 48 x 32 PNG (cropped to its centred 32 x 32), green on the right.
+    Image img;
+    img.width = 48;
+    img.height = 32;
+    img.rgba.assign(size_t(48) * 32 * 4, 255);
+    for (int y = 0; y < 32; ++y)
+        for (int x = 0; x < 48; ++x) {
+            uint8_t* p = &img.rgba[(size_t(y) * 48 + size_t(x)) * 4];
+            p[0] = uint8_t(x < 24 ? 200 : 20);
+            p[1] = uint8_t(x < 24 ? 30 : 220);
+            p[2] = uint8_t(y < 16 ? 10 : 90); // top half differs from the bottom half
+        }
+    const std::string dir = tempPath("sf_matcaps_test");
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir);
+    std::string err;
+    CHECK(img.savePng(dir + "/Green Gold.png", err));
+    { std::ofstream(dir + "/broken.jpg") << "not an image"; }
+    { std::ofstream(dir + "/notes.txt") << "ignored"; }
+
+    const int before = matcapCount();
+    const std::vector<std::string> messages = loadMatcapFolders({dir});
+    CHECK(messages.size() == 1 && messages[0].find("broken.jpg") != std::string::npos);
+    const int i = findMatcap("green gold");
+    CHECK(i == before && matcapCount() == before + 1 && isCustomMatcap(i) && !isCustomMatcap(0));
+    const CustomMatcap* c = customMatcap(i);
+    CHECK(c && c->size == 32 && c->rgba.size() == size_t(32) * 32 * 4 && c->path.find("Green Gold.png") != std::string::npos);
+    // Rows bottom-up like the built-ins: row 0 is the image's bottom row (blue 90); the crop keeps x 8..39.
+    CHECK(c->rgba[2] == 90 && c->rgba[(size_t(31) * 32) * 4 + 2] == 10);
+    CHECK(c->rgba[0] == 200 && c->rgba[(size_t(31)) * 4 + 1] == 220);
+    CHECK(matcapInListOrder(i) == i && matcapKey(i).find("Green Gold#") == 0);
+    CHECK(generateMatcap(i, 16).size() == size_t(16) * 16 * 4);
+
+    // Loading the same name again replaces its pixels (same index); a built-in's name is kept for the built-in.
+    const uint64_t revision = matcapRevision(), hash = c->hash;
+    CustomMatcap again;
+    CHECK(readMatcapImage(dir + "/Green Gold.png", again, err));
+    again.rgba[0] = 1;
+    again.hash = 0;
+    CHECK(addCustomMatcap(again) == i && matcapRevision() != revision && customMatcap(i)->hash != hash);
+    CustomMatcap chrome = again;
+    chrome.name = "Chrome";
+    const int ci = addCustomMatcap(chrome);
+    CHECK(std::string(matcapName(ci)) == "Chrome 2" && findMatcap("Chrome") < builtinMatcapCount());
+
+    // PNG round trip (what projects embed) keeps the pixels exactly.
+    std::vector<uint8_t> png;
+    CHECK(!encodeMatcapPng(0, png)); // built-ins aren't embedded
+    CHECK(encodeMatcapPng(i, png));
+    CustomMatcap back;
+    CHECK(decodeMatcapImage(png.data(), png.size(), back, err) && back.hash == customMatcap(i)->hash);
+    CHECK(findMatcapByHash(back.hash) == i);
+
+    // OpenEXR, linear light: 1.0 is white, 0.5 is sRGB 188, values above 1 clamp.
+    VectorDisplacement exr;
+    exr.width = exr.height = 16;
+    exr.vectors.assign(256, glm::vec3(0.5f, 1.0f, 4.0f));
+    CHECK(writeVdmExr(dir + "/Linear.exr", exr, err));
+    CustomMatcap lin;
+    CHECK(readMatcapImage(dir + "/Linear.exr", lin, err) && lin.size == 16 && lin.name == "Linear");
+    CHECK(std::abs(int(lin.rgba[0]) - 188) <= 1 && lin.rgba[1] == 255 && lin.rgba[2] == 255);
+
+    // Too small, or not an image at all.
+    Image tiny;
+    tiny.width = tiny.height = 8;
+    tiny.rgba.assign(8 * 8 * 4, 128);
+    CHECK(tiny.savePng(dir + "/tiny.png", err));
+    CHECK(!readMatcapImage(dir + "/tiny.png", lin, err) && err.find("too small") != std::string::npos);
+    CHECK(!readMatcapImage(dir + "/missing.png", lin, err));
+    CHECK(isMatcapFile("a/B.EXR") && isMatcapFile("x.jpeg") && !isMatcapFile("x.sfbrush"));
+    std::filesystem::remove_all(dir);
 }
 
 TEST(polypaint_restore_stroke_marks_colors_dirty) {

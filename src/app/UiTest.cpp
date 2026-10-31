@@ -51,6 +51,8 @@
 //   expect_value NAME OP N   triangles, vertices, layers, brushes, masked, hidden, groups, colored,
 //                            can_undo, dirty, splats, show_polygroups, show_mask, show_mesh, wireframe,
 //                            flat_shading (the scene's: 1 Flat), subtool_shading (0 Scene, 1 Smooth, 2 Flat),
+//                            custom_matcaps (MatCaps loaded from images), material_custom (1 when the view uses
+//                            one), matcap_files (images in the library's MatCaps folder),
 //                            subtools (count), active_subtool (index, 0 = top), visible_subtools,
 //                            edited_subtools (SubTools with undo history), user_brushes (brushes in the
 //                            user library), library_files (.sfbrush files in it; UI tests get an empty
@@ -144,6 +146,7 @@
 #include "app/Ui.h"
 
 #include "core/BrushLibrary.h"
+#include "core/Matcap.h"
 #include "core/Multires.h"
 #include "core/Script.h"
 #include "core/ThreadPool.h"
@@ -401,6 +404,17 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "show_mask") return app_.renderSettings_.showMask ? 1.0 : 0.0;
     if (name == "show_mesh") return app_.renderSettings_.showMesh ? 1.0 : 0.0;
     if (name == "wireframe") return app_.renderSettings_.wireframe ? 1.0 : 0.0;
+    if (name == "custom_matcaps") return double(matcapCount() - builtinMatcapCount());
+    if (name == "material_custom") return isCustomMatcap(app_.renderSettings_.matcap) ? 1.0 : 0.0;
+    if (name == "matcap_files") {
+        int n = 0;
+        std::error_code ec;
+        const std::string dir = app_.matcapFolder();
+        for (std::filesystem::directory_iterator it(std::filesystem::path(std::u8string(dir.begin(), dir.end())), ec), end;
+             !dir.empty() && !ec && it != end; it.increment(ec))
+            n += isMatcapFile(it->path().string()) ? 1 : 0;
+        return double(n);
+    }
     if (name == "flat_shading") return app_.renderSettings_.flatShading ? 1.0 : 0.0;
     if (name == "subtool_shading") return double(int(app_.doc_.activeSubtoolInfo().shading));
     if (name == "shelves") return app_.layout_.shelvesVisible ? 1.0 : 0.0;

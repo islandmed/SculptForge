@@ -88,6 +88,8 @@ const char* libraryTabFolder(LibraryTab tab) {
         return "Brushes";
     case LibraryTab::Alpha:
         return "Alphas";
+    case LibraryTab::Material:
+        return "MatCaps"; // custom MatCap images, loaded at start-up (core/Matcap.h)
     case LibraryTab::Image:
         return "Images";
     case LibraryTab::Splats:

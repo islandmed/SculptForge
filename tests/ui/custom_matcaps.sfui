@@ -1,0 +1,54 @@
+# Custom MatCaps (#15): Material > Load MatCap... (the dialog's command), the library's MatCaps folder, and
+# projects that carry their custom MatCap. Files are written to the working directory (the build folder).
+expect_value custom_matcaps == 0
+
+# A project saved with a MatCap this machine doesn't have (Rose, embedded): it opens with it.
+run open path=$SCRIPT_DIR/data/rose_matcap.sfproj
+expect_value material_custom == 1
+expect_value custom_matcaps == 1
+camera 20 10
+shot rose-from-project
+
+# Load an image: it becomes the material, joins the palette's list and is copied into the MatCaps folder.
+run new_sphere subdivisions=4
+expect_value matcap_files == 0
+click "Material##palette.material"
+expect "Material/Load MatCap..."
+key escape
+run load_matcap path=$SCRIPT_DIR/data/Gold.png
+expect_status "Material: Gold (kept in MatCaps)"
+expect_value material_custom == 1
+expect_value custom_matcaps == 2
+expect_value matcap_files == 1
+camera 20 10
+shot gold
+click "Material##palette.material"
+wait_idle 20
+expect "Material/Gold"
+expect "Material/Rose"
+shot material-palette
+click "Material/Soft Clay"
+expect_value material_custom == 0
+click "Material/Gold"
+expect_status "Material: Gold"
+expect_value material_custom == 1
+key escape
+
+# Loading the same file again replaces it rather than adding a second Gold.
+run load_matcap path=$SCRIPT_DIR/data/Gold.png
+expect_value custom_matcaps == 2
+expect_value matcap_files == 1
+
+# Scripts pick custom MatCaps by name (files that aren't images fail: test_polypaint matcap_custom_images).
+run set_material name=rose
+expect_status "Material: Rose"
+
+# A project using Gold keeps it through save and open.
+run set_material name=gold
+run save_project path=sf_ui_custom_matcap.sfproj
+run set_material name=studio
+expect_value material_custom == 0
+run open path=sf_ui_custom_matcap.sfproj
+expect_value material_custom == 1
+expect_value custom_matcaps == 2
+expect_status "sf_ui_custom_matcap"
