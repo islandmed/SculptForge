@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
     paths: ['website/**', '.github/workflows/pages.yml']
+    tags: ['v*'] # a release: its guide goes live
   workflow_dispatch:
 
 permissions:
@@ -23,6 +24,17 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the release tags
+      # The online guide is the latest release's guide, the one inside the app people can download, not main's:
+      # main already documents features that aren't released yet. Its sitemap goes with it. The rest of website/
+      # (home page, update feed) comes from main, where it only changes when a release goes out.
+      - name: Guide from the latest release
+        run: |
+          tag=$(git tag -l 'v[0-9]*' --sort=-v:refname | grep -v -- - | head -1)
+          echo "Guide from $tag"
+          rm -rf website/guide
+          git archive "$tag" website/guide website/sitemap.xml | tar -x
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:
@@ -47,6 +59,17 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the release tags
+      # The online guide is the latest release's guide, the one inside the app people can download, not main's:
+      # main already documents features that aren't released yet. Its sitemap goes with it. The rest of website/
+      # (home page, update feed) comes from main, where it only changes when a release goes out.
+      - name: Guide from the latest release
+        run: |
+          tag=$(git tag -l 'v[0-9]*' --sort=-v:refname | grep -v -- - | head -1)
+          echo "Guide from $tag"
+          rm -rf website/guide
+          git archive "$tag" website/guide website/sitemap.xml | tar -x
       - name: Push website/ to islandmed/islandmed.github.io
         env:
           KEY: ${{ secrets.MIRROR_DEPLOY_KEY }}
