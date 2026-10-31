@@ -20,6 +20,12 @@ SubTool with a polygroup per limb, keeping the ZSpheres to change later. See [ZS
 orbit (Alt+drag with a pen), the numpad views, F / Shift+F, V S P I G C K for brushes, M for the mask. You can
 also import a keymap you exported from Blender. See [Blender keys](shortcuts.md#blender-keys).
 
+### Flat shading
+
+**Material > Shading > Flat** shows every polygon as its own facet, to read a low-poly blockout's planes and
+check exactly what a brush did; **This SubTool** keeps one SubTool smooth or flat whatever the scene says. See
+[Polypaint and materials](polypaint.md).
+
 ### Fixes
 
 - Pens whose drivers send stray mouse events (a Ugee M708 on Linux) can rotate, pan and zoom on the background
