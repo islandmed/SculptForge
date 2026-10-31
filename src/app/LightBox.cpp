@@ -1043,6 +1043,10 @@ bool App::lightBoxKey(SDL_Keycode key, SDL_Keymod mod) {
                                        : nullptr;
     const Action* a = id ? actions_.find(id) : nullptr;
     if (!a || !a->run) return false;
+    if (!heldPicker) { // only while the key is still the action's (the Blender style gives S and M to brushes)
+        const std::vector<Chord> chords = parseChords(actions_.shortcutText(a->id));
+        if (std::find(chords.begin(), chords.end(), chordFromEvent(key, mod)) == chords.end()) return false;
+    }
     actions_.touch(a->id);
     a->run();
     return true;

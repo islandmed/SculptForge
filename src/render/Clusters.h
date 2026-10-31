@@ -86,6 +86,7 @@ struct CullView {
     float nearDistance = 0.0f;
     glm::vec3 forward{0.0f, 0.0f, -1.0f};
     bool backfaces = false; // cull clusters facing away
+    bool ortho = false;     // an orthographic projection: no eye point, so facing away isn't judged from `eye`
     static CullView from(const glm::mat4& view, const glm::mat4& proj);
 };
 bool insideFrustum(const CullView& v, const ClusterBounds& b);

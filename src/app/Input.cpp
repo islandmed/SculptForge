@@ -6,9 +6,15 @@
 // Ctrl+H for the mask, Ctrl+W group masked), Preferences > Input with the ZBrush and SculptForge key styles,
 // the QuickMenu itself and Shift-constrained straight strokes. The mouse gestures live with the rest of the
 // input in App.cpp (roll, Ctrl+click blur / sharpen in PanelMasking.cpp).
+//
+// The Blender style (#12): its default keys come from Blender 4.2 - 5.x's own keymap (blender_default.py, Sculpt
+// and 3D View), with the brush letters on SculptForge's nearest brush. The mouse side is in App.cpp
+// (onMouseDown: middle-drag orbit, Alt+left-drag as the middle button) and blenderMods (Ctrl inverts).
 #include "app/App.h"
+#include "app/BlenderKeymap.h"
 #include "app/Pickers.h"
 #include "app/Ui.h"
+#include "core/Polygroups.h"
 
 #include <IconsLucide.h>
 
@@ -17,6 +23,9 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <string>
 
 namespace sf {
@@ -107,35 +116,279 @@ void App::registerInputActions() {
     add("input.style_zbrush", "ZBrush", nullptr, "Preferences > Input", "",
         "ZBrush's keys and gestures: I is RGB Intensity, 9 is QuickSave, the number keys don't pick brushes, and "
         "Ctrl+drag on the background only clears the mask.",
-        [this] {
-            uiPrefs_.inputStyle = 0;
-            applyInputStyle();
-        },
-        [this] { return uiPrefs_.inputStyle == 0; });
+        [this] { setInputStyle(0); }, [this] { return uiPrefs_.inputStyle == 0; });
     add("input.style_sculptforge", "SculptForge", nullptr, "Preferences > Input", "",
         "SculptForge's own keys from before 0.7: 1-9 and 0 pick the first ten brushes, I is Z Intensity (as is U), "
         "and Ctrl+drag on the background zooms when nothing is masked.",
+        [this] { setInputStyle(1); }, [this] { return uiPrefs_.inputStyle == 1; });
+    add("input.style_blender", "Blender", nullptr, "Preferences > Input", "",
+        "Blender's navigation and sculpt-mode keys: middle-drag orbits (Shift pans, Ctrl zooms), Alt+left-drag does "
+        "the same for pens and trackpads, Ctrl inverts a stroke, Shift smooths, F / Shift+F set radius and strength, "
+        "V S P I G C K pick brushes and M the mask brush, Home frames everything. Rotation switches to Turntable.",
+        [this] { setInputStyle(2); }, [this] { return uiPrefs_.inputStyle == 2; });
+    add("input.emulate_numpad", "Emulate Numpad", nullptr, "Preferences > Input", "",
+        "Blender style: the number keys above the letters work as the numpad (1 front, 3 right, 7 top, 5 "
+        "orthographic...), for keyboards without one.",
+        [this] { uiPrefs_.emulateNumpad = !uiPrefs_.emulateNumpad; }, [this] { return uiPrefs_.emulateNumpad; },
+        [this] { return blenderStyle(); });
+    add("input.import_blender", "Import Blender keymap...", ICON_LC_FILE_INPUT, "Preferences > Input", "",
+        "Use the keys from a keymap you exported in Blender (Preferences > Keymap > Export, a .py file). Switches "
+        "to the Blender style, then takes the navigation and sculpt keys SculptForge has an equivalent for. The "
+        "file is only read, never run. Store Config keeps the result.",
+        [this] { importBlenderKeymapDialog(); });
+
+    // Blender style: the mask brush and Sculpt mode's visibility keys.
+    add("mask.brush", "Mask brush", ICON_LC_PAINTBRUSH, "Tool > Masking", "",
+        "Paint the mask with a plain left drag, Ctrl+drag to unmask (Blender's Mask brush). Press it again, or pick "
+        "another brush, to go back.",
+        [this] { toggleMaskBrush(); }, [this] { return maskBrushActive(); });
+    add("visibility.hide_group", "Hide polygroup under cursor", ICON_LC_EYE_OFF, "Tool > Visibility", "",
+        "Hide the polygroup under the cursor (Blender: hide the face set).", [this] { hideGroupUnderCursor(false); });
+    add("visibility.isolate_group", "Isolate polygroup under cursor", ICON_LC_EYE, "Tool > Visibility", "",
+        "Show only the polygroup under the cursor; again, with it isolated, shows everything (Blender: toggle "
+        "visibility).",
+        [this] { hideGroupUnderCursor(true); });
+    add("visibility.show_all", "Show all", ICON_LC_EYE, "Tool > Visibility", "", "Show every hidden part of the mesh.",
+        [this] { runCommand("show_all"); });
+
+    commands_.add({"blender_keymap_import",
+                   "Use the keys of a keymap exported from Blender (Preferences > Keymap > Export, a .py file): "
+                   "switches to the Blender input style and takes the navigation and sculpt keys SculptForge has an "
+                   "equivalent for. The file is read as text, never run.",
+                   {{"path", ParamSpec::Type::String, "The exported .py file.", true}},
+                   [this](Document&, const Args& a) -> CommandResult {
+                       const bool ok = importBlenderKeymap(argString(a, "path"));
+                       return {ok, status_};
+                   }});
+    registerViewActions();
+    applyInputStyle();
+}
+
+void App::registerViewActions() {
+    auto add = [this](const char* id, const char* label, const char* shortcut, const char* description,
+                      std::function<void()> run, std::function<bool()> checked = nullptr) {
+        Action a;
+        a.id = id;
+        a.label = label;
+        a.palette = "Transform";
+        a.shortcut = shortcut;
+        a.description = description;
+        a.run = std::move(run);
+        a.checked = std::move(checked);
+        actions_.add(std::move(a));
+    };
+    // The numpad, as in Blender (every style: the keys are free otherwise). Axis views are orthographic until the
+    // view is turned again (Blender's Auto Perspective).
+    add("view.front", "Front view", "Numpad 1", "Look at the model from the front (orthographic).",
+        [this] { viewAxis(0.0f, 0.0f); });
+    add("view.back", "Back view", "Ctrl+Numpad 1", "Look at the model from behind (orthographic).",
+        [this] { viewAxis(180.0f, 0.0f); });
+    add("view.right", "Right view", "Numpad 3", "Look at the model's right side (orthographic).",
+        [this] { viewAxis(90.0f, 0.0f); });
+    add("view.left", "Left view", "Ctrl+Numpad 3", "Look at the model's left side (orthographic).",
+        [this] { viewAxis(-90.0f, 0.0f); });
+    add("view.top", "Top view", "Numpad 7", "Look down on the model (orthographic).", [this] { viewAxis(0.0f, -90.0f); });
+    add("view.bottom", "Bottom view", "Ctrl+Numpad 7", "Look up at the model from below (orthographic).",
+        [this] { viewAxis(0.0f, 90.0f); });
+    add("view.ortho", "Orthographic", "Numpad 5",
+        "Switch between a perspective and an orthographic view (no foreshortening: sizes don't shrink with depth).",
         [this] {
-            uiPrefs_.inputStyle = 1;
-            applyInputStyle();
+            camera_.ortho = !camera_.ortho;
+            autoOrtho_ = false;
         },
-        [this] { return uiPrefs_.inputStyle == 1; });
+        [this] { return camera_.ortho; });
+    add("view.orbit_left", "Orbit left", "Numpad 4", "Turn the view 15 degrees to the left around the model.",
+        [this] { viewOrbitStep(-15.0f, 0.0f); });
+    add("view.orbit_right", "Orbit right", "Numpad 6", "Turn the view 15 degrees to the right around the model.",
+        [this] { viewOrbitStep(15.0f, 0.0f); });
+    add("view.orbit_up", "Orbit up", "Numpad 8", "Turn the view 15 degrees up over the model.",
+        [this] { viewOrbitStep(0.0f, -15.0f); });
+    add("view.orbit_down", "Orbit down", "Numpad 2", "Turn the view 15 degrees down under the model.",
+        [this] { viewOrbitStep(0.0f, 15.0f); });
+    add("view.opposite", "Opposite side", "Numpad 9", "Look at the model from the other side.", [this] {
+        camera_.setOrientation(camera_.orientation() * glm::angleAxis(glm::pi<float>(), glm::vec3(0, 1, 0)));
+    });
+    add("view.zoom_in", "Zoom in", "Numpad Plus", "Move the view closer.", [this] { camera_.zoom(1.0f); });
+    add("view.zoom_out", "Zoom out", "Numpad Minus", "Move the view back.", [this] { camera_.zoom(-1.0f); });
+    add("view.frame_selected", "Frame SubTool", "Numpad .", "Fit the active SubTool in the view (Blender: View Selected).",
+        [this] { frameActiveSubtool(); });
+}
+
+void App::setInputStyle(int style) {
+    uiPrefs_.inputStyle = std::clamp(style, 0, 2);
+    if (blenderStyle()) uiPrefs_.turntable = true; // Blender orbits as a turntable; Preferences > Input changes it
+    maskBrush_.on = false;
     applyInputStyle();
 }
 
 void App::applyInputStyle() {
-    const bool sf = !zbrushStyle();
-    for (int i = 0; i < int(BrushType::Count) && i < 10; ++i)
-        actions_.setDefaultShortcut(brushId(BrushType(i)), sf ? (i < 9 ? std::to_string(i + 1) : "0") : "");
-    actions_.setDefaultShortcut("file.quicksave", sf ? "" : "9");
-    actions_.setDefaultShortcut("ui.strength_popup", sf ? "U / I" : "U");
-    actions_.setDefaultShortcut("ui.rgb_popup", sf ? "" : "I");
+    const int style = std::clamp(uiPrefs_.inputStyle, 0, 2);
+    const bool sf = style == 1;
+    // One row per action whose key depends on the style: ZBrush, SculptForge, Blender (Blender 4.2 - 5.x defaults).
+    struct Keys {
+        const char* id;
+        const char* keys[3];
+    };
+    static const Keys kKeys[] = {
+        {"file.quicksave", {"9", "", ""}},
+        {"ui.strength_popup", {"U", "U / I", "Shift+F / U"}},
+        {"ui.rgb_popup", {"I", "", ""}},
+        {"ui.size_popup", {"S", "S", "F"}},
+        {"view.frame", {"F", "F", "Home"}},
+        {"view.wireframe", {"Shift+F", "Shift+F", "Shift+Z"}},
+        {"color.switch", {"V", "V", "X"}},
+        {"color.pick", {"C", "C", "Shift+X"}},
+        {"transform.symmetry_x", {"X", "X", ""}},
+        {"draw.paint", {"P", "P", ""}},
+        {"ui.picker.material", {"M", "M", ""}},
+        {"stroke.lazy", {"L", "L", "L / Shift+S"}},
+        {"mask.clear", {"Ctrl+Shift+A", "Ctrl+Shift+A", "Alt+M / Ctrl+Shift+A"}},
+        {"geometry.lower_res", {"Shift+D", "Shift+D", "Alt+1 / Shift+D"}},
+        {"geometry.higher_res", {"D", "D", "Alt+2 / D"}},
+        {"mask.brush", {"", "", "M"}},
+        {"visibility.hide_group", {"", "", "H"}},
+        {"visibility.isolate_group", {"", "", "Shift+H"}},
+        {"visibility.show_all", {"", "", "Alt+H"}},
+    };
+    for (const Keys& k : kKeys) actions_.setDefaultShortcut(k.id, k.keys[style]);
+    // Brushes: 1-9 and 0 in the SculptForge style; Blender's sculpt-mode letters in the Blender style.
+    static const std::pair<BrushType, const char*> kBlenderBrushes[] = {
+        {BrushType::Standard, "V"}, {BrushType::Smooth, "S"},        {BrushType::Pinch, "P"},
+        {BrushType::Inflate, "I"},  {BrushType::Move, "G"},          {BrushType::Flatten, "Shift+T"},
+        {BrushType::ClayBuildup, "C"}, {BrushType::Crease, "Shift+C"}, {BrushType::SnakeHook, "K"},
+    };
+    for (int i = 0; i < int(BrushType::Count); ++i) {
+        std::string key = sf && i < 10 ? (i < 9 ? std::to_string(i + 1) : "0") : "";
+        if (style == 2)
+            for (const auto& [type, letter] : kBlenderBrushes)
+                if (int(type) == i) key = letter;
+        actions_.setDefaultShortcut(brushId(BrushType(i)), key);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Blender style
+// ---------------------------------------------------------------------------
+
+void App::viewAxis(float yawDegrees, float pitchDegrees) {
+    camera_.yaw = glm::radians(yawDegrees);
+    camera_.pitch = glm::radians(pitchDegrees);
+    camera_.roll = 0.0f;
+    if (!camera_.ortho) {
+        camera_.ortho = true;
+        autoOrtho_ = true;
+    }
+}
+
+void App::viewOrbitStep(float yawDegrees, float pitchDegrees) {
+    // Yaw about the world's up axis, pitch about the view's own right axis (Blender's numpad orbit).
+    camera_.setOrientation(glm::angleAxis(glm::radians(yawDegrees), glm::vec3(0, 1, 0)) * camera_.orientation() *
+                           glm::angleAxis(glm::radians(pitchDegrees), glm::vec3(1, 0, 0)));
+    if (autoOrtho_) {
+        camera_.ortho = false;
+        autoOrtho_ = false;
+    }
+}
+
+void App::frameActiveSubtool() {
+    const AABB b = doc_.mesh.bounds();
+    if (b.valid()) camera_.frame(b);
+    else camera_.frame(sceneBounds());
+}
+
+SDL_Keymod App::blenderMods(SDL_Keymod keyboard) const {
+    // What the sculpting code reads: Alt inverts, Ctrl masks, Shift smooths (the ZBrush meanings). Blender inverts
+    // with Ctrl and masks with the Mask brush; its Alt is the emulated middle button, so it means nothing here.
+    SDL_Keymod out = keyboard & SDL_KMOD_SHIFT;
+    const bool ctrl = (keyboard & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) != 0;
+    if (maskBrushActive()) {
+        if (!(keyboard & SDL_KMOD_SHIFT)) out |= SDL_KMOD_LCTRL; // Shift still smooths the surface
+        if (ctrl) out |= SDL_KMOD_LALT;                          // Ctrl unmasks
+    } else if (ctrl) {
+        out |= SDL_KMOD_LALT;
+    }
+    return out;
+}
+
+bool App::maskBrushActive() const {
+    return maskBrush_.on && blenderStyle() && brush_ == maskBrush_.brush && doc_.activeBrush == maskBrush_.custom &&
+           paintMode_ == maskBrush_.paint && !guidesMode_;
+}
+
+void App::toggleMaskBrush() {
+    if (maskBrushActive()) {
+        maskBrush_.on = false;
+        status_ = "Mask brush off";
+        return;
+    }
+    maskBrush_ = {true, brush_, doc_.activeBrush, paintMode_};
+    status_ = blenderStyle() ? "Mask brush: drag to mask, Ctrl+drag to unmask (M again: back to your brush)"
+                             : "The Mask brush is for the Blender style; here, hold Ctrl to mask";
+}
+
+void App::hideGroupUnderCursor(bool isolate) {
+    doc_.syncBvh();
+    RayHit hit;
+    if (!pick(mouseX_, mouseY_, hit)) {
+        if (isolate && doc_.mesh.hasHidden()) runCommand("show_all");
+        return;
+    }
+    const uint32_t group = doc_.mesh.polygroupAt(hit.triangle);
+    if (!isolate) runCommand("hide_polygroup", {{"group", double(group)}});
+    else if (polygroupIsolated(doc_.mesh, group)) runCommand("show_all");
+    else runCommand("isolate_polygroup", {{"group", double(group)}});
+}
+
+bool App::importBlenderKeymap(const std::string& path) {
+    std::ifstream f(std::filesystem::path(std::u8string(path.begin(), path.end())), std::ios::binary);
+    std::string text;
+    if (f) text.assign(std::istreambuf_iterator<char>(f), {});
+    if (!f && text.empty()) {
+        status_ = "Could not read " + path;
+        lastCommandOk_ = false;
+        return false;
+    }
+    if (text.size() > 8u * 1024u * 1024u) {
+        status_ = "That file is too big for a Blender keymap";
+        lastCommandOk_ = false;
+        return false;
+    }
+    BlenderKeymap keymap;
+    std::string err;
+    if (!parseBlenderKeymap(text, keymap, err)) {
+        status_ = err;
+        lastCommandOk_ = false;
+        return false;
+    }
+    setInputStyle(2);
+    std::vector<std::string> assigned;
+    for (const BlenderKeyBinding& b : keymap.bindings) {
+        if (!actions_.find(b.action)) continue;
+        const bool first = std::find(assigned.begin(), assigned.end(), b.action) == assigned.end();
+        actions_.assignShortcut(b.action, chordText(b.chord), !first);
+        if (first) assigned.push_back(b.action);
+    }
+    status_ = "Blender keymap: " + std::to_string(keymap.bindings.size()) + " keys for " +
+              std::to_string(assigned.size()) + " actions (" + std::to_string(keymap.skipped) +
+              " Blender keys have no SculptForge equivalent). Store Config keeps them.";
+    lastCommandOk_ = true;
+    return true;
+}
+
+void App::drawInputStyleRow(float width) {
+    ui::Segmented(*this, {"input.style_zbrush", "input.style_sculptforge", "input.style_blender"}, width);
 }
 
 void App::drawInputSection() {
     ImGui::TextDisabled("Style");
     ImGui::SameLine();
-    ui::Segmented(*this, {"input.style_zbrush", "input.style_sculptforge"});
+    drawInputStyleRow();
+    if (blenderStyle()) {
+        bool emulate = uiPrefs_.emulateNumpad;
+        if (ImGui::Checkbox("Emulate Numpad", &emulate)) uiPrefs_.emulateNumpad = emulate;
+        ui::HelpAction(*this, "input.emulate_numpad");
+    }
+    ui::ActionButton(*this, "input.import_blender", ImVec2(-FLT_MIN, 0), ui::Look::IconLabel);
     ImGui::TextDisabled("Rotation");
     ImGui::SameLine();
     int rotation = uiPrefs_.turntable ? 1 : 0;

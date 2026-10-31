@@ -1,0 +1,268 @@
+# The Blender input style (#12): Preferences > Input > Blender, middle-drag navigation and Alt+left-drag for pens,
+# the numpad views (orthographic until turned), Blender's sculpt-mode brush letters, F / Shift+F, Ctrl to invert,
+# M for the Mask brush, H / Shift+H / Alt+H, Alt+1 / Alt+2, Emulate Numpad, the Controls window, a keymap
+# exported from Blender, and back to the ZBrush style with its keys intact.
+run new_sphere subdivisions=4
+expect_value input_style == 0
+expect_value shortcut_conflicts == 0
+# The numpad views work in every style.
+key numpad3
+expect_value camera_yaw == 90
+expect_value camera_ortho == 1
+key f
+
+# --- Preferences > Input: three styles ---
+click "Preferences##palette.preferences"
+click "Input##preferences.input"
+hold ctrl
+hover "Blender##input.style_blender"
+expect_help "middle-drag orbits"
+hold none
+click "Blender##input.style_blender"
+expect_value input_style == 2
+expect_value turntable == 1
+expect "Emulate Numpad"
+shot preferences-input-blender
+expect_value shortcut_conflicts == 0
+expect_shortcut view.frame Home
+expect_shortcut ui.size_popup F
+expect_shortcut ui.strength_popup Shift+F / U
+expect_shortcut view.wireframe Shift+Z
+expect_shortcut ui.picker.material
+key home
+
+# --- Blender 4.2+ sculpt-mode brush letters (SculptForge's nearest brush) ---
+key s
+expect_value brush_type == 2
+key p
+expect_value brush_type == 7
+key i
+expect_value brush_type == 4
+key g
+expect_value brush_type == 3
+key shift+t
+expect_value brush_type == 6
+key c
+expect_value brush_type == 9
+key shift+c
+expect_value brush_type == 5
+key k
+expect_value brush_type == 10
+key v
+expect_value brush_type == 0
+# S is Smooth now, not the Draw Size pop-up; F is the radius, Shift+F the strength.
+mouse_move 0.5 0.5
+key f
+expect_text Draw Size
+key escape
+key shift+f
+expect_text Z Intensity
+key escape
+
+# --- Sculpting: a plain drag adds, Ctrl+drag subtracts, Alt+drag navigates instead of sculpting ---
+snapshot
+stroke 0.3 0.5 0.7 0.5
+expect_value moved_out > 0
+key ctrl+z
+snapshot
+hold ctrl
+stroke 0.3 0.5 0.7 0.5
+hold none
+expect_value moved_out < 0
+key ctrl+z
+snapshot
+remember camera_yaw y0
+hold alt
+stroke 0.3 0.5 0.7 0.5
+hold none
+expect_value moved == 0
+expect_value camera_yaw != $y0
+remember camera_pan p0
+hold alt+shift
+stroke 0.3 0.5 0.7 0.5
+hold none
+expect_value moved == 0
+expect_value camera_pan != $p0
+key home
+
+# --- The middle button: orbit, Shift pans, Ctrl zooms (up: in) ---
+remember camera_yaw y1
+button_drag middle 0.4 0.5 0.6 0.5
+expect_value camera_yaw != $y1
+expect_value camera_roll == 0
+remember camera_pan p1
+hold shift
+button_drag middle 0.4 0.5 0.6 0.5
+hold none
+expect_value camera_pan != $p1
+remember camera_distance d1
+hold ctrl
+button_drag middle 0.5 0.6 0.5 0.4
+hold none
+expect_value camera_distance < $d1
+remember camera_distance d2
+key numpadminus
+expect_value camera_distance > $d2
+key home
+
+# --- The numpad: axis views (orthographic until turned), 5, 9, . ---
+key numpad1
+expect_value camera_yaw == 0
+expect_value camera_pitch == 0
+expect_value camera_ortho == 1
+shot front-ortho
+key ctrl+numpad1
+expect_value camera_yaw == 180
+key ctrl+numpad3
+expect_value camera_yaw == -90
+key numpad7
+expect_value camera_pitch == -90
+expect_value camera_aligned == 1
+key ctrl+numpad7
+expect_value camera_pitch == 90
+key numpad1
+key numpad6
+expect_value camera_yaw > 14.99
+expect_value camera_yaw < 15.01
+expect_value camera_ortho == 0
+key numpad5
+expect_value camera_ortho == 1
+button_drag middle 0.4 0.5 0.45 0.5
+# Numpad 5 chose orthographic: turning keeps it.
+expect_value camera_ortho == 1
+key numpad5
+expect_value camera_ortho == 0
+key numpad1
+key numpad9
+expect_value camera_aligned == 1
+expect_value camera_ortho == 1
+key numpad.
+key home
+
+# --- M: the Mask brush (a drag masks, Ctrl+drag unmasks; M again goes back), Alt+M clears, Ctrl+I inverts ---
+key m
+expect_value mask_brush == 1
+stroke 0.2 0.5 0.8 0.5
+expect_value masked > 100
+remember masked m1
+shot mask-brush
+hold ctrl
+stroke 0.4 0.5 0.6 0.5
+hold none
+expect_value masked < $m1
+key m
+expect_value mask_brush == 0
+expect_value brush_type == 0
+key alt+m
+expect_value masked == 0
+key ctrl+i
+expect_value masked > 1000
+key alt+m
+# Picking another brush ends the Mask brush too.
+key m
+key s
+expect_value mask_brush == 0
+
+# --- H hides the polygroup under the cursor, Shift+H shows only it, Alt+H shows everything ---
+key v
+key m
+stroke 0.0 0.3 1.0 0.3
+key m
+key ctrl+w
+expect_value groups == 2
+mouse_move 0.5 0.3
+key h
+expect_value hidden > 0
+key alt+h
+expect_value hidden == 0
+mouse_move 0.5 0.3
+key shift+h
+expect_value hidden > 0
+mouse_move 0.5 0.3
+key shift+h
+expect_value hidden == 0
+
+# --- Alt+1 / Alt+2 step the subdivision levels; X swaps the colours; Shift+Z wireframe ---
+run subdiv_divide
+expect_value sdiv == 2
+key alt+1
+expect_value sdiv == 1
+key alt+2
+expect_value sdiv == 2
+remember paint_r r0
+key x
+expect_value paint_r != $r0
+key x
+expect_value wireframe == 0
+key shift+z
+expect_value wireframe == 1
+key shift+z
+
+# --- Emulate Numpad: the number row works as the numpad ---
+click "Preferences##palette.preferences"
+click "Emulate Numpad"
+key 3
+expect_value camera_yaw == 90
+key 7
+expect_value camera_pitch == -90
+click "Emulate Numpad"
+key 1
+expect_value camera_pitch == -90
+key home
+
+# --- Controls (F1): the style row, the import button and Blender's gestures ---
+key f1
+expect "Blender##input.style_blender"
+expect "Import Blender keymap...##input.import_blender"
+expect_text Front view
+click "Mouse & pen"
+expect_text Middle drag
+shot controls-blender
+# The style row in Controls switches too.
+click "ZBrush##input.style_zbrush"
+expect_value input_style == 0
+expect_text Alt + click it
+key f1
+
+# --- A keymap exported from Blender: read as text, its sculpt keys win over the 3D View's ---
+run blender_keymap_import path=$SCRIPT_DIR/../data/blender_keymap_export.py
+expect_status Blender keymap: 13 keys
+expect_value input_style == 2
+expect_shortcut brush.standard D
+expect_shortcut geometry.higher_res Alt+2
+expect_shortcut brush.claybuildup Shift+Q
+expect_shortcut ui.strength_popup Shift+R
+expect_shortcut view.ortho \
+expect_shortcut view.front Numpad 1
+expect_value shortcut_conflicts == 0
+key d
+expect_value brush_type == 0
+key shift+q
+expect_value brush_type == 9
+
+# --- Back to ZBrush: its keys and gestures are as they were (the imported keys stay until Restore Standard UI) ---
+click "Preferences##palette.preferences"
+click "Config##preferences.config"
+click "Restore Standard UI##config.restore_standard"
+expect_value shortcut_conflicts == 0
+expect_shortcut brush.standard V
+key f1
+click "ZBrush##input.style_zbrush"
+key f1
+expect_value input_style == 0
+expect_value shortcut_conflicts == 0
+expect_shortcut ui.size_popup S
+expect_shortcut view.frame F
+expect_shortcut brush.standard
+mouse_move 0.5 0.5
+key s
+expect_text Draw Size
+key escape
+key b
+key s
+key t
+snapshot
+hold alt
+stroke 0.3 0.5 0.7 0.5
+hold none
+expect_value moved_out < 0

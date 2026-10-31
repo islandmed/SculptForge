@@ -48,7 +48,7 @@ void App::beginMaskStroke(float x, float y) {
     lazyMouse_.reset(glm::vec2(x, y));
     // ZBrush: a Ctrl+click on the model blurs the mask (Ctrl+Alt+click sharpens it); only a drag paints. The
     // pen's eraser end set to Erase mask paints straight away.
-    maskClickPending_ = ctrlDown(inputMods());
+    maskClickPending_ = ctrlDown(inputMods()) && !blenderStyle(); // (Blender's Mask brush dabs on a click)
     maskClickX_ = x;
     maskClickY_ = y;
     if (!maskClickPending_) firstDab(x, y);
@@ -68,7 +68,7 @@ void App::maskCanvasMove(float x, float y) {
     if (std::hypot(x - maskCanvasX_, y - maskCanvasY_) < kMaskDragThresholdPx) return;
     maskCanvasMoved_ = true;
     if (anyMasked(doc_.mesh)) runCommand("mask_clear");
-    else if (!zbrushStyle()) drag_ = Drag::Zoom;
+    else if (uiPrefs_.inputStyle == 1) drag_ = Drag::Zoom;
 }
 
 void App::maskCanvasRelease() {

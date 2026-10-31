@@ -8,7 +8,8 @@
 //
 //   click LABEL / double_click LABEL / right_click LABEL / hover LABEL
 //   type LABEL TEXT          click a text field and type into it
-//   key COMBO                e.g. enter, escape, ctrl+z, ctrl+shift+z, 3, comma, backtick, tab, f3, space, minus
+//   key COMBO                e.g. enter, escape, ctrl+z, ctrl+shift+z, 3, comma, backtick, tab, f3, space, minus,
+//                            home, numpad1, ctrl+numpad7, numpad., numpadplus
 //   hold MODS                ctrl / shift / alt / ctrl+shift ... or none (for strokes and drags)
 //   stroke U0 V0 U1 V1 [S]   brush stroke across the model (fractions of its on-screen bounds)
 //   drag X0 Y0 X1 Y1 [S] [release]  left-drag in window fractions (rectangle hide, sliders...); release:
@@ -26,6 +27,8 @@
 //   gizmo_hover HANDLE       move the mouse onto a Gizmo 3D handle (it lights up, for screenshots)
 //   drag_landmark N DX DY [S] left-drag Make sculptable's face landmark N (0-7, FaceLandmarks order) by DX DY pixels
 //   orbit DX DY              right-drag on the background, in pixels (with the held modifiers)
+//   button_drag middle|right X0 Y0 X1 Y1 [S]  drag with that button in window fractions (with the held modifiers)
+//   expect_shortcut ACTION KEYS  the action's effective keys, e.g. expect_shortcut view.front Numpad 1
 //   camera YAW PITCH         set the view's angles in degrees (0 0 = the front view), e.g. for guide screenshots
 //   zoom FACTOR / look X Y Z  move the camera FACTOR times closer / turn it about (and look at) the point X Y Z
 //   run COMMANDS             sculptforge-cli commands, e.g. run new_sphere subdivisions=4 ($SCRIPT_DIR: the script's folder)
@@ -80,7 +83,9 @@
 //                            last_stroke_dabs (dabs of the last finished stroke), stroke_type (0 Dots, 1 DragRect,
 //                            2 DragDot, 3 Spray, 4 LazyMouse), vdms (VDM brush maps), vdm_files (.sfvdm in the library)
 //                            z_intensity, smooth_intensity, rgb_intensity (0-100), focal_shift (-100..100), draw_size,
-//                            quickmenu_open, lazy_mouse, input_style (0 ZBrush, 1 SculptForge), brush_type (BrushType
+//                            quickmenu_open, lazy_mouse, input_style (0 ZBrush, 1 SculptForge, 2 Blender), turntable,
+//                            camera_ortho, mask_brush (Blender's Mask brush on), shortcut_conflicts (keys two actions
+//                            claim), brush_type (BrushType
 //                            index, -1 for a custom brush or Paint), last_dab_x / last_dab_y (window pixels), paint_r
 //                            gizmo_mode (0 Draw, 1 Move, 2 Scale, 3 Rotate), gizmo_hover (handle under the cursor,
 //                            0 = none, in gizmo_drag's order from 1), gizmo_falloff, pivot_x / pivot_y / pivot_z,
@@ -323,6 +328,19 @@ double Demo::query(const std::string& name, bool& known) const {
         return -1.0; // no such layer
     }
     if (name == "input_style") return double(app_.uiPrefs_.inputStyle);
+    if (name == "turntable") return app_.uiPrefs_.turntable ? 1.0 : 0.0;
+    if (name == "camera_ortho") return app_.camera_.ortho ? 1.0 : 0.0;
+    if (name == "mask_brush") return app_.maskBrushActive() ? 1.0 : 0.0;
+    if (name == "shortcut_conflicts") { // keys that two actions claim (only the first would ever run)
+        int conflicts = 0;
+        std::vector<Chord> seen;
+        for (const Action& a : app_.actions_.all())
+            for (const Chord& c : parseChords(app_.actions_.shortcutText(a.id))) {
+                if (std::find(seen.begin(), seen.end(), c) != seen.end()) ++conflicts;
+                else seen.push_back(c);
+            }
+        return conflicts;
+    }
     if (name == "mask_shape") return double(int(app_.maskShape_)); // 0 MaskPen, 1 MaskLasso, 2 MaskRect
     if (name == "hide_shape") return double(int(app_.hideShape_)); // 1 SelectLasso, 2 SelectRect
     if (name.rfind("phone_", 0) == 0) {
@@ -525,6 +543,10 @@ void Demo::testKey(int line, const std::string& combo) {
     else if (lower == "f3") keyName = "F3";
     else if (lower == "space") keyName = "Space";
     else if (lower == "minus") keyName = "-";
+    else if (lower.rfind("numpad", 0) == 0) { // numpad1 .. numpad0, numpad., numpadplus, numpadminus
+        const std::string k = lower.substr(6);
+        keyName = "Keypad " + (k == "plus" ? std::string("+") : k == "minus" ? std::string("-") : k);
+    }
     const SDL_Keycode key = SDL_GetKeyFromName(keyName.c_str());
     if (key == SDLK_UNKNOWN) {
         run([this, line, keyName] { fail(line, "unknown key \"" + keyName + "\""); });
@@ -704,6 +726,43 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return false;
         });
         wait(0.1f);
+    } else if (verb == "button_drag") { // button_drag middle|right X0 Y0 X1 Y1 [S]: navigation drags
+        if (!need(5)) return false;
+        const int button = w[1] == "middle" ? SDL_BUTTON_MIDDLE : w[1] == "right" ? SDL_BUTTON_RIGHT : 0;
+        if (!button) {
+            error = "button_drag needs middle or right";
+            return false;
+        }
+        const float x0 = num(2, 0), y0 = num(3, 0), x1 = num(4, 0), y1 = num(5, 0), seconds = num(6, 0.4f);
+        auto down = std::make_shared<bool>(false);
+        steps_.push_back([this, button, down, x0, y0, x1, y1, seconds](float t) {
+            int ww = 0, wh = 0;
+            SDL_GetWindowSize(app_.window_, &ww, &wh);
+            const ImVec2 a(x0 * float(ww), y0 * float(wh)), b(x1 * float(ww), y1 * float(wh));
+            if (t == 0.0f) {
+                mouseMotion(a.x, a.y);
+                return false;
+            }
+            if (!*down) {
+                SDL_SetModState(held_);
+                mouseButton(true, button);
+                *down = true;
+            }
+            const float u = std::min(t / seconds, 1.0f);
+            mouseMotion(a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u);
+            if (t < seconds) return false;
+            mouseButton(false, button);
+            return true;
+        });
+        wait(0.1f);
+    } else if (verb == "expect_shortcut") { // expect_shortcut ACTION KEYS: the action's keys (none: no key)
+        if (!need(1)) return false;
+        const std::string id = w[1], want = restOf(lineText_, 2);
+        run([this, line, id, want] {
+            std::string got = app_.actions_.shortcutText(id);
+            if (!app_.actions_.find(id)) fail(line, "no action " + id);
+            else if (got != want) fail(line, id + " has \"" + got + "\", expected \"" + want + "\"");
+        });
     } else if (verb == "drag_landmark") {
         if (!need(3)) return false;
         const int index = int(num(1, 0));

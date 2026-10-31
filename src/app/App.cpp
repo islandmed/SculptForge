@@ -693,6 +693,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         if (eraserAction() == PenAction::EraseMask && previewLod_ < 0 && pick(x, y, hit)) beginMaskStroke(x, y);
         return;
     }
+    if (blenderStyle() && blenderNavigationDown(button)) return; // middle / Alt+left / right drags navigate
     if (button == SDL_BUTTON_LEFT) {
         if (polygroupMouseDown(x, y, mod)) return;
         if (maskSelectMouseDown(x, y, mod)) return;
@@ -703,7 +704,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         // Alt+click on another SubTool selects it (ZBrush); Alt+drag stays an inverted stroke or a pan.
         // Shift+Alt+click selects and frames it (ZBrush), the active one too.
         const bool frameClick = (mod & SDL_KMOD_ALT) && (mod & SDL_KMOD_SHIFT) && !ctrlDown(mod);
-        if ((mod & SDL_KMOD_ALT) && !ctrlDown(mod) && (frameClick || !(mod & SDL_KMOD_SHIFT)) &&
+        if (!blenderStyle() && (mod & SDL_KMOD_ALT) && !ctrlDown(mod) && (frameClick || !(mod & SDL_KMOD_SHIFT)) &&
             (doc_.subtoolCount() > 1 || frameClick)) {
             const int target = pickSubtool(x, y);
             subtoolClickFrame_ = frameClick;
@@ -720,6 +721,10 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         if (previewLod_ < 0 && pick(x, y, hit)) {
             if (maskMod) beginMaskStroke(x, y);
             else beginStroke(x, y, hit);
+        } else if (blenderStyle()) {
+            // Blender: a drag beside the model navigates as the middle button would (Shift pans, Ctrl zooms).
+            const SDL_Keymod keys = SDL_GetModState();
+            drag_ = (keys & SDL_KMOD_SHIFT) ? Drag::Pan : ctrlDown(keys) ? Drag::Zoom : Drag::Orbit;
         } else if (maskMod && !(mod & SDL_KMOD_ALT) && previewLod_ < 0) {
             drag_ = Drag::MaskCanvas; // click inverts, drag clears (or zooms without a mask)
             maskCanvasX_ = x;
@@ -741,6 +746,16 @@ void App::onMouseDown(float x, float y, Uint8 button) {
     } else if (button == SDL_BUTTON_MIDDLE) {
         drag_ = (mod & SDL_KMOD_CTRL) ? Drag::Zoom : Drag::Pan;
     }
+}
+
+// Blender: middle-drag orbits, Shift+middle pans, Ctrl+middle zooms; Alt+left-drag is the emulated middle button
+// (pens, trackpads); the right button drags the same way. True when the press started navigating.
+bool App::blenderNavigationDown(Uint8 button) {
+    const SDL_Keymod keys = SDL_GetModState(); // the keyboard itself: blenderMods turns Ctrl into the invert
+    const bool emulated = button == SDL_BUTTON_LEFT && (keys & SDL_KMOD_ALT);
+    if (button != SDL_BUTTON_MIDDLE && button != SDL_BUTTON_RIGHT && !emulated) return false;
+    drag_ = (keys & SDL_KMOD_SHIFT) ? Drag::Pan : ctrlDown(keys) ? Drag::Zoom : Drag::Orbit;
+    return true;
 }
 
 void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
@@ -776,7 +791,7 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     case Drag::Orbit: orbitBy(dx, dy); break;
     case Drag::Roll: rollBy(x, y, dx, dy); break;
     case Drag::Pan: camera_.pan(dx, dy, canvasHeight()); break;
-    // ZBrush: dragging up (forward) zooms out, every zoom drag; the SculptForge style zooms in.
+    // ZBrush: dragging up (forward) zooms out, every zoom drag; the SculptForge and Blender styles zoom in.
     case Drag::Zoom: camera_.zoom((zbrushStyle() ? dy : -dy) * 0.05f); break;
     case Drag::MaskCanvas: maskCanvasMove(x, y); break;
     case Drag::SubToolClick: subtoolClickMove(x, y); break;
@@ -789,6 +804,10 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
 }
 
 void App::orbitBy(float dx, float dy) {
+    if (autoOrtho_) { // an axis view turned: back to perspective (Blender's Auto Perspective)
+        camera_.ortho = false;
+        autoOrtho_ = false;
+    }
     if (!orbitStarted_) {
         orbitRaw_ = camera_;
         orbitStarted_ = true;
@@ -836,6 +855,10 @@ void App::onMouseUp() {
 void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
     if (captureShortcutKey(key, mod)) return; // Ctrl+Alt+click a button, then press its new key
     if (lightBoxKey(key, mod)) return;        // , LightBox, B / M pickers, S / I pop-ups (LightBox.cpp)
+    // Blender's Emulate Numpad: the number row works as the numpad, unless the key itself has an action.
+    if (blenderStyle() && uiPrefs_.emulateNumpad && key >= SDLK_0 && key <= SDLK_9 &&
+        !actions_.actionForChord(chordFromEvent(key, mod)))
+        key = key == SDLK_0 ? SDLK_KP_0 : SDL_Keycode(SDLK_KP_1 + (key - SDLK_1));
     actions_.handleKey(key, mod);             // the shortcut map: Config.cpp initActions()
 }
 
