@@ -39,6 +39,12 @@ All notable changes to SculptForge are listed here. The format follows
   Windows). It now opens with its knob (the current value) right under the brush cursor, at any UI scale and
   with a pen, and stays open while you drag until you let go, click elsewhere or press Esc.
 - B, M, S and the LightBox key followed the built-in key even after you gave the action another one.
+- SculptForge kept the graphics card and a little of the processor busy while it sat idle (#14): it drew a new
+  frame 60 or more times a second whatever happened. It now draws only when something changes: your input,
+  a stroke or view move, a background job (progress bars, splat training, the update check), a message from the
+  phone or the Blender Bridge, or an animation. Idle, it draws nothing (measured: 120 frames a second and 8% of
+  a processor core before, 0 frames and 0.1% after). UI tests and `--record` still draw every frame.
+  `sculptforge --measure-idle 5` prints the idle frame rate; `SF_CONTINUOUS_REDRAW=1` draws every frame as before.
 
 ## [0.9.4] - 2026-10-29
 
