@@ -153,13 +153,31 @@ Mesh extractShell(const Mesh& mesh, const ExtractOptions& o, std::string& error)
         // The inner surface faces the other way; the rim joins the two along the patch's edge, one quad per edge.
         for (const glm::uvec3& c : tris) out.triangles.push_back(glm::uvec3(c.x + np, c.z + np, c.y + np));
         out.polygroups.resize(out.triangles.size(), 2u);
+        // TCorne: where the edge turns sharply (over 50 degrees) the rim keeps triangles; TBorder: all along it.
+        std::vector<uint8_t> corner(o.triangleCorners && !o.triangleBorder ? np : 0, 0);
+        if (!corner.empty()) {
+            std::vector<uint32_t> next(np, kNone), prev(np, kNone);
+            std::vector<uint8_t> uses(np, 0);
+            for (const auto& [u, v] : boundary) {
+                next[u] = v;
+                prev[v] = u;
+                ++uses[u];
+            }
+            const float cosLimit = std::cos(glm::radians(50.0f));
+            for (uint32_t v = 0; v < np; ++v) {
+                if (next[v] == kNone || prev[v] == kNone) continue;
+                const glm::vec3 a = p[v] - p[prev[v]], b = p[next[v]] - p[v];
+                const float la = glm::length(a), lb = glm::length(b);
+                corner[v] = uses[v] > 1 || (la > 0.0f && lb > 0.0f && glm::dot(a, b) < cosLimit * la * lb);
+            }
+        }
         for (const auto& [u, v] : boundary) {
             const uint32_t first = uint32_t(out.triangles.size());
             out.triangles.push_back(glm::uvec3(v, u, u + np));
             out.triangles.push_back(glm::uvec3(v, u + np, v + np));
             out.polygroups.push_back(3u);
             out.polygroups.push_back(3u);
-            out.pairQuad(first, first + 1);
+            if (!o.triangleBorder && (corner.empty() || (!corner[u] && !corner[v]))) out.pairQuad(first, first + 1);
         }
     }
     // Quads of the source stay quads on both surfaces.
@@ -402,6 +420,8 @@ CommandResult runExtract(Document& doc, const Args& a) {
     o.thickness = std::clamp(float(argNumber(a, "thickness", o.thickness)), -1.0f, 1.0f);
     o.smooth = std::clamp(int(std::lround(argNumber(a, "smooth", o.smooth))), 0, 50);
     o.doubleSided = argBool(a, "double", false);
+    o.triangleCorners = argBool(a, "tcorne", false);
+    o.triangleBorder = argBool(a, "tborder", false);
     std::string error;
     Mesh shell = extractShell(doc.mesh, o, error);
     if (shell.triangleCount() == 0) {
@@ -437,6 +457,8 @@ void registerExtractMirrorCommands(CommandRegistry& reg) {
                false},
               {"smooth", T::Number, "E Smt: smoothing passes along the extracted edge (0-50, default 5).", false},
               {"double", T::Bool, "Double: grow the shell both inward and outward (default false).", false},
+              {"tcorne", T::Bool, "TCorne: triangles instead of quads in the rim's sharp corners (default false).", false},
+              {"tborder", T::Bool, "TBorder: the whole rim is triangles instead of quads (default false).", false},
               {"accept", T::Bool, "Accept at once instead of leaving a preview (default false).", false}},
              runExtract});
     reg.add({"extract_accept", "Keep the Extract preview as a new SubTool (undo removes it again).", {},

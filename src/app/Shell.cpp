@@ -377,6 +377,17 @@ void App::registerShellActions() {
          "clearly (as in ZBrush). SubTools set to Smooth or Flat keep their own. A preference: Store Config keeps it.",
          "Material", "", "", [this] { runCommand("set_shading", {{"mode", std::string("flat")}}); },
          [this] { return renderSettings_.flatShading; }, nullptr});
+    // The view's background (#21; Preferences > Display, Render palette).
+    add({"view.background_gradient", "Gradient", nullptr,
+         "The view's background is the charcoal radial gradient (the default).", "Preferences > Display", "",
+         "set_background", [this] { runCommand("set_background", {{"mode", std::string("gradient")}}); },
+         [this] { return renderSettings_.gradientBackground; }, nullptr});
+    add({"view.background_flat", "Flat Colour", nullptr,
+         "The view's background is one solid colour (pick it below), without the gradient. A preference: Store "
+         "Config keeps it; projects keep their own.",
+         "Preferences > Display", "", "set_background",
+         [this] { runCommand("set_background", {{"mode", std::string("flat")}}); },
+         [this] { return !renderSettings_.gradientBackground; }, nullptr});
     auto subtoolShading = [this, &add](const char* id, const char* label, Shading mode, const char* description) {
         add({id, label, nullptr, description, "Material > This SubTool", "", "subtool_shading",
              [this, mode] { runCommand("subtool_shading", {{"mode", std::string(shadingName(mode))}}); },

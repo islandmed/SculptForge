@@ -5,7 +5,8 @@
 //  - Extract (Tool > SubTool > Extract): the masked part of a SubTool becomes a new SubTool, a shell with a
 //    thickness (a helmet, a strap, a piece of clothing). Extract shows it as a preview; Accept keeps it as an
 //    undoable step. Thick is a fraction of the SubTool's size (negative = inward), E Smt smooths the jagged edge
-//    the mask's triangles leave, Double grows the shell both ways; Thick 0 gives a single-sided surface.
+//    the mask's triangles leave, Double grows the shell both ways; Thick 0 gives a single-sided surface. The rim
+//    is quads, except at sharp corners with TCorne and all along it with TBorder.
 //  - Mirror And Weld (Tool > Geometry > Modify Topology): the half on the + side of a plane through the origin
 //    is kept and mirrored onto the - side, and the seam welded into one watertight mesh. Triangles crossing the
 //    plane are cut on it; polygroups, polypaint, mask, UVs and sculpt layers are carried over.
@@ -24,6 +25,8 @@ struct ExtractOptions {
     float thickness = 0.015f; // fraction of the SubTool's largest side; < 0 grows inward, 0 = a single surface
     int smooth = 5;           // E Smt: smoothing passes along the edge of the extracted part (0-50)
     bool doubleSided = false; // Double: the shell grows both ways from the surface by the thickness
+    bool triangleCorners = false; // TCorne: the rim keeps triangles (not quads) where the edge turns sharply
+    bool triangleBorder = false;  // TBorder: the whole rim is triangles
     float threshold = 0.5f;   // a triangle is extracted when its corners' mean mask reaches this
 };
 

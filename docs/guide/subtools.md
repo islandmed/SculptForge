@@ -119,13 +119,15 @@ top of a head, a strap, a sleeve, a piece of armour that fits the surface exactl
 
 1. Mask the part (hold <kbd>Ctrl</kbd> and paint, or use **MaskRect** / **MaskLasso**; see [Masking](masking.md)).
 2. Click **Extract**. The shell appears as a preview, a SubTool just below the active one.
-3. Change **Thick**, **E Smt** or **Double** and the preview follows. Click **Accept** to keep it.
+3. Change **Thick**, **E Smt**, **Double**, **TCorne** or **TBorder** and the preview follows. Click **Accept** to keep it.
 
 | Setting | What it does |
 |---|---|
 | **Thick** | The shell's thickness as a share of the SubTool's size: 0.015 (the default) is 1.5%. Negative grows it inward; 0 makes a single-sided surface |
 | **E Smt** | Smooths the extracted edge, which otherwise follows the mask's triangles in steps. 0 keeps it as masked |
 | **Double** | Grows the shell both inward and outward from the surface |
+| **TCorne** | Triangles instead of quads in the rim where the edge turns sharply (over 50 degrees), so tight corners don't get twisted quads |
+| **TBorder** | The whole rim is triangles instead of quads |
 
 ![A cap extracted from the masked top of a sphere, shown with its polygroups: outer, inner and rim](images/extract.jpg)
 
@@ -135,8 +137,7 @@ Accept is one undo step: <kbd>Ctrl</kbd>+<kbd>Z</kbd> on the source SubTool take
 and redo brings it back. A preview you don't accept goes away as soon as you change the source SubTool or pick
 another one, and it is never saved.
 
-> **ZBrush:** the same Extract, E Smt, Thick, Double and Accept. ZBrush's TCorne and TBorder options are not
-> there yet.
+> **ZBrush:** the same Extract, E Smt, Thick, Double, TCorne, TBorder and Accept.
 
 ## Delete a SubTool
 
@@ -177,7 +178,7 @@ used.
 | `subtool_move direction=up` | Move a SubTool up or down the list |
 | `subtool_merge_down` / `subtool_merge_visible` | Merge |
 | `subtool_split_groups` / `subtool_split_parts` | Split |
-| `extract thickness=0.02 smooth=5 double=false` | Preview an Extract shell from the mask; `accept=true` keeps it at once |
+| `extract thickness=0.02 smooth=5 double=false` | Preview an Extract shell from the mask; `tcorne` / `tborder` for a triangle rim; `accept=true` keeps it at once |
 | `extract_accept` / `extract_cancel` | Keep or remove the Extract preview |
 
 ```text

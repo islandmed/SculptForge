@@ -414,6 +414,10 @@ void App::drawPalette_Preferences() {
         tray::Section section;
         config::drawHotkeysSection(*this);
     }
+    if (subpalette("preferences.display", "Display")) {
+        tray::Section section;
+        drawBackgroundControls("prefs");
+    }
     if (subpalette("preferences.lightbox", "LightBox")) {
         tray::Section section;
         config::drawLightBoxSection(*this);
@@ -456,6 +460,7 @@ void App::drawPalette_Render() {
     ImGui::Checkbox("Show Splats", &renderSettings_.showSplats);
     ImGui::EndDisabled();
     ui::HelpAction(*this, "view.splats");
+    drawBackgroundControls("render");
     actionRow(*this, {"view.frame", "view.fullscreen"});
 }
 

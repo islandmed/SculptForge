@@ -51,7 +51,8 @@
 //                            hold alt to select it); U V: fractions of its on-screen bounds
 //   expect_value NAME OP N   triangles, vertices, layers, brushes, masked, hidden, groups, colored,
 //                            can_undo, dirty, splats, show_polygroups, show_mask, show_mesh, wireframe,
-//                            flat_shading (the scene's: 1 Flat), subtool_shading (0 Scene, 1 Smooth, 2 Flat),
+//                            flat_shading (the scene's: 1 Flat), gradient_background (1 Gradient, 0 Flat Colour),
+//                            background_r / background_g / background_b (the flat colour, 0-255), subtool_shading (0 Scene, 1 Smooth, 2 Flat),
 //                            custom_matcaps (MatCaps loaded from images), material_custom (1 when the view uses
 //                            one), matcap_files (images in the library's MatCaps folder),
 //                            subtools (count), active_subtool (index, 0 = top), visible_subtools,
@@ -463,6 +464,9 @@ double Demo::query(const std::string& name, bool& known) const {
         return double(n);
     }
     if (name == "flat_shading") return app_.renderSettings_.flatShading ? 1.0 : 0.0;
+    if (name == "gradient_background") return app_.renderSettings_.gradientBackground ? 1.0 : 0.0;
+    if (name == "background_r" || name == "background_g" || name == "background_b") // 0-255, display values
+        return std::round(app_.renderSettings_.backgroundColor[name.back() == 'r' ? 0 : name.back() == 'g' ? 1 : 2] * 255.0f);
     if (name == "subtool_shading") return double(int(app_.doc_.activeSubtoolInfo().shading));
     if (name == "shelves") return app_.layout_.shelvesVisible ? 1.0 : 0.0;
     if (name == "left_tray") return app_.layout_.leftTrayOpen ? double(app_.layout_.leftTray.size()) : -1.0;

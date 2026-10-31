@@ -226,6 +226,8 @@ void App::storeProjectSettings() {
     render.set("show_splats", renderSettings_.showSplats);
     render.set("splat_opacity", double(renderSettings_.splatOpacity));
     render.set("flat_shading", renderSettings_.flatShading);
+    render.set("background", std::string(renderSettings_.gradientBackground ? "gradient" : "flat"));
+    render.set("background_color", vec3Json(renderSettings_.backgroundColor));
     render.set("matcap", renderSettings_.matcap < 0 ? std::string() : std::string(matcapName(renderSettings_.matcap)));
     // A custom MatCap travels inside the project (a PNG attachment), so the project opens with it on any machine.
     for (auto it = doc_.projectFiles.begin(); it != doc_.projectFiles.end();)
@@ -297,6 +299,12 @@ void App::applyProjectSettings() {
         readFloat(r, "splat_opacity", renderSettings_.splatOpacity);
         // Projects from before the setting: the preferred shading.
         renderSettings_.flatShading = r["flat_shading"].asBool(uiPrefs_.flatShading);
+        // The background (#21); projects from before it: the preferred one.
+        renderSettings_.gradientBackground =
+            r["background"].isString() ? r["background"].asString() != "flat" : uiPrefs_.gradientBackground;
+        renderSettings_.backgroundColor = uiPrefs_.backgroundColor;
+        readVec3(r["background_color"], renderSettings_.backgroundColor);
+        renderSettings_.backgroundColor = glm::clamp(renderSettings_.backgroundColor, 0.0f, 1.0f);
         // Unknown, empty or missing (projects from before MatCaps): studio lighting, as they were saved.
         renderSettings_.matcap = -1;
         const std::string name = r["matcap"].isString() ? r["matcap"].asString() : std::string();

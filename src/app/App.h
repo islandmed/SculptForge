@@ -456,6 +456,9 @@ private:
     std::set<std::string> hiddenMatcapFiles_; // removed MatCaps whose file couldn't go to the trash
     int materialListFrame_ = -10;
     void setFlatShading(bool flat); // the scene's shading, and the preference for the next session
+    // The view's background (#21): gradient or a flat display colour; also the preference for the next session.
+    void setBackground(bool gradient, const glm::vec3& color);
+    void drawBackgroundControls(const char* idSuffix); // Preferences > Display and the Render palette
     void drawShadingControls();     // Material palette and Tool > Display: Smooth | Flat, and the SubTool's own
     void paintAt(const DabParams& p);
     void pickColorUnderCursor();
@@ -877,6 +880,8 @@ private:
     float extractThick_ = 0.015f;          // Thick: fraction of the SubTool's size
     int extractSmooth_ = 5;                // E Smt
     bool extractDouble_ = false;           // Double
+    bool extractTCorne_ = false;           // TCorne
+    bool extractTBorder_ = false;          // TBorder
     bool mirrorWeldAxes_[3] = {true, false, false}; // Mirror And Weld's X Y Z
     bool mirrorAxes_[3] = {true, false, false};     // Deformation > Mirror's X Y Z
     void pollAlphaFile();

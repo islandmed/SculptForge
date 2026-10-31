@@ -43,6 +43,9 @@ struct UiPrefs {
     // true = one detail size for the whole mesh.
     bool dyntopoConstantDetail = false;
     bool flatShading = false; // Material palette: the scene's shading at startup (false = Smooth, the default)
+    // Preferences > Display: the view's background (#21), a gradient or a flat display (sRGB) colour.
+    bool gradientBackground = true;
+    glm::vec3 backgroundColor{0.165f, 0.165f, 0.173f};
 };
 
 Json toJson(const UiPrefs& prefs);

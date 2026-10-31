@@ -20,7 +20,11 @@ std::string App::axesText(const bool axes[3]) {
 }
 
 void App::runExtract() {
-    runCommand("extract", {{"thickness", double(extractThick_)}, {"smooth", double(extractSmooth_)}, {"double", extractDouble_}});
+    runCommand("extract", {{"thickness", double(extractThick_)},
+                           {"smooth", double(extractSmooth_)},
+                           {"double", extractDouble_},
+                           {"tcorne", extractTCorne_},
+                           {"tborder", extractTBorder_}});
 }
 
 void App::drawExtractContents() {
@@ -51,6 +55,8 @@ void App::drawExtractContents() {
                  "Tool > SubTool > Extract");
     ui::ActionButton(*this, "subtool.extract_double", ImVec2(half, 0));
     ui::HelpAction(*this, "subtool.extract_double");
+    ImGui::SameLine();
+    ui::Segmented(*this, {"subtool.extract_tcorne", "subtool.extract_tborder"}, -1.0f);
     if (changed && doc_.extractPreviewCurrent()) runExtract();
     Demo::popScope();
 }

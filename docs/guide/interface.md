@@ -63,8 +63,8 @@ Interface > Palettes strictly A-Z (ZBrush order)**.
 | **Draw** | Draw Size, Z Intensity, RGB Intensity, Focal Shift, Sculpt/Paint, Zadd/Zsub, Rgb, Front, and the tablet options (Pressure > strength, Pressure > size) with a pen readout |
 | **Generate** | Generate 3D (image or text to 3D), Relief, Inflate and Stamp from an image, and the AI brush provider settings |
 | **Material** | The MatCap materials (Soft Clay, the default, first), your own (**Load MatCap...**) and Studio, Base colour, Smooth / Flat shading for the scene and the active SubTool |
-| **Preferences** | Config, Interface, Input, Hotkeys, LightBox, Tablet, Performance, Updates and Autosave sub-palettes (see [Customizing the interface](#customizing-the-interface)) |
-| **Render** | Wireframe, Show Mesh, Show Polypaint, Show Mask, Show Polygroups, Show Splats, Frame, Fullscreen |
+| **Preferences** | Config, Interface, Input, Hotkeys, Display, LightBox, Tablet, Performance, Updates and Autosave sub-palettes (see [Customizing the interface](#customizing-the-interface)) |
+| **Render** | Wireframe, Show Mesh, Show Polypaint, Show Mask, Show Polygroups, Show Splats, Background, Frame, Fullscreen |
 | **Script** | Console, Run script file, Copy session as script, Clear console |
 | **Splats** | Gaussian splat tools: show, flip, turn, fit, clean floaters, Make sculptable, sculpt to splats, save, clear |
 | **Stroke** | The stroke types (Dots, DragRect, Spray, LazyMouse) and their settings |
@@ -439,6 +439,17 @@ the numpad views and Blender's sculpt-mode keys (see [Blender keys](shortcuts.md
 style, **Emulate Numpad** makes the number row work as the numpad, and **Import Blender keymap...** takes the keys
 from a keymap you exported in Blender. **Rotation** chooses free rotation (ZBrush) or a turntable. See
 [Coming from ZBrush](coming-from-zbrush.md).
+
+### The background
+
+**Preferences > Display** (and the **Render** palette) sets the view's **Background**: **Gradient**, the
+charcoal radial gradient (the default), or **Flat Colour**, one solid colour without the gradient. Click the
+**Background colour** swatch to pick the colour; picking one switches to Flat Colour. **Store Config** keeps the
+choice for the next session, and each project keeps the background it was saved with. From a script:
+`set_background mode=flat`, `set_background color=60,70,80` or `set_background mode=gradient`.
+
+> **ZBrush:** like turning the gradient off in the Document palette (**Range** 0) and choosing the **Back**
+> colour.
 
 **Preferences > LightBox** has **Show at startup** (on by default), the number of **Rows**, **Placement**
 (along the top of the canvas, or at the bottom above the bottom shelf) and the **Library folder**.

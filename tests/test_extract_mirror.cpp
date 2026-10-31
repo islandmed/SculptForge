@@ -250,3 +250,31 @@ TEST(mirror_flip) {
     CHECK(std::abs(doc.mesh.bounds().min.x - before.min.x) < 1e-6f);
     CHECK(!reg.execute(doc, "mirror", {{"pivot", std::string("somewhere")}}).ok);
 }
+
+TEST(extract_tcorne_tborder) {
+    // The top face of a cube: a square edge with four sharp corners. The rim is quads, without the corners'
+    // with TCorne, and triangles all along with TBorder.
+    Mesh cube = makeCube(4, 2.0f);
+    cube.ensureMask();
+    for (uint32_t v = 0; v < cube.vertexCount(); ++v) cube.mask[v] = cube.positions[v].y > 0.99f ? 1.0f : 0.0f;
+    auto rimQuads = [](const Mesh& m) {
+        size_t n = 0;
+        for (uint32_t t = 0; t < m.triangleCount(); ++t)
+            n += m.polygroupAt(t) == 3 && m.quadPartnerAt(t) != Mesh::kNoQuad;
+        return n / 2;
+    };
+    std::string error;
+    ExtractOptions o;
+    o.smooth = 0;
+    o.threshold = 1.0f; // only triangles with every corner masked: the top face exactly
+    const Mesh plain = extractShell(cube, o, error);
+    CHECK(watertight(plain));
+    CHECK(rimQuads(plain) == 16); // 4 edges of 4 segments
+    o.triangleCorners = true;
+    const Mesh corners = extractShell(cube, o, error);
+    CHECK(watertight(corners) && rimQuads(corners) == 8); // each corner takes the quad on both sides of it
+    o.triangleBorder = true;
+    const Mesh border = extractShell(cube, o, error);
+    CHECK(watertight(border) && rimQuads(border) == 0);
+    CHECK(border.triangleCount() == plain.triangleCount());
+}
