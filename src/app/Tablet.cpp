@@ -31,11 +31,30 @@ constexpr const char* kButtonNames[kPenButtons] = {"Lower button", "Upper button
 } // namespace
 
 // SDL also turns pen side buttons into mouse clicks, but which button depends on the SDL version
-// (3.2: middle / right and only while touching; 3.4: right / middle, also while hovering).
+// (3.2.10: middle / right and only while touching; 3.2.12 and later: right / middle, also while hovering).
 // The mapping in Preferences > Tablet decides instead (see penButton).
 bool App::dropPenMouseEvent(const SDL_Event& e) const {
     return (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN || e.type == SDL_EVENT_MOUSE_BUTTON_UP) &&
            e.button.which == SDL_PEN_MOUSEID && e.button.button != SDL_BUTTON_LEFT;
+}
+
+// Windows Ink and some tablet drivers (Ugee on X11, #7) send mouse events of their own beside the pen's, often at an
+// old position (where the pen last touched). Following those made the brush ring flick between two places, the view
+// shake, and the UI see the cursor jump: a click landed somewhere else, a drag on the Move button threw the model
+// off the canvas (#13). So while the pen is in range (heard from in the last second) only the pen moves the cursor,
+// for the canvas and the UI alike.
+bool App::strayMouseMotion(const SDL_Event& e) const {
+    if (e.type != SDL_EVENT_MOUSE_MOTION || e.motion.which == SDL_PEN_MOUSEID) return false;
+    if (dragFromPen_ && drag_ != Drag::None) return true;
+    return penInProximity_ && SDL_GetTicksNS() - lastPenNs_ < 1000000000ull;
+}
+
+// ImGui's SDL backend also reads the system cursor every frame while no button is held (the cursor minus the window
+// position, on Windows, macOS and X11). With a pen that cursor can be stale or elsewhere, so ImGui's mouse would
+// jump between it and the pen each frame: put it back on the pen.
+void App::keepImGuiOnPen() {
+    if (!penInProximity_ || SDL_GetTicksNS() - lastPenNs_ >= 1000000000ull) return;
+    ImGui::GetIO().AddMousePosEvent(mouseX_, mouseY_);
 }
 
 void App::handlePenEvent(const SDL_Event& e) {

@@ -353,6 +353,7 @@ int App::runUiTest(int w, int h, int fps) {
         Demo::beginFrame();
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
+        keepImGuiOnPen();
         ImGuiIO& io = ImGui::GetIO();
         io.DisplaySize = ImVec2(float(w), float(h));
         io.DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
@@ -512,6 +513,7 @@ int App::runRecording() {
         Demo::beginFrame();
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
+        keepImGuiOnPen();
         ImGuiIO& io = ImGui::GetIO();
         io.DisplaySize = ImVec2(float(w), float(h));
         io.DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
@@ -589,6 +591,7 @@ int App::run() {
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
+        keepImGuiOnPen();
         ImGui::NewFrame();
         drawUi();
         ImGui::Render();
@@ -614,6 +617,7 @@ int App::run() {
 
 void App::handleEvent(const SDL_Event& e) {
     if (dropPenMouseEvent(e)) return; // pen side buttons are mapped in Tablet.cpp, not left to SDL
+    if (strayMouseMotion(e)) return;  // neither the canvas nor the UI follows a driver's stray mouse events
     ImGui_ImplSDL3_ProcessEvent(&e);
     const ImGuiIO& io = ImGui::GetIO();
 
@@ -760,17 +764,9 @@ bool App::blenderNavigationDown(Uint8 button) {
 }
 
 void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
-    if (!fromPen) {
-        // Windows Ink and some tablet drivers send mouse events of their own beside the pen's, often at an old
-        // position (where the pen last touched). Taking those made the brush ring flick between two places, so
-        // while the pen is in range only the pen moves the cursor. A pen that went quiet without saying it left
-        // (some drivers never do) hands the cursor back to the mouse.
-        if (dragFromPen_ && drag_ != Drag::None) return;
-        if (penInProximity_) {
-            if (SDL_GetTicksNS() - lastPenNs_ < 1000000000ull) return;
-            penLeft();
-        }
-    }
+    // (A driver's stray mouse events beside the pen's never get here: strayMouseMotion.) A pen that went quiet
+    // without saying it left (some drivers never do) hands the cursor back to the mouse.
+    if (!fromPen && penInProximity_) penLeft();
     if (fromPen) {
         // The pen moves by the distance from its last position taken here, not by SDL's xrel: SDL keeps one cursor
         // position for the pen and every mouse, so with a driver's stray mouse events in between (a Ugee pen on

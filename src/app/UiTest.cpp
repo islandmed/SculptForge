@@ -124,7 +124,8 @@
 // with Windows Ink, and every frame carries 4 pen samples (a 240 Hz pen at 60 fps).
 //   pen_stroke U0 V0 U1 V1 P0 P1 [eraser] [leave] [S]   pen stroke across the model with pressure P0 -> P1;
 //                            eraser: the eraser end; leave: the pen leaves proximity before lifting
-//   pen_drag_item LABEL DX DY P0 P1 [S]   pen stroke through the item's centre, DX DY pixels long
+//   pen_drag_item LABEL DX DY P0 P1 [stray X Y] [S]   pen stroke through the item's centre, DX DY pixels long (a
+//                            short one is a tap with a little jitter); stray: as for pen_drag
 //   pen_button N down|up     side button N (1 lower, 2 upper, 3 third) with SDL 3.4's synthesized click
 //   pen_hover U V [S]        move the hovering pen to a point on the model (drags the view while a
 //                            button mapped to rotate / pan / right-click is held)
@@ -603,6 +604,24 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         return false;
     };
     auto num = [&](size_t i, float fallback) { return i < w.size() ? std::strtof(w[i].c_str(), nullptr) : fallback; };
+    // Pen verbs' optional words from w[from]: "stray X Y" (window fractions) gives a plain mouse event there after every
+    // pen sample, as Windows Ink and some tablet drivers send; any other number is the duration in seconds.
+    auto strayOption = [&](size_t from, float& seconds) -> std::function<void()> {
+        std::function<void()> stray;
+        for (size_t i = from; i < w.size(); ++i) {
+            if (w[i] == "stray" && i + 2 < w.size()) {
+                stray = [this, sx = num(i + 1, 0), sy = num(i + 2, 0)] {
+                    int ww = 0, wh = 0;
+                    SDL_GetWindowSize(app_.window_, &ww, &wh);
+                    mouseMotion(sx * float(ww), sy * float(wh));
+                };
+                i += 2;
+            } else {
+                seconds = num(i, seconds);
+            }
+        }
+        return stray;
+    };
 
     if (verb == "click" || verb == "double_click" || verb == "right_click") {
         if (!need(1)) return false;
@@ -1298,7 +1317,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     } else if (verb == "pen_drag_item") {
         if (!need(5)) return false;
         const std::string label = w[1];
-        const float dx = num(2, 0), dy = num(3, 0), p0 = num(4, 1), p1 = num(5, 1), seconds = num(6, 0.6f);
+        const float dx = num(2, 0), dy = num(3, 0), p0 = num(4, 1), p1 = num(5, 1);
+        float seconds = 0.6f;
+        const std::function<void()> strayEvent = strayOption(6, seconds);
         auto centre = std::make_shared<ImVec2>();
         steps_.push_back([this, line, label, centre](float t) {
             if (findItem(label, *centre)) return true;
@@ -1306,7 +1327,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return t > 3.0f;
         });
         penStroke([centre, dx, dy](float u) { return ImVec2(centre->x + dx * (u - 0.5f), centre->y + dy * (u - 0.5f)); }, p0, p1,
-                  false, false, seconds);
+                  false, false, seconds, strayEvent);
         wait(0.1f);
     } else if (verb == "pen_button") {
         if (!need(2)) return false;
@@ -1327,8 +1348,8 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         auto to = std::make_shared<ImVec2>();
         steps_.push_back([this, from, to, u, v, seconds](float t) {
             if (t == 0.0f) {
+                *from = penIn_ ? penAt_ : mouse_;
                 if (!penIn_) penProximity(true);
-                *from = mouse_;
                 *to = onModel(u, v);
             }
             const float k = std::min(t / seconds, 1.0f);
@@ -1340,32 +1361,13 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (!need(4)) return false;
         const float x0 = num(1, 0), y0 = num(2, 0), x1 = num(3, 0), y1 = num(4, 0);
         float seconds = 0.4f;
-        bool stray = false;
-        float sx = 0.0f, sy = 0.0f;
-        for (size_t i = 5; i < w.size(); ++i) {
-            if (w[i] == "stray" && i + 2 < w.size()) {
-                stray = true;
-                sx = num(i + 1, 0);
-                sy = num(i + 2, 0);
-                i += 2;
-            } else {
-                seconds = num(i, seconds);
-            }
-        }
+        const std::function<void()> strayEvent = strayOption(5, seconds);
         auto ends = std::make_shared<std::pair<ImVec2, ImVec2>>();
         run([this, ends, x0, y0, x1, y1] {
             int ww = 0, wh = 0;
             SDL_GetWindowSize(app_.window_, &ww, &wh);
             *ends = {ImVec2(x0 * float(ww), y0 * float(wh)), ImVec2(x1 * float(ww), y1 * float(wh))};
         });
-        // A stray mouse event at (sx, sy) after every pen sample, as some tablet drivers send.
-        std::function<void()> strayEvent;
-        if (stray)
-            strayEvent = [this, sx, sy] {
-                int ww = 0, wh = 0;
-                SDL_GetWindowSize(app_.window_, &ww, &wh);
-                mouseMotion(sx * float(ww), sy * float(wh));
-            };
         penStroke([ends](float u) {
             return ImVec2(ends->first.x + (ends->second.x - ends->first.x) * u, ends->first.y + (ends->second.y - ends->first.y) * u);
         }, 0.5f, 0.5f, false, false, seconds, strayEvent);
@@ -1460,6 +1462,7 @@ void Demo::penMove(float x, float y) {
     e.pmotion.pen_state = penState_;
     e.pmotion.x = x;
     e.pmotion.y = y;
+    penAt_ = ImVec2(x, y);
     app_.handleEvent(e);
     mouseMotion(x, y, SDL_PEN_MOUSEID); // SDL moves the mouse with a touching or hovering pen
 }
@@ -1470,8 +1473,8 @@ void Demo::penPressure(float pressure) {
     e.paxis.windowID = SDL_GetWindowID(app_.window_);
     e.paxis.which = kTestPen;
     e.paxis.pen_state = penState_;
-    e.paxis.x = mouse_.x;
-    e.paxis.y = mouse_.y;
+    e.paxis.x = penAt_.x;
+    e.paxis.y = penAt_.y;
     e.paxis.axis = SDL_PEN_AXIS_PRESSURE;
     e.paxis.value = pressure;
     app_.handleEvent(e);
@@ -1487,12 +1490,12 @@ void Demo::penTouch(bool down, bool eraser) {
     e.ptouch.windowID = SDL_GetWindowID(app_.window_);
     e.ptouch.which = kTestPen;
     e.ptouch.pen_state = penState_;
-    e.ptouch.x = mouse_.x;
-    e.ptouch.y = mouse_.y;
+    e.ptouch.x = penAt_.x;
+    e.ptouch.y = penAt_.y;
     e.ptouch.eraser = eraser;
     e.ptouch.down = down;
     app_.handleEvent(e);
-    if (down) mouseMotion(mouse_.x, mouse_.y, SDL_PEN_MOUSEID); // SDL_SendPenTouch: motion, then the left button
+    if (down) mouseMotion(penAt_.x, penAt_.y, SDL_PEN_MOUSEID); // SDL_SendPenTouch: motion, then the left button
     mouseButton(down, SDL_BUTTON_LEFT, SDL_PEN_MOUSEID);
 }
 
@@ -1504,8 +1507,8 @@ void Demo::penButtonEvent(int button, bool down) {
     e.pbutton.windowID = SDL_GetWindowID(app_.window_);
     e.pbutton.which = kTestPen;
     e.pbutton.pen_state = penState_;
-    e.pbutton.x = mouse_.x;
-    e.pbutton.y = mouse_.y;
+    e.pbutton.x = penAt_.x;
+    e.pbutton.y = penAt_.y;
     e.pbutton.button = Uint8(button);
     e.pbutton.down = down;
     app_.handleEvent(e);
@@ -1518,14 +1521,15 @@ void Demo::penStroke(std::function<ImVec2(float u)> path, float p0, float p1, bo
                      std::function<void()> afterSample) {
     // Hover to the start, touch down, then 4 samples a frame along the path, then lift (or leave).
     auto from = std::make_shared<ImVec2>();
-    steps_.push_back([this, path, from](float t) {
+    steps_.push_back([this, path, from, afterSample](float t) {
         if (t == 0.0f) {
+            *from = penIn_ ? penAt_ : mouse_;
             if (!penIn_) penProximity(true);
-            *from = mouse_;
         }
         const ImVec2 p = path(0.0f);
         const float k = std::min(t / 0.25f, 1.0f), u = k * k * (3.0f - 2.0f * k);
         penMove(from->x + (p.x - from->x) * u, from->y + (p.y - from->y) * u);
+        if (afterSample) afterSample();
         return t >= 0.25f;
     });
     auto last = std::make_shared<float>(-1.0f);

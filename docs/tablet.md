@@ -71,9 +71,10 @@ that pressure arrives at all, run `libinput debug-events` and look for `TABLET_T
   pressure value, so a stroke begins where the pen starts pressing, never with a leftover value from the last
   stroke. This is a few milliseconds at most.
 - **Lifting the pen out of range mid-stroke**: the stroke ends there and is one undo step.
-- **The view shakes instead of turning when you drag the background with the pen** (0.9.4 and earlier, with
-  some Ugee and other drivers that also send mouse events): fixed in the next version; meanwhile the lower side
-  button (right-click) or the Rotate / Move / Zoom buttons beside the canvas turn the view.
+- **The view shakes or jumps when you drag with the pen, or pen taps on menus miss** (0.9.4 and earlier, with
+  Windows Ink, Ugee and other drivers that also send mouse events): fixed in 0.9.5. While the pen is in range,
+  SculptForge follows only the pen, so a mouse takes over once the pen leaves the tablet's range (or a second
+  after its last event, for drivers that never say it left).
 
 ## For developers
 
@@ -82,4 +83,6 @@ handling and the preferences panel in `src/app/Tablet.cpp`. UI tests drive a sim
 events plus the mouse events SDL synthesizes from them: `pen_stroke`, `pen_drag_item`, `pen_button`,
 `pen_hover`, `pen_drag`, `pen_pressure` and `pen_out` (documented in `src/app/UiTest.cpp`); `tests/ui/tablet.sfui`
 covers pressure, the curve, Pressure > Size, the eraser, side buttons, leaving proximity and the panel, and
-`tests/ui/pen_navigation.sfui` view drags with the pen tip, with and without a driver's stray mouse events.
+`tests/ui/pen_navigation.sfui` view drags with the pen tip, with and without a driver's stray mouse events, and
+`tests/ui/pen_windows_ink.sfui` pen taps on menus, the Move button and the S slider with Windows Ink's stray
+mouse events.

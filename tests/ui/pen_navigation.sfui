@@ -27,7 +27,8 @@ expect_value camera_pan > $p0
 expect_value moved == 0
 key f
 
-# The SculptForge input style: Ctrl+drag on the background zooms.
+# The SculptForge input style: Ctrl+drag on the background zooms. (The pen leaves before the mouse clicks.)
+pen_out
 click "Preferences##palette.preferences"
 click "Input##preferences.input"
 click "SculptForge##input.style_sculptforge"

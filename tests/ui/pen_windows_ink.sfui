@@ -1,0 +1,74 @@
+# A pen through Windows Ink (#13, Wacom Intuos Pro on Windows): Windows Ink and some tablet drivers send mouse events
+# of their own beside the pen's, at an old position. The UI must follow only the pen, like the canvas does: pen taps
+# on menus and buttons work (with the small jitter of a real tap), dragging the Move button pans by the pen's own
+# movement, the S slider can be dragged with the pen, and Alt+pen drag pans as far as without the stray events.
+run new_sphere subdivisions=4
+snapshot
+
+# Pen taps on a menu and on one of its items (a 3 px jitter while touching), with stray mouse events elsewhere.
+pen_drag_item "Help##palette.help" 3 2 0.5 0.5 stray 0.6 0.85 0.08
+wait 0.2
+expect "User Guide##help.guide"
+pen_drag_item "User Guide##help.guide" 3 2 0.5 0.5 stray 0.6 0.85 0.08
+expect_value guide_open == 1
+key shift+f1
+expect_value guide_open == 0
+pen_drag_item "Preferences##palette.preferences" 2 3 0.5 0.5 stray 0.05 0.95 0.08
+wait 0.2
+expect "Tablet##preferences.tablet"
+key escape
+
+# The Move button beside the canvas: the same pen drag with and without stray events pans the same.
+key f
+remember camera_pan p0
+pen_drag_item "Move##nav.move" 0 36 0.5 0.5 0.5
+remember camera_pan clean
+expect_value camera_pan > $p0
+key f
+pen_drag_item "Move##nav.move" 0 36 0.5 0.5 stray 0.1 0.9 0.5
+expect_value camera_pan >= $clean*0.98
+expect_value camera_pan <= $clean*1.02
+expect_value moved == 0
+key f
+
+# Alt+pen drag on the background: the same pan with and without stray events.
+camera 0 0
+hold alt
+pen_drag 0.12 0.3 0.12 0.5
+hold none
+remember camera_pan alt_clean
+expect_value camera_pan > $p0
+key f
+camera 0 0
+hold alt
+pen_drag 0.12 0.3 0.12 0.5 stray 0.6 0.9
+hold none
+expect_value camera_pan >= $alt_clean*0.98
+expect_value camera_pan <= $alt_clean*1.02
+expect_value moved == 0
+key f
+
+# The S slider with the pen: it opens at the pen, a pen drag on it changes the size as without stray events, and
+# lifting the pen closes it.
+pen_hover 0.5 0.5
+remember draw_size s0
+key s
+expect_value size_popup_open == 1
+pen_drag_item "##cursorvalue" 60 0 0.5 0.5 0.4
+expect_value size_popup_open == 0
+remember draw_size size_clean
+expect_value draw_size > $s0
+pen_hover 0.5 0.5
+key s
+key 6
+key 0
+key enter
+expect_value draw_size == 60
+pen_hover 0.5 0.5
+key s
+pen_drag_item "##cursorvalue" 60 0 0.5 0.5 stray 0.1 0.9 0.4
+expect_value size_popup_open == 0
+expect_value draw_size >= $size_clean-1
+expect_value draw_size <= $size_clean+1
+expect_value moved == 0
+pen_out

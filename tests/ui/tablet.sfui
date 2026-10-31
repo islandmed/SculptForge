@@ -102,7 +102,9 @@ expect_value moved_out < $light*0.5
 expect_value moved_out > 0
 key ctrl+z
 
-# Eraser mapped to Erase mask: the eraser removes mask instead of sculpting.
+# Eraser mapped to Erase mask: the eraser removes mask instead of sculpting. (The pen is put away first: while it
+# is in range the UI, like the canvas, follows only the pen.)
+pen_out
 click "Preferences##palette.preferences"
 click "Linear##tablet_curve"
 click "##Eraser"
