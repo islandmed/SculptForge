@@ -117,6 +117,7 @@ bool IsModeAction(std::string_view id) {
 
 bool IsChoiceAction(std::string_view id) {
     return id == "draw.zadd" || id == "draw.zsub" || id == "material.smooth" || id == "material.flat" ||
+           id == "view.background_gradient" || id == "view.background_flat" ||
            id.substr(0, 16) == "subtool.shading_";
 }
 

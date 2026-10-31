@@ -30,6 +30,9 @@ struct RenderSettings {
     bool dimInactive = true;   // SubTools other than the active one render slightly darker (ZBrush style)
     bool motionProxy = false;  // the view is moving (Fast Navigation): draw big meshes' lighter proxy (render/Clusters.h)
     bool flatShading = false;  // the scene's shading (Material palette): faceted; SubTools can override (core/Document.h)
+    // The view's background: the charcoal radial gradient (default) or one flat display (sRGB) colour (#21).
+    bool gradientBackground = true;
+    glm::vec3 backgroundColor{0.165f, 0.165f, 0.173f};
 };
 
 // A baked tangent-space normal map to preview on a mesh (core/Bake.h): RGB8 rows bottom-up, with the

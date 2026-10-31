@@ -165,6 +165,29 @@ void App::registerPaintUiCommands() {
                        return {true, "Removed " + shown + " for this session; delete " + path +
                                          " to remove it for good (" + err + ")"};
                    }});
+    // The view's background (#21). Also the preference for new sessions.
+    commands_.add({"set_background",
+                   "The viewport background: gradient (the default charcoal radial gradient) or flat, one solid "
+                   "colour.",
+                   {{"mode", ParamSpec::Type::String, "gradient or flat (default: flat when a color is given).", false},
+                    {"color", ParamSpec::Type::String,
+                     "The flat colour: #rrggbb, r,g,b (0-1 or 0-255) or a name such as black or gray.", false}},
+                   [this](Document&, const Args& a) -> CommandResult {
+                       if (!a.contains("mode") && !a.contains("color")) return {false, "Give mode= or color="};
+                       glm::vec3 color = renderSettings_.backgroundColor;
+                       if (a.contains("color")) {
+                           glm::vec3 linear;
+                           if (!parseColor(argString(a, "color"), linear))
+                               return {false, "Bad colour '" + argString(a, "color") + "'"};
+                           color = linearToSrgb(linear); // the background is drawn in display values
+                       }
+                       const std::string mode = argString(a, "mode", a.contains("color") ? "flat" : "");
+                       if (mode != "gradient" && mode != "flat")
+                           return {false, "Unknown background '" + mode + "' (gradient, flat)"};
+                       setBackground(mode == "gradient", color);
+                       return {true, mode == "gradient" ? std::string("Background: Gradient")
+                                                        : "Background: Flat Colour " + colorToHex(srgbToLinear(color))};
+                   }});
     // The scene's shading; SubTools can override it (subtool_shading). Also the preference for new sessions.
     commands_.add({"set_shading",
                    "Viewport shading for every SubTool that doesn't set its own (subtool_shading): smooth (the "
@@ -177,6 +200,24 @@ void App::registerPaintUiCommands() {
                        setFlatShading(mode == Shading::Flat);
                        return {true, mode == Shading::Flat ? "Shading: Flat" : "Shading: Smooth"};
                    }});
+}
+
+void App::setBackground(bool gradient, const glm::vec3& color) {
+    renderSettings_.gradientBackground = uiPrefs_.gradientBackground = gradient;
+    renderSettings_.backgroundColor = uiPrefs_.backgroundColor = glm::clamp(color, 0.0f, 1.0f);
+}
+
+void App::drawBackgroundControls(const char* idSuffix) {
+    ImGui::TextDisabled("Background");
+    ui::Segmented(*this, {"view.background_gradient", "view.background_flat"});
+    // The picker edits the flat colour as shown (display values); picking one switches to Flat Colour.
+    glm::vec3 c = renderSettings_.backgroundColor;
+    const std::string label = std::string("Background colour##") + idSuffix;
+    if (ImGui::ColorEdit3(label.c_str(), &c.x, ImGuiColorEditFlags_NoInputs)) setBackground(false, c);
+    ui::HelpText("Background colour", nullptr,
+                 "The view's flat background colour. Choosing one switches the background to Flat Colour. Store "
+                 "Config keeps it for the next session; projects keep their own.",
+                 "Preferences > Display");
 }
 
 void App::setFlatShading(bool flat) {

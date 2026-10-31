@@ -7,6 +7,25 @@ chapter opens by itself the first time you start a new version; you can always f
 
 ## Next version
 
+### Extract
+
+Mask part of a SubTool and **Tool > SubTool > Extract** turns it into a shell that fits the surface exactly: a
+helmet, a strap, a piece of armour. Set **Thick**, **E Smt** and **Double** while the preview shows, then
+**Accept** keeps it as a new SubTool (and <kbd>Ctrl</kbd>+<kbd>Z</kbd> takes it away again). **TCorne** and
+**TBorder** give the rim triangles instead of quads. See [Extract a shell](subtools.md#extract-a-shell).
+
+### Mirror And Weld
+
+**Tool > Geometry > Modify Topology > Mirror And Weld** mirrors one side of a model onto the other across X, Y
+or Z and welds the seam into one watertight mesh, keeping polygroups and polypaint. **Tool > Deformation >
+Mirror** flips a SubTool. See [Mirror And Weld](geometry.md#mirror-and-weld).
+
+### A flat background
+
+**Preferences > Display > Background** (also in the Render palette) switches the view from the gradient to a
+flat colour you pick. Store Config keeps it, and projects keep their own. See
+[The background](interface.md#the-background).
+
 ### Fixes
 
 - Fast strokes on very dense meshes keep their curve. When one dab cost more than a frame, a quick arc came out

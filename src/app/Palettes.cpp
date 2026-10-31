@@ -414,6 +414,10 @@ void App::drawPalette_Preferences() {
         tray::Section section;
         config::drawHotkeysSection(*this);
     }
+    if (subpalette("preferences.display", "Display")) {
+        tray::Section section;
+        drawBackgroundControls("prefs");
+    }
     if (subpalette("preferences.lightbox", "LightBox")) {
         tray::Section section;
         config::drawLightBoxSection(*this);
@@ -456,6 +460,7 @@ void App::drawPalette_Render() {
     ImGui::Checkbox("Show Splats", &renderSettings_.showSplats);
     ImGui::EndDisabled();
     ui::HelpAction(*this, "view.splats");
+    drawBackgroundControls("render");
     actionRow(*this, {"view.frame", "view.fullscreen"});
 }
 
@@ -492,6 +497,7 @@ void App::drawPalette_Tool() {
         Demo::pushScope("SubTools");
         drawSubToolsContents();
         Demo::popScope();
+        drawExtractContents(); // PanelExtract.cpp
         Demo::pushScope("Project");
         drawProjectContents(); // ProjectAll (PanelRetopo.cpp)
         Demo::popScope();
@@ -548,6 +554,7 @@ void App::drawPalette_Tool() {
         Demo::pushScope("QRemesh");
         drawQRemeshContents(); // quad retopology (PanelRetopo.cpp)
         Demo::popScope();
+        drawModifyTopologyContents(); // Mirror And Weld (PanelExtract.cpp)
     }
     if (subpalette("tool.remesh", "Remesh")) {
         tray::Section section;
@@ -573,6 +580,12 @@ void App::drawPalette_Tool() {
         } else if (hasTexture(doc_.mesh)) {
             drawKeepTextureCheckbox("Keep Texture##remesh", "Tool > Remesh"); // only for a painted SubTool
         }
+    }
+    if (subpalette("tool.deformation", "Deformation")) {
+        tray::Section section;
+        Demo::pushScope("Deformation");
+        drawDeformationContents(); // Mirror (PanelExtract.cpp)
+        Demo::popScope();
     }
     if (subpalette("tool.masking", "Masking")) {
         tray::Section section;

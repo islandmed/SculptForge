@@ -56,6 +56,10 @@ Json toJson(const UiPrefs& p) {
     j.set("multithreading", p.multithreading);
     j.set("dyntopoConstantDetail", p.dyntopoConstantDetail);
     j.set("flatShading", p.flatShading);
+    j.set("background", std::string(p.gradientBackground ? "gradient" : "flat"));
+    Json bg = Json::array();
+    for (int i = 0; i < 3; ++i) bg.push(double(p.backgroundColor[i]));
+    j.set("backgroundColor", std::move(bg));
     return j;
 }
 
@@ -86,6 +90,9 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.multithreading = j["multithreading"].asBool(p.multithreading);
     p.dyntopoConstantDetail = j["dyntopoConstantDetail"].asBool(p.dyntopoConstantDetail);
     p.flatShading = j["flatShading"].asBool(p.flatShading);
+    if (j["background"].isString()) p.gradientBackground = j["background"].asString() != "flat";
+    if (const Json& bg = j["backgroundColor"]; bg.size() == 3)
+        for (int i = 0; i < 3; ++i) p.backgroundColor[i] = std::clamp(float(bg[size_t(i)].asNumber(p.backgroundColor[i])), 0.0f, 1.0f);
 }
 
 namespace {
@@ -261,6 +268,54 @@ void App::initActions() {
         [this] { return subdivCurrentLevel(doc_.mesh) + 1 < subdivLevelCount(doc_.mesh); });
     add("geometry.reconstruct", "Reconstruct Subdiv", "Tool > Geometry", nullptr, [this] { runCommand("subdiv_reconstruct"); },
         nullptr, "subdiv_reconstruct", nullptr, [this] { return subdivCurrentLevel(doc_.mesh) == 0; });
+    // Tool > SubTool > Extract, Tool > Geometry > Modify Topology, Tool > Deformation (PanelExtract.cpp).
+    add("subtool.extract", "Extract", "Tool > SubTool", nullptr, [this] { runExtract(); }, nullptr, "extract", nullptr,
+        [this] { return doc_.mesh.hasMask(); },
+        "Make a shell from the masked part of the SubTool (a helmet, a strap, clothing), shown as a preview below it. "
+        "Change Thick, E Smt or Double and it updates; Accept keeps it as a new SubTool.");
+    add("subtool.extract_accept", "Accept", "Tool > SubTool", nullptr, [this] { runCommand("extract_accept"); }, nullptr,
+        "extract_accept", nullptr, [this] { return doc_.extractPreviewCurrent(); },
+        "Keep the Extract preview as a new SubTool below this one. Ctrl+Z takes it away again.");
+    add("subtool.extract_double", "Double", "Tool > SubTool", nullptr,
+        [this] {
+            extractDouble_ = !extractDouble_;
+            if (doc_.extractPreviewCurrent()) runExtract();
+        },
+        nullptr, nullptr, [this] { return extractDouble_; }, nullptr,
+        "Grow the extracted shell both inward and outward from the surface, instead of outward only.");
+    add("subtool.extract_tcorne", "TCorne", "Tool > SubTool", nullptr,
+        [this] {
+            extractTCorne_ = !extractTCorne_;
+            if (doc_.extractPreviewCurrent()) runExtract();
+        },
+        nullptr, nullptr, [this] { return extractTCorne_; }, nullptr,
+        "Triangle corners: where the extracted edge turns sharply, the rim is made of triangles instead of quads.");
+    add("subtool.extract_tborder", "TBorder", "Tool > SubTool", nullptr,
+        [this] {
+            extractTBorder_ = !extractTBorder_;
+            if (doc_.extractPreviewCurrent()) runExtract();
+        },
+        nullptr, nullptr, [this] { return extractTBorder_; }, nullptr,
+        "Triangle border: the whole rim of the extracted shell is made of triangles instead of quads.");
+    add("geometry.mirror_weld", "Mirror And Weld", "Tool > Geometry", nullptr,
+        [this] { runCommand("mirror_and_weld", {{"axis", axesText(mirrorWeldAxes_)}}); }, nullptr, "mirror_and_weld",
+        nullptr, [this] { return !axesText(mirrorWeldAxes_).empty() && doc_.mesh.triangleCount() > 0; },
+        "Mirror the + side of the SubTool onto the - side across the chosen axis and weld the seam into one "
+        "watertight mesh. Polygroups and polypaint come along. To keep the other side, Deformation > Mirror first.");
+    add("deformation.mirror", "Mirror", "Tool > Deformation", nullptr,
+        [this] { runCommand("mirror", {{"axis", axesText(mirrorAxes_)}}); }, nullptr, "mirror", nullptr,
+        [this] { return !axesText(mirrorAxes_).empty() && doc_.mesh.vertexCount() > 0; },
+        "Flip the SubTool across the chosen axis, through the origin (the plane symmetry and Mirror And Weld use).");
+    for (int k = 0; k < 3; ++k) {
+        static const char* const kWeldIds[3] = {"geometry.mirror_weld_x", "geometry.mirror_weld_y", "geometry.mirror_weld_z"};
+        static const char* const kMirrorIds[3] = {"deformation.mirror_x", "deformation.mirror_y", "deformation.mirror_z"};
+        static const char* const kNames[3] = {"X", "Y", "Z"};
+        add(kWeldIds[k], kNames[k], "Tool > Geometry", nullptr, [this, k] { mirrorWeldAxes_[k] = !mirrorWeldAxes_[k]; },
+            nullptr, nullptr, [this, k] { return mirrorWeldAxes_[k]; }, nullptr,
+            "An axis Mirror And Weld mirrors across (several: one after the other).");
+        add(kMirrorIds[k], kNames[k], "Tool > Deformation", nullptr, [this, k] { mirrorAxes_[k] = !mirrorAxes_[k]; }, nullptr,
+            nullptr, [this, k] { return mirrorAxes_[k]; }, nullptr, "An axis Mirror flips along (several: one after the other).");
+    }
     add("file.new_sphere", "New Sphere", "File", "Ctrl+N", [this] { confirmDiscard([this] { runCommand("new_sphere"); }); },
         ICON_LC_FILE_PLUS, "new_sphere");
     add("file.new_plane", "New Plane", "File", nullptr, [this] { confirmDiscard([this] { runCommand("new_plane"); }); }, nullptr,
@@ -481,6 +536,8 @@ bool App::readUiConfig(const std::string& path, std::string& err) {
     applyInputStyle();
     doc_.sculptor.dyntopo.constantDetail = uiPrefs_.dyntopoConstantDetail;
     renderSettings_.flatShading = uiPrefs_.flatShading;
+    renderSettings_.gradientBackground = uiPrefs_.gradientBackground;
+    renderSettings_.backgroundColor = uiPrefs_.backgroundColor;
     return true;
 }
 

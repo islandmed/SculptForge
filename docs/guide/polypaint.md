@@ -250,6 +250,7 @@ ZBrush key changes meaning; assign one under **Preferences > Hotkeys** if you sw
 | `set_material name=Chrome` | Viewport material: a MatCap name (`Soft Clay` is the default, your own MatCaps included) or `studio` (desktop app only) |
 | `load_matcap path=gold.png` | Load a MatCap image and use it; `keep=false` doesn't copy it into the MatCaps folder (desktop app only) |
 | `remove_matcap name=Gold` | Remove one of your MatCaps; its image in the MatCaps folder goes to the trash (desktop app only) |
+| `set_background mode=flat color=60,70,80` | The view's background: `gradient` (the default) or `flat` with a colour (`#rrggbb`, `r,g,b` or a name); see [The background](interface.md#the-background) (desktop app only) |
 | `set_shading mode=flat` | The scene's shading: `smooth` (the default) or `flat` (desktop app only) |
 | `subtool_shading mode=smooth name=Eyes` | A SubTool's own shading: `default` (follow the scene), `smooth` or `flat`; `index` or `name` picks the SubTool (default: the active one) |
 

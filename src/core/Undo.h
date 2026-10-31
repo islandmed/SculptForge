@@ -89,6 +89,10 @@ struct TextureStackUndo {
     size_t bytes() const;
 };
 
+// Adding or removing a whole SubTool (Extract's Accept; core/Document.h). Applied by the undo / redo commands,
+// which see the whole scene: the record itself leaves the mesh alone.
+struct SubtoolStep;
+
 // "The active paint layer" for UndoRecord::captureColors.
 inline constexpr int kActivePaintLayer = -2;
 
@@ -105,6 +109,7 @@ inline constexpr int kActivePaintLayer = -2;
 //  - textureTiles / texture: texture-paint tiles of one layer, or the whole texture
 //  - subdiv: a subdivision level step or level edit (core/Multires.h), applied on its own
 //  - topology: the slots a dynamic-topology stroke changed (core/Dyntopo.h), applied before the channels
+//  - subtool: a SubTool added to the scene (Extract), taken out on undo and put back on redo
 // Record old values before changing them (ensureX() the attribute first);
 // undo allocates a missing attribute so values can always be restored.
 struct UndoRecord {
@@ -126,10 +131,11 @@ struct UndoRecord {
     std::unique_ptr<Mesh> mesh;
     std::unique_ptr<SubdivUndo> subdiv;
     std::unique_ptr<TopologyUndo> topology;
+    std::shared_ptr<SubtoolStep> subtool; // (shared: SubtoolStep is defined in core/Document.h)
 
     bool empty() const {
         return positions.empty() && mask.empty() && colors.empty() && paintAlpha.empty() && hidden.empty() &&
-               polygroups.empty() && !mesh && !paint && !textureTiles && !texture && !subdiv && !topology;
+               polygroups.empty() && !mesh && !paint && !textureTiles && !texture && !subdiv && !topology && !subtool;
     }
     size_t approxBytes() const;
 
@@ -156,6 +162,9 @@ public:
     const std::string& undoLabel() const { return undo_.back().label; }
     const std::string& redoLabel() const { return redo_.back().label; }
     size_t undoCount() const { return undo_.size(); }
+    // The step the next undo / redo applies (null if none): after undo() the undone step is lastRedo().
+    UndoRecord* lastUndo() { return undo_.empty() ? nullptr : &undo_.back(); }
+    UndoRecord* lastRedo() { return redo_.empty() ? nullptr : &redo_.back(); }
 
     // Both rebuild/refit the BVH as needed.
     bool undo(Mesh& mesh, BVH& bvh);

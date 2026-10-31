@@ -52,6 +52,7 @@ CROPS = {
     "polygroups": ("polygroups", (300, 100, 1600, 860), 960),
     "splats": ("splats", (420, 46, 1600, 900), 960),
     "user-guide": ("user-guide", (130, 140, 1190, 880), 1060),
+    "extract": ("extract", (380, 140, 1000, 740), 620),
     "make-sculptable-panel": ("sculptable-panel", (1276, 500, 1600, 960), 324),
 }
 
@@ -127,6 +128,20 @@ def remesh(shots: pathlib.Path):
     label(d, (before.width // 2, 24), "Before: decimated, uneven", 20, "mt")
     label(d, (before.width + 12 + after.width // 2, 24), "After Voxel Remesh", 20, "mt")
     return save(img, "remesh", 900)
+
+
+def mirror_weld(shots: pathlib.Path):
+    """A head sculpted on one side, then after Mirror And Weld X."""
+    box = (420, 150, 900, 850)
+    before = Image.open(shots / "mirror-weld-before.png").convert("RGB").crop(box)
+    after = Image.open(shots / "mirror-weld-after.png").convert("RGB").crop(box)
+    img = Image.new("RGB", (before.width * 2 + 12, before.height), (20, 20, 22))
+    img.paste(before, (0, 0))
+    img.paste(after, (before.width + 12, 0))
+    d = ImageDraw.Draw(img)
+    label(d, (before.width // 2, 24), "Sculpted on one side", 20, "mt")
+    label(d, (before.width + 12 + after.width // 2, 24), "After Mirror And Weld X", 20, "mt")
+    return save(img, "mirror-weld", 900)
 
 
 def subdivision(shots: pathlib.Path):
@@ -207,7 +222,7 @@ def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     composed = {"interface-overview": overview, "remesh": remesh, "subdivision-levels": subdivision,
                 "qremesh-guides": qremesh_guides, "dynamic-topology": dyntopo,
-                "make-sculptable": make_sculptable, "shading": shading}
+                "make-sculptable": make_sculptable, "shading": shading, "mirror-weld": mirror_weld}
     wanted = lambda name: not args.only or name in args.only
     made = [make(args.shots) for name, make in composed.items() if wanted(name)]
     for name, (shot, box, width) in CROPS.items():

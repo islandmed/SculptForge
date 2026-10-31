@@ -2036,6 +2036,8 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
     }
     const int fbWidth = inset ? viewport.w : targetWidth, fbHeight = inset ? viewport.h : targetHeight;
     if (thumbnailPass_) gl::ClearColor(0.0f, 0.0f, 0.0f, 0.0f); // renderMeshThumbnail: transparent background
+    else if (!settings.gradientBackground)
+        gl::ClearColor(settings.backgroundColor.x, settings.backgroundColor.y, settings.backgroundColor.z, 1.0f);
     else gl::ClearColor(0.075f, 0.075f, 0.08f, 1.0f);
     gl::Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     gl::Enable(GL_MULTISAMPLE);
@@ -2046,11 +2048,11 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
         }
     } scissorOff{inset};
 
-    // Background: charcoal with a radial vignette.
+    // Background: charcoal with a radial vignette (or the flat colour cleared above).
     gl::Disable(GL_DEPTH_TEST);
     gl::UseProgram(bgProgram_);
     gl::BindVertexArray(emptyVao_);
-    if (!thumbnailPass_) gl::DrawArrays(GL_TRIANGLES, 0, 3);
+    if (!thumbnailPass_ && settings.gradientBackground) gl::DrawArrays(GL_TRIANGLES, 0, 3);
 
     const glm::mat4 view = camera.view(), proj = camera.projection();
     frameView_ = view;
