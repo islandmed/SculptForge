@@ -6,6 +6,22 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Strokes on dense meshes keep their shape (#19). When one dab cost more than a frame, the app placed every dab
+  of a long pointer movement before reading the pointer again, so the next movement was longer still and a fast
+  curve came out as a straight line. Dabs now wait in a queue that the app works through for 10 ms a frame,
+  between reading the pointer and drawing; a long gap between pointer samples is drawn as a curve through the
+  last samples, not a chord; and when the queue holds more than 24 dabs (or more than 0.05 s of work, whichever
+  is larger) every second waiting dab is dropped, so the brush stays near the pointer. Measured with the new
+  `--measure-stroke 3,200` (a fast two-turn circle, 200 px brush) on a 21M-triangle sphere: dabs were up to
+  69 px off the circle before and are within 4 px now, at 82 ms frames instead of 143 ms. Light meshes place
+  the same dabs as before. Based on a patch by @bribblej-web in #19. `SF_STROKE_IMMEDIATE=1` places every dab
+  at once as before; `SF_STROKE_BACKLOG=N` sets the queue limit in dabs (0: never drop).
+- The AppImage's root icon and `.DirIcon` are 512 px PNG files, not links to the SVG (#17), so AppImage managers
+  such as AppManager and Gear Lever show the icon when they integrate it, and the current appimagetool accepts
+  the AppDir. The AppImage is now built with appimagetool directly (packaging/linux/build-appimage.sh), which
+  checks the AppDir before packing it.
+
 ## [0.9.5] - 2026-10-31
 
 The day after launch, people filed ten issues. 0.9.5 answers all of them: ZSpheres for blocking out a base mesh,
