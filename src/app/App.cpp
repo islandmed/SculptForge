@@ -600,7 +600,8 @@ void App::redrawIn(double seconds) {
 bool App::wantsFrames(double now) const {
     return now < activeUntil_ || drag_ != Drag::None || doc_.sculptor.strokeActive() || backgroundBusy() ||
            playingLayer_ >= 0 || faceTakePlaying_ ||
-           perf_.framesStill < 10; // the view just moved: Fast Navigation's full-quality frame comes after it stops
+           perf_.framesStill < 10 || // the view just moved: Fast Navigation's full-quality frame comes after it stops
+           spaceMouseMoving();       // a SpaceMouse cap held still sends no events, but the view keeps turning
 }
 
 uint64_t App::frameKey() const {
@@ -657,8 +658,9 @@ int App::run() {
             handleEvent(ev);
             if (ev.type == SDL_EVENT_KEYMAP_CHANGED || ev.type == SDL_EVENT_KEYBOARD_ADDED ||
                 ev.type == SDL_EVENT_KEYBOARD_REMOVED || ev.type == SDL_EVENT_MOUSE_ADDED ||
-                ev.type == SDL_EVENT_MOUSE_REMOVED || ev.type == SDL_EVENT_CLIPBOARD_UPDATE)
-                return; // nothing on screen changes
+                ev.type == SDL_EVENT_MOUSE_REMOVED || ev.type == SDL_EVENT_CLIPBOARD_UPDATE ||
+                (ev.type == SDL_EVENT_JOYSTICK_AXIS_MOTION && !spaceMouseDeflected()))
+                return; // nothing on screen changes (a hand resting on a SpaceMouse: inside its dead zone)
             draw = true;
             if (logRedraw) SDL_Log("redraw: event 0x%x", unsigned(ev.type));
             const bool input = (ev.type >= SDL_EVENT_KEY_DOWN && ev.type < SDL_EVENT_JOYSTICK_AXIS_MOTION) ||

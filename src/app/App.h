@@ -1166,6 +1166,7 @@ private:
     void spaceMouseClose();
     void updateSpaceMouse(float dt);          // once a frame: move the camera by the held axes
     bool spaceMouseMoving() const { return spaceMouseMoving_; } // keep frames coming while the cap is pushed
+    bool spaceMouseDeflected() const; // the cap is pushed past the dead zone now (an axis event worth a frame)
     void drawSpaceMouseSection();             // Preferences > Input > SpaceMouse
     SDL_Joystick* spaceMouse_ = nullptr;
     SDL_JoystickID spaceMouseId_ = 0;

@@ -121,6 +121,14 @@ void App::spaceMouseEvent(const SDL_Event& e) {
     }
 }
 
+bool App::spaceMouseDeflected() const {
+    if (!spaceMouse_) return false;
+    std::array<float, kSmAxes> axes{};
+    for (int i = 0; i < kSmAxes; ++i)
+        axes[size_t(i)] = std::clamp(float(SDL_GetJoystickAxis(spaceMouse_, i)) / 32767.0f, -1.0f, 1.0f);
+    return spaceMouseMotion(axes, 1.0f / 60.0f, uiPrefs_.spaceMouse).any();
+}
+
 void App::updateSpaceMouse(float dt) {
     // The first frame of a move counts as one frame, not the time since the last frame drawn (a loop that sleeps
     // while idle wakes on the axis event: the cap has only just left the centre).
