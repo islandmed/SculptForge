@@ -1,0 +1,46 @@
+# Divide on meshes sent from Blender with high-valence vertices (#16): a cylinder with 22-sided Triangle Fan caps
+# (21 worked) and the default UV sphere (32 x 16, its poles are fans of 32 triangles) crashed SculptForge 0.9.4 on
+# Ctrl+D: the first level's ring around a fan centre overran a fixed buffer while the viewport shaded it. Sent
+# through the bridge as the add-on does (tests/ui/data/blender/divide, with Blender's UVs), divided and drawn.
+run new_sphere subdivisions=2
+env SCULPTFORGE_BLENDER_EXCHANGE sf_ui_blender_divide
+copy data/blender/divide sf_ui_blender_divide/to_sculptforge
+wait 0.2
+expect_status "Received 2 objects from Blender"
+expect_value subtools == 2
+expect_value active_subtool == 0
+remember triangles t0
+
+# The cylinder: three levels, each drawn (the crash was in the viewport's shading after Divide).
+key ctrl+d
+wait 0.2
+expect_value sdiv == 2
+key ctrl+d
+wait 0.2
+key ctrl+d
+wait 0.2
+expect_value sdiv == 4
+expect_value triangles > $t0*60
+key f
+shot cylinder
+# Down to the base and back up.
+key shift+d
+key shift+d
+key shift+d
+expect_value sdiv == 1
+expect_value triangles == $t0
+key d
+key d
+key d
+expect_value sdiv == 4
+
+# The UV sphere.
+run subtool_select index=1
+expect_value active_subtool == 1
+key ctrl+d
+wait 0.2
+key ctrl+d
+wait 0.2
+expect_value sdiv == 3
+key f
+shot sphere

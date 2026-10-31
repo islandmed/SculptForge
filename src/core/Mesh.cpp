@@ -470,7 +470,10 @@ IndexRing Mesh::implicitNeighbors(uint32_t v) const {
         if (tp.catmullClark && ia.sides) { // one corner per polygon around v, ascending
             for (uint32_t k = ia.cornerOffsets[v]; k < ia.cornerOffsets[v + 1]; ++k) out[n++] = nf + ia.corners[k] / 4;
         } else if (tp.catmullClark) {
-            uint32_t* faces = out + n;
+            // Each polygon is listed by both its edges at v: gathered apart (up to 2 x valence) and made unique
+            // before joining the ring, which then holds valence + polygons <= 2 x valence (#16: gathered after
+            // the edge points, a fan centre of 22 triangles needed 66 slots and overran the ring).
+            uint32_t faces[IndexRing::kCapacity];
             uint32_t m = 0;
             for (uint32_t k = k0; k < k1; ++k) {
                 const glm::uvec2 f = tp.edgeFaces[tp.vertEdges[k]];
@@ -478,7 +481,9 @@ IndexRing Mesh::implicitNeighbors(uint32_t v) const {
                 if (f.y != kNone) faces[m++] = nf + f.y;
             }
             sortSmall(faces, m);
-            n += uniqueSmall(faces, m);
+            m = uniqueSmall(faces, m);
+            std::copy(faces, faces + m, out + n);
+            n += m;
         }
     } else if (v < nf) {
         const uint32_t e = v - nv;

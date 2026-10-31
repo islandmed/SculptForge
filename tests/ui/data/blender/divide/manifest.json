@@ -1,0 +1,11 @@
+{
+  "format": "sculptforge-bridge",
+  "version": 1,
+  "revision": 1,
+  "sender": "blender",
+  "sender_version": "4.2.0",
+  "objects": [
+    {"name": "Cylinder", "file": "r1_000.GoZ"},
+    {"name": "Sphere", "file": "r1_001.GoZ"}
+  ]
+}

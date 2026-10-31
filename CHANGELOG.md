@@ -6,6 +6,27 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Divide crashed on models with a vertex shared by 22 or more triangles (#16), such as a cylinder sent from Blender
+  with Triangle Fan caps of 22 sides or more (21 worked) or Blender's UV sphere. The first subdivision level
+  works out each vertex's neighbours from the base mesh; around a high-valence base vertex the list was gathered
+  with every polygon twice before removing the repeats, which overran its 64 slots (3 x valence) and corrupted
+  the stack when the viewport shaded the new level. The repeats are now removed before the list is joined, so
+  it never holds more than 2 x valence (implicit adjacency is only used up to valence 32; above that the stored
+  adjacency has no limit). Unit tests divide fan cylinders of 3 to 300 sides and UV spheres up to 200 segments,
+  through OBJ and through the Blender Bridge, and compare every level's adjacency with a plain rebuild; a UI test
+  receives the issue's meshes from the bridge and divides them in the app.
+
+### Added
+- A log file, `sculptforge.log` in the user data folder (`%APPDATA%\SculptForge\SculptForge` on Windows,
+  `~/Library/Application Support/SculptForge/SculptForge` on macOS, `~/.local/share/SculptForge/SculptForge` on
+  Linux), so a crash is never silent: it holds the version, system and GPU, everything SDL_Log reports (the
+  Windows build has no console), each command run (written before it runs), and on a crash a note with the
+  cause, the last command and, on Linux and macOS, a stack trace. Each start keeps the previous session's log as
+  `sculptforge-previous.log` and notes when that session didn't close normally; the restore dialog after a
+  crash points to it. **Help > Open log folder** opens the folder; `--log-dir` writes the log elsewhere, and
+  `--crash-test segv|abort|throw` crashes on purpose to test the note (ctest `crash_log`).
+
 ## [0.9.5] - 2026-10-31
 
 The day after launch, people filed ten issues. 0.9.5 answers all of them: ZSpheres for blocking out a base mesh,

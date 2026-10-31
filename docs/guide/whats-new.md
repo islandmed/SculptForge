@@ -5,6 +5,16 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Next version
+
+### Fixes
+
+- Divide (<kbd>Ctrl</kbd>+<kbd>D</kbd>) no longer crashes on models with a point where many polygons meet, such
+  as a Blender cylinder with Triangle Fan caps of 22 or more sides or a UV sphere's poles.
+- SculptForge now keeps a log file, `sculptforge.log`, in its settings folder (**Help > Open log folder**). After
+  a crash it says what crashed and what you did last; attach it when you report a problem. See
+  [The log file](troubleshooting.md#the-log-file).
+
 ## Version 0.9.5
 
 ### ZSpheres

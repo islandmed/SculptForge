@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/App.h"
+#include "app/CrashLog.h"
 
 #include "ai/AiCommands.h"
 #include "app/Demo.h"
@@ -1242,6 +1243,7 @@ void App::runCommand(const std::string& name, const Args& args) {
     if (doc_.sculptor.strokeActive()) endStroke();
     if (name == "save_project") storeProjectSettings();
     flushBrushEdits(); // commands may replace brushes: save edits first, then watch what's there afterwards
+    crashlog::action(name); // (failures reach the log through SDL_Log below)
     CommandResult r = commands_.execute(doc_, name, args);
     status_ = r.message;
     lastCommandOk_ = r.ok;
