@@ -66,6 +66,13 @@ def check(manifest, init):
         errors.append("bl_info version must match blender_manifest.toml")
     if re.search(r"^\s*import\s+sculptforge_bridge|^\s*from\s+sculptforge_bridge", init, re.M):
         errors.append("extensions must use relative imports")
+    imported = set()
+    for name in FILES:
+        for rel, names in re.findall(r"^\s*from\s+\.(\w*)\s+import\s+([\w, ]+)", read(name), re.M):
+            imported.update([rel] if rel else [n.strip() for n in names.split(",")])
+    for mod in sorted(imported):
+        if os.path.exists(os.path.join(SOURCE, mod + ".py")) and mod + ".py" not in FILES:
+            errors.append("%s.py is imported but not in FILES, so the zip would lack it" % mod)
     with tempfile.TemporaryDirectory() as tmp:
         for name in FILES:
             try:
@@ -100,7 +107,8 @@ def main():
             print("error:", e)
         if errors:
             return 1
-    files = {"__init__.py": init, "exchange.py": read("exchange.py")}
+    files = {name: read(name) for name in FILES}
+    files["__init__.py"] = init
     with open(LICENSE, "r", encoding="utf-8") as f:
         files["LICENSE"] = f.read()
     os.makedirs(args.out, exist_ok=True)
