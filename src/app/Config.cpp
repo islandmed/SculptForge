@@ -8,6 +8,7 @@
 #include "app/Config.h"
 
 #include "app/App.h"
+#include "app/CrashLog.h"
 #include "app/Ui.h"
 #include "core/Multires.h"
 #include "core/Script.h"
@@ -401,6 +402,16 @@ void App::initActions() {
         ICON_LC_BOOK_OPEN, nullptr, nullptr, nullptr, "Open the SculptForge website and user guide in your browser.");
     add("help.report", "Report a problem", "Help", nullptr, [] { SDL_OpenURL("https://github.com/islandmed/SculptForge/issues"); },
         ICON_LC_CIRCLE_ALERT, nullptr, nullptr, nullptr, "Open the issue tracker in your browser.");
+    add("help.log", "Open log folder", "Help", nullptr,
+        [this] {
+            const std::string url = crashlog::folderUrl();
+            if (url.empty()) status_ = "There is no log file (the user data folder couldn't be written).";
+            else if (!SDL_OpenURL(url.c_str()))
+                status_ = "The log is " + crashlog::path() + " (couldn't open its folder: " + SDL_GetError() + ")";
+        },
+        ICON_LC_FILE_TEXT, nullptr, nullptr, nullptr,
+        "Open the folder with sculptforge.log: what SculptForge did and, after a crash, what crashed. "
+        "sculptforge-previous.log beside it is the last session's. Attach both to a problem report.");
     add("help.feedback", "Fixes & suggestions", "Help", nullptr,
         [] { SDL_OpenURL("https://github.com/islandmed/SculptForge/issues/new/choose"); }, ICON_LC_MESSAGE_SQUARE_PLUS,
         nullptr, nullptr, nullptr,

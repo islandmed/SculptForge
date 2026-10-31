@@ -6,6 +6,7 @@
 // Recent and autosave with crash recovery. Prompts only appear in interactive
 // sessions; --render, --record and demos run straight through.
 #include "app/App.h"
+#include "app/CrashLog.h"
 #include "core/SplatCapture.h"
 #include "app/Ui.h"
 
@@ -497,6 +498,11 @@ void App::drawProjectPopups() {
     if (ImGui::BeginPopupModal(kRestorePopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextUnformatted("SculptForge did not close normally last time.");
         ImGui::TextUnformatted("Restore the autosaved work?");
+        if (crashlog::previousCrashed()) {
+            ImGui::Spacing();
+            ImGui::TextDisabled("What happened is in sculptforge-previous.log (Help > Open log folder);");
+            ImGui::TextDisabled("please attach it if you report the problem.");
+        }
         ImGui::Spacing();
         const float w = 110.0f * uiScale_;
         const std::string autosave = autosavePath(prefDir_);

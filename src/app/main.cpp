@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/App.h"
 #include "app/Bench.h"
+#include "app/CrashLog.h"
 
 #include <SDL3/SDL_main.h>
 
@@ -10,6 +11,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
+#include <stdexcept>
 #include <string>
 
 namespace {
@@ -49,7 +51,9 @@ void usage() {
         "  --bench-no-project       Skip the project save / open (it needs twice the memory)\n"
         "  --bench-view             Benchmark only what the viewport costs (uploads, orbit)\n"
         "  --bench-dyntopo          Benchmark dynamic topology strokes (e.g. --bench-sizes 0.25,1,4)\n"
-        "  --bench-out FILE         Write the benchmark report (Markdown) to FILE");
+        "  --bench-out FILE         Write the benchmark report (Markdown) to FILE\n"
+        "  --log-dir DIR            Write sculptforge.log to DIR instead of the user data folder\n"
+        "  --crash-test KIND        Crash on purpose (segv, abort or throw) to test the crash note in the log");
 }
 
 // UI tests must never read or change the user's real settings, recent files or
@@ -80,8 +84,20 @@ void isolateSettings() {
 
 } // namespace
 
+// --crash-test: crash the way real bugs do, after the log has started.
+[[noreturn]] static void crashOnPurpose(const std::string& kind) {
+    sf::crashlog::quietSystemCrashDialog();
+    sf::crashlog::action("crash_test " + kind);
+    if (kind == "abort") std::abort();
+    if (kind == "throw") throw std::runtime_error("crash test");
+    volatile int* nowhere = nullptr;
+    *nowhere = 1;
+    std::abort();
+}
+
 int main(int argc, char** argv) {
     sf::AppOptions options;
+    std::string logDir, crashTest;
     bool sizeGiven = false;
     sf::BenchCommandLine bench;
     for (int i = 1; i < argc; ++i) {
@@ -107,6 +123,8 @@ int main(int argc, char** argv) {
         else if (a == "--fullscreen") options.fullscreen = true;
         else if (a == "--blender") options.blender = true;
         else if (a == "--ui-out") options.uiOutDir = next();
+        else if (a == "--log-dir") logDir = next();
+        else if (a == "--crash-test") crashTest = next();
         else if (a == "--measure-idle") options.measureIdle = std::max(0.5f, float(std::atof(next().c_str())));
         else if (a == "--measure-stroke") {
             const std::string v = next(); // S or S,RADIUS
@@ -134,12 +152,16 @@ int main(int argc, char** argv) {
         options.width *= options.supersample;
         options.height *= options.supersample;
     }
+    sf::crashlog::start(logDir); // after isolateSettings: a UI test logs into its own folder
+    if (!crashTest.empty()) crashOnPurpose(crashTest);
     sf::App app;
     if (!app.init(options)) {
         app.shutdown();
+        sf::crashlog::stop();
         return 1;
     }
     int code = app.run();
     app.shutdown();
+    sf::crashlog::stop();
     return code;
 }

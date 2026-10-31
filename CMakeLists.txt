@@ -205,6 +205,7 @@ if(SCULPTFORGE_BUILD_APP)
     ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedGuide.cpp
     src/app/main.cpp
     src/app/Bench.cpp
+    src/app/CrashLog.cpp
     src/app/App.cpp
     src/app/Demo.cpp
     src/app/UiTest.cpp
@@ -537,6 +538,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME ui_user_guide_1080 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/user_guide.sfui
              --size 1920x1080 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/user_guide_1080)
     set_tests_properties(ui_user_guide_1080 PROPERTIES LABELS ui TIMEOUT 300)
+    # A crash leaves a note in the log file (#16). Needs no window.
+    add_test(NAME crash_log COMMAND ${CMAKE_COMMAND} -DAPP=$<TARGET_FILE:sculptforge>
+             -DDIR=${CMAKE_CURRENT_BINARY_DIR}/crash-log-test -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/crash_log.cmake)
     # Idle, the app draws nothing (#14): --measure-idle fails when it keeps drawing frames.
     add_test(NAME ui_idle_redraw COMMAND sculptforge --measure-idle 4)
     set_tests_properties(ui_idle_redraw PROPERTIES LABELS ui TIMEOUT 60 ENVIRONMENT "SF_NO_UPDATE_CHECK=1")

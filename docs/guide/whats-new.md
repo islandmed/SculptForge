@@ -33,6 +33,11 @@ flat colour you pick. Store Config keeps it, and projects keep their own. See
   the pointer. Based on a patch by @bribblej-web. See [Performance](performance.md).
 - The AppImage has a PNG icon at its root, so AppImage managers (AppManager, Gear Lever) show SculptForge's
   icon when they add it to your menu.
+- Divide (<kbd>Ctrl</kbd>+<kbd>D</kbd>) no longer crashes on models with a point where many polygons meet, such
+  as a Blender cylinder with Triangle Fan caps of 22 or more sides or a UV sphere's poles.
+- SculptForge now keeps a log file, `sculptforge.log`, in its settings folder (**Help > Open log folder**). After
+  a crash it says what crashed and what you did last; attach it when you report a problem. See
+  [The log file](troubleshooting.md#the-log-file).
 
 ## Version 0.9.5
 

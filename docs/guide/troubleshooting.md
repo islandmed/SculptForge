@@ -22,7 +22,8 @@ found at start-up (for example `OpenGL 4.6 (Core Profile) Mesa 26.1.8 on ...`), 
 
 - Linux: run `sculptforge` in a terminal.
 - macOS: run `/Applications/SculptForge.app/Contents/MacOS/SculptForge` in Terminal.
-- Windows: the release build has no console window; if it closes straight away, update the driver first.
+- Windows: the release build has no console window; if it closes straight away, update the driver first, then
+  read the [log file](#the-log-file), which holds the same messages.
 
 ## First launch warnings on macOS and Windows
 
@@ -179,6 +180,7 @@ SculptForge keeps its settings in one folder per user:
 | `project.json` | Recent files and the autosave interval |
 | `autosave.sfproj` | The autosaved copy of unsaved work (removed once you save) |
 | `clean_exit` | Marks a normal exit; without it, the autosave is offered for restore |
+| `sculptforge.log`, `sculptforge-previous.log` | What this session and the last one did, and what crashed (see [The log file](#the-log-file)) |
 | `console_history.txt` | The console's command history |
 | `recent_actions.txt` | Recently used entries of the command palette |
 | `brushes/` | Your brush library, one `.sfbrush` file per brush |
@@ -191,12 +193,30 @@ separate: `Documents/SculptForge` by default, changeable in **Preferences > Ligh
 > **Tip:** To move settings to another computer, copy `ui.json`, `ai.json` and the `brushes` folder. For a
 > shared layout, use **Preferences > Config > Save UI...** and **Load UI...** instead.
 
+## The log file
+
+SculptForge writes what it does to `sculptforge.log` in its [settings folder](#where-settings-live). Choose
+**Help > Open log folder** to open it:
+
+| System | Log file |
+|---|---|
+| Windows | `%APPDATA%\SculptForge\SculptForge\sculptforge.log` |
+| macOS | `~/Library/Application Support/SculptForge/SculptForge/sculptforge.log` |
+| Linux | `~/.local/share/SculptForge/SculptForge/sculptforge.log` |
+
+It holds the version, your system and GPU (the `OpenGL ... on ...` line), warnings and errors, and each command
+you ran. If SculptForge crashes, it ends with lines starting `CRASH:` that say what crashed and what was done
+last. Every start keeps the previous session's log as `sculptforge-previous.log` beside it, so after a crash
+**attach `sculptforge-previous.log` to your report** (the new `sculptforge.log` is the session after it). It holds
+no models and no keys, only command names and messages, which may include file names.
+
 ## Recovering work after a crash
 
 SculptForge autosaves unsaved work every 5 minutes by default (**Preferences > Autosave**, 0 turns it off).
 After a crash, the next start asks "SculptForge did not close normally last time. Restore the autosaved
 work?". **Restore** opens it as unsaved work (save it under a name); **Discard** deletes it. See
-[Projects, autosave and QuickSave](projects.md).
+[Projects, autosave and QuickSave](projects.md). The dialog also points to the crashed session's
+[log file](#the-log-file).
 
 ## Frequently asked questions
 
@@ -238,7 +258,9 @@ good report includes:
 3. **Steps to reproduce**: what you did, what you expected and what happened instead.
 4. **The commands you ran**: open the console (the backtick key, left of <kbd>1</kbd>), click **Copy session
    as script** and paste it into the report. It often reproduces the problem exactly.
-5. **A file** if the problem is with a particular model (a small `.sfproj` or the original file), and a
+5. **After a crash, the log**: `sculptforge-previous.log` from **Help > Open log folder** (see
+   [The log file](#the-log-file)).
+6. **A file** if the problem is with a particular model (a small `.sfproj` or the original file), and a
    screenshot for display problems.
 
 For a security problem, don't open a public issue; follow `SECURITY.md` in the repository instead.
