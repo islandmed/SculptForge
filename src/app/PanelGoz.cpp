@@ -24,6 +24,7 @@ long long fileTime(const std::string& path) {
 } // namespace
 
 void SDLCALL App::onGozFileChosen(void* userdata, const char* const* files, int) {
+    wakeMainLoop(); // a file dialog answered (maybe on another thread): redraw now
     if (!files || !files[0]) return;
     auto* req = static_cast<GozDialog*>(userdata);
     std::string path = files[0];

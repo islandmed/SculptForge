@@ -33,6 +33,7 @@ void actionButton(App& app, const char* id, float width = -1.0f) {
 } // namespace
 
 void SDLCALL App::onVdmChosen(void* userdata, const char* const* files, int) {
+    wakeMainLoop(); // a file dialog answered (maybe on another thread): redraw now
     if (!files || !files[0]) return;
     auto* app = static_cast<App*>(userdata);
     std::lock_guard lock(app->vdmMutex_);
@@ -40,6 +41,7 @@ void SDLCALL App::onVdmChosen(void* userdata, const char* const* files, int) {
 }
 
 void SDLCALL App::onVdmExportChosen(void* userdata, const char* const* files, int) {
+    wakeMainLoop(); // a file dialog answered (maybe on another thread): redraw now
     if (!files || !files[0]) return;
     auto* app = static_cast<App*>(userdata);
     std::lock_guard lock(app->vdmMutex_);

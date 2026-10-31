@@ -34,6 +34,8 @@ check exactly what a brush did; **This SubTool** keeps one SubTool smooth or fla
 - The Blender Bridge add-on installs again: its zip was missing a file.
 - Pens on Windows (Wacom Intuos Pro and others through Windows Ink): taps on menus and buttons land, and Alt+pen
   drag, the Move button and the S / U / O slider follow the pen instead of jumping.
+- Idle, SculptForge no longer keeps your graphics card busy: it draws a new frame only when something changes
+  (before, 60 or more a second all the time).
 
 ## Version 0.9.4
 

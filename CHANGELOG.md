@@ -44,6 +44,12 @@ All notable changes to SculptForge are listed here. The format follows
   drivers send mouse events of their own beside the pen's, at an old position; the interface followed them as
   well as the pen. While the pen is in range the interface now follows only the pen (as the canvas already
   did), and the Move / Zoom / Rotate buttons move the view by the cursor's own steps.
+- SculptForge kept the graphics card and a little of the processor busy while it sat idle (#14): it drew a new
+  frame 60 or more times a second whatever happened. It now draws only when something changes: your input,
+  a stroke or view move, a background job (progress bars, splat training, the update check), a message from the
+  phone or the Blender Bridge, or an animation. Idle, it draws nothing (measured: 120 frames a second and 8% of
+  a processor core before, 0 frames and 0.1% after). UI tests and `--record` still draw every frame.
+  `sculptforge --measure-idle 5` prints the idle frame rate; `SF_CONTINUOUS_REDRAW=1` draws every frame as before.
 
 ### Changed
 - The release builds use SDL 3.2.30 (was 3.2.10), which fixes Wacom tablets on Windows: clicks dropped with

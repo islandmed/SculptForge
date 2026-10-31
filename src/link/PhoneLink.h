@@ -28,6 +28,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <functional>
 #include <string>
 #include <thread>
 #include <vector>
@@ -167,6 +168,9 @@ public:
 
     // Events for the main thread, oldest first.
     std::vector<PhoneEvent> takeEvents();
+    // Called (from the server's threads) whenever the phone sends something: the app redraws only on demand
+    // and uses it to wake up. Set it before start().
+    void setWake(std::function<void()> wake) { wake_ = std::move(wake); }
 
     // The newest face frame (false when there is none newer than `serial`; updates `serial`).
     bool latestFace(FaceFrame& frame, uint64_t& serial) const;
@@ -208,6 +212,7 @@ private:
     HttpResponse route(const HttpRequest& request);
     bool authorised(const HttpRequest& request);
     void noteDevice(const HttpRequest& request);
+    std::function<void()> wake_;
     void pushEvent(PhoneEvent event);
     void newToken();
     std::string statusJson();

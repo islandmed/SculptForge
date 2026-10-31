@@ -137,6 +137,7 @@ namespace {
 std::mutex g_folderMutex;
 std::string g_pickedFolder;
 void SDLCALL onBakeFolder(void*, const char* const* files, int) {
+    wakeMainLoop(); // a file dialog answered (maybe on another thread): redraw now
     if (!files || !files[0]) return;
     std::lock_guard lock(g_folderMutex);
     g_pickedFolder = files[0];
