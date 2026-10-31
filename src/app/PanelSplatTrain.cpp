@@ -53,6 +53,7 @@ enum class Pick { None, Video, Folder, Brush, Colmap };
 std::mutex g_pickMutex;
 std::vector<std::pair<Pick, std::string>> g_picked;
 void SDLCALL onPicked(void* userdata, const char* const* files, int) {
+    wakeMainLoop(); // a file dialog answered (maybe on another thread): redraw now
     if (!files || !files[0]) return;
     std::lock_guard lock(g_pickMutex);
     g_picked.emplace_back(Pick(reinterpret_cast<intptr_t>(userdata)), files[0]);

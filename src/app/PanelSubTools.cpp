@@ -32,6 +32,7 @@ const SDL_DialogFileFilter kAppendFilters[] = {
     {"Models and projects", "obj;fbx;glb;gltf;ply;stl;GoZ;goz;usda;usd;usdz;sfproj"}, {"All files", "*"}};
 
 void SDLCALL onAppendChosen(void* userdata, const char* const* files, int) {
+    wakeMainLoop(); // a file dialog answered (maybe on another thread): redraw now
     if (!files || !files[0]) return;
     auto* req = static_cast<App::DialogRequest*>(userdata);
     req->app->queueFile(req->action, files[0]);

@@ -529,6 +529,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME ui_user_guide_1080 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/user_guide.sfui
              --size 1920x1080 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/user_guide_1080)
     set_tests_properties(ui_user_guide_1080 PROPERTIES LABELS ui TIMEOUT 300)
+    # Idle, the app draws nothing (#14): --measure-idle fails when it keeps drawing frames.
+    add_test(NAME ui_idle_redraw COMMAND sculptforge --measure-idle 4)
+    set_tests_properties(ui_idle_redraw PROPERTIES LABELS ui TIMEOUT 60 ENVIRONMENT "SF_NO_UPDATE_CHECK=1")
     # The guide's keyboard table must match the app's default shortcuts (tools/guide/update_shortcuts.py).
     if(Python3_Interpreter_FOUND)
       sculptforge_runner(SCULPTFORGE_APP_RUNNER sculptforge)

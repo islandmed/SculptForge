@@ -60,6 +60,7 @@ void readBool(const Json& j, const char* key, bool& v) { v = j[key].asBool(v); }
 // Save As dialog: a cancelled dialog is reported as an empty path so a pending
 // "save, then quit/open/new" is dropped instead of firing on a later save.
 void SDLCALL onProjectChosen(void* userdata, const char* const* files, int) {
+    wakeMainLoop(); // a file dialog answered (maybe on another thread): redraw now
     auto* req = static_cast<App::DialogRequest*>(userdata);
     req->app->queueFile(req->action, files && files[0] ? std::string(files[0]) : std::string());
 }

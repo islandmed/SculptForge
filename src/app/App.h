@@ -70,9 +70,14 @@ struct AppOptions {
     std::string uiTest;   // run this .sfui UI test script headless and exit (see UiTest.cpp)
     std::string uiOutDir; // where UI tests save screenshots
     bool fullscreen = false; // start fullscreen (F11 toggles)
+    float measureIdle = 0.0f; // --measure-idle S: after a settling pause, count the frames drawn in S idle seconds, exit
 };
 
 class Demo;
+
+// Wakes the main loop from any thread (SDL_PushEvent): the app draws only when something changed (#14), so work
+// that finishes off the main thread (a file dialog's answer, a phone message) calls this to be seen at once.
+void wakeMainLoop();
 
 class App {
     friend class Demo;
@@ -88,6 +93,9 @@ public:
     ~App();
     bool init(const AppOptions& options);
     int run(); // returns the process exit code
+    // Redraw on demand (#14): the interactive loop sleeps in SDL_WaitEventTimeout until an event, a background
+    // job or an animation needs a new frame. UI tests and recordings (runRecording) draw every frame as before.
+    bool backgroundBusy() const; // a background job runs (also the UI tests' wait_idle)
 
     ActionRegistry& actions() { return actions_; }
     UiLayout& layout() { return layout_; }
@@ -1109,6 +1117,14 @@ private:
     bool maskClickPending_ = false; // Ctrl+press on the model: a click blurs (Alt: sharpens), a drag paints
     float maskClickX_ = 0.0f, maskClickY_ = 0.0f;
     // ---- end ZBrush feel ----
+    // ---- Redraw on demand (App.cpp run()) ----
+    bool wantsFrames(double now) const; // something animates or runs: keep drawing
+    uint64_t frameKey() const;          // changes when a poller changed what the window shows
+    double activeUntil_ = 0.0;          // seconds: keep drawing until then (after input: hover, tooltips)
+    double redrawAt_ = 0.0;             // seconds (SDL clock): draw one frame then, asleep or not (0: none)
+public:
+    void redrawIn(double seconds);      // something on screen changes by itself later (an error colour fading)
+private:
     // ---- Tablet (Tablet.cpp, core/Tablet.h, docs/tablet.md) ----
     // SDL turns pen tip contact into left mouse button events (SDL_PEN_MOUSEID); the pen's own events
     // add pressure, tilt, the eraser end and the side buttons, which are mapped in Preferences > Tablet.

@@ -345,6 +345,7 @@ void PhoneLink::pushEvent(PhoneEvent event) {
     if (event.type == PhoneEvent::Type::Error) lastError_ = event.text;
     events_.push_back(std::move(event));
     while (events_.size() > 256) events_.pop_front();
+    if (wake_) wake_();
 }
 
 std::vector<PhoneEvent> PhoneLink::takeEvents() {
@@ -432,6 +433,7 @@ void PhoneLink::noteDevice(const HttpRequest& request) {
 }
 
 HttpResponse PhoneLink::route(const HttpRequest& request) {
+    if (wake_) wake_(); // uploads, AR requests and progress show at once
     const std::string& path = request.path;
     const std::string& method = request.method;
     const bool get = method == "GET" || method == "HEAD";
@@ -950,6 +952,7 @@ bool PhoneLink::receiveFaceMessage(const std::string& text, const std::string& t
     std::lock_guard lock(mutex_);
     face_ = frame;
     ++faceSerial_;
+    if (wake_) wake_();
     lastFace_ = now;
     faceTimes_.push_back(now);
     while (!faceTimes_.empty() && now - faceTimes_.front() > std::chrono::seconds(1)) faceTimes_.pop_front();

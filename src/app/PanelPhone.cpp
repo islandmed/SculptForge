@@ -119,7 +119,10 @@ void App::setPhoneLinkOpen(bool open) {
         return;
     }
     if (phone_ && phone_->running()) return;
-    if (!phone_) phone_ = std::make_unique<link::PhoneLink>();
+    if (!phone_) {
+        phone_ = std::make_unique<link::PhoneLink>();
+        phone_->setWake(wakeMainLoop); // the app sleeps while idle (#14): a phone message wakes it
+    }
     phoneError_.clear();
     if (library_.user.empty()) {
         phoneError_ = "The phone link saves into your library's Captures folder: set a library in Preferences > LightBox.";

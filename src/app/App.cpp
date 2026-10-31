@@ -26,6 +26,10 @@
 #include <imgui_impl_opengl3.h>
 #include <imgui_impl_sdl3.h>
 
+#include <cstdio>
+#include <ctime>
+#include <cstdlib>
+#include <functional>
 #include <algorithm>
 #include <chrono>
 #include <cfloat>
@@ -554,16 +558,121 @@ int App::runRecording() {
     return status == 0 ? 0 : 1;
 }
 
+namespace {
+
+Uint32 g_wakeEvent = 0; // registered in App::run(); 0 before
+
+constexpr int kIdleTickMs = 250;       // asleep: wake this often to run the pollers (the Blender bridge, autosave)
+constexpr int kCaretTickMs = 530;      // a text field has the keyboard: redraw for the caret's blink
+constexpr double kAfterChangeSeconds = 0.25; // a poller changed something: draw for this long
+
+} // namespace
+
+void wakeMainLoop() {
+    if (g_wakeEvent == 0) return;
+    SDL_Event e{};
+    e.type = g_wakeEvent;
+    SDL_PushEvent(&e);
+}
+
+bool App::backgroundBusy() const {
+    auto running = [](const auto& f) { return f.valid() && f.wait_for(std::chrono::seconds(0)) != std::future_status::ready; };
+    return running(pendingBrush_) || running(pendingGenerator_) || running(pendingModels_) || running(pendingUnreal_) ||
+           running(pendingComfyCheck_) || galleryBusy() || thumbs_.busy() || libraryScanner_.busy() || autoUv_ ||
+           bakeBusy() || qremesh_ || voxelRemesh_ || updateJob_ || splatTrainBusy() || sculptableBusy() || phoneBusy();
+}
+
+void App::redrawIn(double seconds) {
+    const double at = double(SDL_GetTicksNS()) * 1e-9 + seconds;
+    redrawAt_ = redrawAt_ > 0.0 ? std::min(redrawAt_, at) : at;
+}
+
+bool App::wantsFrames(double now) const {
+    return now < activeUntil_ || drag_ != Drag::None || doc_.sculptor.strokeActive() || backgroundBusy() ||
+           playingLayer_ >= 0 || faceTakePlaying_ ||
+           perf_.framesStill < 10; // the view just moved: Fast Navigation's full-quality frame comes after it stops
+}
+
+uint64_t App::frameKey() const {
+    uint64_t h = std::hash<std::string>{}(status_) ^ (std::hash<std::string>{}(updateStatus_) << 1);
+    for (const uint64_t v : {uint64_t(doc_.undo.revision()), uint64_t(doc_.splatsVersion), uint64_t(doc_.modified),
+                             uint64_t(doc_.subtoolCount()), uint64_t(int64_t(doc_.activeSubtool))})
+        h = h * 1099511628211ull ^ v;
+    return h;
+}
+
 int App::run() {
     if (!options_.renderPath.empty()) return renderHeadless();
     if (!options_.recordPath.empty() || !options_.uiTest.empty()) return runRecording();
+    if (g_wakeEvent == 0) g_wakeEvent = SDL_RegisterEvents(1);
+    // SF_CONTINUOUS_REDRAW=1 draws every frame as before 0.9.5 (for comparison, or a driver that misbehaves).
+    const char* continuousEnv = std::getenv("SF_CONTINUOUS_REDRAW");
+    const bool continuous = continuousEnv && *continuousEnv && *continuousEnv != '0';
+    const bool logRedraw = std::getenv("SF_REDRAW_LOG") != nullptr; // why each frame is drawn (bug reports)
+    auto seconds = [] { return double(SDL_GetTicksNS()) * 1e-9; };
+    // --measure-idle: let start-up settle (first frames, the LightBox's thumbnails), then count.
+    constexpr double kMeasureSettle = 3.0;
+    const double started = seconds();
+    uint64_t framesDrawn = 0, wakeUps = 0, framesAtMeasure = 0, wakesAtMeasure = 0;
+    std::clock_t cpuAtMeasure = 0; // processor time of every thread (the driver's included)
+    bool measuring = false;
     Uint64 lastTicks = SDL_GetTicksNS();
+    uint64_t lastKey = frameKey();
+    bool draw = true;
+    activeUntil_ = started + 1.0;
     while (running_) {
+        const double t0 = seconds();
+        if (options_.measureIdle > 0.0f) {
+            if (!measuring && t0 - started >= kMeasureSettle) {
+                measuring = true;
+                framesAtMeasure = framesDrawn;
+                wakesAtMeasure = wakeUps;
+                cpuAtMeasure = std::clock();
+            } else if (measuring && t0 - started >= kMeasureSettle + options_.measureIdle) {
+                const double fps = double(framesDrawn - framesAtMeasure) / double(options_.measureIdle);
+                const double cpu = 100.0 * double(std::clock() - cpuAtMeasure) / CLOCKS_PER_SEC / double(options_.measureIdle);
+                std::printf("Idle: %llu frames, %llu wake-ups in %.1f s: %.2f fps, CPU %.1f%% of one core (%s redraw)\n",
+                            (unsigned long long)(framesDrawn - framesAtMeasure), (unsigned long long)(wakeUps - wakesAtMeasure),
+                            double(options_.measureIdle), fps, cpu, continuous ? "continuous" : "on-demand");
+                std::fflush(stdout);
+                // Idle is 0 fps; a pointer crossing the window draws about a second's worth. Every frame is 60+.
+                return continuous || fps < 5.0 ? 0 : 1;
+            }
+        }
+        // Nothing to draw: sleep until an event, or the next poller tick.
+        const ImGuiIO& io = ImGui::GetIO();
+        // Input keeps the frames coming a little while (hover highlights, tooltips after their delay); other
+        // events (the window shown, moved, focused) need a frame or two.
+        const auto onEvent = [&](const SDL_Event& ev) {
+            handleEvent(ev);
+            if (ev.type == SDL_EVENT_KEYMAP_CHANGED || ev.type == SDL_EVENT_KEYBOARD_ADDED ||
+                ev.type == SDL_EVENT_KEYBOARD_REMOVED || ev.type == SDL_EVENT_MOUSE_ADDED ||
+                ev.type == SDL_EVENT_MOUSE_REMOVED || ev.type == SDL_EVENT_CLIPBOARD_UPDATE)
+                return; // nothing on screen changes
+            draw = true;
+            if (logRedraw) SDL_Log("redraw: event 0x%x", unsigned(ev.type));
+            const bool input = (ev.type >= SDL_EVENT_KEY_DOWN && ev.type < SDL_EVENT_JOYSTICK_AXIS_MOTION) ||
+                               (ev.type >= SDL_EVENT_FINGER_DOWN && ev.type <= SDL_EVENT_FINGER_CANCELED) ||
+                               (ev.type >= SDL_EVENT_PEN_PROXIMITY_IN && ev.type <= SDL_EVENT_PEN_AXIS) ||
+                               ev.type == SDL_EVENT_DROP_FILE;
+            const double t = seconds();
+            activeUntil_ = std::max(activeUntil_, t + (input ? std::max(0.75, double(uiPrefs_.tooltipDelay) + 0.5) : 0.1));
+        };
+        SDL_Event e;
+        if (!continuous && !draw) {
+            int timeout = io.WantTextInput ? kCaretTickMs : kIdleTickMs;
+            if (redrawAt_ > 0.0) timeout = std::clamp(int((redrawAt_ - t0) * 1000.0) + 1, 0, timeout);
+            if (SDL_WaitEventTimeout(&e, timeout)) {
+                onEvent(e);
+            } else if (io.WantTextInput) {
+                draw = true; // the caret blinks
+            }
+            ++wakeUps;
+        }
+        while (SDL_PollEvent(&e)) onEvent(e);
         Uint64 now = SDL_GetTicksNS();
         float dt = float(double(now - lastTicks) * 1e-9);
         lastTicks = now;
-        SDL_Event e;
-        while (SDL_PollEvent(&e)) handleEvent(e);
         processPendingFiles();
         animateLayers(dt);
         pollBrushRequest();
@@ -577,12 +686,25 @@ int App::run() {
         pollQRemesh();
         pollSplatTrain();
         pollSculptable();
+        tickProject(dt); // the title and autosave, asleep or not
+        const double t = seconds();
+        if (const uint64_t key = frameKey(); key != lastKey) { // a job finished, the Blender bridge sent a model...
+            lastKey = key;
+            draw = true;
+            if (logRedraw) SDL_Log("redraw: changed (status \"%s\")", status_.c_str());
+            activeUntil_ = std::max(activeUntil_, t + kAfterChangeSeconds);
+        }
+        if (redrawAt_ > 0.0 && t >= redrawAt_) {
+            redrawAt_ = 0.0;
+            draw = true;
+        }
+        if (!draw && !continuous && !wantsFrames(t)) continue;
 
         int fbW = 0, fbH = 0, winW = 0, winH = 0;
         SDL_GetWindowSizeInPixels(window_, &fbW, &fbH);
         SDL_GetWindowSize(window_, &winW, &winH);
         if (fbW <= 0 || fbH <= 0) {
-            SDL_Delay(16);
+            draw = false; // minimised: the next event (restore) draws again
             continue;
         }
         updateCameraAspect();
@@ -602,7 +724,12 @@ int App::run() {
         renderSettings_.motionProxy = false; // (other renders, e.g. project thumbnails, draw in full)
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window_);
-        tickProject(dt);
+        ++framesDrawn;
+        lastKey = frameKey(); // what this frame changed is on screen already
+        draw = continuous || wantsFrames(seconds());
+        if (logRedraw && draw && !continuous)
+            SDL_Log("redraw: keep drawing (input %d, drag %d, busy %d, view moved %d)", int(seconds() < activeUntil_),
+                    int(drag_ != Drag::None), int(backgroundBusy()), int(perf_.framesStill < 10));
     }
     finishProject();
     return 0;
@@ -1132,6 +1259,7 @@ void App::runCommand(const std::string& name, const Args& args) {
 namespace {
 
 void SDLCALL onFileChosen(void* userdata, const char* const* files, int) {
+    wakeMainLoop(); // a file dialog answered (maybe on another thread): redraw now
     if (!files || !files[0]) return;
     auto* req = static_cast<App::DialogRequest*>(userdata);
     req->app->queueFile(req->action, files[0]);
