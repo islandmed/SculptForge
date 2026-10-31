@@ -5,6 +5,14 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Next version
+
+### Blender keys
+
+**Preferences > Input > Style > Blender** brings Blender's navigation and Sculpt Mode keys: middle-drag to
+orbit (Alt+drag with a pen), the numpad views, F / Shift+F, V S P I G C K for brushes, M for the mask. You can
+also import a keymap you exported from Blender. See [Blender keys](shortcuts.md#blender-keys).
+
 ## Version 0.9.4
 
 ### Fixes and packaging

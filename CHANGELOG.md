@@ -6,6 +6,25 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- A Blender input style (#12): **Preferences > Input > Style > Blender**, also at the top of the Controls window.
+  Middle-drag orbits, Shift+middle pans, Ctrl+middle zooms, and Alt+left-drag does the same for pens and
+  trackpads (Emulate 3 Button Mouse); Ctrl inverts a stroke, Shift smooths; F / Shift+F set the radius and
+  strength; Blender 4.2+'s Sculpt Mode keys pick the nearest brushes (V Draw, S Smooth, P Pinch, I Inflate,
+  G Grab, C Clay Strips, Shift+C Crease, K Snake Hook, Shift+T Scrape as Flatten) and M the Mask brush
+  (Ctrl+drag unmasks); Alt+M / Ctrl+I clear / invert the mask; H / Shift+H / Alt+H hide, isolate and show
+  polygroups; Alt+1 / Alt+2 step the subdivision levels; Home frames everything. Choosing it sets Rotation to
+  Turntable. **Emulate Numpad** makes the number row work as the numpad.
+- **Import Blender keymap...**: reads a keymap exported from Blender (the .py file, as text: it is never run) and
+  takes the 3D View and Sculpt keys SculptForge has an equivalent for. Also the `blender_keymap_import` command.
+- Numpad views in every input style: Numpad 1 / 3 / 7 front, right, top (Ctrl: back, left, bottom), Numpad 5
+  orthographic, Numpad 4 / 6 / 8 / 2 orbit in 15 degree steps, Numpad 9 the other side, Numpad . frames the
+  active SubTool, Numpad Plus / Minus zoom.
+- An orthographic view. The axis views turn it on until the view is rotated again (Blender's Auto Perspective).
+
+### Fixed
+- B, M, S and the LightBox key followed the built-in key even after you gave the action another one.
+
 ## [0.9.4] - 2026-10-29
 
 ### Fixed

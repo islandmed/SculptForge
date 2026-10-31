@@ -130,12 +130,27 @@ action registry, the same source as the Controls window.
 
 | Action | Keys | What it does |
 |---|---|---|
+| Back view | <kbd>Ctrl</kbd>+<kbd>Numpad 1</kbd> | Look at the model from behind (orthographic). |
+| Bottom view | <kbd>Ctrl</kbd>+<kbd>Numpad 7</kbd> | Look up at the model from below (orthographic). |
 | Draw | <kbd>Q</kbd> | Draw mode: brushes sculpt and paint (leaves the Gizmo 3D). |
 | Frame | <kbd>F</kbd> | Fit the whole model in the view. |
+| Frame SubTool | <kbd>Numpad .</kbd> | Fit the active SubTool in the view (Blender: View Selected). |
+| Front view | <kbd>Numpad 1</kbd> | Look at the model from the front (orthographic). |
+| Left view | <kbd>Ctrl</kbd>+<kbd>Numpad 3</kbd> | Look at the model's left side (orthographic). |
 | Move | <kbd>W</kbd> | Gizmo 3D, Move: drag an arrow to move along an axis, a square to move in a plane, the centre to move in the view. Masked parts stay; Shift snaps to the grid; Alt+drag moves only the gizmo. W again: back to Draw. |
+| Opposite side | <kbd>Numpad 9</kbd> | Look at the model from the other side. |
+| Orbit down | <kbd>Numpad 2</kbd> | Turn the view 15 degrees down under the model. |
+| Orbit left | <kbd>Numpad 4</kbd> | Turn the view 15 degrees to the left around the model. |
+| Orbit right | <kbd>Numpad 6</kbd> | Turn the view 15 degrees to the right around the model. |
+| Orbit up | <kbd>Numpad 8</kbd> | Turn the view 15 degrees up over the model. |
+| Orthographic | <kbd>Numpad 5</kbd> | Switch between a perspective and an orthographic view (no foreshortening: sizes don't shrink with depth). |
+| Right view | <kbd>Numpad 3</kbd> | Look at the model's right side (orthographic). |
 | Rotate | <kbd>R</kbd> | Gizmo 3D, Rotate: drag a ring to turn about that axis, the outer ring to turn in the view. Mask the body and put the pivot at a joint to pose a limb. Shift snaps to 15 degrees. R again: back to Draw. |
 | Scale | <kbd>E</kbd> | Gizmo 3D, Scale: drag a box to stretch along an axis or the centre to scale evenly (right or up: bigger). Shift snaps to 10% steps. E again: back to Draw. |
+| Top view | <kbd>Numpad 7</kbd> | Look down on the model (orthographic). |
 | X | <kbd>X</kbd> | Mirror strokes across X (left and right). |
+| Zoom in | <kbd>Numpad Plus</kbd> | Move the view closer. |
+| Zoom out | <kbd>Numpad Minus</kbd> | Move the view back. |
 
 <!-- END GENERATED: shortcuts -->
 
@@ -219,6 +234,53 @@ Some keys only mean something while a pop-up or panel has the keyboard.
 | <kbd>Backspace</kbd> or <kbd>Delete</kbd> | Remove the shortcut |
 | <kbd>Esc</kbd> | Cancel |
 
+## Blender keys
+
+With **Preferences > Input > Style** on **Blender** (also at the top of the Controls window, <kbd>F1</kbd>), the
+view and the sculpt keys work as in Blender 4.2 and later, Sculpt Mode. The table above shows the ZBrush style's
+keys; these change in the Blender style:
+
+| To | Blender style |
+|---|---|
+| Rotate | Middle-drag, or <kbd>Alt</kbd>+left-drag (pens, trackpads: Blender's Emulate 3 Button Mouse), or left-drag beside the model |
+| Pan | <kbd>Shift</kbd>+middle-drag, or <kbd>Alt</kbd>+<kbd>Shift</kbd>+left-drag |
+| Zoom | Mouse wheel, <kbd>Ctrl</kbd>+middle-drag (up: closer), <kbd>Alt</kbd>+<kbd>Ctrl</kbd>+left-drag, <kbd>Numpad Plus</kbd> / <kbd>Numpad Minus</kbd> |
+| Invert the brush (subtract) | Hold <kbd>Ctrl</kbd> while sculpting |
+| Smooth | Hold <kbd>Shift</kbd> while sculpting |
+| Front, right, top view | <kbd>Numpad 1</kbd>, <kbd>Numpad 3</kbd>, <kbd>Numpad 7</kbd>; with <kbd>Ctrl</kbd>: back, left, bottom |
+| Orthographic on or off | <kbd>Numpad 5</kbd> (the axis views turn it on until you rotate again) |
+| Orbit in 15 degree steps, the other side | <kbd>Numpad 4</kbd> <kbd>Numpad 6</kbd> <kbd>Numpad 8</kbd> <kbd>Numpad 2</kbd>, <kbd>Numpad 9</kbd> |
+| Frame the active SubTool / everything | <kbd>Numpad .</kbd> / <kbd>Home</kbd> |
+| Brush radius / strength | <kbd>F</kbd> / <kbd>Shift</kbd>+<kbd>F</kbd> (drag, or type a number) |
+| Draw, Smooth, Pinch, Inflate, Grab (Move) | <kbd>V</kbd>, <kbd>S</kbd>, <kbd>P</kbd>, <kbd>I</kbd>, <kbd>G</kbd> |
+| Clay Strips (ClayBuildup), Crease, Snake Hook, Scrape (Flatten) | <kbd>C</kbd>, <kbd>Shift</kbd>+<kbd>C</kbd>, <kbd>K</kbd>, <kbd>Shift</kbd>+<kbd>T</kbd> |
+| Mask brush | <kbd>M</kbd>, then drag to mask and <kbd>Ctrl</kbd>+drag to unmask; <kbd>M</kbd> again goes back to your brush |
+| Clear / invert the mask | <kbd>Alt</kbd>+<kbd>M</kbd> / <kbd>Ctrl</kbd>+<kbd>I</kbd> |
+| Hide the polygroup under the cursor | <kbd>H</kbd>; <kbd>Shift</kbd>+<kbd>H</kbd> shows only it (again: everything); <kbd>Alt</kbd>+<kbd>H</kbd> shows everything |
+| Lower / higher subdivision level | <kbd>Alt</kbd>+<kbd>1</kbd> / <kbd>Alt</kbd>+<kbd>2</kbd> (<kbd>Shift</kbd>+<kbd>D</kbd> / <kbd>D</kbd> still work) |
+| Swap colours / sample colour | <kbd>X</kbd> / <kbd>Shift</kbd>+<kbd>X</kbd> |
+| Smooth stroke (LazyMouse) | <kbd>Shift</kbd>+<kbd>S</kbd> (or <kbd>L</kbd>) |
+| Wireframe | <kbd>Shift</kbd>+<kbd>Z</kbd> |
+
+Choosing the Blender style also sets **Rotation** to **Turntable**, as Blender orbits; change it back under
+**Preferences > Input** if you like. Blender's face sets are SculptForge's polygroups, and its brushes map to the
+nearest SculptForge brush. **Symmetry X**, **Paint** and the material picker have no key in the Blender style
+(they are on the shelves); give them one with <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click. Laptops without a numpad:
+turn on **Preferences > Input > Emulate Numpad** and the number row works as the numpad.
+
+The numpad views (<kbd>Numpad 1</kbd>, <kbd>3</kbd>, <kbd>7</kbd>, <kbd>5</kbd> ...) work in every style.
+
+### Your own Blender keymap
+
+If you changed Blender's keys, export them in Blender (**Edit > Preferences > Keymap**, the **Export...** button
+next to the keymap name) and in SculptForge choose **Import Blender keymap...** under **Preferences > Input** or
+at the top of the Controls window. SculptForge switches to the Blender style and takes, from the file's 3D View
+and Sculpt keymaps, the keys of every action it has an equivalent for: the views, the brushes above, the radius
+and strength, the mask, hiding, subdivision levels, undo and redo. Mouse buttons and keys for things
+SculptForge doesn't have are left alone; the status bar says how many keys it took. The file is read as text and
+never run. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> (Store Config) keeps the keys; **Restore Standard UI**
+goes back to the defaults.
+
 ## ZBrush keys that work differently
 
 ZBrush's keys and gestures work in SculptForge (with **Preferences > Input > Style** on **ZBrush**, the
@@ -226,7 +288,7 @@ default). The few that differ, because the feature works differently or doesn't 
 
 | ZBrush | SculptForge |
 |---|---|
-| <kbd>P</kbd> (perspective) | <kbd>P</kbd> is the Paint brush; the view is always in perspective |
+| <kbd>P</kbd> (perspective) | <kbd>P</kbd> is the Paint brush; <kbd>Numpad 5</kbd> switches to an orthographic view |
 | <kbd>T</kbd> (Edit mode) | Always in Edit mode: there is no 2.5D canvas |
 | <kbd>W</kbd> / <kbd>E</kbd> / <kbd>R</kbd> (Transpose line) | The Gizmo 3D (see [Gizmo 3D](gizmo.md)) |
 | <kbd>1</kbd>, <kbd>2</kbd>, <kbd>3</kbd> (replay and record strokes) | Not yet |

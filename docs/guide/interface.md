@@ -431,11 +431,14 @@ Config keeps it.
 | **UI scale** | Automatic | Size of text and controls (100% to 200%); takes effect at the next start |
 | **Camera notch** | Automatic | Keeps the interface below a laptop's camera notch in fullscreen (see below) |
 
-**Preferences > Input** sets the key **Style**: **ZBrush** (the default) or **SculptForge**, which brings back
+**Preferences > Input** sets the key **Style**: **ZBrush** (the default), **SculptForge**, which brings back
 the keys of SculptForge 0.6 and earlier: <kbd>1</kbd> to <kbd>9</kbd> and <kbd>0</kbd> pick the first ten
 brushes (<kbd>9</kbd> is QuickSave in the ZBrush style), <kbd>I</kbd> opens Z Intensity like <kbd>U</kbd>, and
-<kbd>Ctrl</kbd>+drag on the background zooms when nothing is masked. **Rotation** chooses free rotation (ZBrush)
-or a turntable. See [Coming from ZBrush](coming-from-zbrush.md).
+<kbd>Ctrl</kbd>+drag on the background zooms when nothing is masked; or **Blender**: middle-drag navigation,
+the numpad views and Blender's sculpt-mode keys (see [Blender keys](shortcuts.md#blender-keys)). In the Blender
+style, **Emulate Numpad** makes the number row work as the numpad, and **Import Blender keymap...** takes the keys
+from a keymap you exported in Blender. **Rotation** chooses free rotation (ZBrush) or a turntable. See
+[Coming from ZBrush](coming-from-zbrush.md).
 
 **Preferences > LightBox** has **Show at startup** (on by default), the number of **Rows**, **Placement**
 (along the top of the canvas, or at the bottom above the bottom shelf) and the **Library folder**.

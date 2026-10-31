@@ -24,7 +24,7 @@ be confirmed by a ZBrush user.
 | Right-click navigation (Preferences): rotate, Alt pans, Ctrl scales, also over the model [1 §3.1] | Same, always on | none | – | – |
 | F: fit the mesh to the view [1 §6] | Same (frames every visible SubTool) | none | – | – |
 | Shift+Alt+click a SubTool: frame it [1 §6.1] | Missing | small | P3 | fixed |
-| P: perspective on / off [1 §6] | P is Paint; the view is always perspective | small | P3 | open (needs an orthographic camera; documented) |
+| P: perspective on / off [1 §6] | P is Paint; Numpad 5 switches perspective / orthographic | small | P3 | partly (orthographic on Numpad 5; P stays Paint) |
 | Mouse wheel | ZBrush does not zoom with the wheel by default; SculptForge does | none (extra) | – | kept |
 
 ## Sculpting modifiers
