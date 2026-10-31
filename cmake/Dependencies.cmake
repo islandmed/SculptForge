@@ -24,7 +24,7 @@ if(SDL3_FOUND)
 else()
   message(STATUS "Fetching SDL3")
   FetchContent_Declare(SDL3
-    URL https://github.com/libsdl-org/SDL/releases/download/release-3.2.10/SDL3-3.2.10.tar.gz
+    URL https://github.com/libsdl-org/SDL/releases/download/release-3.2.30/SDL3-3.2.30.tar.gz
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
   # Static: release packages then need no separate SDL library (zlib licence allows this).
   set(SDL_SHARED OFF CACHE BOOL "" FORCE)

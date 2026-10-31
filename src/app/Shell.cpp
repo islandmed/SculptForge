@@ -1491,7 +1491,11 @@ bool App::canvasNavButton(const char* id, const char* icon, const char* label, i
     ImGui::InvisibleButton((std::string(label) + "##" + id).c_str(), size);
     const bool hovered = ImGui::IsItemHovered(), active = ImGui::IsItemActive();
     if (active) {
-        const ImVec2 d = ImGui::GetIO().MouseDelta;
+        // The cursor's own steps (the pen's, or the mouse's), not ImGui's MouseDelta: the press itself could carry a
+        // jump from wherever ImGui last saw the cursor, which threw the model off the canvas with a pen (#13).
+        const ImVec2 now(mouseX_, mouseY_);
+        const ImVec2 d = ImGui::IsItemActivated() ? ImVec2(0, 0) : ImVec2(now.x - navLast_.x, now.y - navLast_.y);
+        navLast_ = now;
         const CanvasRect c = shell_.canvas;
         if (d.x != 0.0f || d.y != 0.0f) {
             if (mode == 0) camera_.pan(d.x, d.y, c.h);

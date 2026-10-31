@@ -39,6 +39,16 @@ All notable changes to SculptForge are listed here. The format follows
   Windows). It now opens with its knob (the current value) right under the brush cursor, at any UI scale and
   with a pen, and stays open while you drag until you let go, click elsewhere or press Esc.
 - B, M, S and the LightBox key followed the built-in key even after you gave the action another one.
+- Pens through Windows Ink (a Wacom Intuos Pro, #13): taps on menus and buttons often missed, Alt+pen drag and the
+  Move button threw the model off the canvas, and the S / U / O slider could not be dragged. Windows Ink and some
+  drivers send mouse events of their own beside the pen's, at an old position; the interface followed them as
+  well as the pen. While the pen is in range the interface now follows only the pen (as the canvas already
+  did), and the Move / Zoom / Rotate buttons move the view by the cursor's own steps.
+
+### Changed
+- The release builds use SDL 3.2.30 (was 3.2.10), which fixes Wacom tablets on Windows: clicks dropped with
+  Windows Ink off, and the barrel button pressed while hovering arriving as a left click. On Linux (X11) it also
+  stops the pen's own events from arriving a second time as mouse events.
 
 ## [0.9.4] - 2026-10-29
 

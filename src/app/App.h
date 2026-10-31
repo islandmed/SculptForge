@@ -864,6 +864,7 @@ private:
     size_t activeTris_ = 0;
     float bottomTileW_ = 58.0f; // bottom shelf tiles shrink (down to 44 px) before the shelf scrolls
     int navDrag_ = -1;          // right-shelf drag button being dragged (0 move, 1 zoom, 2 rotate)
+    ImVec2 navLast_{0, 0};      // the cursor at its last frame (the drag moves by the cursor's own steps)
     std::string statusShown_;   // for colouring fresh errors in the title strip
     double statusSince_ = 0.0;
     struct ShelfDrag {
@@ -1113,6 +1114,8 @@ private:
     // SDL turns pen tip contact into left mouse button events (SDL_PEN_MOUSEID); the pen's own events
     // add pressure, tilt, the eraser end and the side buttons, which are mapped in Preferences > Tablet.
     bool dropPenMouseEvent(const SDL_Event& e) const; // SDL's version-dependent clicks for pen buttons
+    bool strayMouseMotion(const SDL_Event& e) const;  // a driver's mouse motion beside the pen's (Tablet.cpp)
+    void keepImGuiOnPen();                            // after ImGui_ImplSDL3_NewFrame (Tablet.cpp)
     void handlePenEvent(const SDL_Event& e);
     void penButton(int button, bool down, float x, float y);
     void penLeft(); // out of proximity: ends what the pen was doing

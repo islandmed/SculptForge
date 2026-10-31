@@ -32,6 +32,8 @@ check exactly what a brush did; **This SubTool** keeps one SubTool smooth or fla
   again instead of shaking the view.
 - The S / U / I / O slider opens with its knob under the cursor and stays open while you drag it.
 - The Blender Bridge add-on installs again: its zip was missing a file.
+- Pens on Windows (Wacom Intuos Pro and others through Windows Ink): taps on menus and buttons land, and Alt+pen
+  drag, the Move button and the S / U / O slider follow the pen instead of jumping.
 
 ## Version 0.9.4
 

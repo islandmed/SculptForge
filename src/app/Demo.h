@@ -156,6 +156,7 @@ private:
     // Simulated pen (pen_* steps).
     static constexpr SDL_PenID kTestPen = 1;
     bool penIn_ = false, penDown_ = false, penEraser_ = false;
+    ImVec2 penAt_{960, 540}; // the simulated pen (mouse_ is SDL's shared cursor, which stray mouse events move too)
     SDL_PenInputFlags penState_ = 0;
     // `snapshot` saves the active mesh; moved* values compare against it. `remember` keeps values for $NAME.
     std::vector<glm::vec3> basePositions_, baseNormals_;
