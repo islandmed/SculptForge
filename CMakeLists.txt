@@ -73,6 +73,7 @@ add_library(sculptforge_core STATIC
   src/core/SurfaceQuery.cpp
   src/core/QRemesh.cpp
   src/core/QRemeshGuides.cpp
+  src/core/ZSpheres.cpp
   src/core/Projection.cpp
   src/core/RetopoCommands.cpp
   third_party/xatlas/xatlas.cpp
@@ -231,6 +232,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/Gizmo.cpp
     src/app/PanelBake.cpp
     src/app/PanelRetopo.cpp
+    src/app/PanelZSpheres.cpp
     src/app/PanelSplatTrain.cpp
     src/app/PanelSculptable.cpp
     src/app/PanelPerformance.cpp

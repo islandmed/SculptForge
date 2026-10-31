@@ -21,6 +21,7 @@
 #include "core/Primitives.h"
 #include "core/Project.h"
 #include "core/QRemesh.h"
+#include "core/ZSpheres.h"
 #include "core/Sculptable.h"
 #include "core/Splats.h"
 #include "core/TextureTransfer.h"
@@ -580,6 +581,7 @@ CommandRegistry::CommandRegistry() {
     registerVdmCommands(*this);   // vdm_set, vdm_capture, vdm_stamp, ... (Vdm.cpp)
     registerRetopoCommands(*this); // qremesh, project_all (RetopoCommands.cpp)
     registerQRemeshGuideCommands(*this); // qremesh_guide, ... (QRemeshGuides.cpp)
+    registerZSphereCommands(*this);      // zsphere_new, ... (ZSpheres.cpp)
 
     add({"stroke",
          "Apply a brush along a path on the active SubTool, like dragging the cursor in the viewport (one undo "

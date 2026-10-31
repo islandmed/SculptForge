@@ -496,6 +496,12 @@ void App::drawPalette_Tool() {
         drawProjectContents(); // ProjectAll (PanelRetopo.cpp)
         Demo::popScope();
     }
+    if (subpalette("tool.zspheres", "ZSpheres")) {
+        tray::Section section;
+        Demo::pushScope("ZSpheres");
+        drawZSpheresContents(); // PanelZSpheres.cpp
+        Demo::popScope();
+    }
     if (subpalette("tool.layers", "Layers")) {
         tray::Section section;
         Demo::pushScope("Layers");

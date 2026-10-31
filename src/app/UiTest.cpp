@@ -11,6 +11,8 @@
 //   key COMBO                e.g. enter, escape, ctrl+z, ctrl+shift+z, 3, comma, backtick, tab, f3, space, minus
 //   hold MODS                ctrl / shift / alt / ctrl+shift ... or none (for strokes and drags)
 //   stroke U0 V0 U1 V1 [S]   brush stroke across the model (fractions of its on-screen bounds)
+//   view_drag X0 Y0 X1 Y1 [S]  left-drag in the viewport at window fractions, gliding there first like stroke (same
+//                            point twice = a click)
 //   drag X0 Y0 X1 Y1 [S] [release]  left-drag in window fractions (rectangle hide, sliders...); release:
 //                            let go of the held modifiers halfway (ZBrush's Alt-drag, release Alt to zoom)
 //   drag_item LABEL DX DY [S] left-drag from the item by DX DY pixels (scrubbing, dragging a tile out)
@@ -288,6 +290,13 @@ double Demo::query(const std::string& name, bool& known) const {
         return double(n);
     }
     if (name == "guides_mode") return app_.guidesMode_ ? 1.0 : 0.0;
+    if (name == "zspheres") return double(m.zspheres.size());
+    if (name == "zsphere_preview") return m.zspherePreview ? 1.0 : 0.0;
+    if (name.rfind("zsphere_x", 0) == 0 || name.rfind("zsphere_r", 0) == 0) { // zsphere_x2, zsphere_r2: sphere 2's x / radius
+        const size_t i = size_t(std::atoi(name.c_str() + 9));
+        if (i >= m.zspheres.size()) return -1.0;
+        return name[8] == 'x' ? double(m.zspheres[i].center.x) : double(m.zspheres[i].radius);
+    }
     if (name == "quads") return double(m.quadCount());
     if (name == "quad_percent")
         return m.triangleCount() ? 100.0 * double(m.quadCount()) / double(m.triangleCount() - m.quadCount()) : 0.0;
@@ -623,6 +632,18 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         stroke([ends](float u) {
             return ImVec2(ends->first.x + (ends->second.x - ends->first.x) * u,
                           ends->first.y + (ends->second.y - ends->first.y) * u);
+        }, seconds);
+        run([this] { SDL_SetModState(held_); });
+        wait(0.1f);
+    } else if (verb == "view_drag") {
+        // view_drag x0 y0 x1 y1 [seconds]: press, drag and release at window fractions, gliding there first like
+        // stroke (so the panels have let go of the mouse); the same point twice is a click.
+        if (!need(4)) return false;
+        const float x0 = num(1, 0), y0 = num(2, 0), x1 = num(3, 0), y1 = num(4, 0), seconds = num(5, 0.4f);
+        stroke([this, x0, y0, x1, y1](float u) {
+            int ww = 0, wh = 0;
+            SDL_GetWindowSize(app_.window_, &ww, &wh);
+            return ImVec2((x0 + (x1 - x0) * u) * float(ww), (y0 + (y1 - y0) * u) * float(wh));
         }, seconds);
         run([this] { SDL_SetModState(held_); });
         wait(0.1f);

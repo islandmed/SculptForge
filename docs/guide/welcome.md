@@ -52,7 +52,7 @@ still on the roadmap:
 - UV editing (seams, relax) and UDIM tiles.
 - Booleans and stencils.
 
-Others are not on the roadmap: ZSpheres, ZModeler, the 2.5D canvas, and reading ZBrush's own `.ZTL` and `.ZPR`
+Others are not on the roadmap: ZModeler, the 2.5D canvas, and reading ZBrush's own `.ZTL` and `.ZPR`
 files directly (bring models over with GoZ, the ZTool Export plug-in for ZBrush, or as OBJ, FBX or GLB).
 
 > **Not yet:** where a chapter describes a ZBrush feature SculptForge doesn't have, it says so in a callout

@@ -125,6 +125,7 @@ action registry, the same source as the Controls window.
 | Invert Mask | <kbd>Ctrl</kbd>+<kbd>I</kbd> | Mask what is unmasked and unmask what is masked (also: Ctrl+click the background). |
 | Lower Res | <kbd>Shift</kbd>+<kbd>D</kbd> | Step one subdivision level down (fewer polygons, for big forms). The detail of the higher levels is kept. |
 | Mask All | <kbd>Ctrl</kbd>+<kbd>A</kbd> | Mask the whole visible SubTool. |
+| Preview | <kbd>A</kbd> | Show the skin Make Mesh would build instead of the spheres (ZBrush's Preview). Turn it off to edit the spheres again. |
 
 ### Transform
 

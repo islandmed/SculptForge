@@ -13,7 +13,7 @@ for what is planned.
 | BPR render | Not yet as a renderer. Headless renders and turntables with `sculptforge --render` ([Scripting](scripting.md)) |
 | Brush pop-up (B) | **Brush picker**, <kbd>B</kbd>, then type letters (B S T = Standard) |
 | Clip brushes | Not yet. The **Trim** brush shaves to a plane |
-| Curve brushes, IMM, ZModeler, ZSpheres | Not yet |
+| Curve brushes, IMM, ZModeler | Not yet |
 | Decimation Master | **Tool > Geometry > Decimate** (`decimate`). See [Geometry](geometry.md#decimate) |
 | Del Hidden | **Tool > Visibility > Delete hidden** (`delete_hidden`) |
 | Del Lower, Del Higher | **Tool > Geometry > Del Lower / Del Higher** (`subdiv_delete_lower`, `subdiv_delete_higher`). See [Subdivision levels](subdivision-levels.md) |
@@ -68,6 +68,7 @@ for what is planned.
 | ZPlugin | No in-app plugin system yet. Automate with the Python module, `sculptforge-cli` and MCP ([Scripting](scripting.md)) |
 | ZRemesher | **Tool > Geometry > QRemesh** (`qremesh`): Target Polygons, Half / Same / Double, Adaptive Size, Keep Groups, Use Polypaint, symmetry. No curve guides yet. See [Quad retopology](retopology.md) |
 | ZScript | Script commands: the console (backtick key), script files, `sculptforge-cli`. See [Scripting](scripting.md) |
+| ZSpheres, Adaptive Skin, Preview (A) | **Tool > ZSpheres**: Draw, Move, Scale, Alt+click deletes, **Preview** (<kbd>A</kbd>), **Make Mesh** (`zsphere_make_mesh`). See [ZSpheres](zspheres.md) |
 | ZTL, ZPR files | Not read directly. Convert ZTools with the ZTool Export plug-in for ZBrush (then open the `.ZTL`), or use GoZ, OBJ, FBX or GLB; save work as `.sfproj` |
 
 ## SculptForge terms

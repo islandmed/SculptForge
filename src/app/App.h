@@ -103,7 +103,7 @@ public:
     void queueFile(FileAction action, std::string path);
 
 private:
-    enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, SubToolClick, Select, Gizmo, Guide, Sculptable };
+    enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, SubToolClick, Select, Gizmo, Guide, Sculptable, ZSphere };
 
     void handleEvent(const SDL_Event& e);
     void onMouseDown(float x, float y, Uint8 button);
@@ -598,6 +598,30 @@ private:
     // Which guide points face the camera (drawn solid; the others faint), cached per view and guide set.
     std::vector<std::vector<uint8_t>> guideVisible_;
     uint64_t guideVisibleKey_ = 0;
+    // ZSpheres (PanelZSpheres.cpp, core/ZSpheres.h): while a ZSphere SubTool is active, clicks on it draw, move,
+    // scale or delete spheres instead of sculpting; each drag is one undo step.
+    enum class ZSphereMode { Draw, Move, Scale };
+    void registerZSphereUiActions();
+    void drawZSpheresContents();                          // Tool > ZSpheres
+    bool zsphereMouseDown(float x, float y, SDL_Keymod mod); // true if it took the click
+    void zsphereDragTo(float x, float y);
+    void zsphereRelease();
+    void drawZSphereOverlay();                            // the hovered sphere's outline
+    bool zsphereActive() const { return !doc_.mesh.zspheres.empty(); }
+    int zsphereAt(float x, float y, bool* link = nullptr) const; // sphere (or link's child) under the cursor, or -1
+    float worldPerPixel(const glm::vec3& at) const;       // world size of one canvas pixel at `at`'s depth
+    ZSphereMode zsphereMode_ = ZSphereMode::Draw;
+    int zsphereResolution_ = 128;                         // Make Mesh resolution
+    struct ZSphereDrag {
+        ZSphereMode op = ZSphereMode::Draw; // what this drag does (a Draw click on a link then moves the new joint)
+        int sphere = -1;               // the sphere being drawn, moved or scaled
+        std::vector<ZSphere> start;    // the armature when the drag began
+        Mesh before;                   // the SubTool's mesh then (the undo step's old state)
+        glm::vec3 grab{0.0f};          // Move: the centre's offset from the grab plane's hit
+        float x = 0.0f, y = 0.0f;      // where the press was
+        bool changed = false;
+        const char* label = "";
+    } zsDrag_;
     const BrushRecipe* strokeRecipe() const; // recipe the current stroke sculpts with (none for Smooth / paint only)
     // ZBrush GoZ bridge and GoZ/STL files (PanelGoz.cpp).
     void drawGozMenu();
