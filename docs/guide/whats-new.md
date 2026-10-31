@@ -41,6 +41,8 @@ rotation, a dominant-axis mode, inverts any axis, and maps the buttons. It reads
   again instead of shaking the view.
 - The S / U / I / O slider opens with its knob under the cursor and stays open while you drag it.
 - The Blender Bridge add-on installs again: its zip was missing a file.
+- Idle, SculptForge no longer keeps your graphics card busy: it draws a new frame only when something changes
+  (before, 60 or more a second all the time).
 
 ## Version 0.9.4
 

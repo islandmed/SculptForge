@@ -99,6 +99,7 @@ struct UiFileRequest {
 UiFileRequest g_requests[kUiFileKinds];
 
 void SDLCALL onUiFileChosen(void* userdata, const char* const* files, int) {
+    wakeMainLoop(); // a file dialog answered (maybe on another thread): redraw now
     if (!files || !files[0]) return;
     auto* req = static_cast<UiFileRequest*>(userdata);
     req->app->queueUiFile(req->kind, files[0]);

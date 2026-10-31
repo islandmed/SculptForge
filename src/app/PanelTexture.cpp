@@ -45,6 +45,7 @@ const SDL_DialogFileFilter kPngFilter[] = {{"PNG image", "png"}};
 const SDL_DialogFileFilter kImageFilters[] = {{"Images", "png;jpg;jpeg;tga;bmp;psd"}, {"All files", "*"}};
 
 void SDLCALL onTextureFile(void* user, const char* const* files, int) {
+    wakeMainLoop(); // a file dialog answered (maybe on another thread): redraw now
     if (!files || !files[0]) return;
     auto* d = static_cast<TextureDialog*>(user);
     std::string path = files[0];

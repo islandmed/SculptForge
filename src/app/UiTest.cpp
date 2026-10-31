@@ -1157,11 +1157,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         // between let the test run on before it started (ui_lightbox failed that way under a loaded ctest -j).
         auto idleFrames = std::make_shared<int>(0);
         steps_.push_back([this, line, timeout, idleFrames](float t) {
-            const bool idle = !busy(app_.pendingBrush_) && !busy(app_.pendingGenerator_) && !busy(app_.pendingModels_) &&
-                              !busy(app_.pendingUnreal_) && !busy(app_.pendingComfyCheck_) && !app_.galleryBusy() &&
-                              !app_.thumbs_.busy() && !app_.libraryScanner_.busy() && !app_.autoUv_ &&
-                              !app_.bakeBusy() && !app_.qremesh_ && !app_.voxelRemesh_ && !app_.updateJob_ &&
-                              !app_.splatTrainBusy() && !app_.sculptableBusy() && !app_.phoneBusy();
+            const bool idle = !app_.backgroundBusy(); // (the same list keeps the app's loop drawing, #14)
             *idleFrames = idle ? *idleFrames + 1 : 0;
             if (*idleFrames >= 4) return true;
             if (idle) return false;

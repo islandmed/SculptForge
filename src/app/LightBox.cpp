@@ -105,6 +105,7 @@ const BrushAlpha& builtinAlpha(int i) {
 const char* const kAlphaNames[] = {"Round", "Square", "Noise"};
 
 void SDLCALL onFolderChosen(void* userdata, const char* const* files, int) {
+    wakeMainLoop(); // a file dialog answered (maybe on another thread): redraw now
     if (files && files[0]) static_cast<LightBox*>(userdata)->folderChosen(files[0]);
 }
 

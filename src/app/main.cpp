@@ -22,6 +22,8 @@ void usage() {
         "  --render out.png         Render headless and exit (thumbnails, review sheets)\n"
         "  --turntable N            With --render: N frames around the model (out_000.png ...)\n"
         "  --size WxH               Render size (default 1024x1024)\n"
+        "  --measure-idle S         Sit idle, print the frames drawn per second over S seconds, exit\n"
+        "                           (SF_CONTINUOUS_REDRAW=1 draws every frame, as before 0.9.5)\n"
         "  --view YAW,PITCH         Camera angles in degrees (default -30,-15)\n"
         "  --zoom F                 Move the camera F times closer than the framed view (default 1)\n"
         "  --wireframe              Render with wireframe overlay\n"
@@ -102,6 +104,7 @@ int main(int argc, char** argv) {
         else if (a == "--fullscreen") options.fullscreen = true;
         else if (a == "--blender") options.blender = true;
         else if (a == "--ui-out") options.uiOutDir = next();
+        else if (a == "--measure-idle") options.measureIdle = std::max(0.5f, float(std::atof(next().c_str())));
         else if (a == "-h" || a == "--help") {
             usage();
             return 0;
@@ -117,6 +120,7 @@ int main(int argc, char** argv) {
         if (!sizeGiven) options.width = 1600, options.height = 960;
         isolateSettings();
     }
+    if (options.measureIdle > 0.0f) isolateSettings(); // a fresh start, no restore prompt, the user's files untouched
     if (!options.recordPath.empty() && options.supersample > 1) { // the app renders large; the video keeps --size
         options.width *= options.supersample;
         options.height *= options.supersample;

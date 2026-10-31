@@ -51,6 +51,7 @@ const ShapeGroup kGroups[] = {{"Eyes", {"eye"}},        {"Brows", {"brow"}},    
 } // namespace
 
 void SDLCALL App::onFaceTakeChosen(void* userdata, const char* const* files, int) {
+    wakeMainLoop(); // a file dialog answered (maybe on another thread): redraw now
     if (!files || !files[0]) return;
     auto* app = static_cast<App*>(userdata);
     std::lock_guard lock(app->faceTakeMutex_);

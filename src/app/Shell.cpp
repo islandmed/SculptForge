@@ -658,6 +658,7 @@ void App::drawShell() {
     if (status_ != statusShown_) {
         statusShown_ = status_;
         statusSince_ = ImGui::GetTime();
+        if (!lastCommandOk_) redrawIn(6.05); // the error colour below goes after 6 s, idle or not
     }
     drawCanvasFrame();
     drawTitleStrip(shell_);

@@ -93,6 +93,13 @@ stepping subdivision levels, saving and opening a project, and turning the view,
 | `--bench-view` | Measure only what the view costs: uploading to the graphics card, a few strokes, and turning the view |
 | `--bench-out report.md` | Write the report to a file |
 
+When nothing changes, SculptForge draws nothing: the graphics card and processor rest until you move the mouse,
+press a key, or something finishes in the background. `sculptforge --measure-idle 5` sits idle for five
+seconds (after a short start) and prints the frames drawn and the processor time used. If the view ever stops
+updating when it should (a driver that misbehaves), start SculptForge with the environment variable
+`SF_CONTINUOUS_REDRAW=1` to draw every frame as versions before 0.9.5 did, and please
+[report it](troubleshooting.md#report-a-problem); `SF_REDRAW_LOG=1` logs why each frame was drawn.
+
 The `perf_info` command (also in the [Console](scripting.md)) prints the threads in use and the memory the
 scene holds; `set_multithreading enabled=false` turns multithreading off from a script.
 
