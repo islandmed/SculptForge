@@ -1,7 +1,7 @@
 # Navigating the view
 
-This chapter explains how to rotate, pan and zoom the camera with a mouse, a pen or the right-shelf buttons,
-how to frame the model, and which display toggles help while you sculpt.
+This chapter explains how to rotate, pan and zoom the camera with a mouse, a pen, the right-shelf buttons or a
+3Dconnexion SpaceMouse, how to frame the model, and which display toggles help while you sculpt.
 
 ## How the camera works
 
@@ -76,6 +76,69 @@ on a laptop trackpad, or when the model fills the canvas and there is no backgro
 | **Rotate** | Orbit the view |
 
 The button stays orange while you drag. **Frame** is also in the **Render** and **Transform** palettes.
+
+## SpaceMouse (experimental)
+
+A 3Dconnexion SpaceMouse lets one hand move the view while the other holds the pen. SculptForge reads it
+directly as a USB device, without 3Dconnexion's driver or SDK, so this is **experimental**: it has been tested
+with simulated input only, not yet with a real SpaceMouse. Tell us how it works with yours
+([GitHub issue #6](https://github.com/islandmed/SculptForge/issues/6)).
+
+Plug it in and it works: **Preferences > Input** shows its name under **SpaceMouse (experimental)**, with live
+bars for its six axes. The model moves the way you move the cap, and turns about the same point the mouse
+orbits around (the camera's target: **Frame** sets it to the scene's centre, and panning moves it).
+
+| Move the cap | The view |
+|---|---|
+| Push left / right | Pans left / right |
+| Pull up / push down | Pans up / down |
+| Pull towards you / push away | Zooms in / out |
+| Twist | Turns the model around |
+| Tilt towards you / away | Tips the model's top towards you / away |
+| Roll left / right | Rolls the model on screen (not with **Lock rotation to turntable**) |
+| Left side button | **Frame** |
+| Right side button | **Front view** |
+
+The speed is the same whatever the frame rate: holding the cap for a second turns the model just as far on a slow
+machine as on a fast one. It works in every input style (ZBrush, SculptForge, Blender) and while a stroke is
+held: the stroke keeps going, sculpting wherever the pen points on the turned model. Many people stop moving the
+pen while they turn the view, and that works best, but you don't have to.
+
+**Preferences > Input > SpaceMouse:**
+
+- **Use SpaceMouse**: off ignores it completely, buttons too.
+- **Speed**: how fast the view moves for the same push.
+- **Dead zone**: how far the cap must move before anything happens (8% by default), so a hand resting on it
+  doesn't drift the view. The live bars turn orange once an axis is past it.
+- **Lock rotation to turntable**: the model stays upright; twisting turns it about the world's up axis and
+  rolling the cap does nothing.
+- **Dominant axis**: only the direction you push the most moves the view, so a twist doesn't also pan a little.
+- **Invert**: reverse any of the six moves (Pan X, Zoom, Pan Y, Tilt, Roll, Spin). If a direction feels wrong on
+  your model of SpaceMouse, flip it here.
+- **Left button**, **Right button** (and **Button 3** onwards on models with more): Frame, Frame SubTool, the
+  axis views, Orthographic, Undo, Redo or Nothing.
+- **SpaceMouse defaults** puts everything back.
+
+Store Config (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) keeps these settings.
+
+**If SculptForge doesn't see it** (Preferences says "No SpaceMouse found"):
+
+- **Windows:** 3Dconnexion's driver, 3DxWare, can keep the device to itself, and may also move the view on its
+  own as it does in other programs. Quit 3DxWare (its tray icon, or stop the **3DxService** service in Task
+  Manager > Services), unplug the SpaceMouse and plug it back in. Without 3DxWare, Windows treats the SpaceMouse as
+  a game controller, which is how SculptForge reads it. If SculptForge sees the SpaceMouse with 3DxWare running,
+  give the buttons a job in only one of the two places, or one press does two things.
+- **macOS:** the same applies to 3DxWare for Mac: quit it (or uninstall it) and plug the SpaceMouse in again.
+- **Linux:** if **spacenavd** is running, it normally opens the device exclusively. SculptForge may still list
+  the SpaceMouse but get no motion from it. Stop it while you sculpt (`sudo systemctl stop spacenavd`). SculptForge
+  reads the device through `/dev/input` as a joystick: that works when the kernel reports the cap's axes as
+  absolute axes, which is how joysticks work. If the kernel reports them as relative motion, as it does for some
+  older models, the SpaceMouse doesn't show up at all. Reading it through spacenavd isn't supported yet.
+
+SculptForge recognises 3Dconnexion devices by their USB ids: everything under 3Dconnexion's own vendor id
+(SpaceMouse Compact, Wireless, Pro, Enterprise, Module, the Universal Receiver) except the CadMouse and the
+keyboards, and the older models sold under Logitech's id (SpaceNavigator, SpacePilot, SpaceExplorer, SpaceMouse
+Pro, SpaceBall 5000).
 
 ## Framing
 

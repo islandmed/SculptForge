@@ -135,6 +135,16 @@
 //   pen_out                  the pen leaves proximity
 //   mouse_move U V           a plain mouse (not the pen) moves to a point on the model, e.g. the stray mouse
 //                            events Windows Ink sends beside the pen's
+//
+// Simulated 3Dconnexion SpaceMouse: an SDL virtual joystick with a SpaceMouse Compact's USB ids (256F:C635), six
+// axes and two buttons, found and opened by the app as a real one would be (SpaceMouse.cpp, hot-plug included).
+//   spacemouse TX TY TZ RX RY RZ [S]   plug it in if needed, hold the cap at these axis values (-1..1, the device's
+//                            raw directions) for S seconds (default 0.5), then let go
+//   spacemouse_hold TX TY TZ RX RY RZ  hold the cap there until the next spacemouse step (for steps in between,
+//                            e.g. a pen stroke while the view turns); spacemouse_hold 0 0 0 0 0 0 lets go
+//   spacemouse_button N      press and release button N (1 = left side button, 2 = right)
+//   spacemouse_unplug        unplug it
+//   expect_value spacemouse_connected (1 when the app opened it), spacemouse_moving (1 while it moves the view)
 #include "app/App.h"
 
 #ifndef SDL_PEN_INPUT_IN_PROXIMITY
@@ -259,6 +269,35 @@ void Demo::fail(int line, const std::string& message) {
     if (!shotDir_.empty()) shotRequest_ = shotDir_ + "/FAIL-line-" + std::to_string(line) + ".png";
     step_ = steps_.size(); // stop: later steps depend on this one
     // The frame loop still renders one more frame, so the failure screenshot shows the state.
+}
+
+bool Demo::attachVirtualSpaceMouse() {
+    if (virtualSpaceMouse_) return true;
+    SDL_VirtualJoystickDesc desc;
+    SDL_INIT_INTERFACE(&desc);
+    desc.type = SDL_JOYSTICK_TYPE_UNKNOWN; // (what SDL reports for a real one: it is no gamepad)
+    desc.vendor_id = 0x256F; // 3Dconnexion
+    desc.product_id = 0xC635; // SpaceMouse Compact: six axes, two side buttons
+    desc.naxes = 6;
+    desc.nbuttons = 2;
+    desc.name = "SpaceMouse Compact (UI test)";
+    virtualSpaceMouse_ = SDL_AttachVirtualJoystick(&desc);
+    if (!virtualSpaceMouse_) return false;
+    virtualSpaceMouseHandle_ = SDL_OpenJoystick(virtualSpaceMouse_); // (the same device the app opens; refcounted)
+    if (!virtualSpaceMouseHandle_) {
+        SDL_DetachVirtualJoystick(virtualSpaceMouse_);
+        virtualSpaceMouse_ = 0;
+        return false;
+    }
+    return true;
+}
+
+void Demo::detachVirtualSpaceMouse() {
+    if (!virtualSpaceMouse_) return;
+    SDL_CloseJoystick(virtualSpaceMouseHandle_);
+    SDL_DetachVirtualJoystick(virtualSpaceMouse_);
+    virtualSpaceMouse_ = 0;
+    virtualSpaceMouseHandle_ = nullptr;
 }
 
 double Demo::query(const std::string& name, bool& known) const {
@@ -487,6 +526,8 @@ double Demo::query(const std::string& name, bool& known) const {
         const glm::vec3 f = glm::abs(app_.camera_.forward());
         return std::max({f.x, f.y, f.z}) > 0.99999f ? 1.0 : 0.0;
     }
+    if (name == "spacemouse_connected") return app_.spaceMouse_ ? 1.0 : 0.0;
+    if (name == "spacemouse_moving") return app_.spaceMouseMoving() ? 1.0 : 0.0;
     if (name == "camera_distance") return app_.camera_.distance;
     if (name == "camera_pan") return glm::length(app_.camera_.target);
     if (name == "groups") {
@@ -1383,6 +1424,56 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             mouseMotion(p.x, p.y);
         });
         wait(0.05f);
+    } else if (verb == "spacemouse" || verb == "spacemouse_hold") {
+        if (!need(6)) return false;
+        std::array<float, 6> v{};
+        for (size_t i = 0; i < 6; ++i) v[i] = std::clamp(num(i + 1, 0), -1.0f, 1.0f);
+        const bool hold = verb == "spacemouse_hold";
+        const float seconds = num(7, 0.5f);
+        steps_.push_back([this, line](float t) { // plug it in; the app opens it on the next frame's events
+            if (t == 0.0f && !attachVirtualSpaceMouse()) {
+                fail(line, std::string("cannot attach a virtual joystick: ") + SDL_GetError());
+                return true;
+            }
+            if (app_.spaceMouse_) return true;
+            if (t > 2.0f) fail(line, "the app didn't open the virtual SpaceMouse");
+            return t > 2.0f;
+        });
+        auto setAxes = [this](const std::array<float, 6>& a) {
+            for (int i = 0; i < 6; ++i)
+                SDL_SetJoystickVirtualAxis(virtualSpaceMouseHandle_, i, Sint16(std::lround(a[size_t(i)] * 32767.0f)));
+        };
+        if (hold) {
+            run([setAxes, v] { setAxes(v); });
+            wait(0.05f);
+        } else {
+            steps_.push_back([setAxes, v, seconds](float t) {
+                setAxes(t < seconds ? v : std::array<float, 6>{});
+                return t >= seconds;
+            });
+            wait(0.1f); // the view settles (the axes read back as centred)
+        }
+    } else if (verb == "spacemouse_button") {
+        if (!need(1)) return false;
+        const int button = int(num(1, 1)) - 1;
+        steps_.push_back([this, line, button](float t) {
+            if (t == 0.0f && !attachVirtualSpaceMouse()) {
+                fail(line, std::string("cannot attach a virtual joystick: ") + SDL_GetError());
+                return true;
+            }
+            if (!app_.spaceMouse_) {
+                if (t > 2.0f) fail(line, "the app didn't open the virtual SpaceMouse");
+                return t > 2.0f;
+            }
+            SDL_SetJoystickVirtualButton(virtualSpaceMouseHandle_, button, true);
+            return true;
+        });
+        wait(0.05f);
+        run([this, button] { SDL_SetJoystickVirtualButton(virtualSpaceMouseHandle_, button, false); });
+        wait(0.1f);
+    } else if (verb == "spacemouse_unplug") {
+        run([this] { detachVirtualSpaceMouse(); });
+        wait(0.1f);
     } else if (verb == "pen_out") {
         run([this] { penProximity(false); });
         wait(0.05f);

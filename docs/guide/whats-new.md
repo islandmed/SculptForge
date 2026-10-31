@@ -26,6 +26,15 @@ also import a keymap you exported from Blender. See [Blender keys](shortcuts.md#
 check exactly what a brush did; **This SubTool** keeps one SubTool smooth or flat whatever the scene says. See
 [Polypaint and materials](polypaint.md).
 
+### SpaceMouse (experimental)
+
+A 3Dconnexion SpaceMouse now moves the view: twist, tilt and push the cap to turn, pan and zoom around the model
+with one hand while the other holds the pen, in every input style and even mid-stroke. The two side buttons
+frame the model and show the front. **Preferences > Input > SpaceMouse** sets the speed, the dead zone, turntable
+rotation, a dominant-axis mode, inverts any axis, and maps the buttons. It reads the device directly, without
+3Dconnexion's driver, and hasn't been tried on real hardware yet: see
+[SpaceMouse](navigation.md#spacemouse-experimental) if yours doesn't show up.
+
 ### Fixes
 
 - Pens whose drivers send stray mouse events (a Ugee M708 on Linux) can rotate, pan and zoom on the background

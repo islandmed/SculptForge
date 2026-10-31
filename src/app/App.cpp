@@ -79,9 +79,17 @@ bool App::init(const AppOptions& options) {
     options_ = options;
     const bool recording = !options.recordPath.empty() || !options.uiTest.empty();
     const bool headless = !options.renderPath.empty() || recording;
+    // UI tests run in a hidden window that never has focus; SDL drops joystick input without focus otherwise, and
+    // the scripted SpaceMouse is a virtual joystick (UiTest.cpp).
+    if (!options.uiTest.empty()) SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return false;
+    }
+    // Joysticks for a 3Dconnexion SpaceMouse (SpaceMouse.cpp). Not fatal: the app works without them.
+    if (!headless || !options.uiTest.empty()) {
+        if (SDL_InitSubSystem(SDL_INIT_JOYSTICK)) spaceMouseScan();
+        else SDL_Log("SDL joystick init failed (no SpaceMouse): %s", SDL_GetError());
     }
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
@@ -268,6 +276,7 @@ void App::shutdown() {
     flushBrushEdits();
     if (blenderInitialised_) writeBridgeHeartbeat(blenderExchangeRoot(), true); // the add-on starts a new one
 
+    spaceMouseClose();
     if (refTexture_) gl::DeleteTextures(1, &refTexture_);
     gallery_.reset(); // its preview textures need the GL context
     thumbs_.clear();
@@ -329,8 +338,8 @@ int App::runUiTest(int w, int h, int fps) {
     bool finalFrame = false;
     while (frames < fps * 60 * 30) {
         SDL_Event e;
-        while (SDL_PollEvent(&e)) {
-        } // the script provides all input
+        while (SDL_PollEvent(&e)) // the script provides all input (its SpaceMouse is a virtual joystick)
+            if (e.type >= SDL_EVENT_JOYSTICK_AXIS_MOTION && e.type < SDL_EVENT_GAMEPAD_AXIS_MOTION) spaceMouseEvent(e);
         if (demo_->finished()) {
             if (finalFrame) break;
             finalFrame = true; // one more frame, for a failure screenshot
@@ -349,6 +358,7 @@ int App::runUiTest(int w, int h, int fps) {
         pollSplatTrain();
         pollSculptable();
         updateCameraAspect();
+        updateSpaceMouse(dt);
 
         Demo::beginFrame();
         ImGui_ImplOpenGL3_NewFrame();
@@ -586,6 +596,9 @@ int App::run() {
             continue;
         }
         updateCameraAspect();
+        // The SpaceMouse moves the view by its held axes every frame (frame-rate independent); while it does,
+        // spaceMouseMoving() is true and a loop that waits for events when idle must keep drawing.
+        updateSpaceMouse(dt);
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
@@ -620,6 +633,12 @@ void App::handleEvent(const SDL_Event& e) {
     switch (e.type) {
     case SDL_EVENT_QUIT:
         requestQuit();
+        break;
+    case SDL_EVENT_JOYSTICK_ADDED:
+    case SDL_EVENT_JOYSTICK_REMOVED:
+    case SDL_EVENT_JOYSTICK_AXIS_MOTION:
+    case SDL_EVENT_JOYSTICK_BUTTON_DOWN:
+        spaceMouseEvent(e); // a SpaceMouse (SpaceMouse.cpp)
         break;
     case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
         if (e.window.windowID == SDL_GetWindowID(window_)) requestQuit();

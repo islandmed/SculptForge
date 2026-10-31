@@ -160,6 +160,11 @@ private:
     // `snapshot` saves the active mesh; moved* values compare against it. `remember` keeps values for $NAME.
     std::vector<glm::vec3> basePositions_, baseNormals_;
     std::map<std::string, double> remembered_;
+    // Simulated SpaceMouse (spacemouse* steps): an SDL virtual joystick with a SpaceMouse Compact's ids.
+    SDL_JoystickID virtualSpaceMouse_ = 0;
+    SDL_Joystick* virtualSpaceMouseHandle_ = nullptr;
+    bool attachVirtualSpaceMouse();
+    void detachVirtualSpaceMouse();
 };
 
 } // namespace sf
