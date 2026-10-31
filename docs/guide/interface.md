@@ -62,7 +62,7 @@ Interface > Palettes strictly A-Z (ZBrush order)**.
 | **Color** | The Paint brush, RGB while sculpting, the paint colour and swatches, Fill, Fill masked, Cavity, Clear, Show polypaint |
 | **Draw** | Draw Size, Z Intensity, RGB Intensity, Focal Shift, Sculpt/Paint, Zadd/Zsub, Rgb, Front, and the tablet options (Pressure > strength, Pressure > size) with a pen readout |
 | **Generate** | Generate 3D (image or text to 3D), Relief, Inflate and Stamp from an image, and the AI brush provider settings |
-| **Material** | The seven MatCap materials (Sculpt, the default, first) and Studio, Base colour |
+| **Material** | The seven MatCap materials (Sculpt, the default, first) and Studio, Base colour, Smooth / Flat shading for the scene and the active SubTool |
 | **Preferences** | Config, Interface, Input, Hotkeys, LightBox, Tablet, Performance, Updates and Autosave sub-palettes (see [Customizing the interface](#customizing-the-interface)) |
 | **Render** | Wireframe, Show Mesh, Show Polypaint, Show Mask, Show Polygroups, Show Splats, Frame, Fullscreen |
 | **Script** | Console, Run script file, Copy session as script, Clear console |

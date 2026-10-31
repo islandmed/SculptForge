@@ -604,6 +604,7 @@ void App::drawPalette_Tool() {
         ui::HelpAction(*this, "view.polygroups");
         ImGui::ColorEdit3("Material colour", &renderSettings_.baseColor.x, ImGuiColorEditFlags_NoInputs);
         ui::HelpText("Material colour", nullptr, "Colour of the Studio material (the clay colour).", "Tool > Display");
+        drawShadingControls();
     }
 }
 

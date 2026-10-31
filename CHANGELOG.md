@@ -23,6 +23,11 @@ All notable changes to SculptForge are listed here. The format follows
   active SubTool, Numpad Plus / Minus zoom.
 - An orthographic view. The axis views turn it on until the view is rotated again (Blender's Auto Perspective).
 
+- Smooth / Flat shading (#11): **Material** palette (and **Tool > Display**) > **Shading** switches the whole
+  scene to flat, faceted shading, where every polygon shows its own face; **This SubTool** keeps one SubTool smooth
+  or flat whatever the scene says. Both are saved in projects (no format change; older files open with your
+  preferred shading) and the scene's choice is a preference (Store Config). Smooth stays the default. Scripts:
+  `set_shading mode=flat`, `subtool_shading mode=smooth name=Eyes`.
 ### Fixed
 - The Blender Bridge add-on zip was missing `zbrush_keys.py`, so Blender refused to install it ("cannot import name zbrush_keys", #10). The zip now carries every module, and the packaging check fails if one is left out.
 - Rotating, panning and zooming with the pen tip on the background only shook the view with some tablets (a Ugee

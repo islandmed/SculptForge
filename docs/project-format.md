@@ -13,7 +13,9 @@ read by `loadProject` (src/core/Project.cpp). Commands: `save_project path=...`,
   surface axes), `use_mask`, `all_subtools` and `falloff`.
 - Each `subtools[i]` holds `name`, `visible` (bool), `mesh`, `layers`, `active_layer` (sculpt layer
   strokes go into, -1 = base) and, for a mesh that came from ZBrush, `goz_name` (the GoZ object name
-  that `goz_send` / `goz_receive` match on).
+  that `goz_send` / `goz_receive` match on). Optional `shading` (`"smooth"` or `"flat"`; missing or unknown =
+  follow the scene) is the SubTool's own viewport shading, and the app's `render.flat_shading` (bool) the scene's;
+  both were added after 0.9.4 without a version bump (older readers ignore them).
 - Blobs are little-endian arrays. The manifest describes each one as
   `{"file", "type": "f32"|"u32"|"u8", "components", "count"}`; readers check all four. SubTool `i`'s
   blobs live under `subtools/<i>/` (the file name comes from the descriptor, so readers don't rely

@@ -436,6 +436,8 @@ private:
     bool paintRgb_ = false;   // also paint the colour while sculpting (ZBrush Rgb + Zadd)
     bool strokePaint_ = false, strokeSculpt_ = true;
     void registerPaintUiCommands();
+    void setFlatShading(bool flat); // the scene's shading, and the preference for the next session
+    void drawShadingControls();     // Material palette and Tool > Display: Smooth | Flat, and the SubTool's own
     void paintAt(const DabParams& p);
     void pickColorUnderCursor();
     // First paint stroke on a mesh without polypaint: undo swaps this paint stack (no colours) back in, so the

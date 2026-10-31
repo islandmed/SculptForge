@@ -181,6 +181,22 @@ def make_sculptable(shots: pathlib.Path):
     return save(img, "make-sculptable", 1200)
 
 
+def shading(shots: pathlib.Path):
+    """Smooth and Flat side by side (the same head, eyes kept smooth), with the palette's shading rows below."""
+    box = (420, 120, 1000, 870)
+    smooth = Image.open(shots / "shading-smooth.png").convert("RGB").crop(box)
+    flat = Image.open(shots / "shading-flat.png").convert("RGB").crop(box)
+    rows = Image.open(shots / "shading-palette.png").convert("RGB").crop((384, 456, 700, 550))
+    img = Image.new("RGB", (smooth.width * 2, smooth.height), (31, 31, 33))
+    img.paste(smooth, (0, 0))
+    img.paste(flat, (smooth.width, 0))
+    img.paste(rows, (img.width - rows.width - 12, img.height - rows.height - 12))
+    d = ImageDraw.Draw(img)
+    label(d, (16, 16), "Smooth")
+    label(d, (smooth.width + 16, 16), "Flat (Eyes: Smooth)")
+    return save(img, "shading", 960)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("shots", type=pathlib.Path, help="folder with the screenshots (--ui-out of shots.sfui)")
@@ -190,7 +206,7 @@ def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     composed = {"interface-overview": overview, "remesh": remesh, "subdivision-levels": subdivision,
                 "qremesh-guides": qremesh_guides, "dynamic-topology": dyntopo,
-                "make-sculptable": make_sculptable}
+                "make-sculptable": make_sculptable, "shading": shading}
     wanted = lambda name: not args.only or name in args.only
     made = [make(args.shots) for name, make in composed.items() if wanted(name)]
     for name, (shot, box, width) in CROPS.items():

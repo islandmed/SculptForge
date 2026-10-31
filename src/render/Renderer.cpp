@@ -23,7 +23,8 @@ namespace {
 // words), an octahedral normal and the (companded) curvature in a third. Decoded here exactly as Clusters.cpp does.
 // Compiled per feature set: PAINT (polypaint colour and mask attributes), PRIM (per-triangle data: the first
 // drawn triangle of the vertex's cluster, from a per-block table indexed by gl_VertexID, or uPrimBase when the
-// clusters are drawn one by one), TEXTURED and NORMALMAP (with a geometry shader, below).
+// clusters are drawn one by one), TEXTURED and NORMALMAP (with a geometry shader, below), and FLAT (flat
+// shading: the view-space position goes along, so the fragment shader takes each triangle's own normal from it).
 const char* kMeshVS = R"(
 layout(location = 0) in uvec2 aPos;
 layout(location = 1) in uint aNormal;
@@ -42,6 +43,9 @@ uniform int uPrimBase; // >= 0: this cluster's first drawn triangle (clusters dr
 flat out int vPrimBase;
 #endif
 out vec4 vNormalCurv; // view-space normal, curvature
+#ifdef FLAT
+out vec3 vViewPos;
+#endif
 vec3 decodeNormal(uint a) {
     vec2 e = vec2(float(int(a & 2047u) - 1024), float(int((a >> 11) & 2047u) - 1024)) / 1023.0;
     vec3 n = vec3(e, 1.0 - abs(e.x) - abs(e.y));
@@ -55,6 +59,9 @@ void main() {
     vec4 p = uView * vec4(uGridOrigin + vec3(q) * uGridStep, 1.0);
     float curvature = float(int(aNormal >> 22) - 512) / 511.0; // sign(c) sqrt(|c|), render/Clusters.h
     vNormalCurv = vec4(mat3(uView) * decodeNormal(aNormal), curvature * abs(curvature));
+#ifdef FLAT
+    vViewPos = p.xyz;
+#endif
 #ifdef PAINT
     vPaint = vec4(pow(aColor.rgb, vec3(2.2)), aMask);
 #endif
@@ -77,6 +84,9 @@ in vec4 vNormalCurv[];
 #ifdef PAINT
 in vec4 vPaint[];
 #endif
+#ifdef FLAT
+in vec3 vViewPos[];
+#endif
 flat in int vPrimBase[];
 uniform samplerBuffer uUvs; // RG32F, 3 corners per drawn triangle
 #ifdef NORMALMAP
@@ -92,12 +102,18 @@ out FragData {
 #ifdef NORMALMAP
     vec4 vTangent;
 #endif
+#ifdef FLAT
+    vec3 vViewPos;
+#endif
     flat int vPrimBase;
 } o;
 void main() {
     int prim = vPrimBase[0] + gl_PrimitiveIDIn;
     for (int i = 0; i < 3; ++i) {
         o.vNormalCurv = vNormalCurv[i];
+#ifdef FLAT
+        o.vViewPos = vViewPos[i];
+#endif
 #ifdef PAINT
         o.vPaint = vPaint[i];
 #endif
@@ -129,6 +145,9 @@ in FragData {
 #ifdef NORMALMAP
     vec4 vTangent;
 #endif
+#ifdef FLAT
+    vec3 vViewPos;
+#endif
     flat int vPrimBase;
 };
 uniform sampler2D uPaintTex; // sRGB texture: samples come back linear
@@ -139,6 +158,9 @@ uniform int uNormalFlipY;     // 1: DirectX convention (green down)
 #endif
 #else
 in vec4 vNormalCurv;
+#ifdef FLAT
+in vec3 vViewPos;
+#endif
 #ifdef PAINT
 in vec4 vPaint;
 #endif
@@ -197,7 +219,16 @@ void main() {
 #elif defined(TEXTURED)
     if (uGroups == 0) albedo = tint = (uPaint == 1 ? V_COLOR : vec3(1.0)) * texture(uPaintTex, vUv).rgb;
 #endif
+#ifdef FLAT
+    // The triangle's own normal, from its plane's screen-space slopes, turned towards the viewer: a back face (seen
+    // through a hole) keeps it that way unless it is the motion proxy's, which shades back faces turned away.
+    vec3 n = cross(dFdx(vViewPos), dFdy(vViewPos));
+    n = dot(n, n) > 1e-30 ? normalize(n) : normalize(vNormalCurv.xyz);
+    if (dot(n, vViewPos) > 0.0) n = -n;
+    if (!gl_FrontFacing && uTwoSided == 0) n = -n;
+#else
     vec3 n = normalize(vNormalCurv.xyz);
+#endif
     float curvature = vNormalCurv.w;
 #ifdef NORMALMAP
     // MikkTSpace's pixel shader: bitangent rebuilt per pixel, n = normalize(tn.x T + tn.y B + tn.z N).
@@ -208,7 +239,9 @@ void main() {
     vec3 B = (vTangent.w < 0.0 ? -1.0 : 1.0) * cross(n, T);
     n = normalize(tn.x * T + tn.y * B + tn.z * n);
 #endif
+#ifndef FLAT
     if (!gl_FrontFacing && uTwoSided == 1) n = -n;
+#endif
     vec2 ndc = (gl_FragCoord.xy - uViewport.xy) / uViewport.zw * 2.0 - 1.0;
     vec3 v = normalize(vec3(-ndc / uProjScale, 1.0));
     if (uMatcap == 1) {
@@ -486,13 +519,14 @@ bool Renderer::init(std::string& error) {
 
 const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     if (features & (kTextured | kNormalMap)) features |= kTextured | kPrim;
-    MeshProgram& p = programs_[features & 15];
+    MeshProgram& p = programs_[features & 31];
     if (p.id) return &p;
     std::string prefix = "#version 330 core\n";
     if (features & kPaint) prefix += "#define PAINT\n";
     if (features & kPrim) prefix += "#define PRIM\n";
     if (features & kTextured) prefix += "#define TEXTURED\n";
     if (features & kNormalMap) prefix += "#define NORMALMAP\n";
+    if (features & kFlat) prefix += "#define FLAT\n";
     const std::string vs = prefix + kMeshVS, fs = prefix + kMeshFS, gs = prefix + kMeshGS;
     p.id = link(vs.c_str(), fs.c_str(), programError_, nullptr, (features & kTextured) ? gs.c_str() : nullptr);
     if (!p.id) return nullptr;
@@ -906,7 +940,7 @@ void Renderer::syncScene(const std::vector<SceneMesh>& scene) {
     for (const SceneMesh& m : scene) {
         if (!m.visible || !m.mesh) continue; // hidden: keeps its dirty state until shown
         sync(slot(m.id), *m.mesh, m.normalMap, m.wireframe && m.active);
-        drawList_.push_back({m.id, m.active});
+        drawList_.push_back({m.id, m.active, m.flat});
     }
 }
 
@@ -2018,7 +2052,7 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
     gl::Enable(GL_POLYGON_OFFSET_FILL);
     gl::PolygonOffset(1.0f, 1.0f);
     for (const DrawItem& item : drawList_)
-        if (const MeshSlot* s = findSlot(item.id); s && s->drawnTriangles > 0) drawSlot(*s, item.active, settings);
+        if (const MeshSlot* s = findSlot(item.id); s && s->drawnTriangles > 0) drawSlot(*s, item.active, item.flat, settings);
     proxyUsed_ = settings.motionProxy;
     gl::Disable(GL_POLYGON_OFFSET_FILL);
     for (GLenum unit : {kTexture7, kTexture6, GL_TEXTURE3, GL_TEXTURE1}) {
@@ -2162,14 +2196,14 @@ void Renderer::drawClusters(const MeshSlot& s, const std::vector<uint32_t>& clus
 }
 
 // One mesh. Mask and polygroup colours are for the SubTool being edited; polypaint shows on all of them.
-void Renderer::drawSlot(const MeshSlot& s, bool active, const RenderSettings& settings) {
+void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings) {
     // A painted texture shows through the textured program (polypaint still multiplies it).
     const bool textured = s.hasUvs && s.paintTexture && settings.showPolypaint && settings.showTexture;
     // A baked normal map preview bends the shading normal (core/Bake.h).
     const bool normalMapped = s.hasUvs && s.normalTexture && s.hasTangents;
     const int groups = active && settings.showPolygroups ? (s.hasGroups ? 1 : 2) : 0;
     const int features = (s.hasColors || s.hasMask ? kPaint : 0) | (groups == 1 ? kPrim : 0) | (textured ? kTextured : 0) |
-                         (normalMapped ? kNormalMap : 0);
+                         (normalMapped ? kNormalMap : 0) | (flat ? kFlat : 0);
     const MeshProgram* p = meshProgram(features);
     if (!p) return;
     gl::UseProgram(p->id);
@@ -2213,7 +2247,7 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, const RenderSettings& se
     if (!s.hasMask) gl::VertexAttrib1f(3, 0.0f);
     // While the view moves, the motion proxy where it is built: not with per-triangle data, which follows the
     // full triangles, nor under the wireframe, whose edges would sink into it.
-    const bool perTriangle = features & (kPrim | kTextured | kNormalMap);
+    const bool perTriangle = features & (kPrim | kTextured | kNormalMap); // (not kFlat: no per-triangle data)
     cull(s, frameCull_, settings.motionProxy && !perTriangle && !(active && settings.wireframe));
     // The back faces left in clusters along the silhouette: the GPU skips them too when they can't show.
     if (cullBackfaces_) gl::Enable(GL_CULL_FACE);

@@ -184,6 +184,26 @@ material is saved with the project: projects saved with Studio open with Studio.
 > **Tip:** **Sculpt** is the material to judge strokes with. The prettier ones (Skin, Red Wax) soften small
 > detail; switch to them for presenting.
 
+## Smooth and flat shading
+
+**Smooth** shading (the default) blends the light across polygons, so the surface reads as one form. **Flat**
+shading lights every polygon on its own, so you see the faces: how the mesh is built, where its vertices sit, and
+exactly what a stroke, crease or pinch did to the geometry, without smooth blending hiding small lumps. It helps
+most when blocking out forms on a low-poly base mesh.
+
+- **Material** palette > **Shading**: **Smooth** | **Flat** for the whole scene. The same buttons are in
+  **Tool > Display**.
+- **This SubTool**: **Scene** (the default) follows the scene's shading; **Smooth** or **Flat** keeps the active
+  SubTool that way whatever the scene says, for example a flat body with smooth eyes.
+
+![Smooth and Flat shading on the template head, with its eyes kept smooth](images/shading.jpg)
+
+Shading works with every material, polypaint, textures and the mask. Like the material, it only changes the view:
+exports are unaffected. Projects save the scene's shading and each SubTool's own; projects from before open with
+your preferred shading. The scene's shading you choose is also the preference for the next session once you
+**Store Config** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>). Smooth and Flat have no default shortcut, so no
+ZBrush key changes meaning; assign one under **Preferences > Hotkeys** if you switch often.
+
 > **Not yet:** loading your own MatCap images, and physically based materials or BPR-style renders.
 
 ## Scripting
@@ -202,6 +222,8 @@ material is saved with the project: projects saved with Studio open with Studio.
 | `paint_layer_merge` / `paint_layer_flatten` | Merge down / bake every visible layer into Base |
 | `paint_layer_list` | List the layers, top first (`*` marks the active one) |
 | `set_material name=Chrome` | Viewport material: a MatCap name (`Sculpt` is the default) or `studio` (desktop app only) |
+| `set_shading mode=flat` | The scene's shading: `smooth` (the default) or `flat` (desktop app only) |
+| `subtool_shading mode=smooth name=Eyes` | A SubTool's own shading: `default` (follow the scene), `smooth` or `flat`; `index` or `name` picks the SubTool (default: the active one) |
 
 ```text
 set_color color="#d9b38c"; paint_fill; paint_from_cavity strength=0.5

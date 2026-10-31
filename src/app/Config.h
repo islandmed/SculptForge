@@ -40,6 +40,7 @@ struct UiPrefs {
     // Dynamic topology (Draw palette): false = the detail follows the brush size on screen (Sculptris Pro);
     // true = one detail size for the whole mesh.
     bool dyntopoConstantDetail = false;
+    bool flatShading = false; // Material palette: the scene's shading at startup (false = Smooth, the default)
 };
 
 Json toJson(const UiPrefs& prefs);

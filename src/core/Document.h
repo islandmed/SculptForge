@@ -18,6 +18,12 @@
 
 namespace sf {
 
+// How a SubTool is shaded in the view: as the scene says (the Material palette's Flat shading), or always smooth
+// or always flat (faceted: every polygon's own face normal). Display only; saved in projects.
+enum class Shading : uint8_t { Default, Smooth, Flat };
+const char* shadingName(Shading s);           // "default", "smooth", "flat"
+bool parseShading(const std::string& name, Shading& out);
+
 // One object in the scene, like a ZBrush SubTool: a body, the eyes, the
 // teeth, a sword. Each keeps its own mesh, attributes, layers and undo
 // history. The active SubTool is "checked out" into Document::mesh / bvh /
@@ -27,6 +33,7 @@ struct SubTool {
     uint32_t id = 0; // stable for the session (renderer slots, UI selection)
     std::string name;
     bool visible = true;
+    Shading shading = Shading::Default; // per-SubTool override of the scene's shading
     // Inactive SubTools only (empty while active).
     Mesh mesh;
     BVH bvh;

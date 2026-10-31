@@ -291,7 +291,9 @@ void registerSubToolCommands(CommandRegistry& reg) {
                  const int i = targetSubtool(doc, a);
                  if (i < 0) return notFound(a);
                  Mesh copy = doc.subtoolMesh(i);
+                 const Shading shading = doc.subtools[size_t(i)].shading;
                  const int added = doc.addSubtool(std::move(copy), doc.subtools[size_t(i)].name + " copy", true, i + 1);
+                 doc.subtools[size_t(added)].shading = shading;
                  return {true, "Duplicated as " + doc.subtools[size_t(added)].name};
              }});
 
@@ -328,6 +330,21 @@ void registerSubToolCommands(CommandRegistry& reg) {
                  s.visible = argBool(a, "visible", !s.visible);
                  doc.modified = true;
                  return {true, s.name + (s.visible ? " shown" : " hidden")};
+             }});
+
+    reg.add({"subtool_shading",
+             "Shade a SubTool smooth or flat (faceted), or as the scene's Flat shading setting says (default).",
+             {{"mode", T::String, "default, smooth or flat.", true}, indexParam, nameParam},
+             [](Document& doc, const Args& a) -> CommandResult {
+                 const int i = targetSubtool(doc, a);
+                 if (i < 0) return notFound(a);
+                 Shading mode;
+                 if (!parseShading(argString(a, "mode"), mode))
+                     return {false, "Unknown shading '" + argString(a, "mode") + "' (default, smooth, flat)"};
+                 SubTool& s = doc.subtools[size_t(i)];
+                 if (s.shading != mode) doc.modified = true;
+                 s.shading = mode;
+                 return {true, s.name + " shading: " + shadingName(mode)};
              }});
 
     reg.add({"subtool_solo", "Show only the active SubTool, or (when it already is the only one shown) show all again.", {},
