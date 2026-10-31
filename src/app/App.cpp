@@ -602,6 +602,7 @@ void App::redrawIn(double seconds) {
 bool App::wantsFrames(double now) const {
     return now < activeUntil_ || drag_ != Drag::None || doc_.sculptor.strokeActive() || backgroundBusy() ||
            playingLayer_ >= 0 || faceTakePlaying_ ||
+           spaceMouseMoving() || // a held SpaceMouse cap sends no events, but the view keeps moving (SpaceMouse.cpp)
            perf_.framesStill < 10; // the view just moved: Fast Navigation's full-quality frame comes after it stops
 }
 
