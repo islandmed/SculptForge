@@ -109,6 +109,7 @@ private:
     void onMouseDown(float x, float y, Uint8 button);
     void onMouseMove(float x, float y, float dx, float dy, bool fromPen);
     void onMouseUp();
+    bool blenderNavigationDown(Uint8 button); // Blender style: a press that navigates (Input.cpp's style)
     void orbitBy(float dx, float dy); // a rotation drag: free or turntable (Preferences), Shift snaps
     void rollBy(float x, float y, float dx, float dy); // Shift+click, release Shift, drag: turn about the view axis
     void onKey(SDL_Keycode key, SDL_Keymod mod);
@@ -1035,6 +1036,30 @@ private:
     void registerInputActions();
     void applyInputStyle(); // the style's default shortcuts (1-0 brushes or 9 QuickSave; I = RGB or Z Intensity)
     bool zbrushStyle() const { return uiPrefs_.inputStyle == 0; }
+    bool blenderStyle() const { return uiPrefs_.inputStyle == 2; }
+    void setInputStyle(int style);
+    // ---- Blender style (Input.cpp) ----
+    // Middle-drag orbits (Shift pans, Ctrl zooms), Alt+left-drag emulates the middle button (pens), Ctrl inverts
+    // a stroke, M toggles the mask brush, and Blender's sculpt-mode letters pick brushes. The numpad views work in
+    // every style. Import Blender keymap reads a keymap exported from Blender (BlenderKeymap.h).
+    void registerViewActions();
+    void viewAxis(float yawDegrees, float pitchDegrees); // Numpad 1 / 3 / 7: orthographic until turned
+    void viewOrbitStep(float yawDegrees, float pitchDegrees);
+    void frameActiveSubtool();
+    SDL_Keymod blenderMods(SDL_Keymod keyboard) const; // Ctrl -> Alt (invert), the mask brush -> Ctrl (mask)
+    bool maskBrushActive() const;
+    void toggleMaskBrush();
+    void hideGroupUnderCursor(bool isolate);
+    void importBlenderKeymapDialog();
+    bool importBlenderKeymap(const std::string& path);
+    void drawInputStyleRow(float width = -1.0f); // the three styles (Preferences > Input, Controls)
+    struct MaskBrush {
+        bool on = false;
+        BrushType brush = BrushType::Standard; // what was picked when M was pressed: picking another brush ends it
+        int custom = -1;
+        bool paint = false;
+    } maskBrush_;
+    bool autoOrtho_ = false; // an axis view switched to orthographic; orbiting goes back to perspective (Blender)
     // ZBrush: while Ctrl is held the brush is the mask brush, with Ctrl+Shift the selection (hide) brush. The shelf
     // tiles show it, and the Brush / Stroke pickers opened then pick among those brushes (PanelMasking.cpp).
     enum class HeldBrush { None, Mask, Select };

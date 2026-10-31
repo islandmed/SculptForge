@@ -402,6 +402,7 @@ CullView CullView::from(const glm::mat4& view, const glm::mat4& proj) {
     const glm::mat4 inv = glm::inverse(view);
     v.eye = glm::vec3(inv[3]);
     v.forward = glm::normalize(glm::vec3(inv * glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)));
+    v.ortho = proj[3][3] == 1.0f && proj[2][3] == 0.0f;
     v.nearDistance = std::abs(proj[2][2] - 1.0f) > 1e-12f ? proj[3][2] / (proj[2][2] - 1.0f) : 0.0f;
     return v;
 }

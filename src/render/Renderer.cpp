@@ -2081,7 +2081,7 @@ void Renderer::cull(const MeshSlot& s, const CullView& frame, bool proxy) {
     proxy = proxy && s.proxyCount.size() == s.drawCount.size() && s.proxyBounds.size() == s.drawCount.size();
     CullView v = frame;
     const glm::vec3 e = v.eye;
-    v.backfaces = s.closed && s.volume > 0.0 && !s.anyHidden && s.box.valid() &&
+    v.backfaces = !v.ortho && s.closed && s.volume > 0.0 && !s.anyHidden && s.box.valid() &&
                   (e.x < s.box.min.x || e.y < s.box.min.y || e.z < s.box.min.z || e.x > s.box.max.x || e.y > s.box.max.y ||
                    e.z > s.box.max.z);
     auto reachesNear = [&](const ClusterBounds& b) {

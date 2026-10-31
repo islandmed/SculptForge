@@ -8,6 +8,20 @@ All notable changes to SculptForge are listed here. The format follows
 
 ### Added
 - ZSpheres (Tool > ZSpheres, #8): block out a base mesh from connected spheres. Draw grows a sphere from another (the drag sets its size) or adds a joint on a link, Move and Scale set the proportions, Alt+click deletes, Symmetry mirrors every edit, Preview (A) shows the skin, and Make Mesh builds it as a new watertight quad SubTool with a polygroup per link, keeping the ZSpheres hidden to edit again. Undoable, saved in projects, and scriptable (zsphere_new, zsphere_add, zsphere_set, zsphere_delete, zsphere_insert, zsphere_preview, zsphere_make_mesh, zsphere_list).
+- A Blender input style (#12): **Preferences > Input > Style > Blender**, also at the top of the Controls window.
+  Middle-drag orbits, Shift+middle pans, Ctrl+middle zooms, and Alt+left-drag does the same for pens and
+  trackpads (Emulate 3 Button Mouse); Ctrl inverts a stroke, Shift smooths; F / Shift+F set the radius and
+  strength; Blender 4.2+'s Sculpt Mode keys pick the nearest brushes (V Draw, S Smooth, P Pinch, I Inflate,
+  G Grab, C Clay Strips, Shift+C Crease, K Snake Hook, Shift+T Scrape as Flatten) and M the Mask brush
+  (Ctrl+drag unmasks); Alt+M / Ctrl+I clear / invert the mask; H / Shift+H / Alt+H hide, isolate and show
+  polygroups; Alt+1 / Alt+2 step the subdivision levels; Home frames everything. Choosing it sets Rotation to
+  Turntable. **Emulate Numpad** makes the number row work as the numpad.
+- **Import Blender keymap...**: reads a keymap exported from Blender (the .py file, as text: it is never run) and
+  takes the 3D View and Sculpt keys SculptForge has an equivalent for. Also the `blender_keymap_import` command.
+- Numpad views in every input style: Numpad 1 / 3 / 7 front, right, top (Ctrl: back, left, bottom), Numpad 5
+  orthographic, Numpad 4 / 6 / 8 / 2 orbit in 15 degree steps, Numpad 9 the other side, Numpad . frames the
+  active SubTool, Numpad Plus / Minus zoom.
+- An orthographic view. The axis views turn it on until the view is rotated again (Blender's Auto Perspective).
 
 ### Fixed
 - The Blender Bridge add-on zip was missing `zbrush_keys.py`, so Blender refused to install it ("cannot import name zbrush_keys", #10). The zip now carries every module, and the packaging check fails if one is left out.
@@ -17,6 +31,7 @@ All notable changes to SculptForge are listed here. The format follows
 - The S / U / I / O slider closed as soon as you grabbed it, and could open away from the cursor (#9, seen on
   Windows). It now opens with its knob (the current value) right under the brush cursor, at any UI scale and
   with a pen, and stays open while you drag until you let go, click elsewhere or press Esc.
+- B, M, S and the LightBox key followed the built-in key even after you gave the action another one.
 
 ## [0.9.4] - 2026-10-29
 

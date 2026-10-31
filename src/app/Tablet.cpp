@@ -143,6 +143,7 @@ float App::strokePressure() const {
 
 SDL_Keymod App::inputMods() const {
     SDL_Keymod mods = SDL_GetModState();
+    if (blenderStyle()) mods = blenderMods(mods); // Blender's Ctrl inverts, its Mask brush masks (Input.cpp)
     for (int b = 1; b <= kPenButtons; ++b) {
         if (!(penButtons_ & (1u << b))) continue;
         const PenAction a = uiPrefs_.tablet.buttons[size_t(b - 1)];

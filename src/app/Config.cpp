@@ -22,6 +22,7 @@
 #include <filesystem>
 #include <fstream>
 #include <map>
+#include <span>
 
 namespace sf {
 
@@ -45,7 +46,8 @@ Json toJson(const UiPrefs& p) {
     j.set("libraryFolder", p.libraryFolder);
     j.set("cameraNotch", double(p.cameraNotch));
     j.set("turntable", p.turntable);
-    j.set("inputStyle", std::string(p.inputStyle == 1 ? "sculptforge" : "zbrush"));
+    j.set("inputStyle", std::string(p.inputStyle == 2 ? "blender" : p.inputStyle == 1 ? "sculptforge" : "zbrush"));
+    j.set("emulateNumpad", p.emulateNumpad);
     j.set("alphabeticalPalettes", p.alphabeticalPalettes);
     j.set("tablet", toJson(p.tablet));
     j.set("antialiasing", double(p.antialiasing));
@@ -68,7 +70,11 @@ void fromJson(const Json& j, UiPrefs& p) {
     if (j["libraryFolder"].isString()) p.libraryFolder = j["libraryFolder"].asString();
     p.cameraNotch = std::clamp(int(j["cameraNotch"].asNumber(p.cameraNotch)), 0, 2);
     p.turntable = j["turntable"].asBool(p.turntable);
-    if (j["inputStyle"].isString()) p.inputStyle = j["inputStyle"].asString() == "sculptforge" ? 1 : 0;
+    if (j["inputStyle"].isString()) {
+        const std::string style = j["inputStyle"].asString();
+        p.inputStyle = style == "blender" ? 2 : style == "sculptforge" ? 1 : 0;
+    }
+    p.emulateNumpad = j["emulateNumpad"].asBool(p.emulateNumpad);
     p.alphabeticalPalettes = j["alphabeticalPalettes"].asBool(p.alphabeticalPalettes);
     fromJson(j["tablet"], p.tablet);
     const int aa = int(j["antialiasing"].asNumber(p.antialiasing));
@@ -80,7 +86,7 @@ void fromJson(const Json& j, UiPrefs& p) {
 
 namespace {
 
-enum UiFileKind { kSaveUi, kLoadUi, kRunScript, kLibraryFolder, kUiFileKinds };
+enum UiFileKind { kSaveUi, kLoadUi, kRunScript, kLibraryFolder, kBlenderKeymap, kUiFileKinds };
 
 struct UiFileRequest {
     App* app = nullptr;
@@ -95,6 +101,7 @@ void SDLCALL onUiFileChosen(void* userdata, const char* const* files, int) {
 }
 
 const SDL_DialogFileFilter kUiFilters[] = {{"SculptForge UI layout", "json"}};
+const SDL_DialogFileFilter kBlenderKeymapFilters[] = {{"Blender keymap", "py"}, {"All files", "*"}};
 const SDL_DialogFileFilter kScriptFilters[] = {{"SculptForge script", "sfscript;txt"}, {"All files", "*"}};
 
 std::filesystem::path fsPath(const std::string& utf8) { return std::filesystem::path(std::u8string(utf8.begin(), utf8.end())); }
@@ -137,6 +144,27 @@ constexpr Gesture kGestures[] = {
     {"Tablet pressure", "Used automatically when a pen is detected (Preferences > Tablet: curve, test area)"},
     {"Pen eraser end", "Inverts the brush (Ctrl + eraser erases mask); Preferences > Tablet"},
     {"Pen side buttons", "Lower: right-click (drag to rotate), upper: Alt (invert); Preferences > Tablet"},
+    {"Open files", "Drop a model (.obj, .glb ...), brush (.sfbrush) or image onto the window"},
+};
+
+// The same in the Blender style (Preferences > Input).
+constexpr Gesture kBlenderGestures[] = {
+    {"Sculpt", "Left drag on the model"},
+    {"Invert (subtract)", "Hold Ctrl while sculpting"},
+    {"Smooth", "Hold Shift while sculpting"},
+    {"Rotate", "Middle drag, Alt + left drag (pen, trackpad), or left drag beside the model"},
+    {"Pan", "Shift + middle drag, or Alt+Shift + left drag"},
+    {"Zoom", "Mouse wheel, Ctrl + middle drag, or Alt+Ctrl + left drag"},
+    {"Views", "Numpad 1 front, 3 right, 7 top (Ctrl: the opposite side), 5 orthographic, . frame the SubTool, Home "
+              "frame everything; Emulate Numpad (Preferences > Input) for the number row"},
+    {"Paint mask", "M for the Mask brush, then drag (Ctrl+drag unmasks); M again goes back"},
+    {"Invert / clear mask", "Ctrl+I / Alt+M"},
+    {"Hide polygroup", "H over it (Shift+H: show only it, again: everything; Alt+H shows all)"},
+    {"Brush radius / strength", "F / Shift+F, then drag or type a number"},
+    {"Help on any control", "Hold Ctrl and point at it (Ctrl+Alt: scripting parameters)"},
+    {"Assign a shortcut", "Ctrl+Alt + click any button, then press the key"},
+    {"Tablet pressure", "Used automatically when a pen is detected (Preferences > Tablet: curve, test area)"},
+    {"Pen side buttons", "Lower: right-click (drag to rotate), upper: invert; Preferences > Tablet"},
     {"Open files", "Drop a model (.obj, .glb ...), brush (.sfbrush) or image onto the window"},
 };
 
@@ -288,6 +316,7 @@ void App::initActions() {
                 doc_.activeBrush = -1;
                 paintMode_ = false;
                 guidesMode_ = false; // leaves the QRemesh Guides brush
+                maskBrush_.on = false;
             },
             ICON_LC_BRUSH, nullptr, [this, type] { return brush_ == type && doc_.activeBrush < 0 && !paintMode_ && !guidesMode_; }, nullptr,
             (std::string("Sculpt with the ") + brushName(type) + " brush.").c_str());
@@ -486,6 +515,10 @@ void App::saveUiDialog() {
     SDL_ShowSaveFileDialog(onUiFileChosen, &g_requests[kSaveUi], window_, kUiFilters, 1, nullptr);
 }
 
+void App::importBlenderKeymapDialog() {
+    SDL_ShowOpenFileDialog(onUiFileChosen, &g_requests[kBlenderKeymap], window_, kBlenderKeymapFilters, 2, nullptr, false);
+}
+
 void App::loadUiDialog() {
     SDL_ShowOpenFileDialog(onUiFileChosen, &g_requests[kLoadUi], window_, kUiFilters, 1, nullptr, false);
 }
@@ -594,6 +627,8 @@ void App::drawHelpConsoleUi() {
                 } else {
                     status_ = err;
                 }
+            } else if (kind == kBlenderKeymap) {
+                importBlenderKeymap(path);
             } else if (kind == kRunScript) {
                 setConsoleOpen(true);
                 console_.queueScriptFile(path);
@@ -653,6 +688,12 @@ void App::drawControlsWindow() {
         ImGui::End();
         return;
     }
+    // The key style (Preferences > Input), and a keymap exported from Blender (#12).
+    ImGui::TextDisabled("Style");
+    ImGui::SameLine();
+    drawInputStyleRow(ImGui::GetContentRegionAvail().x * 0.6f);
+    ImGui::SameLine();
+    ui::ActionButton(*this, "input.import_blender", ImVec2(-FLT_MIN, 0), ui::Look::IconLabel);
     static char filter[96] = "";
     ImGui::SetNextItemWidth(-FLT_MIN);
     ImGui::InputTextWithHint("##controls_filter", ICON_LC_SEARCH "  Filter shortcuts and gestures", filter, sizeof filter);
@@ -705,7 +746,8 @@ void App::drawControlsWindow() {
             if (ImGui::BeginTable("##gestures", 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_PadOuterX)) {
                 ImGui::TableSetupColumn("what", ImGuiTableColumnFlags_WidthFixed, 180.0f * s);
                 ImGui::TableSetupColumn("how", ImGuiTableColumnFlags_WidthStretch);
-                for (const auto& g : kGestures) {
+                const bool blender = blenderStyle();
+                for (const auto& g : blender ? std::span<const Gesture>(kBlenderGestures) : std::span<const Gesture>(kGestures)) {
                     if (!matches(g.what, g.how, "")) continue;
                     ImGui::TableNextRow();
                     ImGui::TableNextColumn();

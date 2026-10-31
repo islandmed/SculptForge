@@ -1,0 +1,185 @@
+keyconfig_version = (4, 2, 61)
+keyconfig_data = \
+[("3D View",
+  {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
+  {"items":
+   [("view3d.rotate", {"type": 'MIDDLEMOUSE', "value": 'PRESS'}, None),
+    ("view3d.view_axis",
+     {"type": 'NUMPAD_1', "value": 'PRESS'},
+     {"properties":
+      [("type", 'FRONT'),
+       ],
+      },
+     ),
+    ("view3d.view_axis",
+     {"type": 'ONE', "value": 'PRESS', "alt": True},
+     {"properties":
+      [("type", 'FRONT'),
+       ],
+      },
+     ),
+    ("view3d.view_axis",
+     {"type": 'NUMPAD_1', "value": 'PRESS', "shift": True},
+     {"properties":
+      [("type", 'FRONT'),
+       ("align_active", True),
+       ],
+      },
+     ),
+    ("view3d.view_axis",
+     {"type": 'NUMPAD_7', "value": 'PRESS', "ctrl": True},
+     {"properties":
+      [("type", 'BOTTOM'),
+       ],
+      },
+     ),
+    ("view3d.view_persportho", {"type": 'BACK_SLASH', "value": 'PRESS'}, None),
+    ("view3d.view_all",
+     {"type": 'HOME', "value": 'PRESS'},
+     {"properties":
+      [("center", False),
+       ],
+      },
+     ),
+    ("view3d.view_all",
+     {"type": 'C', "value": 'PRESS', "shift": True},
+     {"properties":
+      [("center", True),
+       ],
+      },
+     ),
+    ("view3d.view_orbit",
+     {"type": 'NUMPAD_9', "value": 'PRESS'},
+     {"properties":
+      [("angle", 3.1416),
+       ("type", 'ORBITRIGHT'),
+       ],
+      },
+     ),
+    ("view3d.localview", {"type": 'NUMPAD_SLASH', "value": 'PRESS'}, None),
+    ],
+   },
+  ),
+ ("Knife Tool Modal Map",
+  {"space_type": 'EMPTY', "region_type": 'WINDOW', "modal": True},
+  {"items":
+   [("CANCEL", {"type": 'ESC', "value": 'ANY', "any": True}, None),
+    ],
+   },
+  ),
+ ("Object Mode",
+  {"space_type": 'EMPTY', "region_type": 'WINDOW'},
+  {"items":
+   [("object.delete", {"type": 'X', "value": 'PRESS'}, None),
+    ],
+   },
+  ),
+ ("Sculpt",
+  {"space_type": 'EMPTY', "region_type": 'WINDOW'},
+  {"items":
+   [("sculpt.brush_stroke", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
+    ("paint.brush_select",
+     {"type": 'D', "value": 'PRESS'},
+     {"properties":
+      [("sculpt_tool", 'DRAW'),
+       ],
+      },
+     ),
+    ("brush.asset_activate",
+     {"type": 'Q', "value": 'PRESS', "shift": True},
+     {"properties":
+      [("asset_library_type", 'ESSENTIALS'),
+       ("relative_asset_identifier", "brushes/essentials_brushes-mesh_sculpt.blend/Brush/Clay Strips"),
+       ],
+      },
+     ),
+    ("paint.brush_select",
+     {"type": 'C', "value": 'PRESS', "shift": True},
+     {"properties":
+      [("sculpt_tool", 'CREASE'),
+       ],
+      },
+     ),
+    ("paint.brush_select",
+     {"type": 'K', "value": 'PRESS'},
+     {"properties":
+      [("sculpt_tool", 'SNAKE_HOOK'),
+       ],
+      "active":False,
+      },
+     ),
+    ("wm.radial_control",
+     {"type": 'F', "value": 'PRESS'},
+     {"properties":
+      [("data_path_primary", 'tool_settings.sculpt.brush.size'),
+       ("data_path_secondary", 'tool_settings.unified_paint_settings.size'),
+       ("use_secondary", 'tool_settings.unified_paint_settings.use_unified_size'),
+       ("rotation_path", 'tool_settings.sculpt.brush.mask_texture_slot.angle'),
+       ("color_path", 'tool_settings.sculpt.brush.cursor_color_add'),
+       ("fill_color_path", ''),
+       ("fill_color_override_path", ''),
+       ("fill_color_override_test_path", ''),
+       ("zoom_path", ''),
+       ("image_id", 'tool_settings.sculpt.brush'),
+       ("secondary_tex", False),
+       ],
+      },
+     ),
+    ("wm.radial_control",
+     {"type": 'R', "value": 'PRESS', "shift": True},
+     {"properties":
+      [("data_path_primary", 'tool_settings.sculpt.brush.strength'),
+       ("use_secondary", 'tool_settings.unified_paint_settings.use_unified_strength'),
+       ],
+      },
+     ),
+    ("object.subdivision_set",
+     {"type": 'ONE', "value": 'PRESS', "alt": True, "repeat": True},
+     {"properties":
+      [("level", -1),
+       ("relative", True),
+       ],
+      },
+     ),
+    ("paint.mask_flood_fill",
+     {"type": 'M', "value": 'PRESS', "alt": True},
+     {"properties":
+      [("mode", 'VALUE'),
+       ("value", 0.0),
+       ],
+      },
+     ),
+    ("paint.mask_flood_fill",
+     {"type": 'I', "value": 'PRESS', "oskey": True},
+     {"properties":
+      [("mode", 'INVERT'),
+       ],
+      },
+     ),
+    ("sculpt.dyntopo_detail_size_edit", {"type": 'R', "value": 'PRESS'}, None),
+    ("wm.context_menu_enum",
+     {"type": 'E', "value": 'PRESS', "alt": True},
+     {"properties":
+      [("data_path", 'tool_settings.sculpt.brush.stroke_method'),
+       ],
+      },
+     ),
+    ],
+   },
+  ),
+ ]
+
+
+if __name__ == "__main__":
+    # Only add keywords that are supported.
+    from bpy.app import version as blender_version
+    keywords = {}
+    if blender_version >= (2, 92, 0):
+        keywords["keyconfig_version"] = keyconfig_version
+    import os
+    from bl_keymap_utils.io import keyconfig_import_from_data
+    keyconfig_import_from_data(
+        os.path.splitext(os.path.basename(__file__))[0],
+        keyconfig_data,
+        **keywords,
+    )

@@ -20,6 +20,7 @@ public:
     float roll = 0.0f;  // radians around the view direction; only free orbiting makes it non-zero
     float fovY = glm::radians(35.0f);
     float aspect = 1.0f;
+    bool ortho = false; // orthographic: shows what a perspective view would at the target's depth (Numpad 5)
 
     glm::quat orientation() const;
     glm::vec3 position() const;

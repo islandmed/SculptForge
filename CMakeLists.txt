@@ -203,6 +203,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/Demo.cpp
     src/app/UiTest.cpp
     src/app/Actions.cpp
+    src/app/BlenderKeymap.cpp
     src/app/Ui.cpp
     src/app/UiLayout.cpp
     src/app/Shell.cpp
@@ -430,7 +431,7 @@ if(SCULPTFORGE_BUILD_TESTS)
   target_compile_definitions(sculptforge_tests PRIVATE SF_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
   target_link_libraries(sculptforge_tests PRIVATE sculptforge_core sculptforge_ai sculptforge_phone)
   if(SCULPTFORGE_BUILD_APP) # the action registry (key chords, shortcut overrides) needs SDL's key names
-    target_sources(sculptforge_tests PRIVATE src/app/Actions.cpp)
+    target_sources(sculptforge_tests PRIVATE src/app/Actions.cpp src/app/BlenderKeymap.cpp)
     target_link_libraries(sculptforge_tests PRIVATE SDL3::SDL3)
     target_compile_definitions(sculptforge_tests PRIVATE SF_TEST_ACTIONS)
   endif()

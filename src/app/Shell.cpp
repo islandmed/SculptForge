@@ -302,6 +302,7 @@ void App::registerShellActions() {
             doc_.activeBrush = -1;
             paintMode_ = false;
             guidesMode_ = false; // leaves the QRemesh Guides brush
+            maskBrush_.on = false;
         };
         a.checked = [this, type] { return brush_ == type && doc_.activeBrush < 0 && !paintMode_ && !guidesMode_; };
         add(std::move(a));

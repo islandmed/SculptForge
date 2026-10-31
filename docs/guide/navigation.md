@@ -13,7 +13,9 @@ in Blender or Maya, set **Preferences > Interface > Rotation** to **Turntable**:
 model around its vertical axis and up-down drags tilt it, stopping just short of looking straight down or up.
 
 Panning moves the target; zooming moves the camera closer to it or further away. The view is a perspective
-view with a 35 degree field of view.
+view with a 35 degree field of view, or orthographic (<kbd>Numpad 5</kbd>): no foreshortening, so sizes don't
+shrink with depth. The front, side and top views (<kbd>Numpad 1</kbd>, <kbd>3</kbd>, <kbd>7</kbd>) switch to
+orthographic until you rotate again, as in Blender.
 
 Navigation starts only on the canvas. A drag that begins on a shelf, a tray or a palette never moves the
 camera.
@@ -24,6 +26,12 @@ camera.
 > navigation. As in ZBrush, dragging up (forward) zooms out and dragging down zooms in, and when you rotate or pan
 > the model follows the cursor. The right-shelf Move, Zoom and Rotate buttons work as in ZBrush.
 
+> **Blender:** with **Preferences > Input > Style** on **Blender**, middle-drag rotates, <kbd>Shift</kbd>+middle-drag
+> pans and <kbd>Ctrl</kbd>+middle-drag zooms. With a pen or a trackpad, <kbd>Alt</kbd>+left-drag does the same
+> (add <kbd>Shift</kbd> to pan, <kbd>Ctrl</kbd> to zoom), anywhere on the canvas, as Blender's Emulate 3 Button
+> Mouse. The numpad views, <kbd>Numpad .</kbd> and <kbd>Home</kbd> frame as in Blender. See
+> [Blender keys](shortcuts.md#blender-keys).
+
 ## Mouse and pen
 
 | To | Do this |
@@ -32,7 +40,11 @@ camera.
 | Roll (turn about the view axis) | <kbd>Shift</kbd>+click the background, let go of <kbd>Shift</kbd>, then drag (ZBrush) |
 | Pan | <kbd>Alt</kbd>+left-drag on the background, <kbd>Alt</kbd>+right-drag, or middle-drag |
 | Zoom | Mouse wheel; <kbd>Alt</kbd>+left-drag on the background, then let go of <kbd>Alt</kbd> and keep dragging; <kbd>Ctrl</kbd>+right-drag; <kbd>Ctrl</kbd>+middle-drag; with the SculptForge input style also <kbd>Ctrl</kbd>+left-drag on the background |
-| Frame the model | <kbd>F</kbd>, or **Frame** on the right shelf |
+| Frame the model | <kbd>F</kbd> (Blender style: <kbd>Home</kbd>), or **Frame** on the right shelf |
+| Front, right, top view | <kbd>Numpad 1</kbd>, <kbd>Numpad 3</kbd>, <kbd>Numpad 7</kbd>; <kbd>Ctrl</kbd> for the back, left and bottom |
+| Orthographic on or off | <kbd>Numpad 5</kbd> |
+| Turn in 15 degree steps | <kbd>Numpad 4</kbd> / <kbd>Numpad 6</kbd> (around), <kbd>Numpad 8</kbd> / <kbd>Numpad 2</kbd> (over); <kbd>Numpad 9</kbd>: the other side |
+| Frame the active SubTool | <kbd>Numpad .</kbd> |
 
 Zoom drags go the ZBrush way: drag up to zoom out, down to zoom in. The SculptForge input style
 (**Preferences > Input**) reverses them: drag up to come closer.
@@ -90,7 +102,7 @@ These live on the right shelf and in the **Render** palette:
 
 ## Not yet
 
-> **Not yet:** SculptForge has no orthographic view, no rotation around the point under the cursor (the
+> **Not yet:** SculptForge has no rotation around the point under the cursor (the
 > camera always orbits its target, which Frame sets to the scene centre), no floor grid and no saved camera
 > views. Pan the target onto the area you're working on to orbit around it.
 
