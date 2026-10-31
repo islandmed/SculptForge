@@ -492,6 +492,7 @@ void App::drawPalette_Tool() {
         Demo::pushScope("SubTools");
         drawSubToolsContents();
         Demo::popScope();
+        drawExtractContents(); // PanelExtract.cpp
         Demo::pushScope("Project");
         drawProjectContents(); // ProjectAll (PanelRetopo.cpp)
         Demo::popScope();
@@ -548,6 +549,7 @@ void App::drawPalette_Tool() {
         Demo::pushScope("QRemesh");
         drawQRemeshContents(); // quad retopology (PanelRetopo.cpp)
         Demo::popScope();
+        drawModifyTopologyContents(); // Mirror And Weld (PanelExtract.cpp)
     }
     if (subpalette("tool.remesh", "Remesh")) {
         tray::Section section;
@@ -573,6 +575,12 @@ void App::drawPalette_Tool() {
         } else if (hasTexture(doc_.mesh)) {
             drawKeepTextureCheckbox("Keep Texture##remesh", "Tool > Remesh"); // only for a painted SubTool
         }
+    }
+    if (subpalette("tool.deformation", "Deformation")) {
+        tray::Section section;
+        Demo::pushScope("Deformation");
+        drawDeformationContents(); // Mirror (PanelExtract.cpp)
+        Demo::popScope();
     }
     if (subpalette("tool.masking", "Masking")) {
         tray::Section section;

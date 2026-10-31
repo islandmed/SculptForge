@@ -1488,6 +1488,8 @@ void App::updateTitle() {
 // ---------------------------------------------------------------------------
 
 void App::drawUi() {
+    // An Extract preview goes once its source changes or another SubTool is picked (strokes aren't commands).
+    if (doc_.extractPreview.id && !doc_.sculptor.strokeActive()) doc_.dropExtractPreview(true);
     drawProjectPopups();
     if (hideUi_) return; // demos: clean beauty shots
     // Draw order (ui-spec §12): shells, LightBox, floating windows, then pop-ups and help.

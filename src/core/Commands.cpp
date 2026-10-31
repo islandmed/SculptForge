@@ -9,6 +9,7 @@
 #include "core/Decimate.h"
 #include "core/Dyntopo.h"
 #include "core/EnginePresets.h"
+#include "core/ExtractMirror.h"
 #include "core/Face.h"
 #include "core/ImageTo3D.h"
 #include "core/Masking.h"
@@ -740,6 +741,7 @@ CommandRegistry::CommandRegistry() {
     add({"undo", "Undo the last action.", {},
          [](Document& doc, const Args&) -> CommandResult {
              if (!doc.undo.undo(doc.mesh, doc.bvh)) return {false, "Nothing to undo"};
+             if (UndoRecord* r = doc.undo.lastRedo(); r && r->subtool) doc.applySubtoolStep(*r->subtool);
              doc.modified = true;
              return {true, "Undone"};
          }});
@@ -747,6 +749,7 @@ CommandRegistry::CommandRegistry() {
     add({"redo", "Redo the last undone action.", {},
          [](Document& doc, const Args&) -> CommandResult {
              if (!doc.undo.redo(doc.mesh, doc.bvh)) return {false, "Nothing to redo"};
+             if (UndoRecord* r = doc.undo.lastUndo(); r && r->subtool) doc.applySubtoolStep(*r->subtool);
              doc.modified = true;
              return {true, "Redone"};
          }});
@@ -769,6 +772,7 @@ CommandRegistry::CommandRegistry() {
     registerDyntopoCommands(*this); // dyntopo (core/DyntopoCommands.cpp)
     registerSculptableCommands(*this); // splat_to_mesh, face_guides (core/Sculptable.h)
     registerTransformCommands(*this); // transform (core/MeshTransform.h)
+    registerExtractMirrorCommands(*this); // extract, mirror_and_weld, mirror (core/ExtractMirror.h)
     registerPerformanceCommands(*this); // perf_info, set_multithreading (core/Benchmark.cpp)
     registerPaintCommands(*this); // core/Polypaint.cpp
     registerGozCommands(*this); // goz_import/export/send/receive, export_stl (io/GozCommands.cpp)
@@ -792,6 +796,10 @@ CommandResult CommandRegistry::execute(Document& doc, const std::string& name, c
     for (const auto& p : cmd->params)
         if (p.required && !args.contains(p.name)) return {false, "Missing required argument: " + p.name};
     doc.notice.clear();
+    // Extract's preview lasts until Accept or until anything else changes the scene (as in ZBrush); saving or
+    // exporting never writes it.
+    if (doc.extractPreview.id && name.rfind("extract", 0) != 0)
+        doc.dropExtractPreview(!(name.rfind("save", 0) == 0 || name.rfind("export", 0) == 0));
     CommandResult r = cmd->run(doc, args);
     if (const std::string notice = doc.takeNotice(); !notice.empty() && r.ok) r.message += ". " + notice;
     return r;

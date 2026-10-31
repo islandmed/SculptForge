@@ -6,6 +6,11 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Extract (Tool > SubTool > Extract), as in ZBrush: the masked, visible part of a SubTool becomes a shell with Thick (a share of the SubTool's size; negative grows inward, 0 makes a single-sided surface), E Smt (smooths the stepped edge) and Double (both ways). Extract shows a preview below the source that follows the settings; Accept keeps it as a new SubTool with outer, inner and rim polygroups and the source's polypaint, as one undo step (undo removes the SubTool, redo puts it back). An unaccepted preview goes when the source changes and is never saved. Commands: extract, extract_accept, extract_cancel.
+- Mirror And Weld (Tool > Geometry > Modify Topology, X / Y / Z): keeps the + side of the plane through the origin, cuts polygons crossing it, mirrors the half and welds the seam into one watertight mesh, keeping polygroups, polypaint, mask, UVs, quads and sculpt layers (`mirror_and_weld`, with `side=negative` for the other half). Undoable.
+- Mirror (Tool > Deformation, X / Y / Z): flips the SubTool across the plane through the origin, or in place with `pivot=center` (`mirror`). Undoable.
+
 ## [0.9.5] - 2026-10-31
 
 The day after launch, people filed ten issues. 0.9.5 answers all of them: ZSpheres for blocking out a base mesh,

@@ -1,0 +1,93 @@
+# Extract (Tool > SubTool > Extract: preview, then Accept), Mirror And Weld (Tool > Geometry > Modify Topology)
+# and Mirror (Tool > Deformation), as in ZBrush; askNK's 0.9.5 review wishlist.
+
+# --- Extract: a cap from the masked top of a sphere.
+run new_sphere subdivisions=4
+run mask_rect y0=0.3
+expect_value masked > 0
+expect "Extract/Extract"
+expect "Extract/Accept"
+camera 25 25
+key f
+click "Extract/Extract"
+expect_status "Extract preview"
+expect_value subtools == 2
+expect_value active_subtool == 0
+expect_value extract_preview == 1
+shot extract-preview
+
+# The settings follow the preview: Double grows it both ways (still one preview).
+click "Extract/Double"
+expect_value subtools == 2
+expect_value extract_preview == 1
+shot extract-palette
+
+# Accept keeps it as a SubTool below the source; the source stays active.
+click "Extract/Accept"
+expect_status "Extracted Extract"
+expect_value extract_preview == 0
+expect_value subtools == 2
+expect_value can_undo == 1
+run mask_clear
+shot extract-accepted
+
+# The shell is closed: outer, inner and rim polygroups.
+run subtool_select index=1
+expect_value open_edges == 0
+expect_value groups == 3
+run subtool_select index=0
+
+# Ctrl+Z takes the extracted SubTool away again (after the mask_clear), redo brings it back.
+key ctrl+z
+key ctrl+z
+expect_value subtools == 1
+key ctrl+shift+z
+expect_value subtools == 2
+
+# A preview that isn't accepted goes when the source changes.
+click "Extract/Extract"
+expect_value subtools == 3
+run mask_invert
+wait_idle 5
+expect_value subtools == 2
+expect_value extract_preview == 0
+
+# --- Mirror And Weld: an off-centre sphere comes back symmetric and closed.
+run new_sphere subdivisions=4
+run transform translate=0.4,0,0 masked=0
+expect_value open_edges == 0
+wait 0.2
+click "Geometry##tool.geometry"
+expect "Modify Topology/Mirror And Weld"
+click "Modify Topology/Mirror And Weld"
+expect_status "Mirror And Weld X"
+expect_value open_edges == 0
+expect_value can_undo == 1
+camera 0 0
+key f
+shot mirror-weld-sphere
+
+# A head sculpted on one side only (a scar and a brow ridge on its right): Mirror And Weld gives the left side the same.
+run new_head
+run stroke points="0.035,0.005,0.2 0.06,-0.03,0.2 0.07,-0.07,0.2" brush=Standard radius=0.012 strength=1
+run stroke points="0.015,0.105,0.2 0.04,0.1,0.2 0.065,0.085,0.2" brush=Standard radius=0.014 strength=1
+camera 0 0
+key f
+shot head-before
+click "Modify Topology/Mirror And Weld"
+expect_status "Mirror And Weld X"
+shot head-mirror-weld
+click "Geometry##tool.geometry"
+
+# --- Deformation > Mirror flips it (undoable); the axis toggles pick the axes.
+click "Deformation##tool.deformation"
+expect "Deformation/Mirror"
+click "Deformation/Mirror"
+expect_status "Mirrored across X"
+shot deformation-palette
+click "Deformation/Y"
+click "Deformation/Mirror"
+expect_status "Mirrored across XY"
+key ctrl+z
+key ctrl+z
+expect_value can_undo == 1

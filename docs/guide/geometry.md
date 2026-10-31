@@ -1,8 +1,8 @@
 # Subdivide, remesh, decimate and LODs
 
 These tools change the topology of the active SubTool: add resolution for detail, rebuild an even surface,
-reduce the triangle count, or make a chain of levels of detail for a game engine. This chapter explains what each
-one does to your mesh and its attributes, and when to use it.
+reduce the triangle count, make it symmetric, or make a chain of levels of detail for a game engine. This
+chapter explains what each one does to your mesh and its attributes, and when to use it.
 
 All of them work on the **active SubTool** and, except the LOD preview, are undoable with
 <kbd>Ctrl</kbd>+<kbd>Z</kbd>.
@@ -16,6 +16,7 @@ All of them work on the **active SubTool** and, except the LOD preview, are undo
 | Voxel Remesh | **Tool > Remesh > Voxel Remesh** | Set by resolution | All quads (new ones) | Baked in | Yes (transferred) | No (reset); a texture is kept on new UVs with Keep Texture |
 | QRemesh | **Tool > Geometry > QRemesh** | Set by Target Polygons | All quads, with edge loops | Baked in | Yes (transferred) | Polygroups with Keep Groups; no hidden faces; a texture is kept on new UVs with Keep Texture |
 | Decimate | **Tool > Geometry > Decimate** | Reduced | No, all triangles | Yes | Yes | Yes |
+| Mirror And Weld | **Tool > Geometry > Modify Topology** | Twice the kept side | Yes | Yes | Yes (mirrored) | Yes (mirrored) |
 | LOD chain | **Tool > Export** | One level per ratio step | LOD0 keeps them; lower levels are triangles | Yes, on every level | Yes | Yes |
 
 ## Quads and triangles
@@ -117,6 +118,31 @@ scan down to something you can work with.
 > **Tip:** Decimate a duplicate SubTool (**Tool > SubTool > Duplicate**) when you want to keep the full-resolution
 > sculpt in the same project.
 
+## Mirror And Weld
+
+**Mirror And Weld**, in **Tool > Geometry > Modify Topology**, makes a model symmetric: it keeps the half on the
++ side of the chosen axis (+X is the model's left, your right when you look at its face), mirrors it onto the
+other side and welds the two halves along the middle into one watertight mesh. Use it after sculpting one side
+without symmetry, to finish a half model, or to repair a model whose sides have drifted apart.
+
+![A head with a scar and a brow ridge on one side, then the same head after Mirror And Weld X](images/mirror-weld.jpg)
+
+- Pick the axis with **X**, **Y** and **Z** beside the button (X is on by default). With several on, they apply
+  one after the other.
+- The mirror plane goes through the world's origin, the same plane symmetry uses. Polygons that cross it are cut
+  on it, so the seam is clean wherever the model sits. Points on an open edge within 0.1% of the model's size
+  from the plane are welded onto it, which closes a half model whose seam isn't exactly at 0.
+- Polygroups, polypaint, the mask, UVs, quads and sculpt layers are kept; the mirrored side takes the kept side's.
+  Subdivision levels are removed (undo restores them), as with the other tools on this page.
+- To keep the **other** side, flip the model first with **Tool > Deformation > Mirror**, or run
+  `mirror_and_weld side=negative`.
+
+## Mirror
+
+**Tool > Deformation > Mirror** flips the SubTool across the plane through the origin on the chosen axes, with its
+surface still facing outward. Polygroups, polypaint, UVs and layers come along; subdivision levels are removed
+(undo restores them). `mirror pivot=center` flips it in place about its own centre instead.
+
 ## LOD chains
 
 A level-of-detail chain is a series of lighter copies of the model for game engines: LOD0 is the full sculpt, and
@@ -149,9 +175,9 @@ See [Exporting](exporting.md) for these exports and their options.
 
 ## Undo and safety
 
-Subdivide, remesh, QRemesh, decimate and delete hidden are single undo steps on the active SubTool. They can use a lot of
-memory on dense meshes, and undo keeps a full copy of the previous mesh for each of them. Before a big change on a
-heavy sculpt:
+Subdivide, remesh, QRemesh, decimate, Mirror And Weld, Mirror and delete hidden are single undo steps on the
+active SubTool. They can use a lot of memory on dense meshes, and undo keeps a full copy of the previous mesh for
+each of them. Before a big change on a heavy sculpt:
 
 - **QuickSave** (title strip) keeps a timestamped copy of the scene without touching your project file; see
   [Projects](projects.md#quicksave).
@@ -165,6 +191,8 @@ heavy sculpt:
 | `remesh` | `resolution` 32-512 voxels across the longest side (default 200); `keep_texture` (default true) |
 | `decimate` | `ratio` 0.01-1 of the triangles to keep (default 0.5), or `triangles` for an exact target |
 | `qremesh` | `target` quads (default 5000), `adaptive`, `keep_groups`, `detect_edges`, `use_polypaint`, `symmetry`, `keep_original`, `keep_texture`; see [Quad retopology](retopology.md#scripting) |
+| `mirror_and_weld` | `axis` x, y, z or several, e.g. `xz` (default x); `side` positive (default) or negative |
+| `mirror` | `axis` (default x); `pivot` origin (default) or center |
 | `export_lods` | `path` (base name), `levels` 1-8 including LOD0 (default 4), `ratio` 0.1-0.9 (default 0.5) |
 
 ```sh

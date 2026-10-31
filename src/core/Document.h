@@ -46,6 +46,21 @@ struct SubTool {
     std::vector<QRemeshGuide> qremeshGuides; // QRemesh Guides (core/QRemeshGuides.h)
 };
 
+// An undo step that added SubTool `id` at list position `at` (UndoRecord::subtool): `stashed` holds the SubTool
+// while it's undone.
+struct SubtoolStep {
+    uint32_t id = 0;
+    int at = 0;
+    std::unique_ptr<SubTool> stashed;
+};
+
+// Extract's preview (core/ExtractMirror.h): SubTool `id`, made from the mask of SubTool `source` as it was at
+// that SubTool's undo revision `revision`, shown until Accept turns it into an undoable step. id 0 = none.
+struct ExtractPreview {
+    uint32_t id = 0, source = 0;
+    uint64_t revision = 0;
+};
+
 // Everything that makes up the open scene: the mesh, its acceleration
 // structure and edit history. UI-independent so it can be driven by tests,
 // scripts or an AI assistant through the command registry.
@@ -129,6 +144,19 @@ struct Document {
     void moveSubtool(int i, int direction);
     // Index of the SubTool called `name` (exact match, first one), or -1.
     int findSubtool(const std::string& name) const;
+    // Index of the SubTool with this id, or -1.
+    int subtoolIndex(uint32_t id) const;
+    // Undoes or redoes a SubtoolStep: takes the SubTool out of the list into the step, or puts it back. False
+    // when there was nothing to do (the SubTool was deleted since, or it's the active or the last one).
+    bool applySubtoolStep(SubtoolStep& step);
+
+    // The Extract preview waiting for Accept, if any (see ExtractPreview).
+    ExtractPreview extractPreview;
+    // True while the preview SubTool exists, its source is active and unchanged since.
+    bool extractPreviewCurrent() const;
+    // Removes the preview SubTool (if any); `staleOnly`: only when it's no longer current.
+    void dropExtractPreview(bool staleOnly = false);
+
     // A name not used by any SubTool yet ("Eye", "Eye 2", ...).
     std::string uniqueSubtoolName(const std::string& wanted) const;
     // Bounds of every visible SubTool.

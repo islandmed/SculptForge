@@ -21,6 +21,7 @@ for what is planned.
 | Document, 2.5D canvas, pixols | Not planned: SculptForge is a 3D sculpting app only |
 | Draw Size | **Draw Size** (top shelf, <kbd>S</kbd>, <kbd>[</kbd> / <kbd>]</kbd>) |
 | DynaMesh | **Voxel Remesh** (**Tool > Remesh**, `remesh`). See [Geometry](geometry.md#voxel-remesh) |
+| Extract (Tool > SubTool > Extract) | **Tool > SubTool > Extract**: the masked part becomes a shell SubTool, with **Thick**, **E Smt** and **Double**; **Extract** previews, **Accept** keeps it (`extract`, `extract_accept`). See [SubTools](subtools.md#extract-a-shell) |
 | Focal Shift | No slider for the built-in brushes. Custom brushes have **Hardness** and **Tip sharpness** in their recipe |
 | Ghost, Transp | Not yet. Inactive SubTools are drawn slightly dimmed |
 | GoZ | **GoZ**: `.GoZ` import and export and the GoZ bridge (**File > ZBrush (GoZ)**). See [Exporting](exporting.md) |
@@ -36,7 +37,9 @@ for what is planned.
 | Mask by Cavity | **Tool > Masking > By cavity** (`mask_by_cavity`) |
 | Masking (Ctrl) | Hold <kbd>Ctrl</kbd> to paint the mask, <kbd>Ctrl</kbd>+<kbd>Alt</kbd> to erase. See [Masking](masking.md) |
 | MaskLasso, MaskRect | **Tool > Masking**: pick the shape, then <kbd>Ctrl</kbd>+drag (add <kbd>Alt</kbd> to unmask). See [Masking](masking.md) |
-| MatCap | **Material**: seven MatCaps, Sculpt the default, plus Studio (<kbd>M</kbd>). Custom MatCap images not yet. See [Polypaint](polypaint.md) |
+| MatCap | **Material**: the built-in MatCaps, Soft Clay the default, plus Studio (<kbd>M</kbd>), and your own with **Load MatCap...** (`load_matcap`). See [Polypaint](polypaint.md) |
+| Mirror (Tool > Deformation) | **Tool > Deformation > Mirror** with X Y Z (`mirror`): flips the SubTool across the plane through the origin. See [Geometry](geometry.md#mirror) |
+| Mirror And Weld | **Tool > Geometry > Modify Topology > Mirror And Weld** with X Y Z (`mirror_and_weld`): the + side mirrored onto the - side and welded into one watertight mesh, keeping polygroups and polypaint. See [Geometry](geometry.md#mirror-and-weld) |
 | Morph target | A [sculpt layer](layers.md); exported as glTF morph targets and FBX/USD blend shapes |
 | Mrgb, M (material channel) | Not yet: there is no per-vertex material channel |
 | Polyframe (PolyF, Shift+F) | **PolyF** on the right shelf, or <kbd>Shift</kbd>+<kbd>F</kbd> |

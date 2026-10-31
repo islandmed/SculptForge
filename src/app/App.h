@@ -867,6 +867,18 @@ private:
     float sdivSlider_ = 1.0f;   // the SDiv slider while dragged (1-based)
     bool sdivHeld_ = false;
     void drawSubToolsContents();
+    // PanelExtract.cpp: Tool > SubTool > Extract, Tool > Geometry > Modify Topology (Mirror And Weld) and
+    // Tool > Deformation (Mirror), as in ZBrush.
+    void drawExtractContents();
+    void drawModifyTopologyContents();
+    void drawDeformationContents();
+    void runExtract(); // Extract with the palette's settings (a preview; Accept keeps it)
+    static std::string axesText(const bool axes[3]); // "x", "xz", "" (the axis argument of mirror commands)
+    float extractThick_ = 0.015f;          // Thick: fraction of the SubTool's size
+    int extractSmooth_ = 5;                // E Smt
+    bool extractDouble_ = false;           // Double
+    bool mirrorWeldAxes_[3] = {true, false, false}; // Mirror And Weld's X Y Z
+    bool mirrorAxes_[3] = {true, false, false};     // Deformation > Mirror's X Y Z
     void pollAlphaFile();
     ShellGeometry shell_;      // this frame's regions (drawShell)
     ImFont* fontSmall_ = nullptr, *fontTiny_ = nullptr, *fontIcons_ = nullptr, *fontBold_ = nullptr;

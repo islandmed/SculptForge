@@ -55,6 +55,8 @@
 //                            custom_matcaps (MatCaps loaded from images), material_custom (1 when the view uses
 //                            one), matcap_files (images in the library's MatCaps folder),
 //                            subtools (count), active_subtool (index, 0 = top), visible_subtools,
+//                            extract_preview (1 while an Extract preview waits for Accept), open_edges (edges of
+//                            the active SubTool with one triangle: 0 = watertight),
 //                            edited_subtools (SubTools with undo history), user_brushes (brushes in the
 //                            user library), library_files (.sfbrush files in it; UI tests get an empty
 //                            one in --ui-out/brush-library), ui_config (1 once Store Config wrote ui.json),
@@ -482,6 +484,13 @@ double Demo::query(const std::string& name, bool& known) const {
     const Document& doc = app_.doc_;
     if (name == "subtools") return double(doc.subtoolCount());
     if (name == "active_subtool") return double(doc.activeSubtool);
+    if (name == "extract_preview") return doc.extractPreviewCurrent() ? 1.0 : 0.0;
+    if (name == "open_edges") {
+        std::map<std::pair<uint32_t, uint32_t>, int> edges;
+        for (const auto& t : m.triangles)
+            for (int k = 0; k < 3; ++k) ++edges[{std::min(t[k], t[(k + 1) % 3]), std::max(t[k], t[(k + 1) % 3])}];
+        return double(std::count_if(edges.begin(), edges.end(), [](const auto& e) { return e.second == 1; }));
+    }
     if (name == "visible_subtools")
         return double(std::count_if(doc.subtools.begin(), doc.subtools.end(), [](const SubTool& s) { return s.visible; }));
     if (name == "edited_subtools") { // SubTools with undo history (the active one's lives in doc.undo)

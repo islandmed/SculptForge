@@ -42,6 +42,7 @@ add_library(sculptforge_core STATIC
   src/core/Polygroups.cpp
   src/core/ScreenSelect.cpp
   src/core/SubTools.cpp
+  src/core/ExtractMirror.cpp
   src/core/MeshTransform.cpp
   src/core/TransformCommands.cpp
   src/core/Decimate.cpp
@@ -247,6 +248,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelPhone.cpp
     src/app/PanelProject.cpp
     src/app/PanelSubTools.cpp
+    src/app/PanelExtract.cpp
     src/app/Tablet.cpp
     src/app/SpaceMouse.cpp
     src/app/Input.cpp

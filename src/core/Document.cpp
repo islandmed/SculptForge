@@ -4,6 +4,7 @@
 
 #include "core/Multires.h"
 
+#include <algorithm>
 #include <cctype>
 #include <filesystem>
 #include <memory>
@@ -31,6 +32,7 @@ void Document::setMesh(Mesh m, std::string name, BVH* built) {
     subtools.back().id = nextSubtoolId_++;
     subtools.back().name = name.empty() ? "Sculpt" : std::move(name);
     activeSubtool = 0;
+    extractPreview = {};
     markClean();
 }
 
@@ -114,6 +116,46 @@ void Document::moveSubtool(int i, int direction) {
     if (activeSubtool == i) activeSubtool = j;
     else if (activeSubtool == j) activeSubtool = i;
     modified = true;
+}
+
+int Document::subtoolIndex(uint32_t id) const {
+    for (int i = 0; i < subtoolCount(); ++i)
+        if (subtools[size_t(i)].id == id) return i;
+    return -1;
+}
+
+bool Document::applySubtoolStep(SubtoolStep& step) {
+    if (step.stashed) { // redo: put it back where it was
+        const int at = std::clamp(step.at, 0, subtoolCount());
+        subtools.insert(subtools.begin() + at, std::move(*step.stashed));
+        step.stashed.reset();
+        if (at <= activeSubtool) ++activeSubtool;
+        subtools[size_t(at)].mesh.topologyDirty = true;
+        modified = true;
+        return true;
+    }
+    const int i = subtoolIndex(step.id);
+    if (i < 0 || i == activeSubtool || subtoolCount() <= 1) return false;
+    step.at = i;
+    step.stashed = std::make_unique<SubTool>(std::move(subtools[size_t(i)]));
+    subtools.erase(subtools.begin() + i);
+    if (activeSubtool > i) --activeSubtool;
+    modified = true;
+    return true;
+}
+
+bool Document::extractPreviewCurrent() const {
+    if (!extractPreview.id) return false;
+    const int i = subtoolIndex(extractPreview.id);
+    return i >= 0 && i != activeSubtool && activeSubtoolInfo().id == extractPreview.source &&
+           undo.revision() == extractPreview.revision;
+}
+
+void Document::dropExtractPreview(bool staleOnly) {
+    if (!extractPreview.id || (staleOnly && extractPreviewCurrent())) return;
+    const int i = subtoolIndex(extractPreview.id);
+    extractPreview = {};
+    if (i >= 0) removeSubtool(i);
 }
 
 int Document::findSubtool(const std::string& name) const {
