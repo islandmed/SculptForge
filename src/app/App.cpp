@@ -756,6 +756,13 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
             penLeft();
         }
     }
+    if (fromPen) {
+        // The pen moves by the distance from its last position taken here, not by SDL's xrel: SDL keeps one cursor
+        // position for the pen and every mouse, so with a driver's stray mouse events in between (a Ugee pen on
+        // X11, #7) each pen event's xrel jumped back from the stray position and the view shook instead of turning.
+        dx = x - mouseX_;
+        dy = y - mouseY_;
+    }
     mouseX_ = x;
     mouseY_ = y;
     lastInputPen_ = fromPen;

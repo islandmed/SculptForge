@@ -1,0 +1,51 @@
+# Navigating with the pen tip (#7): a tip drag on the background rotates, Alt+drag pans, Ctrl+drag zooms, in both
+# input styles. Some tablet drivers (a Ugee pen on X11, Windows Ink) send stray mouse events at an old position
+# between the pen's; SDL keeps one cursor position for both, so its relative motion jumped back and forth and the
+# view only shook. With the stray events the view must move exactly as without them.
+run new_sphere subdivisions=4
+snapshot
+
+# Rotate: the same pen drag with and without stray events turns the view by the same angle.
+camera 0 0
+pen_drag 0.12 0.3 0.12 0.5
+remember camera_pitch clean
+expect_value camera_pitch < -20
+expect_value moved == 0
+camera 0 0
+pen_drag 0.12 0.3 0.12 0.5 stray 0.6 0.9
+expect_value camera_pitch >= $clean-0.5
+expect_value camera_pitch <= $clean+0.5
+expect_value moved == 0
+
+# Alt+drag pans, also with stray events.
+camera 0 0
+remember camera_pan p0
+hold alt
+pen_drag 0.12 0.3 0.12 0.5 stray 0.6 0.9
+hold none
+expect_value camera_pan > $p0
+expect_value moved == 0
+key f
+
+# The SculptForge input style: Ctrl+drag on the background zooms.
+click "Preferences##palette.preferences"
+click "Input##preferences.input"
+click "SculptForge##input.style_sculptforge"
+expect_value input_style == 1
+key escape
+remember camera_distance d0
+hold ctrl
+pen_drag 0.12 0.5 0.12 0.3 stray 0.6 0.9
+hold none
+expect_value camera_distance < $d0
+key f
+camera 0 0
+pen_drag 0.12 0.3 0.12 0.5 stray 0.6 0.9
+expect_value camera_pitch >= $clean-0.5
+expect_value camera_pitch <= $clean+0.5
+expect_value moved == 0
+
+# The pen still sculpts after navigating, and lifting it ended every drag.
+expect_value stroking == 0
+pen_stroke 0.3 0.45 0.7 0.55 0.6 0.6
+expect_value moved_out > 0

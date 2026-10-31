@@ -58,7 +58,8 @@ void App::handlePenEvent(const SDL_Event& e) {
     case SDL_EVENT_PEN_UP:
         // End the stroke here rather than waiting for SDL's mouse button up: the pen may leave
         // proximity right after, and some drivers then never send it.
-        if (drag_ == Drag::Stroke && dragFromPen_) onMouseUp();
+        // The same for a tip drag on the background (rotate / pan / zoom); a side button's view drag goes on.
+        if (drag_ != Drag::None && dragFromPen_ && !penNavButton_) onMouseUp();
         penTouching_ = penEraser_ = false;
         penTracker_.touchUp();
         break;

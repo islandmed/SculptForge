@@ -111,7 +111,8 @@ private:
     void penPressure(float pressure);               // PEN_AXIS pressure
     void penTouch(bool down, bool eraser);          // PEN_DOWN / PEN_UP (+ left button)
     void penButtonEvent(int button, bool down);     // PEN_BUTTON_DOWN / UP (+ SDL 3.4's mouse button)
-    void penStroke(std::function<ImVec2(float u)> path, float p0, float p1, bool eraser, bool leave, float seconds);
+    void penStroke(std::function<ImVec2(float u)> path, float p0, float p1, bool eraser, bool leave, float seconds,
+                   std::function<void()> afterSample = {}); // afterSample: e.g. a driver's stray mouse event
 
     // World -> screen in window coordinates.
     ImVec2 project(const glm::vec3& p) const;

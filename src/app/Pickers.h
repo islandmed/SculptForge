@@ -56,6 +56,8 @@ struct PickerUi {
     // held or Smooth is the brush), RGB Intensity or Focal Shift.
     enum class Slider { DrawSize, ZIntensity, RgbIntensity, FocalShift };
     static void sizePopup(App& app, Slider which);
+    // The open slider's knob (its current value) in window coordinates, as last drawn; false when none is open.
+    static bool sliderKnob(ImVec2& knob);
 };
 
 // Action id of a brush for the shelves ("brush.clay", "brush.paint", "brush.recipe.<name>").

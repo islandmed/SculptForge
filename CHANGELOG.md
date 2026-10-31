@@ -9,6 +9,15 @@ All notable changes to SculptForge are listed here. The format follows
 ### Added
 - ZSpheres (Tool > ZSpheres, #8): block out a base mesh from connected spheres. Draw grows a sphere from another (the drag sets its size) or adds a joint on a link, Move and Scale set the proportions, Alt+click deletes, Symmetry mirrors every edit, Preview (A) shows the skin, and Make Mesh builds it as a new watertight quad SubTool with a polygroup per link, keeping the ZSpheres hidden to edit again. Undoable, saved in projects, and scriptable (zsphere_new, zsphere_add, zsphere_set, zsphere_delete, zsphere_insert, zsphere_preview, zsphere_make_mesh, zsphere_list).
 
+### Fixed
+- The Blender Bridge add-on zip was missing `zbrush_keys.py`, so Blender refused to install it ("cannot import name zbrush_keys", #10). The zip now carries every module, and the packaging check fails if one is left out.
+- Rotating, panning and zooming with the pen tip on the background only shook the view with some tablets (a Ugee
+  M708 on Linux, #7): their drivers send stray mouse events between the pen's, and the view followed both. The
+  pen now moves the view by its own motion only, and lifting the pen ends a view drag as it ends a stroke.
+- The S / U / I / O slider closed as soon as you grabbed it, and could open away from the cursor (#9, seen on
+  Windows). It now opens with its knob (the current value) right under the brush cursor, at any UI scale and
+  with a pen, and stays open while you drag until you let go, click elsewhere or press Esc.
+
 ## [0.9.4] - 2026-10-29
 
 ### Fixed
