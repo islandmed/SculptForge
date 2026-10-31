@@ -44,17 +44,10 @@ jobs:
       - name: AppImage
         run: |
           DESTDIR=$PWD/AppDir cmake --install build
-          curl -fsSLo linuxdeploy https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${{ matrix.ld }}.AppImage
-          chmod +x linuxdeploy
           # Named the AppImage way (SculptForge-1.2.3-x86_64.AppImage, no "linux"), with update information so
-          # AppImageUpdate and similar tools can update it from the newest GitHub release (the .zsync file).
-          export LDAI_OUTPUT="SculptForge-${TAG#v}-${{ matrix.ld }}.AppImage"
-          export LDAI_UPDATE_INFORMATION="gh-releases-zsync|islandmed|SculptForge|latest|SculptForge-*-${{ matrix.ld }}.AppImage.zsync"
-          VERSION=${TAG#v} ./linuxdeploy --appimage-extract-and-run --appdir AppDir \
-            --desktop-file AppDir/usr/share/applications/org.sculptforge.SculptForge.desktop \
-            --icon-file assets/branding/sculptforge-256.png --icon-filename org.sculptforge.SculptForge \
-            --output appimage
-          mv "$LDAI_OUTPUT" "$LDAI_OUTPUT.zsync" build/
+          # AppImageUpdate and similar tools can update it from the newest GitHub release (the .zsync file). The
+          # AppDir's root gets PNG icons (AppImage managers cannot use the SVG), and appimagetool checks it (#17).
+          packaging/linux/build-appimage.sh AppDir "${TAG#v}" ${{ matrix.ld }} build
       - uses: actions/upload-artifact@v7
         with:
           name: linux-${{ matrix.arch }}
