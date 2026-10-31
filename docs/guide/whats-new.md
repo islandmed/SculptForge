@@ -5,6 +5,16 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Next version
+
+### Fixes
+
+- Fast strokes on very dense meshes keep their curve. When one dab cost more than a frame, a quick arc came out
+  as a straight line; now the dabs wait in a queue the app works through between frames, so it keeps reading
+  the pointer. Based on a patch by @bribblej-web. See [Performance](performance.md).
+- The AppImage has a PNG icon at its root, so AppImage managers (AppManager, Gear Lever) show SculptForge's
+  icon when they add it to your menu.
+
 ## Version 0.9.5
 
 ### ZSpheres
