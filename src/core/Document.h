@@ -13,6 +13,7 @@
 #include "core/Undo.h"
 #include "core/Vdm.h"
 
+#include <map>
 #include <string>
 #include <utility>
 
@@ -93,6 +94,9 @@ struct Document {
     // the app fills it before saving and applies it after opening; the core
     // keeps it as loaded so CLI and scripts round-trip it unchanged.
     Json projectSettings = Json::object();
+    // Files the app keeps inside the project (the custom MatCap the view uses: "matcaps/<name>.png"), by name.
+    // Saved under attachments/ and loaded back as they were; names are letters, digits, space . _ - and '/'.
+    std::map<std::string, std::vector<uint8_t>> projectFiles;
 
     // Unsaved changes: any undoable edit (in any SubTool), splat edit or
     // `modified` since the last markClean() (save, open, new scene).

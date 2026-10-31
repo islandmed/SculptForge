@@ -160,7 +160,8 @@ Materials change only how the model is shaded in the viewport. They aren't expor
 
 | Material | Look |
 |---|---|
-| Sculpt | The default, made for sculpting: neutral warm clay under a strong key light from the upper left, a crisp highlight and deep cavity shading, so small strokes and undulations stay readable |
+| Soft Clay | The default: a matte warm light grey with a clear light and shadow side and a soft rim |
+| Sculpt | Made for sculpting: neutral warm clay under a strong key light from the upper left, a crisp highlight and deep cavity shading, so small strokes and undulations stay readable |
 | Red Wax | Glossy deep red wax, the classic sculpting look |
 | Clay | Matte grey-brown clay |
 | Skin | Warm, soft skin tones |
@@ -183,6 +184,31 @@ material is saved with the project: projects saved with Studio open with Studio.
 
 > **Tip:** **Sculpt** is the material to judge strokes with. The prettier ones (Skin, Red Wax) soften small
 > detail; switch to them for presenting.
+
+### Your own MatCaps
+
+A MatCap is a picture of a lit sphere: the view colours each point of the model with the sphere's colour where its
+surface faces the same way. Any MatCap image made for ZBrush, Blender or Nomad works: a square PNG, JPG or EXR
+with the sphere filling it (a non-square image is cropped to its centre; big ones are scaled to 1024 pixels).
+
+- **Material > Load MatCap...** picks an image. It joins the material list under its file name, the view uses
+  it, and a copy goes into the **MatCaps** folder of your library (**Documents/SculptForge/MatCaps**, or the
+  folder set in **Preferences > LightBox**), so it is there next time.
+- Or put images into that **MatCaps** folder yourself: they show up the next time you open the material picker,
+  the Material palette or the LightBox's Material tab, no restart needed. Studios can share a read-only folder by
+  listing it in the `SCULPTFORGE_MATCAP_PATH` environment variable (separated by `:`, `;` on Windows); those load
+  when SculptForge starts.
+- To remove one, right-click it in the material picker or palette and choose **Remove**. An image from your
+  MatCaps folder goes to the trash (the Recycle Bin on Windows), so you can still get it back. On macOS it is
+  only hidden until you restart, and the message says where its file is so you can delete it yourself.
+  Built-in materials can't be removed.
+
+![A MatCap loaded from an image (Gold) in the Material palette](images/custom-matcaps.jpg)
+
+Your MatCaps appear in the material picker (<kbd>M</kbd>), the Material palette and the LightBox, after the
+built-in ones. A project that uses one carries a copy of the image, so it opens with the same look on another
+computer (or after you delete the file). Loading an image with the same name again replaces it. EXR images are
+read as linear light, so very bright highlights clip to white.
 
 ## Smooth and flat shading
 
@@ -221,7 +247,9 @@ ZBrush key changes meaning; assign one under **Preferences > Hotkeys** if you sw
 | `paint_layer_move direction=up` | Move a layer up or down the stack |
 | `paint_layer_merge` / `paint_layer_flatten` | Merge down / bake every visible layer into Base |
 | `paint_layer_list` | List the layers, top first (`*` marks the active one) |
-| `set_material name=Chrome` | Viewport material: a MatCap name (`Sculpt` is the default) or `studio` (desktop app only) |
+| `set_material name=Chrome` | Viewport material: a MatCap name (`Soft Clay` is the default, your own MatCaps included) or `studio` (desktop app only) |
+| `load_matcap path=gold.png` | Load a MatCap image and use it; `keep=false` doesn't copy it into the MatCaps folder (desktop app only) |
+| `remove_matcap name=Gold` | Remove one of your MatCaps; its image in the MatCaps folder goes to the trash (desktop app only) |
 | `set_shading mode=flat` | The scene's shading: `smooth` (the default) or `flat` (desktop app only) |
 | `subtool_shading mode=smooth name=Eyes` | A SubTool's own shading: `default` (follow the scene), `smooth` or `flat`; `index` or `name` picks the SubTool (default: the active one) |
 

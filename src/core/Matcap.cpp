@@ -2,11 +2,22 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Matcap.h"
 
+#include "core/BrushLibrary.h"
+#include "core/Image.h"
 #include "core/Mesh.h"
+
+#include "tinyexr.h"
 
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <deque>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 
 namespace sf {
 
@@ -147,7 +158,82 @@ std::string squash(const std::string& s) {
 
 } // namespace
 
-int matcapCount() { return kStyleCount; }
+namespace {
+
+// Custom MatCaps, after the built-ins. A deque: names handed out by matcapName stay valid as more are added.
+std::deque<CustomMatcap>& customs() {
+    static std::deque<CustomMatcap> list;
+    return list;
+}
+uint64_t g_revision = 1;
+
+uint64_t hashPixels(const std::vector<uint8_t>& rgba, int size) {
+    uint64_t h = 0xcbf29ce484222325ull ^ uint64_t(size);
+    for (uint8_t b : rgba) h = (h ^ b) * 0x100000001b3ull;
+    return h;
+}
+
+namespace fs = std::filesystem;
+fs::path utf8Path(const std::string& s) { return fs::path(std::u8string(s.begin(), s.end())); }
+std::string pathString(const fs::path& p) {
+    const std::u8string s = p.u8string();
+    return std::string(s.begin(), s.end());
+}
+std::string extensionOf(const std::string& path) {
+    std::string e = pathString(utf8Path(path).extension());
+    for (char& c : e) c = char(std::tolower(static_cast<unsigned char>(c)));
+    return e;
+}
+
+// Top-down RGBA8 (sRGB) of any size -> the centred square, scaled down to kMaxMatcapSide, rows bottom-up.
+bool fromTopDown(const std::vector<uint8_t>& src, int w, int h, CustomMatcap& out, std::string& error) {
+    const int side = std::min(w, h);
+    if (side < 16) {
+        error = "The MatCap image is too small (at least 16 x 16 pixels)";
+        return false;
+    }
+    const int x0 = (w - side) / 2, y0 = (h - side) / 2;
+    const int size = std::min(side, kMaxMatcapSide);
+    out.size = size;
+    out.rgba.assign(size_t(size) * size_t(size) * 4, 255);
+    const float scale = float(side) / float(size); // box filter when scaling down
+    for (int j = 0; j < size; ++j)
+        for (int i = 0; i < size; ++i) {
+            const int sx0 = x0 + int(float(i) * scale), sx1 = std::max(sx0 + 1, x0 + int(float(i + 1) * scale));
+            const int sy0 = y0 + int(float(j) * scale), sy1 = std::max(sy0 + 1, y0 + int(float(j + 1) * scale));
+            uint32_t sum[3] = {0, 0, 0}, n = 0;
+            for (int y = sy0; y < sy1; ++y)
+                for (int x = sx0; x < sx1; ++x) {
+                    const uint8_t* p = &src[(size_t(y) * size_t(w) + size_t(x)) * 4];
+                    for (int k = 0; k < 3; ++k) sum[k] += p[k];
+                    ++n;
+                }
+            uint8_t* d = &out.rgba[(size_t(size - 1 - j) * size_t(size) + size_t(i)) * 4]; // bottom-up
+            for (int k = 0; k < 3; ++k) d[k] = uint8_t((sum[k] + n / 2) / n);
+        }
+    out.hash = hashPixels(out.rgba, size);
+    return true;
+}
+
+} // namespace
+
+int matcapCount() { return kStyleCount + int(customs().size()); }
+int builtinMatcapCount() { return kStyleCount; }
+bool isCustomMatcap(int index) { return index >= kStyleCount && index < matcapCount(); }
+bool isMatcapListed(int index) {
+    return (index >= 0 && index < kStyleCount) || (isCustomMatcap(index) && !customs()[size_t(index - kStyleCount)].removed);
+}
+const CustomMatcap* customMatcap(int index) { return isCustomMatcap(index) ? &customs()[size_t(index - kStyleCount)] : nullptr; }
+uint64_t matcapRevision() { return g_revision; }
+
+std::string matcapKey(int index) {
+    if (const CustomMatcap* c = customMatcap(index)) {
+        char hex[17];
+        std::snprintf(hex, sizeof hex, "%016llx", static_cast<unsigned long long>(c->hash));
+        return c->name + "#" + hex;
+    }
+    return matcapName(index);
+}
 
 int defaultMatcap() {
     static const int index = findMatcap("Soft Clay");
@@ -155,24 +241,167 @@ int defaultMatcap() {
 }
 
 int matcapInListOrder(int k) {
-    if (k < 0 || k >= kStyleCount) return -1;
+    if (k < 0 || k >= matcapCount()) return -1;
+    if (k >= kStyleCount) return k; // custom MatCaps after the built-ins, in the order they were added
     const int d = defaultMatcap();
     return k == 0 ? d : k <= d ? k - 1 : k;
 }
 
-const char* matcapName(int index) { return index >= 0 && index < kStyleCount ? kStyles[index].name : ""; }
+const char* matcapName(int index) {
+    if (const CustomMatcap* c = customMatcap(index)) return c->name.c_str();
+    return index >= 0 && index < kStyleCount ? kStyles[index].name : "";
+}
 
 MatcapCavity matcapCavity(int index) { return index >= 0 && index < kStyleCount ? kStyles[index].cavity : MatcapCavity{}; }
 
 int findMatcap(const std::string& name) {
     const std::string key = squash(name);
-    for (int i = 0; i < kStyleCount; ++i)
-        if (squash(kStyles[i].name) == key) return i;
+    for (int i = 0; i < matcapCount(); ++i)
+        if (isMatcapListed(i) && squash(matcapName(i)) == key) return i;
     return -1;
 }
 
+int findMatcapByPath(const std::string& path) {
+    for (size_t i = 0; i < customs().size(); ++i)
+        if (!customs()[i].removed && !path.empty() && customs()[i].path == path) return kStyleCount + int(i);
+    return -1;
+}
+
+bool removeCustomMatcap(int index) {
+    if (!isCustomMatcap(index) || customs()[size_t(index - kStyleCount)].removed) return false;
+    customs()[size_t(index - kStyleCount)].removed = true;
+    ++g_revision;
+    return true;
+}
+
+int findMatcapByHash(uint64_t hash) {
+    for (size_t i = 0; i < customs().size(); ++i)
+        if (!customs()[i].removed && customs()[i].hash == hash) return kStyleCount + int(i);
+    return -1;
+}
+
+bool isMatcapFile(const std::string& path) {
+    const std::string e = extensionOf(path);
+    return e == ".png" || e == ".jpg" || e == ".jpeg" || e == ".exr" || e == ".bmp" || e == ".tga" || e == ".hdr";
+}
+
+bool decodeMatcapImage(const unsigned char* bytes, size_t size, CustomMatcap& out, std::string& error) {
+    if (bytes && size > 0 && IsEXRFromMemory(bytes, size) == TINYEXR_SUCCESS) {
+        float* rgba = nullptr;
+        int w = 0, h = 0;
+        const char* err = nullptr;
+        if (LoadEXRFromMemory(&rgba, &w, &h, bytes, size, &err) != TINYEXR_SUCCESS) {
+            error = std::string("Can't read the EXR: ") + (err ? err : "unknown error");
+            if (err) FreeEXRErrorMessage(err);
+            return false;
+        }
+        if (w <= 0 || h <= 0 || w > 16384 || h > 16384) {
+            std::free(rgba);
+            error = "The EXR is too big";
+            return false;
+        }
+        // Linear light: clamp to 0..1 and encode as sRGB like the built-ins.
+        std::vector<uint8_t> src(size_t(w) * size_t(h) * 4, 255);
+        for (size_t i = 0; i < size_t(w) * size_t(h); ++i) {
+            const glm::vec3 c = glm::clamp(linearToSrgb(glm::max(glm::vec3(rgba[i * 4], rgba[i * 4 + 1], rgba[i * 4 + 2]),
+                                                                 glm::vec3(0.0f))),
+                                           0.0f, 1.0f);
+            for (int k = 0; k < 3; ++k) src[i * 4 + size_t(k)] = uint8_t(std::lround(c[k] * 255.0f));
+        }
+        std::free(rgba);
+        return fromTopDown(src, w, h, out, error);
+    }
+    Image img;
+    if (!Image::decode(bytes, size, img, error)) return false;
+    return fromTopDown(img.rgba, img.width, img.height, out, error);
+}
+
+bool readMatcapImage(const std::string& path, CustomMatcap& out, std::string& error) {
+    std::ifstream f(utf8Path(path), std::ios::binary);
+    if (!f) {
+        error = "Can't open " + path;
+        return false;
+    }
+    const std::vector<unsigned char> bytes((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    if (bytes.size() > (size_t(256) << 20)) {
+        error = path + " is too big for a MatCap";
+        return false;
+    }
+    if (!decodeMatcapImage(bytes.data(), bytes.size(), out, error)) {
+        error = path + ": " + error;
+        return false;
+    }
+    out.name = pathString(utf8Path(path).stem());
+    if (out.name.empty()) out.name = "MatCap";
+    out.path = path;
+    return true;
+}
+
+bool encodeMatcapPng(int index, std::vector<uint8_t>& png) {
+    const CustomMatcap* c = customMatcap(index);
+    if (!c) return false;
+    Image img;
+    img.width = img.height = c->size;
+    img.rgba.resize(c->rgba.size());
+    const size_t row = size_t(c->size) * 4;
+    for (int y = 0; y < c->size; ++y) std::memcpy(&img.rgba[size_t(c->size - 1 - y) * row], &c->rgba[size_t(y) * row], row);
+    return img.encodePng(png);
+}
+
+int addCustomMatcap(CustomMatcap m) {
+    if (m.name.empty()) m.name = "MatCap";
+    if (m.hash == 0) m.hash = hashPixels(m.rgba, m.size);
+    // A built-in's name stays the built-in's: the custom one becomes "Chrome 2".
+    const std::string base = m.name;
+    for (int n = 2; findMatcap(m.name) >= 0 && findMatcap(m.name) < kStyleCount; ++n) m.name = base + " " + std::to_string(n);
+    ++g_revision;
+    m.removed = false;
+    for (size_t i = 0; i < customs().size(); ++i) // the same name, listed or removed: replace it in place
+        if (squash(customs()[i].name) == squash(m.name)) {
+            customs()[i] = std::move(m);
+            return kStyleCount + int(i);
+        }
+    customs().push_back(std::move(m));
+    return matcapCount() - 1;
+}
+
+std::vector<std::string> loadMatcapFolders(const std::vector<std::string>& dirs) {
+    std::vector<std::string> messages;
+    for (const std::string& dir : dirs) {
+        std::vector<std::string> files;
+        std::error_code ec;
+        for (fs::directory_iterator it(utf8Path(dir), ec), end; !ec && it != end; it.increment(ec)) {
+            std::error_code fileEc;
+            if (isMatcapFile(pathString(it->path())) && it->is_regular_file(fileEc)) files.push_back(pathString(it->path()));
+        }
+        std::sort(files.begin(), files.end());
+        for (const std::string& f : files) {
+            CustomMatcap m;
+            std::string err;
+            if (readMatcapImage(f, m, err)) addCustomMatcap(std::move(m));
+            else messages.push_back("Skipped " + err);
+        }
+    }
+    return messages;
+}
+
+std::vector<std::string> studioMatcapDirs() {
+    const char* v = std::getenv("SCULPTFORGE_MATCAP_PATH");
+    return splitSearchPath(v ? v : "");
+}
+
 std::vector<uint8_t> generateMatcap(int index, int size) {
-    if (index < 0 || index >= kStyleCount || size <= 0) return {};
+    if (size <= 0) return {};
+    if (const CustomMatcap* c = customMatcap(index)) { // nearest sample of its own pixels
+        std::vector<uint8_t> rgba(size_t(size) * size_t(size) * 4);
+        for (int j = 0; j < size; ++j)
+            for (int i = 0; i < size; ++i) {
+                const int si = std::min(c->size - 1, i * c->size / size), sj = std::min(c->size - 1, j * c->size / size);
+                std::memcpy(&rgba[(size_t(j) * size_t(size) + size_t(i)) * 4], &c->rgba[(size_t(sj) * size_t(c->size) + size_t(si)) * 4], 4);
+            }
+        return rgba;
+    }
+    if (index < 0 || index >= kStyleCount) return {};
     const MatcapStyle& m = kStyles[index];
     std::vector<uint8_t> rgba(size_t(size) * size_t(size) * 4);
     for (int j = 0; j < size; ++j)

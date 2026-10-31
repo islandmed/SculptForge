@@ -16,6 +16,11 @@ read by `loadProject` (src/core/Project.cpp). Commands: `save_project path=...`,
   that `goz_send` / `goz_receive` match on). Optional `shading` (`"smooth"` or `"flat"`; missing or unknown =
   follow the scene) is the SubTool's own viewport shading, and the app's `render.flat_shading` (bool) the scene's;
   both were added after 0.9.4 without a version bump (older readers ignore them).
+- Optional top-level `attachments` (added in 0.9.5 without a version bump; older readers ignore it): files the app
+  keeps in the project, each `{"name", "data"}` with `data` a `u8` blob under `attachments/<name>`. Names use
+  letters, digits, space, `. _ -` and `/` (no `..`); a missing or unreadable attachment is left out on loading. The
+  app stores the custom MatCap the view uses as `matcaps/<name>.png` and names it in `render.matcap_file`
+  (`render.matcap` keeps its name).
 - Blobs are little-endian arrays. The manifest describes each one as
   `{"file", "type": "f32"|"u32"|"u8", "components", "count"}`; readers check all four. SubTool `i`'s
   blobs live under `subtools/<i>/` (the file name comes from the descriptor, so readers don't rely

@@ -8,34 +8,162 @@
 
 #include "core/Matcap.h"
 #include "core/Polypaint.h"
+#include "core/Trash.h"
 
 #include <glm/gtc/type_ptr.hpp>
 
+#include <SDL3/SDL.h>
+
 #include <cfloat>
+#include <filesystem>
 #include <iterator>
 
 namespace sf {
 
+namespace {
+
+// Every material name set_material takes (custom MatCaps included, so it is built when needed).
+std::string materialNames() {
+    std::string names;
+    for (int i = 0; i < matcapCount(); ++i)
+        if (isMatcapListed(i)) names += std::string(matcapName(i)) + ", ";
+    return names + "studio";
+}
+
+std::filesystem::path u8path(const std::string& s) { return std::filesystem::path(std::u8string(s.begin(), s.end())); }
+std::string u8string(const std::filesystem::path& p) {
+    const std::u8string s = p.u8string();
+    return std::string(s.begin(), s.end());
+}
+
+} // namespace
+
+std::string App::matcapFolder() const { return library_.user.empty() ? std::string() : library_.user + "/MatCaps"; }
+
+// Custom MatCaps (#15): the studio folders (SCULPTFORGE_MATCAP_PATH), then the library's MatCaps folder.
+void App::loadMatcapLibrary() {
+    for (const std::string& m : loadMatcapFolders(studioMatcapDirs())) SDL_Log("MatCaps: %s", m.c_str());
+    rescanMatcapFolder();
+}
+
+// The MatCaps folder as it is now: images that are new or changed (size or time) load, images that are gone leave the
+// lists (unless the view uses one). Only lists the folder, so it is cheap to call whenever a material list opens.
+void App::rescanMatcapFolder() {
+    const std::string dir = matcapFolder();
+    if (dir.empty()) return;
+    namespace fs = std::filesystem;
+    std::map<std::string, std::pair<uintmax_t, int64_t>> now;
+    std::error_code ec;
+    for (fs::directory_iterator it(u8path(dir), ec), end; !ec && it != end; it.increment(ec)) {
+        std::error_code fileEc;
+        const std::string path = u8string(it->path());
+        if (!isMatcapFile(path) || !it->is_regular_file(fileEc)) continue;
+        const auto size = it->file_size(fileEc);
+        const auto time = it->last_write_time(fileEc).time_since_epoch().count();
+        now[path] = {size, int64_t(time)};
+    }
+    for (const auto& [path, stamp] : now) {
+        if (hiddenMatcapFiles_.count(path)) continue;
+        const auto seen = matcapFolderSeen_.find(path);
+        if (seen != matcapFolderSeen_.end() && seen->second == stamp) continue;
+        CustomMatcap m;
+        std::string err;
+        if (readMatcapImage(path, m, err)) addCustomMatcap(std::move(m));
+        else SDL_Log("MatCaps: skipped %s", err.c_str());
+    }
+    for (const auto& [path, stamp] : matcapFolderSeen_)
+        if (!now.count(path))
+            if (const int i = findMatcapByPath(path); i >= 0 && i != renderSettings_.matcap) removeCustomMatcap(i);
+    matcapFolderSeen_ = std::move(now);
+}
+
+// Material lists (palette, picker, LightBox) call this every frame they show: the first frame after a gap rescans.
+void App::materialListShown() {
+    const int frame = ImGui::GetFrameCount();
+    if (frame > materialListFrame_ + 1) rescanMatcapFolder();
+    materialListFrame_ = frame;
+}
+
 void App::registerPaintUiCommands() {
     // A view setting, so it lives with the app (scripts: --script "set_material name=Chrome").
-    std::string names;
-    for (int i = 0; i < matcapCount(); ++i) names += std::string(matcapName(i)) + ", ";
-    names += "studio";
     commands_.add({"set_material",
-                   "Viewport material: a built-in MatCap (Sculpt, the default, is made for reading strokes) or "
-                   "studio (soft clay lighting in the Base colour). Polypaint multiplies the matcap; cavity "
-                   "shading stays on.",
-                   {{"name", ParamSpec::Type::String, "One of: " + names + ".", true}},
-                   [this, names](Document&, const Args& a) -> CommandResult {
+                   "Viewport material: a built-in MatCap (Sculpt, the default, is made for reading strokes), one of "
+                   "your own (load_matcap) or studio (soft clay lighting in the Base colour). Polypaint multiplies "
+                   "the matcap; cavity shading stays on.",
+                   {{"name", ParamSpec::Type::String, "A MatCap's name (Soft Clay, Sculpt, Red Wax, Clay, Skin, Chrome, "
+                                                      "White, Bronze or a custom one) or studio.", true}},
+                   [this](Document&, const Args& a) -> CommandResult {
                        const std::string name = argString(a, "name");
                        if (name == "studio" || name == "Studio") {
                            renderSettings_.matcap = -1;
                            return {true, "Material: Studio"};
                        }
                        const int index = findMatcap(name);
-                       if (index < 0) return {false, "Unknown material '" + name + "' (" + names + ")"};
+                       if (index < 0) return {false, "Unknown material '" + name + "' (" + materialNames() + ")"};
                        renderSettings_.matcap = index;
                        return {true, std::string("Material: ") + matcapName(index)};
+                   }});
+    commands_.add({"load_matcap",
+                   "Load a MatCap: a lit-sphere image (PNG, JPG or EXR; a non-square image is cropped to its centre) "
+                   "becomes a viewport material named after the file, and the view uses it. It is copied into the "
+                   "library's MatCaps folder (Documents/SculptForge/MatCaps), so it is there next time; projects "
+                   "that use it carry a copy.",
+                   {{"path", ParamSpec::Type::String, "The image file.", true},
+                    {"keep", ParamSpec::Type::Bool, "Copy it into the MatCaps folder (default true).", false}},
+                   [this](Document&, const Args& a) -> CommandResult {
+                       CustomMatcap m;
+                       std::string err;
+                       if (!readMatcapImage(argString(a, "path"), m, err)) return {false, err};
+                       std::string kept;
+                       if (argBool(a, "keep", true) && !matcapFolder().empty()) {
+                           namespace fs = std::filesystem;
+                           const fs::path from = u8path(m.path), to = u8path(matcapFolder()) / from.filename();
+                           std::error_code ec;
+                           fs::create_directories(to.parent_path(), ec);
+                           if (!fs::equivalent(from, to, ec)) {
+                               ec.clear();
+                               fs::copy_file(from, to, fs::copy_options::overwrite_existing, ec);
+                           }
+                           if (ec) {
+                               kept = " (not kept: " + ec.message() + ")";
+                           } else {
+                               const std::u8string s = to.u8string();
+                               m.path.assign(s.begin(), s.end());
+                               kept = " (kept in MatCaps)";
+                           }
+                       }
+                       hiddenMatcapFiles_.erase(m.path);
+                       const int index = addCustomMatcap(std::move(m));
+                       renderSettings_.matcap = index;
+                       return {true, std::string("Material: ") + matcapName(index) + kept};
+                   }});
+    commands_.add({"remove_matcap",
+                   "Remove one of your MatCaps from the material lists. One from the library's MatCaps folder goes to "
+                   "the trash (the Recycle Bin on Windows); where that isn't possible (macOS for now) it is hidden "
+                   "for this session and its file stays put. Built-in MatCaps can't be removed.",
+                   {{"name", ParamSpec::Type::String, "The MatCap's name.", true}},
+                   [this](Document&, const Args& a) -> CommandResult {
+                       const std::string name = argString(a, "name");
+                       const int index = findMatcap(name);
+                       if (index < 0) return {false, "No MatCap called '" + name + "'"};
+                       if (!isCustomMatcap(index)) return {false, std::string(matcapName(index)) + " is built in"};
+                       const std::string shown = matcapName(index), path = customMatcap(index)->path;
+                       namespace fs = std::filesystem;
+                       std::error_code ec;
+                       const bool inFolder = !path.empty() && !matcapFolder().empty() &&
+                                             fs::equivalent(u8path(path).parent_path(), u8path(matcapFolder()), ec);
+                       if (renderSettings_.matcap == index) renderSettings_.matcap = defaultMatcap();
+                       removeCustomMatcap(index);
+                       if (!inFolder)
+                           return {true, "Removed " + shown + (path.empty() ? "" : " (its image stays at " + path + ")")};
+                       std::string where, err;
+                       if (moveToTrash(path, where, err)) {
+                           matcapFolderSeen_.erase(path);
+                           return {true, "Removed " + shown + ": " + u8string(u8path(path).filename()) + " is in " + where};
+                       }
+                       hiddenMatcapFiles_.insert(path); // a rescan must not bring it back
+                       return {true, "Removed " + shown + " for this session; delete " + path +
+                                         " to remove it for good (" + err + ")"};
                    }});
     // The scene's shading; SubTools can override it (subtool_shading). Also the preference for new sessions.
     commands_.add({"set_shading",
@@ -199,6 +327,12 @@ void App::drawPalette_Color() {
 // SubTool's own).
 void App::drawPalette_Material() {
     sf::drawMaterialGrid(*this, GridMode::Palette); // Pickers.cpp, as in the material picker (M)
+    if (ImGui::Button("Load MatCap...", ImVec2(-1, 0))) loadMatcapDialog();
+    ui::HelpText("Load MatCap", nullptr,
+                 "Use a MatCap image of your own: a lit sphere filling a square PNG, JPG or EXR. It joins the list "
+                 "and is kept in Documents/SculptForge/MatCaps; images you put in that folder show up when a material list "
+                 "opens. Right-click one of your MatCaps to remove it.",
+                 "Material");
     ImGui::ColorEdit3("Base colour", &renderSettings_.baseColor.x, ImGuiColorEditFlags_NoInputs);
     ui::HelpText("Base colour", nullptr, "Colour of the Studio material (the clay colour).", "Material");
     drawShadingControls();

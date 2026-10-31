@@ -222,6 +222,26 @@ TEST(project_subtool_shading) {
     std::filesystem::remove(path);
 }
 
+TEST(project_attachments) {
+    // Document::projectFiles (an embedded custom MatCap): saved under attachments/ and loaded back byte for byte;
+    // names that could escape the folder are not written.
+    Document doc = makeDoc(makeIcosphere(1));
+    doc.projectFiles["matcaps/Green Gold.png"] = {1, 2, 3, 250};
+    doc.projectFiles["../evil.png"] = {9};
+    doc.projectFiles["empty.bin"] = {};
+    const std::string path = tempPath("sf_project_attachments.sfproj");
+    std::string err;
+    CHECK(saveProject(path, doc, err));
+    Document back;
+    back.projectFiles["stale"] = {7};
+    CHECK(loadProject(path, back, err));
+    CHECK(back.projectFiles.size() == 2);
+    CHECK(back.projectFiles["matcaps/Green Gold.png"] == std::vector<uint8_t>({1, 2, 3, 250}));
+    CHECK(back.projectFiles.count("empty.bin") == 1 && back.projectFiles.count("../evil.png") == 0);
+    CHECK(!back.projectSettings.has("attachments")); // a core key, not an app setting
+    std::filesystem::remove(path);
+}
+
 TEST(project_version_handling) {
     Document doc = makeDoc(makeIcosphere(1));
     const std::string path = tempPath("sf_project_version.sfproj");

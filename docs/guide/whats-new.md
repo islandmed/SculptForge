@@ -35,6 +35,13 @@ rotation, a dominant-axis mode, inverts any axis, and maps the buttons. It reads
 3Dconnexion's driver, and hasn't been tried on real hardware yet: see
 [SpaceMouse](navigation.md#spacemouse-experimental) if yours doesn't show up.
 
+### Your own MatCaps
+
+**Material > Load MatCap...** turns any lit-sphere image (PNG, JPG or EXR) into a material, and images you put in
+**Documents/SculptForge/MatCaps** show up in the material list, even while SculptForge is running. Right-click one
+and choose **Remove** to send it to the trash. Projects carry the MatCap they use, so they look the same on any
+computer. See [Your own MatCaps](polypaint.md#your-own-matcaps).
+
 ### Fixes
 
 - Pens whose drivers send stray mouse events (a Ugee M708 on Linux) can rotate, pan and zoom on the background

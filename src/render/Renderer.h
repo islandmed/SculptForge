@@ -107,7 +107,8 @@ public:
     // Triangles the last draw() sent to the GPU (after culling), for the benchmark.
     size_t lastDrawnTriangles() const { return lastDrawn_; }
 
-    // Texture of built-in matcap `index` (sRGB RGBA8, rows bottom-up) for UI previews; 0 if none.
+    // Texture of matcap `index` (sRGB RGBA8, rows bottom-up) for UI previews; 0 if none (or a custom one not
+    // uploaded yet: the next syncScene or draw does).
     GLuint matcapTexture(int index) const;
 
     // --- Thumbnails (LightBox / pickers) ---
@@ -274,7 +275,11 @@ private:
     std::vector<DrawItem> drawList_;      // visible meshes, in scene order
     std::vector<uint32_t> visibleGroups_; // scratch for uploadFaces
     std::vector<glm::vec2> visibleUvs_;   // scratch for uploadFaces
-    std::vector<GLuint> matcapTextures_; // one per built-in matcap (core/Matcap.h)
+    std::vector<GLuint> matcapTextures_; // one per matcap (core/Matcap.h): the built-ins, then custom ones
+    std::vector<uint64_t> matcapHashes_; // the custom matcap pixels each texture holds
+    uint64_t matcapRevision_ = 0;
+    void syncMatcaps(); // uploads custom matcaps added or changed since the last call (syncScene and draw call it)
+    static void uploadMatcap(GLuint texture, int size, const std::vector<uint8_t>& pixels);
 };
 
 } // namespace sf

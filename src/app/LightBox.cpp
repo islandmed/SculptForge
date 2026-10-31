@@ -242,8 +242,10 @@ void LightBox::rootEntries(App& app, std::vector<AssetEntry>& out) {
         break;
     }
     case LibraryTab::Material:
+        app.materialListShown(); // just opened: images added to the MatCaps folder since show up
         for (int k = 0; k <= matcapCount(); ++k) { // the MatCaps (the default first), then Studio
             const int i = k < matcapCount() ? matcapInListOrder(k) : -1;
+            if (i >= 0 && !isMatcapListed(i)) continue; // removed
             AssetEntry e;
             e.kind = AssetKind::Material;
             e.index = i;
@@ -948,6 +950,7 @@ void App::initLightBox() {
             library_.user.clear();
         }
     }
+    loadMatcapLibrary(); // custom MatCaps (PanelPolypaint.cpp): the library's MatCaps folder exists by now
     // Thumbnails are cached on disk for the artist; tests and recordings render fresh ones.
     if (interactive() && options_.uiTest.empty() && !prefDir_.empty()) thumbs_.setCacheDir(prefDir_ + "thumbs");
     if (const char* dir = SDL_getenv("SCULPTFORGE_THUMBNAIL_CACHE")) thumbs_.setCacheDir(dir); // to look at them

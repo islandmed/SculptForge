@@ -497,21 +497,15 @@ bool Renderer::init(std::string& error) {
 
     gl::GenVertexArrays(1, &emptyVao_);
 
-    // Built-in matcaps, generated once (256 KB each).
-    matcapTextures_.assign(size_t(matcapCount()), 0);
+    // Built-in matcaps, generated once (256 KB each); custom ones upload in syncMatcaps.
+    matcapTextures_.assign(size_t(builtinMatcapCount()), 0);
+    matcapHashes_.assign(size_t(builtinMatcapCount()), 0);
     gl::GenTextures(GLsizei(matcapTextures_.size()), matcapTextures_.data());
-    gl::PixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    for (int i = 0; i < matcapCount(); ++i) {
+    for (int i = 0; i < builtinMatcapCount(); ++i) {
         constexpr int kSize = 256;
-        const std::vector<uint8_t> pixels = generateMatcap(i, kSize);
-        gl::BindTexture(GL_TEXTURE_2D, matcapTextures_[size_t(i)]);
-        gl::TexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGBA8), kSize, kSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
-        gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GLint(GL_LINEAR));
-        gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GLint(GL_LINEAR));
-        gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GLint(GL_CLAMP_TO_EDGE));
-        gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GLint(GL_CLAMP_TO_EDGE));
+        uploadMatcap(matcapTextures_[size_t(i)], kSize, generateMatcap(i, kSize));
     }
-    gl::BindTexture(GL_TEXTURE_2D, 0);
+    syncMatcaps();
     // SF_NO_VERTEXID_BASE=1 takes the other path, to check it on drivers that don't need it.
     vertexIdHasBase_ = checkVertexIdBase() && !std::getenv("SF_NO_VERTEXID_BASE");
     return true;
@@ -603,6 +597,35 @@ bool Renderer::checkVertexIdBase() {
     return id == 1002;
 }
 
+void Renderer::uploadMatcap(GLuint texture, int size, const std::vector<uint8_t>& pixels) {
+    gl::PixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    gl::BindTexture(GL_TEXTURE_2D, texture);
+    gl::TexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGBA8), size, size, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+    gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GLint(GL_LINEAR));
+    gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GLint(GL_LINEAR));
+    gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GLint(GL_CLAMP_TO_EDGE));
+    gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GLint(GL_CLAMP_TO_EDGE));
+    gl::BindTexture(GL_TEXTURE_2D, 0);
+}
+
+// Custom MatCaps (core/Matcap.h) added or changed since the last call: a texture each, at their own size.
+void Renderer::syncMatcaps() {
+    if (matcapTextures_.empty() || matcapRevision_ == matcapRevision()) return;
+    matcapRevision_ = matcapRevision();
+    for (int i = builtinMatcapCount(); i < matcapCount(); ++i) {
+        const CustomMatcap* c = customMatcap(i);
+        if (size_t(i) >= matcapTextures_.size()) {
+            GLuint t = 0;
+            gl::GenTextures(1, &t);
+            matcapTextures_.push_back(t);
+            matcapHashes_.push_back(0);
+        }
+        if (matcapHashes_[size_t(i)] == c->hash) continue;
+        uploadMatcap(matcapTextures_[size_t(i)], c->size, c->rgba);
+        matcapHashes_[size_t(i)] = c->hash;
+    }
+}
+
 GLuint Renderer::matcapTexture(int index) const {
     return index >= 0 && index < int(matcapTextures_.size()) ? matcapTextures_[size_t(index)] : 0;
 }
@@ -691,6 +714,8 @@ void Renderer::shutdown() {
     drawList_.clear();
     if (!matcapTextures_.empty()) gl::DeleteTextures(GLsizei(matcapTextures_.size()), matcapTextures_.data());
     matcapTextures_.clear();
+    matcapHashes_.clear();
+    matcapRevision_ = 0;
     gl::DeleteVertexArrays(1, &emptyVao_);
     for (MeshProgram& p : programs_) {
         if (p.id) gl::DeleteProgram(p.id);
@@ -926,6 +951,7 @@ bool Renderer::outOfMemory(uint32_t id) const {
 }
 
 void Renderer::syncScene(const std::vector<SceneMesh>& scene) {
+    syncMatcaps();
     // Free the slots of SubTools that are gone (deleted, merged, a new scene).
     for (size_t i = 0; i < slots_.size();) {
         const bool live = std::any_of(scene.begin(), scene.end(), [&](const SceneMesh& m) { return m.id == slots_[i].id; });
@@ -1998,6 +2024,7 @@ void Renderer::endCapture(std::vector<uint8_t>& rgba) {
 
 void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, const RenderSettings& settings,
                     const Viewport& viewport) {
+    syncMatcaps();
     gl::Viewport(0, 0, targetWidth, targetHeight);
     const bool inset = viewport.w > 0 && viewport.h > 0;
     if (inset) {

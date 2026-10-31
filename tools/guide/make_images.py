@@ -31,6 +31,7 @@ CROPS = {
     "stroke-picker": ("stroke-picker", (0, 200, 440, 360), 440),
     "alpha-picker": ("alpha-picker", (0, 310, 600, 520), 600),
     "material-picker": ("material-picker", (0, 330, 520, 590), 520),
+    "custom-matcaps": ("custom-matcaps", (382, 122, 900, 700), 518),
     "ctrl-help": ("ctrl-help", (1040, 180, 1600, 420), 560),
     "command-palette": ("command-palette", (340, 120, 980, 250), 640),
     "console": ("console", (0, 690, 1280, 900), MAX_WIDTH),

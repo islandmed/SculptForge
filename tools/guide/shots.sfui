@@ -349,3 +349,14 @@ hover "Tool/SubTool"
 wait 0.2
 shot shading-flat
 run set_shading mode=smooth
+
+# Your own MatCaps (polypaint.md): one loaded from an image, in the Material palette.
+run new_sphere subdivisions=5
+run load_matcap path=tests/ui/data/Gold.png
+camera 20 10
+click "Material##palette.material"
+wait_idle 20
+wait 0.2
+shot custom-matcaps
+key escape
+run set_material name="Soft Clay"

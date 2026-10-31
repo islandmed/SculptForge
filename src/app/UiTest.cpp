@@ -37,7 +37,8 @@
 //   drop FILE                as if FILE were dropped onto the window (relative to the script's folder)
 //   env NAME VALUE           set an environment variable; $SCRIPT_DIR is the script's folder
 //   copy SRC DST             copy a file or folder (SRC relative to the script's folder, DST to the working
-//                            directory), e.g. to stage what another program would write (the Blender bridge)
+//                            directory), e.g. to stage what another program would write (the Blender bridge);
+//                            $LIBRARY in DST (and in env values) is the test's LightBox library folder
 //   wait SECONDS / wait_idle [TIMEOUT] (AI requests, thumbnails, update checks and other background jobs) / wait_for LABEL [TIMEOUT]
 //   wait_value NAME OP N [TIMEOUT]  wait (real time, default 30 s) until expect_value NAME OP N would pass
 //   expect LABEL / expect_not LABEL
@@ -51,6 +52,8 @@
 //   expect_value NAME OP N   triangles, vertices, layers, brushes, masked, hidden, groups, colored,
 //                            can_undo, dirty, splats, show_polygroups, show_mask, show_mesh, wireframe,
 //                            flat_shading (the scene's: 1 Flat), subtool_shading (0 Scene, 1 Smooth, 2 Flat),
+//                            custom_matcaps (MatCaps loaded from images), material_custom (1 when the view uses
+//                            one), matcap_files (images in the library's MatCaps folder),
 //                            subtools (count), active_subtool (index, 0 = top), visible_subtools,
 //                            edited_subtools (SubTools with undo history), user_brushes (brushes in the
 //                            user library), library_files (.sfbrush files in it; UI tests get an empty
@@ -155,6 +158,7 @@
 #include "app/Ui.h"
 
 #include "core/BrushLibrary.h"
+#include "core/Matcap.h"
 #include "core/Multires.h"
 #include "core/Script.h"
 #include "core/ThreadPool.h"
@@ -441,6 +445,21 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "show_mask") return app_.renderSettings_.showMask ? 1.0 : 0.0;
     if (name == "show_mesh") return app_.renderSettings_.showMesh ? 1.0 : 0.0;
     if (name == "wireframe") return app_.renderSettings_.wireframe ? 1.0 : 0.0;
+    if (name == "custom_matcaps") {
+        int n = 0;
+        for (int i = builtinMatcapCount(); i < matcapCount(); ++i) n += isMatcapListed(i) ? 1 : 0;
+        return double(n);
+    }
+    if (name == "material_custom") return isCustomMatcap(app_.renderSettings_.matcap) ? 1.0 : 0.0;
+    if (name == "matcap_files") {
+        int n = 0;
+        std::error_code ec;
+        const std::string dir = app_.matcapFolder();
+        for (std::filesystem::directory_iterator it(std::filesystem::path(std::u8string(dir.begin(), dir.end())), ec), end;
+             !dir.empty() && !ec && it != end; it.increment(ec))
+            n += isMatcapFile(it->path().string()) ? 1 : 0;
+        return double(n);
+    }
     if (name == "flat_shading") return app_.renderSettings_.flatShading ? 1.0 : 0.0;
     if (name == "subtool_shading") return double(int(app_.doc_.activeSubtoolInfo().shading));
     if (name == "shelves") return app_.layout_.shelvesVisible ? 1.0 : 0.0;
@@ -1035,9 +1054,11 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     } else if (verb == "copy") {
         if (!need(2)) return false;
         namespace fs = std::filesystem;
-        fs::path src(std::u8string(w[1].begin(), w[1].end())), dst(std::u8string(w[2].begin(), w[2].end()));
+        fs::path src(std::u8string(w[1].begin(), w[1].end()));
         if (src.is_relative()) src = fs::path(std::u8string(scriptDir_.begin(), scriptDir_.end())) / src;
-        run([src, dst] {
+        run([this, src, to = w[2]] {
+            const std::string d = expandLibrary(to);
+            const fs::path dst(std::u8string(d.begin(), d.end()));
             std::error_code ec;
             if (dst.has_parent_path()) fs::create_directories(dst.parent_path(), ec);
             fs::copy(src, dst, fs::copy_options::recursive | fs::copy_options::overwrite_existing, ec);
@@ -1141,7 +1162,8 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         std::string value = restOf(lineText_, 2);
         for (size_t at = value.find("$SCRIPT_DIR"); at != std::string::npos; at = value.find("$SCRIPT_DIR", at))
             value.replace(at, 11, scriptDir_);
-        run([name = w[1], value] {
+        run([this, name = w[1], text = value] {
+            const std::string value = expandLibrary(text);
 #if defined(_WIN32)
             _putenv_s(name.c_str(), value.c_str());
 #else
@@ -1489,6 +1511,13 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         return false;
     }
     return true;
+}
+
+std::string Demo::expandLibrary(std::string text) const {
+    const std::string& lib = app_.library_.user;
+    for (size_t at = text.find("$LIBRARY"); at != std::string::npos; at = text.find("$LIBRARY", at + lib.size()))
+        text.replace(at, 8, lib);
+    return text;
 }
 
 // Every default shortcut, grouped by palette like the Controls window (F1), as Markdown for the user guide.

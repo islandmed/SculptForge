@@ -59,6 +59,10 @@
 <p><strong>Preferences &gt; Input &gt; Style &gt; Blender</strong> brings Blender&#x27;s navigation and Sculpt Mode keys: middle-drag to orbit (Alt+drag with a pen), the numpad views, F / Shift+F, V S P I G C K for brushes, M for the mask. You can also import a keymap you exported from Blender. See <a href="shortcuts.html#blender-keys">Blender keys</a>.</p>
 <h3 id="flat-shading">Flat shading<a class="anchor" href="#flat-shading" aria-label="Link to this section">#</a></h3>
 <p><strong>Material &gt; Shading &gt; Flat</strong> shows every polygon as its own facet, to read a low-poly blockout&#x27;s planes and check exactly what a brush did; <strong>This SubTool</strong> keeps one SubTool smooth or flat whatever the scene says. See <a href="polypaint.html">Polypaint and materials</a>.</p>
+<h3 id="spacemouse-experimental">SpaceMouse (experimental)<a class="anchor" href="#spacemouse-experimental" aria-label="Link to this section">#</a></h3>
+<p>A 3Dconnexion SpaceMouse now moves the view: twist, tilt and push the cap to turn, pan and zoom around the model with one hand while the other holds the pen, in every input style and even mid-stroke. The two side buttons frame the model and show the front. <strong>Preferences &gt; Input &gt; SpaceMouse</strong> sets the speed, the dead zone, turntable rotation, a dominant-axis mode, inverts any axis, and maps the buttons. It reads the device directly, without 3Dconnexion&#x27;s driver, and hasn&#x27;t been tried on real hardware yet: see <a href="navigation.html#spacemouse-experimental">SpaceMouse</a> if yours doesn&#x27;t show up.</p>
+<h3 id="your-own-matcaps">Your own MatCaps<a class="anchor" href="#your-own-matcaps" aria-label="Link to this section">#</a></h3>
+<p><strong>Material &gt; Load MatCap...</strong> turns any lit-sphere image (PNG, JPG or EXR) into a material, and images you put in <strong>Documents/SculptForge/MatCaps</strong> show up in the material list, even while SculptForge is running. Right-click one and choose <strong>Remove</strong> to send it to the trash. Projects carry the MatCap they use, so they look the same on any computer. See <a href="polypaint.html#your-own-matcaps">Your own MatCaps</a>.</p>
 <h3 id="fixes">Fixes<a class="anchor" href="#fixes" aria-label="Link to this section">#</a></h3>
 <ul>
 <li>
@@ -72,6 +76,9 @@ The Blender Bridge add-on installs again: its zip was missing a file.
 </li>
 <li>
 Pens on Windows (Wacom Intuos Pro and others through Windows Ink): taps on menus and buttons land, and Alt+pen drag, the Move button and the S / U / O slider follow the pen instead of jumping.
+</li>
+<li>
+Idle, SculptForge no longer keeps your graphics card busy: it draws a new frame only when something changes (before, 60 or more a second all the time).
 </li>
 </ul>
 <h2 id="version-094">Version 0.9.4<a class="anchor" href="#version-094" aria-label="Link to this section">#</a></h2>
