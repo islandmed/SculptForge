@@ -44,7 +44,8 @@ void App::beginMaskStroke(float x, float y) {
     drag_ = Drag::Stroke;
     lastX_ = x;
     lastY_ = y;
-    residual_ = 0.0f;
+    strokePath_.reset(x, y);
+    dabQueue_.clear();
     lazyMouse_.reset(glm::vec2(x, y));
     // ZBrush: a Ctrl+click on the model blurs the mask (Ctrl+Alt+click sharpens it); only a drag paints. The
     // pen's eraser end set to Erase mask paints straight away.

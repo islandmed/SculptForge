@@ -577,6 +577,7 @@ Uint32 g_wakeEvent = 0; // registered in App::run(); 0 before
 constexpr int kIdleTickMs = 250;       // asleep: wake this often to run the pollers (the Blender bridge, autosave)
 constexpr int kCaretTickMs = 530;      // a text field has the keyboard: redraw for the caret's blink
 constexpr double kAfterChangeSeconds = 0.25; // a poller changed something: draw for this long
+constexpr double kStrokeBudgetSeconds = 0.010; // a frame's share of placing a stroke's dabs; the rest waits for the next
 
 } // namespace
 
@@ -618,6 +619,7 @@ int App::run() {
     if (!options_.renderPath.empty()) return renderHeadless();
     if (!options_.recordPath.empty() || !options_.uiTest.empty()) return runRecording();
     if (g_wakeEvent == 0) g_wakeEvent = SDL_RegisterEvents(1);
+    interactiveStrokes_ = true; // dabs are queued and placed within a time budget each frame (strokeTo)
     // SF_CONTINUOUS_REDRAW=1 draws every frame as before 0.9.5 (for comparison, or a driver that misbehaves).
     const char* continuousEnv = std::getenv("SF_CONTINUOUS_REDRAW");
     const bool continuous = continuousEnv && *continuousEnv && *continuousEnv != '0';
@@ -684,6 +686,7 @@ int App::run() {
             ++wakeUps;
         }
         while (SDL_PollEvent(&e)) onEvent(e);
+        drainStrokeDabs(kStrokeBudgetSeconds); // the stroke's queued dabs, for a limited time: then look at the pointer again
         Uint64 now = SDL_GetTicksNS();
         float dt = float(double(now - lastTicks) * 1e-9);
         lastTicks = now;
@@ -1046,7 +1049,8 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
         status_ = "Dynamic is on, but this SubTool has subdivision levels: sculpting without remeshing";
     lastX_ = x;
     lastY_ = y;
-    residual_ = 0.0f;
+    strokePath_.reset(x, y);
+    dabQueue_.clear();
 
     if (strokeBrush_ == BrushType::Move && !recipe && strokeSculpt_) {
         const float pressure = pressureSize_ ? std::max(strokePressure(), 0.05f) : 1.0f;
@@ -1125,6 +1129,7 @@ void App::strokeTo(float x, float y) {
         if (!penTracker_.readyForFirstDab() && penTracker_.everSampled()) {
             lastX_ = x;
             lastY_ = y;
+            strokePath_.reset(x, y);
             return;
         }
         firstDabPending_ = false;
@@ -1134,21 +1139,50 @@ void App::strokeTo(float x, float y) {
 
     // Place dabs at even screen-space spacing along the cursor path. Every input sample counts (pens
     // send 100-200+ a second, several per frame); the pressure is interpolated between samples.
+    // The dabs are queued, not placed here: on a huge mesh one dab can cost more than a frame, and placing every
+    // dab of a long gap before the next look at the pointer made the gaps longer still, until the stroke was one
+    // straight line. The interactive loop works through the queue for a limited time per frame (drainStrokeDabs),
+    // and a gap between samples that is long is drawn as a curve (core/StrokePath.h).
     const float spacing = std::max(1.0f, radiusPx_ * (recipe ? recipe->spacing : 0.15f));
-    glm::vec2 from(lastX_, lastY_), to(x, y);
-    float len = glm::length(to - from);
     const float p0 = lastStrokePressure_, p1 = strokePressure();
-    float travelled = spacing - residual_;
-    while (travelled <= len) {
-        const float u = travelled / len;
-        glm::vec2 p = from + (to - from) * u;
-        dabAt(p.x, p.y, p0 + (p1 - p0) * u);
-        travelled += spacing;
-    }
-    residual_ = len - (travelled - spacing);
+    strokeScratch_.clear();
+    strokePath_.addSample(x, y, p0, p1, spacing, interactiveStrokes_, strokeScratch_);
+    for (const PathDab& d : strokeScratch_) dabQueue_.push(d);
     lastX_ = x;
     lastY_ = y;
     lastStrokePressure_ = p1;
+    if (interactiveStrokes_) {
+        // Too far behind the pointer: place every second waiting dab only (a wider spacing under load). Set
+        // SF_STROKE_BACKLOG=0 to never drop dabs, or a number to change the limit (default 24).
+        static const size_t limit = [] {
+            const char* env = std::getenv("SF_STROKE_BACKLOG");
+            return env && *env ? size_t(std::max(0L, std::strtol(env, nullptr, 10))) : size_t(24);
+        }();
+        dabQueue_.thin(limit);
+    } else {
+        drainStrokeDabs(0.0); // scripts, UI tests and recordings place every dab at once, as before
+    }
+}
+
+void App::drainStrokeDabs(double budgetSeconds) {
+    if (dabQueue_.empty()) return;
+    static const bool log = std::getenv("SF_STROKE_LOG") != nullptr; // per frame: dabs waiting, placed, ms
+    const auto start = std::chrono::steady_clock::now();
+    const size_t waiting = dabQueue_.size();
+    size_t placed = 0;
+    while (!dabQueue_.empty()) {
+        const PathDab d = dabQueue_.pop();
+        dabAt(d.x, d.y, d.pressure);
+        ++placed;
+        if (budgetSeconds > 0.0 &&
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() >= budgetSeconds)
+            break; // at least one dab per call, so a stroke always moves on
+    }
+    if (log)
+        SDL_Log("stroke: %llu waiting, %llu placed in %.1f ms, %llu left", (unsigned long long)waiting,
+                (unsigned long long)placed,
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count(),
+                (unsigned long long)dabQueue_.size());
 }
 
 void App::dabAt(float x, float y, float pressure) {
@@ -1211,6 +1245,7 @@ void App::dabAt(float x, float y, float pressure) {
 }
 
 void App::endStroke() {
+    drainStrokeDabs(0.0); // the dabs still waiting belong to this stroke
     strokeMask_ = false;
     maskClickPending_ = false; // (a command can end a Ctrl+click before its release)
     firstDabPending_ = false;

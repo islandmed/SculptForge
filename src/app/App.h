@@ -24,6 +24,7 @@
 #include "core/AutoUv.h"
 #include "core/QRemesh.h"
 #include "core/Stroke.h"
+#include "core/StrokePath.h"
 #include "core/SpaceMouse.h"
 #include "core/Tablet.h"
 #include "core/UpdateCheck.h"
@@ -207,7 +208,14 @@ private:
     bool panFromAlt_ = false;       // a pan started with Alt: releasing Alt mid-drag zooms (ZBrush)
     bool forceTurntable_ = false;   // demos orbit like a turntable whatever the preference
     float mouseX_ = 0.0f, mouseY_ = 0.0f;
-    float lastX_ = 0.0f, lastY_ = 0.0f, residual_ = 0.0f;
+    float lastX_ = 0.0f, lastY_ = 0.0f;
+    // Dabs are placed along the pointer's path (strokePath_), queued, and worked through for a limited time per
+    // frame in the interactive loop, so a stroke on a huge mesh keeps its curve (core/StrokePath.h).
+    StrokePath strokePath_;
+    DabQueue dabQueue_;
+    std::vector<PathDab> strokeScratch_;
+    bool interactiveStrokes_ = false; // App::run(): budgeted dabs and curved long gaps; other loops dab at once
+    void drainStrokeDabs(double budgetSeconds); // places queued dabs; budget <= 0: all of them
     bool lastInputPen_ = false; // the last mouse event came from a pen (SDL_PEN_MOUSEID)
     bool penSeen_ = false;
     BrushType strokeBrush_ = BrushType::Standard;
