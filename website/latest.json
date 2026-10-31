@@ -1,11 +1,11 @@
 {
-  "version": "0.9.4",
+  "version": "0.9.5",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Exports without a material (FBX, USD) and splats from an unpainted sculpt use the Soft Clay grey, not peach",
-    "Linux AppImages update themselves with AppImageUpdate",
-    "From 0.9.3: a cleaner look with the matte Soft Clay material, orange only on the current tool",
-    "From 0.9.3: bigger brush tiles with Small / Medium / Large, and File > Export STL..."
+    "ZSpheres: block out a body or creature from connected spheres, then Make Mesh to sculpt it",
+    "A Blender input style: middle-drag navigation, numpad views, Blender's sculpt keys, keymap import",
+    "Flat shading, your own MatCaps, and SpaceMouse navigation (experimental)",
+    "Idle, SculptForge no longer keeps your graphics card busy; pens on Windows (Wacom) and Linux work properly"
   ]
 }
