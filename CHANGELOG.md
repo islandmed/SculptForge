@@ -6,6 +6,8 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.9.5] - 2026-10-31
+
 ### Added
 - ZSpheres (Tool > ZSpheres, #8): block out a base mesh from connected spheres. Draw grows a sphere from another (the drag sets its size) or adds a joint on a link, Move and Scale set the proportions, Alt+click deletes, Symmetry mirrors every edit, Preview (A) shows the skin, and Make Mesh builds it as a new watertight quad SubTool with a polygroup per link, keeping the ZSpheres hidden to edit again. Undoable, saved in projects, and scriptable (zsphere_new, zsphere_add, zsphere_set, zsphere_delete, zsphere_insert, zsphere_preview, zsphere_make_mesh, zsphere_list).
 - A Blender input style (#12): **Preferences > Input > Style > Blender**, also at the top of the Controls window.

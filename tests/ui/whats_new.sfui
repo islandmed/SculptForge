@@ -4,7 +4,7 @@ click "Help##palette.help"
 click "What's New##help.whats_new"
 expect_value guide_open == 1
 expect_guide whats-new.md
-expect_text "Next version"
+expect_text "Version 0.9.5"
 expect_text "ZSpheres"
 expect_text "Blender keys"
 expect_text "Flat shading"
@@ -20,5 +20,5 @@ expect_text "Version 0.6"
 expect_text "Version 0.5"
 expect_text "Version 0.4.2"
 # The newest section is on screen.
-expect_text "Fixes and packaging"
+expect_text "ZSpheres"
 shot whats-new
