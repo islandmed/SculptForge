@@ -13,8 +13,8 @@ finish-args:
   - --socket=wayland
   - --socket=fallback-x11
   - --device=dri
-  # A SpaceMouse is read as a joystick from /dev/input (pen tablets work through Wayland/X11 without it).
-  - --device=input
+  # No input devices: pen tablets work through Wayland/X11. A SpaceMouse (read as a joystick from /dev/input) is
+  # opt-in, with the flatpak override given in the metainfo.
   # Update check, cloud and local (Ollama, ComfyUI) AI services, the phone link, Unreal Live Link.
   - --share=network
   # Models reference files beside them (.obj -> .mtl and textures, .gltf -> .bin, .usda -> layers), which a

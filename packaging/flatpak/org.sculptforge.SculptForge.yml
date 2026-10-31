@@ -22,10 +22,10 @@ finish-args:
   - --socket=wayland
   - --socket=fallback-x11
   - --device=dri
-  # Pen tablets and SpaceMouse: SDL reads joysticks (the SpaceMouse) from /dev/input. Tablets work through Wayland
-  # or X11 without it. Flatpak older than 1.15.6 ignores "input"; there, `flatpak override --user --device=all
-  # org.sculptforge.SculptForge` gives the SpaceMouse access.
-  - --device=input
+  # SpaceMouse: SDL reads it as a joystick from /dev/input; pen tablets work through Wayland or X11 without this.
+  # "all" rather than "input": Flatpak before 1.15.6 (Ubuntu 24.04, Debian 12) refuses to install an app that asks for
+  # "input". "all" includes "dri".
+  - --device=all
   # Network: the update check, AI services (cloud ones and a local Ollama or ComfyUI), the phone link, Unreal Live Link.
   - --share=network
   # Projects and models: the whole home folder, not only the files picked in a dialog. An .obj names its .mtl and

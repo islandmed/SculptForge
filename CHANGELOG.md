@@ -10,7 +10,7 @@ All notable changes to SculptForge are listed here. The format follows
 - A Flatpak (#18): `SculptForge-<version>-x86_64.flatpak` and `-aarch64.flatpak` on every release (with
   version-less copies, `SculptForge-linux-x86_64.flatpak` and `SculptForge-linux-arm64.flatpak`), built from
   source on the freedesktop 26.08 runtime by `packaging/flatpak/org.sculptforge.SculptForge.yml`
-  (`packaging/flatpak/build.sh` builds it locally). Sandbox: Wayland or X11, OpenGL, input devices (SpaceMouse),
+  (`packaging/flatpak/build.sh` builds it locally). Sandbox: Wayland or X11, OpenGL, devices (for the SpaceMouse),
   network and the home folder. In a Flatpak the Blender bridge uses the host's folder and tells the add-on to start
   the app through Flatpak's launcher; the add-on also looks for that launcher. A package for the FlatPark
   repository, wrapping the release tarballs, is ready in `packaging/flatpak/flatpark/`.

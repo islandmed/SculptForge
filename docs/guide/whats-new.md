@@ -11,8 +11,8 @@ chapter opens by itself the first time you start a new version; you can always f
 
 SculptForge comes as a Flatpak for x86_64 and ARM64 Linux: one file on the releases page that runs in Flatpak's
 sandbox on any distribution, installed with `flatpak install --user ./SculptForge-linux-x86_64.flatpak`. It can
-open projects and models anywhere in your home folder, works with pen tablets and (with Flatpak 1.15.6 or newer)
-a SpaceMouse, and the Blender bridge finds it by itself. See
+open projects and models anywhere in your home folder, works with pen tablets and a
+SpaceMouse, and the Blender bridge finds it by itself. See
 [Installing SculptForge](installing.md#flatpak).
 
 ## Version 0.9.5

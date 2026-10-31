@@ -89,8 +89,7 @@ set up. Only the runtime comes from Flathub: SculptForge itself is not published
 - **Settings** live in `~/.var/app/org.sculptforge.SculptForge/`, not `~/.local/share/SculptForge`, so a
   Flatpak and another install of SculptForge on the same computer keep separate settings and brushes. Your
   library in Documents/SculptForge is shared.
-- **SpaceMouse**: works with Flatpak 1.15.6 or newer. With an older Flatpak, allow input devices with
-  `flatpak override --user --device=all org.sculptforge.SculptForge`.
+- **Pen tablets and the SpaceMouse** work in the sandbox.
 - **Blender bridge**: the add-on finds the Flatpak by itself and exchanges models through the usual folder.
 - **Not in the sandbox**: programs SculptForge starts on your computer, such as `ffmpeg` for recording demo
   videos and the splat trainer (**Splat > Train**), are not visible to it. Use another package for those.

@@ -17,8 +17,9 @@
     <p>This FlatPark package installs SculptForge's official Linux build, unmodified, from the project's GitHub
     releases. It is maintained with the SculptForge developers.</p>
     <p>The sandbox can read and write your home folder (models name their textures and other files beside them).
-    A SpaceMouse needs Flatpak 1.15.6 or newer; on older Flatpak, allow it with
-    flatpak override --user --device=all org.sculptforge.SculptForge</p>
+    To use a SpaceMouse, allow input devices once with
+    flatpak override --user --device=input org.sculptforge.SculptForge
+    (on Flatpak older than 1.15.6, --device=all instead).</p>
   </description>
   <launchable type="desktop-id">org.sculptforge.SculptForge.desktop</launchable>
   <url type="homepage">https://sculptforge.app/</url>
