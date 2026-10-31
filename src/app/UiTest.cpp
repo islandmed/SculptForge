@@ -51,7 +51,8 @@
 //                            one in --ui-out/brush-library), ui_config (1 once Store Config wrote ui.json),
 //                            console_open, command_palette_open, customize, shelves_visible,
 //                            right_tray_open, left_tray_open, lightbox_open, guide_open, guide_hits (search results), shelves (1 shown), left_tray / right_tray (palettes in
-//                            the tray, -1 when closed); OP is == != < <= > >=
+//                            the tray, -1 when closed); OP is == != < <= > >=; N may be $NAME, $NAME*K,
+//                            $NAME+K or $NAME-K (see remember)
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
 //                            moved_masked (masked vertices that moved),
 //                            moved_out (summed movement along the snapshot's normals: > 0 out, < 0 in),
@@ -80,6 +81,7 @@
 //                            last_stroke_dabs (dabs of the last finished stroke), stroke_type (0 Dots, 1 DragRect,
 //                            2 DragDot, 3 Spray, 4 LazyMouse), vdms (VDM brush maps), vdm_files (.sfvdm in the library)
 //                            z_intensity, smooth_intensity, rgb_intensity (0-100), focal_shift (-100..100), draw_size,
+//                            size_popup_open (the S / U / I / O slider), size_knob_x / size_knob_y (its knob, pixels),
 //                            quickmenu_open, lazy_mouse, input_style (0 ZBrush, 1 SculptForge), brush_type (BrushType
 //                            index, -1 for a custom brush or Paint), last_dab_x / last_dab_y (window pixels), paint_r
 //                            gizmo_mode (0 Draw, 1 Move, 2 Scale, 3 Rotate), gizmo_hover (handle under the cursor,
@@ -118,6 +120,9 @@
 //   pen_button N down|up     side button N (1 lower, 2 upper, 3 third) with SDL 3.4's synthesized click
 //   pen_hover U V [S]        move the hovering pen to a point on the model (drags the view while a
 //                            button mapped to rotate / pan / right-click is held)
+//   pen_drag X0 Y0 X1 Y1 [stray X Y] [S]   pen tip drag from X0 Y0 to X1 Y1 (window fractions, like drag), e.g.
+//                            on the background to rotate the view; stray: a plain mouse event at X Y after every
+//                            pen sample, as some tablet drivers send (Ugee on X11, #7)
 //   pen_pressure P           a pressure sample from the hovering pen (e.g. a stale value before a stroke)
 //   pen_out                  the pen leaves proximity
 //   mouse_move U V           a plain mouse (not the pen) moves to a point on the model, e.g. the stray mouse
@@ -310,6 +315,11 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "focal_shift") return std::round(app_.focalShift_ * 100.0f);
     if (name == "draw_size") return std::round(app_.radiusPx_);
     if (name == "quickmenu_open") return app_.quickMenu_.open ? 1.0 : 0.0;
+    if (name == "size_popup_open" || name == "size_knob_x" || name == "size_knob_y") {
+        ImVec2 knob(-1.0f, -1.0f);
+        const bool open = PickerUi::sliderKnob(knob);
+        return name == "size_popup_open" ? (open ? 1.0 : 0.0) : name == "size_knob_x" ? knob.x : knob.y;
+    }
     if (name == "lazy_mouse") return app_.strokeType_ == StrokeType::LazyMouse ? 1.0 : 0.0;
     if (name == "stroke_type") return double(int(app_.strokeType_)); // 0 Dots, 1 DragRect, 2 DragDot, 3 Spray, 4 LazyMouse
     if (name == "vdms") return double(app_.doc_.vdms.size());
@@ -1114,15 +1124,19 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         const std::string name = w[1], op = w[2], wantText = w[3];
         run([this, line, name, op, wantText] {
             double want = std::strtod(wantText.c_str(), nullptr);
-            if (!wantText.empty() && wantText[0] == '$') { // $NAME or $NAME*K
-                const size_t star = wantText.find('*');
-                const std::string key = wantText.substr(1, star == std::string::npos ? std::string::npos : star - 1);
+            if (!wantText.empty() && wantText[0] == '$') { // $NAME, $NAME*K, $NAME+K or $NAME-K
+                const size_t op = wantText.find_first_of("*+-", 1);
+                const std::string key = wantText.substr(1, op == std::string::npos ? std::string::npos : op - 1);
                 const auto it = remembered_.find(key);
                 if (it == remembered_.end()) {
                     fail(line, "nothing remembered as $" + key);
                     return;
                 }
-                want = it->second * (star == std::string::npos ? 1.0 : std::strtod(wantText.c_str() + star + 1, nullptr));
+                const double k = op == std::string::npos ? 0.0 : std::strtod(wantText.c_str() + op + 1, nullptr);
+                want = op == std::string::npos  ? it->second
+                       : wantText[op] == '*'    ? it->second * k
+                       : wantText[op] == '+'    ? it->second + k
+                                                : it->second - k;
             }
             bool k = false;
             const double v = query(name, k);
@@ -1239,6 +1253,40 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return t >= seconds;
         });
         wait(0.05f);
+    } else if (verb == "pen_drag") {
+        if (!need(4)) return false;
+        const float x0 = num(1, 0), y0 = num(2, 0), x1 = num(3, 0), y1 = num(4, 0);
+        float seconds = 0.4f;
+        bool stray = false;
+        float sx = 0.0f, sy = 0.0f;
+        for (size_t i = 5; i < w.size(); ++i) {
+            if (w[i] == "stray" && i + 2 < w.size()) {
+                stray = true;
+                sx = num(i + 1, 0);
+                sy = num(i + 2, 0);
+                i += 2;
+            } else {
+                seconds = num(i, seconds);
+            }
+        }
+        auto ends = std::make_shared<std::pair<ImVec2, ImVec2>>();
+        run([this, ends, x0, y0, x1, y1] {
+            int ww = 0, wh = 0;
+            SDL_GetWindowSize(app_.window_, &ww, &wh);
+            *ends = {ImVec2(x0 * float(ww), y0 * float(wh)), ImVec2(x1 * float(ww), y1 * float(wh))};
+        });
+        // A stray mouse event at (sx, sy) after every pen sample, as some tablet drivers send.
+        std::function<void()> strayEvent;
+        if (stray)
+            strayEvent = [this, sx, sy] {
+                int ww = 0, wh = 0;
+                SDL_GetWindowSize(app_.window_, &ww, &wh);
+                mouseMotion(sx * float(ww), sy * float(wh));
+            };
+        penStroke([ends](float u) {
+            return ImVec2(ends->first.x + (ends->second.x - ends->first.x) * u, ends->first.y + (ends->second.y - ends->first.y) * u);
+        }, 0.5f, 0.5f, false, false, seconds, strayEvent);
+        wait(0.1f);
     } else if (verb == "pen_pressure") {
         if (!need(1)) return false;
         run([this, p = num(1, 0)] {
@@ -1383,7 +1431,8 @@ void Demo::penButtonEvent(int button, bool down) {
     if (button >= 1 && button < 5) mouseButton(down, kMouse[button], SDL_PEN_MOUSEID);
 }
 
-void Demo::penStroke(std::function<ImVec2(float u)> path, float p0, float p1, bool eraser, bool leave, float seconds) {
+void Demo::penStroke(std::function<ImVec2(float u)> path, float p0, float p1, bool eraser, bool leave, float seconds,
+                     std::function<void()> afterSample) {
     // Hover to the start, touch down, then 4 samples a frame along the path, then lift (or leave).
     auto from = std::make_shared<ImVec2>();
     steps_.push_back([this, path, from](float t) {
@@ -1397,7 +1446,7 @@ void Demo::penStroke(std::function<ImVec2(float u)> path, float p0, float p1, bo
         return t >= 0.25f;
     });
     auto last = std::make_shared<float>(-1.0f);
-    steps_.push_back([this, path, p0, p1, eraser, leave, seconds, last](float t) {
+    steps_.push_back([this, path, p0, p1, eraser, leave, seconds, last, afterSample](float t) {
         if (*last < 0.0f) {
             penTouch(true, eraser);
             penPressure(p0); // the first pressure sample comes after the touch
@@ -1411,6 +1460,7 @@ void Demo::penStroke(std::function<ImVec2(float u)> path, float p0, float p1, bo
             penPressure(p0 + (p1 - p0) * uu);
             const ImVec2 p = path(uu);
             penMove(p.x, p.y);
+            if (afterSample) afterSample();
         }
         *last = u;
         if (u < 1.0f) return false;

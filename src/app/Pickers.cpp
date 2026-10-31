@@ -94,7 +94,10 @@ struct State {
     // Draw Size / Z Intensity / RGB Intensity / Focal Shift at the cursor.
     int slider = -1; // PickerUi::Slider, -1 = closed
     bool sliderSmooth = false; // Z Intensity of the Smooth brush (Shift was held)
-    ImVec2 sliderAt{0, 0};
+    ImVec2 sliderAt{0, 0};  // the cursor when it opened
+    ImVec2 sliderPos{0, 0}; // the window's place, fixed once the knob is under sliderAt
+    bool sliderPlaced = false;
+    ImVec2 sliderKnob{0, 0};
     int sliderFrame = -1;
     std::string sliderTyped;
     bool sliderWasActive = false;
@@ -953,7 +956,11 @@ void PickerUi::sizePopup(App& app, Slider which) {
     State& s = st();
     s.slider = int(which);
     s.sliderSmooth = app.activeBrush() == BrushType::Smooth;
-    s.sliderAt = ImGui::GetIO().MousePos;
+    // The brush cursor's own position (SDL's window coordinates, the brush ring's centre) rather than ImGui's
+    // MousePos: on Windows ImGui's comes from the global cursor minus the window position while no button is held,
+    // and pen drivers' stray mouse events move it too, so the slider opened away from the cursor (#9).
+    s.sliderAt = ImVec2(app.mouseX_, app.mouseY_);
+    s.sliderPlaced = false;
     s.sliderFrame = ImGui::GetFrameCount();
     s.sliderTyped.clear();
     s.sliderWasActive = false;
@@ -1082,7 +1089,10 @@ void drawPickers(App& app) {
                                 "inner ring of the cursor shows it.",
                                 &app.focalShift_, -1.0f, 1.0f, 100.0f};
         const float w = 200.0f * app.uiScale_;
-        ImGui::SetNextWindowPos(ImVec2(s.sliderAt.x - w * 0.5f, s.sliderAt.y + 14.0f), ImGuiCond_Appearing);
+        // As in ZBrush the knob (the current value) opens right under the cursor, so pressing there drags it. The
+        // first frame (hidden while the window sizes itself) measures where the knob is; the window then stays put.
+        if (!s.sliderPlaced) s.sliderPos = ImVec2(s.sliderAt.x - w * 0.5f, s.sliderAt.y - ImGui::GetFrameHeight() * 0.5f);
+        ImGui::SetNextWindowPos(s.sliderPos, ImGuiCond_Always);
         if (s.sliderFrame == ImGui::GetFrameCount()) ImGui::SetNextWindowFocus();
         ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 6.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
@@ -1132,20 +1142,46 @@ void drawPickers(App& app) {
                     *d.value = std::clamp(shown / d.shownScale, d.lo, d.hi);
             }
             ImGui::LogText("%s %.0f", d.name, double(*d.value * d.shownScale));
+            {
+                // The knob's centre as ImGui's slider draws it (2 px padding, GrabMinSize wide; Draw Size is logarithmic).
+                const ImVec2 lo = ImGui::GetItemRectMin(), hi = ImGui::GetItemRectMax();
+                const float grab = std::min(ImGui::GetStyle().GrabMinSize, hi.x - lo.x - 4.0f);
+                const float v = std::clamp(*d.value, d.lo, d.hi);
+                const float t = which == PickerUi::Slider::DrawSize ? std::log(v / d.lo) / std::log(d.hi / d.lo)
+                                                                    : (v - d.lo) / (d.hi - d.lo);
+                s.sliderKnob = ImVec2(lo.x + 2.0f + grab * 0.5f + t * (hi.x - lo.x - 4.0f - grab), (lo.y + hi.y) * 0.5f);
+                if (!s.sliderPlaced) {
+                    const ImVec2 win = ImGui::GetWindowPos(), size = ImGui::GetWindowSize(), view = ImGui::GetIO().DisplaySize;
+                    s.sliderPos = ImVec2(std::clamp(s.sliderAt.x - (s.sliderKnob.x - win.x), 0.0f, std::max(0.0f, view.x - size.x)),
+                                         std::clamp(s.sliderAt.y - (s.sliderKnob.y - win.y), 0.0f, std::max(0.0f, view.y - size.y)));
+                    s.sliderPlaced = true;
+                }
+            }
             ui::HelpText(d.name, d.key, d.help, "Draw");
-            if (ImGui::IsItemActive())
+            const bool dragging = ImGui::IsItemActive();
+            if (dragging)
                 s.sliderWasActive = true;
             else if (s.sliderWasActive)
                 close = true; // closes on release, as in ZBrush
+            // A click elsewhere closes it. (The press that grabs the knob is not one: ImGui reports the window as not
+            // hovered while its own slider is active, and that used to close the slider as soon as it was dragged, #9.)
             const bool clicked =
                 ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right);
-            if (clicked && !first && !ImGui::IsWindowHovered()) close = true;
+            if (clicked && !first && !dragging && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
+                close = true;
         }
         ImGui::End();
         ImGui::PopStyleColor();
         ImGui::PopStyleVar(2);
         if (close) s.slider = -1;
     }
+}
+
+bool PickerUi::sliderKnob(ImVec2& knob) {
+    const State& s = st();
+    if (s.slider < 0 || !s.sliderPlaced) return false;
+    knob = s.sliderKnob;
+    return true;
 }
 
 // ---------------------------------------------------------------------------

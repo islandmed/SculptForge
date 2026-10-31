@@ -1,0 +1,58 @@
+# The S slider (Draw Size; U / I / O work the same) opens with its knob right under the cursor, as in ZBrush, and
+# stays open while it is dragged, until release, a click elsewhere or Esc (#9). CMake runs this script again on a
+# window whose UI is scaled 1.5x (ui_size_popup_scaled), like Windows at 150%.
+run new_sphere subdivisions=4
+
+# Opens at the cursor: the knob (the current size) is under it.
+mouse_move 0.5 0.5
+remember cursor_x cx
+remember cursor_y cy
+key s
+expect_value size_popup_open == 1
+expect_value size_knob_x >= $cx-2
+expect_value size_knob_x <= $cx+2
+expect_value size_knob_y >= $cy-2
+expect_value size_knob_y <= $cy+2
+shot opened
+
+# Dragging the knob, far outside the popup: it stays open and the size follows; letting go closes it.
+remember draw_size s0
+drag_path 0.5 0.5 1.2 0.5 keep
+expect_value size_popup_open == 1
+expect_value draw_size > $s0
+shot dragging
+release
+expect_value size_popup_open == 0
+
+# Somewhere else on the canvas, with the new size: the knob is still under the cursor. Esc closes it.
+mouse_move 0.25 0.7
+remember cursor_x cx2
+remember cursor_y cy2
+key s
+expect_value size_knob_x >= $cx2-2
+expect_value size_knob_x <= $cx2+2
+expect_value size_knob_y >= $cy2-2
+expect_value size_knob_y <= $cy2+2
+key escape
+expect_value size_popup_open == 0
+
+# A click outside closes it without changing the size.
+mouse_move 0.5 0.5
+key s
+remember draw_size s2
+drag 0.12 0.3 0.12 0.3
+expect_value size_popup_open == 0
+expect_value draw_size == $s2
+
+# A hovering pen with a driver's stray mouse event elsewhere: the slider opens at the pen (the brush cursor).
+pen_hover 0.4 0.5
+remember cursor_x px
+remember cursor_y py
+mouse_move 0.9 0.9
+key s
+expect_value size_knob_x >= $px-2
+expect_value size_knob_x <= $px+2
+expect_value size_knob_y >= $py-2
+expect_value size_knob_y <= $py+2
+key escape
+pen_out
