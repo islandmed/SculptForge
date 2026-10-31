@@ -16,6 +16,7 @@
 #include <imgui_internal.h>
 
 #include <algorithm>
+#include <filesystem>
 #include <array>
 #include <cctype>
 #include <cmath>
@@ -881,8 +882,10 @@ void drawMaterialGrid(App& app, GridMode mode) {
     int column = 0;
     int hovered = -2;
     const int active = s.previewing ? s.savedMatcap : app.renderSettings_.matcap;
+    app.materialListShown(); // just opened: pick up images added to the MatCaps folder meanwhile
     for (int k = 0; k <= matcapCount(); ++k) {
         const int i = k < matcapCount() ? matcapInListOrder(k) : -1; // the MatCaps (the default first), then Studio
+        if (i >= 0 && !isMatcapListed(i)) continue; // removed
         tileGrid(column, columns);
         const char* name = i < 0 ? "Studio" : matcapName(i);
         const ImTextureID tex = app.thumbs_.material(i);
@@ -899,8 +902,25 @@ void drawMaterialGrid(App& app, GridMode mode) {
                                               "rim, so strokes read without glare."
                      : i == 0 ? "Made for sculpting: a strong key light, crisp highlights and deep cavities so "
                                 "every stroke reads."
+                     : isCustomMatcap(i) ? "Your own MatCap. Right-click to remove it."
                               : "MatCap material: the whole lit look in one image.",
                      "Material");
+        if (isCustomMatcap(i) && ImGui::BeginPopupContextItem()) {
+            ImGui::TextDisabled("%s", name);
+            if (const CustomMatcap* c = customMatcap(i); c && !c->path.empty()) { // the file name; the folder is long
+                const std::u8string file = std::filesystem::path(std::u8string(c->path.begin(), c->path.end())).filename().u8string();
+                ImGui::TextDisabled("%s", reinterpret_cast<const char*>(file.c_str()));
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Remove##matcap")) {
+                if (popup && s.previewing) { // put the real material back before it can go
+                    app.renderSettings_.matcap = s.savedMatcap;
+                    s.previewing = false;
+                }
+                app.runCommand("remove_matcap", {{"name", std::string(name)}});
+            }
+            ImGui::EndPopup();
+        }
     }
     // ZBrush's "Preview Material On Mesh": hovering a material shows it on the model until the pointer leaves.
     if (popup && st().open) {

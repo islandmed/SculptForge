@@ -84,6 +84,7 @@ add_library(sculptforge_core STATIC
   src/core/Vdm.cpp
   third_party/tinyexr/tinyexr_impl.cpp
   src/core/Matcap.cpp
+  src/core/Trash.cpp
   src/core/Project.cpp
   src/core/Guide.cpp
   src/core/UpdateCheck.cpp
@@ -110,6 +111,9 @@ embed_files(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedFace.cpp sf::assets
 target_sources(sculptforge_core PRIVATE src/core/Face.cpp src/core/FaceCommands.cpp
   ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedFace.cpp)
 target_include_directories(sculptforge_core PUBLIC src PRIVATE third_party/stb third_party/ufbx third_party/xatlas third_party/mikktspace third_party/tinyexr)
+if(WIN32)
+  target_link_libraries(sculptforge_core PRIVATE shell32) # core/Trash.cpp: the Recycle Bin
+endif()
 # Third-party C code: compile quietly.
 if(MSVC)
   set_source_files_properties(third_party/ufbx/ufbx.c third_party/xatlas/xatlas.cpp third_party/mikktspace/mikktspace.c third_party/tinyexr/tinyexr_impl.cpp PROPERTIES COMPILE_OPTIONS "/w")

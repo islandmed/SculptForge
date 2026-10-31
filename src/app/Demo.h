@@ -152,6 +152,7 @@ private:
     std::vector<std::string> failures_;
     std::string frameText_, shotRequest_, shotDir_, scriptName_, lineText_;
     std::string scriptDir_; // the .sfui script's folder: relative `drop` paths, $SCRIPT_DIR in env steps
+    std::string expandLibrary(std::string text) const; // $LIBRARY -> the LightBox library folder (UiTest.cpp)
     SDL_Keymod held_ = SDL_KMOD_NONE; // modifiers held by `hold` (Ctrl to mask, Ctrl+Shift to hide...)
     // Simulated pen (pen_* steps).
     static constexpr SDL_PenID kTestPen = 1;

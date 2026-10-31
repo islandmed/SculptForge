@@ -52,3 +52,36 @@ run open path=sf_ui_custom_matcap.sfproj
 expect_value material_custom == 1
 expect_value custom_matcaps == 2
 expect_status "sf_ui_custom_matcap"
+
+# Images added to the MatCaps folder while the app runs show up when a material list opens.
+env XDG_DATA_HOME $LIBRARY/.trash-test
+copy data/Rose.png $LIBRARY/MatCaps/Pink.png
+expect_value custom_matcaps == 2
+click "Material##palette.material"
+wait_idle 20
+expect "Material/Pink"
+expect_value custom_matcaps == 3
+expect_value matcap_files == 2
+
+# Right-click > Remove: out of the lists, and a MatCaps-folder image goes to the trash (Linux: the one under
+# XDG_DATA_HOME above, inside the test library; Windows: the Recycle Bin). The view was using Gold, so it goes
+# back to the default.
+right_click "Material/Gold"
+shot remove-menu
+click "Remove##matcap"
+expect_status "Removed Gold"
+expect_value custom_matcaps == 2
+expect_value material_custom == 0
+expect_value matcap_files == 1
+expect_not "Material/Gold"
+key escape
+click "Material##palette.material"
+wait_idle 20
+expect_not "Material/Gold"
+expect "Material/Pink"
+key escape
+
+# Loading it again brings it back.
+run load_matcap path=$SCRIPT_DIR/data/Gold.png
+expect_value custom_matcaps == 3
+expect_value matcap_files == 2

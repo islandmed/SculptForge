@@ -45,11 +45,14 @@ struct CustomMatcap {
     int size = 0;              // size x size pixels
     std::vector<uint8_t> rgba; // sRGB RGBA8, rows bottom-up, as generateMatcap
     uint64_t hash = 0;         // of the pixels (thumbnail keys, finding a project's MatCap again)
+    bool removed = false;      // removeCustomMatcap: kept so indices stay put, but listed and found no more
 };
 constexpr int kMaxMatcapSide = 1024; // bigger images are scaled down
 
 int builtinMatcapCount();
-bool isCustomMatcap(int index);
+bool isCustomMatcap(int index); // also true for a removed one (its index stays taken)
+// Shown in the material lists: a built-in, or a custom MatCap that wasn't removed.
+bool isMatcapListed(int index);
 const CustomMatcap* customMatcap(int index); // null for built-ins and bad indices
 // Changes whenever a custom MatCap is added or its pixels replaced (renderers upload again).
 uint64_t matcapRevision();
@@ -64,9 +67,14 @@ bool readMatcapImage(const std::string& path, CustomMatcap& out, std::string& er
 bool decodeMatcapImage(const unsigned char* bytes, size_t size, CustomMatcap& out, std::string& error);
 // PNG of the MatCap's pixels (top row first), e.g. to embed it in a project; false for built-ins.
 bool encodeMatcapPng(int index, std::vector<uint8_t>& png);
-// Adds `m`, or replaces the pixels of the custom MatCap of the same name (case-insensitive); a built-in's name gets
-// " 2" (" 3" ...). Returns its index.
+// Adds `m`, or replaces the pixels of the custom MatCap of the same name (case-insensitive; a removed one comes
+// back at its old index); a built-in's name gets " 2" (" 3" ...). Returns its index.
 int addCustomMatcap(CustomMatcap m);
+// Takes a custom MatCap out of the lists and name lookups for the rest of the session (its file is the caller's
+// business). False for built-ins and bad indices.
+bool removeCustomMatcap(int index);
+// The listed custom MatCap read from `path` (exact path), or -1.
+int findMatcapByPath(const std::string& path);
 // The index of a custom MatCap with exactly these pixels, or -1.
 int findMatcapByHash(uint64_t hash);
 // Every MatCap image directly in each folder (sorted by name; later folders replace earlier ones by name).

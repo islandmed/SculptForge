@@ -194,9 +194,14 @@ with the sphere filling it (a non-square image is cropped to its centre; big one
 - **Material > Load MatCap...** picks an image. It joins the material list under its file name, the view uses
   it, and a copy goes into the **MatCaps** folder of your library (**Documents/SculptForge/MatCaps**, or the
   folder set in **Preferences > LightBox**), so it is there next time.
-- Or put images into that **MatCaps** folder yourself: they load when SculptForge starts. Studios can share a
-  read-only folder by listing it in the `SCULPTFORGE_MATCAP_PATH` environment variable (separated by `:`, `;`
-  on Windows).
+- Or put images into that **MatCaps** folder yourself: they show up the next time you open the material picker,
+  the Material palette or the LightBox's Material tab, no restart needed. Studios can share a read-only folder by
+  listing it in the `SCULPTFORGE_MATCAP_PATH` environment variable (separated by `:`, `;` on Windows); those load
+  when SculptForge starts.
+- To remove one, right-click it in the material picker or palette and choose **Remove**. An image from your
+  MatCaps folder goes to the trash (the Recycle Bin on Windows), so you can still get it back. On macOS it is
+  only hidden until you restart, and the message says where its file is so you can delete it yourself.
+  Built-in materials can't be removed.
 
 ![A MatCap loaded from an image (Gold) in the Material palette](images/custom-matcaps.jpg)
 
@@ -244,6 +249,7 @@ ZBrush key changes meaning; assign one under **Preferences > Hotkeys** if you sw
 | `paint_layer_list` | List the layers, top first (`*` marks the active one) |
 | `set_material name=Chrome` | Viewport material: a MatCap name (`Soft Clay` is the default, your own MatCaps included) or `studio` (desktop app only) |
 | `load_matcap path=gold.png` | Load a MatCap image and use it; `keep=false` doesn't copy it into the MatCaps folder (desktop app only) |
+| `remove_matcap name=Gold` | Remove one of your MatCaps; its image in the MatCaps folder goes to the trash (desktop app only) |
 | `set_shading mode=flat` | The scene's shading: `smooth` (the default) or `flat` (desktop app only) |
 | `subtool_shading mode=smooth name=Eyes` | A SubTool's own shading: `default` (follow the scene), `smooth` or `flat`; `index` or `name` picks the SubTool (default: the active one) |
 

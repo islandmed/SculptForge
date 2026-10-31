@@ -29,8 +29,9 @@ check exactly what a brush did; **This SubTool** keeps one SubTool smooth or fla
 ### Your own MatCaps
 
 **Material > Load MatCap...** turns any lit-sphere image (PNG, JPG or EXR) into a material, and images you put in
-**Documents/SculptForge/MatCaps** load at start-up. Projects carry the MatCap they use, so they look the same on
-any computer. See [Your own MatCaps](polypaint.md#your-own-matcaps).
+**Documents/SculptForge/MatCaps** show up in the material list, even while SculptForge is running. Right-click one
+and choose **Remove** to send it to the trash. Projects carry the MatCap they use, so they look the same on any
+computer. See [Your own MatCaps](polypaint.md#your-own-matcaps).
 
 ### Fixes
 

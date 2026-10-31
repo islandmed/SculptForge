@@ -220,6 +220,9 @@ bool fromTopDown(const std::vector<uint8_t>& src, int w, int h, CustomMatcap& ou
 int matcapCount() { return kStyleCount + int(customs().size()); }
 int builtinMatcapCount() { return kStyleCount; }
 bool isCustomMatcap(int index) { return index >= kStyleCount && index < matcapCount(); }
+bool isMatcapListed(int index) {
+    return (index >= 0 && index < kStyleCount) || (isCustomMatcap(index) && !customs()[size_t(index - kStyleCount)].removed);
+}
 const CustomMatcap* customMatcap(int index) { return isCustomMatcap(index) ? &customs()[size_t(index - kStyleCount)] : nullptr; }
 uint64_t matcapRevision() { return g_revision; }
 
@@ -254,13 +257,26 @@ MatcapCavity matcapCavity(int index) { return index >= 0 && index < kStyleCount 
 int findMatcap(const std::string& name) {
     const std::string key = squash(name);
     for (int i = 0; i < matcapCount(); ++i)
-        if (squash(matcapName(i)) == key) return i;
+        if (isMatcapListed(i) && squash(matcapName(i)) == key) return i;
     return -1;
+}
+
+int findMatcapByPath(const std::string& path) {
+    for (size_t i = 0; i < customs().size(); ++i)
+        if (!customs()[i].removed && !path.empty() && customs()[i].path == path) return kStyleCount + int(i);
+    return -1;
+}
+
+bool removeCustomMatcap(int index) {
+    if (!isCustomMatcap(index) || customs()[size_t(index - kStyleCount)].removed) return false;
+    customs()[size_t(index - kStyleCount)].removed = true;
+    ++g_revision;
+    return true;
 }
 
 int findMatcapByHash(uint64_t hash) {
     for (size_t i = 0; i < customs().size(); ++i)
-        if (customs()[i].hash == hash) return kStyleCount + int(i);
+        if (!customs()[i].removed && customs()[i].hash == hash) return kStyleCount + int(i);
     return -1;
 }
 
@@ -339,10 +355,12 @@ int addCustomMatcap(CustomMatcap m) {
     const std::string base = m.name;
     for (int n = 2; findMatcap(m.name) >= 0 && findMatcap(m.name) < kStyleCount; ++n) m.name = base + " " + std::to_string(n);
     ++g_revision;
-    if (const int i = findMatcap(m.name); i >= 0) {
-        customs()[size_t(i - kStyleCount)] = std::move(m);
-        return i;
-    }
+    m.removed = false;
+    for (size_t i = 0; i < customs().size(); ++i) // the same name, listed or removed: replace it in place
+        if (squash(customs()[i].name) == squash(m.name)) {
+            customs()[i] = std::move(m);
+            return kStyleCount + int(i);
+        }
     customs().push_back(std::move(m));
     return matcapCount() - 1;
 }

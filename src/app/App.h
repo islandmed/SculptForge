@@ -43,7 +43,9 @@
 #include <future>
 #include <memory>
 #include <mutex>
+#include <map>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -439,6 +441,11 @@ private:
     std::string matcapFolder() const; // <library>/MatCaps, empty without a library
     void loadMatcapLibrary();         // custom MatCaps from the studio folders and matcapFolder() (start-up)
     void loadMatcapDialog();          // Material > Load MatCap...
+    void rescanMatcapFolder();        // loads new / changed images in matcapFolder(), drops deleted ones
+    void materialListShown();         // a material list is on screen: rescans when it has just opened
+    std::map<std::string, std::pair<uintmax_t, int64_t>> matcapFolderSeen_; // path -> size, time at the last scan
+    std::set<std::string> hiddenMatcapFiles_; // removed MatCaps whose file couldn't go to the trash
+    int materialListFrame_ = -10;
     void setFlatShading(bool flat); // the scene's shading, and the preference for the next session
     void drawShadingControls();     // Material palette and Tool > Display: Smooth | Flat, and the SubTool's own
     void paintAt(const DabParams& p);

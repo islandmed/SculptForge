@@ -10,6 +10,7 @@
 #include "core/Matcap.h"
 #include "core/Polypaint.h"
 #include "core/Primitives.h"
+#include "core/Trash.h"
 #include "core/Vdm.h"
 #include "io/PlyIO.h"
 
@@ -409,6 +410,52 @@ TEST(matcap_custom_images) {
     CHECK(!readMatcapImage(dir + "/missing.png", lin, err));
     CHECK(isMatcapFile("a/B.EXR") && isMatcapFile("x.jpeg") && !isMatcapFile("x.sfbrush"));
     std::filesystem::remove_all(dir);
+}
+
+TEST(matcap_remove_and_trash) {
+    // Removing keeps the index taken (the renderer and the view refer to MatCaps by index) but takes the MatCap
+    // out of the lists and lookups; loading the same name again brings it back at that index.
+    CustomMatcap m;
+    m.name = "Removable";
+    m.size = 16;
+    m.rgba.assign(16 * 16 * 4, 77);
+    m.path = "/somewhere/Removable.png";
+    const int i = addCustomMatcap(m);
+    CHECK(isMatcapListed(i) && findMatcapByPath("/somewhere/Removable.png") == i);
+    const uint64_t revision = matcapRevision();
+    CHECK(removeCustomMatcap(i) && !removeCustomMatcap(i) && !removeCustomMatcap(0));
+    CHECK(matcapRevision() != revision && isCustomMatcap(i) && !isMatcapListed(i));
+    CHECK(findMatcap("removable") == -1 && findMatcapByPath(m.path) == -1 && findMatcapByHash(customMatcap(i)->hash) == -1);
+    const int count = matcapCount();
+    CHECK(addCustomMatcap(m) == i && isMatcapListed(i) && matcapCount() == count);
+
+#if !defined(_WIN32) && !defined(__APPLE__)
+    // The freedesktop trash: the file moves to $XDG_DATA_HOME/Trash/files with a .trashinfo saying where it was.
+    const std::string root = tempPath("sf_trash_test");
+    std::filesystem::remove_all(root);
+    std::filesystem::create_directories(root + "/lib");
+    const char* old = std::getenv("XDG_DATA_HOME");
+    const std::string saved = old ? old : "";
+    setenv("XDG_DATA_HOME", (root + "/data").c_str(), 1);
+    for (int k = 0; k < 2; ++k) { std::ofstream(root + "/lib/Gold Leaf.png") << "png" << k; }
+    std::string where, err;
+    CHECK(trashSupported() && moveToTrash(root + "/lib/Gold Leaf.png", where, err) && where == "the trash");
+    CHECK(!std::filesystem::exists(root + "/lib/Gold Leaf.png"));
+    CHECK(std::filesystem::exists(root + "/data/Trash/files/Gold Leaf.png"));
+    std::ifstream info(root + "/data/Trash/info/Gold Leaf.png.trashinfo");
+    std::stringstream text;
+    text << info.rdbuf();
+    CHECK(text.str().find("[Trash Info]\nPath=") == 0 && text.str().find("/lib/Gold%20Leaf.png\n") != std::string::npos);
+    CHECK(text.str().find("DeletionDate=20") != std::string::npos);
+    // A second file of the same name gets a name of its own; a missing file fails and leaves the trash alone.
+    { std::ofstream(root + "/lib/Gold Leaf.png") << "again"; }
+    CHECK(moveToTrash(root + "/lib/Gold Leaf.png", where, err));
+    CHECK(std::filesystem::exists(root + "/data/Trash/files/Gold Leaf.2.png"));
+    CHECK(!moveToTrash(root + "/lib/missing.png", where, err) && !err.empty());
+    if (old) setenv("XDG_DATA_HOME", saved.c_str(), 1);
+    else unsetenv("XDG_DATA_HOME");
+    std::filesystem::remove_all(root);
+#endif
 }
 
 TEST(polypaint_restore_stroke_marks_colors_dirty) {

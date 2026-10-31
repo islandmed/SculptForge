@@ -241,8 +241,10 @@ void LightBox::rootEntries(App& app, std::vector<AssetEntry>& out) {
         break;
     }
     case LibraryTab::Material:
+        app.materialListShown(); // just opened: images added to the MatCaps folder since show up
         for (int k = 0; k <= matcapCount(); ++k) { // the MatCaps (the default first), then Studio
             const int i = k < matcapCount() ? matcapInListOrder(k) : -1;
+            if (i >= 0 && !isMatcapListed(i)) continue; // removed
             AssetEntry e;
             e.kind = AssetKind::Material;
             e.index = i;

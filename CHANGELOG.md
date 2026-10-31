@@ -27,10 +27,13 @@ All notable changes to SculptForge are listed here. The format follows
 
 - Custom MatCaps (#15): **Material > Load MatCap...** loads a lit-sphere image (PNG, JPG or EXR; non-square images
   are cropped to the centre, large ones scaled to 1024) as a material and copies it into the new **MatCaps** folder
-  of the library (Documents/SculptForge/MatCaps); images in that folder, and in the folders listed in
-  `SCULPTFORGE_MATCAP_PATH`, load at start-up. They show in the material picker, palette and LightBox. A project
+  of the library (Documents/SculptForge/MatCaps); images in that folder load at start-up and, when added later,
+  the next time a material list opens (a cheap size and time check), and folders listed in `SCULPTFORGE_MATCAP_PATH`
+  load at start-up. They show in the material picker, palette and LightBox. Right-click > **Remove** takes one out
+  of the lists and moves its image to the trash (freedesktop trash on Linux, Recycle Bin on Windows; on macOS it
+  is hidden for the session and the message says where the file is). A project
   using one embeds it as a PNG (an `attachments` entry; no format change), so it opens with the same look anywhere.
-  Scripts: `load_matcap path=...`, `set_material name=<your MatCap>`.
+  Scripts: `load_matcap path=...`, `remove_matcap name=...`, `set_material name=<your MatCap>`.
 - Smooth / Flat shading (#11): **Material** palette (and **Tool > Display**) > **Shading** switches the whole
   scene to flat, faceted shading, where every polygon shows its own face; **This SubTool** keeps one SubTool smooth
   or flat whatever the scene says. Both are saved in projects (no format change; older files open with your
