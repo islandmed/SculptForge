@@ -6,6 +6,7 @@
 
 #include "core/Texture.h"
 #include "core/ThreadPool.h"
+#include "core/ZSpheres.h"
 #include "io/Zip.h"
 
 #include <algorithm>
@@ -775,6 +776,10 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
         if (!gozName.empty()) st.set("goz_name", gozName);
         const std::vector<QRemeshGuide>& guides = active ? doc.qremeshGuides : s.qremeshGuides;
         if (!guides.empty()) st.set("qremesh_guides", qremeshGuidesToJson(guides)); // (no format change: optional)
+        if (const Mesh& m = doc.subtoolMesh(i); !m.zspheres.empty()) { // a ZSphere SubTool (core/ZSpheres.h); optional
+            st.set("zspheres", zspheresToJson(m.zspheres));
+            if (m.zspherePreview) st.set("zsphere_preview", true);
+        }
         subtools.push(std::move(st));
     }
     manifest.set("subtools", std::move(subtools));
@@ -883,6 +888,8 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
             s.gozName = sj["goz_name"].asString();
             s.qremeshGuides = qremeshGuidesFromJson(sj["qremesh_guides"]);
             if (!readMesh(r, sj["mesh"], sj["layers"], s.mesh, error, false, false)) return false;
+            s.mesh.zspheres = zspheresFromJson(sj["zspheres"]);
+            s.mesh.zspherePreview = !s.mesh.zspheres.empty() && sj["zsphere_preview"].asBool(false);
             // The BVH builds (on the pool) while the levels and topology load (off it), then the normals.
             s.startBvh();
             r.parallelReads = !s.bvhBuilder.joinable();

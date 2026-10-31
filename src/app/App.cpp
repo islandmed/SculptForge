@@ -694,6 +694,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         return;
     }
     if (button == SDL_BUTTON_LEFT) {
+        if (zsphereMouseDown(x, y, mod)) return; // a ZSphere SubTool takes clicks on it (PanelZSpheres.cpp)
         if (polygroupMouseDown(x, y, mod)) return;
         if (maskSelectMouseDown(x, y, mod)) return;
         if (gizmoMouseDown(x, y, mod)) return; // Gizmo 3D handles, pivot clicks (Gizmo.cpp)
@@ -784,6 +785,7 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     case Drag::Gizmo: gizmoDragTo(x, y); break;
     case Drag::Guide: guideDragTo(x, y); break;
     case Drag::Sculptable: sculptableMouseMove(x, y); break;
+    case Drag::ZSphere: zsphereDragTo(x, y); break;
     case Drag::None: break;
     }
 }
@@ -827,6 +829,7 @@ void App::onMouseUp() {
     if (drag_ == Drag::SubToolClick) subtoolClickRelease();
     if (drag_ == Drag::Guide) guideRelease();
     if (drag_ == Drag::Sculptable) sculptableMouseUp();
+    if (drag_ == Drag::ZSphere) zsphereRelease();
     gizmoRelease();
     drag_ = Drag::None;
     dragFromPen_ = false;
@@ -1324,11 +1327,12 @@ void App::drawUi() {
     const ImVec2 mouse(mouseX_, mouseY_);
     drawGizmo(); // Gizmo 3D handles and panel (Gizmo.cpp)
     drawQRemeshGuides(); // QRemesh Guides curves (PanelRetopo.cpp)
+    drawZSphereOverlay(); // the sphere under the cursor (PanelZSpheres.cpp)
     drawFaceOverlay();   // facial landmarks (PanelFace.cpp)
     drawSplatTrainOverlay(); // splat training progress (PanelSplatTrain.cpp)
     drawSculptableOverlay(); // Make sculptable: crop box, face landmarks (PanelSculptable.cpp)
     // In Gizmo mode (and with the QRemesh Guides brush) the brush ring shows only while Ctrl masks or Shift smooths.
-    const bool ringOff = gizmoActive() || (guidesMode_ && !(inputMods() & SDL_KMOD_SHIFT)) || sculptableHot();
+    const bool ringOff = gizmoActive() || (guidesMode_ && !(inputMods() & SDL_KMOD_SHIFT)) || sculptableHot() || zsphereActive();
     if (((!ImGui::GetIO().WantCaptureMouse && canvasRect().contains(mouse.x, mouse.y)) || drag_ == Drag::Stroke) &&
         !hideBrushCursor_ && drag_ != Drag::Select && drag_ != Drag::Guide &&
         (!ringOff || drag_ == Drag::Stroke || ctrlDown(inputMods())))

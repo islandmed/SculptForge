@@ -77,6 +77,14 @@ struct SculptLayer {
 // a feature needs them, so plain meshes pay nothing. When present their size
 // always matches the vertex / triangle / corner count; rebuildTopology()
 // drops any that don't.
+// One sphere of a ZSphere armature (core/ZSpheres.h): the root is index 0 with parent -1; every other sphere
+// grows from `parent`.
+struct ZSphere {
+    glm::vec3 center{0.0f};
+    float radius = 1.0f;
+    int parent = -1;
+};
+
 class Mesh {
 public:
     std::vector<glm::vec3> positions;
@@ -182,6 +190,11 @@ public:
     // Subdivision levels (core/Multires.h): the stack this mesh is one level of, shared copy-on-write by
     // copies of the mesh. Null = a plain mesh. sanitizeAttributes() drops it if the topology no longer fits.
     std::shared_ptr<MultiresStack> multires;
+
+    // ZSpheres (core/ZSpheres.h): not empty = a ZSphere SubTool, whose triangles are made from this armature (the
+    // spheres and their links, or the skin while `zspherePreview`). Copies, undo steps and projects carry it.
+    std::vector<ZSphere> zspheres;
+    bool zspherePreview = false;
 
     size_t vertexCount() const { return positions.size(); }
     size_t triangleCount() const { return triangles.size(); }

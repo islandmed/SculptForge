@@ -1,0 +1,84 @@
+# ZSpheres (ZBrush's ZSpheres, Tool > ZSpheres): a ZSphere SubTool with one root, Draw grows an arm from it with X
+# symmetry (the mirror arm follows), Move pulls it out, Scale grows it and undo takes that back, a click on the link
+# adds a joint (both sides), Alt+click deletes a limb, Preview (A) shows the skin, and Make Mesh builds a sculptable
+# SubTool below with the ZSpheres hidden and kept. Dragging the background still navigates.
+run zsphere_new radius=1
+run subtool_visibility index=0 visible=false
+wait 0.3
+click "ZSpheres##tool.zspheres"
+expect "ZSpheres/Draw"
+expect_value zspheres == 1
+expect_text "1 sphere"
+
+# Ctrl-hover help.
+hold ctrl
+hover "ZSpheres/Draw"
+expect_help "grow a new sphere"
+hover "ZSpheres/Preview"
+expect_help "skin"
+hover "ZSpheres/Make Mesh"
+expect_help "Adaptive Skin"
+hold none
+
+# Draw: drag near the root's right edge grows an arm there; symmetry adds its twin on the left.
+view_drag 0.515 0.518 0.545 0.518
+expect_value zspheres == 3
+expect_value zsphere_x1 > 0.5
+expect_value zsphere_x2 < -0.5
+expect_status "ZSphere add"
+shot zspheres-draw
+
+# Move: pull the arm out to the right; the twin goes left.
+click "ZSpheres/Move"
+remember zsphere_x1 x
+view_drag 0.530 0.518 0.600 0.518
+expect_value zsphere_x1 > $x
+expect_value zsphere_x2 < -1.0
+
+# Scale: drag up on the arm to grow it; undo puts it back.
+click "ZSpheres/Scale"
+remember zsphere_r1 r
+view_drag 0.600 0.518 0.600 0.45
+expect_value zsphere_r1 > $r
+key ctrl+z
+expect_value zsphere_r1 == $r
+key ctrl+shift+z
+expect_value zsphere_r1 > $r
+key ctrl+z
+
+# Draw on the link between the root and the arm: a joint halfway, mirrored.
+click "ZSpheres/Draw"
+remember zsphere_x1 armx
+view_drag 0.543 0.518 0.543 0.518 0.05
+expect_value zspheres == 5
+expect_status "ZSphere insert"
+shot zspheres-joint
+
+# Preview: the skin replaces the spheres; clicks on it do nothing.
+key a
+expect_value zsphere_preview == 1
+expect_value zspheres == 5
+shot zspheres-preview
+view_drag 0.412 0.518 0.412 0.518 0.05
+expect_status "Preview is on"
+expect_value zspheres == 5
+key a
+expect_value zsphere_preview == 0
+
+# Make Mesh: a new SubTool below, active and sculptable; the ZSpheres hidden and kept.
+click "ZSpheres/Make Mesh"
+expect_value subtools == 3
+expect_value active_subtool == 2
+expect_value zspheres == 0
+expect_status "from the ZSpheres"
+shot zspheres-mesh
+remember triangles before
+snapshot
+stroke 0.38 0.45 0.44 0.55
+expect_value moved > 0
+expect_value triangles == $before
+
+# The background still navigates.
+remember camera_yaw yaw
+view_drag 0.2 0.8 0.3 0.8
+expect_value camera_yaw != $yaw
