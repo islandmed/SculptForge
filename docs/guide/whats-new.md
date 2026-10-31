@@ -7,11 +7,25 @@ chapter opens by itself the first time you start a new version; you can always f
 
 ## Next version
 
+### ZSpheres
+
+Block out a body, creature or plant from connected spheres, the ZBrush way: **Tool > ZSpheres > New ZSphere**,
+drag on a sphere to grow a limb, Move and Scale it into proportion, Alt+click to delete, with Symmetry mirroring
+every edit. **Preview** (<kbd>A</kbd>) shows the skin, and **Make Mesh** turns it into a sculptable, all-quad
+SubTool with a polygroup per limb, keeping the ZSpheres to change later. See [ZSpheres](zspheres.md).
+
 ### Blender keys
 
 **Preferences > Input > Style > Blender** brings Blender's navigation and Sculpt Mode keys: middle-drag to
 orbit (Alt+drag with a pen), the numpad views, F / Shift+F, V S P I G C K for brushes, M for the mask. You can
 also import a keymap you exported from Blender. See [Blender keys](shortcuts.md#blender-keys).
+
+### Fixes
+
+- Pens whose drivers send stray mouse events (a Ugee M708 on Linux) can rotate, pan and zoom on the background
+  again instead of shaking the view.
+- The S / U / I / O slider opens with its knob under the cursor and stays open while you drag it.
+- The Blender Bridge add-on installs again: its zip was missing a file.
 
 ## Version 0.9.4
 
