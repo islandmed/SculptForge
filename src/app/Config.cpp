@@ -50,6 +50,7 @@ Json toJson(const UiPrefs& p) {
     j.set("emulateNumpad", p.emulateNumpad);
     j.set("alphabeticalPalettes", p.alphabeticalPalettes);
     j.set("tablet", toJson(p.tablet));
+    j.set("spaceMouse", toJson(p.spaceMouse));
     j.set("antialiasing", double(p.antialiasing));
     j.set("fastNavigation", p.fastNavigation);
     j.set("multithreading", p.multithreading);
@@ -78,6 +79,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.emulateNumpad = j["emulateNumpad"].asBool(p.emulateNumpad);
     p.alphabeticalPalettes = j["alphabeticalPalettes"].asBool(p.alphabeticalPalettes);
     fromJson(j["tablet"], p.tablet);
+    fromJson(j["spaceMouse"], p.spaceMouse);
     const int aa = int(j["antialiasing"].asNumber(p.antialiasing));
     p.antialiasing = aa >= 8 ? 8 : aa >= 4 ? 4 : aa >= 2 ? 2 : 1;
     p.fastNavigation = j["fastNavigation"].asBool(p.fastNavigation);

@@ -24,6 +24,7 @@
 #include "core/AutoUv.h"
 #include "core/QRemesh.h"
 #include "core/Stroke.h"
+#include "core/SpaceMouse.h"
 #include "core/Tablet.h"
 #include "core/UpdateCheck.h"
 #include "core/Texture.h"
@@ -1160,6 +1161,23 @@ private:
     };
     std::vector<TabletTestSample> tabletTest_; // Preferences > Tablet draw-test area
     // ---- end Tablet ----
+    // ---- SpaceMouse (SpaceMouse.cpp, core/SpaceMouse.h, docs/guide/navigation.md) ----
+    // A 3Dconnexion SpaceMouse read through SDL's joystick API (no 3Dconnexion SDK): its six axes move the camera
+    // every frame, independently of the mouse and pen (a stroke held by the pen keeps going), its buttons run actions.
+    void spaceMouseEvent(const SDL_Event& e); // hot-plug and buttons
+    void spaceMouseScan();                    // take the first SpaceMouse SDL knows about, if none is open
+    void spaceMouseClose();
+    void updateSpaceMouse(float dt);          // once a frame: move the camera by the held axes
+    bool spaceMouseMoving() const { return spaceMouseMoving_; } // keep frames coming while the cap is pushed
+    void drawSpaceMouseSection();             // Preferences > Input > SpaceMouse
+    SDL_Joystick* spaceMouse_ = nullptr;
+    SDL_JoystickID spaceMouseId_ = 0;
+    std::string spaceMouseName_;
+    int spaceMouseButtonCount_ = 0;
+    std::array<float, kSmAxes> spaceMouseAxes_{}; // the last values read, -1 .. 1 (Preferences shows them)
+    bool spaceMouseMoving_ = false;
+    int spaceMouseLastButton_ = -1; // for Preferences: "Button N pressed"
+    // ---- end SpaceMouse ----
 };
 
 } // namespace sf

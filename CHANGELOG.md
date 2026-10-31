@@ -30,6 +30,15 @@ All notable changes to SculptForge are listed here. The format follows
   or flat whatever the scene says. Both are saved in projects (no format change; older files open with your
   preferred shading) and the scene's choice is a preference (Store Config). Smooth stays the default. Scripts:
   `set_shading mode=flat`, `subtool_shading mode=smooth name=Eyes`.
+- 3Dconnexion SpaceMouse navigation (#6, experimental): the cap's six axes pan, zoom and turn the view about the
+  orbit pivot, continuously and at the same speed whatever the frame rate, in every input style and while a pen
+  stroke is held. Read through SDL's joystick API (no 3Dconnexion SDK), hot-plug aware, recognised by USB id
+  (vendor 256F, and the older Logitech-id SpaceNavigator / SpacePilot / SpaceExplorer / SpaceMouse Pro).
+  **Preferences > Input > SpaceMouse**: on/off, speed, dead zone, per-axis invert, Lock rotation to turntable,
+  Dominant axis, live axis bars, and an action per button (the two side buttons default to Frame and Front view);
+  Store Config keeps them (`spaceMouse` in ui.json). Untested on real hardware; the guide explains what to do when
+  3DxWare (Windows, macOS) or spacenavd (Linux) holds the device. UI tests drive a virtual joystick with a
+  SpaceMouse Compact's ids (`spacemouse`, `spacemouse_hold`, `spacemouse_button`, `spacemouse_unplug` steps).
 ### Fixed
 - The Blender Bridge add-on zip was missing `zbrush_keys.py`, so Blender refused to install it ("cannot import name zbrush_keys", #10). The zip now carries every module, and the packaging check fails if one is left out.
 - Rotating, panning and zooming with the pen tip on the background only shook the view with some tablets (a Ugee

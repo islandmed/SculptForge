@@ -1,0 +1,147 @@
+# SpaceMouse navigation (#6), with a virtual joystick that has a SpaceMouse Compact's USB ids (the app finds and
+# opens it as it would the real device): twisting, tilting, pushing and pulling the cap turn, pan and zoom the view;
+# a resting cap inside the dead zone does nothing; Preferences > Input > SpaceMouse inverts axes, locks the
+# rotation to a turntable and turns it off; the side buttons frame and show the front; a pen stroke held while the
+# view turns stays one stroke; unplugging and plugging back in works; every input style.
+run new_sphere subdivisions=4
+snapshot
+expect_value spacemouse_connected == 0
+
+# Twist the cap clockwise for half a second: the model turns (about 45 degrees at speed 1).
+camera 0 0
+spacemouse 0 0 0 0 0 0.8 0.5
+expect_value spacemouse_connected == 1
+expect_value camera_yaw > 25
+expect_value camera_yaw < 65
+expect_value spacemouse_moving == 0
+expect_value moved == 0
+
+# Tilt it towards you: the model's top comes towards you.
+camera 0 0
+spacemouse 0 0 0 0.8 0 0 0.3
+expect_value camera_pitch < -10
+
+# Roll the cap's top to the left: free rotation rolls the model anticlockwise (the camera the other way).
+camera 0 0
+spacemouse 0 0 0 0 0.8 0 0.3
+expect_value camera_roll > 10
+
+# Push it right: the view pans. Pull it towards you: closer. Push it away: further.
+key f
+camera 0 0
+remember camera_pan p0
+spacemouse 0.8 0 0 0 0 0 0.3
+expect_value camera_pan > $p0
+key f
+remember camera_distance d0
+spacemouse 0 0.8 0 0 0 0 0.3
+expect_value camera_distance < $d0
+remember camera_distance d1
+spacemouse 0 -0.8 0 0 0 0 0.3
+expect_value camera_distance > $d1
+
+# A hand resting on the cap (inside the 8% dead zone) doesn't drift the view.
+key f
+camera 0 0
+remember camera_distance d2
+remember camera_pan p2
+spacemouse 0.05 -0.06 0.04 0.07 -0.05 0.06 0.5
+expect_value camera_yaw == 0
+expect_value camera_pitch == 0
+expect_value camera_distance == $d2
+expect_value camera_pan == $p2
+
+# Side buttons: the right one shows the front (an orthographic axis view), the left one frames the model.
+camera 30 20
+expect_value camera_aligned == 0
+spacemouse_button 2
+expect_value camera_aligned == 1
+expect_value camera_ortho == 1
+spacemouse 0 0 0 0 0 0.5 0.2
+expect_value camera_ortho == 0
+key f
+remember camera_distance framed
+zoom 3
+spacemouse_button 1
+expect_value camera_distance >= $framed-0.001
+expect_value camera_distance <= $framed+0.001
+
+# Preferences > Input > SpaceMouse: invert the twist.
+click "Preferences##palette.preferences"
+click "Input##preferences.input"
+expect_text "SpaceMouse (experimental)"
+expect_text "SpaceMouse Compact (UI test)"
+shot spacemouse_prefs
+click "Spin##spacemouse.invert5"
+key escape
+camera 0 0
+spacemouse 0 0 0 0 0 0.8 0.5
+expect_value camera_yaw < -25
+
+# Lock rotation to turntable: rolling the cap does nothing, a twist turns about the world's up axis.
+click "Preferences##palette.preferences"
+click "Lock rotation to turntable##spacemouse.turntable"
+key escape
+camera 0 0
+spacemouse 0 0 0 0 0.9 0 0.3
+expect_value camera_roll == 0
+expect_value camera_yaw == 0
+spacemouse 0 0 0 0.6 0 0.8 0.4
+expect_value camera_roll == 0
+expect_value camera_up > 0
+
+# Off: the SpaceMouse is ignored, buttons too.
+click "Preferences##palette.preferences"
+click "Use SpaceMouse##spacemouse.enabled"
+key escape
+camera 10 0
+spacemouse 0 0 0 0 0 0.8 0.3
+expect_value camera_yaw == 10
+spacemouse_button 2
+expect_value camera_yaw == 10
+click "Preferences##palette.preferences"
+click "Use SpaceMouse##spacemouse.enabled"
+click "SpaceMouse defaults##spacemouse.defaults"
+key escape
+
+# A pen stroke held while the cap turns the view stays one stroke, and one undo takes it back.
+key f
+camera 0 0
+snapshot
+spacemouse_hold 0 0 0 0 0 0.5
+pen_stroke 0.3 0.45 0.7 0.55 0.6 0.6
+expect_value camera_yaw > 5
+spacemouse_hold 0 0 0 0 0 0
+expect_value stroking == 0
+expect_value moved_out > 0
+key ctrl+z
+expect_value moved == 0
+# The pen still navigates and sculpts afterwards.
+pen_stroke 0.3 0.45 0.7 0.55 0.6 0.6
+expect_value moved_out > 0
+key ctrl+z
+
+# Unplugged and plugged back in (hot-plug).
+spacemouse_unplug
+expect_value spacemouse_connected == 0
+camera 0 0
+spacemouse 0 0 0 0 0 0.8 0.5
+expect_value spacemouse_connected == 1
+expect_value camera_yaw > 25
+
+# Every input style: SculptForge and Blender navigate the same way.
+click "Preferences##palette.preferences"
+click "SculptForge##input.style_sculptforge"
+key escape
+camera 0 0
+spacemouse 0 0 0 0 0 0.8 0.5
+expect_value camera_yaw > 25
+click "Preferences##palette.preferences"
+click "Blender##input.style_blender"
+key escape
+camera 0 0
+spacemouse 0 0 0 0 0 0.8 0.5
+expect_value camera_yaw > 25
+remember camera_distance d3
+spacemouse 0 0.8 0 0 0 0 0.3
+expect_value camera_distance < $d3

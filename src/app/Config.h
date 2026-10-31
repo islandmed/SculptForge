@@ -9,6 +9,7 @@
 #pragma once
 
 #include "core/Json.h"
+#include "core/SpaceMouse.h"
 #include "core/Tablet.h"
 
 #include <string>
@@ -33,6 +34,7 @@ struct UiPrefs {
                                 // 2 Blender (middle-drag orbit, numpad views, Blender's sculpt keys; Input.cpp)
     bool emulateNumpad = false; // Blender style: the 1-9 and 0 keys above the letters act as the numpad (laptops)
     TabletSettings tablet;      // Preferences > Tablet: pressure curve, eraser, pen buttons
+    SpaceMouseSettings spaceMouse; // Preferences > Input > SpaceMouse
     // Preferences > Performance (PanelPerformance.cpp).
     int antialiasing = 4;       // samples per pixel in the 3D view: 1 (off), 2, 4 or 8
     bool fastNavigation = true; // big scenes draw without antialiasing while the view moves
