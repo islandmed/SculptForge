@@ -4,6 +4,7 @@
 // Kelvinlet brushes (see Kelvinlet.h for the math) and the Detail Clone brush (VDM stamps along a stroke).
 #include "core/Kelvinlet.h"
 
+#include "core/Commands.h"
 #include "core/Sculpt.h"
 #include "core/ThreadPool.h"
 #include "core/Vdm.h"
@@ -77,7 +78,7 @@ KelvinletKernel makeKelvinletKernel(KelvinletKind kind, float radius, const Kelv
     radius = std::max(radius, 1e-6f);
     if (kind == KelvinletKind::Grab && !tight) {
         // Tri-scale (1/r^5 far field). The weights cancel the 1/r and 1/r^3 terms of the far field.
-        const float e1 = 0.6f * radius;
+        const float e1 = 0.75f * radius;
         k.scales = 3;
         k.eps[0] = e1;
         k.eps[1] = 1.5f * e1;
@@ -208,9 +209,12 @@ void Sculptor::kelvinletSingle(Mesh& mesh, BVH& bvh, const KelvinletKernel& k, c
     case KelvinletKind::Scale: amount = std::abs(s.logScale), moveScale = amount * s.radius; break;
     }
     if (!(amount > 0.0f)) return;
-    // Adaptive cutoff: where this step moves the surface less than a small fraction of the brush radius (and of
-    // the step: a long jump between frames doesn't drag the whole mesh into the pass; the window hides the rest).
-    const float epsilon = 0.006f * s.radius + 0.02f * moveScale;
+    // Adaptive cutoff: where this step's displacement falls below epsilon = 2% of its largest (the window takes the
+    // rest smoothly to 0), so a slow drag of tiny steps still moves the surface and a fast one doesn't drag the whole
+    // mesh into the pass.
+    float peak = 0.0f;
+    for (int i = 0; i <= 32; ++i) peak = std::max(peak, k.envelope(1.5f * s.radius * float(i) / 32.0f));
+    const float epsilon = std::max(0.02f * amount * peak, 1e-7f * s.radius);
     const float cut = k.cutoff(amount, epsilon, 3.0f * s.radius);
     if (!(cut > 0.0f)) return;
     // Grab: the load point travels from `center` to `center + travel` in `substeps` pieces, each a linear Kelvinlet
@@ -433,6 +437,28 @@ void Sculptor::flushDetailClone(Mesh& mesh, BVH& bvh, Symmetry sym) {
     cloneStamp(mesh, bvh, q, sym);
     clone_.pending = false;
     clone_.stamped = true;
+}
+
+void registerKelvinletCommands(CommandRegistry& registry) {
+    using T = ParamSpec::Type;
+    registry.add({"kelvinlet_settings",
+                  "Set the Kelvinlet brushes' material (Brush > Kelvinlet & Capture): Squash (Poisson's ratio: 0 "
+                  "rubbery, 1 incompressible clay that bulges), Sharpness, and Detail Clone's spacing. Unset values stay.",
+                  {{"squash", T::Number, "0-1 (default 0.5).", false},
+                   {"sharpness", T::Number, "0-1: a tighter, cusped peak (default 0).", false},
+                   {"clone_spacing", T::Number, "Detail Clone: stamp spacing in stamp widths, 0.25-3 (default 1).", false},
+                   {"clone_follow", T::Bool, "Detail Clone: stamps turn with the stroke (default true).", false}},
+                  [](Document& doc, const Args& a) -> CommandResult {
+                      KelvinletSettings& k = doc.sculptor.kelvinlet;
+                      k.squash = float(std::clamp(argNumber(a, "squash", k.squash), 0.0, 1.0));
+                      k.sharpness = float(std::clamp(argNumber(a, "sharpness", k.sharpness), 0.0, 1.0));
+                      k.cloneSpacing = float(std::clamp(argNumber(a, "clone_spacing", k.cloneSpacing), 0.25, 3.0));
+                      k.cloneFollowStroke = argBool(a, "clone_follow", k.cloneFollowStroke);
+                      char buf[160];
+                      std::snprintf(buf, sizeof buf, "Kelvinlet: Squash %.0f (Poisson's ratio %.2f), Sharpness %.0f, clone spacing %.2f",
+                                    k.squash * 100.0f, k.poisson(), k.sharpness * 100.0f, k.cloneSpacing);
+                      return {true, buf};
+                  }});
 }
 
 } // namespace sf

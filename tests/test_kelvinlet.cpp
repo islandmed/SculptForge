@@ -255,6 +255,17 @@ TEST(kelvinlet_twist_and_snake_strokes) {
     CHECK(std::abs(glm::length(b) - glm::length(a)) < 1e-3f); // a rotation in the sheet
     CHECK(std::abs(b.y) < 1e-6f);
     CHECK(glm::length(b - a) > 0.02f);
+    // Scale: a drag to the left pinches toward the press point, to the right swells.
+    for (float dir : {-1.0f, 1.0f}) {
+        Document sc = makeDoc(makePlane(120, 2.0f));
+        PathStroke ps = st;
+        ps.points = {glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.2f * dir, 1.0f, 0.0f)};
+        CHECK(strokePath(sc, nullptr, BrushType::KelvinScale, ps, err) > 0);
+        const uint32_t q = nearest(makePlane(120, 2.0f), glm::vec3(0.1f, 0.0f, 0.05f));
+        const float r0 = glm::length(start[q]), r1 = glm::length(sc.mesh.positions[q]);
+        std::printf("  scale %+.0f: %.4f -> %.4f\n", dir, r0, r1);
+        CHECK(dir < 0.0f ? r1 < r0 * 0.9f : r1 > r0 * 1.1f);
+    }
     // Snake pulls a tapering horn straight out of a sphere.
     Document s = makeDoc(makeIcosphere(6, 1.0f));
     PathStroke pull;
@@ -406,6 +417,32 @@ TEST(capture_vdm_from_view_round_trips_a_stamp) {
     CHECK(run(a, "capture_vdm", {{"point", std::string("0,1,0")}, {"view", std::string("0,-1,0")}, {"size", 0.5},
                                  {"name", std::string("Ear Copy")}, {"save", false}, {"resolution", 64.0}}));
     CHECK(a.vdms.size() == before + 1 && a.brushVdm && a.brushVdm->name == "Ear Copy");
+}
+
+TEST(capture_vdm_on_a_curved_surface_keeps_only_the_detail) {
+    // A horn on a sphere: the sphere's dome stays in the base (the quadric), so the map is the horn alone.
+    Document d = makeDoc(makeIcosphere(7, 1.0f));
+    d.brushVdm = builtinVdm("horn");
+    CHECK(run(d, "vdm_stamp", {{"point", std::string("0,0,2")}, {"view", std::string("0,0,-1")}, {"radius", 0.15}}));
+    d.syncBvh();
+    const CaptureFrame f = makeCaptureFrame(glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f), 0.4f);
+    CaptureOptions opt;
+    opt.resolution = 128;
+    VectorDisplacement v;
+    std::string err;
+    CHECK(captureVdmFromView(d.mesh, d.bvh, f, opt, v, err));
+    float centre = 0.0f, band = 0.0f;
+    for (int y = 0; y < v.height; ++y)
+        for (int x = 0; x < v.width; ++x) {
+            const float u = (float(x) + 0.5f) / float(v.width) * 2.0f - 1.0f, w = 1.0f - (float(y) + 0.5f) / float(v.height) * 2.0f;
+            const float m = glm::length(v.vectors[size_t(y) * size_t(v.width) + size_t(x)]);
+            const float d2 = std::max(std::abs(u), std::abs(w));
+            if (d2 < 0.3f) centre = std::max(centre, m);
+            else if (d2 > 0.5f && d2 < 0.8f) band = std::max(band, m);
+        }
+    std::printf("  horn on a sphere: centre %.3f, outer band %.4f (radii)\n", centre, band);
+    CHECK(centre > 0.2f);
+    CHECK(band < 0.15f * centre); // (what is left: the sphere is not quite a quadric over so wide a square)
 }
 
 TEST(kelvinlet_is_deterministic_with_threads) {

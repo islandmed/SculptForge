@@ -40,7 +40,7 @@ struct CaptureFrame {
 
 struct CaptureOptions {
     int resolution = 256;     // pixels a side (32..1024)
-    float edgeFade = 0.12f;   // fraction of the half size over which the capture fades to 0 at its border
+    float edgeFade = 0.25f;   // fraction of the half size over which the capture fades to 0 at its border
     float smoothing = 0.5f;   // 0..1: how much smooth form the base takes away (0: plain plane; VDM and alpha)
     bool fitPlane = true;     // height alpha: relative to a plane fitted to the surface (removes tilt)
     bool invert = false;      // height alpha: white = deepest

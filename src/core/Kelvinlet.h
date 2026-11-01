@@ -33,6 +33,8 @@
 
 namespace sf {
 
+class CommandRegistry;
+
 // Brush > Kelvinlet (saved with the project's brush settings by the app).
 struct KelvinletSettings {
     float squash = 0.5f;    // 0..1: Poisson's ratio nu = 0.49 * squash. 0 = rubbery (no bulge), 1 = incompressible clay
@@ -88,5 +90,8 @@ struct KelvinletStep {
     glm::vec3 viewDir{0.0f, 0.0f, -1.0f};
     bool frontFacesOnly = false;
 };
+
+// kelvinlet_settings: Squash, Sharpness and the Detail Clone options from a script.
+void registerKelvinletCommands(CommandRegistry& registry);
 
 } // namespace sf

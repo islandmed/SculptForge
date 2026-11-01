@@ -400,6 +400,64 @@ bool captureVdmFromView(const Mesh& mesh, const BVH& bvh, const CaptureFrame& f,
     if (smoothing <= 0.0f) {
         for (size_t i = 0; i < n; ++i) base[i] = X[i] - np * glm::dot(X[i] - f.center, np);
     } else {
+        // The broad form first: a quadric height field over the plane fitted to the outer band of the square (where
+        // the detail usually isn't). Fairing alone would flatten a curved surface (a harmonic fill can't hold a
+        // sphere's dome), so the dome would come out as "detail"; the quadric's own curvature stays in the base.
+        glm::vec3 qr = f.right - np * glm::dot(f.right, np);
+        qr = glm::length(qr) > 1e-6f ? glm::normalize(qr) : f.right;
+        const glm::vec3 qu = glm::cross(np, qr);
+        auto terms = [](double u, double v, double t[6]) {
+            t[0] = 1.0, t[1] = u, t[2] = v, t[3] = u * u, t[4] = u * v, t[5] = v * v;
+        };
+        double coef[6] = {0, 0, 0, 0, 0, 0};
+        for (int pass = 0; pass < 2; ++pass) {
+            double M[6][7] = {};
+            size_t used = 0;
+            for (size_t i = 0; i < n; ++i) {
+                const glm::vec3 o = X[i] - f.center;
+                const double u = glm::dot(o, qr) * inv, v = glm::dot(o, qu) * inv;
+                if (pass == 0 && std::max(std::abs(u), std::abs(v)) < 0.55 && !rim[i]) continue;
+                double t[6];
+                terms(u, v, t);
+                const double h = glm::dot(o, np) * inv;
+                for (int a = 0; a < 6; ++a) {
+                    for (int c = 0; c < 6; ++c) M[a][c] += t[a] * t[c];
+                    M[a][6] += t[a] * h;
+                }
+                ++used;
+            }
+            if (pass == 0 && used < 40) continue; // too few in the band: fit everything
+            for (int a = 0; a < 6; ++a) M[a][a] += 1e-9; // (a degenerate band: stay near flat)
+            // Gaussian elimination with partial pivoting.
+            bool ok = true;
+            for (int c = 0; c < 6 && ok; ++c) {
+                int piv = c;
+                for (int r2 = c + 1; r2 < 6; ++r2)
+                    if (std::abs(M[r2][c]) > std::abs(M[piv][c])) piv = r2;
+                if (std::abs(M[piv][c]) < 1e-14) {
+                    ok = false;
+                    break;
+                }
+                for (int k = 0; k < 7; ++k) std::swap(M[c][k], M[piv][k]);
+                for (int r2 = 0; r2 < 6; ++r2) {
+                    if (r2 == c) continue;
+                    const double fct = M[r2][c] / M[c][c];
+                    for (int k = c; k < 7; ++k) M[r2][k] -= fct * M[c][k];
+                }
+            }
+            if (ok)
+                for (int a = 0; a < 6; ++a) coef[a] = M[a][6] / M[a][a];
+            break;
+        }
+        auto quadric = [&](const glm::vec3& p) {
+            const glm::vec3 o = p - f.center;
+            double t[6];
+            terms(glm::dot(o, qr) * inv, glm::dot(o, qu) * inv, t);
+            double h = 0.0;
+            for (int a = 0; a < 6; ++a) h += coef[a] * t[a];
+            return float(h) * half;
+        };
+        for (size_t i = 0; i < n; ++i) X[i] -= np * quadric(X[i]); // flattened: the fairing works on the rest
         // Implicit fairing with the rim held: (1 + l deg_i) x_i - l sum_{j inner} x_j = X_i + l sum_{j rim} X_j,
         // solved for the inner vertices by Jacobi-preconditioned conjugate gradients (three right-hand sides).
         const float sigma = half * (0.2f + 1.6f * smoothing); // the size of form the base keeps
@@ -469,7 +527,11 @@ bool captureVdmFromView(const Mesh& mesh, const BVH& bvh, const CaptureFrame& f,
                 for (size_t i = lo; i < hi; ++i) p[i] = z[i] + beta * p[i];
             });
         }
-        for (size_t i = 0; i < n; ++i) base[i] = rim[i] ? X[i] : x[i];
+        for (size_t i = 0; i < n; ++i) {
+            base[i] = rim[i] ? X[i] : x[i];
+            base[i] += np * quadric(base[i]); // the broad form back on the base
+            X[i] += np * quadric(X[i]);        // and on the surface
+        }
         np = areaNormal(base);
     }
     // 4. The base's normals and the stamp's frame (the screen's right and up laid on the base plane).
@@ -586,7 +648,7 @@ CaptureOptions optionsFromArgs(const Args& a) {
     CaptureOptions o;
     o.resolution = std::clamp(int(argNumber(a, "resolution", 256)), 32, 1024);
     o.smoothing = float(std::clamp(argNumber(a, "smoothing", 0.5), 0.0, 1.0));
-    o.edgeFade = float(std::clamp(argNumber(a, "edge_fade", 0.12), 0.0, 0.9));
+    o.edgeFade = float(std::clamp(argNumber(a, "edge_fade", 0.25), 0.0, 0.9));
     o.fitPlane = argBool(a, "fit_plane", true);
     o.invert = argBool(a, "invert", false);
     return o;
@@ -604,7 +666,7 @@ void registerCaptureCommands(CommandRegistry& registry) {
         {"circle", T::Bool, "Capture the circle inside the square only.", false},
         {"resolution", T::Number, "Pixels a side (32-1024, default 256).", false},
         {"smoothing", T::Number, "0-1: how much of the smooth form the base takes away (0 = flat plane; default 0.5).", false},
-        {"edge_fade", T::Number, "0-0.9: border fade, as a fraction of the half size (default 0.12).", false},
+        {"edge_fade", T::Number, "0-0.9: border fade, as a fraction of the half size (default 0.25).", false},
     };
     std::vector<ParamSpec> alphaParams = common;
     alphaParams.push_back({"fit_plane", T::Bool, "Height over a plane fitted to the surface (default true) instead of the view plane.", false});
