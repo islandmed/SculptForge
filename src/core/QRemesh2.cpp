@@ -819,7 +819,7 @@ bool remeshPieceV2(const WorkMesh& piece, int axis, double wantQuads, const QRem
     TriangleBVH surface;
     surface.build(piece.P, piece.T);
     mark("surface bvh");
-    const float sharpCos = opt.detectEdges ? std::cos(glm::radians(50.0f)) : 2.0f;
+    const float sharpCos = opt.detectEdges ? std::cos(glm::radians(60.0f)) : 2.0f;
     std::vector<vec3> segA, segB;
     std::unordered_set<uint64_t> sharp;
     {
@@ -883,6 +883,44 @@ bool remeshPieceV2(const WorkMesh& piece, int axis, double wantQuads, const QRem
     mark("remesh");
     std::vector<uint32_t> vmap;
     Proxy proxy = pb.result(&vmap);
+    // Hard edges checked at the proxy's scale: a chain whose faces meet at less than ~40 degrees there (on average),
+    // or shorter than two quads, is sculpt detail (a scan's crease), not a hard edge, and stops being a feature.
+    auto demoteSoftEdges = [&](Proxy& px) {
+        const size_t nc = px.sharp.size();
+        UF uf(px.P.size());
+        for (uint32_t c = 0; c < nc; ++c)
+            if (px.sharp[c] && px.opp[c] != kNone) uf.unite(px.T[c / 3][c % 3], px.T[c / 3][(c % 3 + 1) % 3]);
+        std::unordered_map<uint32_t, std::pair<double, double>> chain; // root -> (length, length-weighted dihedral)
+        for (uint32_t c = 0; c < nc; ++c) {
+            const uint32_t o = px.opp[c];
+            if (!px.sharp[c] || o == kNone || o < c) continue;
+            const glm::uvec3 a = px.T[c / 3], b = px.T[o / 3];
+            const vec3 na = safeNormalize(glm::cross(px.P[a.y] - px.P[a.x], px.P[a.z] - px.P[a.x]));
+            const vec3 nb = safeNormalize(glm::cross(px.P[b.y] - px.P[b.x], px.P[b.z] - px.P[b.x]));
+            const double len = glm::length(px.P[a[(c % 3 + 1) % 3]] - px.P[a[c % 3]]);
+            auto& e = chain[uf.find(a[c % 3])];
+            e.first += len;
+            e.second += len * std::acos(std::clamp(double(glm::dot(na, nb)), -1.0, 1.0));
+        }
+        size_t demoted = 0;
+        for (uint32_t c = 0; c < nc; ++c) {
+            if (!px.sharp[c]) continue;
+            const uint32_t o = px.opp[c];
+            if (o == kNone) continue;
+            const auto& e = chain[uf.find(px.T[c / 3][c % 3])];
+            const double meanAngle = e.first > 0.0 ? e.second / e.first : 0.0;
+            if (e.first < 3.0 * double(h0) || meanAngle < glm::radians(55.0)) {
+                bool other = (opt.keepGroups && px.group[c / 3] != px.group[o / 3]);
+                if (!other) px.feature[c] = 0, ++demoted;
+                px.sharp[c] = 0;
+            }
+        }
+        return demoted;
+    };
+    {
+        const size_t d = demoteSoftEdges(proxy);
+        if (timing && d) std::fprintf(stderr, "  v2 %zu soft hard-edge corners demoted\n", d);
+    }
     Frames frames;
     frames.build(proxy);
     proxy.size.assign(proxy.P.size(), h0);
@@ -946,6 +984,7 @@ bool remeshPieceV2(const WorkMesh& piece, int axis, double wantQuads, const QRem
         pb.remesh(L0, relB, 2);
         vmap.clear();
         proxy = pb.result(&vmap);
+        demoteSoftEdges(proxy);
         frames.build(proxy);
         proxy.size.assign(proxy.P.size(), h0);
         curv = computeCurvature(proxy, frames, curvRadius);

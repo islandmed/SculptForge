@@ -560,8 +560,12 @@ Proxy ProxyBuilder::result(std::vector<uint32_t>* vertexMap) const {
         p.T.push_back({remap[tri.x], remap[tri.y], remap[tri.z]});
         p.group.push_back(m.G[t]);
         p.feature.push_back(0), p.feature.push_back(0), p.feature.push_back(0);
+        p.sharp.push_back(0), p.sharp.push_back(0), p.sharp.push_back(0);
         const size_t f = p.T.size() - 1;
-        for (int k = 0; k < 3; ++k) p.feature[3 * f + size_t(k)] = m.featureEdge(tri[k], tri[(k + 1) % 3]) ? 1 : 0;
+        for (int k = 0; k < 3; ++k) {
+            p.feature[3 * f + size_t(k)] = m.featureEdge(tri[k], tri[(k + 1) % 3]) ? 1 : 0;
+            p.sharp[3 * f + size_t(k)] = !m.sharp.empty() && m.sharp.count(edgeKey(tri[k], tri[(k + 1) % 3])) ? 1 : 0;
+        }
     }
     p.buildOpposites();
     for (size_t c = 0; c < p.opp.size(); ++c)
