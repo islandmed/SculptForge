@@ -11,6 +11,7 @@ chapter opens by itself the first time you start a new version; you can always f
 
 - Divide (<kbd>Ctrl</kbd>+<kbd>D</kbd>) no longer crashes on models with a point where many polygons meet, such
   as a Blender cylinder with Triangle Fan caps of 22 or more sides or a UV sphere's poles.
+- Generating with a [ComfyUI](generate-3d.md) workflow and a fixed seed could crash at random; fixed.
 - SculptForge now keeps a log file, `sculptforge.log`, in its settings folder (**Help > Open log folder**). After
   a crash it says what crashed and what you did last; attach it when you report a problem. See
   [The log file](troubleshooting.md#the-log-file).
