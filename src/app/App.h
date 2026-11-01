@@ -1113,6 +1113,15 @@ private:
     float paintOpacityDrag_ = -1.0f;  // opacity before the slider drag (-1 = not dragging)
     void drawGameExportContents();
     void drawVisibilitySection();
+    // Tool > Selection Sets (PanelSelectionSets.cpp).
+    void drawSelectionSetsSection();
+    char setNameBuffer_[64] = "Set 1";
+    uint32_t setChannels_ = 1 | 2 | 8; // kSetMask | kSetPolygroups | kSetVisibility (core/SelectionSets.h)
+    std::string selectedSet_, combineWith_;
+    int setMode_ = 0; // Replace, Union, Intersect, Subtract
+    float morphAmount_ = 1.0f;
+    bool renamingSet_ = false;
+    char setRenameBuffer_[64] = "";
     void drawGeometrySection(); // PanelGeometry.cpp: Divide, SDiv, Lower / Higher Res, Del Lower / Higher, Reconstruct
     bool smt_ = true;           // Tool > Geometry > Smt: Divide smooths
     float sdivSlider_ = 1.0f;   // the SDiv slider while dragged (1-based)

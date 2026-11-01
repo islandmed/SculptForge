@@ -10,11 +10,14 @@
 //   sf.run(doc, "export_usd", path="/tmp/head.usdz")
 //   verts, tris = doc.vertices, doc.triangles      # (N, 3) float32, (M, 3) uint32
 //   doc.mask, doc.colors, doc.polygroups           # optional attributes, None when absent
+//   doc.set_selection_set("Eyes", mask=m)          # push a selection set; doc.selection_set("Eyes") pulls it
 #include "ai/AiCommands.h"
 #include "ai/SplatTrainer.h"
 #include "core/BrushLibrary.h"
 #include "core/Commands.h"
+#include "core/Multires.h"
 #include "core/Script.h"
+#include "core/SelectionSets.h"
 
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
@@ -91,6 +94,25 @@ void setAttribute(std::vector<T>& dst, const py::object& value, size_t count, co
     if (!a || a.ndim() != 1 || size_t(a.shape(0)) != count)
         throw py::value_error(std::string(what) + ": expected " + std::to_string(count) + " values or None");
     dst.assign(a.data(), a.data() + count);
+}
+
+// An (n, k) float32 array of `count` rows (k = 1: 1-D), or a ValueError.
+template <class T>
+std::vector<T> rows(const py::object& value, size_t count, int k, const char* what) {
+    auto a = py::array_t<float, py::array::c_style | py::array::forcecast>::ensure(value);
+    const bool shape = a && ((k == 1 && a.ndim() == 1) || (k > 1 && a.ndim() == 2 && a.shape(1) == k));
+    if (!shape || size_t(a.shape(0)) != count)
+        throw py::value_error(std::string(what) + ": expected " + std::to_string(count) + (k > 1 ? " rows of " + std::to_string(k) : " values"));
+    std::vector<T> out(count);
+    std::memcpy(out.data(), a.data(), count * sizeof(T));
+    return out;
+}
+
+template <class T>
+py::array_t<float> floatRows(const std::vector<T>& v, int k) {
+    py::array_t<float> a = k == 1 ? py::array_t<float>(py::ssize_t(v.size())) : py::array_t<float>({py::ssize_t(v.size()), py::ssize_t(k)});
+    if (!v.empty()) std::memcpy(a.mutable_data(), v.data(), v.size() * sizeof(T));
+    return a;
 }
 
 } // namespace
@@ -216,6 +238,82 @@ PYBIND11_MODULE(sculptforge, m) {
             },
             "Index of the Part that vertices, mask, layers... and editing commands refer to. Set it to an "
             "index or a Part name to select another one.")
+        // Selection Sets (core/SelectionSets.h) of the active Part (SubTool): push and pull them as arrays.
+        .def_property_readonly(
+            "selection_sets",
+            [](const Document& d) {
+                py::list out;
+                const SelectionSetList* list = d.mesh.selectionSets.get();
+                if (list)
+                    for (const auto& s : list->sets) {
+                        py::list channels;
+                        for (const char* c : {"mask", "polygroups", "paint", "visibility", "uvs", "morph"}) {
+                            uint32_t bit = 0;
+                            std::string err;
+                            if (parseSetChannels(c, bit, err) && s->has(bit)) channels.append(c);
+                        }
+                        out.append(py::dict(py::arg("name") = s->name, py::arg("channels") = channels,
+                                            py::arg("level") = s->level, py::arg("vertex_count") = s->vertexCount,
+                                            py::arg("triangle_count") = s->triangleCount,
+                                            py::arg("fits") = selectionSetFits(d.mesh, *s),
+                                            py::arg("morph_target") = s->name == list->morphTarget));
+                    }
+                return out;
+            },
+            "The active Part's selection sets, as dicts with name, channels, level, vertex_count, triangle_count, "
+            "fits and morph_target.")
+        .def(
+            "selection_set",
+            [](const Document& d, const std::string& name) {
+                const SelectionSetList* list = d.mesh.selectionSets.get();
+                const int i = list ? list->find(name) : -1;
+                if (i < 0) throw py::key_error("no selection set " + name);
+                SelectionSetData data;
+                std::string err;
+                if (!selectionSetAt(d.mesh, *list->sets[size_t(i)], kSetAllChannels, data, err)) throw CommandError(err);
+                py::dict out;
+                if (data.channels & kSetMask) out["mask"] = floatRows(data.mask, 1);
+                if (data.channels & kSetPolygroups) out["polygroups"] = attributeArray(data.polygroups);
+                if (data.channels & kSetPaint) out["colors"] = floatRows(data.colors, 3);
+                if (data.channels & kSetVisibility) out["hidden"] = attributeArray(data.hidden);
+                if (data.channels & kSetUvs) out["uvs"] = floatRows(data.uvs, 2);
+                if (data.channels & kSetMorph) out["positions"] = floatRows(data.positions, 3);
+                return out;
+            },
+            py::arg("name"),
+            "A selection set's channels at the current subdivision level, as a dict of NumPy arrays (mask, polygroups, "
+            "colors, hidden, uvs (per triangle corner), positions), only those the set holds.")
+        .def(
+            "set_selection_set",
+            [](Document& d, const std::string& name, const py::object& mask, const py::object& polygroups,
+               const py::object& colors, const py::object& hidden, const py::object& uvs, const py::object& positions) {
+                const size_t nv = d.mesh.vertexCount(), nt = d.mesh.triangleCount();
+                SelectionSetData data;
+                if (!mask.is_none()) data.mask = rows<float>(mask, nv, 1, "mask"), data.channels |= kSetMask;
+                if (!polygroups.is_none()) {
+                    setAttribute(data.polygroups, polygroups, nt, "polygroups");
+                    data.channels |= kSetPolygroups;
+                }
+                if (!colors.is_none()) data.colors = rows<glm::vec3>(colors, nv, 3, "colors"), data.channels |= kSetPaint;
+                if (!hidden.is_none()) {
+                    setAttribute(data.hidden, hidden, nt, "hidden");
+                    data.channels |= kSetVisibility;
+                }
+                if (!uvs.is_none()) data.uvs = rows<glm::vec2>(uvs, nt * 3, 2, "uvs"), data.channels |= kSetUvs;
+                if (!positions.is_none()) data.positions = rows<glm::vec3>(positions, nv, 3, "positions"), data.channels |= kSetMorph;
+                if (!data.channels) throw py::value_error("give at least one of mask, polygroups, colors, hidden, uvs, positions");
+                SelectionSet set;
+                std::string msg;
+                if (!makeSelectionSet(name, data, uint32_t(nv), uint32_t(nt), subdivCurrentLevel(d.mesh), set, msg) ||
+                    !addSelectionSet(d, std::move(set), "Store set " + name, msg))
+                    throw CommandError(msg);
+                return msg;
+            },
+            py::arg("name"), py::kw_only(), py::arg("mask") = py::none(), py::arg("polygroups") = py::none(),
+            py::arg("colors") = py::none(), py::arg("hidden") = py::none(), py::arg("uvs") = py::none(),
+            py::arg("positions") = py::none(),
+            "Store (or replace) a selection set on the active Part from arrays laid out for the current level "
+            "(one undo step). Restore it with run(doc, 'selection_set_restore', name=...).")
         .def("__repr__", [](const Document& d) {
             return "<sculptforge.Document " + std::to_string(d.mesh.vertexCount()) + " vertices, " +
                    std::to_string(d.mesh.triangleCount()) + " triangles, " + std::to_string(d.mesh.layers.size()) +

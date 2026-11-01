@@ -668,6 +668,10 @@ void App::drawPalette_Tool() {
         tray::Section section;
         drawVisibilitySection();
     }
+    if (subpalette("tool.selection_sets", "Selection Sets")) {
+        tray::Section section;
+        drawSelectionSetsSection();
+    }
     if (subpalette("tool.export", "Export")) {
         tray::Section section;
         Demo::pushScope("Game Ready");

@@ -50,7 +50,11 @@ trailing underscore for private members. A `.clang-format` is provided.
 
 See [README.md#building](README.md#building). On Linux, `packaging/linux/install-build-deps.sh` installs the
 build dependencies. `ctest` runs the unit tests; `cpack` in the build folder makes the platform's packages.
-Releases are built by `.github/workflows/release.yml` when a `v*` tag is pushed.
+`ctest -j 4` runs them four at a time: the `sculptforge_tests` suite is registered as eight shards
+(`sculptforge_tests_0of8` ...), each with its own temporary folder. Run the binary itself for a quick check:
+`./build/sculptforge_tests qremesh` runs the tests whose names contain "qremesh", `--shard 1/4` one shard, and
+each test prints how long it took.
+Releases are built by `.github/workflows/release.yml` when a `v*` tag is pushed; [docs/releasing.md](docs/releasing.md) has the process.
 
 ### UI tests
 
@@ -69,7 +73,8 @@ take under a second. They use a throwaway settings folder and never touch your o
 the script and saves `FAIL-line-N.png`, and clicking a missing item lists similarly named items. Clicks
 scroll panels as needed, and clicking an item a person couldn't reach (off screen) fails. CI runs the UI
 tests on Linux under Xvfb and on Windows with Mesa's software OpenGL, and uploads the screenshots as an
-artifact.
+artifact. CI compiles through ccache (see the comment at the top of `.github/workflows/ci.yml`). Releases: see
+[docs/releasing.md](docs/releasing.md).
 
 ### Windows, from Linux
 

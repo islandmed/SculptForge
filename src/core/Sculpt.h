@@ -36,6 +36,7 @@ enum class BrushType {
     KelvinScale, // pinches (or swells) the surface toward the centre
     KelvinSnake, // multi-scale elastic SnakeHook: pulls tapering horns out along the stroke
     DetailClone, // stamps the VDM brush's map along the stroke, each stamp turned to follow it (Kelvinlet.cpp)
+    Morph,       // pulls the surface toward the Part's morph target, a selection set's shape (core/SelectionSets.h)
     Count
 };
 
@@ -199,7 +200,17 @@ public:
     // started (the stroke stays open). DragRect re-stamps from scratch while dragging.
     void restoreStroke(Mesh& mesh, BVH& bvh);
 
+    // Morph brush (core/SelectionSets.h): the shape it pulls toward at the mesh's current level, from the selection
+    // set the Part names as its morph target. Null when there is none or it doesn't fit the mesh. Worked out on
+    // first use and kept while the set, level and vertex count stay the same (defined in SelectionSets.cpp).
+    const std::vector<glm::vec3>* morphTarget(const Mesh& mesh);
+
 private:
+    std::shared_ptr<const struct SelectionSet> morphSet_;
+    int morphLevel_ = -1;
+    size_t morphVertices_ = 0;
+    std::vector<glm::vec3> morphMapped_;
+    bool morphFits_ = false;
     void dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p);
     void dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const DabParams& p);
     // The Vdm brush (defined in Vdm.cpp); `handedness` -1 for a mirrored pass, so the stamp mirrors exactly.

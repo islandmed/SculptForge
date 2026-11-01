@@ -13,6 +13,19 @@ chapter opens by itself the first time you start a new version; you can always f
 - **New installs start with the SculptForge keys**, and the first start asks what you are coming from (ZBrush,
   Blender, Maya or new to sculpting) to pick the key style. Your saved style is kept; ZBrush's keys are
   **ZBrush-style** in **Preferences > Input**. See [Keyboard and mouse](shortcuts.md#zbrush-style-keys).
+## Version 0.10.5
+
+- **Selection sets** (**Tool > Selection Sets**): store as many named snapshots of a Part's mask, face groups,
+  visibility, vertex paint, UVs and shape as you like, and restore them at any subdivision level, not only the one
+  they were stored at. Combine two sets (union, intersect, subtract), restore one onto the current mask or
+  visibility the same way, or take a quick set from the visible faces. Every step is one undo step, and the sets are
+  saved with the project. See [Selection sets](selection-sets.md).
+- **Morph brush and Morph to Set**: a set with its shape is a morph target. The new **Morph** brush pulls the
+  surface back toward it (<kbd>Alt</kbd> pushes away), and **Morph to Set** blends the whole Part toward it by any
+  amount, within the mask, at any subdivision level.
+- **Sets for pipelines**: `selection_set_*` commands for scripts, `sculptforge-cli` and the AI assistant,
+  `doc.selection_set()` / `doc.set_selection_set()` in Python, `.sfsets` files to move sets between Parts and
+  scenes, and USD exports that carry them as GeomSubsets and primvars (read back on import).
 
 ## Version 0.10.4
 

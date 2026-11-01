@@ -220,6 +220,7 @@ std::string Document::assetName() const {
 }
 
 void Document::replaceMeshUndoable(Mesh m, std::string label) {
+    if (!m.selectionSets) m.selectionSets = mesh.selectionSets; // the Part keeps its sets (restoring checks they fit)
     if (m.multires && !subdivMatches(m)) m.multires.reset();
     if (mesh.multires && !m.multires) {
         // A tool rebuilt the mesh from the current level: the levels go, the undo step keeps them.

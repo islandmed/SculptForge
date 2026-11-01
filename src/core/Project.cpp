@@ -7,6 +7,7 @@
 #include "core/Multires.h"
 
 #include "core/LayerStackIO.h"
+#include "core/SelectionSets.h"
 #include "core/Texture.h"
 #include "core/ThreadPool.h"
 #include "core/ZSpheres.h"
@@ -774,6 +775,54 @@ bool readSubdiv(Reader& r, const Json& sj, Mesh& m, std::string& error, bool wor
     return true;
 }
 
+// Selection Sets (core/SelectionSets.h): `selection_sets` = {"version", "morph_target", "sets": [summary + "data"]},
+// each set one packed u8 blob under subtools/i/sets/. Optional, so no format version bump: older readers ignore it.
+constexpr int kSelectionSetsVersion = 1;
+
+Json writeSelectionSets(Writer& w, const std::string& prefix, const SelectionSetList& list) {
+    Json j = Json::object();
+    j.set("version", kSelectionSetsVersion);
+    if (!list.morphTarget.empty()) j.set("morph_target", list.morphTarget);
+    Json sets = Json::array();
+    for (size_t k = 0; k < list.sets.size(); ++k) {
+        Json one = selectionSetSummary(*list.sets[k]);
+        std::vector<uint8_t> packed = packSelectionSet(*list.sets[k]);
+        const size_t n = packed.size();
+        one.set("data", w.add(prefix + "sets/" + std::to_string(k) + ".bin", Scalar::U8, 1, n, std::move(packed)));
+        sets.push(std::move(one));
+    }
+    j.set("sets", std::move(sets));
+    return j;
+}
+
+// Sets that can't be read (damaged, or from a newer set format) are left out and named in `skipped`; the rest of
+// the project still loads.
+void readSelectionSets(Reader& r, const Json& j, Mesh& m, std::string& skipped) {
+    if (!j.isObject() || !j["sets"].isArray()) return;
+    auto list = std::make_shared<SelectionSetList>();
+    for (const Json& one : j["sets"].items()) {
+        const Json& desc = one["data"];
+        auto it = r.files.find(desc["file"].asString());
+        const double count = desc["count"].asNumber(-1);
+        std::vector<uint8_t> bytes;
+        SelectionSet set;
+        std::string why;
+        const std::string saved = r.error;
+        const bool ok = it != r.files.end() && count >= 0 && double(it->second.size) == count &&
+                        r.bytes(desc, "selection set", size_t(count), bytes) &&
+                        unpackSelectionSet(bytes.data(), bytes.size(), set, why) && list->find(set.name) < 0;
+        r.error = saved;
+        if (!ok) {
+            skipped += (skipped.empty() ? "" : ", ") + ("'" + one["name"].asString() + "'");
+            continue;
+        }
+        list->sets.push_back(std::make_shared<const SelectionSet>(std::move(set)));
+    }
+    list->morphTarget = j["morph_target"].asString();
+    if (list->find(list->morphTarget) < 0) list->morphTarget.clear();
+    if (!list->sets.empty()) m.selectionSets = std::move(list);
+}
+
 // A SubTool read from a project, before it joins the document.
 struct LoadedSubtool {
     std::string name, gozName;
@@ -858,6 +907,8 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
         if (!gozName.empty()) st.set("goz_name", gozName);
         const std::vector<QRemeshGuide>& guides = active ? doc.qremeshGuides : s.qremeshGuides;
         if (!guides.empty()) st.set("qremesh_guides", qremeshGuidesToJson(guides)); // (no format change: optional)
+        if (const Mesh& m = doc.subtoolMesh(i); m.selectionSets && !m.selectionSets->sets.empty())
+            st.set("selection_sets", writeSelectionSets(w, "subtools/" + std::to_string(i) + "/", *m.selectionSets));
         if (const Mesh& m = doc.subtoolMesh(i); !m.zspheres.empty()) { // a ZSphere SubTool (core/ZSpheres.h); optional
             st.set("zspheres", zspheresToJson(m.zspheres));
             if (m.zspherePreview) st.set("zsphere_preview", true);
@@ -963,6 +1014,7 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
 
     // SubTools: version 1 has one mesh at the top level, version 2 a "subtools" list.
     std::deque<LoadedSubtool> subtools; // (stable addresses: BVH threads use them)
+    std::string skippedSets;            // selection sets that couldn't be read
     int activeSubtool = 0;
     if (version < 2) {
         LoadedSubtool& s = subtools.emplace_back();
@@ -986,6 +1038,7 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
             if (!readMesh(r, sj["mesh"], sj["layers"], s.mesh, error, false, false)) return false;
             s.mesh.zspheres = zspheresFromJson(sj["zspheres"]);
             s.mesh.zspherePreview = !s.mesh.zspheres.empty() && sj["zsphere_preview"].asBool(false);
+            readSelectionSets(r, sj["selection_sets"], s.mesh, skippedSets);
             // The BVH builds (on the pool) while the levels and topology load (off it), then the normals.
             s.startBvh();
             r.parallelReads = !s.bvhBuilder.joinable();
@@ -1089,6 +1142,8 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
     doc.selectSubtool(activeSubtool);
     doc.splats = std::move(splats);
     doc.splatsChanged();
+    if (!skippedSets.empty())
+        doc.notice += (doc.notice.empty() ? "" : "; ") + std::string("Selection sets left out (unreadable): ") + skippedSets;
     for (const auto& b : manifest["brushes"].items()) {
         if (!b.isObject()) continue;
         // Brushes the library already has, unchanged, stay library brushes; the rest are the project's own.
