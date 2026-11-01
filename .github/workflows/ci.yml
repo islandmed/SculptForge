@@ -19,6 +19,7 @@ concurrency:
 # maintainer's own branch): pull_request runs, forks included, only restore them (actions/cache/restore), so nothing a
 # pull request builds can end up in another run. GitHub scopes caches by branch as well: a branch reads its own and
 # main's, never another branch's. The release workflow uses no cache at all: release packages build from a clean tree.
+# Keys are ccache-<job>.<commit>: the dot keeps one job's prefix from matching another's (ubuntu-24.04 / ubuntu-24.04-arm).
 # The suite runs as parallel ctest entries (sculptforge_tests is split into shards, CMakeLists.txt), every test as before.
 # The Flatpak bundle check is in flatpak.yml.
 
@@ -77,8 +78,8 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: .ccache
-          key: ccache-${{ matrix.os }}-${{ github.sha }}
-          restore-keys: ccache-${{ matrix.os }}-
+          key: ccache-${{ matrix.os }}.${{ github.sha }}
+          restore-keys: ccache-${{ matrix.os }}.
       - name: NumPy for the Python API test
         run: python -m pip install numpy
       - name: Configure
@@ -103,7 +104,7 @@ jobs:
         uses: actions/cache/save@v5
         with:
           path: .ccache
-          key: ccache-${{ matrix.os }}-${{ github.sha }}
+          key: ccache-${{ matrix.os }}.${{ github.sha }}
       # Every test in one parallel ctest run (UI tests too, where there is a display), so no core idles while the
       # last tests of one group finish.
       - name: Test (C++, Python API, UI tests with Xvfb + Mesa)
@@ -163,8 +164,8 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: .ccache
-          key: ccache-blender-cli-${{ matrix.bpy }}-${{ github.sha }}
-          restore-keys: ccache-blender-cli-${{ matrix.bpy }}-
+          key: ccache-blender-cli-${{ matrix.bpy }}.${{ github.sha }}
+          restore-keys: ccache-blender-cli-${{ matrix.bpy }}.
       - name: bpy and numpy
         run: python -m pip install "bpy==${{ matrix.bpy }}" numpy
       - name: Build sculptforge-cli
@@ -178,7 +179,7 @@ jobs:
         uses: actions/cache/save@v5
         with:
           path: .ccache
-          key: ccache-blender-cli-${{ matrix.bpy }}-${{ github.sha }}
+          key: ccache-blender-cli-${{ matrix.bpy }}.${{ github.sha }}
       - name: Add-on round trip in Blender
         run: python tests/blender/test_in_blender.py -- --cli build/sculptforge-cli
       - name: Add-on exchange code and package
@@ -216,8 +217,8 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: .ccache
-          key: ccache-${{ matrix.cy }}-${{ github.sha }}
-          restore-keys: ccache-${{ matrix.cy }}-
+          key: ccache-${{ matrix.cy }}.${{ github.sha }}
+          restore-keys: ccache-${{ matrix.cy }}.
       - name: Python 3.13 (python-build-standalone via uv)
         run: |
           curl -LsSf https://astral.sh/uv/0.9.5/install.sh | sh
@@ -239,7 +240,7 @@ jobs:
         uses: actions/cache/save@v5
         with:
           path: .ccache
-          key: ccache-${{ matrix.cy }}-${{ github.sha }}
+          key: ccache-${{ matrix.cy }}.${{ github.sha }}
       - name: Test
         run: ctest --test-dir build --output-on-failure -LE ui -j 4
       - name: Check binary compatibility (glibc <= ${{ matrix.glibc }})
