@@ -9,6 +9,9 @@ All notable changes to SculptForge are listed here. The format follows
 ### Added
 - Preferences > Tablet > Mouse mode (relative) (#54): for tablets whose driver is set to mouse mode, the pen moves
   the cursor by how far it moves, like a mouse.
+- Alternate smooth (#40, as in ZBrush): start a stroke with Shift held, then let go of Shift while still pressing,
+  and the rest of the stroke smooths without shrinking the form (a Taubin smooth). Brush > Smooth keeps volume
+  makes that the Shift / Smooth brush smooth (letting go of Shift then switches to the plain one).
 - Ctrl+drag on the background with MaskPen draws a mask rectangle while dragging (#48) and masks what it covers;
   one that covers none of the model clears the mask, as before (and as in ZBrush, without DynaMesh's remesh).
 

@@ -59,6 +59,9 @@ struct DabParams {
     glm::vec3 alphaUp{0.0f, 1.0f, 0.0f}; // world direction of the alpha's top edge (screen up, or rotated)
     float focal = 0.0f;                  // ZBrush Focal Shift, -1..1 (see brushFalloff); recipes keep their own tip
     const VectorDisplacement* vdm = nullptr; // the Vdm brush's map (null = the built-in Horn); top edge = alphaUp
+    // Smooth: keep the volume (#40). A Taubin step, one shrink then one inflate, removes bumps as the plain
+    // (Laplacian) smooth does without shrinking the form. Not on micro levels (they smooth plainly).
+    bool keepVolume = false;
 };
 
 struct Symmetry {
@@ -252,6 +255,10 @@ private:
     bool draft_ = false;                     // this stroke is a draft
     std::vector<uint32_t> draftLeaves_;      // the BVH leaves its dabs touched (flushDraft)
     std::vector<glm::vec3> scratch_;
+    // Smooth with keepVolume: each brush vertex's shrunk position, and (vertex, index) sorted to look it up.
+    void taubinShrink(const Mesh& mesh);
+    std::vector<glm::vec3> shrunk_;
+    std::vector<std::pair<uint32_t, uint32_t>> shrunkIndex_;
     std::vector<float> weights_, influence_;
     std::vector<uint8_t> firstTouch_;
     std::vector<uint32_t> blockFirst_;

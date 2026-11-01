@@ -1371,6 +1371,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     strokeBrush_ = activeBrush();
     straight_ = {};
     straight_.shiftAtStart = (inputMods() & SDL_KMOD_SHIFT) != 0;
+    strokeAltSmooth_ = false;
     strokeInvert_ = invertToggle_ != (((inputMods() & SDL_KMOD_ALT) != 0) || (erasing() && eraserAction() == PenAction::Invert));
     // Shift still smooths geometry while the Paint brush is active (ZBrush behaviour).
     strokePaint_ = strokeBrush_ != BrushType::Smooth && (paintMode_ || paintRgb_);
@@ -1455,6 +1456,12 @@ void App::strokeTo(float x, float y) {
         pointerLatest_ = glm::vec2(x, y);
         pointerLatestAt_ = double(SDL_GetTicksNS()) * 1e-9;
         penPredictor_.add(pointerLatest_, pointerLatestAt_);
+    }
+    // ZBrush's alternate smooth (#40): Shift let go while the stroke it began goes on.
+    if (strokeBrush_ == BrushType::Smooth && straight_.shiftAtStart && !strokeAltSmooth_ && !strokeMask_ &&
+        !(inputMods() & SDL_KMOD_SHIFT)) {
+        strokeAltSmooth_ = true;
+        status_ = smoothKeepVolume_ ? "Smooth: plain (Shift let go)" : "Smooth: keeping volume (Shift let go)";
     }
     if (maskClickPending_) { // Ctrl+press on the model: a drag past the click slop paints the mask after all
         if (std::hypot(x - maskClickX_, y - maskClickY_) < 4.0f) return;
@@ -1619,6 +1626,7 @@ void App::dabAt(float x, float y, float pressure) {
                cam.worldPerPixel(hit.position, dabView_ ? dabView_->canvas.h : canvasHeight()) * dabRadiusScale_;
     // Smooth keeps its own Z Intensity (ZBrush), whether picked or held with Shift.
     p.strength = (st.brush == BrushType::Smooth ? st.smoothStrength : st.strength) * dabStrengthScale_;
+    p.keepVolume = st.brush == BrushType::Smooth && st.smoothKeepVolume;
     p.pressure = st.pressureStrength ? pressure : 1.0f;
     p.invert = st.invert;
     p.frontFacesOnly = st.frontFacesOnly;

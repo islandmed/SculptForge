@@ -16,7 +16,8 @@ keys and gestures by default; where it has habits of its own, they are kept as a
   with ZBrush's RightClick Navigation turned on, over the model too. <kbd>F</kbd> frames the model. See
   [Navigating the view](navigation.md).
 - **Sculpting modifiers.** <kbd>Alt</kbd> swaps Zadd and Zsub, <kbd>Shift</kbd> smooths (Smooth keeps its own Z
-  Intensity), <kbd>Shift</kbd> pressed after a stroke starts draws a straight line.
+  Intensity; let go of <kbd>Shift</kbd> mid-stroke for the alternate smooth that keeps the volume),
+  <kbd>Shift</kbd> pressed after a stroke starts draws a straight line.
 - **Brush keys.** <kbd>B</kbd> then two letters, with ZBrush's letters: <kbd>B</kbd> <kbd>S</kbd> <kbd>T</kbd>
   Standard, <kbd>B</kbd> <kbd>C</kbd> <kbd>B</kbd> ClayBuildup, <kbd>B</kbd> <kbd>D</kbd> <kbd>S</kbd>
   DamStandard, <kbd>B</kbd> <kbd>M</kbd> <kbd>V</kbd> Move, <kbd>B</kbd> <kbd>I</kbd> <kbd>N</kbd> Inflate,

@@ -72,6 +72,8 @@
 //                            moved_masked (masked vertices that moved), mask_soft (vertices partly masked),
 //                            selection_shown (1 while a rectangle / lasso selection is drawn), symmetry_x,
 //                            tablet_mouse_mode (Preferences > Tablet > Mouse mode),
+//                            smooth_keep_volume (Brush > Smooth keeps volume), stroke_keep_volume (1 when Smooth
+//                            dabs keep the volume now: the option, flipped by letting go of Shift mid-stroke),
 //                            moved_out (summed movement along the snapshot's normals: > 0 out, < 0 in),
 //                            pen_pressure (raw), brush_pressure (after the curve; 1 for the mouse),
 //                            stroking (1 while a stroke is open), cursor_x / cursor_y (the brush cursor, pixels),
@@ -401,6 +403,8 @@ double Demo::query(const std::string& name, bool& known) const {
     }
     // ZBrush feel (Input.cpp): the intensities and Focal Shift as shown (0-100, -100..100).
     if (name == "z_intensity") return std::round(app_.strength_ * 100.0f);
+    if (name == "smooth_keep_volume") return app_.smoothKeepVolume_ ? 1.0 : 0.0;
+    if (name == "stroke_keep_volume") return app_.dabSettings().smoothKeepVolume ? 1.0 : 0.0; // (Smooth's dabs)
     if (name == "smooth_intensity") return std::round(app_.smoothStrength_ * 100.0f);
     if (name == "rgb_intensity") return std::round(app_.rgbIntensity_ * 100.0f);
     if (name == "focal_shift") return std::round(app_.focalShift_ * 100.0f);

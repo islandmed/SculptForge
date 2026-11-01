@@ -159,6 +159,20 @@ Smooth keeps a Z Intensity of its own, as in ZBrush, so a gentle Standard stroke
 speed. Hold <kbd>Shift</kbd> (or pick the Smooth brush) and the Z Intensity slider shows **Smooth Z Intensity**:
 change it there, or hold <kbd>Shift</kbd> and press <kbd>U</kbd>. It starts at 50.
 
+### Smooth that keeps the volume
+
+The plain smooth evens out bumps by pulling each point towards its neighbours, so with every pass the form
+shrinks a little too: a cheek flattens, a sphere gets smaller. The other smooth keeps the volume: it removes the
+bumps but leaves the form where it is (a Taubin smooth, one step in and a slightly larger one back out).
+
+- **Alternate smooth**, as in ZBrush: start a stroke with <kbd>Shift</kbd> held, then let go of <kbd>Shift</kbd>
+  while still pressing. The rest of the stroke uses the other smooth, and the status line says which.
+- **Smooth keeps volume** in the **Brush** palette makes the volume-keeping smooth the one <kbd>Shift</kbd> and
+  the Smooth brush use; letting go of <kbd>Shift</kbd> mid-stroke then switches to the plain one. Saved with the
+  project.
+
+On a micro level (see [Micro levels](micro-levels.md)) Smooth is always the plain one for now.
+
 ![The Draw palette](images/draw-palette.jpg)
 
 ## Sculpt, Paint, Zadd, Zsub, Rgb and Front
