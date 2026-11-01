@@ -1,0 +1,71 @@
+# Attachment guard: programs and archives attached to issues, discussions or comments are hidden at once.
+# Only builds from our own release pipeline (tagged source, tested, checksummed) are offered for download. A post or
+# comment by someone outside the project that links an executable, installer, script or archive is closed and
+# locked (issues, discussions) or hidden (comments), with a note pointing to the official builds. Images and plain
+# text attachments (logs, screenshots) are left alone. The maintainer deletes the post afterwards.
+# No checkout, no secrets: only GITHUB_TOKEN with issues and discussions write, and the posted text is read from the
+# event payload inside the script (never interpolated into a shell).
+name: Attachment guard
+
+on:
+  issues:
+    types: [opened, edited]
+  issue_comment:
+    types: [created, edited]
+  discussion:
+    types: [created, edited]
+  discussion_comment:
+    types: [created, edited]
+
+permissions:
+  issues: write
+  discussions: write
+
+jobs:
+  guard:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const p = context.payload;
+            const item = p.comment || p.discussion || p.issue;
+            if (!item) return;
+            if (['OWNER', 'MEMBER', 'COLLABORATOR'].includes(item.author_association)) return;
+            const ext = 'zip|7z|rar|tar|gz|tgz|xz|bz2|zst|exe|msi|msix|appx|dll|bat|cmd|ps1|vbs|scr|com|' +
+                        'dmg|pkg|app|appimage|deb|rpm|flatpak|snap|apk|ipa|jar|sh|run|bin|so|dylib|iso|img';
+            const re = new RegExp(String.raw`https://(?:github\.com/user-attachments/files|` +
+                                  String.raw`github\.com/[^/\s]+/[^/\s]+/files)/\S+?\.(?:${ext})\b`, 'i');
+            if (!re.test(item.body || '')) return;
+
+            const note = 'Thanks for sharing. To keep downloads safe, SculptForge only offers builds from its own ' +
+              'release pipeline (built from tagged source, tested and published with checksums), so posts with ' +
+              'attached programs or archives are hidden automatically. The official downloads are here: ' +
+              'https://github.com/islandmed/SculptForge/releases/latest. If something is missing for your ' +
+              'platform, please open an issue asking for it. -- the SculptForge developer';
+            const gql = (q, v) => github.graphql(q, v);
+
+            if (p.comment) { // a comment on an issue or a discussion: hide it
+              await gql(`mutation($id:ID!){minimizeComment(input:{subjectId:$id,classifier:SPAM}){clientMutationId}}`,
+                        {id: p.comment.node_id});
+              core.notice(`Hid comment ${p.comment.html_url}`);
+              return;
+            }
+            if (p.discussion) {
+              const id = p.discussion.node_id;
+              await gql(`mutation($id:ID!,$b:String!){addDiscussionComment(input:{discussionId:$id,body:$b}){clientMutationId}}`,
+                        {id, b: note});
+              await gql(`mutation($id:ID!){closeDiscussion(input:{discussionId:$id,reason:OUTDATED}){clientMutationId}}`,
+                        {id});
+              await gql(`mutation($id:ID!){lockLockable(input:{lockableId:$id,lockReason:SPAM}){clientMutationId}}`,
+                        {id});
+              core.notice(`Closed and locked discussion ${p.discussion.html_url}`);
+              return;
+            }
+            const {owner, repo} = context.repo;
+            const issue_number = p.issue.number;
+            await github.rest.issues.createComment({owner, repo, issue_number, body: note});
+            await github.rest.issues.update({owner, repo, issue_number, state: 'closed', state_reason: 'not_planned'});
+            await github.rest.issues.lock({owner, repo, issue_number, lock_reason: 'spam'});
+            core.notice(`Closed and locked issue ${p.issue.html_url}`);
