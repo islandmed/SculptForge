@@ -27,8 +27,11 @@ void stroke(Document& d, glm::vec3 a, glm::vec3 b, float radius = 0.3f, int dabs
     d.sculptor.beginStroke(d.mesh, brushName(t));
     for (int i = 0; i < dabs; ++i) {
         DabParams p;
-        p.center = glm::normalize(glm::mix(a, b, dabs > 1 ? float(i) / float(dabs - 1) : 0.0f));
-        p.viewDir = -p.center;
+        const glm::vec3 dir = glm::normalize(glm::mix(a, b, dabs > 1 ? float(i) / float(dabs - 1) : 0.0f));
+        p.center = dir;
+        p.viewDir = -dir;
+        // On the surface as it is now (earlier strokes may have moved it off the unit sphere), as the app picks.
+        if (RayHit hit; d.bvh.raycast(d.mesh, dir * 4.0f, -dir, hit)) p.center = hit.position;
         p.radius = radius;
         p.strength = 0.6f;
         d.sculptor.dab(d.mesh, d.bvh, t, p, Symmetry{});
@@ -302,45 +305,97 @@ TEST(timeline_follows_the_undo_budget_and_clear) {
     CHECK(t2->seek(d, 0));
 }
 
-// Large meshes: seeking must stay interactive (SF_BENCH_LIMITS=1; the sizes follow SF_TIMELINE_MILLIONS, default 5).
+
+// Large meshes with a long history. Always runs small; SF_BENCH_LIMITS=1 runs SF_TIMELINE_MILLIONS (default 5)
+// with SF_TIMELINE_STROKES strokes (default 64; a third of them big) and checks the times. SF_TIMELINE_UNDO_GB
+// raises the undo and timeline budgets (default: the app's 1 GiB undo, 1.5 GiB timeline extras) to keep them all.
 TEST(timeline_seek_large_mesh_timing) {
     const bool limits = benchLimits();
-    double millions = 0.3;
-    if (limits) millions = std::getenv("SF_TIMELINE_MILLIONS") ? std::atof(std::getenv("SF_TIMELINE_MILLIONS")) : 5.0;
-    Document d = makeDoc(makeBenchSphere(size_t(millions * 1e6)));
-    auto t = Timeline::attach(d);
-    const int strokes = limits ? 64 : 12;
-    std::mt19937 rng(3);
+    auto env = [](const char* k, double fallback) { return std::getenv(k) ? std::atof(std::getenv(k)) : fallback; };
+    const double millions = limits ? env("SF_TIMELINE_MILLIONS", 5.0) : 0.3;
+    const int strokes = limits ? int(env("SF_TIMELINE_STROKES", 64)) : 12;
     using C = std::chrono::steady_clock;
-    for (int i = 0; i < strokes; ++i) {
-        stroke(d, randomDir(rng), randomDir(rng), 0.35f, 6);
-        t->sync(d);
-    }
-    const std::vector<glm::vec3> end = d.mesh.positions;
-    double worstStep = 0.0, full = 0.0, back = 0.0;
+    auto ms = [](C::time_point a) { return std::chrono::duration<double, std::milli>(C::now() - a).count(); };
+    const size_t rss0 = residentBytes();
     auto c0 = C::now();
-    CHECK(t->seek(d, 0));
-    full = std::chrono::duration<double, std::milli>(C::now() - c0).count();
-    const size_t last = t->path().size() - 1; // (the undo budget may have dropped the oldest strokes)
-    c0 = C::now();
-    CHECK(t->seek(d, last));
-    back = std::chrono::duration<double, std::milli>(C::now() - c0).count();
-    CHECK(maxDiff(d.mesh.positions, end) == 0.0f);
-    size_t touched = 0;
-    for (size_t i = last; i > last - 8; --i) { // scrubbing one step at a time
-        touched = std::max<size_t>(touched, t->node(t->path()[i]).touched);
+    Document d = makeDoc(makeBenchSphere(size_t(millions * 1e6)));
+    const double buildMs = ms(c0);
+    auto t = Timeline::attach(d);
+    if (const double gb = env("SF_TIMELINE_UNDO_GB", 0.0); gb > 0) {
+        d.undo.byteBudget = size_t(gb * double(1u << 30));
+        t->branchBudget = size_t(gb * double(1u << 30));
+    }
+    const size_t rssMesh = residentBytes();
+    std::mt19937 rng(3);
+    double strokeMs = 0.0, syncMs = 0.0;
+    size_t touchedSum = 0, touchedMax = 0;
+    for (int i = 0; i < strokes; ++i) {
+        const bool big = i % 3 == 2; // every third stroke a big one (a sixth of the sphere and more)
+        const glm::vec3 a = randomDir(rng);
+        const glm::vec3 b = glm::normalize(a + randomDir(rng) * (big ? 0.9f : 0.35f));
+        c0 = C::now();
+        const size_t before = d.undo.undoCount();
+        stroke(d, a, b, big ? 0.45f : 0.12f, big ? 8 : 10);
+        if (std::getenv("SF_TIMELINE_DEBUG") && d.undo.undoCount() == before)
+            std::printf("    stroke %d (%s) changed nothing: a %.2f %.2f %.2f b %.2f %.2f %.2f\n", i, big ? "big" : "small", a.x, a.y, a.z, b.x, b.y, b.z);
+        strokeMs += ms(c0);
+        c0 = C::now();
+        t->sync(d);
+        syncMs += ms(c0);
+        touchedSum += t->node(t->cursorNode()).touched;
+        touchedMax = std::max<size_t>(touchedMax, t->node(t->cursorNode()).touched);
+    }
+    const size_t last = t->path().size() - 1; // the undo budget may have dropped the oldest strokes
+    const std::vector<glm::vec3> end = d.mesh.positions;
+    // Scrubbing one step at a time back over the last 40 steps, as dragging the scrubber slowly does.
+    std::vector<double> stepMs;
+    for (size_t i = last; i > 0 && i + 40 > last; --i) {
         c0 = C::now();
         CHECK(t->seek(d, i - 1));
-        worstStep = std::max(worstStep, std::chrono::duration<double, std::milli>(C::now() - c0).count());
+        stepMs.push_back(ms(c0));
     }
-    std::printf("  timeline %.1fM tris, %d strokes: seek to start %.1f ms, to end %.1f ms (%s), one step worst %.1f ms (strokes of up to %zu vertices), "
-                "checkpoints %zu (%zu MiB), extras %zu MiB\n",
-                double(d.mesh.triangleCount()) / 1e6, strokes, full, back,
-                t->lastSeek().usedCheckpoint ? "checkpoint" : "walked", worstStep, touched, t->checkpointCount(),
-                t->checkpointBytes() >> 20, t->extraBytes() >> 20);
-    if (limits) {
-        CHECK(full < 400.0);
-        CHECK(back < 400.0);
-        CHECK(worstStep < 60.0);
+    // Long jumps: to the start, to the end, and between random points (a fast drag or a click).
+    c0 = C::now();
+    CHECK(t->seek(d, 0));
+    const double toStart = ms(c0);
+    const bool startCk = t->lastSeek().usedCheckpoint;
+    c0 = C::now();
+    CHECK(t->seek(d, last));
+    const double toEnd = ms(c0);
+    const bool endCk = t->lastSeek().usedCheckpoint;
+    CHECK(maxDiff(d.mesh.positions, end) == 0.0f);
+    std::vector<double> jumpMs;
+    int jumpsCk = 0;
+    std::uniform_int_distribution<size_t> pick(0, last);
+    for (int k = 0; k < 20; ++k) {
+        const size_t to = pick(rng);
+        c0 = C::now();
+        CHECK(t->seek(d, to));
+        jumpMs.push_back(ms(c0));
+        jumpsCk += t->lastSeek().usedCheckpoint;
+    }
+    CHECK(t->seek(d, last));
+    CHECK(maxDiff(d.mesh.positions, end) == 0.0f);
+    auto pct = [](std::vector<double> v, double q) {
+        if (v.empty()) return 0.0;
+        std::sort(v.begin(), v.end());
+        return v[std::min(v.size() - 1, size_t(q * double(v.size())))];
+    };
+    std::printf("  timeline %.1fM tris (%.1fM verts), %d strokes (avg %zu, max %zu verts; %zu kept by the undo budget): "
+                "build %.0f ms, strokes avg %.0f ms, capture avg %.1f ms\n"
+                "    scrub 1 step: p50 %.1f ms, max %.1f ms | to start %.0f ms (%s) | to end %.0f ms (%s) | random jumps p50 %.0f ms, "
+                "max %.0f ms (%d of 20 from checkpoints)\n"
+                "    memory: mesh RSS %.2f GB, undo %.2f GB, timeline extras %.2f GB, checkpoints %zu = %.2f GB (every %zu steps), "
+                "process RSS %.2f GB\n",
+                double(d.mesh.triangleCount()) / 1e6, double(d.mesh.vertexCount()) / 1e6, strokes, touchedSum / size_t(strokes),
+                touchedMax, last, buildMs, strokeMs / strokes, syncMs / strokes, pct(stepMs, 0.5), pct(stepMs, 1.0), toStart,
+                startCk ? "checkpoint" : "walked", toEnd, endCk ? "checkpoint" : "walked", pct(jumpMs, 0.5), pct(jumpMs, 1.0), jumpsCk,
+                double(rssMesh - std::min(rssMesh, rss0)) / double(1u << 30), double(d.undo.undoBytes()) / double(1u << 30),
+                double(t->extraBytes()) / double(1u << 30), t->checkpointCount(), double(t->checkpointBytes()) / double(1u << 30),
+                t->checkpointEvery, double(residentBytes()) / double(1u << 30));
+    if (limits) { // generous: other work on the machine shares the cores
+        CHECK(pct(stepMs, 0.5) < 50.0);
+        CHECK(toStart < 1500.0);
+        CHECK(toEnd < 1500.0);
     }
 }

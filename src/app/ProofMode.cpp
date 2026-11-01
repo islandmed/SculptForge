@@ -309,7 +309,7 @@ struct PhaseSpec {
 struct PhaseResult {
     std::string name;
     float radiusPx = 0;
-    double seconds = 0, pathPx = 0;
+    double seconds = 0, pathPx = 0, releaseMs = 0; // releaseMs: lifting the pen (the dabs still queued, the undo step)
     size_t dabs = 0, samples = 0;
     std::vector<double> frameMs, lagMs, lagPx;
 };
@@ -609,7 +609,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         r.phases.push_back({});
         r.phases.back().name = spec.name;
         r.phases.back().radiusPx = spec.radiusPx;
-        p.stageStart = now;
+        p.stageStart = p.lastFrame = nowSeconds(); // (not counting what the last phase's release cost)
         p.samples.clear();
         p.dabs.clear();
         p.sent = 1;
@@ -735,7 +735,9 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             for (; p.sent < p.samples.size(); ++p.sent)
                 onMouseMove(p.samples[p.sent].p.x, p.samples[p.sent].p.y, 0.0f, 0.0f, false);
             if (u >= 1.0) {
+                const double up = nowSeconds();
                 onMouseUp(); // places the dabs still waiting, ends the stroke (undo step, timeline)
+                ph.releaseMs = (nowSeconds() - up) * 1000.0;
                 p.pressed = false;
                 strokeProbe_ = nullptr;
                 ph.dabs = p.dabs.size();
@@ -825,6 +827,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                     j.set("dabs", double(ph.dabs));
                     j.set("pointer_samples", double(ph.samples));
                     j.set("path_px", std::round(ph.pathPx));
+                    j.set("release_ms", std::round(ph.releaseMs * 10) / 10);
                     j.set("pointer_speed_px_s", ph.seconds > 0 ? std::round(ph.pathPx / ph.seconds) : 0.0);
                 }
                 phases.push(j);
@@ -848,7 +851,8 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                 const Percentiles f = percentiles(ph.frameMs), l = percentiles(ph.lagMs), lp = percentiles(ph.lagPx);
                 std::printf("  %-5s %-19s %6.1f fps  frame p50 %5.1f p95 %5.1f p99 %5.1f ms", r.label.c_str(), ph.name.c_str(),
                             ph.seconds > 0 ? double(ph.frameMs.size()) / ph.seconds : 0.0, f.p50, f.p95, f.p99);
-                if (ph.radiusPx > 0) std::printf("  trails %4.0f ms / %4.0f px (p95 %4.0f ms / %4.0f px)", l.p50, lp.p50, l.p95, lp.p95);
+                if (ph.radiusPx > 0)
+                    std::printf("  trails %4.0f ms / %4.0f px (p95 %4.0f ms / %4.0f px), release %.0f ms", l.p50, lp.p50, l.p95, lp.p95, ph.releaseMs);
                 std::printf("\n");
             }
         std::printf("Result: %s%s%s\n", p.jsonPath.c_str(), p.video ? "\nVideo: " : "", p.video ? p.videoPath.c_str() : "");

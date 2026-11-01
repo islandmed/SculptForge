@@ -78,6 +78,41 @@ many small triangles at once; it then spreads the work over several dabs. Undoin
 connections, which takes about a tenth of a second per million triangles. `sculptforge --bench --bench-dyntopo`
 measures it on your machine.
 
+## Proof mode: see it for yourself
+
+**Help > Benchmark** (or `sculptforge --benchmark`) shows how responsive sculpting is on your own computer,
+measured the way it feels rather than the way a developer measures it. For each size, 5, 20 and 33 million
+triangles (and 100 million when there is enough free memory), it builds a sphere with subdivision levels, then
+plays a scripted pen stroke into the same code your mouse and pen go through, 240 pointer samples a second: a
+figure eight with a 60-pixel brush, the same with a 240-pixel brush, then a turn of the view. It replaces the
+scene, so save your work first; <kbd>Esc</kbd> stops it.
+
+While it runs, a panel in the corner shows:
+
+- **fps** and the **frame time**: the median (p50), and the 95th and 99th percentile, the slow frames you
+  would notice as a hitch.
+- **Stroke trails pointer**: how far the stroke on screen is behind the pointer, in milliseconds (from the
+  pointer sample the newest drawn dab belongs to until that frame is handed to the display; the display's
+  own refresh comes on top) and in pixels along the path.
+- The memory SculptForge uses.
+
+Vertical sync is off during the run so frame times aren't capped at the display's rate (tick **Keep vertical
+sync on** to measure with it). At the end a table sums up each mesh and phase, and two files are written: a video
+of the run with the panel in it (needs [ffmpeg](https://ffmpeg.org/); recording costs a millisecond or two per
+frame) and a JSON file with the results, your processor, graphics card, memory, operating system and the
+SculptForge version and commit. In the app they go to the `benchmarks` folder in SculptForge's settings folder
+(**Open folder** in the results); from the command line, to the current folder:
+
+```
+sculptforge --benchmark --benchmark-sizes 5,20,33 --benchmark-out mine.json --benchmark-video mine.mp4
+```
+
+`--benchmark-no-video` skips the video, `--benchmark-vsync` keeps vertical sync on, `--benchmark-seconds 6`
+sets the length of each stroke, and `--size 1920x1080` the window (a tiling window manager may choose another
+size; the result records the one used). Share a result on the
+[benchmarks page](https://sculptforge.app/benchmarks/) as its
+[format description](https://github.com/islandmed/SculptForge/blob/main/docs/benchmark.md) explains.
+
 ## Measuring your own machine
 
 `sculptforge --bench` builds a sphere at 4, 16 and 32 million triangles and measures every brush, undo,
