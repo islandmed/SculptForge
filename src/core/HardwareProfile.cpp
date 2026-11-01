@@ -341,9 +341,10 @@ uint64_t usableGpuMemoryMB(const HardwareInfo& hw) {
     switch (hw.gpuKind) {
     case GpuKind::Discrete: return hw.vramMB;
     case GpuKind::Unified:
-        // Apple GPUs may use about two thirds of the memory (Metal's recommended working set); a reported figure
-        // (CGL, GLX_MESA_query_renderer) already is that.
-        return hw.vramMB ? hw.vramMB : hw.ramMB * 2 / 3;
+        // Apple GPUs may use about two thirds of the memory (Metal's recommended working set). Drivers report
+        // anything from that to all of the RAM (Asahi's GL_NVX_gpu_memory_info): never more than two thirds.
+        if (hw.ramMB == 0) return hw.vramMB;
+        return hw.vramMB ? std::min(hw.vramMB, hw.ramMB * 2 / 3) : hw.ramMB * 2 / 3;
     case GpuKind::Integrated: return std::max(hw.vramMB, hw.ramMB / 2); // the carve-out plus shared system memory
     case GpuKind::Software: return hw.ramMB / 4;
     case GpuKind::Unknown: break;
@@ -371,7 +372,11 @@ TierLimits limits(ProfileTier t) {
 // Thresholds on measured triangle throughput (million small triangles per second, trivial shading).
 constexpr double kSoftwareBelowM = 60.0, kWorkstationFromM = 1000.0, kMonsterFromM = 5000.0;
 
-ProfileTier tierFromMeasurements(const HardwareInfo& hw, const Calibration& c, std::string& why) {
+// A re-calibration of the same GPU keeps its previous tier when the new measurement lands within this factor of
+// the boundary between the two (measurements vary a little from run to run, more on a busy machine).
+constexpr double kStickyBand = 1.15;
+
+ProfileTier tierFromMeasurements(const HardwareInfo& hw, const Calibration& c, const ProfileTier* previous, std::string& why) {
     char buf[256];
     ProfileTier t;
     if (hw.gpuKind == GpuKind::Software) {
@@ -385,6 +390,16 @@ ProfileTier tierFromMeasurements(const HardwareInfo& hw, const Calibration& c, s
         else t = ProfileTier::Monster;
         std::snprintf(buf, sizeof buf, "%.0fM triangles/s", c.trianglesPerSecondM);
         why = buf;
+        if (previous && std::abs(int(*previous) - int(t)) == 1) {
+            const ProfileTier upper = int(*previous) > int(t) ? *previous : t;
+            const double boundary = upper == ProfileTier::Laptop ? kSoftwareBelowM
+                                    : upper == ProfileTier::Workstation ? kWorkstationFromM
+                                                                        : kMonsterFromM;
+            if (c.trianglesPerSecondM >= boundary / kStickyBand && c.trianglesPerSecondM <= boundary * kStickyBand) {
+                t = *previous;
+                why += ", kept " + std::string(tierName(t)) + " (close to the boundary)";
+            }
+        }
     } else {
         // Nothing measured: a conservative guess from the memory sizes.
         const uint64_t gpu = usableGpuMemoryMB(hw);
@@ -468,13 +483,15 @@ bool ProfileOverrides::any() const {
            maxTextureSize || maxSubdivisionTriangles || microTriangleLimit || threads || targetFps || !governor;
 }
 
-HardwareProfile mapProfile(const HardwareInfo& hardware, const Calibration& calibration, const ProfileOverrides& overrides) {
+HardwareProfile mapProfile(const HardwareInfo& hardware, const Calibration& calibration, const ProfileOverrides& overrides,
+                           const ProfileTier* previousTier) {
     HardwareProfile p;
     p.hardware = hardware;
     p.calibration = calibration;
     p.overrides = overrides;
     std::string why;
-    p.tier = tierFromMeasurements(hardware, calibration, why);
+    p.tier = tierFromMeasurements(hardware, calibration, previousTier, why);
+    p.measuredTier = p.tier;
     ProfileTier forced;
     if (!overrides.tier.empty() && tierFromName(overrides.tier, forced) && forced != p.tier) {
         why += std::string("; set to ") + tierName(forced) + " by hand";
@@ -636,6 +653,7 @@ Json hardwareProfileToJson(const HardwareProfile& p) {
     j.set("hardware", hardwareJson(p.hardware));
     j.set("calibration", calibrationToJson(p.calibration));
     j.set("tier", tierName(p.tier));
+    j.set("measured_tier", tierName(p.measuredTier));
     j.set("settings", settingsJson(p.settings));
     j.set("overrides", overridesJson(p.overrides));
     return j;
@@ -650,8 +668,11 @@ bool hardwareProfileFromJson(const Json& j, HardwareProfile& out) {
     hardwareFromJson(j["hardware"], h);
     calibrationFromJson(j["calibration"], c);
     if (j["overrides"].isObject()) overridesFromJson(j["overrides"], o);
-    // The tier and settings are mapped again (not read back), so they always follow this version's mapping.
-    out = mapProfile(h, c, o);
+    // The tier and settings are mapped again (not read back), so they always follow this version's mapping; the
+    // stored tier only settles a measurement close to a boundary, as when it was saved.
+    ProfileTier stored;
+    const bool hasStored = tierFromName(j["measured_tier"].asString(), stored);
+    out = mapProfile(h, c, o, hasStored ? &stored : nullptr);
     return true;
 }
 
@@ -1002,7 +1023,8 @@ void registerHardwareProfileCommands(CommandRegistry& registry) {
                           c.cpuOnly = c.trianglesPerSecondM <= 0.0;
                           calibrateCpu(c, quick);
                           c.durationMs = msSince(t);
-                          p = mapProfile(h, c, hadCache ? cached.overrides : ProfileOverrides{});
+                          const bool sameGpu = hadCache && !h.glRenderer.empty();
+                          p = mapProfile(h, c, hadCache ? cached.overrides : ProfileOverrides{}, sameGpu ? &cached.measuredTier : nullptr);
                       }
                       if (hadCache && !gpu) p.overrides = cached.overrides;
                       saveHardwareProfile(hardwareProfilePath(), p, error); // best effort: the JSON is the answer

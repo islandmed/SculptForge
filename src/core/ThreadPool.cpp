@@ -21,8 +21,22 @@ ThreadPool::~ThreadPool() {
     for (auto& t : workers_) t.join();
 }
 
+namespace {
+std::atomic<int> g_sharedThreads{0};
+std::atomic<bool> g_sharedMade{false};
+} // namespace
+
+bool ThreadPool::setSharedThreadCount(int threads) {
+    g_sharedThreads.store(std::clamp(threads, 0, 64));
+    return !g_sharedMade.load();
+}
+
 ThreadPool& ThreadPool::shared() {
-    static ThreadPool pool(int(std::clamp(std::thread::hardware_concurrency(), 1u, 16u)));
+    static ThreadPool pool([] {
+        g_sharedMade.store(true);
+        const int wanted = g_sharedThreads.load();
+        return wanted > 0 ? wanted : int(std::clamp(std::thread::hardware_concurrency(), 1u, 16u));
+    }());
     return pool;
 }
 

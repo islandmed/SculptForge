@@ -8,6 +8,7 @@
 #include "app/Ui.h"
 
 #include "core/Benchmark.h"
+#include "core/HardwareProfile.h"
 #include "core/ThreadPool.h"
 
 #include <chrono>
@@ -19,11 +20,13 @@ namespace sf {
 namespace {
 
 constexpr const char* kPath = "Preferences > Performance";
-// Scenes this big draw without antialiasing while the view moves (with Fast Navigation on). UI tests lower it
-// with the environment variable SF_FAST_NAVIGATION_TRIANGLES, so they needn't build a huge mesh.
-size_t fastNavigationTriangles() {
+// Scenes this big draw without antialiasing while the view moves (with Fast Navigation on): the hardware profile's
+// motion proxy threshold, which the frame governor adjusts (core/HardwareProfile.h), else 10 million. UI tests
+// set it with the environment variable SF_FAST_NAVIGATION_TRIANGLES, so they needn't build a huge mesh.
+size_t fastNavigationTriangles(bool governed) {
     const char* v = std::getenv("SF_FAST_NAVIGATION_TRIANGLES");
-    return v && *v ? size_t(std::strtoull(v, nullptr, 10)) : size_t(10'000'000);
+    if (v && *v) return size_t(std::strtoull(v, nullptr, 10));
+    return governed ? size_t(motionProxyThreshold()) : size_t(10'000'000);
 }
 
 std::string megabytes(size_t bytes) {
@@ -84,6 +87,7 @@ void App::registerPerformanceUiActions() {
         [] { return !ThreadPool::shared().serial(); },
         "Run brushes, normal and BVH updates and project saving on every core. Turn it off only to compare speeds "
         "or rule it out when troubleshooting: the results are the same either way.");
+    registerPerformanceProfileUiActions(); // Re-calibrate, the frame governor (PanelPerformanceProfile.cpp)
 }
 
 void App::applyPerformancePrefs() { ThreadPool::shared().setSerial(!uiPrefs_.multithreading); }
@@ -102,7 +106,9 @@ int App::viewSamples() {
     size_t triangles = 0;
     for (int i = 0; i < doc_.subtoolCount(); ++i)
         if (doc_.subtools[size_t(i)].visible) triangles += doc_.subtoolMesh(i).triangleCount();
-    perf_.proxyNow = uiPrefs_.fastNavigation && moving && triangles >= fastNavigationTriangles();
+    perf_.movingNow = moving;
+    perf_.sceneTriangles = triangles;
+    perf_.proxyNow = uiPrefs_.fastNavigation && moving && triangles >= fastNavigationTriangles(hardwareProfileGoverns());
     perf_.fastNow = aa > 1 && perf_.proxyNow;
     perf_.samplesWanted = perf_.fastNow ? 1 : aa;
     return perf_.samplesWanted;
@@ -123,6 +129,7 @@ void App::notePerformanceFrame(double syncMs) {
 }
 
 void App::drawPerformanceSection() {
+    drawPerformanceProfileSection(); // what was detected and measured, the profile, overrides (PanelPerformanceProfile.cpp)
     // --- The 3D view ---
     ImGui::TextUnformatted("Antialiasing");
     ui::HelpText("Antialiasing", nullptr,

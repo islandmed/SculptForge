@@ -115,6 +115,7 @@ struct HardwareProfile {
     HardwareInfo hardware;
     Calibration calibration;
     ProfileTier tier = ProfileTier::Laptop;
+    ProfileTier measuredTier = ProfileTier::Laptop; // before a tier override (what re-calibration sticks to)
     std::string reason;          // why this tier, in words (Preferences > Performance)
     PerformanceSettings settings; // the tier's settings with the overrides applied
     PerformanceSettings automatic; // before the overrides
@@ -123,9 +124,10 @@ struct HardwareProfile {
 
 // Maps what was detected and measured to a tier and its settings. Deterministic: the same inputs give the same
 // profile. With nothing measured (skipped, or no GPU numbers) it falls back to the memory sizes and the probe's
-// GPU kind, conservatively.
+// GPU kind, conservatively. `previousTier` (a re-calibration of the same GPU): a measurement within 15% of the
+// boundary between that tier and its neighbour keeps that tier, so the profile doesn't flip between runs.
 HardwareProfile mapProfile(const HardwareInfo& hardware, const Calibration& calibration,
-                           const ProfileOverrides& overrides = {});
+                           const ProfileOverrides& overrides = {}, const ProfileTier* previousTier = nullptr);
 // Applies `overrides` to `automatic` (and a tier override re-maps first). Used by mapProfile.
 PerformanceSettings applyOverrides(const PerformanceSettings& automatic, const ProfileOverrides& overrides);
 // The settings a tier gives for this hardware and calibration (mapProfile's second half).

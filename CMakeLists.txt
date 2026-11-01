@@ -207,6 +207,8 @@ if(SCULPTFORGE_BUILD_APP)
     ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedGuide.cpp
     src/app/main.cpp
     src/app/Bench.cpp
+    src/app/Calibration.cpp
+    src/app/PanelPerformanceProfile.cpp
     src/app/CrashLog.cpp
     src/app/App.cpp
     src/app/Demo.cpp

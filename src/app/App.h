@@ -541,6 +541,8 @@ private:
         int framesStill = 0;          // frames since the view last moved
         bool fastNow = false;         // this frame draws without antialiasing (fast navigation)
         bool proxyNow = false;        // this frame draws big meshes' motion proxy (fast navigation)
+        bool movingNow = false;       // the view moved in the last few frames (the frame governor counts these)
+        size_t sceneTriangles = 0;    // visible triangles in full detail, last frame
         int samplesWanted = 0;        // viewSamples() for the last frame
         int samplesUsed = 0;          // what the renderer managed last frame (fewer when out of memory)
         double strokeSyncMs = 0.0;    // upload time summed over the open stroke's frames
@@ -550,6 +552,20 @@ private:
         int lastStrokeFrames = 0;
         bool gpuOutOfMemory = false;
     } perf_;
+    // Hardware profile (PanelPerformanceProfile.cpp; app/Calibration.h, core/HardwareProfile.h, core/FrameGovernor.h):
+    // calibrates on first launch and when the GPU, driver or version changes; the profile section of Preferences >
+    // Performance; the adaptive frame governor, fed every frame between FrameBegin and FrameEnd.
+    void initHardwareProfile();
+    void shutdownHardwareProfile();
+    void hardwareProfileFrameBegin();
+    void hardwareProfileFrameEnd(); // before the swap: feeds the governor, runs a calibration step
+    void drawHardwareProfileOverlay(); // calibration progress over the first frames (Esc skips)
+    void drawPerformanceProfileSection();
+    void registerPerformanceProfileUiActions();
+    bool hardwareProfileGoverns() const; // the profile's motion proxy threshold applies (else the fixed default)
+    void applyHardwareProfile(const struct HardwareProfile& profile, bool announce);
+    void finishCalibration();
+    std::shared_ptr<struct HwProfileUi> hwProfile_;
     // Splats > Make sculptable (PanelSculptable.cpp, core/Sculptable.h): splat capture -> sculptable SubTool on a
     // worker thread; the crop box and the face landmark review in the viewport.
     void registerSculptableUiActions();
