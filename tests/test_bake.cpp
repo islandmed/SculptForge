@@ -332,7 +332,7 @@ TEST(bake_errors) {
     uint32_t maps = 0;
     CHECK(parseBakeMaps("normal, AO,disp", maps, err));
     CHECK(maps == (bakeBit(BakeMap::Normal) | bakeBit(BakeMap::AmbientOcclusion) | bakeBit(BakeMap::Displacement)));
-    CHECK(parseBakeMaps("all", maps, err) && maps == 63u);
+    CHECK(parseBakeMaps("all", maps, err) && maps == (1u << kBakeMapCount) - 1u);
     CHECK(!parseBakeMaps("normal,specular", maps, err));
     // Cancelling stops it.
     st.maps = bakeBit(BakeMap::Normal);

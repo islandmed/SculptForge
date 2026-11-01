@@ -14,6 +14,7 @@
 #include "app/Ui.h"
 
 #include "core/MapExport.h"
+#include "core/MeshMaps.h"
 #include "core/Polypaint.h"
 #include "core/Texture.h"
 #include "core/TextureChannels.h"
@@ -389,6 +390,7 @@ double App::pbrTestValue(const std::string& name) const {
     if (name == "channel_view") return double(int(doc_.channelView));
     if (name == "frame_ms") return frameSeconds_ * 1000.0; // (smoothed frame interval; fixed in UI tests)
     if (name == "draw_ms") return const_cast<App*>(this)->benchmarkDrawMs(20); // the 3D view drawn 20 times, GPU included
+    if (name == "mesh_maps") return tex && m.texture->meshMaps ? double(m.texture->meshMaps->kinds) : 0.0;
     if (name == "view_pbr") return renderSettings_.pbr() ? 1.0 : 0.0;
     if (name == "environment") return double(renderSettings_.environment);
     if (name == "environment_pending") return renderer_.environmentPending() ? 1.0 : 0.0;

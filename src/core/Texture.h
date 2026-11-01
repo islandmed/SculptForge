@@ -66,6 +66,7 @@ struct TextureLayer {
 };
 
 struct UvTileIndex;   // (Texture.cpp)
+struct MeshMapSet;    // (core/MeshMaps.h)
 struct TexelMapCache; // (Texture.cpp)
 
 struct PaintTexture {
@@ -83,6 +84,9 @@ struct PaintTexture {
     std::vector<uint8_t> viewPixels;
     Channel viewChannel = Channel::BaseColor;
     uint64_t viewRevision = 0;
+    // Mesh Maps (core/MeshMaps.h): the Part's AO, curvature, thickness, ... on these UVs at this size, which Fill
+    // layers read. Derived data, replaced as a whole when re-baked (copies and undo steps share it); not saved.
+    std::shared_ptr<const MeshMapSet> meshMaps;
     // The RGBA8 texels the viewport shows: the composite, or the solo channel.
     const std::vector<uint8_t>& shown() const {
         return viewChannel != Channel::BaseColor && viewPixels.size() == pixels.size() ? viewPixels : pixels;
@@ -124,6 +128,19 @@ struct PaintTexture {
     // Without the material channel tiles (TileImage::liveBytes counts those, safe from any thread).
     size_t colourBytes() const;
 };
+
+// --- Texel maps (Mesh Maps and fill layers, core/MeshMaps.h, core/LayerStack.h) ---
+// Texture tile `tile` (kTextureTile texels square; tiles row-major, rows bottom-up): every texel's triangle
+// (kNoTexelTriangle where no UV island reaches) and barycentrics (b1, b2; b0 = 1 - b1 - b2), gutter texels mapped
+// to their nearest island point. Built from the mesh's UVs (thread-safe: reads the mesh, the shared UV bins).
+constexpr uint32_t kNoTexelTriangle = UINT32_MAX;
+struct TexelTile {
+    std::vector<uint32_t> tri;
+    std::vector<glm::vec2> bary;
+};
+bool texelTile(const Mesh& mesh, int width, int height, uint32_t tile, TexelTile& out);
+// The texture tiles triangle `tri` reaches with the gutter, inclusive; false when none.
+bool triangleTiles(const Mesh& mesh, int width, int height, uint32_t tri, int& tx0, int& ty0, int& tx1, int& ty1);
 
 // A fingerprint of the mesh's UVs (sampled; changes when the layout does), for caches keyed by UV layout.
 uint64_t meshUvFingerprint(const Mesh& mesh);

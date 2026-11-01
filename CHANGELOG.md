@@ -17,6 +17,16 @@ All notable changes to SculptForge are listed here. The format follows
   texture use a roughness and metallic set there. A new environment is prepared on a worker thread, and a
   20.9-million-triangle mesh draws in about 8 ms in PBR next to about 6 ms with Lit Sphere (Apple M1 Pro).
   Saved with the project (`viewport_shading mode=pbr environment=outdoor_sky exposure=0.5 tone_map=agx`).
+- Mesh Maps bake: **Tool > Bake** adds **Curvature** (convex edges bright, creases dark, from the surface's mean
+  curvature at a set radius), **Thickness** (how far rays travel inside), **Position** (16-bit) and **ID** (a colour
+  per polygroup or per Part) to the normal, world normal, displacement, AO, cavity and colour maps. The source can
+  be the Part's own **top subdivision level** (baked onto its lowest level) or its **micro level** (onto its base),
+  besides other Parts. UVs outside 0..1 bake as **UDIM tiles** (`name_normal.1001.png`, `1002`, ...). The bake runs
+  on a worker thread with progress and Cancel (`bake source=subdivision maps=normal,ao,curvature,thickness,position,id`).
+- Mesh Maps in the texture (`mesh_maps`): AO, curvature, thickness, position, world normal and ID baked on the
+  texture's own UVs and size, tile by tile on every core, for Fill layers to read. After sculpting, only the tiles
+  near the change are baked again, from a compact copy of the nearby triangles, and the result matches a full bake
+  texel for texel (2K maps of an 82k-triangle Part: about 10 s in full, about 0.5 s for a local change).
 
 ## [0.10.4] - 2026-11-01
 

@@ -1999,4 +1999,29 @@ void clearTextureLayer(PaintTexture& t, int layer) {
 
 uint64_t meshUvFingerprint(const Mesh& mesh) { return uvFingerprint(mesh); }
 
+bool texelTile(const Mesh& m, int width, int height, uint32_t tile, TexelTile& out) {
+    if (m.uvs.size() != m.triangleCount() * 3 || width <= 0 || height <= 0) return false;
+    const uint64_t key = paintKey(m, width, height);
+    const PaintCacheEntry e = paintCache(m, width, height, key);
+    if (tile >= uint32_t(e.index->tilesX) * uint32_t(e.index->tilesY)) return false;
+    PaintTexture dims; // (buildTexelMap reads the size only)
+    dims.width = width;
+    dims.height = height;
+    const std::unique_ptr<TexelMapTile> map = buildTexelMap(m, dims, *e.index, tile);
+    constexpr size_t n = size_t(kTextureTile) * kTextureTile;
+    out.tri.assign(map->tri.begin(), map->tri.end());
+    out.bary.resize(n);
+    for (size_t i = 0; i < n; ++i) out.bary[i] = glm::vec2(map->bary[i * 2], map->bary[i * 2 + 1]) / 65535.0f;
+    return true;
+}
+
+bool triangleTiles(const Mesh& m, int width, int height, uint32_t tri, int& tx0, int& ty0, int& tx1, int& ty1) {
+    if (m.uvs.size() != m.triangleCount() * 3 || tri >= m.triangleCount()) return false;
+    const PaintCacheEntry e = paintCache(m, width, height, paintKey(m, width, height));
+    const uint8_t* o = &e.index->triTiles[size_t(tri) * 4];
+    if (o[0] > o[2]) return false;
+    tx0 = o[0], ty0 = o[1], tx1 = o[2], ty1 = o[3];
+    return true;
+}
+
 } // namespace sf
