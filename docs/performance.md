@@ -12,6 +12,71 @@ sculptforge-cli --bench ...                     # the same without the GPU (CI, 
 Machine for all figures: Apple M1 Pro (8 performance + 2 efficiency cores, 32 GB unified memory, 30 GB usable
 under Asahi Linux), integrated GPU, Mesa 26.1 (OpenGL 4.6). How the benchmark works is described under v0.5 below.
 
+## Kelvinlet brushes and Capture from view (feat/kelvinlet-alpha)
+
+Measured with the stroke the app draws itself, on the benchmark sphere at 5M, 21M and 33M triangles (with
+subdivision levels, X symmetry on), Move as the reference in the same session:
+
+```
+SF_MEASURE_BRUSH=KelvinGrab sculptforge --run "new_bench_sphere millions=21" --measure-stroke 3,50
+SF_KELVIN_LOG=1 ...   # per move: pieces, vertices, kernel / normals / BVH ms, renderer sync so far
+```
+
+**Caveat: the machine was shared** with several other builds and test runs (load average 14-57 on 10 cores, noted
+per row), and the tiling window manager sometimes gave the window half the size (those runs were thrown away:
+every figure here is with the full window, circle radius 176 px). Each figure is the better of two runs. Treat them
+as an upper bound and as a comparison with Move in the same conditions, not as clean numbers.
+
+Frame time while drawing the fast two-turn circle (mean / worst, ms), 50 px and 300 px brush (300 px is as big as
+the sphere on screen: a whole-model grab):
+
+| Mesh | Brush | Move | KelvinGrab | KelvinTwist | KelvinScale | load |
+|---|---|---:|---:|---:|---:|---:|
+| 5M | 50 px | 12.6 / 34 | **14.2 / 27** | **14.6 / 30** | 35.8 / 64 | 17-25 |
+| 5M | 300 px | 71 / 121 | 197 / 283 | 124 / 165 | 120 / 203 | 20-27 |
+| 21M | 50 px | 16.1 / 54 | 43.8 / 173 | 35.2 / 78 | 77.6 / 194 | 14-19 |
+| 21M | 300 px | 290 / 431 | 1297 / 1694 | 968 / 1505 | 935 / 1593 | 21-58 |
+| 33M | 50 px | 21.0 / 53 | 179 / 390 | 110 / 177 | 279 / 729 | 32-40 |
+| 33M | 300 px | 403 / 548 | (no frame in 3 s) | (no frame in 3 s) | 1546 / 3078 | 18-33 |
+
+A quieter moment (load ~19) gave KelvinGrab at 21M / 50 px **38.5 / 47.9 ms** (Move 28): about 850 000 vertices
+a move in 2 pieces, kernel 10 ms, normals 10-12 ms, BVH 3-4 ms, renderer sync about 15 ms a frame.
+
+What it costs and why:
+
+- A Kelvinlet never reaches zero, so the brush works out each move's own cutoff: the distance past which the move
+  is below 4% of its peak, the field faded smoothly to zero over the last 30% of it. That is about twice the
+  brush radius, so a Kelvinlet touches roughly 4x the area Move does, and with X symmetry twice that. This is what
+  makes the surface move with no edge; it is also the cost.
+- What was done to keep it interactive: the kernel comes from a 2048-entry radial table with the window folded in
+  (a lookup and a lerp per vertex instead of three square roots and divisions per scale); a fast drag between two
+  frames is integrated in up to 8 pieces inside one pass (one BVH query, one move, one normal and BVH update),
+  not one dab per piece (the first version: 470 ms frames at 5M / 50 px, now 14 ms); only vertices that move more
+  than 0.5% of the step go on to undo, normals, the BVH and the GPU (the rest add up to under 0.5% of the drag);
+  when few of the queried vertices moved, normals and the BVH are updated around those only.
+- Where it still falls short: on 21M+ meshes a fast drag makes frames slower, a slow frame makes the next move
+  longer (more pieces, a larger region), and the brush trails the pointer. A whole-model Kelvinlet at 21M-33M
+  (300 px) runs at about 1 frame a second. Next steps, not done here: carry the part of a long move past about
+  one radius over to the next frame (bounded work per frame, the grab catches up), a coarser cutoff while the
+  region is above a vertex budget, and sparse GPU uploads of only the moved vertices (the stroke pipeline work in
+  feat/zero-latency).
+
+The core per-move cost on its own (`sculptforge_tests kelvinlet_grab_dense_mesh_timing`, 1.3M triangles, r 0.3,
+no renderer): about 1.6-3.4 ms a move for 13 000-27 000 vertices, depending on the load.
+
+Capture from view (`sculptforge-cli`, a VDM horn and a DamStandard cut sculpted on the sphere, square half size
+0.15 unless noted):
+
+| Mesh | Height alpha 256 / 1024 px | VDM 256 px (points) | VDM, half size 0.4 (points) |
+|---|---:|---:|---:|
+| 21M (load ~20) | 18 / 106 ms | 117 ms (50 k) | 1329 ms (456 k) |
+| 33M (load ~21) | 55 / 240 ms | 439 ms (76 k) | 3852 ms (696 k) |
+
+The alpha is a z-buffer of the triangles under the square plus a box-blur high pass (three box blurs: the
+1024 px alpha went from 652 to 106 ms at 21M). The VDM is region finding (flood fill over the vertices near the
+square), a quadric fit to its outer band, and implicit fairing by conjugate gradients (90-270 iterations); on a
+large patch the serial flood fill and adjacency build dominate and are the next thing to parallelize.
+
 ## Next version: big brushes on dense meshes (feat/perf-pass)
 
 What a user feels on a heavy model is a large brush: how far it trails the pointer, how long a frame takes, and

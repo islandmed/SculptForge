@@ -209,12 +209,12 @@ void Sculptor::kelvinletSingle(Mesh& mesh, BVH& bvh, const KelvinletKernel& k, c
     case KelvinletKind::Scale: amount = std::abs(s.logScale), moveScale = amount * s.radius; break;
     }
     if (!(amount > 0.0f)) return;
-    // Adaptive cutoff: where this step's displacement falls below epsilon = 2% of its largest (the window takes the
+    // Adaptive cutoff: where this step's displacement falls below epsilon = 4% of its largest (the window takes the
     // rest smoothly to 0), so a slow drag of tiny steps still moves the surface and a fast one doesn't drag the whole
     // mesh into the pass.
     float peak = 0.0f;
     for (int i = 0; i <= 32; ++i) peak = std::max(peak, k.envelope(1.5f * s.radius * float(i) / 32.0f));
-    const float epsilon = std::max(0.02f * amount * peak, 1e-7f * s.radius);
+    const float epsilon = std::max(0.04f * amount * peak, 1e-7f * s.radius);
     const float cut = k.cutoff(amount, epsilon, 3.0f * s.radius);
     if (!(cut > 0.0f)) return;
     // Grab: the load point travels from `center` to `center + travel` in `substeps` pieces, each a linear Kelvinlet
@@ -289,8 +289,8 @@ void Sculptor::kelvinletSingle(Mesh& mesh, BVH& bvh, const KelvinletKernel& k, c
         }
     }, 2048);
     // Only what moves noticeably this step goes on (undo, normals, the BVH): the far part of the region moves
-    // less than 0.2% of the step, which adds up to less than 0.2% of the whole drag.
-    const float keep = 2e-3f * moveScale, keep2 = keep * keep;
+    // less than 0.5% of the step, which adds up to less than 0.5% of the whole drag.
+    const float keep = 5e-3f * moveScale, keep2 = keep * keep;
     const size_t total = verts_.size();
     size_t kept = 0;
     for (size_t i = 0; i < total; ++i)

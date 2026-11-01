@@ -367,9 +367,10 @@ exactly), pen pressure scales it, and like every brush they respect symmetry, th
 layers, and each stroke is one undo step. They don't remesh with dynamic topology on (like Move).
 
 > **How it stays fast:** a Kelvinlet's influence never quite reaches zero, so each move works out how far its
-> effect is still bigger than a few thousandths of the brush radius and only touches the points inside that
-> distance, fading the last part smoothly to nothing. A fast drag between two frames is worked out in small pieces
-> in one pass, so the brush keeps up on meshes of tens of millions of triangles (see
+> effect is still more than 4% of its largest (about twice the brush radius) and only touches the points inside
+> that distance, fading the last part smoothly to nothing. A fast drag between two frames is worked out in small
+> pieces in one pass. Because it reaches further than Move, it costs more: on models of 20 million triangles and
+> up, keep the brush small or step down a subdivision level for big elastic moves (see
 > [Performance](performance.md)).
 
 ## Capture an alpha or a VDM from the model

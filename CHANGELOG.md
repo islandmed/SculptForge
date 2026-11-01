@@ -17,7 +17,7 @@ All notable changes to SculptForge are listed here. The format follows
   incompressible clay that bulges around the thumb (100); **Sharpness** a tighter, cusped peak with the same
   reach. Symmetry (the twist mirrors as a pseudovector), masks, hidden parts, sculpt layers, pressure and undo work
   as with every brush. Each move touches only the points inside an adaptive cutoff (where the move is still more
-  than 2% of its largest, the last part faded smoothly to 0), evaluates the kernel from a radial table, works out a
+  than 4% of its largest, the last part faded smoothly to 0), evaluates the kernel from a radial table, works out a
   fast drag in pieces in one pass, and passes on only what moved to undo, normals and the BVH. KelvinGrab and
   DetailClone are on the bottom shelf; all five are in the brush picker, the LightBox and the `stroke` command.
 - **Capture from view** (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd>, askNK's request): drag a square (Shift: a

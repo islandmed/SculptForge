@@ -81,15 +81,15 @@ void App::kelvinTo(float x, float y) {
         step.center = grabLast_;
         step.delta = delta * amount;
         step.travel = delta;
-        step.substeps = std::clamp(int(std::ceil(glm::length(delta) / (0.4f * kelvinRadius_))), 1, 16);
+        step.substeps = std::clamp(int(std::ceil(glm::length(delta) / (0.4f * kelvinRadius_))), 1, 8);
         static const bool log = std::getenv("SF_KELVIN_LOG") != nullptr;
         const SculptTimings before = doc_.sculptor.timings;
         doc_.sculptor.kelvinletStep(doc_.mesh, doc_.bvh, strokeBrush_, step, symmetry_);
         if (log) {
             const SculptTimings& t = doc_.sculptor.timings;
-            SDL_Log("kelvin: %d pieces, %llu vertices, kernel %.1f normals %.1f bvh %.1f ms", step.substeps,
+            SDL_Log("kelvin: %d pieces, %llu vertices, kernel %.1f normals %.1f bvh %.1f ms (renderer sync so far %.0f ms in %llu frames)", step.substeps,
                     (unsigned long long)(t.vertices - before.vertices), t.kernelMs - before.kernelMs,
-                    t.normalsMs - before.normalsMs, t.bvhMs - before.bvhMs);
+                    t.normalsMs - before.normalsMs, t.bvhMs - before.bvhMs, perf_.strokeSyncMs, (unsigned long long)perf_.strokeFrames);
         }
         grabLast_ = target;
     } else {
