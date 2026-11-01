@@ -91,10 +91,14 @@ This runs each model author's own public demo on Hugging Face's shared ZeroGPU h
 
 | Model | Notes |
 |---|---|
-| Hunyuan3D 2.1 (Tencent) | The default. Detailed shapes, about 20 seconds |
-| TRELLIS.2 (Microsoft) | The most detail. Needs a Hugging Face token |
+| TRELLIS.2 (Microsoft) | The default. The most detail, MIT licence. Needs a free Hugging Face token |
+| Hunyuan3D 2.1 (Tencent) | Detailed shapes, about 20 seconds, no token needed |
 | Hunyuan3D 2 mini Turbo (Tencent) | The fastest, about 6 seconds |
 | Hunyuan3D 2 (Tencent) | |
+
+The Hunyuan3D models' licence doesn't cover use in the European Union, the United Kingdom or South Korea; the
+panel says so when one is picked. See [AI services](https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md)
+for each model's licence.
 | Stable Fast 3D (Stability AI) | Quick and simple, removes the background itself |
 
 GPU time is rationed per person per day, there can be a queue at busy times, and a demo can be paused or

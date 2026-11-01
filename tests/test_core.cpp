@@ -1344,10 +1344,12 @@ TEST(free_huggingface_models) {
     CHECK(wellFormed && usesImage);
     ai::AiSettings defaults;
     CHECK(defaults.generatorService == "huggingface" && defaults.hfModel == presets[0].id);
-    defaults.hfModel = "trellis-2";
+    CHECK(defaults.hfModel == "trellis-2"); // MIT, the default; Hunyuan3D carries its licence note
+    CHECK(!ai::hunyuanModel(defaults.hfModel) && ai::hunyuanModel("hunyuan3d-2.1") && ai::hunyuanModel("fal-ai/hunyuan-3d/v3.1/pro/image-to-3d"));
+    defaults.hfModel = "hunyuan3d-2.1";
     defaults.hfToken = "hf_test";
     ai::AiSettings loaded = ai::AiSettings::fromJson(defaults.toJson());
-    CHECK(loaded.hfModel == "trellis-2" && loaded.resolvedHfToken() == "hf_test");
+    CHECK(loaded.hfModel == "hunyuan3d-2.1" && loaded.resolvedHfToken() == "hf_test");
     CHECK(ai::friendlyGradioError("You have exceeded your ZeroGPU quota (120s requested vs. 0s left).").find("free GPU time") !=
           std::string::npos);
     CHECK(ai::friendlyGradioError("some other failure") == "some other failure");

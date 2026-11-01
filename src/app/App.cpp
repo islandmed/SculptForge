@@ -2832,6 +2832,7 @@ void App::drawImageTo3D() {
                 if (ImGui::Selectable(p.label, aiSettings_.hfModel == p.id)) aiSettings_.hfModel = p.id;
             ImGui::EndCombo();
         }
+        if (ai::hunyuanModel(aiSettings_.hfModel)) hint(ai::kHunyuanLicenceNote);
         ImGui::InputText("HF token", hfToken_, sizeof hfToken_, ImGuiInputTextFlags_Password);
         hint(hfToken_[0] || std::getenv("HF_TOKEN")
                  ? "Runs on Hugging Face's shared GPUs with your account's free daily allowance."
@@ -2849,6 +2850,7 @@ void App::drawImageTo3D() {
             ImGui::EndCombo();
         }
         ImGui::InputText("Model id", falModel_, sizeof falModel_);
+        if (ai::hunyuanModel(falModel_)) hint(ai::kHunyuanLicenceNote);
         ImGui::InputText("API key", falKey_, sizeof falKey_, ImGuiInputTextFlags_Password);
         if (!falKey_[0]) hint(std::getenv("FAL_KEY") ? "Using FAL_KEY from the environment." : "Get a key at fal.ai/dashboard/keys");
     } else if (serviceId == "meshy") {
