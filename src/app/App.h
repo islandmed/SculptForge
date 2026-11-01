@@ -134,7 +134,8 @@ public:
     void queueFile(FileAction action, std::string path);
 
 private:
-    enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, SubToolClick, Select, Gizmo, Guide, Sculptable, ZSphere, Insert, Capture };
+    enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, SubToolClick, Select, Gizmo, Guide, Sculptable, ZSphere, Insert, Capture,
+                      AirStroke }; // AirStroke: a stroke begun off the model, waiting to reach it (#62)
 
     void handleEvent(const SDL_Event& e);
     void onMouseDown(float x, float y, Uint8 button);
@@ -148,6 +149,15 @@ private:
     bool pick(float x, float y, RayHit& hit) const; // the active SubTool (what brushes work on)
     BrushType activeBrush() const;
     void beginStroke(float x, float y, const RayHit& hit);
+    // Preferences > Input > Start strokes off the model (#62): a left press on the background waits as
+    // Drag::AirStroke; the stroke begins where the drag first reaches the surface (airStrokeTo, Input.cpp).
+    bool airStrokeMouseDown(float x, float y, SDL_Keymod mod);
+    void airStrokeTo(float x, float y);
+    void airStrokeRelease();
+    void drawAirStrokeIndicator();
+    bool airMask_ = false;            // the waiting stroke masks (Ctrl held at the press)
+    bool airMoved_ = false;           // it moved past the click slop (a Ctrl+click still inverts the mask)
+    float airX_ = 0.0f, airY_ = 0.0f; // where it was pressed
     void strokeTo(float x, float y);
     void dabAt(float x, float y, float pressure = -1.0f); // pressure < 0: strokePressure()
     void endStroke();

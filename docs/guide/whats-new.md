@@ -5,6 +5,14 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.10.5
+
+### From your requests on GitHub
+
+- **Start strokes off the model** (#62): an option in **Preferences > Input**, off by default, and
+  <kbd>Shift</kbd>+<kbd>L</kbd> to turn it on and off. With it on, a left-drag that starts on the background
+  sculpts once it reaches the model instead of turning the view. See [Navigation](navigation.md#mouse-and-pen).
+
 ## Version 0.10.4
 
 ### From your requests on GitHub

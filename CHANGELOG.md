@@ -6,6 +6,15 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- **Preferences > Input > Start strokes off the model** (#62, off by default) and **Toggle strokes off the model**
+  (<kbd>Shift</kbd>+<kbd>L</kbd>): a left-drag that starts on the background begins a stroke, which touches the model
+  once the cursor reaches it (LazyMouse and the stroke path start there, so nothing jumps). Ctrl (mask) and Shift
+  (smooth) strokes work the same way; a Ctrl+click on the background still inverts the mask. The view still turns
+  with a right-drag (or a pen button set to Right click), pans with Alt+drag or a middle-drag, moves with Space held
+  when that option is on, and Blender and Maya keys keep Alt+left-drag. A label at the top of the canvas shows while
+  it is on. MaskLasso, MaskRect and the hide / show shapes are unchanged.
+
 ### Changed
 - Faster CI and releases with the same tests (docs/releasing.md):
   - **Compiler caching:** compiles go through ccache, cached only by pushes to main and maintainers' own runs.

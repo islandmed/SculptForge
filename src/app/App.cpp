@@ -3,6 +3,7 @@
 #include "app/App.h"
 #include "app/ShellQuote.h"
 #include "app/SpaceCamera.h"
+#include "app/AirStroke.h"
 #include "app/AsyncStroke.h"
 #include "app/Calibration.h"
 #include "app/CrashLog.h"
@@ -1236,6 +1237,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         if (previewLod_ < 0 && pick(x, y, hit)) {
             if (maskMod) beginMaskStroke(x, y);
             else beginStroke(x, y, hit);
+        } else if (airStrokeMouseDown(x, y, mod)) { // Start strokes off the model (#62, Input.cpp)
         } else if (blenderStyle()) {
             // Blender: a drag beside the model navigates as the middle button would (Shift pans, Ctrl zooms).
             const SDL_Keymod keys = SDL_GetModState();
@@ -1336,6 +1338,7 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     case Drag::Sculptable: sculptableMouseMove(x, y); break;
     case Drag::Capture: captureMouseMove(x, y); break;
     case Drag::ZSphere: zsphereDragTo(x, y); break;
+    case Drag::AirStroke: airStrokeTo(x, y); break;
     case Drag::None: break;
     }
 }
@@ -1411,6 +1414,7 @@ void App::onMouseUp() {
     if (drag_ == Drag::Sculptable) sculptableMouseUp();
     if (drag_ == Drag::Capture) captureMouseUp();
     if (drag_ == Drag::ZSphere) zsphereRelease();
+    if (drag_ == Drag::AirStroke) airStrokeRelease();
     gizmoRelease();
     drag_ = Drag::None;
     dragFromPen_ = false;
@@ -2044,6 +2048,7 @@ void App::drawUi() {
     drawSculptableOverlay(); // Make sculptable: crop box, face landmarks (PanelSculptable.cpp)
     drawCaptureOverlay();    // Capture from view: the square, the result window (PanelKelvinlet.cpp)
     if (uiPrefs_.showAxes) drawAxisGizmo(); // X / Y / Z in the canvas corner (#31)
+    drawAirStrokeIndicator(); // Start strokes off the model is on (#62, Input.cpp)
     if (drag_ == Drag::Insert) { // the size the insert will get
         insertPx_ = std::hypot(mouse.x - insertX_, mouse.y - insertY_);
         ImGui::GetForegroundDrawList()->AddCircle(ImVec2(insertX_, insertY_), std::max(insertPx_, 12.0f * uiScale_),
