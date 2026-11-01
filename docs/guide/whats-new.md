@@ -19,6 +19,10 @@ chapter opens by itself the first time you start a new version; you can always f
 - **Twelve new alphas** (Pores, Cracks, Scales, Rivets, Stitches, Fabric Weave, Bark, Rock Strata, Wrinkles, Skin
   Folds, Hair Strands, Dot Grid) and **six new VDM brushes** (Rivet, Stitches, Skin Fold, Wrinkle Line, Crack, Rock
   Ledge), with thumbnails in the LightBox (#43). See [Sculpting](sculpting.md).
+- **Mask from the mesh border** (#61): **Tool > Masking > By border** masks open edges (and polygroup borders),
+  so sculpting leaves them in place. See [Masking](masking.md).
+- **Radial (pie) menus** (#45): hold **T** (brushes) or **Y** (masking), flick and let go; make your own in
+  **Preferences > Input > Radial Menus**. See [Sculpting](sculpting.md#radial-menus).
 - **SelectRect and SelectLasso** follow X / Y / Z symmetry, like the mask versions (#51).
 
 ### Become an Insider

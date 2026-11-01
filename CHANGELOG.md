@@ -6,16 +6,14 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.4] - 2026-11-01
+
 ### Added
 - Mask from the mesh border (#61): **Tool > Masking > By border** masks the open edges of the active SubTool and
   **Rings** (1-20) of edges inside them, so sculpting doesn't move the border (Blender: Mask from mesh
   boundary). **Polygroup borders** also masks where polygroups meet (ZBrush: Mask by polygroup border), **Soft**
   fades the mask inwards; one undo step. A closed mesh masks nothing and the status bar says it has no open edges
   (`mask_border rings=2 polygroups=true soft=true`).
-
-## [0.10.4] - 2026-11-01
-
-### Added
 - Radial (pie) menus (#45): up to 8 menus of up to 8 items, each item any action the command palette (F3) finds
   (brushes, tools, commands, toggles). Hold a menu's key, flick toward an item and let go to run it; tap the key and
   the pie stays open for a click. A menu can also open from a mouse button (middle, back, forward) or a pen side
