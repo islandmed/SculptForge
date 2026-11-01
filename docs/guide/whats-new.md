@@ -5,6 +5,27 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.10.3
+
+### From your requests on GitHub
+
+- **Alternate smooth** (#40): start smoothing with Shift held, then let go of Shift while still pressing, and the
+  rest of the stroke smooths without shrinking the form. **Brush > Smooth keeps volume** makes it the default. See
+  [Sculpting](sculpting.md).
+- **Masking** (#48, #51): Ctrl+drag on the background draws a mask rectangle; Lasso and Rectangle masks follow
+  symmetry; a Ctrl+click with them blurs the mask. See [Masking](masking.md).
+- **Pen tablets in mouse mode** (#54): **Preferences > Tablet > Mouse mode (relative)** stops the cursor jumping
+  back when you lift the pen.
+- **Axis gizmo**: click X, Y or Z to snap to that view (#43). **Undo and Redo** on the right shelf, **Continuous**
+  in the stroke picker, **SubTool thumbnails**, and **Insert on the model** follows symmetry. See
+  [Navigation](navigation.md) and [SubTools](subtools.md).
+- **macOS** (#41): reopening in full screen keeps the menu bar and window buttons reachable.
+
+### Support SculptForge
+
+SculptForge stays free for everyone. **Help > Support SculptForge** opens the page where you can become a
+member: Insiders get new releases about two weeks early.
+
 ## Version 0.10.2
 
 ### QRemesh 2

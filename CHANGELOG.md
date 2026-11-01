@@ -6,6 +6,8 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.3] - 2026-11-01
+
 ### Added
 - Preferences > Tablet > Mouse mode (relative) (#54): for tablets whose driver is set to mouse mode, the pen moves
   the cursor by how far it moves, like a mouse.
