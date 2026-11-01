@@ -519,7 +519,7 @@ TEST(material_dense_mesh_benchmark) {
             for (float radius : {0.05f, 0.35f}) {
                 // Pass 0: colour with the per-triangle dab (as 0.10 shipped); 1: colour with texel tiles; 2: five
                 // channels with texel tiles. `cold`: the first dab of pass 1 (the UV bins and texel tiles are made).
-                double t[3] = {0, 0, 0}, cold = 0;
+                double t[3] = {0, 0, 0}, cold = 0, beginMs = 0, prefetchMs = 0, prefetchedFirst = 0, worst = 0;
                 for (int pass = 0; pass < 3; ++pass) {
                     TexturePainter::setPath(pass == 0 ? TexturePainter::Path::Triangles : TexturePainter::Path::Auto);
                     Mesh& m = base;
@@ -529,8 +529,11 @@ TEST(material_dense_mesh_benchmark) {
                     mat.channels = pass == 2 ? five : channelBit(Channel::BaseColor);
                     if (pass == 2)
                         for (Channel c : {Channel::Roughness, Channel::Metallic, Channel::Height, Channel::AO}) setChannelEnabled(*m.texture, c, true);
+                    if (pass == 1) clearTexturePaintCaches(); // measure building them
                     TexturePainter painter;
+                    const auto b0 = now();
                     CHECK(painter.begin(m, mat.channels));
+                    if (pass == 1) beginMs = ms(b0, now());
                     DabParams p = dab(glm::vec3(0, 0, 1), radius, 0.5f);
                     p.viewDir = glm::vec3(0, 0, -1);
                     const auto c0 = now();
@@ -540,15 +543,33 @@ TEST(material_dense_mesh_benchmark) {
                         p.center = glm::normalize(glm::vec3(-0.15f + 0.03f * float(i), 0.2f, 1.0f));
                         const auto t0 = now();
                         painter.dab(m, bvh, p, mat, Symmetry{true, false, false});
-                        t[pass] += ms(t0, now());
+                        const double one = ms(t0, now());
+                        t[pass] += one;
+                        if (pass > 0) worst = std::max(worst, one);
+                    }
+                    if (pass == 1) {
+                        // A fresh area, as the app does it: the brush hovers there first (prewarm), then paints.
+                        const glm::vec3 c2 = glm::normalize(glm::vec3(0.2f, 0.3f, -1.0f));
+                        const glm::vec3 centers[2] = {c2, c2 * glm::vec3(-1, 1, 1)};
+                        const auto h0 = now();
+                        prewarmTexturePainting(m, &bvh, centers, radius);
+                        prefetchMs = ms(h0, now());
+                        p.center = c2;
+                        p.viewDir = glm::vec3(0, 0, 1);
+                        const auto d0 = now();
+                        painter.dab(m, bvh, p, mat, Symmetry{true, false, false});
+                        prefetchedFirst = ms(d0, now());
                     }
                     UndoRecord rec;
                     painter.end(rec);
                     t[pass] /= 10.0;
                 }
                 TexturePainter::setPath(TexturePainter::Path::Auto);
-                std::printf("    %5.1fM / %dK / %.2f: triangles %7.2f ms -> tiles %6.2f ms (first dab %6.0f ms), 5 channels %6.2f ms (%.2fx)\n",
-                            double(base.triangleCount()) / 1e6, size / 1024, radius, t[0], t[1], cold, t[2], t[2] / t[1]);
+                std::printf("    %5.1fM / %dK / %.2f: triangles %7.2f ms -> tiles %6.2f ms, 5 channels %6.2f ms (%.2fx); worst dab %.1f ms; "
+                            "UV bins %.0f ms (once per UV layout; the app builds them when painting starts), first dab cold %.1f ms, "
+                            "hover prefetch %.1f ms then first dab %.1f ms\n",
+                            double(base.triangleCount()) / 1e6, size / 1024, radius, t[0], t[1], t[2], t[2] / t[1], worst, beginMs, cold,
+                            prefetchMs, prefetchedFirst);
             }
             // Memory: 5 channels, Base plus 3 layers, each with a big stroke on every channel; then one layer painted
             // everywhere (its tiles all dense), and export_maps of the result.

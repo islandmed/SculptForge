@@ -90,6 +90,7 @@ MemoryUse documentMemory(const Document& doc) {
             u.gpu += m.vertexCount() * (12 + (m.hasColors() ? 4 : 0) + (m.hasMask() ? 1 : 0)) * 11 / 10 +
                      m.triangleCount() * (6 + (m.hasPolygroups() ? 2 : 0));
     }
+    u.paintCaches = texturePaintCacheBytes();
     return u;
 }
 
@@ -105,8 +106,8 @@ void registerPerformanceCommands(CommandRegistry& registry) {
                                         (ThreadPool::shared().serial() ? " (multithreading off)" : "") + "; " +
                                         millions(double(u.triangles)) + " triangles; memory " + mb(u.total()) + " (meshes " +
                                         mb(u.mesh) + ", BVH " + mb(u.bvh) + ", subdivision levels " + mb(u.levels) +
-                                        ", undo " + mb(u.undo) + ", textures " + mb(u.textures) + " of which material channels " +
-                                        mb(u.channels) + "), GPU buffers about " + mb(u.gpu);
+                                        ", undo " + mb(u.undo) + ", textures " + mb(u.textures) + " of which material channels " + mb(u.channels) + ", texture painting caches " + mb(u.paintCaches) +
+                                        "), GPU buffers about " + mb(u.gpu);
                       return {true, msg};
                   }});
     registry.add({"set_multithreading",

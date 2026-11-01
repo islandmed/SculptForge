@@ -37,6 +37,7 @@
 #include <atomic>
 #include <functional>
 #include <mutex>
+#include <span>
 #include <memory>
 #include <string>
 #include <vector>
@@ -122,6 +123,12 @@ struct PaintTexture {
     size_t bytes() const;
 };
 
+// Bytes of the texture-painting caches shared by every texture on the same UVs (UV tile bins, coverage, texel
+// maps of dense meshes): Preferences > Performance.
+size_t texturePaintCacheBytes();
+// Drops those caches (tests and benchmarks measure building them; textures keep theirs until repainted).
+void clearTexturePaintCaches();
+
 // Texels a view that is up to date except for the latest changes would upload now (benchmarks, tests).
 size_t textureUploadTexels(const PaintTexture& tex);
 
@@ -205,6 +212,9 @@ public:
     // (tests compare them).
     enum class Path { Auto, Tiles, Triangles };
     static void setPath(Path path);
+    // Readies dense-mesh painting before a dab needs it: the UV bins and coverage (shared per UV layout), and the
+    // texel maps of the tiles a dab of `radius` at each of `centers` would reach (with `bvh`). Paints nothing.
+    void prewarm(Mesh& mesh, const BVH* bvh, std::span<const glm::vec3> centers, float radius);
 
 private:
     // Dense meshes (texels outnumber what each triangle covers): the brush finds the texture tiles under it from
@@ -237,6 +247,10 @@ private:
     std::vector<DabTri> dabTris_;
     std::vector<std::vector<uint32_t>> bandTris_; // per 16-row band: indices into dabTris_, in serial order
 };
+
+// TexturePainter::prewarm without a stroke (the app calls it while the Paint brush hovers a dense textured mesh,
+// so the first dab doesn't build what it needs).
+void prewarmTexturePainting(Mesh& mesh, const BVH* bvh = nullptr, std::span<const glm::vec3> centers = {}, float radius = 0.0f);
 
 // --- Whole-texture operations (callers record undo: TextureStackUndo or captureTexture) ---
 // Calls fn(triangle, b0, b1, b2, x, y) for every texel inside a UV triangle plus the gutter around the

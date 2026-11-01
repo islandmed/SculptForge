@@ -185,6 +185,7 @@ void App::drawPerformanceSection() {
     const std::string mem = "Meshes " + megabytes(m.mesh) + "  BVH " + megabytes(m.bvh) + "\nSubdivision levels " +
                             megabytes(m.levels) + "\nUndo " + megabytes(m.undo) + " of " + megabytes(doc_.undo.byteBudget) +
                             "\nTextures " + megabytes(m.textures) + " (material channels " + megabytes(m.channels) + ")" +
+                            (m.paintCaches ? "\nTexture painting caches " + megabytes(m.paintCaches) : std::string()) +
                             "\nGPU buffers about " + megabytes(m.gpu);
     ImGui::TextUnformatted(mem.c_str());
     ImGui::LogText("%s", mem.c_str());

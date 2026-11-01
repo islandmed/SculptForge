@@ -89,8 +89,9 @@ struct MemoryUse {
     size_t gpu = 0;    // vertex and index buffers the renderer keeps for the visible SubTools (an estimate)
     size_t textures = 0; // painted textures (core/Texture.h): colour, layers, material channels (each texture once)
     size_t channels = 0; // of `textures`, the material channel tiles (core/TextureChannels.h)
+    size_t paintCaches = 0; // texture painting caches of dense meshes (UV tile bins, texel maps), shared per UV layout
     size_t triangles = 0, vertices = 0;
-    size_t total() const { return mesh + bvh + levels + undo + textures; }
+    size_t total() const { return mesh + bvh + levels + undo + textures + paintCaches; }
 };
 MemoryUse documentMemory(const Document& doc);
 
