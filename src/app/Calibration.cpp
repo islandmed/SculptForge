@@ -53,9 +53,11 @@ constexpr GLenum kGL_FRAMEBUFFER_BINDING = 0x8CA6, kGL_VIEWPORT = 0x0BA2, kGL_CU
 // GL_NVX_gpu_memory_info (KB), GL_ATI_meminfo (KB, 4 values: the first is the pool's free total).
 constexpr GLenum kGL_GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX = 0x9047, kGL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX = 0x9049;
 constexpr GLenum kGL_TEXTURE_FREE_MEMORY_ATI = 0x87FC;
+#if defined(__linux__) || defined(__FreeBSD__)
 // GLX_MESA_query_renderer.
 constexpr int kGLX_RENDERER_ACCELERATED_MESA = 0x8186, kGLX_RENDERER_VIDEO_MEMORY_MESA = 0x8187,
               kGLX_RENDERER_UNIFIED_MEMORY_ARCHITECTURE_MESA = 0x8188;
+#endif
 
 struct GlExtra {
     const GLubyte*(SF_GLAPI* GetStringi)(GLenum, GLuint) = nullptr;

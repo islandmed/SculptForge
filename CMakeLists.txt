@@ -529,6 +529,10 @@ if(SCULPTFORGE_BUILD_TESTS)
           "SCULPTFORGE_BRUSH=$<TARGET_FILE:sf_fake_splat_tools>;SCULPTFORGE_COLMAP=$<TARGET_FILE:sf_fake_splat_tools>;SCULPTFORGE_FFMPEG=$<TARGET_FILE:sf_fake_splat_tools>")
       endif()
     endforeach()
+    # The hardware profile panel with a real calibration (tests/ui/hardware_profile.sfui).
+    if(TEST ui_hardware_profile)
+      set_tests_properties(ui_hardware_profile PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1")
+    endif()
     # The shell layout again on a 1920x1080 window (docs/ui-design.md §2.3).
     add_test(NAME ui_shell_layout_1080 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/shell_layout.sfui
              --size 1920x1080 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/shell_layout_1080)

@@ -102,9 +102,12 @@ int displayRefreshHz(SDL_Window* window) {
 bool App::hardwareProfileGoverns() const { return hwProfile_ && hwProfile_->active; }
 
 void App::initHardwareProfile() {
-    // Deterministic runs (UI tests, renders, recordings, demos) and the --measure-* runs keep the fixed defaults.
-    if (uiConfigDeterministic_ || !options_.renderPath.empty() || !options_.recordPath.empty() || !options_.uiTest.empty() ||
-        options_.measureIdle > 0.0f || options_.measureStroke > 0.0f)
+    // Deterministic runs (UI tests, renders, recordings, demos) and the --measure-* runs keep the fixed defaults; a
+    // UI test of this panel turns it on with SF_HW_PROFILE_IN_TESTS=1 (its settings folder is a temporary one).
+    const char* inTests = std::getenv("SF_HW_PROFILE_IN_TESTS");
+    const bool testThis = !options_.uiTest.empty() && inTests && std::string(inTests) == "1";
+    if (!testThis && (uiConfigDeterministic_ || !options_.renderPath.empty() || !options_.recordPath.empty() ||
+                      !options_.uiTest.empty() || options_.measureIdle > 0.0f || options_.measureStroke > 0.0f))
         return;
     hwProfile_ = std::make_shared<HwProfileUi>();
     HwProfileUi& hw = *hwProfile_;
@@ -368,14 +371,21 @@ void App::drawPerformanceProfileSection() {
     const Calibration& c = p.calibration;
     const PerformanceSettings& s = p.settings;
     // "Detected Apple M1 Pro, 21.3 GB unified -> Workstation"
-    std::string vram = h.vramMB ? formatMegabytes(h.vramMB) : h.gpuKind == GpuKind::Unified || h.gpuKind == GpuKind::Integrated
-                                                                  ? formatMegabytes(s.vramBudgetMB) + " shared"
-                                                                  : std::string("memory unknown");
+    // Shared memory shows what the GPU may use (the budget), not what the driver reports (often all of the RAM).
+    const bool shared = h.gpuKind == GpuKind::Unified || h.gpuKind == GpuKind::Integrated;
+    const std::string vram = shared      ? formatMegabytes(s.vramBudgetMB) + " shared"
+                             : h.vramMB ? formatMegabytes(h.vramMB)
+                                        : std::string("memory unknown");
     if (fontBold_) ImGui::PushFont(fontBold_);
     ImGui::TextWrapped("Detected %s, %s -> %s", h.glRenderer.empty() ? "an unknown GPU" : h.glRenderer.c_str(), vram.c_str(),
                        tierName(p.tier));
     if (fontBold_) ImGui::PopFont();
-    dim(p.reason);
+    // Why (the reason without the "Detected ... -> tier" the line above already says).
+    std::string why = p.reason;
+    if (const size_t arrow = why.find(" -> "); arrow != std::string::npos)
+        if (const size_t open = why.find(" (", arrow); open != std::string::npos && why.back() == ')')
+            why = why.substr(open + 2, why.size() - open - 3);
+    dim(why);
     std::string measured;
     if (c.skipped) measured = "Not measured (skipped): settings from the GPU type and memory sizes.\n";
     else {

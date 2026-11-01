@@ -369,6 +369,7 @@ int App::runUiTest(int w, int h, int fps) {
         updateCameraAspect();
         updateSpaceMouse(dt);
 
+        hardwareProfileFrameBegin(); // (only with SF_HW_PROFILE_IN_TESTS=1: tests use fixed settings)
         Demo::beginFrame();
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
@@ -380,6 +381,7 @@ int App::runUiTest(int w, int h, int fps) {
         ImGui::NewFrame();
         ImGui::LogToBuffer(0); // capture every drawn string (0: don't auto-open tree nodes)
         drawUi();
+        drawHardwareProfileOverlay();
         if (ImGuiContext* g = ImGui::GetCurrentContext()) demo_->setFrameText(g->LogBuffer.c_str());
         ImGui::LogFinish();
         ImGui::Render();
@@ -388,6 +390,7 @@ int App::runUiTest(int w, int h, int fps) {
         syncScene();
         notePerformanceFrame(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - syncStart).count());
         viewSamples(); // keeps Fast Navigation's view of the camera current (UI tests read view_samples)
+        hardwareProfileFrameEnd();
         ++frames;
         const std::string shot = demo_->takeShotRequest();
         if (shot.empty()) continue;
