@@ -3,8 +3,15 @@
 //
 // Map baking: the detail of a high-poly sculpt (one or more SubTools) captured as images on the UVs of a
 // low-poly SubTool, for game engines and renderers. Maps: tangent-space normal (MikkTSpace, core/Tangents.h,
-// so Blender, Unreal, Unity and Godot show it right), object-space normal, displacement, ambient occlusion,
-// cavity and colour (polypaint or the source's painted texture).
+// so Blender, Unreal, Unity and Godot show it right), object-space (= world) normal, displacement, ambient
+// occlusion, cavity, colour (polypaint or the source's painted texture), and the Mesh Maps texturing reads:
+// curvature (convex edges bright, concave dark, from the surface's mean curvature at a set radius), thickness
+// (how far rays travel inside the surface), position (in the bounding box, 16-bit) and ID (a flat colour per
+// polygroup or per Part).
+//
+// Sources: other Parts (the classic high-to-low bake), or the active Part's own top subdivision level baked onto
+// its lowest level, or its micro level onto its base (bakeLevelSources). UVs outside 0..1 bake as UDIM tiles,
+// one set of images per tile (<name>_<map>.1001.png, 1002, ... 1011 for the second row).
 //
 // How it works, as xNormal and Substance do it: every texel sample on the low-poly surface casts a ray along
 // its smooth (interpolated) normal through a "cage" from `front` in front of the surface to `rear` behind it,
@@ -31,10 +38,11 @@
 
 namespace sf {
 
-enum class BakeMap : int { Normal, ObjectNormal, Displacement, AmbientOcclusion, Cavity, Color };
-constexpr int kBakeMapCount = 6;
+enum class BakeMap : int { Normal, ObjectNormal, Displacement, AmbientOcclusion, Cavity, Color, Curvature, Thickness, Position, Id };
+constexpr int kBakeMapCount = 10;
 constexpr uint32_t bakeBit(BakeMap m) { return 1u << int(m); }
-const char* bakeMapId(BakeMap m);    // "normal", "object_normal", "displacement", "ao", "cavity", "color"
+const char* bakeMapId(BakeMap m);    // "normal", "object_normal", "displacement", "ao", "cavity", "color",
+                                     // "curvature", "thickness", "position", "id"
 const char* bakeMapLabel(BakeMap m); // "Normal (tangent)", ...
 // A comma-separated list of ids ("normal,ao", or "all"); false + error naming the bad entry.
 bool parseBakeMaps(const std::string& list, uint32_t& maps, std::string& error);
@@ -51,6 +59,11 @@ struct BakeSettings {
     bool flipGreen = false;                // DirectX-style normal map (green = down), as Unreal expects natively
     float displacementScale = 0.0f;        // world units that map to white in the PNG; 0 = the largest distance found
     int threads = 0;                       // 0 = every core
+    int thicknessRays = 24;                // per texel
+    float thicknessDistance = 0.1f;        // rays longer than this count as thick, x bounding-box diagonal
+    float curvatureRadius = 0.02f;         // a bend of this radius (x diagonal) is fully bright / dark
+    enum class IdSource : uint8_t { Polygroups, Parts };
+    IdSource idSource = IdSource::Polygroups;
 };
 
 struct BakeResult {
@@ -58,7 +71,8 @@ struct BakeResult {
     uint32_t maps = 0;
     bool flipGreen = false;
     // Present for the maps baked. RGB8 / grey8, rows bottom-up.
-    std::vector<uint8_t> normal, objectNormal, color, ao, cavity;
+    std::vector<uint8_t> normal, objectNormal, color, ao, cavity, curvature, thickness, id;
+    std::vector<uint16_t> position;  // RGB16: the point in [positionMin, positionMax]
     std::vector<float> displacement; // world units along the low-poly normal, + = the high-poly is outside
     std::vector<uint8_t> coverage;   // 1 = inside a UV island, 2 = padding, 0 = empty
     std::vector<glm::vec4> tangents; // MikkTSpace tangent + sign per low-poly corner (for previews)
@@ -66,6 +80,8 @@ struct BakeResult {
     float diagonal = 0;              // the low-poly's bounding-box diagonal
     float displacementMin = 0, displacementMax = 0; // range found (world units)
     float displacementScale = 0;     // world units at white / black of the 16-bit PNG (mid-grey = 0)
+    glm::vec3 positionMin{0.0f}, positionMax{0.0f}; // the box the position map spans
+    int udim = 0;                    // the UDIM tile this result is (bakeMapsUdim), 0 = plain 0..1 UVs
     size_t islandTexels = 0, missedTexels = 0; // texels inside islands, and those whose rays found nothing
     size_t sourceTriangles = 0;
     double seconds = 0, bvhSeconds = 0;
@@ -81,14 +97,28 @@ using BakeProgress = std::function<bool(float)>;
 bool bakeMaps(const Mesh& low, const std::vector<const Mesh*>& sources, const BakeSettings& settings, BakeResult& result,
               std::string& error, const BakeProgress& progress = {});
 
+// The UDIM tiles (1001 + u + 10 v) the low-poly's triangles lie in (by their UV centres), in order; empty when
+// every triangle is inside 0..1 (a plain bake).
+std::vector<int> udimTiles(const Mesh& low);
+// bakeMaps once per UDIM tile of `low` (or once, as a plain bake, without UDIMs): each result has its `udim`.
+// Progress covers all tiles.
+bool bakeMapsUdim(const Mesh& low, const std::vector<const Mesh*>& sources, const BakeSettings& settings,
+                  std::vector<BakeResult>& results, std::string& error, const BakeProgress& progress = {});
+
+// The meshes of a bake from the Part's own levels: `low` its lowest subdivision level and `high` its top one
+// (source = "subdivision"), or `low` the Part itself and `high` its micro level baked to triangles
+// (source = "micro"). False + error when the Part has no such level or its low mesh has no UVs.
+bool bakeLevelSources(const Mesh& part, const std::string& source, Mesh& low, Mesh& high, std::string& error);
+
 // A baked map as a top-down 8-bit image (displacement mid-grey = 0, +/- displacementScale at white / black).
 Image bakeMapImage(const BakeResult& result, BakeMap map);
 // The displacement as 16-bit grey (top-down; 32768 = 0) and as floats in world units (top-down).
 std::vector<uint16_t> displacement16(const BakeResult& result);
 
 // File name of a map: "<base>_normal.png", "<base>_normal_object.png", "<base>_displacement.png" (+ .exr),
-// "<base>_ao.png", "<base>_cavity.png", "<base>_color.png".
-std::string bakeFileName(const std::string& base, BakeMap map, const char* extension = ".png");
+// "<base>_ao.png", "<base>_cavity.png", "<base>_color.png", "<base>_curvature.png", "<base>_thickness.png",
+// "<base>_position.png" (16-bit), "<base>_id.png"; with a UDIM tile "<base>_normal.1001.png".
+std::string bakeFileName(const std::string& base, BakeMap map, const char* extension = ".png", int udim = 0);
 // Writes every baked map into `folder` (created if needed); `written` gets the paths. Displacement goes out as
 // a 16-bit PNG and, with `exr`, as a 32-bit float EXR in world units.
 bool saveBakeMaps(const BakeResult& result, const std::string& folder, const std::string& base, bool exr,

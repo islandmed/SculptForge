@@ -333,6 +333,7 @@ void App::drawPaintLayersContents() {
     ImGui::EndDisabled();
     ui::HelpText("Fill", nullptr, "Fill the active layer with the current colour (respects the mask, like Color > Fill).",
                  kPath);
+    if (texture) drawFillLayerControls(); // (PanelFill.cpp)
 }
 
 } // namespace sf

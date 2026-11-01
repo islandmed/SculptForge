@@ -1,0 +1,73 @@
+# PBR viewport (Material > Viewport Shading): Lit Sphere | PBR, the environment (built-in Studio and three bundled
+# CC0 HDRIs), exposure, tone map and the environment behind the model. The texture's material channels are uploaded
+# as ORM, normal and emissive planes; a painted height shows through tangent-space normals. Settings are saved with
+# the project. Files are written to the working directory (the build folder).
+run new_sphere subdivisions=5
+run uv_auto resolution=1024
+run texture_create size=1024
+run texture_channels enable=roughness,metallic,height
+run paint_material color=d4af37 roughness=0.2 metallic=1 height=0.5
+key p
+stroke 0.15 0.5 0.85 0.5
+run paint_material color=8a2a1a roughness=0.85 metallic=0 height=0.95 channels=base_color,roughness,metallic,height
+stroke 0.5 0.15 0.5 0.85
+key escape
+expect_value view_pbr == 0
+expect_value pbr_planes == 0
+
+# The Material palette: Lit Sphere | PBR.
+click "Material##palette.material"
+expect "Lit Sphere##view.shading_lit_sphere"
+click "PBR##view.shading_pbr"
+expect_status "Viewport shading: PBR"
+expect_value view_pbr == 1
+wait_value environment_pending == 0
+wait 0.3
+# ORM (roughness, metallic) and the normal from Height are on the GPU; no emissive channel.
+expect_value pbr_planes == 3
+expect "Vertex Paint & Materials/##environment"
+shot material-palette-pbr
+key escape
+
+run viewport_shading environment=photo_studio exposure=0.3
+wait_value environment_pending == 0
+expect_value environment == 1
+camera 25 10
+wait 0.3
+shot pbr-photo-studio
+
+run viewport_shading environment=outdoor_sky background=true blur=0.3 tone_map=agx
+wait_value environment_pending == 0
+wait 0.3
+expect_status "background on"
+shot pbr-outdoor-background
+
+# An emissive channel adds the third plane.
+run texture_channels enable=emissive
+wait 0.2
+expect_value pbr_planes == 7
+run texture_channels disable=emissive
+wait 0.2
+expect_value pbr_planes == 3
+
+# Unknown values are refused.
+run_fails viewport_shading environment=nowhere
+run_fails viewport_shading tone_map=sepia
+run_fails viewport_shading mode=raytraced
+
+# Saved with the project; Lit Sphere frees the planes.
+run save_project path=sf_ui_pbr_viewport.sfproj
+run viewport_shading mode=lit_sphere
+expect_value view_pbr == 0
+wait 0.2
+expect_value pbr_planes == 0
+run open path=sf_ui_pbr_viewport.sfproj
+expect_value view_pbr == 1
+expect_value environment == 3
+
+# Ctrl-hover help.
+click "Material##palette.material"
+hold ctrl
+hover "PBR##view.shading_pbr"
+expect_help "environment"
+hold none

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include "core/EnvironmentMath.h"
 #include "core/Matcap.h"
 #include "core/Mesh.h"
 #include "core/Splats.h"
@@ -12,6 +13,7 @@
 #include "render/Ghost.h"
 
 #include <cstdint>
+#include <functional>
 #include <list>
 #include <memory>
 #include <string>
@@ -42,6 +44,21 @@ struct RenderSettings {
     // of detail drops to fit; a hardware profile may set it), and the micro edge length to aim for on screen.
     size_t renderTriangleBudget = 0; // 0 = TierConfig::activeTriangleBudget (core/TierConfig.h)
     float microTargetPx = 2.0f;
+    // Viewport shading: Lit Sphere (the matcap or studio lights above) or PBR, which shades the material channels
+    // (core/TextureChannels.h) with image-based lighting from an environment (core/EnvironmentMath.h): GGX
+    // specular through a prefiltered environment and a BRDF table, diffuse from its SH9, exposure and a tone map.
+    // Meshes without a PBR texture use pbrRoughness / pbrMetallic with their colour.
+    enum class Shading : uint8_t { LitSphere, Pbr };
+    Shading shading = Shading::LitSphere;
+    int environment = 0;              // index into environments()
+    float environmentRotation = 0.0f; // degrees about the up axis
+    float exposure = 0.0f;            // stops
+    ToneMap toneMap = ToneMap::Aces;
+    bool environmentBackground = false; // show the environment behind the model (blurred by backgroundBlur)
+    float backgroundBlur = 0.4f;        // 0 = sharp .. 1 = the roughest level
+    float pbrRoughness = 0.45f, pbrMetallic = 0.0f;
+    float pbrCavity = 0.5f; // how much the sculpt's creases darken under PBR (0 = physically plain)
+    bool pbr() const { return shading == Shading::Pbr; }
 };
 
 // A baked tangent-space normal map to preview on a mesh (core/Bake.h): RGB8 rows bottom-up, with the
@@ -73,6 +90,7 @@ struct SceneMesh {
     bool wireframe = false; // keep the wireframe's edges on the GPU (built on first need; draw() falls back to
                             // outlining the triangles, quad diagonals included, until they are)
     bool flat = false;      // flat shading: each triangle shows its own face normal (faceted)
+    bool pbr = false;       // the view shades PBR: upload the texture's material channels and their tangents
     const MeshOverlay* overlay = nullptr; // the UV Editor's view of the active mesh (must outlive the frame)
 };
 
@@ -120,6 +138,13 @@ public:
     // Persistent offscreen target (4x MSAA) for recording: draw between these calls.
     bool beginCapture(int width, int height, std::string& error);
     void endCapture(std::vector<uint8_t>& rgba); // top-down RGBA rows
+
+    // PBR view: an environment's lighting is being built (the view shows the previous one meanwhile). `wake` is
+    // called from the worker thread when it is ready (the app redraws then).
+    bool environmentPending() const;
+    // The PBR planes SubTool `id` has on the GPU (pbrViewPlanes bits: 1 ORM, 2 normal, 4 emissive), for tests.
+    uint32_t pbrPlanes(uint32_t id) const;
+    void setEnvironmentWake(std::function<void()> wake) { envWake_ = std::move(wake); }
 
     // GL texture of the painted texture of SubTool `id` as last synced (0 if none), for UI previews (rows bottom-up).
     GLuint paintTexture(uint32_t id) const;
@@ -235,6 +260,15 @@ private:
         // Baked normal map preview (NormalMapView): the map, and the tangents per drawn corner (texture buffer).
         GLuint normalTexture = 0, tangentData = 0, tangentTexture = 0;
         uint64_t normalSerial = 0;
+        // PBR view (RenderSettings::Shading::Pbr): the texture's material channels packed (pbrViewTexels) as
+        // ORM, normal and emissive textures; `pbrPlanes` says which are uploaded (pbrViewPlanes bits). A material
+        // normal uses tangents computed here (MikkTSpace) unless a baked normal map preview brings its own.
+        GLuint ormTexture = 0, matNormalTexture = 0, emissiveTexture = 0;
+        uint32_t pbrPlanes = 0;
+        uint64_t pbrSerial = 0;
+        std::vector<glm::vec4> matTangents; // per mesh corner
+        uint64_t matTangentKey = 0;         // UV fingerprint + counts they were computed for
+        bool tangentsFromMaterial = false;  // tangentTexture holds matTangents (not the baked preview's)
         bool hasTangents = false, tangentsStale = true, normalFlipGreen = false;
         bool hasColors = false, hasMask = false, hasGroups = false, hasUvs = false;
         const MeshOverlay* overlay = nullptr; // this frame's (SceneMesh::overlay)
@@ -302,7 +336,7 @@ private:
     };
     MeshSlot& slot(uint32_t id); // created on first use
     static void freeSlot(MeshSlot& s);
-    void sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap = nullptr, bool wireframe = false);
+    void sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap = nullptr, bool wireframe = false, bool pbr = false);
     void uploadVertices(MeshSlot& s, const Mesh& mesh, bool full);
     // `computed`: the bounds are already current (only the totals are left).
     void updateBounds(MeshSlot& s, const Mesh& mesh, bool all, bool computed = false);
@@ -332,7 +366,19 @@ private:
     std::vector<uint8_t> staging_;                         // scratch for sync: gathered vertex data
     std::vector<uint8_t> blockChanged_, blockMoved_;      // scratch for uploadVertices, per block
     std::vector<std::pair<uint32_t, uint32_t>> movedRuns_; // the dirty runs whose positions moved
-    void syncTexture(MeshSlot& s, Mesh& mesh);
+    void syncTexture(MeshSlot& s, Mesh& mesh, bool pbr);
+    void uploadTangents(MeshSlot& s, const std::vector<glm::vec4>& all);
+    // Image-based lighting (core/EnvironmentMath.h): the prefiltered environment (RGB16F, a mip per roughness
+    // level), the BRDF table (RG16F) and the SH9, built when the environment first shows or changes.
+    bool ensureEnvironment(int index);
+    void setPbrUniforms(const MeshProgram& p, const RenderSettings& settings, bool textured, const MeshSlot& s);
+    GLuint envTexture_ = 0, brdfTexture_ = 0, envBgProgram_ = 0;
+    struct EnvJob;
+    std::shared_ptr<EnvJob> envJob_;
+    std::function<void()> envWake_;
+    int envIndex_ = -1, envFailedIndex_ = -1;
+    SH9 envSh_;
+    glm::mat3 frameViewToEnv_{1.0f};
     // The clusters of `s` to draw this frame: in full (drawClusters_), and with `proxy` as their motion proxy
     // where it is built (proxyClusters_).
     void cull(const MeshSlot& s, const CullView& view, bool proxy = false);
@@ -354,16 +400,19 @@ private:
     glm::mat4 frameView_{1.0f}, frameProj_{1.0f};
     glm::vec4 frameViewport_{0.0f};
     CullView frameCull_;
-    // Mesh shader variants by feature bits (kPaint, kPrim, kTextured, kNormalMap, kFlat), compiled on first use.
+    // Mesh shader variants by feature bits (kPaint, kPrim, kTextured, kNormalMap, kFlat, kPbr), compiled on first use.
     struct MeshProgram {
         GLuint id = 0;
         GLint view = -1, proj = -1, gridOrigin = -1, gridStep = -1, viewport = -1, projScale = -1, baseColor = -1, paint = -1,
               showMask = -1, groups = -1, matcap = -1, matcapCavity = -1, dim = -1, primBase = -1, hasPaint = -1,
               normalFlipY = -1, twoSided = -1, checker = -1, checkerScale = -1;
+        GLint hasOrm = -1, hasEmissive = -1, hasMatNormal = -1, envLevels = -1, exposure = -1, toneMap = -1, material = -1,
+              pbrCavity = -1, viewToEnv = -1, sh = -1;
         GLint ghostGroups = -1, ghostRange = -1, ghostEdge = -1, ghostA = -1, ghostB = -1, ghostC = -1, ghostBound = -1, ghostKind = -1, ghostFocal = -1;
     };
-    static constexpr int kPaint = 1, kPrim = 2, kTextured = 4, kNormalMap = 8, kFlat = 16, kMicro = 32, kGhost = 64;
-    MeshProgram programs_[128];
+    static constexpr int kPaint = 1, kPrim = 2, kTextured = 4, kNormalMap = 8, kFlat = 16, kMicro = 32, kGhost = 64,
+                         kPbr = 128;
+    MeshProgram programs_[256];
     void drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings);
     std::string programError_;
     const MeshProgram* meshProgram(int features);

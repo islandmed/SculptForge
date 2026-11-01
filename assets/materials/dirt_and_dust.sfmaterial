@@ -1,0 +1,26 @@
+{
+  "format": "sculptforge-material-recipe",
+  "version": 1,
+  "id": "dirt_and_dust",
+  "name": "Dirt and Dust",
+  "description": "Weathering to lay over any material: dark dirt packed into crevices and cavities, and pale dust on the surfaces that face up.",
+  "layers": [
+    {
+      "name": "Crevice Dirt",
+      "fill": {
+        "material": {"channels": ["base_color", "roughness", "metallic"], "color": [0.13, 0.1, 0.07], "roughness": 0.95, "metallic": 0.0},
+        "mask": [{"kind": "generator", "generator": "dirt", "level": 0.5, "softness": 0.25, "breakup": 0.7, "scale": 0.04, "seed": 21},
+                 {"kind": "blur", "radius": 2}]
+      }
+    },
+    {
+      "name": "Dust",
+      "fill": {
+        "material": {"channels": ["base_color", "roughness", "metallic"], "color": [0.62, 0.58, 0.5], "roughness": 1.0, "metallic": 0.0},
+        "mask": [{"kind": "generator", "generator": "light_direction", "direction": [0, 1, 0], "level": 0.3, "softness": 0.25, "breakup": 0.8, "scale": 0.03, "seed": 4},
+                 {"kind": "noise", "blend": "multiply", "scale": 0.012, "octaves": 3, "seed": 8, "contrast": 1.5},
+                 {"kind": "levels", "in_low": 0.1, "in_high": 0.6, "out_high": 0.85}]
+      }
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "format": "sculptforge-material-recipe",
+  "version": 1,
+  "id": "painted_edges",
+  "name": "Painted Edges",
+  "description": "Painted metal whose paint has chipped away on the edges, showing the bare metal underneath, with a little dirt in the corners.",
+  "layers": [
+    {
+      "name": "Bare Metal",
+      "fill": {
+        "material": {"channels": ["base_color", "roughness", "metallic"], "color": [0.6, 0.61, 0.62], "roughness": 0.35, "metallic": 1.0},
+        "mask": [{"kind": "fill", "value": 1.0}]
+      }
+    },
+    {
+      "name": "Paint",
+      "fill": {
+        "material": {"channels": ["base_color", "roughness", "metallic", "height"], "color": [0.62, 0.16, 0.1], "roughness": 0.55, "metallic": 0.0, "height": 0.53},
+        "mask": [{"kind": "generator", "generator": "edge_wear", "level": 0.42, "softness": 0.08, "breakup": 0.55, "scale": 0.025, "seed": 5},
+                 {"kind": "invert"}]
+      }
+    },
+    {
+      "name": "Corner Dirt",
+      "fill": {
+        "material": {"channels": ["base_color", "roughness"], "color": [0.2, 0.16, 0.12], "roughness": 0.95},
+        "mask": [{"kind": "generator", "generator": "dirt", "level": 0.35, "softness": 0.35, "breakup": 0.4, "scale": 0.06, "seed": 9},
+                 {"kind": "levels", "out_high": 0.8}]
+      }
+    }
+  ]
+}

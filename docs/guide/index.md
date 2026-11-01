@@ -33,6 +33,7 @@ You can read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<
 15. [Texture painting](texture-painting.md)
 16. [UV Editor](uv-editor.md)
 17. [Material painting (PBR)](pbr-painting.md)
+    - [Fill layers, Mesh Maps and Material Recipes](fill-layers.md)
 18. [Sculpt layers and blend shapes](layers.md)
 19. [Facial shapes and live face](facial-shapes.md)
 20. [Subdivision levels](subdivision-levels.md)

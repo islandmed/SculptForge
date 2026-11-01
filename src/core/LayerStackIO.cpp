@@ -34,7 +34,10 @@ uint16_t get16(const uint8_t* p) { return uint16_t(p[0] | p[1] << 8); }
 
 } // namespace
 
-int textureFormatVersion(const PaintTexture& tex) { return hasMaterialChannels(tex) ? 7 : 6; }
+int textureFormatVersion(const PaintTexture& tex) {
+    const bool fill = std::any_of(tex.layers.begin(), tex.layers.end(), [](const TextureLayer& l) { return l.fill != nullptr; });
+    return hasMaterialChannels(tex) || fill ? 7 : 6; // (Fill layers: "fill" and "mask" on their layer, core/Project.cpp)
+}
 
 std::vector<uint8_t> encodeTileImage(const TileImage& img) {
     std::vector<uint8_t> raw;

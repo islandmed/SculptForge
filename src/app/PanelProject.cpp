@@ -268,6 +268,22 @@ void App::storeProjectSettings() {
     render.set("background", std::string(renderSettings_.gradientBackground ? "gradient" : "flat"));
     render.set("background_color", vec3Json(renderSettings_.backgroundColor));
     render.set("matcap", renderSettings_.matcap < 0 ? std::string() : std::string(matcapName(renderSettings_.matcap)));
+    // Viewport shading (Material > Viewport Shading): Lit Sphere or PBR with its environment.
+    {
+        const RenderSettings& v = renderSettings_;
+        Json pbr = Json::object();
+        pbr.set("shading", std::string(v.pbr() ? "pbr" : "lit_sphere"));
+        pbr.set("environment", environments()[size_t(std::clamp(v.environment, 0, environmentCount() - 1))].id);
+        pbr.set("rotation", double(v.environmentRotation));
+        pbr.set("exposure", double(v.exposure));
+        pbr.set("tone_map", std::string(toneMapId(v.toneMap)));
+        pbr.set("background", v.environmentBackground);
+        pbr.set("background_blur", double(v.backgroundBlur));
+        pbr.set("roughness", double(v.pbrRoughness));
+        pbr.set("metallic", double(v.pbrMetallic));
+        pbr.set("cavity", double(v.pbrCavity));
+        render.set("viewport", std::move(pbr));
+    }
     // A custom MatCap travels inside the project (a PNG attachment), so the project opens with it on any machine.
     for (auto it = doc_.projectFiles.begin(); it != doc_.projectFiles.end();)
         it = it->first.rfind("matcaps/", 0) == 0 ? doc_.projectFiles.erase(it) : std::next(it);
@@ -343,6 +359,29 @@ void App::applyProjectSettings() {
         readFloat(r, "splat_opacity", renderSettings_.splatOpacity);
         // Projects from before the setting: the preferred shading.
         renderSettings_.flatShading = r["flat_shading"].asBool(uiPrefs_.flatShading);
+        // Viewport shading; projects from before it: Lit Sphere.
+        {
+            RenderSettings& v = renderSettings_;
+            const RenderSettings defaults;
+            const Json& pbr = r["viewport"];
+            auto num = [&](const char* key, float def, float lo, float hi) {
+                return pbr.isObject() && pbr[key].isNumber() ? std::clamp(float(pbr[key].asNumber()), lo, hi) : def;
+            };
+            v.shading = pbr.isObject() && pbr["shading"].isString() && pbr["shading"].asString() == "pbr"
+                            ? RenderSettings::Shading::Pbr
+                            : RenderSettings::Shading::LitSphere;
+            const int env = pbr.isObject() && pbr["environment"].isString() ? findEnvironment(pbr["environment"].asString()) : -1;
+            v.environment = env >= 0 ? env : 0;
+            v.environmentRotation = num("rotation", defaults.environmentRotation, -360.0f, 360.0f);
+            v.exposure = num("exposure", defaults.exposure, -10.0f, 10.0f);
+            v.toneMap = defaults.toneMap;
+            if (pbr.isObject() && pbr["tone_map"].isString()) parseToneMap(pbr["tone_map"].asString(), v.toneMap);
+            v.environmentBackground = pbr.isObject() && pbr["background"].isBool() ? pbr["background"].asBool() : defaults.environmentBackground;
+            v.backgroundBlur = num("background_blur", defaults.backgroundBlur, 0.0f, 1.0f);
+            v.pbrRoughness = num("roughness", defaults.pbrRoughness, 0.0f, 1.0f);
+            v.pbrMetallic = num("metallic", defaults.pbrMetallic, 0.0f, 1.0f);
+            v.pbrCavity = num("cavity", defaults.pbrCavity, 0.0f, 1.0f);
+        }
         // The background (#21); projects from before it: the preferred one.
         renderSettings_.gradientBackground =
             r["background"].isString() ? r["background"].asString() != "flat" : uiPrefs_.gradientBackground;

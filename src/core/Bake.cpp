@@ -3,6 +3,10 @@
 #include "core/Bake.h"
 
 #include "core/BakeImage.h"
+#include "core/MeshMaps.h"
+#include "core/Micro.h"
+#include "core/Multires.h"
+#include "core/RayBvh.h"
 #include "core/Document.h"
 #include "core/Tangents.h"
 #include "core/Texture.h"
@@ -34,261 +38,6 @@ std::string utf8(const std::filesystem::path& p) {
 }
 
 // ---------------------------------------------------------------------------
-// Ray BVH: binned-SAH tree over the source triangles. Queries are const and keep their state on the stack,
-// so any number of threads can cast at once.
-// ---------------------------------------------------------------------------
-
-struct RayHitInfo {
-    float t = 0, u = 0, v = 0;
-    uint32_t tri = 0;
-};
-
-class RayBvh {
-public:
-    void build(const std::vector<glm::vec3>& pos, const std::vector<glm::uvec3>& tris) {
-        const size_t n = tris.size();
-        nodes_.clear();
-        order_.resize(n);
-        std::vector<glm::vec3> centroid(n);
-        std::vector<Box> box(n);
-        for (size_t i = 0; i < n; ++i) {
-            order_[i] = uint32_t(i);
-            const glm::vec3 &a = pos[tris[i].x], &b = pos[tris[i].y], &c = pos[tris[i].z];
-            box[i].lo = glm::min(a, glm::min(b, c));
-            box[i].hi = glm::max(a, glm::max(b, c));
-            centroid[i] = (box[i].lo + box[i].hi) * 0.5f;
-        }
-        nodes_.reserve(n ? 2 * n / kLeaf + 16 : 1);
-        nodes_.push_back({});
-        if (n == 0) {
-            nodes_[0].lo = nodes_[0].hi = glm::vec3(0.0f);
-            return;
-        }
-        struct Job {
-            uint32_t node, first, count;
-        };
-        std::vector<Job> stack = {{0, 0, uint32_t(n)}};
-        while (!stack.empty()) {
-            const Job j = stack.back();
-            stack.pop_back();
-            Box nb, cb;
-            for (uint32_t i = j.first; i < j.first + j.count; ++i) {
-                nb.grow(box[order_[i]]);
-                cb.grow(centroid[order_[i]]);
-            }
-            nodes_[j.node].lo = nb.lo;
-            nodes_[j.node].hi = nb.hi;
-            uint32_t mid = 0;
-            if (j.count > kLeaf && split(j.first, j.count, nb, cb, box, centroid, mid)) {
-                const uint32_t left = uint32_t(nodes_.size());
-                nodes_.push_back({});
-                nodes_.push_back({});
-                nodes_[j.node].index = left;
-                nodes_[j.node].count = 0;
-                stack.push_back({left, j.first, mid - j.first});
-                stack.push_back({left + 1, mid, j.first + j.count - mid});
-            } else {
-                nodes_[j.node].index = j.first;
-                nodes_[j.node].count = j.count;
-            }
-        }
-        tris_.resize(n);
-        for (size_t i = 0; i < n; ++i) {
-            const glm::uvec3& t = tris[order_[i]];
-            tris_[i] = {pos[t.x], pos[t.y] - pos[t.x], pos[t.z] - pos[t.x]};
-        }
-    }
-
-    // The hit with t in [tmin, tmax] nearest to `target`.
-    bool nearest(const glm::vec3& o, const glm::vec3& d, float tmin, float tmax, float target, RayHitInfo& hit) const {
-        if (tris_.empty()) return false;
-        const glm::vec3 inv = invDir(d);
-        float best = std::numeric_limits<float>::max();
-        bool found = false;
-        uint32_t stack[64];
-        int sp = 0;
-        float tn, tf;
-        if (!slab(nodes_[0], o, inv, tmin, tmax, tn, tf)) return false;
-        stack[sp++] = 0;
-        while (sp) {
-            const Node& n = nodes_[stack[--sp]];
-            if (!slab(n, o, inv, tmin, tmax, tn, tf) || bound(tn, tf, target) >= best) continue;
-            if (n.count) {
-                for (uint32_t i = n.index; i < n.index + n.count; ++i) {
-                    float t, u, v;
-                    if (!intersect(tris_[i], o, d, t, u, v) || t < tmin || t > tmax) continue;
-                    const float e = std::abs(t - target);
-                    if (e < best) {
-                        best = e;
-                        hit = {t, u, v, order_[i]};
-                        found = true;
-                    }
-                }
-                continue;
-            }
-            float an, af, bn, bf;
-            const bool ha = slab(nodes_[n.index], o, inv, tmin, tmax, an, af);
-            const bool hb = slab(nodes_[n.index + 1], o, inv, tmin, tmax, bn, bf);
-            const float la = ha ? bound(an, af, target) : best, lb = hb ? bound(bn, bf, target) : best;
-            // Push the less promising child first so the better one is visited next.
-            if (la < best && lb < best) {
-                if (sp + 2 > 64) continue;
-                if (la <= lb) {
-                    stack[sp++] = n.index + 1;
-                    stack[sp++] = n.index;
-                } else {
-                    stack[sp++] = n.index;
-                    stack[sp++] = n.index + 1;
-                }
-            } else if (la < best && sp < 64) {
-                stack[sp++] = n.index;
-            } else if (lb < best && sp < 64) {
-                stack[sp++] = n.index + 1;
-            }
-        }
-        return found;
-    }
-
-    // Any hit with t in [tmin, tmax].
-    bool occluded(const glm::vec3& o, const glm::vec3& d, float tmin, float tmax) const {
-        if (tris_.empty()) return false;
-        const glm::vec3 inv = invDir(d);
-        uint32_t stack[64];
-        int sp = 0;
-        stack[sp++] = 0;
-        float tn, tf;
-        while (sp) {
-            const Node& n = nodes_[stack[--sp]];
-            if (!slab(n, o, inv, tmin, tmax, tn, tf)) continue;
-            if (n.count) {
-                for (uint32_t i = n.index; i < n.index + n.count; ++i) {
-                    float t, u, v;
-                    if (intersect(tris_[i], o, d, t, u, v) && t >= tmin && t <= tmax) return true;
-                }
-                continue;
-            }
-            if (sp + 2 <= 64) {
-                stack[sp++] = n.index + 1;
-                stack[sp++] = n.index;
-            }
-        }
-        return false;
-    }
-
-private:
-    static constexpr uint32_t kLeaf = 4;
-    static constexpr int kBins = 16;
-    struct Box {
-        glm::vec3 lo{std::numeric_limits<float>::max()}, hi{std::numeric_limits<float>::lowest()};
-        void grow(const glm::vec3& p) { lo = glm::min(lo, p), hi = glm::max(hi, p); }
-        void grow(const Box& b) { lo = glm::min(lo, b.lo), hi = glm::max(hi, b.hi); }
-        float area() const {
-            if (lo.x > hi.x) return 0.0f;
-            const glm::vec3 e = hi - lo;
-            return e.x * e.y + e.y * e.z + e.z * e.x;
-        }
-    };
-    struct Node {
-        glm::vec3 lo{0.0f};
-        uint32_t index = 0; // leaf: first triangle, inner: left child (right = index + 1)
-        glm::vec3 hi{0.0f};
-        uint32_t count = 0; // > 0 for leaves
-    };
-    struct Tri {
-        glm::vec3 v0, e1, e2;
-    };
-
-    bool split(uint32_t first, uint32_t count, const Box& nb, const Box& cb, const std::vector<Box>& box,
-               const std::vector<glm::vec3>& centroid, uint32_t& mid) {
-        float bestCost = std::numeric_limits<float>::max();
-        int bestAxis = -1, bestBin = 0;
-        const glm::vec3 ext = cb.hi - cb.lo;
-        for (int axis = 0; axis < 3; ++axis) {
-            if (ext[axis] <= 0.0f) continue;
-            Box bins[kBins];
-            uint32_t cnt[kBins] = {};
-            const float k = float(kBins) * 0.9999f / ext[axis];
-            for (uint32_t i = first; i < first + count; ++i) {
-                const int b = std::min(kBins - 1, int((centroid[order_[i]][axis] - cb.lo[axis]) * k));
-                bins[b].grow(box[order_[i]]);
-                ++cnt[b];
-            }
-            float rightArea[kBins];
-            uint32_t rightCount[kBins];
-            Box acc;
-            uint32_t c = 0;
-            for (int b = kBins - 1; b > 0; --b) {
-                acc.grow(bins[b]);
-                c += cnt[b];
-                rightArea[b] = acc.area();
-                rightCount[b] = c;
-            }
-            acc = Box();
-            c = 0;
-            for (int b = 0; b < kBins - 1; ++b) {
-                acc.grow(bins[b]);
-                c += cnt[b];
-                if (!c || !rightCount[b + 1]) continue;
-                const float cost = acc.area() * float(c) + rightArea[b + 1] * float(rightCount[b + 1]);
-                if (cost < bestCost) {
-                    bestCost = cost;
-                    bestAxis = axis;
-                    bestBin = b;
-                }
-            }
-        }
-        if (bestAxis < 0) { // all centroids in one spot: split in the middle of the list
-            if (count <= 16) return false;
-            mid = first + count / 2;
-            return true;
-        }
-        // A leaf costs about one intersection per triangle; stop when splitting doesn't pay.
-        if (count <= 8 && bestCost >= nb.area() * float(count)) return false;
-        const float k = float(kBins) * 0.9999f / ext[bestAxis];
-        auto* b = order_.data() + first;
-        auto* e = b + count;
-        auto* m = std::partition(b, e, [&](uint32_t t) {
-            return std::min(kBins - 1, int((centroid[t][bestAxis] - cb.lo[bestAxis]) * k)) <= bestBin;
-        });
-        mid = uint32_t(m - order_.data());
-        if (mid == first || mid == first + count) mid = first + count / 2;
-        return true;
-    }
-
-    static glm::vec3 invDir(const glm::vec3& d) {
-        auto inv = [](float x) { return std::abs(x) > 1e-20f ? 1.0f / x : (x < 0 ? -1e20f : 1e20f); };
-        return {inv(d.x), inv(d.y), inv(d.z)};
-    }
-    static bool slab(const Node& n, const glm::vec3& o, const glm::vec3& inv, float tmin, float tmax, float& tn, float& tf) {
-        const glm::vec3 t0 = (n.lo - o) * inv, t1 = (n.hi - o) * inv;
-        const glm::vec3 a = glm::min(t0, t1), b = glm::max(t0, t1);
-        tn = std::max(std::max(a.x, a.y), std::max(a.z, tmin));
-        tf = std::min(std::min(b.x, b.y), std::min(b.z, tmax));
-        return tn <= tf;
-    }
-    static float bound(float tn, float tf, float target) { return target < tn ? tn - target : target > tf ? target - tf : 0.0f; }
-    // Two-sided Moller-Trumbore.
-    static bool intersect(const Tri& tr, const glm::vec3& o, const glm::vec3& d, float& t, float& u, float& v) {
-        const glm::vec3 p = glm::cross(d, tr.e2);
-        const float det = glm::dot(tr.e1, p);
-        if (std::abs(det) < 1e-20f) return false;
-        const float inv = 1.0f / det;
-        const glm::vec3 s = o - tr.v0;
-        u = glm::dot(s, p) * inv;
-        if (u < 0.0f || u > 1.0f) return false;
-        const glm::vec3 q = glm::cross(s, tr.e1);
-        v = glm::dot(d, q) * inv;
-        if (v < 0.0f || u + v > 1.0f) return false;
-        t = glm::dot(tr.e2, q) * inv;
-        return true;
-    }
-
-    std::vector<Node> nodes_;
-    std::vector<uint32_t> order_;
-    std::vector<Tri> tris_;
-};
-
-// ---------------------------------------------------------------------------
 // The high-poly side: every source mesh's visible triangles in one list.
 // ---------------------------------------------------------------------------
 
@@ -298,6 +47,7 @@ struct Source {
     std::vector<uint32_t> triMesh, triLocal; // which source mesh / which of its triangles
     std::vector<uint32_t> vertexOffset;      // first vertex of each source mesh
     std::vector<float> curvature;            // per vertex, normalised to about -1..1 (cavity map)
+    std::vector<float> meanCurvature;        // per vertex, 1 / length (curvature map; meshMeanCurvature)
     std::vector<const Mesh*> meshes;
 };
 
@@ -466,6 +216,10 @@ const char* bakeMapId(BakeMap m) {
     case BakeMap::AmbientOcclusion: return "ao";
     case BakeMap::Cavity: return "cavity";
     case BakeMap::Color: return "color";
+    case BakeMap::Curvature: return "curvature";
+    case BakeMap::Thickness: return "thickness";
+    case BakeMap::Position: return "position";
+    case BakeMap::Id: return "id";
     }
     return "";
 }
@@ -473,11 +227,15 @@ const char* bakeMapId(BakeMap m) {
 const char* bakeMapLabel(BakeMap m) {
     switch (m) {
     case BakeMap::Normal: return "Normal (tangent)";
-    case BakeMap::ObjectNormal: return "Normal (object)";
+    case BakeMap::ObjectNormal: return "Normal (object / world)";
     case BakeMap::Displacement: return "Displacement";
     case BakeMap::AmbientOcclusion: return "Ambient Occlusion";
     case BakeMap::Cavity: return "Cavity";
     case BakeMap::Color: return "Colour";
+    case BakeMap::Curvature: return "Curvature";
+    case BakeMap::Thickness: return "Thickness";
+    case BakeMap::Position: return "Position";
+    case BakeMap::Id: return "ID";
     }
     return "";
 }
@@ -500,7 +258,10 @@ bool parseBakeMaps(const std::string& list, uint32_t& maps, std::string& error) 
         if (s == "object" || s == "objectnormal" || s == "object_space" || s == "world_normal") s = "object_normal";
         if (s == "disp" || s == "height") s = "displacement";
         if (s == "occlusion" || s == "ambient_occlusion") s = "ao";
-        if (s == "curvature") s = "cavity";
+        if (s == "convexity") s = "curvature";
+        if (s == "thick" || s == "translucency") s = "thickness";
+        if (s == "pos") s = "position";
+        if (s == "material_id" || s == "polygroups" || s == "polygroup") s = "id";
         if (s == "colour" || s == "polypaint" || s == "albedo" || s == "texture") s = "color";
         bool found = false;
         for (int i = 0; i < kBakeMapCount; ++i)
@@ -509,7 +270,8 @@ bool parseBakeMaps(const std::string& list, uint32_t& maps, std::string& error) 
                 found = true;
             }
         if (!found) {
-            error = "Unknown map '" + item + "' (use normal, object_normal, displacement, ao, cavity, color or all)";
+            error = "Unknown map '" + item + "' (use normal, object_normal, displacement, ao, cavity, color, curvature, "
+                    "thickness, position, id or all)";
             return false;
         }
     }
@@ -587,6 +349,13 @@ bool bakeMaps(const Mesh& low, const std::vector<const Mesh*>& sources, const Ba
     RayBvh bvh;
     bvh.build(src.pos, src.tris);
     if (st.maps & bakeBit(BakeMap::Cavity)) computeCurvature(src);
+    if (st.maps & bakeBit(BakeMap::Curvature)) {
+        src.meanCurvature.assign(src.pos.size(), 0.0f);
+        for (size_t m = 0; m < src.meshes.size(); ++m) {
+            const std::vector<float> h = meshMeanCurvature(*src.meshes[m]);
+            std::copy(h.begin(), h.end(), src.meanCurvature.begin() + std::ptrdiff_t(src.vertexOffset[m]));
+        }
+    }
     out.bvhSeconds = secondsSince(bvhStart);
     out.sourceTriangles = src.tris.size();
 
@@ -596,6 +365,10 @@ bool bakeMaps(const Mesh& low, const std::vector<const Mesh*>& sources, const Ba
     const bool wantAo = st.maps & bakeBit(BakeMap::AmbientOcclusion);
     const bool wantCavity = st.maps & bakeBit(BakeMap::Cavity);
     const bool wantColor = st.maps & bakeBit(BakeMap::Color);
+    const bool wantCurv = st.maps & bakeBit(BakeMap::Curvature);
+    const bool wantThick = st.maps & bakeBit(BakeMap::Thickness);
+    const bool wantPos = st.maps & bakeBit(BakeMap::Position);
+    const bool wantId = st.maps & bakeBit(BakeMap::Id);
 
     AABB lb = low.bounds();
     AABB all = lb;
@@ -650,6 +423,15 @@ bool bakeMaps(const Mesh& low, const std::vector<const Mesh*>& sources, const Ba
         return false;
     }
     const float aoDist = std::max(st.aoDistance, 1e-4f) * diag;
+    const float thickDist = std::max(st.thicknessDistance, 1e-4f) * diag;
+    const float curvRadius = std::max(st.curvatureRadius, 1e-5f) * diag;
+    out.positionMin = all.min;
+    out.positionMax = all.max;
+    const glm::vec3 posScale = 1.0f / glm::max(all.max - all.min, glm::vec3(1e-12f));
+    // ID colours: by polygroup (when any source has them and IdSource::Polygroups) or by source mesh.
+    bool anyGroups = false;
+    for (const Mesh* m : src.meshes) anyGroups = anyGroups || m->hasPolygroups();
+    const bool idByGroup = st.idSource == BakeSettings::IdSource::Polygroups && anyGroups;
 
     // --- Output planes ---
     const int W = st.size, H = st.size, S = st.samples;
@@ -664,6 +446,10 @@ bool bakeMaps(const Mesh& low, const std::vector<const Mesh*>& sources, const Ba
     if (wantAo) out.ao.assign(texels, 255);
     if (wantCavity) out.cavity.assign(texels, 128);
     if (wantDisp) out.displacement.assign(texels, 0.0f);
+    if (wantCurv) out.curvature.assign(texels, 128);
+    if (wantThick) out.thickness.assign(texels, 255);
+    if (wantPos) out.position.assign(texels * 3, 0);
+    if (wantId) out.id.assign(texels * 3, 0);
     out.coverage.assign(texels, 0);
     // Float copies of the normals for padding (averaged and renormalised there), only while baking.
     std::vector<glm::vec3> nTs, nOs, col;
@@ -703,11 +489,12 @@ bool bakeMaps(const Mesh& low, const std::vector<const Mesh*>& sources, const Ba
     std::mutex rangeMutex;
     float dMin = std::numeric_limits<float>::max(), dMax = std::numeric_limits<float>::lowest();
     const int aoPerSample = std::max(1, (st.aoRays + S * S - 1) / (S * S));
+    const int thickPerSample = std::max(1, (st.thicknessRays + S * S - 1) / (S * S));
 
     runWorkers(threads, [&](int worker) {
         struct Acc {
-            glm::vec3 ts{0}, os{0}, color{0}, lowN{0};
-            float disp = 0, ao = 0, cav = 0;
+            glm::vec3 ts{0}, os{0}, color{0}, lowN{0}, pos{0}, id{0};
+            float disp = 0, ao = 0, cav = 0, curv = 0, thick = 0;
             uint16_t hits = 0, samples = 0;
         };
         std::vector<Acc> acc(size_t(kTile) * kTile);
@@ -817,6 +604,40 @@ bool bakeMaps(const Mesh& low, const std::vector<const Mesh*>& sources, const Ba
                             }
                             a.ao += 1.0f - float(hits) / float(aoPerSample);
                         }
+                        if (wantCurv) { // mean curvature at the hit, scaled by the radius: > 0 convex
+                            const float hc = src.meanCurvature[ht.x] * w0 + src.meanCurvature[ht.y] * h.u +
+                                             src.meanCurvature[ht.z] * h.v;
+                            a.curv += std::clamp(hc * curvRadius, -1.0f, 1.0f);
+                        }
+                        if (wantThick) {
+                            // Cosine-weighted rays into the surface: the mean distance to the far side.
+                            glm::vec3 in = -nh;
+                            if (glm::dot(in, n) > 0.0f) in = -in; // (nh faces outwards here)
+                            glm::vec3 bt, bb;
+                            basis(in, bt, bb);
+                            const uint32_t seed = hash32(uint32_t(sx) * 2654435761u ^ uint32_t(sy) * 40503u);
+                            const float r1 = float(seed & 0xFFFF) / 65536.0f, r2 = float(seed >> 16) / 65536.0f;
+                            const glm::vec3 o = hp + in * (eps * 4.0f);
+                            float sum = 0.0f;
+                            for (int r = 0; r < thickPerSample; ++r) {
+                                float u1 = (float(r) + 0.5f) / float(thickPerSample) + r1, u2 = radicalInverse(uint32_t(r)) + r2;
+                                u1 -= std::floor(u1);
+                                u2 -= std::floor(u2);
+                                const float rad = std::sqrt(u1), phi = 6.2831853f * u2;
+                                const glm::vec3 dir = bt * (rad * std::cos(phi)) + bb * (rad * std::sin(phi)) +
+                                                      in * std::sqrt(std::max(0.0f, 1.0f - u1));
+                                RayHitInfo th;
+                                sum += bvh.nearest(o, dir, eps, thickDist, 0.0f, th) ? th.t : thickDist;
+                            }
+                            a.thick += sum / (float(thickPerSample) * thickDist);
+                        }
+                        if (wantPos) a.pos += (hp - all.min) * posScale;
+                        if (wantId) {
+                            const Mesh& m = *src.meshes[src.triMesh[h.tri]];
+                            const uint32_t key = idByGroup ? m.polygroupAt(src.triLocal[h.tri]) * 2654435761u + src.triMesh[h.tri]
+                                                           : src.triMesh[h.tri] * 2246822519u + 7u;
+                            a.id += idMapColor(key);
+                        }
                     }
                 }
             }
@@ -854,6 +675,13 @@ bool bakeMaps(const Mesh& low, const std::vector<const Mesh*>& sources, const Ba
                         const glm::vec3 c = linearToSrgb(glm::clamp(a.color * inv, 0.0f, 1.0f));
                         for (int k = 0; k < 3; ++k) out.color[i * 3 + size_t(k)] = unorm8(c[k]);
                     }
+                    if (wantCurv) out.curvature[i] = unorm8(0.5f + 0.5f * a.curv * inv);
+                    if (wantThick) out.thickness[i] = unorm8(a.thick * inv);
+                    if (wantPos)
+                        for (int k = 0; k < 3; ++k)
+                            out.position[i * 3 + size_t(k)] = uint16_t(std::lround(std::clamp(a.pos[k] * inv, 0.0f, 1.0f) * 65535.0f));
+                    if (wantId)
+                        for (int k = 0; k < 3; ++k) out.id[i * 3 + size_t(k)] = unorm8(a.id[k] * inv);
                 }
             const size_t d = done.fetch_add(1) + 1;
             if (worker == 0 && progress && !progress(0.95f * float(d) / float(work.size()))) cancel = true;
@@ -921,8 +749,8 @@ bool bakeMaps(const Mesh& low, const std::vector<const Mesh*>& sources, const Ba
                     for (size_t q = f; q < std::min(front.size(), f + 256); ++q) {
                         const size_t i = front[q];
                         const int x = int(i % size_t(W)), y = int(i / size_t(W));
-                        glm::vec3 ts(0), os(0), cl(0);
-                        float dp = 0, ao = 0, cv = 0;
+                        glm::vec3 ts(0), os(0), cl(0), ps(0), idc(0);
+                        float dp = 0, ao = 0, cv = 0, cu = 0, th = 0;
                         int n = 0;
                         for (int dy = -1; dy <= 1; ++dy)
                             for (int dx = -1; dx <= 1; ++dx) {
@@ -939,6 +767,10 @@ bool bakeMaps(const Mesh& low, const std::vector<const Mesh*>& sources, const Ba
                                 if (wantDisp) dp += out.displacement[j];
                                 if (wantAo) ao += out.ao[j];
                                 if (wantCavity) cv += out.cavity[j];
+                                if (wantCurv) cu += out.curvature[j];
+                                if (wantThick) th += out.thickness[j];
+                                if (wantPos) ps += glm::vec3(out.position[j * 3], out.position[j * 3 + 1], out.position[j * 3 + 2]);
+                                if (wantId) idc += glm::vec3(out.id[j * 3], out.id[j * 3 + 1], out.id[j * 3 + 2]);
                             }
                         if (!n) continue;
                         const float inv = 1.0f / float(n);
@@ -955,6 +787,12 @@ bool bakeMaps(const Mesh& low, const std::vector<const Mesh*>& sources, const Ba
                         if (wantDisp) out.displacement[i] = dp * inv;
                         if (wantAo) out.ao[i] = uint8_t(std::lround(ao * inv));
                         if (wantCavity) out.cavity[i] = uint8_t(std::lround(cv * inv));
+                        if (wantCurv) out.curvature[i] = uint8_t(std::lround(cu * inv));
+                        if (wantThick) out.thickness[i] = uint8_t(std::lround(th * inv));
+                        for (int c = 0; c < 3; ++c) {
+                            if (wantPos) out.position[i * 3 + size_t(c)] = uint16_t(std::lround(ps[c] * inv));
+                            if (wantId) out.id[i * 3 + size_t(c)] = uint8_t(std::lround(idc[c] * inv));
+                        }
                     }
                 }
             });
@@ -972,6 +810,91 @@ bool bakeMaps(const Mesh& low, const std::vector<const Mesh*>& sources, const Ba
     }
     if (progress) progress(1.0f);
     out.seconds = secondsSince(start);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// UDIM tiles and level sources
+// ---------------------------------------------------------------------------
+
+std::vector<int> udimTiles(const Mesh& low) {
+    std::vector<int> tiles;
+    if (low.uvs.size() != low.triangleCount() * 3) return tiles;
+    bool outside = false;
+    std::vector<uint8_t> seen(100, 0); // u 0..9, v 0..9
+    for (size_t t = 0; t < low.triangleCount(); ++t) {
+        const glm::vec2 c = (low.uvs[t * 3] + low.uvs[t * 3 + 1] + low.uvs[t * 3 + 2]) / 3.0f;
+        if (!std::isfinite(c.x) || !std::isfinite(c.y)) continue;
+        const int u = int(std::floor(c.x)), v = int(std::floor(c.y));
+        if (u != 0 || v != 0) outside = true;
+        if (u < 0 || u > 9 || v < 0 || v > 9) continue; // (UDIM covers 10 columns; others are skipped)
+        seen[size_t(v * 10 + u)] = 1;
+    }
+    if (!outside) return tiles;
+    for (int i = 0; i < 100; ++i)
+        if (seen[size_t(i)]) tiles.push_back(1001 + i);
+    return tiles;
+}
+
+bool bakeMapsUdim(const Mesh& low, const std::vector<const Mesh*>& sources, const BakeSettings& settings,
+                  std::vector<BakeResult>& results, std::string& error, const BakeProgress& progress) {
+    results.clear();
+    const std::vector<int> tiles = udimTiles(low);
+    if (tiles.empty()) {
+        results.emplace_back();
+        return bakeMaps(low, sources, settings, results.back(), error, progress);
+    }
+    // Per tile, a copy of the low-poly whose UVs in that tile move to 0..1 and whose other triangles move far
+    // outside (their samples are skipped).
+    Mesh shifted = low;
+    shifted.texture.reset();
+    for (size_t k = 0; k < tiles.size(); ++k) {
+        const int u = (tiles[k] - 1001) % 10, v = (tiles[k] - 1001) / 10;
+        for (size_t t = 0; t < low.triangleCount(); ++t) {
+            const glm::vec2 c = (low.uvs[t * 3] + low.uvs[t * 3 + 1] + low.uvs[t * 3 + 2]) / 3.0f;
+            const bool in = int(std::floor(c.x)) == u && int(std::floor(c.y)) == v;
+            for (size_t i = 0; i < 3; ++i)
+                shifted.uvs[t * 3 + i] = in ? low.uvs[t * 3 + i] - glm::vec2(float(u), float(v)) : glm::vec2(-8.0f);
+        }
+        BakeResult r;
+        const float lo = float(k) / float(tiles.size()), span = 1.0f / float(tiles.size());
+        const BakeProgress tileProgress = [&](float f) { return !progress || progress(lo + f * span); };
+        if (!bakeMaps(shifted, sources, settings, r, error, tileProgress)) return false;
+        r.udim = tiles[k];
+        results.push_back(std::move(r));
+    }
+    return true;
+}
+
+bool bakeLevelSources(const Mesh& part, const std::string& source, Mesh& low, Mesh& high, std::string& error) {
+    if (source == "subdivision" || source == "levels" || source == "subdiv") {
+        const int levels = subdivLevelCount(part);
+        if (levels < 2) {
+            error = "The Part has no subdivision levels (Tool > Geometry > Divide)";
+            return false;
+        }
+        low = subdivLevelMesh(part, 0);
+        high = subdivLevelMesh(part, levels - 1);
+    } else if (source == "micro") {
+        if (!hasMicro(part)) {
+            error = "The Part has no micro level (Tool > Geometry > Micro)";
+            return false;
+        }
+        low = part;
+        low.micro.reset();
+        if (!microBakeMesh(part, microLevel(part), high, error)) return false;
+    } else {
+        error = "Unknown level source '" + source + "' (use subdivision or micro)";
+        return false;
+    }
+    low.texture.reset();
+    high.texture = part.texture; // (colour comes from the Part's own texture)
+    if (low.uvs.size() != low.triangleCount() * 3) {
+        error = "The Part's lowest level has no UVs: run Auto UV on it first (Tool > Texture Map)";
+        return false;
+    }
+    if (low.normals.size() != low.vertexCount()) low.recomputeAllNormals();
+    if (high.normals.size() != high.vertexCount()) high.recomputeAllNormals();
     return true;
 }
 
@@ -999,8 +922,9 @@ Image bakeMapImage(const BakeResult& r, BakeMap map) {
     img.height = r.height;
     img.rgba.assign(size_t(r.width) * size_t(r.height) * 4, 255);
     const std::vector<uint8_t>* rgb = map == BakeMap::Normal ? &r.normal : map == BakeMap::ObjectNormal ? &r.objectNormal
-                                    : map == BakeMap::Color ? &r.color : nullptr;
-    const std::vector<uint8_t>* grey = map == BakeMap::AmbientOcclusion ? &r.ao : map == BakeMap::Cavity ? &r.cavity : nullptr;
+                                    : map == BakeMap::Color ? &r.color : map == BakeMap::Id ? &r.id : nullptr;
+    const std::vector<uint8_t>* grey = map == BakeMap::AmbientOcclusion ? &r.ao : map == BakeMap::Cavity ? &r.cavity
+                                     : map == BakeMap::Curvature ? &r.curvature : map == BakeMap::Thickness ? &r.thickness : nullptr;
     const float k = r.displacementScale > 0.0f ? 0.5f / r.displacementScale : 0.0f;
     for (int y = 0; y < r.height; ++y)
         for (int x = 0; x < r.width; ++x) {
@@ -1010,6 +934,8 @@ Image bakeMapImage(const BakeResult& r, BakeMap map) {
                 p[0] = (*rgb)[i * 3], p[1] = (*rgb)[i * 3 + 1], p[2] = (*rgb)[i * 3 + 2];
             } else if (grey) {
                 p[0] = p[1] = p[2] = (*grey)[i];
+            } else if (map == BakeMap::Position) {
+                for (int c = 0; c < 3; ++c) p[c] = uint8_t(r.position[i * 3 + size_t(c)] >> 8);
             } else {
                 p[0] = p[1] = p[2] = unorm8(0.5f + r.displacement[i] * k);
             }
@@ -1017,9 +943,9 @@ Image bakeMapImage(const BakeResult& r, BakeMap map) {
     return img;
 }
 
-std::string bakeFileName(const std::string& base, BakeMap map, const char* ext) {
+std::string bakeFileName(const std::string& base, BakeMap map, const char* ext, int udim) {
     const char* suffix = map == BakeMap::ObjectNormal ? "normal_object" : bakeMapId(map);
-    return base + "_" + suffix + ext;
+    return base + "_" + suffix + (udim > 0 ? "." + std::to_string(udim) : std::string()) + ext;
 }
 
 bool saveBakeMaps(const BakeResult& r, const std::string& folder, const std::string& base, bool exr,
@@ -1031,7 +957,16 @@ bool saveBakeMaps(const BakeResult& r, const std::string& folder, const std::str
     for (int i = 0; i < kBakeMapCount; ++i) {
         const BakeMap m = BakeMap(i);
         if (!r.has(m)) continue;
-        const std::string path = utf8(dir / fsPath(bakeFileName(base, m)));
+        const std::string path = utf8(dir / fsPath(bakeFileName(base, m, ".png", r.udim)));
+        if (m == BakeMap::Position) { // 16-bit RGB, top-down
+            std::vector<uint16_t> px(r.position.size());
+            for (int y = 0; y < r.height; ++y)
+                std::memcpy(&px[size_t(r.height - 1 - y) * size_t(r.width) * 3], &r.position[size_t(y) * size_t(r.width) * 3],
+                            size_t(r.width) * 3 * sizeof(uint16_t));
+            if (!savePng16(path, r.width, r.height, 3, px, error)) return false;
+            written.push_back(path);
+            continue;
+        }
         if (m == BakeMap::Displacement) {
             if (!savePng16(path, r.width, r.height, 1, displacement16(r), error)) return false;
             written.push_back(path);
@@ -1040,7 +975,7 @@ bool saveBakeMaps(const BakeResult& r, const std::string& folder, const std::str
                 for (int y = 0; y < r.height; ++y)
                     std::memcpy(&f[size_t(r.height - 1 - y) * size_t(r.width)], &r.displacement[size_t(y) * size_t(r.width)],
                                 size_t(r.width) * sizeof(float));
-                const std::string exrPath = utf8(dir / fsPath(bakeFileName(base, m, ".exr")));
+                const std::string exrPath = utf8(dir / fsPath(bakeFileName(base, m, ".exr", r.udim)));
                 if (!saveExr(exrPath, r.width, r.height, 1, f, error)) return false;
                 written.push_back(exrPath);
             }
@@ -1059,8 +994,9 @@ std::string bakeSummary(const BakeResult& r) {
     std::string names;
     for (int i = 0; i < kBakeMapCount; ++i)
         if (r.has(BakeMap(i))) names += std::string(names.empty() ? "" : ", ") + bakeMapId(BakeMap(i));
-    s << "Baked " << names << " at " << r.width << "x" << r.height << " from " << r.sourceTriangles << " triangles in "
-      << r.seconds << " s";
+    s << "Baked " << names << " at " << r.width << "x" << r.height;
+    if (r.udim > 0) s << " (UDIM " << r.udim << ")";
+    s << " from " << r.sourceTriangles << " triangles in " << r.seconds << " s";
     s.precision(4);
     s << "; rays " << r.front << " in front, " << r.rear << " behind";
     if (r.has(BakeMap::Displacement))
@@ -1125,11 +1061,16 @@ void registerBakeCommands(CommandRegistry& reg) {
     using T = ParamSpec::Type;
     reg.add({"bake",
              "Bake maps from a high-poly source onto the active Part's UVs (the low-poly): tangent-space normal "
-             "(MikkTSpace), object-space normal, displacement (16-bit PNG + 32-bit EXR), ambient occlusion, cavity and "
-             "colour. Rays go along the low-poly's smooth normals from 'front' in front of it to 'rear' behind it. "
-             "Writes <name>_<map>.png into the output folder.",
-             {{"source", T::String, "Part to bake from, or all (default: every visible Part but the active one).", false},
-              {"maps", T::String, "Comma list: normal, object_normal, displacement, ao, cavity, color, or all. Default normal.", false},
+             "(MikkTSpace), object-space (world) normal, displacement (16-bit PNG + 32-bit EXR), ambient occlusion, cavity, "
+             "colour, curvature, thickness, position (16-bit) and ID (polygroups or Parts). Rays go along the low-poly's "
+             "smooth normals from 'front' in front of it to 'rear' behind it. The source can be other Parts, or the "
+             "active Part's own top subdivision level (baked onto its lowest level) or micro level (onto its base). "
+             "UVs outside 0..1 bake as UDIM tiles. Writes <name>_<map>.png (<name>_<map>.1001.png per UDIM tile) into "
+             "the output folder.",
+             {{"source", T::String, "A Part to bake from, all (default: every visible Part but the active one), subdivision "
+                                    "(the active Part's top level onto its lowest) or micro (its micro level onto its base).", false},
+              {"maps", T::String, "Comma list: normal, object_normal (world_normal), displacement, ao, cavity, color, curvature, "
+                                  "thickness, position, id, or all. Default normal.", false},
               {"size", T::Number, "Map size in texels: 512, 1024, 2048 (default), 4096 or 8192 (1k...8k also work).", false},
               {"out", T::String, "Output folder (default: the project's folder, or the current folder).", false},
               {"name", T::String, "File name prefix (default: the active Part's name).", false},
@@ -1141,7 +1082,12 @@ void registerBakeCommands(CommandRegistry& reg) {
               {"ao_distance", T::Number, "How far occluders count, as a fraction of the size. Default 0.05.", false},
               {"green", T::String, "Normal map convention: opengl (default; Blender, Unity, Godot) or directx (Unreal).", false},
               {"displacement_scale", T::Number, "World units at white in the displacement PNG (default: the largest distance).", false},
-              {"exr", T::Bool, "Also write the displacement as a 32-bit float EXR in world units. Default true.", false}},
+              {"exr", T::Bool, "Also write the displacement as a 32-bit float EXR in world units. Default true.", false},
+              {"thickness_rays", T::Number, "Thickness rays per texel. Default 24.", false},
+              {"thickness_distance", T::Number, "Rays longer than this (a fraction of the size) count as thick. Default 0.1.", false},
+              {"curvature_radius", T::Number, "A bend of this radius (a fraction of the size) is fully bright or dark. Default 0.02.", false},
+              {"id", T::String, "What the ID map colours: polygroups (default) or parts.", false},
+              {"udim", T::Bool, "Bake UVs outside 0..1 as UDIM tiles (default true; false bakes the 0..1 square only).", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  BakeSettings st;
                  std::string err;
@@ -1184,25 +1130,53 @@ void registerBakeCommands(CommandRegistry& reg) {
                  const std::string green = argString(a, "green", "opengl");
                  if (green != "opengl" && green != "directx") return {false, "green must be opengl or directx"};
                  st.flipGreen = green == "directx";
+                 st.thicknessRays = int(argNumber(a, "thickness_rays", st.thicknessRays));
+                 st.thicknessDistance = float(argNumber(a, "thickness_distance", st.thicknessDistance));
+                 st.curvatureRadius = float(argNumber(a, "curvature_radius", st.curvatureRadius));
+                 const std::string id = argString(a, "id", "polygroups");
+                 if (id != "polygroups" && id != "parts") return {false, "id must be polygroups or parts"};
+                 st.idSource = id == "parts" ? BakeSettings::IdSource::Parts : BakeSettings::IdSource::Polygroups;
 
-                 std::vector<int> idx;
-                 if (!bakeSourceSubtools(doc, argString(a, "source", "all"), idx, err)) return {false, err};
+                 // The meshes: other Parts onto the active one, or the active Part's own levels.
+                 const std::string sourceArg = argString(a, "source", "all");
+                 Mesh levelLow, levelHigh;
+                 const Mesh* low = &doc.mesh;
                  std::vector<const Mesh*> sources;
-                 for (int i : idx) sources.push_back(&doc.subtoolMesh(i));
-                 auto result = std::make_shared<BakeResult>();
-                 if (!bakeMaps(doc.mesh, sources, st, *result, err)) return {false, err};
+                 if (sourceArg == "subdivision" || sourceArg == "micro") {
+                     if (!bakeLevelSources(doc.mesh, sourceArg, levelLow, levelHigh, err)) return {false, err};
+                     low = &levelLow;
+                     sources.push_back(&levelHigh);
+                 } else {
+                     std::vector<int> idx;
+                     if (!bakeSourceSubtools(doc, sourceArg, idx, err)) return {false, err};
+                     for (int i : idx) sources.push_back(&doc.subtoolMesh(i));
+                 }
+                 std::vector<BakeResult> results;
+                 if (argBool(a, "udim", true)) {
+                     if (!bakeMapsUdim(*low, sources, st, results, err)) return {false, err};
+                 } else {
+                     results.emplace_back();
+                     if (!bakeMaps(*low, sources, st, results.back(), err)) return {false, err};
+                 }
+                 auto result = std::make_shared<BakeResult>(results.front());
                  std::string name = argString(a, "name", doc.activeSubtoolInfo().name);
                  for (char& c : name)
                      if (c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|')
                          c = '_';
                  if (name.empty()) name = "bake";
                  const std::string folder = argString(a, "out", defaultBakeFolder(doc));
-                 std::vector<std::string> written;
-                 if (!saveBakeMaps(*result, folder, name, argBool(a, "exr", true), written, err)) return {false, err};
-                 notifyBakeListener(doc, result, written);
+                 std::vector<std::string> written, all;
+                 std::string summary;
+                 for (const BakeResult& r : results) {
+                     if (!saveBakeMaps(r, folder, name, argBool(a, "exr", true), written, err)) return {false, err};
+                     all.insert(all.end(), written.begin(), written.end());
+                     summary += (summary.empty() ? "" : "\n") + bakeSummary(r);
+                 }
+                 // (the preview shows the bake on the active Part, which is the low-poly only for Part sources)
+                 if (low == &doc.mesh && results.size() == 1) notifyBakeListener(doc, result, all);
                  std::string files;
-                 for (const std::string& w : written) files += "\n  " + w;
-                 return {true, bakeSummary(*result) + "\nWrote:" + files};
+                 for (const std::string& w : all) files += "\n  " + w;
+                 return {true, summary + "\nWrote:" + files};
              }});
 }
 

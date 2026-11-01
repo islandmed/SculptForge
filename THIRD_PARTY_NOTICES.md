@@ -19,6 +19,7 @@ licenses require.
 | QRemesh 2 (published methods, no third-party code) | — | — | The default QRemesh method (src/core/QRemesh2*.cpp) is our own implementation of published techniques: integer-grid maps / mixed-integer quadrangulation (Bommes, Zimmer & Kobbelt 2009; Bommes, Campen, Ebke, Alliez & Kobbelt 2013), N-RoSy fields as complex powers and the smoothest field by inverse power iteration (Ray, Vallet, Li & Lévy 2008; Knöppel, Crane, Pinkall & Schröder 2013), the dihedral curvature tensor (Cohen-Steiner & Morvan 2003), isotropic remeshing (Botsch & Kobbelt 2004) and smoothed aggregation multigrid. No code from QuadWild (GPL-3), libigl (MPL-2.0), CoMISo or Instant Meshes is included. |
 | [GoB](https://github.com/JoseConseco/GoB) | format reference only, nothing vendored | GNU GPL 3 | The .GoZ file layout that Send to ZBrush and the .GoZ import/export read and write (src/io/GozIO.cpp, docs/goz.md) follows this open-source Blender add-on, credited with thanks. No code from it is included. |
 | [Inter typeface](https://github.com/rsms/inter) | 4.1 | SIL Open Font License 1.1 | User interface font, embedded in the desktop app. Vendored in assets/fonts. |
+| [Poly Haven](https://polyhaven.com) HDRIs: Brown Photostudio 02, Studio Small 09 (Sergej Majboroda), Kloofendal 48d Partly Cloudy (Pure Sky) (Greg Zaal, sky edits by Jarod Guest) | 1K files, downsampled to 512 x 256 | CC0 1.0 (public domain) | Image-based lighting of the PBR viewport (Material > Viewport Shading). Vendored in assets/hdri and embedded. |
 | [ICT-FaceKit](https://github.com/ICT-VGL/ICT-FaceKit) (ICT Face Model Light) | commit on master, 2020 | MIT License | The template head of Generate Facial Shapes (Tool > Facial Shapes): its neutral skin, mouth and eye sockets and its 53 ARKit-style expression shapes, converted by tools/face/build_ict_template.py into assets/face/ict-arkit.sfface (embedded). Not the separately licensed full ICT Face Model. |
 | [libcurl](https://curl.se) | system library | curl License (MIT/X derivate) | HTTPS for optional AI features on Linux and macOS. Linked dynamically from the operating system; Windows uses the built-in WinHTTP instead. |
 | [QR Code generator](https://github.com/nayuki/QR-Code-generator) | 1.8.0 | MIT License | The phone link's pairing QR code (File > Capture from phone). Vendored in third_party/qrcodegen. |
@@ -613,6 +614,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
 ---
+
+## Poly Haven HDRIs
+
+https://polyhaven.com — CC0 1.0 Universal (public domain dedication), https://polyhaven.com/license.
+assets/hdri/brown_photostudio_02.hdr and assets/hdri/studio_small_09.hdr (by Sergej Majboroda) and
+assets/hdri/kloofendal_48d_partly_cloudy_puresky.hdr (by Greg Zaal, sky edits by Jarod Guest) are the 1K Radiance files from Poly Haven,
+downsampled to 512 x 256. CC0 needs no attribution; it is given here as thanks. No other environment is bundled:
+the "Studio" environment is generated in code (src/core/EnvironmentMath.cpp).
 
 ## ICT-FaceKit
 

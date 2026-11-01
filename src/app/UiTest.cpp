@@ -145,6 +145,8 @@
 //   (mesh values are the active SubTool's)
 //   snapshot                 remember the active mesh's vertices (for the moved* values)
 //   remember VALUE NAME      keep VALUE's current value as $NAME
+//   run_fails COMMAND ...    run a command that must be refused (bad arguments)
+//   print VALUE              write VALUE's current value to the log (benchmarks: frame_ms)
 //   shot NAME                save a screenshot NAME.png (to --ui-out)
 //   expect_guide FILE        the User Guide shows FILE ("masking.md", "index.md")
 //   dump_shortcuts NAME      write every default shortcut as a Markdown table to --ui-out/NAME
@@ -1412,6 +1414,19 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
                 }
             }
         });
+    } else if (verb == "run_fails") { // run_fails COMMAND ARGS...: the command must be refused
+        if (!need(1)) return false;
+        std::vector<ScriptStatement> statements;
+        if (!parseScript(restOf(lineText_, 1), statements, error)) return false;
+        run([this, line, statements] {
+            for (const auto& st : statements) {
+                app_.runCommand(st.command, st.args);
+                if (app_.lastCommandOk_) {
+                    fail(line, st.command + " was expected to fail: " + app_.status_);
+                    return;
+                }
+            }
+        });
     } else if (verb == "support_card") {
         // The launch decision for the support card (Support.h), as a start would make it: `first_run`, `updated` (a
         // new version since it last showed), `days=N` (the clock N days after it last showed) and `test_mode` (how
@@ -1589,6 +1604,20 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         run([this] {
             basePositions_ = app_.doc_.mesh.positions;
             baseNormals_ = app_.doc_.mesh.normals;
+        });
+    } else if (verb == "print") { // print NAME: writes a value to the log (benchmarks: frame_ms, ...)
+        if (!need(1)) return false;
+        bool known = false;
+        query(w[1], known);
+        if (!known) {
+            error = "unknown value '" + w[1] + "'";
+            return false;
+        }
+        run([this, name = w[1]] {
+            bool k = false;
+            const double v = query(name, k);
+            std::printf("%s = %g\n", name.c_str(), v);
+            std::fflush(stdout);
         });
     } else if (verb == "remember") {
         if (!need(2)) return false;

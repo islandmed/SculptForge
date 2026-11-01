@@ -13,6 +13,8 @@
 #include "app/Ui.h"
 
 #include "core/Bake.h"
+#include "core/Micro.h"
+#include "core/Multires.h"
 
 #include <IconsLucide.h>
 
@@ -78,6 +80,7 @@ struct BakeUiState {
     BakeSettings settings;
     int sizeChoice = 1;          // 2K
     uint32_t source = 0;         // SubTool id to bake from; 0 = every visible SubTool but the active one
+    int levelSource = 0;         // 1: the active Part's top subdivision level onto its lowest, 2: its micro level
     char folder[1024] = "";      // empty = beside the last export / the project / <library>/Bakes
     bool exr = true;
     bool preview = true;         // show the baked normal map on the low-poly
@@ -93,6 +96,8 @@ struct BakeUiState {
         uint32_t subtool = 0;
         size_t triangles = 0;
         std::string folder;
+        bool preview = true; // the bake is of the active Part as it is (no other level, no UDIM tiles)
+        std::shared_ptr<int> tiles; // UDIM tiles baked (0: a plain bake)
     };
     std::unique_ptr<Job> job;
 
@@ -208,9 +213,10 @@ void App::registerBakeUiActions() {
         actions_.add(std::move(a));
     };
     add("bake.run", "Bake", [this] { startBake(); }, nullptr,
-        [this] { return !bake_->job && doc_.mesh.hasUvs() && doc_.subtoolCount() > 1; },
-        "Bake the chosen maps from the source Part(s) onto this Part's UVs, in the background. Maps are saved as "
-        "PNGs (displacement also as a 32-bit EXR) in the output folder, and the normal map shows on the model.",
+        [this] { return !bake_->job && doc_.mesh.hasUvs() && (doc_.subtoolCount() > 1 || bake_->levelSource); },
+        "Bake the chosen maps from the source Part(s), or this Part's own top subdivision or micro level, onto its "
+        "UVs, in the background. Maps are saved as PNGs (displacement also as a 32-bit EXR, position as a 16-bit PNG) "
+        "in the output folder, one set per UDIM tile when the UVs use them, and the normal map shows on the model.",
         "bake");
     add("bake.cancel", "Cancel Bake", [this] {
             if (bake_->job) bake_->job->cancel->store(true);
@@ -240,19 +246,30 @@ void App::registerBakeUiActions() {
 void App::startBake() {
     BakeUiState& b = *bake_;
     if (b.job) return;
-    if (!doc_.mesh.hasUvs()) {
-        status_ = "Bake needs UVs on this Part (the low-poly): Tool > Texture Map > Auto UV";
-        return;
-    }
-    // Source SubTools: the chosen one, or every visible SubTool but this one.
-    std::string source = "all";
-    for (int i = 0; i < doc_.subtoolCount(); ++i)
-        if (b.source && doc_.subtools[size_t(i)].id == b.source) source = doc_.subtools[size_t(i)].name;
+    // Source: the active Part's own levels, or other Parts (the chosen one, or every visible Part but this one).
+    auto low = std::make_shared<Mesh>();
+    auto sources = std::make_shared<std::vector<Mesh>>();
     std::vector<int> idx;
     std::string err;
-    if (!bakeSourceSubtools(doc_, source, idx, err)) {
-        status_ = err;
-        return;
+    if (b.levelSource) {
+        Mesh high;
+        if (!bakeLevelSources(doc_.mesh, b.levelSource == 1 ? "subdivision" : "micro", *low, high, err)) {
+            status_ = err;
+            return;
+        }
+        sources->push_back(std::move(high));
+    } else {
+        if (!doc_.mesh.hasUvs()) {
+            status_ = "Bake needs UVs on this Part (the low-poly): Tool > Texture Map > Auto UV";
+            return;
+        }
+        std::string source = "all";
+        for (int i = 0; i < doc_.subtoolCount(); ++i)
+            if (b.source && doc_.subtools[size_t(i)].id == b.source) source = doc_.subtools[size_t(i)].name;
+        if (!bakeSourceSubtools(doc_, source, idx, err)) {
+            status_ = err;
+            return;
+        }
     }
     if (doc_.sculptor.strokeActive()) endStroke();
     BakeSettings st = b.settings;
@@ -281,26 +298,40 @@ void App::startBake() {
     job->triangles = doc_.mesh.triangleCount();
     job->folder = folder;
     // The worker bakes copies, so sculpting can go on meanwhile.
-    auto low = std::make_shared<Mesh>(doc_.mesh);
-    auto sources = std::make_shared<std::vector<Mesh>>();
-    for (int i : idx) sources->push_back(doc_.subtoolMesh(i));
+    if (!b.levelSource) {
+        *low = doc_.mesh;
+        for (int i : idx) sources->push_back(doc_.subtoolMesh(i));
+    }
+    job->preview = !b.levelSource && udimTiles(*low).empty();
+    job->tiles = std::make_shared<int>(0);
     std::promise<bool> promise;
     job->done = promise.get_future();
     std::thread([promise = std::move(promise), low, sources, st, folder, name = safeName(doc_.activeSubtoolInfo().name),
                  exr = b.exr, progress = job->progress, cancel = job->cancel, result = job->result, error = job->error,
-                 files = job->files]() mutable {
+                 files = job->files, tiles = job->tiles]() mutable {
         std::vector<const Mesh*> src;
         for (const Mesh& m : *sources) src.push_back(&m);
-        bool ok = bakeMaps(*low, src, st, *result, *error, [&](float f) {
+        std::vector<BakeResult> results;
+        bool ok = bakeMapsUdim(*low, src, st, results, *error, [&](float f) {
             progress->store(f);
             return !cancel->load();
         });
-        if (ok) ok = saveBakeMaps(*result, folder, name, exr, *files, *error);
+        for (size_t i = 0; ok && i < results.size(); ++i) {
+            std::vector<std::string> written;
+            ok = saveBakeMaps(results[i], folder, name, exr, written, *error);
+            files->insert(files->end(), written.begin(), written.end());
+        }
+        if (ok) {
+            *tiles = results.size() > 1 || results.front().udim ? int(results.size()) : 0;
+            *result = std::move(results.front());
+        }
         promise.set_value(ok);
     }).detach();
     b.job = std::move(job);
-    status_ = "Baking " + std::to_string(st.size) + " maps from " + std::to_string(idx.size()) + " Part" +
-              (idx.size() == 1 ? "" : "s") + "...";
+    status_ = b.levelSource ? "Baking " + std::to_string(st.size) + " maps from the " +
+                                  (b.levelSource == 1 ? "top subdivision level" : "micro level") + "..."
+                            : "Baking " + std::to_string(st.size) + " maps from " + std::to_string(idx.size()) + " Part" +
+                                  (idx.size() == 1 ? "" : "s") + "...";
 }
 
 void App::pollBake() {
@@ -326,11 +357,12 @@ void App::pollBake() {
     int index = -1;
     for (int i = 0; i < doc_.subtoolCount(); ++i)
         if (doc_.subtools[size_t(i)].id == job->subtool) index = i;
-    if (index >= 0 && doc_.subtoolMesh(index).triangleCount() == job->triangles)
+    if (job->preview && index >= 0 && doc_.subtoolMesh(index).triangleCount() == job->triangles)
         b.show(job->subtool, doc_.subtoolMesh(index), job->result, *job->files, job->folder);
     else
         b.files = *job->files, b.writtenFolder = job->folder;
-    status_ = bakeSummary(*job->result) + ". Saved to " + job->folder;
+    status_ = bakeSummary(*job->result) + (*job->tiles ? " (" + std::to_string(*job->tiles) + " UDIM tiles)" : std::string()) +
+              ". Saved to " + job->folder;
 }
 
 void App::drawBakeContents() {
@@ -364,20 +396,28 @@ void App::drawBakeContents() {
     ImGui::TextUnformatted("Source");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(-1);
+    const bool hasLevels = subdivLevelCount(m) >= 2, hasMicroLevel = hasMicro(m);
+    if (b.levelSource == 1 && !hasLevels) b.levelSource = 0;
+    if (b.levelSource == 2 && !hasMicroLevel) b.levelSource = 0;
+    if (b.levelSource == 1) current = "Own top subdivision level";
+    if (b.levelSource == 2) current = "Own micro level";
     if (ImGui::BeginCombo("##bakesource", current.c_str())) {
-        if (ImGui::Selectable("All visible Parts", b.source == 0)) b.source = 0;
+        if (hasLevels && ImGui::Selectable("Own top subdivision level##level", b.levelSource == 1)) b.levelSource = 1, b.source = 0;
+        if (hasMicroLevel && ImGui::Selectable("Own micro level##micro", b.levelSource == 2)) b.levelSource = 2, b.source = 0;
+        if (ImGui::Selectable("All visible Parts", b.source == 0 && !b.levelSource)) b.source = 0, b.levelSource = 0;
         for (int i = 0; i < doc_.subtoolCount(); ++i) {
             if (i == doc_.activeSubtool) continue;
             const SubTool& st = doc_.subtools[size_t(i)];
             ImGui::PushID(int(st.id));
-            if (ImGui::Selectable(st.name.c_str(), b.source == st.id)) b.source = st.id;
+            if (ImGui::Selectable(st.name.c_str(), b.source == st.id && !b.levelSource)) b.source = st.id, b.levelSource = 0;
             ImGui::PopID();
         }
         ImGui::EndCombo();
     }
     ui::HelpText("Source", nullptr,
-                 "The high-poly to bake from: one Part, or every visible Part except the active one (the low-poly). "
-                 "Hidden faces of the source are ignored.",
+                 "The high-poly to bake from: one Part, or every visible Part except the active one (the low-poly), "
+                 "or this Part's own top subdivision level baked onto its lowest level, or its micro level baked onto its "
+                 "base. Hidden faces of the source are ignored. UVs outside 0..1 bake as UDIM tiles (name.1001.png, ...).",
                  kPath);
 
     // Maps, two columns.
@@ -390,6 +430,13 @@ void App::drawBakeContents() {
         "Ambient occlusion: how much of the sky each point of the high-poly sees. Darker in creases and folds.",
         "Cavity: the high-poly's fine surface curvature. Mid-grey on smooth surfaces, dark in cracks, light on ridges.",
         "Colour transfer: the source's vertex paint, or its painted texture.",
+        "Curvature: the high-poly's surface bend at the radius below: mid-grey flat, bright on convex edges, dark in "
+        "concave ones. Drives edge wear.",
+        "Thickness: how far rays travel through the high-poly before leaving it. Dark where it is thin (ears, fins, "
+        "edges). Drives subsurface and translucency.",
+        "Position: each point's place in the bounding box as colour, 16-bit. Drives gradients and noise that ignore "
+        "UV seams.",
+        "ID: a flat colour per face group of the high-poly, for selecting areas in other programs.",
     };
     for (int i = 0; i < kBakeMapCount; ++i) {
         if (i % 2) {

@@ -1,0 +1,60 @@
+# Fill layers and Material Recipes (Tool > Paint Layers): a recipe laid on a sculpted Part reads its Mesh Maps
+# (baked in the background), the PBR view shows worn metal, a Fill layer's mask effects change from the panel, and
+# sculpting re-bakes only the tiles near the stroke (live), so the wear follows the new form.
+run new_sphere subdivisions=6
+run stroke brush=Crease points="-0.6,0.35,1 0,0.55,1 0.6,0.35,1" radius=0.07 strength=1
+run stroke brush=Inflate points="-0.35,-0.3,1" radius=0.3 strength=1
+run stroke brush=Clay points="0.25,-0.5,1 0.55,-0.05,1" radius=0.1 strength=1
+run stroke brush=Crease invert=true points="-0.75,-0.1,1 -0.45,-0.65,1" radius=0.05 strength=1
+run uv_auto resolution=2048
+wait_value auto_uv_running == 0 120
+run texture_create size=2048
+expect_value fill_layers == 0
+
+# A recipe from the Paint Layers panel: four Fill layers; Mesh Maps bake on a worker thread, then they evaluate.
+click "Paint Layers##tool.paint_layers"
+click "Paint Layers/##recipe"
+click "Painted Edges##recipe"
+expect_value fill_layers == 3
+expect_status "Material Recipe Painted Edges"
+wait_value mesh_maps_busy == 0 300
+expect_value mesh_maps == 63
+expect_value material_channels >= 3
+run viewport_shading mode=pbr environment=photo_studio
+wait_value environment_pending == 0
+camera 20 10
+wait 0.3
+shot recipe-painted-edges
+
+# The active layer (Corner Dirt) shows its material and mask stack; the level slider is a command.
+expect_text "Corner Dirt"
+expect "Paint Layers/##addeffect"
+remember active_fill_alpha_mean dirt_before
+run fill_layer action=effect effect=0 level=0.8
+expect_value active_fill_alpha_mean > $dirt_before
+shot fill-layer-panel
+key ctrl+z
+expect_value active_fill_alpha_mean == $dirt_before
+
+# Add a mask effect from the panel's list.
+click "Paint Layers/##addeffect"
+click "Blur##kind"
+expect_status "blur"
+
+# Live: sculpt a new crease; only the nearby tiles are baked again and the fill layers follow.
+remember mesh_maps_revision before
+key escape
+run stroke brush=Crease points="0.2,0.6,1 0.6,0.2,1" radius=0.06 strength=1
+wait_value mesh_map_updates >= 1 120
+wait_value mesh_maps_busy == 0 120
+expect_value mesh_maps_revision > $before
+print mesh_map_update_ms
+wait 0.3
+shot live-after-stroke
+
+# Other recipes, and the command.
+run material_recipe name=worn_metal
+expect_value fill_layers == 7
+run_fails material_recipe name=glitter
+run mesh_maps action=live live=false
+expect_status "off"

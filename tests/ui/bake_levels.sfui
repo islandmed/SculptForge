@@ -1,0 +1,52 @@
+# Mesh Maps bake (Tool > Bake): a Part's own top subdivision level baked onto its lowest level, the new maps
+# (curvature, thickness, position, ID), and in-texture Mesh Maps for Fill layers (mesh_maps).
+# Files are written to the working directory (the build folder).
+run new_sphere subdivisions=3
+run uv_auto resolution=1024
+expect_value uvs == 1
+run polygroup_uv
+run subdiv_divide
+run subdiv_divide
+expect_value sdiv_levels == 3
+run stroke brush=Crease points="-0.6,0.35,1 0,0.55,1 0.6,0.35,1" radius=0.07 strength=1
+run stroke brush=Inflate points="-0.35,-0.3,1" radius=0.3 strength=1
+run stroke brush=Clay points="0.25,-0.5,1 0.55,-0.05,1" radius=0.1 strength=1
+
+# The Bake sub-palette offers the Part's own levels as the source.
+click "Bake##tool.bake"
+click "Bake/##bakesource"
+expect "Own top subdivision level##level"
+click "Own top subdivision level##level"
+expect_text "Own top subdivision level"
+click "Bake/Curvature"
+click "Bake/Thickness"
+click "Bake/Position"
+click "Bake/ID"
+wait 0.2
+shot bake-levels-palette
+click "Bake/Bake"
+expect_value bake_running == 1
+wait_idle 300
+expect_value bake_running == 0
+expect_status "Baked normal, curvature, thickness, position, id at 2048x2048"
+expect_value bake_files == 5
+
+# The command: the same, smaller, with every map.
+run bake source=subdivision maps=all size=512 out=sf_ui_bake_levels name=Levels
+expect_status "Baked normal, object_normal, displacement, ao, cavity, curvature, thickness, position, id at 512x512"
+run_fails bake source=micro maps=normal size=512 out=sf_ui_bake_levels
+
+# (UDIM tiles: tests/test_mesh_maps.cpp, bake_new_maps_udim_tiles_and_levels.)
+
+# Mesh Maps in the texture, for Fill layers: baked on the texture's UVs at its size.
+run new_sphere subdivisions=4
+run uv_auto resolution=512
+run texture_create size=1024
+run mesh_maps maps=all
+expect_status "Mesh Maps ao, curvature, thickness, position, world_normal, id at 1024x1024"
+expect_value mesh_maps == 63
+run mesh_maps action=info
+expect_status "live"
+run mesh_maps action=clear
+expect_value mesh_maps == 0
+run_fails mesh_maps maps=shine

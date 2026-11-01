@@ -69,6 +69,32 @@ Paint Layers**, each layer row gets a row of **channel chips** (BC, R, M, N, H, 
 
 Merge down and Flatten keep the look of every channel. Duplicate copies a layer with its channels.
 
+## The PBR viewport
+
+**Material > Viewport Shading** switches the view between **Lit Sphere** (the default, made for reading forms
+while sculpting) and **PBR**, which lights the material channels the way game engines and renderers do: rough
+surfaces spread the light, metals reflect the environment in their own colour, painted height and normals catch
+the light, emissive glows.
+
+![PBR viewport, Photo Studio: gold metal and a raised rough red stroke](images/pbr-viewport.jpg)
+
+- **Environment**: **Studio** (made by SculptForge), **Photo Studio**, **Small Studio** and **Outdoor Sky** (free
+  CC0 photographs from Poly Haven). HDR images (`.hdr`, `.exr`) in the folders listed in the
+  `SCULPTFORGE_HDRI_PATH` environment variable are added to the list.
+- **Exposure** in stops, **Rotation** of the environment, and the **Tone map**: ACES (filmic contrast), AgX
+  (softer, keeps bright colours from going flat), Reinhard or None.
+- **Show environment** puts the environment behind the model, with a **Blur**.
+- **Roughness** and **Metallic** apply to Parts without a material texture (their colour comes from vertex paint
+  or the base colour), so you can judge a sculpt as metal or clay too.
+- **Cavity** darkens the sculpt's creases a little so fine detail reads under even light; 0 is plain PBR.
+
+![The environment behind the model: Outdoor Sky with the AgX tone map](images/pbr-environment.jpg)
+
+The view stays as fast as Lit Sphere: lighting is precomputed per environment (on a worker thread when you
+switch), and only the pixels on screen pay for it. A 20.9-million-triangle Part draws in about 8 ms in PBR next
+to about 6 ms with Lit Sphere on an Apple M1 Pro. The settings are saved with the project
+(`viewport_shading mode=pbr environment=outdoor_sky exposure=0.5 tone_map=agx`).
+
 ## See one channel on its own
 
 **Tool > Texture Map > Normal view** opens a list: pick **Solo Roughness** (or any enabled channel) and the model
@@ -102,13 +128,13 @@ material channels is still saved as format 6, so older versions keep opening it.
 | `texture_layer_channel channel=normal blend=normal_combine` | A layer's channel settings (`enabled`, `blend`, `opacity`; `layer` or `index`) |
 | `channel_view channel=roughness` | Solo a channel in the viewport (`off` to go back) |
 | `export_maps preset=unreal folder=...` | Write the maps ([Export presets](export-presets.md)) |
+| `viewport_shading mode=pbr environment=photo_studio exposure=0.3` | The PBR viewport (`mode=lit_sphere` to go back; `rotation`, `tone_map`, `background`, `blur`, `roughness`, `metallic`, `cavity`) |
 
 ## Limitations
 
-- The viewport shows one channel at a time (solo view); a lit PBR preview with environment lighting is planned.
-- Fill layers, generators (edge wear, dirt), mesh-map bakes as layer inputs, filters and material recipes are
-  planned; today the stack is paint layers.
-- One texture per Part (no UDIM tiles yet).
+- Fill layers, their mask generators, Mesh Maps and Material Recipes have their own chapter:
+  [Fill layers, Mesh Maps and Material Recipes](fill-layers.md).
+- One texture per Part (UDIM tiles bake as files, [Baking](baking.md), but paint goes into one texture).
 - Memory: colour, roughness, metallic, height and AO on Base plus three layers, each with a few big strokes,
   take about 370 MB at 4K and 1.5 GB at 8K (most of it the colour layers); a layer painted everywhere adds about
   200 MB of channels at 4K and 800 MB at 8K. Preferences > Performance shows the numbers for your scene. Paint at

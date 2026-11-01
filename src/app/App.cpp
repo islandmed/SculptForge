@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/App.h"
+#include "core/LayerStack.h"
 #include "app/ShellQuote.h"
 #include "app/SpaceCamera.h"
 #include "app/AirStroke.h"
@@ -170,6 +171,9 @@ bool App::init(const AppOptions& options) {
         SDL_Log("%s", err.c_str());
         return false;
     }
+    renderer_.setEnvironmentWake([] { wakeMainLoop(); }); // (PBR view: a new environment's lighting is ready)
+    // Fill layers ask for Mesh Maps: the app bakes them on a worker thread (PanelFill.cpp, updateMeshMaps).
+    setMeshMapRequester([this](Document&) { meshMapsWanted_ = true; });
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -646,7 +650,7 @@ bool App::backgroundBusy() const {
     return running(pendingBrush_) || running(pendingGenerator_) || running(pendingModels_) || running(pendingUnreal_) ||
            running(pendingComfyCheck_) || galleryBusy() || thumbs_.busy() || libraryScanner_.busy() || autoUv_ ||
            bakeBusy() || qremesh_ || voxelRemesh_ || updateJob_ || splatTrainBusy() || sculptableBusy() || phoneBusy() || uvEditorBusy() ||
-           supportCardLoading();
+           supportCardLoading() || renderer_.environmentPending() || meshMapsBusy();
 }
 
 void App::redrawIn(double seconds) {
@@ -1770,6 +1774,7 @@ void App::runCommand(const std::string& name, const Args& args) {
         name != "export_unreal" && name.rfind("unreal_", 0) != 0 && name != "save_obj" && name != "save_project" &&
         name != "mesh_info" && name.rfind("brush_", 0) != 0 && name.rfind("splat_", 0) != 0 && name != "mesh_to_splats" &&
         name != "set_color" && name != "set_material" && name != "load_matcap" && name != "set_shading" && name != "subtool_shading" &&
+        name != "viewport_shading" &&
         name != "export_ply" && name != "face_weights" &&
         name != "face_preset" && name.rfind("face_take", 0) != 0 && name != "face_landmarks_detect") {
         clearLods();
@@ -1954,6 +1959,10 @@ Mesh& App::displayedMesh() {
 
 void App::syncScene() {
     if (solverBusy()) return; // the solver thread is changing the mesh: the GPU keeps what it has (AsyncStroke.cpp)
+    // Fill layers: Mesh Maps bakes started and landed (live after sculpting), and a painted mask's tiles evaluated.
+    updateMeshMaps();
+    if (paintsTexture(doc_.mesh) && doc_.mesh.texture->fillRevision != doc_.mesh.texture->revision)
+        updateFillLayers(doc_.mesh, mutableTexture(doc_.mesh));
     // The active SubTool's slot shows the LOD being previewed instead of the sculpt.
     Mesh& shown = displayedMesh();
     if (&shown != lastDisplayed_) shown.topologyDirty = true;
@@ -1968,6 +1977,7 @@ void App::syncScene() {
         if (mesh->texture) syncChannelView(*mesh->texture, doc_.channelView);
         const bool flat = s.shading == Shading::Flat || (s.shading == Shading::Default && renderSettings_.flatShading);
         scene.push_back({s.id, mesh, active, s.visible, bakeNormalMap(s.id, *mesh), renderSettings_.wireframe, flat});
+        scene.back().pbr = renderSettings_.pbr();
         if (active && &shown == &doc_.mesh) scene.back().overlay = uvEditorOverlay(s.id); // the UV Editor's colours
     }
     renderer_.syncScene(scene);
