@@ -23,8 +23,8 @@ chapter opens by itself the first time you start a new version; you can always f
 
 ### Become an Insider
 
-SculptForge stays free for everyone. Insiders will get each release about two weeks early; early builds start with
-upcoming releases. **Help > Support SculptForge** opens the page to join.
+SculptForge stays free for everyone. Insiders will get each release about two weeks early, starting with SculptForge 1.0. **Help > Support SculptForge**
+opens the page to join.
 
 ## Version 0.10.3
 
@@ -45,7 +45,7 @@ upcoming releases. **Help > Support SculptForge** opens the page to join.
 ### Support SculptForge
 
 SculptForge stays free for everyone. **Help > Support SculptForge** opens the page where you can become a
-member. Insiders will get each release about two weeks early; early builds start with upcoming releases.
+member. Insiders will get each release about two weeks early, starting with SculptForge 1.0.
 
 ## Version 0.10.2
 

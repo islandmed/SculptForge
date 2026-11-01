@@ -27,7 +27,7 @@ expect_value welcome_open == 0
 click "Help##palette.help"
 click "About SculptForge##help.about"
 expect_text "Supporters"
-expect_text "early builds start with upcoming releases"
+expect_text "starting with SculptForge 1.0"
 expect_text "Be the first: sculptforge.app/donate.html"
 shot about_supporters
 click "Support SculptForge##about"
