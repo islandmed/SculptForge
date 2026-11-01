@@ -12,6 +12,7 @@
 #include "app/LightBox.h"
 #include "app/Pickers.h"
 #include "app/ShellGeometry.h"
+#include "app/Support.h"
 #include "app/SubtoolThumbnails.h"
 #include "app/Thumbnails.h"
 #include "app/UiLayout.h"
@@ -328,6 +329,15 @@ private:
     bool lastCommandOk_ = true; // result of the last runCommand (UI tests check it)
     bool showHelp_ = false;
     bool showAbout_ = false;
+    // Supporting SculptForge (Support.h): the app only ever opens kSupportUrl in the browser; nothing else changes.
+    void openSupportPage();
+    void drawSupportUi();               // the first-run welcome and the one reminder note
+    void drawSupportersSection();       // Help > About: the names from docs/supporters.txt, as plain text
+    bool showWelcome_ = false;          // the first start (no project.json yet), or Help > Welcome
+    double sculptSeconds_ = 0.0;        // cumulative time in strokes (project.json)
+    bool supportReminderDone_ = false;  // the reminder was shown (or turned off) once: never again (project.json)
+    bool supportReminderOpen_ = false;
+    int supportPageRequests_ = 0;       // UI tests: how often the page was asked for (only opened when interactive)
 
     // Results from asynchronous native file dialogs (called off the main thread).
     struct PendingFile {

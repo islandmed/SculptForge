@@ -70,7 +70,7 @@ Interface > Palettes strictly A-Z (ZBrush order)**.
 | **Stroke** | The stroke types (Dots, DragRect, Spray, LazyMouse) and their settings |
 | **Tool** | The active SubTool with Open, Save and Import, and the SubTool, Layers, Paint Layers, Geometry, Remesh, Deformation, Masking, Polygroups, Visibility, Export and Display sub-palettes |
 | **Transform** | Draw, Move, Scale and Rotate (the [Gizmo 3D](gizmo.md) with its pivot, axes, options and numeric entry), Symmetry X, Y and Z, Frame, Solo, PolyF |
-| **Help** | Controls, User Guide, What's New, Command palette, Website & documentation, Report a problem, About SculptForge |
+| **Help** | Controls, User Guide, What's New, Command palette, Website & documentation, Report a problem, Support SculptForge..., About SculptForge |
 
 ### Sub-palettes
 

@@ -23,6 +23,15 @@ All notable changes to SculptForge are listed here. The format follows
 - SubTool thumbnails in the SubTool list (#43), drawn from each SubTool's existing GPU buffers (no upload, the
   motion proxy on dense meshes), one per frame at most and only once a change has settled, never during a stroke.
 
+- Ways to support SculptForge (memberships on the website; the app stays free and behaves the same for
+  everyone). Each one only opens https://sculptforge.app/donate.html in the browser: **Help > Support
+  SculptForge...**, a line in the first-run welcome (new: a small note on the very first start, also Help > Welcome
+  in the command palette), a line at the end of **What's New**, and a **Supporters** section in **Help > About**
+  listing the names in `docs/supporters.txt`, compiled in and shown as plain text (control and invisible formatting
+  characters removed, 40 characters and 2000 names at most). After about ten hours of sculpting (counted locally
+  in project.json) one dismissible note shows along the bottom of the canvas, never at launch and never again.
+  No payment code, network calls, tracking or licence checks.
+
 ### Changed
 - The Mask display toggle (right shelf, <kbd>Ctrl</kbd>+<kbd>H</kbd>) says in its help and the status bar that a
   hidden mask still masks (#43).
