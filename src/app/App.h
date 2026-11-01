@@ -27,6 +27,7 @@
 #include "core/PenPredictor.h"
 #include "core/AutoUv.h"
 #include "core/QRemesh.h"
+#include "core/RadialMenu.h"
 #include "core/Stroke.h"
 #include "core/StrokePath.h"
 #include "core/SurfaceCursor.h"
@@ -1374,6 +1375,62 @@ private:
         bool untilLeave = false; // Space let go over the menu: it closes when the pointer leaves it
         int openedFrame = -1;
     } quickMenu_;
+    // ---- Radial menus (RadialMenu.cpp, core/RadialMenu.h, #45) ----
+    // Up to eight pie menus of up to eight actions each. A menu's key (action radial.menuN, set in the keymap like
+    // any other) or its mouse / pen button, held: the pie shows at the cursor, a flick toward a slot and letting go
+    // runs that action. Tapped: the pie stays open; click a slot (or beside the pie, or Esc, to close it). Edited in
+    // Preferences > Input > Radial Menus; Store Config keeps them in ui.json ("radialMenus").
+    enum class RadialHold { None, Key, Mouse, Pen };
+    void registerRadialActions();
+    void refreshRadialActions(); // the radial.menuN actions' labels follow the menus' names
+    void applyRadialMenusJson(const Json& j); // ui.json's "radialMenus", checked against the registry
+    void resetRadialMenus();
+    static std::vector<RadialMenu> defaultRadialMenus();
+    RadialVocabulary radialVocabulary() const; // what a menu read from a file may name
+    bool radialSlotAction(std::string_view id) const; // an action a slot may run
+    void openRadialMenu(int menu, RadialHold hold, int code);
+    void closeRadialMenu() {
+        radial_.menu = -1;
+        radial_.hold = RadialHold::None;
+    }
+    void radialRelease();   // the key or button that holds the pie open was let go
+    void runRadialSlot(int slot);
+    bool radialMouseEvent(const SDL_Event& e); // true: the pie used the event (clicks while open, bound buttons)
+    bool radialPenButton(int button, bool down, float x, float y);
+    void radialKeyUp(SDL_Keycode key);
+    int radialMenuForButton(RadialButton b) const; // -1: none
+    PenAction penButtonAction(int button) const;   // Preferences > Tablet, unless a radial menu claims the button
+    void drawRadialMenu();
+    void drawRadialMenusSection(); // Preferences > Input > Radial Menus
+    void exportRadialMenuDialog(int menu);
+    void importRadialMenuDialog();
+    bool exportRadialMenu(int menu, const std::string& path);
+    bool importRadialMenu(const std::string& path);
+    std::vector<RadialMenu> radialMenus_ = defaultRadialMenus();
+    struct RadialOpen {
+        int menu = -1;          // the open menu, or -1
+        ImVec2 at{0, 0};        // its centre (the cursor when it opened)
+        double openedAt = 0.0;  // seconds (a short press is a tap)
+        RadialHold hold = RadialHold::None; // what holds it open; None: tapped open, stays until a click or Esc
+        int code = 0;           // the held key (SDL_Keycode) or mouse / pen button
+        int hover = -1;         // the slot the pointer points at
+        int openedFrame = -1;
+        int ran = -1;           // the slot run last (UI tests)
+    } radial_;
+    SDL_Keycode keyDown_ = SDLK_UNKNOWN; // the key onKey is handling: a radial menu's key holds the pie open
+    uint32_t radialSwallowUp_ = 0;       // mouse buttons whose press the pie took: their release is its too
+    std::optional<Json> radialPending_;  // radial menus read from ui.json before the actions existed
+    struct RadialEdit {
+        int menu = 0;            // Preferences: the menu being edited
+        int selected = -1;       // the item whose label and icon show
+        int pickSlot = -2;       // the slot whose action is being picked (-1: a new slot; -2: none)
+        char query[96] = "";     // the action search
+        bool focusSearch = false;
+        std::string foundQuery = "\x01"; // the search's results, for this query and registry revision
+        unsigned foundRevision = ~0u;
+        std::vector<size_t> found;
+        int exportMenu = -1;     // the menu the export dialog was opened for
+    } radialEdit_;
     struct RightClick {
         bool pending = false; // a right press that hasn't moved past the slop: navigation waits
         float x = 0.0f, y = 0.0f;

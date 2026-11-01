@@ -112,7 +112,7 @@ void fromJson(const Json& j, UiPrefs& p) {
 
 namespace {
 
-enum UiFileKind { kSaveUi, kLoadUi, kRunScript, kLibraryFolder, kBlenderKeymap, kUiFileKinds };
+enum UiFileKind { kSaveUi, kLoadUi, kRunScript, kLibraryFolder, kBlenderKeymap, kRadialImport, kRadialExport, kUiFileKinds };
 
 struct UiFileRequest {
     App* app = nullptr;
@@ -129,6 +129,7 @@ void SDLCALL onUiFileChosen(void* userdata, const char* const* files, int) {
 
 const SDL_DialogFileFilter kUiFilters[] = {{"SculptForge UI layout", "json"}};
 const SDL_DialogFileFilter kBlenderKeymapFilters[] = {{"Blender keymap", "py"}, {"All files", "*"}};
+const SDL_DialogFileFilter kRadialFilters[] = {{"SculptForge radial menu", "json"}};
 const SDL_DialogFileFilter kScriptFilters[] = {{"SculptForge script", "sfscript;txt"}, {"All files", "*"}};
 
 std::filesystem::path fsPath(const std::string& utf8) { return std::filesystem::path(std::u8string(utf8.begin(), utf8.end())); }
@@ -525,6 +526,7 @@ void App::initActions() {
     actions_.registerCommands(
         commands_, [this](const std::string& name) { runCommand(name); },
         [this](const std::string& name) { consolePrefill(name + " "); });
+    registerRadialActions(); // last: a radial menu's items may be any of the above (RadialMenu.cpp)
 
     if (!uiConfigDeterministic_ && !configDir_.empty()) {
         console_.loadHistory(configDir_ + "console_history.txt");
@@ -624,6 +626,7 @@ bool App::writeUiConfig(const std::string& path, std::string& err) {
     j.set("layout", toJson(layout_));
     j.set("shortcuts", actions_.overridesToJson());
     j.set("prefs", toJson(uiPrefs_));
+    j.set("radialMenus", toJson(radialMenus_));
     std::ofstream f(fsPath(path), std::ios::binary | std::ios::trunc);
     f << j.dump(true) << "\n";
     if (!f) {
@@ -655,6 +658,7 @@ bool App::readUiConfig(const std::string& path, std::string& err) {
     layout_.customize = customize;
     actions_.overridesFromJson(j["shortcuts"]);
     fromJson(j["prefs"], uiPrefs_);
+    if (j.has("radialMenus")) applyRadialMenusJson(j["radialMenus"]); // (an older file keeps the menus there are)
     applyPerformancePrefs();
     applyInputStyle();
     doc_.sculptor.dyntopo.constantDetail = uiPrefs_.dyntopoConstantDetail;
@@ -681,6 +685,7 @@ void App::restoreStandardUi() {
     layout_ = standardLayout();
     layout_.customize = customize;
     actions_.clearOverrides();
+    resetRadialMenus();
     layoutBaseline_ = layoutKey();
     status_ = "Standard UI restored - Store Config (Ctrl+Shift+I) to keep it";
 }
@@ -703,6 +708,15 @@ void App::saveUiDialog() {
 
 void App::importBlenderKeymapDialog() {
     SDL_ShowOpenFileDialog(onUiFileChosen, &g_requests[kBlenderKeymap], window_, kBlenderKeymapFilters, 2, nullptr, false);
+}
+
+void App::importRadialMenuDialog() {
+    SDL_ShowOpenFileDialog(onUiFileChosen, &g_requests[kRadialImport], window_, kRadialFilters, 1, nullptr, false);
+}
+
+void App::exportRadialMenuDialog(int menu) {
+    radialEdit_.exportMenu = menu;
+    SDL_ShowSaveFileDialog(onUiFileChosen, &g_requests[kRadialExport], window_, kRadialFilters, 1, nullptr);
 }
 
 void App::loadUiDialog() {
@@ -815,6 +829,11 @@ void App::drawHelpConsoleUi() {
                 }
             } else if (kind == kBlenderKeymap) {
                 importBlenderKeymap(path);
+            } else if (kind == kRadialImport) {
+                importRadialMenu(path);
+            } else if (kind == kRadialExport) {
+                if (fsPath(path).extension().empty()) path += ".json";
+                exportRadialMenu(radialEdit_.exportMenu, path);
             } else if (kind == kRunScript) {
                 setConsoleOpen(true);
                 console_.queueScriptFile(path);

@@ -1,0 +1,174 @@
+# Radial (pie) menus (#45). Two built in: Brushes on T and Masking on Y, keys no other action has in any input
+# style. Hold the key, flick toward an item, let go: it runs. Let go in the middle after a moment: nothing. Tap
+# the key: the pie stays open; a click on an item runs it, a click in the middle or Esc closes it, and the click
+# never reaches the model. A pen or mouse button set on a menu does the same as its key. Preferences > Input >
+# Radial Menus: a new menu, an item picked with the palette's search, a key; import and export of one menu (only
+# known actions are kept).
+run new_sphere subdivisions=3
+camera 0 0
+expect_value radial_menus == 2
+expect_value radial_slots_1 == 8
+expect_value radial_slots_2 == 8
+expect_shortcut radial.menu1 T
+expect_shortcut radial.menu2 Y
+expect_value radial_ran == -1
+expect_value shortcut_conflicts == 0
+
+# Hold T, flick right, let go: slot 2 of Brushes, Move.
+hover_window 0.5 0.5
+key_down t
+expect_value radial_open == 1
+expect_value radial_held == 1
+expect_value radial_menu == 0
+expect_value radial_hover == -1
+shot brushes_open
+hover_window 0.57 0.5 0.15
+expect_value radial_hover == 2
+shot brushes_flick
+key_up t
+expect_value radial_open == 0
+expect_value radial_ran == 2
+expect_value brush_type == 3
+
+# Flick up: Standard.
+hover_window 0.5 0.5
+key_down t
+hover_window 0.5 0.4 0.1
+expect_value radial_hover == 0
+key_up t
+expect_value radial_open == 0
+expect_value brush_type == 0
+
+# Held, then let go in the middle: it closes and nothing runs.
+hover_window 0.5 0.5
+key_down t
+wait 0.4
+key_up t
+expect_value radial_open == 0
+expect_value radial_ran == 0
+expect_value brush_type == 0
+
+# Tapped: it stays open. A click down and to the left (slot 5, Pinch) runs it; the model isn't touched.
+snapshot
+key t
+expect_value radial_open == 1
+expect_value radial_held == 0
+drag 0.43 0.57 0.43 0.57 0.05
+expect_value radial_open == 0
+expect_value brush_type == 7
+expect_value stroking == 0
+expect_value moved == 0
+
+# Tapped, then a click in the middle closes it (no stroke either); Esc closes it; its key again closes it.
+hover_window 0.5 0.5
+key t
+drag 0.5 0.5 0.5 0.5 0.05
+expect_value radial_open == 0
+expect_value moved == 0
+expect_value brush_type == 7
+key t
+key escape
+expect_value radial_open == 0
+key t
+key_down t
+expect_value radial_open == 0
+key_up t
+expect_value brush_type == 7
+
+# Masking (Y): flick up for Invert Mask, the whole sphere is masked; again, and none is.
+expect_value masked == 0
+hover_window 0.5 0.5
+key_down y
+expect_value radial_menu == 1
+hover_window 0.5 0.4 0.1
+key_up y
+expect_value masked > 100
+hover_window 0.5 0.5
+key_down y
+hover_window 0.5 0.4 0.1
+key_up y
+expect_value masked == 0
+
+# Preferences > Input > Radial Menus: Brushes on the pen's upper button.
+click "Preferences##palette.preferences"
+click "Input##preferences.input"
+expect "##radial.button"
+click "##radial.button"
+click "Pen upper button"
+shot preferences
+key escape
+pen_hover 0.5 0.5
+pen_button 2 down
+expect_value radial_open == 1
+expect_value radial_held == 1
+pen_hover 0.57 0.5 0.15
+pen_button 2 up
+expect_value radial_open == 0
+expect_value brush_type == 3
+# The button belongs to the menu now: it no longer inverts (its Preferences > Tablet mapping).
+pen_button 2 down
+expect_value radial_open == 1
+pen_button 2 up
+expect_value radial_open == 1
+key escape
+pen_out
+
+# A new menu: its first item picked with the palette's search (Smooth), then a key (J).
+click "Preferences##palette.preferences"
+click "###radial.add_menu"
+expect_value radial_menus == 3
+type "##radial.search" smooth
+click "###radial.pick.brush.smooth"
+expect_value radial_slots_3 == 1
+click "###radial.key"
+key j
+expect_shortcut radial.menu3 J
+expect_value shortcut_conflicts == 0
+key escape
+hover_window 0.5 0.5
+key_down j
+expect_value radial_menu == 2
+hover_window 0.5 0.4 0.1
+key_up j
+expect_value brush_type == 2
+
+# Import a menu file: unknown actions, a command that needs a path, a bad icon and a wrong type are left out; its
+# middle mouse button opens it (a right flick: Inflate of Smooth / Inflate / Pinch).
+radial_import data/radial/sculpting.json
+expect_value radial_menus == 4
+expect_value radial_slots_4 == 3
+button_drag middle 0.5 0.5 0.57 0.5 0.3
+expect_value radial_open == 0
+expect_value radial_ran == 1
+expect_value brush_type == 4
+
+# Export it, clear it, import it back into the same (now empty) menu.
+radial_export 4 sculpting_out.json
+click "Preferences##palette.preferences"
+click "Clear##radial.clear"
+expect_value radial_menus == 3
+radial_import sculpting_out.json
+expect_value radial_menus == 4
+expect_value radial_slots_4 == 3
+key escape
+button_drag middle 0.5 0.5 0.5 0.4 0.3
+expect_value brush_type == 2
+
+# Every style keeps T, Y and J free of other actions.
+click "Preferences##palette.preferences"
+click "SculptForge##input.style_sculptforge"
+expect_value shortcut_conflicts == 0
+click "Blender##input.style_blender"
+expect_value shortcut_conflicts == 0
+click "Maya##input.style_maya"
+expect_value shortcut_conflicts == 0
+click "ZBrush##input.style_zbrush"
+expect_value shortcut_conflicts == 0
+key escape
+
+# Restore default menus: Brushes and Masking again.
+click "Preferences##palette.preferences"
+click "Restore default menus##radial.defaults"
+expect_value radial_menus == 2
+expect_value radial_slots_1 == 8
+key escape

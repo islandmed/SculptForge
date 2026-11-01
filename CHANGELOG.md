@@ -9,6 +9,14 @@ All notable changes to SculptForge are listed here. The format follows
 ## [0.10.4] - 2026-11-01
 
 ### Added
+- Radial (pie) menus (#45): up to 8 menus of up to 8 items, each item any action the command palette (F3) finds
+  (brushes, tools, commands, toggles). Hold a menu's key, flick toward an item and let go to run it; tap the key and
+  the pie stays open for a click. A menu can also open from a mouse button (middle, back, forward) or a pen side
+  button while it is held. Two built in: **Brushes** on <kbd>T</kbd> and **Masking** on <kbd>Y</kbd> (free in
+  every input style). Edit them in Preferences > Input > Radial Menus: add, remove and reorder items, pick each
+  action with the palette's search, give it your own label and icon, set the menu's key and button. Store Config
+  keeps them in ui.json; Export / Import shares one menu as a small JSON file holding only action names (unknown
+  actions are left out, counts and text lengths are capped).
 - Insert your own mesh (#34): **Append > Insert on the model > Active SubTool's copy...** (another SubTool) or
   **From file...** (`.obj`, `.ply`, `.glb`), dragged onto the surface like the shapes: centred, sized by the drag,
   its up axis along the normal, turned by the drag and mirrored by symmetry, one undo step

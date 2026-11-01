@@ -11,6 +11,10 @@
 //                            snapped onto the sculpt like stroke), e.g. to show the brush cursor
 //   hover_window X Y [S]     the same to window fractions (anywhere, e.g. the background)
 //   type LABEL TEXT          click a text field and type into it
+//   radial_import FILE       import a radial menu file (from the shots folder if radial_export wrote it there,
+//                            otherwise relative to the script), as Import... would
+//   radial_export N FILE     export radial menu N (1-based) to FILE in the shots folder, as Export... would
+//   key_down KEY / key_up KEY  press a key and keep it down / let go of it (key presses and lets go), e.g. key_down t
 //   key COMBO                e.g. enter, escape, ctrl+z, ctrl+shift+z, 3, comma, backtick, tab, f3, space, minus,
 //                            home, numpad1, ctrl+numpad7, numpad., numpadplus
 //   hold MODS                ctrl / shift / alt / ctrl+shift ... or none (for strokes and drags)
@@ -114,7 +118,9 @@
 //                            2 DragDot, 3 Spray, 4 LazyMouse), vdms (VDM brush maps), vdm_files (.sfvdm in the library)
 //                            z_intensity, smooth_intensity, rgb_intensity (0-100), focal_shift (-100..100), draw_size,
 //                            size_popup_open (the S / U / I / O slider), size_knob_x / size_knob_y (its knob, pixels),
-//                            quickmenu_open, right_click_menu, space_camera, space_held, lazy_mouse, input_style (0 ZBrush, 1 SculptForge, 2 Blender), turntable,
+//                            quickmenu_open, right_click_menu, space_camera, space_held, radial_open / radial_menu (-1 none) / radial_held /
+//                            radial_hover / radial_ran (radial menus: open, the menu, held by its key or button, the
+//                            slot pointed at, the slot run last), radial_menus, radial_slots_N, lazy_mouse, input_style (0 ZBrush, 1 SculptForge, 2 Blender), turntable,
 //                            camera_ortho, mask_brush (Blender's Mask brush on), shortcut_conflicts (keys two actions
 //                            claim), brush_type (BrushType
 //                            index, -1 for a custom brush or Paint), last_dab_x / last_dab_y (window pixels), paint_r
@@ -419,6 +425,16 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "right_click_menu") return app_.uiPrefs_.rightClickQuickMenu ? 1.0 : 0.0;
     if (name == "space_camera") return app_.uiPrefs_.spaceCamera ? 1.0 : 0.0;
     if (name == "space_held") return app_.spaceHeld_ ? 1.0 : 0.0;
+    if (name == "radial_open") return app_.radial_.menu >= 0 ? 1.0 : 0.0;
+    if (name == "radial_menu") return double(app_.radial_.menu); // -1: none open
+    if (name == "radial_held") return app_.radial_.menu >= 0 && app_.radial_.hold != App::RadialHold::None ? 1.0 : 0.0;
+    if (name == "radial_hover") return double(app_.radial_.hover);
+    if (name == "radial_ran") return double(app_.radial_.ran); // the slot run last, -1: none yet
+    if (name == "radial_menus") return double(app_.radialMenus_.size());
+    if (name.rfind("radial_slots_", 0) == 0) { // radial_slots_N: menu N's items (1-based), -1: no such menu
+        const size_t i = size_t(std::max(0, std::atoi(name.c_str() + 13) - 1));
+        return i < app_.radialMenus_.size() ? double(app_.radialMenus_[i].slots.size()) : -1.0;
+    }
     if (name == "size_popup_open" || name == "size_knob_x" || name == "size_knob_y") {
         ImVec2 knob(-1.0f, -1.0f);
         const bool open = PickerUi::sliderKnob(knob);
@@ -1187,6 +1203,26 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (file.is_relative()) file = std::filesystem::path(std::u8string(scriptDir_.begin(), scriptDir_.end())) / file;
         const auto u8 = file.lexically_normal().u8string();
         run([this, action, path = std::string(u8.begin(), u8.end())] { app_.queueFile(action, path); });
+    } else if (verb == "radial_import" || verb == "radial_export") {
+        // radial_import FILE (relative to the script) / radial_export N FILE (in the shots folder): what the file
+        // dialogs of Preferences > Input > Radial Menus do with the path the user picked.
+        const bool import = verb == "radial_import";
+        if (!need(import ? 1 : 2)) return false;
+        const std::string name = w[import ? 1 : 2];
+        run([this, line, import, name, menu = int(num(1, 1)) - 1] {
+            auto file = std::filesystem::path(std::u8string(name.begin(), name.end()));
+            if (file.is_relative()) { // an import reads what radial_export wrote, or else a file beside the script
+                const auto out = std::filesystem::path(std::u8string(shotDir_.begin(), shotDir_.end())) / file;
+                std::error_code ec;
+                file = !import || std::filesystem::exists(out, ec)
+                           ? out
+                           : std::filesystem::path(std::u8string(scriptDir_.begin(), scriptDir_.end())) / file;
+            }
+            const auto u8 = file.lexically_normal().u8string();
+            const std::string path(u8.begin(), u8.end());
+            const bool ok = import ? app_.importRadialMenu(path) : app_.exportRadialMenu(menu, path);
+            if (!ok) fail(line, std::string(import ? "radial_import" : "radial_export") + " failed: " + app_.status_);
+        });
     } else if (verb == "copy") {
         if (!need(2)) return false;
         namespace fs = std::filesystem;

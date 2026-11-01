@@ -211,6 +211,34 @@ the model or on it, and the QuickMenu stays open at the cursor. A right drag sti
 zooms with <kbd>Alt</kbd> or <kbd>Ctrl</kbd>), and a pen button set to **Right click** (Preferences > Tablet)
 works the same way. Turn it off with **Preferences > Input > Right click opens the QuickMenu**.
 
+## Radial menus
+
+Radial (pie) menus put the tools you use most around the cursor. Hold a menu's key, flick the pointer toward an
+item and let go: it runs. Let go in the middle and nothing happens. Tap the key instead and the pie stays open:
+click an item, or click in the middle or press <kbd>Esc</kbd> to close it. Two menus are built in:
+
+| Key | Menu | Items |
+|---|---|---|
+| <kbd>T</kbd> | **Brushes** | Standard, ClayBuildup, Move, DamStandard, Inflate, Pinch, Flatten, SnakeHook |
+| <kbd>Y</kbd> | **Masking** | Invert Mask, MaskLasso, Clear Mask, MaskRect, Mask All, MaskPen, View Mask, Group Masked |
+
+Both keys are free in every input style. Make your own in **Preferences > Input > Radial Menus** (up to 8 menus of
+8 items each):
+
+- **+** adds a menu and opens a search for its first item. An item can be anything the command palette
+  (<kbd>F3</kbd>) finds: a brush, a tool, a command or a toggle.
+- Click an item to give it your own **label** and **icon**, or **Change action**. The arrows reorder items (the
+  first points up, the rest go clockwise); the cross removes one.
+- **Key** sets the key that opens the menu (it is an ordinary shortcut, so **Preferences > Hotkeys** lists it
+  too). The button next to it can also open the menu while held: the middle, back or forward mouse button, or one
+  of the pen's side buttons. That button then stops doing what it did before (a pen button's
+  Preferences > Tablet mapping, the middle button's pan).
+- **Export...** saves the menu as a small `.json` file to share; **Import...** loads one. A menu file holds only
+  action names, never anything that runs: names this version doesn't know are left out.
+- **Restore default menus** brings back Brushes and Masking.
+
+**Store Config** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) keeps your menus.
+
 ## Strokes
 
 The stroke type decides how cursor movement becomes brush dabs. Choose it from the **Stroke** tile on the left
@@ -493,7 +521,8 @@ also have a **Pressure curve** setting that makes them respond to a light or a f
 - a pressure curve for all brushes (Soft, Linear or Firm, or set **Curve**, **Minimum**, **Maximum**, **Threshold**
   and **Full pressure at** yourself), applied before each brush's own curve;
 - the eraser end (default **Invert**, like holding <kbd>Alt</kbd>) and the side buttons (default:
-  lower button right-click to rotate the view, upper button **Invert**, third button **Pan view**);
+  lower button right-click to rotate the view, upper button **Invert**, third button **Pan view**). A side button
+  can open a [radial menu](#radial-menus) instead (Preferences > Input > Radial Menus).
 - **Mouse mode (relative)**, for a tablet whose driver is set to mouse mode: the pen moves the cursor by how far
   it moves, and putting it down elsewhere on the tablet leaves the cursor where it was.
 

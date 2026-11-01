@@ -86,6 +86,53 @@ int CommandPalette::score(const Action& a, const std::string& query) {
     return total;
 }
 
+namespace {
+
+// A command another action already runs is listed once, under that action.
+std::set<std::string> coveredCommands(const ActionRegistry& reg) {
+    std::set<std::string> covered;
+    for (const auto& a : reg.all())
+        if (!a.command.empty() && a.id != "cmd." + a.command) covered.insert(a.command);
+    return covered;
+}
+
+bool listed(const Action& a, const std::set<std::string>& covered) {
+    if (!a.run || a.label.empty()) return false;
+    return a.id.rfind("cmd.", 0) != 0 || !covered.count(a.command);
+}
+
+} // namespace
+
+std::vector<size_t> CommandPalette::find(const App& app, const std::string& query, size_t limit,
+                                         const std::function<bool(const Action&)>& accept) {
+    const ActionRegistry& reg = app.actions_;
+    const auto& all = reg.all();
+    const std::set<std::string> covered = coveredCommands(reg);
+    auto withDescription = [&](const Action& a) {
+        if (!a.description.empty() || a.command.empty()) return a;
+        Action copy = a;
+        if (const Command* c = app.commands_.find(a.command)) copy.description = c->description;
+        return copy;
+    };
+    std::vector<std::pair<int, size_t>> scored;
+    const bool empty = words(query).empty();
+    for (size_t i = 0; i < all.size(); ++i) {
+        if (!listed(all[i], covered) || (accept && !accept(all[i]))) continue;
+        if (empty) scored.emplace_back(1, i);
+        else if (const int s = score(withDescription(all[i]), query); s > 0) scored.emplace_back(s, i);
+    }
+    std::stable_sort(scored.begin(), scored.end(), [&](const auto& a, const auto& b) {
+        if (a.first != b.first) return a.first > b.first;
+        return lower(all[a.second].label) < lower(all[b.second].label);
+    });
+    std::vector<size_t> out;
+    for (const auto& [s, i] : scored) {
+        if (out.size() >= limit) break;
+        out.push_back(i);
+    }
+    return out;
+}
+
 void CommandPalette::search(App& app) {
     const ActionRegistry& reg = app.actions_;
     if (query_ == lastQuery_ && reg.revision() == lastRevision_) return;
@@ -95,45 +142,17 @@ void CommandPalette::search(App& app) {
     selected_ = 0;
     scrollToSelected_ = true;
     const auto& all = reg.all();
-    // A command another action already runs is listed once, under that action.
-    std::set<std::string> covered;
-    for (const auto& a : all)
-        if (!a.command.empty() && a.id != "cmd." + a.command) covered.insert(a.command);
-    auto listed = [&](const Action& a) {
-        if (!a.run || a.label.empty()) return false;
-        return a.id.rfind("cmd.", 0) != 0 || !covered.count(a.command);
-    };
-    auto withDescription = [&](const Action& a) {
-        if (!a.description.empty() || a.command.empty()) return a;
-        Action copy = a;
-        if (const Command* c = app.commands_.find(a.command)) copy.description = c->description;
-        return copy;
-    };
     if (words(query_).empty()) {
+        const std::set<std::string> covered = coveredCommands(reg);
         for (const auto& id : reg.recent()) {
             for (size_t i = 0; i < all.size(); ++i)
-                if (all[i].id == id && listed(all[i])) results_.push_back(i);
+                if (all[i].id == id && listed(all[i], covered)) results_.push_back(i);
             if (int(results_.size()) >= kRecentShown) break;
         }
-        if (results_.empty()) {
-            for (size_t i = 0; i < all.size(); ++i)
-                if (listed(all[i])) results_.push_back(i);
-            std::stable_sort(results_.begin(), results_.end(), [&](size_t a, size_t b) {
-                return lower(all[a].label) < lower(all[b].label);
-            });
-        }
+        if (results_.empty()) results_ = find(app, "", all.size()); // A-Z
         return;
     }
-    std::vector<std::pair<int, size_t>> scored;
-    for (size_t i = 0; i < all.size(); ++i) {
-        if (!listed(all[i])) continue;
-        if (const int s = score(withDescription(all[i]), query_); s > 0) scored.emplace_back(s, i);
-    }
-    std::stable_sort(scored.begin(), scored.end(), [&](const auto& a, const auto& b) {
-        if (a.first != b.first) return a.first > b.first;
-        return lower(all[a.second].label) < lower(all[b.second].label);
-    });
-    for (const auto& [s, i] : scored) results_.push_back(i);
+    results_ = find(app, query_, all.size());
 }
 
 void CommandPalette::draw(App& app, const CanvasRect& area) {

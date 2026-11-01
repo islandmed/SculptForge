@@ -445,7 +445,8 @@ from a keymap you exported in Blender. **Right click opens the QuickMenu** (on b
 the [QuickMenu](sculpting.md#the-quickmenu) with a right click on the canvas; a right drag navigates either
 way. **Hold Space and drag to move the camera** (off by default) turns <kbd>Space</kbd> into a camera key: held,
 left-drag rotates, right- or middle-drag pans and <kbd>Ctrl</kbd>+drag zooms (see
-[Navigation](navigation.md#mouse-and-pen)). **Cursor follows surface** (on by default) lays the brush rings on the model under the pointer (see
+[Navigation](navigation.md#mouse-and-pen)). **Radial Menus** edits your pie menus and their keys (see [Radial menus](sculpting.md#radial-menus)).
+**Cursor follows surface** (on by default) lays the brush rings on the model under the pointer (see
 [Draw Size and Focal Shift](sculpting.md#draw-size-z-intensity-rgb-intensity-and-focal-shift)); off, they are flat circles on the screen. **Rotation** chooses free rotation (ZBrush) or a turntable. See
 [Coming from ZBrush](coming-from-zbrush.md).
 
