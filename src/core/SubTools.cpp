@@ -3,11 +3,13 @@
 #include "core/SubTools.h"
 
 #include "core/Commands.h"
+#include "core/Dyntopo.h"
 #include "core/Multires.h"
 #include "core/Polygroups.h"
 #include "core/Primitives.h"
 #include "core/TextureTransfer.h"
 
+#include <cctype>
 #include <algorithm>
 #include <filesystem>
 #include <map>
@@ -225,7 +227,7 @@ void registerSubToolCommands(CommandRegistry& reg) {
     reg.add({"subtool_append",
              "Add a new SubTool: a primitive (sphere, cube, plane) placed beside the visible model, or a model file. "
              "It becomes the active SubTool.",
-             {{"type", T::String, "'sphere' (default), 'cube' or 'plane'.", false},
+             {{"type", T::String, "'sphere' (default), 'cube', 'plane', 'cylinder', 'cone', 'torus', 'capsule', 'icosphere' or 'quadsphere'.", false},
               {"path", T::String, "Model file to append instead of a primitive (.obj, .glb, .fbx, .ply, .stl, .usd...).", false},
               {"name", T::String, "Name for the new SubTool.", false},
               {"size", T::Number, "Primitive size relative to the largest visible SubTool (0.05-2). Default 0.35.", false}},
@@ -271,18 +273,74 @@ void registerSubToolCommands(CommandRegistry& reg) {
                      if (type == "sphere") m = makeIcosphere(5, size * 0.5f);
                      else if (type == "cube") m = makeCube(48, size);
                      else if (type == "plane") m = makePlane(128, size);
-                     else return {false, "Unknown primitive '" + type + "' (sphere, cube or plane)"};
+                     else if (type == "cylinder") m = makeCylinder(48, size);
+                     else if (type == "cone") m = makeCone(48, size);
+                     else if (type == "torus") m = makeTorus(64, size);
+                     else if (type == "capsule") m = makeCapsule(48, size);
+                     else if (type == "icosphere") m = makeIcosphere(3, size * 0.5f);
+                     else if (type == "quadsphere") m = makeQuadSphere(32, size);
+                     else
+                         return {false, "Unknown primitive '" + type +
+                                            "' (sphere, cube, plane, cylinder, cone, torus, capsule, icosphere, quadsphere)"};
                      // Beside the model on +X, at its middle height.
                      const glm::vec3 at = scene.valid() ? glm::vec3(scene.max.x + size * 0.6f, scene.center().y, scene.center().z)
                                                         : glm::vec3(0.0f);
                      for (auto& p : m.positions) p += at;
                      m.recomputeAllNormals();
-                     name = type == "sphere" ? "Sphere" : type == "cube" ? "Cube" : "Plane";
+                     name = type;
+                     if (!name.empty()) name[0] = char(std::toupper(static_cast<unsigned char>(name[0])));
+                     if (type == "quadsphere") name = "QuadSphere";
                  }
                  if (a.contains("name")) name = argString(a, "name");
                  const size_t tris = m.triangleCount();
                  const int i = doc.addSubtool(std::move(m), name);
                  return {true, "Appended SubTool " + doc.subtools[size_t(i)].name + " (" + countText(tris) + ")"};
+             }});
+
+    reg.add({"insert_primitive",
+             "Insert a primitive into the active SubTool where the surface is (#34): its axis along the surface "
+             "normal, its centre on the surface, as one new polygroup; one undoable step.",
+             {{"type", T::String, "sphere, cube, cylinder, cone, torus, capsule or quadsphere", false},
+              {"x", T::Number, "surface point x", true}, {"y", T::Number, "surface point y", true}, {"z", T::Number, "surface point z", true},
+              {"nx", T::Number, "surface normal x", false}, {"ny", T::Number, "surface normal y", false}, {"nz", T::Number, "surface normal z", false},
+              {"size", T::Number, "size in scene units (default 0.2)", false}},
+             [](Document& doc, const Args& a) -> CommandResult {
+                 const std::string blocked = dyntopoBlocker(doc.mesh);
+                 if (!blocked.empty()) return {false, "Can't insert: " + blocked};
+                 const std::string type = argString(a, "type", "sphere");
+                 const float size = float(std::max(argNumber(a, "size", 0.2), 1e-4));
+                 Mesh prim;
+                 if (type == "sphere") prim = makeIcosphere(3, size * 0.5f);
+                 else if (type == "cube") prim = makeCube(8, size);
+                 else if (type == "cylinder") prim = makeCylinder(24, size);
+                 else if (type == "cone") prim = makeCone(24, size);
+                 else if (type == "torus") prim = makeTorus(32, size);
+                 else if (type == "capsule") prim = makeCapsule(24, size);
+                 else if (type == "quadsphere") prim = makeQuadSphere(8, size);
+                 else return {false, "Unknown primitive '" + type + "'"};
+                 glm::vec3 n(float(argNumber(a, "nx", 0.0)), float(argNumber(a, "ny", 1.0)), float(argNumber(a, "nz", 0.0)));
+                 n = glm::length(n) > 1e-8f ? glm::normalize(n) : glm::vec3(0, 1, 0);
+                 // Rotate +Y onto the normal.
+                 const glm::vec3 y(0, 1, 0);
+                 glm::mat3 rot(1.0f);
+                 const float c = glm::dot(y, n);
+                 if (c < -0.9999f) rot = glm::mat3(1, 0, 0, 0, -1, 0, 0, 0, -1);
+                 else if (c < 0.9999f) {
+                     const glm::vec3 v = glm::cross(y, n);
+                     const glm::mat3 k(0, v.z, -v.y, -v.z, 0, v.x, v.y, -v.x, 0);
+                     rot = glm::mat3(1.0f) + k + k * k * (1.0f / (1.0f + c));
+                 }
+                 const glm::vec3 at(float(argNumber(a, "x", 0.0)), float(argNumber(a, "y", 0.0)), float(argNumber(a, "z", 0.0)));
+                 for (auto& p : prim.positions) p = at + rot * p;
+                 uint32_t group = 0;
+                 for (uint32_t g : doc.mesh.polygroups) group = std::max(group, g);
+                 for (auto& g : prim.polygroups) g = group + 1;
+                 prim.recomputeAllNormals();
+                 Mesh merged = mergeMeshes({&doc.mesh, &prim});
+                 const size_t tris = prim.triangleCount();
+                 doc.replaceMeshUndoable(std::move(merged), "Insert " + type);
+                 return {true, "Inserted a " + type + " (" + std::to_string(tris) + " triangles, polygroup " +
+                                   std::to_string(group + 1) + ")"};
              }});
 
     reg.add({"subtool_duplicate", "Copy a SubTool (with its layers and attributes) and make the copy active.",

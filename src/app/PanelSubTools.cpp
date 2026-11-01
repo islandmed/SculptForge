@@ -9,6 +9,7 @@
 #include "app/Theme.h"
 #include "core/Multires.h"
 
+#include <cctype>
 #include <imgui_internal.h>
 
 #include <algorithm>
@@ -273,7 +274,25 @@ void App::drawSubToolsContents() {
         if (ImGui::MenuItem("Sphere")) runCommand("subtool_append", {{"type", std::string("sphere")}});
         if (ImGui::MenuItem("Cube")) runCommand("subtool_append", {{"type", std::string("cube")}});
         if (ImGui::MenuItem("Plane")) runCommand("subtool_append", {{"type", std::string("plane")}});
+        for (const char* t : {"cylinder", "cone", "torus", "capsule", "icosphere", "quadsphere"}) { // #31
+            std::string label = t;
+            label[0] = char(std::toupper(static_cast<unsigned char>(label[0])));
+            if (label == "Quadsphere") label = "Quad Sphere";
+            if (ImGui::MenuItem(label.c_str())) runCommand("subtool_append", {{"type", std::string(t)}});
+        }
         ImGui::Separator();
+        if (ImGui::BeginMenu("Insert on the model")) { // #34: drag on the surface to place it
+            for (const char* t : {"sphere", "cube", "cylinder", "cone", "torus", "capsule", "quadsphere"}) {
+                std::string label = t;
+                label[0] = char(std::toupper(static_cast<unsigned char>(label[0])));
+                if (label == "Quadsphere") label = "Quad Sphere";
+                if (ImGui::MenuItem(label.c_str(), nullptr, insertType_ == t)) {
+                    insertType_ = t;
+                    status_ = "Insert " + label + ": drag on the model (the drag sets its size). Esc stops.";
+                }
+            }
+            ImGui::EndMenu();
+        }
         if (ImGui::MenuItem("From file..."))
             SDL_ShowOpenFileDialog(onAppendChosen, &dialogRequests_[int(FileAction::AppendSubtool)], window_,
                                    kAppendFilters, 2, nullptr, false);

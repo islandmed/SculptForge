@@ -286,6 +286,31 @@ void App::drawPalette_Draw() {
     if (doc_.sculptor.dyntopo.enabled && !dyntopoBlocker(doc_.mesh).empty())
         hint(*this, "This SubTool has subdivision levels, so strokes don't remesh it: delete the lower (or higher) levels "
              "first.");
+    // Focal length (#26): the perspective view's lens in mm on a 36 x 24 mm frame (vertical field of view);
+    // saved with the project as the camera's fov_y.
+    tray::GroupLabel(*this, "Camera");
+    {
+        auto toMm = [](float fovY) { return 12.0f / std::tan(fovY * 0.5f); };
+        auto toFov = [](float mm) { return 2.0f * std::atan(12.0f / mm); };
+        float mm = toMm(camera_.fovY);
+        ImGui::SetNextItemWidth(-1);
+        if (ui::SliderInside("##focallength", &mm, 15.0f, 300.0f, "Focal Length %.0f mm", ImGuiSliderFlags_Logarithmic))
+            camera_.fovY = toFov(std::clamp(mm, 15.0f, 300.0f));
+        ui::HelpText("Focal Length", nullptr,
+                     "The viewport's lens, as on a full-frame camera: short (15-35 mm) exaggerates perspective, long "
+                     "(85-300 mm) flattens it, which helps judge proportions. Saved with the project; Ctrl+click to type.",
+                     "Draw > Camera");
+        const float presets[] = {35.0f, 50.0f, 85.0f, 135.0f};
+        const float w = (ImGui::GetContentRegionAvail().x - 3.0f * ImGui::GetStyle().ItemSpacing.x) / 4.0f;
+        for (int i = 0; i < 4; ++i) {
+            if (i) ImGui::SameLine();
+            char label[24];
+            std::snprintf(label, sizeof label, "%.0f##focal%d", presets[i], i);
+            if (ImGui::Button(label, ImVec2(w, 0))) camera_.fovY = toFov(presets[i]);
+        }
+        ui::Checkbox("Axes##draw.axes", &uiPrefs_.showAxes);
+        ui::HelpText("Axes", nullptr, "Show the X / Y / Z directions in the corner of the canvas.", "Draw > Camera");
+    }
     // Tablet: the same Pressure > Strength / Size toggles as the top shelf (not checkboxes), and the pen state as
     // a hint line.
     tray::GroupLabel(*this, "Tablet");
@@ -476,7 +501,10 @@ void App::drawPalette_Script() {
              "sculptforge-cli tool.");
 }
 
-void App::drawPalette_Stroke() { drawStrokeGrid(*this, GridMode::Palette); } // Pickers.cpp, as in the stroke picker
+void App::drawPalette_Stroke() {
+    drawStrokeGrid(*this, GridMode::Palette); // Pickers.cpp, as in the stroke picker
+    drawOptionRow(*this, {"stroke.continuous"});
+}
 
 void App::drawPalette_Tool() {
     const tray::Style style; // quiet check marks

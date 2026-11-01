@@ -5,7 +5,20 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
-## Version 0.10.0
+## Version 0.10.1
+
+### From your feedback on GitHub
+
+- **Maya navigation** (#32): **Preferences > Input > Maya**. Alt+left orbits, Alt+middle pans, Alt+right zooms.
+- **Focal length** (#26): **Draw > Camera**, 15-300 mm with 35 / 50 / 85 / 135 presets, saved with the project.
+- **More primitives** (#31): Cylinder, Cone, Torus, Capsule, Icosphere and Quad Sphere in **Tool > SubTool >
+  Append**, plus **Insert on the model** (#34): choose a shape, then drag on the surface to add it.
+- **Continuous** in the Stroke palette keeps the brush working while you hold it still, and an X / Y / Z gizmo
+  shows the view's direction (#31).
+- **Local API** (#36): other programs on your computer (symmetry tools, scripts) can run commands in the open
+  app. Off by default; see [Scripting](scripting.md).
+- The window opens where and how big you left it (#35), and a drawing problem on some graphics drivers that left
+  trails in the viewport is fixed (#29).
 
 ### Micro levels: hundreds of millions of polygons
 

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(SculptForge VERSION 0.10.0 LANGUAGES C CXX)
+project(SculptForge VERSION 0.10.1 LANGUAGES C CXX)
 include(GNUInstallDirs)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -49,6 +49,7 @@ add_library(sculptforge_core STATIC
   src/core/SubTools.cpp
   src/core/ExtractMirror.cpp
   src/core/MeshTransform.cpp
+  src/core/LiveApi.cpp
   src/core/TransformCommands.cpp
   src/core/Decimate.cpp
   src/core/Script.cpp
@@ -270,6 +271,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelExtract.cpp
     src/app/PanelTimeline.cpp
     src/app/ProofMode.cpp
+    src/app/LiveApi.cpp
     src/app/Tablet.cpp
     src/app/SpaceMouse.cpp
     src/app/Input.cpp

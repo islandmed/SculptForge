@@ -128,7 +128,7 @@ public:
     void queueFile(FileAction action, std::string path);
 
 private:
-    enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, SubToolClick, Select, Gizmo, Guide, Sculptable, ZSphere };
+    enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, SubToolClick, Select, Gizmo, Guide, Sculptable, ZSphere, Insert };
 
     void handleEvent(const SDL_Event& e);
     void onMouseDown(float x, float y, Uint8 button);
@@ -472,6 +472,8 @@ private:
     glm::vec3 screenUpVector(float angle) const; // camera up rotated by `angle` around the view axis
     static void SDLCALL onAlphaChosen(void* userdata, const char* const* files, int filter);
     StrokeType strokeType_ = StrokeType::Dots;
+    bool strokeContinuous_ = false; // Stroke > Continuous (#31): keep dabbing while the pointer rests
+    double strokeMovedAt_ = 0.0, continuousDabAt_ = 0.0;
     LazyMouse lazyMouse_;
     Spray spray_;
     float sprayScatter_ = 1.0f;          // jitter radius as a fraction of brush size
@@ -1095,6 +1097,20 @@ private:
     bool captureShortcutKey(SDL_Keycode key, SDL_Keymod mod);
     void consoleEcho(const std::string& name, const Args& args, const CommandResult& r);
     std::string uiConfigPath() const;
+    // Window size, position, maximised and full screen, kept in window.json beside ui.json (#35). Not for tests,
+    // renders, recordings or proof mode.
+    struct WindowState { int w = 1600, h = 960, x = 0, y = 0; bool placed = false, maximized = false, fullscreen = false; };
+    static WindowState loadWindowState();
+    void saveWindowState() const;
+    bool rememberWindow_ = false;
+    std::shared_ptr<struct LiveApiState> liveApi_; // the local API server while on (app/LiveApi.cpp)
+    void setLiveApi(bool on);
+    void pollLiveApi();
+    void drawAxisGizmo();
+    // Insert on the model (#34): the primitive chosen in Append > Insert; a drag on the surface places it.
+    std::string insertType_;
+    glm::vec3 insertAt_{0.0f}, insertNormal_{0.0f, 1.0f, 0.0f};
+    float insertX_ = 0.0f, insertY_ = 0.0f, insertPx_ = 0.0f;
     bool readUiConfig(const std::string& path, std::string& err);
     bool writeUiConfig(const std::string& path, std::string& err);
     std::string layoutKey() const; // the layout without per-session state, to notice edits
@@ -1213,6 +1229,8 @@ private:
     void applyInputStyle(); // the style's default shortcuts (1-0 brushes or 9 QuickSave; I = RGB or Z Intensity)
     bool zbrushStyle() const { return uiPrefs_.inputStyle == 0; }
     bool blenderStyle() const { return uiPrefs_.inputStyle == 2; }
+    bool mayaStyle() const { return uiPrefs_.inputStyle == 3; } // #32: Alt+left/middle/right orbit/pan/zoom
+    bool mayaNavigationDown(Uint8 button);
     void setInputStyle(int style);
     // ---- Blender style (Input.cpp) ----
     // Middle-drag orbits (Shift pans, Ctrl zooms), Alt+left-drag emulates the middle button (pens), Ctrl inverts

@@ -2225,6 +2225,12 @@ void Renderer::endCapture(std::vector<uint8_t>& rgba) {
 void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, const RenderSettings& settings,
                     const Viewport& viewport) {
     syncMatcaps();
+    // Known state before the clears: a scissor box, colour mask or depth mask left over from another pass (UI,
+    // overlays, calibration) makes glClear partial. Some drivers (NVIDIA on Windows, #29) then show old frames
+    // under the cursor and stale depth hides the mesh.
+    gl::Disable(GL_SCISSOR_TEST);
+    gl::ColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    gl::DepthMask(GL_TRUE);
     gl::Viewport(0, 0, targetWidth, targetHeight);
     const bool inset = viewport.w > 0 && viewport.h > 0;
     if (inset) {
