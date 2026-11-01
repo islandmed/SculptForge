@@ -124,8 +124,18 @@ jobs:
         with: { ref: '${{ env.REF }}' }
       - name: flatpak and flatpak-builder
         run: sudo apt-get update && sudo apt-get install -y flatpak flatpak-builder xvfb
-      - name: Build the bundle (packaging/flatpak/org.sculptforge.SculptForge.yml)
-        run: packaging/flatpak/build.sh dist
+      - uses: actions/cache/restore@v5
+        with:
+          path: build-flatpak/state/ccache
+          key: ccache-pkg-flatpak-${{ matrix.arch }}.${{ github.sha }}
+          restore-keys: ccache-pkg-flatpak-${{ matrix.arch }}.
+      - name: Build the bundle (packaging/flatpak/org.sculptforge.SculptForge.yml; the SDK's ccache)
+        run: SF_FLATPAK_CCACHE=1 packaging/flatpak/build.sh dist
+      - if: env.SAVE_CACHE == 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: build-flatpak/state/ccache
+          key: ccache-pkg-flatpak-${{ matrix.arch }}.${{ github.sha }}
       - name: Install it and run UI tests inside the sandbox (Xvfb, Mesa from the runtime)
         run: |
           flatpak install --user -y --noninteractive dist/*.flatpak
