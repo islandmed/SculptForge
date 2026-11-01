@@ -61,7 +61,7 @@ expect_value camera_pitch != $p0
 
 # Turned off: a right click does nothing (and a drag still navigates). (Input is still open from above.)
 click "Preferences##palette.preferences"
-click "Right click opens the QuickMenu##input.right_click_menu"
+click "Right click opens the Quick Menu##input.right_click_menu"
 expect_value right_click_menu == 0
 key escape
 camera 0 0

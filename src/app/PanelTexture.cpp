@@ -109,42 +109,42 @@ void App::registerTextureUiActions() {
     auto textured = [this] { return hasTexture(doc_.mesh); };
     add("draw.paint_vertex", "Vertex", "Draw", [this] { runCommand("paint_target", {{"target", std::string("vertex")}}); },
         [this] { return !paintsTexture(doc_.mesh); }, textured,
-        "Paint into the vertices (polypaint): the colour resolution is the mesh's. Shown when the SubTool has a "
+        "Paint into the vertices (vertex paint): the colour resolution is the mesh's. Shown when the Part has a "
         "texture (Tool > Texture Map).");
     add("draw.paint_texture", "Texture", "Draw", [this] { runCommand("paint_target", {{"target", std::string("texture")}}); },
         [this] { return paintsTexture(doc_.mesh); }, textured,
-        "Paint into the SubTool's texture: the colour resolution comes from the texture, not the mesh. The Paint "
+        "Paint into the Part's texture: the colour resolution comes from the texture, not the mesh. The Paint "
         "brush, Rgb sculpting, fills and Paint Layers all work on it.");
     // Shown on the top shelf and in the Color palette while painting a SubTool that has no texture yet.
     add("draw.new_texture", "New Texture", "Draw", [this] { startNewTexture(); }, nullptr,
         [this] { return !autoUv_ && doc_.mesh.triangleCount() > 0; },
-        "Start texture painting: give the SubTool a texture (the size chosen in Tool > Texture Map, 2K by default) "
+        "Start texture painting: give the Part a texture (the size chosen in Tool > Texture Map, 2K by default) "
         "so paint goes into texels instead of vertices, and the detail comes from the texture, not the mesh. "
         "Without UVs, Auto UV unwraps the model first (in the background, with its progress in the status bar).",
         "texture_create");
     add("view.texture", "Texture", "Render", [this] { renderSettings_.showTexture = !renderSettings_.showTexture; },
         [this] { return renderSettings_.showTexture; }, nullptr,
-        "Show the painted texture on the model (multiplied over the material, like polypaint).");
+        "Show the painted texture on the model (multiplied over the material, like vertex paint).");
     add("texture.auto_uv", "Auto UV", kPath, [this] { startAutoUv(); }, nullptr,
         [this] { return !autoUv_ && doc_.mesh.triangleCount() > 0; },
-        "Unwrap the SubTool automatically: cut it into UV islands and pack them, so any sculpt can carry a texture. "
+        "Unwrap the Part automatically: cut it into UV islands and pack them, so any sculpt can carry a texture. "
         "Replaces existing UVs (undoable). Runs in the background; big meshes can take a minute or more.",
         "uv_auto");
     add("texture.new", "New Texture", kPath,
         [this] { runCommand("texture_create", {{"size", std::to_string(kSizes[std::clamp(textureSizeChoice_, 0, 3)])}}); },
         nullptr, [this] { return doc_.mesh.hasUvs(); },
-        "Give the SubTool a texture of the chosen size to paint into (white). Needs UVs: Auto UV makes them. "
+        "Give the Part a texture of the chosen size to paint into (white). Needs UVs: Auto UV makes them. "
         "Replaces an existing texture (undoable).",
         "texture_create");
     add("texture.show_uvs", "Show UVs", kPath, [this] { showUvView_ = !showUvView_; }, [this] { return showUvView_; },
         [this] { return doc_.mesh.hasUvs(); }, "Show the texture with the UV layout drawn over it, below these buttons.");
-    add("texture.from_polypaint", "Polypaint > Texture", kPath, [this] { runCommand("texture_from_polypaint"); }, nullptr,
+    add("texture.from_polypaint", "Vertex Paint > Texture", kPath, [this] { runCommand("texture_from_polypaint"); }, nullptr,
         [this] { return doc_.mesh.hasUvs() && doc_.mesh.hasColors(); },
-        "Bake the polypaint (all paint layers) into the active texture layer. Makes a 2K texture if there is none.",
+        "Bake the vertex paint (all paint layers) into the active texture layer. Makes a 2K texture if there is none.",
         "texture_from_polypaint");
-    add("texture.to_polypaint", "Texture > Polypaint", kPath, [this] { runCommand("polypaint_from_texture"); }, nullptr,
+    add("texture.to_polypaint", "Texture > Vertex Paint", kPath, [this] { runCommand("polypaint_from_texture"); }, nullptr,
         textured,
-        "Copy the texture into the polypaint of every vertex (detail finer than the mesh is lost).",
+        "Copy the texture into the vertex paint of every vertex (detail finer than the mesh is lost).",
         "polypaint_from_texture");
     add("texture.export", "Export Texture...", kPath,
         [this] { SDL_ShowSaveFileDialog(onTextureFile, &g_dialogs[kExportTexture], window_, kPngFilter, 1, nullptr); },
@@ -152,15 +152,15 @@ void App::registerTextureUiActions() {
     add("texture.import", "Import Texture...", kPath,
         [this] { SDL_ShowOpenFileDialog(onTextureFile, &g_dialogs[kImportTexture], window_, kImageFilters, 2, nullptr, false); },
         nullptr, [this] { return doc_.mesh.hasUvs(); },
-        "Load an image as the SubTool's texture (replacing its layers; undoable).", "texture_import");
+        "Load an image as the Part's texture (replacing its layers; undoable).", "texture_import");
     add("texture.delete", "Delete Texture", kPath, [this] { runCommand("texture_delete"); }, nullptr,
         [this] { return doc_.mesh.texture != nullptr; },
-        "Remove the SubTool's texture (undoable). Painting goes back to the vertices.", "texture_delete");
+        "Remove the Part's texture (undoable). Painting goes back to the vertices.", "texture_delete");
     add("geometry.keep_texture", "Keep Texture", "Tool > Remesh", [this] { keepTexture_ = !keepTexture_; },
         [this] { return keepTexture_; }, nullptr,
-        "Voxel Remesh and QRemesh keep a painted texture: the new mesh gets Auto UVs and the texture (every layer) "
+        "Voxel Remesh and Quad Remesh keep a painted texture: the new mesh gets Auto UVs and the texture (every layer) "
         "is projected onto it from the old surface, in the same undo step. Off: the texture is dropped. Merging "
-        "SubTools keeps textures too. Shown under Remesh and QRemesh when the SubTool has a texture.",
+        "Parts keeps textures too. Shown under Remesh and Quad Remesh when the Part has a texture.",
         "");
     for (int i = 0; i < 2; ++i) g_dialogs[i] = {this, TextureFile(i)};
 }
@@ -263,7 +263,7 @@ void App::drawTextureMapContents() {
     // Status line: UVs, texture size, where paint goes.
     if (autoUv_) {
         ImGui::ProgressBar(autoUv_->progress->load(), ImVec2(-1, 0), "Unwrapping...");
-        ui::HelpText("Auto UV", nullptr, "Unwrapping the SubTool in the background; you can keep working.", kPath);
+        ui::HelpText("Auto UV", nullptr, "Unwrapping the Part in the background; you can keep working.", kPath);
     } else if (!m.hasUvs()) {
         ImGui::TextDisabled("No UVs: Auto UV makes them");
     } else if (!hasTexture(m)) {
@@ -327,7 +327,7 @@ void App::drawTextureMapContents() {
         dl->AddRect(p, ImVec2(p.x + side, p.y + side), IM_COL32(90, 90, 100, 255));
         ImGui::Dummy(ImVec2(side, side));
         ui::HelpText("UV view", nullptr,
-                     "The texture with the SubTool's UV layout over it (island borders on big meshes). Paint on the model; "
+                     "The texture with the Part's UV layout over it (island borders on big meshes). Paint on the model; "
                      "the texture fills in here.",
                      kPath);
     }

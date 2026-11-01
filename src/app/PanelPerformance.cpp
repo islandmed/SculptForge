@@ -146,7 +146,7 @@ void App::notePerformanceFrame(double syncMs) {
     bool oom = false;
     for (const SubTool& s : doc_.subtools) oom = oom || (s.visible && renderer_.outOfMemory(s.id));
     if (oom && !perf_.gpuOutOfMemory)
-        status_ = "Not enough GPU memory to show every SubTool: hide some, or step down a subdivision level "
+        status_ = "Not enough GPU memory to show every Part: hide some, or step down a subdivision level "
                   "(Preferences > Performance)";
     perf_.gpuOutOfMemory = oom;
 }
@@ -208,7 +208,7 @@ void App::drawPerformanceSection() {
                  "What the scene holds: the meshes with their topology, the BVHs, the subdivision levels kept for "
                  "stepping between them, the undo history (Edit keeps up to 1 GB, dropping the oldest steps), painted textures "
                  "with their layers and material channels (only painted 64x64 tiles of a channel use memory), and the "
-                 "GPU buffers of the visible SubTools.",
+                 "GPU buffers of the visible Parts.",
                  kPath);
     const MemoryUse m = documentMemory(doc_);
     const std::string mem = "Meshes " + megabytes(m.mesh) + "  BVH " + megabytes(m.bvh) + "\nSubdivision levels " +
@@ -220,7 +220,7 @@ void App::drawPerformanceSection() {
     ImGui::LogText("%s", mem.c_str());
     if (perf_.gpuOutOfMemory) {
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(ui::color::danger));
-        ImGui::TextWrapped("%s", tr("Not enough GPU memory to show every SubTool: hide some or step down a subdivision level."));
+        ImGui::TextWrapped("%s", tr("Not enough GPU memory to show every Part: hide some or step down a subdivision level."));
         ImGui::PopStyleColor();
     }
 }

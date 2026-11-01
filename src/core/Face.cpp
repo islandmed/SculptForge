@@ -906,7 +906,7 @@ bool generateFaceShapes(Document& doc, const FaceShapesOptions& options, FaceSha
         return false;
     }
     if (doc.mesh.triangleCount() == 0) {
-        error = "The active SubTool is empty";
+        error = "The active Part is empty";
         return false;
     }
     subdivCommit(doc.mesh);

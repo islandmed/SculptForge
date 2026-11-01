@@ -462,7 +462,7 @@ Error metric (tests/test_kelvinlet.cpp):
 The core per-move cost on its own (`sculptforge_tests kelvinlet_grab_dense_mesh_timing`, 1.3M triangles, r 0.3,
 no renderer): about 1.6-3.4 ms a move for 13 000-27 000 vertices, depending on the load.
 
-Capture from view (`sculptforge-cli`, a VDM horn and a DamStandard cut sculpted on the sphere, square half size
+Capture from view (`sculptforge-cli`, a VDM horn and a Sharp Crease cut sculpted on the sphere, square half size
 0.15 unless noted):
 
 | Mesh | Height alpha 256 / 1024 px | VDM 256 px (points) | VDM, half size 0.4 (points) |
@@ -535,11 +535,11 @@ triangle's corners, the double-precision volume in `clusterBounds`.
 
 ## v0.9: Make sculptable (feat/sculptable)
 
-Splat capture to a sculptable SubTool (`splat_to_mesh`, core/Sculptable.h): the built-in test head capture
-(`splat_test_capture count=N floaters=20`), Film preset (12,000 quads) with face loops and polypaint, from the
-command to the finished SubTool. M1 Pro (10 cores), Release build, `sculptforge-cli`; peak RSS of the whole run
+Splat capture to a sculptable Part (`splat_to_mesh`, core/Sculptable.h): the built-in test head capture
+(`splat_test_capture count=N floaters=20`), Film preset (12,000 quads) with face loops and vertex paint, from the
+command to the finished Part. M1 Pro (10 cores), Release build, `sculptforge-cli`; peak RSS of the whole run
 (capture generation included). "Surface" is the splat density, solid and surface nets; the rest is face
-landmarks, QRemesh and colour.
+landmarks, Quad Remesh and colour.
 
 | Splats | Detail | Total | Surface | Peak RSS |
 |---|---|---|---|---|
@@ -598,7 +598,7 @@ What to read from it:
 - Undo memory is what the stroke touched: 5 MB for a 40-dab stroke at 1M.
 - Undo and redo take a full rebuild (85-95 ms at 1M, 350 ms at 4M); see Known limits.
 - Since the first measurements, a randomized stress test (tests/test_dyntopo.cpp, : hundreds of
-  strokes with every brush, detail, radius and symmetry, masks, polygroups, hidden parts, a sculpt layer, random
+  strokes with every brush, detail, radius and symmetry, masks, face groups, hidden parts, a sculpt layer, random
   undo / redo) found and fixed sliver chains, brush-squashed triangles outside the remeshed area and on the mirror
   side, and undo bits leaking between strokes. The repairs cost about 1 ms per medium dab at 1M.
 
@@ -612,8 +612,8 @@ Threads: 10, GPU: Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8.
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | Standard, Detail 50% | 0.94 | 0.05 | 0.04 | 0.02 | 0.68 | **1.74** | 246k | 1.4 | 45.3 | 45.0 | 0.53 MB |
 | Standard, Detail 100% | 10.38 | 0.27 | 0.31 | 0.11 | 2.38 | **13.49** | 322k | 29.5 | 47.0 | 37.8 | 0.79 MB |
-| Snake Hook, Detail 50% | 4.18 | 0.06 | 0.05 | 0.02 | 1.18 | **5.50** | 253k | 42.1 | 48.7 | 50.5 | 0.59 MB |
-| Clay Buildup, Detail 75% | 6.75 | 0.19 | 0.19 | 0.07 | 2.05 | **9.27** | 272k | 24.1 | 47.2 | 29.4 | 0.58 MB |
+| Tendril, Detail 50% | 4.18 | 0.06 | 0.05 | 0.02 | 1.18 | **5.50** | 253k | 42.1 | 48.7 | 50.5 | 0.59 MB |
+| Clay Block, Detail 75% | 6.75 | 0.19 | 0.19 | 0.07 | 2.05 | **9.27** | 272k | 24.1 | 47.2 | 29.4 | 0.58 MB |
 | Smooth (simplifies), Detail 50% | 1.48 | 0.02 | 0.01 | 0.01 | 1.58 | **3.13** | 239k | 1.1 | 45.9 | 43.2 | 1.38 MB |
 | Standard (large, r 0.4), Detail 50% | 4.49 | 0.08 | 0.06 | 0.04 | 2.89 | **7.62** | 214k | 36.1 | 48.3 | 40.8 | 4.20 MB |
 
@@ -623,8 +623,8 @@ Threads: 10, GPU: Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8.
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | Standard, Detail 50% | 4.31 | 0.06 | 0.05 | 0.03 | 4.12 | **8.64** | 959k | 6.0 | 86.1 | 82.7 | 5.20 MB |
 | Standard, Detail 100% | 9.39 | 0.28 | 0.33 | 0.11 | 2.90 | **13.08** | 1.0M | 4.4 | 92.8 | 89.7 | 1.47 MB |
-| Snake Hook, Detail 50% | 6.56 | 0.07 | 0.05 | 0.03 | 4.40 | **11.18** | 969k | 4.3 | 85.1 | 85.3 | 4.59 MB |
-| Clay Buildup, Detail 75% | 6.60 | 0.21 | 0.20 | 0.08 | 3.06 | **10.22** | 977k | 5.1 | 84.8 | 84.1 | 3.38 MB |
+| Tendril, Detail 50% | 6.56 | 0.07 | 0.05 | 0.03 | 4.40 | **11.18** | 969k | 4.3 | 85.1 | 85.3 | 4.59 MB |
+| Clay Block, Detail 75% | 6.60 | 0.21 | 0.20 | 0.08 | 3.06 | **10.22** | 977k | 5.1 | 84.8 | 84.1 | 3.38 MB |
 | Smooth (simplifies), Detail 50% | 4.57 | 0.04 | 0.02 | 0.01 | 4.80 | **9.50** | 952k | 5.3 | 83.4 | 79.9 | 5.94 MB |
 | Standard (large, r 0.4), Detail 50% | 18.00 | 0.24 | 0.18 | 0.15 | 9.90 | **28.60** | 851k | 68.6 | 87.1 | 79.2 | 17.20 MB |
 
@@ -634,8 +634,8 @@ Threads: 10, GPU: Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8.
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | Standard, Detail 50% | 14.29 | 0.13 | 0.07 | 0.06 | 10.44 | **25.18** | 3.8M | 23.9 | 337.6 | 310.0 | 23.02 MB |
 | Standard, Detail 100% | 13.04 | 0.39 | 0.40 | 0.18 | 5.68 | **19.87** | 3.9M | 22.7 | 347.2 | 325.5 | 13.31 MB |
-| Snake Hook, Detail 50% | 15.42 | 0.15 | 0.07 | 0.06 | 11.93 | **27.82** | 3.8M | 23.1 | 333.8 | 317.4 | 20.75 MB |
-| Clay Buildup, Detail 75% | 20.88 | 0.32 | 0.27 | 0.19 | 14.36 | **36.25** | 3.8M | 27.6 | 348.1 | 333.9 | 25.86 MB |
+| Tendril, Detail 50% | 15.42 | 0.15 | 0.07 | 0.06 | 11.93 | **27.82** | 3.8M | 23.1 | 333.8 | 317.4 | 20.75 MB |
+| Clay Block, Detail 75% | 20.88 | 0.32 | 0.27 | 0.19 | 14.36 | **36.25** | 3.8M | 27.6 | 348.1 | 333.9 | 25.86 MB |
 | Smooth (simplifies), Detail 50% | 16.56 | 0.11 | 0.05 | 0.03 | 10.64 | **27.57** | 3.8M | 26.5 | 351.1 | 327.8 | 23.79 MB |
 | Standard (large, r 0.4), Detail 50% | 91.91 | 1.97 | 1.59 | 0.97 | 42.63 | **139.86** | 3.5M | 261.6 | 341.7 | 336.1 | 57.48 MB |
 
@@ -717,11 +717,11 @@ Threads: 10, GPU: Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8.
 | Standard | 12k | 25k (14) | 0.59 | 0.53 | 0.26 | 0.00 | 0.63 | **2.12** | 0.07 | 1.6 | 2.5 | 1.4 MB |
 | Standard (large, r 0.4) | 118k | 155k (32) | 1.49 | 1.26 | 0.98 | 0.01 | 2.53 | **7.09** | 0.07 | 4.7 | 4.8 | 4.6 MB |
 | Clay | 7k | 16k (9) | 0.40 | 0.41 | 0.14 | 0.01 | 0.54 | **1.58** | 0.03 | 1.7 | 1.6 | 0.9 MB |
-| ClayBuildup | 8k | 19k (11) | 0.51 | 0.46 | 0.19 | 0.01 | 1.05 | **2.29** | 0.02 | 1.6 | 1.6 | 0.8 MB |
+| Clay Block | 8k | 19k (11) | 0.51 | 0.46 | 0.19 | 0.01 | 1.05 | **2.29** | 0.02 | 1.6 | 1.6 | 0.8 MB |
 | Smooth | 5k | 12k (9) | 0.29 | 0.25 | 0.08 | 0.01 | 0.40 | **1.07** | 0.03 | 1.4 | 1.4 | 0.6 MB |
 | Smooth (large, r 0.4) | 59k | 84k (23) | 1.32 | 0.89 | 0.45 | 0.01 | 1.45 | **4.54** | 0.06 | 2.6 | 3.0 | 2.6 MB |
 | Inflate | 5k | 12k (9) | 0.27 | 0.27 | 0.09 | 0.01 | 0.43 | **1.13** | 0.03 | 1.7 | 1.4 | 0.6 MB |
-| DamStandard | 4k | 12k (9) | 0.31 | 0.32 | 0.09 | 0.01 | 0.40 | **1.18** | 0.02 | 1.3 | 1.2 | 0.5 MB |
+| Sharp Crease | 4k | 12k (9) | 0.31 | 0.32 | 0.09 | 0.01 | 0.40 | **1.18** | 0.02 | 1.3 | 1.2 | 0.5 MB |
 | Layer | 5k | 12k (9) | 0.33 | 0.26 | 0.08 | 0.01 | 0.45 | **1.18** | 0.03 | 1.4 | 2.1 | 0.6 MB |
 | Move | 4k | 10k (8) | 0.05 | 0.28 | 0.08 | 0.01 | 0.36 | **0.82** | 0.01 | 0.3 | 0.4 | 0.1 MB |
 | Move (large, r 0.4) | 42k | 63k (20) | 0.21 | 0.79 | 0.34 | 0.01 | 1.10 | **2.73** | 0.03 | 1.5 | 1.1 | 0.7 MB |
@@ -765,11 +765,11 @@ Threads: 10, GPU: Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8.
 | Standard | 50k | 77k (26) | 0.97 | 0.89 | 0.57 | 0.00 | 1.43 | **4.34** | 0.08 | 5.1 | 5.9 | 5.4 MB |
 | Standard (large, r 0.4) | 472k | 564k (63) | 3.42 | 3.84 | 2.89 | 0.01 | 9.02 | **22.09** | 0.18 | 18.7 | 18.3 | 18.5 MB |
 | Clay | 28k | 47k (19) | 0.92 | 0.59 | 0.36 | 0.01 | 1.03 | **3.21** | 0.07 | 4.1 | 3.7 | 3.5 MB |
-| ClayBuildup | 33k | 54k (21) | 0.97 | 0.70 | 0.39 | 0.01 | 3.21 | **5.61** | 0.04 | 4.1 | 3.7 | 3.8 MB |
+| Clay Block | 33k | 54k (21) | 0.97 | 0.70 | 0.39 | 0.01 | 3.21 | **5.61** | 0.04 | 4.1 | 3.7 | 3.8 MB |
 | Smooth | 19k | 35k (17) | 1.01 | 0.54 | 0.32 | 0.01 | 0.83 | **2.94** | 0.03 | 3.1 | 3.3 | 2.7 MB |
 | Smooth (large, r 0.4) | 233k | 289k (45) | 2.48 | 2.01 | 1.07 | 0.01 | 4.42 | **11.47** | 0.13 | 11.2 | 10.6 | 11.0 MB |
 | Inflate | 18k | 34k (17) | 0.85 | 0.58 | 0.37 | 0.01 | 0.86 | **2.91** | 0.08 | 3.1 | 3.2 | 2.6 MB |
-| DamStandard | 18k | 33k (17) | 0.86 | 0.54 | 0.35 | 0.02 | 0.83 | **2.82** | 0.03 | 2.9 | 2.9 | 2.5 MB |
+| Sharp Crease | 18k | 33k (17) | 0.86 | 0.54 | 0.35 | 0.02 | 0.83 | **2.82** | 0.03 | 2.9 | 2.9 | 2.5 MB |
 | Layer | 19k | 34k (17) | 1.04 | 0.52 | 0.30 | 0.01 | 0.76 | **2.83** | 0.07 | 2.6 | 3.1 | 2.6 MB |
 | Move | 16k | 32k (12) | 0.15 | 0.59 | 0.12 | 0.01 | 0.71 | **1.80** | 0.05 | 0.8 | 0.7 | 0.3 MB |
 | Move (large, r 0.4) | 168k | 217k (37) | 0.32 | 1.68 | 0.77 | 0.02 | 3.44 | **7.36** | 0.05 | 3.2 | 2.9 | 2.8 MB |
@@ -813,11 +813,11 @@ Threads: 10, GPU: Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8.
 | Standard | 103k | 146k (38) | 1.50 | 1.27 | 0.94 | 0.01 | 2.79 | **7.49** | 0.13 | 11.4 | 11.9 | 11.4 MB |
 | Standard (large, r 0.4) | 987k | 1.1M (93) | 6.27 | 8.59 | 5.65 | 0.01 | 18.48 | **45.14** | 0.30 | 39.8 | 38.4 | 38.7 MB |
 | Clay | 58k | 87k (28) | 1.18 | 0.91 | 0.53 | 0.02 | 1.76 | **4.97** | 0.09 | 7.2 | 7.1 | 7.2 MB |
-| ClayBuildup | 66k | 98k (30) | 1.35 | 1.03 | 0.62 | 0.02 | 6.50 | **10.14** | 0.08 | 7.8 | 7.8 | 8.0 MB |
+| Clay Block | 66k | 98k (30) | 1.35 | 1.03 | 0.62 | 0.02 | 6.50 | **10.14** | 0.08 | 7.8 | 7.8 | 8.0 MB |
 | Smooth | 39k | 63k (24) | 1.17 | 0.78 | 0.35 | 0.02 | 1.33 | **4.07** | 0.08 | 6.0 | 6.7 | 5.7 MB |
 | Smooth (large, r 0.4) | 468k | 556k (64) | 4.04 | 3.79 | 1.86 | 0.03 | 8.59 | **21.28** | 0.18 | 20.2 | 21.1 | 20.5 MB |
 | Inflate | 38k | 61k (24) | 0.99 | 0.82 | 0.44 | 0.02 | 1.37 | **4.06** | 0.09 | 6.3 | 5.7 | 5.6 MB |
-| DamStandard | 37k | 60k (23) | 1.03 | 0.87 | 0.39 | 0.02 | 1.36 | **4.11** | 0.07 | 5.3 | 5.6 | 5.4 MB |
+| Sharp Crease | 37k | 60k (23) | 1.03 | 0.87 | 0.39 | 0.02 | 1.36 | **4.11** | 0.07 | 5.3 | 5.6 | 5.4 MB |
 | Layer | 37k | 60k (23) | 1.46 | 0.82 | 0.33 | 0.02 | 1.25 | **4.32** | 0.08 | 5.6 | 5.6 | 5.6 MB |
 | Move | 34k | 55k (23) | 0.18 | 0.95 | 0.22 | 0.02 | 1.29 | **3.11** | 0.10 | 1.8 | 1.4 | 0.5 MB |
 | Move (large, r 0.4) | 352k | 440k (49) | 0.57 | 3.03 | 1.57 | 0.04 | 7.22 | **14.76** | 0.06 | 5.3 | 5.3 | 5.8 MB |
@@ -920,10 +920,10 @@ GPU upload). Undo is the same or faster.
 
 | | before | after |
 |---|---|---|
-| Mesh: positions 6, normals 6, triangles 12, quad pairs 4, polygroups 4, normal-update stamps 2, dirty bits | 34 | 34 |
+| Mesh: positions 6, normals 6, triangles 12, quad pairs 4, face groups 4, normal-update stamps 2, dirty bits | 34 | 34 |
 | Mesh: vertex-vertex and vertex-triangle lists (CSR) | 28 | **0** (implicit) |
 | Mesh: implicit adjacency indexes (corners per coarse vertex, sides per coarse edge) | | 4.5 |
-| Levels: the top level's data (positions 6, triangles 12, quad pairs 4, polygroups 4) | 26 | **10** (positions, polygroups) |
+| Levels: the top level's data (positions 6, triangles 12, quad pairs 4, face groups 4) | 26 | **10** (positions, face groups) |
 | Levels: the top level's detail | 6 | **0** (fitted to the positions when needed) |
 | Levels: the top level's topology (coarse polygons and edges 18 -> 12; child maps 2, parents and corner codes 11 -> 0) | 31 | **12** |
 | Levels: everything below the top (a quarter, a sixteenth, ...) | 12 | 7 |
@@ -974,10 +974,10 @@ Threads: 10, GPU: Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8.
 | Standard | 12k | 24k (15) | 0.50 | 0.47 | 0.39 | 0.00 | 0.35 | **1.75** | 0.00 | 4.7 | 4.7 | 1.4 MB |
 | Standard (large, r 0.4) | 118k | 148k (45) | 3.26 | 3.40 | 1.93 | 0.00 | 2.28 | **11.10** | 0.00 | 9.5 | 9.7 | 4.6 MB |
 | Clay | 7k | 16k (11) | 0.34 | 0.33 | 0.23 | 0.00 | 0.28 | **1.22** | 0.00 | 2.2 | 2.6 | 0.9 MB |
-| ClayBuildup | 8k | 18k (12) | 0.43 | 0.31 | 0.25 | 0.00 | 0.25 | **1.27** | 0.00 | 3.1 | 2.9 | 0.8 MB |
+| Clay Block | 8k | 18k (12) | 0.43 | 0.31 | 0.25 | 0.00 | 0.25 | **1.27** | 0.00 | 3.1 | 2.9 | 0.8 MB |
 | Smooth | 5k | 12k (9) | 0.24 | 0.18 | 0.12 | 0.00 | 0.17 | **0.74** | 0.00 | 2.4 | 3.2 | 0.6 MB |
 | Inflate | 5k | 12k (9) | 0.20 | 0.17 | 0.13 | 0.00 | 0.16 | **0.68** | 0.00 | 3.0 | 3.0 | 0.6 MB |
-| DamStandard | 4k | 12k (9) | 0.20 | 0.16 | 0.12 | 0.00 | 0.16 | **0.65** | 0.00 | 3.2 | 3.3 | 0.5 MB |
+| Sharp Crease | 4k | 12k (9) | 0.20 | 0.16 | 0.12 | 0.00 | 0.16 | **0.65** | 0.00 | 3.2 | 3.3 | 0.5 MB |
 | Layer | 5k | 12k (9) | 0.31 | 0.18 | 0.12 | 0.00 | 0.17 | **0.80** | 0.00 | 4.4 | 4.3 | 0.6 MB |
 | Move | 4k | 10k (8) | 0.02 | 0.10 | 0.09 | 0.00 | 0.13 | **0.37** | 0.00 | 0.3 | 0.2 | 0.1 MB |
 | Recipe (pattern) | 5k | 13k (9) | 0.48 | 0.17 | 0.12 | 0.00 | 0.17 | **0.97** | 0.00 | 4.2 | 4.4 | 0.6 MB |
@@ -1012,10 +1012,10 @@ Threads: 10, GPU: Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8.
 | Standard | 50k | 76k (15) | 2.45 | 2.28 | 1.37 | 0.00 | 1.52 | **7.79** | 0.00 | 14.8 | 12.8 | 5.4 MB |
 | Standard (large, r 0.4) | 472k | 525k (45) | 8.96 | 9.50 | 5.84 | 0.01 | 8.50 | **33.62** | 0.00 | 34.3 | 32.8 | 18.5 MB |
 | Clay | 28k | 47k (11) | 1.20 | 1.20 | 0.78 | 0.01 | 0.78 | **4.05** | 0.00 | 7.7 | 7.8 | 3.5 MB |
-| ClayBuildup | 33k | 55k (12) | 1.58 | 1.35 | 0.82 | 0.01 | 0.85 | **4.70** | 0.00 | 8.1 | 8.0 | 3.8 MB |
+| Clay Block | 33k | 55k (12) | 1.58 | 1.35 | 0.82 | 0.01 | 0.85 | **4.70** | 0.00 | 8.1 | 8.0 | 3.8 MB |
 | Smooth | 19k | 37k (9) | 0.97 | 0.80 | 0.58 | 0.01 | 0.56 | **2.98** | 0.00 | 6.6 | 7.0 | 2.7 MB |
 | Inflate | 18k | 36k (9) | 0.80 | 0.83 | 0.61 | 0.01 | 0.55 | **2.87** | 0.00 | 7.3 | 7.0 | 2.6 MB |
-| DamStandard | 18k | 35k (9) | 0.89 | 0.85 | 0.62 | 0.01 | 0.53 | **2.96** | 0.00 | 6.7 | 6.4 | 2.5 MB |
+| Sharp Crease | 18k | 35k (9) | 0.89 | 0.85 | 0.62 | 0.01 | 0.53 | **2.96** | 0.00 | 6.7 | 6.4 | 2.5 MB |
 | Layer | 19k | 36k (9) | 1.22 | 0.91 | 0.63 | 0.01 | 0.57 | **3.41** | 0.00 | 9.6 | 6.8 | 2.6 MB |
 | Move | 16k | 29k (8) | 0.14 | 0.47 | 0.63 | 0.01 | 0.44 | **1.75** | 0.00 | 1.3 | 1.2 | 0.3 MB |
 | Recipe (pattern) | 19k | 37k (9) | 1.98 | 0.86 | 0.60 | 0.01 | 0.57 | **4.09** | 0.00 | 8.7 | 8.4 | 2.6 MB |
@@ -1050,10 +1050,10 @@ Threads: 10, GPU: Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8.
 | Standard | 103k | 149k (21) | 4.05 | 3.26 | 1.98 | 0.00 | 3.07 | **12.72** | 0.00 | 21.8 | 21.2 | 11.4 MB |
 | Standard (large, r 0.4) | 987k | 1.1M (57) | 17.52 | 18.05 | 11.48 | 0.01 | 14.05 | **62.60** | 0.00 | 69.1 | 68.4 | 38.7 MB |
 | Clay | 58k | 91k (16) | 2.10 | 1.82 | 1.06 | 0.01 | 1.39 | **6.57** | 0.00 | 13.6 | 13.6 | 7.2 MB |
-| ClayBuildup | 66k | 102k (17) | 2.61 | 2.11 | 1.14 | 0.01 | 1.72 | **7.82** | 0.00 | 15.5 | 14.8 | 8.0 MB |
+| Clay Block | 66k | 102k (17) | 2.61 | 2.11 | 1.14 | 0.01 | 1.72 | **7.82** | 0.00 | 15.5 | 14.8 | 8.0 MB |
 | Smooth | 39k | 67k (14) | 1.75 | 1.61 | 0.79 | 0.02 | 1.15 | **5.47** | 0.00 | 11.4 | 10.8 | 5.7 MB |
 | Inflate | 38k | 66k (14) | 1.63 | 1.53 | 0.80 | 0.02 | 1.29 | **5.43** | 0.00 | 10.8 | 10.3 | 5.6 MB |
-| DamStandard | 37k | 65k (15) | 1.62 | 1.61 | 0.80 | 0.02 | 1.24 | **5.44** | 0.00 | 10.4 | 12.2 | 5.4 MB |
+| Sharp Crease | 37k | 65k (15) | 1.62 | 1.61 | 0.80 | 0.02 | 1.24 | **5.44** | 0.00 | 10.4 | 12.2 | 5.4 MB |
 | Layer | 37k | 65k (14) | 2.11 | 1.65 | 0.77 | 0.02 | 1.21 | **5.92** | 0.00 | 12.0 | 10.1 | 5.6 MB |
 | Move | 33k | 59k (10) | 0.31 | 0.84 | 0.80 | 0.02 | 1.26 | **3.42** | 0.00 | 1.8 | 2.1 | 0.5 MB |
 | Recipe (pattern) | 38k | 68k (15) | 2.50 | 1.61 | 0.78 | 0.02 | 1.28 | **6.39** | 0.00 | 11.1 | 10.7 | 5.4 MB |
@@ -1093,10 +1093,10 @@ Threads: 10, GPU: Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8.
 | Standard | 12k | 24k (15) | 0.49 | 0.59 | 0.46 | 0.00 | 0.49 | **2.06** | 0.00 | 3.7 | 3.8 | 1.4 MB |
 | Standard (large, r 0.4) | 118k | 148k (45) | 3.05 | 3.52 | 1.86 | 0.00 | 3.12 | **11.76** | 0.00 | 11.3 | 10.7 | 4.6 MB |
 | Clay | 7k | 16k (11) | 0.31 | 0.35 | 0.24 | 0.00 | 0.32 | **1.24** | 0.00 | 2.4 | 2.3 | 0.9 MB |
-| ClayBuildup | 8k | 18k (12) | 0.41 | 0.40 | 0.29 | 0.00 | 0.37 | **1.51** | 0.00 | 3.1 | 2.2 | 0.8 MB |
+| Clay Block | 8k | 18k (12) | 0.41 | 0.40 | 0.29 | 0.00 | 0.37 | **1.51** | 0.00 | 3.1 | 2.2 | 0.8 MB |
 | Smooth | 5k | 12k (9) | 0.26 | 0.23 | 0.15 | 0.00 | 0.24 | **0.89** | 0.00 | 2.2 | 2.1 | 0.6 MB |
 | Inflate | 5k | 12k (9) | 0.19 | 0.21 | 0.15 | 0.00 | 0.23 | **0.81** | 0.00 | 2.8 | 2.0 | 0.6 MB |
-| DamStandard | 4k | 12k (9) | 0.20 | 0.21 | 0.14 | 0.00 | 0.23 | **0.79** | 0.00 | 2.1 | 2.0 | 0.5 MB |
+| Sharp Crease | 4k | 12k (9) | 0.20 | 0.21 | 0.14 | 0.00 | 0.23 | **0.79** | 0.00 | 2.1 | 2.0 | 0.5 MB |
 | Layer | 5k | 12k (9) | 0.28 | 0.22 | 0.14 | 0.00 | 0.24 | **0.90** | 0.00 | 2.0 | 1.9 | 0.6 MB |
 | Move | 4k | 10k (8) | 0.02 | 0.13 | 0.11 | 0.00 | 0.20 | **0.47** | 0.00 | 0.3 | 0.3 | 0.1 MB |
 | Recipe (pattern) | 5k | 13k (9) | 0.47 | 0.22 | 0.14 | 0.00 | 0.24 | **1.09** | 0.00 | 1.9 | 2.0 | 0.6 MB |
@@ -1133,10 +1133,10 @@ Threads: 10, GPU: Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8.
 | Standard | 50k | 76k (15) | 2.30 | 2.46 | 1.56 | 0.00 | 1.95 | **8.46** | 0.00 | 16.6 | 10.8 | 5.4 MB |
 | Standard (large, r 0.4) | 472k | 525k (45) | 9.02 | 9.63 | 5.99 | 0.01 | 10.29 | **35.68** | 0.00 | 35.2 | 34.5 | 18.5 MB |
 | Clay | 28k | 47k (11) | 1.18 | 1.44 | 0.93 | 0.01 | 1.03 | **4.68** | 0.00 | 8.7 | 8.6 | 3.5 MB |
-| ClayBuildup | 33k | 55k (12) | 1.75 | 1.77 | 1.18 | 0.01 | 1.28 | **6.09** | 0.00 | 11.7 | 9.5 | 3.8 MB |
+| Clay Block | 33k | 55k (12) | 1.75 | 1.77 | 1.18 | 0.01 | 1.28 | **6.09** | 0.00 | 11.7 | 9.5 | 3.8 MB |
 | Smooth | 19k | 37k (9) | 1.05 | 0.94 | 0.65 | 0.01 | 0.77 | **3.50** | 0.00 | 6.5 | 6.6 | 2.7 MB |
 | Inflate | 18k | 36k (9) | 0.83 | 1.07 | 0.79 | 0.01 | 0.76 | **3.52** | 0.00 | 9.3 | 7.2 | 2.6 MB |
-| DamStandard | 18k | 35k (9) | 0.86 | 0.96 | 0.67 | 0.01 | 0.73 | **3.30** | 0.00 | 6.6 | 6.5 | 2.5 MB |
+| Sharp Crease | 18k | 35k (9) | 0.86 | 0.96 | 0.67 | 0.01 | 0.73 | **3.30** | 0.00 | 6.6 | 6.5 | 2.5 MB |
 | Layer | 19k | 36k (9) | 1.22 | 1.03 | 0.72 | 0.01 | 0.77 | **3.80** | 0.00 | 8.2 | 6.9 | 2.6 MB |
 | Move | 16k | 29k (8) | 0.14 | 0.60 | 0.74 | 0.01 | 0.60 | **2.16** | 0.00 | 1.7 | 1.7 | 0.3 MB |
 | Recipe (pattern) | 19k | 37k (9) | 2.07 | 1.02 | 0.67 | 0.01 | 0.80 | **4.63** | 0.00 | 8.0 | 7.9 | 2.6 MB |
@@ -1173,10 +1173,10 @@ Threads: 10, GPU: Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8.
 | Standard | 103k | 147k (22) | 4.19 | 3.47 | 1.94 | 0.00 | 3.77 | **13.71** | 0.00 | 25.5 | 23.4 | 11.4 MB |
 | Standard (large, r 0.4) | 987k | 1.1M (57) | 17.54 | 19.03 | 11.59 | 0.01 | 15.89 | **65.42** | 0.00 | 71.5 | 69.9 | 38.7 MB |
 | Clay | 58k | 90k (16) | 2.09 | 1.82 | 1.03 | 0.01 | 1.85 | **7.02** | 0.00 | 14.3 | 14.1 | 7.2 MB |
-| ClayBuildup | 66k | 101k (17) | 2.48 | 2.17 | 1.25 | 0.01 | 2.06 | **8.19** | 0.00 | 15.3 | 15.2 | 8.0 MB |
+| Clay Block | 66k | 101k (17) | 2.48 | 2.17 | 1.25 | 0.01 | 2.06 | **8.19** | 0.00 | 15.3 | 15.2 | 8.0 MB |
 | Smooth | 39k | 67k (14) | 1.71 | 1.58 | 0.80 | 0.02 | 1.51 | **5.77** | 0.00 | 11.0 | 10.8 | 5.7 MB |
 | Inflate | 38k | 65k (14) | 1.54 | 1.80 | 0.95 | 0.02 | 1.46 | **5.94** | 0.00 | 10.7 | 11.0 | 5.6 MB |
-| DamStandard | 37k | 64k (14) | 1.54 | 1.76 | 0.91 | 0.02 | 1.64 | **6.03** | 0.00 | 10.4 | 10.4 | 5.4 MB |
+| Sharp Crease | 37k | 64k (14) | 1.54 | 1.76 | 0.91 | 0.02 | 1.64 | **6.03** | 0.00 | 10.4 | 10.4 | 5.4 MB |
 | Layer | 37k | 65k (14) | 2.14 | 1.66 | 0.82 | 0.02 | 1.43 | **6.22** | 0.00 | 11.3 | 11.2 | 5.6 MB |
 | Move | 33k | 58k (11) | 0.27 | 0.88 | 0.76 | 0.02 | 1.22 | **3.32** | 0.00 | 1.5 | 2.0 | 0.5 MB |
 | Recipe (pattern) | 38k | 67k (14) | 2.66 | 1.78 | 0.81 | 0.02 | 1.58 | **7.03** | 0.00 | 11.4 | 11.4 | 5.4 MB |
@@ -1216,10 +1216,10 @@ Threads: 10. Brushes use X symmetry (two dabs per step), radius 0.12 on a unit s
 | Standard | 198k | 259k (28) | 6.58 | 4.76 | 2.82 | 0.00 | **14.68** | 0.00 | 43.2 | 43.1 | 21.8 MB |
 | Standard (large, r 0.4) | 1.9M | 2.0M (79) | 33.33 | 36.58 | 22.48 | 0.01 | **94.81** | 0.00 | 138.0 | 135.5 | 74.0 MB |
 | Clay | 110k | 155k (21) | 4.23 | 2.97 | 1.75 | 0.02 | **9.31** | 0.00 | 25.6 | 25.8 | 13.8 MB |
-| ClayBuildup | 120k | 166k (23) | 4.38 | 3.07 | 1.75 | 0.02 | **9.58** | 0.00 | 29.2 | 28.1 | 15.1 MB |
+| Clay Block | 120k | 166k (23) | 4.38 | 3.07 | 1.75 | 0.02 | **9.58** | 0.00 | 29.2 | 28.1 | 15.1 MB |
 | Smooth | 71k | 108k (19) | 3.11 | 2.26 | 1.12 | 0.03 | **6.76** | 0.00 | 20.9 | 21.3 | 10.8 MB |
 | Inflate | 69k | 106k (19) | 2.81 | 2.30 | 1.25 | 0.03 | **6.65** | 0.00 | 20.6 | 20.2 | 10.7 MB |
-| DamStandard | 68k | 104k (18) | 2.59 | 2.19 | 1.15 | 0.03 | **6.21** | 0.00 | 19.6 | 19.4 | 10.4 MB |
+| Sharp Crease | 68k | 104k (18) | 2.59 | 2.19 | 1.15 | 0.03 | **6.21** | 0.00 | 19.6 | 19.4 | 10.4 MB |
 | Layer | 70k | 107k (19) | 3.73 | 2.34 | 1.18 | 0.03 | **7.55** | 0.00 | 20.7 | 21.6 | 10.8 MB |
 | Move | 64k | 98k (13) | 0.55 | 1.12 | 1.14 | 0.03 | **3.17** | 0.00 | 2.5 | 2.9 | 1.0 MB |
 | Recipe (pattern) | 72k | 109k (19) | 4.01 | 2.42 | 1.15 | 0.04 | **7.90** | 0.00 | 21.0 | 21.2 | 10.6 MB |
@@ -1257,10 +1257,10 @@ Threads: 10. Brushes use X symmetry (two dabs per step), radius 0.12 on a unit s
 | Standard | 324k | 407k (43) | 9.69 | 7.10 | 5.00 | 0.00 | **22.61** | 0.00 | 70.3 | 68.2 | 35.6 MB |
 | Standard (large, r 0.4) | 3.1M | 3.2M (114) | 54.36 | 60.70 | 42.49 | 0.02 | **161.53** | 0.00 | 262.4 | 261.4 | 121.1 MB |
 | Clay | 181k | 242k (32) | 6.10 | 4.26 | 2.59 | 0.03 | **13.52** | 0.00 | 47.7 | 51.7 | 22.6 MB |
-| ClayBuildup | 193k | 256k (34) | 6.94 | 4.91 | 3.10 | 0.04 | **15.59** | 0.00 | 51.3 | 52.3 | 24.4 MB |
+| Clay Block | 193k | 256k (34) | 6.94 | 4.91 | 3.10 | 0.04 | **15.59** | 0.00 | 51.3 | 52.3 | 24.4 MB |
 | Smooth | 115k | 164k (28) | 4.76 | 3.13 | 1.60 | 0.05 | **9.96** | 0.00 | 35.2 | 35.1 | 17.4 MB |
 | Inflate | 113k | 161k (27) | 4.43 | 3.27 | 1.85 | 0.05 | **10.01** | 0.00 | 34.7 | 36.1 | 17.2 MB |
-| DamStandard | 111k | 159k (28) | 4.08 | 3.26 | 1.67 | 0.05 | **9.44** | 0.00 | 37.3 | 39.0 | 16.7 MB |
+| Sharp Crease | 111k | 159k (28) | 4.08 | 3.26 | 1.67 | 0.05 | **9.44** | 0.00 | 37.3 | 39.0 | 16.7 MB |
 | Layer | 114k | 163k (28) | 5.86 | 3.11 | 1.69 | 0.05 | **11.11** | 0.00 | 41.4 | 38.9 | 17.4 MB |
 | Move | 105k | 152k (30) | 0.78 | 1.57 | 1.83 | 0.05 | **4.76** | 0.00 | 4.1 | 4.1 | 1.7 MB |
 | Recipe (pattern) | 117k | 167k (28) | 6.53 | 3.10 | 1.49 | 0.05 | **11.58** | 0.00 | 37.2 | 36.8 | 17.2 MB |
@@ -1370,11 +1370,11 @@ to see the first one's).
 | Standard | 1.40 | **1.09** | 0.49 -> 0.44 | 0.48 -> 0.38 | 0.39 -> 0.24 | 2.9 | **1.2** |
 | Standard (large, r 0.4) | 8.04 | **3.51** | 2.95 -> 1.44 | 3.06 -> 0.93 | 1.80 -> 0.89 | 10.0 | **4.1** |
 | Clay | 0.79 | **0.68** | 0.30 -> 0.30 | 0.27 -> 0.22 | 0.20 -> 0.13 | 2.4 | **1.0** |
-| ClayBuildup | 1.03 | **0.82** | 0.43 -> 0.38 | 0.33 -> 0.25 | 0.25 -> 0.16 | 2.5 | **0.8** |
+| Clay Block | 1.03 | **0.82** | 0.43 -> 0.38 | 0.33 -> 0.25 | 0.25 -> 0.16 | 2.5 | **0.8** |
 | Smooth | 0.55 | **0.48** | 0.24 -> 0.23 | 0.17 -> 0.15 | 0.12 -> 0.08 | 2.0 | **1.1** |
 | Smooth (large, r 0.4) | 5.24 | **2.42** | 2.15 -> 1.18 | 2.04 -> 0.68 | 0.93 -> 0.43 | 6.3 | **2.6** |
 | Inflate | 0.51 | **0.47** | 0.19 -> 0.20 | 0.17 -> 0.16 | 0.12 -> 0.08 | 1.9 | **1.1** |
-| DamStandard | 0.49 | **0.45** | 0.19 -> 0.21 | 0.16 -> 0.15 | 0.11 -> 0.08 | 2.4 | **1.0** |
+| Sharp Crease | 0.49 | **0.45** | 0.19 -> 0.21 | 0.16 -> 0.15 | 0.11 -> 0.08 | 2.4 | **1.0** |
 | Layer | 0.58 | **0.55** | 0.28 -> 0.29 | 0.17 -> 0.15 | 0.11 -> 0.08 | 1.9 | **1.2** |
 | Move | 0.26 | **0.22** | 0.02 -> 0.02 | 0.10 -> 0.12 | 0.12 -> 0.07 | 0.3 | **0.2** |
 | Move (large, r 0.4) | 2.17 | **1.13** | 0.41 -> 0.21 | 0.73 -> 0.55 | 0.86 -> 0.27 | 2.4 | **0.9** |
@@ -1389,11 +1389,11 @@ to see the first one's).
 | Standard | 4.91 | **2.49** | 1.88 -> 1.03 | 1.82 -> 0.69 | 1.07 -> 0.59 | 10.8 | **4.7** |
 | Standard (large, r 0.4) | 24.70 | **10.29** | 8.98 -> 3.29 | 9.29 -> 3.14 | 5.72 -> 2.90 | 33.8 | **16.9** |
 | Clay | 3.09 | **1.89** | 1.16 -> 0.94 | 1.13 -> 0.48 | 0.71 -> 0.33 | 7.1 | **3.4** |
-| ClayBuildup | 3.35 | **2.18** | 1.33 -> 0.96 | 1.20 -> 0.67 | 0.72 -> 0.43 | 7.6 | **3.4** |
+| Clay Block | 3.35 | **2.18** | 1.33 -> 0.96 | 1.20 -> 0.67 | 0.72 -> 0.43 | 7.6 | **3.4** |
 | Smooth | 2.15 | **1.55** | 0.89 -> 0.78 | 0.69 -> 0.39 | 0.50 -> 0.30 | 5.5 | **2.7** |
 | Smooth (large, r 0.4) | 12.95 | **5.43** | 5.48 -> 2.33 | 4.75 -> 1.51 | 2.30 -> 1.09 | 20.2 | **10.0** |
 | Inflate | 2.12 | **1.54** | 0.77 -> 0.68 | 0.74 -> 0.43 | 0.53 -> 0.33 | 5.4 | **2.6** |
-| DamStandard | 2.07 | **1.54** | 0.76 -> 0.71 | 0.73 -> 0.42 | 0.50 -> 0.31 | 5.4 | **2.5** |
+| Sharp Crease | 2.07 | **1.54** | 0.76 -> 0.71 | 0.73 -> 0.42 | 0.50 -> 0.31 | 5.4 | **2.5** |
 | Layer | 2.41 | **1.73** | 1.04 -> 0.92 | 0.78 -> 0.44 | 0.51 -> 0.29 | 6.5 | **2.7** |
 | Move | 1.15 | **0.68** | 0.14 -> 0.11 | 0.42 -> 0.37 | 0.51 -> 0.12 | 0.9 | **0.6** |
 | Move (large, r 0.4) | 7.39 | **2.80** | 1.57 -> 0.34 | 2.37 -> 1.23 | 2.67 -> 0.77 | 5.6 | **2.4** |
@@ -1408,11 +1408,11 @@ to see the first one's).
 | Standard | 8.59 | **3.64** | 3.66 -> 1.47 | 2.87 -> 0.98 | 1.76 -> 0.85 | 21.7 | **10.5** |
 | Standard (large, r 0.4) | 49.42 | **21.03** | 18.08 -> 6.06 | 18.22 -> 7.63 | 11.67 -> 5.53 | 69.5 | **35.0** |
 | Clay | 5.63 | **2.70** | 2.36 -> 1.22 | 2.00 -> 0.76 | 1.03 -> 0.51 | 14.3 | **6.7** |
-| ClayBuildup | 6.32 | **2.96** | 2.60 -> 1.28 | 2.26 -> 0.80 | 1.22 -> 0.59 | 15.8 | **7.5** |
+| Clay Block | 6.32 | **2.96** | 2.60 -> 1.28 | 2.26 -> 0.80 | 1.22 -> 0.59 | 15.8 | **7.5** |
 | Smooth | 3.95 | **2.14** | 1.62 -> 1.00 | 1.44 -> 0.64 | 0.73 -> 0.30 | 12.1 | **5.3** |
 | Smooth (large, r 0.4) | 27.81 | **9.78** | 12.07 -> 3.80 | 9.97 -> 3.14 | 4.98 -> 1.84 | 40.5 | **18.2** |
 | Inflate | 4.39 | **2.02** | 1.72 -> 0.87 | 1.67 -> 0.63 | 0.83 -> 0.37 | 11.1 | **4.9** |
-| DamStandard | 4.28 | **2.41** | 1.64 -> 1.04 | 1.74 -> 0.74 | 0.73 -> 0.38 | 11.4 | **4.8** |
+| Sharp Crease | 4.28 | **2.41** | 1.64 -> 1.04 | 1.74 -> 0.74 | 0.73 -> 0.38 | 11.4 | **4.8** |
 | Layer | 4.85 | **2.80** | 2.14 -> 1.47 | 1.73 -> 0.74 | 0.81 -> 0.36 | 11.5 | **5.0** |
 | Move | 2.14 | **1.26** | 0.28 -> 0.28 | 0.90 -> 0.62 | 0.78 -> 0.23 | 1.8 | **1.1** |
 | Move (large, r 0.4) | 16.52 | **5.23** | 3.23 -> 0.55 | 5.88 -> 2.34 | 5.98 -> 1.53 | 10.7 | **4.4** |
@@ -1478,10 +1478,10 @@ neither 64M nor 104M was drawn before (v0.5 only measured 64M on the CPU). Full 
 | GPU upload per medium dab: Standard / Mask / Paint (ms) | 0.28 / 0.39 / 0.62 -> 0.57 / 0.34 / 0.70 | 0.95 / 1.33 / 2.16 -> 1.19 / 1.05 / 1.76 | 2.19 / 2.89 / 4.64 -> **2.08 / 1.89 / 3.69** | 3.8 / 3.7 / 7.3 | 6.6 / 6.5 / 12.8 | |
 
 "Before" GPU memory is the old buffers' size, which the old renderer didn't report: positions, normals and
-curvature as floats (28 bytes per vertex, 14 per triangle), 32-bit indices (12), 32-bit polygroups (4) and, on
+curvature as floats (28 bytes per vertex, 14 per triangle), 32-bit indices (12), 32-bit face groups (4) and, on
 meshes with quads like this one, the wireframe's edges, always kept, every edge twice (16): 46 bytes per
 triangle (26 without the last two). After: 12-byte vertices with about 10% copies on cluster seams (6.6 per
-triangle), 16-bit indices (6), 16-bit polygroups (2), cluster tables (0.1). Polypaint adds 2.2, a mask 0.6,
+triangle), 16-bit indices (6), 16-bit face groups (2), cluster tables (0.1). Vertex Paint adds 2.2, a mask 0.6,
 the motion proxy 1.5 once the view has moved, the wireframe about 4 while it is on.
 
 Targets from the brief: GPU memory down at least a third (down 68%, or 43% against the 26 bytes counted
@@ -1511,7 +1511,7 @@ from 701: not reached).
   whole mesh, so a vertex copied into two clusters decodes to exactly the same point and seams can't crack; a
   stroke that leaves the grid re-sends the mesh on a new one), an octahedral normal (2 x 11 bits, within 0.12
   degrees) and the curvature (10 bits, square-root companded over its whole range, within 0.001 where the
-  cavity shading ramps). Polypaint is RGBA8 with gamma 2.2 (decoded in the shader), the mask 8-bit. The
+  cavity shading ramps). Vertex Paint is RGBA8 with gamma 2.2 (decoded in the shader), the mask 8-bit. The
   fragment shader works out the view direction from the pixel instead of an interpolated position, so a vertex
   passes only a normal and the curvature (plus colour and mask when the mesh has them; shader variants per
   feature).
@@ -1521,7 +1521,7 @@ from 701: not reached).
   only, up to a quarter of the cluster's triangles; 19% in practice). The proxies of a closed mesh form a closed
   mesh (a simplicial map of it), so the same culling applies to them with their own normal cones and no
   hole can open between clusters. Proxies are built for the clusters that changed, when the view starts moving
-  (126 ms at 33M after an upload, a few clusters after a stroke). Polygroup and texture display and the
+  (126 ms at 33M after an upload, a few clusters after a stroke). Face Group and texture display and the
   wireframe keep the full mesh.
 - **Uploads**: a full upload writes the index buffer straight into the mapped buffer from the threads building
   the layout, and whole vertex arrays mapped in parallel; dab uploads gather all their runs in parallel. Each
@@ -1529,7 +1529,7 @@ from 701: not reached).
   sent again, and clusters whose positions didn't move keep their bounds and proxy.
 - **Wireframe** edges are built when the wireframe is first shown, each edge once (from the lowest-numbered
   drawn triangle using it), at the opacity two overlapping lines had.
-- Per-triangle data (polygroups, texture UVs, baked-normal tangents) is found from `gl_PrimitiveID` plus the
+- Per-triangle data (face groups, texture UVs, baked-normal tangents) is found from `gl_PrimitiveID` plus the
   cluster's first drawn triangle, read through `gl_VertexID` (which includes the base vertex) from a table per
   vertex block. A start-up check draws one point to see that the driver does include it; where it doesn't, those
   meshes draw one cluster at a time with the base as a uniform (`SF_NO_VERTEXID_BASE=1` forces that path).
@@ -1541,7 +1541,7 @@ viewport matches except for: outline pixels of closed meshes, where back faces u
 antialiasing samples and show as a faint light rim (now the background shows there, as it would with a closed
 surface seen exactly edge-on); a few silhouette pixels moved by the position grid (a millionth of the model);
 and the wireframe on quad meshes, where line ends overlap a little differently now that each edge is drawn once.
-Shelf and LightBox thumbnails differ in the UI tests only because they arrive sooner.
+Shelf and Library thumbnails differ in the UI tests only because they arrive sooner.
 
 #### Known limits
 
@@ -1582,10 +1582,10 @@ Threads: 10, GPU: Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8.
 | Standard | 9k | 20k (12) | 0.36 | 0.36 | 0.30 | 0.00 | 0.28 | **1.33** | 0.00 | 1.3 | 1.3 | 0.3 MB |
 | Standard (large, r 0.4) | 147k | 183k (53) | 3.70 | 4.00 | 2.07 | 0.00 | 2.85 | **12.88** | 0.00 | 9.3 | 9.5 | 4.2 MB |
 | Clay | 8k | 17k (11) | 0.33 | 0.30 | 0.24 | 0.00 | 0.23 | **1.13** | 0.00 | 1.0 | 0.9 | 0.3 MB |
-| ClayBuildup | 13k | 24k (13) | 0.54 | 0.44 | 0.40 | 0.00 | 0.32 | **1.73** | 0.00 | 2.1 | 2.2 | 0.4 MB |
+| Clay Block | 13k | 24k (13) | 0.54 | 0.44 | 0.40 | 0.00 | 0.32 | **1.73** | 0.00 | 2.1 | 2.2 | 0.4 MB |
 | Smooth | 7k | 16k (10) | 0.34 | 0.26 | 0.19 | 0.00 | 0.22 | **1.03** | 0.00 | 0.8 | 1.4 | 0.2 MB |
 | Inflate | 7k | 16k (10) | 0.28 | 0.25 | 0.20 | 0.00 | 0.21 | **0.96** | 0.00 | 0.6 | 1.6 | 0.2 MB |
-| DamStandard | 7k | 16k (10) | 0.29 | 0.25 | 0.19 | 0.00 | 0.21 | **0.96** | 0.00 | 1.0 | 2.1 | 0.2 MB |
+| Sharp Crease | 7k | 16k (10) | 0.29 | 0.25 | 0.19 | 0.00 | 0.21 | **0.96** | 0.00 | 1.0 | 2.1 | 0.2 MB |
 | Layer | 7k | 16k (10) | 0.59 | 0.30 | 0.20 | 0.00 | 0.22 | **1.34** | 0.00 | 1.3 | 2.1 | 0.2 MB |
 | Move | 6k | 14k (9) | 0.03 | 0.15 | 0.18 | 0.00 | 0.18 | **0.59** | 0.00 | 0.4 | 0.4 | 0.1 MB |
 | Recipe (pattern) | 8k | 17k (11) | 0.72 | 0.27 | 0.20 | 0.00 | 0.22 | **1.44** | 0.00 | 0.7 | 1.4 | 0.2 MB |
@@ -1618,10 +1618,10 @@ Threads: 10, GPU: Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8.
 | Standard | 37k | 60k (12) | 1.55 | 1.65 | 1.09 | 0.00 | 0.95 | **5.35** | 0.00 | 3.1 | 3.1 | 1.3 MB |
 | Standard (large, r 0.4) | 589k | 650k (53) | 11.12 | 11.62 | 7.06 | 0.01 | 9.93 | **40.64** | 0.00 | 30.7 | 30.4 | 17.0 MB |
 | Clay | 32k | 53k (11) | 1.31 | 1.46 | 0.87 | 0.00 | 0.83 | **4.58** | 0.00 | 2.2 | 2.6 | 1.1 MB |
-| ClayBuildup | 51k | 77k (13) | 1.87 | 1.54 | 1.01 | 0.00 | 1.20 | **5.76** | 0.00 | 3.1 | 3.0 | 1.5 MB |
+| Clay Block | 51k | 77k (13) | 1.87 | 1.54 | 1.01 | 0.00 | 1.20 | **5.76** | 0.00 | 3.1 | 3.0 | 1.5 MB |
 | Smooth | 30k | 51k (10) | 1.17 | 1.18 | 0.54 | 0.00 | 1.02 | **4.02** | 0.00 | 2.3 | 2.4 | 1.0 MB |
 | Inflate | 29k | 50k (10) | 1.24 | 1.30 | 0.86 | 0.00 | 0.76 | **4.25** | 0.00 | 2.5 | 2.4 | 1.0 MB |
-| DamStandard | 29k | 49k (10) | 1.27 | 1.38 | 0.66 | 0.00 | 0.99 | **4.42** | 0.00 | 3.0 | 2.7 | 1.0 MB |
+| Sharp Crease | 29k | 49k (10) | 1.27 | 1.38 | 0.66 | 0.00 | 0.99 | **4.42** | 0.00 | 3.0 | 2.7 | 1.0 MB |
 | Layer | 30k | 51k (10) | 2.29 | 1.42 | 0.59 | 0.00 | 1.06 | **5.49** | 0.00 | 2.9 | 3.2 | 1.0 MB |
 | Move | 23k | 42k (9) | 0.19 | 0.64 | 0.66 | 0.00 | 0.63 | **2.37** | 0.00 | 1.6 | 1.8 | 0.4 MB |
 | Recipe (pattern) | 31k | 52k (11) | 1.69 | 1.20 | 0.50 | 0.00 | 0.80 | **4.31** | 0.00 | 2.0 | 2.5 | 1.0 MB |
@@ -1654,10 +1654,10 @@ Threads: 10, GPU: Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8.
 | Standard | 78k | 117k (18) | 3.34 | 3.86 | 1.84 | 0.00 | 2.62 | **11.91** | 0.00 | 6.9 | 5.6 | 2.8 MB |
 | Standard (large, r 0.4) | 1.2M | 1.3M (67) | 21.60 | 22.79 | 14.70 | 0.01 | 17.56 | **78.51** | 0.00 | 63.7 | 62.8 | 35.5 MB |
 | Clay | 68k | 104k (17) | 2.63 | 2.26 | 1.34 | 0.00 | 1.76 | **8.20** | 0.00 | 4.4 | 4.6 | 2.4 MB |
-| ClayBuildup | 107k | 151k (21) | 4.31 | 2.84 | 1.68 | 0.01 | 2.87 | **12.06** | 0.00 | 6.0 | 6.3 | 3.1 MB |
+| Clay Block | 107k | 151k (21) | 4.31 | 2.84 | 1.68 | 0.01 | 2.87 | **12.06** | 0.00 | 6.0 | 6.3 | 3.1 MB |
 | Smooth | 63k | 98k (17) | 2.55 | 1.91 | 1.05 | 0.01 | 1.70 | **7.46** | 0.00 | 4.3 | 4.6 | 2.1 MB |
 | Inflate | 61k | 96k (16) | 2.36 | 2.27 | 1.31 | 0.01 | 1.67 | **7.82** | 0.00 | 4.4 | 4.0 | 2.1 MB |
-| DamStandard | 61k | 96k (16) | 2.30 | 1.85 | 1.15 | 0.01 | 1.42 | **6.92** | 0.00 | 4.2 | 3.9 | 2.0 MB |
+| Sharp Crease | 61k | 96k (16) | 2.30 | 1.85 | 1.15 | 0.01 | 1.42 | **6.92** | 0.00 | 4.2 | 3.9 | 2.0 MB |
 | Layer | 63k | 99k (17) | 4.53 | 2.18 | 1.14 | 0.01 | 1.60 | **9.66** | 0.00 | 3.7 | 3.8 | 2.1 MB |
 | Move | 49k | 79k (14) | 0.39 | 0.83 | 1.02 | 0.01 | 1.39 | **4.17** | 0.00 | 2.1 | 1.7 | 0.9 MB |
 | Recipe (pattern) | 65k | 102k (18) | 4.06 | 2.12 | 1.13 | 0.01 | 1.84 | **9.39** | 0.00 | 4.0 | 4.3 | 2.1 MB |
@@ -1695,10 +1695,10 @@ Threads: 10, GPU: Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8.
 | Standard | 9k | 21k (14) | 0.40 | 0.43 | 0.30 | 0.00 | 0.58 | **1.79** | 0.00 | 1.1 | 1.1 | 0.3 MB |
 | Standard (large, r 0.4) | 147k | 191k (39) | 3.58 | 3.34 | 2.04 | 0.01 | 2.89 | **12.78** | 0.00 | 9.3 | 8.1 | 4.2 MB |
 | Clay | 8k | 18k (10) | 0.38 | 0.36 | 0.25 | 0.00 | 0.52 | **1.58** | 0.00 | 1.1 | 1.2 | 0.3 MB |
-| ClayBuildup | 13k | 25k (15) | 0.68 | 0.55 | 0.42 | 0.00 | 0.57 | **2.33** | 0.00 | 1.8 | 1.4 | 0.4 MB |
+| Clay Block | 13k | 25k (15) | 0.68 | 0.55 | 0.42 | 0.00 | 0.57 | **2.33** | 0.00 | 1.8 | 1.4 | 0.4 MB |
 | Smooth | 7k | 17k (10) | 0.36 | 0.30 | 0.19 | 0.00 | 0.47 | **1.38** | 0.00 | 0.9 | 1.6 | 0.2 MB |
 | Inflate | 7k | 16k (10) | 0.34 | 0.34 | 0.21 | 0.00 | 0.48 | **1.44** | 0.00 | 0.9 | 0.7 | 0.2 MB |
-| DamStandard | 7k | 16k (10) | 0.40 | 0.35 | 0.21 | 0.00 | 0.48 | **1.50** | 0.00 | 1.4 | 1.1 | 0.2 MB |
+| Sharp Crease | 7k | 16k (10) | 0.40 | 0.35 | 0.21 | 0.00 | 0.48 | **1.50** | 0.00 | 1.4 | 1.1 | 0.2 MB |
 | Layer | 7k | 17k (10) | 0.69 | 0.34 | 0.20 | 0.00 | 0.55 | **1.85** | 0.00 | 1.0 | 1.2 | 0.2 MB |
 | Move | 6k | 12k (10) | 0.05 | 0.17 | 0.18 | 0.00 | 0.40 | **0.87** | 0.00 | 0.5 | 0.6 | 0.1 MB |
 | Recipe (pattern) | 8k | 17k (10) | 0.95 | 0.41 | 0.25 | 0.00 | 0.50 | **2.18** | 0.00 | 1.3 | 1.2 | 0.2 MB |
@@ -1737,10 +1737,10 @@ Threads: 10, GPU: Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8.
 | Standard | 37k | 61k (25) | 1.47 | 1.23 | 0.87 | 0.00 | 1.19 | **5.10** | 0.00 | 2.9 | 2.5 | 1.3 MB |
 | Standard (large, r 0.4) | 589k | 699k (74) | 10.90 | 11.26 | 7.20 | 0.01 | 10.53 | **43.38** | 0.00 | 31.2 | 30.8 | 17.0 MB |
 | Clay | 32k | 54k (21) | 1.22 | 1.28 | 0.73 | 0.00 | 1.03 | **4.54** | 0.00 | 2.1 | 2.5 | 1.1 MB |
-| ClayBuildup | 51k | 78k (25) | 2.37 | 1.92 | 1.04 | 0.01 | 1.39 | **7.14** | 0.00 | 3.2 | 4.0 | 1.5 MB |
+| Clay Block | 51k | 78k (25) | 2.37 | 1.92 | 1.04 | 0.01 | 1.39 | **7.14** | 0.00 | 3.2 | 4.0 | 1.5 MB |
 | Smooth | 30k | 51k (19) | 1.36 | 1.29 | 0.75 | 0.00 | 0.97 | **4.63** | 0.00 | 2.2 | 2.1 | 1.0 MB |
 | Inflate | 29k | 50k (19) | 1.21 | 1.21 | 0.63 | 0.01 | 0.96 | **4.26** | 0.00 | 2.5 | 2.3 | 1.0 MB |
-| DamStandard | 29k | 50k (19) | 1.15 | 1.18 | 0.59 | 0.01 | 1.06 | **4.23** | 0.00 | 2.3 | 1.9 | 1.0 MB |
+| Sharp Crease | 29k | 50k (19) | 1.15 | 1.18 | 0.59 | 0.01 | 1.06 | **4.23** | 0.00 | 2.3 | 1.9 | 1.0 MB |
 | Layer | 30k | 51k (20) | 2.01 | 1.10 | 0.52 | 0.01 | 0.86 | **4.74** | 0.00 | 2.3 | 2.3 | 1.0 MB |
 | Move | 23k | 40k (11) | 0.21 | 0.38 | 0.45 | 0.01 | 0.72 | **2.13** | 0.00 | 0.9 | 1.0 | 0.4 MB |
 | Recipe (pattern) | 31k | 53k (19) | 1.76 | 1.25 | 0.55 | 0.01 | 1.14 | **4.98** | 0.00 | 2.9 | 2.4 | 1.0 MB |
@@ -1779,10 +1779,10 @@ Threads: 10, GPU: Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8.
 | Standard | 78k | 114k (35) | 2.95 | 2.73 | 1.55 | 0.00 | 2.35 | **10.25** | 0.00 | 6.4 | 5.0 | 2.8 MB |
 | Standard (large, r 0.4) | 1.2M | 1.4M (104) | 22.30 | 24.75 | 15.38 | 0.01 | 22.64 | **92.39** | 0.00 | 67.3 | 68.8 | 35.5 MB |
 | Clay | 68k | 101k (30) | 2.67 | 2.49 | 1.42 | 0.01 | 2.07 | **9.26** | 0.00 | 5.4 | 4.9 | 2.4 MB |
-| ClayBuildup | 107k | 150k (35) | 4.00 | 3.00 | 1.58 | 0.01 | 2.77 | **12.20** | 0.00 | 6.2 | 6.9 | 3.1 MB |
+| Clay Block | 107k | 150k (35) | 4.00 | 3.00 | 1.58 | 0.01 | 2.77 | **12.20** | 0.00 | 6.2 | 6.9 | 3.1 MB |
 | Smooth | 63k | 95k (28) | 2.88 | 2.22 | 1.10 | 0.01 | 2.17 | **8.93** | 0.00 | 5.2 | 5.3 | 2.1 MB |
 | Inflate | 61k | 92k (28) | 2.52 | 2.68 | 1.34 | 0.01 | 1.88 | **8.98** | 0.00 | 4.8 | 4.8 | 2.1 MB |
-| DamStandard | 61k | 93k (27) | 2.35 | 2.42 | 1.22 | 0.01 | 1.90 | **8.46** | 0.00 | 4.4 | 4.3 | 2.0 MB |
+| Sharp Crease | 61k | 93k (27) | 2.35 | 2.42 | 1.22 | 0.01 | 1.90 | **8.46** | 0.00 | 4.4 | 4.3 | 2.0 MB |
 | Layer | 63k | 96k (27) | 4.21 | 1.98 | 0.97 | 0.01 | 1.72 | **9.48** | 0.00 | 4.6 | 5.0 | 2.1 MB |
 | Move | 49k | 77k (15) | 0.39 | 1.13 | 1.32 | 0.01 | 1.51 | **5.16** | 0.00 | 2.1 | 2.1 | 0.9 MB |
 | Recipe (pattern) | 65k | 99k (28) | 4.60 | 2.42 | 1.15 | 0.01 | 2.19 | **10.95** | 0.00 | 5.0 | 5.8 | 2.1 MB |
@@ -1825,10 +1825,10 @@ Threads: 10, GPU: Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8.
 | Standard | 78k | 114k (35) | 3.14 | 2.73 | 1.44 | 0.00 | 2.25 | **10.23** | 0.00 | 5.5 | 5.5 | 2.8 MB |
 | Standard (large, r 0.4) | 1.2M | 1.4M (104) | 22.73 | 22.99 | 14.65 | 0.01 | 21.52 | **89.23** | 0.00 | 64.1 | 63.2 | 35.5 MB |
 | Clay | 68k | 101k (30) | 3.13 | 2.15 | 1.24 | 0.01 | 1.95 | **9.06** | 0.00 | 4.9 | 5.0 | 2.4 MB |
-| ClayBuildup | 107k | 150k (35) | 4.85 | 2.71 | 1.74 | 0.01 | 2.74 | **13.00** | 0.00 | 7.2 | 7.1 | 3.1 MB |
+| Clay Block | 107k | 150k (35) | 4.85 | 2.71 | 1.74 | 0.01 | 2.74 | **13.00** | 0.00 | 7.2 | 7.1 | 3.1 MB |
 | Smooth | 63k | 95k (28) | 2.82 | 1.77 | 1.03 | 0.01 | 1.80 | **7.96** | 0.00 | 4.7 | 4.7 | 2.1 MB |
 | Inflate | 61k | 92k (28) | 2.89 | 1.96 | 1.22 | 0.01 | 1.83 | **8.43** | 0.00 | 4.2 | 4.8 | 2.1 MB |
-| DamStandard | 61k | 93k (27) | 2.80 | 1.97 | 1.17 | 0.01 | 1.82 | **8.32** | 0.00 | 4.1 | 4.1 | 2.0 MB |
+| Sharp Crease | 61k | 93k (27) | 2.80 | 1.97 | 1.17 | 0.01 | 1.82 | **8.32** | 0.00 | 4.1 | 4.1 | 2.0 MB |
 | Layer | 63k | 96k (27) | 4.58 | 2.05 | 1.07 | 0.01 | 1.83 | **10.10** | 0.01 | 4.5 | 4.1 | 2.1 MB |
 | Move | 49k | 77k (15) | 0.41 | 0.79 | 1.01 | 0.01 | 1.40 | **4.43** | 0.00 | 2.4 | 2.1 | 0.9 MB |
 | Recipe (pattern) | 65k | 99k (28) | 3.28 | 1.91 | 1.01 | 0.01 | 2.04 | **8.85** | 0.00 | 4.3 | 4.4 | 2.1 MB |
@@ -1871,10 +1871,10 @@ Threads: 10, GPU: Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8.
 | Standard | 149k | 204k (46) | 5.29 | 3.40 | 2.23 | 0.00 | 3.79 | **16.17** | 0.00 | 10.5 | 10.2 | 5.3 MB |
 | Standard (large, r 0.4) | 2.4M | 2.7M (141) | 42.11 | 43.62 | 28.13 | 0.01 | 40.24 | **167.87** | 0.00 | 125.7 | 123.4 | 67.9 MB |
 | Clay | 129k | 180k (40) | 4.91 | 3.28 | 1.88 | 0.01 | 3.40 | **14.67** | 0.00 | 9.4 | 10.1 | 4.5 MB |
-| ClayBuildup | 204k | 271k (46) | 7.79 | 4.76 | 2.66 | 0.01 | 4.79 | **21.48** | 0.00 | 11.7 | 12.6 | 6.0 MB |
+| Clay Block | 204k | 271k (46) | 7.79 | 4.76 | 2.66 | 0.01 | 4.79 | **21.48** | 0.00 | 11.7 | 12.6 | 6.0 MB |
 | Smooth | 120k | 167k (37) | 4.84 | 3.12 | 1.42 | 0.01 | 3.01 | **13.37** | 0.01 | 10.0 | 10.1 | 4.0 MB |
 | Inflate | 117k | 164k (37) | 4.65 | 3.14 | 1.93 | 0.01 | 3.13 | **13.81** | 0.01 | 8.1 | 8.1 | 3.9 MB |
-| DamStandard | 116k | 165k (37) | 4.61 | 3.07 | 1.62 | 0.01 | 3.27 | **13.70** | 0.00 | 7.5 | 7.7 | 3.9 MB |
+| Sharp Crease | 116k | 165k (37) | 4.61 | 3.07 | 1.62 | 0.01 | 3.27 | **13.70** | 0.00 | 7.5 | 7.7 | 3.9 MB |
 | Layer | 120k | 169k (39) | 8.03 | 3.36 | 1.44 | 0.01 | 3.09 | **16.93** | 0.01 | 10.5 | 11.0 | 4.0 MB |
 | Move | 93k | 130k (29) | 0.74 | 1.46 | 1.60 | 0.01 | 2.43 | **7.76** | 0.00 | 3.7 | 3.8 | 1.6 MB |
 | Recipe (pattern) | 125k | 175k (40) | 7.13 | 3.07 | 1.37 | 0.02 | 3.43 | **16.15** | 0.01 | 10.4 | 10.4 | 4.0 MB |
@@ -1997,7 +1997,7 @@ antialiasing it is 49 fps on this integrated GPU (it was 33).
   normal cache, which saves 16 bytes per triangle (cache and stamps); the adjacency list no longer keeps
   spare capacity (12 bytes per triangle); the renderer no longer keeps a CPU copy of the curvature.
 - **Undo** already stored only the touched vertices per stroke; it is faster because the normal and BVH updates
-  it runs are. The first polypaint stroke on an unpainted mesh no longer copies the whole mesh for undo (it
+  it runs are. The first vertex paint stroke on an unpainted mesh no longer copies the whole mesh for undo (it
   keeps the empty paint stack): at 33M that copy was over 2 GB.
 - **Projects**: the ZIP writer streamed the archive into a second in-memory copy and the reader read the file
   through a byte iterator; now entries go straight to the file, are read in place, CRCs use slicing-by-8 in
@@ -2012,7 +2012,7 @@ antialiasing it is 49 fps on this integrated GPU (it was 33).
 
 | | bytes per triangle |
 |---|---|
-| Mesh: positions, normals, triangles, quad pairs, polygroups, adjacency (vertex-vertex and vertex-triangle), stamps, dirty bits | 62 (was 90) |
+| Mesh: positions, normals, triangles, quad pairs, face groups, adjacency (vertex-vertex and vertex-triangle), stamps, dirty bits | 62 (was 90) |
 | BVH | 19.5 |
 | Subdivision levels (the level stack keeps every level's data, detail and topology) | 75 |
 | GPU: positions, normals, curvature per vertex; indices | about 26 |
@@ -2052,10 +2052,10 @@ Threads: 10. Brushes use X symmetry (two dabs per step), radius 0.12 on a unit s
 | Standard | 12k | 0.41 | 0.56 | 0.31 | 0.00 | **1.29** | 0.00 | 7.7 | 7.3 | 1.4 MB |
 | Standard (large, r 0.4) | 118k | 4.27 | 6.18 | 3.33 | 0.00 | **13.78** | 0.00 | 28.2 | 27.9 | 4.6 MB |
 | Clay | 7k | 0.26 | 0.31 | 0.17 | 0.00 | **0.74** | 0.00 | 4.4 | 4.0 | 0.9 MB |
-| ClayBuildup | 8k | 0.34 | 0.37 | 0.21 | 0.00 | **0.92** | 0.00 | 4.0 | 3.9 | 0.8 MB |
+| Clay Block | 8k | 0.34 | 0.37 | 0.21 | 0.00 | **0.92** | 0.00 | 4.0 | 3.9 | 0.8 MB |
 | Smooth | 5k | 0.21 | 0.21 | 0.11 | 0.00 | **0.53** | 0.00 | 2.6 | 2.5 | 0.6 MB |
 | Inflate | 5k | 0.17 | 0.20 | 0.11 | 0.00 | **0.48** | 0.00 | 2.5 | 2.5 | 0.6 MB |
-| DamStandard | 4k | 0.17 | 0.19 | 0.11 | 0.00 | **0.47** | 0.00 | 2.4 | 2.3 | 0.5 MB |
+| Sharp Crease | 4k | 0.17 | 0.19 | 0.11 | 0.00 | **0.47** | 0.00 | 2.4 | 2.3 | 0.5 MB |
 | Layer | 5k | 0.25 | 0.20 | 0.11 | 0.00 | **0.56** | 0.00 | 2.6 | 2.5 | 0.6 MB |
 | Move | 4k | 0.02 | 0.10 | 0.09 | 0.00 | **0.21** | 0.00 | 0.3 | 0.3 | 0.1 MB |
 | Recipe (pattern) | 5k | 0.41 | 0.20 | 0.11 | 0.00 | **0.73** | 0.00 | 2.6 | 2.4 | 0.6 MB |
@@ -2087,10 +2087,10 @@ Threads: 10. Brushes use X symmetry (two dabs per step), radius 0.12 on a unit s
 | Standard | 50k | 1.76 | 2.45 | 1.31 | 0.00 | **5.52** | 0.00 | 33.3 | 32.6 | 5.4 MB |
 | Standard (large, r 0.4) | 472k | 17.82 | 27.90 | 16.01 | 0.01 | **61.73** | 0.00 | 116.2 | 114.7 | 18.5 MB |
 | Clay | 28k | 0.98 | 1.28 | 0.67 | 0.01 | **2.94** | 0.00 | 20.6 | 20.6 | 3.5 MB |
-| ClayBuildup | 33k | 1.34 | 1.56 | 0.82 | 0.01 | **3.73** | 0.00 | 23.1 | 22.7 | 3.8 MB |
+| Clay Block | 33k | 1.34 | 1.56 | 0.82 | 0.01 | **3.73** | 0.00 | 23.1 | 22.7 | 3.8 MB |
 | Smooth | 19k | 0.86 | 0.88 | 0.44 | 0.01 | **2.19** | 0.00 | 15.5 | 15.4 | 2.7 MB |
 | Inflate | 18k | 0.66 | 0.86 | 0.46 | 0.01 | **1.98** | 0.00 | 15.4 | 14.9 | 2.6 MB |
-| DamStandard | 18k | 0.68 | 0.83 | 0.42 | 0.01 | **1.94** | 0.00 | 14.8 | 14.4 | 2.5 MB |
+| Sharp Crease | 18k | 0.68 | 0.83 | 0.42 | 0.01 | **1.94** | 0.00 | 14.8 | 14.4 | 2.5 MB |
 | Layer | 19k | 0.99 | 0.86 | 0.43 | 0.01 | **2.29** | 0.00 | 15.2 | 15.2 | 2.6 MB |
 | Move | 16k | 0.07 | 0.41 | 0.36 | 0.01 | **0.87** | 0.00 | 1.1 | 1.1 | 0.3 MB |
 | Recipe (pattern) | 19k | 1.73 | 0.89 | 0.43 | 0.01 | **3.07** | 0.00 | 15.2 | 15.2 | 2.6 MB |
@@ -2122,10 +2122,10 @@ Threads: 10. Brushes use X symmetry (two dabs per step), radius 0.12 on a unit s
 | Standard | 103k | 3.96 | 5.49 | 2.94 | 0.00 | **12.40** | 0.00 | 70.8 | 71.1 | 11.4 MB |
 | Standard (large, r 0.4) | 987k | 39.60 | 60.23 | 35.90 | 0.01 | **135.74** | 0.00 | 286.0 | 283.7 | 38.7 MB |
 | Clay | 58k | 2.66 | 3.60 | 1.92 | 0.01 | **8.19** | 0.00 | 51.2 | 50.7 | 7.2 MB |
-| ClayBuildup | 66k | 3.29 | 3.96 | 2.13 | 0.02 | **9.41** | 0.00 | 56.5 | 56.7 | 8.0 MB |
+| Clay Block | 66k | 3.29 | 3.96 | 2.13 | 0.02 | **9.41** | 0.00 | 56.5 | 56.7 | 8.0 MB |
 | Smooth | 39k | 2.58 | 2.65 | 1.32 | 0.02 | **6.58** | 0.00 | 55.5 | 40.1 | 5.7 MB |
 | Inflate | 38k | 1.79 | 2.24 | 1.17 | 0.02 | **5.23** | 0.00 | 39.8 | 40.7 | 5.6 MB |
-| DamStandard | 37k | 1.95 | 2.30 | 1.18 | 0.02 | **5.46** | 0.00 | 40.0 | 38.6 | 5.4 MB |
+| Sharp Crease | 37k | 1.95 | 2.30 | 1.18 | 0.02 | **5.46** | 0.00 | 40.0 | 38.6 | 5.4 MB |
 | Layer | 37k | 2.72 | 2.33 | 1.18 | 0.02 | **6.26** | 0.00 | 45.8 | 41.4 | 5.6 MB |
 | Move | 33k | 0.23 | 1.27 | 1.19 | 0.02 | **2.78** | 0.00 | 3.1 | 2.9 | 0.5 MB |
 | Recipe (pattern) | 38k | 4.32 | 2.29 | 1.11 | 0.02 | **7.74** | 0.00 | 37.2 | 37.8 | 5.4 MB |
@@ -2162,10 +2162,10 @@ Threads: 10, GPU: Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8.
 | Standard | 9k | 0.42 | 0.52 | 0.25 | 0.00 | 22.36 | **23.57** | 0.00 | 1.9 | 1.8 | 0.3 MB |
 | Standard (large, r 0.4) | 147k | 6.78 | 9.16 | 5.13 | 0.00 | 23.38 | **44.48** | 0.00 | 28.4 | 36.0 | 4.2 MB |
 | Clay | 8k | 0.75 | 0.57 | 0.27 | 0.01 | 26.43 | **28.05** | 0.00 | 1.5 | 1.5 | 0.3 MB |
-| ClayBuildup | 13k | 0.64 | 0.75 | 0.34 | 0.01 | 23.57 | **25.32** | 0.00 | 2.1 | 2.1 | 0.4 MB |
+| Clay Block | 13k | 0.64 | 0.75 | 0.34 | 0.01 | 23.57 | **25.32** | 0.00 | 2.1 | 2.1 | 0.4 MB |
 | Smooth | 7k | 0.49 | 0.42 | 0.32 | 0.01 | 23.69 | **24.94** | 0.00 | 1.4 | 1.3 | 0.2 MB |
 | Inflate | 7k | 0.34 | 0.40 | 0.20 | 0.01 | 21.50 | **22.45** | 0.00 | 1.3 | 1.5 | 0.2 MB |
-| DamStandard | 7k | 0.35 | 0.42 | 0.18 | 0.01 | 21.82 | **22.78** | 0.00 | 1.3 | 1.4 | 0.2 MB |
+| Sharp Crease | 7k | 0.35 | 0.42 | 0.18 | 0.01 | 21.82 | **22.78** | 0.00 | 1.3 | 1.4 | 0.2 MB |
 | Layer | 7k | 0.64 | 0.43 | 0.19 | 0.01 | 22.58 | **23.85** | 0.00 | 1.6 | 1.7 | 0.2 MB |
 | Move | 6k | 0.05 | 0.27 | 0.17 | 0.01 | 19.98 | **20.53** | 0.00 | 0.6 | 0.6 | 0.1 MB |
 | Recipe (pattern) | 8k | 0.89 | 0.44 | 0.19 | 0.01 | 23.07 | **24.60** | 0.00 | 1.4 | 1.4 | 0.2 MB |
@@ -2203,10 +2203,10 @@ Threads: 10, GPU: Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8.
 | Standard | 37k | 1.62 | 2.14 | 1.09 | 0.01 | 161.12 | **165.99** | 0.00 | 26.0 | 16.9 | 1.3 MB |
 | Standard (large, r 0.4) | 589k | 53.96 | 87.81 | 50.14 | 0.01 | 379.68 | **571.63** | 0.00 | 124.1 | 112.5 | 17.0 MB |
 | Clay | 32k | 1.45 | 1.77 | 0.86 | 0.01 | 148.08 | **152.18** | 0.00 | 6.2 | 6.1 | 1.1 MB |
-| ClayBuildup | 51k | 2.45 | 2.91 | 1.54 | 0.01 | 150.24 | **157.18** | 0.01 | 8.7 | 9.2 | 1.5 MB |
+| Clay Block | 51k | 2.45 | 2.91 | 1.54 | 0.01 | 150.24 | **157.18** | 0.01 | 8.7 | 9.2 | 1.5 MB |
 | Smooth | 30k | 1.94 | 1.82 | 0.99 | 0.01 | 154.28 | **159.06** | 0.01 | 5.4 | 5.3 | 1.0 MB |
 | Inflate | 29k | 1.36 | 1.68 | 0.86 | 0.01 | 152.70 | **156.62** | 0.00 | 6.2 | 6.0 | 1.0 MB |
-| DamStandard | 29k | 1.39 | 1.70 | 0.81 | 0.01 | 163.71 | **167.64** | 0.01 | 6.9 | 11.5 | 1.0 MB |
+| Sharp Crease | 29k | 1.39 | 1.70 | 0.81 | 0.01 | 163.71 | **167.64** | 0.01 | 6.9 | 11.5 | 1.0 MB |
 | Layer | 30k | 2.48 | 1.66 | 0.77 | 0.01 | 149.94 | **154.88** | 0.00 | 5.4 | 5.4 | 1.0 MB |
 | Move | 23k | 0.22 | 0.89 | 0.67 | 0.01 | 141.54 | **143.53** | 0.01 | 2.3 | 2.2 | 0.4 MB |
 | Recipe (pattern) | 31k | 3.35 | 1.72 | 1.49 | 0.01 | 159.51 | **166.10** | 0.01 | 5.7 | 6.3 | 1.0 MB |
@@ -2244,10 +2244,10 @@ Threads: 10, GPU: Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8.
 | Standard | 78k | 3.14 | 4.18 | 2.09 | 0.01 | 380.44 | **389.88** | 0.00 | 16.2 | 16.1 | 2.8 MB |
 | Standard (large, r 0.4) | 1.2M | 48.26 | 73.61 | 43.62 | 0.01 | 382.34 | **547.84** | 0.00 | 220.1 | 219.8 | 35.5 MB |
 | Clay | 68k | 2.82 | 3.50 | 1.76 | 0.01 | 380.26 | **388.35** | 0.00 | 13.0 | 13.3 | 2.4 MB |
-| ClayBuildup | 107k | 4.81 | 5.55 | 2.92 | 0.01 | 380.61 | **393.90** | 0.00 | 17.8 | 17.8 | 3.1 MB |
+| Clay Block | 107k | 4.81 | 5.55 | 2.92 | 0.01 | 380.61 | **393.90** | 0.00 | 17.8 | 17.8 | 3.1 MB |
 | Smooth | 63k | 3.40 | 3.27 | 1.52 | 0.01 | 379.44 | **387.64** | 0.00 | 11.5 | 11.9 | 2.1 MB |
 | Inflate | 61k | 2.52 | 3.18 | 1.57 | 0.01 | 380.18 | **387.47** | 0.00 | 12.3 | 11.3 | 2.1 MB |
-| DamStandard | 61k | 2.63 | 3.19 | 1.52 | 0.01 | 381.24 | **388.60** | 0.00 | 11.3 | 11.1 | 2.0 MB |
+| Sharp Crease | 61k | 2.63 | 3.19 | 1.52 | 0.01 | 381.24 | **388.60** | 0.00 | 11.3 | 11.1 | 2.0 MB |
 | Layer | 63k | 4.98 | 3.28 | 1.49 | 0.01 | 379.55 | **389.33** | 0.00 | 12.3 | 11.6 | 2.1 MB |
 | Move | 49k | 0.39 | 1.73 | 1.43 | 0.01 | 341.09 | **345.07** | 0.00 | 4.5 | 4.5 | 0.9 MB |
 | Recipe (pattern) | 65k | 6.55 | 3.40 | 1.54 | 0.01 | 380.30 | **391.80** | 0.00 | 11.3 | 11.4 | 2.1 MB |
@@ -2284,10 +2284,10 @@ Threads: 10. Brushes use X symmetry (two dabs per step), radius 0.12 on a unit s
 | Standard | 12k | 24k (15) | 0.49 | 0.48 | 0.40 | 0.00 | **1.41** | 0.00 | 3.4 | 3.5 | 1.4 MB |
 | Standard (large, r 0.4) | 118k | 148k (45) | 3.19 | 3.35 | 1.85 | 0.00 | **8.60** | 0.00 | 10.6 | 10.3 | 4.6 MB |
 | Clay | 7k | 16k (11) | 0.31 | 0.27 | 0.20 | 0.00 | **0.81** | 0.00 | 2.7 | 2.4 | 0.9 MB |
-| ClayBuildup | 8k | 18k (12) | 0.40 | 0.31 | 0.25 | 0.00 | **0.99** | 0.00 | 2.4 | 2.4 | 0.8 MB |
+| Clay Block | 8k | 18k (12) | 0.40 | 0.31 | 0.25 | 0.00 | **0.99** | 0.00 | 2.4 | 2.4 | 0.8 MB |
 | Smooth | 5k | 12k (9) | 0.24 | 0.17 | 0.12 | 0.00 | **0.56** | 0.00 | 1.9 | 2.0 | 0.6 MB |
 | Inflate | 5k | 12k (9) | 0.19 | 0.17 | 0.12 | 0.00 | **0.51** | 0.00 | 2.0 | 2.3 | 0.6 MB |
-| DamStandard | 4k | 12k (9) | 0.20 | 0.17 | 0.11 | 0.00 | **0.50** | 0.00 | 2.0 | 1.9 | 0.5 MB |
+| Sharp Crease | 4k | 12k (9) | 0.20 | 0.17 | 0.11 | 0.00 | **0.50** | 0.00 | 2.0 | 1.9 | 0.5 MB |
 | Layer | 5k | 12k (9) | 0.29 | 0.18 | 0.12 | 0.00 | **0.61** | 0.00 | 1.8 | 1.7 | 0.6 MB |
 | Move | 4k | 10k (8) | 0.02 | 0.10 | 0.09 | 0.00 | **0.24** | 0.00 | 0.3 | 0.2 | 0.1 MB |
 | Recipe (pattern) | 5k | 13k (9) | 0.47 | 0.17 | 0.12 | 0.00 | **0.78** | 0.00 | 1.9 | 1.6 | 0.6 MB |
@@ -2319,10 +2319,10 @@ Threads: 10. Brushes use X symmetry (two dabs per step), radius 0.12 on a unit s
 | Standard | 50k | 76k (15) | 1.99 | 1.95 | 1.15 | 0.00 | **5.25** | 0.00 | 11.6 | 11.9 | 5.4 MB |
 | Standard (large, r 0.4) | 472k | 525k (45) | 9.76 | 10.47 | 6.11 | 0.01 | **27.04** | 0.00 | 37.6 | 37.0 | 18.5 MB |
 | Clay | 28k | 47k (11) | 1.19 | 1.15 | 0.69 | 0.01 | **3.14** | 0.00 | 7.7 | 7.6 | 3.5 MB |
-| ClayBuildup | 33k | 55k (12) | 1.44 | 1.37 | 0.85 | 0.01 | **3.78** | 0.00 | 8.1 | 12.2 | 3.8 MB |
+| Clay Block | 33k | 55k (12) | 1.44 | 1.37 | 0.85 | 0.01 | **3.78** | 0.00 | 8.1 | 12.2 | 3.8 MB |
 | Smooth | 19k | 37k (9) | 0.99 | 0.75 | 0.54 | 0.01 | **2.36** | 0.00 | 6.2 | 6.3 | 2.7 MB |
 | Inflate | 18k | 36k (9) | 0.76 | 0.75 | 0.55 | 0.01 | **2.14** | 0.00 | 5.9 | 6.0 | 2.6 MB |
-| DamStandard | 18k | 35k (9) | 0.80 | 0.73 | 0.52 | 0.01 | **2.12** | 0.00 | 5.5 | 5.9 | 2.5 MB |
+| Sharp Crease | 18k | 35k (9) | 0.80 | 0.73 | 0.52 | 0.01 | **2.12** | 0.00 | 5.5 | 5.9 | 2.5 MB |
 | Layer | 19k | 36k (9) | 1.06 | 0.77 | 0.51 | 0.01 | **2.42** | 0.00 | 6.0 | 6.0 | 2.6 MB |
 | Move | 16k | 29k (8) | 0.14 | 0.48 | 0.55 | 0.01 | **1.26** | 0.00 | 0.8 | 1.3 | 0.3 MB |
 | Recipe (pattern) | 19k | 37k (9) | 1.71 | 0.77 | 0.51 | 0.01 | **3.06** | 0.00 | 5.8 | 5.7 | 2.6 MB |
@@ -2354,10 +2354,10 @@ Threads: 10. Brushes use X symmetry (two dabs per step), radius 0.12 on a unit s
 | Standard | 103k | 149k (21) | 3.84 | 3.01 | 1.79 | 0.00 | **8.97** | 0.00 | 23.7 | 22.2 | 11.4 MB |
 | Standard (large, r 0.4) | 987k | 1.1M (57) | 19.07 | 20.32 | 12.46 | 0.01 | **53.27** | 0.00 | 76.6 | 76.7 | 38.7 MB |
 | Clay | 58k | 91k (16) | 2.26 | 2.16 | 1.08 | 0.01 | **5.72** | 0.00 | 15.3 | 15.1 | 7.2 MB |
-| ClayBuildup | 66k | 102k (17) | 2.68 | 2.38 | 1.31 | 0.01 | **6.63** | 0.00 | 16.5 | 16.2 | 8.0 MB |
+| Clay Block | 66k | 102k (17) | 2.68 | 2.38 | 1.31 | 0.01 | **6.63** | 0.00 | 16.5 | 16.2 | 8.0 MB |
 | Smooth | 39k | 67k (14) | 1.78 | 1.54 | 0.82 | 0.02 | **4.32** | 0.00 | 11.9 | 11.7 | 5.7 MB |
 | Inflate | 38k | 66k (14) | 1.65 | 1.69 | 0.90 | 0.02 | **4.41** | 0.00 | 12.0 | 12.8 | 5.6 MB |
-| DamStandard | 37k | 65k (15) | 1.65 | 1.74 | 0.84 | 0.02 | **4.41** | 0.00 | 11.8 | 11.5 | 5.4 MB |
+| Sharp Crease | 37k | 65k (15) | 1.65 | 1.74 | 0.84 | 0.02 | **4.41** | 0.00 | 11.8 | 11.5 | 5.4 MB |
 | Layer | 37k | 65k (14) | 2.12 | 1.74 | 0.88 | 0.02 | **4.92** | 0.00 | 12.8 | 11.8 | 5.6 MB |
 | Move | 33k | 59k (10) | 0.27 | 0.77 | 0.77 | 0.02 | **1.99** | 0.00 | 1.8 | 1.8 | 0.5 MB |
 | Recipe (pattern) | 38k | 68k (15) | 2.61 | 1.63 | 0.81 | 0.02 | **5.22** | 0.00 | 12.1 | 11.6 | 5.4 MB |
@@ -2394,10 +2394,10 @@ Threads: 10, GPU: Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8.
 | Standard | 9k | 20k (12) | 0.36 | 0.36 | 0.30 | 0.00 | 0.28 | **1.33** | 0.00 | 1.2 | 1.4 | 0.3 MB |
 | Standard (large, r 0.4) | 147k | 183k (53) | 3.77 | 3.99 | 2.15 | 0.00 | 2.99 | **13.17** | 0.00 | 9.3 | 9.4 | 4.2 MB |
 | Clay | 8k | 17k (11) | 0.33 | 0.31 | 0.24 | 0.00 | 0.24 | **1.15** | 0.00 | 1.6 | 1.5 | 0.3 MB |
-| ClayBuildup | 13k | 24k (13) | 0.56 | 0.48 | 0.40 | 0.00 | 0.34 | **1.82** | 0.00 | 1.7 | 1.8 | 0.4 MB |
+| Clay Block | 13k | 24k (13) | 0.56 | 0.48 | 0.40 | 0.00 | 0.34 | **1.82** | 0.00 | 1.7 | 1.8 | 0.4 MB |
 | Smooth | 7k | 16k (10) | 0.35 | 0.28 | 0.19 | 0.00 | 0.23 | **1.06** | 0.00 | 1.0 | 0.9 | 0.2 MB |
 | Inflate | 7k | 16k (10) | 0.28 | 0.26 | 0.20 | 0.00 | 0.22 | **0.98** | 0.00 | 0.8 | 1.1 | 0.2 MB |
-| DamStandard | 7k | 16k (10) | 0.30 | 0.26 | 0.19 | 0.00 | 0.21 | **0.98** | 0.00 | 0.8 | 1.2 | 0.2 MB |
+| Sharp Crease | 7k | 16k (10) | 0.30 | 0.26 | 0.19 | 0.00 | 0.21 | **0.98** | 0.00 | 0.8 | 1.2 | 0.2 MB |
 | Layer | 7k | 16k (10) | 0.60 | 0.27 | 0.18 | 0.00 | 0.22 | **1.31** | 0.00 | 0.7 | 0.7 | 0.2 MB |
 | Move | 6k | 14k (9) | 0.03 | 0.15 | 0.17 | 0.00 | 0.18 | **0.59** | 0.00 | 0.4 | 0.4 | 0.1 MB |
 | Recipe (pattern) | 8k | 17k (11) | 0.83 | 0.28 | 0.20 | 0.00 | 0.23 | **1.57** | 0.00 | 1.5 | 1.0 | 0.2 MB |
@@ -2436,10 +2436,10 @@ Threads: 10, GPU: Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8.
 | Standard | 37k | 60k (12) | 1.75 | 1.89 | 1.10 | 0.00 | 1.04 | **5.93** | 0.00 | 3.2 | 4.2 | 1.3 MB |
 | Standard (large, r 0.4) | 589k | 650k (53) | 11.94 | 13.01 | 7.83 | 0.01 | 9.43 | **43.06** | 0.00 | 34.7 | 36.6 | 17.0 MB |
 | Clay | 32k | 53k (11) | 1.48 | 1.48 | 0.82 | 0.00 | 0.87 | **4.77** | 0.00 | 2.7 | 3.3 | 1.1 MB |
-| ClayBuildup | 51k | 77k (13) | 2.11 | 1.87 | 1.15 | 0.00 | 1.27 | **6.57** | 0.00 | 4.1 | 4.4 | 1.5 MB |
+| Clay Block | 51k | 77k (13) | 2.11 | 1.87 | 1.15 | 0.00 | 1.27 | **6.57** | 0.00 | 4.1 | 4.4 | 1.5 MB |
 | Smooth | 30k | 51k (10) | 1.37 | 1.48 | 0.79 | 0.00 | 0.86 | **4.62** | 0.00 | 2.5 | 2.8 | 1.0 MB |
 | Inflate | 29k | 50k (10) | 1.21 | 1.36 | 0.70 | 0.00 | 0.84 | **4.24** | 0.00 | 2.3 | 2.4 | 1.0 MB |
-| DamStandard | 29k | 49k (10) | 1.18 | 1.39 | 0.76 | 0.00 | 0.81 | **4.29** | 0.00 | 2.4 | 2.6 | 1.0 MB |
+| Sharp Crease | 29k | 49k (10) | 1.18 | 1.39 | 0.76 | 0.00 | 0.81 | **4.29** | 0.00 | 2.4 | 2.6 | 1.0 MB |
 | Layer | 30k | 51k (10) | 2.25 | 1.54 | 0.64 | 0.00 | 0.83 | **5.37** | 0.00 | 2.5 | 2.3 | 1.0 MB |
 | Move | 23k | 42k (9) | 0.20 | 0.53 | 0.65 | 0.00 | 0.90 | **2.55** | 0.00 | 2.0 | 1.1 | 0.4 MB |
 | Recipe (pattern) | 31k | 52k (11) | 2.03 | 1.41 | 0.76 | 0.00 | 0.87 | **5.20** | 0.00 | 2.4 | 2.7 | 1.0 MB |
@@ -2478,10 +2478,10 @@ Threads: 10, GPU: Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8.
 | Standard | 78k | 117k (18) | 3.10 | 2.88 | 1.58 | 0.00 | 2.49 | **10.32** | 0.00 | 5.5 | 5.9 | 2.8 MB |
 | Standard (large, r 0.4) | 1.2M | 1.3M (67) | 26.54 | 27.08 | 17.16 | 0.02 | 20.26 | **92.91** | 0.00 | 69.1 | 68.2 | 35.5 MB |
 | Clay | 68k | 104k (17) | 2.77 | 2.45 | 1.56 | 0.00 | 1.69 | **8.71** | 0.00 | 5.7 | 5.3 | 2.4 MB |
-| ClayBuildup | 107k | 151k (21) | 3.98 | 3.02 | 1.62 | 0.01 | 2.51 | **11.46** | 0.00 | 6.5 | 6.6 | 3.1 MB |
+| Clay Block | 107k | 151k (21) | 3.98 | 3.02 | 1.62 | 0.01 | 2.51 | **11.46** | 0.00 | 6.5 | 6.6 | 3.1 MB |
 | Smooth | 63k | 98k (17) | 2.93 | 2.28 | 1.18 | 0.01 | 1.77 | **8.39** | 0.00 | 4.5 | 5.6 | 2.1 MB |
 | Inflate | 61k | 96k (16) | 2.50 | 2.17 | 1.19 | 0.01 | 1.87 | **7.97** | 0.00 | 4.8 | 4.8 | 2.1 MB |
-| DamStandard | 61k | 96k (16) | 2.62 | 2.24 | 1.28 | 0.01 | 1.59 | **8.01** | 0.00 | 4.6 | 4.6 | 2.0 MB |
+| Sharp Crease | 61k | 96k (16) | 2.62 | 2.24 | 1.28 | 0.01 | 1.59 | **8.01** | 0.00 | 4.6 | 4.6 | 2.0 MB |
 | Layer | 63k | 99k (17) | 4.87 | 2.34 | 1.26 | 0.01 | 1.81 | **10.57** | 0.00 | 4.7 | 4.9 | 2.1 MB |
 | Move | 49k | 79k (14) | 0.42 | 0.91 | 1.05 | 0.01 | 1.65 | **4.61** | 0.00 | 2.2 | 1.9 | 0.9 MB |
 | Recipe (pattern) | 65k | 102k (18) | 4.29 | 2.39 | 1.18 | 0.01 | 2.08 | **10.19** | 0.00 | 4.9 | 5.1 | 2.1 MB |
@@ -2517,10 +2517,10 @@ Threads: 10. Brushes use X symmetry (two dabs per step), radius 0.12 on a unit s
 | Standard | 198k | 259k (28) | 6.61 | 4.61 | 2.82 | 0.00 | **14.58** | 0.00 | 42.3 | 42.2 | 21.8 MB |
 | Standard (large, r 0.4) | 1.9M | 2.0M (79) | 33.95 | 38.18 | 23.82 | 0.01 | **98.42** | 0.00 | 148.1 | 147.0 | 74.0 MB |
 | Clay | 110k | 155k (21) | 4.07 | 3.18 | 1.76 | 0.02 | **9.41** | 0.00 | 27.8 | 27.2 | 13.8 MB |
-| ClayBuildup | 120k | 166k (23) | 4.52 | 3.34 | 1.79 | 0.03 | **10.06** | 0.00 | 30.7 | 30.3 | 15.1 MB |
+| Clay Block | 120k | 166k (23) | 4.52 | 3.34 | 1.79 | 0.03 | **10.06** | 0.00 | 30.7 | 30.3 | 15.1 MB |
 | Smooth | 71k | 108k (19) | 3.22 | 2.54 | 1.28 | 0.03 | **7.35** | 0.00 | 22.7 | 22.6 | 10.8 MB |
 | Inflate | 69k | 106k (19) | 2.73 | 2.62 | 1.37 | 0.03 | **7.02** | 0.00 | 22.5 | 22.5 | 10.7 MB |
-| DamStandard | 68k | 104k (18) | 2.76 | 2.60 | 1.27 | 0.03 | **6.94** | 0.00 | 22.5 | 22.5 | 10.4 MB |
+| Sharp Crease | 68k | 104k (18) | 2.76 | 2.60 | 1.27 | 0.03 | **6.94** | 0.00 | 22.5 | 22.5 | 10.4 MB |
 | Layer | 70k | 107k (19) | 3.75 | 2.64 | 1.32 | 0.03 | **8.00** | 0.00 | 21.5 | 22.9 | 10.8 MB |
 | Move | 64k | 98k (13) | 0.50 | 1.06 | 1.12 | 0.03 | **3.04** | 0.00 | 2.5 | 2.5 | 1.0 MB |
 | Recipe (pattern) | 72k | 109k (19) | 4.24 | 2.53 | 1.24 | 0.03 | **8.32** | 0.00 | 22.0 | 22.7 | 10.6 MB |

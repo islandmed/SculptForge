@@ -3,9 +3,9 @@
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Insert your own mesh: a SubTool copy or an OBJ, PLY or GLB, dragged onto the model (#34)",
-    "Keep Masked for Voxel Remesh, Decimate and QRemesh: the masked detail stays exactly as it is (#43)",
+    "Insert your own mesh: a Part copy or an OBJ, PLY or GLB, dragged onto the model (#34)",
+    "Keep Masked for Voxel Remesh, Decimate and Quad Remesh: the masked detail stays exactly as it is (#43)",
     "Pie menus on T and Y (#45), a Maya bridge through a folder (#42), the interface in Spanish (#44)",
-    "Twelve new alphas and six VDM brushes; Focal Shift now shapes alphas (#60); mask from the mesh border (#61)"
+    "Twelve new alphas and six VDM brushes; Falloff now shapes alphas (#60); mask from the mesh border (#61)"
   ]
 }

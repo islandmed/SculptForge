@@ -347,6 +347,10 @@ private:
     void drawSupportUi();               // the first-run welcome and the one reminder note
     void drawSupportersSection();       // Help > About: the names from docs/supporters.txt, as plain text
     bool showWelcome_ = false;          // the first start (no project.json yet), or Help > Welcome
+    // project.json "input_style": the key style an install started with (the welcome's "Coming from" choice, or
+    // SculptForge for a new install), used while ui.json (Store Config) names none; -1: an install from before it,
+    // which keeps the ZBrush-style keys it had.
+    int startInputStyle_ = -1;
     double sculptSeconds_ = 0.0;        // cumulative time in strokes (project.json)
     bool supportReminderDone_ = false;  // the reminder was shown (or turned off) once: never again (project.json)
     bool supportReminderOpen_ = false;
@@ -1351,7 +1355,7 @@ private:
         float move[3] = {0, 0, 0}, rotate[3] = {0, 0, 0}, scale = 100.0f;
     } gizmo_;
     // ---- end Gizmo 3D ----
-    // ---- ZBrush feel (Input.cpp, docs/zbrush-parity.md) ----
+    // ---- ZBrush feel (Input.cpp, docs/guide/coming-from-zbrush.md) ----
     // Preferences > Input (the ZBrush or SculptForge key style), the Space QuickMenu, the intensities and Focal
     // Shift (U / I / O), ZBrush's mask and polygroup keys, Shift-constrained straight strokes and the
     // Shift+click, release Shift, drag roll.

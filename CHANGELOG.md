@@ -10,13 +10,23 @@ All notable changes to SculptForge are listed here. The format follows
 ### Added
 - **Preferences > Input > Start strokes off the model** (#62, off by default) and **Toggle strokes off the model**
   (<kbd>Shift</kbd>+<kbd>L</kbd>): a left-drag that starts on the background begins a stroke, which touches the model
-  once the cursor reaches it (LazyMouse and the stroke path start there, so nothing jumps). Ctrl (mask) and Shift
+  once the cursor reaches it (Lazy Stroke and the stroke path start there, so nothing jumps). Ctrl (mask) and Shift
   (smooth) strokes work the same way; a Ctrl+click on the background still inverts the mask. The view still turns
   with a right-drag (or a pen button set to Right click), pans with Alt+drag or a middle-drag, moves with Space held
   when that option is on, and Blender and Maya keys keep Alt+left-drag. A label at the top of the canvas shows while
-  it is on. MaskLasso, MaskRect and the hide / show shapes are unchanged.
+  it is on. Mask Lasso, Mask Rectangle and the hide / show shapes are unchanged.
 
 ### Changed
+- Features use SculptForge's own names (Parts, Forge Spheres, Vertex Paint, Face Groups, Library, Lit Spheres,
+  Quad Remesh, Voxel Remesh, Dynamic Topology, Snapshot, Gizmo, Lazy Stroke, Wireframe, Send to ZBrush, Sharp
+  Crease, Clay Block, Tendril...); searching for ZBrush terms still finds them. MatCaps are now Lit Spheres. The user guide's chapters follow
+  (Parts, Forge Spheres, Vertex Paint, Face Groups; the old web addresses redirect), and
+  Help > User Guide > Coming from ZBrush has the table of ZBrush terms and their SculptForge names. The ZBrush
+  plug-in is now called SculptForge ZTL Export (same file, `SculptForgeZToolExport.txt`).
+- New installs default to the SculptForge-style keys (Preferences > Input); a first-start "Coming from: ZBrush /
+  Blender / Maya / New to sculpting" choice sets the key style, and existing users keep their saved choice.
+  ZBrush's keys are the **ZBrush-style** option.
+- Contributions are signed off under the Developer Certificate of Origin (`git commit -s`; see CONTRIBUTING.md).
 - Faster CI and releases with the same tests (docs/releasing.md):
   - **Compiler caching:** compiles go through ccache, cached only by pushes to main and maintainers' own runs.
     Pull requests only read the cache, and tags never save one.

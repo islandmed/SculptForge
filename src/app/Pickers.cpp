@@ -357,7 +357,7 @@ std::string brushActionId(const BrushItem& item) {
 }
 
 const char* brushTypeDescription(int type) {
-    if (type == kPaintBrush) return "Polypaint: paints the current colour onto the surface without sculpting (P).";
+    if (type == kPaintBrush) return "Vertex Paint: paints the current colour onto the surface without sculpting (P).";
     switch (BrushType(type)) {
     case BrushType::Standard:
         return "Pushes the surface out along its normal, building soft, rounded form. Alt carves.";
@@ -382,7 +382,7 @@ const char* brushTypeDescription(int type) {
     case BrushType::SnakeHook:
         return "Pulls the surface out along the stroke into horns, tentacles and spikes.";
     case BrushType::Trim:
-        return "Trim Dynamic: cuts away everything above a plane, for hard planar surfaces.";
+        return "Trim: cuts away everything above a plane, for hard planar surfaces.";
     case BrushType::Layer:
         return "Raises the surface to one fixed height per stroke; overlapping passes never stack.";
     case BrushType::Nudge:
@@ -399,7 +399,7 @@ const char* brushTypeDescription(int type) {
     case BrushType::KelvinScale:
         return "Elastic pinch and swell: press and drag left to pinch the surface toward that point, right to swell it.";
     case BrushType::KelvinSnake:
-        return "Elastic SnakeHook: pulls horns, tentacles and spikes that taper naturally as they stretch.";
+        return "Elastic Tendril: pulls horns, tentacles and spikes that taper naturally as they stretch.";
     case BrushType::DetailClone:
         return "Paints copies of a captured detail along the stroke, each turned to follow it. Capture any detail on "
                "the model with Capture from view (Ctrl+Alt+C), or pick a VDM.";
@@ -417,7 +417,7 @@ std::vector<BrushItem> PickerUi::brushItems(App& app, bool libraryFiles) {
         BrushItem b;
         b.kind = BrushItem::Kind::Type;
         b.index = i;
-        b.name = brushName(BrushType(i));
+        b.name = brushLabel(BrushType(i));
         b.description = brushTypeDescription(i);
         items.push_back(std::move(b));
     }
@@ -428,8 +428,8 @@ std::vector<BrushItem> PickerUi::brushItems(App& app, bool libraryFiles) {
     items.push_back(std::move(paint));
     BrushItem guides;
     guides.kind = BrushItem::Kind::Guides;
-    guides.name = "QRemesh Guides";
-    guides.description = "ZBrush's ZRemesher Guides: draw curves on the model for QRemesh's edge loops to follow (a curve "
+    guides.name = "Quad Remesh Guides";
+    guides.description = "ZBrush's ZRemesher Guides: draw curves on the model for Quad Remesh's edge loops to follow (a curve "
                          "that ends where it started makes a loop). Alt+click a curve to delete it.";
     items.push_back(std::move(guides));
     for (int i = 0; i < int(app.doc_.brushes.size()); ++i) {
@@ -656,7 +656,7 @@ void drawBrushGrid(App& app, GridMode mode) {
         std::string footer = b.kind == BrushItem::Kind::Recipe
                                  ? brushOriginText(app.doc_.brushes[size_t(b.index)])
                              : b.kind == BrushItem::Kind::File   ? "Library file - pick to load it"
-                             : b.kind == BrushItem::Kind::Guides ? "Tool > Geometry > QRemesh"
+                             : b.kind == BrushItem::Kind::Guides ? "Tool > Geometry > Quad Remesh"
                                                                  : "Built-in brush";
         quickInfo(tex, glyph, b.name, b.description, footer);
         ui::HelpText(b.name.c_str(), nullptr, b.description.c_str(), "Brush");
@@ -816,7 +816,7 @@ void drawVdmGrid(App& app, GridMode mode) {
         }
         const std::string text = v->builtin ? "Built-in vector displacement map (CC0)." : "Vector displacement map from your library.";
         quickInfo(tex, ICON_LC_STAMP, v->name, text, v->path.empty() ? std::string() : v->path);
-        ui::HelpText(v->name.c_str(), nullptr, "Stamp this vector displacement map with the VDM brush (DragRect).",
+        ui::HelpText(v->name.c_str(), nullptr, "Stamp this vector displacement map with the VDM brush (Drag Stamp).",
                      "Brush > Vector Displacement");
         if (!v->builtin && ImGui::BeginPopupContextItem()) {
             ImGui::TextDisabled("%s", v->name.c_str());
@@ -917,8 +917,8 @@ void drawMaterialGrid(App& app, GridMode mode) {
                                               "rim, so strokes read without glare."
                      : i == 0 ? "Made for sculpting: a strong key light, crisp highlights and deep cavities so "
                                 "every stroke reads."
-                     : isCustomMatcap(i) ? "Your own MatCap. Right-click to remove it."
-                              : "MatCap material: the whole lit look in one image.",
+                     : isCustomMatcap(i) ? "Your own Lit Sphere. Right-click to remove it."
+                              : "Lit Sphere material: the whole lit look in one image.",
                      "Material");
         if (isCustomMatcap(i) && ImGui::BeginPopupContextItem()) {
             ImGui::TextDisabled("%s", name);
@@ -1111,7 +1111,7 @@ void drawPickers(App& app) {
                                 "change it.",
                                 &app.radiusPx_, 2.0f, 800.0f, 1.0f}
                       : which == PickerUi::Slider::ZIntensity
-                          ? Def{s.sliderSmooth ? "Smooth Z Intensity" : "Z Intensity", "U",
+                          ? Def{s.sliderSmooth ? "Smooth Intensity" : "Intensity", "U",
                                 s.sliderSmooth ? "How strongly Smooth works (it keeps its own value, as in ZBrush: hold "
                                                  "Shift and press U to set it). Type a number and press Enter."
                                                : "How strongly the brush changes the surface (1-100). Drag, or type a "
@@ -1122,7 +1122,7 @@ void drawPickers(App& app) {
                                 "How strongly painting colours the surface (1-100). Drag, or type a number and press "
                                 "Enter.",
                                 &app.rgbIntensity_, 0.01f, 1.0f, 100.0f}
-                          : Def{"Focal Shift", "O",
+                          : Def{"Falloff", "O",
                                 "The brush falloff: below 0 a broad, hard tip, above 0 a soft point (-100..100). The "
                                 "inner ring of the cursor shows it.",
                                 &app.focalShift_, -1.0f, 1.0f, 100.0f};
@@ -1347,7 +1347,7 @@ void App::drawColorWidget(float width) {
     ImGui::PopStyleVar();
     ImGui::PopID();
     ImGui::EndGroup();
-    ui::HelpText("Colour", "C", "The polypaint colour (C over the model picks one).", "Left shelf");
+    ui::HelpText("Colour", "C", "The vertex paint colour (C over the model picks one).", "Left shelf");
 
     // Two swatches, like ZBrush's main and secondary colour: clicking either swaps them ("Alternate"). Equal halves of
     // the column, main on the left, the same gap as between the square and the strip.

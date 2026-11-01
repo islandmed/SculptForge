@@ -372,9 +372,9 @@ void registerMaskingCommands(CommandRegistry& registry) {
             return maskByCavity(m, float(argNumber(a, "strength", 1.0)),
                                 std::clamp(float(argNumber(a, "threshold", 0.02)), -1.0f, 1.0f));
         });
-    add("mask_by_polygroup", "Mask by Polygroup",
-        "Mask the vertices of one polygroup (meshes without polygroups are all group 0).",
-        {{"group", T::Number, "Polygroup id.", true},
+    add("mask_by_polygroup", "Mask by Face Group",
+        "Mask the vertices of one face group (meshes without face groups are all group 0).",
+        {{"group", T::Number, "Face Group id.", true},
          {"add", T::Bool, "Add to the current mask instead of replacing it. Default false.", false}},
         [](Mesh& m, const Args& a) {
             return maskByPolygroup(m, uint32_t(std::max(0.0, argNumber(a, "group", 0))), argBool(a, "add", false));
@@ -383,12 +383,12 @@ void registerMaskingCommands(CommandRegistry& registry) {
     registry.add(
         {"mask_border",
          "Mask from the mesh border (Blender: Mask from mesh boundary): mask the vertices on open edges - and, with "
-         "polygroups, where polygroups meet - plus edge rings inside them, so sculpting keeps the border in place. "
+         "face groups, where face groups meet - plus edge rings inside them, so sculpting keeps the border in place. "
          "Replaces the mask unless add is set. A closed mesh has no open edges and masks nothing.",
          {{"rings", T::Number, "Width of the mask in edge rings from the border (1-20; 1 = the border vertices only). "
                                "Default 1.",
            false},
-          {"polygroups", T::Bool, "Also mask polygroup borders (ZBrush: Mask by polygroup border). Default false.",
+          {"polygroups", T::Bool, "Also mask face group borders (ZBrush: Mask by polygroup border). Default false.",
            false},
           {"soft", T::Bool, "Fade the mask from the border towards the innermost ring. Default false.", false},
           {"strength", T::Number, "Mask value on the border (0-1). Default 1.", false},
@@ -403,7 +403,7 @@ void registerMaskingCommands(CommandRegistry& registry) {
                  maskBorder(doc.mesh, int(argNumber(a, "rings", 1)), polygroups, argBool(a, "soft", false),
                             float(argNumber(a, "strength", 1.0)), argBool(a, "add", false), &found);
              if (found == 0)
-                 return {true, polygroups ? "No open edges or polygroup borders: the mesh is closed and one polygroup"
+                 return {true, polygroups ? "No open edges or face group borders: the mesh is closed and one face group"
                                           : "No open edges: the mesh is closed"};
              if (!changed) return {true, label + ": mask unchanged"};
              doc.undo.push(std::move(record));

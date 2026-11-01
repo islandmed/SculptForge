@@ -209,7 +209,7 @@ void App::registerBakeUiActions() {
     };
     add("bake.run", "Bake", [this] { startBake(); }, nullptr,
         [this] { return !bake_->job && doc_.mesh.hasUvs() && doc_.subtoolCount() > 1; },
-        "Bake the chosen maps from the source SubTool(s) onto this SubTool's UVs, in the background. Maps are saved as "
+        "Bake the chosen maps from the source Part(s) onto this Part's UVs, in the background. Maps are saved as "
         "PNGs (displacement also as a 32-bit EXR) in the output folder, and the normal map shows on the model.",
         "bake");
     add("bake.cancel", "Cancel Bake", [this] {
@@ -241,7 +241,7 @@ void App::startBake() {
     BakeUiState& b = *bake_;
     if (b.job) return;
     if (!doc_.mesh.hasUvs()) {
-        status_ = "Bake needs UVs on this SubTool (the low-poly): Tool > Texture Map > Auto UV";
+        status_ = "Bake needs UVs on this Part (the low-poly): Tool > Texture Map > Auto UV";
         return;
     }
     // Source SubTools: the chosen one, or every visible SubTool but this one.
@@ -299,7 +299,7 @@ void App::startBake() {
         promise.set_value(ok);
     }).detach();
     b.job = std::move(job);
-    status_ = "Baking " + std::to_string(st.size) + " maps from " + std::to_string(idx.size()) + " SubTool" +
+    status_ = "Baking " + std::to_string(st.size) + " maps from " + std::to_string(idx.size()) + " Part" +
               (idx.size() == 1 ? "" : "s") + "...";
 }
 
@@ -347,12 +347,12 @@ void App::drawBakeContents() {
         ImGui::TextDisabled("Onto %s (%zu tris, UVs)", doc_.activeSubtoolInfo().name.c_str(), m.triangleCount());
     }
     ui::HelpText("Low-poly", nullptr,
-                 "Maps are baked onto the active SubTool's UVs: make the low-poly active (it needs UVs from import or "
-                 "from Auto UV in Tool > Texture Map), and keep the high-poly SubTool(s) visible.",
+                 "Maps are baked onto the active Part's UVs: make the low-poly active (it needs UVs from import or "
+                 "from Auto UV in Tool > Texture Map), and keep the high-poly Part(s) visible.",
                  kPath);
 
     // Source.
-    std::string current = "All visible SubTools";
+    std::string current = "All visible Parts";
     bool found = false;
     for (int i = 0; i < doc_.subtoolCount(); ++i)
         if (b.source && doc_.subtools[size_t(i)].id == b.source && i != doc_.activeSubtool) {
@@ -365,7 +365,7 @@ void App::drawBakeContents() {
     ImGui::SameLine();
     ImGui::SetNextItemWidth(-1);
     if (ImGui::BeginCombo("##bakesource", current.c_str())) {
-        if (ImGui::Selectable("All visible SubTools", b.source == 0)) b.source = 0;
+        if (ImGui::Selectable("All visible Parts", b.source == 0)) b.source = 0;
         for (int i = 0; i < doc_.subtoolCount(); ++i) {
             if (i == doc_.activeSubtool) continue;
             const SubTool& st = doc_.subtools[size_t(i)];
@@ -376,7 +376,7 @@ void App::drawBakeContents() {
         ImGui::EndCombo();
     }
     ui::HelpText("Source", nullptr,
-                 "The high-poly to bake from: one SubTool, or every visible SubTool except the active one (the low-poly). "
+                 "The high-poly to bake from: one Part, or every visible Part except the active one (the low-poly). "
                  "Hidden faces of the source are ignored.",
                  kPath);
 
@@ -389,7 +389,7 @@ void App::drawBakeContents() {
         "reported when the bake finishes) and a 32-bit EXR in world units.",
         "Ambient occlusion: how much of the sky each point of the high-poly sees. Darker in creases and folds.",
         "Cavity: the high-poly's fine surface curvature. Mid-grey on smooth surfaces, dark in cracks, light on ridges.",
-        "Colour transfer: the source's polypaint, or its painted texture.",
+        "Colour transfer: the source's vertex paint, or its painted texture.",
     };
     for (int i = 0; i < kBakeMapCount; ++i) {
         if (i % 2) {
@@ -473,7 +473,7 @@ void App::drawBakeContents() {
                                                                        : "Output folder (default: last export's)",
                              b.folder, sizeof b.folder);
     ui::HelpText("Output folder", nullptr,
-                 "Where the maps are written, as <SubTool>_normal.png, _ao.png, _displacement.png (+ .exr) and so on. "
+                 "Where the maps are written, as <Part>_normal.png, _ao.png, _displacement.png (+ .exr) and so on. "
                  "Empty: beside your last export, else the project's folder, else Bakes in your library folder.",
                  kPath);
     ImGui::SameLine();

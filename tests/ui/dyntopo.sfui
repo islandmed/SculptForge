@@ -22,17 +22,17 @@ stroke 0.3 0.35 0.7 0.55
 expect_value triangles > $before*1.3
 expect_value can_undo == 1
 shot stroke
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 expect_value wireframe == 1
 shot wireframe
 
 # Snake Hook pulls a horn out of the sphere, with new triangles all along it.
 remember triangles pulled
-click "SnakeHook##brush.snakehook"
+click "Tendril##brush.snakehook"
 stroke 0.62 0.3 0.95 0.05
 expect_value triangles > $pulled
 shot snake_hook
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 shot snake_hook_shaded
 
 # Undo takes the strokes back exactly, Redo brings them again.
@@ -51,9 +51,9 @@ remember triangles fine
 click "Clay##brush.clay"
 stroke 0.25 0.7 0.5 0.75
 expect_value triangles > $fine*1.2
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 shot fine_detail
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 
 # Off: strokes leave the triangles alone.
 click "Dynamic##draw.dynamic"

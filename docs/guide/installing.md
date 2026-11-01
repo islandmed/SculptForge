@@ -128,11 +128,17 @@ file manager's properties).
 
 ## What you see at start-up
 
-SculptForge opens a 1600 x 960 window with a sphere ready to sculpt and the **LightBox** open along the top of
+SculptForge opens a 1600 x 960 window with a sphere ready to sculpt and the **Library** open along the top of
 the canvas on its **Project** tab, so you can reopen recent work with a double-click. Press <kbd>,</kbd>
-(comma) to close it, or turn off **Preferences > LightBox > Show at startup**. The first start also creates
+(comma) to close it, or turn off **Preferences > Library > Show at startup**. The first start also creates
 your library folder (**Documents/SculptForge**, with Projects, Tools, Brushes, Alphas, MatCaps, Images, Splats
-and QuickSave sub-folders), which the LightBox shows as **User**.
+and QuickSave (snapshots) sub-folders), which the Library shows as **User**.
+
+The first start also asks what you are **Coming from**: **ZBrush**, **Blender**, **Maya** or **New to sculpting**.
+Your answer picks the key style: **ZBrush** turns on the ZBrush-style keys, **Blender** and **Maya** their own
+styles, and **New to sculpting** keeps the SculptForge keys (the default). Change it any time in
+**Preferences > Input > Style** (see [Keyboard and mouse](shortcuts.md)); if you are updating from an earlier
+version, your saved style is kept and the question isn't asked.
 
 You can open a file directly from the command line, too: `sculptforge model.obj` (or a `.glb`, `.sfproj`,
 splat capture or image). `sculptforge --fullscreen` starts filling the screen; `sculptforge --help` lists

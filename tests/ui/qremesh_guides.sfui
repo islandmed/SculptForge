@@ -3,25 +3,25 @@
 # delete it, then QRemesh follows the loops: an edge loop round each eye. Guides are saved with the project.
 run new_sphere subdivisions=6
 click "Geometry##tool.geometry"
-expect "QRemesh/QRemesh Guides"
+expect "QRemesh/Quad Remesh Guides"
 expect_value qremesh_guides == 0
 
 # Ctrl-hover help on the new controls.
 hold ctrl
-hover "QRemesh/QRemesh Guides"
+hover "QRemesh/Quad Remesh Guides"
 expect_help "ZRemesher Guides"
 hover "QRemesh/Delete Last"
-expect_help "last QRemesh guide"
+expect_help "last Quad Remesh guide"
 hover "QRemesh/Clear"
-expect_help "every QRemesh guide"
+expect_help "every Quad Remesh guide"
 hover "QRemesh/##qcurves"
 expect_help "six quads"
 hold none
 
 # Pick the brush and draw a loop round the right eye: X symmetry mirrors it onto the left one.
-click "QRemesh/QRemesh Guides"
+click "QRemesh/Quad Remesh Guides"
 expect_value guides_mode == 1
-expect_status "QRemesh Guides"
+expect_status "Quad Remesh Guides"
 snapshot
 drag_path 0.790 0.380 0.785 0.414 0.769 0.445 0.745 0.469 0.714 0.485 0.680 0.490 0.646 0.485 0.615 0.469 0.591 0.445 0.575 0.414 0.570 0.380 0.575 0.346 0.591 0.315 0.615 0.291 0.646 0.275 0.680 0.270 0.714 0.275 0.745 0.291 0.769 0.315 0.785 0.346 0.790 0.380
 expect_value qremesh_guides == 2
@@ -53,7 +53,7 @@ expect_value qremesh_guides == 2
 
 # QRemesh follows them: a loop round each eye.
 drag_item "QRemesh/##qtarget" -16 0
-click "QRemesh/QRemesh"
+click "QRemesh/Quad Remesh"
 wait_idle 120
 expect_status "100% quads"
 expect_status "followed 2 guides"
@@ -63,9 +63,9 @@ key ctrl+z
 expect_value quads == 0
 key ctrl+shift+z
 orbit -60 0
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 shot guides-qremesh-polyf
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 
 # Picking a brush leaves the guides brush; the guides stay (shown fainter).
 click "Clay##brush.clay"
@@ -74,11 +74,11 @@ expect_value qremesh_guides == 2
 
 # The F3 command palette finds the brush; picking the brush that was active before leaves it again.
 key f3
-type "##Command palette" "qremesh guides"
-expect_text "QRemesh Guides"
+type "##Command palette" "quad remesh guides"
+expect_text "Quad Remesh Guides"
 key enter
 expect_value guides_mode == 1
-expect_text "QRemesh Guides"
+expect_text "Quad Remesh Guides"
 click "Clay##brush.clay"
 expect_value guides_mode == 0
 # Clear deletes every curve.

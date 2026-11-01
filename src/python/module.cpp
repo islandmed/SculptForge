@@ -159,7 +159,7 @@ PYBIND11_MODULE(sculptforge, m) {
                 d.mesh.markAllDirty();
                 d.modified = true;
             },
-            "Per-vertex polypaint, (N, 3) float32 linear RGB in 0..1; None if unpainted.")
+            "Per-vertex paint colours, (N, 3) float32 linear RGB in 0..1; None if unpainted.")
         .def_property(
             "polygroups", [](const Document& d) { return attributeArray(d.mesh.polygroups); },
             [](Document& d, const py::object& v) {
@@ -167,7 +167,7 @@ PYBIND11_MODULE(sculptforge, m) {
                 d.mesh.facesDirty = true;
                 d.modified = true;
             },
-            "Per-triangle polygroup ids, (M,) uint32; None means every triangle is in group 0.")
+            "Per-triangle face group ids, (M,) uint32; None means every triangle is in group 0.")
         .def_property(
             "hidden", [](const Document& d) { return attributeArray(d.mesh.hidden); },
             [](Document& d, const py::object& v) {
@@ -226,18 +226,18 @@ PYBIND11_MODULE(sculptforge, m) {
                                                            py::arg("triangles") = d.subtoolMesh(i).triangleCount()));
                                    return out;
                                },
-                               "The SubTools (separate meshes) in list order, as dicts with name, visible and triangles.")
+                               "The Parts (separate meshes) in list order, as dicts with name, visible and triangles.")
         .def_property(
             "active_subtool", [](const Document& d) { return d.activeSubtool; },
             [](Document& d, const py::object& v) {
                 int index = -1;
                 if (py::isinstance<py::str>(v)) index = d.findSubtool(v.cast<std::string>());
                 else index = v.cast<int>();
-                if (index < 0 || index >= d.subtoolCount()) throw py::index_error("no such SubTool");
+                if (index < 0 || index >= d.subtoolCount()) throw py::index_error("no such Part");
                 d.selectSubtool(index);
             },
-            "Index of the SubTool that vertices, mask, layers... and editing commands refer to. Set it to an "
-            "index or a SubTool name to select another one.")
+            "Index of the Part that vertices, mask, layers... and editing commands refer to. Set it to an "
+            "index or a Part name to select another one.")
         // Selection Sets (core/SelectionSets.h) of the active Part (SubTool): push and pull them as arrays.
         .def_property_readonly(
             "selection_sets",

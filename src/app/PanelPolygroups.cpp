@@ -57,7 +57,7 @@ void App::polygroupMouseUp() {
 }
 
 void App::drawPolygroupsSection() {
-    ImGui::Checkbox(tr("Show polygroups"), &renderSettings_.showPolygroups);
+    ImGui::Checkbox(tr("Show face groups"), &renderSettings_.showPolygroups);
     ImGui::SameLine();
     const Mesh& m = doc_.mesh;
     const std::array<uint64_t, 6> key = {doc_.undo.revision() + 1, uint64_t(doc_.modified), m.triangles.size(),
@@ -68,7 +68,7 @@ void App::drawPolygroupsSection() {
         visibleGroups_ = visiblePolygroupCount(m);
     }
     ImGui::TextDisabled(tr("%zu"), visibleGroups_);
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Visible polygroups"));
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Visible face groups"));
 
     // Grouping buttons switch the polygroup colours on so the result is visible.
     auto group = [this](const char* command, const Args& args = {}) {

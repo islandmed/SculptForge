@@ -8,23 +8,23 @@ expect_value hide_shape == 2
 # Holding Ctrl: the brush tile turns into MaskPen, the stroke tile into its Dots.
 hold ctrl
 wait 0.1
-expect_text MaskPen
+expect_text Mask Pen
 shot ctrl-held-shelf
 hold none
-expect_no_text MaskPen
+expect_no_text Mask Pen
 
 # Ctrl+B opens the brush picker with the mask brushes.
 hold ctrl
 key ctrl+b
 wait 0.1
-expect "MaskLasso##held.mask.lasso"
-hover "MaskLasso##held.mask.lasso"
+expect "Mask Lasso##held.mask.lasso"
+hover "Mask Lasso##held.mask.lasso"
 expect_help "lasso"
 shot ctrl-brush-picker
-click "MaskLasso##held.mask.lasso"
+click "Mask Lasso##held.mask.lasso"
 hold none
 expect_value mask_shape == 1
-expect_not "MaskLasso##held.mask.lasso"
+expect_not "Mask Lasso##held.mask.lasso"
 
 # Clicking the shelf's stroke tile with Ctrl held offers the mask's strokes.
 hold ctrl
@@ -44,25 +44,25 @@ expect_value masked > 1000
 key ctrl+z
 expect_value masked == 0
 click "Masking"
-click "MaskPen##mask.pen"
+click "Mask Pen##mask.pen"
 expect_value mask_shape == 0
 
 # Without Ctrl the pickers are the usual ones.
 key b
 wait 0.1
-expect_not "MaskLasso##held.mask.lasso"
+expect_not "Mask Lasso##held.mask.lasso"
 key escape
 
 # Ctrl+Shift: the selection brushes. SelectLasso from the brush picker, SelectRect from the stroke picker.
 hold ctrl+shift
 wait 0.1
-expect_text SelectRect
+expect_text Select Rectangle
 shot ctrl-shift-held-shelf
 click "##tile.brush"
 wait 0.1
-expect "SelectLasso##held.select.lasso"
+expect "Select Lasso##held.select.lasso"
 shot ctrl-shift-brush-picker
-click "SelectLasso##held.select.lasso"
+click "Select Lasso##held.select.lasso"
 hold none
 expect_value hide_shape == 1
 
@@ -101,7 +101,7 @@ shot select-rect-hidden
 click "Show all"
 
 # Polygroups > Group by UVs: refused without UVs, one group per island after Auto UV.
-click "Polygroups"
+click "Face Groups"
 hold ctrl
 hover "Group by UVs##polygroup.uv_groups"
 expect_help "UV island"
@@ -113,7 +113,7 @@ click "Texture Map##tool.texture"
 click "Texture Map/Auto UV"
 wait_idle 120
 expect_value uvs == 1
-click "Polygroups"
+click "Face Groups"
 click "Group by UVs##polygroup.uv_groups"
 expect_value groups > 1
 expect_value show_polygroups == 1

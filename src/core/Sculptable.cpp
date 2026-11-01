@@ -1767,7 +1767,7 @@ bool sculptableOptionsFromArgs(const Args& a, SculptableOptions& o, std::string&
     else if (color == "texture") o.color = SculptableColor::Texture;
     else if (color == "none") o.color = SculptableColor::None;
     else {
-        error = "color must be polypaint, texture or none";
+        error = "color must be vertex paint, texture or none";
         return false;
     }
     o.textureSize = int(argNumber(a, "texture_size", o.textureSize));
@@ -1780,22 +1780,22 @@ bool sculptableOptionsFromArgs(const Args& a, SculptableOptions& o, std::string&
 
 void registerSculptableCommands(CommandRegistry& reg) {
     reg.add({"splat_to_mesh",
-             "Make sculptable: turn the Gaussian-splat capture into a clean, sculptable SubTool with the capture's "
-             "colours - a watertight surface (floaters dropped, holes filled), quad topology from QRemesh with face "
-             "loops when it is a head, and polypaint or a texture. The result is a new SubTool; the splats stay. "
-             "stage=scan stops after the surface and face guides (a \"<name> Scan\" SubTool to check and nudge); "
-             "stage=finish then remeshes the active scan SubTool along its guides.",
+             "Make sculptable: turn the Gaussian-splat capture into a clean, sculptable Part with the capture's "
+             "colours - a watertight surface (floaters dropped, holes filled), quad topology from Quad Remesh with face "
+             "loops when it is a head, and vertex paint or a texture. The result is a new Part; the splats stay. "
+             "stage=scan stops after the surface and face guides (a \"<name> Scan\" Part to check and nudge); "
+             "stage=finish then remeshes the active scan Part along its guides.",
              {{"detail", T::Number, "Voxels across the subject (32-768). Default 256. (resolution: the same.)", false},
               {"preset", T::String, "Polygon budget: game (4000 quads, default), film (12000) or sculpt (2000 quads + 2 "
                                     "subdivision levels with the scan's detail).", false},
-              {"target", T::Number, "Target quads instead of the preset's; 0 keeps the voxel surface (no QRemesh).", false},
+              {"target", T::Number, "Target quads instead of the preset's; 0 keeps the voxel surface (no Quad Remesh).", false},
               {"levels", T::Number, "Subdivision levels on top, with the scan's detail projected onto them (0-6).", false},
               {"face_guides", T::String, "auto (default): find a face and add edge loops round the eyes and mouth; off.", false},
               {"landmarks", T::String, "Face landmarks as JSON {\"eye_outer_l\": [x, y, z], ...} (see face_guides) "
                                        "instead of finding them.", false},
               {"front", T::String, "Direction the face looks, \"x y z\". Default \"0 0 1\" (towards the front view).", false},
               {"up", T::String, "Up direction of the head, \"x y z\". Default \"0 1 0\".", false},
-              {"color", T::String, "polypaint (default), texture (Auto UV + a texture) or none.", false},
+              {"color", T::String, "vertex paint (default), texture (Auto UV + a texture) or none.", false},
               {"texture_size", T::Number, "1024, 2048 (default), 4096 or 8192.", false},
               {"crop", T::String, "Only splats inside this box count: \"minx miny minz maxx maxy maxz\".", false},
               {"min_opacity", T::Number, "Ignore splats fainter than this (0-1). Default 0.2.", false},
@@ -1805,9 +1805,9 @@ void registerSculptableCommands(CommandRegistry& reg) {
               {"keep_parts", T::Bool, "Keep every solid piece, not just the largest (default false).", false},
               {"smooth", T::Number, "Smoothing passes of the surface (0-50). Default 6.", false},
               {"symmetry", T::Bool, "Symmetric topology across the face (default true).", false},
-              {"keep_scan", T::Bool, "Keep the voxel surface as a hidden \"<name> Scan\" SubTool (default true).", false},
+              {"keep_scan", T::Bool, "Keep the voxel surface as a hidden \"<name> Scan\" Part (default true).", false},
               {"stage", T::String, "all (default), scan or finish.", false},
-              {"seed", T::Number, "QRemesh's random start (results are repeatable for a seed).", false}},
+              {"seed", T::Number, "Quad Remesh's random start (results are repeatable for a seed).", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  SculptableOptions o;
                  std::string err;
@@ -1820,7 +1820,7 @@ void registerSculptableCommands(CommandRegistry& reg) {
                      o.faceGuides = true;
                  }
                  if (stage == "finish") {
-                     if (doc.mesh.triangleCount() == 0) return {false, "The active SubTool is empty"};
+                     if (doc.mesh.triangleCount() == 0) return {false, "The active Part is empty"};
                      res.scan = doc.mesh;
                      res.guides = doc.qremeshGuides;
                      // The voxel size the scan was made with, for the colour radius.
@@ -1838,7 +1838,7 @@ void registerSculptableCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"face_guides",
-             "Find a face on the active SubTool (or take the landmarks given) and replace its QRemesh Guides with "
+             "Find a face on the active Part (or take the landmarks given) and replace its Quad Remesh Guides with "
              "animation loops: rings round the eyes and the mouth and the nasolabial loop, mirrored across the face. "
              "The message ends with the landmarks as JSON.",
              {{"landmarks", T::String, "JSON {\"eye_outer_l\": [x, y, z], \"eye_inner_l\", \"eye_inner_r\", \"eye_outer_r\", "
@@ -1848,7 +1848,7 @@ void registerSculptableCommands(CommandRegistry& reg) {
               {"target", T::Number, "The quad count the guides are meant for (loops too small for it are left out). "
                                     "Default 4000.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
-                 if (doc.mesh.triangleCount() == 0) return {false, "The active SubTool is empty"};
+                 if (doc.mesh.triangleCount() == 0) return {false, "The active Part is empty"};
                  FaceFrame f;
                  if (a.contains("front") && !parseVec3(argString(a, "front"), f.front)) return {false, "front takes three numbers"};
                  if (a.contains("up") && !parseVec3(argString(a, "up"), f.up)) return {false, "up takes three numbers"};

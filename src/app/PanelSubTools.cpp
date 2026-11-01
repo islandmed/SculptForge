@@ -350,12 +350,12 @@ void App::drawSubToolsContents() {
     };
     if (deleteIndex >= 0) {
         if (deleteIndex != doc_.activeSubtool) runCommand("subtool_select", {{"index", double(deleteIndex)}});
-        confirm("Delete SubTool?", "Delete \"" + doc_.activeSubtoolInfo().name + "\"? This can't be undone.", "Delete",
+        confirm("Delete Part?", "Delete \"" + doc_.activeSubtoolInfo().name + "\"? This can't be undone.", "Delete",
                 "subtool_delete");
     }
     const float third = (ImGui::GetContentRegionAvail().x - 2 * style.ItemSpacing.x) / 3.0f;
     if (ImGui::Button(tr("Append"), ImVec2(third, 0))) ImGui::OpenPopup("##append");
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", tr("Add a new SubTool beside the model"));
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", tr("Add a new Part beside the model"));
     if (ImGui::BeginPopup("##append")) {
         if (ImGui::MenuItem(tr("Sphere"))) runCommand("subtool_append", {{"type", std::string("sphere")}});
         if (ImGui::MenuItem(tr("Cube"))) runCommand("subtool_append", {{"type", std::string("cube")}});
@@ -379,7 +379,7 @@ void App::drawSubToolsContents() {
             }
             ImGui::Separator();
             // Your own mesh (#34): a copy of another SubTool, or a model file you choose.
-            if (ImGui::BeginMenu(tr("Active SubTool's copy..."), count > 1)) {
+            if (ImGui::BeginMenu(tr("Active Part's copy..."), count > 1)) {
                 for (int i = 0; i < count; ++i) {
                     if (i == active) continue;
                     const std::string& name = doc_.subtools[size_t(i)].name;
@@ -394,8 +394,8 @@ void App::drawSubToolsContents() {
                 ImGui::EndMenu();
             }
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayNormal))
-                ImGui::SetTooltip(count > 1 ? "Insert a copy of another SubTool into the active one"
-                                            : "Append another SubTool first");
+                ImGui::SetTooltip(count > 1 ? "Insert a copy of another Part into the active one"
+                                            : "Append another Part first");
             if (ImGui::MenuItem(tr("From file...##insert")))
                 SDL_ShowOpenFileDialog(onAppendChosen, &dialogRequests_[int(FileAction::InsertMesh)], window_,
                                        kInsertFilters, 2, nullptr, false);
@@ -411,7 +411,7 @@ void App::drawSubToolsContents() {
     ImGui::SameLine();
     ImGui::BeginDisabled(count < 2);
     if (ImGui::Button(tr("Delete..."), ImVec2(third, 0)))
-        confirm("Delete SubTool?", "Delete \"" + activeName + "\"? This can't be undone.", "Delete", "subtool_delete");
+        confirm("Delete Part?", "Delete \"" + activeName + "\"? This can't be undone.", "Delete", "subtool_delete");
     ImGui::EndDisabled();
 
     const float half2 = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) * 0.5f;
@@ -435,7 +435,7 @@ void App::drawSubToolsContents() {
     if (solo) ImGui::PopStyleColor();
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
-        ImGui::SetTooltip(solo ? "Show the other SubTools again" : "Show only the active SubTool");
+        ImGui::SetTooltip(solo ? "Show the other Parts again" : "Show only the active Part");
     ImGui::SameLine();
     ImGui::BeginDisabled(visibleCount == count);
     if (ImGui::Button(tr("Unhide all"), ImVec2(half2, 0))) runCommand("subtool_show_all");
@@ -450,12 +450,12 @@ void App::drawSubToolsContents() {
                 "Merge", "subtool_merge_down");
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayNormal))
-        ImGui::SetTooltip("%s", tr("Merge the active SubTool with the one below it"));
+        ImGui::SetTooltip("%s", tr("Merge the active Part with the one below it"));
     ImGui::SameLine();
     ImGui::BeginDisabled(visibleCount < 2);
     if (ImGui::Button(tr("Merge visible..."), ImVec2(half, 0)))
         confirm("Merge Visible?",
-                "Merge the " + std::to_string(visibleCount) + " visible SubTools into one? This can't be undone,\n"
+                "Merge the " + std::to_string(visibleCount) + " visible Parts into one? This can't be undone,\n"
                 "but Split groups separates them again.",
                 "Merge", "subtool_merge_visible");
     ImGui::EndDisabled();
@@ -473,15 +473,15 @@ void App::drawSubToolsContents() {
     if (ImGui::Button(tr("Split groups"), ImVec2(half, 0))) runCommand("subtool_split_groups");
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayNormal))
-        ImGui::SetTooltip("%s", tr("One SubTool per polygroup"));
+        ImGui::SetTooltip("%s", tr("One Part per face group"));
     ImGui::SameLine();
     ImGui::BeginDisabled(doc_.mesh.triangleCount() == 0);
     if (ImGui::Button(tr("Split parts"), ImVec2(half, 0))) runCommand("subtool_split_parts");
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayNormal))
-        ImGui::SetTooltip("%s", tr("One SubTool per disconnected piece"));
+        ImGui::SetTooltip("%s", tr("One Part per disconnected piece"));
     if (fontSmall_) ImGui::PushFont(fontSmall_);
-    ImGui::TextDisabled("%s", tr("Alt+click a SubTool to select it"));
+    ImGui::TextDisabled("%s", tr("Alt+click a Part to select it"));
     if (fontSmall_) ImGui::PopFont();
 }
 

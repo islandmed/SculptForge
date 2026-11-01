@@ -6,7 +6,7 @@
 # optional vertex_colors (B, N, 3|4) in 0-1 and normals (B, N, 3), with vertex_counts /
 # face_counts (B,) when a batch is zero-padded. Coordinates are glTF-style (Y up), the same
 # convention SculptForge uses, so no axis swap is needed. Meshes cross the process boundary as
-# binary PLY, which SculptForge reads and writes with vertex colours (polypaint).
+# binary PLY, which SculptForge reads and writes with vertex colours (vertex paint).
 import struct
 
 import numpy as np

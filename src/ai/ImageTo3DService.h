@@ -23,6 +23,7 @@
 #include <atomic>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace sf::ai {
@@ -64,6 +65,9 @@ struct HfPreset {
     std::vector<HfStep> steps;
 };
 const std::vector<HfPreset>& hfPresets();
+// A Hunyuan3D model (Hugging Face preset or fal.ai id): its licence's territory note is shown where it's chosen.
+bool hunyuanModel(std::string_view id);
+extern const char* kHunyuanLicenceNote;
 // Free text-to-3D models ("$PROMPT" in step args is the description).
 const std::vector<HfPreset>& hfTextPresets();
 

@@ -159,7 +159,7 @@ def subdivision(shots: pathlib.Path):
 
 def dyntopo(shots: pathlib.Path):
     box = (300, 125, 1020, 845)
-    names = [("dyntopo-wire", "Dynamic on: new triangles where the brush went"), ("dyntopo-shaded", "Snake Hook horns")]
+    names = [("dyntopo-wire", "Dynamic on: new triangles where the brush went"), ("dyntopo-shaded", "Tendril horns")]
     panels = [Image.open(shots / f"{n}.png").convert("RGB").crop(box) for n, _ in names]
     w, h = panels[0].size
     img = Image.new("RGB", (w * 2 + 12, h), (20, 20, 22))
@@ -172,7 +172,7 @@ def dyntopo(shots: pathlib.Path):
 
 def qremesh_guides(shots: pathlib.Path):
     box = (440, 290, 880, 720)
-    names = [("guides-without", "QRemesh"), ("guides-drawn", "QRemesh Guides drawn"), ("guides-with", "QRemesh with guides")]
+    names = [("guides-without", "Quad Remesh"), ("guides-drawn", "Quad Remesh Guides drawn"), ("guides-with", "Quad Remesh with guides")]
     panels = [Image.open(shots / f"{n}.png").convert("RGB").crop(box) for n, _ in names]
     w, h = panels[0].size
     img = Image.new("RGB", (w * 3 + 24, h), (20, 20, 22))

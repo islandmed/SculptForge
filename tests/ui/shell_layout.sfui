@@ -6,7 +6,7 @@ expect "SubTools/Append"            # right tray: the Tool palette with its SubT
 expect_value right_tray == 1
 expect_value left_tray == -1
 expect "Clay##brush.clay"           # bottom shelf: quick brushes
-expect "PolyF##view.polyf"          # right shelf
+expect "Wire##view.polyf"          # right shelf
 expect "##tile.brush"               # left shelf
 expect "##drawsize"                 # top shelf
 expect_not "Brush Lab/Create"       # floating windows stay closed: nothing covers the model
@@ -16,9 +16,9 @@ shot standard
 click "Clay##brush.clay"
 stroke 0.35 0.4 0.65 0.6
 expect_value can_undo == 1
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 expect_value wireframe == 1
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 expect_value wireframe == 0
 click "Groups##view.polygroups"
 expect_value show_polygroups == 1
@@ -45,22 +45,22 @@ expect "SubTools/Append"
 
 # A palette opens as a drop-down from the bar; its icon puts it in the tray, and back.
 click "Stroke##palette.stroke"
-expect "Stroke/DragRect"
+expect "Stroke/Drag Stamp"
 shot dropdown
 # Clicking another name switches drop-downs; Escape closes them.
 click "Draw##palette.draw"
-expect "Draw/Zadd"
-expect_not "Stroke/DragRect"
+expect "Draw/Add"
+expect_not "Stroke/Drag Stamp"
 key escape
-expect_not "Draw/Zadd"
+expect_not "Draw/Add"
 click "Stroke##palette.stroke"
 click "Stroke/##totray"
-expect "Stroke/DragRect"
+expect "Stroke/Drag Stamp"
 expect "SubTools/Append"
 expect_value right_tray == 2
 shot palette-in-tray
 click "Stroke/##totray"
-expect_not "Stroke/DragRect"
+expect_not "Stroke/Drag Stamp"
 expect_value right_tray == 1
 # Shift+click sends it to the left tray, which opens.
 hold shift
@@ -78,7 +78,7 @@ expect "Subdivide"
 expect_not "SubTools/Append"
 click "Subdivide"
 expect_value triangles == 20480
-click "Tool/SubTool"
+click "Tool/Parts"
 expect "SubTools/Append"
 
 # Bottom shelf: remove a brush with its menu, add it back with [+].
@@ -110,12 +110,12 @@ shot preset-sculpt
 click "3##ui.preset.3"
 expect_value left_tray == 3
 expect_value right_tray == 2
-expect "Stroke/DragRect"
+expect "Stroke/Drag Stamp"
 expect "Material/Studio"
 shot preset-wide
 click "1##ui.preset.1"
 expect "SubTools/Append"
-expect_not "Stroke/DragRect"
+expect_not "Stroke/Drag Stamp"
 
 # Window controls: minimise and close sit at the far right of the title strip.
 expect "Minimize##window"

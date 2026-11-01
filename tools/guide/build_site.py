@@ -24,6 +24,9 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SRC = ROOT / "docs" / "guide"
 SITE = "https://sculptforge.app/"
+# Chapters that were renamed: the old page stays as a small redirect so links from elsewhere keep working.
+REDIRECTS = {"subtools.html": "parts.html", "zspheres.html": "forge-spheres.html", "polypaint.html": "vertex-paint.html",
+             "polygroups.html": "face-groups.html"}
 CALLOUTS = {"tip": "Tip", "note": "Note", "zbrush": "ZBrush", "not-yet": "Not yet", "warning": "Warning",
             "important": "Important"}
 
@@ -547,11 +550,29 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
         <a href="https://github.com/islandmed/SculptForge/issues">Report a problem</a>
         <a href="https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md">AI services &amp; privacy</a>
       </div>
-      <p class="fine trademarks">SculptForge is an independent project, not affiliated with or endorsed by Maxon or
-        any other company named in this guide. ZBrush is a trademark of Maxon. All other trademarks belong to their
-        owners.</p>
+      <p class="fine trademarks">ZBrush, GoZ, MatCap and other ZBrush feature names are trademarks of Maxon Computer
+        GmbH. SculptForge is not affiliated with or endorsed by Maxon. All other trademarks belong to their owners.</p>
     </div>
   </footer>
+</body>
+</html>
+"""
+
+
+def redirect_html(target: str) -> str:
+    """A page that sends visitors (and search engines) on to a renamed chapter."""
+    url = SITE + "guide/" + target
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Moved - SculptForge User Guide</title>
+  <meta name="robots" content="noindex">
+  <link rel="canonical" href="{url}">
+  <meta http-equiv="refresh" content="0; url={target}">
+</head>
+<body>
+  <p>This chapter has moved to <a href="{target}">{url}</a>.</p>
 </body>
 </html>
 """
@@ -594,6 +615,11 @@ def check(index: Page, chapters) -> list:
         for src in p.images:
             if not (SRC / src).is_file():
                 problems.append(f"{name}: image {src} doesn't exist")
+    for old_name, new_name in REDIRECTS.items():
+        if new_name[:-5] + ".md" not in pages:
+            problems.append(f"REDIRECTS: {old_name} points to {new_name}, which isn't a chapter")
+        if old_name[:-5] + ".md" in pages:
+            problems.append(f"REDIRECTS: {old_name} is a chapter again; remove the redirect")
     used = {src for p in pages.values() for src in p.images}
     for img in sorted((SRC / "images").glob("*")):
         if f"images/{img.name}" not in used:
@@ -620,6 +646,8 @@ def main() -> int:
     pages = [index] + [c for _, c in chapters]
     for k, page in enumerate(pages):
         (out / (page.name[:-3] + ".html")).write_text(page_html(page, index, chapters, k), encoding="utf-8")
+    for old_name, new_name in REDIRECTS.items():
+        (out / old_name).write_text(redirect_html(new_name), encoding="utf-8")
     images = out / "images"
     if images.exists():
         shutil.rmtree(images)
@@ -637,7 +665,8 @@ def main() -> int:
     # every guide page. Only for the real site, not --out folders.
     if out.resolve() == (ROOT / "website" / "guide").resolve():
         urls = [SITE, SITE + "brushes.html", SITE + "mudbox-alternative.html",
-                SITE + "zbrush-alternative.html", SITE + "zbrush-linux.html", SITE + "press.html"] + [f"{SITE}guide/{p.name[:-3]}.html" for p in pages]
+                SITE + "zbrush-alternative.html", SITE + "zbrush-linux.html", SITE + "press.html",
+                SITE + "studios.html"] + [f"{SITE}guide/{p.name[:-3]}.html" for p in pages]
         (ROOT / "website" / "sitemap.xml").write_text(
             '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
             + "".join(f"  <url><loc>{html.escape(u)}</loc></url>\n" for u in urls) + "</urlset>\n", encoding="utf-8")

@@ -27,7 +27,7 @@ struct ChannelToggle {
 };
 constexpr ChannelToggle kToggles[] = {
     {kSetMask, "Mask##setch", "mask", "The mask (masked and partly masked vertices)."},
-    {kSetPolygroups, "Groups##setch", "polygroups", "The polygroups."},
+    {kSetPolygroups, "Groups##setch", "polygroups", "The face groups."},
     {kSetVisibility, "Visibility##setch", "visibility", "Which faces are shown and which are hidden."},
     {kSetPaint, "Vertex Paint##setch", "paint", "The vertex paint colours."},
     {kSetUvs, "UVs##setch", "uvs", "The UV layout (only when the Part has UVs)."},

@@ -33,7 +33,7 @@ void usage() {
         "  --view YAW,PITCH         Camera angles in degrees (default -30,-15)\n"
         "  --zoom F                 Move the camera F times closer than the framed view (default 1)\n"
         "  --wireframe              Render with wireframe overlay\n"
-        "  --polygroups             Render with polygroup colours\n"
+        "  --polygroups             Render with face group colours\n"
         "  --hide-mesh              Render only the Gaussian splats\n"
         "  --demo NAME              Play a scripted demo (sculpt, image-to-3d, brush-lab, game-ready, splats)\n"
         "  --record out.mp4         Record the demo offscreen to a video (needs ffmpeg) and exit\n"

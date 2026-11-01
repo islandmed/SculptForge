@@ -172,8 +172,8 @@ A `.sfbrush` file is a small JSON file holding one recipe.
   recipe sliders.
 - **Install**: click **Install .sfbrush...** under the recipe sliders, or drop the file onto the SculptForge
   window. The brush goes into your library.
-- **Library folder**: `.sfbrush` files in the `Brushes` folder of your LightBox library (Documents/SculptForge
-  by default) appear in the **Library** section of the brush picker and in LightBox's Brush tab. Picking one
+- **Library folder**: `.sfbrush` files in the `Brushes` folder of your Library library (Documents/SculptForge
+  by default) appear in the **Library** section of the brush picker and in Library's Brush tab. Picking one
   loads it for the session.
 
 The file format and every key are documented in

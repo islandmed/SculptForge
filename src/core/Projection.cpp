@@ -20,7 +20,7 @@ bool computeProjection(const Mesh& target, const std::vector<const Mesh*>& sourc
     stats = {};
     const size_t nv = target.vertexCount();
     if (nv == 0) {
-        error = "ProjectAll: the active SubTool is empty";
+        error = "Project All: the active Part is empty";
         return false;
     }
     // One triangle soup of every visible source triangle, with its colours.
@@ -39,13 +39,13 @@ bool computeProjection(const Mesh& target, const std::vector<const Mesh*>& sourc
             if (!s->triangleHidden(t)) T.push_back(s->triangles[t] + glm::uvec3(first));
     }
     if (T.empty()) {
-        error = "ProjectAll needs another visible SubTool to project from";
+        error = "Project All needs another visible Part to project from";
         return false;
     }
     TriangleBVH bvh;
     bvh.build(std::move(P), std::move(T));
     if (progress && !progress(0.3f)) {
-        error = "ProjectAll cancelled";
+        error = "Project All cancelled";
         return false;
     }
 
@@ -104,7 +104,7 @@ bool computeProjection(const Mesh& target, const std::vector<const Mesh*>& sourc
         if (progress && !progress(0.3f + 0.6f * float(d) / float(nv))) cancel = true;
     });
     if (cancel) {
-        error = "ProjectAll cancelled";
+        error = "Project All cancelled";
         return false;
     }
     // PA Blur: smooth the offsets of the projected vertices.
@@ -145,23 +145,23 @@ bool projectAll(Document& doc, const ProjectOptions& opt, std::string& message, 
         if (doc.subtoolMesh(i).triangleCount() > 0) sources.push_back(&doc.subtoolMesh(i));
     }
     if (sources.empty()) {
-        message = source >= 0 ? "ProjectAll: that SubTool can't be projected from"
-                              : "ProjectAll needs another visible SubTool to project from (the source)";
+        message = source >= 0 ? "Project All: that Part can't be projected from"
+                              : "Project All needs another visible Part to project from (the source)";
         return false;
     }
     if (!opt.geometry && !opt.polypaint) {
-        message = "ProjectAll: nothing to project (turn on Geometry or Polypaint)";
+        message = "Project All: nothing to project (turn on Geometry or Vertex Paint)";
         return false;
     }
     Mesh& m = doc.mesh;
     const int layer = m.layers.empty() ? -1 : doc.activeLayer;
     const float weight = m.layerTargetWeight(layer);
     if (opt.geometry && !m.layers.empty() && std::abs(weight) < 1e-4f) {
-        message = "ProjectAll: the active sculpt layer's weight is 0";
+        message = "Project All: the active sculpt layer's weight is 0";
         return false;
     }
     if (opt.polypaint && !m.paintLayers.empty() && !paintLayerEditable(m, m.activePaintLayer)) {
-        message = "ProjectAll: the active paint layer is locked or hidden";
+        message = "Project All: the active paint layer is locked or hidden";
         return false;
     }
     std::vector<glm::vec3> positions, colors;
@@ -176,7 +176,7 @@ bool projectAll(Document& doc, const ProjectOptions& opt, std::string& message, 
     } else if (st.colors) {
         r = UndoRecord::captureColors(m, "");
     }
-    r.label = "ProjectAll";
+    r.label = "Project All";
     const size_t nv = m.vertexCount();
     if (opt.geometry) {
         std::vector<glm::vec3>& tgt = m.layerTarget(layer);
@@ -202,8 +202,8 @@ bool projectAll(Document& doc, const ProjectOptions& opt, std::string& message, 
     doc.modified = true;
 
     char buf[256];
-    std::snprintf(buf, sizeof buf, "ProjectAll: %zu vertices projected%s from %zu SubTool%s in %.2f s%s", st.projected,
-                  st.colors ? " (shape and polypaint)" : "", sources.size(), sources.size() == 1 ? "" : "s", st.seconds,
+    std::snprintf(buf, sizeof buf, "Project All: %zu vertices projected%s from %zu Part%s in %.2f s%s", st.projected,
+                  st.colors ? " (shape and vertex paint)" : "", sources.size(), sources.size() == 1 ? "" : "s", st.seconds,
                   st.missed ? (", " + std::to_string(st.missed) + " found nothing within Dist").c_str() : "");
     message = buf;
     if (statsOut) *statsOut = st;

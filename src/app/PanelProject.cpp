@@ -92,6 +92,10 @@ void App::initProject() {
     std::string err;
     const bool hadPrefs = f && Json::parse(std::string(std::istreambuf_iterator<char>(f), {}), prefs, err);
     if (hadPrefs) {
+        // An install from before SculptForge-style keys were the default, that never stored its key style: it had
+        // the ZBrush-style keys, and keeps them (initActions applies the style).
+        if (prefs["input_style"].isNumber()) startInputStyle_ = std::clamp(int(prefs["input_style"].asNumber(1)), 0, 3);
+        if (!uiPrefs_.inputStyleSaved && !uiConfigDeterministic_) uiPrefs_.inputStyle = startInputStyle_ >= 0 ? startInputStyle_ : 0;
         for (const auto& p : prefs["recent_files"].items())
             if (p.isString()) recentFiles_.push_back(p.asString());
         autosaveMinutes_ = std::clamp(int(prefs["autosave_minutes"].asNumber(autosaveMinutes_)), 0, 120);
@@ -109,6 +113,7 @@ void App::initProject() {
         if (prefs["support_card_version"].isString()) supportCardPrefs_.shownVersion = prefs["support_card_version"].asString();
     } else {
         showWelcome_ = options_.uiTest.empty() && options_.demo.empty(); // the first start: no prefs yet
+        startInputStyle_ = uiPrefs_.inputStyle; // a new install: SculptForge's keys until the welcome's choice
     }
     recentFiles_ = pruneRecentFiles(std::move(recentFiles_), fileExists);
     saveProjectPrefs(); // records this version, so What's New shows once
@@ -147,6 +152,7 @@ void App::saveProjectPrefs() {
     for (const auto& p : recentFiles_) recent.push(p);
     prefs.set("recent_files", std::move(recent));
     prefs.set("autosave_minutes", autosaveMinutes_);
+    if (startInputStyle_ >= 0) prefs.set("input_style", startInputStyle_);
     prefs.set("last_seen_version", std::string(SCULPTFORGE_VERSION));
     prefs.set("check_updates", checkUpdates_);
     prefs.set("update_checked_at", double(updateCheckedAt_));
@@ -353,7 +359,7 @@ void App::applyProjectSettings() {
         if (file != doc_.projectFiles.end() && decodeMatcapImage(file->second.data(), file->second.size(), m, err)) {
             int index = findMatcapByHash(m.hash);
             if (index < 0) {
-                m.name = name.empty() ? std::string("MatCap") : name;
+                m.name = name.empty() ? std::string("Lit Sphere") : name;
                 for (int n = 2; findMatcap(m.name) >= 0; ++n) m.name = name + " " + std::to_string(n);
                 index = addCustomMatcap(std::move(m));
             }

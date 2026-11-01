@@ -15,13 +15,13 @@ shot palette-dropdown
 key escape
 click "Stroke##palette.stroke"
 click "Stroke/##totray"
-click "Tool/SubTool"
+click "Tool/Parts"
 shot palette-tray
 click "Stroke/##totray"
 
-# LightBox and pickers.
+# Library and pickers.
 key comma
-click "LightBox/Tool"
+click "Library/Tool"
 wait_idle 20
 wait 1
 shot lightbox
@@ -123,7 +123,7 @@ wait 0.2
 shot masking
 run mask_clear
 
-# Polypaint: cavity paint, with the Color palette.
+# Vertex Paint: cavity paint, with the Color palette.
 run paint_fill color=bone
 run paint_from_cavity color=4a2c18 strength=0.9
 click "Color##palette.color"
@@ -160,19 +160,19 @@ wait 0.5
 shot user-guide
 key shift+f1
 
-# SubTools: append a sphere and a cube.
+# Parts: append a sphere and a cube.
 run subtool_append type=sphere name=Eye
 run subtool_append type=cube name=Crate size=0.3
 key f
-click "Tool/SubTool"
+click "Tool/Parts"
 wait 0.3
 shot subtools
 
-# Polygroups on a cube.
+# Face Groups on a cube.
 run new_cube
 run polygroup_auto_by_normals
 click "Groups##view.polygroups"
-click "Tool/Polygroups"
+click "Tool/Face Groups"
 key f
 drag_item "Rotate##nav.rotate" -160 60
 wait 0.3
@@ -182,14 +182,14 @@ click "Groups##view.polygroups"
 # Remesh: an uneven mesh, then voxel remeshed.
 run new_sphere subdivisions=4
 run decimate ratio=0.08
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 key f
 wait 0.2
 shot remesh-before
 run remesh resolution=26
 wait 0.2
 shot remesh-after
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 
 # Gaussian splats made from the lion.
 run open path=assets/demo/lion-head.glb
@@ -240,23 +240,23 @@ stroke 0.2 0.45 0.8 0.5 1.0
 stroke 0.25 0.58 0.75 0.62 1.0
 stroke 0.3 0.7 0.7 0.74 1.0
 run subdiv_level level=1
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 wait 0.2
 shot sdiv-1
 run subdiv_level level=3
 wait 0.2
 shot sdiv-3
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 run subdiv_level level=6
 click "Tool/Geometry"
 wait 0.2
 shot sdiv-6
 
-# Dynamic topology: Snake Hook pulls horns out of a sphere (mirrored), with new triangles all along them.
+# Dynamic topology: Tendril pulls horns out of a sphere (mirrored), with new triangles all along them.
 run new_sphere subdivisions=3
 click "Dynamic##draw.dynamic"
 run dyntopo detail=60
-click "SnakeHook##brush.snakehook"
+click "Tendril##brush.snakehook"
 drag_path 0.76 0.32 0.85 0.25 0.95 0.17 1.05 0.08 1.12 0.0 S=1.5
 drag_path 0.5 0.2 0.5 0.05 0.5 -0.1 S=1.0
 click "Standard##brush.standard"
@@ -264,16 +264,16 @@ stroke 0.3 0.65 0.7 0.65 1.0
 key f
 orbit 60 -25
 wait 0.2
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 wait 0.2
 shot dyntopo-wire
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 wait 0.2
 shot dyntopo-shaded
 click "Dynamic##draw.dynamic"
 
-# QRemesh Guides (retopology.md): a face sculpted on a sphere, QRemesh without guides, loops drawn round the eyes and
-# the mouth with the QRemesh Guides brush (X symmetry mirrors the eye), QRemesh again.
+# Quad Remesh Guides (retopology.md): a face sculpted on a sphere, Quad Remesh without guides, loops drawn round the eyes and
+# the mouth with the Quad Remesh Guides brush (X symmetry mirrors the eye), Quad Remesh again.
 run new_sphere subdivisions=6
 camera 0 0
 key f
@@ -287,23 +287,23 @@ run stroke points="-0.3,-0.42,2 0,-0.46,2 0.3,-0.42,2" brush=DamStandard radius=
 run stroke points="-0.25,-0.36,2 0,-0.38,2 0.25,-0.36,2" brush=Standard radius=0.08 strength=0.6
 run stroke points="-0.25,-0.5,2 0,-0.53,2 0.25,-0.5,2" brush=Standard radius=0.08 strength=0.6
 run qremesh target=1500 symmetry=x keep_original=true
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 wait 0.2
 shot guides-without
 key ctrl+z
 run subtool_delete index=1
-click "PolyF##view.polyf"
-click "QRemesh/QRemesh Guides"
+click "Wire##view.polyf"
+click "Quad Remesh/Quad Remesh Guides"
 drag_path 0.780 0.375 0.779 0.388 0.776 0.401 0.772 0.413 0.766 0.425 0.758 0.436 0.749 0.446 0.739 0.454 0.728 0.462 0.715 0.467 0.702 0.472 0.689 0.474 0.675 0.475 0.661 0.474 0.648 0.472 0.635 0.467 0.623 0.462 0.611 0.454 0.601 0.446 0.592 0.436 0.584 0.425 0.578 0.413 0.574 0.401 0.571 0.388 0.570 0.375 0.571 0.362 0.574 0.349 0.578 0.337 0.584 0.325 0.592 0.314 0.601 0.304 0.611 0.296 0.623 0.288 0.635 0.283 0.648 0.278 0.661 0.276 0.675 0.275 0.689 0.276 0.702 0.278 0.715 0.283 0.728 0.288 0.739 0.296 0.749 0.304 0.758 0.314 0.766 0.325 0.772 0.337 0.776 0.349 0.779 0.362 0.780 0.375
 drag_path 0.700 0.720 0.698 0.731 0.693 0.742 0.685 0.753 0.673 0.762 0.659 0.772 0.641 0.780 0.622 0.787 0.600 0.794 0.577 0.799 0.552 0.802 0.526 0.804 0.500 0.805 0.474 0.804 0.448 0.802 0.423 0.799 0.400 0.794 0.378 0.787 0.359 0.780 0.341 0.772 0.327 0.762 0.315 0.753 0.307 0.742 0.302 0.731 0.300 0.720 0.302 0.709 0.307 0.698 0.315 0.687 0.327 0.677 0.341 0.668 0.359 0.660 0.378 0.653 0.400 0.646 0.423 0.641 0.448 0.638 0.474 0.636 0.500 0.635 0.526 0.636 0.552 0.638 0.577 0.641 0.600 0.646 0.622 0.653 0.641 0.660 0.659 0.668 0.673 0.677 0.685 0.687 0.693 0.698 0.698 0.709 0.700 0.720
 wait 0.2
 shot guides-drawn
 run qremesh target=1500 symmetry=x
 click "Clay##brush.clay"
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 wait 0.2
 shot guides-with
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 
 # Make sculptable (scan-to-sculptable.md): the built-in test head capture, the review with its face landmarks and
 # loops, and the finished quads with the capture's colours.
@@ -326,14 +326,14 @@ shot sculptable-review
 click "Make sculptable/Finish"
 wait_idle 120
 camera 0 0
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 wait 0.2
 shot sculptable-result
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 click "Make sculptable/Review##sculptable"
 run splat_clear
 
-# Smooth and Flat shading (polypaint.md): the template head, smooth, then flat with its eyes kept smooth.
+# Smooth and Flat shading (vertex-paint.md): the template head, smooth, then flat with its eyes kept smooth.
 run new_head
 camera 25 5
 zoom 1.6
@@ -345,12 +345,12 @@ run subtool_shading name=Eyes mode=smooth
 wait 0.2
 shot shading-palette
 key escape
-hover "Tool/SubTool"
+hover "Tool/Parts"
 wait 0.2
 shot shading-flat
 run set_shading mode=smooth
 
-# Your own MatCaps (polypaint.md): one loaded from an image, in the Material palette.
+# Your own Lit Spheres (vertex-paint.md): one loaded from an image, in the Material palette.
 run new_sphere subdivisions=5
 run load_matcap path=tests/ui/data/Gold.png
 camera 20 10
@@ -361,7 +361,7 @@ shot custom-matcaps
 key escape
 run set_material name="Soft Clay"
 
-# Extract (subtools.md): a cap made from the masked top of a sphere, shown with its polygroups (outer, inner, rim).
+# Extract (parts.md): a cap made from the masked top of a sphere, shown with its face groups (outer, inner, rim).
 run new_sphere subdivisions=6
 run mask_rect y0=0.3
 run extract thickness=0.04 smooth=8 accept=true

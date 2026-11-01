@@ -63,7 +63,7 @@ std::string mayaSafeName(const std::string& name) {
         if (s.size() >= kMayaMaxNameBytes) break;
         s += isAsciiAlnum(c) || c == '_' ? char(c) : '_';
     }
-    if (s.empty()) return "SubTool";
+    if (s.empty()) return "Part";
     if (s[0] >= '0' && s[0] <= '9') {
         s.insert(s.begin(), '_');
         if (s.size() > kMayaMaxNameBytes) s.pop_back();
@@ -278,7 +278,7 @@ bool mayaSend(const std::vector<MeshObjectRef>& objects, const std::string& fold
         return false;
     }
     if (objects.size() > kMayaMaxObjects) {
-        message = "Too many SubTools to send to Maya at once (at most " + std::to_string(kMayaMaxObjects) + ")";
+        message = "Too many Parts to send to Maya at once (at most " + std::to_string(kMayaMaxObjects) + ")";
         return false;
     }
     std::error_code ec;

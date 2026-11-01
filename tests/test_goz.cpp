@@ -248,10 +248,10 @@ TEST(goz_commands_and_open) {
           r.message.find("OBJ") != std::string::npos);
     // A .ztl without a conversion beside it points to the ZBrush plug-in.
     r = reg.execute(doc, "open", {{"path", "model.ZTL"}});
-    CHECK(!r.ok && r.message.find("proprietary") != std::string::npos && r.message.find("ZTool Export") != std::string::npos);
+    CHECK(!r.ok && r.message.find("proprietary") != std::string::npos && r.message.find("ZTL Export") != std::string::npos);
 }
 
-// The SculptForge ZTool Export plug-in writes <name>.sf<NNN>_<SubTool>.GoZ next to <name>.ztl; opening the .ztl
+// The SculptForge ZTL Export plug-in writes <name>.sf<NNN>_<SubTool>.GoZ next to <name>.ztl; opening the .ztl
 // opens every SubTool in order. A folder of numbered .GoZ files opens the same way.
 TEST(goz_converted_ztool_opens_as_subtools) {
     namespace fs = std::filesystem;
@@ -280,7 +280,7 @@ TEST(goz_converted_ztool_opens_as_subtools) {
     for (const std::string path : {(base / "Dragon.ztl").string(), (base / "Dragon.sculptforge").string()}) {
         Document doc;
         CommandResult r = reg.execute(doc, "open", {{"path", path}});
-        CHECK(r.ok && r.message.find("2 SubTools") != std::string::npos);
+        CHECK(r.ok && r.message.find("2 Parts") != std::string::npos);
         CHECK(doc.subtoolCount() == 2);
         if (doc.subtoolCount() != 2) continue;
         CHECK(doc.subtools[0].name == "Body" && doc.subtools[1].name == "Horn");
@@ -292,7 +292,7 @@ TEST(goz_converted_ztool_opens_as_subtools) {
     // Without a conversion, a .ztl explains the plug-in; an empty folder is an error, not an empty scene.
     Document doc;
     CommandResult r = reg.execute(doc, "open", {{"path", (base / "Missing.ztl").string()}});
-    CHECK(!r.ok && r.message.find("ZTool Export") != std::string::npos);
+    CHECK(!r.ok && r.message.find("ZTL Export") != std::string::npos);
     fs::create_directories(base / "Empty.sculptforge");
     CHECK(!reg.execute(doc, "open", {{"path", (base / "Empty.sculptforge").string()}}).ok);
     fs::remove_all(base);

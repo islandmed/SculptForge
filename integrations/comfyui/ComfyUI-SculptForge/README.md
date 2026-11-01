@@ -4,7 +4,7 @@
 turn the meshes your graphs generate (Hunyuan3D, TRELLIS, or a quick sketch inflate) into **sculpt-ready**,
 **game-ready** and **VFX-ready** assets without leaving ComfyUI.
 
-- **Voxel Remesh** (like DynaMesh) rebuilds noisy, broken or self-intersecting AI meshes as one clean, watertight
+- **Voxel Remesh** (similar to ZBrush's DynaMesh) rebuilds noisy, broken or self-intersecting AI meshes as one clean, watertight
   sculpting surface.
 - **Decimate**, **Subdivide** and **LOD Chain** for game budgets.
 - **Export** to GLB, FBX (Unreal, Unity, Maya), USDA/USDZ (VFX pipelines, Apple AR), OBJ, STL (3D printing) or PLY.
@@ -66,21 +66,21 @@ requests on the main repository.
 
 | Node | Inputs | Outputs | What it does |
 |---|---|---|---|
-| **SculptForge Load Mesh** | `path` | `mesh` | Loads OBJ, FBX, GLB/glTF, PLY, STL, USD/USDA/USDZ, ZBrush GoZ or a SculptForge `.sfproj`. Relative paths are looked up in ComfyUI's `input` folder (e.g. `3d/rock.glb`). |
+| **SculptForge Load Mesh** | `path` | `mesh` | Loads OBJ, FBX, GLB/glTF, PLY, STL, USD/USDA/USDZ, ZBrush .GoZ files or a SculptForge `.sfproj`. Relative paths are looked up in ComfyUI's `input` folder (e.g. `3d/rock.glb`). |
 | **SculptForge Inflate Image** | `image`, optional `mask`, `thickness`, `resolution`, `subdivisions` | `mesh` | Inflates a sketch or silhouette into a rounded, closed base mesh. Connect *Load Image*'s `MASK` so the transparent background is left out; a plain backdrop works too. Uses the first image of a batch. |
 | **SculptForge Image Relief** | `image`, `depth`, `resolution`, `invert` | `mesh` | Turns an image into a relief: light areas rise (logos, coins, emblems, height maps). |
-| **SculptForge Voxel Remesh** | `mesh`, `resolution` (32-512) | `mesh` | Rebuilds the mesh as an even, watertight surface (like DynaMesh); fixes broken scans and generated models. |
+| **SculptForge Voxel Remesh** | `mesh`, `resolution` (32-512) | `mesh` | Rebuilds the mesh as an even, watertight surface (similar to ZBrush's DynaMesh); fixes broken scans and generated models. |
 | **SculptForge Decimate** | `mesh`, `ratio`, `triangles` | `mesh` | Reduces the triangle count, keeping the shape. `triangles` > 0 sets an exact target instead of the ratio. |
 | **SculptForge Subdivide** | `mesh`, `levels` (1-4) | `mesh` | Loop subdivision; each level multiplies the triangles by 4. |
 | **SculptForge LOD Chain** | `mesh`, `levels`, `ratio`, `filename_prefix` | `file_paths` | Saves `<prefix>_00001_LOD0.glb`, `_LOD1.glb`... to the output folder. |
 | **SculptForge Export** | `mesh`, `format`, `filename_prefix` | `file_path` | Saves GLB, FBX, USDA, USDZ, OBJ, STL or PLY to the output folder, numbered like ComfyUI's save nodes. |
-| **SculptForge Mesh Info** | `mesh` | `info` | Vertex and triangle counts, bounds and SubTools, shown on the node. |
+| **SculptForge Mesh Info** | `mesh` | `info` | Vertex and triangle counts, bounds and Parts, shown on the node. |
 | **SculptForge to MESH** | `mesh` | `MESH` | Converts to ComfyUI's core `MESH` (with normals and vertex colours) for *Save 3D Model*, *Preview 3D* and the other core 3D nodes. |
 | **Open in SculptForge** | `enabled`, optional `mesh` or `file_path` | | Opens the mesh, or an exported file, in the SculptForge desktop app. Only useful when ComfyUI runs on your own computer. |
 
 Every `mesh` input accepts both SculptForge meshes (`SF_MESH`) and ComfyUI's core `MESH`, so you can wire
 *VAE Decode Hunyuan3D → Voxel to Mesh* straight into *SculptForge Voxel Remesh*. Between SculptForge nodes the mesh
-stays a SculptForge project in ComfyUI's temp folder, so polygroups, polypaint and sculpt layers survive every step.
+stays a SculptForge project in ComfyUI's temp folder, so face groups, vertex paint and sculpt layers survive every step.
 
 Exported files are listed in the node's UI output under `3d` (`filename`, `subfolder`, `type: "output"`), the same
 way ComfyUI's *Save 3D Model* reports them, so API clients (including SculptForge's own ComfyUI generator) can

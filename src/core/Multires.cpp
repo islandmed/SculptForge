@@ -1526,11 +1526,11 @@ bool subdivCommit(Mesh& w) {
 
 bool subdivSetLevel(Mesh& mesh, int level, std::string& error, BVH* bvh) {
     if (!mesh.multires) {
-        error = "This SubTool has no subdivision levels (Divide adds them)";
+        error = "This Part has no subdivision levels (Divide adds them)";
         return false;
     }
     if (mesh.micro && level != mesh.multires->current) {
-        error = "This SubTool has a micro level: Bake it down or delete it (Tool > Geometry > Micro) before changing subdivision levels";
+        error = "This Part has a micro level: Bake it down or delete it (Tool > Geometry > Micro) before changing subdivision levels";
         return false;
     }
     if (!subdivCommit(mesh)) {
@@ -1539,7 +1539,7 @@ bool subdivSetLevel(Mesh& mesh, int level, std::string& error, BVH* bvh) {
     }
     const int n = int(mesh.multires->levels.size());
     if (level < 0 || level >= n) {
-        error = "No subdivision level " + std::to_string(level + 1) + " (this SubTool has " + std::to_string(n) + ")";
+        error = "No subdivision level " + std::to_string(level + 1) + " (this Part has " + std::to_string(n) + ")";
         return false;
     }
     if (level == mesh.multires->current) return true;
@@ -1567,7 +1567,7 @@ size_t subdivMaxTriangles() {
 
 bool subdivDivide(Mesh& mesh, bool smooth, std::string& error, BVH* bvh, size_t maxTriangles) {
     if (mesh.micro) {
-        error = "This SubTool has a micro level: Bake it down or delete it (Tool > Geometry > Micro) before changing subdivision levels";
+        error = "This Part has a micro level: Bake it down or delete it (Tool > Geometry > Micro) before changing subdivision levels";
         return false;
     }
     if (maxTriangles == 0) maxTriangles = subdivMaxTriangles();
@@ -1617,11 +1617,11 @@ bool subdivDivide(Mesh& mesh, bool smooth, std::string& error, BVH* bvh, size_t 
 
 bool subdivDeleteLower(Mesh& mesh, std::string& error) {
     if (mesh.micro) {
-        error = "This SubTool has a micro level: Bake it down or delete it (Tool > Geometry > Micro) before changing subdivision levels";
+        error = "This Part has a micro level: Bake it down or delete it (Tool > Geometry > Micro) before changing subdivision levels";
         return false;
     }
     if (!mesh.multires || !subdivCommit(mesh)) {
-        error = "This SubTool has no subdivision levels";
+        error = "This Part has no subdivision levels";
         return false;
     }
     if (mesh.multires->current == 0) {
@@ -1645,7 +1645,7 @@ bool subdivDeleteLower(Mesh& mesh, std::string& error) {
 
 bool subdivDeleteHigher(Mesh& mesh, std::string& error) {
     if (!mesh.multires || !subdivCommit(mesh)) {
-        error = "This SubTool has no subdivision levels";
+        error = "This Part has no subdivision levels";
         return false;
     }
     if (mesh.multires->current == int(mesh.multires->levels.size()) - 1) {
@@ -2098,7 +2098,7 @@ bool reconstructLoop(const Mesh& m, Reconstruction& out, std::string& error) {
 
 bool subdivReconstruct(Mesh& mesh, std::string& error, BVH* bvh) {
     if (mesh.micro) {
-        error = "This SubTool has a micro level: Bake it down or delete it (Tool > Geometry > Micro) before changing subdivision levels";
+        error = "This Part has a micro level: Bake it down or delete it (Tool > Geometry > Micro) before changing subdivision levels";
         return false;
     }
     if (mesh.multires) {
@@ -2288,7 +2288,7 @@ bool divideUndoable(Document& doc, bool smooth, std::string& message) {
 
 bool setSubdivLevelUndoable(Document& doc, int level, std::string& message) {
     if (!doc.mesh.multires) {
-        message = "This SubTool has no subdivision levels (Divide adds them)";
+        message = "This Part has no subdivision levels (Divide adds them)";
         return false;
     }
     if (level == subdivCurrentLevel(doc.mesh)) {

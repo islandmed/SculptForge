@@ -166,7 +166,7 @@ void App::registerTimelineUiActions() {
         },
         [ui] { return ui().visible; });
     add("timeline.timelapse", "Export timelapse...", ICON_LC_FILM, "Edit",
-        "Render the history of the active SubTool as a turntable timelapse video (1080p or 4K MP4, no captions).",
+        "Render the history of the active Part as a turntable timelapse video (1080p or 4K MP4, no captions).",
         [ui] { ui().timelapseDialog = true; });
     add("help.benchmark", "Benchmark (proof mode)", ICON_LC_GAUGE, "Help",
         "Measure how responsive sculpting is on this computer: a scripted stroke on 5, 20 and 33 million triangle "
@@ -346,7 +346,7 @@ void App::drawTimelineUi() {
         s.timelapseDialog = false;
     }
     if (ImGui::BeginPopupModal("Export timelapse", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextWrapped(tr("The history of the active SubTool (%zu steps up to the cursor) played as a turntable."), t->cursor());
+        ImGui::TextWrapped(tr("The history of the active Part (%zu steps up to the cursor) played as a turntable."), t->cursor());
         ImGui::RadioButton("1080p", &s.timelapseRes, 0);
         ImGui::SameLine();
         ImGui::RadioButton("4K", &s.timelapseRes, 1);
@@ -428,7 +428,7 @@ void App::drawTimelineUi() {
         savePrefs(s, configDir_, uiConfigDeterministic_);
     }
     ui::HelpText("Save with project", nullptr,
-                 "Also save the history beside the project as <name>.sfhist (strokes, masks, polypaint, visibility; "
+                 "Also save the history beside the project as <name>.sfhist (strokes, masks, vertex paint, visibility; "
                  "a topology change cuts it). Opening the project brings it back.",
                  "Edit > Sculpt Timeline");
     ImGui::SameLine();

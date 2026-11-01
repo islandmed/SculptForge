@@ -37,7 +37,7 @@ const char* languageName(Language language);    // in that language: "English", 
 // entry, or a string kept for the life of the program: safe to keep across frames.
 const char* tr(const char* english);
 std::string tr(const std::string& english);
-// An action's label: brushes keep their names (Clay Buildup, Move, Smooth...), everything else is translated.
+// An action's label: brushes keep their names (Clay Block, Move, Smooth...), everything else is translated.
 const char* trAction(std::string_view actionId, const std::string& label);
 // A palette path with each step translated: "Tool > Geometry" -> "Herramienta > Geometría".
 std::string trPath(std::string_view path);

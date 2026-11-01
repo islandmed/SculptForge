@@ -1783,7 +1783,7 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
             std::fprintf(stderr, "qremesh %.2f: %.3f s\n", f,
                          std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count());
         if (progress && !progress(std::clamp(f, 0.0f, 1.0f))) {
-            error = "QRemesh cancelled";
+            error = "Quad Remesh cancelled";
             return false;
         }
         return true;
@@ -1794,7 +1794,7 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
                          std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count());
     };
     if (source.triangleCount() == 0) {
-        error = "QRemesh: the SubTool is empty";
+        error = "Quad Remesh: the Part is empty";
         return false;
     }
     const int target = std::clamp(opt.targetQuads, 16, 2'000'000);
@@ -1810,7 +1810,7 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
     const AABB box = source.bounds();
     const float diag = glm::length(box.extent());
     if (!(diag > 0.0f)) {
-        error = "QRemesh: the SubTool has no size";
+        error = "Quad Remesh: the Part has no size";
         return false;
     }
 
@@ -1862,7 +1862,7 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
         for (vec3& p : work.P) p[axis] -= center;
         work = cutAtPlane(work, axis, 1e-6f * diag);
         if (work.T.empty()) {
-            error = "QRemesh: nothing on the positive side of the symmetry plane";
+            error = "Quad Remesh: nothing on the positive side of the symmetry plane";
             return false;
         }
     }
@@ -2026,7 +2026,7 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
             bool cancelled = false;
             const bool ok = qr::remeshPieceV2(parts[i], axis, want, opt, diag, guides, pieceReport, fr, cancelled);
             if (cancelled) {
-                error = "QRemesh cancelled";
+                error = "Quad Remesh cancelled";
                 return false;
             }
             st.attempts += fr.attempts;
@@ -2037,7 +2037,7 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
                 doneByV2 = true;
             } else {
                 ++st.fallbackPieces;
-                if (timing) std::fprintf(stderr, "  piece %zu: QRemesh 2 fell back to legacy (%s)\n", i, fr.why.c_str());
+                if (timing) std::fprintf(stderr, "  piece %zu: Quad Remesh 2 fell back to legacy (%s)\n", i, fr.why.c_str());
             }
         }
         // A piece the lattice misses is tried again finer, then kept as it is (its own triangles).
@@ -2045,7 +2045,7 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
             r = PieceResult{};
             want = budget[i] * std::pow(2.5, attempt);
             if (!remeshPiece(parts[i], axis, want, opt, diag, guides, pieceReport, mark, r)) {
-                error = "QRemesh cancelled";
+                error = "Quad Remesh cancelled";
                 return false;
             }
             st.attempts += r.attempts;
@@ -2058,7 +2058,7 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
             again.seed = opt.seed + seed * 7919u;
             PieceResult other;
             if (!remeshPiece(parts[i], axis, want, again, diag, guides, pieceReport, mark, other)) {
-                error = "QRemesh cancelled";
+                error = "Quad Remesh cancelled";
                 return false;
             }
             st.attempts += other.attempts;
@@ -2082,7 +2082,7 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
     }
     parts.clear();
     if (qm.quads.empty() && qm.tris.empty()) {
-        error = "QRemesh could not build quads on this surface (try a higher Target or turn Keep Groups off)";
+        error = "Quad Remesh could not build quads on this surface (try a higher Target or turn Keep Groups off)";
         return false;
     }
     if (!report(0.94f)) return false;

@@ -364,6 +364,19 @@ const std::vector<ServiceModel>& falModels() {
     return models;
 }
 
+bool hunyuanModel(std::string_view id) {
+    for (size_t i = 0; i + 7 <= id.size(); ++i) {
+        std::string word(id.substr(i, 7));
+        for (auto& c : word) c = char(std::tolower(static_cast<unsigned char>(c)));
+        if (word == "hunyuan") return true;
+    }
+    return false;
+}
+
+const char* kHunyuanLicenceNote =
+    "Hunyuan3D's licence (Tencent Hunyuan Community License) doesn't cover use in the European Union, the United "
+    "Kingdom or South Korea. There, pick TRELLIS.2 or another model.";
+
 std::string base64Encode(const uint8_t* data, size_t size) {
     static const char* chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     std::string out;
@@ -415,10 +428,11 @@ const std::vector<HfPreset>& hfTextPresets() {
 
 const std::vector<HfPreset>& hfPresets() {
     static const std::vector<HfPreset> presets = {
+        // TRELLIS.2 first: the default, under the MIT licence.
+        {"trellis-2", "TRELLIS.2 (Microsoft, MIT) - free, best detail, needs an HF token", "https://microsoft-trellis-2.hf.space",
+         {{"start_session", {}}, {"preprocess_image", {"$IMG"}}, {"image_to_3d", {"$OUT1"}}, {"extract_glb", {}}}},
         {"hunyuan3d-2.1", "Hunyuan3D 2.1 (Tencent) - free, detailed shape", "https://tencent-hunyuan3d-2-1.hf.space",
          {{"shape_generation", {"$IMG"}}}},
-        {"trellis-2", "TRELLIS.2 (Microsoft) - free, best detail, needs an HF token", "https://microsoft-trellis-2.hf.space",
-         {{"start_session", {}}, {"preprocess_image", {"$IMG"}}, {"image_to_3d", {"$OUT1"}}, {"extract_glb", {}}}},
         {"hunyuan3d-2-turbo", "Hunyuan3D 2 mini Turbo (Tencent) - free, fastest", "https://tencent-hunyuan3d-2mini-turbo.hf.space",
          {{"shape_generation", {"\"\"", "$IMG"}}}},
         {"hunyuan3d-2", "Hunyuan3D 2 (Tencent) - free", "https://tencent-hunyuan3d-2.hf.space",

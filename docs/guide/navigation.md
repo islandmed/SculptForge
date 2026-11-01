@@ -44,22 +44,22 @@ camera.
 | Rotate | Left-drag on the background, or right-drag anywhere on the canvas; add <kbd>Shift</kbd> to snap to an axis view |
 | Roll (turn about the view axis) | <kbd>Shift</kbd>+click the background, let go of <kbd>Shift</kbd>, then drag (ZBrush) |
 | Pan | <kbd>Alt</kbd>+left-drag on the background, <kbd>Alt</kbd>+right-drag, or middle-drag |
-| Zoom | Mouse wheel; <kbd>Alt</kbd>+left-drag on the background, then let go of <kbd>Alt</kbd> and keep dragging; <kbd>Ctrl</kbd>+right-drag; <kbd>Ctrl</kbd>+middle-drag; with the SculptForge input style also <kbd>Ctrl</kbd>+left-drag on the background |
+| Zoom | Mouse wheel; <kbd>Alt</kbd>+left-drag on the background, then let go of <kbd>Alt</kbd> and keep dragging; <kbd>Ctrl</kbd>+right-drag; <kbd>Ctrl</kbd>+middle-drag; <kbd>Ctrl</kbd>+left-drag on the background when nothing is masked (not with the ZBrush-style keys) |
 | Frame the model | <kbd>F</kbd> (Blender style: <kbd>Home</kbd>), or **Frame** on the right shelf |
 | Front, right, top view | <kbd>Numpad 1</kbd>, <kbd>Numpad 3</kbd>, <kbd>Numpad 7</kbd>; <kbd>Ctrl</kbd> for the back, left and bottom |
 | Front, side, top or bottom view with the mouse | Click an end of the axis gizmo in the canvas corner |
 | Orthographic on or off | <kbd>Numpad 5</kbd> |
 | Turn in 15 degree steps | <kbd>Numpad 4</kbd> / <kbd>Numpad 6</kbd> (around), <kbd>Numpad 8</kbd> / <kbd>Numpad 2</kbd> (over); <kbd>Numpad 9</kbd>: the other side |
-| Frame the active SubTool | <kbd>Numpad .</kbd> |
-| Frame one SubTool | <kbd>Shift</kbd>+<kbd>Alt</kbd>+click it, or triple-click another SubTool (it becomes the active SubTool) |
+| Frame the active Part | <kbd>Numpad .</kbd> |
+| Frame one Part | <kbd>Shift</kbd>+<kbd>Alt</kbd>+click it, or triple-click another Part (it becomes the active Part) |
 | Sculpt from the background | Turn on **Preferences > Input > Start strokes off the model**, or press <kbd>Shift</kbd>+<kbd>L</kbd> (**Toggle strokes off the model**): a left-drag that starts beside the model sculpts once it reaches the surface |
 | Move the camera with Space held | Turn on **Preferences > Input > Hold Space and drag to move the camera**, then hold <kbd>Space</kbd>: left-drag rotates, right- or middle-drag pans, <kbd>Ctrl</kbd>+drag zooms, anywhere on the canvas (on the model too) |
 
-Zoom drags go the ZBrush way: drag up to zoom out, down to zoom in. The SculptForge input style
-(**Preferences > Input**) reverses them: drag up to come closer.
+Zoom drags: drag up to come closer, down to back away. With the ZBrush-style keys (**Preferences > Input**)
+they go the ZBrush way: drag up to zoom out, down to zoom in.
 
 **Hold Space and drag to move the camera** is off by default, because in ZBrush <kbd>Space</kbd> opens the
-QuickMenu. With it on, <kbd>Space</kbd> no longer opens the QuickMenu (a right click still does), and a space typed in
+Quick Menu. With it on, <kbd>Space</kbd> no longer opens the Quick Menu (a right click still does), and a space typed in
 a text field is never taken.
 
 **Start strokes off the model** is off by default. With it on (a label at the top of the canvas says so), a
@@ -69,7 +69,7 @@ model, so strokes that begin at the silhouette never turn the view by accident. 
 the mask. To move the view, right-drag (a pen's lower button is a right click by default), <kbd>Alt</kbd>+drag to pan,
 middle-drag, or hold <kbd>Space</kbd> if **Hold Space and drag to move the camera** is on; with the Blender or Maya
 style, <kbd>Alt</kbd>+left-drag rotates as before. With a pen that has no buttons and the ZBrush or SculptForge style,
-press <kbd>Shift</kbd>+<kbd>L</kbd> to turn it off while you rotate, or turn on Hold Space. MaskLasso, MaskRect and the
+press <kbd>Shift</kbd>+<kbd>L</kbd> to turn it off while you rotate, or turn on Hold Space. Mask Lasso, Mask Rectangle and the
 <kbd>Ctrl</kbd>+<kbd>Shift</kbd> hide and show shapes work as before.
 
 "Background" means any part of the canvas where the cursor isn't over the model. A left-drag that starts on
@@ -77,7 +77,7 @@ the model sculpts instead, so with a pen or a one-button mouse, start rotations 
 model fills the view, zoom out a little or use the right-shelf buttons.
 
 > **Note:** <kbd>Ctrl</kbd>+left-drag on the background clears the mask when something is masked (and
-> <kbd>Ctrl</kbd>+click there inverts it); with the SculptForge input style it zooms while nothing is masked. Use the wheel or
+> <kbd>Ctrl</kbd>+click there inverts it); while nothing is masked it zooms (with the ZBrush-style keys it draws a mask rectangle instead). Use the wheel or
 > <kbd>Ctrl</kbd>+middle-drag to zoom on a masked model. See [Masking](masking.md).
 
 On macOS, <kbd>Cmd</kbd> works wherever this guide says <kbd>Ctrl</kbd> for these gestures, except
@@ -122,7 +122,7 @@ orbits around (the camera's target: **Frame** sets it to the scene's centre, and
 | Right side button | **Front view** |
 
 The speed is the same whatever the frame rate: holding the cap for a second turns the model just as far on a slow
-machine as on a fast one. It works in every input style (ZBrush, SculptForge, Blender) and while a stroke is
+machine as on a fast one. It works in every input style (SculptForge, ZBrush-style, Blender, Maya) and while a stroke is
 held: the stroke keeps going, sculpting wherever the pen points on the turned model. Many people stop moving the
 pen while they turn the view, and that works best, but you don't have to.
 
@@ -137,7 +137,7 @@ pen while they turn the view, and that works best, but you don't have to.
 - **Dominant axis**: only the direction you push the most moves the view, so a twist doesn't also pan a little.
 - **Invert**: reverse any of the six moves (Pan X, Zoom, Pan Y, Tilt, Roll, Spin). If a direction feels wrong on
   your model of SpaceMouse, flip it here.
-- **Left button**, **Right button** (and **Button 3** onwards on models with more): Frame, Frame SubTool, the
+- **Left button**, **Right button** (and **Button 3** onwards on models with more): Frame, Frame Part, the
   axis views, Orthographic, Undo, Redo or Nothing.
 - **SpaceMouse defaults** puts everything back.
 
@@ -165,7 +165,7 @@ Pro, SpaceBall 5000).
 ## Framing
 
 **Frame** (<kbd>F</kbd>) points the camera at the centre of the scene and moves it back until everything fits:
-every visible SubTool, plus the Gaussian splats when they are shown. SculptForge frames the scene for you when
+every visible Part, plus the Gaussian splats when they are shown. SculptForge frames the scene for you when
 you open a file or start from a new primitive. Use it after panning far away, or when a model comes in at an
 unusual scale.
 
@@ -173,13 +173,13 @@ unusual scale.
 
 These live on the right shelf and in the **Render** palette:
 
-- **PolyF** (<kbd>Shift</kbd>+<kbd>F</kbd>): shows the polygons of the active SubTool over
+- **Wire** (<kbd>Shift</kbd>+<kbd>F</kbd>): shows the polygons of the active Part over
   the surface, ZBrush's PolyFrame. Quads show as quads (see [Quads and triangles](geometry.md#quads-and-triangles)).
   Useful for judging mesh density before you subdivide or remesh.
-- **Groups**: colours each polygroup.
+- **Groups**: colours each face group.
 - **Mask**: darkens masked areas.
-- **Paint**: shows polypaint colours (off shows the plain material).
-- **Solo**: shows only the active SubTool, to get at parts hidden behind others.
+- **Paint**: shows vertex paint colours (off shows the plain material).
+- **Solo**: shows only the active Part, to get at parts hidden behind others.
 - **Show Mesh** (Render palette): hides the sculpt, for example to look at a splat capture on its own.
 
 **Fullscreen** (<kbd>F11</kbd>) and hiding the shelves (<kbd>Tab</kbd>) give the canvas the most room. See

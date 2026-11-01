@@ -320,7 +320,7 @@ std::vector<BrushRecipe> builtinBrushRecipes() {
     }
     {
         BrushRecipe r;
-        r.name = "Clay Buildup";
+        r.name = "Clay Slab";
         r.description = "Builds up flat-topped strokes of clay for blocking in forms.";
         r.depth = 0.3f;
         r.plane = BrushRecipe::Plane::Clay;

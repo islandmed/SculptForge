@@ -853,7 +853,7 @@ void registerVdmCommands(CommandRegistry& registry) {
                   }});
     registry.add({"vdm_new_plane",
                   "Add a VDM plane to sculpt a new vector displacement brush on (ZBrush's VDM plane template): a flat "
-                  "2 x 2 grid seen from the top, its border masked; the other SubTools are hidden. Then vdm_capture.",
+                  "2 x 2 grid seen from the top, its border masked; the other Parts are hidden. Then vdm_capture.",
                   {{"resolution", T::Number, "Quads per side (16-1024). Default 256; divide it for finer detail.", false}},
                   [](Document& doc, const Args& a) -> CommandResult {
                       const int res = std::clamp(int(argNumber(a, "resolution", 256)), 16, 1024);
@@ -889,13 +889,13 @@ void registerVdmCommands(CommandRegistry& registry) {
                       return {true, msg};
                   }});
     registry.add({"vdm_stamp",
-                  "Press the VDM brush once (like a DragRect click): at the surface point a ray along `view` through "
+                  "Press the VDM brush once (like a Drag Stamp click): at the surface point a ray along `view` through "
                   "`point` hits, `radius` in world units, its top turned by `angle` from the view's up. One undo step.",
                   {{"point", T::String, "x,y,z the ray goes through.", true},
                    {"view", T::String, "x,y,z view direction into the scene (default 0,0,-1).", false},
                    {"radius", T::Number, "Brush radius in world units (default 4% of the model's size).", false},
                    {"angle", T::Number, "Rotation in degrees, counter-clockwise on screen (default 0).", false},
-                   {"strength", T::Number, "Z Intensity 0-1 (default 0.5 = the map's own size; 1 doubles it).", false},
+                   {"strength", T::Number, "Intensity 0-1 (default 0.5 = the map's own size; 1 doubles it).", false},
                    {"invert", T::Bool, "Dig the shape in (Alt).", false},
                    {"symmetry", T::String, "Mirror axes, e.g. \"x\" or \"xz\" (default none).", false}},
                   [](Document& doc, const Args& a) -> CommandResult {
@@ -904,7 +904,7 @@ void registerVdmCommands(CommandRegistry& registry) {
                       if (a.count("view") && !parseVec3(argString(a, "view"), view)) return {false, "Bad view (expected x,y,z)"};
                       if (glm::length(view) < 1e-6f) return {false, "The view direction must not be zero"};
                       view = glm::normalize(view);
-                      if (doc.mesh.triangleCount() == 0) return {false, "The active SubTool is empty"};
+                      if (doc.mesh.triangleCount() == 0) return {false, "The active Part is empty"};
                       doc.syncBvh();
                       const AABB box = doc.mesh.bounds();
                       const float diag = std::max(glm::length(box.extent()), 1e-4f);

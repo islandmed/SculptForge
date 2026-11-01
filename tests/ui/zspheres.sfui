@@ -5,7 +5,7 @@
 run zsphere_new radius=1
 run subtool_visibility index=0 visible=false
 wait 0.3
-click "ZSpheres##tool.zspheres"
+click "Forge Spheres##tool.zspheres"
 expect "ZSpheres/Draw"
 expect_value zspheres == 1
 expect_text "1 sphere"
@@ -25,7 +25,7 @@ view_drag 0.515 0.518 0.545 0.518
 expect_value zspheres == 3
 expect_value zsphere_x1 > 0.5
 expect_value zsphere_x2 < -0.5
-expect_status "ZSphere add"
+expect_status "Forge Sphere add"
 shot zspheres-draw
 
 # Move: pull the arm out to the right; the twin goes left.
@@ -51,7 +51,7 @@ click "ZSpheres/Draw"
 remember zsphere_x1 armx
 view_drag 0.543 0.518 0.543 0.518 0.05
 expect_value zspheres == 5
-expect_status "ZSphere insert"
+expect_status "Forge Sphere insert"
 shot zspheres-joint
 
 # Preview: the skin replaces the spheres; clicks on it do nothing.
@@ -70,7 +70,7 @@ click "ZSpheres/Make Mesh"
 expect_value subtools == 3
 expect_value active_subtool == 2
 expect_value zspheres == 0
-expect_status "from the ZSpheres"
+expect_status "from the Forge Spheres"
 shot zspheres-mesh
 remember triangles before
 snapshot

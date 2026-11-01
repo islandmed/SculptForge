@@ -10,8 +10,8 @@ after it, and render the whole history as a turntable timelapse video.
 
 ## The strip
 
-Each step is a tick on the track: sculpt strokes in light grey, masks in blue, polypaint in pink, visibility
-and polygroups in green, and topology changes (dynamic topology, remeshing, Divide, SubTool changes) as tall
+Each step is a tick on the track: sculpt strokes in light grey, masks in blue, vertex paint in pink, visibility
+and face groups in green, and topology changes (dynamic topology, remeshing, Divide, Part changes) as tall
 teal ticks. The orange scrubber marks the state the canvas shows; the steps after it are dimmed. A dot above a
 tick marks a re-tuned stroke.
 
@@ -25,7 +25,7 @@ tick marks a re-tuned stroke.
   the same).
 
 Undo and Redo (<kbd>Ctrl</kbd>+<kbd>Z</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>) move the scrubber one
-step, as before. Each SubTool keeps its own timeline, like its own undo history.
+step, as before. Each Part keeps its own timeline, like its own undo history.
 
 ## Branches: undo without losing anything
 
@@ -74,14 +74,14 @@ about the last 100 strokes of the size above, a 33 million one about 70; small d
 
 Tick **Save with project** in the strip's header and saving a project also writes its history beside it, as
 `name.sfhist` next to `name.sfproj`. Opening the project brings the timeline back, branches and re-tuned strengths
-included, as long as the project hasn't been changed elsewhere since. Sculpt strokes, masks, polypaint, visibility
-and polygroups are saved; a topology change (dynamic topology, remesh, Divide, sculpt layers) cuts the saved
+included, as long as the project hasn't been changed elsewhere since. Sculpt strokes, masks, vertex paint, visibility
+and face groups are saved; a topology change (dynamic topology, remesh, Divide, sculpt layers) cuts the saved
 history there, keeping what came after it.
 
 ## Timelapse video
 
 **Export timelapse** (the film icon in the strip, or **Export timelapse...** in the command palette) renders the
-history of the active SubTool, from the start to the step you are at, as a turntable video: the model builds up
+history of the active Part, from the start to the step you are at, as a turntable video: the model builds up
 stroke by stroke while the camera goes once around it, with a short pause at the start and the end. Pick 1080p
 or 4K, the length, and where to save the MP4. There are no captions or interface in the video. It needs
 [ffmpeg](https://ffmpeg.org/) installed.

@@ -280,7 +280,7 @@ bool parseSetChannels(const std::string& text, uint32_t& out, std::string& error
         word.clear();
         if (w == "all") out |= kSetAllChannels;
         else if (w == "mask") out |= kSetMask;
-        else if (w == "polygroups" || w == "groups" || w == "polygroup") out |= kSetPolygroups;
+        else if (w == "polygroups" || w == "groups" || w == "polygroup" || w == "face_groups" || w == "facegroups") out |= kSetPolygroups;
         else if (w == "paint" || w == "colors" || w == "colours" || w == "polypaint" || w == "vertex_paint") out |= kSetPaint;
         else if (w == "visibility" || w == "hidden" || w == "visible") out |= kSetVisibility;
         else if (w == "uvs" || w == "uv") out |= kSetUvs;

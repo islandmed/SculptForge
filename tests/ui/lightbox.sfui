@@ -7,81 +7,81 @@ expect_value lightbox_open == 0   # (the window; "LightBox" is also the top-shel
 
 key ,
 expect_value lightbox_open == 1
-click "LightBox/Tool"
-expect "LightBox/Sphere"
-expect "LightBox/Cube"
-expect "LightBox/Built-in"
+click "Library/Tool"
+expect "Library/Sphere"
+expect "Library/Cube"
+expect "Library/Built-in"
 wait_idle 60
 shot lightbox-tool
 
 # The header links to the issue forms ("Fixes & suggestions"; tests never open a browser).
-click "LightBox/###Fixes & suggestions"
+click "Library/###Fixes & suggestions"
 expect_status Submit a request for a fix or a suggestion
 
 # Double-click a model to open it (replaces the scene), Shift+double-click to append it as a SubTool.
-double_click "LightBox/Sphere"
+double_click "Library/Sphere"
 expect_value triangles > 128
 expect_value subtools == 1
 hold shift
-double_click "LightBox/Cube"
+double_click "Library/Cube"
 hold none
 expect_value subtools == 2
-expect_status Appended SubTool
+expect_status Appended Part
 
 # A tile dragged out of the strip onto the canvas loads like a double-click (the Cube tile).
-drag_item "LightBox/Cube" 500 300
+drag_item "Library/Cube" 500 300
 expect_status Created cube
 expect_value subtools == 1
 
 # Folders: Built-in holds the bundled demo files; ".." and Back return to the tab's root.
-double_click "LightBox/Built-in"
+double_click "Library/Built-in"
 wait_idle 30
-expect "LightBox/lion-head"
-expect_not "LightBox/Sphere"
-double_click "LightBox/.."
-expect "LightBox/Sphere"
-double_click "LightBox/User"
+expect "Library/lion-head"
+expect_not "Library/Sphere"
+double_click "Library/.."
+expect "Library/Sphere"
+double_click "Library/User"
 wait_idle 30
-expect "LightBox/.."
-click "LightBox/###Back"
-expect "LightBox/Sphere"
+expect "Library/.."
+click "Library/###Back"
+expect "Library/Sphere"
 
 # Materials and brushes load with a double-click too.
-click "LightBox/Material"
-expect "LightBox/Chrome"
-double_click "LightBox/Chrome"
+click "Library/Material"
+expect "Library/Chrome"
+double_click "Library/Chrome"
 expect_status Material: Chrome
-click "LightBox/Brush"
-expect "LightBox/DamStandard"
-double_click "LightBox/DamStandard"
-expect_status Brush: DamStandard
+click "Library/Brush"
+expect "Library/Sharp Crease"
+double_click "Library/Sharp Crease"
+expect_status Brush: Sharp Crease
 wait_idle 60
 shot lightbox-brush
 
 # Drag sideways to scrub the strip: brushes far to the right come into view.
-expect_not "LightBox/Skin Pores"
-drag_item "LightBox/Inflate" -700 0
-drag_item "LightBox/Nudge" -700 0
-drag_item "LightBox/KelvinSnake" -700 0
-expect "LightBox/Skin Pores"
-expect_status Brush: DamStandard
+expect_not "Library/Skin Pores"
+drag_item "Library/Inflate" -700 0
+drag_item "Library/Nudge" -700 0
+drag_item "Library/Elastic Tendril" -700 0
+expect "Library/Skin Pores"
+expect_status Brush: Sharp Crease
 
 # More rows, then back through the history to the Material tab.
-click "LightBox/3"
+click "Library/3"
 wait_idle 60
 shot lightbox-3-rows
-click "LightBox/1"
-click "LightBox/###Back"
-expect "LightBox/Chrome"
+click "Library/1"
+click "Library/###Back"
+expect "Library/Chrome"
 
 # QuickSave: a timestamped copy in the library's QuickSave folder, listed newest first.
-click "LightBox/QuickSave"
-expect_text QuickSave keeps timestamped copies
-click "LightBox/###QuickSave now"
-expect_status QuickSaved
+click "Library/Snapshots"
+expect_text Save Snapshot keeps timestamped copies
+click "Library/###QuickSave now"
+expect_status Saved Snapshot
 wait 6
 wait_idle 30
-expect_no_text QuickSave keeps timestamped copies
+expect_no_text Save Snapshot keeps timestamped copies
 shot lightbox-quicksave
 
 key ,
@@ -108,7 +108,7 @@ expect_status Brush: Standard
 key b
 key s
 key h
-expect_status Brush: SnakeHook
+expect_status Brush: Tendril
 key b
 key z
 expect_text No brush matches
@@ -143,7 +143,7 @@ expect_text Draw Size 120
 key escape
 key u
 expect "##cursorvalue"
-expect_text Z Intensity 50
+expect_text Intensity 50
 shot strength-popup
 key escape
 expect_not "##cursorvalue"   # (the top shelf always shows its own Z Intensity slider)

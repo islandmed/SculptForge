@@ -1,6 +1,6 @@
 # Selection sets and morph targets
 
-A selection set is a named snapshot of a Part's mask, polygroups, vertex paint, visibility (which faces are
+A selection set is a named snapshot of a Part's mask, face groups, vertex paint, visibility (which faces are
 hidden), UVs and shape. Store as many as you like, bring any of them back later, combine them, and use a stored
 shape as the target of the **Morph** brush. Sets belong to the Part, travel with the project, and work across its
 subdivision levels: store at one level, restore at any other.
@@ -15,7 +15,7 @@ Open **Tool > Selection Sets**.
    | Channel | What it keeps | Command name |
    |---|---|---|
    | **Mask** | The mask, soft edges included. | `mask` |
-   | **Groups** | The polygroups. | `polygroups` |
+   | **Groups** | The face groups. | `polygroups` |
    | **Visibility** | Which faces are shown and which are hidden. | `visibility` |
    | **Vertex Paint** | The vertex colours. | `paint` |
    | **UVs** | The UV layout (only when the Part has UVs). | `uvs` |
@@ -25,11 +25,11 @@ Open **Tool > Selection Sets**.
 
 **From Visible** is the quick way: it stores the faces shown right now as a set called **Visible** (then
 **Visible 2**, ...). Isolate a part with the <kbd>Ctrl</kbd>+<kbd>Shift</kbd> gestures
-([Polygroups and visibility](polygroups.md)), click **From Visible**, and you can get back to exactly that view
+([Face Groups and visibility](face-groups.md)), click **From Visible**, and you can get back to exactly that view
 whenever you need it.
 
 There is no limit on the number of sets. They are kept compactly: masks, vertex paint and visibility store only the
-parts that differ from an empty mask, white paint and a fully shown Part, and polygroups are run-length coded, so a
+parts that differ from an empty mask, white paint and a fully shown Part, and face groups are run-length coded, so a
 mask on a few million vertices usually costs a few kilobytes. Shapes and UVs are stored as they are.
 
 ## Restore, rename and delete
@@ -66,12 +66,12 @@ A set remembers the level it was stored at, and restores at any level of the sam
 
 - going down, each vertex and face takes the value of the matching one on the level above, as the levels themselves
   do;
-- going up, masks and vertex paint are interpolated, polygroups and visibility are inherited from the face they lie
+- going up, masks and vertex paint are interpolated, face groups and visibility are inherited from the face they lie
   in, and UVs are interpolated across each face;
 - a shape travels as its difference from that level's own surface, so the detail of the levels in between stays
   where it is.
 
-So you can store a mask at SDiv 1, sculpt at SDiv 5 and restore the mask there, or keep a high-resolution polygroup
+So you can store a mask at SDiv 1, sculpt at SDiv 5 and restore the mask there, or keep a high-resolution face group
 set and use it at the base cage. Sets survive **Divide**, **Del Lower**, **Del Higher** and **Reconstruct
 Subdiv** as long as the level they were stored at still exists.
 
@@ -103,13 +103,13 @@ A `.sfsets` file is a ZIP with a JSON manifest and one small binary file per set
 a different mesh keeps it, but it shows greyed out and can't be restored until the Part has a level it fits.
 
 **USD** (`export_usd`) writes the sets of each Part inside its Mesh prim: the shown faces of each set as a
-`GeomSubset` (`sculptforge_set0_visible`), its polygroups as a partition of `GeomSubset`s (`sculptforge_set0_group7`),
+`GeomSubset` (`sculptforge_set0_visible`), its face groups as a partition of `GeomSubset`s (`sculptforge_set0_group7`),
 and its mask and vertex paint as vertex primvars (`primvars:sculptforge_set0_mask`, `..._color`), with the names in
 `sculptforge:selectionSets`. Houdini, Maya, Blender and Omniverse read these as ordinary face sets and primvars, and
 SculptForge turns them back into selection sets when it imports the file. UVs and shapes are not written to USD.
 
 **OBJ, glTF / GLB, FBX, PLY and STL** have no place for named selections, so sets are not written to them (OBJ
-still writes the current polygroups as `g` groups). Export the sets to a `.sfsets` file alongside the model instead.
+still writes the current face groups as `g` groups). Export the sets to a `.sfsets` file alongside the model instead.
 
 ## Scripting
 

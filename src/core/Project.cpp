@@ -1024,13 +1024,13 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
     } else {
         const Json& list = manifest["subtools"];
         if (!list.isArray() || list.size() == 0 || list.size() > kMaxProjectSubtools) {
-            error = "Project has no valid SubTool list";
+            error = "Project has no valid Part list";
             return false;
         }
         for (const Json& sj : list.items()) {
             LoadedSubtool& s = subtools.emplace_back();
             s.name = sj["name"].asString();
-            if (s.name.empty()) s.name = "SubTool";
+            if (s.name.empty()) s.name = "Part";
             s.visible = sj["visible"].asBool(true);
             if (sj["shading"].isString()) parseShading(sj["shading"].asString(), s.shading); // unknown: Default
             s.gozName = sj["goz_name"].asString();
@@ -1215,7 +1215,7 @@ CommandResult openProjectCommand(Document& doc, const std::string& path) {
     std::string msg = "Opened project " + std::filesystem::path(path).filename().string() + " (";
     // The Sculpt Timeline saved beside it, if it matches (only into the app's own scene: not thumbnails, scratch opens).
     const int histories = &doc == Timeline::historyDocument ? loadHistorySidecar(doc, path) : 0;
-    if (doc.subtoolCount() > 1) msg += std::to_string(doc.subtoolCount()) + " SubTools, ";
+    if (doc.subtoolCount() > 1) msg += std::to_string(doc.subtoolCount()) + " Parts, ";
     size_t tris = 0, layers = 0;
     for (int i = 0; i < doc.subtoolCount(); ++i) {
         tris += doc.subtoolMesh(i).triangleCount();
@@ -1232,7 +1232,7 @@ CommandResult openProjectCommand(Document& doc, const std::string& path) {
 void registerProjectCommands(CommandRegistry& registry) {
     using T = ParamSpec::Type;
     registry.add({"save_project",
-                  "Save everything (mesh, mask, polypaint, polygroups, visibility, UVs, sculpt layers, splats, brushes "
+                  "Save everything (mesh, mask, vertex paint, face groups, visibility, UVs, sculpt layers, splats, brushes "
                   "and view settings) as a SculptForge project (.sfproj).",
                   {{"path", T::String, "Output .sfproj path (UTF-8). Defaults to the current project path.", false}},
                   [](Document& doc, const Args& a) -> CommandResult {

@@ -2,6 +2,8 @@
 # Ctrl+Shift+drag lassos hide, and every selection is one undo step. Then symmetry and Ctrl+click on the model
 # with MaskLasso (#51), and MaskPen's Ctrl+drag rectangle from the background (#48).
 run new_sphere subdivisions=5
+# Ctrl+drag on the background with nothing masked: the ZBrush-style keys draw a mask rectangle (SculptForge zooms).
+input_style zbrush
 expect_value masked == 0
 # (Symmetry X is on by default: off for the first part, so the shapes mask only what they cover.)
 key x
@@ -9,9 +11,9 @@ expect_value symmetry_x == 0
 
 # The shapes sit at the top of Tool > Masking, with Ctrl-hover help.
 click "Masking"
-click "MaskLasso##mask.lasso"
+click "Mask Lasso##mask.lasso"
 hold ctrl
-hover "MaskLasso##mask.lasso"
+hover "Mask Lasso##mask.lasso"
 expect_help "lasso"
 hold none
 
@@ -28,7 +30,7 @@ remember masked lasso
 shot lasso_masked
 
 # MaskRect: Ctrl+Alt+drag starting on the model unmasks the inside.
-click "MaskRect##mask.rect"
+click "Mask Rectangle##mask.rect"
 hold ctrl+alt
 drag_path 0.1 0.35 0.9 0.65 keep
 shot rect_unmask_drawing
@@ -63,7 +65,7 @@ key ctrl+z
 expect_value masked == $unmasked
 
 # Symmetry X (#51): the lasso around the left half masks the right half too, as a mask stroke would.
-click "MaskLasso##mask.lasso"
+click "Mask Lasso##mask.lasso"
 click "Clear##mask"
 key x
 expect_value symmetry_x == 1
@@ -94,7 +96,7 @@ key x
 expect_value symmetry_x == 0
 
 # MaskPen again: Ctrl+drag on the model paints with the brush.
-click "MaskPen##mask.pen"
+click "Mask Pen##mask.pen"
 click "Clear##mask"
 hold ctrl
 stroke 0.3 0.3 0.7 0.3
@@ -133,7 +135,7 @@ click "Clear##mask"
 
 # SelectLasso in Tool > Visibility: Ctrl+Shift+drag keeps the inside, Ctrl+Shift+Alt+drag hides it.
 click "Visibility"
-click "SelectLasso##select.lasso"
+click "Select Lasso##select.lasso"
 expect_value hidden == 0
 hold ctrl+shift
 drag_path -0.2 -0.2 0.7 -0.2 0.7 1.2 -0.2 1.2 keep

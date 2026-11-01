@@ -1,13 +1,13 @@
 # SculptForge User Guide
 
 This guide explains every part of SculptForge, the free, open-source sculpting app for VFX, animation and games:
-how the interface is organised, how to sculpt, mask, paint (on vertices or textures) and manage SubTools, how to generate models with AI,
+how the interface is organised, how to sculpt, mask, paint (on vertices or textures) and manage Parts, how to generate models with AI,
 and how to get your work into a game engine, a film pipeline, Blender or ZBrush. It is written for SculptForge
 0.4.
 
 You can read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<kbd>F1</kbd>) or on the
 [SculptForge website](https://sculptforge.app/guide/). If you're coming from ZBrush, start with
-[Coming from ZBrush](coming-from-zbrush.md) and keep the [Glossary](glossary.md) at hand: ZBrush's keys and gestures work as they are.
+[Coming from ZBrush](coming-from-zbrush.md) and keep the [Glossary](glossary.md) at hand: it has SculptForge's names for ZBrush terms and the ZBrush-style keys.
 
 ![The SculptForge window with its main regions labelled](images/interface-overview.jpg)
 
@@ -25,11 +25,11 @@ You can read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<
 7. [Sculpting and brushes](sculpting.md)
 8. [Brush Lab and sharing brushes](brush-lab.md)
 9. [Masking](masking.md)
-10. [Polygroups and visibility](polygroups.md)
+10. [Face Groups and visibility](face-groups.md)
 11. [Selection sets and morph targets](selection-sets.md)
-12. [SubTools](subtools.md)
-13. [ZSpheres](zspheres.md)
-14. [Polypaint and materials](polypaint.md)
+12. [Parts](parts.md)
+13. [Forge Spheres](forge-spheres.md)
+14. [Vertex Paint and materials](vertex-paint.md)
 15. [Texture painting](texture-painting.md)
 16. [Material painting (PBR)](pbr-painting.md)
 17. [Sculpt layers and blend shapes](layers.md)
@@ -38,7 +38,7 @@ You can read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<
 20. [Micro levels: hundreds of millions of polygons](micro-levels.md)
 21. [Dynamic topology](dynamic-topology.md)
 22. [Sculpt Timeline and timelapse](timeline.md)
-23. [Moving, rotating and posing (Gizmo 3D)](gizmo.md)
+23. [Moving, rotating and posing (Gizmo)](gizmo.md)
 24. [Subdivide, remesh, decimate and LODs](geometry.md)
 25. [Quad retopology and detail projection](retopology.md)
 
@@ -57,7 +57,7 @@ You can read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<
 33. [Export presets](export-presets.md)
 34. [Working with Blender](blender.md)
 35. [Working with Maya](maya.md)
-36. [Projects, autosave and QuickSave](projects.md)
+36. [Projects, autosave and Snapshots](projects.md)
 37. [Scripting and automation](scripting.md)
 38. [SculptForge for studios](studios.md)
 
