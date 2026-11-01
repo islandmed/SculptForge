@@ -21,6 +21,7 @@ chapter opens by itself the first time you start a new version; you can always f
   Ledge), with thumbnails in the LightBox (#43). See [Sculpting](sculpting.md).
 - **Mask from the mesh border** (#61): **Tool > Masking > By border** masks open edges (and polygroup borders),
   so sculpting leaves them in place. See [Masking](masking.md).
+- **SculptForge in Spanish** (#44): **Preferences > Interface > Language > Español**.
 - **Maya bridge** (#42): **File > Maya** and a SculptForge shelf for Maya swap meshes through a folder you
   pick: no connections, nothing run. See [Working with Maya](maya.md).
 - **Radial (pie) menus** (#45): hold **T** (brushes) or **Y** (masking), flick and let go; make your own in
