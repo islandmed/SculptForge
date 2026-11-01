@@ -417,15 +417,6 @@ void App::drawInputSection() {
     if (ui::Checkbox("Cursor follows surface##input.surface_cursor", &surfaceCursor))
         uiPrefs_.cursorFollowsSurface = surfaceCursor;
     ui::HelpAction(*this, "input.surface_cursor");
-    bool liveApi = uiPrefs_.liveApi;
-    if (ui::Checkbox("Local API for other programs##input.local_api", &liveApi)) {
-        uiPrefs_.liveApi = liveApi;
-        setLiveApi(liveApi);
-    }
-    ui::HelpText("Local API for other programs", nullptr,
-                 "Lets tools on this computer (SymSolv, scripts, add-ons) run SculptForge commands in the open app: "
-                 "127.0.0.1 only, with a token in api.json in the settings folder. See Scripting in the guide.",
-                 "Preferences > Input");
     ui::ActionButton(*this, "input.import_blender", ImVec2(-FLT_MIN, 0), ui::Look::IconLabel);
     ImGui::TextDisabled("Rotation");
     ImGui::SameLine();

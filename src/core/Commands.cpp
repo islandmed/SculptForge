@@ -18,7 +18,6 @@
 #include "core/Multires.h"
 #include "core/Micro.h"
 #include "core/MeshTransform.h"
-#include "core/LiveApi.h"
 #include "core/PathStroke.h"
 #include "core/Polygroups.h"
 #include "core/SubTools.h"
@@ -796,7 +795,6 @@ CommandRegistry::CommandRegistry() {
     registerExtractMirrorCommands(*this); // extract, mirror_and_weld, mirror (core/ExtractMirror.h)
     registerPerformanceCommands(*this); // perf_info, set_multithreading (core/Benchmark.cpp)
     registerHardwareProfileCommands(*this); // performance_profile, calibrate, set_performance_override (core/HardwareProfile.cpp)
-    registerLiveApiCommands(*this); // mesh_read, mesh_set_positions (core/LiveApi.h, #36)
     registerTimelineCommands(*this); // timeline_info / seek / select / retune / save / load (core/Timeline.h)
     registerPaintCommands(*this); // core/Polypaint.cpp
     registerGozCommands(*this); // goz_import/export/send/receive, export_stl (io/GozCommands.cpp)

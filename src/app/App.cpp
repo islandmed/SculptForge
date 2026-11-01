@@ -186,9 +186,6 @@ bool App::init(const AppOptions& options) {
     float scale = SDL_GetWindowDisplayScale(window_) / (density > 0.0f ? density : 1.0f);
     if (scale <= 0.0f) scale = 1.0f;
     initUiConfig(headless || !options.demo.empty()); // ui.json (layout, shortcuts, UI scale); never for tests and videos
-    // Preferences > Input > Local API, or SF_LOCAL_API=1 for this run (scripts, CI)
-    if ((uiPrefs_.liveApi || (std::getenv("SF_LOCAL_API") && *std::getenv("SF_LOCAL_API") == '1')) && !headless && options.demo.empty())
-        setLiveApi(true);
     if (!headless && uiPrefs_.uiScale > 0.0f) scale = uiPrefs_.uiScale;
     if (recording) scale = float(options.height) / 900.0f; // UI sized for the video, not this screen
     uiScale_ = scale;
@@ -295,11 +292,6 @@ bool App::init(const AppOptions& options) {
 
 void App::shutdown() {
     saveWindowState();
-    if (liveApi_) { // stop serving; the preference stays on for next time
-        const bool keep = uiPrefs_.liveApi;
-        setLiveApi(false);
-        uiPrefs_.liveApi = keep;
-    }
     if (doc_.sculptor.strokeActive()) endStroke();
     solver_.reset(); // (its thread uses the renderer)
     flushBrushEdits();
@@ -772,7 +764,6 @@ int App::run() {
         phases = 0;
         mark();
         while (SDL_PollEvent(&e)) onEvent(e);
-        pollLiveApi(); // commands from other programs (app/LiveApi.cpp)
         mark();
         // (The window must have settled too: a window manager that maximises it late, on a busy machine, changes
         // the canvas and with it the brush's size in the world mid-stroke.)

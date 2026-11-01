@@ -237,6 +237,7 @@ void App::pumpStroke() {
         s.finalize = true;
         s.view.camera = camera_;
         s.view.canvas = canvasRect();
+    if (std::getenv("SF_TMP_CANVAS")) std::fprintf(stderr, "batch canvas %.0f x %.0f %.0f %.0f aspect %.4f n %zu\n", s.view.canvas.w, s.view.canvas.h, s.view.canvas.x, s.view.canvas.y, camera_.aspect, s.batch.size()); // TEMP
         s.view.probe = nullptr;
         s.view.radiusProbe = nullptr;
         s.view.settings = dabSettings();

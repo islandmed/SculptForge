@@ -1139,9 +1139,6 @@ private:
     static WindowState loadWindowState();
     void saveWindowState() const;
     bool rememberWindow_ = false;
-    std::shared_ptr<struct LiveApiState> liveApi_; // the local API server while on (app/LiveApi.cpp)
-    void setLiveApi(bool on);
-    void pollLiveApi();
     void drawAxisGizmo();
     // Insert on the model (#34): the primitive chosen in Append > Insert; a drag on the surface places it.
     std::string insertType_;

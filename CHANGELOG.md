@@ -6,6 +6,10 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Removed
+- The local API for other programs and its `mesh_read` / `mesh_set_positions` commands (added in 0.10.1, off by
+  default). SculptForge no longer listens on any port for other programs.
+
 ### Changed
 - **Predictive strokes are on by default**: big brushes on dense meshes keep up with the pen (21M triangles: frames
   about 9 ms instead of 70, the brush 1-2 px behind the pointer instead of 40, no pause when you lift the pen). The
