@@ -5,6 +5,15 @@ All notable changes to SculptForge are listed here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Added
+- GPU brushes (Windows and Linux, OpenGL 4.3 compute shaders): Standard, Clay, Inflate, Flatten, Pinch and Crease
+  (and, on micro levels, Smooth and Move) can work out their dabs on the graphics card. The graphics card computes
+  each point's change and SculptForge applies it to the model as whole numbers, so undo, redo, saving and the
+  timeline behave exactly as with processor brushes (the two agree within rounding; tests compare them).
+  **Preferences > Performance > GPU Brushes**: Automatic (the default) uses the graphics card only where calibration
+  measured it faster for big dabs, On, or Off; the hardware profile shows both times, and the status bar shows GPU or
+  CPU next to the frame rate. Without compute shaders (macOS, older drivers) every brush runs on the processor as
+  before. `--benchmark-sizes 33,300micro` adds micro-displaced meshes to proof mode; `SF_GPU_BRUSHES=0/1` forces a path.
 
 ## [0.10.5] - 2026-11-01
 ### Added

@@ -7,6 +7,11 @@ chapter opens by itself the first time you start a new version; you can always f
 
 ## Version 0.10.5
 
+- **GPU brushes** (Windows and Linux): big Standard, Clay, Inflate, Flatten, Pinch and Crease dabs (and Smooth and
+  Move on micro levels) can be worked out on the graphics card, with undo, saving and the timeline unchanged.
+  **Preferences > Performance > GPU Brushes** is Automatic by default: the graphics card is used where calibration
+  measured it faster than the processor. The status bar shows GPU or CPU beside the frame rate. See
+  [Performance](performance.md).
 - **Selection sets** (**Tool > Selection Sets**): store as many named snapshots of a Part's mask, polygroups,
   visibility, vertex paint, UVs and shape as you like, and restore them at any subdivision level, not only the one
   they were stored at. Combine two sets (union, intersect, subtract), restore one onto the current mask or

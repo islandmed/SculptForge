@@ -55,6 +55,9 @@
 <h2 id="version-0105">Version 0.10.5<a class="anchor" href="#version-0105" aria-label="Link to this section">#</a></h2>
 <ul>
 <li>
+<strong>GPU brushes</strong> (Windows and Linux): big Standard, Clay, Inflate, Flatten, Pinch and Crease dabs (and Smooth and Move on micro levels) can be worked out on the graphics card, with undo, saving and the timeline unchanged. <strong>Preferences &gt; Performance &gt; GPU Brushes</strong> is Automatic by default: the graphics card is used where calibration measured it faster than the processor. The status bar shows GPU or CPU beside the frame rate. See <a href="performance.html">Performance</a>.
+</li>
+<li>
 <strong>Selection sets</strong> (<strong>Tool &gt; Selection Sets</strong>): store as many named snapshots of a Part&#x27;s mask, polygroups, visibility, vertex paint, UVs and shape as you like, and restore them at any subdivision level, not only the one they were stored at. Combine two sets (union, intersect, subtract), restore one onto the current mask or visibility the same way, or take a quick set from the visible faces. Every step is one undo step, and the sets are saved with the project. See <a href="selection-sets.html">Selection sets</a>.
 </li>
 <li>
@@ -67,8 +70,14 @@
 <strong>Fixed: the viewport on some Windows PCs</strong> (#29): on displays whose window uses another colour format (seen with NVIDIA and high-resolution screens) the model never appeared and the cursor left trails. The view now reaches the window on every format, and falls back to drawing directly if a driver still refuses.
 </li>
 </ul>
-<h2 id="version-0104">Version 0.10.4<a class="anchor" href="#version-0104" aria-label="Link to this section">#</a></h2>
 <h3 id="from-your-requests-on-github">From your requests on GitHub<a class="anchor" href="#from-your-requests-on-github" aria-label="Link to this section">#</a></h3>
+<ul>
+<li>
+<strong>Start strokes off the model</strong> (#62): an option in <strong>Preferences &gt; Input</strong>, off by default, and <kbd>Shift</kbd>+<kbd>L</kbd> to turn it on and off. With it on, a left-drag that starts on the background sculpts once it reaches the model instead of turning the view. See <a href="navigation.html#mouse-and-pen">Navigation</a>.
+</li>
+</ul>
+<h2 id="version-0104">Version 0.10.4<a class="anchor" href="#version-0104" aria-label="Link to this section">#</a></h2>
+<h3 id="from-your-requests-on-github-1">From your requests on GitHub<a class="anchor" href="#from-your-requests-on-github-1" aria-label="Link to this section">#</a></h3>
 <ul>
 <li>
 <strong>Insert your own mesh</strong> (#34): <strong>Append &gt; Insert on the model</strong> now takes a copy of another SubTool or an <code>.obj</code>, <code>.ply</code> or <code>.glb</code> file, placed, sized and turned by the drag like the shapes. See <a href="subtools.html">SubTools</a>.
@@ -108,7 +117,7 @@
 <p>SculptForge stays free for everyone. Insiders will get each release about two weeks early, starting with SculptForge 1.0. <strong>Help &gt; Support SculptForge</strong> opens the page to join.</p>
 <p>When SculptForge starts for the first time, after an update, and otherwise at most once a week, a card shows the ways to support it: <strong>Supporter</strong>, <strong>Insider</strong> and <strong>Studio</strong> memberships and a one-time gift, each opening its checkout page in your browser. <strong>Maybe later</strong>, <kbd>Esc</kbd> or a click outside closes it; <strong>I&#x27;m already a supporter</strong> hides it for good, and <strong>Preferences &gt; Support</strong> turns it off. It never shows while you work, and nothing about you is sent anywhere.</p>
 <h2 id="version-0103">Version 0.10.3<a class="anchor" href="#version-0103" aria-label="Link to this section">#</a></h2>
-<h3 id="from-your-requests-on-github-1">From your requests on GitHub<a class="anchor" href="#from-your-requests-on-github-1" aria-label="Link to this section">#</a></h3>
+<h3 id="from-your-requests-on-github-2">From your requests on GitHub<a class="anchor" href="#from-your-requests-on-github-2" aria-label="Link to this section">#</a></h3>
 <ul>
 <li>
 <strong>Alternate smooth</strong> (#40): start smoothing with Shift held, then let go of Shift while still pressing, and the rest of the stroke smooths without shrinking the form. <strong>Brush &gt; Smooth keeps volume</strong> makes it the default. See <a href="sculpting.html">Sculpting</a>.

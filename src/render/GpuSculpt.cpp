@@ -89,17 +89,58 @@ void main() {
 }
 )";
 
+// Between the passes: one workgroup adds the plane's partial sums (in a fixed order) and writes the plane, so the
+// kernel pass needs no round trip through the CPU. With nothing under the brush: the weight 0, and on micro
+// levels (uMicro) the plane facing the viewer through the dab's centre, as the CPU does.
+const char* kPlaneTotal = R"(
+layout(std430, binding = 2) readonly buffer Partial { float partial[]; };
+layout(std430, binding = 11) writeonly buffer Plane { float plane[8]; };
+uniform vec3 uViewDir, uCenter;
+uniform int uMicro;
+shared float sums[7][LOCAL];
+void main() {
+    uint l = gl_LocalInvocationID.x;
+    float v[7] = float[7](0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+    for (uint g = l; g < uCount; g += uint(LOCAL))
+        for (int k = 0; k < 7; ++k) v[k] += partial[7u * g + uint(k)];
+    for (int k = 0; k < 7; ++k) sums[k][l] = v[k];
+    barrier();
+    for (uint s = uint(LOCAL) / 2u; s > 0u; s >>= 1) {
+        if (l < s)
+            for (int k = 0; k < 7; ++k) sums[k][l] += sums[k][l + s];
+        barrier();
+    }
+    if (l == 0u) {
+        float w = sums[6][0];
+        vec3 n = vec3(sums[0][0], sums[1][0], sums[2][0]), c = vec3(sums[3][0], sums[4][0], sums[5][0]);
+        float len = length(n);
+        n = len > 1e-12 ? n / len : -uViewDir;
+        c = w > 0.0 ? c / w : vec3(0.0);
+        if (uMicro != 0 && w <= 0.0) { n = -uViewDir; c = uCenter; }
+        plane[0] = n.x; plane[1] = n.y; plane[2] = n.z;
+        plane[3] = c.x; plane[4] = c.y; plane[5] = c.z;
+        plane[6] = w; plane[7] = 0.0;
+    }
+}
+)";
+
 // Mesh levels, pass 2: each vertex's delta in units of uUnit.
 const char* kMeshDeltas = R"(
 layout(std430, binding = 0) readonly buffer Pos { float pos[]; };
 layout(std430, binding = 1) readonly buffer Nrm { float nrm[]; };
 layout(std430, binding = 3) writeonly buffer Out { int outd[]; };
-uniform vec3 uCenter, uAreaNormal, uAreaCenter;
+layout(std430, binding = 11) readonly buffer Plane { float plane[8]; }; // normal, centre, weight (kPlaneTotal)
+uniform vec3 uCenter;
 uniform float uRadius, uFocal, uStrength, uSign, uInvert, uUnit;
 uniform int uBrush;
 void main() {
     uint i = invocation();
     if (i >= uCount) return;
+    vec3 uAreaNormal = vec3(plane[0], plane[1], plane[2]), uAreaCenter = vec3(plane[3], plane[4], plane[5]);
+    if (plane[6] <= 0.0) { // nothing under the brush: nothing moves
+        outd[3u * i] = 0; outd[3u * i + 1u] = 0; outd[3u * i + 2u] = 0;
+        return;
+    }
     vec3 x = vec3(pos[3u * i], pos[3u * i + 1u], pos[3u * i + 2u]);
     vec3 o = x - uCenter;
     float f = falloff(length(o), uRadius, uFocal);
@@ -213,7 +254,9 @@ void main() {
 // in world units (MicroStroke::dab's kernel).
 const char* kMicroCoarse = R"(
 layout(std430, binding = 10) writeonly buffer Coarse { float coarse[]; };
-uniform vec3 uCenter, uAreaNormal, uAreaCenter;
+layout(std430, binding = 11) readonly buffer Plane { float plane[8]; }; // (kPlaneTotal, when uUsePlane)
+uniform vec3 uCenter;
+uniform int uUsePlane;
 uniform float uRadius, uFocal, uStrength, uSign, uInvert;
 uniform int uBrush;
 float before(uint k, uint ci, uint cj) { return heightAt(k, gindex(ci * uStride, cj * uStride, uN)); }
@@ -241,6 +284,11 @@ float sharpen(uint k, uint ci, uint cj, float cur, float amount) {
 void main() {
     uint gid = invocation();
     if (gid >= uCount) return;
+    vec3 uAreaNormal = vec3(0.0), uAreaCenter = vec3(0.0);
+    if (uUsePlane != 0) {
+        uAreaNormal = vec3(plane[0], plane[1], plane[2]);
+        uAreaCenter = vec3(plane[3], plane[4], plane[5]);
+    }
     uint k = gid / uCS, c = gid % uCS;
     uint cc = ccoords[c], ci = cc & 65535u, cj = cc >> 16;
     uint i = ci * uStride, j = cj * uStride, idx = gindex(i, j, uN);
@@ -382,7 +430,7 @@ std::unique_ptr<GpuSculpt> GpuSculpt::create(gl::ProcLoader loader, std::string&
     GLint bindings = 0, blocks = 0;
     gl::GetIntegerv(GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS, &bindings);
     gl::GetIntegerv(GL_MAX_COMPUTE_SHADER_STORAGE_BLOCKS, &blocks);
-    if (bindings < BufferCount || blocks < 8) {
+    if (bindings < 12 || blocks < 8) {
         reason = "too few shader storage buffers (" + std::to_string(blocks) + ")";
         return nullptr;
     }
@@ -399,6 +447,7 @@ bool GpuSculpt::init(std::string& reason) {
     } progs[] = {
         {&meshSums_, source(kLocal, {kMeshSums})},
         {&meshDeltas_, source(kLocal, {kMeshDeltas})},
+        {&planeTotal_, source(kLocal, {kPlaneTotal})},
         {&microPlane_, source(kMicroLocal, {kMicroCommon, kMicroPlane})},
         {&microCoarse_, source(kLocal, {kMicroCommon, kMicroCoarse})},
         {&microFine_, source(kLocal, {kMicroCommon, kMicroFine}, "uniform int uGrab;\n")},
@@ -417,7 +466,7 @@ bool GpuSculpt::init(std::string& reason) {
 
 GpuSculpt::~GpuSculpt() {
     if (!onOwnerThread()) return; // (no context here: the driver frees them with the context)
-    for (GLuint p : {meshSums_, meshDeltas_, microPlane_, microCoarse_, microFine_})
+    for (GLuint p : {meshSums_, meshDeltas_, planeTotal_, microPlane_, microCoarse_, microFine_})
         if (p) gl::DeleteProgram(p);
     gl::DeleteBuffers(BufferCount, buffers_);
 }
@@ -451,7 +500,7 @@ void GpuSculpt::dispatch(size_t invocations, int localSize) {
 }
 
 void GpuSculpt::finish() {
-    for (int b = 0; b < 11; ++b) BindBufferBase(GL_SHADER_STORAGE_BUFFER, GLuint(b), 0);
+    for (int b = 0; b < 12; ++b) BindBufferBase(GL_SHADER_STORAGE_BUFFER, GLuint(b), 0);
     gl::BindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     gl::UseProgram(0);
 }
@@ -477,41 +526,26 @@ bool GpuSculpt::meshDab(const MeshDabJob& job, MeshDabResult& out) {
     bind(Out, n * 12, 3);
     stats.uploadMs += msSince(t);
 
-    // Pass 1: the area plane.
+    // Pass 1: the area plane's partial sums, then their total (on the GPU).
     gl::UseProgram(meshSums_);
     setU(meshSums_, "uCount", uint32_t(n));
     setV(meshSums_, "uCenter", job.center);
     setF(meshSums_, "uRadius", job.radius);
     setF(meshSums_, "uFocal", job.focal);
     dispatch(n, kLocal);
-    MemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
-    partials_.resize(groups * 7);
-    gl::BindBuffer(GL_SHADER_STORAGE_BUFFER, buffers_[Partial]);
-    GetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, GLsizeiptr(groups * 7 * 4), partials_.data());
-    glm::vec3 nsum(0.0f), csum(0.0f);
-    float w = 0.0f;
-    for (size_t g = 0; g < groups; ++g) {
-        const float* p = &partials_[g * 7];
-        nsum += glm::vec3(p[0], p[1], p[2]);
-        csum += glm::vec3(p[3], p[4], p[5]);
-        w += p[6];
-    }
-    out.weight = w;
-    if (w <= 0.0f) {
-        stats.kernelMs += msSince(t);
-        finish();
-        return true;
-    }
-    out.areaCenter = csum / w;
-    const float len = glm::length(nsum);
-    out.areaNormal = len > 1e-12f ? nsum / len : -job.viewDir;
+    MemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    bind(PlaneBuf, 32, 11);
+    gl::UseProgram(planeTotal_);
+    setU(planeTotal_, "uCount", uint32_t(groups));
+    setV(planeTotal_, "uViewDir", job.viewDir);
+    setI(planeTotal_, "uMicro", 0);
+    DispatchCompute(1, 1, 1);
+    MemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
     // Pass 2: the deltas.
     gl::UseProgram(meshDeltas_);
     setU(meshDeltas_, "uCount", uint32_t(n));
     setV(meshDeltas_, "uCenter", job.center);
-    setV(meshDeltas_, "uAreaNormal", out.areaNormal);
-    setV(meshDeltas_, "uAreaCenter", out.areaCenter);
     setF(meshDeltas_, "uRadius", job.radius);
     setF(meshDeltas_, "uFocal", job.focal);
     setF(meshDeltas_, "uStrength", std::clamp(job.strength, 0.0f, 1.0f));
@@ -522,6 +556,12 @@ bool GpuSculpt::meshDab(const MeshDabJob& job, MeshDabResult& out) {
     dispatch(n, kLocal);
     MemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
     stats.kernelMs += msSince(t);
+    float plane[8];
+    gl::BindBuffer(GL_SHADER_STORAGE_BUFFER, buffers_[PlaneBuf]);
+    GetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, 32, plane);
+    out.areaNormal = glm::vec3(plane[0], plane[1], plane[2]);
+    out.areaCenter = glm::vec3(plane[3], plane[4], plane[5]);
+    out.weight = plane[6];
     out.delta.resize(n);
     gl::BindBuffer(GL_SHADER_STORAGE_BUFFER, buffers_[Out]);
     GetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, GLsizeiptr(n * 12), out.delta.data());
@@ -600,8 +640,8 @@ bool GpuSculpt::microDab(const MicroDabJob& job, MicroDabResult& out) {
         setI(prog, "uHasMask", job.mask ? 1 : 0);
         setF(prog, "uStep", job.step);
     };
-    // The plane.
-    glm::vec3 areaNormal(0.0f), areaCenter(0.0f);
+    // The plane (on the GPU: per triangle, then the total).
+    bind(PlaneBuf, 32, 11);
     if (job.needPlane) {
         common(microPlane_);
         setU(microPlane_, "uCount", uint32_t(K));
@@ -610,35 +650,20 @@ bool GpuSculpt::microDab(const MicroDabJob& job, MicroDabResult& out) {
         setF(microPlane_, "uFocal", job.focal);
         setU(microPlane_, "uPlaneStride", job.n >= 4 ? 2u : 1u);
         dispatch(K * kMicroLocal, kMicroLocal);
-        MemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
-        partials_.resize(K * 7);
-        gl::BindBuffer(GL_SHADER_STORAGE_BUFFER, buffers_[Partial]);
-        GetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, GLsizeiptr(K * 7 * 4), partials_.data());
-        glm::dvec3 nsum(0.0), csum(0.0);
-        double w = 0.0;
-        for (size_t k = 0; k < K; ++k) {
-            const float* p = &partials_[k * 7];
-            nsum += glm::dvec3(p[0], p[1], p[2]);
-            csum += glm::dvec3(p[3], p[4], p[5]);
-            w += p[6];
-        }
-        if (w <= 0.0) {
-            areaNormal = -job.viewDir;
-            areaCenter = job.center;
-        } else {
-            areaCenter = glm::vec3(csum / w);
-            const double len = glm::length(nsum);
-            areaNormal = len > 1e-12 ? glm::vec3(nsum / len) : -job.viewDir;
-        }
+        MemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+        gl::UseProgram(planeTotal_);
+        setU(planeTotal_, "uCount", uint32_t(K));
+        setV(planeTotal_, "uViewDir", job.viewDir);
+        setV(planeTotal_, "uCenter", job.center);
+        setI(planeTotal_, "uMicro", 1);
+        DispatchCompute(1, 1, 1);
+        MemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     }
-    out.areaNormal = areaNormal;
-    out.areaCenter = areaCenter;
     // The coarse points.
     common(microCoarse_);
     setU(microCoarse_, "uCount", uint32_t(K * cs));
     setV(microCoarse_, "uCenter", job.center);
-    setV(microCoarse_, "uAreaNormal", areaNormal);
-    setV(microCoarse_, "uAreaCenter", areaCenter);
+    setI(microCoarse_, "uUsePlane", job.needPlane ? 1 : 0);
     setF(microCoarse_, "uRadius", job.radius);
     setF(microCoarse_, "uFocal", job.focal);
     setF(microCoarse_, "uStrength", std::clamp(job.strength, 0.0f, 1.0f));
@@ -659,6 +684,14 @@ bool GpuSculpt::microDab(const MicroDabJob& job, MicroDabResult& out) {
     gl::BindBuffer(GL_SHADER_STORAGE_BUFFER, buffers_[Out]);
     GetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, GLsizeiptr(((points + 1) / 2) * 4), out.delta.data());
     out.delta.resize(points);
+    out.areaNormal = out.areaCenter = glm::vec3(0.0f);
+    if (job.needPlane) {
+        float plane[8];
+        gl::BindBuffer(GL_SHADER_STORAGE_BUFFER, buffers_[PlaneBuf]);
+        GetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, 32, plane);
+        out.areaNormal = glm::vec3(plane[0], plane[1], plane[2]);
+        out.areaCenter = glm::vec3(plane[3], plane[4], plane[5]);
+    }
     finish();
     const bool ok = gl::GetError() == 0;
     stats.readbackMs += msSince(t);

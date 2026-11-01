@@ -50,8 +50,8 @@ private:
     void finish();
 
     std::thread::id owner_;
-    GLuint meshSums_ = 0, meshDeltas_ = 0, microPlane_ = 0, microCoarse_ = 0, microFine_ = 0;
-    enum Buffer { Pos, Nrm, Partial, Out, Corners, Slots, Heights, Mask, Coords, CoarseCoords, Coarse, BufferCount };
+    GLuint meshSums_ = 0, meshDeltas_ = 0, planeTotal_ = 0, microPlane_ = 0, microCoarse_ = 0, microFine_ = 0;
+    enum Buffer { Pos, Nrm, Partial, Out, Corners, Slots, Heights, Mask, Coords, CoarseCoords, Coarse, PlaneBuf, BufferCount };
     GLuint buffers_[BufferCount] = {};
     size_t sizes_[BufferCount] = {};
     std::vector<float> stageA_, stageB_, partials_;

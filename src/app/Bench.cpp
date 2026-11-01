@@ -153,6 +153,11 @@ int runAppBenchmark(BenchCommandLine cl) {
         setBrushCompute(brushes.get());
         std::printf("Brushes: %s%s%s\n", brushPathName().c_str(), brushes ? "" : " - ", brushes ? "" : why.c_str());
         code = runBenchCommandLine(cl, "## With the GPU (sculptforge --bench, brushes: " + brushPathName() + ")\n\n", &gpu);
+        if (brushes && brushes->stats.dabs)
+            std::printf("GPU brushes: %llu dabs, %.1fM points; per dab: upload %.2f ms, kernels %.2f ms, read back %.2f ms\n",
+                        (unsigned long long)brushes->stats.dabs, double(brushes->stats.points) / 1e6,
+                        brushes->stats.uploadMs / double(brushes->stats.dabs), brushes->stats.kernelMs / double(brushes->stats.dabs),
+                        brushes->stats.readbackMs / double(brushes->stats.dabs));
         setBrushCompute(nullptr);
         brushes.reset();
         renderer.shutdown();
