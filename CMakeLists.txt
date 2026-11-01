@@ -36,6 +36,7 @@ add_library(sculptforge_core STATIC
   src/core/Dyntopo.cpp
   src/core/DyntopoCommands.cpp
   src/core/Undo.cpp
+  src/core/Timeline.cpp
   src/core/Primitives.cpp
   src/core/Document.cpp
   src/core/Commands.cpp

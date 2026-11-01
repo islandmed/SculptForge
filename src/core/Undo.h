@@ -149,7 +149,24 @@ struct UndoRecord {
     static UndoRecord capturePolygroups(const Mesh& mesh, std::string label, std::span<const uint32_t> tris = {});
 };
 
+// Watches an UndoStack: the Sculpt Timeline (core/Timeline.h) keeps its history tree in step with it. Held by the
+// stack (UndoStack::listener), so it moves with it (each SubTool's history has its own).
+struct UndoListener {
+    virtual ~UndoListener() = default;
+    // A step was pushed (it is the stack's last undo step); `discardedRedo` holds the redo steps the push is about
+    // to drop (redo_.back() is the next redo) and may be moved from.
+    virtual void undoPushed(UndoRecord& pushed, std::deque<UndoRecord>& discardedRedo) = 0;
+    // Around UndoStack::undo / redo applying `r` to `mesh`.
+    virtual void undoApplying(UndoRecord& r, Mesh& mesh, bool isUndo) = 0;
+    virtual void undoApplied(UndoRecord& r, Mesh& mesh, bool isUndo) = 0;
+    virtual void undoDroppedOldest() = 0; // the byte budget dropped the oldest undo step
+    virtual void undoCleared() = 0;
+};
+
+class Timeline;
+
 class UndoStack {
+    friend class Timeline; // moves steps between undo and redo without applying them (core/Timeline.h)
 public:
     UndoStack() = default;
     UndoStack(UndoStack&&) = default; // move-only (records own mesh snapshots)
@@ -176,6 +193,7 @@ public:
     size_t undoBytes() const;
 
     size_t byteBudget = size_t(1) << 30; // 1 GiB
+    std::shared_ptr<UndoListener> listener; // the Sculpt Timeline (core/Timeline.h), if one watches this history
 
 private:
     static void apply(UndoRecord& r, Mesh& mesh, BVH& bvh);
