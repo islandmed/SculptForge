@@ -64,7 +64,7 @@
 <h2 id="what-it-keeps-and-what-it-doesnt">What it keeps and what it doesn&#x27;t<a class="anchor" href="#what-it-keeps-and-what-it-doesnt" aria-label="Link to this section">#</a></h2>
 <ul>
 <li>
-<strong>Symmetry.</strong> With X (or Y, Z) symmetry on, both sides are remeshed together and get mirrored triangles, not just mirrored shapes.
+<strong>Symmetry.</strong> With X (or Y, Z) symmetry on, both sides are remeshed together and get mirrored triangles, not just mirrored shapes. A model whose sides aren&#x27;t made of mirrored polygons (after QRemesh, or sculpted without symmetry) has no mirrored triangles to keep: each side then gets its own new triangles, as fine as the brush&#x27;s side.
 </li>
 <li>
 <strong>Mask and visibility.</strong> Fully masked and hidden parts are left alone. Partly masked areas are remeshed but move less, as usual.
