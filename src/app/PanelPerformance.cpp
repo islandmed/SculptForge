@@ -9,6 +9,7 @@
 #include "app/I18n.h"
 
 #include "core/Benchmark.h"
+#include "core/BrushCompute.h"
 #include "core/HardwareProfile.h"
 #include "core/ThreadPool.h"
 
@@ -89,6 +90,20 @@ void App::registerPerformanceUiActions() {
         [] { return !ThreadPool::shared().serial(); },
         "Run brushes, normal and BVH updates and project saving on every core. Turn it off only to compare speeds "
         "or rule it out when troubleshooting: the results are the same either way.");
+    add("perf.gpu_brushes", "GPU Brushes",
+        [this] {
+            uiPrefs_.gpuBrushes = !uiPrefs_.gpuBrushes;
+            applyPerformancePrefs();
+            status_ = !brushCompute() ? "GPU brushes need OpenGL 4.3 compute shaders: brushes run on the CPU (" + gpuSculptReason_ + ")"
+                      : gpuBrushesEnabled() ? "GPU brushes on: " + brushPathName()
+                                            : std::string("GPU brushes off: brushes run on the CPU");
+        },
+        [this] { return uiPrefs_.gpuBrushes && brushCompute() != nullptr; },
+        "Work out big brush dabs (Standard, Clay, Inflate, Flatten, Pinch, Crease; on micro levels also Smooth and "
+        "Move) on the graphics card, with OpenGL 4.3 compute shaders (Windows and Linux). The graphics card computes "
+        "each point's change; SculptForge applies it to the model as whole numbers, so undo, redo, saving and the "
+        "Sculpt Timeline work exactly as before. Without compute shaders (macOS, older drivers) every brush runs on the "
+        "processor, as it always has.");
     add("perf.predictive_strokes", "Predictive Strokes",
         [this] {
             uiPrefs_.predictiveStrokes = !uiPrefs_.predictiveStrokes;
@@ -113,7 +128,12 @@ void App::registerPerformanceUiActions() {
     registerPerformanceProfileUiActions(); // Re-calibrate, the frame governor (PanelPerformanceProfile.cpp)
 }
 
-void App::applyPerformancePrefs() { ThreadPool::shared().setSerial(!uiPrefs_.multithreading); }
+void App::applyPerformancePrefs() {
+    ThreadPool::shared().setSerial(!uiPrefs_.multithreading);
+    // GPU brushes: the preference, unless SF_GPU_BRUSHES decides (0 = CPU, 1 = GPU where present).
+    const char* env = std::getenv("SF_GPU_BRUSHES");
+    setGpuBrushesEnabled(env && *env ? *env != '0' : uiPrefs_.gpuBrushes);
+}
 
 int App::viewSamples() {
     const int aa = uiPrefs_.antialiasing;
@@ -165,6 +185,13 @@ void App::drawPerformanceSection() {
         dimText("The GPU had no room for " + std::to_string(uiPrefs_.antialiasing) + "x: using " +
                 (perf_.samplesUsed == 1 ? std::string("none") : std::to_string(perf_.samplesUsed) + "x") + ".");
 
+    bool gpuBrushes = uiPrefs_.gpuBrushes && brushCompute();
+    ImGui::BeginDisabled(!brushCompute());
+    if (ImGui::Checkbox(tr("GPU Brushes"), &gpuBrushes)) actions_.find("perf.gpu_brushes")->run();
+    ImGui::EndDisabled();
+    ui::HelpAction(*this, "perf.gpu_brushes");
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", brushPathName().c_str());
     bool predictive = uiPrefs_.predictiveStrokes;
     if (ImGui::Checkbox(tr("Predictive Strokes"), &predictive)) actions_.find("perf.predictive_strokes")->run();
     ui::HelpAction(*this, "perf.predictive_strokes");

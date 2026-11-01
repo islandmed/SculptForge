@@ -9,6 +9,7 @@
 
 #include "app/Demo.h"
 #include "app/Shell.h"
+#include "core/BrushCompute.h"
 #include "app/Theme.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
@@ -812,9 +813,10 @@ void App::drawTitleStrip(const ShellGeometry& g) {
         fpsShown_ = ImGui::GetIO().Framerate;
         fpsShownAt_ = ImGui::GetTime();
     }
-    char fps[32];
-    std::snprintf(fps, sizeof fps, "%.0f fps", fpsShown_);
-    const float fpsSlot = ImGui::CalcTextSize("0000 fps").x;
+    // ... followed by where brushes run (core/BrushCompute.h): GPU or CPU.
+    char fps[48];
+    std::snprintf(fps, sizeof fps, "%.0f fps  %s", fpsShown_, activeBrushCompute() ? "GPU" : "CPU");
+    const float fpsSlot = ImGui::CalcTextSize("0000 fps  GPU").x;
     const float avail = rightX - infoX - 16.0f * s;
     const float infoW = ImGui::CalcTextSize(info).x + 18.0f * s + fpsSlot;
     if (infoW < avail) {

@@ -298,6 +298,17 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
     touch(mm, cand_);
     findMs += lapMs(clock);
 
+    // GPU brushes (core/BrushCompute.h): the plane and the kernel on the GPU; the integer commit, then the stitch, here.
+    GpuBrush gpuBrush;
+    if (BrushCompute* gpu = activeBrushCompute();
+        gpu && !maskBrush && gpuMicroBrush(type, gpuBrush) && cand_.size() * S >= gpuMinPoints() && gpuDab(m, mm, gpu, gpuBrush, center, viewDir, r, s, invert, focal, alphaUp)) {
+        kernelMs += lapMs(clock);
+        stitch(m, mm, cand_);
+        if (gpuOver_ > 0.0f) widen(mm, gpuOver_ * 1.5f);
+        stitchMs += lapMs(clock);
+        return;
+    }
+
     // 2. The brush plane: weighted area normal and centre over every second grid point under the brush.
     glm::vec3 areaNormal(0.0f), areaCenter(0.0f);
     const bool needPlane = !maskBrush && type != BrushType::Smooth && type != BrushType::Inflate && type != BrushType::Pinch;
@@ -520,6 +531,87 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
     stitchMs += lapMs(clock);
 }
 
+uint32_t MicroStroke::strideFor(uint32_t n, float radius) const {
+    uint32_t stride = 1;
+    const float microEdge = baseEdge_ / float(n);
+    if (adaptive && microEdge > 0.0f)
+        while (stride < n && microEdge * float(stride * 2) <= radius / float(kBrushSamples)) stride *= 2;
+    return stride;
+}
+
+void MicroStroke::gpuCorners(const Mesh& m, uint32_t n, std::span<const uint32_t> tris) {
+    gpuP_.resize(tris.size() * 3);
+    gpuN_.resize(tris.size() * 3);
+    gpuSlot_.resize(tris.size() * 3);
+    poolFor(tris.size(), [&](size_t b, size_t e) {
+        MicroTriangle T;
+        for (size_t k = b; k < e; ++k) {
+            T.set(m, tris[k], n);
+            for (int c = 0; c < 3; ++c) {
+                gpuP_[k * 3 + size_t(c)] = T.p[c];
+                gpuN_[k * 3 + size_t(c)] = T.nrm[c];
+                gpuSlot_[k * 3 + size_t(c)] = T.slot[c];
+            }
+        }
+    }, 256);
+}
+
+// The GPU half of dab(): the kernel's integer changes for every grid point of cand_, committed here (integer adds,
+// clamped as quantizeUnits clamps). False: the GPU declined, nothing changed (the CPU kernel runs).
+bool MicroStroke::gpuDab(Mesh& m, MicroMesh& mm, BrushCompute* gpu, GpuBrush brush, const glm::vec3& center,
+                         const glm::vec3& viewDir, float r, float s, bool invert, float focal, const glm::vec3& alphaUp) {
+    const uint32_t n = mm.n, S = mm.samples;
+    MicroDabJob job;
+    job.brush = brush;
+    job.n = n;
+    job.samples = S;
+    job.stride = strideFor(n, r);
+    job.step = mm.step;
+    job.tris = cand_;
+    gpuCorners(m, n, cand_);
+    job.cornerP = gpuP_.data();
+    job.cornerN = gpuN_.data();
+    job.cornerSlot = gpuSlot_.data();
+    job.heights = mm.disp.data();
+    job.mask = mm.hasMask() ? mm.mask.data() : nullptr;
+    job.center = center;
+    job.viewDir = viewDir;
+    job.alphaUp = alphaUp;
+    job.radius = r;
+    job.strength = s;
+    job.focal = focal;
+    job.invert = invert;
+    job.needPlane = brush != GpuBrush::Smooth && brush != GpuBrush::Inflate && brush != GpuBrush::Pinch;
+    if (!gpu->microDab(job, gpuResult_)) return false;
+    lastStride = job.stride;
+    std::vector<float> clipped((cand_.size() + 63) / 64, 0.0f);
+    const float step = mm.step;
+    poolFor(cand_.size(), [&](size_t b, size_t e) {
+        float over = 0.0f;
+        for (size_t ci = b; ci < e; ++ci) {
+            const uint32_t t = cand_[ci];
+            int16_t* g = mm.disp.data() + size_t(t) * S;
+            const int16_t* d = gpuResult_.delta.data() + ci * S;
+            int triMax = mm.triRange[t];
+            for (uint32_t k = 0; k < S; ++k) {
+                if (!d[k]) continue;
+                const int nd = int(g[k]) + int(d[k]);
+                const int a = nd >= 0 ? nd : -nd;
+                if (a > 32767) over = std::max(over, float(a) * step);
+                const int q = std::clamp(nd, -32767, 32767);
+                g[k] = int16_t(q);
+                triMax = std::max(triMax, q >= 0 ? q : -q);
+            }
+            mm.triRange[t] = uint16_t(std::min(triMax, 32767));
+        }
+        clipped[b / 64] = std::max(clipped[b / 64], over);
+    }, 64);
+    gpuOver_ = 0.0f;
+    for (float c : clipped) gpuOver_ = std::max(gpuOver_, c);
+    points += uint64_t(cand_.size()) * S;
+    return true;
+}
+
 void MicroStroke::widen(MicroMesh& mm, float need) {
     const int div = mm.widen(need);
     if (div == 1) return;
@@ -591,6 +683,44 @@ void MicroStroke::grab(Mesh& m, const glm::vec3& delta) {
     for (const GrabMirror& gm : grabMirrors_) {
         const uint32_t cm = n / gm.stride, cs = (cm + 1) * (cm + 2) / 2;
         const glm::vec3 dm = delta * gm.mirror;
+        if (BrushCompute* gpu = activeBrushCompute(); gpu && size_t(gm.tris) * S >= gpuMinPoints()) {
+            // GPU: the coarse changes here (one dot product each), spread over every grid point there, committed here.
+            gpuCoarse_.resize(size_t(gm.tris) * cs);
+            poolFor(size_t(gm.tris) * cs, [&](size_t b, size_t e) {
+                for (size_t c = b; c < e; ++c) {
+                    const float w = grabWeight_[weightBase + c];
+                    gpuCoarse_[c] = w > 0.0f ? glm::dot(dm, grabNormal_[weightBase + c]) * w : 0.0f;
+                }
+            }, 1 << 14);
+            MicroGrabJob job;
+            job.n = n;
+            job.samples = S;
+            job.stride = gm.stride;
+            job.step = mm.step;
+            job.tris = std::span<const uint32_t>(grabTris_).subspan(gm.firstTri, gm.tris);
+            job.coarse = gpuCoarse_.data();
+            job.heights = mm.disp.data();
+            job.mask = mm.hasMask() ? mm.mask.data() : nullptr;
+            if (gpu->microGrab(job, gpuResult_.delta)) {
+                poolFor(gm.tris, [&](size_t b, size_t e) {
+                    for (size_t k = b; k < e; ++k) {
+                        const uint32_t t = job.tris[k];
+                        int16_t* g = mm.disp.data() + size_t(t) * S;
+                        const int16_t* d = gpuResult_.delta.data() + k * S;
+                        int triMax = mm.triRange[t];
+                        for (uint32_t p = 0; p < S; ++p) {
+                            if (!d[p]) continue;
+                            const int q = std::clamp(int(g[p]) + int(d[p]), -32767, 32767);
+                            g[p] = int16_t(q);
+                            triMax = std::max(triMax, q >= 0 ? q : -q);
+                        }
+                        mm.triRange[t] = uint16_t(std::min(triMax, 32767));
+                    }
+                }, 8);
+                weightBase += size_t(gm.tris) * cs;
+                continue;
+            }
+        }
         poolFor(gm.tris, [&](size_t b, size_t e) {
             thread_local std::vector<float> coarse;
             coarse.resize(cs);

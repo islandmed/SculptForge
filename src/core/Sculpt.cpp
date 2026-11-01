@@ -545,6 +545,39 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
         if (verts_.empty()) return;
     }
 
+    // GPU brushes (core/BrushCompute.h): the area plane and the kernel on the GPU, the commit here.
+    GpuBrush gpuBrush;
+    if (BrushCompute* gpu = activeBrushCompute();
+        gpu && !useAlpha && verts_.size() >= gpuMinPoints() && gpuMeshBrush(type, gpuBrush)) {
+        MeshDabJob job;
+        job.brush = gpuBrush;
+        job.positions = pos.data();
+        job.normals = nrm.data();
+        job.verts = verts_;
+        job.center = p.center;
+        job.viewDir = p.viewDir;
+        job.alphaUp = p.alphaUp;
+        job.radius = p.radius;
+        job.strength = std::clamp(p.strength, 0.0f, 1.0f) * std::clamp(p.pressure, 0.0f, 1.0f);
+        job.focal = p.focal;
+        job.invert = p.invert;
+        job.unit = meshDeltaUnit(p.radius);
+        if (gpu->meshDab(job, gpuResult_)) {
+            if (gpuResult_.weight <= 0.0f) return;
+            if (frameWanted_) {
+                lastFrame = {p.center, gpuResult_.areaNormal, gpuResult_.areaCenter, true};
+                frameWanted_ = false;
+            }
+            scratch_.resize(verts_.size());
+            poolFor(verts_.size(), [&](size_t b, size_t e) {
+                for (size_t i = b; i < e; ++i) scratch_[i] = meshDeltaValue(gpuResult_.delta[i], job.unit);
+            }, 1 << 14);
+            displaceAll(mesh, verts_, scratch_);
+            finishDab(mesh, bvh, clock);
+            return;
+        }
+    }
+
     // Weighted area normal and centre of the brush region.
     const AreaSums sums = areaSums(verts_.size(), [&](size_t i, AreaSums& acc) {
         const uint32_t v = verts_[i];

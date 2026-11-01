@@ -78,6 +78,7 @@ add_library(sculptforge_core STATIC
   src/core/LayerStackIO.cpp
   src/core/MapExport.cpp
   src/core/Multires.cpp
+  src/core/BrushCompute.cpp
   src/core/Micro.cpp
   src/core/MicroSculpt.cpp
   src/core/MicroCommands.cpp
@@ -299,6 +300,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/render/Ghost.cpp
     src/render/Renderer.cpp
     src/render/MicroRenderer.cpp
+    src/render/GpuSculpt.cpp
   )
   target_link_libraries(sculptforge PRIVATE sculptforge_core sculptforge_ai sculptforge_phone imgui SDL3::SDL3)
   target_include_directories(sculptforge PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/lucide)
@@ -567,6 +569,13 @@ if(SCULPTFORGE_BUILD_TESTS)
   # UI tests: each tests/ui/*.sfui script drives the real app headless (needs an
   # OpenGL 3.3 context; CI runs them on Linux under Xvfb with Mesa). Label "ui".
   if(SCULPTFORGE_BUILD_APP)
+    # GPU brushes against the CPU ones (tests/gpu/test_gpu_sculpt.cpp): needs a window and OpenGL 4.3 compute
+    # shaders; skipped (exit 77) where there are none (macOS, no display).
+    add_executable(sculptforge_gpu_tests tests/gpu/test_gpu_sculpt.cpp src/render/GL.cpp src/render/GpuSculpt.cpp)
+    target_include_directories(sculptforge_gpu_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    target_link_libraries(sculptforge_gpu_tests PRIVATE sculptforge_core SDL3::SDL3)
+    add_test(NAME gpu_sculpt_parity COMMAND sculptforge_gpu_tests)
+    set_tests_properties(gpu_sculpt_parity PROPERTIES LABELS ui TIMEOUT 300 SKIP_RETURN_CODE 77)
     file(GLOB SCULPTFORGE_UI_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/*.sfui)
     foreach(script ${SCULPTFORGE_UI_TESTS})
       get_filename_component(name ${script} NAME_WE)

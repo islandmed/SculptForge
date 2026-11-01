@@ -35,6 +35,7 @@
 // sharpens the height profile instead (see microBrushSupport).
 #pragma once
 
+#include "core/BrushCompute.h"
 #include "core/Mesh.h"
 #include "core/MicroStore.h"
 
@@ -268,6 +269,17 @@ private:
     void touch(MicroMesh& mm, std::span<const uint32_t> tris);
     void widen(MicroMesh& mm, float need); // MicroMesh::widen, keeping this stroke's saved tiles in step
     void stitch(const Mesh& m, MicroMesh& mm, std::span<const uint32_t> tris);
+    // The dab's stride (scale-adaptive brushing) for a brush of `radius` on an n-grid.
+    uint32_t strideFor(uint32_t n, float radius) const;
+    // GPU brushes (core/BrushCompute.h): the corners of `tris` for the GPU, and dab()'s GPU half.
+    void gpuCorners(const Mesh& m, uint32_t n, std::span<const uint32_t> tris);
+    bool gpuDab(Mesh& m, MicroMesh& mm, BrushCompute* gpu, GpuBrush brush, const glm::vec3& center, const glm::vec3& viewDir,
+                float r, float s, bool invert, float focal, const glm::vec3& alphaUp);
+    std::vector<glm::vec3> gpuP_, gpuN_;
+    std::vector<uint8_t> gpuSlot_;
+    std::vector<float> gpuCoarse_;
+    MicroDabResult gpuResult_;
+    float gpuOver_ = 0.0f; // the largest height the last GPU dab clipped (world units)
     bool active_ = false;
     float strokeStep_ = 0.0f;
     std::vector<uint32_t> tileOf_;        // per base triangle: its undo tile + 1 (0 = not yet touched)

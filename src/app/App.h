@@ -211,6 +211,10 @@ private:
     Document doc_;
     CommandRegistry commands_;
     Renderer renderer_;
+    // GPU brushes (render/GpuSculpt.h, core/BrushCompute.h): installed when the context has OpenGL 4.3 compute;
+    // otherwise null and why.
+    std::unique_ptr<class GpuSculpt> gpuSculpt_;
+    std::string gpuSculptReason_;
     RenderSettings renderSettings_;
     Camera camera_;
 

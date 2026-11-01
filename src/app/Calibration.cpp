@@ -392,6 +392,12 @@ void probeHardware(HardwareInfo& info) {
     gl::GetIntegerv(kGL_MAX_TEXTURE_SIZE, &maxTexture);
     info.maxTextureSize = maxTexture;
     info.timerQuery = e.timer();
+    {
+        GLint major = 0, minor = 0;
+        gl::GetIntegerv(0x821B, &major); // GL_MAJOR_VERSION
+        gl::GetIntegerv(0x821C, &minor); // GL_MINOR_VERSION
+        info.computeShaders = major * 10 + minor >= 43;
+    }
     info.vramMB = info.vramAvailableMB = 0;
     info.vramSource = "none";
     while (gl::GetError() != GL_NO_ERROR) {}

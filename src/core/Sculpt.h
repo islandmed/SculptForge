@@ -3,6 +3,7 @@
 #pragma once
 
 #include "core/BVH.h"
+#include "core/BrushCompute.h"
 #include "core/BrushRecipe.h"
 #include "core/Dyntopo.h"
 #include "core/Kelvinlet.h"
@@ -261,6 +262,7 @@ private:
     bool draft_ = false;                     // this stroke is a draft
     std::vector<uint32_t> draftLeaves_;      // the BVH leaves its dabs touched (flushDraft)
     std::vector<glm::vec3> scratch_;
+    MeshDabResult gpuResult_; // a GPU dab's deltas (core/BrushCompute.h)
     // Smooth with keepVolume: each brush vertex's shrunk position, and (vertex, index) sorted to look it up.
     void taubinShrink(const Mesh& mesh);
     std::vector<glm::vec3> shrunk_;

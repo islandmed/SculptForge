@@ -51,6 +51,7 @@ struct HardwareInfo {
     std::string vramSource;       // how vramMB was found, e.g. "GL_NVX_gpu_memory_info", "sysfs amdgpu", "none"
     int maxTextureSize = 0;       // GL_MAX_TEXTURE_SIZE
     bool timerQuery = false;      // GL timer queries work (GL_TIME_ELAPSED)
+    bool computeShaders = false;  // OpenGL 4.3 compute shaders: GPU brushes (core/BrushCompute.h)
     // The machine.
     std::string os;               // e.g. "Linux 6.9.1 aarch64", "Windows 10.0.22631 x86_64", "macOS 15.1 arm64"
     std::string cpu;              // brand string or board model, "" if unknown

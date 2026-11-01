@@ -15,6 +15,7 @@
 #include "app/Calibration.h"
 #include "app/Ui.h"
 
+#include "core/BrushCompute.h"
 #include "core/FrameGovernor.h"
 #include "core/HardwareProfile.h"
 #include "core/ThreadPool.h"
@@ -399,7 +400,9 @@ void App::drawPerformanceProfileSection() {
     measured += h.cpu + (h.cpu.empty() ? "" : ", ") + std::to_string(h.cpuThreads) + " threads" + (simd.empty() ? "" : " (" + simd + ")") +
                 ", " + formatMegabytes(h.ramMB) + " RAM\nVideo memory: " + (h.vramSource.empty() ? std::string("none") : h.vramSource) +
                 (h.vramAvailableMB ? ", " + formatMegabytes(h.vramAvailableMB) + " free" : std::string()) + "\n" + h.os + ", OpenGL " +
-                h.glVersion;
+                h.glVersion + "\nBrushes: " + brushPathName() +
+                (brushCompute() ? std::string(gpuBrushesEnabled() ? "" : " (GPU brushes are off)")
+                                : gpuSculptReason_.empty() ? std::string() : " (" + gpuSculptReason_ + ")");
     ImGui::TextWrapped("%s", measured.c_str());
     ImGui::LogText("%s", measured.c_str());
 

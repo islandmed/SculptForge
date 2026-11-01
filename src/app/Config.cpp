@@ -63,6 +63,7 @@ Json toJson(const UiPrefs& p) {
     j.set("antialiasing", double(p.antialiasing));
     j.set("fastNavigation", p.fastNavigation);
     j.set("multithreading", p.multithreading);
+    j.set("gpuBrushes", p.gpuBrushes);
     j.set("predictiveStrokes", p.predictiveStrokes);
     j.set("draftStrokes", p.draftStrokes);
     j.set("dyntopoConstantDetail", p.dyntopoConstantDetail);
@@ -104,6 +105,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.antialiasing = aa >= 8 ? 8 : aa >= 4 ? 4 : aa >= 2 ? 2 : 1;
     p.fastNavigation = j["fastNavigation"].asBool(p.fastNavigation);
     p.multithreading = j["multithreading"].asBool(p.multithreading);
+    p.gpuBrushes = j["gpuBrushes"].asBool(p.gpuBrushes);
     p.predictiveStrokes = j["predictiveStrokes"].asBool(p.predictiveStrokes);
     p.draftStrokes = j["draftStrokes"].asBool(p.draftStrokes);
     p.dyntopoConstantDetail = j["dyntopoConstantDetail"].asBool(p.dyntopoConstantDetail);

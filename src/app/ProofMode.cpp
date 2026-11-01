@@ -19,6 +19,7 @@
 #include "app/Theme.h"
 
 #include "core/Benchmark.h"
+#include "core/BrushCompute.h"
 #include "core/Primitives.h"
 #include "core/Timeline.h"
 
@@ -799,8 +800,9 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                       f.p50, f.p95, f.p99);
         p.hudLine2 = buf;
         if (spec.radiusPx > 0)
-            std::snprintf(buf, sizeof buf, "stroke trails pointer %.0f ms / %.0f px (p95 %.0f ms)   RAM %.1f GB   %s", l.p50, lp.p50, l.p95,
-                          double(residentBytes()) / double(1u << 30), p.vsync ? "vsync on" : "vsync off");
+            std::snprintf(buf, sizeof buf, "stroke trails pointer %.0f ms / %.0f px (p95 %.0f ms)   RAM %.1f GB   %s   brushes %s", l.p50,
+                          lp.p50, l.p95, double(residentBytes()) / double(1u << 30), p.vsync ? "vsync on" : "vsync off",
+                          activeBrushCompute() ? "GPU" : "CPU");
         else
             std::snprintf(buf, sizeof buf, "orbiting   RAM %.1f GB   %s", double(residentBytes()) / double(1u << 30), p.vsync ? "vsync on" : "vsync off");
         p.hudLine3 = buf;
@@ -824,6 +826,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         settings.set("vsync", p.vsync);
         settings.set("video", p.video);
         settings.set("pointer_hz", kPointerHz);
+        settings.set("brushes", brushPathName()); // GPU (OpenGL 4.3 compute) or CPU (core/BrushCompute.h)
         settings.set("stroke_seconds", p.strokeSeconds);
         settings.set("input", "scripted pointer samples into App::onMouseMove (the mouse / pen handler)");
         settings.set("lag", "pointer sample time to SwapWindow of the frame showing its dab (display scan-out not included)");

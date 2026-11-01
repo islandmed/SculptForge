@@ -27,6 +27,8 @@
 #include "core/Script.h"
 #include "io/BlenderBridge.h"
 #include "render/GL.h"
+#include "render/GpuSculpt.h"
+#include "core/BrushCompute.h"
 
 #include <imgui.h>
 #include <imgui_impl_opengl3.h>
@@ -169,6 +171,11 @@ bool App::init(const AppOptions& options) {
         SDL_Log("%s", err.c_str());
         return false;
     }
+    // GPU brushes: OpenGL 4.3 compute where the context has it (Windows, Linux), else every dab on the CPU.
+    gpuSculpt_ = GpuSculpt::create([](const char* n) { return reinterpret_cast<gl::GenericProc>(SDL_GL_GetProcAddress(n)); },
+                                   gpuSculptReason_);
+    setBrushCompute(gpuSculpt_.get());
+    SDL_Log("Brushes: %s%s%s", brushPathName().c_str(), gpuSculpt_ ? "" : " - ", gpuSculpt_ ? "" : gpuSculptReason_.c_str());
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -324,6 +331,8 @@ void App::shutdown() {
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
+    setBrushCompute(nullptr);
+    gpuSculpt_.reset(); // (its buffers need the GL context)
     renderer_.shutdown();
     if (glContext_) SDL_GL_DestroyContext(glContext_);
     if (window_) SDL_DestroyWindow(window_);

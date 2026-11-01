@@ -540,6 +540,7 @@ Json hardwareJson(const HardwareInfo& h) {
     j.set("vram_source", h.vramSource.empty() ? std::string("none") : h.vramSource);
     j.set("max_texture_size", h.maxTextureSize);
     j.set("timer_query", h.timerQuery);
+    j.set("compute_shaders", h.computeShaders);
     j.set("os", h.os);
     j.set("cpu", h.cpu);
     j.set("cpu_threads", h.cpuThreads);
@@ -562,6 +563,7 @@ void hardwareFromJson(const Json& j, HardwareInfo& h) {
     h.vramSource = j["vram_source"].asString();
     h.maxTextureSize = int(j["max_texture_size"].asNumber());
     h.timerQuery = j["timer_query"].asBool();
+    h.computeShaders = j["compute_shaders"].asBool();
     h.os = j["os"].asString();
     h.cpu = j["cpu"].asString();
     h.cpuThreads = int(j["cpu_threads"].asNumber());
@@ -1044,6 +1046,7 @@ void registerHardwareProfileCommands(CommandRegistry& registry) {
                               h.vramSource = cached.hardware.vramSource;
                               h.maxTextureSize = cached.hardware.maxTextureSize;
                               h.timerQuery = cached.hardware.timerQuery;
+                              h.computeShaders = cached.hardware.computeShaders;
                               c.trianglesPerSecondM = cached.calibration.trianglesPerSecondM;
                               c.uploadGBps = cached.calibration.uploadGBps;
                               c.gpuTimer = cached.calibration.gpuTimer;
