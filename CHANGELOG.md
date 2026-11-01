@@ -68,6 +68,13 @@ All notable changes to SculptForge are listed here. The format follows
   brushes now, which ignored it; at 0 they keep their own tip exactly as before.
 - SelectRect and SelectLasso (hide / show) ignored symmetry (#51 follow-up): with X / Y / Z on, the mirror image of
   the shape counts as inside too, as with MaskRect and MaskLasso (`hide_rect` / `hide_lasso symmetry=x`).
+### Changed
+- CI is faster with the same tests: compiles go through ccache (saved only by pushes to main and maintainers' own
+  runs; pull requests only read it; release builds use no cache), `sculptforge_tests` runs as four parallel shards
+  (`sculptforge_tests --shard K/N`; every test still runs once, and each now prints its time), ctest runs tests
+  in parallel (timed measurements alone), and the Windows build compiles one file per core. The Flatpak check
+  moved to its own workflow that runs when the packaging, the build or the Flatpak-specific code changes, every
+  night, and for every release.
 
 ## [0.10.3] - 2026-11-01
 
