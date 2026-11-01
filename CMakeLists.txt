@@ -76,6 +76,7 @@ add_library(sculptforge_core STATIC
   src/core/EnvironmentMath.cpp
   src/core/MeshMaps.cpp
   src/core/LayerStack.cpp
+  src/core/MaterialRecipe.cpp
   src/core/TextureChannels.cpp
   src/core/TextureChannelCommands.cpp
   src/core/LayerStackIO.cpp
@@ -147,6 +148,13 @@ embed_files(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedHdri.cpp sf::assets
   hdriSmallStudio ${CMAKE_CURRENT_SOURCE_DIR}/assets/hdri/studio_small_09.hdr
   hdriOutdoorSky ${CMAKE_CURRENT_SOURCE_DIR}/assets/hdri/kloofendal_48d_partly_cloudy_puresky.hdr)
 target_sources(sculptforge_core PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedHdri.cpp)
+# The built-in Material Recipes (core/MaterialRecipe.h): Fill layer stacks as data files.
+embed_files(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedRecipes.cpp sf::assets
+  recipeWornMetal ${CMAKE_CURRENT_SOURCE_DIR}/assets/materials/worn_metal.sfmaterial
+  recipePaintedEdges ${CMAKE_CURRENT_SOURCE_DIR}/assets/materials/painted_edges.sfmaterial
+  recipeDirtAndDust ${CMAKE_CURRENT_SOURCE_DIR}/assets/materials/dirt_and_dust.sfmaterial
+  recipeRustedIron ${CMAKE_CURRENT_SOURCE_DIR}/assets/materials/rusted_iron.sfmaterial)
+target_sources(sculptforge_core PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedRecipes.cpp)
 target_include_directories(sculptforge_core PUBLIC src PRIVATE third_party/stb third_party/ufbx third_party/xatlas third_party/mikktspace third_party/tinyexr)
 if(WIN32)
   target_link_libraries(sculptforge_core PRIVATE shell32) # core/Trash.cpp: the Recycle Bin

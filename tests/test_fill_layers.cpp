@@ -9,6 +9,7 @@
 #include "core/Commands.h"
 #include "core/Document.h"
 #include "core/LayerStack.h"
+#include "core/MaterialRecipe.h"
 #include "core/MeshMaps.h"
 #include "core/Primitives.h"
 #include "core/Project.h"
@@ -264,4 +265,36 @@ TEST(fill_layer_command_undo_and_projects) {
     CHECK(f.effects.size() == 1 && f.effects[0].generator == GeneratorKind::EdgeWear && std::abs(f.effects[0].level - 0.6f) < 1e-4f);
     CHECK(back.mesh.texture->layers[0].mask[(512 * 1024 + 100) * 4 + 3] == 77);
     CHECK(std::abs(alphaAt(*back.mesh.texture, 0, texelX(0.3f), 512) - alphaAt(*doc.mesh.texture, 0, texelX(0.3f), 512)) < 0.01f);
+}
+
+TEST(material_recipes_are_data_and_wear_the_model) {
+    const auto& list = builtinMaterialRecipes();
+    CHECK(list.size() == 4);
+    for (const MaterialRecipe& r : list) CHECK(!r.name.empty() && !r.description.empty() && r.layers.size() >= 2);
+    CHECK(findMaterialRecipe("Worn Metal") && findMaterialRecipe("painted_edges") && !findMaterialRecipe("glitter"));
+    Document doc = makeDoc(trenchPart());
+    CommandRegistry reg;
+    CommandResult r = reg.execute(doc, "material_recipe", {{"name", std::string("worn_metal")}});
+    std::printf("  %s\n", r.message.c_str());
+    CHECK(r.ok);
+    const PaintTexture& t = *doc.mesh.texture;
+    CHECK(t.layers.size() == 4 && isFillLayer(t, 0) && isFillLayer(t, 3));
+    CHECK(channelEnabled(t, Channel::Metallic) && channelEnabled(t, Channel::Roughness));
+    // Polished edges on the rims are brighter than the plain steel on the flat.
+    const uint8_t* rim = &t.pixels[(512 * 1024 + size_t(texelX(0.3f))) * 4];
+    const uint8_t* flat = &t.pixels[(512 * 1024 + size_t(texelX(0.75f))) * 4];
+    std::printf("  rim %d flat %d\n", rim[0], flat[0]);
+    CHECK(rim[0] > flat[0] + 20);
+    CHECK(channelImage(t, Channel::Metallic).value(texelX(0.75f), 512) > 0.9f);
+    // Saved and read back.
+    const std::string path = tempPath("sf_recipe.sfmaterial");
+    CHECK(reg.execute(doc, "material_recipe", {{"action", std::string("save")}, {"name", std::string("Mine")}, {"path", path}}).ok);
+    CHECK(reg.execute(doc, "material_recipe", {{"path", path}}).ok);
+    CHECK(doc.mesh.texture->layers.size() == 8);
+    CHECK(reg.execute(doc, "undo").ok);
+    CHECK(doc.mesh.texture->layers.size() == 4);
+    CHECK(!reg.execute(doc, "material_recipe", {{"name", std::string("glitter")}}).ok);
+    MaterialRecipe bad;
+    std::string err;
+    CHECK(!parseMaterialRecipe("{\"format\":\"other\"}", bad, err));
 }

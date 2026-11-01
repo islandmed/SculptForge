@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Polypaint.h"
 #include "core/LayerStack.h"
+#include "core/MaterialRecipe.h"
 #include "core/MeshMaps.h"
 #include "core/MapExport.h"
 
@@ -408,6 +409,7 @@ void registerPaintCommands(CommandRegistry& registry) {
     registerTextureChannelCommands(registry); // texture_channels, paint_material, channel_view (core/TextureChannelCommands.cpp)
     registerMeshMapCommands(registry);        // mesh_maps (core/MeshMaps.cpp)
     registerLayerStackCommands(registry);     // fill_layer (core/LayerStack.cpp)
+    registerMaterialRecipeCommands(registry); // material_recipe (core/MaterialRecipe.cpp)
     registerMapExportCommands(registry);      // export_maps (core/MapExport.cpp)
 }
 

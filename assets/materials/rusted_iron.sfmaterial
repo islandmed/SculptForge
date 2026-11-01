@@ -1,0 +1,33 @@
+{
+  "format": "sculptforge-material-recipe",
+  "version": 1,
+  "id": "rusted_iron",
+  "name": "Rusted Iron",
+  "description": "Dark iron eaten by rust: orange-brown patches spreading from the crevices and over thin parts, rough and flaky.",
+  "layers": [
+    {
+      "name": "Iron",
+      "fill": {
+        "material": {"channels": ["base_color", "roughness", "metallic"], "color": [0.3, 0.3, 0.31], "roughness": 0.6, "metallic": 1.0},
+        "mask": [{"kind": "fill", "value": 1.0}]
+      }
+    },
+    {
+      "name": "Rust",
+      "fill": {
+        "material": {"channels": ["base_color", "roughness", "metallic", "height"], "color": [0.45, 0.2, 0.08], "roughness": 0.92, "metallic": 0.0, "height": 0.52},
+        "mask": [{"kind": "noise", "scale": 0.06, "octaves": 5, "seed": 31, "contrast": 1.4},
+                 {"kind": "generator", "generator": "dirt", "blend": "add", "level": 0.55, "softness": 0.4, "breakup": 0.6, "scale": 0.03, "seed": 2},
+                 {"kind": "levels", "in_low": 0.45, "in_high": 0.75}]
+      }
+    },
+    {
+      "name": "Dark Rust",
+      "fill": {
+        "material": {"channels": ["base_color", "roughness"], "color": [0.22, 0.09, 0.04], "roughness": 1.0},
+        "mask": [{"kind": "noise", "scale": 0.02, "octaves": 4, "seed": 44, "contrast": 1.6},
+                 {"kind": "levels", "in_low": 0.55, "in_high": 0.8, "out_high": 0.9}]
+      }
+    }
+  ]
+}
