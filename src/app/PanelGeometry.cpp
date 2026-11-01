@@ -5,6 +5,7 @@
 // Reconstruct Subdiv, Divide with Smt). The levels themselves live in core/Multires.
 #include "app/App.h"
 #include "app/Ui.h"
+#include "app/I18n.h"
 
 #include "core/Micro.h"
 #include "core/Multires.h"
@@ -61,7 +62,7 @@ void App::drawGeometrySection() {
                       subdivLevelTriangles(m, 0), subdivLevelTriangles(m, levels - 1));
         ImGui::TextDisabled("%s", info);
     } else {
-        ImGui::TextDisabled("No subdivision levels - Divide adds them");
+        ImGui::TextDisabled("%s", tr("No subdivision levels - Divide adds them"));
     }
 
     // Micro: displacement levels above the highest level (core/Micro.h). One row: the level slider and Divide to
@@ -94,7 +95,7 @@ void App::drawGeometrySection() {
         ui::ActionButton(*this, "geometry.micro_delete", ImVec2(-1, 0));
         ui::ActionButton(*this, "geometry.micro_export", ImVec2(half, 0));
         ImGui::SameLine();
-        ImGui::Checkbox("Move along normals", &doc_.sculptor.microMoveAlongNormals);
+        ImGui::Checkbox(tr("Move along normals"), &doc_.sculptor.microMoveAlongNormals);
     }
     if (micro && m.micro) { // (a button above may have just removed it)
         const MicroMesh& mm = *m.micro;

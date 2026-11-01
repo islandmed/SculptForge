@@ -28,6 +28,7 @@ struct UiPrefs {
     bool lightboxAtStartup = true;
     std::string libraryFolder;  // "" = Documents/SculptForge
     bool alphabeticalPalettes = false; // strict A-Z palette bar like ZBrush (default: File, Edit first)
+    std::string language = "en"; // Preferences > Interface: the interface language, "en" or "es" (app/I18n.h, #44)
     int cameraNotch = 0;        // keep the UI out of a laptop's camera notch: 0 automatic, 1 always, 2 never
     bool turntable = false;     // rotation: false = free, about the screen axes (ZBrush); true = turntable (Y up)
     int inputStyle = 0;         // Preferences > Input: 0 ZBrush, 1 SculptForge (1-0 brushes, I = Z Intensity...),

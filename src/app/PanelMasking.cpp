@@ -9,6 +9,7 @@
 #include "app/Palettes.h"
 #include "app/Pickers.h"
 #include "app/Ui.h"
+#include "app/I18n.h"
 
 #include <IconsLucide.h>
 
@@ -167,10 +168,10 @@ bool App::drawHeldBrushGrid(HeldBrush held, bool strokes) {
 }
 
 void App::drawMaskingSection() {
-    ImGui::Checkbox("Show mask", &renderSettings_.showMask);
+    ImGui::Checkbox(tr("Show mask"), &renderSettings_.showMask);
     ImGui::SameLine();
-    ImGui::TextDisabled(maskShape_ == SelectShape::Pen ? "(Ctrl paints, Ctrl+Alt erases)"
-                                                       : "(Ctrl masks, Ctrl+Alt unmasks)");
+    ImGui::TextDisabled("%s", tr(maskShape_ == SelectShape::Pen ? "(Ctrl paints, Ctrl+Alt erases)"
+                                                             : "(Ctrl masks, Ctrl+Alt unmasks)"));
     ui::Segmented(*this, {"mask.pen", "mask.lasso", "mask.rect"});
     ImGui::SetNextItemWidth(-1);
     ui::SliderInside("##maskstrength", &maskStrength_, 0.01f, 1.0f, "Mask Strength %.2f");
@@ -178,38 +179,38 @@ void App::drawMaskingSection() {
     const ImGuiStyle& style = ImGui::GetStyle();
     const float third = (ImGui::GetContentRegionAvail().x - 2 * style.ItemSpacing.x) / 3.0f;
     const float half = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) * 0.5f;
-    if (ImGui::Button("Clear##mask", ImVec2(third, 0))) runCommand("mask_clear");
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Unmask everything (MaskPen: Ctrl + drag background)");
+    if (ImGui::Button(tr("Clear##mask"), ImVec2(third, 0))) runCommand("mask_clear");
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Unmask everything (MaskPen: Ctrl + drag background)"));
     ImGui::SameLine();
-    if (ImGui::Button("Invert##mask", ImVec2(third, 0))) runCommand("mask_invert");
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Ctrl + click background");
+    if (ImGui::Button(tr("Invert##mask"), ImVec2(third, 0))) runCommand("mask_invert");
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Ctrl + click background"));
     ImGui::SameLine();
-    if (ImGui::Button("All##mask", ImVec2(third, 0))) runCommand("mask_all");
+    if (ImGui::Button(tr("All##mask"), ImVec2(third, 0))) runCommand("mask_all");
 
     const Args passes = {{"iterations", double(maskIterations_)}};
-    if (ImGui::Button("Blur##mask", ImVec2(half, 0))) runCommand("mask_blur", passes);
+    if (ImGui::Button(tr("Blur##mask"), ImVec2(half, 0))) runCommand("mask_blur", passes);
     ImGui::SameLine();
-    if (ImGui::Button("Sharpen##mask", ImVec2(half, 0))) runCommand("mask_sharpen", passes);
-    if (ImGui::Button("Grow##mask", ImVec2(half, 0))) runCommand("mask_grow", passes);
+    if (ImGui::Button(tr("Sharpen##mask"), ImVec2(half, 0))) runCommand("mask_sharpen", passes);
+    if (ImGui::Button(tr("Grow##mask"), ImVec2(half, 0))) runCommand("mask_grow", passes);
     ImGui::SameLine();
-    if (ImGui::Button("Shrink##mask", ImVec2(half, 0))) runCommand("mask_shrink", passes);
+    if (ImGui::Button(tr("Shrink##mask"), ImVec2(half, 0))) runCommand("mask_shrink", passes);
     ImGui::SetNextItemWidth(-1);
     tray::SliderInt("##maskpasses", &maskIterations_, 1, 20, "Passes %d");
 
-    if (ImGui::Button("By cavity", ImVec2(half, 0)))
+    if (ImGui::Button(tr("By cavity"), ImVec2(half, 0)))
         runCommand("mask_by_cavity", {{"strength", double(maskStrength_)}, {"threshold", double(cavityThreshold_)}});
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Mask creases and folds (replaces the mask; uses the mask strength)");
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Mask creases and folds (replaces the mask; uses the mask strength)"));
     ImGui::SameLine();
     ImGui::SetNextItemWidth(-1);
     ui::SliderInside("##cavitythreshold", &cavityThreshold_, -0.2f, 0.5f, "Threshold %.2f");
-    if (ImGui::Button("By polygroup", ImVec2(half, 0)))
+    if (ImGui::Button(tr("By polygroup"), ImVec2(half, 0)))
         runCommand("mask_by_polygroup", {{"group", double(maskGroup_)}});
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Mask one polygroup (replaces the mask)");
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Mask one polygroup (replaces the mask)"));
     ImGui::SameLine();
     // The group id as a drag field the size of the button beside it (Ctrl+click or double-click types a number),
     // rather than an input with tiny - and + buttons.
     ImGui::SetNextItemWidth(-1);
-    if (ImGui::DragInt("##maskgroup", &maskGroup_, 0.1f, 0, 1 << 30, "Group %d", ImGuiSliderFlags_AlwaysClamp))
+    if (ImGui::DragInt("##maskgroup", &maskGroup_, 0.1f, 0, 1 << 30, tr("Group %d"), ImGuiSliderFlags_AlwaysClamp))
         maskGroup_ = std::max(0, maskGroup_);
 }
 

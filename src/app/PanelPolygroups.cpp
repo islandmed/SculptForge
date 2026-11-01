@@ -9,6 +9,7 @@
 #include "app/App.h"
 
 #include "app/Ui.h"
+#include "app/I18n.h"
 
 #include "core/Polygroups.h"
 
@@ -56,7 +57,7 @@ void App::polygroupMouseUp() {
 }
 
 void App::drawPolygroupsSection() {
-    ImGui::Checkbox("Show polygroups", &renderSettings_.showPolygroups);
+    ImGui::Checkbox(tr("Show polygroups"), &renderSettings_.showPolygroups);
     ImGui::SameLine();
     const Mesh& m = doc_.mesh;
     const std::array<uint64_t, 6> key = {doc_.undo.revision() + 1, uint64_t(doc_.modified), m.triangles.size(),
@@ -66,8 +67,8 @@ void App::drawPolygroupsSection() {
         visibleGroupsKey_ = key;
         visibleGroups_ = visiblePolygroupCount(m);
     }
-    ImGui::TextDisabled("%zu", visibleGroups_);
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Visible polygroups");
+    ImGui::TextDisabled(tr("%zu"), visibleGroups_);
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Visible polygroups"));
 
     // Grouping buttons switch the polygroup colours on so the result is visible.
     auto group = [this](const char* command, const Args& args = {}) {
@@ -75,20 +76,20 @@ void App::drawPolygroupsSection() {
         renderSettings_.showPolygroups = true;
     };
     const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
-    if (ImGui::Button("By normals", ImVec2(half, 0)))
+    if (ImGui::Button(tr("By normals"), ImVec2(half, 0)))
         group("polygroup_auto_by_normals", {{"angle", double(polygroupAngle_)}});
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("New group wherever the surface turns more than the angle");
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("New group wherever the surface turns more than the angle"));
     ImGui::SameLine();
     ImGui::SetNextItemWidth(-1);
     ui::SliderInside("##pgangle", &polygroupAngle_, 1.0f, 90.0f, "Angle %.0f deg");
-    if (ImGui::Button("By pieces", ImVec2(half, 0))) group("polygroup_by_connectivity");
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("One group per disconnected piece");
+    if (ImGui::Button(tr("By pieces"), ImVec2(half, 0))) group("polygroup_by_connectivity");
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("One group per disconnected piece"));
     ImGui::SameLine();
-    if (ImGui::Button("From mask", ImVec2(half, 0))) group("polygroup_from_mask");
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Masked triangles become a new group");
-    if (ImGui::Button("Merge visible", ImVec2(half, 0))) group("polygroup_merge_visible");
+    if (ImGui::Button(tr("From mask"), ImVec2(half, 0))) group("polygroup_from_mask");
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Masked triangles become a new group"));
+    if (ImGui::Button(tr("Merge visible"), ImVec2(half, 0))) group("polygroup_merge_visible");
     ImGui::SameLine();
-    if (ImGui::Button("Clear groups", ImVec2(half, 0))) runCommand("polygroup_clear");
+    if (ImGui::Button(tr("Clear groups"), ImVec2(half, 0))) runCommand("polygroup_clear");
     ui::ActionButton(*this, "polygroup.uv_groups", ImVec2(half, 0));
 }
 
@@ -96,16 +97,16 @@ void App::drawVisibilitySection() {
     ui::Segmented(*this, {"select.rect", "select.lasso"});
     const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
     ImGui::BeginDisabled(!doc_.mesh.hasHidden());
-    if (ImGui::Button("Show all", ImVec2(half, 0))) runCommand("show_all");
+    if (ImGui::Button(tr("Show all"), ImVec2(half, 0))) runCommand("show_all");
     ImGui::EndDisabled();
     ImGui::SameLine();
-    if (ImGui::Button("Invert visible", ImVec2(half, 0))) runCommand("invert_visibility");
+    if (ImGui::Button(tr("Invert visible"), ImVec2(half, 0))) runCommand("invert_visibility");
     ImGui::BeginDisabled(!doc_.mesh.hasHidden());
-    if (ImGui::Button("Delete hidden", ImVec2(-1, 0))) runCommand("delete_hidden");
+    if (ImGui::Button(tr("Delete hidden"), ImVec2(-1, 0))) runCommand("delete_hidden");
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-        ImGui::SetTooltip("Ctrl+Shift+click a group to isolate it, +Alt to hide it, on the background to show all.\n"
-                          "Ctrl+Shift+drag hides outside the rectangle or lasso (Alt: inside).");
+        ImGui::SetTooltip("%s", tr("Ctrl+Shift+click a group to isolate it, +Alt to hide it, on the background to show all.\n"
+                          "Ctrl+Shift+drag hides outside the rectangle or lasso (Alt: inside)."));
 }
 
 } // namespace sf

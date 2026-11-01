@@ -14,6 +14,7 @@
 #include "app/BlenderKeymap.h"
 #include "app/Pickers.h"
 #include "app/Ui.h"
+#include "app/I18n.h"
 #include "core/Polygroups.h"
 
 #include <IconsLucide.h>
@@ -406,12 +407,12 @@ void App::drawInputStyleRow(float width) {
 }
 
 void App::drawInputSection() {
-    ImGui::TextDisabled("Style");
+    ImGui::TextDisabled("%s", tr("Style"));
     ImGui::SameLine();
     drawInputStyleRow();
     if (blenderStyle()) {
         bool emulate = uiPrefs_.emulateNumpad;
-        if (ImGui::Checkbox("Emulate Numpad", &emulate)) uiPrefs_.emulateNumpad = emulate;
+        if (ImGui::Checkbox(tr("Emulate Numpad"), &emulate)) uiPrefs_.emulateNumpad = emulate;
         ui::HelpAction(*this, "input.emulate_numpad");
     }
     bool rightClickMenu = uiPrefs_.rightClickQuickMenu;
@@ -427,11 +428,12 @@ void App::drawInputSection() {
         uiPrefs_.cursorFollowsSurface = surfaceCursor;
     ui::HelpAction(*this, "input.surface_cursor");
     ui::ActionButton(*this, "input.import_blender", ImVec2(-FLT_MIN, 0), ui::Look::IconLabel);
-    ImGui::TextDisabled("Rotation");
+    ImGui::TextDisabled("%s", tr("Rotation"));
     ImGui::SameLine();
     int rotation = uiPrefs_.turntable ? 1 : 0;
     ImGui::SetNextItemWidth(-1);
-    if (ImGui::Combo("##rotation_input", &rotation, "Free (ZBrush)\0Turntable\0")) uiPrefs_.turntable = rotation == 1;
+    const std::string rotations = std::string(tr("Free (ZBrush)")) + '\0' + tr("Turntable") + '\0';
+    if (ImGui::Combo("##rotation_input", &rotation, rotations.c_str())) uiPrefs_.turntable = rotation == 1;
     ui::HelpText("Rotation", nullptr,
                  "Free: the model turns about the screen's axes and can roll over the top, as in ZBrush. Turntable: it "
                  "stays upright, as in Blender or Maya.",

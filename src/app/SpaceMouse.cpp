@@ -11,6 +11,7 @@
 // Config keeps them. User guide: docs/guide/navigation.md.
 #include "app/App.h"
 #include "app/Ui.h"
+#include "app/I18n.h"
 
 #include <IconsLucide.h>
 
@@ -171,7 +172,7 @@ void App::drawSpaceMouseSection() {
     const char* path = "Preferences > Input > SpaceMouse";
     const float width = ImGui::GetContentRegionAvail().x;
     ImGui::Spacing();
-    ImGui::SeparatorText("SpaceMouse (experimental)");
+    ImGui::SeparatorText(tr("SpaceMouse (experimental)"));
     if (spaceMouse_) {
         ImGui::TextColored(col(ui::color::accent), ICON_LC_JOYSTICK);
         ImGui::SameLine();
@@ -181,11 +182,11 @@ void App::drawSpaceMouseSection() {
         ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::textDim));
         ImGui::PushTextWrapPos(0.0f);
 #if defined(_WIN32) || defined(__APPLE__)
-        ImGui::TextUnformatted("Plug it in. If 3DxWare is installed it may keep the device to itself: see the "
-                               "Navigation page of the guide.");
+        ImGui::TextUnformatted(tr("Plug it in. If 3DxWare is installed it may keep the device to itself: see the "
+                               "Navigation page of the guide."));
 #else
-        ImGui::TextUnformatted("Plug it in. SculptForge reads it as a joystick (/dev/input): you need read access to "
-                               "it, and spacenavd may hold it. See the Navigation page of the guide.");
+        ImGui::TextUnformatted(tr("Plug it in. SculptForge reads it as a joystick (/dev/input): you need read access to "
+                               "it, and spacenavd may hold it. See the Navigation page of the guide."));
 #endif
         ImGui::PopTextWrapPos();
         ImGui::PopStyleColor();
@@ -219,7 +220,7 @@ void App::drawSpaceMouseSection() {
                  "Only the direction you push the most moves the view: a twist doesn't also pan a little.", path);
 
     // Invert, two rows of three: the moves, then the turns.
-    ImGui::TextDisabled("Invert");
+    ImGui::TextDisabled("%s", tr("Invert"));
     const float cw = (width - 2.0f * ImGui::GetStyle().ItemSpacing.x) / 3.0f;
     for (int i = 0; i < kSmAxes; ++i) {
         if (i % 3) ImGui::SameLine(float(i % 3) * (cw + ImGui::GetStyle().ItemSpacing.x));
@@ -234,7 +235,7 @@ void App::drawSpaceMouseSection() {
     // order above, filled from the centre; grey while inside the dead zone.
     if (spaceMouse_) {
         ImGui::AlignTextToFramePadding();
-        ImGui::TextDisabled("Live");
+        ImGui::TextDisabled("%s", tr("Live"));
         ImGui::SameLine();
         const float x0 = ImGui::GetCursorScreenPos().x, avail = ImGui::GetContentRegionAvail().x;
         const float gap = 4.0f * ImGui::GetFontSize() / 15.0f, bw = (avail - 5.0f * gap) / 6.0f;

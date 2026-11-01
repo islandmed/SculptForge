@@ -10,6 +10,7 @@
 // the math is in core/Tablet.h. User guide: docs/tablet.md.
 #include "app/App.h"
 #include "app/Ui.h"
+#include "app/I18n.h"
 
 #include <IconsLucide.h>
 
@@ -261,10 +262,10 @@ void App::drawTabletSection() {
         ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::textDim));
         ImGui::PushTextWrapPos(0.0f);
 #if defined(_WIN32)
-        ImGui::TextUnformatted("Bring the pen close to the tablet. Wacom: turn on \"Use Windows Ink\" in Wacom Tablet "
-                               "Properties > Mapping; Huion / XP-Pen: enable Windows Ink in the driver.");
+        ImGui::TextUnformatted(tr("Bring the pen close to the tablet. Wacom: turn on \"Use Windows Ink\" in Wacom Tablet "
+                               "Properties > Mapping; Huion / XP-Pen: enable Windows Ink in the driver."));
 #else
-        ImGui::TextUnformatted("Bring the pen close to the tablet. Pressure works through the system's tablet driver.");
+        ImGui::TextUnformatted(tr("Bring the pen close to the tablet. Pressure works through the system's tablet driver."));
 #endif
         ImGui::PopTextWrapPos();
         ImGui::PopStyleColor();
@@ -285,7 +286,7 @@ void App::drawTabletSection() {
     }
 
     // --- Pen or mouse mode (#54) ---
-    ImGui::Checkbox("Mouse mode (relative)##tablet_mouse_mode", &t.mouseMode);
+    ImGui::Checkbox(tr("Mouse mode (relative)##tablet_mouse_mode"), &t.mouseMode);
     ui::HelpText("Mouse mode", nullptr,
                  "Turn on if the tablet driver is set to Mouse mode: the pen moves the cursor by how far it moves, and "
                  "lifting it and putting it down elsewhere leaves the cursor where it was. Off (Pen mode): the cursor "
@@ -302,7 +303,7 @@ void App::drawTabletSection() {
     ui::HelpText("Pressure meter", nullptr,
                  "The pen's pressure as the tablet reports it, and after the pressure curve below (what brushes get).", path);
     if (penTiltSeen_) {
-        ImGui::Text("Tilt  X %+.0f" "\xc2\xb0" "   Y %+.0f" "\xc2\xb0", penTiltX_, penTiltY_);
+        ImGui::Text(tr("Tilt  X %+.0f" "\xc2\xb0" "   Y %+.0f" "\xc2\xb0"), penTiltX_, penTiltY_);
         ui::HelpText("Tilt", nullptr, "The pen's tilt, as the tablet reports it (brushes don't use it yet).", path);
     } else if (penSeen_) {
         ImGui::TextColored(col(ui::color::textDim), "Tilt: not reported by this pen");
@@ -468,7 +469,7 @@ void App::drawTabletSection() {
                                              "button: Pan view. The curve and Mouse mode stay.", path);
     ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::textDim));
     ImGui::PushTextWrapPos(0.0f);
-    ImGui::TextUnformatted("Store Config (Ctrl+Shift+I) keeps these settings.");
+    ImGui::TextUnformatted(tr("Store Config (Ctrl+Shift+I) keeps these settings."));
     ImGui::PopTextWrapPos();
     ImGui::PopStyleColor();
 }

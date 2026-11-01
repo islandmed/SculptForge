@@ -1,0 +1,69 @@
+# The interface language (#44), Preferences > Interface > Language: Español translates the palette bar, the
+# palettes, the shelves and the Ctrl-help; brush and tool names (SubTool, QRemesh, Clay Buildup) stay as they are.
+# The "##" ids don't change, so every button works the same in either language, and English comes back unchanged.
+run new_sphere subdivisions=2
+click "Preferences##palette.preferences"
+click "Interface##preferences.interface"
+expect_text "Language"
+expect "English##language.en"
+click "Español##language.es"
+expect_text "Idioma"
+expect "Preferencias##palette.preferences"
+expect "Interfaz##preferences.interface"
+expect "Entrada##preferences.input"
+expect_text "Escala de la interfaz"
+expect_no_text "Popup Info opacity"
+shot preferencias
+key escape
+
+# The palette bar, the top shelf and the right shelf in Spanish (the brushes on the bottom shelf keep their names).
+expect "Archivo##palette.file"
+expect "Herramienta##palette.tool"
+expect "Dibujar##tool.draw"
+expect "Mover##tool.move"
+expect_text "Tamaño de dibujo"
+expect_text "Intensidad Z"
+expect "ClayBuildup##brush.claybuildup"
+expect "Move##brush.move"
+expect "SubTool##tool.subtool"
+
+# Tool > Geometry: the translated Divide divides.
+click "Geometría##tool.geometry"
+expect_value sdiv_levels == 0
+expect_text "Sin niveles de subdivisión"
+click "Dividir##geometry.divide"
+expect_value sdiv_levels == 2
+expect "Res. menor##geometry.lower_res"
+shot geometria
+click "Geometría##tool.geometry"
+
+# Tool > Masking: translated buttons run their commands.
+click "Enmascarado##tool.masking"
+click "Todo##mask"
+expect_value masked > 0
+click "Borrar##mask"
+expect_value masked == 0
+click "Enmascarado##tool.masking"
+
+# Ctrl-help in Spanish: the action's name and where it lives.
+hold ctrl
+hover "Dibujar##tool.draw"
+expect_help "Dibujar"
+hold none
+
+# The command palette finds commands by their Spanish names too.
+key f3
+type "##Command palette" Dividir
+expect "Dividir##pal.geometry.divide"
+key escape
+
+# Back to English: the same items with their English labels.
+click "Preferencias##palette.preferences"
+click "English##language.en"
+expect "Preferences##palette.preferences"
+expect_text "Language"
+expect_no_text "Idioma"
+key escape
+expect "Geometry##tool.geometry"
+expect "Draw##tool.draw"
+expect_text "Draw Size"

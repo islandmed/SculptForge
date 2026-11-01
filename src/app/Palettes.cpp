@@ -14,6 +14,7 @@
 #include "app/Shell.h"
 #include "app/Theme.h"
 #include "app/Ui.h"
+#include "app/I18n.h"
 #include "core/Matcap.h"
 
 #include <IconsLucide.h>
@@ -95,7 +96,7 @@ void menuAction(App& app, const char* id) {
     const std::string shortcut = app.actions().shortcutText(id);
     const bool enabled = !a->enabled || a->enabled();
     const bool checked = a->checked && a->checked();
-    const std::string label = a->label + "##" + a->id; // no icons: they'd misalign with the plain project items
+    const std::string label = std::string(trAction(a->id, a->label)) + "##" + a->id; // no icons: they'd misalign with the plain project items
     if (ImGui::MenuItem(label.c_str(), shortcut.empty() ? nullptr : shortcut.c_str(), checked, enabled) && a->run) {
         app.actions().touch(a->id);
         a->run();
@@ -107,7 +108,7 @@ void menuAction(App& app, const char* id) {
 void hint(const App& app, const char* text) {
     if (app.smallFont()) ImGui::PushFont(app.smallFont());
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    ImGui::TextWrapped("%s", text);
+    ImGui::TextWrapped("%s", tr(text));
     ImGui::PopStyleColor();
     if (app.smallFont()) ImGui::PopFont();
 }
@@ -146,7 +147,7 @@ void GroupLabel(const App& app, const char* text) {
     ImGui::PushStyleColor(ImGuiCol_Separator, ImGui::ColorConvertU32ToFloat4(kSectionRule));
     ImGui::PushStyleVar(ImGuiStyleVar_SeparatorTextPadding, ImVec2(0.0f, 2.0f * s));
     ImGui::PushStyleVar(ImGuiStyleVar_SeparatorTextAlign, ImVec2(0.0f, 0.5f));
-    ImGui::SeparatorText(text);
+    ImGui::SeparatorText(tr(text));
     ImGui::PopStyleVar(2);
     ImGui::PopStyleColor(2);
     if (app.smallFont()) ImGui::PopFont();
@@ -166,7 +167,8 @@ bool SliderInt(const char* id, int* v, int lo, int hi, const char* format, ImGui
 
 } // namespace tray
 
-bool App::subpalette(const char* id, const char* title) {
+bool App::subpalette(const char* id, const char* englishTitle) {
+    const char* title = tr(englishTitle); // the interface language (I18n.h); the id keeps the item's identity
     auto& open = layout_.openSubpalettes;
     bool isOpen = std::find(open.begin(), open.end(), id) != open.end();
     const float s = uiScale_;
@@ -225,12 +227,12 @@ void App::drawPalette_Brush() {
     actionRow(*this, {"ui.brush_lab", "ui.brush_gallery"});
     actionRow(*this, {"brush.paste"});
     drawCustomBrushes();
-    ImGui::Checkbox("Front faces only", &frontFacesOnly_);
+    ImGui::Checkbox(tr("Front faces only"), &frontFacesOnly_);
     ui::HelpAction(*this, "draw.front_faces");
     ImGui::SameLine();
-    ImGui::Checkbox("Invert (Alt)", &invertToggle_);
+    ImGui::Checkbox(tr("Invert (Alt)"), &invertToggle_);
     ui::HelpText("Invert", "Alt", "Brushes subtract instead of add (ZBrush Zsub). Holding Alt flips it for one stroke.", "Brush");
-    ImGui::Checkbox("Smooth keeps volume##smooth_keep_volume", &smoothKeepVolume_);
+    ImGui::Checkbox(tr("Smooth keeps volume##smooth_keep_volume"), &smoothKeepVolume_);
     ui::HelpText("Smooth keeps volume", nullptr,
                  "The Smooth brush (and Shift) removes bumps without shrinking the form, instead of the plain smooth "
                  "that also flattens it. Either way, let go of Shift while still pressing a Shift-smooth stroke to "
@@ -239,7 +241,7 @@ void App::drawPalette_Brush() {
     if (BrushRecipe* recipe = doc_.activeBrush >= 0 && doc_.activeBrush < int(doc_.brushes.size())
                                   ? &doc_.brushes[size_t(doc_.activeBrush)]
                                   : nullptr) {
-        if (subpalette("brush.recipe", ("Edit recipe: " + recipe->name).c_str())) {
+        if (subpalette("brush.recipe", (std::string(tr("Edit recipe:")) + " " + recipe->name).c_str())) {
             tray::Section section;
             drawRecipeEditor(*recipe);
             if (!pendingRename_.empty()) {
@@ -335,8 +337,8 @@ void App::drawPalette_Draw() {
 }
 
 void App::drawPalette_Edit() {
-    const std::string undoText = doc_.undo.canUndo() ? "Undo " + doc_.undo.undoLabel() : std::string("Undo");
-    const std::string redoText = doc_.undo.canRedo() ? "Redo " + doc_.undo.redoLabel() : std::string("Redo");
+    const std::string undoText = doc_.undo.canUndo() ? std::string(tr("Undo")) + " " + doc_.undo.undoLabel() : std::string(tr("Undo"));
+    const std::string redoText = doc_.undo.canRedo() ? std::string(tr("Redo")) + " " + doc_.undo.redoLabel() : std::string(tr("Redo"));
     ImGui::BeginDisabled(!doc_.undo.canUndo());
     if (ImGui::MenuItem((undoText + "##edit.undo").c_str(), "Ctrl+Z")) runCommand("undo");
     ImGui::EndDisabled();
@@ -389,21 +391,21 @@ void App::drawPalette_Generate() {
     ui::HelpText("Choose image", nullptr, "A sketch, concept, logo, photo or height map (or drop one on the window).", "Generate");
     ImGui::BeginDisabled(refImage_.empty());
     const float third = (ImGui::GetContentRegionAvail().x - 2.0f * ImGui::GetStyle().ItemSpacing.x) / 3.0f;
-    if (ImGui::Button("Relief", ImVec2(third, 0)))
+    if (ImGui::Button(tr("Relief"), ImVec2(third, 0)))
         runCommand("image_relief", {{"path", refImagePath_},
                                     {"depth", double(reliefDepth_)},
                                     {"resolution", double(reliefDetail_)},
                                     {"invert", reliefInvert_}});
     ui::HelpText("Relief", nullptr, "Light areas rise: logos, coins, emblems, height maps.", "Generate");
     ImGui::SameLine();
-    if (ImGui::Button("Inflate", ImVec2(third, 0)))
+    if (ImGui::Button(tr("Inflate"), ImVec2(third, 0)))
         runCommand("image_inflate", {{"path", refImagePath_},
                                      {"thickness", double(inflateThickness_)},
                                      {"resolution", double(inflateDetail_)},
                                      {"subdivisions", 2.0}});
     ui::HelpText("Inflate", nullptr, "Inflates the outline into a rounded blockout.", "Generate");
     ImGui::SameLine();
-    if (ImGui::Button("Stamp", ImVec2(third, 0))) projectImageFromView();
+    if (ImGui::Button(tr("Stamp"), ImVec2(third, 0))) projectImageFromView();
     ui::HelpText("Stamp", nullptr, "Projects the image onto the model from this view as surface detail.", "Generate");
     ImGui::EndDisabled();
     if (subpalette("generate.ai", "AI brush provider")) {
@@ -434,7 +436,7 @@ void App::drawPalette_Preferences() {
     if (subpalette("preferences.config", "Config")) {
         tray::Section section;
         config::drawConfigSection(*this);
-        ImGui::TextDisabled("Layout");
+        ImGui::TextDisabled("%s", tr("Layout"));
         for (int i = 1; i <= 3; ++i) {
             ImGui::SameLine();
             ui::ActionButton(*this, ("ui.preset." + std::to_string(i)).c_str(), ImVec2(ImGui::GetFrameHeight() * 1.4f, 0));
@@ -484,18 +486,18 @@ void App::drawPalette_Preferences() {
 
 void App::drawPalette_Render() {
     const tray::Style style; // quiet check marks
-    ImGui::Checkbox("Wireframe", &renderSettings_.wireframe);
+    ImGui::Checkbox(tr("Wireframe"), &renderSettings_.wireframe);
     ui::HelpAction(*this, "view.wireframe");
-    ImGui::Checkbox("Show Mesh", &renderSettings_.showMesh);
+    ImGui::Checkbox(tr("Show Mesh"), &renderSettings_.showMesh);
     ui::HelpAction(*this, "view.mesh");
-    ImGui::Checkbox("Show Polypaint", &renderSettings_.showPolypaint);
+    ImGui::Checkbox(tr("Show Polypaint"), &renderSettings_.showPolypaint);
     ui::HelpAction(*this, "view.polypaint");
-    ImGui::Checkbox("Show Mask", &renderSettings_.showMask);
+    ImGui::Checkbox(tr("Show Mask"), &renderSettings_.showMask);
     ui::HelpAction(*this, "view.mask");
-    ImGui::Checkbox("Show Polygroups##render", &renderSettings_.showPolygroups);
+    ImGui::Checkbox(tr("Show Polygroups##render"), &renderSettings_.showPolygroups);
     ui::HelpAction(*this, "view.polygroups");
     ImGui::BeginDisabled(doc_.splats.empty());
-    ImGui::Checkbox("Show Splats", &renderSettings_.showSplats);
+    ImGui::Checkbox(tr("Show Splats"), &renderSettings_.showSplats);
     ImGui::EndDisabled();
     ui::HelpAction(*this, "view.splats");
     drawBackgroundControls("render");
@@ -585,7 +587,7 @@ void App::drawPalette_Tool() {
         drawGeometrySection();
         actionRow(*this, {"geometry.subdivide"});
         const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
-        if (ImGui::Button("Decimate", ImVec2(half, 0))) {
+        if (ImGui::Button(tr("Decimate"), ImVec2(half, 0))) {
             Args args{{"ratio", double(decimateRatio_)}};
             if (decimateKeepMasked_) args["keep_masked"] = true;
             runCommand("decimate", args);
@@ -596,7 +598,7 @@ void App::drawPalette_Tool() {
         ImGui::SetNextItemWidth(-1);
         ui::SliderInside("##decimate", &decimateRatio_, 0.05f, 0.95f, "Keep %.2f");
         ui::HelpText("Keep", nullptr, "Fraction of the triangles Decimate keeps.", "Tool > Geometry");
-        ImGui::Checkbox("Keep Masked##decimate", &decimateKeepMasked_);
+        ImGui::Checkbox(tr("Keep Masked##decimate"), &decimateKeepMasked_);
         ui::HelpText("Keep Masked", nullptr,
                      "Decimate leaves masked vertices where they are, so masked areas keep their triangles exactly; "
                      "the rest is decimated around them.",
@@ -632,10 +634,10 @@ void App::drawPalette_Tool() {
         ui::HelpText("Resolution", nullptr, "Voxels across the model: higher keeps more detail and makes more triangles.",
                      "Tool > Remesh");
         if (voxelRemesh_) {
-            if (ImGui::Button("Cancel##voxelremesh", ImVec2(half, 0))) voxelRemesh_->cancel->store(true);
+            if (ImGui::Button(tr("Cancel##voxelremesh"), ImVec2(half, 0))) voxelRemesh_->cancel->store(true);
             ui::HelpText("Cancel", nullptr, "Stop the remesh; the SubTool stays as it is.", "Tool > Remesh");
         } else {
-            ImGui::Checkbox("Keep Masked##remesh", &voxelKeepMasked_);
+            ImGui::Checkbox(tr("Keep Masked##remesh"), &voxelKeepMasked_);
             ui::HelpText("Keep Masked", nullptr, kKeepMaskedHelp, "Tool > Remesh");
             if (hasTexture(doc_.mesh)) {
                 ImGui::SameLine();
@@ -669,15 +671,15 @@ void App::drawPalette_Tool() {
     }
     if (subpalette("tool.display", "Display")) {
         tray::Section section;
-        ImGui::Checkbox("Wireframe##display", &renderSettings_.wireframe);
+        ImGui::Checkbox(tr("Wireframe##display"), &renderSettings_.wireframe);
         ui::HelpAction(*this, "view.wireframe");
         ImGui::SameLine();
-        ImGui::Checkbox("Mask##display", &renderSettings_.showMask);
+        ImGui::Checkbox(tr("Mask##display"), &renderSettings_.showMask);
         ui::HelpAction(*this, "view.mask");
         ImGui::SameLine();
-        ImGui::Checkbox("Groups##display", &renderSettings_.showPolygroups);
+        ImGui::Checkbox(tr("Groups##display"), &renderSettings_.showPolygroups);
         ui::HelpAction(*this, "view.polygroups");
-        ImGui::ColorEdit3("Material colour", &renderSettings_.baseColor.x, ImGuiColorEditFlags_NoInputs);
+        ImGui::ColorEdit3(tr("Material colour"), &renderSettings_.baseColor.x, ImGuiColorEditFlags_NoInputs);
         ui::HelpText("Material colour", nullptr, "Colour of the Studio material (the clay colour).", "Tool > Display");
         drawShadingControls();
     }
@@ -685,9 +687,9 @@ void App::drawPalette_Tool() {
 
 void App::drawPalette_Transform() {
     const tray::Style style; // quiet check marks
-    ImGui::TextDisabled("Gizmo 3D");
+    ImGui::TextDisabled("%s", tr("Gizmo 3D"));
     drawGizmoContents(false);
-    ImGui::TextDisabled("Symmetry");
+    ImGui::TextDisabled("%s", tr("Symmetry"));
     segmented(*this, {"transform.symmetry_x", "transform.symmetry_y", "transform.symmetry_z"});
     actionRow(*this, {"view.frame", "subtool.solo"});
     actionRow(*this, {"view.polyf"});

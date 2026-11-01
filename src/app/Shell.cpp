@@ -11,6 +11,7 @@
 #include "app/Shell.h"
 #include "app/Theme.h"
 #include "app/Ui.h"
+#include "app/I18n.h"
 #include "core/Matcap.h"
 #include "core/Polypaint.h"
 #include "core/Texture.h"
@@ -225,7 +226,8 @@ int brushTypeOfAction(std::string_view id) {
 
 bool drawShelfTile(App& app, const Action& a, ImVec2 size) {
     const bool on = a.checked && a.checked();
-    const std::string id = a.label + "##" + a.id;
+    const std::string label = trAction(a.id, a.label); // the interface language (I18n.h)
+    const std::string id = label + "##" + a.id;
     const float s = app.uiScale_;
     const int type = brushTypeOfAction(a.id);
     const int look = type >= 0 || a.id == "draw.paint" ? 3 : 2; // picture tile, or icon over caption
@@ -253,7 +255,7 @@ bool drawShelfTile(App& app, const Action& a, ImVec2 size) {
         const ImU32 fg = theme::u32(on ? (mode ? theme::textOnAccent : theme::textBright) : hovered || !a.checked ? theme::text : theme::textOff, alpha);
         centredText(dl, app.fontIcons_, p0, ImVec2(p1.x, p1.y - capH + 2.0f * s), fg, a.icon ? a.icon : "?");
         centredText(dl, caption, ImVec2(p0.x, p1.y - capH), ImVec2(p1.x, p1.y - 1.0f * s), fg,
-                    elide(caption ? caption : ImGui::GetFont(), a.label, size.x - 2.0f * s).c_str());
+                    elide(caption ? caption : ImGui::GetFont(), label, size.x - 2.0f * s).c_str());
         return clicked;
     }
     // Tile: a square picture (brush thumbnail or icon) with the name under it.
@@ -281,7 +283,7 @@ bool drawShelfTile(App& app, const Action& a, ImVec2 size) {
     if (key.size() == 1 && caption)
         dl->AddText(caption, caption->FontSize, ImVec2(p0.x + 3 * s, p0.y + 1 * s), theme::u32(theme::textDim), key.c_str());
     centredText(dl, caption, ImVec2(p0.x, p1.y - capH), p1, theme::u32(on ? theme::accent : theme::text, alpha),
-                elide(caption ? caption : ImGui::GetFont(), a.label, size.x).c_str());
+                elide(caption ? caption : ImGui::GetFont(), label, size.x).c_str());
     return clicked;
 }
 
@@ -765,7 +767,7 @@ void App::drawTitleStrip(const ShellGeometry& g) {
 
     // Document name; click saves.
     ImGui::SameLine(0.0f, 16.0f * s);
-    std::string name = doc_.path.empty() ? std::string("Untitled")
+    std::string name = doc_.path.empty() ? std::string(tr("Untitled"))
                                          : std::filesystem::path(std::u8string(doc_.path.begin(), doc_.path.end())).filename().string();
     if (doc_.dirty()) name += " *";
     ImGui::SetCursorPosY((h - buttonH) * 0.5f);
@@ -781,7 +783,7 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     const bool quickSave = actions_.find("file.quicksave") != nullptr;
     const float searchW = 150.0f * s;
     const float windowButtonW = buttonH + 6.0f * s; // minimise and close, at the far right like ZBrush's
-    float rightW = searchW + buttonW(ICON_LC_MENU " Menus") + 3.0f * (buttonH + 2.0f * s) + 18.0f * s +
+    float rightW = searchW + buttonW(tr(ICON_LC_MENU " Menus")) + 3.0f * (buttonH + 2.0f * s) + 18.0f * s +
                    10.0f * s + 2.0f * windowButtonW + 2.0f * s;
     if (quickSave) rightW += buttonW("QuickSave") + 8.0f * s;
     const float rightX = g.title.w - 8.0f * s - rightW;
@@ -797,13 +799,13 @@ void App::drawTitleStrip(const ShellGeometry& g) {
         verts += doc_.subtoolMesh(i).vertexCount();
     }
     char info[256];
-    std::snprintf(info, sizeof info, "Verts %s   Tris %s   SubTool %s (%d/%d)   Layer %s%s%s",
+    std::snprintf(info, sizeof info, tr("Verts %s   Tris %s   SubTool %s (%d/%d)   Layer %s%s%s"),
                   shortCount(verts).c_str(), shortCount(tris).c_str(), doc_.activeSubtoolInfo().name.c_str(),
                   doc_.activeSubtool + 1, doc_.subtoolCount(),
                   doc_.activeLayer >= 0 && doc_.activeLayer < int(doc_.mesh.layers.size())
                       ? doc_.mesh.layers[size_t(doc_.activeLayer)].name.c_str()
-                      : "Base",
-                  doc_.splats.empty() ? "" : "   Splats ", doc_.splats.empty() ? "" : shortCount(doc_.splats.size()).c_str());
+                      : tr("Base"),
+                  doc_.splats.empty() ? "" : tr("   Splats "), doc_.splats.empty() ? "" : shortCount(doc_.splats.size()).c_str());
     // The frame rate gets a fixed-width slot, refreshed twice a second: a number that changes width every frame
     // would make everything after it (the status message) jitter.
     if (ImGui::GetTime() - fpsShownAt_ > 0.5 || fpsShown_ < 0.0f) {
@@ -823,7 +825,7 @@ void App::drawTitleStrip(const ShellGeometry& g) {
         ImGui::TextDisabled("%s", fps);
         ImGui::SameLine(0.0f, 0.0f);
         ImGui::SetCursorPosX(slotX + fpsSlot);
-        const std::string& msg = layout_.customize ? std::string("Customize: Ctrl+Alt+drag to move or remove items") : status_;
+        const std::string msg = layout_.customize ? std::string(tr("Customize: Ctrl+Alt+drag to move or remove items")) : tr(status_);
         if (!msg.empty() && avail - infoW > 60.0f * s) {
             // The status message is what just happened, so it stands out from the readout: the regular font, in
             // the bright text colour (still elided to the space the small-font readout leaves).
@@ -868,7 +870,7 @@ void App::drawTitleStrip(const ShellGeometry& g) {
         const bool hovered = ImGui::IsItemHovered();
         dl->AddRectFilled(p, ImVec2(p.x + searchW, p.y + buttonH), theme::u32(hovered ? theme::frameHover : theme::frame), 3.0f * s);
         const float ty = p.y + (buttonH - ImGui::GetFontSize()) * 0.5f;
-        dl->AddText(ImVec2(p.x + 7.0f * s, ty), theme::u32(theme::textDim), ICON_LC_SEARCH "  Search");
+        dl->AddText(ImVec2(p.x + 7.0f * s, ty), theme::u32(theme::textDim), tr(ICON_LC_SEARCH "  Search"));
         const ImVec2 kw = ImGui::CalcTextSize("F3");
         dl->AddText(ImVec2(p.x + searchW - kw.x - 7.0f * s, ty), theme::u32(theme::textDim, 0.8f), "F3");
         if (clicked) {
@@ -943,7 +945,7 @@ void App::drawPaletteBar(const ShellGeometry& g) {
         ImGui::PushStyleColor(ImGuiCol_Text, inTray ? theme::accent : open ? theme::textOnAccent : theme::text);
         const bool gap = !uiPrefs_.alphabeticalPalettes && (k == 2 || (help >= 0 && k + 1 == order.size()));
         if (i) ImGui::SameLine(0.0f, gap ? 10.0f * s : -1.0f); // small gaps after File, Edit and before Help
-        const std::string label = std::string(p.name) + "##palette." + p.id;
+        const std::string label = std::string(tr(p.name)) + "##palette." + p.id;
         // While a drop-down is open, the click that closes it (ImGui swallows that one) opens another palette
         // when it lands on that palette's name, as in a menu bar; on the open palette's own name it just closes.
         const bool pressed = ImGui::Button(label.c_str(), ImVec2(0, g.paletteBar.h - 1.0f));
@@ -984,13 +986,13 @@ bool App::paletteHeader(const char* id, bool inTray, bool right) {
     const bool iconHovered = ImGui::IsItemHovered();
     if (!inTray && ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoDisableHover)) {
         ImGui::SetDragDropPayload("SF_PALETTE", id, std::strlen(id) + 1);
-        ImGui::Text(ICON_LC_PANEL_RIGHT "  %s", def->name);
+        ImGui::Text(ICON_LC_PANEL_RIGHT "  %s", tr(def->name));
         ImGui::EndDragDropSource();
     }
-    if (inTray) ui::HelpText("Back to the palette bar", nullptr, "Take this palette out of the tray.", def->name);
+    if (inTray) ui::HelpText("Back to the palette bar", nullptr, "Take this palette out of the tray.", tr(def->name));
     else
         ui::HelpText("Move to the tray", nullptr,
-                     "Keep this palette in the right tray (Shift+click: left tray), or drag the icon onto a tray.", def->name);
+                     "Keep this palette in the right tray (Shift+click: left tray), or drag the icon onto a tray.", tr(def->name));
     centredText(dl, nullptr, p, ImVec2(p.x + h, p.y + h), theme::u32(iconHovered ? theme::accentHover : theme::textDim),
                 inTray ? (right ? ICON_LC_PANEL_RIGHT : ICON_LC_PANEL_LEFT) : ICON_LC_PANEL_RIGHT);
     ImGui::SameLine();
@@ -998,8 +1000,8 @@ bool App::paletteHeader(const char* id, bool inTray, bool right) {
     const bool titleHovered = ImGui::IsItemHovered();
     if (fontBold_) ImGui::PushFont(fontBold_);
     dl->AddText(ImVec2(p.x + h + 2.0f * s, p.y + (h - ImGui::GetFontSize()) * 0.5f),
-                theme::u32(titleHovered && inTray ? theme::textOnAccent : theme::text), def->name);
-    ImGui::LogText("%s", def->name);
+                theme::u32(titleHovered && inTray ? theme::textOnAccent : theme::text), tr(def->name));
+    ImGui::LogText("%s", tr(def->name));
     if (fontBold_) ImGui::PopFont();
     ImGui::SameLine();
     const bool endClicked = ImGui::InvisibleButton(inTray ? "##collapse" : "##close", ImVec2(h, h));
@@ -1474,7 +1476,7 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         ImGui::Dummy(ImVec2(0, 0)); // an id this version doesn't know: keep its place in the list
     }
     if (item != "sep" && ImGui::BeginPopupContextItem("##shelfitem")) {
-        if (ImGui::MenuItem("Remove from shelf")) {
+        if (ImGui::MenuItem(tr("Remove from shelf"))) {
             auto& list = shelf == kShelfTop    ? layout_.topShelf
                          : shelf == kShelfLeft  ? layout_.leftShelf
                          : shelf == kShelfRight ? layout_.rightShelf
@@ -1482,10 +1484,10 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
             if (index < int(list.size()) && list[size_t(index)] == item) list.erase(list.begin() + index);
             noteLayoutChanged();
         }
-        if (shelf == kShelfBottom && ImGui::BeginMenu("Tile size")) { // also in Preferences > Interface
+        if (shelf == kShelfBottom && ImGui::BeginMenu(tr("Tile size"))) { // also in Preferences > Interface
             static const char* kTiles[] = {"Small", "Medium", "Large"};
             for (int i = 0; i < 3; ++i)
-                if (ImGui::MenuItem(kTiles[i], nullptr, layout_.shelfTiles == i)) layout_.shelfTiles = i;
+                if (ImGui::MenuItem(tr(kTiles[i]), nullptr, layout_.shelfTiles == i)) layout_.shelfTiles = i;
             ImGui::EndMenu();
         }
         ImGui::EndPopup();
@@ -1549,7 +1551,8 @@ void App::finishShelfDrag() {
 }
 
 // Right-shelf Move / Zoom / Rotate: drag on the button to navigate, as in ZBrush.
-bool App::canvasNavButton(const char* id, const char* icon, const char* label, int mode) {
+bool App::canvasNavButton(const char* id, const char* icon, const char* englishLabel, int mode) {
+    const char* label = tr(englishLabel);
     const float s = uiScale_;
     const ImVec2 size(44.0f * s, 40.0f * s);
     ImGui::InvisibleButton((std::string(label) + "##" + id).c_str(), size);

@@ -6,6 +6,15 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- The interface in Spanish (#44): **Preferences > Interface > Language** switches between **English** (the default)
+  and **Español** at once, and Store Config keeps it. The palette bar, the palettes and their sub-palettes
+  (Preferences, SubTool, Geometry, Remesh, Masking, Polygroups and more), the top, left and right shelves, the
+  LightBox tabs, the command palette (which also finds commands by their Spanish names), Ctrl-help titles and many
+  messages are translated; tool and brush names stay as Spanish-speaking ZBrush artists use them (SubTool, QRemesh,
+  ZSpheres, LightBox, MatCap, Clay Buildup). The translations are written by hand and compiled into the program;
+  anything not yet translated shows in English.
+
 ## [0.10.4] - 2026-11-01
 
 ### Added

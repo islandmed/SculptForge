@@ -3,6 +3,7 @@
 #include "app/Ui.h"
 
 #include "app/App.h"
+#include "app/I18n.h"
 #include "app/Shell.h"
 #include "app/Theme.h"
 
@@ -101,9 +102,9 @@ void HelpText(const char* title, const char* shortcut, const char* description, 
     if (!wantHelp() || !itemHoveredForHelp()) return;
     g_help = HelpRequest{};
     g_help.active = true;
-    g_help.title = title ? title : "";
+    g_help.title = title ? tr(title) : "";
     g_help.shortcut = shortcut ? shortcut : "";
-    g_help.description = description ? description : "";
+    g_help.description = description ? tr(description) : "";
     g_help.path = path ? path : "";
     g_help.disabled = (ImGui::GetItemFlags() & ImGuiItemFlags_Disabled) != 0;
 }
@@ -122,7 +123,7 @@ bool IsChoiceAction(std::string_view id) {
 }
 
 bool Checkbox(const char* label, bool* v) {
-    const bool changed = ImGui::Checkbox(label, v);
+    const bool changed = ImGui::Checkbox(tr(label), v);
     if (!*v) {
         const ImVec2 a = ImGui::GetItemRectMin();
         const float sz = ImGui::GetFrameHeight();
@@ -159,16 +160,16 @@ void HelpAction(App& app, const char* actionId) {
     if (!a) return;
     g_help = HelpRequest{};
     g_help.active = true;
-    g_help.title = a->label;
+    g_help.title = trAction(a->id, a->label);
     g_help.actionId = a->id;
     g_help.icon = a->icon;
     g_help.shortcut = app.actions().shortcutText(a->id);
     g_help.path = a->palette;
     g_help.command = a->command;
     g_help.disabled = a->enabled && !a->enabled();
-    g_help.description = a->description;
+    g_help.description = tr(a->description);
     if (const Command* c = a->command.empty() ? nullptr : app.commands().find(a->command)) {
-        if (g_help.description.empty()) g_help.description = c->description;
+        if (g_help.description.empty()) g_help.description = tr(c->description);
         g_help.params = c->params;
         g_help.hasCommand = true;
     }
@@ -236,7 +237,7 @@ void Keycaps(const std::string& chord) {
 
 void DelayedTooltip(const char* text) {
     if (!text || !*text || CtrlHeld()) return;
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal | ImGuiHoveredFlags_NoSharedDelay)) ImGui::SetTooltip("%s", text);
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal | ImGuiHoveredFlags_NoSharedDelay)) ImGui::SetTooltip("%s", tr(text));
 }
 
 bool ActionButton(App& app, const char* actionId, ImVec2 size, Look look) {
@@ -250,7 +251,7 @@ bool ActionButton(App& app, const char* actionId, ImVec2 size, Look look) {
         return false;
     }
     // Copy what we need: running the action may add or replace actions.
-    const std::string id = a->id, label = a->label;
+    const std::string id = a->id, label = trAction(a->id, a->label); // the visible words in the interface language (I18n.h)
     const char* icon = a->icon;
     const std::function<void()> run = a->run;
     const bool enabled = !a->enabled || a->enabled();
@@ -364,7 +365,7 @@ bool SliderInside(const char* id, float* v, float lo, float hi, const char* form
     // No grab over the label: the position shows as the fill and a thin accent bar along the bottom (ZBrush).
     ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0, 0, 0, 0));
     ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0, 0, 0, 0));
-    const bool changed = ImGui::SliderFloat(id, v, lo, hi, format, flags);
+    const bool changed = ImGui::SliderFloat(id, v, lo, hi, format ? tr(format) : format, flags);
     const bool active = ImGui::IsItemActive();
     ImGui::PopStyleColor(5);
     dl->ChannelsSetCurrent(0);
@@ -451,7 +452,7 @@ void DrawHelp(App& app) {
         ImGui::PushTextWrapPos(0.0f);
         if (!alternate) {
             ImGui::PushStyleColor(ImGuiCol_Text, rgba(IM_COL32(0xc8, 0xc8, 0xc8, 0xff)));
-            ImGui::TextUnformatted(r.description.empty() ? "No description yet." : r.description.c_str());
+            ImGui::TextUnformatted(r.description.empty() ? tr("No description yet.") : r.description.c_str());
             ImGui::PopStyleColor();
             if (r.hasCommand && !r.params.empty()) {
                 ImGui::PushStyleColor(ImGuiCol_Text, rgba(color::textDim));
@@ -479,7 +480,7 @@ void DrawHelp(App& app) {
                 ImGui::Unindent(10.0f * s);
             }
         }
-        if (r.disabled) ImGui::TextColored(rgba(color::danger), "Not available right now.");
+        if (r.disabled) ImGui::TextColored(rgba(color::danger), "%s", tr("Not available right now."));
         ImGui::PopTextWrapPos();
         // The user guide chapter about it: F1 (with Ctrl still held) opens it.
         if (const std::string chapter = UserGuide::chapterFor(r.path, r.actionId); !chapter.empty()) {
@@ -488,7 +489,7 @@ void DrawHelp(App& app) {
                 ImGui::Dummy(ImVec2(0, 1.0f * s));
                 Keycaps("F1");
                 ImGui::SameLine();
-                ImGui::TextColored(rgba(color::textDim), "Learn more: %s", title.c_str());
+                ImGui::TextColored(rgba(color::textDim), tr("Learn more: %s"), title.c_str());
                 if (ImGui::IsKeyPressed(ImGuiKey_F1, false)) app.guide().open(chapter);
                 r.description += "\nLearn more: " + title;
             }
@@ -497,7 +498,7 @@ void DrawHelp(App& app) {
         if (!r.path.empty() || !r.command.empty()) {
             ImGui::Dummy(ImVec2(0, 2.0f * s));
             ImGui::SetWindowFontScale(0.82f);
-            if (!r.path.empty()) ImGui::TextColored(rgba(color::textDim), "%s", r.path.c_str());
+            if (!r.path.empty()) ImGui::TextColored(rgba(color::textDim), "%s", trPath(r.path).c_str());
             ImGui::SetWindowFontScale(1.0f);
             if (!r.command.empty()) {
                 ImGui::PushFont(app.consoleFont());

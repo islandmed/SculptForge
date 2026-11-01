@@ -5,6 +5,7 @@
 // picker and swatches, fills, and the viewport MatCap material picker.
 #include "app/App.h"
 #include "app/Ui.h"
+#include "app/I18n.h"
 
 #include "core/Matcap.h"
 #include "core/Polypaint.h"
@@ -208,7 +209,7 @@ void App::setBackground(bool gradient, const glm::vec3& color) {
 }
 
 void App::drawBackgroundControls(const char* idSuffix) {
-    ImGui::TextDisabled("Background");
+    ImGui::TextDisabled("%s", tr("Background"));
     ui::Segmented(*this, {"view.background_gradient", "view.background_flat"});
     // The picker edits the flat colour as shown (display values); picking one switches to Flat Colour.
     glm::vec3 c = renderSettings_.backgroundColor;
@@ -304,14 +305,14 @@ void App::pickColorUnderCursor() {
 
 // Color palette: the Paint brush (ZBrush Rgb / Zadd), the colour, swatches and fills.
 void App::drawPalette_Color() {
-    ImGui::SeparatorText("Paint");
+    ImGui::SeparatorText(tr("Paint"));
     const bool painting = paintMode_;
     if (painting) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
-    if (ImGui::Button("Paint brush (P)", ImVec2(-1, 0))) paintMode_ = !paintMode_;
+    if (ImGui::Button(tr("Paint brush (P)"), ImVec2(-1, 0))) paintMode_ = !paintMode_;
     if (painting) ImGui::PopStyleColor();
     ui::HelpAction(*this, "draw.paint");
-    ImGui::Checkbox("RGB while sculpting", &paintRgb_);
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Sculpt brushes also paint the colour (ZBrush Rgb with Zadd)");
+    ImGui::Checkbox(tr("RGB while sculpting"), &paintRgb_);
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Sculpt brushes also paint the colour (ZBrush Rgb with Zadd)"));
 
     // The picker edits display (sRGB) values; the mesh stores linear colour.
     glm::vec3 srgb = linearToSrgb(doc_.paintColor);
@@ -342,7 +343,7 @@ void App::drawPalette_Color() {
         if (hasTexture(m)) {
             // Where paint goes, when the SubTool has a texture (Tool > Texture Map).
             ImGui::AlignTextToFramePadding();
-            ImGui::TextDisabled("Paint into");
+            ImGui::TextDisabled("%s", tr("Paint into"));
             ImGui::SameLine();
             ui::Segmented(*this, {"draw.paint_vertex", "draw.paint_texture"});
         } else {
@@ -352,9 +353,9 @@ void App::drawPalette_Color() {
         if (paintsTexture(m)) {
             const PaintTexture& t = *m.texture;
             const bool texLayered = t.activeLayer >= 0 && t.activeLayer < int(t.layers.size());
-            ImGui::TextDisabled("Painting on: texture, %s", texLayered ? t.layers[size_t(t.activeLayer)].name.c_str() : "Base");
+            ImGui::TextDisabled(tr("Painting on: texture, %s"), texLayered ? t.layers[size_t(t.activeLayer)].name.c_str() : "Base");
         } else
-        ImGui::TextDisabled("Painting on: %s", layered ? m.paintLayers[size_t(m.activePaintLayer)].name.c_str() : "Base");
+        ImGui::TextDisabled(tr("Painting on: %s"), layered ? m.paintLayers[size_t(m.activePaintLayer)].name.c_str() : "Base");
         ui::HelpText("Paint layer", nullptr,
                      "The paint layer the Paint brush and fills write into. Add and arrange layers in Tool > Paint Layers.",
                      "Color");
@@ -362,24 +363,24 @@ void App::drawPalette_Color() {
 
     const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
     const std::string hex = colorToHex(doc_.paintColor);
-    if (ImGui::Button("Fill", ImVec2(half, 0))) runCommand("paint_fill", {{"color", hex}});
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Fill the unmasked area (the whole mesh if nothing is masked)");
+    if (ImGui::Button(tr("Fill"), ImVec2(half, 0))) runCommand("paint_fill", {{"color", hex}});
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Fill the unmasked area (the whole mesh if nothing is masked)"));
     ImGui::SameLine();
     ImGui::BeginDisabled(!doc_.mesh.hasMask());
-    if (ImGui::Button("Fill masked", ImVec2(half, 0)))
+    if (ImGui::Button(tr("Fill masked"), ImVec2(half, 0)))
         runCommand("paint_fill", {{"color", hex}, {"area", std::string("masked")}});
     ImGui::EndDisabled();
-    if (ImGui::Button("Cavity", ImVec2(half, 0))) runCommand("paint_from_cavity");
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Darken creases and cavities (respects the mask)");
+    if (ImGui::Button(tr("Cavity"), ImVec2(half, 0))) runCommand("paint_from_cavity");
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Darken creases and cavities (respects the mask)"));
     ImGui::SameLine();
     ImGui::BeginDisabled(!doc_.mesh.hasColors() && !paintsTexture(doc_.mesh));
-    if (ImGui::Button("Clear", ImVec2(half, 0))) runCommand("paint_clear");
+    if (ImGui::Button(tr("Clear"), ImVec2(half, 0))) runCommand("paint_clear");
     ImGui::EndDisabled();
     ui::HelpText("Clear", nullptr, "Remove all polypaint from the SubTool, paint layers included (undoable).", "Color");
-    ImGui::Checkbox("Show polypaint", &renderSettings_.showPolypaint);
+    ImGui::Checkbox(tr("Show polypaint"), &renderSettings_.showPolypaint);
     if (hasTexture(doc_.mesh)) {
         ImGui::SameLine();
-        ImGui::Checkbox("Texture##show", &renderSettings_.showTexture);
+        ImGui::Checkbox(tr("Texture##show"), &renderSettings_.showTexture);
         ui::HelpAction(*this, "view.texture");
     }
 }
@@ -388,21 +389,21 @@ void App::drawPalette_Color() {
 // SubTool's own).
 void App::drawPalette_Material() {
     sf::drawMaterialGrid(*this, GridMode::Palette); // Pickers.cpp, as in the material picker (M)
-    if (ImGui::Button("Load MatCap...", ImVec2(-1, 0))) loadMatcapDialog();
+    if (ImGui::Button(tr("Load MatCap..."), ImVec2(-1, 0))) loadMatcapDialog();
     ui::HelpText("Load MatCap", nullptr,
                  "Use a MatCap image of your own: a lit sphere filling a square PNG, JPG or EXR. It joins the list "
                  "and is kept in Documents/SculptForge/MatCaps; images you put in that folder show up when a material list "
                  "opens. Right-click one of your MatCaps to remove it.",
                  "Material");
-    ImGui::ColorEdit3("Base colour", &renderSettings_.baseColor.x, ImGuiColorEditFlags_NoInputs);
+    ImGui::ColorEdit3(tr("Base colour"), &renderSettings_.baseColor.x, ImGuiColorEditFlags_NoInputs);
     ui::HelpText("Base colour", nullptr, "Colour of the Studio material (the clay colour).", "Material");
     drawShadingControls();
 }
 
 void App::drawShadingControls() {
-    ImGui::TextDisabled("Shading");
+    ImGui::TextDisabled("%s", tr("Shading"));
     ui::Segmented(*this, {"material.smooth", "material.flat"});
-    ImGui::TextDisabled("This SubTool");
+    ImGui::TextDisabled("%s", tr("This SubTool"));
     ui::Segmented(*this, {"subtool.shading_default", "subtool.shading_smooth", "subtool.shading_flat"});
 }
 

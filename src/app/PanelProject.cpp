@@ -9,6 +9,7 @@
 #include "app/CrashLog.h"
 #include "core/SplatCapture.h"
 #include "app/Ui.h"
+#include "app/I18n.h"
 
 #include "ai/Http.h"
 
@@ -438,7 +439,7 @@ void App::openPathConfirmed(const std::string& path) {
 }
 
 void App::drawFileMenuProjectItems() {
-    if (ImGui::BeginMenu("Open Recent", !recentFiles_.empty())) {
+    if (ImGui::BeginMenu(tr("Open Recent"), !recentFiles_.empty())) {
         const size_t before = recentFiles_.size();
         recentFiles_ = pruneRecentFiles(std::move(recentFiles_), fileExists);
         if (recentFiles_.size() != before) saveProjectPrefs();
@@ -449,17 +450,17 @@ void App::drawFileMenuProjectItems() {
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", recentFiles_[i].c_str());
         }
         ImGui::Separator();
-        if (ImGui::MenuItem("Clear Recent")) {
+        if (ImGui::MenuItem(tr("Clear Recent"))) {
             recentFiles_.clear();
             saveProjectPrefs();
         }
         ImGui::EndMenu();
         if (!chosen.empty()) openPathConfirmed(chosen);
     }
-    if (ImGui::MenuItem("Save", "Ctrl+S")) saveProjectAs(false);
-    if (ImGui::MenuItem("Save As...", "Ctrl+Shift+S")) saveProjectAs(true);
+    if (ImGui::MenuItem(tr("Save"), "Ctrl+S")) saveProjectAs(false);
+    if (ImGui::MenuItem(tr("Save As..."), "Ctrl+Shift+S")) saveProjectAs(true);
     ImGui::SetNextItemWidth(120.0f * uiScale_);
-    ImGui::SliderInt("Autosave (min)", &autosaveMinutes_, 0, 60, autosaveMinutes_ ? "%d" : "off");
+    ImGui::SliderInt(tr("Autosave (min)"), &autosaveMinutes_, 0, 60, autosaveMinutes_ ? "%d" : "off");
     if (ImGui::IsItemDeactivatedAfterEdit()) saveProjectPrefs();
 }
 
@@ -472,11 +473,11 @@ void App::drawProjectPopups() {
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal(kUnsavedPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         const std::string name = doc_.path.empty() ? std::string("Untitled") : utf8(fsPath(doc_.path).filename());
-        ImGui::Text("Save changes to %s before continuing?", name.c_str());
-        ImGui::TextDisabled("Your changes will be lost if you don't save them.");
+        ImGui::Text(tr("Save changes to %s before continuing?"), name.c_str());
+        ImGui::TextDisabled("%s", tr("Your changes will be lost if you don't save them."));
         ImGui::Spacing();
         const float w = 110.0f * uiScale_;
-        if (ImGui::Button("Save", ImVec2(w, 0)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+        if (ImGui::Button(tr("Save"), ImVec2(w, 0)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
             ImGui::CloseCurrentPopup();
             if (isProjectPath(doc_.path)) {
                 saveProjectTo(doc_.path);
@@ -489,14 +490,14 @@ void App::drawProjectPopups() {
             }
         }
         ImGui::SameLine();
-        if (ImGui::Button("Don't Save", ImVec2(w, 0))) {
+        if (ImGui::Button(tr("Don't Save"), ImVec2(w, 0))) {
             ImGui::CloseCurrentPopup();
             auto action = std::move(discardAction_);
             discardAction_ = nullptr;
             if (action) action();
         }
         ImGui::SameLine();
-        if (ImGui::Button("Cancel", ImVec2(w, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+        if (ImGui::Button(tr("Cancel"), ImVec2(w, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
             ImGui::CloseCurrentPopup();
             discardAction_ = nullptr;
         }
@@ -514,17 +515,17 @@ void App::drawProjectPopups() {
     drawUpdateBanner();
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal(kRestorePopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextUnformatted("SculptForge did not close normally last time.");
-        ImGui::TextUnformatted("Restore the autosaved work?");
+        ImGui::TextUnformatted(tr("SculptForge did not close normally last time."));
+        ImGui::TextUnformatted(tr("Restore the autosaved work?"));
         if (crashlog::previousCrashed()) {
             ImGui::Spacing();
-            ImGui::TextDisabled("What happened is in sculptforge-previous.log (Help > Open log folder);");
-            ImGui::TextDisabled("please attach it if you report the problem.");
+            ImGui::TextDisabled("%s", tr("What happened is in sculptforge-previous.log (Help > Open log folder);"));
+            ImGui::TextDisabled("%s", tr("please attach it if you report the problem."));
         }
         ImGui::Spacing();
         const float w = 110.0f * uiScale_;
         const std::string autosave = autosavePath(prefDir_);
-        if (ImGui::Button("Restore", ImVec2(w, 0))) {
+        if (ImGui::Button(tr("Restore"), ImVec2(w, 0))) {
             ImGui::CloseCurrentPopup();
             runCommand("open_project", {{"path", autosave}});
             if (doc_.path == autosave) {
@@ -534,7 +535,7 @@ void App::drawProjectPopups() {
             }
         }
         ImGui::SameLine();
-        if (ImGui::Button("Discard", ImVec2(w, 0))) {
+        if (ImGui::Button(tr("Discard"), ImVec2(w, 0))) {
             ImGui::CloseCurrentPopup();
             std::error_code ec;
             std::filesystem::remove(fsPath(autosave), ec);
@@ -609,25 +610,25 @@ void App::drawUpdateBanner() {
     if (ImGui::Begin("##update_banner", nullptr, flags)) {
         // Reading size (the guide's 17 px fonts), so the highlights are easy to read over the canvas.
         if (ImFont* title = guide_.bodyBoldFont()) ImGui::PushFont(title);
-        ImGui::Text("SculptForge %s is available", u.version.c_str());
+        ImGui::Text(tr("SculptForge %s is available"), u.version.c_str());
         if (guide_.bodyBoldFont()) ImGui::PopFont();
         if (ImFont* body = guide_.bodyFont()) ImGui::PushFont(body);
         ImGui::SameLine();
-        ImGui::TextDisabled("(you have %s)", SCULPTFORGE_VERSION);
+        ImGui::TextDisabled(tr("(you have %s)"), SCULPTFORGE_VERSION);
         for (const auto& h : u.highlights) ImGui::BulletText("%s", h.c_str());
         if (guide_.bodyFont()) ImGui::PopFont();
         ImGui::Spacing();
         bool close = false;
-        if (ImGui::Button("What's new")) SDL_OpenURL(u.notesUrl.c_str());
+        if (ImGui::Button(tr("What's new"))) SDL_OpenURL(u.notesUrl.c_str());
         ImGui::SameLine();
-        if (ImGui::Button("Download")) {
+        if (ImGui::Button(tr("Download"))) {
             SDL_OpenURL(u.downloadUrl.c_str());
             close = true;
         }
         ImGui::SameLine();
-        if (ImGui::Button("Later")) close = true;
+        if (ImGui::Button(tr("Later"))) close = true;
         ImGui::SameLine();
-        if (ImGui::Button("Skip this version")) {
+        if (ImGui::Button(tr("Skip this version"))) {
             updateSkipped_ = u.version;
             saveProjectPrefs();
             close = true;
@@ -639,16 +640,16 @@ void App::drawUpdateBanner() {
 
 void App::drawUpdatesSection() {
 #if SF_UPDATE_CHECK
-    if (ImGui::Checkbox("Check for updates", &checkUpdates_)) saveProjectPrefs();
+    if (ImGui::Checkbox(tr("Check for updates"), &checkUpdates_)) saveProjectPrefs();
     ui::HelpText("Check for updates", nullptr,
                  "Once a day at startup, download a small file from the SculptForge website that names the newest "
                  "version, and show a banner when there is a newer one. Nothing about you or your computer is sent.",
                  "Preferences > Updates");
 #else
-    ImGui::TextWrapped("This build gets its updates from your package manager.");
+    ImGui::TextWrapped("%s", tr("This build gets its updates from your package manager."));
 #endif
     ui::ActionButton(*this, "help.check_updates", ImVec2(-1, 0));
-    if (updateJob_) ImGui::TextDisabled("Checking...");
+    if (updateJob_) ImGui::TextDisabled("%s", tr("Checking..."));
     else if (!updateStatus_.empty()) ImGui::TextWrapped("%s", updateStatus_.c_str());
 }
 

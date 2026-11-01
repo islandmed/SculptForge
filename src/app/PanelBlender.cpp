@@ -4,6 +4,7 @@
 // File > Blender: the bridge to the SculptForge add-on for Blender (io/BlenderBridge.h, addons/blender).
 // Blender writes to_sculptforge/manifest.json; this polls it once a second and loads each new revision.
 #include "app/App.h"
+#include "app/I18n.h"
 #include "app/Ui.h"
 
 #include "io/BlenderBridge.h"
@@ -49,7 +50,7 @@ void menuAction(App& app, const char* id) {
     const Action* a = app.actions().find(id);
     if (!a) return;
     const std::string shortcut = app.actions().shortcutText(id);
-    const std::string label = a->label + "##" + a->id;
+    const std::string label = std::string(trAction(a->id, a->label)) + "##" + a->id;
     if (ImGui::MenuItem(label.c_str(), shortcut.empty() ? nullptr : shortcut.c_str(), false, !a->enabled || a->enabled()) &&
         a->run) {
         app.actions().touch(a->id);

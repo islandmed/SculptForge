@@ -10,6 +10,7 @@
 #include "app/Demo.h"
 #include "app/Palettes.h"
 #include "app/Ui.h"
+#include "app/I18n.h"
 
 #include "core/KeepMasked.h"
 #include "core/TextureTransfer.h"
@@ -327,13 +328,13 @@ void App::drawQRemeshContents() {
         ui::HelpText("QRemesh", nullptr, "Remeshing in the background. The result replaces the SubTool when it's done.",
                      kQRemeshPath);
         ImGui::SameLine();
-        if (ImGui::Button("Cancel", ImVec2(-1, 0))) qremesh_->cancel->store(true);
+        if (ImGui::Button(tr("Cancel"), ImVec2(-1, 0))) qremesh_->cancel->store(true);
         ui::HelpText("Cancel", nullptr, "Stop QRemesh; the SubTool stays as it is.", kQRemeshPath);
     } else {
         ui::ActionButton(*this, "geometry.qremesh", ImVec2(half, 0));
         ImGui::SameLine();
         ImGui::AlignTextToFramePadding();
-        ImGui::TextDisabled("%zu polygons", faceCount(doc_.mesh));
+        ImGui::TextDisabled(tr("%zu polygons"), faceCount(doc_.mesh));
     }
 
     {
@@ -354,14 +355,14 @@ void App::drawQRemeshContents() {
                  kQRemeshPath);
     const size_t faces = faceCount(doc_.mesh);
     auto setTarget = [&](double k) { retopo_.target = int(std::clamp(double(faces) * k, 100.0, 2'000'000.0)); };
-    if (ImGui::Button("Half", ImVec2(third, 0))) setTarget(0.5);
+    if (ImGui::Button(tr("Half"), ImVec2(third, 0))) setTarget(0.5);
     ui::HelpText("Half", nullptr, "Target half the SubTool's current polygon count.", kQRemeshPath);
     ImGui::SameLine();
-    if (ImGui::Button("Same", ImVec2(third, 0))) setTarget(1.0);
+    if (ImGui::Button(tr("Same"), ImVec2(third, 0))) setTarget(1.0);
     ui::HelpText("Same", nullptr, "Target the SubTool's current polygon count (to clean up topology without changing its density).",
                  kQRemeshPath);
     ImGui::SameLine();
-    if (ImGui::Button("Double", ImVec2(-1, 0))) setTarget(2.0);
+    if (ImGui::Button(tr("Double"), ImVec2(-1, 0))) setTarget(2.0);
     ui::HelpText("Double", nullptr, "Target twice the SubTool's current polygon count.", kQRemeshPath);
 
     ImGui::SetNextItemWidth(-1);
@@ -371,38 +372,38 @@ void App::drawQRemeshContents() {
                  "flat areas (the count stays near the target).",
                  kQRemeshPath);
 
-    ImGui::Checkbox("Keep Groups", &retopo_.keepGroups);
+    ImGui::Checkbox(tr("Keep Groups"), &retopo_.keepGroups);
     ui::HelpText("Keep Groups", nullptr,
                  "Edge loops follow the polygroup borders exactly and the result keeps the polygroups. Paint groups "
                  "where you want loops (around the eyes, the mouth) to guide the flow.",
                  kQRemeshPath);
     ImGui::SameLine();
     ImGui::SetCursorPosX(x0 + half + style.ItemSpacing.x); // the right column, inside the section indent
-    ImGui::Checkbox("Detect Edges", &retopo_.detectEdges);
+    ImGui::Checkbox(tr("Detect Edges"), &retopo_.detectEdges);
     ui::HelpText("Detect Edges", nullptr, "Hard edges get an edge loop, so they stay sharp (QRemesh 2: faces meeting at more than about 60 degrees along a line at least a few quads long; legacy: more than 50 degrees).",
                  kQRemeshPath);
-    ImGui::Checkbox("Use Polypaint", &retopo_.usePolypaint);
+    ImGui::Checkbox(tr("Use Polypaint"), &retopo_.usePolypaint);
     ui::HelpText("Use Polypaint", nullptr,
                  "Paint where you want density: red areas get up to 4 times the quads, blue areas down to a quarter, "
                  "white is unchanged.",
                  kQRemeshPath);
     ImGui::SameLine();
     ImGui::SetCursorPosX(x0 + half + style.ItemSpacing.x); // the right column, inside the section indent
-    ImGui::Checkbox("Symmetry", &retopo_.symmetry);
+    ImGui::Checkbox(tr("Symmetry"), &retopo_.symmetry);
     const char axis = char('X' + symmetryAxis(symmetry_));
     const std::string symHelp = std::string("Mirror the topology across ") + axis +
                                 " (the Transform palette's symmetry axis), welded on the seam. The mirror plane is the "
                                 "model's own, so a model away from the world centre works too; a model that isn't "
                                 "mirror-symmetric is remeshed without symmetry (the status line says so).";
     ui::HelpText("Symmetry", nullptr, symHelp.c_str(), kQRemeshPath);
-    ImGui::Checkbox("Keep Original", &retopo_.keepOriginal);
+    ImGui::Checkbox(tr("Keep Original"), &retopo_.keepOriginal);
     ui::HelpText("Keep Original", nullptr,
                  "Keep the SubTool as it was, hidden, right below the new one (\"<name> Original\"), ready to "
                  "ProjectAll its detail back. Off: replace it, as ZBrush does (undo brings it back).",
                  kQRemeshPath);
     ImGui::SameLine();
     ImGui::SetCursorPosX(x0 + half + style.ItemSpacing.x); // the right column, inside the section indent
-    ImGui::Checkbox("Keep Masked##qremesh", &retopo_.keepMasked);
+    ImGui::Checkbox(tr("Keep Masked##qremesh"), &retopo_.keepMasked);
     ui::HelpText("Keep Masked", nullptr, kKeepMaskedHelp, kQRemeshPath);
     if (hasTexture(doc_.mesh)) // only matters for a painted SubTool
         drawKeepTextureCheckbox("Keep Texture##qremesh", kQRemeshPath);
@@ -416,15 +417,15 @@ void App::drawQRemeshReport() {
     const QuadQuality& q = st.quality;
     if (q.quads == 0) return;
     tray::GroupLabel(*this, "Quality Report");
-    ImGui::TextDisabled("%s: %zu quads in %.1f s", st.method == QRemeshMethod::Legacy ? "Legacy" : "QRemesh 2", q.quads,
+    ImGui::TextDisabled(tr("%s: %zu quads in %.1f s"), st.method == QRemeshMethod::Legacy ? "Legacy" : "QRemesh 2", q.quads,
                         st.seconds);
-    ImGui::TextDisabled("Poles: %zu  (3 edges %zu, 5 edges %zu, other %zu)", q.poles, q.valence[3], q.valence[5],
+    ImGui::TextDisabled(tr("Poles: %zu  (3 edges %zu, 5 edges %zu, other %zu)"), q.poles, q.valence[3], q.valence[5],
                         q.poles - q.valence[3] - q.valence[5]);
-    ImGui::TextDisabled("Corners off square: %.1f deg mean, %.0f deg worst 1%%", double(q.angleDeviation),
+    ImGui::TextDisabled(tr("Corners off square: %.1f deg mean, %.0f deg worst 1%%"), double(q.angleDeviation),
                         double(q.angleDeviationMax));
     if (q.measured)
-        ImGui::TextDisabled("Distance to the sculpt: %.3f%% mean, %.2f%% max", double(q.meanDistance), double(q.hausdorff));
-    if (st.fallbackPieces) ImGui::TextDisabled("%zu piece(s) used the legacy method", st.fallbackPieces);
+        ImGui::TextDisabled(tr("Distance to the sculpt: %.3f%% mean, %.2f%% max"), double(q.meanDistance), double(q.hausdorff));
+    if (st.fallbackPieces) ImGui::TextDisabled(tr("%zu piece(s) used the legacy method"), st.fallbackPieces);
     ui::HelpText("Quality Report", nullptr,
                  "How clean the new topology is: poles are vertices with other than four edges (fewer is cleaner), "
                  "corners off square measure how far quad corners are from 90 degrees, and the distance is how far the "
@@ -446,8 +447,8 @@ void App::drawQRemeshGuideControls() {
     ImGui::AlignTextToFramePadding();
     size_t loops = 0;
     for (const QRemeshGuide& g : doc_.qremeshGuides) loops += g.closed;
-    if (doc_.qremeshGuides.empty()) ImGui::TextDisabled("no curves");
-    else ImGui::TextDisabled("%zu curves (%zu loops)", doc_.qremeshGuides.size(), loops);
+    if (doc_.qremeshGuides.empty()) ImGui::TextDisabled("%s", tr("no curves"));
+    else ImGui::TextDisabled(tr("%zu curves (%zu loops)"), doc_.qremeshGuides.size(), loops);
     ui::ActionButton(*this, "geometry.qremesh_guides_delete_last", ImVec2(half, 0));
     ImGui::SameLine();
     ui::ActionButton(*this, "geometry.qremesh_guides_clear", ImVec2(-1, 0));
@@ -678,15 +679,15 @@ void App::drawProjectContents() {
     ui::HelpText("PA Blur", nullptr, "Smooth the projected result this many times (softens noise from the source).",
                  kProjectPath);
     ImGui::SameLine();
-    ImGui::Checkbox("Mean", &retopo_.projectMean);
+    ImGui::Checkbox(tr("Mean"), &retopo_.projectMean);
     ui::HelpText("Mean", nullptr,
                  "Where the source is found on both sides of a vertex, settle halfway between instead of on the nearest.",
                  kProjectPath);
-    ImGui::Checkbox("Geometry", &retopo_.projectGeometry);
+    ImGui::Checkbox(tr("Geometry"), &retopo_.projectGeometry);
     ui::HelpText("Geometry", nullptr, "Project the shape (into the active sculpt layer).", kProjectPath);
     ImGui::SameLine();
     ImGui::SetCursorPosX(x0 + half + style.ItemSpacing.x); // the right column, inside the section indent
-    ImGui::Checkbox("Polypaint", &retopo_.projectPolypaint);
+    ImGui::Checkbox(tr("Polypaint"), &retopo_.projectPolypaint);
     ui::HelpText("Polypaint", nullptr, "Project the polypaint (into the active paint layer) when a source has any.",
                  kProjectPath);
 }
