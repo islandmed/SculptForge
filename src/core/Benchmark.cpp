@@ -381,6 +381,7 @@ std::string runMicroBenchmark(const BenchOptions& o, const BenchGpu* gpu) {
     const std::vector<BenchBrush> brushes = {
         {"Standard", Kind::Brush, BrushType::Standard},
         {"Standard (large, r 0.4)", Kind::Brush, BrushType::Standard, 0.4f},
+        {"Standard (300 px, r 0.56)", Kind::Brush, BrushType::Standard, 0.56f},
         {"Clay", Kind::Brush, BrushType::Clay},
         {"ClayBuildup", Kind::Brush, BrushType::ClayBuildup},
         {"Smooth", Kind::Brush, BrushType::Smooth},
@@ -391,6 +392,7 @@ std::string runMicroBenchmark(const BenchOptions& o, const BenchGpu* gpu) {
         {"Crease", Kind::Brush, BrushType::Crease},
         {"Layer", Kind::Brush, BrushType::Layer},
         {"Move", Kind::Move, BrushType::Move},
+        {"Move (300 px, r 0.56)", Kind::Move, BrushType::Move, 0.56f},
         {"Mask", Kind::Mask},
     };
     for (double sizeM : o.sizesMillions) {
@@ -456,9 +458,9 @@ std::string runMicroBenchmark(const BenchOptions& o, const BenchGpu* gpu) {
         if (peak > rss0) md << "| Peak (RSS) | " << fmt("%.0f MB", double(peak) / 1e6) << " |\n";
         md << "\n";
 
-        md << "| Brush | points/dab | pick | find + undo tiles | kernel | stitch | shading | " << (gpu ? "GPU upload | " : "")
+        md << "| Brush | stride | points/dab | pick | find + undo tiles | kernel | stitch | shading | " << (gpu ? "GPU upload | " : "")
            << "**dab total** | stroke end | undo | redo | undo step |\n";
-        md << "|---|---:|---:|---:|---:|---:|---:|" << (gpu ? "---:|" : "") << "---:|---:|---:|---:|---:|\n";
+        md << "|---|---:|---:|---:|---:|---:|---:|---:|" << (gpu ? "---:|" : "") << "---:|---:|---:|---:|---:|\n";
         for (const BenchBrush& b : brushes) {
             if (!o.brushFilter.empty() && b.name.find(o.brushFilter) == std::string::npos) continue;
             log("  " + b.name);
@@ -525,7 +527,8 @@ std::string runMicroBenchmark(const BenchOptions& o, const BenchGpu* gpu) {
             const double redoMs = msSince(te);
             if (gpu && gpu->upload) gpu->upload(m);
             else m.micro->clearDirty();
-            md << "| " << b.name << " | " << millions(double(ms.points - p0) / d) << " | " << fmt("%.2f", pick / d) << " | "
+            md << "| " << b.name << " | " << ms.lastStride << " | " << millions(double(ms.points - p0) / d) << " | "
+               << fmt("%.2f", pick / d) << " | "
                << fmt("%.2f", (ms.findMs - f0) / d) << " | " << fmt("%.2f", (ms.kernelMs - k0) / d) << " | "
                << fmt("%.2f", (ms.stitchMs - s0) / d) << " | " << (gpu ? std::string("(in upload)") : fmt("%.2f", shade / d)) << " | ";
             if (gpu) md << fmt("%.2f", upload / d) << " | ";

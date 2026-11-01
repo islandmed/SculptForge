@@ -340,6 +340,7 @@ bool microDivide(Mesh& m, int level, std::string& error) {
         mm->bulgeMax = std::max(mm->bulgeMax, bulge[i]);
     }
     const float avgEdge = float(total / double(nt * 3));
+    mm->baseEdge = avgEdge;
     // 1/4096 of a base edge per unit: +/-8 base edges of range, steps far below a micro edge (1/256 of one at
     // level 4). Brushes widen the range when they need more (MicroStroke).
     mm->step = std::max(avgEdge / 4096.0f, 1e-12f);
@@ -389,6 +390,15 @@ bool microAttach(Mesh& m, int level, float step, std::vector<int16_t> disp, std:
         bulge[b / block] = g;
     }, block);
     for (float g : bulge) mm->bulgeMax = std::max(mm->bulgeMax, g);
+    {
+        double e = 0.0;
+        for (size_t t = 0; t < nt; ++t) {
+            const glm::uvec3 tr = m.triangles[t];
+            e += double(glm::distance(m.positions[tr.x], m.positions[tr.y]) + glm::distance(m.positions[tr.y], m.positions[tr.z]) +
+                        glm::distance(m.positions[tr.z], m.positions[tr.x]));
+        }
+        mm->baseEdge = float(e / double(std::max<size_t>(nt * 3, 1)));
+    }
     for (uint16_t r : mm->triRange) mm->rangeMax = std::max(mm->rangeMax, r);
     mm->ensureTopology(m);
     mm->serial = MicroMesh::newSerial();

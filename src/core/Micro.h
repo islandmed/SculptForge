@@ -67,6 +67,7 @@ struct MicroMesh {
     std::vector<uint16_t> triRange; // per base triangle: the largest |disp| (an upper bound; brushes find triangles with it)
     uint16_t rangeMax = 0;          // the largest triRange (an upper bound)
     float bulgeMax = 0.0f;          // the most S leaves a base triangle's plane (world units, an upper bound)
+    float baseEdge = 0.0f;          // the base's average edge length
 
     // Base topology this level needs (derived, not saved; rebuilt when the base changes): per triangle edge the
     // neighbouring triangle (tri << 2 | its edge), or kNone on a boundary.
@@ -218,6 +219,12 @@ public:
     // The stroke's undo step (null when nothing changed).
     std::unique_ptr<MicroUndo> end(Mesh& m);
     bool active() const { return active_; }
+    // Scale-adaptive brushing: a dab is evaluated on grid points about radius / kBrushSamples apart (a power-of-two
+    // stride of the micro grid) and interpolated in between, so its evaluation cost doesn't grow with the micro
+    // level. Off: every grid point (tests compare).
+    static constexpr int kBrushSamples = 48;
+    bool adaptive = true;
+    uint32_t lastStride = 1; // the stride the last dab used
     // Timings of the last dabs (ms): finding the triangles + saving undo tiles, the kernel, stitching.
     double findMs = 0, kernelMs = 0, stitchMs = 0;
     uint64_t points = 0; // grid points visited
@@ -238,13 +245,16 @@ private:
     uint32_t dabEpoch_ = 0;
     std::vector<uint32_t> vertStamp_;
     std::vector<uint32_t> corners_;
-    struct GrabPoint {
-        uint32_t tri;
-        uint16_t index;
-        float weight;
-        glm::vec3 normal; // the direction the point moves along
+    float baseEdge_ = 0.0f; // the base's average edge length
+    // Move: per mirror its triangles and, per triangle, weight and direction of its coarse grid points.
+    struct GrabMirror {
+        glm::vec3 mirror{1.0f};
+        uint32_t stride = 1, firstTri = 0, tris = 0;
     };
-    std::vector<GrabPoint> grab_;
+    std::vector<GrabMirror> grabMirrors_;
+    std::vector<uint32_t> grabTris_;
+    std::vector<float> grabWeight_;
+    std::vector<glm::vec3> grabNormal_;
 };
 
 // One micro step: the old grid points of the base triangles a stroke touched (in units of `step`), or a whole
