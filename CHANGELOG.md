@@ -27,6 +27,7 @@ All notable changes to SculptForge are listed here. The format follows
   quoted so nothing in them is interpreted (and refused on Windows when they contain shell characters).
 - The brush ring that follows the surface (#25) read the mesh while a predictive stroke's thread was changing it,
   which could change where that stroke's dabs landed; it now shows the flat ring during such strokes.
+
 ### Added
 - **QRemesh 2**, the new default quad retopology (**Tool > Remesh > QRemesh**, also under **Tool > Geometry**;
   `qremesh method=v2`). The layout is solved over the whole model at once as an integer grid: a smooth cross field
@@ -51,6 +52,42 @@ All notable changes to SculptForge are listed here. The format follows
 - Tests: test_qremesh2.cpp (eight poles on a sphere, determinism, exact symmetry, hard edges and groups, the
   command); `SF_QREMESH_BENCH=<dir>` runs the comparison with the legacy method and writes the results as OBJ,
   `SF_BENCH_LIMITS=1` times 1.3M / 5.2M / 21M-triangle sculpts with their peak memory.
+
+- **Kelvinlet brushes**: physically based elastic brushes from the regularized Kelvinlets of de Goes & James
+  (SIGGRAPH 2017): the exact displacement of an elastic solid under a softened point load, so the surface moves
+  like clay pushed with a thumb, with no falloff edge. **KelvinGrab** (an elastic Move: tri-scale kernel, 1/r^5
+  falloff), **KelvinTwist** (press and drag right to turn clockwise around that point; every ring turns rigidly,
+  so volume is kept), **KelvinScale** (drag left to pinch, right to swell; integrated as a radial flow, so it never
+  folds through the centre) and **KelvinSnake** (a multi-scale SnakeHook whose pull narrows as it travels, so
+  horns taper by themselves). **Brush > Kelvinlet & Capture**: **Squash** is Poisson's ratio, from rubbery (0) to
+  incompressible clay that bulges around the thumb (100); **Sharpness** a tighter, cusped peak with the same
+  reach. Symmetry (the twist mirrors as a pseudovector), masks, hidden parts, sculpt layers, pressure and undo work
+  as with every brush. Each move touches only the points inside an adaptive cutoff (where the move is still more
+  than 4% of its largest, the last part faded smoothly to 0), evaluates the kernel from a radial table, works out a
+  fast drag in pieces in one pass, and passes on only what moved to undo, normals and the BVH. KelvinGrab and
+  DetailClone are on the bottom shelf; all five are in the brush picker, the LightBox and the `stroke` command.
+  On dense meshes a long move is applied at most about a brush radius per frame (the rest in the next frames),
+  the far field is evaluated on a coarse lattice and, over 400k vertices, deferred to a world lattice that a
+  sixth of the vertices take each frame (all of it when the stroke ends), and the cutoff tightens up to 10% of
+  the peak over a vertex budget. Twist and Scale at 33M / 50 px: 57 ms frames (was 110-280); KelvinGrab still
+  about 190 ms there (renderer sync), see docs/performance.md.
+- **Capture from view** (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd>, askNK's request): drag a square (Shift: a
+  circle) over any sculpted detail and get, side by side, a **grayscale height alpha** (height toward the viewer
+  over a fitted plane, normalized, optionally detail-only) and a **vector displacement map**: each point's true 3D
+  offset from a smooth base (the broad form as a fitted quadric, the rest by implicit fairing with the rim held),
+  in the base's own tangent frame, so overhangs and sideways leans come along. Options: Base Smoothing, Edge Fade,
+  Resolution, Fit plane, Invert. **Use as Alpha**, **Use as VDM**, **Detail Clone** or **Save to Library** (the
+  alpha as a PNG in the LightBox Alphas folder, the VDM in the brush library; VDMs now show in the LightBox Brush
+  tab with their thumbnails). Commands `capture_alpha` and `capture_vdm`.
+- **DetailClone** brush: stamps the VDM brush's map along the stroke, one copy every stamp width (Clone Spacing),
+  each turned to follow the stroke (Clone follows stroke) and shaped to the surface under it; a click stamps one.
+- `new_bench_sphere millions=N` makes the benchmark's sphere of N million triangles (with subdivision levels),
+  and `SF_MEASURE_BRUSH=<brush>` makes `--measure-stroke` measure another built-in brush (`SF_KELVIN_LOG=1` logs
+  each Kelvinlet move: pieces, vertices, kernel / normals / BVH milliseconds).
+- Tests: tests/test_kelvinlet.cpp (kernel normalization and far-field cancellation, divergence against Squash,
+  bulge, exact twist, pinch without folding, symmetry, mask, undo, sculpt layers, threads, Detail Clone, the
+  captures with a VDM round trip within 9% RMS and a curved-surface capture; a dense-mesh timing check with
+  SF_BENCH_LIMITS=1) and the UI test kelvinlet_capture.
 
 ### Changed
 - Make sculptable still remeshes with the legacy method for now (QRemesh 2 flattened part of a thin handle on x86).
@@ -213,41 +250,6 @@ All notable changes to SculptForge are listed here. The format follows
 ### Fixed (predictive strokes)
 - A big brush that raised the surface past the GPU's position grid stalled the view for seconds on dense meshes
   (the whole mesh was re-packed inside a frame); it is re-packed on the brush thread now.
-- **Kelvinlet brushes**: physically based elastic brushes from the regularized Kelvinlets of de Goes & James
-  (SIGGRAPH 2017): the exact displacement of an elastic solid under a softened point load, so the surface moves
-  like clay pushed with a thumb, with no falloff edge. **KelvinGrab** (an elastic Move: tri-scale kernel, 1/r^5
-  falloff), **KelvinTwist** (press and drag right to turn clockwise around that point; every ring turns rigidly,
-  so volume is kept), **KelvinScale** (drag left to pinch, right to swell; integrated as a radial flow, so it never
-  folds through the centre) and **KelvinSnake** (a multi-scale SnakeHook whose pull narrows as it travels, so
-  horns taper by themselves). **Brush > Kelvinlet & Capture**: **Squash** is Poisson's ratio, from rubbery (0) to
-  incompressible clay that bulges around the thumb (100); **Sharpness** a tighter, cusped peak with the same
-  reach. Symmetry (the twist mirrors as a pseudovector), masks, hidden parts, sculpt layers, pressure and undo work
-  as with every brush. Each move touches only the points inside an adaptive cutoff (where the move is still more
-  than 4% of its largest, the last part faded smoothly to 0), evaluates the kernel from a radial table, works out a
-  fast drag in pieces in one pass, and passes on only what moved to undo, normals and the BVH. KelvinGrab and
-  DetailClone are on the bottom shelf; all five are in the brush picker, the LightBox and the `stroke` command.
-  On dense meshes a long move is applied at most about a brush radius per frame (the rest in the next frames),
-  the far field is evaluated on a coarse lattice and, over 400k vertices, deferred to a world lattice that a
-  sixth of the vertices take each frame (all of it when the stroke ends), and the cutoff tightens up to 10% of
-  the peak over a vertex budget. Twist and Scale at 33M / 50 px: 57 ms frames (was 110-280); KelvinGrab still
-  about 190 ms there (renderer sync), see docs/performance.md.
-- **Capture from view** (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd>, askNK's request): drag a square (Shift: a
-  circle) over any sculpted detail and get, side by side, a **grayscale height alpha** (height toward the viewer
-  over a fitted plane, normalized, optionally detail-only) and a **vector displacement map**: each point's true 3D
-  offset from a smooth base (the broad form as a fitted quadric, the rest by implicit fairing with the rim held),
-  in the base's own tangent frame, so overhangs and sideways leans come along. Options: Base Smoothing, Edge Fade,
-  Resolution, Fit plane, Invert. **Use as Alpha**, **Use as VDM**, **Detail Clone** or **Save to Library** (the
-  alpha as a PNG in the LightBox Alphas folder, the VDM in the brush library; VDMs now show in the LightBox Brush
-  tab with their thumbnails). Commands `capture_alpha` and `capture_vdm`.
-- **DetailClone** brush: stamps the VDM brush's map along the stroke, one copy every stamp width (Clone Spacing),
-  each turned to follow the stroke (Clone follows stroke) and shaped to the surface under it; a click stamps one.
-- `new_bench_sphere millions=N` makes the benchmark's sphere of N million triangles (with subdivision levels),
-  and `SF_MEASURE_BRUSH=<brush>` makes `--measure-stroke` measure another built-in brush (`SF_KELVIN_LOG=1` logs
-  each Kelvinlet move: pieces, vertices, kernel / normals / BVH milliseconds).
-- Tests: tests/test_kelvinlet.cpp (kernel normalization and far-field cancellation, divergence against Squash,
-  bulge, exact twist, pinch without folding, symmetry, mask, undo, sculpt layers, threads, Detail Clone, the
-  captures with a VDM round trip within 9% RMS and a curved-surface capture; a dense-mesh timing check with
-  SF_BENCH_LIMITS=1) and the UI test kelvinlet_capture.
 
 ## [0.9.7] - 2026-10-31
 

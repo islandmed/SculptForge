@@ -1,11 +1,11 @@
 {
-  "version": "0.10.1",
+  "version": "0.10.2",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Micro levels: sculpt hundreds of millions of polygons (about a billion in under 2 GB)",
-    "Material painting (PBR): roughness, metal, normal, height and more, with export presets for Unreal, Unity, glTF and Godot",
-    "Sculpt Timeline, Help > Benchmark, and settings tuned to your computer on first start",
-    "From your feedback: Maya navigation, focal length, more primitives and Insert on the model, a brush ring that follows the surface"
+    "Security fix: please update if you export videos (timelapse, Benchmark); a crafted file name could run a command in 0.10.1",
+    "QRemesh 2: the new default quad remesher, with far fewer poles and edge loops that follow the forms",
+    "Kelvinlet brushes that move the surface like elastic clay, and Capture from view to turn any detail into an alpha or VDM brush",
+    "Insert on the model turns the shape with your drag (#34); the local API from 0.10.1 is removed"
   ]
 }
