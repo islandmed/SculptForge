@@ -36,6 +36,12 @@ struct App::StrokeSolver {
     uint32_t uploadId = 0;        // the active SubTool's renderer slot
     bool prepare = true;          // pack the upload on the thread
     bool finalize = false;        // before the batch: Sculptor::flushDraft (a draft stroke's end)
+    // Kelvinlet strokes (PanelKelvinlet.cpp): after the batch's dabs, these moves (taken on the main thread, by
+    // value) and, when kelvinFar, one group of the deferred far field.
+    std::vector<KelvinletStep> kelvinSteps;
+    BrushType kelvinBrush = BrushType::KelvinGrab;
+    Symmetry kelvinSymmetry;
+    bool kelvinFar = false;
     Renderer::StrokeUpload upload;
     bool uploadReady = false; // packed (else the main thread's syncScene sends the change)
     bool done = false;        // a finished batch waits for its commit

@@ -78,6 +78,15 @@ void App::StrokeSolver::loop() {
             spent += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
         }
         app.dabView_ = nullptr;
+        if (!kelvinSteps.empty() || kelvinFar) { // a Kelvinlet stroke's moves (PanelKelvinlet.cpp)
+            const auto t0 = std::chrono::steady_clock::now();
+            for (const KelvinletStep& step : kelvinSteps)
+                app.doc_.sculptor.kelvinletStep(app.doc_.mesh, app.doc_.bvh, kelvinBrush, step, kelvinSymmetry);
+            if (kelvinSteps.empty() && kelvinFar) app.doc_.sculptor.flushKelvinletFar(app.doc_.mesh, app.doc_.bvh, false);
+            spent += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+            kelvinSteps.clear();
+            kelvinFar = false;
+        }
         dabSeconds = batch.empty() ? 0.0 : spent / double(batch.size());
         const auto prepStart = std::chrono::steady_clock::now();
         uploadReady = prepare && app.renderer_.prepareStrokeUpload(uploadId, app.doc_.mesh, upload, app.doc_.sculptor.strokeCurvature());
@@ -216,6 +225,7 @@ void App::commitSolverBatch() {
 
 void App::pumpStroke() {
     if (!asyncStroke_) return;
+    if (kelvinStrokeBrush()) return; // (Kelvinlet strokes hand their moves over in kelvinCatchUp)
     if (!solver_) solver_ = std::make_unique<StrokeSolver>(*this);
     if (solver_->busy()) return;
     if (solver_->done) commitSolverBatch();

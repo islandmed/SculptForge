@@ -517,6 +517,8 @@ private:
     void kelvinBegin(const RayHit& hit);
     void kelvinTo(float x, float y);
     void kelvinAdvance();  // applies a bounded part of the move the cursor asked for
+    bool kelvinNextStep(KelvinletStep& step); // that part, as a step (false: nothing left)
+    bool kelvinPump();     // predictive strokes: hands the next step to the solver thread
     void kelvinCatchUp();  // every frame: the rest of a long move, a frame at a time
     void kelvinFinish();   // the stroke ends: all of it
     void drawKelvinletSection();

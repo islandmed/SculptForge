@@ -225,6 +225,35 @@ struct KelvinFarField {
     uint64_t stroke = 0;
     float h = 0.0f;         // lattice spacing (world)
     double meshVolume = 1.0; // the model's bounding box volume at the stroke's start
+    // Spatial groups: blocks of kBlockTriangles consecutive triangles (a compact patch: the renderer's chunks and
+    // clusters are made of runs of consecutive triangles too), block b in group b % kGroups; a vertex belongs to
+    // the block of its first triangle (fixed for the stroke: Kelvinlets don't change the topology). So a group's
+    // turn moves whole patches and dirties few render clusters.
+    static constexpr uint32_t kBlockShift = 12; // 4096 triangles
+    std::vector<uint32_t> firstTriangle; // per vertex (its block is its group's)
+    std::vector<AABB> blockBox;      // per block, at the stroke's start, grown by the radius
+    void prepare(const Mesh& mesh, float margin) {
+        const size_t nv = mesh.vertexCount(), nt = mesh.triangleCount(), blocks = (nt + (1u << kBlockShift) - 1) >> kBlockShift;
+        firstTriangle.assign(nv, ~0u);
+        poolFor(nv, [&](size_t b, size_t e) {
+            for (size_t v = b; v < e; ++v) {
+                const IndexRing tris = mesh.vertexTriangles(uint32_t(v));
+                if (tris.begin() != tris.end()) firstTriangle[v] = *tris.begin();
+            }
+        }, 1 << 14);
+        blockBox.assign(blocks, AABB{});
+        poolFor(blocks, [&](size_t b, size_t e) {
+            for (size_t k = b; k < e; ++k) {
+                AABB box;
+                const size_t t1 = std::min(nt, (k + 1) << kBlockShift);
+                for (size_t t = k << kBlockShift; t < t1; ++t)
+                    for (int c = 0; c < 3; ++c) box.expand(mesh.positions[mesh.triangles[t][c]]);
+                box.min -= glm::vec3(margin);
+                box.max += glm::vec3(margin);
+                blockBox[k] = box;
+            }
+        }, 16);
+    }
     int turn = 0;           // the group whose turn is next
     std::unordered_map<uint64_t, uint32_t> index; // lattice point -> slot
     std::vector<glm::ivec3> point;               // slot -> lattice point
@@ -246,9 +275,9 @@ struct KelvinFarField {
 
 namespace {
 
-// 1 within 0.6 of the radius of the load's path, a smoothstep to 0 at 1.2 radii: the near field.
+// 1 within half the radius of the load's path, a smoothstep to 0 at the radius: the near field.
 float nearWeight(float d, float radius) {
-    const float t = std::clamp((d - 0.6f * radius) / (0.6f * radius), 0.0f, 1.0f);
+    const float t = std::clamp((d - 0.5f * radius) / (0.5f * radius), 0.0f, 1.0f);
     return 1.0f - t * t * (3.0f - 2.0f * t);
 }
 
@@ -335,33 +364,33 @@ void Sculptor::applyKelvinletFarGroup(Mesh& mesh, BVH& bvh, int g) {
     const glm::vec3 c = 0.5f * (f.lo[g] + f.hi[g]), ext = f.hi[g] - f.lo[g];
     const double volume = double(ext.x) * double(ext.y) * double(ext.z);
     const double meshVolume = f.meshVolume; // (measured once per stroke: bounds() reads every vertex)
-    // Groups are runs of 4096 consecutive vertices (every kGroups-th run): a group is read as contiguous memory.
-    constexpr uint32_t kRun = 4096;
-    auto inGroup = [&](uint32_t v) { return int((v / kRun) % uint32_t(KelvinFarField::kGroups)) == g; };
-    if (volume > 0.05 * meshVolume) {
-        // A box over much of the model: this group's runs directly, not a BVH query that would list the others too.
-        const size_t nv = mesh.vertexCount(), runs = (nv + kRun - 1) / kRun;
-        std::vector<std::vector<uint32_t>> parts(runs);
-        const glm::vec3 lo = f.lo[g], hi = f.hi[g];
-        poolFor(runs, [&](size_t b, size_t e) {
-            for (size_t r = b; r < e; ++r) {
-                if (int(r % size_t(KelvinFarField::kGroups)) != g) continue;
-                auto& out = parts[r];
-                const uint32_t v0 = uint32_t(r * kRun), v1 = uint32_t(std::min(nv, (r + 1) * size_t(kRun)));
-                for (uint32_t v = v0; v < v1; ++v) {
-                    const glm::vec3 p = pos[v];
-                    if (p.x < lo.x || p.y < lo.y || p.z < lo.z || p.x > hi.x || p.y > hi.y || p.z > hi.z) continue;
-                    if (mesh.hasHidden() && mesh.vertexHidden(v)) continue;
-                    out.push_back(v);
+    (void)c;
+    (void)volume;
+    (void)meshVolume;
+    const double denseMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - clock).count();
+    // This group's blocks that meet the bounds it gathered: their triangles' corners that belong to the group.
+    const size_t nt = mesh.triangleCount(), blocks = f.blockBox.size();
+    const glm::vec3 lo = f.lo[g], hi = f.hi[g];
+    std::vector<std::vector<uint32_t>> parts(blocks);
+    poolFor(blocks, [&](size_t b, size_t e) {
+        for (size_t k = b; k < e; ++k) {
+            if (int(k % size_t(KelvinFarField::kGroups)) != g) continue;
+            const AABB& box = f.blockBox[k];
+            if (box.max.x < lo.x || box.max.y < lo.y || box.max.z < lo.z || box.min.x > hi.x || box.min.y > hi.y || box.min.z > hi.z)
+                continue;
+            auto& out = parts[k];
+            const size_t t1 = std::min(nt, (k + 1) << KelvinFarField::kBlockShift);
+            for (size_t t = k << KelvinFarField::kBlockShift; t < t1; ++t)
+                for (int corner = 0; corner < 3; ++corner) {
+                    const uint32_t v = mesh.triangles[t][corner];
+                    // (each vertex once: from its first triangle, which is in a block of its group)
+                    if (f.firstTriangle[v] == uint32_t(t) && !(mesh.hasHidden() && mesh.vertexHidden(v))) out.push_back(v);
                 }
-            }
-        }, 1);
-        verts_.clear();
-        for (const auto& part : parts) verts_.insert(verts_.end(), part.begin(), part.end());
-    } else {
-        brushVertices(mesh, bvh, c, 0.5f * glm::length(ext), verts_);
-        std::erase_if(verts_, [&](uint32_t v) { return !inGroup(v); });
-    }
+        }
+    }, 1);
+    verts_.clear();
+    for (const auto& part : parts) verts_.insert(verts_.end(), part.begin(), part.end());
+    const double selectMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - clock).count();
     scratch_.resize(verts_.size());
     poolFor(verts_.size(), [&](size_t b, size_t e) {
         for (size_t i = b; i < e; ++i) {
@@ -390,9 +419,8 @@ void Sculptor::applyKelvinletFarGroup(Mesh& mesh, BVH& bvh, int g) {
     verts_.resize(kept);
     scratch_.resize(kept);
     if (std::getenv("SF_KELVIN_LOG"))
-        std::fprintf(stderr, "kelvin far: group %d, %zu vertices, %s, %.1f ms\n", g, kept,
-                     volume > 0.05 * meshVolume ? "stride" : "query",
-                     std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - clock).count());
+        std::fprintf(stderr, "kelvin far: group %d, %zu vertices, lattice %.1f, select %.1f, total %.1f ms\n", g, kept, denseMs,
+                     selectMs, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - clock).count());
     if (verts_.empty()) return;
     displaceAll(mesh, verts_, scratch_);
     timings.kernelMs += lapMs(clock);
@@ -520,7 +548,7 @@ void Sculptor::kelvinletSingle(Mesh& mesh, BVH& bvh, const KelvinletKernel& k, c
     const auto& pos = mesh.positions;
     // A region bigger than kelvinlet.deferMinVertices (from the last move's density): the far field goes to the
     // lattice (gatherKelvinletFar), only the near field's vertices are moved now.
-    const float nearReach = 1.2f * s.radius + 0.5f * glm::length(travel);
+    const float nearReach = s.radius + 0.5f * glm::length(travel);
     const bool defer = kelvinLastVerts_ > 0 && kelvinLastCut_ > 0.0f && reach > nearReach &&
                        double(kelvinLastVerts_) * double(reach * reach) / double(kelvinLastCut_ * kelvinLastCut_) >
                            double(kelvinlet.deferMinVertices);
@@ -532,6 +560,7 @@ void Sculptor::kelvinletSingle(Mesh& mesh, BVH& bvh, const KelvinletKernel& k, c
             kelvinFar_->h = 0.1f * s.radius;
             const glm::vec3 e = mesh.bounds().extent();
             kelvinFar_->meshVolume = std::max(1e-30, double(e.x) * double(e.y) * double(e.z));
+            kelvinFar_->prepare(mesh, s.radius);
         }
         gatherKelvinletFar(displacement, s.center, travel, s.radius, mid, reach);
         brushVertices(mesh, bvh, mid, nearReach, verts_);
@@ -542,6 +571,9 @@ void Sculptor::kelvinletSingle(Mesh& mesh, BVH& bvh, const KelvinletKernel& k, c
     }
     kelvinLastCut_ = reach;
     kelvinOverBudget_ = kelvinOverBudget_ || kelvinLastVerts_ > budget;
+    if (std::getenv("SF_KELVIN_LOG"))
+        std::fprintf(stderr, "kelvin move: %s, %zu vertices queried, reach %.3f (radius %.3f, travel %.3f), cut %.2f%%\n",
+                     defer ? "near field now" : "all now", verts_.size(), reach, s.radius, glm::length(travel), fraction * 100.0f);
     if (verts_.empty()) return;
     if (s.frontFacesOnly) {
         const auto& nrm = mesh.normals;

@@ -9,6 +9,7 @@
 //   - Capture from view (Ctrl+Alt+C): drag a square (or circle) over the model; a window shows the captured
 //     height alpha and VDM, their options, and Use / Save to library buttons.
 #include "app/App.h"
+#include "app/AsyncStroke.h"
 #include "app/Ui.h"
 
 #include "core/BrushLibrary.h"
@@ -85,8 +86,72 @@ void App::kelvinTo(float x, float y) {
 // Applies what the cursor asked for since the last move, at most a bounded amount per frame (about one brush radius
 // of travel, a 0.3 rad turn or a 0.2 log-scale step): a fast drag over a dense mesh then costs a bounded frame and
 // the rest comes in the next frames (kelvinCatchUp runs every frame, also when the pointer stopped).
+bool App::kelvinNextStep(KelvinletStep& step) {
+    step = KelvinletStep{};
+    step.radius = kelvinRadius_;
+    step.viewDir = camera_.forward();
+    step.axis = -camera_.forward();
+    step.frontFacesOnly = frontFacesOnly_;
+    const float share = doc_.sculptor.kelvinletOverBudget() ? 0.5f : 1.0f;
+    if (strokeBrush_ == BrushType::KelvinGrab) {
+        glm::vec3 delta = kelvinTarget_ - grabLast_;
+        const float len = glm::length(delta), most = share * kelvinRadius_;
+        if (len < 1e-7f * kelvinRadius_) return false;
+        if (len > most) delta *= most / len;
+        step.center = grabLast_;
+        step.delta = delta * kelvinAmount_;
+        step.travel = delta;
+        step.substeps = std::clamp(int(std::ceil(glm::length(delta) / (0.4f * kelvinRadius_))), 1, 3);
+        grabLast_ += delta;
+        return true;
+    }
+    const float most = share * (strokeBrush_ == BrushType::KelvinTwist ? 0.3f : 0.2f);
+    if (std::abs(kelvinPending_) < 1e-6f) return false;
+    const float now = std::clamp(kelvinPending_, -most, most);
+    kelvinPending_ -= now;
+    step.center = kelvinCenter_;
+    if (strokeBrush_ == BrushType::KelvinTwist) step.angle = now;
+    else step.logScale = now;
+    return true;
+}
+
+// Predictive strokes (AsyncStroke.cpp): the next bounded move goes to the solver thread when it is free; the frame
+// draws meanwhile. The finished batch's upload is committed first. False when there was nothing to hand over.
+bool App::kelvinPump() {
+    if (!solver_) solver_ = std::make_unique<StrokeSolver>(*this);
+    if (solver_->busy()) return true;
+    if (solver_->done) commitSolverBatch();
+    StrokeSolver& s = *solver_;
+    KelvinletStep step;
+    const bool move = kelvinNextStep(step);
+    const bool far = !move && doc_.sculptor.kelvinletFarPending();
+    if (!move && !far) return false;
+    s.batch.clear();
+    s.kelvinSteps.clear();
+    if (move) s.kelvinSteps.push_back(step);
+    s.kelvinFar = far;
+    s.kelvinBrush = strokeBrush_;
+    s.kelvinSymmetry = symmetry_;
+    s.finalize = false;
+    s.view.camera = camera_;
+    s.view.canvas = canvasRect();
+    s.view.probe = nullptr;
+    s.view.radiusProbe = nullptr;
+    s.view.settings = dabSettings();
+    s.uploadId = doc_.activeSubtoolInfo().id;
+    renderer_.bindStrokeUpload(s.uploadId, s.upload);
+    s.prepare = &displayedMesh() == &doc_.mesh;
+    renderer_.setDraftNormals(doc_.sculptor.draftActive() ? s.uploadId : 0);
+    s.start();
+    return true;
+}
+
 void App::kelvinAdvance() {
     if (drag_ != Drag::Stroke || !kelvinStrokeBrush()) return;
+    if (asyncStroke_) { // the solver thread does the moves (kelvinCatchUp hands them over each frame)
+        kelvinPump();
+        return;
+    }
     KelvinletStep step;
     step.radius = kelvinRadius_;
     step.viewDir = camera_.forward();
@@ -130,6 +195,17 @@ void App::kelvinAdvance() {
 }
 
 void App::kelvinCatchUp() {
+    if (asyncStroke_ && kelvinStrokeBrush() && (drag_ == Drag::Stroke || strokeFinishing_)) {
+        if (kelvinPump()) {
+            redrawIn(0.0);
+            return;
+        }
+        if (strokeFinishing_) { // released and everything applied: the stroke's end (a draft's normals too)
+            solverWait();
+            finishStrokeNow();
+        }
+        return;
+    }
     if (drag_ != Drag::Stroke || !kelvinStrokeBrush()) return;
     if (kelvinMovedThisFrame_) { // the pointer already moved it this frame: one bounded move a frame
         kelvinMovedThisFrame_ = false;
@@ -145,13 +221,17 @@ void App::kelvinCatchUp() {
 }
 
 void App::kelvinFinish() {
-    if (drag_ != Drag::Stroke || !kelvinStrokeBrush()) return;
+    if (!kelvinStrokeBrush() || (drag_ != Drag::Stroke && !strokeFinishing_)) return;
+    if (asyncStroke_) solverWait(); // (then the rest on this thread)
     for (int i = 0; i < 64; ++i) { // the rest of the move before the stroke ends
         const float left = strokeBrush_ == BrushType::KelvinGrab ? glm::length(kelvinTarget_ - grabLast_) / std::max(kelvinRadius_, 1e-9f)
                                                                  : std::abs(kelvinPending_);
         if (left < 1e-6f) break;
-        kelvinAdvance();
+        KelvinletStep step;
+        if (!kelvinNextStep(step)) break;
+        doc_.sculptor.kelvinletStep(doc_.mesh, doc_.bvh, strokeBrush_, step, symmetry_);
     }
+    doc_.sculptor.flushKelvinletFar(doc_.mesh, doc_.bvh, true);
 }
 
 // ---------------------------------------------------------------------------
