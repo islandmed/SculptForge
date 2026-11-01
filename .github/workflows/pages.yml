@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
     paths: ['website/**', '.github/workflows/pages.yml']
-    tags: ['v*'] # a release: its guide goes live
   workflow_dispatch:
 
 permissions:

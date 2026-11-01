@@ -1,11 +1,11 @@
 {
-  "version": "0.9.5",
+  "version": "0.9.6",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "ZSpheres: block out a body or creature from connected spheres, then Make Mesh to sculpt it",
-    "A Blender input style: middle-drag navigation, numpad views, Blender's sculpt keys, keymap import",
-    "Flat shading, your own MatCaps, and SpaceMouse navigation (experimental)",
-    "Idle, SculptForge no longer keeps your graphics card busy; pens on Windows (Wacom) and Linux work properly"
+    "Extract: turn a masked area into a shell SubTool (helmets, straps, armour), ZBrush style",
+    "Mirror And Weld, Mirror, and a flat viewport background",
+    "Fixed: Divide crashing on models from Blender; fast strokes on dense meshes keep their curve",
+    "A log file for crash reports (Help > Open log folder), and a Flatpak for Linux"
   ]
 }
