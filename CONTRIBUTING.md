@@ -31,8 +31,8 @@ trailing underscore for private members. A `.clang-format` is provided.
 
 See [README.md#building](README.md#building). On Linux, `packaging/linux/install-build-deps.sh` installs the
 build dependencies. `ctest` runs the unit tests; `cpack` in the build folder makes the platform's packages.
-`ctest -j 4` runs them four at a time: the `sculptforge_tests` suite is registered as four shards
-(`sculptforge_tests_0of4` ...), each with its own temporary folder. Run the binary itself for a quick check:
+`ctest -j 4` runs them four at a time: the `sculptforge_tests` suite is registered as eight shards
+(`sculptforge_tests_0of8` ...), each with its own temporary folder. Run the binary itself for a quick check:
 `./build/sculptforge_tests qremesh` runs the tests whose names contain "qremesh", `--shard 1/4` one shard, and
 each test prints how long it took.
 Releases are built by `.github/workflows/release.yml` when a `v*` tag is pushed.

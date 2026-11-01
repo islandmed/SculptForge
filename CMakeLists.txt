@@ -498,9 +498,10 @@ if(SCULPTFORGE_BUILD_TESTS)
   if(MSVC)
     target_compile_options(sculptforge_tests PRIVATE /utf-8)
   endif()
-  # The suite as SCULPTFORGE_TEST_SHARDS processes (sculptforge_tests_0of4 ...; `ctest -j` runs them at once, CI does),
-  # each with its own temporary folder so tests in different shards never share a scratch file.
-  set(SCULPTFORGE_TEST_SHARDS 4 CACHE STRING "Number of ctest entries the sculptforge_tests suite is split into")
+  # The suite as SCULPTFORGE_TEST_SHARDS processes (sculptforge_tests_0of8 ...; `ctest -j` runs them at once, CI does;
+  # more shards than cores balance better), each with its own temporary folder so tests in different shards never
+  # share a scratch file.
+  set(SCULPTFORGE_TEST_SHARDS 8 CACHE STRING "Number of ctest entries the sculptforge_tests suite is split into")
   math(EXPR last_shard "${SCULPTFORGE_TEST_SHARDS} - 1")
   foreach(k RANGE ${last_shard})
     set(shard_tmp ${CMAKE_CURRENT_BINARY_DIR}/test-tmp/shard${k})
