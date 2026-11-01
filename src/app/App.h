@@ -1145,6 +1145,7 @@ private:
     static WindowState loadWindowState();
     void saveWindowState() const;
     bool rememberWindow_ = false;
+    bool fullscreenAfterFirstFrame_ = false; // macOS: the saved full screen, entered once the window is on screen (#41)
     void drawAxisGizmo();
     // Insert on the model (#34): the primitive chosen in Append > Insert; a drag on the surface places it.
     std::string insertType_;
