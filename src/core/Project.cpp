@@ -6,6 +6,7 @@
 
 #include "core/Multires.h"
 
+#include "core/LayerStack.h"
 #include "core/LayerStackIO.h"
 #include "core/Texture.h"
 #include "core/ThreadPool.h"
@@ -542,6 +543,13 @@ Json writeTexture(Writer& w, const std::string& prefix, const Mesh& m) {
         l.set("visible", tl.visible);
         l.set("locked", tl.locked);
         l.set("rgba", pngBlob(w, prefix + "texture/" + std::to_string(i) + ".png", t.width, t.height, tl.rgba));
+        // A Fill layer (format 7, core/LayerStack.h): its settings and painted mask; `rgba` is its last evaluation,
+        // so readers that don't know Fill layers show it as a paint layer.
+        if (tl.fill) {
+            l.set("fill", fillLayerJson(*tl.fill));
+            if (tl.mask.size() == t.texelCount() * 4)
+                l.set("mask", pngBlob(w, prefix + "texture/" + std::to_string(i) + "_mask.png", t.width, t.height, tl.mask));
+        }
         layers.push(std::move(l));
     }
     out.set("layers", std::move(layers));
@@ -574,6 +582,13 @@ bool readTexture(Reader& r, const Json& tj, Mesh& m, std::string& error) {
         l.visible = lj["visible"].asBool(true);
         l.locked = lj["locked"].asBool(false);
         if (!readPngBlob(r, lj["rgba"], "texture layer", tex->width, tex->height, l.rgba, error)) return false;
+        if (lj["fill"].isObject()) {
+            auto fill = std::make_shared<FillLayer>();
+            if (!fillLayerFromJson(lj["fill"], *fill, error)) return false;
+            l.fill = std::move(fill);
+            if (lj["mask"].isObject() && !readPngBlob(r, lj["mask"], "fill layer mask", tex->width, tex->height, l.mask, error))
+                return false;
+        }
         tex->layers.push_back(std::move(l));
     }
     if (tex->layers.empty()) {

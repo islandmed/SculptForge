@@ -600,8 +600,6 @@ std::string describeMeshMaps(const MeshMapSet& s) {
     return buf;
 }
 
-void notifyMeshMapsChanged(Document&, Mesh&, const std::vector<uint32_t>*) {}
-
 void registerMeshMapCommands(CommandRegistry& reg) {
     using T = ParamSpec::Type;
     reg.add({"mesh_maps",

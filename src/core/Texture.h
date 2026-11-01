@@ -44,6 +44,8 @@
 
 namespace sf {
 
+struct FillLayer; // (core/LayerStack.h)
+
 
 constexpr int kTextureTile = 64;       // undo tile size (texels)
 constexpr int kTextureGutter = 4;      // texels of padding painted around UV islands
@@ -63,6 +65,12 @@ struct TextureLayer {
     bool visible = true;
     bool locked = false; // locked layers can't be painted, filled, cleared or merged
     LayerChannels channels; // material channels (core/TextureChannels.h); [BaseColor] only says whether colour shows
+    // A Fill layer (core/LayerStack.h): its material and mask effects; `rgba` and the channel images are then the
+    // evaluation's output. Copies of the layer (undo, duplicates) share it; edits replace it. Null: a paint layer.
+    std::shared_ptr<FillLayer> fill;
+    // A Fill layer's painted mask, RGBA8 with the mask in alpha: what painting with the layer active paints into
+    // (PaintTexture::target), read by the layer's Paint mask effects. Empty for paint layers.
+    std::vector<uint8_t> mask;
 };
 
 struct UvTileIndex;   // (Texture.cpp)
@@ -87,6 +95,7 @@ struct PaintTexture {
     // Mesh Maps (core/MeshMaps.h): the Part's AO, curvature, thickness, ... on these UVs at this size, which Fill
     // layers read. Derived data, replaced as a whole when re-baked (copies and undo steps share it); not saved.
     std::shared_ptr<const MeshMapSet> meshMaps;
+    uint64_t fillRevision = 0; // the revision updateFillLayers last looked at (core/LayerStack.h)
     // The RGBA8 texels the viewport shows: the composite, or the solo channel.
     const std::vector<uint8_t>& shown() const {
         return viewChannel != Channel::BaseColor && viewPixels.size() == pixels.size() ? viewPixels : pixels;
@@ -122,7 +131,7 @@ struct PaintTexture {
     std::shared_ptr<TexelMapCache> texelMaps;
 
     size_t texelCount() const { return size_t(width) * size_t(height); }
-    // The array painting writes into (layer -1 = Base: `pixels` without layers).
+    // The array painting writes into (layer -1 = Base: `pixels` without layers; a Fill layer: its mask).
     std::vector<uint8_t>& target(int layer);
     size_t bytes() const;
     // Without the material channel tiles (TileImage::liveBytes counts those, safe from any thread).

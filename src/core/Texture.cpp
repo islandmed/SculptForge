@@ -459,12 +459,17 @@ void writeTile(const PackedTexels& p, size_t i, uint8_t* dst, size_t stride, int
     }
 }
 
-// The texel arrays of a texture: Base (or the plain texture) first, then the layers.
-size_t planeCount(const PaintTexture& t) { return 1 + t.layers.size(); }
+// The texel arrays of a texture: Base (or the plain texture) first, then the layers, then the layers' painted
+// masks (Fill layers; empty for paint layers).
+size_t planeCount(const PaintTexture& t) { return 1 + 2 * t.layers.size(); }
 const std::vector<uint8_t>& plane(const PaintTexture& t, size_t i) {
-    return i == 0 ? (t.layers.empty() ? t.pixels : t.base) : t.layers[i - 1].rgba;
+    if (i == 0) return t.layers.empty() ? t.pixels : t.base;
+    return i <= t.layers.size() ? t.layers[i - 1].rgba : t.layers[i - 1 - t.layers.size()].mask;
 }
-uint32_t planeId(const PaintTexture& t, size_t i) { return i == 0 ? 0 : t.layers[i - 1].id; }
+uint32_t planeId(const PaintTexture& t, size_t i) {
+    if (i == 0) return 0;
+    return i <= t.layers.size() ? t.layers[i - 1].id : t.layers[i - 1 - t.layers.size()].id | 0x80000000u;
+}
 // The array of `ref` with the same id and size as array `i` of `t`, or null.
 const std::vector<uint8_t>* matchingPlane(const PaintTexture& t, size_t i, const PaintTexture* ref) {
     if (!ref || ref->width != t.width || ref->height != t.height) return nullptr;
@@ -487,6 +492,7 @@ std::shared_ptr<PaintTexture> packTexture(const PaintTexture* t, const PaintText
     shell->activeLayer = t->activeLayer;
     shell->channels = t->channels; // material channels: copy-on-write tiles, shared until either side edits them
     shell->heightNormalStrength = t->heightNormalStrength;
+    shell->meshMaps = t->meshMaps;
     shell->layers.reserve(t->layers.size());
     for (const TextureLayer& l : t->layers) {
         TextureLayer s;
@@ -497,6 +503,7 @@ std::shared_ptr<PaintTexture> packTexture(const PaintTexture* t, const PaintText
         s.visible = l.visible;
         s.locked = l.locked;
         s.channels = l.channels;
+        s.fill = l.fill;
         shell->layers.push_back(std::move(s));
     }
     const int tilesX = tileCount(t->width), tilesY = tileCount(t->height);
@@ -535,11 +542,16 @@ std::shared_ptr<PaintTexture> unpackTexture(const PaintTexture& shell, const std
     t->activeLayer = shell.activeLayer;
     t->channels = shell.channels;
     t->heightNormalStrength = shell.heightNormalStrength;
+    t->meshMaps = ref && ref->width == shell.width && ref->height == shell.height ? ref->meshMaps : shell.meshMaps;
     t->layers = shell.layers;
     const size_t n = t->texelCount() * 4, stride = size_t(t->width) * 4;
     const int tilesX = tileCount(t->width);
     for (size_t i = 0; i < planeCount(*t) && i < planes.size(); ++i) {
-        std::vector<uint8_t>& dst = i == 0 ? (t->layers.empty() ? t->pixels : t->base) : t->layers[i - 1].rgba;
+        const size_t nl = t->layers.size();
+        const bool maskPlane = i > nl;
+        if (maskPlane && !t->layers[i - 1 - nl].fill) continue; // (paint layers have no mask)
+        std::vector<uint8_t>& dst = i == 0 ? (t->layers.empty() ? t->pixels : t->base)
+                                           : maskPlane ? t->layers[i - 1 - nl].mask : t->layers[i - 1].rgba;
         if (const std::vector<uint8_t>* r = matchingPlane(shell, i, ref); r && r->size() == n) dst = *r;
         else dst.assign(n, 255);
         const PackedTexels& p = planes[i];
@@ -618,7 +630,15 @@ size_t textureUploadTexels(const PaintTexture& t) {
 std::vector<uint8_t>& PaintTexture::target(int layer) {
     if (layers.empty()) return pixels;
     if (layer < 0 || layer >= int(layers.size())) return base;
-    return layers[size_t(layer)].rgba;
+    TextureLayer& l = layers[size_t(layer)];
+    if (l.fill) {
+        if (l.mask.size() != texelCount() * 4) { // (a Fill layer without a painted mask yet: an empty one)
+            l.mask.assign(texelCount() * 4, 0);
+            for (size_t k = 0; k < l.mask.size(); k += 4) l.mask[k] = l.mask[k + 1] = l.mask[k + 2] = 255;
+        }
+        return l.mask;
+    }
+    return l.rgba;
 }
 
 size_t PaintTexture::colourBytes() const {
@@ -756,6 +776,8 @@ bool TexturePainter::begin(Mesh& mesh, uint32_t channels) {
     layer_ = t.layers.empty() ? -1 : std::clamp(t.activeLayer, -1, int(t.layers.size()) - 1);
     if (!textureLayerEditable(t, layer_)) return false;
     channels_ = channels & enabledChannelMask(t);
+    // Painting a Fill layer paints its mask: coverage only, whatever the brush's material.
+    if (layer_ >= 0 && t.layers[size_t(layer_)].fill) channels_ = 1u;
     if (!channels_) return false;
     PaintTexture& tex = mutableTexture(mesh);
     syncLayerChannels(tex); // every layer has an image for every enabled channel

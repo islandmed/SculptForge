@@ -75,6 +75,7 @@ add_library(sculptforge_core STATIC
   src/core/TileImage.cpp
   src/core/EnvironmentMath.cpp
   src/core/MeshMaps.cpp
+  src/core/LayerStack.cpp
   src/core/TextureChannels.cpp
   src/core/TextureChannelCommands.cpp
   src/core/LayerStackIO.cpp
