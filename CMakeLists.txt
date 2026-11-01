@@ -83,6 +83,8 @@ add_library(sculptforge_core STATIC
   src/core/Tangents.cpp
   third_party/mikktspace/mikktspace.c
   src/core/Vdm.cpp
+  src/core/Kelvinlet.cpp
+  src/core/ViewCapture.cpp
   third_party/tinyexr/tinyexr_impl.cpp
   src/core/Matcap.cpp
   src/core/Trash.cpp

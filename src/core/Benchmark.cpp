@@ -99,6 +99,16 @@ void registerPerformanceCommands(CommandRegistry& registry) {
                                         ", undo " + mb(u.undo) + "), GPU buffers about " + mb(u.gpu);
                       return {true, msg};
                   }});
+    registry.add({"new_bench_sphere",
+                  "Replace the scene with the benchmark's sphere of about `millions` million triangles (a cube made "
+                  "round, then divided: subdivision levels like a real sculpt), for measuring brushes on heavy meshes.",
+                  {{"millions", ParamSpec::Type::Number, "Triangles in millions (0.01-200, default 5).", false}},
+                  [](Document& doc, const Args& a) -> CommandResult {
+                      const double m = std::clamp(argNumber(a, "millions", 5.0), 0.01, 200.0);
+                      doc.setMesh(makeBenchSphere(size_t(m * 1e6)), "Sphere");
+                      doc.path.clear();
+                      return {true, "Created benchmark sphere with " + std::to_string(doc.mesh.triangleCount()) + " triangles"};
+                  }});
     registry.add({"set_multithreading",
                   "Run brushes, normal and BVH updates, project saving and other per-dab work on every core (on, the "
                   "default) or on one thread (off: slower, for comparing or troubleshooting). Results are the same.",

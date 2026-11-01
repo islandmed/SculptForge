@@ -5,6 +5,7 @@
 #include "core/BVH.h"
 #include "core/BrushRecipe.h"
 #include "core/Dyntopo.h"
+#include "core/Kelvinlet.h"
 #include "core/Mesh.h"
 #include "core/Undo.h"
 
@@ -26,8 +27,20 @@ enum class BrushType {
     Layer,       // raises to one fixed height per stroke (overlaps never stack)
     Nudge,       // slides the surface sideways along the stroke
     Vdm,         // vector displacement: stamps DabParams::vdm (a horn, an ear...) with overhangs (core/Vdm.h)
+    // Kelvinlet brushes (core/Kelvinlet.h): physically based elastic deformation.
+    KelvinGrab,  // elastic move: drags the surface like clay, bulging with Squash (Poisson's ratio)
+    KelvinTwist, // turns the surface around the view axis, fading smoothly
+    KelvinScale, // pinches (or swells) the surface toward the centre
+    KelvinSnake, // multi-scale elastic SnakeHook: pulls tapering horns out along the stroke
+    DetailClone, // stamps the VDM brush's map along the stroke, each stamp turned to follow it (Kelvinlet.cpp)
     Count
 };
+
+// The brushes Kelvinlet.cpp implements (Sculptor::dab hands them over).
+inline bool isKelvinletBrush(BrushType t) {
+    return t == BrushType::KelvinGrab || t == BrushType::KelvinTwist || t == BrushType::KelvinScale ||
+           t == BrushType::KelvinSnake || t == BrushType::DetailClone;
+}
 
 const char* brushName(BrushType type);
 
@@ -118,6 +131,15 @@ public:
     // DragDot; restoreStroke) put positions back, not topology. restoreStroke holds it too.
     void holdTopology() { topologyHeld_ = true; }
 
+    // Kelvinlet brushes (core/Kelvinlet.h, defined in Kelvinlet.cpp): one step of KelvinGrab / KelvinSnake
+    // (step.delta), KelvinTwist (step.angle) or KelvinScale (step.logScale), mirrored by `sym`. dab() turns a plain
+    // dab into steps. The settings are Brush > Kelvinlet's.
+    KelvinletSettings kelvinlet;
+    void kelvinletStep(Mesh& mesh, BVH& bvh, BrushType type, const KelvinletStep& step, Symmetry sym);
+    // Detail Clone: a stroke that never moved has its one stamp waiting (for a direction): this presses it.
+    // Call before endStroke() (harmless for every other brush).
+    void flushDetailClone(Mesh& mesh, BVH& bvh, Symmetry sym);
+
     // Mirror sign vectors for the enabled symmetry axes (always starts with (1,1,1)).
     static std::vector<glm::vec3> mirrors(Symmetry sym);
 
@@ -130,6 +152,20 @@ private:
     void dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const DabParams& p);
     // The Vdm brush (defined in Vdm.cpp); `handedness` -1 for a mirrored pass, so the stamp mirrors exactly.
     void dabVdmSingle(Mesh& mesh, BVH& bvh, const DabParams& p, float handedness);
+    // Kelvinlet.cpp: the Kelvinlet brushes and Detail Clone.
+    void dabKelvinlet(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Symmetry sym);
+    void kelvinletSingle(Mesh& mesh, BVH& bvh, const KelvinletKernel& k, const KelvinletStep& s);
+    void dabDetailClone(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym);
+    void cloneStamp(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym);
+    struct CloneState {
+        uint64_t stroke = 0;
+        bool pending = false, stamped = false;
+        DabParams first;
+        glm::vec3 last{0.0f};
+    } clone_;
+    bool kelvinRingNormals_ = false; // a Kelvinlet pass moved only part of what it queried
+    uint64_t snakeStroke_ = 0;
+    float snakeTravel_ = 0.0f;
     void finishDab(Mesh& mesh, BVH& bvh, std::chrono::steady_clock::time_point clock);
     void updateDabNormals(Mesh& mesh, const BVH& bvh);
     void touch(Mesh& mesh, uint32_t v);

@@ -29,6 +29,11 @@ const char* brushName(BrushType type) {
     case BrushType::Layer: return "Layer";
     case BrushType::Nudge: return "Nudge";
     case BrushType::Vdm: return "VDM";
+    case BrushType::KelvinGrab: return "KelvinGrab";
+    case BrushType::KelvinTwist: return "KelvinTwist";
+    case BrushType::KelvinScale: return "KelvinScale";
+    case BrushType::KelvinSnake: return "KelvinSnake";
+    case BrushType::DetailClone: return "DetailClone";
     default: return "?";
     }
 }
@@ -453,6 +458,10 @@ UndoRecord Sculptor::endStroke() {
 
 void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Symmetry sym) {
     if (!active_) return;
+    if (isKelvinletBrush(type)) { // Kelvinlet.cpp (no remeshing: they move the surface, as Move does)
+        dabKelvinlet(mesh, bvh, type, p, sym);
+        return;
+    }
     if (type != BrushType::Move) {
         const bool useAlpha = p.alpha && !p.alpha->empty(); // (the reach dabSingle gives the brush)
         const float reach = useAlpha ? 1.4143f : type == BrushType::ClayBuildup ? 1.3f : 1.0f;

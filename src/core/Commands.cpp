@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Commands.h"
+#include "core/ViewCapture.h"
 
 #include "core/Bake.h"
 #include "core/Benchmark.h"
@@ -580,6 +581,7 @@ CommandRegistry::CommandRegistry() {
     registerBrushLibraryCommands(*this); // brush_install, brush_code, brush_delete, ... (BrushLibrary.cpp)
     registerBrushCommands(*this); // brush_set_alpha (BrushAlpha.cpp)
     registerVdmCommands(*this);   // vdm_set, vdm_capture, vdm_stamp, ... (Vdm.cpp)
+    registerCaptureCommands(*this); // capture_alpha, capture_vdm: alpha / VDM from the viewport (ViewCapture.cpp)
     registerRetopoCommands(*this); // qremesh, project_all (RetopoCommands.cpp)
     registerQRemeshGuideCommands(*this); // qremesh_guide, ... (QRemeshGuides.cpp)
     registerZSphereCommands(*this);      // zsphere_new, ... (ZSpheres.cpp)
