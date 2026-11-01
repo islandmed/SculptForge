@@ -26,8 +26,9 @@ chapter opens by itself the first time you start a new version; you can always f
   new sphere away from its parent in one drag; **Delete Selected**, **Insert Between** and **Set as Root** work on
   the sphere you last clicked, and a right click on a sphere opens a menu with the same. See
   [Forge Spheres](forge-spheres.md#pointer-only).
-- **Maya zoom** (#32): in the Maya input style <kbd>Alt</kbd>+right drag zooms sideways, as Maya's own dolly (right
-  zooms in), and **Invert zoom** turns any zoom drag around; <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd> erases
+- **Maya zoom** (#32): in the Maya input style <kbd>Alt</kbd>+right drag now zooms with a sideways drag, as Maya's own
+  dolly (right zooms in). To keep zooming up and down as before, choose **Preferences > Input > Zoom drag > Up and
+  down**. **Invert zoom** turns any zoom drag around; <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd> erases
   the mask. See [Maya keys](shortcuts.md#maya-keys).
 - **Move along the normal** (from the discussions): Move, Tendril, Elastic Tendril and KelvinGrab started with
   <kbd>Alt</kbd> held pull the surface straight out of itself (or push it straight in) instead of across the screen.
