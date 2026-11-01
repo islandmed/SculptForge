@@ -498,7 +498,18 @@ if(SCULPTFORGE_BUILD_TESTS)
   if(MSVC)
     target_compile_options(sculptforge_tests PRIVATE /utf-8)
   endif()
-  add_test(NAME sculptforge_tests COMMAND sculptforge_tests)
+  # The suite as SCULPTFORGE_TEST_SHARDS processes (sculptforge_tests_0of4 ...; `ctest -j` runs them at once, CI does),
+  # each with its own temporary folder so tests in different shards never share a scratch file.
+  set(SCULPTFORGE_TEST_SHARDS 4 CACHE STRING "Number of ctest entries the sculptforge_tests suite is split into")
+  math(EXPR last_shard "${SCULPTFORGE_TEST_SHARDS} - 1")
+  foreach(k RANGE ${last_shard})
+    set(shard_tmp ${CMAKE_CURRENT_BINARY_DIR}/test-tmp/shard${k})
+    file(MAKE_DIRECTORY ${shard_tmp})
+    add_test(NAME sculptforge_tests_${k}of${SCULPTFORGE_TEST_SHARDS}
+             COMMAND sculptforge_tests --shard ${k}/${SCULPTFORGE_TEST_SHARDS})
+    set_tests_properties(sculptforge_tests_${k}of${SCULPTFORGE_TEST_SHARDS} PROPERTIES
+                         ENVIRONMENT "TMPDIR=${shard_tmp};TMP=${shard_tmp};TEMP=${shard_tmp}")
+  endforeach()
   # A stand-in for Brush, COLMAP and ffmpeg (tests/tools/fake_splat_tools.cpp): splat training is tested without a GPU.
   add_executable(sf_fake_splat_tools tests/tools/fake_splat_tools.cpp)
   target_include_directories(sf_fake_splat_tools PRIVATE third_party/stb)
@@ -617,6 +628,13 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME ui_stroke_resize COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
     set_tests_properties(ui_stroke_resize PROPERTIES LABELS ui TIMEOUT 60 DISABLED TRUE # predictive strokes: not yet identical in every run
                          ENVIRONMENT "SF_NO_UPDATE_CHECK=1;SF_MEASURE_RESIZE=1;SF_MEASURE_VERIFY=1;SF_PREDICTIVE_STROKE=1")
+    # Timed measurements run alone when ctest runs tests in parallel (CI: ctest -j): other tests' load must not
+    # change what they measure.
+    foreach(t ui_idle_redraw ui_calibrate_json ui_stroke_path ui_hardware_profile)
+      if(TEST ${t})
+        set_tests_properties(${t} PROPERTIES RUN_SERIAL TRUE)
+      endif()
+    endforeach()
     # The guide's keyboard table must match the app's default shortcuts (tools/guide/update_shortcuts.py).
     if(Python3_Interpreter_FOUND)
       sculptforge_runner(SCULPTFORGE_APP_RUNNER sculptforge)
