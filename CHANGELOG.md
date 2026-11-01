@@ -53,6 +53,7 @@ All notable changes to SculptForge are listed here. The format follows
   `SF_BENCH_LIMITS=1` times 1.3M / 5.2M / 21M-triangle sculpts with their peak memory.
 
 ### Changed
+- Make sculptable still remeshes with the legacy method for now (QRemesh 2 flattened part of a thin handle on x86).
 - The 0.9 QRemesh is kept as **Method > Legacy** (`qremesh method=legacy`). Closed QRemesh Guide loops (round an
   eye, or across the symmetry plane) still use it for that piece for now, and a piece QRemesh 2 can't do cleanly
   falls back to it; the status line says so.

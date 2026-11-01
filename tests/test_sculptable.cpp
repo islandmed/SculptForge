@@ -381,11 +381,7 @@ TEST(sculptable_texture_and_levels) {
         if (p.x < 0.85f || std::abs(p.y) > 0.2f) continue;
         ++handle;
         const glm::vec3 c = linearToSrgb(sampleTextureAt(d.mesh, t, p));
-        const bool isOrange = c.x > 0.75f && c.y > 0.35f && c.y < 0.75f && c.z < 0.3f;
-        orange += isOrange;
-        if (!isOrange && handle - orange <= 6)
-            std::printf("  handle sample not orange: tri %u at (%.3f %.3f %.3f) colour (%.3f %.3f %.3f)\n", t, p.x, p.y, p.z,
-                        c.x, c.y, c.z);
+        orange += c.x > 0.75f && c.y > 0.35f && c.y < 0.75f && c.z < 0.3f;
     }
     std::printf("  handle samples %zu, orange %zu\n", handle, orange);
     CHECK(handle > 10 && orange * 10 >= handle * 8);

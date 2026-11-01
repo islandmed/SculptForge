@@ -1344,6 +1344,8 @@ bool finishSculptable(const SplatCloud& cloud, const SculptableOptions& o, Sculp
         q.targetQuads = std::clamp(o.targetQuads, 16, 2'000'000);
         q.adaptive = std::clamp(o.adaptive, 0.0f, 1.0f);
         q.seed = o.seed;
+        // The legacy method for now: on x86 QRemesh 2 flattened part of the test mug's thin handle (0.10.2 CI).
+        q.method = QRemeshMethod::Legacy;
         q.guides = res.guides;
         if (o.symmetry) {
             // The world axis along the face's right (QRemesh mirrors across world axes); none if it is tilted.
