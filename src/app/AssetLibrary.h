@@ -31,6 +31,7 @@ enum class AssetKind {
     Material,  // matcap (index; -1 = Studio)
     Image,     // reference image
     Splat,     // Gaussian splat capture (.ply .splat, splat .glb)
+    Vdm,       // vector displacement map in the brush library (name; Capture from view saves these)
 };
 
 enum class Primitive { Sphere, Cube, Plane, Count };

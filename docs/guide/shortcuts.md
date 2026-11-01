@@ -24,6 +24,7 @@ action registry, the same source as the Controls window.
 | Action | Keys | What it does |
 |---|---|---|
 | Brush picker | <kbd>B</kbd> | Pop up every brush under the cursor. Type the first letter of a brush, then the orange letter on its tile (B S T = Standard). |
+| Capture from view | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd> | Alpha and VDM from the viewport: drag a square over any sculpted detail (Shift for a circle) and capture it as a grayscale height alpha and as a vector displacement brush, ready to stamp with the VDM brush or along strokes with Detail Clone, and to save in your library. |
 | Paste brush | <kbd>Ctrl</kbd>+<kbd>V</kbd> | Add the brush on the clipboard: a brush code someone shared, or the text of a .sfbrush file. |
 
 ### Color

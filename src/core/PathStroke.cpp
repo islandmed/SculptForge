@@ -153,6 +153,45 @@ int strokePath(Document& doc, const BrushRecipe* recipe, BrushType type, const P
             for (size_t i = 1; i < samples.size(); ++i) doc.sculptor.grab(mesh, doc.bvh, samples[i] - samples[i - 1]);
             dabs = int(samples.size());
         }
+    } else if ((type == BrushType::KelvinGrab || type == BrushType::KelvinSnake) && !recipe) {
+        // Elastic grab and Snake: the grabbed point follows the path (in the view plane, as the cursor drags it;
+        // a ray would hit the surface behind a pulled shape), in small steps.
+        RayHit hit;
+        if (project(samples.front(), hit)) {
+            DabParams p = base;
+            glm::vec3 tip = hit.position;
+            const glm::vec3 offset = hit.position - samples.front();
+            for (size_t i = 1; i < samples.size(); ++i) {
+                p.center = tip;
+                p.strokeDelta = samples[i] + offset - tip;
+                doc.sculptor.dab(mesh, doc.bvh, type, p, stroke.symmetry);
+                tip += p.strokeDelta;
+            }
+            if (samples.size() == 1) {
+                p.center = tip;
+                doc.sculptor.dab(mesh, doc.bvh, type, p, stroke.symmetry);
+            }
+            dabs = int(samples.size());
+        }
+    } else if ((type == BrushType::KelvinTwist || type == BrushType::KelvinScale) && !recipe && samples.size() > 1) {
+        // Twist and Scale act at the first point; moving right along the screen turns clockwise / swells (as a
+        // drag in the viewport does), by the distance in brush radii.
+        RayHit hit;
+        if (project(samples.front(), hit)) {
+            KelvinletStep step;
+            step.center = hit.position;
+            step.radius = radius;
+            step.viewDir = view;
+            step.axis = -view;
+            const float amount = std::min(1.0f, 2.0f * base.strength) * base.pressure * (stroke.invert ? -1.0f : 1.0f);
+            for (size_t i = 1; i < samples.size(); ++i) {
+                const float dx = glm::dot(samples[i] - samples[i - 1], right) / radius * amount;
+                if (type == BrushType::KelvinTwist) step.angle = -dx * 1.5707963f;
+                else step.logScale = dx * 0.6f;
+                doc.sculptor.kelvinletStep(mesh, doc.bvh, type, step, stroke.symmetry);
+            }
+            dabs = int(samples.size());
+        }
     } else {
         glm::vec3 last{0.0f};
         bool haveLast = false;
@@ -170,6 +209,7 @@ int strokePath(Document& doc, const BrushRecipe* recipe, BrushType type, const P
             ++dabs;
         }
     }
+    doc.sculptor.flushDetailClone(mesh, doc.bvh, stroke.symmetry); // a click with Detail Clone
     UndoRecord record = doc.sculptor.endStroke();
     if (!record.empty()) doc.undo.push(std::move(record));
     return dabs;

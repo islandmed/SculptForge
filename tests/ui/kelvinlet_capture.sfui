@@ -1,0 +1,68 @@
+# Kelvinlet brushes and Capture from view: KelvinGrab from the bottom shelf drags the sphere out elastically (undo
+# puts it back), Twist and Scale act where they press, the Kelvinlet section's Squash slider; then Ctrl+Alt+C, a
+# square dragged over a sculpted detail, the capture window, and Detail Clone stamping the capture along a stroke.
+run new_sphere subdivisions=7
+wait_idle 30
+
+# KelvinGrab: the grabbed side follows the cursor, the surface around it follows softly (no edge).
+click "KelvinGrab##brush.kelvingrab"
+expect_value brush_type == 15
+snapshot
+stroke 0.62 0.42 0.78 0.3
+expect_value moved > 2000
+expect_value moved_max > 0.1
+expect_value can_undo == 1
+wait_idle 30
+shot kelvin_grab
+key ctrl+z
+expect_value moved == 0
+
+# Twist and Scale: press, drag sideways.
+click "Brush##palette.brush"
+click "Brush/##totray"
+wait 0.3
+click "Kelvinlet & Capture##brush.kelvinlet"
+expect "##kelvinsquash"
+expect "Capture from view##brush.capture_view"
+hold ctrl
+hover "##kelvinsquash"
+expect_help Poisson
+hold none
+click "KelvinTwist##Built-in16"
+expect_value brush_type == 16
+snapshot
+stroke 0.5 0.45 0.62 0.45
+expect_value moved > 200
+key ctrl+z
+click "KelvinScale##Built-in17"
+expect_value brush_type == 17
+snapshot
+stroke 0.5 0.45 0.4 0.45
+expect_value moved > 200
+key ctrl+z
+
+# A detail to capture: a horn from the VDM brush, then Ctrl+Alt+C and a square over it.
+run vdm_stamp point=0,0,2 view=0,0,-1 radius=0.25
+wait_idle 30
+key ctrl+alt+c
+expect_value capture_armed == 1
+view_drag 0.328 0.375 0.497 0.656
+wait_value capture_open == 1
+expect_value capture_ok == 1
+expect_value capture_points > 1000
+expect "Capture from view##capture"
+expect "Detail Clone##capture"
+wait_idle 30
+shot capture_window
+hold ctrl
+hover "##capsmooth"
+expect_help detail
+hold none
+click "Detail Clone##capture"
+expect_value brush_type == 19
+run new_sphere subdivisions=7
+snapshot
+stroke 0.38 0.62 0.66 0.62
+expect_value moved > 500
+wait_idle 30
+shot detail_clone

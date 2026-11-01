@@ -795,6 +795,9 @@ int App::run() {
             strokeProbe_ = &sm.dabs;
             strokeRadiusProbe_ = &sm.radii;
             if (options_.measureStrokeRadius > 0.0f) radiusPx_ = std::clamp(options_.measureStrokeRadius, 2.0f, 800.0f);
+            if (const char* b = std::getenv("SF_MEASURE_BRUSH")) // e.g. KelvinGrab: measure another built-in brush
+                for (int i = 0; i < int(BrushType::Count); ++i)
+                    if (SDL_strcasecmp(brushName(BrushType(i)), b) == 0) brush_ = BrushType(i), doc_.activeBrush = -1;
             if (verify) sm.before = meshStateHash(doc_.mesh);
             onMouseDown(sm.cx + sm.r, sm.cy, SDL_BUTTON_LEFT);
             if (drag_ != Drag::Stroke) {
@@ -883,6 +886,7 @@ int App::run() {
         if (asyncStroke_) pumpStroke();
         else drainStrokeDabs(kStrokeBudgetSeconds);
         mark();
+        kelvinCatchUp(); // a long Kelvinlet move, a bounded part per frame (PanelKelvinlet.cpp)
         Uint64 now = SDL_GetTicksNS();
         float dt = float(double(now - lastTicks) * 1e-9);
         lastTicks = now;
@@ -1138,6 +1142,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         if (guideMouseDown(x, y, mod)) return; // the QRemesh Guides brush (PanelRetopo.cpp)
         if (faceMouseDown(x, y, mod)) return;  // placing facial landmarks (PanelFace.cpp)
         if (sculptableMouseDown(x, y)) return; // Make sculptable: landmarks, crop box (PanelSculptable.cpp)
+        if (captureMouseDown(x, y)) return;    // Capture from view: the drag draws the square (PanelKelvinlet.cpp)
         // Alt+click on another SubTool selects it (ZBrush); Alt+drag stays an inverted stroke or a pan.
         // Shift+Alt+click selects and frames it (ZBrush), the active one too.
         const bool frameClick = (mod & SDL_KMOD_ALT) && (mod & SDL_KMOD_SHIFT) && !ctrlDown(mod);
@@ -1265,6 +1270,7 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     case Drag::Gizmo: gizmoDragTo(x, y); break;
     case Drag::Guide: guideDragTo(x, y); break;
     case Drag::Sculptable: sculptableMouseMove(x, y); break;
+    case Drag::Capture: captureMouseMove(x, y); break;
     case Drag::ZSphere: zsphereDragTo(x, y); break;
     case Drag::None: break;
     }
@@ -1331,6 +1337,7 @@ void App::onMouseUp() {
     if (drag_ == Drag::SubToolClick) subtoolClickRelease();
     if (drag_ == Drag::Guide) guideRelease();
     if (drag_ == Drag::Sculptable) sculptableMouseUp();
+    if (drag_ == Drag::Capture) captureMouseUp();
     if (drag_ == Drag::ZSphere) zsphereRelease();
     gizmoRelease();
     drag_ = Drag::None;
@@ -1345,6 +1352,11 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
         return;
     }
     if (captureShortcutKey(key, mod)) return; // Ctrl+Alt+click a button, then press its new key
+    if (key == SDLK_ESCAPE && capture_.armed) { // Capture from view waiting for its square (PanelKelvinlet.cpp)
+        capture_.armed = false;
+        status_ = "Capture cancelled";
+        return;
+    }
     if (lightBoxKey(key, mod)) return;        // , LightBox, B / M pickers, S / I pop-ups (LightBox.cpp)
     // Blender's Emulate Numpad: the number row works as the numpad, unless the key itself has an action.
     if (blenderStyle() && uiPrefs_.emulateNumpad && key >= SDLK_0 && key <= SDLK_9 &&
@@ -1418,8 +1430,12 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
         grabPlanePoint_ = grabLast_ = hit.position;
         return;
     }
+    if (kelvinStrokeBrush()) { // KelvinGrab / Twist / Scale (PanelKelvinlet.cpp)
+        kelvinBegin(hit);
+        return;
+    }
     lazyMouse_.reset(glm::vec2(x, y));
-    if (strokeBrush_ == BrushType::SnakeHook && !recipe && strokeSculpt_) {
+    if ((strokeBrush_ == BrushType::SnakeHook || strokeBrush_ == BrushType::KelvinSnake) && !recipe && strokeSculpt_) {
         grabPlanePoint_ = grabLast_ = hit.position; // the pulled tip (see snakeHookTo)
         return;
     }
@@ -1460,7 +1476,11 @@ void App::strokeTo(float x, float y) {
         grabLast_ = p;
         return;
     }
-    if (strokeBrush_ == BrushType::SnakeHook && !recipe && strokeSculpt_) {
+    if (kelvinStrokeBrush()) {
+        kelvinTo(x, y);
+        return;
+    }
+    if ((strokeBrush_ == BrushType::SnakeHook || strokeBrush_ == BrushType::KelvinSnake) && !recipe && strokeSculpt_) {
         snakeHookTo(x, y);
         return;
     }
@@ -1629,6 +1649,8 @@ void App::dabAt(float x, float y, float pressure) {
 void App::endStroke() {
     if (asyncStroke_) solverWait(); // (the dabs in flight; then the solver thread is idle)
     drainStrokeDabs(0.0); // the dabs still waiting belong to this stroke
+    doc_.sculptor.flushDetailClone(doc_.mesh, doc_.bvh, symmetry_); // a Detail Clone click
+    kelvinFinish(); // the rest of a Kelvinlet move (PanelKelvinlet.cpp)
     // (a command can end a Ctrl+click before its release: finishStrokeNow clears the mask click too)
     finishStrokeNow(); // AsyncStroke.cpp
 }
@@ -1923,6 +1945,7 @@ void App::drawUi() {
     drawFaceOverlay();   // facial landmarks (PanelFace.cpp)
     drawSplatTrainOverlay(); // splat training progress (PanelSplatTrain.cpp)
     drawSculptableOverlay(); // Make sculptable: crop box, face landmarks (PanelSculptable.cpp)
+    drawCaptureOverlay();    // Capture from view: the square, the result window (PanelKelvinlet.cpp)
     if (uiPrefs_.showAxes) drawAxisGizmo(); // X / Y / Z in the canvas corner (#31)
     if (drag_ == Drag::Insert) { // the size the insert will get
         insertPx_ = std::hypot(mouse.x - insertX_, mouse.y - insertY_);

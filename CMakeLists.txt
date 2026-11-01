@@ -98,6 +98,8 @@ add_library(sculptforge_core STATIC
   src/core/Tangents.cpp
   third_party/mikktspace/mikktspace.c
   src/core/Vdm.cpp
+  src/core/Kelvinlet.cpp
+  src/core/ViewCapture.cpp
   third_party/tinyexr/tinyexr_impl.cpp
   src/core/Matcap.cpp
   src/core/Trash.cpp
@@ -248,6 +250,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/Selection.cpp
     src/app/PanelBrushes.cpp
     src/app/PanelVdm.cpp
+    src/app/PanelKelvinlet.cpp
     src/app/PanelFace.cpp
     src/app/PanelBrushLibrary.cpp
     src/app/PanelBrushGallery.cpp

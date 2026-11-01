@@ -390,6 +390,19 @@ const char* brushTypeDescription(int type) {
     case BrushType::Vdm:
         return "Vector displacement: drag out one stamp of a whole 3D shape, overhangs and all (a horn, an ear, "
                "scales). Choose the map in Brush > Vector Displacement or the Alpha picker. Works best on dense meshes.";
+    case BrushType::KelvinGrab:
+        return "Elastic move from the physics of elasticity (Kelvinlets): the surface follows the cursor like real clay, "
+               "fading out with no edge. Squash (Brush > Kelvinlet) makes it bulge like incompressible clay.";
+    case BrushType::KelvinTwist:
+        return "Elastic twist: press and drag right to turn the surface clockwise around that point (left turns it "
+               "back); the turn fades smoothly, keeping the volume.";
+    case BrushType::KelvinScale:
+        return "Elastic pinch and swell: press and drag left to pinch the surface toward that point, right to swell it.";
+    case BrushType::KelvinSnake:
+        return "Elastic SnakeHook: pulls horns, tentacles and spikes that taper naturally as they stretch.";
+    case BrushType::DetailClone:
+        return "Paints copies of a captured detail along the stroke, each turned to follow it. Capture any detail on "
+               "the model with Capture from view (Ctrl+Alt+C), or pick a VDM.";
     default:
         return "";
     }

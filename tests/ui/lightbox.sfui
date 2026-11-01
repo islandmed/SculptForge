@@ -62,6 +62,7 @@ shot lightbox-brush
 expect_not "LightBox/Skin Pores"
 drag_item "LightBox/Inflate" -700 0
 drag_item "LightBox/Nudge" -700 0
+drag_item "LightBox/KelvinSnake" -700 0
 expect "LightBox/Skin Pores"
 expect_status Brush: DamStandard
 
