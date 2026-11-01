@@ -43,7 +43,7 @@ struct KelvinletSettings {
     bool cloneFollowStroke = true; // Detail Clone: the stamp's top turns with the stroke (else it keeps screen up)
     // Dense meshes: a move whose region holds more vertices than this tightens its cutoff (4% -> up to 10% of the
     // peak) and the app gives it a smaller part of the move per frame. (A constant until the hardware profile sets it.)
-    size_t vertexBudget = 1500000;
+    size_t vertexBudget = 600000;
     // Regions above this many vertices evaluate the far field on a coarse lattice and interpolate it.
     size_t proxyMinVertices = 150000;
     // Regions above this many vertices move only their near field (within the radius) at once and gather the far

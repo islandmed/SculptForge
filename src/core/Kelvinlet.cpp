@@ -12,6 +12,8 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <functional>
 #include <unordered_map>
 #include <vector>
@@ -217,10 +219,13 @@ struct KelvinFarField {
     static constexpr int kGroups = 6;
     uint64_t stroke = 0;
     float h = 0.0f;         // lattice spacing (world)
+    double meshVolume = 1.0; // the model's bounding box volume at the stroke's start
     int turn = 0;           // the group whose turn is next
     std::unordered_map<uint64_t, uint32_t> index; // lattice point -> slot
     std::vector<glm::ivec3> point;               // slot -> lattice point
     std::vector<std::array<glm::vec3, kGroups>> acc;
+    std::vector<uint64_t> listed;                // slot -> a bit per group: in that group's list since its turn
+    std::vector<uint32_t> slots[kGroups];        // per group: the slots gathered since its turn
     glm::vec3 lo[kGroups], hi[kGroups];          // per group: the bounds of what it gathered since its turn
     bool any[kGroups] = {};
     static uint64_t key(const glm::ivec3& p) {
@@ -247,6 +252,7 @@ float nearWeight(float d, float radius) {
 void Sculptor::gatherKelvinletFar(const std::function<glm::vec3(const glm::vec3&)>& displacement, const glm::vec3& a,
                                   const glm::vec3& ab, float radius, const glm::vec3& mid, float reach) {
     KelvinFarField& f = *kelvinFar_;
+    const auto t0 = std::chrono::steady_clock::now();
     const float h = f.h;
     const glm::ivec3 i0 = glm::ivec3(glm::floor((mid - glm::vec3(reach)) / h));
     const glm::ivec3 i1 = glm::ivec3(glm::ceil((mid + glm::vec3(reach)) / h));
@@ -277,9 +283,19 @@ void Sculptor::gatherKelvinletFar(const std::function<glm::vec3(const glm::vec3&
             f.point.push_back(q);
             f.acc.emplace_back();
             f.acc.back().fill(glm::vec3(0.0f));
+            f.listed.push_back(0);
         }
-        for (glm::vec3& slot : f.acc[it->second]) slot += value[i];
+        const uint32_t slot = it->second;
+        for (glm::vec3& a : f.acc[slot]) a += value[i];
+        if (f.listed[slot] != (uint64_t(1) << KelvinFarField::kGroups) - 1) {
+            for (int g = 0; g < KelvinFarField::kGroups; ++g)
+                if (!(f.listed[slot] & (uint64_t(1) << g))) f.slots[g].push_back(slot);
+            f.listed[slot] = (uint64_t(1) << KelvinFarField::kGroups) - 1;
+        }
     }
+    if (std::getenv("SF_KELVIN_LOG"))
+        std::fprintf(stderr, "kelvin far: gathered %zu lattice points (%zu in all) in %.1f ms\n", count, f.point.size(),
+                     std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
     const glm::vec3 lo = glm::vec3(i0) * h, hi = glm::vec3(i1) * h;
     for (int g = 0; g < KelvinFarField::kGroups; ++g) {
         f.lo[g] = f.any[g] ? glm::min(f.lo[g], lo) : lo;
@@ -297,7 +313,8 @@ void Sculptor::applyKelvinletFarGroup(Mesh& mesh, BVH& bvh, int g) {
     const glm::ivec3 i0 = glm::ivec3(glm::floor(f.lo[g] / h)), i1 = glm::ivec3(glm::ceil(f.hi[g] / h));
     const glm::ivec3 dim = i1 - i0 + glm::ivec3(2);
     std::vector<glm::vec3> dense(size_t(dim.x) * size_t(dim.y) * size_t(dim.z), glm::vec3(0.0f));
-    for (size_t s = 0; s < f.point.size(); ++s) {
+    for (const uint32_t s : f.slots[g]) {
+        f.listed[s] &= ~(uint64_t(1) << g);
         const glm::ivec3 q = f.point[s] - i0;
         glm::vec3& v = f.acc[s][size_t(g)];
         if (q.x < 0 || q.y < 0 || q.z < 0 || q.x >= dim.x || q.y >= dim.y || q.z >= dim.z) {
@@ -307,33 +324,38 @@ void Sculptor::applyKelvinletFarGroup(Mesh& mesh, BVH& bvh, int g) {
         dense[(size_t(q.z) * size_t(dim.y) + size_t(q.y)) * size_t(dim.x) + size_t(q.x)] = v;
         v = glm::vec3(0.0f);
     }
+    f.slots[g].clear();
     f.any[g] = false;
     const auto& pos = mesh.positions;
-    const glm::vec3 c = 0.5f * (f.lo[g] + f.hi[g]), ext = f.hi[g] - f.lo[g], meshExt = mesh.bounds().extent();
+    const glm::vec3 c = 0.5f * (f.lo[g] + f.hi[g]), ext = f.hi[g] - f.lo[g];
     const double volume = double(ext.x) * double(ext.y) * double(ext.z);
-    const double meshVolume = std::max(1e-30, double(meshExt.x) * double(meshExt.y) * double(meshExt.z));
+    const double meshVolume = f.meshVolume; // (measured once per stroke: bounds() reads every vertex)
+    // Groups are runs of 4096 consecutive vertices (every kGroups-th run): a group is read as contiguous memory.
+    constexpr uint32_t kRun = 4096;
+    auto inGroup = [&](uint32_t v) { return int((v / kRun) % uint32_t(KelvinFarField::kGroups)) == g; };
     if (volume > 0.05 * meshVolume) {
-        // A box over much of the model: this group's vertices directly (every kGroups-th index), not a BVH query
-        // that would list all the others too.
-        const size_t nv = mesh.vertexCount(), mine = (nv + KelvinFarField::kGroups - 1 - size_t(g)) / KelvinFarField::kGroups;
-        constexpr size_t kBlock = 1 << 16;
-        std::vector<std::vector<uint32_t>> parts((mine + kBlock - 1) / kBlock);
+        // A box over much of the model: this group's runs directly, not a BVH query that would list the others too.
+        const size_t nv = mesh.vertexCount(), runs = (nv + kRun - 1) / kRun;
+        std::vector<std::vector<uint32_t>> parts(runs);
         const glm::vec3 lo = f.lo[g], hi = f.hi[g];
-        poolFor(mine, [&](size_t b, size_t e) {
-            auto& out = parts[b / kBlock];
-            for (size_t k = b; k < e; ++k) {
-                const uint32_t v = uint32_t(k * KelvinFarField::kGroups + size_t(g));
-                const glm::vec3 p = pos[v];
-                if (p.x < lo.x || p.y < lo.y || p.z < lo.z || p.x > hi.x || p.y > hi.y || p.z > hi.z) continue;
-                if (mesh.hasHidden() && mesh.vertexHidden(v)) continue;
-                out.push_back(v);
+        poolFor(runs, [&](size_t b, size_t e) {
+            for (size_t r = b; r < e; ++r) {
+                if (int(r % size_t(KelvinFarField::kGroups)) != g) continue;
+                auto& out = parts[r];
+                const uint32_t v0 = uint32_t(r * kRun), v1 = uint32_t(std::min(nv, (r + 1) * size_t(kRun)));
+                for (uint32_t v = v0; v < v1; ++v) {
+                    const glm::vec3 p = pos[v];
+                    if (p.x < lo.x || p.y < lo.y || p.z < lo.z || p.x > hi.x || p.y > hi.y || p.z > hi.z) continue;
+                    if (mesh.hasHidden() && mesh.vertexHidden(v)) continue;
+                    out.push_back(v);
+                }
             }
-        }, kBlock);
+        }, 1);
         verts_.clear();
         for (const auto& part : parts) verts_.insert(verts_.end(), part.begin(), part.end());
     } else {
         brushVertices(mesh, bvh, c, 0.5f * glm::length(ext), verts_);
-        std::erase_if(verts_, [&](uint32_t v) { return int(v % uint32_t(KelvinFarField::kGroups)) != g; });
+        std::erase_if(verts_, [&](uint32_t v) { return !inGroup(v); });
     }
     scratch_.resize(verts_.size());
     poolFor(verts_.size(), [&](size_t b, size_t e) {
@@ -362,6 +384,10 @@ void Sculptor::applyKelvinletFarGroup(Mesh& mesh, BVH& bvh, int g) {
         }
     verts_.resize(kept);
     scratch_.resize(kept);
+    if (std::getenv("SF_KELVIN_LOG"))
+        std::fprintf(stderr, "kelvin far: group %d, %zu vertices, %s, %.1f ms\n", g, kept,
+                     volume > 0.05 * meshVolume ? "stride" : "query",
+                     std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - clock).count());
     if (verts_.empty()) return;
     displaceAll(mesh, verts_, scratch_);
     timings.kernelMs += lapMs(clock);
@@ -499,6 +525,8 @@ void Sculptor::kelvinletSingle(Mesh& mesh, BVH& bvh, const KelvinletKernel& k, c
             *kelvinFar_ = KelvinFarField{};
             kelvinFar_->stroke = strokeId_;
             kelvinFar_->h = 0.1f * s.radius;
+            const glm::vec3 e = mesh.bounds().extent();
+            kelvinFar_->meshVolume = std::max(1e-30, double(e.x) * double(e.y) * double(e.z));
         }
         gatherKelvinletFar(displacement, s.center, travel, s.radius, mid, reach);
         brushVertices(mesh, bvh, mid, nearReach, verts_);

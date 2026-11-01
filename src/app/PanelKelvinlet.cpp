@@ -119,6 +119,7 @@ void App::kelvinAdvance() {
         else step.logScale = now;
         doc_.sculptor.kelvinletStep(doc_.mesh, doc_.bvh, strokeBrush_, step, symmetry_);
     }
+    kelvinMovedThisFrame_ = true;
     if (log) {
         const SculptTimings& t = doc_.sculptor.timings;
         SDL_Log("kelvin: %llu vertices, kernel %.1f normals %.1f bvh %.1f ms (renderer sync so far %.0f ms in %llu frames)",
@@ -130,6 +131,11 @@ void App::kelvinAdvance() {
 
 void App::kelvinCatchUp() {
     if (drag_ != Drag::Stroke || !kelvinStrokeBrush()) return;
+    if (kelvinMovedThisFrame_) { // the pointer already moved it this frame: one bounded move a frame
+        kelvinMovedThisFrame_ = false;
+        redrawIn(0.0);
+        return;
+    }
     const float left = strokeBrush_ == BrushType::KelvinGrab ? glm::length(kelvinTarget_ - grabLast_) / std::max(kelvinRadius_, 1e-9f)
                                                              : std::abs(kelvinPending_);
     if (left > 1e-6f) kelvinAdvance();
