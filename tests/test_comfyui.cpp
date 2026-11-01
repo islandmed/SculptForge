@@ -121,15 +121,20 @@ TEST(comfy_seed_contract) {
       "2": {"class_type": "SamplerCustom", "inputs": {"noise_seed": 5}},
       "3": {"class_type": "PrimitiveInt", "inputs": {"value": 5}, "_meta": {"title": "sf_seed"}},
       "4": {"class_type": "KSampler", "inputs": {"seed": ["3", 0]}},
-      "5": {"class_type": "PrimitiveInt", "inputs": {"value": 5}}
+      "5": {"class_type": "PrimitiveInt", "inputs": {"value": 5}},
+      "6": {"class_type": "SamplerBoth", "inputs": {"seed": 5, "noise_seed": 6, "cfg": 7}}
     })j");
     comfy::ContractInputs in;
     in.seed = 123456789012345ull; // above 1e15 would print as 1.2e+15 and fail ComfyUI's INT check
     comfy::ContractReport rep;
     std::string err;
     CHECK(comfy::applyContract(wf, in, err, &rep));
-    CHECK(rep.seedNodes.size() == 3);
+    CHECK(rep.seedNodes.size() == 4);
     CHECK(wf["1"]["inputs"]["seed"].asNumber() == 123456789012345.0);
+    // Both seeds of one node (setting the first replaced the node the second was read from: a use-after-free).
+    CHECK(wf["6"]["inputs"]["seed"].asNumber() == 123456789012345.0);
+    CHECK(wf["6"]["inputs"]["noise_seed"].asNumber() == 123456789012345.0);
+    CHECK(wf["6"]["inputs"]["cfg"].asNumber() == 7.0);
     CHECK(wf["2"]["inputs"]["noise_seed"].asNumber() == 123456789012345.0);
     CHECK(wf["3"]["inputs"]["value"].asNumber() == 123456789012345.0);
     CHECK(wf["4"]["inputs"]["seed"].isArray()); // linked seed stays linked

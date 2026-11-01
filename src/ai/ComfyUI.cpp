@@ -393,21 +393,22 @@ bool applyContract(Json& workflow, const ContractInputs& in, std::string& error,
     if (in.seed) {
         const double seed = double(*in.seed);
         for (const auto& id : ids) {
-            const Json& inputs = workflow[id]["inputs"];
-            bool set = false;
-            for (const char* key : {"seed", "noise_seed"})
-                if (inputs[key].isNumber()) {
-                    setInput(workflow, id, key, seed);
-                    set = true;
-                }
-            if (!set && titleOf(workflow[id]) == "sf_seed")
-                for (const char* key : {"value", "int", "number"})
-                    if (workflow[id]["inputs"][key].isNumber()) {
-                        setInput(workflow, id, key, seed);
-                        set = true;
-                        break;
-                    }
-            if (set) rep.seedNodes.push_back(id);
+            // The keys are chosen first and set after: setInput replaces the node, so a reference into its
+            // inputs doesn't survive it.
+            std::vector<const char*> keys;
+            {
+                const Json& inputs = workflow[id]["inputs"];
+                for (const char* key : {"seed", "noise_seed"})
+                    if (inputs[key].isNumber()) keys.push_back(key);
+                if (keys.empty() && titleOf(workflow[id]) == "sf_seed")
+                    for (const char* key : {"value", "int", "number"})
+                        if (inputs[key].isNumber()) {
+                            keys.push_back(key);
+                            break;
+                        }
+            }
+            for (const char* key : keys) setInput(workflow, id, key, seed);
+            if (!keys.empty()) rep.seedNodes.push_back(id);
         }
     }
     return true;

@@ -51,6 +51,10 @@ All notable changes to SculptForge are listed here. The format follows
   adjacency has no limit). Unit tests divide fan cylinders of 3 to 300 sides and UV spheres up to 200 segments,
   through OBJ and through the Blender Bridge, and compare every level's adjacency with a plain rebuild; a UI test
   receives the issue's meshes from the bridge and divides them in the app.
+- Generating with a ComfyUI workflow and a seed read freed memory, which could crash at random or set the wrong
+  seed: while setting a node's seeds, the node was replaced after its first seed but its inputs were still read
+  for the second (a sampler with both `seed` and `noise_seed`). Found with AddressSanitizer; the keys are now
+  chosen before any is set. The unit test now has a node with both seeds.
 
 ## [0.9.5] - 2026-10-31
 
