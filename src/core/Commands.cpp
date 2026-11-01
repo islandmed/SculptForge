@@ -21,6 +21,7 @@
 #include "core/MeshTransform.h"
 #include "core/PathStroke.h"
 #include "core/Polygroups.h"
+#include "core/SelectionSets.h"
 #include "core/SubTools.h"
 #include "core/Polypaint.h"
 #include "core/Primitives.h"
@@ -801,6 +802,7 @@ CommandRegistry::CommandRegistry() {
 
     registerMaskingCommands(*this);
     registerPolygroupCommands(*this);
+    registerSelectionSetCommands(*this); // selection_set_* (core/SelectionSets.h)
     registerSubToolCommands(*this);
     registerSubdivCommands(*this); // subdiv_* (core/MultiresCommands.cpp)
     registerMicroCommands(*this);  // micro_* (core/MicroCommands.cpp)

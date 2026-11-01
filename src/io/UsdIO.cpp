@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "io/UsdIO.h"
 
+#include "core/SelectionSets.h"
 #include "io/TextureExport.h"
 #include "io/Zip.h"
 
@@ -101,6 +102,16 @@ struct Writer {
 };
 
 std::string quoted(const std::string& t) { return "\"" + t + "\""; }
+// A string literal for any text (quotes, backslashes and control characters escaped).
+std::string usdQuoted(const std::string& t) {
+    std::string out = "\"";
+    for (unsigned char c : t) {
+        if (c == '"' || c == '\\') out += '\\';
+        if (c < 0x20) out += ' ';
+        else out += char(c);
+    }
+    return out + "\"";
+}
 
 void writeExtent(Writer& w, const AABB& b) {
     w.indent();
@@ -109,6 +120,79 @@ void writeExtent(Writer& w, const AABB& b) {
     w.s += ", ";
     w.vec3(b.valid() ? b.max : glm::vec3(0.0f));
     w.s += "]\n";
+}
+
+// Selection Sets (core/SelectionSets.h) of the mesh, inside its Mesh prim: their names and channels as
+// `sculptforge:selectionSets` / `sculptforge:selectionSetChannels`, the mask and vertex paint of set k as vertex
+// primvars `sculptforge_set<k>_mask` / `_color`, its shown faces as the GeomSubset `sculptforge_set<k>_visible` and
+// its polygroups as a partition of GeomSubsets `sculptforge_set<k>_group<id>`. UVs and shapes aren't written (they
+// travel in projects and .sfsets files). `triFace`: the face each triangle was written in.
+void writeSelectionSets(Writer& w, const Mesh& mesh, std::vector<uint32_t> triFace, size_t faceCount) {
+    if (!mesh.selectionSets || mesh.selectionSets->sets.empty()) return;
+    for (uint32_t t = 0; t < triFace.size(); ++t) // the second half of a quad is in its partner's face
+        if (triFace[t] == ~0u && mesh.quadPartnerAt(t) != Mesh::kNoQuad) triFace[t] = triFace[mesh.quadPartnerAt(t)];
+    constexpr uint32_t kChannels = kSetMask | kSetPaint | kSetVisibility | kSetPolygroups;
+    std::vector<std::string> names, channels;
+    std::vector<SelectionSetData> data;
+    for (const auto& set : mesh.selectionSets->sets) {
+        SelectionSetData d;
+        std::string error;
+        if (!(set->channels & kChannels) || !selectionSetAt(mesh, *set, kChannels, d, error)) continue;
+        names.push_back(set->name);
+        channels.push_back(setChannelNames(d.channels));
+        data.push_back(std::move(d));
+    }
+    if (names.empty()) return;
+    w.array("uniform token[] sculptforge:selectionSets", names, [&](const std::string& n) { w.s += usdQuoted(n); });
+    w.array("uniform token[] sculptforge:selectionSetChannels", channels, [&](const std::string& n) { w.s += usdQuoted(n); });
+    auto faceSubset = [&](const std::string& name, const std::string& family, auto inSubset, bool partition) {
+        std::vector<uint8_t> in(faceCount, 0);
+        for (uint32_t t = 0; t < triFace.size(); ++t)
+            if (triFace[t] < faceCount && inSubset(t)) in[triFace[t]] = 1;
+        std::vector<uint32_t> indices;
+        for (uint32_t f = 0; f < faceCount; ++f)
+            if (in[f]) indices.push_back(f);
+        w.s += '\n';
+        w.open("def GeomSubset \"" + name + "\"");
+        w.line("uniform token elementType = \"face\"");
+        w.line("uniform token familyName = \"" + family + "\"");
+        if (partition) w.line("uniform token familyType = \"partition\"");
+        w.array("int[] indices", indices, [&](uint32_t f) { w.s += std::to_string(f); });
+        w.close();
+    };
+    for (size_t k = 0; k < data.size(); ++k) {
+        const SelectionSetData& d = data[k];
+        const std::string base = "sculptforge_set" + std::to_string(k);
+        if (!d.mask.empty()) {
+            w.array("float[] primvars:" + base + "_mask", d.mask, [&](float v) { w.num(v); });
+            w.s.pop_back();
+            w.s += " (\n";
+            w.line("    interpolation = \"vertex\"");
+            w.line(")");
+        }
+        if (!d.colors.empty()) {
+            w.array("color3f[] primvars:" + base + "_color", d.colors, [&](const glm::vec3& c) { w.vec3(c); });
+            w.s.pop_back();
+            w.s += " (\n";
+            w.line("    interpolation = \"vertex\"");
+            w.line(")");
+        }
+    }
+    for (size_t k = 0; k < data.size(); ++k) {
+        const SelectionSetData& d = data[k];
+        const std::string base = "sculptforge_set" + std::to_string(k);
+        if (!d.hidden.empty())
+            faceSubset(base + "_visible", "sculptforge:set" + std::to_string(k) + ":visibility",
+                       [&](uint32_t t) { return d.hidden[t] == 0; }, false);
+        if (!d.polygroups.empty()) {
+            std::vector<uint32_t> ids = d.polygroups;
+            std::sort(ids.begin(), ids.end());
+            ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
+            for (uint32_t id : ids)
+                faceSubset(base + "_group" + std::to_string(id), "sculptforge:set" + std::to_string(k) + ":polygroups",
+                           [&](uint32_t t) { return d.polygroups[t] == id; }, true);
+        }
+    }
 }
 
 // One mesh prim `prim` under the root (a SkelRoot holding the Mesh when it has blend shapes).
@@ -147,11 +231,13 @@ void writeMesh(Writer& w, const Mesh& mesh, const std::string& root, const std::
     std::vector<int> counts;
     std::vector<glm::vec2> st;
     faces.reserve(mesh.triangleCount());
+    std::vector<uint32_t> triFace(mesh.triangleCount(), ~0u); // the face each triangle is written in (selection sets)
     for (uint32_t t = 0; t < mesh.triangleCount(); ++t) {
         glm::uvec4 f;
         glm::vec2 fuv[4];
         const int corners = exportFaceUv(mesh, t, f, fuv);
         if (corners == 0) continue;
+        triFace[t] = uint32_t(faces.size());
         faces.push_back(f);
         counts.push_back(corners);
         if (uvs) st.insert(st.end(), fuv, fuv + corners);
@@ -185,6 +271,7 @@ void writeMesh(Writer& w, const Mesh& mesh, const std::string& root, const std::
         w.line(")");
     }
     w.line("uniform token subdivisionScheme = \"none\"");
+    writeSelectionSets(w, mesh, triFace, faces.size());
     if (skinned) {
         w.array("uniform token[] skel:blendShapes", shapeNames, [&](const std::string& n) { w.s += quoted(n); });
         w.array("rel skel:blendShapeTargets", shapeNames, [&](const std::string& n) { w.s += "<" + meshPath + "/" + n + ">"; });
@@ -777,6 +864,64 @@ private:
     }
 };
 
+// The selection sets writeSelectionSets put in Mesh prim `mesh` (and its GeomSubset children), as arrays for its
+// `vertices` and `triangles` (`faceTris`: each face's first triangle and count). Anything that doesn't fit is
+// left out.
+void readSelectionSets(const std::vector<Prim>& prims, size_t mesh, size_t vertices, size_t triangles,
+                       const std::vector<glm::uvec2>& faceTris, std::vector<std::pair<std::string, SelectionSetData>>& out) {
+    const Prim& p = prims[mesh];
+    const Value* names = p.get("sculptforge:selectionSets");
+    const Value* channelList = p.get("sculptforge:selectionSetChannels");
+    if (!names || !channelList || names->strs.size() != channelList->strs.size()) return;
+    for (size_t k = 0; k < names->strs.size() && k < 100000; ++k) {
+        uint32_t channels = 0;
+        std::string error;
+        if (!parseSetChannels(channelList->strs[k], channels, error)) continue;
+        channels &= kSetMask | kSetPaint | kSetVisibility | kSetPolygroups;
+        const std::string base = "sculptforge_set" + std::to_string(k);
+        SelectionSetData d;
+        d.channels = channels;
+        if (channels & kSetMask) {
+            const Value* v = p.get("primvars:" + base + "_mask");
+            if (!v || v->nums.size() != vertices) continue;
+            d.mask.assign(v->nums.begin(), v->nums.end());
+        }
+        if (channels & kSetPaint) {
+            const Value* v = p.get("primvars:" + base + "_color");
+            if (!v || v->nums.size() != vertices * 3) continue;
+            d.colors.resize(vertices);
+            for (size_t i = 0; i < vertices; ++i)
+                d.colors[i] = glm::vec3(float(v->nums[i * 3]), float(v->nums[i * 3 + 1]), float(v->nums[i * 3 + 2]));
+        }
+        if (channels & kSetVisibility) d.hidden.assign(triangles, 1);
+        if (channels & kSetPolygroups) d.polygroups.assign(triangles, 0u);
+        bool visibleFound = false;
+        for (const Prim& c : prims) {
+            if (c.parent != int(mesh) || c.type != "GeomSubset") continue;
+            const std::string name = c.path.substr(c.path.rfind('/') + 1);
+            if (name.rfind(base + "_", 0) != 0) continue;
+            const std::string rest = name.substr(base.size() + 1);
+            const bool visible = rest == "visible";
+            const bool group = rest.rfind("group", 0) == 0 && rest.size() > 5 && rest.size() < 16 &&
+                               std::all_of(rest.begin() + 5, rest.end(), [](char ch) { return ch >= '0' && ch <= '9'; });
+            if ((!visible || !(channels & kSetVisibility)) && (!group || !(channels & kSetPolygroups))) continue;
+            const uint32_t id = group ? uint32_t(std::min<unsigned long long>(std::stoull(rest.substr(5)), 0xFFFFFFFFull)) : 0u;
+            visibleFound |= visible;
+            if (const Value* idx = c.get("indices"))
+                for (double f : idx->nums) {
+                    if (f < 0 || f >= double(faceTris.size())) continue;
+                    const glm::uvec2 ft = faceTris[size_t(f)];
+                    for (uint32_t t = ft.x; t < ft.x + ft.y && t < triangles; ++t) {
+                        if (visible) d.hidden[t] = 0;
+                        else d.polygroups[t] = id;
+                    }
+                }
+        }
+        if ((channels & kSetVisibility) && !visibleFound) continue;
+        out.emplace_back(names->strs[k], std::move(d));
+    }
+}
+
 glm::mat4 axisRotation(char axis, float degrees) {
     const glm::vec3 a = axis == 'X' ? glm::vec3(1, 0, 0) : axis == 'Y' ? glm::vec3(0, 1, 0) : glm::vec3(0, 0, 1);
     return glm::rotate(glm::mat4(1.0f), glm::radians(degrees), a);
@@ -887,6 +1032,8 @@ bool readUsdaText(const std::string& text, bool split, std::vector<MeshObject>& 
         Mesh m;
         std::vector<SculptLayer> layers;
         bool uvs = false; // some prim had UVs (Mesh::uvs holds one per corner either way until the end)
+        int meshPrims = 0;
+        std::vector<std::pair<std::string, SelectionSetData>> sets; // selection sets SculptForge wrote (one prim only)
     };
     std::vector<Gathered> objects(split ? 0 : 1);
     bool splatsFound = false;
@@ -906,7 +1053,7 @@ bool readUsdaText(const std::string& text, bool split, std::vector<MeshObject>& 
                 // Named after the prim, or after its SkelRoot (SculptForge writes <Name>/Mesh for blend shapes).
                 const int parent = p.parent;
                 const Prim& named = parent >= 0 && prims[size_t(parent)].type == "SkelRoot" ? prims[size_t(parent)] : p;
-                objects.push_back({named.path.substr(named.path.rfind('/') + 1), {}, {}, false});
+                objects.push_back({named.path.substr(named.path.rfind('/') + 1), {}, {}, false, 0, {}});
             }
             Mesh& m = objects.back().m;
             std::vector<SculptLayer>& layers = objects.back().layers;
@@ -959,6 +1106,7 @@ bool readUsdaText(const std::string& text, bool split, std::vector<MeshObject>& 
                 return e < st->nums.size() / 2 ? glm::vec2(float(st->nums[e * 2]), float(st->nums[e * 2 + 1])) : glm::vec2(0.0f);
             };
             size_t cursor = 0;
+            std::vector<glm::uvec2> faceTris; // per face: its first triangle and how many (selection sets)
             for (double c : counts->nums) {
                 const size_t n = size_t(std::max(0.0, c));
                 if (cursor + n > indices->nums.size()) {
@@ -983,8 +1131,11 @@ bool readUsdaText(const std::string& text, bool split, std::vector<MeshObject>& 
                     m.uvs.insert(m.uvs.end(), uv, uv + 3);
                 }
                 if (n == 4) m.pairQuad(firstTri, firstTri + 1); // a quad stays paired (Mesh::quadPartners)
+                faceTris.push_back({firstTri, uint32_t(m.triangles.size()) - firstTri});
                 cursor += n;
             }
+            ++objects.back().meshPrims;
+            readSelectionSets(prims, i, pts.size(), m.triangles.size(), faceTris, objects.back().sets);
             if (m.hasQuads()) m.quadPartners.resize(m.triangles.size(), Mesh::kNoQuad);
             for (auto& l : layers) l.delta.resize(m.positions.size(), glm::vec3(0.0f));
             // Blend shapes bound to this mesh.
@@ -1044,6 +1195,20 @@ bool readUsdaText(const std::string& text, bool split, std::vector<MeshObject>& 
         if (!o.uvs) o.m.uvs.clear();
         for (auto& l : o.layers) l.delta.resize(o.m.positions.size(), glm::vec3(0.0f));
         outMeshes.push_back({o.name, weldImported(o.m, o.layers)});
+        // Sets come back when the mesh came from one prim and welding kept its vertices and triangles.
+        Mesh& welded = outMeshes.back().mesh;
+        if (o.meshPrims == 1 && !o.sets.empty() && welded.vertexCount() == o.m.vertexCount() &&
+            welded.triangleCount() == o.m.triangleCount()) {
+            auto list = std::make_shared<SelectionSetList>();
+            for (auto& [name, data] : o.sets) {
+                SelectionSet set;
+                std::string error;
+                if (list->find(name) < 0 && makeSelectionSet(name, data, uint32_t(welded.vertexCount()),
+                                                             uint32_t(welded.triangleCount()), 0, set, error))
+                    list->sets.push_back(std::make_shared<const SelectionSet>(std::move(set)));
+            }
+            if (!list->sets.empty()) welded.selectionSets = std::move(list);
+        }
     }
     if (outMeshes.empty() && !splatsFound) {
         error = "No meshes or Gaussian splats found (references, payloads and binary .usdc layers are not supported yet)";

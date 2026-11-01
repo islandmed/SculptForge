@@ -118,7 +118,7 @@
 //                            2 DragDot, 3 Spray, 4 LazyMouse), vdms (VDM brush maps), vdm_files (.sfvdm in the library)
 //                            z_intensity, smooth_intensity, rgb_intensity (0-100), focal_shift (-100..100), draw_size,
 //                            size_popup_open (the S / U / I / O slider), size_knob_x / size_knob_y (its knob, pixels),
-//                            quickmenu_open, right_click_menu, space_camera, space_held, radial_open / radial_menu (-1 none) / radial_held /
+//                            quickmenu_open, right_click_menu, space_camera, space_held, air_strokes, radial_open / radial_menu (-1 none) / radial_held /
 //                            radial_hover / radial_ran (radial menus: open, the menu, held by its key or button, the
 //                            slot pointed at, the slot run last), radial_menus, radial_slots_N, lazy_mouse, input_style (0 ZBrush, 1 SculptForge, 2 Blender), turntable,
 //                            camera_ortho, mask_brush (Blender's Mask brush on), shortcut_conflicts (keys two actions
@@ -191,6 +191,7 @@
 #include "core/Matcap.h"
 #include "core/Multires.h"
 #include "core/Script.h"
+#include "core/SelectionSets.h"
 #include "core/ThreadPool.h"
 #include "core/Timeline.h"
 #include "link/HttpServer.h"
@@ -385,6 +386,9 @@ double Demo::query(const std::string& name, bool& known) const {
     if (const double v = app_.sculptableTestValue(name); !std::isnan(v)) return v;
     if (name == "qremesh_running") return app_.qremesh_ ? 1.0 : 0.0;
     if (name == "qremesh_guides") return double(app_.doc_.qremeshGuides.size());
+    if (name == "selection_sets") return m.selectionSets ? double(m.selectionSets->sets.size()) : 0.0;
+    if (name == "morph_target") return m.selectionSets && !m.selectionSets->morphTarget.empty() ? 1.0 : 0.0;
+    if (name == "morph_brush") return app_.brush_ == BrushType::Morph && app_.doc_.activeBrush < 0 ? 1.0 : 0.0;
     if (name == "qremesh_guide_loops") {
         size_t n = 0;
         for (const QRemeshGuide& g : app_.doc_.qremeshGuides) n += g.closed;
@@ -424,6 +428,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "quickmenu_open") return app_.quickMenu_.open ? 1.0 : 0.0;
     if (name == "right_click_menu") return app_.uiPrefs_.rightClickQuickMenu ? 1.0 : 0.0;
     if (name == "space_camera") return app_.uiPrefs_.spaceCamera ? 1.0 : 0.0;
+    if (name == "air_strokes") return app_.uiPrefs_.airStrokes ? 1.0 : 0.0;
     if (name == "space_held") return app_.spaceHeld_ ? 1.0 : 0.0;
     if (name == "radial_open") return app_.radial_.menu >= 0 ? 1.0 : 0.0;
     if (name == "radial_menu") return double(app_.radial_.menu); // -1: none open

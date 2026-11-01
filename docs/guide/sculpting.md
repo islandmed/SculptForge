@@ -50,6 +50,7 @@ are on the bottom shelf by default and in the brush picker.
 | **KelvinScale** | | Press and drag left to pinch the surface toward that point, right to swell it. | The other way |
 | **KelvinSnake** | | An elastic SnakeHook: smooth horns and tendrils that taper as they stretch. | No change |
 | **DetailClone** | | Paints copies of a captured detail (the VDM brush's map) along the stroke, each turned to follow it. | Digs them in |
+| **Morph** | | Pulls the surface back toward the morph target, a selection set with its shape ([Selection sets](selection-sets.md#morph-targets)). Does nothing until you pick one. | Pushes away from it |
 | **Paint** | <kbd>P</kbd> | Paints colour without sculpting. See [Polypaint and materials](polypaint.md). | Paints back to white |
 
 Notes on particular brushes:

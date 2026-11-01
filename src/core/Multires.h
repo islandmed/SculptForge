@@ -223,6 +223,18 @@ void subdivLevelFaces(const Mesh& mesh, int level, std::vector<glm::uvec3>& out)
 // True when the mesh holds no edits its stack hasn't folded in yet (its current level's data is the mesh).
 bool subdivInSync(const Mesh& mesh);
 
+// --- Moving values between levels (Selection Sets, core/SelectionSets.h) ---
+// Each carries `values`, laid out for level `from` (per vertex, per triangle or per triangle corner), to level `to`
+// through the levels in between, as the stack passes attributes on: copied down to the parent elements,
+// interpolated (vertices, UV corners) or inherited (triangles) up. `smooth` (vec3 per vertex): up through the
+// levels' own subdivision stencils instead of linear interpolation (for offsets of the shape). False when the mesh
+// has no such levels.
+bool subdivMapVertices(const Mesh& mesh, int from, int to, std::vector<float>& values);
+bool subdivMapVertices(const Mesh& mesh, int from, int to, std::vector<glm::vec3>& values, glm::vec3 fill, bool smooth);
+bool subdivMapTriangles(const Mesh& mesh, int from, int to, std::vector<uint32_t>& values);
+bool subdivMapTriangles(const Mesh& mesh, int from, int to, std::vector<uint8_t>& values);
+bool subdivMapCorners(const Mesh& mesh, int from, int to, std::vector<glm::vec2>& values);
+
 // --- Undoable document operations (one undo step each). Return a message for the status bar / console. ---
 bool divideUndoable(Document& doc, bool smooth, std::string& message);
 bool setSubdivLevelUndoable(Document& doc, int level, std::string& message);

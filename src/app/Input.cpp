@@ -11,8 +11,10 @@
 // and 3D View), with the brush letters on SculptForge's nearest brush. The mouse side is in App.cpp
 // (onMouseDown: middle-drag orbit, Alt+left-drag as the middle button) and blenderMods (Ctrl inverts).
 #include "app/App.h"
+#include "app/AirStroke.h"
 #include "app/BlenderKeymap.h"
 #include "app/Pickers.h"
+#include "app/Theme.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
 #include "core/Polygroups.h"
@@ -34,6 +36,8 @@ namespace sf {
 namespace {
 
 constexpr double kQuickMenuTapSeconds = 0.25; // Space released sooner: a tap, the QuickMenu stays open
+
+bool ctrlDown(SDL_Keymod mod) { return (mod & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) != 0; } // as App.cpp
 
 bool anyMasked(const Mesh& mesh) {
     return std::any_of(mesh.mask.begin(), mesh.mask.end(), [](float m) { return m > 0.0f; });
@@ -151,6 +155,22 @@ void App::registerInputActions() {
         "and with Ctrl held too a drag zooms (#43). Off by default: in ZBrush, Space opens the QuickMenu (with this "
         "on, a right click still does). Typing a space in a text field is never taken.",
         [this] { uiPrefs_.spaceCamera = !uiPrefs_.spaceCamera; }, [this] { return uiPrefs_.spaceCamera; });
+    add("input.air_strokes", "Start strokes off the model", nullptr, "Preferences > Input", "",
+        "A left-drag that starts on the background begins a brush stroke instead of turning the view; the brush "
+        "touches the model once the cursor reaches it (#62). Ctrl (mask) and Shift (smooth) work the same way, and "
+        "a Ctrl+click on the background still inverts the mask. The view still turns with a right-drag or a pen "
+        "button set to Right click, pans with Alt+drag or a middle-drag, and moves with Space held if Hold Space is "
+        "on; with Blender or Maya keys, Alt+left-drag orbits. Shift+L turns it on and off.",
+        [this] { uiPrefs_.airStrokes = !uiPrefs_.airStrokes; }, [this] { return uiPrefs_.airStrokes; });
+    add("input.toggle_air_strokes", "Toggle strokes off the model", nullptr, "Preferences > Input", "Shift+L",
+        "Turn Preferences > Input > Start strokes off the model on or off: with it on, a left-drag on the background "
+        "sculpts once it reaches the model instead of turning the view (#62).",
+        [this] {
+            uiPrefs_.airStrokes = !uiPrefs_.airStrokes;
+            status_ = uiPrefs_.airStrokes ? "Strokes start off the model: right-drag or Alt+drag to move the view"
+                                          : "Strokes off the model: off (a drag on the background turns the view)";
+        },
+        [this] { return uiPrefs_.airStrokes; });
     add("input.surface_cursor", "Cursor follows surface", nullptr, "Preferences > Input", "",
         "The brush ring lies on the model under the pointer, turned to the surface and pressed onto its bumps, at "
         "the brush's real size there (as in SculptGL), with a short line along the surface's direction. With "
@@ -423,6 +443,9 @@ void App::drawInputSection() {
     if (ui::Checkbox("Hold Space and drag to move the camera##input.space_camera", &spaceCamera))
         uiPrefs_.spaceCamera = spaceCamera;
     ui::HelpAction(*this, "input.space_camera");
+    bool airStrokes = uiPrefs_.airStrokes;
+    if (ui::Checkbox("Start strokes off the model##input.air_strokes", &airStrokes)) uiPrefs_.airStrokes = airStrokes;
+    ui::HelpAction(*this, "input.air_strokes");
     bool surfaceCursor = uiPrefs_.cursorFollowsSurface;
     if (ui::Checkbox("Cursor follows surface##input.surface_cursor", &surfaceCursor))
         uiPrefs_.cursorFollowsSurface = surfaceCursor;
@@ -603,6 +626,64 @@ void App::drawQuickMenu() {
     ImGui::PopStyleColor();
     ImGui::PopStyleVar(2);
     if (close) quickMenu_.open = false;
+}
+
+// ---------------------------------------------------------------------------
+// Start strokes off the model (#62)
+// ---------------------------------------------------------------------------
+
+// A left press on the background (no surface under it): with the preference on, the stroke waits until the drag
+// reaches the model. Alt+drag still navigates and Ctrl+Shift still draws the hide / show shapes; the mask shapes
+// (MaskLasso, MaskRect) and every other tool took the press before this.
+bool App::airStrokeMouseDown(float x, float y, SDL_Keymod mod) {
+    const SDL_Keymod keys = SDL_GetModState(); // the keyboard itself (blenderMods turns Ctrl into Alt)
+    if (!airStrokeStarts(uiPrefs_.airStrokes, (keys & SDL_KMOD_ALT) != 0, ctrlDown(mod) && (mod & SDL_KMOD_SHIFT),
+                         previewLod_ >= 0 || !insertType_.empty()))
+        return false;
+    drag_ = Drag::AirStroke;
+    airMask_ = ctrlDown(mod) && !(mod & SDL_KMOD_SHIFT);
+    airMoved_ = false;
+    airX_ = x;
+    airY_ = y;
+    return true;
+}
+
+// The waiting stroke begins at the first point over the surface, exactly as a press there would: the stroke path,
+// LazyMouse and the first dab start from that point, so nothing jumps from where the drag began.
+void App::airStrokeTo(float x, float y) {
+    if (!airMoved_ && std::hypot(x - airX_, y - airY_) >= 4.0f) airMoved_ = true;
+    doc_.syncBvh();
+    RayHit hit;
+    if (!pick(x, y, hit)) return;
+    drag_ = Drag::None;
+    if (airMask_) {
+        beginMaskStroke(x, y);
+        if (drag_ == Drag::Stroke && maskClickPending_) { // (a Ctrl+press on the model waits to tell a click)
+            maskClickPending_ = false;
+            firstDab(x, y);
+        }
+    } else {
+        beginStroke(x, y, hit);
+        if (drag_ == Drag::Orbit) drag_ = Drag::None; // (the active layer's weight is 0: never turn the view)
+    }
+}
+
+// Let go before reaching the model: nothing happens, except a Ctrl+click, which inverts the mask as before.
+void App::airStrokeRelease() {
+    if (airMask_ && !airMoved_) runCommand("mask_invert");
+}
+
+void App::drawAirStrokeIndicator() {
+    if (!uiPrefs_.airStrokes) return;
+    const CanvasRect c = canvasRect();
+    const char* text = tr("Strokes start off the model");
+    const ImVec2 size = ImGui::CalcTextSize(text);
+    const float pad = 6.0f * uiScale_;
+    const ImVec2 at(c.x + (c.w - size.x) * 0.5f, c.y + 10.0f * uiScale_);
+    ImDrawList* dl = ImGui::GetForegroundDrawList();
+    dl->AddRectFilled(ImVec2(at.x - pad, at.y - pad * 0.5f), ImVec2(at.x + size.x + pad, at.y + size.y + pad * 0.5f),
+                      IM_COL32(0, 0, 0, 110), 4.0f * uiScale_);
+    dl->AddText(at, theme::u32(theme::accent), text);
 }
 
 } // namespace sf

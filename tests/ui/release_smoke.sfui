@@ -1,0 +1,9 @@
+# The release smoke test on the real UI (.github/workflows/release.yml runs it on every packaged app before
+# publishing; ctest runs it like any UI test): the app starts, opens a model dropped on the window and sculpts.
+drop ../data/marble-bust.glb
+expect_value triangles == 17456
+click "Clay##brush.clay"
+stroke 0.4 0.35 0.6 0.4
+expect_value can_undo == 1
+expect_value dirty == 1
+shot smoke

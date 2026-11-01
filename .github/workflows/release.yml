@@ -1,181 +1,228 @@
 name: Release
 
+# A v* tag publishes a GitHub release (docs/releasing.md has the whole process; scripts/release.sh drives it).
+#
+#   locate   the tagged commit must carry the version the tag names (CMakeLists.txt). If CI and the Packages
+#            workflow (packages.yml) both succeeded on a push to main for exactly this commit, the release uses those
+#            packages: built and tested once, promoted unchanged. Otherwise:
+#   build    the Packages workflow runs here, from the tag (compiler cache restored from main, never saved).
+#   smoke    every package installed or unpacked on a fresh runner: the app opens a model and sculpts
+#            (tests/ui/release_smoke.sfui), sculptforge-cli opens, sculpts, saves and reopens (tests/release_smoke.py).
+#   publish  only after every smoke test passed: checksums, notes from CHANGELOG.md, the GitHub release.
+#
+# Only publish holds a token that can write (contents: write); every other job reads. Build and smoke jobs take their
+# runner from the SF_RUNNER_* repository variables (standard GitHub runners when unset); locate and publish always run
+# on GitHub's own runners.
+# workflow_dispatch rebuilds and republishes an existing tag; dry_run does everything but publish, and promote_run
+# (dry runs only) smoke-tests the packages of any Packages run, so the pipeline can be tried from a branch.
+
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing tag to (re)build, e.g. v0.1.0
+        description: Existing tag to (re)build, e.g. v0.1.0 (a dry run also takes a branch or commit)
         required: true
+      dry_run:
+        description: Everything but publishing
+        type: boolean
+        default: false
+      promote_run:
+        description: (dry runs only) smoke-test the packages of this Packages or Release run id
+        required: false
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   TAG: ${{ github.event.inputs.tag || github.ref_name }}
 
 jobs:
-  linux:
-    name: Linux ${{ matrix.arch }} (.deb, AppImage, .tar.gz)
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { arch: x86_64, os: ubuntu-22.04, ld: x86_64 }
-          - { arch: arm64, os: ubuntu-22.04-arm, ld: aarch64 }
+  locate:
+    name: Locate tested packages
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      run-id: ${{ steps.find.outputs.run-id }}
+      sha: ${{ steps.find.outputs.sha }}
+      tag: ${{ steps.find.outputs.tag }}
     steps:
       - uses: actions/checkout@v7
         with: { ref: '${{ env.TAG }}' }
-      - run: sudo ./packaging/linux/install-build-deps.sh
-      - name: Build and test
+      - id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          PROMOTE_RUN: ${{ inputs.promote_run }}
         run: |
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DSCULPTFORGE_USE_SYSTEM_SDL=OFF
-          cmake --build build --parallel 4
-          ctest --test-dir build --output-on-failure -LE ui
-      - name: UI tests (real app, Xvfb + Mesa)
-        run: |
-          sudo apt-get install -y xvfb libgl1-mesa-dri
-          xvfb-run -a -s "-screen 0 1920x1080x24" env LIBGL_ALWAYS_SOFTWARE=1 \
-            ctest --test-dir build --output-on-failure -L ui
-      - name: .deb and .tar.gz
-        run: cd build && cpack -G "DEB;TGZ"
-      - name: AppImage
-        run: |
-          DESTDIR=$PWD/AppDir cmake --install build
-          # Named the AppImage way (SculptForge-1.2.3-x86_64.AppImage, no "linux"), with update information so
-          # AppImageUpdate and similar tools can update it from the newest GitHub release (the .zsync file). The
-          # AppDir's root gets PNG icons (AppImage managers cannot use the SVG), and appimagetool checks it (#17).
-          packaging/linux/build-appimage.sh AppDir "${TAG#v}" ${{ matrix.ld }} build
-      - uses: actions/upload-artifact@v7
-        with:
-          name: linux-${{ matrix.arch }}
-          path: |
-            build/*.deb
-            build/*.tar.gz
-            build/*.AppImage
-            build/*.AppImage.zsync
+          sha=$(git rev-parse HEAD)
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          version=$(sed -n 's/^project(SculptForge VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
+          if [ "$DRY_RUN" = true ] && ! git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            # A dry run of a branch or commit: its packages are named for the version it carries.
+            echo "Dry run of $TAG ($sha), packages named v$version"
+            echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          elif [ "v$version" != "$TAG" ]; then
+            echo "::error::$TAG tags a commit whose CMakeLists.txt says $version. Fix: delete the tag, bump the version (or tag v$version), tag again."
+            exit 1
+          else
+            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          fi
+          if [ "$DRY_RUN" = true ] && [ -n "$PROMOTE_RUN" ]; then
+            run=$(gh api "repos/$REPO/actions/runs/$PROMOTE_RUN" \
+                  --jq 'select((.path == ".github/workflows/packages.yml" or .path == ".github/workflows/release.yml")
+                                and .conclusion == "success") | .id')
+            [ -n "$run" ] || { echo "::error::$PROMOTE_RUN is not a successful Packages (or Release) run"; exit 1; }
+            echo "Dry run: smoke-testing the packages of run $run (not of $sha)"
+            echo "run-id=$run" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Successful runs on a push to main for exactly this commit, from this repository's own workflow files.
+          runs() {
+            gh api "repos/$REPO/actions/workflows/$1/runs?head_sha=$sha&event=push&branch=main&status=success&per_page=5" \
+              --jq '.workflow_runs[] | select(.head_sha == "'"$sha"'" and .head_branch == "main" and .event == "push"
+                    and .path == ".github/workflows/'"$1"'" and .head_repository.full_name == "'"$REPO"'") | .id' | head -1
+          }
+          ci=$(runs ci.yml || true)
+          pkg=$(runs packages.yml || true)
+          if [ -n "$ci" ] && [ -n "$pkg" ]; then
+            echo "Promoting the packages of Packages run $pkg (CI run $ci passed for $sha)"
+            echo "run-id=$pkg" >> "$GITHUB_OUTPUT"
+          else
+            echo "No successful CI ($ci) and Packages ($pkg) runs on main for $sha: building the packages here"
+          fi
 
-  flatpak:
-    name: Flatpak ${{ matrix.arch }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { arch: x86_64, os: ubuntu-24.04 }
-          - { arch: aarch64, os: ubuntu-24.04-arm }
-    steps:
-      - uses: actions/checkout@v7
-        with: { ref: '${{ env.TAG }}' }
-      - name: flatpak and flatpak-builder
-        run: sudo apt-get update && sudo apt-get install -y flatpak flatpak-builder xvfb
-      - name: Build the bundle (packaging/flatpak/org.sculptforge.SculptForge.yml)
-        run: packaging/flatpak/build.sh dist
-      - name: Install it and run a UI test inside the sandbox (Xvfb, Mesa from the runtime)
-        run: |
-          flatpak install --user -y --noninteractive dist/*.flatpak
-          xvfb-run -a -s "-screen 0 1920x1080x24" \
-            flatpak run --env=LIBGL_ALWAYS_SOFTWARE=1 org.sculptforge.SculptForge \
-              --ui-test "$PWD/tests/ui/sculpt_basics.sfui" --ui-out "$PWD/flatpak-ui"
-      - uses: actions/upload-artifact@v7
-        with:
-          name: flatpak-${{ matrix.arch }}
-          path: dist/*.flatpak
+  build:
+    name: Build
+    needs: locate
+    if: needs.locate.outputs.run-id == ''
+    uses: ./.github/workflows/packages.yml
+    with:
+      ref: ${{ needs.locate.outputs.sha }}
+      tag: ${{ needs.locate.outputs.tag }}
 
-  vfx:
-    name: ${{ matrix.label }} ${{ matrix.arch }}
+  smoke:
+    name: Smoke test ${{ matrix.name }}
+    needs: [locate, build]
+    if: ${{ !cancelled() && needs.locate.result == 'success' && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
     runs-on: ${{ matrix.os }}
     container: ${{ matrix.image }}
+    permissions:
+      contents: read
+      actions: read # the packages may be another run's artifacts
     strategy:
       fail-fast: false
       matrix:
         include:
-          # CY2026: EL8 / glibc 2.28 also gives the .rpm for RHEL 8, 9, 10 and Fedora.
-          - { label: 'RPM + VFX CY2026', suffix: vfx2026, generators: 'RPM;TGZ', image: 'rockylinux:8', arch: x86_64, os: ubuntu-24.04 }
-          - { label: 'RPM + VFX CY2026', suffix: vfx2026, generators: 'RPM;TGZ', image: 'rockylinux:8', arch: arm64, os: ubuntu-24.04-arm }
-          - { label: 'VFX CY2027', suffix: vfx2027, generators: 'TGZ', image: 'rockylinux:9', arch: x86_64, os: ubuntu-24.04 }
-          - { label: 'VFX CY2027', suffix: vfx2027, generators: 'TGZ', image: 'rockylinux:9', arch: arm64, os: ubuntu-24.04-arm }
+          - { name: Windows installer and .zip, kind: windows, artifact: windows, os: "${{ vars.SF_RUNNER_WIN || 'windows-2022' }}" }
+          - { name: macOS .dmg, kind: macos, artifact: macos, os: "${{ vars.SF_RUNNER_MAC || 'macos-15' }}" }
+          - { name: Linux x86_64 .deb and AppImage, kind: linux, artifact: linux-x86_64, os: "${{ vars.SF_RUNNER_LINUX || 'ubuntu-24.04' }}" }
+          - { name: Linux arm64 .deb and AppImage, kind: linux, artifact: linux-arm64, os: "${{ vars.SF_RUNNER_LINUX_ARM || 'ubuntu-24.04-arm' }}" }
+          - { name: .rpm (Rocky Linux 9), kind: rpm, artifact: vfx-vfx2026-x86_64, os: "${{ vars.SF_RUNNER_LINUX || 'ubuntu-24.04' }}", image: 'rockylinux:9' }
     steps:
-      - run: dnf -y install git
+      - if: matrix.kind == 'rpm'
+        run: dnf -y install git tar python3 xorg-x11-server-Xvfb mesa-dri-drivers
+      # The smoke scripts and the test model come from the workflow's own commit (the tag, when a tag runs this).
       - uses: actions/checkout@v7
-        with: { ref: '${{ env.TAG }}' }
-      - run: ./packaging/linux/install-build-deps.sh
-      - name: Python 3.13
-        run: |
-          curl -LsSf https://astral.sh/uv/0.9.5/install.sh | sh
-          ~/.local/bin/uv venv --python 3.13 /opt/py313
-          ~/.local/bin/uv pip install --python /opt/py313/bin/python numpy
-          echo "PYTHON313=/opt/py313/bin/python" >> "$GITHUB_ENV"
-      - name: Build, test and package with GCC 14
-        run: |
-          source /opt/rh/gcc-toolset-14/enable
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DSCULPTFORGE_USE_SYSTEM_SDL=OFF \
-            -DSCULPTFORGE_BUILD_PYTHON=ON -DPython_EXECUTABLE="$PYTHON313" -DSCULPTFORGE_PYTHON_INSTALL_DIR=lib/sculptforge/python
-          cmake --build build --parallel 4
-          # UI tests need a display; they run under Xvfb in the Linux jobs above and in CI.
-          ctest --test-dir build --output-on-failure -LE ui
-          cd build
-          cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME=SculptForge-${TAG#v}-linux-${{ matrix.arch }}-${{ matrix.suffix }}
-          if [ "${{ matrix.generators }}" = "RPM;TGZ" ]; then cpack -G RPM; fi
-      - uses: actions/upload-artifact@v7
         with:
-          name: vfx-${{ matrix.suffix }}-${{ matrix.arch }}
-          path: |
-            build/*.rpm
-            build/*.tar.gz
-
-  macos:
-    name: macOS (universal .dmg)
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v7
-        with: { ref: '${{ env.TAG }}' }
-      - name: Build and test
-        run: |
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSCULPTFORGE_USE_SYSTEM_SDL=OFF \
-            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
-          cmake --build build --parallel 4
-          # UI tests need a display; they run under Xvfb in the Linux jobs above and in CI.
-          ctest --test-dir build --output-on-failure -LE ui
-      - name: Package (signed ad-hoc inside CPack, see cmake/MacSign.cmake)
-        run: cd build && cpack -G DragNDrop
-      - uses: actions/upload-artifact@v7
+          sparse-checkout: |
+            tests/release_smoke.py
+            tests/ui/release_smoke.sfui
+            tests/data/marble-bust.glb
+          sparse-checkout-cone-mode: false
+      - uses: actions/download-artifact@v8
         with:
-          name: macos
-          path: build/*.dmg
-
-  windows:
-    name: Windows x64 (installer, .zip)
-    runs-on: windows-2022
-    steps:
-      - uses: actions/checkout@v7
-        with: { ref: '${{ env.TAG }}' }
-      - name: Build and test
+          name: ${{ matrix.artifact }}
+          path: pkg
+          run-id: ${{ needs.locate.outputs.run-id || github.run_id }}
+          github-token: ${{ github.token }}
+      - name: Windows installer (silent) and .zip
+        if: matrix.kind == 'windows'
+        shell: pwsh
         run: |
-          cmake -S . -B build -DSCULPTFORGE_USE_SYSTEM_SDL=OFF
-          cmake --build build --config Release --parallel 4
-          # UI tests need a display; they run under Xvfb in the Linux jobs above and in CI.
-          ctest --test-dir build -C Release --output-on-failure -LE ui
-      - name: Package
-        run: cd build && cpack -C Release -G "NSIS;ZIP"
-      - uses: actions/upload-artifact@v7
+          $installer = Get-ChildItem pkg/SculptForge-*-windows-x86_64.exe | Select-Object -First 1
+          Start-Process $installer.FullName -ArgumentList '/S', '/D=C:\SFInstalled' -Wait
+          Expand-Archive (Get-ChildItem pkg/SculptForge-*-windows-x86_64.zip | Select-Object -First 1).FullName -DestinationPath zip
+          $zipbin = (Get-ChildItem zip -Recurse -Filter sculptforge.exe | Select-Object -First 1).DirectoryName
+          # No GPU driver on the runner: Mesa's software OpenGL (pal1000/mesa-dist-win), pinned by hash, next to the exe.
+          $url = 'https://github.com/pal1000/mesa-dist-win/releases/download/26.2.4/mesa3d-26.2.4-release-msvc.7z'
+          Invoke-WebRequest $url -OutFile mesa.7z
+          if ((Get-FileHash mesa.7z -Algorithm SHA256).Hash -ne '351FC8C8B695878FFB3EAA044B3EAD08672A48B1A045E3C3E3975811DF0F6695') {
+            throw 'mesa3d archive hash mismatch'
+          }
+          $env:GALLIUM_DRIVER = 'llvmpipe'
+          foreach ($bin in @('C:\SFInstalled\bin', $zipbin)) {
+            Write-Host "== $bin"
+            7z e mesa.7z x64/opengl32.dll x64/libgallium_wgl.dll "-o$bin" -y | Out-Null
+            & "$bin\sculptforge.exe" --ui-test "$PWD\tests\ui\release_smoke.sfui" --ui-out "$PWD\shots\$(Split-Path $bin -Leaf)"
+            if ($LASTEXITCODE -ne 0) { throw "the app's smoke test failed in $bin" }
+            python tests/release_smoke.py --cli "$bin\sculptforge-cli.exe" --out "smoke-$(Split-Path $bin -Leaf)"
+            if ($LASTEXITCODE -ne 0) { throw "the CLI smoke test failed in $bin" }
+          }
+      - name: macOS .dmg
+        if: matrix.kind == 'macos'
+        run: |
+          mnt=$(mktemp -d)
+          hdiutil attach -nobrowse -readonly -mountpoint "$mnt" pkg/*.dmg
+          cp -R "$mnt/SculptForge.app" "$RUNNER_TEMP/"
+          hdiutil detach "$mnt"
+          app="$RUNNER_TEMP/SculptForge.app/Contents/MacOS"
+          codesign --verify --deep "$RUNNER_TEMP/SculptForge.app"
+          python3 tests/release_smoke.py --cli "$app/sculptforge-cli" --out smoke
+          "$app/sculptforge" --ui-test "$PWD/tests/ui/release_smoke.sfui" --ui-out "$PWD/shots"
+      - name: Linux .deb and AppImage
+        if: matrix.kind == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ./pkg/sculptforge_*.deb xvfb libgl1-mesa-dri
+          ui() { xvfb-run -a -s "-screen 0 1920x1080x24" env LIBGL_ALWAYS_SOFTWARE=1 "$@" \
+                   --ui-test "$PWD/tests/ui/release_smoke.sfui"; }
+          echo "== .deb"
+          ui /usr/bin/sculptforge --ui-out "$PWD/shots/deb"
+          python3 tests/release_smoke.py --cli /usr/bin/sculptforge-cli --out smoke-deb
+          echo "== AppImage (extracted: runners have no FUSE)"
+          chmod +x pkg/*.AppImage
+          (cd "$RUNNER_TEMP" && "$GITHUB_WORKSPACE"/pkg/*.AppImage --appimage-extract >/dev/null)
+          ui "$RUNNER_TEMP/squashfs-root/AppRun" --ui-out "$PWD/shots/appimage"
+          python3 tests/release_smoke.py --cli "$RUNNER_TEMP/squashfs-root/usr/bin/sculptforge-cli" --out smoke-appimage
+      - name: .rpm
+        if: matrix.kind == 'rpm'
+        run: |
+          dnf -y install ./pkg/sculptforge-*.rpm
+          python3 tests/release_smoke.py --cli /usr/bin/sculptforge-cli --out smoke-rpm
+          Xvfb :99 -screen 0 1920x1080x24 & sleep 2
+          DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 /usr/bin/sculptforge \
+            --ui-test "$PWD/tests/ui/release_smoke.sfui" --ui-out "$PWD/shots/rpm"
+      - name: Screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
         with:
-          name: windows
-          path: |
-            build/*.exe
-            build/*.zip
+          name: smoke-shots-${{ matrix.artifact }}
+          path: shots
+          if-no-files-found: ignore
 
   publish:
     name: Publish GitHub Release
-    needs: [linux, flatpak, vfx, macos, windows]
+    needs: [locate, build, smoke]
+    if: ${{ !cancelled() && needs.smoke.result == 'success' && inputs.dry_run != true }}
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: read
     steps:
       - uses: actions/checkout@v7
         with: { ref: '${{ env.TAG }}' }
       - uses: actions/download-artifact@v8
-        with: { path: dist, merge-multiple: true }
+        with:
+          path: dist
+          merge-multiple: true
+          pattern: '{linux,flatpak,vfx,macos,windows}*'
+          run-id: ${{ needs.locate.outputs.run-id || github.run_id }}
+          github-token: ${{ github.token }}
       - name: Version-less copies (fixed links such as releases/latest/download/SculptForge-macos.dmg)
         run: |
           cd dist
