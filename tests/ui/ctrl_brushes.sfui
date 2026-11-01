@@ -38,7 +38,7 @@ expect_value mask_shape == 2
 
 # The picked MaskRect masks with Ctrl+drag (starting on the background) and Tool > Masking agrees.
 hold ctrl
-drag_path -0.2 -0.2 0.5 1.2
+drag_path -0.2 -0.05 0.5 1.2
 hold none
 expect_value masked > 1000
 key ctrl+z
@@ -73,7 +73,7 @@ hold none
 expect_value hidden > 1000
 remember hidden kept
 hold ctrl+shift+alt
-drag_path -0.2 -0.2 0.45 -0.2 0.45 1.2 -0.2 1.2
+drag_path -0.2 -0.05 0.45 -0.05 0.45 1.2 -0.2 1.2
 hold none
 expect_value hidden > $kept
 click "Visibility"
@@ -89,7 +89,7 @@ expect_value hide_shape == 2
 # SelectRect from the background, then with Alt from the model. (X symmetry is on: the mirror image of the
 # rectangle is kept too, so it stops short of the middle to leave something to hide.)
 hold ctrl+shift
-drag_path -0.2 -0.2 0.3 1.2
+drag_path -0.2 -0.05 0.3 1.2
 hold none
 expect_value hidden > 1000
 remember hidden kept

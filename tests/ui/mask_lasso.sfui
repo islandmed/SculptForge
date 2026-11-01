@@ -19,7 +19,7 @@ hold none
 
 # Ctrl+drag a lasso that starts on the background around the left half: it masks inside, front and back.
 hold ctrl
-drag_path -0.2 -0.2 0.45 -0.2 0.55 0.5 0.45 1.2 -0.2 1.2 keep
+drag_path -0.2 -0.05 0.45 -0.05 0.55 0.5 0.45 1.2 -0.2 1.2 keep
 shot lasso_drawing
 release
 hold none
@@ -42,7 +42,7 @@ shot rect_unmasked
 
 # Ctrl+drag a rectangle over the top masks it; undo takes back just that selection.
 hold ctrl
-drag_path 0.6 -0.3 1.3 0.3
+drag_path 0.6 -0.05 1.3 0.3
 hold none
 expect_value masked > $unmasked
 key ctrl+z
@@ -50,7 +50,7 @@ expect_value masked == $unmasked
 
 # A Ctrl+drag selection that covers none of the model clears the mask (ZBrush); undo brings it back.
 hold ctrl
-drag_path 1.3 -0.3 1.6 0.0
+drag_path 1.3 -0.05 1.6 0.0
 hold none
 expect_value masked == 0
 key ctrl+z
@@ -70,7 +70,7 @@ click "Clear##mask"
 key x
 expect_value symmetry_x == 1
 hold ctrl
-drag_path -0.2 -0.2 0.45 -0.2 0.55 0.5 0.45 1.2 -0.2 1.2
+drag_path -0.2 -0.05 0.45 -0.05 0.55 0.5 0.45 1.2 -0.2 1.2
 hold none
 expect_value masked > $lasso*1.6
 remember masked lasso_mirrored
@@ -108,7 +108,7 @@ click "Clear##mask"
 # MaskPen, Ctrl+drag starting on the background (#48): a mask rectangle is drawn while dragging and masks what it
 # covers (the left half); one that covers none of the model clears the mask, as before.
 hold ctrl
-drag_path -0.3 -0.3 0.45 1.3 keep
+drag_path -0.3 -0.05 0.45 1.3 keep
 expect_value selection_shown == 1
 shot pen_rect_drawing
 release
@@ -118,7 +118,7 @@ expect_value masked > 2000
 expect_value masked < 7000
 remember masked pen_rect
 hold ctrl
-drag_path 1.3 -0.3 1.6 0.0 keep
+drag_path 1.3 -0.05 1.6 0.0 keep
 expect_value selection_shown == 1
 release
 hold none
@@ -138,7 +138,7 @@ click "Visibility"
 click "Select Lasso##select.lasso"
 expect_value hidden == 0
 hold ctrl+shift
-drag_path -0.2 -0.2 0.7 -0.2 0.7 1.2 -0.2 1.2 keep
+drag_path -0.2 -0.05 0.7 -0.05 0.7 1.2 -0.2 1.2 keep
 shot hide_lasso_drawing
 release
 hold none

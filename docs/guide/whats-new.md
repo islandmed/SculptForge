@@ -33,6 +33,14 @@ chapter opens by itself the first time you start a new version; you can always f
 - **Start strokes off the model** (#62): an option in **Preferences > Input**, off by default, and
   <kbd>Shift</kbd>+<kbd>L</kbd> to turn it on and off. With it on, a left-drag that starts on the background
   sculpts once it reaches the model instead of turning the view. See [Navigation](navigation.md#mouse-and-pen).
+- **Radial and local symmetry** (#63): **R** in **Transform > Symmetry** (and on the top shelf) repeats every
+  stroke around the X, Y or Z axis, 2 to 64 times (**Radial Count**), together with the X / Y / Z mirrors. Every
+  brush, mask, vertex paint and texture stroke, the mask and select shapes, Dynamic Topology and Insert follow it,
+  and the brush cursor shows on every copy. **Local** puts the planes and the axis through the active Part's centre.
+  Saved with the project and scriptable (`radial`, `radial_axis`, `local`). See [Sculpting](sculpting.md#radial-symmetry).
+- **The Sculpt Timeline is at the top of the viewport** (#63), away from the brushes on the bottom shelf. **Preferences >
+  Interface > Timeline position** puts it back at the bottom; Store Config keeps the choice. See
+  [Sculpt Timeline](timeline.md).
 
 ## Version 0.10.4
 

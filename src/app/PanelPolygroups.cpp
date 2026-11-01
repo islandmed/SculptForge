@@ -50,8 +50,7 @@ void App::polygroupMouseUp() {
     // Drag: keep the inside of the rectangle or lasso, or with Alt hide it. A shape around nothing (dragged on
     // the background) reverses the visibility instead (ZBrush).
     // The mirror image of the shape counts too with X / Y / Z symmetry on, as with MaskLasso / MaskRect (#51).
-    const std::string symmetry = std::string(symmetry_.x ? "x" : "") + (symmetry_.y ? "y" : "") + (symmetry_.z ? "z" : "");
-    if (runSelection("hide_rect", "hide_lasso", {{"inside", alt}, {"symmetry", symmetry}}) && !lastCommandOk_ && !alt &&
+    if (runSelection("hide_rect", "hide_lasso", withSymmetryArgs({{"inside", alt}})) && !lastCommandOk_ && !alt &&
         doc_.mesh.hasHidden())
         runCommand("invert_visibility");
 }

@@ -33,7 +33,29 @@ std::string symmetryAxes(const Symmetry& s) { return std::string(s.x ? "x" : "")
 
 } // namespace
 
+void App::refreshSymmetryPivot() {
+    if (!symmetry_.local) return;
+    if (doc_.sculptor.strokeActive() || solverBusy()) return; // (the centre holds still during a stroke)
+    const uint64_t key = doc_.undo.revision() * 0x9E3779B97F4A7C15ull ^ (uint64_t(doc_.activeSubtool) << 40) ^
+                         uint64_t(doc_.mesh.vertexCount()) ^ (uint64_t(doc_.subtools.size()) << 56);
+    if (key == symmetryPivotKey_) return;
+    symmetryPivotKey_ = key;
+    symmetry_.pivot = symmetryPivot(doc_.mesh);
+}
+
+Args App::withSymmetryArgs(Args args) {
+    refreshSymmetryPivot();
+    args["symmetry"] = symmetryAxes(symmetry_);
+    if (symmetry_.radialOn()) {
+        args["radial"] = double(symmetry_.radial);
+        args["radial_axis"] = std::string(1, char('x' + symmetry_.radialAxis));
+    }
+    if (symmetry_.local) args["local"] = true;
+    return args;
+}
+
 void App::beginMaskStroke(float x, float y) {
+    refreshSymmetryPivot();
     // Masks are not layered, so the stroke always targets the base (its weight is never 0).
     // Ctrl+Alt erases, and so does the pen's eraser end (set to Invert or Erase mask).
     strokeInvert_ = (inputMods() & SDL_KMOD_ALT) != 0 ||
@@ -111,8 +133,7 @@ void App::maskSelectMouseUp() {
     // Mask the inside, or unmask it with Alt (Mask Strength sets how much), mirrored by the symmetry like a mask
     // stroke (#51). A shape that covers none of the model clears the mask instead (ZBrush).
     runSelection("mask_rect", "mask_lasso",
-                 {{"unmask", alt}, {"strength", double(maskStrength_)}, {"symmetry", symmetryAxes(symmetry_)},
-                  {"clear_outside", !alt}});
+                 withSymmetryArgs({{"unmask", alt}, {"strength", double(maskStrength_)}, {"clear_outside", !alt}}));
 }
 
 App::HeldBrush App::heldBrush() const {

@@ -148,7 +148,7 @@ bool groupExists(const Mesh& m, uint32_t group) {
 // Hides or keeps the visible triangles by whether their centre projects inside a screen shape.
 template <class Inside>
 std::vector<uint8_t> hiddenByShape(const Mesh& mesh, const glm::mat4& viewProj, Inside inside, bool hideInside,
-                                   const std::vector<glm::vec3>& mirrors) {
+                                   const std::vector<SymCopy>& mirrors) {
     std::vector<uint8_t> hidden = currentHidden(mesh);
     for (uint32_t t = 0; t < mesh.triangleCount(); ++t) {
         if (hidden[t]) continue;
@@ -157,7 +157,7 @@ std::vector<uint8_t> hiddenByShape(const Mesh& mesh, const glm::mat4& viewProj, 
         glm::vec2 ndc;
         bool in = projectToNdc(viewProj, c, ndc) && inside(ndc);
         for (size_t k = 0; k < mirrors.size() && !in; ++k) // or its mirror image, with symmetry (#51)
-            in = mirrors[k] != glm::vec3(1.0f) && projectToNdc(viewProj, c * mirrors[k], ndc) && inside(ndc);
+            in = !mirrors[k].identity() && projectToNdc(viewProj, mirrors[k].point(c), ndc) && inside(ndc);
         if (in == hideInside) hidden[t] = 1;
     }
     return unlessAllHidden(std::move(hidden));
@@ -262,7 +262,7 @@ std::vector<uint8_t> hiddenInverted(const Mesh& mesh) {
 }
 
 std::vector<uint8_t> hiddenByRect(const Mesh& mesh, const glm::mat4& viewProj, glm::vec2 rectMin, glm::vec2 rectMax,
-                                  bool hideInside, const std::vector<glm::vec3>& mirrors) {
+                                  bool hideInside, const std::vector<SymCopy>& mirrors) {
     const glm::vec2 lo = glm::min(rectMin, rectMax), hi = glm::max(rectMin, rectMax);
     return hiddenByShape(
         mesh, viewProj, [&](glm::vec2 p) { return p.x >= lo.x && p.x <= hi.x && p.y >= lo.y && p.y <= hi.y; },
@@ -270,7 +270,7 @@ std::vector<uint8_t> hiddenByRect(const Mesh& mesh, const glm::mat4& viewProj, g
 }
 
 std::vector<uint8_t> hiddenByLasso(const Mesh& mesh, const glm::mat4& viewProj, const std::vector<glm::vec2>& lasso,
-                                   bool hideInside, const std::vector<glm::vec3>& mirrors) {
+                                   bool hideInside, const std::vector<SymCopy>& mirrors) {
     const ScreenPolygon polygon(lasso);
     return hiddenByShape(mesh, viewProj, [&](glm::vec2 p) { return polygon.contains(p); }, hideInside, mirrors);
 }
@@ -454,8 +454,8 @@ void registerPolygroupCommands(CommandRegistry& reg) {
                  if (doc.mesh.triangleCount() == 0) return {false, "The mesh is empty"};
                  glm::mat4 vp;
                  std::string error;
-                 std::vector<glm::vec3> mirrors;
-                 if (!viewProjArg(doc.mesh, a, vp, error) || !symmetryMirrorsArg(a, mirrors, error)) return {false, error};
+                 std::vector<SymCopy> mirrors;
+                 if (!viewProjArg(doc.mesh, a, vp, error) || !symmetryCopiesArg(a, doc.mesh, mirrors, error)) return {false, error};
                  const glm::vec2 lo(float(argNumber(a, "x0", -1)), float(argNumber(a, "y0", -1)));
                  const glm::vec2 hi(float(argNumber(a, "x1", 1)), float(argNumber(a, "y1", 1)));
                  const bool inside = argBool(a, "inside", false);
@@ -479,9 +479,9 @@ void registerPolygroupCommands(CommandRegistry& reg) {
                  glm::mat4 vp;
                  std::vector<glm::vec2> lasso;
                  std::string error;
-                 std::vector<glm::vec3> mirrors;
+                 std::vector<SymCopy> mirrors;
                  if (!viewProjArg(doc.mesh, a, vp, error) || !lassoArg(a, lasso, error) ||
-                     !symmetryMirrorsArg(a, mirrors, error))
+                     !symmetryCopiesArg(a, doc.mesh, mirrors, error))
                      return {false, error};
                  const bool inside = argBool(a, "inside", false);
                  std::vector<uint8_t> hidden = hiddenByLasso(doc.mesh, vp, lasso, inside, mirrors);

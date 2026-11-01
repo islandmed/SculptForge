@@ -36,7 +36,7 @@ for what is planned.
 | LazyMouse | **Lazy Stroke** stroke type (Stroke palette) |
 | LightBox | **Library**, <kbd>,</kbd> (comma) |
 | Live Boolean | Not yet |
-| Local symmetry, radial symmetry | Not yet. Symmetry is X, Y and Z across the world axes |
+| Local symmetry, radial symmetry | **Transform > Symmetry**: **R** (radial symmetry, Radial Count 2-64 around X, Y or Z, combined with the X / Y / Z mirrors) and **Local** (about the active Part's centre). See [Sculpting](sculpting.md#radial-symmetry) |
 | Mask by Cavity | **Tool > Masking > By cavity** (`mask_by_cavity`) |
 | Masking (Ctrl) | Hold <kbd>Ctrl</kbd> to paint the mask, <kbd>Ctrl</kbd>+<kbd>Alt</kbd> to erase. See [Masking](masking.md) |
 | MaskLasso, MaskRect | **Tool > Masking**: pick the shape, then <kbd>Ctrl</kbd>+drag (add <kbd>Alt</kbd> to unmask). See [Masking](masking.md) |

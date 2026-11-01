@@ -94,7 +94,7 @@ the ones you will use most:
 | Geometry | `qremesh` | `target` (default 5000), `adaptive`, `keep_groups`, `detect_edges`, `use_polypaint`, `symmetry`, `keep_original` |
 | Parts | `project_all` | `distance` (default 0.02), `mean`, `blur`, `geometry`, `polypaint`, `source` |
 | Geometry | `mesh_info` | |
-| Sculpting | `stroke` | `points` (required), `brush`, `radius`, `strength`, `invert`, `symmetry` |
+| Sculpting | `stroke` | `points` (required), `brush`, `radius`, `strength`, `invert`, `symmetry`, `radial`, `radial_axis`, `local` |
 | Brushes | `brush_set_alpha` | `name` (round, square, noise) or `path`, `invert` |
 | Brushes | `brush_ai` | `prompt` (required), `provider`, `model`, `endpoint` |
 | Brushes | `brush_install` | `path`, `code` or `json` |

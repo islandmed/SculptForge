@@ -207,6 +207,77 @@ std::vector<glm::vec3> Sculptor::mirrors(Symmetry sym) {
     return out;
 }
 
+std::vector<SymCopy> symmetryCopies(const Symmetry& sym) {
+    const glm::vec3 pivot = sym.local ? sym.pivot : glm::vec3(0.0f);
+    const int n = sym.radialOn() ? std::clamp(sym.radial, 1, Symmetry::kMaxRadial) : 1;
+    const int axis = std::clamp(sym.radialAxis, 0, 2);
+    std::vector<SymCopy> out;
+    for (const glm::vec3& s : Sculptor::mirrors(sym))
+        for (int k = 0; k < n; ++k) {
+            // A turn of k/n about the axis (exact for the quarter and half turns, so duplicates compare equal).
+            glm::mat3 r(1.0f);
+            if (k > 0) {
+                const double a = 2.0 * 3.14159265358979323846 * double(k) / double(n);
+                float c = float(std::cos(a)), si = float(std::sin(a));
+                if (4 * k % n == 0) { // a multiple of a quarter turn
+                    c = std::round(c);
+                    si = std::round(si);
+                }
+                const int u = (axis + 1) % 3, v = (axis + 2) % 3; // r turns u towards v
+                r[u][u] = c;
+                r[u][v] = si;
+                r[v][u] = -si;
+                r[v][v] = c;
+            }
+            SymCopy copy;
+            copy.m = glm::mat3(glm::vec3(s.x, 0, 0), glm::vec3(0, s.y, 0), glm::vec3(0, 0, s.z)) * r;
+            copy.pivot = pivot;
+            bool repeated = false;
+            for (const SymCopy& o : out) {
+                float d = 0.0f;
+                for (int i = 0; i < 3; ++i) d += glm::dot(o.m[i] - copy.m[i], o.m[i] - copy.m[i]);
+                repeated = repeated || d < 1e-8f;
+            }
+            if (!repeated) out.push_back(copy);
+        }
+    return out;
+}
+
+glm::vec3 symmetryPivot(const Mesh& mesh) {
+    const size_t n = mesh.positions.size();
+    if (n == 0) return glm::vec3(0.0f);
+    constexpr size_t kBlock = 1 << 16;
+    std::vector<AABB> boxes((n + kBlock - 1) / kBlock);
+    poolFor(n, [&](size_t b, size_t e) {
+        AABB box;
+        for (size_t i = b; i < e; ++i) box.expand(mesh.positions[i]);
+        boxes[b / kBlock] = box;
+    }, kBlock);
+    AABB all;
+    for (const AABB& b : boxes) {
+        all.expand(b.min);
+        all.expand(b.max);
+    }
+    return all.center();
+}
+
+std::vector<size_t> symmetryInverses(std::span<const SymCopy> copies) {
+    std::vector<size_t> out(copies.size(), 0);
+    for (size_t i = 0; i < copies.size(); ++i) {
+        const glm::mat3 t = glm::transpose(copies[i].m); // (orthogonal: the inverse)
+        float best = 1e30f;
+        for (size_t j = 0; j < copies.size(); ++j) {
+            float d = 0.0f;
+            for (int c = 0; c < 3; ++c) d += glm::dot(copies[j].m[c] - t[c], copies[j].m[c] - t[c]);
+            if (d < best) {
+                best = d;
+                out[i] = j;
+            }
+        }
+    }
+    return out;
+}
+
 namespace {
 
 // Sets bit `v` (atomically: neighbouring blocks of a parallel pass may share a word); true if it was clear.
@@ -273,7 +344,7 @@ void Sculptor::remeshDab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym,
     auto clock = std::chrono::steady_clock::now();
     if (dyntopo.constantDetail && strokeDiagonal_ <= 0.0f) strokeDiagonal_ = glm::length(mesh.bounds().extent());
     const float edge = dyntopoEdgeLength(dyntopo, p.radius, strokeDiagonal_) * scale;
-    const std::vector<glm::vec3> ms = mirrors(sym);
+    const std::vector<SymCopy> ms = copies(sym);
     // Over everything the brush can reach (square tips and alphas reach into their corners).
     dynTopo_.remesh(mesh, bvh, p.center, p.radius * reach, edge, ms);
     lastRemesh_ = true;
@@ -530,9 +601,9 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
     if (microReady(mesh)) { // a micro level: the grid takes the dab (core/MicroSculpt.cpp)
         const double k0 = micro_.findMs + micro_.kernelMs, s0 = micro_.stitchMs;
         const uint64_t pts = micro_.points;
-        for (const glm::vec3& m : mirrors(sym))
-            micro_.dab(mesh, bvh, type, p.center * m, p.viewDir * m, p.radius, p.strength * std::clamp(p.pressure, 0.0f, 1.0f),
-                       p.invert, p.focal, p.alphaUp * m, false, 0.0f);
+        for (const SymCopy& m : copies(sym))
+            micro_.dab(mesh, bvh, type, m.point(p.center), m.dir(p.viewDir), p.radius, p.strength * std::clamp(p.pressure, 0.0f, 1.0f),
+                       p.invert, p.focal, m.dir(p.alphaUp), false, 0.0f);
         timings.kernelMs += micro_.findMs + micro_.kernelMs - k0;
         timings.normalsMs += micro_.stitchMs - s0;
         timings.vertices += micro_.points - pts;
@@ -546,14 +617,10 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
     }
     dabVerts_.clear();
     dabLeaves_.clear();
-    for (const glm::vec3& m : mirrors(sym)) {
-        frameWanted_ = m == glm::vec3(1.0f); // (the unmirrored pass records lastFrame)
-        DabParams mp = p;
-        mp.center *= m;
-        mp.viewDir *= m;
-        mp.strokeDelta *= m;
-        mp.alphaUp *= m;
-        if (type == BrushType::Vdm) dabVdmSingle(mesh, bvh, mp, m.x * m.y * m.z);
+    for (const SymCopy& m : copies(sym)) {
+        frameWanted_ = m.identity(); // (the unmirrored pass records lastFrame)
+        const DabParams mp = m.identity() ? p : transformed(p, m);
+        if (type == BrushType::Vdm) dabVdmSingle(mesh, bvh, mp, m.handedness());
         else dabSingle(mesh, bvh, type, mp);
     }
     updateDabNormals(mesh, bvh);
@@ -855,13 +922,9 @@ void Sculptor::dabRecipe(Mesh& mesh, BVH& bvh, const BrushRecipe& recipe, const 
     base.frontFacesOnly = p.frontFacesOnly || recipe.frontFacesOnly;
     dabVerts_.clear();
     dabLeaves_.clear();
-    for (const glm::vec3& m : mirrors(sym)) {
-        frameWanted_ = m == glm::vec3(1.0f); // (the unmirrored pass records lastFrame)
-        DabParams mp = base;
-        mp.center *= m;
-        mp.viewDir *= m;
-        mp.strokeDelta *= m;
-        mp.alphaUp *= m;
+    for (const SymCopy& m : copies(sym)) {
+        frameWanted_ = m.identity(); // (the unmirrored pass records lastFrame)
+        const DabParams mp = m.identity() ? base : transformed(base, m);
         dabRecipeSingle(mesh, bvh, recipe, mp);
     }
     updateDabNormals(mesh, bvh);
@@ -1011,11 +1074,11 @@ void Sculptor::beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym)
     // A micro level (core/Micro.h): Move deforms the base cage below it (dual scale: the detail is relative to the
     // base, so it rides along in its local frame), unless asked to move the micro surface along its normals.
     if (microMoveAlongNormals && microReady(mesh)) {
-        for (const glm::vec3& m : mirrors(sym)) micro_.beginGrab(mesh, bvh, p.center * m, p.radius, p.focal, m);
+        for (const SymCopy& m : copies(sym)) micro_.beginGrab(mesh, bvh, m.point(p.center), p.radius, p.focal, m.m);
         return;
     }
-    for (const glm::vec3& m : mirrors(sym)) {
-        glm::vec3 c = p.center * m;
+    for (const SymCopy& m : copies(sym)) {
+        glm::vec3 c = m.point(p.center);
         brushVertices(mesh, bvh, c, p.radius, verts_);
         for (uint32_t v : verts_) {
             float w = brushFalloff(glm::distance(mesh.positions[v], c), p.radius, p.focal) *
@@ -1024,7 +1087,7 @@ void Sculptor::beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym)
             grabVerts_.push_back(v);
             grabWeights_.push_back(w);
         }
-        grabMirrors_.push_back({grabVerts_.size(), m});
+        grabMirrors_.push_back({grabVerts_.size(), m.m});
         const std::span<const uint32_t> leaves = bvh.queriedLeaves();
         grabLeaves_.insert(grabLeaves_.end(), leaves.begin(), leaves.end());
     }
@@ -1054,7 +1117,7 @@ void Sculptor::grab(Mesh& mesh, BVH& bvh, const glm::vec3& delta) {
     // One mirror after another (a vertex may be in two), each in parallel.
     size_t begin = 0;
     for (const auto& [end, m] : grabMirrors_) {
-        const glm::vec3 dm = delta * m;
+        const glm::vec3 dm = m * delta;
         scratch_.resize(end - begin);
         poolFor(end - begin, [&](size_t b, size_t e) {
             for (size_t i = b; i < e; ++i) scratch_[i] = dm * grabWeights_[begin + i];

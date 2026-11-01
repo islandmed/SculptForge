@@ -420,7 +420,8 @@ void App::buildGhost() {
     const CanvasRect c = canvasRect();
     const glm::vec3 n0 = glm::normalize(ghostFrame_.normal);
     const float depth = glm::dot(ghostFrame_.center - ghostFrame_.areaCenter, n0); // area centre below the surface
-    const std::vector<glm::vec3> mirrors = Sculptor::mirrors(symmetry_);
+    std::vector<SymCopy> mirrors = Sculptor::copies(symmetry_);
+    if (mirrors.size() > GhostStroke::kMaxMirrors) mirrors.resize(GhostStroke::kMaxMirrors); // (the shader's groups)
     const size_t perMirror = GhostStroke::kMaxDabs / std::max<size_t>(1, mirrors.size());
     std::vector<GhostDab> base;
     for (const Screen& sd : pending) {
@@ -440,9 +441,9 @@ void App::buildGhost() {
     for (uint32_t m = 0; m < mirrors.size(); ++m)
         for (const GhostDab& b : base) {
             GhostDab d = b;
-            d.center *= mirrors[m];
-            d.normal *= mirrors[m];
-            d.areaCenter *= mirrors[m];
+            d.center = mirrors[m].point(b.center);
+            d.normal = mirrors[m].dir(b.normal);
+            d.areaCenter = mirrors[m].point(b.areaCenter);
             d.mirror = m;
             g.dabs.push_back(d);
         }

@@ -8,6 +8,14 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [0.10.5] - 2026-11-01
 ### Added
+- **Radial symmetry** (#63): **R** in Transform > Symmetry and on the top shelf repeats strokes around the X, Y or Z
+  axis (Radial Count 2-64), combined with the X / Y / Z mirrors (mirror + radial = 2N copies), and **Local**
+  symmetry about the active Part's centre. Applies to every brush and stroke, mask and smooth strokes, vertex paint
+  and texture painting, Mask / Select Rectangle and Lasso, Dynamic Topology (new topology on every copy) and Insert;
+  the brush cursor shows on every copy. Saved in projects; `radial`, `radial_axis` and `local` arguments on
+  `stroke`, `vdm_stamp`, `mask_rect`, `mask_lasso`, `hide_rect`, `hide_lasso`, `insert_primitive` and `insert_mesh`.
+- **Preferences > Interface > Timeline position** (#63): the Sculpt Timeline strip at the top of the viewport (the
+  new default, away from the brush shelf) or at the bottom; Store Config keeps it.
 - **Preferences > Input > Start strokes off the model** (#62, off by default) and **Toggle strokes off the model**
   (<kbd>Shift</kbd>+<kbd>L</kbd>): a left-drag that starts on the background begins a stroke, which touches the model
   once the cursor reaches it (Lazy Stroke and the stroke path start there, so nothing jumps). Ctrl (mask) and Shift

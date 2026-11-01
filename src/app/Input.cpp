@@ -679,7 +679,7 @@ void App::drawAirStrokeIndicator() {
     const char* text = tr("Strokes start off the model");
     const ImVec2 size = ImGui::CalcTextSize(text);
     const float pad = 6.0f * uiScale_;
-    const ImVec2 at(c.x + (c.w - size.x) * 0.5f, c.y + 10.0f * uiScale_);
+    const ImVec2 at(c.x + (c.w - size.x) * 0.5f, c.y + timelineTopInset_ + 10.0f * uiScale_); // (below a top timeline)
     ImDrawList* dl = ImGui::GetForegroundDrawList();
     dl->AddRectFilled(ImVec2(at.x - pad, at.y - pad * 0.5f), ImVec2(at.x + size.x + pad, at.y + size.y + pad * 0.5f),
                       IM_COL32(0, 0, 0, 110), 4.0f * uiScale_);
