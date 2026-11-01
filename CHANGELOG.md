@@ -7,6 +7,137 @@ All notable changes to SculptForge are listed here. The format follows
 ## [Unreleased]
 
 ### Added
+- **Micro levels: hundreds of millions of sculptable polygons** (**Tool > Geometry > Micro**, `micro_*`
+  commands). Above the highest subdivision level a SubTool can carry a micro level: per triangle a regular grid of
+  16-bit heights along the interpolated normal of the smooth (Phong-tessellated) base, instead of a mesh.
+  300 million micro triangles take 374 MB (1.25 bytes each; the whole app about 0.8 GB), where a mesh of that size
+  would need about 27 GB. Unlike ZBrush's HD Geometry the whole model is sculptable at once.
+  - Brushes: Standard, Clay, Clay Buildup, Smooth, Inflate, Flatten, Trim, Layer, Pinch / Crease / Dam Standard
+    (as height sharpening), Mask; symmetry, Focal Shift, pressure and the mask apply. Big brushes are evaluated on
+    a coarser grid and interpolated (scale-adaptive). Move reshapes the base below the micro level and the detail
+    rides along (dual scale); "Move along normals" moves the micro surface itself.
+  - Viewport: the micro surface is evaluated on the GPU per frame, with a level of detail per cluster and a
+    triangle budget (2M on a laptop profile, 8M on a workstation, `RenderSettings::renderTriangleBudget`), crack
+    free; the shading keeps every micro detail. 300M micro triangles orbit at 70+ fps with 4x antialiasing (M1 Pro).
+  - Bake Micro (to a mesh), Export Displacement (32-bit EXR or 16-bit PNG, scalar or vector, over the base UVs).
+  - Undo: a packed journal per stroke (tiles in Morton order, each tile's change predicted and packed).
+  - Very large levels stay out of core in a sparse memory-mapped file (only what you touch is in memory).
+  - Projects: format 7 when a SubTool has a micro level (others stay format 6 for older versions).
+  - `sculptforge --bench-micro --bench-sizes 33,100,300` measures it. Guide chapter "Micro levels".
+- Automatic hardware detection and calibration. On first launch, and again when the graphics card, its driver or
+  the version changes, SculptForge spends about a second or two (under a small overlay; Esc skips) measuring
+  triangle throughput, upload bandwidth, brush speed and memory bandwidth, and probes the GPU (OpenGL strings,
+  video memory through GL_NVX_gpu_memory_info, GL_ATI_meminfo, GLX_MESA_query_renderer, amdgpu sysfs, DXGI or
+  CGL), RAM, threads, SIMD and OS. The result picks a profile: **Laptop / Budget**, **Workstation** (64 GB+ RAM
+  with a 16 GB+ discrete GPU, or Apple Silicon Max / Ultra and big APUs, that measure fast) or a **Software** safe
+  mode for llvmpipe, with a render triangle budget, motion proxy
+  threshold, GPU memory and upload budgets, texture, subdivision and micro-triangle limits and the thread count.
+  Cached in the settings folder; no network use. A one-line status bar message says what was found.
+- Preferences > Performance shows what was detected and measured ("Detected <GPU>, <memory> -> Workstation"),
+  the settings in effect, **Re-calibrate** and manual overrides (kept across re-calibrations).
+- An adaptive frame governor holds the view at 60 fps (120 / 144 on a fast display) while it moves, by switching
+  big scenes to their motion proxy sooner or later, with hysteresis; it changes only what is drawn, never the
+  model. Fast Navigation's 10 million triangle threshold now comes from the profile.
+- On battery (laptops), brushes switch to draft mode, uploads per frame halve and the target is 60 Hz.
+- `sculptforge --calibrate` prints the profile as JSON (schema sculptforge.calibration/1); commands
+  `performance_profile`, `calibrate` and `set_performance_override` for the console, scripts and MCP.
+- For developers: `core/TierConfig.h` (resident cache cap, active-triangle budget, upload budget, draft brush
+  mode, zero-copy UMA, target Hz) and `renderTriangleBudget()` for the renderer and micro-displacement
+  (docs/performance.md, "Hardware profile").
+- Material painting (PBR): a painted texture can carry Roughness, Metallic, Normal, Height (16-bit), Ambient
+  Occlusion, Emissive and Opacity besides its colour, all painted in the same strokes. Turn channels on in
+  **Tool > Texture Map > Material Channels** (`texture_channels`); a channel costs no memory until it is painted
+  (64x64 copy-on-write tiles; untouched tiles aren't stored). **Color > Material** sets what the brush lays on
+  each channel (material swatches, per-channel value swatches and sliders; `paint_material`), and **C** picks the
+  whole material under the cursor. Paint layers hold every channel: channel chips on each layer row turn a
+  channel on or off for that layer, and give it its own blend mode and opacity, including **Normal Combine** for
+  normals (`texture_layer_channel`). Height also yields a normal combined onto the Normal channel. One undo step
+  per stroke, kept per layer and channel. Auto UV, Voxel Remesh, QRemesh and merging SubTools carry every channel.
+  See the guide's Material painting page.
+- Solo channel view: **Tool > Texture Map** shows one channel on the model (roughness and the other scalars in
+  grey, the normal as colours, emission in colour), live while painting (`channel_view`).
+- Export Maps with presets (`export_maps`): Unreal (`T_*_BC`, `T_*_N` in DirectX, `T_*_ORM`), Unity URP and HDRP
+  (mask map), glTF, Godot, Blender (one file per channel) and USD, plus your own JSON presets (the guide's Export
+  presets page). Height maps are 16-bit PNG.
+- Model exports wire the channels into their materials: glTF metal-rough slots (packed occlusion / roughness /
+  metallic, normal, emissive, alpha from opacity), UsdPreviewSurface inputs, the MTL PBR keys and FBX material
+  maps. Send to Unreal imports `T_<Name>_BC / _N / _ORM` and builds an `M_<Name>` material from them.
+- Preferences > Performance and `perf_info` show the memory of textures and their material channels.
+
+### Changed
+- Texture painting on dense meshes costs the texels a dab reaches instead of the triangles under it: the brush
+  finds the texture tiles under it from the BVH and paints each texel from a cached triangle-and-barycentrics
+  map, tiles in parallel. A 0.35-radius dab with X symmetry on a 21M-triangle sphere: 4K 150-360 ms -> 24-39 ms,
+  8K 240-350 ms -> 39-55 ms (M1 Pro, ranges over a busy and a quiet machine); results match the old dab within
+  1/255. Lighter meshes keep the per-triangle dab. No first-dab stutter: the UV bins are shared by every texture on
+  the same UVs (undo steps, copies) and built in parallel when painting starts (about 45 ms at 21M), the area under
+  the hovering brush is readied before it lands, and a stroke into a fresh area stays under 20 ms at 4K.
+  Preferences > Performance counts these caches.
+- Project format 7 stores material channels. It is written only when a texture has them: other projects are
+  still saved as format 6, and every older project opens as before.
+- **Sculpt Timeline**: every stroke and operation is a tick on a strip along the bottom of the canvas. Drag the
+  scrubber to see the model at any point of the session, click a step to go there. Sculpting from an earlier
+  point no longer throws the later steps away: they stay as a branch (a lane above the track) you can switch
+  back to, with undo / redo working on the active branch as before. Right-click a stroke to re-tune its strength
+  (0 removes it, 2 doubles it) without redoing the strokes after it; where later strokes overlap it they keep
+  their own displacement on top (they aren't sculpted again; see the guide's Sculpt Timeline chapter). Seeking
+  reuses undo's per-stroke deltas, swaps runs of strokes at once with one normal / BVH / GPU update, and jumps
+  from full checkpoints every 16 steps (within 1 GB; fewer on huge meshes) for long seeks. Each SubTool keeps
+  its own timeline. Commands `timeline_info`, `timeline_seek`, `timeline_select`, `timeline_retune`,
+  `timeline_save`, `timeline_load`; UI test timeline.
+- **Save with project** (in the timeline's header) also writes the history beside the project as
+  `<name>.sfhist` (strokes, masks, polypaint, visibility, polygroups, branches, re-tuned strengths; a topology
+  change cuts it). Opening the project brings it back when the mesh matches. The project format is unchanged.
+- **Export timelapse**: the history rendered as a turntable video, the model building up stroke by stroke while
+  the camera goes once around it (1080p or 4K MP4, no captions; needs ffmpeg). Also
+  `sculptforge project.sfproj --timelapse out.mp4 [--size 3840x2160] [--timelapse-seconds 20]`.
+- **Proof mode** (**Help > Benchmark**, `sculptforge --benchmark`): a scripted 240 Hz pen stroke through the
+  same input handlers a real pen uses, with a 60 px and a 240 px brush and a turn of the view, on 5, 20 and 33
+  million triangle meshes (100 million when free memory allows). A live HUD shows fps, frame time p50 / p95 /
+  p99, how far the stroke trails the pointer (ms and px) and memory; the run is recorded to an MP4 with the HUD in
+  it and written as a JSON result with the processor, graphics card, memory, OS, version and commit.
+  `docs/benchmark.md` describes the format, `tools/benchmark/submit.py` checks results and adds them to
+  `website/benchmarks/results.json`, which the new benchmarks page lists.
+- The brush cursor follows the surface (#25), as in SculptGL: over the model the Draw Size and Focal Shift rings
+  lie on the surface under the pointer, turned to its (smoothed) direction and pressed onto its shape, at the
+  brush's real size there, with a short normal line; with symmetry on, a fainter mirrored ring shows too. Every
+  brush (sculpt, paint, mask, dynamic topology). A few dozen BVH ray casts per drawn frame, no pass over the mesh
+  (0.09 ms on 5M triangles), and the idle view still draws nothing. **Preferences > Input > Cursor follows
+  surface** (on by default) brings back the flat screen rings.
+
+- **Predictive Strokes** (Preferences > Performance, on by default): a sculpt stroke's brush is worked out on its
+  own thread while the view keeps drawing at the display's rate. The dabs not finished yet are drawn as a GPU
+  preview on the surface (each brush's kernel in the vertex shader, with its shading and cavities), and the brush
+  cursor and the stroke's head are drawn where the pen will be a frame later. When a dab's result reaches the GPU
+  it replaces its preview in the same frame. Lifting the pen never waits. The finished sculpt is the same, bit for
+  bit, as with it off (`--measure-stroke` with `SF_MEASURE_VERIFY=1` replays the stroke and checks undo).
+  Painting, masking, dynamic topology, Move, Snake Hook and the drag strokes work as before.
+- **Draft Strokes** (Preferences > Performance, off by default; meant for laptops and battery): with Predictive
+  Strokes, the brush only moves the surface during the stroke; normals, cavities and culling bounds are worked out
+  once when the pen lifts.
+- `tools/bench_strokes.sh`: the big-brush stroke benchmark on 5M, 21M and 33M triangles, one build or two
+  interleaved (docs/performance.md). `new_sphere triangles=N` makes a sphere of about N triangles.
+  `--measure-stroke` reports frame p95 / p99, the preview's lag, and when the first and last dab reach the screen.
+
+### Changed (predictive strokes)
+- Big brushes on dense meshes no longer slow the view. `tools/bench_strokes.sh`, 200 px brush, M1 Pro shared
+  with other builds (load 9-45, so both columns are slower than on an idle machine; A/B interleaved):
+
+  | | 0.9.7 frame mean / p99 | Now | Brush on screen behind the pointer, 0.9.7 / now | Press | Release |
+  |---|---|---|---|---|---|
+  | 5.2M | 47 / 134 ms | 8.4 / 14 ms | 95 / 1 px | 98 -> 24 ms | 31 -> 0 ms |
+  | 21M | 71 / 651 ms | 8.8 / 18 ms | 37 / 1.5 px | 623 -> 14 ms | 1 -> 0 ms |
+  | 33.6M | 169 / 323 ms | 12.2 / 27 ms | 245 / 4 px | 315 -> 13 ms | 374 -> 0 ms |
+
+  With 60 and 240 px brushes at 21M and 33.6M the p99 frame is 11-31 ms (0.9.7: 26-636 ms). The solved surface
+  itself still trails as before; the preview covers it (docs/performance.md, "Predictive strokes").
+- Packing a stroke's vertices for the GPU no longer walks every vertex's neighbours again: the cavity term comes
+  from the normals pass. Clusters a stroke moved get quick culling bounds, made exact when it ends.
+- `Mesh::recomputeAllNormals` (new meshes, undo of big changes, timeline seeks) runs in parallel.
+
+### Fixed (predictive strokes)
+- A big brush that raised the surface past the GPU's position grid stalled the view for seconds on dense meshes
+  (the whole mesh was re-packed inside a frame); it is re-packed on the brush thread now.
 - **Kelvinlet brushes**: physically based elastic brushes from the regularized Kelvinlets of de Goes & James
   (SIGGRAPH 2017): the exact displacement of an elastic solid under a softened point load, so the surface moves
   like clay pushed with a thumb, with no falloff edge. **KelvinGrab** (an elastic Move: tri-scale kernel, 1/r^5

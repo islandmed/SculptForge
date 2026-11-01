@@ -10,6 +10,7 @@
 #pragma once
 
 #include "core/Image.h"
+#include "core/MapExport.h"
 #include "core/Mesh.h"
 #include "core/Texture.h"
 #include "io/MeshObject.h"
@@ -18,6 +19,7 @@
 #include <cctype>
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -99,10 +101,14 @@ inline std::vector<std::string> textureFileNames(const std::string& modelPath, c
     return names;
 }
 
-// The mesh's texture (its composite) as PNG bytes.
+// The mesh has a texture with material channels (core/TextureChannels.h): exporters add PBR material slots.
+inline bool hasPbrTexture(const Mesh& mesh) { return hasTexture(mesh) && hasMaterialChannels(*mesh.texture); }
+
+// The mesh's texture (its composite) as PNG bytes; with material channels, opacity goes into alpha.
 inline bool encodeTexturePng(const Mesh& mesh, std::vector<uint8_t>& png) {
     png.clear();
     if (!hasTexture(mesh)) return false;
+    if (hasPbrTexture(mesh)) return encodeMapPng(*mesh.texture, pbrSlotSources("base_color"), false, png);
     return textureImage(*mesh.texture).encodePng(png);
 }
 
@@ -114,7 +120,70 @@ inline bool writeTextureBeside(const std::string& modelPath, const std::string& 
         error = "The mesh has no texture";
         return false;
     }
+    if (hasPbrTexture(mesh)) {
+        std::vector<uint8_t> png;
+        if (!encodeTexturePng(mesh, png)) {
+            error = "Cannot encode the texture";
+            return false;
+        }
+        std::ofstream f(textureFsPath(pngPath), std::ios::binary);
+        if (!f || !f.write(reinterpret_cast<const char*>(png.data()), std::streamsize(png.size()))) {
+            error = "Cannot write " + pngPath;
+            return false;
+        }
+        return true;
+    }
     return textureImage(*mesh.texture).savePng(pngPath, error);
+}
+
+// --- PBR material slots (core/MapExport.h pbrSlots): one PNG per slot beside / inside the model ---
+
+// The file name of a slot's PNG, made from the object's colour PNG name ("<stem>_color.png" ->
+// "<stem>_roughness.png").
+inline std::string pbrFileName(const std::string& colorName, const std::string& slot) {
+    const std::string tail = "_color.png";
+    std::string stem = colorName;
+    if (stem.size() > tail.size() && stem.compare(stem.size() - tail.size(), tail.size(), tail) == 0)
+        stem.resize(stem.size() - tail.size());
+    else if (stem.size() > 4)
+        stem.resize(stem.size() - 4);
+    return stem + "_" + slot + ".png";
+}
+
+struct PbrPng {
+    std::string slot, name; // name: pbrFileName of the colour PNG ("" when written inside the file)
+    std::vector<uint8_t> png;
+};
+// Every PBR slot but base colour (which is the colour PNG) for the mesh, encoded. Empty without material channels.
+inline bool encodePbrPngs(const Mesh& mesh, bool packedOrm, const std::string& colorName, std::vector<PbrPng>& out) {
+    out.clear();
+    if (!hasPbrTexture(mesh)) return true;
+    for (const std::string& slot : pbrSlots(*mesh.texture, packedOrm)) {
+        if (slot == "base_color") continue;
+        PbrPng p;
+        p.slot = slot;
+        p.name = colorName.empty() ? std::string() : pbrFileName(colorName, slot);
+        if (!encodeMapPng(*mesh.texture, pbrSlotSources(slot), false, p.png)) return false;
+        out.push_back(std::move(p));
+    }
+    return true;
+}
+// Writes encodePbrPngs' files beside `modelPath`.
+inline bool writePbrPngsBeside(const std::string& modelPath, const std::vector<PbrPng>& pngs, std::string& error) {
+    for (const PbrPng& p : pngs) {
+        const std::string path = textureUtf8(textureFsPath(modelPath).parent_path() / textureFsPath(p.name));
+        std::ofstream f(textureFsPath(path), std::ios::binary);
+        if (!f || !f.write(reinterpret_cast<const char*>(p.png.data()), std::streamsize(p.png.size()))) {
+            error = "Cannot write " + path;
+            return false;
+        }
+    }
+    return true;
+}
+inline const PbrPng* findPbrPng(const std::vector<PbrPng>& pngs, const std::string& slot) {
+    for (const PbrPng& p : pngs)
+        if (p.slot == slot) return &p;
+    return nullptr;
 }
 
 } // namespace sf

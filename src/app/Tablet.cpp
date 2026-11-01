@@ -182,7 +182,8 @@ void App::firstDab(float x, float y) {
     }
     firstDabPending_ = false;
     lastStrokePressure_ = strokePressure();
-    dabAt(x, y, lastStrokePressure_);
+    if (asyncStroke_) dabQueue_.push({x, y, lastStrokePressure_}); // the solver thread places it (AsyncStroke.cpp)
+    else dabAt(x, y, lastStrokePressure_);
 }
 
 // SDL has no pen names, so on Linux read the kernel's input device list; elsewhere the pen stays unnamed.

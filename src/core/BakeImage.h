@@ -15,6 +15,12 @@ namespace sf {
 // `channels` is 1 (grey) or 3 (RGB); `pixels` holds width * height * channels values.
 bool savePng16(const std::string& path, int width, int height, int channels, const std::vector<uint16_t>& pixels,
                std::string& error);
+// The same PNG in memory; `channels` 1-4 (grey, grey + alpha, RGB, RGBA).
+bool encodePng16(int width, int height, int channels, const std::vector<uint16_t>& pixels, std::vector<uint8_t>& out,
+                 std::string& error);
+// Decodes PNG bytes at 16 bits per channel (8-bit files are scaled up), as `wantChannels` (0 = as stored).
+bool decodePng16(const uint8_t* bytes, size_t size, int& width, int& height, int& channels, std::vector<uint16_t>& pixels,
+                 std::string& error, int wantChannels = 0);
 // Reads any PNG as 16 bits per channel (8-bit files are scaled up); `channels` is what the file has.
 bool loadPng16(const std::string& path, int& width, int& height, int& channels, std::vector<uint16_t>& pixels,
                std::string& error);

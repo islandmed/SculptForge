@@ -5,14 +5,17 @@
 #include "core/BrushRecipe.h"
 #include "core/Commands.h"
 #include "core/Document.h"
+#include "core/Micro.h"
 #include "core/Multires.h"
 #include "core/Polypaint.h"
 #include "core/Primitives.h"
 #include "core/Project.h"
+#include "core/Texture.h"
 #include "core/ThreadPool.h"
 #include "core/UploadOrder.h"
 
 #include <algorithm>
+#include <bit>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -66,11 +69,16 @@ size_t peakResidentBytes() {
 
 MemoryUse documentMemory(const Document& doc) {
     MemoryUse u;
+    std::vector<const PaintTexture*> seen; // textures shared between SubTools count once
     for (int i = 0; i < doc.subtoolCount(); ++i) {
         const bool active = i == doc.activeSubtool;
         const SubTool& st = doc.subtools[size_t(i)];
         const Mesh& m = doc.subtoolMesh(i);
         u.mesh += m.memoryBytes();
+        if (m.texture && std::find(seen.begin(), seen.end(), m.texture.get()) == seen.end()) {
+            seen.push_back(m.texture.get());
+            u.textures += m.texture->colourBytes();
+        }
         u.bvh += (active ? doc.bvh : st.bvh).memoryBytes();
         u.levels += subdivBytes(m);
         u.undo += (active ? doc.undo : st.undo).undoBytes();
@@ -81,6 +89,11 @@ MemoryUse documentMemory(const Document& doc) {
             u.gpu += m.vertexCount() * (12 + (m.hasColors() ? 4 : 0) + (m.hasMask() ? 1 : 0)) * 11 / 10 +
                      m.triangleCount() * (6 + (m.hasPolygroups() ? 2 : 0));
     }
+    // Material channel tiles from the atomic count (every texture, copies and undo steps): no tile walk here, so
+    // the readout is safe whatever else is painting.
+    u.channels = TileImage::liveBytes();
+    u.textures += u.channels;
+    u.paintCaches = texturePaintCacheBytes();
     return u;
 }
 
@@ -96,7 +109,8 @@ void registerPerformanceCommands(CommandRegistry& registry) {
                                         (ThreadPool::shared().serial() ? " (multithreading off)" : "") + "; " +
                                         millions(double(u.triangles)) + " triangles; memory " + mb(u.total()) + " (meshes " +
                                         mb(u.mesh) + ", BVH " + mb(u.bvh) + ", subdivision levels " + mb(u.levels) +
-                                        ", undo " + mb(u.undo) + "), GPU buffers about " + mb(u.gpu);
+                                        ", undo " + mb(u.undo) + ", textures " + mb(u.textures) + " of which material channels " + mb(u.channels) + ", texture painting caches " + mb(u.paintCaches) +
+                                        "), GPU buffers about " + mb(u.gpu);
                       return {true, msg};
                   }});
     registry.add({"new_bench_sphere",
@@ -264,6 +278,12 @@ bool parseBenchArg(int argc, char** argv, int& i, BenchCommandLine& cl) {
     } else if (a == "--bench-dyntopo") {
         cl.options.dyntopo = true;
         cl.options.projectRoundTrip = false;
+    } else if (a == "--bench-micro") {
+        cl.run = true;
+        cl.options.micro = true;
+    } else if (a == "--bench-micro-level") {
+        cl.options.micro = true;
+        cl.options.microLevel = std::clamp(std::atoi(next().c_str()), 1, 7);
     } else if (a == "--bench-out") {
         cl.outPath = next();
     } else {
@@ -365,10 +385,239 @@ std::string runDyntopoBenchmark(const BenchOptions& o, const BenchGpu* gpu) {
     return md.str();
 }
 
+// Micro-displacement levels (core/Micro.h): a base sphere with subdivision levels, divided to micro level
+// o.microLevel, so the micro triangle count is each size. Strokes as in the mesh benchmark (X symmetry, dabs
+// along a line over the front); "shading" is what the renderer recomputes for a dab (normals, curvature) on the
+// CPU before its upload.
+std::string runMicroBenchmark(const BenchOptions& o, const BenchGpu* gpu) {
+    auto log = [&](const std::string& s) {
+        if (o.log) o.log(s);
+    };
+    std::ostringstream md;
+    md << "Threads: " << ThreadPool::shared().threads();
+    if (gpu && !gpu->description.empty()) md << ", GPU: " << gpu->description;
+    md << ". Micro level " << o.microLevel << " (" << (1 << (2 * o.microLevel))
+       << " micro triangles per base triangle). Brushes use X symmetry (two dabs per step), radius 0.12 on a unit sphere "
+          "unless noted, "
+       << o.dabsPerStroke << " dabs per stroke. Times in milliseconds.\n\n";
+    const std::vector<BenchBrush> brushes = {
+        {"Standard", Kind::Brush, BrushType::Standard},
+        {"Standard (large, r 0.4)", Kind::Brush, BrushType::Standard, 0.4f},
+        {"Standard (300 px, r 0.56)", Kind::Brush, BrushType::Standard, 0.56f},
+        {"Clay", Kind::Brush, BrushType::Clay},
+        {"ClayBuildup", Kind::Brush, BrushType::ClayBuildup},
+        {"Smooth", Kind::Brush, BrushType::Smooth},
+        {"Smooth (large, r 0.4)", Kind::Brush, BrushType::Smooth, 0.4f},
+        {"Inflate", Kind::Brush, BrushType::Inflate},
+        {"Flatten", Kind::Brush, BrushType::Flatten},
+        {"Pinch", Kind::Brush, BrushType::Pinch},
+        {"Crease", Kind::Brush, BrushType::Crease},
+        {"Layer", Kind::Brush, BrushType::Layer},
+        {"Move", Kind::Move, BrushType::Move},
+        {"Move (300 px, r 0.56)", Kind::Move, BrushType::Move, 0.56f},
+        {"Mask", Kind::Mask},
+    };
+    for (double sizeM : o.sizesMillions) {
+        const size_t target = size_t(sizeM * 1e6);
+        const size_t baseTarget = std::max<size_t>(target >> (2 * o.microLevel), 1000);
+        log("Building a " + millions(double(target)) + " micro triangle sphere (" + millions(double(baseTarget)) + " base)...");
+        Document doc;
+        const size_t rss0 = resetPeakResidentBytes();
+        auto t = Clock::now();
+        doc.mesh = makeBenchSphere(baseTarget);
+        const double baseMs = msSince(t);
+        t = Clock::now();
+        doc.bvh.build(doc.mesh);
+        const double bvhMs = msSince(t);
+        Mesh& m = doc.mesh;
+        const size_t rssBase = residentBytes();
+        std::string err;
+        t = Clock::now();
+        if (!microDivide(m, o.microLevel, err)) {
+            md << "### " << millions(double(target)) << ": " << err << "\n\n";
+            continue;
+        }
+        const double divideMs = msSince(t);
+        const MicroMesh& mm = *m.micro;
+        const double nt = double(mm.microTriangles()), nv = double(mm.microVertices());
+        // The renderer's first full shading pass (into a scratch tile per thread: no GPU here).
+        MicroShader shader;
+        std::vector<uint32_t> written;
+        auto scratch = [&](uint32_t) -> uint32_t* {
+            thread_local std::vector<uint32_t> tile;
+            tile.resize(mm.samples);
+            return tile.data();
+        };
+        t = Clock::now();
+        shader.shade(m, {}, true, written, scratch);
+        const double shadeAllMs = msSince(t);
+        if (!gpu) m.micro->clearDirty();
+        double uploadAll = 0;
+        if (gpu && gpu->upload) uploadAll = gpu->upload(m);
+        const size_t rss = residentBytes(), peak = peakResidentBytes();
+        md << "### " << millions(nt) << " micro triangles (" << millions(nv) << " micro vertices; base "
+           << millions(double(m.triangleCount())) << " triangles, " << subdivLevelCount(m) << " subdivision levels)\n\n";
+        md << "| Setup | |\n|---|---|\n";
+        md << "| Base sphere (Divide) | " << fmt("%.0f", baseMs) << " |\n";
+        md << "| BVH build (base) | " << fmt("%.0f", bvhMs) << " |\n";
+        md << "| Divide to micro level | " << fmt("%.0f", divideMs) << " |\n";
+        md << "| Shading, whole surface (CPU) | " << fmt("%.0f", shadeAllMs) << " |\n";
+        if (gpu) md << "| First GPU upload | " << fmt("%.0f", uploadAll) << " |\n";
+        if (gpu && gpu->gpuBytes) {
+            const double b = double(gpu->gpuBytes());
+            md << "| GPU memory (buffers) | " << fmt("%.0f MB", b / 1e6) << " = " << fmt("%.2f", b / nt) << " B/micro triangle |\n";
+        }
+        md << "| Micro level (displacements, ranges, topology) | " << fmt("%.0f MB", double(mm.bytes()) / 1e6) << " = "
+           << fmt("%.2f", double(mm.bytes()) / nt) << " B/micro triangle, " << fmt("%.2f", double(mm.bytes()) / nv)
+           << " B/micro vertex |\n";
+        md << "| Base mesh + BVH + levels | "
+           << fmt("%.0f MB", double(m.memoryBytes() + doc.bvh.memoryBytes() + subdivBytes(m)) / 1e6) << " |\n";
+        if (rss)
+            md << "| Process memory (RSS) | " << fmt("%.0f MB", double(rss) / 1e6) << " (micro level and shading: +"
+               << fmt("%.0f MB", double(rss - std::min(rss, rssBase)) / 1e6) << "; everything: +"
+               << fmt("%.0f MB", double(rss - std::min(rss, rss0)) / 1e6) << " = "
+               << fmt("%.2f", double(rss - std::min(rss, rss0)) / nt) << " B/micro triangle) |\n";
+        if (peak > rss0) md << "| Peak (RSS) | " << fmt("%.0f MB", double(peak) / 1e6) << " |\n";
+        md << "\n";
+
+        md << "| Brush | stride | points/dab | pick | find + undo tiles | kernel | stitch | shading | " << (gpu ? "GPU upload | " : "")
+           << "**dab total** | stroke end | undo | redo | undo step |\n";
+        md << "|---|---:|---:|---:|---:|---:|---:|---:|" << (gpu ? "---:|" : "") << "---:|---:|---:|---:|---:|\n";
+        for (const BenchBrush& b : brushes) {
+            if (!o.brushFilter.empty() && b.name.find(o.brushFilter) == std::string::npos) continue;
+            log("  " + b.name);
+            Sculptor& sc = doc.sculptor;
+            sc.beginStroke(m, b.name);
+            Symmetry sym;
+            MicroStroke& ms = sc.microStroke();
+            const double f0 = ms.findMs, k0 = ms.kernelMs, s0 = ms.stitchMs;
+            const uint64_t p0 = ms.points;
+            double pick = 0, shade = 0, upload = 0;
+            int dabs = 0;
+            const float step = 0.15f * b.radius;
+            const auto stroke0 = Clock::now();
+            std::vector<uint32_t> dirty;
+            for (int i = 0; i < o.dabsPerStroke; ++i) {
+                const float x = 0.15f + std::fmod(float(i) * step, 0.6f), y = 0.2f + 0.1f * std::sin(float(i) * 0.3f);
+                auto tp = Clock::now();
+                RayHit hit;
+                const bool ok = surfaceRaycast(m, doc.bvh, glm::vec3(x, y, 5.0f), glm::vec3(0, 0, -1), hit);
+                pick += msSince(tp);
+                if (!ok) continue;
+                DabParams p;
+                p.center = hit.position;
+                p.viewDir = glm::vec3(0, 0, -1);
+                p.radius = b.radius;
+                p.strength = 0.5f;
+                switch (b.kind) {
+                case Kind::Move:
+                    if (i == 0) sc.beginGrab(m, doc.bvh, p, sym);
+                    else sc.grab(m, doc.bvh, glm::vec3(0.0f, 0.0f, 0.002f));
+                    break;
+                case Kind::Mask: sc.dabMask(m, doc.bvh, p, sym); break;
+                default: sc.dab(m, doc.bvh, b.type, p, sym); break;
+                }
+                // What the renderer does next: the shading of what changed (and its neighbours), then the upload.
+                tp = Clock::now();
+                if (gpu && gpu->upload) {
+                    upload += gpu->upload(m); // (the renderer shades inside its upload)
+                } else {
+                    MicroMesh& live = *m.micro;
+                    dirty.clear();
+                    for (size_t w = 0; w < live.dirtyBits.size(); ++w)
+                        for (uint64_t bits = live.dirtyBits[w]; bits; bits &= bits - 1)
+                            dirty.push_back(uint32_t(w * 64 + size_t(std::countr_zero(bits))));
+                    shader.shade(m, dirty, live.allDirty, written, scratch);
+                    live.clearDirty();
+                    shade += msSince(tp);
+                }
+                ++dabs;
+            }
+            const double total = msSince(stroke0);
+            const double d = std::max(dabs, 1);
+            auto te = Clock::now();
+            UndoRecord r = sc.endStroke();
+            const double endMs = msSince(te);
+            const size_t undoBytes = r.approxBytes();
+            doc.undo.push(std::move(r));
+            te = Clock::now();
+            doc.undo.undo(m, doc.bvh);
+            const double undoMs = msSince(te);
+            if (gpu && gpu->upload) gpu->upload(m);
+            te = Clock::now();
+            doc.undo.redo(m, doc.bvh);
+            const double redoMs = msSince(te);
+            if (gpu && gpu->upload) gpu->upload(m);
+            else m.micro->clearDirty();
+            md << "| " << b.name << " | " << ms.lastStride << " | " << millions(double(ms.points - p0) / d) << " | "
+               << fmt("%.2f", pick / d) << " | "
+               << fmt("%.2f", (ms.findMs - f0) / d) << " | " << fmt("%.2f", (ms.kernelMs - k0) / d) << " | "
+               << fmt("%.2f", (ms.stitchMs - s0) / d) << " | " << (gpu ? std::string("(in upload)") : fmt("%.2f", shade / d)) << " | ";
+            if (gpu) md << fmt("%.2f", upload / d) << " | ";
+            md << "**" << fmt("%.2f", total / d) << "** | " << fmt("%.1f", endMs) << " | " << fmt("%.1f", undoMs) << " | "
+               << fmt("%.1f", redoMs) << " | " << fmt("%.1f MB", double(undoBytes) / 1e6) << " |\n";
+        }
+        md << "\n";
+        md << "| Operation | ms |\n|---|---:|\n";
+        {
+            log("  surface noise (whole surface)");
+            t = Clock::now();
+            microNoise(m, 0.002f, 60.0f);
+            md << "| Surface noise, every point | " << fmt("%.0f", msSince(t)) << " |\n";
+            if (gpu && gpu->upload) {
+                t = Clock::now();
+                gpu->upload(m);
+                md << "| GPU upload after it (shading + displacements) | " << fmt("%.0f", msSince(t)) << " |\n";
+            } else {
+                m.micro->clearDirty();
+            }
+        }
+        if (o.projectRoundTrip) {
+            namespace fs = std::filesystem;
+            std::error_code ec;
+            const fs::path dir = o.projectDir.empty() ? fs::temp_directory_path(ec) : fs::path(o.projectDir);
+            const std::string path = (dir / "sculptforge-bench-micro.sfproj").string();
+            log("  project save / open");
+            t = Clock::now();
+            const bool saved = saveProject(path, doc, err);
+            const double saveMs = msSince(t);
+            const double fileMb = saved ? double(fs::file_size(path, ec)) / 1e6 : 0.0;
+            Document loaded;
+            t = Clock::now();
+            const bool opened = saved && loadProject(path, loaded, err);
+            const double openMs = msSince(t);
+            fs::remove(path, ec);
+            md << "| Save project (" << fmt("%.0f MB", fileMb) << ") | " << (saved ? fmt("%.0f", saveMs) : "failed: " + err) << " |\n";
+            md << "| Open project | " << (opened ? fmt("%.0f", openMs) : "failed: " + err) << " |\n";
+        }
+        if (gpu && gpu->orbitFrameMs) {
+            log("  orbit");
+            struct Orbit {
+                int samples;
+                bool moving;
+                const char* name;
+            };
+            for (const Orbit& ob : {Orbit{4, false, "4x antialiasing"}, Orbit{1, false, "no antialiasing"},
+                                    Orbit{1, true, "Fast Navigation (no antialiasing, coarser)"}}) {
+                const double f = gpu->orbitFrameMs(m, ob.samples, ob.moving);
+                md << "| Orbit: frame time, " << ob.name << " | " << fmt("%.1f", f) << " (" << fmt("%.0f", 1000.0 / std::max(f, 1e-3))
+                   << " fps) |\n";
+                if (gpu->drawnTriangles && ob.samples == 1)
+                    md << "| Orbit: triangles drawn" << (ob.moving ? " (moving)" : "") << " | " << millions(double(gpu->drawnTriangles()))
+                       << " |\n";
+            }
+        }
+        md << "\n";
+        if (o.partial) o.partial(md.str());
+    }
+    return md.str();
+}
+
 } // namespace
 
 std::string runBenchmark(const BenchOptions& o, const BenchGpu* gpu) {
     if (o.dyntopo) return runDyntopoBenchmark(o, gpu);
+    if (o.micro) return runMicroBenchmark(o, gpu);
     auto log = [&](const std::string& s) {
         if (o.log) o.log(s);
     };

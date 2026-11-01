@@ -256,6 +256,25 @@ void BVH::queryTriangles(const Mesh& mesh, const glm::vec3& center, float radius
     }
 }
 
+void BVH::forEachLeafInSphere(const glm::vec3& center, float radius,
+                              const std::function<void(std::span<const uint32_t>)>& fn) const {
+    if (nodes_.empty()) return;
+    const float r2 = radius * radius;
+    std::vector<uint32_t> stack;
+    stack.reserve(64);
+    stack.push_back(0);
+    while (!stack.empty()) {
+        const Node& n = nodes_[stack.back()];
+        stack.pop_back();
+        if (!sphereBox(n.box, center, r2)) continue;
+        if (n.count > 0) fn(std::span<const uint32_t>(triIndices_.data() + n.first, n.count));
+        else if (n.first != kNoLeaf) {
+            stack.push_back(n.first);
+            stack.push_back(n.first + 1);
+        }
+    }
+}
+
 void BVH::queryVertices(const Mesh& mesh, const glm::vec3& center, float radius, std::vector<uint32_t>& out) const {
     out.clear();
     queryLeaves_.clear();

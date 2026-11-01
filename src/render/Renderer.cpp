@@ -1,10 +1,12 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "render/Renderer.h"
+#include "render/MicroRenderer.h"
 
 #include "core/Matcap.h"
 #include "core/Texture.h"
 #include "core/ThreadPool.h"
+#include "core/TierConfig.h"
 #include "core/UploadOrder.h"
 
 #include <glm/gtc/type_ptr.hpp>
@@ -54,11 +56,125 @@ vec3 decodeNormal(uint a) {
     n.y += n.y >= 0.0 ? -t : t;
     return normalize(n);
 }
+#ifdef GHOST
+// The predictive stroke preview (render/Ghost.h): the dabs the solver hasn't placed yet move the vertices as the
+// brush would. Keep in step with sf::ghostMove (Ghost.cpp).
+uniform vec4 uGhostA[64];    // centre, radius
+uniform vec4 uGhostB[64];    // area normal, strength x pressure
+uniform vec4 uGhostC[64];    // area centre, weight
+uniform int uGhostGroups;    // runs of dabs (one per mirror), each with a sphere holding its dabs
+uniform vec4 uGhostBound[8];
+uniform ivec2 uGhostRange[8]; // [first, end) of each run
+uniform ivec2 uGhostKind;    // kernel (sf::GhostKind), inverted
+uniform float uGhostFocal;
+uniform float uGhostEdge;    // the mesh's edge length under the brush (the cavity term's scale)
+// The falloff and its first two derivatives in the distance (brushFalloff with Focal Shift).
+vec3 ghostFalloff(float d, float r) {
+    float u = clamp(1.0 - d / r, 0.0, 1.0);
+    if (u <= 0.0) return vec3(0.0);
+    if (uGhostFocal == 0.0) // (the plain smoothstep: t = u)
+        return vec3(u * u * (3.0 - 2.0 * u), -6.0 * u * (1.0 - u) / r, (6.0 - 12.0 * u) / (r * r));
+    float k = exp2(2.0 * clamp(uGhostFocal, -1.0, 1.0));
+    float t = pow(u, k), dt = -k * t / (u * r), ddt = k * (k - 1.0) * t / (u * u * r * r);
+    return vec3(t * t * (3.0 - 2.0 * t), 6.0 * t * (1.0 - t) * dt, (6.0 - 12.0 * t) * dt * dt + 6.0 * t * (1.0 - t) * ddt);
+}
+vec3 onPlane(vec3 v, vec3 n) { return v - n * dot(v, n); }
+// Moves x as the dabs [first, end) would, and follows what the moves do to the surface seen as a height field
+// over the vertex's tangent plane (normal n): the height's gradient g (in that plane) and its Laplacian lap
+// (forward differentiation of each kernel's height change; lateral moves don't count). The shading normal is
+// then n - g, and the cavity term changes by the edge length over four times lap (curvatureAt).
+vec3 ghostMove(vec3 x, vec3 n, int first, int end, inout vec3 g, inout float lap) {
+    float sgn = uGhostKind.y != 0 ? -1.0 : 1.0;
+    int kind = uGhostKind.x;
+    for (int i = first; i < end; ++i) {
+        vec3 c = uGhostA[i].xyz;
+        float r = uGhostA[i].w;
+        float dist = length(x - c);
+        if (dist >= r) continue;
+        float w = uGhostC[i].w;
+        vec3 F = ghostFalloff(dist, r) * w; // f, f', f'' in the distance
+        float f = F.x;
+        float s = uGhostB[i].w;
+        vec3 an = uGhostB[i].xyz;
+        vec3 ac = uGhostC[i].xyz;
+        vec3 radial = onPlane(x - c, n);
+        float rl = length(radial);
+        radial = rl > 1e-12 ? radial / rl : vec3(0.0);
+        float inv = 1.0 / max(dist, r * 1e-3);
+        float cn = dot(an, n);              // the kernel moves along an: the height changes by cn per unit
+        vec3 dh = onPlane(an, n) + cn * g;  // gradient of dot(x, an) over the surface
+        float radialLap = F.z + F.y * inv;  // Laplacian of f
+        if (kind == 1 || kind == 2) {       // Standard (along the area normal), Inflate (along the vertex's)
+            float a = sgn * s * r * (kind == 1 ? 0.06 : 0.05);
+            float k = kind == 1 ? cn : 1.0;
+            x += (kind == 1 ? an : n) * (a * f);
+            g += radial * (k * a * F.y);
+            lap += k * a * radialLap;
+        } else if (kind == 3 || kind == 4) { // Clay, Clay Buildup: everything below a plane pulled up to it
+            float h = dot(x - (ac + an * (sgn * r * (kind == 3 ? 0.05 : 0.08) * s)), an);
+            if (sgn * h < 0.0) {
+                vec3 W = F; // the pull's profile and its derivatives
+                if (kind == 4) {
+                    float e = clamp((1.0 - dist / r) / 0.35, 0.0, 1.0), de = e > 0.0 && e < 1.0 ? -1.0 / (0.35 * r) : 0.0;
+                    W = vec3(e * e * (3.0 - 2.0 * e), 6.0 * e * (1.0 - e) * de, (6.0 - 12.0 * e) * de * de) * w;
+                }
+                x -= an * (h * W.x);
+                lap -= cn * (2.0 * W.y * dot(radial, dh) + W.x * cn * lap + h * (W.z + W.y * inv));
+                g -= cn * (W.x * dh + h * W.y * radial);
+            }
+        } else if (kind == 5) { // Flatten
+            float m = s * (uGhostKind.y != 0 ? -0.5 : 1.0);
+            float h = dot(x - ac, an);
+            x -= an * (h * m * f);
+            lap -= cn * m * (2.0 * F.y * dot(radial, dh) + f * cn * lap + h * radialLap);
+            g -= cn * m * (f * dh + h * F.y * radial);
+        } else if (kind == 6) { // Crease: a valley of f^2, the sides pinched in
+            float a = -sgn * s * r * 0.05;
+            x += an * (a * f * f) + onPlane(c - x, an) * (0.25 * s * f);
+            g += radial * (cn * a * 2.0 * f * F.y);
+            lap += cn * a * (2.0 * (F.y * F.y + f * F.z) + 2.0 * f * F.y * inv);
+        } else if (kind == 7) { // Pinch: sideways only
+            x += onPlane(c - x, an) * (sgn * 0.2 * s * f);
+        } else if (kind == 8) { // Dam Standard: f^4, the sides pinched in
+            float a = -sgn * s * r * 0.08;
+            float f3 = f * f * f;
+            x += an * (a * f3 * f) + onPlane(c - x, an) * (0.3 * s * f);
+            g += radial * (cn * a * 4.0 * f3 * F.y);
+            lap += cn * a * (12.0 * f * f * F.y * F.y + 4.0 * f3 * F.z + 4.0 * f3 * F.y * inv);
+        } else if (kind == 9) { // Trim: what sticks out above a plane cut off
+            float h = dot(x - (ac - an * (sgn * r * 0.02 * s)), an);
+            if (sgn * h > 0.0) {
+                float q = sqrt(max(f, 0.0)) * (0.5 + s);
+                float m = min(1.0, q), dm = q < 1.0 && f > 1e-6 ? (0.5 + s) * F.y / (2.0 * sqrt(f)) : 0.0;
+                x -= an * (h * m);
+                lap -= cn * (2.0 * dm * dot(radial, dh) + m * cn * lap + h * dm * inv);
+                g -= cn * (m * dh + h * dm * radial);
+            }
+        }
+    }
+    return x;
+}
+#endif
 void main() {
     uvec3 q = uvec3(aPos.x & 0x1FFFFFu, (aPos.x >> 21) | ((aPos.y & 0x3FFu) << 11), (aPos.y >> 10) & 0x1FFFFFu);
-    vec4 p = uView * vec4(uGridOrigin + vec3(q) * uGridStep, 1.0);
+    vec3 world = uGridOrigin + vec3(q) * uGridStep;
+    vec3 normal = decodeNormal(aNormal);
     float curvature = float(int(aNormal >> 22) - 512) / 511.0; // sign(c) sqrt(|c|), render/Clusters.h
-    vNormalCurv = vec4(mat3(uView) * decodeNormal(aNormal), curvature * abs(curvature));
+    curvature *= abs(curvature);
+#ifdef GHOST
+    // The moved position, normal and cavity term (one evaluation per vertex, no extra varyings: a tiled GPU
+    // writes every vertex's outputs to memory and reads them back).
+    for (int k = 0; k < uGhostGroups; ++k) {
+        if (distance(world, uGhostBound[k].xyz) >= uGhostBound[k].w) continue;
+        vec3 g = vec3(0.0);
+        float lap = 0.0;
+        world = ghostMove(world, normal, uGhostRange[k].x, uGhostRange[k].y, g, lap);
+        normal = normalize(normal - g);
+        curvature = clamp(curvature + 0.25 * uGhostEdge * lap, -1.0, 1.0);
+    }
+#endif
+    vec4 p = uView * vec4(world, 1.0);
+    vNormalCurv = vec4(mat3(uView) * normal, curvature);
 #ifdef FLAT
     vViewPos = p.xyz;
 #endif
@@ -157,7 +273,9 @@ uniform int uHasPaint;        // 1: a painted texture is bound to uPaintTex too
 uniform int uNormalFlipY;     // 1: DirectX convention (green down)
 #endif
 #else
+#ifndef MICRO
 in vec4 vNormalCurv;
+#endif
 #ifdef FLAT
 in vec3 vViewPos;
 #endif
@@ -174,6 +292,54 @@ flat in int vPrimBase;
 #else
 #define V_COLOR vec3(1.0)
 #define V_MASK 0.0
+#endif
+#ifdef MICRO
+// Micro-displacement levels (render/MicroRenderer.cpp): the full-resolution shading grid of the base triangle,
+// interpolated on the micro triangle under the pixel (normal, curvature, mask), whatever level the geometry drew.
+flat in int vSlot;
+in vec2 vIJ;
+uniform samplerBuffer uShade;
+uniform int uN;
+uniform int uSamples;
+uniform mat4 uView;
+vec4 gNC;
+float gMask;
+vec4 shadeAt(int i, int j) { return texelFetch(uShade, vSlot * uSamples + j * (uN + 1) - (j * (j - 1)) / 2 + i); }
+vec3 octNormal(vec2 v) {
+    vec2 e = v * 2.0 - 1.0;
+    vec3 n = vec3(e, 1.0 - abs(e.x) - abs(e.y));
+    float t = max(-n.z, 0.0);
+    n.x += n.x >= 0.0 ? -t : t;
+    n.y += n.y >= 0.0 ? -t : t;
+    return normalize(n);
+}
+void microFetch() {
+    float fi = clamp(vIJ.x, 0.0, float(uN)), fj = clamp(vIJ.y, 0.0, float(uN));
+    int i0 = min(int(fi), uN - 1), j0 = min(int(fj), uN - 1);
+    if (i0 + j0 > uN - 1) {
+        if (fi >= fj) i0 = uN - 1 - j0;
+        else j0 = uN - 1 - i0;
+    }
+    float a = fi - float(i0), b = fj - float(j0);
+    vec4 s0, s1, s2;
+    vec3 w;
+    if (a + b <= 1.0 || i0 + j0 + 2 > uN) {
+        s0 = shadeAt(i0, j0); s1 = shadeAt(i0 + 1, j0); s2 = shadeAt(i0, j0 + 1);
+        w = vec3(1.0 - a - b, a, b);
+    } else {
+        s0 = shadeAt(i0 + 1, j0); s1 = shadeAt(i0 + 1, j0 + 1); s2 = shadeAt(i0, j0 + 1);
+        w = vec3(1.0 - b, a + b - 1.0, 1.0 - a);
+    }
+    w = clamp(w, 0.0, 1.0);
+    vec3 n = octNormal(s0.xy) * w.x + octNormal(s1.xy) * w.y + octNormal(s2.xy) * w.z;
+    vec3 c3 = (vec3(s0.z, s1.z, s2.z) * 255.0 - 128.0) / 127.0;
+    float c = dot(c3, w);
+    gNC = vec4(mat3(uView) * normalize(n), c * abs(c));
+    gMask = dot(vec3(s0.w, s1.w, s2.w), w);
+}
+#define vNormalCurv gNC
+#undef V_MASK
+#define V_MASK gMask
 #endif
 uniform vec4 uViewport;  // the view's rectangle in window pixels
 uniform vec2 uProjScale; // projection x and y scale
@@ -211,6 +377,9 @@ vec3 viewRay() {
     return normalize(vec3(-ndc / uProjScale, 1.0));
 }
 void main() {
+#ifdef MICRO
+    microFetch();
+#endif
     vec3 albedo = uBaseColor;
     vec3 tint = vec3(1.0); // multiplies a matcap: polypaint or polygroup colours
 #ifdef PRIM
@@ -519,15 +688,20 @@ bool Renderer::init(std::string& error) {
 
 const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     if (features & (kTextured | kNormalMap)) features |= kTextured | kPrim;
-    MeshProgram& p = programs_[features & 31];
+    // (micro levels: no per-vertex paint, per-triangle data or predictive preview)
+    if (features & kMicro) features &= kMicro | kFlat;
+    MeshProgram& p = programs_[features & 127];
     if (p.id) return &p;
     std::string prefix = "#version 330 core\n";
+    if (features & kMicro) prefix += "#define MICRO\n";
     if (features & kPaint) prefix += "#define PAINT\n";
     if (features & kPrim) prefix += "#define PRIM\n";
     if (features & kTextured) prefix += "#define TEXTURED\n";
     if (features & kNormalMap) prefix += "#define NORMALMAP\n";
     if (features & kFlat) prefix += "#define FLAT\n";
-    const std::string vs = prefix + kMeshVS, fs = prefix + kMeshFS, gs = prefix + kMeshGS;
+    if (features & kGhost) prefix += "#define GHOST\n";
+    const std::string vs = prefix + ((features & kMicro) ? microVertexShaderSource() : kMeshVS), fs = prefix + kMeshFS,
+                      gs = prefix + kMeshGS;
     p.id = link(vs.c_str(), fs.c_str(), programError_, nullptr, (features & kTextured) ? gs.c_str() : nullptr);
     if (!p.id) return nullptr;
     auto at = [&](const char* name) { return gl::GetUniformLocation(p.id, name); };
@@ -548,6 +722,15 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     p.hasPaint = at("uHasPaint");
     p.normalFlipY = at("uNormalFlipY");
     p.twoSided = at("uTwoSided");
+    p.ghostGroups = at("uGhostGroups");
+    p.ghostRange = at("uGhostRange");
+    p.ghostEdge = at("uGhostEdge");
+    p.ghostA = at("uGhostA");
+    p.ghostB = at("uGhostB");
+    p.ghostC = at("uGhostC");
+    p.ghostBound = at("uGhostBound");
+    p.ghostKind = at("uGhostKind");
+    p.ghostFocal = at("uGhostFocal");
     // Texture units: groups 1, matcap 2, UVs 3, painted texture 4, normal map 5, tangents 6, cluster table 7.
     gl::UseProgram(p.id);
     gl::Uniform1i(at("uGroupIds"), 1);
@@ -693,6 +876,7 @@ void Renderer::freeSlot(MeshSlot& s) {
     gl::DeleteVertexArrays(1, &s.vao);
     gl::DeleteVertexArrays(1, &s.lineVao);
     gl::DeleteVertexArrays(1, &s.proxyVao);
+    s.micro.reset();
     if (s.patchVao) {
         for (GLuint* b : {&s.patchVertices, &s.patchIndices, &s.patchLines, &s.patchColors, &s.patchMask, &s.patchGroupData})
             gl::DeleteBuffers(1, b);
@@ -710,6 +894,7 @@ size_t Renderer::gpuBytes() const {
         total += s.patchBytes;
         if (s.proxyAllocated) total += (s.order.triangleCount() / 4) * 3 * sizeof(uint16_t);
         if (s.paintTexture) total += size_t(s.textureW) * size_t(s.textureH) * 4 * 4 / 3; // with mipmaps
+        if (s.micro) total += s.micro->gpuBytes();
     }
     return total;
 }
@@ -822,21 +1007,8 @@ void Renderer::drawSplats(const glm::mat4& view, const glm::mat4& proj, int fbWi
 namespace {
 
 // Signed curvature at vertex `v`: how far the neighbour average sits above (crease, > 0) or below (ridge, < 0)
-// the surface, relative to the local edge length.
-float curvatureAt(const Mesh& mesh, uint32_t v) {
-    const auto ring = mesh.neighbors(v);
-    if (ring.empty()) return 0.0f;
-    glm::vec3 avg(0.0f);
-    float edge = 0.0f;
-    const glm::vec3 p = mesh.positions[v];
-    for (uint32_t n : ring) {
-        avg += mesh.positions[n];
-        edge += glm::distance(mesh.positions[n], p);
-    }
-    avg /= float(ring.size());
-    edge /= float(ring.size());
-    return edge > 0.0f ? glm::dot(mesh.normals[v], avg - p) / edge : 0.0f;
-}
+// the surface, relative to the local edge length (Mesh::curvatureAt).
+float curvatureAt(const Mesh& mesh, uint32_t v) { return mesh.curvatureAt(v); }
 
 using Runs = std::vector<std::pair<uint32_t, uint32_t>>;
 
@@ -959,14 +1131,14 @@ bool Renderer::outOfMemory(uint32_t id) const {
 void Renderer::syncScene(const std::vector<SceneMesh>& scene) {
     syncMatcaps();
     // Free the slots of SubTools that are gone (deleted, merged, a new scene).
-    for (size_t i = 0; i < slots_.size();) {
-        const bool live = std::any_of(scene.begin(), scene.end(), [&](const SceneMesh& m) { return m.id == slots_[i].id; });
+    for (auto it = slots_.begin(); it != slots_.end();) {
+        const bool live = std::any_of(scene.begin(), scene.end(), [&](const SceneMesh& m) { return m.id == it->id; });
         if (live) {
-            ++i;
+            ++it;
             continue;
         }
-        freeSlot(slots_[i]);
-        slots_.erase(slots_.begin() + std::ptrdiff_t(i));
+        freeSlot(*it);
+        it = slots_.erase(it);
     }
     drawList_.clear();
     for (const SceneMesh& m : scene) {
@@ -988,6 +1160,7 @@ void Renderer::uploadVertices(MeshSlot& s, const Mesh& mesh, bool full) {
     // Per block, hashes of what it last sent (positions; normals and curvature): a block a dab marked but didn't
     // change (paint, mask) isn't sent again, and a cluster whose positions didn't move keeps its bounds and proxy.
     s.blockHash.resize(nb * 2, 0);
+    s.blockBox.resize(nb);
     blockChanged_.assign(nb, 0);
     blockMoved_.assign(nb, 0);
     bool everything = full;
@@ -995,12 +1168,15 @@ void Renderer::uploadVertices(MeshSlot& s, const Mesh& mesh, bool full) {
         PackedVertex* out = static_cast<PackedVertex*>(dst);
         bool inside = true;
         uint64_t hp = 0, hn = 0;
+        AABB box;
         for (uint32_t i = b; i < e; ++i) {
             const uint32_t v = order[i];
             PackedVertex pv{}; // packed here and stored once: `out` may be mapped GPU memory, slow to read back
-            if (v < nv) // (else a vertex dynamic topology removed, which only patched clusters named)
+            if (v < nv) { // (else a vertex dynamic topology removed, which only patched clusters named)
                 inside &= packVertex(s.grid, mesh.positions[v], normals ? mesh.normals[v] : glm::vec3(0.0f, 0.0f, 1.0f),
                                      curvatureAt(mesh, v), pv);
+                box.expand(mesh.positions[v]);
+            }
             out[i - b] = pv;
             hp = (hp ^ (uint64_t(pv.pos[0]) | uint64_t(pv.pos[1]) << 32)) * 0x100000001B3ull + i;
             hn = (hn ^ pv.normal) * 0x100000001B3ull + i;
@@ -1010,7 +1186,9 @@ void Renderer::uploadVertices(MeshSlot& s, const Mesh& mesh, bool full) {
                 blockChanged_[g] = blockMoved_[g] || s.blockHash[g * 2 + 1] != hn;
                 s.blockHash[g * 2] = hp;
                 s.blockHash[g * 2 + 1] = hn;
+                s.blockBox[g] = box;
                 hp = hn = 0;
+                box = AABB();
             }
         }
         if (!inside) outside.store(true, std::memory_order_relaxed);
@@ -1636,6 +1814,17 @@ void Renderer::drawPatches(const MeshSlot& s, GLenum mode, Part part, GLint prim
 }
 
 void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, bool wireframe) {
+    if (mesh.micro && microMatches(mesh)) { // a micro level draws its own way (render/MicroRenderer.h)
+        if (!s.micro) s.micro = std::make_shared<MicroRenderer>();
+        s.outOfMemory = !s.micro->sync(mesh);
+        s.drawnTriangles = s.outOfMemory ? 0 : 1; // (draw() skips empty slots)
+        s.fresh = true;                           // (back to a mesh: a full upload)
+        return;
+    }
+    if (s.micro) {
+        s.micro.reset();
+        s.fresh = true;
+    }
     const size_t nv = mesh.vertexCount();
     if (normalMap && (!normalMap->rgb || !normalMap->tangents || normalMap->tangents->size() != mesh.uvs.size() ||
                       !mesh.hasUvs() || normalMap->rgb->size() != size_t(normalMap->width) * size_t(normalMap->height) * 3))
@@ -1688,9 +1877,14 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
         gl::BindVertexArray(0);
         s.grid = PositionGrid::around(meshBounds(mesh));
         dirtyRuns_.assign(1, {0u, uint32_t(s.order.size())});
+    } else if (s.regrid) { // a stroke's vertex left the grid (prepareStrokeUpload): a new one, everything sent
+        s.grid = PositionGrid::around(meshBounds(mesh));
+        dirtyRuns_.assign(1, {0u, uint32_t(s.order.size())});
+        std::fill(s.blockHash.begin(), s.blockHash.end(), ~uint64_t(0) >> 1); // (no block keeps its hash)
     } else {
         s.order.dirtyRuns(mesh, dirtyRuns_);
     }
+    s.regrid = false;
     const size_t ns = s.order.size();
     const bool ranged = !full && !dirtyRuns_.empty();
     const std::span<const uint32_t> order = s.order.fromGpu();
@@ -1787,7 +1981,7 @@ void Renderer::syncTexture(MeshSlot& s, Mesh& mesh) {
         if (!s.paintTexture) gl::GenTextures(1, &s.paintTexture);
         gl::BindTexture(GL_TEXTURE_2D, s.paintTexture);
         gl::TexImage2D(GL_TEXTURE_2D, 0, GLint(GL_SRGB8_ALPHA8), tex->width, tex->height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-                       tex->pixels.data());
+                       tex->shown().data());
         gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GLint(GL_LINEAR_MIPMAP_LINEAR));
         gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GLint(GL_LINEAR));
         gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GLint(GL_CLAMP_TO_EDGE));
@@ -1802,7 +1996,7 @@ void Renderer::syncTexture(MeshSlot& s, Mesh& mesh) {
         auto upload = [&](int x0, int y0, int x1, int y1) {
             x1 = std::min(x1, tex->width), y1 = std::min(y1, tex->height);
             gl::TexSubImage2D(GL_TEXTURE_2D, 0, x0, y0, x1 - x0, y1 - y0, GL_RGBA, GL_UNSIGNED_BYTE,
-                              tex->pixels.data() + (size_t(y0) * size_t(tex->width) + size_t(x0)) * 4);
+                              tex->shown().data() + (size_t(y0) * size_t(tex->width) + size_t(x0)) * 4);
         };
         if (!rect) {
             upload(0, 0, tex->width, tex->height);
@@ -2109,7 +2303,7 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
         gl::DepthMask(GL_FALSE);
         for (const DrawItem& item : drawList_) {
             const MeshSlot* s = item.active ? findSlot(item.id) : nullptr;
-            if (!s || s->drawnTriangles == 0) continue;
+            if (!s || s->drawnTriangles == 0 || s->micro) continue; // (micro levels: no wireframe)
             gl::Uniform3fv(gl::GetUniformLocation(wireProgram_, "uGridOrigin"), 1, glm::value_ptr(s->grid.origin));
             gl::Uniform1f(gl::GetUniformLocation(wireProgram_, "uGridStep"), s->grid.step);
             cull(*s, frameCull_);
@@ -2231,16 +2425,51 @@ void Renderer::drawClusters(const MeshSlot& s, const std::vector<uint32_t>& clus
 }
 
 // One mesh. Mask and polygroup colours are for the SubTool being edited; polypaint shows on all of them.
+void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings) {
+    const MeshProgram* p = meshProgram(kMicro | (flat ? kFlat : 0));
+    if (!p) return;
+    gl::UseProgram(p->id);
+    gl::UniformMatrix4fv(p->view, 1, GL_FALSE, glm::value_ptr(frameView_));
+    gl::UniformMatrix4fv(p->proj, 1, GL_FALSE, glm::value_ptr(frameProj_));
+    gl::Uniform4fv(p->viewport, 1, glm::value_ptr(frameViewport_));
+    const bool orthographic = frameProj_[3][3] == 1.0f;
+    gl::Uniform2f(p->projScale, orthographic ? 1e20f : frameProj_[0][0], orthographic ? 1e20f : frameProj_[1][1]);
+    gl::Uniform3fv(p->baseColor, 1, glm::value_ptr(settings.baseColor));
+    gl::Uniform1i(p->matcap, matcapTexture(settings.matcap) ? 1 : 0);
+    const MatcapCavity cavity = matcapCavity(settings.matcap);
+    gl::Uniform2f(p->matcapCavity, cavity.crease, cavity.ridge);
+    gl::Uniform1i(p->paint, 0);
+    gl::Uniform1i(p->showMask, active && settings.showMask ? 1 : 0);
+    gl::Uniform1i(p->groups, active && settings.showPolygroups ? 2 : 0);
+    gl::Uniform1i(p->dim, !active && settings.dimInactive ? 1 : 0);
+    gl::Uniform1i(p->twoSided, 1);
+    // Moving (Fast Navigation): a coarser target and half the budget, so orbiting stays smooth.
+    const bool moving = settings.motionProxy;
+    const size_t full = settings.renderTriangleBudget ? settings.renderTriangleBudget : size_t(currentTierConfig().activeTriangleBudget);
+    const size_t budget = moving ? full / 2 : full;
+    const float target = settings.microTargetPx * (moving ? 2.0f : 1.0f);
+    // (the budget is shared by the micro SubTools on screen: each gets it whole; one is the usual case)
+    const_cast<MeshSlot&>(s).microDrawn = s.micro->draw(p->id, frameCull_, frameProj_, frameViewport_, budget, target);
+    lastDrawn_ += s.microDrawn;
+}
+
 void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings) {
+    if (s.micro) {
+        drawMicro(s, active, flat, settings);
+        return;
+    }
     // A painted texture shows through the textured program (polypaint still multiplies it).
     const bool textured = s.hasUvs && s.paintTexture && settings.showPolypaint && settings.showTexture;
     // A baked normal map preview bends the shading normal (core/Bake.h).
     const bool normalMapped = s.hasUvs && s.normalTexture && s.hasTangents;
     const int groups = active && settings.showPolygroups ? (s.hasGroups ? 1 : 2) : 0;
+    // (Not through the textured program's geometry shader: those meshes are sculpted without the preview.)
+    const bool ghost = active && s.id == ghostId_ && !ghost_.empty() && !settings.motionProxy && !textured && !normalMapped;
     const int features = (s.hasColors || s.hasMask ? kPaint : 0) | (groups == 1 ? kPrim : 0) | (textured ? kTextured : 0) |
                          (normalMapped ? kNormalMap : 0) | (flat ? kFlat : 0);
     const MeshProgram* p = meshProgram(features);
     if (!p) return;
+    const auto bind = [&](const MeshProgram* p) {
     gl::UseProgram(p->id);
     gl::UniformMatrix4fv(p->view, 1, GL_FALSE, glm::value_ptr(frameView_));
     gl::UniformMatrix4fv(p->proj, 1, GL_FALSE, glm::value_ptr(frameProj_));
@@ -2280,6 +2509,8 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     gl::Uniform1i(p->groups, groups);
     gl::Uniform1i(p->dim, !active && settings.dimInactive ? 1 : 0);
     gl::Uniform1i(p->twoSided, 1);
+    };
+    bind(p);
     gl::BindVertexArray(s.vao);
     // Constant values for the attribute arrays that are disabled.
     if (!s.hasColors) gl::VertexAttrib4f(2, 1.0f, 1.0f, 1.0f, 1.0f);
@@ -2290,7 +2521,38 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     cull(s, frameCull_, settings.motionProxy && !perTriangle && !(active && settings.wireframe));
     // The back faces left in clusters along the silhouette: the GPU skips them too when they can't show.
     if (cullBackfaces_) gl::Enable(GL_CULL_FACE);
+    // The predictive preview (render/Ghost.h): the clusters a ghost dab reaches draw with the GHOST program, the
+    // rest as usual (most of the mesh, which then doesn't pay for the preview).
+    // A draft stroke (Sculptor::draftStrokes) left the normals of the clusters it moved as they were: those draw
+    // with normals from the moved triangles themselves (the FLAT program's per-pixel face normals) until it ends.
+    const bool draft = active && s.id == draftId_ && !perTriangle && s.looseMark.size() == s.bounds.size();
+    for (auto& list : extraClusters_) list.clear();
+    if (ghost || draft) {
+        size_t kept = 0;
+        for (uint32_t c : drawClusters_) {
+            const ClusterBounds& b = s.bounds[c];
+            bool reached = false;
+            if (ghost) {
+                reached = b.radius < 0.0f;
+                for (size_t i = 0; i < ghost_.dabs.size() && !reached; ++i)
+                    reached = glm::distance(b.center, ghost_.dabs[i].center) < b.radius + ghost_.dabs[i].radius * 1.05f;
+            }
+            const bool rough = draft && s.looseMark[c];
+            if (reached || rough) extraClusters_[(reached ? 1 : 0) | (rough ? 2 : 0)].push_back(c);
+            else drawClusters_[kept++] = c;
+        }
+        drawClusters_.resize(kept);
+    }
     drawClusters(s, drawClusters_, GL_TRIANGLES, Part::Triangles, perTriangle ? p->primBase : -1);
+    for (int k = 1; k < 4; ++k) {
+        if (extraClusters_[k].empty()) continue;
+        if (const MeshProgram* pg = meshProgram(features | ((k & 1) ? kGhost : 0) | ((k & 2) ? kFlat : 0))) {
+            bind(pg);
+            if (k & 1) setGhostUniforms(*pg);
+            drawClusters(s, extraClusters_[k], GL_TRIANGLES, Part::Triangles, -1);
+            bind(p);
+        }
+    }
     if (!s.patches.empty() && s.patchVao) { // dynamic topology: what changed since the layout (in full while moving)
         gl::BindVertexArray(s.patchVao);
         if (!s.patchColorsOn) gl::VertexAttrib4f(2, 1.0f, 1.0f, 1.0f, 1.0f);
@@ -2311,6 +2573,326 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
         drawClusters(s, proxyClusters_, GL_TRIANGLES, Part::Proxy, -1);
     }
     gl::Disable(GL_CULL_FACE);
+}
+
+// ---------------------------------------------------------------------------
+// Strokes on heavy meshes: the ghost and the two-part upload (app/AsyncStroke.cpp)
+// ---------------------------------------------------------------------------
+
+void Renderer::setGhost(uint32_t id, const GhostStroke& ghost) {
+    ghostId_ = id;
+    ghost_.kind = ghost.kind;
+    ghost_.invert = ghost.invert;
+    ghost_.focal = ghost.focal;
+    ghost_.edge = ghost.edge;
+    ghost_.dabs.assign(ghost.dabs.begin(), ghost.dabs.begin() + std::ptrdiff_t(std::min(ghost.dabs.size(), GhostStroke::kMaxDabs)));
+}
+
+void Renderer::setGhostUniforms(const MeshProgram& p) {
+    glm::vec4 a[GhostStroke::kMaxDabs], b[GhostStroke::kMaxDabs], c[GhostStroke::kMaxDabs];
+    glm::vec4 bound[GhostStroke::kMaxMirrors];
+    GLint range[GhostStroke::kMaxMirrors * 2];
+    int groups = 0;
+    const size_t n = ghost_.dabs.size();
+    for (size_t i = 0; i < n; ++i) {
+        const GhostDab& d = ghost_.dabs[i];
+        a[i] = glm::vec4(d.center, d.radius);
+        b[i] = glm::vec4(d.normal, d.strength);
+        c[i] = glm::vec4(d.areaCenter, d.weight);
+        const bool next = i == 0 || d.mirror != ghost_.dabs[i - 1].mirror;
+        if (next) {
+            if (groups == int(GhostStroke::kMaxMirrors)) break;
+            range[groups * 2] = range[groups * 2 + 1] = GLint(i);
+            ++groups;
+        }
+        range[groups * 2 - 1] = GLint(i + 1);
+    }
+    // Each run's bounding sphere (around its dabs' spheres, a little wider: the moves reach out a little).
+    for (int g = 0; g < groups; ++g) {
+        AABB box;
+        for (GLint i = range[g * 2]; i < range[g * 2 + 1]; ++i) {
+            box.expand(glm::vec3(a[i]) - glm::vec3(a[i].w));
+            box.expand(glm::vec3(a[i]) + glm::vec3(a[i].w));
+        }
+        bound[g] = glm::vec4(box.center(), glm::length(box.max - box.min) * 0.5f * 1.1f);
+    }
+    gl::Uniform1i(p.ghostGroups, groups);
+    gl::Uniform4fv(p.ghostBound, groups, glm::value_ptr(bound[0]));
+    gl::Uniform2iv(p.ghostRange, groups, range);
+    gl::Uniform4fv(p.ghostA, GLsizei(n), glm::value_ptr(a[0]));
+    gl::Uniform4fv(p.ghostB, GLsizei(n), glm::value_ptr(b[0]));
+    gl::Uniform4fv(p.ghostC, GLsizei(n), glm::value_ptr(c[0]));
+    gl::Uniform2i(p.ghostKind, GLint(ghost_.kind), ghost_.invert ? 1 : 0);
+    gl::Uniform1f(p.ghostFocal, ghost_.focal);
+    gl::Uniform1f(p.ghostEdge, ghost_.edge);
+}
+
+bool Renderer::prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out, const float* curvature) {
+    out.id = id;
+    out.ready = false;
+    out.data.clear();
+    out.ranges.clear();
+    out.movedClusters.clear();
+    out.bounds.clear();
+    out.exactClusters.clear();
+    out.exactBounds.clear();
+    out.regrid = false;
+    out.packMs = out.boundsMs = 0.0;
+    const auto clock = std::chrono::steady_clock::now();
+    MeshSlot* found = static_cast<MeshSlot*>(out.slot); // (bindStrokeUpload: never the list from this thread)
+    if (!found || found->id != id) return false;
+    MeshSlot& s = *found;
+    const size_t nv = mesh.vertexCount();
+    // What only the regular sync handles: a new layout, faces, attributes appearing, dynamic topology, textures.
+    if (s.micro || s.fresh || s.outOfMemory || s.regrid || mesh.topologyDirty || mesh.facesDirty || nv != s.vertexCapacity ||
+        !mesh.changedTriangles.empty() || !s.patches.empty() || mesh.normals.size() != nv || s.hasUvs ||
+        s.hasColors != (nv > 0 && mesh.colors.size() == nv) || s.hasMask != (nv > 0 && mesh.mask.size() == nv))
+        return false;
+    std::vector<std::pair<uint32_t, uint32_t>> runs;
+    s.order.dirtyRuns(mesh, runs);
+    if (runs.empty()) {
+        out.ready = true;
+        return true;
+    }
+    // The colours and mask of the dirty runs would go up too (a sculpt stroke doesn't change them; a stroke that
+    // does takes the regular sync).
+    const size_t ns = s.order.size();
+    const size_t nb = (ns + UploadOrder::kBlock - 1) / UploadOrder::kBlock;
+    const std::span<const uint32_t> order = s.order.fromGpu();
+    s.blockHash.resize(nb * 2, 0);
+    out.blockChanged.assign(nb, 0);
+    out.blockMoved.assign(nb, 0);
+    // Pieces of a few thousand slots packed in parallel, each at its offset in `data`.
+    constexpr uint32_t kPiece = 2048;
+    struct Piece {
+        uint32_t begin, end;
+        size_t offset;
+    };
+    std::vector<Piece> pieces;
+    const auto cut = [&] {
+        pieces.clear();
+        size_t total = 0;
+        for (const auto& [b, e] : runs)
+            for (uint32_t c = b; c < e; c += kPiece) {
+                const uint32_t ce = std::min(e, c + kPiece);
+                pieces.push_back({c, ce, total});
+                total += ce - c;
+            }
+        out.data.resize(total);
+    };
+    cut();
+    std::atomic<bool> outside{false};
+    std::vector<uint64_t> hashes(nb * 2, 0); // (written per block, then compared: a failed prepare keeps the old)
+    std::vector<AABB> boxes(nb);
+    s.blockBox.resize(nb);
+    PositionGrid grid = s.grid;
+    bool everything = false;
+    const auto pack = [&] {
+    poolFor(pieces.size(), [&](size_t i0, size_t i1) {
+        for (size_t pi = i0; pi < i1; ++pi) {
+            const Piece& pc = pieces[pi];
+            PackedVertex* dst = out.data.data() + pc.offset;
+            bool inside = true;
+            uint64_t hp = 0, hn = 0;
+            AABB box;
+            for (uint32_t i = pc.begin; i < pc.end; ++i) {
+                const uint32_t v = order[i];
+                PackedVertex pv{};
+                if (v < nv) {
+                    inside &= packVertex(grid, mesh.positions[v], mesh.normals[v], curvature ? curvature[v] : curvatureAt(mesh, v), pv);
+                    box.expand(mesh.positions[v]);
+                }
+                dst[i - pc.begin] = pv;
+                hp = (hp ^ (uint64_t(pv.pos[0]) | uint64_t(pv.pos[1]) << 32)) * 0x100000001B3ull + i;
+                hn = (hn ^ pv.normal) * 0x100000001B3ull + i;
+                if ((i + 1) % UploadOrder::kBlock == 0 || i + 1 == pc.end) {
+                    const size_t g = i >> UploadOrder::kBlockShift;
+                    hashes[g * 2] = hp;
+                    hashes[g * 2 + 1] = hn;
+                    out.blockMoved[g] = everything || s.blockHash[g * 2] != hp;
+                    out.blockChanged[g] = out.blockMoved[g] || s.blockHash[g * 2 + 1] != hn;
+                    boxes[g] = box;
+                    hp = hn = 0;
+                    box = AABB();
+                }
+            }
+            if (!inside) outside.store(true, std::memory_order_relaxed);
+        }
+    }, 1, 2);
+    };
+    pack();
+    if (outside.load()) {
+        // A vertex left the position grid: a new one round the mesh, and every vertex packed again, here on this
+        // thread (the GL thread keeps drawing with the old grid and data until the commit swaps both; the
+        // regular sync did this in the frame, a stall of seconds at 33M triangles).
+        grid = PositionGrid::around(meshBounds(mesh));
+        runs.assign(1, {0u, uint32_t(ns)});
+        cut();
+        everything = true;
+        outside = false;
+        pack();
+        if (outside.load()) return false; // (can't happen: the grid holds the mesh)
+        out.regrid = true;
+        out.grid = grid;
+    }
+    out.packMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - clock).count();
+    // The changed blocks' GPU ranges and where they are in `data`.
+    for (const Piece& pc : pieces)
+        for (uint32_t b = pc.begin; b < pc.end;) {
+            const uint32_t e = std::min(pc.end, (b & ~(UploadOrder::kBlock - 1)) + UploadOrder::kBlock);
+            const size_t g = b >> UploadOrder::kBlockShift;
+            s.blockBox[g] = boxes[g];
+            if (out.blockChanged[g]) {
+                s.blockHash[g * 2] = hashes[g * 2];
+                s.blockHash[g * 2 + 1] = hashes[g * 2 + 1];
+                const size_t offset = pc.offset + (b - pc.begin);
+                if (!out.ranges.empty() && out.ranges.back().end == b && out.ranges.back().offset +
+                                                                          (out.ranges.back().end - out.ranges.back().begin) == offset)
+                    out.ranges.back().end = e;
+                else out.ranges.push_back({b, e, offset});
+            }
+            b = e;
+        }
+    // The clusters with a block that moved, and their culling bounds.
+    for (const auto& [b, e] : runs)
+        for (uint32_t g = b >> UploadOrder::kBlockShift; g < (e + UploadOrder::kBlock - 1) >> UploadOrder::kBlockShift; ++g) {
+            if (!out.blockMoved[g]) continue;
+            const uint32_t c = s.order.clusterOfSlot(g << UploadOrder::kBlockShift);
+            if (out.movedClusters.empty() || c > out.movedClusters.back()) out.movedClusters.push_back(c);
+        }
+    // Their quick bounds: a sphere round their blocks' boxes, no normal cone (never culled as facing away), the
+    // volume as it was (a stroke doesn't turn the mesh inside out); refineStrokeBounds makes them exact.
+    out.bounds.resize(out.movedClusters.size());
+    const auto layout = s.order.clusters();
+    for (size_t i = 0; i < out.movedClusters.size(); ++i) {
+        const uint32_t c = out.movedClusters[i];
+        AABB box;
+        for (uint32_t g = layout[c].firstVertex >> UploadOrder::kBlockShift,
+                      ge = (layout[c].firstVertex + layout[c].vertexCount + UploadOrder::kBlock - 1) >> UploadOrder::kBlockShift;
+             g < ge && g < nb; ++g)
+            if (s.blockBox[g].valid()) box.expand(s.blockBox[g]);
+        ClusterBounds& cb = out.bounds[i];
+        cb = ClusterBounds();
+        if (box.valid()) {
+            cb.center = box.center();
+            cb.radius = glm::length(box.max - box.min) * 0.5f;
+        }
+        cb.coneAngle = -1.0f;
+        cb.volume = c < s.bounds.size() ? s.bounds[c].volume : 0.0;
+    }
+    mesh.clearDirty();
+    out.boundsMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - clock).count() - out.packMs;
+    out.ready = true;
+    return true;
+}
+
+void Renderer::commitStrokeUpload(StrokeUpload& up) {
+    if (!up.ready) return;
+    up.ready = false;
+    MeshSlot* found = nullptr;
+    for (MeshSlot& s : slots_)
+        if (s.id == up.id) found = &s;
+    if (!found) return;
+    MeshSlot& s = *found;
+    if (up.regrid) s.grid = up.grid; // (with every vertex, packed on it)
+    if (!up.ranges.empty()) {
+        gl::BindBuffer(GL_ARRAY_BUFFER, s.vertexBuffer);
+        for (const StrokeUpload::Range& r : up.ranges)
+            gl::BufferSubData(GL_ARRAY_BUFFER, GLintptr(size_t(r.begin) * sizeof(PackedVertex)),
+                              GLsizeiptr(size_t(r.end - r.begin) * sizeof(PackedVertex)), up.data.data() + r.offset);
+        gl::BindBuffer(GL_ARRAY_BUFFER, 0);
+    }
+    if (!up.movedClusters.empty()) {
+        s.bounds.resize(s.order.clusters().size());
+        s.proxyStale.resize(s.bounds.size(), 1);
+        for (size_t i = 0; i < up.movedClusters.size(); ++i) {
+            s.bounds[up.movedClusters[i]] = up.bounds[i];
+            s.proxyStale[up.movedClusters[i]] = 1;
+        }
+        s.looseClusters.insert(s.looseClusters.end(), up.movedClusters.begin(), up.movedClusters.end());
+        s.looseMark.resize(s.bounds.size(), 0);
+        for (uint32_t c : up.movedClusters) s.looseMark[c] = 1;
+    }
+    if (up.exact) { // the stroke's end (refineStrokeBoundsInto): exact bounds for every cluster it moved
+        s.bounds.resize(s.order.clusters().size());
+        for (size_t i = 0; i < up.exactClusters.size(); ++i)
+            if (up.exactClusters[i] < s.bounds.size()) s.bounds[up.exactClusters[i]] = up.exactBounds[i];
+        s.looseClusters.clear();
+        std::fill(s.looseMark.begin(), s.looseMark.end(), 0);
+    }
+    if (!up.movedClusters.empty() || up.exact) {
+        s.box = AABB();
+        s.volume = 0.0;
+        for (const ClusterBounds& b : s.bounds) {
+            s.volume += b.volume;
+            if (b.radius >= 0.0f) {
+                s.box.expand(b.center - glm::vec3(b.radius));
+                s.box.expand(b.center + glm::vec3(b.radius));
+            }
+        }
+    }
+}
+
+void Renderer::setDraftNormals(uint32_t id) { draftId_ = id; }
+
+void Renderer::bindStrokeUpload(uint32_t id, StrokeUpload& up) {
+    up.slot = nullptr;
+    for (MeshSlot& s : slots_)
+        if (s.id == id) up.slot = &s;
+}
+
+void Renderer::refineStrokeBoundsInto(uint32_t id, const Mesh& mesh, StrokeUpload& up) {
+    up.exact = false;
+    up.exactClusters.clear();
+    up.exactBounds.clear();
+    MeshSlot* found = static_cast<MeshSlot*>(up.slot);
+    if (!found || found->id != id) return;
+    MeshSlot& s = *found;
+    const size_t nc = s.order.clusters().size();
+    if (s.fresh || mesh.topologyDirty || s.bounds.size() != nc) return;
+    // Those moved before and those this upload moves (the main thread doesn't touch the list while we run).
+    up.exactClusters = s.looseClusters;
+    up.exactClusters.insert(up.exactClusters.end(), up.movedClusters.begin(), up.movedClusters.end());
+    std::sort(up.exactClusters.begin(), up.exactClusters.end());
+    up.exactClusters.erase(std::unique(up.exactClusters.begin(), up.exactClusters.end()), up.exactClusters.end());
+    while (!up.exactClusters.empty() && up.exactClusters.back() >= nc) up.exactClusters.pop_back();
+    up.exactBounds.resize(up.exactClusters.size());
+    poolFor(up.exactClusters.size(), [&](size_t i0, size_t i1) {
+        for (size_t i = i0; i < i1; ++i) up.exactBounds[i] = clusterBounds(mesh, s.order, up.exactClusters[i]);
+    }, 1, 2);
+    up.exact = true;
+    up.ready = true;
+}
+
+void Renderer::refineStrokeBounds(uint32_t id, const Mesh& mesh) {
+    MeshSlot* found = nullptr;
+    for (MeshSlot& s : slots_)
+        if (s.id == id) found = &s;
+    if (!found) return;
+    std::fill(found->looseMark.begin(), found->looseMark.end(), 0);
+    if (found->looseClusters.empty()) return;
+    MeshSlot& s = *found;
+    std::sort(s.looseClusters.begin(), s.looseClusters.end());
+    s.looseClusters.erase(std::unique(s.looseClusters.begin(), s.looseClusters.end()), s.looseClusters.end());
+    const size_t nc = s.order.clusters().size();
+    if (s.fresh || mesh.topologyDirty || s.bounds.size() != nc) { // (a full upload since makes them anyway)
+        s.looseClusters.clear();
+        return;
+    }
+    poolFor(s.looseClusters.size(), [&](size_t i0, size_t i1) {
+        for (size_t i = i0; i < i1; ++i)
+            if (s.looseClusters[i] < nc) s.bounds[s.looseClusters[i]] = clusterBounds(mesh, s.order, s.looseClusters[i]);
+    }, 1, 2);
+    s.looseClusters.clear();
+    s.volume = 0.0;
+    s.box = AABB();
+    for (const ClusterBounds& b : s.bounds) {
+        s.volume += b.volume;
+        if (b.radius >= 0.0f) {
+            s.box.expand(b.center - glm::vec3(b.radius));
+            s.box.expand(b.center + glm::vec3(b.radius));
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -2335,10 +2917,10 @@ bool Renderer::renderMeshThumbnail(Mesh& mesh, const Camera& camera, int size, c
     const bool ok = renderToImage(camera, size, size, settings, rgba, error);
     thumbnailPass_ = false;
     drawList_.swap(scene);
-    for (size_t i = 0; i < slots_.size(); ++i)
-        if (slots_[i].id == kThumbnailSlot) {
-            freeSlot(slots_[i]);
-            slots_.erase(slots_.begin() + std::ptrdiff_t(i));
+    for (auto it = slots_.begin(); it != slots_.end(); ++it)
+        if (it->id == kThumbnailSlot) {
+            freeSlot(*it);
+            slots_.erase(it);
             break;
         }
 

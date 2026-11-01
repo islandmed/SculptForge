@@ -398,3 +398,104 @@ TEST(texture_io_export_commands_write_textures) {
     CHECK(checkPng(dir / "out_Body_color.png"));
     fs::remove_all(dir);
 }
+
+// --- PBR material slots from material channels (core/TextureChannels.h, core/MapExport.h) ---
+
+namespace {
+
+// The red-bottom texture with roughness, metallic, normal, AO, emissive and opacity painted in places.
+std::shared_ptr<PaintTexture> pbrTexture() {
+    auto t = redBottomTexture();
+    for (Channel c : {Channel::Roughness, Channel::Metallic, Channel::Normal, Channel::AO, Channel::Emissive, Channel::Opacity})
+        setChannelEnabled(*t, c, true);
+    const float rough[1] = {0.2f}, metal[1] = {1.0f}, alpha[1] = {0.5f};
+    for (int y = 0; y < 8; ++y)
+        for (int x = 0; x < 16; ++x) {
+            t->channels[size_t(Channel::Roughness)].base.setValues(x, y, rough);
+            t->channels[size_t(Channel::Metallic)].base.setValues(x, y, metal);
+            t->channels[size_t(Channel::Opacity)].base.setValues(x, y, alpha);
+        }
+    return t;
+}
+
+} // namespace
+
+TEST(texture_io_pbr_slots_in_gltf_usd_obj_fbx) {
+    const fs::path dir = testDir("sf_texture_io_pbr");
+    std::string err;
+    Mesh m = seamSphere();
+    m.texture = pbrTexture();
+
+    // glTF: ORM image on metallicRoughness and occlusion, normal, emissive, opacity -> BLEND.
+    CHECK(saveGlb(str(dir / "model.glb"), m, "Sculpt", err));
+    const std::string glb = readText(dir / "model.glb");
+    CHECK(glb.find("\"baseColorTexture\":{\"index\":0}") != std::string::npos);
+    CHECK(glb.find("\"metallicRoughnessTexture\":{\"index\":1},\"metallicFactor\":1,\"roughnessFactor\":1") != std::string::npos);
+    CHECK(glb.find("\"occlusionTexture\":{\"index\":1}") != std::string::npos);
+    CHECK(glb.find("\"normalTexture\":{\"index\":2}") != std::string::npos);
+    CHECK(glb.find("\"emissiveTexture\":{\"index\":3},\"emissiveFactor\":[1,1,1]") != std::string::npos);
+    CHECK(glb.find("\"alphaMode\":\"BLEND\"") != std::string::npos);
+    CHECK(glb.find("Sculpt_occlusionRoughnessMetallic") != std::string::npos);
+    CHECK(glb.find("\"materials\":[{") != std::string::npos);
+    Mesh back;
+    CHECK(loadGltf(str(dir / "model.glb"), back, err));
+
+    // USD: every UsdPreviewSurface input reads its own raw map; normal with scale / bias.
+    CHECK(saveUsd(str(dir / "model.usda"), &m, nullptr, "Sculpt", err));
+    const std::string usda = readText(dir / "model.usda");
+    CHECK(usda.find("float inputs:roughness.connect = </Sculpt/Materials/Sculpt_Material/RoughnessTexture.outputs:r>") != std::string::npos);
+    CHECK(usda.find("float inputs:metallic.connect") != std::string::npos);
+    CHECK(usda.find("normal3f inputs:normal.connect") != std::string::npos);
+    CHECK(usda.find("float inputs:occlusion.connect") != std::string::npos);
+    CHECK(usda.find("color3f inputs:emissiveColor.connect") != std::string::npos);
+    CHECK(usda.find("float inputs:opacity.connect") != std::string::npos);
+    CHECK(usda.find("@model_roughness.png@") != std::string::npos && usda.find("@model_normal.png@") != std::string::npos);
+    CHECK(usda.find("float4 inputs:bias = (-1, -1, -1, 0)") != std::string::npos);
+    CHECK(usda.find("token inputs:sourceColorSpace = \"raw\"") != std::string::npos);
+    Image color;
+    for (const char* f : {"model_color.png", "model_roughness.png", "model_metallic.png", "model_normal.png", "model_occlusion.png",
+                          "model_emissive.png", "model_opacity.png"})
+        CHECK(fs::exists(dir / f) && Image::load(str(dir / f), color, err) && color.width == 16);
+    // The roughness map holds the painted value at the bottom (image rows top-down: the last row).
+    Image rough;
+    CHECK(Image::load(str(dir / "model_roughness.png"), rough, err));
+    CHECK(std::abs(int(rough.rgba[(size_t(rough.height - 1) * size_t(rough.width)) * 4]) - 51) <= 1);
+    CHECK(std::abs(int(rough.rgba[0]) - 166) <= 1);
+    // Base colour carries the opacity in alpha.
+    CHECK(Image::load(str(dir / "model_color.png"), color, err));
+    CHECK(std::abs(int(color.rgba[(size_t(color.height - 1) * size_t(color.width)) * 4 + 3]) - 128) <= 1);
+    CHECK(color.rgba[3] == 255);
+    // USDZ packs the maps.
+    CHECK(saveUsd(str(dir / "model.usdz"), &m, nullptr, "Sculpt", err));
+    std::vector<ZipEntry> entries;
+    CHECK(readStoredZip(str(dir / "model.usdz"), entries, err));
+    CHECK(entries.size() == 8);
+
+    // OBJ: the PBR MTL keys.
+    CHECK(saveObj(str(dir / "model.obj"), m, err));
+    const std::string mtl = readText(dir / "model.mtl");
+    CHECK(mtl.find("map_Pr model_roughness.png") != std::string::npos);
+    CHECK(mtl.find("map_Pm model_metallic.png") != std::string::npos);
+    CHECK(mtl.find("norm model_normal.png") != std::string::npos);
+    CHECK(mtl.find("map_Ke model_emissive.png") != std::string::npos);
+    CHECK(mtl.find("map_d model_opacity.png") != std::string::npos);
+
+    // FBX: maps on the material properties importers read.
+    CHECK(saveFbx(str(dir / "model.fbx"), "Sculpt", {&m}, FbxExportOptions{}, err));
+    const std::string fbx = readText(dir / "model.fbx");
+    for (const char* key : {"NormalMap", "ShininessExponent", "ReflectionFactor", "EmissiveColor", "TransparencyFactor",
+                            "model_normal.png", "model_roughness.png"})
+        CHECK(fbx.find(key) != std::string::npos);
+
+    // A texture without material channels exports exactly as before (no extra maps).
+    Mesh plain = seamSphere();
+    plain.texture = redBottomTexture();
+    const fs::path pdir = testDir("sf_texture_io_pbr_plain");
+    CHECK(saveObj(str(pdir / "plain.obj"), plain, err));
+    CHECK(!fs::exists(pdir / "plain_roughness.png"));
+    CHECK(readText(pdir / "plain.mtl").find("map_Pr") == std::string::npos);
+    CHECK(saveGlb(str(pdir / "plain.glb"), plain, "Sculpt", err));
+    CHECK(readText(pdir / "plain.glb").find("\"metallicFactor\":0,\"roughnessFactor\":0.65") != std::string::npos);
+    fs::remove_all(dir);
+    fs::remove_all(pdir);
+}

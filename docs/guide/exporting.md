@@ -132,6 +132,7 @@ Python remote execution.
 | Several visible SubTools | One FBX model per SubTool, combined into one asset on import |
 | Any | A material slot `M_Clay`, and the real-world size from **Height** |
 | A baked normal map ([Tool > Bake](baking.md)) | The texture `T_<Name>_N`, set up as a normal map (Unreal on this computer only) |
+| A texture with [material channels](pbr-painting.md) | `T_<Name>_BC`, `T_<Name>_N` (DirectX) and `T_<Name>_ORM` (occlusion, roughness, metallic), plus `T_<Name>_E` when emissive is painted, and a material `M_<Name>` built from them and assigned to the mesh (Unreal on this computer only; see [Export presets](export-presets.md)) |
 
 Sending the same asset again updates it in place (same name and folder), so references in your levels stay
 intact.

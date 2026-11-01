@@ -100,6 +100,9 @@ constexpr GLenum GL_UNSIGNED_SHORT = 0x1403;
 constexpr GLenum GL_CULL_FACE = 0x0B44;
 constexpr GLenum GL_R16UI = 0x8234;
 constexpr GLenum GL_RED_INTEGER = 0x8D94;
+constexpr GLenum GL_R16I = 0x8233;
+constexpr GLenum GL_RGBA32UI = 0x8D70;
+constexpr GLbitfield GL_MAP_INVALIDATE_RANGE_BIT = 0x0004;
 constexpr GLbitfield GL_DEPTH_BUFFER_BIT = 0x0100;
 constexpr GLbitfield GL_COLOR_BUFFER_BIT = 0x4000;
 
@@ -171,11 +174,15 @@ constexpr GLbitfield GL_COLOR_BUFFER_BIT = 0x4000;
     X(void, VertexAttribIPointer, GLuint, GLint, GLenum, GLsizei, const void*)               \
     X(void, VertexAttribDivisor, GLuint, GLuint)                                             \
     X(void, DrawArraysInstanced, GLenum, GLint, GLsizei, GLsizei)                            \
+    X(void, DrawElementsInstanced, GLenum, GLsizei, GLenum, const void*, GLsizei)            \
     X(void, ActiveTexture, GLenum)                                                           \
     X(void, GetIntegerv, GLenum, GLint*)                                                     \
     X(void, Uniform1i, GLint, GLint)                                                         \
+    X(void, Uniform1iv, GLint, GLsizei, const GLint*)                                        \
     X(void, Uniform1f, GLint, GLfloat)                                                       \
     X(void, Uniform2f, GLint, GLfloat, GLfloat)                                              \
+    X(void, Uniform2i, GLint, GLint, GLint)                                                  \
+    X(void, Uniform2iv, GLint, GLsizei, const GLint*)                                        \
     X(void, DisableVertexAttribArray, GLuint)                                                \
     X(void, VertexAttrib1f, GLuint, GLfloat)                                                 \
     X(void, VertexAttrib3f, GLuint, GLfloat, GLfloat, GLfloat)                               \

@@ -39,6 +39,8 @@ void usage() {
         "      --bench-no-project     Skip the project save / open (it needs twice the memory)\n"
         "      --bench-view           Benchmark only what the viewport costs (uploads, orbit)\n"
         "      --bench-dyntopo        Benchmark dynamic topology strokes (e.g. --bench-sizes 0.25,1,4)\n"
+        "      --bench-micro          Benchmark micro-displacement levels (sizes = micro triangles, e.g. 33,100,300)\n"
+        "      --bench-micro-level N  Micro level for --bench-micro (default 4: 256 per base triangle)\n"
         "      --bench-out FILE       Write the benchmark report (Markdown) to FILE\n"
         "  -h, --help                 Show this help\n"
         "\n"

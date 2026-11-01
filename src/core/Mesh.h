@@ -22,6 +22,7 @@ struct PaintTexture;
 struct MultiresStack;
 struct SubdivTopology;
 struct ImplicitAdjacency;
+struct MicroMesh;
 
 // The vertices or triangles around a vertex (Mesh::neighbors, Mesh::vertexTriangles), in ascending order: a view
 // of the mesh's adjacency lists or, where the mesh's adjacency is implicit, the list itself. Use it like a span
@@ -192,6 +193,12 @@ public:
     // copies of the mesh. Null = a plain mesh. sanitizeAttributes() drops it if the topology no longer fits.
     std::shared_ptr<MultiresStack> multires;
 
+    // Micro-displacement level (core/Micro.h): above this mesh (the base, its highest subdivision level), a grid of
+    // scalar displacements per triangle that the brushes and the renderer use instead of the mesh. Shared
+    // copy-on-write by copies of the mesh (mutableMicro). Null = none. sanitizeAttributes() drops it if the
+    // triangle or vertex count changes.
+    std::shared_ptr<MicroMesh> micro;
+
     // ZSpheres (core/ZSpheres.h): not empty = a ZSphere SubTool, whose triangles are made from this armature (the
     // spheres and their links, or the skin while `zspherePreview`). Copies, undo steps and projects carry it.
     std::vector<ZSphere> zspheres;
@@ -204,12 +211,23 @@ public:
     // subdivision stack, made by Divide, gets implicit adjacency (implicitAdjacency).
     void rebuildTopology();
     void recomputeAllNormals();
-    // Recompute normals of the faces around `verts` and of every vertex they touch.
-    void updateNormals(std::span<const uint32_t> verts);
+    // Recompute normals of the faces around `verts` and of every vertex they touch. With `curvature` (indexed
+    // by vertex), also each of those vertices' curvatureAt, from the same triangles (a brush stroke hands it to
+    // the renderer, which then needn't walk the rings again).
+    void updateNormals(std::span<const uint32_t> verts, float* curvature = nullptr);
     // The same, given the vertices whose normals may have changed (any superset: the others come out the
     // same): fill(begin, end, set) adds those of jobs [begin, end) of `count` with set.insertLocal(). A brush
     // gives the corners of the BVH leaves its query listed, which is cheaper than every moved vertex's ring.
-    void updateNormalsAround(size_t count, size_t grain, const std::function<void(size_t, size_t, IndexBits&)>& fill);
+    void updateNormalsAround(size_t count, size_t grain, const std::function<void(size_t, size_t, IndexBits&)>& fill,
+                             float* curvature = nullptr);
+    // Marks the vertices fill() lists dirty for the GPU without recomputing their normals (a draft stroke, whose
+    // normals wait for its end: Sculptor::draftStrokes).
+    void markDirtyAround(size_t count, size_t grain, const std::function<void(size_t, size_t, IndexBits&)>& fill);
+    // The renderer's cavity term at `v` (render/Clusters.h): how far the average of the other corners of its
+    // triangles sits above the vertex along its normal (> 0 in a crease), over their mean distance. Each
+    // neighbour of an inner vertex of a manifold is the corner of two of its triangles, so this is the average
+    // over its ring.
+    float curvatureAt(uint32_t v) const;
 
     // The vertices sharing an edge with `v`, and the triangles around it, in ascending order.
     IndexRing neighbors(uint32_t v) const {
@@ -280,7 +298,7 @@ public:
 private:
     void finishTopology();
     bool beginNormalSet(); // updateNormals: room for the set (false: no topology)
-    void finishNormals();  // ... then each member's normal
+    void finishNormals(float* curvature, bool computeNormals = true); // ... then each member's normal (and curvatureAt)
     IndexRing implicitTriangles(uint32_t v) const;
     IndexRing implicitNeighbors(uint32_t v) const;
 

@@ -8,8 +8,10 @@
 #include "core/Commands.h"
 #include "core/Primitives.h"
 #include "core/Project.h"
+#include "core/Texture.h"
 #include "io/Zip.h"
 
+#include <cmath>
 #include <filesystem>
 
 using namespace sf;
@@ -248,7 +250,8 @@ TEST(project_version_handling) {
     std::string err;
     CHECK(saveProject(path, doc, err));
     const std::string manifest = readManifest(path);
-    const std::string v = std::to_string(kProjectVersion);
+    const std::string v = std::to_string(kProjectBaseWriteVersion); // nothing in it needs a newer format
+    CHECK(kProjectVersion >= 7);
     CHECK(manifest.find("\"version\": " + v) != std::string::npos || manifest.find("\"version\":" + v) != std::string::npos);
     CHECK(manifest.find("app_version") != std::string::npos);
 
@@ -369,4 +372,94 @@ TEST(project_save_adds_extension_to_any_other_extension) {
     CHECK(doc.path == asked + kProjectExtension && isProjectPath(doc.path));
     CHECK(std::filesystem::exists(doc.path));
     std::filesystem::remove(doc.path);
+}
+
+namespace {
+
+// A plane with planar UVs and a 512 texture (texture tests have their own helpers; this one is enough here).
+Document texturedDoc() {
+    Mesh m = makePlane(8);
+    const AABB b = m.bounds();
+    m.uvs.resize(m.triangleCount() * 3);
+    for (size_t t = 0; t < m.triangleCount(); ++t)
+        for (int c = 0; c < 3; ++c) {
+            const glm::vec3 p = m.positions[m.triangles[t][c]];
+            m.uvs[t * 3 + size_t(c)] = glm::vec2((p.x - b.min.x) / b.extent().x, (p.z - b.min.z) / b.extent().z);
+        }
+    m.texture = makeTexture(512, 512);
+    m.paintToTexture = true;
+    return makeDoc(std::move(m));
+}
+
+} // namespace
+
+TEST(project_texture_without_material_channels_writes_format_6) {
+    Document doc = texturedDoc();
+    addTextureLayer(*doc.mesh.texture, "Layer 1");
+    const std::string path = tempPath("sf_project_v6_texture.sfproj");
+    std::string err;
+    CHECK(saveProject(path, doc, err));
+    Json manifest;
+    CHECK(Json::parse(readManifest(path), manifest, err));
+    CHECK(manifest["version"].asNumber() == 6);
+    CHECK(!manifest["subtools"][0]["texture"].has("pbr"));
+    // A format 6 texture project loads with no material channels.
+    Document back;
+    CHECK(loadProject(path, back, err));
+    CHECK(back.mesh.texture && back.mesh.texture->layers.size() == 1 && !hasMaterialChannels(*back.mesh.texture));
+    std::filesystem::remove(path);
+}
+
+TEST(project_material_channels_round_trip_as_format_7) {
+    Document doc = texturedDoc();
+    PaintTexture& t = *doc.mesh.texture;
+    for (Channel c : {Channel::Roughness, Channel::Metallic, Channel::Normal, Channel::Height, Channel::Emissive}) setChannelEnabled(t, c, true);
+    t.heightNormalStrength = 2.5f;
+    const float rough[1] = {0.125f}, height[1] = {0.700012f};
+    for (int y = 100; y < 180; ++y)
+        for (int x = 100; x < 180; ++x) {
+            t.channels[size_t(Channel::Roughness)].base.setValues(x, y, rough);
+            t.channels[size_t(Channel::Height)].base.setValues(x, y, height);
+        }
+    addTextureLayer(t, "Scratches");
+    LayerChannel& ln = t.layers[0].channels[size_t(Channel::Normal)];
+    ln.blend = kBlendNormalCombine;
+    ln.opacity = 0.75f;
+    const float n4[4] = {0.7f, 0.5f, 0.9f, 1.0f};
+    ln.image.setValues(300, 300, n4);
+    t.layers[0].channels[size_t(Channel::Metallic)].enabled = false;
+    t.layers[0].channels[0].enabled = false;
+    compositeTextureAll(t);
+    const std::string path = tempPath("sf_project_v7_pbr.sfproj");
+    std::string err;
+    CHECK(saveProject(path, doc, err));
+    Json manifest;
+    CHECK(Json::parse(readManifest(path), manifest, err));
+    CHECK(manifest["version"].asNumber() == 7);
+    CHECK(manifest["subtools"][0]["texture"]["pbr"]["channels"].size() == 5);
+    Document back;
+    CHECK(loadProject(path, back, err));
+    const PaintTexture& b = *back.mesh.texture;
+    CHECK(enabledChannelMask(b) == enabledChannelMask(t));
+    CHECK(b.heightNormalStrength == 2.5f);
+    for (Channel c : {Channel::Roughness, Channel::Metallic, Channel::Normal, Channel::Height, Channel::Emissive})
+        CHECK(b.channels[size_t(c)].base.sameTexels(t.channels[size_t(c)].base));
+    CHECK(std::abs(b.channels[size_t(Channel::Height)].base.value(150, 150) - 0.700012f) < 2e-5f); // 16 bits kept
+    CHECK(b.layers.size() == 1);
+    CHECK(b.layers[0].channels[size_t(Channel::Normal)].blend == kBlendNormalCombine);
+    CHECK(b.layers[0].channels[size_t(Channel::Normal)].opacity == 0.75f);
+    CHECK(!b.layers[0].channels[size_t(Channel::Metallic)].enabled);
+    CHECK(!b.layers[0].channels[0].enabled);
+    CHECK(b.layers[0].channels[size_t(Channel::Normal)].image.sameTexels(ln.image));
+    CHECK(b.layers[0].channels[size_t(Channel::Roughness)].image.empty()); // transparent layer channels store nothing
+    CHECK(channelImage(b, Channel::Normal).sameTexels(channelImage(t, Channel::Normal)));
+    // Sparse: the unpainted channels cost a few bytes in the file.
+    CHECK(std::filesystem::file_size(path) < 400 * 1024);
+    // Turning every channel off goes back to format 6.
+    for (Channel c : {Channel::Roughness, Channel::Metallic, Channel::Normal, Channel::Height, Channel::Emissive})
+        setChannelEnabled(*back.mesh.texture, c, false);
+    CHECK(saveProject(path, back, err));
+    CHECK(Json::parse(readManifest(path), manifest, err));
+    CHECK(manifest["version"].asNumber() == 6);
+    std::filesystem::remove(path);
 }

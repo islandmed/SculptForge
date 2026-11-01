@@ -9,12 +9,17 @@
 #include "render/Camera.h"
 #include "render/Clusters.h"
 #include "render/GL.h"
+#include "render/Ghost.h"
 
 #include <cstdint>
+#include <list>
+#include <memory>
 #include <string>
 #include <vector>
 
 namespace sf {
+
+class MicroRenderer;
 
 struct RenderSettings {
     bool wireframe = false;
@@ -33,6 +38,10 @@ struct RenderSettings {
     // The view's background: the charcoal radial gradient (default) or one flat display (sRGB) colour (#21).
     bool gradientBackground = true;
     glm::vec3 backgroundColor{0.165f, 0.165f, 0.173f};
+    // Micro-displacement levels (render/MicroRenderer.h): the most triangles a frame draws for them (their level
+    // of detail drops to fit; a hardware profile may set it), and the micro edge length to aim for on screen.
+    size_t renderTriangleBudget = 0; // 0 = TierConfig::activeTriangleBudget (core/TierConfig.h)
+    float microTargetPx = 2.0f;
 };
 
 // A baked tangent-space normal map to preview on a mesh (core/Bake.h): RGB8 rows bottom-up, with the
@@ -105,6 +114,54 @@ public:
     // GL texture of the painted texture of SubTool `id` as last synced (0 if none), for UI previews (rows bottom-up).
     GLuint paintTexture(uint32_t id) const;
 
+    // --- Strokes on heavy meshes (app/AsyncStroke.cpp) ---
+    // The predictive stroke preview (render/Ghost.h) drawn on SubTool `id`; an empty stroke turns it off.
+    void setGhost(uint32_t id, const GhostStroke& ghost);
+    // A sculpt stroke's vertex upload made in two halves: prepareStrokeUpload packs what the mesh marked dirty
+    // (positions and normals only) and the culling bounds of the clusters that moved, on any thread and without
+    // GL, while the GL thread keeps drawing from what it has; commitStrokeUpload sends it on the GL thread.
+    // prepare clears the mesh's dirty state; it returns false, and leaves the mesh as it was, when the change
+    // needs the regular syncScene instead (a new layout, attributes, dynamic topology, a vertex off the grid).
+    // Only one prepare at a time, and no syncScene of that mesh until its commit.
+    struct StrokeUpload {
+        uint32_t id = 0;
+        void* slot = nullptr; // bindStrokeUpload
+        bool ready = false;
+        std::vector<PackedVertex> data;
+        struct Range {
+            uint32_t begin, end; // GPU slots
+            size_t offset;       // into data
+        };
+        std::vector<Range> ranges;
+        std::vector<uint32_t> movedClusters;
+        std::vector<ClusterBounds> bounds; // of movedClusters
+        std::vector<uint8_t> blockChanged, blockMoved; // scratch, per block
+        double packMs = 0.0, boundsMs = 0.0;           // where prepare's time went
+        bool regrid = false;                           // every vertex, packed on a new grid
+        PositionGrid grid;
+        bool exact = false;                            // refineStrokeBoundsInto: exact bounds to set
+        std::vector<uint32_t> exactClusters;
+        std::vector<ClusterBounds> exactBounds;
+        size_t bytes() const { return data.size() * sizeof(PackedVertex); }
+    };
+    // `curvature` (optional, by vertex): the cavity term of every vertex the mesh marked dirty, already worked
+    // out (Sculptor::strokeCurvature).
+    bool prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out, const float* curvature = nullptr);
+    // GL thread, before handing `up` to another thread: finds SubTool id's slot (slots come and go on the GL
+    // thread, e.g. thumbnails; the other thread uses this one, which stays put in the list).
+    void bindStrokeUpload(uint32_t id, StrokeUpload& up);
+    void commitStrokeUpload(StrokeUpload& up);
+    // The stroke uploads gave the clusters they moved quick culling bounds (around their vertices' boxes, which
+    // packing finds anyway, without the normal cone, so they are never culled as facing away); at the stroke's
+    // end this works out the exact ones (GL thread, the mesh no longer changing).
+    void refineStrokeBounds(uint32_t id, const Mesh& mesh);
+    // A draft stroke on SubTool `id` (0: none): the clusters its uploads moved draw with per-pixel face normals
+    // (theirs are stale) until refineStrokeBounds.
+    void setDraftNormals(uint32_t id);
+    // refineStrokeBounds on the solver thread at a stroke's end, after prepareStrokeUpload: the exact bounds go
+    // into `up` and commitStrokeUpload sets them.
+    void refineStrokeBoundsInto(uint32_t id, const Mesh& mesh, StrokeUpload& up);
+
     // Bytes of GPU buffers and textures the mesh slots hold.
     size_t gpuBytes() const;
     // Triangles the last draw() sent to the GPU (after culling), for the benchmark.
@@ -159,6 +216,7 @@ private:
         bool hasTangents = false, tangentsStale = true, normalFlipGreen = false;
         bool hasColors = false, hasMask = false, hasGroups = false, hasUvs = false;
         bool fresh = true; // nothing uploaded yet
+        bool regrid = false; // a stroke's vertex left the position grid (prepareStrokeUpload): the next sync re-sends everything
         bool outOfMemory = false; // the last full upload ran out of GPU memory: not drawn
         UploadOrder order; // the cluster layout
         PositionGrid grid; // the positions' quantisation
@@ -181,6 +239,11 @@ private:
         size_t drawnTriangles = 0;
         size_t vertexCapacity = 0;
         std::vector<uint64_t> blockHash; // per UploadOrder block: hashes of its packed positions, and the rest
+        std::vector<AABB> blockBox;      // per UploadOrder block: its vertices' box as last packed
+        // Clusters whose culling bounds a stroke upload set from blockBox (a sphere round the box, no normal cone,
+        // the old volume): refineStrokeBounds makes them exact.
+        std::vector<uint32_t> looseClusters;
+        std::vector<uint8_t> looseMark; // per cluster: in looseClusters
         size_t bytes[8] = {}; // GPU sizes: vertices, indices, lines, colours, mask, groups, prims, uvs + tangents
 
         // Dynamic topology (Mesh::changedTriangles, core/Dyntopo.h): the clusters whose triangles changed since
@@ -208,6 +271,9 @@ private:
         bool patchColorsOn = false, patchMaskOn = false, patchLinesOn = false;
         PositionGrid patchGrid; // the grid the patches' vertices were packed with
         size_t patchBytes = 0;
+        // A mesh with a micro level (core/Micro.h) draws through this instead of the buffers above.
+        std::shared_ptr<MicroRenderer> micro;
+        size_t microDrawn = 0;
     };
     MeshSlot& slot(uint32_t id); // created on first use
     static void freeSlot(MeshSlot& s);
@@ -218,6 +284,11 @@ private:
     void buildLines(MeshSlot& s, const Mesh& mesh);
     void buildProxies(MeshSlot& s, const Mesh& mesh);
     bool proxyUsed_ = false; // the last draw() drew motion proxies: sync keeps them current
+    // The ghost (setGhost), drawn on the slot ghostId_.
+    GhostStroke ghost_;
+    uint32_t ghostId_ = 0;
+    struct MeshProgram;
+    void setGhostUniforms(const MeshProgram& p);
     void syncNormalMap(MeshSlot& s, const Mesh& mesh, const NormalMapView* normalMap);
     // `indicesDone`: the index buffer and drawCount are already written (a full upload writes them while
     // building the layout).
@@ -249,6 +320,8 @@ private:
     std::vector<const void*> drawOffsets_;
     std::vector<GLint> drawBases_;
     std::vector<uint32_t> drawClusters_;
+    std::vector<uint32_t> extraClusters_[4]; // drawSlot: clusters a ghost dab reaches (1), a draft moved (2), both
+    uint32_t draftId_ = 0;                   // setDraftNormals
     bool cullBackfaces_ = false; // the last cull(): back faces can't show (so the GPU may skip them too)
     std::vector<uint32_t> cullScratch_;
     size_t lastDrawn_ = 0;
@@ -262,14 +335,17 @@ private:
         GLint view = -1, proj = -1, gridOrigin = -1, gridStep = -1, viewport = -1, projScale = -1, baseColor = -1, paint = -1,
               showMask = -1, groups = -1, matcap = -1, matcapCavity = -1, dim = -1, primBase = -1, hasPaint = -1,
               normalFlipY = -1, twoSided = -1;
+        GLint ghostGroups = -1, ghostRange = -1, ghostEdge = -1, ghostA = -1, ghostB = -1, ghostC = -1, ghostBound = -1, ghostKind = -1, ghostFocal = -1;
     };
-    static constexpr int kPaint = 1, kPrim = 2, kTextured = 4, kNormalMap = 8, kFlat = 16;
-    MeshProgram programs_[32];
+    static constexpr int kPaint = 1, kPrim = 2, kTextured = 4, kNormalMap = 8, kFlat = 16, kMicro = 32, kGhost = 64;
+    MeshProgram programs_[128];
+    void drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings);
     std::string programError_;
     const MeshProgram* meshProgram(int features);
     bool vertexIdHasBase_ = true; // gl_VertexID includes the base vertex (checked at init; else per-cluster draws)
     bool checkVertexIdBase();
-    std::vector<MeshSlot> slots_;
+    // (A list: a slot stays put while others come and go, so prepareStrokeUpload can work on one from another thread.)
+    std::list<MeshSlot> slots_;
     struct DrawItem {
         uint32_t id;
         bool active;

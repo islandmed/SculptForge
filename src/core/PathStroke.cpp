@@ -1,5 +1,6 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include "core/Micro.h"
 #include "core/PathStroke.h"
 
 #include <algorithm>
@@ -127,7 +128,7 @@ int strokePath(Document& doc, const BrushRecipe* recipe, BrushType type, const P
     };
     auto project = [&](glm::vec3 p, RayHit& hit) {
         const glm::vec3 origin = p - view * (glm::dot(p - box.center(), view) + diag);
-        return doc.bvh.raycast(mesh, origin, view, hit);
+        return surfaceRaycast(mesh, doc.bvh, origin, view, hit);
     };
 
     DabParams base;

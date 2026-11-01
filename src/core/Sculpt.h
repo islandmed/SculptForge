@@ -124,6 +124,13 @@ public:
     bool strokeActive() const { return active_; }
 
     SculptTimings timings;
+    // The brush's frame on the surface at the last dab's first (unmirrored) pass: the dab centre, the area normal
+    // and the area centre its kernel used (the predictive stroke preview estimates the next dabs from it).
+    struct DabFrame {
+        glm::vec3 center{0.0f}, normal{0.0f, 0.0f, 1.0f}, areaCenter{0.0f};
+        bool valid = false;
+    };
+    DabFrame lastFrame;
 
     // Dynamic topology (core/Dyntopo.h): while enabled, dab() and dabRecipe() remesh the surface under the
     // brush first (Smooth towards twice the edge length, so it simplifies, as in ZBrush). Not the Move brush.
@@ -148,6 +155,27 @@ public:
     // The last kelvinletStep found more vertices than kelvinlet.vertexBudget (the app then moves less per frame).
     bool kelvinletOverBudget() const { return kelvinOverBudget_; }
 
+    // The cavity term (Mesh::curvatureAt) of every vertex whose normal this stroke's dabs updated, by vertex,
+    // worked out with the normals (the renderer packs it instead of walking the rings again); null outside a
+    // stroke. Entries of other vertices are stale.
+    const float* strokeCurvature() const { return active_ && !curvature_.empty() ? curvature_.data() : nullptr; }
+
+    // Draft strokes (Preferences > Performance > Draft Strokes): when set before beginStroke (it asks once), dabs move the vertices
+    // and refit the BVH but leave the normals and the cavity term as they were (the brushes that read normals see
+    // the stroke-start ones, so the result differs slightly from a full stroke); the vertices are only marked
+    // for the GPU. flushDraft works out every normal and cavity term the stroke touched, once (the app calls
+    // it before endStroke). Not with dynamic topology.
+    bool draftStrokes = false;
+    bool draftActive() const { return draft_; }
+    bool draftPending() const { return draft_ && !draftLeaves_.empty(); }
+    void flushDraft(Mesh& mesh, const BVH& bvh);
+
+    // Micro level timings (findMs, kernelMs, stitchMs, points) of the current stroke (core/Micro.h).
+    const MicroStroke& microStroke() const { return micro_; }
+    // Move on a micro level: false (default) deforms the base cage and the detail rides along; true moves the
+    // micro displacement along its normals instead.
+    bool microMoveAlongNormals = false;
+    MicroStroke& microStroke() { return micro_; }
     // Mirror sign vectors for the enabled symmetry axes (always starts with (1,1,1)).
     static std::vector<glm::vec3> mirrors(Symmetry sym);
 
@@ -195,6 +223,10 @@ private:
     void followRemesh(Mesh& mesh);
     void mergeTopologyUndo(TopologyUndo& topo, const Mesh& mesh);
     DynamicTopology dynTopo_;
+    // Micro-displacement levels (core/Micro.h): strokes on a mesh with one go to its grid instead.
+    MicroStroke micro_;
+    Mesh* microMesh_ = nullptr;
+    bool microReady(Mesh& mesh); // the mesh has a micro level: starts the micro stroke on first use
     float strokeDiagonal_ = 0.0f;
     // The last remesh (repairDab remeshes it again when the brush squashed a triangle).
     bool lastRemesh_ = false;
@@ -204,6 +236,7 @@ private:
     std::vector<glm::vec3> lastMirrors_;
 
     bool active_ = false;
+    bool frameWanted_ = false; // the next dabSingle records lastFrame
     int layer_ = -1;
     UndoRecord record_;
     // A bit per vertex: recorded in record_'s positions / mask / colours (cleared from those lists).
@@ -213,6 +246,11 @@ private:
 
     std::vector<uint32_t> verts_, dabVerts_; // one mirror's vertices; every mirror's (for the normals)
     std::vector<uint32_t> dabLeaves_;        // the BVH leaves every mirror's query listed (the normals' set)
+    std::vector<float> curvature_;           // strokeCurvature
+    bool curvatureFilled_ = false;           // every entry current (a draft stroke packs them as they are)
+    const Mesh* curvatureMesh_ = nullptr;    // the mesh curvature_ is for
+    bool draft_ = false;                     // this stroke is a draft
+    std::vector<uint32_t> draftLeaves_;      // the BVH leaves its dabs touched (flushDraft)
     std::vector<glm::vec3> scratch_;
     std::vector<float> weights_, influence_;
     std::vector<uint8_t> firstTouch_;

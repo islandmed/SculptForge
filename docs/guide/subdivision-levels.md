@@ -150,3 +150,8 @@ you come back takes a moment longer (about 0.1 s at that size) while the level i
 
 > **ZBrush:** Divide, Smt, Lower Res, Higher Res, SDiv, Del Lower, Del Higher and Reconstruct Subdiv work as in
 > ZBrush. Not yet: Freeze SubDivision Levels, Cage, Rstr, Suv (UV smoothing on divide) and creased edges.
+
+## Past the highest level
+
+For more detail than the computer can hold as a mesh (hundreds of millions of polygons), add a micro level on
+top of the highest level: see [Micro levels](micro-levels.md).

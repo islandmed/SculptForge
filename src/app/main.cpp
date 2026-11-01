@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/App.h"
 #include "app/Bench.h"
+#include "app/Calibration.h"
 #include "app/CrashLog.h"
 
 #include <SDL3/SDL_main.h>
@@ -51,7 +52,22 @@ void usage() {
         "  --bench-no-project       Skip the project save / open (it needs twice the memory)\n"
         "  --bench-view             Benchmark only what the viewport costs (uploads, orbit)\n"
         "  --bench-dyntopo          Benchmark dynamic topology strokes (e.g. --bench-sizes 0.25,1,4)\n"
+        "  --bench-micro            Benchmark micro-displacement levels (sizes = micro triangles, e.g. 33,100,300)\n"
+        "  --bench-micro-level N    Micro level for --bench-micro (default 4: 256 per base triangle)\n"
         "  --bench-out FILE         Write the benchmark report (Markdown) to FILE\n"
+        "  --calibrate              Measure this computer (GPU, CPU, memory; about 2-3 s), print the hardware\n"
+        "                           profile as JSON and save it (add --calibrate-quick, --calibrate-no-save)\n"
+        "  --timelapse out.mp4      Render the opened project's history (saved beside it as .sfhist) as a\n"
+        "                           turntable timelapse and exit (--size 3840x2160 for 4K, --fps N)\n"
+        "  --timelapse-seconds S    Length of the timelapse (default 20)\n"
+        "  --benchmark              Proof mode: a scripted stroke on 5M / 20M / 33M (and 100M when memory\n"
+        "                           allows) triangle meshes through the input handlers, with a live HUD; writes a\n"
+        "                           JSON result and an MP4 of the run and exits (docs/benchmark.md)\n"
+        "  --benchmark-sizes 5,20   Proof mode mesh sizes in millions of triangles\n"
+        "  --benchmark-out FILE     Where the JSON result goes (default: sculptforge-benchmark-<time>.json here)\n"
+        "  --benchmark-video FILE   Where the MP4 goes; --benchmark-no-video records none\n"
+        "  --benchmark-vsync        Keep vertical sync on (default off: frame times are not capped)\n"
+        "  --benchmark-seconds S    Length of each scripted stroke (default 6)\n"
         "  --log-dir DIR            Write sculptforge.log to DIR instead of the user data folder\n"
         "  --crash-test KIND        Crash on purpose (segv, abort or throw) to test the crash note in the log");
 }
@@ -101,11 +117,15 @@ int main(int argc, char** argv) {
     std::string logDir, crashTest;
     bool sizeGiven = false;
     sf::BenchCommandLine bench;
+    bool calibrate = false, calibrateQuick = false, calibrateSave = true;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
         auto next = [&]() -> std::string { return i + 1 < argc ? argv[++i] : std::string(); };
         if (sf::parseBenchArg(argc, argv, i, bench)) continue;
-        if (a == "--run") options.script += next() + "\n";
+        if (a == "--calibrate") calibrate = true;
+        else if (a == "--calibrate-quick") calibrate = calibrateQuick = true;
+        else if (a == "--calibrate-no-save") calibrateSave = false;
+        else if (a == "--run") options.script += next() + "\n";
         else if (a == "--render") options.renderPath = next();
         else if (a == "--turntable") options.turntable = std::atoi(next().c_str());
         else if (a == "--size") sizeGiven = std::sscanf(next().c_str(), "%dx%d", &options.width, &options.height) == 2;
@@ -133,6 +153,15 @@ int main(int argc, char** argv) {
             if (const size_t comma = v.find(','); comma != std::string::npos)
                 options.measureStrokeRadius = float(std::atof(v.c_str() + comma + 1));
         }
+        else if (a == "--timelapse") options.timelapsePath = next();
+        else if (a == "--timelapse-seconds") options.timelapseSeconds = std::max(2.0f, float(std::atof(next().c_str())));
+        else if (a == "--benchmark") options.benchmark = true;
+        else if (a == "--benchmark-sizes") options.benchmarkSizes = next();
+        else if (a == "--benchmark-out") options.benchmarkOut = next();
+        else if (a == "--benchmark-video") options.benchmarkVideo = next();
+        else if (a == "--benchmark-no-video") options.benchmarkNoVideo = true;
+        else if (a == "--benchmark-vsync") options.benchmarkVsync = true;
+        else if (a == "--benchmark-seconds") options.benchmarkStrokeSeconds = std::max(1.0f, float(std::atof(next().c_str())));
         else if (a == "-h" || a == "--help") {
             usage();
             return 0;
@@ -144,10 +173,14 @@ int main(int argc, char** argv) {
         }
     }
     if (bench.run) return sf::runAppBenchmark(bench);
+    if (calibrate) return sf::runCalibrateCommandLine(calibrateQuick, calibrateSave);
     if (!options.uiTest.empty()) {
         if (!sizeGiven) options.width = 1600, options.height = 960;
         isolateSettings();
     }
+    if (options.benchmark && !sizeGiven) options.width = 1920, options.height = 1080;
+    if (options.benchmark || !options.timelapsePath.empty()) isolateSettings(); // the user's settings and files untouched
+    if (!options.timelapsePath.empty() && !sizeGiven) options.width = 1920, options.height = 1080;
     if (options.measureIdle > 0.0f || options.measureStroke > 0.0f) isolateSettings(); // a fresh start, no restore prompt, the user's files untouched
     if (!options.recordPath.empty() && options.supersample > 1) { // the app renders large; the video keeps --size
         options.width *= options.supersample;

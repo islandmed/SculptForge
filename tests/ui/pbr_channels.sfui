@@ -1,0 +1,79 @@
+# Material channels (PBR texture painting): Texture Map turns channels on, the Color palette's Material section
+# sets what the brush paints per channel, Paint Layers rows get channel chips, C picks every channel, and the
+# view can show one channel on its own.
+run new_sphere subdivisions=4
+run uv_auto resolution=1024
+run texture_create size=1024
+expect_value texture_size == 1024
+expect_value material_channels == 0
+
+# Tool > Texture Map > Material Channels: two clicks turn on roughness and metallic.
+click "Texture Map##tool.texture"
+click "Texture Map/Roughness##texchan"
+click "Texture Map/Metallic##texchan"
+expect_value material_channels == 2
+run texture_channels enable=normal,height
+expect_value material_channels == 4
+expect_text "Channel memory"
+
+# The brush material: glossy metal on Base.
+run paint_material color=c8c8d0 roughness=0.1 metallic=1
+expect_value brush_channels == 7
+key p
+stroke 0.15 0.5 0.85 0.5
+expect_value roughness_painted > 3000
+remember roughness_painted base_stroke
+
+# Color > Material shows a row per channel with swatches.
+click "Color##palette.color"
+expect "Polypaint & Materials/Roughness"
+wait 0.3
+shot brush-material
+
+# A layer: chips under its row; a rough stroke on roughness only.
+key escape
+click "Paint Layers##tool.paint_layers"
+click "Paint Layers/New"
+expect_value texture_layers == 1
+expect "Paint Layers/R##chip"
+run paint_material channels=roughness roughness=0.95
+stroke 0.5 0.15 0.5 0.85
+expect_value roughness_painted > $base_stroke
+remember roughness_painted with_layer
+shot layer-rows
+
+# Clicking the R chip turns the layer's roughness off (undoable); the composite goes back.
+click "Paint Layers/R##chip"
+expect_value layer_channel_roughness == 0
+expect_value roughness_painted == $base_stroke
+key ctrl+z
+expect_value layer_channel_roughness == 1
+expect_value roughness_painted == $with_layer
+
+# Solo roughness view: the viewport is sent the roughness as grey (the default 0.65 is ~166).
+run channel_view channel=roughness
+expect_value channel_view == 1
+wait 0.2
+expect_value shown_mean_r > 120
+expect_value shown_mean_r < 200
+shot solo-roughness
+run channel_view channel=off
+expect_value channel_view == 0
+
+# Save and reopen: format 7 brings the channels and the layer chips back.
+run save_project path=sf_ui_pbr_channels.sfproj
+run new_sphere subdivisions=2
+expect_value material_channels == 0
+run open path=sf_ui_pbr_channels.sfproj
+expect_value material_channels == 4
+expect_value texture_layers == 1
+expect_value roughness_painted == $with_layer
+
+# Ctrl-hover help on the new controls.
+click "Texture Map##tool.texture"
+hold ctrl
+hover "Texture Map/Roughness##texchan"
+expect_help "rough"
+hover "Texture Map/##channelview"
+expect_help "own"
+hold none

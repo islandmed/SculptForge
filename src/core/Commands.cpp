@@ -12,9 +12,11 @@
 #include "core/EnginePresets.h"
 #include "core/ExtractMirror.h"
 #include "core/Face.h"
+#include "core/HardwareProfile.h"
 #include "core/ImageTo3D.h"
 #include "core/Masking.h"
 #include "core/Multires.h"
+#include "core/Micro.h"
 #include "core/MeshTransform.h"
 #include "core/PathStroke.h"
 #include "core/Polygroups.h"
@@ -27,6 +29,7 @@
 #include "core/Sculptable.h"
 #include "core/Splats.h"
 #include "core/TextureTransfer.h"
+#include "core/Timeline.h"
 #include "core/Voxel.h"
 #include "io/FbxIO.h"
 #include "io/GltfIO.h"
@@ -108,8 +111,21 @@ CommandRegistry::CommandRegistry() {
 
     add({"new_sphere",
          "Replace the scene with a new sphere ready for sculpting.",
-         {{"subdivisions", T::Number, "Icosphere subdivision level (0-8). Default 6.", false}},
+         {{"subdivisions", T::Number, "Icosphere subdivision level (0-8). Default 6.", false},
+          {"triangles", T::Number,
+           "About this many triangles instead (a cube's quads pushed onto the sphere, up to 48M; benchmarks: "
+           "tools/bench_strokes.sh).",
+           false}},
          [](Document& doc, const Args& a) -> CommandResult {
+             if (const double t = argNumber(a, "triangles", 0.0); t > 0.0) {
+                 const int res = std::clamp(int(std::lround(std::sqrt(t / 12.0))), 1, 2000);
+                 Mesh m = makeCube(res, 2.0f);
+                 for (glm::vec3& p : m.positions) p = glm::normalize(p);
+                 m.recomputeAllNormals();
+                 doc.setMesh(std::move(m), "Sphere");
+                 doc.path.clear();
+                 return {true, "Created sphere with " + std::to_string(doc.mesh.triangleCount()) + " triangles"};
+             }
              int level = std::clamp(int(argNumber(a, "subdivisions", 6)), 0, 8);
              doc.setMesh(makeIcosphere(level), "Sphere");
              doc.path.clear();
@@ -176,7 +192,7 @@ CommandRegistry::CommandRegistry() {
              if (!ok) return {false, err};
              if (m.triangleCount() > 0) objects.push_back({"", std::move(m)});
              std::erase_if(objects, [](const MeshObject& o) { return o.mesh.triangleCount() == 0; });
-             std::string msg = "Opened " + path;
+             std::string msg = "Opened " + std::filesystem::path(path).filename().string();  // file name only: status shows in screen recordings
              const bool hasMesh = !objects.empty();
              if (hasMesh) {
                  size_t tris = 0, quads = 0, layers = 0;
@@ -772,11 +788,14 @@ CommandRegistry::CommandRegistry() {
     registerPolygroupCommands(*this);
     registerSubToolCommands(*this);
     registerSubdivCommands(*this); // subdiv_* (core/MultiresCommands.cpp)
+    registerMicroCommands(*this);  // micro_* (core/MicroCommands.cpp)
     registerDyntopoCommands(*this); // dyntopo (core/DyntopoCommands.cpp)
     registerSculptableCommands(*this); // splat_to_mesh, face_guides (core/Sculptable.h)
     registerTransformCommands(*this); // transform (core/MeshTransform.h)
     registerExtractMirrorCommands(*this); // extract, mirror_and_weld, mirror (core/ExtractMirror.h)
     registerPerformanceCommands(*this); // perf_info, set_multithreading (core/Benchmark.cpp)
+    registerHardwareProfileCommands(*this); // performance_profile, calibrate, set_performance_override (core/HardwareProfile.cpp)
+    registerTimelineCommands(*this); // timeline_info / seek / select / retune / save / load (core/Timeline.h)
     registerPaintCommands(*this); // core/Polypaint.cpp
     registerGozCommands(*this); // goz_import/export/send/receive, export_stl (io/GozCommands.cpp)
     registerBlenderCommands(*this); // blender_send/receive (io/BlenderCommands.cpp)

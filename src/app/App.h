@@ -21,10 +21,12 @@
 #include "core/Document.h"
 #include "core/Face.h"
 #include "core/MeshTransform.h"
+#include "core/PenPredictor.h"
 #include "core/AutoUv.h"
 #include "core/QRemesh.h"
 #include "core/Stroke.h"
 #include "core/StrokePath.h"
+#include "core/SurfaceCursor.h"
 #include "core/SpaceMouse.h"
 #include "core/Tablet.h"
 #include "core/UpdateCheck.h"
@@ -78,6 +80,15 @@ struct AppOptions {
     float measureStroke = 0.0f; // --measure-stroke S: a scripted fast circle stroke, report its path and frame times
     float measureStrokeRadius = 0.0f; // --measure-stroke S,R: the brush radius in screen pixels
     float measureIdle = 0.0f; // --measure-idle S: after a settling pause, count the frames drawn in S idle seconds, exit
+    // --timelapse out.mp4: render the opened project's history (its .sfhist) as a turntable timelapse and exit.
+    std::string timelapsePath;
+    float timelapseSeconds = 20.0f;
+    // --benchmark: proof mode (ProofMode.cpp), then exit. Sizes in millions of triangles (empty: 5, 20, 33 and
+    // 100 when memory allows); outputs default to the current folder.
+    bool benchmark = false;
+    std::string benchmarkSizes, benchmarkOut, benchmarkVideo;
+    bool benchmarkNoVideo = false, benchmarkVsync = false;
+    float benchmarkStrokeSeconds = 6.0f;
 };
 
 class Demo;
@@ -173,6 +184,11 @@ private:
     void pollBrushRequest();
     const BrushRecipe* activeRecipe() const;
     void drawBrushCursor();
+    // The brush ring lying on the surface under the pointer (#25, Preferences > Input > Cursor follows surface);
+    // false when the pointer is off the model (the flat screen ring is drawn instead).
+    bool drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col);
+    std::vector<SurfaceRingPoint> cursorRing_, cursorInner_; // scratch, kept to avoid allocating per frame
+    bool surfaceCursorShown_ = false; // the last cursor drawn lay on the surface (UI tests: surface_cursor)
     void updateTitle();
 
     int runRecording(); // also runs UI tests (options_.uiTest)
@@ -218,9 +234,86 @@ private:
     DabQueue dabQueue_;
     std::vector<PathDab> strokeScratch_;
     std::vector<glm::vec2>* strokeProbe_ = nullptr; // --measure-stroke: where each dab went (screen)
+    std::vector<float>* strokeRadiusProbe_ = nullptr; // ... and its brush radius (px)
     double dabSeconds_ = 0.0;         // what a dab of this stroke costs (running average), for the backlog limit
     bool interactiveStrokes_ = false; // App::run(): budgeted dabs and curved long gaps; other loops dab at once
     void drainStrokeDabs(double budgetSeconds); // places queued dabs; budget <= 0: all of them
+
+    // --- Strokes on heavy meshes (AsyncStroke.cpp) ---
+    // A sculpt stroke's dabs are placed on a solver thread while the main loop keeps drawing at the display's rate:
+    // each frame the finished batch of dabs is uploaded (packed on the solver thread, render/Renderer.h) and the
+    // next batch starts, and the dabs still waiting are drawn as a GPU preview (the ghost, render/Ghost.h) ahead of
+    // the solver, the stroke's head and the brush cursor where the pen will be a frame later (core/PenPredictor.h).
+    // The dabs, their order and so the geometry are those of the synchronous path. Preferences > Performance >
+    // Predictive strokes (SF_PREDICTIVE_STROKE=0 / 1 overrides it).
+    struct StrokeSolver;
+    // Everything a dab reads besides the mesh, the BVH and the sculptor (which the solver thread owns while it
+    // runs): taken on the main thread, by value, for each batch (dabSettings), so brush size, strength,
+    // symmetry, the brush, its alpha, recipe and VDM can change mid-stroke without the solver thread seeing a
+    // half-written value (they take effect from the next batch, as they did from the next dab before). The
+    // alpha and the recipe are the stroke's own copies (strokeAlpha_, strokeRecipe_), which nothing changes.
+    // Never on the solver thread: the painted texture and PBR channels (Mesh::texture: its tiles, shown() and dirty
+    // tiles are edited on the main thread only, and the Texture Map panel runs texture commands). Painting strokes
+    // stay in the frame loop (asyncStrokeAllowed), and nothing a batch does (dabAt without paint, the sculptor,
+    // prepareStrokeUpload, which refuses slots with UVs) reads mesh->texture.
+    struct DabSettings {
+        float radiusPx = 60.0f, strength = 0.5f, smoothStrength = 0.5f, focal = 0.0f, maskStrength = 1.0f;
+        float sprayScatter = 1.0f;
+        bool pressureSize = false, pressureStrength = true, invert = false, frontFacesOnly = false;
+        bool mask = false, paint = false, sculpt = true, visible = true;
+        BrushType brush = BrushType::Standard;
+        StrokeType strokeType = StrokeType::Dots;
+        Symmetry symmetry;
+        const BrushRecipe* recipe = nullptr;
+        const BrushAlpha* alpha = nullptr;
+        const VectorDisplacement* vdm = nullptr;
+        std::shared_ptr<const VectorDisplacement> vdmOwner; // (keeps the VDM alive for the batch)
+    };
+    DabSettings dabSettings() const; // the live values (AsyncStroke.cpp)
+    std::shared_ptr<const BrushAlpha> strokeAlpha_;   // this stroke's alpha and recipe (predictive strokes)
+    std::shared_ptr<const BrushRecipe> strokeRecipe_;
+    struct DabView { // what a dab on the solver thread sees (the main thread's may move on)
+        Camera camera;
+        CanvasRect canvas;
+        DabSettings settings;
+        std::vector<glm::vec2>* probe = nullptr; // --measure-stroke: where its dabs went
+        std::vector<float>* radiusProbe = nullptr; // ... and their brush radius in pixels (verify replays it)
+    };
+    std::unique_ptr<StrokeSolver> solver_;
+    const DabView* dabView_ = nullptr; // set while the solver thread places dabs (dabAt reads it)
+    bool asyncStroke_ = false;         // this stroke's dabs go to the solver thread
+    bool strokeFinishing_ = false;     // released: the solver places the last dabs, the UI carries on
+    bool predictiveStrokes() const;    // the preference (and its environment override)
+    bool draftStrokes() const;         // Draft Strokes (SF_DRAFT_STROKE=0 / 1 overrides)
+    bool asyncStrokeAllowed() const;   // the stroke beginning now may use the solver thread
+    bool solverBusy() const;
+    void solverWait();                 // waits for the dabs in flight and commits them
+    void pumpStroke();                 // per frame: commit what the solver finished, start its next batch
+    void commitSolverBatch();
+    void finishStrokeNow();            // the rest of endStroke: undo step, timings
+    void buildGhost();                 // per frame: the dabs not yet on the GPU, for the renderer's preview
+    bool pickWith(const DabView& view, float x, float y, RayHit& hit) const;
+    // Where a screen ray meets the surface as the last dabs placed describe it (the ghost's estimate).
+    bool ghostSurface(const glm::vec3& origin, const glm::vec3& dir, glm::vec3& at, glm::vec3& normal) const;
+    PenPredictor penPredictor_;
+    glm::vec2 pointerLatest_{0.0f};   // the newest pointer sample of the stroke (window pixels)
+    double pointerLatestAt_ = 0.0;    // its time (seconds)
+    double frameSeconds_ = 1.0 / 60.0; // running mean of the frame interval (how far ahead to predict)
+    double prepSeconds_ = 0.0;         // running mean of what packing a batch's upload costs (the batch size)
+    Sculptor::DabFrame ghostFrame_;    // the last placed dab's frame (the ghost's estimates start from it)
+    float ghostEdge_ = 0.0f;           // mean edge length of the triangle the stroke began on (the preview's cavities)
+    float ghostCurvature_ = 0.0f;      // the surface's curvature along the stroke (1 / radius, > 0 convex; 0 flat)
+    glm::vec2 ghostHead_{0.0f};        // where the preview's head is on screen (--measure-stroke)
+    bool ghostHeadValid_ = false;
+    uint64_t commits_ = 0; // solver batches committed
+    // --measure-stroke SF_MEASURE_POP=1: at each commit the view is drawn offscreen as it was (with the batch's
+    // preview), as it is (the batch's result), and as it was without the batch's preview; the mean differences.
+    bool popProbe_ = false;
+    double popWith_ = 0.0, popWithout_ = 0.0, popWorst_ = 0.0;
+    uint64_t popCommits_ = 0;
+    glm::vec2 predictedPointer() const; // where the pen will be when this frame shows (the cursor, the head)
+    static uint64_t meshStateHash(const Mesh& mesh); // --measure-stroke SF_MEASURE_VERIFY=1
+    bool verifyStroke(uint64_t before, const std::vector<glm::vec2>& dabs, const std::vector<float>& radii);
     bool lastInputPen_ = false; // the last mouse event came from a pen (SDL_PEN_MOUSEID)
     bool penSeen_ = false;
     BrushType strokeBrush_ = BrushType::Standard;
@@ -533,6 +626,21 @@ private:
     bool textureAfterAutoUv_ = false;    // the running Auto UV came from New Texture: make the texture after it
     int textureSizeChoice_ = 1;          // 1K, 2K, 4K, 8K
     bool showUvView_ = false;            // Texture Map > Show UVs
+    // Material channels (PanelPbr.cpp): channel toggles, the solo channel view and map export under Texture Map,
+    // the brush material (per-channel values and swatches) in the Color palette, and per-channel chips on the
+    // Paint Layers rows (enable, blend, opacity).
+    void drawTextureChannelsContents();
+    void drawBrushMaterialContents();
+    // The channel chips of texture layer `layer` (a row under its name).
+    Args drawLayerChannelChips(int layer); // the texture_layer_channel arguments to run (empty: nothing clicked)
+    void registerPbrUiActions();
+    double pbrTestValue(const std::string& name) const; // UI test values (UiTest.cpp), NaN when not one of ours
+    int exportPresetChoice_ = 0;
+    // Dense textured meshes: while the Paint brush hovers, the texture painting caches for the area under it are
+    // built ahead of the first dab (PanelPbr.cpp; TexturePainter::prewarm).
+    void prewarmTexturePaint();
+    glm::vec3 prewarmCenter_{1e30f};
+    float prewarmRadius_ = 0.0f;
     // Bake sub-palette (PanelBake.cpp): normal / displacement / AO / cavity / colour maps from a high-poly onto
     // the active SubTool's UVs (core/Bake.h), on a worker thread, and the baked normal map shown on the model.
     void drawBakeContents();
@@ -575,6 +683,8 @@ private:
         int framesStill = 0;          // frames since the view last moved
         bool fastNow = false;         // this frame draws without antialiasing (fast navigation)
         bool proxyNow = false;        // this frame draws big meshes' motion proxy (fast navigation)
+        bool movingNow = false;       // the view moved in the last few frames (the frame governor counts these)
+        size_t sceneTriangles = 0;    // visible triangles in full detail, last frame
         int samplesWanted = 0;        // viewSamples() for the last frame
         int samplesUsed = 0;          // what the renderer managed last frame (fewer when out of memory)
         double strokeSyncMs = 0.0;    // upload time summed over the open stroke's frames
@@ -584,6 +694,20 @@ private:
         int lastStrokeFrames = 0;
         bool gpuOutOfMemory = false;
     } perf_;
+    // Hardware profile (PanelPerformanceProfile.cpp; app/Calibration.h, core/HardwareProfile.h, core/FrameGovernor.h):
+    // calibrates on first launch and when the GPU, driver or version changes; the profile section of Preferences >
+    // Performance; the adaptive frame governor, fed every frame between FrameBegin and FrameEnd.
+    void initHardwareProfile();
+    void shutdownHardwareProfile();
+    void hardwareProfileFrameBegin();
+    void hardwareProfileFrameEnd(); // before the swap: feeds the governor, runs a calibration step
+    void drawHardwareProfileOverlay(); // calibration progress over the first frames (Esc skips)
+    void drawPerformanceProfileSection();
+    void registerPerformanceProfileUiActions();
+    bool hardwareProfileGoverns() const; // the profile's motion proxy threshold applies (else the fixed default)
+    void applyHardwareProfile(const struct HardwareProfile& profile, bool announce);
+    void finishCalibration();
+    std::shared_ptr<struct HwProfileUi> hwProfile_;
     // Splats > Make sculptable (PanelSculptable.cpp, core/Sculptable.h): splat capture -> sculptable SubTool on a
     // worker thread; the crop box and the face landmark review in the viewport.
     void registerSculptableUiActions();
@@ -914,6 +1038,7 @@ private:
     void drawGeometrySection(); // PanelGeometry.cpp: Divide, SDiv, Lower / Higher Res, Del Lower / Higher, Reconstruct
     bool smt_ = true;           // Tool > Geometry > Smt: Divide smooths
     float sdivSlider_ = 1.0f;   // the SDiv slider while dragged (1-based)
+    float microSlider_ = 4.0f;  // Tool > Geometry > Micro: the micro level the next Divide to micro makes
     bool sdivHeld_ = false;
     void drawSubToolsContents();
     // PanelExtract.cpp: Tool > SubTool > Extract, Tool > Geometry > Modify Topology (Mirror And Weld) and
@@ -1261,6 +1386,20 @@ private:
     bool spaceMouseMoving_ = false;
     int spaceMouseLastButton_ = -1; // for Preferences: "Button N pressed"
     // ---- end SpaceMouse ----
+    // ---- Sculpt Timeline (PanelTimeline.cpp, core/Timeline.h) and proof mode (ProofMode.cpp) ----
+    // The history strip along the bottom of the canvas, the timelapse export, and Help > Benchmark: a scripted
+    // stroke through the input handlers on 5M..100M+ meshes with a live HUD, an MP4 and a JSON result.
+    std::shared_ptr<struct TimelineUiState> timelineUi_;
+    std::shared_ptr<struct ProofState> proof_;
+    void drawTimelineUi();            // once a frame from drawUi: keeps the timeline attached and draws the strip
+    void registerTimelineUiActions(); // view.timeline, timeline.timelapse, help.benchmark
+    void startTimelapse(const std::string& path, int width, int height, float seconds, int fps);
+    bool timelapseStep(double budgetSeconds); // renders frames for up to the budget; false when finished
+    int runTimelapseCli();                    // sculptforge FILE --timelapse out.mp4
+    void startProofMode();                    // Help > Benchmark, sculptforge --benchmark
+    void proofBeforeSwap(int fbW, int fbH);   // the interactive loop, after drawing a frame, before showing it
+    void drawProofUi();
+    // ---- end Sculpt Timeline ----
 };
 
 } // namespace sf
