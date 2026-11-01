@@ -68,6 +68,7 @@ All notable changes to SculptForge are listed here. The format follows
   brushes now, which ignored it; at 0 they keep their own tip exactly as before.
 - SelectRect and SelectLasso (hide / show) ignored symmetry (#51 follow-up): with X / Y / Z on, the mirror image of
   the shape counts as inside too, as with MaskRect and MaskLasso (`hide_rect` / `hide_lasso symmetry=x`).
+
 ### Changed
 - Faster CI and releases with the same tests (docs/releasing.md):
   - **Compiler caching:** compiles go through ccache, cached only by pushes to main and maintainers' own runs.
