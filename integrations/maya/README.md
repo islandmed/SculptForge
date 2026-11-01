@@ -35,19 +35,19 @@ servers, and neither app runs anything it finds in the folder. Meshes travel as 
    folder.
 2. In Maya select one or more meshes and click **Send**.
 3. In SculptForge choose **File > Maya > Get from Maya** (or turn on **Get automatically**, which checks the
-   folder once a second). Each mesh becomes a SubTool with its Maya name.
+   folder once a second). Each mesh becomes a Part with its Maya name.
 4. Sculpt, then choose **File > Maya > Send to Maya**.
 5. In Maya click **Get**. Each object that came from Maya gets its new mesh, keeping its transform, parent and
-   shading groups; a SubTool you added in SculptForge becomes a new object. The whole Get is one undo step.
+   shading groups; a Part you added in SculptForge becomes a new object. The whole Get is one undo step.
 
 ## What comes across
 
 - Positions in world space and Maya's own units (SculptForge takes the numbers as they are), quads, n-gons (as
   triangles), UVs.
-- Not: polygroups, masks and polypaint stay in SculptForge; normals, creases, history, deformers and skinning
+- Not: face groups, masks and vertex paint stay in SculptForge; normals, creases, history, deformers and skinning
   stay in Maya. Get replaces the mesh shape, so a skinned or deformed mesh loses its deformers: send a copy of
   those.
-- Maya node names: SculptForge sends names made of letters, digits and `_` (a SubTool called "Body Hi" arrives
+- Maya node names: SculptForge sends names made of letters, digits and `_` (a Part called "Body Hi" arrives
   as `Body_Hi`).
 
 ## The folder

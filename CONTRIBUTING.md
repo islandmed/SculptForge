@@ -6,14 +6,33 @@ agree your work is licensed under the same terms.
 ## Ground rules
 
 - **Clean-room only.** Do not contribute code, shaders, brushes, alphas, icons or
-  other assets copied or decompiled from ZBrush or any other proprietary
-  product. Re-implementing well-known published techniques is fine.
+  other assets copied or decompiled from any proprietary product. Re-implementing well-known published techniques is fine.
 - Keep `src/core` free of UI and GPU dependencies so it stays testable and
   scriptable.
 - New editor operations should be registered as commands in
   `src/core/Commands.cpp` so they are available to the UI, scripting and the
   AI assistant alike.
 - Add or update tests in `tests/` for core behaviour changes.
+
+## Developer Certificate of Origin
+
+SculptForge uses the [Developer Certificate of Origin 1.1](https://developercertificate.org) (DCO). There is no
+CLA: you keep the copyright to your work and license it under GPL-3.0-or-later.
+
+Sign off every commit with `git commit -s`, which adds a line like this to the commit message:
+
+```
+Signed-off-by: Your Name <you@example.com>
+```
+
+By signing off you certify, as the DCO says, that the contribution is your own original work, or that you have
+the right to submit it under the project's license (for example, code under a compatible open-source license,
+with its notice kept). You also certify that it is not copied or derived from proprietary software, its SDKs,
+decompiled or disassembled code, its documentation or its assets.
+Describing how a feature behaves from the outside, and implementing published techniques, is fine.
+
+Forgot the sign-off? `git commit --amend -s` fixes the last commit, and `git rebase --signoff main` the whole
+branch.
 
 ## Workflow
 

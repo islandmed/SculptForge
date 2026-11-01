@@ -79,7 +79,7 @@ void registerFaceCommands(CommandRegistry& registry) {
     registry.add({"new_head",
                   "New scene with a human head to sculpt a face on (the ICT-FaceKit template head, MIT licence: face, "
                   "neck, mouth and eye sockets, about 14,000 vertices, life size in metres) and its eyes as a second "
-                  "SubTool. Generate Facial Shapes fits it exactly.",
+                  "Part. Generate Facial Shapes fits it exactly.",
                   {},
                   [](Document& doc, const Args&) -> CommandResult {
                       Mesh eyes;
@@ -90,11 +90,11 @@ void registerFaceCommands(CommandRegistry& registry) {
                       return {true, "New head (" + std::to_string(doc.mesh.vertexCount()) + " vertices) with Eyes"};
                   }});
     registry.add({"face_shapes_generate",
-                  "Generate Facial Shapes: gives the active SubTool (a sculpted humanoid head looking down +Z, Y up) "
+                  "Generate Facial Shapes: gives the active Part (a sculpted humanoid head looking down +Z, Y up) "
                   "the 52 Apple ARKit blend shapes (eyeBlinkLeft, jawOpen, mouthSmileRight, ...) as sculpt layers at "
                   "weight 0, fitted to its proportions, ready to fix by sculpting into each layer and to export as "
                   "morph targets. Layers with those names are replaced (undo brings them back). Eyes, teeth and tongue "
-                  "SubTools (by name) and SubTools on the face (brows, lashes) get the shapes they need.",
+                  "Parts (by name) and Parts on the face (brows, lashes) get the shapes they need.",
                   {{"landmarks", T::String,
                     "Optional JSON of points on the sculpt guiding the fit, e.g. {\"nose_tip\":[0,1.2,0.4],"
                     "\"chin\":[0,0.9,0.3]}: eye_outer_right, eye_inner_right, eye_inner_left, eye_outer_left, "
@@ -103,7 +103,7 @@ void registerFaceCommands(CommandRegistry& registry) {
                     false},
                    {"symmetry", T::String,
                     "auto (default: mirror Left / Right when the sculpt is symmetric about X = 0), on or off.", false},
-                   {"subtools", T::Bool, "Also give the shapes to eyes, teeth, tongue and SubTools on the face (default true).",
+                   {"subtools", T::Bool, "Also give the shapes to eyes, teeth, tongue and Parts on the face (default true).",
                     false},
                    {"level", T::Number,
                     "Subdivision level (1-based, as SDiv) to make the shapes on; default: the lowest with at least 20,000 "
@@ -133,7 +133,7 @@ void registerFaceCommands(CommandRegistry& registry) {
                   }});
 
     registry.add({"face_landmarks_detect",
-                  "Finds the facial landmarks (eye and mouth corners, nose tip, chin) on the active SubTool by fitting "
+                  "Finds the facial landmarks (eye and mouth corners, nose tip, chin) on the active Part by fitting "
                   "the template head automatically, and reports them as the JSON face_shapes_generate takes (to check "
                   "or correct before generating).",
                   {},
@@ -149,7 +149,7 @@ void registerFaceCommands(CommandRegistry& registry) {
                   }});
 
     registry.add({"face_weights",
-                  "Live face: sets the weights of the named blend shapes (sculpt layers) on every SubTool, e.g. "
+                  "Live face: sets the weights of the named blend shapes (sculpt layers) on every Part, e.g. "
                   "json={\"jawOpen\":0.3,\"eyeBlinkLeft\":1}. Made for 30+ calls a second (the phone's face feed): no "
                   "undo step, only the vertices those shapes move are updated. Names not given keep their weight.",
                   {{"json", T::String, "JSON object of ARKit blend shape names and weights 0-1 (a whole face message works too).",

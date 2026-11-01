@@ -18,7 +18,7 @@ Nothing leaves your computer until you choose a hosted service and press **Gener
 what is sent where, see [AI services and privacy](#privacy-and-model-licences) below.
 
 > **ZBrush:** ZBrush has no built-in image-to-3D. The closest workflow is blocking out a base mesh by hand
-> with DynaMesh or ZSpheres; here you get a starting shape in seconds and refine it with the usual brushes.
+> with DynaMesh or Forge Spheres; here you get a starting shape in seconds and refine it with the usual brushes.
 
 ## Open the Generate 3D window
 
@@ -210,8 +210,7 @@ Generated meshes are a starting point. A typical next pass:
 1. Check the size of the remeshed result in the title strip (Verts, Tris). If the detail is too soft, generate
    again with a higher **Resolution**, or run **Tool > Remesh > Voxel Remesh** at a higher value on the
    result.
-2. Turn on **X** symmetry if the subject is symmetrical, and sculpt the forms with Clay Buildup, Move and Dam
-   Standard ([Sculpting and brushes](sculpting.md)).
+2. Turn on **X** symmetry if the subject is symmetrical, and sculpt the forms with Clay Block, Move and Sharp Crease ([Sculpting and brushes](sculpting.md)).
 3. Save a project (<kbd>Ctrl</kbd>+<kbd>S</kbd>): generated scenes start untitled.
 
 ## From scripts and agents

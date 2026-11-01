@@ -88,6 +88,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.cameraNotch = std::clamp(int(j["cameraNotch"].asNumber(p.cameraNotch)), 0, 2);
     p.turntable = j["turntable"].asBool(p.turntable);
     if (j["inputStyle"].isString()) {
+        p.inputStyleSaved = true;
         const std::string style = j["inputStyle"].asString();
         p.inputStyle = style == "maya" ? 3 : style == "blender" ? 2 : style == "sculptforge" ? 1 : 0;
     }
@@ -163,13 +164,13 @@ constexpr Gesture kGestures[] = {
     {"Zoom", "Mouse wheel, Ctrl + middle drag, or Ctrl + left drag on the background (nothing masked)"},
     {"Paint mask", "Hold Ctrl while stroking (Ctrl+Alt erases)"},
     {"Invert mask", "Ctrl + click the background"},
-    {"Clear mask", "Ctrl + drag on the background (MaskPen)"},
-    {"Mask a lasso or rectangle", "Ctrl + drag with MaskLasso / MaskRect (Tool > Masking; Ctrl+Alt unmasks)"},
-    {"Isolate polygroup", "Ctrl+Shift + click it (again: invert)"},
-    {"Hide polygroup", "Ctrl+Shift+Alt + click it"},
+    {"Clear mask", "Ctrl + drag on the background (Mask Pen)"},
+    {"Mask a lasso or rectangle", "Ctrl + drag with Mask Lasso / Mask Rectangle (Tool > Masking; Ctrl+Alt unmasks)"},
+    {"Isolate face group", "Ctrl+Shift + click it (again: invert)"},
+    {"Hide face group", "Ctrl+Shift+Alt + click it"},
     {"Show all", "Ctrl+Shift + click the background"},
     {"Hide outside a rectangle or lasso", "Ctrl+Shift + drag (add Alt: inside; shape in Tool > Visibility)"},
-    {"Select a SubTool", "Alt + click it"},
+    {"Select a Part", "Alt + click it"},
     {"Help on any control", "Hold Ctrl and point at it (Ctrl+Alt: scripting parameters)"},
     {"Assign a shortcut", "Ctrl+Alt + click any button, then press the key"},
     {"Tablet pressure", "Used automatically when a pen is detected (Preferences > Tablet: curve, test area)"},
@@ -186,11 +187,11 @@ constexpr Gesture kBlenderGestures[] = {
     {"Rotate", "Middle drag, Alt + left drag (pen, trackpad), or left drag beside the model"},
     {"Pan", "Shift + middle drag, or Alt+Shift + left drag"},
     {"Zoom", "Mouse wheel, Ctrl + middle drag, or Alt+Ctrl + left drag"},
-    {"Views", "Numpad 1 front, 3 right, 7 top (Ctrl: the opposite side), 5 orthographic, . frame the SubTool, Home "
+    {"Views", "Numpad 1 front, 3 right, 7 top (Ctrl: the opposite side), 5 orthographic, . frame the Part, Home "
               "frame everything; Emulate Numpad (Preferences > Input) for the number row"},
     {"Paint mask", "M for the Mask brush, then drag (Ctrl+drag unmasks); M again goes back"},
     {"Invert / clear mask", "Ctrl+I / Alt+M"},
-    {"Hide polygroup", "H over it (Shift+H: show only it, again: everything; Alt+H shows all)"},
+    {"Hide face group", "H over it (Shift+H: show only it, again: everything; Alt+H shows all)"},
     {"Brush radius / strength", "F / Shift+F, then drag or type a number"},
     {"Help on any control", "Hold Ctrl and point at it (Ctrl+Alt: scripting parameters)"},
     {"Assign a shortcut", "Ctrl+Alt + click any button, then press the key"},
@@ -297,7 +298,7 @@ void App::initActions() {
         "micro_delete", nullptr, [this] { return hasMicro(doc_.mesh); });
     add("geometry.micro_bake", "Bake Micro", "Tool > Geometry", nullptr, [this] { runCommand("micro_bake"); }, nullptr, "micro_bake",
         nullptr, [this] { return hasMicro(doc_.mesh); },
-        "Turn the micro level into a regular mesh in a new SubTool (for export or tools that need real geometry).");
+        "Turn the micro level into a regular mesh in a new Part (for export or tools that need real geometry).");
     add("geometry.micro_export", "Export Displacement", "Tool > Geometry", nullptr,
         [this] {
             const std::string path = (std::filesystem::path(defaultBakeFolder(doc_)) / (doc_.assetName() + "_micro_displacement.exr")).string();
@@ -308,28 +309,28 @@ void App::initActions() {
     add("geometry.micro_noise", "Micro Surface Noise", "Tool > Geometry", nullptr, [this] { runCommand("micro_noise"); }, nullptr,
         "micro_noise", nullptr, [this] { return hasMicro(doc_.mesh); });
     // Tool > SubTool > Extract, Tool > Geometry > Modify Topology, Tool > Deformation (PanelExtract.cpp).
-    add("subtool.extract", "Extract", "Tool > SubTool", nullptr, [this] { runExtract(); }, nullptr, "extract", nullptr,
+    add("subtool.extract", "Extract", "Tool > Parts", nullptr, [this] { runExtract(); }, nullptr, "extract", nullptr,
         [this] { return doc_.mesh.hasMask(); },
-        "Make a shell from the masked part of the SubTool (a helmet, a strap, clothing), shown as a preview below it. "
-        "Change Thick, E Smt or Double and it updates; Accept keeps it as a new SubTool.");
-    add("subtool.extract_accept", "Accept", "Tool > SubTool", nullptr, [this] { runCommand("extract_accept"); }, nullptr,
+        "Make a shell from the masked part of the Part (a helmet, a strap, clothing), shown as a preview below it. "
+        "Change Thick, E Smt or Double and it updates; Accept keeps it as a new Part.");
+    add("subtool.extract_accept", "Accept", "Tool > Parts", nullptr, [this] { runCommand("extract_accept"); }, nullptr,
         "extract_accept", nullptr, [this] { return doc_.extractPreviewCurrent(); },
-        "Keep the Extract preview as a new SubTool below this one. Ctrl+Z takes it away again.");
-    add("subtool.extract_double", "Double", "Tool > SubTool", nullptr,
+        "Keep the Extract preview as a new Part below this one. Ctrl+Z takes it away again.");
+    add("subtool.extract_double", "Double", "Tool > Parts", nullptr,
         [this] {
             extractDouble_ = !extractDouble_;
             if (doc_.extractPreviewCurrent()) runExtract();
         },
         nullptr, nullptr, [this] { return extractDouble_; }, nullptr,
         "Grow the extracted shell both inward and outward from the surface, instead of outward only.");
-    add("subtool.extract_tcorne", "TCorne", "Tool > SubTool", nullptr,
+    add("subtool.extract_tcorne", "TCorne", "Tool > Parts", nullptr,
         [this] {
             extractTCorne_ = !extractTCorne_;
             if (doc_.extractPreviewCurrent()) runExtract();
         },
         nullptr, nullptr, [this] { return extractTCorne_; }, nullptr,
         "Triangle corners: where the extracted edge turns sharply, the rim is made of triangles instead of quads.");
-    add("subtool.extract_tborder", "TBorder", "Tool > SubTool", nullptr,
+    add("subtool.extract_tborder", "TBorder", "Tool > Parts", nullptr,
         [this] {
             extractTBorder_ = !extractTBorder_;
             if (doc_.extractPreviewCurrent()) runExtract();
@@ -339,12 +340,12 @@ void App::initActions() {
     add("geometry.mirror_weld", "Mirror And Weld", "Tool > Geometry", nullptr,
         [this] { runCommand("mirror_and_weld", {{"axis", axesText(mirrorWeldAxes_)}}); }, nullptr, "mirror_and_weld",
         nullptr, [this] { return !axesText(mirrorWeldAxes_).empty() && doc_.mesh.triangleCount() > 0; },
-        "Mirror the + side of the SubTool onto the - side across the chosen axis and weld the seam into one "
-        "watertight mesh. Polygroups and polypaint come along. To keep the other side, Deformation > Mirror first.");
+        "Mirror the + side of the Part onto the - side across the chosen axis and weld the seam into one "
+        "watertight mesh. Face Groups and vertex paint come along. To keep the other side, Deformation > Mirror first.");
     add("deformation.mirror", "Mirror", "Tool > Deformation", nullptr,
         [this] { runCommand("mirror", {{"axis", axesText(mirrorAxes_)}}); }, nullptr, "mirror", nullptr,
         [this] { return !axesText(mirrorAxes_).empty() && doc_.mesh.vertexCount() > 0; },
-        "Flip the SubTool across the chosen axis, through the origin (the plane symmetry and Mirror And Weld use).");
+        "Flip the Part across the chosen axis, through the origin (the plane symmetry and Mirror And Weld use).");
     for (int k = 0; k < 3; ++k) {
         static const char* const kWeldIds[3] = {"geometry.mirror_weld_x", "geometry.mirror_weld_y", "geometry.mirror_weld_z"};
         static const char* const kMirrorIds[3] = {"deformation.mirror_x", "deformation.mirror_y", "deformation.mirror_z"};
@@ -362,7 +363,7 @@ void App::initActions() {
     add("file.open", "Open...", "File", "Ctrl+O", [this] { confirmDiscard([this] { openFileDialog(); }); }, ICON_LC_FOLDER_OPEN,
         nullptr, nullptr, nullptr, "Open a project (.sfproj), a model (.obj, .glb, .fbx, .stl, .ply, .usd ...) or splats.");
     add("file.save", "Save", "File", "Ctrl+S", [this] { saveProjectAs(false); }, ICON_LC_SAVE, nullptr, nullptr, nullptr,
-        "Save the project (.sfproj: every SubTool, layer, brush and setting). Asks for a name the first time.");
+        "Save the project (.sfproj: every Part, layer, brush and setting). Asks for a name the first time.");
     add("file.save_as", "Save As...", "File", "Ctrl+Shift+S", [this] { saveProjectAs(true); }, nullptr, nullptr, nullptr, nullptr,
         "Save the project under a new name.");
     add("file.export_glb", "Export GLB...", "File > Export", "Ctrl+E", [this] { saveFileDialog(FileAction::ExportGlb); },
@@ -372,7 +373,7 @@ void App::initActions() {
             static const SDL_DialogFileFilter filters[] = {{"STL", "stl"}, {"All files", "*"}};
             SDL_ShowSaveFileDialog(onGozFileChosen, &gozDialogs_[int(GozFile::ExportStl)], window_, filters, 2, nullptr);
         },
-        nullptr, nullptr, nullptr, nullptr, "Save the visible SubTools as one binary STL, for 3D printing.");
+        nullptr, nullptr, nullptr, nullptr, "Save the visible Parts as one binary STL, for 3D printing.");
     add("file.send_unreal", "Send to Unreal", "File > Export", "Ctrl+U", [this] { sendToUnreal(); }, ICON_LC_SEND, nullptr,
         nullptr, [this] { return !pendingUnreal_.valid(); },
         "Export a game-ready FBX and import it into the running Unreal Editor (Python remote execution).");
@@ -382,20 +383,20 @@ void App::initActions() {
             blenderLastBeatNs_ = 0; // beat now: the add-on must see this SculptForge as running when Blender sends next
         },
         ICON_LC_SEND, "blender_send", nullptr, nullptr,
-        "Send the visible SubTools back to Blender (the SculptForge add-on): objects that came from Blender update "
-        "in place, keeping their transform, materials and modifiers; new SubTools become new objects.");
+        "Send the visible Parts back to Blender (the SculptForge add-on): objects that came from Blender update "
+        "in place, keeping their transform, materials and modifiers; new Parts become new objects.");
     add("file.receive_blender", "Receive from Blender", "File > Blender", nullptr, [this] { receiveFromBlender(); },
         nullptr, "blender_receive", nullptr, nullptr,
-        "Load what Blender last sent with the add-on's Send to SculptForge. Each object updates its SubTool (undoable) "
+        "Load what Blender last sent with the add-on's Send to SculptForge. Each object updates its Part (undoable) "
         "or becomes a new one; this happens by itself while Receive automatically is on.");
     // Maya bridge (PanelMaya.cpp, integrations/maya, #42): off until an exchange folder is chosen.
     add("file.send_maya", "Send to Maya", "File > Maya", nullptr, [this] { sendToMaya(); }, ICON_LC_SEND, "maya_send",
         nullptr, nullptr,
-        "Send the visible SubTools to Maya (OBJ with quads and UVs) through the exchange folder you chose; Get from "
+        "Send the visible Parts to Maya (OBJ with quads and UVs) through the exchange folder you chose; Get from "
         "SculptForge on Maya's SculptForge shelf loads them, replacing the objects they came from by name.");
     add("file.receive_maya", "Get from Maya", "File > Maya", nullptr, [this] { receiveFromMaya(); }, nullptr,
         "maya_receive", nullptr, nullptr,
-        "Load what Maya last sent with the shelf's Send to SculptForge. Each object replaces the SubTool with its name "
+        "Load what Maya last sent with the shelf's Send to SculptForge. Each object replaces the Part with its name "
         "(undoable) or becomes a new one.");
     add("file.maya_folder", "Exchange folder...", "File > Maya", nullptr, [this] { chooseMayaFolder(); },
         ICON_LC_FOLDER_OPEN, nullptr, nullptr, nullptr,
@@ -422,7 +423,7 @@ void App::initActions() {
         for (const char* c = brushName(type); *c; ++c)
             if (*c != ' ') id += char(std::tolower(static_cast<unsigned char>(*c)));
         const std::string key = i < 9 ? std::to_string(i + 1) : i == 9 ? std::string("0") : std::string();
-        add(id.c_str(), brushName(type), "Brush", key.c_str(),
+        add(id.c_str(), brushLabel(type), "Brush", key.c_str(),
             [this, type] {
                 brush_ = type;
                 doc_.activeBrush = -1;
@@ -431,7 +432,7 @@ void App::initActions() {
                 maskBrush_.on = false;
             },
             ICON_LC_BRUSH, nullptr, [this, type] { return brush_ == type && doc_.activeBrush < 0 && !paintMode_ && !guidesMode_; }, nullptr,
-            (std::string("Sculpt with the ") + brushName(type) + " brush.").c_str());
+            (std::string("Sculpt with the ") + brushLabel(type) + " brush.").c_str());
     }
 
     // --- Help ---
@@ -1035,8 +1036,8 @@ void drawInterfaceSection(App& app) {
             setLanguage(lang);
         }
         ui::HelpText("Language", nullptr,
-                     "The language of menus, palettes, shelves and messages. Brush and tool names (SubTool, QRemesh, "
-                     "DynaMesh-style names) stay as they are, as in ZBrush. Store Config keeps it for the next start.",
+                     "The language of menus, palettes, shelves and messages. Brush and tool names (Quad Remesh, Forge Spheres, "
+                     "Clay Block...) stay as they are. Store Config keeps it for the next start.",
                      "Preferences > Interface");
     }
     ImGui::Checkbox(tr("Popup Info (Ctrl+hover help)"), &p.popupInfo);
@@ -1178,8 +1179,8 @@ void drawLightBoxSection(App& app) {
     UiPrefs& p = app.uiPrefs();
     UiLayout& l = app.layout();
     ImGui::Checkbox(tr("Show at startup"), &p.lightboxAtStartup);
-    ui::HelpText("Show LightBox at startup", nullptr, "Open LightBox on the Project tab when SculptForge starts (as ZBrush does).",
-                 "Preferences > LightBox");
+    ui::HelpText("Show Library at startup", nullptr, "Open Library on the Project tab when SculptForge starts (as ZBrush does).",
+                 "Preferences > Library");
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted(tr("Rows"));
     for (int r = 1; r <= 4; ++r) {
@@ -1188,23 +1189,23 @@ void drawLightBoxSection(App& app) {
         if (on) ImGui::PushStyleColor(ImGuiCol_Button, col(ui::color::accent));
         if (ImGui::Button((std::to_string(r) + "##lbrows").c_str(), ImVec2(ImGui::GetFrameHeight() * 1.3f, 0))) l.lightboxRows = r;
         if (on) ImGui::PopStyleColor();
-        ui::HelpText("LightBox rows", nullptr, "How many rows of thumbnails the LightBox strip shows.", "Preferences > LightBox");
+        ui::HelpText("Library rows", nullptr, "How many rows of thumbnails the Library strip shows.", "Preferences > Library");
     }
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted(tr("Placement"));
     ImGui::SameLine();
     if (ImGui::RadioButton(tr("Top"), !l.lightboxBottom)) l.lightboxBottom = false;
-    ui::HelpText("LightBox at the top", nullptr, "LightBox opens along the top edge of the canvas.", "Preferences > LightBox");
+    ui::HelpText("Library at the top", nullptr, "Library opens along the top edge of the canvas.", "Preferences > Library");
     ImGui::SameLine();
     if (ImGui::RadioButton(tr("Bottom"), l.lightboxBottom)) l.lightboxBottom = true;
-    ui::HelpText("LightBox at the bottom", nullptr, "LightBox opens above the bottom shelf.", "Preferences > LightBox");
+    ui::HelpText("Library at the bottom", nullptr, "Library opens above the bottom shelf.", "Preferences > Library");
     ImGui::TextColored(col(ui::color::textDim), "Library folder");
     const std::string shown = p.libraryFolder.empty() ? std::string("Documents/SculptForge (default)") : p.libraryFolder;
     if (ImGui::Button((std::string(ICON_LC_FOLDER_OPEN "  ") + shown + "##libfolder").c_str(), ImVec2(-FLT_MIN, 0)))
         SDL_ShowOpenFolderDialog(onUiFileChosen, &g_requests[kLibraryFolder], app.window_, nullptr, false);
     ui::HelpText("Library folder", nullptr,
-                 "Where your projects, tools, brushes, alphas, images, splats and QuickSaves live. LightBox shows it as User.",
-                 "Preferences > LightBox");
+                 "Where your projects, tools, brushes, alphas, images, splats and Snapshots live. Library shows it as User.",
+                 "Preferences > Library");
     if (!p.libraryFolder.empty() && ImGui::SmallButton(tr("Use the default folder"))) p.libraryFolder.clear();
 }
 

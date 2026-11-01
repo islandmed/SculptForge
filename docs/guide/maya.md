@@ -2,7 +2,7 @@
 
 Keep Maya for the scene, rigging and animation, and sculpt in SculptForge: the **SculptForge shelf** for Maya
 sends the selected meshes to SculptForge, and **File > Maya > Send to Maya** sends them back, replacing each
-Maya object's mesh by name. It works like GoZ between ZBrush and other apps, on Linux, Windows and macOS.
+Maya object's mesh by name. It works like ZBrush's GoZ between ZBrush and other apps, on Linux, Windows and macOS.
 
 The two apps exchange files through **one folder that you choose in both**, and nothing else: SculptForge opens
 no ports or connections for this, reads and writes only inside that folder, and never runs anything it finds
@@ -31,12 +31,12 @@ The script uses plain `maya.cmds` and Maya's own OBJ exporter; it needs Maya 202
 ## A round trip
 
 1. In Maya select one or more meshes and click **Send** on the SculptForge shelf.
-2. In SculptForge choose **File > Maya > Get from Maya**. Each mesh becomes a SubTool with its Maya name; a
-   SubTool with that name already there is replaced (one undo step on that SubTool).
+2. In SculptForge choose **File > Maya > Get from Maya**. Each mesh becomes a Part with its Maya name; a
+   Part with that name already there is replaced (one undo step on that Part).
 3. Sculpt, paint, divide, remesh: anything SculptForge does.
-4. Choose **File > Maya > Send to Maya**. Every visible SubTool goes.
+4. Choose **File > Maya > Send to Maya**. Every visible Part goes.
 5. In Maya click **Get**. Each object that came from Maya gets the new mesh and keeps its transform, parent and
-   shading groups; a SubTool you added in SculptForge becomes a new object. The whole Get is one undo step in
+   shading groups; a Part you added in SculptForge becomes a new object. The whole Get is one undo step in
    Maya.
 
 **Get automatically** (in **File > Maya**, off by default) loads what Maya sends as soon as it arrives:
@@ -46,16 +46,16 @@ SculptForge checks the folder's manifest once a second.
 
 | | Maya | SculptForge |
 |---|---|---|
-| Shape | The mesh, in world space | The SubTool, as placed in Maya's scene |
-| Faces | Quads and triangles; n-gons as triangles | Triangles and quads (PolyF shows the quads) |
+| Shape | The mesh, in world space | The Part, as placed in Maya's scene |
+| Faces | Quads and triangles; n-gons as triangles | Triangles and quads (Wire shows the quads) |
 | UVs | The current UV set | UVs |
-| Name | The transform's name | SubTool name |
+| Name | The transform's name | Part name |
 | Units | Maya's linear unit (cm by default) | Taken as they are: 1 cm in Maya is 1 unit here |
 
-Polygroups, the mask and polypaint stay in SculptForge. Normals, creases, construction history, deformers and
-skinning stay in Maya: **Get** replaces the mesh shape, so send a copy of a skinned or deformed mesh. A SubTool
+Face Groups, the mask and vertex paint stay in SculptForge. Normals, creases, construction history, deformers and
+skinning stay in Maya: **Get** replaces the mesh shape, so send a copy of a skinned or deformed mesh. A Part
 named "Body Hi" arrives in Maya as `Body_Hi` (Maya names allow letters, digits and `_`), and comes back to the
-same SubTool.
+same Part.
 
 ## The exchange folder
 
@@ -79,4 +79,4 @@ The commands are `maya_send folder=<folder>` and `maya_receive folder=<folder>` 
   SculptForge; click **Folder** in Maya to see or change it).
 - **Get in Maya says nothing has been sent**: choose **File > Maya > Send to Maya** in SculptForge first.
 - **A mesh came in as a new object instead of replacing one**: Get matches the transform's name; renaming the
-  object in Maya or the SubTool's Maya name breaks the link.
+  object in Maya or the Part's Maya name breaks the link.

@@ -9,7 +9,7 @@ shot one-subtool
 # Append from the panel's menu: each new SubTool becomes the active one.
 click "SubTools/Append"
 click "Sphere"
-expect_status Appended SubTool Sphere
+expect_status Appended Part Sphere
 expect_value subtools == 2
 expect_value active_subtool == 1
 click "SubTools/Append"
@@ -22,7 +22,7 @@ shot appended
 # Click rows to select.
 click "SubTools/Body"
 expect_value active_subtool == 0
-expect_status Active SubTool: Body
+expect_status Active Part: Body
 click "SubTools/Sphere"
 expect_value active_subtool == 1
 
@@ -31,7 +31,7 @@ hold alt
 click_subtool Cube
 hold none
 expect_value active_subtool == 2
-expect_status Active SubTool: Cube
+expect_status Active Part: Cube
 hold alt
 click_subtool Body
 hold none
@@ -112,12 +112,12 @@ expect "SubTools/Helmet copy"
 click "SubTools/Delete..."
 expect_text This can't be undone
 shot confirm-delete
-click "Delete SubTool?/Cancel"
+click "Delete Part?/Cancel"
 expect_value subtools == 4
 click "SubTools/Delete..."
-click "Delete SubTool?/Delete"
+click "Delete Part?/Delete"
 expect_value subtools == 3
-expect_status Deleted SubTool Helmet copy
+expect_status Deleted Part Helmet copy
 expect_not "SubTools/Helmet copy"
 
 # Move the active SubTool up and down the list.
@@ -136,7 +136,7 @@ expect_status Merged Sphere into Body
 expect_value can_undo == 0
 click "SubTools/Split groups"
 expect_value subtools == 3
-expect_status Split into 2 SubTools
+expect_status Split into 2 Parts
 shot split-groups
 click "SubTools/Merge visible..."
 click "Merge Visible?/Merge"
@@ -144,28 +144,28 @@ expect_value subtools == 1
 expect "SubTools/Merged"
 click "SubTools/Split parts"
 expect_value subtools == 3
-expect_status Split into 3 SubTools
+expect_status Split into 3 Parts
 shot split-parts
 
 # The Tool palette's SubTool sub-palette closes and opens.
-click "SubTool##tool.subtool"
+click "Parts##tool.subtool"
 expect_not "SubTools/Append"
-click "SubTool##tool.subtool"
+click "Parts##tool.subtool"
 expect "SubTools/Append"
 
 # Wireframe, polygroup colours and the LOD preview are for the active SubTool only.
 key shift+f
 expect_value wireframe == 1
-click "Polygroups"
-click "Show polygroups"
+click "Face Groups"
+click "Show face groups"
 shot active-overlays
-click "Show polygroups"
+click "Show face groups"
 key shift+f
 click "Export"
 click "Generate LOD chain"
 shot lod-preview
 click "Game Ready/Sculpt"
-click "SubTool##tool.subtool"
+click "Parts##tool.subtool"
 
 # Past six SubTools the list scrolls; clicks scroll it like a person would.
 run subtool_append ; subtool_append ; subtool_append ; subtool_append

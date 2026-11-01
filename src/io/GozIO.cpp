@@ -566,8 +566,8 @@ std::string gozDefaultRoot() {
 }
 
 std::string gozUnavailableMessage() {
-    return "The ZBrush bridge (GoZ) needs ZBrush, which runs only on Windows and macOS. Use Export GoZ / Import GoZ "
-           "to move .GoZ files by hand, or set a GoZ folder (e.g. a Wine prefix's Users/Public/Pixologic).";
+    return "The ZBrush Bridge needs ZBrush, which runs only on Windows and macOS. Use Export / Import GoZ-compatible file "
+           "to move .GoZ files by hand, or set a bridge folder (e.g. a Wine prefix's Users/Public/Pixologic).";
 }
 
 void setGozApplicationPath(std::string executable) { g_appPath = std::move(executable); }
@@ -600,7 +600,7 @@ bool gozSend(const std::vector<MeshObjectRef>& objects, const GozSendOptions& o,
     std::error_code ec;
     if (o.launch) { // these paths reach the shell (launchDetached)
         if (!gozShellSafePath(root)) {
-            message = "The GoZ folder path contains characters that are not allowed when launching ZBrush";
+            message = "The bridge folder path contains characters that are not allowed when launching ZBrush";
             return false;
         }
         if (!o.zbrushPath.empty()) {
@@ -614,7 +614,7 @@ bool gozSend(const std::vector<MeshObjectRef>& objects, const GozSendOptions& o,
         }
     }
     if (objects.empty()) {
-        message = "Nothing to send: no visible SubTools";
+        message = "Nothing to send: no visible Parts";
         return false;
     }
     for (const auto& obj : objects)
@@ -628,7 +628,7 @@ bool gozSend(const std::vector<MeshObjectRef>& objects, const GozSendOptions& o,
     const fs::path app = rootPath / "GoZApps" / "SculptForge";
     for (const auto& d : {brush, project, app}) fs::create_directories(d, ec);
     if (!fs::is_directory(project, ec)) {
-        message = "Cannot create the GoZ folder " + pathUtf8(project);
+        message = "Cannot create the bridge folder " + pathUtf8(project);
         return false;
     }
     // One .GoZ per object (ZBrush makes each a SubTool), all listed in GoZ_ObjectList.txt.
@@ -664,7 +664,7 @@ bool gozSend(const std::vector<MeshObjectRef>& objects, const GozSendOptions& o,
         message = "Cannot write the GoZ bridge files in " + root;
         return false;
     }
-    message = "Sent " + names.front() + (names.size() > 1 ? " and " + std::to_string(names.size() - 1) + " more SubTools" : "") +
+    message = "Sent " + names.front() + (names.size() > 1 ? " and " + std::to_string(names.size() - 1) + " more Parts" : "") +
               " to " + pathUtf8(project);
     if (sentNames) *sentNames = names;
     if (!o.launch) return true;
@@ -758,7 +758,7 @@ bool gozReceive(const std::string& rootIn, std::vector<MeshObject>& out, std::st
     size_t tris = 0;
     for (const auto& obj : loaded) tris += obj.mesh.triangleCount();
     message = "Received " + loaded.front().name;
-    if (loaded.size() > 1) message += " and " + std::to_string(loaded.size() - 1) + " more SubTools";
+    if (loaded.size() > 1) message += " and " + std::to_string(loaded.size() - 1) + " more Parts";
     message += " from ZBrush (" + std::to_string(tris) + " triangles)";
     if (!problems.empty()) message += "; skipped: " + problems;
     out = std::move(loaded);
@@ -778,7 +778,7 @@ bool gozReceive(const std::string& root, Mesh& out, std::string& message, std::v
     merged.recomputeAllNormals();
     out = std::move(merged);
     if (objects.size() > 1) {
-        const size_t from = message.find(" more SubTools");
+        const size_t from = message.find(" more Parts");
         if (from != std::string::npos) message.insert(from + 14, " (merged)");
     }
     return true;
@@ -789,10 +789,10 @@ std::string zbrushProprietaryMessage(const std::string& extension) {
     std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::toupper(c)); });
     if (ext == ".ZTL")
         return ".ZTL is ZBrush's proprietary format and cannot be read directly. Convert it once in ZBrush with the "
-               "SculptForge ZTool Export plug-in (Help > User Guide > Coming from ZBrush), then open the .ztl again; "
-               "or send the model with GoZ (File > ZBrush (GoZ) > Receive from ZBrush).";
+               "SculptForge ZTL Export plug-in (Help > User Guide > Coming from ZBrush), then open the .ztl again; "
+               "or send the model with GoZ (File > ZBrush Bridge > Receive from ZBrush).";
     return ext + " is ZBrush's proprietary format and cannot be read. In ZBrush, send the model with GoZ "
-                 "(File > ZBrush (GoZ) > Receive from ZBrush) or export it as OBJ or FBX "
+                 "(File > ZBrush Bridge > Receive from ZBrush) or export it as OBJ or FBX "
                  "(Tool > Export / the FBX ExportImport plug-in) and open that instead.";
 }
 
@@ -845,7 +845,7 @@ bool loadConvertedZTool(const std::string& path, std::vector<MeshObject>& out, s
     std::error_code ec;
     const std::vector<std::string> files = convertedZToolFiles(path);
     if (files.empty()) {
-        error = "No converted ZTool found for " + path + " (convert it in ZBrush with the SculptForge ZTool Export plug-in)";
+        error = "No converted ZTool found for " + path + " (convert it in ZBrush with the SculptForge ZTL Export plug-in)";
         return false;
     }
     const fs::path source = utf8Path(path);

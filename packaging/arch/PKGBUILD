@@ -2,7 +2,7 @@
 pkgname=sculptforge
 pkgver=0.10.3
 pkgrel=1
-pkgdesc="Free, open-source digital sculpting app with ZBrush-style tools, for artists and game pipelines"
+pkgdesc="Free, open-source digital sculpting app with ZBrush-style keys available, for artists and game pipelines"
 arch=('x86_64' 'aarch64')
 url="https://sculptforge.app/"
 license=('GPL-3.0-or-later')

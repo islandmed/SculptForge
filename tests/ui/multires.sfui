@@ -123,7 +123,7 @@ expect_value triangles == 108
 shot base-level
 
 # The SubTool list shows the level.
-click "SubTool##tool.subtool"
+click "Parts##tool.subtool"
 expect_text "SDiv 1/5"
 shot subtool-list
 

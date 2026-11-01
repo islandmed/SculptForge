@@ -297,7 +297,7 @@ void App::finishStrokeNow() {
     UndoRecord r = doc_.sculptor.endStroke();
     finishPaintStroke(r);
     if (r.topology && !r.topology->uvs.empty())
-        status_ = "Dynamic topology removed the UVs of the remeshed SubTool (Undo brings them back)";
+        status_ = "Dynamic topology removed the UVs of the remeshed Part (Undo brings them back)";
     if (!r.empty()) {
         doc_.undo.push(std::move(r));
         doc_.modified = true;
@@ -485,7 +485,7 @@ bool App::verifyStroke(uint64_t before, const std::vector<glm::vec2>& dabs, cons
         doc_.syncBvh();
         haveLastDab_ = false;
         doc_.sculptor.draftStrokes = draftStrokes(); // (the measured stroke is one the solver thread takes)
-        doc_.sculptor.beginStroke(doc_.mesh, brushName(strokeBrush_), doc_.activeLayer);
+        doc_.sculptor.beginStroke(doc_.mesh, brushLabel(strokeBrush_), doc_.activeLayer);
         const float radius = radiusPx_;
         for (size_t i = 0; i < dabs.size(); ++i) {
             if (i < radii.size()) radiusPx_ = radii[i]; // (the size each dab had: it may change mid-stroke)

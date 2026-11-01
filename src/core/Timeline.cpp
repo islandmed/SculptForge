@@ -1120,7 +1120,7 @@ void registerTimelineCommands(CommandRegistry& registry) {
                       std::string e;
                       const int n = loadHistorySidecar(doc, path, &e);
                       if (n == 0) return {false, e.empty() ? "No history beside " + path : e};
-                      return {true, "History loaded for " + std::to_string(n) + " SubTool(s)"};
+                      return {true, "History loaded for " + std::to_string(n) + " Part(s)"};
                   }});
 }
 

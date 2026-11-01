@@ -20,9 +20,9 @@ wait_idle 120
 expect_status Remeshed to
 expect_value triangles != $before
 expect_value masked >= $kept
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 shot voxel_keep_masked
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 key ctrl+z
 expect_value triangles == $before
 
@@ -37,10 +37,10 @@ key ctrl+z
 
 # QRemesh with Keep Masked: the unmasked part becomes quads.
 click "QRemesh/Keep Masked##qremesh"
-click "QRemesh/QRemesh"
+click "QRemesh/Quad Remesh"
 wait_idle 120
 expect_status quads
 expect_value quads > 100
 expect_value masked >= $kept
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 shot qremesh_keep_masked

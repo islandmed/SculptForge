@@ -38,7 +38,7 @@ is saved automatically).
 
 The defaults follow the usual ZBrush setup: Alt on the pen to carve without reaching for the keyboard, and
 right-click to turn the model. Invert and Smooth act exactly like holding Alt or Shift, so Alt + click on
-another SubTool selects it and Alt + drag on the background pans. Rotate view and Pan view: hold the button
+another Part selects it and Alt + drag on the background pans. Rotate view and Pan view: hold the button
 and move the pen above the tablet (or drag with the tip down).
 
 SDL also turns pen buttons into mouse clicks, but which mouse button depends on the SDL version, so

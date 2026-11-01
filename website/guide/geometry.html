@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Subdivide, remesh, decimate and LODs - SculptForge User Guide</title>
-  <meta name="description" content="These tools change the topology of the active SubTool: add resolution for detail, rebuild an even surface, reduce the triangle count, make it symmetric, or make a chain of levels of detail for a game engine. This chapter explains what each one does to your mesh and its attributes, and when to use it">
+  <meta name="description" content="These tools change the topology of the active Part: add resolution for detail, rebuild an even surface, reduce the triangle count, make it symmetric, or make a chain of levels of detail for a game engine. This chapter explains what each one does to your mesh and its attributes, and when to use it.">
   <meta name="theme-color" content="#111114">
   <meta name="color-scheme" content="dark">
   <link rel="icon" type="image/svg+xml" href="../img/favicon.svg?v=2">
@@ -13,7 +13,7 @@
   <link rel="canonical" href="https://sculptforge.app/guide/geometry.html">
   <meta property="og:type" content="article">
   <meta property="og:title" content="Subdivide, remesh, decimate and LODs - SculptForge User Guide">
-  <meta property="og:description" content="These tools change the topology of the active SubTool: add resolution for detail, rebuild an even surface, reduce the triangle count, make it symmetric, or make a chain of levels of detail for a game engine. This chapter explains what each one does to your mesh and its attributes, and when to use it">
+  <meta property="og:description" content="These tools change the topology of the active Part: add resolution for detail, rebuild an even surface, reduce the triangle count, make it symmetric, or make a chain of levels of detail for a game engine. This chapter explains what each one does to your mesh and its attributes, and when to use it.">
   <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=3">
   <meta property="og:url" content="https://sculptforge.app/guide/geometry.html">
   <link rel="stylesheet" href="../style.css?v=17">
@@ -45,29 +45,29 @@
           <input type="search" id="guide-q" placeholder="Search the guide" aria-label="Search the guide" autocomplete="off">
           <div class="search-results" id="guide-results" hidden></div>
         </div>
-        <nav class="toc" aria-label="User guide"><a class="toc-home" href="index.html">Contents</a><p class="toc-group">Getting started</p><ul><li><a href="welcome.html">Welcome to SculptForge</a></li><li><a href="whats-new.html">What&#x27;s new</a></li><li><a href="coming-from-zbrush.html">Coming from ZBrush</a></li><li><a href="installing.html">Installing SculptForge</a></li><li><a href="interface.html">The interface</a></li><li><a href="navigation.html">Navigating the view</a></li></ul><p class="toc-group">Sculpting</p><ul><li><a href="sculpting.html">Sculpting and brushes</a></li><li><a href="brush-lab.html">Brush Lab and sharing brushes</a></li><li><a href="masking.html">Masking</a></li><li><a href="polygroups.html">Polygroups and visibility</a></li><li><a href="subtools.html">SubTools</a></li><li><a href="zspheres.html">ZSpheres</a></li><li><a href="polypaint.html">Polypaint and materials</a></li><li><a href="texture-painting.html">Texture painting</a></li><li><a href="pbr-painting.html">Material painting (PBR)</a></li><li><a href="layers.html">Sculpt layers and blend shapes</a></li><li><a href="facial-shapes.html">Facial shapes and live face</a></li><li><a href="subdivision-levels.html">Subdivision levels</a></li><li><a href="micro-levels.html">Micro levels: hundreds of millions of polygons</a></li><li><a href="dynamic-topology.html">Dynamic topology</a></li><li><a href="timeline.html">Sculpt Timeline and timelapse</a></li><li><a href="gizmo.html">Moving, rotating and posing (Gizmo 3D)</a></li><li><a href="geometry.html" class="current" aria-current="page">Subdivide, remesh, decimate and LODs</a><ul class="toc-sections"><li><a href="#at-a-glance">At a glance</a></li><li><a href="#quads-and-triangles">Quads and triangles</a></li><li><a href="#subdivide">Subdivide</a></li><li><a href="#voxel-remesh">Voxel remesh</a></li><li><a href="#qremesh">QRemesh</a></li><li><a href="#decimate">Decimate</a></li><li><a href="#mirror-and-weld">Mirror And Weld</a></li><li><a href="#mirror">Mirror</a></li><li><a href="#lod-chains">LOD chains</a></li><li><a href="#undo-and-safety">Undo and safety</a></li><li><a href="#scripting">Scripting</a></li><li><a href="#see-also">See also</a></li></ul></li><li><a href="retopology.html">Quad retopology and detail projection</a></li></ul><p class="toc-group">AI and capture</p><ul><li><a href="generate-3d.html">Image and text to 3D</a></li><li><a href="splats.html">Gaussian splats</a></li><li><a href="scan-to-splat.html">Scan an object into a splat</a></li><li><a href="scan-to-sculptable.html">From scan to sculptable mesh</a></li><li><a href="phone-capture.html">Phone capture and AR</a></li></ul><p class="toc-group">Files and pipelines</p><ul><li><a href="baking.html">Baking normal and displacement maps</a></li><li><a href="exporting.html">Exporting, Unreal and ZBrush</a></li><li><a href="export-presets.html">Export presets</a></li><li><a href="blender.html">Working with Blender</a></li><li><a href="maya.html">Working with Maya</a></li><li><a href="projects.html">Projects, autosave and QuickSave</a></li><li><a href="scripting.html">Scripting and automation</a></li><li><a href="studios.html">SculptForge for studios</a></li></ul><p class="toc-group">Reference</p><ul><li><a href="shortcuts.html">Keyboard and mouse</a></li><li><a href="performance.html">Performance and big meshes</a></li><li><a href="troubleshooting.html">Troubleshooting and FAQ</a></li><li><a href="glossary.html">Glossary</a></li></ul></nav>
+        <nav class="toc" aria-label="User guide"><a class="toc-home" href="index.html">Contents</a><p class="toc-group">Getting started</p><ul><li><a href="welcome.html">Welcome to SculptForge</a></li><li><a href="whats-new.html">What&#x27;s new</a></li><li><a href="coming-from-zbrush.html">Coming from ZBrush</a></li><li><a href="installing.html">Installing SculptForge</a></li><li><a href="interface.html">The interface</a></li><li><a href="navigation.html">Navigating the view</a></li></ul><p class="toc-group">Sculpting</p><ul><li><a href="sculpting.html">Sculpting and brushes</a></li><li><a href="brush-lab.html">Brush Lab and sharing brushes</a></li><li><a href="masking.html">Masking</a></li><li><a href="face-groups.html">Face Groups and visibility</a></li><li><a href="parts.html">Parts</a></li><li><a href="forge-spheres.html">Forge Spheres</a></li><li><a href="vertex-paint.html">Vertex Paint and materials</a></li><li><a href="texture-painting.html">Texture painting</a></li><li><a href="pbr-painting.html">Material painting (PBR)</a></li><li><a href="layers.html">Sculpt layers and blend shapes</a></li><li><a href="facial-shapes.html">Facial shapes and live face</a></li><li><a href="subdivision-levels.html">Subdivision levels</a></li><li><a href="micro-levels.html">Micro levels: hundreds of millions of polygons</a></li><li><a href="dynamic-topology.html">Dynamic topology</a></li><li><a href="timeline.html">Sculpt Timeline and timelapse</a></li><li><a href="gizmo.html">Moving, rotating and posing (Gizmo)</a></li><li><a href="geometry.html" class="current" aria-current="page">Subdivide, remesh, decimate and LODs</a><ul class="toc-sections"><li><a href="#at-a-glance">At a glance</a></li><li><a href="#quads-and-triangles">Quads and triangles</a></li><li><a href="#subdivide">Subdivide</a></li><li><a href="#voxel-remesh">Voxel remesh</a></li><li><a href="#quad-remesh">Quad Remesh</a></li><li><a href="#decimate">Decimate</a></li><li><a href="#mirror-and-weld">Mirror And Weld</a></li><li><a href="#mirror">Mirror</a></li><li><a href="#lod-chains">LOD chains</a></li><li><a href="#undo-and-safety">Undo and safety</a></li><li><a href="#scripting">Scripting</a></li><li><a href="#see-also">See also</a></li></ul></li><li><a href="retopology.html">Quad retopology and detail projection</a></li></ul><p class="toc-group">AI and capture</p><ul><li><a href="generate-3d.html">Image and text to 3D</a></li><li><a href="splats.html">Gaussian splats</a></li><li><a href="scan-to-splat.html">Scan an object into a splat</a></li><li><a href="scan-to-sculptable.html">From scan to sculptable mesh</a></li><li><a href="phone-capture.html">Phone capture and AR</a></li></ul><p class="toc-group">Files and pipelines</p><ul><li><a href="baking.html">Baking normal and displacement maps</a></li><li><a href="exporting.html">Exporting, Unreal and ZBrush</a></li><li><a href="export-presets.html">Export presets</a></li><li><a href="blender.html">Working with Blender</a></li><li><a href="maya.html">Working with Maya</a></li><li><a href="projects.html">Projects, autosave and snapshots</a></li><li><a href="scripting.html">Scripting and automation</a></li><li><a href="studios.html">SculptForge for studios</a></li></ul><p class="toc-group">Reference</p><ul><li><a href="shortcuts.html">Keyboard and mouse</a></li><li><a href="performance.html">Performance and big meshes</a></li><li><a href="troubleshooting.html">Troubleshooting and FAQ</a></li><li><a href="glossary.html">Glossary</a></li></ul></nav>
       </div>
     </div>
     <main class="guide-main" id="top">
       <article class="guide-article">
 <h1 id="subdivide-remesh-decimate-and-lods">Subdivide, remesh, decimate and LODs</h1>
-<p>These tools change the topology of the active SubTool: add resolution for detail, rebuild an even surface, reduce the triangle count, make it symmetric, or make a chain of levels of detail for a game engine. This chapter explains what each one does to your mesh and its attributes, and when to use it.</p>
-<p>All of them work on the <strong>active SubTool</strong> and, except the LOD preview, are undoable with <kbd>Ctrl</kbd>+<kbd>Z</kbd>.</p>
+<p>These tools change the topology of the active Part: add resolution for detail, rebuild an even surface, reduce the triangle count, make it symmetric, or make a chain of levels of detail for a game engine. This chapter explains what each one does to your mesh and its attributes, and when to use it.</p>
+<p>All of them work on the <strong>active Part</strong> and, except the LOD preview, are undoable with <kbd>Ctrl</kbd>+<kbd>Z</kbd>.</p>
 <h2 id="at-a-glance">At a glance<a class="anchor" href="#at-a-glance" aria-label="Link to this section">#</a></h2>
-<div class="table-wrap"><table><thead><tr><th>Tool</th><th>Where</th><th>Triangles</th><th>Quads</th><th>Keeps sculpt layers</th><th>Keeps mask and polypaint</th><th>Keeps polygroups, hidden faces, UVs</th></tr></thead><tbody><tr><td>Divide (levels)</td><td><strong>Tool &gt; Geometry &gt; Divide</strong>, <kbd>Ctrl</kbd>+<kbd>D</kbd></td><td>x4 per level, lower levels kept</td><td>Each quad becomes four (Catmull-Clark)</td><td>Yes</td><td>Yes (interpolated)</td><td>Yes</td></tr><tr><td>Subdivide</td><td><strong>Tool &gt; Geometry &gt; Subdivide</strong></td><td>x4 per level</td><td>Each quad becomes four</td><td>Yes</td><td>Yes (interpolated)</td><td>Yes</td></tr><tr><td>Voxel Remesh</td><td><strong>Tool &gt; Remesh &gt; Voxel Remesh</strong></td><td>Set by resolution</td><td>All quads (new ones)</td><td>Baked in</td><td>Yes (transferred)</td><td>No (reset); a texture is kept on new UVs with Keep Texture</td></tr><tr><td>QRemesh</td><td><strong>Tool &gt; Geometry &gt; QRemesh</strong></td><td>Set by Target Polygons</td><td>All quads, with edge loops</td><td>Baked in</td><td>Yes (transferred)</td><td>Polygroups with Keep Groups; no hidden faces; a texture is kept on new UVs with Keep Texture</td></tr><tr><td>Decimate</td><td><strong>Tool &gt; Geometry &gt; Decimate</strong></td><td>Reduced</td><td>No, all triangles</td><td>Yes</td><td>Yes</td><td>Yes</td></tr><tr><td>Mirror And Weld</td><td><strong>Tool &gt; Geometry &gt; Modify Topology</strong></td><td>Twice the kept side</td><td>Yes</td><td>Yes</td><td>Yes (mirrored)</td><td>Yes (mirrored)</td></tr><tr><td>LOD chain</td><td><strong>Tool &gt; Export</strong></td><td>One level per ratio step</td><td>LOD0 keeps them; lower levels are triangles</td><td>Yes, on every level</td><td>Yes</td><td>Yes</td></tr></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>Tool</th><th>Where</th><th>Triangles</th><th>Quads</th><th>Keeps sculpt layers</th><th>Keeps mask and vertex paint</th><th>Keeps face groups, hidden faces, UVs</th></tr></thead><tbody><tr><td>Divide (levels)</td><td><strong>Tool &gt; Geometry &gt; Divide</strong>, <kbd>Ctrl</kbd>+<kbd>D</kbd></td><td>x4 per level, lower levels kept</td><td>Each quad becomes four (Catmull-Clark)</td><td>Yes</td><td>Yes (interpolated)</td><td>Yes</td></tr><tr><td>Subdivide</td><td><strong>Tool &gt; Geometry &gt; Subdivide</strong></td><td>x4 per level</td><td>Each quad becomes four</td><td>Yes</td><td>Yes (interpolated)</td><td>Yes</td></tr><tr><td>Voxel Remesh</td><td><strong>Tool &gt; Remesh &gt; Voxel Remesh</strong></td><td>Set by resolution</td><td>All quads (new ones)</td><td>Baked in</td><td>Yes (transferred)</td><td>No (reset); a texture is kept on new UVs with Keep Texture</td></tr><tr><td>Quad Remesh</td><td><strong>Tool &gt; Geometry &gt; Quad Remesh</strong></td><td>Set by Target Polygons</td><td>All quads, with edge loops</td><td>Baked in</td><td>Yes (transferred)</td><td>Face Groups with Keep Groups; no hidden faces; a texture is kept on new UVs with Keep Texture</td></tr><tr><td>Decimate</td><td><strong>Tool &gt; Geometry &gt; Decimate</strong></td><td>Reduced</td><td>No, all triangles</td><td>Yes</td><td>Yes</td><td>Yes</td></tr><tr><td>Mirror And Weld</td><td><strong>Tool &gt; Geometry &gt; Modify Topology</strong></td><td>Twice the kept side</td><td>Yes</td><td>Yes</td><td>Yes (mirrored)</td><td>Yes (mirrored)</td></tr><tr><td>LOD chain</td><td><strong>Tool &gt; Export</strong></td><td>One level per ratio step</td><td>LOD0 keeps them; lower levels are triangles</td><td>Yes, on every level</td><td>Yes</td><td>Yes</td></tr></tbody></table></div>
 <h2 id="quads-and-triangles">Quads and triangles<a class="anchor" href="#quads-and-triangles" aria-label="Link to this section">#</a></h2>
-<p>SculptForge sculpts on triangles, but it remembers which pairs of triangles were one quad. A model you open from ZBrush (GoZ), Blender or Maya (OBJ, FBX, PLY, USD) keeps its quads: <strong>PolyF</strong> draws them as quads, without the diagonal, and OBJ, FBX, PLY, USD and GoZ exports write them back as quads, corner for corner. Polygons with more than four sides are split into triangles. The new <strong>Plane</strong> and <strong>Cube</strong> are made of quads, and so is the result of a voxel remesh.</p>
-<p>Sculpting, masking, polypaint, sculpt layers, undo, SubTools and project files all keep the quads. Subdivide turns every quad into four quads. Two things turn quads into triangles:</p>
+<p>SculptForge sculpts on triangles, but it remembers which pairs of triangles were one quad. A model you open from ZBrush (ZBrush Bridge), Blender or Maya (OBJ, FBX, PLY, USD) keeps its quads: <strong>Wire</strong> draws them as quads, without the diagonal, and OBJ, FBX, PLY, USD and GoZ-compatible exports write them back as quads, corner for corner. Polygons with more than four sides are split into triangles. The new <strong>Plane</strong> and <strong>Cube</strong> are made of quads, and so is the result of a voxel remesh.</p>
+<p>Sculpting, masking, vertex paint, sculpt layers, undo, Parts and project files all keep the quads. Subdivide turns every quad into four quads. Two things turn quads into triangles:</p>
 <ul>
 <li>
 <strong>Decimate</strong> (and the lower levels of a LOD chain) collapses edges, so its result is all triangles.
 </li>
 <li>
-When the two halves of a quad end up in different polygroups, or one half is deleted, they show and export as two triangles.
+When the two halves of a quad end up in different face groups, or one half is deleted, they show and export as two triangles.
 </li>
 </ul>
 <p>glTF (<code>.glb</code>) and STL only hold triangles, so those exports always write triangles.</p>
-<aside class="callout callout-zbrush"><p><strong>ZBrush:</strong> Besides keeping the quads you bring in, SculptForge can make new ones from any mesh: <strong>QRemesh</strong> (like ZRemesher) builds quads with flowing edge loops. See <a href="retopology.html">Quad retopology</a>.</p></aside>
+<aside class="callout callout-zbrush"><p><strong>ZBrush:</strong> Besides keeping the quads you bring in, SculptForge can make new ones from any mesh: <strong>Quad Remesh</strong> (like ZRemesher) builds quads with flowing edge loops. See <a href="retopology.html">Quad retopology</a>.</p></aside>
 <h2 id="subdivide">Subdivide<a class="anchor" href="#subdivide" aria-label="Link to this section">#</a></h2>
 <p>For sculpting at several resolutions use <strong>Divide</strong> (<kbd>Ctrl</kbd>+<kbd>D</kbd>), which keeps the lower levels to step back to: see <a href="subdivision-levels.html">Subdivision levels</a>. <strong>Subdivide</strong> is the one-way version.</p>
 <p><strong>Tool &gt; Geometry &gt; Subdivide</strong> smooths the mesh with Loop subdivision. Each level multiplies the triangle count by four and rounds off the shape slightly, like ZBrush&#x27;s Divide with Smt on.</p>
@@ -76,7 +76,7 @@ When the two halves of a quad end up in different polygroups, or one half is del
 Sculpt layers are subdivided with the mesh, so blend shapes keep working.
 </li>
 <li>
-Mask, polypaint and UVs are interpolated; polygroups and hidden faces carry over.
+Mask, vertex paint and UVs are interpolated; face groups and hidden faces carry over.
 </li>
 <li>
 Each quad becomes four quads; triangles become four triangles.
@@ -85,16 +85,16 @@ Each quad becomes four quads; triangles become four triangles.
 SculptForge refuses to subdivide past 50 million triangles.
 </li>
 </ul>
-<aside class="callout callout-note"><p><strong>Note:</strong> Subdivide replaces the mesh with a denser one and drops any <a href="subdivision-levels.html">subdivision levels</a>: it subdivides the level you are on, which becomes the new base, and the status line says so (undo brings the levels back). Voxel Remesh, Decimate and QRemesh do the same. To add triangles only where you sculpt, use <a href="dynamic-topology.html">Dynamic topology</a>.</p></aside>
+<aside class="callout callout-note"><p><strong>Note:</strong> Subdivide replaces the mesh with a denser one and drops any <a href="subdivision-levels.html">subdivision levels</a>: it subdivides the level you are on, which becomes the new base, and the status line says so (undo brings the levels back). Voxel Remesh, Decimate and Quad Remesh do the same. To add triangles only where you sculpt, use <a href="dynamic-topology.html">Dynamic topology</a>.</p></aside>
 <aside class="callout callout-tip"><p><strong>Tip:</strong> The title strip shows the vertex and triangle counts of the whole scene. A few million triangles sculpt smoothly on a recent GPU; go up a level only when you need finer detail.</p></aside>
 <h2 id="voxel-remesh">Voxel remesh<a class="anchor" href="#voxel-remesh" aria-label="Link to this section">#</a></h2>
-<p><strong>Tool &gt; Remesh &gt; Voxel Remesh</strong> rebuilds the active SubTool as an even, watertight surface, like ZBrush&#x27;s DynaMesh. Use it to:</p>
+<p><strong>Tool &gt; Remesh &gt; Voxel Remesh</strong> rebuilds the active Part as an even, watertight surface, like ZBrush&#x27;s DynaMesh. Use it to:</p>
 <ul>
 <li>
 fuse overlapping pieces into one surface (append a sphere, overlap it, merge, remesh);
 </li>
 <li>
-even out stretched triangles after heavy Move or Snake Hook work;
+even out stretched triangles after heavy Move or Tendril work;
 </li>
 <li>
 clean up scans, splat conversions and AI-generated models before sculpting.
@@ -108,13 +108,13 @@ clean up scans, splat conversions and AI-generated models before sculpting.
 Sculpt layers are baked into the surface: the result has no layers.
 </li>
 <li>
-Mask and polypaint are transferred from the nearest original vertex.
+Mask and vertex paint are transferred from the nearest original vertex.
 </li>
 <li>
-Polygroups, hidden faces and UVs are reset (everything becomes visible, one polygroup). Hidden parts are remeshed too.
+Face Groups, hidden faces and UVs are reset (everything becomes visible, one face group). Hidden parts are remeshed too.
 </li>
 <li>
-A painted texture is kept with <strong>Keep Texture</strong> (on by default, shown next to the button when the SubTool has a texture): the result gets Auto UVs and the texture is projected onto it, every layer included, in the same undo step. This runs in the background (Auto UV of a few hundred thousand triangles takes several seconds) with a progress bar and <strong>Cancel</strong>. Off: the texture is dropped. See <a href="texture-painting.html#uvs-and-geometry">Texture painting</a>.
+A painted texture is kept with <strong>Keep Texture</strong> (on by default, shown next to the button when the Part has a texture): the result gets Auto UVs and the texture is projected onto it, every layer included, in the same undo step. This runs in the background (Auto UV of a few hundred thousand triangles takes several seconds) with a progress bar and <strong>Cancel</strong>. Off: the texture is dropped. See <a href="texture-painting.html#uvs-and-geometry">Texture painting</a>.
 </li>
 <li>
 Separate pieces that don&#x27;t touch stay separate pieces; overlapping ones are merged.
@@ -126,16 +126,16 @@ The new surface is made of even quads (the original&#x27;s quads are rebuilt, no
 <strong>Keep Masked</strong> (off by default): masked areas keep their triangles exactly, detail included, and only the rest is remeshed. The new surface is joined to the masked area along the mask&#x27;s edge by a narrow strip of triangles, so the model stays closed. A triangle counts as masked when all three of its corners are at least half masked. If the mask&#x27;s edge is too ragged or too thin to join up at this resolution, the status line says so and nothing changes (smooth or grow the mask, or raise the resolution). Command: <code>remesh keep_masked=true</code>.
 </li>
 </ul>
-<p>To remesh several SubTools into one, first combine them with <strong>Merge visible...</strong> or <strong>Merge down...</strong> in <a href="subtools.html#merge-subtools">SubTools</a>.</p>
-<aside class="callout callout-zbrush"><p><strong>ZBrush:</strong> There is no Project option, Groups-aware remesh or Blur slider yet. Like DynaMesh, the remesh produces an even grid of quads, not flowing edge loops. For quads with edge loops that follow the forms, use <a href="retopology.html">QRemesh</a> (like ZRemesher), and ProjectAll to get the detail back.</p></aside>
-<h2 id="qremesh">QRemesh<a class="anchor" href="#qremesh" aria-label="Link to this section">#</a></h2>
-<p><strong>Tool &gt; Geometry &gt; QRemesh</strong> is automatic quad retopology, like ZBrush&#x27;s ZRemesher: it rebuilds the SubTool as clean quads whose edge loops follow the forms, close to a target polygon count, with Keep Groups, Adaptive Size, polypaint density and symmetry. <strong>ProjectAll</strong> (<strong>Tool &gt; SubTool &gt; Project</strong>) brings the sculpted detail back onto the new topology after you divide it. Both have their own chapter: <a href="retopology.html">Quad retopology and detail projection</a>.</p>
+<p>To remesh several Parts into one, first combine them with <strong>Merge visible...</strong> or <strong>Merge down...</strong> in <a href="parts.html#merge-parts">Parts</a>.</p>
+<aside class="callout callout-zbrush"><p><strong>ZBrush:</strong> There is no Project option, Groups-aware remesh or Blur slider yet. Like ZBrush&#x27;s DynaMesh, the remesh produces an even grid of quads, not flowing edge loops. For quads with edge loops that follow the forms, use <a href="retopology.html">Quad Remesh</a> (like ZRemesher), and Project All to get the detail back.</p></aside>
+<h2 id="quad-remesh">Quad Remesh<a class="anchor" href="#quad-remesh" aria-label="Link to this section">#</a></h2>
+<p><strong>Tool &gt; Geometry &gt; Quad Remesh</strong> is automatic quad retopology, like ZBrush&#x27;s ZRemesher: it rebuilds the Part as clean quads whose edge loops follow the forms, close to a target polygon count, with Keep Groups, Adaptive Size, vertex paint density and symmetry. <strong>Project All</strong> (<strong>Tool &gt; Parts &gt; Project</strong>) brings the sculpted detail back onto the new topology after you divide it. Both have their own chapter: <a href="retopology.html">Quad retopology and detail projection</a>.</p>
 <h2 id="decimate">Decimate<a class="anchor" href="#decimate" aria-label="Link to this section">#</a></h2>
 <p><strong>Tool &gt; Geometry &gt; Decimate</strong> reduces the triangle count while keeping the shape, using quadric edge collapse (the same family of algorithm as ZBrush&#x27;s Decimation Master). The <strong>Keep</strong> slider next to the button sets the fraction of triangles to keep (0.05 to 0.95, default 0.50).</p>
-<p>Decimation keeps open borders in place, and because it only removes vertices, every remaining vertex keeps its exact sculpt layer offsets, mask and polypaint. Polygroups, hidden flags and UVs survive on the remaining triangles. The result is all triangles: quads are not kept.</p>
+<p>Decimation keeps open borders in place, and because it only removes vertices, every remaining vertex keeps its exact sculpt layer offsets, mask and vertex paint. Face Groups, hidden flags and UVs survive on the remaining triangles. The result is all triangles: quads are not kept.</p>
 <p>With <strong>Keep Masked</strong> (under the button, off by default) masked vertices are never removed, so masked areas keep their triangles exactly and only the rest is decimated (<code>decimate keep_masked=true</code>).</p>
 <p>Use it to make a lighter version of a finished sculpt for export, 3D printing or a review, or to bring a dense scan down to something you can work with.</p>
-<aside class="callout callout-tip"><p><strong>Tip:</strong> Decimate a duplicate SubTool (<strong>Tool &gt; SubTool &gt; Duplicate</strong>) when you want to keep the full-resolution sculpt in the same project.</p></aside>
+<aside class="callout callout-tip"><p><strong>Tip:</strong> Decimate a duplicate Part (<strong>Tool &gt; Parts &gt; Duplicate</strong>) when you want to keep the full-resolution sculpt in the same project.</p></aside>
 <h2 id="mirror-and-weld">Mirror And Weld<a class="anchor" href="#mirror-and-weld" aria-label="Link to this section">#</a></h2>
 <p><strong>Mirror And Weld</strong>, in <strong>Tool &gt; Geometry &gt; Modify Topology</strong>, makes a model symmetric: it keeps the half on the</p>
 <ul>
@@ -152,14 +152,14 @@ Pick the axis with <strong>X</strong>, <strong>Y</strong> and <strong>Z</strong>
 The mirror plane goes through the world&#x27;s origin, the same plane symmetry uses. Polygons that cross it are cut on it, so the seam is clean wherever the model sits. Points on an open edge within 0.1% of the model&#x27;s size from the plane are welded onto it, which closes a half model whose seam isn&#x27;t exactly at 0.
 </li>
 <li>
-Polygroups, polypaint, the mask, UVs, quads and sculpt layers are kept; the mirrored side takes the kept side&#x27;s. Subdivision levels are removed (undo restores them), as with the other tools on this page.
+Face Groups, vertex paint, the mask, UVs, quads and sculpt layers are kept; the mirrored side takes the kept side&#x27;s. Subdivision levels are removed (undo restores them), as with the other tools on this page.
 </li>
 <li>
 To keep the <strong>other</strong> side, flip the model first with <strong>Tool &gt; Deformation &gt; Mirror</strong>, or run <code>mirror_and_weld side=negative</code>.
 </li>
 </ul>
 <h2 id="mirror">Mirror<a class="anchor" href="#mirror" aria-label="Link to this section">#</a></h2>
-<p><strong>Tool &gt; Deformation &gt; Mirror</strong> flips the SubTool across the plane through the origin on the chosen axes, with its surface still facing outward. Polygroups, polypaint, UVs and layers come along; subdivision levels are removed (undo restores them). <code>mirror pivot=center</code> flips it in place about its own centre instead.</p>
+<p><strong>Tool &gt; Deformation &gt; Mirror</strong> flips the Part across the plane through the origin on the chosen axes, with its surface still facing outward. Face Groups, vertex paint, UVs and layers come along; subdivision levels are removed (undo restores them). <code>mirror pivot=center</code> flips it in place about its own centre instead.</p>
 <h2 id="lod-chains">LOD chains<a class="anchor" href="#lod-chains" aria-label="Link to this section">#</a></h2>
 <p>A level-of-detail chain is a series of lighter copies of the model for game engines: LOD0 is the full sculpt, and each level after it has a fixed fraction of the triangles of the one before.</p>
 <ol>
@@ -186,15 +186,15 @@ Click <strong>Generate LOD chain</strong>.
 </li>
 </ul>
 <p>See <a href="exporting.html">Exporting</a> for these exports and their options.</p>
-<aside class="callout callout-note"><p><strong>Note:</strong> The preview in <strong>Tool &gt; Export</strong> is of the active SubTool. The exports themselves build a chain for every visible SubTool.</p></aside>
+<aside class="callout callout-note"><p><strong>Note:</strong> The preview in <strong>Tool &gt; Export</strong> is of the active Part. The exports themselves build a chain for every visible Part.</p></aside>
 <h2 id="undo-and-safety">Undo and safety<a class="anchor" href="#undo-and-safety" aria-label="Link to this section">#</a></h2>
-<p>Subdivide, remesh, QRemesh, decimate, Mirror And Weld, Mirror and delete hidden are single undo steps on the active SubTool. They can use a lot of memory on dense meshes, and undo keeps a full copy of the previous mesh for each of them. Before a big change on a heavy sculpt:</p>
+<p>Subdivide, remesh, Quad Remesh, decimate, Mirror And Weld, Mirror and delete hidden are single undo steps on the active Part. They can use a lot of memory on dense meshes, and undo keeps a full copy of the previous mesh for each of them. Before a big change on a heavy sculpt:</p>
 <ul>
 <li>
-<strong>QuickSave</strong> (title strip) keeps a timestamped copy of the scene without touching your project file; see <a href="projects.html#quicksave">Projects</a>.
+<strong>Snapshot</strong> (<strong>File &gt; Save Snapshot</strong>, title strip) keeps a timestamped copy of the scene without touching your project file; see <a href="projects.html#snapshots">Projects</a>.
 </li>
 <li>
-<strong>Duplicate</strong> the SubTool to keep the old version side by side.
+<strong>Duplicate</strong> the Part to keep the old version side by side.
 </li>
 </ul>
 <h2 id="scripting">Scripting<a class="anchor" href="#scripting" aria-label="Link to this section">#</a></h2>
@@ -204,10 +204,10 @@ Click <strong>Generate LOD chain</strong>.
 <h2 id="see-also">See also<a class="anchor" href="#see-also" aria-label="Link to this section">#</a></h2>
 <ul>
 <li>
-<a href="retopology.html">Quad retopology and detail projection</a>: QRemesh and ProjectAll
+<a href="retopology.html">Quad retopology and detail projection</a>: Quad Remesh and Project All
 </li>
 <li>
-<a href="subtools.html">SubTools</a>: merge pieces before a remesh, duplicate before a decimate
+<a href="parts.html">Parts</a>: merge pieces before a remesh, duplicate before a decimate
 </li>
 <li>
 <a href="layers.html">Sculpt layers and blend shapes</a>
@@ -220,11 +220,11 @@ Click <strong>Generate LOD chain</strong>.
 </li>
 </ul>
       </article>
-      <nav class="pager" aria-label="Previous and next chapter"><a class="prev" rel="prev" href="gizmo.html"><span>Previous</span>Moving, rotating and posing (Gizmo 3D)</a><a class="next" rel="next" href="retopology.html"><span>Next</span>Quad retopology and detail projection</a></nav>
+      <nav class="pager" aria-label="Previous and next chapter"><a class="prev" rel="prev" href="gizmo.html"><span>Previous</span>Moving, rotating and posing (Gizmo)</a><a class="next" rel="next" href="retopology.html"><span>Next</span>Quad retopology and detail projection</a></nav>
       <p class="guide-meta fine">Also in the app: <strong>Help &gt; User Guide</strong> (<kbd>Shift</kbd>+<kbd>F1</kbd>).
         Found a mistake? <a href="https://github.com/islandmed/SculptForge/edit/main/docs/guide/geometry.md">Edit this page on GitHub</a>.</p>
     </main>
-    <aside class="on-page" aria-label="On this page"><p>On this page</p><ul><li><a href="#at-a-glance">At a glance</a></li><li><a href="#quads-and-triangles">Quads and triangles</a></li><li><a href="#subdivide">Subdivide</a></li><li><a href="#voxel-remesh">Voxel remesh</a></li><li><a href="#qremesh">QRemesh</a></li><li><a href="#decimate">Decimate</a></li><li><a href="#mirror-and-weld">Mirror And Weld</a></li><li><a href="#mirror">Mirror</a></li><li><a href="#lod-chains">LOD chains</a></li><li><a href="#undo-and-safety">Undo and safety</a></li><li><a href="#scripting">Scripting</a></li><li><a href="#see-also">See also</a></li></ul></aside>
+    <aside class="on-page" aria-label="On this page"><p>On this page</p><ul><li><a href="#at-a-glance">At a glance</a></li><li><a href="#quads-and-triangles">Quads and triangles</a></li><li><a href="#subdivide">Subdivide</a></li><li><a href="#voxel-remesh">Voxel remesh</a></li><li><a href="#quad-remesh">Quad Remesh</a></li><li><a href="#decimate">Decimate</a></li><li><a href="#mirror-and-weld">Mirror And Weld</a></li><li><a href="#mirror">Mirror</a></li><li><a href="#lod-chains">LOD chains</a></li><li><a href="#undo-and-safety">Undo and safety</a></li><li><a href="#scripting">Scripting</a></li><li><a href="#see-also">See also</a></li></ul></aside>
   </div>
   <footer class="footer">
     <div class="wrap footer-grid">
@@ -239,9 +239,8 @@ Click <strong>Generate LOD chain</strong>.
         <a href="https://github.com/islandmed/SculptForge/issues">Report a problem</a>
         <a href="https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md">AI services &amp; privacy</a>
       </div>
-      <p class="fine trademarks">SculptForge is an independent project, not affiliated with or endorsed by Maxon or
-        any other company named in this guide. ZBrush is a trademark of Maxon. All other trademarks belong to their
-        owners.</p>
+      <p class="fine trademarks">ZBrush, GoZ, MatCap and other ZBrush feature names are trademarks of Maxon Computer
+        GmbH. SculptForge is not affiliated with or endorsed by Maxon. All other trademarks belong to their owners.</p>
     </div>
   </footer>
 </body>

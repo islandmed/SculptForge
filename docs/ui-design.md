@@ -9,14 +9,14 @@ ZBrush users should feel at home within a minute:
 
 - a **bounded central canvas**, surrounded by **shelves** that hold the most-used controls (Tab hides them);
 - an **alphabetical palette bar** under the title strip that holds *every* function; palettes open as drop-downs and can be pinned into the **left or right tray**;
-- **LightBox** on `,` (comma): a horizontal thumbnail strip along the top of the canvas;
+- **Library** on `,` (comma): a horizontal thumbnail strip along the top of the canvas;
 - a **ZScript-style console** at the bottom;
 - **Ctrl+hover** on any control shows its description and shortcut;
 - **Customize**: Preferences > Config > Enable Customize, Ctrl+Alt+drag to move or remove items, **Store Config (Ctrl+Shift+I)**, **Restore Standard UI**.
 
 Not goals: free-floating or OS-level detachable panels, tabbed docking, a full keymap editor, ZBrush 2.5D canvas or pixols. These need ImGui's docking branch or aren't worth the cost (see §12).
 
-The current UI (screenshot, 1600x960) is a menu bar (File/Edit/Mesh/View/Help) plus floating windows over a full-window viewport: Tools (250 px, left), SubTools, Layers / Blend Shapes, Game Ready, Brush Lab (open by default, covers the model), and optionally Polypaint & Materials, Generate 3D, Gaussian Splats. All of the features stay. Only where they live changes.
+The current UI (screenshot, 1600x960) is a menu bar (File/Edit/Mesh/View/Help) plus floating windows over a full-window viewport: Tools (250 px, left), Parts, Layers / Blend Shapes, Game Ready, Brush Lab (open by default, covers the model), and optionally Vertex Paint & Materials, Generate 3D, Gaussian Splats. All of the features stay. Only where they live changes.
 
 ---
 
@@ -24,23 +24,23 @@ The current UI (screenshot, 1600x960) is a menu bar (File/Edit/Mesh/View/Help) p
 
 | Element | Concrete behaviour (source) |
 |---|---|
-| Title bar | Left: version, memory, PolyCount / ActivePoints. Right: QuickSave, See-through slider, "Menus" toggle (show or hide the palette bar), DefaultZScript, layout preset cycle buttons, help [R1][picture] |
+| Title bar | Left: version, memory, PolyCount / ActivePoints. Right: Snapshot, See-through slider, "Menus" toggle (show or hide the palette bar), DefaultZScript, layout preset cycle buttons, help [R1][picture] |
 | Palette bar | Palettes listed **alphabetically** under the title bar (Alpha, Brush, Color, Document, Draw, Edit, File, Layer, Light, ... Tool, Transform, Zoom, Zplugin, Zscript). Clicking a name drops the palette down. Sub-palettes inside are context-sensitive [R1][R2] |
 | Sub-palettes | One open at a time by default; **Shift+click** opens more (Preferences > Interface > One Subpalette) [R2][R3] |
 | Trays | Left and right trays hold whole palettes. Right is open by default, left closed. **Double-click or click the divider** to toggle. A palette goes into a tray when you click its icon (top-left of the palette) or drag that icon to a tray. Only palettes go in trays [R1][R3][R4] |
 | Shelves | Surround the canvas. Each grows to fit its largest item. **Tab** hides or shows them. Menus can't go on shelves [R1][R2][R4] |
-| Top shelf | LightBox button; Draw / Move / Scale / Rotate (Q W E R); Mrgb / Rgb / M; Rgb Intensity; Zadd / Zsub; Z Intensity; Focal Shift; Draw Size; ActivePoints / TotalPoints readout [picture][R1] |
+| Top shelf | Library button; Draw / Move / Scale / Rotate (Q W E R); Mrgb / Rgb / M; Rgb Intensity; Add / Sub; Intensity; Falloff; Draw Size; ActivePoints / TotalPoints readout [picture][R1] |
 | Left shelf | Big thumbnail buttons: Brush, Stroke, Alpha, Texture, Material, then a colour picker, two swatches, "Alternate", "FillObject" [picture][R1] |
-| Right shelf | Canvas: BPR, Scroll, Zoom, Actual, AAHalf. Object: Persp, Floor, Local, L.Sym, Xyz, **Frame, Move, Scale, Rotate** (drag on the button to navigate), PolyF, Transp, Ghost, Solo [picture][R1] |
-| Bottom shelf (Core) | One row of the most-used brushes: ClayBuildup, Standard, DamStandard, Move, TrimDynamic, hPolish, Pinch, Inflate, IMM Primitives, Paint, Transpose, SelectLasso, SelectRect [picture] |
+| Right shelf | Canvas: BPR, Scroll, Zoom, Actual, AAHalf. Object: Persp, Floor, Local, L.Sym, Xyz, **Frame, Move, Scale, Rotate** (drag on the button to navigate), Wire, Transp, Ghost, Solo [picture][R1] |
+| Bottom shelf (Core) | One row of the most-used brushes: Clay Block, Standard, Sharp Crease, Move, Trim, Hard Polish, Pinch, Inflate, IMM Primitives, Paint, Transpose, Select Lasso, Select Rectangle [picture] |
 | Pop-up pickers | Any preview thumbnail with changeable contents opens a pop-up grid when clicked (Tool, Brush, Stroke, Alpha, Texture, Material) [R1] |
 | Brush pop-up | **B** opens it. Typing a letter narrows the grid to brushes starting with that letter and shows a second key on each. Pressing it selects (B, S, T = Standard). Holding Ctrl while you pick chooses a masking brush [R5][R6] |
-| LightBox | **`,`** toggles it. Category tabs along its top: Project, Tool, Brush, Material, Alpha, Texture, LightCaps, QuickSave (+ Recent). Back and forward arrows; an up-folder tile; **double-click** to enter folders or load items; drag in the strip to scrub sideways; 1-4 rows of icons; placement top or bottom (preference); thumbnail glow and label brightness preferences. Assets split into built-in (Maxon) and User [R7] |
+| Library | **`,`** toggles it. Category tabs along its top: Project, Tool, Brush, Material, Alpha, Texture, Light Editor, Snapshots (+ Recent). Back and forward arrows; an up-folder tile; **double-click** to enter folders or load items; drag in the strip to scrub sideways; 1-4 rows of icons; placement top or bottom (preference); thumbnail glow and label brightness preferences. Assets split into built-in (Maxon) and User [R7] |
 | Ctrl-hover help | **Ctrl + cursor over item** shows the item's description when "Popup Info" is on. **Ctrl+Alt + hover** shows an alternative description. Opacity is set by Preferences > Icolors > Quick Info Opacity [R6][R8] |
 | Quick Info | Large thumbnail viewer when you hover items in the Alpha, Material, Texture and Tool palettes. Has a delay slider, a "Large Quick Info Text" option, and Preview Material On Mesh [R9] |
 | Customize | Preferences > Config > **Enable Customize**, then **Ctrl+Alt+drag** an item to move it. Dragging it to an invalid place (e.g. the canvas) **removes** it. Custom menus are made with Custom UI > Create New Menu. Items fill left to right. Element sizes are 1, 3/4, 1/2 or 1/4 of the width, 1/8 high [R4] |
 | Config | **Store Config = Ctrl+Shift+I** (ZBrush never saves preferences automatically). Alt+Ctrl+Shift+I stores an alternate layout, Ctrl+L loads one. **Restore Standard UI** returns to the default; Restore Custom UI goes back to the stored one [R2][R4][R10] |
-| Shortcuts | Tab shelves, `,` LightBox, B brush pop-up, Space QuickMenu, S / I / O size / intensity / focal, X symmetry, F frame, Shift+F polyframe, Ctrl+D divide, D / Shift+D sdiv up / down, Ctrl+Z / Ctrl+Shift+Z, Shift+Ctrl+I store config, H hide ZScript [R6] |
+| Shortcuts | Tab shelves, `,` Library, B brush pop-up, Space Quick Menu, S / I / O size / intensity / focal, X symmetry, F frame, Shift+F polyframe, Ctrl+D divide, D / Shift+D sdiv up / down, Ctrl+Z / Ctrl+Shift+Z, Shift+Ctrl+I store config, H hide ZScript [R6] |
 | Blender 4.3+ | Brushes are assets in an **asset shelf** at the bottom of the viewport (Shift+Space toggles it; drag its border to resize). Right-click a brush > Assign Shortcut [R11][R12] |
 | Nomad Sculpt | Tools on the right; Radius / Intensity sliders and a "Sub" (invert) button on the left; a bottom bar of shortcuts that users can bind (Undo, Redo, Solo by default); top-left stats; nav cube; a mirrored left-handed layout [R13] |
 | 3DCoat | "Rooms" show only the tools for one task. The Brush Options panel starts with an alpha preview. An "Activity bar" of pop-up libraries (Brushes, Strips, Stencils, Smart Materials...). Space shows the tool pop-up [R14] |
@@ -67,7 +67,7 @@ All sizes are logical px at `uiScale_ = 1` and get multiplied by `uiScale_`. She
 | Tray divider | w 8 each side, always visible | top of palette bar to bottom |
 | Right tray | w 300 (1600 wide) / 320 (>=1920), drag 240-480 | palette bar bottom to window bottom |
 | Left tray | 0 (closed) by default, 300 when open | same |
-| LightBox | h = 28 (tab row) + rows x 118 (96 thumb + 22 label), 1 row default | overlays the top of the canvas, full canvas width |
+| Library | h = 28 (tab row) + rows x 118 (96 thumb + 22 label), 1 row default | overlays the top of the canvas, full canvas width |
 | Canvas | the rest | 3D view renders **only** here |
 
 ### 2.2 1600 x 960 (default, right tray open, left tray closed)
@@ -106,7 +106,7 @@ x:0 8      96                                                              1240 
   +--+-------------------------------------------------------------------------------------+-+-------------------+ y960
 ```
 
-Canvas = x 96..1240, y 110..900 (1144 x 790). With LightBox open (1 row), it covers y 110..256 of the canvas. With the console open, the canvas bottom moves to y 740.
+Canvas = x 96..1240, y 110..900 (1144 x 790). With Library open (1 row), it covers y 110..256 of the canvas. With the console open, the canvas bottom moves to y 740.
 
 ### 2.3 1920 x 1080
 
@@ -127,7 +127,7 @@ CanvasRect canvasRect() const;                     // from Layout, recomputed ev
 ```
 
 - `Renderer::draw(...)` gets a viewport rect (`glViewport` / `glScissor` to the canvas in framebuffer pixels). `camera_.aspect = w/h` of the canvas.
-- `pick`, `onMouseDown/Move`, the brush cursor, `onScreen`, `hide_rect` and polygroup overlays all convert window -> canvas coordinates in one helper.
+- `pick`, `onMouseDown/Move`, the brush cursor, `onScreen`, `hide_rect` and face group overlays all convert window -> canvas coordinates in one helper.
 - Mouse events outside the canvas never start strokes or orbits, even when ImGui doesn't capture them (e.g. on gaps between shelf items).
 - Recording, `--render`, demos and `hideUi_` keep using the full window (`canvasRect()` returns the whole viewport when `hideUi_` is set).
 - The area outside the canvas is cleared to `shellBg`. The canvas itself has a neutral charcoal background with a soft radial vignette (no coloured gradient) and gets a 1 px `#0e0e10` border.
@@ -145,7 +145,7 @@ Left to right:
 3. Info readout (dim text, like ZBrush's memory and PolyCount line): `Verts 5.1k  Tris 10.2k  SubTool <name> (2/5)  Layer <name|Base>  60 fps`. Splat count when splats are loaded.
 4. Status message (`status_`), elided. Errors in orange-red for 6 s.
 5. Right-aligned:
-   - `[QuickSave]`: `act:file.quicksave` writes a timestamped `.sfproj` to `<user lib>/QuickSave/`, keeping the last 10. It shows up in the LightBox QuickSave tab.
+   - `[QuickSave]`: `act:file.quicksave` writes a timestamped `.sfproj` to `<user lib>/QuickSave/`, keeping the last 10. It shows up in the Library Snapshots tab.
    - Layout preset buttons `[1][2][3]` (§9.3).
    - `[Menus]` toggles the palette bar.
    - A search field showing "Search  F3" that opens the command palette (§7).
@@ -159,22 +159,22 @@ Every palette's body is one function `void drawPalette_<Id>()`, and the same fun
 |---|---|
 | **Alpha** | Large preview; built-in grid (round, square, noise); Load image...; Invert loaded image; recent alphas. (`PanelBrushes.cpp` alpha section, `cmd:brush_set_alpha`) |
 | **Brush** | Brush grid (the same widget as the picker, §4.1); Custom brushes list; Brush Lab (AI)... button; recipe editor for the active custom brush (`drawRecipeEditor`); Save brush... / Load brush... (`cmd:brush_save`, `cmd:brush_load`); Front faces only; Invert (Alt) |
-| **Color** | Polypaint colour picker and swatches; Fill object (`cmd:paint_fill`); Clear (`cmd:paint_clear`); From cavity (`cmd:paint_from_cavity`); Pick under cursor (C). (`PanelPolypaint.cpp` minus the material part) |
-| **Draw** | Draw Size, Strength (Z Intensity), Zadd/Zsub, Rgb (`paintRgb_`), Paint mode, Tablet: Pressure > strength, Pressure > size, pen readout |
+| **Color** | Vertex Paint colour picker and swatches; Fill object (`cmd:paint_fill`); Clear (`cmd:paint_clear`); From cavity (`cmd:paint_from_cavity`); Pick under cursor (C). (`PanelPolypaint.cpp` minus the material part) |
+| **Draw** | Draw Size, Strength (Intensity), Add/Sub, Rgb (`paintRgb_`), Paint mode, Tablet: Pressure > strength, Pressure > size, pen readout |
 | **Edit** | Undo <label>, Redo <label> (`cmd:undo`, `cmd:redo`) |
-| **File** | New Sphere, New Plane, Open..., Open Recent >, Save, Save As..., Autosave interval; Import/Export: Export OBJ, GLB (blend shapes), LOD chain, USD/USDZ, FBX for Unreal, Send to Unreal, Save Splats...; GoZ >; Quit. (Today's File menu, `drawFileMenuProjectItems`, `drawGozMenu`) |
+| **File** | New Sphere, New Plane, Open..., Open Recent >, Save, Save As..., Autosave interval; Import/Export: Export OBJ, GLB (blend shapes), LOD chain, USD/USDZ, FBX for Unreal, Send to Unreal, Save Splats...; ZBrush Bridge >; Quit. (Today's File menu, `drawFileMenuProjectItems`, `drawGozMenu`) |
 | **Generate** | Generate 3D (image/text -> 3D, ComfyUI) opens the existing Generate 3D window; Image Relief / Inflate / Project (`cmd:image_relief`, `image_inflate`, `image_project`); AI provider settings (`drawAiSettings`) |
 | **Help** | Controls (shortcut sheet generated from the Action registry), User Guide (Shift+F1), What's New (also opened once after each update), Command palette (F3), Website & documentation, Report a problem, About SculptForge |
-| **Material** | Studio + MatCap thumbnail grid (`cmd:set_material`); base colour (today's "Material" ColorEdit in Tools) |
-| **Preferences** | Sub-palettes: **Config** (Enable Customize, Store Config Ctrl+Shift+I, Restore Custom UI, Restore Standard UI, Save UI..., Load UI... Ctrl+L); **Interface** (UI scale, Popup Info, Plain tooltips delay, One sub-palette open, Left-handed layout); **LightBox** (library folder, Show at startup, Startup rows, Placement top/bottom); **Hotkeys** (list with reset; Store); **Tablet** (pen, pressure meter, test area, pressure curve, eraser and side-button mappings; see docs/tablet.md); **Autosave** |
-| **Render** | Wireframe (Shift+F), Show Mesh, Show Polypaint, Show Mask, Show Polygroups, Show Splats, Frame Model (F) (today's View menu render toggles) |
+| **Material** | Studio + Lit Sphere thumbnail grid (`cmd:set_material`); base colour (today's "Material" ColorEdit in Tools) |
+| **Preferences** | Sub-palettes: **Config** (Enable Customize, Store Config Ctrl+Shift+I, Restore Custom UI, Restore Standard UI, Save UI..., Load UI... Ctrl+L); **Interface** (UI scale, Popup Info, Plain tooltips delay, One sub-palette open, Left-handed layout); **Library** (library folder, Show at startup, Startup rows, Placement top/bottom); **Hotkeys** (list with reset; Store); **Tablet** (pen, pressure meter, test area, pressure curve, eraser and side-button mappings; see docs/tablet.md); **Autosave** |
+| **Render** | Wireframe (Shift+F), Show Mesh, Show Vertex Paint, Show Mask, Show Face Groups, Show Splats, Frame Model (F) (today's View menu render toggles) |
 | **Script** | Show console (`` ` ``), Run script file..., Copy session as script, Clear console |
 | **Splats** | `drawSplatSection` body (info, clean, transform, to mesh, save, clear) |
-| **Stroke** | Stroke type (Dots, DragRect, Spray, LazyMouse) and its settings (spray scatter, lazy radius) |
-| **Tool** | The ZBrush "Tool" palette. Header: active SubTool name + tri count, `[Open] [Save] [Import]`. Sub-palettes (collapsing headers, one open at a time, Shift+click for more): **SubTool** (SubTools panel body), **Layers** (Layers / Blend Shapes body), **Geometry** (Lower Res / Higher Res, SDiv slider, Del Lower / Del Higher, Reconstruct Subdiv, Divide Ctrl+D + Smt, Subdivide, Decimate, `cmd:decimate`), **Remesh** (Voxel remesh + resolution, the "DynaMesh" analogue), **Masking** (`drawMaskingSection`), **Polygroups** (`drawPolygroupsSection`), **Visibility** (Show all, Invert visibility, Delete hidden), **Export** (Game Ready panel body: LODs, Unreal, GLB/LOD chain), **Display** (wireframe, show mask/groups, material colour) |
-| **Transform** | Draw / Move / Scale / Rotate (Q W E R, Gizmo 3D: pivot, World / Surface axes, Mask, All SubTools, Falloff, numeric entry; `cmd:transform`), Symmetry X / Y / Z (X), Frame (F), Solo (`cmd:subtool_solo`), Wireframe |
+| **Stroke** | Stroke type (Dots, Drag Stamp, Spray, Lazy Stroke) and its settings (spray scatter, lazy radius) |
+| **Tool** | The ZBrush "Tool" palette. Header: active Part name + tri count, `[Open] [Save] [Import]`. Sub-palettes (collapsing headers, one open at a time, Shift+click for more): **Part** (Parts panel body), **Layers** (Layers / Blend Shapes body), **Geometry** (Lower Res / Higher Res, SDiv slider, Del Lower / Del Higher, Reconstruct Subdiv, Divide Ctrl+D + Smt, Subdivide, Decimate, `cmd:decimate`), **Remesh** (Voxel remesh + resolution, the "DynaMesh" analogue), **Masking** (`drawMaskingSection`), **Face Groups** (`drawPolygroupsSection`), **Visibility** (Show all, Invert visibility, Delete hidden), **Export** (Game Ready panel body: LODs, Unreal, GLB/LOD chain), **Display** (wireframe, show mask/groups, material colour) |
+| **Transform** | Draw / Move / Scale / Rotate (Q W E R, Gizmo: pivot, World / Surface axes, Mask, All Parts, Falloff, numeric entry; `cmd:transform`), Symmetry X / Y / Z (X), Frame (F), Solo (`cmd:subtool_solo`), Wireframe |
 
-ZBrush has no separate top-level SubTool / Layer / Masking / Polygroups palettes, so they are **Tool** sub-palettes only. The Mesh and View menus disappear, and their items move to Tool > Geometry/Remesh and Render. Palettes are sorted by name at registration, so a new palette lands in alphabetical order automatically.
+ZBrush has no separate top-level Part / Layer / Masking / Face Groups palettes, so they are **Tool** sub-palettes only. The Mesh and View menus disappear, and their items move to Tool > Geometry/Remesh and Render. Palettes are sorted by name at registration, so a new palette lands in alphabetical order automatically.
 
 ### 3.3 Top shelf (h 64, two rows)
 Row 1:
@@ -182,7 +182,7 @@ Row 1:
 - `[Sculpt | Paint]` (`paintMode_`)
 - `[Zadd | Zsub]` (`invertToggle_`)
 - `[Rgb]` (`paintRgb_`)
-- `[Vertex | Texture]` paint target (`act:draw.paint_vertex`, `act:draw.paint_texture`; contextual: only when the SubTool has a texture)
+- `[Vertex | Texture]` paint target (`act:draw.paint_vertex`, `act:draw.paint_texture`; contextual: only when the Part has a texture)
 - `Draw Size 60` slider (w 180; `radiusPx_`, `S`)
 - `Strength 0.50` slider (w 180; `strength_`, `I`)
 
@@ -204,9 +204,9 @@ Sliders use the ZBrush style: the label sits inside the frame (`SliderFloat("##s
 ### 3.4 Left shelf (w 88)
 A vertical stack of **thumbnail tiles** (76x76, label under). A click opens the pop-up picker beside the tile (§4):
 1. Brush: current brush thumbnail + name. Picker §4.1.
-2. Stroke: icon for Dots / DragRect / Spray / LazyMouse. Picker = 4 tiles + settings.
+2. Stroke: icon for Dots / Drag Stamp / Spray / Lazy Stroke. Picker = 4 tiles + settings.
 3. Alpha: alpha preview (today's 48 px preview). Picker = alpha grid + Load image.
-4. Material: matcap sphere. Picker = material grid.
+4. Material: lit sphere sphere. Picker = material grid.
 5. Colour: a 76x76 SV square + hue strip (`ImGui::ColorPicker3` with `NoSidePreview|NoInputs|NoLabel`, width 76), then two swatches (primary / secondary, a click swaps them, like "Alternate"), then `[Fill]` (`cmd:paint_fill`).
 
 ZBrush's Texture slot is left out (no texture feature yet). It's reserved in the layout data so it can be added later.
@@ -214,24 +214,24 @@ ZBrush's Texture slot is left out (no texture feature yet). It's reserved in the
 ### 3.5 Right shelf (w 52)
 Icon + tiny label, 44x40 each. Groups are separated by 8 px.
 - **Navigation**: Frame (F). **Move, Zoom and Rotate are drag buttons**: left-drag on the button pans / zooms / orbits the camera, as in ZBrush. Implement with `InvisibleButton` + `IsItemActive()` + `io.MouseDelta`, feeding the existing camera functions.
-- **View**: Persp (only if the camera supports ortho; otherwise leave it out), Floor (optional grid, only if cheap), PolyF = wireframe (Shift+F; W is the Gizmo 3D's Move since 0.5), Groups (`showPolygroups`), Mask (`showMask`), Paint (`showPolypaint`).
+- **View**: Persp (only if the camera supports ortho; otherwise leave it out), Floor (optional grid, only if cheap), Wire = wireframe (Shift+F; W is the Gizmo's Move since 0.5), Groups (`showPolygroups`), Mask (`showMask`), Paint (`showPolypaint`).
 - **Object**: Solo (`cmd:subtool_solo`), Splats (show splats; shown only when splats are loaded).
 
 Toggles that are on get an accent background.
 
 ### 3.6 Bottom shelf (h 78, Medium tiles): quick brushes (ZBrush Core / Blender asset shelf)
-Default contents, in order: Standard, Clay, ClayBuildup, DamStandard, Move, Smooth, Inflate, Pinch, Flatten, Crease, Trim, SnakeHook, Layer, Nudge, Paint. Then any custom brushes the user adds, and a `[+]` tile that opens the brush picker in "add to shelf" mode.
+Default contents, in order: Standard, Clay, Clay Block, Sharp Crease, Move, Smooth, Inflate, Pinch, Flatten, Crease, Trim, Tendril, Layer, Nudge, Paint. Then any custom brushes the user adds, and a `[+]` tile that opens the brush picker in "add to shelf" mode.
 
 Tiles are 40 px brush thumbnails with the name under them. The active brush gets an accent outline. Hotkey digits (1-9, 0) are drawn small in the tile's top-left. Right-click a tile: "Remove from shelf", "Assign shortcut...". Right-click in the brush picker: "Add to bottom shelf".
 
 ### 3.7 Right tray (default) / left tray (empty by default)
-- Right tray default stack: **Tool** (SubTool sub-palette open).
+- Right tray default stack: **Tool** (Parts sub-palette open).
 - Trays scroll vertically. Palette headers are full-width bars (h 22, `#2e2e32`) with the tray icon (click returns the palette to the bar), the title and a collapse arrow.
 - Divider: 8 px. Click or double-click toggles the tray, and dragging resizes it (cursor `ResizeEW`). It draws a 2 px grip in its centre.
 - With Preferences > Interface > "Auto Collapse", opening one palette in a tray collapses the others when they'd overflow (ZBrush default: on for the left tray, off for the right).
 
 ### 3.8 Floating windows that stay floating
-Brush Lab, Generate 3D, About, Controls, project / SubTool confirmation pop-ups. They keep their current ImGui windows and their imgui.ini persistence. Two changes: **Brush Lab defaults to closed**, opened from the top-shelf `[AI Brush]` or Brush palette. Its first-use position is the canvas top-left + (16,16), so it no longer sits over the model at 1600x960.
+Brush Lab, Generate 3D, About, Controls, project / Part confirmation pop-ups. They keep their current ImGui windows and their imgui.ini persistence. Two changes: **Brush Lab defaults to closed**, opened from the top-shelf `[AI Brush]` or Brush palette. Its first-use position is the canvas top-left + (16,16), so it no longer sits over the model at 1600x960.
 
 ---
 
@@ -242,7 +242,7 @@ All pickers are ImGui pop-up windows (`BeginPopup`). They open next to the shelf
 ### 4.1 Brush picker (B, or click the Brush tile)
 - A "Recent" row of the last 8 brushes at the top.
 - Grid sections: **Built-in** (the 14 `BrushType`s + Paint), **Custom** (`doc.brushes` recipes, with AI-made ones marked by a small sparkle badge), **Library** (`.sfbrush` files in `<user lib>/Brushes` that aren't loaded yet; picking one runs `cmd:brush_load`).
-- **Type-to-filter, the ZBrush way.** The first letter typed keeps only brushes whose name starts with it, and the grid shows letter-index chips A-Z with counts at the top. Each remaining tile then shows an **orange key badge**: the shortest next letter that tells it apart (Standard after S -> `T`, SnakeHook -> `N`, Smooth -> `M`). Pressing that letter picks the brush.
+- **Type-to-filter, the ZBrush way.** The first letter typed keeps only brushes whose name starts with it, and the grid shows letter-index chips A-Z with counts at the top. Each remaining tile then shows an **orange key badge**: the shortest next letter that tells it apart (Standard after S -> `T`, Tendril -> `N`, Smooth -> `M`). Pressing that letter picks the brush.
   - If no prefix matches, fall back to a substring match (shown in a filter field at the top).
   - Backspace undoes one letter. Enter picks the first match.
   - Thumbnails come from §6 (fallback: Lucide glyph + name).
@@ -262,12 +262,12 @@ Holding Space shows a compact panel under the cursor: Brush / Stroke / Alpha / M
 
 ---
 
-## 5. LightBox (`,`)
+## 5. Library (`,`)
 
 ### 5.1 Layout
 - An overlay window anchored to the **top edge of the canvas**, full canvas width, `NoDecoration|NoMove|NoSavedSettings`, background `#141416` at 96%. Preference "Placement: bottom" anchors it above the bottom shelf instead.
 - **Header row (h 28)**: tabs (text buttons, active = accent underline):
-  `Project | Tool | Brush | Alpha | Material | Image | Splats | QuickSave | Recent`
+  `Project | Tool | Brush | Alpha | Material | Image | Splats | Snapshots | Recent`
   then back / forward arrows (tab+folder history), a breadcrumb (`User > Tools > creatures`), a filter field (w 160, our addition; ZBrush has none), the rows selector `[1][2][3][4]`, `[Open folder...]` (picks a folder and adds it as a library root), and close.
 - **Strip**: tiles 96x96 + 22 label (elided, full name in hover). Tiles flow top-to-bottom within the row count, then left to right, so the strip scrolls **horizontally**.
   - The mouse wheel scrolls sideways.
@@ -277,27 +277,27 @@ Holding Space shows a compact panel under the cursor: Brush / Stroke / Alpha / M
 
 ### 5.2 Sources (what SculptForge shows)
 Library roots:
-- **Built-in**: assets shipped with the app. `assets/demo/*` (lion-head.glb, teddy-sketch.png), built-in brushes, built-in alphas, matcaps, primitives.
-- **User**: `SDL_GetUserFolder(SDL_FOLDER_DOCUMENTS)/SculptForge/`, created on first run with `Projects/ Tools/ Brushes/ Alphas/ Images/ Splats/ QuickSave/`. The Preferences > LightBox "library folder" setting overrides it.
+- **Built-in**: assets shipped with the app. `assets/demo/*` (lion-head.glb, teddy-sketch.png), built-in brushes, built-in alphas, lit spheres, primitives.
+- **User**: `SDL_GetUserFolder(SDL_FOLDER_DOCUMENTS)/SculptForge/`, created on first run with `Projects/ Tools/ Brushes/ Alphas/ Images/ Splats/ QuickSave/`. The Preferences > Library "library folder" setting overrides it.
 
 Each tab shows a "Built-in" and a "User" folder at its root, as ZBrush shows Maxon and User.
 
 | Tab | Shows | Double-click | Other actions |
 |---|---|---|---|
 | Project | `*.sfproj` in User/Projects + `recentFiles_` projects | open (via `confirmDiscard`) | |
-| Tool | meshes `.obj .glb .gltf .fbx .stl .ply .usda .usdz .GoZ` + built-in primitives Sphere, Plane, Cube (`makeCube` exists) + demo lion | open (replace scene, with `confirmDiscard`) | **Shift+double-click = append as SubTool** (`cmd:subtool_append`) |
+| Tool | meshes `.obj .glb .gltf .fbx .stl .ply .usda .usdz .GoZ` + built-in primitives Sphere, Plane, Cube (`makeCube` exists) + demo lion | open (replace scene, with `confirmDiscard`) | **Shift+double-click = append as Part** (`cmd:subtool_append`) |
 | Brush | built-in brush types, `doc.brushes`, `.sfbrush` files | activate / `cmd:brush_load` | |
 | Alpha | round/square/noise + images in User/Alphas | `cmd:brush_set_alpha` | |
-| Material | Studio + every matcap | `cmd:set_material` | |
+| Material | Studio + every lit sphere | `cmd:set_material` | |
 | Image | images in User/Images + demo sketch | small menu: Generate 3D... / Relief / Inflate / Project onto model / Use as alpha | |
 | Splats | `.ply .splat` captures, splat `.glb` | `cmd:open` (loads as reference) | |
-| QuickSave | QuickSave + autosave files, newest first | open | |
+| Snapshots | Snapshot + autosave files, newest first | open | |
 | Recent | `recentFiles_` (all kinds) | open | |
 
-- Right-click any tile: Open / Append as SubTool (meshes) / Show in file manager (`SDL_OpenURL("file://...")`) / Refresh thumbnail.
+- Right-click any tile: Open / Append as Part (meshes) / Show in file manager (`SDL_OpenURL("file://...")`) / Refresh thumbnail.
 - Dragging a tile onto the canvas = double-click.
-- Directory listing runs on a worker thread and is re-scanned when a tab opens and every 5 s while LightBox is open (cheap `last_write_time` check).
-- Preferences > LightBox > "Show at startup" defaults **on**, opening the Project tab (ZBrush behaviour). It's forced off for `--ui-test`, `--render`, recording and demos.
+- Directory listing runs on a worker thread and is re-scanned when a tab opens and every 5 s while Library is open (cheap `last_write_time` check).
+- Preferences > Library > "Show at startup" defaults **on**, opening the Project tab (ZBrush behaviour). It's forced off for `--ui-test`, `--render`, recording and demos.
 
 ---
 
@@ -307,10 +307,10 @@ Each tab shows a "Built-in" and a "User" folder at its root, as ZBrush shows Max
 
 - **Meshes and projects**: rendered offscreen. Use `Renderer::renderToImage`, or a new `Renderer::renderMeshThumbnail(const Mesh&, matcap, size, rgba&)` if `renderToImage` is tied to the synced scene. Size 192x192 (displayed at 96, crisp on HiDPI), the default material (Soft Clay), transparent background, camera framed on the bounds from a 3/4 front view (yaw 30, pitch 15).
   - Mesh loading uses the existing importers on a worker thread. GL rendering happens on the main thread, **at most 2 thumbnails per frame**.
-  - Projects: `saveProject` also writes `thumbnail.png` (256x256, current camera) into the `.sfproj` ZIP. The LightBox reads that instead of loading the whole project. Older projects without it are loaded on the worker and rendered once.
-- **Brushes**: on a worker, sculpt a mark of each brush's own shape on the front of a fresh clay ball (icosphere sdiv 6) using the same `Sculptor`/recipe code as real strokes, so brushes tell apart at shelf size: Standard an S, Clay three strips, ClayBuildup a hash of bars, DamStandard a diagonal cut, Crease a curved groove, Inflate a puffed ring, Pinch a sharp chevron, Smooth a bumpy ridge smoothed on one half, Flatten a planed dome, Trim a cut-down ridge, Layer a raised square frame, Nudge an upright ridge slid sideways, Move and SnakeHook pulls at the silhouette, recipes an S. The ball fills 97% of the tile. Every brush, Paint included, is the same ball, camera and material (Soft Clay), so the shelf reads as one icon set. Key = brush type or recipe JSON hash plus `kThumbnailVersion` (bump it whenever thumbnails are made differently, so stale disk-cached ones are remade).
+  - Projects: `saveProject` also writes `thumbnail.png` (256x256, current camera) into the `.sfproj` ZIP. The Library reads that instead of loading the whole project. Older projects without it are loaded on the worker and rendered once.
+- **Brushes**: on a worker, sculpt a mark of each brush's own shape on the front of a fresh clay ball (icosphere sdiv 6) using the same `Sculptor`/recipe code as real strokes, so brushes tell apart at shelf size: Standard an S, Clay three strips, Clay Block a hash of bars, Sharp Crease a diagonal cut, Crease a curved groove, Inflate a puffed ring, Pinch a sharp chevron, Smooth a bumpy ridge smoothed on one half, Flatten a planed dome, Trim a cut-down ridge, Layer a raised square frame, Nudge an upright ridge slid sideways, Move and Tendril pulls at the silhouette, recipes an S. The ball fills 97% of the tile. Every brush, Paint included, is the same ball, camera and material (Soft Clay), so the shelf reads as one icon set. Key = brush type or recipe JSON hash plus `kThumbnailVersion` (bump it whenever thumbnails are made differently, so stale disk-cached ones are remade).
 - **Alphas**: the alpha's samples, from the tile's charcoal (none) to the clay's lit grey (full effect), not white on black.
-- **Materials**: the same ball as the brushes, rendered with that matcap. Pickers list the default (Soft Clay) first (`matcapInListOrder`), then the others, then Studio.
+- **Materials**: the same ball as the brushes, rendered with that lit sphere. Pickers list the default (Soft Clay) first (`matcapInListOrder`), then the others, then Studio.
 - **Images**: stb-decoded, downscaled to 192.
 - **Disk cache**: `<prefDir>/thumbs/<fnv1a64(kind|absPath|size|mtime|version)>.png` (stb_image_write is in third_party). In-memory LRU of 256 GL textures.
 - **Placeholder**: while a thumbnail is pending, the tile shows the Lucide glyph for its kind (`box`, `brush`, `circle-dashed`, `palette`, `image`, `sparkles`, `folder`) on `#2a2a2e`.
@@ -416,10 +416,10 @@ bool SliderInside(const char* id, float* v, float lo, float hi, const char* fmt,
 
 | Key | Action | | Key | Action |
 |---|---|---|---|---|
-| `,` | LightBox | | `B` | Brush picker |
+| `,` | Library | | `B` | Brush picker |
 | `Tab` | Hide/show shelves (+ trays) | | `M` | Material picker |
 | `` ` `` | Console | | `S` / `I` | Size / Strength at cursor |
-| `F3`, `Ctrl+Shift+P` | Command palette | | `Shift+F` | Wireframe (`W` until 0.4; since 0.5 `Q W E R` are Draw and the Gizmo 3D's Move, Scale, Rotate) |
+| `F3`, `Ctrl+Shift+P` | Command palette | | `Shift+F` | Wireframe (`W` until 0.4; since 0.5 `Q W E R` are Draw and the Gizmo's Move, Scale, Rotate) |
 | `Ctrl+Shift+I` | Store Config | | `Ctrl+L` | Load UI... |
 | `F1` | Controls | | `1-9, 0, [ ] X F P C, Ctrl+D/Z/Y/O/S/N/E/U/V` | unchanged |
 
@@ -467,7 +467,7 @@ Json toJson(const UiLayout&); bool fromJson(const Json&, UiLayout&, std::string&
 
 ### 9.3 Presets (title-strip `[1][2][3]`)
 1. **Standard** (§2).
-2. **Sculpt**: trays closed, shelves on, LightBox off. Maximum canvas.
+2. **Sculpt**: trays closed, shelves on, Library off. Maximum canvas.
 3. **Wide**: left tray open with Brush + Stroke + Alpha, right tray Tool + Material.
 
 Clicking a preset applies it (layout only). Store Config makes it stick.
@@ -485,9 +485,9 @@ Keep the existing orange accent, but only for **one thing per group**: the curre
 | `header` | `#2b2b2f` / hover `#37373c` | palette and sub-palette headers |
 | `frame` | `#28282c` / hover `#323237` | slider and input frames |
 | `button` | `#333337` / hover `#414146` / pressed `#4e4e55` | buttons |
-| `accent` | `#f0882e` (hover `#ff9a45`) | the **current tool or mode** of a group (bg accent, text `#ffffff`): Draw/Move/Scale/Rotate, Sculpt/Paint, the brush, MaskPen/MaskLasso...; the 2 px underline of an option that is on; a slider bar only while dragging; LightBox active tab |
+| `accent` | `#f0882e` (hover `#ff9a45`) | the **current tool or mode** of a group (bg accent, text `#ffffff`): Draw/Move/Scale/Rotate, Sculpt/Paint, the brush, Mask Pen/Mask Lasso...; the 2 px underline of an option that is on; a slider bar only while dragging; Library active tab |
 | `toggleOff` | `#29292e` (hover `#36363c`), text `textOff` `#b4b4b9` (6.9:1) | options that are off: a dark chip with a readable label, so off never looks disabled (disabled is faded by alpha) |
-| `toggleOn` | `#4c4c53` (hover `#58585f`), text `textBright` `#f2f2f2` | options that are on (X, Rgb, Pressure > Strength, Mask, Menus): raised grey with a 2 px accent underline (a side bar on the right shelf), never a solid accent fill. Also the chosen side of a **choice** (`ui::IsChoiceAction`: Zadd \| Zsub), without the underline |
+| `toggleOn` | `#4c4c53` (hover `#58585f`), text `textBright` `#f2f2f2` | options that are on (X, Rgb, Pressure > Strength, Mask, Menus): raised grey with a 2 px accent underline (a side bar on the right shelf), never a solid accent fill. Also the chosen side of a **choice** (`ui::IsChoiceAction`: Add \| Sub), without the underline |
 | `trough` | `#2c2c31` | unselected segments of a mode or choice group |
 | `selection` | `#3a3a41` (active `#45454c`) | selected list rows (`ImGuiCol_Header`): a lighter neutral row, with a 2 px accent bar on the left where the list draws one |
 | `sliderFill` / `sliderBar` | white 9% / `#85858c` | the filled part of a `SliderInside` and the thin bar along its bottom (accent while dragging); plain slider grabs are `sliderBar` too |
@@ -501,12 +501,12 @@ Style:
 - Rounding: `WindowRounding 0` (shells), `PopupRounding 6`, `FrameRounding 3`, `GrabRounding 2`.
 - Spacing: `FramePadding (6,3)`, `ItemSpacing (4,4)`, `ItemInnerSpacing (4,4)`.
 - `ScrollbarSize 10`, `GrabMinSize 6`.
-- Top shelf hierarchy, by meaning: every item is the full row height in the 15 px font, so both rows share one baseline. Modes (Draw \| Move \| Scale \| Rotate, Sculpt \| Paint) and choices (Zadd \| Zsub) are 1 px-gap segments on `trough`; options (Front, Dynamic, X/Y/Z, Rgb, Pressure...) are separate `toggleOff` chips; LightBox / AI Brush plain buttons. The ActiveTris / TotalTris readout is one 12 px line on the row's centre line. The Draw palette uses the same looks (Pressure toggles are buttons there too) and 12 px dim section labels with a hairline.
-- Title strip: QuickSave, 1 2 3 and Menus are `toggleOff` chips; the readout is 12 px `textDim`, the status message 15 px `textBright` so it stands out.
+- Top shelf hierarchy, by meaning: every item is the full row height in the 15 px font, so both rows share one baseline. Modes (Draw \| Move \| Scale \| Rotate, Sculpt \| Paint) and choices (Add \| Sub) are 1 px-gap segments on `trough`; options (Front, Dynamic, X/Y/Z, Rgb, Pressure...) are separate `toggleOff` chips; Library / AI Brush plain buttons. The ActiveTris / TotalTris readout is one 12 px line on the row's centre line. The Draw palette uses the same looks (Pressure toggles are buttons there too) and 12 px dim section labels with a hairline.
+- Title strip: Snapshot, 1 2 3 and Menus are `toggleOff` chips; the readout is 12 px `textDim`, the status message 15 px `textBright` so it stands out.
 - Palette drop-downs open below the top shelf (under the palette bar when Tab hides the shelves), never over the tool rows.
 - Font: Inter Regular 15 x scale (as now). Shelf labels and tile captions 12 px (a second Inter size), help titles Inter SemiBold 15, console ProggyClean 13.
-- Trays (helpers in `src/app/Palettes.h`): two header levels only. A palette header is a filled bar (icon, bold title, chevron at the right). A sub-palette header is 22 px and quiet: title 8 px in, chevron at the right, no fill until hovered or open, an opaque hairline under it, no accent. The open section's content is indented 8 px (`tray::Section`), so it lines up with the header title. A group inside a section ("Project", "QRemesh", "Tablet") is `tray::GroupLabel`: 12 px `textDim` flush with the content, then a hairline; not `ImGui::SeparatorText`.
-- Tray controls: every slider is a `ui::SliderInside` (ints through `tray::SliderInt`), never a stock grab over its label. Check marks in palettes are the text colour (`tray::Style`), not the accent. A row of controls fills the line in equal halves or thirds; a number beside a button is a drag field of the same size (no tiny - / + buttons). The active row of a list (SubTools) is a lighter neutral (white ~9%) with a 2 px accent bar on its left, in a recessed well with no outline. Helper text is 12 px `textDim`.
+- Trays (helpers in `src/app/Palettes.h`): two header levels only. A palette header is a filled bar (icon, bold title, chevron at the right). A sub-palette header is 22 px and quiet: title 8 px in, chevron at the right, no fill until hovered or open, an opaque hairline under it, no accent. The open section's content is indented 8 px (`tray::Section`), so it lines up with the header title. A group inside a section ("Project", "Quad Remesh", "Tablet") is `tray::GroupLabel`: 12 px `textDim` flush with the content, then a hairline; not `ImGui::SeparatorText`.
+- Tray controls: every slider is a `ui::SliderInside` (ints through `tray::SliderInt`), never a stock grab over its label. Check marks in palettes are the text colour (`tray::Style`), not the accent. A row of controls fills the line in equal halves or thirds; a number beside a button is a drag field of the same size (no tiny - / + buttons). The active row of a list (Parts) is a lighter neutral (white ~9%) with a 2 px accent bar on its left, in a recessed well with no outline. Helper text is 12 px `textDim`.
 - The left tray's colour field is drawn by hand (`App::drawColorWidget`, Pickers.cpp): a rounded saturation/value square with a ring marker, a 10 px hue strip with a thin bar marker that stays inside its ends, and the main/second swatches as equal halves with a 1 px edge. One 4 px gap between all of them. The default main colour is a mid grey (second: white), so the swatches are neutral until the user picks a colour.
 
 ---
@@ -544,7 +544,7 @@ Works without the docking branch:
 - Palette drop-downs, pickers and the command palette as pop-ups.
 - Customize drag and drop via `BeginDragDropSource/Target`.
 
-Each shell window needs `NoFocusOnAppearing` and must not steal keyboard focus, so `onKey` still gets keys. Draw order: shells first, then LightBox, then floating windows, then pop-ups and help.
+Each shell window needs `NoFocusOnAppearing` and must not steal keyboard focus, so `onKey` still gets keys. Draw order: shells first, then Library, then floating windows, then pop-ups and help.
 
 **Needs the docking branch (flagged, not planned):** dragging panels out into separate OS windows (multi-viewport); arbitrary tabbed or split docking of palettes; ImGui-native persistence of dock layouts. ZBrush has none of these either: elements "cannot be undocked outside the window" [R1].
 
@@ -565,13 +565,13 @@ Create these with real declarations and **stub** implementations, so all three s
 ### Workstream A: shell, layout, palettes, theme
 **Owns**: `src/app/Shell.cpp` (new: title strip, palette bar, shelves, trays, splitters, layout math, `canvasRect()`), `src/app/Palettes.cpp` (new: palette registry, `drawPalette_*` for all 16 palettes, Tool sub-palettes), `src/app/Theme.cpp` (moved `applyStyle` + tokens), the existing `Panel*.cpp` (converted to `draw*Contents()` without `Begin/End`), `App.cpp` `drawUi`/`drawMenuBar` (removed)/`drawToolPanel` (removed)/panel functions, the canvas-rect changes in `run`/`handleEvent`/`pick`/brush cursor, and `src/render/Renderer.*` (viewport rect param).
 **Delivers**: §2, §3 (except the picker internals), §9.1 runtime use (reads and edits `layout_`, Ctrl+Alt drag/drop targets on shelves and trays), §9.3 presets, §10. Registers the Actions for everything it draws (brush.*, view.*, ui.toggle_shelves, ui.palette.<id>...). Uses `ui::ActionButton` everywhere.
-**Tests**: rewrite `tests/ui/*.sfui` steps that clicked View-menu items or old window titles. Item labels stay the same wherever possible: "Brush Lab/..." stays a floating window with the same name, and SubTools buttons keep their labels inside Tool > SubTool. Add `tests/ui/shell_layout.sfui` (shots at 1600x960 and 1920x1080, Tab hides shelves, tray divider toggle, palette into tray).
+**Tests**: rewrite `tests/ui/*.sfui` steps that clicked View-menu items or old window titles. Item labels stay the same wherever possible: "Brush Lab/..." stays a floating window with the same name, and Parts buttons keep their labels inside Tool > Parts. Add `tests/ui/shell_layout.sfui` (shots at 1600x960 and 1920x1080, Tab hides shelves, tray divider toggle, palette into tray).
 
-### Workstream B: LightBox, thumbnails, pickers
+### Workstream B: Library, thumbnails, pickers
 **Owns**: `src/app/LightBox.cpp`, `src/app/Thumbnails.cpp`, `src/app/Pickers.cpp`, `src/app/AssetLibrary.h/.cpp` (folder roots, worker-thread scanning), `src/core/Project.cpp` (+ `thumbnail.png` in `.sfproj`, read helper `loadProjectThumbnail(path, Image&)`), and maybe a `Renderer::renderMeshThumbnail` (coordinate the signature with A, who owns `Renderer.*`; B adds the new method in a separate block).
-**Delivers**: §4 (brush picker with letter badges, stroke/alpha/material pickers, S/I sliders, material hover preview), §5, §6, QuickSave target folder. Registers `ui.lightbox` (`,`), `ui.picker.brush` (B), `ui.picker.material` (M), `ui.size_popup` (S), `ui.strength_popup` (I), `file.quicksave`.
+**Delivers**: §4 (brush picker with letter badges, stroke/alpha/material pickers, S/I sliders, material hover preview), §5, §6, Snapshot target folder. Registers `ui.lightbox` (`,`), `ui.picker.brush` (B), `ui.picker.material` (M), `ui.size_popup` (S), `ui.strength_popup` (I), `file.quicksave`.
 **Interface used by A**: the left-shelf tiles call `thumbs.brush(...)` etc. and `openPicker(Picker::X, tileRectMax)`. The bottom shelf uses `thumbs.brush/recipe`. The Brush/Alpha/Material palettes reuse `drawBrushGrid(App&, GridMode)` exported from `Pickers.h`.
-**Tests**: `tests/ui/lightbox.sfui` (`key ,` -> expect "LightBox", tab switch, double-click the "Sphere" tile -> triangles changed, Shift+double-click -> subtools == 2), the brush picker (`key b`, `key s`, `key t` -> Standard active), unit tests for the cache key and the project-thumbnail round-trip.
+**Tests**: `tests/ui/lightbox.sfui` (`key ,` -> expect "Library", tab switch, double-click the "Sphere" tile -> triangles changed, Shift+double-click -> parts == 2), the brush picker (`key b`, `key s`, `key t` -> Standard active), unit tests for the cache key and the project-thumbnail round-trip.
 
 ### Workstream C: help, command palette, console, config, keys
 **Owns**: `src/app/Actions.cpp` (real `handleKey`, chord parsing, overrides, MRU, auto-registering commands), `src/app/Ui.cpp` (real Ctrl-hover help rendering, customize-mode drag sources inside `ActionButton`), `src/app/CommandPalette.cpp`, `src/app/Console.cpp`, `src/app/Config.cpp` (Store/Restore/Load/Save UI, `ui.json`, preferences values), `src/core/Script.*` (`formatStatement` + test), `App::onKey` (replaced by `actions_.handleKey`), the one-line echo hook in `App::runCommand`, and the generated F1 Controls window. Also `src/app/UiTest.cpp` key aliases (`comma`, `backtick`, `tab`, `f3`), and a test step `expect_help TEXT` (the Ctrl-help box shown this frame contains TEXT).
@@ -589,7 +589,7 @@ Create these with real declarations and **stub** implementations, so all three s
 - [ ] Ctrl+hover shows description + shortcut on every shelf, palette and picker item.
 - [ ] `,` / `B` / `M` / `Tab` / `` ` `` / `F3` / `Ctrl+Shift+I` work. Existing shortcuts are unchanged.
 - [ ] Customize: Ctrl+Alt drag adds, moves and removes shelf items; Store Config persists across restarts; Restore Standard UI resets.
-- [ ] LightBox shows thumbnails for every tab within ~1 s of opening (cached afterwards). Double-click loads; Shift+double-click appends a SubTool.
+- [ ] Library shows thumbnails for every tab within ~1 s of opening (cached afterwards). Double-click loads; Shift+double-click appends a Part.
 - [ ] Tests, `--render` and demo recordings are unchanged (standard layout, full-window canvas when `hideUi_`).
 - [ ] Lucide ISC + MIT notices are in THIRD_PARTY_NOTICES.md and About.
 
@@ -602,7 +602,7 @@ Create these with real declarations and **stub** implementations, so all three s
 - [R4] Areas for Customization / Custom Interface: https://help.maxon.net/zbr/en-us/Content/html/user-guide/customizing-zbrush/interface-layout/custom-interface/custom-interface.html
 - [R5] ZBrushCentral, brush pop-up letter selection: https://www.zbrushcentral.com/t/does-nobody-use-shortcuts-for-brushes/397885 and https://www.zbrushcentral.com/t/popup-hotkey/320306
 - [R6] ZBrush Shortcuts by Palette: https://help.maxon.net/zbr/en-us/Content/html/user-guide/keyboard-shortcuts/shortcuts-by-palette/shortcuts-by-palette.html (PDF: https://help.maxon.net/zbr/en-us/Content/Resources/Uploads/ZBrush-Shortcuts.pdf)
-- [R7] LightBox: https://help.maxon.net/zbr/en-us/Content/html/getting-started/basic-concepts/lightbox/lightbox.html
+- [R7] Library: https://help.maxon.net/zbr/en-us/Content/html/getting-started/basic-concepts/lightbox/lightbox.html
 - [R8] ZBrushCentral, tooltip (Quick Info) opacity: https://www.zbrushcentral.com/t/how-can-i-change-tooltip-transparency-answered/310810
 - [R9] Preferences > Quick Info: https://help.maxon.net/zbr/en-us/Content/html/reference-guide/preferences/quick-info/quick-info.html
 - [R10] Preferences > Config: https://help.maxon.net/zbr/en-us/Content/html/reference-guide/preferences/config/config.html

@@ -10,24 +10,24 @@ normal map on the low-poly right away so you can compare it with the sculpt.
 
 ## What you need
 
-- **A high-poly source**: one or more SubTools with the detail. They stay as they are.
-- **A low-poly SubTool with UVs**, in the same place as the high-poly. It can come from another app (import it
-  with **Tool > SubTool > Append**; models with UVs keep them), or you make it in SculptForge: **Duplicate** the
+- **A high-poly source**: one or more Parts with the detail. They stay as they are.
+- **A low-poly Part with UVs**, in the same place as the high-poly. It can come from another app (import it
+  with **Tool > Parts > Append**; models with UVs keep them), or you make it in SculptForge: **Duplicate** the
   sculpt, **Tool > Geometry > Decimate** it, then **Tool > Texture Map > Auto UV**.
 
-The maps go onto the **active** SubTool, so select the low-poly before baking.
+The maps go onto the **active** Part, so select the low-poly before baking.
 
 ## Bake in five steps
 
-1. Select the low-poly SubTool and open **Tool > Bake** in the right tray. The first line says which SubTool
+1. Select the low-poly Part and open **Tool > Bake** in the right tray. The first line says which Part
    the maps go onto, or "No UVs" if it needs Auto UV first.
-2. **Source**: leave **All visible SubTools** to bake from everything that is shown (except the low-poly), or
-   pick one SubTool.
+2. **Source**: leave **All visible Parts** to bake from everything that is shown (except the low-poly), or
+   pick one Part.
 3. Tick the maps you want, and choose the **size** (1K, 2K, 4K or 8K).
 4. Click **Bake**. A progress bar shows while it works on every processor core; you can keep working, or click
    **Cancel Bake**.
 5. When it is done, the status line reports what was baked and where the files went, and the low-poly shows its
-   normal map. Hide the high-poly (**Tool > SubTool**, the eye) to compare, or untick **Preview Normal Map** to
+   normal map. Hide the high-poly (**Tool > Parts**, the eye) to compare, or untick **Preview Normal Map** to
    see the bare low-poly.
 
 ## The maps
@@ -39,9 +39,9 @@ The maps go onto the **active** SubTool, so select the low-poly before baking.
 | **Displacement** | `<name>_displacement.png` and `.exr` | The distance from the low-poly to the high-poly along the low-poly's normal |
 | **Ambient Occlusion** | `<name>_ao.png` | How much of the sky each point sees: darker in creases, folds and cavities |
 | **Cavity** | `<name>_cavity.png` | The fine surface curvature: mid-grey where the surface is smooth, dark in cracks, light on ridges |
-| **Colour** | `<name>_color.png` | The source's polypaint, or its painted texture |
+| **Colour** | `<name>_color.png` | The source's vertex paint, or its painted texture |
 
-`<name>` is the low-poly SubTool's name. Colour is skipped when the source has neither polypaint nor a texture.
+`<name>` is the low-poly Part's name. Colour is skipped when the source has neither vertex paint nor a texture.
 
 ### Tangent-space normal maps that look right everywhere
 
@@ -66,7 +66,7 @@ float OpenEXR holds the real distances in world units, with no scale to set.
 
 | Setting | What it does |
 |---|---|
-| **Source** | The high-poly: one SubTool, or every visible SubTool except the active one. Hidden faces of the source are ignored |
+| **Source** | The high-poly: one Part, or every visible Part except the active one. Hidden faces of the source are ignored |
 | **Size** | 1K, 2K (default), 4K or 8K square |
 | **AA** | Anti-aliasing: 1 to 4 means 1, 4, 9 or 16 rays per texel, averaged. 2 (the default) gives clean edges |
 | **Auto distance** | Measure how far the high-poly lies in front of and behind the low-poly, and cast rays just that far. After a bake, **Front** and **Rear** show what it measured |
@@ -87,7 +87,7 @@ Rays follow the smoothed normals, so hard edges of the low-poly don't leave gaps
 - **Missing detail** ("x% of texels found no surface" in red under the Bake button): rays didn't reach the
   high-poly. Turn off Auto distance and raise **Front** and **Rear**.
 - **Detail from the wrong place** (for example the inside of an ear showing on its back): the rays reach too
-  far. Lower **Rear** (or **Front**), or bake the parts from separate SubTools with **Source**.
+  far. Lower **Rear** (or **Front**), or bake the parts from separate Parts with **Source**.
 - The bake works on copies, so you can keep sculpting meanwhile. If the low-poly's triangles or UVs change
   afterwards, the normal map preview turns off because it no longer fits (undo brings it back).
 
@@ -98,7 +98,7 @@ Rays follow the smoothed normals, so hard edges of the low-poly don't leave gaps
 
 ## Send to Unreal with the normal map
 
-When the last bake made a normal map, its low-poly SubTool is shown and still fits the map, **Send to Unreal**
+When the last bake made a normal map, its low-poly Part is shown and still fits the map, **Send to Unreal**
 (**Tool > Export**) imports the map too, as `T_<Name>_N` next to the mesh, set up as a normal map (linear, normal
 map compression), with Unreal's **Flip Green Channel** set for an OpenGL map. This works with an Unreal Editor
 on the same computer; for one on another computer, import the PNG by hand. See
@@ -108,7 +108,7 @@ on the same computer; for one on another computer, import the PNG by hand. See
 
 | Command | What it does |
 |---|---|
-| `bake` | Bake onto the active SubTool and write the maps. Options: `source=all` or a SubTool name, `maps=normal,object_normal,displacement,ao,cavity,color` (or `all`), `size=2048` (512 to 8192, or `1k`...`8k`), `out=folder`, `name=prefix`, `front=0.02` and `rear=0.02` (fractions of the model's size, or `auto`), `samples=2`, `padding=8`, `ao_rays=48`, `ao_distance=0.05`, `green=opengl` or `directx`, `displacement_scale=` (world units at white), `exr=true` |
+| `bake` | Bake onto the active Part and write the maps. Options: `source=all` or a Part name, `maps=normal,object_normal,displacement,ao,cavity,color` (or `all`), `size=2048` (512 to 8192, or `1k`...`8k`), `out=folder`, `name=prefix`, `front=0.02` and `rear=0.02` (fractions of the model's size, or `auto`), `samples=2`, `padding=8`, `ao_rays=48`, `ao_distance=0.05`, `green=opengl` or `directx`, `displacement_scale=` (world units at white), `exr=true` |
 
 For example, from the console or `sculptforge-cli`:
 

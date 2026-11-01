@@ -69,7 +69,7 @@ bool parseAxes(const std::string& text, std::vector<int>& axes) {
 Mesh extractShell(const Mesh& mesh, const ExtractOptions& o, std::string& error) {
     const size_t nv = mesh.vertexCount(), nt = mesh.triangleCount();
     if (!mesh.zspheres.empty()) {
-        error = "Extract works on meshes; make the ZSpheres a mesh first";
+        error = "Extract works on meshes; make the Forge Spheres a mesh first";
         return {};
     }
     // The patch: the visible triangles whose corners are masked (on average), with their own vertices.
@@ -441,18 +441,18 @@ CommandResult runExtract(Document& doc, const Args& a) {
         doc.extractPreview = {doc.subtools[size_t(i)].id, doc.activeSubtoolInfo().id, doc.undo.revision()};
     }
     if (argBool(a, "accept", false)) return acceptPreview(doc);
-    return {true, "Extract preview (" + triangles(tris) + "): Accept keeps it as a new SubTool"};
+    return {true, "Extract preview (" + triangles(tris) + "): Accept keeps it as a new Part"};
 }
 
 } // namespace
 
 void registerExtractMirrorCommands(CommandRegistry& reg) {
     reg.add({"extract",
-             "ZBrush Extract (Tool > SubTool): make a shell from the masked, visible part of the active SubTool and "
-             "show it as a preview below it; extract_accept (or accept=true) keeps it as a new SubTool in one undo "
+             "ZBrush Extract (Tool > SubTool): make a shell from the masked, visible part of the active Part and "
+             "show it as a preview below it; extract_accept (or accept=true) keeps it as a new Part in one undo "
              "step. Running it again replaces the preview.",
              {{"thickness", T::Number,
-               "Thick: shell thickness as a fraction of the SubTool's largest side (default 0.015; negative grows "
+               "Thick: shell thickness as a fraction of the Part's largest side (default 0.015; negative grows "
                "inward; 0 = a single-sided surface).",
                false},
               {"smooth", T::Number, "E Smt: smoothing passes along the extracted edge (0-50, default 5).", false},
@@ -461,7 +461,7 @@ void registerExtractMirrorCommands(CommandRegistry& reg) {
               {"tborder", T::Bool, "TBorder: the whole rim is triangles instead of quads (default false).", false},
               {"accept", T::Bool, "Accept at once instead of leaving a preview (default false).", false}},
              runExtract});
-    reg.add({"extract_accept", "Keep the Extract preview as a new SubTool (undo removes it again).", {},
+    reg.add({"extract_accept", "Keep the Extract preview as a new Part (undo removes it again).", {},
              [](Document& doc, const Args&) { return acceptPreview(doc); }});
     reg.add({"extract_cancel", "Remove the Extract preview.", {},
              [](Document& doc, const Args&) -> CommandResult {
@@ -471,9 +471,9 @@ void registerExtractMirrorCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"mirror_and_weld",
-             "ZBrush Mirror And Weld (Tool > Geometry > Modify Topology): keep the half of the active SubTool on the "
+             "ZBrush Mirror And Weld (Tool > Geometry > Modify Topology): keep the half of the active Part on the "
              "+ side of the plane through the origin, mirror it onto the other side and weld the seam into one "
-             "watertight mesh. Polygroups, polypaint, mask, UVs and sculpt layers are kept. One undo step.",
+             "watertight mesh. Face Groups, vertex paint, mask, UVs and sculpt layers are kept. One undo step.",
              {{"axis", T::String, "Axis whose plane to mirror across: x (default), y or z; several (xz) in turn.", false},
               {"side", T::String, "The side kept: positive (default) or negative.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
@@ -483,8 +483,8 @@ void registerExtractMirrorCommands(CommandRegistry& reg) {
                  const bool positive = side == "positive" || side == "+" || side == "pos";
                  if (!positive && side != "negative" && side != "-" && side != "neg")
                      return {false, "Bad side '" + side + "' (positive or negative)"};
-                 if (!doc.mesh.zspheres.empty()) return {false, "Mirror And Weld works on meshes; make the ZSpheres a mesh first"};
-                 if (doc.mesh.triangleCount() == 0) return {false, "The SubTool is empty"};
+                 if (!doc.mesh.zspheres.empty()) return {false, "Mirror And Weld works on meshes; make the Forge Spheres a mesh first"};
+                 if (doc.mesh.triangleCount() == 0) return {false, "The Part is empty"};
                  const size_t before = doc.mesh.triangleCount();
                  Mesh m = doc.mesh;
                  std::string names;
@@ -500,17 +500,17 @@ void registerExtractMirrorCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"mirror",
-             "ZBrush Mirror (Tool > Deformation): flip the active SubTool across a plane, by default the one through "
+             "ZBrush Mirror (Tool > Deformation): flip the active Part across a plane, by default the one through "
              "the origin that symmetry and Mirror And Weld use. One undo step.",
              {{"axis", T::String, "Axis to flip along: x (default), y or z; several (xz) in turn.", false},
-              {"pivot", T::String, "origin (default) or center (flip in place about the SubTool's centre).", false}},
+              {"pivot", T::String, "origin (default) or center (flip in place about the Part's centre).", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  std::vector<int> axes;
                  if (!parseAxes(argString(a, "axis", "x"), axes)) return {false, "Bad axis (expected x, y, z or e.g. xz)"};
                  const std::string pivot = argString(a, "pivot", "origin");
                  const bool center = pivot == "center" || pivot == "centre";
                  if (!center && pivot != "origin") return {false, "Bad pivot '" + pivot + "' (origin or center)"};
-                 if (doc.mesh.vertexCount() == 0) return {false, "The SubTool is empty"};
+                 if (doc.mesh.vertexCount() == 0) return {false, "The Part is empty"};
                  const glm::vec3 c = doc.mesh.bounds().center();
                  Mesh m = doc.mesh;
                  std::string names;

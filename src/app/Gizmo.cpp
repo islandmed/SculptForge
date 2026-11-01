@@ -22,7 +22,7 @@ namespace {
 
 bool ctrlDown(SDL_Keymod mod) { return (mod & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) != 0; } // as App.cpp
 
-constexpr const char* kPath = "Transform > Gizmo 3D";
+constexpr const char* kPath = "Transform > Gizmo";
 constexpr float kRadiusPx = 105.0f;   // arrow length / ring radius on screen
 constexpr float kViewRing = 1.22f;   // the view ring, relative to the others
 constexpr float kPickPx = 8.0f;
@@ -137,18 +137,18 @@ void App::registerGizmoActions() {
     };
     auto is = [this](GizmoMode m) { return [this, m] { return gizmo_.mode == m; }; };
     add("tool.draw", "Draw", ICON_LC_PENCIL, "Transform", "Q", mode(GizmoMode::Off), is(GizmoMode::Off),
-        "Draw mode: brushes sculpt and paint (leaves the Gizmo 3D).");
+        "Draw mode: brushes sculpt and paint (leaves the Gizmo).");
     add("tool.move", "Move", ICON_LC_MOVE, "Transform", "W", mode(GizmoMode::Move), is(GizmoMode::Move),
-        "Gizmo 3D, Move: drag an arrow to move along an axis, a square to move in a plane, the centre to move in "
+        "Gizmo, Move: drag an arrow to move along an axis, a square to move in a plane, the centre to move in "
         "the view. Masked parts stay; Shift snaps to the grid; Alt+drag moves only the gizmo. W again: back to Draw.");
     add("tool.scale", "Scale", ICON_LC_SCALING, "Transform", "E", mode(GizmoMode::Scale), is(GizmoMode::Scale),
-        "Gizmo 3D, Scale: drag a box to stretch along an axis or the centre to scale evenly (right or up: bigger). "
+        "Gizmo, Scale: drag a box to stretch along an axis or the centre to scale evenly (right or up: bigger). "
         "Shift snaps to 10% steps. E again: back to Draw.");
     add("tool.rotate", "Rotate", ICON_LC_ROTATE_CW, "Transform", "R", mode(GizmoMode::Rotate), is(GizmoMode::Rotate),
-        "Gizmo 3D, Rotate: drag a ring to turn about that axis, the outer ring to turn in the view. Mask the body "
+        "Gizmo, Rotate: drag a ring to turn about that axis, the outer ring to turn in the view. Mask the body "
         "and put the pivot at a joint to pose a limb. Shift snaps to 15 degrees. R again: back to Draw.");
     add("gizmo.reset_pivot", "Reset", ICON_LC_LOCATE_FIXED, kPath, "", [this] { resetGizmoPivot(); }, nullptr,
-        "Put the gizmo back at the centre of what moves (the SubTool, or its unmasked part) with world axes.");
+        "Put the gizmo back at the centre of what moves (the Part, or its unmasked part) with world axes.");
     add("gizmo.snap_pivot", "To Surface", ICON_LC_CROSSHAIR, kPath, "",
         [this] {
             gizmo_.snapNext = !gizmo_.snapNext;
@@ -171,10 +171,10 @@ void App::registerGizmoActions() {
     add("gizmo.use_mask", "Mask", ICON_LC_DROPLET, kPath, "", [this] { gizmo_.useMask = !gizmo_.useMask; },
         [this] { return gizmo_.useMask; },
         "Masked parts stay where they are and partly masked parts move partly (on by default). Off: the whole "
-        "SubTool moves whatever the mask.");
-    add("gizmo.all", "All SubTools", ICON_LC_LAYERS, kPath, "", [this] { gizmo_.all = !gizmo_.all; },
+        "Part moves whatever the mask.");
+    add("gizmo.all", "All Parts", ICON_LC_LAYERS, kPath, "", [this] { gizmo_.all = !gizmo_.all; },
         [this] { return gizmo_.all; },
-        "Transform every visible SubTool together (ZBrush Transpose All). Each SubTool gets its own undo step.");
+        "Transform every visible Part together (ZBrush Transpose All). Each Part gets its own undo step.");
 }
 
 void App::setGizmoMode(GizmoMode mode) {
@@ -494,7 +494,7 @@ bool App::gizmoMouseDown(float x, float y, SDL_Keymod mod) {
         if (gizmo_.sessions.empty()) {
             status_ = gizmo_.useMask && doc_.mesh.hasMask() ? "Nothing to move: everything is masked (Ctrl+click the "
                                                               "background to invert the mask)"
-                                                            : "Nothing to move: the SubTool is hidden or empty";
+                                                            : "Nothing to move: the Part is hidden or empty";
             gizmo_.handle = H::None;
             return true;
         }
@@ -880,7 +880,7 @@ void App::drawGizmoPanel() {
     ImGui::SetNextWindowPos(ImVec2(c.x + 12.0f * uiScale_, c.y + c.h - 12.0f * uiScale_), ImGuiCond_FirstUseEver,
                             ImVec2(0.0f, 1.0f));
     ImGui::SetNextWindowSize(ImVec2(270.0f * uiScale_, 0.0f), ImGuiCond_Always);
-    if (ImGui::Begin("Gizmo 3D", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings)) {
+    if (ImGui::Begin("Gizmo", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings)) {
         drawGizmoContents(true);
     }
     ImGui::End();
@@ -911,7 +911,7 @@ void App::drawGizmoContents(bool compact) {
     if (ui::SliderInside("##gizmo_falloff", &pct, 0.0f, 50.0f, "Falloff %.0f%%")) gizmo_.falloff = pct / 100.0f;
     ui::HelpText("Falloff", nullptr,
                  "A soft joint for posing: the movement eases in over this distance from the masked part (a share "
-                 "of the SubTool's size), so a hard mask edge bends smoothly instead of creasing. 0: the mask as it is.",
+                 "of the Part's size), so a hard mask edge bends smoothly instead of creasing. 0: the mask as it is.",
                  kPath);
     ImGui::Separator();
     // Numeric entry: one transform about the pivot, along the gizmo's axes.

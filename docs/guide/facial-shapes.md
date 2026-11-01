@@ -10,17 +10,17 @@ expressions.
 
 ## What you need
 
-- A humanoid head (human or stylised) as the active [SubTool](subtools.md), its face pointing at the front view
+- A humanoid head (human or stylised) as the active [Part](parts.md), its face pointing at the front view
   (+Z) with Y up, as SculptForge's front view shows it. A bust with shoulders is fine.
-- Separate SubTools for the eyes, teeth and tongue, if the sculpt has them (see [SubTools](#subtools)).
+- Separate Parts for the eyes, teeth and tongue, if the sculpt has them (see [Parts](#parts)).
 - Nothing to download: the template head the shapes come from is built into SculptForge.
 
 To try it on a ready-made head, type `new_head` in the console (<kbd>`</kbd>): a life-size human head with a mouth
-and eye sockets, and its eyes as a second SubTool.
+and eye sockets, and its eyes as a second Part.
 
 ## Generate the shapes
 
-1. Select the head SubTool and open **Tool > Facial Shapes**.
+1. Select the head Part and open **Tool > Facial Shapes**.
 2. Click **Generate Facial Shapes**. It takes a second or two (more on millions of vertices).
 3. The status line says how well the template fitted: the fit error (as a share of the head's height; under 1% is
    good) and how much of the template's face found the sculpt.
@@ -33,7 +33,7 @@ fixes you had sculpted into them.
 
 - **Symmetry**: **Auto** makes each Left / Right pair exact mirror images when the sculpt is symmetric about X = 0;
   **On** always mirrors (a slightly asymmetric sculpt gets the average); **Off** keeps each side as fitted.
-- **SubTools too**: also give the other SubTools the shapes they need (below).
+- **Parts too**: also give the other Parts the shapes they need (below).
 
 ## How it works
 
@@ -73,16 +73,16 @@ the nose), guide it with landmarks:
 
 **Clear** removes them (the fit is automatic again). Landmarks aren't saved with the project.
 
-## SubTools
+## Parts
 
-With **SubTools too** on, the other visible SubTools get shapes by their names:
+With **Parts too** on, the other visible Parts get shapes by their names:
 
-| SubTool name contains | It gets |
+| Part name contains | It gets |
 |---|---|
-| `eye` (not `lash`, `brow` or `lid`) | the 8 `eyeLook...` shapes: each eye turns about its own centre (about 30 degrees sideways, 25 up or down). One SubTool may hold both eyes. |
+| `eye` (not `lash`, `brow` or `lid`) | the 8 `eyeLook...` shapes: each eye turns about its own centre (about 30 degrees sideways, 25 up or down). One Part may hold both eyes. |
 | `teeth`, `tooth`, `gum` or `jaw` | the jaw shapes (`jawOpen`, `jawLeft`, `jawRight`, `jawForward`, `tongueOut`): the part below the bite moves with the lower jaw, the upper teeth stay. |
 | `tongue` | the jaw shapes, and `tongueOut` pushes it out past the lips. |
-| anything else that sits on the face (brows, lashes, a beard, a moustache) | the shapes that move the skin under it. SubTools that aren't on the face get none. |
+| anything else that sits on the face (brows, lashes, a beard, a moustache) | the shapes that move the skin under it. Parts that aren't on the face get none. |
 
 The eyes' shapes are rotations stored as blend shapes, so halfway (weight 0.5) an eye is a little smaller than a
 true rotation would leave it, as with any blend-shape eye. Rigs that turn eyes with bones can ignore those shapes.
@@ -94,12 +94,12 @@ true rotation would leave it, as with any blend-shape eye. Rigs that turn eyes w
 - **A closed mouth** sculpted as one continuous surface can't open: the shapes that part the lips move the lower lip
   and stretch the skin between the lips like a membrane. Cut the mouth first (sculpt a slit, or start from
   `new_head`, which has a mouth bag), or sculpt the fix into `jawOpen`.
-- **Eyelids** close over the eyeballs in `eyeBlinkLeft` / `eyeBlinkRight` when the eyes are a separate SubTool.
+- **Eyelids** close over the eyeballs in `eyeBlinkLeft` / `eyeBlinkRight` when the eyes are a separate Part.
   Eyes sculpted into the head's own surface (one mesh) would be pulled along by the lids: split them into their
-  own SubTool first ([Split parts](subtools.md)).
+  own Part first ([Split parts](parts.md)).
 - `mouthClose` is meant to be used with `jawOpen`: it closes the lips while the jaw is open (the ARKit convention).
   On its own it pushes the lips through each other.
-- `tongueOut`: the template has no tongue shape, so on the head it opens the jaw a little; a tongue SubTool moves out.
+- `tongueOut`: the template has no tongue shape, so on the head it opens the jaw a little; a tongue Part moves out.
 
 ## Fix a shape by sculpting
 
@@ -117,7 +117,7 @@ Under **Face test**:
 - **Presets** show common expressions built from the shapes: Neutral, Smile, Grin, Surprise, Anger, Sad,
   Disgust, Fear, Blink, Wink, Kiss, Aah, Ooh, Puff, Look left, Tongue out. **Preset amount** sets how strongly.
 - **Eyes, Brows, Jaw, Mouth, Cheeks & nose, Tongue** open a slider per shape. A slider drives the shape of that
-  name on every SubTool (the eyes turn with `eyeLookUpLeft`).
+  name on every Part (the eyes turn with `eyeLookUpLeft`).
 
 Neither creates undo steps. The weights are saved with the project and written to exports (as the default pose).
 
@@ -175,14 +175,14 @@ The ARKit names are kept exactly in every format:
 | **FBX** (and Send to Unreal) | blend shape channels; Unreal: morph targets on a skeletal mesh | not yet |
 | **Blender bridge** (File > Blender > Send to Blender) | shape keys, at their weights, on every object | not yet |
 
-Each SubTool exports as its own object with its own shapes (the eyes with their eyeLook shapes, the teeth with
+Each Part exports as its own object with its own shapes (the eyes with their eyeLook shapes, the teeth with
 the jaw's). Apple's ARKit, Unreal's Live Link Face and most face-capture tools drive meshes by these names directly.
 
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `face_shapes_generate [landmarks=<json>] [symmetry=auto/on/off] [subtools=true] [level=N]` | Generate Facial Shapes on the active SubTool |
+| `face_shapes_generate [landmarks=<json>] [symmetry=auto/on/off] [subtools=true] [level=N]` | Generate Facial Shapes on the active Part |
 | `face_landmarks_detect` | the automatic landmarks, as the JSON `landmarks=` takes |
 | `face_weights json=<json>` | set shape weights (live) |
 | `face_preset name=Smile [amount=1]` | show a preset |
@@ -192,7 +192,7 @@ the jaw's). Apple's ARKit, Unreal's Live Link Face and most face-capture tools d
 
 ## Subdivision levels
 
-On a SubTool with [subdivision levels](subdivision-levels.md) the shapes are made on the lowest level with at least
+On a Part with [subdivision levels](subdivision-levels.md) the shapes are made on the lowest level with at least
 20,000 vertices (`level=` picks another), and the levels carry them up: at the top level the shapes bend your
 high-level detail along instead of flattening it.
 
@@ -206,5 +206,5 @@ the shapes up.
 
 - The fit expects a humanoid head with the face pointing at the front view. Animals and creatures (the lion bust)
   fit poorly or not at all; landmarks help with stylised humans.
-- Hair sculpted as part of the head moves with the brows and forehead; keep hair in its own SubTool.
+- Hair sculpted as part of the head moves with the brows and forehead; keep hair in its own Part.
 - Landmarks are placed by hand or found by the fit itself; there is no image-based face detector.

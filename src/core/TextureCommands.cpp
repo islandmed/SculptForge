@@ -69,8 +69,8 @@ int layerArg(const PaintTexture& t, const Args& a, std::string& error) {
     return t.activeLayer >= -1 && t.activeLayer < int(t.layers.size()) ? t.activeLayer : -1;
 }
 
-const char* kNoUvs = "The SubTool has no UVs: run Auto UV first (Tool > Texture Map > Auto UV, or uv_auto)";
-const char* kNoTexture = "The SubTool has no texture: create one first (Tool > Texture Map > New, or texture_create)";
+const char* kNoUvs = "The Part has no UVs: run Auto UV first (Tool > Texture Map > Auto UV, or uv_auto)";
+const char* kNoTexture = "The Part has no texture: create one first (Tool > Texture Map > New, or texture_create)";
 
 } // namespace
 
@@ -202,7 +202,7 @@ CommandResult textureLayerCommand(Document& doc, const std::string& verb, const 
 
 void registerTextureCommands(CommandRegistry& reg) {
     reg.add({"uv_auto",
-             "Unwrap the active SubTool automatically (xatlas): cuts it into UV islands and packs them into the 0-1 "
+             "Unwrap the active Part automatically (xatlas): cuts it into UV islands and packs them into the 0-1 "
              "square, so it can carry a painted texture. Replaces any existing UVs; a painted texture and its layers "
              "are moved onto the new UVs (one undo step). Can take a while on millions of triangles.",
              {{"resolution", T::Number, "Texture size the islands are packed for (padding in texels). Default: the "
@@ -224,11 +224,11 @@ void registerTextureCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"texture_create",
-             "Give the active SubTool a texture to paint into (texture painting on its UVs: the colour resolution "
+             "Give the active Part a texture to paint into (texture painting on its UVs: the colour resolution "
              "comes from the texture, not the mesh). The Paint brush, fills and paint layers then work on the texture. "
              "Needs UVs (uv_auto makes them). Replaces an existing texture (undoable).",
              {{"size", T::String, "1024, 2048 (default), 4096 or 8192 (or 1k, 2k, 4k, 8k).", false},
-              {"from_polypaint", T::Bool, "Start from the SubTool's polypaint instead of white. Default false.", false}},
+              {"from_polypaint", T::Bool, "Start from the Part's vertex paint instead of white. Default false.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  Mesh& m = doc.mesh;
                  if (m.triangleCount() == 0) return {false, "There is no mesh to paint"};
@@ -247,10 +247,10 @@ void registerTextureCommands(CommandRegistry& reg) {
                  return {true, "New " + sizeLabel(*m.texture) + " texture: painting now goes into the texture"};
              }});
 
-    reg.add({"texture_delete", "Remove the active SubTool's texture (undoable). Painting goes back to the vertices.", {},
+    reg.add({"texture_delete", "Remove the active Part's texture (undoable). Painting goes back to the vertices.", {},
              [](Document& doc, const Args&) -> CommandResult {
                  Mesh& m = doc.mesh;
-                 if (!m.texture) return {true, "The SubTool has no texture"};
+                 if (!m.texture) return {true, "The Part has no texture"};
                  UndoRecord r = captureTexture(m, "Delete Texture");
                  m.texture.reset();
                  m.paintToTexture = false;
@@ -261,14 +261,14 @@ void registerTextureCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"paint_target",
-             "Where painting goes on the active SubTool: vertex (polypaint) or texture (its texture map). Applies to the "
+             "Where painting goes on the active Part: vertex (vertex paint) or texture (its texture map). Applies to the "
              "Paint brush, Rgb sculpting, fills and the paint_layer_* commands.",
              {{"target", T::String, "vertex or texture.", true}},
              [](Document& doc, const Args& a) -> CommandResult {
                  const std::string t = argString(a, "target");
                  if (t == "vertex" || t == "vertices" || t == "polypaint") {
                      doc.mesh.paintToTexture = false;
-                     return {true, "Painting goes into the vertices (polypaint)"};
+                     return {true, "Painting goes into the vertices (vertex paint)"};
                  }
                  if (t != "texture") return {false, "target must be vertex or texture"};
                  if (!doc.mesh.hasUvs()) return {false, kNoUvs};
@@ -278,16 +278,16 @@ void registerTextureCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"texture_from_polypaint",
-             "Bake the SubTool's polypaint (vertex colours, all paint layers composited) into the active texture layer "
+             "Bake the Part's vertex paint (vertex colours, all paint layers composited) into the active texture layer "
              "(undoable). Creates a 2K texture when there is none.",
              {{"size", T::String, "Size for a new texture: 1024, 2048, 4096 or 8192. Default 2048.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  Mesh& m = doc.mesh;
                  if (!m.hasUvs()) return {false, kNoUvs};
-                 if (!m.hasColors()) return {false, "The SubTool has no polypaint to convert"};
+                 if (!m.hasColors()) return {false, "The Part has no vertex paint to convert"};
                  const int size = parseTextureSize(argString(a, "size", "2048"));
                  if (!size) return {false, "size must be 1024, 2048, 4096 or 8192"};
-                 UndoRecord r = captureTexture(m, "Polypaint to Texture");
+                 UndoRecord r = captureTexture(m, "Vertex Paint to Texture");
                  if (!hasTexture(m)) {
                      m.texture = makeTexture(size, size);
                      m.facesDirty = true;
@@ -296,11 +296,11 @@ void registerTextureCommands(CommandRegistry& reg) {
                  polypaintToTexture(m);
                  finishTextureUndo(r, m);
                  doc.undo.push(std::move(r));
-                 return {true, "Polypaint baked into the " + sizeLabel(*m.texture) + " texture"};
+                 return {true, "Vertex Paint baked into the " + sizeLabel(*m.texture) + " texture"};
              }});
 
     reg.add({"polypaint_from_texture",
-             "Set the polypaint (the active paint layer) of every vertex to the texture's colour under it (undoable). "
+             "Set the vertex paint (the active paint layer) of every vertex to the texture's colour under it (undoable). "
              "Detail finer than the mesh is lost; vertices on UV seams average their sides.",
              {},
              [](Document& doc, const Args&) -> CommandResult {
@@ -310,19 +310,19 @@ void registerTextureCommands(CommandRegistry& reg) {
                      return {false, "Paint layer '" + m.paintLayers[size_t(m.activePaintLayer)].name + "' is locked or hidden"};
                  UndoRecord r;
                  if (m.hasColors()) {
-                     r = UndoRecord::captureColors(m, "Texture to Polypaint");
+                     r = UndoRecord::captureColors(m, "Texture to Vertex Paint");
                  } else {
-                     r.label = "Texture to Polypaint";
+                     r.label = "Texture to Vertex Paint";
                      r.mesh = std::make_unique<Mesh>(m);
                  }
                  textureToPolypaint(m);
                  doc.undo.push(std::move(r));
                  doc.modified = true;
-                 return {true, "Texture copied into the polypaint of " + std::to_string(m.vertexCount()) + " vertices"};
+                 return {true, "Texture copied into the vertex paint of " + std::to_string(m.vertexCount()) + " vertices"};
              }});
 
     reg.add({"texture_export",
-             "Save the active SubTool's texture (all visible layers composited) as a PNG image.",
+             "Save the active Part's texture (all visible layers composited) as a PNG image.",
              {{"path", T::String, "Output .png path (UTF-8).", true}},
              [](Document& doc, const Args& a) -> CommandResult {
                  if (!hasTexture(doc.mesh)) return {false, kNoTexture};
@@ -334,7 +334,7 @@ void registerTextureCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"texture_import",
-             "Load an image (PNG, JPEG, TGA, ...) as the active SubTool's texture (undoable; its layers are replaced). "
+             "Load an image (PNG, JPEG, TGA, ...) as the active Part's texture (undoable; its layers are replaced). "
              "The image is laid on the UVs as it is (v = 0 at the bottom of the image).",
              {{"path", T::String, "Image path (UTF-8).", true}},
              [](Document& doc, const Args& a) -> CommandResult {

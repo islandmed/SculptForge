@@ -45,6 +45,7 @@
 //   run COMMANDS             sculptforge-cli commands, e.g. run new_sphere subdivisions=4 ($SCRIPT_DIR: the script's folder)
 //   drop FILE                as if FILE were dropped onto the window (relative to the script's folder)
 //   env NAME VALUE           set an environment variable; $SCRIPT_DIR is the script's folder
+//   input_style STYLE        zbrush, sculptforge (the default), blender or maya, as Preferences > Input sets it
 //   copy SRC DST             copy a file or folder (SRC relative to the script's folder, DST to the working
 //                            directory), e.g. to stage what another program would write (the Blender bridge);
 //                            $LIBRARY in DST (and in env values) is the test's LightBox library folder
@@ -908,7 +909,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         steps_.push_back([this, line, name, u, v, times](float t) {
             const int index = app_.doc_.findSubtool(name);
             if (index < 0) {
-                fail(line, "no SubTool named \"" + name + "\"");
+                fail(line, "no Part named \"" + name + "\"");
                 return true;
             }
             // The point of its on-screen bounds nearest (U, V) where it's the front SubTool and no panel covers it.
@@ -941,7 +942,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
                 }
             }
             if (!found) {
-                fail(line, "SubTool \"" + name + "\" can't be clicked (hidden, covered or off screen)");
+                fail(line, "Part \"" + name + "\" can't be clicked (hidden, covered or off screen)");
                 return true;
             }
             if (t == 0.0f) { // hover for a frame first
@@ -1340,6 +1341,16 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             r = call("POST", "/api/capture/" + capture + "/finish", "");
             if (r.status != 200) fail(line, "finish refused: " + std::to_string(r.status) + " " + r.body + r.error);
         });
+    } else if (verb == "input_style") {
+        // input_style zbrush|sculptforge|blender|maya: as Preferences > Input sets it (scripts written for one style)
+        if (!need(1)) return false;
+        const std::string n = w[1];
+        const int style = n == "zbrush" ? 0 : n == "sculptforge" ? 1 : n == "blender" ? 2 : n == "maya" ? 3 : -1;
+        if (style < 0) {
+            fail(line, "input_style takes zbrush, sculptforge, blender or maya");
+            return false;
+        }
+        run([this, style] { app_.setInputStyle(style); });
     } else if (verb == "env") {
         if (!need(2)) return false;
         std::string value = restOf(lineText_, 2);

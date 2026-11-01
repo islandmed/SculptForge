@@ -11,7 +11,7 @@ shot capture
 hold ctrl
 wait 0.2
 hover "Make sculptable/Make sculptable"
-expect_help "sculptable SubTool"
+expect_help "sculptable Part"
 hover "Make sculptable/##sculptdetail"
 expect_help "voxels across"
 hover "Make sculptable/Face loops"
@@ -44,9 +44,9 @@ expect_value colored > 0
 expect_value qremesh_guide_loops == 6
 camera 0 0
 shot result
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 shot result-polyf
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 
 # Review: Film density, stop after the scan to check the landmarks.
 click "Show##splats"
@@ -80,9 +80,9 @@ expect_value quad_percent >= 97
 expect_value subtools == 5
 expect_value visible_subtools == 2
 camera 0 0
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 shot film-polyf
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 
 # Place by hand: Review again, then click the eight landmarks on the scan.
 click "Make sculptable/Make sculptable"

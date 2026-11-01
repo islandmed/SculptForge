@@ -119,10 +119,10 @@ A `--set` variable replaces a whole value, so pass complete paths (with their ex
 | OpenUSD (`.usda`, `.usdz`) | Yes | Yes | Meshes, xform ops, Z-up stages, UsdSkel blend shapes, ParticleField Gaussian splats, textures; checked with OpenUSD's validators |
 | FBX | Yes (any version) | Yes (7.4 binary) | LOD groups, blend shapes, centimetre units, textures; checked with ufbx's strict mode |
 | glTF / GLB | Yes | Yes | Morph targets, vertex colours, `KHR_gaussian_splatting`, embedded textures; checked with the Khronos validator |
-| OBJ | Yes | Yes | Objects as SubTools, groups as polygroups, vertex colours, textures through `.mtl` |
+| OBJ | Yes | Yes | Objects as Parts, groups as face groups, vertex colours, textures through `.mtl` |
 | PLY | Yes | Yes | Meshes with vertex colours, Gaussian splats |
 | STL | Yes (binary and ASCII) | Yes (binary) | |
-| ZBrush GoZ | Yes | Yes | Polygroups, mask, polypaint, UVs |
+| ZBrush Bridge (GoZ-compatible) | Yes | Yes | Face Groups, mask, vertex paint, UVs |
 | SculptForge project (`.sfproj`) | Yes | Yes | Everything; a documented ZIP of JSON and binary arrays |
 
 Binary `.usdc` files and USD references or payloads aren't read yet; convert with `usdcat in.usd -o out.usda`.
@@ -152,7 +152,7 @@ requests are welcome as issues on the project's GitHub page.
 ## See also
 
 - [Scripting and automation](scripting.md)
-- [Exporting, Send to Unreal and GoZ](exporting.md)
+- [Exporting, Send to Unreal and ZBrush](exporting.md)
 - [Brush Lab and sharing brushes](brush-lab.md)
 - [Image and text to 3D](generate-3d.md): running models on your own ComfyUI server
 - [Troubleshooting](troubleshooting.md)

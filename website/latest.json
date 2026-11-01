@@ -5,7 +5,7 @@
   "highlights": [
     "Alternate smooth: let go of Shift mid-stroke to smooth without losing volume, as in ZBrush",
     "Masking: Ctrl+drag draws a mask rectangle, Lasso and Rectangle follow symmetry, a click blurs the mask",
-    "Pen tablets in mouse mode no longer jump; click the axis gizmo to snap views; SubTool thumbnails",
+    "Pen tablets in mouse mode no longer jump; click the axis gizmo to snap views; Part thumbnails",
     "SculptForge stays free: Help > Support SculptForge if you'd like to back it (Insiders get releases early)"
   ]
 }

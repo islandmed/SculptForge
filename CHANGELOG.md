@@ -6,6 +6,18 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Features use SculptForge's own names (Parts, Forge Spheres, Vertex Paint, Face Groups, Library, Lit Spheres,
+  Quad Remesh, Voxel Remesh, Dynamic Topology, Snapshot, Gizmo, Lazy Stroke, Wireframe, ZBrush Bridge, Sharp
+  Crease, Clay Block, Tendril...); searching for ZBrush terms still finds them. MatCaps are now Lit Spheres. The user guide's chapters follow
+  (Parts, Forge Spheres, Vertex Paint, Face Groups; the old web addresses redirect), and
+  Help > User Guide > Coming from ZBrush has the table of ZBrush terms and their SculptForge names. The ZBrush
+  plug-in is now called SculptForge ZTL Export (same file, `SculptForgeZToolExport.txt`).
+- New installs default to the SculptForge-style keys (Preferences > Input); a first-start "Coming from: ZBrush /
+  Blender / Maya / New to sculpting" choice sets the key style, and existing users keep their saved choice.
+  ZBrush's keys are the **ZBrush-style** option.
+- Contributions are signed off under the Developer Certificate of Origin (`git commit -s`; see CONTRIBUTING.md).
+
 ## [0.10.4] - 2026-11-01
 
 ### Added

@@ -179,9 +179,9 @@ std::vector<QRemeshGuide> qremeshGuidesFromJson(const Json& json) {
 void registerQRemeshGuideCommands(CommandRegistry& reg) {
     using T = ParamSpec::Type;
     reg.add({"qremesh_guide",
-             "QRemesh Guides (ZBrush's ZRemesher Guides brush): draw a curve on the active SubTool for QRemesh to "
+             "Quad Remesh Guides (ZBrush's ZRemesher Guides brush): draw a curve on the active Part for Quad Remesh to "
              "follow; an edge loop runs along it and the edge flow around it turns with it. A curve that ends where it "
-             "started becomes a loop (around an eye or the mouth). The guides are kept with the SubTool and saved in "
+             "started becomes a loop (around an eye or the mouth). The guides are kept with the Part and saved in "
              "projects.",
              {{"points", T::String, "The curve: \"x,y,z x,y,z ...\" (2+ points), on or near the surface.", true},
               {"view", T::String, "Project the points onto the surface along this direction \"x,y,z\" (as a stroke "
@@ -189,7 +189,7 @@ void registerQRemeshGuideCommands(CommandRegistry& reg) {
               {"symmetry", T::String, "Mirror the curve across these planes through the centre, e.g. \"x\" or \"xz\". "
                                       "Default: none.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
-                 if (doc.mesh.triangleCount() == 0) return {false, "QRemesh Guides: the SubTool is empty"};
+                 if (doc.mesh.triangleCount() == 0) return {false, "Quad Remesh Guides: the Part is empty"};
                  std::vector<vec3> pts;
                  std::string err;
                  if (!parsePathPoints(argString(a, "points"), pts, err)) return {false, err};
@@ -219,32 +219,32 @@ void registerQRemeshGuideCommands(CommandRegistry& reg) {
                      else return {false, "symmetry takes the letters x, y and z"};
                  }
                  const int added = addQRemeshGuide(doc.qremeshGuides, doc.mesh, doc.bvh, pts, s);
-                 if (added == 0) return {false, "QRemesh Guides: the curve is too short or misses the SubTool"};
+                 if (added == 0) return {false, "Quad Remesh Guides: the curve is too short or misses the Part"};
                  doc.modified = true;
                  const QRemeshGuide& g = doc.qremeshGuides[doc.qremeshGuides.size() - size_t(added)];
-                 return {true, std::string("QRemesh guide added (") + (g.closed ? "a loop" : "a curve") +
+                 return {true, std::string("Quad Remesh guide added (") + (g.closed ? "a loop" : "a curve") +
                                    (added > 1 ? ", mirrored" : "") + "); " + std::to_string(doc.qremeshGuides.size()) +
-                                   " guides on the SubTool"};
+                                   " guides on the Part"};
              }});
-    reg.add({"qremesh_guide_delete_last", "QRemesh Guides: delete the last curve drawn (with its mirror copies).", {},
+    reg.add({"qremesh_guide_delete_last", "Quad Remesh Guides: delete the last curve drawn (with its mirror copies).", {},
              [](Document& doc, const Args&) -> CommandResult {
-                 if (!deleteLastQRemeshGuide(doc.qremeshGuides)) return {false, "No QRemesh guides to delete"};
+                 if (!deleteLastQRemeshGuide(doc.qremeshGuides)) return {false, "No Quad Remesh guides to delete"};
                  doc.modified = true;
-                 return {true, std::to_string(doc.qremeshGuides.size()) + " QRemesh guides left"};
+                 return {true, std::to_string(doc.qremeshGuides.size()) + " Quad Remesh guides left"};
              }});
-    reg.add({"qremesh_guides_clear", "QRemesh Guides: delete every guide curve of the active SubTool.", {},
+    reg.add({"qremesh_guides_clear", "Quad Remesh Guides: delete every guide curve of the active Part.", {},
              [](Document& doc, const Args&) -> CommandResult {
-                 if (doc.qremeshGuides.empty()) return {false, "No QRemesh guides to delete"};
+                 if (doc.qremeshGuides.empty()) return {false, "No Quad Remesh guides to delete"};
                  doc.qremeshGuides.clear();
                  doc.modified = true;
-                 return {true, "QRemesh guides cleared"};
+                 return {true, "Quad Remesh guides cleared"};
              }});
-    reg.add({"qremesh_guides_info", "QRemesh Guides: how many guide curves the active SubTool has, and their length.", {},
+    reg.add({"qremesh_guides_info", "Quad Remesh Guides: how many guide curves the active Part has, and their length.", {},
              [](Document& doc, const Args&) -> CommandResult {
                  size_t loops = 0;
                  for (const QRemeshGuide& g : doc.qremeshGuides) loops += g.closed;
                  char buf[160];
-                 std::snprintf(buf, sizeof buf, "%zu QRemesh guides (%zu loops), total length %.4g", doc.qremeshGuides.size(),
+                 std::snprintf(buf, sizeof buf, "%zu Quad Remesh guides (%zu loops), total length %.4g", doc.qremeshGuides.size(),
                                loops, double(qremeshGuideLength(doc.qremeshGuides)));
                  return {true, buf};
              }});

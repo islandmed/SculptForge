@@ -6,6 +6,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <string_view>
+#include <utility>
 
 namespace sf {
 
@@ -24,11 +26,25 @@ std::string trim(std::string_view s) {
     return std::string(s.substr(a, b - a));
 }
 
-// "subtool_append" -> "Subtool append"
+// "subtool_append" -> "Part append": the command's words, with the interface's names for what they name.
 std::string humanize(const std::string& name) {
-    std::string out = name;
-    for (auto& c : out)
-        if (c == '_') c = ' ';
+    static const std::pair<std::string_view, std::string_view> kWords[] = {
+        {"subtool", "part"},           {"subtools", "parts"},       {"zsphere", "forge sphere"},
+        {"zspheres", "forge spheres"}, {"polygroup", "face group"}, {"polygroups", "face groups"},
+        {"polypaint", "vertex paint"}, {"qremesh", "quad remesh"},  {"matcap", "lit sphere"},
+        {"matcaps", "lit spheres"},    {"lightbox", "library"},     {"goz", "zbrush bridge"},
+        {"quicksave", "snapshot"}};
+    std::string out;
+    size_t start = 0;
+    while (start <= name.size()) {
+        const size_t end = std::min(name.find('_', start), name.size());
+        std::string_view word(name.data() + start, end - start);
+        for (const auto& [from, to] : kWords)
+            if (word == from) word = to;
+        if (!out.empty()) out += ' ';
+        out += word;
+        start = end + 1;
+    }
     if (!out.empty()) out[0] = char(std::toupper(static_cast<unsigned char>(out[0])));
     return out;
 }

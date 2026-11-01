@@ -3,7 +3,7 @@
 Keep Blender for the scene, rigging, shading and animation, and sculpt in SculptForge: the **SculptForge Bridge**
 add-on sends the selected objects from Blender to SculptForge with one click, and one click in SculptForge sends
 them back. The objects update in place in Blender: their transform, materials and modifiers stay as they were.
-It works like GoZ between ZBrush and other apps, on Linux, Windows and macOS, with Blender 4.2 or newer.
+It works like ZBrush's GoZ between ZBrush and other apps, on Linux, Windows and macOS, with Blender 4.2 or newer.
 
 ## Install the add-on
 
@@ -25,14 +25,14 @@ add-on's preferences (**Edit > Preferences > Add-ons > SculptForge Bridge**).
 ## A round trip
 
 1. In Blender, select one or more mesh objects and click **Send to SculptForge** in the SculptForge tab.
-   SculptForge starts, or, if it's already open, loads them within a second. Each object becomes a SubTool with
+   SculptForge starts, or, if it's already open, loads them within a second. Each object becomes a Part with
    the object's name, placed as it is in the Blender scene.
 2. Sculpt, paint, mask, divide, remesh: anything SculptForge does.
-3. In SculptForge choose **File > Blender > Send to Blender**. Every visible SubTool goes back.
+3. In SculptForge choose **File > Blender > Send to Blender**. Every visible Part goes back.
 4. Blender picks it up by itself within a second (or click **Receive from SculptForge**). Each object that came
-   from Blender is updated; a SubTool you added in SculptForge becomes a new object.
+   from Blender is updated; a Part you added in SculptForge becomes a new object.
 
-Sending again from Blender updates the same SubTools: each update is one undo step on that SubTool in
+Sending again from Blender updates the same Parts: each update is one undo step on that Part in
 SculptForge, and each receive in Blender is one undo step there.
 
 ![File > Blender in SculptForge](images/blender-menu.jpg)
@@ -41,13 +41,13 @@ SculptForge, and each receive in Blender is one undo step there.
 
 | | Blender | SculptForge |
 |---|---|---|
-| Shape | The object's mesh, in its own space | The SubTool, placed in the scene with the object's transform |
-| Faces | Triangles and quads; n-gons as triangle fans | Triangles and quads (PolyF shows the quads) |
+| Shape | The object's mesh, in its own space | The Part, placed in the scene with the object's transform |
+| Faces | Triangles and quads; n-gons as triangle fans | Triangles and quads (Wire shows the quads) |
 | UVs | The active UV map | UVs |
-| Colour | The active colour attribute (point or face corner) | Polypaint |
+| Colour | The active colour attribute (point or face corner) | Vertex Paint |
 | Mask | The sculpt mask | Mask |
-| Face sets | Sculpt mode face sets | Polygroups |
-| Name | Object name | SubTool name |
+| Face sets | Sculpt mode face sets | Face Groups |
+| Name | Object name | Part name |
 
 Blender is Z-up and SculptForge Y-up, both in metres; the add-on and SculptForge convert between them, so the
 model stands the same way in both and a round trip changes nothing. Objects with a negative scale (mirrored)
@@ -57,7 +57,7 @@ come across the right way out.
 it had: its n-gons, edges, seams, creases, custom attributes and the other UV maps; only the positions, the active
 UV map, colour, mask and face sets are updated.
 
-**When the topology changes** (Divide, a remesh, QRemesh, Subdivide...), the object's mesh is rebuilt from what
+**When the topology changes** (Divide, a remesh, Quad Remesh, Subdivide...), the object's mesh is rebuilt from what
 SculptForge sent. The object keeps its transform, materials, modifiers and the names of its active UV map and
 colour attribute; things tied to the old faces (material per face, seams, other UV maps, shape keys) can't
 follow and are reset.
@@ -93,22 +93,22 @@ add-on. The preferences list every key while it's on.
 
 | ZBrush key | In Blender's Sculpt Mode |
 |---|---|
-| <kbd>S</kbd> / <kbd>U</kbd> / <kbd>O</kbd> | Draw Size / Z Intensity (Strength) / Focal Shift (Hardness), dragged at the cursor |
+| <kbd>S</kbd> / <kbd>U</kbd> / <kbd>O</kbd> | Draw Size / Intensity (Strength) / Falloff (Hardness), dragged at the cursor |
 | <kbd>Space</kbd> | Blender's Sculpt quick menu at the cursor (brush, size, strength) |
-| <kbd>B</kbd> | The brush list by ZBrush name (Standard, DamStandard, Clay, ClayBuildup, Move, SnakeHook...): type a few letters, <kbd>Enter</kbd> picks |
-| <kbd>Alt</kbd>+drag | Zsub: the brush digs in |
+| <kbd>B</kbd> | The brush list by ZBrush brush name (Standard, DamStandard, Clay, ClayBuildup, Move, SnakeHook...): type a few letters, <kbd>Enter</kbd> picks |
+| <kbd>Alt</kbd>+drag | Sub: the brush digs in |
 | <kbd>Ctrl</kbd>+drag / <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+drag | Mask / unmask, drawn as a lasso |
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+drag / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+drag | Show only what's inside / hide what's inside |
 | <kbd>Ctrl</kbd>+<kbd>W</kbd> | Group the masked part as a face set and clear the mask (with nothing masked: the visible part) |
 | <kbd>Ctrl</kbd>+<kbd>D</kbd> / <kbd>D</kbd> / <kbd>Shift</kbd>+<kbd>D</kbd> | Divide (a Multires level) / SDiv up / SDiv down (never adds a level) |
 | <kbd>X</kbd> | Symmetry X |
-| <kbd>Shift</kbd>+<kbd>F</kbd> | PolyFrame (the wireframe overlay) |
+| <kbd>Shift</kbd>+<kbd>F</kbd> | Wireframe (the wireframe overlay) |
 | <kbd>F</kbd> / <kbd>P</kbd> | Frame the model / perspective on and off |
-| <kbd>L</kbd> | LazyMouse (Blender: Stabilize Stroke) |
+| <kbd>L</kbd> | Lazy Stroke (Blender: Stabilize Stroke) |
 | <kbd>W</kbd> / <kbd>E</kbd> / <kbd>R</kbd> | Move / Scale / Rotate |
 | <kbd>Shift</kbd>+drag | Smooth (Blender already does this) |
 
-The ZBrush brushes map to Blender's closest: Standard = Draw, DamStandard = Draw Sharp, ClayBuildup = Clay
+ZBrush's brushes map to Blender's closest: Standard = Draw, DamStandard = Draw Sharp, ClayBuildup = Clay
 Strips, Move = Grab, Move Elastic = Elastic Grab, TrimDynamic = Trim (Scrape in Blender 4.2), Crease = Crease
 Sharp, MaskPen = Mask.
 
@@ -123,9 +123,9 @@ What Blender has no key for, or can't do the ZBrush way:
   (show all): use <kbd>Ctrl</kbd>+<kbd>I</kbd>, <kbd>Alt</kbd>+<kbd>M</kbd> and <kbd>Alt</kbd>+<kbd>H</kbd>.
 - <kbd>B</kbd> then two letters: a Blender menu takes one key at a time, so <kbd>B</kbd> opens the list and the
   letters filter it.
-- <kbd>Alt</kbd>+click a SubTool: Blender's objects aren't SubTools (<kbd>Alt</kbd>+<kbd>Q</kbd> switches the object
+- <kbd>Alt</kbd>+click a Part: Blender's objects aren't Parts (<kbd>Alt</kbd>+<kbd>Q</kbd> switches the object
   you sculpt).
-- Stroke types (DragRect, Spray...): each Blender brush sets its stroke method in its Stroke panel.
+- Stroke types (Drag Stamp, Spray...): each Blender brush sets its stroke method in its Stroke panel.
 
 These keys take Blender's place while they're on: <kbd>F</kbd> no longer sets the radius (that's <kbd>S</kbd>),
 <kbd>B</kbd> no longer draws a box mask, <kbd>Ctrl</kbd>+drag no longer inverts the brush (that's <kbd>Alt</kbd>),
@@ -163,7 +163,7 @@ SculptForge with `--blender` loads what Blender last sent.
   `SCULPTFORGE_BLENDER_EXCHANGE` set to it, and send.
 - **Linked duplicates** (objects sharing one mesh) all show the last one received.
 - **Shape keys**: the Basis and the keys named like SculptForge's layers are updated; other keys keep their shapes.
-- **Subdivision levels** don't go to Blender: it receives the level you're on (like GoZ).
+- **Subdivision levels** don't go to Blender: it receives the level you're on (like ZBrush's GoZ).
 - **Sculpt layers** arrive as **shape keys** (Basis plus one key per layer, with its name and weight), so the 52
   [facial shapes](facial-shapes.md) keep their ARKit names. Shape keys don't come back from Blender, and textures
   stay in SculptForge.
@@ -174,6 +174,6 @@ SculptForge with `--blender` loads what Blender last sent.
 
 ## See also
 
-- [Exporting, Unreal and ZBrush](exporting.md): files, game engines and GoZ
-- [SubTools](subtools.md): each Blender object is a SubTool
-- [Polygroups and visibility](polygroups.md): Blender's face sets
+- [Exporting, Unreal and ZBrush](exporting.md): files, game engines and the ZBrush Bridge
+- [Parts](parts.md): each Blender object is a Part
+- [Face Groups and visibility](face-groups.md): Blender's face sets

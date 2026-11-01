@@ -20,7 +20,7 @@ namespace {
 
 using T = ParamSpec::Type;
 
-const char* kNoTexture = "The SubTool has no texture: create one first (Tool > Texture Map > New, or texture_create)";
+const char* kNoTexture = "The Part has no texture: create one first (Tool > Texture Map > New, or texture_create)";
 
 std::string channelList() {
     std::string s;
@@ -132,7 +132,7 @@ int layerArg(const PaintTexture& t, const Args& a, std::string& error) {
 
 void registerTextureChannelCommands(CommandRegistry& reg) {
     reg.add({"texture_channels",
-             "Turn material channels of the active SubTool's texture on or off (PBR texture painting). Base colour is "
+             "Turn material channels of the active Part's texture on or off (PBR texture painting). Base colour is "
              "always there; roughness, metallic, normal, height, ambient occlusion (ao), emissive and opacity can be "
              "added. A new channel starts at its default everywhere and costs no memory until it is painted. Turning "
              "one off discards what was painted in it (undoable). Without arguments, lists the channels.",

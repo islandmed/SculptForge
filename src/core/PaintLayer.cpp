@@ -512,8 +512,8 @@ std::string percent(float x) { return std::to_string(int(std::lround(x * 100.0f)
 
 void registerPaintLayerCommands(CommandRegistry& reg) {
     reg.add({"paint_layer_add",
-             "Add a polypaint layer above the active one (Photoshop-style paint layers) and paint into it. "
-             "Base is the existing polypaint; new layers start transparent.",
+             "Add a vertex paint layer above the active one (Photoshop-style paint layers) and paint into it. "
+             "Base is the existing vertex paint; new layers start transparent.",
              {{"name", T::String, "Layer name, e.g. 'Freckles'. Default 'Layer N'.", false},
               {"blend", T::String, "Blend mode: " + blendList() + ". Default normal.", false},
               {"opacity", T::Number, "Layer opacity 0-1. Default 1.", false}},
@@ -600,7 +600,7 @@ void registerPaintLayerCommands(CommandRegistry& reg) {
                  return {true, "Duplicated into '" + m.paintLayers[size_t(at)].name + "'"};
              }});
 
-    reg.add({"paint_layer_delete", "Delete a paint layer (not Base). With the last layer gone, Base is plain polypaint again.",
+    reg.add({"paint_layer_delete", "Delete a paint layer (not Base). With the last layer gone, Base is plain vertex paint again.",
              {kIndexParam, kLayerParam},
              [](Document& doc, const Args& a) -> CommandResult {
                  if (paintsTexture(doc.mesh)) return textureLayerCommand(doc, "delete", a);
@@ -608,7 +608,7 @@ void registerPaintLayerCommands(CommandRegistry& reg) {
                  std::string err;
                  const int i = layerArg(m, a, err);
                  if (i == -2) return {false, err};
-                 if (i < 0) return {false, "Base can't be deleted (paint_clear removes all polypaint)"};
+                 if (i < 0) return {false, "Base can't be deleted (paint_clear removes all vertex paint)"};
                  const std::string name = layerName(m, i);
                  UndoRecord r = stackUndo(m, "Delete Paint Layer");
                  removePaintLayer(m, i);
@@ -675,14 +675,14 @@ void registerPaintLayerCommands(CommandRegistry& reg) {
                  const int i = layerArg(m, a, err);
                  if (i == -2) return {false, err};
                  if (i >= 0 && m.paintLayers[size_t(i)].locked) return {false, "Layer '" + layerName(m, i) + "' is locked"};
-                 if (m.paintLayers.empty() && !m.hasColors()) return {true, "The mesh has no polypaint"};
+                 if (m.paintLayers.empty() && !m.hasColors()) return {true, "The mesh has no vertex paint"};
                  UndoRecord r = UndoRecord::captureColors(m, "Clear Paint Layer", {}, i);
                  clearPaintLayer(m, i);
                  doc.undo.push(std::move(r));
                  return {true, "Cleared " + layerName(m, i)};
              }});
 
-    reg.add({"paint_layer_list", "List the active SubTool's paint layers, top first.", {},
+    reg.add({"paint_layer_list", "List the active Part's paint layers, top first.", {},
              [](Document& doc, const Args&) -> CommandResult {
                  if (paintsTexture(doc.mesh)) return textureLayerCommand(doc, "list", {});
                  const Mesh& m = doc.mesh;

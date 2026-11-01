@@ -531,15 +531,15 @@ bool bakeMaps(const Mesh& low, const std::vector<const Mesh*>& sources, const Ba
     out = BakeResult();
     const size_t nt = low.triangleCount();
     if (nt == 0) {
-        error = "The low-poly SubTool is empty";
+        error = "The low-poly Part is empty";
         return false;
     }
     if (low.uvs.size() != nt * 3) {
-        error = "The low-poly SubTool has no UVs: import it with UVs or run Auto UV (Tool > Texture Map)";
+        error = "The low-poly Part has no UVs: import it with UVs or run Auto UV (Tool > Texture Map)";
         return false;
     }
     if (low.normals.size() != low.vertexCount()) {
-        error = "The low-poly SubTool has no normals";
+        error = "The low-poly Part has no normals";
         return false;
     }
     if (st.size < 64 || st.size > 8192) {
@@ -571,7 +571,7 @@ bool bakeMaps(const Mesh& low, const std::vector<const Mesh*>& sources, const Ba
         }
     }
     if (src.tris.empty()) {
-        error = "There is no high-poly source to bake from (show the SubTools to bake, or name one)";
+        error = "There is no high-poly source to bake from (show the Parts to bake, or name one)";
         return false;
     }
     bool anyColor = false;
@@ -579,7 +579,7 @@ bool bakeMaps(const Mesh& low, const std::vector<const Mesh*>& sources, const Ba
     if ((st.maps & bakeBit(BakeMap::Color)) && !anyColor) {
         st.maps &= ~bakeBit(BakeMap::Color);
         if (!st.maps) {
-            error = "The source has no polypaint or texture to transfer";
+            error = "The source has no vertex paint or texture to transfer";
             return false;
         }
     }
@@ -1079,16 +1079,16 @@ bool bakeSourceSubtools(const Document& doc, const std::string& source, std::vec
         for (int i = 0; i < doc.subtoolCount(); ++i)
             if (i != doc.activeSubtool && doc.subtools[size_t(i)].visible && doc.subtoolMesh(i).triangleCount())
                 indices.push_back(i);
-        if (indices.empty()) error = "No other visible SubTool to bake from: show the high-poly SubTool(s), or append one";
+        if (indices.empty()) error = "No other visible Part to bake from: show the high-poly Part(s), or append one";
         return !indices.empty();
     }
     const int i = doc.findSubtool(source);
     if (i < 0) {
-        error = "No SubTool called '" + source + "'";
+        error = "No Part called '" + source + "'";
         return false;
     }
     if (i == doc.activeSubtool) {
-        error = "'" + source + "' is the active SubTool (the low-poly the maps go onto): pick another source";
+        error = "'" + source + "' is the active Part (the low-poly the maps go onto): pick another source";
         return false;
     }
     indices.push_back(i);
@@ -1124,15 +1124,15 @@ void notifyBakeListener(const Document& doc, std::shared_ptr<const BakeResult> r
 void registerBakeCommands(CommandRegistry& reg) {
     using T = ParamSpec::Type;
     reg.add({"bake",
-             "Bake maps from a high-poly source onto the active SubTool's UVs (the low-poly): tangent-space normal "
+             "Bake maps from a high-poly source onto the active Part's UVs (the low-poly): tangent-space normal "
              "(MikkTSpace), object-space normal, displacement (16-bit PNG + 32-bit EXR), ambient occlusion, cavity and "
              "colour. Rays go along the low-poly's smooth normals from 'front' in front of it to 'rear' behind it. "
              "Writes <name>_<map>.png into the output folder.",
-             {{"source", T::String, "SubTool to bake from, or all (default: every visible SubTool but the active one).", false},
+             {{"source", T::String, "Part to bake from, or all (default: every visible Part but the active one).", false},
               {"maps", T::String, "Comma list: normal, object_normal, displacement, ao, cavity, color, or all. Default normal.", false},
               {"size", T::Number, "Map size in texels: 512, 1024, 2048 (default), 4096 or 8192 (1k...8k also work).", false},
               {"out", T::String, "Output folder (default: the project's folder, or the current folder).", false},
-              {"name", T::String, "File name prefix (default: the active SubTool's name).", false},
+              {"name", T::String, "File name prefix (default: the active Part's name).", false},
               {"front", T::String, "Ray start in front of the low-poly, as a fraction of its size (e.g. 0.02), or auto (default).", false},
               {"rear", T::String, "How far behind the low-poly rays look, as a fraction of its size, or auto (default).", false},
               {"samples", T::Number, "Anti-aliasing: samples x samples rays per texel, 1-4. Default 2.", false},

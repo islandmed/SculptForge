@@ -812,8 +812,7 @@ int App::run() {
             strokeRadiusProbe_ = &sm.radii;
             if (options_.measureStrokeRadius > 0.0f) radiusPx_ = std::clamp(options_.measureStrokeRadius, 2.0f, 800.0f);
             if (const char* b = std::getenv("SF_MEASURE_BRUSH")) // e.g. KelvinGrab: measure another built-in brush
-                for (int i = 0; i < int(BrushType::Count); ++i)
-                    if (SDL_strcasecmp(brushName(BrushType(i)), b) == 0) brush_ = BrushType(i), doc_.activeBrush = -1;
+                if (BrushType t; brushFromName(b, t)) brush_ = t, doc_.activeBrush = -1;
             if (verify) sm.before = meshStateHash(doc_.mesh);
             onMouseDown(sm.cx + sm.r, sm.cy, SDL_BUTTON_LEFT);
             if (drag_ != Drag::Stroke) {
@@ -1460,7 +1459,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     haveLastDab_ = false;
     doc_.sculptor.draftStrokes = draftStrokes() && asyncStrokeAllowed(); // (AsyncStroke.cpp)
     if (!doc_.sculptor.beginStroke(doc_.mesh,
-                                   !strokeSculpt_ ? std::string("Paint") : recipe ? recipe->name : brushName(strokeBrush_),
+                                   !strokeSculpt_ ? std::string("Paint") : recipe ? recipe->name : brushLabel(strokeBrush_),
                                    strokeSculpt_ ? doc_.activeLayer : -1)) {
         status_ = "Active layer weight is 0 - raise it to sculpt into the layer";
         drag_ = Drag::Orbit;
@@ -1474,7 +1473,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     if (!lods_.empty() || previewLod_ >= 0) clearLods();
     beginPaintStroke();
     if (doc_.sculptor.dyntopo.enabled && strokeSculpt_ && !dyntopoBlocker(doc_.mesh).empty())
-        status_ = "Dynamic is on, but this SubTool has subdivision levels: sculpting without remeshing";
+        status_ = "Dynamic is on, but this Part has subdivision levels: sculpting without remeshing";
     lastX_ = x;
     lastY_ = y;
     strokePath_.reset(x, y);
@@ -1811,7 +1810,7 @@ void App::queueFile(FileAction action, std::string path) {
 }
 
 void App::loadMatcapDialog() {
-    static const SDL_DialogFileFilter kMatcapFilters[] = {{"MatCap images", "png;jpg;jpeg;exr"}, {"All files", "*"}};
+    static const SDL_DialogFileFilter kMatcapFilters[] = {{"Lit Sphere images", "png;jpg;jpeg;exr"}, {"All files", "*"}};
     const std::string folder = matcapFolder();
     SDL_ShowOpenFileDialog(onFileChosen, &dialogRequests_[int(FileAction::LoadMatcap)], window_, kMatcapFilters, 2,
                            folder.empty() ? nullptr : folder.c_str(), false);
@@ -2071,7 +2070,7 @@ void App::drawUi() {
                                "version 3 or later. It comes with ABSOLUTELY NO WARRANTY.");
             ImGui::Spacing();
             ImGui::TextWrapped("Built with SDL 3 (zlib), Dear ImGui (MIT), GLM (MIT), stb (MIT/public domain), ufbx "
-                               "(MIT/public domain), xatlas (MIT), MikkTSpace (zlib) and the Inter typeface (SIL OFL 1.1). QRemesh follows Instant Meshes "
+                               "(MIT/public domain), xatlas (MIT), MikkTSpace (zlib) and the Inter typeface (SIL OFL 1.1). Quad Remesh follows Instant Meshes "
                                "(BSD-3-Clause). The phone link uses QR Code generator (MIT), libdatachannel and libjuice (MPL-2.0), usrsctp "
                                "(BSD-3-Clause) and Mbed TLS (Apache-2.0). Uses libcurl (curl license) "
                                "where available.");

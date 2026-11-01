@@ -24,12 +24,12 @@ expect_value masked == 0
 
 # Polygroups by normals on a cube-ish shape, then hide one with Ctrl+Shift+click.
 run new_sphere subdivisions=1
-click "Polygroups"
+click "Face Groups"
 click "By normals"
 expect_value groups > 1
 expect_value show_polygroups == 1    # grouping turns the colours on
 shot polygroups
-click "Show polygroups"
+click "Show face groups"
 expect_value show_polygroups == 0
 click "Visibility"
 click "Show all"
@@ -37,5 +37,5 @@ expect_value hidden == 0
 
 # Palettes open as drop-downs from the palette bar.
 click "Color##palette.color"
-expect "Polypaint & Materials/Paint brush (P)"
-expect "Polypaint & Materials/Fill masked"
+expect "Vertex Paint & Materials/Paint brush (P)"
+expect "Vertex Paint & Materials/Fill masked"

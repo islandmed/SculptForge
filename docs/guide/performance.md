@@ -38,7 +38,7 @@ Open **Preferences** and click **Performance**.
 |---|---|
 | **Antialiasing** (Off, 2x, 4x, 8x) | How many samples per pixel the 3D view uses to smooth edges. 4x is the default. More samples look smoother and cost more on huge meshes. If the graphics card can't make room for them, the view quietly uses fewer and the panel says so |
 | **Fast Navigation** | While you rotate, pan or zoom a scene bigger than the hardware profile's motion proxy threshold (see below), draw it without antialiasing and draw big meshes as a lighter version with about a fifth of their triangles, so the view keeps up. The full mesh, smooth again, is back as soon as the view stops. On by default |
-| **Predictive Strokes** | The brush is worked out on its own thread while the view keeps drawing at full speed. The dabs it hasn't finished show at once as a preview on the surface, and the brush cursor and the stroke's head are drawn where the pen is about to be, so on a heavy mesh the surface moves under the pen straight away and lifting the pen never waits. The finished sculpt is exactly the same as with it off. On by default (painting, masking, dynamic topology, Move, Snake Hook and the drag strokes work as before) |
+| **Predictive Strokes** | The brush is worked out on its own thread while the view keeps drawing at full speed. The dabs it hasn't finished show at once as a preview on the surface, and the brush cursor and the stroke's head are drawn where the pen is about to be, so on a heavy mesh the surface moves under the pen straight away and lifting the pen never waits. The finished sculpt is exactly the same as with it off. On by default (painting, masking, dynamic topology, Move, Tendril and the drag strokes work as before) |
 | **Draft Strokes** | With Predictive Strokes: while you sculpt, the brush only moves the surface, the moved part is shaded from its facets, and the smooth shading, the cavities and the rest are worked out once when you lift the pen. Lighter on laptops and on battery. Inflate and the plane brushes use the surface's direction from the stroke's start, so the result can differ slightly from a full stroke. Off by default |
 | **Multithreading** | Run brushes, normal and picking updates and project saving on every core (the number of threads is shown beside it). The results are exactly the same with it off; turn it off only to compare speeds or rule it out when something goes wrong |
 | **Last stroke** | What your last stroke cost per dab: **Brush** (finding and moving the vertices), **Normals** (shading), **BVH** (the structure that finds the surface under the cursor), and the **GPU upload** per frame |
@@ -85,18 +85,18 @@ setting is also in the <kbd>F3</kbd> command palette (type "antialiasing", "fast
 - **Sculpt at the lowest level that holds the detail.** With [subdivision levels](subdivision-levels.md) you can
   shape the forms a few levels down and only go to the top for fine detail. Each level down is four times
   lighter.
-- **Hide what you're not working on.** Hidden SubTools aren't drawn and hidden parts of a SubTool aren't
-  sculpted (**Tool > Visibility**). A hidden SubTool costs no drawing time at all.
+- **Hide what you're not working on.** Hidden Parts aren't drawn and hidden parts of a Part aren't
+  sculpted (**Tool > Visibility**). A hidden Part costs no drawing time at all.
 - **Memory.** A divided model takes about 85 bytes per triangle: about 37 for the sculpting mesh, 17 for its
   BVH and 29 for its subdivision levels. A 33 million triangle sculpt with levels needs about 3.4 GB of memory, a 100
   million one about 9 GB (and a little more while dividing). Opening a project needs only a little more than the
   model itself. A mesh without levels (an import, a remesh) takes about 60 bytes per triangle for the mesh. Project
   files over 4 GB are saved in the ZIP64 format.
 - **How far Divide goes** depends on the memory: about 160 million triangles on a computer with 32 GB.
-- **The graphics card.** A mesh needs about 15 bytes per triangle on the graphics card (polypaint and a mask add
+- **The graphics card.** A mesh needs about 15 bytes per triangle on the graphics card (vertex paint and a mask add
   about 3; the wireframe, while it is on, about 4; the lighter version Fast Navigation draws, once you move
-  the view, about 1.5). If a SubTool doesn't fit, SculptForge doesn't draw it and says so in the status bar
-  instead of failing: hide other SubTools or step down a subdivision level.
+  the view, about 1.5). If a Part doesn't fit, SculptForge doesn't draw it and says so in the status bar
+  instead of failing: hide other Parts or step down a subdivision level.
 - **Closed meshes draw faster.** Parts of a mesh that face away from you are skipped when the mesh is closed
   (no holes or hidden parts) and you look at it from outside. A mesh with holes, hidden polygons, or a view from
   inside it draws everything, which can take about twice as long on huge meshes.

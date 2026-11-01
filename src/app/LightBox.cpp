@@ -270,7 +270,7 @@ void LightBox::rootEntries(App& app, std::vector<AssetEntry>& out) {
         break;
     }
     case LibraryTab::QuickSave: {
-        // Autosave first (it is the newest by nature), then QuickSaves newest first.
+        // Autosave first (it is the newest by nature), then snapshots newest first.
         if (!app.prefDir_.empty()) {
             const std::string autosave = app.prefDir_ + "autosave.sfproj";
             std::error_code ec;
@@ -285,7 +285,7 @@ void LightBox::rootEntries(App& app, std::vector<AssetEntry>& out) {
         }
         // "QuickSave 2026-10-21 23-15-04" reads better as its time: "Oct 21  23:15:04".
         for (AssetEntry e : scan(userDir, true)) {
-            if (e.name.rfind("QuickSave ", 0) == 0 && e.mtime) {
+            if ((e.name.rfind("Snapshot ", 0) == 0 || e.name.rfind("QuickSave ", 0) == 0) && e.mtime) { // (older ones: QuickSave)
                 const std::time_t t = std::time_t(e.mtime);
                 std::tm tm{};
 #if defined(_WIN32)
@@ -469,7 +469,7 @@ void LightBox::contextMenu(App& app, const AssetEntry& e) {
     const bool mesh = e.kind == AssetKind::Mesh || e.kind == AssetKind::Project || e.kind == AssetKind::Primitive;
     if (ImGui::MenuItem(e.kind == AssetKind::Folder || e.kind == AssetKind::Up ? "Open folder" : "Open"))
         activate(app, e, false);
-    if (mesh && ImGui::MenuItem(tr("Append as SubTool"), "Shift+double-click")) activate(app, e, true);
+    if (mesh && ImGui::MenuItem(tr("Append as Part"), "Shift+double-click")) activate(app, e, true);
     if (e.kind == AssetKind::Image) {
         if (ImGui::MenuItem(tr("Generate 3D..."))) app.openPath(e.path);
         if (ImGui::MenuItem(tr("Relief from image")))
@@ -551,16 +551,16 @@ void LightBox::drawHeader(App& app, float width) {
 
     // Title (an item, so tests and help find "LightBox").
     {
-        const char* title = ICON_LC_IMAGES "  LightBox";
+        const char* title = ICON_LC_IMAGES "  Library";
         const ImVec2 ts = ImGui::CalcTextSize(title);
         const ImVec2 p = ImGui::GetCursorScreenPos();
-        ImGui::InvisibleButton("LightBox", ImVec2(ts.x, ImGui::GetFrameHeight()));
+        ImGui::InvisibleButton("Library", ImVec2(ts.x, ImGui::GetFrameHeight()));
         dl->AddText(ImVec2(p.x, p.y + (ImGui::GetFrameHeight() - ts.y) * 0.5f), ImGui::GetColorU32(ImGuiCol_Text),
                     title);
-        ui::HelpText("LightBox", ",",
+        ui::HelpText("Library", ",",
                      "Browse projects, models, brushes, alphas, materials, images and splats. Double-click to load; "
-                     "Shift+double-click a model to append it as a SubTool; drag sideways to scrub.",
-                     "LightBox");
+                     "Shift+double-click a model to append it as a Part; drag sideways to scrub.",
+                     "Library");
     }
     ImGui::SameLine(0, 14 * scale);
 
@@ -581,16 +581,16 @@ void LightBox::drawHeader(App& app, float width) {
         }
         static const char* const tips[] = {
             "Your projects (.sfproj) and recently opened projects.",
-            "Models to start from or append as SubTools: primitives and model files.",
+            "Models to start from or append as Parts: primitives and model files.",
             "Every brush: built-in, custom and .sfbrush files in your library.",
             "Brush alphas: built-in stamps and images in your Alphas folder.",
-            "Viewport materials: Studio and the MatCaps.",
+            "Viewport materials: Studio and the Lit Spheres.",
             "Reference images: generate 3D, relief, inflate, project onto the model or use as an alpha.",
             "Gaussian splat captures (.ply, .splat) to sculpt against.",
-            "QuickSaves and the autosave, newest first.",
+            "Snapshots and the autosave, newest first.",
             "Recently opened files of every kind.",
         };
-        ui::HelpText(libraryTabName(tab), nullptr, tips[i], "LightBox");
+        ui::HelpText(libraryTabName(tab), nullptr, tips[i], "Library");
         ImGui::SameLine(0, 0);
     }
     ImGui::SameLine(0, 10 * scale);
@@ -605,7 +605,7 @@ void LightBox::drawHeader(App& app, float width) {
         scrollTo_ = 0.0f;
     }
     ImGui::EndDisabled();
-    ui::HelpText("Back", nullptr, "The previous tab or folder.", "LightBox");
+    ui::HelpText("Back", nullptr, "The previous tab or folder.", "Library");
     ImGui::SameLine(0, 2);
     ImGui::BeginDisabled(forward_.empty());
     if (ImGui::Button(ICON_LC_CHEVRON_RIGHT "###Forward")) {
@@ -615,7 +615,7 @@ void LightBox::drawHeader(App& app, float width) {
         scrollTo_ = 0.0f;
     }
     ImGui::EndDisabled();
-    ui::HelpText("Forward", nullptr, "Forward again after going back.", "LightBox");
+    ui::HelpText("Forward", nullptr, "Forward again after going back.", "Library");
     ImGui::PopStyleColor();
     if (!place_.folder.empty()) {
         ImGui::SameLine(0, 8 * scale);
@@ -658,7 +658,7 @@ void LightBox::drawHeader(App& app, float width) {
     }
     ImGui::SetNextItemWidth(filterW);
     ImGui::InputTextWithHint("##lbfilter", tr(ICON_LC_SEARCH "  Filter"), filter_, sizeof filter_);
-    ui::HelpText("Filter", nullptr, "Show only the items whose names contain this text.", "LightBox");
+    ui::HelpText("Filter", nullptr, "Show only the items whose names contain this text.", "Library");
     ImGui::SameLine(0, 8 * scale);
     for (int r = 1; r <= 4; ++r) {
         const bool on = app.layout_.lightboxRows == r;
@@ -667,7 +667,7 @@ void LightBox::drawHeader(App& app, float width) {
         if (on) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(kAccent));
         if (ImGui::Button(label, ImVec2(ImGui::GetFrameHeight(), 0))) app.layout_.lightboxRows = r;
         if (on) ImGui::PopStyleColor();
-        ui::HelpText("Rows", nullptr, "How many rows of thumbnails the LightBox shows (1-4).", "LightBox");
+        ui::HelpText("Rows", nullptr, "How many rows of thumbnails the Library shows (1-4).", "Library");
         ImGui::SameLine(0, 2);
     }
     ImGui::SameLine(0, 8 * scale);
@@ -679,8 +679,8 @@ void LightBox::drawHeader(App& app, float width) {
     if (ImGui::Button(compact ? ICON_LC_FOLDER_PLUS "###Open folder"
                               : ICON_LC_FOLDER_PLUS "  Open folder...###Open folder"))
         SDL_ShowOpenFolderDialog(onFolderChosen, this, app.window_, nullptr, false);
-    ui::HelpText("Open folder", nullptr, "Add a folder of your own to the LightBox (shown at the root of every tab).",
-                 "LightBox");
+    ui::HelpText("Open folder", nullptr, "Add a folder of your own to the Library (shown at the root of every tab).",
+                 "Library");
     ImGui::SameLine(0, 8 * scale);
     if (ImGui::Button(compactFeedback ? ICON_LC_MESSAGE_SQUARE_PLUS "###Fixes & suggestions"
                               : ICON_LC_MESSAGE_SQUARE_PLUS "  Fixes & suggestions###Fixes & suggestions")) {
@@ -691,7 +691,7 @@ void LightBox::drawHeader(App& app, float width) {
     ui::HelpAction(app, "help.feedback");
     ImGui::SameLine(0, 8 * scale);
     if (ImGui::Button(ICON_LC_X "##lbclose", ImVec2(closeW, 0))) open_ = false;
-    ui::HelpText("Close LightBox", ",", "Hide the LightBox (comma toggles it).", "LightBox");
+    ui::HelpText("Close Library", ",", "Hide the Library (comma toggles it).", "Library");
 
     const float y = origin.y + kHeader * scale - 2.0f;
     dl->AddLine(ImVec2(origin.x - 8, y), ImVec2(right + 8, y), kHeaderLine, 1.0f);
@@ -704,7 +704,7 @@ void LightBox::draw(App& app, const CanvasRect& canvas) {
         if (!chosenFolder_.empty()) {
             if (std::find(extraRoots_.begin(), extraRoots_.end(), chosenFolder_) == extraRoots_.end())
                 extraRoots_.push_back(chosenFolder_);
-            app.status_ = "Added " + chosenFolder_ + " to the LightBox";
+            app.status_ = "Added " + chosenFolder_ + " to the Library";
             Place to{place_.tab, chosenFolder_};
             chosenFolder_.clear();
             open_ = true;
@@ -738,7 +738,7 @@ void LightBox::draw(App& app, const CanvasRect& canvas) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
     const bool visible =
-        ImGui::Begin("LightBox", nullptr,
+        ImGui::Begin("Library", nullptr,
                      ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
                          ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoScrollWithMouse);
     ImGui::PopStyleVar(3);
@@ -832,11 +832,11 @@ void LightBox::draw(App& app, const CanvasRect& canvas) {
         std::string details =
             e.kind == AssetKind::Folder || e.kind == AssetKind::Up ? "Double-click to open the folder."
             : e.kind == AssetKind::Mesh || e.kind == AssetKind::Primitive || e.kind == AssetKind::Project
-                ? "Double-click to open (replaces the scene); Shift+double-click appends it as a SubTool."
+                ? "Double-click to open (replaces the scene); Shift+double-click appends it as a Part."
             : e.kind == AssetKind::Image ? "Double-click for what to do with the image."
                                          : "Double-click to use it.";
         if (e.size) details += "\n" + sizeText(e.size) + ", modified " + dateText(e.mtime);
-        ui::HelpText(e.name.c_str(), nullptr, details.c_str(), e.path.empty() ? "LightBox" : e.path.c_str());
+        ui::HelpText(e.name.c_str(), nullptr, details.c_str(), e.path.empty() ? "Library" : e.path.c_str());
         if (ImGui::BeginPopupContextItem()) {
             contextMenu(app, e);
             ImGui::EndPopup();
@@ -851,7 +851,7 @@ void LightBox::draw(App& app, const CanvasRect& canvas) {
                            : place_.tab == LibraryTab::Project
                                ? "Nothing here yet. Projects you save (Ctrl+S) into the User folder show up here."
                            : place_.tab == LibraryTab::QuickSave
-                               ? "Nothing here yet. QuickSave keeps timestamped copies of your scene here."
+                               ? "Nothing here yet. Save Snapshot keeps timestamped copies of your scene here."
                            : place_.tab == LibraryTab::Recent ? "Nothing here yet. Files you open show up here."
                            : place_.tab == LibraryTab::Image
                                ? "Nothing here yet. Put reference images in the User folder."
@@ -922,19 +922,19 @@ void LightBox::drawPreferences(App& app) {
     UiLayout& layout = app.layout_;
     ImGui::Checkbox(tr("Show at startup##lightbox"), &showAtStartup);
     ui::HelpText("Show at startup", nullptr,
-                 "Open the LightBox on the Project tab when SculptForge starts (as ZBrush does).",
-                 "Preferences > LightBox");
+                 "Open the Library on the Project tab when SculptForge starts (as ZBrush does).",
+                 "Preferences > Library");
     ImGui::SetNextItemWidth(-1);
     ImGui::SliderInt("##lbrowspref", &layout.lightboxRows, 1, 4, "Rows %d");
-    ui::HelpText("Rows", nullptr, "Rows of thumbnails in the LightBox strip.", "Preferences > LightBox");
+    ui::HelpText("Rows", nullptr, "Rows of thumbnails in the Library strip.", "Preferences > Library");
     int placement = layout.lightboxBottom ? 1 : 0;
     ImGui::TextUnformatted(tr("Placement"));
     ImGui::SameLine();
     if (ImGui::RadioButton(tr("Top##lbplace"), placement == 0)) layout.lightboxBottom = false;
     ImGui::SameLine();
     if (ImGui::RadioButton(tr("Bottom##lbplace"), placement == 1)) layout.lightboxBottom = true;
-    ui::HelpText("Placement", nullptr, "Show the LightBox along the top or the bottom of the canvas.",
-                 "Preferences > LightBox");
+    ui::HelpText("Placement", nullptr, "Show the Library along the top or the bottom of the canvas.",
+                 "Preferences > Library");
     ImGui::TextDisabled("%s", tr("Library folder"));
     ImGui::TextWrapped("%s", app.library_.user.empty() ? "(none)" : app.library_.user.c_str());
     if (!app.library_.user.empty() && ImGui::Button(ICON_LC_FOLDER_OPEN "  Show library folder"))
@@ -963,7 +963,7 @@ void App::initLightBox() {
     if (!library_.user.empty()) {
         std::string err;
         if (!ensureUserLibrary(library_.user, err)) {
-            SDL_Log("LightBox library: %s", err.c_str());
+            SDL_Log("Library library: %s", err.c_str());
             library_.user.clear();
         }
     }
@@ -974,7 +974,7 @@ void App::initLightBox() {
 
     // Cube is a LightBox primitive like Sphere and Plane (new_sphere / new_plane live in the core).
     commands_.add({"new_cube",
-                   "Replace the scene with a new cube ready for sculpting (one polygroup per side).",
+                   "Replace the scene with a new cube ready for sculpting (one face group per side).",
                    {{"resolution", ParamSpec::Type::Number, "Cells along each edge (1-256). Default 48.", false}},
                    [](Document& doc, const Args& a) -> CommandResult {
                        const int res = std::clamp(int(argNumber(a, "resolution", 48)), 1, 256);
@@ -1014,17 +1014,17 @@ void App::initLightBox() {
         actions_.add(std::move(a));
     };
     add(
-        "ui.lightbox", "LightBox", ICON_LC_IMAGES, "LightBox", ",",
-        "Show or hide the LightBox: thumbnails of your projects, models, brushes, alphas, materials, images, splats "
+        "ui.lightbox", "Library", ICON_LC_IMAGES, "Library", ",",
+        "Show or hide the Library: thumbnails of your projects, models, brushes, alphas, materials, images, splats "
         "and "
-        "QuickSaves along the top of the canvas. Double-click to load.",
+        "Snapshots along the top of the canvas. Double-click to load.",
         [this] { lightbox_.toggle(); }, [this] { return lightbox_.open(); });
     add("ui.picker.brush", "Brush picker", ICON_LC_BRUSH, "Brush", "B",
         "Pop up every brush under the cursor. Type the first letter of a brush, then the orange letter on its tile "
         "(B S T = Standard).",
         [] { openPicker(Picker::Brush, ImVec2(-1, -1)); });
     add("ui.picker.stroke", "Stroke picker", ICON_LC_SPLINE, "Stroke", "",
-        "Pop up the stroke types: Dots, DragRect, DragDot, Spray and LazyMouse.",
+        "Pop up the stroke types: Dots, Drag Stamp, Slide Stamp, Spray and Lazy Stroke.",
         [] { openPicker(Picker::Stroke, ImVec2(-1, -1)); });
     add("ui.picker.alpha", "Alpha picker", ICON_LC_CIRCLE_DASHED, "Alpha", "",
         "Pop up the brush alphas: built-in stamps and images from your library.",
@@ -1036,9 +1036,9 @@ void App::initLightBox() {
         "A Draw Size slider under the cursor: drag it, or type a number and press Enter.",
         [this] { PickerUi::sizePopup(*this, PickerUi::Slider::DrawSize); });
     // U / I / O (Z Intensity, RGB Intensity, Focal Shift) are in Input.cpp.
-    add("file.quicksave", "QuickSave", ICON_LC_SAVE, "File", "",
-        "Save a timestamped copy of the whole scene to the QuickSave folder of your library (the last 10 are kept). "
-        "Your project file is not changed. Find them in the LightBox QuickSave tab.",
+    add("file.quicksave", "Save Snapshot", ICON_LC_SAVE, "File", "",
+        "Save a timestamped snapshot of the whole scene to your library (the last 10 are kept). "
+        "Your project file is not changed. Find them in the Library's Snapshots tab.",
         [this] { quickSave(); });
 
     // ZBrush opens the LightBox at startup on the Project tab (never in tests, renders or recordings).
@@ -1075,7 +1075,7 @@ bool App::lightBoxKey(SDL_Keycode key, SDL_Keymod mod) {
 
 void App::quickSave() {
     if (library_.user.empty()) {
-        status_ = "QuickSave needs a library folder (Preferences > LightBox)";
+        status_ = "Snapshot needs a library folder (Preferences > Library)";
         return;
     }
     const std::string folder = library_.user + "/QuickSave";
@@ -1088,13 +1088,13 @@ void App::quickSave() {
     std::string err;
     // A copy: the document keeps its own path and unsaved state, as with ZBrush's QuickSave.
     if (!saveProject(path, doc_, err)) {
-        status_ = "QuickSave failed: " + err;
+        status_ = "Snapshot failed: " + err;
         lastCommandOk_ = false;
         return;
     }
     pruneQuickSaves(folder);
     libraryScanner_.invalidate();
-    status_ = "QuickSaved " + utf8(fsPath(path).filename());
+    status_ = "Saved " + utf8(fsPath(path).filename());
     lastCommandOk_ = true;
 }
 

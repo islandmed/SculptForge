@@ -59,9 +59,10 @@ TEST(i18n_spanish_lookup_and_fallback) {
     CHECK(std::string(tr("Unknown##some.id")) == "Unknown##some.id");
     CHECK(std::string(tr("")) == "");
     // Brand and tool names stay as they are.
-    CHECK(std::string(tr("SubTool")) == "SubTool");
-    CHECK(std::string(tr("QRemesh")) == "QRemesh");
-    CHECK(std::string(tr("LightBox")) == "LightBox");
+    CHECK(std::string(tr("Forge Spheres")) == "Forge Spheres");
+    CHECK(std::string(tr("Quad Remesh")) == "Quad Remesh");
+    CHECK(std::string(tr("Library")) == "Biblioteca");
+    CHECK(std::string(tr("Part")) == "Pieza");
     // Brush names are never translated, even where the word has an entry ("Move" the tool is "Mover").
     const std::string move = "Move";
     CHECK(std::string(trAction("brush.move", move)) == "Move");
@@ -75,7 +76,7 @@ TEST(i18n_keeps_ids_icons_and_tails) {
     // Everything from "##" on is kept exactly, so the ImGui id of the item stays the same.
     CHECK(std::string(tr("Decimate##decimate")) == "Diezmar##decimate");
     CHECK(std::string(tr("Keep Masked##remesh")) == "Conservar máscara##remesh");
-    CHECK(std::string(tr("Show Polygroups##render")) == "Mostrar poligrupos##render");
+    CHECK(std::string(tr("Show Face Groups##render")) == "Mostrar grupos de caras##render");
     CHECK(std::string(tr("Display###window.display")) == "Visualización###window.display");
     CHECK(std::string(tr("##only.an.id")) == "##only.an.id");
     // An icon in front is kept, the words after it translated.

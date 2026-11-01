@@ -90,7 +90,7 @@ std::string fileStem(const std::string& path) {
 
 // " (3 SubTools)" for a multi-object export, else nothing.
 std::string objectCountText(const std::vector<MeshObjectRef>& objects) {
-    return objects.size() > 1 ? " (" + std::to_string(objects.size()) + " SubTools)" : std::string();
+    return objects.size() > 1 ? " (" + std::to_string(objects.size()) + " Parts)" : std::string();
 }
 
 std::string jsonEscape(const std::string& s) {
@@ -155,14 +155,14 @@ CommandRegistry::CommandRegistry() {
              const size_t count = objects.size();
              setSceneObjects(doc, std::move(objects), fileStem(path));
              doc.path = path;
-             return {true, "Loaded " + path + (count > 1 ? " (" + std::to_string(count) + " SubTools)" : "")};
+             return {true, "Loaded " + path + (count > 1 ? " (" + std::to_string(count) + " Parts)" : "")};
          }});
 
     add({"open",
          "Open a file: models (.obj, .fbx, .glb, .gltf, .ply, .stl, .usda, .usdz, ZBrush .GoZ) replace the scene; Gaussian splats "
          "(.ply/.splat captures, KHR_gaussian_splatting .glb, USD ParticleField) load as a reference next to the sculpt. "
          "glTF morph targets and FBX/USD blend shapes become sculpt layers. Files with several objects (OBJ `o`, "
-         "glTF nodes, FBX models, USD meshes) open as one SubTool each. SculptForge projects (.sfproj) "
+         "glTF nodes, FBX models, USD meshes) open as one Part each. SculptForge projects (.sfproj) "
          "restore the whole scene.",
          {{"path", T::String, "File path (UTF-8).", true}},
          [](Document& doc, const Args& a) -> CommandResult {
@@ -183,7 +183,7 @@ CommandRegistry::CommandRegistry() {
              else if (ext == ".goz") ok = loadGoz(path, m, err, &goz);
              else if (ext == ".stl") ok = loadStl(path, m, err);
              else if (ext == ".ztl" || ext == ".sculptforge") {
-                 // A ZTool converted in ZBrush by the SculptForge ZTool Export plug-in (GoZ files beside it).
+                 // A ZTool converted in ZBrush by the SculptForge ZTL Export plug-in (GoZ files beside it).
                  if (convertedZToolFiles(path).empty()) return {false, zbrushProprietaryMessage(".ztl")};
                  ok = loadConvertedZTool(path, objects, err, &ztoolNote);
              } else if (ext == ".zpr" || ext == ".zbr") return {false, zbrushProprietaryMessage(ext)};
@@ -207,7 +207,7 @@ CommandRegistry::CommandRegistry() {
                  setSceneObjects(doc, std::move(objects), ext == ".goz" && !goz.name.empty() ? goz.name : fileStem(path));
                  doc.path = ext == ".obj" ? path : std::string(); // other formats are exported explicitly
                  if (ext == ".goz") doc.gozName = goz.name;
-                 msg += " (" + (count > 1 ? std::to_string(count) + " SubTools, " : std::string()) + std::to_string(tris) +
+                 msg += " (" + (count > 1 ? std::to_string(count) + " Parts, " : std::string()) + std::to_string(tris) +
                         " triangles" + (quads == 0 ? "" : ", " + std::to_string(quads) + " quads") + (layers == 0 ? "" : ", " + std::to_string(layers) + " layers") + ")";
                  if (!ztoolNote.empty()) msg += "; " + ztoolNote;
              }
@@ -222,7 +222,7 @@ CommandRegistry::CommandRegistry() {
          }});
 
     add({"remesh",
-         "Voxel remesh (like DynaMesh): rebuild the sculpt as an even, watertight surface, merging overlapping "
+         "Voxel remesh (like Voxel Remesh): rebuild the sculpt as an even, watertight surface, merging overlapping "
          "parts and fixing broken scans or generated models. Sculpt layers are baked in. A painted texture is "
          "kept (new Auto UVs, colour projected from the old surface) unless keep_texture=false.",
          {{"resolution", T::Number, "Voxels across the longest side (32-512). Default 200; higher keeps more detail.", false},
@@ -320,9 +320,9 @@ CommandRegistry::CommandRegistry() {
          }});
 
     add({"save_obj",
-         "Export the visible SubTools as a Wavefront OBJ file (one `o` object each, polygroups as `g` groups). OBJ "
+         "Export the visible Parts as a Wavefront OBJ file (one `o` object each, face groups as `g` groups). OBJ "
          "cannot hold the mask, visibility, sculpt layers or splats, so this is an export: the document keeps its "
-         "path and unsaved-changes state. UVs are kept; a textured SubTool also writes <name>.mtl and its PNG beside "
+         "path and unsaved-changes state. UVs are kept; a textured Part also writes <name>.mtl and its PNG beside "
          "the file.",
          {{"path", T::String, "File path (UTF-8). Defaults to the current document path unless that is a project.", false}},
          [](Document& doc, const Args& a) -> CommandResult {
@@ -415,8 +415,8 @@ CommandRegistry::CommandRegistry() {
          }});
 
     add({"export_glb",
-         "Export a game-ready binary glTF (.glb), one node and mesh per visible SubTool. Sculpt layers become "
-         "morph targets (blend shapes). UVs are kept and SubTool textures are embedded. A baked face take "
+         "Export a game-ready binary glTF (.glb), one node and mesh per visible Part. Sculpt layers become "
+         "morph targets (blend shapes). UVs are kept and Part textures are embedded. A baked face take "
          "(face_take_bake) becomes an animation of the morph target weights.",
          {{"path", T::String, "Output .glb path (UTF-8).", true}},
          [](Document& doc, const Args& a) -> CommandResult {
@@ -432,9 +432,9 @@ CommandRegistry::CommandRegistry() {
 
     add({"export_usd",
          "Export OpenUSD (.usda text, or .usdz package for AR Quick Look / Vision Pro), one Mesh prim per visible "
-         "SubTool. Sculpt layers become "
+         "Part. Sculpt layers become "
          "UsdSkel blend shapes with their current weights; loaded Gaussian splats are included as a "
-         "ParticleField3DGaussianSplat prim. UVs are kept; a SubTool's texture becomes a UsdPreviewSurface texture "
+         "ParticleField3DGaussianSplat prim. UVs are kept; a Part's texture becomes a UsdPreviewSurface texture "
          "(packed into .usdz, else a PNG beside the file). A baked face take (face_take_bake) becomes time samples "
          "of the blend shape weights.",
          {{"path", T::String, "Output .usda, .usd or .usdz path (UTF-8).", true},
@@ -453,8 +453,8 @@ CommandRegistry::CommandRegistry() {
          }});
 
     add({"export_fbx",
-         "Export binary FBX, one model per visible SubTool: sculpt layers become blend shapes; with lods > 1 each "
-         "SubTool's LOD chain is written as an FBX LOD group in the same file. UVs are kept; a SubTool's texture is "
+         "Export binary FBX, one model per visible Part: sculpt layers become blend shapes; with lods > 1 each "
+         "Part's LOD chain is written as an FBX LOD group in the same file. UVs are kept; a Part's texture is "
          "written as a PNG beside the file and used by its material.",
          {{"path", T::String, "Output .fbx path (UTF-8).", true},
           {"lods", T::Number, "LOD levels including LOD0 (1-8). Default 1.", false},
@@ -486,7 +486,7 @@ CommandRegistry::CommandRegistry() {
 
     add({"export_unreal",
          "Export an Unreal Engine-ready FBX: centimetres, SM_/SK_ naming, LOD chain packed for automatic LOD "
-         "import; a sculpt with layers becomes a skeletal mesh with morph targets. Every visible SubTool is its own "
+         "import; a sculpt with layers becomes a skeletal mesh with morph targets. Every visible Part is its own "
          "model (Unreal's Combine Meshes makes them one asset).",
          {{"folder", T::String, "Output folder (UTF-8). The file is named after the asset.", true},
           {"name", T::String, "Asset name (default SM_<document> or SK_<document>).", false},
@@ -510,7 +510,7 @@ CommandRegistry::CommandRegistry() {
          }});
 
     add({"export_lods",
-         "Generate a LOD chain of every visible SubTool and export each level as <name>_LOD<n>.glb next to `path`. "
+         "Generate a LOD chain of every visible Part and export each level as <name>_LOD<n>.glb next to `path`. "
          "Blend shapes are kept on every LOD.",
          {{"path", T::String, "Base output path, e.g. /assets/rock.glb.", true},
           {"levels", T::Number, "Number of LODs including LOD0 (1-8). Default 4.", false},
@@ -619,7 +619,7 @@ CommandRegistry::CommandRegistry() {
     registerZSphereCommands(*this);      // zsphere_new, ... (ZSpheres.cpp)
 
     add({"stroke",
-         "Apply a brush along a path on the active SubTool, like dragging the cursor in the viewport (one undo "
+         "Apply a brush along a path on the active Part, like dragging the cursor in the viewport (one undo "
          "step). Each point is projected onto the surface along the view direction, so points drawn in the "
          "camera's plane give a screen-space stroke. Used for scripted detailing and brush preview renders.",
          {{"points", T::String,
@@ -674,17 +674,13 @@ CommandRegistry::CommandRegistry() {
                  for (const auto& b : doc.brushes)
                      if (!recipe && lower(b.name) == lower(name)) recipe = &b;
                  if (!recipe) {
-                     int found = -1;
-                     for (int i = 0; i < int(BrushType::Count); ++i)
-                         if (lower(brushName(BrushType(i))) == lower(name)) found = i;
-                     if (found < 0) return {false, "No such brush: " + name};
-                     type = BrushType(found);
+                     if (!brushFromName(name, type)) return {false, "No such brush: " + name}; // stored name or label
                  }
              }
              const int dabs = strokePath(doc, recipe, type, st, err);
              if (dabs < 0) return {false, err};
              if (dabs == 0) return {false, "The path never crosses the surface (check the points and view)"};
-             return {true, "Stroked " + std::to_string(dabs) + " dabs with " + (recipe ? recipe->name : brushName(type))};
+             return {true, "Stroked " + std::to_string(dabs) + " dabs with " + (recipe ? recipe->name : brushLabel(type))};
          }});
 
     add({"splat_info", "Report the loaded Gaussian splats.", {},
@@ -748,7 +744,7 @@ CommandRegistry::CommandRegistry() {
     // splat_to_mesh (Make sculptable) and face_guides: core/Sculptable.cpp.
 
     add({"mesh_to_splats",
-         "Turn the visible SubTools into Gaussian splats (flat oriented surfels with baked clay shading), replacing any "
+         "Turn the visible Parts into Gaussian splats (flat oriented surfels with baked clay shading), replacing any "
          "loaded splats - for splat viewers, web scenes and engines that render 3DGS.",
          {{"count", T::Number, "Number of splats (1000-5000000). Default 250000.", false},
           {"shading", T::Bool, "Bake soft lighting and cavity darkening into the colour. Default true.", false}},

@@ -26,7 +26,7 @@ remember roughness_painted base_stroke
 
 # Color > Material shows a row per channel with swatches.
 click "Color##palette.color"
-expect "Polypaint & Materials/Roughness"
+expect "Vertex Paint & Materials/Roughness"
 wait 0.3
 shot brush-material
 

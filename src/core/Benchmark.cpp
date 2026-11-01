@@ -100,7 +100,7 @@ MemoryUse documentMemory(const Document& doc) {
 void registerPerformanceCommands(CommandRegistry& registry) {
     registry.add({"perf_info",
                   "Performance information: the threads brushes use, and the memory the scene holds (meshes, BVHs, "
-                  "subdivision levels, undo history, GPU buffers), per SubTool and in total.",
+                  "subdivision levels, undo history, GPU buffers), per Part and in total.",
                   {},
                   [](Document& doc, const Args&) -> CommandResult {
                       auto mb = [](size_t b) { return fmt("%.1f MB", double(b) / 1e6); };
@@ -339,8 +339,8 @@ std::string runDyntopoBenchmark(const BenchOptions& o, const BenchGpu* gpu) {
     const std::vector<Row> rows = {
         {{"Standard, Detail 50%", Kind::Brush, BrushType::Standard}, 0.5f},
         {{"Standard, Detail 100%", Kind::Brush, BrushType::Standard}, 1.0f},
-        {{"Snake Hook, Detail 50%", Kind::Brush, BrushType::SnakeHook}, 0.5f},
-        {{"Clay Buildup, Detail 75%", Kind::Brush, BrushType::ClayBuildup}, 0.75f},
+        {{"Tendril, Detail 50%", Kind::Brush, BrushType::SnakeHook}, 0.5f},
+        {{"Clay Block, Detail 75%", Kind::Brush, BrushType::ClayBuildup}, 0.75f},
         {{"Smooth (simplifies), Detail 50%", Kind::Brush, BrushType::Smooth}, 0.5f},
         {{"Standard (large, r 0.4), Detail 50%", Kind::Brush, BrushType::Standard, 0.4f}, 0.5f},
     };
@@ -405,7 +405,7 @@ std::string runMicroBenchmark(const BenchOptions& o, const BenchGpu* gpu) {
         {"Standard (large, r 0.4)", Kind::Brush, BrushType::Standard, 0.4f},
         {"Standard (300 px, r 0.56)", Kind::Brush, BrushType::Standard, 0.56f},
         {"Clay", Kind::Brush, BrushType::Clay},
-        {"ClayBuildup", Kind::Brush, BrushType::ClayBuildup},
+        {"Clay Block", Kind::Brush, BrushType::ClayBuildup},
         {"Smooth", Kind::Brush, BrushType::Smooth},
         {"Smooth (large, r 0.4)", Kind::Brush, BrushType::Smooth, 0.4f},
         {"Inflate", Kind::Brush, BrushType::Inflate},
@@ -631,11 +631,11 @@ std::string runBenchmark(const BenchOptions& o, const BenchGpu* gpu) {
         {"Standard", Kind::Brush, BrushType::Standard},
         {"Standard (large, r 0.4)", Kind::Brush, BrushType::Standard, 0.4f},
         {"Clay", Kind::Brush, BrushType::Clay},
-        {"ClayBuildup", Kind::Brush, BrushType::ClayBuildup},
+        {"Clay Block", Kind::Brush, BrushType::ClayBuildup},
         {"Smooth", Kind::Brush, BrushType::Smooth},
         {"Smooth (large, r 0.4)", Kind::Brush, BrushType::Smooth, 0.4f},
         {"Inflate", Kind::Brush, BrushType::Inflate},
-        {"DamStandard", Kind::Brush, BrushType::DamStandard},
+        {"Sharp Crease", Kind::Brush, BrushType::DamStandard},
         {"Layer", Kind::Brush, BrushType::Layer},
         {"Move", Kind::Move, BrushType::Move},
         {"Move (large, r 0.4)", Kind::Move, BrushType::Move, 0.4f},

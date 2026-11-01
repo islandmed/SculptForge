@@ -11,7 +11,7 @@ void registerBlenderCommands(CommandRegistry& reg) {
     using T = ParamSpec::Type;
 
     reg.add({"blender_send",
-             "Send the visible SubTools to Blender through the SculptForge add-on's exchange folder. Objects that "
+             "Send the visible Parts to Blender through the SculptForge add-on's exchange folder. Objects that "
              "came from Blender update in place there (keeping their transform, materials and modifiers); the "
              "others become new objects.",
              {{"folder", T::String, "Exchange folder. Default: the per-user one the add-on uses.", false}},
@@ -28,8 +28,8 @@ void registerBlenderCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"blender_receive",
-             "Load what Blender last sent with the SculptForge add-on. Each object updates the SubTool it was sent "
-             "from (an undoable step on that SubTool) or becomes a new SubTool, placed as it is in Blender's scene; "
+             "Load what Blender last sent with the SculptForge add-on. Each object updates the Part it was sent "
+             "from (an undoable step on that Part) or becomes a new Part, placed as it is in Blender's scene; "
              "the first object replaces a fresh scene.",
              {{"folder", T::String, "Exchange folder. Default: the per-user one the add-on uses.", false}},
              [](Document& doc, const Args& a) -> CommandResult {

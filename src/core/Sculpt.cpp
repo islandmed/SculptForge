@@ -7,6 +7,7 @@
 #include "core/ThreadPool.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <unordered_map>
 
@@ -36,6 +37,33 @@ const char* brushName(BrushType type) {
     case BrushType::DetailClone: return "DetailClone";
     default: return "?";
     }
+}
+
+const char* brushLabel(BrushType type) {
+    switch (type) {
+    case BrushType::DamStandard: return "Sharp Crease";
+    case BrushType::ClayBuildup: return "Clay Block";
+    case BrushType::SnakeHook: return "Tendril";
+    case BrushType::KelvinSnake: return "Elastic Tendril";
+    default: return brushName(type);
+    }
+}
+
+bool brushFromName(std::string_view name, BrushType& out) {
+    auto squash = [](std::string_view s) {
+        std::string r;
+        for (unsigned char c : s)
+            if (c != ' ' && c != '_' && c != '-') r += char(std::tolower(c));
+        return r;
+    };
+    const std::string want = squash(name);
+    if (want.empty()) return false;
+    for (int i = 0; i < int(BrushType::Count); ++i)
+        if (squash(brushName(BrushType(i))) == want || squash(brushLabel(BrushType(i))) == want) {
+            out = BrushType(i);
+            return true;
+        }
+    return false;
 }
 
 float brushFalloff(float dist, float radius, float focal) {

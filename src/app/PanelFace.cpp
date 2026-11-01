@@ -80,12 +80,12 @@ void App::registerFaceUiActions() {
     };
     add("face.generate", "Generate Facial Shapes", ICON_LC_SMILE, [this] { generateFaceShapesUi(); },
         [this] { return doc_.mesh.triangleCount() > 0; },
-        "Give the active SubTool (a humanoid head, looking down +Z in the front view) the 52 Apple ARKit blend shapes "
+        "Give the active Part (a humanoid head, looking down +Z in the front view) the 52 Apple ARKit blend shapes "
         "as sculpt layers: eyeBlinkLeft, jawOpen, mouthSmileRight and the rest, fitted to this head's proportions. "
         "Then fix any of them by sculpting into its layer (Tool > Layers), test them with the presets below, export "
         "them as morph targets (GLB, USD, FBX, Blender) or drive them live from your phone. The landmarks you placed "
-        "(at least 3) guide the fit; otherwise it finds the face by itself. Eyes, teeth and tongue SubTools (by name) "
-        "and SubTools on the face get the shapes they need. Running it again replaces the 52 layers (undo brings back "
+        "(at least 3) guide the fit; otherwise it finds the face by itself. Eyes, teeth and tongue Parts (by name) "
+        "and Parts on the face get the shapes they need. Running it again replaces the 52 layers (undo brings back "
         "the old ones and the fixes sculpted into them).",
         "face_shapes_generate");
     add("face.landmarks", "Place Landmarks", ICON_LC_CROSSHAIR,
@@ -294,10 +294,10 @@ void App::drawFaceContents() {
                  "Auto: Left and Right shapes are made exact mirror images when the sculpt is symmetric about X = 0. "
                  "On: always (asymmetric spots take the average). Off: each side as fitted.",
                  kFacePath);
-    ImGui::Checkbox("SubTools too##face", &faceSubtools_);
-    ui::HelpText("SubTools too", nullptr,
-                 "Eyes (SubTools named Eye...) turn for the eyeLook shapes, Teeth / Tongue follow the jaw below the "
-                 "bite (and tongueOut), and other SubTools on the face (brows, lashes, a beard) follow the skin.",
+    ImGui::Checkbox("Parts too##face", &faceSubtools_);
+    ui::HelpText("Parts too", nullptr,
+                 "Eyes (Parts named Eye...) turn for the eyeLook shapes, Teeth / Tongue follow the jaw below the "
+                 "bite (and tongueOut), and other Parts on the face (brows, lashes, a beard) follow the skin.",
                  kFacePath);
 
     // Landmarks.
@@ -348,7 +348,7 @@ void App::drawFaceContents() {
                 applyFaceWeights(doc_, {{l.name, w}});
             }
             ui::HelpText(l.name.c_str(), nullptr,
-                         "This ARKit shape's weight (it drives the same-named layer on every SubTool). To fix the shape, "
+                         "This ARKit shape's weight (it drives the same-named layer on every Part). To fix the shape, "
                          "select its layer in Tool > Layers, set the weight to 1 and sculpt.",
                          kFacePath);
         }

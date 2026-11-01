@@ -22,10 +22,10 @@ expect "Herramienta##palette.tool"
 expect "Dibujar##tool.draw"
 expect "Mover##tool.move"
 expect_text "Tamaño de dibujo"
-expect_text "Intensidad Z"
-expect "ClayBuildup##brush.claybuildup"
+expect_text "Intensidad"
+expect "Clay Block##brush.claybuildup"
 expect "Move##brush.move"
-expect "SubTool##tool.subtool"
+expect "Piezas##tool.subtool"
 
 # Tool > Geometry: the translated Divide divides.
 click "Geometría##tool.geometry"

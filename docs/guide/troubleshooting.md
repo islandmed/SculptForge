@@ -44,7 +44,7 @@ documentation** opens links to it).
   **Tool > Geometry > Decimate** or a lower **Voxel Remesh** resolution brings it down. See
   [Subdivide, Remesh, Decimate and LODs](geometry.md).
 - Turn off **Wireframe** (<kbd>Shift</kbd>+<kbd>F</kbd>) on dense meshes.
-- Hide SubTools you aren't working on, or **Solo** the active one.
+- Hide Parts you aren't working on, or **Solo** the active one.
 - A large Gaussian splat capture costs GPU time too: lower the count with **Clean floaters**, or untick
   **Show** in the **Splats** palette while you sculpt.
 - On laptops with two GPUs, make sure SculptForge runs on the dedicated one (in the GPU maker's control panel
@@ -52,8 +52,8 @@ documentation** opens links to it).
 - **Preferences > Performance**: lower **Antialiasing** (or turn it off), keep **Fast Navigation** on, and look
   at **Last stroke** to see whether brushes or the graphics card take the time. Step down a
   [subdivision level](subdivision-levels.md) for big changes. See [Performance and big meshes](performance.md).
-- A SubTool missing from the view with "Not enough GPU memory" in the status bar didn't fit on the graphics
-  card: hide other SubTools or step down a level.
+- A Part missing from the view with "Not enough GPU memory" in the status bar didn't fit on the graphics
+  card: hide other Parts or step down a level.
 
 ## Pen tablets
 
@@ -187,10 +187,10 @@ SculptForge keeps its settings in one folder per user:
 | `recent_actions.txt` | Recently used entries of the command palette |
 | `brushes/` | Your brush library, one `.sfbrush` file per brush |
 | `brush-gallery-cache/`, `brush-gallery.json` | Community brush gallery cache and its address |
-| `thumbs/` | Cached LightBox and picker thumbnails (safe to delete) |
+| `thumbs/` | Cached Library and picker thumbnails (safe to delete) |
 
-Your **library folder** (projects, tools, alphas, images, splats and QuickSaves shown in the LightBox) is
-separate: `Documents/SculptForge` by default, changeable in **Preferences > LightBox > Library folder**.
+Your **library folder** (projects, tools, alphas, images, splats and QuickSaves shown in the Library) is
+separate: `Documents/SculptForge` by default, changeable in **Preferences > Library > Library folder**.
 
 > **Tip:** To move settings to another computer, copy `ui.json`, `ai.json` and the `brushes` folder. For a
 > shared layout, use **Preferences > Config > Save UI...** and **Load UI...** instead.
@@ -217,20 +217,20 @@ no models and no keys, only command names and messages, which may include file n
 SculptForge autosaves unsaved work every 5 minutes by default (**Preferences > Autosave**, 0 turns it off).
 After a crash, the next start asks "SculptForge did not close normally last time. Restore the autosaved
 work?". **Restore** opens it as unsaved work (save it under a name); **Discard** deletes it. See
-[Projects, autosave and QuickSave](projects.md). The dialog also points to the crashed session's
+[Projects, autosave and snapshots](projects.md). The dialog also points to the crashed session's
 [log file](#the-log-file).
 
 ## Frequently asked questions
 
 **Can SculptForge open ZBrush files (.ZTL, .ZPR)?**
 Not directly: they are proprietary and undocumented. Convert ZTools once in ZBrush with the free
-**SculptForge ZTool Export** plug-in, then open the `.ZTL` in SculptForge (see
-[Coming from ZBrush](coming-from-zbrush.md#bring-your-ztools-over)). Or use GoZ, or export OBJ or FBX from ZBrush
-(see [Exporting, Send to Unreal and GoZ](exporting.md#exchange-models-with-zbrush-goz)). `.ZPR` projects can't be
+**SculptForge ZTL Export** plug-in, then open the `.ZTL` in SculptForge (see
+[Coming from ZBrush](coming-from-zbrush.md#bring-your-ztools-over)). Or use the ZBrush Bridge, or export OBJ or FBX from ZBrush
+(see [Exporting, Send to Unreal and ZBrush](exporting.md#exchange-models-with-zbrush-zbrush-bridge)). `.ZPR` projects can't be
 converted; open their ZTools instead.
 
 **Does it have subdivision levels, DynaMesh, ZRemesher or UVs?**
-Voxel remesh works like DynaMesh, **QRemesh** like ZRemesher (with **ProjectAll** to bring the detail back; see
+Voxel remesh works like DynaMesh, **Quad Remesh** like ZRemesher (with **Project All** to bring the detail back; see
 [Quad retopology](retopology.md)), **Auto UV** unwraps any model, and Divide adds subdivision levels you can
 step up and down (see [Subdivision levels](subdivision-levels.md)). **Dynamic** on the top shelf is dynamic
 topology, like Sculptris Pro (see [Dynamic topology](dynamic-topology.md)).

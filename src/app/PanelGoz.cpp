@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// File > ZBrush (GoZ): send/receive through the GoZ bridge, GoZ and STL files.
+// File > ZBrush Bridge: send/receive through the GoZ-compatible bridge, GoZ and STL files.
 #include "app/App.h"
 
 #include "io/GozIO.h"
@@ -12,7 +12,7 @@ namespace sf {
 
 namespace {
 
-const SDL_DialogFileFilter kGozFilters[] = {{"ZBrush GoZ", "GoZ;goz"}, {"All files", "*"}};
+const SDL_DialogFileFilter kGozFilters[] = {{"GoZ-compatible files", "GoZ;goz"}, {"All files", "*"}};
 
 long long fileTime(const std::string& path) {
     if (path.empty()) return 0;
@@ -48,7 +48,7 @@ void App::runGozCommand(const std::string& name, const Args& args) {
 
 void App::drawGozMenu() {
     if (!gozInitialised_) pollGoz(); // sets up the dialogs
-    if (!ImGui::BeginMenu("ZBrush (GoZ)")) return;
+    if (!ImGui::BeginMenu("ZBrush Bridge")) return;
     const std::string root = gozFolder_[0] ? std::string(gozFolder_) : gozDefaultRoot();
     const bool bridge = !root.empty();
     if (ImGui::MenuItem("Send to ZBrush")) {
@@ -60,14 +60,14 @@ void App::drawGozMenu() {
     if (!bridge && ImGui::IsItemHovered()) ImGui::SetTooltip("%s", gozUnavailableMessage().c_str());
     if (ImGui::MenuItem("Receive automatically", nullptr, &gozAutoReceive_, bridge) && gozAutoReceive_)
         gozListTime_ = fileTime(gozObjectListPath(root));
-    if (bridge) ImGui::TextDisabled("GoZ folder: %s", root.c_str());
-    else ImGui::TextDisabled("ZBrush runs on Windows and macOS only;\nGoZ files still import and export.");
+    if (bridge) ImGui::TextDisabled("Bridge folder: %s", root.c_str());
+    else ImGui::TextDisabled("ZBrush runs on Windows and macOS only;\nGoZ-compatible files still import and export.");
     ImGui::SetNextItemWidth(260.0f * uiScale_);
-    ImGui::InputTextWithHint("##gozfolder", "Custom GoZ folder (optional)", gozFolder_, sizeof(gozFolder_));
+    ImGui::InputTextWithHint("##gozfolder", "Custom bridge folder (optional)", gozFolder_, sizeof(gozFolder_));
     ImGui::Separator();
-    if (ImGui::MenuItem("Import GoZ..."))
+    if (ImGui::MenuItem("Import GoZ-compatible file..."))
         SDL_ShowOpenFileDialog(onGozFileChosen, &gozDialogs_[int(GozFile::Import)], window_, kGozFilters, 2, nullptr, false);
-    if (ImGui::MenuItem("Export GoZ..."))
+    if (ImGui::MenuItem("Export GoZ-compatible file..."))
         SDL_ShowSaveFileDialog(onGozFileChosen, &gozDialogs_[int(GozFile::Export)], window_, kGozFilters, 2, nullptr);
     ImGui::EndMenu();
 }

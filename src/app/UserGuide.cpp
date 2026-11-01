@@ -19,6 +19,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <utility>
 
 namespace sf {
 
@@ -401,6 +402,13 @@ void UserGuide::navigate(const std::string& target, bool record) {
     }
     std::string file = t.file;
     if (const size_t slash = file.rfind('/'); slash != std::string::npos) file = file.substr(slash + 1);
+    // Chapters renamed to SculptForge's own names: old links still find them.
+    static const std::pair<const char*, const char*> kRenamed[] = {{"subtools.md", "parts.md"},
+                                                                   {"zspheres.md", "forge-spheres.md"},
+                                                                   {"polypaint.md", "vertex-paint.md"},
+                                                                   {"polygroups.md", "face-groups.md"}};
+    for (const auto& [from, to] : kRenamed)
+        if (file == from) file = to;
     if (file == "index.md") {
         go({-1, 0.0f}, t.anchor, record);
         return;
@@ -419,26 +427,30 @@ std::string UserGuide::websiteUrl() const {
 std::string UserGuide::chapterFor(const std::string& palette, const std::string& actionId) {
     auto starts = [&](const char* p) { return palette.rfind(p, 0) == 0; };
     auto idStarts = [&](const char* p) { return actionId.rfind(p, 0) == 0; };
-    if (starts("Tool > Geometry > QRemesh") || starts("Tool > SubTool > Project")) return "retopology.md";
-    if (starts("Tool > SubTool")) return "subtools.md";
+    // Palette paths by SculptForge's names, and the older ZBrush-style ones (stored layouts, scripts).
+    if (starts("Tool > Geometry > Quad Remesh") || starts("Tool > Geometry > QRemesh") || starts("Tool > Parts > Project") ||
+        starts("Tool > SubTool > Project"))
+        return "retopology.md";
+    if (starts("Tool > Parts") || starts("Tool > SubTool")) return "parts.md";
+    if (starts("Tool > Forge Spheres") || starts("Tool > ZSpheres")) return "forge-spheres.md";
     if (starts("Tool > Layers")) return "layers.md";
     if (starts("Tool > Facial Shapes")) return "facial-shapes.md";
     if (starts("Tool > Geometry") || starts("Tool > Remesh")) return "geometry.md";
     if (starts("Tool > Masking")) return "masking.md";
-    if (starts("Tool > Polygroups") || starts("Tool > Visibility")) return "polygroups.md";
+    if (starts("Tool > Face Groups") || starts("Tool > Polygroups") || starts("Tool > Visibility")) return "face-groups.md";
     if (starts("Tool > Export")) return "exporting.md";
     if (starts("Tool > Display")) return "interface.md";
-    if (starts("Tool")) return "subtools.md";
+    if (starts("Tool")) return "parts.md";
     if (starts("Brush"))
         return actionId == "ui.brush_lab" || actionId == "ui.brush_gallery" || actionId == "brush.paste" ? "brush-lab.md"
                                                                                                          : "sculpting.md";
     if (starts("Draw") || starts("Stroke") || starts("Alpha")) return "sculpting.md";
-    if (starts("Color") || starts("Material")) return "polypaint.md";
+    if (starts("Color") || starts("Material")) return "vertex-paint.md";
     if (starts("File > Blender")) return "blender.md";
     if (starts("File > Maya")) return "maya.md";
     if (starts("File > Capture from phone") || actionId == "file.capture_phone") return "phone-capture.md";
     if (starts("File > Export") || idStarts("file.export") || actionId == "file.send_unreal" || actionId == "file.save_splats" ||
-        starts("File > GoZ"))
+        starts("File > ZBrush Bridge") || starts("File > GoZ"))
         return "exporting.md";
     if (starts("File")) return "projects.md";
     if (starts("Generate")) return "generate-3d.md";
@@ -450,7 +462,7 @@ std::string UserGuide::chapterFor(const std::string& palette, const std::string&
         return "gizmo.md";
     if (starts("Transform")) return idStarts("transform.symmetry") ? "sculpting.md" : "navigation.md";
     if (starts("Render") || starts("Edit") || starts("Help") || starts("Palettes") || starts("Preferences") ||
-        starts("LightBox"))
+        starts("Library") || starts("LightBox"))
         return "interface.md";
     return {};
 }

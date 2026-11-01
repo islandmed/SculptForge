@@ -58,18 +58,18 @@ expect_value triangles == $before_remesh
 # QRemesh keeps it too; with Keep Texture off the texture is dropped and the status says so.
 click "Geometry##tool.geometry"
 expect "QRemesh/Keep Texture##qremesh"
-click "QRemesh/QRemesh"
+click "QRemesh/Quad Remesh"
 wait_idle 300
 expect_status "texture kept"
 expect_value quad_percent == 100
 expect_value texture_size == 1024
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 shot qremeshed
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 key ctrl+z
 expect_value triangles == $before_remesh
 click "QRemesh/Keep Texture##qremesh"
-click "QRemesh/QRemesh"
+click "QRemesh/Quad Remesh"
 wait_idle 300
 expect_status "texture was dropped"
 expect_value texture_size == 0

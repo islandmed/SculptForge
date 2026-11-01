@@ -543,7 +543,7 @@ TEST(spray_and_spacing_are_deterministic) {
     CHECK(pts.empty());
     spacer.moveTo(glm::vec2(115, 0), 10.0f, pts);
     CHECK(pts.size() == 1 && std::abs(pts[0].x - 110.0f) < 1e-3f);
-    CHECK(std::string(strokeTypeName(StrokeType::LazyMouse)) == "LazyMouse");
+    CHECK(std::string(strokeTypeName(StrokeType::LazyMouse)) == "Lazy Stroke");
 }
 
 TEST(alpha_generated_builtins) {

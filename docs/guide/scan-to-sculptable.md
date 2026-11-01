@@ -1,9 +1,9 @@
 # From scan to sculptable mesh
 
 A Gaussian-splat capture looks great but you can't sculpt, rig or animate it. **Make sculptable** turns it into
-a clean SubTool you can: a watertight surface with the floaters and background gone, quad topology at the
+a clean Part you can: a watertight surface with the floaters and background gone, quad topology at the
 polygon budget you choose, edge loops round the eyes and mouth when the capture is a head, and the capture's
-colours as polypaint or a texture. One click, in the background, with the splats kept next to the result.
+colours as vertex paint or a texture. One click, in the background, with the splats kept next to the result.
 
 ![A test head capture, the review of its face landmarks and loops, and the finished quads with its colours](images/make-sculptable.jpg)
 
@@ -17,8 +17,8 @@ colours as polypaint or a texture. One click, in the background, with the splats
 
 A progress bar and **Cancel** show while it works. When it's done:
 
-- a new SubTool named after the capture holds the sculptable mesh, and is active;
-- a hidden **"<name> Scan"** SubTool keeps the dense voxel surface it was made from (turn off **Keep scan** if you
+- a new Part named after the capture holds the sculptable mesh, and is active;
+- a hidden **"<name> Scan"** Part keeps the dense voxel surface it was made from (turn off **Keep scan** if you
   don't want it);
 - the splats are hidden, not deleted (**Show** in the Splats palette brings them back);
 - an untouched starting sphere is hidden too.
@@ -35,10 +35,10 @@ have. `splat_test_capture kind=object` loads a mug with a thin handle instead.
 |---|---|
 | **Detail** | How finely the surface follows the capture, in voxels across the subject (96 to 512, default 256). Higher keeps thinner parts and more detail and takes longer |
 | **Game / Film / Sculpt** | The polygon budget. **Game**: about 4,000 quads, for real-time characters and props. **Film**: about 12,000 quads, for close-ups and smooth deformation. **Sculpt**: a 2,000-quad base with two subdivision levels, the scan's detail projected onto the top level, so you sculpt with levels straight away |
-| **Face loops** | When the capture is a head: find the eyes, nose, mouth and chin and give QRemesh edge loops round the eyes and mouth and along the nasolabial folds, mirrored across the face (see below) |
+| **Face loops** | When the capture is a head: find the eyes, nose, mouth and chin and give Quad Remesh edge loops round the eyes and mouth and along the nasolabial folds, mirrored across the face (see below) |
 | **Review** | Stop after the scan to check the face landmarks and the loops before remeshing |
-| **Polypaint / Texture** | Where the capture's colours go: the vertices (polypaint), or a 2K texture on automatic UVs (sharp colour on a light mesh, for games and exports) |
-| **Keep scan** | Keep the dense voxel surface as a hidden "<name> Scan" SubTool, to ProjectAll more detail from later |
+| **Vertex Paint / Texture** | Where the capture's colours go: the vertices (vertex paint), or a 2K texture on automatic UVs (sharp colour on a light mesh, for games and exports) |
+| **Keep scan** | Keep the dense voxel surface as a hidden "<name> Scan" Part, to Project All more detail from later |
 | **Crop Box** | Only the splats inside the box count (see below) |
 | **More > Min Opacity** | Splats fainter than this are ignored (haze and floaters are usually faint). Default 0.2 |
 | **More > Close Gaps** | Seal gaps up to this many voxels between splats. Default 2 |
@@ -56,14 +56,14 @@ sculptable looks for a face on the scan as seen from the current view: a depth a
 middle line where it is mirror-symmetric, the nose as the strongest bump on that line, the eyes as a matching
 pair of hollows (and darker spots) above it, the line between the lips below it, then the chin. From those
 eight landmarks (the corners of both eyes, the nose tip, the mouth corners, the chin) it draws
-[QRemesh Guides](retopology.md#qremesh-guides) for QRemesh to follow:
+[Quad Remesh Guides](retopology.md#quad-remesh-guides) for Quad Remesh to follow:
 
 - a ring round each eye, and a bigger one round the eye socket when the polygon budget is high enough for it;
 - a ring round the lips;
 - the nasolabial loop: from each side of the nose down the fold past the mouth corner and under the lower lip;
-- all of them mirrored across the face, and QRemesh's symmetry on, so both halves get the same edge flow.
+- all of them mirrored across the face, and Quad Remesh's symmetry on, so both halves get the same edge flow.
 
-The guides stay on the result SubTool, so you can **QRemesh** it again at another density (Geometry > QRemesh)
+The guides stay on the result Part, so you can **Quad Remesh** it again at another density (Geometry > Quad Remesh)
 and the loops come back. Small loops are left out at low budgets, where they couldn't come out as clean rings.
 
 If no face is found (the status bar says why), the result is remeshed without face loops. Turn the view to face
@@ -71,7 +71,7 @@ the head and run it again, or use Review and place the landmarks by hand.
 
 ### Review and nudge the landmarks
 
-With **Review** on, Make sculptable stops after the scan: the "<name> Scan" SubTool shows with the landmarks as
+With **Review** on, Make sculptable stops after the scan: the "<name> Scan" Part shows with the landmarks as
 blue dots and the guide loops as orange lines.
 
 - **Drag a dot** to move a landmark onto the right spot. Its partner on the other side follows (mirrored), and
@@ -100,20 +100,20 @@ splats are shown; click **Crop Box** again to turn it off.
 2. **Colour.** Each vertex (or texel) takes the colour of the splats around it, weighted by their opacity and
    distance. Splats behind the surface, inside the subject, are faded out: trained captures fill the inside with
    splats of any colour.
-3. **Topology.** QRemesh rebuilds the scan as quads at the budget's polygon count, along the face guides, with
-   symmetry. **Sculpt** then divides it twice and projects the scan onto the top level (as ProjectAll does).
+3. **Topology.** Quad Remesh rebuilds the scan as quads at the budget's polygon count, along the face guides, with
+   symmetry. **Sculpt** then divides it twice and projects the scan onto the top level (as Project All does).
 
 ## Speed
 
 Measured on an M1 Pro laptop (10 cores, 2021) with the built-in test head at **Film** density, from click to the
-finished SubTool:
+finished Part:
 
 | Splats | Detail 256 | Detail 384 | Detail 512 | Peak memory (512) |
 |---|---|---|---|---|
 | 1 million | 3.4 s (surface 1.3 s) | 5.5 s (surface 2.6 s) | 8.8 s (surface 5.1 s) | 1.0 GB |
 | 5 million | 7.2 s (surface 4.2 s) | 9.1 s (surface 5.6 s) | 13.2 s (surface 8.0 s) | 1.2 GB |
 
-The rest of the time is QRemesh and colour. Everything runs on the CPU, so a studio PC with more cores is
+The rest of the time is Quad Remesh and colour. Everything runs on the CPU, so a studio PC with more cores is
 faster; no GPU or CUDA is needed.
 
 ## How good is it?
@@ -122,7 +122,7 @@ What works well:
 
 - Watertight, manifold surfaces every time (no holes, no non-manifold edges), with floaters and stray background
   pieces dropped and open bottoms sealed.
-- Faithful colour: on test captures with known colours the transferred polypaint is within a few percent of the
+- Faithful colour: on test captures with known colours the transferred vertex paint is within a few percent of the
   original, and the wrongly coloured splats inside the subject don't bleed through.
 - Clean quads (97% or more) with symmetric rings round the eyes and mouth on faces it finds.
 - Thin parts survive down to a few voxels across (a mug handle at Detail 160 stays a handle, its hole open).
@@ -147,8 +147,8 @@ The same pipeline runs from the console, `sculptforge-cli`, MCP and Python:
 
 | Command | What it does | Key parameters |
 |---|---|---|
-| `splat_to_mesh` | Make sculptable | `detail` (32 to 768, default 256; `resolution` is the same), `preset` (game, film or sculpt), `target` (quads; 0 keeps the voxel surface), `levels`, `face_guides` (auto or off), `landmarks` (JSON, instead of finding them), `front`, `up` (the face's directions, default `"0 0 1"` and `"0 1 0"`), `color` (polypaint, texture or none), `texture_size`, `crop` (`"minx miny minz maxx maxy maxz"`), `min_opacity`, `keep`, `close`, `fill_holes`, `keep_parts`, `smooth`, `symmetry`, `keep_scan`, `stage` (all, scan or finish), `seed` |
-| `face_guides` | Finds a face on the active SubTool (or takes `landmarks`) and replaces its QRemesh Guides with the face loops; the message ends with the landmarks as JSON | `landmarks`, `front`, `up`, `target` |
+| `splat_to_mesh` | Make sculptable | `detail` (32 to 768, default 256; `resolution` is the same), `preset` (game, film or sculpt), `target` (quads; 0 keeps the voxel surface), `levels`, `face_guides` (auto or off), `landmarks` (JSON, instead of finding them), `front`, `up` (the face's directions, default `"0 0 1"` and `"0 1 0"`), `color` (vertex paint, texture or none), `texture_size`, `crop` (`"minx miny minz maxx maxy maxz"`), `min_opacity`, `keep`, `close`, `fill_holes`, `keep_parts`, `smooth`, `symmetry`, `keep_scan`, `stage` (all, scan or finish), `seed` |
+| `face_guides` | Finds a face on the active Part (or takes `landmarks`) and replaces its Quad Remesh Guides with the face loops; the message ends with the landmarks as JSON | `landmarks`, `front`, `up`, `target` |
 | `splat_test_capture` | Loads the built-in test head or mug capture | `kind` (head or object), `count`, `floaters`, `open_bottom` |
 
 ```sh
@@ -171,6 +171,6 @@ them), so you can copy it into a batch script.
 ## See also
 
 - [Gaussian splats](splats.md): loading, placing and saving captures
-- [Quad retopology and detail projection](retopology.md): QRemesh, QRemesh Guides and ProjectAll
+- [Quad retopology and detail projection](retopology.md): Quad Remesh, Quad Remesh Guides and Project All
 - [Subdivision levels](subdivision-levels.md): sculpting the **Sculpt** preset's levels
 - [Texture painting](texture-painting.md): painting on the **Texture** result

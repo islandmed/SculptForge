@@ -10,10 +10,10 @@ namespace sf {
 const char* strokeTypeName(StrokeType type) {
     switch (type) {
     case StrokeType::Dots: return "Dots";
-    case StrokeType::DragRect: return "DragRect";
-    case StrokeType::DragDot: return "DragDot";
+    case StrokeType::DragRect: return "Drag Stamp";
+    case StrokeType::DragDot: return "Slide Stamp";
     case StrokeType::Spray: return "Spray";
-    case StrokeType::LazyMouse: return "LazyMouse";
+    case StrokeType::LazyMouse: return "Lazy Stroke";
     default: return "?";
     }
 }

@@ -7,6 +7,6 @@ Exec=sculptforge %f
 Icon=org.sculptforge.SculptForge
 Terminal=false
 Categories=Graphics;3DGraphics;
-Keywords=sculpt;3d;model;zbrush;mesh;gltf;fbx;usd;unreal;
+Keywords=sculpt;3d;model;mesh;gltf;fbx;usd;unreal;
 MimeType=model/obj;model/gltf-binary;model/gltf+json;model/vnd.usdz+zip;model/vnd.usda;application/x-sculptforge-brush;
 StartupWMClass=sculptforge

@@ -7,9 +7,10 @@ explains what it is, what it can and can't do yet, and how the rest of this guid
 
 SculptForge is a focused sculpting tool with the brushes, symmetry, masking and navigation that ZBrush artists
 already know, built around a ZBrush-style interface: shelves around a canvas, alphabetical palettes that hold
-every function, a LightBox of thumbnails and pop-up pickers. It runs natively on Windows, macOS and Linux,
-starts in a moment, works offline and costs nothing. ZBrush's keys and gestures work out of the box: see
-[Coming from ZBrush](coming-from-zbrush.md). There is no account, no subscription, no licence server
+every function, a Library of thumbnails and pop-up pickers. It runs natively on Windows, macOS and Linux,
+starts in a moment, works offline and costs nothing. ZBrush's keys and gestures are one choice away: answer
+**ZBrush** when the first start asks what you are coming from, or pick **ZBrush-style** in **Preferences > Input**.
+See [Coming from ZBrush](coming-from-zbrush.md). There is no account, no subscription, no licence server
 and no telemetry.
 
 It is free software under the GNU General Public License v3.0 or later. You own everything you make with it:
@@ -25,18 +26,18 @@ of the canvas, once, and never again after you close it.
 
 ## What you can do with it
 
-- **Sculpt** with fourteen built-in brushes (Standard, Clay, Clay Buildup, Dam Standard, Move, Smooth,
-  Inflate, Pinch, Flatten, Crease, Trim, Snake Hook, Layer and Nudge), four stroke types, brush alphas, X/Y/Z
+- **Sculpt** with fourteen built-in brushes (Standard, Clay, Clay Block, Sharp Crease, Move, Smooth,
+  Inflate, Pinch, Flatten, Crease, Trim, Tendril, Layer and Nudge), four stroke types, brush alphas, X/Y/Z
   symmetry and tablet pressure. See [Sculpting and brushes](sculpting.md).
 - **Design brushes in words** with Brush Lab: describe "dry cracked mud" and an AI builds a brush recipe you
   can tweak with sliders, keep in your library and share as a file or a one-line brush code. See [Brush Lab
   and sharing brushes](brush-lab.md).
 - **Mask, group and hide** parts of the model the ZBrush way: Ctrl to paint a mask, Ctrl+Shift to isolate a
-  polygroup. See [Masking](masking.md) and [Polygroups and visibility](polygroups.md).
-- **Keep separate meshes** as SubTools (body, eyes, teeth, armour), each with its own undo history. See
-  [SubTools](subtools.md).
-- **Paint colour** on the surface (polypaint) and look at the model through seven MatCap materials. See
-  [Polypaint and materials](polypaint.md).
+  face group. See [Masking](masking.md) and [Face Groups and visibility](face-groups.md).
+- **Keep separate meshes** as Parts (body, eyes, teeth, armour), each with its own undo history. See
+  [Parts](parts.md).
+- **Paint colour** on the surface (vertex paint) and look at the model through seven Lit Sphere materials. See
+  [Vertex Paint and materials](vertex-paint.md).
 - **Sculpt layers** that double as blend shapes (morph targets), with live weights. See [Sculpt layers and
   blend shapes](layers.md).
 - **Rebuild the mesh**: Loop subdivision, voxel remesh (similar to DynaMesh), decimation and one-click LOD
@@ -46,7 +47,7 @@ of the canvas, once, and never again after you close it.
 - **Work with Gaussian splats** from phone captures: sculpt against them or turn them into meshes. See
   [Gaussian splats](splats.md).
 - **Export** to glTF/GLB, FBX, OpenUSD, OBJ, STL and PLY, send models straight into Unreal Engine, and
-  exchange them with ZBrush through GoZ. See [Exporting, Unreal and ZBrush](exporting.md).
+  exchange them with ZBrush through the ZBrush Bridge (GoZ-compatible format). See [Exporting, Unreal and ZBrush](exporting.md).
 - **Automate** everything: every action is a command you can type in the console, run headless with
   `sculptforge-cli`, script from Python or hand to an AI agent over MCP. See [Scripting and
   automation](scripting.md).
@@ -56,12 +57,12 @@ of the canvas, once, and never again after you close it.
 SculptForge is young (version 0.8; see [What's new](whats-new.md)). Some things ZBrush artists rely on are
 still on the roadmap:
 
-- QRemesh curve guides.
+- Quad Remesh curve guides.
 - UV editing (seams, relax) and UDIM tiles.
 - Booleans and stencils.
 
 Others are not on the roadmap: ZModeler, the 2.5D canvas, and reading ZBrush's own `.ZTL` and `.ZPR`
-files directly (bring models over with GoZ, the ZTool Export plug-in for ZBrush, or as OBJ, FBX or GLB).
+files directly (bring models over with the ZBrush Bridge, the ZTL Export plug-in for ZBrush, or as OBJ, FBX or GLB).
 
 > **Not yet:** where a chapter describes a ZBrush feature SculptForge doesn't have, it says so in a callout
 > like this one. The project's ROADMAP.md lists what is planned and in which order.
@@ -71,17 +72,18 @@ files directly (bring models over with GoZ, the ZTool Export plug-in for ZBrush,
 Most habits carry over. You sculpt with a left drag, hold <kbd>Alt</kbd> to subtract and <kbd>Shift</kbd> to
 smooth, drag on the background to rotate, <kbd>Alt</kbd>+drag to pan, and hold <kbd>Ctrl</kbd> to mask. The
 palettes have the names you expect (Alpha, Brush, Stroke, Tool, Transform...), the Tool palette holds the
-SubTool, Masking and Polygroups sub-palettes, <kbd>B</kbd> opens the brush pop-up with the same letter keys
-(B, S, T picks Standard), <kbd>,</kbd> opens the LightBox and <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>
+Parts (ZBrush's SubTool), Masking and Face Groups (Polygroups) sub-palettes, <kbd>B</kbd> opens the brush pop-up with the same letter keys
+(B, S, T picks Standard), <kbd>,</kbd> opens the Library and <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>
 stores your interface, and <kbd>S</kbd> <kbd>U</kbd> <kbd>I</kbd> <kbd>O</kbd>, <kbd>Space</kbd>, <kbd>Ctrl</kbd>+<kbd>W</kbd>
-and the mask keys do what your hands expect. [Coming from ZBrush](coming-from-zbrush.md) lists what is the same,
+and the mask keys do what your hands expect with the ZBrush-style keys on (**Preferences > Input**).
+[Coming from ZBrush](coming-from-zbrush.md) lists SculptForge's names for ZBrush terms, what is the same,
 what differs and every shortcut side by side; the [Glossary](glossary.md) maps ZBrush terms to SculptForge ones.
 
 ## How this guide is organised
 
 - **Getting started**: [installing](installing.md), [the interface](interface.md) and [navigating the
   view](navigation.md).
-- **Sculpting**: brushes, Brush Lab, masking, polygroups, SubTools, polypaint, layers and mesh operations.
+- **Sculpting**: brushes, Brush Lab, masking, face groups, Parts, vertex paint, layers and mesh operations.
 - **AI and capture**: generating models from images and text, and Gaussian splats.
 - **Files and pipelines**: exporting, projects, scripting and studio deployment.
 - **Reference**: [keyboard and mouse](shortcuts.md), [troubleshooting](troubleshooting.md) and the

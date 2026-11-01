@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Meshes flow between SculptForge nodes as SF_MESH: a small object holding the path of a
-# working file (a .sfproj project, so polygroups, polypaint and sculpt layers survive every
+# working file (a .sfproj project, so face groups, vertex paint and sculpt layers survive every
 # step). Every mesh input also accepts ComfyUI's core MESH type (Hunyuan3D, TRELLIS, Get 3D
 # Components...), and "SculptForge to MESH" goes the other way, so core and SculptForge
 # nodes chain freely.
@@ -44,7 +44,7 @@ class SFMesh:
 
 
 def _temp(ext, stem=None):
-    """A new working file. Give a stem when SculptForge names the SubTool after the file."""
+    """A new working file. Give a stem when SculptForge names the Part after the file."""
     if not stem:
         return os.path.join(paths.work_dir(), f"{uuid.uuid4().hex}{ext}")
     folder = os.path.join(paths.work_dir(), uuid.uuid4().hex)
@@ -118,7 +118,7 @@ def _output_ui(saved):
 
 
 class SculptForgeLoadMesh:
-    DESCRIPTION = ("Load a model file (OBJ, FBX, GLB/glTF, PLY, STL, USD/USDZ, ZBrush GoZ or a SculptForge "
+    DESCRIPTION = ("Load a model file (OBJ, FBX, GLB/glTF, PLY, STL, USD/USDZ, ZBrush .GoZ files or a SculptForge "
                    ".sfproj) for the SculptForge nodes. Relative paths are looked up in ComfyUI's input folder.")
     CATEGORY = CATEGORY
     RETURN_TYPES = (SF_MESH,)
@@ -204,7 +204,7 @@ class SculptForgeImageRelief:
 
 
 class SculptForgeVoxelRemesh:
-    DESCRIPTION = ("Voxel remesh (like DynaMesh): rebuild the mesh as an even, watertight sculpting surface, "
+    DESCRIPTION = ("Voxel remesh (similar to ZBrush's DynaMesh): rebuild the mesh as an even, watertight sculpting surface, "
                    "merging overlapping parts and fixing broken scans or AI-generated models.")
     CATEGORY = CATEGORY
     RETURN_TYPES = (SF_MESH,)
@@ -343,7 +343,7 @@ class SculptForgeLODChain:
 
 
 class SculptForgeMeshInfo:
-    DESCRIPTION = "Report vertex and triangle counts, bounds and SubTools of a mesh."
+    DESCRIPTION = "Report vertex and triangle counts, bounds and Parts of a mesh."
     CATEGORY = CATEGORY
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("info",)
