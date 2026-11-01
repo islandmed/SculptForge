@@ -112,6 +112,9 @@ public:
     // --- settings and statistics
     // save_project also writes <name>.sfhist (the app's Preferences; off for the CLI and scripts).
     inline static bool saveWithProject = false;
+    // The document open_project / save_project read and write the sidecar for (the app's scene; null = none),
+    // so opening a project for a thumbnail or a scratch scene never reads a history.
+    inline static const Document* historyDocument = nullptr;
     size_t checkpointEvery = 16;           // a checkpoint every this many path steps (doubles when over budget)
     size_t checkpointBudget = size_t(1) << 30; // bytes of checkpoints
     size_t branchBudget = size_t(3) << 29;     // 1.5 GiB of inactive branches and `other` copies

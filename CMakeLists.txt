@@ -251,6 +251,8 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelProject.cpp
     src/app/PanelSubTools.cpp
     src/app/PanelExtract.cpp
+    src/app/PanelTimeline.cpp
+    src/app/ProofMode.cpp
     src/app/Tablet.cpp
     src/app/SpaceMouse.cpp
     src/app/Input.cpp
@@ -263,6 +265,15 @@ if(SCULPTFORGE_BUILD_APP)
   target_include_directories(sculptforge PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/lucide)
   target_compile_definitions(sculptforge PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}"
                                                  SF_UPDATE_CHECK=$<BOOL:${SCULPTFORGE_UPDATE_CHECK}>)
+  # The commit a build came from, for proof mode's results (src/app/ProofMode.cpp); taken when CMake configures.
+  find_package(Git QUIET)
+  if(GIT_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
+    execute_process(COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                    OUTPUT_VARIABLE SF_GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+  endif()
+  if(SF_GIT_COMMIT)
+    set_source_files_properties(src/app/ProofMode.cpp PROPERTIES COMPILE_DEFINITIONS "SF_GIT_COMMIT=\"${SF_GIT_COMMIT}\"")
+  endif()
   if(MSVC)
     target_compile_options(sculptforge PRIVATE /W4 /utf-8 /permissive-)
   else()

@@ -479,6 +479,7 @@ void App::initActions() {
     registerFaceUiActions();   // Tool > Facial Shapes, face_take_play / face_take_stop (PanelFace.cpp)
     registerPerformanceUiActions(); // Preferences > Performance (PanelPerformance.cpp)
     registerInputActions();     // ZBrush keys: U I O, Space, L, V, Ctrl+A / I / H / W..., the input style (Input.cpp)
+    registerTimelineUiActions(); // Sculpt Timeline, timelapse, Help > Benchmark (PanelTimeline.cpp)
 
     // Every command, so the command palette finds anything scriptable.
     actions_.registerCommands(
