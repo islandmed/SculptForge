@@ -425,6 +425,7 @@ Config keeps it.
 
 | Setting | Default | What it does |
 |---|---|---|
+| **Language** | English | The interface language: **English** or **Español** (see below) |
 | **Popup Info (Ctrl+hover help)** | On | Ctrl-hover help boxes |
 | **Popup Info opacity** | 0.97 | How solid the help box is |
 | **Tooltip delay** | 0.5 s | How long to point at an icon-only button before its name appears |
@@ -434,6 +435,13 @@ Config keeps it.
 | **Left-handed layout** | Off | Mirrors the shelves and trays: tools on the right, navigation on the left |
 | **UI scale** | Automatic | Size of text and controls (100% to 200%); takes effect at the next start |
 | **Camera notch** | Automatic | Keeps the interface below a laptop's camera notch in fullscreen (see below) |
+
+**Language** changes the interface at once, without a restart; Store Config keeps it for the next start. In
+**Español** the palette bar, the palettes, the shelves, the LightBox, the command palette and the Ctrl-help titles
+are in Spanish, while the names of tools and brushes stay as Spanish-speaking ZBrush artists use them (SubTool,
+QRemesh, ZSpheres, LightBox, MatCap, Clay Buildup, Zadd). The command palette finds a command by its Spanish or its
+English name. Anything not translated yet (most Ctrl-help descriptions, this guide) shows in English. Scripts and
+`sculptforge-cli` commands are the same in every language.
 
 **Preferences > Input** sets the key **Style**: **ZBrush** (the default), **SculptForge**, which brings back
 the keys of SculptForge 0.6 and earlier: <kbd>1</kbd> to <kbd>9</kbd> and <kbd>0</kbd> pick the first ten

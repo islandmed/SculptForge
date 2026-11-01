@@ -10,6 +10,7 @@
 #include "app/ShellQuote.h"
 #include "app/Theme.h"
 #include "app/Ui.h"
+#include "app/I18n.h"
 
 #include "core/Json.h"
 #include "core/Timeline.h"
@@ -326,7 +327,7 @@ void App::drawTimelineUi() {
         if (ImGui::BeginPopupModal("Rendering timelapse", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
             ImGui::Text("%s", s.job->path.c_str());
             ImGui::ProgressBar(float(s.job->frame) / float(std::max(1, s.job->frames)), ImVec2(360 * uiScale_, 0));
-            if (ImGui::Button("Cancel")) s.job->cancelled = true;
+            if (ImGui::Button(tr("Cancel"))) s.job->cancelled = true;
             ImGui::EndPopup();
         }
         activeUntil_ = std::max(activeUntil_, double(SDL_GetTicksNS()) * 1e-9 + 0.2);
@@ -345,21 +346,21 @@ void App::drawTimelineUi() {
         s.timelapseDialog = false;
     }
     if (ImGui::BeginPopupModal("Export timelapse", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextWrapped("The history of the active SubTool (%zu steps up to the cursor) played as a turntable.", t->cursor());
+        ImGui::TextWrapped(tr("The history of the active SubTool (%zu steps up to the cursor) played as a turntable."), t->cursor());
         ImGui::RadioButton("1080p", &s.timelapseRes, 0);
         ImGui::SameLine();
         ImGui::RadioButton("4K", &s.timelapseRes, 1);
         ImGui::SetNextItemWidth(200 * uiScale_);
-        ImGui::SliderFloat("Length", &s.timelapseSeconds, 5.0f, 90.0f, "%.0f s");
+        ImGui::SliderFloat(tr("Length"), &s.timelapseSeconds, 5.0f, 90.0f, "%.0f s");
         ImGui::SetNextItemWidth(420 * uiScale_);
         ImGui::InputText("File", s.timelapsePath, sizeof s.timelapsePath);
-        if (ImGui::Button("Export")) {
+        if (ImGui::Button(tr("Export"))) {
             const bool k4 = s.timelapseRes == 1;
             startTimelapse(s.timelapsePath, k4 ? 3840 : 1920, k4 ? 2160 : 1080, s.timelapseSeconds, 30);
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
-        if (ImGui::Button("Close")) ImGui::CloseCurrentPopup();
+        if (ImGui::Button(tr("Close"))) ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
     }
 
@@ -407,7 +408,7 @@ void App::drawTimelineUi() {
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted(ICON_LC_HISTORY);
     ImGui::SameLine();
-    ImGui::Text("Step %zu of %zu", t->cursor(), n - 1);
+    ImGui::Text(tr("Step %zu of %zu"), t->cursor(), n - 1);
     if (!branches.empty()) {
         ImGui::SameLine();
         ImGui::TextDisabled("%s %zu branch%s", ICON_LC_GIT_BRANCH, branches.size(), branches.size() == 1 ? "" : "es");
@@ -422,7 +423,7 @@ void App::drawTimelineUi() {
     }
     const float buttons = 250 * sc;
     ImGui::SameLine(ImGui::GetWindowWidth() - buttons);
-    if (ImGui::Checkbox("Save with project", &s.saveHistory)) {
+    if (ImGui::Checkbox(tr("Save with project"), &s.saveHistory)) {
         Timeline::saveWithProject = s.saveHistory;
         savePrefs(s, configDir_, uiConfigDeterministic_);
     }
@@ -514,7 +515,7 @@ void App::drawTimelineUi() {
     if (trackHovered && hovered != Timeline::kNone && !ImGui::IsPopupOpen("##retune")) {
         const Timeline::Node& node = t->node(hovered);
         const int d = t->depth(hovered);
-        if (node.parent == Timeline::kNone) ImGui::SetTooltip("Start of the history");
+        if (node.parent == Timeline::kNone) ImGui::SetTooltip("%s", tr("Start of the history"));
         else
             ImGui::SetTooltip("Step %d: %s (%s)\n%u %s, %s%s\nClick or drag to show the model here; right-click to re-tune", d,
                               node.label.c_str(), kindLabel(node.kind), node.touched,
@@ -535,11 +536,11 @@ void App::drawTimelineUi() {
         const uint32_t id = s.retuneNode;
         if (id < t->nodeCount() && t->node(id).alive) {
             const Timeline::Node& node = t->node(id);
-            ImGui::Text("Step %d: %s", t->depth(id), node.label.c_str());
+            ImGui::Text(tr("Step %d: %s"), t->depth(id), node.label.c_str());
             std::string why;
             if (t->canRetune(id, &why)) {
                 ImGui::SetNextItemWidth(220 * sc);
-                if (ImGui::SliderFloat("Strength", &s.retuneValue, 0.0f, 2.0f, "%.2f")) {
+                if (ImGui::SliderFloat(tr("Strength"), &s.retuneValue, 0.0f, 2.0f, "%.2f")) {
                     std::string e;
                     if (!t->retune(doc_, id, s.retuneValue, &e)) s.message = e;
                     doc_.modified = true;
@@ -548,7 +549,7 @@ void App::drawTimelineUi() {
                              "How strongly this stroke shows: 1 = as sculpted, 0 = gone, 2 = twice as strong. Later strokes "
                              "are not redone: where they overlap this one they keep their own displacement on top.",
                              "Edit > Sculpt Timeline");
-                if (ImGui::SmallButton("Reset to 1")) {
+                if (ImGui::SmallButton(tr("Reset to 1"))) {
                     s.retuneValue = 1.0f;
                     t->retune(doc_, id, 1.0f);
                 }
@@ -556,12 +557,12 @@ void App::drawTimelineUi() {
             } else {
                 ImGui::TextDisabled("%s", why.c_str());
             }
-            if (ImGui::SmallButton("Show the model here")) {
+            if (ImGui::SmallButton(tr("Show the model here"))) {
                 std::string e;
                 if (!t->select(doc_, id, &e)) s.message = e;
                 ImGui::CloseCurrentPopup();
             }
-            ImGui::TextDisabled("Sculpting from an earlier step starts a branch;\nthe later steps stay as a lane above.");
+            ImGui::TextDisabled("%s", tr("Sculpting from an earlier step starts a branch;\nthe later steps stay as a lane above."));
         }
         ImGui::EndPopup();
     } else if (s.retuneNode != Timeline::kNone && !ImGui::IsPopupOpen("##retune")) {

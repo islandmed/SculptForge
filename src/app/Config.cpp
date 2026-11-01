@@ -10,6 +10,7 @@
 #include "app/App.h"
 #include "app/CrashLog.h"
 #include "app/Ui.h"
+#include "app/I18n.h"
 #include "core/Bake.h"
 #include "core/Micro.h"
 #include "core/Multires.h"
@@ -56,6 +57,7 @@ Json toJson(const UiPrefs& p) {
     j.set("cursorFollowsSurface", p.cursorFollowsSurface);
     j.set("showAxes", p.showAxes);
     j.set("alphabeticalPalettes", p.alphabeticalPalettes);
+    j.set("language", p.language);
     j.set("tablet", toJson(p.tablet));
     j.set("spaceMouse", toJson(p.spaceMouse));
     j.set("antialiasing", double(p.antialiasing));
@@ -95,6 +97,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.cursorFollowsSurface = j["cursorFollowsSurface"].asBool(p.cursorFollowsSurface);
     p.showAxes = j["showAxes"].asBool(p.showAxes);
     p.alphabeticalPalettes = j["alphabeticalPalettes"].asBool(p.alphabeticalPalettes);
+    if (j["language"].isString()) p.language = languageCode(languageFromCode(j["language"].asString()));
     fromJson(j["tablet"], p.tablet);
     fromJson(j["spaceMouse"], p.spaceMouse);
     const int aa = int(j["antialiasing"].asNumber(p.antialiasing));
@@ -672,6 +675,7 @@ bool App::readUiConfig(const std::string& path, std::string& err) {
     actions_.overridesFromJson(j["shortcuts"]);
     fromJson(j["prefs"], uiPrefs_);
     if (j.has("radialMenus")) applyRadialMenusJson(j["radialMenus"]); // (an older file keeps the menus there are)
+    setLanguage(languageFromCode(uiPrefs_.language));
     applyPerformancePrefs();
     applyInputStyle();
     doc_.sculptor.dyntopo.constantDetail = uiPrefs_.dyntopoConstantDetail;
@@ -915,7 +919,7 @@ void App::drawControlsWindow() {
         return;
     }
     // The key style (Preferences > Input), and a keymap exported from Blender (#12).
-    ImGui::TextDisabled("Style");
+    ImGui::TextDisabled("%s", tr("Style"));
     ImGui::SameLine();
     drawInputStyleRow(ImGui::GetContentRegionAvail().x * 0.6f);
     ImGui::SameLine();
@@ -930,7 +934,7 @@ void App::drawControlsWindow() {
     };
     ImGui::Spacing();
     if (ImGui::BeginTabBar("##controls_tabs")) {
-        if (ImGui::BeginTabItem("Keyboard")) {
+        if (ImGui::BeginTabItem(tr("Keyboard"))) {
             ImGui::BeginChild("##controls_keys", ImVec2(0, -ImGui::GetTextLineHeightWithSpacing() * 1.6f));
             // Grouped by palette, alphabetically (as ZBrush lists its palettes).
             std::map<std::string, std::vector<const Action*>> groups;
@@ -968,7 +972,7 @@ void App::drawControlsWindow() {
             ImGui::TextColored(col(ui::color::textDim), "Double-click a row, or Ctrl+Alt+click any button, to assign a key.");
             ImGui::EndTabItem();
         }
-        if (ImGui::BeginTabItem("Mouse & pen")) {
+        if (ImGui::BeginTabItem(tr("Mouse & pen"))) {
             if (ImGui::BeginTable("##gestures", 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_PadOuterX)) {
                 ImGui::TableSetupColumn("what", ImGuiTableColumnFlags_WidthFixed, 180.0f * s);
                 ImGui::TableSetupColumn("how", ImGuiTableColumnFlags_WidthStretch);
@@ -1001,7 +1005,7 @@ namespace config {
 void drawConfigSection(App& app) {
     const ImVec2 full(-FLT_MIN, 0);
     bool customize = app.layout().customize;
-    if (ImGui::Checkbox("Enable Customize", &customize)) app.actions().find("config.customize")->run();
+    if (ImGui::Checkbox(tr("Enable Customize"), &customize)) app.actions().find("config.customize")->run();
     ui::HelpAction(app, "config.customize");
     ui::ActionButton(app, "config.store", full, ui::Look::IconLabel);
     ui::ActionButton(app, "config.restore_custom", full, ui::Look::IconLabel);
@@ -1012,14 +1016,30 @@ void drawConfigSection(App& app) {
     ui::ActionButton(app, "config.load", ImVec2(half, 0), ui::Look::IconLabel);
     ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::textDim));
     ImGui::PushTextWrapPos(0.0f);
-    ImGui::TextUnformatted("Changes to the layout and shortcuts last until you quit. Store Config keeps them.");
+    ImGui::TextUnformatted(tr("Changes to the layout and shortcuts last until you quit. Store Config keeps them."));
     ImGui::PopTextWrapPos();
     ImGui::PopStyleColor();
 }
 
 void drawInterfaceSection(App& app) {
     UiPrefs& p = app.uiPrefs();
-    ImGui::Checkbox("Popup Info (Ctrl+hover help)", &p.popupInfo);
+    // Language (#44): each name in its own language, never translated, so it can be found in either.
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(tr("Language"));
+    for (int i = 0; i < kLanguageCount; ++i) {
+        const Language lang = Language(i);
+        ImGui::SameLine();
+        const std::string label = std::string(languageName(lang)) + "##language." + languageCode(lang);
+        if (ImGui::RadioButton(label.c_str(), languageFromCode(p.language) == lang)) {
+            p.language = languageCode(lang);
+            setLanguage(lang);
+        }
+        ui::HelpText("Language", nullptr,
+                     "The language of menus, palettes, shelves and messages. Brush and tool names (SubTool, QRemesh, "
+                     "DynaMesh-style names) stay as they are, as in ZBrush. Store Config keeps it for the next start.",
+                     "Preferences > Interface");
+    }
+    ImGui::Checkbox(tr("Popup Info (Ctrl+hover help)"), &p.popupInfo);
     ui::HelpText("Popup Info", nullptr,
                  "Hold Ctrl and point at any control to see what it does and its shortcut. Ctrl+Alt shows a command's "
                  "scripting parameters.",
@@ -1035,31 +1055,31 @@ void drawInterfaceSection(App& app) {
     ui::HelpText("Tooltip delay", nullptr,
                  "How long to point at an icon-only button (or a clipped label) before its name appears.",
                  "Preferences > Interface");
-    ImGui::Checkbox("One sub-palette open", &p.oneSubpalette);
+    ImGui::Checkbox(tr("One sub-palette open"), &p.oneSubpalette);
     ui::HelpText("One sub-palette open", nullptr,
                  "Opening a sub-palette closes the others in that palette. Shift+click opens more than one.",
                  "Preferences > Interface");
-    ImGui::Checkbox("Auto collapse left tray", &p.autoCollapseLeft);
+    ImGui::Checkbox(tr("Auto collapse left tray"), &p.autoCollapseLeft);
     ui::HelpText("Auto collapse left tray", nullptr,
                  "Opening a palette in the left tray collapses the others when they would not fit.", "Preferences > Interface");
-    ImGui::Checkbox("Auto collapse right tray", &p.autoCollapseRight);
+    ImGui::Checkbox(tr("Auto collapse right tray"), &p.autoCollapseRight);
     ui::HelpText("Auto collapse right tray", nullptr,
                  "Opening a palette in the right tray collapses the others when they would not fit.", "Preferences > Interface");
-    ImGui::Checkbox("Palettes strictly A-Z (ZBrush order)", &p.alphabeticalPalettes);
+    ImGui::Checkbox(tr("Palettes strictly A-Z (ZBrush order)"), &p.alphabeticalPalettes);
     ui::HelpText("Palettes strictly A-Z", nullptr,
                  "Off: File and Edit come first in the palette bar and Help last, the rest A to Z. On: every palette A to Z, as in "
                  "ZBrush.",
                  "Preferences > Interface");
-    ImGui::Checkbox("Left-handed layout", &app.layout().leftHanded);
+    ImGui::Checkbox(tr("Left-handed layout"), &app.layout().leftHanded);
     ui::HelpText("Left-handed layout", nullptr, "Mirror the shelves and trays: tools on the left, navigation on the right.",
                  "Preferences > Interface");
     {
         static const char* kTiles[] = {"Small", "Medium", "Large"};
         int& tiles = app.layout().shelfTiles;
         ImGui::SetNextItemWidth(-FLT_MIN);
-        if (ImGui::BeginCombo("##shelf_tiles", (std::string("Shelf tiles: ") + kTiles[std::clamp(tiles, 0, 2)]).c_str())) {
+        if (ImGui::BeginCombo("##shelf_tiles", (std::string(tr("Shelf tiles:")) + " " + tr(kTiles[std::clamp(tiles, 0, 2)])).c_str())) {
             for (int i = 0; i < 3; ++i)
-                if (ImGui::Selectable(kTiles[i], tiles == i)) tiles = i;
+                if (ImGui::Selectable(tr(kTiles[i]), tiles == i)) tiles = i;
             ImGui::EndCombo();
         }
         ui::HelpText("Shelf tiles", nullptr, "How big the brush tiles on the bottom shelf are. Small leaves the most room for the model.",
@@ -1071,9 +1091,9 @@ void drawInterfaceSection(App& app) {
     for (int i = 0; i < 6; ++i)
         if (std::abs(kScaleValues[i] - p.uiScale) < 0.01f) current = i;
     ImGui::SetNextItemWidth(-FLT_MIN);
-    if (ImGui::BeginCombo("##ui_scale", (std::string("UI scale: ") + kScales[current]).c_str())) {
+    if (ImGui::BeginCombo("##ui_scale", (std::string(tr("UI scale:")) + " " + tr(kScales[current])).c_str())) {
         for (int i = 0; i < 6; ++i)
-            if (ImGui::Selectable(kScales[i], i == current)) p.uiScale = kScaleValues[i];
+            if (ImGui::Selectable(tr(kScales[i]), i == current)) p.uiScale = kScaleValues[i];
         ImGui::EndCombo();
     }
     ui::HelpText("UI scale", nullptr,
@@ -1082,9 +1102,9 @@ void drawInterfaceSection(App& app) {
                  "Preferences > Interface");
     static const char* kRotation[] = {"Free (ZBrush)", "Turntable"};
     ImGui::SetNextItemWidth(-FLT_MIN);
-    if (ImGui::BeginCombo("##rotation", (std::string("Rotation: ") + kRotation[p.turntable ? 1 : 0]).c_str())) {
+    if (ImGui::BeginCombo("##rotation", (std::string(tr("Rotation:")) + " " + tr(kRotation[p.turntable ? 1 : 0])).c_str())) {
         for (int i = 0; i < 2; ++i)
-            if (ImGui::Selectable(kRotation[i], (i == 1) == p.turntable)) p.turntable = i == 1;
+            if (ImGui::Selectable(tr(kRotation[i]), (i == 1) == p.turntable)) p.turntable = i == 1;
         ImGui::EndCombo();
     }
     ui::HelpText("Rotation", nullptr,
@@ -1094,9 +1114,9 @@ void drawInterfaceSection(App& app) {
                  "Preferences > Interface");
     static const char* kNotch[] = {"Automatic", "Always reserve", "Off"};
     ImGui::SetNextItemWidth(-FLT_MIN);
-    if (ImGui::BeginCombo("##camera_notch", (std::string("Camera notch: ") + kNotch[std::clamp(p.cameraNotch, 0, 2)]).c_str())) {
+    if (ImGui::BeginCombo("##camera_notch", (std::string(tr("Camera notch:")) + " " + tr(kNotch[std::clamp(p.cameraNotch, 0, 2)])).c_str())) {
         for (int i = 0; i < 3; ++i)
-            if (ImGui::Selectable(kNotch[i], i == p.cameraNotch)) p.cameraNotch = i;
+            if (ImGui::Selectable(tr(kNotch[i]), i == p.cameraNotch)) p.cameraNotch = i;
         ImGui::EndCombo();
     }
     ui::HelpText("Camera notch", nullptr,
@@ -1108,14 +1128,16 @@ void drawInterfaceSection(App& app) {
 void drawHotkeysSection(App& app) {
     static char filter[64] = "";
     ImGui::SetNextItemWidth(-FLT_MIN);
-    ImGui::InputTextWithHint("##hotkeys_filter", ICON_LC_SEARCH "  Filter", filter, sizeof filter);
+    ImGui::InputTextWithHint("##hotkeys_filter", tr(ICON_LC_SEARCH "  Filter"), filter, sizeof filter);
     const std::string f = lower(filter);
     ActionRegistry& reg = app.actions();
     const float s = ImGui::GetFontSize() / 15.0f;
     std::vector<const Action*> list;
     for (const auto& a : reg.all()) {
         if (!a.run || a.id.rfind("cmd.", 0) == 0) continue; // commands: through the command palette
-        if (!f.empty() && lower(a.label).find(f) == std::string::npos && lower(a.palette).find(f) == std::string::npos) continue;
+        if (!f.empty() && lower(a.label).find(f) == std::string::npos && lower(a.palette).find(f) == std::string::npos &&
+            lower(trAction(a.id, a.label)).find(f) == std::string::npos)
+            continue;
         list.push_back(&a);
     }
     std::stable_sort(list.begin(), list.end(), [](const Action* x, const Action* y) {
@@ -1130,22 +1152,22 @@ void drawHotkeysSection(App& app) {
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
             ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted(a->label.c_str());
+            ImGui::TextUnformatted(trAction(a->id, a->label));
             ui::HelpAction(app, a->id.c_str());
             ImGui::TableNextColumn();
             const std::string chord = reg.shortcutText(a->id);
             const bool capturing = app.capturingShortcut() == a->id;
-            const std::string text = capturing ? "press a key..." : chord.empty() ? "-" : chord;
+            const std::string text = capturing ? tr("press a key...") : chord.empty() ? "-" : chord;
             if (reg.hasOverride(a->id)) ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::accent));
             if (ImGui::Button((text + "##hk." + a->id).c_str(), ImVec2(-FLT_MIN, 0))) app.beginShortcutCapture(a->id);
             if (reg.hasOverride(a->id)) ImGui::PopStyleColor();
-            ui::HelpText(("Shortcut for " + a->label).c_str(), chord.c_str(),
+            ui::HelpText((std::string(tr("Shortcut for")) + " " + trAction(a->id, a->label)).c_str(), chord.c_str(),
                          "Click, then press the new key. Esc cancels, Backspace clears. Orange: changed from the default.",
                          "Preferences > Hotkeys");
         }
         ImGui::EndTable();
     }
-    if (ImGui::Button(ICON_LC_ROTATE_CCW "  Default shortcuts", ImVec2(-FLT_MIN, 0))) {
+    if (ImGui::Button(tr(ICON_LC_ROTATE_CCW "  Default shortcuts"), ImVec2(-FLT_MIN, 0))) {
         reg.clearOverrides();
         app.status_ = "Default shortcuts restored - Store Config (Ctrl+Shift+I) to keep them";
     }
@@ -1155,11 +1177,11 @@ void drawHotkeysSection(App& app) {
 void drawLightBoxSection(App& app) {
     UiPrefs& p = app.uiPrefs();
     UiLayout& l = app.layout();
-    ImGui::Checkbox("Show at startup", &p.lightboxAtStartup);
+    ImGui::Checkbox(tr("Show at startup"), &p.lightboxAtStartup);
     ui::HelpText("Show LightBox at startup", nullptr, "Open LightBox on the Project tab when SculptForge starts (as ZBrush does).",
                  "Preferences > LightBox");
     ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted("Rows");
+    ImGui::TextUnformatted(tr("Rows"));
     for (int r = 1; r <= 4; ++r) {
         ImGui::SameLine();
         const bool on = l.lightboxRows == r;
@@ -1169,12 +1191,12 @@ void drawLightBoxSection(App& app) {
         ui::HelpText("LightBox rows", nullptr, "How many rows of thumbnails the LightBox strip shows.", "Preferences > LightBox");
     }
     ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted("Placement");
+    ImGui::TextUnformatted(tr("Placement"));
     ImGui::SameLine();
-    if (ImGui::RadioButton("Top", !l.lightboxBottom)) l.lightboxBottom = false;
+    if (ImGui::RadioButton(tr("Top"), !l.lightboxBottom)) l.lightboxBottom = false;
     ui::HelpText("LightBox at the top", nullptr, "LightBox opens along the top edge of the canvas.", "Preferences > LightBox");
     ImGui::SameLine();
-    if (ImGui::RadioButton("Bottom", l.lightboxBottom)) l.lightboxBottom = true;
+    if (ImGui::RadioButton(tr("Bottom"), l.lightboxBottom)) l.lightboxBottom = true;
     ui::HelpText("LightBox at the bottom", nullptr, "LightBox opens above the bottom shelf.", "Preferences > LightBox");
     ImGui::TextColored(col(ui::color::textDim), "Library folder");
     const std::string shown = p.libraryFolder.empty() ? std::string("Documents/SculptForge (default)") : p.libraryFolder;
@@ -1183,7 +1205,7 @@ void drawLightBoxSection(App& app) {
     ui::HelpText("Library folder", nullptr,
                  "Where your projects, tools, brushes, alphas, images, splats and QuickSaves live. LightBox shows it as User.",
                  "Preferences > LightBox");
-    if (!p.libraryFolder.empty() && ImGui::SmallButton("Use the default folder")) p.libraryFolder.clear();
+    if (!p.libraryFolder.empty() && ImGui::SmallButton(tr("Use the default folder"))) p.libraryFolder.clear();
 }
 
 } // namespace config

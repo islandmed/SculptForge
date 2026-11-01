@@ -5,6 +5,7 @@
 #include "app/App.h"
 #include "app/Pickers.h"
 #include "app/Ui.h"
+#include "app/I18n.h"
 #include "core/Matcap.h"
 #include "core/Primitives.h"
 #include "core/Project.h"
@@ -468,24 +469,24 @@ void LightBox::contextMenu(App& app, const AssetEntry& e) {
     const bool mesh = e.kind == AssetKind::Mesh || e.kind == AssetKind::Project || e.kind == AssetKind::Primitive;
     if (ImGui::MenuItem(e.kind == AssetKind::Folder || e.kind == AssetKind::Up ? "Open folder" : "Open"))
         activate(app, e, false);
-    if (mesh && ImGui::MenuItem("Append as SubTool", "Shift+double-click")) activate(app, e, true);
+    if (mesh && ImGui::MenuItem(tr("Append as SubTool"), "Shift+double-click")) activate(app, e, true);
     if (e.kind == AssetKind::Image) {
-        if (ImGui::MenuItem("Generate 3D...")) app.openPath(e.path);
-        if (ImGui::MenuItem("Relief from image"))
+        if (ImGui::MenuItem(tr("Generate 3D..."))) app.openPath(e.path);
+        if (ImGui::MenuItem(tr("Relief from image")))
             app.confirmDiscard([&app, p = e.path] { app.runCommand("image_relief", {{"path", p}}); });
-        if (ImGui::MenuItem("Inflate image"))
+        if (ImGui::MenuItem(tr("Inflate image")))
             app.confirmDiscard([&app, p = e.path] { app.runCommand("image_inflate", {{"path", p}}); });
-        if (ImGui::MenuItem("Project onto model")) app.runCommand("image_project", {{"path", e.path}});
-        if (ImGui::MenuItem("Use as alpha"))
+        if (ImGui::MenuItem(tr("Project onto model"))) app.runCommand("image_project", {{"path", e.path}});
+        if (ImGui::MenuItem(tr("Use as alpha")))
             app.runCommand("brush_set_alpha", {{"path", e.path}, {"invert", app.alphaInvert_}});
     }
     if (!e.path.empty() && e.kind != AssetKind::Up) {
         ImGui::Separator();
-        if (ImGui::MenuItem("Show in file manager")) {
+        if (ImGui::MenuItem(tr("Show in file manager"))) {
             const std::string dir = e.kind == AssetKind::Folder ? e.path : utf8(fsPath(e.path).parent_path());
             if (!SDL_OpenURL(("file://" + dir).c_str())) app.status_ = "Couldn't open " + dir + ": " + SDL_GetError();
         }
-        if (e.kind != AssetKind::Folder && ImGui::MenuItem("Refresh thumbnail")) app.thumbs_.refresh(e.path);
+        if (e.kind != AssetKind::Folder && ImGui::MenuItem(tr("Refresh thumbnail"))) app.thumbs_.refresh(e.path);
     }
 }
 
@@ -503,7 +504,7 @@ std::string LightBox::folderLabel(const App& app, const std::string& folder) con
 void LightBox::drawBreadcrumb(App& app) {
     // Tab > Built-in/User > sub > sub: each crumb goes back there.
     std::vector<std::pair<std::string, Place>> crumbs;
-    crumbs.push_back({libraryTabName(place_.tab), {place_.tab, ""}});
+    crumbs.push_back({tr(libraryTabName(place_.tab)), {place_.tab, ""}});
     if (!place_.folder.empty()) {
         const LibraryRoots& r = app.library_;
         std::string top;
@@ -572,7 +573,7 @@ void LightBox::drawHeader(App& app, float width) {
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(255, 255, 255, 30));
         ImGui::PushStyleColor(ImGuiCol_Text,
                               on ? IM_COL32(255, 255, 255, 255) : ImGui::GetColorU32(ImGuiCol_TextDisabled));
-        if (ImGui::Button(libraryTabName(tab)) && !on) navigate(app, {tab, ""});
+        if (ImGui::Button(tr(libraryTabName(tab))) && !on) navigate(app, {tab, ""});
         ImGui::PopStyleColor(4);
         if (on) {
             const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
@@ -656,7 +657,7 @@ void LightBox::drawHeader(App& app, float width) {
         ImGui::SameLine(0, 8 * scale);
     }
     ImGui::SetNextItemWidth(filterW);
-    ImGui::InputTextWithHint("##lbfilter", ICON_LC_SEARCH "  Filter", filter_, sizeof filter_);
+    ImGui::InputTextWithHint("##lbfilter", tr(ICON_LC_SEARCH "  Filter"), filter_, sizeof filter_);
     ui::HelpText("Filter", nullptr, "Show only the items whose names contain this text.", "LightBox");
     ImGui::SameLine(0, 8 * scale);
     for (int r = 1; r <= 4; ++r) {
@@ -862,9 +863,9 @@ void LightBox::draw(App& app, const CanvasRect& canvas) {
             (items.empty() ? 8.0f : float((items.size() + size_t(rows) - 1) / size_t(rows)) * (tile + gap) + 12.0f);
         ImGui::SetCursorScreenPos(ImVec2(x, base.y + 4.0f * scale + tile * 0.5f - ImGui::GetTextLineHeight() * 0.5f));
         if (hint)
-            ImGui::TextDisabled("%s", hint);
+            ImGui::TextDisabled("%s", tr(hint));
         else
-            ImGui::TextDisabled("Nothing here matches \"%s\".", filter_);
+            ImGui::TextDisabled(tr("Nothing here matches \"%s\"."), filter_);
     }
     AssetTileHoverGlow();
     ImGui::EndChild();
@@ -881,16 +882,16 @@ void LightBox::draw(App& app, const CanvasRect& canvas) {
             ImGui::Separator();
             bool done = false;
             if (ImGui::MenuItem(ICON_LC_SPARKLES "  Generate 3D...")) app.openPath(e.path), done = true;
-            if (ImGui::MenuItem("Relief from image")) {
+            if (ImGui::MenuItem(tr("Relief from image"))) {
                 app.confirmDiscard([&app, p = e.path] { app.runCommand("image_relief", {{"path", p}}); });
                 done = true;
             }
-            if (ImGui::MenuItem("Inflate image")) {
+            if (ImGui::MenuItem(tr("Inflate image"))) {
                 app.confirmDiscard([&app, p = e.path] { app.runCommand("image_inflate", {{"path", p}}); });
                 done = true;
             }
-            if (ImGui::MenuItem("Project onto model")) app.runCommand("image_project", {{"path", e.path}}), done = true;
-            if (ImGui::MenuItem("Use as alpha"))
+            if (ImGui::MenuItem(tr("Project onto model"))) app.runCommand("image_project", {{"path", e.path}}), done = true;
+            if (ImGui::MenuItem(tr("Use as alpha")))
                 app.runCommand("brush_set_alpha", {{"path", e.path}, {"invert", app.alphaInvert_}}), done = true;
             if (done) imageMenu_.clear();
             ImGui::EndPopup();
@@ -919,7 +920,7 @@ void LightBox::draw(App& app, const CanvasRect& canvas) {
 
 void LightBox::drawPreferences(App& app) {
     UiLayout& layout = app.layout_;
-    ImGui::Checkbox("Show at startup##lightbox", &showAtStartup);
+    ImGui::Checkbox(tr("Show at startup##lightbox"), &showAtStartup);
     ui::HelpText("Show at startup", nullptr,
                  "Open the LightBox on the Project tab when SculptForge starts (as ZBrush does).",
                  "Preferences > LightBox");
@@ -927,14 +928,14 @@ void LightBox::drawPreferences(App& app) {
     ImGui::SliderInt("##lbrowspref", &layout.lightboxRows, 1, 4, "Rows %d");
     ui::HelpText("Rows", nullptr, "Rows of thumbnails in the LightBox strip.", "Preferences > LightBox");
     int placement = layout.lightboxBottom ? 1 : 0;
-    ImGui::TextUnformatted("Placement");
+    ImGui::TextUnformatted(tr("Placement"));
     ImGui::SameLine();
-    if (ImGui::RadioButton("Top##lbplace", placement == 0)) layout.lightboxBottom = false;
+    if (ImGui::RadioButton(tr("Top##lbplace"), placement == 0)) layout.lightboxBottom = false;
     ImGui::SameLine();
-    if (ImGui::RadioButton("Bottom##lbplace", placement == 1)) layout.lightboxBottom = true;
+    if (ImGui::RadioButton(tr("Bottom##lbplace"), placement == 1)) layout.lightboxBottom = true;
     ui::HelpText("Placement", nullptr, "Show the LightBox along the top or the bottom of the canvas.",
                  "Preferences > LightBox");
-    ImGui::TextDisabled("Library folder");
+    ImGui::TextDisabled("%s", tr("Library folder"));
     ImGui::TextWrapped("%s", app.library_.user.empty() ? "(none)" : app.library_.user.c_str());
     if (!app.library_.user.empty() && ImGui::Button(ICON_LC_FOLDER_OPEN "  Show library folder"))
         SDL_OpenURL(("file://" + app.library_.user).c_str());

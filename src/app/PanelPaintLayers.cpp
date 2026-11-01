@@ -13,6 +13,7 @@
 // shows and edits the texture's layers (the commands hand over to it).
 #include "app/App.h"
 #include "app/Ui.h"
+#include "app/I18n.h"
 
 #include "core/PaintLayer.h"
 #include "core/Polypaint.h"
@@ -100,7 +101,7 @@ void App::drawPaintLayersContents() {
     const int count = int(rows.size());
     if (hasTexture(mesh)) {
         ImGui::AlignTextToFramePadding();
-        ImGui::TextDisabled("Paint into");
+        ImGui::TextDisabled("%s", tr("Paint into"));
         ImGui::SameLine();
         ui::Segmented(*this, {"draw.paint_vertex", "draw.paint_texture"});
     }
@@ -173,15 +174,15 @@ void App::drawPaintLayersContents() {
                 }
                 if (ImGui::BeginPopupContextItem("##row")) {
                     ImGui::TextDisabled("%s", name.c_str());
-                    if (ImGui::MenuItem("Rename", nullptr, false, l != nullptr)) {
+                    if (ImGui::MenuItem(tr("Rename"), nullptr, false, l != nullptr)) {
                         renamingPaintLayer_ = i;
                         focusPaintRename_ = true;
                         std::snprintf(paintRenameBuffer_, sizeof paintRenameBuffer_, "%s", name.c_str());
                     }
-                    if (ImGui::MenuItem("Duplicate")) duplicateIndex = i;
-                    if (ImGui::MenuItem("Merge down", nullptr, false, l != nullptr)) mergeIndex = i;
-                    if (ImGui::MenuItem("Clear")) clearIndex = i;
-                    if (ImGui::MenuItem("Delete", nullptr, false, l != nullptr)) deleteIndex = i;
+                    if (ImGui::MenuItem(tr("Duplicate"))) duplicateIndex = i;
+                    if (ImGui::MenuItem(tr("Merge down"), nullptr, false, l != nullptr)) mergeIndex = i;
+                    if (ImGui::MenuItem(tr("Clear"))) clearIndex = i;
+                    if (ImGui::MenuItem(tr("Delete"), nullptr, false, l != nullptr)) deleteIndex = i;
                     ImGui::EndPopup();
                 }
             }
@@ -289,12 +290,12 @@ void App::drawPaintLayersContents() {
     ui::HelpText("New paint layer", nullptr, "Add a transparent paint layer above the active one and paint on it.", kPath);
     ImGui::SameLine();
     ImGui::BeginDisabled(mesh.vertexCount() == 0);
-    if (ImGui::Button("Duplicate##paint", ImVec2(third, 0))) runCommand("paint_layer_duplicate");
+    if (ImGui::Button(tr("Duplicate##paint"), ImVec2(third, 0))) runCommand("paint_layer_duplicate");
     ImGui::EndDisabled();
     ui::HelpText("Duplicate", nullptr, "Copy the active layer (Base becomes an opaque layer) to a new layer above it.", kPath);
     ImGui::SameLine();
     ImGui::BeginDisabled(!cur);
-    if (ImGui::Button("Delete##paint", ImVec2(third, 0))) runCommand("paint_layer_delete");
+    if (ImGui::Button(tr("Delete##paint"), ImVec2(third, 0))) runCommand("paint_layer_delete");
     ImGui::EndDisabled();
     ui::HelpText("Delete", nullptr, "Delete the active layer (undoable). Base can't be deleted.", kPath);
 
@@ -311,13 +312,13 @@ void App::drawPaintLayersContents() {
     ui::HelpText("Move down", nullptr, "Move the active layer down the stack (Base stays at the bottom).", kPath);
     ImGui::SameLine();
     ImGui::BeginDisabled(!cur);
-    if (ImGui::Button("Merge down##paint", ImVec2(rest, 0))) runCommand("paint_layer_merge");
+    if (ImGui::Button(tr("Merge down##paint"), ImVec2(rest, 0))) runCommand("paint_layer_merge");
     ImGui::EndDisabled();
     ui::HelpText("Merge down", nullptr,
                  "Merge the active layer into the one below it (Base for the lowest layer), keeping how it looks.", kPath);
     ImGui::SameLine();
     ImGui::BeginDisabled(stackSize == 0);
-    if (ImGui::Button("Flatten##paint", ImVec2(-1, 0))) runCommand("paint_layer_flatten");
+    if (ImGui::Button(tr("Flatten##paint"), ImVec2(-1, 0))) runCommand("paint_layer_flatten");
     ImGui::EndDisabled();
     ui::HelpText("Flatten", nullptr, "Bake every visible layer into Base and remove the layers (hidden layers are discarded).",
                  kPath);
@@ -328,7 +329,7 @@ void App::drawPaintLayersContents() {
     ui::HelpText("Clear", nullptr, "Clear the active layer: a layer becomes transparent, Base white. Undoable.", kPath);
     ImGui::SameLine();
     ImGui::BeginDisabled(mesh.vertexCount() == 0 || (cur && (cur->locked || !cur->visible)));
-    if (ImGui::Button("Fill layer", ImVec2(-1, 0))) runCommand("paint_fill", {{"color", colorToHex(doc_.paintColor)}});
+    if (ImGui::Button(tr("Fill layer"), ImVec2(-1, 0))) runCommand("paint_fill", {{"color", colorToHex(doc_.paintColor)}});
     ImGui::EndDisabled();
     ui::HelpText("Fill", nullptr, "Fill the active layer with the current colour (respects the mask, like Color > Fill).",
                  kPath);
