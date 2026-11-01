@@ -1,0 +1,40 @@
+# #60: Focal Shift shapes brushes with an alpha, as in ZBrush. The same Square-alpha dab moves the whole square at
+# -100, a rounded mound at 0 and only a small point at +100 (moved_sum: the summed movement).
+run new_sphere subdivisions=5
+run brush_set_alpha name=square
+click "Standard##brush.standard"
+
+key o
+key minus
+key 1
+key 0
+key 0
+key enter
+expect_value focal_shift == -100
+snapshot
+stroke 0.5 0.5 0.5 0.5
+remember moved_sum hard
+expect_value moved > 50
+key ctrl+z
+
+key o
+key 0
+key enter
+expect_value focal_shift == 0
+snapshot
+stroke 0.5 0.5 0.5 0.5
+remember moved_sum soft
+expect_value moved_sum < $hard*0.8
+shot focal-alpha-soft
+key ctrl+z
+
+key o
+key 1
+key 0
+key 0
+key enter
+expect_value focal_shift == 100
+snapshot
+stroke 0.5 0.5 0.5 0.5
+expect_value moved_sum < $soft*0.6
+expect_value moved_sum < $hard*0.3

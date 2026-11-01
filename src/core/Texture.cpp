@@ -1292,8 +1292,9 @@ size_t TexturePainter::dabTiles(const DabContext& c, const Paint& paint, bool co
                     if (d2 >= c.r2) continue;
                     const glm::vec3 N = c.normals ? N0 * b.x + N1 * b.y + N2 * b.z : faceN;
                     if (glm::dot(N, mi.viewDir) > 0.0f) continue;
-                    const float f = c.useAlpha ? c.p.alpha->sample(glm::dot(o, mi.aRight) / c.r, glm::dot(o, mi.aUp) / c.r)
-                                               : brushFalloff(std::sqrt(d2), c.r, c.p.focal);
+                    const float f = c.useAlpha
+                        ? c.p.alpha->stamp(glm::dot(o, mi.aRight) / c.r, glm::dot(o, mi.aUp) / c.r, c.p.focal)
+                        : brushFalloff(std::sqrt(d2), c.r, c.p.focal);
                     const float wgt = f * c.s * (1.0f - std::clamp(m0 * b.x + m1 * b.y + m2 * b.z, 0.0f, 1.0f));
                     if (wgt <= 0.0f) continue;
                     if (!rec) rec = &tile(ti, c.target, w, h, c.tex);
@@ -1501,7 +1502,7 @@ size_t TexturePainter::dab(Mesh& mesh, const BVH& bvh, const DabParams& p, const
                 // Front faces only: never paint through to the far side.
                 const glm::vec3 N = normals ? N0 * b.x + N1 * b.y + N2 * b.z : faceN;
                 if (glm::dot(N, mi.viewDir) > 0.0f) return;
-                const float f = useAlpha ? p.alpha->sample(glm::dot(o, mi.aRight) / r, glm::dot(o, mi.aUp) / r)
+                const float f = useAlpha ? p.alpha->stamp(glm::dot(o, mi.aRight) / r, glm::dot(o, mi.aUp) / r, p.focal)
                                          : brushFalloff(std::sqrt(d2), r, p.focal);
                 const float wgt = f * s * (1.0f - std::clamp(m0 * b.x + m1 * b.y + m2 * b.z, 0.0f, 1.0f));
                 if (wgt <= 0.0f) return;

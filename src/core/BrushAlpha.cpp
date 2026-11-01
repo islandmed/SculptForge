@@ -295,6 +295,13 @@ float BrushAlpha::sample(float u, float v) const {
     return a + (b - a) * ty;
 }
 
+float BrushAlpha::stamp(float u, float v, float focal) const {
+    const float d = std::sqrt(u * u + v * v);
+    if (empty()) return d < 1.0f ? brushFalloff(d, 1.0f, focal) : 0.0f;
+    const float a = sample(u, v);
+    return a > 0.0f ? a * alphaFalloff(d, 1.0f, focal) : 0.0f;
+}
+
 BrushAlpha BrushAlpha::round() { return BrushAlpha{}; }
 
 BrushAlpha BrushAlpha::square() {

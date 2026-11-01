@@ -50,6 +50,11 @@ float focalRingFraction(float focal) {
     return 1.0f - std::pow(0.5f, 1.0f / k);
 }
 
+float alphaFalloff(float dist, float radius, float focal) {
+    const float f = brushFalloff(dist, radius * kAlphaReach, focal);
+    return focal < 0.0f ? f + (1.0f - f) * std::min(-focal, 1.0f) : f; // (-1: flat to the corners)
+}
+
 void brushVertices(const Mesh& mesh, const BVH& bvh, const glm::vec3& center, float radius, std::vector<uint32_t>& out) {
     bvh.queryVertices(mesh, center, radius, out);
     if (mesh.hasHidden()) std::erase_if(out, [&](uint32_t v) { return mesh.vertexHidden(v); });
@@ -505,7 +510,7 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
     }
     if (type != BrushType::Move) {
         const bool useAlpha = p.alpha && !p.alpha->empty(); // (the reach dabSingle gives the brush)
-        const float reach = useAlpha ? 1.4143f : type == BrushType::ClayBuildup ? 1.3f : 1.0f;
+        const float reach = useAlpha ? kAlphaReach : type == BrushType::ClayBuildup ? 1.3f : 1.0f;
         remeshDab(mesh, bvh, p, sym, type == BrushType::Smooth ? 2.0f : 1.0f, reach);
     }
     dabVerts_.clear();
@@ -528,7 +533,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     auto clock = std::chrono::steady_clock::now();
     // Alphas and the square ClayBuildup tip reach into the corners of their square.
     const bool useAlpha = p.alpha && !p.alpha->empty();
-    const float reach = useAlpha ? 1.4143f : type == BrushType::ClayBuildup ? 1.3f : 1.0f;
+    const float reach = useAlpha ? kAlphaReach : type == BrushType::ClayBuildup ? 1.3f : 1.0f;
     brushVertices(mesh, bvh, p.center, p.radius * reach, verts_);
     if (verts_.empty()) return;
 
@@ -582,7 +587,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
         const uint32_t v = verts_[i];
         const glm::vec3& x = pos[v];
         const glm::vec3 o = x - p.center;
-        const float f = useAlpha ? p.alpha->sample(glm::dot(o, right) / r, glm::dot(o, up) / r)
+        const float f = useAlpha ? p.alpha->stamp(glm::dot(o, right) / r, glm::dot(o, up) / r, p.focal)
                                  : brushFalloff(glm::length(o), r, p.focal);
         glm::vec3 d(0.0f);
 
@@ -655,6 +660,13 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
                 const float corner = std::clamp((1.3f - glm::length(o) / r) / 0.3f, 0.0f, 1.0f);
                 const float edge = std::clamp((1.0f - cheb) / 0.35f, 0.0f, 1.0f);
                 w = edge * edge * (3.0f - 2.0f * edge) * corner;
+                // Focal Shift (#60) keeps this tip at 0: below, harder edges and a broader slab; above, it fades
+                // toward a soft round point, as an alpha does.
+                if (p.focal < 0.0f) w = std::pow(w, std::exp2(2.0f * std::max(p.focal, -1.0f)));
+                else if (p.focal > 0.0f) {
+                    const float k = std::min(p.focal, 1.0f);
+                    w *= 1.0f - k + k * brushFalloff(glm::length(o), r * 1.3f, k);
+                }
             }
             glm::vec3 planePoint = areaCenter + areaNormal * (sign * r * 0.08f * s);
             float h = glm::dot(x - planePoint, areaNormal);
@@ -825,7 +837,8 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
     if (verts_.empty()) return;
     const auto& pos = mesh.positions;
     const auto& nrm = mesh.normals;
-    // An alpha (if any) modulates the recipe's tip, oriented on the view-facing plane.
+    // An alpha (if any) modulates the recipe's tip, oriented on the view-facing plane. Focal Shift shifts the tip
+    // (0 keeps the recipe's own Hardness / Tip Sharpness), and so the alpha with it.
     const bool useAlpha = p.alpha && !p.alpha->empty();
     glm::vec3 aUp = projectOnPlane(p.alphaUp, p.viewDir);
     aUp = glm::length(aUp) > 1e-6f ? glm::normalize(aUp) : glm::vec3(0, 1, 0);
@@ -851,6 +864,7 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
     const AreaSums sums = areaSums(verts_.size(), [&](size_t i, AreaSums& acc) {
         const uint32_t v = verts_[i];
         float t = std::clamp((1.0f - glm::distance(pos[v], p.center) / rad) / edge, 0.0f, 1.0f);
+        if (p.focal != 0.0f) t = std::pow(t, std::exp2(2.0f * std::clamp(p.focal, -1.0f, 1.0f))); // (brushFalloff's)
         float w = std::pow(t * t * (3.0f - 2.0f * t), exponent);
         acc.normal += nrm[v] * w;
         acc.center += pos[v] * w;
