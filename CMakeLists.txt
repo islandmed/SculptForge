@@ -111,6 +111,7 @@ add_library(sculptforge_core STATIC
   src/core/Guide.cpp
   src/core/UpdateCheck.cpp
   src/core/Tablet.cpp
+  src/core/RadialMenu.cpp
   src/core/SpaceMouse.cpp
   src/io/ObjIO.cpp
   src/io/FbxIO.cpp
