@@ -255,6 +255,7 @@ private:
     glm::vec2 pointerLatest_{0.0f};   // the newest pointer sample of the stroke (window pixels)
     double pointerLatestAt_ = 0.0;    // its time (seconds)
     double frameSeconds_ = 1.0 / 60.0; // running mean of the frame interval (how far ahead to predict)
+    double prepSeconds_ = 0.0;         // running mean of what packing a batch's upload costs (the batch size)
     Sculptor::DabFrame ghostFrame_;    // the last placed dab's frame (the ghost's estimates start from it)
     float ghostEdge_ = 0.0f;           // mean edge length of the triangle the stroke began on (the preview's cavities)
     float ghostCurvature_ = 0.0f;      // the surface's curvature along the stroke (1 / radius, > 0 convex; 0 flat)

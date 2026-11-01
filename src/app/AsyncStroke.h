@@ -31,6 +31,7 @@ struct App::StrokeSolver {
     DabView view;
     std::vector<glm::vec2> probe; // --measure-stroke: where the batch's dabs went
     double dabSeconds = 0.0;      // the batch's mean cost per dab
+    double prepSeconds = 0.0;     // what packing its upload cost
     uint32_t uploadId = 0;        // the active SubTool's renderer slot
     bool prepare = true;          // pack the upload on the thread
     bool finalize = false;        // before the batch: Sculptor::flushDraft (a draft stroke's end)

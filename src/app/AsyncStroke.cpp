@@ -81,6 +81,7 @@ void App::StrokeSolver::loop() {
         const auto prepStart = std::chrono::steady_clock::now();
         uploadReady = prepare && app.renderer_.prepareStrokeUpload(uploadId, app.doc_.mesh, upload, app.doc_.sculptor.strokeCurvature());
         if (finalize && uploadReady) app.renderer_.refineStrokeBoundsInto(uploadId, app.doc_.mesh, upload);
+        prepSeconds = finalize ? 0.0 : std::chrono::duration<double>(std::chrono::steady_clock::now() - prepStart).count();
         static const bool log = std::getenv("SF_STROKE_LOG") != nullptr;
         if (log) {
             const SculptTimings& t = app.doc_.sculptor.timings;
@@ -172,6 +173,7 @@ void App::commitSolverBatch() {
         syncScene(); // (the regular sync: a new grid, or a mesh the two-part upload doesn't handle)
     }
     if (strokeProbe_) strokeProbe_->insert(strokeProbe_->end(), s.probe.begin(), s.probe.end());
+    if (s.prepSeconds > 0.0) prepSeconds_ = prepSeconds_ > 0.0 ? prepSeconds_ * 0.7 + s.prepSeconds * 0.3 : s.prepSeconds;
     if (!s.batch.empty()) {
         lastDabScreen_ = glm::vec2(s.batch.back().x, s.batch.back().y);
         if (s.dabSeconds > 0.0) dabSeconds_ = dabSeconds_ > 0.0 ? dabSeconds_ * 0.8 + s.dabSeconds * 0.2 : s.dabSeconds;
@@ -244,11 +246,16 @@ void App::pumpStroke() {
         if (strokeFinishing_) finishStrokeNow(); // released, and every dab is on the GPU
         return;
     }
-    // The next batch: about kBatchSeconds of work (at least one dab), oldest first.
+    // The next batch, oldest first: about kBatchSeconds of work, or as much as packing its upload costs (so the
+    // packing, per batch, stays at most about half the work), at least one dab; once the pen has lifted, every
+    // dab left (the preview shows them all: only the end result is waited for), with the stroke's end work.
     StrokeSolver& s = *solver_;
-    const size_t n = dabSeconds_ > 0.0 ? size_t(std::clamp(kBatchSeconds / dabSeconds_, 1.0, 64.0)) : 1;
+    const double target = std::max(kBatchSeconds, prepSeconds_);
+    size_t n = dabSeconds_ > 0.0 ? size_t(std::clamp(target / dabSeconds_, 1.0, 64.0)) : 1;
+    if (strokeFinishing_) n = 64;
     s.batch.clear();
     while (!dabQueue_.empty() && s.batch.size() < n) s.batch.push_back(dabQueue_.pop());
+    s.finalize = strokeFinishing_ && dabQueue_.empty();
     s.view.camera = camera_;
     s.view.canvas = canvasRect();
     s.view.probe = strokeProbe_ ? &s.probe : nullptr;

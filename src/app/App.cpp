@@ -1295,7 +1295,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     lastY_ = y;
     strokePath_.reset(x, y);
     dabQueue_.clear();
-    dabSeconds_ = 0.0; // measured again: the mesh and the brush may have changed
+    dabSeconds_ = prepSeconds_ = 0.0; // measured again: the mesh and the brush may have changed
     // Predictive strokes (AsyncStroke.cpp): the solver thread, the ghost's first estimate (the picked triangle).
     asyncStroke_ = asyncStrokeAllowed();
     pointerLatest_ = glm::vec2(x, y);
