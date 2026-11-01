@@ -286,7 +286,7 @@ void App::drawSubToolsContents() {
                 std::string label = t;
                 label[0] = char(std::toupper(static_cast<unsigned char>(label[0])));
                 if (label == "Quadsphere") label = "Quad Sphere";
-                if (ImGui::MenuItem(label.c_str(), nullptr, insertType_ == t)) {
+                if (ImGui::MenuItem((label + "##insert").c_str(), nullptr, insertType_ == t)) { // (Append's own Cone is beside it)
                     insertType_ = t;
                     status_ = "Insert " + label + ": drag on the model (the drag sets its size). Esc stops.";
                 }

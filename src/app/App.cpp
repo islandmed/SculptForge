@@ -1327,7 +1327,8 @@ void App::onMouseUp() {
         const float px = std::max(insertPx_, 12.0f * uiScale_);
         const float dist = glm::length(camera_.position() - insertAt_);
         const float worldPerPx = 2.0f * dist * std::tan(camera_.fovY * 0.5f) / std::max(canvasRect().h, 1.0f);
-        runCommand("insert_primitive", {{"type", insertType_}, {"x", double(insertAt_.x)}, {"y", double(insertAt_.y)},
+        const std::string symmetry = std::string(symmetry_.x ? "x" : "") + (symmetry_.y ? "y" : "") + (symmetry_.z ? "z" : "");
+        runCommand("insert_primitive", {{"type", insertType_}, {"symmetry", symmetry}, {"x", double(insertAt_.x)}, {"y", double(insertAt_.y)},
                                         {"z", double(insertAt_.z)}, {"nx", double(insertNormal_.x)},
                                         {"ny", double(insertNormal_.y)}, {"nz", double(insertNormal_.z)},
                                         {"size", double(2.0f * px * worldPerPx)},
