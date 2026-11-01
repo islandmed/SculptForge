@@ -7,6 +7,7 @@
 
 #include "app/UiLayout.h"
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -23,6 +24,10 @@ public:
 
     // Ranks actions for QUERY (best first); exposed for tests.
     static int score(const Action& action, const std::string& query);
+    // The palette's search: indices into ActionRegistry::all() of the actions matching QUERY, best first, at most
+    // LIMIT, only those ACCEPT takes (null: all). Radial menus pick their items with it.
+    static std::vector<size_t> find(const App& app, const std::string& query, size_t limit,
+                                    const std::function<bool(const Action&)>& accept = nullptr);
 
 private:
     void search(App& app);
