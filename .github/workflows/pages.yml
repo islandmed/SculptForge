@@ -39,7 +39,7 @@ jobs:
         with:
           path: website
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
       # Tell Bing and the other IndexNow search engines about the pages straight away (key file in website/).
       - name: IndexNow
         continue-on-error: true
