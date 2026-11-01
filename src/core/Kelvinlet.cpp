@@ -7,6 +7,7 @@
 #include "core/Commands.h"
 #include "core/Sculpt.h"
 #include "core/ThreadPool.h"
+#include "core/TierConfig.h"
 #include "core/Vdm.h"
 
 #include <algorithm>
@@ -19,6 +20,10 @@
 #include <vector>
 
 namespace sf {
+
+size_t KelvinletSettings::budget() const {
+    return vertexBudget ? vertexBudget : std::max<size_t>(size_t(currentTierConfig().activeTriangleBudget / 3), 100000);
+}
 
 float KelvinletSettings::poisson() const { return 0.49f * std::clamp(squash, 0.0f, 1.0f); }
 
@@ -441,7 +446,7 @@ void Sculptor::kelvinletSingle(Mesh& mesh, BVH& bvh, const KelvinletKernel& k, c
     const float maxDist = 3.0f * s.radius;
     float fraction = 0.04f;
     float cut = k.cutoff(amount, std::max(fraction * amount * peak, 1e-7f * s.radius), maxDist);
-    const size_t budget = std::max<size_t>(kelvinlet.vertexBudget, 1000);
+    const size_t budget = kelvinlet.budget();
     if (kelvinLastVerts_ > 0 && kelvinLastCut_ > 0.0f) {
         const float reach = cut + 0.5f * glm::length(travel0), lastReach = kelvinLastCut_;
         const double predicted = double(kelvinLastVerts_) * double(reach * reach) / double(lastReach * lastReach);
