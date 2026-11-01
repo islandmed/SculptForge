@@ -191,6 +191,7 @@
 #include "core/Matcap.h"
 #include "core/Multires.h"
 #include "core/Script.h"
+#include "core/SelectionSets.h"
 #include "core/ThreadPool.h"
 #include "core/Timeline.h"
 #include "link/HttpServer.h"
@@ -385,6 +386,9 @@ double Demo::query(const std::string& name, bool& known) const {
     if (const double v = app_.sculptableTestValue(name); !std::isnan(v)) return v;
     if (name == "qremesh_running") return app_.qremesh_ ? 1.0 : 0.0;
     if (name == "qremesh_guides") return double(app_.doc_.qremeshGuides.size());
+    if (name == "selection_sets") return m.selectionSets ? double(m.selectionSets->sets.size()) : 0.0;
+    if (name == "morph_target") return m.selectionSets && !m.selectionSets->morphTarget.empty() ? 1.0 : 0.0;
+    if (name == "morph_brush") return app_.brush_ == BrushType::Morph && app_.doc_.activeBrush < 0 ? 1.0 : 0.0;
     if (name == "qremesh_guide_loops") {
         size_t n = 0;
         for (const QRemeshGuide& g : app_.doc_.qremeshGuides) n += g.closed;

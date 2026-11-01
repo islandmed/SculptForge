@@ -330,6 +330,8 @@ void App::registerShellActions() {
         "Elastic pinch / swell: drag left to pinch the surface toward where you pressed, right to swell it.",
         "Elastic SnakeHook: pulls smooth, tapering horns and tendrils out along the stroke.",
         "Stamps the VDM brush's map along the stroke, each copy turned to follow it. Capture one with Capture from view.",
+        "Pulls the surface back toward the morph target, a selection set's shape (Tool > Selection Sets > Morph "
+        "Target); Alt pushes away. Works at any subdivision level.",
     };
     static_assert(std::size(kBrushHelp) == size_t(BrushType::Count));
     for (int i = 0; i < int(BrushType::Count); ++i) {

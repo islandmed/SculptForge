@@ -47,6 +47,21 @@ read by `loadProject` (src/core/Project.cpp). Commands: `save_project path=...`,
 
 Optional attributes are simply absent when the mesh doesn't have them.
 
+### Selection sets
+`subtools[i].selection_sets` (only for SubTools with sets; src/core/SelectionSets.h; added after 0.10.4 without a
+format version bump, older readers ignore it) holds `version` (1), `morph_target` (the set the Morph brush uses, if
+any) and `sets`: per set its `name`, `channels`, `level`, `vertex_count`, `triangle_count` (for people and tools;
+readers rely on the data) and `data`, a `u8` blob under `subtools/i/sets/<k>.bin`. The blob is self-contained,
+little-endian: `SFSS`, the set format version (1), the channel bits (1 mask, 2 polygroups, 4 vertex paint,
+8 visibility, 16 UVs, 32 shape), the vertex and triangle counts and level it was stored at, the name (u32 length +
+UTF-8), then one section per channel (u32 channel bit, u64 byte length, payload): runs (u64 count, then u32 start,
+u32 length each) of masked vertices plus a u32 "all ones" flag and otherwise f32 values; run-length polygroups (u32
+id, u32 length); runs of non-white vertices plus f32 x3 colours; runs of hidden triangles; f32 x2 UVs per triangle
+corner; f32 x3 positions. Readers skip sections they don't know and leave out (with a notice) any set they can't
+read; a set whose format version is newer than theirs is left out the same way. `.sfsets` files
+(`selection_sets_export`) are stored ZIPs of a `manifest.json` (`format` = `"SculptForge selection sets"`,
+`version` 1, `morph_target`, `sets` as above with `data` naming the entry) and the same blobs under `sets/`.
+
 ### Paint layers
 `subtools[i].paint_layers` (only written when the SubTool has paint layers; src/core/PaintLayer.h) holds
 `active` (the layer painting writes into, -1 = Base), `base` and `layers` (bottom to top). `blend` is one of

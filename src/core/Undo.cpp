@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Undo.h"
 
+#include "core/SelectionSets.h"
+
 #include <utility>
 
 namespace sf {
@@ -11,7 +13,7 @@ size_t UndoRecord::approxBytes() const {
                    polygroups.bytes() + (paint ? paint->bytes() : 0) +
                    (textureTiles ? textureTiles->bytes() : 0) + (texture ? texture->bytes() : 0) +
                    (subdiv ? subdiv->bytes() : 0) + (topology ? topology->bytes() : 0) +
-                   (micro ? micro->bytes() : 0);
+                   (micro ? micro->bytes() : 0) + uvs.bytes() + (sets ? sets->bytes() : 0);
     for (const auto& l : layerOffsets) bytes += l.bytes();
     if (mesh)
         bytes += mesh->vertexCount() * ((2 + (mesh->base.empty() ? 0 : 1 + mesh->layers.size())) * sizeof(glm::vec3) +
@@ -155,6 +157,7 @@ void UndoStack::apply(UndoRecord& r, Mesh& mesh, BVH& bvh) {
         return;
     }
     if (r.micro) r.micro->swapWith(mesh); // (the base doesn't move: no BVH work)
+    if (r.sets) std::swap(mesh.selectionSets, r.sets->list);
     if (r.mesh) {
         std::swap(*r.mesh, mesh);
         mesh.topologyDirty = true;
@@ -212,6 +215,20 @@ void UndoStack::apply(UndoRecord& r, Mesh& mesh, BVH& bvh) {
         r.polygroups.swapWith(mesh.ensurePolygroups());
         mesh.facesDirty = true;
     }
+    if (!r.uvs.empty()) {
+        if (mesh.uvs.size() != mesh.triangleCount() * 3) mesh.uvs.assign(mesh.triangleCount() * 3, glm::vec2(0.0f));
+        r.uvs.swapWith(mesh.uvs);
+        mesh.facesDirty = true;
+        mesh.topologyDirty = true;
+    }
+}
+
+size_t SelectionSetsUndo::bytes() const {
+    if (!list) return 0;
+    size_t total = 0;
+    for (const auto& s : list->sets)
+        if (s.use_count() == 1) total += s->bytes();
+    return total;
 }
 
 bool UndoStack::undo(Mesh& mesh, BVH& bvh) {

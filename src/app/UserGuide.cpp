@@ -426,6 +426,7 @@ std::string UserGuide::chapterFor(const std::string& palette, const std::string&
     if (starts("Tool > Geometry") || starts("Tool > Remesh")) return "geometry.md";
     if (starts("Tool > Masking")) return "masking.md";
     if (starts("Tool > Polygroups") || starts("Tool > Visibility")) return "polygroups.md";
+    if (starts("Tool > Selection Sets")) return "selection-sets.md";
     if (starts("Tool > Export")) return "exporting.md";
     if (starts("Tool > Display")) return "interface.md";
     if (starts("Tool")) return "subtools.md";
