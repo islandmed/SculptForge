@@ -39,6 +39,7 @@ jobs:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_BASEDIR: ${{ github.workspace }}
       CCACHE_MAXSIZE: 500M
+      CCACHE_DEPEND: 'true' # include files from the compiler's own dependency list (-MD, /showIncludes): no extra preprocessor run
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -152,6 +153,7 @@ jobs:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_BASEDIR: ${{ github.workspace }}
       CCACHE_MAXSIZE: 300M
+      CCACHE_DEPEND: 'true'
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -213,6 +215,7 @@ jobs:
           echo "CCACHE_DIR=$GITHUB_WORKSPACE/.ccache" >> "$GITHUB_ENV"
           echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
           echo "CCACHE_MAXSIZE=500M" >> "$GITHUB_ENV"
+          echo "CCACHE_DEPEND=true" >> "$GITHUB_ENV"
       - name: Compiler cache (restore)
         uses: actions/cache/restore@v5
         with:
