@@ -24,8 +24,18 @@ namespace sf {
 // painted texture with layers ("texture"; older files still load). 4: SubTools may carry subdivision levels
 // ("subdiv"; older files still load). 5: sculpt-layer details of subdivision levels are in the levels' local
 // frames, not world space (format 4 files are converted when they load). 6: levels made by Divide keep no
-// triangles, child maps or (where their positions say it) details; older files still load.
-constexpr int kProjectVersion = 6;
+// triangles, child maps or (where their positions say it) details; older files still load. 7: a SubTool texture
+// may carry material channels (the texture's "pbr" key, core/LayerStackIO.h).
+//
+// kProjectVersion is the newest format this build reads. Saving writes the lowest version the content needs
+// (ProjectVersionNeed): a project that uses nothing newer than format 6 is still written as 6, so older
+// SculptForge versions keep opening it. A feature that needs a newer format calls need(N) while saving.
+constexpr int kProjectVersion = 7;
+constexpr int kProjectBaseWriteVersion = 6;
+struct ProjectVersionNeed {
+    int version = kProjectBaseWriteVersion;
+    void need(int v) { version = v > version ? v : version; }
+};
 constexpr const char* kProjectExtension = ".sfproj";
 
 // True for paths ending in .sfproj (any case).
