@@ -176,6 +176,8 @@ constexpr GLbitfield GL_COLOR_BUFFER_BIT = 0x4000;
     X(void, Uniform1i, GLint, GLint)                                                         \
     X(void, Uniform1f, GLint, GLfloat)                                                       \
     X(void, Uniform2f, GLint, GLfloat, GLfloat)                                              \
+    X(void, Uniform2i, GLint, GLint, GLint)                                                  \
+    X(void, Uniform2iv, GLint, GLsizei, const GLint*)                                        \
     X(void, DisableVertexAttribArray, GLuint)                                                \
     X(void, VertexAttrib1f, GLuint, GLfloat)                                                 \
     X(void, VertexAttrib3f, GLuint, GLfloat, GLfloat, GLfloat)                               \

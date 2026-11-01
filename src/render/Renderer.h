@@ -9,8 +9,10 @@
 #include "render/Camera.h"
 #include "render/Clusters.h"
 #include "render/GL.h"
+#include "render/Ghost.h"
 
 #include <cstdint>
+#include <list>
 #include <string>
 #include <vector>
 
@@ -105,6 +107,32 @@ public:
     // GL texture of the painted texture of SubTool `id` as last synced (0 if none), for UI previews (rows bottom-up).
     GLuint paintTexture(uint32_t id) const;
 
+    // --- Strokes on heavy meshes (app/AsyncStroke.cpp) ---
+    // The predictive stroke preview (render/Ghost.h) drawn on SubTool `id`; an empty stroke turns it off.
+    void setGhost(uint32_t id, const GhostStroke& ghost);
+    // A sculpt stroke's vertex upload made in two halves: prepareStrokeUpload packs what the mesh marked dirty
+    // (positions and normals only) and the culling bounds of the clusters that moved, on any thread and without
+    // GL, while the GL thread keeps drawing from what it has; commitStrokeUpload sends it on the GL thread.
+    // prepare clears the mesh's dirty state; it returns false, and leaves the mesh as it was, when the change
+    // needs the regular syncScene instead (a new layout, attributes, dynamic topology, a vertex off the grid).
+    // Only one prepare at a time, and no syncScene of that mesh until its commit.
+    struct StrokeUpload {
+        uint32_t id = 0;
+        bool ready = false;
+        std::vector<PackedVertex> data;
+        struct Range {
+            uint32_t begin, end; // GPU slots
+            size_t offset;       // into data
+        };
+        std::vector<Range> ranges;
+        std::vector<uint32_t> movedClusters;
+        std::vector<ClusterBounds> bounds; // of movedClusters
+        std::vector<uint8_t> blockChanged, blockMoved; // scratch, per block
+        size_t bytes() const { return data.size() * sizeof(PackedVertex); }
+    };
+    bool prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out);
+    void commitStrokeUpload(StrokeUpload& up);
+
     // Bytes of GPU buffers and textures the mesh slots hold.
     size_t gpuBytes() const;
     // Triangles the last draw() sent to the GPU (after culling), for the benchmark.
@@ -159,6 +187,7 @@ private:
         bool hasTangents = false, tangentsStale = true, normalFlipGreen = false;
         bool hasColors = false, hasMask = false, hasGroups = false, hasUvs = false;
         bool fresh = true; // nothing uploaded yet
+        bool regrid = false; // a stroke's vertex left the position grid (prepareStrokeUpload): the next sync re-sends everything
         bool outOfMemory = false; // the last full upload ran out of GPU memory: not drawn
         UploadOrder order; // the cluster layout
         PositionGrid grid; // the positions' quantisation
@@ -218,6 +247,11 @@ private:
     void buildLines(MeshSlot& s, const Mesh& mesh);
     void buildProxies(MeshSlot& s, const Mesh& mesh);
     bool proxyUsed_ = false; // the last draw() drew motion proxies: sync keeps them current
+    // The ghost (setGhost), drawn on the slot ghostId_.
+    GhostStroke ghost_;
+    uint32_t ghostId_ = 0;
+    struct MeshProgram;
+    void setGhostUniforms(const MeshProgram& p);
     void syncNormalMap(MeshSlot& s, const Mesh& mesh, const NormalMapView* normalMap);
     // `indicesDone`: the index buffer and drawCount are already written (a full upload writes them while
     // building the layout).
@@ -262,14 +296,16 @@ private:
         GLint view = -1, proj = -1, gridOrigin = -1, gridStep = -1, viewport = -1, projScale = -1, baseColor = -1, paint = -1,
               showMask = -1, groups = -1, matcap = -1, matcapCavity = -1, dim = -1, primBase = -1, hasPaint = -1,
               normalFlipY = -1, twoSided = -1;
+        GLint ghostGroups = -1, ghostRange = -1, ghostEps = -1, ghostEdge = -1, ghostA = -1, ghostB = -1, ghostC = -1, ghostBound = -1, ghostKind = -1, ghostFocal = -1;
     };
-    static constexpr int kPaint = 1, kPrim = 2, kTextured = 4, kNormalMap = 8, kFlat = 16;
-    MeshProgram programs_[32];
+    static constexpr int kPaint = 1, kPrim = 2, kTextured = 4, kNormalMap = 8, kFlat = 16, kGhost = 32;
+    MeshProgram programs_[64];
     std::string programError_;
     const MeshProgram* meshProgram(int features);
     bool vertexIdHasBase_ = true; // gl_VertexID includes the base vertex (checked at init; else per-cluster draws)
     bool checkVertexIdBase();
-    std::vector<MeshSlot> slots_;
+    // (A list: a slot stays put while others come and go, so prepareStrokeUpload can work on one from another thread.)
+    std::list<MeshSlot> slots_;
     struct DrawItem {
         uint32_t id;
         bool active;

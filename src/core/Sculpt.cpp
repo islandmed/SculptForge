@@ -461,6 +461,7 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
     dabVerts_.clear();
     dabLeaves_.clear();
     for (const glm::vec3& m : mirrors(sym)) {
+        frameWanted_ = m == glm::vec3(1.0f); // (the unmirrored pass records lastFrame)
         DabParams mp = p;
         mp.center *= m;
         mp.viewDir *= m;
@@ -503,6 +504,10 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     areaCenter /= wsum;
     float nlen = glm::length(areaNormal);
     areaNormal = nlen > 1e-12f ? areaNormal / nlen : -p.viewDir;
+    if (frameWanted_) {
+        lastFrame = {p.center, areaNormal, areaCenter, true};
+        frameWanted_ = false;
+    }
 
     const float s = std::clamp(p.strength, 0.0f, 1.0f) * std::clamp(p.pressure, 0.0f, 1.0f);
     const float sign = p.invert ? -1.0f : 1.0f;
@@ -684,6 +689,7 @@ void Sculptor::dabRecipe(Mesh& mesh, BVH& bvh, const BrushRecipe& recipe, const 
     dabVerts_.clear();
     dabLeaves_.clear();
     for (const glm::vec3& m : mirrors(sym)) {
+        frameWanted_ = m == glm::vec3(1.0f); // (the unmirrored pass records lastFrame)
         DabParams mp = base;
         mp.center *= m;
         mp.viewDir *= m;
@@ -759,6 +765,10 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
     areaCenter /= wsum;
     float nlen = glm::length(areaNormal);
     areaNormal = nlen > 1e-12f ? areaNormal / nlen : -p.viewDir;
+    if (frameWanted_) {
+        lastFrame = {p.center, areaNormal, areaCenter, true};
+        frameWanted_ = false;
+    }
 
     glm::vec3 strokeDir = p.strokeDelta;
     float strokeLen = glm::length(strokeDir);

@@ -207,6 +207,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/Bench.cpp
     src/app/CrashLog.cpp
     src/app/App.cpp
+    src/app/AsyncStroke.cpp
     src/app/Demo.cpp
     src/app/UiTest.cpp
     src/app/Actions.cpp
@@ -256,6 +257,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/render/GL.cpp
     src/render/Camera.cpp
     src/render/Clusters.cpp
+    src/render/Ghost.cpp
     src/render/Renderer.cpp
   )
   target_link_libraries(sculptforge PRIVATE sculptforge_core sculptforge_ai sculptforge_phone imgui SDL3::SDL3)
@@ -435,7 +437,7 @@ if(SCULPTFORGE_BUILD_TESTS)
   file(GLOB SCULPTFORGE_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_*.cpp)
   add_executable(sculptforge_tests ${SCULPTFORGE_TEST_SOURCES} src/cli/McpServer.cpp src/app/AssetLibrary.cpp
                                    src/app/UiLayout.cpp src/app/ShellGeometry.cpp src/render/Camera.cpp
-                                   src/render/Clusters.cpp)
+                                   src/render/Clusters.cpp src/render/Ghost.cpp)
   target_include_directories(sculptforge_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
   target_compile_definitions(sculptforge_tests PRIVATE SF_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
   target_link_libraries(sculptforge_tests PRIVATE sculptforge_core sculptforge_ai sculptforge_phone)

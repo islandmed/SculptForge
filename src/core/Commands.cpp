@@ -107,8 +107,21 @@ CommandRegistry::CommandRegistry() {
 
     add({"new_sphere",
          "Replace the scene with a new sphere ready for sculpting.",
-         {{"subdivisions", T::Number, "Icosphere subdivision level (0-8). Default 6.", false}},
+         {{"subdivisions", T::Number, "Icosphere subdivision level (0-8). Default 6.", false},
+          {"triangles", T::Number,
+           "About this many triangles instead (a cube's quads pushed onto the sphere, up to 48M; benchmarks: "
+           "tools/bench_strokes.sh).",
+           false}},
          [](Document& doc, const Args& a) -> CommandResult {
+             if (const double t = argNumber(a, "triangles", 0.0); t > 0.0) {
+                 const int res = std::clamp(int(std::lround(std::sqrt(t / 12.0))), 1, 2000);
+                 Mesh m = makeCube(res, 2.0f);
+                 for (glm::vec3& p : m.positions) p = glm::normalize(p);
+                 m.recomputeAllNormals();
+                 doc.setMesh(std::move(m), "Sphere");
+                 doc.path.clear();
+                 return {true, "Created sphere with " + std::to_string(doc.mesh.triangleCount()) + " triangles"};
+             }
              int level = std::clamp(int(argNumber(a, "subdivisions", 6)), 0, 8);
              doc.setMesh(makeIcosphere(level), "Sphere");
              doc.path.clear();

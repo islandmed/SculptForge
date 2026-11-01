@@ -54,11 +54,94 @@ vec3 decodeNormal(uint a) {
     n.y += n.y >= 0.0 ? -t : t;
     return normalize(n);
 }
+#ifdef GHOST
+// The predictive stroke preview (render/Ghost.h): the dabs the solver hasn't placed yet move the vertices as the
+// brush would. Keep in step with sf::ghostMove (Ghost.cpp).
+uniform vec4 uGhostA[64];    // centre, radius
+uniform vec4 uGhostB[64];    // area normal, strength x pressure
+uniform vec4 uGhostC[64];    // area centre, weight
+uniform int uGhostGroups;    // runs of dabs (one per mirror), each with a sphere holding its dabs
+uniform vec4 uGhostBound[8];
+uniform ivec2 uGhostRange[8]; // [first, end) of each run
+uniform ivec2 uGhostKind;    // kernel (sf::GhostKind), inverted
+uniform float uGhostFocal;
+uniform float uGhostEps;     // the tangent step for the bent normal and the curvature
+uniform float uGhostEdge;    // the mesh's edge length under the brush (the cavity term's scale)
+float ghostFalloff(float d, float r) {
+    float t = clamp(1.0 - d / r, 0.0, 1.0);
+    if (uGhostFocal != 0.0) t = pow(t, exp2(2.0 * clamp(uGhostFocal, -1.0, 1.0)));
+    return t * t * (3.0 - 2.0 * t);
+}
+vec3 onPlane(vec3 v, vec3 n) { return v - n * dot(v, n); }
+vec3 ghostMove(vec3 x, vec3 n, int first, int end) {
+    float sgn = uGhostKind.y != 0 ? -1.0 : 1.0;
+    int kind = uGhostKind.x;
+    for (int i = first; i < end; ++i) {
+        vec3 c = uGhostA[i].xyz;
+        float r = uGhostA[i].w;
+        float dist = length(x - c);
+        if (dist >= r) continue;
+        float w = uGhostC[i].w;
+        float f = ghostFalloff(dist, r) * w;
+        float s = uGhostB[i].w;
+        vec3 an = uGhostB[i].xyz;
+        vec3 ac = uGhostC[i].xyz;
+        if (kind == 1) x += an * (sgn * s * r * 0.06 * f);
+        else if (kind == 2) x += n * (sgn * s * r * 0.05 * f);
+        else if (kind == 3) {
+            float h = dot(x - (ac + an * (sgn * r * 0.05 * s)), an);
+            if (sgn * h < 0.0) x -= an * (h * f);
+        } else if (kind == 4) {
+            float e = clamp((1.0 - dist / r) / 0.35, 0.0, 1.0);
+            float h = dot(x - (ac + an * (sgn * r * 0.08 * s)), an);
+            if (sgn * h < 0.0) x -= an * (h * e * e * (3.0 - 2.0 * e) * w);
+        } else if (kind == 5) {
+            x -= an * (dot(x - ac, an) * s * f * (uGhostKind.y != 0 ? -0.5 : 1.0));
+        } else if (kind == 6) {
+            x += an * (-sgn * s * r * 0.05 * f * f) + onPlane(c - x, an) * (0.25 * s * f);
+        } else if (kind == 7) {
+            x += onPlane(c - x, an) * (sgn * 0.2 * s * f);
+        } else if (kind == 8) {
+            x += an * (-sgn * s * r * 0.08 * f * f * f * f) + onPlane(c - x, an) * (0.3 * s * f);
+        } else if (kind == 9) {
+            float h = dot(x - (ac - an * (sgn * r * 0.02 * s)), an);
+            if (sgn * h > 0.0) x -= an * (h * min(1.0, sqrt(f) * (0.5 + s)));
+        }
+    }
+    return x;
+}
+#endif
 void main() {
     uvec3 q = uvec3(aPos.x & 0x1FFFFFu, (aPos.x >> 21) | ((aPos.y & 0x3FFu) << 11), (aPos.y >> 10) & 0x1FFFFFu);
-    vec4 p = uView * vec4(uGridOrigin + vec3(q) * uGridStep, 1.0);
+    vec3 world = uGridOrigin + vec3(q) * uGridStep;
+    vec3 normal = decodeNormal(aNormal);
     float curvature = float(int(aNormal >> 22) - 512) / 511.0; // sign(c) sqrt(|c|), render/Clusters.h
-    vNormalCurv = vec4(mat3(uView) * decodeNormal(aNormal), curvature * abs(curvature));
+    curvature *= abs(curvature);
+#ifdef GHOST
+    for (int g = 0; g < uGhostGroups; ++g) {
+        if (distance(world, uGhostBound[g].xyz) >= uGhostBound[g].w) continue;
+        int first = uGhostRange[g].x, end = uGhostRange[g].y;
+        vec3 m0 = ghostMove(world, normal, first, end);
+        if (m0 == world) continue;
+        // The moved point and four neighbours on its tangent plane moved alike: the displaced surface's normal
+        // (central differences) and the change of the cavity term, which is the edge length over four times the
+        // Laplacian of the move along the normal (Renderer.cpp curvatureAt: neighbour average above the vertex).
+        vec3 t1 = normalize(abs(normal.x) < 0.9 ? cross(normal, vec3(1.0, 0.0, 0.0)) : cross(normal, vec3(0.0, 1.0, 0.0)));
+        vec3 t2 = cross(normal, t1);
+        float e = uGhostEps;
+        vec3 a1 = ghostMove(world + t1 * e, normal, first, end), b1 = ghostMove(world - t1 * e, normal, first, end);
+        vec3 a2 = ghostMove(world + t2 * e, normal, first, end), b2 = ghostMove(world - t2 * e, normal, first, end);
+        float h0 = dot(m0 - world, normal);
+        float lap = (dot(a1 - world - t1 * e, normal) + dot(b1 - world + t1 * e, normal) + dot(a2 - world - t2 * e, normal) +
+                     dot(b2 - world + t2 * e, normal) - 4.0 * h0) / (e * e);
+        curvature = clamp(curvature + 0.25 * uGhostEdge * lap, -1.0, 1.0);
+        vec3 bent = cross(a1 - b1, a2 - b2);
+        if (dot(bent, bent) > 1e-30) normal = normalize(dot(bent, normal) < 0.0 ? -bent : bent);
+        world = m0;
+    }
+#endif
+    vec4 p = uView * vec4(world, 1.0);
+    vNormalCurv = vec4(mat3(uView) * normal, curvature);
 #ifdef FLAT
     vViewPos = p.xyz;
 #endif
@@ -519,7 +602,7 @@ bool Renderer::init(std::string& error) {
 
 const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     if (features & (kTextured | kNormalMap)) features |= kTextured | kPrim;
-    MeshProgram& p = programs_[features & 31];
+    MeshProgram& p = programs_[features & 63];
     if (p.id) return &p;
     std::string prefix = "#version 330 core\n";
     if (features & kPaint) prefix += "#define PAINT\n";
@@ -527,6 +610,7 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     if (features & kTextured) prefix += "#define TEXTURED\n";
     if (features & kNormalMap) prefix += "#define NORMALMAP\n";
     if (features & kFlat) prefix += "#define FLAT\n";
+    if (features & kGhost) prefix += "#define GHOST\n";
     const std::string vs = prefix + kMeshVS, fs = prefix + kMeshFS, gs = prefix + kMeshGS;
     p.id = link(vs.c_str(), fs.c_str(), programError_, nullptr, (features & kTextured) ? gs.c_str() : nullptr);
     if (!p.id) return nullptr;
@@ -548,6 +632,16 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     p.hasPaint = at("uHasPaint");
     p.normalFlipY = at("uNormalFlipY");
     p.twoSided = at("uTwoSided");
+    p.ghostGroups = at("uGhostGroups");
+    p.ghostRange = at("uGhostRange");
+    p.ghostEps = at("uGhostEps");
+    p.ghostEdge = at("uGhostEdge");
+    p.ghostA = at("uGhostA");
+    p.ghostB = at("uGhostB");
+    p.ghostC = at("uGhostC");
+    p.ghostBound = at("uGhostBound");
+    p.ghostKind = at("uGhostKind");
+    p.ghostFocal = at("uGhostFocal");
     // Texture units: groups 1, matcap 2, UVs 3, painted texture 4, normal map 5, tangents 6, cluster table 7.
     gl::UseProgram(p.id);
     gl::Uniform1i(at("uGroupIds"), 1);
@@ -959,14 +1053,14 @@ bool Renderer::outOfMemory(uint32_t id) const {
 void Renderer::syncScene(const std::vector<SceneMesh>& scene) {
     syncMatcaps();
     // Free the slots of SubTools that are gone (deleted, merged, a new scene).
-    for (size_t i = 0; i < slots_.size();) {
-        const bool live = std::any_of(scene.begin(), scene.end(), [&](const SceneMesh& m) { return m.id == slots_[i].id; });
+    for (auto it = slots_.begin(); it != slots_.end();) {
+        const bool live = std::any_of(scene.begin(), scene.end(), [&](const SceneMesh& m) { return m.id == it->id; });
         if (live) {
-            ++i;
+            ++it;
             continue;
         }
-        freeSlot(slots_[i]);
-        slots_.erase(slots_.begin() + std::ptrdiff_t(i));
+        freeSlot(*it);
+        it = slots_.erase(it);
     }
     drawList_.clear();
     for (const SceneMesh& m : scene) {
@@ -1688,9 +1782,14 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
         gl::BindVertexArray(0);
         s.grid = PositionGrid::around(meshBounds(mesh));
         dirtyRuns_.assign(1, {0u, uint32_t(s.order.size())});
+    } else if (s.regrid) { // a stroke's vertex left the grid (prepareStrokeUpload): a new one, everything sent
+        s.grid = PositionGrid::around(meshBounds(mesh));
+        dirtyRuns_.assign(1, {0u, uint32_t(s.order.size())});
+        std::fill(s.blockHash.begin(), s.blockHash.end(), ~uint64_t(0) >> 1); // (no block keeps its hash)
     } else {
         s.order.dirtyRuns(mesh, dirtyRuns_);
     }
+    s.regrid = false;
     const size_t ns = s.order.size();
     const bool ranged = !full && !dirtyRuns_.empty();
     const std::span<const uint32_t> order = s.order.fromGpu();
@@ -2237,11 +2336,13 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     // A baked normal map preview bends the shading normal (core/Bake.h).
     const bool normalMapped = s.hasUvs && s.normalTexture && s.hasTangents;
     const int groups = active && settings.showPolygroups ? (s.hasGroups ? 1 : 2) : 0;
+    const bool ghost = active && s.id == ghostId_ && !ghost_.empty() && !settings.motionProxy;
     const int features = (s.hasColors || s.hasMask ? kPaint : 0) | (groups == 1 ? kPrim : 0) | (textured ? kTextured : 0) |
-                         (normalMapped ? kNormalMap : 0) | (flat ? kFlat : 0);
+                         (normalMapped ? kNormalMap : 0) | (flat ? kFlat : 0) | (ghost ? kGhost : 0);
     const MeshProgram* p = meshProgram(features);
     if (!p) return;
     gl::UseProgram(p->id);
+    if (ghost) setGhostUniforms(*p);
     gl::UniformMatrix4fv(p->view, 1, GL_FALSE, glm::value_ptr(frameView_));
     gl::UniformMatrix4fv(p->proj, 1, GL_FALSE, glm::value_ptr(frameProj_));
     gl::Uniform3fv(p->gridOrigin, 1, glm::value_ptr(s.grid.origin));
@@ -2314,6 +2415,205 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
 }
 
 // ---------------------------------------------------------------------------
+// Strokes on heavy meshes: the ghost and the two-part upload (app/AsyncStroke.cpp)
+// ---------------------------------------------------------------------------
+
+void Renderer::setGhost(uint32_t id, const GhostStroke& ghost) {
+    ghostId_ = id;
+    ghost_.kind = ghost.kind;
+    ghost_.invert = ghost.invert;
+    ghost_.focal = ghost.focal;
+    ghost_.edge = ghost.edge;
+    ghost_.dabs.assign(ghost.dabs.begin(), ghost.dabs.begin() + std::ptrdiff_t(std::min(ghost.dabs.size(), GhostStroke::kMaxDabs)));
+}
+
+void Renderer::setGhostUniforms(const MeshProgram& p) {
+    glm::vec4 a[GhostStroke::kMaxDabs], b[GhostStroke::kMaxDabs], c[GhostStroke::kMaxDabs];
+    glm::vec4 bound[GhostStroke::kMaxMirrors];
+    GLint range[GhostStroke::kMaxMirrors * 2];
+    int groups = 0;
+    float minRadius = 1e30f;
+    const size_t n = ghost_.dabs.size();
+    for (size_t i = 0; i < n; ++i) {
+        const GhostDab& d = ghost_.dabs[i];
+        a[i] = glm::vec4(d.center, d.radius);
+        b[i] = glm::vec4(d.normal, d.strength);
+        c[i] = glm::vec4(d.areaCenter, d.weight);
+        minRadius = std::min(minRadius, d.radius);
+        const bool next = i == 0 || d.mirror != ghost_.dabs[i - 1].mirror;
+        if (next) {
+            if (groups == int(GhostStroke::kMaxMirrors)) break;
+            range[groups * 2] = range[groups * 2 + 1] = GLint(i);
+            ++groups;
+        }
+        range[groups * 2 - 1] = GLint(i + 1);
+    }
+    // Each run's bounding sphere (around its dabs' spheres, a little wider: the moves reach out a little).
+    for (int g = 0; g < groups; ++g) {
+        AABB box;
+        for (GLint i = range[g * 2]; i < range[g * 2 + 1]; ++i) {
+            box.expand(glm::vec3(a[i]) - glm::vec3(a[i].w));
+            box.expand(glm::vec3(a[i]) + glm::vec3(a[i].w));
+        }
+        bound[g] = glm::vec4(box.center(), glm::length(box.max - box.min) * 0.5f * 1.1f);
+    }
+    gl::Uniform1i(p.ghostGroups, groups);
+    gl::Uniform4fv(p.ghostBound, groups, glm::value_ptr(bound[0]));
+    gl::Uniform2iv(p.ghostRange, groups, range);
+    gl::Uniform4fv(p.ghostA, GLsizei(n), glm::value_ptr(a[0]));
+    gl::Uniform4fv(p.ghostB, GLsizei(n), glm::value_ptr(b[0]));
+    gl::Uniform4fv(p.ghostC, GLsizei(n), glm::value_ptr(c[0]));
+    gl::Uniform2i(p.ghostKind, GLint(ghost_.kind), ghost_.invert ? 1 : 0);
+    gl::Uniform1f(p.ghostFocal, ghost_.focal);
+    gl::Uniform1f(p.ghostEps, std::max(minRadius, 1e-6f) * 0.02f);
+    gl::Uniform1f(p.ghostEdge, ghost_.edge);
+}
+
+bool Renderer::prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out) {
+    out.id = id;
+    out.ready = false;
+    out.data.clear();
+    out.ranges.clear();
+    out.movedClusters.clear();
+    out.bounds.clear();
+    MeshSlot* found = nullptr;
+    for (MeshSlot& s : slots_)
+        if (s.id == id) found = &s;
+    if (!found) return false;
+    MeshSlot& s = *found;
+    const size_t nv = mesh.vertexCount();
+    // What only the regular sync handles: a new layout, faces, attributes appearing, dynamic topology, textures.
+    if (s.fresh || s.outOfMemory || s.regrid || mesh.topologyDirty || mesh.facesDirty || nv != s.vertexCapacity ||
+        !mesh.changedTriangles.empty() || !s.patches.empty() || mesh.normals.size() != nv || s.hasUvs ||
+        s.hasColors != (nv > 0 && mesh.colors.size() == nv) || s.hasMask != (nv > 0 && mesh.mask.size() == nv))
+        return false;
+    std::vector<std::pair<uint32_t, uint32_t>> runs;
+    s.order.dirtyRuns(mesh, runs);
+    if (runs.empty()) {
+        out.ready = true;
+        return true;
+    }
+    // The colours and mask of the dirty runs would go up too (a sculpt stroke doesn't change them; a stroke that
+    // does takes the regular sync).
+    const size_t ns = s.order.size();
+    const size_t nb = (ns + UploadOrder::kBlock - 1) / UploadOrder::kBlock;
+    const std::span<const uint32_t> order = s.order.fromGpu();
+    s.blockHash.resize(nb * 2, 0);
+    out.blockChanged.assign(nb, 0);
+    out.blockMoved.assign(nb, 0);
+    // Pieces of a few thousand slots packed in parallel, each at its offset in `data`.
+    constexpr uint32_t kPiece = 2048;
+    struct Piece {
+        uint32_t begin, end;
+        size_t offset;
+    };
+    std::vector<Piece> pieces;
+    size_t total = 0;
+    for (const auto& [b, e] : runs)
+        for (uint32_t c = b; c < e; c += kPiece) {
+            const uint32_t ce = std::min(e, c + kPiece);
+            pieces.push_back({c, ce, total});
+            total += ce - c;
+        }
+    out.data.resize(total);
+    std::atomic<bool> outside{false};
+    std::vector<uint64_t> hashes(nb * 2, 0); // (written per block, then compared: a failed prepare keeps the old)
+    poolFor(pieces.size(), [&](size_t i0, size_t i1) {
+        for (size_t pi = i0; pi < i1; ++pi) {
+            const Piece& pc = pieces[pi];
+            PackedVertex* dst = out.data.data() + pc.offset;
+            bool inside = true;
+            uint64_t hp = 0, hn = 0;
+            for (uint32_t i = pc.begin; i < pc.end; ++i) {
+                const uint32_t v = order[i];
+                PackedVertex pv{};
+                if (v < nv) inside &= packVertex(s.grid, mesh.positions[v], mesh.normals[v], curvatureAt(mesh, v), pv);
+                dst[i - pc.begin] = pv;
+                hp = (hp ^ (uint64_t(pv.pos[0]) | uint64_t(pv.pos[1]) << 32)) * 0x100000001B3ull + i;
+                hn = (hn ^ pv.normal) * 0x100000001B3ull + i;
+                if ((i + 1) % UploadOrder::kBlock == 0 || i + 1 == pc.end) {
+                    const size_t g = i >> UploadOrder::kBlockShift;
+                    hashes[g * 2] = hp;
+                    hashes[g * 2 + 1] = hn;
+                    out.blockMoved[g] = s.blockHash[g * 2] != hp;
+                    out.blockChanged[g] = out.blockMoved[g] || s.blockHash[g * 2 + 1] != hn;
+                    hp = hn = 0;
+                }
+            }
+            if (!inside) outside.store(true, std::memory_order_relaxed);
+        }
+    }, 1, 2);
+    if (outside.load()) {
+        s.regrid = true; // the next syncScene makes a new grid and sends everything (the mesh stays dirty)
+        return false;
+    }
+    // The changed blocks' GPU ranges and where they are in `data`.
+    for (const Piece& pc : pieces)
+        for (uint32_t b = pc.begin; b < pc.end;) {
+            const uint32_t e = std::min(pc.end, (b & ~(UploadOrder::kBlock - 1)) + UploadOrder::kBlock);
+            const size_t g = b >> UploadOrder::kBlockShift;
+            if (out.blockChanged[g]) {
+                s.blockHash[g * 2] = hashes[g * 2];
+                s.blockHash[g * 2 + 1] = hashes[g * 2 + 1];
+                const size_t offset = pc.offset + (b - pc.begin);
+                if (!out.ranges.empty() && out.ranges.back().end == b && out.ranges.back().offset +
+                                                                          (out.ranges.back().end - out.ranges.back().begin) == offset)
+                    out.ranges.back().end = e;
+                else out.ranges.push_back({b, e, offset});
+            }
+            b = e;
+        }
+    // The clusters with a block that moved, and their culling bounds.
+    for (const auto& [b, e] : runs)
+        for (uint32_t g = b >> UploadOrder::kBlockShift; g < (e + UploadOrder::kBlock - 1) >> UploadOrder::kBlockShift; ++g) {
+            if (!out.blockMoved[g]) continue;
+            const uint32_t c = s.order.clusterOfSlot(g << UploadOrder::kBlockShift);
+            if (out.movedClusters.empty() || c > out.movedClusters.back()) out.movedClusters.push_back(c);
+        }
+    out.bounds.resize(out.movedClusters.size());
+    poolFor(out.movedClusters.size(), [&](size_t i0, size_t i1) {
+        for (size_t i = i0; i < i1; ++i) out.bounds[i] = clusterBounds(mesh, s.order, out.movedClusters[i]);
+    }, 1, 2);
+    mesh.clearDirty();
+    out.ready = true;
+    return true;
+}
+
+void Renderer::commitStrokeUpload(StrokeUpload& up) {
+    if (!up.ready) return;
+    up.ready = false;
+    MeshSlot* found = nullptr;
+    for (MeshSlot& s : slots_)
+        if (s.id == up.id) found = &s;
+    if (!found) return;
+    MeshSlot& s = *found;
+    if (!up.ranges.empty()) {
+        gl::BindBuffer(GL_ARRAY_BUFFER, s.vertexBuffer);
+        for (const StrokeUpload::Range& r : up.ranges)
+            gl::BufferSubData(GL_ARRAY_BUFFER, GLintptr(size_t(r.begin) * sizeof(PackedVertex)),
+                              GLsizeiptr(size_t(r.end - r.begin) * sizeof(PackedVertex)), up.data.data() + r.offset);
+        gl::BindBuffer(GL_ARRAY_BUFFER, 0);
+    }
+    if (!up.movedClusters.empty()) {
+        s.bounds.resize(s.order.clusters().size());
+        s.proxyStale.resize(s.bounds.size(), 1);
+        for (size_t i = 0; i < up.movedClusters.size(); ++i) {
+            s.bounds[up.movedClusters[i]] = up.bounds[i];
+            s.proxyStale[up.movedClusters[i]] = 1;
+        }
+        s.box = AABB();
+        s.volume = 0.0;
+        for (const ClusterBounds& b : s.bounds) {
+            s.volume += b.volume;
+            if (b.radius >= 0.0f) {
+                s.box.expand(b.center - glm::vec3(b.radius));
+                s.box.expand(b.center + glm::vec3(b.radius));
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Thumbnails (LightBox / pickers)
 // ---------------------------------------------------------------------------
 
@@ -2335,10 +2635,10 @@ bool Renderer::renderMeshThumbnail(Mesh& mesh, const Camera& camera, int size, c
     const bool ok = renderToImage(camera, size, size, settings, rgba, error);
     thumbnailPass_ = false;
     drawList_.swap(scene);
-    for (size_t i = 0; i < slots_.size(); ++i)
-        if (slots_[i].id == kThumbnailSlot) {
-            freeSlot(slots_[i]);
-            slots_.erase(slots_.begin() + std::ptrdiff_t(i));
+    for (auto it = slots_.begin(); it != slots_.end(); ++it)
+        if (it->id == kThumbnailSlot) {
+            freeSlot(*it);
+            slots_.erase(it);
             break;
         }
 

@@ -109,6 +109,13 @@ public:
     bool strokeActive() const { return active_; }
 
     SculptTimings timings;
+    // The brush's frame on the surface at the last dab's first (unmirrored) pass: the dab centre, the area normal
+    // and the area centre its kernel used (the predictive stroke preview estimates the next dabs from it).
+    struct DabFrame {
+        glm::vec3 center{0.0f}, normal{0.0f, 0.0f, 1.0f}, areaCenter{0.0f};
+        bool valid = false;
+    };
+    DabFrame lastFrame;
 
     // Dynamic topology (core/Dyntopo.h): while enabled, dab() and dabRecipe() remesh the surface under the
     // brush first (Smooth towards twice the edge length, so it simplifies, as in ZBrush). Not the Move brush.
@@ -152,6 +159,7 @@ private:
     std::vector<glm::vec3> lastMirrors_;
 
     bool active_ = false;
+    bool frameWanted_ = false; // the next dabSingle records lastFrame
     int layer_ = -1;
     UndoRecord record_;
     // A bit per vertex: recorded in record_'s positions / mask / colours (cleared from those lists).

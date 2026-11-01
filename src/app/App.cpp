@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/App.h"
+#include "app/AsyncStroke.h"
 #include "app/CrashLog.h"
 
 #include "ai/AiCommands.h"
@@ -278,6 +279,8 @@ bool App::init(const AppOptions& options) {
 }
 
 void App::shutdown() {
+    if (doc_.sculptor.strokeActive()) endStroke();
+    solver_.reset(); // (its thread uses the renderer)
     flushBrushEdits();
     if (blenderInitialised_) writeBridgeHeartbeat(blenderExchangeRoot(), true); // the add-on starts a new one
 
@@ -608,6 +611,7 @@ void App::redrawIn(double seconds) {
 bool App::wantsFrames(double now) const {
     return now < activeUntil_ || drag_ != Drag::None || doc_.sculptor.strokeActive() ||
            !dabQueue_.empty() || // a stroke's dabs still waiting (drainStrokeDabs) are placed a few each frame
+           strokeFinishing_ || solverBusy() || // the solver thread is placing a stroke's dabs (AsyncStroke.cpp)
            backgroundBusy() || playingLayer_ >= 0 || faceTakePlaying_ ||
            spaceMouseMoving() || // a held SpaceMouse cap sends no events, but the view keeps moving (SpaceMouse.cpp)
            perf_.framesStill < 10; // the view just moved: Fast Navigation's full-quality frame comes after it stops
@@ -646,13 +650,29 @@ int App::run() {
     activeUntil_ = started + 1.0;
     // --measure-stroke: two turns of a circle over the model in S seconds. The pointer is read once per pass of the loop, as a busy program gets it (the window system hands
     // over only the latest position), so a pass that places many dabs makes the next gap longer.
+    // The brush behind the pointer is measured twice: the surface (the last dab whose result is on the GPU) and
+    // the preview (the predictive stroke's head, render/Ghost.h; the surface when there is none). Release is how
+    // long letting go holds up the UI, then how long until the last dab is on screen.
     struct StrokeMeasure {
         bool started = false, moving = false; // moving: the press's first frame is on screen, the pointer moves
+        bool releasing = false;               // let go: waiting for the last dab to reach the screen
         double pressMs = 0.0, start = 0.0, lastFrame = 0.0, maxFrame = 0.0, sumFrames = 0.0, maxLag = 0.0, sumLag = 0.0;
+        double pressAt = 0.0, firstSurfaceMs = 0.0, maxPreviewLag = 0.0, sumPreviewLag = 0.0;
+        double releaseMs = 0.0, releaseAt = 0.0;
         uint64_t frames = 0, samples = 0, lagSamples = 0;
         float cx = 0.0f, cy = 0.0f, r = 0.0f;
         std::vector<glm::vec2> dabs;
+        // SF_MEASURE_VERIFY=1: the mesh before the stroke, to check undo and replay the dabs (verifyStroke).
+        uint64_t before = 0;
+        // SF_MEASURE_SNAPSHOT=prefix: the canvas at a few points of the stroke, as prefix-N.png.
+        int snapshots = 0;
     } sm;
+    // SF_MEASURE_POP=1: how much the picture jumps when the solver's result replaces the preview (commitSolverBatch).
+    const char* popEnv = std::getenv("SF_MEASURE_POP");
+    popProbe_ = popEnv && *popEnv && *popEnv != '0';
+    const char* verifyEnv = std::getenv("SF_MEASURE_VERIFY");
+    const bool verify = verifyEnv && *verifyEnv && *verifyEnv != '0';
+    const char* snapshotEnv = std::getenv("SF_MEASURE_SNAPSHOT");
     while (running_) {
         const double t0 = seconds();
         if (options_.measureIdle > 0.0f) {
@@ -713,9 +733,10 @@ int App::run() {
             sm.cy = c.y + c.h * 0.5f;
             sm.r = 0.25f * std::min(c.w, c.h);
             sm.started = true;
-            sm.start = sm.lastFrame = seconds();
+            sm.start = sm.lastFrame = sm.pressAt = seconds();
             strokeProbe_ = &sm.dabs;
             if (options_.measureStrokeRadius > 0.0f) radiusPx_ = std::clamp(options_.measureStrokeRadius, 2.0f, 800.0f);
+            if (verify) sm.before = meshStateHash(doc_.mesh);
             onMouseDown(sm.cx + sm.r, sm.cy, SDL_BUTTON_LEFT);
             if (drag_ != Drag::Stroke) {
                 std::printf("Stroke: no stroke began (nothing to sculpt under the circle's start)\n");
@@ -727,47 +748,72 @@ int App::run() {
             onMouseMove(sm.cx + sm.r * float(std::cos(a)), sm.cy + sm.r * float(std::sin(a)), 0.0f, 0.0f, false);
             ++sm.samples;
             if (u >= 1.0) {
-                const double releaseStart = seconds();
-                onMouseUp(); // places the dabs still waiting
-                const double releaseMs = (seconds() - releaseStart) * 1000.0;
+                sm.releaseAt = seconds();
+                onMouseUp(); // places the dabs still waiting (or, with predictive strokes, leaves them to the solver)
+                sm.releaseMs = (seconds() - sm.releaseAt) * 1000.0;
+                sm.moving = false;
+                sm.releasing = true;
+            }
+        } else if (sm.releasing && !doc_.sculptor.strokeActive()) {
+            {
+                const double releaseDoneMs = (seconds() - sm.releaseAt) * 1000.0;
+                const double releaseMs = sm.releaseMs;
                 strokeProbe_ = nullptr;
                 std::vector<float> off;
                 for (const glm::vec2& d : sm.dabs) off.push_back(std::abs(std::hypot(d.x - sm.cx, d.y - sm.cy) - sm.r));
                 std::sort(off.begin(), off.end());
                 const auto pct = [&](double q) { return off.empty() ? 0.0f : off[std::min(off.size() - 1, size_t(q * off.size()))]; };
-                std::printf("Stroke (%s): %zu dabs from %llu pointer samples in %.1f s, circle radius %.0f px, brush radius %.0f px\n"
+                const double frameMean = sm.frames ? sm.sumFrames / double(sm.frames) * 1000.0 : 0.0;
+                const double lagMean = sm.lagSamples ? sm.sumLag / double(sm.lagSamples) : 0.0;
+                const double previewMean = sm.lagSamples ? sm.sumPreviewLag / double(sm.lagSamples) : 0.0;
+                std::printf("Stroke (%s%s): %zu dabs from %llu pointer samples in %.1f s, circle radius %.0f px, brush radius %.0f px\n"
                             "  off the circle: median %.1f px, 95%% %.1f px, worst %.1f px\n"
-                            "  press %.0f ms; then frames: %llu, mean %.1f ms, worst %.1f ms; brush behind the pointer: mean %.0f px, "
-                            "worst %.0f px; release %.0f ms\n",
-                            interactiveStrokes_ ? "queued" : "immediate", sm.dabs.size(), (unsigned long long)sm.samples,
-                            double(options_.measureStroke), double(sm.r), double(radiusPx_), double(pct(0.5)), double(pct(0.95)),
-                            double(off.empty() ? 0.0f : off.back()), sm.pressMs, (unsigned long long)sm.frames,
-                            sm.frames ? sm.sumFrames / double(sm.frames) * 1000.0 : 0.0, sm.maxFrame * 1000.0,
-                            sm.lagSamples ? sm.sumLag / double(sm.lagSamples) : 0.0, sm.maxLag, releaseMs);
+                            "  press %.0f ms (first dab's surface on screen %.0f ms); then frames: %llu, mean %.1f ms, worst %.1f ms\n"
+                            "  brush behind the pointer: surface mean %.0f px, worst %.0f px; preview mean %.0f px, worst %.0f px\n"
+                            "  release %.0f ms (last dab on screen after %.0f ms)\n",
+                            interactiveStrokes_ ? "queued" : "immediate", predictiveStrokes() ? ", predictive" : "", sm.dabs.size(),
+                            (unsigned long long)sm.samples, double(options_.measureStroke), double(sm.r), double(radiusPx_),
+                            double(pct(0.5)), double(pct(0.95)), double(off.empty() ? 0.0f : off.back()), sm.pressMs,
+                            sm.firstSurfaceMs, (unsigned long long)sm.frames, frameMean, sm.maxFrame * 1000.0, lagMean, sm.maxLag,
+                            previewMean, sm.maxPreviewLag, releaseMs, releaseDoneMs);
+                // tools/bench_strokes.sh reads this line.
+                std::printf("bench: %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f\n", frameMean, sm.maxFrame * 1000.0, lagMean, previewMean,
+                            sm.pressMs, sm.firstSurfaceMs, releaseMs, releaseDoneMs);
+                if (popProbe_ && popCommits_ > 0)
+                    std::printf("pop: when the solver's dabs replace their preview the view changes by %.3f on average "
+                                "(worst %.3f); without the preview those dabs would change it by %.3f (%llu commits)\n",
+                                popWith_ / double(popCommits_), popWorst_, popWithout_ / double(popCommits_),
+                                (unsigned long long)popCommits_);
                 std::fflush(stdout);
+                if (verify && !verifyStroke(sm.before, sm.dabs)) return 1;
                 // The test (ui_stroke_path, a light sphere): every dab placed, all of them on the circle.
                 const float spacing = std::max(1.0f, radiusPx_ * 0.15f);
                 const double expected = 4.0 * 3.14159265358979 * double(sm.r) / double(spacing);
                 return double(sm.dabs.size()) >= 0.9 * expected && !off.empty() && off.back() < spacing ? 0 : 1;
             }
         }
-        drainStrokeDabs(kStrokeBudgetSeconds); // the stroke's queued dabs, for a limited time: then look at the pointer again
+        // The stroke's queued dabs: handed to the solver thread (predictive strokes, AsyncStroke.cpp), or placed here
+        // for a limited time, then look at the pointer again.
+        if (asyncStroke_) pumpStroke();
+        else drainStrokeDabs(kStrokeBudgetSeconds);
         Uint64 now = SDL_GetTicksNS();
         float dt = float(double(now - lastTicks) * 1e-9);
         lastTicks = now;
-        processPendingFiles();
-        animateLayers(dt);
-        pollBrushRequest();
-        pollGenerator();
-        pollUnreal();
-        pollGoz();
-        pollBlender();
-        pollPhone();
-        pollAutoUv();
-        pollBake();
-        pollQRemesh();
-        pollSplatTrain();
-        pollSculptable();
+        if (!solverBusy()) { // (the solver thread owns the document's mesh until the stroke's end)
+            processPendingFiles();
+            animateLayers(dt);
+            pollBrushRequest();
+            pollGenerator();
+            pollUnreal();
+            pollGoz();
+            pollBlender();
+            pollPhone();
+            pollAutoUv();
+            pollBake();
+            pollQRemesh();
+            pollSplatTrain();
+            pollSculptable();
+        }
         tickProject(dt); // the title and autosave, asleep or not
         const double t = seconds();
         if (const uint64_t key = frameKey(); key != lastKey) { // a job finished, the Blender bridge sent a model...
@@ -801,17 +847,45 @@ int App::run() {
         drawUi();
         ImGui::Render();
 
+        buildGhost(); // the dabs not on the GPU yet, drawn as a preview (predictive strokes)
         const auto syncStart = std::chrono::steady_clock::now();
         syncScene();
         notePerformanceFrame(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - syncStart).count());
         const int samples = viewSamples();
         renderSettings_.motionProxy = perf_.proxyNow; // big meshes draw their lighter proxy while the view moves
         perf_.samplesUsed = renderer_.drawView(camera_, fbW, fbH, renderSettings_, canvasViewport(fbW, fbH), samples);
+        if (snapshotEnv && *snapshotEnv && (sm.moving || sm.releasing)) {
+            // Three points of the stroke, and the end (the frame the last dab reached the screen).
+            const double u = sm.moving ? (seconds() - sm.start) / double(options_.measureStroke) : 2.0;
+            const bool last = sm.releasing && !doc_.sculptor.strokeActive();
+            if ((sm.snapshots < 3 && u >= 0.3 * (sm.snapshots + 1)) || (last && sm.snapshots < 4)) {
+                sm.snapshots = last ? 4 : sm.snapshots + 1;
+                const Renderer::Viewport v = canvasViewport(fbW, fbH);
+                Image img;
+                img.width = v.w > 0 ? v.w : fbW;
+                img.height = v.h > 0 ? v.h : fbH;
+                img.rgba.resize(size_t(img.width) * size_t(img.height) * 4);
+                gl::ReadPixels(v.w > 0 ? v.x : 0, v.w > 0 ? v.y : 0, img.width, img.height, GL_RGBA, GL_UNSIGNED_BYTE, img.rgba.data());
+                for (int y = 0; y < img.height / 2; ++y) // (GL rows are bottom-up)
+                    std::swap_ranges(img.rgba.begin() + std::ptrdiff_t(size_t(y) * img.width * 4),
+                                     img.rgba.begin() + std::ptrdiff_t(size_t(y + 1) * img.width * 4),
+                                     img.rgba.begin() + std::ptrdiff_t(size_t(img.height - 1 - y) * img.width * 4));
+                std::string error;
+                img.savePng(std::string(snapshotEnv) + "-" + std::to_string(sm.snapshots) + ".png", error);
+            }
+        }
         renderSettings_.motionProxy = false; // (other renders, e.g. project thumbnails, draw in full)
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window_);
         ++framesDrawn;
-        if (sm.started && !sm.moving) { // the press is on screen: start moving round the circle
+        {
+            const double frameNow = seconds();
+            static double lastSwap = 0.0;
+            if (lastSwap > 0.0) frameSeconds_ = frameSeconds_ * 0.9 + std::min(0.1, frameNow - lastSwap) * 0.1;
+            lastSwap = frameNow;
+        }
+        if (sm.started && sm.firstSurfaceMs == 0.0 && !sm.dabs.empty()) sm.firstSurfaceMs = (seconds() - sm.pressAt) * 1000.0;
+        if (sm.started && !sm.moving && !sm.releasing && sm.pressMs == 0.0) { // the press is on screen: start moving round the circle
             sm.moving = true;
             sm.pressMs = (seconds() - sm.start) * 1000.0;
             sm.start = sm.lastFrame = seconds();
@@ -831,6 +905,11 @@ int App::run() {
                 sm.maxLag = std::max(sm.maxLag, px);
                 sm.sumLag += px;
                 ++sm.lagSamples;
+                const glm::vec2 h = ghostHeadValid_ ? ghostHead_ : d; // the preview's head (or the surface's)
+                double ahead = pointer - std::atan2(double(h.y - sm.cy), double(h.x - sm.cx));
+                const double hpx = std::abs(std::remainder(ahead, 2.0 * 3.14159265358979)) * double(sm.r);
+                sm.maxPreviewLag = std::max(sm.maxPreviewLag, hpx);
+                sm.sumPreviewLag += hpx;
             }
         }
         lastKey = frameKey(); // what this frame changed is on screen already
@@ -925,6 +1004,7 @@ BrushType App::activeBrush() const {
 }
 
 void App::onMouseDown(float x, float y, Uint8 button) {
+    if (strokeFinishing_) endStroke(); // the last stroke's dabs still being placed: finish them first
     mouseX_ = x;
     mouseY_ = y;
     const SDL_Keymod mod = inputMods();
@@ -1105,7 +1185,12 @@ void App::onMouseUp() {
     panFromAlt_ = false;
     if (drag_ == Drag::Select) selectionMouseUp();
     if (drag_ == Drag::Stroke && maskClickPending_) maskClickRelease(); // Ctrl+click: blur / sharpen the mask
-    else if (drag_ == Drag::Stroke) endStroke();
+    else if (drag_ == Drag::Stroke && asyncStroke_) {
+        // Predictive strokes: letting go doesn't wait for the dabs still to place; the solver carries on and
+        // pumpStroke ends the stroke once they are on screen (anything that needs the document first ends it).
+        strokeFinishing_ = true;
+        if (!solverBusy() && dabQueue_.empty()) endStroke();
+    } else if (drag_ == Drag::Stroke) endStroke();
     if (drag_ == Drag::MaskCanvas) maskCanvasRelease();
     if (drag_ == Drag::SubToolClick) subtoolClickRelease();
     if (drag_ == Drag::Guide) guideRelease();
@@ -1162,6 +1247,19 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     strokePath_.reset(x, y);
     dabQueue_.clear();
     dabSeconds_ = 0.0; // measured again: the mesh and the brush may have changed
+    // Predictive strokes (AsyncStroke.cpp): the solver thread, the ghost's first estimate (the picked triangle).
+    asyncStroke_ = asyncStrokeAllowed();
+    pointerLatest_ = glm::vec2(x, y);
+    pointerLatestAt_ = double(SDL_GetTicksNS()) * 1e-9;
+    penPredictor_.reset(pointerLatest_, pointerLatestAt_);
+    {
+        const glm::vec3 n = glm::dot(hit.normal, camera_.forward()) > 0.0f ? -hit.normal : hit.normal;
+        ghostFrame_ = {hit.position, glm::length(n) > 0.0f ? glm::normalize(n) : -camera_.forward(), hit.position, true};
+        const glm::uvec3 t = hit.triangle < doc_.mesh.triangles.size() ? doc_.mesh.triangles[hit.triangle] : glm::uvec3(0);
+        const auto& P = doc_.mesh.positions;
+        ghostCurvature_ = 0.0f;
+        ghostEdge_ = (glm::distance(P[t.x], P[t.y]) + glm::distance(P[t.y], P[t.z]) + glm::distance(P[t.z], P[t.x])) / 3.0f;
+    }
 
     if (strokeBrush_ == BrushType::Move && !recipe && strokeSculpt_) {
         const float pressure = pressureSize_ ? std::max(strokePressure(), 0.05f) : 1.0f;
@@ -1193,6 +1291,11 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
 }
 
 void App::strokeTo(float x, float y) {
+    if (asyncStroke_) {
+        pointerLatest_ = glm::vec2(x, y);
+        pointerLatestAt_ = double(SDL_GetTicksNS()) * 1e-9;
+        penPredictor_.add(pointerLatest_, pointerLatestAt_);
+    }
     if (maskClickPending_) { // Ctrl+press on the model: a drag past the click slop paints the mask after all
         if (std::hypot(x - maskClickX_, y - maskClickY_) < 4.0f) return;
         maskClickPending_ = false;
@@ -1245,7 +1348,8 @@ void App::strokeTo(float x, float y) {
         }
         firstDabPending_ = false;
         lastStrokePressure_ = strokePressure();
-        dabAt(lastX_, lastY_, lastStrokePressure_);
+        if (asyncStroke_) dabQueue_.push({lastX_, lastY_, lastStrokePressure_}); // (the solver thread places it)
+        else dabAt(lastX_, lastY_, lastStrokePressure_);
     }
 
     // Place dabs at even screen-space spacing along the cursor path. Every input sample counts (pens
@@ -1306,7 +1410,13 @@ void App::drainStrokeDabs(double budgetSeconds) {
 }
 
 void App::dabAt(float x, float y, float pressure) {
-    if (strokeProbe_) strokeProbe_->emplace_back(x, y);
+    // On the solver thread (predictive strokes) the dab sees the view as it was when its batch began.
+    if (dabView_) {
+        if (dabView_->probe) dabView_->probe->emplace_back(x, y);
+    } else if (strokeProbe_) {
+        strokeProbe_->emplace_back(x, y);
+    }
+    const Camera& cam = dabView_ ? dabView_->camera : camera_;
     const BrushRecipe* recipe = strokeRecipe();
     if (recipe && recipe->jitter > 0.0f) {
         // Deterministic per-stroke scatter (xorshift).
@@ -1330,28 +1440,28 @@ void App::dabAt(float x, float y, float pressure) {
         dabAngle_ = s.angle;
     }
     RayHit hit;
-    if (!pick(x, y, hit)) return;
+    if (!(dabView_ ? pickWith(*dabView_, x, y, hit) : pick(x, y, hit))) return;
     if (pressure < 0.0f) pressure = strokePressure();
 
     DabParams p;
     p.center = hit.position;
-    p.viewDir = camera_.forward();
+    p.viewDir = cam.forward();
     p.radius = radiusPx_ * (pressureSize_ ? std::max(pressure, 0.05f) : 1.0f) *
-               camera_.worldPerPixel(hit.position, canvasHeight()) * dabRadiusScale_;
+               cam.worldPerPixel(hit.position, dabView_ ? dabView_->canvas.h : canvasHeight()) * dabRadiusScale_;
     // Smooth keeps its own Z Intensity (ZBrush), whether picked or held with Shift.
     p.strength = (strokeBrush_ == BrushType::Smooth ? smoothStrength_ : strength_) * dabStrengthScale_;
     p.pressure = pressureStrength_ ? pressure : 1.0f;
     p.invert = strokeInvert_;
     p.frontFacesOnly = frontFacesOnly_;
     p.focal = focalShift_;
-    lastDabScreen_ = glm::vec2(x, y);
+    if (!dabView_) lastDabScreen_ = glm::vec2(x, y); // (the solver's: when its batch is committed)
     if (strokeMask_) {
         p.strength = maskStrength_;
         doc_.sculptor.dabMask(doc_.mesh, doc_.bvh, p, symmetry_);
         return;
     }
     p.alpha = &doc_.brushAlpha;
-    p.alphaUp = screenUpVector(dabAngle_);
+    p.alphaUp = cam.orientation() * glm::vec3(-std::sin(dabAngle_), std::cos(dabAngle_), 0.0f); // screenUpVector
     p.vdm = doc_.brushVdm.get();
     p.strokeDelta = haveLastDab_ ? hit.position - lastDabHit_ : glm::vec3(0.0f);
     lastDabHit_ = hit.position;
@@ -1366,28 +1476,10 @@ void App::dabAt(float x, float y, float pressure) {
 }
 
 void App::endStroke() {
+    if (asyncStroke_) solverWait(); // (the dabs in flight; then the solver thread is idle)
     drainStrokeDabs(0.0); // the dabs still waiting belong to this stroke
-    strokeMask_ = false;
-    maskClickPending_ = false; // (a command can end a Ctrl+click before its release)
-    firstDabPending_ = false;
-    // Preferences > Performance shows what the stroke cost.
-    if (doc_.sculptor.timings.dabs > 0) {
-        perf_.lastStroke = doc_.sculptor.timings;
-        perf_.lastStrokeSyncMs = perf_.strokeSyncMs;
-        perf_.lastStrokeFrames = perf_.strokeFrames;
-    }
-    doc_.sculptor.timings = {};
-    perf_.strokeSyncMs = 0.0;
-    perf_.strokeFrames = 0;
-    UndoRecord r = doc_.sculptor.endStroke();
-    finishPaintStroke(r);
-    if (r.topology && !r.topology->uvs.empty())
-        status_ = "Dynamic topology removed the UVs of the remeshed SubTool (Undo brings them back)";
-    if (!r.empty()) {
-        doc_.undo.push(std::move(r));
-        doc_.modified = true;
-        updateTitle();
-    }
+    // (a command can end a Ctrl+click before its release: finishStrokeNow clears the mask click too)
+    finishStrokeNow(); // AsyncStroke.cpp
 }
 
 // ---------------------------------------------------------------------------
@@ -1581,6 +1673,7 @@ Mesh& App::displayedMesh() {
 }
 
 void App::syncScene() {
+    if (solverBusy()) return; // the solver thread is changing the mesh: the GPU keeps what it has (AsyncStroke.cpp)
     // The active SubTool's slot shows the LOD being previewed instead of the sculpt.
     Mesh& shown = displayedMesh();
     if (&shown != lastDisplayed_) shown.topologyDirty = true;
@@ -2601,7 +2694,8 @@ void App::drawBrushCursor() {
         ~PopClip() { dl->PopClipRect(); }
     } popClip{dl};
     const float r = radiusPx_ * (pressureSize_ && lastInputPen_ ? std::max(strokePressure(), 0.05f) : 1.0f);
-    const ImVec2 c(mouseX_, mouseY_);
+    const glm::vec2 at = predictedPointer(); // during a predictive stroke, where the pen will be as this frame shows
+    const ImVec2 c(at.x, at.y);
     const SDL_Keymod mod = inputMods();
     const bool inverted = drag_ == Drag::Stroke ? strokeInvert_
                                                 : invertToggle_ != (((mod & SDL_KMOD_ALT) != 0) ||

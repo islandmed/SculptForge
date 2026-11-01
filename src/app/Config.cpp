@@ -56,6 +56,7 @@ Json toJson(const UiPrefs& p) {
     j.set("antialiasing", double(p.antialiasing));
     j.set("fastNavigation", p.fastNavigation);
     j.set("multithreading", p.multithreading);
+    j.set("predictiveStrokes", p.predictiveStrokes);
     j.set("dyntopoConstantDetail", p.dyntopoConstantDetail);
     j.set("flatShading", p.flatShading);
     j.set("background", std::string(p.gradientBackground ? "gradient" : "flat"));
@@ -91,6 +92,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.antialiasing = aa >= 8 ? 8 : aa >= 4 ? 4 : aa >= 2 ? 2 : 1;
     p.fastNavigation = j["fastNavigation"].asBool(p.fastNavigation);
     p.multithreading = j["multithreading"].asBool(p.multithreading);
+    p.predictiveStrokes = j["predictiveStrokes"].asBool(p.predictiveStrokes);
     p.dyntopoConstantDetail = j["dyntopoConstantDetail"].asBool(p.dyntopoConstantDetail);
     p.flatShading = j["flatShading"].asBool(p.flatShading);
     if (j["background"].isString()) p.gradientBackground = j["background"].asString() != "flat";

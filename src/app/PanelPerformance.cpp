@@ -84,6 +84,16 @@ void App::registerPerformanceUiActions() {
         [] { return !ThreadPool::shared().serial(); },
         "Run brushes, normal and BVH updates and project saving on every core. Turn it off only to compare speeds "
         "or rule it out when troubleshooting: the results are the same either way.");
+    add("perf.predictive_strokes", "Predictive Strokes",
+        [this] {
+            uiPrefs_.predictiveStrokes = !uiPrefs_.predictiveStrokes;
+            status_ = uiPrefs_.predictiveStrokes ? "Predictive strokes on" : "Predictive strokes off";
+        },
+        [this] { return uiPrefs_.predictiveStrokes; },
+        "Sculpt strokes work out the brush on their own thread while the view keeps drawing at full speed, and show "
+        "the dabs still being worked out as a preview on the surface, with the cursor and the stroke's head drawn "
+        "where the pen is about to be. On a heavy mesh the surface moves under the pen at once and lifting the pen "
+        "is instant. The finished sculpt is exactly the same either way.");
 }
 
 void App::applyPerformancePrefs() { ThreadPool::shared().setSerial(!uiPrefs_.multithreading); }
@@ -134,6 +144,10 @@ void App::drawPerformanceSection() {
     if (perf_.samplesUsed > 0 && perf_.samplesUsed < uiPrefs_.antialiasing && !perf_.fastNow)
         dimText("The GPU had no room for " + std::to_string(uiPrefs_.antialiasing) + "x: using " +
                 (perf_.samplesUsed == 1 ? std::string("none") : std::to_string(perf_.samplesUsed) + "x") + ".");
+
+    bool predictive = uiPrefs_.predictiveStrokes;
+    if (ImGui::Checkbox("Predictive Strokes", &predictive)) actions_.find("perf.predictive_strokes")->run();
+    ui::HelpAction(*this, "perf.predictive_strokes");
 
     // --- Threads ---
     bool threads = !ThreadPool::shared().serial();

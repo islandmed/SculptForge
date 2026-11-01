@@ -40,6 +40,9 @@ struct UiPrefs {
     int antialiasing = 4;       // samples per pixel in the 3D view: 1 (off), 2, 4 or 8
     bool fastNavigation = true; // big scenes draw without antialiasing while the view moves
     bool multithreading = true; // brushes, normals and BVH updates on every core (off: one thread)
+    // Sculpt strokes solved on their own thread with a GPU preview of the dabs still to come, the cursor and the
+    // stroke's head predicted a frame ahead (app/AsyncStroke.cpp). Off: the dabs are placed in the frame loop.
+    bool predictiveStrokes = true;
     // Dynamic topology (Draw palette): false = the detail follows the brush size on screen (Sculptris Pro);
     // true = one detail size for the whole mesh.
     bool dyntopoConstantDetail = false;

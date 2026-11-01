@@ -21,6 +21,7 @@
 #include "core/Document.h"
 #include "core/Face.h"
 #include "core/MeshTransform.h"
+#include "core/PenPredictor.h"
 #include "core/AutoUv.h"
 #include "core/QRemesh.h"
 #include "core/Stroke.h"
@@ -220,6 +221,53 @@ private:
     double dabSeconds_ = 0.0;         // what a dab of this stroke costs (running average), for the backlog limit
     bool interactiveStrokes_ = false; // App::run(): budgeted dabs and curved long gaps; other loops dab at once
     void drainStrokeDabs(double budgetSeconds); // places queued dabs; budget <= 0: all of them
+
+    // --- Strokes on heavy meshes (AsyncStroke.cpp) ---
+    // A sculpt stroke's dabs are placed on a solver thread while the main loop keeps drawing at the display's rate:
+    // each frame the finished batch of dabs is uploaded (packed on the solver thread, render/Renderer.h) and the
+    // next batch starts, and the dabs still waiting are drawn as a GPU preview (the ghost, render/Ghost.h) ahead of
+    // the solver, the stroke's head and the brush cursor where the pen will be a frame later (core/PenPredictor.h).
+    // The dabs, their order and so the geometry are those of the synchronous path. Preferences > Performance >
+    // Predictive strokes (SF_PREDICTIVE_STROKE=0 / 1 overrides it).
+    struct StrokeSolver;
+    struct DabView { // what a dab on the solver thread sees of the view (the main thread's may move on)
+        Camera camera;
+        CanvasRect canvas;
+        std::vector<glm::vec2>* probe = nullptr; // --measure-stroke: where its dabs went
+    };
+    std::unique_ptr<StrokeSolver> solver_;
+    const DabView* dabView_ = nullptr; // set while the solver thread places dabs (dabAt reads it)
+    bool asyncStroke_ = false;         // this stroke's dabs go to the solver thread
+    bool strokeFinishing_ = false;     // released: the solver places the last dabs, the UI carries on
+    bool predictiveStrokes() const;    // the preference (and its environment override)
+    bool asyncStrokeAllowed() const;   // the stroke beginning now may use the solver thread
+    bool solverBusy() const;
+    void solverWait();                 // waits for the dabs in flight and commits them
+    void pumpStroke();                 // per frame: commit what the solver finished, start its next batch
+    void commitSolverBatch();
+    void finishStrokeNow();            // the rest of endStroke: undo step, timings
+    void buildGhost();                 // per frame: the dabs not yet on the GPU, for the renderer's preview
+    bool pickWith(const DabView& view, float x, float y, RayHit& hit) const;
+    // Where a screen ray meets the surface as the last dabs placed describe it (the ghost's estimate).
+    bool ghostSurface(const glm::vec3& origin, const glm::vec3& dir, glm::vec3& at, glm::vec3& normal) const;
+    PenPredictor penPredictor_;
+    glm::vec2 pointerLatest_{0.0f};   // the newest pointer sample of the stroke (window pixels)
+    double pointerLatestAt_ = 0.0;    // its time (seconds)
+    double frameSeconds_ = 1.0 / 60.0; // running mean of the frame interval (how far ahead to predict)
+    Sculptor::DabFrame ghostFrame_;    // the last placed dab's frame (the ghost's estimates start from it)
+    float ghostEdge_ = 0.0f;           // mean edge length of the triangle the stroke began on (the preview's cavities)
+    float ghostCurvature_ = 0.0f;      // the surface's curvature along the stroke (1 / radius, > 0 convex; 0 flat)
+    glm::vec2 ghostHead_{0.0f};        // where the preview's head is on screen (--measure-stroke)
+    bool ghostHeadValid_ = false;
+    uint64_t commits_ = 0; // solver batches committed
+    // --measure-stroke SF_MEASURE_POP=1: at each commit the view is drawn offscreen as it was (with the batch's
+    // preview), as it is (the batch's result), and as it was without the batch's preview; the mean differences.
+    bool popProbe_ = false;
+    double popWith_ = 0.0, popWithout_ = 0.0, popWorst_ = 0.0;
+    uint64_t popCommits_ = 0;
+    glm::vec2 predictedPointer() const; // where the pen will be when this frame shows (the cursor, the head)
+    static uint64_t meshStateHash(const Mesh& mesh); // --measure-stroke SF_MEASURE_VERIFY=1
+    bool verifyStroke(uint64_t before, const std::vector<glm::vec2>& dabs);
     bool lastInputPen_ = false; // the last mouse event came from a pen (SDL_PEN_MOUSEID)
     bool penSeen_ = false;
     BrushType strokeBrush_ = BrushType::Standard;
