@@ -2123,10 +2123,27 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
     Mesh m;
     m.positions = qm.P;
     m.triangles.reserve(qm.quads.size() * 2 + qm.tris.size());
+    // Each quad split along a diagonal that isn't an edge of another face (else that edge would be used by four
+    // triangles), the shorter one when both are free.
+    std::unordered_map<uint64_t, uint8_t> quadEdges;
+    for (const auto& q : qm.quads)
+        for (int k = 0; k < 4; ++k) quadEdges[edgeKey(q[k], q[(k + 1) % 4])] = 1;
+    for (const glm::uvec3& t : qm.tris)
+        for (int k = 0; k < 3; ++k) quadEdges[edgeKey(t[k], t[(k + 1) % 3])] = 1;
     for (const auto& q : qm.quads) {
         const uint32_t t = uint32_t(m.triangles.size());
-        m.triangles.push_back({q.x, q.y, q.z});
-        m.triangles.push_back({q.x, q.z, q.w});
+        const bool xzTaken = quadEdges.count(edgeKey(q.x, q.z)) > 0, ywTaken = quadEdges.count(edgeKey(q.y, q.w)) > 0;
+        const bool useYW = (xzTaken && !ywTaken) ||
+                           (xzTaken == ywTaken && glm::length(qm.P[q.y] - qm.P[q.w]) < 0.98f * glm::length(qm.P[q.x] - qm.P[q.z]));
+        if (useYW) {
+            m.triangles.push_back({q.y, q.z, q.w});
+            m.triangles.push_back({q.y, q.w, q.x});
+            quadEdges[edgeKey(q.y, q.w)] = 1; // two quads with the same diagonal would also share it four ways
+        } else {
+            m.triangles.push_back({q.x, q.y, q.z});
+            m.triangles.push_back({q.x, q.z, q.w});
+            quadEdges[edgeKey(q.x, q.z)] = 1;
+        }
         m.pairQuad(t, t + 1);
     }
     for (const glm::uvec3& t : qm.tris) m.triangles.push_back(t);

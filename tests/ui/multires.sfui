@@ -24,6 +24,8 @@ click "Geometry/Reconstruct Subdiv"
 expect_value sdiv_levels == 5
 expect_value triangles == 108
 expect_status "Reconstructed"
+# Close Geometry first: open, it is taller than the tray and Display's header would be out of reach.
+click "Geometry##tool.geometry"
 click "Display##tool.display"
 click "Wireframe##display"
 click "Geometry##tool.geometry"
@@ -47,6 +49,7 @@ expect_value triangles == 27648
 expect_text "SDiv 5 / 5"
 expect_status "SDiv 5/5"
 shot divided-wire
+click "Geometry##tool.geometry"
 click "Display##tool.display"
 click "Wireframe##display"
 click "Geometry##tool.geometry"
