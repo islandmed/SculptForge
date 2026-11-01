@@ -329,7 +329,9 @@ TEST(alpha_shapes_and_orients_dabs) {
     BrushAlpha square = BrushAlpha::square();
     DabParams p = dabAt(glm::vec3(0));
     p.alpha = &square;
+    p.focal = -1.0f; // (Focal Shift -100: the alpha shows hard to its edges; at 0 it rounds the corners, #60)
     stroke(sq, BrushType::Standard, p);
+    p.focal = 0.0f;
     const uint32_t c = nearest(sq.mesh, glm::vec3(0)), diag = nearest(sq.mesh, glm::vec3(0.25f, 0, 0.25f));
     CHECK(sq.mesh.positions[diag].y > 0.9f * sq.mesh.positions[c].y);
     CHECK(round.mesh.positions[diag].y == 0.0f);
@@ -366,6 +368,79 @@ TEST(alpha_shapes_and_orients_dabs) {
     r.undo.push(r.sculptor.endStroke());
     CHECK(r.mesh.positions[nearest(r.mesh, glm::vec3(-0.12f, 0, 0))].y > 0.001f);
     CHECK(r.mesh.positions[nearest(r.mesh, glm::vec3(0.12f, 0, 0))].y == 0.0f);
+}
+
+// #60: Focal Shift shapes alpha brushes as in ZBrush. The alpha is multiplied by a round falloff reaching the
+// stamp's corners: -100 shows the whole square, 0 rounds its corners into a soft mound, +100 leaves a small point.
+TEST(focal_shift_shapes_alpha_dabs) {
+    CHECK(alphaFalloff(0.0f, 1.0f, 0.0f) == 1.0f);
+    for (float d : {0.0f, 0.5f, 1.0f, 1.3f, 1.414f}) CHECK(alphaFalloff(d, 1.0f, -1.0f) == 1.0f);
+    CHECK(alphaFalloff(1.2f, 1.0f, 0.0f) < 0.1f && alphaFalloff(1.5f, 1.0f, 0.0f) == 0.0f);
+    CHECK(alphaFalloff(0.5f, 1.0f, 1.0f) < 0.5f * alphaFalloff(0.5f, 1.0f, 0.0f));
+
+    const BrushAlpha square = BrushAlpha::square();
+    CHECK(square.stamp(0.7f, 0.7f, -1.0f) == square.sample(0.7f, 0.7f));
+    CHECK(square.stamp(0.7f, 0.7f, 0.0f) < 0.5f * square.stamp(0.7f, 0.0f, 0.0f)); // rounded corners
+    CHECK(square.stamp(1.2f, 0.0f, -1.0f) == 0.0f);
+    const BrushAlpha round = BrushAlpha::round(); // (empty: the plain brush falloff, Focal Shift included)
+    CHECK(round.stamp(0.4f, 0.0f, 0.5f) == brushFalloff(0.4f, 1.0f, 0.5f) && round.stamp(1.1f, 0.0f, -1.0f) == 0.0f);
+
+    // A square-alpha dab: how much moves (footprint) and how much of the corner survives.
+    struct Footprint { int moved = 0; float corner = 0.0f, centre = 0.0f; };
+    auto dabWith = [&](BrushType type, float focal) {
+        Document d = planeDoc();
+        DabParams p = dabAt(glm::vec3(0));
+        p.alpha = &square;
+        p.alphaUp = glm::vec3(0, 0, -1);
+        p.focal = focal;
+        stroke(d, type, p);
+        Footprint f;
+        for (const glm::vec3& v : d.mesh.positions) f.moved += std::abs(v.y) > 1e-4f;
+        f.corner = d.mesh.positions[nearest(d.mesh, glm::vec3(0.22f, 0, 0.22f))].y;
+        f.centre = d.mesh.positions[nearest(d.mesh, glm::vec3(0))].y;
+        return f;
+    };
+    for (BrushType type : {BrushType::Standard, BrushType::ClayBuildup}) {
+        const Footprint hard = dabWith(type, -1.0f), soft = dabWith(type, 0.0f), point = dabWith(type, 1.0f);
+        CHECK(hard.centre > 0.0f && soft.centre > 0.0f && point.centre > 0.0f);
+        CHECK(hard.moved > soft.moved && soft.moved > point.moved);
+        CHECK(hard.corner > 0.8f * hard.centre);  // the full square
+        CHECK(soft.corner < 0.5f * soft.centre);  // corners rounded
+        CHECK(point.corner < 0.05f * point.centre); // almost gone
+        CHECK(point.moved < hard.moved / 2);
+    }
+}
+
+// #60: Focal Shift reaches the built-in square ClayBuildup tip and custom (recipe) brushes; 0 keeps their own tip.
+TEST(focal_shift_reaches_clay_buildup_and_recipes) {
+    auto height = [&](float focal, bool recipe, const glm::vec3& at) {
+        Document d = planeDoc();
+        DabParams p = dabAt(glm::vec3(0));
+        p.focal = focal;
+        if (recipe) {
+            BrushRecipe r;
+            r.name = "test";
+            d.sculptor.beginStroke(d.mesh, "test");
+            d.sculptor.dabRecipe(d.mesh, d.bvh, r, p, kNoSymmetry);
+            d.undo.push(d.sculptor.endStroke());
+        } else {
+            stroke(d, BrushType::ClayBuildup, p);
+        }
+        const uint32_t v = nearest(d.mesh, at);
+        return d.mesh.positions[v].y / std::max(d.mesh.positions[nearest(d.mesh, glm::vec3(0))].y, 1e-9f);
+    };
+    for (bool recipe : {false, true}) {
+        const glm::vec3 at = recipe ? glm::vec3(0.15f, 0, 0) : glm::vec3(0.27f, 0, 0); // (on the tip's soft edge)
+        const float hard = height(-0.8f, recipe, at), plain = height(0.0f, recipe, at), soft = height(0.8f, recipe, at);
+        CHECK(hard > plain + 0.02f && plain > soft + 0.02f);
+    }
+    // 0 is bit-identical to no Focal Shift at all (the brush's own tip).
+    Document a = planeDoc(), b = planeDoc();
+    DabParams p = dabAt(glm::vec3(0));
+    stroke(a, BrushType::ClayBuildup, p);
+    p.focal = 0.0f;
+    stroke(b, BrushType::ClayBuildup, p);
+    CHECK(a.mesh.positions == b.mesh.positions);
 }
 
 TEST(brush_set_alpha_command) {

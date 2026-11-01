@@ -141,8 +141,12 @@ Because **Draw Size** is measured on screen, the brush covers less of the model 
 you want for detail work.
 
 The brush cursor shows two rings, as in ZBrush: the outer one is the Draw Size, the inner one is Focal Shift
-(where the brush works at half strength). Masking, painting, Move and SnakeHook follow Focal Shift too; custom
-brushes made in Brush Lab keep their own tip shape.
+(where the brush works at half strength). Masking, painting, Move and SnakeHook follow Focal Shift too. Custom
+brushes made in Brush Lab and ClayBuildup's square tip keep their own tip shape at 0 and shift it like the others.
+
+With an [alpha](#alphas), Focal Shift works as in ZBrush: the alpha is multiplied by the round falloff. At -100
+the whole alpha shows, hard to its edges (a Square alpha stamps the full square); at 0 the falloff softens it and
+rounds a square's corners; at +100 only a soft point in the middle is left.
 
 Over the model, the rings lie on the surface, as in SculptGL: they turn with the surface under the pointer, bend
 over its bumps and curves, and show the brush's real size there, with a short line pointing out of the surface.
@@ -277,6 +281,9 @@ Notes:
 An alpha is a grayscale stamp that shapes the brush tip: white is full effect, black is none. It affects every
 brush, built-in or custom. Choose one from the **Alpha** tile on the left shelf (the alpha picker) or the
 **Alpha** palette, which also shows a large preview of the current alpha.
+[Focal Shift](#draw-size-z-intensity-rgb-intensity-and-focal-shift) fades it as in ZBrush: set it to -100 to
+stamp the whole alpha (a crisp square, or a pattern out to its edges), 0 for a soft round fade, +100 for a soft
+point.
 
 ![The alpha picker](images/alpha-picker.jpg)
 
