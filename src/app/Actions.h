@@ -51,6 +51,7 @@ std::vector<std::string> chordKeys(std::string_view chord);
 class ActionRegistry {
 public:
     void add(Action a); // replaces by id
+    void removePrefix(std::string_view prefix); // every action whose id starts with PREFIX (macros that went away)
     const Action* find(std::string_view id) const;
     const std::vector<Action>& all() const { return actions_; }
     // Runs the action bound to this chord; true if consumed. Callers skip it while ImGui wants the keyboard.

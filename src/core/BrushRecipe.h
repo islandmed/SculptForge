@@ -23,6 +23,7 @@ enum class BrushSource {
     Studio,  // a read-only shared folder from SCULPTFORGE_BRUSH_PATH
     Gallery, // installed from the community gallery (lives in the user library)
     Project, // came with an opened .sfproj and differs from (or is not in) the library
+    Pack,    // from an installed pack (core/Pack.h): read-only, like a studio brush
 };
 const char* brushSourceName(BrushSource source); // "session", "built-in", "user", "studio", "gallery", "project"
 
@@ -31,6 +32,7 @@ struct BrushOrigin {
     std::string path; // the .sfbrush file it was loaded from or is saved to (user, gallery, studio)
     // A built-in or studio brush of the same name this user/gallery brush hides (Session = none).
     BrushSource overrides = BrushSource::Session;
+    std::string pack; // Pack: the pack's name (the lists show it as the brush's tag)
 };
 
 struct BrushRecipe {

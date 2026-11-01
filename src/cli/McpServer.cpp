@@ -17,9 +17,16 @@ namespace {
 
 constexpr const char* kLatestProtocol = "2025-06-18";
 
+// Installing, removing or switching packs changes what every later session loads: that stays the user's own
+// decision (the app's review screen, or sculptforge-cli run by hand), never an AI agent's.
+bool hiddenFromAgents(const std::string& name) {
+    return name == "pack_install" || name == "pack_remove" || name == "pack_enable" || name == "pack_disable";
+}
+
 Json toolList(const CommandRegistry& registry) {
     Json tools = Json::array();
     for (const auto& c : registry.all()) {
+        if (hiddenFromAgents(c.name)) continue;
         Json props = Json::object(), required = Json::array();
         for (const auto& p : c.params) {
             Json prop = Json::object();
@@ -97,7 +104,7 @@ std::string handleMcpMessage(const CommandRegistry& registry, Document& doc, con
     if (method == "tools/list") return reply(id, toolList(registry)).dump();
     if (method == "tools/call") {
         const std::string name = msg["params"]["name"].asString();
-        if (!registry.find(name)) return errorReply(id, -32602, "Unknown tool: " + name).dump();
+        if (!registry.find(name) || hiddenFromAgents(name)) return errorReply(id, -32602, "Unknown tool: " + name).dump();
         Args args;
         for (const auto& [key, value] : msg["params"]["arguments"].members()) {
             if (value.isBool()) args[key] = value.asBool();

@@ -224,6 +224,8 @@ public:
     // The step the next undo / redo applies (null if none): after undo() the undone step is lastRedo().
     UndoRecord* lastUndo() { return undo_.empty() ? nullptr : &undo_.back(); }
     UndoRecord* lastRedo() { return redo_.empty() ? nullptr : &redo_.back(); }
+    // The undo step BACK places below the top (0 = the next undo), or null.
+    const UndoRecord* undoStep(size_t back) const { return back < undo_.size() ? &undo_[undo_.size() - 1 - back] : nullptr; }
 
     // Both rebuild/refit the BVH as needed.
     bool undo(Mesh& mesh, BVH& bvh);

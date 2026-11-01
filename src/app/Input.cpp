@@ -479,6 +479,7 @@ void App::drawInputSection() {
         uiPrefs_.cursorFollowsSurface = surfaceCursor;
     ui::HelpAction(*this, "input.surface_cursor");
     ui::ActionButton(*this, "input.import_blender", ImVec2(-FLT_MIN, 0), ui::Look::IconLabel);
+    drawPackKeymapRows(); // keymaps from installed packs (PanelPacks.cpp)
     ImGui::TextDisabled("%s", tr("Rotation"));
     ImGui::SameLine();
     int rotation = uiPrefs_.turntable ? 1 : 0;

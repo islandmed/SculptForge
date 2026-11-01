@@ -587,6 +587,7 @@ void App::initActions() {
     actions_.registerCommands(
         commands_, [this](const std::string& name) { runCommand(name); },
         [this](const std::string& name) { consolePrefill(name + " "); });
+    registerPackActions();   // Install Pack, New Pack, Record Macro, the editor, one action per macro (PanelPacks.cpp)
     registerRadialActions(); // last: a radial menu's items may be any of the above (RadialMenu.cpp)
 
     if (!uiConfigDeterministic_ && !configDir_.empty()) {

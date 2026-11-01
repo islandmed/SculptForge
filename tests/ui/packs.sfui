@@ -1,0 +1,157 @@
+# Packs and macros (#20): a pack made from a folder laid out like one (as the monthly Supporter Pack is), the review
+# screen before install (what's inside, the license, the author; nothing is installed until Install), Library >
+# Packs (off, on, details), its items in the lists tagged with the pack's name, a hostile pack refused with a clear
+# message, and a macro: recorded, saved, found with F3, confirmed before its first run, run as one undo step.
+run new_sphere subdivisions=3
+expect_value packs_installed == 0
+expect_value macros == 0
+run pack_create folder="$SCRIPT_DIR/data/packs/demo" path="$LIBRARY/Demo.sfpack" id=demo-pack name="Demo Pack" author="Test Author" license=CC0-1.0 channel=insider
+
+# The review: everything about the pack, before anything is installed.
+run pack_install path="$LIBRARY/Demo.sfpack"
+expect_value pack_review_open == 1
+expect_value pack_review_ok == 1
+expect_value pack_review_brush == 1
+expect_value pack_review_alpha == 1
+expect_value pack_review_matcap == 1
+expect_value pack_review_material == 1
+expect_value pack_review_keymap == 1
+expect_value pack_review_piemenu == 1
+expect_value pack_review_macro == 1
+expect_value packs_installed == 0
+wait_idle 30
+expect_text Demo Pack  1.0
+expect_text Supporter Pack
+expect_text Test Author
+expect_text CC0-1.0
+expect_text CC0 1.0 Universal
+shot pack_review
+click "Install##packreview"
+expect_value pack_review_open == 0
+expect_value packs_installed == 1
+expect_value packs_enabled == 1
+expect_status Installed Demo Pack 1.0
+expect_value pack_brushes == 1
+expect_value pack_alphas == 1
+expect_value pack_matcaps == 1
+expect_value pack_materials == 1
+expect_value pack_keymaps == 1
+expect_value macros == 1
+expect_value macro_actions == 1
+expect_value lightbox_open == 1
+wait_idle 30
+expect_text Demo Pack 1.0
+shot packs_tab
+
+# Its items show in the lists with the pack's name.
+click "Library/Alpha"
+type Library/##lbfilter grit
+wait_idle 30
+expect_text Grit (Demo Pack)
+key backspace
+key esc
+click "Library/Packs"
+click "Library/Details##demo-pack"
+expect "Library/Apply keymap Demo Keys##km.demo-pack.Demo Keys"
+click "Library/Apply keymap Demo Keys##km.demo-pack.Demo Keys"
+expect_shortcut mask.invert Ctrl+Shift+K
+expect_status Keymap Demo Keys: 1 keys
+click "Library/Add pie menu Demo Pie##pie.demo-pack.Demo Pie"
+expect_value radial_menus == 3
+expect_value radial_slots_3 == 2
+
+# Off: its items leave the lists; on again: back.
+click "Library/##ondemo-pack"
+expect_value packs_enabled == 0
+expect_value pack_brushes == 0
+expect_value pack_alphas == 0
+expect_value pack_matcaps == 0
+expect_value macro_actions == 0
+click "Library/##ondemo-pack"
+expect_value packs_enabled == 1
+expect_value pack_brushes == 1
+expect_value macro_actions == 1
+
+# A hostile pack (a file that climbs out of its folder), dropped on the window, is refused with a clear message;
+# nothing is installed.
+drop data/packs/traversal.sfpack
+expect_value pack_review_open == 1
+expect_value pack_review_ok == 0
+wait_idle 30
+expect_text This pack can't be installed
+expect_text leaves its folder
+shot pack_refused
+click "Close##packreview"
+expect_value pack_review_open == 0
+expect_value packs_installed == 1
+
+# A macro: Record, run some commands, Stop; the editor opens with them, checked.
+click "Library/Record Macro##macro.record"
+expect_value macro_recording == 1
+run mask_all
+run mask_invert
+run transform translate=0.2,0,0 masked=false
+expect_value macro_recorded == 3
+wait_idle 10
+shot recording
+click "Library/###macro.stop"
+expect_value macro_recording == 0
+expect_value macro_editor_open == 1
+expect_value macro_editor_ok == 1
+expect_text 3 commands, all allowed
+shot macro_editor
+click "Save##macroeditor"
+expect_status Saved macro Recorded Macro
+expect_value macros == 2
+click "Close##macroeditor"
+expect_value macro_editor_open == 0
+run undo
+run undo
+run undo
+
+# F3 finds it. Its first run shows every command and asks; Run runs them as one undo step.
+snapshot
+remember undo_steps before
+key f3
+type "##Command palette" "recorded macro"
+key enter
+expect_value macro_confirm_open == 1
+wait_idle 10
+expect_text transform masked=false translate=0.2,0,0
+shot macro_confirm
+click "Run##macroconfirm"
+expect_value macro_confirm_open == 0
+expect_value macro_ran == 3
+expect_value macro_one_step == 1
+expect_value moved > 0
+expect_value undo_steps == $before+1
+run undo
+expect_value moved == 0
+
+# The second run doesn't ask again (the text is the one confirmed).
+key f3
+type "##Command palette" "recorded macro"
+key enter
+expect_value macro_confirm_open == 0
+expect_value moved > 0
+
+# A macro may not reach outside the project folder: the console refuses it before anything runs.
+run_fails macro_check text="open path=/etc/passwd"
+
+# New Pack: the user's own items (here the recorded macro and the pie menus), written as a .sfpack that passes the
+# same checks as an install.
+# (Regression: with changed shortcuts - the keymap applied above - New Pack lists them as a keymap; it once read a
+# destroyed temporary there and crashed.)
+click "Library/New Pack...##pack.new"
+expect_value new_pack_open == 1
+expect "New Pack/My shortcuts (1 keys)##npi.keymap.My shortcuts (1 keys)"
+type "New Pack/Name##newpack" My Test Pack
+type "New Pack/Author##newpack" Tester
+click "New Pack/Recorded Macro##npi.macro.Recorded Macro"
+wait_idle 10
+shot new_pack
+click "New Pack/Save Pack...##newpack"
+answer_dialog My Test Pack.sfpack
+wait 0.2
+expect_status Wrote
+expect_value new_pack_open == 0

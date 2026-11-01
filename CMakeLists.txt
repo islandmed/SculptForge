@@ -54,6 +54,8 @@ add_library(sculptforge_core STATIC
   src/core/TransformCommands.cpp
   src/core/Decimate.cpp
   src/core/Script.cpp
+  src/core/Macro.cpp
+  src/core/Pack.cpp
   src/core/Json.cpp
   src/core/BrushRecipe.cpp
   src/core/BrushLibrary.cpp
@@ -292,6 +294,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelBrushLibrary.cpp
     src/app/PanelBrushGallery.cpp
     src/app/PanelPolypaint.cpp
+    src/app/PanelPacks.cpp
     src/app/PanelPaintLayers.cpp
     src/app/PanelTexture.cpp
     src/app/PanelUvEditor.cpp

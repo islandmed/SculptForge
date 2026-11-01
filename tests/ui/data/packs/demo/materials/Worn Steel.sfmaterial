@@ -1,0 +1,38 @@
+{
+  "format": "sculptforge-material-recipe",
+  "version": 1,
+  "id": "worn_metal",
+  "name": "Worn Metal",
+  "description": "Dull steel with bright, polished edges where hands and tools rub it, and dark grime settled in the creases.",
+  "layers": [
+    {
+      "name": "Steel",
+      "fill": {
+        "material": {"channels": ["base_color", "roughness", "metallic"], "color": [0.48, 0.49, 0.51], "roughness": 0.5, "metallic": 1.0},
+        "mask": [{"kind": "fill", "value": 1.0}]
+      }
+    },
+    {
+      "name": "Steel Roughness Variation",
+      "fill": {
+        "material": {"channels": ["roughness"], "roughness": 0.3},
+        "mask": [{"kind": "noise", "scale": 0.08, "octaves": 5, "seed": 11, "contrast": 1.2}, {"kind": "levels", "in_low": 0.35, "in_high": 0.85}]
+      }
+    },
+    {
+      "name": "Polished Edges",
+      "fill": {
+        "material": {"channels": ["base_color", "roughness", "metallic"], "color": [0.78, 0.79, 0.8], "roughness": 0.18, "metallic": 1.0},
+        "mask": [{"kind": "generator", "generator": "edge_wear", "level": 0.45, "softness": 0.2, "breakup": 0.45, "scale": 0.03, "seed": 3}]
+      }
+    },
+    {
+      "name": "Grime",
+      "fill": {
+        "material": {"channels": ["base_color", "roughness", "metallic"], "color": [0.16, 0.13, 0.1], "roughness": 0.9, "metallic": 0.0},
+        "mask": [{"kind": "generator", "generator": "dirt", "level": 0.45, "softness": 0.3, "breakup": 0.5, "scale": 0.05, "seed": 7},
+                 {"kind": "blur", "radius": 2, "opacity": 1.0}]
+      }
+    }
+  ]
+}

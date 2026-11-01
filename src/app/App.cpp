@@ -1825,6 +1825,27 @@ void App::endStroke() {
 // ---------------------------------------------------------------------------
 
 void App::runCommand(const std::string& name, const Args& args) {
+    // In the app a macro asks before it first runs and a pack is reviewed before it's installed (PanelPacks.cpp),
+    // whether they come from a button, a key, the console or a script.
+    if (name == "macro_run" && macros_.runDepth == 0) {
+        Macro m;
+        std::string err;
+        const std::string path = argString(args, "path");
+        if (!(path.empty() ? findMacro(argString(args, "name"), &commands_, m, err)
+                           : readMacroFile(path, &commands_, m, err))) {
+            status_ = err;
+            lastCommandOk_ = false;
+            return;
+        }
+        lastCommandOk_ = true;
+        requestMacroRun(m);
+        return;
+    }
+    if (name == "pack_install") {
+        reviewPackFile(argString(args, "path"));
+        lastCommandOk_ = packs_.review != nullptr;
+        return;
+    }
     if (doc_.sculptor.strokeActive()) endStroke();
     if (name == "save_project") storeProjectSettings();
     flushBrushEdits(); // commands may replace brushes: save edits first, then watch what's there afterwards
@@ -1860,6 +1881,10 @@ void App::runCommand(const std::string& name, const Args& args) {
     updateTitle();
     // The console shows every command as a script line (but not a live face feed, 30 times a second).
     if (name != "face_weights" || !r.ok) consoleEcho(name, args, r);
+    if (r.ok && (name == "pack_remove" || name == "pack_enable" || name == "pack_disable")) refreshPacks();
+    // Macro > Record keeps what the user runs (not what a running macro runs).
+    if (r.ok && macros_.recorder.active() && macros_.runDepth == 0 && name != "face_weights")
+        macros_.recorder.record(name, args, macroProjectDir());
 }
 
 namespace {
@@ -1911,6 +1936,8 @@ void App::openPath(const std::string& path) {
         if (loadReferenceImage(path)) showImageTo3D_ = true;
     } else if (ext == ".sfbrush") {
         installBrushFile(path);
+    } else if (ext == kPackExtension) { // a pack: the review screen first, nothing is installed yet
+        reviewPackFile(path);
     } else if (ext == ".exr" || ext == ".sfvdm") { // a vector displacement map for the VDM brush
         runCommand("vdm_set", {{"path", path}, {"swap_yz", vdmImport_.swapYZ}, {"flip_x", vdmImport_.flipX},
                                {"flip_y", vdmImport_.flipY}, {"flip_z", vdmImport_.flipZ}, {"scale", double(vdmImport_.scale)}});
@@ -1959,6 +1986,7 @@ AABB App::sceneBounds() const {
 }
 
 void App::processPendingFiles() {
+    pollPackDialogs(); // Install Pack, New Pack's save and a macro's "?" files (PanelPacks.cpp)
     std::vector<PendingFile> files;
     {
         std::lock_guard lock(pendingMutex_);
@@ -2182,6 +2210,7 @@ void App::drawUi() {
     }
     drawSupportUi(); // the first-run welcome, the one support reminder (PanelSupport.cpp)
     guide_.draw(*this);  // Help > User Guide
+    drawPacksUi();       // pack review, New Pack, macro confirmation and editor (PanelPacks.cpp)
     drawHelpConsoleUi(); // console, command palette, Controls (F1), Ctrl-hover help: last, on top
     drawSupportCard();   // the support card at launch, over everything (PanelSupportCard.cpp)
 }

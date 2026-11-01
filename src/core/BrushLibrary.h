@@ -29,6 +29,13 @@ struct Document;
 struct BrushLibraryPaths {
     std::string userDir;                 // empty = nothing is saved (tests, demo recordings)
     std::vector<std::string> studioDirs; // read-only, in precedence order
+    // Folders of enabled packs (core/Pack.h sets them): read-only, below the studio folders. A pack brush or VDM
+    // never replaces a built-in, studio or other pack's of the same name: it gets " (<pack>)" after its name.
+    struct PackDir {
+        std::string dir, pack; // the pack's brushes/ or vdms/ folder, and the pack's name
+        bool vdm = false;
+    };
+    std::vector<PackDir> packs;
     // <app data>/brushes plus the folders in SCULPTFORGE_BRUSH_PATH.
     static BrushLibraryPaths fromEnvironment();
 };

@@ -213,6 +213,11 @@ void ActionRegistry::add(Action a) {
     actions_.push_back(std::move(a));
 }
 
+void ActionRegistry::removePrefix(std::string_view prefix) {
+    ++revision_;
+    std::erase_if(actions_, [&](const Action& a) { return std::string_view(a.id).substr(0, prefix.size()) == prefix; });
+}
+
 const Action* ActionRegistry::find(std::string_view id) const {
     for (const auto& a : actions_)
         if (a.id == id) return &a;

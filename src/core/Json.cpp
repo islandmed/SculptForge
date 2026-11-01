@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 
 namespace sf {
 
@@ -19,6 +20,7 @@ struct Parser {
     size_t i = 0;
     std::string error;
     int depth = 0;
+    bool strict = false; // parseStrict: duplicate keys and numbers outside JSON's grammar are errors
 
     void ws() {
         while (i < s.size() && (s[i] == ' ' || s[i] == '\t' || s[i] == '\n' || s[i] == '\r')) ++i;
@@ -118,6 +120,7 @@ struct Parser {
                     if (i >= s.size() || s[i] != '"') { ok = fail("Expected key"); break; }
                     std::string key;
                     if (!string(key)) { ok = false; break; }
+                    if (strict && out.has(key)) { ok = fail("Duplicate key \"" + key + "\""); break; }
                     ws();
                     if (i >= s.size() || s[i] != ':') { ok = fail("Expected ':'"); break; }
                     ++i;
@@ -167,6 +170,12 @@ struct Parser {
             char* end = nullptr;
             double d = std::strtod(start, &end);
             if (end == start) ok = fail("Bad number");
+            // strtod also takes hex, "inf", "nan" and a leading '+': not JSON.
+            else if (strict) {
+                for (const char* q = start; q < end; ++q)
+                    if (!std::strchr("0123456789+-.eE", *q)) { ok = fail("Bad number"); break; }
+                if (ok && !std::isfinite(d)) ok = fail("Number out of range");
+            }
             i += size_t(end - start);
             out = Json(d);
         } else {
@@ -293,8 +302,12 @@ std::string Json::dump(bool pretty) const {
     return out;
 }
 
-bool Json::parse(const std::string& text, Json& out, std::string& error) {
+bool Json::parse(const std::string& text, Json& out, std::string& error) { return parseImpl(text, out, error, false); }
+bool Json::parseStrict(const std::string& text, Json& out, std::string& error) { return parseImpl(text, out, error, true); }
+
+bool Json::parseImpl(const std::string& text, Json& out, std::string& error, bool strict) {
     Parser p(text);
+    p.strict = strict;
     Json v;
     if (!p.value(v)) {
         error = p.error;

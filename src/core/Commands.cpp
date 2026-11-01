@@ -9,6 +9,8 @@
 #include "core/BrushLibrary.h"
 #include "core/Decimate.h"
 #include "core/KeepMasked.h"
+#include "core/Macro.h"
+#include "core/Pack.h"
 #include "core/Dyntopo.h"
 #include "core/EnginePresets.h"
 #include "core/ExtractMirror.h"
@@ -818,6 +820,8 @@ CommandRegistry::CommandRegistry() {
     registerMayaCommands(*this); // maya_send/receive (io/MayaCommands.cpp)
     registerBakeCommands(*this); // bake (core/Bake.cpp)
     registerFaceCommands(*this); // face_shapes_generate, face_weights, ... (core/FaceCommands.cpp)
+    registerPackCommands(*this);    // pack_install, pack_list, pack_remove, ... (core/Pack.h)
+    registerMacroCommands(*this);   // macro_run, macro_list, macro_check (core/Macro.h)
     registerProjectCommands(*this); // keep last (core/Project.cpp)
 }
 

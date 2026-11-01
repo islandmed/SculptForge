@@ -150,6 +150,9 @@
 //   shot NAME                save a screenshot NAME.png (to --ui-out)
 //   expect_guide FILE        the User Guide shows FILE ("masking.md", "index.md")
 //   dump_shortcuts NAME      write every default shortcut as a Markdown table to --ui-out/NAME
+//   answer_dialog PATH|cancel   what the open pack or macro file dialog answers (Install Pack, Save Pack, a
+//                            macro's "?"); values: packs_installed, pack_review_open, pack_review_brush, macros,
+//                            macro_recording, macro_recorded, macro_confirm_open, macro_ran, macro_one_step ...
 // A scripted phone for File > Capture from phone (link/PhoneLink.h), over real HTTP to the link on 127.0.0.1:
 //   phone_upload KIND FILE... send files as the capture page does (KIND splat / photo / ply; FILE relative to the
 //                            script), in 64 KB chunks with one lost chunk resumed, then finish the capture
@@ -461,6 +464,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "radial_hover") return double(app_.radial_.hover);
     if (name == "radial_ran") return double(app_.radial_.ran); // the slot run last, -1: none yet
     if (name == "radial_menus") return double(app_.radialMenus_.size());
+    if (const double v = app_.packsTestValue(name); !std::isnan(v)) return v; // packs_installed, macro_recording, ...
     if (name.rfind("radial_slots_", 0) == 0) { // radial_slots_N: menu N's items (1-based), -1: no such menu
         const size_t i = size_t(std::max(0, std::atoi(name.c_str() + 13) - 1));
         return i < app_.radialMenus_.size() ? double(app_.radialMenus_[i].slots.size()) : -1.0;
@@ -1264,6 +1268,26 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (file.is_relative()) file = std::filesystem::path(std::u8string(scriptDir_.begin(), scriptDir_.end())) / file;
         const auto u8 = file.lexically_normal().u8string();
         run([this, action, path = std::string(u8.begin(), u8.end())] { app_.queueFile(action, path); });
+    } else if (verb == "answer_dialog") {
+        // answer_dialog PATH | cancel: what the open pack or macro file dialog (Install Pack, New Pack's Save Pack,
+        // a macro's "?") answers. PATH is relative to the script; a file that doesn't exist beside it (a save) lands
+        // in the shots folder.
+        if (!need(1)) return false;
+        std::string path;
+        if (w[1] != "cancel") {
+            const std::string name = restOf(lineText_, 1); // (names may have spaces)
+            auto file = std::filesystem::path(std::u8string(name.begin(), name.end()));
+            if (file.is_relative()) {
+                const auto beside = std::filesystem::path(std::u8string(scriptDir_.begin(), scriptDir_.end())) / file;
+                std::error_code ec;
+                file = std::filesystem::exists(beside, ec)
+                           ? beside
+                           : std::filesystem::path(std::u8string(shotDir_.begin(), shotDir_.end())) / file;
+            }
+            const auto u8 = file.lexically_normal().u8string();
+            path.assign(u8.begin(), u8.end());
+        }
+        run([this, path] { app_.packDialogAnswered(path); });
     } else if (verb == "radial_import" || verb == "radial_export") {
         // radial_import FILE (relative to the script) / radial_export N FILE (in the shots folder): what the file
         // dialogs of Preferences > Input > Radial Menus do with the path the user picked.
@@ -1424,7 +1448,10 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (!parseScript(text, statements, error)) return false;
         run([this, line, statements] {
             for (const auto& st : statements) {
-                app_.runCommand(st.command, st.args);
+                Args args = st.args; // $LIBRARY: the test's own library folder (known once the app runs)
+                for (auto& [key, value] : args)
+                    if (auto* sv = std::get_if<std::string>(&value)) *sv = expandLibrary(*sv);
+                app_.runCommand(st.command, args);
                 if (!app_.lastCommandOk_) {
                     fail(line, st.command + " failed: " + app_.status_);
                     return;

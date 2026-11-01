@@ -35,6 +35,7 @@ std::string utf8(const fs::path& p) {
 const char* brushTag(const BrushRecipe& b) {
     switch (b.origin.source) {
     case BrushSource::Studio: return "studio";
+    case BrushSource::Pack: return b.origin.pack.c_str(); // the pack's name
     case BrushSource::Gallery: return "gallery";
     case BrushSource::Project: return "project";
     case BrushSource::Session: return "unsaved";
@@ -82,6 +83,7 @@ std::string brushOriginText(const BrushRecipe& b) {
                    : "In your brush library";
     case BrushSource::Gallery: return "From the community gallery, in your brush library";
     case BrushSource::Studio: return "Studio brush (shared folder, read-only)";
+    case BrushSource::Pack: return "From the pack " + b.origin.pack + " (read-only; Library > Packs)";
     case BrushSource::Project: return "From the open project, not in your brush library";
     case BrushSource::Session: return "Not saved - refine it in Brush Lab to keep it";
     }
@@ -93,12 +95,19 @@ void App::initBrushLibrary() {
     if (!options_.uiTest.empty()) {
         // UI tests get an empty library of their own, never the artist's.
         const fs::path base = options_.uiOutDir.empty() ? fs::temp_directory_path() / "sculptforge-ui-test" : fsPath(options_.uiOutDir);
-        paths = {utf8(base / "brush-library"), {}};
+        paths = {utf8(base / "brush-library"), {}, {}};
         std::error_code ec;
         fs::remove_all(fsPath(paths.userDir), ec);
+        // ... and no packs or macros but their own (core/Pack.h, core/Macro.h).
+        setPacksRoot(utf8(base / "packs"));
+        setUserMacroDir(utf8(base / "macros"));
+        fs::remove_all(base / "packs", ec);
+        fs::remove_all(base / "macros", ec);
     } else if (!options_.recordPath.empty() || !options_.renderPath.empty()) {
         paths = {}; // demo videos and renders: built-in brushes only, nothing saved
+        setPacksSafeMode(true);
     }
+    applyPacksToBrushLibrary(paths); // the enabled packs' brushes and VDMs (none in safe mode)
     const auto messages = loadBrushLibrary(doc_, paths);
     for (const auto& m : messages) SDL_Log("Brush library: %s", m.c_str());
     if (!messages.empty())

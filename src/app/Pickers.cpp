@@ -444,6 +444,9 @@ std::vector<BrushItem> PickerUi::brushItems(App& app, bool libraryFiles) {
         case BrushSource::Studio:
             b.tag = "studio";
             break;
+        case BrushSource::Pack:
+            b.tag = r.origin.pack;
+            break;
         case BrushSource::Gallery:
             b.tag = "gallery";
             break;
@@ -876,6 +879,18 @@ void drawAlphaGrid(App& app, GridMode mode) {
             if (AssetTile((e.name + "##alphafile").c_str(), tex, ICON_LC_IMAGE, e.name, tile, false))
                 app.runCommand("brush_set_alpha", {{"path", e.path}, {"invert", app.alphaInvert_}});
             quickInfo(tex, ICON_LC_IMAGE, e.name, "Image in your library's Alphas folder.", e.path);
+        }
+    }
+    if (!app.packAlphas().empty()) { // alphas from installed packs, tagged with the pack's name
+        sectionHeader("Packs");
+        column = 0;
+        for (const PackContentItem& it : app.packAlphas()) {
+            tileGrid(column, columns);
+            const std::string label = it.label();
+            const ImTextureID tex = app.thumbs_.file(it.file);
+            if (AssetTile((label + "##alphapack" + it.file).c_str(), tex, ICON_LC_IMAGE, label, tile, false))
+                app.runCommand("brush_set_alpha", {{"path", it.file}, {"invert", app.alphaInvert_}});
+            quickInfo(tex, ICON_LC_IMAGE, label, ("From the pack " + it.packName + ".").c_str(), it.file);
         }
     }
     ImGui::Dummy(ImVec2(0, 2));

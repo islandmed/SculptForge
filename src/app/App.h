@@ -21,6 +21,8 @@
 #include "ai/ImageTo3DService.h"
 #include "core/Commands.h"
 #include "core/Image.h"
+#include "core/Macro.h"
+#include "core/Pack.h"
 #include "core/Document.h"
 #include "core/Face.h"
 #include "core/MeshTransform.h"
@@ -1510,6 +1512,89 @@ private:
         bool untilLeave = false; // Space let go over the menu: it closes when the pointer leaves it
         int openedFrame = -1;
     } quickMenu_;
+    // ---- Packs and macros (PanelPacks.cpp, core/Pack.h, core/Macro.h, #20) ----
+    // Library > Packs: install (a review screen first: what's inside, the license, the author), list, switch on and
+    // off, remove, and New Pack. Pack items join the brush, alpha, Lit Sphere, Material Recipe, keymap, pie menu and
+    // macro lists tagged with the pack's name. Macros: Record (the commands run between Start and Stop), the
+    // editor (plain text, checked as you type), and one action per macro ("macro.<pack or user>.<name>") for F3, keys
+    // and pie menus. A macro shows its whole command list and asks before it first runs (again after it changed).
+public:
+    void drawPacksTab(float height);                // Library > Packs (LightBox.cpp)
+    double packsTestValue(const std::string& name) const; // NaN: not a pack value (UiTest.cpp)
+    void packDialogAnswered(std::string path);      // thread-safe: a pack or macro file dialog's answer
+    void reviewPackFile(const std::string& path);   // File > Install Pack, a dropped .sfpack: the review screen
+    const std::vector<PackContentItem>& packAlphas() const { return packs_.alphas; }
+    const std::vector<PackContentItem>& packMaterials() const { return packs_.materials; }
+
+private:
+    void registerPackActions();
+    void refreshPacks();        // after an install, removal or switch: brushes, VDMs, Lit Spheres, recipes, macros
+    void refreshMacroActions(); // one action per macro
+    void loadPackMatcaps();
+    void drawPacksUi();         // the review screen, New Pack, the macro confirmation and the macro editor
+    void drawPackReview();
+    void drawNewPack();
+    void drawMacroConfirm();
+    void drawMacroEditor();
+    void drawPackKeymapRows();  // Preferences > Input: the enabled packs' keymaps
+    void pollPackDialogs();
+    void openPackDialog(int kind, int pathKind = 0); // PackDialog, MacroPathKind
+    void requestMacroRun(const Macro& m); // asks first unless this exact text was confirmed
+    void startMacroRun(Macro m);          // asks for "?" files, then runs
+    void runMacroNow();
+    void toggleMacroRecording();
+    void openMacroEditor(const std::string& name, const std::string& text, const std::string& path);
+    bool applyPackKeymap(const std::string& file);
+    void openNewPack();
+    void writeNewPack(const std::string& path);
+    std::string macroProjectDir() const; // the saved project's folder ("" when the scene isn't a saved project)
+    enum PackDialog { kPackDialogNone, kPackDialogInstall, kPackDialogSave, kPackDialogMacro };
+    struct NewPackItem {
+        PackItemType type = PackItemType::Brush;
+        std::string label, file, name; // name: the file name in the pack
+        std::vector<uint8_t> data;     // made in memory (pie menus, the keymap, the current Fill layers)
+        bool on = false;
+    };
+    struct PacksUi {
+        std::vector<InstalledPack> installed;
+        std::vector<PackContentItem> alphas, materials, keymaps, pieMenus;
+        std::vector<int> matcaps; // Lit Sphere indices the packs added (removed again on a refresh)
+        std::unique_ptr<PackReview> review;
+        std::string reviewError, reviewPath;
+        bool reviewOpen = false;
+        std::string expanded; // the pack id whose details show
+        bool newOpen = false;
+        char id[65] = "", name[65] = "", version[33] = "1.0", author[65] = "", license[65] = "CC-BY-4.0";
+        char description[1001] = "";
+        bool insider = false;
+        std::vector<NewPackItem> candidates;
+        std::string newError;
+        std::mutex mutex;          // the dialog answer arrives on another thread
+        std::string answer;
+        bool answered = false, answerCancelled = false;
+        int dialog = kPackDialogNone; // what the open dialog is for
+    } packs_;
+    struct MacrosUi {
+        MacroRecorder recorder;
+        int runDepth = 0;          // > 0 while a macro runs: its commands aren't recorded or intercepted
+        std::vector<Macro> list;   // the user's and the packs' (refreshMacroActions)
+        bool confirmOpen = false;
+        Macro confirm;
+        bool editorOpen = false;
+        char name[97] = "";
+        std::vector<char> text = std::vector<char>(kMaxMacroFileSize + 1, '\0');
+        std::string path;          // the file the editor saves to ("" = new)
+        std::string check;         // the editor's validation line
+        bool checkOk = false;
+        std::string checkedText = "\x01";
+        Macro running;             // waiting for its "?" files
+        std::vector<MacroAsk> asks;
+        std::vector<std::string> answers;
+        bool waiting = false;
+        int ran = -1;              // commands the last run ran (UI tests)
+        bool lastOk = false, lastOneStep = false;
+    } macros_;
+    // ---- end Packs and macros ----
     // ---- Radial menus (RadialMenu.cpp, core/RadialMenu.h, #45) ----
     // Up to eight pie menus of up to eight actions each. A menu's key (action radial.menuN, set in the keymap like
     // any other) or its mouse / pen button, held: the pie shows at the cursor, a flick toward a slot and letting go

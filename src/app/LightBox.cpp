@@ -249,6 +249,13 @@ void LightBox::rootEntries(App& app, std::vector<AssetEntry>& out) {
         }
         const auto files = scan(userDir, false);
         out.insert(out.end(), files.begin(), files.end());
+        for (const PackContentItem& it : app.packAlphas()) { // the enabled packs' alphas, tagged with the pack
+            AssetEntry e;
+            e.kind = AssetKind::AlphaFile;
+            e.name = it.label();
+            e.path = it.file;
+            out.push_back(std::move(e));
+        }
         break;
     }
     case LibraryTab::Material:
@@ -589,6 +596,7 @@ void LightBox::drawHeader(App& app, float width) {
             "Gaussian splat captures (.ply, .splat) to sculpt against.",
             "Snapshots and the autosave, newest first.",
             "Recently opened files of every kind.",
+            "Installed packs (.sfpack): switch them on or off, remove them, make your own. Also macros: record, edit, run.",
         };
         ui::HelpText(libraryTabName(tab), nullptr, tips[i], "Library");
         ImGui::SameLine(0, 0);
@@ -755,6 +763,11 @@ void LightBox::draw(App& app, const CanvasRect& canvas) {
 
     ImGui::SetCursorPosY(std::round((kHeader * scale - ImGui::GetFrameHeight()) * 0.5f));
     drawHeader(app, ws.x - 16.0f * scale);
+    if (place_.tab == LibraryTab::Packs) { // a list, not tiles (PanelPacks.cpp)
+        app.drawPacksTab(float(rows) * (kTile + kLabel + 4.0f) * scale + 8.0f * scale);
+        ImGui::End();
+        return;
+    }
 
     const std::vector<AssetEntry> items = entries(app);
     const float tile = kTile * scale, rowH = (kTile + kLabel + 4.0f) * scale, gap = kGap * scale;

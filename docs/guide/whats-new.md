@@ -19,6 +19,12 @@ chapter opens by itself the first time you start a new version; you can always f
   chipped paint and dirt move with the form while you sculpt.
 - **Material Recipes**: Worn Metal, Painted Edges, Dirt and Dust and Rusted Iron in one click, and your own saved
   as small files.
+- **Packs and macros** (**File > Install Pack...**, **Library > Packs**): install a `.sfpack` of brushes, alphas,
+  Lit Spheres, Material Recipes, VDMs, keymaps, pie menus and macros after a review that shows exactly what's
+  inside, its license and its author. Switch packs off, remove them, or make your own with **New Pack**. Record
+  the commands you run as a **macro**, edit it as plain text, and run it from <kbd>F3</kbd>, a key or a pie menu as
+  one undo step. Packs are data only and macros only run SculptForge's own commands; `--no-packs` starts without
+  any pack. See [Packs and macros](packs-and-macros.md).
 - **More maps from Tool > Bake**: curvature, thickness, position and ID; bake a Part's top subdivision level (or
   micro level) onto its lowest level without a second Part; UDIM tiles bake as one set of files per tile. See
   [Baking](baking.md).

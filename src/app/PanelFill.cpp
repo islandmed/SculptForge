@@ -170,6 +170,9 @@ void App::drawFillLayerControls() {
             if (ImGui::Selectable((r.name + "##recipe").c_str())) runCommand("material_recipe", {{"name", r.id}});
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", r.description.c_str());
         }
+        for (const PackContentItem& it : packMaterials()) // from installed packs, tagged with the pack's name
+            if (ImGui::Selectable((it.label() + "##recipe" + it.file).c_str()))
+                runCommand("material_recipe", {{"path", it.file}});
         ImGui::EndCombo();
     }
     ui::HelpText("Material Recipe", nullptr,

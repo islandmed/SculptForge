@@ -458,6 +458,7 @@ std::string UserGuide::chapterFor(const std::string& palette, const std::string&
     if (starts("Splats > Make sculptable")) return "scan-to-sculptable.md";
     if (starts("Splats")) return "splats.md";
     if (starts("Script")) return "scripting.md";
+    if (starts("Library > Packs") || starts("Macros") || idStarts("pack.") || idStarts("macro.")) return "packs-and-macros.md";
     if (starts("Transform > Gizmo") || idStarts("gizmo.") || actionId == "tool.draw" || actionId == "tool.move" ||
         actionId == "tool.scale" || actionId == "tool.rotate")
         return "gizmo.md";

@@ -7,6 +7,22 @@ All notable changes to SculptForge are listed here. The format follows
 ## [Unreleased]
 
 ### Added
+- Packs and macros (#20): `.sfpack` files bring brushes, alphas, Lit Spheres, Material Recipes, VDMs, keymaps, pie
+  menus and macros in one file (format: `docs/pack-format.md`). **File > Install Pack...**, a dropped file or
+  **Library > Packs** shows a review first (counts by type, every item, the license text, the author; a Supporter
+  Pack is marked by its `"channel": "insider"`, display only). Installed packs live in their own folders in the app
+  data folder, can be switched off or removed, never replace built-in or user items (a clash gets the pack's name),
+  and their items appear in the brush, alpha, Lit Sphere, Material Recipe, keymap, pie menu and macro lists tagged
+  with the pack. **New Pack** exports your own items; `pack_install`, `pack_list`, `pack_remove`, `pack_enable`,
+  `pack_disable` and `pack_create` work in `sculptforge-cli` and Python; `--no-packs` is a safe mode. Packs are data
+  only and every one is treated as hostile: a strict zip reader refuses absolute paths, `..`, symbolic links,
+  devices, encryption, ZIP64, overlapping entries and duplicate or Windows-reserved names, caps sizes, file counts
+  and the unpacking ratio, accepts only the listed file types and parses every file (JSON strictly).
+  Macros (`.sfmacro`): **Record Macro** keeps the commands you run, the **Macro Editor** checks the text as you type,
+  and every macro is an action for F3, keys and pie menus; edits on one Part undo as one step. A macro
+  shows its whole command list and asks before it first runs, only runs SculptForge's own commands (nothing that
+  reaches the network or another program), and uses files only inside the project folder or picked when it runs
+  (`macro_run`, `macro_list`, `macro_check`).
 - PBR viewport: **Material > Viewport Shading** switches between **Lit Sphere** (the default) and **PBR**, which
   shows the texture's material channels as a game engine or renderer does: GGX reflections from a prefiltered
   environment, diffuse light from its spherical harmonics, multiple-scattering energy for rough metals, exposure

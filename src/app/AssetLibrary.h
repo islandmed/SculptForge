@@ -48,7 +48,7 @@ struct AssetEntry {
 };
 
 // The LightBox tabs, in the order they are shown.
-enum class LibraryTab { Project, Tool, Brush, Alpha, Material, Image, Splats, QuickSave, Recent, Count };
+enum class LibraryTab { Project, Tool, Brush, Alpha, Material, Image, Splats, QuickSave, Recent, Packs, Count };
 const char* libraryTabName(LibraryTab tab);       // "Project"
 const char* libraryTabId(LibraryTab tab);         // "project" (UiLayout::lightboxTab)
 LibraryTab libraryTabFromId(std::string_view id); // unknown -> Project

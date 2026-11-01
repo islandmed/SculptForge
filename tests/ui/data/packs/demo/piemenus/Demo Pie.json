@@ -1,0 +1,15 @@
+{
+  "format": "sculptforge-radial-menu",
+  "version": 1,
+  "menu": {
+    "name": "Demo Pie",
+    "slots": [
+      {
+        "action": "mask.invert"
+      },
+      {
+        "action": "mask.clear"
+      }
+    ]
+  }
+}
