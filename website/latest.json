@@ -1,11 +1,11 @@
 {
-  "version": "0.9.6",
+  "version": "0.9.7",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Extract: turn a masked area into a shell SubTool (helmets, straps, armour), ZBrush style",
-    "Mirror And Weld, Mirror, and a flat viewport background",
-    "Fixed: Divide crashing on models from Blender; fast strokes on dense meshes keep their curve",
-    "A log file for crash reports (Help > Open log folder), and a Flatpak for Linux"
+    "Big brushes on dense meshes: a third faster per frame, about half the lag behind the pen, no pause when you lift it",
+    "A right click on the canvas opens the QuickMenu, as in ZBrush",
+    "Dynamic topology with symmetry now remeshes both sides of a QRemeshed or asymmetric mesh",
+    "Fixed: the orthographic view (Numpad 5) shaded MatCaps and lights inside out"
   ]
 }

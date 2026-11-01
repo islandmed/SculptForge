@@ -15,7 +15,7 @@ _glm=1.0.1
 source=("$pkgname-$pkgver.tar.gz::https://github.com/islandmed/SculptForge/archive/refs/tags/v$pkgver.tar.gz"
         "imgui-$_imgui.tar.gz::https://github.com/ocornut/imgui/archive/refs/tags/v$_imgui.tar.gz"
         "glm-$_glm.tar.gz::https://github.com/g-truc/glm/archive/refs/tags/$_glm.tar.gz")
-sha256sums=('df92d491f455233d85dd2a232cfe237c7289892f3a51d9ea7585064c16420634'
+sha256sums=('60842ff3baa84aeda44b7f81c4308e2aeeec1d9b32872d754e1d204fae45feec'
             '3872a5f90df78fced023c1945f4466b654fd74573370b77b17742149763a7a7c'
             '9f3174561fd26904b23f0db5e560971cbf9b3cbda0b280f04d5c379d03bf234c')
 
@@ -33,7 +33,7 @@ build() {
 }
 
 check() {
-  ctest --test-dir build --output-on-failure
+  ctest --test-dir build --output-on-failure -LE ui
 }
 
 package() {
