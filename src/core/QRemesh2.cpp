@@ -81,9 +81,8 @@ std::vector<SrcEdge> meshEdges(const std::vector<vec3>& P, const std::vector<glm
     }
     const size_t blocks = (nv + 8191) / 8192;
     std::vector<std::vector<SrcEdge>> parts(blocks);
-    parallelFor(blocks, [&](size_t b0, size_t b1) {
+    parallelJobs(blocks, [&](size_t blk) {
         std::vector<std::pair<uint32_t, uint32_t>> loc;
-        for (size_t blk = b0; blk < b1; ++blk)
             for (size_t a = blk * 8192, e = std::min(nv, a + 8192); a < e; ++a) {
                 loc.clear();
                 for (uint32_t k = off[a]; k < off[a + 1]; ++k) {
@@ -104,7 +103,7 @@ std::vector<SrcEdge> meshEdges(const std::vector<vec3>& P, const std::vector<glm
                     i = j;
                 }
             }
-    }, 1);
+    });
     std::vector<SrcEdge> all;
     for (auto& p : parts) all.insert(all.end(), p.begin(), p.end());
     return all;
@@ -872,10 +871,21 @@ bool remeshPieceV2(const WorkMesh& piece, int axis, double wantQuads, const QRem
     ps.features = features.empty() ? nullptr : &features;
     ps.sharp = std::move(sharp);
     ps.keepGroups = opt.keepGroups;
-    ProxyBuilder pb(ps);
     // About three proxy edges per quad edge, at most ~400k proxy triangles.
     const float minEdge = float(std::sqrt(area / (0.433 * 400000.0)));
     const float L0 = std::max(h0 / tune("SF_QR2_DENSITY", 2.5f), minEdge);
+    // Dense input (many times the proxy's triangles): decimate in parallel blocks first.
+    qr::WorkMesh pre;
+    const double proxyTris = area / (0.433 * double(L0) * double(L0));
+    if (double(piece.T.size()) > 8.0 * proxyTris && piece.T.size() > 300000) {
+        std::unordered_set<uint64_t> sharpPre;
+        pre = preDecimate(ps, L0, sharpPre);
+        ps.mesh = &pre;
+        ps.sharp = std::move(sharpPre);
+        mark("parallel pre-decimate");
+        if (timing) std::fprintf(stderr, "  v2 pre-decimated %zu -> %zu triangles\n", piece.T.size(), pre.T.size());
+    }
+    ProxyBuilder pb(ps);
     pb.decimate(L0);
     mark("decimate");
     if (!step(0.25f)) return false;

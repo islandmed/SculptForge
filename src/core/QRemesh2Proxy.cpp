@@ -19,9 +19,32 @@
 
 #include <algorithm>
 #include <cmath>
+#include <atomic>
+#include <numeric>
+#include <thread>
 #include <unordered_map>
 
 namespace sf::qr2 {
+
+static thread_local bool tInJob = false;
+
+void parallelJobs(size_t n, const std::function<void(size_t)>& fn) {
+    const size_t threads = tInJob ? 1 : std::min<size_t>(n, size_t(parallelThreads()));
+    if (threads <= 1) {
+        for (size_t i = 0; i < n; ++i) fn(i);
+        return;
+    }
+    std::atomic<size_t> next{0};
+    auto work = [&] {
+        tInJob = true;
+        for (size_t i = next++; i < n; i = next++) fn(i);
+        tInJob = false;
+    };
+    std::vector<std::thread> pool;
+    for (size_t t = 1; t < threads; ++t) pool.emplace_back(work);
+    work();
+    for (auto& th : pool) th.join();
+}
 
 void Proxy::buildOpposites() {
     const size_t nt = T.size();
@@ -63,6 +86,7 @@ struct ProxyBuilder::Impl {
     std::vector<uint8_t> deadT, deadV;
     std::vector<std::vector<uint32_t>> VT;
     std::vector<float> Lt; // per vertex target length (remesh)
+    std::vector<uint8_t> locked; // pre-decimation blocks: vertices shared with other blocks never go
     float reach = 1.0f;
 
     explicit Impl(const ProxySource& s)
@@ -140,6 +164,7 @@ struct ProxyBuilder::Impl {
 
     // 0 free, 1 on a feature line, 2 pinned (lines meet, end, or turn by more than 45 degrees).
     int kind(uint32_t v, uint32_t* ends, std::vector<uint32_t>& scratch) const {
+        if (!locked.empty() && locked[v]) return 2;
         const int n = featureInfo(v, ends, scratch);
         if (n == 0) return 0;
         if (n != 2) return 2;
@@ -262,9 +287,9 @@ struct ProxyBuilder::Impl {
         const size_t nv = P.size();
         const size_t blocks = (nv + 4095) / 4096;
         std::vector<std::vector<Cand>> parts(blocks);
-        parallelFor(blocks, [&](size_t b0, size_t b1) {
+        parallelJobs(blocks, [&](size_t blk) {
             std::vector<uint32_t> r;
-            for (size_t blk = b0; blk < b1; ++blk) {
+            {
                 auto& out = parts[blk];
                 for (size_t v = blk * 4096, e = std::min(nv, v + 4096); v < e; ++v) {
                     if (deadV[v]) continue;
@@ -277,7 +302,7 @@ struct ProxyBuilder::Impl {
                     }
                 }
             }
-        }, 1);
+        });
         size_t total = 0;
         for (auto& p : parts) total += p.size();
         std::vector<Cand> all;
@@ -533,6 +558,124 @@ struct ProxyBuilder::Impl {
         }
     }
 };
+
+qr::WorkMesh preDecimate(const ProxySource& source, float edge, std::unordered_set<uint64_t>& sharpOut) {
+    const qr::WorkMesh& m = *source.mesh;
+    const size_t nt = m.T.size(), nv = m.P.size();
+    // Spatial blocks: recursive median splits of the triangle centres along the longest axis.
+    const int levels = 6; // 64 blocks
+    std::vector<uint32_t> order(nt);
+    std::iota(order.begin(), order.end(), 0u);
+    std::vector<vec3> centre(nt);
+    parallelFor(nt, [&](size_t b, size_t e) {
+        for (size_t t = b; t < e; ++t) centre[t] = (m.P[m.T[t].x] + m.P[m.T[t].y] + m.P[m.T[t].z]) / 3.0f;
+    });
+    std::vector<std::pair<size_t, size_t>> ranges{{0, nt}};
+    for (int l = 0; l < levels; ++l) {
+        std::vector<std::pair<size_t, size_t>> next;
+        for (auto [b, e] : ranges) {
+            if (e - b < 2) {
+                next.push_back({b, e});
+                continue;
+            }
+            vec3 lo(1e30f), hi(-1e30f);
+            for (size_t i = b; i < e; ++i) lo = glm::min(lo, centre[order[i]]), hi = glm::max(hi, centre[order[i]]);
+            const vec3 ext = hi - lo;
+            const int axis = ext.x >= ext.y && ext.x >= ext.z ? 0 : ext.y >= ext.z ? 1 : 2;
+            const size_t mid = (b + e) / 2;
+            std::nth_element(order.begin() + long(b), order.begin() + long(mid), order.begin() + long(e),
+                             [&](uint32_t x, uint32_t y) { return centre[x][axis] < centre[y][axis]; });
+            next.push_back({b, mid});
+            next.push_back({mid, e});
+        }
+        ranges.swap(next);
+    }
+    std::vector<uint32_t> blockOf(nt);
+    for (uint32_t k = 0; k < ranges.size(); ++k)
+        for (size_t i = ranges[k].first; i < ranges[k].second; ++i) blockOf[order[i]] = k;
+    // Vertices used by more than one block stay.
+    std::vector<uint32_t> vblock(nv, kNone);
+    std::vector<uint8_t> shared(nv, 0);
+    for (uint32_t t = 0; t < nt; ++t)
+        for (int k = 0; k < 3; ++k) {
+            uint32_t& b = vblock[m.T[t][k]];
+            if (b == kNone) b = blockOf[t];
+            else if (b != blockOf[t]) shared[m.T[t][k]] = 1;
+        }
+    struct Part {
+        std::vector<vec3> P;
+        std::vector<uint32_t> g; // local -> global vertex
+        std::vector<glm::uvec3> T;
+        std::vector<uint32_t> G;
+        std::vector<uint64_t> sharp;
+    };
+    std::vector<Part> parts(ranges.size());
+    std::vector<vec3> P = m.P;
+    parallelJobs(ranges.size(), [&](size_t k) {
+        {
+            qr::WorkMesh local;
+            std::unordered_map<uint32_t, uint32_t> l;
+            std::vector<uint32_t> g;
+            auto id = [&](uint32_t v) {
+                auto [it, inserted] = l.try_emplace(v, uint32_t(g.size()));
+                if (inserted) g.push_back(v), local.P.push_back(m.P[v]);
+                return it->second;
+            };
+            for (size_t i = ranges[k].first; i < ranges[k].second; ++i) {
+                const uint32_t t = order[i];
+                local.T.push_back({id(m.T[t].x), id(m.T[t].y), id(m.T[t].z)});
+                local.group.push_back(m.group.empty() ? 0u : m.group[t]);
+            }
+            ProxySource ls = source;
+            ls.mesh = &local;
+            ls.sharp.clear();
+            for (uint64_t key : source.sharp) {
+                const auto a = l.find(uint32_t(key >> 32)), b = l.find(uint32_t(key & 0xffffffffu));
+                if (a != l.end() && b != l.end()) ls.sharp.insert(edgeKey(a->second, b->second));
+            }
+            ProxyBuilder::Impl impl(ls);
+            impl.locked.assign(local.P.size(), 0);
+            for (size_t v = 0; v < g.size(); ++v) impl.locked[v] = shared[g[v]];
+            impl.decimate(edge);
+            Part& out = parts[k];
+            out.g = g;
+            out.P = impl.P;
+            for (uint32_t t = 0; t < impl.T.size(); ++t)
+                if (!impl.deadT[t]) out.T.push_back({g[impl.T[t].x], g[impl.T[t].y], g[impl.T[t].z]}), out.G.push_back(impl.G[t]);
+            for (uint64_t key : impl.sharp) out.sharp.push_back(edgeKey(g[uint32_t(key >> 32)], g[uint32_t(key & 0xffffffffu)]));
+        }
+    });
+    // Merge (surviving vertices keep their global ids, moved by midpoint collapses), then compact.
+    qr::WorkMesh merged;
+    std::vector<uint32_t> remap(nv, kNone);
+    for (Part& part : parts) {
+        for (size_t v = 0; v < part.g.size(); ++v) P[part.g[v]] = part.P[v];
+    }
+    sharpOut.clear();
+    for (Part& part : parts) {
+        for (size_t i = 0; i < part.T.size(); ++i) {
+            glm::uvec3 t = part.T[i];
+            for (int k = 0; k < 3; ++k) {
+                uint32_t& r = remap[t[k]];
+                if (r == kNone) r = uint32_t(merged.P.size()), merged.P.push_back(P[t[k]]);
+                t[k] = r;
+            }
+            merged.T.push_back(t);
+            merged.group.push_back(part.G[i]);
+        }
+    }
+    for (Part& part : parts)
+        for (uint64_t key : part.sharp) {
+            const uint32_t a = remap[uint32_t(key >> 32)], b = remap[uint32_t(key & 0xffffffffu)];
+            if (a != kNone && b != kNone) sharpOut.insert(edgeKey(a, b));
+        }
+    if (!m.color.empty()) {
+        merged.color.assign(merged.P.size(), vec3(1.0f));
+        for (uint32_t v = 0; v < nv; ++v)
+            if (remap[v] != kNone) merged.color[remap[v]] = m.color[v];
+    }
+    return merged;
+}
 
 ProxyBuilder::ProxyBuilder(const ProxySource& source) : impl_(std::make_unique<Impl>(source)) {}
 ProxyBuilder::~ProxyBuilder() = default;

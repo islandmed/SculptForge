@@ -29,6 +29,9 @@ inline vec3 safeNormalize(const vec3& v, const vec3& fallback = vec3(0, 0, 1)) {
     return l > 1e-20f ? v / l : fallback;
 }
 
+// Runs fn(i) for i in [0, n) on all hardware threads (coarse jobs: one i is a lot of work).
+void parallelJobs(size_t n, const std::function<void(size_t)>& fn);
+
 // --- Proxy surface ----------------------------------------------------------------------------------------------
 
 // The triangle mesh the field and the map are solved on: about three triangle edges per quad edge, even triangles,
@@ -55,8 +58,14 @@ struct ProxySource {
     bool keepGroups = false;
 };
 
+// Dense sculpts: the piece cut into spatial blocks, each decimated towards `edge` on its own thread (vertices shared
+// between blocks stay), merged. The builder's own pass then finishes the strips along the block borders. The hard
+// edges (source.sharp) come back in the result's vertex numbers.
+qr::WorkMesh preDecimate(const ProxySource& source, float edge, std::unordered_set<uint64_t>& sharpOut);
+
 class ProxyBuilder {
 public:
+    struct Impl;
     explicit ProxyBuilder(const ProxySource& source);
     ~ProxyBuilder();
     // Edge collapses down to edges of about `edge` (the dense sculpt to the proxy's density).
@@ -69,7 +78,6 @@ public:
     size_t vertexCount() const; // builder vertex slots (relSize's length)
 
 private:
-    struct Impl;
     std::unique_ptr<Impl> impl_;
 };
 
