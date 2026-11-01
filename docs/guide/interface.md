@@ -227,7 +227,7 @@ brushes](brush-lab.md)).
 As in ZBrush, press <kbd>S</kbd> for a Draw Size slider under the mouse, <kbd>U</kbd> for Z Intensity,
 <kbd>I</kbd> for RGB Intensity or <kbd>O</kbd> for Focal Shift. Drag the slider, or type a number and press
 <kbd>Enter</kbd> (<kbd>Esc</kbd> cancels). The pop-up closes when you release the slider. <kbd>[</kbd> and
-<kbd>]</kbd> make the brush 10% smaller or larger at any time. <kbd>Space</kbd> opens the QuickMenu with all of
+<kbd>]</kbd> make the brush 10% smaller or larger at any time. <kbd>Space</kbd> (or a right click on the canvas) opens the QuickMenu with all of
 them and the brush, stroke, alpha and material (see [The QuickMenu](sculpting.md#the-quickmenu)).
 
 ## The LightBox
@@ -437,7 +437,9 @@ brushes (<kbd>9</kbd> is QuickSave in the ZBrush style), <kbd>I</kbd> opens Z In
 <kbd>Ctrl</kbd>+drag on the background zooms when nothing is masked; or **Blender**: middle-drag navigation,
 the numpad views and Blender's sculpt-mode keys (see [Blender keys](shortcuts.md#blender-keys)). In the Blender
 style, **Emulate Numpad** makes the number row work as the numpad, and **Import Blender keymap...** takes the keys
-from a keymap you exported in Blender. **Rotation** chooses free rotation (ZBrush) or a turntable. See
+from a keymap you exported in Blender. **Right click opens the QuickMenu** (on by default, in every style) opens
+the [QuickMenu](sculpting.md#the-quickmenu) with a right click on the canvas; a right drag navigates either
+way. **Rotation** chooses free rotation (ZBrush) or a turntable. See
 [Coming from ZBrush](coming-from-zbrush.md).
 
 ### The background

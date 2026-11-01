@@ -14,6 +14,12 @@ with a 200-pixel brush, the brush now trails the pointer by half as far, a frame
 first dab appears in half the time, and lifting the pen no longer pauses for up to a second while waiting dabs
 are placed. See [Performance](performance.md).
 
+### Right click for the QuickMenu
+
+A right click on the canvas opens the QuickMenu under the cursor, as in ZBrush (Space still does too). A right
+drag turns the view as before, and **Preferences > Input > Right click opens the QuickMenu** turns it off. See
+[The QuickMenu](sculpting.md#the-quickmenu).
+
 ### Fixes
 
 - The orthographic view (<kbd>Numpad 5</kbd>) shades like the perspective one: MatCaps and the lights no longer

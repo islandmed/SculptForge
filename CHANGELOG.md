@@ -6,6 +6,15 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- A right click on the canvas opens the QuickMenu under the cursor, as in ZBrush (#22). Pressed and let go
+  without moving more than 4 px, beside the model or on it; the view waits until the press moves past that, so
+  a click never nudges it, and a right drag turns, pans or zooms as before (by everything it moved, nothing
+  lost). A pen button set to Right click works the same; SDL's own mouse click for another pen button doesn't
+  open it. On by default in every input style (a right click without a drag did nothing before);
+  **Preferences > Input > Right click opens the QuickMenu** turns it off (`rightClickQuickMenu` in ui.json).
+  UI test right_click_menu (mouse, tremble, drag, pen button, Blender style, preference off).
+
 ### Changed
 - Large brushes on dense meshes are faster and stay closer to the pointer. Measured on a 21M-triangle sphere
   with a 200 px brush (`--measure-stroke 3,200`, M1 Pro):

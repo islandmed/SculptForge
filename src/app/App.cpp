@@ -580,6 +580,7 @@ constexpr int kIdleTickMs = 250;       // asleep: wake this often to run the pol
 constexpr int kCaretTickMs = 530;      // a text field has the keyboard: redraw for the caret's blink
 constexpr double kAfterChangeSeconds = 0.25; // a poller changed something: draw for this long
 constexpr double kStrokeBudgetSeconds = 0.010; // a frame's share of placing a stroke's dabs; the rest waits for the next
+constexpr float kRightClickSlop = 4.0f;        // pixels a right press may move and still be a click (#22)
 constexpr double kStrokeBacklogSeconds = 0.05; // queued dabs beyond this much work are thinned (strokeTo)
 constexpr size_t kStrokeBacklogMinDabs = 4;    // ... but never fewer dabs than this waiting
 
@@ -882,6 +883,9 @@ void App::handleEvent(const SDL_Event& e) {
             onMouseDown(e.button.x, e.button.y, e.button.button);
         break;
     case SDL_EVENT_MOUSE_BUTTON_UP:
+        // A right click that didn't drag: the QuickMenu (#22). (SDL's click for a pen button doesn't count: a pen
+        // button opens it only when set to Right click, in penButton.)
+        if (e.button.button == SDL_BUTTON_RIGHT && e.button.which != SDL_PEN_MOUSEID) rightClickRelease();
         onMouseUp();
         break;
     case SDL_EVENT_MOUSE_MOTION:
@@ -934,6 +938,13 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         if (eraserAction() == PenAction::EraseMask && previewLod_ < 0 && pick(x, y, hit)) beginMaskStroke(x, y);
         return;
     }
+    // A right press with no keys held may be a click that opens the QuickMenu (rightClickRelease); it navigates
+    // only once it moves past the slop.
+    rightClick_.pending = button == SDL_BUTTON_RIGHT && uiPrefs_.rightClickQuickMenu &&
+                          !(SDL_GetModState() & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI));
+    rightClick_.x = x;
+    rightClick_.y = y;
+    rightClick_.dx = rightClick_.dy = 0.0f;
     if (blenderStyle() && blenderNavigationDown(button)) return; // middle / Alt+left / right drags navigate
     if (button == SDL_BUTTON_LEFT) {
         if (zsphereMouseDown(x, y, mod)) return; // a ZSphere SubTool takes clicks on it (PanelZSpheres.cpp)
@@ -1014,6 +1025,16 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     mouseX_ = x;
     mouseY_ = y;
     lastInputPen_ = fromPen;
+    if (rightClick_.pending) { // a right click so far: the view waits until it is a drag
+        // (By the motion's own steps, not the position: some input moves only relatively.) Past the slop, the
+        // drag goes on by everything since the press, so it loses nothing.
+        rightClick_.dx += dx;
+        rightClick_.dy += dy;
+        if (std::hypot(rightClick_.dx, rightClick_.dy) <= kRightClickSlop) return;
+        rightClick_.pending = false;
+        dx = rightClick_.dx;
+        dy = rightClick_.dy;
+    }
     // ZBrush: start a pan with Alt, then let go of Alt while still dragging to zoom.
     if (drag_ == Drag::Pan && panFromAlt_ && !(inputMods() & SDL_KMOD_ALT)) drag_ = Drag::Zoom;
     // Shift+press on the background: letting go of Shift before the drag gets going rolls the view instead.
@@ -1079,6 +1100,7 @@ void App::rollBy(float x, float y, float dx, float dy) {
 
 void App::onMouseUp() {
     rollPending_ = false;
+    rightClick_.pending = false;
     orbitStarted_ = false;
     panFromAlt_ = false;
     if (drag_ == Drag::Select) selectionMouseUp();

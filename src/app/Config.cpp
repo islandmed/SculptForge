@@ -49,6 +49,7 @@ Json toJson(const UiPrefs& p) {
     j.set("turntable", p.turntable);
     j.set("inputStyle", std::string(p.inputStyle == 2 ? "blender" : p.inputStyle == 1 ? "sculptforge" : "zbrush"));
     j.set("emulateNumpad", p.emulateNumpad);
+    j.set("rightClickQuickMenu", p.rightClickQuickMenu);
     j.set("alphabeticalPalettes", p.alphabeticalPalettes);
     j.set("tablet", toJson(p.tablet));
     j.set("spaceMouse", toJson(p.spaceMouse));
@@ -82,6 +83,7 @@ void fromJson(const Json& j, UiPrefs& p) {
         p.inputStyle = style == "blender" ? 2 : style == "sculptforge" ? 1 : 0;
     }
     p.emulateNumpad = j["emulateNumpad"].asBool(p.emulateNumpad);
+    p.rightClickQuickMenu = j["rightClickQuickMenu"].asBool(p.rightClickQuickMenu);
     p.alphabeticalPalettes = j["alphabeticalPalettes"].asBool(p.alphabeticalPalettes);
     fromJson(j["tablet"], p.tablet);
     fromJson(j["spaceMouse"], p.spaceMouse);

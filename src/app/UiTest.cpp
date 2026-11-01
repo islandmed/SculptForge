@@ -94,7 +94,7 @@
 //                            2 DragDot, 3 Spray, 4 LazyMouse), vdms (VDM brush maps), vdm_files (.sfvdm in the library)
 //                            z_intensity, smooth_intensity, rgb_intensity (0-100), focal_shift (-100..100), draw_size,
 //                            size_popup_open (the S / U / I / O slider), size_knob_x / size_knob_y (its knob, pixels),
-//                            quickmenu_open, lazy_mouse, input_style (0 ZBrush, 1 SculptForge, 2 Blender), turntable,
+//                            quickmenu_open, right_click_menu, lazy_mouse, input_style (0 ZBrush, 1 SculptForge, 2 Blender), turntable,
 //                            camera_ortho, mask_brush (Blender's Mask brush on), shortcut_conflicts (keys two actions
 //                            claim), brush_type (BrushType
 //                            index, -1 for a custom brush or Paint), last_dab_x / last_dab_y (window pixels), paint_r
@@ -390,6 +390,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "focal_shift") return std::round(app_.focalShift_ * 100.0f);
     if (name == "draw_size") return std::round(app_.radiusPx_);
     if (name == "quickmenu_open") return app_.quickMenu_.open ? 1.0 : 0.0;
+    if (name == "right_click_menu") return app_.uiPrefs_.rightClickQuickMenu ? 1.0 : 0.0;
     if (name == "size_popup_open" || name == "size_knob_x" || name == "size_knob_y") {
         ImVec2 knob(-1.0f, -1.0f);
         const bool open = PickerUi::sliderKnob(knob);

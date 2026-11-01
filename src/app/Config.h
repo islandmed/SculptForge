@@ -33,6 +33,7 @@ struct UiPrefs {
     int inputStyle = 0;         // Preferences > Input: 0 ZBrush, 1 SculptForge (1-0 brushes, I = Z Intensity...),
                                 // 2 Blender (middle-drag orbit, numpad views, Blender's sculpt keys; Input.cpp)
     bool emulateNumpad = false; // Blender style: the 1-9 and 0 keys above the letters act as the numpad (laptops)
+    bool rightClickQuickMenu = true; // a right click on the canvas (no drag) opens the QuickMenu, as in ZBrush (#22)
     TabletSettings tablet;      // Preferences > Tablet: pressure curve, eraser, pen buttons
     SpaceMouseSettings spaceMouse; // Preferences > Input > SpaceMouse
     // Preferences > Performance (PanelPerformance.cpp).
