@@ -6,6 +6,16 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.5] - 2026-11-01
+### Added
+- **Preferences > Input > Start strokes off the model** (#62, off by default) and **Toggle strokes off the model**
+  (<kbd>Shift</kbd>+<kbd>L</kbd>): a left-drag that starts on the background begins a stroke, which touches the model
+  once the cursor reaches it (Lazy Stroke and the stroke path start there, so nothing jumps). Ctrl (mask) and Shift
+  (smooth) strokes work the same way; a Ctrl+click on the background still inverts the mask. The view still turns
+  with a right-drag (or a pen button set to Right click), pans with Alt+drag or a middle-drag, moves with Space held
+  when that option is on, and Blender and Maya keys keep Alt+left-drag. A label at the top of the canvas shows while
+  it is on. Mask Lasso, Mask Rectangle and the hide / show shapes are unchanged.
+
 ### Changed
 - Features use SculptForge's own names (Parts, Forge Spheres, Vertex Paint, Face Groups, Library, Lit Spheres,
   Quad Remesh, Voxel Remesh, Dynamic Topology, Snapshot, Gizmo, Lazy Stroke, Wireframe, Send to ZBrush, Sharp
@@ -43,6 +53,9 @@ All notable changes to SculptForge are listed here. The format follows
   `selection_set_morph` (Morph to Set) blends the whole Part toward it by an amount, within the mask. Python:
   `Document.selection_sets`, `selection_set(name)` and `set_selection_set(name, mask=..., ...)` push and pull sets as
   NumPy arrays.
+
+### Fixed
+- The viewport now appears on Windows setups whose window uses another colour format (seen on NVIDIA with high-resolution displays): the view was drawn but never reached the window, so the cursor left trails and the model never showed (#29).
 
 ## [0.10.4] - 2026-11-01
 

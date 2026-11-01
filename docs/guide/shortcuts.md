@@ -111,6 +111,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Save UI... | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> | Save the layout, shortcuts and interface preferences to a file you can share. |
 | Shelves | <kbd>Tab</kbd> | Hide or show the shelves and trays around the canvas. |
 | Store Config | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> | Keep the current layout, shortcuts and interface preferences for future sessions. Like ZBrush, SculptForge never saves them on its own. |
+| Toggle strokes off the model | <kbd>Shift</kbd>+<kbd>L</kbd> | Turn Preferences > Input > Start strokes off the model on or off: with it on, a left-drag on the background sculpts once it reaches the model instead of turning the view (#62). |
 
 ### Render
 
@@ -178,6 +179,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Action | Gesture |
 |---|---|
 | Sculpt | Left-drag on the model |
+| Sculpt from beside the model | Turn on **Preferences > Input > Start strokes off the model** (or press <kbd>Shift</kbd>+<kbd>L</kbd>), then left-drag from the background onto the model; the view then turns with a right-drag (see [Navigation](navigation.md#mouse-and-pen)) |
 | Invert the brush (subtract) | Hold <kbd>Alt</kbd> while sculpting |
 | Smooth | Hold <kbd>Shift</kbd> while sculpting (works with any brush, and with Paint) |
 | Straight line | Press <kbd>Shift</kbd> after a stroke has started (45 degree steps) |

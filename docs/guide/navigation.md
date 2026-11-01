@@ -52,6 +52,7 @@ camera.
 | Turn in 15 degree steps | <kbd>Numpad 4</kbd> / <kbd>Numpad 6</kbd> (around), <kbd>Numpad 8</kbd> / <kbd>Numpad 2</kbd> (over); <kbd>Numpad 9</kbd>: the other side |
 | Frame the active Part | <kbd>Numpad .</kbd> |
 | Frame one Part | <kbd>Shift</kbd>+<kbd>Alt</kbd>+click it, or triple-click another Part (it becomes the active Part) |
+| Sculpt from the background | Turn on **Preferences > Input > Start strokes off the model**, or press <kbd>Shift</kbd>+<kbd>L</kbd> (**Toggle strokes off the model**): a left-drag that starts beside the model sculpts once it reaches the surface |
 | Move the camera with Space held | Turn on **Preferences > Input > Hold Space and drag to move the camera**, then hold <kbd>Space</kbd>: left-drag rotates, right- or middle-drag pans, <kbd>Ctrl</kbd>+drag zooms, anywhere on the canvas (on the model too) |
 
 Zoom drags: drag up to come closer, down to back away. With the ZBrush-style keys (**Preferences > Input**)
@@ -60,6 +61,16 @@ they go the ZBrush way: drag up to zoom out, down to zoom in.
 **Hold Space and drag to move the camera** is off by default, because in ZBrush <kbd>Space</kbd> opens the
 Quick Menu. With it on, <kbd>Space</kbd> no longer opens the Quick Menu (a right click still does), and a space typed in
 a text field is never taken.
+
+**Start strokes off the model** is off by default. With it on (a label at the top of the canvas says so), a
+left-drag on the background no longer rotates: it waits, and the brush starts where the cursor first reaches the
+model, so strokes that begin at the silhouette never turn the view by accident. <kbd>Ctrl</kbd> (mask) and
+<kbd>Shift</kbd> (smooth) strokes start the same way, and a <kbd>Ctrl</kbd>+click on the background still inverts
+the mask. To move the view, right-drag (a pen's lower button is a right click by default), <kbd>Alt</kbd>+drag to pan,
+middle-drag, or hold <kbd>Space</kbd> if **Hold Space and drag to move the camera** is on; with the Blender or Maya
+style, <kbd>Alt</kbd>+left-drag rotates as before. With a pen that has no buttons and the ZBrush or SculptForge style,
+press <kbd>Shift</kbd>+<kbd>L</kbd> to turn it off while you rotate, or turn on Hold Space. Mask Lasso, Mask Rectangle and the
+<kbd>Ctrl</kbd>+<kbd>Shift</kbd> hide and show shapes work as before.
 
 "Background" means any part of the canvas where the cursor isn't over the model. A left-drag that starts on
 the model sculpts instead, so with a pen or a one-button mouse, start rotations beside the model. When the

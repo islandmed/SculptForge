@@ -39,6 +39,8 @@ struct UiPrefs {
     bool emulateNumpad = false; // Blender style: the 1-9 and 0 keys above the letters act as the numpad (laptops)
     bool rightClickQuickMenu = true; // a right click on the canvas (no drag) opens the QuickMenu, as in ZBrush (#22)
     bool spaceCamera = false; // hold Space and drag to move the camera (#43; off: Space opens the QuickMenu)
+    bool airStrokes = false;  // start strokes off the model (#62): a left-drag on the background sculpts once it
+                              // reaches the surface instead of turning the view (off: it turns the view, ZBrush)
     bool showAxes = true;              // Draw > Camera > Axes: the X / Y / Z gizmo in the canvas corner (#31)
     bool cursorFollowsSurface = true; // the brush ring lies on the surface under the pointer, as in SculptGL (#25)
     TabletSettings tablet;      // Preferences > Tablet: pressure curve, eraser, pen buttons

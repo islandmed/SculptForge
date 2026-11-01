@@ -5,14 +5,6 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
-## Next version
-
-- **Features use SculptForge's own names** (Parts, Forge Spheres, Vertex Paint, Face Groups, Library, Lit Spheres,
-  Quad Remesh, Send to ZBrush, Snapshot...); searching for ZBrush terms still finds them, and MatCaps are now Lit
-  Spheres. The table is in [Coming from ZBrush](coming-from-zbrush.md#zbrush-terms-in-sculptforge).
-- **New installs start with the SculptForge keys**, and the first start asks what you are coming from (ZBrush,
-  Blender, Maya or new to sculpting) to pick the key style. Your saved style is kept; ZBrush's keys are
-  **ZBrush-style** in **Preferences > Input**. See [Keyboard and mouse](shortcuts.md#zbrush-style-keys).
 ## Version 0.10.5
 
 - **Selection sets** (**Tool > Selection Sets**): store as many named snapshots of a Part's mask, face groups,
@@ -26,6 +18,21 @@ chapter opens by itself the first time you start a new version; you can always f
 - **Sets for pipelines**: `selection_set_*` commands for scripts, `sculptforge-cli` and the AI assistant,
   `doc.selection_set()` / `doc.set_selection_set()` in Python, `.sfsets` files to move sets between Parts and
   scenes, and USD exports that carry them as GeomSubsets and primvars (read back on import).
+- **Fixed: the viewport on some Windows PCs** (#29): on displays whose window uses another colour format (seen with
+  NVIDIA and high-resolution screens) the model never appeared and the cursor left trails. The view now reaches the
+  window on every format, and falls back to drawing directly if a driver still refuses.
+- **Features use SculptForge's own names** (Parts, Forge Spheres, Vertex Paint, Face Groups, Library, Lit Spheres,
+  Quad Remesh, Send to ZBrush, Snapshot...); searching for ZBrush terms still finds them, and MatCaps are now Lit
+  Spheres. The table is in [Coming from ZBrush](coming-from-zbrush.md#zbrush-terms-in-sculptforge).
+- **New installs start with the SculptForge keys**, and the first start asks what you are coming from (ZBrush,
+  Blender, Maya or new to sculpting) to pick the key style. Your saved style is kept; ZBrush's keys are
+  **ZBrush-style** in **Preferences > Input**. See [Keyboard and mouse](shortcuts.md#zbrush-style-keys).
+
+### From your requests on GitHub
+
+- **Start strokes off the model** (#62): an option in **Preferences > Input**, off by default, and
+  <kbd>Shift</kbd>+<kbd>L</kbd> to turn it on and off. With it on, a left-drag that starts on the background
+  sculpts once it reaches the model instead of turning the view. See [Navigation](navigation.md#mouse-and-pen).
 
 ## Version 0.10.4
 
