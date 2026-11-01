@@ -260,6 +260,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/render/Camera.cpp
     src/render/Clusters.cpp
     src/render/Renderer.cpp
+    src/render/MicroRenderer.cpp
   )
   target_link_libraries(sculptforge PRIVATE sculptforge_core sculptforge_ai sculptforge_phone imgui SDL3::SDL3)
   target_include_directories(sculptforge PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/lucide)

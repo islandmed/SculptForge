@@ -78,6 +78,10 @@ struct MicroMesh {
     bool maskDirty = false; // the mask was added or removed (the renderer's shading changes everywhere)
     bool rescaled = false;  // `step` grew and every value was rescaled (same surface: the renderer re-sends the values only)
     uint64_t revision = 0;  // bumped by every edit
+    // Which level this is (new on Divide / load; kept by copies, which hold the same values): the renderer keeps
+    // its GPU copy while the serial stays.
+    uint64_t serial = 0;
+    static uint64_t newSerial();
 
     size_t microTriangles() const { return size_t(baseTriangles) * n * n; }
     size_t microVertices() const; // unique grid points (shared edges and corners counted once)
@@ -175,13 +179,15 @@ public:
     // Recomputes what changes when base triangles `dirty` changed (all of them when `all`): the shading of those
     // and of every base triangle sharing a vertex with one (whose shared edges and corners average with them).
     // out(tri) gives where that triangle's `samples` values go (each written whole). `written` lists them.
+    // `prepare`, if given, sees the triangles about to be written (before any out() call), once per batch.
+    using Prepare = std::function<void(std::span<const uint32_t> tris)>;
     void shade(const Mesh& m, std::span<const uint32_t> dirty, bool all, std::vector<uint32_t>& written,
-               const std::function<uint32_t*(uint32_t tri)>& out);
+               const std::function<uint32_t*(uint32_t tri)>& out, const Prepare& prepare = {});
 
 private:
     // shade() for the triangles `seeds` (grown by the triangles sharing a vertex when `grow`); appends to `written`.
     void shadeSet(const Mesh& m, std::span<const uint32_t> seeds, bool grow, std::vector<uint32_t>& written,
-                  const std::function<uint32_t*(uint32_t tri)>& out);
+                  const std::function<uint32_t*(uint32_t tri)>& out, const Prepare& prepare);
     std::vector<uint32_t> seed_, grown_;
     std::vector<uint32_t> stamp_, slot_; // per base triangle: in a set of this call (stamp), its partials (slot)
     std::vector<uint32_t> vstamp_;       // per base vertex

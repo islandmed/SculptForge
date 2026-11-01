@@ -13,6 +13,7 @@
 
 #include <imgui_internal.h>
 #include "ai/Generator3D.h"
+#include "core/Micro.h"
 #include "core/EnginePresets.h"
 #include "link/UnrealLink.h"
 #include "core/BrushLibrary.h"
@@ -914,7 +915,7 @@ bool App::pick(float x, float y, RayHit& hit) const {
     if (!doc_.activeSubtoolInfo().visible) return false; // you can't sculpt what you can't see
     glm::vec3 origin, dir;
     canvasRay(x, y, origin, dir);
-    return doc_.bvh.raycast(doc_.mesh, origin, dir, hit);
+    return surfaceRaycast(doc_.mesh, doc_.bvh, origin, dir, hit); // (the micro surface on a micro level)
 }
 
 BrushType App::activeBrush() const {

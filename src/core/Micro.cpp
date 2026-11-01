@@ -31,6 +31,11 @@ namespace sf {
 // MicroMesh
 // ---------------------------------------------------------------------------
 
+uint64_t MicroMesh::newSerial() {
+    static std::atomic<uint64_t> next{1};
+    return next++;
+}
+
 size_t MicroMesh::microVertices() const {
     size_t edges = size_t(baseTriangles) * 3 / 2;
     if (edgeNeighbor.size() == size_t(baseTriangles) * 3) {
@@ -338,6 +343,7 @@ bool microDivide(Mesh& m, int level, std::string& error) {
     // 1/4096 of a base edge per unit: +/-8 base edges of range, steps far below a micro edge (1/256 of one at
     // level 4). Brushes widen the range when they need more (MicroStroke).
     mm->step = std::max(avgEdge / 4096.0f, 1e-12f);
+    mm->serial = MicroMesh::newSerial();
     mm->allDirty = true;
     m.micro = std::move(mm);
     m.topologyDirty = true; // the renderer draws it differently
@@ -385,6 +391,7 @@ bool microAttach(Mesh& m, int level, float step, std::vector<int16_t> disp, std:
     for (float g : bulge) mm->bulgeMax = std::max(mm->bulgeMax, g);
     for (uint16_t r : mm->triRange) mm->rangeMax = std::max(mm->rangeMax, r);
     mm->ensureTopology(m);
+    mm->serial = MicroMesh::newSerial();
     mm->allDirty = true;
     m.micro = std::move(mm);
     m.topologyDirty = true;
@@ -584,11 +591,11 @@ struct GridWork {
 } // namespace
 
 void MicroShader::shade(const Mesh& m, std::span<const uint32_t> dirty, bool all, std::vector<uint32_t>& written,
-                        const std::function<uint32_t*(uint32_t tri)>& out) {
+                        const std::function<uint32_t*(uint32_t tri)>& out, const Prepare& prepare) {
     written.clear();
     if (!m.micro) return;
     if (!all) {
-        shadeSet(m, dirty, true, written, out);
+        shadeSet(m, dirty, true, written, out, prepare);
         return;
     }
     // Everything: in runs of triangles (neighbours by index on levels made by Divide), each with the ring its
@@ -599,12 +606,12 @@ void MicroShader::shade(const Mesh& m, std::span<const uint32_t> dirty, bool all
     for (uint32_t b = 0; b < nt; b += kRun) {
         run.resize(std::min(kRun, nt - b));
         for (uint32_t i = 0; i < run.size(); ++i) run[i] = b + i;
-        shadeSet(m, run, false, written, out);
+        shadeSet(m, run, false, written, out, prepare);
     }
 }
 
 void MicroShader::shadeSet(const Mesh& m, std::span<const uint32_t> dirty, bool grow, std::vector<uint32_t>& written,
-                           const std::function<uint32_t*(uint32_t tri)>& out) {
+                           const std::function<uint32_t*(uint32_t tri)>& out, const Prepare& prepare) {
     const MicroMesh& mm = *m.micro;
     const uint32_t n = mm.n, S = mm.samples, nt = mm.baseTriangles;
     if (mm.edgeNeighbor.size() != size_t(nt) * 3) return; // (ensureTopology first)
@@ -652,6 +659,7 @@ void MicroShader::shadeSet(const Mesh& m, std::span<const uint32_t> dirty, bool 
     vertexRing(ring_, ring2_, inR2, v2);
     for (size_t i = 0; i < ring_.size(); ++i) slot_[ring_[i]] = uint32_t(i);
     for (size_t i = 0; i < ring2_.size(); ++i) slot_[ring2_[i]] = uint32_t(ring_.size() + i);
+    if (prepare) prepare(ring_);
     const size_t slots = ring_.size() + ring2_.size();
     const size_t edgePoints = size_t(3) * n;
     partial_.resize(slots * edgePoints * kPartialFloats);
