@@ -58,13 +58,72 @@ inline void sampleRgba(const uint8_t* plane, int w, int h, const glm::vec2& uv, 
     out[3] = uint8_t(std::lround(std::clamp(a, 0.0f, 255.0f)));
 }
 
+// Material channels (core/TextureChannels.h) carried along: per destination channel image a dense buffer filled
+// texel by texel like the RGBA8 planes (bilinear reads of the source images, any format), padded the same way,
+// then stored back into the sparse image.
+struct ChannelJob {
+    std::vector<const TileImage*> src; // per Source (null: that source has no such channel; reads `def`)
+    TileImage* dst = nullptr;
+    std::vector<uint8_t> dense; // w * h texels of dst's format
+    int comps = 1, bits = 8;
+    bool alpha = false; // a layer channel: the last component is coverage (weights the padding)
+    float def[4] = {0, 0, 0, 0};
+};
+using ChannelJobs = std::vector<ChannelJob>;
+
+inline void readTexelUnits(const uint8_t* p, int comps, int bits, float* out) {
+    for (int k = 0; k < comps; ++k) {
+        if (bits == 16) {
+            uint16_t u;
+            std::memcpy(&u, p + k * 2, 2);
+            out[k] = float(u) / 65535.0f;
+        } else {
+            out[k] = float(p[k]) / 255.0f;
+        }
+    }
+}
+inline void writeTexelUnits(uint8_t* p, int comps, int bits, const float* v) {
+    for (int k = 0; k < comps; ++k) {
+        if (bits == 16) {
+            const uint16_t u = uint16_t(std::lround(std::clamp(v[k], 0.0f, 1.0f) * 65535.0f));
+            std::memcpy(p + k * 2, &u, 2);
+        } else {
+            p[k] = uint8_t(std::lround(std::clamp(v[k], 0.0f, 1.0f) * 255.0f));
+        }
+    }
+}
+
+// Starts a job writing `dst` (already sized and formatted) with every texel at dst's fill.
+ChannelJob channelJob(TileImage& dst, bool alpha, size_t sources) {
+    ChannelJob j;
+    j.dst = &dst;
+    j.comps = dst.components();
+    j.bits = dst.bits();
+    j.alpha = alpha;
+    j.src.assign(sources, nullptr);
+    for (int k = 0; k < j.comps; ++k) j.def[k] = float(dst.fill()[size_t(k)]) / dst.maxValue();
+    const size_t tb = size_t(dst.texelBytes());
+    j.dense.resize(size_t(dst.width()) * size_t(dst.height()) * tb);
+    uint8_t px[8];
+    writeTexelUnits(px, j.comps, j.bits, j.def);
+    for (size_t i = 0; i < j.dense.size(); i += tb) std::memcpy(&j.dense[i], px, tb);
+    return j;
+}
+
+void finishChannelJobs(ChannelJobs& jobs) {
+    for (ChannelJob& j : jobs) {
+        j.dst->assignDense(j.dense);
+        std::vector<uint8_t>().swap(j.dense);
+    }
+}
+
 // Fills `planes` (each w * h RGBA8, already holding the blank value) from the sources: every texel inside a
 // triangle of `uvs` asks lookup(tri, bary, source, sourceTri, sourceBary) where to read. `ring` gets 1 for
 // filled texels. Returns the texels inside islands; `missed` those whose lookup failed.
 template <class Lookup>
 size_t fillPlanes(std::vector<std::vector<uint8_t>*>& planes, int w, int h, const std::vector<glm::vec2>& uvs,
                   size_t triangles, const std::vector<Source>& sources, std::vector<uint8_t>& ring, size_t& missed,
-                  Lookup&& lookup) {
+                  ChannelJobs& chans, Lookup&& lookup) {
     std::atomic<size_t> inside{0}, lost{0};
     ring.assign(size_t(w) * size_t(h), 0);
     parallelFor(triangles, [&](size_t b, size_t e) {
@@ -85,6 +144,11 @@ size_t fillPlanes(std::vector<std::vector<uint8_t>*>& planes, int w, int h, cons
                                          (*src.uvs)[size_t(st) * 3 + 2] * sb.z;
                     for (size_t k = 0; k < planes.size(); ++k)
                         sampleRgba(src.planes[k]->data(), src.tex->width, src.tex->height, uv, &(*planes[k])[i * 4]);
+                    for (ChannelJob& j : chans) {
+                        float v[4] = {j.def[0], j.def[1], j.def[2], j.def[3]};
+                        if (const TileImage* img = j.src[s]) img->sample(uv.x, uv.y, v);
+                        writeTexelUnits(&j.dense[i * size_t(j.dst->texelBytes())], j.comps, j.bits, v);
+                    }
                 } else {
                     for (size_t k = 0; k < planes.size(); ++k) std::memset(&(*planes[k])[i * 4], 255, 4);
                 }
@@ -100,7 +164,8 @@ size_t fillPlanes(std::vector<std::vector<uint8_t>*>& planes, int w, int h, cons
 
 // Pads `rings` texels around the filled ones: ring by ring, each empty texel next to filled ones takes their
 // alpha-weighted average (as the baker pads its maps).
-void padPlanes(std::vector<std::vector<uint8_t>*>& planes, int w, int h, std::vector<uint8_t>& ring, int rings) {
+void padPlanes(std::vector<std::vector<uint8_t>*>& planes, int w, int h, std::vector<uint8_t>& ring, int rings,
+               ChannelJobs& chans) {
     std::vector<uint8_t> next(ring.size(), 0);
     for (int k = 2; k <= rings + 1; ++k) {
         std::atomic<size_t> added{0};
@@ -135,6 +200,22 @@ void padPlanes(std::vector<std::vector<uint8_t>*>& planes, int w, int h, std::ve
                         o[2] = uint8_t(std::lround(b / a));
                         o[3] = uint8_t(std::lround(std::clamp(a / float(cnt), 0.0f, 255.0f)));
                     }
+                    for (ChannelJob& j : chans) {
+                        const size_t tb = size_t(j.dst->texelBytes());
+                        float sum[4] = {0, 0, 0, 0}, wsum = 0, asum = 0;
+                        for (int q = 0; q < cnt; ++q) {
+                            float v[4] = {0, 0, 0, 0};
+                            readTexelUnits(&j.dense[size_t(nb[q]) * tb], j.comps, j.bits, v);
+                            const float wq = j.alpha ? v[j.comps - 1] + 1e-3f : 1.0f;
+                            for (int k = 0; k < j.comps; ++k) sum[k] += v[k] * wq;
+                            wsum += wq;
+                            if (j.alpha) asum += v[j.comps - 1];
+                        }
+                        float out[4];
+                        for (int k = 0; k < j.comps; ++k) out[k] = sum[k] / wsum;
+                        if (j.alpha) out[j.comps - 1] = asum / float(cnt);
+                        writeTexelUnits(&j.dense[i * tb], j.comps, j.bits, out);
+                    }
                     next[i] = uint8_t(k);
                     ++n;
                 }
@@ -162,12 +243,41 @@ std::shared_ptr<PaintTexture> blankLike(const PaintTexture& like, bool withLayer
             c.blend = l.blend;
             c.visible = l.visible;
             c.locked = l.locked;
+            for (int ch = 0; ch < kChannelCount; ++ch) { // channel settings; images come from syncLayerChannels
+                c.channels[size_t(ch)].enabled = l.channels[size_t(ch)].enabled;
+                c.channels[size_t(ch)].blend = l.channels[size_t(ch)].blend;
+                c.channels[size_t(ch)].opacity = l.channels[size_t(ch)].opacity;
+            }
             c.rgba.assign(t->texelCount() * 4, 0);
             t->layers.push_back(std::move(c));
         }
         t->activeLayer = like.activeLayer;
     }
+    t->heightNormalStrength = like.heightNormalStrength;
+    for (int ch = 1; ch < kChannelCount; ++ch)
+        if (channelEnabled(like, Channel(ch))) setChannelEnabled(*t, Channel(ch), true);
     return t;
+}
+
+// Jobs moving every material channel of the single source `old` into `t` (made by blankLike): Base and each
+// layer's channel when `withLayers`, else the composites into Base.
+ChannelJobs channelJobsFor(const PaintTexture& old, PaintTexture& t, bool withLayers) {
+    ChannelJobs jobs;
+    syncLayerChannels(t);
+    for (int c = 1; c < kChannelCount; ++c) {
+        if (!channelEnabled(old, Channel(c)) || !channelEnabled(t, Channel(c))) continue;
+        jobs.push_back(channelJob(t.channels[size_t(c)].base, false, 1));
+        jobs.back().src[0] = withLayers ? &old.channels[size_t(c)].base : &channelImage(old, Channel(c));
+        if (!withLayers) continue;
+        for (size_t l = 0; l < t.layers.size() && l < old.layers.size(); ++l) {
+            const TileImage& src = old.layers[l].channels[size_t(c)].image;
+            TileImage& dst = t.layers[l].channels[size_t(c)].image;
+            if (!src.valid() || !dst.valid()) continue;
+            jobs.push_back(channelJob(dst, true, 1));
+            jobs.back().src[0] = &src;
+        }
+    }
+    return jobs;
 }
 
 // The destination planes of `t` and the matching source planes of `src` (Base / pixels first, then layers).
@@ -197,7 +307,8 @@ bool layersUsable(const PaintTexture& t) {
     return true;
 }
 
-void finish(PaintTexture& t) {
+void finish(PaintTexture& t, ChannelJobs& jobs) {
+    finishChannelJobs(jobs);
     if (!t.layers.empty()) compositeTextureAll(t);
     t.markAllDirty();
 }
@@ -217,15 +328,16 @@ std::shared_ptr<PaintTexture> retargetTexture(const Mesh& mesh, const std::vecto
     sources[0].tex = &old;
     sources[0].uvs = &mesh.uvs;
     planesOf(old, layers, sources[0].planes);
+    ChannelJobs chans = channelJobsFor(old, *tex, layers);
     std::vector<uint8_t> ring;
     size_t missed = 0;
-    const size_t texels = fillPlanes(dst, tex->width, tex->height, newUvs, mesh.triangleCount(), sources, ring, missed,
+    const size_t texels = fillPlanes(dst, tex->width, tex->height, newUvs, mesh.triangleCount(), sources, ring, missed, chans,
                                      [](uint32_t t, const glm::vec3& b, uint32_t& s, uint32_t& st, glm::vec3& sb) {
                                          s = 0, st = t, sb = b;
                                          return true;
                                      });
-    padPlanes(dst, tex->width, tex->height, ring, kTransferPadding);
-    finish(*tex);
+    padPlanes(dst, tex->width, tex->height, ring, kTransferPadding, chans);
+    finish(*tex, chans);
     if (stats) {
         stats->texels = texels;
         stats->missed = missed;
@@ -275,6 +387,7 @@ bool transferTextureFromSurface(const Mesh& source, Mesh& target, std::string& e
     sources[0].tex = &old;
     sources[0].uvs = &source.uvs;
     planesOf(old, layers, sources[0].planes);
+    ChannelJobs chans = channelJobsFor(old, *tex, layers);
 
     TriangleBVH bvh;
     bvh.build(source.positions, source.triangles);
@@ -301,7 +414,7 @@ bool transferTextureFromSurface(const Mesh& source, Mesh& target, std::string& e
     });
     std::vector<uint8_t> ring;
     size_t missed = 0;
-    const size_t texels = fillPlanes(dst, tex->width, tex->height, target.uvs, nt, sources, ring, missed,
+    const size_t texels = fillPlanes(dst, tex->width, tex->height, target.uvs, nt, sources, ring, missed, chans,
                                      [&](uint32_t t, const glm::vec3& b, uint32_t& s, uint32_t& st, glm::vec3& sb) {
                                          const glm::uvec3 tv = target.triangles[t];
                                          const glm::vec3 p = target.positions[tv.x] * b.x + target.positions[tv.y] * b.y +
@@ -311,8 +424,8 @@ bool transferTextureFromSurface(const Mesh& source, Mesh& target, std::string& e
                                          s = 0, st = h.prim, sb = h.bary;
                                          return true;
                                      });
-    padPlanes(dst, tex->width, tex->height, ring, kTransferPadding);
-    finish(*tex);
+    padPlanes(dst, tex->width, tex->height, ring, kTransferPadding, chans);
+    finish(*tex, chans);
     target.texture = std::move(tex);
     target.paintToTexture = source.paintToTexture;
     target.facesDirty = true;
@@ -393,9 +506,21 @@ bool carryMergedTextures(const std::vector<const Mesh*>& parts, Mesh& merged, st
         sources[i].uvs = &parts[i]->uvs;
         sources[i].planes = {&parts[i]->texture->pixels};
     }
+    // Material channels: every channel any part has; parts without it read its default.
+    ChannelJobs chans;
+    for (int c = 1; c < kChannelCount; ++c) {
+        bool any = false;
+        for (const Mesh* m : parts) any = any || (hasTexture(*m) && channelEnabled(*m->texture, Channel(c)));
+        if (!any) continue;
+        setChannelEnabled(*tex, Channel(c), true);
+        chans.push_back(channelJob(tex->channels[size_t(c)].base, false, parts.size()));
+        for (size_t i = 0; i < parts.size(); ++i)
+            if (hasTexture(*parts[i]) && channelEnabled(*parts[i]->texture, Channel(c)))
+                chans.back().src[i] = &channelImage(*parts[i]->texture, Channel(c));
+    }
     std::vector<uint8_t> ring;
     size_t missed = 0;
-    st.texels = fillPlanes(dst, tex->width, tex->height, merged.uvs, merged.triangleCount(), sources, ring, missed,
+    st.texels = fillPlanes(dst, tex->width, tex->height, merged.uvs, merged.triangleCount(), sources, ring, missed, chans,
                            [&](uint32_t t, const glm::vec3& b, uint32_t& s, uint32_t& lt, glm::vec3& sb) {
                                s = uint32_t(std::upper_bound(first.begin(), first.end(), t) - first.begin()) - 1;
                                lt = t - first[s];
@@ -403,8 +528,8 @@ bool carryMergedTextures(const std::vector<const Mesh*>& parts, Mesh& merged, st
                                return true;
                            });
     st.missed = missed;
-    padPlanes(dst, tex->width, tex->height, ring, kTransferPadding);
-    finish(*tex);
+    padPlanes(dst, tex->width, tex->height, ring, kTransferPadding, chans);
+    finish(*tex, chans);
     merged.texture = std::move(tex);
     merged.paintToTexture = toTexture;
     merged.facesDirty = true;
