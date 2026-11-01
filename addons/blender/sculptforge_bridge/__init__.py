@@ -7,8 +7,8 @@
 # contributors. The exchange itself (folder, manifest, .GoZ reading and writing) is in exchange.py.
 #
 # What travels: positions (object space, with each object's matrix_world in the manifest), triangles
-# and quads (n-gons as triangle fans), the active UV map, the active colour attribute (polypaint),
-# the sculpt mask (.sculpt_mask) and face sets (.sculpt_face_set, SculptForge's polygroups).
+# and quads (n-gons as triangle fans), the active UV map, the active colour attribute (vertex paint),
+# the sculpt mask (.sculpt_mask) and face sets (.sculpt_face_set, SculptForge's face groups).
 #
 # The preference "ZBrush-style keys in Sculpt Mode" adds ZBrush's keys to Blender's Sculpt Mode (zbrush_keys.py).
 
@@ -18,7 +18,7 @@ bl_info = {  # legacy add-on install (Blender 4.2+ reads blender_manifest.toml i
     "version": (0, 7, 0),
     "blender": (4, 2, 0),
     "location": "3D View > Sidebar > SculptForge, Object menu, File > Import / Export",
-    "description": "Send meshes to SculptForge and back, updating the objects in place (like GoZ)",
+    "description": "Send meshes to SculptForge and back, updating the objects in place",
     "doc_url": "https://sculptforge.app/guide/blender.html",
     "category": "Import-Export",
 }
@@ -106,7 +106,7 @@ def mesh_arrays(me, mirrored):
         out["mask"] = _get(mask.data, "value", nv, np.float32)
     sets = me.attributes.get(FACE_SETS)
     if sets is not None and sets.domain == "FACE" and sets.data_type == "INT":
-        # Face sets start at 1; SculptForge's polygroups at 0.
+        # Face sets start at 1; SculptForge's face groups at 0.
         out["groups"] = np.maximum(_get(sets.data, "value", len(me.polygons), np.int32)[face_poly] - 1, 0)
     return out
 
@@ -138,7 +138,7 @@ def set_geometry(me, positions, faces):
 
 
 def write_attributes(me, g, loops, corner, face_poly, names):
-    """Received UVs, polypaint, mask and polygroups into `me`. `loops[i, s]` is the loop of corner s of face i
+    """Received UVs, vertex paint, mask and face groups into `me`. `loops[i, s]` is the loop of corner s of face i
     and `corner[i, s]` the received face's corner at that vertex; `names` the attribute names to (re)use."""
     nl, nv = len(me.loops), len(me.vertices)
     valid = loops >= 0
@@ -470,7 +470,7 @@ def _poll_inbox():
 class SCULPTFORGE_OT_send(bpy.types.Operator):
     bl_idname = "sculptforge.send"
     bl_label = "Send to SculptForge"
-    bl_description = ("Send the selected meshes to SculptForge (starting it if needed); each becomes a SubTool. "
+    bl_description = ("Send the selected meshes to SculptForge (starting it if needed); each becomes a Part. "
                       "Send them back from SculptForge with File > Blender > Send to Blender")
     bl_options = {"REGISTER"}
 
@@ -489,7 +489,7 @@ class SCULPTFORGE_OT_receive(bpy.types.Operator):
     bl_idname = "sculptforge.receive"
     bl_label = "Receive from SculptForge"
     bl_description = ("Load what SculptForge last sent: objects that came from here update in place (transform, "
-                      "materials and modifiers kept), new SubTools become new objects")
+                      "materials and modifiers kept), new Parts become new objects")
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):

@@ -38,7 +38,7 @@ TEST(maya_names_and_files) {
     CHECK(mayaSafeName("pCube1") == "pCube1");
     CHECK(mayaSafeName("Body Hi") == "Body_Hi");
     CHECK(mayaSafeName("3D head") == "_3D_head");
-    CHECK(mayaSafeName("") == "SubTool");
+    CHECK(mayaSafeName("") == "Part");
     CHECK(mayaSafeName("a|b:c/../d") == "a_b_c____d");
     CHECK(mayaSafeName(std::string(1000, 'x')).size() == kMayaMaxNameBytes);
     CHECK(mayaSafeName("9" + std::string(1000, 'x')).size() == kMayaMaxNameBytes);

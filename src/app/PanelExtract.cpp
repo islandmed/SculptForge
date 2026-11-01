@@ -44,15 +44,15 @@ void App::drawExtractContents() {
     changed |= ImGui::IsItemDeactivatedAfterEdit();
     ui::HelpText("E Smt", nullptr,
                  "Smooths the extracted edge, which otherwise follows the mask's triangles in steps (0 = as masked).",
-                 "Tool > SubTool > Extract");
+                 "Tool > Parts > Extract");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(-1);
     ui::SliderInside("##extract_thick", &extractThick_, -0.1f, 0.1f, "Thick %.3f");
     changed |= ImGui::IsItemDeactivatedAfterEdit();
     ui::HelpText("Thick", nullptr,
-                 "Thickness of the shell, as a fraction of the SubTool's size (0.015 is 1.5%). Negative grows it "
+                 "Thickness of the shell, as a fraction of the Part's size (0.015 is 1.5%). Negative grows it "
                  "inward; 0 makes a single-sided surface.",
-                 "Tool > SubTool > Extract");
+                 "Tool > Parts > Extract");
     ui::ActionButton(*this, "subtool.extract_double", ImVec2(half, 0));
     ui::HelpAction(*this, "subtool.extract_double");
     ImGui::SameLine();

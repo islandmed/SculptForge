@@ -6,6 +6,57 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.5] - 2026-11-01
+### Added
+- **Preferences > Input > Start strokes off the model** (#62, off by default) and **Toggle strokes off the model**
+  (<kbd>Shift</kbd>+<kbd>L</kbd>): a left-drag that starts on the background begins a stroke, which touches the model
+  once the cursor reaches it (Lazy Stroke and the stroke path start there, so nothing jumps). Ctrl (mask) and Shift
+  (smooth) strokes work the same way; a Ctrl+click on the background still inverts the mask. The view still turns
+  with a right-drag (or a pen button set to Right click), pans with Alt+drag or a middle-drag, moves with Space held
+  when that option is on, and Blender and Maya keys keep Alt+left-drag. A label at the top of the canvas shows while
+  it is on. Mask Lasso, Mask Rectangle and the hide / show shapes are unchanged.
+
+### Changed
+- Features use SculptForge's own names (Parts, Forge Spheres, Vertex Paint, Face Groups, Library, Lit Spheres,
+  Quad Remesh, Voxel Remesh, Dynamic Topology, Snapshot, Gizmo, Lazy Stroke, Wireframe, Send to ZBrush, Sharp
+  Crease, Clay Block, Tendril...); searching for ZBrush terms still finds them. MatCaps are now Lit Spheres. The user guide's chapters follow
+  (Parts, Forge Spheres, Vertex Paint, Face Groups; the old web addresses redirect), and
+  Help > User Guide > Coming from ZBrush has the table of ZBrush terms and their SculptForge names. The ZBrush
+  plug-in is now called SculptForge ZTL Export (same file, `SculptForgeZToolExport.txt`).
+- New installs default to the SculptForge-style keys (Preferences > Input); a first-start "Coming from: ZBrush /
+  Blender / Maya / New to sculpting" choice sets the key style, and existing users keep their saved choice.
+  ZBrush's keys are the **ZBrush-style** option.
+- Contributions are signed off under the Developer Certificate of Origin (`git commit -s`; see CONTRIBUTING.md).
+- Faster CI and releases with the same tests (docs/releasing.md):
+  - **Compiler caching:** compiles go through ccache, cached only by pushes to main and maintainers' own runs.
+    Pull requests only read the cache, and tags never save one.
+  - **Parallel tests:** `sculptforge_tests` runs as eight parallel shards (`sculptforge_tests --shard K/N`; each test
+    now prints its time). ctest runs in parallel, with timed measurements and clipboard tests alone. The slowest
+    test sets are spread over several free runners.
+  - **Skipped work:** website-only pushes skip the build and test jobs.
+  - **Build once, promote:** the release packages are built and tested on every push to main (the new Packages
+    workflow). A tagged release promotes the packages of the commit it tags instead of building them again.
+  - **Smoke tests before publishing:** every package (Windows installer and .zip, .dmg, .deb and AppImage on x86_64
+    and arm64, .rpm) is installed on a fresh runner, opens a model, sculpts and saves.
+- `scripts/release.sh X.Y.Z` tags, waits and brings the site, update feed, guide, AUR, Homebrew and Omarchy to the
+  release, and drafts the issue replies. It is resumable, and stops with the fix when something is wrong.
+### Added
+- Selection Sets (**Tool > Selection Sets**, `selection_set_*`): any number of named snapshots per Part of the mask,
+  polygroups, visibility, vertex paint, UVs and shape, each holding the channels you tick. Store, restore, rename,
+  delete, combine (union / intersect / subtract, also as restore modes onto the current mask and visibility) and a
+  quick set from the visible faces, each one undo step. A set restores at any subdivision level of its Part (values
+  carried through the levels as the stack carries attributes; shapes as offsets, so in-between detail stays). Stored
+  compactly (runs of masked / painted / hidden elements, run-length polygroups) in projects under the optional
+  `selection_sets` key (no format version bump; older versions skip it), in `.sfsets` files
+  (`selection_sets_export` / `selection_sets_import`) and in USD exports as GeomSubsets and primvars, which USD import
+  reads back. A set with its shape is a morph target: the new **Morph** brush pulls toward it (Alt pushes away) and
+  `selection_set_morph` (Morph to Set) blends the whole Part toward it by an amount, within the mask. Python:
+  `Document.selection_sets`, `selection_set(name)` and `set_selection_set(name, mask=..., ...)` push and pull sets as
+  NumPy arrays.
+
+### Fixed
+- The viewport now appears on Windows setups whose window uses another colour format (seen on NVIDIA with high-resolution displays): the view was drawn but never reached the window, so the cursor left trails and the model never showed (#29).
+
 ## [0.10.4] - 2026-11-01
 
 ### Added

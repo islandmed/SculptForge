@@ -85,14 +85,14 @@ the ones you will use most:
 |---|---|---|
 | Scene | `new_sphere` | `subdivisions` (0 to 8, default 6) |
 | Scene | `new_plane` | `resolution` (cells per side, default 128) |
-| Files | `open` | `path`: models, projects, splats, GoZ |
+| Files | `open` | `path`: models, projects, splats, GoZ-compatible files |
 | Files | `save_project` | `path` (default: the current project) |
 | Files | `open_project` | `path` |
 | Geometry | `subdivide` | `levels` (1 to 4, default 1) |
 | Geometry | `remesh` | `resolution` (32 to 512, default 200) |
 | Geometry | `decimate` | `ratio` (default 0.5) or `triangles` |
 | Geometry | `qremesh` | `target` (default 5000), `adaptive`, `keep_groups`, `detect_edges`, `use_polypaint`, `symmetry`, `keep_original` |
-| SubTools | `project_all` | `distance` (default 0.02), `mean`, `blur`, `geometry`, `polypaint`, `source` |
+| Parts | `project_all` | `distance` (default 0.02), `mean`, `blur`, `geometry`, `polypaint`, `source` |
 | Geometry | `mesh_info` | |
 | Sculpting | `stroke` | `points` (required), `brush`, `radius`, `strength`, `invert`, `symmetry` |
 | Brushes | `brush_set_alpha` | `name` (round, square, noise) or `path`, `invert` |
@@ -103,14 +103,14 @@ the ones you will use most:
 | Layers | `layer_set_weight` | `index`, `weight` (both required) |
 | Masking | `mask_by_cavity` | `strength`, `threshold` |
 | Masking | `mask_invert`, `mask_clear`, `mask_blur`, `mask_grow` | `iterations` where it applies |
-| Polygroups | `polygroup_auto_by_normals` | `angle` (default 30) |
+| Face Groups | `polygroup_auto_by_normals` | `angle` (default 30) |
 | Visibility | `isolate_polygroup`, `hide_polygroup` | `group` (required) |
 | Visibility | `show_all`, `delete_hidden` | |
-| Transform | `transform` | `translate`, `rotate`, `scale`, `pivot`, `orient`, `masked`, `falloff`, `symmetry`, `all` ([Gizmo 3D](gizmo.md#scripting)) |
-| SubTools | `subtool_append` | `type` (sphere, cube, plane) or `path`, `name`, `size` |
-| SubTools | `subtool_select` | `index` or `name` |
-| Polypaint | `set_color`, `paint_fill` | `color`, `area` (unmasked, masked, all) |
-| Polypaint | `paint_from_cavity` | `color`, `strength`, `smoothing` |
+| Transform | `transform` | `translate`, `rotate`, `scale`, `pivot`, `orient`, `masked`, `falloff`, `symmetry`, `all` ([Gizmo](gizmo.md#scripting)) |
+| Parts | `subtool_append` | `type` (sphere, cube, plane) or `path`, `name`, `size` |
+| Parts | `subtool_select` | `index` or `name` |
+| Vertex Paint | `set_color`, `paint_fill` | `color`, `area` (unmasked, masked, all) |
+| Vertex Paint | `paint_from_cavity` | `color`, `strength`, `smoothing` |
 | AI | `image_to_3d` | `path` (required), `service`, `model`, `remesh`, `resolution` |
 | AI | `text_to_3d` | `prompt` (required), `service`, `model` |
 | Export | `export_glb`, `export_usd`, `export_stl`, `export_ply` | `path` (required); `export_stl` also `height_mm`, `scale`, `z_up` |
@@ -122,7 +122,7 @@ the ones you will use most:
 | Edit | `undo`, `redo` | |
 
 A few commands exist only inside the app, because they change the view rather than the model: `set_material`
-(`name=` a MatCap such as Sculpt, or Studio) and `new_cube`.
+(`name=` a Lit Sphere such as Sculpt, or Studio) and `new_cube`.
 
 ## sculptforge-cli
 
@@ -190,7 +190,7 @@ The desktop app takes a few options too, for renders and start-up scripts:
 | `--size WxH` | Render size (default 1024x1024) |
 | `--view YAW,PITCH` | Camera angles in degrees (default -30,-15) |
 | `--zoom F` | Move the camera F times closer than the framed view |
-| `--wireframe`, `--polygroups` | Render with the wireframe or polygroup colours |
+| `--wireframe`, `--polygroups` | Render with the wireframe or face group colours |
 | `--hide-mesh` | Render only the Gaussian splats |
 | `--fullscreen` | Start filling the screen (<kbd>F11</kbd> toggles) |
 | `--demo NAME`, `--record out.mp4` | Play a scripted demo, and record it to a video (needs ffmpeg) |
@@ -236,10 +236,10 @@ print([c["name"] for c in sf.commands()])            # every command with its pa
 | `sf.run_script(doc, script)` | Runs a script in the syntax above and returns the messages |
 | `sf.commands()` | Lists every command with its parameters |
 | `sf.tool_schema()` | The commands as LLM tool definitions (JSON) |
-| `doc.vertices`, `doc.base_vertices`, `doc.normals`, `doc.triangles` | Mesh arrays of the active SubTool (copies) |
+| `doc.vertices`, `doc.base_vertices`, `doc.normals`, `doc.triangles` | Mesh arrays of the active Part (copies) |
 | `doc.mask`, `doc.colors`, `doc.polygroups`, `doc.hidden` | Attribute arrays you can read and assign (`None` if absent) |
 | `doc.layers`, `doc.layer_delta(i)` | Sculpt layers as `(name, weight)` and their per-vertex offsets |
-| `doc.subtools`, `doc.active_subtool` | The SubTool list and the active SubTool |
+| `doc.subtools`, `doc.active_subtool` | The Parts list and the active Part |
 | `doc.splat_count` | Number of loaded Gaussian splats |
 
 Failures raise `sculptforge.CommandError`. Long operations release the GIL, so you can run them on worker

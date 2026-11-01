@@ -460,13 +460,13 @@ std::vector<std::string> pbrSlotSources(const std::string& slot) {
 void registerMapExportCommands(CommandRegistry& reg) {
     using T = ParamSpec::Type;
     reg.add({"export_maps",
-             "Export the active SubTool's texture channels as image files for an engine or DCC, using an export "
+             "Export the active Part's texture channels as image files for an engine or DCC, using an export "
              "preset: unreal (T_<name>_BC / _N in DirectX / _ORM), unity_urp, unity_hdrp (mask map), gltf, godot, "
              "blender (one file per channel), usd, or your own preset .json file (docs/guide/export-presets.md). "
              "list=true lists the presets.",
              {{"preset", T::String, "Preset id or a preset .json path. Default gltf.", false},
               {"folder", T::String, "Output folder (created if missing).", false},
-              {"name", T::String, "Object name in the file names. Default: the SubTool's name.", false},
+              {"name", T::String, "Object name in the file names. Default: the Part's name.", false},
               {"list", T::Bool, "List the built-in presets instead.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  if (argBool(a, "list", false)) {
@@ -478,7 +478,7 @@ void registerMapExportCommands(CommandRegistry& reg) {
                      return {true, s};
                  }
                  if (!hasTexture(doc.mesh))
-                     return {false, "The SubTool has no texture: create one first (Tool > Texture Map > New, or texture_create)"};
+                     return {false, "The Part has no texture: create one first (Tool > Texture Map > New, or texture_create)"};
                  const std::string folder = argString(a, "folder");
                  if (folder.empty()) return {false, "Give a folder"};
                  ExportPreset preset;

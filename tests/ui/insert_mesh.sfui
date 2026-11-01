@@ -11,7 +11,7 @@ key f
 remember triangles base
 click "SubTools/Append"
 hover "Insert on the model"
-hover "Active SubTool's copy..."
+hover "Active Part's copy..."
 click "Cube##insertcopy1"
 expect_status Insert a copy of Cube
 stroke 0.8 0.45 0.86 0.45

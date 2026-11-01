@@ -1,6 +1,7 @@
 # ZBrush navigation: free rotation over the top, Shift snaps to an axis view, Alt-drag then release Alt
 # zooms, Ctrl+right-drag zooms, Alt+right-drag pans.
 run new_sphere subdivisions=4
+input_style zbrush
 expect_value camera_roll == 0
 
 # Free rotation (the default) rolls right over the top: drag 400 px up/down = 183 degrees.

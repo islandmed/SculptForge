@@ -1,14 +1,17 @@
-# The ZBrush feel (docs/zbrush-parity.md): U / I / O at the cursor, Smooth's own Z Intensity, ZBrush's brush
+# The ZBrush-style keys (docs/guide/coming-from-zbrush.md): U / I / O at the cursor, Smooth's own Z Intensity, ZBrush's brush
 # letters, L, V, Space QuickMenu, the mask keys (Ctrl+A, Ctrl+Shift+A, Ctrl+I, Ctrl+H), Ctrl+click to blur and
 # Ctrl+Alt+click to sharpen the mask, Ctrl+W, Ctrl+Shift+click on a partly hidden mesh, Shift-constrained
 # straight strokes, Shift+click / release Shift / drag to roll, and the ZBrush / SculptForge input styles.
 run new_sphere subdivisions=5
+# New installs start with the SculptForge keys; this script is about the ZBrush-style ones.
+expect_value input_style == 1
+input_style zbrush
 expect_value input_style == 0
 
 # --- U / I / O: Z Intensity, RGB Intensity and Focal Shift at the cursor (typed in ZBrush's 0-100) ---
 mouse_move 0.5 0.5
 key u
-expect_text Z Intensity 50
+expect_text Intensity 50
 key 2
 key 5
 key enter
@@ -19,7 +22,7 @@ shot rgb-popup
 key escape
 expect_value rgb_intensity == 100
 key o
-expect_text Focal Shift 0
+expect_text Falloff 0
 key minus
 key 6
 key 0
@@ -42,7 +45,7 @@ expect_value focal_shift == 0
 # Smooth keeps its own Z Intensity: with Shift held, U shows and sets Smooth's value.
 hold shift
 key u
-expect_text Smooth Z Intensity 50
+expect_text Smooth Intensity 50
 key 8
 key 0
 key enter
@@ -53,7 +56,7 @@ expect_value z_intensity == 25
 # The Draw palette shows the new sliders, with Ctrl-hover help.
 click "Draw##palette.draw"
 expect_text RGB Intensity 100
-expect_text Focal Shift 0
+expect_text Falloff 0
 hold ctrl
 hover "##focalshift"
 expect_help "soft point"
@@ -102,7 +105,7 @@ mouse_move 0.5 0.5
 key space
 expect_value quickmenu_open == 1
 expect "##qm_drawsize"
-expect_text Focal Shift 0
+expect_text Falloff 0
 shot quickmenu
 key escape
 expect_value quickmenu_open == 0
@@ -219,7 +222,7 @@ key 3
 expect_value brush_type == 2
 key i
 # 3 picked Smooth, so U shows its own value.
-expect_text Smooth Z Intensity 80
+expect_text Smooth Intensity 80
 key escape
 remember camera_distance d1
 hold ctrl
@@ -229,7 +232,18 @@ hold none
 expect_value camera_distance > $d1
 key f
 click "Preferences##palette.preferences"
-click "ZBrush##input.style_zbrush"
+click "ZBrush-style##input.style_zbrush"
 expect_value input_style == 0
 key 1
 expect_value brush_type == 2
+
+# The F3 search finds features by the names ZBrush users type, and says what SculptForge calls them.
+key f3
+type "##Command palette" zspheres
+expect_text "ZBrush users: ZSpheres"
+shot search-zbrush-name
+key escape
+key f3
+type "##Command palette" subtool append
+expect_text "ZBrush users: SubTool"
+key escape

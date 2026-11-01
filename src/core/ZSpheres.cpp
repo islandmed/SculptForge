@@ -348,7 +348,7 @@ std::vector<ZSphere> zspheresFromJson(const Json& json) {
 
 namespace {
 
-constexpr const char* kNotZSphere = "The active SubTool is not a ZSphere SubTool (zsphere_new makes one)";
+constexpr const char* kNotZSphere = "The active Part is not a Forge Sphere Part (zsphere_new makes one)";
 
 Symmetry symmetryArg(const Args& a) {
     Symmetry s{false, false, false};
@@ -361,7 +361,7 @@ Symmetry symmetryArg(const Args& a) {
 }
 
 CommandResult applyEdit(Document& doc, std::vector<ZSphere> s, const std::string& label, std::string message) {
-    if (const std::string err = zspheresValidate(s); !err.empty()) return {false, "ZSpheres: " + err};
+    if (const std::string err = zspheresValidate(s); !err.empty()) return {false, "Forge Spheres: " + err};
     doc.replaceMeshUndoable(zsphereMesh(s, doc.mesh.zspherePreview), label);
     return {true, message + "; " + std::to_string(s.size()) + " spheres"};
 }
@@ -380,19 +380,19 @@ void registerZSphereCommands(CommandRegistry& reg) {
                                   "Mirror the edit across these planes through the centre, e.g. \"x\". Default: none.",
                                   false};
     reg.add({"zsphere_new",
-             "ZSpheres (ZBrush's ZSpheres): add a ZSphere SubTool holding one root sphere at the centre and make it "
-             "active. Grow limbs from it with zsphere_add (or the ZSphere tool), see the skin with zsphere_preview, "
-             "then zsphere_make_mesh turns it into a sculptable SubTool.",
-             {{"name", T::String, "SubTool name (default \"ZSphere\").", false},
+             "Forge Spheres (ZBrush's ZSpheres): add a Forge Sphere Part holding one root sphere at the centre and make it "
+             "active. Grow limbs from it with zsphere_add (or the Forge Sphere tool), see the skin with zsphere_preview, "
+             "then zsphere_make_mesh turns it into a sculptable Part.",
+             {{"name", T::String, "Part name (default \"Forge Sphere\").", false},
               {"radius", T::Number, "Root sphere radius (default 0.5).", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  const float r = float(argNumber(a, "radius", 0.5));
                  if (!(r > 0.0f) || !std::isfinite(r)) return {false, "radius must be above 0"};
-                 const std::string name = doc.uniqueSubtoolName(argString(a, "name", "ZSphere"));
+                 const std::string name = doc.uniqueSubtoolName(argString(a, "name", "Forge Sphere"));
                  doc.addSubtool(zsphereMesh({{vec3(0.0f), r, -1}}, false), name);
-                 return {true, "Added ZSphere SubTool \"" + name + "\" with a root sphere (index 0)"};
+                 return {true, "Added Forge Sphere Part \"" + name + "\" with a root sphere (index 0)"};
              }});
-    reg.add({"zsphere_list", "List the active ZSphere SubTool's spheres: index, centre, radius and parent.", {},
+    reg.add({"zsphere_list", "List the active Forge Sphere Part's spheres: index, centre, radius and parent.", {},
              [](Document& doc, const Args&) -> CommandResult {
                  const auto& s = doc.mesh.zspheres;
                  if (s.empty()) return {false, kNotZSphere};
@@ -401,7 +401,7 @@ void registerZSphereCommands(CommandRegistry& reg) {
                  return {true, out};
              }});
     reg.add({"zsphere_add",
-             "Grow a new sphere from sphere `parent` of the active ZSphere SubTool (a limb, finger or tail joint). "
+             "Grow a new sphere from sphere `parent` of the active Forge Sphere Part (a limb, finger or tail joint). "
              "Its index is reported; mirror copies (with symmetry) follow it.",
              {{"parent", T::Number, "Index of the sphere it grows from (0 = the root).", true},
               {"position", T::String, "Centre \"x,y,z\".", true},
@@ -417,9 +417,9 @@ void registerZSphereCommands(CommandRegistry& reg) {
                  const float r = float(argNumber(a, "radius", s[size_t(parent)].radius));
                  int added = -1;
                  if (!zsphereAdd(s, parent, c, r, symmetryArg(a), &added)) return {false, "radius must be above 0"};
-                 return applyEdit(doc, std::move(s), "ZSphere add", "Added sphere " + std::to_string(added));
+                 return applyEdit(doc, std::move(s), "Forge Sphere add", "Added sphere " + std::to_string(added));
              }});
-    reg.add({"zsphere_set", "Move and/or resize a sphere of the active ZSphere SubTool (ZBrush's Move and Scale).",
+    reg.add({"zsphere_set", "Move and/or resize a sphere of the active Forge Sphere Part (ZBrush's Move and Scale).",
              {{"index", T::Number, "Sphere index.", true},
               {"position", T::String, "New centre \"x,y,z\" (default: unchanged).", false},
               {"radius", T::Number, "New radius (default: unchanged).", false},
@@ -434,9 +434,9 @@ void registerZSphereCommands(CommandRegistry& reg) {
                      return {false, "position must be \"x,y,z\""};
                  if (!zsphereSet(s, i, c, float(argNumber(a, "radius", s[size_t(i)].radius)), symmetryArg(a)))
                      return {false, "radius must be above 0"};
-                 return applyEdit(doc, std::move(s), "ZSphere edit", "Changed sphere " + std::to_string(i));
+                 return applyEdit(doc, std::move(s), "Forge Sphere edit", "Changed sphere " + std::to_string(i));
              }});
-    reg.add({"zsphere_delete", "Delete a sphere of the active ZSphere SubTool and every sphere growing from it.",
+    reg.add({"zsphere_delete", "Delete a sphere of the active Forge Sphere Part and every sphere growing from it.",
              {{"index", T::Number, "Sphere index (not 0, the root).", true}, symmetryParam},
              [](Document& doc, const Args& a) -> CommandResult {
                  auto s = doc.mesh.zspheres;
@@ -444,7 +444,7 @@ void registerZSphereCommands(CommandRegistry& reg) {
                  const int i = int(argNumber(a, "index", -1));
                  if (!zsphereDelete(s, i, symmetryArg(a)))
                      return {false, "index must be from 1 to " + std::to_string(s.size() - 1) + " (the root stays)"};
-                 return applyEdit(doc, std::move(s), "ZSphere delete", "Deleted sphere " + std::to_string(i));
+                 return applyEdit(doc, std::move(s), "Forge Sphere delete", "Deleted sphere " + std::to_string(i));
              }});
     reg.add({"zsphere_insert",
              "Insert a sphere halfway along the link from sphere `index` to its parent (a new joint, like clicking "
@@ -456,38 +456,38 @@ void registerZSphereCommands(CommandRegistry& reg) {
                  int added = -1;
                  if (!zsphereInsert(s, int(argNumber(a, "index", -1)), symmetryArg(a), &added))
                      return {false, "index must be from 1 to " + std::to_string(s.size() - 1)};
-                 return applyEdit(doc, std::move(s), "ZSphere insert", "Inserted sphere " + std::to_string(added));
+                 return applyEdit(doc, std::move(s), "Forge Sphere insert", "Inserted sphere " + std::to_string(added));
              }});
     reg.add({"zsphere_preview",
-             "Show the skin over the active ZSphere SubTool's spheres instead of the spheres (ZBrush's Preview, A).",
+             "Show the skin over the active Forge Sphere Part's spheres instead of the spheres (ZBrush's Preview, A).",
              {{"on", T::Bool, "Default: toggle.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  if (doc.mesh.zspheres.empty()) return {false, kNotZSphere};
                  const bool on = argBool(a, "on", !doc.mesh.zspherePreview);
                  if (on == doc.mesh.zspherePreview) return {true, on ? "Skin preview is on" : "Skin preview is off"};
-                 doc.replaceMeshUndoable(zsphereMesh(doc.mesh.zspheres, on), on ? "ZSphere preview" : "ZSphere spheres");
+                 doc.replaceMeshUndoable(zsphereMesh(doc.mesh.zspheres, on), on ? "Forge Sphere preview" : "Forge Sphere spheres");
                  return {true, on ? "Skin preview on" : "Skin preview off"};
              }});
     reg.add({"zsphere_make_mesh",
-             "Make Mesh (ZBrush's Make Adaptive Skin): build the skin over the active ZSphere SubTool as a new, "
-             "sculptable SubTool right below it, watertight quads with one polygroup per link. The ZSphere SubTool "
+             "Make Mesh (ZBrush's Make Adaptive Skin): build the skin over the active Forge Sphere Part as a new, "
+             "sculptable Part right below it, watertight quads with one face group per link. The Forge Sphere Part "
              "is hidden and kept so the proportions can still be changed and a new mesh made.",
              {{"resolution", T::Number, "Cells across the longest side (16-1024, default 128): higher is denser.", false},
               {"smooth", T::Number, "Smoothing passes (default 2).", false},
-              {"keep", T::Bool, "Keep the ZSphere SubTool (hidden). Default true; false deletes it.", false}},
+              {"keep", T::Bool, "Keep the Forge Sphere Part (hidden). Default true; false deletes it.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  if (doc.mesh.zspheres.empty()) return {false, kNotZSphere};
                  const int res = int(argNumber(a, "resolution", 128));
                  if (res < 16 || res > 1024) return {false, "resolution must be from 16 to 1024"};
                  Mesh skin = zsphereSkin(doc.mesh.zspheres, res, int(argNumber(a, "smooth", 2)));
-                 if (skin.triangleCount() == 0) return {false, "ZSpheres: the skin came out empty (resolution too high?)"};
+                 if (skin.triangleCount() == 0) return {false, "Forge Spheres: the skin came out empty (resolution too high?)"};
                  const size_t faces = skin.triangleCount() - skin.quadCount();
                  const int from = doc.activeSubtool;
                  const std::string name = doc.uniqueSubtoolName(doc.subtools[size_t(from)].name + " Mesh");
                  doc.addSubtool(std::move(skin), name, true, from + 1);
                  if (argBool(a, "keep", true)) doc.subtools[size_t(from)].visible = false;
                  else doc.removeSubtool(from);
-                 return {true, "Made \"" + name + "\" from the ZSpheres: " + std::to_string(faces) + " faces"};
+                 return {true, "Made \"" + name + "\" from the Forge Spheres: " + std::to_string(faces) + " faces"};
              }});
 }
 

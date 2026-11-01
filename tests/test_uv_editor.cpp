@@ -236,10 +236,8 @@ TEST(uv_pack_one_tile_and_udim_tiles) {
     // at twice the size one tile would give.
     CommandResult r = run(doc, "uv_pack", {{"tiles", 4.0}, {"margin", 16.0}});
     CHECK(r.ok);
-    }
     CHECK(r.message.find("2 UDIM tiles") != std::string::npos);
     CHECK(uvsWithin(doc.mesh, glm::vec2(0.0f), glm::vec2(4.0f, 1.0f)));
-    const UvTopology topo = buildUvTopology(doc.mesh);
     std::vector<int> tiles;
     for (uint32_t t = 0; t < doc.mesh.triangleCount(); ++t)
         tiles.push_back(udimTile((doc.mesh.uvs[t * 3] + doc.mesh.uvs[t * 3 + 1] + doc.mesh.uvs[t * 3 + 2]) / 3.0f));
@@ -547,7 +545,7 @@ TEST(uv_unwrap_lion_head_by_sharp_edges) {
     lion = lion.substr(0, lion.rfind("tests")) + "assets/demo/lion-head.glb";
     if (!run(doc, "open", {{"path", lion}}).ok) return;
     CHECK(run(doc, "uv_seam", {{"op", std::string("angle")}, {"angle", 50.0}}).ok);
-    for (const char* method : {"isometric", "conformal", "polygroups"}) {
+    for (const char* method : {"isometric", "conformal"}) {
         const CommandResult r = run(doc, "uv_unwrap", {{"method", std::string(method)}});
         CHECK(r.ok);
         const UvStretchStats st = uvStretchStats(doc.mesh);

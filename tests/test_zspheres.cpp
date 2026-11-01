@@ -143,7 +143,7 @@ TEST(zspheres_commands_and_undo) {
     CommandRegistry reg;
     CHECK(!reg.execute(doc, "zsphere_add", {{"parent", 0.0}, {"position", std::string("1,0,0")}}).ok); // not a ZSphere SubTool
     CHECK(reg.execute(doc, "zsphere_new", {{"radius", 0.5}}).ok);
-    CHECK(doc.subtoolCount() == 2 && doc.subtools[1].name == "ZSphere" && doc.mesh.zspheres.size() == 1);
+    CHECK(doc.subtoolCount() == 2 && doc.subtools[1].name == "Forge Sphere" && doc.mesh.zspheres.size() == 1);
     CHECK(reg.execute(doc, "zsphere_add", {{"parent", 0.0}, {"position", std::string("0.9,0,0")}, {"radius", 0.25},
                                            {"symmetry", std::string("x")}}).ok);
     CHECK(doc.mesh.zspheres.size() == 3);
@@ -170,14 +170,14 @@ TEST(zspheres_commands_and_undo) {
 
     // Make Mesh: a new sculptable SubTool below, the ZSphere SubTool hidden and kept.
     CHECK(reg.execute(doc, "zsphere_make_mesh", {{"resolution", 48.0}}).ok);
-    CHECK(doc.subtoolCount() == 3 && doc.activeSubtool == 2 && doc.subtools[2].name == "ZSphere Mesh");
+    CHECK(doc.subtoolCount() == 3 && doc.activeSubtool == 2 && doc.subtools[2].name == "Forge Sphere Mesh");
     CHECK(doc.mesh.zspheres.empty() && watertight(doc.mesh));
     CHECK(!doc.subtools[1].visible && doc.subtoolMesh(1).zspheres.size() == 4);
     CHECK(!reg.execute(doc, "zsphere_make_mesh").ok); // the new mesh is not a ZSphere SubTool
     // keep=false replaces the ZSphere SubTool.
     doc.selectSubtool(1);
     CHECK(reg.execute(doc, "zsphere_make_mesh", {{"resolution", 32.0}, {"keep", false}}).ok);
-    CHECK(doc.subtoolCount() == 3 && doc.subtools[doc.activeSubtool].name == "ZSphere Mesh 2");
+    CHECK(doc.subtoolCount() == 3 && doc.subtools[doc.activeSubtool].name == "Forge Sphere Mesh 2");
     for (int i = 0; i < doc.subtoolCount(); ++i) CHECK(doc.subtoolMesh(i).zspheres.empty());
 }
 

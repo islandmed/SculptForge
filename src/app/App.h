@@ -134,7 +134,8 @@ public:
     void queueFile(FileAction action, std::string path);
 
 private:
-    enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, SubToolClick, Select, Gizmo, Guide, Sculptable, ZSphere, Insert, Capture, UvTool };
+    enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, SubToolClick, Select, Gizmo, Guide, Sculptable, ZSphere, Insert, Capture,
+                      AirStroke, UvTool }; // AirStroke: a stroke begun off the model, waiting to reach it (#62)
 
     void handleEvent(const SDL_Event& e);
     void onMouseDown(float x, float y, Uint8 button);
@@ -148,6 +149,15 @@ private:
     bool pick(float x, float y, RayHit& hit) const; // the active SubTool (what brushes work on)
     BrushType activeBrush() const;
     void beginStroke(float x, float y, const RayHit& hit);
+    // Preferences > Input > Start strokes off the model (#62): a left press on the background waits as
+    // Drag::AirStroke; the stroke begins where the drag first reaches the surface (airStrokeTo, Input.cpp).
+    bool airStrokeMouseDown(float x, float y, SDL_Keymod mod);
+    void airStrokeTo(float x, float y);
+    void airStrokeRelease();
+    void drawAirStrokeIndicator();
+    bool airMask_ = false;            // the waiting stroke masks (Ctrl held at the press)
+    bool airMoved_ = false;           // it moved past the click slop (a Ctrl+click still inverts the mask)
+    float airX_ = 0.0f, airY_ = 0.0f; // where it was pressed
     void strokeTo(float x, float y);
     void dabAt(float x, float y, float pressure = -1.0f); // pressure < 0: strokePressure()
     void endStroke();
@@ -337,6 +347,10 @@ private:
     void drawSupportUi();               // the first-run welcome and the one reminder note
     void drawSupportersSection();       // Help > About: the names from docs/supporters.txt, as plain text
     bool showWelcome_ = false;          // the first start (no project.json yet), or Help > Welcome
+    // project.json "input_style": the key style an install started with (the welcome's "Coming from" choice, or
+    // SculptForge for a new install), used while ui.json (Store Config) names none; -1: an install from before it,
+    // which keeps the ZBrush-style keys it had.
+    int startInputStyle_ = -1;
     double sculptSeconds_ = 0.0;        // cumulative time in strokes (project.json)
     bool supportReminderDone_ = false;  // the reminder was shown (or turned off) once: never again (project.json)
     bool supportReminderOpen_ = false;
@@ -1130,6 +1144,15 @@ private:
     float paintOpacityDrag_ = -1.0f;  // opacity before the slider drag (-1 = not dragging)
     void drawGameExportContents();
     void drawVisibilitySection();
+    // Tool > Selection Sets (PanelSelectionSets.cpp).
+    void drawSelectionSetsSection();
+    char setNameBuffer_[64] = "Set 1";
+    uint32_t setChannels_ = 1 | 2 | 8; // kSetMask | kSetPolygroups | kSetVisibility (core/SelectionSets.h)
+    std::string selectedSet_, combineWith_;
+    int setMode_ = 0; // Replace, Union, Intersect, Subtract
+    float morphAmount_ = 1.0f;
+    bool renamingSet_ = false;
+    char setRenameBuffer_[64] = "";
     void drawGeometrySection(); // PanelGeometry.cpp: Divide, SDiv, Lower / Higher Res, Del Lower / Higher, Reconstruct
     bool smt_ = true;           // Tool > Geometry > Smt: Divide smooths
     float sdivSlider_ = 1.0f;   // the SDiv slider while dragged (1-based)
@@ -1353,7 +1376,7 @@ private:
         float move[3] = {0, 0, 0}, rotate[3] = {0, 0, 0}, scale = 100.0f;
     } gizmo_;
     // ---- end Gizmo 3D ----
-    // ---- ZBrush feel (Input.cpp, docs/zbrush-parity.md) ----
+    // ---- ZBrush feel (Input.cpp, docs/guide/coming-from-zbrush.md) ----
     // Preferences > Input (the ZBrush or SculptForge key style), the Space QuickMenu, the intensities and Focal
     // Shift (U / I / O), ZBrush's mask and polygroup keys, Shift-constrained straight strokes and the
     // Shift+click, release Shift, drag roll.

@@ -95,7 +95,7 @@ TEST(v02_every_brush_and_alpha_respects_painted_mask) {
             d.undo.push(d.sculptor.endStroke());
             CHECK(leftUnchanged(d.mesh, before));
             // A flat plane has nothing to smooth or flatten.
-            if (type != BrushType::Smooth && type != BrushType::Flatten) {
+            if (type != BrushType::Smooth && type != BrushType::Flatten && type != BrushType::Morph) { // (Morph: no target)
                 const bool changed = rightChanged(d.mesh, before);
                 if (!changed) std::printf("  %s (%s alpha) did not sculpt\n", brushName(type), alpha);
                 CHECK(changed);

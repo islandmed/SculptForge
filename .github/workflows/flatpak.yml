@@ -1,0 +1,58 @@
+name: Flatpak
+
+# The Flatpak (packaging/flatpak), built as the release builds it, installed, and UI tests run inside the sandbox.
+#
+# This is a packaging check: the code in it is the code CI already builds and tests on every push (ci.yml: Linux
+# x86_64 and ARM64 with the same CMake options, UI tests under Xvfb + Mesa). It takes 11-14 minutes, nearly all of it
+# compiling the app again inside the SDK, so it runs only when something it checks beyond that can change:
+#   - the manifest and build script (packaging/flatpak), the desktop file, metainfo and icons it installs
+#     (packaging/linux), the CMake build and the pinned dependencies (CMakeLists.txt, cmake/, third_party/);
+#   - the code that behaves differently inside a Flatpak (the Blender bridge folder, FLATPAK_ID and /.flatpak-info:
+#     src/io/BlenderBridge.*, src/app/PanelBlender.cpp; settings isolation for UI tests: src/app/main.cpp) and the
+#     SpaceMouse reading /dev/input (src/app/SpaceMouse.cpp), with the three UI tests run in the sandbox;
+#   - this workflow.
+# On main, the Packages workflow (packages.yml) builds and tests both Flatpaks on every push that changes the app,
+# and the release promotes those; this workflow is the check for pull requests, and can be run by hand.
+
+on:
+  pull_request:
+    paths: # the list above
+      - packaging/flatpak/**
+      - packaging/linux/**
+      - CMakeLists.txt
+      - cmake/**
+      - third_party/**
+      - src/io/BlenderBridge.*
+      - src/app/PanelBlender.cpp
+      - src/app/main.cpp
+      - src/app/SpaceMouse.cpp
+      - tests/ui/sculpt_basics.sfui
+      - tests/ui/blender_bridge.sfui
+      - tests/ui/spacemouse.sfui
+      - .github/workflows/flatpak.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flatpak-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flatpak:
+    name: Flatpak x86_64
+    runs-on: ${{ vars.SF_RUNNER_LINUX || 'ubuntu-24.04' }}
+    steps:
+      - uses: actions/checkout@v7
+      - run: sudo apt-get update && sudo apt-get install -y flatpak flatpak-builder xvfb
+      - name: Build the bundle
+        run: packaging/flatpak/build.sh dist
+      - name: Install it and run UI tests inside the sandbox (Xvfb, Mesa from the runtime)
+        run: |
+          flatpak install --user -y --noninteractive dist/*.flatpak
+          for t in sculpt_basics blender_bridge spacemouse; do
+            xvfb-run -a -s "-screen 0 1920x1080x24" \
+              flatpak run --env=LIBGL_ALWAYS_SOFTWARE=1 org.sculptforge.SculptForge \
+                --ui-test "$PWD/tests/ui/$t.sfui" --ui-out "$PWD/flatpak-ui/$t"
+          done

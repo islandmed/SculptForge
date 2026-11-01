@@ -27,10 +27,10 @@ what was painted in it; **Undo** brings it back.
 
 ## Turn channels on
 
-1. Give the SubTool a texture ([Texture painting](texture-painting.md)).
+1. Give the Part a texture ([Texture painting](texture-painting.md)).
 2. Open **Tool > Texture Map**. Under **Material Channels**, tick the channels you want (for a typical game asset:
    Roughness, Metallic and Normal; add Height to paint relief, Ambient Occlusion to paint dirt into crevices).
-3. **Channel memory** below the ticks shows what the painted tiles use; the same number, for every SubTool, is in
+3. **Channel memory** below the ticks shows what the painted tiles use; the same number, for every Part, is in
    **Preferences > Performance** under Memory.
 
 ## Paint a material
@@ -85,8 +85,8 @@ detail. `texture_channels height_normal_strength=4` sets how steep that normal i
 
 ## Carrying channels through geometry changes
 
-Auto UV, Voxel Remesh, QRemesh and merging SubTools move every channel and every layer's channels onto the new
-UVs, as they do the colour. A part without a channel takes that channel's default when SubTools merge.
+Auto UV, Voxel Remesh, Quad Remesh and merging Parts move every channel and every layer's channels onto the new
+UVs, as they do the colour. A part without a channel takes that channel's default when Parts merge.
 
 ## Projects
 
@@ -108,7 +108,7 @@ material channels is still saved as format 6, so older versions keep opening it.
 - The viewport shows one channel at a time (solo view); a lit PBR preview with environment lighting is planned.
 - Fill layers, generators (edge wear, dirt), mesh-map bakes as layer inputs, filters and material recipes are
   planned; today the stack is paint layers.
-- One texture per SubTool (no UDIM tiles yet).
+- One texture per Part (no UDIM tiles yet).
 - Memory: colour, roughness, metallic, height and AO on Base plus three layers, each with a few big strokes,
   take about 370 MB at 4K and 1.5 GB at 8K (most of it the colour layers); a layer painted everywhere adds about
   200 MB of channels at 4K and 800 MB at 8K. Preferences > Performance shows the numbers for your scene. Paint at

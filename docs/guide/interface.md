@@ -2,7 +2,7 @@
 
 SculptForge's window is laid out like ZBrush's: a canvas in the middle, shelves of the most-used controls
 around it, a bar of alphabetical palettes that hold every function, and trays at the sides where palettes can
-stay open. This chapter walks through each region, the pop-up pickers, the LightBox, the built-in help, and
+stay open. This chapter walks through each region, the pop-up pickers, the Library, the built-in help, and
 how to rearrange the interface and keep your changes.
 
 ![The SculptForge window with its main regions labelled](images/interface-overview.jpg)
@@ -11,9 +11,9 @@ how to rearrange the interface and keep your changes.
 
 | Region | Where | What it holds |
 |---|---|---|
-| Title strip | Top edge | Document name, scene statistics, status messages, QuickSave, layout presets, Menus, Search |
+| Title strip | Top edge | Document name, scene statistics, status messages, Snapshot, layout presets, Menus, Search |
 | Palette bar | Under the title strip | The 16 palettes, which hold every function |
-| Top shelf | Above the canvas | LightBox, Sculpt/Paint, Zadd/Zsub, Rgb, Draw Size, Z Intensity, symmetry, pressure |
+| Top shelf | Above the canvas | Library, Sculpt/Paint, Add/Sub, Rgb, Draw Size, Intensity, symmetry, pressure |
 | Left shelf | Left of the canvas | Brush, Stroke, Alpha and Material tiles, the colour picker |
 | Canvas | Centre | The 3D view; strokes and navigation start only here |
 | Right shelf | Right of the canvas | Undo and Redo, Frame, Move, Zoom and Rotate, display toggles, Solo |
@@ -29,13 +29,13 @@ From left to right:
 
 - **SculptForge** and the **document name** ("Untitled" until you save). A `*` after the name means there are
   unsaved changes; click the name to save (<kbd>Ctrl</kbd>+<kbd>S</kbd>).
-- **Scene statistics**: vertices and triangles across all SubTools, the active SubTool and its position
-  ("SubTool Body (2/5)"), the active sculpt layer ("Layer Base" when you sculpt the base mesh), the number of
+- **Scene statistics**: vertices and triangles across all Parts, the active Part and its position
+  ("Part Body (2/5)"), the active sculpt layer ("Layer Base" when you sculpt the base mesh), the number of
   Gaussian splats when a capture is loaded, and the frame rate.
 - **The status message**: the result of the last command or action. Errors show in red for a few seconds.
   Point at a long message to read all of it.
-- **QuickSave**: saves a timestamped copy of the whole scene to your library without touching your project
-  file (see [Projects, autosave and QuickSave](projects.md)).
+- **Snapshot**: saves a timestamped copy of the whole scene to your library without touching your project
+  file (see [Projects, autosave and snapshots](projects.md)).
 - **1**, **2**, **3**: the layout presets (see [Layout presets](#layout-presets)).
 - **Menus**: shows or hides the palette bar.
 - **Search** (<kbd>F3</kbd>): opens the [command palette](#the-command-palette).
@@ -55,32 +55,32 @@ Interface > Palettes strictly A-Z (ZBrush order)**.
 
 | Palette | What's in it |
 |---|---|
-| **File** | New Sphere, New Plane, Open, Open Recent, Save, Save As, autosave interval, Import and every export (OBJ, GLB, LOD chain, USD/USDZ, FBX for Unreal, Send to Unreal, splats), ZBrush (GoZ), Quit |
+| **File** | New Sphere, New Plane, Open, Open Recent, Save, Save As, autosave interval, Import and every export (OBJ, GLB, LOD chain, USD/USDZ, FBX for Unreal, Send to Unreal, splats), Send to ZBrush, Quit |
 | **Edit** | Undo and Redo (with the name of the step), Paste brush |
 | **Alpha** | The brush alphas: Round, Square, Noise and twelve patterns (Pores, Cracks, Scales...), images from your library, Load image, Invert loaded image |
 | **Brush** | AI Brush (Brush Lab), Community brushes, Paste brush, your custom brushes, Front faces only, Invert (Alt), the recipe editor for a custom brush, and every brush as a thumbnail grid with a filter |
-| **Color** | The Paint brush, RGB while sculpting, the paint colour and swatches, Fill, Fill masked, Cavity, Clear, Show polypaint |
-| **Draw** | Draw Size, Z Intensity, RGB Intensity, Focal Shift, Sculpt/Paint, Zadd/Zsub, Rgb, Front, and the tablet options (Pressure > strength, Pressure > size) with a pen readout |
+| **Color** | The Paint brush, RGB while sculpting, the paint colour and swatches, Fill, Fill masked, Cavity, Clear, Show vertex paint |
+| **Draw** | Draw Size, Intensity, RGB Intensity, Falloff, Sculpt/Paint, Add/Sub, Rgb, Front, and the tablet options (Pressure > strength, Pressure > size) with a pen readout |
 | **Generate** | Generate 3D (image or text to 3D), Relief, Inflate and Stamp from an image, and the AI brush provider settings |
-| **Material** | The MatCap materials (Soft Clay, the default, first), your own (**Load MatCap...**) and Studio, Base colour, Smooth / Flat shading for the scene and the active SubTool |
-| **Preferences** | Config, Interface, Input, Hotkeys, Display, LightBox, Tablet, Performance, Updates and Autosave sub-palettes (see [Customizing the interface](#customizing-the-interface)) |
-| **Render** | Wireframe, Show Mesh, Show Polypaint, Show Mask, Show Polygroups, Show Splats, Background, Frame, Fullscreen |
+| **Material** | The Lit Sphere materials (Soft Clay, the default, first), your own (**Load Lit Sphere...**) and Studio, Base colour, Smooth / Flat shading for the scene and the active Part |
+| **Preferences** | Config, Interface, Input, Hotkeys, Display, Library, Tablet, Performance, Updates and Autosave sub-palettes (see [Customizing the interface](#customizing-the-interface)) |
+| **Render** | Wireframe, Show Mesh, Show Vertex Paint, Show Mask, Show Face Groups, Show Splats, Background, Frame, Fullscreen |
 | **Script** | Console, Run script file, Copy session as script, Clear console |
 | **Splats** | Gaussian splat tools: show, flip, turn, fit, clean floaters, Make sculptable, sculpt to splats, save, clear |
-| **Stroke** | The stroke types (Dots, DragRect, Spray, LazyMouse) and their settings |
-| **Tool** | The active SubTool with Open, Save and Import, and the SubTool, Layers, Paint Layers, Geometry, Remesh, Deformation, Masking, Polygroups, Visibility, Export and Display sub-palettes |
-| **Transform** | Draw, Move, Scale and Rotate (the [Gizmo 3D](gizmo.md) with its pivot, axes, options and numeric entry), Symmetry X, Y and Z, Frame, Solo, PolyF |
+| **Stroke** | The stroke types (Dots, Drag Stamp, Spray, Lazy Stroke) and their settings |
+| **Tool** | The active Part with Open, Save and Import, and the Part, Layers, Paint Layers, Geometry, Remesh, Deformation, Masking, Face Groups, Visibility, Export and Display sub-palettes |
+| **Transform** | Draw, Move, Scale and Rotate (the [Gizmo](gizmo.md) with its pivot, axes, options and numeric entry), Symmetry X, Y and Z, Frame, Solo, Wire |
 | **Help** | Controls, User Guide, What's New, Command palette, Website & documentation, Report a problem, Support SculptForge..., About SculptForge |
 
 ### Sub-palettes
 
 Large palettes are divided into **sub-palettes**: headers you click to open or close. The Tool palette is the
-main example (SubTool, Layers, Geometry and so on). By default opening one sub-palette closes the others in
+main example (Part, Layers, Geometry and so on). By default opening one sub-palette closes the others in
 the same palette, which keeps the palette short. **Shift**+click a header to open it without closing the
 others, or turn off **Preferences > Interface > One sub-palette open**.
 
-> **ZBrush:** as in ZBrush, SubTool, Layers, Masking, Polygroups and Visibility are sub-palettes of the Tool
-> palette rather than palettes of their own. SculptForge's Remesh sub-palette is where DynaMesh would be.
+> **ZBrush:** as in ZBrush, Parts (ZBrush's SubTool), Layers, Masking, Face Groups (Polygroups) and Visibility are sub-palettes of the Tool
+> palette rather than palettes of their own. SculptForge's Remesh sub-palette is where ZBrush's DynaMesh would be.
 
 ## Trays
 
@@ -118,13 +118,13 @@ interface](#customizing-the-interface) to add items.
 
 First row:
 
-- **LightBox** (<kbd>,</kbd>): shows or hides the [LightBox](#the-lightbox).
+- **Library** (<kbd>,</kbd>): shows or hides the [Library](#the-library).
 - **Sculpt** / **Paint** (<kbd>P</kbd>): brushes change the shape, or paint colour without sculpting.
-- **Zadd** / **Zsub**: brushes add to or subtract from the surface. Holding <kbd>Alt</kbd> flips it for one
+- **Add** / **Sub**: brushes add to or subtract from the surface. Holding <kbd>Alt</kbd> flips it for one
   stroke.
 - **Rgb**: sculpt brushes paint the colour at the same time.
 - **Draw Size**: the brush radius in screen pixels (2 to 800).
-- **Z Intensity**: how strongly each dab changes the surface (1 to 100). While <kbd>Shift</kbd> is held it shows
+- **Intensity**: how strongly each dab changes the surface (1 to 100). While <kbd>Shift</kbd> is held it shows
   Smooth's own value.
 
 Second row:
@@ -133,10 +133,10 @@ Second row:
 - **Front**: front faces only, so brushes leave the far side of thin parts alone.
 - **X**, **Y**, **Z**: symmetry across each axis (<kbd>X</kbd> toggles X).
 - **Pressure > Strength** and **Pressure > Size**: what pen pressure controls.
-- **ActiveTris / TotalTris** at the right: the triangles you can see and sculpt (visible SubTools, hidden
+- **ActiveTris / TotalTris** at the right: the triangles you can see and sculpt (visible Parts, hidden
   parts left out) and the total in the scene.
 
-Draw Size and Z Intensity are sliders with the label inside, as in ZBrush: drag along them, or
+Draw Size and Intensity are sliders with the label inside, as in ZBrush: drag along them, or
 <kbd>Ctrl</kbd>+click to type a value.
 
 ### Left shelf
@@ -144,11 +144,11 @@ Draw Size and Z Intensity are sliders with the label inside, as in ZBrush: drag 
 Four large tiles, each showing the current choice. Click one to open its [pop-up picker](#pop-up-pickers):
 
 - **Brush**: the active brush, with a rendered preview.
-- **Stroke**: Dots, DragRect, Spray or LazyMouse.
+- **Stroke**: Dots, Drag Stamp, Spray or Lazy Stroke.
 - **Alpha**: the brush's stamp shape.
 - **Material**: how the model is shaded in the view.
 
-Under them is the **colour picker** for polypaint (a saturation/value square and a hue strip), two swatches
+Under them is the **colour picker** for vertex paint (a saturation/value square and a hue strip), two swatches
 (the main and second colour; click either to swap them, like ZBrush's Alternate) and **Fill**, which fills the
 unmasked area with the main colour.
 
@@ -158,20 +158,20 @@ unmasked area with the main colour.
   there is nothing to undo or redo. A layout you customised before they were added gets them at the top.
 - **Frame** (<kbd>F</kbd>): fits the model in the view.
 - **Move**, **Zoom**, **Rotate**: drag on these buttons to pan, zoom and orbit the view, as in ZBrush.
-- **PolyF** (<kbd>Shift</kbd>+<kbd>F</kbd>): shows the mesh's polygons: quads as quads, triangles as triangles.
-- **Groups**: colours each polygroup.
+- **Wire** (<kbd>Shift</kbd>+<kbd>F</kbd>): shows the mesh's polygons: quads as quads, triangles as triangles.
+- **Groups**: colours each face group.
 - **Mask** (<kbd>Ctrl</kbd>+<kbd>H</kbd>): shows or hides the mask's darkening (on by default). Hiding it keeps
   the mask, which still protects the surface.
-- **Paint**: shows polypaint colours (on by default).
-- **Solo**: shows only the active SubTool (available with two or more SubTools).
+- **Paint**: shows vertex paint colours (on by default).
+- **Solo**: shows only the active Part (available with two or more Parts).
 - **Splats**: shows or hides a Gaussian splat capture (only shown while one is loaded).
 
 Options that are on are a lighter grey with a thin orange line; orange fill marks only the current tool or mode. See [Navigating the view](navigation.md) for the camera.
 
 ### Bottom shelf
 
-A row of quick brushes: Standard, Clay, ClayBuildup, DamStandard, Move, Smooth, Inflate, Pinch, Flatten,
-Crease, Trim, SnakeHook, Layer, Nudge and Paint. The small digit in a tile's corner is its shortcut
+A row of quick brushes: Standard, Clay, Clay Block, Sharp Crease, Move, Smooth, Inflate, Pinch, Flatten,
+Crease, Trim, Tendril, Layer, Nudge and Paint. The small digit in a tile's corner is its shortcut
 (<kbd>1</kbd> to <kbd>9</kbd> and <kbd>0</kbd> select the first ten built-in brushes, <kbd>P</kbd> is Paint).
 The active brush has an orange outline.
 
@@ -217,30 +217,30 @@ brushes](brush-lab.md)).
 
 ### Stroke, Alpha and Material pickers
 
-- **Stroke** (click the Stroke tile): Dots, DragRect, Spray and LazyMouse, with Scatter for Spray and Lazy
-  radius for LazyMouse. See [Sculpting and brushes](sculpting.md).
+- **Stroke** (click the Stroke tile): Dots, Drag Stamp, Spray and Lazy Stroke, with Scatter for Spray and Lazy
+  radius for Lazy Stroke. See [Sculpting and brushes](sculpting.md).
 - **Alpha** (click the Alpha tile): Round, Square, Noise and the twelve built-in patterns (Pores, Cracks, Scales,
   Rivets, Stitches, Fabric Weave, Bark, Rock Strata, Wrinkles, Skin Folds, Hair Strands, Dot Grid), the image alpha you loaded, images in your
   library's Alphas folder, **Load image...** and **Invert loaded image**.
-- **Material** (<kbd>M</kbd>, or click the Material tile): the MatCaps and Studio. Point at a material to
+- **Material** (<kbd>M</kbd>, or click the Material tile): the Lit Spheres and Studio. Point at a material to
   preview it on the model; click to keep it. Closing the picker without clicking puts the old material back.
-  See [Polypaint and materials](polypaint.md).
+  See [Vertex Paint and materials](vertex-paint.md).
 
-### Sliders at the cursor and the QuickMenu
+### Sliders at the cursor and the Quick Menu
 
-As in ZBrush, press <kbd>S</kbd> for a Draw Size slider under the mouse, <kbd>U</kbd> for Z Intensity,
-<kbd>I</kbd> for RGB Intensity or <kbd>O</kbd> for Focal Shift. Drag the slider, or type a number and press
+As in ZBrush, press <kbd>S</kbd> for a Draw Size slider under the mouse, <kbd>U</kbd> for Intensity,
+<kbd>I</kbd> for RGB Intensity or <kbd>O</kbd> for Falloff. Drag the slider, or type a number and press
 <kbd>Enter</kbd> (<kbd>Esc</kbd> cancels). The pop-up closes when you release the slider. <kbd>[</kbd> and
-<kbd>]</kbd> make the brush 10% smaller or larger at any time. <kbd>Space</kbd> (or a right click on the canvas) opens the QuickMenu with all of
-them and the brush, stroke, alpha and material (see [The QuickMenu](sculpting.md#the-quickmenu)).
+<kbd>]</kbd> make the brush 10% smaller or larger at any time. <kbd>Space</kbd> (or a right click on the canvas) opens the Quick Menu with all of
+them and the brush, stroke, alpha and material (see [The Quick Menu](sculpting.md#the-quick-menu)).
 
-## The LightBox
+## The Library
 
-The LightBox is a strip of thumbnails across the top of the canvas for browsing everything you can load. Press
-<kbd>,</kbd> (comma) or click **LightBox** on the top shelf to show or hide it. It opens on its own at
+The Library is a strip of thumbnails across the top of the canvas for browsing everything you can load. Press
+<kbd>,</kbd> (comma) or click **Library** on the top shelf to show or hide it. It opens on its own at
 start-up (see [Preferences](#interface-preferences)).
 
-![The LightBox on the Tool tab](images/lightbox.jpg)
+![The Library on the Tool tab](images/lightbox.jpg)
 
 | Tab | Shows | Double-click |
 |---|---|---|
@@ -248,34 +248,34 @@ start-up (see [Preferences](#interface-preferences)).
 | **Tool** | Sphere, Plane and Cube, and model files in your library | Open (replaces the scene) |
 | **Brush** | Every brush: built-in, custom and `.sfbrush` files, and the VDM brushes (built-in ones too) | Select or load the brush |
 | **Alpha** | Round, Square, Noise, the twelve built-in patterns and images in your Alphas folder | Use as the brush alpha |
-| **Material** | The MatCaps (your own included) and Studio | Use the material |
+| **Material** | The Lit Spheres (your own included) and Studio | Use the material |
 | **Image** | Reference images in your library | A menu: Generate 3D, relief, inflate, project onto the model, use as alpha |
 | **Splats** | Gaussian splat captures (`.ply`, `.splat`) | Open the capture as a reference |
-| **QuickSave** | The autosave and your QuickSaves, newest first | Open it |
+| **Snapshots** | The autosave and your snapshots, newest first | Open it |
 | **Recent** | Recently opened files of every kind | Open it |
 
 Working with the strip:
 
-- **Shift+double-click** a model, project or primitive to append it to the scene as a new SubTool instead of
+- **Shift+double-click** a model, project or primitive to append it to the scene as a new Part instead of
   replacing the scene.
 - Drag sideways (or use the mouse wheel) to scroll through the strip. A drag of more than a few pixels scrubs,
   so a plain click still selects.
-- Drag a tile down out of the LightBox onto the canvas to load it, like a double-click.
+- Drag a tile down out of the Library onto the canvas to load it, like a double-click.
 - Folders open with a double-click; the first tile inside a folder goes back up. The arrows at the top go back
   and forward through tabs and folders, and the breadcrumb shows where you are.
 - Type in **Filter** to show only items whose names contain the text.
 - Choose **1** to **4** rows of thumbnails.
 - **Open folder...** adds a folder of your own to the root of every tab.
-- On the QuickSave tab, **Save now** makes a QuickSave.
-- Right-click a tile for **Open**, **Append as SubTool**, the image actions, **Show in file manager** and
+- On the Snapshots tab, **Save now** takes a snapshot.
+- Right-click a tile for **Open**, **Append as Part**, the image actions, **Show in file manager** and
   **Refresh thumbnail**.
 
 At the root of the Tool and Image tabs is a **Built-in** folder (the models and images that ship with
 SculptForge, such as the demo lion head), and the Project, Tool, Brush, Alpha, Image and Splats tabs have a
 **User** folder, your library folder (**Documents/SculptForge** by default). To use a different library folder,
-choose it in **Preferences > LightBox > Library folder**.
+choose it in **Preferences > Library > Library folder**.
 
-> **ZBrush:** the LightBox works like ZBrush's: comma toggles it, double-click loads, and Built-in and User
+> **ZBrush:** the Library works like ZBrush's LightBox: comma toggles it, double-click loads, and Built-in and User
 > folders play the part of ZBrush's Maxon and User folders.
 
 ## Getting help on anything
@@ -401,7 +401,7 @@ All in **Preferences > Config**:
 | **Load UI...** (<kbd>Ctrl</kbd>+<kbd>L</kbd>) | Loads such a file (Store Config afterwards to keep it) |
 
 The first time you change the layout in a session, the status line reminds you once: "Layout changed -
-Ctrl+Shift+I to keep it". What a session changes by itself (the console and LightBox being open, the LightBox
+Ctrl+Shift+I to keep it". What a session changes by itself (the console and Library being open, the Library
 tab) doesn't count as a layout change.
 
 > **ZBrush:** Store Config has the same shortcut as in ZBrush, and SculptForge never saves the layout on its
@@ -416,7 +416,7 @@ layouts:
 2. **Sculpt**: both trays closed, for the largest canvas.
 3. **Wide**: Brush, Stroke and Alpha in the left tray, Tool and Material in the right tray.
 
-A preset changes the layout only (the console, LightBox and left-handed setting stay as they are). Store
+A preset changes the layout only (the console, Library and left-handed setting stay as they are). Store
 Config keeps it.
 
 ### Interface preferences
@@ -437,25 +437,27 @@ Config keeps it.
 | **Camera notch** | Automatic | Keeps the interface below a laptop's camera notch in fullscreen (see below) |
 
 **Language** changes the interface at once, without a restart; Store Config keeps it for the next start. In
-**Español** the palette bar, the palettes, the shelves, the LightBox, the command palette and the Ctrl-help titles
-are in Spanish, while the names of tools and brushes stay as Spanish-speaking ZBrush artists use them (SubTool,
-QRemesh, ZSpheres, LightBox, MatCap, Clay Buildup, Zadd). The command palette finds a command by its Spanish or its
+**Español** the palette bar, the palettes, the shelves, the Library, the command palette and the Ctrl-help titles
+are in Spanish, while the names of tools and brushes stay in English, as Spanish-speaking sculptors use them (Parts,
+Quad Remesh, Forge Spheres, Library, Lit Sphere, Clay Block, Add). The command palette finds a command by its Spanish or its
 English name. Anything not translated yet (most Ctrl-help descriptions, this guide) shows in English. Scripts and
 `sculptforge-cli` commands are the same in every language.
 
-**Preferences > Input** sets the key **Style**: **ZBrush** (the default), **SculptForge**, which brings back
-the keys of SculptForge 0.6 and earlier: <kbd>1</kbd> to <kbd>9</kbd> and <kbd>0</kbd> pick the first ten
-brushes (<kbd>9</kbd> is QuickSave in the ZBrush style), <kbd>I</kbd> opens Z Intensity like <kbd>U</kbd>, and
-<kbd>Ctrl</kbd>+drag on the background zooms when nothing is masked; or **Blender**: middle-drag navigation,
+**Preferences > Input** sets the key **Style** (the first start sets it from your **Coming from** answer):
+**SculptForge** (the default for new installs): <kbd>1</kbd> to <kbd>9</kbd> and <kbd>0</kbd> pick the first ten
+brushes, <kbd>I</kbd> opens Intensity like <kbd>U</kbd>, and <kbd>Ctrl</kbd>+drag on the background zooms when
+nothing is masked; **ZBrush-style**: ZBrush's keys, with the number keys free (<kbd>9</kbd> is Save Snapshot),
+<kbd>I</kbd> for RGB Intensity and <kbd>Ctrl</kbd>+drag on the background for a mask rectangle (see
+[ZBrush-style keys](shortcuts.md#zbrush-style-keys)); **Maya**: Maya's view controls; or **Blender**: middle-drag navigation,
 the numpad views and Blender's sculpt-mode keys (see [Blender keys](shortcuts.md#blender-keys)). In the Blender
 style, **Emulate Numpad** makes the number row work as the numpad, and **Import Blender keymap...** takes the keys
-from a keymap you exported in Blender. **Right click opens the QuickMenu** (on by default, in every style) opens
-the [QuickMenu](sculpting.md#the-quickmenu) with a right click on the canvas; a right drag navigates either
+from a keymap you exported in Blender. **Right click opens the Quick Menu** (on by default, in every style) opens
+the [Quick Menu](sculpting.md#the-quick-menu) with a right click on the canvas; a right drag navigates either
 way. **Hold Space and drag to move the camera** (off by default) turns <kbd>Space</kbd> into a camera key: held,
 left-drag rotates, right- or middle-drag pans and <kbd>Ctrl</kbd>+drag zooms (see
 [Navigation](navigation.md#mouse-and-pen)). **Radial Menus** edits your pie menus and their keys (see [Radial menus](sculpting.md#radial-menus)).
 **Cursor follows surface** (on by default) lays the brush rings on the model under the pointer (see
-[Draw Size and Focal Shift](sculpting.md#draw-size-z-intensity-rgb-intensity-and-focal-shift)); off, they are flat circles on the screen. **Rotation** chooses free rotation (ZBrush) or a turntable. See
+[Draw Size and Falloff](sculpting.md#draw-size-intensity-rgb-intensity-and-falloff)); off, they are flat circles on the screen. **Rotation** chooses free rotation (ZBrush) or a turntable. See
 [Coming from ZBrush](coming-from-zbrush.md).
 
 ### The background
@@ -469,10 +471,9 @@ choice for the next session, and each project keeps the background it was saved 
 > **ZBrush:** like turning the gradient off in the Document palette (**Range** 0) and choosing the **Back**
 > colour.
 
-**Preferences > LightBox** has **Show at startup** (on by default), the number of **Rows**, **Placement**
+**Preferences > Library** has **Show at startup** (on by default), the number of **Rows**, **Placement**
 (along the top of the canvas, or at the bottom above the bottom shelf) and the **Library folder**.
-**Preferences > Autosave** sets how often a recovery copy is saved (see [Projects, autosave and
-QuickSave](projects.md)).
+**Preferences > Autosave** sets how often a recovery copy is saved (see [Projects, autosave and snapshots](projects.md)).
 
 ![The Preferences palette with the Config and Interface sub-palettes](images/preferences.jpg)
 

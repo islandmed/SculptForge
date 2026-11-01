@@ -6,7 +6,7 @@
 | Attribute    | Type                      | Size           | Empty means          |
 |--------------|---------------------------|----------------|----------------------|
 | `mask`       | `std::vector<float>`      | vertices       | nothing masked       |
-| `colors`     | `std::vector<glm::vec3>`  | vertices       | no polypaint         |
+| `colors`     | `std::vector<glm::vec3>`  | vertices       | no vertex paint         |
 | `polygroups` | `std::vector<uint32_t>`   | triangles      | every triangle in group 0 |
 | `hidden`     | `std::vector<uint8_t>`    | triangles      | all visible          |
 | `uvs`        | `std::vector<glm::vec2>`  | 3 x triangles  | no UVs (corner order = triangle order) |
@@ -25,7 +25,7 @@ two, a Plane/Cube cell, a voxel-remesh cell). Pairs are mutual, share one edge w
 `sanitizeAttributes()` unpairs anything else, so a topology change can never leave a stale pair (at worst it
 loses some). Record pairs with `pairQuad(t, u)` after pushing both triangles (it grows the array; resize it to the
 triangle count before `rebuildTopology()` if triangles follow). Read with `quadPartnerAt(t)`, which also
-requires both halves to share a polygroup: what PolyF shows as a quad and what exporters write as one.
+requires both halves to share a face group: what Wire shows as a quad and what exporters write as one.
 - Display: `Renderer::uploadFaces` builds GL_LINES edges without the diagonals for meshes with quads.
 - Export: `exportFace(t, face)` gives 4 corners (in winding order; an `(a,b,c)+(a,c,d)` split gives `(a,b,c,d)`),
   3, or 0 for the second half of a quad. OBJ, FBX, PLY, USD and GoZ use it; glTF and STL stay triangles.
@@ -34,20 +34,20 @@ requires both halves to share a polygroup: what PolyF shows as a quad and what e
 
 ## Telling the renderer
 - Vertex attributes (mask, colors): `mesh.markDirty(v)` per vertex or `markAllDirty()`.
-- Triangle attributes (hidden, polygroups): set `mesh.facesDirty = true`.
+- Triangle attributes (hidden, face groups): set `mesh.facesDirty = true`.
 - `RenderSettings` (src/render/Renderer.h): `showPolypaint` (colors replace the base colour),
   `showMask` (masked areas darken), `showPolygroups` (`polygroupColor(id)`, same hash as the shader).
   Hidden triangles are left out of the index buffer. Toggles live in the View menu.
 
 ## Preservation through topology changes
-| Operation | mask / colors | polygroups / hidden | uvs | quadPartners |
+| Operation | mask / colors | face groups / hidden | uvs | quadPartners |
 |-----------|---------------|---------------------|-----|--------------|
 | `loopSubdivide` (Primitives.cpp) | linear interpolation | children inherit | corner midpoints | each quad -> 4 quads |
 | `decimate` / `generateLods` (Decimate.cpp) | exact (vertices are a subset) | surviving faces keep theirs | follow kept vertex (approximate at seams) | dropped |
 | `voxelRemesh` (Voxel.cpp) | nearest original vertex (`transferVertexAttributes`) | **reset** (visible, group 0) | dropped | new: every surface-nets quad |
 | `weldImported` (Mesh.cpp) | first vertex of each welded group | per kept triangle | per kept triangle | pairs of kept triangles |
-| `extractTriangles` / split / delete hidden (Polygroups.cpp) | per kept vertex | per kept triangle | per kept triangle | pairs with both halves kept |
-| `mergeMeshes` (SubTools.cpp) | concatenated | concatenated | concatenated | concatenated (ids shifted) |
+| `extractTriangles` / split / delete hidden (Face Groups.cpp) | per kept vertex | per kept triangle | per kept triangle | pairs with both halves kept |
+| `mergeMeshes` (Parts.cpp) | concatenated | concatenated | concatenated | concatenated (ids shifted) |
 | plane / cube primitives | empty | cube: one group per side | empty | every grid cell |
 | icosphere, image relief/inflate | empty | empty | empty | empty |
 

@@ -7,7 +7,7 @@ to SculptForge over your Wi-Fi.
 
 ## Pair your phone
 
-1. Choose **File > Capture from phone** (or the phone button in the LightBox's header). A window opens with a QR code.
+1. Choose **File > Capture from phone** (or the phone button in the Library's header). A window opens with a QR code.
 2. Point the phone's camera at the QR code and tap the link it shows. The capture page opens, already paired with
    this window: the badge at its top shows your computer's name.
 
@@ -74,14 +74,14 @@ The phone sends large photos at about 2048 pixels, which is plenty and much fast
 ## Send a splat file
 
 Already scanned it with Scaniverse, Polycam or Luma? Export a Gaussian splat `.ply` from the app, tap **Send a splat
-file** and choose it. It opens next to your sculpt as a splat. A `.ply` that is a plain mesh becomes a new SubTool
+file** and choose it. It opens next to your sculpt as a splat. A `.ply` that is a plain mesh becomes a new Part
 instead, so it never replaces your work.
 
 ## View in AR
 
-Tap **View in AR**, choose what to show (the **Active SubTool** or the **Whole scene**) and how big it should be on
+Tap **View in AR**, choose what to show (the **Active Part** or the **Whole scene**) and how big it should be on
 the desk (10 cm to 1 m), then **Get the model**. SculptForge prepares a phone-friendly copy: reduced to about 80,000
-triangles, its polypaint or texture baked into one texture, standing on its base. When it is ready, tap **View in
+triangles, its vertex paint or texture baked into one texture, standing on its base. When it is ready, tap **View in
 AR** and point the phone at a desk or the floor.
 
 - **iPhone and iPad** open it in AR Quick Look (a USDZ file).
@@ -109,7 +109,7 @@ weights (the ARKit set: jawOpen, eyeBlinkLeft, mouthSmileRight...) and the head'
 Prop the phone up at eye level, about an arm's length away, with light on your face. The window's **Face** section
 shows a little face following yours and the frame rate.
 
-The weights drive the character's facial shapes on the active SubTool (made with **Generate facial shapes**).
+The weights drive the character's facial shapes on the active Part (made with **Generate facial shapes**).
 If the character winks with the wrong eye, tick **Mirror left and right**.
 
 **Record face take** records the feed until you press it again. Each take is saved in the Captures folder as
@@ -123,7 +123,7 @@ If the character winks with the wrong eye, tick **Mirror left and right**.
 
 ## The Captures folder
 
-Everything the phone sends is saved in your library (the folder the LightBox shows, normally
+Everything the phone sends is saved in your library (the folder the Library shows, normally
 `Documents/SculptForge`), under `Captures`, one folder per capture:
 
 ```

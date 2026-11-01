@@ -394,7 +394,7 @@ TEST(qremesh_guide_drawing_and_commands) {
     CHECK(reg.execute(doc, "qremesh_guide", {{"points", std::string("-0.3,0.6,2 0,0.65,2 0.3,0.6,2")},
                                              {"view", std::string("0,0,-1")}, {"symmetry", std::string("x")}}).ok);
     CHECK(doc.qremeshGuides.size() == 4);
-    CHECK(reg.execute(doc, "qremesh_guides_info").message.find("4 QRemesh guides (2 loops)") != std::string::npos);
+    CHECK(reg.execute(doc, "qremesh_guides_info").message.find("4 Quad Remesh guides (2 loops)") != std::string::npos);
     // Too short, or off the model.
     CHECK(!reg.execute(doc, "qremesh_guide", {{"points", std::string("0,0,2 0.001,0,2")}, {"view", std::string("0,0,-1")}}).ok);
     CHECK(!reg.execute(doc, "qremesh_guide", {{"points", std::string("5,5,2 6,5,2")}, {"view", std::string("0,0,-1")}}).ok);

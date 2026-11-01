@@ -3,6 +3,7 @@
 #include "app/App.h"
 #include "app/ShellQuote.h"
 #include "app/SpaceCamera.h"
+#include "app/AirStroke.h"
 #include "app/AsyncStroke.h"
 #include "app/Calibration.h"
 #include "app/CrashLog.h"
@@ -814,8 +815,7 @@ int App::run() {
             strokeRadiusProbe_ = &sm.radii;
             if (options_.measureStrokeRadius > 0.0f) radiusPx_ = std::clamp(options_.measureStrokeRadius, 2.0f, 800.0f);
             if (const char* b = std::getenv("SF_MEASURE_BRUSH")) // e.g. KelvinGrab: measure another built-in brush
-                for (int i = 0; i < int(BrushType::Count); ++i)
-                    if (SDL_strcasecmp(brushName(BrushType(i)), b) == 0) brush_ = BrushType(i), doc_.activeBrush = -1;
+                if (BrushType t; brushFromName(b, t)) brush_ = t, doc_.activeBrush = -1;
             if (verify) sm.before = meshStateHash(doc_.mesh);
             onMouseDown(sm.cx + sm.r, sm.cy, SDL_BUTTON_LEFT);
             if (drag_ != Drag::Stroke) {
@@ -1241,6 +1241,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         if (previewLod_ < 0 && pick(x, y, hit)) {
             if (maskMod) beginMaskStroke(x, y);
             else beginStroke(x, y, hit);
+        } else if (airStrokeMouseDown(x, y, mod)) { // Start strokes off the model (#62, Input.cpp)
         } else if (blenderStyle()) {
             // Blender: a drag beside the model navigates as the middle button would (Shift pans, Ctrl zooms).
             const SDL_Keymod keys = SDL_GetModState();
@@ -1342,6 +1343,7 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     case Drag::Sculptable: sculptableMouseMove(x, y); break;
     case Drag::Capture: captureMouseMove(x, y); break;
     case Drag::ZSphere: zsphereDragTo(x, y); break;
+    case Drag::AirStroke: airStrokeTo(x, y); break;
     case Drag::None: break;
     }
 }
@@ -1418,6 +1420,7 @@ void App::onMouseUp() {
     if (drag_ == Drag::Sculptable) sculptableMouseUp();
     if (drag_ == Drag::Capture) captureMouseUp();
     if (drag_ == Drag::ZSphere) zsphereRelease();
+    if (drag_ == Drag::AirStroke) airStrokeRelease();
     gizmoRelease();
     drag_ = Drag::None;
     dragFromPen_ = false;
@@ -1468,7 +1471,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     haveLastDab_ = false;
     doc_.sculptor.draftStrokes = draftStrokes() && asyncStrokeAllowed(); // (AsyncStroke.cpp)
     if (!doc_.sculptor.beginStroke(doc_.mesh,
-                                   !strokeSculpt_ ? std::string("Paint") : recipe ? recipe->name : brushName(strokeBrush_),
+                                   !strokeSculpt_ ? std::string("Paint") : recipe ? recipe->name : brushLabel(strokeBrush_),
                                    strokeSculpt_ ? doc_.activeLayer : -1)) {
         status_ = "Active layer weight is 0 - raise it to sculpt into the layer";
         drag_ = Drag::Orbit;
@@ -1482,7 +1485,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     if (!lods_.empty() || previewLod_ >= 0) clearLods();
     beginPaintStroke();
     if (doc_.sculptor.dyntopo.enabled && strokeSculpt_ && !dyntopoBlocker(doc_.mesh).empty())
-        status_ = "Dynamic is on, but this SubTool has subdivision levels: sculpting without remeshing";
+        status_ = "Dynamic is on, but this Part has subdivision levels: sculpting without remeshing";
     lastX_ = x;
     lastY_ = y;
     strokePath_.reset(x, y);
@@ -1820,7 +1823,7 @@ void App::queueFile(FileAction action, std::string path) {
 }
 
 void App::loadMatcapDialog() {
-    static const SDL_DialogFileFilter kMatcapFilters[] = {{"MatCap images", "png;jpg;jpeg;exr"}, {"All files", "*"}};
+    static const SDL_DialogFileFilter kMatcapFilters[] = {{"Lit Sphere images", "png;jpg;jpeg;exr"}, {"All files", "*"}};
     const std::string folder = matcapFolder();
     SDL_ShowOpenFileDialog(onFileChosen, &dialogRequests_[int(FileAction::LoadMatcap)], window_, kMatcapFilters, 2,
                            folder.empty() ? nullptr : folder.c_str(), false);
@@ -2056,6 +2059,7 @@ void App::drawUi() {
     drawSculptableOverlay(); // Make sculptable: crop box, face landmarks (PanelSculptable.cpp)
     drawCaptureOverlay();    // Capture from view: the square, the result window (PanelKelvinlet.cpp)
     if (uiPrefs_.showAxes) drawAxisGizmo(); // X / Y / Z in the canvas corner (#31)
+    drawAirStrokeIndicator(); // Start strokes off the model is on (#62, Input.cpp)
     if (drag_ == Drag::Insert) { // the size the insert will get
         insertPx_ = std::hypot(mouse.x - insertX_, mouse.y - insertY_);
         ImGui::GetForegroundDrawList()->AddCircle(ImVec2(insertX_, insertY_), std::max(insertPx_, 12.0f * uiScale_),
@@ -2084,7 +2088,7 @@ void App::drawUi() {
                                "version 3 or later. It comes with ABSOLUTELY NO WARRANTY.");
             ImGui::Spacing();
             ImGui::TextWrapped("Built with SDL 3 (zlib), Dear ImGui (MIT), GLM (MIT), stb (MIT/public domain), ufbx "
-                               "(MIT/public domain), xatlas (MIT), MikkTSpace (zlib) and the Inter typeface (SIL OFL 1.1). QRemesh follows Instant Meshes "
+                               "(MIT/public domain), xatlas (MIT), MikkTSpace (zlib) and the Inter typeface (SIL OFL 1.1). Quad Remesh follows Instant Meshes "
                                "(BSD-3-Clause). The phone link uses QR Code generator (MIT), libdatachannel and libjuice (MPL-2.0), usrsctp "
                                "(BSD-3-Clause) and Mbed TLS (Apache-2.0). Uses libcurl (curl license) "
                                "where available.");
@@ -2846,6 +2850,7 @@ void App::drawImageTo3D() {
                 if (ImGui::Selectable(p.label, aiSettings_.hfModel == p.id)) aiSettings_.hfModel = p.id;
             ImGui::EndCombo();
         }
+        if (ai::hunyuanModel(aiSettings_.hfModel)) hint(ai::kHunyuanLicenceNote);
         ImGui::InputText("HF token", hfToken_, sizeof hfToken_, ImGuiInputTextFlags_Password);
         hint(hfToken_[0] || std::getenv("HF_TOKEN")
                  ? "Runs on Hugging Face's shared GPUs with your account's free daily allowance."
@@ -2863,6 +2868,7 @@ void App::drawImageTo3D() {
             ImGui::EndCombo();
         }
         ImGui::InputText("Model id", falModel_, sizeof falModel_);
+        if (ai::hunyuanModel(falModel_)) hint(ai::kHunyuanLicenceNote);
         ImGui::InputText("API key", falKey_, sizeof falKey_, ImGuiInputTextFlags_Password);
         if (!falKey_[0]) hint(std::getenv("FAL_KEY") ? "Using FAL_KEY from the environment." : "Get a key at fal.ai/dashboard/keys");
     } else if (serviceId == "meshy") {

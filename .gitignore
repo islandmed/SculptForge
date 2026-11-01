@@ -14,3 +14,7 @@ __pycache__/
 build-flatpak/
 .flatpak-builder/
 *.flatpak
+
+# Local outputs: a face_shapes UI test export and build logs
+/sf_ui_face.glb
+/build-*.log

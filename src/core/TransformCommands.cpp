@@ -103,9 +103,9 @@ CommandResult runTransform(Document& doc, const Args& a) {
     for (int i : targets) moved += transformSubtool(doc, i, t, useMask, falloff, sym, "Transform");
     if (moved == 0)
         return {false, useMask && doc.mesh.hasMask() ? "Nothing moved: everything is masked (masked=0 ignores the mask)"
-                                                    : "Nothing moved: the SubTool is empty or hidden"};
+                                                    : "Nothing moved: the Part is empty or hidden"};
     std::string msg = "Transformed " + std::to_string(moved) + " vertices";
-    if (targets.size() > 1) msg += " in " + std::to_string(targets.size()) + " SubTools";
+    if (targets.size() > 1) msg += " in " + std::to_string(targets.size()) + " Parts";
     msg += " about " + fmt(t.pivot);
     return {true, msg};
 }
@@ -114,9 +114,9 @@ CommandResult runTransform(Document& doc, const Args& a) {
 
 void registerTransformCommands(CommandRegistry& reg) {
     reg.add({"transform",
-             "Move, rotate and scale the active SubTool, or only its unmasked part (the Gizmo 3D as a command): "
+             "Move, rotate and scale the active Part, or only its unmasked part (the Gizmo as a command): "
              "p' = pivot + translate + R * S * (p - pivot). Masked vertices stay, partly masked ones move partly; "
-             "falloff eases it in from the mask's edge (a soft joint for posing). One undo step per SubTool.",
+             "falloff eases it in from the mask's edge (a soft joint for posing). One undo step per Part.",
              {{"translate", T::String, "Movement x,y,z in world units. Default 0,0,0.", false},
               {"rotate", T::String, "Rotation in degrees about the X, then Y, then Z axis (of orient). Default 0,0,0.",
                false},
@@ -128,13 +128,13 @@ void registerTransformCommands(CommandRegistry& reg) {
                false},
               {"falloff", T::Number,
                "Soft joint: ease the movement in over this distance from the masked part, as a fraction of the "
-               "SubTool's size (0-1, e.g. 0.1; default 0 = the mask as it is).",
+               "Part's size (0-1, e.g. 0.1; default 0 = the mask as it is).",
                false},
               {"symmetry", T::String,
                "Mirror a masked transform across these planes through the origin, e.g. x: the unmasked part on the "
                "other side of the plane takes the mirrored transform (both arms pose together).",
                false},
-              {"all", T::Bool, "Transform every visible SubTool (ZBrush Transpose All). Default false.", false}},
+              {"all", T::Bool, "Transform every visible Part (ZBrush Transpose All). Default false.", false}},
              runTransform});
 }
 

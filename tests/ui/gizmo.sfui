@@ -12,7 +12,7 @@ remember center_z cz0
 # W: Move mode shows the gizmo and its panel; the top shelf's Move lights up.
 key w
 expect_value gizmo_mode == 1
-expect "Gizmo 3D/Apply"
+expect "Gizmo/Apply"
 expect_value wireframe == 0
 gizmo_hover move_x
 wait 0.2
@@ -101,7 +101,7 @@ hold none
 expect_value pivot_x < 0.8
 expect_value pivot_x > -0.8
 expect_status Pivot on Arm
-drag_item "Gizmo 3D/##gizmo_falloff" 25 0
+drag_item "Gizmo/##gizmo_falloff" 25 0
 expect_value gizmo_falloff > 0.05
 snapshot
 gizmo_hover rotate_z
@@ -128,13 +128,13 @@ run mask_clear
 
 # Every control explains itself with Ctrl held; Ctrl+F1 opens this chapter of the guide.
 hold ctrl
-hover "Gizmo 3D/Apply"
+hover "Gizmo/Apply"
 expect_help "about the pivot"
-hover "Gizmo 3D/##gizmo_falloff"
+hover "Gizmo/##gizmo_falloff"
 expect_help "soft joint"
-hover "Gizmo 3D/To Surface##gizmo.snap_pivot"
+hover "Gizmo/To Surface##gizmo.snap_pivot"
 expect_help "Alt+click"
-hover "Gizmo 3D/All SubTools##gizmo.all"
+hover "Gizmo/All Parts##gizmo.all"
 expect_help "Transpose All"
 hover "Rotate##tool.rotate"
 expect_help "pose a limb"
@@ -147,24 +147,24 @@ expect_value guide_open == 0
 
 # Numeric entry: type the amounts, Apply runs one transform command about the pivot.
 click "Reset##gizmo.reset_pivot"
-type "Gizmo 3D/##gizmo_rotate_z" 90
-click "Gizmo 3D/Apply"
+type "Gizmo/##gizmo_rotate_z" 90
+click "Gizmo/Apply"
 expect_status Transformed
 expect_value size_y > 5.9
 expect_value can_undo == 1
 shot numeric
 key ctrl+z
-click "Gizmo 3D/Clear"
+click "Gizmo/Clear"
 
 # All SubTools moves every visible SubTool together, with an undo step in each.
 run subtool_append type=sphere name=Ball
 key f
 key w
-click "All SubTools##gizmo.all"
+click "All Parts##gizmo.all"
 gizmo_drag move_view 50 40
 expect_value edited_subtools == 2
 shot all-subtools
-click "All SubTools##gizmo.all"
+click "All Parts##gizmo.all"
 
 # Q (or W again) goes back to Draw: the gizmo and its panel go away and brushes sculpt again.
 key w
@@ -172,5 +172,5 @@ expect_value gizmo_mode == 0
 key r
 key q
 expect_value gizmo_mode == 0
-expect_not "Gizmo 3D/Apply"
+expect_not "Gizmo/Apply"
 shot draw-mode

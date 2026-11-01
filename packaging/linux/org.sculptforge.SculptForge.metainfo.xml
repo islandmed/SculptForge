@@ -14,6 +14,8 @@
     <p>It exports game-ready FBX, glTF and OpenUSD files, can send assets straight into the Unreal Editor,
     works with Gaussian splats, and includes free AI tools (or bring your own): describe a brush in words,
     or turn an image or a description into a sculptable 3D model.</p>
+    <p>ZBrush, GoZ, MatCap, FiberMesh, LightCap and other ZBrush feature names are trademarks of Maxon Computer GmbH. SculptForge is not affiliated with
+    or endorsed by Maxon.</p>
   </description>
   <launchable type="desktop-id">org.sculptforge.SculptForge.desktop</launchable>
   <url type="homepage">https://sculptforge.app/</url>
@@ -27,6 +29,7 @@
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.10.5" date="2026-11-01"/>
     <release version="0.10.4" date="2026-11-01"/>
     <release version="0.10.3" date="2026-11-01"/>
     <release version="0.10.2" date="2026-11-01"/>

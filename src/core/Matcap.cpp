@@ -189,7 +189,7 @@ std::string extensionOf(const std::string& path) {
 bool fromTopDown(const std::vector<uint8_t>& src, int w, int h, CustomMatcap& out, std::string& error) {
     const int side = std::min(w, h);
     if (side < 16) {
-        error = "The MatCap image is too small (at least 16 x 16 pixels)";
+        error = "The Lit Sphere image is too small (at least 16 x 16 pixels)";
         return false;
     }
     const int x0 = (w - side) / 2, y0 = (h - side) / 2;
@@ -324,7 +324,7 @@ bool readMatcapImage(const std::string& path, CustomMatcap& out, std::string& er
     }
     const std::vector<unsigned char> bytes((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
     if (bytes.size() > (size_t(256) << 20)) {
-        error = path + " is too big for a MatCap";
+        error = path + " is too big for a Lit Sphere";
         return false;
     }
     if (!decodeMatcapImage(bytes.data(), bytes.size(), out, error)) {
@@ -332,7 +332,7 @@ bool readMatcapImage(const std::string& path, CustomMatcap& out, std::string& er
         return false;
     }
     out.name = pathString(utf8Path(path).stem());
-    if (out.name.empty()) out.name = "MatCap";
+    if (out.name.empty()) out.name = "Lit Sphere";
     out.path = path;
     return true;
 }
@@ -349,7 +349,7 @@ bool encodeMatcapPng(int index, std::vector<uint8_t>& png) {
 }
 
 int addCustomMatcap(CustomMatcap m) {
-    if (m.name.empty()) m.name = "MatCap";
+    if (m.name.empty()) m.name = "Lit Sphere";
     if (m.hash == 0) m.hash = hashPixels(m.rgba, m.size);
     // A built-in's name stays the built-in's: the custom one becomes "Chrome 2".
     const std::string base = m.name;

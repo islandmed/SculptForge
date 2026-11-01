@@ -74,6 +74,35 @@ void App::drawSupportUi() {
         if (ImGui::Begin("Welcome to SculptForge", &showWelcome_, flags)) {
             ImGui::TextWrapped("Hold Ctrl over any control to see what it does. The User Guide (Shift+F1) explains every "
                                "tool, and Coming from ZBrush lists what is where.");
+            // The keys to start with (Preferences > Input changes them later; Store Config keeps them).
+            ImGui::Spacing();
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted("Coming from:");
+            struct Origin {
+                const char* label;
+                int style;
+                const char* help;
+            };
+            static const Origin kOrigins[] = {
+                {"ZBrush##welcome.from", 0, "ZBrush-style keys and gestures."},
+                {"Blender##welcome.from", 2, "Blender's navigation and sculpt-mode keys."},
+                {"Maya##welcome.from", 3, "Maya's Alt+drag view controls."},
+                {"New to sculpting##welcome.from", 1, "SculptForge's own keys (the default)."},
+            };
+            for (const Origin& o : kOrigins) {
+                ImGui::SameLine();
+                const bool on = uiPrefs_.inputStyle == o.style;
+                if (on) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+                if (ImGui::Button(o.label)) {
+                    setInputStyle(o.style);
+                    startInputStyle_ = o.style; // kept for the next start, also without Store Config
+                    saveProjectPrefs();
+                    status_ = std::string("Keys: ") + (o.style == 0 ? "ZBrush-style" : o.style == 2 ? "Blender" : o.style == 3 ? "Maya" : "SculptForge") +
+                              " (Preferences > Input changes them)";
+                }
+                if (on) ImGui::PopStyleColor();
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", o.help);
+            }
             if (ImGui::Button("Open the User Guide##welcome")) {
                 guide_.open();
                 showWelcome_ = false;

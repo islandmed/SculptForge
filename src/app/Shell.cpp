@@ -320,23 +320,25 @@ void App::registerShellActions() {
         "A sharp V-shaped crease with the sides pinched in (ZBrush DamStandard).",
         "Square, flat-topped clay strokes for blocking in forms.",
         "Pulls the surface out into horns and tendrils.",
-        "Trim Dynamic: shaves away everything above a plane.",
+        "Trim: shaves away everything above a plane.",
         "Raises the surface to one fixed height per stroke; overlaps never stack.",
         "Slides the surface sideways along the stroke.",
-        "Vector displacement: one DragRect stamps a whole shape with overhangs (horn, ear curl, scales, nostril, or "
+        "Vector displacement: one Drag Stamp stamps a whole shape with overhangs (horn, ear curl, scales, nostril, or "
         "your own from a VDM plane). Pick the map under Brush > Vector Displacement.",
         "Elastic move (Kelvinlets): drags the surface like real clay, with no falloff edge; Squash makes it bulge.",
         "Elastic twist: drag right to turn the surface clockwise around where you pressed, left to turn it back.",
         "Elastic pinch / swell: drag left to pinch the surface toward where you pressed, right to swell it.",
-        "Elastic SnakeHook: pulls smooth, tapering horns and tendrils out along the stroke.",
+        "Elastic Tendril: pulls smooth, tapering horns and tendrils out along the stroke.",
         "Stamps the VDM brush's map along the stroke, each copy turned to follow it. Capture one with Capture from view.",
+        "Pulls the surface back toward the morph target, a selection set's shape (Tool > Selection Sets > Morph "
+        "Target); Alt pushes away. Works at any subdivision level.",
     };
     static_assert(std::size(kBrushHelp) == size_t(BrushType::Count));
     for (int i = 0; i < int(BrushType::Count); ++i) {
         const BrushType type = BrushType(i);
         Action a;
         a.id = brushActionId(type);
-        a.label = brushName(type);
+        a.label = brushLabel(type);
         a.icon = ICON_LC_BRUSH;
         a.palette = "Brush";
         a.shortcut = i < 9 ? std::to_string(i + 1) : i == 9 ? "0" : "";
@@ -357,9 +359,9 @@ void App::registerShellActions() {
     add({"draw.paint", "Paint", ICON_LC_PAINTBRUSH,
          "Paint colour without sculpting (ZBrush Rgb on, Zadd off). Alt paints back to white, Shift still smooths.",
          "Draw", "P", "", [this] { paintMode_ = !paintMode_; }, [this] { return paintMode_; }, nullptr});
-    add({"draw.zadd", "Zadd", nullptr, "Brushes add to the surface. Hold Alt to subtract for one stroke.", "Draw", "", "",
+    add({"draw.zadd", "Add", nullptr, "Brushes add to the surface. Hold Alt to subtract for one stroke.", "Draw", "", "",
          [this] { invertToggle_ = false; }, [this] { return !invertToggle_; }, nullptr});
-    add({"draw.zsub", "Zsub", nullptr, "Brushes subtract from the surface. Hold Alt to add for one stroke.", "Draw", "", "",
+    add({"draw.zsub", "Sub", nullptr, "Brushes subtract from the surface. Hold Alt to add for one stroke.", "Draw", "", "",
          [this] { invertToggle_ = true; }, [this] { return invertToggle_; }, nullptr});
     flag("draw.rgb", "Rgb", nullptr, "Draw", "", &paintRgb_, "Sculpt brushes also paint the colour (ZBrush Rgb with Zadd).");
     flag("draw.front_faces", "Front", nullptr, "Brush", "", &frontFacesOnly_,
@@ -377,15 +379,15 @@ void App::registerShellActions() {
         actions_.add({std::move(id), std::move(label), nullptr, std::move(description), std::move(palette), "", "",
                       [target, value] { *target = value; }, [target, value] { return *target == value; }, nullptr});
     };
-    shape("mask.pen", "MaskPen", "Tool > Masking", &maskShape_, SelectShape::Pen,
+    shape("mask.pen", "Mask Pen", "Tool > Masking", &maskShape_, SelectShape::Pen,
           "Ctrl+drag paints the mask with the brush; Ctrl+Alt+drag erases it. Ctrl+drag on the background clears it.");
-    shape("mask.lasso", "MaskLasso", "Tool > Masking", &maskShape_, SelectShape::Lasso,
+    shape("mask.lasso", "Mask Lasso", "Tool > Masking", &maskShape_, SelectShape::Lasso,
           "Ctrl+drag draws a lasso and masks everything inside it; Ctrl+Alt+drag unmasks. The far side is included.");
-    shape("mask.rect", "MaskRect", "Tool > Masking", &maskShape_, SelectShape::Rect,
+    shape("mask.rect", "Mask Rectangle", "Tool > Masking", &maskShape_, SelectShape::Rect,
           "Ctrl+drag draws a rectangle and masks everything inside it; Ctrl+Alt+drag unmasks. The far side is included.");
-    shape("select.rect", "SelectRect", "Tool > Visibility", &hideShape_, SelectShape::Rect,
+    shape("select.rect", "Select Rectangle", "Tool > Visibility", &hideShape_, SelectShape::Rect,
           "Ctrl+Shift+drag a rectangle to keep what's inside and hide the rest; add Alt to hide the inside.");
-    shape("select.lasso", "SelectLasso", "Tool > Visibility", &hideShape_, SelectShape::Lasso,
+    shape("select.lasso", "Select Lasso", "Tool > Visibility", &hideShape_, SelectShape::Lasso,
           "Ctrl+Shift+drag a lasso to keep what's inside and hide the rest; add Alt to hide the inside.");
     flag("draw.pressure_strength", "Pressure > Strength", nullptr, "Draw > Tablet", "", &pressureStrength_,
          "Pen pressure scales the brush strength.");
@@ -404,10 +406,10 @@ void App::registerShellActions() {
     // View (right shelf, Render palette). Frame keeps F; its short label fits the right shelf.
     add({"view.frame", "Frame", ICON_LC_SCAN, "Fit the whole model in the view.", "Transform", "F", "",
          [this] { camera_.frame(sceneBounds()); }, nullptr, nullptr});
-        flag("view.polyf", "PolyF", ICON_LC_GRID_3X3, "Render", "", &renderSettings_.wireframe,
-         "Polyframe: show the polygons of the active SubTool (Shift+F).");
+        flag("view.polyf", "Wire", ICON_LC_GRID_3X3, "Render", "", &renderSettings_.wireframe,
+         "Wireframe: show the polygons of the active Part (Shift+F).");
     flag("view.polygroups", "Groups", ICON_LC_SHAPES, "Render", "", &renderSettings_.showPolygroups,
-         "Colour each polygroup of the active SubTool.");
+         "Colour each face group of the active Part.");
     flag("view.mask", "Mask", ICON_LC_DROPLET, "Render", "", &renderSettings_.showMask,
          "Show or hide the mask (masked areas drawn darker). Hiding it keeps the mask: masked areas stay protected "
          "from brushes until you clear it.");
@@ -420,7 +422,7 @@ void App::registerShellActions() {
         actions_.add(std::move(a));
     }
     flag("view.polypaint", "Paint", ICON_LC_PALETTE, "Render", "", &renderSettings_.showPolypaint,
-         "Show polypaint colours (off: plain material).");
+         "Show vertex paint colours (off: plain material).");
     // Shading (Material palette, Tool > Display): the scene's, and the active SubTool's own.
     add({"material.smooth", "Smooth", nullptr,
          "Smooth shading (the default): normals blend across polygons, so the surface reads as one form.", "Material", "",
@@ -428,7 +430,7 @@ void App::registerShellActions() {
          [this] { return !renderSettings_.flatShading; }, nullptr});
     add({"material.flat", "Flat", nullptr,
          "Flat shading: every polygon shows its own face, so the mesh's structure and each stroke's effect on it read "
-         "clearly (as in ZBrush). SubTools set to Smooth or Flat keep their own. A preference: Store Config keeps it.",
+         "clearly (as in ZBrush). Parts set to Smooth or Flat keep their own. A preference: Store Config keeps it.",
          "Material", "", "", [this] { runCommand("set_shading", {{"mode", std::string("flat")}}); },
          [this] { return renderSettings_.flatShading; }, nullptr});
     // The view's background (#21; Preferences > Display, Render palette).
@@ -443,16 +445,16 @@ void App::registerShellActions() {
          [this] { runCommand("set_background", {{"mode", std::string("flat")}}); },
          [this] { return !renderSettings_.gradientBackground; }, nullptr});
     auto subtoolShading = [this, &add](const char* id, const char* label, Shading mode, const char* description) {
-        add({id, label, nullptr, description, "Material > This SubTool", "", "subtool_shading",
+        add({id, label, nullptr, description, "Material > This Part", "", "subtool_shading",
              [this, mode] { runCommand("subtool_shading", {{"mode", std::string(shadingName(mode))}}); },
              [this, mode] { return doc_.activeSubtoolInfo().shading == mode; }, nullptr});
     };
     subtoolShading("subtool.shading_default", "Scene", Shading::Default,
-                   "The active SubTool follows the scene's shading (Smooth | Flat above).");
+                   "The active Part follows the scene's shading (Smooth | Flat above).");
     subtoolShading("subtool.shading_smooth", "Smooth", Shading::Smooth,
-                   "The active SubTool always shades smooth, whatever the scene's shading. Saved in the project.");
+                   "The active Part always shades smooth, whatever the scene's shading. Saved in the project.");
     subtoolShading("subtool.shading_flat", "Flat", Shading::Flat,
-                   "The active SubTool always shades flat (faceted), whatever the scene's shading. Saved in the project.");
+                   "The active Part always shades flat (faceted), whatever the scene's shading. Saved in the project.");
     flag("view.mesh", "Show Mesh", ICON_LC_BOX, "Render", "", &renderSettings_.showMesh, "Draw the sculpt.");
     add({"view.fullscreen", "Fullscreen", ICON_LC_MAXIMIZE, "Fill the screen with SculptForge (again: back to a window).",
          "Render", "F11", "",
@@ -461,8 +463,8 @@ void App::registerShellActions() {
     add({"view.splats", "Splats", ICON_LC_SPARKLE, "Show the Gaussian splat capture.", "Render", "", "",
          [this] { renderSettings_.showSplats = !renderSettings_.showSplats; },
          [this] { return renderSettings_.showSplats; }, [this] { return !doc_.splats.empty(); }});
-    add({"subtool.solo", "Solo", ICON_LC_SCAN_EYE, "Show only the active SubTool (again: show the others).",
-         "Tool > SubTool", "", "subtool_solo", [this] { runCommand("subtool_solo"); },
+    add({"subtool.solo", "Solo", ICON_LC_SCAN_EYE, "Show only the active Part (again: show the others).",
+         "Tool > Parts", "", "subtool_solo", [this] { runCommand("subtool_solo"); },
          [this] {
              int visible = 0;
              for (const auto& s : doc_.subtools) visible += s.visible ? 1 : 0;
@@ -477,7 +479,7 @@ void App::registerShellActions() {
          "Transform", "", "", nullptr, nullptr, nullptr});
 
     // Files and editing (File / Edit palettes).
-    add({"file.import", "Import", ICON_LC_IMPORT, "Add a model file as a new SubTool.", "Tool", "", "",
+    add({"file.import", "Import", ICON_LC_IMPORT, "Add a model file as a new Part.", "Tool", "", "",
          [this] {
              static const SDL_DialogFileFilter filters[] = {
                  {"Models", "obj;fbx;glb;gltf;ply;stl;GoZ;goz;usda;usd;usdz"}, {"All files", "*"}};
@@ -488,7 +490,7 @@ void App::registerShellActions() {
                  this, window_, filters, 2, nullptr, false);
          },
          nullptr, nullptr});
-    add({"file.export_obj", "Export OBJ...", nullptr, "Save the visible SubTools as Wavefront OBJ.", "File", "", "",
+    add({"file.export_obj", "Export OBJ...", nullptr, "Save the visible Parts as Wavefront OBJ.", "File", "", "",
          [this] { saveFileDialog(FileAction::SaveObj); }, nullptr, nullptr});
     add({"file.export_lods", "Export LOD Chain...", nullptr, "One GLB per level of detail.", "File", "", "",
          [this] { saveFileDialog(FileAction::ExportLods); }, nullptr, nullptr});
@@ -501,7 +503,7 @@ void App::registerShellActions() {
     add({"file.quit", "Quit", ICON_LC_LOG_OUT, "Close SculptForge (asks to save changes first).", "File", "Ctrl+Q", "",
          [this] { requestQuit(); }, nullptr, nullptr});
     add({"geometry.remesh", "Voxel Remesh", nullptr,
-         "Rebuild as an even, watertight surface (like DynaMesh): merges parts, fixes scans and generated models.",
+         "Rebuild as an even, watertight surface (like Voxel Remesh): merges parts, fixes scans and generated models.",
          "Tool > Remesh", "", "remesh",
          [this] { startVoxelRemesh(); }, nullptr, [this] { return !voxelRemesh_; }});
     add({"geometry.to_splats", "Sculpt to Splats", nullptr, "Turn the sculpt into Gaussian splats.", "Splats", "",
@@ -785,7 +787,7 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     const float windowButtonW = buttonH + 6.0f * s; // minimise and close, at the far right like ZBrush's
     float rightW = searchW + buttonW(tr(ICON_LC_MENU " Menus")) + 3.0f * (buttonH + 2.0f * s) + 18.0f * s +
                    10.0f * s + 2.0f * windowButtonW + 2.0f * s;
-    if (quickSave) rightW += buttonW("QuickSave") + 8.0f * s;
+    if (quickSave) rightW += buttonW(tr("Save Snapshot")) + 8.0f * s;
     const float rightX = g.title.w - 8.0f * s - rightW;
 
     // Info readout and the status message, elided to fit: secondary, so in the 12 px font.
@@ -799,7 +801,7 @@ void App::drawTitleStrip(const ShellGeometry& g) {
         verts += doc_.subtoolMesh(i).vertexCount();
     }
     char info[256];
-    std::snprintf(info, sizeof info, tr("Verts %s   Tris %s   SubTool %s (%d/%d)   Layer %s%s%s"),
+    std::snprintf(info, sizeof info, tr("Verts %s   Tris %s   Part %s (%d/%d)   Layer %s%s%s"),
                   shortCount(verts).c_str(), shortCount(tris).c_str(), doc_.activeSubtoolInfo().name.c_str(),
                   doc_.activeSubtool + 1, doc_.subtoolCount(),
                   doc_.activeLayer >= 0 && doc_.activeLayer < int(doc_.mesh.layers.size())
@@ -1374,7 +1376,7 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         if (fontSmall_) ImGui::PopFont();
         ImGui::EndGroup();
         ui::HelpText("ActiveTris / TotalTris", nullptr,
-                     "Triangles you can see and sculpt (visible SubTools, hidden parts left out) and in the whole scene.",
+                     "Triangles you can see and sculpt (visible Parts, hidden parts left out) and in the whole scene.",
                      "Draw");
     } else if (item.rfind("widget.tile.", 0) == 0) {
         const float w = (shell_.narrow ? 60.0f : 76.0f) * s;
@@ -1520,7 +1522,7 @@ void App::drawDetailSlider(const char* id) {
                      ? "Dynamic topology: how small the triangles get, one size for the whole mesh (0 coarse, 100 fine; "
                        "Constant detail is on in the Draw palette). Ctrl+click to type."
                      : "Dynamic topology: how small the triangles get, relative to the brush (0 coarse, 100 fine). Zoom "
-                       "in or shrink the brush for finer triangles, as in Sculptris Pro. Ctrl+click to type.",
+                       "in or shrink the brush for finer triangles, as in Dynamic Topology. Ctrl+click to type.",
                  "Draw");
 }
 
@@ -1625,11 +1627,11 @@ void App::drawBrushTile(const char* id, ImVec2 size) {
         drawHeldBrushIcon(ImGui::GetWindowDrawList(), a, b, held->icon, heldBrush() == HeldBrush::Select);
         if (clicked) openPicker(Picker::Brush, ImVec2(ImGui::GetItemRectMax().x + 4.0f * s, ImGui::GetItemRectMin().y));
         ui::HelpText("Brush", "B", "Ctrl held: the mask brush (Ctrl+Shift: the selection brush). Click, or press B with Ctrl "
-                     "held, to pick MaskPen, MaskLasso or MaskRect (SelectRect or SelectLasso).", "Left shelf");
+                     "held, to pick Mask Pen, Mask Lasso or Mask Rectangle (Select Rectangle or Select Lasso).", "Left shelf");
         return;
     }
     const BrushRecipe* recipe = activeRecipe();
-    const std::string name = guidesMode_ ? "QRemesh Guides" : paintMode_ ? "Paint" : recipe ? recipe->name : brushName(brush_);
+    const std::string name = guidesMode_ ? "Quad Remesh Guides" : paintMode_ ? "Paint" : recipe ? recipe->name : brushLabel(brush_);
     ImVec2 a, b;
     const bool clicked = tileFrame(id, size, fontSmall_, name, s, a, b);
     ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -1662,7 +1664,7 @@ void App::drawStrokeTile(const char* id, ImVec2 size) {
         const bool clicked = tileFrame(id, size, fontSmall_, held->stroke, s, a, b);
         drawHeldBrushIcon(ImGui::GetWindowDrawList(), a, b, held->icon, heldBrush() == HeldBrush::Select);
         if (clicked) openPicker(Picker::Stroke, ImVec2(ImGui::GetItemRectMax().x + 4.0f * s, ImGui::GetItemRectMin().y));
-        ui::HelpText("Stroke", nullptr, "Ctrl held: the mask's stroke, Dots (MaskPen), Lasso or Rect (Ctrl+Shift: the "
+        ui::HelpText("Stroke", nullptr, "Ctrl held: the mask's stroke, Dots (Mask Pen), Lasso or Rect (Ctrl+Shift: the "
                      "selection's). Click with Ctrl held to choose.", "Left shelf");
         return;
     }
@@ -1716,7 +1718,7 @@ void App::drawStrokeTile(const char* id, ImVec2 size) {
     default: break;
     }
     if (clicked) openPicker(Picker::Stroke, ImVec2(ImGui::GetItemRectMax().x + 4.0f * s, ImGui::GetItemRectMin().y));
-    ui::HelpText("Stroke", nullptr, "How dabs follow the cursor: Dots, DragRect, DragDot, Spray or LazyMouse. Click to choose.",
+    ui::HelpText("Stroke", nullptr, "How dabs follow the cursor: Dots, Drag Stamp, Slide Stamp, Spray or Lazy Stroke. Click to choose.",
                  "Left shelf");
 }
 

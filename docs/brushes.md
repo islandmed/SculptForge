@@ -137,7 +137,7 @@ The gallery's tooling lives in this repository under `tools/brush-gallery/` (Pyt
 
 | Tool | What it does |
 |---|---|
-| `render_previews.py` | Renders the preview for each `.sfbrush`: `sculptforge --render` sculpts three S-curves of the brush on a sphere with the `stroke` command and shoots it with the Clay MatCap at a fixed camera. Brushes masked to cavities or ridges get raised forms or grooves to work on first. |
+| `render_previews.py` | Renders the preview for each `.sfbrush`: `sculptforge --render` sculpts three S-curves of the brush on a sphere with the `stroke` command and shoots it with the Clay Lit Sphere at a fixed camera. Brushes masked to cavities or ridges get raised forms or grooves to work on first. |
 | `build_index.py` | Validates every brush (only recipe keys plus `name`, `description`, `author`, `tags`, `format`, `version`; values in range, checked by round-tripping through `sculptforge-cli`; file named after the brush; a 512 x 384 preview) and writes `index.json`. `--validate-only` for pull requests, `--check` to verify the index is current (a ctest test runs it on `tools/brush-gallery/repo`). |
 | `sync_website.py` | Copies the gallery into `website/gallery/` and writes the cards into `website/brushes.html`. |
 | `repo/` | The content of the gallery repository: README with the submission rules, CC0 licence, seed brushes, previews, index and its GitHub Actions workflows (`validate.yml` checks pull requests; `publish.yml` renders missing previews and rebuilds `index.json` on `main`). |
@@ -145,7 +145,7 @@ The gallery's tooling lives in this repository under `tools/brush-gallery/` (Pyt
 ### The `stroke` command
 
 Previews use `stroke`, which is useful on its own for scripted detailing and AI agents: it applies a brush along
-a path on the active SubTool as one undoable stroke.
+a path on the active Part as one undoable stroke.
 
 ```sh
 sculptforge-cli -c 'new_sphere subdivisions=7; brush_load path=bark.sfbrush;

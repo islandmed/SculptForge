@@ -155,7 +155,7 @@ TEST(quicksave_files) {
     fs::remove_all(dir);
     fs::create_directories(dir);
     const std::string name = quickSaveName(1700000000);
-    CHECK(name.rfind("QuickSave ", 0) == 0);
+    CHECK(name.rfind("Snapshot ", 0) == 0);
     CHECK(name.size() > 10 && name.substr(name.size() - 7) == ".sfproj");
     CHECK(quickSaveName(1700000000, 2).find(" (2).sfproj") != std::string::npos);
 

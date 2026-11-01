@@ -208,8 +208,13 @@ private:
     GLuint captureFbo_[2] = {}, captureRb_[3] = {};
     // drawView's multisampled target; viewFailed_ = the sample count that couldn't be made at this size.
     bool viewTarget(int width, int height, int samples);
-    GLuint viewFbo_ = 0, viewRb_[2] = {};
+    // viewResolveFbo_ is a single-sample RGBA8 copy: a multisample resolve must match formats exactly, and the
+    // window's own framebuffer can be another format (10-bit or sRGB on some Windows drivers), so the resolve
+    // goes there first and a plain blit (which may convert) takes it to the window. If even that blit errors,
+    // directView_ makes later frames draw straight to the window without antialiasing.
+    GLuint viewFbo_ = 0, viewResolveFbo_ = 0, viewRb_[3] = {};
     int viewW_ = 0, viewH_ = 0, viewSamples_ = 0, viewFailed_ = 0;
+    bool directView_ = false;
     int captureW_ = 0, captureH_ = 0;
     GLuint emptyVao_ = 0;
     bool thumbnailPass_ = false; // draw(): transparent background, no gradient (renderMeshThumbnail)

@@ -5,7 +5,7 @@ ZBrush's **Sculptris Pro** and Blender's **Dyntopo** do. Pull a sphere out into 
 new shapes get triangles of their own instead of stretched ones; block in a creature from a ball without
 remeshing first.
 
-![A sphere with horns pulled out by Snake Hook with Dynamic on, in Polyframe and shaded](images/dynamic-topology.jpg)
+![A sphere with horns pulled out by Tendril with Dynamic on, in Polyframe and shaded](images/dynamic-topology.jpg)
 
 ## Turn it on
 
@@ -16,10 +16,10 @@ remeshing first.
 | **Constant detail** | Draw palette | Off: the size follows the brush. On: one size for the whole mesh |
 
 Then sculpt as usual. Every brush works with it except **Move** (it drags the surface without remeshing), the
-mask and paint brushes, and the stamping strokes **DragRect** and **DragDot** (so VDM stamps don't remesh either). **Smooth** remeshes towards larger triangles, so smoothing
+mask and paint brushes, and the stamping strokes **Drag Stamp** and **Slide Stamp** (so VDM stamps don't remesh either). **Smooth** remeshes towards larger triangles, so smoothing
 also simplifies, as in ZBrush.
 
-> **Tip:** Turn on **PolyF** (<kbd>Shift</kbd>+<kbd>F</kbd>) to see the triangles appear under the brush.
+> **Tip:** Turn on **Wire** (<kbd>Shift</kbd>+<kbd>F</kbd>) to see the triangles appear under the brush.
 
 ## How big the triangles get
 
@@ -39,27 +39,27 @@ and fine ones around the eyes.
 ## What it keeps and what it doesn't
 
 - **Symmetry.** With X (or Y, Z) symmetry on, both sides are remeshed together and get mirrored triangles, not
-  just mirrored shapes. A model whose sides aren't made of mirrored polygons (after QRemesh, or sculpted
+  just mirrored shapes. A model whose sides aren't made of mirrored polygons (after Quad Remesh, or sculpted
   without symmetry) has no mirrored triangles to keep: each side then gets its own new triangles, as fine as
   the brush's side.
 - **Mask and visibility.** Fully masked and hidden parts are left alone. Partly masked areas are remeshed but
   move less, as usual.
-- **Borders.** Open edges and the borders between polygroups stay where they are; their vertices only slide
-  along them. New triangles take the polygroup of the triangle they came from.
-- **Polypaint, mask values and sculpt layers** are carried onto new vertices (blended between their
+- **Borders.** Open edges and the borders between face groups stay where they are; their vertices only slide
+  along them. New triangles take the face group of the triangle they came from.
+- **Vertex Paint, mask values and sculpt layers** are carried onto new vertices (blended between their
   neighbours).
 - **Quads** under the brush become triangles. The rest of the mesh keeps its quads.
-- **UVs are dropped** the first time a stroke remeshes a SubTool (the status bar says so), since the new
+- **UVs are dropped** the first time a stroke remeshes a Part (the status bar says so), since the new
   triangles have none. Undo brings them back. Unwrap again with **Auto UV** when you are done.
 
 ## Subdivision levels
 
-Dynamic topology works on meshes without [subdivision levels](subdivision-levels.md), as in ZBrush. On a SubTool
+Dynamic topology works on meshes without [subdivision levels](subdivision-levels.md), as in ZBrush. On a Part
 with levels, **Dynamic** stays off and the status bar says why: go to the level you want to keep and use **Del
-Lower** and **Del Higher** in **Tool > Geometry** first. If you turn it on and then pick a SubTool that has
+Lower** and **Del Higher** in **Tool > Geometry** first. If you turn it on and then pick a Part that has
 levels, strokes sculpt it without remeshing.
 
-A good workflow: block in with Dynamic, then [QRemesh](retopology.md) or [Voxel Remesh](geometry.md) for an even
+A good workflow: block in with Dynamic, then [Quad Remesh](retopology.md) or [Voxel Remesh](geometry.md) for an even
 base, **Divide** for levels, and sculpt the fine detail on them.
 
 ## Undo and speed

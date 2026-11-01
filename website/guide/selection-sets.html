@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Selection sets and morph targets - SculptForge User Guide</title>
+  <meta name="description" content="A selection set is a named snapshot of a Part&#x27;s mask, face groups, vertex paint, visibility (which faces are hidden), UVs and shape. Store as many as you like, bring any of them back later, combine them, and use a stored shape as the target of the Morph brush. Sets belong to the Part, travel with th">
+  <meta name="theme-color" content="#111114">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" type="image/svg+xml" href="../img/favicon.svg?v=2">
+  <link rel="icon" type="image/png" href="../img/favicon-64.png?v=2">
+  <link rel="apple-touch-icon" href="../img/icon-256.png?v=2">
+  <link rel="canonical" href="https://sculptforge.app/guide/selection-sets.html">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Selection sets and morph targets - SculptForge User Guide">
+  <meta property="og:description" content="A selection set is a named snapshot of a Part&#x27;s mask, face groups, vertex paint, visibility (which faces are hidden), UVs and shape. Store as many as you like, bring any of them back later, combine them, and use a stored shape as the target of the Morph brush. Sets belong to the Part, travel with th">
+  <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=3">
+  <meta property="og:url" content="https://sculptforge.app/guide/selection-sets.html">
+  <link rel="stylesheet" href="../style.css?v=17">
+  <script src="../motion.js?v=10" defer></script>
+  <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+  <script src="search-index.js?v=42" defer></script>
+</head>
+<body class="guide-page" data-prev="face-groups.html" data-next="parts.html">
+  <div class="scroll-progress" aria-hidden="true"></div>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="../index.html"><img src="../img/logo.svg?v=2" alt="" width="34" height="34"><span>SculptForge</span></a>
+      <nav aria-label="Main">
+        <a href="../index.html#features">Features</a>
+        <a href="../index.html#demos">Demos</a>
+        <a href="../brushes.html">Brushes</a>
+        <a href="index.html" aria-current="page">Guide</a>
+        <a class="nav-dl" href="../index.html#download">Download</a>
+        <a class="gh" href="https://github.com/islandmed/SculptForge">GitHub</a>
+      </nav>
+    </div>
+  </header>
+  <div class="wrap guide-layout">
+    <div class="guide-side">
+      <button class="toc-toggle" type="button" aria-expanded="false" aria-controls="guide-toc">
+        <span>Contents</span><span class="toc-current">Selection sets and morph targets</span></button>
+      <div id="guide-toc" class="toc-panel">
+        <div class="guide-search" role="search">
+          <input type="search" id="guide-q" placeholder="Search the guide" aria-label="Search the guide" autocomplete="off">
+          <div class="search-results" id="guide-results" hidden></div>
+        </div>
+        <nav class="toc" aria-label="User guide"><a class="toc-home" href="index.html">Contents</a><p class="toc-group">Getting started</p><ul><li><a href="welcome.html">Welcome to SculptForge</a></li><li><a href="whats-new.html">What&#x27;s new</a></li><li><a href="coming-from-zbrush.html">Coming from ZBrush</a></li><li><a href="installing.html">Installing SculptForge</a></li><li><a href="interface.html">The interface</a></li><li><a href="navigation.html">Navigating the view</a></li></ul><p class="toc-group">Sculpting</p><ul><li><a href="sculpting.html">Sculpting and brushes</a></li><li><a href="brush-lab.html">Brush Lab and sharing brushes</a></li><li><a href="masking.html">Masking</a></li><li><a href="face-groups.html">Face Groups and visibility</a></li><li><a href="selection-sets.html" class="current" aria-current="page">Selection sets and morph targets</a><ul class="toc-sections"><li><a href="#store-a-set">Store a set</a></li><li><a href="#restore-rename-and-delete">Restore, rename and delete</a></li><li><a href="#combine-sets">Combine sets</a></li><li><a href="#subdivision-levels">Subdivision levels</a></li><li><a href="#morph-targets">Morph targets</a></li><li><a href="#projects-files-and-other-apps">Projects, files and other apps</a></li><li><a href="#scripting">Scripting</a></li></ul></li><li><a href="parts.html">Parts</a></li><li><a href="forge-spheres.html">Forge Spheres</a></li><li><a href="vertex-paint.html">Vertex Paint and materials</a></li><li><a href="texture-painting.html">Texture painting</a></li><li><a href="pbr-painting.html">Material painting (PBR)</a></li><li><a href="layers.html">Sculpt layers and blend shapes</a></li><li><a href="facial-shapes.html">Facial shapes and live face</a></li><li><a href="subdivision-levels.html">Subdivision levels</a></li><li><a href="micro-levels.html">Micro levels: hundreds of millions of polygons</a></li><li><a href="dynamic-topology.html">Dynamic topology</a></li><li><a href="timeline.html">Sculpt Timeline and timelapse</a></li><li><a href="gizmo.html">Moving, rotating and posing (Gizmo)</a></li><li><a href="geometry.html">Subdivide, remesh, decimate and LODs</a></li><li><a href="retopology.html">Quad retopology and detail projection</a></li></ul><p class="toc-group">AI and capture</p><ul><li><a href="generate-3d.html">Image and text to 3D</a></li><li><a href="splats.html">Gaussian splats</a></li><li><a href="scan-to-splat.html">Scan an object into a splat</a></li><li><a href="scan-to-sculptable.html">From scan to sculptable mesh</a></li><li><a href="phone-capture.html">Phone capture and AR</a></li></ul><p class="toc-group">Files and pipelines</p><ul><li><a href="baking.html">Baking normal and displacement maps</a></li><li><a href="exporting.html">Exporting, Unreal and ZBrush</a></li><li><a href="export-presets.html">Export presets</a></li><li><a href="blender.html">Working with Blender</a></li><li><a href="maya.html">Working with Maya</a></li><li><a href="projects.html">Projects, autosave and snapshots</a></li><li><a href="scripting.html">Scripting and automation</a></li><li><a href="studios.html">SculptForge for studios</a></li></ul><p class="toc-group">Reference</p><ul><li><a href="shortcuts.html">Keyboard and mouse</a></li><li><a href="performance.html">Performance and big meshes</a></li><li><a href="troubleshooting.html">Troubleshooting and FAQ</a></li><li><a href="glossary.html">Glossary</a></li></ul></nav>
+      </div>
+    </div>
+    <main class="guide-main" id="top">
+      <article class="guide-article">
+<h1 id="selection-sets-and-morph-targets">Selection sets and morph targets</h1>
+<p>A selection set is a named snapshot of a Part&#x27;s mask, face groups, vertex paint, visibility (which faces are hidden), UVs and shape. Store as many as you like, bring any of them back later, combine them, and use a stored shape as the target of the <strong>Morph</strong> brush. Sets belong to the Part, travel with the project, and work across its subdivision levels: store at one level, restore at any other.</p>
+<h2 id="store-a-set">Store a set<a class="anchor" href="#store-a-set" aria-label="Link to this section">#</a></h2>
+<p>Open <strong>Tool &gt; Selection Sets</strong>.</p>
+<ol>
+<li>
+Type a name in the field next to <strong>Store</strong> (it suggests &quot;Set 1&quot;, then &quot;Set 2&quot; and so on).
+</li>
+<li>
+Tick the channels the set should hold:
+</li>
+</ol>
+<div class="table-wrap"><table><thead><tr><th>Channel</th><th>What it keeps</th><th>Command name</th></tr></thead><tbody><tr><td><strong>Mask</strong></td><td>The mask, soft edges included.</td><td><code>mask</code></td></tr><tr><td><strong>Groups</strong></td><td>The face groups.</td><td><code>polygroups</code></td></tr><tr><td><strong>Visibility</strong></td><td>Which faces are shown and which are hidden.</td><td><code>visibility</code></td></tr><tr><td><strong>Vertex Paint</strong></td><td>The vertex colours.</td><td><code>paint</code></td></tr><tr><td><strong>UVs</strong></td><td>The UV layout (only when the Part has UVs).</td><td><code>uvs</code></td></tr><tr><td><strong>Shape</strong></td><td>The surface itself, as a morph target.</td><td><code>morph</code></td></tr></tbody></table></div>
+<ol start="3">
+<li>
+Click <strong>Store</strong>. Storing again under the same name replaces that set.
+</li>
+</ol>
+<p><strong>From Visible</strong> is the quick way: it stores the faces shown right now as a set called <strong>Visible</strong> (then <strong>Visible 2</strong>, ...). Isolate a part with the <kbd>Ctrl</kbd>+<kbd>Shift</kbd> gestures (<a href="face-groups.html">Face Groups and visibility</a>), click <strong>From Visible</strong>, and you can get back to exactly that view whenever you need it.</p>
+<p>There is no limit on the number of sets. They are kept compactly: masks, vertex paint and visibility store only the parts that differ from an empty mask, white paint and a fully shown Part, and face groups are run-length coded, so a mask on a few million vertices usually costs a few kilobytes. Shapes and UVs are stored as they are.</p>
+<h2 id="restore-rename-and-delete">Restore, rename and delete<a class="anchor" href="#restore-rename-and-delete" aria-label="Link to this section">#</a></h2>
+<p>Select a set in the list (hover it to see its channels and the level it was stored at), then:</p>
+<ul>
+<li>
+<strong>Restore</strong> puts its channels back. The shape is not restored here: <strong>Morph to Set</strong> does that, so you can keep a set with a shape in it and still restore just its mask. Double-clicking a set restores it too.
+</li>
+<li>
+<strong>Rename</strong> edits its name; <strong>Delete</strong> removes it.
+</li>
+</ul>
+<p>The menu next to <strong>From Visible</strong> sets how <strong>Restore</strong> meets what you have now, for the mask and visibility:</p>
+<div class="table-wrap"><table><thead><tr><th>Mode</th><th>Mask</th><th>Visibility</th></tr></thead><tbody><tr><td><strong>Replace</strong></td><td>The set&#x27;s mask.</td><td>The set&#x27;s shown faces.</td></tr><tr><td><strong>Union</strong></td><td>Masked in either.</td><td>Shown in either.</td></tr><tr><td><strong>Intersect</strong></td><td>Masked in both.</td><td>Shown in both.</td></tr><tr><td><strong>Subtract</strong></td><td>Masked now but not in the set.</td><td>Shown now but not in the set.</td></tr></tbody></table></div>
+<p>Every store, restore, rename, delete and combine is one undo step.</p>
+<p>A set greyed out in the list no longer fits the Part: its topology changed since (a remesh, Dynamic topology, Delete hidden). Undo the change, or delete the set.</p>
+<h2 id="combine-sets">Combine sets<a class="anchor" href="#combine-sets" aria-label="Link to this section">#</a></h2>
+<p>Pick a second set in the menu under <strong>Restore</strong>, choose <strong>Union</strong>, <strong>Intersect</strong> or <strong>Subtract</strong> above, and click <strong>Combine</strong>: a new set (&quot;Head + Arms&quot;, &quot;Head &amp; Arms&quot; or &quot;Head - Arms&quot;) holds the mask and visibility of the two combined that way. Your current mask and visibility are not touched until you restore it.</p>
+<h2 id="subdivision-levels">Subdivision levels<a class="anchor" href="#subdivision-levels" aria-label="Link to this section">#</a></h2>
+<p>A set remembers the level it was stored at, and restores at any level of the same Part:</p>
+<ul>
+<li>
+going down, each vertex and face takes the value of the matching one on the level above, as the levels themselves do;
+</li>
+<li>
+going up, masks and vertex paint are interpolated, face groups and visibility are inherited from the face they lie in, and UVs are interpolated across each face;
+</li>
+<li>
+a shape travels as its difference from that level&#x27;s own surface, so the detail of the levels in between stays where it is.
+</li>
+</ul>
+<p>So you can store a mask at SDiv 1, sculpt at SDiv 5 and restore the mask there, or keep a high-resolution face group set and use it at the base cage. Sets survive <strong>Divide</strong>, <strong>Del Lower</strong>, <strong>Del Higher</strong> and <strong>Reconstruct Subdiv</strong> as long as the level they were stored at still exists.</p>
+<h2 id="morph-targets">Morph targets<a class="anchor" href="#morph-targets" aria-label="Link to this section">#</a></h2>
+<p>Store a set with <strong>Shape</strong> ticked to keep the surface as it is now. Then:</p>
+<ul>
+<li>
+<strong>Morph Target</strong> makes it the target of the <strong>Morph</strong> brush and picks that brush. Strokes pull the surface back toward the stored shape, as much as the brush&#x27;s strength; <kbd>Alt</kbd> pushes away from it. The set&#x27;s name shows <strong>[morph]</strong> in the list; <strong>Clear Morph Target</strong> turns it off.
+</li>
+<li>
+<strong>Morph to Set</strong> moves the whole surface toward the set&#x27;s shape by <strong>Amount</strong> (1 = all the way, 0.5 = halfway, negative values push away), respecting the mask, as one undo step.
+</li>
+</ul>
+<p>Both work at any subdivision level, not only the one the shape was stored at, and with sculpt layers (the change goes into the active layer). Use them to undo a sculpting session locally, to blend between two versions of a form, or to keep a neutral pose while you sculpt an expression.</p>
+<h2 id="projects-files-and-other-apps">Projects, files and other apps<a class="anchor" href="#projects-files-and-other-apps" aria-label="Link to this section">#</a></h2>
+<p>Sets are saved in the project with each Part (older versions of SculptForge open such projects and leave the sets out). To move them between Parts, scenes or tools, use the commands:</p>
+<div class="code-block"><pre class="code"><code>selection_sets_export path=head.sfsets            # every set of the active Part (name=... for one)
+selection_sets_import path=head.sfsets            # into the active Part</code></pre><button class="copy" type="button" aria-label="Copy">Copy</button></div>
+<p>A <code>.sfsets</code> file is a ZIP with a JSON manifest and one small binary file per set. Importing a set that was stored on a different mesh keeps it, but it shows greyed out and can&#x27;t be restored until the Part has a level it fits.</p>
+<p><strong>USD</strong> (<code>export_usd</code>) writes the sets of each Part inside its Mesh prim: the shown faces of each set as a <code>GeomSubset</code> (<code>sculptforge_set0_visible</code>), its face groups as a partition of <code>GeomSubset</code>s (<code>sculptforge_set0_group7</code>), and its mask and vertex paint as vertex primvars (<code>primvars:sculptforge_set0_mask</code>, <code>..._color</code>), with the names in <code>sculptforge:selectionSets</code>. Houdini, Maya, Blender and Omniverse read these as ordinary face sets and primvars, and SculptForge turns them back into selection sets when it imports the file. UVs and shapes are not written to USD.</p>
+<p><strong>OBJ, glTF / GLB, FBX, PLY and STL</strong> have no place for named selections, so sets are not written to them (OBJ still writes the current face groups as <code>g</code> groups). Export the sets to a <code>.sfsets</code> file alongside the model instead.</p>
+<h2 id="scripting">Scripting<a class="anchor" href="#scripting" aria-label="Link to this section">#</a></h2>
+<p>Every button is a command, so scripts, <code>sculptforge-cli</code>, the MCP server and the AI assistant can use sets:</p>
+<div class="table-wrap"><table><thead><tr><th>Command</th><th>What it does</th></tr></thead><tbody><tr><td><code>selection_set_store name=Head channels=mask,visibility</code></td><td>Store (or replace) a set. <code>channels</code> takes <code>mask</code>, <code>polygroups</code>, <code>paint</code>, <code>visibility</code>, <code>uvs</code>, <code>morph</code> or <code>all</code>.</td></tr><tr><td><code>selection_set_restore name=Head mode=union</code></td><td>Restore; <code>channels=</code> restores some of them (add <code>morph</code> to restore the shape).</td></tr><tr><td><code>selection_set_rename name=Head to=Face</code></td><td>Rename.</td></tr><tr><td><code>selection_set_delete name=Head</code></td><td>Delete.</td></tr><tr><td><code>selection_set_list json=true</code></td><td>List the sets with their channels and levels.</td></tr><tr><td><code>selection_set_combine a=Head b=Ears op=union into=HeadEars</code></td><td>Combine two sets into a new one.</td></tr><tr><td><code>selection_set_from_visible</code></td><td>The quick set from the visible faces.</td></tr><tr><td><code>selection_set_morph_target name=Rest</code></td><td>Make a set the Morph brush&#x27;s target (empty name: none).</td></tr><tr><td><code>selection_set_morph name=Rest amount=0.5</code></td><td>Morph to Set.</td></tr><tr><td><code>selection_sets_export</code> / <code>selection_sets_import</code></td><td><code>.sfsets</code> files.</td></tr></tbody></table></div>
+<p>In Python (<code>import sculptforge as sf</code>), push and pull sets as NumPy arrays:</p>
+<div class="code-block"><pre class="code"><code class="language-python">doc.set_selection_set(&quot;Eyes&quot;, mask=eye_mask, hidden=hidden_faces)   # store from arrays (one undo step)
+doc.selection_sets                                                  # [{&#x27;name&#x27;: &#x27;Eyes&#x27;, &#x27;channels&#x27;: [...], ...}]
+arrays = doc.selection_set(&quot;Eyes&quot;)                                  # {&#x27;mask&#x27;: ..., &#x27;hidden&#x27;: ...} at this level
+sf.run(doc, &quot;selection_set_restore&quot;, name=&quot;Eyes&quot;)</code></pre><button class="copy" type="button" aria-label="Copy">Copy</button></div>
+<p>See <a href="scripting.html">Scripting and automation</a> for running commands.</p>
+      </article>
+      <nav class="pager" aria-label="Previous and next chapter"><a class="prev" rel="prev" href="face-groups.html"><span>Previous</span>Face Groups and visibility</a><a class="next" rel="next" href="parts.html"><span>Next</span>Parts</a></nav>
+      <p class="guide-meta fine">Also in the app: <strong>Help &gt; User Guide</strong> (<kbd>Shift</kbd>+<kbd>F1</kbd>).
+        Found a mistake? <a href="https://github.com/islandmed/SculptForge/edit/main/docs/guide/selection-sets.md">Edit this page on GitHub</a>.</p>
+    </main>
+    <aside class="on-page" aria-label="On this page"><p>On this page</p><ul><li><a href="#store-a-set">Store a set</a></li><li><a href="#restore-rename-and-delete">Restore, rename and delete</a></li><li><a href="#combine-sets">Combine sets</a></li><li><a href="#subdivision-levels">Subdivision levels</a></li><li><a href="#morph-targets">Morph targets</a></li><li><a href="#projects-files-and-other-apps">Projects, files and other apps</a></li><li><a href="#scripting">Scripting</a></li></ul></aside>
+  </div>
+  <footer class="footer">
+    <div class="wrap footer-grid">
+      <div>
+        <a class="brand" href="../index.html"><img src="../img/logo.svg?v=2" alt="" width="28" height="28"><span>SculptForge</span></a>
+        <p class="fine">Copyright © 2026 The SculptForge contributors.<br>The SculptForge User Guide is part of
+          SculptForge, licensed under the <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
+      </div>
+      <div class="links">
+        <a href="index.html">User guide</a>
+        <a href="https://github.com/islandmed/SculptForge">Source code</a>
+        <a href="https://github.com/islandmed/SculptForge/issues">Report a problem</a>
+        <a href="https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md">AI services &amp; privacy</a>
+      </div>
+      <p class="fine trademarks">ZBrush, GoZ, MatCap and other ZBrush feature names are trademarks of Maxon Computer
+        GmbH. SculptForge is not affiliated with or endorsed by Maxon. All other trademarks belong to their owners.</p>
+    </div>
+  </footer>
+</body>
+</html>

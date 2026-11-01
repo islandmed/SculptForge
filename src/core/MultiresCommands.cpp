@@ -62,7 +62,7 @@ void registerSubdivCommands(CommandRegistry& reg) {
 
     reg.add({"subdiv_lower", "Lower Res (Shift+D): step one subdivision level down.", {},
              [](Document& doc, const Args&) -> CommandResult {
-                 if (!doc.mesh.multires) return {false, "This SubTool has no subdivision levels (Divide adds them)"};
+                 if (!doc.mesh.multires) return {false, "This Part has no subdivision levels (Divide adds them)"};
                  if (subdivCurrentLevel(doc.mesh) == 0) return {false, "Already at the lowest level (SDiv 1)"};
                  std::string msg;
                  const bool ok = setSubdivLevelUndoable(doc, subdivCurrentLevel(doc.mesh) - 1, msg);
@@ -71,7 +71,7 @@ void registerSubdivCommands(CommandRegistry& reg) {
 
     reg.add({"subdiv_higher", "Higher Res (D): step one subdivision level up.", {},
              [](Document& doc, const Args&) -> CommandResult {
-                 if (!doc.mesh.multires) return {false, "This SubTool has no subdivision levels (Divide adds them)"};
+                 if (!doc.mesh.multires) return {false, "This Part has no subdivision levels (Divide adds them)"};
                  if (subdivCurrentLevel(doc.mesh) + 1 >= subdivLevelCount(doc.mesh))
                      return {false, "Already at the highest level (" + subdivLevelText(doc.mesh) + ")"};
                  std::string msg;
@@ -105,7 +105,7 @@ void registerSubdivCommands(CommandRegistry& reg) {
                  return result(ok, msg);
              }});
 
-    reg.add({"subdiv_info", "List the active SubTool's subdivision levels and their polygon counts.", {},
+    reg.add({"subdiv_info", "List the active Part's subdivision levels and their polygon counts.", {},
              [](Document& doc, const Args&) -> CommandResult {
                  const int n = subdivLevelCount(doc.mesh);
                  if (n == 0) return {true, "No subdivision levels (" + std::to_string(doc.mesh.triangleCount()) + " triangles)"};
@@ -118,11 +118,11 @@ void registerSubdivCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"subdiv_export",
-             "Export the visible SubTools at a subdivision level other than the current one, e.g. the base cage for "
-             "another app (exports and GoZ otherwise write the current level). SubTools without levels are written "
+             "Export the visible Parts at a subdivision level other than the current one, e.g. the base cage for "
+             "another app (exports and GoZ otherwise write the current level). Parts without levels are written "
              "as they are. The format follows the extension (.obj, .glb, .usd, .fbx, .ply, .stl, .goz).",
              {{"path", T::String, "File to write.", true},
-              {"level", T::Number, "Level to export: 1 = the base cage (default); higher than a SubTool has = its highest.", false}},
+              {"level", T::Number, "Level to export: 1 = the base cage (default); higher than a Part has = its highest.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  const std::string path = argString(a, "path");
                  if (path.empty()) return {false, "Give path="};

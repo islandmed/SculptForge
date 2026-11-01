@@ -123,7 +123,7 @@ struct Generated {
 };
 
 const Generated kGenerated[] = {
-    {"Pores", "Scattered skin pores of mixed sizes (use with Zsub to press them in).",
+    {"Pores", "Scattered skin pores of mixed sizes (use with Sub to press them in).",
      [] {
          return generate("Pores", [](float u, float v) {
              float f1, f2;
@@ -176,7 +176,7 @@ const Generated kGenerated[] = {
              return d < 1.0f ? std::sqrt(1.0f - d * d) : 0.0f;
          });
      }},
-    {"Stitches", "A seam with cross stitches along it (drag along the seam with DragRect or a stroke).",
+    {"Stitches", "A seam with cross stitches along it (drag along the seam with Drag Stamp or a stroke).",
      [] {
          return generate("Stitches", [](float u, float v) {
              const float seam = 0.35f * (1.0f - smooth01(std::abs(u) / 0.05f)); // the sewn-together edge

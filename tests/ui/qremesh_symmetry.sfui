@@ -18,25 +18,25 @@ hold none
 
 # Off-centre: mirrored about the model's middle, not the world's.
 drag_item "QRemesh/##qtarget" -20 0
-click "QRemesh/QRemesh"
+click "QRemesh/Quad Remesh"
 wait_idle 120
 expect_status "mirrored across X = 2.5"
 expect_value quad_percent == 100
 expect_value center_x > 2.45
 expect_value center_x < 2.55
 click "Frame##view.frame"
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 shot offcentre-symmetry-polyf
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 
 # A small separate piece beside it: not symmetric any more, so no mirroring; both pieces come out as quads.
 run subtool_append type=sphere size=0.12
 run subtool_merge_visible
 remember triangles merged_tris
-click "QRemesh/QRemesh"
+click "QRemesh/Quad Remesh"
 wait_idle 120
 expect_status "Symmetry off"
 expect_value quad_percent == 100
 click "Frame##view.frame"
-click "PolyF##view.polyf"
+click "Wire##view.polyf"
 shot small-piece-kept-polyf

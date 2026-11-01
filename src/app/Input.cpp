@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The ZBrush feel (docs/zbrush-parity.md): ZBrush's keys that SculptForge lacked (U Z Intensity, I RGB
+// The ZBrush feel (docs/guide/coming-from-zbrush.md): ZBrush's keys that SculptForge lacked (U Z Intensity, I RGB
 // Intensity, O Focal Shift, Space QuickMenu, L LazyMouse, V switch colour, Ctrl+A / Ctrl+Shift+A / Ctrl+I /
 // Ctrl+H for the mask, Ctrl+W group masked), Preferences > Input with the ZBrush and SculptForge key styles,
 // the QuickMenu itself and Shift-constrained straight strokes. The mouse gestures live with the rest of the
@@ -11,8 +11,10 @@
 // and 3D View), with the brush letters on SculptForge's nearest brush. The mouse side is in App.cpp
 // (onMouseDown: middle-drag orbit, Alt+left-drag as the middle button) and blenderMods (Ctrl inverts).
 #include "app/App.h"
+#include "app/AirStroke.h"
 #include "app/BlenderKeymap.h"
 #include "app/Pickers.h"
+#include "app/Theme.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
 #include "core/Polygroups.h"
@@ -34,6 +36,8 @@ namespace sf {
 namespace {
 
 constexpr double kQuickMenuTapSeconds = 0.25; // Space released sooner: a tap, the QuickMenu stays open
+
+bool ctrlDown(SDL_Keymod mod) { return (mod & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) != 0; } // as App.cpp
 
 bool anyMasked(const Mesh& mesh) {
     return std::any_of(mesh.mask.begin(), mesh.mask.end(), [](float m) { return m > 0.0f; });
@@ -67,36 +71,36 @@ void App::registerInputActions() {
     };
 
     // The sliders at the cursor (S is Draw Size, in LightBox.cpp).
-    add("ui.strength_popup", "Z Intensity at cursor", ICON_LC_CIRCLE_DOT, "Draw", "U",
-        "A Z Intensity slider under the cursor: drag it, or type a number (1-100) and press Enter. Hold Shift (or "
-        "pick Smooth) to set Smooth's own Z Intensity.",
+    add("ui.strength_popup", "Intensity at cursor", ICON_LC_CIRCLE_DOT, "Draw", "U",
+        "A Intensity slider under the cursor: drag it, or type a number (1-100) and press Enter. Hold Shift (or "
+        "pick Smooth) to set Smooth's own Intensity.",
         [this] { PickerUi::sizePopup(*this, PickerUi::Slider::ZIntensity); });
     add("ui.rgb_popup", "RGB Intensity at cursor", ICON_LC_PALETTE, "Draw", "I",
         "An RGB Intensity slider under the cursor: how strongly painting colours the surface (1-100).",
         [this] { PickerUi::sizePopup(*this, PickerUi::Slider::RgbIntensity); });
-    add("ui.focal_popup", "Focal Shift at cursor", ICON_LC_CIRCLE_DASHED, "Draw", "O",
-        "A Focal Shift slider under the cursor: below 0 a broad, hard brush tip, above 0 a soft point (-100..100). The "
+    add("ui.focal_popup", "Falloff at cursor", ICON_LC_CIRCLE_DASHED, "Draw", "O",
+        "A Falloff slider under the cursor: below 0 a broad, hard brush tip, above 0 a soft point (-100..100). The "
         "inner ring of the brush cursor shows it.",
         [this] { PickerUi::sizePopup(*this, PickerUi::Slider::FocalShift); });
-    add("ui.quickmenu", "QuickMenu", ICON_LC_LAYOUT_GRID, "Help", "Space",
-        "ZBrush's QuickMenu under the cursor: brush, stroke, alpha, material, colour, Draw Size, Focal Shift and the "
+    add("ui.quickmenu", "Quick Menu", ICON_LC_LAYOUT_GRID, "Help", "Space",
+        "ZBrush's QuickMenu under the cursor: brush, stroke, alpha, material, colour, Draw Size, Falloff and the "
         "intensities. Hold Space and let go to close it, or tap Space to keep it open.",
         [this] { openQuickMenu(); }, [this] { return quickMenu_.open; });
 
     // Stroke and colour.
-    add("stroke.lazy", "LazyMouse", ICON_LC_SPLINE, "Stroke", "L",
-        "LazyMouse on or off: the brush trails the cursor on a string, for steady lines.",
+    add("stroke.lazy", "Lazy Stroke", ICON_LC_SPLINE, "Stroke", "L",
+        "Lazy Stroke on or off: the brush trails the cursor on a string, for steady lines.",
         [this] { strokeType_ = strokeType_ == StrokeType::LazyMouse ? StrokeType::Dots : StrokeType::LazyMouse; },
         [this] { return strokeType_ == StrokeType::LazyMouse; });
     add("stroke.continuous", "Continuous", ICON_LC_REPEAT, "Stroke", "",
         "Continuous on or off: while you hold the brush still on the model it keeps adding, 30 dabs a second "
-        "(build up a bump without moving). Not for Move, Snake Hook or the drag strokes.",
+        "(build up a bump without moving). Not for Move, Tendril or the drag strokes.",
         [this] { strokeContinuous_ = !strokeContinuous_; }, [this] { return strokeContinuous_; });
     add("color.switch", "Switch Color", ICON_LC_ARROW_LEFT_RIGHT, "Color", "V",
         "Swap the main and the secondary colour.", [this] { std::swap(doc_.paintColor, secondaryColor_); });
 
     // Masking (ZBrush Tool > Masking keys).
-    add("mask.all", "Mask All", ICON_LC_SQUARE, "Tool > Masking", "Ctrl+A", "Mask the whole visible SubTool.",
+    add("mask.all", "Mask All", ICON_LC_SQUARE, "Tool > Masking", "Ctrl+A", "Mask the whole visible Part.",
         [this] { runCommand("mask_all"); });
     add("mask.clear", "Clear Mask", ICON_LC_ERASER, "Tool > Masking", "Ctrl+Shift+A",
         "Unmask everything (also: Ctrl+drag on the background, away from the model).", [this] { runCommand("mask_clear"); });
@@ -104,12 +108,12 @@ void App::registerInputActions() {
         "Mask what is unmasked and unmask what is masked (also: Ctrl+click the background).",
         [this] { runCommand("mask_invert"); });
     actions_.setDefaultShortcut("view.mask", "Ctrl+H"); // View Mask
-    add("polygroup.group_masked", "Group Masked", ICON_LC_SHAPES, "Tool > Polygroups", "Ctrl+W",
-        "Turn the masked part into a new polygroup and clear the mask (ZBrush Ctrl+W). With nothing masked, "
+    add("polygroup.group_masked", "Group Masked", ICON_LC_SHAPES, "Tool > Face Groups", "Ctrl+W",
+        "Turn the masked part into a new face group and clear the mask (ZBrush Ctrl+W). With nothing masked, "
         "everything visible becomes one group.",
         [this] { groupMasked(); });
-    add("polygroup.uv_groups", "Group by UVs", ICON_LC_GRID_2X2, "Tool > Polygroups", "",
-        "One polygroup per UV island (ZBrush UV Groups): triangles that touch without a UV seam share a group. "
+    add("polygroup.uv_groups", "Group by UVs", ICON_LC_GRID_2X2, "Tool > Face Groups", "",
+        "One face group per UV island (ZBrush UV Groups): triangles that touch without a UV seam share a group. "
         "Only the visible part is regrouped. Needs UVs (Tool > Texture Map > Auto UV makes some).",
         [this] {
             runCommand("polygroup_uv");
@@ -118,12 +122,12 @@ void App::registerInputActions() {
     actions_.setDefaultShortcut("config.save", "Ctrl+Shift+Alt+I");
 
     // Preferences > Input: the key style.
-    add("input.style_zbrush", "ZBrush", nullptr, "Preferences > Input", "",
-        "ZBrush's keys and gestures: I is RGB Intensity, 9 is QuickSave, the number keys don't pick brushes, and "
+    add("input.style_zbrush", "ZBrush-style", nullptr, "Preferences > Input", "",
+        "Keys and gestures as in ZBrush, for hands that know it: I is RGB Intensity, 9 saves a snapshot, the number keys don't pick brushes, and "
         "Ctrl+drag on the background only clears the mask.",
         [this] { setInputStyle(0); }, [this] { return uiPrefs_.inputStyle == 0; });
     add("input.style_sculptforge", "SculptForge", nullptr, "Preferences > Input", "",
-        "SculptForge's own keys from before 0.7: 1-9 and 0 pick the first ten brushes, I is Z Intensity (as is U), "
+        "SculptForge's own keys (the default): 1-9 and 0 pick the first ten brushes, I is Intensity (as is U), "
         "and Ctrl+drag on the background zooms when nothing is masked.",
         [this] { setInputStyle(1); }, [this] { return uiPrefs_.inputStyle == 1; });
     add("input.style_blender", "Blender", nullptr, "Preferences > Input", "",
@@ -141,16 +145,32 @@ void App::registerInputActions() {
         "orthographic...), for keyboards without one.",
         [this] { uiPrefs_.emulateNumpad = !uiPrefs_.emulateNumpad; }, [this] { return uiPrefs_.emulateNumpad; },
         [this] { return blenderStyle(); });
-    add("input.right_click_menu", "Right click opens the QuickMenu", nullptr, "Preferences > Input", "",
-        "A right click on the canvas, without dragging, opens the QuickMenu under the cursor, as in ZBrush (Space "
+    add("input.right_click_menu", "Right click opens the Quick Menu", nullptr, "Preferences > Input", "",
+        "A right click on the canvas, without dragging, opens the Quick Menu under the cursor, as in ZBrush (Space "
         "does too). A right drag still turns, pans or zooms the view. A pen button set to Right click works the same.",
         [this] { uiPrefs_.rightClickQuickMenu = !uiPrefs_.rightClickQuickMenu; },
         [this] { return uiPrefs_.rightClickQuickMenu; });
     add("input.space_camera", "Hold Space and drag to move the camera", nullptr, "Preferences > Input", "",
         "While Space is held, a drag on the canvas moves the camera: left-drag turns it, right- or middle-drag pans, "
-        "and with Ctrl held too a drag zooms (#43). Off by default: in ZBrush, Space opens the QuickMenu (with this "
+        "and with Ctrl held too a drag zooms (#43). Off by default: in ZBrush, Space opens the Quick Menu (with this "
         "on, a right click still does). Typing a space in a text field is never taken.",
         [this] { uiPrefs_.spaceCamera = !uiPrefs_.spaceCamera; }, [this] { return uiPrefs_.spaceCamera; });
+    add("input.air_strokes", "Start strokes off the model", nullptr, "Preferences > Input", "",
+        "A left-drag that starts on the background begins a brush stroke instead of turning the view; the brush "
+        "touches the model once the cursor reaches it (#62). Ctrl (mask) and Shift (smooth) work the same way, and "
+        "a Ctrl+click on the background still inverts the mask. The view still turns with a right-drag or a pen "
+        "button set to Right click, pans with Alt+drag or a middle-drag, and moves with Space held if Hold Space is "
+        "on; with Blender or Maya keys, Alt+left-drag orbits. Shift+L turns it on and off.",
+        [this] { uiPrefs_.airStrokes = !uiPrefs_.airStrokes; }, [this] { return uiPrefs_.airStrokes; });
+    add("input.toggle_air_strokes", "Toggle strokes off the model", nullptr, "Preferences > Input", "Shift+L",
+        "Turn Preferences > Input > Start strokes off the model on or off: with it on, a left-drag on the background "
+        "sculpts once it reaches the model instead of turning the view (#62).",
+        [this] {
+            uiPrefs_.airStrokes = !uiPrefs_.airStrokes;
+            status_ = uiPrefs_.airStrokes ? "Strokes start off the model: right-drag or Alt+drag to move the view"
+                                          : "Strokes off the model: off (a drag on the background turns the view)";
+        },
+        [this] { return uiPrefs_.airStrokes; });
     add("input.surface_cursor", "Cursor follows surface", nullptr, "Preferences > Input", "",
         "The brush ring lies on the model under the pointer, turned to the surface and pressed onto its bumps, at "
         "the brush's real size there (as in SculptGL), with a short line along the surface's direction. With "
@@ -169,10 +189,10 @@ void App::registerInputActions() {
         "Paint the mask with a plain left drag, Ctrl+drag to unmask (Blender's Mask brush). Press it again, or pick "
         "another brush, to go back.",
         [this] { toggleMaskBrush(); }, [this] { return maskBrushActive(); });
-    add("visibility.hide_group", "Hide polygroup under cursor", ICON_LC_EYE_OFF, "Tool > Visibility", "",
-        "Hide the polygroup under the cursor (Blender: hide the face set).", [this] { hideGroupUnderCursor(false); });
-    add("visibility.isolate_group", "Isolate polygroup under cursor", ICON_LC_EYE, "Tool > Visibility", "",
-        "Show only the polygroup under the cursor; again, with it isolated, shows everything (Blender: toggle "
+    add("visibility.hide_group", "Hide face group under cursor", ICON_LC_EYE_OFF, "Tool > Visibility", "",
+        "Hide the face group under the cursor (Blender: hide the face set).", [this] { hideGroupUnderCursor(false); });
+    add("visibility.isolate_group", "Isolate face group under cursor", ICON_LC_EYE, "Tool > Visibility", "",
+        "Show only the face group under the cursor; again, with it isolated, shows everything (Blender: toggle "
         "visibility).",
         [this] { hideGroupUnderCursor(true); });
     add("visibility.show_all", "Show all", ICON_LC_EYE, "Tool > Visibility", "", "Show every hidden part of the mesh.",
@@ -237,7 +257,7 @@ void App::registerViewActions() {
     });
     add("view.zoom_in", "Zoom in", "Numpad Plus", "Move the view closer.", [this] { camera_.zoom(1.0f); });
     add("view.zoom_out", "Zoom out", "Numpad Minus", "Move the view back.", [this] { camera_.zoom(-1.0f); });
-    add("view.frame_selected", "Frame SubTool", "Numpad .", "Fit the active SubTool in the view (Blender: View Selected).",
+    add("view.frame_selected", "Frame Part", "Numpad .", "Fit the active Part in the view (Blender: View Selected).",
         [this] { frameActiveSubtool(); });
 }
 
@@ -416,13 +436,16 @@ void App::drawInputSection() {
         ui::HelpAction(*this, "input.emulate_numpad");
     }
     bool rightClickMenu = uiPrefs_.rightClickQuickMenu;
-    if (ui::Checkbox("Right click opens the QuickMenu##input.right_click_menu", &rightClickMenu))
+    if (ui::Checkbox("Right click opens the Quick Menu##input.right_click_menu", &rightClickMenu))
         uiPrefs_.rightClickQuickMenu = rightClickMenu;
     ui::HelpAction(*this, "input.right_click_menu");
     bool spaceCamera = uiPrefs_.spaceCamera;
     if (ui::Checkbox("Hold Space and drag to move the camera##input.space_camera", &spaceCamera))
         uiPrefs_.spaceCamera = spaceCamera;
     ui::HelpAction(*this, "input.space_camera");
+    bool airStrokes = uiPrefs_.airStrokes;
+    if (ui::Checkbox("Start strokes off the model##input.air_strokes", &airStrokes)) uiPrefs_.airStrokes = airStrokes;
+    ui::HelpAction(*this, "input.air_strokes");
     bool surfaceCursor = uiPrefs_.cursorFollowsSurface;
     if (ui::Checkbox("Cursor follows surface##input.surface_cursor", &surfaceCursor))
         uiPrefs_.cursorFollowsSurface = surfaceCursor;
@@ -446,9 +469,9 @@ void App::drawZIntensitySlider(const char* id) {
     const bool smooth = activeBrush() == BrushType::Smooth && drag_ != Drag::Stroke;
     float& value = smooth ? smoothStrength_ : strength_;
     float shown = value * 100.0f;
-    if (ui::SliderInside(id, &shown, 1.0f, 100.0f, smooth ? "Smooth Z Intensity %.0f" : "Z Intensity %.0f"))
+    if (ui::SliderInside(id, &shown, 1.0f, 100.0f, smooth ? "Smooth Intensity %.0f" : "Intensity %.0f"))
         value = std::clamp(shown / 100.0f, 0.01f, 1.0f);
-    ui::HelpText(smooth ? "Smooth Z Intensity" : "Z Intensity", "U",
+    ui::HelpText(smooth ? "Smooth Intensity" : "Intensity", "U",
                  smooth ? "How strongly Smooth works. Smooth keeps its own value, as in ZBrush: hold Shift to see and "
                           "set it. Ctrl+click to type."
                         : "How strongly each dab changes the surface (1-100). Holding Shift shows Smooth's own value. "
@@ -531,7 +554,7 @@ void App::quickMenuKeyUp() {
     if (!quickMenu_.open) return;
     // Held: let go to close, as in ZBrush, unless the pointer is on the menu (then it stays until it leaves).
     const bool tap = ImGui::GetTime() - quickMenu_.openedAt < kQuickMenuTapSeconds;
-    ImGuiWindow* w = ImGui::FindWindowByName("QuickMenu##quickmenu");
+    ImGuiWindow* w = ImGui::FindWindowByName("Quick Menu##quickmenu");
     const bool over = w && ImGui::IsMouseHoveringRect(w->Pos, ImVec2(w->Pos.x + w->Size.x, w->Pos.y + w->Size.y), false);
     if (!tap && !over) quickMenu_.open = false;
     quickMenu_.untilLeave = !tap && over;
@@ -551,7 +574,7 @@ void App::drawQuickMenu() {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
     ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(37, 37, 40, 245));
     bool close = false;
-    if (ImGui::Begin("QuickMenu##quickmenu", nullptr,
+    if (ImGui::Begin("Quick Menu##quickmenu", nullptr,
                      ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
                          ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing)) {
         ImGui::BeginGroup();
@@ -568,22 +591,22 @@ void App::drawQuickMenu() {
         const float sw = 150.0f * s;
         ImGui::SetNextItemWidth(sw);
         ui::SliderInside("##qm_drawsize", &radiusPx_, 2.0f, 800.0f, "Draw Size %.0f", ImGuiSliderFlags_Logarithmic);
-        ui::HelpText("Draw Size", "S", "Brush radius in screen pixels.", "QuickMenu");
+        ui::HelpText("Draw Size", "S", "Brush radius in screen pixels.", "Quick Menu");
         float focal = focalShift_ * 100.0f;
         ImGui::SetNextItemWidth(sw);
-        if (ui::SliderInside("##qm_focal", &focal, -100.0f, 100.0f, "Focal Shift %.0f")) focalShift_ = focal / 100.0f;
-        ui::HelpText("Focal Shift", "O", "Below 0: a broad, hard tip. Above 0: a soft point.", "QuickMenu");
+        if (ui::SliderInside("##qm_focal", &focal, -100.0f, 100.0f, "Falloff %.0f")) focalShift_ = focal / 100.0f;
+        ui::HelpText("Falloff", "O", "Below 0: a broad, hard tip. Above 0: a soft point.", "Quick Menu");
         const bool smooth = activeBrush() == BrushType::Smooth;
         float& zValue = smooth ? smoothStrength_ : strength_;
         float z = zValue * 100.0f;
         ImGui::SetNextItemWidth(sw);
-        if (ui::SliderInside("##qm_z", &z, 1.0f, 100.0f, smooth ? "Smooth Z Intensity %.0f" : "Z Intensity %.0f"))
+        if (ui::SliderInside("##qm_z", &z, 1.0f, 100.0f, smooth ? "Smooth Intensity %.0f" : "Intensity %.0f"))
             zValue = z / 100.0f;
-        ui::HelpText("Z Intensity", "U", "How strongly the brush changes the surface.", "QuickMenu");
+        ui::HelpText("Intensity", "U", "How strongly the brush changes the surface.", "Quick Menu");
         float rgb = rgbIntensity_ * 100.0f;
         ImGui::SetNextItemWidth(sw);
         if (ui::SliderInside("##qm_rgb", &rgb, 1.0f, 100.0f, "RGB Intensity %.0f")) rgbIntensity_ = rgb / 100.0f;
-        ui::HelpText("RGB Intensity", "I", "How strongly painting colours the surface.", "QuickMenu");
+        ui::HelpText("RGB Intensity", "I", "How strongly painting colours the surface.", "Quick Menu");
         ImGui::EndGroup();
         ui::Segmented(*this, {"draw.zadd", "draw.zsub"}, 2 * tile + ImGui::GetStyle().ItemSpacing.x);
         ImGui::SameLine();
@@ -603,6 +626,64 @@ void App::drawQuickMenu() {
     ImGui::PopStyleColor();
     ImGui::PopStyleVar(2);
     if (close) quickMenu_.open = false;
+}
+
+// ---------------------------------------------------------------------------
+// Start strokes off the model (#62)
+// ---------------------------------------------------------------------------
+
+// A left press on the background (no surface under it): with the preference on, the stroke waits until the drag
+// reaches the model. Alt+drag still navigates and Ctrl+Shift still draws the hide / show shapes; the mask shapes
+// (MaskLasso, MaskRect) and every other tool took the press before this.
+bool App::airStrokeMouseDown(float x, float y, SDL_Keymod mod) {
+    const SDL_Keymod keys = SDL_GetModState(); // the keyboard itself (blenderMods turns Ctrl into Alt)
+    if (!airStrokeStarts(uiPrefs_.airStrokes, (keys & SDL_KMOD_ALT) != 0, ctrlDown(mod) && (mod & SDL_KMOD_SHIFT),
+                         previewLod_ >= 0 || !insertType_.empty()))
+        return false;
+    drag_ = Drag::AirStroke;
+    airMask_ = ctrlDown(mod) && !(mod & SDL_KMOD_SHIFT);
+    airMoved_ = false;
+    airX_ = x;
+    airY_ = y;
+    return true;
+}
+
+// The waiting stroke begins at the first point over the surface, exactly as a press there would: the stroke path,
+// LazyMouse and the first dab start from that point, so nothing jumps from where the drag began.
+void App::airStrokeTo(float x, float y) {
+    if (!airMoved_ && std::hypot(x - airX_, y - airY_) >= 4.0f) airMoved_ = true;
+    doc_.syncBvh();
+    RayHit hit;
+    if (!pick(x, y, hit)) return;
+    drag_ = Drag::None;
+    if (airMask_) {
+        beginMaskStroke(x, y);
+        if (drag_ == Drag::Stroke && maskClickPending_) { // (a Ctrl+press on the model waits to tell a click)
+            maskClickPending_ = false;
+            firstDab(x, y);
+        }
+    } else {
+        beginStroke(x, y, hit);
+        if (drag_ == Drag::Orbit) drag_ = Drag::None; // (the active layer's weight is 0: never turn the view)
+    }
+}
+
+// Let go before reaching the model: nothing happens, except a Ctrl+click, which inverts the mask as before.
+void App::airStrokeRelease() {
+    if (airMask_ && !airMoved_) runCommand("mask_invert");
+}
+
+void App::drawAirStrokeIndicator() {
+    if (!uiPrefs_.airStrokes) return;
+    const CanvasRect c = canvasRect();
+    const char* text = tr("Strokes start off the model");
+    const ImVec2 size = ImGui::CalcTextSize(text);
+    const float pad = 6.0f * uiScale_;
+    const ImVec2 at(c.x + (c.w - size.x) * 0.5f, c.y + 10.0f * uiScale_);
+    ImDrawList* dl = ImGui::GetForegroundDrawList();
+    dl->AddRectFilled(ImVec2(at.x - pad, at.y - pad * 0.5f), ImVec2(at.x + size.x + pad, at.y + size.y + pad * 0.5f),
+                      IM_COL32(0, 0, 0, 110), 4.0f * uiScale_);
+    dl->AddText(at, theme::u32(theme::accent), text);
 }
 
 } // namespace sf

@@ -5,7 +5,7 @@ src/core/Face.h) fits to a sculpt. It is embedded into the program at build time
 
 | File | Source | Licence |
 |---|---|---|
-| `ict-arkit.sfface` | The "ICT Face Model Light" of [ICT-FaceKit](https://github.com/ICT-VGL/ICT-FaceKit) by the USC Institute for Creative Technologies Vision and Graphics Lab: `FaceXModel/generic_neutral_mesh.obj` (vertices 0-14061: face, head and neck, mouth socket, eye sockets) and the expression OBJs, converted by `tools/face/build_ict_template.py` | [MIT](https://github.com/ICT-VGL/ICT-FaceKit/blob/master/LICENSE), Copyright (c) 2020 USC Institute for Creative Technologies (full text in THIRD_PARTY_NOTICES.md) |
+| `ict-arkit.sfface` | The "ICT Face Model Light" of [ICT-FaceKit](https://github.com/ICT-VGL/ICT-FaceKit) by the USC Institute for Creative Technologies Vision and Graphics Lab: `FaceXModel/generic_neutral_mesh.obj` (vertices 0-14061: face, head and neck, mouth socket, eye sockets) and the expression OBJs, converted by `tools/face/build_ict_template.py` | [MIT](https://github.com/ICT-VGL/ICT-FaceKit/blob/master/LICENSE), Copyright (c) 2020 USC Institute for Creative Technologies (the full licence text is in THIRD_PARTY_NOTICES.md, ICT-FaceKit section) |
 
 What changed from ICT's data: the 52 shapes carry Apple ARKit's names (ICT's `_L` / `_R` become `Left` / `Right`,
 the character's own sides), ICT's separate `browInnerUp_L/_R` and `cheekPuff_L/_R` are summed into ARKit's single

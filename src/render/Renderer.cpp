@@ -9,6 +9,8 @@
 #include "core/TierConfig.h"
 #include "core/UploadOrder.h"
 
+#include <SDL3/SDL_log.h>
+
 #include <glm/gtc/type_ptr.hpp>
 
 #include <algorithm>
@@ -942,8 +944,9 @@ void Renderer::shutdown() {
     gl::DeleteVertexArrays(1, &splatVao_);
     if (viewFbo_) {
         gl::DeleteFramebuffers(1, &viewFbo_);
-        gl::DeleteRenderbuffers(2, viewRb_);
-        viewFbo_ = 0;
+        gl::DeleteFramebuffers(1, &viewResolveFbo_);
+        gl::DeleteRenderbuffers(3, viewRb_);
+        viewFbo_ = viewResolveFbo_ = 0;
     }
 }
 
@@ -2145,28 +2148,36 @@ bool Renderer::viewTarget(int width, int height, int samples) {
     if (width == viewW_ && height == viewH_ && samples == viewFailed_) return false; // don't retry every frame
     if (viewFbo_) {
         gl::DeleteFramebuffers(1, &viewFbo_);
-        gl::DeleteRenderbuffers(2, viewRb_);
-        viewFbo_ = 0;
+        gl::DeleteFramebuffers(1, &viewResolveFbo_);
+        gl::DeleteRenderbuffers(3, viewRb_);
+        viewFbo_ = viewResolveFbo_ = 0;
     }
     for (int i = 0; i < 16 && gl::GetError() != GL_NO_ERROR; ++i) {
     }
     gl::GenFramebuffers(1, &viewFbo_);
-    gl::GenRenderbuffers(2, viewRb_);
+    gl::GenFramebuffers(1, &viewResolveFbo_);
+    gl::GenRenderbuffers(3, viewRb_);
     gl::BindRenderbuffer(GL_RENDERBUFFER, viewRb_[0]);
     gl::RenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_RGBA8, width, height);
     gl::BindRenderbuffer(GL_RENDERBUFFER, viewRb_[1]);
     gl::RenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_DEPTH_COMPONENT24, width, height);
+    gl::BindRenderbuffer(GL_RENDERBUFFER, viewRb_[2]);
+    gl::RenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, width, height);
     gl::BindFramebuffer(GL_FRAMEBUFFER, viewFbo_);
     gl::FramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, viewRb_[0]);
     gl::FramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, viewRb_[1]);
-    const bool ok = gl::CheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE && gl::GetError() == GL_NO_ERROR;
+    bool ok = gl::CheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+    gl::BindFramebuffer(GL_FRAMEBUFFER, viewResolveFbo_);
+    gl::FramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, viewRb_[2]);
+    ok = ok && gl::CheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE && gl::GetError() == GL_NO_ERROR;
     gl::BindFramebuffer(GL_FRAMEBUFFER, 0);
     viewW_ = width;
     viewH_ = height;
     if (!ok) {
         gl::DeleteFramebuffers(1, &viewFbo_);
-        gl::DeleteRenderbuffers(2, viewRb_);
-        viewFbo_ = 0;
+        gl::DeleteFramebuffers(1, &viewResolveFbo_);
+        gl::DeleteRenderbuffers(3, viewRb_);
+        viewFbo_ = viewResolveFbo_ = 0;
         viewSamples_ = 0;
         viewFailed_ = samples;
         return false;
@@ -2181,6 +2192,7 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
     GLint maxSamples = 1;
     gl::GetIntegerv(GL_MAX_SAMPLES, &maxSamples);
     samples = std::clamp(samples, 1, std::max(1, int(maxSamples)));
+    if (directView_) samples = 1;
     while (samples > 1 && !viewTarget(width, height, samples)) samples /= 2;
     if (samples <= 1) {
         gl::BindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -2189,10 +2201,23 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
     }
     gl::BindFramebuffer(GL_FRAMEBUFFER, viewFbo_);
     draw(camera, width, height, settings, viewport);
-    gl::BindFramebuffer(GL_READ_FRAMEBUFFER, viewFbo_);
+    for (int i = 0; i < 16 && gl::GetError() != GL_NO_ERROR; ++i) {
+    }
+    gl::BindFramebuffer(GL_READ_FRAMEBUFFER, viewFbo_); // resolve: same format and size on both sides
+    gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, viewResolveFbo_);
+    gl::BlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    gl::BindFramebuffer(GL_READ_FRAMEBUFFER, viewResolveFbo_); // single-sample blit: may convert to the window's format
     gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
     gl::BlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    const GLenum blitError = gl::GetError();
     gl::BindFramebuffer(GL_FRAMEBUFFER, 0);
+    if (blitError != GL_NO_ERROR) { // the view never reached the window: draw this frame and later ones directly
+        directView_ = true;
+        SDL_Log("View copy to the window failed (GL error 0x%04x); drawing the view directly without antialiasing",
+                unsigned(blitError));
+        draw(camera, width, height, settings, viewport);
+        return 1;
+    }
     return samples;
 }
 

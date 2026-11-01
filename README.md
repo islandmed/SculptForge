@@ -50,30 +50,30 @@ Plug in Claude, fal.ai or Meshy, or run models entirely on your own machine.
 | Image or text → sculptable 3D model | **Built in** (free models) | No |
 | Gaussian splats, OpenUSD / USDZ | **Built in** | No |
 | AI agents (MCP), headless scripting | **Built in** | ZScript |
-| Masking, polygroups, visibility (Ctrl / Ctrl+Shift, lasso or rectangle), polypaint, MatCaps | **Yes** | Yes |
-| Polypaint layers with blend modes (Multiply, Overlay, Screen...) | **Yes** (new in 0.4) | Opacity only |
+| Masking, face groups, visibility (Ctrl / Ctrl+Shift, lasso or rectangle), vertex paint, Lit Spheres | **Yes** | Yes |
+| Vertex Paint layers with blend modes (Multiply, Overlay, Screen...) | **Yes** (new in 0.4) | Opacity only |
 | Texture painting on UVs (1K-8K, same paint layers), automatic UV unwrap | **Yes** (new in 0.5) | Polypaint, converted to a texture |
-| Automatic quad retopology (ZRemesher-style) and ProjectAll detail transfer | **Yes** (new in 0.5) | Yes |
+| Automatic quad retopology (ZRemesher-style) and Project All detail transfer | **Yes** (new in 0.5) | Yes |
 | Quads kept from import, shown and exported as quads | **Yes** (new in 0.4) | Yes |
-| SubTools (separate meshes: append, split, merge, solo, Alt+click to select) | **Yes** (new in 0.3) | Yes |
-| Gizmo 3D: move, scale, rotate and pose (masked parts, soft joints, Transpose All) | **Yes** (new in 0.5) | Yes |
-| GoZ exchange with ZBrush | **Yes** (new in 0.2; not yet tested against a live ZBrush) | Yes |
+| Parts (separate meshes: append, split, merge, solo, Alt+click to select) | **Yes** (new in 0.3) | Yes |
+| Gizmo: move, scale, rotate and pose (masked parts, soft joints, All Parts) | **Yes** (new in 0.5) | Yes |
+| Send to ZBrush (GoZ-compatible exchange) | **Yes** (new in 0.2; not yet tested against a live ZBrush) | Yes |
 | Multiresolution (subdivision levels), dynamic topology, UV editing | Not yet ([roadmap](ROADMAP.md)) | Yes |
 
-SculptForge doesn't read ZBrush's proprietary `.ZTL`/`.ZPR` files directly. Bring models over with GoZ (`.GoZ`
-files keep polygroups, mask and polypaint), as OBJ, FBX or GLB, or convert a ZTool library once with the
-[ZTool Export plug-in for ZBrush](integrations/zbrush/README.md), after which SculptForge opens the `.ZTL` files.
+SculptForge doesn't read ZBrush's proprietary `.ZTL`/`.ZPR` files directly. Bring models over with Send to ZBrush (`.GoZ`
+files keep face groups, mask and vertex paint), as OBJ, FBX or GLB, or convert a ZTool library once with the
+[SculptForge ZTL Export plug-in for ZBrush](integrations/zbrush/README.md), after which SculptForge opens the `.ZTL` files.
 
 > **Status: early release (v0.8).** The core sculpting, pipeline and AI features work and are tested on every
 > commit. Version 0.8 adds dynamic topology (Sculptris Pro style: brushes add triangles where they need them),
-> vector displacement brushes, QRemesh Guides and sculpt layers on every subdivision level; 0.7 follows ZBrush's
-> keys and gestures by default and adds a Blender bridge add-on; 0.6 halved the memory and made the view twice as
+> vector displacement brushes, Quad Remesh Guides and sculpt layers on every subdivision level; 0.7 added ZBrush-style
+> keys and gestures and a Blender bridge add-on; 0.6 halved the memory and made the view twice as
 > fast on huge meshes (see the [changelog](CHANGELOG.md)).
 
 ## Features
 
 **A ZBrush-style interface**
-- Shelves around the canvas, alphabetical palettes holding every tool, a LightBox (`,`) of thumbnails, the
+- Shelves around the canvas, alphabetical palettes holding every tool, a Library (`,`) of thumbnails, the
   brush picker (`B`, type letters to pick), hold-Ctrl help on every button, a command palette (F3) and a script
   console (`` ` ``), and a fully customizable layout with Store Config. See [docs/ui-design.md](docs/ui-design.md).
 - A built-in **user guide** (Help > User Guide, Shift+F1) with search, also on the
@@ -81,27 +81,27 @@ files keep polygroups, mask and polypaint), as OBJ, FBX or GLB, or convert a ZTo
   chapter. Source: [docs/guide](docs/guide/index.md).
 
 **Sculpting**
-- Standard, Clay, Smooth, Move, Inflate, Crease, Flatten, Pinch, Dam Standard, Clay Buildup, Snake Hook, Trim,
+- Standard, Clay, Smooth, Move, Inflate, Crease, Flatten, Pinch, Sharp Crease, Clay Block, Tendril, Trim,
   Layer and Nudge brushes; X/Y/Z symmetry; tablet pressure; ZBrush-style modifiers and navigation.
 - Stroke types (dots, drag-rect, spray, lazy mouse) and brush alphas (built-in or any grayscale image).
-- **Masking** (Ctrl to paint, invert, blur, sharpen, grow/shrink, mask by cavity or polygroup) that every brush
+- **Masking** (Ctrl to paint, invert, blur, sharpen, grow/shrink, mask by cavity or face group) that every brush
   respects.
-- **Polygroups and visibility** the ZBrush way: auto groups, Ctrl+Shift isolate / hide, rectangle hide, delete
+- **Face Groups and visibility** with ZBrush-style gestures: auto groups, Ctrl+Shift isolate / hide, rectangle hide, delete
   hidden.
-- **SubTools**: keep the body, eyes, teeth and armour as separate meshes, each with its own undo history. You can
-  append a sphere, cube, plane or model file, show/hide, solo, reorder, duplicate, merge and split (by polygroup or
-  by piece), and Alt+click a SubTool to select it. Projects, OBJ, glTF, FBX, USD and GoZ keep them as separate
+- **Parts**: keep the body, eyes, teeth and armour as separate meshes, each with its own undo history. You can
+  append a sphere, cube, plane or model file, show/hide, solo, reorder, duplicate, merge and split (by face group or
+  by piece), and Alt+click a Part to select it. Projects, OBJ, glTF, FBX, USD and GoZ-compatible files keep them as separate
   objects.
-- **Gizmo 3D** (W Move, E Scale, R Rotate): move, scale and rotate a SubTool, or only its unmasked part with a
-  soft falloff for posing a limb at its joint; Shift snapping, numeric entry, All SubTools, one undo step per drag.
-- **Polypaint** (Paint brush, RGB while sculpting, fills, cavity paint) and six MatCap materials.
+- **Gizmo** (W Move, E Scale, R Rotate): move, scale and rotate a Part, or only its unmasked part with a
+  soft falloff for posing a limb at its joint; Shift snapping, numeric entry, All Parts, one undo step per drag.
+- **Vertex Paint** (Paint brush, RGB while sculpting, fills, cavity paint) and six Lit Sphere materials.
 - **Texture painting** on UV maps: Auto UV (xatlas) unwraps any sculpt, then the Paint brush paints a 1K-8K
-  texture with the same paint layers and blend modes; polypaint and texture convert both ways, and OBJ, glTF,
-  USD, FBX and GoZ exports write the PNG next to the model.
+  texture with the same paint layers and blend modes; vertex paint and texture convert both ways, and OBJ, glTF,
+  USD, FBX and GoZ-compatible exports write the PNG next to the model.
 - **Project files** (`.sfproj`) that keep everything, with an unsaved-changes prompt, recent files and autosave.
 - Unlimited undo, Loop subdivision, **voxel remesh** (DynaMesh-style) and quadric decimation.
-- **QRemesh** quad retopology (ZRemesher-style: target count, Adaptive Size, Keep Groups, polypaint density,
-  symmetry) and **ProjectAll** to bring the sculpted detail back onto the new topology.
+- **Quad Remesh** quad retopology (ZRemesher-style: target count, Adaptive Size, Keep Groups, vertex paint density,
+  symmetry) and **Project All** to bring the sculpted detail back onto the new topology.
 - **Sculpt layers** that work as blend shapes, with live weights and playback.
 
 **Free built-in AI: Brush Lab (describe a brush, AI builds it)**
@@ -148,8 +148,8 @@ files keep polygroups, mask and polypaint), as OBJ, FBX or GLB, or convert a ZTo
   [docs/blender.md](docs/blender.md).
 
 **ZBrush interchange**
-- `.GoZ` import/export with polygroups, mask, polypaint and UVs, and a GoZ bridge (Send / Receive) on Windows and
-  macOS. Every visible SubTool goes over as its own ZBrush SubTool. See [docs/goz.md](docs/goz.md); the live bridge hasn't been tested against a running ZBrush yet.
+- `.GoZ` import/export with face groups, mask, vertex paint and UVs, and Send to ZBrush (Send / Receive) on Windows and
+  macOS. Every visible Part goes over as its own ZBrush SubTool. See [docs/goz.md](docs/goz.md); the live bridge hasn't been tested against a running ZBrush yet.
 
 **Gaussian splats**
 - Open phone captures (Polycam, Luma, Postshot, Scaniverse and others) as a sculpting reference, convert them
@@ -276,8 +276,8 @@ app: F1 for Controls, Shift+F1 for the guide).
 | Zoom | Mouse wheel, Ctrl + middle-drag, or Ctrl + left-drag background when nothing is masked |
 | Paint / erase mask | Hold **Ctrl** / **Ctrl+Alt** while stroking |
 | Invert / clear mask | Ctrl + click / Ctrl + drag on the background |
-| Isolate / hide polygroup | Ctrl+Shift + click / Ctrl+Shift+Alt + click |
-| Select a SubTool | Alt + click it |
+| Isolate / hide face group | Ctrl+Shift + click / Ctrl+Shift+Alt + click |
+| Select a Part | Alt + click it |
 | Show all | Ctrl+Shift + click on the background |
 | Hide outside / inside a rectangle | Ctrl+Shift + drag / Ctrl+Shift+Alt + drag |
 | Pen pressure | Strength (and optionally size); curve and test area in **Preferences > Tablet** |
@@ -287,7 +287,7 @@ app: F1 for Controls, Shift+F1 for the guide).
 | Select brush | `1`–`9`, `0` |
 | Paint brush / pick colour | `P` / `C` |
 | Toggle X symmetry / wireframe | `X` / `Shift+F` |
-| Gizmo 3D: Move / Scale / Rotate / back to Draw | `W` / `E` / `R` / `Q` (Alt+drag: the gizmo only; Shift snaps) |
+| Gizmo: Move / Scale / Rotate / back to Draw | `W` / `E` / `R` / `Q` (Alt+drag: the gizmo only; Shift snaps) |
 | Frame model | `F` |
 | Subdivide | Ctrl+D |
 | Undo / Redo | Ctrl+Z / Ctrl+Shift+Z |
@@ -337,6 +337,6 @@ licences are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 <sub>SculptForge is an independent project and is not affiliated with or endorsed by Maxon, Epic Games,
 Autodesk, Pixar, the Khronos Group, Hugging Face, Tencent, Microsoft, Stability AI, Anthropic, fal or Meshy.
-ZBrush is a trademark of Maxon. Unreal and Unreal Engine are trademarks of Epic Games, Inc. FBX is a trademark
+ZBrush, GoZ, MatCap and other ZBrush feature names are trademarks of Maxon Computer GmbH. Unreal and Unreal Engine are trademarks of Epic Games, Inc. FBX is a trademark
 of Autodesk, Inc. glTF is a trademark of the Khronos Group Inc. Other names are trademarks of their respective
 owners.</sub>

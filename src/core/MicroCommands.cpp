@@ -71,7 +71,7 @@ bool microDivideUndoable(Document& doc, int level, std::string& message) {
 
 bool microDeleteUndoable(Document& doc, std::string& message) {
     if (!doc.mesh.micro) {
-        message = "This SubTool has no micro level";
+        message = "This Part has no micro level";
         return false;
     }
     UndoRecord r;
@@ -111,7 +111,7 @@ void registerMicroCommands(CommandRegistry& reg) {
                  return {ok, msg};
              }});
 
-    reg.add({"micro_info", "The micro level of the active SubTool: level, micro triangles, memory, displacement range.", {},
+    reg.add({"micro_info", "The micro level of the active Part: level, micro triangles, memory, displacement range.", {},
              [](Document& doc, const Args&) -> CommandResult {
                  if (!doc.mesh.micro) return {true, "No micro level (micro_divide adds one above the highest subdivision level)"};
                  const MicroMesh& mm = *doc.mesh.micro;
@@ -123,12 +123,12 @@ void registerMicroCommands(CommandRegistry& reg) {
 
     reg.add({"micro_bake",
              "Bake down: turn the micro level into a regular mesh (for export or tools that need real geometry). By "
-             "default a new SubTool next to this one; replace=true replaces this SubTool's mesh (undoable). Its UVs, "
-             "polygroups, hidden faces and the micro mask carry over.",
+             "default a new Part next to this one; replace=true replaces this Part's mesh (undoable). Its UVs, "
+             "face groups, hidden faces and the micro mask carry over.",
              {{"level", T::Number, "Micro level to bake (default: the full micro level; lower = 1/4 the triangles each).", false},
-              {"replace", T::Bool, "Replace this SubTool's mesh instead of adding a SubTool (default false).", false}},
+              {"replace", T::Bool, "Replace this Part's mesh instead of adding a Part (default false).", false}},
              [](Document& doc, const Args& a) -> CommandResult {
-                 if (!doc.mesh.micro) return {false, "This SubTool has no micro level"};
+                 if (!doc.mesh.micro) return {false, "This Part has no micro level"};
                  const int level = int(argNumber(a, "level", doc.mesh.micro->level));
                  Mesh baked;
                  std::string err;
@@ -136,11 +136,11 @@ void registerMicroCommands(CommandRegistry& reg) {
                  const std::string tris = millions(double(baked.triangleCount()));
                  if (argBool(a, "replace", false)) {
                      doc.replaceMeshUndoable(std::move(baked), "Bake micro");
-                     return {true, "Baked the micro level into this SubTool: " + tris + " triangles"};
+                     return {true, "Baked the micro level into this Part: " + tris + " triangles"};
                  }
                  const std::string name = doc.uniqueSubtoolName(doc.activeSubtoolInfo().name + " baked");
                  doc.addSubtool(std::move(baked), name, false, doc.activeSubtool + 1);
-                 return {true, "Baked the micro level into SubTool \"" + name + "\": " + tris + " triangles"};
+                 return {true, "Baked the micro level into Part \"" + name + "\": " + tris + " triangles"};
              }});
 
     reg.add({"micro_export_displacement",
@@ -174,7 +174,7 @@ void registerMicroCommands(CommandRegistry& reg) {
               {"scale", T::Number, "Noise features across the model (default 120).", false},
               {"seed", T::Number, "Random seed (default 1).", false}},
              [](Document& doc, const Args& a) -> CommandResult {
-                 if (!doc.mesh.micro) return {false, "This SubTool has no micro level"};
+                 if (!doc.mesh.micro) return {false, "This Part has no micro level"};
                  const float diag = glm::length(doc.mesh.bounds().extent());
                  const float amp = float(argNumber(a, "amplitude", 0.0015)) * diag;
                  const float freq = float(argNumber(a, "scale", 120)) / std::max(diag, 1e-6f);

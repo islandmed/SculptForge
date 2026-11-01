@@ -45,6 +45,7 @@
 //   run COMMANDS             sculptforge-cli commands, e.g. run new_sphere subdivisions=4 ($SCRIPT_DIR: the script's folder)
 //   drop FILE                as if FILE were dropped onto the window (relative to the script's folder)
 //   env NAME VALUE           set an environment variable; $SCRIPT_DIR is the script's folder
+//   input_style STYLE        zbrush, sculptforge (the default), blender or maya, as Preferences > Input sets it
 //   copy SRC DST             copy a file or folder (SRC relative to the script's folder, DST to the working
 //                            directory), e.g. to stage what another program would write (the Blender bridge);
 //                            $LIBRARY in DST (and in env values) is the test's LightBox library folder
@@ -118,7 +119,7 @@
 //                            2 DragDot, 3 Spray, 4 LazyMouse), vdms (VDM brush maps), vdm_files (.sfvdm in the library)
 //                            z_intensity, smooth_intensity, rgb_intensity (0-100), focal_shift (-100..100), draw_size,
 //                            size_popup_open (the S / U / I / O slider), size_knob_x / size_knob_y (its knob, pixels),
-//                            quickmenu_open, right_click_menu, space_camera, space_held, radial_open / radial_menu (-1 none) / radial_held /
+//                            quickmenu_open, right_click_menu, space_camera, space_held, air_strokes, radial_open / radial_menu (-1 none) / radial_held /
 //                            radial_hover / radial_ran (radial menus: open, the menu, held by its key or button, the
 //                            slot pointed at, the slot run last), radial_menus, radial_slots_N, lazy_mouse, input_style (0 ZBrush, 1 SculptForge, 2 Blender), turntable,
 //                            camera_ortho, mask_brush (Blender's Mask brush on), shortcut_conflicts (keys two actions
@@ -191,6 +192,7 @@
 #include "core/Matcap.h"
 #include "core/Multires.h"
 #include "core/Script.h"
+#include "core/SelectionSets.h"
 #include "core/ThreadPool.h"
 #include "core/Timeline.h"
 #include "link/HttpServer.h"
@@ -386,6 +388,9 @@ double Demo::query(const std::string& name, bool& known) const {
     if (const double v = app_.sculptableTestValue(name); !std::isnan(v)) return v;
     if (name == "qremesh_running") return app_.qremesh_ ? 1.0 : 0.0;
     if (name == "qremesh_guides") return double(app_.doc_.qremeshGuides.size());
+    if (name == "selection_sets") return m.selectionSets ? double(m.selectionSets->sets.size()) : 0.0;
+    if (name == "morph_target") return m.selectionSets && !m.selectionSets->morphTarget.empty() ? 1.0 : 0.0;
+    if (name == "morph_brush") return app_.brush_ == BrushType::Morph && app_.doc_.activeBrush < 0 ? 1.0 : 0.0;
     if (name == "qremesh_guide_loops") {
         size_t n = 0;
         for (const QRemeshGuide& g : app_.doc_.qremeshGuides) n += g.closed;
@@ -425,6 +430,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "quickmenu_open") return app_.quickMenu_.open ? 1.0 : 0.0;
     if (name == "right_click_menu") return app_.uiPrefs_.rightClickQuickMenu ? 1.0 : 0.0;
     if (name == "space_camera") return app_.uiPrefs_.spaceCamera ? 1.0 : 0.0;
+    if (name == "air_strokes") return app_.uiPrefs_.airStrokes ? 1.0 : 0.0;
     if (name == "space_held") return app_.spaceHeld_ ? 1.0 : 0.0;
     if (name == "radial_open") return app_.radial_.menu >= 0 ? 1.0 : 0.0;
     if (name == "radial_menu") return double(app_.radial_.menu); // -1: none open
@@ -909,7 +915,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         steps_.push_back([this, line, name, u, v, times](float t) {
             const int index = app_.doc_.findSubtool(name);
             if (index < 0) {
-                fail(line, "no SubTool named \"" + name + "\"");
+                fail(line, "no Part named \"" + name + "\"");
                 return true;
             }
             // The point of its on-screen bounds nearest (U, V) where it's the front SubTool and no panel covers it.
@@ -942,7 +948,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
                 }
             }
             if (!found) {
-                fail(line, "SubTool \"" + name + "\" can't be clicked (hidden, covered or off screen)");
+                fail(line, "Part \"" + name + "\" can't be clicked (hidden, covered or off screen)");
                 return true;
             }
             if (t == 0.0f) { // hover for a frame first
@@ -1341,6 +1347,16 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             r = call("POST", "/api/capture/" + capture + "/finish", "");
             if (r.status != 200) fail(line, "finish refused: " + std::to_string(r.status) + " " + r.body + r.error);
         });
+    } else if (verb == "input_style") {
+        // input_style zbrush|sculptforge|blender|maya: as Preferences > Input sets it (scripts written for one style)
+        if (!need(1)) return false;
+        const std::string n = w[1];
+        const int style = n == "zbrush" ? 0 : n == "sculptforge" ? 1 : n == "blender" ? 2 : n == "maya" ? 3 : -1;
+        if (style < 0) {
+            fail(line, "input_style takes zbrush, sculptforge, blender or maya");
+            return false;
+        }
+        run([this, style] { app_.setInputStyle(style); });
     } else if (verb == "env") {
         if (!need(2)) return false;
         std::string value = restOf(lineText_, 2);
