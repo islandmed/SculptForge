@@ -8,6 +8,9 @@ symmetry, mask and paint layers with blend modes.
 
 ![Texture painting: a sharp texture stroke above a soft polypaint stroke, with the UV view in Tool > Texture Map](images/texture-painting.jpg)
 
+> The texture can also carry roughness, metallic, normal, height, AO, emission and opacity, painted in the same
+> strokes: see [Material painting (PBR)](pbr-painting.md).
+
 ## Start in one click
 
 Press <kbd>P</kbd> for the Paint brush (or turn on **Rgb**). While the SubTool has no texture, **New Texture**

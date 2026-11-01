@@ -7,6 +7,7 @@
 // what a 5-channel dab costs next to a base-colour dab.
 #include "TestHarness.h"
 
+#include "core/Benchmark.h"
 #include "core/Commands.h"
 #include "core/Primitives.h"
 #include "core/Texture.h"
@@ -17,6 +18,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 
 using namespace sf;
 
@@ -483,4 +485,108 @@ TEST(material_dab_cost_against_base_colour_dab) {
     }
     CHECK(ms[0] > 0 && ms[1] > 0);
     if (std::getenv("SF_BENCH_LIMITS")) CHECK(ms[1] <= 2.5 * ms[0]);
+}
+
+TEST(material_dense_mesh_benchmark) {
+    // Dense meshes (SF_BENCH_DENSE=1; minutes and several GB): 4K and 8K textures on a 330k, a 5.2M and a 21M
+    // triangle sphere with UVs; per size the base-colour dab and the 5-channel dab (small and big brush, X
+    // symmetry), export_maps with the unreal preset, and the memory of 5 channels on Base plus 3 layers.
+    if (!std::getenv("SF_BENCH_DENSE")) {
+        std::printf("  (set SF_BENCH_DENSE=1 to run the dense-mesh material benchmark)\n");
+        return;
+    }
+    const uint32_t five = channelBit(Channel::BaseColor) | channelBit(Channel::Roughness) | channelBit(Channel::Metallic) |
+                          channelBit(Channel::Height) | channelBit(Channel::AO);
+    auto now = [] { return std::chrono::steady_clock::now(); };
+    auto ms = [](auto a, auto b) { return std::chrono::duration<double, std::milli>(b - a).count(); };
+    std::printf("  tris / tex / radius: colour dab ms, 5-channel dab ms (ratio)\n");
+    for (int level : {7, 9, 10}) {
+        const auto tb = now();
+        // One mesh per size, shared by every measurement (a 21M copy would cost gigabytes).
+        Document doc;
+        {
+            Mesh made = makeIcosphere(level);
+            sphericalUvs(made);
+            doc.setMesh(std::move(made));
+        }
+        doc.syncBvh();
+        Mesh& base = doc.mesh;
+        const BVH& bvh = doc.bvh;
+        std::printf("  %zu triangles (built in %.1f s, RSS %.2f GB)\n", base.triangleCount(), ms(tb, now()) / 1000.0,
+                    double(residentBytes()) / 1e9);
+        for (int size : {4096, 8192}) {
+            for (float radius : {0.05f, 0.35f}) {
+                double t[2] = {0, 0};
+                for (int pass = 0; pass < 2; ++pass) {
+                    Mesh& m = base;
+                    m.texture = makeTexture(size, size);
+                    m.paintToTexture = true;
+                    BrushMaterial mat = rustyMetal();
+                    mat.channels = pass ? five : channelBit(Channel::BaseColor);
+                    if (pass)
+                        for (Channel c : {Channel::Roughness, Channel::Metallic, Channel::Height, Channel::AO}) setChannelEnabled(*m.texture, c, true);
+                    TexturePainter painter;
+                    CHECK(painter.begin(m, mat.channels));
+                    DabParams p = dab(glm::vec3(0, 0, 1), radius, 0.5f);
+                    p.viewDir = glm::vec3(0, 0, -1);
+                    painter.dab(m, bvh, p, mat, Symmetry{true, false, false}); // warm-up (first touch of the tiles)
+                    for (int i = 0; i < 10; ++i) {
+                        p.center = glm::normalize(glm::vec3(-0.15f + 0.03f * float(i), 0.2f, 1.0f));
+                        const auto t0 = now();
+                        painter.dab(m, bvh, p, mat, Symmetry{true, false, false});
+                        t[pass] += ms(t0, now());
+                    }
+                    UndoRecord rec;
+                    painter.end(rec);
+                    t[pass] /= 10.0;
+                }
+                std::printf("    %5.1fM / %dK / %.2f: %7.2f ms, %7.2f ms (%.2fx)\n", double(base.triangleCount()) / 1e6, size / 1024,
+                            radius, t[0], t[1], t[1] / t[0]);
+            }
+            // Memory: 5 channels, Base plus 3 layers, each with a big stroke on every channel; then one layer painted
+            // everywhere (its tiles all dense), and export_maps of the result.
+            doc.mesh.texture.reset();
+            const size_t rss0 = residentBytes();
+            doc.mesh.texture = makeTexture(size, size);
+            doc.mesh.paintToTexture = true;
+            for (Channel c : {Channel::Roughness, Channel::Metallic, Channel::Height, Channel::AO}) setChannelEnabled(*doc.mesh.texture, c, true);
+            for (int layer = -1; layer < 3; ++layer) {
+                if (layer >= 0) addTextureLayer(*doc.mesh.texture, "Layer " + std::to_string(layer + 1));
+                TexturePainter painter;
+                BrushMaterial mat = rustyMetal();
+                mat.channels = five;
+                CHECK(painter.begin(doc.mesh, five));
+                DabParams p = dab(glm::vec3(0, 0, 1), 0.35f, 0.5f);
+                p.viewDir = glm::vec3(0, 0, -1);
+                for (int i = 0; i < 8; ++i) {
+                    p.center = glm::normalize(glm::vec3(-0.3f + 0.08f * float(i), 0.1f * float(layer), 1.0f));
+                    painter.dab(doc.mesh, doc.bvh, p, mat, Symmetry{true, false, false});
+                }
+                UndoRecord rec;
+                painter.end(rec);
+            }
+            const PaintTexture& tex = *doc.mesh.texture;
+            const size_t strokes = channelBytes(tex), all = tex.bytes(), rss1 = residentBytes();
+            // One layer fully painted: every tile of its four channels dense.
+            PaintTexture& wt = *doc.mesh.texture;
+            for (int c = 1; c < kChannelCount; ++c) {
+                TileImage& img = wt.layers[0].channels[size_t(c)].image;
+                if (!img.valid()) continue;
+                for (size_t ti = 0; ti < img.tileCount(); ++ti) img.writableTile(ti);
+            }
+            const size_t full = channelBytes(wt), rss2 = residentBytes();
+            const auto e0 = now();
+            CommandRegistry reg;
+            const auto dir = std::filesystem::temp_directory_path() / "sf_dense_export_maps";
+            const CommandResult r = reg.execute(doc, "export_maps", {{"preset", std::string("unreal")}, {"folder", dir.string()}});
+            const double exportMs = ms(e0, now());
+            CHECK(r.ok);
+            std::filesystem::remove_all(dir);
+            doc.mesh.texture.reset();
+            std::printf("    %dK, 5 channels x (Base + 3 layers), strokes: channels %.0f MB, texture %.0f MB, RSS +%.0f MB; "
+                        "one layer fully painted: channels %.0f MB, RSS +%.0f MB; export_maps unreal %.0f ms\n",
+                        size / 1024, double(strokes) / 1e6, double(all) / 1e6, double(rss1 - std::min(rss0, rss1)) / 1e6,
+                        double(full) / 1e6, double(rss2 - std::min(rss0, rss2)) / 1e6, exportMs);
+        }
+    }
 }
