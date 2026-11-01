@@ -136,6 +136,13 @@ void App::registerInputActions() {
         "does too). A right drag still turns, pans or zooms the view. A pen button set to Right click works the same.",
         [this] { uiPrefs_.rightClickQuickMenu = !uiPrefs_.rightClickQuickMenu; },
         [this] { return uiPrefs_.rightClickQuickMenu; });
+    add("input.surface_cursor", "Cursor follows surface", nullptr, "Preferences > Input", "",
+        "The brush ring lies on the model under the pointer, turned to the surface and pressed onto its bumps, at "
+        "the brush's real size there (as in SculptGL), with a short line along the surface's direction. With "
+        "symmetry on, the mirrored ring shows too. Off the model, and with this off, the ring is a flat circle on "
+        "the screen.",
+        [this] { uiPrefs_.cursorFollowsSurface = !uiPrefs_.cursorFollowsSurface; },
+        [this] { return uiPrefs_.cursorFollowsSurface; });
     add("input.import_blender", "Import Blender keymap...", ICON_LC_FILE_INPUT, "Preferences > Input", "",
         "Use the keys from a keymap you exported in Blender (Preferences > Keymap > Export, a .py file). Switches "
         "to the Blender style, then takes the navigation and sculpt keys SculptForge has an equivalent for. The "
@@ -397,6 +404,10 @@ void App::drawInputSection() {
     if (ui::Checkbox("Right click opens the QuickMenu##input.right_click_menu", &rightClickMenu))
         uiPrefs_.rightClickQuickMenu = rightClickMenu;
     ui::HelpAction(*this, "input.right_click_menu");
+    bool surfaceCursor = uiPrefs_.cursorFollowsSurface;
+    if (ui::Checkbox("Cursor follows surface##input.surface_cursor", &surfaceCursor))
+        uiPrefs_.cursorFollowsSurface = surfaceCursor;
+    ui::HelpAction(*this, "input.surface_cursor");
     ui::ActionButton(*this, "input.import_blender", ImVec2(-FLT_MIN, 0), ui::Look::IconLabel);
     ImGui::TextDisabled("Rotation");
     ImGui::SameLine();

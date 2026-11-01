@@ -7,6 +7,9 @@
 // "Brush Lab/Save settings" for the one in that window).
 //
 //   click LABEL / double_click LABEL / right_click LABEL / hover LABEL
+//   hover_model U V [S]      glide the mouse (no button) to a point on the model (fractions of its on-screen bounds,
+//                            snapped onto the sculpt like stroke), e.g. to show the brush cursor
+//   hover_window X Y [S]     the same to window fractions (anywhere, e.g. the background)
 //   type LABEL TEXT          click a text field and type into it
 //   key COMBO                e.g. enter, escape, ctrl+z, ctrl+shift+z, 3, comma, backtick, tab, f3, space, minus,
 //                            home, numpad1, ctrl+numpad7, numpad., numpadplus
@@ -70,6 +73,8 @@
 //                            moved_out (summed movement along the snapshot's normals: > 0 out, < 0 in),
 //                            pen_pressure (raw), brush_pressure (after the curve; 1 for the mouse),
 //                            stroking (1 while a stroke is open), cursor_x / cursor_y (the brush cursor, pixels),
+//                            surface_cursor (1 when the brush ring last drawn lay on the surface, #25),
+//                            cursor_follows_surface (Preferences > Input, 1 on),
 //                            camera_yaw / camera_pitch / camera_roll (degrees),
 //                            camera_up (the view's up vector . world Y), camera_aligned (1 when looking along a world
 //                            axis), camera_distance, camera_pan (target offset);
@@ -579,6 +584,8 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "stroking") return app_.drag_ == App::Drag::Stroke ? 1.0 : 0.0;
     if (name == "cursor_x") return app_.mouseX_;
     if (name == "cursor_y") return app_.mouseY_;
+    if (name == "surface_cursor") return app_.surfaceCursorShown_ ? 1.0 : 0.0;
+    if (name == "cursor_follows_surface") return app_.uiPrefs_.cursorFollowsSurface ? 1.0 : 0.0;
     if (name == "camera_yaw") return glm::degrees(app_.camera_.yaw);
     if (name == "camera_pitch") return glm::degrees(app_.camera_.pitch);
     if (name == "camera_roll") return glm::degrees(app_.camera_.roll);
@@ -754,6 +761,24 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return t > 3.0f;
         });
         wait(0.6f); // tooltips appear after a short delay
+    } else if (verb == "hover_model" || verb == "hover_window") {
+        if (!need(2)) return false;
+        const float u = num(1, 0.5f), v = num(2, 0.5f), seconds = num(3, 0.3f);
+        const bool window = verb == "hover_window";
+        auto from = std::make_shared<ImVec2>();
+        auto to = std::make_shared<ImVec2>();
+        steps_.push_back([this, from, to, u, v, seconds, window](float t) {
+            if (t == 0.0f) {
+                *from = mouse_;
+                int ww = 0, wh = 0;
+                SDL_GetWindowSize(app_.window_, &ww, &wh);
+                *to = window ? ImVec2(u * float(ww), v * float(wh)) : onModel(u, v);
+            }
+            const float k = std::min(t / seconds, 1.0f);
+            mouseMotion(from->x + (to->x - from->x) * k, from->y + (to->y - from->y) * k);
+            return t >= seconds;
+        });
+        wait(0.05f);
     } else if (verb == "type") {
         if (!need(2)) return false;
         testClick(line, w[1], SDL_BUTTON_LEFT, false);

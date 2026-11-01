@@ -2615,6 +2615,64 @@ void App::drawPalette_Splats() {
     drawSculptableSection(); // Make sculptable (PanelSculptable.cpp)
 }
 
+bool App::drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col) {
+    // Only what brushes work on: the active, visible SubTool with an up-to-date BVH (a stale one, after a
+    // whole-mesh change, is rebuilt at the next press; until then the flat ring shows), not an LOD preview.
+    if (previewLod_ >= 0 || doc_.bvhDirty) return false;
+    RayHit hit;
+    if (!pick(mouseX_, mouseY_, hit)) return false; // one ray, as a press would cast
+    // The world radius a dab here gets (App::firstDab / the brushes: Draw Size times world size of a pixel).
+    const float radius = radiusPx * camera_.worldPerPixel(hit.position, canvasHeight());
+    if (!(radius > 0.0f) || !std::isfinite(radius)) return false;
+    // A steady normal (8 rays), the ring pressed onto the surface (48) and the Focal Shift ring (32): a few dozen
+    // BVH ray casts, only on frames that are drawn anyway, never a pass over the mesh.
+    const glm::vec3 n = surfaceCursorNormal(doc_.mesh, doc_.bvh, hit, radius);
+    surfaceCursorRing(doc_.mesh, doc_.bvh, hit.position, n, radius, 48, cursorRing_);
+    const float focal = focalRingFraction(focalShift_);
+    surfaceCursorRing(doc_.mesh, doc_.bvh, hit.position, n, radius * focal, 32, cursorInner_);
+
+    const glm::vec3 eye = camera_.position(), forward = camera_.forward();
+    const bool ortho = camera_.ortho;
+    auto facing = [&](const glm::vec3& p, const glm::vec3& pn) {
+        return glm::dot(pn, ortho ? -forward : eye - p) > 0.0f;
+    };
+    const ImU32 inner = IM_COL32(255, 255, 255, 90);
+    // Closed polyline through the points facing the camera; a point on the far side of a curve breaks the line.
+    auto drawRing = [&](const std::vector<SurfaceRingPoint>& ring, const glm::vec3& m, ImU32 colour, float width) {
+        const size_t count = std::min<size_t>(ring.size(), 64);
+        ImVec2 sp[64];
+        bool ok[64];
+        for (size_t i = 0; i < count; ++i)
+            ok[i] = facing(ring[i].position * m, ring[i].normal * m) && gizmoProject(ring[i].position * m, sp[i]);
+        for (size_t i = 0; i < count; ++i) {
+            const size_t j = (i + 1) % count;
+            if (ok[i] && ok[j]) dl->AddLine(sp[i], sp[j], colour, width);
+        }
+    };
+    auto fade = [](ImU32 colour, float k) {
+        const ImU32 a = ImU32(float((colour >> IM_COL32_A_SHIFT) & 0xFF) * k);
+        return (colour & ~IM_COL32_A_MASK) | (a << IM_COL32_A_SHIFT);
+    };
+    // The mirrored rings first (fainter), as the brush mirrors its dabs (Sculptor::mirrors; the first is this one).
+    const std::vector<glm::vec3> mirrors = Sculptor::mirrors(symmetry_);
+    for (size_t k = mirrors.size(); k-- > 0;) {
+        const glm::vec3& m = mirrors[k];
+        const bool self = k == 0;
+        // A mirror that lands on the cursor's own ring (hovering on the plane) adds nothing.
+        if (!self && glm::length(hit.position * m - hit.position) < radius * 0.05f) continue;
+        if (!self && !facing(hit.position * m, n * m)) continue;
+        drawRing(cursorRing_, m, self ? col : fade(col, 0.45f), self ? 2.0f : 1.25f);
+        drawRing(cursorInner_, m, self ? inner : fade(inner, 0.6f), 1.0f);
+    }
+    // The surface's direction: a short line out of the centre (with a dot where the brush touches).
+    ImVec2 c0, c1;
+    if (gizmoProject(hit.position, c0) && gizmoProject(hit.position + n * (radius * 0.4f), c1)) {
+        dl->AddLine(c0, c1, fade(col, 0.85f), 1.5f);
+        dl->AddCircleFilled(c0, 2.0f * uiScale_, col);
+    }
+    return true;
+}
+
 void App::drawBrushCursor() {
     ImDrawList* dl = ImGui::GetForegroundDrawList();
     const CanvasRect canvas = canvasRect();
@@ -2645,9 +2703,12 @@ void App::drawBrushCursor() {
         const glm::vec3 pc = linearToSrgb(inverted ? glm::vec3(1.0f) : doc_.paintColor);
         col = ImGui::GetColorU32(ImVec4(pc.x, pc.y, pc.z, 0.9f));
     }
-    dl->AddCircle(c, r, col, 64, 1.5f);
-    // The inner ring is Focal Shift, as in ZBrush: where the falloff drops to half.
-    dl->AddCircle(c, r * focalRingFraction(focalShift_), IM_COL32(255, 255, 255, 90), 48, 1.0f);
+    surfaceCursorShown_ = uiPrefs_.cursorFollowsSurface && drawSurfaceCursor(dl, r, col);
+    if (!surfaceCursorShown_) {
+        dl->AddCircle(c, r, col, 64, 1.5f);
+        // The inner ring is Focal Shift, as in ZBrush: where the falloff drops to half.
+        dl->AddCircle(c, r * focalRingFraction(focalShift_), IM_COL32(255, 255, 255, 90), 48, 1.0f);
+    }
     if (strokeType_ == StrokeType::LazyMouse && drag_ == Drag::Stroke) {
         // The string from the cursor to the lagging brush point.
         const ImVec2 lp(lazyMouse_.point.x, lazyMouse_.point.y);

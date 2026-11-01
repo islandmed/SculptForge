@@ -25,6 +25,7 @@
 #include "core/QRemesh.h"
 #include "core/Stroke.h"
 #include "core/StrokePath.h"
+#include "core/SurfaceCursor.h"
 #include "core/SpaceMouse.h"
 #include "core/Tablet.h"
 #include "core/UpdateCheck.h"
@@ -181,6 +182,11 @@ private:
     void pollBrushRequest();
     const BrushRecipe* activeRecipe() const;
     void drawBrushCursor();
+    // The brush ring lying on the surface under the pointer (#25, Preferences > Input > Cursor follows surface);
+    // false when the pointer is off the model (the flat screen ring is drawn instead).
+    bool drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col);
+    std::vector<SurfaceRingPoint> cursorRing_, cursorInner_; // scratch, kept to avoid allocating per frame
+    bool surfaceCursorShown_ = false; // the last cursor drawn lay on the surface (UI tests: surface_cursor)
     void updateTitle();
 
     int runRecording(); // also runs UI tests (options_.uiTest)
