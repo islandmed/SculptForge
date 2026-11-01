@@ -66,7 +66,7 @@ versions open them). Untouched areas take almost no room in the file.
 
 ## Very large levels and laptops
 
-A micro level larger than the resident cache your hardware profile allows (Preferences > Performance; a quarter of
+A micro level larger than the resident cache your hardware profile allows (a quarter of
 the memory when there is no profile yet) is kept **out of core**: in a file in
 the cache folder (`~/.cache/sculptforge`), of which only the parts you sculpt or look at stay in memory. A
 billion micro triangles then fit on a 16 GB machine. The status line under the slider says when a level is out
