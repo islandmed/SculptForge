@@ -6,6 +6,12 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.9.6] - 2026-10-31
+
+The same evening as 0.9.5, the next batch from your reports and from askNK's review: Extract and Mirror And Weld,
+a flat background, a Flatpak, strokes that keep their shape on dense meshes (built on a patch by @bribblej-web),
+and a fix for Divide crashing on models from Blender, with a log file so a crash is never silent again.
+
 ### Added
 - Extract (Tool > SubTool > Extract), as in ZBrush: the masked, visible part of a SubTool becomes a shell with Thick (a share of the SubTool's size; negative grows inward, 0 makes a single-sided surface), E Smt (smooths the stepped edge) and Double (both ways). Extract shows a preview below the source that follows the settings; Accept keeps it as a new SubTool with outer, inner and rim polygroups and the source's polypaint, as one undo step (undo removes the SubTool, redo puts it back). TCorne and TBorder make the rim triangles instead of quads at sharp corners or all along it. An unaccepted preview goes when the source changes and is never saved. Commands: extract, extract_accept, extract_cancel.
 - Mirror And Weld (Tool > Geometry > Modify Topology, X / Y / Z): keeps the + side of the plane through the origin, cuts polygons crossing it, mirrors the half and welds the seam into one watertight mesh, keeping polygroups, polypaint, mask, UVs, quads and sculpt layers (`mirror_and_weld`, with `side=negative` for the other half). Undoable.
