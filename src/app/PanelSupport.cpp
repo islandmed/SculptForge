@@ -59,6 +59,7 @@ void App::drawSupportersSection() {
         }
         ImGui::EndChild();
     }
+    ImGui::TextWrapped("%s", kInsiderNote);
     if (ImGui::Button("Support SculptForge##about")) openSupportPage();
 }
 
@@ -80,7 +81,7 @@ void App::drawSupportUi() {
             ImGui::Spacing();
             ImGui::Separator();
             ImGui::Spacing();
-            ImGui::TextWrapped("SculptForge is free. If it helps your work, consider supporting it.");
+            ImGui::TextWrapped("SculptForge is free. If it helps your work, consider supporting it. %s", kInsiderNote);
             if (ImGui::Button("Support SculptForge##welcome")) openSupportPage();
             ImGui::SameLine();
             if (ImGui::Button("Close##welcome")) showWelcome_ = false;

@@ -21,6 +21,11 @@ chapter opens by itself the first time you start a new version; you can always f
   Ledge), with thumbnails in the LightBox (#43). See [Sculpting](sculpting.md).
 - **SelectRect and SelectLasso** follow X / Y / Z symmetry, like the mask versions (#51).
 
+### Become an Insider
+
+SculptForge stays free for everyone. Insiders will get each release about two weeks early; early builds start with
+upcoming releases. **Help > Support SculptForge** opens the page to join.
+
 ## Version 0.10.3
 
 ### From your requests on GitHub
@@ -40,7 +45,7 @@ chapter opens by itself the first time you start a new version; you can always f
 ### Support SculptForge
 
 SculptForge stays free for everyone. **Help > Support SculptForge** opens the page where you can become a
-member: Insiders get new releases about two weeks early.
+member. Insiders will get each release about two weeks early; early builds start with upcoming releases.
 
 ## Version 0.10.2
 

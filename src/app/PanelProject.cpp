@@ -6,6 +6,7 @@
 // Recent and autosave with crash recovery. Prompts only appear in interactive
 // sessions; --render, --record and demos run straight through.
 #include "app/App.h"
+#include "app/Support.h"
 #include "app/CrashLog.h"
 #include "core/SplatCapture.h"
 #include "app/Ui.h"
@@ -615,6 +616,7 @@ void App::drawUpdateBanner() {
         ImGui::SameLine();
         ImGui::TextDisabled("(you have %s)", SCULPTFORGE_VERSION);
         for (const auto& h : u.highlights) ImGui::BulletText("%s", h.c_str());
+        ImGui::TextDisabled("%s", kInsiderNote); // memberships (Support.h): honest about what's not running yet
         if (guide_.bodyFont()) ImGui::PopFont();
         ImGui::Spacing();
         bool close = false;
@@ -624,6 +626,8 @@ void App::drawUpdateBanner() {
             SDL_OpenURL(u.downloadUrl.c_str());
             close = true;
         }
+        ImGui::SameLine();
+        if (ImGui::Button("Become an Insider")) openSupportPage();
         ImGui::SameLine();
         if (ImGui::Button("Later")) close = true;
         ImGui::SameLine();

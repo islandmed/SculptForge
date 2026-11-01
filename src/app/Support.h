@@ -17,6 +17,9 @@
 namespace sf {
 
 inline constexpr const char* kSupportUrl = "https://sculptforge.app/donate.html";
+// What Insider members get, worded for while early builds aren't running yet (Tony, 2026-11-01).
+inline constexpr const char* kInsiderNote =
+    "Insiders will get each release about two weeks early; early builds start with upcoming releases.";
 
 inline constexpr size_t kSupporterNameMax = 40;   // characters (code points) per name; longer ones are cut
 inline constexpr size_t kSupportersMax = 2000;    // names kept
