@@ -102,13 +102,32 @@ al. 2013), in its own implementation:
 With **Symmetry** one half is remeshed with the mirror plane as a feature line and mirrored, so the field and
 the result are exactly symmetric. The result is the same every time for the same settings.
 
-Compared with the legacy method on the same models and targets (M1 Pro, 10 cores), QRemesh 2 has a quarter to a
-tenth of the poles and quad corners closer to square at the same distance to the sculpt:
+![The lion scan at 5,000 quads. Left: the legacy method, 1,028 poles. Right: QRemesh 2, 199 poles, with loops along the mane and round the muzzle and a clean box on the base](images/qremesh2-compare.jpg)
 
-BENCHTABLE
+Compared with the legacy method on the same models and targets, QRemesh 2 has a quarter to a fiftieth of the
+poles at the same distance to the sculpt (poles, then the mean angle of quad corners off 90 degrees, then the mean
+distance in % of the model's size; legacy first):
 
-A 1.3-million-triangle sculpt takes about 4 seconds to 5,000 quads; dense sculpts are first decimated in
-parallel to a working resolution, so 21 million triangles take DENSE21.
+| Model | Target | Poles | Corners off square | Distance |
+|---|---|---|---|---|
+| Lion scan (47k triangles) | 2,000 | 433 to 116 | 22.7° to 7.8° | 0.295% to 0.290% |
+| | 5,000 | 1,028 to 199 | 18.2° to 7.9° | 0.125% to 0.120% |
+| | 10,000 | 1,665 to 398 | 14.5° to 8.3° | 0.059% to 0.060% |
+| ICT head (28k, symmetry) | 2,000 | 269 to 128 | 12.6° to 8.1° | 0.112% to 0.106% |
+| | 5,000 | 511 to 186 | 8.8° to 8.4° | 0.040% to 0.044% |
+| | 10,000 | 727 to 248 | 6.6° to 7.9° | 0.016% to 0.019% |
+| Creature from a sphere (82k, symmetry) | 2,000 | 96 to 22 | 4.6° to 8.5° | 0.035% to 0.037% |
+| | 10,000 | 308 to 37 | 3.4° to 6.8° | 0.007% to 0.007% |
+| Hard-surface part (3 boxes) | 2,000 | 56 to 24 | 2.0° to 0.7° | 0.082% to 0.000% |
+| | 10,000 | 24 to 28 | 0.3° to 0.7° | 0.000% to 0.000% |
+| Sculpted sphere (1.3M) | 2,000 | 84 to 8 | 4.3° to 3.9° | 0.037% to 0.035% |
+| | 10,000 | 401 to 8 | 4.3° to 5.2° | 0.008% to 0.007% |
+
+On smooth sculpts with Adaptive Size the corners are a few degrees further from square than the legacy method's:
+the grid bends to vary the quad size instead of adding poles. Set Adaptive Size to 0 for the squarest grid.
+
+A 1.3-million-triangle sculpt takes about 4 seconds to 5,000 quads on a 10-core M1 Pro; denser sculpts are first
+decimated in parallel blocks to a working resolution (DENSE21).
 
 The legacy method (**Method > Legacy**, `method=legacy`) is the Instant Meshes style field-aligned method of
 SculptForge 0.9 (Jakob, Tarini, Panozzo and Sorkine-Hornung, 2015): faster on small models but with many more

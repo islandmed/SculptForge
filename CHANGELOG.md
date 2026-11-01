@@ -17,7 +17,10 @@ All notable changes to SculptForge are listed here. The format follows
   change of density needs; symmetry mirrors the field and the result exactly; the result is deterministic.
   Loop-aware relaxation lets vertices slide along loops on ridges but not off them. Against the legacy method on
   the lion scan, the ICT head, a creature sculpted from a sphere and a hard-surface part at 2k / 5k / 10k quads:
-  BENCHSUMMARY
+  a quarter to a fiftieth of the poles at the same distance to the sculpt (lion 5k: 1,028 → 199 poles, corners
+  18.2° → 7.9° off square; ICT head 5k: 511 → 186; creature 10k: 308 → 37; a 1.3M-triangle sculpt at 10k:
+  401 → 8; boxes: one pole per corner and 0.000% distance). The full table is in the guide (Quad retopology >
+  How it works). A 1.3M-triangle sculpt takes about 4 s to 5,000 quads.
 - **Quality report** after QRemesh, in the status line, the QRemesh panel and the `qremesh` command's message:
   poles (by valence), how far quad corners are from square, and the distance to the sculpt (mean and Hausdorff).
   `quality=false` skips the measuring.
