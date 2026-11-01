@@ -25,7 +25,7 @@ wait_value environment_pending == 0
 wait 0.3
 # ORM (roughness, metallic) and the normal from Height are on the GPU; no emissive channel.
 expect_value pbr_planes == 3
-expect "Polypaint & Materials/##environment"
+expect "Vertex Paint & Materials/##environment"
 shot material-palette-pbr
 key escape
 
