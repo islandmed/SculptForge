@@ -1,0 +1,35 @@
+# Dynamic topology's Smooth remesh (from the discussions): how much Shift-smoothing changes the topology while
+# Dynamic is on. Smooth only leaves the triangles as they are; Simplify (the default, as before) merges them.
+run new_sphere subdivisions=4
+run dyntopo enabled=true detail=0
+click "Draw##palette.draw"
+expect "##dyntopo_smooth_remesh"
+expect_value smooth_remesh == 100
+hold ctrl
+hover "##dyntopo_smooth_remesh"
+expect_help "Smooth only"
+hold none
+
+# Smooth only: Shift-smoothing keeps the triangle count.
+click "Smooth only##sr0"
+expect_value smooth_remesh == 0
+click "Draw##palette.draw"
+remember triangles before
+snapshot
+hold shift
+stroke 0.3 0.5 0.7 0.5
+hold none
+expect_value moved > 0
+expect_value triangles == $before
+key ctrl+z
+
+# Simplify (the default): the same stroke merges triangles.
+click "Draw##palette.draw"
+click "Simplify##sr100"
+expect_value smooth_remesh == 100
+click "Draw##palette.draw"
+hold shift
+stroke 0.3 0.5 0.7 0.5
+hold none
+expect_value triangles < $before
+key ctrl+z

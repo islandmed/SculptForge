@@ -54,6 +54,12 @@ Json toJson(const UiPrefs& p) {
     j.set("emulateNumpad", p.emulateNumpad);
     j.set("rightClickQuickMenu", p.rightClickQuickMenu);
     j.set("spaceCamera", p.spaceCamera);
+    j.set("mayaZoomHorizontal", p.mayaZoomHorizontal);
+    j.set("invertZoom", p.invertZoom);
+    j.set("alongNormal", std::string(p.alongNormal == 1 ? "always" : p.alongNormal == 2 ? "never" : "invert_key"));
+    j.set("connectedOnly", p.connectedOnly);
+    j.set("viewFalloff", p.viewFalloff);
+    j.set("dyntopoSmoothRemesh", double(p.dyntopoSmoothRemesh));
     j.set("airStrokes", p.airStrokes);
     j.set("cursorFollowsSurface", p.cursorFollowsSurface);
     j.set("timelinePosition", std::string(p.timelineTop ? "top" : "bottom"));
@@ -97,6 +103,15 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.emulateNumpad = j["emulateNumpad"].asBool(p.emulateNumpad);
     p.rightClickQuickMenu = j["rightClickQuickMenu"].asBool(p.rightClickQuickMenu);
     p.spaceCamera = j["spaceCamera"].asBool(p.spaceCamera);
+    p.mayaZoomHorizontal = j["mayaZoomHorizontal"].asBool(p.mayaZoomHorizontal);
+    p.invertZoom = j["invertZoom"].asBool(p.invertZoom);
+    if (j["alongNormal"].isString()) {
+        const std::string a = j["alongNormal"].asString();
+        p.alongNormal = a == "always" ? 1 : a == "never" ? 2 : 0;
+    }
+    p.connectedOnly = j["connectedOnly"].asBool(p.connectedOnly);
+    p.viewFalloff = j["viewFalloff"].asBool(p.viewFalloff);
+    p.dyntopoSmoothRemesh = std::clamp(float(j["dyntopoSmoothRemesh"].asNumber(p.dyntopoSmoothRemesh)), 0.0f, 1.0f);
     p.airStrokes = j["airStrokes"].asBool(p.airStrokes);
     p.cursorFollowsSurface = j["cursorFollowsSurface"].asBool(p.cursorFollowsSurface);
     if (j["timelinePosition"].isString()) p.timelineTop = j["timelinePosition"].asString() != "bottom";
@@ -359,6 +374,30 @@ void App::initActions() {
             "An axis Mirror And Weld mirrors across (several: one after the other).");
         add(kMirrorIds[k], kNames[k], "Tool > Deformation", nullptr, [this, k] { mirrorAxes_[k] = !mirrorAxes_[k]; }, nullptr,
             nullptr, [this, k] { return mirrorAxes_[k]; }, nullptr, "An axis Mirror flips along (several: one after the other).");
+    }
+    // Whole-mesh deformations (core/Deform.h, PanelExtract.cpp), each by its amount slider.
+    {
+        static const char* const kIds[4] = {"deformation.polish", "deformation.relax", "deformation.smooth", "deformation.balloon"};
+        static const char* const kLabels[4] = {"Polish", "Relax", "Smooth", "Balloon"};
+        static const char* const kCommands[4] = {"deform_polish", "deform_relax", "deform_smooth", "deform_balloon"};
+        static const char* const kHelp[4] = {
+            "Polish the whole Part by the amount beside it: fine noise and small bumps flatten out while flat areas and "
+            "sharp edges stay. The mask holds what it covers; one undo step.",
+            "Relax the whole Part: the vertices even out their spacing along the surface without changing its shape "
+            "(stretched areas after big moves). The mask holds what it covers; one undo step.",
+            "Smooth the whole Part by the amount beside it (Smooth keeps volume: without shrinking it). The mask "
+            "holds what it covers; one undo step.",
+            "Fill the whole Part out toward a rounder volume, like a balloon (ZBrush's Inflate Balloon); a negative "
+            "amount lets the air out. The mask holds what it covers; one undo step."};
+        for (int k = 0; k < 4; ++k)
+            add(kIds[k], kLabels[k], "Tool > Deformation", nullptr,
+                [this, k] {
+                    Args a{{"amount", double(deformAmount_[k])}};
+                    if (k == 2) a["keep_volume"] = deformKeepVolume_;
+                    runCommand(kCommands[k], a);
+                },
+                nullptr, kCommands[k], nullptr, [this, k] { return doc_.mesh.vertexCount() > 0 && deformAmount_[k] != 0.0f; },
+                kHelp[k]);
     }
     add("file.new_sphere", "New Sphere", "File", "Ctrl+N", [this] { confirmDiscard([this] { runCommand("new_sphere"); }); },
         ICON_LC_FILE_PLUS, "new_sphere");
@@ -685,6 +724,7 @@ bool App::readUiConfig(const std::string& path, std::string& err) {
     applyPerformancePrefs();
     applyInputStyle();
     doc_.sculptor.dyntopo.constantDetail = uiPrefs_.dyntopoConstantDetail;
+    doc_.sculptor.dyntopo.smoothRemesh = uiPrefs_.dyntopoSmoothRemesh;
     renderSettings_.flatShading = uiPrefs_.flatShading;
     renderSettings_.gradientBackground = uiPrefs_.gradientBackground;
     renderSettings_.backgroundColor = uiPrefs_.backgroundColor;

@@ -82,6 +82,28 @@ void App::drawDeformationContents() {
     ui::HelpAction(*this, "deformation.mirror");
     ImGui::SameLine();
     ui::Segmented(*this, {"deformation.mirror_x", "deformation.mirror_y", "deformation.mirror_z"}, -1.0f);
+    // Whole-mesh deformations (core/Deform.h, from the discussions): a button and its amount on one row.
+    const float button = ImGui::CalcTextSize("Balloon").x + 2.0f * style.FramePadding.x + ImGui::GetFrameHeight();
+    const struct {
+        const char* action;
+        float* amount;
+        float lo;
+        const char* slider;
+    } rows[] = {{"deformation.polish", &deformAmount_[0], 0.0f, "##deform_polish_amount"},
+                {"deformation.relax", &deformAmount_[1], 0.0f, "##deform_relax_amount"},
+                {"deformation.smooth", &deformAmount_[2], 0.0f, "##deform_smooth_amount"},
+                {"deformation.balloon", &deformAmount_[3], -100.0f, "##deform_balloon_amount"}};
+    for (const auto& r : rows) {
+        ui::ActionButton(*this, r.action, ImVec2(button, 0));
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(-1);
+        ui::SliderInside(r.slider, r.amount, r.lo, 100.0f, "%.0f");
+    }
+    ui::Checkbox("Smooth keeps volume##deformation.smooth_volume", &deformKeepVolume_);
+    ui::HelpText("Smooth keeps volume", nullptr,
+                 "Deformation > Smooth smooths without shrinking the form (Taubin smoothing) instead of the plain "
+                 "smooth, which also shrinks it.",
+                 "Tool > Deformation");
 }
 
 } // namespace sf

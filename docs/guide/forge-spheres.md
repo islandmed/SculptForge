@@ -39,6 +39,22 @@ you added, moved or scaled.
 > **Tip:** build the structure first with few spheres (one per joint), set the proportions with Move and Scale,
 > and add joints on links only where a limb needs to bend or swell.
 
+## Pointer only
+
+Everything also works with the pointer alone, without a key held (#8):
+
+- **Drag places child**: with it on, a Draw drag on a sphere makes a new sphere half its size and moves it away
+  from its parent as you drag, so one drag places the next joint of a limb. With it off, hold <kbd>Ctrl</kbd> while
+  you drag for the same.
+- **The selected sphere**: the sphere you last clicked or added is outlined in orange. **Delete Selected** deletes
+  it and everything growing from it, **Insert Between** adds a joint halfway to the sphere it grows from, and **Set
+  as Root** makes it the root: the armature keeps its shape and links and grows from there, so the skin doesn't
+  change.
+- **Right click** a sphere (a click, not a drag: a right drag still turns the view) for a menu with **Delete
+  Sphere**, **Insert Between** and **Set as Root**.
+
+Each is one undo step, and Symmetry mirrors Delete and Insert. From a script: `zsphere_set_root index=3`.
+
 ## Preview the skin
 
 **Preview** (<kbd>A</kbd>) shows the skin over the spheres instead of the spheres themselves, so you can judge the

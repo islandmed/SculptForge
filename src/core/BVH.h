@@ -28,6 +28,10 @@ public:
     // Appends every vertex within `radius` of `center` to `out` (cleared first), in increasing index order.
     // Ignores visibility; brushes use sf::brushVertices, which filters hidden ones.
     void queryVertices(const Mesh& mesh, const glm::vec3& center, float radius, std::vector<uint32_t>& out) const;
+    // queryVertices for an infinite cylinder: every vertex within `radius` of the line through `point` along
+    // `axis` (a brush whose falloff is measured on screen reaches through the model along the view).
+    void queryVerticesCylinder(const Mesh& mesh, const glm::vec3& point, const glm::vec3& axis, float radius,
+                               std::vector<uint32_t>& out) const;
     // Appends every triangle whose bounds touch the sphere (cleared first; hidden ones included).
     void queryTriangles(const Mesh& mesh, const glm::vec3& center, float radius, std::vector<uint32_t>& out) const;
     // Calls fn(triangles of the leaf) for every leaf whose box touches the sphere (hidden triangles included);
@@ -98,6 +102,8 @@ private:
     void refitAncestors(std::span<const uint32_t> leaves); // refitLeaves for many leaves, in parallel
     void splitLeaf(const Mesh& mesh, uint32_t leaf);
 
+    template <class Shape>
+    void queryVerticesIn(const Mesh& mesh, const Shape& shape, std::vector<uint32_t>& out) const;
     mutable IndexBits vertBits_;               // queryVertices: the vertices found so far
     mutable std::vector<uint32_t> queryLeaves_; // the leaves holding them, for refitQueried()
     mutable std::vector<uint32_t> queryTasks_, queryNext_;

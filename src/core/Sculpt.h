@@ -72,6 +72,11 @@ struct DabParams {
     // Smooth: keep the volume (#40). A Taubin step, one shrink then one inflate, removes bumps as the plain
     // (Laplacian) smooth does without shrinking the form. Not on micro levels (they smooth plainly).
     bool keepVolume = false;
+    // Falloff options (#55, Blender's proportional editing): `connectedOnly` keeps the dab to the surface joined
+    // to the point under the cursor (the other leg, the next finger stay put); `viewFalloff` measures the falloff
+    // on screen, so the brush reaches through the model along the view as a cylinder.
+    bool connectedOnly = false;
+    bool viewFalloff = false;
 };
 
 // Local symmetry's centre for a Part: the middle of its bounding box (in parallel).
@@ -98,6 +103,37 @@ inline float vertexInfluence(const Mesh& mesh, uint32_t v) {
 }
 // Vertices within `radius` of `center` that a brush may touch (fully hidden ones excluded).
 void brushVertices(const Mesh& mesh, const BVH& bvh, const glm::vec3& center, float radius, std::vector<uint32_t>& out);
+// Distance from the dab centre for the falloff: in space, or (viewFalloff) across the view only.
+inline float brushDistance(const glm::vec3& x, const glm::vec3& center, const glm::vec3& viewDir, bool viewFalloff) {
+    const glm::vec3 o = x - center;
+    if (!viewFalloff) return glm::length(o);
+    const float l2 = glm::dot(viewDir, viewDir);
+    return l2 > 1e-24f ? glm::length(o - viewDir * (glm::dot(o, viewDir) / l2)) : glm::length(o);
+}
+inline float brushDistance(const struct DabParams& p, const glm::vec3& x) {
+    return brushDistance(x, p.center, p.viewDir, p.viewFalloff);
+}
+// Scratch for keepConnected (a stamp per vertex, so nothing is cleared between dabs).
+struct ConnectedScratch {
+    std::vector<uint32_t> stamp, queue;
+    uint32_t epoch = 0;
+};
+// Connected only: keeps the vertices of `verts` (in increasing order) that the vertex of `verts` nearest `seed`
+// reaches through edges between vertices of `verts`; the order stays.
+void keepConnected(const Mesh& mesh, const glm::vec3& seed, std::vector<uint32_t>& verts, ConnectedScratch& scratch);
+// The vertices a dab may touch with the falloff options: brushVertices, or the cylinder along `viewDir`
+// (viewFalloff), then keepConnected from `center` (connectedOnly).
+void brushRegion(const Mesh& mesh, const BVH& bvh, const glm::vec3& center, const glm::vec3& viewDir, float radius,
+                 bool connectedOnly, bool viewFalloff, std::vector<uint32_t>& out, ConnectedScratch& scratch);
+// Along the normal (from the discussions: Move, Tendril, Elastic Tendril and Elastic Grab with Alt): the
+// falloff-weighted average normal of the visible surface within `radius` of `center`, unit length (zero when
+// there is no surface there).
+glm::vec3 brushAreaNormal(const Mesh& mesh, const BVH& bvh, const glm::vec3& center, float radius, float focal = 0.0f);
+// The parameter s of the point point + s * dir (dir unit length) nearest the ray origin + t * rayDir: where a
+// cursor ray says a grab sliding along the line should be. False when the line is within `minSine` (the sine of
+// the angle between them) of parallel to the ray, so the cursor can't say where along it.
+bool lineRayClosest(const glm::vec3& point, const glm::vec3& dir, const glm::vec3& origin, const glm::vec3& rayDir,
+                    float& s, float minSine = 0.25f);
 // Smoothstep brush falloff: 1 at the centre, 0 at `radius`. `focal` is ZBrush's Focal Shift (-1..1): below 0
 // the full-strength centre widens (a harder, broader tip), above 0 it narrows to a softer point; 0 is the plain
 // smoothstep, unchanged.
@@ -149,6 +185,10 @@ public:
 
     UndoRecord endStroke();
     bool strokeActive() const { return active_; }
+    // Whole-mesh operations (core/Deform.h) inside a stroke: moves `verts` (each once, increasing) by `d` as given
+    // (the caller weighed in the mask), recorded for undo and written to the stroke's layer; then their normals
+    // and the BVH.
+    void moveVertices(Mesh& mesh, BVH& bvh, std::span<const uint32_t> verts, std::span<const glm::vec3> d);
 
     SculptTimings timings;
     // The brush's frame on the surface at the last dab's first (unmirrored) pass: the dab centre, the area normal
@@ -254,7 +294,7 @@ private:
     void touch(Mesh& mesh, uint32_t v);
     // The one place brushes move vertices: scales `d` by vertexInfluence().
     void displace(Mesh& mesh, uint32_t v, const glm::vec3& d);
-    void displaceAll(Mesh& mesh, std::span<const uint32_t> verts, std::span<const glm::vec3> d);
+    void displaceAll(Mesh& mesh, std::span<const uint32_t> verts, std::span<const glm::vec3> d, bool influence = true);
 
     // Dynamic topology: remeshes before a dab, and keeps the stroke's per-vertex state in step with it.
     void remeshDab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym, float scale, float reach);
@@ -284,6 +324,7 @@ private:
     void clearRecorded();
 
     std::vector<uint32_t> verts_, dabVerts_; // one mirror's vertices; every mirror's (for the normals)
+    ConnectedScratch connected_;             // Connected only (DabParams::connectedOnly)
     std::vector<uint32_t> dabLeaves_;        // the BVH leaves every mirror's query listed (the normals' set)
     std::vector<float> curvature_;           // strokeCurvature
     bool curvatureFilled_ = false;           // every entry current (a draft stroke packs them as they are)

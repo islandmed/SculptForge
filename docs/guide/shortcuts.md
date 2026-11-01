@@ -279,6 +279,25 @@ Everything else, from the <kbd>B</kbd> brush letters and <kbd>S</kbd> / <kbd>U</
 <kbd>Ctrl</kbd> and <kbd>Ctrl</kbd>+<kbd>Shift</kbd> gestures, is the same in both styles. The **Maya** style keeps
 these ZBrush-style keys and changes only the view controls (<kbd>Alt</kbd>+left, middle and right drags).
 
+## Maya keys
+
+With **Preferences > Input > Style** on **Maya** (#32), the view works as in Maya, on the model or beside it, as
+long as <kbd>Alt</kbd> is the only key held:
+
+| To | Maya style |
+|---|---|
+| Rotate | <kbd>Alt</kbd>+left-drag |
+| Pan | <kbd>Alt</kbd>+middle-drag |
+| Zoom | <kbd>Alt</kbd>+right-drag **sideways**: right zooms in, left zooms out, as Maya's own dolly |
+| Invert the brush (subtract) | Hold <kbd>Ctrl</kbd> while sculpting |
+| Paint a mask / erase it | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+drag / <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+drag |
+| Smooth | Hold <kbd>Shift</kbd> while sculpting |
+| Visibility gestures | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>, as in the other styles |
+
+Maya's default dolly follows a sideways drag, so that is the default here too. **Preferences > Input > Zoom
+drag** switches it to **Up and down** (drag up to zoom in) if you set Maya up that way. **Invert zoom**, in every
+style, turns zoom drags around (the mouse wheel stays as it is).
+
 ## Blender keys
 
 With **Preferences > Input > Style** on **Blender** (also at the top of the Controls window, <kbd>F1</kbd>), the

@@ -27,6 +27,7 @@
 
 #include <glm/glm.hpp>
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <span>
@@ -42,7 +43,16 @@ struct DyntopoSettings {
     // true: one detail size for the whole mesh, relative to its size.
     bool constantDetail = false;
     float detail = 0.5f; // 0 (coarse) .. 1 (fine)
+    // How much Smooth (Shift) remeshes while dynamic topology is on (from the discussions): 0 = smooth only, the
+    // topology stays; 1 (the default, as before) = it remeshes toward twice the edge length, so smoothing also
+    // simplifies. In between it remeshes toward 1 + smoothRemesh times the edge length.
+    float smoothRemesh = 1.0f;
 };
+
+// The edge-length scale Smooth remeshes with (0 = it doesn't remesh): 1 + smoothRemesh, as above.
+inline float dyntopoSmoothScale(const DyntopoSettings& s) {
+    return s.smoothRemesh <= 0.005f ? 0.0f : 1.0f + std::min(s.smoothRemesh, 1.0f);
+}
 
 // The edge length dabs of world radius `radius` remesh towards, on a mesh whose bounding box diagonal is `diagonal`.
 float dyntopoEdgeLength(const DyntopoSettings& s, float radius, float diagonal);

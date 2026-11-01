@@ -443,6 +443,34 @@ void App::drawInputSection() {
     if (ui::Checkbox("Hold Space and drag to move the camera##input.space_camera", &spaceCamera))
         uiPrefs_.spaceCamera = spaceCamera;
     ui::HelpAction(*this, "input.space_camera");
+    if (mayaStyle()) {
+        int zoom = uiPrefs_.mayaZoomHorizontal ? 0 : 1;
+        ImGui::TextDisabled("%s", tr("Zoom drag"));
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(-1);
+        const std::string zooms = std::string(tr("Sideways (Maya)")) + '\0' + tr("Up and down") + '\0';
+        if (ImGui::Combo("##input.maya_zoom", &zoom, zooms.c_str())) uiPrefs_.mayaZoomHorizontal = zoom == 0;
+        ui::HelpText("Zoom drag", nullptr,
+                     "Alt+right drag zooms. Sideways (the default, as Maya's own dolly): drag right to zoom in, left to "
+                     "zoom out. Up and down: drag up to zoom in, as the SculptForge style.",
+                     "Preferences > Input");
+    }
+    ui::Checkbox("Invert zoom##input.invert_zoom", &uiPrefs_.invertZoom);
+    ui::HelpText("Invert zoom", nullptr, "Turn zoom drags around (the mouse wheel stays as it is).", "Preferences > Input");
+    {
+        ImGui::TextDisabled("%s", tr("Along the normal"));
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(-1);
+        const char* key = blenderStyle() || mayaStyle() ? "With Ctrl" : "With Alt";
+        const std::string modes = std::string(tr(key)) + '\0' + tr("Always") + '\0' + tr("Never") + '\0';
+        ImGui::Combo("##input.along_normal", &uiPrefs_.alongNormal, modes.c_str());
+        ui::HelpText("Along the normal", nullptr,
+                     "Move, Tendril, Elastic Tendril and KelvinGrab: with the invert key held as the stroke begins "
+                     "(Alt; Ctrl in the Blender and Maya styles), the surface moves along the average normal under the "
+                     "brush instead of across the screen, so it pulls straight out of the surface or pushes straight "
+                     "in. Always: every stroke of those brushes does; Never: the key does nothing for them.",
+                     "Preferences > Input");
+    }
     bool airStrokes = uiPrefs_.airStrokes;
     if (ui::Checkbox("Start strokes off the model##input.air_strokes", &airStrokes)) uiPrefs_.airStrokes = airStrokes;
     ui::HelpAction(*this, "input.air_strokes");
@@ -536,9 +564,14 @@ void App::openQuickMenu() {
 }
 
 void App::rightClickRelease() {
-    if (!rightClick_.pending) return;
+    const bool click = rightClick_.pending;
     rightClick_.pending = false;
-    if (!uiPrefs_.rightClickQuickMenu) return;
+    if (zsMenu_.armed) { // on a Forge Sphere: its menu instead (PanelZSpheres.cpp)
+        zsMenu_.armed = false;
+        zsMenu_.open = click;
+        return;
+    }
+    if (!click || !uiPrefs_.rightClickQuickMenu) return;
     // Opened as a tap of Space would: it stays until a click elsewhere or Esc.
     quickMenu_.open = true;
     quickMenu_.at = ImVec2(rightClick_.x, rightClick_.y);

@@ -1,0 +1,49 @@
+# Tool > Deformation's whole-Part operations (from the discussions): Polish, Relax, Smooth and Balloon, each with
+# its amount beside it, one undo step each, the mask holding what it covers.
+run new_sphere subdivisions=4
+run deform_balloon amount=-40
+click "Tool##palette.tool"
+click "Deformation##tool.deformation"
+expect "Deformation/Polish"
+expect "##deform_balloon_amount"
+hold ctrl
+hover "Deformation/Polish"
+expect_help "sharp edges stay"
+hover "Deformation/Balloon"
+expect_help "rounder volume"
+hold none
+
+# Balloon fills the Part out; undo takes it back in one step.
+snapshot
+click "Deformation/Balloon"
+expect_status "Balloon 50"
+expect_value moved_out > 0
+shot balloon
+key ctrl+z
+expect_value moved == 0
+
+# Smooth, Polish and Relax each move it, and each is one undo step.
+click "Deformation/Smooth"
+expect_status "Smooth 50"
+expect_value moved > 0
+key ctrl+z
+expect_value moved == 0
+click "Smooth keeps volume##deformation.smooth_volume"
+click "Deformation/Smooth"
+expect_value moved > 0
+key ctrl+z
+click "Deformation/Polish"
+expect_status "Polish 50"
+key ctrl+z
+expect_value moved == 0
+click "Deformation/Relax"
+expect_status "Relax 50"
+expect_value moved > 0
+key ctrl+z
+
+# Masked all over: nothing moves, and the status says why.
+run mask_all
+click "Deformation/Balloon"
+expect_status "everything masked"
+expect_value moved == 0
+run mask_clear

@@ -193,15 +193,39 @@ These toggles sit on the top shelf and in the **Draw** palette:
 The **Brush** palette has the same Front and invert settings as the checkboxes **Front faces only** and
 **Invert (Alt)**.
 
+### Falloff options
+
+Two more checkboxes in the **Brush** palette change what a brush reaches, as Blender's proportional editing
+does (from the discussions). Both work with every sculpt brush, recipes, VDM stamps, masking and vertex paint, and
+are saved with the preferences and the project (custom brushes can turn them on for themselves in the Brush Lab):
+
+| Option | What it does |
+|---|---|
+| **Connected only** | The brush only moves the surface joined to the point under the cursor, within the brush size. Inflate a finger and the next finger stays as it is; Move one leg and the other doesn't follow, however close they are. |
+| **View falloff** | The falloff is measured on screen, across the view: everything inside the brush circle is reached, through the model and out the back, as a cylinder along the view. Add **Connected only** to keep it to the piece under the cursor. |
+
+Kelvinlet brushes keep their own elastic falloff, and the Gizmo's falloff eases in from the mask's edge rather
+than from a brush centre, so these options don't apply to them. On a 10-million-vertex Part a dab that moves half
+a million vertices takes about 10 ms, and about 16 ms with Connected only.
+
 ## Modifier keys while sculpting
 
 | Hold | Effect |
 |---|---|
-| <kbd>Alt</kbd> | Inverts the brush for this stroke (see the table of brushes). |
+| <kbd>Alt</kbd> | Inverts the brush for this stroke (see the table of brushes). For Move, Tendril, Elastic Tendril and KelvinGrab, which have nothing to invert, it moves the surface along the normal instead (below). |
 | <kbd>Shift</kbd> (before the stroke) | Smooths with the Smooth brush, whatever brush is active, at Smooth's own Intensity. With the Paint brush active, <kbd>Shift</kbd> still smooths the shape. |
 | <kbd>Shift</kbd> (after the stroke started) | Draws a straight line from where you pressed <kbd>Shift</kbd>, snapped to 45 degree steps on screen. Let go of <kbd>Shift</kbd> to carry on freehand. |
 | <kbd>Ctrl</kbd> | Paints a mask instead of sculpting; <kbd>Ctrl</kbd>+<kbd>Alt</kbd> erases it. A <kbd>Ctrl</kbd>+click without dragging blurs the mask (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click sharpens it). See [Masking](masking.md). |
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd> | Visibility gestures: isolate, hide and show face groups. See [Face Groups and visibility](face-groups.md). |
+
+### Along the normal
+
+Move, Tendril, Elastic Tendril and KelvinGrab normally move the surface across the screen. Hold <kbd>Alt</kbd> as
+you start the stroke (<kbd>Ctrl</kbd> in the Blender and Maya styles, where that key inverts) and the surface moves
+along the average normal under the brush where you pressed instead (from the discussions): drag out and it pulls
+straight out of the surface, drag back and it pushes straight in, however the view is turned. When the normal
+points right at you, drag up to pull it out. **Preferences > Input > Along the normal** can make it **Always**
+(no key needed, handy with a pen) or **Never**.
 
 ## The Quick Menu
 
@@ -242,6 +266,23 @@ Both keys are free in every input style. Make your own in **Preferences > Input 
 - **Restore default menus** brings back Brushes and Masking.
 
 **Store Config** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) keeps your menus.
+
+## Whole-Part deformations
+
+**Tool > Deformation** has four operations that work on the whole active Part at once, each with its amount
+beside it (from the discussions). The mask holds what it covers (partly masked areas move partly), hidden faces and
+open borders stay where they are, and each is one undo step:
+
+| Operation | What it does |
+|---|---|
+| **Polish** | Flattens fine noise and small bumps while flat areas and sharp edges stay sharp: a scan's grain, or the ripples a voxel remesh leaves on a hard-surface piece. |
+| **Relax** | Evens out the spacing of the vertices along the surface without changing its shape, for areas a big Move or Tendril stretched. |
+| **Smooth** | Smooths everything; with **Smooth keeps volume** it doesn't shrink the form. |
+| **Balloon** | Fills the form out toward a rounder volume, like blowing into it (ZBrush users: Inflate Balloon). A negative amount lets the air out. |
+
+They are commands too: `deform_polish amount=60`, `deform_relax`, `deform_smooth amount=30 keep_volume=true`,
+`deform_balloon amount=-20` (add `masked=false` to ignore the mask). On a 10-million-vertex Part at amount 50,
+Smooth takes about 0.5 s, Balloon 0.7 s, Relax 0.9 s and Polish 2 s (Apple M1 Pro).
 
 ## Strokes
 

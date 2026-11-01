@@ -281,19 +281,19 @@ void BVH::forEachLeafInSphere(const glm::vec3& center, float radius,
     }
 }
 
-void BVH::queryVertices(const Mesh& mesh, const glm::vec3& center, float radius, std::vector<uint32_t>& out) const {
+template <class Shape>
+void BVH::queryVerticesIn(const Mesh& mesh, const Shape& shape, std::vector<uint32_t>& out) const {
     out.clear();
     queryLeaves_.clear();
     if (nodes_.empty()) return;
     if (vertBits_.capacity() < mesh.vertexCount()) vertBits_.resize(mesh.vertexCount());
-    const float r2 = radius * radius;
 
     // The units of parallel work: the subtrees the sphere touches, split breadth first until there are enough
     // of them (the same ones for any thread count).
     constexpr size_t kTasks = 128, kSerialTriangles = 16384;
     std::vector<uint32_t>& tasks = queryTasks_;
     tasks.clear();
-    if (sphereBox(nodes_[0].box, center, r2)) tasks.push_back(0);
+    if (shape.touches(nodes_[0].box)) tasks.push_back(0);
     int depth = 0; // of every inner node in `tasks` (median splits: each holds about nt >> depth triangles)
     for (bool split = true; split && tasks.size() < kTasks; ++depth) {
         split = false;
@@ -306,7 +306,7 @@ void BVH::queryVertices(const Mesh& mesh, const glm::vec3& center, float radius,
             }
             split = true;
             for (uint32_t c : {n.first, n.first + 1})
-                if (sphereBox(nodes_[c].box, center, r2)) queryNext_.push_back(c);
+                if (shape.touches(nodes_[c].box)) queryNext_.push_back(c);
         }
         tasks.swap(queryNext_);
     }
@@ -318,13 +318,13 @@ void BVH::queryVertices(const Mesh& mesh, const glm::vec3& center, float radius,
             const uint32_t ni = nodeStack.back();
             const Node& n = nodes_[ni];
             nodeStack.pop_back();
-            if (!sphereBox(n.box, center, r2) || (n.count == 0 && n.first == kNoLeaf)) continue;
+            if (!shape.touches(n.box) || (n.count == 0 && n.first == kNoLeaf)) continue;
             if (n.count == 0) {
                 nodeStack.push_back(n.first);
                 nodeStack.push_back(n.first + 1);
                 continue;
             }
-            if (boxInSphere(n.box, center, r2)) { // every corner is inside
+            if (shape.containsBox(n.box)) { // every corner is inside
                 for (uint32_t i = n.first; i < n.first + n.count; ++i) {
                     const auto& t = mesh.triangles[triIndices_[i]];
                     found.insertLocal(t.x);
@@ -343,8 +343,7 @@ void BVH::queryVertices(const Mesh& mesh, const glm::vec3& center, float radius,
                         any = true;
                         continue;
                     }
-                    const glm::vec3 d = mesh.positions[v] - center;
-                    if (glm::dot(d, d) <= r2) {
+                    if (shape.contains(mesh.positions[v])) {
                         found.insertLocal(v);
                         any = true;
                     }
@@ -372,6 +371,56 @@ void BVH::queryVertices(const Mesh& mesh, const glm::vec3& center, float radius,
     });
     for (size_t k = 0; k < tasks.size(); ++k) queryLeaves_.insert(queryLeaves_.end(), queryParts_[k].begin(), queryParts_[k].end());
     vertBits_.take(out);
+}
+
+namespace {
+
+struct SphereShape {
+    glm::vec3 c;
+    float r2;
+    bool touches(const AABB& b) const { return sphereBox(b, c, r2); }
+    bool containsBox(const AABB& b) const { return boxInSphere(b, c, r2); }
+    bool contains(const glm::vec3& p) const { return glm::dot(p - c, p - c) <= r2; }
+};
+
+// An infinite cylinder: the points within sqrt(r2) of the line through c along the unit vector a.
+struct CylinderShape {
+    glm::vec3 c, a;
+    float r, r2;
+    float dist2(const glm::vec3& p) const {
+        const glm::vec3 d = p - c;
+        const glm::vec3 off = d - a * glm::dot(d, a);
+        return glm::dot(off, off);
+    }
+    bool touches(const AABB& b) const { // conservative: the box's bounding sphere against the cylinder
+        const glm::vec3 mid = (b.min + b.max) * 0.5f;
+        const float reach = r + glm::length(b.max - mid);
+        return dist2(mid) <= reach * reach;
+    }
+    bool containsBox(const AABB& b) const {
+        for (int k = 0; k < 8; ++k) {
+            const glm::vec3 p((k & 1) ? b.max.x : b.min.x, (k & 2) ? b.max.y : b.min.y, (k & 4) ? b.max.z : b.min.z);
+            if (dist2(p) > r2) return false;
+        }
+        return true;
+    }
+    bool contains(const glm::vec3& p) const { return dist2(p) <= r2; }
+};
+
+} // namespace
+
+void BVH::queryVertices(const Mesh& mesh, const glm::vec3& center, float radius, std::vector<uint32_t>& out) const {
+    queryVerticesIn(mesh, SphereShape{center, radius * radius}, out);
+}
+
+void BVH::queryVerticesCylinder(const Mesh& mesh, const glm::vec3& point, const glm::vec3& axis, float radius,
+                                std::vector<uint32_t>& out) const {
+    const float len = glm::length(axis);
+    if (!(len > 1e-12f)) {
+        queryVertices(mesh, point, radius, out);
+        return;
+    }
+    queryVerticesIn(mesh, CylinderShape{point, axis / len, radius, radius * radius}, out);
 }
 
 void BVH::refit(const Mesh& mesh, std::span<const uint32_t> movedVerts) {

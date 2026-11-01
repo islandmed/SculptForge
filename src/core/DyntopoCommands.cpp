@@ -11,7 +11,11 @@ namespace sf {
 std::string dyntopoSummary(const DyntopoSettings& s) {
     const int detail = int(std::lround(std::clamp(s.detail, 0.0f, 1.0f) * 100.0f));
     return std::string("Dynamic topology ") + (s.enabled ? "on" : "off") + ": Detail " + std::to_string(detail) +
-           (s.constantDetail ? " (one size for the whole mesh)" : " (follows the brush size)");
+           (s.constantDetail ? " (one size for the whole mesh)" : " (follows the brush size)") +
+           (s.smoothRemesh <= 0.005f ? "; Smooth leaves the topology alone"
+            : s.smoothRemesh >= 0.995f
+                ? ""
+                : "; Smooth remeshes " + std::to_string(int(std::lround(s.smoothRemesh * 100.0f))) + "%");
 }
 
 void registerDyntopoCommands(CommandRegistry& registry) {
@@ -26,6 +30,10 @@ void registerDyntopoCommands(CommandRegistry& registry) {
                    {"constant", T::Bool,
                     "false (default) = the triangle size follows the brush size on screen (zoom in or shrink the brush "
                     "for finer detail); true = one size for the whole mesh, set by Detail.",
+                    false},
+                   {"smooth_remesh", T::Number,
+                    "0-100: how much Smooth (Shift) remeshes while on. 0 = smooth only, the topology stays; 100 "
+                    "(default) = it simplifies toward larger triangles as it smooths.",
                     false}},
                   [](Document& doc, const Args& a) -> CommandResult {
                       DyntopoSettings& s = doc.sculptor.dyntopo;
@@ -36,6 +44,8 @@ void registerDyntopoCommands(CommandRegistry& registry) {
                       }
                       if (a.count("detail")) s.detail = float(std::clamp(argNumber(a, "detail", 50.0), 0.0, 100.0) / 100.0);
                       s.constantDetail = argBool(a, "constant", s.constantDetail);
+                      if (a.count("smooth_remesh"))
+                          s.smoothRemesh = float(std::clamp(argNumber(a, "smooth_remesh", 100.0), 0.0, 100.0) / 100.0);
                       s.enabled = enable;
                       return {true, dyntopoSummary(s)};
                   }});

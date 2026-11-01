@@ -39,6 +39,36 @@ All notable changes to SculptForge are listed here. The format follows
   kept as small `.sfmaterial` text files, laid on a Part in one undoable step from **Tool > Paint Layers >
   Material Recipe**. Save your own from a Part's Fill layers (`material_recipe name=worn_metal`,
   `material_recipe action=save path=mine.sfmaterial`).
+- Forge Spheres with the pointer only (#8): **Drag places child** (or <kbd>Ctrl</kbd>+drag) moves a new sphere away
+  from its parent in one Draw drag; the sphere last clicked or added is selected (outlined in orange) for **Delete
+  Selected**, **Insert Between** and **Set as Root**, and a right click on a sphere opens a menu with the same.
+  Set as Root keeps the armature's shape and links (`zsphere_set_root index=3`).
+- Maya input style (#32): <kbd>Alt</kbd>+right drag zooms with a sideways drag (right zooms in), as Maya's own
+  dolly; **Preferences > Input > Zoom drag** switches it back to up and down, and **Invert zoom** turns zoom drags
+  around in every style.
+- Along the normal (from the discussions): Move, Tendril, Elastic Tendril and KelvinGrab started with the invert
+  key held (<kbd>Alt</kbd>; <kbd>Ctrl</kbd> in the Blender and Maya styles) move the surface along the average
+  normal under the brush instead of the view plane. These brushes had no use for the key; **Preferences > Input >
+  Along the normal** makes it Always or Never.
+- Whole-Part deformations (from the discussions): **Tool > Deformation > Polish** (bilateral normal filtering:
+  noise goes, planes and edges stay), **Relax** (even spacing along the surface), **Smooth** (Laplacian, or Taubin
+  with Smooth keeps volume) and **Balloon** (fills the form out; negative lets the air out), each with an amount,
+  mask-aware, open borders and hidden faces kept, one undo step, and as commands (`deform_polish`, `deform_relax`,
+  `deform_smooth`, `deform_balloon`). 10.5M vertices at amount 50: Smooth 0.5 s, Balloon 0.7 s, Relax 0.9 s,
+  Polish 2 s (Apple M1 Pro).
+- Dynamic topology's **Smooth remesh** (from the discussions): how much Shift-smoothing remeshes while Dynamic is
+  on, from **Smooth only** (the topology stays) to **Simplify** (the default, as before); a preference, saved with
+  the project, `dyntopo smooth_remesh=0`.
+- Brush falloff options (from the discussions): **Connected only** keeps a dab to the surface joined to the point
+  under the cursor, **View falloff** measures the falloff on screen (a cylinder through the model along the view),
+  as Blender's proportional editing. For every sculpt brush, recipes, VDM stamps, masking and vertex paint; saved
+  with the preferences, the project and custom brushes. A dab moving 470k of 10.5M vertices: 9.6 ms, 16 ms with
+  Connected only.
+
+### Fixed
+- Maya input style (#32): <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+drag erases the mask instead of starting
+  the <kbd>Ctrl</kbd>+<kbd>Shift</kbd> visibility selection.
+
 ## [0.10.5] - 2026-11-01
 ### Added
 - **Radial symmetry** (#63): **R** in Transform > Symmetry and on the top shelf repeats strokes around the X, Y or Z

@@ -648,7 +648,7 @@ void Sculptor::dabVdmSingle(Mesh& mesh, BVH& bvh, const DabParams& p, float hand
     auto clock = std::chrono::steady_clock::now();
     const VectorDisplacement* vdm = p.vdm && !p.vdm->empty() ? p.vdm : builtinVdms().front().get();
     // The stamp is the brush's square, so the corners reach out to radius x sqrt(2).
-    brushVertices(mesh, bvh, p.center, p.radius * 1.4143f, verts_);
+    brushRegion(mesh, bvh, p.center, p.viewDir, p.radius * 1.4143f, p.connectedOnly, p.viewFalloff, verts_, connected_);
     if (verts_.empty()) return;
     const auto& pos = mesh.positions;
     const auto& nrm = mesh.normals;

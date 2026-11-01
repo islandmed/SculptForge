@@ -66,13 +66,15 @@ void App::kelvinTo(float x, float y) {
     const float pressure = pressureStrength_ ? strokePressure() : 1.0f;
     kelvinAmount_ = std::min(1.0f, 2.0f * strength_) * pressure;
     if (strokeBrush_ == BrushType::KelvinGrab) {
-        // The grabbed point follows the cursor in the plane through it facing the camera (as Move).
+        // The grabbed point follows the cursor in the plane through it facing the camera (as Move), or along the
+        // normal (App::beginAlongNormal).
         glm::vec3 origin, dir;
         canvasRay(x, y, origin, dir);
         const glm::vec3 n = camera_.forward();
         const float denom = glm::dot(dir, n);
-        if (std::abs(denom) < 1e-6f) return;
-        kelvinTarget_ = origin + dir * (glm::dot(grabPlanePoint_ - origin, n) / denom);
+        if (strokeAlongNormal_) kelvinTarget_ = alongNormalTarget(x, y);
+        else if (std::abs(denom) < 1e-6f) return;
+        else kelvinTarget_ = origin + dir * (glm::dot(grabPlanePoint_ - origin, n) / denom);
     } else {
         // Twist / Scale: the drag's sideways distance in brush radii (Alt reverses).
         const float dx = (x - kelvinLastX_) / std::max(radiusPx_, 1.0f) * kelvinAmount_ * (strokeInvert_ ? -1.0f : 1.0f);

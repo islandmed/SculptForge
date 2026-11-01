@@ -36,12 +36,38 @@ hold alt
 button_drag middle 0.4 0.5 0.6 0.5
 hold none
 expect_value camera_pan != $p0
-# Alt+right zooms.
+# Alt+right zooms with a sideways drag, as Maya's dolly (#32): right zooms in, left out; up and down don't.
+expect_value maya_zoom_horizontal == 1
 remember camera_distance d0
+hold alt
+button_drag right 0.4 0.5 0.6 0.5
+hold none
+expect_value camera_distance < $d0
+remember camera_distance d1
+hold alt
+button_drag right 0.6 0.5 0.4 0.5
+hold none
+expect_value camera_distance > $d1
+remember camera_distance d2
 hold alt
 button_drag right 0.5 0.4 0.5 0.6
 hold none
-expect_value camera_distance != $d0
+expect_value camera_distance == $d2
+# Invert zoom turns it around.
+click "Preferences##palette.preferences"
+expect "##input.maya_zoom"
+click "Invert zoom##input.invert_zoom"
+expect_value invert_zoom == 1
+click "Preferences##palette.preferences"
+remember camera_distance d3
+hold alt
+button_drag right 0.4 0.5 0.6 0.5
+hold none
+expect_value camera_distance > $d3
+click "Preferences##palette.preferences"
+click "Invert zoom##input.invert_zoom"
+expect_value invert_zoom == 0
+click "Preferences##palette.preferences"
 
 # Ctrl+Alt+drag on the model masks.
 key f
@@ -49,6 +75,14 @@ hold ctrl+alt
 stroke 0.3 0.5 0.7 0.5
 hold none
 expect_value masked > 0
+# Ctrl+Alt+Shift+drag erases the mask (#32; not Ctrl+Shift's visibility selection).
+remember masked m0
+remember hidden h0
+hold ctrl+alt+shift
+stroke 0.3 0.5 0.7 0.5
+hold none
+expect_value masked < $m0
+expect_value hidden == $h0
 
 click "Preferences##palette.preferences"
 click "ZBrush-style##input.style_zbrush"

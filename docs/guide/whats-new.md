@@ -22,6 +22,26 @@ chapter opens by itself the first time you start a new version; you can always f
 - **More maps from Tool > Bake**: curvature, thickness, position and ID; bake a Part's top subdivision level (or
   micro level) onto its lowest level without a second Part; UDIM tiles bake as one set of files per tile. See
   [Baking](baking.md).
+- **Forge Spheres with the pointer alone** (#8): **Drag places child** (or <kbd>Ctrl</kbd> while you drag) moves a
+  new sphere away from its parent in one drag; **Delete Selected**, **Insert Between** and **Set as Root** work on
+  the sphere you last clicked, and a right click on a sphere opens a menu with the same. See
+  [Forge Spheres](forge-spheres.md#pointer-only).
+- **Maya zoom** (#32): in the Maya input style <kbd>Alt</kbd>+right drag zooms sideways, as Maya's own dolly (right
+  zooms in), and **Invert zoom** turns any zoom drag around; <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd> erases
+  the mask. See [Maya keys](shortcuts.md#maya-keys).
+- **Move along the normal** (from the discussions): Move, Tendril, Elastic Tendril and KelvinGrab started with
+  <kbd>Alt</kbd> held pull the surface straight out of itself (or push it straight in) instead of across the screen.
+  See [Sculpting](sculpting.md#along-the-normal).
+- **Polish, Relax, Smooth and Balloon** (from the discussions): **Tool > Deformation** works on the whole Part by an
+  amount: Polish flattens fine noise and keeps edges, Relax evens out the spacing, Smooth can keep the volume, and
+  Balloon fills the form out. The mask holds what it covers; one undo step each. See
+  [Sculpting](sculpting.md#whole-part-deformations).
+- **Smooth without remeshing** (from the discussions): **Smooth remesh** in **Draw > Dynamic topology** sets how
+  much Shift-smoothing changes the topology, down to **Smooth only**. See
+  [Dynamic topology](dynamic-topology.md#smooth-remesh).
+- **Connected only and View falloff** (from the discussions): brush options that keep a stroke to the piece under
+  the cursor (the other leg, the next finger stay put) or reach through the model along the view, as Blender's
+  proportional editing. See [Sculpting](sculpting.md#falloff-options).
 
 ## Version 0.10.5
 

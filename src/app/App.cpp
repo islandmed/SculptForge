@@ -1180,6 +1180,11 @@ void App::onMouseDown(float x, float y, Uint8 button) {
     rightClick_.x = x;
     rightClick_.y = y;
     rightClick_.dx = rightClick_.dy = 0.0f;
+    zsMenu_.armed = false;
+    // A right click on a Forge Sphere opens its menu (#8): Delete, Insert Between, Set as Root.
+    if (button == SDL_BUTTON_RIGHT && zsphereActive() && !doc_.mesh.zspherePreview &&
+        !(SDL_GetModState() & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)))
+        zsphereRightDown(x, y);
     if (spaceHeld_) { // Preferences > Input > Hold Space and drag to move the camera (#43)
         switch (spaceCameraMove(button, ctrlDown(SDL_GetModState()))) {
         case SpaceCameraMove::Orbit: drag_ = Drag::Orbit; break;
@@ -1336,8 +1341,7 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     case Drag::Orbit: orbitBy(dx, dy); break;
     case Drag::Roll: rollBy(x, y, dx, dy); break;
     case Drag::Pan: camera_.pan(dx, dy, canvasHeight()); break;
-    // ZBrush: dragging up (forward) zooms out, every zoom drag; the SculptForge and Blender styles zoom in.
-    case Drag::Zoom: camera_.zoom((zbrushStyle() ? dy : -dy) * 0.05f); break;
+    case Drag::Zoom: camera_.zoom(zoomDragAmount(dx, dy)); break;
     case Drag::MaskCanvas: maskCanvasMove(x, y); break;
     case Drag::SubToolClick: subtoolClickMove(x, y); break;
     case Drag::Select: selectionMove(x, y); break;
@@ -1350,6 +1354,15 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     case Drag::AirStroke: airStrokeTo(x, y); break;
     case Drag::None: break;
     }
+}
+
+// How far a zoom drag zooms in (negative: out). ZBrush: dragging up (forward) zooms out; the SculptForge and
+// Blender styles zoom in. Maya (#32): a drag to the right zooms in, as Maya's own dolly (Preferences > Input >
+// Zoom drag can make it vertical). Invert zoom turns either around.
+float App::zoomDragAmount(float dx, float dy) const {
+    float a = mayaStyle() && uiPrefs_.mayaZoomHorizontal ? dx : zbrushStyle() ? dy : -dy;
+    if (uiPrefs_.invertZoom) a = -a;
+    return a * 0.05f;
 }
 
 void App::orbitBy(float dx, float dy) {
@@ -1387,6 +1400,7 @@ void App::rollBy(float x, float y, float dx, float dy) {
 void App::onMouseUp() {
     rollPending_ = false;
     rightClick_.pending = false;
+    zsMenu_.armed = false;
     orbitStarted_ = false;
     panFromAlt_ = false;
     if (drag_ == Drag::Select) selectionMouseUp();
@@ -1462,9 +1476,45 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
 // Strokes
 // ---------------------------------------------------------------------------
 
+bool App::alongNormalBrush(BrushType t) const {
+    return t == BrushType::Move || t == BrushType::SnakeHook || t == BrushType::KelvinSnake || t == BrushType::KelvinGrab;
+}
+
+// Along the normal (from the discussions): with the invert key held as the stroke begins (Preferences > Input >
+// Along the normal), the grab slides along the average normal under the brush rather than across the view. These
+// brushes don't use the invert key otherwise (Alt flips only Elastic Tendril's click-without-moving bump).
+void App::beginAlongNormal(const RayHit& hit, float radius) {
+    strokeAlongNormal_ = false;
+    if (!alongNormalBrush(strokeBrush_) || uiPrefs_.alongNormal == 2) return;
+    const bool key = (inputMods() & SDL_KMOD_ALT) != 0 || (erasing() && eraserAction() == PenAction::Invert);
+    if (uiPrefs_.alongNormal == 0 && !key) return;
+    glm::vec3 n = brushAreaNormal(doc_.mesh, doc_.bvh, hit.position, std::max(radius, 1e-6f), focalShift_);
+    if (glm::length(n) < 0.5f) n = hit.normal;
+    if (glm::length(n) < 0.5f) return;
+    if (glm::dot(n, camera_.forward()) > 0.0f && glm::dot(hit.normal, camera_.forward()) < 0.0f) n = -n; // (outward, to the viewer)
+    strokeAlongNormal_ = true;
+    alongNormalDir_ = glm::normalize(n);
+    alongNormalAnchor_ = hit.position;
+    alongNormalStartY_ = lastY_;
+    strokeInvert_ = invertToggle_; // (the key chose the direction, it doesn't invert the stroke)
+    status_ = std::string(brushLabel(strokeBrush_)) + ": along the normal";
+}
+
+// The point on the normal line the cursor asks for: nearest the cursor's ray, or, when the normal points at the
+// viewer (the cursor can't say how far along it), by how far the cursor went up since the press.
+glm::vec3 App::alongNormalTarget(float x, float y) const {
+    glm::vec3 origin, dir;
+    canvasRay(x, y, origin, dir);
+    float s = 0.0f;
+    if (!lineRayClosest(alongNormalAnchor_, alongNormalDir_, origin, dir, s))
+        s = (alongNormalStartY_ - y) * camera_.worldPerPixel(alongNormalAnchor_, canvasHeight());
+    return alongNormalAnchor_ + alongNormalDir_ * s;
+}
+
 void App::beginStroke(float x, float y, const RayHit& hit) {
     refreshSymmetryPivot(); // (local symmetry: the active Part's centre as the stroke starts)
     strokeBrush_ = activeBrush();
+    strokeAlongNormal_ = false;
     straight_ = {};
     straight_.shiftAtStart = (inputMods() & SDL_KMOD_SHIFT) != 0;
     strokeAltSmooth_ = false;
@@ -1521,17 +1571,22 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
         p.radius = radiusPx_ * pressure * camera_.worldPerPixel(hit.position, canvasHeight());
         p.strength = strength_;
         p.focal = focalShift_;
+        p.connectedOnly = uiPrefs_.connectedOnly;
+        p.viewFalloff = uiPrefs_.viewFalloff;
         doc_.sculptor.beginGrab(doc_.mesh, doc_.bvh, p, symmetry_);
         grabPlanePoint_ = grabLast_ = hit.position;
+        beginAlongNormal(hit, p.radius);
         return;
     }
     if (kelvinStrokeBrush()) { // KelvinGrab / Twist / Scale (PanelKelvinlet.cpp)
         kelvinBegin(hit);
+        if (strokeBrush_ == BrushType::KelvinGrab) beginAlongNormal(hit, kelvinRadius_);
         return;
     }
     lazyMouse_.reset(glm::vec2(x, y));
     if ((strokeBrush_ == BrushType::SnakeHook || strokeBrush_ == BrushType::KelvinSnake) && !recipe && strokeSculpt_) {
         grabPlanePoint_ = grabLast_ = hit.position; // the pulled tip (see snakeHookTo)
+        beginAlongNormal(hit, radiusPx_ * camera_.worldPerPixel(hit.position, canvasHeight()));
         return;
     }
     if (strokeType_ == StrokeType::DragRect) {
@@ -1565,6 +1620,12 @@ void App::strokeTo(float x, float y) {
         firstDab(maskClickX_, maskClickY_);
     }
     const BrushRecipe* recipe = strokeRecipe();
+    if (strokeBrush_ == BrushType::Move && !recipe && strokeSculpt_ && strokeAlongNormal_) {
+        const glm::vec3 p = alongNormalTarget(x, y);
+        doc_.sculptor.grab(doc_.mesh, doc_.bvh, p - grabLast_);
+        grabLast_ = p;
+        return;
+    }
     if (strokeBrush_ == BrushType::Move && !recipe && strokeSculpt_) {
         glm::vec3 origin, dir;
         canvasRay(x, y, origin, dir);
@@ -1726,6 +1787,8 @@ void App::dabAt(float x, float y, float pressure) {
     p.pressure = st.pressureStrength ? pressure : 1.0f;
     p.invert = st.invert;
     p.frontFacesOnly = st.frontFacesOnly;
+    p.connectedOnly = st.connectedOnly;
+    p.viewFalloff = st.viewFalloff;
     p.focal = st.focal;
     if (!dabView_) lastDabScreen_ = glm::vec2(x, y); // (the solver's: when its batch is committed)
     if (st.mask) {
@@ -2065,6 +2128,7 @@ void App::drawUi() {
     drawQRemeshGuides(); // QRemesh Guides curves (PanelRetopo.cpp)
     drawUvEditorOverlay(); // UV seams on the model, the Seam tool's cursor (PanelUvEditor.cpp)
     drawZSphereOverlay(); // the sphere under the cursor (PanelZSpheres.cpp)
+    drawZSphereMenu();    // a right click on a sphere
     drawFaceOverlay();   // facial landmarks (PanelFace.cpp)
     drawSplatTrainOverlay(); // splat training progress (PanelSplatTrain.cpp)
     drawSculptableOverlay(); // Make sculptable: crop box, face landmarks (PanelSculptable.cpp)
@@ -2348,7 +2412,11 @@ void App::drawRecipeEditor(BrushRecipe& recipe) {
         case RecipeParam::Kind::Float:
             ImGui::SliderFloat(p.label, recipe.field(p.key), p.min, p.max, "%.2f");
             break;
-        case RecipeParam::Kind::Bool: ImGui::Checkbox(p.label, &recipe.frontFacesOnly); break;
+        case RecipeParam::Kind::Bool:
+            ImGui::Checkbox(p.label, &recipe.frontFacesOnly);
+            ImGui::Checkbox("Connected only##recipe", &recipe.connectedOnly); // (falloff options, not recipeParams)
+            ImGui::Checkbox("View falloff##recipe", &recipe.viewFalloff);
+            break;
         case RecipeParam::Kind::Enum: {
             int idx = recipe.enumIndex(p.key);
             if (ImGui::Combo(p.label, &idx, p.options.data(), int(p.options.size()))) recipe.setEnumIndex(p.key, idx);

@@ -232,6 +232,11 @@ void App::drawPalette_Brush() {
     ImGui::SameLine();
     ImGui::Checkbox(tr("Invert (Alt)"), &invertToggle_);
     ui::HelpText("Invert", "Alt", "Brushes subtract instead of add (ZBrush Zsub). Holding Alt flips it for one stroke.", "Brush");
+    ui::Checkbox("Connected only##draw.connected_only", &uiPrefs_.connectedOnly);
+    ui::HelpAction(*this, "draw.connected_only");
+    ImGui::SameLine();
+    ui::Checkbox("View falloff##draw.view_falloff", &uiPrefs_.viewFalloff);
+    ui::HelpAction(*this, "draw.view_falloff");
     ImGui::Checkbox(tr("Smooth keeps volume##smooth_keep_volume"), &smoothKeepVolume_);
     ui::HelpText("Smooth keeps volume", nullptr,
                  "The Smooth brush (and Shift) removes bumps without shrinking the form, instead of the plain smooth "
@@ -295,6 +300,32 @@ void App::drawPalette_Draw() {
                  "Off (the default): the triangle size follows the brush size on screen, as in Dynamic Topology. On: one "
                  "size for the whole mesh, set by Detail. A preference (Store Config keeps it).",
                  "Draw > Dynamic topology");
+    {
+        float remesh = doc_.sculptor.dyntopo.smoothRemesh * 100.0f;
+        ImGui::SetNextItemWidth(-1);
+        const char* shown = remesh <= 0.5f ? "Smooth remesh: none (smooth only)" : "Smooth remesh %.0f";
+        if (ui::SliderInside("##dyntopo_smooth_remesh", &remesh, 0.0f, 100.0f, shown)) {
+            doc_.sculptor.dyntopo.smoothRemesh = std::clamp(remesh / 100.0f, 0.0f, 1.0f);
+            uiPrefs_.dyntopoSmoothRemesh = doc_.sculptor.dyntopo.smoothRemesh;
+        }
+        ui::HelpText("Smooth remesh", nullptr,
+                     "How much Smooth (Shift) changes the topology while Dynamic is on. 100 (the default): it also "
+                     "simplifies, merging triangles toward twice the size. Lower: it remeshes less. 0: Smooth only "
+                     "smooths and the triangles stay as they are. A preference (Store Config keeps it).",
+                     "Draw > Dynamic topology");
+        const float third = (ImGui::GetContentRegionAvail().x - 2.0f * ImGui::GetStyle().ItemSpacing.x) / 3.0f;
+        const struct {
+            const char* label;
+            float value;
+        } presets[] = {{"Smooth only##sr0", 0.0f}, {"Light##sr50", 0.5f}, {"Simplify##sr100", 1.0f}};
+        for (int k = 0; k < 3; ++k) {
+            if (k) ImGui::SameLine();
+            if (ImGui::Button(presets[k].label, ImVec2(k == 2 ? -1.0f : third, 0))) {
+                doc_.sculptor.dyntopo.smoothRemesh = presets[k].value;
+                uiPrefs_.dyntopoSmoothRemesh = presets[k].value;
+            }
+        }
+    }
     if (doc_.sculptor.dyntopo.enabled && !dyntopoBlocker(doc_.mesh).empty())
         hint(*this, "This Part has subdivision levels, so strokes don't remesh it: delete the lower (or higher) levels "
              "first.");

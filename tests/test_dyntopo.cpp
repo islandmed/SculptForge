@@ -590,6 +590,29 @@ TEST(dyntopo_smooth_simplifies) {
     CHECK(d.mesh.triangleCount() < before);
 }
 
+// Smooth remesh (from the discussions): 0 smooths without touching the topology, in between it remeshes less
+// than the default, which simplifies the most.
+TEST(dyntopo_smooth_remesh_setting) {
+    auto run = [](float smoothRemesh) {
+        Document d = sphereDoc(4);
+        d.sculptor.dyntopo.detail = 0.0f;
+        d.sculptor.dyntopo.smoothRemesh = smoothRemesh;
+        const std::vector<glm::vec3> before = d.mesh.positions;
+        CHECK(d.sculptor.beginStroke(d.mesh, "Smooth"));
+        for (int i = 0; i < 10; ++i) dabToward(d, glm::vec3(0.05f * float(i), 0.0f, 3.0f), 0.5f, BrushType::Smooth, Symmetry{});
+        d.undo.push(d.sculptor.endStroke());
+        CHECK(invalid(d.mesh, true).empty());
+        if (smoothRemesh == 0.0f) CHECK(d.mesh.positions.size() == before.size() && d.mesh.positions != before); // smoothed
+        return d.mesh.triangleCount();
+    };
+    const size_t start = makeIcosphere(4, 1.0f).triangleCount();
+    const size_t none = run(0.0f), half = run(0.5f), full = run(1.0f);
+    CHECK(none == start);
+    CHECK(full < start);
+    CHECK(half <= start && half >= full);
+    CHECK(dyntopoSmoothScale(DyntopoSettings{}) == 2.0f); // the default stays as before
+}
+
 // Long randomized sessions (set SF_STRESS=1, or another number for other seeds; skipped otherwise, it takes a while): every brush, detail, radius,
 // symmetry and invert, with a partial mask, polygroups, hidden triangles, a sculpt layer and polypaint, random
 // undo / redo between strokes; the mesh stays valid after every stroke and undoing everything gives the start back.

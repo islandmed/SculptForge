@@ -55,6 +55,9 @@ bool zsphereSet(std::vector<ZSphere>& spheres, int i, const glm::vec3& center, f
 bool zsphereDelete(std::vector<ZSphere>& spheres, int i, Symmetry sym);
 // Inserts a sphere halfway along the link from `child` to its parent; `added` gets its index.
 bool zsphereInsert(std::vector<ZSphere>& spheres, int child, Symmetry sym, int* added = nullptr);
+// Makes sphere `i` the root: the links on its way to the old root turn around, and it moves to index 0 (the old
+// root takes its index). The spheres and links stay where they are, so the skin is the same. False for the root.
+bool zsphereSetRoot(std::vector<ZSphere>& spheres, int i);
 
 // "x,y,z,radius,parent" per sphere, as a flat array; FromJson drops an armature that doesn't form a tree.
 Json zspheresToJson(const std::vector<ZSphere>& spheres);
