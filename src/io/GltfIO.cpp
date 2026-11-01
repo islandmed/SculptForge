@@ -421,7 +421,7 @@ std::vector<uint8_t> base64Decode(const std::string& in) {
     int val = 0, bits = -8;
     for (unsigned char c : in) {
         if (table[c] < 0) continue;
-        val = (val << 6) | table[c];
+        val = ((val << 6) | table[c]) & 0xFFFF; // only the bits not yet written matter (and an int must not overflow)
         bits += 6;
         if (bits >= 0) {
             out.push_back(uint8_t((val >> bits) & 0xff));
@@ -450,13 +450,17 @@ struct GltfReader {
             error = "Only float VEC3 positions are supported";
             return false;
         }
-        const size_t count = size_t(acc["count"].asNumber());
-        out.assign(count, glm::vec3(0.0f));
-        if (acc["bufferView"].isNull()) return true; // all zeros (sparse not supported)
+        size_t count;
+        if (!elementCount(acc, count)) return false;
+        if (acc["bufferView"].isNull()) { // all zeros (sparse not supported)
+            out.assign(count, glm::vec3(0.0f));
+            return true;
+        }
         const uint8_t* base;
         size_t stride, available;
         if (!view(acc, 12, base, stride, available)) return false;
-        if (count && (count - 1) * stride + 12 > available) return fail("Accessor out of range");
+        if (!fits(count, 12, stride, available)) return fail("Accessor out of range");
+        out.assign(count, glm::vec3(0.0f));
         for (size_t i = 0; i < count; ++i) std::memcpy(&out[i], base + i * stride, 12);
         return true;
     }
@@ -471,14 +475,18 @@ struct GltfReader {
         const size_t size = type == 5126 ? 4 : (type == 5122 || type == 5123) ? 2 : (type == 5120 || type == 5121) ? 1 : 0;
         if (!size) return fail("Unsupported accessor component type");
         const bool normalized = acc["normalized"].asBool(false);
-        const size_t count = size_t(acc["count"].asNumber());
-        out.assign(count * size_t(components), 0.0f);
-        if (acc["bufferView"].isNull()) return true;
+        size_t count;
+        if (!elementCount(acc, count)) return false;
+        if (acc["bufferView"].isNull()) {
+            out.assign(count * size_t(components), 0.0f);
+            return true;
+        }
         const uint8_t* base;
         size_t stride, available;
         const size_t element = size * size_t(components);
         if (!view(acc, element, base, stride, available)) return false;
-        if (count && (count - 1) * stride + element > available) return fail("Accessor out of range");
+        if (!fits(count, element, stride, available)) return fail("Accessor out of range");
+        out.assign(count * size_t(components), 0.0f);
         for (size_t i = 0; i < count; ++i)
             for (int c = 0; c < components; ++c) {
                 const uint8_t* p = base + i * stride + size_t(c) * size;
@@ -509,11 +517,16 @@ struct GltfReader {
         const int type = int(acc["componentType"].asNumber());
         const size_t size = type == 5125 ? 4 : type == 5123 ? 2 : type == 5121 ? 1 : 0;
         if (!size) return fail("Unsupported index type");
-        const size_t count = size_t(acc["count"].asNumber());
+        size_t count;
+        if (!elementCount(acc, count)) return false;
+        if (acc["bufferView"].isNull()) { // all zeros, as for any accessor without data
+            out.assign(count, 0u);
+            return true;
+        }
         const uint8_t* base;
         size_t stride, available;
         if (!view(acc, size, base, stride, available)) return false;
-        if (count && (count - 1) * stride + size > available) return fail("Accessor out of range");
+        if (!fits(count, size, stride, available)) return fail("Accessor out of range");
         out.resize(count);
         for (size_t i = 0; i < count; ++i) {
             const uint8_t* p = base + i * stride;
@@ -525,17 +538,49 @@ struct GltfReader {
     }
 
     bool view(const Json& acc, size_t elementSize, const uint8_t*& base, size_t& stride, size_t& available) {
-        const Json& bv = doc["bufferViews"][size_t(acc["bufferView"].asNumber())];
-        const size_t buf = size_t(bv["buffer"].asNumber());
-        if (buf >= buffers.size()) return fail("Missing buffer");
-        const size_t viewOffset = size_t(bv["byteOffset"].asNumber());
-        const size_t viewLength = size_t(bv["byteLength"].asNumber());
-        const size_t accOffset = size_t(acc["byteOffset"].asNumber());
-        if (viewOffset + viewLength > buffers[buf].size() || accOffset > viewLength) return fail("Buffer view out of range");
+        size_t viewIndex, buf, viewOffset, viewLength, accOffset;
+        if (!wholeNumber(acc["bufferView"], viewIndex)) return fail("Invalid buffer view");
+        const Json& bv = doc["bufferViews"][viewIndex];
+        if (!wholeNumber(bv["buffer"], buf) || buf >= buffers.size()) return fail("Missing buffer");
+        // Offsets and lengths come from the file: compare without sums that could wrap around.
+        if (!wholeNumber(bv["byteOffset"], viewOffset, 0.0) || !wholeNumber(bv["byteLength"], viewLength) ||
+            !wholeNumber(acc["byteOffset"], accOffset, 0.0) || viewOffset > buffers[buf].size() ||
+            viewLength > buffers[buf].size() - viewOffset || accOffset > viewLength)
+            return fail("Buffer view out of range");
         base = buffers[buf].data() + viewOffset + accOffset;
-        stride = bv["byteStride"].isNumber() ? size_t(bv["byteStride"].asNumber()) : elementSize;
+        stride = elementSize;
+        if (bv["byteStride"].isNumber() && !wholeNumber(bv["byteStride"], stride)) return fail("Invalid byte stride");
         available = viewLength - accOffset;
         return true;
+    }
+
+    // A non-negative whole number from the file (`fallback` when absent; false when negative, fractional or huge).
+    static bool wholeNumber(const Json& j, size_t& out, double fallback = -1.0) {
+        const double n = j.asNumber(fallback);
+        if (!(n >= 0.0 && n <= 9007199254740992.0) || n != std::floor(n)) return false;
+        out = size_t(n);
+        return true;
+    }
+
+    // An accessor's element count (meshes index vertices with 32 bits). Accessors without a buffer view are
+    // zeros that nothing in the file backs: at most 16M of them, or one per byte of buffer data (a real file
+    // with that many vertices carries at least that much).
+    bool elementCount(const Json& acc, size_t& count) {
+        if (!wholeNumber(acc["count"], count) || count > 0xFFFFFFFFu) return fail("Invalid accessor count");
+        if (acc["bufferView"].isNull()) {
+            const size_t limit = size_t(1) << 24;
+            size_t bytes = 0;
+            for (const auto& b : buffers) bytes += b.size();
+            if (count > std::max(limit, bytes)) return fail("Invalid accessor count");
+        }
+        return true;
+    }
+
+    // True when `count` elements of `element` bytes, `stride` apart, lie within `available` bytes.
+    static bool fits(size_t count, size_t element, size_t stride, size_t available) {
+        if (count == 0) return true;
+        if (element > available) return false;
+        return stride == 0 || count - 1 <= (available - element) / stride;
     }
 
     bool fail(const std::string& msg) {

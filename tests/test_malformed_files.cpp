@@ -7,6 +7,7 @@
 
 #include "core/Mesh.h"
 #include "core/Splats.h"
+#include "io/GltfIO.h"
 #include "io/ObjIO.h"
 #include "io/PlyIO.h"
 #include "core/LayerStackIO.h"
@@ -218,4 +219,84 @@ TEST(malformed_material_channels_in_a_project_fail_cleanly) {
     CHECK(!loadProject(path, back, err));
     CHECK(!err.empty());
     std::filesystem::remove(path);
+}
+
+namespace {
+
+// A one-triangle glTF (corners (0,0,0), (1,0,0), (0,1,0) in buffer 0, indices 0 1 2 as bytes in buffer 1) with
+// the buffer view, accessor and primitive fields spliced in.
+bool gltfLoads(const std::string& view, const std::string& accessor, std::string& err,
+               const std::string& primitive = R"({"attributes":{"POSITION":0}})", const std::string& more = "") {
+    const std::string text =
+        R"({"asset":{"version":"2.0"},"buffers":[{"uri":"data:application/octet-stream;base64,)"
+        R"(AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAA","byteLength":36},)"
+        R"({"uri":"data:application/octet-stream;base64,AAEC","byteLength":3}],"bufferViews":[)" +
+        view + R"(],"accessors":[)" + accessor + more + R"(],"meshes":[{"primitives":[)" + primitive +
+        R"(]}],"nodes":[{"mesh":0}],"scenes":[{"nodes":[0]}]})";
+    const std::string path = writeFile("sculptforge_malformed.gltf", text);
+    Mesh m;
+    err.clear();
+    const bool ok = loadGltf(path, m, err);
+    std::filesystem::remove(path);
+    return ok && m.triangleCount() == 1;
+}
+
+const char* kView = R"({"buffer":0,"byteOffset":0,"byteLength":36})";
+const char* kPositions = R"({"bufferView":0,"componentType":5126,"count":3,"type":"VEC3"})";
+
+} // namespace
+
+TEST(gltf_well_formed_triangle_loads) {
+    std::string err;
+    CHECK(gltfLoads(kView, kPositions, err));
+    CHECK(err.empty());
+}
+
+TEST(gltf_buffer_view_offsets_that_wrap_around_are_rejected) {
+    // byteOffset + byteLength overflowed 64 bits and passed the range check: positions were read from far
+    // outside the buffer.
+    std::string err;
+    CHECK(!gltfLoads(R"({"buffer":0,"byteOffset":18446744073709547520,"byteLength":4096})", kPositions, err));
+    CHECK(err.find("out of range") != std::string::npos);
+    // Within the 53 bits a double holds exactly, offset + length still can't pass by wrapping.
+    CHECK(!gltfLoads(R"({"buffer":0,"byteOffset":9007199254740992,"byteLength":36})", kPositions, err));
+    CHECK(!gltfLoads(R"({"buffer":0,"byteOffset":-8,"byteLength":44})", kPositions, err));
+    CHECK(!gltfLoads(R"({"buffer":0,"byteOffset":0.5,"byteLength":36})", kPositions, err));
+    CHECK(!gltfLoads(R"({"buffer":0,"byteOffset":0,"byteLength":37})", kPositions, err)); // longer than the buffer
+    CHECK(!gltfLoads(kView, R"({"bufferView":0,"byteOffset":37,"componentType":5126,"count":3,"type":"VEC3"})", err));
+}
+
+TEST(gltf_accessor_counts_beyond_the_data_are_rejected_before_allocating) {
+    // Counts sized the arrays before the range check, and (count - 1) * stride could wrap around.
+    std::string err;
+    CHECK(!gltfLoads(kView, R"({"bufferView":0,"componentType":5126,"count":4000000000000,"type":"VEC3"})", err));
+    CHECK(err.find("count") != std::string::npos);
+    CHECK(!gltfLoads(kView, R"({"bufferView":0,"componentType":5126,"count":4,"type":"VEC3"})", err));
+    CHECK(err.find("out of range") != std::string::npos);
+    // 4096 * 2^52 is exactly 2^64: the old check computed 0 + 12 <= 36.
+    CHECK(!gltfLoads(R"({"buffer":0,"byteOffset":0,"byteLength":36,"byteStride":4503599627370496})",
+                     R"({"bufferView":0,"componentType":5126,"count":4097,"type":"VEC3"})", err));
+    CHECK(err.find("out of range") != std::string::npos);
+    CHECK(!gltfLoads(kView, R"({"bufferView":0,"componentType":5126,"count":-1,"type":"VEC3"})", err));
+    CHECK(!gltfLoads(kView, R"({"bufferView":0,"componentType":5126,"type":"VEC3"})", err)); // count is required
+    // Accessors without a buffer view are zeros; a tiny file can't ask for billions of them.
+    CHECK(!gltfLoads(kView, R"({"componentType":5126,"count":4000000000,"type":"VEC3"})", err));
+    CHECK(err.find("count") != std::string::npos);
+    // Index data is checked the same way.
+    CHECK(!gltfLoads(kView, kPositions, err, R"({"attributes":{"POSITION":0},"indices":1})",
+                     R"(,{"bufferView":0,"componentType":5125,"count":10,"type":"SCALAR"})"));
+    CHECK(err.find("out of range") != std::string::npos);
+}
+
+TEST(gltf_index_accessor_without_a_buffer_view_is_zeros) {
+    // Zero indices make only degenerate triangles: nothing to import, but no read from another buffer view.
+    std::string err;
+    CHECK(!gltfLoads(kView, kPositions, err, R"({"attributes":{"POSITION":0},"indices":1})",
+                     R"(,{"componentType":5125,"count":3,"type":"SCALAR"})"));
+    CHECK(err.find("out of range") == std::string::npos);
+    CHECK(err.find("count") == std::string::npos);
+    // Indices into the buffer: the triangle loads.
+    CHECK(gltfLoads(R"({"buffer":0,"byteOffset":0,"byteLength":36},{"buffer":1,"byteOffset":0,"byteLength":3})",
+                    kPositions, err, R"({"attributes":{"POSITION":0},"indices":1})",
+                    R"(,{"bufferView":1,"componentType":5121,"count":3,"type":"SCALAR"})"));
 }
