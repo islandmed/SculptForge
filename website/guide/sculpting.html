@@ -136,6 +136,17 @@ Press the letter on the badge to pick that brush. For example <kbd>B</kbd>, <kbd
 <p>The <kbd>S</kbd>, <kbd>U</kbd>, <kbd>I</kbd> and <kbd>O</kbd> pop-ups take the mouse or the keyboard: drag the slider and release to close it, or type a number and press <kbd>Enter</kbd> (a minus first for a negative Focal Shift). <kbd>Esc</kbd> closes the pop-up without typing anything new.</p>
 <h3 id="smooths-own-z-intensity">Smooth&#x27;s own Z Intensity<a class="anchor" href="#smooths-own-z-intensity" aria-label="Link to this section">#</a></h3>
 <p>Smooth keeps a Z Intensity of its own, as in ZBrush, so a gentle Standard stroke at 10 still smooths at full speed. Hold <kbd>Shift</kbd> (or pick the Smooth brush) and the Z Intensity slider shows <strong>Smooth Z Intensity</strong>: change it there, or hold <kbd>Shift</kbd> and press <kbd>U</kbd>. It starts at 50.</p>
+<h3 id="smooth-that-keeps-the-volume">Smooth that keeps the volume<a class="anchor" href="#smooth-that-keeps-the-volume" aria-label="Link to this section">#</a></h3>
+<p>The plain smooth evens out bumps by pulling each point towards its neighbours, so with every pass the form shrinks a little too: a cheek flattens, a sphere gets smaller. The other smooth keeps the volume: it removes the bumps but leaves the form where it is (a Taubin smooth, one step in and a slightly larger one back out).</p>
+<ul>
+<li>
+<strong>Alternate smooth</strong>, as in ZBrush: start a stroke with <kbd>Shift</kbd> held, then let go of <kbd>Shift</kbd> while still pressing. The rest of the stroke uses the other smooth, and the status line says which.
+</li>
+<li>
+<strong>Smooth keeps volume</strong> in the <strong>Brush</strong> palette makes the volume-keeping smooth the one <kbd>Shift</kbd> and the Smooth brush use; letting go of <kbd>Shift</kbd> mid-stroke then switches to the plain one. Saved with the project.
+</li>
+</ul>
+<p>On a micro level (see <a href="micro-levels.html">Micro levels</a>) Smooth is always the plain one for now.</p>
 <figure class="shot"><a href="images/draw-palette.jpg" class="zoom"><img src="images/draw-palette.jpg" alt="The Draw palette" width="400" height="310" loading="lazy" decoding="async"></a><figcaption>The Draw palette</figcaption></figure>
 <h2 id="sculpt-paint-zadd-zsub-rgb-and-front">Sculpt, Paint, Zadd, Zsub, Rgb and Front<a class="anchor" href="#sculpt-paint-zadd-zsub-rgb-and-front" aria-label="Link to this section">#</a></h2>
 <p>These toggles sit on the top shelf and in the <strong>Draw</strong> palette:</p>
@@ -151,6 +162,7 @@ Press the letter on the badge to pick that brush. For example <kbd>B</kbd>, <kbd
 <figure class="shot"><a href="images/stroke-picker.jpg" class="zoom"><img src="images/stroke-picker.jpg" alt="The stroke picker" width="440" height="160" loading="lazy" decoding="async"></a><figcaption>The stroke picker</figcaption></figure>
 <div class="table-wrap"><table><thead><tr><th>Stroke</th><th>What it does</th><th>Setting</th></tr></thead><tbody><tr><td><strong>Dots</strong></td><td>Even dabs along the path: the classic brush stroke (default).</td><td>None; spacing comes from the brush.</td></tr><tr><td><strong>DragRect</strong></td><td>Click and drag one stamp: the drag length sets its size and its direction the rotation. Great with alphas.</td><td>None</td></tr><tr><td><strong>DragDot</strong></td><td>Click and drag one stamp of the brush&#x27;s Draw Size: it slides over the surface under the cursor and lands where you let go. Great for VDMs.</td><td>None</td></tr><tr><td><strong>Spray</strong></td><td>Scattered dabs of random size, strength and rotation, for organic texture.</td><td><strong>Scatter</strong> (0 to 2, default 1): how far dabs land from the cursor, as a fraction of the brush size.</td></tr><tr><td><strong>LazyMouse</strong></td><td>The brush trails the cursor on a string, for smooth, steady lines.</td><td><strong>Lazy radius</strong> (1 to 300 px, default 40): longer is steadier.</td></tr></tbody></table></div>
 <p>The setting slider appears under the stroke tiles when <strong>Spray</strong> or <strong>LazyMouse</strong> is selected. With LazyMouse, the viewport draws the string between the cursor and the brush point.</p>
+<p><strong>Continuous</strong>, under the stroke tiles in the stroke picker and in the <strong>Stroke</strong> palette, keeps the brush working while you hold it still on the model (30 dabs a second), with any stroke type.</p>
 <p>Notes:</p>
 <ul>
 <li>
@@ -326,7 +338,10 @@ a pressure meter and a draw-test area, to see what the tablet reports at a light
 a pressure curve for all brushes (Soft, Linear or Firm, or set <strong>Curve</strong>, <strong>Minimum</strong>, <strong>Maximum</strong>, <strong>Threshold</strong> and <strong>Full pressure at</strong> yourself), applied before each brush&#x27;s own curve;
 </li>
 <li>
-the eraser end (default <strong>Invert</strong>, like holding <kbd>Alt</kbd>) and the side buttons (default: lower button right-click to rotate the view, upper button <strong>Invert</strong>, third button <strong>Pan view</strong>).
+the eraser end (default <strong>Invert</strong>, like holding <kbd>Alt</kbd>) and the side buttons (default: lower button right-click to rotate the view, upper button <strong>Invert</strong>, third button <strong>Pan view</strong>);
+</li>
+<li>
+<strong>Mouse mode (relative)</strong>, for a tablet whose driver is set to mouse mode: the pen moves the cursor by how far it moves, and putting it down elsewhere on the tablet leaves the cursor where it was.
 </li>
 </ul>
 <p><strong>Store Config</strong> (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) keeps these settings. Setup notes for Windows Ink, macOS and Linux are in <a href="https://github.com/islandmed/SculptForge/blob/main/docs/tablet.md" rel="noopener">docs/tablet.md</a>.</p>

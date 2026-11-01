@@ -17,10 +17,16 @@
   <meta property="og:url" content="https://sculptforge.app/donate.html">
   <link rel="canonical" href="https://sculptforge.app/donate.html">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="stylesheet" href="style.css?v=17">
+  <link rel="stylesheet" href="style.css?v=18">
   <style>
     .tiers .card { display: flex; flex-direction: column; gap: 10px; }
-    .tiers .card h3 small { display: block; color: var(--muted); font-weight: 500; margin-top: 4px; }
+    .donate-hero .lede { margin-bottom: 26px; }
+    .tiers .card h3 { margin: 0; font-size: 1.25rem; }
+    .tiers .price { color: #fff; font-size: 2.2rem; font-weight: 700; line-height: 1.1; margin: 0; }
+    .tiers .price span { color: var(--muted); font-size: 0.95rem; font-weight: 500; }
+    .tiers .card.featured { border-color: #f6994d; box-shadow: 0 0 0 1px rgba(246, 153, 77, 0.35), 0 10px 40px rgba(246, 153, 77, 0.12); }
+    .tiers .badge { align-self: flex-start; color: #1a0d04; background: #f6994d; font-size: 0.75rem; font-weight: 700;
+                    padding: 3px 10px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.04em; }
     .tiers .card p:last-child { margin-top: auto; padding-top: 8px; }
     .tiers + .fine { margin-top: 18px; }
     @media (max-width: 620px) {
@@ -41,6 +47,7 @@
         <a href="index.html#demos">Demos</a>
         <a href="brushes.html">Brushes</a>
         <a href="guide/index.html">Guide</a>
+        <a class="nav-support" href="donate.html">Support</a>
         <a class="nav-dl" href="index.html#download">Download</a>
         <a class="gh" href="https://github.com/islandmed/SculptForge">GitHub</a>
       </nav>
@@ -48,49 +55,37 @@
   </header>
 
   <main id="top">
-    <section class="hero">
+    <section class="hero donate-hero">
       <div class="wrap">
         <p class="eyebrow">Support SculptForge</p>
         <h1>Free for everyone, <span class="accent">kept going by you</span></h1>
         <p class="lede thanks" id="thanks" hidden><strong>Thank you!</strong> Your support means a lot. Check your
           email for the receipt; Insider invites go out within a couple of days.</p>
-        <p class="lede">SculptForge is free and open source, with no ads, no accounts and no telemetry. Every feature is
-          free for everyone, and stays that way. If it's useful to you, supporting it makes it grow faster.</p>
-        <div class="ctas">
-          <a class="btn primary" href="https://buy.stripe.com/dRmdR94eH4D06qD9ux4F202" rel="noopener">Become an Insider</a>
-          <a class="btn" href="https://buy.stripe.com/4gM7sL8uXc5s4iv5eh4F200" rel="noopener">Give once</a>
-        </div>
-        <p class="fine">Payments are handled by Stripe (cards, Apple Pay, Google Pay); SculptForge never sees your card
-          details. Cancel a membership anytime. Not a tax-deductible charitable donation.</p>
-      </div>
-    </section>
-
-    <section class="section">
-      <div class="wrap">
-        <h2>Memberships</h2>
+        <p class="lede">Every feature stays free, with no ads, no accounts and no telemetry. Members make it grow
+          faster, and Insiders get new releases about two weeks early.</p>
         <div class="grid tiers">
           <article class="card">
-            <h3>Supporter <small>$5 / month</small></h3>
+            <h3>Supporter</h3><p class="price">$5<span>/month</span></p>
             <p>Your name in the app's <strong>Supporters</strong> list and on this site (optional, any name you
               choose).</p>
             <p><a class="btn" href="https://buy.stripe.com/aFacN5h1t6L8cP14ad4F201" rel="noopener">Support monthly</a></p>
           </article>
-          <article class="card">
-            <h3>Insider <small>$20 / month</small></h3>
+          <article class="card featured">
+            <p class="badge">Recommended</p><h3>Insider</h3><p class="price">$20<span>/month</span></p>
             <p><strong>New releases about two weeks before everyone else</strong>, built and tested by the same
               release pipeline as public builds. A <strong>monthly vote</strong> on what gets built next, the monthly
               <strong>Supporter Pack</strong> of brushes, alphas and VDMs, and your name in the credits.</p>
             <p><a class="btn primary" href="https://buy.stripe.com/dRmdR94eH4D06qD9ux4F202" rel="noopener">Become an Insider</a></p>
           </article>
           <article class="card">
-            <h3>Studio <small>$250 / month</small></h3>
+            <h3>Studio</h3><p class="price">$250<span>/month</span></p>
             <p>Your <strong>logo</strong> on this site and the project README, <strong>Insider access for up to 10
               artists</strong>, and <strong>priority triage</strong> of your pipeline bugs. Custom features and
               integration work are quoted separately: <a href="mailto:hello@sculptforge.app">hello@sculptforge.app</a>.</p>
             <p><a class="btn" href="https://buy.stripe.com/9B63cv8uXb1og1dfSV4F203" rel="noopener">Studio membership</a></p>
           </article>
           <article class="card">
-            <h3>One-time <small>any amount</small></h3>
+            <h3>One-time</h3><p class="price">Any<span> amount</span></p>
             <p>Not a fan of subscriptions? A single contribution of any size (from $5) helps just as much.</p>
             <p><a class="btn" href="https://buy.stripe.com/4gM7sL8uXc5s4iv5eh4F200" rel="noopener">Give once</a></p>
           </article>
@@ -98,8 +93,11 @@
         <p class="fine">Insider builds are shared through a private GitHub repository: give your GitHub username at
           checkout and you'll get an invite. Supporter Packs become free for everyone after three months, and every
           Insider release becomes the public release about two weeks later. <a href="https://billing.stripe.com/p/login/4gM7sL8uXc5s4iv5eh4F200" rel="noopener">Manage or cancel your membership</a>.</p>
+        <p class="fine">Payments are handled by Stripe (cards, Apple Pay, Google Pay); SculptForge never sees your
+          card details. Cancel a membership anytime. Not a tax-deductible charitable donation.</p>
       </div>
     </section>
+
 
     <section class="section alt">
       <div class="wrap">

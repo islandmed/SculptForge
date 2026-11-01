@@ -52,7 +52,10 @@ p { margin: 0 0 1em; }
 .nav nav a.gh { color: var(--text); border: 1px solid var(--border); padding: 6px 14px; border-radius: 999px; }
 /* Site menu (motion.js adds .compact when the links don't fit beside the logo). */
 .nav-toggle { display: none; }
-.nav.compact nav a:not(.gh):not(.nav-dl), .nav.tight nav a.gh { display: none; }
+.nav.compact nav a:not(.gh):not(.nav-dl):not(.nav-support), .nav.tight nav a.gh { display: none; }
+.nav nav a.nav-support { color: #f6994d; border: 1px solid rgba(246, 153, 77, 0.55); padding: 6px 14px; border-radius: 999px;
+                         font-weight: 600; }
+.nav nav a.nav-support:hover { color: #1a0d04; background: #f6994d; }
 .nav.tiny .brand span { display: none; }
 .nav.compact nav a.nav-dl { color: #1a0d04; background: linear-gradient(180deg, #f6994d, #e2742a); padding: 6px 14px;
                             border-radius: 999px; font-weight: 600; }
@@ -161,7 +164,8 @@ p { margin: 0 0 1em; }
   .downloads { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 620px) {
-  .nav nav a:not(.gh):not(.nav-dl) { display: none; }
+  .nav nav a:not(.gh):not(.nav-dl):not(.nav-support) { display: none; }
+  .nav.tight nav a.nav-support { display: none; }
   .footer-grid { grid-template-columns: 1fr; }
   .footer .links { align-items: flex-start; }
   .section { padding: 64px 0; }

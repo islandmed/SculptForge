@@ -7,19 +7,6 @@ All notable changes to SculptForge are listed here. The format follows
 ## [Unreleased]
 
 ### Added
-- Preferences > Tablet > Mouse mode (relative) (#54): for tablets whose driver is set to mouse mode, the pen moves
-  the cursor by how far it moves, like a mouse.
-- Alternate smooth (#40, as in ZBrush): start a stroke with Shift held, then let go of Shift while still pressing,
-  and the rest of the stroke smooths without shrinking the form (a Taubin smooth). Brush > Smooth keeps volume
-  makes that the Shift / Smooth brush smooth (letting go of Shift then switches to the plain one).
-- Ctrl+drag on the background with MaskPen draws a mask rectangle while dragging (#48) and masks what it covers;
-  one that covers none of the model clears the mask, as before (and as in ZBrush, without DynaMesh's remesh).
-- Axis gizmo (#43): click an end of the X / Y / Z gizmo in the canvas corner to snap to that side view
-  (orthographic), as in Blender; the negative ends are drawn too and the end under the pointer is ringed.
-- Undo and Redo on the right shelf (#43); stored layouts get them at the top once (layout version 3).
-- **Continuous** is also in the left shelf's stroke picker, under the stroke tiles (#43).
-- Insert on the model respects X / Y / Z symmetry (#43): a mirrored copy on the other side, one undo step
-  (`insert_primitive symmetry=x`).
 - Insert your own mesh (#34): **Append > Insert on the model > Active SubTool's copy...** (another SubTool) or
   **From file...** (`.obj`, `.ply`, `.glb`), dragged onto the surface like the shapes: centred, sized by the drag,
   its up axis along the normal, turned by the drag and mirrored by symmetry, one undo step
@@ -35,6 +22,27 @@ All notable changes to SculptForge are listed here. The format follows
   Wrinkles, Skin Folds, Hair Strands and Dot Grid; and six more VDM brushes: Rivet, Stitches, Skin Fold, Wrinkle
   Line, Crack and Rock Ledge. All are generated in code the first time they're used (no downloaded or bundled
   image files), with thumbnails in the pickers and the LightBox (whose Brush tab now lists the built-in VDMs too).
+
+### Fixed
+- SelectRect and SelectLasso (hide / show) ignored symmetry (#51 follow-up): with X / Y / Z on, the mirror image of
+  the shape counts as inside too, as with MaskRect and MaskLasso (`hide_rect` / `hide_lasso symmetry=x`).
+
+## [0.10.3] - 2026-11-01
+
+### Added
+- Preferences > Tablet > Mouse mode (relative) (#54): for tablets whose driver is set to mouse mode, the pen moves
+  the cursor by how far it moves, like a mouse.
+- Alternate smooth (#40, as in ZBrush): start a stroke with Shift held, then let go of Shift while still pressing,
+  and the rest of the stroke smooths without shrinking the form (a Taubin smooth). Brush > Smooth keeps volume
+  makes that the Shift / Smooth brush smooth (letting go of Shift then switches to the plain one).
+- Ctrl+drag on the background with MaskPen draws a mask rectangle while dragging (#48) and masks what it covers;
+  one that covers none of the model clears the mask, as before (and as in ZBrush, without DynaMesh's remesh).
+- Axis gizmo (#43): click an end of the X / Y / Z gizmo in the canvas corner to snap to that side view
+  (orthographic), as in Blender; the negative ends are drawn too and the end under the pointer is ringed.
+- Undo and Redo on the right shelf (#43); stored layouts get them at the top once (layout version 3).
+- **Continuous** is also in the left shelf's stroke picker, under the stroke tiles (#43).
+- Insert on the model respects X / Y / Z symmetry (#43): a mirrored copy on the other side, one undo step
+  (`insert_primitive symmetry=x`).
 - SubTool thumbnails in the SubTool list (#43), drawn from each SubTool's existing GPU buffers (no upload, the
   motion proxy on dense meshes), one per frame at most and only once a change has settled, never during a stroke.
 
@@ -57,8 +65,6 @@ All notable changes to SculptForge are listed here. The format follows
 - MaskLasso and MaskRect ignored symmetry (#51): the mirror image of the shape is masked too now, as with mask
   strokes. A Ctrl+click on the model with MaskLasso or MaskRect blurs the mask (Ctrl+Alt+click sharpens it), as
   with MaskPen; it did nothing. A lasso or rectangle that covers none of the model clears the mask.
-- SelectRect and SelectLasso (hide / show) ignored symmetry (#51 follow-up): with X / Y / Z on, the mirror image of
-  the shape counts as inside too, as with MaskRect and MaskLasso (`hide_rect` / `hide_lasso symmetry=x`).
 - macOS (#41): reopening in full screen (restored from the last session, #35) left the menu bar and window buttons
   unreachable until another display was clicked; full screen is now entered after the window is on screen.
 
