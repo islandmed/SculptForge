@@ -81,7 +81,7 @@ Curvature computeCurvature(const Proxy& p, const Frames& f, float radius) {
             const vec3 e = p.P[p.T[t][(k + 1) % 3]] - p.P[p.T[t][k]];
             const float len = glm::length(e);
             edgeSum += len, ++edgeCount;
-            if (o == kNone || o < c) continue;
+            if (o == kNone || o < c || p.feature[c]) continue; // a feature edge is a crease, not curvature
             const uint32_t g = o / 3;
             const vec3 ed = e / std::max(len, 1e-30f);
             // Signed dihedral angle: positive where the surface bends away from its normal (convex).
@@ -265,7 +265,10 @@ bool solveCrossField(const Proxy& p, const Frames& f, const Curvature& curv, con
             // Start: the pull, or a constant phase where there is none.
             for (uint32_t i = 0; i < nfree; ++i)
                 if (std::abs(x[i]) == 0.0) x[i] = cd(1.0, 0.0);
-            const double sigma = std::max(bn, 1e-3 * meanDiag) * 1.0;
+            // With fixed directions (feature lines) the pull towards them must dominate: only a light smoothest-field
+            // term. Without any, the smoothest field is the answer and the scale only sets the step.
+            static const double tune_sigma = std::getenv("SF_QR2_SIGMA") ? std::atof(std::getenv("SF_QR2_SIGMA")) : 2e-3;
+            const double sigma = nfree < nt ? tune_sigma * meanDiag : std::max(bn, 1e-3 * meanDiag);
             std::vector<cd> rhsk(nfree);
             static const int projected = std::getenv("SF_QR2_PROJ") ? std::atoi(std::getenv("SF_QR2_PROJ")) : 30;
             for (int round = 0; round < 6 + projected; ++round) {

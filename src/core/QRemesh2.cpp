@@ -363,6 +363,26 @@ Poly extractLattice(const Proxy& p, const Frames& fr, const GridMap& map, float 
             if (L[3 * t + size_t(i)] == L[3 * t + size_t(j)]) uf.unite(p.T[t][i], p.T[t][j]);
         }
     }
+    // A virtual node whose lattice point a vertex one ring away already rounds to (in the same chart: the shared
+    // vertex has the same map value in both triangles) is that vertex's lattice point.
+    if (!virt.empty()) {
+        VertexFaces vf;
+        vf.build(nv, p.T);
+        for (const Virt& v : virt)
+            for (int k = 0; k < 3; ++k) {
+                const uint32_t x = p.T[v.tri][k];
+                const vec2 at = map.uv[3 * v.tri + uint32_t(k)];
+                for (uint32_t i = vf.off[x]; i < vf.off[x + 1]; ++i) {
+                    const uint32_t t2 = vf.tri[i];
+                    if (t2 == v.tri || flipped[t2]) continue;
+                    int kx = 0;
+                    while (kx < 3 && p.T[t2][kx] != x) ++kx;
+                    if (glm::length(map.uv[3 * t2 + uint32_t(kx)] - at) > 1e-4f) continue; // across a seam
+                    for (int j = 0; j < 3; ++j)
+                        if (L[3 * t2 + uint32_t(j)] == v.g) uf.unite(uint32_t(nv + v.node), p.T[t2][j]);
+                }
+            }
+    }
     std::vector<uint32_t> cluster(nn, kNone);
     uint32_t nc = 0;
     for (uint32_t v = 0; v < nn; ++v) {
@@ -1283,6 +1303,11 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
         }
         return demoted;
     };
+    if (timing) {
+        size_t fc = 0, sc = 0;
+        for (size_t c = 0; c < proxy.feature.size(); ++c) fc += proxy.feature[c], sc += proxy.sharp[c];
+        std::fprintf(stderr, "  v2 proxy features: %zu corners (%zu hard-edge), %zu source hard edges kept\n", fc, sc, ps.sharp.size());
+    }
     {
         const size_t d = demoteSoftEdges(proxy);
         if (timing && d) std::fprintf(stderr, "  v2 %zu soft hard-edge corners demoted\n", d);
@@ -1314,7 +1339,7 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
             std::nth_element(sorted.begin(), sorted.begin() + long(sorted.size() / 2), sorted.end());
             const float ref = std::max(sorted[sorted.size() / 2], 0.2f / h0); // flat models stay even
             for (size_t v = 0; v < rel.size(); ++v)
-                rel[v] = std::clamp(std::pow(std::max(k[v], 1e-9f) / ref, -0.6f * opt.adaptive), 0.45f, 2.2f);
+                rel[v] = std::clamp(std::pow(std::max(k[v], 1e-9f) / ref, tune("SF_QR2_ADAPT", 0.6f) * -opt.adaptive), 0.45f, 2.2f);
         }
         if (!piece.color.empty()) {
             proxy.color.assign(proxy.P.size(), vec3(1.0f));

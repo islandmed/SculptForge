@@ -263,9 +263,12 @@ TEST(qremesh2_benchmark) {
     models.push_back({"sculpt1m", sculptedSphere(2), -1});
     std::printf("\n| model | triangles | target | method | quads | time s | poles | x3/x5/other | corner dev deg | mean dist %% | Hausdorff %% |\n");
     std::printf("|---|---|---|---|---|---|---|---|---|---|---|\n");
+    const char* only = std::getenv("SF_QREMESH_BENCH_MODELS"); // e.g. "lion,head"
     for (const Model& md : models)
         for (int target : {2000, 5000, 10000})
             for (QRemeshMethod method : {QRemeshMethod::Legacy, QRemeshMethod::V2}) {
+                if (only && std::string(only).find(md.name) == std::string::npos) continue;
+                if (method == QRemeshMethod::Legacy && std::getenv("SF_QREMESH_BENCH_V2_ONLY")) continue;
                 const Run r = run(md.mesh, target, method, md.symmetry);
                 if (!r.ok) continue;
                 const QuadQuality& q = r.st.quality;
