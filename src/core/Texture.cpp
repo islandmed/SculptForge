@@ -11,6 +11,9 @@
 #include <atomic>
 #include <cmath>
 #include <cstring>
+#include <limits>
+#include <chrono>
+#include <cstdio>
 #include <thread>
 
 namespace sf {
@@ -225,7 +228,152 @@ void dropStackIfEmpty(PaintTexture& t) {
     if (t.base.size() == t.pixels.size()) t.pixels = t.base;
     std::vector<uint8_t>().swap(t.base);
     t.activeLayer = -1;
+    syncLayerChannels(t); // drops the channel composites
     t.markAllDirty();
+}
+
+static_assert(kTileImageTile == kTextureTile, "material channel tiles line up with the texture's undo tiles");
+
+// Writes paint of weight `w` into one texel of a material channel (n components of `bits`), starting from
+// `orig`: Base mixes towards `val` (erase: towards the channel's default); a layer paints "source over" onto its
+// coverage (component n), erase lowers the coverage. Normals are renormalised.
+inline void paintChannelTexel(uint8_t* dst, const uint8_t* orig, int n, int bits, bool layer, const float* val,
+                              const float* def, float w, bool erase, bool normal) {
+    const int m = layer ? n + 1 : n;
+    float o[5], v[5];
+    if (bits == 16) {
+        for (int k = 0; k < m; ++k) {
+            uint16_t u;
+            std::memcpy(&u, orig + k * 2, 2);
+            o[k] = float(u) * (1.0f / 65535.0f);
+        }
+    } else {
+        for (int k = 0; k < m; ++k) o[k] = float(orig[k]) * (1.0f / 255.0f);
+    }
+    if (!layer) {
+        const float* to = erase ? def : val;
+        for (int k = 0; k < n; ++k) v[k] = o[k] + (to[k] - o[k]) * w;
+    } else if (erase) {
+        for (int k = 0; k < n; ++k) v[k] = o[k];
+        v[n] = o[n] * (1.0f - w);
+    } else {
+        const float a = o[n], na = a + w * (1.0f - a);
+        for (int k = 0; k < n; ++k) v[k] = na > 0.0f ? (o[k] * (a * (1.0f - w)) + val[k] * w) / na : val[k];
+        v[n] = na;
+    }
+    if (normal && n == 3) {
+        glm::vec3 d(v[0] * 2.0f - 1.0f, v[1] * 2.0f - 1.0f, v[2] * 2.0f - 1.0f);
+        const float len = glm::length(d);
+        d = len > 1e-6f ? d / len : glm::vec3(0, 0, 1);
+        v[0] = d.x * 0.5f + 0.5f, v[1] = d.y * 0.5f + 0.5f, v[2] = d.z * 0.5f + 0.5f;
+    }
+    if (bits == 16) {
+        for (int k = 0; k < m; ++k) {
+            const uint16_t u = uint16_t(std::clamp(v[k], 0.0f, 1.0f) * 65535.0f + 0.5f);
+            std::memcpy(dst + k * 2, &u, 2);
+        }
+    } else {
+        for (int k = 0; k < m; ++k) dst[k] = uint8_t(std::clamp(v[k], 0.0f, 1.0f) * 255.0f + 0.5f);
+    }
+}
+
+// A layer channel image made from a Base channel image (opaque coverage), for duplicating Base.
+TileImage layerImageFromBase(const TileImage& base) {
+    TileImage out;
+    if (!base.valid()) return out;
+    const int n = base.components(), bits = base.bits();
+    std::array<uint16_t, 4> fill = base.fill();
+    if (n < 4) fill[size_t(n)] = bits == 16 ? 65535 : 255;
+    out.reset(base.width(), base.height(), n + 1, bits, fill);
+    for (size_t ti = 0; ti < base.tileCount(); ++ti) {
+        const TileImage::Tile* t = base.tile(ti);
+        if (!t) continue; // stays the opaque fill
+        const int x0 = int(ti % size_t(base.tilesX())) * kTileImageTile, y0 = int(ti / size_t(base.tilesX())) * kTileImageTile;
+        for (int y = y0; y < std::min(y0 + kTileImageTile, base.height()); ++y)
+            for (int x = x0; x < std::min(x0 + kTileImageTile, base.width()); ++x) {
+                float v[5] = {0, 0, 0, 0, 0};
+                base.values(x, y, v);
+                v[n] = 1.0f;
+                out.setValues(x, y, v);
+            }
+        out.compactTile(ti);
+    }
+    return out;
+}
+
+// A layer channel merged onto a Base channel image (the lowest layer merging down).
+void mergeChannelIntoBase(TileImage& base, const TileImage& layer, float opacity, uint8_t blend, bool normal) {
+    if (!base.valid() || !layer.valid()) return;
+    const int n = base.components();
+    for (size_t ti = 0; ti < layer.tileCount(); ++ti) {
+        if (!layer.tile(ti)) continue;
+        const int x0 = int(ti % size_t(layer.tilesX())) * kTileImageTile, y0 = int(ti / size_t(layer.tilesX())) * kTileImageTile;
+        for (int y = y0; y < std::min(y0 + kTileImageTile, base.height()); ++y)
+            for (int x = x0; x < std::min(x0 + kTileImageTile, base.width()); ++x) {
+                float v[4] = {0, 0, 0, 0}, s[5] = {0, 0, 0, 0, 0};
+                base.values(x, y, v);
+                layer.values(x, y, s);
+                const float a = std::min(s[n] * opacity, 1.0f);
+                if (a <= 0.0f) continue;
+                if (normal && n == 3) {
+                    const glm::vec3 b = glm::normalize(decodeNormal(v[0], v[1], v[2]) + glm::vec3(0, 0, 1e-6f));
+                    const glm::vec3 d = glm::normalize(decodeNormal(s[0], s[1], s[2]) + glm::vec3(0, 0, 1e-6f));
+                    const glm::vec3 r = blend == kBlendNormalCombine ? normalCombine(b, d) : d;
+                    const glm::vec3 mixed = glm::normalize(b * (1.0f - a) + r * a + glm::vec3(0, 0, 1e-6f));
+                    v[0] = mixed.x * 0.5f + 0.5f, v[1] = mixed.y * 0.5f + 0.5f, v[2] = mixed.z * 0.5f + 0.5f;
+                } else {
+                    const BlendMode mode = blend < kBlendModeCount ? BlendMode(blend) : BlendMode::Normal;
+                    const glm::vec3 bc = n == 1 ? glm::vec3(v[0]) : glm::vec3(v[0], v[1], v[2]);
+                    const glm::vec3 sc = n == 1 ? glm::vec3(s[0]) : glm::vec3(s[0], s[1], s[2]);
+                    const glm::vec3 o = glm::mix(bc, glm::clamp(blendColors(mode, bc, sc), 0.0f, 1.0f), a);
+                    for (int k = 0; k < n; ++k) v[k] = o[k];
+                }
+                base.setValues(x, y, v);
+            }
+        base.compactTile(ti);
+    }
+}
+
+// A layer channel merged into the layer channel below it (keeping coverage, as the colour merge does).
+void mergeChannelIntoLayer(TileImage& low, float lowOpacity, const TileImage& up, float upOpacity, uint8_t blend, bool normal) {
+    if (!low.valid() || !up.valid()) return;
+    const int n = low.components() - 1;
+    for (size_t ti = 0; ti < low.tileCount(); ++ti) {
+        if (!up.tile(ti) && (!low.tile(ti) || lowOpacity == 1.0f)) continue;
+        const int x0 = int(ti % size_t(low.tilesX())) * kTileImageTile, y0 = int(ti / size_t(low.tilesX())) * kTileImageTile;
+        for (int y = y0; y < std::min(y0 + kTileImageTile, low.height()); ++y)
+            for (int x = x0; x < std::min(x0 + kTileImageTile, low.width()); ++x) {
+                float d[5] = {0, 0, 0, 0, 0}, s[5] = {0, 0, 0, 0, 0};
+                low.values(x, y, d);
+                up.values(x, y, s);
+                const float ab = std::min(d[n] * lowOpacity, 1.0f), as = std::min(s[n] * upOpacity, 1.0f);
+                if (as <= 0.0f) {
+                    if (lowOpacity != 1.0f) {
+                        d[n] = ab;
+                        low.setValues(x, y, d);
+                    }
+                    continue;
+                }
+                const float ao = as + ab * (1.0f - as);
+                float mixed[3];
+                if (normal && n == 3) {
+                    const glm::vec3 b = glm::normalize(decodeNormal(d[0], d[1], d[2]) + glm::vec3(0, 0, 1e-6f));
+                    const glm::vec3 t = glm::normalize(decodeNormal(s[0], s[1], s[2]) + glm::vec3(0, 0, 1e-6f));
+                    const glm::vec3 r = blend == kBlendNormalCombine ? normalCombine(b, t) : t;
+                    mixed[0] = r.x * 0.5f + 0.5f, mixed[1] = r.y * 0.5f + 0.5f, mixed[2] = r.z * 0.5f + 0.5f;
+                } else {
+                    const BlendMode mode = blend < kBlendModeCount ? BlendMode(blend) : BlendMode::Normal;
+                    const glm::vec3 bc = n == 1 ? glm::vec3(d[0]) : glm::vec3(d[0], d[1], d[2]);
+                    const glm::vec3 sc = n == 1 ? glm::vec3(s[0]) : glm::vec3(s[0], s[1], s[2]);
+                    const glm::vec3 o = glm::clamp(blendColors(mode, bc, sc), 0.0f, 1.0f);
+                    mixed[0] = o.x, mixed[1] = o.y, mixed[2] = o.z;
+                }
+                for (int k = 0; k < n; ++k) d[k] = (as * (1.0f - ab) * s[k] + as * ab * mixed[k] + (1.0f - as) * ab * d[k]) / ao;
+                d[n] = ao;
+                low.setValues(x, y, d);
+            }
+        low.compactTile(ti);
+    }
 }
 
 // One texel of the composite: Base and the visible layers in display (sRGB) space, as compositePaintVertex.
@@ -234,7 +382,7 @@ inline void compositeTexel(const PaintTexture& t, size_t i, uint8_t* out) {
     glm::vec3 c(0.0f);
     bool blended = false;
     for (const TextureLayer& l : t.layers) {
-        if (!l.visible) continue;
+        if (!l.visible || !l.channels[0].enabled) continue; // channels[BaseColor]: the layer shows its colour
         const uint8_t* s = &l.rgba[i * 4];
         const float a = std::min(float(s[3]) / 255.0f * l.opacity, 1.0f);
         if (a <= 0.0f) continue;
@@ -337,6 +485,8 @@ std::shared_ptr<PaintTexture> packTexture(const PaintTexture* t, const PaintText
     shell->width = t->width;
     shell->height = t->height;
     shell->activeLayer = t->activeLayer;
+    shell->channels = t->channels; // material channels: copy-on-write tiles, shared until either side edits them
+    shell->heightNormalStrength = t->heightNormalStrength;
     shell->layers.reserve(t->layers.size());
     for (const TextureLayer& l : t->layers) {
         TextureLayer s;
@@ -346,6 +496,7 @@ std::shared_ptr<PaintTexture> packTexture(const PaintTexture* t, const PaintText
         s.blend = l.blend;
         s.visible = l.visible;
         s.locked = l.locked;
+        s.channels = l.channels;
         shell->layers.push_back(std::move(s));
     }
     const int tilesX = tileCount(t->width), tilesY = tileCount(t->height);
@@ -382,6 +533,8 @@ std::shared_ptr<PaintTexture> unpackTexture(const PaintTexture& shell, const std
     t->height = shell.height;
     t->serial = gTextureSerial++;
     t->activeLayer = shell.activeLayer;
+    t->channels = shell.channels;
+    t->heightNormalStrength = shell.heightNormalStrength;
     t->layers = shell.layers;
     const size_t n = t->texelCount() * 4, stride = size_t(t->width) * 4;
     const int tilesX = tileCount(t->width);
@@ -471,7 +624,7 @@ std::vector<uint8_t>& PaintTexture::target(int layer) {
 size_t PaintTexture::bytes() const {
     size_t n = pixels.size() + base.size() + coverage.size() + sizeof(PaintTexture);
     for (const auto& l : layers) n += l.rgba.size() + sizeof(TextureLayer);
-    return n;
+    return n + channelBytes(*this);
 }
 
 std::shared_ptr<PaintTexture> makeTexture(int width, int height) {
@@ -503,9 +656,21 @@ PaintTexture& mutableTexture(Mesh& m) {
     return *m.texture;
 }
 
+// The coverage of a dense mesh's UVs from the texture-painting cache (defined with the tile dabs below); null if it
+// can't be made that way.
+std::shared_ptr<const std::vector<uint8_t>> cachedCoverage(const Mesh& m, int w, int h);
+
 void ensureCoverage(const Mesh& m, PaintTexture& tex, bool force) {
     const uint64_t fp = uvFingerprint(m);
     if (!force && tex.coverageUvs == fp && tex.coverage.size() == (tex.texelCount() + 7) / 8) return;
+    // Dense meshes: from the shared texture-painting cache, built tile by tile in parallel.
+    if (!force && m.triangleCount() >= 200000 && m.uvs.size() == m.triangleCount() * 3)
+        if (std::shared_ptr<const std::vector<uint8_t>> c = cachedCoverage(m, tex.width, tex.height);
+            c && c->size() == (tex.texelCount() + 7) / 8) {
+            tex.coverage = *c;
+            tex.coverageUvs = fp;
+            return;
+        }
     tex.coverage.assign((tex.texelCount() + 7) / 8, 0);
     tex.coverageUvs = fp;
     if (m.uvs.size() != m.triangleCount() * 3) return;
@@ -540,6 +705,7 @@ void compositeTexture(PaintTexture& t, int x0, int y0, int x1, int y1) {
                     compositeTexel(t, i, &t.pixels[i * 4]);
                 }
         });
+        compositeChannels(t, x0, y0, x1, y1);
     }
     t.markDirty(x0, y0, x1, y1);
 }
@@ -579,7 +745,7 @@ glm::vec3 sampleTextureAt(const Mesh& m, uint32_t tri, const glm::vec3& point) {
 
 // --- Brush ---
 
-bool TexturePainter::begin(Mesh& mesh) {
+bool TexturePainter::begin(Mesh& mesh, uint32_t channels) {
     active_ = false;
     tiles_.clear();
     dab_ = 0;
@@ -587,8 +753,11 @@ bool TexturePainter::begin(Mesh& mesh) {
     const PaintTexture& t = *mesh.texture;
     layer_ = t.layers.empty() ? -1 : std::clamp(t.activeLayer, -1, int(t.layers.size()) - 1);
     if (!textureLayerEditable(t, layer_)) return false;
+    channels_ = channels & enabledChannelMask(t);
+    if (!channels_) return false;
     PaintTexture& tex = mutableTexture(mesh);
-    ensureCoverage(mesh, tex);
+    syncLayerChannels(tex); // every layer has an image for every enabled channel
+    if (!useTilePath(mesh, tex)) ensureCoverage(mesh, tex); // (the per-triangle dab pads islands with it)
     tilesX_ = (tex.width + kTextureTile - 1) / kTextureTile;
     tilesY_ = (tex.height + kTextureTile - 1) / kTextureTile;
     tiles_.resize(size_t(tilesX_) * size_t(tilesY_));
@@ -598,7 +767,18 @@ bool TexturePainter::begin(Mesh& mesh) {
     return true;
 }
 
-TexturePainter::Tile& TexturePainter::tile(uint32_t index, const std::vector<uint8_t>& target, int width, int height) {
+TileImage* TexturePainter::channelTarget(PaintTexture& tex, int c) const {
+    if (c <= 0 || c >= kChannelCount || !(channels_ & (1u << c)) || !channelEnabled(tex, Channel(c))) return nullptr;
+    if (layer_ >= 0) {
+        if (layer_ >= int(tex.layers.size())) return nullptr;
+        TileImage& img = tex.layers[size_t(layer_)].channels[size_t(c)].image;
+        return img.valid() && img.width() == tex.width && img.height() == tex.height ? &img : nullptr;
+    }
+    return &tex.channels[size_t(c)].base;
+}
+
+TexturePainter::Tile& TexturePainter::tile(uint32_t index, const std::vector<uint8_t>& target, int width, int height,
+                                           PaintTexture& tex) {
     if (Tile* made = tilePtr_[index].load(std::memory_order_acquire)) return *made;
     std::lock_guard<std::mutex> lock(tileMutex_);
     std::unique_ptr<Tile>& slot = tiles_[index];
@@ -614,8 +794,533 @@ TexturePainter::Tile& TexturePainter::tile(uint32_t index, const std::vector<uin
     for (int y = 0; y < ch; ++y)
         std::memcpy(&t.original[size_t(y) * kTextureTile * 4], &target[(size_t(ty + y) * size_t(width) + size_t(tx)) * 4],
                     size_t(cw) * 4);
+    // The material channels: keep the old tile for undo and make the image's tile writable.
+    for (int c = 1; c < kChannelCount; ++c) {
+        TileImage* img = channelTarget(tex, c);
+        if (!img) continue;
+        ChannelTile& ct = t.channels[size_t(c)];
+        ct.original = img->tilePtr(index);
+        if (ct.original && !ct.original->uniform) {
+            ct.origTexels = ct.original->data.data();
+            ct.origStride = img->texelBytes();
+        } else {
+            img->texel(tx, ty, ct.origValue); // the uniform value or the fill, as one raw texel
+            ct.origTexels = ct.origValue;
+            ct.origStride = 0;
+        }
+        ct.texels = img->writableTile(index);
+    }
     tilePtr_[index].store(&t, std::memory_order_release);
     return t;
+}
+
+// --- Texel-tile dabs for dense meshes ---
+
+namespace {
+
+struct DabMirror {
+    glm::vec3 center, viewDir, aUp, aRight;
+    uint32_t stamp;
+};
+
+std::atomic<int> gDabPath{0}; // TexturePainter::Path
+
+constexpr uint32_t kNoTri = UINT32_MAX;
+constexpr size_t kTexelMapBudget = 4096; // cached texel tiles (32 KB each): 128 MB at most
+
+uint64_t mixKey(uint64_t h, uint64_t v) { return (h ^ (v + 0x9E3779B97F4A7C15ull + (h << 6) + (h >> 2))) * 1099511628211ull; }
+
+} // namespace
+
+// The UV triangles binned per kTextureTile tile: each triangle in every tile its UV box (grown by the gutter)
+// touches, in triangle order.
+struct UvTileIndex {
+    uint64_t key = 0;
+    int tilesX = 0, tilesY = 0;
+    std::vector<uint8_t> triTiles;  // 4 per triangle: tile x0, y0, x1, y1 (x0 > x1: none); tiles per side <= 256
+    std::vector<uint32_t> binStart; // tilesX * tilesY + 1
+    std::vector<uint32_t> bins;
+};
+
+// One tile's texels: the triangle and barycentrics (b1, b2 as 16 bits) of each, kNoTri where no island reaches.
+struct TexelMapTile {
+    std::vector<uint32_t> tri;
+    std::vector<uint16_t> bary;
+    // Texels more than one island triangle covers (overlapping UVs, e.g. mirrored halves), in texel order: the
+    // other triangles, painted after the first as the per-triangle dab would.
+    struct Extra {
+        uint16_t li;
+        uint16_t b1, b2;
+        uint32_t tri;
+    };
+    std::vector<Extra> extras;
+    uint64_t used = 0;
+};
+struct TexelMapCache {
+    uint64_t key = 0;
+    std::vector<std::unique_ptr<TexelMapTile>> tiles;
+    size_t live = 0;
+    uint64_t clock = 0;
+};
+
+namespace {
+
+uint64_t paintKey(const Mesh& m, int w, int h) {
+    return mixKey(mixKey(uvFingerprint(m), m.triangleCount()), uint64_t(uint32_t(w)) << 32 | uint64_t(uint32_t(h)));
+}
+uint64_t texelMapKey(const Mesh& m, const PaintTexture& t) { return paintKey(m, t.width, t.height); }
+
+std::shared_ptr<const UvTileIndex> buildUvIndex(const Mesh& m, int width, int height, uint64_t key) {
+    auto idx = std::make_shared<UvTileIndex>();
+    idx->key = key;
+    idx->tilesX = tileCount(width);
+    idx->tilesY = tileCount(height);
+    const size_t nt = m.triangleCount();
+    idx->triTiles.resize(nt * 4);
+    const float w = float(width), h = float(height), pad = float(kTextureGutter + 1);
+    const int tx1max = idx->tilesX - 1, ty1max = idx->tilesY - 1;
+    poolFor(nt, [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) {
+            uint8_t* o = &idx->triTiles[i * 4];
+            const glm::vec2 a = m.uvs[i * 3], c = m.uvs[i * 3 + 1], d = m.uvs[i * 3 + 2];
+            const float minX = std::min({a.x, c.x, d.x}) * w - 0.5f - pad, maxX = std::max({a.x, c.x, d.x}) * w - 0.5f + pad;
+            const float minY = std::min({a.y, c.y, d.y}) * h - 0.5f - pad, maxY = std::max({a.y, c.y, d.y}) * h - 0.5f + pad;
+            if (!(minX <= maxX && minY <= maxY) || maxX < 0.0f || maxY < 0.0f || minX >= w || minY >= h) {
+                o[0] = 1, o[1] = 0, o[2] = 0, o[3] = 0;
+                continue;
+            }
+            o[0] = uint8_t(std::clamp(int(std::floor(minX)) / kTextureTile, 0, tx1max));
+            o[1] = uint8_t(std::clamp(int(std::floor(minY)) / kTextureTile, 0, ty1max));
+            o[2] = uint8_t(std::clamp(int(std::ceil(maxX)) / kTextureTile, 0, tx1max));
+            o[3] = uint8_t(std::clamp(int(std::ceil(maxY)) / kTextureTile, 0, ty1max));
+        }
+    }, 65536);
+    // Bins in triangle order, on every core: each block of triangles counts its tiles, a prefix over (tile,
+    // block) gives every block its place in each bin, then the blocks fill in parallel.
+    const size_t tiles = size_t(idx->tilesX) * size_t(idx->tilesY);
+    const size_t blocks = std::clamp<size_t>(nt / 65536, 1, 32), per = (nt + blocks - 1) / blocks;
+    std::vector<uint32_t> counts(blocks * tiles, 0);
+    auto forTiles = [&](size_t i, auto&& fn) {
+        const uint8_t* o = &idx->triTiles[i * 4];
+        if (o[0] > o[2]) return;
+        for (int ty = o[1]; ty <= o[3]; ++ty)
+            for (int tx = o[0]; tx <= o[2]; ++tx) fn(size_t(ty) * size_t(idx->tilesX) + size_t(tx));
+    };
+    ThreadPool::shared().run(blocks, [&](size_t b) {
+        uint32_t* c = &counts[b * tiles];
+        for (size_t i = b * per; i < std::min(nt, (b + 1) * per); ++i) forTiles(i, [&](size_t k) { ++c[k]; });
+    });
+    idx->binStart.assign(tiles + 1, 0);
+    uint32_t running = 0;
+    for (size_t k = 0; k < tiles; ++k) {
+        idx->binStart[k] = running;
+        for (size_t b = 0; b < blocks; ++b) {
+            const uint32_t n = counts[b * tiles + k];
+            counts[b * tiles + k] = running; // now: where block b writes into bin k
+            running += n;
+        }
+    }
+    idx->binStart[tiles] = running;
+    idx->bins.resize(running);
+    ThreadPool::shared().run(blocks, [&](size_t b) {
+        uint32_t* at = &counts[b * tiles];
+        for (size_t i = b * per; i < std::min(nt, (b + 1) * per); ++i) forTiles(i, [&](size_t k) { idx->bins[at[k]++] = uint32_t(i); });
+    });
+    return idx;
+}
+
+// The coverage bitmap (PaintTexture::coverage) from the bins, tiles in parallel: a tile's texels are whole bytes
+// of the bitmap (64 texels per row), so tiles never share a byte. Needs widths that are multiples of 64.
+std::vector<uint8_t> coverageFromIndex(const Mesh& m, int w, int h, const UvTileIndex& idx) {
+    std::vector<uint8_t> cov((size_t(w) * size_t(h) + 7) / 8, 0);
+    poolFor(size_t(idx.tilesX) * size_t(idx.tilesY), [&](size_t b, size_t e) {
+        for (size_t ti = b; ti < e; ++ti) {
+            const int x0 = int(ti % size_t(idx.tilesX)) * kTextureTile, y0 = int(ti / size_t(idx.tilesX)) * kTextureTile;
+            const int x1 = std::min(x0 + kTextureTile, w) - 1, y1 = std::min(y0 + kTextureTile, h) - 1;
+            for (uint32_t k = idx.binStart[ti]; k < idx.binStart[ti + 1]; ++k) {
+                const uint32_t tri = idx.bins[k];
+                const TriSetup s(m.uvs[size_t(tri) * 3], m.uvs[size_t(tri) * 3 + 1], m.uvs[size_t(tri) * 3 + 2], w, h);
+                visitTriangle(s, w, h, 0, nullptr, x0, y0, x1, y1, [&](int x, int y, const glm::vec3&, bool) {
+                    const size_t i = size_t(y) * size_t(w) + size_t(x);
+                    cov[i >> 3] |= uint8_t(1u << (i & 7));
+                });
+            }
+        }
+    }, 1);
+    return cov;
+}
+
+// Texture-painting caches by UV layout and texture size (not by texture: copies, undo steps and new textures on
+// the same UVs share them): the UV bins, the texel maps and the coverage. The two most recent layouts are kept.
+struct PaintCacheEntry {
+    uint64_t key = 0;
+    std::shared_ptr<const UvTileIndex> index;
+    std::shared_ptr<TexelMapCache> maps;
+    std::shared_ptr<const std::vector<uint8_t>> coverage;
+};
+std::mutex gPaintCacheMutex;
+std::vector<PaintCacheEntry> gPaintCache; // most recent first
+
+PaintCacheEntry paintCache(const Mesh& m, int w, int h, uint64_t key) {
+    std::lock_guard lock(gPaintCacheMutex);
+    for (size_t i = 0; i < gPaintCache.size(); ++i)
+        if (gPaintCache[i].key == key) {
+            std::rotate(gPaintCache.begin(), gPaintCache.begin() + std::ptrdiff_t(i), gPaintCache.begin() + std::ptrdiff_t(i) + 1);
+            return gPaintCache[0];
+        }
+    PaintCacheEntry e;
+    e.key = key;
+    e.index = buildUvIndex(m, w, h, key);
+    auto maps = std::make_shared<TexelMapCache>();
+    maps->key = key;
+    maps->tiles.resize(size_t(e.index->tilesX) * size_t(e.index->tilesY));
+    e.maps = std::move(maps);
+    gPaintCache.insert(gPaintCache.begin(), e);
+    if (gPaintCache.size() > 2) gPaintCache.resize(2);
+    return e;
+}
+
+// The texel map of tile `ti`: every island texel's triangle (exact top-left rule, as rasterizeUvTriangle), and
+// every gutter texel's nearest island point within kTextureGutter texels.
+std::unique_ptr<TexelMapTile> buildTexelMap(const Mesh& m, const PaintTexture& t, const UvTileIndex& idx, size_t ti) {
+    auto map = std::make_unique<TexelMapTile>();
+    constexpr size_t n = size_t(kTextureTile) * kTextureTile;
+    map->tri.assign(n, kNoTri);
+    map->bary.assign(n * 2, 0);
+    std::vector<float> dist(n, std::numeric_limits<float>::max());
+    const int x0 = int(ti % size_t(idx.tilesX)) * kTextureTile, y0 = int(ti / size_t(idx.tilesX)) * kTextureTile;
+    const int x1 = std::min(x0 + kTextureTile, t.width) - 1, y1 = std::min(y0 + kTextureTile, t.height) - 1;
+    auto put = [&](size_t li, uint32_t tri, const glm::vec3& b) {
+        map->tri[li] = tri;
+        map->bary[li * 2] = uint16_t(std::lround(std::clamp(b.y, 0.0f, 1.0f) * 65535.0f));
+        map->bary[li * 2 + 1] = uint16_t(std::lround(std::clamp(b.z, 0.0f, 1.0f) * 65535.0f));
+    };
+    // Pass 1, island texels: every bin triangle without the gutter. The bin holds every triangle that reaches the
+    // tile, so this is also the tile's coverage (no texture-wide coverage needed).
+    for (uint32_t k = idx.binStart[ti]; k < idx.binStart[ti + 1]; ++k) {
+        const uint32_t tri = idx.bins[k];
+        const TriSetup s(m.uvs[size_t(tri) * 3], m.uvs[size_t(tri) * 3 + 1], m.uvs[size_t(tri) * 3 + 2], t.width, t.height);
+        visitTriangle(s, t.width, t.height, 0, nullptr, x0, y0, x1, y1, [&](int x, int y, const glm::vec3& b, bool) {
+            const size_t li = size_t(y - y0) * kTextureTile + size_t(x - x0);
+            if (dist[li] < 0.0f) { // overlapping UVs: the texel's other triangles
+                map->extras.push_back({uint16_t(li), uint16_t(std::lround(std::clamp(b.y, 0.0f, 1.0f) * 65535.0f)),
+                                       uint16_t(std::lround(std::clamp(b.z, 0.0f, 1.0f) * 65535.0f)), tri});
+                return;
+            }
+            dist[li] = -1.0f;
+            put(li, tri, b);
+        });
+    }
+    // Uncovered texels of the tile as a summed-area table: a triangle needs the gutter pass only when its grown
+    // box holds one (most triangles of a dense mesh lie inside an island and cost nothing more).
+    constexpr int S = kTextureTile + 1;
+    std::array<uint16_t, size_t(S) * S> sat{};
+    for (int y = y0; y <= y1; ++y)
+        for (int x = x0; x <= x1; ++x) {
+            const int ly = y - y0 + 1, lx = x - x0 + 1;
+            const bool cov = dist[size_t(y - y0) * kTextureTile + size_t(x - x0)] < 0.0f;
+            sat[size_t(ly) * S + size_t(lx)] = uint16_t((cov ? 0 : 1) + sat[size_t(ly - 1) * S + size_t(lx)] +
+                                                        sat[size_t(ly) * S + size_t(lx - 1)] - sat[size_t(ly - 1) * S + size_t(lx - 1)]);
+        }
+    auto uncovered = [&](int bx0, int by0, int bx1, int by1) { // texel box (inclusive), clipped to the tile
+        bx0 = std::max(bx0, x0) - x0, by0 = std::max(by0, y0) - y0, bx1 = std::min(bx1, x1) - x0, by1 = std::min(by1, y1) - y0;
+        if (bx0 > bx1 || by0 > by1) return false;
+        return sat[size_t(by1 + 1) * S + size_t(bx1 + 1)] - sat[size_t(by0) * S + size_t(bx1 + 1)] -
+                   sat[size_t(by1 + 1) * S + size_t(bx0)] + sat[size_t(by0) * S + size_t(bx0)] > 0;
+    };
+    // Pass 2, gutter texels: the nearest island point of the triangles near uncovered texels.
+    for (uint32_t k = idx.binStart[ti]; k < idx.binStart[ti + 1]; ++k) {
+        const uint32_t tri = idx.bins[k];
+        // The texel box (as TriSetup::bounds) from the UVs alone: most triangles are skipped without a setup.
+        const glm::vec2 a = m.uvs[size_t(tri) * 3], bb = m.uvs[size_t(tri) * 3 + 1], cc = m.uvs[size_t(tri) * 3 + 2];
+        const float fw = float(t.width), fh = float(t.height);
+        const int bx0 = int(std::floor(std::min({a.x, bb.x, cc.x}) * fw - 0.5f)) - kTextureGutter;
+        const int by0 = int(std::floor(std::min({a.y, bb.y, cc.y}) * fh - 0.5f)) - kTextureGutter;
+        const int bx1 = int(std::ceil(std::max({a.x, bb.x, cc.x}) * fw - 0.5f)) + kTextureGutter;
+        const int by1 = int(std::ceil(std::max({a.y, bb.y, cc.y}) * fh - 0.5f)) + kTextureGutter;
+        if (!uncovered(bx0, by0, bx1, by1)) continue;
+        const TriSetup s(a, bb, cc, t.width, t.height);
+        if (!s.valid) continue;
+        visitTriangle(s, t.width, t.height, kTextureGutter, nullptr, x0, y0, x1, y1, [&](int x, int y, const glm::vec3& b, bool inside) {
+            const size_t li = size_t(y - y0) * kTextureTile + size_t(x - x0);
+            if (inside || dist[li] < 0.0f) return; // island texels came from pass 1
+            const glm::vec2 q = s.t[0] * b.x + s.t[1] * b.y + s.t[2] * b.z, c(float(x) + 0.5f, float(y) + 0.5f);
+            const float d2 = glm::dot(q - c, q - c);
+            if (d2 < dist[li]) {
+                dist[li] = d2;
+                put(li, tri, b);
+            }
+        });
+    }
+    std::stable_sort(map->extras.begin(), map->extras.end(),
+                     [](const TexelMapTile::Extra& a, const TexelMapTile::Extra& b) { return a.li < b.li; });
+    return map;
+}
+
+// The tiles a triangle spanning several tiles can paint under the brush sphere: the affine texel -> 3D map turns
+// the sphere into an ellipse in texel space (as the per-triangle dab clips), grown by the gutter. False if none.
+bool sphereTiles(const Mesh& m, uint32_t tri, int w, int h, const glm::vec3& center, float r2, int& tx0, int& ty0, int& tx1, int& ty1) {
+    const TriSetup su(m.uvs[size_t(tri) * 3], m.uvs[size_t(tri) * 3 + 1], m.uvs[size_t(tri) * 3 + 2], w, h);
+    if (!su.valid) return false;
+    const glm::uvec3& tv = m.triangles[tri];
+    const glm::vec3 P0 = m.positions[tv.x], P1 = m.positions[tv.y], P2 = m.positions[tv.z];
+    const glm::vec2 e1 = su.t[1] - su.t[0], e2 = su.t[2] - su.t[0];
+    const float det = e1.x * e2.y - e1.y * e2.x;
+    if (std::abs(det) < 1e-12f) return false;
+    const glm::vec3 q1 = P1 - P0, q2 = P2 - P0;
+    const glm::vec3 Ax = (q1 * e2.y - q2 * e1.y) / det, Ay = (q2 * e1.x - q1 * e2.x) / det;
+    const float mxx = glm::dot(Ax, Ax), mxy = glm::dot(Ax, Ay), myy = glm::dot(Ay, Ay);
+    const float mdet = mxx * myy - mxy * mxy;
+    int x0 = 0, y0 = 0, x1 = w - 1, y1 = h - 1;
+    if (mdet > 1e-30f) {
+        const glm::vec3 rel = center - P0;
+        const float bx = glm::dot(Ax, rel), by = glm::dot(Ay, rel);
+        const float dx = (myy * bx - mxy * by) / mdet, dy = (mxx * by - mxy * bx) / mdet;
+        const glm::vec3 closest = P0 + Ax * dx + Ay * dy;
+        const float k = r2 - glm::dot(closest - center, closest - center);
+        if (k < 0.0f) return false;
+        const float hx = std::sqrt(k * myy / mdet), hy = std::sqrt(k * mxx / mdet);
+        const glm::vec2 c = su.t[0] + glm::vec2(dx, dy);
+        x0 = int(std::floor(c.x - hx)) - kTextureGutter - 1, x1 = int(std::ceil(c.x + hx)) + kTextureGutter + 1;
+        y0 = int(std::floor(c.y - hy)) - kTextureGutter - 1, y1 = int(std::ceil(c.y + hy)) + kTextureGutter + 1;
+    }
+    int bx0, by0, bx1, by1;
+    su.bounds(w, h, kTextureGutter, bx0, by0, bx1, by1);
+    x0 = std::max(x0, bx0), y0 = std::max(y0, by0), x1 = std::min(x1, bx1), y1 = std::min(y1, by1);
+    if (x0 > x1 || y0 > y1) return false;
+    tx0 = x0 / kTextureTile, ty0 = y0 / kTextureTile, tx1 = x1 / kTextureTile, ty1 = y1 / kTextureTile;
+    return true;
+}
+
+} // namespace
+
+struct TexturePainter::DabContext {
+    Mesh& mesh;
+    const BVH& bvh;
+    const DabParams& p;
+    PaintTexture& tex;
+    std::vector<uint8_t>& target;
+    float s;
+    bool useAlpha, masked, normals;
+    float r, r2;
+    const std::vector<DabMirror>& mirrors;
+};
+
+void TexturePainter::setPath(Path path) { gDabPath = int(path); }
+
+void TexturePainter::prewarm(Mesh& mesh, const BVH* bvh, std::span<const glm::vec3> centers, float radius) {
+    if (!paintsTexture(mesh)) return;
+    PaintTexture& tex = *mesh.texture; // (only its caches change)
+    if (!useTilePath(mesh, tex)) {
+        ensureCoverage(mesh, tex);
+        return;
+    }
+    if (!bvh || centers.empty() || radius <= 0.0f) return;
+    std::vector<DabMirror> mirrors;
+    for (const glm::vec3& c : centers) mirrors.push_back({c, glm::vec3(0, 0, -1), glm::vec3(0, 1, 0), glm::vec3(1, 0, 0), 0});
+    DabParams dp;
+    dp.center = centers[0];
+    dp.radius = radius;
+    dp.strength = 0.0f;
+    const DabContext ctx{mesh, *bvh, dp, tex, tex.pixels, 0.0f, false, false, false, radius, radius * radius, mirrors};
+    std::vector<std::pair<glm::ivec2, glm::ivec2>> rects;
+    dabTiles(ctx, [](Tile&, size_t, int, int, float) {}, false, rects);
+}
+
+void prewarmTexturePainting(Mesh& mesh, const BVH* bvh, std::span<const glm::vec3> centers, float radius) {
+    TexturePainter painter;
+    painter.prewarm(mesh, bvh, centers, radius);
+}
+
+std::shared_ptr<const std::vector<uint8_t>> cachedCoverage(const Mesh& m, int w, int h) {
+    if (w % kTextureTile != 0 || tileCount(w) > 256 || tileCount(h) > 256) return nullptr;
+    const uint64_t key = paintKey(m, w, h);
+    const PaintCacheEntry e = paintCache(m, w, h, key);
+    if (e.coverage) return e.coverage;
+    auto cov = std::make_shared<const std::vector<uint8_t>>(coverageFromIndex(m, w, h, *e.index));
+    std::lock_guard lock(gPaintCacheMutex);
+    for (PaintCacheEntry& c : gPaintCache)
+        if (c.key == key) c.coverage = cov;
+    return cov;
+}
+
+void clearTexturePaintCaches() {
+    std::lock_guard lock(gPaintCacheMutex);
+    gPaintCache.clear();
+}
+
+size_t texturePaintCacheBytes() {
+    std::lock_guard lock(gPaintCacheMutex);
+    size_t n = 0;
+    for (const PaintCacheEntry& e : gPaintCache) {
+        if (e.index) n += e.index->triTiles.size() + (e.index->binStart.size() + e.index->bins.size()) * sizeof(uint32_t);
+        if (e.coverage) n += e.coverage->size();
+        if (e.maps)
+            for (const auto& t : e.maps->tiles)
+                if (t) n += t->tri.size() * 4 + t->bary.size() * 2 + t->extras.size() * sizeof(TexelMapTile::Extra);
+    }
+    return n;
+}
+
+
+bool TexturePainter::useTilePath(const Mesh& mesh, PaintTexture& tex) const {
+    const Path path = Path(gDabPath.load());
+    if (path == Path::Triangles) return false;
+    if (tileCount(tex.width) > 256 || tileCount(tex.height) > 256) return false;
+    if (path == Path::Auto && mesh.triangleCount() * 64 < tex.texelCount()) return false;
+    const uint64_t key = texelMapKey(mesh, tex);
+    if (!tex.uvIndex || tex.uvIndex->key != key || !tex.texelMaps || tex.texelMaps->key != key) {
+        const PaintCacheEntry e = paintCache(mesh, tex.width, tex.height, key);
+        tex.uvIndex = e.index;
+        tex.texelMaps = e.maps;
+    }
+    return true; // (the tile path needs no texture-wide coverage: each texel map finds its tile's own)
+}
+
+template <class Paint>
+size_t TexturePainter::dabTiles(const DabContext& c, const Paint& paint, bool composite,
+                                std::vector<std::pair<glm::ivec2, glm::ivec2>>& rects) {
+    const UvTileIndex& idx = *c.tex.uvIndex;
+    TexelMapCache& cache = *c.tex.texelMaps;
+    const Mesh& mesh = c.mesh;
+    const int w = c.tex.width, h = c.tex.height;
+    // 1. The tiles under the brush: every tile a triangle of a BVH leaf touching the sphere can reach.
+    const size_t tiles = cache.tiles.size();
+    touchedFlag_.assign(tiles, 0);
+    touched_.clear();
+    struct Leaf {
+        std::span<const uint32_t> tris;
+        uint32_t mirror;
+    };
+    std::vector<Leaf> leaves;
+    for (uint32_t mi = 0; mi < uint32_t(c.mirrors.size()); ++mi)
+        c.bvh.forEachLeafInSphere(c.mirrors[mi].center, c.r, [&](std::span<const uint32_t> tris) { leaves.push_back({tris, mi}); });
+    // The leaves' triangles mark their tiles on every core (a flag set from two threads is still just set).
+    poolFor(leaves.size(), [&](size_t b, size_t e) {
+        for (size_t k = b; k < e; ++k) {
+            const glm::vec3& center = c.mirrors[leaves[k].mirror].center;
+            for (uint32_t t : leaves[k].tris) {
+                const uint8_t* o = &idx.triTiles[size_t(t) * 4];
+                if (o[0] > o[2]) continue;
+                int tx0 = o[0], ty0 = o[1], tx1 = o[2], ty1 = o[3];
+                // A triangle wider than a tile (big triangles, UV seams): only the tiles the sphere can reach.
+                if ((tx1 - tx0 > 1 || ty1 - ty0 > 1) && !sphereTiles(mesh, t, w, h, center, c.r2, tx0, ty0, tx1, ty1)) continue;
+                for (int ty = ty0; ty <= ty1; ++ty)
+                    for (int tx = tx0; tx <= tx1; ++tx) {
+                        uint8_t& flag = touchedFlag_[size_t(ty) * size_t(idx.tilesX) + size_t(tx)];
+                        std::atomic_ref<uint8_t> f(flag);
+                        if (!f.load(std::memory_order_relaxed)) f.store(1, std::memory_order_relaxed);
+                    }
+            }
+        }
+    }, 256);
+    for (uint32_t i = 0; i < uint32_t(tiles); ++i)
+        if (touchedFlag_[i]) touched_.push_back(i);
+    if (touched_.empty()) return 0;
+    // 2. Room in the texel map cache: drop the least recently used tiles this dab doesn't need.
+    ++cache.clock;
+    size_t missing = 0;
+    for (uint32_t i : touched_) {
+        if (cache.tiles[i]) cache.tiles[i]->used = cache.clock;
+        else ++missing;
+    }
+    if (cache.live + missing > kTexelMapBudget) {
+        std::vector<std::pair<uint64_t, uint32_t>> old;
+        for (uint32_t i = 0; i < uint32_t(tiles); ++i)
+            if (cache.tiles[i] && !touchedFlag_[i]) old.push_back({cache.tiles[i]->used, i});
+        std::sort(old.begin(), old.end());
+        for (const auto& [used, i] : old) {
+            if (cache.live + missing <= kTexelMapBudget) break;
+            cache.tiles[i].reset();
+            --cache.live;
+        }
+    }
+    cache.live += missing;
+    // 3. Every texel of those tiles, tiles in parallel (each texel in one tile: the same result on any thread count).
+    struct Result {
+        glm::ivec2 lo{INT32_MAX}, hi{INT32_MIN};
+        size_t changed = 0;
+    };
+    std::vector<Result> results(touched_.size());
+    ThreadPool::shared().run(touched_.size(), [&](size_t job) {
+        const uint32_t ti = touched_[job];
+        std::unique_ptr<TexelMapTile>& slot = cache.tiles[ti];
+        if (!slot) {
+            slot = buildTexelMap(mesh, c.tex, idx, ti);
+            slot->used = cache.clock;
+        }
+        const TexelMapTile& map = *slot;
+        if (c.s <= 0.0f) return; // prewarm: only the texel maps
+        Result& res = results[job];
+        const int x0 = int(ti % uint32_t(idx.tilesX)) * kTextureTile, y0 = int(ti / uint32_t(idx.tilesX)) * kTextureTile;
+        const int x1 = std::min(x0 + kTextureTile, w), y1 = std::min(y0 + kTextureTile, h);
+        Tile* rec = nullptr;
+        uint32_t last = kNoTri;
+        bool lastHidden = false;
+        glm::vec3 P0{}, P1{}, P2{}, N0{}, N1{}, N2{}, faceN{};
+        float m0 = 0, m1 = 0, m2 = 0;
+        size_t extra = 0;
+        // One texel from one of its triangles, for every mirror (each mirror writes a texel once).
+        auto texel = [&](int x, int y, size_t li, uint32_t tri, uint16_t ub1, uint16_t ub2) {
+                if (tri != last) {
+                    last = tri;
+                    lastHidden = mesh.triangleHidden(tri);
+                    const glm::uvec3& tv = mesh.triangles[tri];
+                    P0 = mesh.positions[tv.x], P1 = mesh.positions[tv.y], P2 = mesh.positions[tv.z];
+                    if (c.normals) N0 = mesh.normals[tv.x], N1 = mesh.normals[tv.y], N2 = mesh.normals[tv.z];
+                    faceN = glm::cross(P1 - P0, P2 - P0);
+                    if (c.masked) m0 = mesh.mask[tv.x], m1 = mesh.mask[tv.y], m2 = mesh.mask[tv.z];
+                }
+                if (lastHidden) return;
+                const float b1 = float(ub1) / 65535.0f, b2 = float(ub2) / 65535.0f;
+                const glm::vec3 b(1.0f - b1 - b2, b1, b2);
+                const glm::vec3 P = P0 * b.x + P1 * b.y + P2 * b.z;
+                for (const DabMirror& mi : c.mirrors) {
+                    const glm::vec3 o = P - mi.center;
+                    const float d2 = glm::dot(o, o);
+                    if (d2 >= c.r2) continue;
+                    const glm::vec3 N = c.normals ? N0 * b.x + N1 * b.y + N2 * b.z : faceN;
+                    if (glm::dot(N, mi.viewDir) > 0.0f) continue;
+                    const float f = c.useAlpha ? c.p.alpha->sample(glm::dot(o, mi.aRight) / c.r, glm::dot(o, mi.aUp) / c.r)
+                                               : brushFalloff(std::sqrt(d2), c.r, c.p.focal);
+                    const float wgt = f * c.s * (1.0f - std::clamp(m0 * b.x + m1 * b.y + m2 * b.z, 0.0f, 1.0f));
+                    if (wgt <= 0.0f) continue;
+                    if (!rec) rec = &tile(ti, c.target, w, h, c.tex);
+                    Tile& t = *rec;
+                    if (t.stamp[li] == mi.stamp) continue;
+                    t.stamp[li] = mi.stamp;
+                    float& acc = t.coverage[li];
+                    acc += std::min(wgt, 1.0f) * (1.0f - acc);
+                    paint(t, li, x, y, acc);
+                    res.lo = glm::min(res.lo, glm::ivec2(x, y));
+                    res.hi = glm::max(res.hi, glm::ivec2(x + 1, y + 1));
+                    ++res.changed;
+                }
+        };
+        for (int y = y0; y < y1; ++y)
+            for (int x = x0; x < x1; ++x) {
+                const size_t li = size_t(y - y0) * kTextureTile + size_t(x - x0);
+                const uint32_t tri = map.tri[li];
+                if (tri == kNoTri) continue;
+                texel(x, y, li, tri, map.bary[li * 2], map.bary[li * 2 + 1]);
+                for (; extra < map.extras.size() && map.extras[extra].li <= li; ++extra)
+                    if (map.extras[extra].li == li)
+                        texel(x, y, li, map.extras[extra].tri, map.extras[extra].b1, map.extras[extra].b2);
+            }
+        if (composite && res.changed && !c.tex.layers.empty() && c.tex.base.size() == c.tex.pixels.size())
+            for (int y = res.lo.y; y < res.hi.y; ++y)
+                for (int x = res.lo.x; x < res.hi.x; ++x) {
+                    const size_t i = size_t(y) * size_t(w) + size_t(x);
+                    compositeTexel(c.tex, i, &c.tex.pixels[i * 4]);
+                }
+    });
+    size_t changed = 0;
+    for (const Result& res : results)
+        if (res.changed) {
+            changed += res.changed;
+            rects.push_back({res.lo, res.hi});
+        }
+    return changed;
 }
 
 // A dab in two passes: (1) per mirror, the triangles under the brush and the texel box each can reach, in a
@@ -623,11 +1328,38 @@ TexturePainter::Tile& TexturePainter::tile(uint32_t index, const std::vector<uin
 // texel lies in one band, so it sees exactly the writes it would get serially: the result doesn't depend on
 // the thread count.
 size_t TexturePainter::dab(Mesh& mesh, const BVH& bvh, const DabParams& p, const glm::vec3& color, Symmetry sym) {
+    BrushMaterial m;
+    m.color = color;
+    m.channels = channelBit(Channel::BaseColor);
+    return dab(mesh, bvh, p, m, sym);
+}
+
+size_t TexturePainter::dab(Mesh& mesh, const BVH& bvh, const DabParams& p, const BrushMaterial& material, Symmetry sym) {
     if (!active_ || p.radius <= 0.0f || !hasTexture(mesh)) return 0;
     PaintTexture& tex = mutableTexture(mesh);
     if (!textureLayerEditable(tex, layer_) || (layer_ >= 0 && layer_ >= int(tex.layers.size()))) return 0;
     std::vector<uint8_t>& target = tex.target(layer_);
     const bool onLayer = layer_ >= 0;
+    const glm::vec3 color = material.color;
+    const uint32_t painted = channels_ & material.channels;
+    const bool paintColor = painted & 1u;
+    // The material channels this dab writes, with the brush's value and the channel's default (for erasing).
+    struct ChanJob {
+        int c, n, bits, tb;
+        bool normal;
+        float val[4], def[4];
+    };
+    std::vector<ChanJob> jobs;
+    for (int c = 1; c < kChannelCount; ++c) {
+        if (!(painted & (1u << c)) || !channelTarget(tex, c)) continue;
+        const ChannelFormat& f = channelFormat(c);
+        ChanJob j{c, f.components, f.bits, f.components * (f.bits == 16 ? 2 : 1) + (onLayer ? (f.bits == 16 ? 2 : 1) : 0),
+                  c == int(Channel::Normal), {}, {}};
+        const std::array<float, 4> v = material.encoded(Channel(c));
+        for (int k = 0; k < 4; ++k) j.val[k] = v[size_t(k)], j.def[k] = f.defaultValue[size_t(k)];
+        jobs.push_back(j);
+    }
+    if (!paintColor && jobs.empty()) return 0;
     const int w = tex.width, h = tex.height;
     const float s = std::clamp(p.strength, 0.0f, 1.0f) * std::clamp(p.pressure, 0.0f, 1.0f);
     if (s <= 0.0f) return 0;
@@ -636,12 +1368,8 @@ size_t TexturePainter::dab(Mesh& mesh, const BVH& bvh, const DabParams& p, const
     const bool normals = mesh.normals.size() == mesh.vertexCount();
     const float r = p.radius, r2 = r * r;
 
-    struct Mirror {
-        glm::vec3 center, viewDir, aUp, aRight;
-        uint32_t stamp;
-    };
+    using Mirror = DabMirror;
     std::vector<Mirror> mirrors;
-    dabTris_.clear();
     for (const glm::vec3& m : Sculptor::mirrors(sym)) {
         Mirror mi;
         mi.center = p.center * m;
@@ -652,8 +1380,31 @@ size_t TexturePainter::dab(Mesh& mesh, const BVH& bvh, const DabParams& p, const
         mi.aUp = glm::length(aUp) > 1e-6f ? glm::normalize(aUp) : glm::vec3(0, 1, 0);
         mi.aRight = glm::cross(mi.aUp, -mi.viewDir);
         mi.stamp = ++dab_;
-        const int mirror = int(mirrors.size());
         mirrors.push_back(mi);
+    }
+    // Dense meshes: texel tiles instead of triangles (dabTiles).
+    if (useTilePath(mesh, tex)) {
+        const DabContext ctx{mesh, bvh, p, tex, target, s, useAlpha, masked, normals, r, r2, mirrors};
+        std::vector<std::pair<glm::ivec2, glm::ivec2>> rects;
+        const size_t changed = dabTiles(ctx, [&](Tile& t, size_t li, int x, int y, float acc) {
+            if (paintColor)
+                paintTexel(&target[(size_t(y) * size_t(w) + size_t(x)) * 4], &t.original[li * 4], onLayer, color, acc, p.invert);
+            for (const ChanJob& j : jobs) {
+                const ChannelTile& ct = t.channels[size_t(j.c)];
+                paintChannelTexel(ct.texels + li * size_t(j.tb), ct.origTexels + li * size_t(ct.origStride), j.n, j.bits,
+                                  onLayer, j.val, j.def, acc, p.invert, j.normal);
+            }
+        }, paintColor, rects);
+        for (const auto& [lo, hi] : rects) {
+            if (!tex.layers.empty())
+                for (const ChanJob& j : jobs) compositeChannel(tex, Channel(j.c), lo.x, lo.y, hi.x, hi.y);
+            tex.markDirty(lo.x, lo.y, hi.x, hi.y);
+        }
+        return changed;
+    }
+    dabTris_.clear();
+    for (int mirror = 0; mirror < int(mirrors.size()); ++mirror) {
+        const Mirror& mi = mirrors[size_t(mirror)];
         bvh.queryTriangles(mesh, mi.center, r, tris_);
         for (uint32_t ti : tris_) {
             if (mesh.triangleHidden(ti)) continue;
@@ -745,7 +1496,7 @@ size_t TexturePainter::dab(Mesh& mesh, const BVH& bvh, const DabParams& p, const
                 if (wgt <= 0.0f) return;
                 const uint32_t ti2 = uint32_t(y / kTextureTile) * uint32_t(tilesX_) + uint32_t(x / kTextureTile);
                 if (ti2 != cachedIndex) {
-                    cached = &tile(ti2, target, w, h);
+                    cached = &tile(ti2, target, w, h, tex);
                     cachedIndex = ti2;
                 }
                 Tile& t = *cached;
@@ -754,14 +1505,20 @@ size_t TexturePainter::dab(Mesh& mesh, const BVH& bvh, const DabParams& p, const
                 t.stamp[li] = mi.stamp;
                 float& acc = t.coverage[li];
                 acc += std::min(wgt, 1.0f) * (1.0f - acc);
-                paintTexel(&target[(size_t(y) * size_t(w) + size_t(x)) * 4], &t.original[li * 4], onLayer, color, acc, p.invert);
+                if (paintColor)
+                    paintTexel(&target[(size_t(y) * size_t(w) + size_t(x)) * 4], &t.original[li * 4], onLayer, color, acc, p.invert);
+                for (const ChanJob& j : jobs) {
+                    const ChannelTile& ct = t.channels[size_t(j.c)];
+                    paintChannelTexel(ct.texels + li * size_t(j.tb), ct.origTexels + li * size_t(ct.origStride), j.n, j.bits,
+                                      onLayer, j.val, j.def, acc, p.invert, j.normal);
+                }
                 res.lo = glm::min(res.lo, glm::ivec2(x, y));
                 res.hi = glm::max(res.hi, glm::ivec2(x + 1, y + 1));
                 ++res.changed;
             });
         }
         // With layers, the band recomposites its own changed rows (in parallel with the other bands).
-        if (res.changed && !tex.layers.empty() && tex.base.size() == tex.pixels.size())
+        if (paintColor && res.changed && !tex.layers.empty() && tex.base.size() == tex.pixels.size())
             for (int y = res.lo.y; y < res.hi.y; ++y)
                 for (int x = res.lo.x; x < res.hi.x; ++x) {
                     const size_t i = size_t(y) * size_t(w) + size_t(x);
@@ -773,6 +1530,8 @@ size_t TexturePainter::dab(Mesh& mesh, const BVH& bvh, const DabParams& p, const
     for (const BandResult& res : results)
         if (res.changed) {
             changed += res.changed;
+            if (!tex.layers.empty())
+                for (const ChanJob& j : jobs) compositeChannel(tex, Channel(j.c), res.lo.x, res.lo.y, res.hi.x, res.hi.y);
             tex.markDirty(res.lo.x, res.lo.y, res.hi.x, res.hi.y);
         }
     return changed;
@@ -783,12 +1542,31 @@ void TexturePainter::end(UndoRecord& record) {
         auto u = std::make_unique<TextureTileUndo>();
         u->layer = layer_;
         u->texels.offsets.push_back(0);
-        for (uint32_t i = 0; i < uint32_t(tiles_.size()); ++i)
-            if (tiles_[i]) {
-                u->texels.tiles.push_back(i);
-                appendTile(u->texels, tiles_[i]->original.data(), size_t(kTextureTile) * 4, kTextureTile, kTextureTile);
+        bool any = false;
+        if (channels_ & 1u)
+            for (uint32_t i = 0; i < uint32_t(tiles_.size()); ++i)
+                if (tiles_[i]) {
+                    u->texels.tiles.push_back(i);
+                    appendTile(u->texels, tiles_[i]->original.data(), size_t(kTextureTile) * 4, kTextureTile, kTextureTile);
+                    any = true;
+                }
+        // Material channels: one entry per (layer, channel) holding the tiles before the stroke.
+        for (int c = 1; c < kChannelCount; ++c) {
+            if (!(channels_ & (1u << c))) continue;
+            TextureChannelTiles ct;
+            ct.layer = layer_;
+            ct.channel = uint8_t(c);
+            for (uint32_t i = 0; i < uint32_t(tiles_.size()); ++i)
+                if (tiles_[i] && tiles_[i]->channels[size_t(c)].texels) {
+                    ct.tiles.push_back(i);
+                    ct.old.push_back(tiles_[i]->channels[size_t(c)].original);
+                }
+            if (!ct.tiles.empty()) {
+                u->channels.push_back(std::move(ct));
+                any = true;
             }
-        if (!u->texels.tiles.empty()) record.textureTiles = std::move(u);
+        }
+        if (any) record.textureTiles = std::move(u);
     }
     active_ = false;
     tiles_.clear();
@@ -798,9 +1576,42 @@ void TexturePainter::end(UndoRecord& record) {
     bandTris_.clear();
 }
 
+size_t TextureChannelTiles::bytes() const {
+    size_t n = tiles.size() * sizeof(uint32_t) + old.size() * sizeof(old[0]);
+    for (const auto& t : old)
+        if (t) n += sizeof(*t) + t->data.size(); // shared with nothing once the image has moved on
+    return n;
+}
+
+size_t TextureTileUndo::bytes() const {
+    size_t n = texels.bytes();
+    for (const auto& c : channels) n += c.bytes();
+    return n;
+}
+
 void TextureTileUndo::swapWith(Mesh& mesh) {
     if (!mesh.texture) return;
     PaintTexture& t = mutableTexture(mesh);
+    // Material channels: swap the tile pointers with the image's (the inverse step).
+    for (TextureChannelTiles& ct : channels) {
+        const Channel c = Channel(ct.channel);
+        if (ct.channel == 0 || ct.channel >= kChannelCount || !channelEnabled(t, c)) continue;
+        if (ct.layer >= 0) syncLayerChannels(t);
+        TileImage* img = ct.layer < 0 ? &t.channels[ct.channel].base
+                         : ct.layer < int(t.layers.size()) ? &t.layers[size_t(ct.layer)].channels[ct.channel].image
+                                                          : nullptr;
+        if (!img || !img->valid()) continue;
+        for (size_t i = 0; i < ct.tiles.size() && i < ct.old.size(); ++i) {
+            if (ct.tiles[i] >= img->tileCount()) continue;
+            TileImage::TilePtr now = img->tilePtr(ct.tiles[i]);
+            img->setTilePtr(ct.tiles[i], std::move(ct.old[i]));
+            ct.old[i] = std::move(now);
+            const int tx = int(ct.tiles[i] % uint32_t(img->tilesX())) * kTextureTile, ty = int(ct.tiles[i] / uint32_t(img->tilesX())) * kTextureTile;
+            if (!t.layers.empty()) compositeChannel(t, c, tx, ty, tx + kTextureTile, ty + kTextureTile);
+            t.markDirty(tx, ty, tx + kTextureTile, ty + kTextureTile);
+        }
+    }
+    if (texels.tiles.empty()) return;
     if (!validTexLayer(t, layer) || (layer >= 0 && t.layers.empty())) return;
     std::vector<uint8_t>& target = t.target(layer);
     if (target.size() != t.texelCount() * 4) return;
@@ -844,7 +1655,12 @@ size_t TextureStackUndo::bytes() const {
     if (!texture) return 0;
     if (!committed) return texture->bytes();
     size_t n = sizeof(PaintTexture);
-    for (const auto& l : texture->layers) n += sizeof(TextureLayer) + l.name.size();
+    for (const auto& l : texture->layers) {
+        n += sizeof(TextureLayer) + l.name.size();
+        for (int c = 1; c < kChannelCount; ++c) n += l.channels[size_t(c)].image.uniqueBytes();
+    }
+    for (int c = 1; c < kChannelCount; ++c)
+        n += texture->channels[size_t(c)].base.uniqueBytes() + texture->channels[size_t(c)].composite.uniqueBytes();
     for (const auto& p : planes) n += p.bytes() + sizeof(PackedTexels);
     return n;
 }
@@ -957,11 +1773,17 @@ bool loadTextureImage(PaintTexture& t, const Image& img, std::string& error) {
         error = "The image is larger than 16384 pixels";
         return false;
     }
+    const uint32_t channels = enabledChannelMask(t);
     t.width = img.width;
     t.height = img.height;
     t.layers.clear();
     t.base.clear();
     t.activeLayer = -1;
+    // The material channels start again at their defaults at the new size.
+    for (int c = 1; c < kChannelCount; ++c) {
+        t.channels[size_t(c)] = ChannelPlane();
+        if (channels & (1u << c)) setChannelEnabled(t, Channel(c), true);
+    }
     t.coverage.clear();
     t.coverageUvs = 0;
     t.pixels.resize(img.rgba.size());
@@ -1007,6 +1829,8 @@ int addTextureLayer(PaintTexture& t, std::string name, int above) {
     above = std::clamp(above, -1, int(t.layers.size()) - 1);
     t.layers.insert(t.layers.begin() + (above + 1), std::move(l));
     t.activeLayer = above + 1;
+    syncLayerChannels(t); // transparent material channels (null tiles: no texel memory)
+    compositeChannels(t, 0, 0, t.width, t.height);
     return above + 1;
 }
 
@@ -1018,6 +1842,8 @@ int duplicateTextureLayer(PaintTexture& t, int layer) {
         copy.name = "Base";
         copy.rgba = t.base;
         for (size_t i = 3; i < copy.rgba.size(); i += 4) copy.rgba[i] = 255;
+        for (int c = 1; c < kChannelCount; ++c)
+            if (channelEnabled(t, Channel(c))) copy.channels[size_t(c)].image = layerImageFromBase(t.channels[size_t(c)].base);
     } else {
         copy = t.layers[size_t(layer)];
         copy.id = newTextureLayerId();
@@ -1025,6 +1851,7 @@ int duplicateTextureLayer(PaintTexture& t, int layer) {
     }
     copy.name = uniqueTextureLayerName(t, copy.name + " copy");
     t.layers.insert(t.layers.begin() + (layer + 1), std::move(copy));
+    syncLayerChannels(t);
     t.activeLayer = layer + 1;
     compositeTextureAll(t);
     return layer + 1;
@@ -1060,6 +1887,23 @@ bool mergeTextureLayerDown(PaintTexture& t, int layer, std::string& error) {
         return false;
     }
     const size_t n = t.texelCount();
+    // Material channels first (the colour merge below changes `low`'s opacity).
+    for (int c = 1; c < kChannelCount; ++c) {
+        if (!channelEnabled(t, Channel(c))) continue;
+        const LayerChannel& uc = up.channels[size_t(c)];
+        if (!up.visible || !uc.enabled || !uc.image.valid()) continue;
+        const bool normal = c == int(Channel::Normal);
+        if (layer == 0) {
+            mergeChannelIntoBase(t.channels[size_t(c)].base, uc.image, up.opacity * uc.opacity, uc.blend, normal);
+        } else {
+            TextureLayer& low = t.layers[size_t(layer - 1)];
+            if (low.locked || !low.visible) break; // refused below
+            LayerChannel& lc = low.channels[size_t(c)];
+            if (!lc.image.valid()) continue;
+            mergeChannelIntoLayer(lc.image, low.opacity * lc.opacity, uc.image, up.opacity * uc.opacity, uc.blend, normal);
+            lc.opacity = 1.0f;
+        }
+    }
     if (layer == 0) {
         if (up.visible)
             parallelRows(t.height, n, [&](int b, int e) {
@@ -1112,12 +1956,22 @@ bool mergeTextureLayerDown(PaintTexture& t, int layer, std::string& error) {
 void flattenTextureLayers(PaintTexture& t) {
     if (t.layers.empty()) return;
     compositeTextureAll(t);
+    for (int c = 1; c < kChannelCount; ++c)
+        if (channelEnabled(t, Channel(c))) t.channels[size_t(c)].base = channelImage(t, Channel(c));
     t.layers.clear();
     t.base = t.pixels;
     dropStackIfEmpty(t);
 }
 
 void clearTextureLayer(PaintTexture& t, int layer) {
+    // Material channels go back to their default (Base) or to transparent (a layer) too.
+    for (int c = 1; c < kChannelCount; ++c) {
+        if (!channelEnabled(t, Channel(c))) continue;
+        TileImage* img = layer < 0 ? &t.channels[size_t(c)].base
+                         : layer < int(t.layers.size()) ? &t.layers[size_t(layer)].channels[size_t(c)].image
+                                                        : nullptr;
+        if (img && img->valid()) img->reset(img->width(), img->height(), img->components(), img->bits(), img->fill());
+    }
     if (t.layers.empty()) {
         std::fill(t.pixels.begin(), t.pixels.end(), uint8_t(255));
         t.markAllDirty();

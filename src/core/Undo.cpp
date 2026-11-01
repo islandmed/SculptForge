@@ -10,7 +10,8 @@ size_t UndoRecord::approxBytes() const {
     size_t bytes = positions.bytes() + mask.bytes() + colors.bytes() + paintAlpha.bytes() + hidden.bytes() +
                    polygroups.bytes() + (paint ? paint->bytes() : 0) +
                    (textureTiles ? textureTiles->bytes() : 0) + (texture ? texture->bytes() : 0) +
-                   (subdiv ? subdiv->bytes() : 0) + (topology ? topology->bytes() : 0);
+                   (subdiv ? subdiv->bytes() : 0) + (topology ? topology->bytes() : 0) +
+                   (micro ? micro->bytes() : 0);
     for (const auto& l : layerOffsets) bytes += l.bytes();
     if (mesh)
         bytes += mesh->vertexCount() * ((2 + (mesh->base.empty() ? 0 : 1 + mesh->layers.size())) * sizeof(glm::vec3) +
@@ -141,6 +142,7 @@ UndoRecord UndoRecord::capturePolygroups(const Mesh& mesh, std::string label, st
 void UndoStack::push(UndoRecord record) {
     if (record.empty()) return;
     undo_.push_back(std::move(record));
+    if (listener) listener->undoPushed(undo_.back(), redo_);
     redo_.clear();
     ++revision_;
     enforceBudget();
@@ -152,6 +154,7 @@ void UndoStack::apply(UndoRecord& r, Mesh& mesh, BVH& bvh) {
         applySubdivUndo(*r.subdiv, mesh, bvh);
         return;
     }
+    if (r.micro) r.micro->swapWith(mesh); // (the base doesn't move: no BVH work)
     if (r.mesh) {
         std::swap(*r.mesh, mesh);
         mesh.topologyDirty = true;
@@ -215,8 +218,10 @@ bool UndoStack::undo(Mesh& mesh, BVH& bvh) {
     if (undo_.empty()) return false;
     UndoRecord r = std::move(undo_.back());
     undo_.pop_back();
+    if (listener) listener->undoApplying(r, mesh, true);
     apply(r, mesh, bvh);
     redo_.push_back(std::move(r));
+    if (listener) listener->undoApplied(redo_.back(), mesh, true);
     ++revision_;
     return true;
 }
@@ -225,8 +230,10 @@ bool UndoStack::redo(Mesh& mesh, BVH& bvh) {
     if (redo_.empty()) return false;
     UndoRecord r = std::move(redo_.back());
     redo_.pop_back();
+    if (listener) listener->undoApplying(r, mesh, false);
     apply(r, mesh, bvh);
     undo_.push_back(std::move(r));
+    if (listener) listener->undoApplied(undo_.back(), mesh, false);
     ++revision_;
     return true;
 }
@@ -234,6 +241,7 @@ bool UndoStack::redo(Mesh& mesh, BVH& bvh) {
 void UndoStack::clear() {
     undo_.clear();
     redo_.clear();
+    if (listener) listener->undoCleared();
 }
 
 size_t UndoStack::undoBytes() const {
@@ -248,6 +256,7 @@ void UndoStack::enforceBudget() {
     while (undo_.size() > 1 && total > byteBudget) {
         total -= undo_.front().approxBytes();
         undo_.pop_front();
+        if (listener) listener->undoDroppedOldest();
     }
 }
 

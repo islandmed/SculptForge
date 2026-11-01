@@ -26,6 +26,7 @@
 #include "core/QRemesh.h"
 #include "core/Stroke.h"
 #include "core/StrokePath.h"
+#include "core/SurfaceCursor.h"
 #include "core/SpaceMouse.h"
 #include "core/Tablet.h"
 #include "core/UpdateCheck.h"
@@ -78,6 +79,15 @@ struct AppOptions {
     float measureStroke = 0.0f; // --measure-stroke S: a scripted fast circle stroke, report its path and frame times
     float measureStrokeRadius = 0.0f; // --measure-stroke S,R: the brush radius in screen pixels
     float measureIdle = 0.0f; // --measure-idle S: after a settling pause, count the frames drawn in S idle seconds, exit
+    // --timelapse out.mp4: render the opened project's history (its .sfhist) as a turntable timelapse and exit.
+    std::string timelapsePath;
+    float timelapseSeconds = 20.0f;
+    // --benchmark: proof mode (ProofMode.cpp), then exit. Sizes in millions of triangles (empty: 5, 20, 33 and
+    // 100 when memory allows); outputs default to the current folder.
+    bool benchmark = false;
+    std::string benchmarkSizes, benchmarkOut, benchmarkVideo;
+    bool benchmarkNoVideo = false, benchmarkVsync = false;
+    float benchmarkStrokeSeconds = 6.0f;
 };
 
 class Demo;
@@ -173,6 +183,11 @@ private:
     void pollBrushRequest();
     const BrushRecipe* activeRecipe() const;
     void drawBrushCursor();
+    // The brush ring lying on the surface under the pointer (#25, Preferences > Input > Cursor follows surface);
+    // false when the pointer is off the model (the flat screen ring is drawn instead).
+    bool drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col);
+    std::vector<SurfaceRingPoint> cursorRing_, cursorInner_; // scratch, kept to avoid allocating per frame
+    bool surfaceCursorShown_ = false; // the last cursor drawn lay on the surface (UI tests: surface_cursor)
     void updateTitle();
 
     int runRecording(); // also runs UI tests (options_.uiTest)
@@ -573,6 +588,21 @@ private:
     bool textureAfterAutoUv_ = false;    // the running Auto UV came from New Texture: make the texture after it
     int textureSizeChoice_ = 1;          // 1K, 2K, 4K, 8K
     bool showUvView_ = false;            // Texture Map > Show UVs
+    // Material channels (PanelPbr.cpp): channel toggles, the solo channel view and map export under Texture Map,
+    // the brush material (per-channel values and swatches) in the Color palette, and per-channel chips on the
+    // Paint Layers rows (enable, blend, opacity).
+    void drawTextureChannelsContents();
+    void drawBrushMaterialContents();
+    // The channel chips of texture layer `layer` (a row under its name).
+    Args drawLayerChannelChips(int layer); // the texture_layer_channel arguments to run (empty: nothing clicked)
+    void registerPbrUiActions();
+    double pbrTestValue(const std::string& name) const; // UI test values (UiTest.cpp), NaN when not one of ours
+    int exportPresetChoice_ = 0;
+    // Dense textured meshes: while the Paint brush hovers, the texture painting caches for the area under it are
+    // built ahead of the first dab (PanelPbr.cpp; TexturePainter::prewarm).
+    void prewarmTexturePaint();
+    glm::vec3 prewarmCenter_{1e30f};
+    float prewarmRadius_ = 0.0f;
     // Bake sub-palette (PanelBake.cpp): normal / displacement / AO / cavity / colour maps from a high-poly onto
     // the active SubTool's UVs (core/Bake.h), on a worker thread, and the baked normal map shown on the model.
     void drawBakeContents();
@@ -615,6 +645,8 @@ private:
         int framesStill = 0;          // frames since the view last moved
         bool fastNow = false;         // this frame draws without antialiasing (fast navigation)
         bool proxyNow = false;        // this frame draws big meshes' motion proxy (fast navigation)
+        bool movingNow = false;       // the view moved in the last few frames (the frame governor counts these)
+        size_t sceneTriangles = 0;    // visible triangles in full detail, last frame
         int samplesWanted = 0;        // viewSamples() for the last frame
         int samplesUsed = 0;          // what the renderer managed last frame (fewer when out of memory)
         double strokeSyncMs = 0.0;    // upload time summed over the open stroke's frames
@@ -624,6 +656,20 @@ private:
         int lastStrokeFrames = 0;
         bool gpuOutOfMemory = false;
     } perf_;
+    // Hardware profile (PanelPerformanceProfile.cpp; app/Calibration.h, core/HardwareProfile.h, core/FrameGovernor.h):
+    // calibrates on first launch and when the GPU, driver or version changes; the profile section of Preferences >
+    // Performance; the adaptive frame governor, fed every frame between FrameBegin and FrameEnd.
+    void initHardwareProfile();
+    void shutdownHardwareProfile();
+    void hardwareProfileFrameBegin();
+    void hardwareProfileFrameEnd(); // before the swap: feeds the governor, runs a calibration step
+    void drawHardwareProfileOverlay(); // calibration progress over the first frames (Esc skips)
+    void drawPerformanceProfileSection();
+    void registerPerformanceProfileUiActions();
+    bool hardwareProfileGoverns() const; // the profile's motion proxy threshold applies (else the fixed default)
+    void applyHardwareProfile(const struct HardwareProfile& profile, bool announce);
+    void finishCalibration();
+    std::shared_ptr<struct HwProfileUi> hwProfile_;
     // Splats > Make sculptable (PanelSculptable.cpp, core/Sculptable.h): splat capture -> sculptable SubTool on a
     // worker thread; the crop box and the face landmark review in the viewport.
     void registerSculptableUiActions();
@@ -954,6 +1000,7 @@ private:
     void drawGeometrySection(); // PanelGeometry.cpp: Divide, SDiv, Lower / Higher Res, Del Lower / Higher, Reconstruct
     bool smt_ = true;           // Tool > Geometry > Smt: Divide smooths
     float sdivSlider_ = 1.0f;   // the SDiv slider while dragged (1-based)
+    float microSlider_ = 4.0f;  // Tool > Geometry > Micro: the micro level the next Divide to micro makes
     bool sdivHeld_ = false;
     void drawSubToolsContents();
     // PanelExtract.cpp: Tool > SubTool > Extract, Tool > Geometry > Modify Topology (Mirror And Weld) and
@@ -1301,6 +1348,20 @@ private:
     bool spaceMouseMoving_ = false;
     int spaceMouseLastButton_ = -1; // for Preferences: "Button N pressed"
     // ---- end SpaceMouse ----
+    // ---- Sculpt Timeline (PanelTimeline.cpp, core/Timeline.h) and proof mode (ProofMode.cpp) ----
+    // The history strip along the bottom of the canvas, the timelapse export, and Help > Benchmark: a scripted
+    // stroke through the input handlers on 5M..100M+ meshes with a live HUD, an MP4 and a JSON result.
+    std::shared_ptr<struct TimelineUiState> timelineUi_;
+    std::shared_ptr<struct ProofState> proof_;
+    void drawTimelineUi();            // once a frame from drawUi: keeps the timeline attached and draws the strip
+    void registerTimelineUiActions(); // view.timeline, timeline.timelapse, help.benchmark
+    void startTimelapse(const std::string& path, int width, int height, float seconds, int fps);
+    bool timelapseStep(double budgetSeconds); // renders frames for up to the budget; false when finished
+    int runTimelapseCli();                    // sculptforge FILE --timelapse out.mp4
+    void startProofMode();                    // Help > Benchmark, sculptforge --benchmark
+    void proofBeforeSwap(int fbW, int fbH);   // the interactive loop, after drawing a frame, before showing it
+    void drawProofUi();
+    // ---- end Sculpt Timeline ----
 };
 
 } // namespace sf

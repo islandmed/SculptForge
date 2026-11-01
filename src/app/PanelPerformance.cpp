@@ -8,6 +8,7 @@
 #include "app/Ui.h"
 
 #include "core/Benchmark.h"
+#include "core/HardwareProfile.h"
 #include "core/ThreadPool.h"
 
 #include <chrono>
@@ -19,11 +20,13 @@ namespace sf {
 namespace {
 
 constexpr const char* kPath = "Preferences > Performance";
-// Scenes this big draw without antialiasing while the view moves (with Fast Navigation on). UI tests lower it
-// with the environment variable SF_FAST_NAVIGATION_TRIANGLES, so they needn't build a huge mesh.
-size_t fastNavigationTriangles() {
+// Scenes this big draw without antialiasing while the view moves (with Fast Navigation on): the hardware profile's
+// motion proxy threshold, which the frame governor adjusts (core/HardwareProfile.h), else 10 million. UI tests
+// set it with the environment variable SF_FAST_NAVIGATION_TRIANGLES, so they needn't build a huge mesh.
+size_t fastNavigationTriangles(bool governed) {
     const char* v = std::getenv("SF_FAST_NAVIGATION_TRIANGLES");
-    return v && *v ? size_t(std::strtoull(v, nullptr, 10)) : size_t(10'000'000);
+    if (v && *v) return size_t(std::strtoull(v, nullptr, 10));
+    return governed ? size_t(motionProxyThreshold()) : size_t(10'000'000);
 }
 
 std::string megabytes(size_t bytes) {
@@ -72,8 +75,9 @@ void App::registerPerformanceUiActions() {
             status_ = uiPrefs_.fastNavigation ? "Fast Navigation on" : "Fast Navigation off";
         },
         [this] { return uiPrefs_.fastNavigation; },
-        "While you rotate, pan or zoom a scene of 10 million triangles or more, draw it without antialiasing, so the "
-        "view keeps up; it is smooth again as soon as the view stops.");
+        "While you rotate, pan or zoom a big scene (over the hardware profile's motion proxy threshold, which the "
+        "frame governor adjusts; 10 million triangles without a profile), draw a lighter version without "
+        "antialiasing, so the view keeps up; it is full detail again as soon as the view stops.");
     add("perf.multithreading", "Multithreading",
         [this] {
             uiPrefs_.multithreading = ThreadPool::shared().serial();
@@ -102,8 +106,10 @@ void App::registerPerformanceUiActions() {
         [this] { return uiPrefs_.draftStrokes; },
         "With Predictive Strokes: while you sculpt, the brush only moves the surface and shades the moved part from "
         "its facets; the smooth shading, the cavities and the rest are worked out once when you lift the pen. "
-        "Lighter on laptops and on battery. Brushes that follow the surface's direction (Inflate, the plane brushes) "
-        "use its direction from the stroke's start, so the result can differ slightly from a full stroke.");
+        "Lighter on laptops and on battery: the hardware profile turns it on there by itself (its Draft brushes "
+        "setting); this turns it on everywhere. Brushes that follow the surface's direction (Inflate, the plane "
+        "brushes) use its direction from the stroke's start, so the result can differ slightly from a full stroke.");
+    registerPerformanceProfileUiActions(); // Re-calibrate, the frame governor (PanelPerformanceProfile.cpp)
 }
 
 void App::applyPerformancePrefs() { ThreadPool::shared().setSerial(!uiPrefs_.multithreading); }
@@ -122,7 +128,9 @@ int App::viewSamples() {
     size_t triangles = 0;
     for (int i = 0; i < doc_.subtoolCount(); ++i)
         if (doc_.subtools[size_t(i)].visible) triangles += doc_.subtoolMesh(i).triangleCount();
-    perf_.proxyNow = uiPrefs_.fastNavigation && moving && triangles >= fastNavigationTriangles();
+    perf_.movingNow = moving;
+    perf_.sceneTriangles = triangles;
+    perf_.proxyNow = uiPrefs_.fastNavigation && moving && triangles >= fastNavigationTriangles(hardwareProfileGoverns());
     perf_.fastNow = aa > 1 && perf_.proxyNow;
     perf_.samplesWanted = perf_.fastNow ? 1 : aa;
     return perf_.samplesWanted;
@@ -143,6 +151,7 @@ void App::notePerformanceFrame(double syncMs) {
 }
 
 void App::drawPerformanceSection() {
+    drawPerformanceProfileSection(); // what was detected and measured, the profile, overrides (PanelPerformanceProfile.cpp)
     // --- The 3D view ---
     ImGui::TextUnformatted("Antialiasing");
     ui::HelpText("Antialiasing", nullptr,
@@ -196,12 +205,15 @@ void App::drawPerformanceSection() {
     ImGui::TextUnformatted("Memory");
     ui::HelpText("Memory", nullptr,
                  "What the scene holds: the meshes with their topology, the BVHs, the subdivision levels kept for "
-                 "stepping between them, the undo history (Edit keeps up to 1 GB, dropping the oldest steps) and the "
+                 "stepping between them, the undo history (Edit keeps up to 1 GB, dropping the oldest steps), painted textures "
+                 "with their layers and material channels (only painted 64x64 tiles of a channel use memory), and the "
                  "GPU buffers of the visible SubTools.",
                  kPath);
     const MemoryUse m = documentMemory(doc_);
     const std::string mem = "Meshes " + megabytes(m.mesh) + "  BVH " + megabytes(m.bvh) + "\nSubdivision levels " +
                             megabytes(m.levels) + "\nUndo " + megabytes(m.undo) + " of " + megabytes(doc_.undo.byteBudget) +
+                            "\nTextures " + megabytes(m.textures) + " (material channels " + megabytes(m.channels) + ")" +
+                            (m.paintCaches ? "\nTexture painting caches " + megabytes(m.paintCaches) : std::string()) +
                             "\nGPU buffers about " + megabytes(m.gpu);
     ImGui::TextUnformatted(mem.c_str());
     ImGui::LogText("%s", mem.c_str());

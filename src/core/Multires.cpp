@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Multires.h"
+#include "core/Micro.h"
 
 #include "core/BVH.h"
 #include "core/Document.h"
@@ -1525,6 +1526,10 @@ bool subdivSetLevel(Mesh& mesh, int level, std::string& error, BVH* bvh) {
         error = "This SubTool has no subdivision levels (Divide adds them)";
         return false;
     }
+    if (mesh.micro && level != mesh.multires->current) {
+        error = "This SubTool has a micro level: Bake it down or delete it (Tool > Geometry > Micro) before changing subdivision levels";
+        return false;
+    }
     if (!subdivCommit(mesh)) {
         error = "The mesh topology changed, so its subdivision levels were dropped";
         return false;
@@ -1558,6 +1563,10 @@ size_t subdivMaxTriangles() {
 }
 
 bool subdivDivide(Mesh& mesh, bool smooth, std::string& error, BVH* bvh, size_t maxTriangles) {
+    if (mesh.micro) {
+        error = "This SubTool has a micro level: Bake it down or delete it (Tool > Geometry > Micro) before changing subdivision levels";
+        return false;
+    }
     if (maxTriangles == 0) maxTriangles = subdivMaxTriangles();
     if (mesh.triangleCount() == 0) {
         error = "Nothing to divide";
@@ -1604,6 +1613,10 @@ bool subdivDivide(Mesh& mesh, bool smooth, std::string& error, BVH* bvh, size_t 
 }
 
 bool subdivDeleteLower(Mesh& mesh, std::string& error) {
+    if (mesh.micro) {
+        error = "This SubTool has a micro level: Bake it down or delete it (Tool > Geometry > Micro) before changing subdivision levels";
+        return false;
+    }
     if (!mesh.multires || !subdivCommit(mesh)) {
         error = "This SubTool has no subdivision levels";
         return false;
@@ -2081,6 +2094,10 @@ bool reconstructLoop(const Mesh& m, Reconstruction& out, std::string& error) {
 } // namespace
 
 bool subdivReconstruct(Mesh& mesh, std::string& error, BVH* bvh) {
+    if (mesh.micro) {
+        error = "This SubTool has a micro level: Bake it down or delete it (Tool > Geometry > Micro) before changing subdivision levels";
+        return false;
+    }
     if (mesh.multires) {
         if (!subdivCommit(mesh)) {
             // dropped: reconstruct from this mesh alone

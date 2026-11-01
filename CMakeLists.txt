@@ -28,14 +28,19 @@ include(cmake/Dependencies.cmake)
 add_library(sculptforge_core STATIC
   src/core/Mesh.cpp
   src/core/BVH.cpp
+  src/core/SurfaceCursor.cpp
   src/core/IndexBits.cpp
   src/core/ThreadPool.cpp
   src/core/UploadOrder.cpp
   src/core/Benchmark.cpp
+  src/core/HardwareProfile.cpp
+  src/core/FrameGovernor.cpp
+  src/core/TierConfig.cpp
   src/core/Sculpt.cpp
   src/core/Dyntopo.cpp
   src/core/DyntopoCommands.cpp
   src/core/Undo.cpp
+  src/core/Timeline.cpp
   src/core/Primitives.cpp
   src/core/Document.cpp
   src/core/Commands.cpp
@@ -67,7 +72,16 @@ add_library(sculptforge_core STATIC
   src/core/PaintLayer.cpp
   src/core/Texture.cpp
   src/core/TextureCommands.cpp
+  src/core/TileImage.cpp
+  src/core/TextureChannels.cpp
+  src/core/TextureChannelCommands.cpp
+  src/core/LayerStackIO.cpp
+  src/core/MapExport.cpp
   src/core/Multires.cpp
+  src/core/Micro.cpp
+  src/core/MicroSculpt.cpp
+  src/core/MicroCommands.cpp
+  src/core/MicroStore.cpp
   src/core/MultiresCommands.cpp
   src/core/AutoUv.cpp
   src/core/TextureTransfer.cpp
@@ -205,6 +219,8 @@ if(SCULPTFORGE_BUILD_APP)
     ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedGuide.cpp
     src/app/main.cpp
     src/app/Bench.cpp
+    src/app/Calibration.cpp
+    src/app/PanelPerformanceProfile.cpp
     src/app/CrashLog.cpp
     src/app/App.cpp
     src/app/AsyncStroke.cpp
@@ -237,6 +253,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelPolypaint.cpp
     src/app/PanelPaintLayers.cpp
     src/app/PanelTexture.cpp
+    src/app/PanelPbr.cpp
     src/app/PanelGeometry.cpp
     src/app/Gizmo.cpp
     src/app/PanelBake.cpp
@@ -251,6 +268,8 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelProject.cpp
     src/app/PanelSubTools.cpp
     src/app/PanelExtract.cpp
+    src/app/PanelTimeline.cpp
+    src/app/ProofMode.cpp
     src/app/Tablet.cpp
     src/app/SpaceMouse.cpp
     src/app/Input.cpp
@@ -259,11 +278,21 @@ if(SCULPTFORGE_BUILD_APP)
     src/render/Clusters.cpp
     src/render/Ghost.cpp
     src/render/Renderer.cpp
+    src/render/MicroRenderer.cpp
   )
   target_link_libraries(sculptforge PRIVATE sculptforge_core sculptforge_ai sculptforge_phone imgui SDL3::SDL3)
   target_include_directories(sculptforge PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/lucide)
   target_compile_definitions(sculptforge PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}"
                                                  SF_UPDATE_CHECK=$<BOOL:${SCULPTFORGE_UPDATE_CHECK}>)
+  # The commit a build came from, for proof mode's results (src/app/ProofMode.cpp); taken when CMake configures.
+  find_package(Git QUIET)
+  if(GIT_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
+    execute_process(COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                    OUTPUT_VARIABLE SF_GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+  endif()
+  if(SF_GIT_COMMIT)
+    set_source_files_properties(src/app/ProofMode.cpp PROPERTIES COMPILE_DEFINITIONS "SF_GIT_COMMIT=\"${SF_GIT_COMMIT}\"")
+  endif()
   if(MSVC)
     target_compile_options(sculptforge PRIVATE /W4 /utf-8 /permissive-)
   else()
@@ -499,6 +528,8 @@ if(SCULPTFORGE_BUILD_TESTS)
                                         -- --cli ${SCULPTFORGE_CLI_RUNNER})
       set_tests_properties(blender_addon PROPERTIES TIMEOUT 300)
     endif()
+    # Proof mode results: the validator and website list tool (tools/benchmark/submit.py, docs/benchmark.md).
+    add_test(NAME benchmark_submit COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/benchmark/submit.py selftest)
     add_test(NAME guide_site COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/guide/build_site.py --check
                                      --out ${CMAKE_CURRENT_BINARY_DIR}/guide-site)
   endif()
@@ -526,6 +557,10 @@ if(SCULPTFORGE_BUILD_TESTS)
           "SCULPTFORGE_BRUSH=$<TARGET_FILE:sf_fake_splat_tools>;SCULPTFORGE_COLMAP=$<TARGET_FILE:sf_fake_splat_tools>;SCULPTFORGE_FFMPEG=$<TARGET_FILE:sf_fake_splat_tools>")
       endif()
     endforeach()
+    # The hardware profile panel with a real calibration (tests/ui/hardware_profile.sfui).
+    if(TEST ui_hardware_profile)
+      set_tests_properties(ui_hardware_profile PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1")
+    endif()
     # The shell layout again on a 1920x1080 window (docs/ui-design.md §2.3).
     add_test(NAME ui_shell_layout_1080 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/shell_layout.sfui
              --size 1920x1080 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/shell_layout_1080)
@@ -546,6 +581,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Idle, the app draws nothing (#14): --measure-idle fails when it keeps drawing frames.
     add_test(NAME ui_idle_redraw COMMAND sculptforge --measure-idle 4)
     set_tests_properties(ui_idle_redraw PROPERTIES LABELS ui TIMEOUT 60 ENVIRONMENT "SF_NO_UPDATE_CHECK=1")
+    # sculptforge --calibrate on this machine's GPU: the JSON it prints passes the schema check (it exits 1 if not).
+    add_test(NAME ui_calibrate_json COMMAND sculptforge --calibrate-quick --calibrate-no-save)
+    set_tests_properties(ui_calibrate_json PROPERTIES LABELS ui TIMEOUT 60)
     # A fast stroke in the interactive loop (dabs queued, placed a few milliseconds a frame): every dab lands on the
     # pointer's circle (#19).
     add_test(NAME ui_stroke_path COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)

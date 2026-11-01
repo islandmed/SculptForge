@@ -1,9 +1,12 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Project.h"
+#include "core/Micro.h"
+#include "core/Timeline.h"
 
 #include "core/Multires.h"
 
+#include "core/LayerStackIO.h"
 #include "core/Texture.h"
 #include "core/ThreadPool.h"
 #include "core/ZSpheres.h"
@@ -141,6 +144,29 @@ public:
         return add(file, Scalar::U32, 1, v.size(), littleEndian(v.data(), v.size()));
     }
     Json bytes(const std::string& file, const std::vector<uint8_t>& v) { return add(file, Scalar::U8, 1, v.size(), v); }
+    // `count` 16-bit integers at `v` (which must outlive the save), as u8 x 2, written straight from memory on
+    // little-endian machines.
+    Json int16s(const std::string& file, const int16_t* v, size_t count) {
+        if constexpr (std::endian::native == std::endian::little) {
+            ZipEntry e{file, {}};
+            e.external = count ? reinterpret_cast<const uint8_t*>(v) : nullptr;
+            e.externalSize = count * 2;
+            entries.push_back(std::move(e));
+            return descriptor(file, Scalar::U8, 2, count);
+        } else {
+            std::vector<uint8_t> data(count * 2);
+            for (size_t i = 0; i < count; ++i) data[2 * i] = uint8_t(uint16_t(v[i])), data[2 * i + 1] = uint8_t(uint16_t(v[i]) >> 8);
+            return add(file, Scalar::U8, 2, count, std::move(data));
+        }
+    }
+    // Copied external-free: a byte array that must outlive the save.
+    Json externalBytes(const std::string& file, const std::vector<uint8_t>& v) {
+        ZipEntry e{file, {}};
+        e.external = v.empty() ? nullptr : v.data();
+        e.externalSize = v.size();
+        entries.push_back(std::move(e));
+        return descriptor(file, Scalar::U8, 1, v.size());
+    }
 
     std::vector<ZipEntry> entries;
 
@@ -219,6 +245,16 @@ public:
     bool bytes(const Json& desc, const char* what, size_t count, std::vector<uint8_t>& out) {
         out.resize(count);
         return read(desc, what, Scalar::U8, 1, count, out.data());
+    }
+    bool int16s(const Json& desc, const char* what, size_t count, std::vector<int16_t>& out) {
+        out.resize(count);
+        if (!read(desc, what, Scalar::U8, 2, count, out.data())) return false;
+        if constexpr (std::endian::native != std::endian::little)
+            for (int16_t& v : out) {
+                const uint8_t* p = reinterpret_cast<const uint8_t*>(&v);
+                v = int16_t(uint16_t(p[0]) | uint16_t(p[1]) << 8);
+            }
+        return true;
     }
 
 private:
@@ -509,6 +545,12 @@ Json writeTexture(Writer& w, const std::string& prefix, const Mesh& m) {
         layers.push(std::move(l));
     }
     out.set("layers", std::move(layers));
+    // Material channels (format 7, core/LayerStackIO.h); absent for a base-colour-only texture.
+    if (Json pbr = writeTextureChannels(t, prefix, [&](const std::string& file, const std::vector<uint8_t>& bytes) {
+            return w.bytes(file, bytes);
+        });
+        pbr.isObject())
+        out.set("pbr", std::move(pbr));
     return out;
 }
 
@@ -544,6 +586,15 @@ bool readTexture(Reader& r, const Json& tj, Mesh& m, std::string& error) {
     }
     for (size_t i = 3; i < (tex->layers.empty() ? tex->pixels : tex->base).size(); i += 4)
         (tex->layers.empty() ? tex->pixels : tex->base)[i] = 255; // Base is opaque
+    if (!readTextureChannels(tj["pbr"], *tex,
+                             [&](const Json& desc, const char* what, size_t maxBytes, std::vector<uint8_t>& out) {
+                                 const size_t n = countOf(desc["count"]);
+                                 return n != size_t(-1) && n <= maxBytes && r.bytes(desc, what, n, out);
+                             },
+                             error)) {
+        if (!r.error.empty()) error = r.error;
+        return false;
+    }
     tex->markAllDirty();
     m.texture = std::move(tex);
     m.paintToTexture = tj["paint_to_texture"].asBool(true);
@@ -765,7 +816,8 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
     Writer w;
     Json manifest = Json::object();
     manifest.set("format", kFormatName);
-    manifest.set("version", kProjectVersion);
+    ProjectVersionNeed version; // the lowest format the content needs (set again once the SubTools are written)
+    manifest.set("version", version.version);
     manifest.set("app_version", SCULPTFORGE_VERSION);
 
     // Every SubTool with its mesh, layers and state; blobs live under subtools/<i>/.
@@ -781,10 +833,27 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
         st.set("active_layer", active ? doc.activeLayer : s.activeLayer);
         if (hasPaintLayers(doc.subtoolMesh(i)))
             st.set("paint_layers", writePaintLayers(w, "subtools/" + std::to_string(i) + "/", doc.subtoolMesh(i)));
-        if (doc.subtoolMesh(i).texture && doc.subtoolMesh(i).texture->width > 0)
+        if (doc.subtoolMesh(i).texture && doc.subtoolMesh(i).texture->width > 0) {
             st.set("texture", writeTexture(w, "subtools/" + std::to_string(i) + "/", doc.subtoolMesh(i)));
+            version.need(textureFormatVersion(*doc.subtoolMesh(i).texture));
+        }
         if (subdivLevelCount(doc.subtoolMesh(i)))
             st.set("subdiv", writeSubdiv(w, "subtools/" + std::to_string(i) + "/", doc.subtoolMesh(i)));
+        if (const Mesh& m = doc.subtoolMesh(i); m.micro && microMatches(m)) { // format 7: the micro level (core/Micro.h)
+            const MicroMesh& mm = *m.micro;
+            const std::string p = "subtools/" + std::to_string(i) + "/micro/";
+            Json mj = Json::object();
+            mj.set("level", mm.level);
+            mj.set("step", double(mm.step));
+            // Tiles packed (delta + per-tile range, core/MicroStore.h): untouched tiles are 3 bytes.
+            std::vector<uint8_t> packed;
+            microPackTiles(mm.disp.data(), mm.baseTriangles, mm.samples, packed);
+            const size_t packedBytes = packed.size();
+            mj.set("displacement_packed", w.add(p + "displacement.pack", Scalar::U8, 1, packedBytes, std::move(packed)));
+            if (mm.hasMask()) mj.set("mask", w.externalBytes(p + "mask.bin", mm.mask));
+            st.set("micro", std::move(mj));
+            version.need(7);
+        }
         const std::string& gozName = active ? doc.gozName : s.gozName;
         if (!gozName.empty()) st.set("goz_name", gozName);
         const std::vector<QRemeshGuide>& guides = active ? doc.qremeshGuides : s.qremeshGuides;
@@ -842,6 +911,7 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
         for (const auto& [key, value] : doc.projectSettings.members())
             if (!isCoreKey(key)) manifest.set(key, value);
 
+    manifest.set("version", version.version);
     const std::string text = manifest.dump(true);
     w.entries.insert(w.entries.begin(), ZipEntry{kManifestName, std::vector<uint8_t>(text.begin(), text.end())});
     // The preview goes second, so loadProjectThumbnail finds it after reading two local headers.
@@ -926,6 +996,45 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
             s.finishBvh();
             r.parallelReads = true;
             s.mesh.recomputeAllNormals();
+            if (const Json& mj = sj["micro"]; mj.isObject() && version >= 7) {
+                const int level = int(mj["level"].asNumber(0));
+                if (level < 1 || level > MicroMesh::kMaxLevel) {
+                    error = "Project micro level is invalid";
+                    return false;
+                }
+                const uint32_t n = 1u << level;
+                const size_t count = s.mesh.triangleCount() * size_t((n + 1) * (n + 2) / 2);
+                const uint32_t samples = (n + 1) * (n + 2) / 2;
+                MicroStore disp;
+                std::vector<uint8_t> mask;
+                if (const Json& pj = mj["displacement_packed"]; pj.isObject()) { // tiles packed (MicroStore.h)
+                    std::vector<uint8_t> packed;
+                    const size_t bytes = countOf(pj["count"]);
+                    if (bytes == size_t(-1) || !r.bytes(pj, "micro displacement", bytes, packed)) {
+                        error = r.error.empty() ? "Project micro displacement is invalid" : r.error;
+                        return false;
+                    }
+                    std::string why;
+                    if (microWantsOutOfCore(count)) disp.assignMapped(count, why);
+                    else disp.assign(count, 0);
+                    if (!microUnpackTiles(packed.data(), packed.size(), s.mesh.triangleCount(), samples, disp.data())) {
+                        error = "Project micro displacement is damaged";
+                        return false;
+                    }
+                } else {
+                    std::vector<int16_t> plain;
+                    if (!r.int16s(mj["displacement"], "micro displacement", count, plain)) {
+                        error = r.error;
+                        return false;
+                    }
+                    disp = std::move(plain);
+                }
+                if (mj["mask"].isObject() && !r.bytes(mj["mask"], "micro mask", count, mask)) {
+                    error = r.error;
+                    return false;
+                }
+                if (!microAttach(s.mesh, level, float(mj["step"].asNumber(0)), std::move(disp), std::move(mask), error)) return false;
+            }
             s.activeLayer = int(sj["active_layer"].asNumber(-1));
         }
         const double active = manifest["active_subtool"].asNumber(0);
@@ -1048,7 +1157,9 @@ bool loadProjectThumbnail(const std::string& path, Image& out, std::string& erro
 CommandResult openProjectCommand(Document& doc, const std::string& path) {
     std::string err;
     if (!loadProject(path, doc, err)) return {false, err};
-    std::string msg = "Opened project " + path + " (";
+    std::string msg = "Opened project " + std::filesystem::path(path).filename().string() + " (";
+    // The Sculpt Timeline saved beside it, if it matches (only into the app's own scene: not thumbnails, scratch opens).
+    const int histories = &doc == Timeline::historyDocument ? loadHistorySidecar(doc, path) : 0;
     if (doc.subtoolCount() > 1) msg += std::to_string(doc.subtoolCount()) + " SubTools, ";
     size_t tris = 0, layers = 0;
     for (int i = 0; i < doc.subtoolCount(); ++i) {
@@ -1058,6 +1169,7 @@ CommandResult openProjectCommand(Document& doc, const std::string& path) {
     msg += std::to_string(tris) + " triangles";
     if (layers) msg += ", " + std::to_string(layers) + " layers";
     if (!doc.splats.empty()) msg += ", " + std::to_string(doc.splats.size()) + " splats";
+    if (histories > 0) msg += ", with its history";
     return {true, msg + ")"};
 }
 
@@ -1079,6 +1191,9 @@ void registerProjectCommands(CommandRegistry& registry) {
                       if (!saveProject(path, doc, err)) return {false, err};
                       doc.path = path;
                       doc.markClean();
+                      // The Sculpt Timeline's history beside it (<name>.sfhist), when the app asks for it.
+                      if (Timeline::saveWithProject && &doc == Timeline::historyDocument && !saveHistorySidecar(doc, path, &err))
+                          return {true, "Saved project " + path + " (the history wasn't saved: " + err + ")"};
                       return {true, "Saved project " + path};
                   }});
     registry.add({"open_project", "Open a SculptForge project (.sfproj), replacing the current scene.",

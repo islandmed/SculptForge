@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/App.h"
 #include "app/AsyncStroke.h"
+#include "app/Calibration.h"
 #include "app/CrashLog.h"
 
 #include "ai/AiCommands.h"
@@ -14,6 +15,7 @@
 
 #include <imgui_internal.h>
 #include "ai/Generator3D.h"
+#include "core/Micro.h"
 #include "core/EnginePresets.h"
 #include "link/UnrealLink.h"
 #include "core/BrushLibrary.h"
@@ -84,10 +86,11 @@ App::~App() = default;
 bool App::init(const AppOptions& options) {
     options_ = options;
     const bool recording = !options.recordPath.empty() || !options.uiTest.empty();
-    const bool headless = !options.renderPath.empty() || recording;
+    const bool headless = !options.renderPath.empty() || recording || !options.timelapsePath.empty();
     // UI tests run in a hidden window that never has focus; SDL drops joystick input without focus otherwise, and
     // the scripted SpaceMouse is a virtual joystick (UiTest.cpp).
     if (!options.uiTest.empty()) SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+    if (!headless && options.demo.empty()) applyCachedThreadCount(); // the hardware profile's threads, before any brush work
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return false;
@@ -112,7 +115,8 @@ bool App::init(const AppOptions& options) {
     const SDL_WindowFlags flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY |
                                   (headless ? SDL_WINDOW_HIDDEN : 0) |
                                   (options.fullscreen && !headless ? SDL_WINDOW_FULLSCREEN : 0);
-    const int winW = recording ? options.width : 1600, winH = recording ? options.height : 960;
+    const bool sized = recording || options.benchmark; // proof mode: --size (1920x1080 by default)
+    const int winW = sized ? options.width : 1600, winH = sized ? options.height : 960;
     window_ = SDL_CreateWindow("SculptForge", winW, winH, flags);
     if (!window_) {
         SDL_Log("SDL_CreateWindow failed: %s", SDL_GetError());
@@ -275,6 +279,7 @@ bool App::init(const AppOptions& options) {
         std::snprintf(generatorCommand_, sizeof generatorCommand_, "%s",
                       ai::defaultGeneratorCommand(std::string(base) + cliName).c_str());
     }
+    initHardwareProfile(); // the cached hardware profile, or calibration over the first frames (PanelPerformanceProfile.cpp)
     return true;
 }
 
@@ -285,6 +290,7 @@ void App::shutdown() {
     if (blenderInitialised_) writeBridgeHeartbeat(blenderExchangeRoot(), true); // the add-on starts a new one
 
     spaceMouseClose();
+    shutdownHardwareProfile(); // its timer queries need the GL context
     if (refTexture_) gl::DeleteTextures(1, &refTexture_);
     gallery_.reset(); // its preview textures need the GL context
     thumbs_.clear();
@@ -368,6 +374,7 @@ int App::runUiTest(int w, int h, int fps) {
         updateCameraAspect();
         updateSpaceMouse(dt);
 
+        hardwareProfileFrameBegin(); // (only with SF_HW_PROFILE_IN_TESTS=1: tests use fixed settings)
         Demo::beginFrame();
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
@@ -379,14 +386,17 @@ int App::runUiTest(int w, int h, int fps) {
         ImGui::NewFrame();
         ImGui::LogToBuffer(0); // capture every drawn string (0: don't auto-open tree nodes)
         drawUi();
+        drawHardwareProfileOverlay();
         if (ImGuiContext* g = ImGui::GetCurrentContext()) demo_->setFrameText(g->LogBuffer.c_str());
         ImGui::LogFinish();
         ImGui::Render();
 
+        prewarmTexturePaint(); // dense textured meshes: ready the area under the hovering Paint brush (PanelPbr.cpp)
         const auto syncStart = std::chrono::steady_clock::now();
         syncScene();
         notePerformanceFrame(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - syncStart).count());
         viewSamples(); // keeps Fast Navigation's view of the camera current (UI tests read view_samples)
+        hardwareProfileFrameEnd();
         ++frames;
         const std::string shot = demo_->takeShotRequest();
         if (shot.empty()) continue;
@@ -628,6 +638,8 @@ uint64_t App::frameKey() const {
 int App::run() {
     if (!options_.renderPath.empty()) return renderHeadless();
     if (!options_.recordPath.empty() || !options_.uiTest.empty()) return runRecording();
+    if (!options_.timelapsePath.empty()) return runTimelapseCli(); // (PanelTimeline.cpp)
+    if (options_.benchmark) startProofMode();                     // runs in this loop (ProofMode.cpp)
     if (g_wakeEvent == 0) g_wakeEvent = SDL_RegisterEvents(1);
     // Dabs are queued and placed within a time budget each frame (strokeTo). SF_STROKE_IMMEDIATE=1 places them all
     // as each pointer sample arrives, as before 0.9.6 (for comparison).
@@ -888,15 +900,20 @@ int App::run() {
         // spaceMouseMoving() is true and a loop that waits for events when idle must keep drawing.
         updateSpaceMouse(dt);
 
+        hardwareProfileFrameBegin(); // the frame governor's CPU and GPU timing
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         keepImGuiOnPen();
         ImGui::NewFrame();
         drawUi();
+        drawHardwareProfileOverlay();
         ImGui::Render();
         mark();
 
         buildGhost(); // the dabs not on the GPU yet, drawn as a preview (predictive strokes)
+        // dense textured meshes: ready the area under the hovering Paint brush (PanelPbr.cpp); not while the solver
+        // thread owns the mesh
+        if (!solverBusy()) prewarmTexturePaint();
         const auto syncStart = std::chrono::steady_clock::now();
         syncScene();
         mark();
@@ -927,6 +944,8 @@ int App::run() {
         renderSettings_.motionProxy = false; // (other renders, e.g. project thumbnails, draw in full)
         mark();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        hardwareProfileFrameEnd();
+        if (proof_) proofBeforeSwap(fbW, fbH); // Help > Benchmark: timing, video capture, the scripted pointer
         SDL_GL_SwapWindow(window_);
         mark();
         if (phases == 7 && phase[6] - phase[0] > frameLogMs)
@@ -1050,7 +1069,7 @@ bool App::pick(float x, float y, RayHit& hit) const {
     if (!doc_.activeSubtoolInfo().visible) return false; // you can't sculpt what you can't see
     glm::vec3 origin, dir;
     canvasRay(x, y, origin, dir);
-    return doc_.bvh.raycast(doc_.mesh, origin, dir, hit);
+    return surfaceRaycast(doc_.mesh, doc_.bvh, origin, dir, hit); // (the micro surface on a micro level)
 }
 
 BrushType App::activeBrush() const {
@@ -1750,6 +1769,8 @@ void App::syncScene() {
         SubTool& s = doc_.subtools[size_t(i)];
         const bool active = i == doc_.activeSubtool;
         Mesh* mesh = active ? &shown : &s.mesh;
+        // Solo channel view (channel_view): the texture's shown texels follow before the renderer uploads them.
+        if (mesh->texture) syncChannelView(*mesh->texture, doc_.channelView);
         const bool flat = s.shading == Shading::Flat || (s.shading == Shading::Default && renderSettings_.flatShading);
         scene.push_back({s.id, mesh, active, s.visible, bakeNormalMap(s.id, *mesh), renderSettings_.wireframe, flat});
     }
@@ -1818,6 +1839,7 @@ void App::drawUi() {
     drawBrushGallery();
     if (showImageTo3D_) drawImageTo3D();
     drawPhoneWindow(); // File > Capture from phone (PanelPhone.cpp)
+    drawTimelineUi();  // the Sculpt Timeline strip, timelapse, proof mode HUD (PanelTimeline.cpp, ProofMode.cpp)
     pollAlphaFile();
     pollVdm();
     if (previewLod_ >= 0) {
@@ -1954,6 +1976,11 @@ void App::sendToUnreal() {
     import.skeletal = r.skeletal;
     import.lods = r.lodCount > 1;
     import.normalMapPath = bakedNormalMapFile(import.normalMapDirectX); // Tool > Bake's last normal map, if it fits
+    // A texture with material channels goes along as T_<name>_BC / _N / _ORM and a built M_<name> material.
+    if (hasTexture(doc_.mesh) && !link::addUnrealMaterialMaps(*doc_.mesh.texture, o.folder, import, err)) {
+        status_ = "Export failed: " + err;
+        return;
+    }
     status_ = "Sending " + r.assetName + " to Unreal...";
     auto promise = std::make_shared<std::promise<std::string>>();
     pendingUnreal_ = promise->get_future();
@@ -2752,6 +2779,64 @@ void App::drawPalette_Splats() {
     drawSculptableSection(); // Make sculptable (PanelSculptable.cpp)
 }
 
+bool App::drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col) {
+    // Only what brushes work on: the active, visible SubTool with an up-to-date BVH (a stale one, after a
+    // whole-mesh change, is rebuilt at the next press; until then the flat ring shows), not an LOD preview.
+    if (previewLod_ >= 0 || doc_.bvhDirty) return false;
+    RayHit hit;
+    if (!pick(mouseX_, mouseY_, hit)) return false; // one ray, as a press would cast
+    // The world radius a dab here gets (App::firstDab / the brushes: Draw Size times world size of a pixel).
+    const float radius = radiusPx * camera_.worldPerPixel(hit.position, canvasHeight());
+    if (!(radius > 0.0f) || !std::isfinite(radius)) return false;
+    // A steady normal (8 rays), the ring pressed onto the surface (48) and the Focal Shift ring (32): a few dozen
+    // BVH ray casts, only on frames that are drawn anyway, never a pass over the mesh.
+    const glm::vec3 n = surfaceCursorNormal(doc_.mesh, doc_.bvh, hit, radius);
+    surfaceCursorRing(doc_.mesh, doc_.bvh, hit.position, n, radius, 48, cursorRing_);
+    const float focal = focalRingFraction(focalShift_);
+    surfaceCursorRing(doc_.mesh, doc_.bvh, hit.position, n, radius * focal, 32, cursorInner_);
+
+    const glm::vec3 eye = camera_.position(), forward = camera_.forward();
+    const bool ortho = camera_.ortho;
+    auto facing = [&](const glm::vec3& p, const glm::vec3& pn) {
+        return glm::dot(pn, ortho ? -forward : eye - p) > 0.0f;
+    };
+    const ImU32 inner = IM_COL32(255, 255, 255, 90);
+    // Closed polyline through the points facing the camera; a point on the far side of a curve breaks the line.
+    auto drawRing = [&](const std::vector<SurfaceRingPoint>& ring, const glm::vec3& m, ImU32 colour, float width) {
+        const size_t count = std::min<size_t>(ring.size(), 64);
+        ImVec2 sp[64];
+        bool ok[64];
+        for (size_t i = 0; i < count; ++i)
+            ok[i] = facing(ring[i].position * m, ring[i].normal * m) && gizmoProject(ring[i].position * m, sp[i]);
+        for (size_t i = 0; i < count; ++i) {
+            const size_t j = (i + 1) % count;
+            if (ok[i] && ok[j]) dl->AddLine(sp[i], sp[j], colour, width);
+        }
+    };
+    auto fade = [](ImU32 colour, float k) {
+        const ImU32 a = ImU32(float((colour >> IM_COL32_A_SHIFT) & 0xFF) * k);
+        return (colour & ~IM_COL32_A_MASK) | (a << IM_COL32_A_SHIFT);
+    };
+    // The mirrored rings first (fainter), as the brush mirrors its dabs (Sculptor::mirrors; the first is this one).
+    const std::vector<glm::vec3> mirrors = Sculptor::mirrors(symmetry_);
+    for (size_t k = mirrors.size(); k-- > 0;) {
+        const glm::vec3& m = mirrors[k];
+        const bool self = k == 0;
+        // A mirror that lands on the cursor's own ring (hovering on the plane) adds nothing.
+        if (!self && glm::length(hit.position * m - hit.position) < radius * 0.05f) continue;
+        if (!self && !facing(hit.position * m, n * m)) continue;
+        drawRing(cursorRing_, m, self ? col : fade(col, 0.45f), self ? 2.0f : 1.25f);
+        drawRing(cursorInner_, m, self ? inner : fade(inner, 0.6f), 1.0f);
+    }
+    // The surface's direction: a short line out of the centre (with a dot where the brush touches).
+    ImVec2 c0, c1;
+    if (gizmoProject(hit.position, c0) && gizmoProject(hit.position + n * (radius * 0.4f), c1)) {
+        dl->AddLine(c0, c1, fade(col, 0.85f), 1.5f);
+        dl->AddCircleFilled(c0, 2.0f * uiScale_, col);
+    }
+    return true;
+}
+
 void App::drawBrushCursor() {
     ImDrawList* dl = ImGui::GetForegroundDrawList();
     const CanvasRect canvas = canvasRect();
@@ -2783,9 +2868,12 @@ void App::drawBrushCursor() {
         const glm::vec3 pc = linearToSrgb(inverted ? glm::vec3(1.0f) : doc_.paintColor);
         col = ImGui::GetColorU32(ImVec4(pc.x, pc.y, pc.z, 0.9f));
     }
-    dl->AddCircle(c, r, col, 64, 1.5f);
-    // The inner ring is Focal Shift, as in ZBrush: where the falloff drops to half.
-    dl->AddCircle(c, r * focalRingFraction(focalShift_), IM_COL32(255, 255, 255, 90), 48, 1.0f);
+    surfaceCursorShown_ = uiPrefs_.cursorFollowsSurface && drawSurfaceCursor(dl, r, col);
+    if (!surfaceCursorShown_) {
+        dl->AddCircle(c, r, col, 64, 1.5f);
+        // The inner ring is Focal Shift, as in ZBrush: where the falloff drops to half.
+        dl->AddCircle(c, r * focalRingFraction(focalShift_), IM_COL32(255, 255, 255, 90), 48, 1.0f);
+    }
     if (strokeType_ == StrokeType::LazyMouse && drag_ == Drag::Stroke) {
         // The string from the cursor to the lagging brush point.
         const ImVec2 lp(lazyMouse_.point.x, lazyMouse_.point.y);

@@ -113,7 +113,10 @@ void App::drawPaintLayersContents() {
     const float scale = uiScale_;
     const ImVec2 cellPad(6.0f * scale, 4.0f * scale);
     const float rowH = ImGui::GetTextLineHeight() + 2.0f * cellPad.y;
-    const float listH = rowH * float(std::min(count + 1, kPaintListRows)) + 2.0f;
+    // A texture with material channels shows a row of channel chips under each layer (PanelPbr.cpp).
+    const bool chips = texture && hasMaterialChannels(*mesh.texture);
+    Args chipArgs;
+    const float listH = rowH * float(std::min(count * (chips ? 2 : 1) + 1, kPaintListRows + (chips ? 3 : 0))) + 2.0f;
     ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, cellPad);
     if (ImGui::BeginTable("##paintlayers", 4, ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersOuter,
                           ImVec2(-1, listH))) {
@@ -206,10 +209,18 @@ void App::drawPaintLayersContents() {
                 listedPaintLayer_ = i;
             }
             ImGui::PopID();
+            if (chips && l) {
+                ImGui::TableNextRow(ImGuiTableRowFlags_None, rowH);
+                ImGui::TableSetColumnIndex(0);
+                ImGui::PushID(1000 + i);
+                if (Args a = drawLayerChannelChips(i); !a.empty()) chipArgs = std::move(a);
+                ImGui::PopID();
+            }
         }
         ImGui::EndTable();
     }
     ImGui::PopStyleVar();
+    if (!chipArgs.empty()) runCommand("texture_layer_channel", chipArgs);
 
     if (selectIndex >= -1) runCommand("paint_layer_select", indexArg(selectIndex));
     if (toggleVisible >= 0)

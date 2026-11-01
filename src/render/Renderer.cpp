@@ -1,10 +1,12 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "render/Renderer.h"
+#include "render/MicroRenderer.h"
 
 #include "core/Matcap.h"
 #include "core/Texture.h"
 #include "core/ThreadPool.h"
+#include "core/TierConfig.h"
 #include "core/UploadOrder.h"
 
 #include <glm/gtc/type_ptr.hpp>
@@ -271,7 +273,9 @@ uniform int uHasPaint;        // 1: a painted texture is bound to uPaintTex too
 uniform int uNormalFlipY;     // 1: DirectX convention (green down)
 #endif
 #else
+#ifndef MICRO
 in vec4 vNormalCurv;
+#endif
 #ifdef FLAT
 in vec3 vViewPos;
 #endif
@@ -288,6 +292,54 @@ flat in int vPrimBase;
 #else
 #define V_COLOR vec3(1.0)
 #define V_MASK 0.0
+#endif
+#ifdef MICRO
+// Micro-displacement levels (render/MicroRenderer.cpp): the full-resolution shading grid of the base triangle,
+// interpolated on the micro triangle under the pixel (normal, curvature, mask), whatever level the geometry drew.
+flat in int vSlot;
+in vec2 vIJ;
+uniform samplerBuffer uShade;
+uniform int uN;
+uniform int uSamples;
+uniform mat4 uView;
+vec4 gNC;
+float gMask;
+vec4 shadeAt(int i, int j) { return texelFetch(uShade, vSlot * uSamples + j * (uN + 1) - (j * (j - 1)) / 2 + i); }
+vec3 octNormal(vec2 v) {
+    vec2 e = v * 2.0 - 1.0;
+    vec3 n = vec3(e, 1.0 - abs(e.x) - abs(e.y));
+    float t = max(-n.z, 0.0);
+    n.x += n.x >= 0.0 ? -t : t;
+    n.y += n.y >= 0.0 ? -t : t;
+    return normalize(n);
+}
+void microFetch() {
+    float fi = clamp(vIJ.x, 0.0, float(uN)), fj = clamp(vIJ.y, 0.0, float(uN));
+    int i0 = min(int(fi), uN - 1), j0 = min(int(fj), uN - 1);
+    if (i0 + j0 > uN - 1) {
+        if (fi >= fj) i0 = uN - 1 - j0;
+        else j0 = uN - 1 - i0;
+    }
+    float a = fi - float(i0), b = fj - float(j0);
+    vec4 s0, s1, s2;
+    vec3 w;
+    if (a + b <= 1.0 || i0 + j0 + 2 > uN) {
+        s0 = shadeAt(i0, j0); s1 = shadeAt(i0 + 1, j0); s2 = shadeAt(i0, j0 + 1);
+        w = vec3(1.0 - a - b, a, b);
+    } else {
+        s0 = shadeAt(i0 + 1, j0); s1 = shadeAt(i0 + 1, j0 + 1); s2 = shadeAt(i0, j0 + 1);
+        w = vec3(1.0 - b, a + b - 1.0, 1.0 - a);
+    }
+    w = clamp(w, 0.0, 1.0);
+    vec3 n = octNormal(s0.xy) * w.x + octNormal(s1.xy) * w.y + octNormal(s2.xy) * w.z;
+    vec3 c3 = (vec3(s0.z, s1.z, s2.z) * 255.0 - 128.0) / 127.0;
+    float c = dot(c3, w);
+    gNC = vec4(mat3(uView) * normalize(n), c * abs(c));
+    gMask = dot(vec3(s0.w, s1.w, s2.w), w);
+}
+#define vNormalCurv gNC
+#undef V_MASK
+#define V_MASK gMask
 #endif
 uniform vec4 uViewport;  // the view's rectangle in window pixels
 uniform vec2 uProjScale; // projection x and y scale
@@ -325,6 +377,9 @@ vec3 viewRay() {
     return normalize(vec3(-ndc / uProjScale, 1.0));
 }
 void main() {
+#ifdef MICRO
+    microFetch();
+#endif
     vec3 albedo = uBaseColor;
     vec3 tint = vec3(1.0); // multiplies a matcap: polypaint or polygroup colours
 #ifdef PRIM
@@ -633,16 +688,20 @@ bool Renderer::init(std::string& error) {
 
 const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     if (features & (kTextured | kNormalMap)) features |= kTextured | kPrim;
-    MeshProgram& p = programs_[features & 63];
+    // (micro levels: no per-vertex paint, per-triangle data or predictive preview)
+    if (features & kMicro) features &= kMicro | kFlat;
+    MeshProgram& p = programs_[features & 127];
     if (p.id) return &p;
     std::string prefix = "#version 330 core\n";
+    if (features & kMicro) prefix += "#define MICRO\n";
     if (features & kPaint) prefix += "#define PAINT\n";
     if (features & kPrim) prefix += "#define PRIM\n";
     if (features & kTextured) prefix += "#define TEXTURED\n";
     if (features & kNormalMap) prefix += "#define NORMALMAP\n";
     if (features & kFlat) prefix += "#define FLAT\n";
     if (features & kGhost) prefix += "#define GHOST\n";
-    const std::string vs = prefix + kMeshVS, fs = prefix + kMeshFS, gs = prefix + kMeshGS;
+    const std::string vs = prefix + ((features & kMicro) ? microVertexShaderSource() : kMeshVS), fs = prefix + kMeshFS,
+                      gs = prefix + kMeshGS;
     p.id = link(vs.c_str(), fs.c_str(), programError_, nullptr, (features & kTextured) ? gs.c_str() : nullptr);
     if (!p.id) return nullptr;
     auto at = [&](const char* name) { return gl::GetUniformLocation(p.id, name); };
@@ -817,6 +876,7 @@ void Renderer::freeSlot(MeshSlot& s) {
     gl::DeleteVertexArrays(1, &s.vao);
     gl::DeleteVertexArrays(1, &s.lineVao);
     gl::DeleteVertexArrays(1, &s.proxyVao);
+    s.micro.reset();
     if (s.patchVao) {
         for (GLuint* b : {&s.patchVertices, &s.patchIndices, &s.patchLines, &s.patchColors, &s.patchMask, &s.patchGroupData})
             gl::DeleteBuffers(1, b);
@@ -834,6 +894,7 @@ size_t Renderer::gpuBytes() const {
         total += s.patchBytes;
         if (s.proxyAllocated) total += (s.order.triangleCount() / 4) * 3 * sizeof(uint16_t);
         if (s.paintTexture) total += size_t(s.textureW) * size_t(s.textureH) * 4 * 4 / 3; // with mipmaps
+        if (s.micro) total += s.micro->gpuBytes();
     }
     return total;
 }
@@ -1753,6 +1814,17 @@ void Renderer::drawPatches(const MeshSlot& s, GLenum mode, Part part, GLint prim
 }
 
 void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, bool wireframe) {
+    if (mesh.micro && microMatches(mesh)) { // a micro level draws its own way (render/MicroRenderer.h)
+        if (!s.micro) s.micro = std::make_shared<MicroRenderer>();
+        s.outOfMemory = !s.micro->sync(mesh);
+        s.drawnTriangles = s.outOfMemory ? 0 : 1; // (draw() skips empty slots)
+        s.fresh = true;                           // (back to a mesh: a full upload)
+        return;
+    }
+    if (s.micro) {
+        s.micro.reset();
+        s.fresh = true;
+    }
     const size_t nv = mesh.vertexCount();
     if (normalMap && (!normalMap->rgb || !normalMap->tangents || normalMap->tangents->size() != mesh.uvs.size() ||
                       !mesh.hasUvs() || normalMap->rgb->size() != size_t(normalMap->width) * size_t(normalMap->height) * 3))
@@ -1909,7 +1981,7 @@ void Renderer::syncTexture(MeshSlot& s, Mesh& mesh) {
         if (!s.paintTexture) gl::GenTextures(1, &s.paintTexture);
         gl::BindTexture(GL_TEXTURE_2D, s.paintTexture);
         gl::TexImage2D(GL_TEXTURE_2D, 0, GLint(GL_SRGB8_ALPHA8), tex->width, tex->height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-                       tex->pixels.data());
+                       tex->shown().data());
         gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GLint(GL_LINEAR_MIPMAP_LINEAR));
         gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GLint(GL_LINEAR));
         gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GLint(GL_CLAMP_TO_EDGE));
@@ -1924,7 +1996,7 @@ void Renderer::syncTexture(MeshSlot& s, Mesh& mesh) {
         auto upload = [&](int x0, int y0, int x1, int y1) {
             x1 = std::min(x1, tex->width), y1 = std::min(y1, tex->height);
             gl::TexSubImage2D(GL_TEXTURE_2D, 0, x0, y0, x1 - x0, y1 - y0, GL_RGBA, GL_UNSIGNED_BYTE,
-                              tex->pixels.data() + (size_t(y0) * size_t(tex->width) + size_t(x0)) * 4);
+                              tex->shown().data() + (size_t(y0) * size_t(tex->width) + size_t(x0)) * 4);
         };
         if (!rect) {
             upload(0, 0, tex->width, tex->height);
@@ -2231,7 +2303,7 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
         gl::DepthMask(GL_FALSE);
         for (const DrawItem& item : drawList_) {
             const MeshSlot* s = item.active ? findSlot(item.id) : nullptr;
-            if (!s || s->drawnTriangles == 0) continue;
+            if (!s || s->drawnTriangles == 0 || s->micro) continue; // (micro levels: no wireframe)
             gl::Uniform3fv(gl::GetUniformLocation(wireProgram_, "uGridOrigin"), 1, glm::value_ptr(s->grid.origin));
             gl::Uniform1f(gl::GetUniformLocation(wireProgram_, "uGridStep"), s->grid.step);
             cull(*s, frameCull_);
@@ -2353,7 +2425,39 @@ void Renderer::drawClusters(const MeshSlot& s, const std::vector<uint32_t>& clus
 }
 
 // One mesh. Mask and polygroup colours are for the SubTool being edited; polypaint shows on all of them.
+void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings) {
+    const MeshProgram* p = meshProgram(kMicro | (flat ? kFlat : 0));
+    if (!p) return;
+    gl::UseProgram(p->id);
+    gl::UniformMatrix4fv(p->view, 1, GL_FALSE, glm::value_ptr(frameView_));
+    gl::UniformMatrix4fv(p->proj, 1, GL_FALSE, glm::value_ptr(frameProj_));
+    gl::Uniform4fv(p->viewport, 1, glm::value_ptr(frameViewport_));
+    const bool orthographic = frameProj_[3][3] == 1.0f;
+    gl::Uniform2f(p->projScale, orthographic ? 1e20f : frameProj_[0][0], orthographic ? 1e20f : frameProj_[1][1]);
+    gl::Uniform3fv(p->baseColor, 1, glm::value_ptr(settings.baseColor));
+    gl::Uniform1i(p->matcap, matcapTexture(settings.matcap) ? 1 : 0);
+    const MatcapCavity cavity = matcapCavity(settings.matcap);
+    gl::Uniform2f(p->matcapCavity, cavity.crease, cavity.ridge);
+    gl::Uniform1i(p->paint, 0);
+    gl::Uniform1i(p->showMask, active && settings.showMask ? 1 : 0);
+    gl::Uniform1i(p->groups, active && settings.showPolygroups ? 2 : 0);
+    gl::Uniform1i(p->dim, !active && settings.dimInactive ? 1 : 0);
+    gl::Uniform1i(p->twoSided, 1);
+    // Moving (Fast Navigation): a coarser target and half the budget, so orbiting stays smooth.
+    const bool moving = settings.motionProxy;
+    const size_t full = settings.renderTriangleBudget ? settings.renderTriangleBudget : size_t(currentTierConfig().activeTriangleBudget);
+    const size_t budget = moving ? full / 2 : full;
+    const float target = settings.microTargetPx * (moving ? 2.0f : 1.0f);
+    // (the budget is shared by the micro SubTools on screen: each gets it whole; one is the usual case)
+    const_cast<MeshSlot&>(s).microDrawn = s.micro->draw(p->id, frameCull_, frameProj_, frameViewport_, budget, target);
+    lastDrawn_ += s.microDrawn;
+}
+
 void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings) {
+    if (s.micro) {
+        drawMicro(s, active, flat, settings);
+        return;
+    }
     // A painted texture shows through the textured program (polypaint still multiplies it).
     const bool textured = s.hasUvs && s.paintTexture && settings.showPolypaint && settings.showTexture;
     // A baked normal map preview bends the shading normal (core/Bake.h).
@@ -2540,7 +2644,7 @@ bool Renderer::prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out, c
     MeshSlot& s = *found;
     const size_t nv = mesh.vertexCount();
     // What only the regular sync handles: a new layout, faces, attributes appearing, dynamic topology, textures.
-    if (s.fresh || s.outOfMemory || s.regrid || mesh.topologyDirty || mesh.facesDirty || nv != s.vertexCapacity ||
+    if (s.micro || s.fresh || s.outOfMemory || s.regrid || mesh.topologyDirty || mesh.facesDirty || nv != s.vertexCapacity ||
         !mesh.changedTriangles.empty() || !s.patches.empty() || mesh.normals.size() != nv || s.hasUvs ||
         s.hasColors != (nv > 0 && mesh.colors.size() == nv) || s.hasMask != (nv > 0 && mesh.mask.size() == nv))
         return false;

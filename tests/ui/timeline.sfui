@@ -1,0 +1,35 @@
+# Sculpt Timeline (PanelTimeline.cpp, core/Timeline.h): the strip records every stroke, the scrubber travels in the
+# history, sculpting from an earlier point keeps the old continuation as a branch.
+run new_sphere subdivisions=5
+expect_value timeline_steps == 0
+stroke 0.35 0.40 0.60 0.45
+stroke 0.40 0.55 0.62 0.60
+stroke 0.30 0.30 0.50 0.35
+stroke 0.55 0.35 0.65 0.55
+expect_value timeline_steps == 4
+expect_value timeline_cursor == 4
+shot strokes
+
+# Drag the scrubber to the start of the track, then back to the middle.
+view_drag 0.60 0.887 0.075 0.887
+expect_value timeline_cursor == 0
+view_drag 0.09 0.887 0.40 0.887
+expect_value timeline_cursor < 4
+expect_value timeline_cursor > 0
+shot scrubbed
+
+# Sculpting from here starts a branch: the later strokes stay as a lane above the track.
+run timeline_seek index=2
+stroke 0.30 0.60 0.55 0.70
+expect_value timeline_steps == 3
+expect_value timeline_branches == 1
+shot branch
+
+# The other branch comes back through the command (the strip's lane does the same).
+run timeline_info list=true
+run timeline_select node=4
+expect_value timeline_steps == 4
+expect_value timeline_branches == 1
+# Re-tune the first stroke: half as strong.
+run timeline_retune node=1 strength=0.5
+expect_status "re-tuned"

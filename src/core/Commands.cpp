@@ -11,9 +11,11 @@
 #include "core/EnginePresets.h"
 #include "core/ExtractMirror.h"
 #include "core/Face.h"
+#include "core/HardwareProfile.h"
 #include "core/ImageTo3D.h"
 #include "core/Masking.h"
 #include "core/Multires.h"
+#include "core/Micro.h"
 #include "core/MeshTransform.h"
 #include "core/PathStroke.h"
 #include "core/Polygroups.h"
@@ -26,6 +28,7 @@
 #include "core/Sculptable.h"
 #include "core/Splats.h"
 #include "core/TextureTransfer.h"
+#include "core/Timeline.h"
 #include "core/Voxel.h"
 #include "io/FbxIO.h"
 #include "io/GltfIO.h"
@@ -188,7 +191,7 @@ CommandRegistry::CommandRegistry() {
              if (!ok) return {false, err};
              if (m.triangleCount() > 0) objects.push_back({"", std::move(m)});
              std::erase_if(objects, [](const MeshObject& o) { return o.mesh.triangleCount() == 0; });
-             std::string msg = "Opened " + path;
+             std::string msg = "Opened " + std::filesystem::path(path).filename().string();  // file name only: status shows in screen recordings
              const bool hasMesh = !objects.empty();
              if (hasMesh) {
                  size_t tris = 0, quads = 0, layers = 0;
@@ -782,11 +785,14 @@ CommandRegistry::CommandRegistry() {
     registerPolygroupCommands(*this);
     registerSubToolCommands(*this);
     registerSubdivCommands(*this); // subdiv_* (core/MultiresCommands.cpp)
+    registerMicroCommands(*this);  // micro_* (core/MicroCommands.cpp)
     registerDyntopoCommands(*this); // dyntopo (core/DyntopoCommands.cpp)
     registerSculptableCommands(*this); // splat_to_mesh, face_guides (core/Sculptable.h)
     registerTransformCommands(*this); // transform (core/MeshTransform.h)
     registerExtractMirrorCommands(*this); // extract, mirror_and_weld, mirror (core/ExtractMirror.h)
     registerPerformanceCommands(*this); // perf_info, set_multithreading (core/Benchmark.cpp)
+    registerHardwareProfileCommands(*this); // performance_profile, calibrate, set_performance_override (core/HardwareProfile.cpp)
+    registerTimelineCommands(*this); // timeline_info / seek / select / retune / save / load (core/Timeline.h)
     registerPaintCommands(*this); // core/Polypaint.cpp
     registerGozCommands(*this); // goz_import/export/send/receive, export_stl (io/GozCommands.cpp)
     registerBlenderCommands(*this); // blender_send/receive (io/BlenderCommands.cpp)

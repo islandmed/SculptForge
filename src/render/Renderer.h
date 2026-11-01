@@ -13,10 +13,13 @@
 
 #include <cstdint>
 #include <list>
+#include <memory>
 #include <string>
 #include <vector>
 
 namespace sf {
+
+class MicroRenderer;
 
 struct RenderSettings {
     bool wireframe = false;
@@ -35,6 +38,10 @@ struct RenderSettings {
     // The view's background: the charcoal radial gradient (default) or one flat display (sRGB) colour (#21).
     bool gradientBackground = true;
     glm::vec3 backgroundColor{0.165f, 0.165f, 0.173f};
+    // Micro-displacement levels (render/MicroRenderer.h): the most triangles a frame draws for them (their level
+    // of detail drops to fit; a hardware profile may set it), and the micro edge length to aim for on screen.
+    size_t renderTriangleBudget = 0; // 0 = TierConfig::activeTriangleBudget (core/TierConfig.h)
+    float microTargetPx = 2.0f;
 };
 
 // A baked tangent-space normal map to preview on a mesh (core/Bake.h): RGB8 rows bottom-up, with the
@@ -264,6 +271,9 @@ private:
         bool patchColorsOn = false, patchMaskOn = false, patchLinesOn = false;
         PositionGrid patchGrid; // the grid the patches' vertices were packed with
         size_t patchBytes = 0;
+        // A mesh with a micro level (core/Micro.h) draws through this instead of the buffers above.
+        std::shared_ptr<MicroRenderer> micro;
+        size_t microDrawn = 0;
     };
     MeshSlot& slot(uint32_t id); // created on first use
     static void freeSlot(MeshSlot& s);
@@ -327,8 +337,9 @@ private:
               normalFlipY = -1, twoSided = -1;
         GLint ghostGroups = -1, ghostRange = -1, ghostEdge = -1, ghostA = -1, ghostB = -1, ghostC = -1, ghostBound = -1, ghostKind = -1, ghostFocal = -1;
     };
-    static constexpr int kPaint = 1, kPrim = 2, kTextured = 4, kNormalMap = 8, kFlat = 16, kGhost = 32;
-    MeshProgram programs_[64];
+    static constexpr int kPaint = 1, kPrim = 2, kTextured = 4, kNormalMap = 8, kFlat = 16, kMicro = 32, kGhost = 64;
+    MeshProgram programs_[128];
+    void drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings);
     std::string programError_;
     const MeshProgram* meshProgram(int features);
     bool vertexIdHasBase_ = true; // gl_VertexID includes the base vertex (checked at init; else per-cluster draws)

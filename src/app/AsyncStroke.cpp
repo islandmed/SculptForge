@@ -11,7 +11,9 @@
 // ends the stroke first, which waits for the solver).
 #include "app/AsyncStroke.h"
 
+#include "core/Micro.h"
 #include "core/Sculpt.h"
+#include "core/TierConfig.h"
 
 #include <algorithm>
 #include <chrono>
@@ -116,7 +118,9 @@ bool App::draftStrokes() const {
         const char* v = std::getenv("SF_DRAFT_STROKE");
         return v && *v ? (*v == '0' ? 0 : 1) : -1;
     }();
-    return predictiveStrokes() && (env >= 0 ? env == 1 : uiPrefs_.draftStrokes);
+    // The hardware profile's tier decides (draft on laptops and on battery, core/TierConfig.h); the preference
+    // turns it on whatever the tier.
+    return predictiveStrokes() && (env >= 0 ? env == 1 : uiPrefs_.draftStrokes || currentTierConfig().draftBrushMode);
 }
 
 bool App::asyncStrokeAllowed() const {
@@ -125,6 +129,7 @@ bool App::asyncStrokeAllowed() const {
     const bool recipe = strokeRecipe() != nullptr;
     return interactiveStrokes_ && predictiveStrokes() && strokeSculpt_ && !strokePaint_ && !strokeMask_ &&
            !doc_.sculptor.dyntopo.enabled && previewLod_ < 0 && !faceTakePlaying_ &&
+           !doc_.mesh.micro && // (a micro level is sculpted and drawn by core/MicroSculpt and the MicroRenderer)
            (recipe || (strokeBrush_ != BrushType::Move && strokeBrush_ != BrushType::SnakeHook)) &&
            strokeType_ != StrokeType::DragRect && strokeType_ != StrokeType::DragDot;
 }
@@ -321,7 +326,7 @@ bool App::pickWith(const DabView& view, float x, float y, RayHit& hit) const {
     if (!view.settings.visible) return false;
     glm::vec3 origin, dir;
     view.camera.screenRay(x - view.canvas.x, y - view.canvas.y, view.canvas.w, view.canvas.h, origin, dir);
-    return doc_.bvh.raycast(doc_.mesh, origin, dir, hit);
+    return surfaceRaycast(doc_.mesh, doc_.bvh, origin, dir, hit);
 }
 
 glm::vec2 App::predictedPointer() const {

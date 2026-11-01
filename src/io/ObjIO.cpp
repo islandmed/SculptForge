@@ -316,6 +316,20 @@ bool saveObj(const std::string& path, const std::vector<MeshObjectRef>& objects,
             std::string pngPath;
             if (!writeTextureBeside(path, pngs[i], *objects[i].mesh, pngPath, error)) return false;
             mtl += "\nnewmtl " + name + "\nKa 0 0 0\nKd 1 1 1\nKs 0 0 0\nillum 1\nmap_Kd " + pngs[i] + "\n";
+            // Material channels: the PBR extension of MTL (Pr / Pm / Ke, map_Pr, map_Pm, map_Ke, norm), as Blender
+            // and other importers read it; occlusion has no MTL key and goes out as its file only.
+            std::vector<PbrPng> pbr;
+            if (!encodePbrPngs(*objects[i].mesh, false, pngs[i], pbr) || !writePbrPngsBeside(path, pbr, error)) {
+                if (error.empty()) error = "Cannot encode the material maps of " + objects[i].name;
+                return false;
+            }
+            for (const PbrPng& p : pbr) {
+                if (p.slot == "roughness") mtl += "Pr 1\nmap_Pr " + p.name + "\n";
+                else if (p.slot == "metallic") mtl += "Pm 1\nmap_Pm " + p.name + "\n";
+                else if (p.slot == "normal") mtl += "norm " + p.name + "\nmap_Bump -bm 1 " + p.name + "\n";
+                else if (p.slot == "emissive") mtl += "Ke 1 1 1\nmap_Ke " + p.name + "\n";
+                else if (p.slot == "opacity") mtl += "map_d " + p.name + "\n";
+            }
         }
         if (clayUsed) mtl += "\nnewmtl " + clay + "\nKa 0 0 0\nKd 0.8 0.55 0.45\nKs 0 0 0\nillum 1\n";
         const std::filesystem::path mtlPath = utf8Path(path).parent_path() / utf8Path(sidecarStem(path) + ".mtl");

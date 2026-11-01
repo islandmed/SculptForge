@@ -29,6 +29,9 @@ public:
 
     // The pool brushes use: one thread per hardware thread (up to 16), the caller included.
     static ThreadPool& shared();
+    // Threads for shared() (the hardware profile's, core/HardwareProfile.h), honoured if called before its first
+    // use; 0 = automatic. Returns false when the pool already exists (the count applies at the next start).
+    static bool setSharedThreadCount(int threads);
 
     int threads() const { return int(workers_.size()) + 1; }
     // Serial: every run() executes inline on the calling thread (tests compare results against this).

@@ -22,6 +22,7 @@ struct PaintTexture;
 struct MultiresStack;
 struct SubdivTopology;
 struct ImplicitAdjacency;
+struct MicroMesh;
 
 // The vertices or triangles around a vertex (Mesh::neighbors, Mesh::vertexTriangles), in ascending order: a view
 // of the mesh's adjacency lists or, where the mesh's adjacency is implicit, the list itself. Use it like a span
@@ -191,6 +192,12 @@ public:
     // Subdivision levels (core/Multires.h): the stack this mesh is one level of, shared copy-on-write by
     // copies of the mesh. Null = a plain mesh. sanitizeAttributes() drops it if the topology no longer fits.
     std::shared_ptr<MultiresStack> multires;
+
+    // Micro-displacement level (core/Micro.h): above this mesh (the base, its highest subdivision level), a grid of
+    // scalar displacements per triangle that the brushes and the renderer use instead of the mesh. Shared
+    // copy-on-write by copies of the mesh (mutableMicro). Null = none. sanitizeAttributes() drops it if the
+    // triangle or vertex count changes.
+    std::shared_ptr<MicroMesh> micro;
 
     // ZSpheres (core/ZSpheres.h): not empty = a ZSphere SubTool, whose triangles are made from this armature (the
     // spheres and their links, or the skin while `zspherePreview`). Copies, undo steps and projects carry it.

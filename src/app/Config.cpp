@@ -10,6 +10,8 @@
 #include "app/App.h"
 #include "app/CrashLog.h"
 #include "app/Ui.h"
+#include "core/Bake.h"
+#include "core/Micro.h"
 #include "core/Multires.h"
 #include "core/Script.h"
 
@@ -50,6 +52,7 @@ Json toJson(const UiPrefs& p) {
     j.set("inputStyle", std::string(p.inputStyle == 2 ? "blender" : p.inputStyle == 1 ? "sculptforge" : "zbrush"));
     j.set("emulateNumpad", p.emulateNumpad);
     j.set("rightClickQuickMenu", p.rightClickQuickMenu);
+    j.set("cursorFollowsSurface", p.cursorFollowsSurface);
     j.set("alphabeticalPalettes", p.alphabeticalPalettes);
     j.set("tablet", toJson(p.tablet));
     j.set("spaceMouse", toJson(p.spaceMouse));
@@ -86,6 +89,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     }
     p.emulateNumpad = j["emulateNumpad"].asBool(p.emulateNumpad);
     p.rightClickQuickMenu = j["rightClickQuickMenu"].asBool(p.rightClickQuickMenu);
+    p.cursorFollowsSurface = j["cursorFollowsSurface"].asBool(p.cursorFollowsSurface);
     p.alphabeticalPalettes = j["alphabeticalPalettes"].asBool(p.alphabeticalPalettes);
     fromJson(j["tablet"], p.tablet);
     fromJson(j["spaceMouse"], p.spaceMouse);
@@ -275,6 +279,26 @@ void App::initActions() {
         [this] { return subdivCurrentLevel(doc_.mesh) + 1 < subdivLevelCount(doc_.mesh); });
     add("geometry.reconstruct", "Reconstruct Subdiv", "Tool > Geometry", nullptr, [this] { runCommand("subdiv_reconstruct"); },
         nullptr, "subdiv_reconstruct", nullptr, [this] { return subdivCurrentLevel(doc_.mesh) == 0; });
+    // Micro-displacement levels (Tool > Geometry > Micro; core/Micro.h).
+    add("geometry.micro_divide", "Divide to Micro", "Tool > Geometry", nullptr,
+        [this] { runCommand("micro_divide", {{"level", double(microSlider_)}}); }, ICON_LC_GRID_3X3, "micro_divide", nullptr,
+        [this] { return !hasMicro(doc_.mesh) && subdivCurrentLevel(doc_.mesh) + 1 >= subdivLevelCount(doc_.mesh); },
+        "Store the surface above the highest level as micro displacements: hundreds of millions of sculptable "
+        "triangles in a fraction of the memory (300M take about 0.4 GB). The Micro slider sets how fine.");
+    add("geometry.micro_delete", "Delete Micro", "Tool > Geometry", nullptr, [this] { runCommand("micro_delete"); }, nullptr,
+        "micro_delete", nullptr, [this] { return hasMicro(doc_.mesh); });
+    add("geometry.micro_bake", "Bake Micro", "Tool > Geometry", nullptr, [this] { runCommand("micro_bake"); }, nullptr, "micro_bake",
+        nullptr, [this] { return hasMicro(doc_.mesh); },
+        "Turn the micro level into a regular mesh in a new SubTool (for export or tools that need real geometry).");
+    add("geometry.micro_export", "Export Displacement", "Tool > Geometry", nullptr,
+        [this] {
+            const std::string path = (std::filesystem::path(defaultBakeFolder(doc_)) / (doc_.assetName() + "_micro_displacement.exr")).string();
+            runCommand("micro_export_displacement", {{"path", path}});
+        },
+        nullptr, "micro_export_displacement", nullptr, [this] { return hasMicro(doc_.mesh) && doc_.mesh.hasUvs(); },
+        "Write the micro level as a 32-bit EXR displacement map over the base UVs (next to the project).");
+    add("geometry.micro_noise", "Micro Surface Noise", "Tool > Geometry", nullptr, [this] { runCommand("micro_noise"); }, nullptr,
+        "micro_noise", nullptr, [this] { return hasMicro(doc_.mesh); });
     // Tool > SubTool > Extract, Tool > Geometry > Modify Topology, Tool > Deformation (PanelExtract.cpp).
     add("subtool.extract", "Extract", "Tool > SubTool", nullptr, [this] { runExtract(); }, nullptr, "extract", nullptr,
         [this] { return doc_.mesh.hasMask(); },
@@ -473,6 +497,7 @@ void App::initActions() {
     // the same id and own P (Paint), the symmetry toggles and Tab.
     registerShellActions();
     registerTextureUiActions(); // Tool > Texture Map, the Vertex / Texture paint target (PanelTexture.cpp)
+    registerPbrUiActions();     // material channels, solo view, map export (PanelPbr.cpp)
     registerGizmoActions();     // Q W E R: Draw, and the Gizmo 3D's Move, Scale, Rotate (Gizmo.cpp)
     registerBakeUiActions();    // Tool > Bake (PanelBake.cpp)
     registerRetopoUiActions(); // Geometry > QRemesh, SubTool > ProjectAll (PanelRetopo.cpp)
@@ -483,6 +508,7 @@ void App::initActions() {
     registerFaceUiActions();   // Tool > Facial Shapes, face_take_play / face_take_stop (PanelFace.cpp)
     registerPerformanceUiActions(); // Preferences > Performance (PanelPerformance.cpp)
     registerInputActions();     // ZBrush keys: U I O, Space, L, V, Ctrl+A / I / H / W..., the input style (Input.cpp)
+    registerTimelineUiActions(); // Sculpt Timeline, timelapse, Help > Benchmark (PanelTimeline.cpp)
 
     // Every command, so the command palette finds anything scriptable.
     actions_.registerCommands(
