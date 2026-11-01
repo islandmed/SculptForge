@@ -439,7 +439,8 @@ the numpad views and Blender's sculpt-mode keys (see [Blender keys](shortcuts.md
 style, **Emulate Numpad** makes the number row work as the numpad, and **Import Blender keymap...** takes the keys
 from a keymap you exported in Blender. **Right click opens the QuickMenu** (on by default, in every style) opens
 the [QuickMenu](sculpting.md#the-quickmenu) with a right click on the canvas; a right drag navigates either
-way. **Cursor follows surface** (on by default) lays the brush rings on the model under the pointer (see
+way. **Radial Menus** edits your pie menus and their keys (see [Radial menus](sculpting.md#radial-menus)).
+**Cursor follows surface** (on by default) lays the brush rings on the model under the pointer (see
 [Draw Size and Focal Shift](sculpting.md#draw-size-z-intensity-rgb-intensity-and-focal-shift)); off, they are flat circles on the screen. **Rotation** chooses free rotation (ZBrush) or a turntable. See
 [Coming from ZBrush](coming-from-zbrush.md).
 
