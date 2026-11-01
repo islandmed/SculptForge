@@ -1061,6 +1061,9 @@ void drawPickers(App& app) {
                     pickerTitle(ICON_LC_SPLINE, "Stroke", nullptr);
                     ImGui::Spacing();
                     drawStrokeGrid(app, GridMode::Popup);
+                    // Continuous (#31) here too, beside the strokes, as in the Stroke palette (#43)
+                    ImGui::Spacing();
+                    ui::ActionButton(app, "stroke.continuous", ImVec2(-1.0f, 0.0f));
                 }
                 ImGui::End();
                 break;
