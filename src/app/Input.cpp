@@ -427,7 +427,8 @@ void App::drawInputSection() {
                  "Free: the model turns about the screen's axes and can roll over the top, as in ZBrush. Turntable: it "
                  "stays upright, as in Blender or Maya.",
                  "Preferences > Input");
-    drawSpaceMouseSection(); // SpaceMouse.cpp
+    drawRadialMenusSection(); // RadialMenu.cpp
+    drawSpaceMouseSection();  // SpaceMouse.cpp
 }
 
 void App::drawZIntensitySlider(const char* id) {

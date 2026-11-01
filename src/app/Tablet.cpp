@@ -110,8 +110,9 @@ void App::penButton(int button, bool down, float x, float y) {
     if (((penButtons_ & bit) != 0) == down) return;
     penButtons_ = down ? penButtons_ | bit : penButtons_ & ~bit;
     penSeen_ = true;
+    if (radialPenButton(button, down, x, y)) return; // a radial menu's button (RadialMenu.cpp)
     // Invert and Smooth need nothing here: inputMods() reports them as Alt / Shift while held.
-    const PenAction a = button <= kPenButtons ? uiPrefs_.tablet.buttons[size_t(button - 1)] : PenAction::None;
+    const PenAction a = penButtonAction(button);
     if (a != PenAction::RotateView && a != PenAction::PanView && a != PenAction::RightClick) return;
     ImGuiIO& io = ImGui::GetIO();
     if (a == PenAction::RightClick) { // context menus and right-click items in the UI
@@ -142,11 +143,12 @@ void App::penButton(int button, bool down, float x, float y) {
 
 void App::penLeft() {
     // A pen lifted out of range mid-stroke: finish the stroke (one undo step) instead of leaving it open.
+    if (radial_.hold == RadialHold::Pen) closeRadialMenu(); // a pen button held a radial menu open
     if (drag_ != Drag::None && dragFromPen_) onMouseUp();
     ImGuiIO& io = ImGui::GetIO();
     if (penTouching_) io.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
     for (int b = 1; b <= kPenButtons; ++b)
-        if ((penButtons_ & (1u << b)) && uiPrefs_.tablet.buttons[size_t(b - 1)] == PenAction::RightClick)
+        if ((penButtons_ & (1u << b)) && penButtonAction(b) == PenAction::RightClick)
             io.AddMouseButtonEvent(ImGuiMouseButton_Right, false);
     penInProximity_ = penTouching_ = penEraser_ = false;
     penButtons_ = 0;
@@ -171,7 +173,7 @@ SDL_Keymod App::inputMods() const {
     }
     for (int b = 1; b <= kPenButtons; ++b) {
         if (!(penButtons_ & (1u << b))) continue;
-        const PenAction a = uiPrefs_.tablet.buttons[size_t(b - 1)];
+        const PenAction a = penButtonAction(b);
         if (a == PenAction::Invert) mods |= SDL_KMOD_LALT;
         else if (a == PenAction::Smooth) mods |= SDL_KMOD_LSHIFT;
     }

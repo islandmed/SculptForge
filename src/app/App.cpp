@@ -1032,6 +1032,7 @@ int App::run() {
 void App::handleEvent(const SDL_Event& e) {
     if (dropPenMouseEvent(e)) return; // pen side buttons are mapped in Tablet.cpp, not left to SDL
     if (strayMouseMotion(e)) return;  // neither the canvas nor the UI follows a driver's stray mouse events
+    if (radialMouseEvent(e)) return;  // clicks on an open radial menu, and the buttons that open one (RadialMenu.cpp)
     ImGui_ImplSDL3_ProcessEvent(&e);
     const ImGuiIO& io = ImGui::GetIO();
 
@@ -1044,6 +1045,9 @@ void App::handleEvent(const SDL_Event& e) {
     case SDL_EVENT_JOYSTICK_AXIS_MOTION:
     case SDL_EVENT_JOYSTICK_BUTTON_DOWN:
         spaceMouseEvent(e); // a SpaceMouse (SpaceMouse.cpp)
+        break;
+    case SDL_EVENT_WINDOW_FOCUS_LOST:
+        if (radial_.hold != RadialHold::None) closeRadialMenu(); // its key or button's release won't come here
         break;
     case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
         if (e.window.windowID == SDL_GetWindowID(window_)) requestQuit();
@@ -1083,6 +1087,7 @@ void App::handleEvent(const SDL_Event& e) {
         break;
     case SDL_EVENT_KEY_UP:
         if (e.key.key == SDLK_SPACE) quickMenuKeyUp(); // a held Space closes the QuickMenu when let go
+        radialKeyUp(e.key.key);                        // a radial menu's held key: run the slot pointed at
         break;
     case SDL_EVENT_DROP_FILE:
         if (e.drop.data) openPathConfirmed(e.drop.data);
@@ -1342,6 +1347,10 @@ void App::onMouseUp() {
 }
 
 void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
+    if (key == SDLK_ESCAPE && radial_.menu >= 0) {
+        closeRadialMenu();
+        return;
+    }
     if (key == SDLK_ESCAPE && !insertType_.empty()) { // Append > Insert (#34) off
         insertType_.clear();
         status_ = "Insert off";
@@ -1358,7 +1367,9 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
     if (blenderStyle() && uiPrefs_.emulateNumpad && key >= SDLK_0 && key <= SDLK_9 &&
         !actions_.actionForChord(chordFromEvent(key, mod)))
         key = key == SDLK_0 ? SDLK_KP_0 : SDL_Keycode(SDLK_KP_1 + (key - SDLK_1));
+    keyDown_ = key; // a radial menu's key holds it open until this key is let go (RadialMenu.cpp)
     actions_.handleKey(key, mod);             // the shortcut map: Config.cpp initActions()
+    keyDown_ = SDLK_UNKNOWN;
 }
 
 // ---------------------------------------------------------------------------
@@ -1918,6 +1929,7 @@ void App::drawUi() {
     drawShell();
     drawLightBoxUi(); // thumbnails, the LightBox over the canvas, pickers, size / strength pop-ups
     drawQuickMenu();  // Space (Input.cpp)
+    drawRadialMenu(); // radial menus (RadialMenu.cpp)
     drawSubToolPopups();
     if (showBrushLab_) drawBrushLab();
     drawBrushGallery();
@@ -1951,7 +1963,7 @@ void App::drawUi() {
     // In Gizmo mode (and with the QRemesh Guides brush) the brush ring shows only while Ctrl masks or Shift smooths.
     const bool ringOff = gizmoActive() || (guidesMode_ && !(inputMods() & SDL_KMOD_SHIFT)) || sculptableHot() || zsphereActive();
     if (((!ImGui::GetIO().WantCaptureMouse && canvasRect().contains(mouse.x, mouse.y)) || drag_ == Drag::Stroke) &&
-        !hideBrushCursor_ && drag_ != Drag::Select && drag_ != Drag::Guide &&
+        !hideBrushCursor_ && radial_.menu < 0 && drag_ != Drag::Select && drag_ != Drag::Guide && // (no ring under a pie)
         (!ringOff || drag_ == Drag::Stroke || ctrlDown(inputMods())))
         drawBrushCursor();
     drawSelectionOverlay();

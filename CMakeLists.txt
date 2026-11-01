@@ -282,6 +282,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/Tablet.cpp
     src/app/SpaceMouse.cpp
     src/app/Input.cpp
+    src/app/RadialMenu.cpp
     src/render/GL.cpp
     src/render/Camera.cpp
     src/render/Clusters.cpp

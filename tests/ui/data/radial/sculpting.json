@@ -1,0 +1,17 @@
+{
+  "format": "sculptforge-radial-menu",
+  "version": 1,
+  "menu": {
+    "name": "Sculpting\n\u001b[31m with a name far longer than any menu needs to have",
+    "button": "mouse_middle",
+    "slots": [
+      {"action": "brush.smooth", "label": "Smooth it", "icon": "waves"},
+      {"action": "cmd.blender_keymap_import", "label": "needs a path: left out"},
+      {"action": "no.such.action"},
+      {"action": "brush.inflate", "icon": "../../not-an-icon"},
+      {"action": 12},
+      "brush.move",
+      {"action": "brush.pinch"}
+    ]
+  }
+}
