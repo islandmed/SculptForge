@@ -1532,6 +1532,17 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
     // each bite with a face (a middle vertex on the plane when it is odd) and split it into quads.
     if (axis >= 0) {
         auto onPlane = [&](uint32_t v) { return std::abs(qp[v][axis]) < 0.05f * h0; };
+        SegmentBVH modelOpen; // the proxy's open edges off the plane: the model's own outline
+        {
+            std::vector<vec3> a, b;
+            for (uint32_t c = 0; c < proxy.opp.size(); ++c) {
+                if (proxy.opp[c] != kNone) continue;
+                const vec3 x = proxy.P[proxy.T[c / 3][c % 3]], y = proxy.P[proxy.T[c / 3][(c % 3 + 1) % 3]];
+                if (std::abs(x[axis]) < 1e-5f * diag && std::abs(y[axis]) < 1e-5f * diag) continue;
+                a.push_back(x), b.push_back(y);
+            }
+            if (!a.empty()) modelOpen.build(a, b);
+        }
         std::unordered_map<uint64_t, int> use;
         std::unordered_map<uint64_t, std::pair<uint32_t, uint32_t>> dir; // open edge -> (from, to) as wound
         for (const auto& q : quads)
@@ -1560,6 +1571,14 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
             }
             done.insert(startV);
             if (path.size() < 3 || !onPlane(path.back())) continue;
+            // A bite is a hole; a path along the model's own open edges reaching the plane (a bust's base) is not.
+            if (path.size() > 48) continue;
+            size_t alongOpen = 0;
+            for (size_t i = 1; i + 1 < path.size(); ++i) {
+                SurfaceHit hit;
+                if (!modelOpen.empty() && modelOpen.closestPoint(qp[path[i]], 0.1f * h0, hit)) ++alongOpen;
+            }
+            if (alongOpen * 2 > path.size() - 2) continue;
             if (path.size() % 2 == 1) { // odd: a middle vertex on the plane
                 vec3 m = 0.5f * (qp[path.front()] + qp[path.back()]);
                 m[axis] = 0.0f;
@@ -1605,9 +1624,9 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
                 nbq[quads[f][k]].push_back(quads[f][(k + 1) % 4]);
                 nbq[quads[f][k]].push_back(quads[f][(k + 3) % 4]);
             }
-        std::vector<uint8_t> isFeat(nv, 0);
+        std::vector<uint8_t> isFeat(nv, 0), onPlaneV(nv, 0);
         for (size_t v = 0; v < nv && v < feat.size(); ++v) isFeat[v] = feat[v];
-        for (uint32_t v : planeVerts) isFeat[v] = 1;
+        for (uint32_t v : planeVerts) isFeat[v] = 0, onPlaneV[v] = 1; // these move within the plane
         size_t untangled = 0;
         for (int it = 0; it < 8; ++it) {
             std::vector<vec3> qn(quads.size());
@@ -1631,8 +1650,10 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
                 vec3 c(0.0f);
                 for (uint32_t u : nbq[v]) c += qp[u];
                 c /= float(nbq[v].size());
+                if (onPlaneV[v]) c[axis] = 0.0f;
                 SurfaceHit hit;
                 qp[v] = surface.closestPoint(c, 2.0f * h0, hit) ? hit.position : c;
+                if (onPlaneV[v]) qp[v][axis] = 0.0f;
                 ++untangled;
             }
         }
