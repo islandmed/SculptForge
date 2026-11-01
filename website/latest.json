@@ -1,11 +1,13 @@
 {
-  "version": "0.10.4",
+  "version": "0.10.5",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Insert your own mesh: a Part copy or an OBJ, PLY or GLB, dragged onto the model (#34)",
-    "Keep Masked for Voxel Remesh, Decimate and Quad Remesh: the masked detail stays exactly as it is (#43)",
-    "Pie menus on T and Y (#45), a Maya bridge through a folder (#42), the interface in Spanish (#44)",
-    "Twelve new alphas and six VDM brushes; Falloff now shapes alphas (#60); mask from the mesh border (#61)"
+    "A UV Editor (Alt+U): UDIM tiles, seams, six unwraps, packing, texel density, trim sheets; stretch shows live on the model",
+    "Selection sets: store mask, groups, visibility, vertex paint, UVs and shape per Part; restore at any level; Morph brush",
+    "Radial and local symmetry, with mirror symmetry and every brush (#63); the timeline can sit at the top",
+    "Start strokes off the model: Preferences > Input or Shift+L (#62)",
+    "Fixed: the viewport on some Windows PCs never showed the model and left cursor trails (#29)",
+    "Tools now use SculptForge's own names; searching the old terms still finds them"
   ]
 }
