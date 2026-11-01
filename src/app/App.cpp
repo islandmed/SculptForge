@@ -1794,6 +1794,11 @@ void App::sendToUnreal() {
     import.skeletal = r.skeletal;
     import.lods = r.lodCount > 1;
     import.normalMapPath = bakedNormalMapFile(import.normalMapDirectX); // Tool > Bake's last normal map, if it fits
+    // A texture with material channels goes along as T_<name>_BC / _N / _ORM and a built M_<name> material.
+    if (hasTexture(doc_.mesh) && !link::addUnrealMaterialMaps(*doc_.mesh.texture, o.folder, import, err)) {
+        status_ = "Export failed: " + err;
+        return;
+    }
     status_ = "Sending " + r.assetName + " to Unreal...";
     auto promise = std::make_shared<std::promise<std::string>>();
     pendingUnreal_ = promise->get_future();

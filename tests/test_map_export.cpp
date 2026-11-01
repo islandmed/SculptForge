@@ -12,6 +12,7 @@
 #include "core/Primitives.h"
 #include "core/Texture.h"
 #include "core/TextureChannels.h"
+#include "link/UnrealLink.h"
 
 #include <cmath>
 #include <filesystem>
@@ -241,5 +242,38 @@ TEST(map_export_command) {
     CHECK(!reg.execute(doc, "export_maps", {}).ok);
     Document plain = makeDoc(makePlane(2));
     CHECK(!reg.execute(plain, "export_maps", {{"folder", dir.string()}}).ok);
+    fs::remove_all(dir);
+}
+
+TEST(map_export_unreal_bridge_builds_a_material) {
+    // addUnrealMaterialMaps exports T_<name>_BC / _N / _ORM and the import script brings them in and builds M_<name>.
+    auto t = sampleTexture(false);
+    const fs::path dir = freshDir("sf_map_export_bridge");
+    link::UnrealImport im;
+    im.fbxPath = "/tmp/SM_Lion.fbx";
+    im.assetName = "SM_Lion";
+    std::string err;
+    CHECK(link::addUnrealMaterialMaps(*t, dir.string(), im, err));
+    CHECK(im.buildMaterial && im.normalMapDirectX);
+    CHECK(fs::exists(im.baseColorPath) && fs::exists(im.ormPath) && fs::exists(im.normalMapPath));
+    CHECK(fs::path(im.ormPath).filename() == "T_Lion_ORM.png");
+    CHECK(im.emissivePath.empty());
+    const std::string py = link::unrealImportScript(im);
+    CHECK(py.find("'T_Lion_BC'") != std::string::npos && py.find("'T_Lion_ORM'") != std::string::npos);
+    CHECK(py.find("'T_Lion_N'") != std::string::npos);
+    CHECK(py.find("TC_MASKS") != std::string::npos && py.find("flip_green_channel', False") != std::string::npos);
+    CHECK(py.find("'/Game/SculptForge/M_Lion'") != std::string::npos);
+    CHECK(py.find("MP_ROUGHNESS") != std::string::npos && py.find("MP_AMBIENT_OCCLUSION") != std::string::npos &&
+          py.find("MP_METALLIC") != std::string::npos && py.find("MP_NORMAL") != std::string::npos);
+    CHECK(py.find("SCULPTFORGE_IMPORTED") < py.find("SCULPTFORGE_MATERIAL"));
+    // A remote editor can't read our files: no maps, no material.
+    im.downloadUrl = "http://10.0.0.5:5000/t/SM_Lion.fbx";
+    CHECK(link::unrealImportScript(im).find("T_Lion_ORM") == std::string::npos);
+    CHECK(link::unrealImportScript(im).find("SCULPTFORGE_MATERIAL") == std::string::npos);
+    // No material channels: nothing added.
+    link::UnrealImport plain;
+    auto colourOnly = makeTexture(16, 16);
+    CHECK(link::addUnrealMaterialMaps(*colourOnly, dir.string(), plain, err));
+    CHECK(!plain.buildMaterial && plain.baseColorPath.empty());
     fs::remove_all(dir);
 }
