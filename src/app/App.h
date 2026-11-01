@@ -215,6 +215,7 @@ private:
     // otherwise null and why.
     std::unique_ptr<class GpuSculpt> gpuSculpt_;
     std::string gpuSculptReason_;
+    bool gpuBrushesMeasuredFaster_ = false; // the hardware profile's comparison (GPU Brushes: Automatic)
     RenderSettings renderSettings_;
     Camera camera_;
 

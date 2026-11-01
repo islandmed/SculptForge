@@ -7,6 +7,7 @@
 
 #include "render/Camera.h"
 #include "render/GL.h"
+#include "render/GpuSculpt.h"
 #include "render/Renderer.h"
 
 #include "core/Image.h"
@@ -18,6 +19,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <memory>
 
 namespace sf {
 
@@ -144,7 +146,15 @@ int runAppBenchmark(BenchCommandLine cl) {
         };
         gpu.gpuBytes = [&] { return renderer.gpuBytes(); };
         gpu.drawnTriangles = [&] { return orbitDrawn; };
-        code = runBenchCommandLine(cl, "## With the GPU (sculptforge --bench)\n\n", &gpu);
+        // GPU brushes as in the app (core/BrushCompute.h; SF_GPU_BRUSHES=0 for the CPU's numbers).
+        std::string why;
+        std::unique_ptr<GpuSculpt> brushes =
+            GpuSculpt::create([](const char* n) { return reinterpret_cast<gl::GenericProc>(SDL_GL_GetProcAddress(n)); }, why);
+        setBrushCompute(brushes.get());
+        std::printf("Brushes: %s%s%s\n", brushPathName().c_str(), brushes ? "" : " - ", brushes ? "" : why.c_str());
+        code = runBenchCommandLine(cl, "## With the GPU (sculptforge --bench, brushes: " + brushPathName() + ")\n\n", &gpu);
+        setBrushCompute(nullptr);
+        brushes.reset();
         renderer.shutdown();
     }
     SDL_GL_DestroyContext(context);

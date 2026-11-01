@@ -37,7 +37,7 @@ public:
     HardwareProfile profile(const ProfileOverrides& overrides = {}, const ProfileTier* previous = nullptr) const;
 
 private:
-    static constexpr int kStages = 5; // probe, triangles, upload, memory, dab
+    static constexpr int kStages = 6; // probe, triangles, upload, memory, dab, GPU against CPU brushes
     bool quick_ = false;
     int stage_ = 0;
     HardwareInfo hw_;

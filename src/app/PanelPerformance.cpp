@@ -91,19 +91,20 @@ void App::registerPerformanceUiActions() {
         "Run brushes, normal and BVH updates and project saving on every core. Turn it off only to compare speeds "
         "or rule it out when troubleshooting: the results are the same either way.");
     add("perf.gpu_brushes", "GPU Brushes",
-        [this] {
-            uiPrefs_.gpuBrushes = !uiPrefs_.gpuBrushes;
+        [this] { // Automatic -> On -> Off -> Automatic
+            uiPrefs_.gpuBrushes = uiPrefs_.gpuBrushes == 2 ? 1 : uiPrefs_.gpuBrushes == 1 ? 0 : 2;
             applyPerformancePrefs();
             status_ = !brushCompute() ? "GPU brushes need OpenGL 4.3 compute shaders: brushes run on the CPU (" + gpuSculptReason_ + ")"
-                      : gpuBrushesEnabled() ? "GPU brushes on: " + brushPathName()
-                                            : std::string("GPU brushes off: brushes run on the CPU");
+                      : gpuBrushesEnabled() ? std::string(uiPrefs_.gpuBrushes == 2 ? "GPU brushes automatic: " : "GPU brushes on: ") + brushPathName()
+                      : std::string(uiPrefs_.gpuBrushes == 2 ? "GPU brushes automatic: the CPU measured faster here" : "GPU brushes off: brushes run on the CPU");
         },
-        [this] { return uiPrefs_.gpuBrushes && brushCompute() != nullptr; },
+        [this] { return gpuBrushesEnabled() && brushCompute() != nullptr; },
         "Work out big brush dabs (Standard, Clay, Inflate, Flatten, Pinch, Crease; on micro levels also Smooth and "
         "Move) on the graphics card, with OpenGL 4.3 compute shaders (Windows and Linux). The graphics card computes "
         "each point's change; SculptForge applies it to the model as whole numbers, so undo, redo, saving and the "
         "Sculpt Timeline work exactly as before. Without compute shaders (macOS, older drivers) every brush runs on the "
-        "processor, as it always has.");
+        "processor, as it always has. Automatic (the default) uses the graphics card only where calibration measured "
+        "it faster than the processor for big dabs (Preferences > Performance shows both times).");
     add("perf.predictive_strokes", "Predictive Strokes",
         [this] {
             uiPrefs_.predictiveStrokes = !uiPrefs_.predictiveStrokes;
@@ -132,7 +133,7 @@ void App::applyPerformancePrefs() {
     ThreadPool::shared().setSerial(!uiPrefs_.multithreading);
     // GPU brushes: the preference, unless SF_GPU_BRUSHES decides (0 = CPU, 1 = GPU where present).
     const char* env = std::getenv("SF_GPU_BRUSHES");
-    setGpuBrushesEnabled(env && *env ? *env != '0' : uiPrefs_.gpuBrushes);
+    setGpuBrushesEnabled(env && *env ? *env != '0' : uiPrefs_.gpuBrushes == 2 ? gpuBrushesMeasuredFaster_ : uiPrefs_.gpuBrushes == 1);
 }
 
 int App::viewSamples() {
@@ -185,9 +186,16 @@ void App::drawPerformanceSection() {
         dimText("The GPU had no room for " + std::to_string(uiPrefs_.antialiasing) + "x: using " +
                 (perf_.samplesUsed == 1 ? std::string("none") : std::to_string(perf_.samplesUsed) + "x") + ".");
 
-    bool gpuBrushes = uiPrefs_.gpuBrushes && brushCompute();
     ImGui::BeginDisabled(!brushCompute());
-    if (ImGui::Checkbox(tr("GPU Brushes"), &gpuBrushes)) actions_.find("perf.gpu_brushes")->run();
+    {
+        const char* modes[] = {"GPU Brushes: Off", "GPU Brushes: On", "GPU Brushes: Automatic"};
+        int mode = uiPrefs_.gpuBrushes;
+        ImGui::SetNextItemWidth(200.0f * uiScale_);
+        if (ImGui::Combo("##perf.gpu_brushes", &mode, modes, 3) && mode != uiPrefs_.gpuBrushes) {
+            uiPrefs_.gpuBrushes = mode;
+            applyPerformancePrefs();
+        }
+    }
     ImGui::EndDisabled();
     ui::HelpAction(*this, "perf.gpu_brushes");
     ImGui::SameLine();

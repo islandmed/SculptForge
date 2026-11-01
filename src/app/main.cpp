@@ -63,7 +63,7 @@ void usage() {
         "  --benchmark              Proof mode: a scripted stroke on 5M / 20M / 33M (and 100M when memory\n"
         "                           allows) triangle meshes through the input handlers, with a live HUD; writes a\n"
         "                           JSON result and an MP4 of the run and exits (docs/benchmark.md)\n"
-        "  --benchmark-sizes 5,20   Proof mode mesh sizes in millions of triangles\n"
+        "  --benchmark-sizes 5,20   Proof mode mesh sizes in millions of triangles (300micro: a micro-displaced one)\n"
         "  --benchmark-out FILE     Where the JSON result goes (default: sculptforge-benchmark-<time>.json here)\n"
         "  --benchmark-video FILE   Where the MP4 goes; --benchmark-no-video records none\n"
         "  --benchmark-vsync        Keep vertical sync on (default off: frame times are not capped)\n"

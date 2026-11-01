@@ -1,6 +1,8 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/Calibration.h"
+#include "core/BrushCompute.h"
+#include "render/GpuSculpt.h"
 
 #include "core/ThreadPool.h"
 #include "core/TierConfig.h"
@@ -9,6 +11,7 @@
 #include <SDL3/SDL.h>
 
 #include <algorithm>
+#include <memory>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -542,6 +545,7 @@ const char* Calibrator::stageName() const {
     case 2: return "Measuring upload bandwidth";
     case 3: return "Measuring memory bandwidth";
     case 4: return "Measuring brush speed";
+    case 5: return "Comparing GPU and CPU brushes";
     default: return "Done";
     }
 }
@@ -554,9 +558,14 @@ bool Calibrator::step() {
     case 1: cal_.trianglesPerSecondM = measureTriangles(loadExtra(), quick_, cal_.gpuTimer); break;
     case 2: cal_.uploadGBps = measureUpload(quick_); break;
     case 3: cal_.memoryGBps = measureMemoryBandwidthGBps(quick_ ? 3 : 5); break;
-    case 4:
+    case 4: {
+        const bool gpu = gpuBrushesEnabled(); // (the CPU's brush speed: the profile's tiers are for it)
+        setGpuBrushesEnabled(false);
         cal_.dabMs = measureDabMs(quick_ ? 200'000 : 1'000'000, quick_ ? 3 : 5, quick_ ? 12 : 20, &cal_.dabVertices);
+        setGpuBrushesEnabled(gpu);
         break;
+    }
+    case 5: measureBrushPaths(cal_, quick_); break;
     }
     ++stage_;
     cal_.runs = quick_ ? 3 : 5;
@@ -611,6 +620,11 @@ int runCalibrateCommandLine(bool quick, bool save) {
     if (const char* missing = gl::load([](const char* n) { return reinterpret_cast<gl::GenericProc>(SDL_GL_GetProcAddress(n)); })) {
         std::fprintf(stderr, "Missing OpenGL function: %s\n", missing);
     } else {
+        // GPU brushes, as the app installs them (the calibration compares them with the CPU's).
+        std::string why;
+        std::unique_ptr<GpuSculpt> brushes =
+            GpuSculpt::create([](const char* n) { return reinterpret_cast<gl::GenericProc>(SDL_GL_GetProcAddress(n)); }, why);
+        setBrushCompute(brushes.get());
         HardwareProfile cached;
         const std::string path = hardwareProfilePath();
         const bool hadCache = loadHardwareProfile(path, cached);
@@ -638,6 +652,7 @@ int runCalibrateCommandLine(bool quick, bool save) {
             code = 0;
             if (save && !saveHardwareProfile(path, p, error)) std::fprintf(stderr, "not saved: %s\n", error.c_str());
         }
+        setBrushCompute(nullptr);
     }
     SDL_GL_DestroyContext(context);
     SDL_DestroyWindow(window);

@@ -20,6 +20,7 @@
 
 #include "core/Benchmark.h"
 #include "core/BrushCompute.h"
+#include "core/Micro.h"
 #include "core/Primitives.h"
 #include "core/Timeline.h"
 
@@ -398,7 +399,20 @@ std::vector<ProofMeshSize> parseSizes(const std::string& list) {
     for (std::string item; std::getline(ss, item, ',');) {
         const double m = std::atof(item.c_str());
         if (m <= 0) continue;
-        char label[32];
+        char label[48];
+        if (item.find("micro") != std::string::npos) {
+            // "300micro": a micro-displaced sphere of about that many micro triangles (level 4: 256 per base
+            // triangle, with surface noise), sculpted through the micro brushes (core/MicroSculpt.cpp).
+            std::snprintf(label, sizeof label, "%gM micro-displaced", m);
+            out.push_back({m, label, [](size_t triangles) {
+                               Mesh mesh = makeBenchSphere(std::max<size_t>(triangles / 256, 1280));
+                               std::string err;
+                               if (microDivide(mesh, 4, err)) microNoise(mesh, 0.002f, 60.0f);
+                               return mesh;
+                           },
+                           6});
+            continue;
+        }
         std::snprintf(label, sizeof label, "%gM", m);
         out.push_back({m, label, nullptr, 150});
     }

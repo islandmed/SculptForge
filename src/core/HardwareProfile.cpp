@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/HardwareProfile.h"
 
+#include "core/BrushCompute.h"
+
 #include "core/Benchmark.h"
 #include "core/BrushLibrary.h"
 #include "core/Commands.h"
@@ -580,6 +582,8 @@ Json calibrationToJson(const Calibration& c) {
     j.set("upload_gb_per_second", c.uploadGBps);
     j.set("dab_ms", c.dabMs);
     j.set("dab_vertices", c.dabVertices);
+    j.set("cpu_big_dab_ms", c.cpuBigDabMs);
+    j.set("gpu_dab_ms", c.gpuDabMs);
     j.set("memory_gb_per_second", c.memoryGBps);
     j.set("gpu_timer", c.gpuTimer);
     j.set("runs", c.runs);
@@ -594,6 +598,8 @@ void calibrationFromJson(const Json& j, Calibration& c) {
     c.uploadGBps = j["upload_gb_per_second"].asNumber();
     c.dabMs = j["dab_ms"].asNumber();
     c.dabVertices = j["dab_vertices"].asNumber();
+    c.cpuBigDabMs = j["cpu_big_dab_ms"].asNumber();
+    c.gpuDabMs = j["gpu_dab_ms"].asNumber();
     c.memoryGBps = j["memory_gb_per_second"].asNumber();
     c.gpuTimer = j["gpu_timer"].asBool();
     c.runs = int(j["runs"].asNumber());
@@ -732,6 +738,7 @@ std::string recalibrationReason(const HardwareProfile* cached, const HardwareInf
     if (!cached) return "first launch";
     const HardwareInfo& old = cached->hardware;
     if (old.glVendor != cur.glVendor || old.glRenderer != cur.glRenderer) return "GPU changed";
+    if (cur.computeShaders && !old.computeShaders) return "GPU brushes to compare"; // (a profile from before them)
     if (old.glVersion != cur.glVersion) return "driver changed";
     if (old.appVersion != cur.appVersion) return "new version";
     if (cached->calibration.cpuOnly && !cur.glRenderer.empty()) return "GPU not measured yet";
@@ -844,12 +851,12 @@ double measureMemoryBandwidthGBps(int runs) {
     return median(rates);
 }
 
-double measureDabMs(size_t triangles, int runs, int dabsPerRun, double* verticesPerDab) {
+double measureDabMs(size_t triangles, int runs, int dabsPerRun, double* verticesPerDab, float radius) {
     Document doc;
     doc.setMesh(makeBenchSphere(triangles), "Calibration");
     Mesh& m = doc.mesh;
     Sculptor& sc = doc.sculptor;
-    const float radius = 0.12f, step = 0.15f * radius;
+    const float step = 0.15f * radius;
     std::vector<double> perDab;
     double verts = 0.0;
     for (int run = 0; run < std::max(1, runs) + 1; ++run) { // run 0 warms the caches and the thread pool
@@ -887,6 +894,25 @@ double measureDabMs(size_t triangles, int runs, int dabsPerRun, double* vertices
     if (verticesPerDab) *verticesPerDab = verts;
     return median(perDab);
 }
+
+void measureBrushPaths(Calibration& out, bool quick) {
+    out.cpuBigDabMs = out.gpuDabMs = 0.0;
+    if (!brushCompute()) return;
+    const bool was = gpuBrushesEnabled();
+    const size_t minPoints = gpuMinPoints();
+    const size_t tris = quick ? 400'000 : 1'000'000;
+    setGpuMinPoints(0); // (every dab of this comparison on the GPU)
+    setGpuBrushesEnabled(false);
+    out.cpuBigDabMs = measureDabMs(tris, 2, quick ? 4 : 8, nullptr, 0.6f);
+    setGpuBrushesEnabled(true);
+    const uint64_t before = brushCompute()->stats.dabs;
+    out.gpuDabMs = measureDabMs(tris, 2, quick ? 4 : 8, nullptr, 0.6f);
+    if (brushCompute()->stats.dabs == before) out.gpuDabMs = 0.0; // (it declined every dab)
+    setGpuBrushesEnabled(was);
+    setGpuMinPoints(minPoints);
+}
+
+bool gpuBrushesFaster(const Calibration& c) { return c.gpuDabMs > 0.0 && c.cpuBigDabMs > 0.0 && c.gpuDabMs < 0.9 * c.cpuBigDabMs; }
 
 void calibrateCpu(Calibration& out, bool quick) {
     out.memoryGBps = measureMemoryBandwidthGBps(quick ? 3 : 5);

@@ -44,7 +44,7 @@ struct UiPrefs {
     int antialiasing = 4;       // samples per pixel in the 3D view: 1 (off), 2, 4 or 8
     bool fastNavigation = true; // big scenes draw without antialiasing while the view moves
     bool multithreading = true; // brushes, normals and BVH updates on every core (off: one thread)
-    bool gpuBrushes = true;     // brush dabs on the GPU where it has compute shaders (core/BrushCompute.h)
+    int gpuBrushes = 2;         // brush dabs on the GPU (core/BrushCompute.h): 0 off, 1 on, 2 automatic (where measured faster)
     // Sculpt strokes solved on their own thread with a GPU preview of the dabs still to come, the cursor and the
     // stroke's head predicted a frame ahead (app/AsyncStroke.cpp). Off: the dabs are placed in the frame loop.
     bool predictiveStrokes = false; // experimental: not yet bit-identical to the serial path in every run

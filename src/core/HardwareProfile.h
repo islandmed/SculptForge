@@ -79,6 +79,7 @@ struct Calibration {
     double uploadGBps = 0.0;          // glBufferSubData of a large buffer, GB/s (10^9 bytes)
     double dabMs = 0.0;               // one Standard brush dab (X symmetry) on a generated 1M triangle sphere (0.2M quick)
     double dabVertices = 0.0;         // vertices one dab moved (both sides)
+    double cpuBigDabMs = 0.0, gpuDabMs = 0.0; // measureBrushPaths: a big dab on the CPU and on the GPU (0 = no GPU path)
     double memoryGBps = 0.0;          // memcpy of a 64 MB buffer, bytes copied per second (GB/s)
     bool gpuTimer = false;            // GPU numbers came from timer queries (else glFinish around the CPU clock)
     int runs = 0;
@@ -168,7 +169,12 @@ bool validateCalibrationJson(const Json& j, std::string& error);
 double measureMemoryBandwidthGBps(int runs = 5);
 // Standard brush dabs on a generated sphere of about `triangles` triangles; returns ms per dab (median of runs)
 // and the vertices one dab moved.
-double measureDabMs(size_t triangles, int runs, int dabsPerRun, double* verticesPerDab = nullptr);
+double measureDabMs(size_t triangles, int runs, int dabsPerRun, double* verticesPerDab = nullptr, float radius = 0.12f);
+// GPU brushes (core/BrushCompute.h) against CPU brushes: a big Standard dab (radius 0.6 on a 1M triangle sphere)
+// both ways, into calibration.cpuBigDabMs and gpuDabMs (left 0 without an installed GPU path).
+void measureBrushPaths(Calibration& out, bool quick);
+// Whether GPU brushes measured faster here (at least 10%): GPU Brushes "Automatic" uses them only then.
+bool gpuBrushesFaster(const Calibration& c);
 // The CPU half of calibration: memory bandwidth and dab cost into `out` (GPU fields untouched).
 void calibrateCpu(Calibration& out, bool quick = false);
 

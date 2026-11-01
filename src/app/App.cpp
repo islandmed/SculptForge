@@ -175,7 +175,7 @@ bool App::init(const AppOptions& options) {
     gpuSculpt_ = GpuSculpt::create([](const char* n) { return reinterpret_cast<gl::GenericProc>(SDL_GL_GetProcAddress(n)); },
                                    gpuSculptReason_);
     setBrushCompute(gpuSculpt_.get());
-    SDL_Log("Brushes: %s%s%s", brushPathName().c_str(), gpuSculpt_ ? "" : " - ", gpuSculpt_ ? "" : gpuSculptReason_.c_str());
+    SDL_Log("GPU brushes: %s", gpuSculpt_ ? "available (OpenGL 4.3 compute)" : gpuSculptReason_.c_str());
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();

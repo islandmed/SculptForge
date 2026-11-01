@@ -173,6 +173,8 @@ void App::applyHardwareProfile(const HardwareProfile& p, bool announce) {
     cfg.maxBudget = std::min<uint64_t>(2'000'000'000, std::max<uint64_t>(s.renderTriangleBudget * 4, cfg.minBudget));
     hw.governor.reset(cfg, s.renderTriangleBudget);
     hw.revision = performanceSettingsRevision();
+    gpuBrushesMeasuredFaster_ = gpuBrushesFaster(p.calibration);
+    applyPerformancePrefs(); // (GPU Brushes: Automatic follows the measurement)
     if (!announce) return;
     // A software renderer draws every sample on the CPU: no antialiasing.
     if (p.tier == ProfileTier::Software && uiPrefs_.antialiasing > 1) uiPrefs_.antialiasing = 1;
@@ -394,6 +396,9 @@ void App::drawPerformanceProfileSection() {
                     "   Upload " + fmt("%.1f GB/s", c.uploadGBps) + "\n";
         measured += "Brush dab " + fmt("%.2f ms", c.dabMs) + " (" + fmt("%.1fk", c.dabVertices / 1000.0) + " vertices)   Memory " +
                     fmt("%.1f GB/s", c.memoryGBps) + "\n";
+        if (c.gpuDabMs > 0.0)
+            measured += "Big dab on the GPU " + fmt("%.1f ms", c.gpuDabMs) + ", on the CPU " + fmt("%.1f ms", c.cpuBigDabMs) +
+                        (gpuBrushesFaster(c) ? " (GPU faster)\n" : " (CPU faster)\n");
     }
     std::string simd;
     for (const auto& x : h.simd) simd += (simd.empty() ? "" : ", ") + x;
