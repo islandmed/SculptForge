@@ -26,6 +26,8 @@ chapter opens by itself the first time you start a new version; you can always f
   pick: no connections, nothing run. See [Working with Maya](maya.md).
 - **Radial (pie) menus** (#45): hold **T** (brushes) or **Y** (masking), flick and let go; make your own in
   **Preferences > Input > Radial Menus**. See [Sculpting](sculpting.md#radial-menus).
+- **Focal Shift works with alphas** (#60): -100 shows the whole alpha, 0 rounds it off, +100 leaves a soft point
+  (alpha brushes are softer at the default 0 than before; set -100 for the old crisp look).
 - **SelectRect and SelectLasso** follow X / Y / Z symmetry, like the mask versions (#51).
 
 ### Become an Insider

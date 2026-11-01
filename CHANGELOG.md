@@ -6,13 +6,6 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
-### Fixed
-- Focal Shift now shapes brushes that use an alpha, as in ZBrush (#60): the alpha is multiplied by the round
-  falloff Focal Shift controls, so at -100 the whole alpha shows hard to its edges, at 0 a Square alpha's corners
-  round off into a soft mound, and at +100 only a soft point in the middle is left. Before, alpha brushes always
-  behaved as at -100. Focal Shift also reaches the built-in ClayBuildup's square tip and custom (Brush Lab)
-  brushes now, which ignored it; at 0 they keep their own tip exactly as before.
-
 ## [0.10.4] - 2026-11-01
 
 ### Added
@@ -60,6 +53,11 @@ All notable changes to SculptForge are listed here. The format follows
   image files), with thumbnails in the pickers and the LightBox (whose Brush tab now lists the built-in VDMs too).
 
 ### Fixed
+- Focal Shift now shapes brushes that use an alpha, as in ZBrush (#60): the alpha is multiplied by the round
+  falloff Focal Shift controls, so at -100 the whole alpha shows hard to its edges, at 0 a Square alpha's corners
+  round off into a soft mound, and at +100 only a soft point in the middle is left. Before, alpha brushes always
+  behaved as at -100. Focal Shift also reaches the built-in ClayBuildup's square tip and custom (Brush Lab)
+  brushes now, which ignored it; at 0 they keep their own tip exactly as before.
 - SelectRect and SelectLasso (hide / show) ignored symmetry (#51 follow-up): with X / Y / Z on, the mirror image of
   the shape counts as inside too, as with MaskRect and MaskLasso (`hide_rect` / `hide_lasso symmetry=x`).
 
