@@ -39,6 +39,12 @@ public:
     // The leaves holding the vertices the last queryVertices() returned, and refit() given such leaves (from
     // one or more queries, each once: the Move brush keeps them for its whole stroke).
     std::span<const uint32_t> queriedLeaves() const { return queryLeaves_; }
+    // The triangles of a leaf (empty for an inner node): every triangle with a vertex a query found is in one of
+    // the leaves it listed.
+    std::span<const uint32_t> leafTriangles(uint32_t leaf) const {
+        const Node& n = nodes_[leaf];
+        return n.count > 0 ? std::span<const uint32_t>(triIndices_.data() + n.first, n.count) : std::span<const uint32_t>();
+    }
     void refitLeaves(const Mesh& mesh, std::span<const uint32_t> leaves);
     // Recomputes every box (same tree) after most of the mesh moved, e.g. a whole SubTool transformed.
     void refitAll(const Mesh& mesh);

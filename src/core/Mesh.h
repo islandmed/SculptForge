@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <functional>
 #include <span>
 #include <string>
 #include <utility>
@@ -205,6 +206,10 @@ public:
     void recomputeAllNormals();
     // Recompute normals of the faces around `verts` and of every vertex they touch.
     void updateNormals(std::span<const uint32_t> verts);
+    // The same, given the vertices whose normals may have changed (any superset: the others come out the
+    // same): fill(begin, end, set) adds those of jobs [begin, end) of `count` with set.insertLocal(). A brush
+    // gives the corners of the BVH leaves its query listed, which is cheaper than every moved vertex's ring.
+    void updateNormalsAround(size_t count, size_t grain, const std::function<void(size_t, size_t, IndexBits&)>& fill);
 
     // The vertices sharing an edge with `v`, and the triangles around it, in ascending order.
     IndexRing neighbors(uint32_t v) const {
@@ -274,6 +279,8 @@ public:
 
 private:
     void finishTopology();
+    bool beginNormalSet(); // updateNormals: room for the set (false: no topology)
+    void finishNormals();  // ... then each member's normal
     IndexRing implicitTriangles(uint32_t v) const;
     IndexRing implicitNeighbors(uint32_t v) const;
 

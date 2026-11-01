@@ -459,6 +459,7 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
         remeshDab(mesh, bvh, p, sym, type == BrushType::Smooth ? 2.0f : 1.0f, reach);
     }
     dabVerts_.clear();
+    dabLeaves_.clear();
     for (const glm::vec3& m : mirrors(sym)) {
         DabParams mp = p;
         mp.center *= m;
@@ -468,7 +469,7 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
         if (type == BrushType::Vdm) dabVdmSingle(mesh, bvh, mp, m.x * m.y * m.z);
         else dabSingle(mesh, bvh, type, mp);
     }
-    updateDabNormals(mesh);
+    updateDabNormals(mesh, bvh);
     if (type != BrushType::Move) repairDab(mesh, bvh);
 }
 
@@ -647,11 +648,30 @@ void Sculptor::finishDab(Mesh& mesh, BVH& bvh, std::chrono::steady_clock::time_p
     ++timings.dabs;
     timings.vertices += verts_.size();
     dabVerts_.insert(dabVerts_.end(), verts_.begin(), verts_.end()); // a vertex twice is fine: updateNormals dedups
+    const auto leaves = bvh.queriedLeaves(); // (the query that found verts_)
+    dabLeaves_.insert(dabLeaves_.end(), leaves.begin(), leaves.end());
 }
 
-void Sculptor::updateDabNormals(Mesh& mesh) {
+// The normals that the dab's moves change: those of every corner of the triangles in the leaves the queries
+// listed (each triangle with a moved vertex is in one), a set found faster than from each moved vertex's ring
+// (implicit rings on levels made by Divide cost 7 ms a dab for 3M vertices). Dynamic topology changed the tree
+// as it remeshed, so there the rings are used.
+void Sculptor::updateDabNormals(Mesh& mesh, const BVH& bvh) {
     auto clock = std::chrono::steady_clock::now();
-    mesh.updateNormals(dabVerts_);
+    if (dynTopo_.active() || dabLeaves_.empty()) {
+        mesh.updateNormals(dabVerts_);
+    } else {
+        mesh.updateNormalsAround(dabLeaves_.size(), 64, [&](size_t b, size_t e, IndexBits& set) {
+            for (size_t i = b; i < e; ++i)
+                for (uint32_t t : bvh.leafTriangles(dabLeaves_[i])) {
+                    const glm::uvec3& tri = mesh.triangles[t];
+                    set.insertLocal(tri.x);
+                    set.insertLocal(tri.y);
+                    set.insertLocal(tri.z);
+                }
+        });
+    }
+    dabLeaves_.clear();
     timings.normalsMs += lapMs(clock);
 }
 
@@ -662,6 +682,7 @@ void Sculptor::dabRecipe(Mesh& mesh, BVH& bvh, const BrushRecipe& recipe, const 
     base.pressure = std::pow(std::clamp(p.pressure, 0.0f, 1.0f), recipe.pressureCurve);
     base.frontFacesOnly = p.frontFacesOnly || recipe.frontFacesOnly;
     dabVerts_.clear();
+    dabLeaves_.clear();
     for (const glm::vec3& m : mirrors(sym)) {
         DabParams mp = base;
         mp.center *= m;
@@ -670,7 +691,7 @@ void Sculptor::dabRecipe(Mesh& mesh, BVH& bvh, const BrushRecipe& recipe, const 
         mp.alphaUp *= m;
         dabRecipeSingle(mesh, bvh, recipe, mp);
     }
-    updateDabNormals(mesh);
+    updateDabNormals(mesh, bvh);
     repairDab(mesh, bvh);
 }
 

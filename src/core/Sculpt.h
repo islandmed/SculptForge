@@ -131,7 +131,7 @@ private:
     // The Vdm brush (defined in Vdm.cpp); `handedness` -1 for a mirrored pass, so the stamp mirrors exactly.
     void dabVdmSingle(Mesh& mesh, BVH& bvh, const DabParams& p, float handedness);
     void finishDab(Mesh& mesh, BVH& bvh, std::chrono::steady_clock::time_point clock);
-    void updateDabNormals(Mesh& mesh);
+    void updateDabNormals(Mesh& mesh, const BVH& bvh);
     void touch(Mesh& mesh, uint32_t v);
     // The one place brushes move vertices: scales `d` by vertexInfluence().
     void displace(Mesh& mesh, uint32_t v, const glm::vec3& d);
@@ -160,6 +160,7 @@ private:
     void clearRecorded();
 
     std::vector<uint32_t> verts_, dabVerts_; // one mirror's vertices; every mirror's (for the normals)
+    std::vector<uint32_t> dabLeaves_;        // the BVH leaves every mirror's query listed (the normals' set)
     std::vector<glm::vec3> scratch_;
     std::vector<float> weights_, influence_;
     std::vector<uint8_t> firstTouch_;

@@ -10,6 +10,7 @@
 #include "core/Benchmark.h"
 #include "core/BrushRecipe.h"
 #include "core/IndexBits.h"
+#include "core/Multires.h"
 #include "core/Primitives.h"
 #include "core/ThreadPool.h"
 #include "core/UploadOrder.h"
@@ -146,6 +147,81 @@ TEST(parallel_normals_match_full_recompute) {
     float worst = 0.0f;
     for (size_t v = 0; v < partial.size(); ++v) worst = std::max(worst, glm::length(partial[v] - m.normals[v]));
     CHECK(worst < 1e-5f);
+}
+
+TEST(upload_runs_of_a_big_brush_match_one_thread) {
+    // A brush over a good part of the mesh (more marked vertices than dirtyRuns walks on one thread, under the
+    // three quarters it uploads whole): the GPU blocks are marked in parallel, and the runs are exactly the ones
+    // a single thread finds, every slot of every marked vertex in one.
+    Mesh m = makeBenchSphere(1600000);
+    BVH bvh;
+    bvh.build(m);
+    UploadOrder order;
+    order.build(m);
+    m.clearDirty();
+    Sculptor s;
+    s.beginStroke(m, "Standard");
+    DabParams p;
+    p.center = glm::vec3(0.0f, 0.0f, 1.0f);
+    p.radius = 1.0f;
+    s.dab(m, bvh, BrushType::Standard, p, Symmetry{});
+    size_t dirty = 0;
+    for (uint32_t v = 0; v < m.vertexCount(); ++v) dirty += m.vertexDirty(v);
+    CHECK(dirty > 65536 && dirty * 4 < m.vertexCount() * 3);
+    std::vector<std::pair<uint32_t, uint32_t>> par, ser;
+    order.dirtyRuns(m, par);
+    serially([&] { order.dirtyRuns(m, ser); });
+    CHECK(par == ser && !par.empty());
+    CHECK(!(par.size() == 1 && par[0].first == 0 && par[0].second == order.size())); // (not everything)
+    std::vector<uint8_t> inRun(order.size(), 0);
+    for (const auto& [b, e] : par)
+        for (uint32_t g = b; g < e; ++g) inRun[g] = 1;
+    bool covered = true;
+    std::vector<uint32_t> slots;
+    for (uint32_t v = 0; v < m.vertexCount() && covered; ++v)
+        if (m.vertexDirty(v)) {
+            order.slotsOf(v, slots);
+            for (uint32_t g : slots) covered = covered && inRun[g];
+        }
+    CHECK(covered);
+}
+
+TEST(dab_normals_from_the_query_leaves_match_a_full_recompute) {
+    // A dab's normals are recomputed for the corners of the BVH leaves its queries listed: every normal comes
+    // out exactly as recomputeAllNormals has it, and every vertex whose normal changed is marked for upload.
+    // On a plain mesh and on a level made by Divide (implicit adjacency), with symmetry, for several brushes.
+    for (int divided = 0; divided < 2; ++divided) {
+        Mesh m = divided ? makeIcosphere(4) : makeBenchSphere(300000);
+        if (divided) {
+            std::string err;
+            CHECK(subdivDivide(m, true, err) && subdivDivide(m, true, err));
+            CHECK(m.implicitAdjacency());
+        }
+        BVH bvh;
+        bvh.build(m);
+        Sculptor s;
+        s.beginStroke(m, "Standard");
+        bool same = true, marked = true;
+        for (BrushType type : {BrushType::Standard, BrushType::Smooth, BrushType::Clay, BrushType::Vdm}) {
+            const std::vector<glm::vec3> before = m.normals;
+            m.clearDirty();
+            DabParams p;
+            p.center = glm::normalize(glm::vec3(0.4f, 0.3f, 0.8f));
+            p.viewDir = -p.center;
+            p.radius = 0.5f;
+            p.strength = 0.7f;
+            s.dab(m, bvh, type, p, Symmetry{});
+            Mesh fresh = m;
+            fresh.recomputeAllNormals();
+            for (uint32_t v = 0; v < m.vertexCount(); ++v) {
+                same = same && m.normals[v] == fresh.normals[v];
+                if (m.normals[v] != before[v]) marked = marked && m.vertexDirty(v);
+            }
+        }
+        CHECK(same);
+        CHECK(marked);
+        s.endStroke();
+    }
 }
 
 TEST(upload_runs_cover_changed_vertices) {

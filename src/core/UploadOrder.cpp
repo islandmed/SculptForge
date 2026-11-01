@@ -11,6 +11,10 @@
 namespace sf {
 
 namespace {
+constexpr size_t kParallelDirtyVertices = 65536; // fewer: the serial walk, no threads woken
+}
+
+namespace {
 
 // Mesh vertex -> local index within one cluster: an open-addressing table, cleared by bumping a stamp. Big
 // enough for a cluster's worst case (3 distinct vertices per triangle) at under half load.
@@ -292,7 +296,32 @@ void UploadOrder::dirtyRuns(const Mesh& mesh, std::vector<std::pair<uint32_t, ui
             blocks_.push_back(g);
         }
     };
-    // The GPU blocks of every slot of every marked vertex.
+    // The GPU blocks of every slot of every marked vertex. Many marks (a big brush, 3M vertices at 21M triangles:
+    // 3.7 ms on one thread): the mesh's dirty blocks in parallel, each GPU block flagged, then the flags read in
+    // order (the same sorted blocks).
+    if (dirty >= kParallelDirtyVertices) {
+        poolFor(lastBlock - firstBlock, [&](size_t b0, size_t b1) {
+            for (size_t b = firstBlock + b0; b < firstBlock + b1; ++b) {
+                if (!mesh.dirtyBlocks[b]) continue;
+                for (size_t w = b * kWordsPerBlock; w < (b + 1) * kWordsPerBlock && w < mesh.dirtyBits.size(); ++w) {
+                    const uint64_t copies = w < hasCopy_.size() ? hasCopy_[w] : 0;
+                    for (uint64_t bits = mesh.dirtyBits[w]; bits; bits &= bits - 1) {
+                        const int bit = std::countr_zero(bits);
+                        const size_t v = w * 64 + size_t(bit);
+                        if (v >= nv) break;
+                        if (toGpu_[v] == kNone) continue;
+                        AtomicRef<uint8_t>(marked_[toGpu_[v] >> kBlockShift]).store(1, std::memory_order_relaxed);
+                        if ((copies >> bit) & 1)
+                            for (auto it = std::lower_bound(copies_.begin(), copies_.end(), std::make_pair(uint32_t(v), 0u));
+                                 it != copies_.end() && it->first == v; ++it)
+                                AtomicRef<uint8_t>(marked_[it->second >> kBlockShift]).store(1, std::memory_order_relaxed);
+                    }
+                }
+            }
+        }, 64);
+        for (uint32_t g = 0; g < uint32_t(marked_.size()); ++g)
+            if (marked_[g]) blocks_.push_back(g);
+    } else
     for (size_t b = firstBlock; b < lastBlock; ++b) {
         if (!mesh.dirtyBlocks[b]) continue;
         for (size_t w = b * kWordsPerBlock; w < (b + 1) * kWordsPerBlock && w < mesh.dirtyBits.size(); ++w) {

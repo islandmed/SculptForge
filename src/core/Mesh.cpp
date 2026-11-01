@@ -605,10 +605,7 @@ void Mesh::updateNormals(std::span<const uint32_t> verts) {
     // The vertices whose normal changes: the moved ones and every neighbour, gathered as a set and listed in
     // index order; then each one's normal from its faces, in its triangle order (as recomputeAllNormals sums
     // them). The set, and every normal computed from it, doesn't depend on the thread count.
-    const size_t nv = positions.size();
-    if (!implicit_ && adjOffsets_.size() != nv + 1) return; // no topology
-    growDirtyBlocks((nv + kDirtyBlock - 1) / kDirtyBlock);
-    if (normalBits_.capacity() < nv) normalBits_.resize(nv);
+    if (!beginNormalSet()) return;
     normalBits_.insertParallel(verts.size(), 4096, [&](size_t b, size_t e, IndexBits& set) {
         for (size_t i = b; i < e; ++i) {
             const uint32_t v = verts[i];
@@ -616,6 +613,24 @@ void Mesh::updateNormals(std::span<const uint32_t> verts) {
             for (uint32_t u : neighbors(v)) set.insertLocal(u);
         }
     });
+    finishNormals();
+}
+
+void Mesh::updateNormalsAround(size_t count, size_t grain, const std::function<void(size_t, size_t, IndexBits&)>& fill) {
+    if (!beginNormalSet()) return;
+    normalBits_.insertParallel(count, grain, fill);
+    finishNormals();
+}
+
+bool Mesh::beginNormalSet() {
+    const size_t nv = positions.size();
+    if (!implicit_ && adjOffsets_.size() != nv + 1) return false; // no topology
+    growDirtyBlocks((nv + kDirtyBlock - 1) / kDirtyBlock);
+    if (normalBits_.capacity() < nv) normalBits_.resize(nv);
+    return true;
+}
+
+void Mesh::finishNormals() {
     // Listing the set also marks it dirty: its words are laid out like dirtyBits, and each 2048-vertex dirty
     // block lies in one of its chunks (so no two threads write the same word).
     static_assert(IndexBits::kChunk % kDirtyBlock == 0);
