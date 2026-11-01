@@ -104,14 +104,17 @@ jobs:
         with:
           path: .ccache
           key: ccache-${{ matrix.os }}-${{ github.sha }}
-      - name: Test (C++ and Python API)
-        run: ctest --test-dir build -C Release --output-on-failure -LE ui -j 4
-      - name: UI tests (real app, Xvfb + Mesa)
+      # Every test in one parallel ctest run (UI tests too, where there is a display), so no core idles while the
+      # last tests of one group finish.
+      - name: Test (C++, Python API, UI tests with Xvfb + Mesa)
         if: runner.os == 'Linux'
         run: |
           xvfb-run -a -s "-screen 0 1920x1080x24" env LIBGL_ALWAYS_SOFTWARE=1 \
-            ctest --test-dir build -C Release --output-on-failure -L ui -j 4
-      - name: UI tests (real app, Mesa llvmpipe)
+            ctest --test-dir build -C Release --output-on-failure -j 4
+      - name: Test (C++ and Python API; UI tests need a display)
+        if: runner.os == 'macOS'
+        run: ctest --test-dir build -C Release --output-on-failure -LE ui -j 4
+      - name: Test (C++, Python API, UI tests with Mesa llvmpipe)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
@@ -123,7 +126,7 @@ jobs:
           }
           7z e mesa.7z x64/opengl32.dll x64/libgallium_wgl.dll -obuild/Release -y | Out-Null
           $env:GALLIUM_DRIVER = 'llvmpipe'
-          ctest --test-dir build -C Release --output-on-failure -L ui -j 4
+          ctest --test-dir build -C Release --output-on-failure -j 4
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: UI test screenshots
         if: always() && runner.os != 'macOS'

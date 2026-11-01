@@ -507,7 +507,7 @@ if(SCULPTFORGE_BUILD_TESTS)
     file(MAKE_DIRECTORY ${shard_tmp})
     add_test(NAME sculptforge_tests_${k}of${SCULPTFORGE_TEST_SHARDS}
              COMMAND sculptforge_tests --shard ${k}/${SCULPTFORGE_TEST_SHARDS})
-    set_tests_properties(sculptforge_tests_${k}of${SCULPTFORGE_TEST_SHARDS} PROPERTIES
+    set_tests_properties(sculptforge_tests_${k}of${SCULPTFORGE_TEST_SHARDS} PROPERTIES COST 1000 # the longest: start first
                          ENVIRONMENT "TMPDIR=${shard_tmp};TMP=${shard_tmp};TEMP=${shard_tmp}")
   endforeach()
   # A stand-in for Brush, COLMAP and ffmpeg (tests/tools/fake_splat_tools.cpp): splat training is tested without a GPU.
@@ -628,6 +628,27 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME ui_stroke_resize COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
     set_tests_properties(ui_stroke_resize PROPERTIES LABELS ui TIMEOUT 60 DISABLED TRUE # predictive strokes: not yet identical in every run
                          ENVIRONMENT "SF_NO_UPDATE_CHECK=1;SF_MEASURE_RESIZE=1;SF_MEASURE_VERIFY=1;SF_PREDICTIVE_STROKE=1")
+    # The system clipboard is one per desktop (one X server under CI's xvfb-run), and on X11 every SDL program asks a
+    # new clipboard owner what it holds: a program that quits meanwhile makes the owner's answer fail (BadWindow).
+    # Scripts that set, read or paste it (or click a Copy / Paste button) run alone under ctest -j.
+    foreach(t ${SCULPTFORGE_UI_TESTS} shell_layout_1080 help_console_1080 size_popup_scaled user_guide_1080)
+      string(REGEX REPLACE "_1080$|_scaled$" "" base ${t})
+      get_filename_component(base ${base} NAME_WE)
+      set(script ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/${base}.sfui)
+      get_filename_component(name ${t} NAME_WE)
+      if(EXISTS ${script} AND TEST ui_${name})
+        file(READ ${script} body)
+        if(body MATCHES "(^|\n)(clipboard|expect_clipboard) |\"[^\"\n]*(Copy|Paste)[^\"\n]*\"|ctrl\\+[cvx]")
+          set_tests_properties(ui_${name} PROPERTIES RUN_SERIAL TRUE)
+        endif()
+      endif()
+    endforeach()
+    # The longest UI tests start first under ctest -j (COST orders a parallel run; without it they may start last).
+    foreach(t ui_make_sculptable ui_texture_transfer ui_bake)
+      if(TEST ${t})
+        set_tests_properties(${t} PROPERTIES COST 500)
+      endif()
+    endforeach()
     # Timed measurements run alone when ctest runs tests in parallel (CI: ctest -j): other tests' load must not
     # change what they measure.
     foreach(t ui_idle_redraw ui_calibrate_json ui_stroke_path ui_hardware_profile)
