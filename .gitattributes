@@ -4,3 +4,7 @@
 tools/brush-gallery/repo/** -text
 website/gallery/** -text
 tests/data/** -text
+# Parallel branches all add lines at the top of these two: keep both sides instead of conflicting (the release
+# coordinator checks the order of the merged result before tagging).
+CHANGELOG.md merge=union
+docs/guide/whats-new.md merge=union
