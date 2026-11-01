@@ -71,6 +71,7 @@ add_library(sculptforge_core STATIC
   src/core/TextureChannels.cpp
   src/core/TextureChannelCommands.cpp
   src/core/LayerStackIO.cpp
+  src/core/MapExport.cpp
   src/core/Multires.cpp
   src/core/MultiresCommands.cpp
   src/core/AutoUv.cpp
