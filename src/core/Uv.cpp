@@ -258,6 +258,7 @@ bool triangleJacobian(const Mesh& m, uint32_t t, float& s1, float& s2, bool& fli
     s1 = Q + R;
     s2 = std::abs(Q - R);
     flipped = (a * d - b * c) < 0.0f;
+    if (!std::isfinite(s1) || !std::isfinite(s2)) return false; // (a sliver: no meaningful stretch)
     return true;
 }
 
@@ -298,6 +299,38 @@ void uvTriangleStretch(const Mesh& m, std::vector<float>& out) {
                                                   : std::log2(std::max(std::max(s1 / s, 1e-6f), s / std::max(s2, 1e-6f * s)));
         }
     }, 1 << 14);
+}
+
+UvStretchCache uvStretchCache(const Mesh& m, const UvTopology& topo) {
+    UvStretchCache cache;
+    cache.scale.assign(topo.islandCount, 0.0f);
+    cache.mirrored.assign(topo.islandCount, 0);
+    if (m.uvs.size() != m.triangleCount() * 3) return cache;
+    poolFor(topo.islandCount, [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) {
+            double a = 0.0, u = 0.0, sense = 0.0;
+            for (uint32_t k = topo.islandOffsets[i]; k < topo.islandOffsets[i + 1]; ++k) {
+                const uint32_t t = topo.islandTriangles[k];
+                const float su = signedAreaUv(m, t);
+                a += area3(m, t);
+                u += std::abs(su);
+                sense += su;
+            }
+            cache.scale[i] = a > 0.0 ? float(std::sqrt(u / a)) : 0.0f;
+            cache.mirrored[i] = sense < 0.0;
+        }
+    }, 64);
+    return cache;
+}
+
+float uvTriangleStretchAt(const Mesh& m, uint32_t t, const UvTopology& topo, const UvStretchCache& cache) {
+    float s1 = 0, s2 = 0;
+    bool flipped = false;
+    const uint32_t i = topo.island[t];
+    const float s = cache.scale[i];
+    if (s <= 0.0f || !triangleJacobian(m, t, s1, s2, flipped)) return 0.0f;
+    if (flipped != bool(cache.mirrored[i])) return -1.0f;
+    return std::log2(std::max(std::max(s1 / s, 1e-6f), s / std::max(s2, 1e-6f * s)));
 }
 
 UvStretchStats uvStretchStats(const Mesh& m) {

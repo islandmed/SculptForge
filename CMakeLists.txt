@@ -273,6 +273,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelPolypaint.cpp
     src/app/PanelPaintLayers.cpp
     src/app/PanelTexture.cpp
+    src/app/PanelUvEditor.cpp
     src/app/PanelPbr.cpp
     src/app/PanelGeometry.cpp
     src/app/Gizmo.cpp
@@ -302,6 +303,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/render/Clusters.cpp
     src/render/Ghost.cpp
     src/render/Renderer.cpp
+    src/render/UvView.cpp
     src/render/MicroRenderer.cpp
   )
   target_link_libraries(sculptforge PRIVATE sculptforge_core sculptforge_ai sculptforge_phone imgui SDL3::SDL3)

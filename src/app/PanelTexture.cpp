@@ -276,6 +276,7 @@ void App::drawTextureMapContents() {
     ui::ActionButton(*this, "texture.auto_uv", ImVec2(half, 0));
     ImGui::SameLine();
     ui::ActionButton(*this, "texture.show_uvs", ImVec2(-1, 0));
+    ui::ActionButton(*this, "ui.uv_editor", ImVec2(-1, 0), ui::Look::IconLabel);
 
     ImGui::SetNextItemWidth(half);
     ImGui::Combo("##texsize", &textureSizeChoice_, kSizeLabels, 4);

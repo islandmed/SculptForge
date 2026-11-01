@@ -236,6 +236,7 @@ TEST(uv_pack_one_tile_and_udim_tiles) {
     // at twice the size one tile would give.
     CommandResult r = run(doc, "uv_pack", {{"tiles", 4.0}, {"margin", 16.0}});
     CHECK(r.ok);
+    }
     CHECK(r.message.find("2 UDIM tiles") != std::string::npos);
     CHECK(uvsWithin(doc.mesh, glm::vec2(0.0f), glm::vec2(4.0f, 1.0f)));
     const UvTopology topo = buildUvTopology(doc.mesh);
@@ -537,4 +538,26 @@ TEST(uv_editor_million_triangles_stay_interactive) {
     CHECK(packS < 2.0);
     CHECK(unwrap < 60.0);
     CHECK(flippedTriangles(m) < m.triangleCount() / 1000);
+}
+
+TEST(uv_unwrap_lion_head_by_sharp_edges) {
+    // A real sculpt with holes and thin strands: the islands don't fold, overlap or leave the tile.
+    Document doc;
+    std::string lion = __FILE__;
+    lion = lion.substr(0, lion.rfind("tests")) + "assets/demo/lion-head.glb";
+    if (!run(doc, "open", {{"path", lion}}).ok) return;
+    CHECK(run(doc, "uv_seam", {{"op", std::string("angle")}, {"angle", 50.0}}).ok);
+    for (const char* method : {"isometric", "conformal", "polygroups"}) {
+        const CommandResult r = run(doc, "uv_unwrap", {{"method", std::string(method)}});
+        CHECK(r.ok);
+        const UvStretchStats st = uvStretchStats(doc.mesh);
+        const UvTopology topo = buildUvTopology(doc.mesh);
+        const size_t folded = flippedTriangles(doc.mesh);
+        std::printf("  lion %s: %s; %u islands, %zu folded, stretch %.3f, boxes disjoint %d\n", method, r.message.c_str(),
+                    topo.islandCount, folded, double(st.mean), int(islandBoxesDisjoint(doc.mesh)));
+        CHECK(folded * 200 < doc.mesh.triangleCount());
+        CHECK(islandBoxesDisjoint(doc.mesh));
+        CHECK(uvsWithin(doc.mesh, glm::vec2(0.0f), glm::vec2(1.0f)));
+        CHECK(st.mean < 0.25f);
+    }
 }

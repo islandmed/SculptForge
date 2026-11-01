@@ -345,6 +345,8 @@ bool flattenIsometricImpl(const std::vector<glm::vec3>& pos, const std::vector<g
             harmonic.solve(hv, nullptr, 1e-8, 300);
             uv.resize(n);
             for (uint32_t i = 0; i < n; ++i) uv[i] = glm::vec2(float(hu[i]), float(hv[i]));
+            for (const glm::vec2& x : uv)
+                if (!std::isfinite(x.x) || !std::isfinite(x.y)) return flattenConformalImpl(pos, tris, uv = {}, pins, parallel);
             iterations += 10; // (further from the result than LSCM: a few more steps)
         }
     }
@@ -434,7 +436,7 @@ Pieces buildPieces(const Mesh& m, const std::vector<uint32_t>& twin, const std::
 
 // The cut-graph edges (corners) that make piece `triangles` a disk, or empty when it already is one.
 std::vector<uint32_t> diskCuts(const Mesh& m, const std::vector<uint32_t>& twin, const std::vector<uint8_t>& cut,
-                               const Pieces& pc, const std::vector<uint32_t>& triangles) {
+                               const Pieces& pc, const std::vector<uint32_t>& triangles, long long* eulerOut = nullptr) {
     // Local numbering of the piece's vertices.
     std::vector<uint32_t> vlist;
     for (uint32_t t : triangles)
@@ -452,7 +454,35 @@ std::vector<uint32_t> diskCuts(const Mesh& m, const std::vector<uint32_t>& twin,
         }
     const long long E = (3 * (long long)F + (long long)boundary) / 2;
     const long long chi = (long long)V - E + (long long)F;
+    if (eulerOut) *eulerOut = chi;
     if (chi == 1) return {};
+    if (chi < 0 && eulerOut) {
+        // Tangled (several holes or handles): a cut graph would make one island with slits everywhere. Cut it into
+        // charts the way Auto Seams does instead (each then flattened like any piece).
+        std::vector<uint32_t> vmap(m.vertexCount(), ~0u);
+        std::vector<glm::vec3> pos;
+        std::vector<glm::uvec3> tris(F);
+        for (size_t k = 0; k < F; ++k)
+            for (int j = 0; j < 3; ++j) {
+                const uint32_t v = m.triangles[triangles[k]][j];
+                if (vmap[v] == ~0u) vmap[v] = uint32_t(pos.size()), pos.push_back(m.positions[v]);
+                tris[k][j] = vmap[v];
+            }
+        std::vector<uint32_t> chart;
+        int charts = 0;
+        std::string error;
+        if (computeAutoCharts(pos, tris, chart, charts, error) && charts > 1) {
+            std::vector<uint32_t> out;
+            for (size_t k = 0; k < F; ++k)
+                for (uint32_t j = 0; j < 3; ++j) {
+                    const uint32_t c = triangles[k] * 3 + j, d = twin[c];
+                    if (cut[c] || d == kNoCorner || d < c || !std::binary_search(triangles.begin(), triangles.end(), d / 3)) continue;
+                    const size_t kd = size_t(std::lower_bound(triangles.begin(), triangles.end(), d / 3) - triangles.begin());
+                    if (chart[k] != chart[kd]) out.push_back(c);
+                }
+            if (!out.empty()) return out;
+        }
+    }
     // Dual spanning tree (breadth first from the first triangle) over the piece's inner edges.
     auto inner = [&](uint32_t c) {
         const uint32_t d = twin[c];
@@ -734,7 +764,8 @@ bool uvUnwrap(const Mesh& m, const UvUnwrapOptions& o, UvUnwrapResult& result, s
             poolFor(pc.count, [&](size_t b, size_t e) {
                 for (size_t i = b; i < e; ++i) {
                     const std::vector<uint32_t> list(tris.begin() + offsets[i], tris.begin() + offsets[i + 1]);
-                    extra[i] = diskCuts(m, twin, cut, pc, list);
+                    long long euler = 1;
+                    extra[i] = diskCuts(m, twin, cut, pc, list, round == 0 ? &euler : nullptr);
                 }
             }, 1);
             size_t added = 0;
@@ -807,7 +838,10 @@ bool uvUnwrap(const Mesh& m, const UvUnwrapOptions& o, UvUnwrapResult& result, s
         } else {
             ok = flattenIsometricImpl(pos, lt, uv, std::max(o.iterations, 0), pins, parallel);
         }
-        if (!ok) uv = project(pos, lt); // (a piece the solver can't flatten still gets UVs)
+        if (ok)
+            for (const glm::vec2& x : uv)
+                if (!std::isfinite(x.x) || !std::isfinite(x.y)) ok = false;
+        if (!ok || uv.size() != pos.size()) uv = project(pos, lt); // (a piece the solver can't flatten still gets UVs)
         if (pins.size() < 2) {
             // One texel density: UV area = surface area, centred.
             double a3 = 0.0, au = 0.0;
@@ -892,6 +926,8 @@ bool uvUnwrap(const Mesh& m, const UvUnwrapOptions& o, UvUnwrapResult& result, s
         pt.islandCount = pc.count;
         for (uint32_t t = 0; t < nt; ++t) pt.island[t] = pc.piece[t] == kNoCorner ? pc.count : pc.piece[t];
         pt.islandCount = pc.count + (faces ? 1 : 0);
+        pt.uvVertex = pc.vertex; // (the corners each flattened vertex joins)
+        pt.uvVertexCount = pc.vertexCount;
         pt.islandOffsets.assign(pt.islandCount + 1, 0);
         for (uint32_t t = 0; t < nt; ++t) ++pt.islandOffsets[pt.island[t] + 1];
         for (uint32_t i = 0; i < pt.islandCount; ++i) pt.islandOffsets[i + 1] += pt.islandOffsets[i];

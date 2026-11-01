@@ -10,10 +10,14 @@
 #include "core/Uv.h"
 #include "core/UvInternal.h"
 
+#include <xatlas.h>
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <memory>
 #include <numeric>
+#include <cstdio>
 
 namespace sf {
 
@@ -72,6 +76,136 @@ struct Skyline {
         }
     }
 };
+
+// The shape packer (xatlas, on the islands as a UV mesh): islands are rasterised and fitted by their outlines, so
+// far less space goes to waste than with boxes. The islands go in scaled to one density (UV area = surface area,
+// or kept relative with k = 1), so xatlas's texels per unit is the texel density itself: with `density` it packs at
+// exactly that and opens as many tiles as it needs; otherwise the largest density that fits `tiles` is found by
+// bisection at a quarter of the resolution, then packed at full resolution. False when xatlas can't (the box
+// packer takes over).
+bool packByShape(Mesh& m, const UvTopology& topo, const std::vector<uint32_t>& list, const std::vector<uint32_t>& offsets,
+                 const std::vector<uint32_t>& corners, const std::vector<float>& k, const std::vector<float>& angle,
+                 const UvPackOptions& o, UvPackResult& result) {
+    const int res = std::clamp(o.resolution, 64, 16384);
+    std::vector<uint32_t> vid(topo.uvVertexCount, ~0u);
+    std::vector<glm::vec2> verts;
+    std::vector<uint32_t> idx, cornerOf, material;
+    double total = 0.0;
+    for (size_t p = 0; p < list.size(); ++p) {
+        const uint32_t i = list[p];
+        glm::vec2 lo(std::numeric_limits<float>::max()), hi(std::numeric_limits<float>::lowest());
+        for (uint32_t c = offsets[i]; c < offsets[i + 1]; ++c) lo = glm::min(lo, m.uvs[corners[c]]), hi = glm::max(hi, m.uvs[corners[c]]);
+        const glm::vec2 mid = (lo + hi) * 0.5f;
+        const float ca = std::cos(angle[p]), sa = std::sin(angle[p]);
+        for (uint32_t c = offsets[i]; c < offsets[i + 1]; ++c) {
+            const uint32_t corner = corners[c], v = topo.uvVertex[corner];
+            if (vid[v] == ~0u) {
+                vid[v] = uint32_t(verts.size());
+                verts.push_back(rotate(m.uvs[corner] - mid, ca, sa) * k[p]);
+            }
+            idx.push_back(vid[v]);
+            cornerOf.push_back(corner);
+            if (idx.size() % 3 == 0) material.push_back(uint32_t(p));
+        }
+    }
+    for (size_t t = 0; t + 2 < idx.size(); t += 3) // (the islands' area as they go in)
+        total += 0.5 * std::abs(double(cross2(verts[idx[t + 1]] - verts[idx[t]], verts[idx[t + 2]] - verts[idx[t]])));
+    if (idx.empty() || total <= 0.0) return false;
+    std::unique_ptr<xatlas::Atlas, void (*)(xatlas::Atlas*)> atlas(xatlas::Create(), xatlas::Destroy);
+    xatlas::UvMeshDecl decl;
+    decl.vertexUvData = verts.data();
+    decl.vertexStride = sizeof(glm::vec2);
+    decl.vertexCount = uint32_t(verts.size());
+    decl.indexData = idx.data();
+    decl.indexCount = uint32_t(idx.size());
+    decl.indexFormat = xatlas::IndexFormat::UInt32;
+    decl.faceMaterialData = material.data(); // (one per island: islands that overlap stay apart)
+    if (xatlas::AddUvMesh(atlas.get(), decl) != xatlas::AddMeshError::Success) return false;
+    xatlas::ComputeCharts(atlas.get());
+    auto pack = [&](float texelsPerUnit, int resolution) {
+        xatlas::PackOptions po;
+        po.padding = uint32_t(std::lround(std::max(o.marginPx, 0.0f) * float(resolution) / float(res)));
+        po.texelsPerUnit = texelsPerUnit;
+        po.resolution = uint32_t(resolution);
+        po.bilinear = false;
+        po.blockAlign = resolution > 1024;
+        po.rotateCharts = o.rotate; // (quarter turns, undone exactly by the fit below)
+        po.rotateChartsToAxis = false; // (turned to their smallest box above: xatlas's own turn could mirror)
+        xatlas::PackCharts(atlas.get(), po);
+        return atlas->meshCount == 1 ? int(std::max(atlas->atlasCount, 1u)) : 0;
+    };
+    const int tiles = std::clamp(o.tiles, 1, 100);
+    float density = o.density;
+    int used = 0;
+    if (density > 0.0f) {
+        used = pack(density, res);
+        if (used == 0 || used > 100) return false;
+    } else {
+        // Bisection at a quarter of the resolution (fast), then the full pack, a little smaller until it fits.
+        const int lowRes = std::max(res / 4, 256);
+        const float rel = float(lowRes) / float(res);
+        float lo = 0.0f, hi = float(std::sqrt(double(tiles) * double(res) * double(res) / total));
+        for (int it = 0; it < 12; ++it) {
+            const float mid = lo > 0.0f ? 0.5f * (lo + hi) : hi * 0.6f;
+            const int count = pack(mid * rel, lowRes);
+            if (count > 0 && count <= tiles) lo = mid;
+            else hi = mid;
+            if (lo > 0.0f && hi / lo < 1.01f) break;
+        }
+        if (lo <= 0.0f) return false;
+        density = lo;
+        for (int tries = 0; tries < 8; ++tries, density *= 0.97f)
+            if ((used = pack(density, res)) > 0 && used <= tiles) break;
+        if (used == 0 || used > tiles) return false;
+    }
+    const xatlas::Mesh& out = atlas->meshes[0];
+    if (out.indexCount != idx.size()) return false;
+    const int first = std::max(o.firstTile, 1001) - 1001;
+    const float inv = 1.0f / float(res);
+    // Only where xatlas put each island is taken: the move (and scale) that best maps the island onto its packed
+    // copy is applied to the island's own UVs, so its shape stays exactly as it was.
+    // xatlas may split an island it finds folded or pinched into several charts: then the islands wouldn't stay
+    // whole, and the box packer takes over.
+    for (size_t i = 3; i < idx.size(); ++i)
+        if (material[i / 3] == material[(i - 1) / 3] &&
+            out.vertexArray[out.indexArray[i]].chartIndex != out.vertexArray[out.indexArray[i - 1]].chartIndex)
+            return false;
+    std::vector<glm::vec2> placed(out.indexCount);
+    for (uint32_t i = 0; i < out.indexCount; ++i) {
+        const xatlas::Vertex& v = out.vertexArray[out.indexArray[i]];
+        const int t = first + std::max(v.atlasIndex, 0);
+        placed[i] = glm::vec2(float(t % 10), float(t / 10)) + glm::vec2(v.uv[0], v.uv[1]) * inv;
+    }
+    for (size_t b = 0; b < idx.size();) {
+        size_t e = b;
+        while (e < idx.size() && material[e / 3] == material[b / 3]) e += 3;
+        glm::dvec2 ca(0.0), cb(0.0);
+        for (size_t i = b; i < e; ++i) ca += glm::dvec2(verts[idx[i]]), cb += glm::dvec2(placed[i]);
+        ca /= double(e - b), cb /= double(e - b);
+        double dotSum = 0.0, crossSum = 0.0, norm = 0.0;
+        for (size_t i = b; i < e; ++i) {
+            const glm::dvec2 p = glm::dvec2(verts[idx[i]]) - ca, q = glm::dvec2(placed[i]) - cb;
+            dotSum += p.x * q.x + p.y * q.y;
+            crossSum += p.x * q.y - p.y * q.x;
+            norm += p.x * p.x + p.y * p.y;
+        }
+        const double s = norm > 0.0 ? std::sqrt(dotSum * dotSum + crossSum * crossSum) / norm : 1.0;
+        const double a = std::atan2(crossSum, dotSum), c = std::cos(a) * s, sn = std::sin(a) * s;
+        for (size_t i = b; i < e; ++i) {
+            const glm::dvec2 p = glm::dvec2(verts[idx[i]]) - ca;
+            m.uvs[cornerOf[i]] = glm::vec2(cb + glm::dvec2(c * p.x - sn * p.y, sn * p.x + c * p.y));
+        }
+        b = e;
+    }
+    const double uvArea = total;
+    result.islands = list.size();
+    result.tilesUsed = used;
+    // (UV area after packing = surface area x (density / res)^2 when the islands went in at one density.)
+    result.coverage = float(uvArea * double(density) * double(density) * double(inv) * double(inv) / double(std::max(used, 1)));
+    result.density = uvMeshDensity(m, res);
+    m.facesDirty = true;
+    return true;
+}
 
 } // namespace
 
@@ -183,6 +317,25 @@ bool uvPack(Mesh& m, const UvTopology& topo, const std::vector<uint8_t>& islands
             pc.k = equal && pc.areaUv > 1e-20 && pc.area3 > 0.0 ? float(std::sqrt(pc.area3 / pc.areaUv)) : 1.0f;
         }
     }, 16);
+    // The shape packer when there are enough islands for their shapes to matter (and not so many triangles that
+    // rasterising them would keep you waiting); the box packer always runs too, and the denser layout wins.
+    std::vector<glm::vec2> shapeUvs;
+    UvPackResult shapeResult;
+    if (n >= 8 && m.triangleCount() <= 600000) {
+        std::vector<float> k(n), angle(n);
+        std::vector<double> a3(n);
+        for (size_t p = 0; p < n; ++p) k[p] = pieces[p].k, angle[p] = pieces[p].angle, a3[p] = pieces[p].area3;
+        const std::vector<glm::vec2> before = m.uvs;
+        if (packByShape(m, topo, list, offsets, corners, k, angle, o, shapeResult)) shapeUvs = m.uvs;
+        m.uvs = before;
+    }
+    auto useShapes = [&] {
+        if (shapeUvs.empty()) return false;
+        m.uvs = std::move(shapeUvs);
+        result = shapeResult;
+        m.facesDirty = true;
+        return true;
+    };
     const float margin = std::max(o.marginPx, 0.0f) / float(res);
     std::vector<glm::vec2> sizes(n), pos;
     std::vector<uint8_t> turned;
@@ -197,6 +350,7 @@ bool uvPack(Mesh& m, const UvTopology& topo, const std::vector<uint8_t>& islands
         scale = o.density / float(res); // UV units per surface unit
         used = tryScale(scale, 100);
         if (!used) {
+            if (useShapes()) return true;
             error = "At that texel density an island is bigger than a tile (or it needs over 100 tiles): lower it";
             return false;
         }
@@ -216,6 +370,7 @@ bool uvPack(Mesh& m, const UvTopology& topo, const std::vector<uint8_t>& islands
             if (tryScale(s, tiles)) fits = s;
         }
         if (fits == 0.0f) {
+            if (useShapes()) return true;
             error = "The islands don't fit: lower the margin or use more tiles";
             return false;
         }
@@ -254,6 +409,9 @@ bool uvPack(Mesh& m, const UvTopology& topo, const std::vector<uint8_t>& islands
     result.coverage = float(uvArea / double(std::max(used, 1)));
     result.density = uvMeshDensity(m, res);
     m.facesDirty = true;
+    // Fixed density: the layout that needs fewer tiles; fitting tiles: the denser one.
+    if (!shapeUvs.empty() && (o.density > 0.0f ? shapeResult.tilesUsed < used : shapeResult.density > result.density * 1.005f))
+        useShapes();
     return true;
 }
 

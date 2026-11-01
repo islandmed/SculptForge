@@ -134,7 +134,7 @@ public:
     void queueFile(FileAction action, std::string path);
 
 private:
-    enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, SubToolClick, Select, Gizmo, Guide, Sculptable, ZSphere, Insert, Capture };
+    enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, SubToolClick, Select, Gizmo, Guide, Sculptable, ZSphere, Insert, Capture, UvTool };
 
     void handleEvent(const SDL_Event& e);
     void onMouseDown(float x, float y, Uint8 button);
@@ -655,6 +655,27 @@ private:
     // Texture Map sub-palette (PanelTexture.cpp): texture painting on UVs, Auto UV, the UV view.
     void drawTextureMapContents();
     void registerTextureUiActions();
+    // UV Editor (PanelUvEditor.cpp): the window with the 2D UV layout and its tools, the 3D Seam / Select tool, the
+    // seams and colours on the model, a background unwrap. UvEditorUi (that file) does the work.
+    friend struct UvEditorUi;
+    void registerUvEditorActions();
+    void drawUvEditor();
+    void drawUvEditorOverlay(); // the marked seams on the model, the 3D tool's cursor
+    void pollUvEditor();
+    void uvEditorChanged(); // a uv_* command ran: the editor's caches are stale
+    bool uvEditorKey(SDL_Keycode key, SDL_Keymod mod); // keys over the UV view (true: taken)
+    bool uvToolActive() const;
+    bool uvToolMouseDown(float x, float y, SDL_Keymod mod);
+    void uvToolDragTo(float x, float y);
+    void uvToolRelease();
+    const MeshOverlay* uvEditorOverlay(uint32_t subtool); // what syncScene hands the renderer for the model
+    bool uvEditorBusy() const;
+    // UI test values: uv_editor_open, uv_islands, uv_seams, uv_selected, uv_select_mode, uv_pins, uv_tiles,
+    // uv_stretch_x1000, uv_flipped_x1000, uv_density, uv_max_u, uv_unwrapping, uv_unwraps, uv_tool,
+    // uv_view_triangles, uv_overlay; NaN for other names.
+    double uvEditorTestValue(const std::string& name);
+    std::shared_ptr<struct UvEditorState> uvEditor_;
+    bool showUvEditor_ = false;
     void startAutoUv();
     void startNewTexture(); // New Texture on the top shelf / Color palette: Auto UV first when there are no UVs
     void pollAutoUv();

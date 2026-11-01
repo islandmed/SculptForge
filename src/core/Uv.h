@@ -68,6 +68,14 @@ float uvMeshDensity(const Mesh& mesh, int resolution);
 // Jacobian, measured against its island's mean scale: 0 = no stretch, 1 = twice or half as long in some
 // direction (log2 of the worst of s1 and 1/s2 over the mean). Triangles folded over their island get -1.
 void uvTriangleStretch(const Mesh& mesh, std::vector<float>& out);
+// The same for one triangle, with each island's scale and sense computed once (uvStretchCache) so a drag can
+// update the triangles it moves without measuring everything again.
+struct UvStretchCache {
+    std::vector<float> scale;      // per island
+    std::vector<uint8_t> mirrored; // per island
+};
+UvStretchCache uvStretchCache(const Mesh& mesh, const UvTopology& topo);
+float uvTriangleStretchAt(const Mesh& mesh, uint32_t triangle, const UvTopology& topo, const UvStretchCache& cache);
 // Summary for the status line and the tests: area-weighted mean stretch, and the share of flipped triangles.
 struct UvStretchStats {
     float mean = 0.0f, worst = 0.0f;

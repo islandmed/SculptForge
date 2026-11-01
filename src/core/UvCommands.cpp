@@ -11,6 +11,7 @@
 #include "core/TextureTransfer.h"
 #include "core/Undo.h"
 #include "core/Uv.h"
+#include "core/UvEdit.h"
 
 #include <algorithm>
 #include <cmath>
@@ -23,40 +24,6 @@ namespace {
 using T = ParamSpec::Type;
 
 const char* kNoUvs = "The Part has no UVs: unwrap it first (UV Editor > Unwrap, or uv_unwrap)";
-
-// One undoable UV edit: captures the UVs (and the texture when it should follow) before, pushes the step after.
-class UvEdit {
-public:
-    UvEdit(Document& doc, std::string label, bool keepTexture) : doc_(doc), tex_(keepTexture && hasTexture(doc.mesh)) {
-        if (tex_) r_ = captureTexture(doc.mesh, label);
-        else r_.label = std::move(label);
-        r_.uv = UvUndo::capture(doc.mesh);
-    }
-    // Pushes the step if anything changed; returns the texture note (" ; paint moved ...").
-    std::string commit() {
-        Mesh& m = doc_.mesh;
-        if (m.uvs == r_.uv->uvs && m.uvFlags == r_.uv->flags) {
-            if (tex_) r_.texture->swapWith(m); // (put back the untouched original)
-            return {};
-        }
-        std::string note;
-        if (tex_ && m.uvs.size() == r_.uv->uvs.size() && m.uvs != r_.uv->uvs) {
-            std::vector<glm::vec2> fresh = std::move(m.uvs);
-            m.uvs = r_.uv->uvs;
-            note = setUvsKeepingTexture(m, std::move(fresh), true);
-        }
-        m.facesDirty = true;
-        r_.uv->commit(m);
-        if (tex_) finishTextureUndo(r_, m);
-        doc_.undo.push(std::move(r_));
-        return note;
-    }
-
-private:
-    Document& doc_;
-    bool tex_;
-    UndoRecord r_;
-};
 
 int resolutionArg(const Document& doc, const Args& a) {
     if (a.contains("resolution")) return std::clamp(int(argNumber(a, "resolution", kDefaultTextureSize)), 64, 16384);
@@ -105,6 +72,34 @@ std::string packNote(const UvPackResult& p) {
 }
 
 } // namespace
+
+UvEditStep::UvEditStep(Document& doc, std::string label, bool keepTexture) : doc_(doc), texture_(keepTexture && hasTexture(doc.mesh)) {
+    if (texture_) record_ = captureTexture(doc.mesh, label);
+    else record_.label = std::move(label);
+    record_.uv = UvUndo::capture(doc.mesh);
+}
+
+std::string UvEditStep::commit() {
+    Mesh& m = doc_.mesh;
+    if (!record_.uv) return {};
+    if (m.uvs == record_.uv->uvs && m.uvFlags == record_.uv->flags) {
+        if (texture_) record_.texture->swapWith(m); // (put back the untouched original)
+        record_.uv.reset();
+        return {};
+    }
+    std::string note;
+    if (texture_ && m.uvs.size() == record_.uv->uvs.size() && m.uvs != record_.uv->uvs) {
+        std::vector<glm::vec2> fresh = std::move(m.uvs);
+        m.uvs = record_.uv->uvs;
+        note = setUvsKeepingTexture(m, std::move(fresh), true);
+    }
+    m.facesDirty = true;
+    record_.uv->commit(m);
+    if (texture_) finishTextureUndo(record_, m);
+    doc_.undo.push(std::move(record_));
+    record_.uv.reset();
+    return note;
+}
 
 std::string uvInfoText(const Mesh& m, int resolution) {
     if (!m.hasUvs()) {
@@ -176,7 +171,7 @@ void registerUvCommands(CommandRegistry& reg) {
                  UvUnwrapResult r;
                  std::string err;
                  if (!uvUnwrap(m, o, r, err)) return {false, err};
-                 UvEdit edit(doc, std::string("Unwrap (") + uvUnwrapMethodLabel(o.method) + ")", argBool(a, "keep_texture", true));
+                 UvEditStep edit(doc, std::string("Unwrap (") + uvUnwrapMethodLabel(o.method) + ")", argBool(a, "keep_texture", true));
                  m.uvs = std::move(r.uvs);
                  const std::string note = edit.commit();
                  std::string msg = std::string("Unwrapped (") + uvUnwrapMethodLabel(o.method) + "): " + plural(r.islands, "island");
@@ -205,7 +200,7 @@ void registerUvCommands(CommandRegistry& reg) {
                  if (!m.hasUvs()) return {false, kNoUvs};
                  const UvTopology topo = buildUvTopology(m);
                  const std::vector<uint8_t> islands = targetIslands(doc, topo);
-                 UvEdit edit(doc, "Pack UVs", argBool(a, "keep_texture", true));
+                 UvEditStep edit(doc, "Pack UVs", argBool(a, "keep_texture", true));
                  UvPackResult r;
                  std::string err;
                  if (!uvPack(m, topo, islands, packOptions(doc, a), r, err)) return {false, err};
@@ -228,7 +223,7 @@ void registerUvCommands(CommandRegistry& reg) {
                  if (m.triangleCount() == 0) return {false, "There is no mesh"};
                  const std::string op = argString(a, "op");
                  const size_t before = uvSeamCount(m);
-                 UvEdit edit(doc, "UV Seams", false);
+                 UvEditStep edit(doc, "UV Seams", false);
                  const std::vector<uint32_t> twin = cornerTwins(m);
                  if (op == "mark" || op == "clear") {
                      const UvSelection& sel = doc.uvSelection;
@@ -383,7 +378,7 @@ void registerUvCommands(CommandRegistry& reg) {
                  const float ang = glm::radians(float(argNumber(a, "rotate", 0.0)));
                  const glm::mat2 rot(std::cos(ang), std::sin(ang), -std::sin(ang), std::cos(ang));
                  const glm::mat2 mat = rot * glm::mat2(su, 0.0f, 0.0f, sv);
-                 UvEdit edit(doc, "Transform UVs", argBool(a, "keep_texture", true));
+                 UvEditStep edit(doc, "Transform UVs", argBool(a, "keep_texture", true));
                  uvTransform(m.uvs, corners, mat, uvCenter(m.uvs, corners),
                              glm::vec2(float(argNumber(a, "move_u", 0.0)), float(argNumber(a, "move_v", 0.0))));
                  const std::string note = edit.commit();
@@ -405,7 +400,7 @@ void registerUvCommands(CommandRegistry& reg) {
                  const UvTopology topo = buildUvTopology(m);
                  const bool haveSel = doc.uvSelection.valid(m) && !doc.uvSelection.empty();
                  const std::vector<uint32_t> corners = targetCorners(doc, topo);
-                 UvEdit edit(doc, "UV " + op, argBool(a, "keep_texture", true));
+                 UvEditStep edit(doc, "UV " + op, argBool(a, "keep_texture", true));
                  std::string msg;
                  if (op == "pin" || op == "unpin") {
                      if (!haveSel) return {false, "Select the UVs to " + op + " first"};
@@ -471,7 +466,7 @@ void registerUvCommands(CommandRegistry& reg) {
                  else if (op == "match") target = argString(a, "match", "mean") == "first" ? d[size_t(first)] : mean;
                  else return {false, "op must be set, match or info"};
                  if (!(target > 0.0f)) return {false, "Give the texel density: value (texels per unit)"};
-                 UvEdit edit(doc, "Texel Density", argBool(a, "keep_texture", true));
+                 UvEditStep edit(doc, "Texel Density", argBool(a, "keep_texture", true));
                  const size_t n = uvSetDensity(m, topo, islands, target, res);
                  const std::string note = edit.commit();
                  return {true, plural(n, "island") + " at " + fmt("%.1f", double(target)) + " texels per unit" + note};
@@ -501,7 +496,7 @@ void registerUvCommands(CommandRegistry& reg) {
                  const UvTopology topo = buildUvTopology(m);
                  const std::vector<uint8_t> islands = targetIslands(doc, topo);
                  const float margin = float(std::max(argNumber(a, "margin", 4.0), 0.0)) / float(resolutionArg(doc, a));
-                 UvEdit edit(doc, "Trim Sheet", argBool(a, "keep_texture", false));
+                 UvEditStep edit(doc, "Trim Sheet", argBool(a, "keep_texture", false));
                  const size_t n = uvTrimIslands(m, topo, islands, strips[size_t(k - 1)], argBool(a, "fit_width", false), margin);
                  if (!n) return {false, "Nothing to lay into the strip (it may be too thin for the margin)"};
                  const std::string note = edit.commit();

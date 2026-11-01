@@ -527,6 +527,7 @@ void App::initActions() {
     registerPbrUiActions();     // material channels, solo view, map export (PanelPbr.cpp)
     registerGizmoActions();     // Q W E R: Draw, and the Gizmo 3D's Move, Scale, Rotate (Gizmo.cpp)
     registerBakeUiActions();    // Tool > Bake (PanelBake.cpp)
+    registerUvEditorActions();  // UV Editor (PanelUvEditor.cpp)
     registerRetopoUiActions(); // Geometry > QRemesh, SubTool > ProjectAll (PanelRetopo.cpp)
     registerZSphereUiActions(); // Tool > ZSpheres (PanelZSpheres.cpp)
     registerSplatTrainUi();    // Splats > Train from capture (PanelSplatTrain.cpp)

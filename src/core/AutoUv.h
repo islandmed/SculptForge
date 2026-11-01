@@ -30,6 +30,10 @@ struct AutoUvResult {
 // failure or cancel.
 bool computeAutoUv(const std::vector<glm::vec3>& positions, const std::vector<glm::uvec3>& triangles, int resolution,
                    AutoUvResult& out, std::string& error, const AutoUvProgress& progress = {});
+// Only the charts xatlas would cut `triangles` into (per triangle, 0 .. charts - 1), for the UV Editor's unwrap of
+// pieces too tangled to cut into a disk by itself (core/UvUnwrap.cpp). False with `error` on failure.
+bool computeAutoCharts(const std::vector<glm::vec3>& positions, const std::vector<glm::uvec3>& triangles,
+                       std::vector<uint32_t>& chartOfTriangle, int& charts, std::string& error);
 // The same for a mesh (its texture size, or 2048 without one).
 bool computeAutoUv(const Mesh& mesh, AutoUvResult& out, std::string& error, const AutoUvProgress& progress = {});
 
