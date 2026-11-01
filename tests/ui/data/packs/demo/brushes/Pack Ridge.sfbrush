@@ -1,0 +1,23 @@
+{
+  "name": "Pack Ridge",
+  "description": "A sharp ridge from the demo pack",
+  "direction": "normal",
+  "depth": 0.6,
+  "plane": "none",
+  "planeAmount": 0.5,
+  "pinch": 0.5,
+  "drag": 0,
+  "smooth": 0,
+  "hardness": 0,
+  "tipSharpness": 0,
+  "pattern": "none",
+  "patternScale": 0.3,
+  "patternAmount": 0,
+  "spacing": 0.15,
+  "jitter": 0,
+  "pressureCurve": 1,
+  "frontFacesOnly": false,
+  "cavityMask": 0,
+  "format": "sfbrush",
+  "version": 1
+}

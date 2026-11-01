@@ -61,14 +61,15 @@ You can read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<
 36. [Working with Maya](maya.md)
 37. [Projects, autosave and Snapshots](projects.md)
 38. [Scripting and automation](scripting.md)
-39. [SculptForge for studios](studios.md)
+39. [Packs and macros](packs-and-macros.md)
+40. [SculptForge for studios](studios.md)
 
 ## Reference
 
-40. [Keyboard and mouse](shortcuts.md)
-41. [Performance and big meshes](performance.md)
-42. [Troubleshooting and FAQ](troubleshooting.md)
-43. [Glossary](glossary.md)
+41. [Keyboard and mouse](shortcuts.md)
+42. [Performance and big meshes](performance.md)
+43. [Troubleshooting and FAQ](troubleshooting.md)
+44. [Glossary](glossary.md)
 
 ## Getting help
 

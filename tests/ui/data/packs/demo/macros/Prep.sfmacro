@@ -1,0 +1,4 @@
+# name: Prep
+# description: Clear the mask, then mask everything
+mask_clear
+mask_all

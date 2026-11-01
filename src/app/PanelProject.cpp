@@ -508,7 +508,8 @@ void App::openPathConfirmed(const std::string& path) {
         runCommand("splat_train", {{"source", path}});
         return;
     }
-    if (Image::isImagePath(path) || ext == ".sfbrush" || ext == ".exr" || ext == ".sfvdm") openPath(path);
+    if (Image::isImagePath(path) || ext == ".sfbrush" || ext == ".exr" || ext == ".sfvdm" || ext == kPackExtension)
+        openPath(path); // (a pack opens its review screen: the scene stays)
     else confirmDiscard([this, path] { openPath(path); });
 }
 

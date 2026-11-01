@@ -1,0 +1,8 @@
+{
+  "format": "sculptforge-keymap",
+  "version": 1,
+  "name": "Demo Keys",
+  "shortcuts": {
+    "mask.invert": "Ctrl+Shift+K"
+  }
+}

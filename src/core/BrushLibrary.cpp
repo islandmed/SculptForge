@@ -4,6 +4,7 @@
 
 #include "core/Commands.h"
 #include "core/Document.h"
+#include "core/Pack.h"
 #include "core/Vdm.h"
 
 #include <algorithm>
@@ -203,6 +204,16 @@ bool findShadowed(const std::string& name, const BrushLibraryPaths& paths, Brush
             return true;
         }
     }
+    for (const auto& pack : paths.packs) {
+        if (pack.vdm) continue;
+        for (const auto& file : brushFiles(pack.dir)) {
+            std::string err;
+            if (readBrushFile(file, out, err) && out.name == name) {
+                out.origin = {BrushSource::Pack, file, BrushSource::Session, pack.pack};
+                return true;
+            }
+        }
+    }
     return false;
 }
 
@@ -218,6 +229,7 @@ BrushLibraryPaths BrushLibraryPaths::fromEnvironment() {
     BrushLibraryPaths p;
     p.userDir = pathString(utf8Path(appDataDir()) / "brushes");
     p.studioDirs = splitSearchPath(env("SCULPTFORGE_BRUSH_PATH"));
+    applyPacksToBrushLibrary(p); // the enabled packs' brushes and VDMs (none with --no-packs)
     return p;
 }
 
@@ -386,6 +398,22 @@ std::vector<std::string> loadBrushLibrary(Document& doc, const BrushLibraryPaths
         }
     }
 
+    for (const auto& pack : paths.packs) {
+        if (pack.vdm || packsSafeMode()) continue;
+        for (const auto& file : brushFiles(pack.dir)) {
+            BrushRecipe r;
+            std::string err;
+            if (!readBrushFile(file, r, err)) {
+                messages.push_back("Skipped " + file + " (pack " + pack.pack + "): " + err);
+                continue;
+            }
+            r.origin = {BrushSource::Pack, file, BrushSource::Session, pack.pack};
+            if (findBrush(doc, r.name) >= 0) r.name += " (" + pack.pack + ")"; // never replaces another brush
+            if (findBrush(doc, r.name) >= 0) continue;                          // (the same pack twice)
+            doc.brushes.push_back(std::move(r));
+        }
+    }
+
     if (!paths.userDir.empty()) {
         for (const auto& file : brushFiles(paths.userDir)) {
             BrushRecipe r;
@@ -404,6 +432,7 @@ std::vector<std::string> loadBrushLibrary(Document& doc, const BrushLibraryPaths
                                    " already has a brush called '" + r.name + "'");
             } else {
                 r.origin.overrides = doc.brushes[size_t(i)].origin.source;
+                r.origin.pack = doc.brushes[size_t(i)].origin.pack;
                 doc.brushes[size_t(i)] = std::move(r);
             }
         }
@@ -510,7 +539,7 @@ int renameBrush(Document& doc, int index, const std::string& newName, std::strin
 
     BrushRecipe& r = doc.brushes[size_t(index)];
     const BrushSource source = r.origin.source;
-    if (source == BrushSource::Builtin || source == BrushSource::Studio) {
+    if (source == BrushSource::Builtin || source == BrushSource::Studio || source == BrushSource::Pack) {
         // Shared brushes stay as they are; the renamed one is the artist's copy.
         BrushRecipe copy = r;
         copy.name = name;
@@ -635,7 +664,7 @@ void registerBrushLibraryCommands(CommandRegistry& registry) {
                       if (j < 0) return {false, err};
                       const std::string to = doc.brushes[size_t(j)].name;
                       const std::string note = err.empty() ? "" : " (not saved: " + err + ")";
-                      if (source == BrushSource::Builtin || source == BrushSource::Studio)
+                      if (source == BrushSource::Builtin || source == BrushSource::Studio || source == BrushSource::Pack)
                           return {true, "Saved a copy of the " + std::string(brushSourceName(source)) + " brush '" + from +
                                             "' as '" + to + "'" + note};
                       return {true, "Renamed '" + from + "' to '" + to + "'" + note};

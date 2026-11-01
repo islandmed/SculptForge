@@ -1,0 +1,1 @@
+CC0 1.0 Universal: no rights reserved. Test data for SculptForge's UI tests.

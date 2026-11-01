@@ -366,6 +366,7 @@ void App::drawPalette_File() {
     menuAction(*this, "file.export_fbx");
     menuAction(*this, "file.send_unreal");
     menuAction(*this, "file.save_splats");
+    menuAction(*this, "pack.install"); // a review screen first (PanelPacks.cpp)
     ImGui::Separator();
     drawGozMenu();
     drawBlenderMenu(); // the Blender bridge (PanelBlender.cpp)

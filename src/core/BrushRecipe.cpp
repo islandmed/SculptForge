@@ -105,6 +105,7 @@ const char* brushSourceName(BrushSource source) {
     case BrushSource::Studio: return "studio";
     case BrushSource::Gallery: return "gallery";
     case BrushSource::Project: return "project";
+    case BrushSource::Pack: return "pack";
     }
     return "session";
 }

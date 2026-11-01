@@ -1150,12 +1150,16 @@ TEST(mcp_server_protocol) {
     CHECK(init["result"]["serverInfo"]["name"].asString() == "sculptforge" && init["result"]["capabilities"]["tools"].isObject());
     CHECK(handleMcpMessage(reg, d, R"({"jsonrpc":"2.0","method":"notifications/initialized"})").empty());
     Json list = call(R"({"jsonrpc":"2.0","id":2,"method":"tools/list"})");
-    bool hasRemesh = false, schemasOk = true;
+    bool hasRemesh = false, schemasOk = true, packTools = false;
     for (const auto& t : list["result"]["tools"].items()) {
         hasRemesh = hasRemesh || t["name"].asString() == "remesh";
         schemasOk = schemasOk && t["inputSchema"]["type"].asString() == "object";
+        packTools = packTools || t["name"].asString() == "pack_install" || t["name"].asString() == "pack_remove";
     }
-    CHECK(hasRemesh && schemasOk && list["result"]["tools"].size() == reg.all().size());
+    // Every command but installing, removing and switching packs (the user's decision, never an agent's).
+    CHECK(hasRemesh && schemasOk && !packTools && list["result"]["tools"].size() == reg.all().size() - 4);
+    Json refused = call(R"({"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"pack_install","arguments":{"path":"x.sfpack"}}})");
+    CHECK(refused.has("error"));
     Json ok = call(R"({"jsonrpc":"2.0","id":"a","method":"tools/call","params":{"name":"new_sphere","arguments":{"subdivisions":2}}})");
     CHECK(ok["id"].asString() == "a" && !ok["result"]["isError"].asBool(true) && d.mesh.triangleCount() == 320);
     CHECK(ok["result"]["content"][0]["text"].asString().find("320") != std::string::npos);

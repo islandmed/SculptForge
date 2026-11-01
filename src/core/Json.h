@@ -53,9 +53,13 @@ public:
 
     std::string dump(bool pretty = false) const;
     static bool parse(const std::string& text, Json& out, std::string& error);
+    // Like parse, but a key given twice in one object, or a number JSON doesn't allow (hex, inf, nan), is an error
+    // (files from outside: packs, macros' companions, keymaps).
+    static bool parseStrict(const std::string& text, Json& out, std::string& error);
 
 private:
     void dumpTo(std::string& out, bool pretty, int indent) const;
+    static bool parseImpl(const std::string& text, Json& out, std::string& error, bool strict);
 
     Type type_ = Type::Null;
     bool bool_ = false;

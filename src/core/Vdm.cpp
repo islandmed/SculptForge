@@ -4,6 +4,7 @@
 #include "core/Masking.h"
 
 #include "core/BrushLibrary.h"
+#include "core/Pack.h"
 #include "core/Commands.h"
 #include "core/Document.h"
 #include "core/PathStroke.h"
@@ -730,7 +731,7 @@ std::shared_ptr<const VectorDisplacement> addVdm(Document& doc, VectorDisplaceme
 void loadVdmLibrary(Document& doc, const BrushLibraryPaths& paths, std::vector<std::string>& messages) {
     const std::string current = doc.brushVdm ? doc.brushVdm->name : std::string();
     doc.vdms = builtinVdms();
-    auto scan = [&](const std::string& dir, bool user) {
+    auto scan = [&](const std::string& dir, bool user, const std::string& pack = {}) {
         std::vector<std::string> files;
         std::error_code ec;
         for (fs::directory_iterator it(utf8Path(dir), ec), end; !ec && it != end; it.increment(ec)) {
@@ -746,6 +747,11 @@ void loadVdmLibrary(Document& doc, const BrushLibraryPaths& paths, std::vector<s
                 messages.push_back("Skipped " + f + ": " + err);
                 continue;
             }
+            if (!pack.empty()) {
+                // A pack's VDM never replaces another: it gets the pack's name after its own.
+                if (findVdm(doc, v.name) >= 0) v.name += " (" + pack + ")";
+                if (findVdm(doc, v.name) >= 0) continue;
+            }
             const int i = findVdm(doc, v.name);
             auto shared = std::make_shared<const VectorDisplacement>(std::move(v));
             if (i < 0) doc.vdms.push_back(shared);
@@ -753,6 +759,8 @@ void loadVdmLibrary(Document& doc, const BrushLibraryPaths& paths, std::vector<s
         }
     };
     for (const std::string& dir : paths.studioDirs) scan(dir, false);
+    for (const auto& p : paths.packs)
+        if (p.vdm && !packsSafeMode()) scan(p.dir, false, p.pack);
     if (!paths.userDir.empty()) scan(paths.userDir, true);
     const int i = findVdm(doc, current);
     doc.brushVdm = i >= 0 ? doc.vdms[size_t(i)] : doc.vdms.front();

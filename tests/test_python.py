@@ -106,4 +106,31 @@ try:
 except ValueError:
     pass
 
+# Packs and macros: data only, checked before install; a macro's files stay inside the project folder.
+data_home = tempfile.mkdtemp()
+os.environ["XDG_DATA_HOME"] = data_home  # (packs and macros go to the app data folder; keep the user's untouched)
+os.environ["APPDATA"] = data_home
+os.environ["HOME"] = data_home
+src = tempfile.mkdtemp()
+os.makedirs(os.path.join(src, "macros"))
+with open(os.path.join(src, "macros", "Prep.sfmacro"), "w") as f:
+    f.write("# name: Prep\nmask_clear\nmask_all\n")
+pack_path = os.path.join(tempfile.mkdtemp(), "py.sfpack")
+sf.run(doc, "pack_create", folder=src, path=pack_path, id="py-pack", name="Py Pack", author="Tester", license="CC0-1.0")
+assert "1 macro" in sf.run(doc, "pack_install", path=pack_path)
+assert "py-pack" in sf.run(doc, "pack_list")
+assert "Prep (Py Pack)" in sf.run(doc, "macro_list")
+sf.run(doc, "new_sphere", subdivisions=2)
+assert "Ran macro Prep" in sf.run(doc, "macro_run", name="Prep")
+bad = os.path.join(src, "bad.sfmacro")
+with open(bad, "w") as f:
+    f.write("open path=/etc/passwd\n")
+try:
+    sf.run(doc, "macro_run", path=bad)
+    raise AssertionError("expected CommandError")
+except sf.CommandError as e:
+    assert "not inside the project folder" in str(e)
+sf.run(doc, "pack_remove", id="py-pack")
+assert "No packs" in sf.run(doc, "pack_list")
+
 print("python api ok:", sf.__version__)

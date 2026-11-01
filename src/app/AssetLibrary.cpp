@@ -61,14 +61,14 @@ const char* primitiveName(Primitive p) {
 }
 
 const char* libraryTabName(LibraryTab tab) {
-    static const char* const names[] = {"Project", "Tool",   "Brush",     "Alpha", "Material",
-                                        "Image",   "Splats", "Snapshots", "Recent"};
+    static const char* const names[] = {"Project", "Tool",   "Brush",     "Alpha",  "Material",
+                                        "Image",   "Splats", "Snapshots", "Recent", "Packs"};
     return tab < LibraryTab::Count ? names[int(tab)] : "";
 }
 
 const char* libraryTabId(LibraryTab tab) {
-    static const char* const ids[] = {"project", "tool",   "brush",     "alpha", "material",
-                                      "image",   "splats", "quicksave", "recent"};
+    static const char* const ids[] = {"project", "tool",   "brush",     "alpha",  "material",
+                                      "image",   "splats", "quicksave", "recent", "packs"};
     return tab < LibraryTab::Count ? ids[int(tab)] : "project";
 }
 
