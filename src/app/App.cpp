@@ -676,6 +676,7 @@ int App::run() {
         MeasureView view{};     // the view before the stroke (it starts once this has held still for a second)
         double viewSince = 0.0;
         std::vector<double> frameTimes; // seconds, for the percentiles
+        std::vector<float> radii;       // each dab's brush radius (px)
         // SF_MEASURE_VERIFY=1: the mesh before the stroke, to check undo and replay the dabs (verifyStroke).
         uint64_t before = 0;
         // SF_MEASURE_SNAPSHOT=prefix: the canvas at a few points of the stroke, as prefix-N.png.
@@ -763,6 +764,7 @@ int App::run() {
             sm.started = true;
             sm.start = sm.lastFrame = sm.pressAt = seconds();
             strokeProbe_ = &sm.dabs;
+            strokeRadiusProbe_ = &sm.radii;
             if (options_.measureStrokeRadius > 0.0f) radiusPx_ = std::clamp(options_.measureStrokeRadius, 2.0f, 800.0f);
             if (verify) sm.before = meshStateHash(doc_.mesh);
             onMouseDown(sm.cx + sm.r, sm.cy, SDL_BUTTON_LEFT);
@@ -773,6 +775,11 @@ int App::run() {
         } else if (sm.moving) {
             const double u = std::min(1.0, (seconds() - sm.start) / double(options_.measureStroke));
             const double a = u * 4.0 * 3.14159265358979;
+            // SF_MEASURE_RESIZE=1: the brush size changes every frame mid-stroke, as [ and ] would (the solver thread
+            // must see each batch's own size: ui_stroke_resize, with verify).
+            static const bool resize = std::getenv("SF_MEASURE_RESIZE") != nullptr;
+            if (resize) radiusPx_ = std::clamp(options_.measureStrokeRadius > 0.0f ? options_.measureStrokeRadius : 60.0f, 2.0f, 800.0f) *
+                                    (1.0f + 0.4f * float(std::sin(u * 40.0)));
             onMouseMove(sm.cx + sm.r * float(std::cos(a)), sm.cy + sm.r * float(std::sin(a)), 0.0f, 0.0f, false);
             ++sm.samples;
             if (u >= 1.0) {
@@ -787,6 +794,7 @@ int App::run() {
                 const double releaseDoneMs = (seconds() - sm.releaseAt) * 1000.0;
                 const double releaseMs = sm.releaseMs;
                 strokeProbe_ = nullptr;
+                strokeRadiusProbe_ = nullptr;
                 std::vector<float> off;
                 for (const glm::vec2& d : sm.dabs) off.push_back(std::abs(std::hypot(d.x - sm.cx, d.y - sm.cy) - sm.r));
                 std::sort(off.begin(), off.end());
@@ -823,10 +831,11 @@ int App::run() {
                 if (verify && !(now == sm.view))
                     std::printf("verify: skipped (the view changed during the stroke: distance %.3f -> %.3f, canvas %.0fx%.0f -> %.0fx%.0f)\n",
                                 double(sm.view.distance), double(now.distance), double(sm.view.w), double(sm.view.h), double(now.w), double(now.h));
-                else if (verify && !verifyStroke(sm.before, sm.dabs)) return 1;
+                else if (verify && !verifyStroke(sm.before, sm.dabs, sm.radii)) return 1;
                 // The test (ui_stroke_path, a light sphere): every dab placed, all of them on the circle.
                 const float spacing = std::max(1.0f, radiusPx_ * 0.15f);
                 const double expected = 4.0 * 3.14159265358979 * double(sm.r) / double(spacing);
+                if (std::getenv("SF_MEASURE_RESIZE")) return 0; // (the spacing changed with the size: verify checked it)
                 return double(sm.dabs.size()) >= 0.9 * expected && !off.empty() && off.back() < spacing ? 0 : 1;
             }
         }
@@ -1296,8 +1305,11 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     strokePath_.reset(x, y);
     dabQueue_.clear();
     dabSeconds_ = prepSeconds_ = 0.0; // measured again: the mesh and the brush may have changed
-    // Predictive strokes (AsyncStroke.cpp): the solver thread, the ghost's first estimate (the picked triangle).
+    // Predictive strokes (AsyncStroke.cpp): the solver thread, the ghost's first estimate (the picked triangle);
+    // the stroke's own copies of the recipe and the alpha, which the solver thread reads (DabSettings).
     asyncStroke_ = asyncStrokeAllowed();
+    strokeRecipe_ = asyncStroke_ && recipe ? std::make_shared<const BrushRecipe>(*recipe) : nullptr;
+    strokeAlpha_ = asyncStroke_ && !doc_.brushAlpha.empty() ? std::make_shared<const BrushAlpha>(doc_.brushAlpha) : nullptr;
     pointerLatest_ = glm::vec2(x, y);
     pointerLatestAt_ = double(SDL_GetTicksNS()) * 1e-9;
     penPredictor_.reset(pointerLatest_, pointerLatestAt_);
@@ -1459,14 +1471,19 @@ void App::drainStrokeDabs(double budgetSeconds) {
 }
 
 void App::dabAt(float x, float y, float pressure) {
-    // On the solver thread (predictive strokes) the dab sees the view as it was when its batch began.
+    // On the solver thread (predictive strokes) the dab sees the view and the brush settings as they were when its
+    // batch began (DabSettings), and nothing the main thread changes meanwhile.
+    const DabSettings live = dabView_ ? DabSettings() : dabSettings();
+    const DabSettings& st = dabView_ ? dabView_->settings : live;
     if (dabView_) {
         if (dabView_->probe) dabView_->probe->emplace_back(x, y);
+        if (dabView_->radiusProbe) dabView_->radiusProbe->push_back(st.radiusPx);
     } else if (strokeProbe_) {
         strokeProbe_->emplace_back(x, y);
+        if (strokeRadiusProbe_) strokeRadiusProbe_->push_back(st.radiusPx);
     }
     const Camera& cam = dabView_ ? dabView_->camera : camera_;
-    const BrushRecipe* recipe = strokeRecipe();
+    const BrushRecipe* recipe = st.recipe;
     if (recipe && recipe->jitter > 0.0f) {
         // Deterministic per-stroke scatter (xorshift).
         auto rnd = [this] {
@@ -1475,13 +1492,13 @@ void App::dabAt(float x, float y, float pressure) {
             jitterSeed_ ^= jitterSeed_ << 5;
             return float(jitterSeed_ & 0xffff) / 65535.0f * 2.0f - 1.0f;
         };
-        x += rnd() * recipe->jitter * radiusPx_;
-        y += rnd() * recipe->jitter * radiusPx_;
+        x += rnd() * recipe->jitter * st.radiusPx;
+        y += rnd() * recipe->jitter * st.radiusPx;
     }
     dabRadiusScale_ = dabStrengthScale_ = 1.0f;
     dabAngle_ = 0.0f;
-    if (strokeType_ == StrokeType::Spray) {
-        const SprayDab s = spray_.next(radiusPx_, sprayScatter_);
+    if (st.strokeType == StrokeType::Spray) {
+        const SprayDab s = spray_.next(st.radiusPx, st.sprayScatter);
         x += s.offset.x;
         y += s.offset.y;
         dabRadiusScale_ = s.scale;
@@ -1495,33 +1512,33 @@ void App::dabAt(float x, float y, float pressure) {
     DabParams p;
     p.center = hit.position;
     p.viewDir = cam.forward();
-    p.radius = radiusPx_ * (pressureSize_ ? std::max(pressure, 0.05f) : 1.0f) *
+    p.radius = st.radiusPx * (st.pressureSize ? std::max(pressure, 0.05f) : 1.0f) *
                cam.worldPerPixel(hit.position, dabView_ ? dabView_->canvas.h : canvasHeight()) * dabRadiusScale_;
     // Smooth keeps its own Z Intensity (ZBrush), whether picked or held with Shift.
-    p.strength = (strokeBrush_ == BrushType::Smooth ? smoothStrength_ : strength_) * dabStrengthScale_;
-    p.pressure = pressureStrength_ ? pressure : 1.0f;
-    p.invert = strokeInvert_;
-    p.frontFacesOnly = frontFacesOnly_;
-    p.focal = focalShift_;
+    p.strength = (st.brush == BrushType::Smooth ? st.smoothStrength : st.strength) * dabStrengthScale_;
+    p.pressure = st.pressureStrength ? pressure : 1.0f;
+    p.invert = st.invert;
+    p.frontFacesOnly = st.frontFacesOnly;
+    p.focal = st.focal;
     if (!dabView_) lastDabScreen_ = glm::vec2(x, y); // (the solver's: when its batch is committed)
-    if (strokeMask_) {
-        p.strength = maskStrength_;
-        doc_.sculptor.dabMask(doc_.mesh, doc_.bvh, p, symmetry_);
+    if (st.mask) {
+        p.strength = st.maskStrength;
+        doc_.sculptor.dabMask(doc_.mesh, doc_.bvh, p, st.symmetry);
         return;
     }
-    p.alpha = &doc_.brushAlpha;
+    p.alpha = st.alpha;
     p.alphaUp = cam.orientation() * glm::vec3(-std::sin(dabAngle_), std::cos(dabAngle_), 0.0f); // screenUpVector
-    p.vdm = doc_.brushVdm.get();
+    p.vdm = st.vdm;
     p.strokeDelta = haveLastDab_ ? hit.position - lastDabHit_ : glm::vec3(0.0f);
     lastDabHit_ = hit.position;
     haveLastDab_ = true;
-    if (strokePaint_) paintAt(p);
-    if (!strokeSculpt_) return;
+    if (st.paint) paintAt(p); // (never on the solver thread: painting strokes stay in the frame loop)
+    if (!st.sculpt) return;
     if (recipe) {
-        doc_.sculptor.dabRecipe(doc_.mesh, doc_.bvh, *recipe, p, symmetry_);
+        doc_.sculptor.dabRecipe(doc_.mesh, doc_.bvh, *recipe, p, st.symmetry);
         return;
     }
-    doc_.sculptor.dab(doc_.mesh, doc_.bvh, strokeBrush_, p, symmetry_);
+    doc_.sculptor.dab(doc_.mesh, doc_.bvh, st.brush, p, st.symmetry);
 }
 
 void App::endStroke() {
@@ -1741,6 +1758,7 @@ void App::syncScene() {
 }
 
 void App::setLayerWeight(int index, float weight) {
+    if (solverBusy()) solverWait(); // (the solver thread is moving this mesh: after its batch)
     doc_.mesh.setLayerWeight(index, weight);
     doc_.bvhDirty = true;
     doc_.modified = true;

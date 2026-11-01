@@ -30,6 +30,7 @@ struct App::StrokeSolver {
     std::vector<PathDab> batch;
     DabView view;
     std::vector<glm::vec2> probe; // --measure-stroke: where the batch's dabs went
+    std::vector<float> radiusProbe;
     double dabSeconds = 0.0;      // the batch's mean cost per dab
     double prepSeconds = 0.0;     // what packing its upload cost
     uint32_t uploadId = 0;        // the active SubTool's renderer slot

@@ -218,6 +218,7 @@ private:
     DabQueue dabQueue_;
     std::vector<PathDab> strokeScratch_;
     std::vector<glm::vec2>* strokeProbe_ = nullptr; // --measure-stroke: where each dab went (screen)
+    std::vector<float>* strokeRadiusProbe_ = nullptr; // ... and its brush radius (px)
     double dabSeconds_ = 0.0;         // what a dab of this stroke costs (running average), for the backlog limit
     bool interactiveStrokes_ = false; // App::run(): budgeted dabs and curved long gaps; other loops dab at once
     void drainStrokeDabs(double budgetSeconds); // places queued dabs; budget <= 0: all of them
@@ -230,10 +231,33 @@ private:
     // The dabs, their order and so the geometry are those of the synchronous path. Preferences > Performance >
     // Predictive strokes (SF_PREDICTIVE_STROKE=0 / 1 overrides it).
     struct StrokeSolver;
-    struct DabView { // what a dab on the solver thread sees of the view (the main thread's may move on)
+    // Everything a dab reads besides the mesh, the BVH and the sculptor (which the solver thread owns while it
+    // runs): taken on the main thread, by value, for each batch (dabSettings), so brush size, strength,
+    // symmetry, the brush, its alpha, recipe and VDM can change mid-stroke without the solver thread seeing a
+    // half-written value (they take effect from the next batch, as they did from the next dab before). The
+    // alpha and the recipe are the stroke's own copies (strokeAlpha_, strokeRecipe_), which nothing changes.
+    struct DabSettings {
+        float radiusPx = 60.0f, strength = 0.5f, smoothStrength = 0.5f, focal = 0.0f, maskStrength = 1.0f;
+        float sprayScatter = 1.0f;
+        bool pressureSize = false, pressureStrength = true, invert = false, frontFacesOnly = false;
+        bool mask = false, paint = false, sculpt = true, visible = true;
+        BrushType brush = BrushType::Standard;
+        StrokeType strokeType = StrokeType::Dots;
+        Symmetry symmetry;
+        const BrushRecipe* recipe = nullptr;
+        const BrushAlpha* alpha = nullptr;
+        const VectorDisplacement* vdm = nullptr;
+        std::shared_ptr<const VectorDisplacement> vdmOwner; // (keeps the VDM alive for the batch)
+    };
+    DabSettings dabSettings() const; // the live values (AsyncStroke.cpp)
+    std::shared_ptr<const BrushAlpha> strokeAlpha_;   // this stroke's alpha and recipe (predictive strokes)
+    std::shared_ptr<const BrushRecipe> strokeRecipe_;
+    struct DabView { // what a dab on the solver thread sees (the main thread's may move on)
         Camera camera;
         CanvasRect canvas;
+        DabSettings settings;
         std::vector<glm::vec2>* probe = nullptr; // --measure-stroke: where its dabs went
+        std::vector<float>* radiusProbe = nullptr; // ... and their brush radius in pixels (verify replays it)
     };
     std::unique_ptr<StrokeSolver> solver_;
     const DabView* dabView_ = nullptr; // set while the solver thread places dabs (dabAt reads it)
@@ -269,7 +293,7 @@ private:
     uint64_t popCommits_ = 0;
     glm::vec2 predictedPointer() const; // where the pen will be when this frame shows (the cursor, the head)
     static uint64_t meshStateHash(const Mesh& mesh); // --measure-stroke SF_MEASURE_VERIFY=1
-    bool verifyStroke(uint64_t before, const std::vector<glm::vec2>& dabs);
+    bool verifyStroke(uint64_t before, const std::vector<glm::vec2>& dabs, const std::vector<float>& radii);
     bool lastInputPen_ = false; // the last mouse event came from a pen (SDL_PEN_MOUSEID)
     bool penSeen_ = false;
     BrushType strokeBrush_ = BrushType::Standard;

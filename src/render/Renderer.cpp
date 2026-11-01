@@ -2535,10 +2535,8 @@ bool Renderer::prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out, c
     out.regrid = false;
     out.packMs = out.boundsMs = 0.0;
     const auto clock = std::chrono::steady_clock::now();
-    MeshSlot* found = nullptr;
-    for (MeshSlot& s : slots_)
-        if (s.id == id) found = &s;
-    if (!found) return false;
+    MeshSlot* found = static_cast<MeshSlot*>(out.slot); // (bindStrokeUpload: never the list from this thread)
+    if (!found || found->id != id) return false;
     MeshSlot& s = *found;
     const size_t nv = mesh.vertexCount();
     // What only the regular sync handles: a new layout, faces, attributes appearing, dynamic topology, textures.
@@ -2733,14 +2731,18 @@ void Renderer::commitStrokeUpload(StrokeUpload& up) {
 
 void Renderer::setDraftNormals(uint32_t id) { draftId_ = id; }
 
+void Renderer::bindStrokeUpload(uint32_t id, StrokeUpload& up) {
+    up.slot = nullptr;
+    for (MeshSlot& s : slots_)
+        if (s.id == id) up.slot = &s;
+}
+
 void Renderer::refineStrokeBoundsInto(uint32_t id, const Mesh& mesh, StrokeUpload& up) {
     up.exact = false;
     up.exactClusters.clear();
     up.exactBounds.clear();
-    MeshSlot* found = nullptr;
-    for (MeshSlot& s : slots_)
-        if (s.id == id) found = &s;
-    if (!found) return;
+    MeshSlot* found = static_cast<MeshSlot*>(up.slot);
+    if (!found || found->id != id) return;
     MeshSlot& s = *found;
     const size_t nc = s.order.clusters().size();
     if (s.fresh || mesh.topologyDirty || s.bounds.size() != nc) return;

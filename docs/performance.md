@@ -64,7 +64,7 @@ with only the measurement additions, "B" this branch with Predictive Strokes on 
 | 33.6M, 240 px | A | 292 / 636 / 636 ms | 226 px | 226 px | 779 ms | 826 ms | 1362 ms |
 | | B | **12.8 / 27.2 / 31.1 ms** | 337 px | 117 px* | **11 ms** | 0 ms | 1689 ms |
 
-\* One of the two runs had a preview lag of 230 px, the other 4 px; repeated runs with `SF_GHOST_DEBUG=1` gave
+\* One of the two runs had a preview lag of 230 px, the other 4 px; repeated runs with the head logged gave
 4 px and couldn't reproduce it (a tiling window manager resizing the window mid-stroke, which other agents'
 windows did during these runs, also moves the canvas under the scripted circle).
 
@@ -112,7 +112,7 @@ What changed, in order:
    plane) for the bent normal and the cavity term, with no extra varyings (a tiled GPU writes every vertex's
    outputs to memory). Each dab's surface point comes from a sphere fitted to the last two placed dabs (their
    normals turn by an angle over the distance between them): centre within 0.003-0.07 r, normal within 1-5
-   degrees (`SF_GHOST_DEBUG=1`). Only the clusters a ghost dab reaches use it. The brush cursor is drawn at the
+   degrees (measured with a debug log since removed). Only the clusters a ghost dab reaches use it. The brush cursor is drawn at the
    predicted pen position too.
 3. **Two-part upload** (Renderer::prepareStrokeUpload / commitStrokeUpload). The solver thread packs the dirty
    vertices and the culling bounds; the GL thread only calls glBufferSubData. The cavity term comes from the

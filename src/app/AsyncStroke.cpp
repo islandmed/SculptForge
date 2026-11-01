@@ -61,6 +61,7 @@ void App::StrokeSolver::loop() {
             pending_ = false;
         }
         probe.clear();
+        radiusProbe.clear();
         double spent = 0.0;
         const SculptTimings before = app.doc_.sculptor.timings;
         app.dabView_ = &view;
@@ -75,8 +76,6 @@ void App::StrokeSolver::loop() {
             spent += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
         }
         app.dabView_ = nullptr;
-        static const char* slow = std::getenv("SF_SOLVER_DELAY_MS"); // (a slower solver, for testing the preview)
-        if (slow && *slow) std::this_thread::sleep_for(std::chrono::milliseconds(std::atoi(slow)));
         dabSeconds = batch.empty() ? 0.0 : spent / double(batch.size());
         const auto prepStart = std::chrono::steady_clock::now();
         uploadReady = prepare && app.renderer_.prepareStrokeUpload(uploadId, app.doc_.mesh, upload, app.doc_.sculptor.strokeCurvature());
@@ -173,24 +172,11 @@ void App::commitSolverBatch() {
         syncScene(); // (the regular sync: a new grid, or a mesh the two-part upload doesn't handle)
     }
     if (strokeProbe_) strokeProbe_->insert(strokeProbe_->end(), s.probe.begin(), s.probe.end());
+    if (strokeRadiusProbe_) strokeRadiusProbe_->insert(strokeRadiusProbe_->end(), s.radiusProbe.begin(), s.radiusProbe.end());
     if (s.prepSeconds > 0.0) prepSeconds_ = prepSeconds_ > 0.0 ? prepSeconds_ * 0.7 + s.prepSeconds * 0.3 : s.prepSeconds;
     if (!s.batch.empty()) {
         lastDabScreen_ = glm::vec2(s.batch.back().x, s.batch.back().y);
         if (s.dabSeconds > 0.0) dabSeconds_ = dabSeconds_ > 0.0 ? dabSeconds_ * 0.8 + s.dabSeconds * 0.2 : s.dabSeconds;
-    }
-    static const bool debug = std::getenv("SF_GHOST_DEBUG") != nullptr;
-    if (debug && !s.batch.empty() && doc_.sculptor.lastFrame.valid) {
-        // The last dab's estimate (from the frame before it) against where the solver placed it.
-        const CanvasRect c = canvasRect();
-        glm::vec3 origin, dir, est, n;
-        camera_.screenRay(s.batch.back().x - c.x, s.batch.back().y - c.y, c.w, c.h, origin, dir);
-        if (!ghostSurface(origin, dir, est, n)) est = n = glm::vec3(0.0f);
-        const Sculptor::DabFrame& f = doc_.sculptor.lastFrame;
-        const float r = radiusPx_ * camera_.worldPerPixel(f.center, c.h);
-        SDL_Log("ghost: centre off by %.3f r, normal off %.1f deg, area depth est %.4f r real %.4f r", glm::distance(est, f.center) / r,
-                glm::degrees(std::acos(std::clamp(glm::dot(n, f.normal), -1.0f, 1.0f))),
-                glm::dot(ghostFrame_.center - ghostFrame_.areaCenter, ghostFrame_.normal) / r,
-                glm::dot(f.center - f.areaCenter, f.normal) / r);
     }
     if (doc_.sculptor.lastFrame.valid) {
         // The surface's curvature along the stroke (signed, 1 / radius; > 0 convex), from how the area normal
@@ -237,7 +223,11 @@ void App::pumpStroke() {
         s.view.camera = camera_;
         s.view.canvas = canvasRect();
         s.view.probe = nullptr;
+        s.view.radiusProbe = nullptr;
+        s.view.settings = dabSettings();
         s.uploadId = doc_.activeSubtoolInfo().id;
+        renderer_.bindStrokeUpload(s.uploadId, s.upload);
+    renderer_.bindStrokeUpload(s.uploadId, s.upload); // (the slot, found here: the thread doesn't walk the renderer's list)
         s.prepare = &displayedMesh() == &doc_.mesh;
         s.start();
         return;
@@ -259,7 +249,10 @@ void App::pumpStroke() {
     s.view.camera = camera_;
     s.view.canvas = canvasRect();
     s.view.probe = strokeProbe_ ? &s.probe : nullptr;
+    s.view.radiusProbe = strokeProbe_ ? &s.radiusProbe : nullptr;
+    s.view.settings = dabSettings();
     s.uploadId = doc_.activeSubtoolInfo().id;
+    renderer_.bindStrokeUpload(s.uploadId, s.upload); // (the slot, found here: the thread doesn't walk the renderer's list)
     s.prepare = &displayedMesh() == &doc_.mesh; // (a previewed LOD shows instead: nothing to pack)
     renderer_.setDraftNormals(doc_.sculptor.draftActive() ? s.uploadId : 0);
     s.start();
@@ -297,8 +290,35 @@ void App::finishStrokeNow() {
     }
 }
 
+App::DabSettings App::dabSettings() const {
+    DabSettings st;
+    st.radiusPx = radiusPx_;
+    st.strength = strength_;
+    st.smoothStrength = smoothStrength_;
+    st.focal = focalShift_;
+    st.maskStrength = maskStrength_;
+    st.sprayScatter = sprayScatter_;
+    st.pressureSize = pressureSize_;
+    st.pressureStrength = pressureStrength_;
+    st.invert = strokeInvert_;
+    st.frontFacesOnly = frontFacesOnly_;
+    st.mask = strokeMask_;
+    st.paint = strokePaint_;
+    st.sculpt = strokeSculpt_;
+    st.visible = doc_.activeSubtoolInfo().visible;
+    st.brush = strokeBrush_;
+    st.strokeType = strokeType_;
+    st.symmetry = symmetry_;
+    // A predictive stroke works from its own copies of the recipe and alpha (made when it began).
+    st.recipe = asyncStroke_ ? strokeRecipe_.get() : strokeRecipe();
+    st.alpha = asyncStroke_ ? strokeAlpha_.get() : &doc_.brushAlpha; // (null: round)
+    st.vdmOwner = doc_.brushVdm;
+    st.vdm = st.vdmOwner.get();
+    return st;
+}
+
 bool App::pickWith(const DabView& view, float x, float y, RayHit& hit) const {
-    if (!doc_.activeSubtoolInfo().visible) return false;
+    if (!view.settings.visible) return false;
     glm::vec3 origin, dir;
     view.camera.screenRay(x - view.canvas.x, y - view.canvas.y, view.canvas.w, view.canvas.h, origin, dir);
     return doc_.bvh.raycast(doc_.mesh, origin, dir, hit);
@@ -368,10 +388,6 @@ void App::buildGhost() {
         const bool moving = glm::length(penPredictor_.velocity()) > 20.0f; // px / s
         if (moving && gap > 0.2f * spacing)
             pending.push_back({head.x, head.y, lastStrokePressure_, std::min(1.0f, gap / spacing)});
-        static const bool debug = std::getenv("SF_GHOST_DEBUG") != nullptr;
-        if (debug && glm::distance(head, glm::vec2(mouseX_, mouseY_)) > 30.0f)
-            SDL_Log("ghost: head %.0f %.0f pointer %.0f %.0f latest %.0f %.0f from %.0f %.0f v %.0f", head.x, head.y, mouseX_, mouseY_,
-                    pointerLatest_.x, pointerLatest_.y, from.x, from.y, glm::length(penPredictor_.velocity()));
     }
     if (!pending.empty()) {
         ghostHead_ = glm::vec2(pending.back().x, pending.back().y);
@@ -431,7 +447,7 @@ uint64_t App::meshStateHash(const Mesh& mesh) {
     return h;
 }
 
-bool App::verifyStroke(uint64_t before, const std::vector<glm::vec2>& dabs) {
+bool App::verifyStroke(uint64_t before, const std::vector<glm::vec2>& dabs, const std::vector<float>& radii) {
     const uint64_t after = meshStateHash(doc_.mesh);
     runCommand("undo", {});
     const uint64_t undone = meshStateHash(doc_.mesh);
@@ -445,7 +461,12 @@ bool App::verifyStroke(uint64_t before, const std::vector<glm::vec2>& dabs) {
         haveLastDab_ = false;
         doc_.sculptor.draftStrokes = draftStrokes(); // (the measured stroke is one the solver thread takes)
         doc_.sculptor.beginStroke(doc_.mesh, brushName(strokeBrush_), doc_.activeLayer);
-        for (const glm::vec2& d : dabs) dabAt(d.x, d.y, 1.0f);
+        const float radius = radiusPx_;
+        for (size_t i = 0; i < dabs.size(); ++i) {
+            if (i < radii.size()) radiusPx_ = radii[i]; // (the size each dab had: it may change mid-stroke)
+            dabAt(dabs[i].x, dabs[i].y, 1.0f);
+        }
+        radiusPx_ = radius;
         doc_.sculptor.flushDraft(doc_.mesh, doc_.bvh);
         doc_.undo.push(doc_.sculptor.endStroke());
         return meshStateHash(doc_.mesh);

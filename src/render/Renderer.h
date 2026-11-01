@@ -118,6 +118,7 @@ public:
     // Only one prepare at a time, and no syncScene of that mesh until its commit.
     struct StrokeUpload {
         uint32_t id = 0;
+        void* slot = nullptr; // bindStrokeUpload
         bool ready = false;
         std::vector<PackedVertex> data;
         struct Range {
@@ -139,6 +140,9 @@ public:
     // `curvature` (optional, by vertex): the cavity term of every vertex the mesh marked dirty, already worked
     // out (Sculptor::strokeCurvature).
     bool prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out, const float* curvature = nullptr);
+    // GL thread, before handing `up` to another thread: finds SubTool id's slot (slots come and go on the GL
+    // thread, e.g. thumbnails; the other thread uses this one, which stays put in the list).
+    void bindStrokeUpload(uint32_t id, StrokeUpload& up);
     void commitStrokeUpload(StrokeUpload& up);
     // The stroke uploads gave the clusters they moved quick culling bounds (around their vertices' boxes, which
     // packing finds anyway, without the normal cone, so they are never culled as facing away); at the stroke's
