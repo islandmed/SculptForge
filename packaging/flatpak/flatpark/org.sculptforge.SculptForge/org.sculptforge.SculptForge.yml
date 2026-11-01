@@ -1,0 +1,60 @@
+id: org.sculptforge.SculptForge
+runtime: org.freedesktop.Platform
+runtime-version: '26.08'
+sdk: org.freedesktop.Sdk
+command: sculptforge
+separate-locales: false
+build-options:
+  no-debuginfo: true
+finish-args:
+  # SculptForge is an SDL3 + OpenGL app: the upstream tarball links only libcurl, libstdc++ and glibc from the
+  # runtime (SDL3 and Dear ImGui are static in the binary).
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  # No input devices: pen tablets work through Wayland/X11. A SpaceMouse (read as a joystick from /dev/input) is
+  # opt-in, with the flatpak override given in the metainfo.
+  # Update check, cloud and local (Ollama, ComfyUI) AI services, the phone link, Unreal Live Link.
+  - --share=network
+  # Models reference files beside them (.obj -> .mtl and textures, .gltf -> .bin, .usda -> layers), which a
+  # file-chooser grant does not cover; projects live anywhere in the home folder.
+  - --filesystem=home
+  # The Blender bridge folder, shared with SculptForge's Blender add-on outside the sandbox.
+  - --filesystem=xdg-data/SculptForge/SculptForge/blender:create
+modules:
+  - name: sculptforge
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 apply_extra.sh /app/bin/apply_extra
+      - install -Dm755 sculptforge-wrapper /app/bin/sculptforge
+      - install -Dm644 org.sculptforge.SculptForge.desktop /app/share/applications/org.sculptforge.SculptForge.desktop
+      - install -Dm644 org.sculptforge.SculptForge.metainfo.xml /app/share/metainfo/org.sculptforge.SculptForge.metainfo.xml
+      - install -Dm644 org.sculptforge.SculptForge.png /app/share/icons/hicolor/512x512/apps/org.sculptforge.SculptForge.png
+    sources:
+      # BEGIN MANAGED EXTRA-DATA
+      - type: extra-data
+        filename: sculptforge.tar.gz
+        only-arches:
+          - x86_64
+        url: https://github.com/islandmed/SculptForge/releases/download/v0.9.5/SculptForge-0.9.5-linux-x86_64.tar.gz
+        sha256: 3d94bd3c60c34c5c88ff8f852286a843c5cbaad114dc0bd75d2fa5f522cb44d0
+        size: 17766977
+      - type: extra-data
+        filename: sculptforge.tar.gz
+        only-arches:
+          - aarch64
+        url: https://github.com/islandmed/SculptForge/releases/download/v0.9.5/SculptForge-0.9.5-linux-arm64.tar.gz
+        sha256: 80b4e8e02720ce0b16d6c18875cc908cb3e1e2ea1b9118af9cc6a0f44928ec59
+        size: 17196324
+      # END MANAGED EXTRA-DATA
+      - type: file
+        path: apply_extra.sh
+      - type: file
+        path: sculptforge-wrapper
+      - type: file
+        path: org.sculptforge.SculptForge.desktop
+      - type: file
+        path: org.sculptforge.SculptForge.metainfo.xml
+      - type: file
+        path: org.sculptforge.SculptForge.png

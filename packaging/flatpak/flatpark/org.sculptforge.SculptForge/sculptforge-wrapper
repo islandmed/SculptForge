@@ -1,0 +1,4 @@
+#!/bin/sh
+# SculptForge's own binary from the upstream tarball, staged by apply_extra. It finds its data (share/sculptforge)
+# relative to itself; libcurl comes from org.freedesktop.Platform.
+exec /app/extra/sculptforge/bin/sculptforge "$@"

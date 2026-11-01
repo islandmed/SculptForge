@@ -459,6 +459,9 @@ def find_sculptforge(root, override=""):
         for folder in ("~/Applications", "~/.local/bin", "~/Downloads", "/opt"):
             candidates += sorted(glob.glob(os.path.join(os.path.expanduser(folder), "SculptForge*.AppImage")), reverse=True)
         candidates += ["/usr/bin/sculptforge", "/usr/local/bin/sculptforge", "/opt/sculptforge/bin/sculptforge"]
+        # The Flatpak's launchers, per-user and system-wide.
+        candidates += [os.path.expanduser("~/.local/share/flatpak/exports/bin/org.sculptforge.SculptForge"),
+                       "/var/lib/flatpak/exports/bin/org.sculptforge.SculptForge"]
     for c in candidates:
         if c and os.path.exists(c):
             return c

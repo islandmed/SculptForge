@@ -19,6 +19,13 @@ All notable changes to SculptForge are listed here. The format follows
   `sculptforge-previous.log` and notes when that session didn't close normally; the restore dialog after a
   crash points to it. **Help > Open log folder** opens the folder; `--log-dir` writes the log elsewhere, and
   `--crash-test segv|abort|throw` crashes on purpose to test the note (ctest `crash_log`).
+- A Flatpak (#18): `SculptForge-<version>-x86_64.flatpak` and `-aarch64.flatpak` on every release (with
+  version-less copies, `SculptForge-linux-x86_64.flatpak` and `SculptForge-linux-arm64.flatpak`), built from
+  source on the freedesktop 26.08 runtime by `packaging/flatpak/org.sculptforge.SculptForge.yml`
+  (`packaging/flatpak/build.sh` builds it locally). Sandbox: Wayland or X11, OpenGL, devices (for the SpaceMouse),
+  network and the home folder. In a Flatpak the Blender bridge uses the host's folder and tells the add-on to start
+  the app through Flatpak's launcher; the add-on also looks for that launcher. A package for the FlatPark
+  repository, wrapping the release tarballs, is ready in `packaging/flatpak/flatpark/`.
 
 ### Fixed
 - Strokes on dense meshes keep their shape (#19). When one dab cost more than a frame, the app placed every dab

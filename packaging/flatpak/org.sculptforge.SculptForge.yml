@@ -1,0 +1,99 @@
+# SculptForge as a Flatpak, built from this source tree (issue #18).
+#
+#   flatpak-builder --user --install-deps-from=flathub --force-clean --default-branch=stable --repo=repo build-flatpak \
+#       packaging/flatpak/org.sculptforge.SculptForge.yml
+#   flatpak build-bundle --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo repo SculptForge.flatpak \
+#       org.sculptforge.SculptForge stable
+# (packaging/flatpak/build.sh does both.)
+#
+# The release workflow (.github/workflows/release.yml, job "flatpak") builds the same way and attaches
+# SculptForge-<version>-<arch>.flatpak to the GitHub release. docs/guide/installing.md has the user side.
+#
+# Every dependency is pinned by URL and checksum below and handed to CMake's FetchContent as a local folder, so the
+# build runs without network access. Keep the URLs in step with cmake/Dependencies.cmake and cmake/WebRTC.cmake.
+id: org.sculptforge.SculptForge
+runtime: org.freedesktop.Platform
+runtime-version: '26.08'
+sdk: org.freedesktop.Sdk
+command: sculptforge
+finish-args:
+  # Display: Wayland first, X11 when there is no Wayland. OpenGL through the GPU.
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  # SpaceMouse: SDL reads it as a joystick from /dev/input; pen tablets work through Wayland or X11 without this.
+  # "all" rather than "input": Flatpak before 1.15.6 (Ubuntu 24.04, Debian 12) refuses to install an app that asks for
+  # "input". "all" includes "dri".
+  - --device=all
+  # Network: the update check, AI services (cloud ones and a local Ollama or ComfyUI), the phone link, Unreal Live Link.
+  - --share=network
+  # Projects and models: the whole home folder, not only the files picked in a dialog. An .obj names its .mtl and
+  # textures, a .gltf its .bin, a .usda its layers: all beside the file opened, which a file-dialog grant doesn't cover.
+  # The Blender bridge folder (~/.local/share/SculptForge/SculptForge/blender) is shared with the Blender add-on.
+  - --filesystem=home
+  - --filesystem=xdg-data/SculptForge/SculptForge/blender:create
+modules:
+  - name: sculptforge
+    buildsystem: cmake-ninja
+    builddir: true
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DSCULPTFORGE_USE_SYSTEM_SDL=OFF # SDL 3.2.30, the version every other package ships (pen and tablet fixes)
+      - -DSCULPTFORGE_BUILD_TESTS=OFF # the tests run in CI and in the release jobs, outside the sandbox
+      - -DSCULPTFORGE_BUILD_PYTHON=OFF
+      - -DFETCHCONTENT_FULLY_DISCONNECTED=ON
+      - -DFETCHCONTENT_SOURCE_DIR_GLM=/run/build/sculptforge/_deps-src/glm
+      - -DFETCHCONTENT_SOURCE_DIR_SDL3=/run/build/sculptforge/_deps-src/SDL3
+      - -DFETCHCONTENT_SOURCE_DIR_IMGUI=/run/build/sculptforge/_deps-src/imgui
+      - -DFETCHCONTENT_SOURCE_DIR_MBEDTLS=/run/build/sculptforge/_deps-src/mbedtls
+      - -DFETCHCONTENT_SOURCE_DIR_LIBDATACHANNEL=/run/build/sculptforge/_deps-src/libdatachannel
+      - -DFETCHCONTENT_SOURCE_DIR_LDC_USRSCTP=/run/build/sculptforge/_deps-src/usrsctp
+      - -DFETCHCONTENT_SOURCE_DIR_LDC_LIBJUICE=/run/build/sculptforge/_deps-src/libjuice
+      - -DFETCHCONTENT_SOURCE_DIR_LDC_PLOG=/run/build/sculptforge/_deps-src/plog
+    sources:
+      - type: dir
+        path: ../..
+        skip:
+          - .git
+          - build
+          - install
+          - out
+          - website/media # the build needs only website/link (the phone page, embedded in the app)
+          - website/guide
+          - website/gallery
+          - .flatpak-builder
+          - build-flatpak
+          - repo
+      - type: archive
+        url: https://github.com/g-truc/glm/archive/refs/tags/1.0.1.tar.gz
+        sha256: 9f3174561fd26904b23f0db5e560971cbf9b3cbda0b280f04d5c379d03bf234c
+        dest: _deps-src/glm
+      - type: archive
+        url: https://github.com/libsdl-org/SDL/releases/download/release-3.2.30/SDL3-3.2.30.tar.gz
+        sha256: 4c3b09330d866dc52eb65b66259a6684ad387252ca8c57901b3a2b534eb42e3d
+        dest: _deps-src/SDL3
+      - type: archive
+        url: https://github.com/ocornut/imgui/archive/refs/tags/v1.91.9.tar.gz
+        sha256: 3872a5f90df78fced023c1945f4466b654fd74573370b77b17742149763a7a7c
+        dest: _deps-src/imgui
+      - type: archive
+        url: https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.7/mbedtls-3.6.7.tar.bz2
+        sha256: a7e8bcbec0e6f761b4af24f25677626b35f762f68eef79c08677a363212d11f6
+        dest: _deps-src/mbedtls
+      - type: archive
+        url: https://github.com/paullouisageneau/libdatachannel/archive/refs/tags/v0.24.6.tar.gz
+        sha256: 22a66aebebd8dae561d8e5181da96f2fcc203e067c5b2186c07b39af913464c0
+        dest: _deps-src/libdatachannel
+      - type: archive
+        url: https://github.com/paullouisageneau/usrsctp/archive/fec583d54493f879d2ae44a743423bf8a04371ab.tar.gz
+        sha256: e5c114afe73c9a0ec419fab5f5b3f63f3ce57b09b90d06ea85e63dca8aed3e7c
+        dest: _deps-src/usrsctp
+      - type: archive
+        url: https://github.com/paullouisageneau/libjuice/archive/b89c792e3612faf2f12cf35bcc56857313a06be3.tar.gz
+        sha256: 713b22174e8cb2e06538fa9bac2650bda21b83c86f5128813ab4dcf8f5bea9ed
+        dest: _deps-src/libjuice
+      - type: archive
+        url: https://github.com/SergiusTheBest/plog/archive/94899e0b926ac1b0f4750bfbd495167b4a6ae9ef.tar.gz
+        sha256: 92a08bce559b5f28aa88d3fd9071567414b9f43a83fe2a05a6dd14f1da536072
+        dest: _deps-src/plog

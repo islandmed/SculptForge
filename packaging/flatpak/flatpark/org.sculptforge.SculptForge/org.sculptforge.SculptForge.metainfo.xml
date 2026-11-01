@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.sculptforge.SculptForge</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>SculptForge</name>
+  <summary>Digital sculpting for artists and game pipelines</summary>
+  <developer id="org.sculptforge">
+    <name>The SculptForge contributors</name>
+  </developer>
+  <description>
+    <p>SculptForge is a free and open-source alternative to ZBrush: a digital sculpting application with familiar brushes,
+    symmetry, sculpt layers, voxel remeshing and one-click LOD chains.</p>
+    <p>It exports game-ready FBX, glTF and OpenUSD files, can send assets straight into the Unreal Editor,
+    works with Gaussian splats, and includes free AI tools (or bring your own): describe a brush in words,
+    or turn an image or a description into a sculptable 3D model.</p>
+    <p>This FlatPark package installs SculptForge's official Linux build, unmodified, from the project's GitHub
+    releases. It is maintained with the SculptForge developers.</p>
+    <p>The sandbox can read and write your home folder (models name their textures and other files beside them).
+    To use a SpaceMouse, allow input devices once with
+    flatpak override --user --device=input org.sculptforge.SculptForge
+    (on Flatpak older than 1.15.6, --device=all instead).</p>
+  </description>
+  <launchable type="desktop-id">org.sculptforge.SculptForge.desktop</launchable>
+  <url type="homepage">https://sculptforge.app/</url>
+  <url type="bugtracker">https://github.com/islandmed/SculptForge/issues</url>
+  <url type="vcs-browser">https://github.com/islandmed/SculptForge</url>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://sculptforge.app/media/screenshot-sculpt.jpg</image>
+      <caption>Sculpting a creature with symmetry</caption>
+    </screenshot>
+  </screenshots>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.9.5" date="2026-10-31">
+      <url>https://github.com/islandmed/SculptForge/releases/tag/v0.9.5</url>
+    </release>
+  </releases>
+  <provides>
+    <binary>sculptforge</binary>
+    <binary>sculptforge-cli</binary>
+  </provides>
+</component>

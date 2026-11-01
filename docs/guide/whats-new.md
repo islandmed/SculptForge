@@ -26,6 +26,14 @@ Mirror** flips a SubTool. See [Mirror And Weld](geometry.md#mirror-and-weld).
 flat colour you pick. Store Config keeps it, and projects keep their own. See
 [The background](interface.md#the-background).
 
+### Flatpak
+
+SculptForge comes as a Flatpak for x86_64 and ARM64 Linux: one file on the releases page that runs in Flatpak's
+sandbox on any distribution, installed with `flatpak install --user ./SculptForge-linux-x86_64.flatpak`. It can
+open projects and models anywhere in your home folder, works with pen tablets and a
+SpaceMouse, and the Blender bridge finds it by itself. See
+[Installing SculptForge](installing.md#flatpak).
+
 ### Fixes
 
 - Fast strokes on very dense meshes keep their curve. When one dab cost more than a frame, a quick arc came out

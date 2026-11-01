@@ -44,7 +44,13 @@ struct BridgeManifest {
 // The exchange folder: $SCULPTFORGE_BLENDER_EXCHANGE, else <app data>/blender
 // (~/.local/share/SculptForge/SculptForge/blender, %APPDATA%\SculptForge\SculptForge\blender,
 // ~/Library/Application Support/SculptForge/SculptForge/blender). The add-on computes the same path.
+// Inside a Flatpak the app's own data folder is private (~/.var/app/<id>/data), so the folder is the host's:
+// $HOST_XDG_DATA_HOME, else ~/.local/share.
 std::string blenderExchangeRoot();
+// Inside a Flatpak: the launcher Flatpak exports for the app (<installation>/exports/bin/<id>), which the add-on
+// can start from outside the sandbox. `flatpakInfo` is the text of /.flatpak-info; empty when it names no
+// installation.
+std::string flatpakHostLauncher(const std::string& flatpakInfo);
 std::string blenderInbox(const std::string& root);  // <root>/to_sculptforge
 std::string blenderOutbox(const std::string& root); // <root>/to_blender
 std::string bridgeManifestPath(const std::string& folder); // <folder>/manifest.json
