@@ -54,7 +54,7 @@ public:
     size_t capacity() const; // (in elements, like std::vector: residentBytes() / 2 when mapped)
     size_t residentBytes() const;
     // Out of core: when more than `maxBytes` are resident, writes the dirty tiles back and lets the system drop
-    // them (they page in again when touched). TierConfig::residentPatchCacheMB. Returns the bytes resident after.
+    // them (they page in again when touched). TierConfig::residentCacheCapMB. Returns the bytes resident after.
     size_t trim(size_t maxBytes);
     // True when every page holding elements [first, first + count) is in memory (always, in memory).
     bool rangeResident(size_t first, size_t count) const;

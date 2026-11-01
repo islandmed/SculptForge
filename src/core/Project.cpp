@@ -1138,7 +1138,7 @@ bool loadProjectThumbnail(const std::string& path, Image& out, std::string& erro
 CommandResult openProjectCommand(Document& doc, const std::string& path) {
     std::string err;
     if (!loadProject(path, doc, err)) return {false, err};
-    std::string msg = "Opened project " + path + " (";
+    std::string msg = "Opened project " + std::filesystem::path(path).filename().string() + " (";
     if (doc.subtoolCount() > 1) msg += std::to_string(doc.subtoolCount()) + " SubTools, ";
     size_t tris = 0, layers = 0;
     for (int i = 0; i < doc.subtoolCount(); ++i) {

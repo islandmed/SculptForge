@@ -125,7 +125,7 @@ struct MicroPatch {
 MicroPatch microPatch(Mesh& m, uint32_t id);
 // PatchPageTable: which patches are resident. In memory every patch is; out of core (MicroStore::mapped) a patch
 // is resident when its pages are, cold ones live in the sparse file (untouched = a hole) and come back on touch;
-// the operating system's page cache keeps the LRU order and trim() enforces TierConfig::residentPatchCacheMB.
+// the operating system's page cache keeps the LRU order and trim() enforces TierConfig::residentCacheCapMB.
 class PatchPageTable {
 public:
     explicit PatchPageTable(MicroMesh& mm) : mm_(mm) {}

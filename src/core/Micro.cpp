@@ -295,7 +295,7 @@ float triangleBulge(const MicroTriangle& T) {
 
 bool microWantsOutOfCore(size_t points) {
     if (const char* e = std::getenv("SF_MICRO_OUT_OF_CORE"); e && *e) return std::string(e) == "1";
-    if (const size_t limit = tierConfig().outOfCorePoints) return points > limit;
+    if (const size_t limit = currentTierConfig().outOfCorePoints) return points > limit;
     size_t memory = 0;
 #if defined(_SC_PHYS_PAGES)
     const long pages = sysconf(_SC_PHYS_PAGES), page = sysconf(_SC_PAGESIZE);

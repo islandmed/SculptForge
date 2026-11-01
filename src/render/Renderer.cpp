@@ -2322,7 +2322,7 @@ void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const Render
     gl::Uniform1i(p->twoSided, 1);
     // Moving (Fast Navigation): a coarser target and half the budget, so orbiting stays smooth.
     const bool moving = settings.motionProxy;
-    const size_t full = settings.renderTriangleBudget ? settings.renderTriangleBudget : tierConfig().activeTriangleBudget;
+    const size_t full = settings.renderTriangleBudget ? settings.renderTriangleBudget : size_t(currentTierConfig().activeTriangleBudget);
     const size_t budget = moving ? full / 2 : full;
     const float target = settings.microTargetPx * (moving ? 2.0f : 1.0f);
     // (the budget is shared by the micro SubTools on screen: each gets it whole; one is the usual case)

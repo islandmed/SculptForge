@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/App.h"
+#include "app/Calibration.h"
 #include "app/CrashLog.h"
 
 #include "ai/AiCommands.h"
@@ -88,6 +89,7 @@ bool App::init(const AppOptions& options) {
     // UI tests run in a hidden window that never has focus; SDL drops joystick input without focus otherwise, and
     // the scripted SpaceMouse is a virtual joystick (UiTest.cpp).
     if (!options.uiTest.empty()) SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+    if (!headless && options.demo.empty()) applyCachedThreadCount(); // the hardware profile's threads, before any brush work
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return false;
@@ -275,6 +277,7 @@ bool App::init(const AppOptions& options) {
         std::snprintf(generatorCommand_, sizeof generatorCommand_, "%s",
                       ai::defaultGeneratorCommand(std::string(base) + cliName).c_str());
     }
+    initHardwareProfile(); // the cached hardware profile, or calibration over the first frames (PanelPerformanceProfile.cpp)
     return true;
 }
 
@@ -283,6 +286,7 @@ void App::shutdown() {
     if (blenderInitialised_) writeBridgeHeartbeat(blenderExchangeRoot(), true); // the add-on starts a new one
 
     spaceMouseClose();
+    shutdownHardwareProfile(); // its timer queries need the GL context
     if (refTexture_) gl::DeleteTextures(1, &refTexture_);
     gallery_.reset(); // its preview textures need the GL context
     thumbs_.clear();
@@ -366,6 +370,7 @@ int App::runUiTest(int w, int h, int fps) {
         updateCameraAspect();
         updateSpaceMouse(dt);
 
+        hardwareProfileFrameBegin(); // (only with SF_HW_PROFILE_IN_TESTS=1: tests use fixed settings)
         Demo::beginFrame();
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
@@ -377,6 +382,7 @@ int App::runUiTest(int w, int h, int fps) {
         ImGui::NewFrame();
         ImGui::LogToBuffer(0); // capture every drawn string (0: don't auto-open tree nodes)
         drawUi();
+        drawHardwareProfileOverlay();
         if (ImGuiContext* g = ImGui::GetCurrentContext()) demo_->setFrameText(g->LogBuffer.c_str());
         ImGui::LogFinish();
         ImGui::Render();
@@ -385,6 +391,7 @@ int App::runUiTest(int w, int h, int fps) {
         syncScene();
         notePerformanceFrame(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - syncStart).count());
         viewSamples(); // keeps Fast Navigation's view of the camera current (UI tests read view_samples)
+        hardwareProfileFrameEnd();
         ++frames;
         const std::string shot = demo_->takeShotRequest();
         if (shot.empty()) continue;
@@ -795,11 +802,13 @@ int App::run() {
         // spaceMouseMoving() is true and a loop that waits for events when idle must keep drawing.
         updateSpaceMouse(dt);
 
+        hardwareProfileFrameBegin(); // the frame governor's CPU and GPU timing
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         keepImGuiOnPen();
         ImGui::NewFrame();
         drawUi();
+        drawHardwareProfileOverlay();
         ImGui::Render();
 
         const auto syncStart = std::chrono::steady_clock::now();
@@ -810,6 +819,7 @@ int App::run() {
         perf_.samplesUsed = renderer_.drawView(camera_, fbW, fbH, renderSettings_, canvasViewport(fbW, fbH), samples);
         renderSettings_.motionProxy = false; // (other renders, e.g. project thumbnails, draw in full)
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        hardwareProfileFrameEnd();
         SDL_GL_SwapWindow(window_);
         ++framesDrawn;
         if (sm.started && !sm.moving) { // the press is on screen: start moving round the circle

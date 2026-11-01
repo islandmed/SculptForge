@@ -32,6 +32,9 @@ add_library(sculptforge_core STATIC
   src/core/ThreadPool.cpp
   src/core/UploadOrder.cpp
   src/core/Benchmark.cpp
+  src/core/HardwareProfile.cpp
+  src/core/FrameGovernor.cpp
+  src/core/TierConfig.cpp
   src/core/Sculpt.cpp
   src/core/Dyntopo.cpp
   src/core/DyntopoCommands.cpp
@@ -72,7 +75,6 @@ add_library(sculptforge_core STATIC
   src/core/MicroSculpt.cpp
   src/core/MicroCommands.cpp
   src/core/MicroStore.cpp
-  src/core/TierConfig.cpp
   src/core/MultiresCommands.cpp
   src/core/AutoUv.cpp
   src/core/TextureTransfer.cpp
@@ -210,6 +212,8 @@ if(SCULPTFORGE_BUILD_APP)
     ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedGuide.cpp
     src/app/main.cpp
     src/app/Bench.cpp
+    src/app/Calibration.cpp
+    src/app/PanelPerformanceProfile.cpp
     src/app/CrashLog.cpp
     src/app/App.cpp
     src/app/Demo.cpp
@@ -530,6 +534,10 @@ if(SCULPTFORGE_BUILD_TESTS)
           "SCULPTFORGE_BRUSH=$<TARGET_FILE:sf_fake_splat_tools>;SCULPTFORGE_COLMAP=$<TARGET_FILE:sf_fake_splat_tools>;SCULPTFORGE_FFMPEG=$<TARGET_FILE:sf_fake_splat_tools>")
       endif()
     endforeach()
+    # The hardware profile panel with a real calibration (tests/ui/hardware_profile.sfui).
+    if(TEST ui_hardware_profile)
+      set_tests_properties(ui_hardware_profile PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1")
+    endif()
     # The shell layout again on a 1920x1080 window (docs/ui-design.md §2.3).
     add_test(NAME ui_shell_layout_1080 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/shell_layout.sfui
              --size 1920x1080 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/shell_layout_1080)
@@ -550,6 +558,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Idle, the app draws nothing (#14): --measure-idle fails when it keeps drawing frames.
     add_test(NAME ui_idle_redraw COMMAND sculptforge --measure-idle 4)
     set_tests_properties(ui_idle_redraw PROPERTIES LABELS ui TIMEOUT 60 ENVIRONMENT "SF_NO_UPDATE_CHECK=1")
+    # sculptforge --calibrate on this machine's GPU: the JSON it prints passes the schema check (it exits 1 if not).
+    add_test(NAME ui_calibrate_json COMMAND sculptforge --calibrate-quick --calibrate-no-save)
+    set_tests_properties(ui_calibrate_json PROPERTIES LABELS ui TIMEOUT 60)
     # A fast stroke in the interactive loop (dabs queued, placed a few milliseconds a frame): every dab lands on the
     # pointer's circle (#19).
     add_test(NAME ui_stroke_path COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)

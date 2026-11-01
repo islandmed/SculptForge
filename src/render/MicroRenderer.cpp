@@ -538,8 +538,8 @@ bool MicroRenderer::sync(Mesh& mesh) {
             }
             // TierConfig: continuous normals shade up to the budget every sync; draft ones a quarter of it while a
             // stroke runs (the rest follows when it ends).
-            const TierConfig& tier = tierConfig();
-            shadeBudget = tier.shadeBudgetPoints / (mm.stroking && !tier.continuousNormals ? 4 : 1);
+            const TierConfig tier = currentTierConfig();
+            shadeBudget = size_t(tier.shadeBudgetPoints) / (mm.stroking && tier.draftBrushMode ? 4 : 1);
             if (pendingCount_) shadePending(mesh, false);
         }
     }

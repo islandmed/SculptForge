@@ -24,6 +24,26 @@ All notable changes to SculptForge are listed here. The format follows
   - Very large levels stay out of core in a sparse memory-mapped file (only what you touch is in memory).
   - Projects: format 7 when a SubTool has a micro level (others stay format 6 for older versions).
   - `sculptforge --bench-micro --bench-sizes 33,100,300` measures it. Guide chapter "Micro levels".
+- Automatic hardware detection and calibration. On first launch, and again when the graphics card, its driver or
+  the version changes, SculptForge spends about a second or two (under a small overlay; Esc skips) measuring
+  triangle throughput, upload bandwidth, brush speed and memory bandwidth, and probes the GPU (OpenGL strings,
+  video memory through GL_NVX_gpu_memory_info, GL_ATI_meminfo, GLX_MESA_query_renderer, amdgpu sysfs, DXGI or
+  CGL), RAM, threads, SIMD and OS. The result picks a profile: **Laptop / Budget**, **Workstation** (64 GB+ RAM
+  with a 16 GB+ discrete GPU, or Apple Silicon Max / Ultra and big APUs, that measure fast) or a **Software** safe
+  mode for llvmpipe, with a render triangle budget, motion proxy
+  threshold, GPU memory and upload budgets, texture, subdivision and micro-triangle limits and the thread count.
+  Cached in the settings folder; no network use. A one-line status bar message says what was found.
+- Preferences > Performance shows what was detected and measured ("Detected <GPU>, <memory> -> Workstation"),
+  the settings in effect, **Re-calibrate** and manual overrides (kept across re-calibrations).
+- An adaptive frame governor holds the view at 60 fps (120 / 144 on a fast display) while it moves, by switching
+  big scenes to their motion proxy sooner or later, with hysteresis; it changes only what is drawn, never the
+  model. Fast Navigation's 10 million triangle threshold now comes from the profile.
+- On battery (laptops), brushes switch to draft mode, uploads per frame halve and the target is 60 Hz.
+- `sculptforge --calibrate` prints the profile as JSON (schema sculptforge.calibration/1); commands
+  `performance_profile`, `calibrate` and `set_performance_override` for the console, scripts and MCP.
+- For developers: `core/TierConfig.h` (resident cache cap, active-triangle budget, upload budget, draft brush
+  mode, zero-copy UMA, target Hz) and `renderTriangleBudget()` for the renderer and micro-displacement
+  (docs/performance.md, "Hardware profile").
 
 ## [0.9.7] - 2026-10-31
 

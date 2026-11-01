@@ -649,7 +649,7 @@ std::unique_ptr<MicroUndo> MicroStroke::end(Mesh& m) {
     active_ = false;
     if (m.micro) {
         m.micro->stroking = false;
-        if (const size_t cap = tierConfig().residentPatchCacheMB) m.micro->disp.trim(cap << 20);
+        if (const uint64_t cap = currentTierConfig().residentCacheCapMB) m.micro->disp.trim(size_t(cap) << 20);
     }
     grabMirrors_.clear();
     grabTris_.clear();

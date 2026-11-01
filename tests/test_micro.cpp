@@ -543,13 +543,16 @@ TEST(micro_undo_journal_is_small) {
 }
 
 TEST(micro_tier_config_and_page_table) {
-    const TierConfig saved = tierConfig();
-    setTierConfig(TierConfig::laptop());
-    CHECK(tierConfig().activeTriangleBudget < TierConfig::workstation().activeTriangleBudget);
-    CHECK(!tierConfig().continuousNormals);
-    // Laptop: big levels go out of core sooner.
-    CHECK(microWantsOutOfCore(size_t(300) << 20) || std::getenv("SF_MICRO_OUT_OF_CORE"));
-    setTierConfig(saved);
+    // The tier (feat/hw-profile) decides when a level goes out of core: past its resident cache.
+    const TierConfig saved = currentTierConfig();
+    TierConfig small = saved;
+    small.outOfCorePoints = size_t(1) << 20;
+    setCurrentTierConfig(small);
+    if (!std::getenv("SF_MICRO_OUT_OF_CORE")) {
+        CHECK(microWantsOutOfCore(size_t(2) << 20));
+        CHECK(!microWantsOutOfCore(size_t(1) << 19));
+    }
+    setCurrentTierConfig(saved);
     Document doc = microDoc(2, 3000);
     PatchPageTable pages(*doc.mesh.micro);
     CHECK(pages.residentPatches() == doc.mesh.micro->baseTriangles); // in memory: every patch

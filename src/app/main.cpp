@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/App.h"
 #include "app/Bench.h"
+#include "app/Calibration.h"
 #include "app/CrashLog.h"
 
 #include <SDL3/SDL_main.h>
@@ -54,6 +55,8 @@ void usage() {
         "  --bench-micro            Benchmark micro-displacement levels (sizes = micro triangles, e.g. 33,100,300)\n"
         "  --bench-micro-level N    Micro level for --bench-micro (default 4: 256 per base triangle)\n"
         "  --bench-out FILE         Write the benchmark report (Markdown) to FILE\n"
+        "  --calibrate              Measure this computer (GPU, CPU, memory; about 2-3 s), print the hardware\n"
+        "                           profile as JSON and save it (add --calibrate-quick, --calibrate-no-save)\n"
         "  --log-dir DIR            Write sculptforge.log to DIR instead of the user data folder\n"
         "  --crash-test KIND        Crash on purpose (segv, abort or throw) to test the crash note in the log");
 }
@@ -103,11 +106,15 @@ int main(int argc, char** argv) {
     std::string logDir, crashTest;
     bool sizeGiven = false;
     sf::BenchCommandLine bench;
+    bool calibrate = false, calibrateQuick = false, calibrateSave = true;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
         auto next = [&]() -> std::string { return i + 1 < argc ? argv[++i] : std::string(); };
         if (sf::parseBenchArg(argc, argv, i, bench)) continue;
-        if (a == "--run") options.script += next() + "\n";
+        if (a == "--calibrate") calibrate = true;
+        else if (a == "--calibrate-quick") calibrate = calibrateQuick = true;
+        else if (a == "--calibrate-no-save") calibrateSave = false;
+        else if (a == "--run") options.script += next() + "\n";
         else if (a == "--render") options.renderPath = next();
         else if (a == "--turntable") options.turntable = std::atoi(next().c_str());
         else if (a == "--size") sizeGiven = std::sscanf(next().c_str(), "%dx%d", &options.width, &options.height) == 2;
@@ -146,6 +153,7 @@ int main(int argc, char** argv) {
         }
     }
     if (bench.run) return sf::runAppBenchmark(bench);
+    if (calibrate) return sf::runCalibrateCommandLine(calibrateQuick, calibrateSave);
     if (!options.uiTest.empty()) {
         if (!sizeGiven) options.width = 1600, options.height = 960;
         isolateSettings();
