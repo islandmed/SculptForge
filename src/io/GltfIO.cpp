@@ -115,7 +115,7 @@ bool saveGlb(const std::string& path, const std::vector<MeshObjectRef>& objects,
     };
     std::vector<View> views;
     std::ostringstream accessors, meshes, nodes, images, materials;
-    int accessorCount = 0, textureCount = 0;
+    int accessorCount = 0, textureCount = 0, materialCount = 0; // images and textures share an index
 
     auto addVec3 = [&](const std::vector<glm::vec3>& v, bool withMinMax) {
         size_t off = bin.append(v.data(), v.size() * sizeof(glm::vec3));
@@ -212,17 +212,43 @@ bool saveGlb(const std::string& path, const std::vector<MeshObjectRef>& objects,
         std::vector<int> targetAccs;
         for (const auto& l : mesh.layers) targetAccs.push_back(addVec3(uvs ? split(l.delta) : l.delta, true));
 
-        // The texture (core/Texture.h) embedded as a PNG: image, texture and material share one index.
+        // The texture (core/Texture.h) embedded as PNGs: one image and texture per map. With material channels
+        // (core/TextureChannels.h) the material gets the glTF metal-rough slots: occlusion / roughness / metallic
+        // packed in one image, the normal map, emission, and opacity in the base colour's alpha.
         int material = -1;
         std::vector<uint8_t> png;
+        auto addImage = [&](const std::vector<uint8_t>& bytes, const std::string& suffix) {
+            const size_t off = bin.append(bytes.data(), bytes.size());
+            views.push_back({off, bytes.size(), 0});
+            const int index = textureCount++;
+            images << (index ? "," : "") << "{\"bufferView\":" << views.size() - 1 << ",\"mimeType\":\"image/png\",\"name\":\""
+                   << jsonEscape(name) << "_" << suffix << "\"}";
+            return index;
+        };
         if (encodeTexturePng(mesh, png)) {
-            const size_t off = bin.append(png.data(), png.size());
-            views.push_back({off, png.size(), 0});
-            material = textureCount++;
-            images << (material ? "," : "") << "{\"bufferView\":" << views.size() - 1 << ",\"mimeType\":\"image/png\",\"name\":\""
-                   << jsonEscape(name) << "_color\"}";
+            const int color = addImage(png, "color");
+            std::vector<PbrPng> pbr;
+            if (!encodePbrPngs(mesh, true, std::string(), pbr)) {
+                error = "Cannot encode the material maps of " + name;
+                return false;
+            }
+            material = materialCount++;
             materials << (material ? "," : "") << "{\"name\":\"" << jsonEscape(name) << "\",\"pbrMetallicRoughness\":{"
-                      << "\"baseColorTexture\":{\"index\":" << material << "},\"metallicFactor\":0,\"roughnessFactor\":0.65}}";
+                      << "\"baseColorTexture\":{\"index\":" << color << "}";
+            const PbrPng* orm = findPbrPng(pbr, "orm");
+            int ormTex = -1;
+            if (orm) {
+                ormTex = addImage(orm->png, "occlusionRoughnessMetallic");
+                materials << ",\"metallicRoughnessTexture\":{\"index\":" << ormTex << "},\"metallicFactor\":1,\"roughnessFactor\":1}";
+            } else {
+                materials << ",\"metallicFactor\":0,\"roughnessFactor\":0.65}";
+            }
+            if (orm && channelEnabled(*mesh.texture, Channel::AO)) materials << ",\"occlusionTexture\":{\"index\":" << ormTex << "}";
+            if (const PbrPng* n = findPbrPng(pbr, "normal")) materials << ",\"normalTexture\":{\"index\":" << addImage(n->png, "normal") << "}";
+            if (const PbrPng* e = findPbrPng(pbr, "emissive"))
+                materials << ",\"emissiveTexture\":{\"index\":" << addImage(e->png, "emissive") << "},\"emissiveFactor\":[1,1,1]";
+            if (hasPbrTexture(mesh) && channelEnabled(*mesh.texture, Channel::Opacity)) materials << ",\"alphaMode\":\"BLEND\"";
+            materials << "}";
         }
 
         nodes << (oi ? "," : "") << "{\"mesh\":" << oi << ",\"name\":\"" << jsonEscape(name) << "\"}";
@@ -295,6 +321,7 @@ bool saveGlb(const std::string& path, const std::vector<MeshObjectRef>& objects,
         json << ",\"images\":[" << images.str() << "],\"samplers\":[{\"magFilter\":9729,\"minFilter\":9987,"
              << "\"wrapS\":10497,\"wrapT\":10497}],\"textures\":[";
         for (int i = 0; i < textureCount; ++i) json << (i ? "," : "") << "{\"sampler\":0,\"source\":" << i << "}";
+        (void)materialCount;
         json << "],\"materials\":[" << materials.str() << "]";
     }
     if (animated)

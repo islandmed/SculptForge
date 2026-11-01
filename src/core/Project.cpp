@@ -5,6 +5,7 @@
 
 #include "core/Multires.h"
 
+#include "core/LayerStackIO.h"
 #include "core/Texture.h"
 #include "core/ThreadPool.h"
 #include "core/ZSpheres.h"
@@ -543,6 +544,12 @@ Json writeTexture(Writer& w, const std::string& prefix, const Mesh& m) {
         layers.push(std::move(l));
     }
     out.set("layers", std::move(layers));
+    // Material channels (format 7, core/LayerStackIO.h); absent for a base-colour-only texture.
+    if (Json pbr = writeTextureChannels(t, prefix, [&](const std::string& file, const std::vector<uint8_t>& bytes) {
+            return w.bytes(file, bytes);
+        });
+        pbr.isObject())
+        out.set("pbr", std::move(pbr));
     return out;
 }
 
@@ -578,6 +585,15 @@ bool readTexture(Reader& r, const Json& tj, Mesh& m, std::string& error) {
     }
     for (size_t i = 3; i < (tex->layers.empty() ? tex->pixels : tex->base).size(); i += 4)
         (tex->layers.empty() ? tex->pixels : tex->base)[i] = 255; // Base is opaque
+    if (!readTextureChannels(tj["pbr"], *tex,
+                             [&](const Json& desc, const char* what, size_t maxBytes, std::vector<uint8_t>& out) {
+                                 const size_t n = countOf(desc["count"]);
+                                 return n != size_t(-1) && n <= maxBytes && r.bytes(desc, what, n, out);
+                             },
+                             error)) {
+        if (!r.error.empty()) error = r.error;
+        return false;
+    }
     tex->markAllDirty();
     m.texture = std::move(tex);
     m.paintToTexture = tj["paint_to_texture"].asBool(true);
@@ -816,8 +832,10 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
         st.set("active_layer", active ? doc.activeLayer : s.activeLayer);
         if (hasPaintLayers(doc.subtoolMesh(i)))
             st.set("paint_layers", writePaintLayers(w, "subtools/" + std::to_string(i) + "/", doc.subtoolMesh(i)));
-        if (doc.subtoolMesh(i).texture && doc.subtoolMesh(i).texture->width > 0)
+        if (doc.subtoolMesh(i).texture && doc.subtoolMesh(i).texture->width > 0) {
             st.set("texture", writeTexture(w, "subtools/" + std::to_string(i) + "/", doc.subtoolMesh(i)));
+            version.need(textureFormatVersion(*doc.subtoolMesh(i).texture));
+        }
         if (subdivLevelCount(doc.subtoolMesh(i)))
             st.set("subdiv", writeSubdiv(w, "subtools/" + std::to_string(i) + "/", doc.subtoolMesh(i)));
         if (const Mesh& m = doc.subtoolMesh(i); m.micro && microMatches(m)) { // format 7: the micro level (core/Micro.h)

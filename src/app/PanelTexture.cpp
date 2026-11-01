@@ -331,6 +331,7 @@ void App::drawTextureMapContents() {
                      "the texture fills in here.",
                      kPath);
     }
+    drawTextureChannelsContents(); // Material Channels: toggles, solo view, Export Maps (PanelPbr.cpp)
 }
 
 } // namespace sf

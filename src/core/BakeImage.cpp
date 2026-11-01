@@ -124,7 +124,28 @@ std::vector<std::pair<const char*, int>> exrChannels(int channels) {
 
 bool savePng16(const std::string& path, int width, int height, int channels, const std::vector<uint16_t>& px,
                std::string& error) {
-    if (width <= 0 || height <= 0 || (channels != 1 && channels != 3) ||
+    std::vector<uint8_t> out;
+    if (!encodePng16(width, height, channels, px, out, error)) return false;
+    return writeFile(path, out, error);
+}
+
+bool decodePng16(const uint8_t* bytes, size_t size, int& width, int& height, int& channels, std::vector<uint16_t>& pixels,
+                 std::string& error, int wantChannels) {
+    int w = 0, h = 0, n = 0;
+    stbi_us* data = size > 0 && size < (size_t(1) << 31) ? stbi_load_16_from_memory(bytes, int(size), &w, &h, &n, wantChannels) : nullptr;
+    if (!data) {
+        error = "Cannot decode the 16-bit PNG";
+        return false;
+    }
+    width = w, height = h, channels = wantChannels ? wantChannels : n;
+    pixels.assign(data, data + size_t(w) * size_t(h) * size_t(channels));
+    stbi_image_free(data);
+    return true;
+}
+
+bool encodePng16(int width, int height, int channels, const std::vector<uint16_t>& px, std::vector<uint8_t>& out,
+                 std::string& error) {
+    if (width <= 0 || height <= 0 || channels < 1 || channels > 4 ||
         px.size() != size_t(width) * size_t(height) * size_t(channels)) {
         error = "Bad 16-bit image";
         return false;
@@ -150,16 +171,17 @@ bool savePng16(const std::string& path, int width, int height, int channels, con
         error = "PNG compression failed";
         return false;
     }
-    std::vector<uint8_t> out = {0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'};
+    out = {0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'};
     std::vector<uint8_t> ihdr;
     putBe32(ihdr, uint32_t(width));
     putBe32(ihdr, uint32_t(height));
-    ihdr.insert(ihdr.end(), {16, uint8_t(channels == 1 ? 0 : 2), 0, 0, 0});
+    static const uint8_t kColorType[5] = {0, 0, 4, 2, 6}; // grey, grey + alpha, RGB, RGBA
+    ihdr.insert(ihdr.end(), {16, kColorType[channels], 0, 0, 0});
     chunk(out, "IHDR", ihdr.data(), ihdr.size());
     chunk(out, "IDAT", z, size_t(zlen));
     std::free(z);
     chunk(out, "IEND", nullptr, 0);
-    return writeFile(path, out, error);
+    return true;
 }
 
 bool loadPng16(const std::string& path, int& width, int& height, int& channels, std::vector<uint16_t>& pixels,

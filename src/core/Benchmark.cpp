@@ -10,6 +10,7 @@
 #include "core/Polypaint.h"
 #include "core/Primitives.h"
 #include "core/Project.h"
+#include "core/Texture.h"
 #include "core/ThreadPool.h"
 #include "core/UploadOrder.h"
 
@@ -68,11 +69,17 @@ size_t peakResidentBytes() {
 
 MemoryUse documentMemory(const Document& doc) {
     MemoryUse u;
+    std::vector<const PaintTexture*> seen; // textures shared between SubTools count once
     for (int i = 0; i < doc.subtoolCount(); ++i) {
         const bool active = i == doc.activeSubtool;
         const SubTool& st = doc.subtools[size_t(i)];
         const Mesh& m = doc.subtoolMesh(i);
         u.mesh += m.memoryBytes();
+        if (m.texture && std::find(seen.begin(), seen.end(), m.texture.get()) == seen.end()) {
+            seen.push_back(m.texture.get());
+            u.textures += m.texture->bytes();
+            u.channels += channelBytes(*m.texture);
+        }
         u.bvh += (active ? doc.bvh : st.bvh).memoryBytes();
         u.levels += subdivBytes(m);
         u.undo += (active ? doc.undo : st.undo).undoBytes();
@@ -98,7 +105,8 @@ void registerPerformanceCommands(CommandRegistry& registry) {
                                         (ThreadPool::shared().serial() ? " (multithreading off)" : "") + "; " +
                                         millions(double(u.triangles)) + " triangles; memory " + mb(u.total()) + " (meshes " +
                                         mb(u.mesh) + ", BVH " + mb(u.bvh) + ", subdivision levels " + mb(u.levels) +
-                                        ", undo " + mb(u.undo) + "), GPU buffers about " + mb(u.gpu);
+                                        ", undo " + mb(u.undo) + ", textures " + mb(u.textures) + " of which material channels " +
+                                        mb(u.channels) + "), GPU buffers about " + mb(u.gpu);
                       return {true, msg};
                   }});
     registry.add({"set_multithreading",

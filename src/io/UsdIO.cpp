@@ -306,18 +306,56 @@ void writeMaterial(Writer& w, const std::string& path, const std::string& name, 
     w.close();
 }
 
-// A UsdPreviewSurface whose colour is the texture `file` (an asset path) on the "st" primvar.
-void writeTextureMaterial(Writer& w, const std::string& path, const std::string& name, const std::string& file) {
+// A UsdUVTexture reading `file` on the "st" primvar (raw data unless `srgb`); normal maps get scale 2, bias -1.
+void writeUvTexture(Writer& w, const std::string& path, const std::string& shader, const std::string& file, bool srgb,
+                    bool normal, const char* output) {
+    w.s += '\n';
+    w.open("def Shader " + quoted(shader));
+    w.line("uniform token info:id = \"UsdUVTexture\"");
+    w.line("asset inputs:file = @" + file + "@");
+    w.line(std::string("token inputs:sourceColorSpace = \"") + (srgb ? "sRGB" : "raw") + "\"");
+    w.line("float2 inputs:st.connect = <" + path + "/TexCoords.outputs:result>");
+    w.line("token inputs:wrapS = \"repeat\"");
+    w.line("token inputs:wrapT = \"repeat\"");
+    if (normal) {
+        w.line("float4 inputs:scale = (2, 2, 2, 1)");
+        w.line("float4 inputs:bias = (-1, -1, -1, 0)");
+    }
+    w.line(output);
+    w.close();
+}
+
+// A UsdPreviewSurface whose colour is the texture `file` (an asset path) on the "st" primvar. `pbr`: material
+// channel maps (slot, asset path) for its other inputs (core/MapExport.h pbrSlots).
+void writeTextureMaterial(Writer& w, const std::string& path, const std::string& name, const std::string& file,
+                          const std::vector<std::pair<std::string, std::string>>& pbr = {}) {
+    auto slotFile = [&](const char* slot) -> std::string {
+        for (const auto& [s, f] : pbr)
+            if (s == slot) return f;
+        return {};
+    };
     w.open("def Material " + quoted(name));
     w.line("token outputs:surface.connect = <" + path + "/PreviewSurface.outputs:surface>");
     w.s += '\n';
     w.open("def Shader \"PreviewSurface\"");
     w.line("uniform token info:id = \"UsdPreviewSurface\"");
     w.line("color3f inputs:diffuseColor.connect = <" + path + "/Texture.outputs:rgb>");
-    w.line("float inputs:metallic = 0");
-    w.line("float inputs:roughness = 0.65");
+    if (!slotFile("metallic").empty()) w.line("float inputs:metallic.connect = <" + path + "/MetallicTexture.outputs:r>");
+    else w.line("float inputs:metallic = 0");
+    if (!slotFile("roughness").empty()) w.line("float inputs:roughness.connect = <" + path + "/RoughnessTexture.outputs:r>");
+    else w.line("float inputs:roughness = 0.65");
+    if (!slotFile("normal").empty()) w.line("normal3f inputs:normal.connect = <" + path + "/NormalTexture.outputs:rgb>");
+    if (!slotFile("occlusion").empty()) w.line("float inputs:occlusion.connect = <" + path + "/OcclusionTexture.outputs:r>");
+    if (!slotFile("emissive").empty()) w.line("color3f inputs:emissiveColor.connect = <" + path + "/EmissiveTexture.outputs:rgb>");
+    if (!slotFile("opacity").empty()) w.line("float inputs:opacity.connect = <" + path + "/OpacityTexture.outputs:r>");
     w.line("token outputs:surface");
     w.close();
+    if (!slotFile("metallic").empty()) writeUvTexture(w, path, "MetallicTexture", slotFile("metallic"), false, false, "float outputs:r");
+    if (!slotFile("roughness").empty()) writeUvTexture(w, path, "RoughnessTexture", slotFile("roughness"), false, false, "float outputs:r");
+    if (!slotFile("normal").empty()) writeUvTexture(w, path, "NormalTexture", slotFile("normal"), false, true, "float3 outputs:rgb");
+    if (!slotFile("occlusion").empty()) writeUvTexture(w, path, "OcclusionTexture", slotFile("occlusion"), false, false, "float outputs:r");
+    if (!slotFile("emissive").empty()) writeUvTexture(w, path, "EmissiveTexture", slotFile("emissive"), true, false, "float3 outputs:rgb");
+    if (!slotFile("opacity").empty()) writeUvTexture(w, path, "OpacityTexture", slotFile("opacity"), false, false, "float outputs:r");
     w.s += '\n';
     w.open("def Shader \"Texture\"");
     w.line("uniform token info:id = \"UsdUVTexture\"");
@@ -337,9 +375,11 @@ void writeTextureMaterial(Writer& w, const std::string& path, const std::string&
     w.close();
 }
 
-// `textures`: per mesh, the PNG asset path its material reads ("" = no texture).
+// `textures`: per mesh, the PNG asset path its material reads ("" = no texture). `pbr`: per mesh, its material
+// channel maps (slot, asset path).
 std::string buildUsda(const std::vector<MeshObjectRef>& meshes, const std::vector<std::string>& textures,
-                      const SplatCloud* splats, const std::string& name, const MorphAnimation* animation) {
+                      const SplatCloud* splats, const std::string& name, const MorphAnimation* animation,
+                      const std::vector<std::vector<std::pair<std::string, std::string>>>& pbr) {
     const std::string root = usdIdentifier(name.empty() ? "Sculpt" : name);
     // Textured meshes bind a material of their own. Of the others, polypainted ones bind a material that
     // reads their colours; with a mix, plain ones bind "Clay".
@@ -385,6 +425,7 @@ std::string buildUsda(const std::vector<MeshObjectRef>& meshes, const std::vecto
         // One prim per object: "Sculpt" for a single one, else valid unique names from the objects.
         std::set<std::string> used = {"Materials", "Splats"};
         std::vector<std::pair<std::string, std::string>> textured; // material name, texture
+        std::vector<size_t> texturedMesh;                         // which mesh each textured material is for
         for (size_t i = 0; i < meshes.size(); ++i) {
             const MeshObjectRef& m = meshes[i];
             std::string prim = "Sculpt";
@@ -397,6 +438,7 @@ std::string buildUsda(const std::vector<MeshObjectRef>& meshes, const std::vecto
             std::string material = mixed && m.mesh->hasColors() ? paintedClay : clay;
             if (!textures[i].empty()) {
                 textured.push_back({prim + "_Material", textures[i]});
+                texturedMesh.push_back(i);
                 material = "/" + root + "/Materials/" + textured.back().first;
             }
             writeMesh(w, *m.mesh, root, prim, material, animation);
@@ -410,7 +452,8 @@ std::string buildUsda(const std::vector<MeshObjectRef>& meshes, const std::vecto
         }
         for (size_t k = 0; k < textured.size(); ++k) {
             if (plain || k) w.s += '\n';
-            writeTextureMaterial(w, "/" + root + "/Materials/" + textured[k].first, textured[k].first, textured[k].second);
+            writeTextureMaterial(w, "/" + root + "/Materials/" + textured[k].first, textured[k].first, textured[k].second,
+                                 texturedMesh[k] < pbr.size() ? pbr[texturedMesh[k]] : std::vector<std::pair<std::string, std::string>>{});
         }
         w.close();
     }
@@ -1049,7 +1092,18 @@ bool saveUsd(const std::string& path, const std::vector<MeshObjectRef>& meshesIn
     }
     // Textures: PNGs inside a .usdz package, else beside the layer; asset paths are relative to the layer.
     const std::vector<std::string> pngs = textureFileNames(path, meshes);
-    const std::string text = buildUsda(meshes, pngs, hasSplats ? splats : nullptr, name, animation);
+    // Material channel maps (PBR slots) per textured mesh, named after its colour PNG.
+    std::vector<std::vector<PbrPng>> pbrPngs(meshes.size());
+    std::vector<std::vector<std::pair<std::string, std::string>>> pbr(meshes.size());
+    for (size_t i = 0; i < meshes.size(); ++i) {
+        if (pngs[i].empty()) continue;
+        if (!encodePbrPngs(*meshes[i].mesh, false, pngs[i], pbrPngs[i])) {
+            error = "Cannot encode the material maps of " + meshes[i].name;
+            return false;
+        }
+        for (const PbrPng& p : pbrPngs[i]) pbr[i].push_back({p.slot, p.name});
+    }
+    const std::string text = buildUsda(meshes, pngs, hasSplats ? splats : nullptr, name, animation, pbr);
     if (ext == ".usdz") {
         std::string inner = usdIdentifier(name.empty() ? "Sculpt" : name) + ".usda";
         std::vector<ZipEntry> entries = {{inner, std::vector<uint8_t>(text.begin(), text.end())}};
@@ -1060,12 +1114,14 @@ bool saveUsd(const std::string& path, const std::vector<MeshObjectRef>& meshesIn
                 error = "Cannot encode the texture of " + meshes[i].name;
                 return false;
             }
+            for (const PbrPng& p : pbrPngs[i]) entries.push_back({p.name, p.png});
         }
         return writeStoredZip(path, entries, 64, error);
     }
     for (size_t i = 0; i < meshes.size(); ++i) {
         std::string pngPath;
         if (!pngs[i].empty() && !writeTextureBeside(path, pngs[i], *meshes[i].mesh, pngPath, error)) return false;
+        if (!writePbrPngsBeside(path, pbrPngs[i], error)) return false;
     }
     std::ofstream f(fsPath(path), std::ios::binary);
     if (!f || !f.write(text.data(), std::streamsize(text.size()))) {

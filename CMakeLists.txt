@@ -70,6 +70,11 @@ add_library(sculptforge_core STATIC
   src/core/PaintLayer.cpp
   src/core/Texture.cpp
   src/core/TextureCommands.cpp
+  src/core/TileImage.cpp
+  src/core/TextureChannels.cpp
+  src/core/TextureChannelCommands.cpp
+  src/core/LayerStackIO.cpp
+  src/core/MapExport.cpp
   src/core/Multires.cpp
   src/core/Micro.cpp
   src/core/MicroSculpt.cpp
@@ -245,6 +250,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelPolypaint.cpp
     src/app/PanelPaintLayers.cpp
     src/app/PanelTexture.cpp
+    src/app/PanelPbr.cpp
     src/app/PanelGeometry.cpp
     src/app/Gizmo.cpp
     src/app/PanelBake.cpp

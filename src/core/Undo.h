@@ -8,6 +8,7 @@
 #include "core/Micro.h"
 #include "core/Multires.h"
 #include "core/ThreadPool.h"
+#include "core/TileImage.h"
 
 #include <deque>
 #include <memory>
@@ -68,11 +69,21 @@ struct PackedTexels {
 
 // Old texels of the 64x64 tiles a texture-paint stroke touched in one layer (core/Texture.h);
 // applying swaps them with the texture.
+// Material channels (core/TextureChannels.h) are kept per (layer, channel) as the old tile pointers of the
+// channel's TileImage: nothing is copied, the tiles are shared with the image until it overwrites them.
+struct TextureChannelTiles {
+    int layer = -1;      // -1 = Base
+    uint8_t channel = 0; // Channel
+    std::vector<uint32_t> tiles;
+    std::vector<std::shared_ptr<TileImage::Tile>> old; // per tile; null = the image's fill
+    size_t bytes() const;
+};
 struct TextureTileUndo {
     int layer = -1;
-    PackedTexels texels;
+    PackedTexels texels; // base colour (no tiles when the stroke painted only material channels)
+    std::vector<TextureChannelTiles> channels;
     void swapWith(Mesh& mesh);
-    size_t bytes() const { return texels.bytes(); }
+    size_t bytes() const;
 };
 
 // The texture before a texture edit (create, delete, layer edits, conversions, fills). captureTexture

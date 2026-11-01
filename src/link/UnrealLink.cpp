@@ -3,6 +3,8 @@
 #include "link/UnrealLink.h"
 
 #include "core/Json.h"
+#include "core/MapExport.h"
+#include "core/Texture.h"
 #include "link/Socket.h"
 
 #include <atomic>
@@ -213,6 +215,42 @@ std::string unrealImportScript(const UnrealImport& im) {
         py += "    f.write(r.read())\n";
         fileExpr = "fbx_path";
     }
+    // Material maps (export_maps' "unreal" preset) are imported first, then the mesh, then the material.
+    const bool localFiles = im.downloadUrl.empty();
+    py += "sf_textures = {}\n";
+    const std::string base = im.assetName.rfind("SM_", 0) == 0 || im.assetName.rfind("SK_", 0) == 0 ? im.assetName.substr(3) : im.assetName;
+    struct Map {
+        const std::string* path;
+        const char* key;
+        const char* compression;
+        bool srgb;
+    };
+    const Map maps[] = {{&im.baseColorPath, "BC", "TC_DEFAULT", true},
+                        {&im.ormPath, "ORM", "TC_MASKS", false},
+                        {&im.emissivePath, "E", "TC_DEFAULT", true}};
+    for (const Map& m : maps) {
+        if (m.path->empty() || !localFiles) continue;
+        const std::string texName = "T_" + base + "_" + m.key;
+        py += "try:\n";
+        py += "    ttask = unreal.AssetImportTask()\n";
+        py += "    ttask.set_editor_property('filename', " + pyString(*m.path) + ")\n";
+        py += "    ttask.set_editor_property('destination_path', " + pyString(im.destination) + ")\n";
+        py += "    ttask.set_editor_property('destination_name', " + pyString(texName) + ")\n";
+        py += "    ttask.set_editor_property('replace_existing', True)\n";
+        py += "    ttask.set_editor_property('automated', True)\n";
+        py += "    ttask.set_editor_property('save', True)\n";
+        py += "    unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks([ttask])\n";
+        py += "    for p in list(ttask.get_editor_property('imported_object_paths') or []):\n";
+        py += "        tex = unreal.load_asset(p)\n";
+        py += "        if isinstance(tex, unreal.Texture2D):\n";
+        py += std::string("            tex.set_editor_property('compression_settings', unreal.TextureCompressionSettings.") + m.compression + ")\n";
+        py += std::string("            tex.set_editor_property('srgb', ") + (m.srgb ? "True" : "False") + ")\n";
+        py += "            unreal.EditorAssetLibrary.save_loaded_asset(tex)\n";
+        py += std::string("            sf_textures['") + m.key + "'] = tex\n";
+        py += "            print('SCULPTFORGE_TEXTURE ' + p)\n";
+        py += "except Exception as e:\n";
+        py += std::string("    unreal.log_warning('SculptForge: ") + m.key + " map import failed (' + str(e) + ')')\n";
+    }
     if (!im.normalMapPath.empty() && im.downloadUrl.empty()) {
         // The baked normal map first (its result line comes before the mesh's, which the caller reads last).
         std::string texName = im.assetName.rfind("SM_", 0) == 0 || im.assetName.rfind("SK_", 0) == 0 ? im.assetName.substr(3) : im.assetName;
@@ -233,6 +271,7 @@ std::string unrealImportScript(const UnrealImport& im) {
         py += "            tex.set_editor_property('srgb', False)\n";
         py += std::string("            tex.set_editor_property('flip_green_channel', ") + (im.normalMapDirectX ? "False" : "True") + ")\n";
         py += "            unreal.EditorAssetLibrary.save_loaded_asset(tex)\n";
+        py += "            sf_textures['N'] = tex\n";
         py += "            print('SCULPTFORGE_TEXTURE ' + p)\n";
         py += "except Exception as e:\n";
         py += "    unreal.log_warning('SculptForge: normal map import failed (' + str(e) + ')')\n";
@@ -271,7 +310,72 @@ std::string unrealImportScript(const UnrealImport& im) {
     py += "unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks([task])\n";
     py += "paths = list(task.get_editor_property('imported_object_paths') or [])\n";
     py += "print('SCULPTFORGE_IMPORTED ' + (', '.join(paths) if paths else 'nothing'))\n";
+    if (im.buildMaterial && localFiles) {
+        // M_<name> from the imported maps: base colour, normal, and occlusion / roughness / metallic from the
+        // ORM map's R / G / B, assigned to the mesh's first material slot. Built with Unreal's
+        // MaterialEditingLibrary, so it is an ordinary editable material.
+        const std::string matName = "M_" + base;
+        py += "try:\n";
+        py += "    mel = unreal.MaterialEditingLibrary\n";
+        py += "    mat_path = " + pyString(im.destination + "/" + matName) + "\n";
+        py += "    if unreal.EditorAssetLibrary.does_asset_exist(mat_path):\n";
+        py += "        mat = unreal.load_asset(mat_path)\n";
+        py += "        mel.delete_all_material_expressions(mat)\n";
+        py += "    else:\n";
+        py += "        mat = unreal.AssetToolsHelpers.get_asset_tools().create_asset(" + pyString(matName) + ", " +
+              pyString(im.destination) + ", unreal.Material, unreal.MaterialFactoryNew())\n";
+        py += "    def sf_sample(key, x, y, sampler):\n";
+        py += "        node = mel.create_material_expression(mat, unreal.MaterialExpressionTextureSampleParameter2D, x, y)\n";
+        py += "        node.set_editor_property('parameter_name', key)\n";
+        py += "        node.set_editor_property('texture', sf_textures[key])\n";
+        py += "        node.set_editor_property('sampler_type', sampler)\n";
+        py += "        return node\n";
+        py += "    if 'BC' in sf_textures:\n";
+        py += "        mel.connect_material_property(sf_sample('BC', -600, -300, unreal.MaterialSamplerType.SAMPLERTYPE_COLOR), 'RGB', unreal.MaterialProperty.MP_BASE_COLOR)\n";
+        py += "    if 'ORM' in sf_textures:\n";
+        py += "        orm = sf_sample('ORM', -600, 0, unreal.MaterialSamplerType.SAMPLERTYPE_MASKS)\n";
+        py += "        mel.connect_material_property(orm, 'R', unreal.MaterialProperty.MP_AMBIENT_OCCLUSION)\n";
+        py += "        mel.connect_material_property(orm, 'G', unreal.MaterialProperty.MP_ROUGHNESS)\n";
+        py += "        mel.connect_material_property(orm, 'B', unreal.MaterialProperty.MP_METALLIC)\n";
+        py += "    if 'N' in sf_textures:\n";
+        py += "        mel.connect_material_property(sf_sample('N', -600, 300, unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL), 'RGB', unreal.MaterialProperty.MP_NORMAL)\n";
+        py += "    if 'E' in sf_textures:\n";
+        py += "        mel.connect_material_property(sf_sample('E', -600, 600, unreal.MaterialSamplerType.SAMPLERTYPE_COLOR), 'RGB', unreal.MaterialProperty.MP_EMISSIVE_COLOR)\n";
+        py += "    mel.recompile_material(mat)\n";
+        py += "    unreal.EditorAssetLibrary.save_loaded_asset(mat)\n";
+        py += "    for p in paths:\n";
+        py += "        mesh = unreal.load_asset(p)\n";
+        py += "        if isinstance(mesh, unreal.StaticMesh):\n";
+        py += "            mesh.set_material(0, mat)\n";
+        py += "            unreal.EditorAssetLibrary.save_loaded_asset(mesh)\n";
+        py += "        elif isinstance(mesh, unreal.SkeletalMesh):\n";
+        py += "            mats = mesh.get_editor_property('materials')\n";
+        py += "            if mats:\n";
+        py += "                mats[0].set_editor_property('material_interface', mat)\n";
+        py += "                mesh.set_editor_property('materials', mats)\n";
+        py += "                unreal.EditorAssetLibrary.save_loaded_asset(mesh)\n";
+        py += "    print('SCULPTFORGE_MATERIAL ' + mat_path)\n";
+        py += "except Exception as e:\n";
+        py += "    unreal.log_warning('SculptForge: building the material failed (' + str(e) + ')')\n";
+    }
     return py;
+}
+
+bool addUnrealMaterialMaps(const PaintTexture& tex, const std::string& folder, UnrealImport& im, std::string& error) {
+    if (!hasMaterialChannels(tex)) return true;
+    ExportPreset preset;
+    if (!findExportPreset("unreal", preset, error)) return false;
+    const std::string base = im.assetName.rfind("SM_", 0) == 0 || im.assetName.rfind("SK_", 0) == 0 ? im.assetName.substr(3) : im.assetName;
+    std::vector<ExportedMap> written;
+    if (!exportMaps(tex, preset, folder, base.empty() ? std::string("Sculpt") : base, written, error)) return false;
+    for (const ExportedMap& m : written) {
+        if (m.map == "BC") im.baseColorPath = m.path;
+        else if (m.map == "N") im.normalMapPath = m.path, im.normalMapDirectX = true;
+        else if (m.map == "ORM") im.ormPath = m.path;
+        else if (m.map == "E") im.emissivePath = m.path;
+    }
+    im.buildMaterial = true;
+    return true;
 }
 
 bool sendToUnreal(const UnrealEndpoint& endpoint, const UnrealImport& import, std::string& message,
@@ -318,14 +422,16 @@ bool sendToUnreal(const UnrealEndpoint& endpoint, const UnrealImport& import, st
         return false;
     }
     const size_t at = output.find("SCULPTFORGE_IMPORTED ");
-    std::string imported = at == std::string::npos ? std::string() : output.substr(at + 20);
+    std::string imported = at == std::string::npos ? std::string() : output.substr(at + 21);
+    imported = imported.substr(0, imported.find('\n')); // later lines: the material
     while (!imported.empty() && (imported.back() == '\n' || imported.back() == '\r')) imported.pop_back();
     if (imported.empty() || imported == "nothing") {
         message = "Unreal ran the import but reported no asset - check the Output Log in " + target->projectName;
         return false;
     }
     message = "Sent to Unreal (" + target->projectName + "): " + imported;
-    if (output.find("SCULPTFORGE_TEXTURE ") != std::string::npos) message += " + normal map";
+    if (output.find("SCULPTFORGE_MATERIAL ") != std::string::npos) message += " + material maps and M_ material";
+    else if (output.find("SCULPTFORGE_TEXTURE ") != std::string::npos) message += " + normal map";
     return true;
 }
 

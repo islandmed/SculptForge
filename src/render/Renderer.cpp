@@ -1858,7 +1858,7 @@ void Renderer::syncTexture(MeshSlot& s, Mesh& mesh) {
         if (!s.paintTexture) gl::GenTextures(1, &s.paintTexture);
         gl::BindTexture(GL_TEXTURE_2D, s.paintTexture);
         gl::TexImage2D(GL_TEXTURE_2D, 0, GLint(GL_SRGB8_ALPHA8), tex->width, tex->height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-                       tex->pixels.data());
+                       tex->shown().data());
         gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GLint(GL_LINEAR_MIPMAP_LINEAR));
         gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GLint(GL_LINEAR));
         gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GLint(GL_CLAMP_TO_EDGE));
@@ -1873,7 +1873,7 @@ void Renderer::syncTexture(MeshSlot& s, Mesh& mesh) {
         auto upload = [&](int x0, int y0, int x1, int y1) {
             x1 = std::min(x1, tex->width), y1 = std::min(y1, tex->height);
             gl::TexSubImage2D(GL_TEXTURE_2D, 0, x0, y0, x1 - x0, y1 - y0, GL_RGBA, GL_UNSIGNED_BYTE,
-                              tex->pixels.data() + (size_t(y0) * size_t(tex->width) + size_t(x0)) * 4);
+                              tex->shown().data() + (size_t(y0) * size_t(tex->width) + size_t(x0)) * 4);
         };
         if (!rect) {
             upload(0, 0, tex->width, tex->height);

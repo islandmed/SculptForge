@@ -87,8 +87,10 @@ struct MemoryUse {
     size_t levels = 0; // subdivision level stacks (subdivBytes)
     size_t undo = 0;   // undo history (UndoStack::undoBytes)
     size_t gpu = 0;    // vertex and index buffers the renderer keeps for the visible SubTools (an estimate)
+    size_t textures = 0; // painted textures (core/Texture.h): colour, layers, material channels (each texture once)
+    size_t channels = 0; // of `textures`, the material channel tiles (core/TextureChannels.h)
     size_t triangles = 0, vertices = 0;
-    size_t total() const { return mesh + bvh + levels + undo; }
+    size_t total() const { return mesh + bvh + levels + undo + textures; }
 };
 MemoryUse documentMemory(const Document& doc);
 

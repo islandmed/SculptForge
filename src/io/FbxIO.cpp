@@ -391,33 +391,55 @@ bool saveFbx(const std::string& path, const std::vector<FbxObject>& fbxObjects, 
             prop70(p70, "Shininess", "double", "Number", "").f64(20.0);
             prop70(p70, "ShininessExponent", "double", "Number", "").f64(20.0);
 
-            const std::string texName = safeTextureName(name) + "_color";
-            Node& tex = objects.add("Texture").i64(textureId).objName(texName, "Texture").str("");
-            tex.add("Type").str("TextureVideoClip");
-            tex.add("Version").i32(202);
-            tex.add("TextureName").objName(texName, "Texture");
-            Node& tp70 = tex.add("Properties70");
-            prop70(tp70, "UseMaterial", "bool", "", "").i32(1);
-            prop70(tp70, "UseMipMap", "bool", "", "").i32(0);
-            tex.add("Media").objName(texName, "Video");
-            tex.add("FileName").str(file);
-            tex.add("RelativeFilename").str(pngs[oi]);
-            tex.add("ModelUVTranslation").f64(0.0).f64(0.0);
-            tex.add("ModelUVScaling").f64(1.0).f64(1.0);
-            tex.add("Texture_Alpha_Source").str("None");
-            tex.add("Cropping").i32(0).i32(0).i32(0).i32(0);
+            // One Texture + Video pair reading `fileAbs` (relative name `rel`), connected to the material's `property`.
+            auto addTexture = [&](int64_t texId, int64_t vidId, const std::string& texName, const std::string& fileAbs,
+                                  const std::string& rel, const std::string& property) {
+                Node& tex = objects.add("Texture").i64(texId).objName(texName, "Texture").str("");
+                tex.add("Type").str("TextureVideoClip");
+                tex.add("Version").i32(202);
+                tex.add("TextureName").objName(texName, "Texture");
+                Node& tp70 = tex.add("Properties70");
+                prop70(tp70, "UseMaterial", "bool", "", "").i32(1);
+                prop70(tp70, "UseMipMap", "bool", "", "").i32(0);
+                tex.add("Media").objName(texName, "Video");
+                tex.add("FileName").str(fileAbs);
+                tex.add("RelativeFilename").str(rel);
+                tex.add("ModelUVTranslation").f64(0.0).f64(0.0);
+                tex.add("ModelUVScaling").f64(1.0).f64(1.0);
+                tex.add("Texture_Alpha_Source").str("None");
+                tex.add("Cropping").i32(0).i32(0).i32(0).i32(0);
 
-            Node& video = objects.add("Video").i64(videoId).objName(texName, "Video").str("Clip");
-            video.add("Type").str("Clip");
-            prop70(video.add("Properties70"), "Path", "KString", "XRefUrl", "").str(file);
-            video.add("UseMipMap").i32(0);
-            video.add("Filename").str(file);
-            video.add("RelativeFilename").str(pngs[oi]);
+                Node& video = objects.add("Video").i64(vidId).objName(texName, "Video").str("Clip");
+                video.add("Type").str("Clip");
+                prop70(video.add("Properties70"), "Path", "KString", "XRefUrl", "").str(fileAbs);
+                video.add("UseMipMap").i32(0);
+                video.add("Filename").str(fileAbs);
+                video.add("RelativeFilename").str(rel);
 
-            addConnection(connections, "OO", videoId, textureId);
-            addPropertyConnection(connections, textureId, objectMaterialId, "DiffuseColor");
+                addConnection(connections, "OO", vidId, texId);
+                addPropertyConnection(connections, texId, objectMaterialId, property);
+                ++textures;
+            };
+            addTexture(textureId, videoId, safeTextureName(name) + "_color", file, pngs[oi], "DiffuseColor");
+            // Material channels (core/TextureChannels.h): their maps on the FBX material properties importers map
+            // to PBR inputs (Blender: ShininessExponent -> roughness, ReflectionFactor -> metallic).
+            std::vector<PbrPng> pbr;
+            if (!encodePbrPngs(*lods[0], false, pngs[oi], pbr) || !writePbrPngsBeside(path, pbr, error)) {
+                if (error.empty()) error = "Cannot encode the material maps of " + name;
+                return false;
+            }
+            for (const PbrPng& p : pbr) {
+                const char* property = p.slot == "normal"      ? "NormalMap"
+                                       : p.slot == "roughness" ? "ShininessExponent"
+                                       : p.slot == "metallic"  ? "ReflectionFactor"
+                                       : p.slot == "emissive"  ? "EmissiveColor"
+                                       : p.slot == "opacity"   ? "TransparencyFactor"
+                                                               : nullptr;
+                if (!property) continue; // occlusion: no FBX material input; the file is still written
+                const std::string pngAbs = textureUtf8(textureFsPath(file).parent_path() / textureFsPath(p.name));
+                addTexture(ids(), ids(), safeTextureName(name) + "_" + p.slot, pngAbs, p.name, property);
+            }
             ++materials;
-            ++textures;
         }
         if (grouped) {
             const int64_t groupId = ids(), attrId = ids();

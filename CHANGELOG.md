@@ -44,6 +44,34 @@ All notable changes to SculptForge are listed here. The format follows
 - For developers: `core/TierConfig.h` (resident cache cap, active-triangle budget, upload budget, draft brush
   mode, zero-copy UMA, target Hz) and `renderTriangleBudget()` for the renderer and micro-displacement
   (docs/performance.md, "Hardware profile").
+- Material painting (PBR): a painted texture can carry Roughness, Metallic, Normal, Height (16-bit), Ambient
+  Occlusion, Emissive and Opacity besides its colour, all painted in the same strokes. Turn channels on in
+  **Tool > Texture Map > Material Channels** (`texture_channels`); a channel costs no memory until it is painted
+  (64x64 copy-on-write tiles; untouched tiles aren't stored). **Color > Material** sets what the brush lays on
+  each channel (material swatches, per-channel value swatches and sliders; `paint_material`), and **C** picks the
+  whole material under the cursor. Paint layers hold every channel: channel chips on each layer row turn a
+  channel on or off for that layer, and give it its own blend mode and opacity, including **Normal Combine** for
+  normals (`texture_layer_channel`). Height also yields a normal combined onto the Normal channel. One undo step
+  per stroke, kept per layer and channel. Auto UV, Voxel Remesh, QRemesh and merging SubTools carry every channel.
+  See the guide's Material painting page.
+- Solo channel view: **Tool > Texture Map** shows one channel on the model (roughness and the other scalars in
+  grey, the normal as colours, emission in colour), live while painting (`channel_view`).
+- Export Maps with presets (`export_maps`): Unreal (`T_*_BC`, `T_*_N` in DirectX, `T_*_ORM`), Unity URP and HDRP
+  (mask map), glTF, Godot, Blender (one file per channel) and USD, plus your own JSON presets (the guide's Export
+  presets page). Height maps are 16-bit PNG.
+- Model exports wire the channels into their materials: glTF metal-rough slots (packed occlusion / roughness /
+  metallic, normal, emissive, alpha from opacity), UsdPreviewSurface inputs, the MTL PBR keys and FBX material
+  maps. Send to Unreal imports `T_<Name>_BC / _N / _ORM` and builds an `M_<Name>` material from them.
+- Preferences > Performance and `perf_info` show the memory of textures and their material channels.
+
+### Changed
+- Texture painting on dense meshes costs the texels a dab reaches instead of the triangles under it: the brush
+  finds the texture tiles under it from the BVH and paints each texel from a cached triangle-and-barycentrics
+  map, tiles in parallel. A 0.35-radius dab with X symmetry on a 21M-triangle sphere: 4K 150-360 ms -> 24-39 ms,
+  8K 240-350 ms -> 39-55 ms (M1 Pro, ranges over a busy and a quiet machine); results match the old dab within
+  1/255. Lighter meshes keep the per-triangle dab.
+- Project format 7 stores material channels. It is written only when a texture has them: other projects are
+  still saved as format 6, and every older project opens as before.
 
 ## [0.9.7] - 2026-10-31
 

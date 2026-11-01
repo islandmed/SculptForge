@@ -1602,6 +1602,8 @@ void App::syncScene() {
         SubTool& s = doc_.subtools[size_t(i)];
         const bool active = i == doc_.activeSubtool;
         Mesh* mesh = active ? &shown : &s.mesh;
+        // Solo channel view (channel_view): the texture's shown texels follow before the renderer uploads them.
+        if (mesh->texture) syncChannelView(*mesh->texture, doc_.channelView);
         const bool flat = s.shading == Shading::Flat || (s.shading == Shading::Default && renderSettings_.flatShading);
         scene.push_back({s.id, mesh, active, s.visible, bakeNormalMap(s.id, *mesh), renderSettings_.wireframe, flat});
     }
@@ -1805,6 +1807,11 @@ void App::sendToUnreal() {
     import.skeletal = r.skeletal;
     import.lods = r.lodCount > 1;
     import.normalMapPath = bakedNormalMapFile(import.normalMapDirectX); // Tool > Bake's last normal map, if it fits
+    // A texture with material channels goes along as T_<name>_BC / _N / _ORM and a built M_<name> material.
+    if (hasTexture(doc_.mesh) && !link::addUnrealMaterialMaps(*doc_.mesh.texture, o.folder, import, err)) {
+        status_ = "Export failed: " + err;
+        return;
+    }
     status_ = "Sending " + r.assetName + " to Unreal...";
     auto promise = std::make_shared<std::promise<std::string>>();
     pendingUnreal_ = promise->get_future();

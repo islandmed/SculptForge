@@ -6,6 +6,7 @@
 #include "ai/ComfyUI.h"
 #include "ai/ImageTo3DService.h"
 #include "core/EnginePresets.h"
+#include "core/Texture.h"
 #include "core/Voxel.h"
 #include "link/UnrealLink.h"
 
@@ -201,6 +202,8 @@ void registerAiCommands(CommandRegistry& registry, std::function<AiSettings()> s
                       import.assetName = r.assetName;
                       import.skeletal = r.skeletal;
                       import.lods = r.lodCount > 1;
+                      if (hasTexture(doc.mesh) && !link::addUnrealMaterialMaps(*doc.mesh.texture, o.folder, import, err))
+                          return {false, err};
                       std::string message;
                       const auto endpoint = argBool(a, "network", false) ? link::UnrealEndpoint::network() : link::UnrealEndpoint();
                       const bool ok = link::sendToUnreal(endpoint, import, message, argString(a, "project"));

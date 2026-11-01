@@ -12,6 +12,10 @@
 #include <string>
 #include <vector>
 
+namespace sf {
+struct PaintTexture;
+}
+
 namespace sf::link {
 
 struct UnrealEndpoint {
@@ -60,9 +64,18 @@ struct UnrealImport {
     // green-down; an OpenGL map gets Unreal's Flip Green Channel.
     std::string normalMapPath;
     bool normalMapDirectX = false;
+    // Material maps of a texture with material channels (export_maps' "unreal" preset): T_<name>_BC (sRGB),
+    // T_<name>_ORM (linear, masks), T_<name>_E, with the normal above as T_<name>_N. With `buildMaterial` the
+    // script then builds M_<name> from them (our own Python, Unreal's MaterialEditingLibrary) and assigns it to
+    // the mesh. Only for an editor on this computer.
+    std::string baseColorPath, ormPath, emissivePath;
+    bool buildMaterial = false;
 };
 // Python that imports (or reimports, replacing) the asset and prints a result line.
 std::string unrealImportScript(const UnrealImport& import);
+// Exports the texture's maps with the "unreal" preset into `folder` and fills the map paths of `import` (and
+// buildMaterial). Does nothing (true) for a texture without material channels.
+bool addUnrealMaterialMaps(const PaintTexture& texture, const std::string& folder, UnrealImport& import, std::string& error);
 
 // Finds an editor (the first one, or the one whose project name matches) and
 // imports. `message` is a human-readable result either way.
