@@ -875,7 +875,7 @@ bool remeshPieceV2(const WorkMesh& piece, int axis, double wantQuads, const QRem
     ProxyBuilder pb(ps);
     // About three proxy edges per quad edge, at most ~400k proxy triangles.
     const float minEdge = float(std::sqrt(area / (0.433 * 400000.0)));
-    const float L0 = std::max(h0 / 3.0f, minEdge);
+    const float L0 = std::max(h0 / tune("SF_QR2_DENSITY", 2.5f), minEdge);
     pb.decimate(L0);
     mark("decimate");
     if (!step(0.25f)) return false;
@@ -967,7 +967,7 @@ bool remeshPieceV2(const WorkMesh& piece, int axis, double wantQuads, const QRem
 
     // 2. Guides as feature chains.
     FieldSettings fs;
-    fs.alignWeight = tune("SF_QR2_ALIGN", 1.0f);
+    fs.alignWeight = tune("SF_QR2_ALIGN", 0.01f);
     applyGuides(proxy, guides, opt.guideStrength, h0, fs, frames);
     if (!guides.empty()) {
         frames.build(proxy);
@@ -1032,10 +1032,19 @@ bool remeshPieceV2(const WorkMesh& piece, int axis, double wantQuads, const QRem
     std::vector<glm::uvec4> quads;
     std::vector<vec3> qp;
     const CrossField fieldStart = field;
+    // The map is solved on the smoothed proxy, which has less area than the real one: scale the sizes to match.
     double scale = 1.0;
+    {
+        double ar = 0.0, as = 0.0;
+        for (size_t t = 0; t < frames.area.size(); ++t) ar += frames.area[t], as += sframes.area[t];
+        if (ar > 0.0 && as > 0.0) scale = std::sqrt(as / ar);
+        setSizes(scale);
+    }
+    double countFix = 1.0; // the map's area aims at wantQuads * countFix unit squares
     for (int attempt = 0; attempt < 2; ++attempt) {
         field = fieldStart;
         GridMap map;
+        map.wantQuads = wantQuads * countFix;
         smooth.size = proxy.size;
         if (!solveGridMap(smooth, sframes, field, map, isCancelled)) {
             if (cancelled) return false;
@@ -1058,9 +1067,8 @@ bool remeshPieceV2(const WorkMesh& piece, int axis, double wantQuads, const QRem
         cleanQuads(qp, quads);
         mark("extract");
         const double ratio = double(quads.size()) / wantQuads;
-        if (quads.empty() || attempt == 1 || std::abs(ratio - 1.0) < 0.08) break;
-        scale *= std::sqrt(ratio);
-        setSizes(scale);
+        if (quads.empty() || attempt == 1 || std::abs(ratio - 1.0) < 0.12) break;
+        countFix /= ratio;
         if (!step(0.7f)) return false;
     }
     if (quads.size() < 4) {

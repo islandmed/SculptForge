@@ -111,7 +111,10 @@ private:
     struct Level {
         SparseMatrix<S> A;
         std::vector<uint32_t> agg; // fine unknown -> coarse unknown (this level -> next)
-        std::vector<S> phase;      // prolongation coefficient of each fine unknown
+        std::vector<S> phase;      // tentative prolongation coefficient of each fine unknown
+        // Smoothed prolongation P = (I - w D^-1 A) P0, rows per fine unknown.
+        std::vector<uint32_t> pOff, pCol;
+        std::vector<S> pVal;
     };
     std::vector<Level> levels_;
 
@@ -167,14 +170,47 @@ private:
         for (size_t i = 0; i < n; ++i)
             if (f.agg[i] == ~0u) f.agg[i] = nc++, f.phase[i] = S(1.0);
         if (nc == 0 || nc >= n) return false;
-        // Galerkin: Ac[I][J] = sum conj(P_i) A_ij P_j.
-        std::vector<std::pair<uint64_t, S>> trips;
-        trips.reserve(A.val.size());
-        for (size_t i = 0; i < n; ++i)
-            for (uint32_t k = A.off[i]; k < A.off[i + 1]; ++k) {
-                const uint32_t j = A.col[k];
-                trips.push_back({(uint64_t(f.agg[i]) << 32) | f.agg[j], conjOf(f.phase[i]) * A.val[k] * f.phase[j]});
+        // Smoothed aggregation: P = (I - w D^-1 A) P0 (w = 2/3), so coarse corrections are smooth and the V-cycle
+        // converges in a few dozen iterations instead of hundreds.
+        const double w = 2.0 / 3.0;
+        f.pOff.assign(n + 1, 0);
+        f.pCol.clear();
+        f.pVal.clear();
+        {
+            std::vector<std::pair<uint32_t, S>> row;
+            for (size_t i = 0; i < n; ++i) {
+                row.clear();
+                row.push_back({f.agg[i], f.phase[i]});
+                for (uint32_t k = A.off[i]; k < A.off[i + 1]; ++k) {
+                    const uint32_t j = A.col[k];
+                    row.push_back({f.agg[j], -(w / A.diag[i]) * A.val[k] * f.phase[j]});
+                }
+                std::sort(row.begin(), row.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+                for (size_t k = 0; k < row.size(); ++k) {
+                    if (!f.pCol.empty() && f.pOff[i + 1] > 0 && f.pCol.back() == row[k].first) f.pVal.back() += row[k].second;
+                    else f.pCol.push_back(row[k].first), f.pVal.push_back(row[k].second), ++f.pOff[i + 1];
+                }
             }
+            for (size_t i = 0; i < n; ++i) f.pOff[i + 1] += f.pOff[i];
+        }
+        // Galerkin: Ac = P^H A P, via AP (rows fine, columns coarse).
+        std::vector<std::pair<uint64_t, S>> trips;
+        {
+            std::vector<std::pair<uint32_t, S>> ap;
+            std::unordered_map<uint32_t, S> acc;
+            for (size_t i = 0; i < n; ++i) {
+                acc.clear();
+                for (uint32_t k = A.off[i]; k < A.off[i + 1]; ++k) {
+                    const uint32_t j = A.col[k];
+                    for (uint32_t m = f.pOff[j]; m < f.pOff[j + 1]; ++m) acc[f.pCol[m]] += A.val[k] * f.pVal[m];
+                }
+                for (uint32_t m = f.pOff[i]; m < f.pOff[i + 1]; ++m) {
+                    const uint32_t I = f.pCol[m];
+                    const S pc = conjOf(f.pVal[m]);
+                    for (const auto& [J, v] : acc) trips.push_back({(uint64_t(I) << 32) | J, pc * v});
+                }
+            }
+        }
         c.A.build(nc, trips);
         return true;
     }
@@ -242,9 +278,11 @@ private:
         for (size_t i = 0; i < n; ++i) r[i] = b[i] - r[i];
         const size_t nc = levels_[li + 1].A.n;
         std::vector<S> rc(nc, S{}), xc;
-        for (size_t i = 0; i < n; ++i) rc[L.agg[i]] += conjOf(L.phase[i]) * r[i];
+        for (size_t i = 0; i < n; ++i)
+            for (uint32_t m = L.pOff[i]; m < L.pOff[i + 1]; ++m) rc[L.pCol[m]] += conjOf(L.pVal[m]) * r[i];
         vcycle(li + 1, rc, xc);
-        for (size_t i = 0; i < n; ++i) x[i] += L.phase[i] * xc[L.agg[i]];
+        for (size_t i = 0; i < n; ++i)
+            for (uint32_t m = L.pOff[i]; m < L.pOff[i + 1]; ++m) x[i] += L.pVal[m] * xc[L.pCol[m]];
         sweep(L.A, b, x, false);
     }
     std::vector<S> dense_;

@@ -114,6 +114,7 @@ struct GridMap {
     std::vector<vec2> uv;          // per corner 3t+k: the map at that corner, in the triangle's chart
     size_t flipped = 0;            // triangles whose image is turned over
     size_t cutEdges = 0, integerVars = 0;
+    double wantQuads = 0.0;        // in: scale the map to this many unit squares before rounding (0: as solved)
 };
 
 // Seamless map with the u / v gradients following the field at 1 / size, singularities and feature lines on the

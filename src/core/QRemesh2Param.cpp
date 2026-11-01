@@ -185,13 +185,13 @@ struct ReducedOp {
 // Conjugate gradients on the unknowns not fixed (Jacobi preconditioner); fixed entries of x stay. Returns iterations.
 int conjugateGradients(const ReducedOp& A, const std::vector<double>& b, const std::vector<uint8_t>& fixed,
                        std::vector<double>& x, double tol, int maxIt, const std::function<bool()>& cancelled, bool& stop,
-                       const Multigrid<double>* mg = nullptr) {
+                       const std::function<void(const std::vector<double>&, std::vector<double>&)>& pre = {}) {
     const size_t n = A.n;
     const std::vector<double>& D = *A.diag;
     std::vector<double> r(n), z(n), d(n), q(n);
     auto precond = [&] {
-        if (mg) {
-            mg->apply(r, z);
+        if (pre) {
+            pre(r, z);
             for (size_t i = 0; i < n; ++i)
                 if (fixed[i]) z[i] = 0.0;
         } else {
@@ -602,13 +602,133 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
         As.build(nf, trips);
         mg.build(As);
     }
+    // The integer unknowns (singularity positions, seam shifts, feature lines) couple across the whole cut tree, which
+    // the stand-in leaves out: they get an exact dense block A_ii = S^T K S (S: their columns of C), and the
+    // preconditioner is a symmetric block Gauss-Seidel over (integers, reals, integers).
+    std::vector<uint32_t> intIdx(nf, kNone), intVars;
+    for (size_t j = 0; j < nf; ++j)
+        if (el.kind(freeVars[j]) != 0) intIdx[j] = uint32_t(intVars.size()), intVars.push_back(uint32_t(j));
+    const size_t mi = intVars.size();
+    std::vector<double> Aii(mi * mi, 0.0);
+    if (mi > 0 && mi <= 4000) {
+        // S rows (per wedge unknown: its integer terms) and W = K S.
+        std::vector<std::vector<std::pair<uint32_t, double>>> S(ncopy);
+        for (uint32_t v = 0; v < ncopy; ++v)
+            for (uint32_t k = cOff[v]; k < cOff[v + 1]; ++k)
+                if (intIdx[cCol[k]] != kNone) S[v].push_back({intIdx[cCol[k]], cVal[k]});
+        std::vector<double> acc(mi, 0.0);
+        std::vector<uint32_t> touched;
+        for (uint32_t v = 0; v < ncopy; ++v) {
+            if (S[v].empty()) continue;
+            // Row v of K S, then A_ii += S_v^T (K S)_v ... K is symmetric, so use (K S)_v = sum_u K_vu S_u.
+            touched.clear();
+            for (uint32_t k = K.off[v]; k < K.off[v + 1]; ++k)
+                for (const auto& [j, c] : S[K.col[k]]) {
+                    if (acc[j] == 0.0) touched.push_back(j);
+                    acc[j] += K.val[k] * c;
+                    if (acc[j] == 0.0) acc[j] = 1e-300;
+                }
+            for (const auto& [i, c] : S[v])
+                for (uint32_t j : touched) Aii[size_t(i) * mi + j] += c * acc[j];
+            for (uint32_t j : touched) acc[j] = 0.0;
+        }
+        for (size_t i = 0; i < mi; ++i) Aii[i * mi + i] += reg;
+    }
+    std::vector<double> Lii; // Cholesky of A_ii over the integers not fixed yet
+    std::vector<uint32_t> liveInts;
+    auto factorInts = [&](const std::vector<uint8_t>& fixedMask) {
+        liveInts.clear();
+        for (size_t a = 0; a < mi; ++a)
+            if (!fixedMask[intVars[a]]) liveInts.push_back(uint32_t(a));
+        const size_t m = liveInts.size();
+        Lii.assign(m * m, 0.0);
+        for (size_t a = 0; a < m; ++a)
+            for (size_t b = 0; b < m; ++b) Lii[a * m + b] = Aii[size_t(liveInts[a]) * mi + liveInts[b]];
+        for (size_t j = 0; j < m; ++j) {
+            double d = Lii[j * m + j];
+            for (size_t k = 0; k < j; ++k) d -= Lii[j * m + k] * Lii[j * m + k];
+            d = std::sqrt(std::max(d, 1e-300));
+            Lii[j * m + j] = d;
+            for (size_t i = j + 1; i < m; ++i) {
+                double s2 = Lii[i * m + j];
+                for (size_t k = 0; k < j; ++k) s2 -= Lii[i * m + k] * Lii[j * m + k];
+                Lii[i * m + j] = s2 / d;
+            }
+        }
+    };
+    auto solveInts = [&](std::vector<double>& rhsI) { // in place, over liveInts
+        const size_t m = liveInts.size();
+        for (size_t i = 0; i < m; ++i) {
+            double s2 = rhsI[i];
+            for (size_t k = 0; k < i; ++k) s2 -= Lii[i * m + k] * rhsI[k];
+            rhsI[i] = s2 / Lii[i * m + i];
+        }
+        for (size_t i = m; i-- > 0;) {
+            double s2 = rhsI[i];
+            for (size_t k = i + 1; k < m; ++k) s2 -= Lii[k * m + i] * rhsI[k];
+            rhsI[i] = s2 / Lii[i * m + i];
+        }
+    };
+    const bool useIntBlock = mi > 0 && mi <= 4000;
+    std::vector<double> pt(nf), pz(nf), pr(nf), ri;
+    const std::function<void(const std::vector<double>&, std::vector<double>&)> precond =
+        [&](const std::vector<double>& r, std::vector<double>& z) {
+            if (!useIntBlock || liveInts.empty()) {
+                mg.apply(r, z);
+                return;
+            }
+            const size_t m = liveInts.size();
+            // z_i1 = A_ii^-1 r_i
+            ri.assign(m, 0.0);
+            for (size_t a = 0; a < m; ++a) ri[a] = r[intVars[liveInts[a]]];
+            solveInts(ri);
+            std::fill(pz.begin(), pz.end(), 0.0);
+            for (size_t a = 0; a < m; ++a) pz[intVars[liveInts[a]]] = ri[a];
+            // z_r = MG(r_r - A_ri z_i1)
+            op.apply(pz, pt);
+            for (size_t j = 0; j < nf; ++j) pr[j] = intIdx[j] == kNone ? r[j] - pt[j] : 0.0;
+            mg.apply(pr, z);
+            for (size_t j = 0; j < nf; ++j)
+                if (intIdx[j] != kNone) z[j] = 0.0;
+            // z_i = A_ii^-1 (r_i - A_ir z_r)
+            op.apply(z, pt);
+            for (size_t a = 0; a < m; ++a) ri[a] = r[intVars[liveInts[a]]] - pt[intVars[liveInts[a]]];
+            solveInts(ri);
+            for (size_t a = 0; a < m; ++a) z[intVars[liveInts[a]]] = ri[a];
+        };
 
     // 5. Solve, round the integers nearest-first, re-solve.
     std::vector<double> y(nf, 0.0);
     std::vector<uint8_t> fixed(nf, 0);
     bool stop = false;
-    int iters = conjugateGradients(op, rhs, fixed, y, 1e-6, 2000, cancelled, stop, &mg);
+    if (useIntBlock) factorInts(fixed);
+    int iters = conjugateGradients(op, rhs, fixed, y, 1e-4, 2000, cancelled, stop, precond);
     if (stop) return false;
+    // Before rounding: scale the map so its area (the number of unit squares, i.e. quads) is the wanted count. The
+    // constraints are homogeneous, so a scaled solution is still a solution; distortion near singularities and
+    // features otherwise leaves the count 10-20% off.
+    if (out.wantQuads > 0.0) {
+        double area = 0.0;
+        std::vector<Term> terms;
+        auto at = [&](uint32_t corner, int coord) {
+            double k;
+            expand(U(corner) + uint32_t(coord), terms, k);
+            double s = k;
+            for (const Term& t : terms) s += t.a * y[t.var];
+            return s;
+        };
+        for (uint32_t t = 0; t < nt; ++t) {
+            const double ax = at(3 * t, 0), ay = at(3 * t, 1), bx = at(3 * t + 1, 0), by = at(3 * t + 1, 1);
+            const double cx = at(3 * t + 2, 0), cy = at(3 * t + 2, 1);
+            area += 0.5 * std::abs((bx - ax) * (cy - ay) - (cx - ax) * (by - ay));
+        }
+        if (area > 0.0) {
+            const double s = std::sqrt(out.wantQuads / area);
+            for (double& v : y) v *= s;
+            for (double& v : rhs) v *= s;
+            if (timing) std::fprintf(stderr, "  grid map: area %.0f, scaled by %.3f\n", area, s);
+        }
+    }
     std::vector<uint32_t> intFree;
     for (size_t i = 0; i < nf; ++i)
         if (el.kind(freeVars[i]) != 0) intFree.push_back(uint32_t(i));
@@ -619,7 +739,7 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
             std::vector<std::pair<double, uint32_t>> dist;
             for (uint32_t i : left) dist.push_back({std::abs(y[i] - std::round(y[i])), i});
             std::sort(dist.begin(), dist.end());
-            static const double frac = std::getenv("SF_QR2_ROUND") ? std::atof(std::getenv("SF_QR2_ROUND")) : 0.2;
+            static const double frac = std::getenv("SF_QR2_ROUND") ? std::atof(std::getenv("SF_QR2_ROUND")) : 0.5;
             size_t take = std::max<size_t>(1, size_t(double(left.size()) * frac + 0.999));
             while (take < dist.size() && dist[take].first < 0.08) ++take;
             if (left.size() <= 8) take = left.size();
@@ -631,8 +751,9 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
             std::vector<uint32_t> rest;
             for (size_t k = take; k < dist.size(); ++k) rest.push_back(dist[k].second);
             left.swap(rest);
-            static const double midTol = std::getenv("SF_QR2_TOL") ? std::atof(std::getenv("SF_QR2_TOL")) : 1e-5;
-            iters += conjugateGradients(op, rhs, fixed, y, left.empty() ? 1e-6 : midTol, left.empty() ? 2000 : 500, cancelled, stop, &mg);
+            static const double midTol = std::getenv("SF_QR2_TOL") ? std::atof(std::getenv("SF_QR2_TOL")) : 1e-3;
+            if (useIntBlock) factorInts(fixed);
+            iters += conjugateGradients(op, rhs, fixed, y, left.empty() ? 1e-5 : midTol, left.empty() ? 2000 : 500, cancelled, stop, precond);
             if (stop) return false;
             ++rounds;
         }
