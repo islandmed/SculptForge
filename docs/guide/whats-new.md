@@ -14,6 +14,12 @@ with a 200-pixel brush, the brush now trails the pointer by half as far, a frame
 first dab appears in half the time, and lifting the pen no longer pauses for up to a second while waiting dabs
 are placed. See [Performance](performance.md).
 
+### Fixes
+
+- Dynamic topology with symmetry now adds detail on the mirrored side too when the model's two sides aren't
+  built from mirrored polygons (a QRemeshed head, say): before, only the side under the brush got the new
+  triangles. See [Dynamic topology](dynamic-topology.md).
+
 ## Version 0.9.6
 
 ### Extract

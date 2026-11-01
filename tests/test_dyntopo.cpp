@@ -13,6 +13,8 @@
 #include "core/Primitives.h"
 #include "core/ThreadPool.h"
 
+#include <glm/gtc/matrix_transform.hpp>
+
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -323,6 +325,92 @@ TEST(dyntopo_x_symmetry_makes_mirrored_topology) {
     const std::vector<uint32_t> map = mirrorMap(d.mesh, target * 0.3f);
     CHECK(map.size() == d.mesh.vertexCount());
     if (map.size() == d.mesh.vertexCount()) CHECK(mirroredTopology(d.mesh, map));
+}
+
+TEST(dyntopo_symmetry_remeshes_both_sides_of_an_asymmetric_mesh) {
+    // #23: a symmetric shape whose triangles aren't mirrored (here a sphere turned a little; in the report a
+    // QRemeshed head) found no mirror images for the remeshing, so with X symmetry the side under the brush got
+    // fine triangles and the mirrored side, which the brush moves just the same, kept its coarse ones. Both
+    // sides must get the detail (not the same triangles: there were none to mirror).
+    Document d = sphereDoc(3);
+    const glm::mat3 turn = glm::mat3(glm::rotate(glm::mat4(1.0f), 0.3f, glm::vec3(0.2f, 1.0f, 0.4f)));
+    for (glm::vec3& p : d.mesh.positions) p = turn * p;
+    d.mesh.recomputeAllNormals();
+    d.mesh.rebuildTopology();
+    d.bvh.build(d.mesh);
+    d.sculptor.dyntopo.detail = 0.75f;
+    const Symmetry sym{true, false, false};
+    const float radius = 0.3f, target = dyntopoEdgeLength(d.sculptor.dyntopo, radius, 2.0f);
+    std::vector<glm::vec3> path;
+    CHECK(d.sculptor.beginStroke(d.mesh, "Standard"));
+    for (int i = 0; i < 8; ++i) {
+        const glm::vec3 from = glm::vec3(0.55f, 0.1f * float(i) - 0.35f, 0.9f) * 3.0f;
+        RayHit hit;
+        if (d.bvh.raycast(d.mesh, from, glm::normalize(-from), hit)) path.push_back(hit.position);
+        CHECK(dabToward(d, from, radius, BrushType::Standard, sym));
+    }
+    d.undo.push(d.sculptor.endStroke());
+    CHECK(invalid(d.mesh, true).empty());
+    CHECK(bvhMatches(d.mesh, d.bvh));
+    // Along the stroke and along its mirror image: how many triangles, and the longest edge.
+    auto near = [&](float sign, size_t& count, float& longest) {
+        count = 0;
+        longest = 0.0f;
+        for (const glm::uvec3& t : d.mesh.triangles) {
+            const glm::vec3 c = (d.mesh.positions[t.x] + d.mesh.positions[t.y] + d.mesh.positions[t.z]) / 3.0f;
+            bool in = false;
+            for (const glm::vec3& p : path) in = in || glm::distance(c, glm::vec3(p.x * sign, p.y, p.z)) < radius * 0.6f;
+            if (!in) continue;
+            ++count;
+            for (int k = 0; k < 3; ++k)
+                longest = std::max(longest, glm::distance(d.mesh.positions[t[k]], d.mesh.positions[t[(k + 1) % 3]]));
+        }
+    };
+    size_t brushSide = 0, mirrorSide = 0;
+    float brushLongest = 0.0f, mirrorLongest = 0.0f;
+    near(1.0f, brushSide, brushLongest);
+    near(-1.0f, mirrorSide, mirrorLongest);
+    std::printf("  brush side %zu triangles (longest edge %.3f), mirrored side %zu (%.3f), target %.3f\n", brushSide,
+                brushLongest, mirrorSide, mirrorLongest, target);
+    CHECK(brushSide > 200);
+    CHECK(mirrorSide * 10 > brushSide * 7); // within 30%
+    CHECK(mirrorLongest <= target * 4.0f / 3.0f * 1.5f);
+
+    // Every side remeshed on its own stays a valid mesh, with X and Z symmetry (three images) and any brush,
+    // and undo takes it all back exactly.
+    const Mesh turned = [&] {
+        Mesh m = makeIcosphere(3, 1.0f);
+        for (glm::vec3& p : m.positions) p = turn * p;
+        return m;
+    }();
+    uint32_t rng = 777;
+    auto rnd = [&rng] {
+        rng ^= rng << 13;
+        rng ^= rng >> 17;
+        rng ^= rng << 5;
+        return float(rng & 0xffff) / 65535.0f;
+    };
+    const BrushType types[] = {BrushType::Standard, BrushType::SnakeHook, BrushType::Smooth, BrushType::Clay, BrushType::Pinch};
+    bool valid = true;
+    for (int stroke = 0; stroke < 10 && valid; ++stroke) {
+        const BrushType type = types[stroke % 5];
+        d.sculptor.dyntopo.detail = 0.4f + 0.5f * rnd();
+        CHECK(d.sculptor.beginStroke(d.mesh, brushName(type)));
+        const glm::vec3 dir = glm::normalize(glm::vec3(0.3f + 0.6f * rnd(), rnd() - 0.5f, 0.2f + 0.6f * rnd()));
+        const glm::vec3 step = glm::normalize(glm::cross(dir, glm::vec3(0.1f, 1.0f, 0.2f))) * 0.07f;
+        for (int i = 0; i < 6 && valid; ++i) {
+            dabToward(d, (dir + step * float(i)) * 3.0f, 0.2f + 0.2f * rnd(), type, Symmetry{true, false, true}, 0.6f, step * 0.5f);
+            const std::string why = invalid(d.mesh, true);
+            if (!why.empty()) std::printf("  stroke %d dab %d: %s\n", stroke, i, why.c_str());
+            valid = why.empty();
+        }
+        d.undo.push(d.sculptor.endStroke());
+    }
+    CHECK(valid);
+    CHECK(bvhMatches(d.mesh, d.bvh));
+    while (d.undo.canUndo()) d.undo.undo(d.mesh, d.bvh);
+    CHECK(d.mesh.triangles == turned.triangles);
+    CHECK(invalid(d.mesh, true).empty());
 }
 
 TEST(dyntopo_carries_attributes_and_drops_uvs) {

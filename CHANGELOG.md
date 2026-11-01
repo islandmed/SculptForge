@@ -27,6 +27,16 @@ All notable changes to SculptForge are listed here. The format follows
     mesh above a quarter: 78 ms a frame against 14-30), and finds them in parallel (3.7 -> 0.4 ms).
   - Starting a stroke no longer re-uploads the whole mesh when there are no LODs.
 
+### Fixed
+- Dynamic topology with symmetry remeshes the mirrored side of a model whose sides aren't mirrored polygon for
+  polygon (#23; a QRemeshed head in the report). Splits, collapses and flips are found under the brush and done
+  on the mirror images of the same edges; without images (nothing to pair the vertices with) the other side only
+  moved and kept its coarse triangles: a stroke left 2,199 triangles along its path and 33 along its mirror image.
+  An edge under a mirror image of the brush whose image on the brush's side is missing is now remeshed where it
+  is (2,260 there). Symmetric meshes still get exactly mirrored topology (the 1M dynamic topology benchmark's times
+  are unchanged). Test `dyntopo_symmetry_remeshes_both_sides_of_an_asymmetric_mesh` (a turned sphere, then
+  random strokes with X and Z symmetry, valid after every dab, undone exactly).
+
 ## [0.9.6] - 2026-10-31
 
 The same evening as 0.9.5, the next batch from your reports and from askNK's review: Extract and Mirror And Weld,

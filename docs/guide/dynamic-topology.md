@@ -39,7 +39,9 @@ and fine ones around the eyes.
 ## What it keeps and what it doesn't
 
 - **Symmetry.** With X (or Y, Z) symmetry on, both sides are remeshed together and get mirrored triangles, not
-  just mirrored shapes.
+  just mirrored shapes. A model whose sides aren't made of mirrored polygons (after QRemesh, or sculpted
+  without symmetry) has no mirrored triangles to keep: each side then gets its own new triangles, as fine as
+  the brush's side.
 - **Mask and visibility.** Fully masked and hidden parts are left alone. Partly masked areas are remeshed but
   move less, as usual.
 - **Borders.** Open edges and the borders between polygroups stay where they are; their vertices only slide

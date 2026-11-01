@@ -157,6 +157,9 @@ private:
     bool boundaryVertex(uint32_t v) const;
     float len2(uint32_t a, uint32_t b) const;
     bool inside(uint32_t a, uint32_t b, bool mirrored = false) const;
+    // An edge to remesh: under the brush, or under a mirror image of it with no image on the brush's side (an
+    // asymmetric mesh: that side is remeshed on its own).
+    bool candidate(uint32_t a, uint32_t b) const;
     glm::vec3 faceNormalAt(uint32_t v) const;
     // Symmetry: the mirror images of vertex v (kNone where unknown).
     uint32_t mirrorOf(size_t mirror, uint32_t v) const;
@@ -202,11 +205,13 @@ private:
     std::vector<uint8_t> deadV_, deadT_;
     std::vector<uint32_t> freeV_, freeT_;
     std::vector<uint32_t> changedV_, changedT_, regionTris_, slivers_;
+    std::vector<uint32_t> mirrorTris_; // the triangles under the brush's mirror images (queryRegion)
     std::vector<uint8_t> changedVFlag_;
     std::vector<Edge> heap_;
     std::vector<std::pair<uint32_t, uint32_t>> moved_;
     std::vector<uint32_t> recordedNow_;
     mutable bool orbitIncomplete_ = false; // the last orbit() missed a mirror image
+    mutable std::vector<std::pair<uint32_t, uint32_t>> orbitScratch_; // candidate()
     size_t ops_ = 0, maxOps_ = 0;
     mutable std::vector<uint32_t> scratch_, scratch2_, ringA_, ringB_, ringC_, lockScratch_;
 };
