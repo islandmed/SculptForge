@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/App.h"
+#include "app/ShellQuote.h"
 #include "app/AsyncStroke.h"
 #include "app/Calibration.h"
 #include "app/CrashLog.h"
@@ -515,10 +516,14 @@ int App::runRecording() {
     // virtual camera and downsampled.
     const int ss = std::max(options_.supersample, 1), ow = w / ss, oh = h / ss;
     // Frames go straight to ffmpeg as raw RGBA.
+    if (shellQuote(options_.recordPath).empty()) {
+        SDL_Log("--record: choose a file name without \" %% ! ^ & | < > in it");
+        return 1;
+    }
     std::string cmd = "ffmpeg -loglevel error -y -f rawvideo -pix_fmt rgba -s " + std::to_string(ow) + "x" + std::to_string(oh) +
                       " -r " + std::to_string(fps) +
-                      " -i - -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p -movflags +faststart \"" +
-                      options_.recordPath + "\"";
+                      " -i - -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p -movflags +faststart " +
+                      shellQuote(options_.recordPath);
 #if defined(_WIN32)
     FILE* ff = _popen(cmd.c_str(), "wb");
 #else

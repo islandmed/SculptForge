@@ -21,6 +21,9 @@ All notable changes to SculptForge are listed here. The format follows
 - Insert on the model (#34): the drag's direction also turns the inserted shape about the surface normal.
 
 ### Fixed
+- Security: the timelapse, proof-mode and --record video exports passed the file name to ffmpeg's command line in
+  double quotes, so a crafted name (for example a project called `x$(...)`) could run a command. Names are now
+  quoted so nothing in them is interpreted (and refused on Windows when they contain shell characters).
 - The brush ring that follows the surface (#25) read the mesh while a predictive stroke's thread was changing it,
   which could change where that stroke's dabs landed; it now shows the flat ring during such strokes.
 

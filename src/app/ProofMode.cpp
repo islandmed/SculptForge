@@ -15,6 +15,7 @@
 #include "app/ProofMode.h"
 
 #include "app/App.h"
+#include "app/ShellQuote.h"
 #include "app/Theme.h"
 
 #include "core/Benchmark.h"
@@ -219,10 +220,12 @@ public:
     bool start(const std::string& path, int w, int h) {
         w_ = w, h_ = h;
         // Bottom-up rows from glReadPixels: flipped; scaled to at most 1920 wide to keep the encoder light.
+        const std::string quoted = shellQuote(path); // (never a shell-active file name)
+        if (quoted.empty()) return false;
         const std::string cmd = "ffmpeg -loglevel error -y -f rawvideo -pix_fmt rgba -s " + std::to_string(w) + "x" +
                                 std::to_string(h) + " -r " + std::to_string(kVideoFps) +
                                 " -i - -vf \"vflip,scale='min(1920,iw)':-2\" -c:v libx264 -preset veryfast -crf 20 "
-                                "-pix_fmt yuv420p -movflags +faststart \"" + path + "\"";
+                                "-pix_fmt yuv420p -movflags +faststart " + quoted;
 #if defined(_WIN32)
         ff_ = _popen(cmd.c_str(), "wb");
 #else

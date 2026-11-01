@@ -7,6 +7,7 @@
 // Right-click a stroke to re-tune its strength. Timelapse renders the history as a turntable video. The data
 // side is core/Timeline.h; Help > Benchmark (proof mode) is in ProofMode.cpp.
 #include "app/App.h"
+#include "app/ShellQuote.h"
 #include "app/Theme.h"
 #include "app/Ui.h"
 
@@ -200,9 +201,14 @@ void App::startTimelapse(const std::string& path, int width, int height, float s
     job->camera.distance *= 0.72f; // frame() leaves room for any view direction; a turntable can come closer
     job->camera.aspect = float(job->width) / float(std::max(job->height, 1));
     job->yaw0 = camera_.yaw;
+    const std::string quoted = shellQuote(path); // (never a shell-active file name)
+    if (quoted.empty()) {
+        status_ = s.message = "Timelapse: choose a file name without \" % ! ^ & | < > in it";
+        return;
+    }
     const std::string cmd = "ffmpeg -loglevel error -y -f rawvideo -pix_fmt rgba -s " + std::to_string(job->width) + "x" +
                             std::to_string(job->height) + " -r " + std::to_string(job->fps) +
-                            " -i - -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart \"" + path + "\"";
+                            " -i - -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart " + quoted;
 #if defined(_WIN32)
     job->ffmpeg = _popen(cmd.c_str(), "wb");
 #else
