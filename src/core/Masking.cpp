@@ -175,6 +175,15 @@ void Sculptor::dabMask(Mesh& mesh, const BVH& bvh, const DabParams& p, Symmetry 
     if (!active_) return;
     const float s = std::clamp(p.strength, 0.0f, 1.0f) * std::clamp(p.pressure, 0.0f, 1.0f);
     if (s <= 0.0f) return;
+    if (microReady(mesh)) { // the micro level's own mask, per grid point (core/MicroSculpt.cpp)
+        const double k0 = micro_.findMs + micro_.kernelMs + micro_.stitchMs;
+        for (const glm::vec3& mirror : mirrors(sym))
+            micro_.dab(mesh, bvh, BrushType::Standard, p.center * mirror, p.viewDir * mirror, p.radius, 1.0f, p.invert, p.focal,
+                       p.alphaUp * mirror, true, s);
+        timings.kernelMs += micro_.findMs + micro_.kernelMs + micro_.stitchMs - k0;
+        ++timings.dabs;
+        return;
+    }
     auto clock = std::chrono::steady_clock::now();
     std::vector<float>& mask = mesh.ensureMask();
     for (const glm::vec3& mirror : mirrors(sym)) {

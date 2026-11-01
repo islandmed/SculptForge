@@ -46,13 +46,17 @@ struct BenchOptions {
     bool viewOnly = false;
     // Dynamic topology instead (--bench-dyntopo): spheres without subdivision levels, strokes that remesh.
     bool dyntopo = false;
+    // Micro-displacement levels instead (--bench-micro, core/Micro.h): sizes are micro triangles (millions), on
+    // a base sphere at micro level `microLevel` (4: 256 micro triangles per base triangle).
+    bool micro = false;
+    int microLevel = 4;
     std::function<void(const std::string&)> log; // progress lines (optional)
     std::function<void(const std::string&)> partial; // the report so far, after each size (optional)
 };
 
 // Command-line options shared by sculptforge-cli and the app: --bench, --bench-sizes 4,16,32 (millions of
 // triangles), --bench-dabs N, --bench-no-project (skip saving / opening, which needs twice the memory),
-// --bench-brushes TEXT (only the rows whose name contains TEXT), --bench-view (only the viewport's costs), --bench-dyntopo (dynamic topology strokes), --bench-out FILE. parseBenchArg returns true when argv[i] was one of them
+// --bench-brushes TEXT (only the rows whose name contains TEXT), --bench-view (only the viewport's costs), --bench-dyntopo (dynamic topology strokes), --bench-micro (micro-displacement levels; --bench-micro-level N), --bench-out FILE. parseBenchArg returns true when argv[i] was one of them
 // (advancing i past its value).
 struct BenchCommandLine {
     bool run = false;

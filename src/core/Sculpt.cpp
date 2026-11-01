@@ -209,7 +209,17 @@ bool Sculptor::beginStroke(const Mesh& mesh, std::string label, int layer) {
     strokeDiagonal_ = 0.0f;
     lastRemesh_ = false;
     topologyHeld_ = false;
+    microMesh_ = nullptr;
     active_ = true;
+    return true;
+}
+
+bool Sculptor::microReady(Mesh& mesh) {
+    if (!mesh.micro || !microMatches(mesh)) return false;
+    if (!micro_.active() || microMesh_ != &mesh) {
+        micro_.begin(mesh);
+        microMesh_ = &mesh;
+    }
     return true;
 }
 
@@ -444,6 +454,8 @@ UndoRecord Sculptor::endStroke() {
             record_.topology = std::move(topo);
         }
     }
+    if (micro_.active() && microMesh_) record_.micro = micro_.end(*microMesh_);
+    microMesh_ = nullptr;
     clearRecorded();
     active_ = false;
     grabVerts_.clear();
@@ -453,6 +465,18 @@ UndoRecord Sculptor::endStroke() {
 
 void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Symmetry sym) {
     if (!active_) return;
+    if (microReady(mesh)) { // a micro level: the grid takes the dab (core/MicroSculpt.cpp)
+        const double k0 = micro_.findMs + micro_.kernelMs, s0 = micro_.stitchMs;
+        const uint64_t pts = micro_.points;
+        for (const glm::vec3& m : mirrors(sym))
+            micro_.dab(mesh, bvh, type, p.center * m, p.viewDir * m, p.radius, p.strength * std::clamp(p.pressure, 0.0f, 1.0f),
+                       p.invert, p.focal, p.alphaUp * m, false, 0.0f);
+        timings.kernelMs += micro_.findMs + micro_.kernelMs - k0;
+        timings.normalsMs += micro_.stitchMs - s0;
+        timings.vertices += micro_.points - pts;
+        ++timings.dabs;
+        return;
+    }
     if (type != BrushType::Move) {
         const bool useAlpha = p.alpha && !p.alpha->empty(); // (the reach dabSingle gives the brush)
         const float reach = useAlpha ? 1.4143f : type == BrushType::ClayBuildup ? 1.3f : 1.0f;
@@ -677,6 +701,10 @@ void Sculptor::updateDabNormals(Mesh& mesh, const BVH& bvh) {
 
 void Sculptor::dabRecipe(Mesh& mesh, BVH& bvh, const BrushRecipe& recipe, const DabParams& p, Symmetry sym) {
     if (!active_) return;
+    if (mesh.micro && microMatches(mesh)) { // recipes aren't grid brushes: a micro level gets the Standard dab
+        dab(mesh, bvh, BrushType::Standard, p, sym);
+        return;
+    }
     remeshDab(mesh, bvh, p, sym, 1.0f, 1.0f);
     DabParams base = p;
     base.pressure = std::pow(std::clamp(p.pressure, 0.0f, 1.0f), recipe.pressureCurve);
@@ -829,6 +857,10 @@ void Sculptor::beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym)
     grabAll_.clear();
     grabLeaves_.clear();
     if (!active_) return;
+    if (microReady(mesh)) { // along the normals (a micro level can't move sideways)
+        for (const glm::vec3& m : mirrors(sym)) micro_.beginGrab(mesh, bvh, p.center * m, p.radius, p.focal, m);
+        return;
+    }
     for (const glm::vec3& m : mirrors(sym)) {
         glm::vec3 c = p.center * m;
         brushVertices(mesh, bvh, c, p.radius, verts_);
@@ -856,6 +888,14 @@ void Sculptor::beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym)
 }
 
 void Sculptor::grab(Mesh& mesh, BVH& bvh, const glm::vec3& delta) {
+    if (micro_.active() && microMesh_ == &mesh) {
+        const double k0 = micro_.kernelMs, s0 = micro_.stitchMs;
+        micro_.grab(mesh, delta);
+        timings.kernelMs += micro_.kernelMs - k0;
+        timings.normalsMs += micro_.stitchMs - s0;
+        ++timings.dabs;
+        return;
+    }
     if (grabVerts_.empty()) return;
     auto clock = std::chrono::steady_clock::now();
     // One mirror after another (a vertex may be in two), each in parallel.
@@ -881,6 +921,10 @@ void Sculptor::grab(Mesh& mesh, BVH& bvh, const glm::vec3& delta) {
 // Puts every vertex the current stroke moved back to its stroke-start position.
 void Sculptor::restoreStroke(Mesh& mesh, BVH& bvh) {
     if (!active_) return;
+    if (micro_.active() && microMesh_ == &mesh) {
+        micro_.restore(mesh);
+        return;
+    }
     topologyHeld_ = true; // (positions come back, topology wouldn't)
     // Polypaint laid down by the stroke so far (Paint brush / RGB while sculpting).
     if (!record_.colors.empty() && mesh.hasColors()) {

@@ -24,8 +24,11 @@ namespace sf {
 // painted texture with layers ("texture"; older files still load). 4: SubTools may carry subdivision levels
 // ("subdiv"; older files still load). 5: sculpt-layer details of subdivision levels are in the levels' local
 // frames, not world space (format 4 files are converted when they load). 6: levels made by Divide keep no
-// triangles, child maps or (where their positions say it) details; older files still load.
-constexpr int kProjectVersion = 6;
+// triangles, child maps or (where their positions say it) details; older files still load. 7: SubTools may carry a
+// micro-displacement level ("micro", core/Micro.h); only projects with one are written as 7.
+constexpr int kProjectVersion = 7;
+// Projects without a micro level (core/Micro.h) are written as format 6, which older versions read.
+constexpr int kProjectVersionWithoutMicro = 6;
 constexpr const char* kProjectExtension = ".sfproj";
 
 // True for paths ending in .sfproj (any case).

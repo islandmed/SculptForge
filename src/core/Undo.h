@@ -5,6 +5,7 @@
 #include "core/BVH.h"
 #include "core/Dyntopo.h"
 #include "core/Mesh.h"
+#include "core/Micro.h"
 #include "core/Multires.h"
 #include "core/ThreadPool.h"
 
@@ -110,6 +111,7 @@ inline constexpr int kActivePaintLayer = -2;
 //  - subdiv: a subdivision level step or level edit (core/Multires.h), applied on its own
 //  - topology: the slots a dynamic-topology stroke changed (core/Dyntopo.h), applied before the channels
 //  - subtool: a SubTool added to the scene (Extract), taken out on undo and put back on redo
+//  - micro: the grid tiles a stroke on a micro level changed, or a whole micro level (core/Micro.h)
 // Record old values before changing them (ensureX() the attribute first);
 // undo allocates a missing attribute so values can always be restored.
 struct UndoRecord {
@@ -132,10 +134,11 @@ struct UndoRecord {
     std::unique_ptr<SubdivUndo> subdiv;
     std::unique_ptr<TopologyUndo> topology;
     std::shared_ptr<SubtoolStep> subtool; // (shared: SubtoolStep is defined in core/Document.h)
+    std::unique_ptr<MicroUndo> micro;     // micro-displacement tiles of a stroke, or a micro level added / removed (core/Micro.h)
 
     bool empty() const {
         return positions.empty() && mask.empty() && colors.empty() && paintAlpha.empty() && hidden.empty() &&
-               polygroups.empty() && !mesh && !paint && !textureTiles && !texture && !subdiv && !topology && !subtool;
+               polygroups.empty() && !mesh && !paint && !textureTiles && !texture && !subdiv && !topology && !subtool && !micro;
     }
     size_t approxBytes() const;
 

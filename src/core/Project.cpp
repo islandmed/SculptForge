@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Project.h"
+#include "core/Micro.h"
 
 #include "core/Multires.h"
 
@@ -141,6 +142,29 @@ public:
         return add(file, Scalar::U32, 1, v.size(), littleEndian(v.data(), v.size()));
     }
     Json bytes(const std::string& file, const std::vector<uint8_t>& v) { return add(file, Scalar::U8, 1, v.size(), v); }
+    // `count` 16-bit integers at `v` (which must outlive the save), as u8 x 2, written straight from memory on
+    // little-endian machines.
+    Json int16s(const std::string& file, const int16_t* v, size_t count) {
+        if constexpr (std::endian::native == std::endian::little) {
+            ZipEntry e{file, {}};
+            e.external = count ? reinterpret_cast<const uint8_t*>(v) : nullptr;
+            e.externalSize = count * 2;
+            entries.push_back(std::move(e));
+            return descriptor(file, Scalar::U8, 2, count);
+        } else {
+            std::vector<uint8_t> data(count * 2);
+            for (size_t i = 0; i < count; ++i) data[2 * i] = uint8_t(uint16_t(v[i])), data[2 * i + 1] = uint8_t(uint16_t(v[i]) >> 8);
+            return add(file, Scalar::U8, 2, count, std::move(data));
+        }
+    }
+    // Copied external-free: a byte array that must outlive the save.
+    Json externalBytes(const std::string& file, const std::vector<uint8_t>& v) {
+        ZipEntry e{file, {}};
+        e.external = v.empty() ? nullptr : v.data();
+        e.externalSize = v.size();
+        entries.push_back(std::move(e));
+        return descriptor(file, Scalar::U8, 1, v.size());
+    }
 
     std::vector<ZipEntry> entries;
 
@@ -219,6 +243,16 @@ public:
     bool bytes(const Json& desc, const char* what, size_t count, std::vector<uint8_t>& out) {
         out.resize(count);
         return read(desc, what, Scalar::U8, 1, count, out.data());
+    }
+    bool int16s(const Json& desc, const char* what, size_t count, std::vector<int16_t>& out) {
+        out.resize(count);
+        if (!read(desc, what, Scalar::U8, 2, count, out.data())) return false;
+        if constexpr (std::endian::native != std::endian::little)
+            for (int16_t& v : out) {
+                const uint8_t* p = reinterpret_cast<const uint8_t*>(&v);
+                v = int16_t(uint16_t(p[0]) | uint16_t(p[1]) << 8);
+            }
+        return true;
     }
 
 private:
@@ -767,6 +801,7 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
     manifest.set("format", kFormatName);
     manifest.set("version", kProjectVersion);
     manifest.set("app_version", SCULPTFORGE_VERSION);
+    bool anyMicro = false; // projects without micro levels stay format 6, so 0.9.7 and older still open them
 
     // Every SubTool with its mesh, layers and state; blobs live under subtools/<i>/.
     Json subtools = Json::array();
@@ -785,6 +820,17 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
             st.set("texture", writeTexture(w, "subtools/" + std::to_string(i) + "/", doc.subtoolMesh(i)));
         if (subdivLevelCount(doc.subtoolMesh(i)))
             st.set("subdiv", writeSubdiv(w, "subtools/" + std::to_string(i) + "/", doc.subtoolMesh(i)));
+        if (const Mesh& m = doc.subtoolMesh(i); m.micro && microMatches(m)) { // format 7: the micro level (core/Micro.h)
+            const MicroMesh& mm = *m.micro;
+            const std::string p = "subtools/" + std::to_string(i) + "/micro/";
+            Json mj = Json::object();
+            mj.set("level", mm.level);
+            mj.set("step", double(mm.step));
+            mj.set("displacement", w.int16s(p + "displacement.bin", mm.disp.data(), mm.disp.size()));
+            if (mm.hasMask()) mj.set("mask", w.externalBytes(p + "mask.bin", mm.mask));
+            st.set("micro", std::move(mj));
+            anyMicro = true;
+        }
         const std::string& gozName = active ? doc.gozName : s.gozName;
         if (!gozName.empty()) st.set("goz_name", gozName);
         const std::vector<QRemeshGuide>& guides = active ? doc.qremeshGuides : s.qremeshGuides;
@@ -797,6 +843,7 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
     }
     manifest.set("subtools", std::move(subtools));
     manifest.set("active_subtool", doc.activeSubtool);
+    if (!anyMicro) manifest.set("version", kProjectVersionWithoutMicro);
 
     Json brushes = Json::array();
     for (const auto& b : doc.brushes) brushes.push(b.toJson());
@@ -926,6 +973,23 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
             s.finishBvh();
             r.parallelReads = true;
             s.mesh.recomputeAllNormals();
+            if (const Json& mj = sj["micro"]; mj.isObject() && version >= 7) {
+                const int level = int(mj["level"].asNumber(0));
+                if (level < 1 || level > MicroMesh::kMaxLevel) {
+                    error = "Project micro level is invalid";
+                    return false;
+                }
+                const uint32_t n = 1u << level;
+                const size_t count = s.mesh.triangleCount() * size_t((n + 1) * (n + 2) / 2);
+                std::vector<int16_t> disp;
+                std::vector<uint8_t> mask;
+                if (!r.int16s(mj["displacement"], "micro displacement", count, disp) ||
+                    (mj["mask"].isObject() && !r.bytes(mj["mask"], "micro mask", count, mask))) {
+                    error = r.error;
+                    return false;
+                }
+                if (!microAttach(s.mesh, level, float(mj["step"].asNumber(0)), std::move(disp), std::move(mask), error)) return false;
+            }
             s.activeLayer = int(sj["active_layer"].asNumber(-1));
         }
         const double active = manifest["active_subtool"].asNumber(0);

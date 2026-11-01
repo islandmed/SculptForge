@@ -14,6 +14,7 @@
 #include "core/ImageTo3D.h"
 #include "core/Masking.h"
 #include "core/Multires.h"
+#include "core/Micro.h"
 #include "core/MeshTransform.h"
 #include "core/PathStroke.h"
 #include "core/Polygroups.h"
@@ -769,6 +770,7 @@ CommandRegistry::CommandRegistry() {
     registerPolygroupCommands(*this);
     registerSubToolCommands(*this);
     registerSubdivCommands(*this); // subdiv_* (core/MultiresCommands.cpp)
+    registerMicroCommands(*this);  // micro_* (core/MicroCommands.cpp)
     registerDyntopoCommands(*this); // dyntopo (core/DyntopoCommands.cpp)
     registerSculptableCommands(*this); // splat_to_mesh, face_guides (core/Sculptable.h)
     registerTransformCommands(*this); // transform (core/MeshTransform.h)

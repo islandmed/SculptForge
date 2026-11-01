@@ -118,6 +118,9 @@ public:
     // DragDot; restoreStroke) put positions back, not topology. restoreStroke holds it too.
     void holdTopology() { topologyHeld_ = true; }
 
+    // Micro level timings (findMs, kernelMs, stitchMs, points) of the current stroke (core/Micro.h).
+    const MicroStroke& microStroke() const { return micro_; }
+    MicroStroke& microStroke() { return micro_; }
     // Mirror sign vectors for the enabled symmetry axes (always starts with (1,1,1)).
     static std::vector<glm::vec3> mirrors(Symmetry sym);
 
@@ -143,6 +146,10 @@ private:
     void followRemesh(Mesh& mesh);
     void mergeTopologyUndo(TopologyUndo& topo, const Mesh& mesh);
     DynamicTopology dynTopo_;
+    // Micro-displacement levels (core/Micro.h): strokes on a mesh with one go to its grid instead.
+    MicroStroke micro_;
+    Mesh* microMesh_ = nullptr;
+    bool microReady(Mesh& mesh); // the mesh has a micro level: starts the micro stroke on first use
     float strokeDiagonal_ = 0.0f;
     // The last remesh (repairDab remeshes it again when the brush squashed a triangle).
     bool lastRemesh_ = false;

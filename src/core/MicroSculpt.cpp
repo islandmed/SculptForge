@@ -1,0 +1,552 @@
+// SculptForge - open source digital sculpting
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// Brushes on micro-displacement levels (core/Micro.h). A dab:
+//  1. finds the base triangles it can reach: the BVH over the base, with the radius grown by how far the micro
+//     surface can leave the base (the Phong bulge plus the largest displacement), then each triangle's own box;
+//  2. saves the grids of triangles the stroke touches for the first time (the undo step: whole tiles);
+//  3. finds the brush plane (area normal and centre) from every second grid point under the brush;
+//  4. runs the kernel over the triangles in parallel: each grid point inside the brush gets a new scalar;
+//  5. stitches: copies of a point on a shared edge or corner are averaged (they differ only where a brush read
+//     neighbours, like Smooth), so the surface stays closed.
+#include "core/Micro.h"
+
+#include "core/BVH.h"
+#include "core/Sculpt.h"
+#include "core/ThreadPool.h"
+
+#include <algorithm>
+#include <cmath>
+
+namespace sf {
+
+int microBrushSupport(BrushType type) {
+    switch (type) {
+    case BrushType::Standard:
+    case BrushType::Clay:
+    case BrushType::ClayBuildup:
+    case BrushType::Smooth:
+    case BrushType::Inflate:
+    case BrushType::Flatten:
+    case BrushType::Trim:
+    case BrushType::Layer: return 2;
+    case BrushType::Pinch:
+    case BrushType::Crease:
+    case BrushType::DamStandard:
+    case BrushType::Move: return 1;
+    default: return 0;
+    }
+}
+
+namespace {
+
+glm::vec3 projectOnPlane(const glm::vec3& v, const glm::vec3& n) { return v - n * glm::dot(v, n); }
+
+// A base triangle's box grown by its Phong bulge and displacement range.
+bool triangleNear(const Mesh& m, const MicroMesh& mm, uint32_t t, const glm::vec3& c, float r) {
+    const glm::uvec3 tr = m.triangles[t];
+    const glm::vec3 a = m.positions[tr.x], b = m.positions[tr.y], d = m.positions[tr.z];
+    const glm::vec3 na = m.normals[tr.x], nb = m.normals[tr.y], nd = m.normals[tr.z];
+    float bulge = 0.0f;
+    bulge = std::max({bulge, std::abs(glm::dot(b - a, na)), std::abs(glm::dot(d - a, na)), std::abs(glm::dot(a - b, nb)),
+                      std::abs(glm::dot(d - b, nb)), std::abs(glm::dot(a - d, nd)), std::abs(glm::dot(b - d, nd))});
+    const float grow = bulge * MicroMesh::kPhong + float(mm.triRange[t]) * mm.step;
+    const glm::vec3 lo = glm::min(a, glm::min(b, d)) - grow, hi = glm::max(a, glm::max(b, d)) + grow;
+    const glm::vec3 q = glm::clamp(c, lo, hi);
+    return glm::dot(q - c, q - c) <= r * r;
+}
+
+int16_t quantize(float d, float step) { return int16_t(std::clamp(std::lround(d / step), -32767L, 32767L)); }
+
+// The six lattice neighbours of (i, j) inside the triangle.
+template <class F>
+void forNeighbors(uint32_t i, uint32_t j, uint32_t n, F&& f) {
+    if (i > 0) f(i - 1, j);
+    if (i + j < n) f(i + 1, j);
+    if (j > 0) f(i, j - 1);
+    if (i + j < n) f(i, j + 1);
+    if (j > 0) f(i + 1, j - 1);
+    if (i > 0) f(i - 1, j + 1);
+}
+
+} // namespace
+
+void MicroStroke::begin(Mesh& m) {
+    MicroMesh& mm = mutableMicro(m);
+    mm.ensureTopology(m);
+    if (mm.dirtyBits.size() != (size_t(mm.baseTriangles) + 63) / 64) mm.dirtyBits.assign((size_t(mm.baseTriangles) + 63) / 64, 0);
+    tileOf_.assign(mm.baseTriangles, 0);
+    tiles_.clear();
+    oldDisp_.clear();
+    oldMask_.clear();
+    maskAdded_ = false;
+    if (dabStamp_.size() != mm.baseTriangles) {
+        dabStamp_.assign(mm.baseTriangles, 0);
+        dabEpoch_ = 0;
+    }
+    if (vertStamp_.size() != m.vertexCount()) vertStamp_.assign(m.vertexCount(), 0);
+    strokeStep_ = mm.step;
+    grab_.clear();
+    active_ = true;
+}
+
+// Saves the grids of the triangles in `tris` that this stroke hasn't touched yet.
+void MicroStroke::touch(MicroMesh& mm, std::span<const uint32_t> tris) {
+    const size_t S = mm.samples, before = tiles_.size();
+    for (uint32_t t : tris)
+        if (!tileOf_[t]) {
+            tiles_.push_back(t);
+            tileOf_[t] = uint32_t(tiles_.size());
+        }
+    if (tiles_.size() == before) return;
+    oldDisp_.resize(tiles_.size() * S);
+    if (mm.hasMask()) oldMask_.resize(tiles_.size() * S);
+    poolFor(tiles_.size() - before, [&](size_t b, size_t e) {
+        for (size_t i = before + b; i < before + e; ++i) {
+            const size_t t = tiles_[i];
+            std::copy_n(mm.disp.data() + t * S, S, oldDisp_.data() + i * S);
+            if (mm.hasMask()) std::copy_n(mm.mask.data() + t * S, S, oldMask_.data() + i * S);
+        }
+    }, 64);
+}
+
+// Makes the copies of every shared point of triangles `tris` equal again (see the file comment).
+void MicroStroke::stitch(const Mesh& m, MicroMesh& mm, std::span<const uint32_t> tris) {
+    const uint32_t n = mm.n, S = mm.samples;
+    const uint32_t epoch = dabEpoch_;
+    auto inDab = [&](uint32_t t) { return dabStamp_[t] == epoch; };
+    // Edges: each shared edge once, by the lower triangle of the two (both in this dab), or copied from a hidden
+    // neighbour (which brushes leave alone).
+    poolFor(tris.size(), [&](size_t b, size_t e) {
+        for (size_t s = b; s < e; ++s) {
+            const uint32_t t = tris[s];
+            const glm::uvec3 tt = m.triangles[t];
+            int16_t* g = mm.disp.data() + size_t(t) * S;
+            uint8_t* mk = mm.hasMask() ? mm.mask.data() + size_t(t) * S : nullptr;
+            for (int ed = 0; ed < 3; ++ed) {
+                const uint32_t nb = mm.edgeNeighbor[size_t(t) * 3 + size_t(ed)];
+                if (nb == MicroMesh::kNone) continue;
+                const uint32_t u = nb >> 2;
+                const int f = int(nb & 3);
+                const bool hiddenU = m.triangleHidden(u);
+                if (!(inDab(u) && t < u) && !(hiddenU && !inDab(u))) continue;
+                int16_t* h = mm.disp.data() + size_t(u) * S;
+                uint8_t* hk = mk ? mm.mask.data() + size_t(u) * S : nullptr;
+                const bool reversed = m.triangles[u][f] != tt[ed];
+                for (uint32_t k = 1; k < n; ++k) {
+                    uint32_t i, j, i2, j2;
+                    MicroMesh::edgePoint(ed, k, n, i, j);
+                    MicroMesh::edgePoint(f, reversed ? n - k : k, n, i2, j2);
+                    const uint32_t a = MicroMesh::index(i, j, n), c = MicroMesh::index(i2, j2, n);
+                    if (hiddenU) {
+                        g[a] = h[c];
+                        if (mk) mk[a] = hk[c];
+                    } else {
+                        const int16_t v = int16_t((int(g[a]) + int(h[c]) + (int(g[a]) + int(h[c]) >= 0 ? 1 : 0)) / 2);
+                        g[a] = h[c] = v;
+                        if (mk) mk[a] = hk[c] = uint8_t((int(mk[a]) + int(hk[c]) + 1) / 2);
+                    }
+                }
+            }
+        }
+    }, 64);
+    // Corners: every base vertex of these triangles once, averaged over the triangles around it in this dab (or
+    // taken from a hidden one).
+    corners_.clear();
+    const uint32_t vmark = epoch;
+    for (uint32_t t : tris) {
+        const glm::uvec3 tt = m.triangles[t];
+        for (int k = 0; k < 3; ++k)
+            if (vertStamp_[tt[k]] != vmark) {
+                vertStamp_[tt[k]] = vmark;
+                corners_.push_back(tt[k]);
+            }
+    }
+    poolFor(corners_.size(), [&](size_t b, size_t e) {
+        for (size_t s = b; s < e; ++s) {
+            const uint32_t v = corners_[s];
+            const IndexRing ring = m.vertexTriangles(v);
+            auto cornerIndex = [&](uint32_t u) {
+                const glm::uvec3 ut = m.triangles[u];
+                const int c = ut.x == v ? 0 : ut.y == v ? 1 : 2;
+                return size_t(u) * S + (c == 0 ? 0 : c == 1 ? MicroMesh::index(n, 0, n) : MicroMesh::index(0, n, n));
+            };
+            long sum = 0, msum = 0;
+            int count = 0;
+            int hiddenValue = 0, hiddenMask = 0;
+            bool fromHidden = false;
+            for (uint32_t u : ring) {
+                const size_t ci = cornerIndex(u);
+                if (!inDab(u)) {
+                    if (m.triangleHidden(u) && !fromHidden) {
+                        fromHidden = true;
+                        hiddenValue = mm.disp[ci];
+                        hiddenMask = mm.hasMask() ? mm.mask[ci] : 0;
+                    }
+                    continue;
+                }
+                sum += mm.disp[ci];
+                if (mm.hasMask()) msum += mm.mask[ci];
+                ++count;
+            }
+            if (!count) continue;
+            const int16_t value = fromHidden ? int16_t(hiddenValue)
+                                             : int16_t((sum + (sum >= 0 ? count / 2 : -(count / 2))) / count);
+            const uint8_t mval = fromHidden ? uint8_t(hiddenMask) : uint8_t((msum + count / 2) / count);
+            for (uint32_t u : ring) {
+                if (!inDab(u)) continue;
+                const size_t ci = cornerIndex(u);
+                mm.disp[ci] = value;
+                if (mm.hasMask()) mm.mask[ci] = mval;
+            }
+        }
+    }, 256);
+    // Ranges: stitching averages between triangles, so a triangle may now hold its neighbour's larger value.
+    poolFor(tris.size(), [&](size_t b, size_t e) {
+        for (size_t s = b; s < e; ++s) {
+            const uint32_t t = tris[s];
+            const int16_t* g = mm.disp.data() + size_t(t) * S;
+            int r = 0;
+            for (uint32_t k = 0; k < S; ++k) r = std::max(r, std::abs(int(g[k])));
+            mm.triRange[t] = uint16_t(r);
+        }
+    }, 64);
+    for (uint32_t t : tris) {
+        mm.rangeMax = std::max(mm.rangeMax, mm.triRange[t]);
+        mm.markDirty(t);
+    }
+    ++mm.revision;
+}
+
+void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& center, const glm::vec3& viewDir, float radius,
+                      float strength, bool invert, float focal, const glm::vec3& alphaUp, bool maskBrush, float maskStrength) {
+    if (!active_ || !m.micro || radius <= 0.0f) return;
+    if (!maskBrush && microBrushSupport(type) == 0) return;
+    auto clock = std::chrono::steady_clock::now();
+    MicroMesh& mm = *m.micro; // (made unique by begin)
+    const uint32_t n = mm.n, S = mm.samples;
+    const float r = radius, r2 = r * r;
+    const float s = std::clamp(strength, 0.0f, 1.0f);
+    const float sign = invert ? -1.0f : 1.0f;
+    const float reach = type == BrushType::ClayBuildup && !maskBrush ? 1.3f : 1.0f;
+
+    // The displacement range this dab may need: widened first (it costs precision) when what a dab adds could
+    // pass it; a dab that still clips (planes far off) widens it for the next one.
+    if (!maskBrush) widen(mm, float(mm.rangeMax) * mm.step + 0.12f * r * s);
+
+    // 1. The base triangles within reach.
+    if (++dabEpoch_ == 0) {
+        std::fill(dabStamp_.begin(), dabStamp_.end(), 0);
+        std::fill(vertStamp_.begin(), vertStamp_.end(), 0);
+        dabEpoch_ = 1;
+    }
+    bvh.queryTriangles(m, center, r * reach + mm.bulgeMax + float(mm.rangeMax) * mm.step, cand_);
+    std::erase_if(cand_, [&](uint32_t t) { return m.triangleHidden(t) || !triangleNear(m, mm, t, center, r * reach); });
+    if (cand_.empty()) return;
+    for (uint32_t t : cand_) dabStamp_[t] = dabEpoch_;
+    if (maskBrush && !mm.hasMask()) {
+        mm.mask.assign(mm.disp.size(), 0);
+        oldMask_.assign(tiles_.size() * S, 0); // (the tiles saved so far had no mask: zeros)
+        maskAdded_ = true;
+        mm.maskDirty = true;
+    }
+    touch(mm, cand_);
+    findMs += lapMs(clock);
+
+    // 2. The brush plane: weighted area normal and centre over every second grid point under the brush.
+    glm::vec3 areaNormal(0.0f), areaCenter(0.0f);
+    const bool needPlane = !maskBrush && type != BrushType::Smooth && type != BrushType::Inflate && type != BrushType::Pinch;
+    if (needPlane) {
+        const uint32_t stride = n >= 4 ? 2 : 1;
+        struct Sum {
+            glm::dvec3 nrm{0.0}, ctr{0.0};
+            double w = 0.0;
+        };
+        const size_t block = 8;
+        std::vector<Sum> sums((cand_.size() + block - 1) / block);
+        poolFor(cand_.size(), [&](size_t b, size_t e) {
+            Sum acc;
+            MicroTriangle T;
+            for (size_t ci = b; ci < e; ++ci) {
+                const uint32_t t = cand_[ci];
+                T.set(m, t, n);
+                const int16_t* g = mm.disp.data() + size_t(t) * S;
+                for (uint32_t j = 0; j <= n; j += stride)
+                    for (uint32_t i = 0; i + j <= n; i += stride) {
+                        glm::vec3 sp, nn;
+                        T.eval(i, j, sp, nn);
+                        const glm::vec3 p = sp + nn * (float(g[MicroMesh::index(i, j, n)]) * mm.step);
+                        const float d2 = glm::dot(p - center, p - center);
+                        if (d2 >= r2) continue;
+                        const float w = brushFalloff(std::sqrt(d2), r, focal);
+                        acc.nrm += glm::dvec3(nn * w);
+                        acc.ctr += glm::dvec3(p * w);
+                        acc.w += w;
+                    }
+            }
+            sums[b / block] = acc;
+        }, block, 2);
+        Sum total;
+        for (const Sum& x : sums) total.nrm += x.nrm, total.ctr += x.ctr, total.w += x.w;
+        if (total.w <= 0.0) {
+            // nothing under the brush (it only grazed the boxes): the stitch below still runs for the saved tiles
+            areaNormal = -viewDir;
+            areaCenter = center;
+        } else {
+            areaCenter = glm::vec3(total.ctr / total.w);
+            const double len = glm::length(total.nrm);
+            areaNormal = len > 1e-12 ? glm::vec3(total.nrm / len) : -viewDir;
+        }
+    }
+    glm::vec3 up = projectOnPlane(alphaUp, areaNormal);
+    if (glm::length(up) < 1e-6f)
+        up = projectOnPlane(std::abs(areaNormal.x) < 0.9f ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0), areaNormal);
+    up = glm::normalize(up);
+    const glm::vec3 right = glm::cross(up, areaNormal);
+    const float layerHeight = r * 0.08f * s;
+    const bool readsNeighbours = type == BrushType::Smooth || type == BrushType::Pinch || type == BrushType::Crease ||
+                                 type == BrushType::DamStandard;
+
+    // 3. The kernel, in parallel over the triangles (each writes only its own grid).
+    std::vector<uint64_t> visited((cand_.size() + 7) / 8, 0);
+    std::vector<float> clipped((cand_.size() + 7) / 8, 0.0f); // per block: the largest |d| that didn't fit
+    const float range = mm.rangeWorld();
+    poolFor(cand_.size(), [&](size_t b, size_t e) {
+        thread_local std::vector<int16_t> before;
+        MicroTriangle T;
+        uint64_t count = 0;
+        float over = 0.0f;
+        for (size_t ci = b; ci < e; ++ci) {
+            const uint32_t t = cand_[ci];
+            T.set(m, t, n);
+            int16_t* g = mm.disp.data() + size_t(t) * S;
+            uint8_t* mk = mm.hasMask() ? mm.mask.data() + size_t(t) * S : nullptr;
+            if (readsNeighbours && !maskBrush) before.assign(g, g + S); // Jacobi: neighbours as they were
+            const int16_t* old = !maskBrush && type == BrushType::Layer ? oldDisp_.data() + size_t(tileOf_[t] - 1) * S : nullptr;
+            uint32_t idx = 0;
+            for (uint32_t j = 0; j <= n; ++j)
+                for (uint32_t i = 0; i + j <= n; ++i, ++idx) {
+                    glm::vec3 sp, nn;
+                    T.eval(i, j, sp, nn);
+                    const float d = float(g[idx]) * mm.step;
+                    const glm::vec3 p = sp + nn * d;
+                    const glm::vec3 o = p - center;
+                    const float dist2 = glm::dot(o, o);
+                    if (dist2 >= r2 * reach * reach) continue;
+                    ++count;
+                    if (maskBrush) {
+                        if (dist2 >= r2) continue;
+                        const float a = std::clamp(maskStrength, 0.0f, 1.0f) * brushFalloff(std::sqrt(dist2), r, focal);
+                        const float cur = float(mk[idx]) / 255.0f;
+                        const float nv = invert ? cur * (1.0f - a) : cur + (1.0f - cur) * a;
+                        mk[idx] = uint8_t(std::clamp(std::lround(nv * 255.0f), 0L, 255L));
+                        continue;
+                    }
+                    float f = brushFalloff(std::sqrt(dist2), r, focal);
+                    if (type == BrushType::ClayBuildup) { // square tip, rounded corners (as Sculpt.cpp)
+                        const float cheb = std::max(std::abs(glm::dot(o, right)), std::abs(glm::dot(o, up))) / r;
+                        const float corner = std::clamp((1.3f - std::sqrt(dist2) / r) / 0.3f, 0.0f, 1.0f);
+                        const float edge = std::clamp((1.0f - cheb) / 0.35f, 0.0f, 1.0f);
+                        f = edge * edge * (3.0f - 2.0f * edge) * corner;
+                    }
+                    if (mk) f *= 1.0f - float(mk[idx]) / 255.0f;
+                    if (f <= 0.0f) continue;
+                    const float facing = std::max(glm::dot(nn, areaNormal), 0.3f); // moving along nn reaches a plane this much slower
+                    float delta = 0.0f;
+                    auto neighbourAverage = [&](float& lo, float& hi) {
+                        float sum = 0.0f;
+                        int c = 0;
+                        lo = 1e30f, hi = -1e30f;
+                        forNeighbors(i, j, n, [&](uint32_t a, uint32_t bb) {
+                            const float v = float(before[MicroMesh::index(a, bb, n)]);
+                            sum += v, ++c;
+                            lo = std::min(lo, v), hi = std::max(hi, v);
+                        });
+                        return c ? sum / float(c) : float(before[idx]);
+                    };
+                    auto sharpen = [&](float k) { // pinch, on a height field: away from the neighbour average, kept within them
+                        float lo, hi;
+                        const float avg = neighbourAverage(lo, hi);
+                        const float cur = float(before[idx]);
+                        const float target = std::clamp(cur + (cur - avg) * k, lo, hi);
+                        return (target - cur) * mm.step;
+                    };
+                    switch (type) {
+                    case BrushType::Standard: delta = sign * s * r * 0.06f * f * glm::dot(areaNormal, nn); break;
+                    case BrushType::Inflate: delta = sign * s * r * 0.05f * f; break;
+                    case BrushType::Smooth: {
+                        float lo, hi;
+                        const float avg = neighbourAverage(lo, hi);
+                        delta = (avg - float(before[idx])) * mm.step * std::min(1.0f, s * f);
+                        break;
+                    }
+                    case BrushType::Flatten: {
+                        const float h = glm::dot(p - areaCenter, areaNormal);
+                        delta = -h * s * f * (invert ? -0.5f : 1.0f) / facing;
+                        break;
+                    }
+                    case BrushType::Clay: {
+                        const glm::vec3 pp = areaCenter + areaNormal * (sign * r * 0.05f * s);
+                        const float h = glm::dot(p - pp, areaNormal);
+                        if (sign * h < 0.0f) delta = -h * f / facing;
+                        break;
+                    }
+                    case BrushType::ClayBuildup: {
+                        const glm::vec3 pp = areaCenter + areaNormal * (sign * r * 0.08f * s);
+                        const float h = glm::dot(p - pp, areaNormal);
+                        if (sign * h < 0.0f) delta = -h * f / facing;
+                        break;
+                    }
+                    case BrushType::Trim: {
+                        const glm::vec3 pp = areaCenter - areaNormal * (sign * r * 0.02f * s);
+                        const float h = glm::dot(p - pp, areaNormal);
+                        if (sign * h > 0.0f) delta = -h * std::min(1.0f, std::sqrt(f) * (0.5f + s)) / facing;
+                        break;
+                    }
+                    case BrushType::Layer: {
+                        // Up to one height per stroke above where the point started (overlaps never stack).
+                        const float start = float(old[idx]) * mm.step;
+                        const float target = start + sign * layerHeight * f;
+                        delta = sign > 0.0f ? std::max(0.0f, target - d) : std::min(0.0f, target - d);
+                        break;
+                    }
+                    case BrushType::Pinch: delta = sign * sharpen(0.6f * s * f); break;
+                    case BrushType::Crease:
+                        delta = -sign * s * r * 0.05f * f * f + sharpen(0.5f * s * f);
+                        break;
+                    case BrushType::DamStandard:
+                        delta = -sign * s * r * 0.08f * f * f * f * f + sharpen(0.7f * s * f);
+                        break;
+                    default: break;
+                    }
+                    if (delta != 0.0f) {
+                        const float nd = d + delta;
+                        if (std::abs(nd) > range) over = std::max(over, std::abs(nd));
+                        g[idx] = quantize(nd, mm.step);
+                    }
+                }
+        }
+        visited[b / 8] = count;
+        clipped[b / 8] = over;
+    }, 8, 2);
+    for (uint64_t c : visited) points += c;
+    kernelMs += lapMs(clock);
+    float over = 0.0f;
+    for (float c : clipped) over = std::max(over, c);
+
+    // 4. Stitch the shared points.
+    stitch(m, mm, cand_);
+    if (over > 0.0f) widen(mm, over * 1.5f);
+    stitchMs += lapMs(clock);
+}
+
+void MicroStroke::widen(MicroMesh& mm, float need) {
+    const int div = mm.widen(need);
+    if (div == 1) return;
+    for (int16_t& v : oldDisp_) v = int16_t(int(v) / div);
+    strokeStep_ = mm.step;
+}
+
+void MicroStroke::beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, float radius, float focal, const glm::vec3& mirror) {
+    if (!active_ || !m.micro) return;
+    MicroMesh& mm = *m.micro;
+    const uint32_t n = mm.n, S = mm.samples;
+    widen(mm, float(mm.rangeMax) * mm.step + radius); // room to move a radius either way
+    std::vector<uint32_t> cand;
+    bvh.queryTriangles(m, center, radius + mm.bulgeMax + float(mm.rangeMax) * mm.step, cand);
+    std::erase_if(cand, [&](uint32_t t) { return m.triangleHidden(t) || !triangleNear(m, mm, t, center, radius); });
+    touch(mm, cand);
+    GrabPoint mirrorMark{MicroMesh::kNone, 0, 0.0f, mirror}; // a range marker: the points after it use this mirror
+    grab_.push_back(mirrorMark);
+    MicroTriangle T;
+    for (uint32_t t : cand) {
+        T.set(m, t, n);
+        const int16_t* g = mm.disp.data() + size_t(t) * S;
+        const uint8_t* mk = mm.hasMask() ? mm.mask.data() + size_t(t) * S : nullptr;
+        uint32_t idx = 0;
+        for (uint32_t j = 0; j <= n; ++j)
+            for (uint32_t i = 0; i + j <= n; ++i, ++idx) {
+                glm::vec3 sp, nn;
+                T.eval(i, j, sp, nn);
+                const glm::vec3 p = sp + nn * (float(g[idx]) * mm.step);
+                const float d = glm::distance(p, center);
+                if (d >= radius) continue;
+                float w = brushFalloff(d, radius, focal);
+                if (mk) w *= 1.0f - float(mk[idx]) / 255.0f;
+                if (w <= 0.0f) continue;
+                grab_.push_back({t, uint16_t(idx), w, nn});
+                ++points;
+            }
+    }
+}
+
+void MicroStroke::grab(Mesh& m, const glm::vec3& delta) {
+    if (!active_ || !m.micro || grab_.empty()) return;
+    auto clock = std::chrono::steady_clock::now();
+    MicroMesh& mm = *m.micro;
+    const size_t S = mm.samples;
+    // Mirror ranges one after another (a point may be in two), each point once within its range.
+    size_t i = 0;
+    while (i < grab_.size()) {
+        const glm::vec3 mirror = grab_[i].normal;
+        size_t end = i + 1;
+        while (end < grab_.size() && grab_[end].tri != MicroMesh::kNone) ++end;
+        const glm::vec3 dm = delta * mirror;
+        poolFor(end - i - 1, [&](size_t b, size_t e) {
+            for (size_t k = i + 1 + b; k < i + 1 + e; ++k) {
+                const GrabPoint& gp = grab_[k];
+                int16_t& v = mm.disp[size_t(gp.tri) * S + gp.index];
+                v = quantize(float(v) * mm.step + glm::dot(dm, gp.normal) * gp.weight, mm.step);
+            }
+        }, 1 << 14);
+        i = end;
+    }
+    kernelMs += lapMs(clock);
+    cand_.clear();
+    if (++dabEpoch_ == 0) dabEpoch_ = 1;
+    for (const GrabPoint& gp : grab_)
+        if (gp.tri != MicroMesh::kNone && dabStamp_[gp.tri] != dabEpoch_) {
+            dabStamp_[gp.tri] = dabEpoch_;
+            cand_.push_back(gp.tri);
+        }
+    stitch(m, mm, cand_);
+    stitchMs += lapMs(clock);
+}
+
+void MicroStroke::restore(Mesh& m) {
+    if (!active_ || !m.micro || tiles_.empty()) return;
+    MicroMesh& mm = *m.micro;
+    const size_t S = mm.samples;
+    poolFor(tiles_.size(), [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) {
+            const size_t t = tiles_[i];
+            std::copy_n(oldDisp_.data() + i * S, S, mm.disp.data() + t * S);
+            if (mm.hasMask() && oldMask_.size() == tiles_.size() * S) std::copy_n(oldMask_.data() + i * S, S, mm.mask.data() + t * S);
+        }
+    }, 64);
+    for (uint32_t t : tiles_) mm.markDirty(t);
+    ++mm.revision;
+}
+
+std::unique_ptr<MicroUndo> MicroStroke::end(Mesh& m) {
+    active_ = false;
+    grab_.clear();
+    if (tiles_.empty() || !m.micro) {
+        tiles_.clear();
+        return nullptr;
+    }
+    auto u = std::make_unique<MicroUndo>();
+    u->step = strokeStep_;
+    u->samples = m.micro->samples;
+    u->tris = std::move(tiles_);
+    u->disp = std::move(oldDisp_);
+    if (m.micro->hasMask() && oldMask_.size() == u->tris.size() * u->samples) u->mask = std::move(oldMask_);
+    u->maskAdded = maskAdded_;
+    for (uint32_t t : u->tris) tileOf_[t] = 0;
+    tiles_.clear();
+    oldDisp_.clear();
+    oldMask_.clear();
+    return u;
+}
+
+} // namespace sf

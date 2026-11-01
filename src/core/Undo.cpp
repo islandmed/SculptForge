@@ -10,7 +10,8 @@ size_t UndoRecord::approxBytes() const {
     size_t bytes = positions.bytes() + mask.bytes() + colors.bytes() + paintAlpha.bytes() + hidden.bytes() +
                    polygroups.bytes() + (paint ? paint->bytes() : 0) +
                    (textureTiles ? textureTiles->bytes() : 0) + (texture ? texture->bytes() : 0) +
-                   (subdiv ? subdiv->bytes() : 0) + (topology ? topology->bytes() : 0);
+                   (subdiv ? subdiv->bytes() : 0) + (topology ? topology->bytes() : 0) +
+                   (micro ? micro->bytes() : 0);
     for (const auto& l : layerOffsets) bytes += l.bytes();
     if (mesh)
         bytes += mesh->vertexCount() * ((2 + (mesh->base.empty() ? 0 : 1 + mesh->layers.size())) * sizeof(glm::vec3) +
@@ -152,6 +153,7 @@ void UndoStack::apply(UndoRecord& r, Mesh& mesh, BVH& bvh) {
         applySubdivUndo(*r.subdiv, mesh, bvh);
         return;
     }
+    if (r.micro) r.micro->swapWith(mesh); // (the base doesn't move: no BVH work)
     if (r.mesh) {
         std::swap(*r.mesh, mesh);
         mesh.topologyDirty = true;

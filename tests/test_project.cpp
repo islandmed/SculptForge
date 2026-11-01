@@ -248,7 +248,7 @@ TEST(project_version_handling) {
     std::string err;
     CHECK(saveProject(path, doc, err));
     const std::string manifest = readManifest(path);
-    const std::string v = std::to_string(kProjectVersion);
+    const std::string v = std::to_string(kProjectVersionWithoutMicro); // (7 only with a micro level: test_micro.cpp)
     CHECK(manifest.find("\"version\": " + v) != std::string::npos || manifest.find("\"version\":" + v) != std::string::npos);
     CHECK(manifest.find("app_version") != std::string::npos);
 
