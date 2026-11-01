@@ -97,7 +97,8 @@ private:
     void fail(int line, const std::string& message);
     bool parseStep(int line, const std::vector<std::string>& words, std::string& error);
     void testClick(int line, const std::string& label, int button, bool doubleClick);
-    void testKey(int line, const std::string& combo);
+    // phase: 0 press and release, 1 press only (key_down), 2 release only (key_up).
+    void testKey(int line, const std::string& combo, int phase = 0);
     void testKeyNow(SDL_Keycode key, SDL_Keymod mods);
     double query(const std::string& name, bool& known) const;
 

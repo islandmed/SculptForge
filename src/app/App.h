@@ -969,6 +969,7 @@ private:
     int subtoolClickTarget_ = -1;
     bool subtoolClickFrame_ = false; // Shift+Alt+click: frame the SubTool as well
     int mouseClicks_ = 1; // SDL's click count of the press being handled (3 = a triple-click, #43)
+    bool spaceHeld_ = false; // Space is down with Preferences > Input > Hold Space to move the camera on (#43)
     float subtoolClickX_ = 0.0f, subtoolClickY_ = 0.0f;
     uint32_t renamingSubtool_ = 0; // SubTool id being renamed inline (0: none)
     uint32_t listedActiveSubtool_ = 0; // the list scrolls to the active SubTool when it changes

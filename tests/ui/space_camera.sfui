@@ -1,0 +1,56 @@
+# #43: Preferences > Input > Hold Space and drag to move the camera (off by default: Space opens the QuickMenu).
+run new_sphere subdivisions=4
+key f
+
+# Off: Space opens the QuickMenu, as in ZBrush.
+expect_value space_camera == 0
+key space
+expect_value quickmenu_open == 1
+key escape
+expect_value quickmenu_open == 0
+
+# On: Space no longer opens the QuickMenu; held, a left drag on the model orbits instead of sculpting.
+click "Preferences##palette.preferences"
+click "Input##preferences.input"
+hold ctrl
+hover "Hold Space and drag to move the camera##input.space_camera"
+expect_help "Space"
+hold none
+click "Hold Space and drag to move the camera##input.space_camera"
+expect_value space_camera == 1
+key escape
+camera 0 0
+key space
+expect_value quickmenu_open == 0
+remember camera_yaw yaw0
+key_down space
+expect_value space_held == 1
+view_drag 0.45 0.5 0.6 0.5
+expect_value camera_yaw != $yaw0
+expect_value can_undo == 0
+
+# Space+right drag pans; Space+Ctrl+drag zooms.
+remember camera_pan pan0
+button_drag right 0.45 0.5 0.45 0.6
+expect_value camera_pan != $pan0
+remember camera_distance d0
+hold ctrl
+view_drag 0.45 0.5 0.45 0.6
+hold none
+expect_value camera_distance != $d0
+expect_value can_undo == 0
+key_up space
+expect_value space_held == 0
+shot space_camera
+
+# Let go: a drag on the model sculpts again.
+stroke 0.3 0.5 0.6 0.5
+expect_value can_undo == 1
+
+# Typing a space in a text field never holds it.
+key f3
+expect_value command_palette_open == 1
+key_down space
+expect_value space_held == 0
+key_up space
+key escape

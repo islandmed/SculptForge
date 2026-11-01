@@ -442,7 +442,9 @@ the numpad views and Blender's sculpt-mode keys (see [Blender keys](shortcuts.md
 style, **Emulate Numpad** makes the number row work as the numpad, and **Import Blender keymap...** takes the keys
 from a keymap you exported in Blender. **Right click opens the QuickMenu** (on by default, in every style) opens
 the [QuickMenu](sculpting.md#the-quickmenu) with a right click on the canvas; a right drag navigates either
-way. **Cursor follows surface** (on by default) lays the brush rings on the model under the pointer (see
+way. **Hold Space and drag to move the camera** (off by default) turns <kbd>Space</kbd> into a camera key: held,
+left-drag rotates, right- or middle-drag pans and <kbd>Ctrl</kbd>+drag zooms (see
+[Navigation](navigation.md#mouse-and-pen)). **Cursor follows surface** (on by default) lays the brush rings on the model under the pointer (see
 [Draw Size and Focal Shift](sculpting.md#draw-size-z-intensity-rgb-intensity-and-focal-shift)); off, they are flat circles on the screen. **Rotation** chooses free rotation (ZBrush) or a turntable. See
 [Coming from ZBrush](coming-from-zbrush.md).
 

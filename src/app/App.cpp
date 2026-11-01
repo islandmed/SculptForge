@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/App.h"
 #include "app/ShellQuote.h"
+#include "app/SpaceCamera.h"
 #include "app/AsyncStroke.h"
 #include "app/Calibration.h"
 #include "app/CrashLog.h"
@@ -1063,6 +1064,9 @@ void App::handleEvent(const SDL_Event& event) {
     case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
         if (e.window.windowID == SDL_GetWindowID(window_)) requestQuit();
         break;
+    case SDL_EVENT_WINDOW_FOCUS_LOST:
+        spaceHeld_ = false; // Space let go in another window never reaches us
+        break;
     case SDL_EVENT_PEN_PROXIMITY_IN:
     case SDL_EVENT_PEN_PROXIMITY_OUT:
     case SDL_EVENT_PEN_DOWN:
@@ -1095,11 +1099,17 @@ void App::handleEvent(const SDL_Event& event) {
         if (!io.WantCaptureMouse && canvasRect().contains(e.wheel.mouse_x, e.wheel.mouse_y)) camera_.zoom(e.wheel.y);
         break;
     case SDL_EVENT_KEY_DOWN:
+        if (e.key.key == SDLK_SPACE && !e.key.repeat && // hold Space and drag: the camera (#43; not while typing)
+            spaceCameraKeyDown(uiPrefs_.spaceCamera, io.WantTextInput || io.WantCaptureKeyboard)) {
+            spaceHeld_ = true;
+            break;
+        }
         if (!io.WantCaptureKeyboard && !e.key.repeat) onKey(e.key.key, e.key.mod);
         else if (!io.WantCaptureKeyboard && (e.key.key == SDLK_LEFTBRACKET || e.key.key == SDLK_RIGHTBRACKET))
             onKey(e.key.key, e.key.mod);
         break;
     case SDL_EVENT_KEY_UP:
+        if (e.key.key == SDLK_SPACE) spaceHeld_ = false;
         if (e.key.key == SDLK_SPACE) quickMenuKeyUp(); // a held Space closes the QuickMenu when let go
         break;
     case SDL_EVENT_DROP_FILE:
@@ -1146,6 +1156,18 @@ void App::onMouseDown(float x, float y, Uint8 button) {
     rightClick_.x = x;
     rightClick_.y = y;
     rightClick_.dx = rightClick_.dy = 0.0f;
+    if (spaceHeld_) { // Preferences > Input > Hold Space and drag to move the camera (#43)
+        switch (spaceCameraMove(button, ctrlDown(SDL_GetModState()))) {
+        case SpaceCameraMove::Orbit: drag_ = Drag::Orbit; break;
+        case SpaceCameraMove::Pan: drag_ = Drag::Pan; break;
+        case SpaceCameraMove::Zoom: drag_ = Drag::Zoom; break;
+        case SpaceCameraMove::None: break;
+        }
+        if (drag_ != Drag::None) {
+            rightClick_.pending = false;
+            return;
+        }
+    }
     if (blenderStyle() && blenderNavigationDown(button)) return; // middle / Alt+left / right drags navigate
     if (mayaStyle() && mayaNavigationDown(button)) return;       // Alt+left / middle / right: orbit / pan / zoom
     if (button == SDL_BUTTON_LEFT) {

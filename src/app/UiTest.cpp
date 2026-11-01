@@ -14,6 +14,7 @@
 //   key COMBO                e.g. enter, escape, ctrl+z, ctrl+shift+z, 3, comma, backtick, tab, f3, space, minus,
 //                            home, numpad1, ctrl+numpad7, numpad., numpadplus
 //   hold MODS                ctrl / shift / alt / ctrl+shift ... or none (for strokes and drags)
+//   key_down KEY / key_up KEY  press a key and keep it down over the next steps / let it go (e.g. space)
 //   stroke U0 V0 U1 V1 [S]   brush stroke across the model (fractions of its on-screen bounds)
 //   view_drag X0 Y0 X1 Y1 [S]  left-drag in the viewport at window fractions, gliding there first like stroke (same
 //                            point twice = a click)
@@ -113,7 +114,7 @@
 //                            2 DragDot, 3 Spray, 4 LazyMouse), vdms (VDM brush maps), vdm_files (.sfvdm in the library)
 //                            z_intensity, smooth_intensity, rgb_intensity (0-100), focal_shift (-100..100), draw_size,
 //                            size_popup_open (the S / U / I / O slider), size_knob_x / size_knob_y (its knob, pixels),
-//                            quickmenu_open, right_click_menu, lazy_mouse, input_style (0 ZBrush, 1 SculptForge, 2 Blender), turntable,
+//                            quickmenu_open, right_click_menu, space_camera, space_held, lazy_mouse, input_style (0 ZBrush, 1 SculptForge, 2 Blender), turntable,
 //                            camera_ortho, mask_brush (Blender's Mask brush on), shortcut_conflicts (keys two actions
 //                            claim), brush_type (BrushType
 //                            index, -1 for a custom brush or Paint), last_dab_x / last_dab_y (window pixels), paint_r
@@ -416,6 +417,8 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "draw_size") return std::round(app_.radiusPx_);
     if (name == "quickmenu_open") return app_.quickMenu_.open ? 1.0 : 0.0;
     if (name == "right_click_menu") return app_.uiPrefs_.rightClickQuickMenu ? 1.0 : 0.0;
+    if (name == "space_camera") return app_.uiPrefs_.spaceCamera ? 1.0 : 0.0;
+    if (name == "space_held") return app_.spaceHeld_ ? 1.0 : 0.0;
     if (name == "size_popup_open" || name == "size_knob_x" || name == "size_knob_y") {
         ImVec2 knob(-1.0f, -1.0f);
         const bool open = PickerUi::sliderKnob(knob);
@@ -691,7 +694,7 @@ void Demo::testClick(int line, const std::string& label, int button, bool double
     wait(0.1f);
 }
 
-void Demo::testKey(int line, const std::string& combo) {
+void Demo::testKey(int line, const std::string& combo, int phase) {
     std::string keyName;
     const SDL_Keymod mods = parseMods(combo, &keyName);
     std::string lower = keyName;
@@ -713,7 +716,7 @@ void Demo::testKey(int line, const std::string& combo) {
         run([this, line, keyName] { fail(line, "unknown key \"" + keyName + "\""); });
         return;
     }
-    steps_.push_back([this, mods, key](float) {
+    steps_.push_back([this, mods, key, phase](float) {
         const SDL_Keymod before = SDL_GetModState();
         SDL_SetModState(mods | held_);
         SDL_Event e{};
@@ -723,11 +726,11 @@ void Demo::testKey(int line, const std::string& combo) {
         e.key.scancode = SDL_GetScancodeFromKey(key, nullptr);
         e.key.mod = mods | held_;
         e.key.down = true;
-        app_.handleEvent(e);
+        if (phase != 2) app_.handleEvent(e);
         e.type = SDL_EVENT_KEY_UP;
         e.key.down = false;
         e.key.mod = held_; // the combo's modifiers are released with the key
-        app_.handleEvent(e);
+        if (phase != 1) app_.handleEvent(e);
         SDL_SetModState(before);
         return true;
     });
@@ -827,6 +830,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     } else if (verb == "key") {
         if (!need(1)) return false;
         testKey(line, w[1]);
+    } else if (verb == "key_down" || verb == "key_up") { // a key held down over the next steps, then let go
+        if (!need(1)) return false;
+        testKey(line, w[1], verb == "key_down" ? 1 : 2);
     } else if (verb == "hold") {
         if (!need(1)) return false;
         const SDL_Keymod mods = w[1] == "none" ? SDL_KMOD_NONE : parseMods(w[1]);

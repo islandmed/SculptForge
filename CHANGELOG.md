@@ -28,6 +28,9 @@ All notable changes to SculptForge are listed here. The format follows
   triangles exactly; the rest is rebuilt and, for the remeshers, joined to them along the mask's edge with a
   strip of triangles so the model stays closed (`keep_masked=true` on `remesh`, `decimate`, `qremesh`).
 - Triple-click another SubTool in the viewport to make it the active one and frame it (#43).
+- **Preferences > Input > Hold Space and drag to move the camera** (#43, off by default since ZBrush's Space opens
+  the QuickMenu): with Space held, left-drag rotates, right- or middle-drag pans and Ctrl+drag zooms, anywhere on
+  the canvas; never while typing in a text field.
 - SubTool thumbnails in the SubTool list (#43), drawn from each SubTool's existing GPU buffers (no upload, the
   motion proxy on dense meshes), one per frame at most and only once a change has settled, never during a stroke.
 

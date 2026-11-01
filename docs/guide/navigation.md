@@ -51,10 +51,15 @@ camera.
 | Orthographic on or off | <kbd>Numpad 5</kbd> |
 | Turn in 15 degree steps | <kbd>Numpad 4</kbd> / <kbd>Numpad 6</kbd> (around), <kbd>Numpad 8</kbd> / <kbd>Numpad 2</kbd> (over); <kbd>Numpad 9</kbd>: the other side |
 | Frame the active SubTool | <kbd>Numpad .</kbd> |
+| Frame one SubTool | <kbd>Shift</kbd>+<kbd>Alt</kbd>+click it, or triple-click another SubTool (it becomes the active SubTool) |
+| Move the camera with Space held | Turn on **Preferences > Input > Hold Space and drag to move the camera**, then hold <kbd>Space</kbd>: left-drag rotates, right- or middle-drag pans, <kbd>Ctrl</kbd>+drag zooms, anywhere on the canvas (on the model too) |
 
 Zoom drags go the ZBrush way: drag up to zoom out, down to zoom in. The SculptForge input style
 (**Preferences > Input**) reverses them: drag up to come closer.
-| Frame one SubTool | <kbd>Shift</kbd>+<kbd>Alt</kbd>+click it, or triple-click another SubTool (it becomes the active SubTool) |
+
+**Hold Space and drag to move the camera** is off by default, because in ZBrush <kbd>Space</kbd> opens the
+QuickMenu. With it on, <kbd>Space</kbd> no longer opens the QuickMenu (a right click still does), and a space typed in
+a text field is never taken.
 
 "Background" means any part of the canvas where the cursor isn't over the model. A left-drag that starts on
 the model sculpts instead, so with a pen or a one-button mouse, start rotations beside the model. When the

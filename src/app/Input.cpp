@@ -145,6 +145,11 @@ void App::registerInputActions() {
         "does too). A right drag still turns, pans or zooms the view. A pen button set to Right click works the same.",
         [this] { uiPrefs_.rightClickQuickMenu = !uiPrefs_.rightClickQuickMenu; },
         [this] { return uiPrefs_.rightClickQuickMenu; });
+    add("input.space_camera", "Hold Space and drag to move the camera", nullptr, "Preferences > Input", "",
+        "While Space is held, a drag on the canvas moves the camera: left-drag turns it, right- or middle-drag pans, "
+        "and with Ctrl held too a drag zooms (#43). Off by default: in ZBrush, Space opens the QuickMenu (with this "
+        "on, a right click still does). Typing a space in a text field is never taken.",
+        [this] { uiPrefs_.spaceCamera = !uiPrefs_.spaceCamera; }, [this] { return uiPrefs_.spaceCamera; });
     add("input.surface_cursor", "Cursor follows surface", nullptr, "Preferences > Input", "",
         "The brush ring lies on the model under the pointer, turned to the surface and pressed onto its bumps, at "
         "the brush's real size there (as in SculptGL), with a short line along the surface's direction. With "
@@ -413,6 +418,10 @@ void App::drawInputSection() {
     if (ui::Checkbox("Right click opens the QuickMenu##input.right_click_menu", &rightClickMenu))
         uiPrefs_.rightClickQuickMenu = rightClickMenu;
     ui::HelpAction(*this, "input.right_click_menu");
+    bool spaceCamera = uiPrefs_.spaceCamera;
+    if (ui::Checkbox("Hold Space and drag to move the camera##input.space_camera", &spaceCamera))
+        uiPrefs_.spaceCamera = spaceCamera;
+    ui::HelpAction(*this, "input.space_camera");
     bool surfaceCursor = uiPrefs_.cursorFollowsSurface;
     if (ui::Checkbox("Cursor follows surface##input.surface_cursor", &surfaceCursor))
         uiPrefs_.cursorFollowsSurface = surfaceCursor;
