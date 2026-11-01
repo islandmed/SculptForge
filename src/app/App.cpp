@@ -1175,7 +1175,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
             const SDL_Keymod keys = SDL_GetModState();
             drag_ = (keys & SDL_KMOD_SHIFT) ? Drag::Pan : ctrlDown(keys) ? Drag::Zoom : Drag::Orbit;
         } else if (maskMod && !(mod & SDL_KMOD_ALT) && previewLod_ < 0) {
-            drag_ = Drag::MaskCanvas; // click inverts, drag clears (or zooms without a mask)
+            drag_ = Drag::MaskCanvas; // click inverts, drag draws a mask rectangle (PanelMasking.cpp)
             maskCanvasX_ = x;
             maskCanvasY_ = y;
             maskCanvasMoved_ = false;

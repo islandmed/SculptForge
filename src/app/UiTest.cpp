@@ -559,6 +559,13 @@ double Demo::query(const std::string& name, bool& known) const {
         for (float v : m.mask) n += v > 0.5f;
         return double(n);
     }
+    if (name == "mask_soft") { // vertices partly masked (a blurred edge)
+        size_t n = 0;
+        for (float v : m.mask) n += v > 0.01f && v < 0.99f;
+        return double(n);
+    }
+    if (name == "selection_shown") return app_.drag_ == App::Drag::Select && app_.selectMoved_ ? 1.0 : 0.0;
+    if (name == "symmetry_x") return app_.symmetry_.x ? 1.0 : 0.0;
     if (name == "hidden") {
         size_t n = 0;
         for (uint8_t h : m.hidden) n += h != 0;

@@ -58,6 +58,8 @@ With **MaskLasso** or **MaskRect**:
 
 The selection works in screen space, like the visibility rectangle: a vertex counts as inside when it falls
 inside the shape as you see it, including vertices on the far side of the model. Hidden parts are left alone.
+With symmetry on (**X**, **Y**, **Z** on the top shelf), the mirror image of what's inside is masked too, as a
+mask stroke mirrors. A shape that covers none of the model clears the mask instead (as in ZBrush).
 **Mask Strength** sets how much a selection masks or unmasks, and each selection is one undo step. A lasso that
 crosses itself leaves out the areas it encloses twice.
 
@@ -76,10 +78,14 @@ With <kbd>Ctrl</kbd> held, clicks and drags on the empty background act on the w
 | Gesture | Effect |
 |---|---|
 | <kbd>Ctrl</kbd> + click the background | Invert the mask |
-| <kbd>Ctrl</kbd> + drag on the background | Clear the mask (MaskPen) |
-| <kbd>Ctrl</kbd> + drag on the background, with nothing masked | Nothing, as in ZBrush (the SculptForge input style zooms the view, see [Coming from ZBrush](coming-from-zbrush.md)) |
+| <kbd>Ctrl</kbd> + drag on the background | Draw a mask rectangle (MaskPen; MaskLasso draws a lasso): what it covers is masked, mirrored by the symmetry. A shape that covers none of the model clears the mask. |
+| <kbd>Ctrl</kbd> + drag on the background, with nothing masked, in the SculptForge input style | Zoom the view (see [Coming from ZBrush](coming-from-zbrush.md)) |
 
-On the model, a <kbd>Ctrl</kbd> + click that doesn't drag works on the mask's edges, as in ZBrush:
+> **ZBrush:** with DynaMesh, ZBrush also remeshes when a <kbd>Ctrl</kbd> + drag on the background misses the
+> model. SculptForge doesn't: remesh with **Tool > Remesh** instead.
+
+On the model, a <kbd>Ctrl</kbd> + click that doesn't drag works on the mask's edges, as in ZBrush, whichever
+mask shape is picked:
 
 | Gesture | Effect |
 |---|---|
@@ -97,8 +103,8 @@ On the model, a <kbd>Ctrl</kbd> + click that doesn't drag works on the mask's ed
 | <kbd>Ctrl</kbd>+<kbd>W</kbd> | Group Masked: the masked part becomes a new polygroup and the mask is cleared (see [Polygroups](polygroups.md)) |
 
 A drag starts after the cursor moves a few pixels, so a slightly shaky click still inverts. With **MaskLasso**
-or **MaskRect**, a <kbd>Ctrl</kbd> + drag on the background draws the shape instead; clear the mask with
-**Clear**, or <kbd>Ctrl</kbd>+<kbd>Alt</kbd> + drag a shape around the whole model.
+or **MaskRect**, a <kbd>Ctrl</kbd> + drag on the background draws that shape; to clear the mask, draw it away
+from the model, or use **Clear**.
 
 ## The Masking sub-palette
 

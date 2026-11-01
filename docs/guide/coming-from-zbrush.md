@@ -28,8 +28,8 @@ keys and gestures by default; where it has habits of its own, they are kept as a
   Size, the inner ring the Focal Shift. See [Sculpting and brushes](sculpting.md).
 - **Masking.** <kbd>Ctrl</kbd> paints a mask and <kbd>Ctrl</kbd>+<kbd>Alt</kbd> erases it; <kbd>Ctrl</kbd>+click
   the model blurs it and <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click sharpens it; <kbd>Ctrl</kbd>+click the background
-  inverts it and <kbd>Ctrl</kbd>+drag there clears it. MaskLasso and MaskRect: with <kbd>Ctrl</kbd> held the shelf
-  shows the mask brush, and the Brush (<kbd>B</kbd>) and Stroke pickers pick it. See [Masking](masking.md).
+  inverts it and <kbd>Ctrl</kbd>+drag there draws a mask rectangle (one that misses the model clears the mask).
+  MaskLasso and MaskRect follow the symmetry: with <kbd>Ctrl</kbd> held the shelf shows the mask brush, and the Brush (<kbd>B</kbd>) and Stroke pickers pick it. See [Masking](masking.md).
 - **Visibility and polygroups.** <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+drag keeps the inside (press <kbd>Alt</kbd> to
   hide it instead), <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+click a group to isolate it (on a partly hidden mesh: to hide
   it), <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+click the background to show everything, <kbd>Ctrl</kbd>+<kbd>W</kbd> to
@@ -92,7 +92,7 @@ Style** switches between:
 |---|---|---|
 | <kbd>1</kbd> to <kbd>9</kbd>, <kbd>0</kbd> | Free (<kbd>9</kbd> is QuickSave) | Pick the ten first brushes (Standard, Clay, Smooth, Move ...) |
 | <kbd>I</kbd> | RGB Intensity at the cursor | Z Intensity at the cursor (as <kbd>U</kbd>) |
-| <kbd>Ctrl</kbd>+drag on the background with nothing masked | Nothing | Zooms |
+| <kbd>Ctrl</kbd>+drag on the background with nothing masked | Draws a mask rectangle | Zooms |
 | Zoom drags (<kbd>Ctrl</kbd>+right-drag, <kbd>Alt</kbd> then release) | Up zooms out | Up zooms in |
 
 **Preferences > Input > Rotation** chooses free rotation (ZBrush) or a turntable that keeps the model upright, as

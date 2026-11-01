@@ -8,6 +8,7 @@
 #include "core/ThreadPool.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <functional>
 
@@ -55,6 +56,23 @@ bool repeatPass(Mesh& mesh, int iterations, F next) {
         changed = true;
     }
     return changed;
+}
+
+// The "symmetry" argument ("x", "xz" ...) as mirror sign vectors (Sculptor::mirrors); none without it.
+bool symmetryArg(const Args& a, std::vector<glm::vec3>& mirrors, std::string& error) {
+    Symmetry sym{false, false, false};
+    for (char c : argString(a, "symmetry")) {
+        const char l = char(std::tolower(static_cast<unsigned char>(c)));
+        if (l == 'x') sym.x = true;
+        else if (l == 'y') sym.y = true;
+        else if (l == 'z') sym.z = true;
+        else {
+            error = "symmetry takes the axes x, y and z";
+            return false;
+        }
+    }
+    mirrors = Sculptor::mirrors(sym);
+    return true;
 }
 
 float smoothstep01(float e0, float e1, float x) {
@@ -161,14 +179,37 @@ bool maskByPolygroup(Mesh& mesh, uint32_t group, bool add) {
     });
 }
 
-bool maskInShape(Mesh& mesh, const glm::mat4& viewProj, const ScreenPolygon& shape, float strength, bool unmask) {
+namespace {
+
+// Vertex v, or one of its mirror images, projects inside the shape.
+bool inShape(const Mesh& mesh, const glm::mat4& viewProj, const ScreenPolygon& shape,
+             const std::vector<glm::vec3>& mirrors, uint32_t v) {
+    glm::vec2 ndc;
+    if (projectToNdc(viewProj, mesh.positions[v], ndc) && shape.contains(ndc)) return true;
+    for (const glm::vec3& m : mirrors)
+        if (m != glm::vec3(1.0f) && projectToNdc(viewProj, mesh.positions[v] * m, ndc) && shape.contains(ndc)) return true;
+    return false;
+}
+
+} // namespace
+
+bool maskInShape(Mesh& mesh, const glm::mat4& viewProj, const ScreenPolygon& shape, float strength, bool unmask,
+                 const std::vector<glm::vec3>& mirrors) {
     if (mesh.vertexCount() == 0 || !shape.valid()) return false;
     const float s = std::clamp(strength, 0.0f, 1.0f);
     return maskPass(mesh, [&](const std::vector<float>& m, uint32_t v) {
-        glm::vec2 ndc;
-        if (!projectToNdc(viewProj, mesh.positions[v], ndc) || !shape.contains(ndc)) return m[v];
+        if (!inShape(mesh, viewProj, shape, mirrors, v)) return m[v];
         return unmask ? m[v] * (1.0f - s) : m[v] + (1.0f - m[v]) * s;
     });
+}
+
+bool shapeCoversMesh(const Mesh& mesh, const glm::mat4& viewProj, const ScreenPolygon& shape,
+                     const std::vector<glm::vec3>& mirrors) {
+    if (!shape.valid()) return false;
+    const bool anyHidden = mesh.hasHidden();
+    for (uint32_t v = 0; v < uint32_t(mesh.vertexCount()); ++v)
+        if (!(anyHidden && mesh.vertexHidden(v)) && inShape(mesh, viewProj, shape, mirrors, v)) return true;
+    return false;
 }
 
 void Sculptor::dabMask(Mesh& mesh, const BVH& bvh, const DabParams& p, Symmetry sym) {
@@ -271,6 +312,14 @@ void registerMaskingCommands(CommandRegistry& registry) {
     const ParamSpec strength{"strength", T::Number, "How much to mask or unmask (0-1). Default 1.", false};
     const ParamSpec viewProj{"view_proj", T::String, "Optional 16 numbers: column-major view-projection matrix.",
                              false};
+    const ParamSpec symmetry{"symmetry", T::String,
+                             "Mirror axes, e.g. \"x\" or \"xz\": the mirror image of the shape is selected too, as the "
+                             "brushes mirror (default none).",
+                             false};
+    const ParamSpec clearOutside{"clear_outside", T::Bool,
+                                 "When the shape covers none of the model, clear the mask instead (ZBrush: Ctrl+drag on "
+                                 "the background). Default false.",
+                                 false};
     auto selection = [&registry](std::string name, std::string description, std::vector<ParamSpec> params,
                                  std::function<bool(const Args&, std::vector<glm::vec2>&, std::string&)> shape) {
         registry.add(
@@ -281,10 +330,20 @@ void registerMaskingCommands(CommandRegistry& registry) {
                  std::vector<glm::vec2> points;
                  std::string error;
                  if (!viewProjArg(doc.mesh, a, vp, error) || !shape(a, points, error)) return {false, error};
+                 std::vector<glm::vec3> mirrors;
+                 if (!symmetryArg(a, mirrors, error)) return {false, error};
+                 const ScreenPolygon polygon(points);
                  const bool unmask = argBool(a, "unmask", false);
+                 if (argBool(a, "clear_outside", false) && !shapeCoversMesh(doc.mesh, vp, polygon, mirrors)) {
+                     UndoRecord record = UndoRecord::captureMask(doc.mesh, "Clear Mask");
+                     if (!maskClear(doc.mesh)) return {true, "Clear Mask: mask unchanged"};
+                     doc.undo.push(std::move(record));
+                     doc.modified = true;
+                     return {true, "Clear Mask"};
+                 }
                  const std::string label = unmask ? "Unmask" : "Mask";
                  UndoRecord record = UndoRecord::captureMask(doc.mesh, label);
-                 if (!maskInShape(doc.mesh, vp, ScreenPolygon(points), float(argNumber(a, "strength", 1.0)), unmask))
+                 if (!maskInShape(doc.mesh, vp, polygon, float(argNumber(a, "strength", 1.0)), unmask, mirrors))
                      return {true, label + ": mask unchanged"};
                  doc.undo.push(std::move(record));
                  doc.modified = true;
@@ -302,7 +361,9 @@ void registerMaskingCommands(CommandRegistry& registry) {
          {"y1", T::Number, "Rectangle top (-1..1). Default 1.", false},
          unmask,
          strength,
-         viewProj},
+         viewProj,
+         symmetry,
+         clearOutside},
         [](const Args& a, std::vector<glm::vec2>& points, std::string&) {
             const float x0 = float(argNumber(a, "x0", -1)), y0 = float(argNumber(a, "y0", -1));
             const float x1 = float(argNumber(a, "x1", 1)), y1 = float(argNumber(a, "y1", 1));
@@ -317,7 +378,9 @@ void registerMaskingCommands(CommandRegistry& registry) {
         {{"points", T::String, "The lasso: at least 3 points as \"x0 y0 x1 y1 ...\" (-1..1, y up).", true},
          unmask,
          strength,
-         viewProj},
+         viewProj,
+         symmetry,
+         clearOutside},
         lassoArg);
 }
 
