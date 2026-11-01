@@ -182,7 +182,28 @@ bool solveCrossField(const Proxy& p, const Frames& f, const Curvature& curv, con
             const uint32_t g = o / 3;
             const vec3 e = p.P[p.T[t][(k + 1) % 3]] - p.P[p.T[t][k]];
             const double at = angleIn(f, t, e), ag = angleIn(f, g, e);
-            transport[c] = std::polar(1.0, 4.0 * (at - ag));
+            // Wanted quad size h: the field lives in the metric scaled by 1/h, whose connection turns by
+            // (log h_b - log h_a) times the dual / primal edge length ratio (cotangent weight) crossing into t.
+            // Without it, (1/h) X can't be a gradient and the map smears the density out.
+            double size = 0.0;
+            if (!p.fieldSize.empty()) {
+                const uint32_t a = p.T[t][k], b = p.T[t][(k + 1) % 3];
+                auto cotAt = [&](uint32_t tri, uint32_t opposite) {
+                    const glm::uvec3 q = p.T[tri];
+                    int j = 0;
+                    while (j < 3 && q[j] != opposite) ++j;
+                    const vec3 u = p.P[q[(j + 1) % 3]] - p.P[q[j]], v = p.P[q[(j + 2) % 3]] - p.P[q[j]];
+                    return double(glm::dot(u, v)) / std::max(1e-20, double(glm::length(glm::cross(u, v))));
+                };
+                const uint32_t ct = p.T[t][(k + 2) % 3];
+                uint32_t cg = p.T[g][0];
+                for (int j = 0; j < 3; ++j)
+                    if (p.T[g][j] != a && p.T[g][j] != b) cg = p.T[g][j];
+                const double w = std::clamp(0.5 * (cotAt(t, ct) + cotAt(g, cg)), 0.0, 5.0);
+                static const double gain = std::getenv("SF_QR2_SIZEGAIN") ? std::atof(std::getenv("SF_QR2_SIZEGAIN")) : 2.0;
+                size = gain * w * (std::log(double(p.fieldSize[b])) - std::log(double(p.fieldSize[a])));
+            }
+            transport[c] = std::polar(1.0, 4.0 * (at - ag + size));
         }
     // System: for free t, (deg + w) z_t - sum r z_g = w target (+ fixed neighbours).
     std::vector<double> diag(nt, 1.0);

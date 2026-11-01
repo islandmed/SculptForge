@@ -44,6 +44,7 @@ struct Proxy {
     std::vector<uint8_t> feature;  // per corner: the edge is a feature line (open edges included)
     std::vector<uint8_t> sharp;    // per corner: ... because it is a hard edge (Detect Edges)
     std::vector<float> size;       // per vertex: wanted quad edge length
+    std::vector<float> fieldSize;  // per vertex: the (relative) size the cross field turns with; empty = none
     std::vector<vec3> color;       // per vertex polypaint (usePolypaint only)
 
     size_t triangles() const { return T.size(); }

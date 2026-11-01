@@ -948,8 +948,10 @@ bool remeshPieceV2(const WorkMesh& piece, int axis, double wantQuads, const QRem
         for (size_t v = 0; v < s.size(); ++v) s[v] = w[v] > 0.0f ? s[v] / w[v] : 0.0f;
         return s;
     };
+    std::vector<float> relPaint;
     auto computeRel = [&]() {
         rel.assign(proxy.P.size(), 1.0f);
+        relPaint.assign(proxy.P.size(), 1.0f);
         if (opt.adaptive > 0.01f) {
             const std::vector<float> k = vertexAverage(curv.magnitude);
             std::vector<float> sorted(k);
@@ -968,23 +970,33 @@ bool remeshPieceV2(const WorkMesh& piece, int axis, double wantQuads, const QRem
                 proxy.color[v] = c;
                 const float red = std::clamp(c.x - std::max(c.y, c.z), 0.0f, 1.0f);
                 const float blue = std::clamp(c.z - std::max(c.x, c.y), 0.0f, 1.0f);
-                rel[v] *= std::pow(2.0f, blue - red);
+                relPaint[v] = std::pow(2.0f, blue - red);
             }
         }
-        // Smooth the log size so it changes gradually.
+        // The size the cross field turns with (QRemesh2Field.cpp): the polypaint density, which asks for real changes
+        // of density (pole pairs where it changes). Adaptive Size only stretches the map (a noisy sculpt's curvature
+        // would otherwise ask for many pole pairs).
+        if (!piece.color.empty()) proxy.fieldSize = relPaint;
+        else proxy.fieldSize.clear();
+        for (size_t v = 0; v < rel.size(); ++v) rel[v] *= relPaint[v];
+        // Smooth the log sizes so they change gradually.
         VertexFaces vf;
         vf.build(proxy.P.size(), proxy.T);
-        for (int it = 0; it < 10; ++it) {
-            std::vector<float> lr(rel.size());
-            for (size_t v = 0; v < rel.size(); ++v) {
-                double s = 0.0;
-                int c = 0;
-                for (uint32_t k = vf.off[v]; k < vf.off[v + 1]; ++k)
-                    for (int j = 0; j < 3; ++j) s += std::log(double(rel[proxy.T[vf.tri[k]][j]])), ++c;
-                lr[v] = c ? float(std::exp(s / double(c))) : rel[v];
+        auto smoothLog = [&](std::vector<float>& x, int rounds) {
+            for (int it = 0; it < rounds; ++it) {
+                std::vector<float> lr(x.size());
+                for (size_t v = 0; v < x.size(); ++v) {
+                    double s = 0.0;
+                    int c = 0;
+                    for (uint32_t k = vf.off[v]; k < vf.off[v + 1]; ++k)
+                        for (int j = 0; j < 3; ++j) s += std::log(double(x[proxy.T[vf.tri[k]][j]])), ++c;
+                    lr[v] = c ? float(std::exp(s / double(c))) : x[v];
+                }
+                x.swap(lr);
             }
-            rel.swap(lr);
-        }
+        };
+        smoothLog(rel, 10);
+        if (!proxy.fieldSize.empty()) smoothLog(proxy.fieldSize, 30);
     };
     if (adaptive) {
         computeRel();
