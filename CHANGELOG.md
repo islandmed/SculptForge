@@ -20,6 +20,11 @@ All notable changes to SculptForge are listed here. The format follows
   than 4% of its largest, the last part faded smoothly to 0), evaluates the kernel from a radial table, works out a
   fast drag in pieces in one pass, and passes on only what moved to undo, normals and the BVH. KelvinGrab and
   DetailClone are on the bottom shelf; all five are in the brush picker, the LightBox and the `stroke` command.
+  On dense meshes a long move is applied at most about a brush radius per frame (the rest in the next frames),
+  the far field is evaluated on a coarse lattice and, over 400k vertices, deferred to a world lattice that a
+  sixth of the vertices take each frame (all of it when the stroke ends), and the cutoff tightens up to 10% of
+  the peak over a vertex budget. Twist and Scale at 33M / 50 px: 57 ms frames (was 110-280); KelvinGrab still
+  about 190 ms there (renderer sync), see docs/performance.md.
 - **Capture from view** (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd>, askNK's request): drag a square (Shift: a
   circle) over any sculpted detail and get, side by side, a **grayscale height alpha** (height toward the viewer
   over a fitted plane, normalized, optionally detail-only) and a **vector displacement map**: each point's true 3D

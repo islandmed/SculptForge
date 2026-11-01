@@ -28,38 +28,54 @@ every figure here is with the full window, circle radius 176 px). Each figure is
 as an upper bound and as a comparison with Move in the same conditions, not as clean numbers.
 
 Frame time while drawing the fast two-turn circle (mean / worst, ms), 50 px and 300 px brush (300 px is as big as
-the sphere on screen: a whole-model grab):
+the sphere on screen: a whole-model grab). "Before" is the first version of the branch, "now" after the
+dense-mesh pass described below; Move was measured in each session:
 
-| Mesh | Brush | Move | KelvinGrab | KelvinTwist | KelvinScale | load |
+| Mesh | Brush | Move | KelvinGrab before -> now | KelvinTwist before -> now | KelvinScale before -> now | load |
 |---|---|---:|---:|---:|---:|---:|
-| 5M | 50 px | 12.6 / 34 | **14.2 / 27** | **14.6 / 30** | 35.8 / 64 | 17-25 |
-| 5M | 300 px | 71 / 121 | 197 / 283 | 124 / 165 | 120 / 203 | 20-27 |
-| 21M | 50 px | 16.1 / 54 | 43.8 / 173 | 35.2 / 78 | 77.6 / 194 | 14-19 |
-| 21M | 300 px | 290 / 431 | 1297 / 1694 | 968 / 1505 | 935 / 1593 | 21-58 |
-| 33M | 50 px | 21.0 / 53 | 179 / 390 | 110 / 177 | 279 / 729 | 32-40 |
-| 33M | 300 px | 403 / 548 | (no frame in 3 s) | (no frame in 3 s) | 1546 / 3078 | 18-33 |
+| 5M | 50 px | 8.3 / 11 | 14.2 -> **9.6** / 22 | 14.6 -> **8.9** / 18 | 35.8 -> **9.3** / 15 | 12-16 |
+| 5M | 300 px | 42 / 57 | 197 -> 145 / 210 | 124 -> 163 / 232 | 120 -> 384 / 491 | 13-24 |
+| 21M | 50 px | 20.6 / 38 | 43.8 -> 138 / 195 | 35.2 -> **55** / 152 | 77.6 -> **52** / 122 | 17-22 |
+| 21M | 300 px | 203 / 223 | 1297 -> **557** / 668 | 968 -> **499** / 688 | 935 -> **415** / 558 | 17-23 |
+| 33M | 50 px | 19.2 / 37 | 179 -> 187 / 805 | 110 -> **58** / 99 | 279 -> **57** / 104 | 23-58 |
+| 33M | 300 px | 381 / 405 | no frame in 3 s -> **920** / 1022 | no frame -> **505** / 746 | 1546 -> **1170** / 2234 | 16-38 |
 
-A quieter moment (load ~19) gave KelvinGrab at 21M / 50 px **38.5 / 47.9 ms** (Move 28): about 850 000 vertices
-a move in 2 pieces, kernel 10 ms, normals 10-12 ms, BVH 3-4 ms, renderer sync about 15 ms a frame.
+(Both columns are under heavy, varying load; KelvinGrab's "before" at 21M / 50 px came from a quieter moment.)
 
-What it costs and why:
+**Targets not met.** The goal was KelvinGrab at 33M under 20 ms (50 px) and 50 ms (300 px). Measured: 187 and 920
+ms. Twist and Scale at 33M / 50 px came down from 110-280 to 57-58 ms. On the same machine Move took 19 and 381
+ms. So a 300 px move under 50 ms at 33M would be well beyond what plain Move does today. A KelvinGrab move at
+33M / 50 px costs about 39 ms on the CPU (`SF_KELVIN_LOG`: about 900 000 vertices, kernel 15, normals 14, BVH
+10 ms). What is left is the renderer: about 60 ms a frame of sync, because the deferred far field touches
+vertices spread over a large box every frame. The next step is GPU-side: show the far field as a vertex-shader
+displacement from the lattice (a 3D texture) and write it to the mesh when the stroke ends. That needs the
+render pipeline (feat/zero-latency).
 
-- A Kelvinlet never reaches zero, so the brush works out each move's own cutoff: the distance past which the move
-  is below 4% of its peak, the field faded smoothly to zero over the last 30% of it. That is about twice the
-  brush radius, so a Kelvinlet touches roughly 4x the area Move does, and with X symmetry twice that. This is what
-  makes the surface move with no edge; it is also the cost.
-- What was done to keep it interactive: the kernel comes from a 2048-entry radial table with the window folded in
-  (a lookup and a lerp per vertex instead of three square roots and divisions per scale); a fast drag between two
-  frames is integrated in up to 8 pieces inside one pass (one BVH query, one move, one normal and BVH update),
-  not one dab per piece (the first version: 470 ms frames at 5M / 50 px, now 14 ms); only vertices that move more
-  than 0.5% of the step go on to undo, normals, the BVH and the GPU (the rest add up to under 0.5% of the drag);
-  when few of the queried vertices moved, normals and the BVH are updated around those only.
-- Where it still falls short: on 21M+ meshes a fast drag makes frames slower, a slow frame makes the next move
-  longer (more pieces, a larger region), and the brush trails the pointer. A whole-model Kelvinlet at 21M-33M
-  (300 px) runs at about 1 frame a second. Next steps, not done here: carry the part of a long move past about
-  one radius over to the next frame (bounded work per frame, the grab catches up), a coarser cutoff while the
-  region is above a vertex budget, and sparse GPU uploads of only the moved vertices (the stroke pipeline work in
-  feat/zero-latency).
+What the dense-mesh pass does (`src/core/Kelvinlet.cpp`, `src/app/PanelKelvinlet.cpp`):
+
+1. **Bounded work per frame.** The app applies at most about one brush radius of a long move per frame (half that
+   when the last move found more vertices than `KelvinletSettings::vertexBudget`, 600 000, a constant until the
+   hardware profile sets it). For Twist and Scale the cap is a 0.3 rad turn or a 0.2 log-scale step. It moves
+   once per frame and catches up in later frames, also when the pointer rests, and completely when the stroke
+   ends.
+2. **A coarse proxy for the far field.** Regions above 150 000 vertices evaluate the field on a lattice (spacing
+   0.06 radius) beyond half a radius from the load's path and interpolate it trilinearly; the near field stays
+   exact. Regions above 400 000 vertices (predicted from the last move) go further: only the near field (within
+   1.2 radii, smoothly weighted) moves at once. The far field is gathered on a world lattice (spacing 0.1 radius),
+   and a sixth of the vertices (runs of 4096 indices) take what they gathered each frame.
+3. **An adaptive cutoff.** It is 4% of the peak, rising to 10% when the predicted region is over the budget.
+4. **A threaded VDM capture.** The flood fill runs one ring at a time in parallel, and the adjacency and the
+   triangles are built in parallel.
+
+Error metric (tests/test_kelvinlet.cpp):
+- **Lattice proxy:** the largest deviation from the exact field is 0.53% of the step's size. That includes the
+  0.5% floor below which a vertex's move is skipped, which the exact path has too.
+- **Deferred far field, at the stroke's end:** within 1.1% of the brush radius of the immediate evaluation
+  (under a pixel for brushes up to about 70 px; about 3 px for a 300 px brush). The deviation is smooth, with no
+  seams.
+- **During a drag:** the far part of the surface (beyond about one radius) trails the near part by up to six
+  frames, then settles.
+- **Undo** is exact.
 
 The core per-move cost on its own (`sculptforge_tests kelvinlet_grab_dense_mesh_timing`, 1.3M triangles, r 0.3,
 no renderer): about 1.6-3.4 ms a move for 13 000-27 000 vertices, depending on the load.
@@ -71,11 +87,12 @@ Capture from view (`sculptforge-cli`, a VDM horn and a DamStandard cut sculpted 
 |---|---:|---:|---:|
 | 21M (load ~20) | 18 / 106 ms | 117 ms (50 k) | 1329 ms (456 k) |
 | 33M (load ~21) | 55 / 240 ms | 439 ms (76 k) | 3852 ms (696 k) |
+| 33M, threaded region (load ~11) | | 128 ms (76 k) | 1212 ms (696 k) |
 
 The alpha is a z-buffer of the triangles under the square plus a box-blur high pass (three box blurs: the
 1024 px alpha went from 652 to 106 ms at 21M). The VDM is region finding (flood fill over the vertices near the
 square), a quadric fit to its outer band, and implicit fairing by conjugate gradients (90-270 iterations); on a
-large patch the serial flood fill and adjacency build dominate and are the next thing to parallelize.
+large patch the flood fill and adjacency build dominated; they are threaded now (the last row).
 
 ## Next version: big brushes on dense meshes (feat/perf-pass)
 
