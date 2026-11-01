@@ -125,6 +125,8 @@ add_library(sculptforge_core STATIC
   src/io/GozCommands.cpp
   src/io/BlenderBridge.cpp
   src/io/BlenderCommands.cpp
+  src/io/MayaBridge.cpp
+  src/io/MayaCommands.cpp
   src/io/StlIO.cpp
   src/io/ArExport.cpp
 )
@@ -275,6 +277,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelPerformance.cpp
     src/app/PanelGoz.cpp
     src/app/PanelBlender.cpp
+    src/app/PanelMaya.cpp
     src/app/PanelPhone.cpp
     src/app/PanelProject.cpp
     src/app/PanelSubTools.cpp
@@ -533,6 +536,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The add-on's zips build and its manifest passes the checks Blender's validator makes.
     add_test(NAME blender_addon_package COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/addons/blender/build_addon.py
                                               --check --version ${PROJECT_VERSION} --out ${CMAKE_CURRENT_BINARY_DIR}/blender-addon)
+    # The Maya shelf script (integrations/maya, #42) with a mocked maya.cmds, round-tripped through sculptforge-cli.
+    add_test(NAME maya_shelf_script COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/maya/test_sculptforge_maya.py
+                                            --cli ${SCULPTFORGE_CLI_RUNNER})
     # The add-on inside a real Blender, when one is installed (tests/blender/test_in_blender.py).
     find_program(SCULPTFORGE_BLENDER blender)
     if(SCULPTFORGE_BLENDER)

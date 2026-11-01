@@ -383,6 +383,7 @@ int App::runUiTest(int w, int h, int fps) {
         pollUnreal();
         pollGenerator();
         pollBlender(); // (demo recordings leave the user's Blender bridge alone)
+        pollMaya(); // (tests and recordings never read the user's Maya folder: maya.json isn't loaded)
         pollPhone();
         pollAutoUv();
         pollBake();
@@ -903,6 +904,7 @@ int App::run() {
             pollUnreal();
             pollGoz();
             pollBlender();
+            pollMaya();
             pollPhone();
             pollAutoUv();
             pollBake();

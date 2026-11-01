@@ -9,6 +9,13 @@ All notable changes to SculptForge are listed here. The format follows
 ## [0.10.4] - 2026-11-01
 
 ### Added
+- Maya bridge (#42): **File > Maya** and a SculptForge shelf for Maya (`integrations/maya/sculptforge_maya.py`,
+  plain `maya.cmds`, released as `sculptforge_maya.zip`). Send the selected meshes from Maya, sculpt, then
+  **Send to Maya**: each object gets its new mesh by name, keeping its transform, parent and shading groups (one
+  undo step in Maya). Meshes travel as OBJ (quads, UVs) through one exchange folder you pick in both apps, with
+  a small, strictly checked manifest; no ports or connections, nothing in the folder is ever run, and the bridge
+  is off until you choose the folder. **Get automatically** (off by default) checks that folder once a second
+  (`maya_send` / `maya_receive folder=<folder>`; Help > User Guide > Working with Maya).
 - Mask from the mesh border (#61): **Tool > Masking > By border** masks the open edges of the active SubTool and
   **Rings** (1-20) of edges inside them, so sculpting doesn't move the border (Blender: Mask from mesh
   boundary). **Polygroup borders** also masks where polygroups meet (ZBrush: Mask by polygroup border), **Soft**

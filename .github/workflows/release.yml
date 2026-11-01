@@ -195,6 +195,8 @@ jobs:
         run: |
           python3 addons/blender/build_addon.py --check --version "${TAG#v}" --out dist
           cp "dist/sculptforge_bridge-${TAG#v}.zip" dist/sculptforge_bridge.zip
+      - name: Maya shelf script (Python source and its README; nothing to build)
+        run: python3 -m zipfile -c dist/sculptforge_maya.zip integrations/maya/sculptforge_maya.py integrations/maya/README.md
       - name: ZBrush ZTool Export plug-in (ZScript source; ZBrush compiles it)
         run: cp integrations/zbrush/SculptForgeZToolExport.txt dist/
       - name: Checksums

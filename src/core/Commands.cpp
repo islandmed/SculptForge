@@ -37,6 +37,7 @@
 #include "io/BlenderCommands.h"
 #include "io/GozCommands.h"
 #include "io/GozIO.h"
+#include "io/MayaCommands.h"
 #include "io/ObjIO.h"
 #include "io/PlyIO.h"
 #include "io/StlIO.h"
@@ -813,6 +814,7 @@ CommandRegistry::CommandRegistry() {
     registerPaintCommands(*this); // core/Polypaint.cpp
     registerGozCommands(*this); // goz_import/export/send/receive, export_stl (io/GozCommands.cpp)
     registerBlenderCommands(*this); // blender_send/receive (io/BlenderCommands.cpp)
+    registerMayaCommands(*this); // maya_send/receive (io/MayaCommands.cpp)
     registerBakeCommands(*this); // bake (core/Bake.cpp)
     registerFaceCommands(*this); // face_shapes_generate, face_weights, ... (core/FaceCommands.cpp)
     registerProjectCommands(*this); // keep last (core/Project.cpp)
