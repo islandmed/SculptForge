@@ -37,10 +37,42 @@ Open **Preferences** and click **Performance**.
 | Control | What it does |
 |---|---|
 | **Antialiasing** (Off, 2x, 4x, 8x) | How many samples per pixel the 3D view uses to smooth edges. 4x is the default. More samples look smoother and cost more on huge meshes. If the graphics card can't make room for them, the view quietly uses fewer and the panel says so |
-| **Fast Navigation** | While you rotate, pan or zoom a scene of 10 million triangles or more, draw it without antialiasing and draw big meshes as a lighter version with about a fifth of their triangles, so the view keeps up. The full mesh, smooth again, is back as soon as the view stops. On by default |
+| **Fast Navigation** | While you rotate, pan or zoom a scene bigger than the hardware profile's motion proxy threshold (see below), draw it without antialiasing and draw big meshes as a lighter version with about a fifth of their triangles, so the view keeps up. The full mesh, smooth again, is back as soon as the view stops. On by default |
 | **Multithreading** | Run brushes, normal and picking updates and project saving on every core (the number of threads is shown beside it). The results are exactly the same with it off; turn it off only to compare speeds or rule it out when something goes wrong |
 | **Last stroke** | What your last stroke cost per dab: **Brush** (finding and moving the vertices), **Normals** (shading), **BVH** (the structure that finds the surface under the cursor), and the **GPU upload** per frame |
 | **Memory** | What the scene holds: the meshes, the BVHs, the subdivision levels kept for stepping between them, the undo history (up to 1 GB; the oldest steps are dropped beyond that) and, roughly, the graphics card's buffers |
+
+## The hardware profile
+
+The first time you start SculptForge, a small window says **Getting to know this computer** for a second or two:
+it checks how fast your graphics card draws and receives data, how fast a brush runs and how fast the memory is,
+and picks settings to match. It does this once, and again only when you change the graphics card, update its
+driver or install a new version. Press <kbd>Esc</kbd> or **Skip** to skip it; the settings then come from the
+type of graphics card and the memory sizes. Nothing is sent anywhere: the results stay in your settings folder.
+
+There are two main profiles and a safe mode:
+
+| Profile | For | What changes |
+|---|---|---|
+| **Laptop / Budget** | laptops and most desktops: 8-16 GB of memory, a 2-4 GB graphics card, Apple Silicon | a moderate number of triangles drawn while the view moves; brushes update shading when you lift the pen (draft brushes) |
+| **Workstation** | 64 GB of memory or more and a graphics card with 16 GB or more | more triangles drawn per frame, larger textures and subdivision limits, shading updated with every dab |
+| **Software** (safe mode) | no graphics driver, so the drawing happens on the processor (llvmpipe) | the lightest settings, no antialiasing |
+
+On a laptop running on battery, SculptForge switches to draft brushes, sends less data to the graphics card per
+frame and aims for 60 frames a second, and the status bar says so; plugged in again, it goes back.
+
+At the top of **Preferences > Performance**:
+
+| Control | What it does |
+|---|---|
+| **Detected ...** | the graphics card, its memory and the profile, and why |
+| Measured numbers | triangles drawn per second, upload speed, the cost of a brush dab, memory speed, the processor and the system |
+| Settings | how many triangles the view draws per frame, from what size big scenes use their lighter version while moving, memory and upload budgets, texture and subdivision limits, threads, the target frame rate (60, or 120 / 144 on a fast display) |
+| **Frame Governor** | while the view moves, watch how long frames take and draw big scenes' lighter version sooner or later to hold the target frame rate. It only changes what you see while moving, never the model. On by default |
+| **Re-calibrate** | measure again (your overrides are kept) |
+| **Manual overrides** | choose the profile yourself, or set any of the numbers (empty = automatic); **Back to automatic** clears them. Overrides are saved at once and kept when you re-calibrate |
+
+From a shell, `sculptforge --calibrate` measures and prints the result as JSON.
 
 Like the other preferences, these last until you quit; **Preferences > Config > Store Config** keeps them. Every
 setting is also in the <kbd>F3</kbd> command palette (type "antialiasing", "fast navigation" or

@@ -549,6 +549,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Idle, the app draws nothing (#14): --measure-idle fails when it keeps drawing frames.
     add_test(NAME ui_idle_redraw COMMAND sculptforge --measure-idle 4)
     set_tests_properties(ui_idle_redraw PROPERTIES LABELS ui TIMEOUT 60 ENVIRONMENT "SF_NO_UPDATE_CHECK=1")
+    # sculptforge --calibrate on this machine's GPU: the JSON it prints passes the schema check (it exits 1 if not).
+    add_test(NAME ui_calibrate_json COMMAND sculptforge --calibrate-quick --calibrate-no-save)
+    set_tests_properties(ui_calibrate_json PROPERTIES LABELS ui TIMEOUT 60)
     # A fast stroke in the interactive loop (dabs queued, placed a few milliseconds a frame): every dab lands on the
     # pointer's circle (#19).
     add_test(NAME ui_stroke_path COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)

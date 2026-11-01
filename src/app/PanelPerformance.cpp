@@ -75,8 +75,9 @@ void App::registerPerformanceUiActions() {
             status_ = uiPrefs_.fastNavigation ? "Fast Navigation on" : "Fast Navigation off";
         },
         [this] { return uiPrefs_.fastNavigation; },
-        "While you rotate, pan or zoom a scene of 10 million triangles or more, draw it without antialiasing, so the "
-        "view keeps up; it is smooth again as soon as the view stops.");
+        "While you rotate, pan or zoom a big scene (over the hardware profile's motion proxy threshold, which the "
+        "frame governor adjusts; 10 million triangles without a profile), draw a lighter version without "
+        "antialiasing, so the view keeps up; it is full detail again as soon as the view stops.");
     add("perf.multithreading", "Multithreading",
         [this] {
             uiPrefs_.multithreading = ThreadPool::shared().serial();

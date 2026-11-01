@@ -12,6 +12,145 @@ sculptforge-cli --bench ...                     # the same without the GPU (CI, 
 Machine for all figures: Apple M1 Pro (8 performance + 2 efficiency cores, 32 GB unified memory, 30 GB usable
 under Asahi Linux), integrated GPU, Mesa 26.1 (OpenGL 4.6). How the benchmark works is described under v0.5 below.
 
+## Hardware profile, calibration and the frame governor (feat/hw-profile)
+
+SculptForge measures the computer it runs on and sets its budgets from what it measured. Code:
+`src/core/HardwareProfile.*` (probe types, mapping, cache, JSON, commands), `src/core/TierConfig.*` (the knobs other
+modules read), `src/core/FrameGovernor.*` (run-time adaptation), `src/app/Calibration.*` (OpenGL probe and GPU
+benchmarks, `--calibrate`), `src/app/PanelPerformanceProfile.cpp` (first-launch flow, Preferences > Performance).
+Nothing in it uses the network.
+
+### When it runs
+
+On first launch, and again when `GL_VENDOR`, `GL_RENDERER` or `GL_VERSION` (which carries the driver version)
+or the app version changes, or when the cache holds only a CPU calibration from `sculptforge-cli`. The result
+is cached in `<settings folder>/hardware_profile.json` (Linux `~/.local/share/SculptForge/SculptForge/`, macOS
+`~/Library/Application Support/SculptForge/SculptForge/`, Windows `%APPDATA%\SculptForge\SculptForge\`). In the
+app it runs over the first frames, one step per frame under a small overlay (Esc or Skip skips it; the profile
+then comes from the probe alone). UI tests, renders, recordings, demos and the `--measure-*` runs never
+calibrate and keep the fixed defaults (Fast Navigation at 10 million triangles), so their results don't depend
+on the machine. `SF_NO_CALIBRATION=1` skips it too.
+
+```
+sculptforge --calibrate [--calibrate-quick] [--calibrate-no-save]   # prints JSON (schema sculptforge.calibration/1)
+sculptforge-cli -c 'calibrate'              # CPU half only (no OpenGL); GPU numbers from the cache
+sculptforge-cli -c 'performance_profile'    # the cached profile as JSON
+sculptforge-cli -c 'set_performance_override name=render_triangle_budget value=12000000'   # value=auto clears
+```
+
+The same three commands are in the command registry, so the console, scripts and MCP clients have them; in the
+app `calibrate` measures the GPU too.
+
+### What it probes
+
+| | How |
+|---|---|
+| GPU | `GL_VENDOR`, `GL_RENDERER`, `GL_VERSION`, `GL_MAX_TEXTURE_SIZE`, timer queries (`GL_TIME_ELAPSED`) |
+| Memory type | Software (llvmpipe, softpipe, SwiftShader, GDI Generic, Microsoft Basic Render), unified (Apple GPUs on macOS and Asahi), integrated or discrete, from the renderer string, refined by `GLX_RENDERER_UNIFIED_MEMORY_ARCHITECTURE_MESA` / `..._ACCELERATED_MESA` where available. Only the memory type comes from names; tiers come from measurements and memory sizes |
+| Video memory | the first that answers: `GL_NVX_gpu_memory_info` (NVIDIA; Mesa's radeonsi and asahi too), `GL_ATI_meminfo` (free memory only), `GLX_MESA_query_renderer` (Mesa on X11), amdgpu's `mem_info_vram_total` in sysfs (Linux, also on Wayland), DXGI (Windows), CGL (macOS). Unified memory counts at most two thirds of the RAM (Metal's working set), whatever the driver reports |
+| Machine | RAM, hardware threads, SIMD (SSE4.2 / AVX2 / AVX-512 on x86, NEON / SVE on ARM) and what the build uses, OS, CPU brand (x86 cpuid, macOS sysctl, the device tree on ARM Linux) |
+
+### What it measures (about 0.5-1.5 s of work; medians of 5 runs, 3 quick)
+
+| Measurement | Work |
+|---|---|
+| Triangle throughput | a 512 x 256 quad grid (262k triangles, about 4 pixels each, like a whole sculpt on screen) drawn instanced into a 1024 x 1024 offscreen target, every instance in front of the last; the instance count is chosen for about 25 ms a run; GL timer queries, else glFinish around the CPU clock |
+| Upload bandwidth | `glBufferSubData` of a 32 MB buffer, waited for (glFinish) |
+| Brush dab | 20 Standard dabs (X symmetry, radius 0.12) on a generated 1M-triangle sphere, undone between runs |
+| Memory bandwidth | `memcpy` of 64 MB |
+
+### Profiles
+
+Two main tiers and a safe mode:
+
+- **Workstation**: a discrete GPU with 16 GB or more (15 GB reported), 64 GB or more of RAM (60 GB reported),
+  at least 1000M triangles/s, dabs under 3 ms, memory over 4 GB/s.
+- **Laptop / Budget**: everything else, including Apple Silicon and other unified memory machines (8-16 GB RAM,
+  2-4 GB GPUs, thermal and battery limits).
+- **Software** (safe mode): a software renderer, or under 60M triangles/s.
+
+A re-calibration of the same GPU keeps the previous tier while the new triangle throughput is within 15% of the
+boundary, so a busy machine doesn't flip between tiers. Settings, before overrides:
+
+| Setting | How |
+|---|---|
+| `render_triangle_budget` | half a 60 Hz frame of the measured throughput, clamped per tier (Software 0.25-4M, Laptop 2-40M, Workstation 8-600M) |
+| `motion_proxy_threshold` | the budget (at least 262k): scenes over it draw the motion proxy while the view moves |
+| `vram_budget_mb` | 80% of dedicated memory; unified: two thirds of RAM; integrated: half of RAM; software: a quarter |
+| `upload_budget_mb_per_frame` | a quarter of a 60 Hz frame at the measured upload bandwidth (4-1024 MB) |
+| `max_texture_size` | the GL limit, at most 4096 / 8192 / 16384 by tier, 8192 under 2 GB of GPU memory |
+| `max_subdivision_triangles` | the smaller of half the RAM at 100 bytes per triangle and the GPU budget at 16 bytes per triangle, capped by tier |
+| `micro_triangle_limit` | a quarter of the GPU budget at 8 bytes per micro-triangle, capped by tier |
+| `threads` | hardware threads (at most 16, the pool's limit); half in safe mode, where llvmpipe draws on the same cores. Applies at the next start |
+| `target_fps` | 60, 120 or 144 from the display (`TierConfig::targetHz`) |
+
+Every setting can be overridden by hand (Preferences > Performance > Manual overrides, or `set_performance_override`),
+and overrides survive re-calibration.
+
+### TierConfig (core/TierConfig.h)
+
+What feat/micromesh and feat/zero-latency read, through `currentTierConfig()` (thread-safe; `tierConfigRevision()`
+changes when it does):
+
+| Field | Software | Laptop / Budget | Workstation |
+|---|---|---|---|
+| `residentCacheCapMB` | RAM / 8, at most 1 GB | RAM / 4, at most 4 GB | RAM x 2/5, at most 64 GB |
+| `activeTriangleBudget` | 0.5M | 2M | 8M+ (half the render budget, at most 64M) |
+| `uploadBudgetMBPerFrame` | the profile's | the profile's | the profile's |
+| `draftBrushMode` (normals and cavity at pen release) | on | on | off (continuous) |
+| `zeroCopyUMA` | the GPU shares system memory: unified or integrated | | |
+| `targetHz` | 60 | 60 / 120 / 144 from the display | 60 / 120 / 144 from the display |
+
+The app reads the power source with `SDL_GetPowerInfo` at start and every 5 seconds. On battery: draft brushes,
+half the upload budget and 60 Hz (unless set by hand), and the status bar says so. The `draft_brush` override
+(on / off) wins over both. `draftBrushMode` is a flag for the brush engine; the brushes don't read it yet.
+
+### Render triangle budget and the frame governor
+
+`renderTriangleBudget()` (core/HardwareProfile.h) is the number of triangles the 3D view may draw per frame to
+hold the target frame rate; `motionProxyThreshold()` is where Fast Navigation switches big scenes to their
+motion proxy. The frame governor (core/FrameGovernor.h) adjusts both from real frames:
+
+- Inputs per drawn frame: CPU time from input to swap (without the vsync wait), GPU time from a `GL_TIME_ELAPSED`
+  query read up to 4 frames later (never waiting), triangles drawn, the scene's full triangle count, whether
+  the view is moving and whether the proxy was used. Only moving frames count: still frames draw everything in
+  full and the governor can't change them. Frames over 250 ms (dialogs, loading) are ignored.
+- Every 20 counted frames it takes the medians. Above the target frame time it lowers the budget (aiming at 80%
+  of the frame, at most halving it); under 60% it raises it (at most 1.25x) when the budget is what limits the
+  view. In between it holds (the dead band). After a change, 5 frames are ignored.
+- Raising the budget past the scene's size would switch the proxy off; it only does when the predicted full
+  frame stays under 90% of the target, so the view never flips between proxy and full detail.
+- Bounds: an eighth to four times the profile's budget. It changes only how much is drawn, never the mesh.
+
+Today's renderer uses the governed threshold for the motion proxy (Preferences > Performance > Fast Navigation;
+`SF_FAST_NAVIGATION_TRIANGLES` still overrides it for tests).
+
+**How micromesh consumes it:** read `renderTriangleBudget()` once per frame (an atomic load) and amplify
+micro-displacement only until the frame's drawn triangles reach it, finest where the screen-space error is
+largest; keep the generated micro-triangles under `currentPerformanceSettings().microTriangleLimit` and their
+pages under `currentTierConfig().residentCacheCapMB`. Report the triangles actually drawn through
+`Renderer::lastDrawnTriangles()` so the governor sees them; it then raises or lowers the budget continuously
+(continuous level of detail converges without the proxy's step, see the `governor_converges_*` tests).
+
+### This machine
+
+Apple M1 Pro under Asahi Linux, on battery, with about 35 other processes compiling (load average 35 on 10
+cores), so the CPU numbers here are low (memory bandwidth measured 23 GB/s on a quieter run, dabs 0.07 ms on a
+0.2M sphere):
+
+```
+"gl_renderer": "Apple M1 Pro (G13S C0)", "gl_version": "4.6 (Core Profile) Mesa 26.1.8", "gpu_kind": "unified",
+"vram_mb": 31667 (GL_NVX_gpu_memory_info: all of the RAM), "timer_query": true, "cpu_threads": 10, "simd": ["neon"]
+measurements: 1358M triangles/s (GPU timer), upload 12.8 GB/s, dab 0.37 ms (2.5k vertices), memory 5.9 GB/s, 607 ms
+profile: Laptop ("Detected Apple M1 Pro (G13S C0), 20.6 GB unified -> Laptop (1358M triangles/s, Laptop / Budget:
+         no discrete GPU (unified))")
+settings: render budget 11.3M, motion proxy from 11.3M, GPU memory 20.6 GB, uploads 50 MB/frame, textures 8192,
+          subdivision 120M, micro-triangles 256M, 10 threads, 60 fps
+tier_config: cache 4 GB, active 2M, uploads 25 MB/frame (battery), draft brushes, zero-copy UMA, 60 Hz, on battery
+```
+
+Across runs on the busy machine the triangle throughput ranged 913-1410M/s and upload 4.3-21 GB/s.
+
 ## Next version: big brushes on dense meshes (feat/perf-pass)
 
 What a user feels on a heavy model is a large brush: how far it trails the pointer, how long a frame takes, and
