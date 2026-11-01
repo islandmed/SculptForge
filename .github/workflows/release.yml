@@ -29,7 +29,7 @@ on:
         type: boolean
         default: false
       promote_run:
-        description: (dry runs only) smoke-test the packages of this Packages run id
+        description: (dry runs only) smoke-test the packages of this Packages or Release run id
         required: false
 
 permissions:
@@ -67,8 +67,9 @@ jobs:
           fi
           if [ "$DRY_RUN" = true ] && [ -n "$PROMOTE_RUN" ]; then
             run=$(gh api "repos/$REPO/actions/runs/$PROMOTE_RUN" \
-                  --jq 'select(.path == ".github/workflows/packages.yml" and .conclusion == "success") | .id')
-            [ -n "$run" ] || { echo "::error::$PROMOTE_RUN is not a successful Packages run"; exit 1; }
+                  --jq 'select((.path == ".github/workflows/packages.yml" or .path == ".github/workflows/release.yml")
+                                and .conclusion == "success") | .id')
+            [ -n "$run" ] || { echo "::error::$PROMOTE_RUN is not a successful Packages (or Release) run"; exit 1; }
             echo "Dry run: smoke-testing the packages of run $run (not of $sha)"
             echo "run-id=$run" >> "$GITHUB_OUTPUT"
             exit 0
