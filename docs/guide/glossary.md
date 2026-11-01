@@ -68,7 +68,7 @@ for what is planned.
 | Texture palette | Not yet as a palette of texture images. **Tool > Texture Map > Import Texture** loads an image onto the UVs |
 | Transpose, Gizmo 3D (Move W, Scale E, Rotate R) | **Gizmo**: same keys, arrows, rings and boxes; masked parts stay, Falloff softens the joint. See [Gizmo](gizmo.md) |
 | Transpose All | **All Parts** in the Gizmo panel. See [Gizmo](gizmo.md#all-parts) |
-| UV Master (Unwrap), UV editing | The **UV Editor** (<kbd>Shift</kbd>+<kbd>U</kbd>): seams on the model, Least Stretch, Conformal, By Face Groups, Planar and Unfold unwraps, UDIM packing, texel density, trim sheets (`uv_unwrap`, `uv_pack`...). **Tool > Texture Map > Auto UV** (`uv_auto`) is the one-click unwrap. See [UV Editor](uv-editor.md) |
+| UV Master (Unwrap), UV editing | The **UV Editor** (<kbd>Alt</kbd>+<kbd>U</kbd>): seams on the model, Least Stretch, Conformal, By Face Groups, Planar and Unfold unwraps, UDIM packing, texel density, trim sheets (`uv_unwrap`, `uv_pack`...). **Tool > Texture Map > Auto UV** (`uv_auto`) is the one-click unwrap. See [UV Editor](uv-editor.md) |
 | VDM brush, 3D alpha, Create VDM brush from the VDM plane | The **VDM** brush and **Brush > Vector Displacement**: built-in maps, **Load VDM...** (EXR), **New VDM Plane**, **Create VDM**, **Export EXR...**. See [Vector displacement brushes](sculpting.md#vector-displacement-brushes) |
 | Zadd / Zsub | **Add** / **Sub** on the top shelf; <kbd>Alt</kbd> flips for one stroke |
 | ZPlugin | No in-app plugin system yet. Automate with the Python module, `sculptforge-cli` and MCP ([Scripting](scripting.md)) |

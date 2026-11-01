@@ -8,7 +8,7 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [0.10.5] - 2026-11-01
 ### Added
-- **UV Editor** (Tool > Texture Map > UV Editor, Shift+U): a window with the active Part's UV layout over the UDIM
+- **UV Editor** (Tool > Texture Map > UV Editor, Alt+U): a window with the active Part's UV layout over the UDIM
   tile grid, drawn on the GPU (pan, zoom, a checker or the painted texture behind). Select vertices, edges, faces or
   islands (1-4) by click or box, or on the model with **Select in 3D**; move, rotate and scale with the selection's
   handles or G / R / S (X / Y lock an axis, Ctrl snaps). **Seam Tool**: drag on the model to mark seams along the

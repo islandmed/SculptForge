@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The UV Editor (Tool > Texture Map > UV Editor, Shift+U): a window with the active Part's UV layout in 2D,
+// The UV Editor (Tool > Texture Map > UV Editor, Alt+U): a window with the active Part's UV layout in 2D,
 // drawn on the GPU (render/UvView.h) over the UDIM tile grid with a checker or the painted texture behind it.
 //
 // - Select vertices, edges, faces or islands (1-4) by clicking or dragging a box (Shift adds, Ctrl removes), or
@@ -173,6 +173,7 @@ struct UvEditorState {
     };
     std::unique_ptr<Job> job;
     int unwraps = 0; // finished (UI tests)
+    double frameMs = 0.0; // what the last frame of the window cost on the CPU (UI tests: uv_frame_ms)
 };
 
 // The UV Editor's work, with App's internals (a friend of App).
@@ -799,7 +800,7 @@ void App::registerUvEditorActions() {
         runCommand(name, a);
         if (uvEditor_) uvEditor_->dirty = true;
     };
-    add("ui.uv_editor", "UV Editor", ICON_LC_GRID_2X2, "Shift+U",
+    add("ui.uv_editor", "UV Editor", ICON_LC_GRID_2X2, "Alt+U",
         [this] {
             showUvEditor_ = !showUvEditor_;
             if (showUvEditor_) { // the model to the left of the window, which opens over the right of the canvas
@@ -951,6 +952,7 @@ void App::drawUvEditor() {
     UvEditorUi u = uvUi(*this, uvEditor_);
     UvEditorState& s = *uvEditor_;
     const float scale = uiScale_;
+    const Uint64 frameStart = SDL_GetTicksNS();
     if (!s.gpuTried) {
         s.gpuTried = true;
         if (!s.gpu.init(s.gpuError)) SDL_Log("UV Editor: %s", s.gpuError.c_str());
@@ -1376,6 +1378,7 @@ void App::drawUvEditor() {
                  "shows the UVs' new place on it (what trim sheets want).",
                  kPath);
     ImGui::EndChild();
+    s.frameMs = double(SDL_GetTicksNS() - frameStart) * 1e-6;
     ImGui::End();
 }
 
@@ -1563,6 +1566,7 @@ double App::uvEditorTestValue(const std::string& name) {
     if (name == "uv_select_mode") return double(int(doc_.uvSelection.mode));
     if (name == "uv_unwrapping") return uvEditor_ && uvEditor_->job ? 1.0 : 0.0;
     if (name == "uv_unwraps") return uvEditor_ ? double(uvEditor_->unwraps) : 0.0;
+    if (name == "uv_frame_ms") return uvEditor_ ? uvEditor_->frameMs : 0.0;
     if (name == "uv_tool") return uvEditor_ ? double(uvEditor_->tool) : 0.0;
     if (name == "uv_view_triangles") return uvEditor_ ? double(uvEditor_->gpu.triangles()) : 0.0;
     if (name == "uv_overlay") return uvEditorOverlay(doc_.activeSubtoolInfo().id) && !uvEditor_->overlay.colors.empty() ? 1.0 : 0.0;

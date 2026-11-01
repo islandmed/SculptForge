@@ -6,7 +6,7 @@ trim sheets, and hand editing of vertices, edges, faces and islands. While you w
 colours and a checker, so stretch and density show up on the surface the moment they appear, and a painted texture
 can move with every edit so the model keeps its look.
 
-Open it with **Tool > Texture Map > UV Editor**, or <kbd>Shift</kbd>+<kbd>U</kbd>. It opens over the right of the
+Open it with **Tool > Texture Map > UV Editor**, or <kbd>Alt</kbd>+<kbd>U</kbd>. It opens over the right of the
 canvas with the model moved to the left; drag its title bar or its edges to place it anywhere.
 
 ![The UV Editor: the lion's islands after Unwrap, with island colours and a checker on the model](images/uv-editor.jpg)

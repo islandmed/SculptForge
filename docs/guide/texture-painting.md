@@ -33,7 +33,7 @@ by hand, with more choices.
    mask work as they do for vertex paint.
 
 Click **Show UVs** to see the texture with the UV layout drawn over it, below the buttons, or open the
-[UV Editor](uv-editor.md) (<kbd>Shift</kbd>+<kbd>U</kbd>) to cut seams, unwrap, pack and edit the UVs. Paint on the model and
+[UV Editor](uv-editor.md) (<kbd>Alt</kbd>+<kbd>U</kbd>) to cut seams, unwrap, pack and edit the UVs. Paint on the model and
 watch the texture fill in.
 
 ## Vertex or Texture

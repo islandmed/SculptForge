@@ -1,9 +1,9 @@
-# UV Editor (Tool > Texture Map > UV Editor, Shift+U): the 2D layout drawn on the GPU, seams drawn on the model,
+# UV Editor (Tool > Texture Map > UV Editor, Alt+U): the 2D layout drawn on the GPU, seams drawn on the model,
 # unwrapping, the colours and checker on the model, packing across UDIM tiles, texel density, trim strips,
 # selecting and moving islands with undo.
 drop ../../assets/demo/lion-head.glb
 wait_idle 60
-key shift+u
+key alt+u
 expect_value uv_editor_open == 1
 expect "UV Editor/Unwrap##uvunwrap"
 expect_value uv_islands == 0
@@ -107,5 +107,5 @@ click "UV Editor/Select in 3D"
 
 # The window closes with its key.
 hover_window 0.2 0.5
-key shift+u
+key alt+u
 expect_value uv_editor_open == 0
