@@ -14,9 +14,11 @@
 #include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <thread>
 
 namespace sf {
 
@@ -377,23 +379,37 @@ bool exportMaps(const PaintTexture& t, const ExportPreset& preset, const std::st
         error = "Cannot create the folder " + folder;
         return false;
     }
-    for (const MapSpec& map : preset.maps) {
-        if (!mapWanted(t, map)) continue;
-        const std::string path = utf8(fsPath(folder) / fsPath(mapFileName(preset, map, name)));
+    // PNG compression is single-threaded and dominates at 4K / 8K: maps are written on up to four threads at once.
+    std::vector<const MapSpec*> maps;
+    for (const MapSpec& map : preset.maps)
+        if (mapWanted(t, map)) maps.push_back(&map);
+    std::vector<std::string> paths(maps.size()), errors(maps.size());
+    std::vector<char> ok(maps.size(), 0);
+    auto writeOne = [&](size_t i) {
+        const MapSpec& map = *maps[i];
+        paths[i] = utf8(fsPath(folder) / fsPath(mapFileName(preset, map, name)));
         int channels = 0;
-        bool ok = false;
         if (map.bits == 16) {
             std::vector<uint16_t> px;
-            ok = renderMap16(t, map, preset.normalDirectX, px, channels) && savePng16(path, t.width, t.height, channels, px, error);
+            ok[i] = renderMap16(t, map, preset.normalDirectX, px, channels) && savePng16(paths[i], t.width, t.height, channels, px, errors[i]);
         } else {
             Image img;
-            ok = renderMap(t, map, preset.normalDirectX, img, channels) && img.savePng(path, error);
+            ok[i] = renderMap(t, map, preset.normalDirectX, img, channels) && img.savePng(paths[i], errors[i]);
         }
-        if (!ok) {
-            if (error.empty()) error = "Cannot write " + path;
+    };
+    constexpr size_t kAtOnce = 4;
+    for (size_t first = 0; first < maps.size(); first += kAtOnce) {
+        std::vector<std::thread> threads;
+        for (size_t i = first + 1; i < std::min(maps.size(), first + kAtOnce); ++i) threads.emplace_back(writeOne, i);
+        writeOne(first);
+        for (auto& th : threads) th.join();
+    }
+    for (size_t i = 0; i < maps.size(); ++i) {
+        if (!ok[i]) {
+            error = errors[i].empty() ? "Cannot write " + paths[i] : errors[i];
             return false;
         }
-        written.push_back({map.map, path});
+        written.push_back({maps[i]->map, paths[i]});
     }
     return true;
 }

@@ -109,5 +109,8 @@ material channels is still saved as format 6, so older versions keep opening it.
 - Fill layers, generators (edge wear, dirt), mesh-map bakes as layer inputs, filters and material recipes are
   planned; today the stack is paint layers.
 - One texture per SubTool (no UDIM tiles yet).
-- Memory: a fully painted 8K channel set is large (see Performance); paint at 4K and export at 4K unless you need
-  8K.
+- Memory: colour, roughness, metallic, height and AO on Base plus three layers, each with a few big strokes,
+  take about 370 MB at 4K and 1.5 GB at 8K (most of it the colour layers); a layer painted everywhere adds about
+  200 MB of channels at 4K and 800 MB at 8K. Preferences > Performance shows the numbers for your scene. Paint at
+  4K unless you need 8K.
+- Export Maps takes a few seconds at 4K and about ten at 8K (PNG compression).
