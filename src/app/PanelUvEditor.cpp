@@ -147,6 +147,7 @@ struct UvEditorState {
     char strips[64] = "4";
     int strip = 0;
     bool fitWidth = false;
+    bool trimOpen = false; // the Trim Sheet section is open: the strips show in the view
     float seamAngle = 60.0f;
     // The 3D tool: 0 off, 1 Seams, 2 Select.
     int tool = 0;
@@ -1128,7 +1129,7 @@ void App::drawUvEditor() {
             dl->AddText(ImVec2(p.x + 5 * scale, p.y + 3 * scale), used ? IM_COL32(170, 170, 182, 210) : IM_COL32(110, 110, 118, 150), label);
         }
     // Trim strips (while the Trim Sheet section is open).
-    if (ImGui::GetStateStorage()->GetBool(ImGui::GetID("uvtrimopen"), false)) {
+    if (s.trimOpen) {
         std::vector<TrimStrip> strips;
         std::string err;
         if (parseTrimStrips(s.strips, strips, err))
@@ -1318,7 +1319,7 @@ void App::drawUvEditor() {
         ui::ActionButton(*this, "uv.density_pack", ImVec2(w, 0));
     }
     const bool trimOpen = section("Trim Sheet", false);
-    ImGui::GetStateStorage()->SetBool(ImGui::GetID("uvtrimopen"), trimOpen);
+    s.trimOpen = trimOpen;
     if (trimOpen) {
         ImGui::SetNextItemWidth(w);
         ImGui::InputText("##uvstrips", s.strips, sizeof s.strips);
