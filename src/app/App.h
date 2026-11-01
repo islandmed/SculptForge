@@ -1131,6 +1131,10 @@ private:
     void drawZIntensitySlider(const char* id);
     void openQuickMenu();
     void quickMenuKeyUp();   // Space released: a hold closes the menu, a tap leaves it open
+    // A right click on the canvas (pressed and let go without moving past kRightClickSlop) opens the QuickMenu
+    // there, as in ZBrush (#22); a right drag navigates as before. Preferences > Input > Right click opens the
+    // QuickMenu (uiPrefs_.rightClickQuickMenu).
+    void rightClickRelease();
     void drawQuickMenu();
     void groupMasked();      // Ctrl+W
     // Straight strokes: Shift pressed after a stroke started constrains it to a line from where Shift went down,
@@ -1147,6 +1151,11 @@ private:
         bool untilLeave = false; // Space let go over the menu: it closes when the pointer leaves it
         int openedFrame = -1;
     } quickMenu_;
+    struct RightClick {
+        bool pending = false; // a right press that hasn't moved past the slop: navigation waits
+        float x = 0.0f, y = 0.0f;
+        float dx = 0.0f, dy = 0.0f; // the motion since the press
+    } rightClick_;
     struct StraightStroke {
         bool active = false;   // Shift went down mid-stroke
         bool shiftAtStart = false; // the stroke began with Shift (it smooths; Shift isn't a constraint then)

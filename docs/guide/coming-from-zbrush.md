@@ -107,7 +107,7 @@ in Blender or Maya. Press **Store Config** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kb
 | Frame | <kbd>F</kbd> | <kbd>F</kbd> |
 | Brush pop-up | <kbd>B</kbd> | <kbd>B</kbd> |
 | Draw Size / Z Intensity / RGB Intensity / Focal Shift | <kbd>S</kbd> / <kbd>U</kbd> / <kbd>I</kbd> / <kbd>O</kbd> | Same |
-| QuickMenu | <kbd>Space</kbd> | <kbd>Space</kbd> (right-click navigates) |
+| QuickMenu | <kbd>Space</kbd> or right-click | <kbd>Space</kbd> or right-click (a right drag navigates) |
 | LazyMouse | <kbd>L</kbd> | <kbd>L</kbd> |
 | Pick colour / switch colour | <kbd>C</kbd> / <kbd>V</kbd> | Same |
 | Symmetry | <kbd>X</kbd> | <kbd>X</kbd> |

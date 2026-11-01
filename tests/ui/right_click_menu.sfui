@@ -1,0 +1,71 @@
+# A right click on the canvas opens the QuickMenu under the cursor, as in ZBrush (#22): pressed and let go
+# without moving more than a few pixels, beside the model or on it, and the view doesn't move. A right drag still
+# turns the view and opens nothing. A pen button set to Right click (the lower one, by default) does the same.
+# Preferences > Input > Right click opens the QuickMenu turns it off.
+run new_sphere subdivisions=3
+camera 0 0
+remember camera_yaw y0
+remember camera_pitch p0
+expect_value right_click_menu == 1
+
+# Beside the model: the menu opens there, the view hasn't moved.
+button_drag right 0.12 0.3 0.12 0.3 0.1
+expect_value quickmenu_open == 1
+expect "##qm_drawsize"
+expect_value camera_yaw == $y0
+expect_value camera_pitch == $p0
+shot opened
+key escape
+expect_value quickmenu_open == 0
+
+# On the model, with a hand's tremble (under 2 px): still a click.
+button_drag right 0.5 0.5 0.501 0.5 0.1
+expect_value quickmenu_open == 1
+expect_value camera_yaw == $y0
+key escape
+
+# A right drag turns the view and opens nothing.
+button_drag right 0.12 0.3 0.12 0.5
+expect_value quickmenu_open == 0
+expect_value camera_pitch < $p0-20
+
+# The pen's lower button (Right click): a tap opens it, a drag turns the view.
+camera 0 0
+pen_hover 0.5 0.5
+pen_button 1 down
+pen_button 1 up
+expect_value quickmenu_open == 1
+expect_value camera_yaw == $y0
+key escape
+expect_value quickmenu_open == 0
+pen_button 1 down
+pen_hover 0.9 0.5
+pen_button 1 up
+expect_value camera_yaw != $y0
+expect_value quickmenu_open == 0
+pen_out
+
+# The Blender style too (its right drag navigates as well).
+click "Preferences##palette.preferences"
+click "Input##preferences.input"
+click "Blender##input.style_blender"
+expect_value input_style == 2
+key escape
+camera 0 0
+button_drag right 0.12 0.3 0.12 0.3 0.1
+expect_value quickmenu_open == 1
+key escape
+button_drag right 0.12 0.3 0.12 0.5
+expect_value quickmenu_open == 0
+expect_value camera_pitch != $p0
+
+# Turned off: a right click does nothing (and a drag still navigates). (Input is still open from above.)
+click "Preferences##palette.preferences"
+click "Right click opens the QuickMenu##input.right_click_menu"
+expect_value right_click_menu == 0
+key escape
+camera 0 0
+button_drag right 0.12 0.3 0.12 0.3 0.1
+expect_value quickmenu_open == 0
+button_drag right 0.12 0.3 0.12 0.5
+expect_value camera_pitch != $p0

@@ -131,6 +131,11 @@ void App::registerInputActions() {
         "orthographic...), for keyboards without one.",
         [this] { uiPrefs_.emulateNumpad = !uiPrefs_.emulateNumpad; }, [this] { return uiPrefs_.emulateNumpad; },
         [this] { return blenderStyle(); });
+    add("input.right_click_menu", "Right click opens the QuickMenu", nullptr, "Preferences > Input", "",
+        "A right click on the canvas, without dragging, opens the QuickMenu under the cursor, as in ZBrush (Space "
+        "does too). A right drag still turns, pans or zooms the view. A pen button set to Right click works the same.",
+        [this] { uiPrefs_.rightClickQuickMenu = !uiPrefs_.rightClickQuickMenu; },
+        [this] { return uiPrefs_.rightClickQuickMenu; });
     add("input.import_blender", "Import Blender keymap...", ICON_LC_FILE_INPUT, "Preferences > Input", "",
         "Use the keys from a keymap you exported in Blender (Preferences > Keymap > Export, a .py file). Switches "
         "to the Blender style, then takes the navigation and sculpt keys SculptForge has an equivalent for. The "
@@ -388,6 +393,10 @@ void App::drawInputSection() {
         if (ImGui::Checkbox("Emulate Numpad", &emulate)) uiPrefs_.emulateNumpad = emulate;
         ui::HelpAction(*this, "input.emulate_numpad");
     }
+    bool rightClickMenu = uiPrefs_.rightClickQuickMenu;
+    if (ui::Checkbox("Right click opens the QuickMenu##input.right_click_menu", &rightClickMenu))
+        uiPrefs_.rightClickQuickMenu = rightClickMenu;
+    ui::HelpAction(*this, "input.right_click_menu");
     ui::ActionButton(*this, "input.import_blender", ImVec2(-FLT_MIN, 0), ui::Look::IconLabel);
     ImGui::TextDisabled("Rotation");
     ImGui::SameLine();
@@ -467,6 +476,19 @@ void App::openQuickMenu() {
     quickMenu_.at = ImVec2(mouseX_, mouseY_);
     quickMenu_.openedAt = ImGui::GetTime();
     quickMenu_.keyHeld = true;
+    quickMenu_.untilLeave = false;
+    quickMenu_.openedFrame = ImGui::GetFrameCount();
+}
+
+void App::rightClickRelease() {
+    if (!rightClick_.pending) return;
+    rightClick_.pending = false;
+    if (!uiPrefs_.rightClickQuickMenu) return;
+    // Opened as a tap of Space would: it stays until a click elsewhere or Esc.
+    quickMenu_.open = true;
+    quickMenu_.at = ImVec2(rightClick_.x, rightClick_.y);
+    quickMenu_.openedAt = ImGui::GetTime();
+    quickMenu_.keyHeld = false;
     quickMenu_.untilLeave = false;
     quickMenu_.openedFrame = ImGui::GetFrameCount();
 }

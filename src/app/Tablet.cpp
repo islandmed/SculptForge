@@ -131,6 +131,7 @@ void App::penButton(int button, bool down, float x, float y) {
         }
         if (drag_ != Drag::None) penNavButton_ = button;
     } else if (penNavButton_ == button) {
+        if (a == PenAction::RightClick) rightClickRelease(); // a tap of the button: the QuickMenu, as the mouse's
         if (drag_ == Drag::Orbit || drag_ == Drag::Pan || drag_ == Drag::Zoom) {
             drag_ = Drag::None;
             dragFromPen_ = false;

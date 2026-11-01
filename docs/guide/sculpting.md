@@ -181,6 +181,11 @@ Draw Size, Focal Shift, Z Intensity and RGB Intensity, Zadd / Zsub, Sculpt / Pai
 <kbd>Space</kbd> and let go to close it again (it stays while the pointer is on it), or tap <kbd>Space</kbd> to
 keep it open until you click elsewhere or press <kbd>Esc</kbd>. Clicking a tile opens its picker.
 
+A right click on the canvas opens it too, as in ZBrush: press the right button and let go without moving, beside
+the model or on it, and the QuickMenu stays open at the cursor. A right drag still turns the view (and pans or
+zooms with <kbd>Alt</kbd> or <kbd>Ctrl</kbd>), and a pen button set to **Right click** (Preferences > Tablet)
+works the same way. Turn it off with **Preferences > Input > Right click opens the QuickMenu**.
+
 ## Strokes
 
 The stroke type decides how cursor movement becomes brush dabs. Choose it from the **Stroke** tile on the left
