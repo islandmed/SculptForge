@@ -6,6 +6,21 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Faster CI and releases with the same tests (docs/releasing.md):
+  - **Compiler caching:** compiles go through ccache, cached only by pushes to main and maintainers' own runs.
+    Pull requests only read the cache, and tags never save one.
+  - **Parallel tests:** `sculptforge_tests` runs as eight parallel shards (`sculptforge_tests --shard K/N`; each test
+    now prints its time). ctest runs in parallel, with timed measurements and clipboard tests alone. The slowest
+    test sets are spread over several free runners.
+  - **Skipped work:** website-only pushes skip the build and test jobs.
+  - **Build once, promote:** the release packages are built and tested on every push to main (the new Packages
+    workflow). A tagged release promotes the packages of the commit it tags instead of building them again.
+  - **Smoke tests before publishing:** every package (Windows installer and .zip, .dmg, .deb and AppImage on x86_64
+    and arm64, .rpm) is installed on a fresh runner, opens a model, sculpts and saves.
+- `scripts/release.sh X.Y.Z` tags, waits and brings the site, update feed, guide, AUR, Homebrew and Omarchy to the
+  release, and drafts the issue replies. It is resumable, and stops with the fix when something is wrong.
+
 ## [0.10.4] - 2026-11-01
 
 ### Added
@@ -68,21 +83,6 @@ All notable changes to SculptForge are listed here. The format follows
   brushes now, which ignored it; at 0 they keep their own tip exactly as before.
 - SelectRect and SelectLasso (hide / show) ignored symmetry (#51 follow-up): with X / Y / Z on, the mirror image of
   the shape counts as inside too, as with MaskRect and MaskLasso (`hide_rect` / `hide_lasso symmetry=x`).
-
-### Changed
-- Faster CI and releases with the same tests (docs/releasing.md):
-  - **Compiler caching:** compiles go through ccache, cached only by pushes to main and maintainers' own runs.
-    Pull requests only read the cache, and tags never save one.
-  - **Parallel tests:** `sculptforge_tests` runs as eight parallel shards (`sculptforge_tests --shard K/N`; each test
-    now prints its time). ctest runs in parallel, with timed measurements and clipboard tests alone. The slowest
-    test sets are spread over several free runners.
-  - **Skipped work:** website-only pushes skip the build and test jobs.
-  - **Build once, promote:** the release packages are built and tested on every push to main (the new Packages
-    workflow). A tagged release promotes the packages of the commit it tags instead of building them again.
-  - **Smoke tests before publishing:** every package (Windows installer and .zip, .dmg, .deb and AppImage on x86_64
-    and arm64, .rpm) is installed on a fresh runner, opens a model, sculpts and saves.
-- `scripts/release.sh X.Y.Z` tags, waits and brings the site, update feed, guide, AUR, Homebrew and Omarchy to the
-  release, and drafts the issue replies. It is resumable, and stops with the fix when something is wrong.
 
 ## [0.10.3] - 2026-11-01
 
