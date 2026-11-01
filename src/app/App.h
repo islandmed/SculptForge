@@ -509,6 +509,11 @@ private:
     void registerPbrUiActions();
     double pbrTestValue(const std::string& name) const; // UI test values (UiTest.cpp), NaN when not one of ours
     int exportPresetChoice_ = 0;
+    // Dense textured meshes: while the Paint brush hovers, the texture painting caches for the area under it are
+    // built ahead of the first dab (PanelPbr.cpp; TexturePainter::prewarm).
+    void prewarmTexturePaint();
+    glm::vec3 prewarmCenter_{1e30f};
+    float prewarmRadius_ = 0.0f;
     // Bake sub-palette (PanelBake.cpp): normal / displacement / AO / cavity / colour maps from a high-poly onto
     // the active SubTool's UVs (core/Bake.h), on a worker thread, and the baked normal map shown on the model.
     void drawBakeContents();

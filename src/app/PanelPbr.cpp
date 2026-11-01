@@ -328,6 +328,28 @@ Args App::drawLayerChannelChips(int layer) {
     return run;
 }
 
+void App::prewarmTexturePaint() {
+    Mesh& m = doc_.mesh;
+    if (!(paintMode_ || paintRgb_) || drag_ == Drag::Stroke || !paintsTexture(m)) return;
+    // The UV bins (once per UV layout; cheap to check every frame).
+    prewarmTexturePainting(m);
+    // The texel maps under the hovering brush, again once it has moved a quarter of its size.
+    const CanvasRect canvas = canvasRect();
+    if (ImGui::GetIO().WantCaptureMouse || mouseX_ < canvas.x || mouseY_ < canvas.y || mouseX_ > canvas.x + canvas.w ||
+        mouseY_ > canvas.y + canvas.h)
+        return;
+    doc_.syncBvh();
+    RayHit hit;
+    if (!pick(mouseX_, mouseY_, hit)) return;
+    const float r = radiusPx_ * camera_.worldPerPixel(hit.position, canvasHeight());
+    if (glm::distance(hit.position, prewarmCenter_) < 0.25f * r && std::abs(r - prewarmRadius_) < 0.2f * r) return;
+    prewarmCenter_ = hit.position;
+    prewarmRadius_ = r;
+    std::vector<glm::vec3> centers;
+    for (const glm::vec3& mirror : Sculptor::mirrors(symmetry_)) centers.push_back(hit.position * mirror);
+    prewarmTexturePainting(m, &doc_.bvh, centers, r * 1.25f); // a little wider: the pen moves before it lands
+}
+
 double App::pbrTestValue(const std::string& name) const {
     const Mesh& m = doc_.mesh;
     const bool tex = hasTexture(m);

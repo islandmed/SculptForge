@@ -32,7 +32,10 @@ All notable changes to SculptForge are listed here. The format follows
   finds the texture tiles under it from the BVH and paints each texel from a cached triangle-and-barycentrics
   map, tiles in parallel. A 0.35-radius dab with X symmetry on a 21M-triangle sphere: 4K 150-360 ms -> 24-39 ms,
   8K 240-350 ms -> 39-55 ms (M1 Pro, ranges over a busy and a quiet machine); results match the old dab within
-  1/255. Lighter meshes keep the per-triangle dab.
+  1/255. Lighter meshes keep the per-triangle dab. No first-dab stutter: the UV bins are shared by every texture on
+  the same UVs (undo steps, copies) and built in parallel when painting starts (about 45 ms at 21M), the area under
+  the hovering brush is readied before it lands, and a stroke into a fresh area stays under 20 ms at 4K.
+  Preferences > Performance counts these caches.
 - Project format 7 stores material channels. It is written only when a texture has them: other projects are
   still saved as format 6, and every older project opens as before.
 

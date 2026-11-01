@@ -380,6 +380,7 @@ int App::runUiTest(int w, int h, int fps) {
         ImGui::LogFinish();
         ImGui::Render();
 
+        prewarmTexturePaint(); // dense textured meshes: ready the area under the hovering Paint brush (PanelPbr.cpp)
         const auto syncStart = std::chrono::steady_clock::now();
         syncScene();
         notePerformanceFrame(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - syncStart).count());
@@ -801,6 +802,7 @@ int App::run() {
         drawUi();
         ImGui::Render();
 
+        prewarmTexturePaint(); // dense textured meshes: ready the area under the hovering Paint brush (PanelPbr.cpp)
         const auto syncStart = std::chrono::steady_clock::now();
         syncScene();
         notePerformanceFrame(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - syncStart).count());

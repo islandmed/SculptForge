@@ -12,6 +12,7 @@
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <chrono>
 #include <cstdio>
 #include <thread>
 
@@ -655,9 +656,21 @@ PaintTexture& mutableTexture(Mesh& m) {
     return *m.texture;
 }
 
+// The coverage of a dense mesh's UVs from the texture-painting cache (defined with the tile dabs below); null if it
+// can't be made that way.
+std::shared_ptr<const std::vector<uint8_t>> cachedCoverage(const Mesh& m, int w, int h);
+
 void ensureCoverage(const Mesh& m, PaintTexture& tex, bool force) {
     const uint64_t fp = uvFingerprint(m);
     if (!force && tex.coverageUvs == fp && tex.coverage.size() == (tex.texelCount() + 7) / 8) return;
+    // Dense meshes: from the shared texture-painting cache, built tile by tile in parallel.
+    if (!force && m.triangleCount() >= 200000 && m.uvs.size() == m.triangleCount() * 3)
+        if (std::shared_ptr<const std::vector<uint8_t>> c = cachedCoverage(m, tex.width, tex.height);
+            c && c->size() == (tex.texelCount() + 7) / 8) {
+            tex.coverage = *c;
+            tex.coverageUvs = fp;
+            return;
+        }
     tex.coverage.assign((tex.texelCount() + 7) / 8, 0);
     tex.coverageUvs = fp;
     if (m.uvs.size() != m.triangleCount() * 3) return;
@@ -744,7 +757,7 @@ bool TexturePainter::begin(Mesh& mesh, uint32_t channels) {
     if (!channels_) return false;
     PaintTexture& tex = mutableTexture(mesh);
     syncLayerChannels(tex); // every layer has an image for every enabled channel
-    ensureCoverage(mesh, tex);
+    if (!useTilePath(mesh, tex)) ensureCoverage(mesh, tex); // (the per-triangle dab pads islands with it)
     tilesX_ = (tex.width + kTextureTile - 1) / kTextureTile;
     tilesY_ = (tex.height + kTextureTile - 1) / kTextureTile;
     tiles_.resize(size_t(tilesX_) * size_t(tilesY_));
@@ -852,20 +865,19 @@ struct TexelMapCache {
 
 namespace {
 
-uint64_t texelMapKey(const Mesh& m, const PaintTexture& t) {
-    uint64_t h = mixKey(uvFingerprint(m), m.triangleCount());
-    h = mixKey(h, uint64_t(t.width) << 32 | uint64_t(t.height));
-    return mixKey(h, t.coverageUvs);
+uint64_t paintKey(const Mesh& m, int w, int h) {
+    return mixKey(mixKey(uvFingerprint(m), m.triangleCount()), uint64_t(uint32_t(w)) << 32 | uint64_t(uint32_t(h)));
 }
+uint64_t texelMapKey(const Mesh& m, const PaintTexture& t) { return paintKey(m, t.width, t.height); }
 
-std::shared_ptr<const UvTileIndex> buildUvIndex(const Mesh& m, const PaintTexture& t, uint64_t key) {
+std::shared_ptr<const UvTileIndex> buildUvIndex(const Mesh& m, int width, int height, uint64_t key) {
     auto idx = std::make_shared<UvTileIndex>();
     idx->key = key;
-    idx->tilesX = tileCount(t.width);
-    idx->tilesY = tileCount(t.height);
+    idx->tilesX = tileCount(width);
+    idx->tilesY = tileCount(height);
     const size_t nt = m.triangleCount();
     idx->triTiles.resize(nt * 4);
-    const float w = float(t.width), h = float(t.height), pad = float(kTextureGutter + 1);
+    const float w = float(width), h = float(height), pad = float(kTextureGutter + 1);
     const int tx1max = idx->tilesX - 1, ty1max = idx->tilesY - 1;
     poolFor(nt, [&](size_t b, size_t e) {
         for (size_t i = b; i < e; ++i) {
@@ -883,24 +895,89 @@ std::shared_ptr<const UvTileIndex> buildUvIndex(const Mesh& m, const PaintTextur
             o[3] = uint8_t(std::clamp(int(std::ceil(maxY)) / kTextureTile, 0, ty1max));
         }
     }, 65536);
+    // Bins in triangle order, on every core: each block of triangles counts its tiles, a prefix over (tile,
+    // block) gives every block its place in each bin, then the blocks fill in parallel.
     const size_t tiles = size_t(idx->tilesX) * size_t(idx->tilesY);
+    const size_t blocks = std::clamp<size_t>(nt / 65536, 1, 32), per = (nt + blocks - 1) / blocks;
+    std::vector<uint32_t> counts(blocks * tiles, 0);
+    auto forTiles = [&](size_t i, auto&& fn) {
+        const uint8_t* o = &idx->triTiles[i * 4];
+        if (o[0] > o[2]) return;
+        for (int ty = o[1]; ty <= o[3]; ++ty)
+            for (int tx = o[0]; tx <= o[2]; ++tx) fn(size_t(ty) * size_t(idx->tilesX) + size_t(tx));
+    };
+    ThreadPool::shared().run(blocks, [&](size_t b) {
+        uint32_t* c = &counts[b * tiles];
+        for (size_t i = b * per; i < std::min(nt, (b + 1) * per); ++i) forTiles(i, [&](size_t k) { ++c[k]; });
+    });
     idx->binStart.assign(tiles + 1, 0);
-    for (size_t i = 0; i < nt; ++i) {
-        const uint8_t* o = &idx->triTiles[i * 4];
-        if (o[0] > o[2]) continue;
-        for (int ty = o[1]; ty <= o[3]; ++ty)
-            for (int tx = o[0]; tx <= o[2]; ++tx) ++idx->binStart[size_t(ty) * size_t(idx->tilesX) + size_t(tx) + 1];
+    uint32_t running = 0;
+    for (size_t k = 0; k < tiles; ++k) {
+        idx->binStart[k] = running;
+        for (size_t b = 0; b < blocks; ++b) {
+            const uint32_t n = counts[b * tiles + k];
+            counts[b * tiles + k] = running; // now: where block b writes into bin k
+            running += n;
+        }
     }
-    for (size_t k = 0; k < tiles; ++k) idx->binStart[k + 1] += idx->binStart[k];
-    idx->bins.resize(idx->binStart[tiles]);
-    std::vector<uint32_t> fill(idx->binStart.begin(), idx->binStart.end() - 1);
-    for (size_t i = 0; i < nt; ++i) {
-        const uint8_t* o = &idx->triTiles[i * 4];
-        if (o[0] > o[2]) continue;
-        for (int ty = o[1]; ty <= o[3]; ++ty)
-            for (int tx = o[0]; tx <= o[2]; ++tx) idx->bins[fill[size_t(ty) * size_t(idx->tilesX) + size_t(tx)]++] = uint32_t(i);
-    }
+    idx->binStart[tiles] = running;
+    idx->bins.resize(running);
+    ThreadPool::shared().run(blocks, [&](size_t b) {
+        uint32_t* at = &counts[b * tiles];
+        for (size_t i = b * per; i < std::min(nt, (b + 1) * per); ++i) forTiles(i, [&](size_t k) { idx->bins[at[k]++] = uint32_t(i); });
+    });
     return idx;
+}
+
+// The coverage bitmap (PaintTexture::coverage) from the bins, tiles in parallel: a tile's texels are whole bytes
+// of the bitmap (64 texels per row), so tiles never share a byte. Needs widths that are multiples of 64.
+std::vector<uint8_t> coverageFromIndex(const Mesh& m, int w, int h, const UvTileIndex& idx) {
+    std::vector<uint8_t> cov((size_t(w) * size_t(h) + 7) / 8, 0);
+    poolFor(size_t(idx.tilesX) * size_t(idx.tilesY), [&](size_t b, size_t e) {
+        for (size_t ti = b; ti < e; ++ti) {
+            const int x0 = int(ti % size_t(idx.tilesX)) * kTextureTile, y0 = int(ti / size_t(idx.tilesX)) * kTextureTile;
+            const int x1 = std::min(x0 + kTextureTile, w) - 1, y1 = std::min(y0 + kTextureTile, h) - 1;
+            for (uint32_t k = idx.binStart[ti]; k < idx.binStart[ti + 1]; ++k) {
+                const uint32_t tri = idx.bins[k];
+                const TriSetup s(m.uvs[size_t(tri) * 3], m.uvs[size_t(tri) * 3 + 1], m.uvs[size_t(tri) * 3 + 2], w, h);
+                visitTriangle(s, w, h, 0, nullptr, x0, y0, x1, y1, [&](int x, int y, const glm::vec3&, bool) {
+                    const size_t i = size_t(y) * size_t(w) + size_t(x);
+                    cov[i >> 3] |= uint8_t(1u << (i & 7));
+                });
+            }
+        }
+    }, 1);
+    return cov;
+}
+
+// Texture-painting caches by UV layout and texture size (not by texture: copies, undo steps and new textures on
+// the same UVs share them): the UV bins, the texel maps and the coverage. The two most recent layouts are kept.
+struct PaintCacheEntry {
+    uint64_t key = 0;
+    std::shared_ptr<const UvTileIndex> index;
+    std::shared_ptr<TexelMapCache> maps;
+    std::shared_ptr<const std::vector<uint8_t>> coverage;
+};
+std::mutex gPaintCacheMutex;
+std::vector<PaintCacheEntry> gPaintCache; // most recent first
+
+PaintCacheEntry paintCache(const Mesh& m, int w, int h, uint64_t key) {
+    std::lock_guard lock(gPaintCacheMutex);
+    for (size_t i = 0; i < gPaintCache.size(); ++i)
+        if (gPaintCache[i].key == key) {
+            std::rotate(gPaintCache.begin(), gPaintCache.begin() + std::ptrdiff_t(i), gPaintCache.begin() + std::ptrdiff_t(i) + 1);
+            return gPaintCache[0];
+        }
+    PaintCacheEntry e;
+    e.key = key;
+    e.index = buildUvIndex(m, w, h, key);
+    auto maps = std::make_shared<TexelMapCache>();
+    maps->key = key;
+    maps->tiles.resize(size_t(e.index->tilesX) * size_t(e.index->tilesY));
+    e.maps = std::move(maps);
+    gPaintCache.insert(gPaintCache.begin(), e);
+    if (gPaintCache.size() > 2) gPaintCache.resize(2);
+    return e;
 }
 
 // The texel map of tile `ti`: every island texel's triangle (exact top-left rule, as rasterizeUvTriangle), and
@@ -918,22 +995,55 @@ std::unique_ptr<TexelMapTile> buildTexelMap(const Mesh& m, const PaintTexture& t
         map->bary[li * 2] = uint16_t(std::lround(std::clamp(b.y, 0.0f, 1.0f) * 65535.0f));
         map->bary[li * 2 + 1] = uint16_t(std::lround(std::clamp(b.z, 0.0f, 1.0f) * 65535.0f));
     };
+    // Pass 1, island texels: every bin triangle without the gutter. The bin holds every triangle that reaches the
+    // tile, so this is also the tile's coverage (no texture-wide coverage needed).
     for (uint32_t k = idx.binStart[ti]; k < idx.binStart[ti + 1]; ++k) {
         const uint32_t tri = idx.bins[k];
         const TriSetup s(m.uvs[size_t(tri) * 3], m.uvs[size_t(tri) * 3 + 1], m.uvs[size_t(tri) * 3 + 2], t.width, t.height);
-        visitTriangle(s, t.width, t.height, kTextureGutter, &t, x0, y0, x1, y1, [&](int x, int y, const glm::vec3& b, bool inside) {
+        visitTriangle(s, t.width, t.height, 0, nullptr, x0, y0, x1, y1, [&](int x, int y, const glm::vec3& b, bool) {
             const size_t li = size_t(y - y0) * kTextureTile + size_t(x - x0);
-            if (dist[li] < 0.0f) { // an island texel that already has a triangle: overlapping UVs
-                if (inside)
-                    map->extras.push_back({uint16_t(li), uint16_t(std::lround(std::clamp(b.y, 0.0f, 1.0f) * 65535.0f)),
-                                           uint16_t(std::lround(std::clamp(b.z, 0.0f, 1.0f) * 65535.0f)), tri});
+            if (dist[li] < 0.0f) { // overlapping UVs: the texel's other triangles
+                map->extras.push_back({uint16_t(li), uint16_t(std::lround(std::clamp(b.y, 0.0f, 1.0f) * 65535.0f)),
+                                       uint16_t(std::lround(std::clamp(b.z, 0.0f, 1.0f) * 65535.0f)), tri});
                 return;
             }
-            if (inside) {
-                dist[li] = -1.0f;
-                put(li, tri, b);
-                return;
-            }
+            dist[li] = -1.0f;
+            put(li, tri, b);
+        });
+    }
+    // Uncovered texels of the tile as a summed-area table: a triangle needs the gutter pass only when its grown
+    // box holds one (most triangles of a dense mesh lie inside an island and cost nothing more).
+    constexpr int S = kTextureTile + 1;
+    std::array<uint16_t, size_t(S) * S> sat{};
+    for (int y = y0; y <= y1; ++y)
+        for (int x = x0; x <= x1; ++x) {
+            const int ly = y - y0 + 1, lx = x - x0 + 1;
+            const bool cov = dist[size_t(y - y0) * kTextureTile + size_t(x - x0)] < 0.0f;
+            sat[size_t(ly) * S + size_t(lx)] = uint16_t((cov ? 0 : 1) + sat[size_t(ly - 1) * S + size_t(lx)] +
+                                                        sat[size_t(ly) * S + size_t(lx - 1)] - sat[size_t(ly - 1) * S + size_t(lx - 1)]);
+        }
+    auto uncovered = [&](int bx0, int by0, int bx1, int by1) { // texel box (inclusive), clipped to the tile
+        bx0 = std::max(bx0, x0) - x0, by0 = std::max(by0, y0) - y0, bx1 = std::min(bx1, x1) - x0, by1 = std::min(by1, y1) - y0;
+        if (bx0 > bx1 || by0 > by1) return false;
+        return sat[size_t(by1 + 1) * S + size_t(bx1 + 1)] - sat[size_t(by0) * S + size_t(bx1 + 1)] -
+                   sat[size_t(by1 + 1) * S + size_t(bx0)] + sat[size_t(by0) * S + size_t(bx0)] > 0;
+    };
+    // Pass 2, gutter texels: the nearest island point of the triangles near uncovered texels.
+    for (uint32_t k = idx.binStart[ti]; k < idx.binStart[ti + 1]; ++k) {
+        const uint32_t tri = idx.bins[k];
+        // The texel box (as TriSetup::bounds) from the UVs alone: most triangles are skipped without a setup.
+        const glm::vec2 a = m.uvs[size_t(tri) * 3], bb = m.uvs[size_t(tri) * 3 + 1], cc = m.uvs[size_t(tri) * 3 + 2];
+        const float fw = float(t.width), fh = float(t.height);
+        const int bx0 = int(std::floor(std::min({a.x, bb.x, cc.x}) * fw - 0.5f)) - kTextureGutter;
+        const int by0 = int(std::floor(std::min({a.y, bb.y, cc.y}) * fh - 0.5f)) - kTextureGutter;
+        const int bx1 = int(std::ceil(std::max({a.x, bb.x, cc.x}) * fw - 0.5f)) + kTextureGutter;
+        const int by1 = int(std::ceil(std::max({a.y, bb.y, cc.y}) * fh - 0.5f)) + kTextureGutter;
+        if (!uncovered(bx0, by0, bx1, by1)) continue;
+        const TriSetup s(a, bb, cc, t.width, t.height);
+        if (!s.valid) continue;
+        visitTriangle(s, t.width, t.height, kTextureGutter, nullptr, x0, y0, x1, y1, [&](int x, int y, const glm::vec3& b, bool inside) {
+            const size_t li = size_t(y - y0) * kTextureTile + size_t(x - x0);
+            if (inside || dist[li] < 0.0f) return; // island texels came from pass 1
             const glm::vec2 q = s.t[0] * b.x + s.t[1] * b.y + s.t[2] * b.z, c(float(x) + 0.5f, float(y) + 0.5f);
             const float d2 = glm::dot(q - c, q - c);
             if (d2 < dist[li]) {
@@ -984,8 +1094,6 @@ bool sphereTiles(const Mesh& m, uint32_t tri, int w, int h, const glm::vec3& cen
 
 } // namespace
 
-void TexturePainter::setPath(Path path) { gDabPath = int(path); }
-
 struct TexturePainter::DabContext {
     Mesh& mesh;
     const BVH& bvh;
@@ -998,20 +1106,75 @@ struct TexturePainter::DabContext {
     const std::vector<DabMirror>& mirrors;
 };
 
+void TexturePainter::setPath(Path path) { gDabPath = int(path); }
+
+void TexturePainter::prewarm(Mesh& mesh, const BVH* bvh, std::span<const glm::vec3> centers, float radius) {
+    if (!paintsTexture(mesh)) return;
+    PaintTexture& tex = *mesh.texture; // (only its caches change)
+    if (!useTilePath(mesh, tex)) {
+        ensureCoverage(mesh, tex);
+        return;
+    }
+    if (!bvh || centers.empty() || radius <= 0.0f) return;
+    std::vector<DabMirror> mirrors;
+    for (const glm::vec3& c : centers) mirrors.push_back({c, glm::vec3(0, 0, -1), glm::vec3(0, 1, 0), glm::vec3(1, 0, 0), 0});
+    DabParams dp;
+    dp.center = centers[0];
+    dp.radius = radius;
+    dp.strength = 0.0f;
+    const DabContext ctx{mesh, *bvh, dp, tex, tex.pixels, 0.0f, false, false, false, radius, radius * radius, mirrors};
+    std::vector<std::pair<glm::ivec2, glm::ivec2>> rects;
+    dabTiles(ctx, [](Tile&, size_t, int, int, float) {}, false, rects);
+}
+
+void prewarmTexturePainting(Mesh& mesh, const BVH* bvh, std::span<const glm::vec3> centers, float radius) {
+    TexturePainter painter;
+    painter.prewarm(mesh, bvh, centers, radius);
+}
+
+std::shared_ptr<const std::vector<uint8_t>> cachedCoverage(const Mesh& m, int w, int h) {
+    if (w % kTextureTile != 0 || tileCount(w) > 256 || tileCount(h) > 256) return nullptr;
+    const uint64_t key = paintKey(m, w, h);
+    const PaintCacheEntry e = paintCache(m, w, h, key);
+    if (e.coverage) return e.coverage;
+    auto cov = std::make_shared<const std::vector<uint8_t>>(coverageFromIndex(m, w, h, *e.index));
+    std::lock_guard lock(gPaintCacheMutex);
+    for (PaintCacheEntry& c : gPaintCache)
+        if (c.key == key) c.coverage = cov;
+    return cov;
+}
+
+void clearTexturePaintCaches() {
+    std::lock_guard lock(gPaintCacheMutex);
+    gPaintCache.clear();
+}
+
+size_t texturePaintCacheBytes() {
+    std::lock_guard lock(gPaintCacheMutex);
+    size_t n = 0;
+    for (const PaintCacheEntry& e : gPaintCache) {
+        if (e.index) n += e.index->triTiles.size() + (e.index->binStart.size() + e.index->bins.size()) * sizeof(uint32_t);
+        if (e.coverage) n += e.coverage->size();
+        if (e.maps)
+            for (const auto& t : e.maps->tiles)
+                if (t) n += t->tri.size() * 4 + t->bary.size() * 2 + t->extras.size() * sizeof(TexelMapTile::Extra);
+    }
+    return n;
+}
+
+
 bool TexturePainter::useTilePath(const Mesh& mesh, PaintTexture& tex) const {
     const Path path = Path(gDabPath.load());
     if (path == Path::Triangles) return false;
     if (tileCount(tex.width) > 256 || tileCount(tex.height) > 256) return false;
     if (path == Path::Auto && mesh.triangleCount() * 64 < tex.texelCount()) return false;
     const uint64_t key = texelMapKey(mesh, tex);
-    if (!tex.uvIndex || tex.uvIndex->key != key) tex.uvIndex = buildUvIndex(mesh, tex, key);
-    if (!tex.texelMaps || tex.texelMaps->key != key) {
-        auto cache = std::make_shared<TexelMapCache>();
-        cache->key = key;
-        cache->tiles.resize(size_t(tex.uvIndex->tilesX) * size_t(tex.uvIndex->tilesY));
-        tex.texelMaps = std::move(cache);
+    if (!tex.uvIndex || tex.uvIndex->key != key || !tex.texelMaps || tex.texelMaps->key != key) {
+        const PaintCacheEntry e = paintCache(mesh, tex.width, tex.height, key);
+        tex.uvIndex = e.index;
+        tex.texelMaps = e.maps;
     }
-    return true;
+    return true; // (the tile path needs no texture-wide coverage: each texel map finds its tile's own)
 }
 
 template <class Paint>
@@ -1087,6 +1250,7 @@ size_t TexturePainter::dabTiles(const DabContext& c, const Paint& paint, bool co
             slot->used = cache.clock;
         }
         const TexelMapTile& map = *slot;
+        if (c.s <= 0.0f) return; // prewarm: only the texel maps
         Result& res = results[job];
         const int x0 = int(ti % uint32_t(idx.tilesX)) * kTextureTile, y0 = int(ti / uint32_t(idx.tilesX)) * kTextureTile;
         const int x1 = std::min(x0 + kTextureTile, w), y1 = std::min(y0 + kTextureTile, h);
