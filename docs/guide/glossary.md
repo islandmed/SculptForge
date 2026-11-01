@@ -27,7 +27,7 @@ for what is planned.
 | Extract (Tool > SubTool > Extract) | **Tool > Parts > Extract**: the masked part becomes a shell Part, with **Thick**, **E Smt** and **Double**; **Extract** previews, **Accept** keeps it (`extract`, `extract_accept`). See [Parts](parts.md#extract-a-shell) |
 | Focal Shift | No slider for the built-in brushes. Custom brushes have **Hardness** and **Tip sharpness** in their recipe |
 | Ghost, Transp | Not yet. Inactive Parts are drawn slightly dimmed |
-| GoZ | **ZBrush Bridge** (GoZ-compatible): send to and receive from ZBrush, and import or export GoZ-compatible files (**File > ZBrush Bridge**). See [Exporting](exporting.md#exchange-models-with-zbrush-zbrush-bridge) |
+| GoZ | **Send to ZBrush** (GoZ-compatible): send to and receive from ZBrush, and import or export GoZ-compatible files (**File > Send to ZBrush**). See [Exporting](exporting.md#exchange-models-with-zbrush-send-to-zbrush) |
 | Group Masked | **Tool > Face Groups > From mask** (`polygroup_from_mask`) |
 | Group Visible | **Tool > Face Groups > Merge visible** (`polygroup_merge_visible`) |
 | Groups By Normals | **Tool > Face Groups > By normals** with an angle (`polygroup_auto_by_normals`) |
@@ -75,7 +75,7 @@ for what is planned.
 | ZRemesher | **Tool > Geometry > Quad Remesh** (`qremesh`): Target Polygons, Half / Same / Double, Adaptive Size, Keep Groups, Use Vertex Paint, symmetry. No curve guides yet. See [Quad retopology](retopology.md) |
 | ZScript | Script commands: the console (backtick key), script files, `sculptforge-cli`. See [Scripting](scripting.md) |
 | ZSpheres, Adaptive Skin, Preview (A) | **Tool > Forge Spheres**: Draw, Move, Scale, Alt+click deletes, **Preview** (<kbd>A</kbd>), **Make Mesh** (`zsphere_make_mesh`). See [Forge Spheres](forge-spheres.md) |
-| ZTL, ZPR files | Not read directly. Convert ZTools with the SculptForge ZTL Export plug-in for ZBrush (then open the `.ZTL`), or use the ZBrush Bridge, OBJ, FBX or GLB; save work as `.sfproj` |
+| ZTL, ZPR files | Not read directly. Convert ZTools with the SculptForge ZTL Export plug-in for ZBrush (then open the `.ZTL`), or use Send to ZBrush, OBJ, FBX or GLB; save work as `.sfproj` |
 
 ## SculptForge terms
 

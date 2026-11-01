@@ -8,7 +8,7 @@ chapter opens by itself the first time you start a new version; you can always f
 ## Next version
 
 - **Features use SculptForge's own names** (Parts, Forge Spheres, Vertex Paint, Face Groups, Library, Lit Spheres,
-  Quad Remesh, ZBrush Bridge, Snapshot...); searching for ZBrush terms still finds them, and MatCaps are now Lit
+  Quad Remesh, Send to ZBrush, Snapshot...); searching for ZBrush terms still finds them, and MatCaps are now Lit
   Spheres. The table is in [Coming from ZBrush](coming-from-zbrush.md#zbrush-terms-in-sculptforge).
 - **New installs start with the SculptForge keys**, and the first start asks what you are coming from (ZBrush,
   Blender, Maya or new to sculpting) to pick the key style. Your saved style is kept; ZBrush's keys are
@@ -704,7 +704,7 @@ material picker (<kbd>M</kbd>), and projects keep the material they were saved w
 
 ### Quads stay quads
 
-Models you bring in from ZBrush (ZBrush Bridge) or as OBJ, FBX, PLY or USD keep their quads: **Wire** shows them as
+Models you bring in from ZBrush (Send to ZBrush) or as OBJ, FBX, PLY or USD keep their quads: **Wire** shows them as
 quads, and exporting writes them back as quads. Subdivide turns each quad into four, voxel remesh now gives
 an even grid of quads (like DynaMesh), and new cubes and planes are made of quads. See
 [Quads and triangles](geometry.md#quads-and-triangles).
@@ -742,7 +742,7 @@ for Windows, macOS and Linux.
   [vertex paint with Lit Spheres](vertex-paint.md).
 - New brushes: Sharp Crease, Clay Block, Tendril, Trim, Layer and Nudge, with strokes and alphas.
 - [Project files](projects.md) with autosave, recent files and snapshots, and
-  [exchange with ZBrush (ZBrush Bridge)](exporting.md).
+  [exchange with ZBrush (Send to ZBrush)](exporting.md).
 
 ## Version 0.1
 

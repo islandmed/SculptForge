@@ -22,7 +22,7 @@ All of them work on the **active Part** and, except the LOD preview, are undoabl
 ## Quads and triangles
 
 SculptForge sculpts on triangles, but it remembers which pairs of triangles were one quad. A model you open
-from ZBrush (ZBrush Bridge), Blender or Maya (OBJ, FBX, PLY, USD) keeps its quads: **Wire** draws them as quads, without
+from ZBrush (Send to ZBrush), Blender or Maya (OBJ, FBX, PLY, USD) keeps its quads: **Wire** draws them as quads, without
 the diagonal, and OBJ, FBX, PLY, USD and GoZ-compatible exports write them back as quads, corner for corner. Polygons with
 more than four sides are split into triangles. The new **Plane** and **Cube** are made of quads, and so is the
 result of a voxel remesh.

@@ -162,7 +162,7 @@ Every palette's body is one function `void drawPalette_<Id>()`, and the same fun
 | **Color** | Vertex Paint colour picker and swatches; Fill object (`cmd:paint_fill`); Clear (`cmd:paint_clear`); From cavity (`cmd:paint_from_cavity`); Pick under cursor (C). (`PanelPolypaint.cpp` minus the material part) |
 | **Draw** | Draw Size, Strength (Intensity), Add/Sub, Rgb (`paintRgb_`), Paint mode, Tablet: Pressure > strength, Pressure > size, pen readout |
 | **Edit** | Undo <label>, Redo <label> (`cmd:undo`, `cmd:redo`) |
-| **File** | New Sphere, New Plane, Open..., Open Recent >, Save, Save As..., Autosave interval; Import/Export: Export OBJ, GLB (blend shapes), LOD chain, USD/USDZ, FBX for Unreal, Send to Unreal, Save Splats...; ZBrush Bridge >; Quit. (Today's File menu, `drawFileMenuProjectItems`, `drawGozMenu`) |
+| **File** | New Sphere, New Plane, Open..., Open Recent >, Save, Save As..., Autosave interval; Import/Export: Export OBJ, GLB (blend shapes), LOD chain, USD/USDZ, FBX for Unreal, Send to Unreal, Save Splats...; Send to ZBrush >; Quit. (Today's File menu, `drawFileMenuProjectItems`, `drawGozMenu`) |
 | **Generate** | Generate 3D (image/text -> 3D, ComfyUI) opens the existing Generate 3D window; Image Relief / Inflate / Project (`cmd:image_relief`, `image_inflate`, `image_project`); AI provider settings (`drawAiSettings`) |
 | **Help** | Controls (shortcut sheet generated from the Action registry), User Guide (Shift+F1), What's New (also opened once after each update), Command palette (F3), Website & documentation, Report a problem, About SculptForge |
 | **Material** | Studio + Lit Sphere thumbnail grid (`cmd:set_material`); base colour (today's "Material" ColorEdit in Tools) |

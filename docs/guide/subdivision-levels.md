@@ -103,7 +103,7 @@ keeping the dense mesh exactly as it was. Press it again for more levels.
 - **Projects** (`.sfproj`) save every level of every Part and open at the level you saved at. They use
   project format 5 (sculpt-layer detail relative to the surface), so older SculptForge versions ask you to update
   before opening them. Projects saved with format 4 open as before and are converted as they load.
-- **Exports and the ZBrush Bridge** write the current level. To write another one, step to it first, or use the
+- **Exports and Send to ZBrush** write the current level. To write another one, step to it first, or use the
   `subdiv_export` command (`subdiv_export path=base.obj level=1` writes the base cage of every visible Part,
   in any export format). LODs and **Send to Unreal** start from the current level too.
 - **Tools that rebuild the mesh** (Voxel Remesh, Decimate, Quad Remesh, Subdivide, Delete hidden, merging and

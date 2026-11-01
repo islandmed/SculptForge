@@ -451,7 +451,7 @@ std::string UserGuide::chapterFor(const std::string& palette, const std::string&
     if (starts("File > Maya")) return "maya.md";
     if (starts("File > Capture from phone") || actionId == "file.capture_phone") return "phone-capture.md";
     if (starts("File > Export") || idStarts("file.export") || actionId == "file.send_unreal" || actionId == "file.save_splats" ||
-        starts("File > ZBrush Bridge") || starts("File > GoZ"))
+        starts("File > Send to ZBrush") || starts("File > GoZ"))
         return "exporting.md";
     if (starts("File")) return "projects.md";
     if (starts("Generate")) return "generate-3d.md";

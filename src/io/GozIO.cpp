@@ -566,7 +566,7 @@ std::string gozDefaultRoot() {
 }
 
 std::string gozUnavailableMessage() {
-    return "The ZBrush Bridge needs ZBrush, which runs only on Windows and macOS. Use Export / Import GoZ-compatible file "
+    return "Send to ZBrush needs ZBrush, which runs only on Windows and macOS. Use Export / Import GoZ-compatible file "
            "to move .GoZ files by hand, or set a bridge folder (e.g. a Wine prefix's Users/Public/Pixologic).";
 }
 
@@ -790,9 +790,9 @@ std::string zbrushProprietaryMessage(const std::string& extension) {
     if (ext == ".ZTL")
         return ".ZTL is ZBrush's proprietary format and cannot be read directly. Convert it once in ZBrush with the "
                "SculptForge ZTL Export plug-in (Help > User Guide > Coming from ZBrush), then open the .ztl again; "
-               "or send the model with GoZ (File > ZBrush Bridge > Receive from ZBrush).";
+               "or send the model with GoZ (File > Send to ZBrush > Receive from ZBrush).";
     return ext + " is ZBrush's proprietary format and cannot be read. In ZBrush, send the model with GoZ "
-                 "(File > ZBrush Bridge > Receive from ZBrush) or export it as OBJ or FBX "
+                 "(File > Send to ZBrush > Receive from ZBrush) or export it as OBJ or FBX "
                  "(Tool > Export / the FBX ExportImport plug-in) and open that instead.";
 }
 

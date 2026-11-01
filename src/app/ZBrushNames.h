@@ -24,7 +24,7 @@ inline constexpr ZBrushName kZBrushNames[] = {
     {"Vertex Paint", "Polypaint", false},
     {"vertex paint", "Polypaint", false},
     {"Part", "SubTool", false},
-    {"ZBrush Bridge", "GoZ", false},
+    {"Send to ZBrush", "GoZ", false},
     {"Add", "Zadd", true},
     {"Sub", "Zsub", true},
     {"Intensity", "Z Intensity", true},

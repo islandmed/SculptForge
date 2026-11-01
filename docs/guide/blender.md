@@ -174,6 +174,6 @@ SculptForge with `--blender` loads what Blender last sent.
 
 ## See also
 
-- [Exporting, Unreal and ZBrush](exporting.md): files, game engines and the ZBrush Bridge
+- [Exporting, Unreal and ZBrush](exporting.md): files, game engines and Send to ZBrush
 - [Parts](parts.md): each Blender object is a Part
 - [Face Groups and visibility](face-groups.md): Blender's face sets

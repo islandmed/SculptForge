@@ -162,7 +162,7 @@ delete can't be undone.
 | glTF / GLB | One node and mesh per visible Part, both ways |
 | FBX | One model per visible Part (with LODs, an LOD group each), both ways |
 | USD | One Mesh prim per visible Part, both ways |
-| ZBrush Bridge (GoZ-compatible) | Each visible Part is sent to ZBrush as its own SubTool |
+| Send to ZBrush (GoZ-compatible exchange) | Each visible Part is sent to ZBrush as its own SubTool |
 | PLY, STL, splat conversion | The visible Parts are merged into one mesh |
 
 Opening a multi-object file replaces the scene with one Part per object. See [Exporting](exporting.md) for the

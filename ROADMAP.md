@@ -93,7 +93,7 @@ rendering/animation (use Blender).
 - 📋 Ambient occlusion shading
 - ✅ Project file format (`.sfproj`: mesh, layers, mask, vertex paint, face groups, visibility, UVs, splats, brushes,
   view settings), quit-with-unsaved-changes prompt, recent files, autosave with restore
-- ✅ ZBrush GoZ-compatible interchange: `.GoZ` import/export with face groups, mask, vertex paint and UVs, plus the ZBrush Bridge
+- ✅ ZBrush GoZ-compatible interchange: `.GoZ` import/export with face groups, mask, vertex paint and UVs, plus Send to ZBrush
   (Send / Receive) on Windows and macOS. The format follows the GoB add-on; the live bridge has not yet been
   tested against a running ZBrush
 - 📋 Multithreaded brush evaluation, partial GPU uploads per BVH node

@@ -47,7 +47,7 @@ of the canvas, once, and never again after you close it.
 - **Work with Gaussian splats** from phone captures: sculpt against them or turn them into meshes. See
   [Gaussian splats](splats.md).
 - **Export** to glTF/GLB, FBX, OpenUSD, OBJ, STL and PLY, send models straight into Unreal Engine, and
-  exchange them with ZBrush through the ZBrush Bridge (GoZ-compatible format). See [Exporting, Unreal and ZBrush](exporting.md).
+  exchange them with ZBrush through Send to ZBrush (GoZ-compatible exchange). See [Exporting, Unreal and ZBrush](exporting.md).
 - **Automate** everything: every action is a command you can type in the console, run headless with
   `sculptforge-cli`, script from Python or hand to an AI agent over MCP. See [Scripting and
   automation](scripting.md).
@@ -62,7 +62,7 @@ still on the roadmap:
 - Booleans and stencils.
 
 Others are not on the roadmap: ZModeler, the 2.5D canvas, and reading ZBrush's own `.ZTL` and `.ZPR`
-files directly (bring models over with the ZBrush Bridge, the ZTL Export plug-in for ZBrush, or as OBJ, FBX or GLB).
+files directly (bring models over with Send to ZBrush, the ZTL Export plug-in for ZBrush, or as OBJ, FBX or GLB).
 
 > **Not yet:** where a chapter describes a ZBrush feature SculptForge doesn't have, it says so in a callout
 > like this one. The project's ROADMAP.md lists what is planned and in which order.

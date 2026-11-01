@@ -57,10 +57,10 @@ Plug in Claude, fal.ai or Meshy, or run models entirely on your own machine.
 | Quads kept from import, shown and exported as quads | **Yes** (new in 0.4) | Yes |
 | Parts (separate meshes: append, split, merge, solo, Alt+click to select) | **Yes** (new in 0.3) | Yes |
 | Gizmo: move, scale, rotate and pose (masked parts, soft joints, All Parts) | **Yes** (new in 0.5) | Yes |
-| ZBrush Bridge (GoZ-compatible exchange with ZBrush) | **Yes** (new in 0.2; not yet tested against a live ZBrush) | Yes |
+| Send to ZBrush (GoZ-compatible exchange) | **Yes** (new in 0.2; not yet tested against a live ZBrush) | Yes |
 | Multiresolution (subdivision levels), dynamic topology, UV editing | Not yet ([roadmap](ROADMAP.md)) | Yes |
 
-SculptForge doesn't read ZBrush's proprietary `.ZTL`/`.ZPR` files directly. Bring models over with the ZBrush Bridge (`.GoZ`
+SculptForge doesn't read ZBrush's proprietary `.ZTL`/`.ZPR` files directly. Bring models over with Send to ZBrush (`.GoZ`
 files keep face groups, mask and vertex paint), as OBJ, FBX or GLB, or convert a ZTool library once with the
 [SculptForge ZTL Export plug-in for ZBrush](integrations/zbrush/README.md), after which SculptForge opens the `.ZTL` files.
 
@@ -148,7 +148,7 @@ files keep face groups, mask and vertex paint), as OBJ, FBX or GLB, or convert a
   [docs/blender.md](docs/blender.md).
 
 **ZBrush interchange**
-- `.GoZ` import/export with face groups, mask, vertex paint and UVs, and the ZBrush Bridge (Send / Receive) on Windows and
+- `.GoZ` import/export with face groups, mask, vertex paint and UVs, and Send to ZBrush (Send / Receive) on Windows and
   macOS. Every visible Part goes over as its own ZBrush SubTool. See [docs/goz.md](docs/goz.md); the live bridge hasn't been tested against a running ZBrush yet.
 
 **Gaussian splats**

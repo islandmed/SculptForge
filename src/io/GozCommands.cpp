@@ -143,7 +143,7 @@ void registerGozCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"goz_send",
-             "Send the visible Parts to ZBrush through the ZBrush Bridge (GoZ-compatible; Windows/macOS): writes each to the shared "
+             "Send the visible Parts to ZBrush (Send to ZBrush, a GoZ-compatible exchange; Windows/macOS): writes each to the shared "
              "GoZ folder, lists them in GoZ_ObjectList.txt and notifies or starts ZBrush. Sending meshes received "
              "from ZBrush updates those Parts.",
              {{"name", T::String, "Part name (single Part only). Default: the name it came from ZBrush with, else the document name.", false},

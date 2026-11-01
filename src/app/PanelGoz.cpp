@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// File > ZBrush Bridge: send/receive through the GoZ-compatible bridge, GoZ and STL files.
+// File > Send to ZBrush: send/receive through the GoZ-compatible bridge, GoZ and STL files.
 #include "app/App.h"
 
 #include "io/GozIO.h"
@@ -48,10 +48,10 @@ void App::runGozCommand(const std::string& name, const Args& args) {
 
 void App::drawGozMenu() {
     if (!gozInitialised_) pollGoz(); // sets up the dialogs
-    if (!ImGui::BeginMenu("ZBrush Bridge")) return;
+    if (!ImGui::BeginMenu("Send to ZBrush")) return;
     const std::string root = gozFolder_[0] ? std::string(gozFolder_) : gozDefaultRoot();
     const bool bridge = !root.empty();
-    if (ImGui::MenuItem("Send to ZBrush")) {
+    if (ImGui::MenuItem("Send")) {
         runGozCommand("goz_send");
         if (bridge) gozAutoReceive_ = true; // a round trip comes back the same way
     }

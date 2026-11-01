@@ -55,7 +55,7 @@ Interface > Palettes strictly A-Z (ZBrush order)**.
 
 | Palette | What's in it |
 |---|---|
-| **File** | New Sphere, New Plane, Open, Open Recent, Save, Save As, autosave interval, Import and every export (OBJ, GLB, LOD chain, USD/USDZ, FBX for Unreal, Send to Unreal, splats), ZBrush Bridge, Quit |
+| **File** | New Sphere, New Plane, Open, Open Recent, Save, Save As, autosave interval, Import and every export (OBJ, GLB, LOD chain, USD/USDZ, FBX for Unreal, Send to Unreal, splats), Send to ZBrush, Quit |
 | **Edit** | Undo and Redo (with the name of the step), Paste brush |
 | **Alpha** | The brush alphas: Round, Square, Noise and twelve patterns (Pores, Cracks, Scales...), images from your library, Load image, Invert loaded image |
 | **Brush** | AI Brush (Brush Lab), Community brushes, Paste brush, your custom brushes, Front faces only, Invert (Alt), the recipe editor for a custom brush, and every brush as a thumbnail grid with a filter |

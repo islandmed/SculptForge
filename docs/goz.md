@@ -1,4 +1,4 @@
-# ZBrush interoperability (ZBrush Bridge, GoZ format) and STL
+# ZBrush interoperability (Send to ZBrush, GoZ format) and STL
 
 SculptForge reads and writes ZBrush's **GoZ** bridge format and can send meshes to and receive them
 from a running ZBrush the way GoZ-enabled apps do. The format notes below come from reading
@@ -7,13 +7,13 @@ JoseConseco and contributors. Its `gob_import.py`, `gob_export.py` and `paths.py
 reference for this implementation. Many thanks to them.
 
 ZBrush's own **.ZTL** (tool) and **.ZPR** (project) files are proprietary and undocumented, so SculptForge
-cannot open them. Opening one gives an error that suggests sending the model with the ZBrush Bridge or exporting OBJ/FBX
+cannot open them. Opening one gives an error that suggests sending the model with Send to ZBrush or exporting OBJ/FBX
 from ZBrush.
 
 The Blender bridge ([blender.md](blender.md)) sends meshes to and from Blender as the same `.GoZ` files.
 
 Code: `src/io/GozIO.h/.cpp` (format + bridge), `src/io/StlIO.h/.cpp`, `src/io/GozCommands.cpp`
-(commands), `src/app/PanelGoz.cpp` (File > ZBrush Bridge menu). Tests: `tests/test_goz.cpp`.
+(commands), `src/app/PanelGoz.cpp` (File > Send to ZBrush menu). Tests: `tests/test_goz.cpp`.
 
 ## Commands
 
@@ -84,7 +84,7 @@ GoZ apps exchange files through a shared folder:
 - macOS: `/Users/Shared/Pixologic`
 - Linux: ZBrush doesn't run there, so there is no default. The bridge commands explain this, and GoZ
   files can still be imported and exported. Setting a custom folder (the `folder=` argument, or the
-  field in File > ZBrush Bridge), such as a Wine prefix's `drive_c/users/Public/Pixologic`, makes the
+  field in File > Send to ZBrush), such as a Wine prefix's `drive_c/users/Public/Pixologic`, makes the
   bridge work anyway.
 
 **Send** (`goz_send`), following GoB's `GoB_OT_export.execute`. Every visible Part is one GoZ object,

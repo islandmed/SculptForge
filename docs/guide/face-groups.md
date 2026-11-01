@@ -130,7 +130,7 @@ Group the model, then click **Split groups** in **Tool > Parts**: each face grou
 
 - **Masking**: **By face group** in **Tool > Masking** masks one group (see [Masking](masking.md)).
 - **Brushes and vertex paint** skip hidden faces.
-- **Projects** save face groups and what's hidden; **ZBrush Bridge** and **OBJ** carry face groups to and from ZBrush.
+- **Projects** save face groups and what's hidden; **Send to ZBrush** and **OBJ** carry face groups to and from ZBrush.
 - Each Part has its own face groups and visibility. To show and hide whole Parts, use the eye icons and
   **Solo** in **Tool > Parts**.
 

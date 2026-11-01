@@ -2,7 +2,7 @@
 
 This chapter covers getting your sculpt out of SculptForge: the export formats and what each one keeps, LOD
 chains for games, sending a mesh straight into a running Unreal Editor, and exchanging models with ZBrush
-through the ZBrush Bridge. To keep everything (Parts, layers, mask, vertex paint, brushes) use a project file instead; see
+with Send to ZBrush. To keep everything (Parts, layers, mask, vertex paint, brushes) use a project file instead; see
 [Projects, autosave and snapshots](projects.md).
 
 ## Export formats at a glance
@@ -17,8 +17,8 @@ or mark it saved, so your next <kbd>Ctrl</kbd>+<kbd>S</kbd> still saves the proj
 | OpenUSD (`.usda`, `.usdz`) | **File > Export USD / USDZ...** | One Mesh prim per Part, quads, layers as UsdSkel blend shapes, vertex paint as `displayColor`, UVs (`primvars:st`) and the painted texture through a preview material (inside a USDZ), loaded splats | Film pipelines, Omniverse, Apple AR Quick Look |
 | FBX for Unreal (`.fbx`) | **File > Export FBX for Unreal...** | Unreal naming and scale, quads, UVs, LOD group, layers as blend shapes, the painted texture as a PNG beside it | Unreal Engine (by hand) |
 | Wavefront OBJ (`.obj`) | **File > Export OBJ...** | One `o` object per Part, quads, face groups as `g` groups, vertex paint as vertex colour, UVs, the painted texture through a `.mtl` (`map_Kd`) and a PNG beside it. Layers are baked into the current blend | Any 3D app, ZBrush |
-| ZBrush GoZ-compatible (`.GoZ`) | **File > ZBrush Bridge > Export GoZ-compatible file...** | Quads, face groups, mask, vertex paint, UVs, the painted texture as a PNG beside it | ZBrush |
-| STL (`.stl`) | **File > ZBrush Bridge > Export STL...** | Geometry only (triangles), visible Parts merged, in millimetres with Z up | [3D printing](#3d-printing) |
+| ZBrush GoZ-compatible (`.GoZ`) | **File > Send to ZBrush > Export GoZ-compatible file...** | Quads, face groups, mask, vertex paint, UVs, the painted texture as a PNG beside it | ZBrush |
+| STL (`.stl`) | **File > Send to ZBrush > Export STL...** | Geometry only (triangles), visible Parts merged, in millimetres with Z up | [3D printing](#3d-printing) |
 | PLY (`.ply`) | `export_ply` command | Geometry, quads and vertex paint, visible Parts merged | Scan tools, MeshLab, Blender |
 | FBX (general) | `export_fbx` command | One model per Part, quads, UVs, blend shapes, optional LOD groups, the painted texture | Other FBX pipelines |
 
@@ -78,7 +78,7 @@ sculptforge-cli -c 'open path=bust.sfproj; export_stl path=bust.stl; export_ply 
 
 ## 3D printing
 
-**File > ZBrush Bridge > Export STL...** writes every visible Part as one binary STL, ready for a slicer
+**File > Send to ZBrush > Export STL...** writes every visible Part as one binary STL, ready for a slicer
 (PrusaSlicer, Cura, Bambu Studio, OrcaSlicer ...). The status line gives the printed size, for example
 "Exported lion.stl (47214 triangles, 320.8 x 206.6 x 436.4 mm)": width, depth and height as the slicer shows them.
 
@@ -184,10 +184,10 @@ sculptforge-cli -c 'open path=statue.obj; export_unreal folder=out height_cm=200
 > stand-in editor that speaks the same protocol but not yet against every Unreal version. If an import fails,
 > Unreal's **Output Log** shows the importer's messages.
 
-## Exchange models with ZBrush (ZBrush Bridge)
+## Exchange models with ZBrush (Send to ZBrush)
 
-SculptForge reads and writes ZBrush's GoZ format and can talk to a running ZBrush through the **ZBrush Bridge** on
-Windows and macOS. The commands are in **File > ZBrush Bridge**:
+SculptForge reads and writes ZBrush's GoZ format and can talk to a running ZBrush through the **Send to ZBrush** on
+Windows and macOS. The commands are in **File > Send to ZBrush**:
 
 | Item | What it does |
 |---|---|
@@ -204,7 +204,7 @@ ZBrush doesn't run on Linux, so there the bridge needs a custom folder; GoZ-comp
 
 ### A round trip
 
-1. In SculptForge, choose **File > ZBrush Bridge > Send to ZBrush**. ZBrush starts or comes forward with the
+1. In SculptForge, choose **File > Send to ZBrush > Send**. ZBrush starts or comes forward with the
    Parts. If ZBrush was not running and does not import them, press **GoZ** in ZBrush.
 2. Work in ZBrush, then press **GoZ** there to send the model back.
 3. SculptForge receives it automatically and updates the matching Parts. Each update is an undo step on
@@ -215,12 +215,12 @@ they go back to ZBrush as the same quads. The format has no hidden-face flag, so
 any others.
 
 > **ZBrush:** SculptForge can't read ZBrush's own `.ZTL` and `.ZPR` files (they are proprietary and
-> undocumented). Bring models over with the ZBrush Bridge, export OBJ or FBX from ZBrush, or convert your ZTools once with the
+> undocumented). Bring models over with Send to ZBrush, export OBJ or FBX from ZBrush, or convert your ZTools once with the
 > **SculptForge ZTL Export** plug-in for ZBrush, after which SculptForge opens the `.ZTL` itself (see
 > [Coming from ZBrush](coming-from-zbrush.md#bring-your-ztools-over)). Subdivision levels don't come across:
 > SculptForge receives the mesh at the level you sent.
 
-> **Note:** The ZBrush Bridge follows the format of the open-source Blender GoZ add-on (GoB) and is tested with
+> **Note:** Send to ZBrush follows the format of the open-source Blender GoZ add-on (GoB) and is tested with
 > files, but has not yet been tested against a live ZBrush. If a send does not arrive, export a `.GoZ` file
 > and import it in ZBrush by hand, and please report it (**Help > Report a problem**).
 

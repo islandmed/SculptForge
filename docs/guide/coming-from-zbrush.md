@@ -16,7 +16,7 @@ Features use SculptForge's own names. The ideas are the ones you know; here is w
 | Polypaint | **Vertex Paint** | The Paint brush (<kbd>P</kbd>), **Rgb**, the Color palette. See [Vertex Paint and materials](vertex-paint.md) |
 | Polygroups | **Face Groups** | **Tool > Face Groups**. See [Face Groups and visibility](face-groups.md) |
 | LightBox | **Library** | <kbd>,</kbd> (comma). See [The interface](interface.md#the-library) |
-| GoZ | **ZBrush Bridge** (GoZ-compatible) | **File > ZBrush Bridge**. See [Exporting](exporting.md#exchange-models-with-zbrush-zbrush-bridge) |
+| GoZ | **Send to ZBrush** (GoZ-compatible) | **File > Send to ZBrush**. See [Exporting](exporting.md#exchange-models-with-zbrush-send-to-zbrush) |
 | MatCap | **Lit Sphere** | The Material palette, <kbd>M</kbd>. See [Materials](vertex-paint.md#materials-lit-spheres) |
 | Zadd / Zsub | **Add** / **Sub** | Top shelf; <kbd>Alt</kbd> flips for one stroke |
 | Z Intensity | **Intensity** | Top shelf, <kbd>U</kbd> |
@@ -108,8 +108,8 @@ either. See [Keyboard and mouse](shortcuts.md#zbrush-style-keys) for the full li
   frame it; **subdivision levels** with <kbd>Ctrl</kbd>+<kbd>D</kbd>, <kbd>D</kbd> and <kbd>Shift</kbd>+<kbd>D</kbd>;
   **Wireframe** on <kbd>Shift</kbd>+<kbd>F</kbd>; **Save Snapshot** on <kbd>9</kbd> (ZBrush-style keys). See
   [Parts](parts.md) and [Subdivision levels](subdivision-levels.md).
-- **ZBrush Bridge** (GoZ-compatible). Send models to and from ZBrush. See
-  [Exporting, Unreal and ZBrush](exporting.md#exchange-models-with-zbrush-zbrush-bridge).
+- **Send to ZBrush** (GoZ-compatible). Send models to and from ZBrush. See
+  [Exporting, Unreal and ZBrush](exporting.md#exchange-models-with-zbrush-send-to-zbrush).
 - **VDM brushes** with Drag Stamp and Slide Stamp, and your own made from a VDM plane. See
   [Vector displacement brushes](sculpting.md#vector-displacement-brushes).
 - **Sculpting in Blender too?** The Blender add-on can give Blender's Sculpt Mode ZBrush's keys. See
@@ -186,4 +186,4 @@ Every shortcut is in [Keyboard and mouse](shortcuts.md), generated from the app 
 
 - [Keyboard and mouse](shortcuts.md)
 - [Glossary](glossary.md): more ZBrush terms and their SculptForge names
-- [Exporting, Unreal and ZBrush](exporting.md): the ZBrush Bridge
+- [Exporting, Unreal and ZBrush](exporting.md): Send to ZBrush

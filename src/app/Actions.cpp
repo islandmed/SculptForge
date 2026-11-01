@@ -32,7 +32,7 @@ std::string humanize(const std::string& name) {
         {"subtool", "part"},           {"subtools", "parts"},       {"zsphere", "forge sphere"},
         {"zspheres", "forge spheres"}, {"polygroup", "face group"}, {"polygroups", "face groups"},
         {"polypaint", "vertex paint"}, {"qremesh", "quad remesh"},  {"matcap", "lit sphere"},
-        {"matcaps", "lit spheres"},    {"lightbox", "library"},     {"goz", "zbrush bridge"},
+        {"matcaps", "lit spheres"},    {"lightbox", "library"},     {"goz", "zbrush"},
         {"quicksave", "snapshot"}};
     std::string out;
     size_t start = 0;

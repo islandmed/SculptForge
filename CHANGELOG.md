@@ -8,7 +8,7 @@ All notable changes to SculptForge are listed here. The format follows
 
 ### Changed
 - Features use SculptForge's own names (Parts, Forge Spheres, Vertex Paint, Face Groups, Library, Lit Spheres,
-  Quad Remesh, Voxel Remesh, Dynamic Topology, Snapshot, Gizmo, Lazy Stroke, Wireframe, ZBrush Bridge, Sharp
+  Quad Remesh, Voxel Remesh, Dynamic Topology, Snapshot, Gizmo, Lazy Stroke, Wireframe, Send to ZBrush, Sharp
   Crease, Clay Block, Tendril...); searching for ZBrush terms still finds them. MatCaps are now Lit Spheres. The user guide's chapters follow
   (Parts, Forge Spheres, Vertex Paint, Face Groups; the old web addresses redirect), and
   Help > User Guide > Coming from ZBrush has the table of ZBrush terms and their SculptForge names. The ZBrush

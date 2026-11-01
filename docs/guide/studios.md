@@ -122,7 +122,7 @@ A `--set` variable replaces a whole value, so pass complete paths (with their ex
 | OBJ | Yes | Yes | Objects as Parts, groups as face groups, vertex colours, textures through `.mtl` |
 | PLY | Yes | Yes | Meshes with vertex colours, Gaussian splats |
 | STL | Yes (binary and ASCII) | Yes (binary) | |
-| ZBrush Bridge (GoZ-compatible) | Yes | Yes | Face Groups, mask, vertex paint, UVs |
+| Send to ZBrush (GoZ-compatible exchange) | Yes | Yes | Face Groups, mask, vertex paint, UVs |
 | SculptForge project (`.sfproj`) | Yes | Yes | Everything; a documented ZIP of JSON and binary arrays |
 
 Binary `.usdc` files and USD references or payloads aren't read yet; convert with `usdcat in.usd -o out.usda`.

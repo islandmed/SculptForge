@@ -225,8 +225,8 @@ work?". **Restore** opens it as unsaved work (save it under a name); **Discard**
 **Can SculptForge open ZBrush files (.ZTL, .ZPR)?**
 Not directly: they are proprietary and undocumented. Convert ZTools once in ZBrush with the free
 **SculptForge ZTL Export** plug-in, then open the `.ZTL` in SculptForge (see
-[Coming from ZBrush](coming-from-zbrush.md#bring-your-ztools-over)). Or use the ZBrush Bridge, or export OBJ or FBX from ZBrush
-(see [Exporting, Send to Unreal and ZBrush](exporting.md#exchange-models-with-zbrush-zbrush-bridge)). `.ZPR` projects can't be
+[Coming from ZBrush](coming-from-zbrush.md#bring-your-ztools-over)). Or use Send to ZBrush, or export OBJ or FBX from ZBrush
+(see [Exporting, Send to Unreal and ZBrush](exporting.md#exchange-models-with-zbrush-send-to-zbrush)). `.ZPR` projects can't be
 converted; open their ZTools instead.
 
 **Does it have subdivision levels, DynaMesh, ZRemesher or UVs?**

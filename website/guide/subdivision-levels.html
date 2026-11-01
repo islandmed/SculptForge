@@ -118,7 +118,7 @@ The vertices of the new lower level sit on the dense mesh&#x27;s corner vertices
 <strong>Projects</strong> (<code>.sfproj</code>) save every level of every Part and open at the level you saved at. They use project format 5 (sculpt-layer detail relative to the surface), so older SculptForge versions ask you to update before opening them. Projects saved with format 4 open as before and are converted as they load.
 </li>
 <li>
-<strong>Exports and the ZBrush Bridge</strong> write the current level. To write another one, step to it first, or use the <code>subdiv_export</code> command (<code>subdiv_export path=base.obj level=1</code> writes the base cage of every visible Part, in any export format). LODs and <strong>Send to Unreal</strong> start from the current level too.
+<strong>Exports and Send to ZBrush</strong> write the current level. To write another one, step to it first, or use the <code>subdiv_export</code> command (<code>subdiv_export path=base.obj level=1</code> writes the base cage of every visible Part, in any export format). LODs and <strong>Send to Unreal</strong> start from the current level too.
 </li>
 <li>
 <strong>Tools that rebuild the mesh</strong> (Voxel Remesh, Decimate, Quad Remesh, Subdivide, Delete hidden, merging and splitting Parts) work on the level you are on, including what you just sculpted there, and make a new mesh without levels: that level becomes the new base. The status line says so, e.g. <em>Subdivision levels removed: SDiv 3 of 5 kept as the new base (undo restores them)</em>. <kbd>Ctrl</kbd>+<kbd>Z</kbd> brings every level back, at the level you were on. Merging and splitting Parts can&#x27;t be undone (as in ZBrush), so step to the level you want to keep first, or save before.
