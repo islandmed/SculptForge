@@ -1,0 +1,32 @@
+# The orthographic view (Numpad 5) shades like the perspective one (#24): the matcap and the lights looked inside
+# out, because each pixel's view ray was worked out as in a perspective view. The same sphere, both ways: the
+# brightness matches where 0.9.6 was furthest off (up to 38 levels; now within 1).
+run new_sphere subdivisions=4
+key f
+shot perspective
+remember luma@0.47,0.63 a
+remember luma@0.50,0.57 b
+remember luma@0.44,0.39 c
+remember luma@0.41,0.52 d
+key numpad5
+expect_value camera_ortho == 1
+key f
+shot orthographic
+expect_value luma@0.47,0.63 >= $a-8
+expect_value luma@0.47,0.63 <= $a+8
+expect_value luma@0.50,0.57 >= $b-8
+expect_value luma@0.50,0.57 <= $b+8
+expect_value luma@0.44,0.39 >= $c-8
+expect_value luma@0.44,0.39 <= $c+8
+expect_value luma@0.41,0.52 >= $d-8
+expect_value luma@0.41,0.52 <= $d+8
+# Flat shading too (its facing test used the direction from the eye, which an orthographic view can put
+# inside the model).
+run set_shading mode=flat
+shot flat_orthographic
+remember luma@0.41,0.52 fo
+key numpad5
+shot flat_perspective
+expect_value camera_ortho == 0
+expect_value luma@0.41,0.52 >= $fo-8
+expect_value luma@0.41,0.52 <= $fo+8

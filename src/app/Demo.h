@@ -65,6 +65,12 @@ public:
     std::string shortcutsMarkdown() const; // dump_shortcuts: the default shortcuts as Markdown tables
     // A screenshot requested by a `shot` step: the frame loop saves the next frame there.
     std::string takeShotRequest() { return std::exchange(shotRequest_, std::string()); }
+    // The last screenshot's pixels (RGBA, top row first), for the luma@X,Y values.
+    void setLastShot(std::vector<uint8_t> rgba, int w, int h) {
+        lastShot_ = std::move(rgba);
+        lastShotW_ = w;
+        lastShotH_ = h;
+    }
 
 private:
     using Step = std::function<bool(float t)>; // returns true when done; t = seconds since the step began
@@ -151,6 +157,8 @@ private:
     bool testing_ = false;
     std::vector<std::string> failures_;
     std::string frameText_, shotRequest_, shotDir_, scriptName_, lineText_;
+    std::vector<uint8_t> lastShot_;
+    int lastShotW_ = 0, lastShotH_ = 0;
     std::string scriptDir_; // the .sfui script's folder: relative `drop` paths, $SCRIPT_DIR in env steps
     std::string expandLibrary(std::string text) const; // $LIBRARY -> the LightBox library folder (UiTest.cpp)
     SDL_Keymod held_ = SDL_KMOD_NONE; // modifiers held by `hold` (Ctrl to mask, Ctrl+Shift to hide...)

@@ -27,6 +27,14 @@ All notable changes to SculptForge are listed here. The format follows
     mesh above a quarter: 78 ms a frame against 14-30), and finds them in parallel (3.7 -> 0.4 ms).
   - Starting a stroke no longer re-uploads the whole mesh when there are no LODs.
 
+### Fixed
+- The orthographic view (Numpad 5) shaded MatCaps and the lights as if inside out (#24): the shader worked out
+  each pixel's view ray as in a perspective view, which in an orthographic one tilted it far off the axis
+  towards the edges. An orthographic view now gives every pixel the axis; flat shading turns its facets
+  towards the viewer by that ray too (the direction from the eye, which an orthographic view can put inside
+  the model, turned them away). UI test ortho_shading (a new `luma@X,Y` value reads the last screenshot): the
+  same sphere in both views matches within 1 brightness level, where 0.9.6 was up to 38 off.
+
 ## [0.9.6] - 2026-10-31
 
 The same evening as 0.9.5, the next batch from your reports and from askNK's review: Extract and Mirror And Weld,

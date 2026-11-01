@@ -14,6 +14,11 @@ with a 200-pixel brush, the brush now trails the pointer by half as far, a frame
 first dab appears in half the time, and lifting the pen no longer pauses for up to a second while waiting dabs
 are placed. See [Performance](performance.md).
 
+### Fixes
+
+- The orthographic view (<kbd>Numpad 5</kbd>) shades like the perspective one: MatCaps and the lights no longer
+  look inside out.
+
 ## Version 0.9.6
 
 ### Extract

@@ -399,6 +399,7 @@ int App::runUiTest(int w, int h, int fps) {
         img.height = h;
         img.rgba = rgba;
         for (size_t i = 3; i < img.rgba.size(); i += 4) img.rgba[i] = 255;
+        demo_->setLastShot(img.rgba, w, h);
         if (!img.savePng(shot, err)) SDL_Log("%s", err.c_str());
         else SDL_Log("Screenshot %s", shot.c_str());
     }

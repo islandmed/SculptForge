@@ -311,6 +311,19 @@ void Demo::detachVirtualSpaceMouse() {
 double Demo::query(const std::string& name, bool& known) const {
     const Mesh& m = app_.doc_.mesh;
     known = true;
+    if (name.rfind("luma@", 0) == 0) { // luma@X,Y: brightness 0-255 of the last shot at window fractions X, Y
+        float fx = 0.0f, fy = 0.0f;
+        if (std::sscanf(name.c_str() + 5, "%f,%f", &fx, &fy) != 2) {
+            known = false;
+            return 0.0;
+        }
+        if (lastShot_.empty()) return -1.0; // (no shot yet)
+        const int x = std::clamp(int(fx * float(lastShotW_)), 0, lastShotW_ - 1);
+        const int y = std::clamp(int(fy * float(lastShotH_)), 0, lastShotH_ - 1);
+        const size_t i = size_t(y) * size_t(lastShotW_) * 4 + size_t(x) * 4;
+        // (rows as saved: top first)
+        return 0.2126 * lastShot_[i] + 0.7152 * lastShot_[i + 1] + 0.0722 * lastShot_[i + 2];
+    }
     if (name == "triangles") return double(m.triangleCount());
     if (name == "vertices") return double(m.vertexCount());
     if (name == "layers") return double(m.layers.size());

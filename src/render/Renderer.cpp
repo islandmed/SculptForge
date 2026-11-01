@@ -205,6 +205,11 @@ vec3 groupColor(uint id) {
     vec3 rgb = clamp(abs(fract(hue + vec3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0) - 1.0, 0.0, 1.0);
     return val * mix(vec3(1.0), rgb, sat);
 }
+// The unit vector from the pixel's point towards the eye, in view space.
+vec3 viewRay() {
+    vec2 ndc = (gl_FragCoord.xy - uViewport.xy) / uViewport.zw * 2.0 - 1.0;
+    return normalize(vec3(-ndc / uProjScale, 1.0));
+}
 void main() {
     vec3 albedo = uBaseColor;
     vec3 tint = vec3(1.0); // multiplies a matcap: polypaint or polygroup colours
@@ -224,7 +229,9 @@ void main() {
     // through a hole) keeps it that way unless it is the motion proxy's, which shades back faces turned away.
     vec3 n = cross(dFdx(vViewPos), dFdy(vViewPos));
     n = dot(n, n) > 1e-30 ? normalize(n) : normalize(vNormalCurv.xyz);
-    if (dot(n, vViewPos) > 0.0) n = -n;
+    // Towards the viewer: against the pixel's view ray (in an orthographic view the eye can sit inside the
+    // model, where the direction from it to the point would turn the facet the wrong way).
+    if (dot(n, viewRay()) < 0.0) n = -n;
     if (!gl_FrontFacing && uTwoSided == 0) n = -n;
 #else
     vec3 n = normalize(vNormalCurv.xyz);
@@ -242,8 +249,7 @@ void main() {
 #ifndef FLAT
     if (!gl_FrontFacing && uTwoSided == 1) n = -n;
 #endif
-    vec2 ndc = (gl_FragCoord.xy - uViewport.xy) / uViewport.zw * 2.0 - 1.0;
-    vec3 v = normalize(vec3(-ndc / uProjScale, 1.0));
+    vec3 v = viewRay();
     if (uMatcap == 1) {
         // View-aligned basis so the material stays put towards the edges of a perspective view.
         vec3 bx = normalize(vec3(v.z, 0.0, -v.x));
@@ -2241,7 +2247,11 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     gl::Uniform3fv(p->gridOrigin, 1, glm::value_ptr(s.grid.origin));
     gl::Uniform1f(p->gridStep, s.grid.step);
     gl::Uniform4fv(p->viewport, 1, glm::value_ptr(frameViewport_));
-    gl::Uniform2f(p->projScale, frameProj_[0][0], frameProj_[1][1]);
+    // The shader turns a pixel into its view ray as (-ndc / scale, 1): right for perspective. An orthographic
+    // view (Numpad 5) looks straight along the axis at every pixel, which an unbounded scale gives (its own
+    // scale tilted the ray at the edges until the matcap and the lights came from the other side, #24).
+    const bool orthographic = frameProj_[3][3] == 1.0f;
+    gl::Uniform2f(p->projScale, orthographic ? 1e20f : frameProj_[0][0], orthographic ? 1e20f : frameProj_[1][1]);
     gl::Uniform3fv(p->baseColor, 1, glm::value_ptr(settings.baseColor));
     gl::Uniform1i(p->matcap, matcapTexture(settings.matcap) ? 1 : 0);
     const MatcapCavity cavity = matcapCavity(settings.matcap);
