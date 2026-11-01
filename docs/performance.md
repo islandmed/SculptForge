@@ -356,6 +356,46 @@ Across runs on the busy machine the triangle throughput ranged 913-1410M/s and u
 
 ## Kelvinlet brushes and Capture from view (feat/kelvinlet-alpha)
 
+### After the merge with 0.10.1 (predictive strokes off and on)
+
+Measured with `--measure-stroke 3,R` on the benchmark sphere, best of two full-window runs, Move then KelvinGrab
+back to back, `SF_PREDICTIVE_STROKE=0/1`. Load average 4-23. Frame time is mean / worst ms:
+
+| Mesh | Brush | Move (off) | KelvinGrab (off) | ratio | Move (on) | KelvinGrab (on) |
+|---|---|---:|---:|---:|---:|---:|
+| 5M | 50 px | 8.6 / 19 | 13.1 / 19 | 1.5x | 8.3 / 11 | 8.4 / 15 |
+| 5M | 300 px | 43 / 67 | 78 / 159 | 1.8x | 42 / 62 | 8.4 / 17 |
+| 21M | 50 px | 12.5 / 17 | 56.7 / 101 | 4.5x | 11.2 / 20 | 8.9 / 20 |
+| 21M | 300 px | 199 / 217 | 428 / 491 | 2.2x | 200 / 226 | 9.7 / 21 |
+| 33M | 50 px | 17.1 / 76 | 57.9 / 164 | 3.4x | 70 / 100 | 10.5 / 30 |
+| 33M | 300 px | 656 / 1056 | 1449 / 1654 | 2.2x | 429 / 523 | 11.8 / 28 |
+
+**With predictive strokes off (0.10.1's default), the target is not met.** The target was KelvinGrab within
+about 2x of Move at 33M, with no frame over 100 ms at 50 px. At 33M / 50 px KelvinGrab is 3.4x Move with a
+164 ms worst frame; at 21M it is 4.5x with 101 ms. At 300 px it is about 2.2x Move, and at 5M 1.5-1.8x. A
+KelvinGrab move at 33M / 50 px costs about 40 ms on the CPU. It touches about a million vertices with X
+symmetry (kernel 15-20, normals 10-14, BVH 5-7 ms), where Move touches about 240 000.
+
+**With predictive strokes on, the Kelvinlet moves run on the solver thread** (`App::kelvinPump`: one bounded move
+per batch, taken by value on the main thread; the solver reads only the mesh, the BVH and the sculptor). Frames
+stay at 8-12 ms at every size. But the frame column then only says the UI no longer waits. **The surface itself
+still updates at the solver's pace**: about every 40-60 ms at 33M / 50 px, and every 0.4-1.5 s for a 300 px
+whole-model move. The "brush behind the pointer" figure the harness prints is not meaningful for Kelvinlet
+strokes in this mode, because they don't report their dabs to the probe.
+
+What changed in this pass:
+- The far field's catch-up groups are blocks of 4096 consecutive triangles (block b in group b mod 6, each
+  vertex in the block of its first triangle). These are spatial patches like the renderer's chunks, so a frame
+  dirties few clusters; renderer sync went from about 60 to about 20-25 ms a frame at 33M.
+- The near field is the vertices within one radius of the brush's path, with a smooth weight from half a radius.
+- The vertex budget is a third of `currentTierConfig().activeTriangleBudget`.
+- Error metric: after the stroke ends, the surface is within 2.5% of the brush radius of the immediate
+  evaluation (about a pixel for a 50 px brush). The lattice interpolation itself stays within 0.53% of the step.
+
+Recommendation: ship Kelvinlets as best below about 10M polygons with predictive strokes off; with them on, the
+UI stays fluid at any size and the surface follows at the solver's pace.
+
+
 Measured with the stroke the app draws itself, on the benchmark sphere at 5M, 21M and 33M triangles (with
 subdivision levels, X symmetry on), Move as the reference in the same session:
 
