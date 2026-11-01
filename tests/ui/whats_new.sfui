@@ -4,8 +4,8 @@ click "Help##palette.help"
 click "What's New##help.whats_new"
 expect_value guide_open == 1
 expect_guide whats-new.md
-expect_text "Version 0.10.1"
-expect_text "Micro levels: hundreds of millions of polygons"
+expect_text "Version 0.10.2"
+expect_text "QRemesh 2"
 expect_text "Version 0.9.6"
 expect_text "Extract"
 expect_text "Version 0.9.5"
@@ -21,5 +21,5 @@ expect_text "Version 0.6"
 expect_text "Version 0.5"
 expect_text "Version 0.4.2"
 # The newest section is on screen.
-expect_text "Micro levels: hundreds of millions of polygons"
+expect_text "QRemesh 2"
 shot whats-new

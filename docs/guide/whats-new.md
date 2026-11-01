@@ -5,6 +5,29 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.10.2
+
+### QRemesh 2
+
+A new quad remesher is now the default in **Tool > Remesh** and **Tool > Geometry**: two to fifty times fewer poles
+than before at the same accuracy, edge loops that follow the forms (round the mouth and nose), exact symmetry, and a
+quality report after each run. The previous method is still there as **Legacy**, and pieces with closed guide loops
+use it for now. See [Quad retopology](retopology.md).
+
+### Kelvinlet brushes and Capture from view
+
+**KelvinGrab**, **KelvinTwist**, **KelvinScale** and **KelvinSnake** move the surface like elastic clay, with a Squash
+slider from rubber to firm clay; they're at their best below about 10 million triangles for now. **Capture from view**
+(<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd>) turns any detail into an alpha or a vector displacement brush, and
+**Detail Clone** stamps it along a stroke. See [Sculpting](sculpting.md).
+
+### Also
+
+- Insert on the model (#34): the drag's direction also turns the shape about the surface.
+- Security: video exports (timelapse, Benchmark) no longer pass the file name to ffmpeg in a way a crafted name
+  could abuse. Update if you use them.
+- The local API added in 0.10.1 is removed; SculptForge doesn't listen for other programs.
+
 ## Version 0.10.1
 
 ### From your feedback on GitHub

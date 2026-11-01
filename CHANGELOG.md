@@ -6,6 +6,8 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-11-01
+
 ### Removed
 - The local API for other programs and its `mesh_read` / `mesh_set_positions` commands (added in 0.10.1, off by
   default). SculptForge no longer listens on any port for other programs.
