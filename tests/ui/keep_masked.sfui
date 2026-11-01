@@ -1,0 +1,46 @@
+# #43: Keep Masked for Voxel Remesh, Decimate and QRemesh: the masked top of a sphere keeps its triangles while
+# the rest is rebuilt and joined to it.
+run new_sphere subdivisions=5
+run mask_rect x0=-1 y0=0.3 x1=1 y1=1
+expect_value masked > 100
+key f
+
+# Voxel Remesh, Keep Masked on: one undo step; the masked vertices are all still masked.
+click "Remesh##tool.remesh"
+expect "Keep Masked##remesh"
+hold ctrl
+hover "Keep Masked##remesh"
+expect_help "keep their triangles"
+hold none
+remember masked kept
+remember triangles before
+click "Keep Masked##remesh"
+click "Voxel Remesh##geometry.remesh"
+wait_idle 120
+expect_status Remeshed to
+expect_value triangles != $before
+expect_value masked >= $kept
+click "PolyF##view.polyf"
+shot voxel_keep_masked
+click "PolyF##view.polyf"
+key ctrl+z
+expect_value triangles == $before
+
+# Decimate with Keep Masked.
+click "Geometry##tool.geometry"
+click "Keep Masked##decimate"
+click "Decimate"
+expect_status Decimated to
+expect_value triangles < $before
+expect_value masked >= $kept
+key ctrl+z
+
+# QRemesh with Keep Masked: the unmasked part becomes quads.
+click "QRemesh/Keep Masked##qremesh"
+click "QRemesh/QRemesh"
+wait_idle 120
+expect_status quads
+expect_value quads > 100
+expect_value masked >= $kept
+click "PolyF##view.polyf"
+shot qremesh_keep_masked

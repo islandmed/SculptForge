@@ -24,6 +24,9 @@ All notable changes to SculptForge are listed here. The format follows
   **From file...** (`.obj`, `.ply`, `.glb`), dragged onto the surface like the shapes: centred, sized by the drag,
   its up axis along the normal, turned by the drag and mirrored by symmetry, one undo step
   (`insert_mesh subtool=<name>|file=<path>`).
+- **Keep Masked** for Voxel Remesh, Decimate and QRemesh (#43, off by default): masked areas keep their
+  triangles exactly; the rest is rebuilt and, for the remeshers, joined to them along the mask's edge with a
+  strip of triangles so the model stays closed (`keep_masked=true` on `remesh`, `decimate`, `qremesh`).
 - SubTool thumbnails in the SubTool list (#43), drawn from each SubTool's existing GPU buffers (no upload, the
   motion proxy on dense meshes), one per frame at most and only once a change has settled, never during a stroke.
 

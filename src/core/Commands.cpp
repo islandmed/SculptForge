@@ -8,6 +8,7 @@
 #include "core/BrushAlpha.h"
 #include "core/BrushLibrary.h"
 #include "core/Decimate.h"
+#include "core/KeepMasked.h"
 #include "core/Dyntopo.h"
 #include "core/EnginePresets.h"
 #include "core/ExtractMirror.h"
@@ -225,11 +226,22 @@ CommandRegistry::CommandRegistry() {
          "kept (new Auto UVs, colour projected from the old surface) unless keep_texture=false.",
          {{"resolution", T::Number, "Voxels across the longest side (32-512). Default 200; higher keeps more detail.", false},
           {"keep_texture", T::Bool, "Keep a painted texture: Auto UV the result and project the texture onto it. "
-                                    "Default true.", false}},
+                                    "Default true.", false},
+          {"keep_masked", T::Bool, "Keep masked: masked areas keep their triangles exactly; the rest is remeshed and "
+                                   "joined to them watertight. Default false.", false}},
          [](Document& doc, const Args& a) -> CommandResult {
              std::string err;
+             const std::vector<uint8_t> keep = argBool(a, "keep_masked", false) ? keepMaskedTriangles(doc.mesh) : std::vector<uint8_t>();
+             const bool keeping = std::find(keep.begin(), keep.end(), 1) != keep.end();
+             if (keeping && std::find(keep.begin(), keep.end(), 0) == keep.end())
+                 return {false, "Remesh: everything is masked, so nothing would change"};
              Mesh m = voxelRemesh(doc.mesh, std::clamp(int(argNumber(a, "resolution", 200)), 32, 512), &err);
              if (m.triangleCount() == 0) return {false, err};
+             if (keeping) {
+                 Mesh stitched;
+                 if (!stitchKeptTriangles(doc.mesh, keep, m, stitched, err)) return {false, "Remesh (Keep masked): " + err};
+                 m = std::move(stitched);
+             }
              const std::string texture = carryTextureNote(doc.mesh, m, argBool(a, "keep_texture", true));
              doc.replaceMeshUndoable(std::move(m), "Remesh");
              return {true, "Remeshed to " + std::to_string(doc.mesh.triangleCount()) + " triangles" + texture};
@@ -389,13 +401,15 @@ CommandRegistry::CommandRegistry() {
     add({"decimate",
          "Reduce triangle count while preserving shape (quadric edge collapse). Sculpt layers are kept.",
          {{"ratio", T::Number, "Fraction of triangles to keep (0.01-1). Default 0.5.", false},
-          {"triangles", T::Number, "Exact target triangle count (overrides ratio).", false}},
+          {"triangles", T::Number, "Exact target triangle count (overrides ratio).", false},
+          {"keep_masked", T::Bool, "Keep masked: masked vertices aren't moved or removed, so masked areas keep their "
+                                   "triangles exactly. Default false.", false}},
          [](Document& doc, const Args& a) -> CommandResult {
              size_t target = a.contains("triangles")
                                  ? size_t(std::max(4.0, argNumber(a, "triangles", 4)))
                                  : size_t(double(doc.mesh.triangleCount()) *
                                           std::clamp(argNumber(a, "ratio", 0.5), 0.01, 1.0));
-             doc.replaceMeshUndoable(decimate(doc.mesh, target), "Decimate");
+             doc.replaceMeshUndoable(decimate(doc.mesh, target, argBool(a, "keep_masked", false)), "Decimate");
              return {true, "Decimated to " + std::to_string(doc.mesh.triangleCount()) + " triangles"};
          }});
 

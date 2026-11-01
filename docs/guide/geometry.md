@@ -86,6 +86,11 @@ What happens to your data:
   progress bar and **Cancel**. Off: the texture is dropped. See [Texture painting](texture-painting.md#uvs-and-geometry).
 - Separate pieces that don't touch stay separate pieces; overlapping ones are merged.
 - The new surface is made of even quads (the original's quads are rebuilt, not kept).
+- **Keep Masked** (off by default): masked areas keep their triangles exactly, detail included, and only the rest
+  is remeshed. The new surface is joined to the masked area along the mask's edge by a narrow strip of triangles,
+  so the model stays closed. A triangle counts as masked when all three of its corners are at least half masked.
+  If the mask's edge is too ragged or too thin to join up at this resolution, the status line says so and nothing
+  changes (smooth or grow the mask, or raise the resolution). Command: `remesh keep_masked=true`.
 
 To remesh several SubTools into one, first combine them with **Merge visible...** or **Merge down...** in
 [SubTools](subtools.md#merge-subtools).
@@ -111,6 +116,9 @@ of triangles to keep (0.05 to 0.95, default 0.50).
 Decimation keeps open borders in place, and because it only removes vertices, every remaining vertex keeps its
 exact sculpt layer offsets, mask and polypaint. Polygroups, hidden flags and UVs survive on the remaining
 triangles. The result is all triangles: quads are not kept.
+
+With **Keep Masked** (under the button, off by default) masked vertices are never removed, so masked areas keep
+their triangles exactly and only the rest is decimated (`decimate keep_masked=true`).
 
 Use it to make a lighter version of a finished sculpt for export, 3D printing or a review, or to bring a dense
 scan down to something you can work with.

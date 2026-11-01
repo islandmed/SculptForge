@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include "core/KeepMasked.h"
 #include "core/Mesh.h"
 
 #include <vector>
@@ -14,8 +15,9 @@ namespace sf {
 // and sculpt layers / blend shapes, mask and colours carry over exactly;
 // surviving triangles keep their polygroup and hidden flag, and corner UVs
 // follow the kept vertex. A decimated result is all triangles (quad pairs are
-// dropped).
-Mesh decimate(const Mesh& src, size_t targetTriangles);
+// dropped). keepMasked: masked vertices (mask >= kKeepMaskedThreshold) are never collapsed, so they and the
+// triangles between them come through unchanged (#43).
+Mesh decimate(const Mesh& src, size_t targetTriangles, bool keepMasked = false);
 
 // LOD chain: lods[0] is a copy of `src`, each following level has
 // `ratio` times the triangles of the previous one.

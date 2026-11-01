@@ -4,6 +4,7 @@
 // qremesh and project_all: the scriptable side of Geometry > QRemesh and SubTool > Project (core/QRemesh.h,
 // core/Projection.h). The app runs QRemesh on a worker thread and applies the result with applyQRemesh.
 #include "core/Commands.h"
+#include "core/KeepMasked.h"
 #include "core/Projection.h"
 #include "core/QRemesh.h"
 #include "core/TextureTransfer.h"
@@ -115,9 +116,16 @@ void registerRetopoCommands(CommandRegistry& reg) {
                                   "runs along each. Default true.", false},
               {"curves_strength", T::Number, "Curves Strength 0-100: how far around each guide the edge flow follows "
                                              "it (0 = just the loop on the curve, 100 = about six quads to each side). "
-                                             "Default 50.", false}},
+                                             "Default 50.", false},
+              {"keep_masked", T::Bool, "Keep masked: masked areas keep their triangles exactly as a fixed piece; the "
+                                       "rest is remeshed and joined to them watertight. Default false.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  if (doc.mesh.triangleCount() == 0) return {false, "QRemesh: the SubTool is empty"};
+                 const std::vector<uint8_t> keep =
+                     argBool(a, "keep_masked", false) ? keepMaskedTriangles(doc.mesh) : std::vector<uint8_t>();
+                 const bool keeping = std::find(keep.begin(), keep.end(), 1) != keep.end();
+                 if (keeping && std::find(keep.begin(), keep.end(), 0) == keep.end())
+                     return {false, "QRemesh: everything is masked, so nothing would change"};
                  QRemeshOptions o;
                  const std::string method = argString(a, "method");
                  if (method == "legacy" || method == "Legacy") o.method = QRemeshMethod::Legacy;
@@ -141,7 +149,12 @@ void registerRetopoCommands(CommandRegistry& reg) {
                  Mesh out;
                  std::string err;
                  QRemeshStats st;
-                 if (!qremesh(doc.mesh, o, out, err, {}, &st)) return {false, err};
+                 if (keeping) { // remesh the unmasked part on its own, then put the masked part back beside it
+                     if (!qremesh(unmaskedPart(doc.mesh, keep), o, out, err, {}, &st)) return {false, err};
+                     Mesh stitched;
+                     if (!stitchKeptTriangles(doc.mesh, keep, out, stitched, err)) return {false, "QRemesh (Keep masked): " + err};
+                     out = std::move(stitched);
+                 } else if (!qremesh(doc.mesh, o, out, err, {}, &st)) return {false, err};
                  const std::string texture = carryTextureNote(doc.mesh, out, argBool(a, "keep_texture", true));
                  return {true, applyQRemesh(doc, std::move(out), argBool(a, "keep_original", false), st) + texture};
              }});

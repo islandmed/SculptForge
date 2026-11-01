@@ -585,13 +585,22 @@ void App::drawPalette_Tool() {
         drawGeometrySection();
         actionRow(*this, {"geometry.subdivide"});
         const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
-        if (ImGui::Button("Decimate", ImVec2(half, 0))) runCommand("decimate", {{"ratio", double(decimateRatio_)}});
+        if (ImGui::Button("Decimate", ImVec2(half, 0))) {
+            Args args{{"ratio", double(decimateRatio_)}};
+            if (decimateKeepMasked_) args["keep_masked"] = true;
+            runCommand("decimate", args);
+        }
         ui::HelpText("Decimate", nullptr, "Reduce the triangle count while keeping the shape. Sculpt layers are kept.",
                      "Tool > Geometry");
         ImGui::SameLine();
         ImGui::SetNextItemWidth(-1);
         ui::SliderInside("##decimate", &decimateRatio_, 0.05f, 0.95f, "Keep %.2f");
         ui::HelpText("Keep", nullptr, "Fraction of the triangles Decimate keeps.", "Tool > Geometry");
+        ImGui::Checkbox("Keep Masked##decimate", &decimateKeepMasked_);
+        ui::HelpText("Keep Masked", nullptr,
+                     "Decimate leaves masked vertices where they are, so masked areas keep their triangles exactly; "
+                     "the rest is decimated around them.",
+                     "Tool > Geometry");
         Demo::pushScope("QRemesh");
         drawQRemeshContents(); // quad retopology (PanelRetopo.cpp)
         Demo::popScope();
@@ -625,8 +634,13 @@ void App::drawPalette_Tool() {
         if (voxelRemesh_) {
             if (ImGui::Button("Cancel##voxelremesh", ImVec2(half, 0))) voxelRemesh_->cancel->store(true);
             ui::HelpText("Cancel", nullptr, "Stop the remesh; the SubTool stays as it is.", "Tool > Remesh");
-        } else if (hasTexture(doc_.mesh)) {
-            drawKeepTextureCheckbox("Keep Texture##remesh", "Tool > Remesh"); // only for a painted SubTool
+        } else {
+            ImGui::Checkbox("Keep Masked##remesh", &voxelKeepMasked_);
+            ui::HelpText("Keep Masked", nullptr, kKeepMaskedHelp, "Tool > Remesh");
+            if (hasTexture(doc_.mesh)) {
+                ImGui::SameLine();
+                drawKeepTextureCheckbox("Keep Texture##remesh", "Tool > Remesh"); // only for a painted SubTool
+            }
         }
     }
     if (subpalette("tool.deformation", "Deformation")) {

@@ -406,6 +406,11 @@ private:
     std::string comfyWorkflowError_;
     bool remeshGenerated_ = true;
     int voxelResolution_ = 200;
+    bool voxelKeepMasked_ = false; // Voxel Remesh's Keep Masked (#43)
+    static constexpr const char* kKeepMaskedHelp =
+        "Masked areas keep their triangles exactly as they are (their detail too); only the rest is rebuilt, and "
+        "it's joined to them along the mask's edge so the model stays closed. Mask what to keep first (Ctrl). "
+        "If the mask's edge is too ragged to join up, the status line says so and nothing changes.";
     bool keepTexture_ = true; // Keep Texture: remeshes carry a painted texture over (core/TextureTransfer.h)
     int remeshResolution_ = 256;
     std::future<ai::GeneratorResult> pendingGenerator_;
@@ -764,6 +769,7 @@ private:
         uint32_t subtool = 0;
         size_t triangles = 0;
         int resolution = 200;
+        bool keepMasked = false;
     };
     std::unique_ptr<VoxelRemeshJob> voxelRemesh_;
     void pollQRemesh();
@@ -786,6 +792,7 @@ private:
         int target = 5000;
         float adaptive = 0.5f;
         bool keepGroups = false, detectEdges = true, usePolypaint = false, symmetry = true, keepOriginal = false;
+        bool keepMasked = false; // Keep Masked (#43): the masked area stays as it is (core/KeepMasked.h)
         float projectDist = 0.02f;
         int projectBlur = 0;
         bool projectMean = false, projectGeometry = true, projectPolypaint = true;
@@ -1093,6 +1100,7 @@ private:
     float dropdownX_ = 0.0f;
     bool openDropdown_ = false;
     float decimateRatio_ = 0.5f;
+    bool decimateKeepMasked_ = false; // Decimate's Keep Masked (#43)
     std::string flashPalette_; // a tray palette that was clicked in the bar: scrolled to and flashed
     double flashStart_ = 0.0;
     std::vector<std::string> collapsedPalettes_; // tray palettes showing only their header

@@ -52,7 +52,7 @@ uint64_t edgeKey(uint32_t a, uint32_t b) {
 
 } // namespace
 
-Mesh decimate(const Mesh& src, size_t targetTriangles) {
+Mesh decimate(const Mesh& src, size_t targetTriangles, bool keepMasked) {
     const size_t nv = src.vertexCount();
     const size_t nt = src.triangleCount();
     targetTriangles = std::max<size_t>(targetTriangles, 4);
@@ -80,6 +80,12 @@ Mesh decimate(const Mesh& src, size_t targetTriangles) {
                 else if (glm::any(glm::greaterThan(glm::abs(firstUv[v] - uv), glm::vec2(1e-6f)))) uvSeam[v] = 1;
             }
     }
+
+    // Keep masked (#43): masked vertices are never collapsed away, so they and the triangles between them stay
+    // exactly as they were (a collapse keeps the other endpoint where it is).
+    std::vector<char> locked(nv, 0);
+    if (keepMasked && src.hasMask())
+        for (size_t v = 0; v < nv; ++v) locked[v] = src.mask[v] >= kKeepMaskedThreshold;
 
     // Area-weighted plane quadrics.
     std::vector<Quadric> Q(nv);
@@ -149,7 +155,7 @@ Mesh decimate(const Mesh& src, size_t targetTriangles) {
         heap.pop();
         const uint32_t u = c.from, v = c.to;
         if (!vAlive[u] || !vAlive[v] || version[u] != c.fromVersion || version[v] != c.toVersion) continue;
-        if (uvSeam[u]) continue;
+        if (uvSeam[u] || locked[u]) continue;
 
         shared.clear();
         for (uint32_t f : vFaces[u]) {

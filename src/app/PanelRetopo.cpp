@@ -11,6 +11,7 @@
 #include "app/Palettes.h"
 #include "app/Ui.h"
 
+#include "core/KeepMasked.h"
 #include "core/TextureTransfer.h"
 #include "core/Voxel.h"
 
@@ -99,9 +100,29 @@ void App::registerRetopoUiActions() {
         "project_all");
 }
 
+namespace {
+
+// Keep Masked (#43): the triangles to keep, or empty when it's off or nothing is masked. `allMasked`: there's
+// nothing left to remesh.
+std::vector<uint8_t> keptForRemesh(const Mesh& mesh, bool keepMasked, bool& allMasked) {
+    allMasked = false;
+    std::vector<uint8_t> keep = keepMasked ? keepMaskedTriangles(mesh) : std::vector<uint8_t>();
+    if (std::find(keep.begin(), keep.end(), 1) == keep.end()) return {};
+    allMasked = std::find(keep.begin(), keep.end(), 0) == keep.end();
+    return keep;
+}
+
+} // namespace
+
 void App::startQRemesh() {
     if (qremesh_ || doc_.mesh.triangleCount() == 0) return;
     if (doc_.sculptor.strokeActive()) endStroke();
+    bool allMasked = false;
+    std::vector<uint8_t> keep = keptForRemesh(doc_.mesh, retopo_.keepMasked, allMasked);
+    if (allMasked) {
+        status_ = "QRemesh: everything is masked, so nothing would change (Keep Masked)";
+        return;
+    }
     QRemeshOptions o;
     o.method = retopo_.method == 1 ? QRemeshMethod::Legacy : QRemeshMethod::V2;
     o.targetQuads = std::clamp(retopo_.target, 16, 2'000'000);
@@ -129,6 +150,7 @@ void App::startQRemesh() {
     if (o.usePolypaint) job->args["use_polypaint"] = true;
     if (o.symmetryAxis >= 0) job->args["symmetry"] = std::string(1, char('x' + o.symmetryAxis));
     if (job->keepOriginal) job->args["keep_original"] = true;
+    if (!keep.empty()) job->args["keep_masked"] = true;
     if (!o.guides.empty() && std::abs(curvesStrength_ - 50.0f) > 0.01f) job->args["curves_strength"] = double(curvesStrength_);
     const bool keepTexture = keepTexture_;
     if (!keepTexture && hasTexture(doc_.mesh)) job->args["keep_texture"] = false;
@@ -138,13 +160,20 @@ void App::startQRemesh() {
     job->done = promise.get_future();
     std::thread([promise = std::move(promise), source = std::make_shared<Mesh>(doc_.mesh), o, progress = job->progress,
                  cancel = job->cancel, result = job->result, stats = job->stats, error = job->error,
-                 note = job->textureNote, keepTexture]() mutable {
+                 note = job->textureNote, keepTexture, keep = std::move(keep)]() mutable {
         // With a texture to keep, QRemesh takes the first 80% of the bar and Auto UV + transfer the rest.
         const float share = hasTexture(*source) && keepTexture ? 0.8f : 1.0f;
-        bool ok = qremesh(*source, o, *result, *error, [&](float f) {
+        // Keep Masked: the unmasked part is remeshed on its own, then the masked part is joined back to it.
+        bool ok = qremesh(keep.empty() ? *source : unmaskedPart(*source, keep), o, *result, *error, [&](float f) {
             progress->store(f * share);
             return !cancel->load();
         }, stats.get());
+        if (ok && !keep.empty()) {
+            Mesh stitched;
+            ok = stitchKeptTriangles(*source, keep, *result, stitched, *error);
+            if (ok) *result = std::move(stitched);
+            else *error = "QRemesh (Keep Masked): " + *error;
+        }
         if (ok) *note = carryTextureNote(*source, *result, keepTexture, [&](float f) {
             progress->store(share + (1.0f - share) * f);
             return !cancel->load();
@@ -163,6 +192,7 @@ void App::startQRemesh() {
 void App::startVoxelRemesh() {
     if (voxelRemesh_) return;
     Args args{{"resolution", double(voxelResolution_)}};
+    if (voxelKeepMasked_) args["keep_masked"] = true;
     if (!hasTexture(doc_.mesh) || !keepTexture_) {
         if (hasTexture(doc_.mesh)) args["keep_texture"] = false; // Keep Texture off
         runCommand("remesh", args);
@@ -179,14 +209,27 @@ void App::startVoxelRemesh() {
     job->subtool = doc_.activeSubtoolInfo().id;
     job->triangles = doc_.mesh.triangleCount();
     job->resolution = std::clamp(voxelResolution_, 32, 512);
+    bool allMasked = false;
+    std::vector<uint8_t> keep = keptForRemesh(doc_.mesh, voxelKeepMasked_, allMasked);
+    if (allMasked) {
+        status_ = "Remesh: everything is masked, so nothing would change (Keep Masked)";
+        return;
+    }
+    job->keepMasked = !keep.empty();
     std::promise<bool> promise;
     job->done = promise.get_future();
     std::thread([promise = std::move(promise), source = std::make_shared<Mesh>(doc_.mesh), res = job->resolution,
                  progress = job->progress, cancel = job->cancel, result = job->result, error = job->error,
-                 note = job->note]() mutable {
+                 note = job->note, keep = std::move(keep)]() mutable {
         progress->store(0.02f);
         *result = voxelRemesh(*source, res, error.get());
         bool ok = result->triangleCount() > 0;
+        if (ok && !keep.empty()) { // Keep Masked: the masked part goes back in, joined to the new surface
+            Mesh stitched;
+            ok = stitchKeptTriangles(*source, keep, *result, stitched, *error);
+            if (ok) *result = std::move(stitched);
+            else *error = "Remesh (Keep Masked): " + *error;
+        }
         progress->store(0.15f);
         if (ok) *note = carryTextureNote(*source, *result, true, [&](float f) {
             progress->store(0.15f + 0.85f * f);
@@ -231,7 +274,9 @@ void App::pollVoxelRemesh() {
     playingLayer_ = -1;
     uvLinesKey_ = 0;
     updateTitle();
-    consoleEcho("remesh", {{"resolution", double(job->resolution)}}, r);
+    Args echo{{"resolution", double(job->resolution)}};
+    if (job->keepMasked) echo["keep_masked"] = true;
+    consoleEcho("remesh", echo, r);
 }
 
 void App::pollQRemesh() {
@@ -355,11 +400,12 @@ void App::drawQRemeshContents() {
                  "Keep the SubTool as it was, hidden, right below the new one (\"<name> Original\"), ready to "
                  "ProjectAll its detail back. Off: replace it, as ZBrush does (undo brings it back).",
                  kQRemeshPath);
-    if (hasTexture(doc_.mesh)) { // only matters for a painted SubTool
-        ImGui::SameLine();
-        ImGui::SetCursorPosX(x0 + half + style.ItemSpacing.x); // the right column, inside the section indent
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(x0 + half + style.ItemSpacing.x); // the right column, inside the section indent
+    ImGui::Checkbox("Keep Masked##qremesh", &retopo_.keepMasked);
+    ui::HelpText("Keep Masked", nullptr, kKeepMaskedHelp, kQRemeshPath);
+    if (hasTexture(doc_.mesh)) // only matters for a painted SubTool
         drawKeepTextureCheckbox("Keep Texture##qremesh", kQRemeshPath);
-    }
     drawQRemeshGuideControls();
     drawQRemeshReport();
 }
