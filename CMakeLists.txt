@@ -563,6 +563,9 @@ if(SCULPTFORGE_BUILD_TESTS)
                                         -- --cli ${SCULPTFORGE_CLI_RUNNER})
       set_tests_properties(blender_addon PROPERTIES TIMEOUT 300)
     endif()
+    # The release smoke test (tests/release_smoke.py, run by release.yml on every package): open, sculpt, save, reopen.
+    add_test(NAME release_smoke COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_smoke.py
+                                      --cli ${SCULPTFORGE_CLI_RUNNER} --out ${CMAKE_CURRENT_BINARY_DIR}/release-smoke)
     # Proof mode results: the validator and website list tool (tools/benchmark/submit.py, docs/benchmark.md).
     add_test(NAME benchmark_submit COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/benchmark/submit.py selftest)
     add_test(NAME guide_site COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/guide/build_site.py --check
