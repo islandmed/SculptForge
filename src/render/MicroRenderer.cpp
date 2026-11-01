@@ -3,6 +3,7 @@
 #include "render/MicroRenderer.h"
 
 #include "core/ThreadPool.h"
+#include "core/TierConfig.h"
 
 #include <glm/gtc/type_ptr.hpp>
 
@@ -474,17 +475,45 @@ bool MicroRenderer::sync(Mesh& mesh) {
         uploadDispTiles(mesh, scratch_, true);
         shadePending(mesh, true);
     } else {
-        if (baseMoved) { // a transform or a base edit: the base, the bounds and every shading point
-            uploadBase(mesh);
-            bytes_ -= mesh.vertexCount() * 2 * sizeof(glm::vec4);
-            std::vector<uint32_t> all(bounds_.size());
-            for (uint32_t c = 0; c < all.size(); ++c) all[c] = c;
-            updateClusterBounds(mesh, all);
+        // The base cage moved (dual-scale Move, a transform, undo of either): the detail rides along on the GPU (it
+        // is relative to the base); what changes is the base, the bounds and the shading around moved vertices.
+        bool baseEverywhere = false;
+        std::vector<uint32_t> baseTris;
+        if (baseMoved) {
+            size_t moved = 0;
+            const uint32_t b0 = mesh.dirtyBegin, b1 = std::min<uint32_t>(mesh.dirtyEnd, uint32_t(mesh.vertexCount()));
+            for (uint32_t v = b0; v < b1; ++v)
+                if (mesh.vertexDirty(v)) ++moved;
+            baseEverywhere = moved * 4 > mesh.vertexCount();
+            if (baseEverywhere) {
+                uploadBase(mesh);
+                bytes_ -= mesh.vertexCount() * 2 * sizeof(glm::vec4);
+                std::vector<uint32_t> all(bounds_.size());
+                for (uint32_t c = 0; c < all.size(); ++c) all[c] = c;
+                updateClusterBounds(mesh, all);
+            } else {
+                std::vector<glm::vec4> part(size_t(b1 - b0) * 2);
+                for (uint32_t v = b0; v < b1; ++v) {
+                    part[size_t(v - b0) * 2] = glm::vec4(mesh.positions[v], 1.0f);
+                    part[size_t(v - b0) * 2 + 1] = glm::vec4(mesh.normals[v], 0.0f);
+                    if (mesh.vertexDirty(v))
+                        for (uint32_t t : mesh.vertexTriangles(v)) baseTris.push_back(t);
+                }
+                gl::BindBuffer(GL_TEXTURE_BUFFER, baseData_);
+                gl::BufferSubData(GL_TEXTURE_BUFFER, GLintptr(size_t(b0) * 2 * sizeof(glm::vec4)), GLsizeiptr(part.size() * sizeof(glm::vec4)),
+                                  part.data());
+                gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
+            }
         }
         // This sync's dirty triangles.
         scratch_.clear();
         for (size_t w = 0; w < mm.dirtyBits.size(); ++w)
             for (uint64_t bits = mm.dirtyBits[w]; bits; bits &= bits - 1) scratch_.push_back(uint32_t(w * 64 + size_t(std::countr_zero(bits))));
+        if (!baseTris.empty()) {
+            scratch_.insert(scratch_.end(), baseTris.begin(), baseTris.end());
+            std::sort(scratch_.begin(), scratch_.end());
+            scratch_.erase(std::unique(scratch_.begin(), scratch_.end()), scratch_.end());
+        }
         if (mm.allDirty || mm.rescaled) {
             uploadDispTiles(mesh, scratch_, true);
         } else if (!scratch_.empty()) {
@@ -499,7 +528,7 @@ bool MicroRenderer::sync(Mesh& mesh) {
             cl.erase(std::unique(cl.begin(), cl.end()), cl.end());
             updateClusterBounds(mesh, cl);
         }
-        if (mm.allDirty || baseMoved) {
+        if (mm.allDirty || baseEverywhere) {
             shadePending(mesh, true);
         } else {
             for (uint32_t t : scratch_) {
@@ -507,6 +536,10 @@ bool MicroRenderer::sync(Mesh& mesh) {
                 const uint64_t bit = uint64_t(1) << (t & 63);
                 if (!(w & bit)) w |= bit, ++pendingCount_;
             }
+            // TierConfig: continuous normals shade up to the budget every sync; draft ones a quarter of it while a
+            // stroke runs (the rest follows when it ends).
+            const TierConfig& tier = tierConfig();
+            shadeBudget = tier.shadeBudgetPoints / (mm.stroking && !tier.continuousNormals ? 4 : 1);
             if (pendingCount_) shadePending(mesh, false);
         }
     }

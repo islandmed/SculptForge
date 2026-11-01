@@ -146,6 +146,37 @@ size_t MicroStore::residentBytes() const {
 #endif
 }
 
+size_t MicroStore::trim(size_t maxBytes) {
+    const size_t resident = residentBytes();
+#if SF_MICRO_MMAP
+    if (map_ && maxBytes && resident > maxBytes) {
+        const size_t bytes = mapCount_ * sizeof(int16_t);
+        msync(map_, bytes, MS_SYNC);           // the file keeps every value
+        madvise(map_, bytes, MADV_DONTNEED);   // and the pages leave memory
+        return residentBytes();
+    }
+#endif
+    return resident;
+}
+
+bool MicroStore::rangeResident(size_t first, size_t count) const {
+    if (!map_ || count == 0) return true;
+#if SF_MICRO_MMAP
+    const uintptr_t page = uintptr_t(sysconf(_SC_PAGESIZE));
+    const uintptr_t a = reinterpret_cast<uintptr_t>(map_ + first) & ~(page - 1);
+    const uintptr_t b = reinterpret_cast<uintptr_t>(map_ + first + count);
+    std::vector<unsigned char> vec((b - a + page - 1) / page);
+#if defined(__APPLE__)
+    if (mincore(reinterpret_cast<void*>(a), b - a, reinterpret_cast<char*>(vec.data())) != 0) return false;
+#else
+    if (mincore(reinterpret_cast<void*>(a), b - a, vec.data()) != 0) return false;
+#endif
+    for (unsigned char c : vec)
+        if (!(c & 1)) return false;
+#endif
+    return true;
+}
+
 size_t MicroStore::capacity() const { return map_ ? residentBytes() / sizeof(int16_t) : heap_.capacity(); }
 
 bool MicroStore::operator==(const std::vector<int16_t>& v) const {

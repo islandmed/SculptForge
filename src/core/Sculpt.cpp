@@ -857,7 +857,9 @@ void Sculptor::beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym)
     grabAll_.clear();
     grabLeaves_.clear();
     if (!active_) return;
-    if (microReady(mesh)) { // along the normals (a micro level can't move sideways)
+    // A micro level (core/Micro.h): Move deforms the base cage below it (dual scale: the detail is relative to the
+    // base, so it rides along in its local frame), unless asked to move the micro surface along its normals.
+    if (microMoveAlongNormals && microReady(mesh)) {
         for (const glm::vec3& m : mirrors(sym)) micro_.beginGrab(mesh, bvh, p.center * m, p.radius, p.focal, m);
         return;
     }

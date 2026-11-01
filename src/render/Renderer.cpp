@@ -6,6 +6,7 @@
 #include "core/Matcap.h"
 #include "core/Texture.h"
 #include "core/ThreadPool.h"
+#include "core/TierConfig.h"
 #include "core/UploadOrder.h"
 
 #include <glm/gtc/type_ptr.hpp>
@@ -2321,7 +2322,8 @@ void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const Render
     gl::Uniform1i(p->twoSided, 1);
     // Moving (Fast Navigation): a coarser target and half the budget, so orbiting stays smooth.
     const bool moving = settings.motionProxy;
-    const size_t budget = moving ? settings.renderTriangleBudget / 2 : settings.renderTriangleBudget;
+    const size_t full = settings.renderTriangleBudget ? settings.renderTriangleBudget : tierConfig().activeTriangleBudget;
+    const size_t budget = moving ? full / 2 : full;
     const float target = settings.microTargetPx * (moving ? 2.0f : 1.0f);
     // (the budget is shared by the micro SubTools on screen: each gets it whole; one is the usual case)
     const_cast<MeshSlot&>(s).microDrawn = s.micro->draw(p->id, frameCull_, frameProj_, frameViewport_, budget, target);

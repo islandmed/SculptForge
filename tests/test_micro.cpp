@@ -11,6 +11,7 @@
 #include "core/Multires.h"
 #include "core/Primitives.h"
 #include "core/Project.h"
+#include "core/TierConfig.h"
 #include "io/Zip.h"
 
 #include <chrono>
@@ -18,6 +19,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <algorithm>
 #include <map>
 
 using namespace sf;
@@ -225,8 +227,29 @@ TEST(micro_mask_brush_protects) {
     CHECK(doc.mesh.micro->hasMask());
 }
 
+TEST(micro_move_deforms_the_base_cage) {
+    // Dual scale: Move reshapes the base below the micro level; the detail (displacements) rides along unchanged.
+    Document doc = microDoc(3);
+    microNoise(doc.mesh, 0.005f, 20.0f);
+    const std::vector<int16_t> detail = doc.mesh.micro->disp;
+    const float h0 = frontHeight(doc);
+    Symmetry sym;
+    doc.sculptor.beginStroke(doc.mesh, "Move");
+    doc.sculptor.beginGrab(doc.mesh, doc.bvh, dabAt(glm::vec3(0, 0, 1), 0.4f, 1.0f), sym);
+    for (int i = 0; i < 5; ++i) doc.sculptor.grab(doc.mesh, doc.bvh, glm::vec3(0.03f, 0, 0.02f));
+    UndoRecord r = doc.sculptor.endStroke();
+    CHECK(!r.positions.empty() && !r.micro);
+    doc.undo.push(std::move(r));
+    CHECK(doc.mesh.micro->disp == detail);
+    CHECK(frontHeight(doc) > h0 + 0.05f);
+    CHECK(watertight(doc.mesh));
+    doc.undo.undo(doc.mesh, doc.bvh);
+    CHECK(std::abs(frontHeight(doc) - h0) < 1e-4f);
+}
+
 TEST(micro_move_brush_moves_along_normals) {
     Document doc = microDoc(3);
+    doc.sculptor.microMoveAlongNormals = true;
     const float h0 = frontHeight(doc);
     Symmetry sym;
     doc.sculptor.beginStroke(doc.mesh, "Move");
@@ -495,4 +518,52 @@ TEST(micro_adaptive_brush_matches_full) {
     CHECK(ha > 1.01f);
     CHECK(std::abs(ha - hb) < (ha - 1.0f) * 0.02f);
     CHECK(watertight(b.mesh));
+}
+
+TEST(micro_undo_journal_is_small) {
+    // A stroke's undo step is its change, packed per tile in Morton order: far below 2 bytes per touched point.
+    Document doc = microDoc(4);
+    microNoise(doc.mesh, 0.003f, 30.0f); // detail under the brush (old values far from zero)
+    Symmetry sym;
+    doc.sculptor.beginStroke(doc.mesh, "Standard");
+    for (int i = 0; i < 10; ++i)
+        doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::Standard, dabAt(glm::normalize(glm::vec3(0.03f * float(i), 0.1f, 1)), 0.15f), sym);
+    UndoRecord r = doc.sculptor.endStroke();
+    CHECK(r.micro && r.micro->journal);
+    const size_t raw = r.micro->tris.size() * doc.mesh.micro->samples * 2;
+    std::printf("  micro undo journal: %zu tiles, %.1f KB (whole tiles %.1f KB)\n", r.micro->tris.size(),
+                double(r.micro->bytes()) / 1e3, double(raw) / 1e3);
+    CHECK(r.micro->bytes() * 2 < raw);
+    CHECK(std::is_sorted(r.micro->keys.begin(), r.micro->keys.end()));
+    const std::vector<int16_t> after = doc.mesh.micro->disp;
+    doc.undo.push(std::move(r));
+    doc.undo.undo(doc.mesh, doc.bvh);
+    doc.undo.redo(doc.mesh, doc.bvh);
+    CHECK(doc.mesh.micro->disp == after);
+}
+
+TEST(micro_tier_config_and_page_table) {
+    const TierConfig saved = tierConfig();
+    setTierConfig(TierConfig::laptop());
+    CHECK(tierConfig().activeTriangleBudget < TierConfig::workstation().activeTriangleBudget);
+    CHECK(!tierConfig().continuousNormals);
+    // Laptop: big levels go out of core sooner.
+    CHECK(microWantsOutOfCore(size_t(300) << 20) || std::getenv("SF_MICRO_OUT_OF_CORE"));
+    setTierConfig(saved);
+    Document doc = microDoc(2, 3000);
+    PatchPageTable pages(*doc.mesh.micro);
+    CHECK(pages.residentPatches() == doc.mesh.micro->baseTriangles); // in memory: every patch
+    MicroPatch p = microPatch(doc.mesh, 5);
+    CHECK(p.points() == doc.mesh.micro->samples && p.heights == doc.mesh.micro->disp.data() + 5 * p.points());
+    std::string err;
+    Document ooc = makeDoc(makeBenchSphere(20000));
+    CHECK(microDivide(ooc.mesh, 3, err, 1));
+    if (ooc.mesh.micro->disp.mapped()) {
+        PatchPageTable cold(*ooc.mesh.micro);
+        CHECK(cold.residentPatches() < ooc.mesh.micro->baseTriangles); // untouched: holes, not resident
+        microPatch(ooc.mesh, 7).heights[0] = 3;
+        CHECK(cold.resident(7));
+        cold.trim(1);
+        CHECK(ooc.mesh.micro->disp[7 * ooc.mesh.micro->samples] == 3); // trimmed pages come back from the file
+    }
 }

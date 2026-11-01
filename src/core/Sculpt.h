@@ -120,6 +120,9 @@ public:
 
     // Micro level timings (findMs, kernelMs, stitchMs, points) of the current stroke (core/Micro.h).
     const MicroStroke& microStroke() const { return micro_; }
+    // Move on a micro level: false (default) deforms the base cage and the detail rides along; true moves the
+    // micro displacement along its normals instead.
+    bool microMoveAlongNormals = false;
     MicroStroke& microStroke() { return micro_; }
     // Mirror sign vectors for the enabled symmetry axes (always starts with (1,1,1)).
     static std::vector<glm::vec3> mirrors(Symmetry sym);

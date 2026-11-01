@@ -10,6 +10,7 @@
 #include "core/BVH.h"
 #include "core/Multires.h"
 #include "core/ThreadPool.h"
+#include "core/TierConfig.h"
 
 #include <algorithm>
 #include <atomic>
@@ -153,6 +154,28 @@ glm::vec3 MicroTriangle::flat(uint32_t i, uint32_t j) const {
     return f;
 }
 
+MicroPatch microPatch(Mesh& m, uint32_t id) {
+    MicroMesh& mm = mutableMicro(m);
+    MicroPatch p;
+    p.id = id;
+    p.n = mm.n;
+    p.heights = mm.disp.data() + size_t(id) * mm.samples;
+    p.mask = mm.hasMask() ? mm.mask.data() + size_t(id) * mm.samples : nullptr;
+    return p;
+}
+
+bool PatchPageTable::resident(uint32_t patch) const {
+    if (!mm_.disp.mapped()) return true;
+    return mm_.disp.rangeResident(size_t(patch) * mm_.samples, mm_.samples);
+}
+
+size_t PatchPageTable::residentPatches() const {
+    if (!mm_.disp.mapped()) return mm_.baseTriangles;
+    size_t count = 0;
+    for (uint32_t t = 0; t < mm_.baseTriangles; ++t) count += resident(t);
+    return count;
+}
+
 int microLevel(const Mesh& m) { return m.micro ? m.micro->level : 0; }
 size_t microTriangleCount(const Mesh& m) { return m.micro ? m.micro->microTriangles() : 0; }
 size_t microBytes(const Mesh& m) { return m.micro ? m.micro->bytes() : 0; }
@@ -272,6 +295,7 @@ float triangleBulge(const MicroTriangle& T) {
 
 bool microWantsOutOfCore(size_t points) {
     if (const char* e = std::getenv("SF_MICRO_OUT_OF_CORE"); e && *e) return std::string(e) == "1";
+    if (const size_t limit = tierConfig().outOfCorePoints) return points > limit;
     size_t memory = 0;
 #if defined(_SC_PHYS_PAGES)
     const long pages = sysconf(_SC_PHYS_PAGES), page = sysconf(_SC_PAGESIZE);
@@ -808,7 +832,7 @@ void MicroUndo::swapWith(Mesh& m) {
     MicroMesh& mm = mutableMicro(m);
     const size_t S = samples;
     // Values kept in another step size (the range grew since): convert to the current one.
-    if (step != mm.step && step > 0.0f) {
+    if (!journal && step != mm.step && step > 0.0f) {
         const float r = step / mm.step;
         for (int16_t& v : disp) v = int16_t(std::clamp(std::lround(float(v) * r), -32767L, 32767L));
         step = mm.step;
@@ -837,6 +861,42 @@ void MicroUndo::swapWith(Mesh& m) {
                                  mm.mask.begin() + std::ptrdiff_t(size_t(tris[i]) * S));
         }, 64);
     }
+    if (journal) { // the stroke's change: subtract it (undo) or add it back (redo)
+        std::vector<int16_t> change(tris.size() * S, 0);
+        if (!microUnpackTiles(packed.data(), packed.size(), tris.size(), samples, change.data())) return;
+        poolFor(tris.size(), [&](size_t b, size_t e) { // (stored as differences to the point before, see MicroUndo)
+            const uint32_t n = mm.n;
+            for (size_t t = b; t < e; ++t) {
+                int16_t* c = change.data() + t * S;
+                uint32_t p = 0;
+                for (uint32_t j = 0; j <= n; ++j)
+                    for (uint32_t i = 0; i + j <= n; ++i, ++p) {
+                        int v;
+                        if (p == 0) v = firsts[t];
+                        else if (i > 0) v = int(c[p - 1]) + int(c[p]);
+                        else v = int(c[MicroMesh::index(0, j - 1, n)]) + int(c[p]);
+                        c[p] = int16_t(std::clamp(v, -32767, 32767));
+                    }
+            }
+        }, 256);
+        const float ratio = step / mm.step; // (the range grew since: the change in today's units)
+        const int sgn = applied ? -1 : 1;
+        poolFor(tris.size(), [&](size_t b, size_t e) {
+            for (size_t i = b; i < e; ++i) {
+                int16_t* g = mm.disp.data() + size_t(tris[i]) * S;
+                int r = 0;
+                for (size_t k = 0; k < S; ++k) {
+                    const float c = ratio == 1.0f ? float(change[i * S + k]) : float(change[i * S + k]) * ratio;
+                    const int v = std::clamp(int(g[k]) + sgn * int(std::lround(c)), -32767, 32767);
+                    g[k] = int16_t(v);
+                    r = std::max(r, std::abs(v));
+                }
+                mm.triRange[tris[i]] = uint16_t(std::max<int>(r, mm.triRange[tris[i]]));
+            }
+        }, 64);
+        applied = !applied;
+        for (uint32_t t : tris) mm.rangeMax = std::max(mm.rangeMax, mm.triRange[t]);
+    }
     if (!disp.empty()) {
         poolFor(tris.size(), [&](size_t b, size_t e) {
             for (size_t i = b; i < e; ++i) {
@@ -854,7 +914,8 @@ void MicroUndo::swapWith(Mesh& m) {
 }
 
 size_t MicroUndo::bytes() const {
-    return tris.size() * sizeof(uint32_t) + disp.size() * sizeof(int16_t) + mask.size() + (swapWhole && whole ? whole->bytes() : 0);
+    return tris.size() * sizeof(uint32_t) + keys.size() * sizeof(uint64_t) + packed.size() + firsts.size() * sizeof(int16_t) + disp.size() * sizeof(int16_t) +
+           mask.size() + (swapWhole && whole ? whole->bytes() : 0);
 }
 
 // ---------------------------------------------------------------------------

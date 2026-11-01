@@ -38,7 +38,7 @@ struct RenderSettings {
     glm::vec3 backgroundColor{0.165f, 0.165f, 0.173f};
     // Micro-displacement levels (render/MicroRenderer.h): the most triangles a frame draws for them (their level
     // of detail drops to fit; a hardware profile may set it), and the micro edge length to aim for on screen.
-    size_t renderTriangleBudget = size_t(6) << 20;
+    size_t renderTriangleBudget = 0; // 0 = TierConfig::activeTriangleBudget (core/TierConfig.h)
     float microTargetPx = 2.0f;
 };
 

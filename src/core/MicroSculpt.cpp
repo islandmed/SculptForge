@@ -14,8 +14,10 @@
 #include "core/BVH.h"
 #include "core/Sculpt.h"
 #include "core/ThreadPool.h"
+#include "core/TierConfig.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 
 namespace sf {
@@ -123,6 +125,7 @@ void MicroStroke::begin(Mesh& m) {
     grabWeight_.clear();
     grabNormal_.clear();
     baseEdge_ = mm.baseEdge;
+    mm.stroking = true;
     active_ = true;
 }
 
@@ -644,6 +647,10 @@ void MicroStroke::restore(Mesh& m) {
 
 std::unique_ptr<MicroUndo> MicroStroke::end(Mesh& m) {
     active_ = false;
+    if (m.micro) {
+        m.micro->stroking = false;
+        if (const size_t cap = tierConfig().residentPatchCacheMB) m.micro->disp.trim(cap << 20);
+    }
     grabMirrors_.clear();
     grabTris_.clear();
     grabWeight_.clear();
@@ -653,13 +660,81 @@ std::unique_ptr<MicroUndo> MicroStroke::end(Mesh& m) {
         return nullptr;
     }
     auto u = std::make_unique<MicroUndo>();
+    const MicroMesh& mm = *m.micro;
+    const size_t S = mm.samples, count = tiles_.size();
     u->step = strokeStep_;
-    u->samples = m.micro->samples;
-    u->tris = std::move(tiles_);
-    u->disp = std::move(oldDisp_);
-    if (m.micro->hasMask() && oldMask_.size() == u->tris.size() * u->samples) u->mask = std::move(oldMask_);
+    u->samples = mm.samples;
+    for (uint32_t t : tiles_) tileOf_[t] = 0;
+    // The journal: tiles in Morton order of their centres, each the stroke's change, packed.
+    AABB box;
+    for (uint32_t t : tiles_) {
+        const glm::uvec3 tr = m.triangles[t];
+        box.expand(m.positions[tr.x]);
+    }
+    const glm::vec3 lo = box.min, ext = glm::max(box.extent(), glm::vec3(1e-20f));
+    auto spread = [](uint32_t x) {
+        uint64_t v = x & 0x1FFFFF;
+        v = (v | v << 32) & 0x1F00000000FFFFull;
+        v = (v | v << 16) & 0x1F0000FF0000FFull;
+        v = (v | v << 8) & 0x100F00F00F00F00Full;
+        v = (v | v << 4) & 0x10C30C30C30C30C3ull;
+        v = (v | v << 2) & 0x1249249249249249ull;
+        return v;
+    };
+    std::vector<std::pair<uint64_t, uint32_t>> order(count);
+    for (size_t i = 0; i < count; ++i) {
+        const glm::uvec3 tr = m.triangles[tiles_[i]];
+        const glm::vec3 c = ((m.positions[tr.x] + m.positions[tr.y] + m.positions[tr.z]) / 3.0f - lo) / ext;
+        const glm::uvec3 q(glm::clamp(c, 0.0f, 1.0f) * 2097151.0f);
+        order[i] = {spread(q.x) | spread(q.y) << 1 | spread(q.z) << 2, uint32_t(i)};
+    }
+    std::sort(order.begin(), order.end());
+    std::vector<int16_t> change(count * S), firsts(count);
+    std::atomic<bool> fits{true};
+    poolFor(count, [&](size_t b, size_t e) {
+        for (size_t k = b; k < e; ++k) {
+            const size_t i = order[k].second;
+            const int16_t* now = mm.disp.data() + size_t(tiles_[i]) * S;
+            const int16_t* was = oldDisp_.data() + i * S;
+            // The change, predicted from the point before it in its row (a row's first point: from the row below;
+            // the very first is kept apart), so a smooth change needs few bits.
+            const uint32_t n = mm.n;
+            uint32_t p = 0;
+            for (uint32_t j = 0; j <= n; ++j)
+                for (uint32_t i = 0; i + j <= n; ++i, ++p) {
+                    const int d = int(now[p]) - int(was[p]);
+                    int pred = 0;
+                    if (i > 0) pred = int(now[p - 1]) - int(was[p - 1]);
+                    else if (j > 0) {
+                        const uint32_t q = MicroMesh::index(0, j - 1, n);
+                        pred = int(now[q]) - int(was[q]);
+                    }
+                    const int r = d - pred;
+                    if (r < -32767 || r > 32767) fits = false;
+                    if (p == 0) firsts[k] = int16_t(std::clamp(d, -32767, 32767)), fits = fits && d >= -32767 && d <= 32767;
+                    change[k * S + p] = p == 0 ? int16_t(0) : int16_t(r);
+                }
+        }
+    }, 256);
+    const bool masked = mm.hasMask() && oldMask_.size() == count * S;
+    if (fits) {
+        u->journal = true;
+        u->tris.resize(count);
+        u->keys.resize(count);
+        for (size_t k = 0; k < count; ++k) u->tris[k] = tiles_[order[k].second], u->keys[k] = order[k].first;
+        microPackTiles(change.data(), count, mm.samples, u->packed);
+        u->firsts = std::move(firsts);
+        if (masked) {
+            u->mask.resize(count * S);
+            for (size_t k = 0; k < count; ++k)
+                std::copy_n(oldMask_.data() + size_t(order[k].second) * S, S, u->mask.data() + k * S);
+        }
+    } else { // (a change wider than 16 bits: whole old tiles)
+        u->tris = tiles_;
+        u->disp = std::move(oldDisp_);
+        if (masked) u->mask = std::move(oldMask_);
+    }
     u->maskAdded = maskAdded_;
-    for (uint32_t t : u->tris) tileOf_[t] = 0;
     tiles_.clear();
     oldDisp_.clear();
     oldMask_.clear();

@@ -78,6 +78,7 @@ struct MicroMesh {
     std::vector<uint64_t> dirtyBits;
     bool allDirty = true;
     bool maskDirty = false; // the mask was added or removed (the renderer's shading changes everywhere)
+    bool stroking = false;  // a stroke is running (TierConfig draft normals: the renderer shades less meanwhile)
     bool rescaled = false;  // `step` grew and every value was rescaled (same surface: the renderer re-sends the values only)
     uint64_t revision = 0;  // bumped by every edit
     // Which level this is (new on Divide / load; kept by copies, which hold the same values): the renderer keeps
@@ -106,6 +107,35 @@ struct MicroMesh {
     void clearDirty();
     // Builds edgeNeighbor for `base` (if it doesn't fit already).
     void ensureTopology(const Mesh& base);
+};
+
+// --- The two-tier engine's vocabulary ---
+// BaseCage: the coarse surface the brushes for big forms (Move, transforms) deform: the SubTool's mesh, its highest
+// subdivision level. Its polygons are triangles (a quad of the cage is a triangle pair, one patch each).
+using BaseCage = Mesh;
+// MicroPatch: one base triangle's regular grid of scalar heights (n + 1)(n + 2) / 2, implicit topology (no index
+// buffer anywhere), heights 16-bit in memory and packed to their range (0-16 bits) on disk and in undo steps.
+struct MicroPatch {
+    uint32_t id = 0;   // the base triangle
+    uint32_t n = 0;    // segments per edge
+    int16_t* heights = nullptr;
+    uint8_t* mask = nullptr; // null without a mask
+    size_t points() const { return size_t(n + 1) * (n + 2) / 2; }
+};
+MicroPatch microPatch(Mesh& m, uint32_t id);
+// PatchPageTable: which patches are resident. In memory every patch is; out of core (MicroStore::mapped) a patch
+// is resident when its pages are, cold ones live in the sparse file (untouched = a hole) and come back on touch;
+// the operating system's page cache keeps the LRU order and trim() enforces TierConfig::residentPatchCacheMB.
+class PatchPageTable {
+public:
+    explicit PatchPageTable(MicroMesh& mm) : mm_(mm) {}
+    bool resident(uint32_t patch) const;
+    size_t residentPatches() const;
+    size_t residentBytes() const { return mm_.disp.residentBytes(); }
+    size_t trim(size_t maxBytes) { return mm_.disp.trim(maxBytes); }
+
+private:
+    MicroMesh& mm_;
 };
 
 // The base triangle's corners and normals, sorted by vertex index, for evaluating its grid points.
@@ -264,11 +294,22 @@ private:
 
 // One micro step: the old grid points of the base triangles a stroke touched (in units of `step`), or a whole
 // micro level swapped in or out (Divide to micro, Delete micro: `whole`, with `swapWhole`).
+//
+// Strokes keep a journal (`journal`): the touched tiles sorted by a Morton code of their centre (`keys`, so the
+// journal of a region is contiguous and can be looked up), each as the stroke's change (new - old, stored as the
+// difference to the point before it in its row, or below it for a row's first) packed with the tile codec (core/MicroStore.h): untouched points cost nothing, a smooth change a few bits
+// per point, so a typical stroke's step is tens of KB instead of 2 bytes per point. `applied`: the change is in
+// the mesh (undo subtracts it, redo adds it back).
 struct MicroUndo {
     float step = 0.0f;
     uint32_t samples = 0;
     std::vector<uint32_t> tris;
-    std::vector<int16_t> disp;
+    std::vector<int16_t> disp;       // whole-tile old values (no journal)
+    bool journal = false;
+    bool applied = true;
+    std::vector<uint64_t> keys;      // journal: Morton code of each tile's centre, ascending
+    std::vector<uint8_t> packed;     // journal: the tiles' changes (each point less its predecessor), packed
+    std::vector<int16_t> firsts;     // journal: each tile's first change
     std::vector<uint8_t> mask;
     bool maskAdded = false; // the step allocated the mask: undo frees it again (redo brings it back)
     bool swapWhole = false;
