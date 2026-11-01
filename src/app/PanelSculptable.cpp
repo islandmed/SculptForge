@@ -118,13 +118,13 @@ void App::registerSculptableUiActions() {
     };
     add("splats.make_sculptable", "Make sculptable", [this] { startSculptable(sculptable_->review ? 1 : 0); },
         [this] { return !doc_.splats.empty() && !sculptableBusy(); }, nullptr,
-        "Turn the capture into a clean, sculptable SubTool with its colours, in one go: a watertight surface (floaters "
+        "Turn the capture into a clean, sculptable Part with its colours, in one go: a watertight surface (floaters "
         "dropped, holes filled), quad topology at the chosen polygon budget with edge loops round the eyes and mouth "
-        "when it is a face, and polypaint or a texture. The splats stay (hidden). Runs in the background; Cancel stops it.",
+        "when it is a face, and vertex paint or a texture. The splats stay (hidden). Runs in the background; Cancel stops it.",
         "splat_to_mesh");
     add("splats.sculptable_finish", "Finish", [this] { startSculptable(2); },
         [this] { return sculptable_->reviewing && !sculptableBusy(); }, nullptr,
-        "QRemesh the scan along the face guides you checked, then colour it: the sculptable SubTool appears next to "
+        "Quad Remesh the scan along the face guides you checked, then colour it: the sculptable Part appears next to "
         "the scan (which is hidden).",
         nullptr);
     add("splats.sculptable_place", "Place by hand",
@@ -208,7 +208,7 @@ void App::startSculptable(int stage) {
         for (int i = 0; i < doc_.subtoolCount(); ++i)
             if (doc_.subtools[size_t(i)].id == s.scanId) index = i;
         if (index < 0) {
-            status_ = "The scan SubTool is gone; Make sculptable again";
+            status_ = "The scan Part is gone; Make sculptable again";
             s.reviewing = false;
             return;
         }
@@ -287,7 +287,7 @@ void App::pollSculptable() {
         for (int i = 0; i < doc_.subtoolCount(); ++i)
             if (doc_.subtools[size_t(i)].id == job->scanId) index = i;
         if (index < 0 || doc_.subtoolMesh(index).triangleCount() != job->scanTriangles) {
-            status_ = "Make sculptable skipped: the scan SubTool changed meanwhile";
+            status_ = "Make sculptable skipped: the scan Part changed meanwhile";
             return;
         }
         r.message = applySculptableFinish(doc_, res, index, s.keepScan);
@@ -319,7 +319,7 @@ void App::drawSculptableSection() {
 
     if (s.job) {
         ImGui::ProgressBar(s.job->progress->load(), ImVec2(half, 0), s.job->stage == 2 ? "Remeshing..." : "Working...");
-        ui::HelpText("Make sculptable", nullptr, "Working in the background; the new SubTool appears when it's done.", kPath);
+        ui::HelpText("Make sculptable", nullptr, "Working in the background; the new Part appears when it's done.", kPath);
         ImGui::SameLine();
         if (ImGui::Button("Cancel##sculptable", ImVec2(-1, 0))) s.job->cancel->store(true);
         ui::HelpText("Cancel", nullptr, "Stop Make sculptable; nothing changes.", kPath);
@@ -329,12 +329,12 @@ void App::drawSculptableSection() {
         if (ImGui::Button("Back##sculptable", ImVec2(-1, 0))) {
             s.reviewing = false;
             s.placing = -1;
-            status_ = "Review closed; the scan SubTool stays";
+            status_ = "Review closed; the scan Part stays";
         }
-        ui::HelpText("Back", nullptr, "Leave the review without remeshing (the scan SubTool stays as it is).", kPath);
+        ui::HelpText("Back", nullptr, "Leave the review without remeshing (the scan Part stays as it is).", kPath);
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
         if (s.placing >= 0) ImGui::TextWrapped("Click %s.", kLandmarkPrompts[s.placing]);
-        else if (s.landmarks.valid) ImGui::TextWrapped("Drag the dots to move the landmarks (the other side follows). The lines are the loops QRemesh will follow.");
+        else if (s.landmarks.valid) ImGui::TextWrapped("Drag the dots to move the landmarks (the other side follows). The lines are the loops Quad Remesh will follow.");
         else ImGui::TextWrapped("No face found: Place by hand, or Finish without face loops.");
         ImGui::PopStyleColor();
         ui::ActionButton(*this, "splats.sculptable_place", ImVec2(half, 0));
@@ -376,7 +376,7 @@ void App::drawSculptableSection() {
     ImGui::Checkbox("Face loops", &s.faceLoops);
     ui::HelpText("Face loops", nullptr,
                  "When the capture is a head, find the eyes, nose, mouth and chin as seen from the current view and "
-                 "give QRemesh edge loops round the eyes and mouth and along the nasolabial folds, mirrored across "
+                 "give Quad Remesh edge loops round the eyes and mouth and along the nasolabial folds, mirrored across "
                  "the face (animation topology). Turn the view to face it first.",
                  kPath);
     ImGui::SameLine();
@@ -388,8 +388,8 @@ void App::drawSculptableSection() {
                  "Stop after the scan to check the face landmarks and the loops: drag a dot to move it, or place them "
                  "by hand, then Finish.",
                  kPath);
-    ImGui::RadioButton("Polypaint##sculptcolor", &s.color, 0);
-    ui::HelpText("Polypaint", nullptr, "The capture's colours go into the vertices (polypaint): more polygons, more colour detail.", kPath);
+    ImGui::RadioButton("Vertex Paint##sculptcolor", &s.color, 0);
+    ui::HelpText("Vertex Paint", nullptr, "The capture's colours go into the vertices (vertex paint): more polygons, more colour detail.", kPath);
     ImGui::SameLine();
     ImGui::SetCursorPosX(x0 + half + style.ItemSpacing.x); // the right column, inside the section indent
     ImGui::RadioButton("Texture##sculptcolor", &s.color, 1);
@@ -399,7 +399,7 @@ void App::drawSculptableSection() {
                  kPath);
     ImGui::Checkbox("Keep scan", &s.keepScan);
     ui::HelpText("Keep scan", nullptr,
-                 "Keep the dense voxel surface as a hidden \"<name> Scan\" SubTool, to ProjectAll more detail from later.",
+                 "Keep the dense voxel surface as a hidden \"<name> Scan\" Part, to Project All more detail from later.",
                  kPath);
     ImGui::SameLine();
     ImGui::SetCursorPosX(x0 + half + style.ItemSpacing.x); // the right column, inside the section indent

@@ -214,7 +214,7 @@ void App::registerBakeUiActions() {
     };
     add("bake.run", "Bake", [this] { startBake(); }, nullptr,
         [this] { return !bake_->job && doc_.mesh.hasUvs() && (doc_.subtoolCount() > 1 || bake_->levelSource); },
-        "Bake the chosen maps from the source SubTool(s), or this Part's own top subdivision or micro level, onto its "
+        "Bake the chosen maps from the source Part(s), or this Part's own top subdivision or micro level, onto its "
         "UVs, in the background. Maps are saved as PNGs (displacement also as a 32-bit EXR, position as a 16-bit PNG) "
         "in the output folder, one set per UDIM tile when the UVs use them, and the normal map shows on the model.",
         "bake");
@@ -260,7 +260,7 @@ void App::startBake() {
         sources->push_back(std::move(high));
     } else {
         if (!doc_.mesh.hasUvs()) {
-            status_ = "Bake needs UVs on this SubTool (the low-poly): Tool > Texture Map > Auto UV";
+            status_ = "Bake needs UVs on this Part (the low-poly): Tool > Texture Map > Auto UV";
             return;
         }
         std::string source = "all";
@@ -330,7 +330,7 @@ void App::startBake() {
     b.job = std::move(job);
     status_ = b.levelSource ? "Baking " + std::to_string(st.size) + " maps from the " +
                                   (b.levelSource == 1 ? "top subdivision level" : "micro level") + "..."
-                            : "Baking " + std::to_string(st.size) + " maps from " + std::to_string(idx.size()) + " SubTool" +
+                            : "Baking " + std::to_string(st.size) + " maps from " + std::to_string(idx.size()) + " Part" +
                                   (idx.size() == 1 ? "" : "s") + "...";
 }
 
@@ -379,12 +379,12 @@ void App::drawBakeContents() {
         ImGui::TextDisabled("Onto %s (%zu tris, UVs)", doc_.activeSubtoolInfo().name.c_str(), m.triangleCount());
     }
     ui::HelpText("Low-poly", nullptr,
-                 "Maps are baked onto the active SubTool's UVs: make the low-poly active (it needs UVs from import or "
-                 "from Auto UV in Tool > Texture Map), and keep the high-poly SubTool(s) visible.",
+                 "Maps are baked onto the active Part's UVs: make the low-poly active (it needs UVs from import or "
+                 "from Auto UV in Tool > Texture Map), and keep the high-poly Part(s) visible.",
                  kPath);
 
     // Source.
-    std::string current = "All visible SubTools";
+    std::string current = "All visible Parts";
     bool found = false;
     for (int i = 0; i < doc_.subtoolCount(); ++i)
         if (b.source && doc_.subtools[size_t(i)].id == b.source && i != doc_.activeSubtool) {
@@ -404,7 +404,7 @@ void App::drawBakeContents() {
     if (ImGui::BeginCombo("##bakesource", current.c_str())) {
         if (hasLevels && ImGui::Selectable("Own top subdivision level##level", b.levelSource == 1)) b.levelSource = 1, b.source = 0;
         if (hasMicroLevel && ImGui::Selectable("Own micro level##micro", b.levelSource == 2)) b.levelSource = 2, b.source = 0;
-        if (ImGui::Selectable("All visible SubTools", b.source == 0 && !b.levelSource)) b.source = 0, b.levelSource = 0;
+        if (ImGui::Selectable("All visible Parts", b.source == 0 && !b.levelSource)) b.source = 0, b.levelSource = 0;
         for (int i = 0; i < doc_.subtoolCount(); ++i) {
             if (i == doc_.activeSubtool) continue;
             const SubTool& st = doc_.subtools[size_t(i)];
@@ -415,7 +415,7 @@ void App::drawBakeContents() {
         ImGui::EndCombo();
     }
     ui::HelpText("Source", nullptr,
-                 "The high-poly to bake from: one SubTool, or every visible SubTool except the active one (the low-poly), "
+                 "The high-poly to bake from: one Part, or every visible Part except the active one (the low-poly), "
                  "or this Part's own top subdivision level baked onto its lowest level, or its micro level baked onto its "
                  "base. Hidden faces of the source are ignored. UVs outside 0..1 bake as UDIM tiles (name.1001.png, ...).",
                  kPath);
@@ -429,14 +429,14 @@ void App::drawBakeContents() {
         "reported when the bake finishes) and a 32-bit EXR in world units.",
         "Ambient occlusion: how much of the sky each point of the high-poly sees. Darker in creases and folds.",
         "Cavity: the high-poly's fine surface curvature. Mid-grey on smooth surfaces, dark in cracks, light on ridges.",
-        "Colour transfer: the source's polypaint, or its painted texture.",
+        "Colour transfer: the source's vertex paint, or its painted texture.",
         "Curvature: the high-poly's surface bend at the radius below: mid-grey flat, bright on convex edges, dark in "
         "concave ones. Drives edge wear.",
         "Thickness: how far rays travel through the high-poly before leaving it. Dark where it is thin (ears, fins, "
         "edges). Drives subsurface and translucency.",
         "Position: each point's place in the bounding box as colour, 16-bit. Drives gradients and noise that ignore "
         "UV seams.",
-        "ID: a flat colour per polygroup of the high-poly, for selecting areas in other programs.",
+        "ID: a flat colour per face group of the high-poly, for selecting areas in other programs.",
     };
     for (int i = 0; i < kBakeMapCount; ++i) {
         if (i % 2) {
@@ -520,7 +520,7 @@ void App::drawBakeContents() {
                                                                        : "Output folder (default: last export's)",
                              b.folder, sizeof b.folder);
     ui::HelpText("Output folder", nullptr,
-                 "Where the maps are written, as <SubTool>_normal.png, _ao.png, _displacement.png (+ .exr) and so on. "
+                 "Where the maps are written, as <Part>_normal.png, _ao.png, _displacement.png (+ .exr) and so on. "
                  "Empty: beside your last export, else the project's folder, else Bakes in your library folder.",
                  kPath);
     ImGui::SameLine();

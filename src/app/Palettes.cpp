@@ -33,13 +33,13 @@ const PaletteDef* palettes(int& count) {
     static const PaletteDef kPalettes[] = {
         {"alpha", "Alpha", ICON_LC_CIRCLE_DASHED, nullptr, &App::drawPalette_Alpha},
         {"brush", "Brush", ICON_LC_BRUSH, nullptr, &App::drawPalette_Brush},
-        {"color", "Color", ICON_LC_PALETTE, "Polypaint & Materials", &App::drawPalette_Color},
+        {"color", "Color", ICON_LC_PALETTE, "Vertex Paint & Materials", &App::drawPalette_Color},
         {"draw", "Draw", ICON_LC_PENCIL, nullptr, &App::drawPalette_Draw},
         {"edit", "Edit", ICON_LC_UNDO_2, nullptr, &App::drawPalette_Edit},
         {"file", "File", ICON_LC_FILE, nullptr, &App::drawPalette_File},
         {"generate", "Generate", ICON_LC_WAND_SPARKLES, nullptr, &App::drawPalette_Generate},
         {"help", "Help", ICON_LC_CIRCLE_HELP, nullptr, &App::drawPalette_Help},
-        {"material", "Material", ICON_LC_SUN, "Polypaint & Materials", &App::drawPalette_Material},
+        {"material", "Material", ICON_LC_SUN, "Vertex Paint & Materials", &App::drawPalette_Material},
         {"preferences", "Preferences", ICON_LC_SETTINGS, nullptr, &App::drawPalette_Preferences},
         {"render", "Render", ICON_LC_EYE, nullptr, &App::drawPalette_Render},
         {"script", "Script", ICON_LC_SQUARE_TERMINAL, nullptr, &App::drawPalette_Script},
@@ -274,8 +274,8 @@ void App::drawPalette_Draw() {
     ui::HelpText("RGB Intensity", "I", "How strongly painting colours the surface (1-100); Ctrl+click to type.", "Draw");
     ImGui::SetNextItemWidth(-1);
     float focal = focalShift_ * 100.0f;
-    if (ui::SliderInside("##focalshift", &focal, -100.0f, 100.0f, "Focal Shift %.0f")) focalShift_ = focal / 100.0f;
-    ui::HelpText("Focal Shift", "O",
+    if (ui::SliderInside("##focalshift", &focal, -100.0f, 100.0f, "Falloff %.0f")) focalShift_ = focal / 100.0f;
+    ui::HelpText("Falloff", "O",
                  "The brush falloff: below 0 a broad, hard tip, above 0 a soft point. The brush cursor's inner ring shows "
                  "where the brush works at half strength.",
                  "Draw");
@@ -292,11 +292,11 @@ void App::drawPalette_Draw() {
     if (ui::Checkbox("Constant detail", &uiPrefs_.dyntopoConstantDetail))
         doc_.sculptor.dyntopo.constantDetail = uiPrefs_.dyntopoConstantDetail;
     ui::HelpText("Constant detail", nullptr,
-                 "Off (the default): the triangle size follows the brush size on screen, as in Sculptris Pro. On: one "
+                 "Off (the default): the triangle size follows the brush size on screen, as in Dynamic Topology. On: one "
                  "size for the whole mesh, set by Detail. A preference (Store Config keeps it).",
                  "Draw > Dynamic topology");
     if (doc_.sculptor.dyntopo.enabled && !dyntopoBlocker(doc_.mesh).empty())
-        hint(*this, "This SubTool has subdivision levels, so strokes don't remesh it: delete the lower (or higher) levels "
+        hint(*this, "This Part has subdivision levels, so strokes don't remesh it: delete the lower (or higher) levels "
              "first.");
     // Focal length (#26): the perspective view's lens in mm on a 36 x 24 mm frame (vertical field of view);
     // saved with the project as the camera's fov_y.
@@ -459,7 +459,7 @@ void App::drawPalette_Preferences() {
         tray::Section section;
         drawBackgroundControls("prefs");
     }
-    if (subpalette("preferences.lightbox", "LightBox")) {
+    if (subpalette("preferences.lightbox", "Library")) {
         tray::Section section;
         config::drawLightBoxSection(*this);
     }
@@ -495,11 +495,11 @@ void App::drawPalette_Render() {
     ui::HelpAction(*this, "view.wireframe");
     ImGui::Checkbox(tr("Show Mesh"), &renderSettings_.showMesh);
     ui::HelpAction(*this, "view.mesh");
-    ImGui::Checkbox(tr("Show Polypaint"), &renderSettings_.showPolypaint);
+    ImGui::Checkbox(tr("Show Vertex Paint"), &renderSettings_.showPolypaint);
     ui::HelpAction(*this, "view.polypaint");
     ImGui::Checkbox(tr("Show Mask"), &renderSettings_.showMask);
     ui::HelpAction(*this, "view.mask");
-    ImGui::Checkbox(tr("Show Polygroups##render"), &renderSettings_.showPolygroups);
+    ImGui::Checkbox(tr("Show Face Groups##render"), &renderSettings_.showPolygroups);
     ui::HelpAction(*this, "view.polygroups");
     ImGui::BeginDisabled(doc_.splats.empty());
     ImGui::Checkbox(tr("Show Splats"), &renderSettings_.showSplats);
@@ -540,7 +540,7 @@ void App::drawPalette_Tool() {
         actionRow(*this, {"file.open", "file.save", "file.import"});
         ImGui::Dummy(ImVec2(0, 2.0f * s));
     }
-    if (subpalette("tool.subtool", "SubTool")) {
+    if (subpalette("tool.subtool", "Parts")) {
         tray::Section section;
         Demo::pushScope("SubTools");
         drawSubToolsContents();
@@ -550,7 +550,7 @@ void App::drawPalette_Tool() {
         drawProjectContents(); // ProjectAll (PanelRetopo.cpp)
         Demo::popScope();
     }
-    if (subpalette("tool.zspheres", "ZSpheres")) {
+    if (subpalette("tool.zspheres", "Forge Spheres")) {
         tray::Section section;
         Demo::pushScope("ZSpheres");
         drawZSpheresContents(); // PanelZSpheres.cpp
@@ -627,7 +627,7 @@ void App::drawPalette_Tool() {
             ImGui::ProgressBar(voxelRemesh_->progress->load(), ImVec2(half, 0), "Remeshing...");
             ui::HelpText("Voxel Remesh", nullptr,
                          "Remeshing and keeping the texture in the background (Auto UV of the new surface, then the "
-                         "texture projected onto it). The result replaces the SubTool when it's done.",
+                         "texture projected onto it). The result replaces the Part when it's done.",
                          "Tool > Remesh");
         } else {
             ui::ActionButton(*this, "geometry.remesh", ImVec2(half, 0));
@@ -640,7 +640,7 @@ void App::drawPalette_Tool() {
                      "Tool > Remesh");
         if (voxelRemesh_) {
             if (ImGui::Button(tr("Cancel##voxelremesh"), ImVec2(half, 0))) voxelRemesh_->cancel->store(true);
-            ui::HelpText("Cancel", nullptr, "Stop the remesh; the SubTool stays as it is.", "Tool > Remesh");
+            ui::HelpText("Cancel", nullptr, "Stop the remesh; the Part stays as it is.", "Tool > Remesh");
         } else {
             ImGui::Checkbox(tr("Keep Masked##remesh"), &voxelKeepMasked_);
             ui::HelpText("Keep Masked", nullptr, kKeepMaskedHelp, "Tool > Remesh");
@@ -660,13 +660,17 @@ void App::drawPalette_Tool() {
         tray::Section section;
         drawMaskingSection();
     }
-    if (subpalette("tool.polygroups", "Polygroups")) {
+    if (subpalette("tool.polygroups", "Face Groups")) {
         tray::Section section;
         drawPolygroupsSection();
     }
     if (subpalette("tool.visibility", "Visibility")) {
         tray::Section section;
         drawVisibilitySection();
+    }
+    if (subpalette("tool.selection_sets", "Selection Sets")) {
+        tray::Section section;
+        drawSelectionSetsSection();
     }
     if (subpalette("tool.export", "Export")) {
         tray::Section section;
@@ -690,12 +694,27 @@ void App::drawPalette_Tool() {
     }
 }
 
+// Radial symmetry (#63): the toggle with Local, then the count and the axis.
+void App::drawRadialSymmetryControls() {
+    segmented(*this, {"transform.symmetry_radial", "transform.symmetry_local"});
+    ImGui::BeginDisabled(!symmetry_.radialEnabled);
+    ImGui::SetNextItemWidth(-FLT_MIN);
+    tray::SliderInt("##radialcount", &symmetry_.radial, 2, Symmetry::kMaxRadial, tr("Radial Count %d"));
+    ui::HelpText("Radial Count", nullptr,
+                 "How many copies radial symmetry makes of every stroke, turned evenly around the axis (2 to 64). With "
+                 "X, Y or Z on too, each mirror image gets its copies.",
+                 "Transform > Symmetry");
+    segmented(*this, {"transform.radial_axis_x", "transform.radial_axis_y", "transform.radial_axis_z"});
+    ImGui::EndDisabled();
+}
+
 void App::drawPalette_Transform() {
     const tray::Style style; // quiet check marks
-    ImGui::TextDisabled("%s", tr("Gizmo 3D"));
+    ImGui::TextDisabled("%s", tr("Gizmo"));
     drawGizmoContents(false);
     ImGui::TextDisabled("%s", tr("Symmetry"));
     segmented(*this, {"transform.symmetry_x", "transform.symmetry_y", "transform.symmetry_z"});
+    drawRadialSymmetryControls();
     actionRow(*this, {"view.frame", "subtool.solo"});
     actionRow(*this, {"view.polyf"});
 }

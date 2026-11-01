@@ -4,6 +4,7 @@
 #include "core/LayerStack.h"
 #include "app/ShellQuote.h"
 #include "app/SpaceCamera.h"
+#include "app/AirStroke.h"
 #include "app/AsyncStroke.h"
 #include "app/Calibration.h"
 #include "app/CrashLog.h"
@@ -399,6 +400,7 @@ int App::runUiTest(int w, int h, int fps) {
         pollMaya(); // (tests and recordings never read the user's Maya folder: maya.json isn't loaded)
         pollPhone();
         pollAutoUv();
+        pollUvEditor();
         pollBake();
         pollQRemesh();
         pollSplatTrain();
@@ -569,6 +571,7 @@ int App::runRecording() {
         pollBrushRequest();
         pollUnreal();
         pollAutoUv();
+        pollUvEditor();
         pollBake();
         pollQRemesh();
         pollSplatTrain();
@@ -646,7 +649,7 @@ bool App::backgroundBusy() const {
     auto running = [](const auto& f) { return f.valid() && f.wait_for(std::chrono::seconds(0)) != std::future_status::ready; };
     return running(pendingBrush_) || running(pendingGenerator_) || running(pendingModels_) || running(pendingUnreal_) ||
            running(pendingComfyCheck_) || galleryBusy() || thumbs_.busy() || libraryScanner_.busy() || autoUv_ ||
-           bakeBusy() || qremesh_ || voxelRemesh_ || updateJob_ || splatTrainBusy() || sculptableBusy() || phoneBusy() ||
+           bakeBusy() || qremesh_ || voxelRemesh_ || updateJob_ || splatTrainBusy() || sculptableBusy() || phoneBusy() || uvEditorBusy() ||
            supportCardLoading() || renderer_.environmentPending() || meshMapsBusy();
 }
 
@@ -816,8 +819,7 @@ int App::run() {
             strokeRadiusProbe_ = &sm.radii;
             if (options_.measureStrokeRadius > 0.0f) radiusPx_ = std::clamp(options_.measureStrokeRadius, 2.0f, 800.0f);
             if (const char* b = std::getenv("SF_MEASURE_BRUSH")) // e.g. KelvinGrab: measure another built-in brush
-                for (int i = 0; i < int(BrushType::Count); ++i)
-                    if (SDL_strcasecmp(brushName(BrushType(i)), b) == 0) brush_ = BrushType(i), doc_.activeBrush = -1;
+                if (BrushType t; brushFromName(b, t)) brush_ = t, doc_.activeBrush = -1;
             if (verify) sm.before = meshStateHash(doc_.mesh);
             onMouseDown(sm.cx + sm.r, sm.cy, SDL_BUTTON_LEFT);
             if (drag_ != Drag::Stroke) {
@@ -921,6 +923,8 @@ int App::run() {
             pollMaya();
             pollPhone();
             pollAutoUv();
+            pollUvEditor();
+        pollUvEditor();
             pollBake();
             pollQRemesh();
             pollSplatTrain();
@@ -1196,6 +1200,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         if (polygroupMouseDown(x, y, mod)) return;
         if (maskSelectMouseDown(x, y, mod)) return;
         if (gizmoMouseDown(x, y, mod)) return; // Gizmo 3D handles, pivot clicks (Gizmo.cpp)
+        if (uvToolMouseDown(x, y, mod)) return; // the UV Editor's Seam / Select in 3D tool (PanelUvEditor.cpp)
         if (guideMouseDown(x, y, mod)) return; // the QRemesh Guides brush (PanelRetopo.cpp)
         if (faceMouseDown(x, y, mod)) return;  // placing facial landmarks (PanelFace.cpp)
         if (sculptableMouseDown(x, y)) return; // Make sculptable: landmarks, crop box (PanelSculptable.cpp)
@@ -1240,6 +1245,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         if (previewLod_ < 0 && pick(x, y, hit)) {
             if (maskMod) beginMaskStroke(x, y);
             else beginStroke(x, y, hit);
+        } else if (airStrokeMouseDown(x, y, mod)) { // Start strokes off the model (#62, Input.cpp)
         } else if (blenderStyle()) {
             // Blender: a drag beside the model navigates as the middle button would (Shift pans, Ctrl zooms).
             const SDL_Keymod keys = SDL_GetModState();
@@ -1337,9 +1343,11 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     case Drag::Select: selectionMove(x, y); break;
     case Drag::Gizmo: gizmoDragTo(x, y); break;
     case Drag::Guide: guideDragTo(x, y); break;
+    case Drag::UvTool: uvToolDragTo(x, y); break;
     case Drag::Sculptable: sculptableMouseMove(x, y); break;
     case Drag::Capture: captureMouseMove(x, y); break;
     case Drag::ZSphere: zsphereDragTo(x, y); break;
+    case Drag::AirStroke: airStrokeTo(x, y); break;
     case Drag::None: break;
     }
 }
@@ -1387,13 +1395,13 @@ void App::onMouseUp() {
         const float px = std::max(insertPx_, 12.0f * uiScale_);
         const float dist = glm::length(camera_.position() - insertAt_);
         const float worldPerPx = 2.0f * dist * std::tan(camera_.fovY * 0.5f) / std::max(canvasRect().h, 1.0f);
-        const std::string symmetry = std::string(symmetry_.x ? "x" : "") + (symmetry_.y ? "y" : "") + (symmetry_.z ? "z" : "");
-        Args args{{"symmetry", symmetry}, {"x", double(insertAt_.x)}, {"y", double(insertAt_.y)},
+        Args args{{"x", double(insertAt_.x)}, {"y", double(insertAt_.y)},
                   {"z", double(insertAt_.z)}, {"nx", double(insertNormal_.x)},
                   {"ny", double(insertNormal_.y)}, {"nz", double(insertNormal_.z)},
                   {"size", double(2.0f * px * worldPerPx)},
                   // the drag's direction on screen turns it about the normal
                   {"twist", insertPx_ > 4.0f ? double(glm::degrees(std::atan2(mouseY_ - insertY_, mouseX_ - insertX_))) : 0.0}};
+        args = withSymmetryArgs(std::move(args));
         if (insertType_ == "mesh") { // your own mesh: a SubTool's copy or a file (insert_mesh)
             args[insertMeshKey_] = insertMeshValue_;
             runCommand("insert_mesh", args);
@@ -1412,9 +1420,11 @@ void App::onMouseUp() {
     if (drag_ == Drag::MaskCanvas) maskCanvasRelease();
     if (drag_ == Drag::SubToolClick) subtoolClickRelease();
     if (drag_ == Drag::Guide) guideRelease();
+    if (drag_ == Drag::UvTool) uvToolRelease();
     if (drag_ == Drag::Sculptable) sculptableMouseUp();
     if (drag_ == Drag::Capture) captureMouseUp();
     if (drag_ == Drag::ZSphere) zsphereRelease();
+    if (drag_ == Drag::AirStroke) airStrokeRelease();
     gizmoRelease();
     drag_ = Drag::None;
     dragFromPen_ = false;
@@ -1432,6 +1442,7 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
         return;
     }
     if (captureShortcutKey(key, mod)) return; // Ctrl+Alt+click a button, then press its new key
+    if (uvEditorKey(key, mod)) return;        // keys over the UV Editor's view (PanelUvEditor.cpp)
     if (key == SDLK_ESCAPE && capture_.armed) { // Capture from view waiting for its square (PanelKelvinlet.cpp)
         capture_.armed = false;
         status_ = "Capture cancelled";
@@ -1452,6 +1463,7 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
 // ---------------------------------------------------------------------------
 
 void App::beginStroke(float x, float y, const RayHit& hit) {
+    refreshSymmetryPivot(); // (local symmetry: the active Part's centre as the stroke starts)
     strokeBrush_ = activeBrush();
     straight_ = {};
     straight_.shiftAtStart = (inputMods() & SDL_KMOD_SHIFT) != 0;
@@ -1464,7 +1476,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     haveLastDab_ = false;
     doc_.sculptor.draftStrokes = draftStrokes() && asyncStrokeAllowed(); // (AsyncStroke.cpp)
     if (!doc_.sculptor.beginStroke(doc_.mesh,
-                                   !strokeSculpt_ ? std::string("Paint") : recipe ? recipe->name : brushName(strokeBrush_),
+                                   !strokeSculpt_ ? std::string("Paint") : recipe ? recipe->name : brushLabel(strokeBrush_),
                                    strokeSculpt_ ? doc_.activeLayer : -1)) {
         status_ = "Active layer weight is 0 - raise it to sculpt into the layer";
         drag_ = Drag::Orbit;
@@ -1478,7 +1490,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     if (!lods_.empty() || previewLod_ >= 0) clearLods();
     beginPaintStroke();
     if (doc_.sculptor.dyntopo.enabled && strokeSculpt_ && !dyntopoBlocker(doc_.mesh).empty())
-        status_ = "Dynamic is on, but this SubTool has subdivision levels: sculpting without remeshing";
+        status_ = "Dynamic is on, but this Part has subdivision levels: sculpting without remeshing";
     lastX_ = x;
     lastY_ = y;
     strokePath_.reset(x, y);
@@ -1756,6 +1768,7 @@ void App::runCommand(const std::string& name, const Args& args) {
     crashlog::action(name); // (failures reach the log through SDL_Log below)
     CommandResult r = commands_.execute(doc_, name, args);
     status_ = r.message;
+    if (name.rfind("uv_", 0) == 0 || name == "texture_create" || name == "texture_delete") uvEditorChanged();
     lastCommandOk_ = r.ok;
     if (r.ok && name != "export_glb" && name != "export_lods" && name != "export_usd" && name != "export_fbx" &&
         name != "export_unreal" && name.rfind("unreal_", 0) != 0 && name != "save_obj" && name != "save_project" &&
@@ -1816,7 +1829,7 @@ void App::queueFile(FileAction action, std::string path) {
 }
 
 void App::loadMatcapDialog() {
-    static const SDL_DialogFileFilter kMatcapFilters[] = {{"MatCap images", "png;jpg;jpeg;exr"}, {"All files", "*"}};
+    static const SDL_DialogFileFilter kMatcapFilters[] = {{"Lit Sphere images", "png;jpg;jpeg;exr"}, {"All files", "*"}};
     const std::string folder = matcapFolder();
     SDL_ShowOpenFileDialog(onFileChosen, &dialogRequests_[int(FileAction::LoadMatcap)], window_, kMatcapFilters, 2,
                            folder.empty() ? nullptr : folder.c_str(), false);
@@ -1963,8 +1976,9 @@ void App::syncScene() {
         // Solo channel view (channel_view): the texture's shown texels follow before the renderer uploads them.
         if (mesh->texture) syncChannelView(*mesh->texture, doc_.channelView);
         const bool flat = s.shading == Shading::Flat || (s.shading == Shading::Default && renderSettings_.flatShading);
-        scene.push_back({s.id, mesh, active, s.visible, bakeNormalMap(s.id, *mesh), renderSettings_.wireframe, flat,
-                         renderSettings_.pbr()});
+        scene.push_back({s.id, mesh, active, s.visible, bakeNormalMap(s.id, *mesh), renderSettings_.wireframe, flat});
+        scene.back().pbr = renderSettings_.pbr();
+        if (active && &shown == &doc_.mesh) scene.back().overlay = uvEditorOverlay(s.id); // the UV Editor's colours
     }
     renderer_.syncScene(scene);
     renderer_.syncSplats(doc_.splats, doc_.splatsVersion);
@@ -2034,6 +2048,7 @@ void App::drawUi() {
     drawBrushGallery();
     if (showImageTo3D_) drawImageTo3D();
     drawPhoneWindow(); // File > Capture from phone (PanelPhone.cpp)
+    drawUvEditor();    // Tool > Texture Map > UV Editor (PanelUvEditor.cpp)
     drawTimelineUi();  // the Sculpt Timeline strip, timelapse, proof mode HUD (PanelTimeline.cpp, ProofMode.cpp)
     pollAlphaFile();
     pollVdm();
@@ -2048,19 +2063,22 @@ void App::drawUi() {
     const ImVec2 mouse(mouseX_, mouseY_);
     drawGizmo(); // Gizmo 3D handles and panel (Gizmo.cpp)
     drawQRemeshGuides(); // QRemesh Guides curves (PanelRetopo.cpp)
+    drawUvEditorOverlay(); // UV seams on the model, the Seam tool's cursor (PanelUvEditor.cpp)
     drawZSphereOverlay(); // the sphere under the cursor (PanelZSpheres.cpp)
     drawFaceOverlay();   // facial landmarks (PanelFace.cpp)
     drawSplatTrainOverlay(); // splat training progress (PanelSplatTrain.cpp)
     drawSculptableOverlay(); // Make sculptable: crop box, face landmarks (PanelSculptable.cpp)
     drawCaptureOverlay();    // Capture from view: the square, the result window (PanelKelvinlet.cpp)
     if (uiPrefs_.showAxes) drawAxisGizmo(); // X / Y / Z in the canvas corner (#31)
+    drawAirStrokeIndicator(); // Start strokes off the model is on (#62, Input.cpp)
     if (drag_ == Drag::Insert) { // the size the insert will get
         insertPx_ = std::hypot(mouse.x - insertX_, mouse.y - insertY_);
         ImGui::GetForegroundDrawList()->AddCircle(ImVec2(insertX_, insertY_), std::max(insertPx_, 12.0f * uiScale_),
                                                   theme::u32(theme::accent), 48, 2.0f * uiScale_);
     }
     // In Gizmo mode (and with the QRemesh Guides brush) the brush ring shows only while Ctrl masks or Shift smooths.
-    const bool ringOff = gizmoActive() || (guidesMode_ && !(inputMods() & SDL_KMOD_SHIFT)) || sculptableHot() || zsphereActive();
+    const bool ringOff = gizmoActive() || (guidesMode_ && !(inputMods() & SDL_KMOD_SHIFT)) || sculptableHot() || zsphereActive() ||
+                         uvToolActive();
     if (((!ImGui::GetIO().WantCaptureMouse && canvasRect().contains(mouse.x, mouse.y)) || drag_ == Drag::Stroke) &&
         !hideBrushCursor_ && radial_.menu < 0 && drag_ != Drag::Select && drag_ != Drag::Guide && // (no ring under a pie)
         (!ringOff || drag_ == Drag::Stroke || ctrlDown(inputMods())))
@@ -2081,7 +2099,7 @@ void App::drawUi() {
                                "version 3 or later. It comes with ABSOLUTELY NO WARRANTY.");
             ImGui::Spacing();
             ImGui::TextWrapped("Built with SDL 3 (zlib), Dear ImGui (MIT), GLM (MIT), stb (MIT/public domain), ufbx "
-                               "(MIT/public domain), xatlas (MIT), MikkTSpace (zlib) and the Inter typeface (SIL OFL 1.1). QRemesh follows Instant Meshes "
+                               "(MIT/public domain), xatlas (MIT), MikkTSpace (zlib) and the Inter typeface (SIL OFL 1.1). Quad Remesh follows Instant Meshes "
                                "(BSD-3-Clause). The phone link uses QR Code generator (MIT), libdatachannel and libjuice (MPL-2.0), usrsctp "
                                "(BSD-3-Clause) and Mbed TLS (Apache-2.0). Uses libcurl (curl license) "
                                "where available.");
@@ -2843,6 +2861,7 @@ void App::drawImageTo3D() {
                 if (ImGui::Selectable(p.label, aiSettings_.hfModel == p.id)) aiSettings_.hfModel = p.id;
             ImGui::EndCombo();
         }
+        if (ai::hunyuanModel(aiSettings_.hfModel)) hint(ai::kHunyuanLicenceNote);
         ImGui::InputText("HF token", hfToken_, sizeof hfToken_, ImGuiInputTextFlags_Password);
         hint(hfToken_[0] || std::getenv("HF_TOKEN")
                  ? "Runs on Hugging Face's shared GPUs with your account's free daily allowance."
@@ -2860,6 +2879,7 @@ void App::drawImageTo3D() {
             ImGui::EndCombo();
         }
         ImGui::InputText("Model id", falModel_, sizeof falModel_);
+        if (ai::hunyuanModel(falModel_)) hint(ai::kHunyuanLicenceNote);
         ImGui::InputText("API key", falKey_, sizeof falKey_, ImGuiInputTextFlags_Password);
         if (!falKey_[0]) hint(std::getenv("FAL_KEY") ? "Using FAL_KEY from the environment." : "Get a key at fal.ai/dashboard/keys");
     } else if (serviceId == "meshy") {
@@ -3010,12 +3030,14 @@ bool App::drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col) {
     };
     const ImU32 inner = IM_COL32(255, 255, 255, 90);
     // Closed polyline through the points facing the camera; a point on the far side of a curve breaks the line.
-    auto drawRing = [&](const std::vector<SurfaceRingPoint>& ring, const glm::vec3& m, ImU32 colour, float width) {
+    auto drawRing = [&](const std::vector<SurfaceRingPoint>& ring, const SymCopy& m, ImU32 colour, float width) {
         const size_t count = std::min<size_t>(ring.size(), 64);
         ImVec2 sp[64];
         bool ok[64];
-        for (size_t i = 0; i < count; ++i)
-            ok[i] = facing(ring[i].position * m, ring[i].normal * m) && gizmoProject(ring[i].position * m, sp[i]);
+        for (size_t i = 0; i < count; ++i) {
+            const glm::vec3 q = m.point(ring[i].position);
+            ok[i] = facing(q, m.dir(ring[i].normal)) && gizmoProject(q, sp[i]);
+        }
         for (size_t i = 0; i < count; ++i) {
             const size_t j = (i + 1) % count;
             if (ok[i] && ok[j]) dl->AddLine(sp[i], sp[j], colour, width);
@@ -3025,14 +3047,18 @@ bool App::drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col) {
         const ImU32 a = ImU32(float((colour >> IM_COL32_A_SHIFT) & 0xFF) * k);
         return (colour & ~IM_COL32_A_MASK) | (a << IM_COL32_A_SHIFT);
     };
-    // The mirrored rings first (fainter), as the brush mirrors its dabs (Sculptor::mirrors; the first is this one).
-    const std::vector<glm::vec3> mirrors = Sculptor::mirrors(symmetry_);
+    // The mirrored and radial rings first (fainter), as the brush copies its dabs (Sculptor::copies; the first is
+    // this one): every copy's cursor shows.
+    refreshSymmetryPivot();
+    const std::vector<SymCopy> mirrors = Sculptor::copies(symmetry_);
+    symmetryCopiesDrawn_ = 0;
     for (size_t k = mirrors.size(); k-- > 0;) {
-        const glm::vec3& m = mirrors[k];
+        const SymCopy& m = mirrors[k];
         const bool self = k == 0;
-        // A mirror that lands on the cursor's own ring (hovering on the plane) adds nothing.
-        if (!self && glm::length(hit.position * m - hit.position) < radius * 0.05f) continue;
-        if (!self && !facing(hit.position * m, n * m)) continue;
+        // A copy that lands on the cursor's own ring (hovering on the plane or the axis) adds nothing.
+        if (!self && glm::length(m.point(hit.position) - hit.position) < radius * 0.05f) continue;
+        if (!self && !facing(m.point(hit.position), m.dir(n))) continue;
+        ++symmetryCopiesDrawn_;
         drawRing(cursorRing_, m, self ? col : fade(col, 0.45f), self ? 2.0f : 1.25f);
         drawRing(cursorInner_, m, self ? inner : fade(inner, 0.6f), 1.0f);
     }
@@ -3046,10 +3072,11 @@ bool App::drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col) {
 }
 
 std::array<AxisGizmoEnd, 6> App::axisGizmoLayout() const {
-    // Top left of the canvas: the timeline strip is at the bottom.
+    // Top left of the canvas, below the timeline strip when that is at the top (timelineTopInset_).
     const CanvasRect canvas = canvasRect();
     const float s = 34.0f * uiScale_;
-    return axisGizmoEnds(glm::mat3(camera_.view()), glm::vec2(canvas.x + s + 18.0f * uiScale_, canvas.y + s + 18.0f * uiScale_), s);
+    return axisGizmoEnds(glm::mat3(camera_.view()),
+                         glm::vec2(canvas.x + s + 18.0f * uiScale_, canvas.y + timelineTopInset_ + s + 18.0f * uiScale_), s);
 }
 
 bool App::axisGizmoMouseDown(float x, float y) {

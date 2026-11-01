@@ -506,7 +506,7 @@ void App::drawCaptureWindow() {
         doc_.activeBrush = -1;
         paintMode_ = false;
     }
-    ui::HelpText("Use as VDM", nullptr, "Make the capture the VDM brush's map and pick the VDM brush (DragRect stamps it).", help);
+    ui::HelpText("Use as VDM", nullptr, "Make the capture the VDM brush's map and pick the VDM brush (Drag Stamp stamps it).", help);
     if (ImGui::Button("Detail Clone##capture", ImVec2(w2, 0))) {
         Args a = args();
         a["save"] = false;
@@ -532,11 +532,11 @@ void App::drawCaptureWindow() {
             runCommand("capture_alpha", b);
             libraryScanner_.invalidate();
         }
-        status_ = "Saved '" + name + "' to your library (LightBox > Alpha, and the VDM picker)";
+        status_ = "Saved '" + name + "' to your library (Library > Alpha, and the VDM picker)";
     }
     ui::HelpText("Save to Library", nullptr,
-                 "Keep both: the alpha as a PNG in your LightBox Alphas folder, the VDM in your brush library (Alpha "
-                 "picker, Brush > Vector Displacement and the LightBox's Brush tab), with thumbnails.",
+                 "Keep both: the alpha as a PNG in your Library Alphas folder, the VDM in your brush library (Alpha "
+                 "picker, Brush > Vector Displacement and the Library's Brush tab), with thumbnails.",
                  help);
     ImGui::EndDisabled();
     if (ImGui::Button("Capture again##capture", ImVec2(-1, 0))) {

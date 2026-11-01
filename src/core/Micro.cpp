@@ -315,7 +315,7 @@ bool microDivide(Mesh& m, int level, std::string& error, int outOfCore) {
         return false;
     }
     if (m.micro) {
-        error = "This SubTool already has a micro level (Delete micro or Bake it first)";
+        error = "This Part already has a micro level (Delete micro or Bake it first)";
         return false;
     }
     if (subdivLevelCount(m) > 0 && subdivCurrentLevel(m) != subdivLevelCount(m) - 1) {
@@ -323,7 +323,7 @@ bool microDivide(Mesh& m, int level, std::string& error, int outOfCore) {
         return false;
     }
     if (!m.zspheres.empty()) {
-        error = "ZSphere SubTools can't have a micro level (make an adaptive skin first)";
+        error = "Forge Sphere Parts can't have a micro level (make an adaptive skin first)";
         return false;
     }
     if (!m.layers.empty()) {
@@ -938,7 +938,7 @@ size_t MicroUndo::bytes() const {
 
 bool microBakeMesh(const Mesh& m, int level, Mesh& out, std::string& error, size_t maxTriangles) {
     if (!m.micro || !microMatches(m)) {
-        error = "This SubTool has no micro level";
+        error = "This Part has no micro level";
         return false;
     }
     const MicroMesh& mm = *m.micro;
@@ -1071,7 +1071,7 @@ bool microBakeMesh(const Mesh& m, int level, Mesh& out, std::string& error, size
 bool microExportDisplacement(const Mesh& m, const std::string& path, int size, bool vector, const std::string& format,
                              float& scaleOut, std::string& error) {
     if (!m.micro || !microMatches(m)) {
-        error = "This SubTool has no micro level";
+        error = "This Part has no micro level";
         return false;
     }
     if (!m.hasUvs()) {

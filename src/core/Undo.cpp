@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Undo.h"
 
+#include "core/SelectionSets.h"
+
 #include <utility>
 
 namespace sf {
@@ -11,7 +13,7 @@ size_t UndoRecord::approxBytes() const {
                    polygroups.bytes() + (paint ? paint->bytes() : 0) +
                    (textureTiles ? textureTiles->bytes() : 0) + (texture ? texture->bytes() : 0) +
                    (subdiv ? subdiv->bytes() : 0) + (topology ? topology->bytes() : 0) +
-                   (micro ? micro->bytes() : 0);
+                   (micro ? micro->bytes() : 0) + uvs.bytes() + (sets ? sets->bytes() : 0) + (uv ? uv->bytes() : 0);
     for (const auto& l : layerOffsets) bytes += l.bytes();
     if (mesh)
         bytes += mesh->vertexCount() * ((2 + (mesh->base.empty() ? 0 : 1 + mesh->layers.size())) * sizeof(glm::vec3) +
@@ -155,6 +157,7 @@ void UndoStack::apply(UndoRecord& r, Mesh& mesh, BVH& bvh) {
         return;
     }
     if (r.micro) r.micro->swapWith(mesh); // (the base doesn't move: no BVH work)
+    if (r.sets) std::swap(mesh.selectionSets, r.sets->list);
     if (r.mesh) {
         std::swap(*r.mesh, mesh);
         mesh.topologyDirty = true;
@@ -189,6 +192,7 @@ void UndoStack::apply(UndoRecord& r, Mesh& mesh, BVH& bvh) {
         for (uint32_t v : r.mask.indices) mesh.markDirty(v);
     }
     if (r.paint) r.paint->swapWith(mesh);
+    if (r.uv) r.uv->swapWith(mesh);
     if (r.texture) r.texture->swapWith(mesh);
     if (r.textureTiles) r.textureTiles->swapWith(mesh);
     if (!r.colors.empty()) {
@@ -212,6 +216,59 @@ void UndoStack::apply(UndoRecord& r, Mesh& mesh, BVH& bvh) {
         r.polygroups.swapWith(mesh.ensurePolygroups());
         mesh.facesDirty = true;
     }
+    if (!r.uvs.empty()) {
+        if (mesh.uvs.size() != mesh.triangleCount() * 3) mesh.uvs.assign(mesh.triangleCount() * 3, glm::vec2(0.0f));
+        r.uvs.swapWith(mesh.uvs);
+        mesh.facesDirty = true;
+        mesh.topologyDirty = true;
+    }
+}
+
+size_t SelectionSetsUndo::bytes() const {
+    if (!list) return 0;
+    size_t total = 0;
+    for (const auto& s : list->sets)
+        if (s.use_count() == 1) total += s->bytes();
+    return total;
+}
+
+std::unique_ptr<UvUndo> UvUndo::capture(const Mesh& mesh) {
+    auto u = std::make_unique<UvUndo>();
+    u->uvs = mesh.uvs;
+    u->flags = mesh.uvFlags;
+    return u;
+}
+
+void UvUndo::commit(const Mesh& mesh) {
+    // Sparse when the arrays keep their sizes and under half of the corners changed.
+    if (sparse || uvs.size() != mesh.uvs.size() || flags.size() != mesh.uvFlags.size()) return;
+    UndoChannel<glm::vec2> cu;
+    UndoChannel<uint8_t> cf;
+    for (uint32_t c = 0; c < uvs.size(); ++c)
+        if (uvs[c] != mesh.uvs[c]) cu.add(c, uvs[c]);
+    for (uint32_t c = 0; c < flags.size(); ++c)
+        if (flags[c] != mesh.uvFlags[c]) cf.add(c, flags[c]);
+    if (cu.bytes() + cf.bytes() >= (uvs.size() * sizeof(glm::vec2) + flags.size()) / 2) return;
+    uvCorners = std::move(cu);
+    flagCorners = std::move(cf);
+    std::vector<glm::vec2>().swap(uvs);
+    std::vector<uint8_t>().swap(flags);
+    sparse = true;
+}
+
+void UvUndo::swapWith(Mesh& mesh) {
+    if (sparse) {
+        if (mesh.uvs.size() >= mesh.triangleCount() * 3) uvCorners.swapWith(mesh.uvs);
+        if (mesh.uvFlags.size() >= mesh.triangleCount() * 3) flagCorners.swapWith(mesh.uvFlags);
+    } else {
+        std::swap(uvs, mesh.uvs);
+        std::swap(flags, mesh.uvFlags);
+    }
+    mesh.facesDirty = true; // the renderer's per-triangle UVs
+}
+
+size_t UvUndo::bytes() const {
+    return uvs.size() * sizeof(glm::vec2) + flags.size() + uvCorners.bytes() + flagCorners.bytes();
 }
 
 bool UndoStack::undo(Mesh& mesh, BVH& bvh) {

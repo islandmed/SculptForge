@@ -8,6 +8,7 @@
 
 #include "core/LayerStack.h"
 #include "core/LayerStackIO.h"
+#include "core/SelectionSets.h"
 #include "core/Texture.h"
 #include "core/ThreadPool.h"
 #include "core/ZSpheres.h"
@@ -350,6 +351,7 @@ void writeMesh(Writer& w, const std::string& prefix, const Mesh& m, Json& out, s
         mesh.set("polygroups", w.uints(prefix + "mesh/polygroups.bin", m.polygroups.data(), m.polygroups.size(), 1));
     if (m.hasHidden()) mesh.set("hidden", w.bytes(prefix + "mesh/hidden.bin", m.hidden));
     if (m.hasUvs()) mesh.set("uvs", w.floats(prefix + "mesh/uvs.bin", &m.uvs[0].x, m.uvs.size(), 2));
+    if (m.hasUvFlags()) mesh.set("uv_flags", w.bytes(prefix + "mesh/uv_flags.bin", m.uvFlags)); // seams, pins (core/Uv.h)
     // Optional and ignored by older readers, so no format version bump.
     if (m.hasQuads())
         mesh.set("quad_partners", w.uints(prefix + "mesh/quad_partners.bin", m.quadPartners.data(), m.quadPartners.size(), 1));
@@ -404,6 +406,9 @@ bool readMesh(Reader& r, const Json& mj, const Json& lj, Mesh& m, std::string& e
     if (mj.has("uvs")) {
         m.uvs.resize(nt * 3);
         r.floats(mj["uvs"], "uvs", nt * 3, 2, nt ? &m.uvs[0].x : nullptr);
+    }
+    if (mj.has("uv_flags")) {
+        if (!r.bytes(mj["uv_flags"], "UV seams", nt * 3, m.uvFlags)) m.uvFlags.clear();
     }
     if (mj.has("quad_partners")) { // rebuildTopology() unpairs anything that isn't a valid pair
         m.quadPartners.resize(nt);
@@ -789,6 +794,54 @@ bool readSubdiv(Reader& r, const Json& sj, Mesh& m, std::string& error, bool wor
     return true;
 }
 
+// Selection Sets (core/SelectionSets.h): `selection_sets` = {"version", "morph_target", "sets": [summary + "data"]},
+// each set one packed u8 blob under subtools/i/sets/. Optional, so no format version bump: older readers ignore it.
+constexpr int kSelectionSetsVersion = 1;
+
+Json writeSelectionSets(Writer& w, const std::string& prefix, const SelectionSetList& list) {
+    Json j = Json::object();
+    j.set("version", kSelectionSetsVersion);
+    if (!list.morphTarget.empty()) j.set("morph_target", list.morphTarget);
+    Json sets = Json::array();
+    for (size_t k = 0; k < list.sets.size(); ++k) {
+        Json one = selectionSetSummary(*list.sets[k]);
+        std::vector<uint8_t> packed = packSelectionSet(*list.sets[k]);
+        const size_t n = packed.size();
+        one.set("data", w.add(prefix + "sets/" + std::to_string(k) + ".bin", Scalar::U8, 1, n, std::move(packed)));
+        sets.push(std::move(one));
+    }
+    j.set("sets", std::move(sets));
+    return j;
+}
+
+// Sets that can't be read (damaged, or from a newer set format) are left out and named in `skipped`; the rest of
+// the project still loads.
+void readSelectionSets(Reader& r, const Json& j, Mesh& m, std::string& skipped) {
+    if (!j.isObject() || !j["sets"].isArray()) return;
+    auto list = std::make_shared<SelectionSetList>();
+    for (const Json& one : j["sets"].items()) {
+        const Json& desc = one["data"];
+        auto it = r.files.find(desc["file"].asString());
+        const double count = desc["count"].asNumber(-1);
+        std::vector<uint8_t> bytes;
+        SelectionSet set;
+        std::string why;
+        const std::string saved = r.error;
+        const bool ok = it != r.files.end() && count >= 0 && double(it->second.size) == count &&
+                        r.bytes(desc, "selection set", size_t(count), bytes) &&
+                        unpackSelectionSet(bytes.data(), bytes.size(), set, why) && list->find(set.name) < 0;
+        r.error = saved;
+        if (!ok) {
+            skipped += (skipped.empty() ? "" : ", ") + ("'" + one["name"].asString() + "'");
+            continue;
+        }
+        list->sets.push_back(std::make_shared<const SelectionSet>(std::move(set)));
+    }
+    list->morphTarget = j["morph_target"].asString();
+    if (list->find(list->morphTarget) < 0) list->morphTarget.clear();
+    if (!list->sets.empty()) m.selectionSets = std::move(list);
+}
+
 // A SubTool read from a project, before it joins the document.
 struct LoadedSubtool {
     std::string name, gozName;
@@ -873,6 +926,8 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
         if (!gozName.empty()) st.set("goz_name", gozName);
         const std::vector<QRemeshGuide>& guides = active ? doc.qremeshGuides : s.qremeshGuides;
         if (!guides.empty()) st.set("qremesh_guides", qremeshGuidesToJson(guides)); // (no format change: optional)
+        if (const Mesh& m = doc.subtoolMesh(i); m.selectionSets && !m.selectionSets->sets.empty())
+            st.set("selection_sets", writeSelectionSets(w, "subtools/" + std::to_string(i) + "/", *m.selectionSets));
         if (const Mesh& m = doc.subtoolMesh(i); !m.zspheres.empty()) { // a ZSphere SubTool (core/ZSpheres.h); optional
             st.set("zspheres", zspheresToJson(m.zspheres));
             if (m.zspherePreview) st.set("zsphere_preview", true);
@@ -978,6 +1033,7 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
 
     // SubTools: version 1 has one mesh at the top level, version 2 a "subtools" list.
     std::deque<LoadedSubtool> subtools; // (stable addresses: BVH threads use them)
+    std::string skippedSets;            // selection sets that couldn't be read
     int activeSubtool = 0;
     if (version < 2) {
         LoadedSubtool& s = subtools.emplace_back();
@@ -987,13 +1043,13 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
     } else {
         const Json& list = manifest["subtools"];
         if (!list.isArray() || list.size() == 0 || list.size() > kMaxProjectSubtools) {
-            error = "Project has no valid SubTool list";
+            error = "Project has no valid Part list";
             return false;
         }
         for (const Json& sj : list.items()) {
             LoadedSubtool& s = subtools.emplace_back();
             s.name = sj["name"].asString();
-            if (s.name.empty()) s.name = "SubTool";
+            if (s.name.empty()) s.name = "Part";
             s.visible = sj["visible"].asBool(true);
             if (sj["shading"].isString()) parseShading(sj["shading"].asString(), s.shading); // unknown: Default
             s.gozName = sj["goz_name"].asString();
@@ -1001,6 +1057,7 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
             if (!readMesh(r, sj["mesh"], sj["layers"], s.mesh, error, false, false)) return false;
             s.mesh.zspheres = zspheresFromJson(sj["zspheres"]);
             s.mesh.zspherePreview = !s.mesh.zspheres.empty() && sj["zsphere_preview"].asBool(false);
+            readSelectionSets(r, sj["selection_sets"], s.mesh, skippedSets);
             // The BVH builds (on the pool) while the levels and topology load (off it), then the normals.
             s.startBvh();
             r.parallelReads = !s.bvhBuilder.joinable();
@@ -1104,6 +1161,8 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
     doc.selectSubtool(activeSubtool);
     doc.splats = std::move(splats);
     doc.splatsChanged();
+    if (!skippedSets.empty())
+        doc.notice += (doc.notice.empty() ? "" : "; ") + std::string("Selection sets left out (unreadable): ") + skippedSets;
     for (const auto& b : manifest["brushes"].items()) {
         if (!b.isObject()) continue;
         // Brushes the library already has, unchanged, stay library brushes; the rest are the project's own.
@@ -1175,7 +1234,7 @@ CommandResult openProjectCommand(Document& doc, const std::string& path) {
     std::string msg = "Opened project " + std::filesystem::path(path).filename().string() + " (";
     // The Sculpt Timeline saved beside it, if it matches (only into the app's own scene: not thumbnails, scratch opens).
     const int histories = &doc == Timeline::historyDocument ? loadHistorySidecar(doc, path) : 0;
-    if (doc.subtoolCount() > 1) msg += std::to_string(doc.subtoolCount()) + " SubTools, ";
+    if (doc.subtoolCount() > 1) msg += std::to_string(doc.subtoolCount()) + " Parts, ";
     size_t tris = 0, layers = 0;
     for (int i = 0; i < doc.subtoolCount(); ++i) {
         tris += doc.subtoolMesh(i).triangleCount();
@@ -1192,7 +1251,7 @@ CommandResult openProjectCommand(Document& doc, const std::string& path) {
 void registerProjectCommands(CommandRegistry& registry) {
     using T = ParamSpec::Type;
     registry.add({"save_project",
-                  "Save everything (mesh, mask, polypaint, polygroups, visibility, UVs, sculpt layers, splats, brushes "
+                  "Save everything (mesh, mask, vertex paint, face groups, visibility, UVs, sculpt layers, splats, brushes "
                   "and view settings) as a SculptForge project (.sfproj).",
                   {{"path", T::String, "Output .sfproj path (UTF-8). Defaults to the current project path.", false}},
                   [](Document& doc, const Args& a) -> CommandResult {

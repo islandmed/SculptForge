@@ -155,6 +155,7 @@ void Mesh::sanitizeAttributes() {
     if (!polygroups.empty() && polygroups.size() != triangles.size()) clearPolygroups();
     if (!hidden.empty() && hidden.size() != triangles.size()) clearHidden();
     if (!uvs.empty() && uvs.size() != triangles.size() * 3) std::vector<glm::vec2>().swap(uvs);
+    if (!uvFlags.empty() && uvFlags.size() != triangles.size() * 3) std::vector<uint8_t>().swap(uvFlags);
     if (!quadPartners.empty() && quadPartners.size() != triangles.size()) clearQuads();
     // Quad pairs must be mutual and share an edge: unpair anything an edit or a malformed file left behind.
     bool anyQuad = false;
@@ -794,7 +795,7 @@ AABB Mesh::bounds() const {
 size_t Mesh::memoryBytes() const {
     auto bytes = [](const auto& v) { return v.capacity() * sizeof(v[0]); };
     size_t n = bytes(positions) + bytes(normals) + bytes(triangles) + bytes(mask) + bytes(colors) + bytes(polygroups) +
-               bytes(hidden) + bytes(uvs) + bytes(quadPartners) + bytes(base) + bytes(paintBase) + bytes(adjOffsets_) +
+               bytes(hidden) + bytes(uvs) + bytes(uvFlags) + bytes(quadPartners) + bytes(base) + bytes(paintBase) + bytes(adjOffsets_) +
                bytes(adjList_) + bytes(vtOffsets_) + bytes(vtList_) + bytes(adjEnds_) + bytes(adjCaps_) + bytes(vtEnds_) + bytes(vtCaps_) + normalBits_.memoryBytes() + bytes(scratchVerts_) + bytes(dirtyBlocks) + bytes(dirtyBits);
     for (const auto& l : layers) n += bytes(l.delta);
     for (const auto& l : paintLayers) n += bytes(l.color) + bytes(l.alpha);

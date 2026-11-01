@@ -87,7 +87,7 @@ std::vector<glm::vec3> samplePath(const std::vector<glm::vec3>& points, bool cur
 int strokePath(Document& doc, const BrushRecipe* recipe, BrushType type, const PathStroke& stroke, std::string& error) {
     Mesh& mesh = doc.mesh;
     if (mesh.triangleCount() == 0) {
-        error = "The active SubTool is empty";
+        error = "The active Part is empty";
         return -1;
     }
     if (stroke.points.empty()) {
@@ -113,7 +113,7 @@ int strokePath(Document& doc, const BrushRecipe* recipe, BrushType type, const P
     const glm::vec3 right = glm::normalize(glm::cross(view, helper));
     const glm::vec3 up = glm::cross(right, view);
 
-    const std::string label = recipe ? recipe->name : brushName(type);
+    const std::string label = recipe ? recipe->name : brushLabel(type);
     if (!doc.sculptor.beginStroke(mesh, label, doc.activeLayer)) {
         error = "Active layer weight is 0 - raise it to sculpt into the layer";
         return -1;

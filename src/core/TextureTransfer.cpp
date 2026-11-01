@@ -464,7 +464,7 @@ std::string carryTextureNote(const Mesh& source, Mesh& target, bool keep, const 
     std::string err;
     TextureTransferStats st;
     if (!carryTexture(source, target, err, &st, progress))
-        return "; the texture could not be kept (" + err + "): undo, export it, or bake it to polypaint first";
+        return "; the texture could not be kept (" + err + "): undo, export it, or bake it to vertex paint first";
     char buf[160];
     std::snprintf(buf, sizeof buf, "; texture kept (Auto UV, %d islands, %.1f s)", st.charts, st.uvSeconds + st.transferSeconds);
     return buf;

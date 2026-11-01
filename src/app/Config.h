@@ -31,13 +31,21 @@ struct UiPrefs {
     std::string language = "en"; // Preferences > Interface: the interface language, "en" or "es" (app/I18n.h, #44)
     int cameraNotch = 0;        // keep the UI out of a laptop's camera notch: 0 automatic, 1 always, 2 never
     bool turntable = false;     // rotation: false = free, about the screen axes (ZBrush); true = turntable (Y up)
-    int inputStyle = 0;         // Preferences > Input: 0 ZBrush, 1 SculptForge (1-0 brushes, I = Z Intensity...),
-                                // 2 Blender (middle-drag orbit, numpad views, Blender's sculpt keys; Input.cpp)
+    int inputStyle = 1;         // Preferences > Input: 0 ZBrush-style, 1 SculptForge (the default for new installs:
+                                // 1-0 brushes, I = Intensity...), 2 Blender (middle-drag orbit, numpad views,
+                                // Blender's sculpt keys), 3 Maya (Input.cpp). The first-run welcome asks.
+    bool inputStyleSaved = false; // ui.json named the style (not saved itself): an install from before 0.10.4
+                                  // without it had the ZBrush-style keys and keeps them (PanelProject.cpp)
     bool emulateNumpad = false; // Blender style: the 1-9 and 0 keys above the letters act as the numpad (laptops)
     bool rightClickQuickMenu = true; // a right click on the canvas (no drag) opens the QuickMenu, as in ZBrush (#22)
     bool spaceCamera = false; // hold Space and drag to move the camera (#43; off: Space opens the QuickMenu)
+    bool airStrokes = false;  // start strokes off the model (#62): a left-drag on the background sculpts once it
+                              // reaches the surface instead of turning the view (off: it turns the view, ZBrush)
     bool showAxes = true;              // Draw > Camera > Axes: the X / Y / Z gizmo in the canvas corner (#31)
     bool cursorFollowsSurface = true; // the brush ring lies on the surface under the pointer, as in SculptGL (#25)
+    // Preferences > Interface > Timeline position (#63): the Sculpt Timeline strip along the top of the viewport
+    // (true, the default: clear of the brush shelf below it) or its bottom.
+    bool timelineTop = true;
     TabletSettings tablet;      // Preferences > Tablet: pressure curve, eraser, pen buttons
     SpaceMouseSettings spaceMouse; // Preferences > Input > SpaceMouse
     // Preferences > Performance (PanelPerformance.cpp).

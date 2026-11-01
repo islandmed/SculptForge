@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(SculptForge VERSION 0.10.4 LANGUAGES C CXX)
+project(SculptForge VERSION 0.10.5 LANGUAGES C CXX)
 include(GNUInstallDirs)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -45,6 +45,7 @@ add_library(sculptforge_core STATIC
   src/core/Document.cpp
   src/core/Commands.cpp
   src/core/Polygroups.cpp
+  src/core/SelectionSets.cpp
   src/core/ScreenSelect.cpp
   src/core/SubTools.cpp
   src/core/ExtractMirror.cpp
@@ -72,6 +73,10 @@ add_library(sculptforge_core STATIC
   src/core/PaintLayer.cpp
   src/core/Texture.cpp
   src/core/TextureCommands.cpp
+  src/core/Uv.cpp
+  src/core/UvCommands.cpp
+  src/core/UvPack.cpp
+  src/core/UvUnwrap.cpp
   src/core/TileImage.cpp
   src/core/EnvironmentMath.cpp
   src/core/MeshMaps.cpp
@@ -277,6 +282,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/AssetLibrary.cpp
     src/app/PanelMasking.cpp
     src/app/PanelPolygroups.cpp
+    src/app/PanelSelectionSets.cpp
     src/app/Selection.cpp
     src/app/PanelBrushes.cpp
     src/app/PanelVdm.cpp
@@ -287,6 +293,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelPolypaint.cpp
     src/app/PanelPaintLayers.cpp
     src/app/PanelTexture.cpp
+    src/app/PanelUvEditor.cpp
     src/app/PanelPbr.cpp
     src/app/PanelFill.cpp
     src/app/PanelGeometry.cpp
@@ -317,6 +324,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/render/Clusters.cpp
     src/render/Ghost.cpp
     src/render/Renderer.cpp
+    src/render/UvView.cpp
     src/render/MicroRenderer.cpp
   )
   target_link_libraries(sculptforge PRIVATE sculptforge_core sculptforge_ai sculptforge_phone imgui SDL3::SDL3)
@@ -517,7 +525,19 @@ if(SCULPTFORGE_BUILD_TESTS)
   if(MSVC)
     target_compile_options(sculptforge_tests PRIVATE /utf-8)
   endif()
-  add_test(NAME sculptforge_tests COMMAND sculptforge_tests)
+  # The suite as SCULPTFORGE_TEST_SHARDS processes (sculptforge_tests_0of8 ...; `ctest -j` runs them at once, CI does;
+  # more shards than cores balance better), each with its own temporary folder so tests in different shards never
+  # share a scratch file.
+  set(SCULPTFORGE_TEST_SHARDS 8 CACHE STRING "Number of ctest entries the sculptforge_tests suite is split into")
+  math(EXPR last_shard "${SCULPTFORGE_TEST_SHARDS} - 1")
+  foreach(k RANGE ${last_shard})
+    set(shard_tmp ${CMAKE_CURRENT_BINARY_DIR}/test-tmp/shard${k})
+    file(MAKE_DIRECTORY ${shard_tmp})
+    add_test(NAME sculptforge_tests_${k}of${SCULPTFORGE_TEST_SHARDS}
+             COMMAND sculptforge_tests --shard ${k}/${SCULPTFORGE_TEST_SHARDS})
+    set_tests_properties(sculptforge_tests_${k}of${SCULPTFORGE_TEST_SHARDS} PROPERTIES COST 1000 # the longest: start first
+                         ENVIRONMENT "TMPDIR=${shard_tmp};TMP=${shard_tmp};TEMP=${shard_tmp}")
+  endforeach()
   # A stand-in for Brush, COLMAP and ffmpeg (tests/tools/fake_splat_tools.cpp): splat training is tested without a GPU.
   add_executable(sf_fake_splat_tools tests/tools/fake_splat_tools.cpp)
   target_include_directories(sf_fake_splat_tools PRIVATE third_party/stb)
@@ -570,6 +590,9 @@ if(SCULPTFORGE_BUILD_TESTS)
                                         -- --cli ${SCULPTFORGE_CLI_RUNNER})
       set_tests_properties(blender_addon PROPERTIES TIMEOUT 300)
     endif()
+    # The release smoke test (tests/release_smoke.py, run by release.yml on every package): open, sculpt, save, reopen.
+    add_test(NAME release_smoke COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_smoke.py
+                                      --cli ${SCULPTFORGE_CLI_RUNNER} --out ${CMAKE_CURRENT_BINARY_DIR}/release-smoke)
     # Proof mode results: the validator and website list tool (tools/benchmark/submit.py, docs/benchmark.md).
     add_test(NAME benchmark_submit COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/benchmark/submit.py selftest)
     add_test(NAME guide_site COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/guide/build_site.py --check
@@ -636,6 +659,34 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME ui_stroke_resize COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
     set_tests_properties(ui_stroke_resize PROPERTIES LABELS ui TIMEOUT 60 DISABLED TRUE # predictive strokes: not yet identical in every run
                          ENVIRONMENT "SF_NO_UPDATE_CHECK=1;SF_MEASURE_RESIZE=1;SF_MEASURE_VERIFY=1;SF_PREDICTIVE_STROKE=1")
+    # The system clipboard is one per desktop (one X server under CI's xvfb-run), and on X11 every SDL program asks a
+    # new clipboard owner what it holds: a program that quits meanwhile makes the owner's answer fail (BadWindow).
+    # Scripts that set, read or paste it (or click a Copy / Paste button) run alone under ctest -j.
+    foreach(t ${SCULPTFORGE_UI_TESTS} shell_layout_1080 help_console_1080 size_popup_scaled user_guide_1080)
+      string(REGEX REPLACE "_1080$|_scaled$" "" base ${t})
+      get_filename_component(base ${base} NAME_WE)
+      set(script ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/${base}.sfui)
+      get_filename_component(name ${t} NAME_WE)
+      if(EXISTS ${script} AND TEST ui_${name})
+        file(READ ${script} body)
+        if(body MATCHES "(^|\n)(clipboard|expect_clipboard) |\"[^\"\n]*(Copy|Paste)[^\"\n]*\"|ctrl\\+[cvx]")
+          set_tests_properties(ui_${name} PROPERTIES RUN_SERIAL TRUE)
+        endif()
+      endif()
+    endforeach()
+    # The longest UI tests start first under ctest -j (COST orders a parallel run; without it they may start last).
+    foreach(t ui_make_sculptable ui_texture_transfer ui_bake)
+      if(TEST ${t})
+        set_tests_properties(${t} PROPERTIES COST 500)
+      endif()
+    endforeach()
+    # Timed measurements run alone when ctest runs tests in parallel (CI: ctest -j): other tests' load must not
+    # change what they measure.
+    foreach(t ui_idle_redraw ui_calibrate_json ui_stroke_path ui_hardware_profile)
+      if(TEST ${t})
+        set_tests_properties(${t} PROPERTIES RUN_SERIAL TRUE)
+      endif()
+    endforeach()
     # The guide's keyboard table must match the app's default shortcuts (tools/guide/update_shortcuts.py).
     if(Python3_Interpreter_FOUND)
       sculptforge_runner(SCULPTFORGE_APP_RUNNER sculptforge)

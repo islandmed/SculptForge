@@ -3,6 +3,9 @@
 # M for the Mask brush, H / Shift+H / Alt+H, Alt+1 / Alt+2, Emulate Numpad, the Controls window, a keymap
 # exported from Blender, and back to the ZBrush style with its keys intact.
 run new_sphere subdivisions=4
+# New installs start with the SculptForge keys; this script is about the ZBrush-style ones.
+expect_value input_style == 1
+input_style zbrush
 expect_value input_style == 0
 expect_value shortcut_conflicts == 0
 # The numpad views work in every style.
@@ -56,7 +59,7 @@ key f
 expect_text Draw Size
 key escape
 key shift+f
-expect_text Z Intensity
+expect_text Intensity
 key escape
 
 # --- Sculpting: a plain drag adds, Ctrl+drag subtracts, Alt+drag navigates instead of sculpting ---
@@ -219,7 +222,7 @@ click "Mouse & pen"
 expect_text Middle drag
 shot controls-blender
 # The style row in Controls switches too.
-click "ZBrush##input.style_zbrush"
+click "ZBrush-style##input.style_zbrush"
 expect_value input_style == 0
 expect_text Alt + click it
 key f1
@@ -247,7 +250,7 @@ click "Restore Standard UI##config.restore_standard"
 expect_value shortcut_conflicts == 0
 expect_shortcut brush.standard V
 key f1
-click "ZBrush##input.style_zbrush"
+click "ZBrush-style##input.style_zbrush"
 key f1
 expect_value input_style == 0
 expect_value shortcut_conflicts == 0

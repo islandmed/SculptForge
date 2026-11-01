@@ -68,9 +68,8 @@ float smoothstep01(float e0, float e1, float x) {
 
 } // namespace
 
-// The "symmetry" argument ("x", "xz" ...) as mirror sign vectors (Sculptor::mirrors); none without it.
-bool symmetryMirrorsArg(const Args& a, std::vector<glm::vec3>& mirrors, std::string& error) {
-    Symmetry sym{false, false, false};
+bool symmetryArg(const Args& a, const Mesh& mesh, Symmetry& sym, std::string& error) {
+    sym = Symmetry{false, false, false};
     for (char c : argString(a, "symmetry")) {
         const char l = char(std::tolower(static_cast<unsigned char>(c)));
         if (l == 'x') sym.x = true;
@@ -81,8 +80,43 @@ bool symmetryMirrorsArg(const Args& a, std::vector<glm::vec3>& mirrors, std::str
             return false;
         }
     }
-    mirrors = Sculptor::mirrors(sym);
+    const double radial = argNumber(a, "radial", 1.0);
+    if (!(radial >= 1.0 && radial <= double(Symmetry::kMaxRadial)) || radial != std::floor(radial)) {
+        error = "radial takes a whole number of copies, 1 (off) to " + std::to_string(Symmetry::kMaxRadial);
+        return false;
+    }
+    sym.radial = int(radial);
+    sym.radialEnabled = sym.radial > 1;
+    std::string axis = argString(a, "radial_axis");
+    if (axis.empty()) axis = "y";
+    for (char& c : axis) c = char(std::tolower(static_cast<unsigned char>(c)));
+    if (axis != "x" && axis != "y" && axis != "z") {
+        error = "radial_axis takes x, y or z";
+        return false;
+    }
+    sym.radialAxis = axis[0] - 'x';
+    sym.local = argBool(a, "local", false);
+    if (sym.local) sym.pivot = symmetryPivot(mesh);
     return true;
+}
+
+bool symmetryCopiesArg(const Args& a, const Mesh& mesh, std::vector<SymCopy>& copies, std::string& error) {
+    Symmetry sym;
+    if (!symmetryArg(a, mesh, sym, error)) return false;
+    copies = Sculptor::copies(sym);
+    return true;
+}
+
+std::vector<ParamSpec> radialSymmetryParams() {
+    return {{"radial", ParamSpec::Type::Number,
+             "Radial symmetry: this many copies turned evenly around radial_axis (2-64; default 1, off). With "
+             "mirror axes too, each mirror image gets its copies.",
+             false},
+            {"radial_axis", ParamSpec::Type::String, "The axis radial copies turn around: x, y or z (default y).", false},
+            {"local", ParamSpec::Type::Bool,
+             "Local symmetry: mirror planes and the radial axis go through the Part's centre instead of the world "
+             "origin (default false).",
+             false}};
 }
 
 bool maskClear(Mesh& mesh) {
@@ -256,18 +290,18 @@ namespace {
 
 // Vertex v, or one of its mirror images, projects inside the shape.
 bool inShape(const Mesh& mesh, const glm::mat4& viewProj, const ScreenPolygon& shape,
-             const std::vector<glm::vec3>& mirrors, uint32_t v) {
+             const std::vector<SymCopy>& mirrors, uint32_t v) {
     glm::vec2 ndc;
     if (projectToNdc(viewProj, mesh.positions[v], ndc) && shape.contains(ndc)) return true;
-    for (const glm::vec3& m : mirrors)
-        if (m != glm::vec3(1.0f) && projectToNdc(viewProj, mesh.positions[v] * m, ndc) && shape.contains(ndc)) return true;
+    for (const SymCopy& m : mirrors)
+        if (!m.identity() && projectToNdc(viewProj, m.point(mesh.positions[v]), ndc) && shape.contains(ndc)) return true;
     return false;
 }
 
 } // namespace
 
 bool maskInShape(Mesh& mesh, const glm::mat4& viewProj, const ScreenPolygon& shape, float strength, bool unmask,
-                 const std::vector<glm::vec3>& mirrors) {
+                 const std::vector<SymCopy>& mirrors) {
     if (mesh.vertexCount() == 0 || !shape.valid()) return false;
     const float s = std::clamp(strength, 0.0f, 1.0f);
     return maskPass(mesh, [&](const std::vector<float>& m, uint32_t v) {
@@ -277,7 +311,7 @@ bool maskInShape(Mesh& mesh, const glm::mat4& viewProj, const ScreenPolygon& sha
 }
 
 bool shapeCoversMesh(const Mesh& mesh, const glm::mat4& viewProj, const ScreenPolygon& shape,
-                     const std::vector<glm::vec3>& mirrors) {
+                     const std::vector<SymCopy>& mirrors) {
     if (!shape.valid()) return false;
     const bool anyHidden = mesh.hasHidden();
     for (uint32_t v = 0; v < uint32_t(mesh.vertexCount()); ++v)
@@ -291,17 +325,17 @@ void Sculptor::dabMask(Mesh& mesh, const BVH& bvh, const DabParams& p, Symmetry 
     if (s <= 0.0f) return;
     if (microReady(mesh)) { // the micro level's own mask, per grid point (core/MicroSculpt.cpp)
         const double k0 = micro_.findMs + micro_.kernelMs + micro_.stitchMs;
-        for (const glm::vec3& mirror : mirrors(sym))
-            micro_.dab(mesh, bvh, BrushType::Standard, p.center * mirror, p.viewDir * mirror, p.radius, 1.0f, p.invert, p.focal,
-                       p.alphaUp * mirror, true, s);
+        for (const SymCopy& mirror : copies(sym))
+            micro_.dab(mesh, bvh, BrushType::Standard, mirror.point(p.center), mirror.dir(p.viewDir), p.radius, 1.0f, p.invert,
+                       p.focal, mirror.dir(p.alphaUp), true, s);
         timings.kernelMs += micro_.findMs + micro_.kernelMs + micro_.stitchMs - k0;
         ++timings.dabs;
         return;
     }
     auto clock = std::chrono::steady_clock::now();
     std::vector<float>& mask = mesh.ensureMask();
-    for (const glm::vec3& mirror : mirrors(sym)) {
-        const glm::vec3 center = p.center * mirror, viewDir = p.viewDir * mirror;
+    for (const SymCopy& mirror : copies(sym)) {
+        const glm::vec3 center = mirror.point(p.center), viewDir = mirror.dir(p.viewDir);
         brushVertices(mesh, bvh, center, p.radius, verts_);
         // New values in parallel; recording and writing them in order.
         weights_.resize(verts_.size());
@@ -372,9 +406,9 @@ void registerMaskingCommands(CommandRegistry& registry) {
             return maskByCavity(m, float(argNumber(a, "strength", 1.0)),
                                 std::clamp(float(argNumber(a, "threshold", 0.02)), -1.0f, 1.0f));
         });
-    add("mask_by_polygroup", "Mask by Polygroup",
-        "Mask the vertices of one polygroup (meshes without polygroups are all group 0).",
-        {{"group", T::Number, "Polygroup id.", true},
+    add("mask_by_polygroup", "Mask by Face Group",
+        "Mask the vertices of one face group (meshes without face groups are all group 0).",
+        {{"group", T::Number, "Face Group id.", true},
          {"add", T::Bool, "Add to the current mask instead of replacing it. Default false.", false}},
         [](Mesh& m, const Args& a) {
             return maskByPolygroup(m, uint32_t(std::max(0.0, argNumber(a, "group", 0))), argBool(a, "add", false));
@@ -383,12 +417,12 @@ void registerMaskingCommands(CommandRegistry& registry) {
     registry.add(
         {"mask_border",
          "Mask from the mesh border (Blender: Mask from mesh boundary): mask the vertices on open edges - and, with "
-         "polygroups, where polygroups meet - plus edge rings inside them, so sculpting keeps the border in place. "
+         "face groups, where face groups meet - plus edge rings inside them, so sculpting keeps the border in place. "
          "Replaces the mask unless add is set. A closed mesh has no open edges and masks nothing.",
          {{"rings", T::Number, "Width of the mask in edge rings from the border (1-20; 1 = the border vertices only). "
                                "Default 1.",
            false},
-          {"polygroups", T::Bool, "Also mask polygroup borders (ZBrush: Mask by polygroup border). Default false.",
+          {"polygroups", T::Bool, "Also mask face group borders (ZBrush: Mask by polygroup border). Default false.",
            false},
           {"soft", T::Bool, "Fade the mask from the border towards the innermost ring. Default false.", false},
           {"strength", T::Number, "Mask value on the border (0-1). Default 1.", false},
@@ -403,7 +437,7 @@ void registerMaskingCommands(CommandRegistry& registry) {
                  maskBorder(doc.mesh, int(argNumber(a, "rings", 1)), polygroups, argBool(a, "soft", false),
                             float(argNumber(a, "strength", 1.0)), argBool(a, "add", false), &found);
              if (found == 0)
-                 return {true, polygroups ? "No open edges or polygroup borders: the mesh is closed and one polygroup"
+                 return {true, polygroups ? "No open edges or face group borders: the mesh is closed and one face group"
                                           : "No open edges: the mesh is closed"};
              if (!changed) return {true, label + ": mask unchanged"};
              doc.undo.push(std::move(record));
@@ -434,8 +468,8 @@ void registerMaskingCommands(CommandRegistry& registry) {
                  std::vector<glm::vec2> points;
                  std::string error;
                  if (!viewProjArg(doc.mesh, a, vp, error) || !shape(a, points, error)) return {false, error};
-                 std::vector<glm::vec3> mirrors;
-                 if (!symmetryMirrorsArg(a, mirrors, error)) return {false, error};
+                 std::vector<SymCopy> mirrors;
+                 if (!symmetryCopiesArg(a, doc.mesh, mirrors, error)) return {false, error};
                  const ScreenPolygon polygon(points);
                  const bool unmask = argBool(a, "unmask", false);
                  if (argBool(a, "clear_outside", false) && !shapeCoversMesh(doc.mesh, vp, polygon, mirrors)) {

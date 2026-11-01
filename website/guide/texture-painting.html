@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Texture painting - SculptForge User Guide</title>
-  <meta name="description" content="Texture painting puts the colour into an image laid over the model&#x27;s UVs, instead of on its vertices. The detail you can paint then comes from the texture&#x27;s resolution, not from how dense the mesh is: a 4K texture on a light, game-ready mesh holds pores, freckles and sharp decals that polypaint coul">
+  <meta name="description" content="Texture painting puts the colour into an image laid over the model&#x27;s UVs, instead of on its vertices. The detail you can paint then comes from the texture&#x27;s resolution, not from how dense the mesh is: a 4K texture on a light, game-ready mesh holds pores, freckles and sharp decals that vertex paint c">
   <meta name="theme-color" content="#111114">
   <meta name="color-scheme" content="dark">
   <link rel="icon" type="image/svg+xml" href="../img/favicon.svg?v=2">
@@ -13,15 +13,15 @@
   <link rel="canonical" href="https://sculptforge.app/guide/texture-painting.html">
   <meta property="og:type" content="article">
   <meta property="og:title" content="Texture painting - SculptForge User Guide">
-  <meta property="og:description" content="Texture painting puts the colour into an image laid over the model&#x27;s UVs, instead of on its vertices. The detail you can paint then comes from the texture&#x27;s resolution, not from how dense the mesh is: a 4K texture on a light, game-ready mesh holds pores, freckles and sharp decals that polypaint coul">
+  <meta property="og:description" content="Texture painting puts the colour into an image laid over the model&#x27;s UVs, instead of on its vertices. The detail you can paint then comes from the texture&#x27;s resolution, not from how dense the mesh is: a 4K texture on a light, game-ready mesh holds pores, freckles and sharp decals that vertex paint c">
   <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=3">
   <meta property="og:url" content="https://sculptforge.app/guide/texture-painting.html">
   <link rel="stylesheet" href="../style.css?v=17">
   <script src="../motion.js?v=10" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
-  <script src="search-index.js?v=41" defer></script>
+  <script src="search-index.js?v=43" defer></script>
 </head>
-<body class="guide-page" data-prev="polypaint.html" data-next="pbr-painting.html">
+<body class="guide-page" data-prev="vertex-paint.html" data-next="uv-editor.html">
   <div class="scroll-progress" aria-hidden="true"></div>
   <header class="nav">
     <div class="wrap nav-inner">
@@ -45,48 +45,48 @@
           <input type="search" id="guide-q" placeholder="Search the guide" aria-label="Search the guide" autocomplete="off">
           <div class="search-results" id="guide-results" hidden></div>
         </div>
-        <nav class="toc" aria-label="User guide"><a class="toc-home" href="index.html">Contents</a><p class="toc-group">Getting started</p><ul><li><a href="welcome.html">Welcome to SculptForge</a></li><li><a href="whats-new.html">What&#x27;s new</a></li><li><a href="coming-from-zbrush.html">Coming from ZBrush</a></li><li><a href="installing.html">Installing SculptForge</a></li><li><a href="interface.html">The interface</a></li><li><a href="navigation.html">Navigating the view</a></li></ul><p class="toc-group">Sculpting</p><ul><li><a href="sculpting.html">Sculpting and brushes</a></li><li><a href="brush-lab.html">Brush Lab and sharing brushes</a></li><li><a href="masking.html">Masking</a></li><li><a href="polygroups.html">Polygroups and visibility</a></li><li><a href="subtools.html">SubTools</a></li><li><a href="zspheres.html">ZSpheres</a></li><li><a href="polypaint.html">Polypaint and materials</a></li><li><a href="texture-painting.html" class="current" aria-current="page">Texture painting</a><ul class="toc-sections"><li><a href="#start-in-one-click">Start in one click</a></li><li><a href="#paint-a-texture-in-four-steps">Paint a texture in four steps</a></li><li><a href="#vertex-or-texture">Vertex or Texture</a></li><li><a href="#how-texture-painting-works">How texture painting works</a></li><li><a href="#paint-layers-on-a-texture">Paint layers on a texture</a></li><li><a href="#convert-between-polypaint-and-texture">Convert between polypaint and texture</a></li><li><a href="#import-and-export">Import and export</a></li><li><a href="#uvs-and-geometry">UVs and geometry</a></li><li><a href="#scripting">Scripting</a></li></ul></li><li><a href="pbr-painting.html">Material painting (PBR)</a></li><li><a href="layers.html">Sculpt layers and blend shapes</a></li><li><a href="facial-shapes.html">Facial shapes and live face</a></li><li><a href="subdivision-levels.html">Subdivision levels</a></li><li><a href="micro-levels.html">Micro levels: hundreds of millions of polygons</a></li><li><a href="dynamic-topology.html">Dynamic topology</a></li><li><a href="timeline.html">Sculpt Timeline and timelapse</a></li><li><a href="gizmo.html">Moving, rotating and posing (Gizmo 3D)</a></li><li><a href="geometry.html">Subdivide, remesh, decimate and LODs</a></li><li><a href="retopology.html">Quad retopology and detail projection</a></li></ul><p class="toc-group">AI and capture</p><ul><li><a href="generate-3d.html">Image and text to 3D</a></li><li><a href="splats.html">Gaussian splats</a></li><li><a href="scan-to-splat.html">Scan an object into a splat</a></li><li><a href="scan-to-sculptable.html">From scan to sculptable mesh</a></li><li><a href="phone-capture.html">Phone capture and AR</a></li></ul><p class="toc-group">Files and pipelines</p><ul><li><a href="baking.html">Baking normal and displacement maps</a></li><li><a href="exporting.html">Exporting, Unreal and ZBrush</a></li><li><a href="export-presets.html">Export presets</a></li><li><a href="blender.html">Working with Blender</a></li><li><a href="maya.html">Working with Maya</a></li><li><a href="projects.html">Projects, autosave and QuickSave</a></li><li><a href="scripting.html">Scripting and automation</a></li><li><a href="studios.html">SculptForge for studios</a></li></ul><p class="toc-group">Reference</p><ul><li><a href="shortcuts.html">Keyboard and mouse</a></li><li><a href="performance.html">Performance and big meshes</a></li><li><a href="troubleshooting.html">Troubleshooting and FAQ</a></li><li><a href="glossary.html">Glossary</a></li></ul></nav>
+        <nav class="toc" aria-label="User guide"><a class="toc-home" href="index.html">Contents</a><p class="toc-group">Getting started</p><ul><li><a href="welcome.html">Welcome to SculptForge</a></li><li><a href="whats-new.html">What&#x27;s new</a></li><li><a href="coming-from-zbrush.html">Coming from ZBrush</a></li><li><a href="installing.html">Installing SculptForge</a></li><li><a href="interface.html">The interface</a></li><li><a href="navigation.html">Navigating the view</a></li></ul><p class="toc-group">Sculpting</p><ul><li><a href="sculpting.html">Sculpting and brushes</a></li><li><a href="brush-lab.html">Brush Lab and sharing brushes</a></li><li><a href="masking.html">Masking</a></li><li><a href="face-groups.html">Face Groups and visibility</a></li><li><a href="selection-sets.html">Selection sets and morph targets</a></li><li><a href="parts.html">Parts</a></li><li><a href="forge-spheres.html">Forge Spheres</a></li><li><a href="vertex-paint.html">Vertex Paint and materials</a></li><li><a href="texture-painting.html" class="current" aria-current="page">Texture painting</a><ul class="toc-sections"><li><a href="#start-in-one-click">Start in one click</a></li><li><a href="#paint-a-texture-in-four-steps">Paint a texture in four steps</a></li><li><a href="#vertex-or-texture">Vertex or Texture</a></li><li><a href="#how-texture-painting-works">How texture painting works</a></li><li><a href="#paint-layers-on-a-texture">Paint layers on a texture</a></li><li><a href="#convert-between-vertex-paint-and-texture">Convert between vertex paint and texture</a></li><li><a href="#import-and-export">Import and export</a></li><li><a href="#uvs-and-geometry">UVs and geometry</a></li><li><a href="#scripting">Scripting</a></li></ul></li><li><a href="uv-editor.html">UV Editor</a></li><li><a href="pbr-painting.html">Material painting (PBR)</a></li><li><a href="layers.html">Sculpt layers and blend shapes</a></li><li><a href="facial-shapes.html">Facial shapes and live face</a></li><li><a href="subdivision-levels.html">Subdivision levels</a></li><li><a href="micro-levels.html">Micro levels: hundreds of millions of polygons</a></li><li><a href="dynamic-topology.html">Dynamic topology</a></li><li><a href="timeline.html">Sculpt Timeline and timelapse</a></li><li><a href="gizmo.html">Moving, rotating and posing (Gizmo)</a></li><li><a href="geometry.html">Subdivide, remesh, decimate and LODs</a></li><li><a href="retopology.html">Quad retopology and detail projection</a></li></ul><p class="toc-group">AI and capture</p><ul><li><a href="generate-3d.html">Image and text to 3D</a></li><li><a href="splats.html">Gaussian splats</a></li><li><a href="scan-to-splat.html">Scan an object into a splat</a></li><li><a href="scan-to-sculptable.html">From scan to sculptable mesh</a></li><li><a href="phone-capture.html">Phone capture and AR</a></li></ul><p class="toc-group">Files and pipelines</p><ul><li><a href="baking.html">Baking normal and displacement maps</a></li><li><a href="exporting.html">Exporting, Unreal and ZBrush</a></li><li><a href="export-presets.html">Export presets</a></li><li><a href="blender.html">Working with Blender</a></li><li><a href="maya.html">Working with Maya</a></li><li><a href="projects.html">Projects, autosave and snapshots</a></li><li><a href="scripting.html">Scripting and automation</a></li><li><a href="studios.html">SculptForge for studios</a></li></ul><p class="toc-group">Reference</p><ul><li><a href="shortcuts.html">Keyboard and mouse</a></li><li><a href="performance.html">Performance and big meshes</a></li><li><a href="troubleshooting.html">Troubleshooting and FAQ</a></li><li><a href="glossary.html">Glossary</a></li></ul></nav>
       </div>
     </div>
     <main class="guide-main" id="top">
       <article class="guide-article">
 <h1 id="texture-painting">Texture painting</h1>
-<p>Texture painting puts the colour into an image laid over the model&#x27;s UVs, instead of on its vertices. The detail you can paint then comes from the texture&#x27;s resolution, not from how dense the mesh is: a 4K texture on a light, game-ready mesh holds pores, freckles and sharp decals that polypaint could only show on millions of polygons. Everything you know from <a href="polypaint.html">polypaint</a> still applies: the same Paint brush, colours, fills, symmetry, mask and paint layers with blend modes.</p>
-<figure class="shot"><a href="images/texture-painting.jpg" class="zoom"><img src="images/texture-painting.jpg" alt="Texture painting: a sharp texture stroke above a soft polypaint stroke, with the UV view in Tool &gt; Texture Map" width="1600" height="960" loading="lazy" decoding="async"></a><figcaption>Texture painting: a sharp texture stroke above a soft polypaint stroke, with the UV view in Tool &gt; Texture Map</figcaption></figure>
+<p>Texture painting puts the colour into an image laid over the model&#x27;s UVs, instead of on its vertices. The detail you can paint then comes from the texture&#x27;s resolution, not from how dense the mesh is: a 4K texture on a light, game-ready mesh holds pores, freckles and sharp decals that vertex paint could only show on millions of polygons. Everything you know from <a href="vertex-paint.html">vertex paint</a> still applies: the same Paint brush, colours, fills, symmetry, mask and paint layers with blend modes.</p>
+<figure class="shot"><a href="images/texture-painting.jpg" class="zoom"><img src="images/texture-painting.jpg" alt="Texture painting: a sharp texture stroke above a soft vertex paint stroke, with the UV view in Tool &gt; Texture Map" width="1600" height="960" loading="lazy" decoding="async"></a><figcaption>Texture painting: a sharp texture stroke above a soft vertex paint stroke, with the UV view in Tool &gt; Texture Map</figcaption></figure>
 <aside class="callout callout-note"><p>The texture can also carry roughness, metallic, normal, height, AO, emission and opacity, painted in the same strokes: see <a href="pbr-painting.html">Material painting (PBR)</a>.</p></aside>
 <h2 id="start-in-one-click">Start in one click<a class="anchor" href="#start-in-one-click" aria-label="Link to this section">#</a></h2>
-<p>Press <kbd>P</kbd> for the Paint brush (or turn on <strong>Rgb</strong>). While the SubTool has no texture, <strong>New Texture</strong> appears on the top shelf and in the Color palette. Click it: if the model has no UVs, SculptForge runs <strong>Auto UV</strong> first (in the background; the status bar shows its progress), then gives it a white texture (2K, or the size chosen in Tool &gt; Texture Map) and switches painting to <strong>Texture</strong>. Paint away. The steps below do the same thing by hand, with more choices.</p>
+<p>Press <kbd>P</kbd> for the Paint brush (or turn on <strong>Rgb</strong>). While the Part has no texture, <strong>New Texture</strong> appears on the top shelf and in the Color palette. Click it: if the model has no UVs, SculptForge runs <strong>Auto UV</strong> first (in the background; the status bar shows its progress), then gives it a white texture (2K, or the size chosen in Tool &gt; Texture Map) and switches painting to <strong>Texture</strong>. Paint away. The steps below do the same thing by hand, with more choices.</p>
 <h2 id="paint-a-texture-in-four-steps">Paint a texture in four steps<a class="anchor" href="#paint-a-texture-in-four-steps" aria-label="Link to this section">#</a></h2>
 <ol>
 <li>
 Open <strong>Tool &gt; Texture Map</strong> in the right tray.
 </li>
 <li>
-If the SubTool has no UVs (the sub-palette says &quot;No UVs&quot;), click <strong>Auto UV</strong>. SculptForge cuts the model into UV islands and packs them into the texture square. It works in the background with a progress bar; on a few hundred thousand triangles it takes seconds, on millions it can take a minute or more. Models imported with UVs (from ZBrush, Maya, Blender...) already have them: skip this step.
+If the Part has no UVs (the sub-palette says &quot;No UVs&quot;), click <strong>Auto UV</strong>. SculptForge cuts the model into UV islands and packs them into the texture square. It works in the background with a progress bar; on a few hundred thousand triangles it takes seconds, on millions it can take a minute or more. Models imported with UVs (from ZBrush, Maya, Blender...) already have them: skip this step.
 </li>
 <li>
 Choose a size (<strong>1K</strong>, <strong>2K</strong>, <strong>4K</strong> or <strong>8K</strong>; 2K is the default) and click <strong>New Texture</strong>. The model now carries a white texture, and painting goes into it: <strong>Texture</strong> lights up next to <strong>Vertex</strong> on the top shelf.
 </li>
 <li>
-Press <kbd>P</kbd> and paint. Draw Size, RGB Intensity, pen pressure, the stroke type, the alpha, symmetry and the mask work as they do for polypaint.
+Press <kbd>P</kbd> and paint. Draw Size, RGB Intensity, pen pressure, the stroke type, the alpha, symmetry and the mask work as they do for vertex paint.
 </li>
 </ol>
-<p>Click <strong>Show UVs</strong> to see the texture with the UV layout drawn over it, below the buttons. Paint on the model and watch the texture fill in.</p>
+<p>Click <strong>Show UVs</strong> to see the texture with the UV layout drawn over it, below the buttons, or open the <a href="uv-editor.html">UV Editor</a> (<kbd>Alt</kbd>+<kbd>U</kbd>) to cut seams, unwrap, pack and edit the UVs. Paint on the model and watch the texture fill in.</p>
 <h2 id="vertex-or-texture">Vertex or Texture<a class="anchor" href="#vertex-or-texture" aria-label="Link to this section">#</a></h2>
-<p>When a SubTool has a texture, <strong>Vertex</strong> and <strong>Texture</strong> appear on the top shelf next to <strong>Rgb</strong> (and in the Color, Paint Layers and Texture Map palettes). They choose where paint goes:</p>
+<p>When a Part has a texture, <strong>Vertex</strong> and <strong>Texture</strong> appear on the top shelf next to <strong>Rgb</strong> (and in the Color, Paint Layers and Texture Map palettes). They choose where paint goes:</p>
 <ul>
 <li>
 <strong>Texture</strong>: the Paint brush, <strong>Rgb</strong> while sculpting, <strong>Fill</strong>, <strong>Fill masked</strong>, <strong>Cavity</strong>, <strong>Clear</strong> and the Paint Layers palette work on the texture.
 </li>
 <li>
-<strong>Vertex</strong>: they work on the polypaint, exactly as before.
+<strong>Vertex</strong>: they work on the vertex paint, exactly as before.
 </li>
 </ul>
-<p>The model shows both: the polypaint multiplied by the texture, over the material. If paint looks as coarse as the mesh&#x27;s polygons, it is going into the vertices: check that <strong>Texture</strong> is lit, and that the SubTool carries no old polypaint (Tool &gt; Paint Layers, or <strong>Polypaint &gt; Texture</strong> to move it into the texture). Texture paint itself is as sharp as the texture: a hard alpha gives the same texels on a two-triangle plane as on a dense mesh. Each SubTool keeps its own choice, saved in the project. <strong>Show texture</strong> (Texture Map, or the Color palette) hides the texture in the viewport without deleting it.</p>
+<p>The model shows both: the vertex paint multiplied by the texture, over the material. If paint looks as coarse as the mesh&#x27;s polygons, it is going into the vertices: check that <strong>Texture</strong> is lit, and that the Part carries no old vertex paint (Tool &gt; Paint Layers, or <strong>Vertex Paint &gt; Texture</strong> to move it into the texture). Texture paint itself is as sharp as the texture: a hard alpha gives the same texels on a two-triangle plane as on a dense mesh. Each Part keeps its own choice, saved in the project. <strong>Show texture</strong> (Texture Map, or the Color palette) hides the texture in the viewport without deleting it.</p>
 <h2 id="how-texture-painting-works">How texture painting works<a class="anchor" href="#how-texture-painting-works" aria-label="Link to this section">#</a></h2>
 <ul>
 <li>
-Each texel under the brush gets its 3D position on the surface, so the falloff, the alpha and the brush size are the same as for polypaint, and a stroke looks the same whatever the UV layout.
+Each texel under the brush gets its 3D position on the surface, so the falloff, the alpha and the brush size are the same as for vertex paint, and a stroke looks the same whatever the UV layout.
 </li>
 <li>
 <strong>Front faces only:</strong> the brush never paints through a thin part onto its far side, and never on surfaces facing away from you.
@@ -104,7 +104,7 @@ Around every UV island the paint runs on a few texels into the empty space (padd
 One stroke is one undo step. SculptForge stores only the 64x64-texel tiles the stroke touched, so undo stays light even on an 8K texture. Layer edits (new layer, fill, clear, merge, flatten, delete) also keep only the tiles they changed, and an empty or single-colour tile costs almost nothing. Only an edit that changes a whole painted layer at once, like clearing a fully painted Base, stores the full layer.
 </li>
 <li>
-<kbd>Alt</kbd> paints back towards white on Base, and erases on a paint layer, as with polypaint.
+<kbd>Alt</kbd> paints back towards white on Base, and erases on a paint layer, as with vertex paint.
 </li>
 <li>
 <kbd>C</kbd> over the model picks the texture&#x27;s colour under the cursor.
@@ -112,23 +112,23 @@ One stroke is one undo step. SculptForge stores only the 64x64-texel tiles the s
 </ul>
 <aside class="callout callout-tip"><p><strong>Tip:</strong> Painting stays fast with big textures on big meshes: only the triangles under the brush are visited, the texels are painted on every core, and only the changed 64x64 tiles of the texture are sent to the graphics card. A big brush on a 4K texture takes a few milliseconds per dab. Memory is the limit: a 4K texture takes 64 MB per layer, an 8K texture 256 MB.</p></aside>
 <h2 id="paint-layers-on-a-texture">Paint layers on a texture<a class="anchor" href="#paint-layers-on-a-texture" aria-label="Link to this section">#</a></h2>
-<p><strong>Tool &gt; Paint Layers</strong> works on the texture&#x27;s own stack while painting goes into the texture: new layers, blend modes, opacity, visibility, lock, Merge down, Flatten, Clear and Fill layer behave exactly as described in <a href="polypaint.html#paint-layers">Paint layers</a>. Switch to <strong>Vertex</strong> and the palette shows the polypaint layers again; the two stacks are separate.</p>
-<h2 id="convert-between-polypaint-and-texture">Convert between polypaint and texture<a class="anchor" href="#convert-between-polypaint-and-texture" aria-label="Link to this section">#</a></h2>
-<div class="table-wrap"><table><thead><tr><th>Button</th><th>What it does</th></tr></thead><tbody><tr><td><strong>Polypaint &gt; Texture</strong></td><td>Bakes the polypaint (all its layers, as shown) into the active texture layer. Makes a 2K texture if there is none</td></tr><tr><td><strong>Texture &gt; Polypaint</strong></td><td>Sets the polypaint of every vertex to the texture&#x27;s colour under it. Detail finer than the mesh is lost; vertices on a UV seam take the average of both sides</td></tr></tbody></table></div>
-<p>Both are undoable. Polypaint &gt; Texture is a quick way to move an existing polypainted sculpt onto a game mesh&#x27;s texture after giving it UVs.</p>
+<p><strong>Tool &gt; Paint Layers</strong> works on the texture&#x27;s own stack while painting goes into the texture: new layers, blend modes, opacity, visibility, lock, Merge down, Flatten, Clear and Fill layer behave exactly as described in <a href="vertex-paint.html#paint-layers">Paint layers</a>. Switch to <strong>Vertex</strong> and the palette shows the vertex paint layers again; the two stacks are separate.</p>
+<h2 id="convert-between-vertex-paint-and-texture">Convert between vertex paint and texture<a class="anchor" href="#convert-between-vertex-paint-and-texture" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table><thead><tr><th>Button</th><th>What it does</th></tr></thead><tbody><tr><td><strong>Vertex Paint &gt; Texture</strong></td><td>Bakes the vertex paint (all its layers, as shown) into the active texture layer. Makes a 2K texture if there is none</td></tr><tr><td><strong>Texture &gt; Vertex Paint</strong></td><td>Sets the vertex paint of every vertex to the texture&#x27;s colour under it. Detail finer than the mesh is lost; vertices on a UV seam take the average of both sides</td></tr></tbody></table></div>
+<p>Both are undoable. Vertex Paint &gt; Texture is a quick way to move an existing vertex-painted sculpt onto a game mesh&#x27;s texture after giving it UVs.</p>
 <h2 id="import-and-export">Import and export<a class="anchor" href="#import-and-export" aria-label="Link to this section">#</a></h2>
 <ul>
 <li>
 <strong>Export Texture...</strong> saves the texture (every visible layer composited) as a PNG.
 </li>
 <li>
-<strong>Import Texture...</strong> loads a PNG, JPEG, TGA, BMP or PSD as the SubTool&#x27;s texture (it replaces the texture&#x27;s layers; undoable). The image is laid on the UVs as it is, so a texture made for these UVs in another app lines up.
+<strong>Import Texture...</strong> loads a PNG, JPEG, TGA, BMP or PSD as the Part&#x27;s texture (it replaces the texture&#x27;s layers; undoable). The image is laid on the UVs as it is, so a texture made for these UVs in another app lines up.
 </li>
 <li>
 Projects (<code>.sfproj</code>) save the texture with all its layers, blend modes and settings.
 </li>
 <li>
-Exporting the model writes the texture next to it as a PNG and references it, so other apps pick it up: OBJ writes a <code>.mtl</code> material with <code>map_Kd</code>; glTF/GLB embeds it as the base colour texture; USD binds a preview material that reads it; FBX and GoZ export write the PNG beside the file. See <a href="exporting.html">Exporting</a>.
+Exporting the model writes the texture next to it as a PNG and references it, so other apps pick it up: OBJ writes a <code>.mtl</code> material with <code>map_Kd</code>; glTF/GLB embeds it as the base colour texture; USD binds a preview material that reads it; FBX and GoZ-compatible export write the PNG beside the file. See <a href="exporting.html">Exporting</a>.
 </li>
 <li>
 <strong>Delete Texture</strong> removes it (undoable); painting goes back to the vertices.
@@ -137,35 +137,35 @@ Exporting the model writes the texture next to it as a PNG and references it, so
 <h2 id="uvs-and-geometry">UVs and geometry<a class="anchor" href="#uvs-and-geometry" aria-label="Link to this section">#</a></h2>
 <ul>
 <li>
-<strong>Auto UV</strong> replaces any existing UVs. If the SubTool already has a painted texture, the paint moves with it: every texel of the new layout takes the colour of the same point of the surface from the old one, for the Base and every texture layer (with their blend modes, opacity and names), and the islands get a padded border. It is one undo step: undo brings back the old UVs and the old texture exactly. Moving a 4K texture takes a fraction of a second on a million triangles (the unwrap itself takes longer; see below). The paint is resampled once, so very fine detail softens slightly (well under one texel).
+<strong>Auto UV</strong> replaces any existing UVs. If the Part already has a painted texture, the paint moves with it: every texel of the new layout takes the colour of the same point of the surface from the old one, for the Base and every texture layer (with their blend modes, opacity and names), and the islands get a padded border. It is one undo step: undo brings back the old UVs and the old texture exactly. Moving a 4K texture takes a fraction of a second on a million triangles (the unwrap itself takes longer; see below). The paint is resampled once, so very fine detail softens slightly (well under one texel).
 </li>
 <li>
-<a href="geometry.html#subdivide">Subdividing</a>, <a href="geometry.html#decimate">decimating</a>, <a href="subtools.html#split-a-subtool">splitting</a> and duplicating keep the UVs, so the texture stays on. Decimate leaves the vertices on UV seams in place, so the texture stays exact across seams.
+<a href="geometry.html#subdivide">Subdividing</a>, <a href="geometry.html#decimate">decimating</a>, <a href="parts.html#split-a-part">splitting</a> and duplicating keep the UVs, so the texture stays on. Decimate leaves the vertices on UV seams in place, so the texture stays exact across seams.
 </li>
 <li>
-<strong>Keep Texture</strong> (on by default, shown under <strong>Tool &gt; Remesh</strong> and <strong>Tool &gt; Geometry &gt; QRemesh</strong> when the SubTool has a texture): a <a href="geometry.html#voxel-remesh">voxel remesh</a> or <a href="retopology.html">QRemesh</a> builds a new surface without UVs, so SculptForge unwraps the result with Auto UV and projects the texture onto it from the old surface (each new texel takes the colour of the closest point of the old one), keeping every layer. It is part of the same undo step. It adds the time of an Auto UV of the result, so a voxel remesh of a painted SubTool runs in the background with a progress bar and <strong>Cancel</strong>. Turn it off to drop the texture instead (the status line says so). Paint finer than the new surface&#x27;s detail is kept, since it lives in the texture.
+<strong>Keep Texture</strong> (on by default, shown under <strong>Tool &gt; Remesh</strong> and <strong>Tool &gt; Geometry &gt; Quad Remesh</strong> when the Part has a texture): a <a href="geometry.html#voxel-remesh">voxel remesh</a> or <a href="retopology.html">Quad Remesh</a> builds a new surface without UVs, so SculptForge unwraps the result with Auto UV and projects the texture onto it from the old surface (each new texel takes the colour of the closest point of the old one), keeping every layer. It is part of the same undo step. It adds the time of an Auto UV of the result, so a voxel remesh of a painted Part runs in the background with a progress bar and <strong>Cancel</strong>. Turn it off to drop the texture instead (the status line says so). Paint finer than the new surface&#x27;s detail is kept, since it lives in the texture.
 </li>
 <li>
-<a href="subtools.html#merge-subtools">Merging</a> SubTools keeps their textures: the merged SubTool gets Auto UVs and one texture (the size of the largest) holding each part&#x27;s paint, with the texture layers flattened. Parts without a texture come out white.
+<a href="parts.html#merge-parts">Merging</a> Parts keeps their textures: the merged Part gets Auto UVs and one texture (the size of the largest) holding each part&#x27;s paint, with the texture layers flattened. Parts without a texture come out white.
 </li>
 <li>
 Auto UV on dense meshes: the islands are kept to about 4,000 triangles each, so a million-triangle sculpt unwraps in a quarter of a minute or so and gets a few hundred islands.
 </li>
 <li>
-UVs outside the 0-1 square (tiles, UDIMs) aren&#x27;t painted.
+UVs outside the 0-1 square (other UDIM tiles) aren&#x27;t painted yet; the <a href="uv-editor.html">UV Editor</a> lays them out.
 </li>
 </ul>
-<aside class="callout callout-zbrush"><p><strong>ZBrush:</strong> ZBrush paints polypaint and converts it to a texture afterwards (<strong>Texture Map &gt; New From Polypaint</strong>). SculptForge can do both: paint the texture directly, or bake polypaint with <strong>Polypaint &gt; Texture</strong>. <strong>Auto UV</strong> plays the part of UV Master&#x27;s Unwrap.</p></aside>
+<aside class="callout callout-zbrush"><p><strong>ZBrush:</strong> ZBrush paints polypaint and converts it to a texture afterwards (<strong>Texture Map &gt; New From Polypaint</strong>). SculptForge can do both: paint the texture directly, or bake vertex paint with <strong>Vertex Paint &gt; Texture</strong>. <strong>Auto UV</strong> plays the part of UV Master&#x27;s Unwrap.</p></aside>
 <h2 id="scripting">Scripting<a class="anchor" href="#scripting" aria-label="Link to this section">#</a></h2>
-<div class="table-wrap"><table><thead><tr><th>Command</th><th>What it does</th></tr></thead><tbody><tr><td><code>uv_auto</code></td><td>Unwrap the active SubTool (xatlas); <code>resolution=4096</code> packs the islands for that texture size. A painted texture moves onto the new UVs (<code>keep_texture=false</code> leaves it as it was)</td></tr><tr><td><code>texture_create size=2048</code></td><td>Give the SubTool a texture (1024, 2048, 4096, 8192 or <code>1k</code>...<code>8k</code>) and paint into it; <code>from_polypaint=true</code> starts from the polypaint</td></tr><tr><td><code>paint_target target=texture</code></td><td>Where painting goes: <code>vertex</code> or <code>texture</code></td></tr><tr><td><code>texture_from_polypaint</code></td><td>Bake the polypaint into the active texture layer</td></tr><tr><td><code>polypaint_from_texture</code></td><td>Copy the texture into the polypaint</td></tr><tr><td><code>texture_export path=skin.png</code></td><td>Save the texture as a PNG</td></tr><tr><td><code>texture_import path=skin.png</code></td><td>Load an image as the texture</td></tr><tr><td><code>texture_delete</code></td><td>Remove the texture</td></tr></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>Command</th><th>What it does</th></tr></thead><tbody><tr><td><code>uv_auto</code></td><td>Unwrap the active Part (xatlas); <code>resolution=4096</code> packs the islands for that texture size. A painted texture moves onto the new UVs (<code>keep_texture=false</code> leaves it as it was)</td></tr><tr><td><code>texture_create size=2048</code></td><td>Give the Part a texture (1024, 2048, 4096, 8192 or <code>1k</code>...<code>8k</code>) and paint into it; <code>from_polypaint=true</code> starts from the vertex paint</td></tr><tr><td><code>paint_target target=texture</code></td><td>Where painting goes: <code>vertex</code> or <code>texture</code></td></tr><tr><td><code>texture_from_polypaint</code></td><td>Bake the vertex paint into the active texture layer</td></tr><tr><td><code>polypaint_from_texture</code></td><td>Copy the texture into the vertex paint</td></tr><tr><td><code>texture_export path=skin.png</code></td><td>Save the texture as a PNG</td></tr><tr><td><code>texture_import path=skin.png</code></td><td>Load an image as the texture</td></tr><tr><td><code>texture_delete</code></td><td>Remove the texture</td></tr></tbody></table></div>
 <p><code>remesh</code>, <code>qremesh</code>, <code>subtool_merge_down</code> and <code>subtool_merge_visible</code> keep a texture unless you add <code>keep_texture=false</code>.</p>
 <p><code>paint_fill</code>, <code>paint_from_cavity</code>, <code>paint_clear</code> and every <code>paint_layer_*</code> command work on the texture while <code>paint_target</code> is <code>texture</code>. See <a href="scripting.html">Scripting and automation</a>.</p>
       </article>
-      <nav class="pager" aria-label="Previous and next chapter"><a class="prev" rel="prev" href="polypaint.html"><span>Previous</span>Polypaint and materials</a><a class="next" rel="next" href="pbr-painting.html"><span>Next</span>Material painting (PBR)</a></nav>
+      <nav class="pager" aria-label="Previous and next chapter"><a class="prev" rel="prev" href="vertex-paint.html"><span>Previous</span>Vertex Paint and materials</a><a class="next" rel="next" href="uv-editor.html"><span>Next</span>UV Editor</a></nav>
       <p class="guide-meta fine">Also in the app: <strong>Help &gt; User Guide</strong> (<kbd>Shift</kbd>+<kbd>F1</kbd>).
         Found a mistake? <a href="https://github.com/islandmed/SculptForge/edit/main/docs/guide/texture-painting.md">Edit this page on GitHub</a>.</p>
     </main>
-    <aside class="on-page" aria-label="On this page"><p>On this page</p><ul><li><a href="#start-in-one-click">Start in one click</a></li><li><a href="#paint-a-texture-in-four-steps">Paint a texture in four steps</a></li><li><a href="#vertex-or-texture">Vertex or Texture</a></li><li><a href="#how-texture-painting-works">How texture painting works</a></li><li><a href="#paint-layers-on-a-texture">Paint layers on a texture</a></li><li><a href="#convert-between-polypaint-and-texture">Convert between polypaint and texture</a></li><li><a href="#import-and-export">Import and export</a></li><li><a href="#uvs-and-geometry">UVs and geometry</a></li><li><a href="#scripting">Scripting</a></li></ul></aside>
+    <aside class="on-page" aria-label="On this page"><p>On this page</p><ul><li><a href="#start-in-one-click">Start in one click</a></li><li><a href="#paint-a-texture-in-four-steps">Paint a texture in four steps</a></li><li><a href="#vertex-or-texture">Vertex or Texture</a></li><li><a href="#how-texture-painting-works">How texture painting works</a></li><li><a href="#paint-layers-on-a-texture">Paint layers on a texture</a></li><li><a href="#convert-between-vertex-paint-and-texture">Convert between vertex paint and texture</a></li><li><a href="#import-and-export">Import and export</a></li><li><a href="#uvs-and-geometry">UVs and geometry</a></li><li><a href="#scripting">Scripting</a></li></ul></aside>
   </div>
   <footer class="footer">
     <div class="wrap footer-grid">
@@ -180,9 +180,8 @@ UVs outside the 0-1 square (tiles, UDIMs) aren&#x27;t painted.
         <a href="https://github.com/islandmed/SculptForge/issues">Report a problem</a>
         <a href="https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md">AI services &amp; privacy</a>
       </div>
-      <p class="fine trademarks">SculptForge is an independent project, not affiliated with or endorsed by Maxon or
-        any other company named in this guide. ZBrush is a trademark of Maxon. All other trademarks belong to their
-        owners.</p>
+      <p class="fine trademarks">ZBrush, GoZ, MatCap and other ZBrush feature names are trademarks of Maxon Computer
+        GmbH. SculptForge is not affiliated with or endorsed by Maxon. All other trademarks belong to their owners.</p>
     </div>
   </footer>
 </body>

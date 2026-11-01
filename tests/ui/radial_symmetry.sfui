@@ -1,0 +1,77 @@
+# Radial and local symmetry (#63): the R toggle on the top shelf and in Transform > Symmetry, Radial Count and the
+# axis, every copy's brush cursor, strokes that land on every copy, mask rectangles that follow them, projects
+# that keep the settings, and Local about the Part's own centre.
+run new_sphere subdivisions=5
+key f
+expect_value symmetry_radial == 0
+expect_value symmetry_copies == 2
+
+# Ctrl+hover explains it; a click turns it on with 8 copies about Y (16 with X on).
+hold ctrl
+hover "R##transform.symmetry_radial"
+expect_help "Radial symmetry"
+hold none
+click "R##transform.symmetry_radial"
+expect_value symmetry_radial == 8
+expect_value radial_axis == 1
+expect_value symmetry_copies == 16
+
+# The Transform palette: Radial Count and the axis.
+click "Transform##palette.transform"
+expect "##radialcount"
+expect_text "Radial Count 8"
+expect "Y axis##transform.radial_axis_y"
+shot transform-palette
+key escape
+
+# Seen from above: the brush cursor shows on every copy (8 turns, each mirrored: the mirror images of a cursor
+# off the plane land on other turns' places only when the count is even, so all 16 show).
+camera 0 89
+key f
+hover_model 0.8 0.5
+expect_value surface_cursor == 1
+expect_value cursor_copies >= 8
+shot cursors-from-above
+
+# X off: a stroke near the rim lands 8 times, once per copy.
+key x
+expect_value symmetry_copies == 8
+snapshot
+stroke 0.82 0.45 0.86 0.55
+expect_value moved > 0
+remember moved one_stroke
+shot radial-stroke
+key ctrl+z
+
+# 4 copies through the command (the same as the slider): the stroke moves about half as many vertices.
+run stroke points=0.9,0.3,0.2 view=-1,0,0 radius=0.15 radial=4
+key ctrl+z
+
+# A mask rectangle follows the copies too (#51 for mirrors, now for turns).
+remember masked unmasked
+hold ctrl
+drag_path 0.75 0.4 0.95 0.4 0.95 0.6 0.75 0.6
+hold none
+expect_value masked > $unmasked
+remember masked radial_mask
+shot radial-mask
+run mask_clear
+
+# Projects keep radial symmetry.
+run save_project path=sf_ui_radial.sfproj
+click "R##transform.symmetry_radial"
+expect_value symmetry_radial == 0
+run open path=sf_ui_radial.sfproj
+expect_value symmetry_radial == 8
+expect_value radial_axis == 1
+
+# Local: about the Part's own centre. Move the sphere off the origin; the centre follows it.
+click "Transform##palette.transform"
+click "Local##transform.symmetry_local"
+expect_value symmetry_local == 1
+key escape
+run transform translate=2,0,0 all=true
+hover_model 0.5 0.5
+expect_value symmetry_pivot_x > 1.9
+expect_value symmetry_pivot_x < 2.1
+shot local

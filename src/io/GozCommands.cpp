@@ -21,10 +21,10 @@ std::string fileStem(const std::string& path) {
 
 std::string meshSummary(const Mesh& m) {
     std::string s = std::to_string(m.triangleCount()) + " triangles";
-    if (m.hasPolygroups()) s += ", polygroups";
+    if (m.hasPolygroups()) s += ", face groups";
     if (m.hasUvs()) s += ", UVs";
     if (m.hasMask()) s += ", mask";
-    if (m.hasColors()) s += ", polypaint";
+    if (m.hasColors()) s += ", vertex paint";
     return s;
 }
 
@@ -88,7 +88,7 @@ void registerGozCommands(CommandRegistry& reg) {
     using T = ParamSpec::Type;
 
     reg.add({"goz_import",
-             "Open a ZBrush GoZ file (.GoZ), replacing the scene. Polygroups, UVs, mask and polypaint are kept; "
+             "Open a GoZ-compatible file (.GoZ, as ZBrush writes), replacing the scene. Face Groups, UVs, mask and vertex paint are kept; "
              "quads are split into triangle pairs (exported back as quads).",
              {{"path", T::String, "Input .GoZ path (UTF-8).", true}},
              [](Document& doc, const Args& a) -> CommandResult {
@@ -107,11 +107,11 @@ void registerGozCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"goz_export",
-             "Export the mesh as a ZBrush GoZ file (.GoZ) with polygroups, UVs, mask and polypaint. With several "
-             "visible SubTools, each is written next to `path` as <name>_<SubTool>.GoZ.",
+             "Export the mesh as a GoZ-compatible file (.GoZ) with face groups, UVs, mask and vertex paint. With several "
+             "visible Parts, each is written next to `path` as <name>_<Part>.GoZ.",
              {{"path", T::String, "Output .GoZ path (UTF-8).", true},
-              {"name", T::String, "SubTool name. Default: the name it came from ZBrush with, else the document name.", false},
-              {"quads", T::Bool, "Rebuild quads from triangle pairs made by GoZ import. Default true.", false}},
+              {"name", T::String, "Part name. Default: the name it came from ZBrush with, else the document name.", false},
+              {"quads", T::Bool, "Rebuild quads from triangle pairs made by the .GoZ import. Default true.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  const std::string path = argString(a, "path");
                  GozWriteOptions o;
@@ -139,14 +139,14 @@ void registerGozCommands(CommandRegistry& reg) {
                      const auto out = (base.parent_path() / std::u8string(file.begin(), file.end())).u8string();
                      if (!saveGoz(std::string(out.begin(), out.end()), *obj.mesh, name, err, o)) return {false, err};
                  }
-                 return {true, "Exported " + std::to_string(objects.size()) + " SubTools as " + fileStem(path) + "_*.GoZ"};
+                 return {true, "Exported " + std::to_string(objects.size()) + " Parts as " + fileStem(path) + "_*.GoZ"};
              }});
 
     reg.add({"goz_send",
-             "Send the visible SubTools to ZBrush through the GoZ bridge (Windows/macOS): writes each to the shared "
+             "Send the visible Parts to ZBrush (Send to ZBrush, a GoZ-compatible exchange; Windows/macOS): writes each to the shared "
              "GoZ folder, lists them in GoZ_ObjectList.txt and notifies or starts ZBrush. Sending meshes received "
-             "from ZBrush updates those SubTools.",
-             {{"name", T::String, "SubTool name (single SubTool only). Default: the name it came from ZBrush with, else the document name.", false},
+             "from ZBrush updates those Parts.",
+             {{"name", T::String, "Part name (single Part only). Default: the name it came from ZBrush with, else the document name.", false},
               {"folder", T::String, "GoZ root folder (contains GoZBrush/ and GoZProjects/). Default: the public Pixologic folder.", false},
               {"launch", T::Bool, "Notify or start ZBrush. Default true.", false},
               {"zbrush", T::String, "ZBrush executable to start if GoZ's notifier is missing (optional).", false}},
@@ -175,8 +175,8 @@ void registerGozCommands(CommandRegistry& reg) {
 
     reg.add({"goz_receive",
              "Receive what ZBrush last sent with GoZ (the objects in GoZ_ObjectList.txt). Each object updates the "
-             "SubTool it was sent from (an undoable step on that SubTool), or becomes a new SubTool; a single object "
-             "replaces a scene of one SubTool that didn't come from ZBrush.",
+             "Part it was sent from (an undoable step on that Part), or becomes a new Part; a single object "
+             "replaces a scene of one Part that didn't come from ZBrush.",
              {{"folder", T::String, "GoZ root folder. Default: the public Pixologic folder.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  std::vector<MeshObject> objects;
@@ -187,7 +187,7 @@ void registerGozCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"export_stl",
-             "Export the visible SubTools as one binary STL mesh for 3D printing, in millimetres with Z up (what "
+             "Export the visible Parts as one binary STL mesh for 3D printing, in millimetres with Z up (what "
              "slicers expect): 1 unit = 1 m in SculptForge becomes 1000 mm.",
              {{"path", T::String, "Output .stl path (UTF-8).", true},
               {"height_mm", T::Number, "Print height in millimetres: scales the model to this height (overrides scale).", false},

@@ -120,7 +120,7 @@ bool IsChoiceAction(std::string_view id) {
     return id == "draw.zadd" || id == "draw.zsub" || id == "material.smooth" || id == "material.flat" ||
            id == "view.background_gradient" || id == "view.background_flat" || id == "view.shading_lit_sphere" ||
            id == "view.shading_pbr" ||
-           id.substr(0, 16) == "subtool.shading_";
+           id.substr(0, 16) == "subtool.shading_" || id.substr(0, 8) == "uv.mode_";
 }
 
 bool Checkbox(const char* label, bool* v) {

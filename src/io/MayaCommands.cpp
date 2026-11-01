@@ -11,7 +11,7 @@ void registerMayaCommands(CommandRegistry& reg) {
     using T = ParamSpec::Type;
 
     reg.add({"maya_send",
-             "Send the visible SubTools to Maya through the exchange folder the SculptForge shelf script reads "
+             "Send the visible Parts to Maya through the exchange folder the SculptForge shelf script reads "
              "(OBJ with quads and UVs, plus a manifest). Objects that came from Maya replace their mesh there by "
              "name; the others become new objects.",
              {{"folder", T::String, "The exchange folder (the same one chosen in Maya's shelf script).", true}},
@@ -27,8 +27,8 @@ void registerMayaCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"maya_receive",
-             "Load what Maya last sent with the SculptForge shelf script. Each object replaces the SubTool with its "
-             "name (an undoable step on that SubTool) or becomes a new SubTool; the first object replaces a fresh "
+             "Load what Maya last sent with the SculptForge shelf script. Each object replaces the Part with its "
+             "name (an undoable step on that Part) or becomes a new Part; the first object replaces a fresh "
              "scene.",
              {{"folder", T::String, "The exchange folder (the same one chosen in Maya's shelf script).", true}},
              [](Document& doc, const Args& a) -> CommandResult {

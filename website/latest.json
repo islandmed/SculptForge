@@ -1,11 +1,13 @@
 {
-  "version": "0.10.3",
+  "version": "0.10.5",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Alternate smooth: let go of Shift mid-stroke to smooth without losing volume, as in ZBrush",
-    "Masking: Ctrl+drag draws a mask rectangle, Lasso and Rectangle follow symmetry, a click blurs the mask",
-    "Pen tablets in mouse mode no longer jump; click the axis gizmo to snap views; SubTool thumbnails",
-    "SculptForge stays free: Help > Support SculptForge if you'd like to back it (Insiders get releases early)"
+    "A UV Editor (Alt+U): UDIM tiles, seams, six unwraps, packing, texel density, trim sheets; stretch shows live on the model",
+    "Selection sets: store mask, groups, visibility, vertex paint, UVs and shape per Part; restore at any level; Morph brush",
+    "Radial and local symmetry, with mirror symmetry and every brush (#63); the timeline can sit at the top",
+    "Start strokes off the model: Preferences > Input or Shift+L (#62)",
+    "Fixed: the viewport on some Windows PCs never showed the model and left cursor trails (#29)",
+    "Tools now use SculptForge's own names; searching the old terms still finds them"
   ]
 }

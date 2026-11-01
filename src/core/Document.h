@@ -12,6 +12,7 @@
 #include "core/Splats.h"
 #include "core/TextureChannels.h"
 #include "core/Undo.h"
+#include "core/Uv.h"
 #include "core/Vdm.h"
 
 #include <map>
@@ -102,6 +103,9 @@ struct Document {
     // QRemesh Guides of the active SubTool: curves QRemesh's edge loops follow (core/QRemeshGuides.h). Not part
     // of undo (Delete Last / Clear remove them); editing them sets `modified`.
     std::vector<QRemeshGuide> qremeshGuides;
+    // The UV Editor's selection on the active SubTool (core/Uv.h); dropped when another SubTool is picked or the
+    // triangles change (UvSelection::valid). Not part of undo.
+    UvSelection uvSelection;
 
     void syncBvh() {
         if (bvhDirty) bvh.build(mesh);

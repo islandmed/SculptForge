@@ -14,7 +14,7 @@ expect_value active_subtool == 0
 remember camera_distance far
 click_subtool Cube 0.5 0.5 3
 expect_value active_subtool == 1
-expect_status Active SubTool: Cube
+expect_status Active Part: Cube
 expect_value camera_distance < $far
 expect_value edited_subtools == 0
 shot triple_click_frame

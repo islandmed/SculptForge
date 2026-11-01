@@ -7,12 +7,15 @@
 #include "core/Dyntopo.h"
 #include "core/Kelvinlet.h"
 #include "core/Mesh.h"
+#include "core/Symmetry.h"
 #include "core/Undo.h"
 
 #include <chrono>
 #include <functional>
 #include <memory>
+#include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace sf {
@@ -35,6 +38,7 @@ enum class BrushType {
     KelvinScale, // pinches (or swells) the surface toward the centre
     KelvinSnake, // multi-scale elastic SnakeHook: pulls tapering horns out along the stroke
     DetailClone, // stamps the VDM brush's map along the stroke, each stamp turned to follow it (Kelvinlet.cpp)
+    Morph,       // pulls the surface toward the Part's morph target, a selection set's shape (core/SelectionSets.h)
     Count
 };
 
@@ -44,7 +48,13 @@ inline bool isKelvinletBrush(BrushType t) {
            t == BrushType::KelvinSnake || t == BrushType::DetailClone;
 }
 
+// The brush's stored name: the key projects, brush files, hotkeys ("brush.damstandard") and scripts (stroke
+// brush=DamStandard) use. Never changes, so old files and scripts keep working.
 const char* brushName(BrushType type);
+// The name the interface shows ("Sharp Crease" for DamStandard); brushes named after ZBrush's coinages have their own.
+const char* brushLabel(BrushType type);
+// The brush a name means: its stored name or its label (any case, spaces ignored). False when none.
+bool brushFromName(std::string_view name, BrushType& out);
 
 struct DabParams {
     glm::vec3 center{0.0f};             // surface point under the cursor
@@ -64,9 +74,17 @@ struct DabParams {
     bool keepVolume = false;
 };
 
-struct Symmetry {
-    bool x = true, y = false, z = false;
-};
+// Local symmetry's centre for a Part: the middle of its bounding box (in parallel).
+glm::vec3 symmetryPivot(const Mesh& mesh);
+// A dab's parameters for one copy: its centre, view direction, stroke delta and alpha orientation moved by it.
+inline DabParams transformed(const DabParams& p, const SymCopy& c) {
+    DabParams o = p;
+    o.center = c.point(p.center);
+    o.viewDir = c.dir(p.viewDir);
+    o.strokeDelta = c.dir(p.strokeDelta);
+    o.alphaUp = c.dir(p.alphaUp);
+    return o;
+}
 
 // --- Shared brush helpers (every brush, including future paint/mask brushes, goes through these) ---
 
@@ -185,14 +203,26 @@ public:
     // micro displacement along its normals instead.
     bool microMoveAlongNormals = false;
     MicroStroke& microStroke() { return micro_; }
-    // Mirror sign vectors for the enabled symmetry axes (always starts with (1,1,1)).
+    // Mirror sign vectors for the enabled symmetry axes (always starts with (1,1,1)); ignores radial and local.
     static std::vector<glm::vec3> mirrors(Symmetry sym);
+    // Every copy of a stroke (core/Symmetry.h, symmetryCopies), the identity first.
+    static std::vector<SymCopy> copies(Symmetry sym) { return symmetryCopies(sym); }
 
     // Puts every vertex the current stroke moved (or painted) back the way it
     // started (the stroke stays open). DragRect re-stamps from scratch while dragging.
     void restoreStroke(Mesh& mesh, BVH& bvh);
 
+    // Morph brush (core/SelectionSets.h): the shape it pulls toward at the mesh's current level, from the selection
+    // set the Part names as its morph target. Null when there is none or it doesn't fit the mesh. Worked out on
+    // first use and kept while the set, level and vertex count stay the same (defined in SelectionSets.cpp).
+    const std::vector<glm::vec3>* morphTarget(const Mesh& mesh);
+
 private:
+    std::shared_ptr<const struct SelectionSet> morphSet_;
+    int morphLevel_ = -1;
+    size_t morphVertices_ = 0;
+    std::vector<glm::vec3> morphMapped_;
+    bool morphFits_ = false;
     void dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p);
     void dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const DabParams& p);
     // The Vdm brush (defined in Vdm.cpp); `handedness` -1 for a mirrored pass, so the stamp mirrors exactly.
@@ -242,7 +272,7 @@ private:
     bool topologyHeld_ = false;
     glm::vec3 lastCenter_{0.0f};
     float lastRadius_ = 0.0f, lastEdge_ = 0.0f;
-    std::vector<glm::vec3> lastMirrors_;
+    std::vector<SymCopy> lastMirrors_;
 
     bool active_ = false;
     bool frameWanted_ = false; // the next dabSingle records lastFrame
@@ -269,10 +299,10 @@ private:
     std::vector<uint8_t> firstTouch_;
     std::vector<uint32_t> blockFirst_;
     // Move brush: each mirror's vertices and weights (grabMirrors_: where each mirror's run ends, and its
-    // signs), every vertex once (sorted), and the BVH leaves holding them.
+    // matrix), every vertex once (sorted), and the BVH leaves holding them.
     std::vector<uint32_t> grabVerts_;
     std::vector<float> grabWeights_;
-    std::vector<std::pair<size_t, glm::vec3>> grabMirrors_;
+    std::vector<std::pair<size_t, glm::mat3>> grabMirrors_;
     std::vector<uint32_t> grabAll_, grabLeaves_;
 
     // Layer brush: per-stroke height already applied to each vertex.

@@ -6,14 +6,14 @@ subdivision level without a mesh: each triangle of that level carries a regular 
 per point, and the micro triangles are worked out on the fly by the brushes and by the graphics card. 300 million
 micro triangles take about 0.4 GB, sculpt in real time and draw at 60+ frames per second.
 
-![A sphere with 335 million micro triangles: surface noise, a Clay Buildup band, Crease and Dam Standard lines (Micro 4, 420 MB)](images/micro-300m.jpg)
+![A sphere with 335 million micro triangles: surface noise, a Clay Block band, Crease and Sharp Crease lines (Micro 4, 420 MB)](images/micro-300m.jpg)
 
 > **ZBrush:** HD Geometry also goes past the subdivision levels, but you sculpt it one small region at a time.
-> A micro level is the whole model, all the time: every brush stroke, every view, every SubTool at once.
+> A micro level is the whole model, all the time: every brush stroke, every view, every Part at once.
 
 ## Making a micro level
 
-1. Divide the SubTool to a comfortable highest level (0.3 to 2 million triangles is the sweet spot).
+1. Divide the Part to a comfortable highest level (0.3 to 2 million triangles is the sweet spot).
 2. In **Tool > Geometry**, set the **Micro** slider. Each step is four times the triangles: the label shows the
    total (Micro 4 on a 1.2 million triangle level is 300 million micro triangles).
 3. Click **Divide to Micro**. The surface stays exactly as smooth as before; the micro level starts flat on it.
@@ -33,12 +33,12 @@ triangles draws faster than Micro 4 on 1.2 million.
 
 ## Sculpting
 
-These brushes work on micro levels: **Standard**, **Clay**, **Clay Buildup**, **Smooth**, **Inflate**,
-**Flatten**, **Trim**, **Layer**, **Pinch**, **Crease**, **Dam Standard** and **Mask** (with
-<kbd>Ctrl</kbd>). Symmetry, Focal Shift, pressure and the mask work as usual, and every stroke is one undo step.
+These brushes work on micro levels: **Standard**, **Clay**, **Clay Block**, **Smooth**, **Inflate**,
+**Flatten**, **Trim**, **Layer**, **Pinch**, **Crease**, **Sharp Crease** and **Mask** (with
+<kbd>Ctrl</kbd>). Symmetry, Falloff, pressure and the mask work as usual, and every stroke is one undo step.
 
 - A micro level stores one height per point, so it moves the surface in and out, never sideways. **Pinch**,
-  **Crease** and **Dam Standard** sharpen the height profile instead of pulling points together (the result
+  **Crease** and **Sharp Crease** sharpen the height profile instead of pulling points together (the result
   looks the same for creases and folds).
 - **Move** reshapes the level below the micro level (the base) and the micro detail rides along on it, in its own
   frame: drag an ear back without smearing the pores. To move the micro surface itself along its normals, tick
@@ -46,15 +46,15 @@ These brushes work on micro levels: **Standard**, **Clay**, **Clay Buildup**, **
 - Big brushes are evaluated on a coarser grid (about 50 points across the brush) and the change is spread
   smoothly over the points in between, so a brush that covers half the model costs about as much as a small one.
   The detail under it is kept.
-- Brushes that slide the surface (Snake Hook, Nudge, VDM stamps) and custom recipe brushes don't apply to micro
+- Brushes that slide the surface (Tendril, Nudge, VDM stamps) and custom recipe brushes don't apply to micro
   levels; recipe brushes act as Standard.
 
-Polypaint, sculpt layers, polygroup colours and the wireframe aren't shown on micro levels yet.
+Vertex Paint, sculpt layers, face group colours and the wireframe aren't shown on micro levels yet.
 
 ## Baking down and exporting
 
-- **Bake Micro** makes a regular mesh of the micro level in a new SubTool (the micro level stays). `micro_bake
-  level=3` bakes a coarser micro level; `replace=true` replaces this SubTool instead. UVs, polygroups, hidden faces
+- **Bake Micro** makes a regular mesh of the micro level in a new Part (the micro level stays). `micro_bake
+  level=3` bakes a coarser micro level; `replace=true` replaces this Part instead. UVs, face groups, hidden faces
   and the micro mask carry over.
 - **Export Displacement** writes a 32-bit EXR displacement map over the base UVs (needs UVs) next to the project:
   the height of the micro surface above the flat base triangles, along the interpolated normal. `micro_export_displacement

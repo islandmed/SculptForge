@@ -62,7 +62,7 @@ const char* primitiveName(Primitive p) {
 
 const char* libraryTabName(LibraryTab tab) {
     static const char* const names[] = {"Project", "Tool",   "Brush",     "Alpha", "Material",
-                                        "Image",   "Splats", "QuickSave", "Recent"};
+                                        "Image",   "Splats", "Snapshots", "Recent"};
     return tab < LibraryTab::Count ? names[int(tab)] : "";
 }
 
@@ -319,11 +319,30 @@ std::string typedName(const std::string& name) {
     return out;
 }
 
+std::string typedZBrushAlias(const std::string& typed) {
+    // The brushes SculptForge names its own way, under the names ZBrush users type for them.
+    static const std::pair<const char*, const char*> kAliases[] = {
+        {"sharpcrease", "damstandard"}, {"clayblock", "claybuildup"}, {"tendril", "snakehook"},
+        {"elastictendril", "kelvinsnake"}};
+    for (const auto& [name, alias] : kAliases)
+        if (typed == name) return alias;
+    return {};
+}
+
+namespace {
+bool typedStarts(const std::string& name, const std::string& typed) {
+    const std::string n = typedName(name);
+    if (n.rfind(typed, 0) == 0) return true;
+    const std::string alias = typedZBrushAlias(n);
+    return !alias.empty() && alias.rfind(typed, 0) == 0;
+}
+} // namespace
+
 std::vector<size_t> filterByTyped(const std::vector<std::string>& names, const std::string& typed, bool* substring) {
     std::vector<size_t> out;
     if (substring) *substring = false;
     for (size_t i = 0; i < names.size(); ++i)
-        if (typed.empty() || typedName(names[i]).rfind(typed, 0) == 0) out.push_back(i);
+        if (typed.empty() || typedStarts(names[i], typed)) out.push_back(i);
     if (!out.empty() || typed.empty()) return out;
     if (substring) *substring = true;
     for (size_t i = 0; i < names.size(); ++i)
@@ -341,21 +360,22 @@ std::vector<std::pair<char, size_t>> letterBadges(const std::vector<std::string>
     auto has = [&](size_t i) {
         return std::any_of(badges.begin(), badges.end(), [i](const auto& b) { return b.second == i; });
     };
-    // ZBrush's own keys for the brushes both apps have (B S T Standard, B C B ClayBuildup ...) come first, so
-    // the hands that know ZBrush pick the same brush.
+    // ZBrush's keys for the brushes both apps have (B S T Standard, B C B for Clay Block, ZBrush's ClayBuildup ...)
+    // come first, so the hands that know ZBrush pick the same brush.
     static const std::pair<const char*, const char*> kZBrushKeys[] = {
         {"standard", "st"}, {"smooth", "sm"}, {"snakehook", "sh"}, {"claybuildup", "cb"}, {"clay", "cl"},
         {"damstandard", "ds"}, {"move", "mv"}, {"inflate", "in"}, {"pinch", "pi"}, {"flatten", "fl"},
         {"trim", "td"}, {"layer", "ly"}, {"nudge", "nu"}, {"crease", "cr"}};
     if (typed.size() == 1)
         for (size_t i : kept) {
-            const std::string n = typedName(names[i]);
+            const std::string n = typedName(names[i]), alias = typedZBrushAlias(n);
             for (const auto& [name, keys] : kZBrushKeys)
-                if (n == name && keys[0] == typed[0] && !taken(keys[1]) && !has(i)) badges.emplace_back(keys[1], i);
+                if ((n == name || alias == name) && keys[0] == typed[0] && !taken(keys[1]) && !has(i)) badges.emplace_back(keys[1], i);
         }
     for (size_t i : kept) {
         if (has(i)) continue;
-        const std::string n = typedName(names[i]);
+        std::string n = typedName(names[i]);
+        if (n.rfind(typed, 0) != 0) n = typedZBrushAlias(n); // typed by its ZBrush name
         if (n.rfind(typed, 0) != 0) continue;
         for (size_t k = typed.size(); k < n.size(); ++k)
             if (std::isalpha(static_cast<unsigned char>(n[k])) && !taken(n[k])) {
@@ -379,7 +399,7 @@ std::string quickSaveName(int64_t epochSeconds, int serial) {
     localtime_r(&t, &tm);
 #endif
     char buf[64];
-    std::strftime(buf, sizeof buf, "QuickSave %Y-%m-%d %H-%M-%S", &tm);
+    std::strftime(buf, sizeof buf, "Snapshot %Y-%m-%d %H-%M-%S", &tm);
     std::string name = buf;
     if (serial > 0) name += " (" + std::to_string(serial) + ")";
     return name + ".sfproj";
@@ -398,7 +418,7 @@ size_t pruneQuickSaves(const std::string& folder, size_t keep) {
         folder,
         [](const std::string& p) {
             const std::string name = utf8(fsPath(p).filename());
-            return isProjectFile(p) && name.rfind("QuickSave ", 0) == 0 ? AssetKind::Project : AssetKind::Folder;
+            return isProjectFile(p) && (name.rfind("Snapshot ", 0) == 0 || name.rfind("QuickSave ", 0) == 0) ? AssetKind::Project : AssetKind::Folder;
         },
         true);
     saves.erase(

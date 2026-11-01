@@ -1,15 +1,18 @@
-// SculptForge ZTool Export - a ZBrush plug-in that converts ZTools (.ZTL) so SculptForge can open them.
+// SculptForge ZTL Export - a ZBrush plug-in that converts ZTools (.ZTL) so SculptForge can open them.
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright The SculptForge contributors. https://github.com/islandmed/SculptForge
 //
 // ZBrush's .ZTL files are proprietary, so SculptForge can't read them. This plug-in runs inside ZBrush and
 // writes every SubTool of a ZTool, at its highest subdivision level, as a GoZ file next to the .ZTL:
 //     Dragon.ZTL  ->  Dragon.sf001_Body.GoZ, Dragon.sf002_Horns.GoZ, ...
-// GoZ keeps polygroups, polypaint, the mask and UVs. Then open Dragon.ZTL in SculptForge: it finds the GoZ
-// files and opens them as SubTools, in the same order and with the same names.
+// The .GoZ files keep polygroups, polypaint, the mask and UVs (SculptForge: face groups, vertex paint). Then open Dragon.ZTL in SculptForge: it finds the GoZ
+// files and opens them as Parts, in the same order and with the same names.
 //
 // Install: copy this file into ZBrush's ZStartup/ZPlugs64 folder and restart ZBrush (ZBrush compiles it to a
 // .zsc), or load it once with ZScript > Load. The buttons are in ZPlugin > SculptForge.
+//
+// ZBrush, ZScript, ZTool, GoZ, MatCap and other ZBrush feature names are trademarks of Maxon Computer GmbH. SculptForge is not affiliated with or
+// endorsed by Maxon.
 
 [VarDef, sfPath, ""]       // the .ZTL path
 [VarDef, sfBase, ""]       // the .ZTL path without its extension

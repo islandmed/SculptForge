@@ -184,7 +184,7 @@ int targetSubtool(const Document& doc, const Args& a) {
 }
 
 CommandResult notFound(const Args& a) {
-    return {false, a.contains("name") ? "No SubTool named '" + argString(a, "name") + "'" : std::string("No such SubTool")};
+    return {false, a.contains("name") ? "No Part named '" + argString(a, "name") + "'" : std::string("No such Part")};
 }
 
 // Replaces SubTool `index` by `pieces`, named after it ("Body 1", "Body 2", ...); the first piece is selected.
@@ -247,9 +247,9 @@ bool normalizedPiece(const Mesh& source, float size, Mesh& out) {
 // point, +Y along the normal, turned by twist, with mirrored copies for symmetry; merged into the active
 // SubTool as one new polygroup, one undo step.
 CommandResult insertPiece(Document& doc, Mesh prim, const Args& a, const std::string& label) {
-    std::vector<glm::vec3> mirrors;
+    std::vector<SymCopy> mirrors;
     std::string error;
-    if (!symmetryMirrorsArg(a, mirrors, error)) return {false, error};
+    if (!symmetryCopiesArg(a, doc.mesh, mirrors, error)) return {false, error};
     const float size = float(std::max(argNumber(a, "size", 0.2), 1e-4));
     glm::vec3 n(float(argNumber(a, "nx", 0.0)), float(argNumber(a, "ny", 1.0)), float(argNumber(a, "nz", 0.0)));
     n = glm::length(n) > 1e-8f ? glm::normalize(n) : glm::vec3(0, 1, 0);
@@ -274,43 +274,47 @@ CommandResult insertPiece(Document& doc, Mesh prim, const Args& a, const std::st
     for (uint32_t g : doc.mesh.polygroups) group = std::max(group, g);
     prim.polygroups.assign(prim.triangles.size(), group + 1);
     prim.recomputeAllNormals();
-    // Symmetry: a mirrored copy across each enabled plane (through the centre, as the brushes mirror),
-    // in the same polygroup and the same undo step. A copy that would land on one already there
-    // (inserted on a plane itself) is left out.
+    // Symmetry: a copy for each mirror image and radial turn (about the same centre as the brushes'), in the
+    // same polygroup and the same undo step. A copy that would land on one already there (inserted on a plane
+    // or the radial axis itself) is left out.
     std::vector<Mesh> copies;
     std::vector<glm::vec3> placed{at};
-    for (const glm::vec3& m : mirrors) {
-        const glm::vec3 centre = at * m;
+    for (const SymCopy& m : mirrors) {
+        const glm::vec3 centre = m.point(at);
         if (std::any_of(placed.begin(), placed.end(),
                         [&](const glm::vec3& p) { return glm::length(centre - p) < size * 0.25f; }))
             continue;
         placed.push_back(centre);
         Mesh copy = prim;
-        for (auto& p : copy.positions) p *= m;
-        if (m.x * m.y * m.z < 0.0f) // a reflection turns the triangles inside out: wind them back
+        for (auto& p : copy.positions) p = m.point(p);
+        if (m.handedness() < 0.0f) // a reflection turns the triangles inside out: wind them back
             for (auto& t : copy.triangles) std::swap(t.y, t.z);
         copy.recomputeAllNormals();
         copies.push_back(std::move(copy));
     }
+    bool radial = false; // (a copy turned other than by a half turn: not just mirrored)
+    for (const SymCopy& m : mirrors)
+        for (int i = 0; i < 3; ++i)
+            for (int j = 0; j < 3; ++j) radial = radial || (i != j && m.m[i][j] != 0.0f);
     std::vector<const Mesh*> parts{&doc.mesh, &prim};
     for (const Mesh& c2 : copies) parts.push_back(&c2);
     Mesh merged = mergeMeshes(parts);
     const size_t tris = prim.triangleCount() * (1 + copies.size());
     doc.replaceMeshUndoable(std::move(merged), "Insert " + label);
-    return {true, "Inserted " + (copies.empty() ? "a " + label : std::to_string(copies.size() + 1) + " " + label + "s (mirrored)") +
-                      " (" + std::to_string(tris) + " triangles, polygroup " + std::to_string(group + 1) + ")"};
+    return {true, "Inserted " + (copies.empty() ? "a " + label : std::to_string(copies.size() + 1) + " " + label + (radial ? "s (radial)" : "s (mirrored)")) +
+                      " (" + std::to_string(tris) + " triangles, face group " + std::to_string(group + 1) + ")"};
 }
 
 } // namespace
 
 void registerSubToolCommands(CommandRegistry& reg) {
     using T = ParamSpec::Type;
-    const ParamSpec indexParam{"index", T::Number, "SubTool index (0 = top of the list). Default: the active one.", false};
-    const ParamSpec nameParam{"name", T::String, "SubTool name (instead of index).", false};
+    const ParamSpec indexParam{"index", T::Number, "Part index (0 = top of the list). Default: the active one.", false};
+    const ParamSpec nameParam{"name", T::String, "Part name (instead of index).", false};
 
-    reg.add({"subtool_list", "List the SubTools (separate meshes) in the scene.", {},
+    reg.add({"subtool_list", "List the Parts (separate meshes) in the scene.", {},
              [](Document& doc, const Args&) -> CommandResult {
-                 std::string out = std::to_string(doc.subtoolCount()) + " SubTool" + (doc.subtoolCount() == 1 ? "" : "s") + ":";
+                 std::string out = std::to_string(doc.subtoolCount()) + " Part" + (doc.subtoolCount() == 1 ? "" : "s") + ":";
                  for (int i = 0; i < doc.subtoolCount(); ++i) {
                      const SubTool& s = doc.subtools[size_t(i)];
                      out += "\n" + std::to_string(i) + ". " + s.name + " (" + countText(doc.subtoolMesh(i).triangleCount());
@@ -322,23 +326,23 @@ void registerSubToolCommands(CommandRegistry& reg) {
                  return {true, out};
              }});
 
-    reg.add({"subtool_select", "Make a SubTool the active one: brushes and commands work on it.", {indexParam, nameParam},
+    reg.add({"subtool_select", "Make a Part the active one: brushes and commands work on it.", {indexParam, nameParam},
              [](Document& doc, const Args& a) -> CommandResult {
                  if (!a.contains("index") && !a.contains("name")) return {false, "Give index= or name="};
                  const int i = targetSubtool(doc, a);
                  if (i < 0) return notFound(a);
                  doc.selectSubtool(i);
                  doc.subtools[size_t(i)].visible = true; // you can't sculpt what you can't see
-                 return {true, "Active SubTool: " + doc.subtools[size_t(i)].name};
+                 return {true, "Active Part: " + doc.subtools[size_t(i)].name};
              }});
 
     reg.add({"subtool_append",
-             "Add a new SubTool: a primitive (sphere, cube, plane) placed beside the visible model, or a model file. "
-             "It becomes the active SubTool.",
+             "Add a new Part: a primitive (sphere, cube, plane) placed beside the visible model, or a model file. "
+             "It becomes the active Part.",
              {{"type", T::String, "'sphere' (default), 'cube', 'plane', 'cylinder', 'cone', 'torus', 'capsule', 'icosphere' or 'quadsphere'.", false},
               {"path", T::String, "Model file to append instead of a primitive (.obj, .glb, .fbx, .ply, .stl, .usd...).", false},
-              {"name", T::String, "Name for the new SubTool.", false},
-              {"size", T::Number, "Primitive size relative to the largest visible SubTool (0.05-2). Default 0.35.", false}},
+              {"name", T::String, "Name for the new Part.", false},
+              {"size", T::Number, "Primitive size relative to the largest visible Part (0.05-2). Default 0.35.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  Mesh m;
                  std::string name;
@@ -361,7 +365,7 @@ void registerSubToolCommands(CommandRegistry& reg) {
                              doc.addSubtool(std::move(scratch.subtoolMesh(i)), scratch.subtools[size_t(i)].name, false);
                          }
                          doc.selectSubtool(first);
-                         return {true, "Appended " + std::to_string(scratch.subtoolCount()) + " SubTools from " + path + " (" +
+                         return {true, "Appended " + std::to_string(scratch.subtoolCount()) + " Parts from " + path + " (" +
                                            countText(tris) + ")"};
                      }
                  } else {
@@ -402,7 +406,7 @@ void registerSubToolCommands(CommandRegistry& reg) {
                  if (a.contains("name")) name = argString(a, "name");
                  const size_t tris = m.triangleCount();
                  const int i = doc.addSubtool(std::move(m), name);
-                 return {true, "Appended SubTool " + doc.subtools[size_t(i)].name + " (" + countText(tris) + ")"};
+                 return {true, "Appended Part " + doc.subtools[size_t(i)].name + " (" + countText(tris) + ")"};
              }});
 
     const std::vector<ParamSpec> placeParams{
@@ -414,8 +418,8 @@ void registerSubToolCommands(CommandRegistry& reg) {
     std::vector<ParamSpec> primitiveParams{{"type", T::String, "sphere, cube, cylinder, cone, torus, capsule or quadsphere", false}};
     primitiveParams.insert(primitiveParams.end(), placeParams.begin(), placeParams.end());
     reg.add({"insert_primitive",
-             "Insert a primitive into the active SubTool where the surface is (#34): its axis along the surface "
-             "normal, its centre on the surface, as one new polygroup; one undoable step.",
+             "Insert a primitive into the active Part where the surface is (#34): its axis along the surface "
+             "normal, its centre on the surface, as one new face group; one undoable step.",
              primitiveParams,
              [](Document& doc, const Args& a) -> CommandResult {
                  const std::string blocked = dyntopoBlocker(doc.mesh);
@@ -435,13 +439,13 @@ void registerSubToolCommands(CommandRegistry& reg) {
              }});
 
     std::vector<ParamSpec> meshParams{
-        {"subtool", T::String, "insert a copy of this SubTool (by name)", false},
+        {"subtool", T::String, "insert a copy of this Part (by name)", false},
         {"file", T::String, "insert the mesh in this model file (.obj, .ply or .glb)", false}};
     meshParams.insert(meshParams.end(), placeParams.begin(), placeParams.end());
     reg.add({"insert_mesh",
-             "Insert your own mesh into the active SubTool where the surface is (#34), placed like insert_primitive: "
-             "a copy of another SubTool or a model file, scaled so its largest side is `size`, its up (+Y) axis "
-             "along the surface normal, as one new polygroup; one undoable step.",
+             "Insert your own mesh into the active Part where the surface is (#34), placed like insert_primitive: "
+             "a copy of another Part or a model file, scaled so its largest side is `size`, its up (+Y) axis "
+             "along the surface normal, as one new face group; one undoable step.",
              meshParams,
              [](Document& doc, const Args& a) -> CommandResult {
                  const std::string blocked = dyntopoBlocker(doc.mesh);
@@ -452,7 +456,7 @@ void registerSubToolCommands(CommandRegistry& reg) {
                  if (a.contains("subtool")) {
                      label = argString(a, "subtool");
                      const int i = doc.findSubtool(label);
-                     if (i < 0) return {false, "No SubTool named '" + label + "'"};
+                     if (i < 0) return {false, "No Part named '" + label + "'"};
                      source = doc.subtoolMesh(i);
                  } else {
                      const std::string path = argString(a, "file");
@@ -466,7 +470,7 @@ void registerSubToolCommands(CommandRegistry& reg) {
                  return insertPiece(doc, std::move(piece), a, label);
              }});
 
-    reg.add({"subtool_duplicate", "Copy a SubTool (with its layers and attributes) and make the copy active.",
+    reg.add({"subtool_duplicate", "Copy a Part (with its layers and attributes) and make the copy active.",
              {indexParam, nameParam},
              [](Document& doc, const Args& a) -> CommandResult {
                  const int i = targetSubtool(doc, a);
@@ -478,18 +482,18 @@ void registerSubToolCommands(CommandRegistry& reg) {
                  return {true, "Duplicated as " + doc.subtools[size_t(added)].name};
              }});
 
-    reg.add({"subtool_delete", "Delete a SubTool (not undoable). The last SubTool can't be deleted.",
+    reg.add({"subtool_delete", "Delete a Part (not undoable). The last Part can't be deleted.",
              {indexParam, nameParam},
              [](Document& doc, const Args& a) -> CommandResult {
                  const int i = targetSubtool(doc, a);
                  if (i < 0) return notFound(a);
-                 if (doc.subtoolCount() == 1) return {false, "The scene needs at least one SubTool"};
+                 if (doc.subtoolCount() == 1) return {false, "The scene needs at least one Part"};
                  const std::string name = doc.subtools[size_t(i)].name;
                  doc.removeSubtool(i);
-                 return {true, "Deleted SubTool " + name};
+                 return {true, "Deleted Part " + name};
              }});
 
-    reg.add({"subtool_rename", "Rename a SubTool.",
+    reg.add({"subtool_rename", "Rename a Part.",
              {{"to", T::String, "The new name.", true}, indexParam, nameParam},
              [](Document& doc, const Args& a) -> CommandResult {
                  const int i = targetSubtool(doc, a);
@@ -502,7 +506,7 @@ void registerSubToolCommands(CommandRegistry& reg) {
                  return {true, "Renamed to " + to};
              }});
 
-    reg.add({"subtool_visibility", "Show or hide a SubTool. Hidden SubTools aren't drawn, picked or exported.",
+    reg.add({"subtool_visibility", "Show or hide a Part. Hidden Parts aren't drawn, picked or exported.",
              {{"visible", T::Bool, "true to show, false to hide. Default: toggle.", false}, indexParam, nameParam},
              [](Document& doc, const Args& a) -> CommandResult {
                  const int i = targetSubtool(doc, a);
@@ -514,7 +518,7 @@ void registerSubToolCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"subtool_shading",
-             "Shade a SubTool smooth or flat (faceted), or as the scene's Flat shading setting says (default).",
+             "Shade a Part smooth or flat (faceted), or as the scene's Flat shading setting says (default).",
              {{"mode", T::String, "default, smooth or flat.", true}, indexParam, nameParam},
              [](Document& doc, const Args& a) -> CommandResult {
                  const int i = targetSubtool(doc, a);
@@ -528,7 +532,7 @@ void registerSubToolCommands(CommandRegistry& reg) {
                  return {true, s.name + " shading: " + shadingName(mode)};
              }});
 
-    reg.add({"subtool_solo", "Show only the active SubTool, or (when it already is the only one shown) show all again.", {},
+    reg.add({"subtool_solo", "Show only the active Part, or (when it already is the only one shown) show all again.", {},
              [](Document& doc, const Args&) -> CommandResult {
                  bool othersShown = false;
                  for (int i = 0; i < doc.subtoolCount(); ++i)
@@ -536,17 +540,17 @@ void registerSubToolCommands(CommandRegistry& reg) {
                  for (int i = 0; i < doc.subtoolCount(); ++i)
                      doc.subtools[size_t(i)].visible = i == doc.activeSubtool || !othersShown;
                  doc.modified = true;
-                 return {true, othersShown ? "Solo: " + doc.activeSubtoolInfo().name : std::string("All SubTools shown")};
+                 return {true, othersShown ? "Solo: " + doc.activeSubtoolInfo().name : std::string("All Parts shown")};
              }});
 
-    reg.add({"subtool_show_all", "Show every SubTool.", {},
+    reg.add({"subtool_show_all", "Show every Part.", {},
              [](Document& doc, const Args&) -> CommandResult {
                  for (auto& s : doc.subtools) s.visible = true;
                  doc.modified = true;
-                 return {true, "All SubTools shown"};
+                 return {true, "All Parts shown"};
              }});
 
-    reg.add({"subtool_move", "Move a SubTool up or down the list.",
+    reg.add({"subtool_move", "Move a Part up or down the list.",
              {{"direction", T::String, "'up' or 'down'.", true}, indexParam, nameParam},
              [](Document& doc, const Args& a) -> CommandResult {
                  const int i = targetSubtool(doc, a);
@@ -558,13 +562,13 @@ void registerSubToolCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"subtool_merge_down",
-             "Merge the active SubTool with the one below it into one mesh (not undoable). Each keeps its own "
-             "polygroups, so subtool_split_groups can separate them again. Painted textures are kept in one new "
+             "Merge the active Part with the one below it into one mesh (not undoable). Each keeps its own "
+             "face groups, so subtool_split_groups can separate them again. Painted textures are kept in one new "
              "texture on new Auto UVs.",
              {{"keep_texture", T::Bool, "Keep painted textures (Auto UV the result and copy them in). Default true.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  const int i = doc.activeSubtool;
-                 if (i + 1 >= doc.subtoolCount()) return {false, "There's no SubTool below " + doc.activeSubtoolInfo().name};
+                 if (i + 1 >= doc.subtoolCount()) return {false, "There's no Part below " + doc.activeSubtoolInfo().name};
                  Mesh merged = mergeMeshes({&doc.subtoolMesh(i), &doc.subtoolMesh(i + 1)});
                  const std::string texture = carryMergedTexturesNote({&doc.subtoolMesh(i), &doc.subtoolMesh(i + 1)}, merged,
                                                                      argBool(a, "keep_texture", true));
@@ -576,14 +580,14 @@ void registerSubToolCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"subtool_merge_visible",
-             "Merge every visible SubTool into one new SubTool, replacing them (not undoable). Hidden SubTools stay "
+             "Merge every visible Part into one new Part, replacing them (not undoable). Hidden Parts stay "
              "as they are. Painted textures are kept in one new texture on new Auto UVs.",
              {{"keep_texture", T::Bool, "Keep painted textures (Auto UV the result and copy them in). Default true.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  std::vector<int> visible;
                  for (int i = 0; i < doc.subtoolCount(); ++i)
                      if (doc.subtools[size_t(i)].visible) visible.push_back(i);
-                 if (visible.size() < 2) return {false, "Show at least two SubTools to merge"};
+                 if (visible.size() < 2) return {false, "Show at least two Parts to merge"};
                  Mesh merged = mergedVisibleMesh(doc);
                  std::vector<const Mesh*> parts; // as mergedVisibleMesh gathers them
                  for (int i : visible)
@@ -595,26 +599,26 @@ void registerSubToolCommands(CommandRegistry& reg) {
                  const int at = visible.front();
                  doc.addSubtool(std::move(merged), "Merged", true, at);
                  for (auto it = visible.rbegin(); it != visible.rend(); ++it) doc.removeSubtool(*it + 1);
-                 return {true, "Merged " + std::to_string(visible.size()) + " SubTools into " +
+                 return {true, "Merged " + std::to_string(visible.size()) + " Parts into " +
                                    doc.activeSubtoolInfo().name + " (" + countText(tris) + ")" + texture};
              }});
 
-    reg.add({"subtool_split_groups", "Split the active SubTool into one SubTool per polygroup (not undoable).", {},
+    reg.add({"subtool_split_groups", "Split the active Part into one Part per face group (not undoable).", {},
              [](Document& doc, const Args&) -> CommandResult {
                  auto pieces = splitByPolygroups(doc.mesh);
-                 if (pieces.empty()) return {false, doc.activeSubtoolInfo().name + " has only one polygroup"};
+                 if (pieces.empty()) return {false, doc.activeSubtoolInfo().name + " has only one face group"};
                  const size_t n = pieces.size();
                  replaceWithPieces(doc, doc.activeSubtool, std::move(pieces));
-                 return {true, "Split into " + std::to_string(n) + " SubTools"};
+                 return {true, "Split into " + std::to_string(n) + " Parts"};
              }});
 
-    reg.add({"subtool_split_parts", "Split the active SubTool into one SubTool per disconnected piece (not undoable).", {},
+    reg.add({"subtool_split_parts", "Split the active Part into one Part per disconnected piece (not undoable).", {},
              [](Document& doc, const Args&) -> CommandResult {
                  auto pieces = splitIntoParts(doc.mesh);
                  if (pieces.empty()) return {false, doc.activeSubtoolInfo().name + " is a single piece"};
                  const size_t n = pieces.size();
                  replaceWithPieces(doc, doc.activeSubtool, std::move(pieces));
-                 return {true, "Split into " + std::to_string(n) + " SubTools"};
+                 return {true, "Split into " + std::to_string(n) + " Parts"};
              }});
 }
 

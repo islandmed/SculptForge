@@ -35,7 +35,7 @@ struct ButtonChoice {
 constexpr ButtonChoice kButtonChoices[] = {
     {"", "Nothing"},
     {"view.frame", "Frame"},
-    {"view.frame_selected", "Frame SubTool"},
+    {"view.frame_selected", "Frame Part"},
     {"view.front", "Front view"},
     {"view.back", "Back view"},
     {"view.right", "Right view"},

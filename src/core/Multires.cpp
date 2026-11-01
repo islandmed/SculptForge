@@ -940,6 +940,7 @@ void enterLevel(Mesh& mesh, int level, BVH* bvh, const SubdivLevel* leavingLevel
     if (!stack->cache) stack->cache = std::make_shared<SubdivLevelCache>();
     SubdivLevelCache& cache = *stack->cache;
     std::shared_ptr<PaintTexture> texture = mesh.texture;
+    std::shared_ptr<const SelectionSetList> selectionSets = mesh.selectionSets; // (the Part's, not a level's)
     const bool toTexture = mesh.paintToTexture;
     const SubdivLevel& wantLevel = stack->levels[size_t(level)];
     const std::shared_ptr<Mesh> want = wantLevel.data;
@@ -963,6 +964,7 @@ void enterLevel(Mesh& mesh, int level, BVH* bvh, const SubdivLevel* leavingLevel
             SubdivLevelCache::Entry e{std::move(leaving), std::move(leavingTopo), std::move(mesh), std::move(*bvh)};
             e.mesh.multires.reset();
             e.mesh.texture.reset();
+            e.mesh.selectionSets.reset();
             cache.entries.push_back(std::move(e));
             while (cache.entries.size() > SubdivLevelCache::kMaxEntries) cache.entries.erase(cache.entries.begin());
         }
@@ -989,6 +991,7 @@ void enterLevel(Mesh& mesh, int level, BVH* bvh, const SubdivLevel* leavingLevel
     }
     mesh.multires = std::move(stack);
     mesh.texture = std::move(texture);
+    mesh.selectionSets = std::move(selectionSets);
     mesh.paintToTexture = toTexture;
     if (!taken) {
         mesh.rebuildTopology();
@@ -1523,11 +1526,11 @@ bool subdivCommit(Mesh& w) {
 
 bool subdivSetLevel(Mesh& mesh, int level, std::string& error, BVH* bvh) {
     if (!mesh.multires) {
-        error = "This SubTool has no subdivision levels (Divide adds them)";
+        error = "This Part has no subdivision levels (Divide adds them)";
         return false;
     }
     if (mesh.micro && level != mesh.multires->current) {
-        error = "This SubTool has a micro level: Bake it down or delete it (Tool > Geometry > Micro) before changing subdivision levels";
+        error = "This Part has a micro level: Bake it down or delete it (Tool > Geometry > Micro) before changing subdivision levels";
         return false;
     }
     if (!subdivCommit(mesh)) {
@@ -1536,7 +1539,7 @@ bool subdivSetLevel(Mesh& mesh, int level, std::string& error, BVH* bvh) {
     }
     const int n = int(mesh.multires->levels.size());
     if (level < 0 || level >= n) {
-        error = "No subdivision level " + std::to_string(level + 1) + " (this SubTool has " + std::to_string(n) + ")";
+        error = "No subdivision level " + std::to_string(level + 1) + " (this Part has " + std::to_string(n) + ")";
         return false;
     }
     if (level == mesh.multires->current) return true;
@@ -1564,7 +1567,7 @@ size_t subdivMaxTriangles() {
 
 bool subdivDivide(Mesh& mesh, bool smooth, std::string& error, BVH* bvh, size_t maxTriangles) {
     if (mesh.micro) {
-        error = "This SubTool has a micro level: Bake it down or delete it (Tool > Geometry > Micro) before changing subdivision levels";
+        error = "This Part has a micro level: Bake it down or delete it (Tool > Geometry > Micro) before changing subdivision levels";
         return false;
     }
     if (maxTriangles == 0) maxTriangles = subdivMaxTriangles();
@@ -1614,11 +1617,11 @@ bool subdivDivide(Mesh& mesh, bool smooth, std::string& error, BVH* bvh, size_t 
 
 bool subdivDeleteLower(Mesh& mesh, std::string& error) {
     if (mesh.micro) {
-        error = "This SubTool has a micro level: Bake it down or delete it (Tool > Geometry > Micro) before changing subdivision levels";
+        error = "This Part has a micro level: Bake it down or delete it (Tool > Geometry > Micro) before changing subdivision levels";
         return false;
     }
     if (!mesh.multires || !subdivCommit(mesh)) {
-        error = "This SubTool has no subdivision levels";
+        error = "This Part has no subdivision levels";
         return false;
     }
     if (mesh.multires->current == 0) {
@@ -1642,7 +1645,7 @@ bool subdivDeleteLower(Mesh& mesh, std::string& error) {
 
 bool subdivDeleteHigher(Mesh& mesh, std::string& error) {
     if (!mesh.multires || !subdivCommit(mesh)) {
-        error = "This SubTool has no subdivision levels";
+        error = "This Part has no subdivision levels";
         return false;
     }
     if (mesh.multires->current == int(mesh.multires->levels.size()) - 1) {
@@ -2095,7 +2098,7 @@ bool reconstructLoop(const Mesh& m, Reconstruction& out, std::string& error) {
 
 bool subdivReconstruct(Mesh& mesh, std::string& error, BVH* bvh) {
     if (mesh.micro) {
-        error = "This SubTool has a micro level: Bake it down or delete it (Tool > Geometry > Micro) before changing subdivision levels";
+        error = "This Part has a micro level: Bake it down or delete it (Tool > Geometry > Micro) before changing subdivision levels";
         return false;
     }
     if (mesh.multires) {
@@ -2228,9 +2231,11 @@ void applySubdivUndo(SubdivUndo& r, Mesh& mesh, BVH& bvh) {
         return;
     } else if (r.plain) {
         std::shared_ptr<PaintTexture> texture = mesh.texture;
+        std::shared_ptr<const SelectionSetList> selectionSets = mesh.selectionSets;
         const bool toTexture = mesh.paintToTexture;
         mesh = leanCopy(*r.plain);
         mesh.texture = std::move(texture);
+        mesh.selectionSets = std::move(selectionSets);
         mesh.paintToTexture = toTexture;
         mesh.rebuildTopology();
         mesh.recomputeAllNormals();
@@ -2283,7 +2288,7 @@ bool divideUndoable(Document& doc, bool smooth, std::string& message) {
 
 bool setSubdivLevelUndoable(Document& doc, int level, std::string& message) {
     if (!doc.mesh.multires) {
-        message = "This SubTool has no subdivision levels (Divide adds them)";
+        message = "This Part has no subdivision levels (Divide adds them)";
         return false;
     }
     if (level == subdivCurrentLevel(doc.mesh)) {
@@ -2319,6 +2324,104 @@ bool reconstructUndoable(Document& doc, std::string& message) {
         msg = "Reconstructed a lower level: " + levelSummary(m);
         return true;
     }, message, doc.mesh.multires ? -1 : 1);
+}
+
+// --- Moving values between levels (Selection Sets, core/SelectionSets.h) ---
+
+namespace {
+
+bool mapLevelsValid(const Mesh& mesh, int from, int to) {
+    const int n = subdivLevelCount(mesh);
+    return n > 0 && from >= 0 && to >= 0 && from < n && to < n;
+}
+
+template <class T>
+bool mapVertexValues(const Mesh& mesh, int from, int to, std::vector<T>& values, T fill, bool smooth) {
+    if (from == to) return true;
+    if (!mapLevelsValid(mesh, from, to)) return false;
+    const MultiresStack& s = *mesh.multires;
+    std::vector<T> next;
+    std::vector<uint8_t> flags;
+    for (int k = from; k > to; --k) { // down: each coarse vertex takes its child's value
+        const SubdivTopology& tp = *s.levels[size_t(k)].topo;
+        if (values.size() != tp.fineVertices) values.assign(tp.fineVertices, fill);
+        next.clear();
+        restrictVertices(tp, values, next, fill, nullptr, flags);
+        values.swap(next);
+    }
+    for (int k = from + 1; k <= to; ++k) { // up: interpolated (or through the level's stencils)
+        const SubdivTopology& tp = *s.levels[size_t(k)].topo;
+        if (values.size() != tp.coarseVertices) values.assign(tp.coarseVertices, fill);
+        next.clear();
+        if (smooth) next = subdivideField(tp, tp.smooth, values);
+        else prolongVertices(tp, values, next, fill, nullptr, flags);
+        values.swap(next);
+    }
+    return true;
+}
+
+template <class T>
+bool mapTriangleValues(const Mesh& mesh, int from, int to, std::vector<T>& values, T fill) {
+    if (from == to) return true;
+    if (!mapLevelsValid(mesh, from, to)) return false;
+    const MultiresStack& s = *mesh.multires;
+    std::vector<T> next;
+    std::vector<uint8_t> flags;
+    for (int k = from; k > to; --k) {
+        const SubdivTopology& tp = *s.levels[size_t(k)].topo;
+        if (values.size() != tp.fineTriangles) values.assign(tp.fineTriangles, fill);
+        next.clear();
+        restrictFaces(tp, values, next, s.levels[size_t(k) - 1].triangleCount(), fill, nullptr, flags);
+        values.swap(next);
+    }
+    for (int k = from + 1; k <= to; ++k) {
+        const SubdivTopology& tp = *s.levels[size_t(k)].topo;
+        if (values.size() != s.levels[size_t(k) - 1].triangleCount()) values.assign(s.levels[size_t(k) - 1].triangleCount(), fill);
+        next.clear();
+        prolongFaces(tp, values, next, fill, nullptr, flags);
+        values.swap(next);
+    }
+    return true;
+}
+
+} // namespace
+
+bool subdivMapVertices(const Mesh& mesh, int from, int to, std::vector<float>& values) {
+    return mapVertexValues(mesh, from, to, values, 0.0f, false);
+}
+bool subdivMapVertices(const Mesh& mesh, int from, int to, std::vector<glm::vec3>& values, glm::vec3 fill, bool smooth) {
+    return mapVertexValues(mesh, from, to, values, fill, smooth);
+}
+bool subdivMapTriangles(const Mesh& mesh, int from, int to, std::vector<uint32_t>& values) {
+    return mapTriangleValues(mesh, from, to, values, 0u);
+}
+bool subdivMapTriangles(const Mesh& mesh, int from, int to, std::vector<uint8_t>& values) {
+    return mapTriangleValues(mesh, from, to, values, uint8_t(0));
+}
+bool subdivMapCorners(const Mesh& mesh, int from, int to, std::vector<glm::vec2>& values) {
+    if (from == to) return true;
+    if (!mapLevelsValid(mesh, from, to)) return false;
+    const MultiresStack& s = *mesh.multires;
+    std::vector<glm::vec2> next;
+    std::vector<uint8_t> flags;
+    std::vector<glm::uvec3> coarseTris;
+    for (int k = from; k > to; --k) {
+        const SubdivTopology& tp = *s.levels[size_t(k)].topo;
+        if (values.size() != tp.fineTriangles * 3) values.assign(tp.fineTriangles * 3, glm::vec2(0.0f));
+        subdivLevelFaces(mesh, k - 1, coarseTris);
+        next.clear();
+        restrictUvs(tp, coarseTris, values, next, nullptr, flags);
+        values.swap(next);
+    }
+    for (int k = from + 1; k <= to; ++k) {
+        const SubdivTopology& tp = *s.levels[size_t(k)].topo;
+        const size_t coarse = s.levels[size_t(k) - 1].triangleCount() * 3;
+        if (values.size() != coarse) values.assign(coarse, glm::vec2(0.0f));
+        next.clear();
+        prolongUvs(tp, values, next, nullptr, flags);
+        values.swap(next);
+    }
+    return true;
 }
 
 } // namespace sf

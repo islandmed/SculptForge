@@ -12,8 +12,8 @@ shot contents
 click "User Guide/Masking##guide.toc.masking.md"
 expect_guide masking.md
 expect "User Guide/Paint a mask##guide.sec.paint-a-mask"
-click "User Guide/Polygroups and visibility##guide.toc.polygroups.md"
-expect_guide polygroups.md
+click "User Guide/Face Groups and visibility##guide.toc.face-groups.md"
+expect_guide face-groups.md
 shot chapter
 
 # Search finds a term across chapters; a result opens its chapter.

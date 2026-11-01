@@ -1,0 +1,111 @@
+# UV Editor (Tool > Texture Map > UV Editor, Alt+U): the 2D layout drawn on the GPU, seams drawn on the model,
+# unwrapping, the colours and checker on the model, packing across UDIM tiles, texel density, trim strips,
+# selecting and moving islands with undo.
+drop ../../assets/demo/lion-head.glb
+wait_idle 60
+key alt+u
+expect_value uv_editor_open == 1
+expect "UV Editor/Unwrap##uvunwrap"
+expect_value uv_islands == 0
+shot open
+
+# Seams on the model with the Seam tool: a drag across the mane marks the edges under it, red on the model.
+click "UV Editor/Seam Tool"
+expect_value uv_tool == 1
+stroke 0.2 0.45 0.8 0.45
+expect_value uv_seams > 10
+remember uv_seams drawn
+shot seam-tool
+key ctrl+z
+expect_value uv_seams == 0
+key ctrl+shift+z
+expect_value uv_seams == $drawn
+click "UV Editor/Seam Tool"
+expect_value uv_tool == 0
+
+# Sharp edges as seams, then Least Stretch: islands that neither fold nor stretch much, a view of them and the
+# same colours and a checker on the model.
+run uv_seam op=angle angle=50
+click "UV Editor/Unwrap##uvunwrap"
+wait_idle 120
+expect_value uv_unwraps == 1
+expect_value uv_islands > 20
+expect_value uv_stretch_x1000 < 60
+expect_value uv_flipped_x1000 < 5
+expect_value uv_view_triangles == 47214
+expect_value uv_overlay == 1
+expect_status "Unwrapped"
+shot unwrapped
+# One undo step: back to no UVs, and redo.
+key ctrl+z
+expect_value uv_islands == 0
+key ctrl+shift+z
+expect_value uv_islands > 20
+
+# Stretch on the model and in the view.
+click "UV Editor/##uvcolor"
+click "Stretch"
+shot stretch
+
+# Across two UDIM tiles.
+run uv_pack tiles=2 margin=6
+expect_value uv_tiles == 2
+hover_window 0.45 0.5
+key f
+shot udim
+run uv_pack tiles=1
+expect_value uv_tiles == 1
+
+# Texel density: every island to 400 texels per unit at 2K.
+run uv_density op=set value=400
+wait 0.2
+expect_value uv_density > 395
+expect_value uv_density < 405
+run uv_pack
+
+# Select an island and move it with G; undo puts it back.
+click "UV Editor/##uvcolor"
+click "Islands"
+run uv_select op=island face=20000 mode=island
+expect_value uv_selected > 10
+hover_window 0.45 0.5
+key home
+remember uv_max_u before_move
+shot selected
+hover_window 0.40 0.50
+key g
+hover_window 0.52 0.50
+key enter
+expect_value can_undo == 1
+shot moved
+key ctrl+z
+expect_value uv_max_u == $before_move
+
+# Box select in the view (islands touched by the box), then a click on empty space clears it.
+run uv_select op=none
+expect_value uv_selected == 0
+drag 0.33 0.45 0.45 0.62
+expect_value uv_selected > 0
+shot box-select
+drag 0.31 0.235 0.31 0.235
+expect_value uv_selected == 0
+run uv_select op=island face=20000
+
+# Trim sheet: the selected island laid into the second of four strips.
+click "UV Editor/Trim Sheet"
+run uv_trim strip=2 strips=4 fit_width=true
+expect_status "in Strip 2"
+shot trim
+
+# Select in 3D: a click on the model picks its island.
+run uv_select op=none
+click "UV Editor/Select in 3D"
+expect_value uv_tool == 2
+stroke 0.5 0.4 0.5 0.4
+expect_value uv_selected > 0
+click "UV Editor/Select in 3D"
+
+# The window closes with its key.
+hover_window 0.2 0.5
+key alt+u
+expect_value uv_editor_open == 0

@@ -10,6 +10,7 @@
 
 #include "core/Commands.h"
 #include "core/Mesh.h"
+#include "core/Symmetry.h"
 
 #include <glm/glm.hpp>
 
@@ -57,19 +58,24 @@ bool maskBorder(Mesh& mesh, int rings, bool polygroups, bool soft, float strengt
 // project inside `shape` (NDC under `viewProj`, see ScreenSelect.h) gain
 // `strength` (0-1) of mask, or lose it with `unmask`. Vertices behind the
 // camera count as outside; the far side of the model is selected too.
-// `mirrors` (Sculptor::mirrors of the symmetry) also selects each vertex whose
-// mirror image projects inside, as the brushes mirror (#51); empty = none.
+// `mirrors` (Sculptor::copies of the symmetry) also selects each vertex whose
+// mirror image or radial copy projects inside, as the brushes mirror (#51, #63); empty = none.
 bool maskInShape(Mesh& mesh, const glm::mat4& viewProj, const ScreenPolygon& shape, float strength, bool unmask,
-                 const std::vector<glm::vec3>& mirrors = {});
+                 const std::vector<SymCopy>& mirrors = {});
 // Whether any visible vertex (or, with `mirrors`, its mirror image) projects
 // inside `shape`: a selection that covers none of the model clears the mask
 // instead (ZBrush: Ctrl+drag on the background).
 bool shapeCoversMesh(const Mesh& mesh, const glm::mat4& viewProj, const ScreenPolygon& shape,
-                     const std::vector<glm::vec3>& mirrors = {});
+                     const std::vector<SymCopy>& mirrors = {});
 
-// The "symmetry" argument of a command ("x", "xz" ...) as mirror sign vectors (Sculptor::mirrors, the first one
-// the identity); just the identity without it. False, saying why, for anything but the axes x, y and z.
-bool symmetryMirrorsArg(const Args& a, std::vector<glm::vec3>& mirrors, std::string& error);
+// A command's symmetry arguments: "symmetry" (mirror axes, "x", "xz" ...), "radial" (copies around an axis,
+// 2-64; default 1, off), "radial_axis" (x, y or z; default y) and "local" (around `mesh`'s centre instead of
+// the world origin). Without them, no symmetry. False, saying why, for a bad value.
+bool symmetryArg(const Args& a, const Mesh& mesh, Symmetry& sym, std::string& error);
+// The same as the list of copies (Sculptor::copies, the first one the identity).
+bool symmetryCopiesArg(const Args& a, const Mesh& mesh, std::vector<SymCopy>& copies, std::string& error);
+// The parameter specs of "radial", "radial_axis" and "local" (commands that take "symmetry" add them).
+std::vector<ParamSpec> radialSymmetryParams();
 
 // Registers mask_clear, mask_all, mask_invert, mask_blur, mask_sharpen,
 // mask_grow, mask_shrink, mask_by_cavity, mask_by_polygroup, mask_border,

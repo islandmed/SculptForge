@@ -17,7 +17,7 @@
       "added": "2026-10-22"
     },
     {
-      "name": "Clay Buildup",
+      "name": "Clay Slab",
       "description": "Builds up flat-topped strokes of clay for blocking in forms.",
       "author": "SculptForge",
       "tags": [
@@ -25,9 +25,9 @@
         "blocking",
         "forms"
       ],
-      "file": "brushes/clay-buildup.sfbrush",
-      "preview": "previews/clay-buildup.png",
-      "sha256": "0681e2d2e16d0ca18f2d70297509a9939fdcd89488077299e2d162afe7a4ca55",
+      "file": "brushes/clay-slab.sfbrush",
+      "preview": "previews/clay-slab.png",
+      "sha256": "4aa8ec9eda58680dd9cbd62bb6b1f26ac70737c4ae2e0d50c73991e71863b66b",
       "added": "2026-10-22"
     },
     {

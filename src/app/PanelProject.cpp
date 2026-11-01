@@ -92,6 +92,10 @@ void App::initProject() {
     std::string err;
     const bool hadPrefs = f && Json::parse(std::string(std::istreambuf_iterator<char>(f), {}), prefs, err);
     if (hadPrefs) {
+        // An install from before SculptForge-style keys were the default, that never stored its key style: it had
+        // the ZBrush-style keys, and keeps them (initActions applies the style).
+        if (prefs["input_style"].isNumber()) startInputStyle_ = std::clamp(int(prefs["input_style"].asNumber(1)), 0, 3);
+        if (!uiPrefs_.inputStyleSaved && !uiConfigDeterministic_) uiPrefs_.inputStyle = startInputStyle_ >= 0 ? startInputStyle_ : 0;
         for (const auto& p : prefs["recent_files"].items())
             if (p.isString()) recentFiles_.push_back(p.asString());
         autosaveMinutes_ = std::clamp(int(prefs["autosave_minutes"].asNumber(autosaveMinutes_)), 0, 120);
@@ -109,6 +113,7 @@ void App::initProject() {
         if (prefs["support_card_version"].isString()) supportCardPrefs_.shownVersion = prefs["support_card_version"].asString();
     } else {
         showWelcome_ = options_.uiTest.empty() && options_.demo.empty(); // the first start: no prefs yet
+        startInputStyle_ = uiPrefs_.inputStyle; // a new install: SculptForge's keys until the welcome's choice
     }
     recentFiles_ = pruneRecentFiles(std::move(recentFiles_), fileExists);
     saveProjectPrefs(); // records this version, so What's New shows once
@@ -147,6 +152,7 @@ void App::saveProjectPrefs() {
     for (const auto& p : recentFiles_) recent.push(p);
     prefs.set("recent_files", std::move(recent));
     prefs.set("autosave_minutes", autosaveMinutes_);
+    if (startInputStyle_ >= 0) prefs.set("input_style", startInputStyle_);
     prefs.set("last_seen_version", std::string(SCULPTFORGE_VERSION));
     prefs.set("check_updates", checkUpdates_);
     prefs.set("update_checked_at", double(updateCheckedAt_));
@@ -310,6 +316,10 @@ void App::storeProjectSettings() {
     sym.set("x", symmetry_.x);
     sym.set("y", symmetry_.y);
     sym.set("z", symmetry_.z);
+    sym.set("radial", symmetry_.radialEnabled); // radial symmetry (#63): on, its count and axis
+    sym.set("radial_count", double(symmetry_.radial));
+    sym.set("radial_axis", double(symmetry_.radialAxis));
+    sym.set("local", symmetry_.local); // around the active Part's centre
     s.set("symmetry", std::move(sym));
 
     Json gizmo = Json::object(); // Gizmo 3D (Gizmo.cpp): where the pivot is and the options
@@ -392,7 +402,7 @@ void App::applyProjectSettings() {
         if (file != doc_.projectFiles.end() && decodeMatcapImage(file->second.data(), file->second.size(), m, err)) {
             int index = findMatcapByHash(m.hash);
             if (index < 0) {
-                m.name = name.empty() ? std::string("MatCap") : name;
+                m.name = name.empty() ? std::string("Lit Sphere") : name;
                 for (int n = 2; findMatcap(m.name) >= 0; ++n) m.name = name + " " + std::to_string(n);
                 index = addCustomMatcap(std::move(m));
             }
@@ -428,6 +438,16 @@ void App::applyProjectSettings() {
         readBool(sym, "x", symmetry_.x);
         readBool(sym, "y", symmetry_.y);
         readBool(sym, "z", symmetry_.z);
+        symmetry_.radialEnabled = false; // (older projects have none)
+        symmetry_.local = false;
+        readBool(sym, "radial", symmetry_.radialEnabled);
+        readBool(sym, "local", symmetry_.local);
+        float count = float(symmetry_.radial), axis = float(symmetry_.radialAxis);
+        readFloat(sym, "radial_count", count);
+        readFloat(sym, "radial_axis", axis);
+        symmetry_.radial = std::clamp(int(std::lround(count)), 2, Symmetry::kMaxRadial);
+        symmetry_.radialAxis = std::clamp(int(std::lround(axis)), 0, 2);
+        symmetryPivotKey_ = ~uint64_t(0);
     }
     if (const Json& g = s["gizmo"]; g.isObject()) {
         gizmo_.centreKey = ~uint64_t(0);
@@ -656,7 +676,8 @@ void App::drawUpdateBanner() {
     if (!updateAvailable_) return;
     const UpdateInfo& u = *updateAvailable_;
     const CanvasRect c = canvasRect(); // top centre of the 3D view, clear of the shelves
-    ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + 12.0f * uiScale_), ImGuiCond_Always, ImVec2(0.5f, 0.0f));
+    ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + timelineTopInset_ + 12.0f * uiScale_), ImGuiCond_Always,
+                            ImVec2(0.5f, 0.0f)); // (below the timeline strip when it is at the top)
     ImGui::SetNextWindowBgAlpha(0.96f);
     const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
                                    ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |

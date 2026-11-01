@@ -23,6 +23,7 @@ struct MultiresStack;
 struct SubdivTopology;
 struct ImplicitAdjacency;
 struct MicroMesh;
+struct SelectionSetList;
 
 // The vertices or triangles around a vertex (Mesh::neighbors, Mesh::vertexTriangles), in ascending order: a view
 // of the mesh's adjacency lists or, where the mesh's adjacency is implicit, the list itself. Use it like a span
@@ -101,6 +102,9 @@ public:
     std::vector<uint8_t> hidden;
     // Per triangle corner (3 per triangle, in triangle order): texture coordinates.
     std::vector<glm::vec2> uvs;
+    // Per triangle corner (empty = none): UV editing flags (core/Uv.h), kUvSeam on the edge from this corner to
+    // the next (a marked seam, kept on both sides of the edge) and kUvPin (the corner's UV stays put on Unwrap).
+    std::vector<uint8_t> uvFlags;
     // Per triangle: the triangle it forms a quad with (kNoQuad = a plain triangle; empty = no quads). Imported
     // quads are split into two triangles that keep each other here, so the wireframe and the exporters can
     // show and write them as quads again. Pairs are symmetric and share one edge, wound oppositely;
@@ -113,6 +117,7 @@ public:
     bool hasPolygroups() const { return !polygroups.empty(); }
     bool hasHidden() const { return !hidden.empty(); }
     bool hasUvs() const { return !uvs.empty(); }
+    bool hasUvFlags() const { return !uvFlags.empty(); }
     bool hasQuads() const { return !quadPartners.empty(); }
 
     float maskAt(uint32_t v) const { return mask.empty() ? 0.0f : mask[v]; }
@@ -203,6 +208,11 @@ public:
     // spheres and their links, or the skin while `zspherePreview`). Copies, undo steps and projects carry it.
     std::vector<ZSphere> zspheres;
     bool zspherePreview = false;
+
+    // Selection Sets (core/SelectionSets.h): named snapshots of the mask, polygroups, vertex paint, hidden faces, UVs
+    // and shape, immutable and shared by copies of the mesh (undo steps swap the whole list). They belong to the
+    // Part, not to one subdivision level: stepping levels keeps them. Null = none.
+    std::shared_ptr<const SelectionSetList> selectionSets;
 
     size_t vertexCount() const { return positions.size(); }
     size_t triangleCount() const { return triangles.size(); }

@@ -1,25 +1,25 @@
-# ZSpheres
+# Forge Spheres
 
-ZSpheres block out an organic base mesh from connected spheres: start from one root sphere, grow a torso, a head,
+Forge Spheres (ZBrush users: ZSpheres) block out an organic base mesh from connected spheres: start from one root sphere, grow a torso, a head,
 limbs, fingers, a tail or branches from it, set the proportions, look at the skin over them, then turn it into a
 mesh you sculpt as usual. It is the quickest way to get the structure of a character or creature before any detail.
 
-> **ZBrush:** this is ZSpheres with Adaptive Skin: Draw, Move and Scale on the spheres, Alt+click to delete,
+> **ZBrush:** this works like ZBrush's ZSpheres with Adaptive Skin: Draw, Move and Scale on the spheres, Alt+click to delete,
 > **A** to preview the skin, and **Make Mesh** in place of Make Adaptive Skin. Rotate mode, ZSketch, the
 > Topology and Rigging uses of ZSpheres and the link-sphere (magnet) tricks are not there.
 
-## Make a ZSphere SubTool
+## Make a Forge Sphere Part
 
-**Tool > ZSpheres > New ZSphere** adds a ZSphere SubTool holding one root sphere at the centre and makes it active.
-It sits in the SubTool list like any other SubTool, so you can block out a creature next to a model you already
+**Tool > Forge Spheres > New Forge Sphere** adds a Forge Sphere Part holding one root sphere at the centre and makes it active.
+It sits in the Parts list like any other Part, so you can block out a creature next to a model you already
 have.
 
-While a ZSphere SubTool is active, dragging on it edits the spheres instead of sculpting. Dragging the background
+While a Forge Sphere Part is active, dragging on it edits the spheres instead of sculpting. Dragging the background
 still navigates. The brush ring is hidden; the sphere under the cursor gets an outline instead.
 
 ## Edit the spheres
 
-Pick the mode in **Tool > ZSpheres**:
+Pick the mode in **Tool > Forge Spheres**:
 
 | Mode | On a sphere | On a link |
 |---|---|---|
@@ -33,7 +33,7 @@ sphere (orange) always stays.
 **Symmetry** (<kbd>X</kbd>) mirrors every edit: grow an arm on the right and the left one grows with it, move a
 leg and its twin moves too. A sphere on the centre line stays on it.
 
-Every drag is one step of the SubTool's undo history, so <kbd>Ctrl</kbd>+<kbd>Z</kbd> takes back the last sphere
+Every drag is one step of the Part's undo history, so <kbd>Ctrl</kbd>+<kbd>Z</kbd> takes back the last sphere
 you added, moved or scaled.
 
 > **Tip:** build the structure first with few spheres (one per joint), set the proportions with Move and Scale,
@@ -47,18 +47,18 @@ Turn Preview off to edit the spheres again; while it is on, clicks on the model 
 
 ## Make Mesh
 
-**Make Mesh** builds the skin as a new SubTool right below the ZSphere SubTool and makes it active:
+**Make Mesh** builds the skin as a new Part right below the Forge Sphere Part and makes it active:
 
 - It is watertight and made of quads, ready for the brushes, [Dynamic topology](dynamic-topology.md),
-  [Divide](subdivision-levels.md) or [QRemesh](retopology.md).
-- Each link gets its own [polygroup](polygroups.md), so you can isolate or mask a limb straight away.
+  [Divide](subdivision-levels.md) or [Quad Remesh](retopology.md).
+- Each link gets its own [face group](face-groups.md), so you can isolate or mask a limb straight away.
 - **Resolution** sets how dense it is: cells across the model's longest side. 128 suits a blockout; raise it for
   thin fingers or tails that come out too thin or broken.
 
-The ZSphere SubTool is hidden and kept. To change the proportions later, show and select it, edit the spheres and
+The Forge Sphere Part is hidden and kept. To change the proportions later, show and select it, edit the spheres and
 Make Mesh again. The armature is saved with the project.
 
-> **Tip:** for clean edge flow, run [QRemesh](retopology.md) on the new mesh, then Divide and sculpt.
+> **Tip:** for clean edge flow, run [Quad Remesh](retopology.md) on the new mesh, then Divide and sculpt.
 
 ## Scripting
 

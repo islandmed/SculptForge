@@ -23,6 +23,7 @@
 
 #include "core/BVH.h"
 #include "core/Mesh.h"
+#include "core/Symmetry.h"
 
 #include <glm/glm.hpp>
 
@@ -95,10 +96,11 @@ struct DyntopoStats {
 // starts recording, finish() ends the stroke.
 class DynamicTopology {
 public:
-    // Remeshes within `radius` of `center` and of its mirror images (`mirrors` as Sculptor::mirrors makes them,
-    // the identity first) towards edges of `edgeLength`. Returns false when nothing changed.
+    // Remeshes within `radius` of `center` and of its symmetric copies (`mirrors` as Sculptor::copies makes them:
+    // mirror images and radial turns, the identity first) towards edges of `edgeLength`. Returns false when
+    // nothing changed.
     bool remesh(Mesh& mesh, BVH& bvh, const glm::vec3& center, float radius, float edgeLength,
-                std::span<const glm::vec3> mirrors);
+                std::span<const SymCopy> mirrors);
     // The vertices the last remesh renumbered (old slot, new slot), for per-vertex stroke state.
     std::span<const std::pair<uint32_t, uint32_t>> movedVertices() const { return moved_; }
     // The vertex slots the last remesh added to the stroke's undo record (their stroke-start state is there).
@@ -192,7 +194,8 @@ private:
     // The current remesh.
     glm::vec3 center_{0.0f};
     float radius_ = 0.0f, target_ = 0.0f, splitLen2_ = 0.0f, collapseLen2_ = 0.0f, eps_ = 0.0f;
-    std::vector<glm::vec3> mirrorSigns_; // without the identity
+    std::vector<SymCopy> mirrorSigns_; // the symmetric copies, without the identity
+    std::vector<size_t> mirrorInverse_; // per copy, the index (in mirrorSigns_) of its inverse
     // Per mirror: each vertex's image (valid where stamp == mirrorStamp_, so a new remesh forgets them all).
     struct MirrorMap {
         std::vector<uint32_t> to, stamp;

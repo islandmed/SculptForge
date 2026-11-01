@@ -4,6 +4,7 @@
 #include "core/LayerStack.h"
 #include "core/MaterialRecipe.h"
 #include "core/MeshMaps.h"
+#include "core/Uv.h"
 #include "core/MapExport.h"
 
 #include "core/Commands.h"
@@ -122,8 +123,8 @@ size_t paintDab(Sculptor& sculptor, Mesh& mesh, const BVH& bvh, const DabParams&
     static thread_local std::vector<uint32_t> verts;
     auto clock = std::chrono::steady_clock::now();
     size_t changed = 0;
-    for (const glm::vec3& m : Sculptor::mirrors(sym)) {
-        const glm::vec3 center = p.center * m, viewDir = p.viewDir * m;
+    for (const SymCopy& m : Sculptor::copies(sym)) {
+        const glm::vec3 center = m.point(p.center), viewDir = m.dir(p.viewDir);
         brushVertices(mesh, bvh, center, p.radius, verts);
         for (uint32_t v : verts) {
             if (p.frontFacesOnly && v < mesh.normals.size() && glm::dot(mesh.normals[v], viewDir) > 0.0f) continue;
@@ -286,7 +287,7 @@ void registerPaintCommands(CommandRegistry& registry) {
     using T = ParamSpec::Type;
 
     registry.add({"set_color",
-                  "Set the current polypaint colour used by the Paint brush and paint_fill.",
+                  "Set the current vertex paint colour used by the Paint brush and paint_fill.",
                   {{"color", T::String, kColorHelp, false},
                    {"r", T::Number, "Red 0-1 (sRGB), instead of color.", false},
                    {"g", T::Number, "Green 0-1 (sRGB).", false},
@@ -300,7 +301,7 @@ void registerPaintCommands(CommandRegistry& registry) {
                   }});
 
     registry.add({"paint_fill",
-                  "Fill the active paint layer (of the texture when the SubTool paints into one) with a colour (undoable). By default the mask is respected: only "
+                  "Fill the active paint layer (of the texture when the Part paints into one) with a colour (undoable). By default the mask is respected: only "
                   "unmasked areas are painted. Hidden faces are never painted.",
                   {{"color", T::String, std::string(kColorHelp) + " Default: the current paint colour.", false},
                    {"area", T::String, "unmasked (default), masked (only the masked area) or all (ignore the mask).", false},
@@ -338,7 +339,7 @@ void registerPaintCommands(CommandRegistry& registry) {
                       return {true, "Filled " + std::to_string(n) + " vertices with " + colorToHex(c)};
                   }});
 
-    registry.add({"paint_clear", "Remove all polypaint from the mesh, paint layers included (undoable).", {},
+    registry.add({"paint_clear", "Remove all vertex paint from the mesh, paint layers included (undoable).", {},
                   [](Document& doc, const Args&) -> CommandResult {
                       if (paintsTexture(doc.mesh)) {
                           UndoRecord r = captureTexture(doc.mesh, "Clear Texture");
@@ -351,19 +352,19 @@ void registerPaintCommands(CommandRegistry& registry) {
                           doc.undo.push(std::move(r));
                           return {true, "Texture cleared to white (its layers too)"};
                       }
-                      if (!doc.mesh.hasColors()) return {true, "The mesh has no polypaint"};
+                      if (!doc.mesh.hasColors()) return {true, "The mesh has no vertex paint"};
                       // A snapshot, so redo removes the attribute again instead of leaving white paint.
                       Mesh cleared = doc.mesh;
                       cleared.clearColors();
                       cleared.paintLayers.clear();
                       cleared.paintBase.clear();
                       cleared.activePaintLayer = -1;
-                      doc.replaceMeshUndoable(std::move(cleared), "Clear Polypaint");
-                      return {true, "Polypaint cleared"};
+                      doc.replaceMeshUndoable(std::move(cleared), "Clear Vertex Paint");
+                      return {true, "Vertex Paint cleared"};
                   }});
 
     registry.add({"paint_from_cavity",
-                  "Darken (or tint) the creases and cavities of the sculpt with polypaint, like ZBrush's cavity "
+                  "Darken (or tint) the creases and cavities of the sculpt with vertex paint, like ZBrush's cavity "
                   "masking plus fill (undoable, respects the mask).",
                   {{"color", T::String, std::string(kColorHelp) + " Default: a dark brown.", false},
                    {"strength", T::Number, "0-1. Default 0.7.", false},
@@ -393,7 +394,7 @@ void registerPaintCommands(CommandRegistry& registry) {
                   }});
 
     registry.add({"export_ply",
-                  "Export the visible SubTools as one binary PLY mesh with vertex colours (polypaint), for scan tools, MeshLab, Blender.",
+                  "Export the visible Parts as one binary PLY mesh with vertex colours (vertex paint), for scan tools, MeshLab, Blender.",
                   {{"path", T::String, "Output .ply path (UTF-8).", true}},
                   [](Document& doc, const Args& a) -> CommandResult {
                       const std::string path = argString(a, "path");
@@ -402,10 +403,11 @@ void registerPaintCommands(CommandRegistry& registry) {
                       const Mesh& mesh = doc.subtoolCount() == 1 ? doc.mesh : (merged = mergedVisibleMesh(doc));
                       if (mesh.triangleCount() == 0) return {false, "Nothing visible to export"};
                       if (!savePlyMesh(path, mesh, err)) return {false, err};
-                      return {true, "Exported " + path + (mesh.hasColors() ? " (with polypaint)" : "")};
+                      return {true, "Exported " + path + (mesh.hasColors() ? " (with vertex paint)" : "")};
                   }});
     registerPaintLayerCommands(registry); // paint_layer_* (core/PaintLayer.cpp)
     registerTextureCommands(registry);    // texture_*, uv_auto, paint_target (core/TextureCommands.cpp)
+    registerUvCommands(registry);         // uv_unwrap, uv_pack, uv_seam, uv_select, ... (core/UvCommands.cpp)
     registerTextureChannelCommands(registry); // texture_channels, paint_material, channel_view (core/TextureChannelCommands.cpp)
     registerMeshMapCommands(registry);        // mesh_maps (core/MeshMaps.cpp)
     registerLayerStackCommands(registry);     // fill_layer (core/LayerStack.cpp)

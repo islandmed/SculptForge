@@ -82,3 +82,27 @@ TEST(action_registry_commands) {
     CHECK(prefilled == "open" && ran == "subdivide");
 }
 #endif
+
+#include "app/ZBrushNames.h"
+#include "core/Sculpt.h"
+
+TEST(zbrush_names_find_renamed_features) {
+    using namespace sf;
+    CHECK(zbrushNamesIn("Forge Spheres") == "ZSpheres");
+    CHECK(zbrushNamesIn("Append", "Tool > Parts") == "SubTool");
+    CHECK(zbrushNamesIn("Partial redo").empty()); // whole words only
+    CHECK(zbrushNamesIn("Add") == "Zadd");
+    CHECK(zbrushNamesIn("Add a folder").empty()); // "Add" only as the whole label
+    CHECK(zbrushNamesIn("Load Lit Sphere...") == "MatCap");
+    CHECK(zbrushNamesIn("Quad Remesh") == "ZRemesher");
+    CHECK(zbrushNamesIn("Quad Remesh", {}, true) == "ZRemesher, QRemesh");
+    // Brushes: stored names stay (old projects, hotkeys and scripts), labels are SculptForge's.
+    BrushType t = BrushType::Standard;
+    CHECK(std::string(brushName(BrushType::DamStandard)) == "DamStandard");
+    CHECK(std::string(brushLabel(BrushType::DamStandard)) == "Sharp Crease");
+    CHECK(brushFromName("DamStandard", t) && t == BrushType::DamStandard);
+    CHECK(brushFromName("sharp crease", t) && t == BrushType::DamStandard);
+    CHECK(brushFromName("Clay Block", t) && t == BrushType::ClayBuildup);
+    CHECK(brushFromName("snakehook", t) && t == BrushType::SnakeHook);
+    CHECK(!brushFromName("frobnicate", t));
+}

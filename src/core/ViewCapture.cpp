@@ -180,7 +180,7 @@ bool captureHeightAlpha(const Mesh& mesh, const BVH& bvh, const CaptureFrame& f,
                         BrushAlpha& out, std::string& error, CaptureInfo* info) {
     const int res = std::clamp(opt.resolution, 32, 1024);
     if (mesh.triangleCount() == 0) {
-        error = "The active SubTool is empty";
+        error = "The active Part is empty";
         return false;
     }
     std::vector<float> depth;
@@ -277,7 +277,7 @@ bool captureVdmFromView(const Mesh& mesh, const BVH& bvh, const CaptureFrame& f,
                         VectorDisplacement& out, std::string& error, CaptureInfo* info) {
     const int res = std::clamp(opt.resolution, 32, 1024);
     if (mesh.triangleCount() == 0) {
-        error = "The active SubTool is empty";
+        error = "The active Part is empty";
         return false;
     }
     const float half = f.halfSize, inv = 1.0f / half;
@@ -660,7 +660,7 @@ bool frameFromArgs(Document& doc, const Args& a, CaptureFrame& f, std::string& e
     if (a.count("up") && !parseVec3(argString(a, "up"), up)) return error = "Bad up (expected x,y,z)", false;
     if (glm::length(view) < 1e-6f) return error = "The view direction must not be zero", false;
     view = glm::normalize(view);
-    if (doc.mesh.triangleCount() == 0) return error = "The active SubTool is empty", false;
+    if (doc.mesh.triangleCount() == 0) return error = "The active Part is empty", false;
     doc.syncBvh();
     const AABB box = doc.mesh.bounds();
     const float diag = std::max(glm::length(box.extent()), 1e-4f);

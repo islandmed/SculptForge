@@ -5,10 +5,11 @@
 // is the key (I18n.h); a label without an entry stays in English.
 //
 // Conventions, as Spanish-speaking ZBrush artists use them:
-//   - Names of tools, brushes and products stay in English: SubTool, QRemesh, ZSpheres, LightBox, MatCap, Polypaint,
-//     Clay Buildup and every other brush, Zadd / Zsub, Smt, Rgb, PolyF, ProjectAll, LazyMouse, MaskPen, VDM.
+//   - Names of tools, brushes and products stay in English: Quad Remesh, Forge Spheres, Lit Sphere, Clay Block and every
+//     other brush, Smt, Rgb, Project All, Lazy Stroke, Mask Pen, VDM. Generic words are translated: Pieza (Part),
+//     Biblioteca (Library), Pintura de vértices (Vertex Paint), Grupos de caras (Face Groups).
 //   - Palettes and actions read as ZBrush's own Spanish: Pincel, Trazo, Herramienta, Dibujar, Tamaño de dibujo,
-//     Intensidad Z, Desplazamiento focal, Dividir, Poligrupos, Enmascarado.
+//     Intensidad, Atenuación, Dividir, Enmascarado.
 //   - Short and imperative, "tú" (Elige, Guarda), sentence case like the English.
 //   - printf conversions (%d, %.1f, %s, %%) stay in the same order: tests check every entry.
 // Keep the entries sorted by English within each group, one entry per English text.
@@ -52,19 +53,20 @@ constexpr Entry kSpanish[] = {
     {"Interface", "Interfaz"},
     {"Kelvinlet & Capture", "Kelvinlet y captura"},
     {"Layers", "Capas"},
-    {"LightBox", "LightBox"},
+    {"Library", "Biblioteca"},
     {"Masking", "Enmascarado"},
     {"Paint Layers", "Capas de pintura"},
     {"Performance", "Rendimiento"},
-    {"Polygroups", "Poligrupos"},
+    {"Face Groups", "Grupos de caras"},
     {"Remesh", "Remallado"},
-    {"SubTool", "SubTool"},
+    {"Part", "Pieza"},
+    {"Parts", "Piezas"},
     {"Tablet", "Tableta"},
     {"Texture Map", "Mapa de textura"},
     {"Updates", "Actualizaciones"},
     {"Vector Displacement", "Desplazamiento vectorial"},
     {"Visibility", "Visibilidad"},
-    {"ZSpheres", "ZSpheres"},
+    {"Forge Spheres", "Forge Spheres"},
     {"Edit recipe", "Editar receta"},
 
     // --- Palette paths in the Ctrl-help box ("Tool > Geometry") ---
@@ -89,10 +91,11 @@ constexpr Entry kSpanish[] = {
     {"Search", "Buscar"},
     {"Minimize", "Minimizar"},
     {"Menus", "Menús"},
-    {"QuickSave", "QuickSave"},
+    {"Snapshots", "Instantáneas"},
+    {"Save Snapshot", "Guardar instantánea"},
     {"Base", "Base"},
     {"   Splats ", "   Splats "},
-    {"Verts %s   Tris %s   SubTool %s (%d/%d)   Layer %s%s%s", "Vért. %s   Tris %s   SubTool %s (%d/%d)   Capa %s%s%s"},
+    {"Verts %s   Tris %s   Part %s (%d/%d)   Layer %s%s%s", "Vért. %s   Tris %s   Pieza %s (%d/%d)   Capa %s%s%s"},
     {"Customize: Ctrl+Alt+drag to move or remove items", "Personalizar: Ctrl+Alt+arrastrar para mover o quitar elementos"},
     {"Customize off", "Personalizar desactivado"},
     {"UI configuration stored", "Configuración de la interfaz guardada"},
@@ -149,8 +152,8 @@ constexpr Entry kSpanish[] = {
     {"Large", "Grande"},
     {"The active brush. Click for the brush picker; the bottom shelf holds favourites.",
      "El pincel activo. Clic para elegir pincel; el estante inferior guarda los favoritos."},
-    {"How dabs follow the cursor: Dots, DragRect, DragDot, Spray or LazyMouse. Click to choose.",
-     "Cómo siguen los toques al cursor: Dots, DragRect, DragDot, Spray o LazyMouse. Clic para elegir."},
+    {"How dabs follow the cursor: Dots, Drag Stamp, Slide Stamp, Spray or Lazy Stroke. Click to choose.",
+     "Cómo siguen los toques al cursor: Dots, Drag Stamp, Slide Stamp, Spray o Lazy Stroke. Clic para elegir."},
     {"The VDM brush's vector displacement map. Click to pick another.",
      "El mapa de desplazamiento vectorial del pincel VDM. Clic para elegir otro."},
     {"The brush's stamp shape (white = full effect). Click for the alpha picker.",
@@ -169,10 +172,9 @@ constexpr Entry kSpanish[] = {
 
     // --- Draw and the top shelf ---
     {"Draw Size", "Tamaño de dibujo"},
-    {"Z Intensity", "Intensidad Z"},
-    {"Smooth Z Intensity", "Intensidad Z de Smooth"},
+    {"Intensity", "Intensidad"},
+    {"Smooth Intensity", "Intensidad de Smooth"},
     {"RGB Intensity", "Intensidad RGB"},
-    {"Focal Shift", "Desplazamiento focal"},
     {"Focal Length", "Distancia focal"},
     {"Detail", "Detalle"},
     {"Sculpt", "Esculpir"},
@@ -190,10 +192,17 @@ constexpr Entry kSpanish[] = {
     {"Smooth keeps volume", "Smooth conserva el volumen"},
     {"Symmetry", "Simetría"},
     {"Symmetry X", "Simetría X"},
+    {"Local", "Local"},
+    {"X axis", "Eje X"},
+    {"Y axis", "Eje Y"},
+    {"Z axis", "Eje Z"},
+    {"Radial Count %d", "Copias radiales %d"},
+    {"Timeline position", "Posición de la línea de tiempo"},
+    {"Top of viewport", "Arriba del visor"},
     {"How strongly painting colours the surface (1-100); Ctrl+click to type.",
      "Con qué fuerza colorea la pintura la superficie (1-100); Ctrl+clic para escribirlo."},
-    {"This SubTool has subdivision levels, so strokes don't remesh it: delete the lower (or higher) levels first.",
-     "Este SubTool tiene niveles de subdivisión, así que los trazos no lo remallan: borra antes los niveles "
+    {"This Part has subdivision levels, so strokes don't remesh it: delete the lower (or higher) levels first.",
+     "Esta pieza tiene niveles de subdivisión, así que los trazos no la remallan: borra antes los niveles "
      "inferiores (o superiores)."},
 
     // --- Edit, File, Help ---
@@ -202,7 +211,7 @@ constexpr Entry kSpanish[] = {
     {"Paste brush", "Pegar pincel"},
     {"New Sphere", "Nueva esfera"},
     {"New Plane", "Nuevo plano"},
-    {"New ZSphere", "Nueva ZSphere"},
+    {"New Forge Sphere", "Nueva Forge Sphere"},
     {"Open", "Abrir"},
     {"Open Recent", "Abrir reciente"},
     {"Save", "Guardar"},
@@ -255,14 +264,14 @@ constexpr Entry kSpanish[] = {
     // --- Render, Display, Material ---
     {"Wireframe", "Malla de alambre"},
     {"Show Mesh", "Mostrar malla"},
-    {"Show Polypaint", "Mostrar Polypaint"},
+    {"Show Vertex Paint", "Mostrar pintura de vértices"},
     {"Show Mask", "Mostrar máscara"},
-    {"Show Polygroups", "Mostrar poligrupos"},
+    {"Show Face Groups", "Mostrar grupos de caras"},
     {"Show Splats", "Mostrar splats"},
     {"Show mesh", "Mostrar malla"},
     {"Show mask", "Mostrar máscara"},
-    {"Show polygroups", "Mostrar poligrupos"},
-    {"Show polypaint", "Mostrar Polypaint"},
+    {"Show face groups", "Mostrar grupos de caras"},
+    {"Show vertex paint", "Mostrar pintura de vértices"},
     {"Show texture", "Mostrar textura"},
     {"Show UVs", "Mostrar UVs"},
     {"Mask", "Máscara"},
@@ -270,13 +279,13 @@ constexpr Entry kSpanish[] = {
     {"Material colour", "Color del material"},
     {"Colour of the Studio material (the clay colour).", "Color del material Studio (el color de la arcilla)."},
     {"Frame model", "Encuadrar modelo"},
-    {"Frame SubTool", "Encuadrar SubTool"},
+    {"Frame Part", "Encuadrar pieza"},
     {"Fullscreen", "Pantalla completa"},
     {"Gradient", "Degradado"},
     {"Flat Colour", "Color plano"},
     {"Background colour", "Color de fondo"},
     {"Flat", "Plano"},
-    {"Load MatCap", "Cargar MatCap"},
+    {"Load Lit Sphere", "Cargar Lit Sphere"},
     {"Material picker", "Selector de materiales"},
     {"Material swatches", "Muestras de material"},
 
@@ -296,11 +305,11 @@ constexpr Entry kSpanish[] = {
     {"Stroke picker", "Selector de trazos"},
     {"Lazy radius", "Radio Lazy"},
 
-    // --- Tool: header, SubTool ---
+    // --- Tool: header, Parts ---
     {"tris", "tris"},
     {"Append", "Añadir"},
-    {"Append as SubTool", "Añadir como SubTool"},
-    {"Add a new SubTool beside the model", "Añade un SubTool nuevo junto al modelo"},
+    {"Append as Part", "Añadir como pieza"},
+    {"Add a new Part beside the model", "Añade una pieza nueva junto al modelo"},
     {"Insert on the model", "Insertar en el modelo"},
     {"Duplicate", "Duplicar"},
     {"Rename", "Renombrar"},
@@ -310,22 +319,22 @@ constexpr Entry kSpanish[] = {
     {"Move up the list", "Sube en la lista"},
     {"Move down the list", "Baja en la lista"},
     {"Merge down", "Combinar abajo"},
-    {"Merge the active SubTool with the one below it", "Combina el SubTool activo con el que tiene debajo"},
+    {"Merge the active Part with the one below it", "Combina la pieza activa con la que tiene debajo"},
     {"Merge visible", "Combinar visibles"},
     {"Split parts", "Separar partes"},
     {"Split groups", "Separar grupos"},
-    {"One SubTool per disconnected piece", "Un SubTool por cada pieza separada"},
-    {"One SubTool per polygroup", "Un SubTool por cada poligrupo"},
-    {"Alt+click a SubTool to select it", "Alt+clic en un SubTool para seleccionarlo"},
-    {"All SubTools", "Todos los SubTools"},
+    {"One Part per disconnected piece", "Una pieza por cada pieza separada"},
+    {"One Part per face group", "Una pieza por cada grupo de caras"},
+    {"Alt+click a Part to select it", "Alt+clic en una pieza para seleccionarla"},
+    {"All Parts", "Todas las piezas"},
     {"Solo", "Solo"},
     {"Sphere", "Esfera"},
     {"Cube", "Cubo"},
     {"Plane", "Plano"},
     {"From file", "Desde archivo"},
-    {"Active SubTool's copy", "Copia del SubTool activo"},
-    {"Not enough GPU memory to show every SubTool: hide some or step down a subdivision level.",
-     "No hay memoria de GPU suficiente para mostrar todos los SubTools: oculta alguno o baja un nivel de "
+    {"Active Part's copy", "Copia de la pieza activa"},
+    {"Not enough GPU memory to show every Part: hide some or step down a subdivision level.",
+     "No hay memoria de GPU suficiente para mostrar todas las piezas: oculta alguna o baja un nivel de "
      "subdivisión."},
     {"%s\n%zu vertices, %zu triangles%s%s\nClick to select, double-click to rename",
      "%s\n%zu vértices, %zu triángulos%s%s\nClic para seleccionar, doble clic para renombrar"},
@@ -333,7 +342,7 @@ constexpr Entry kSpanish[] = {
     {"Accept", "Aceptar"},
     {"Double", "Doble"},
     {"Thick", "Grosor"},
-    {"ProjectAll", "ProjectAll"},
+    {"Project All", "Project All"},
     {"Dist", "Dist"},
 
     // --- Geometry ---
@@ -366,14 +375,14 @@ constexpr Entry kSpanish[] = {
     {"Fill holes", "Rellenar agujeros"},
     {"Delete hidden", "Eliminar ocultos"},
 
-    // --- QRemesh and Remesh ---
-    {"QRemesh", "QRemesh"},
-    {"QRemesh Guides", "Guías de QRemesh"},
+    // --- Quad Remesh and Remesh ---
+    {"Quad Remesh", "Quad Remesh"},
+    {"Quad Remesh Guides", "Guías de Quad Remesh"},
     {"Target Polygons", "Polígonos objetivo"},
     {"Adaptive Size", "Tamaño adaptativo"},
     {"Curves Strength", "Fuerza de las curvas"},
     {"Guides", "Guías"},
-    {"Use Polypaint", "Usar Polypaint"},
+    {"Use Vertex Paint", "Usar pintura de vértices"},
     {"Detect Edges", "Detectar bordes"},
     {"Half", "Mitad"},
     {"Same", "Igual"},
@@ -390,7 +399,7 @@ constexpr Entry kSpanish[] = {
     {"Resolution", "Resolución"},
     {"Remeshing", "Remallando"},
     {"Cancel", "Cancelar"},
-    {"Stop the remesh; the SubTool stays as it is.", "Detén el remallado; el SubTool se queda como está."},
+    {"Stop the remesh; the Part stays as it is.", "Detén el remallado; la pieza se queda como está."},
     {"Voxels across the model: higher keeps more detail and makes more triangles.",
      "Vóxeles a lo ancho del modelo: más conserva más detalle y genera más triángulos."},
     {"Remesh for sculpting", "Remallar para esculpir"},
@@ -403,7 +412,7 @@ constexpr Entry kSpanish[] = {
     {"Grow", "Expandir"},
     {"Shrink", "Contraer"},
     {"By cavity", "Por cavidad"},
-    {"By polygroup", "Por poligrupo"},
+    {"By face group", "Por grupo de caras"},
     {"Passes", "Pasadas"},
     {"Mask Strength", "Fuerza de la máscara"},
     {"Threshold", "Umbral"},
@@ -411,13 +420,13 @@ constexpr Entry kSpanish[] = {
     {"Invert Mask", "Invertir máscara"},
     {"Mask All", "Enmascarar todo"},
     {"Mask brush", "Pincel de máscara"},
-    {"Unmask everything (MaskPen: Ctrl + drag background)", "Quita toda la máscara (MaskPen: Ctrl + arrastrar el fondo)"},
+    {"Unmask everything (Mask Pen: Ctrl + drag background)", "Quita toda la máscara (Mask Pen: Ctrl + arrastrar el fondo)"},
     {"Ctrl + click background", "Ctrl + clic en el fondo"},
     {"Mask creases and folds (replaces the mask; uses the mask strength)",
      "Enmascara pliegues y arrugas (sustituye la máscara; usa la fuerza de la máscara)"},
-    {"Mask one polygroup (replaces the mask)", "Enmascara un poligrupo (sustituye la máscara)"},
+    {"Mask one face group (replaces the mask)", "Enmascara un grupo de caras (sustituye la máscara)"},
 
-    // --- Polygroups and Visibility ---
+    // --- Face Groups and Visibility ---
     {"By normals", "Por normales"},
     {"By pieces", "Por piezas"},
     {"From mask", "Desde la máscara"},
@@ -429,9 +438,9 @@ constexpr Entry kSpanish[] = {
     {"New group wherever the surface turns more than the angle",
      "Grupo nuevo donde la superficie gira más que el ángulo"},
     {"One group per disconnected piece", "Un grupo por cada pieza separada"},
-    {"Visible polygroups", "Poligrupos visibles"},
-    {"Hide polygroup under cursor", "Ocultar el poligrupo bajo el cursor"},
-    {"Isolate polygroup under cursor", "Aislar el poligrupo bajo el cursor"},
+    {"Visible face groups", "Grupos de caras visibles"},
+    {"Hide face group under cursor", "Ocultar el grupo de caras bajo el cursor"},
+    {"Isolate face group under cursor", "Aislar el grupo de caras bajo el cursor"},
     {"Show all", "Mostrar todo"},
     {"Unhide all", "Mostrar todo"},
     {"Invert visible", "Invertir visibles"},
@@ -451,8 +460,8 @@ constexpr Entry kSpanish[] = {
     {"New Texture", "Nueva textura"},
     {"Import Texture", "Importar textura"},
     {"Delete Texture", "Eliminar textura"},
-    {"Polypaint > Texture", "Polypaint > Textura"},
-    {"Texture > Polypaint", "Textura > Polypaint"},
+    {"Vertex Paint > Texture", "Pintura de vértices > Textura"},
+    {"Texture > Vertex Paint", "Textura > Pintura de vértices"},
     {"Texture size", "Tamaño de textura"},
     {"Auto UV", "UV automáticas"},
     {"Pick colour", "Tomar color"},
@@ -461,7 +470,7 @@ constexpr Entry kSpanish[] = {
     {"Second colour", "Color secundario"},
 
     // --- Transform and the gizmo ---
-    {"Gizmo 3D", "Gizmo 3D"},
+    {"Gizmo", "Gizmo"},
     {"Front view", "Vista frontal"},
     {"Back view", "Vista trasera"},
     {"Left view", "Vista izquierda"},
@@ -492,10 +501,10 @@ constexpr Entry kSpanish[] = {
 
     // --- Preferences > Interface ---
     {"Language", "Idioma"},
-    {"The language of menus, palettes, shelves and messages. Brush and tool names (SubTool, QRemesh, DynaMesh-style "
-     "names) stay as they are, as in ZBrush. Store Config keeps it for the next start.",
+    {"The language of menus, palettes, shelves and messages. Brush and tool names (Quad Remesh, Forge Spheres, "
+     "Clay Block...) stay as they are. Store Config keeps it for the next start.",
      "El idioma de los menús, las paletas, los estantes y los mensajes. Los nombres de pinceles y herramientas "
-     "(SubTool, QRemesh y similares) se quedan como están, igual que en ZBrush. Store Config lo conserva para el "
+     "(Quad Remesh, Forge Spheres, Clay Block...) se quedan como están. Store Config lo conserva para el "
      "próximo inicio."},
     {"Popup Info (Ctrl+hover help)", "Popup Info (ayuda con Ctrl+pasar el ratón)"},
     {"Popup Info", "Popup Info"},
@@ -542,20 +551,23 @@ constexpr Entry kSpanish[] = {
     {"Maya", "Maya"},
     {"SculptForge", "SculptForge"},
     {"Emulate Numpad", "Emular teclado numérico"},
-    {"Right click opens the QuickMenu", "El clic derecho abre el QuickMenu"},
+    {"Right click opens the Quick Menu", "El clic derecho abre el menú rápido"},
     {"Hold Space and drag to move the camera", "Mantén Espacio y arrastra para mover la cámara"},
+    {"Start strokes off the model", "Empezar trazos fuera del modelo"},
+    {"Strokes start off the model", "Los trazos empiezan fuera del modelo"},
+    {"Toggle strokes off the model", "Activar trazos fuera del modelo"},
     {"Cursor follows surface", "El cursor sigue la superficie"},
     {"Import Blender keymap", "Importar atajos de Blender"},
-    {"QuickMenu", "QuickMenu"},
+    {"Quick Menu", "Menú rápido"},
 
     // --- Preferences > Hotkeys ---
     {"Filter", "Filtrar"},
     {"press a key", "pulsa una tecla"},
     {"Default shortcuts", "Atajos predeterminados"},
 
-    // --- Preferences > Display, LightBox, Tablet, Performance, Updates, Autosave ---
+    // --- Preferences > Display, Library, Tablet, Performance, Updates, Autosave ---
     {"Show at startup", "Mostrar al iniciar"},
-    {"Show LightBox at startup", "Mostrar LightBox al iniciar"},
+    {"Show Library at startup", "Mostrar Biblioteca al iniciar"},
     {"Placement", "Ubicación"},
     {"Top", "Arriba"},
     {"Bottom", "Abajo"},
@@ -618,14 +630,14 @@ constexpr Entry kSpanish[] = {
     {"Save a recovery copy this often (0 = off). Restored after a crash.",
      "Guarda una copia de recuperación con esta frecuencia (0 = desactivado). Se restaura tras un fallo."},
 
-    // --- LightBox ---
+    // --- Library ---
     {"Image", "Imagen"},
     {"Recent", "Recientes"},
     {"Nothing here yet.", "Aún no hay nada."},
     {"Nothing here yet. Projects you save (Ctrl+S) into the User folder show up here.",
      "Aún no hay nada. Aquí aparecen los proyectos que guardas (Ctrl+S) en la carpeta User."},
-    {"Nothing here yet. QuickSave keeps timestamped copies of your scene here.",
-     "Aún no hay nada. QuickSave guarda aquí copias de tu escena con fecha y hora."},
+    {"Nothing here yet. Save Snapshot keeps timestamped copies of your scene here.",
+     "Aún no hay nada. Guardar instantánea deja aquí copias de tu escena con fecha y hora."},
     {"Nothing here yet. Files you open show up here.", "Aún no hay nada. Aquí aparecen los archivos que abres."},
     {"Nothing here yet. Put reference images in the User folder.",
      "Aún no hay nada. Pon imágenes de referencia en la carpeta User."},
@@ -634,7 +646,7 @@ constexpr Entry kSpanish[] = {
     {"Back", "Atrás"},
     {"Forward", "Adelante"},
     {"Open folder", "Abrir carpeta"},
-    {"Close LightBox", "Cerrar LightBox"},
+    {"Close Library", "Cerrar Biblioteca"},
     {"Relief from image", "Relieve a partir de la imagen"},
     {"Inflate image", "Inflar imagen"},
     {"Project onto model", "Proyectar sobre el modelo"},
@@ -644,35 +656,35 @@ constexpr Entry kSpanish[] = {
     {"Show in file manager", "Mostrar en el gestor de archivos"},
     {"Refresh thumbnail", "Actualizar miniatura"},
     {"Nothing here matches \"%s\".", "Aquí nada coincide con \"%s\"."},
-    {"LightBox rows", "Filas del LightBox"},
-    {"LightBox at the top", "LightBox arriba"},
-    {"LightBox at the bottom", "LightBox abajo"},
+    {"Library rows", "Filas de la Biblioteca"},
+    {"Library at the top", "Biblioteca arriba"},
+    {"Library at the bottom", "Biblioteca abajo"},
     {"Show the items whose names contain this text.", "Muestra solo los elementos cuyo nombre contiene este texto."},
     {"Show only the items whose names contain this text.", "Muestra solo los elementos cuyo nombre contiene este texto."},
     {"The previous tab or folder.", "La pestaña o carpeta anterior."},
     {"Forward again after going back.", "Adelante otra vez después de volver atrás."},
-    {"Hide the LightBox (comma toggles it).", "Oculta el LightBox (la coma lo muestra u oculta)."},
-    {"How many rows of thumbnails the LightBox shows (1-4).", "Cuántas filas de miniaturas muestra el LightBox (1-4)."},
+    {"Hide the Library (comma toggles it).", "Oculta la Biblioteca (la coma la muestra u oculta)."},
+    {"How many rows of thumbnails the Library shows (1-4).", "Cuántas filas de miniaturas muestra la Biblioteca (1-4)."},
     {"Your projects (.sfproj) and recently opened projects.", "Tus proyectos (.sfproj) y los abiertos recientemente."},
-    {"Models to start from or append as SubTools: primitives and model files.",
-     "Modelos con los que empezar o que añadir como SubTools: primitivas y archivos de modelo."},
+    {"Models to start from or append as Parts: primitives and model files.",
+     "Modelos con los que empezar o que añadir como piezas: primitivas y archivos de modelo."},
     {"Every brush: built-in, custom and .sfbrush files in your library.",
      "Todos los pinceles: de serie, personalizados y archivos .sfbrush de tu biblioteca."},
     {"Brush alphas: built-in stamps and images in your Alphas folder.",
      "Alphas de pincel: sellos de serie e imágenes de tu carpeta Alphas."},
-    {"Viewport materials: Studio and the MatCaps.", "Materiales de la vista: Studio y los MatCaps."},
+    {"Viewport materials: Studio and the Lit Spheres.", "Materiales de la vista: Studio y las Lit Spheres."},
     {"Reference images: generate 3D, relief, inflate, project onto the model or use as an alpha.",
      "Imágenes de referencia: genera 3D, relieve, infla, proyecta sobre el modelo o úsalas como alpha."},
     {"Gaussian splat captures (.ply, .splat) to sculpt against.",
      "Capturas de Gaussian splats (.ply, .splat) sobre las que esculpir."},
-    {"QuickSaves and the autosave, newest first.", "Los QuickSaves y el autoguardado, los más nuevos primero."},
+    {"Snapshots and the autosave, newest first.", "Las instantáneas y el autoguardado, los más nuevos primero."},
     {"Recently opened files of every kind.", "Archivos de todo tipo abiertos recientemente."},
-    {"Add a folder of your own to the LightBox (shown at the root of every tab).",
-     "Añade una carpeta tuya al LightBox (aparece en la raíz de cada pestaña)."},
+    {"Add a folder of your own to the Library (shown at the root of every tab).",
+     "Añade una carpeta tuya a la Biblioteca (aparece en la raíz de cada pestaña)."},
     {"Browse projects, models, brushes, alphas, materials, images and splats. Double-click to load; Shift+double-click "
-     "a model to append it as a SubTool; drag sideways to scrub.",
+     "a model to append it as a Part; drag sideways to scrub.",
      "Explora proyectos, modelos, pinceles, alphas, materiales, imágenes y splats. Doble clic para cargar; "
-     "Mayús+doble clic en un modelo para añadirlo como SubTool; arrastra a los lados para recorrerlos."},
+     "Mayús+doble clic en un modelo para añadirlo como pieza; arrastra a los lados para recorrerlos."},
 
     // --- Pickers and brushes ---
     {"Brush picker", "Selector de pinceles"},
@@ -748,12 +760,12 @@ constexpr Entry kSpanish[] = {
     {"Show the model here", "Mostrar aquí el modelo"},
     {"Sculpting from an earlier step starts a branch;\nthe later steps stay as a lane above.",
      "Esculpir desde un paso anterior inicia una rama;\nlos pasos posteriores quedan como un carril encima."},
-    {"The history of the active SubTool (%zu steps up to the cursor) played as a turntable.",
-     "El historial del SubTool activo (%zu pasos hasta el cursor) reproducido en plataforma giratoria."},
+    {"The history of the active Part (%zu steps up to the cursor) played as a turntable.",
+     "El historial de la pieza activa (%zu pasos hasta el cursor) reproducido en plataforma giratoria."},
     {"Length", "Duración"},
     {"Rendering timelapse", "Renderizando timelapse"},
 
-    // --- Color, Polypaint, paint layers ---
+    // --- Color, Vertex Paint, paint layers ---
     {"Fill", "Rellenar"},
     {"Fill layer", "Rellenar capa"},
     {"Fill masked", "Rellenar enmascarado"},
@@ -783,13 +795,13 @@ constexpr Entry kSpanish[] = {
     {"(Ctrl paints, Ctrl+Alt erases)", "(Ctrl pinta, Ctrl+Alt borra)"},
     {"(Ctrl masks, Ctrl+Alt unmasks)", "(Ctrl enmascara, Ctrl+Alt desenmascara)"},
 
-    // --- More actions (shelves, QuickMenu, palettes) ---
+    // --- More actions (shelves, Quick Menu, palettes) ---
     {"Shelves", "Estantes"},
     {"Frame", "Encuadrar"},
     {"Draw Size at cursor", "Tamaño de dibujo en el cursor"},
-    {"Z Intensity at cursor", "Intensidad Z en el cursor"},
+    {"Intensity at cursor", "Intensidad en el cursor"},
     {"RGB Intensity at cursor", "Intensidad RGB en el cursor"},
-    {"Focal Shift at cursor", "Desplazamiento focal en el cursor"},
+    {"Falloff at cursor", "Atenuación en el cursor"},
     {"Last stroke", "Último trazo"},
     {"To Surface", "A la superficie"},
     {"Crop Box", "Recortar a la caja"},
@@ -812,8 +824,8 @@ constexpr Entry kSpanish[] = {
     // --- Extract, Project, Deformation ---
     {"E Smt", "E Smt"},
     {"PA Blur", "PA Blur"},
-    {"SubTools too", "También los SubTools"},
-    {"This SubTool", "Este SubTool"},
+    {"Parts too", "También las piezas"},
+    {"This Part", "Esta pieza"},
     {"Move along normals", "Mover a lo largo de las normales"},
     {"Mirror left and right", "Reflejar izquierda y derecha"},
     {"Flip X", "Voltear X"},

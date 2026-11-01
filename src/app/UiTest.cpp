@@ -45,6 +45,7 @@
 //   run COMMANDS             sculptforge-cli commands, e.g. run new_sphere subdivisions=4 ($SCRIPT_DIR: the script's folder)
 //   drop FILE                as if FILE were dropped onto the window (relative to the script's folder)
 //   env NAME VALUE           set an environment variable; $SCRIPT_DIR is the script's folder
+//   input_style STYLE        zbrush, sculptforge (the default), blender or maya, as Preferences > Input sets it
 //   copy SRC DST             copy a file or folder (SRC relative to the script's folder, DST to the working
 //                            directory), e.g. to stage what another program would write (the Blender bridge);
 //                            $LIBRARY in DST (and in env values) is the test's LightBox library folder
@@ -80,6 +81,10 @@
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
 //                            moved_masked (masked vertices that moved), mask_soft (vertices partly masked),
 //                            selection_shown (1 while a rectangle / lasso selection is drawn), symmetry_x,
+//                            symmetry_radial (the radial count, 0 off), radial_axis (0 X, 1 Y, 2 Z), symmetry_local,
+//                            symmetry_copies (copies every stroke makes), cursor_copies (brush cursors drawn),
+//                            symmetry_pivot_x (local symmetry's centre), timeline_top (1: the strip at the top),
+//                            timeline_y / axis_gizmo_y (their tops / centre, fractions of the canvas from its top),
 //                            tablet_mouse_mode (Preferences > Tablet > Mouse mode),
 //                            smooth_keep_volume (Brush > Smooth keeps volume), stroke_keep_volume (1 when Smooth
 //                            dabs keep the volume now: the option, flipped by letting go of Shift mid-stroke),
@@ -118,7 +123,7 @@
 //                            2 DragDot, 3 Spray, 4 LazyMouse), vdms (VDM brush maps), vdm_files (.sfvdm in the library)
 //                            z_intensity, smooth_intensity, rgb_intensity (0-100), focal_shift (-100..100), draw_size,
 //                            size_popup_open (the S / U / I / O slider), size_knob_x / size_knob_y (its knob, pixels),
-//                            quickmenu_open, right_click_menu, space_camera, space_held, radial_open / radial_menu (-1 none) / radial_held /
+//                            quickmenu_open, right_click_menu, space_camera, space_held, air_strokes, radial_open / radial_menu (-1 none) / radial_held /
 //                            radial_hover / radial_ran (radial menus: open, the menu, held by its key or button, the
 //                            slot pointed at, the slot run last), radial_menus, radial_slots_N, lazy_mouse, input_style (0 ZBrush, 1 SculptForge, 2 Blender), turntable,
 //                            camera_ortho, mask_brush (Blender's Mask brush on), shortcut_conflicts (keys two actions
@@ -193,6 +198,7 @@
 #include "core/Matcap.h"
 #include "core/Multires.h"
 #include "core/Script.h"
+#include "core/SelectionSets.h"
 #include "core/ThreadPool.h"
 #include "core/Timeline.h"
 #include "link/HttpServer.h"
@@ -382,11 +388,15 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "active_texture_layer") return hasTexture(m) && !m.texture->layers.empty() ? double(m.texture->activeLayer) : -1.0;
     if (name == "auto_uv_running") return app_.autoUv_ ? 1.0 : 0.0;
     if (const double v = app_.bakeTestValue(name); !std::isnan(v)) return v;
+    if (const double v = app_.uvEditorTestValue(name); !std::isnan(v)) return v;
     if (const double v = app_.pbrTestValue(name); !std::isnan(v)) return v; // material_channels, channel_view, ...
     if (const double v = app_.splatTrainTestValue(name); !std::isnan(v)) return v; // splat_training, ...
     if (const double v = app_.sculptableTestValue(name); !std::isnan(v)) return v;
     if (name == "qremesh_running") return app_.qremesh_ ? 1.0 : 0.0;
     if (name == "qremesh_guides") return double(app_.doc_.qremeshGuides.size());
+    if (name == "selection_sets") return m.selectionSets ? double(m.selectionSets->sets.size()) : 0.0;
+    if (name == "morph_target") return m.selectionSets && !m.selectionSets->morphTarget.empty() ? 1.0 : 0.0;
+    if (name == "morph_brush") return app_.brush_ == BrushType::Morph && app_.doc_.activeBrush < 0 ? 1.0 : 0.0;
     if (name == "qremesh_guide_loops") {
         size_t n = 0;
         for (const QRemeshGuide& g : app_.doc_.qremeshGuides) n += g.closed;
@@ -426,6 +436,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "quickmenu_open") return app_.quickMenu_.open ? 1.0 : 0.0;
     if (name == "right_click_menu") return app_.uiPrefs_.rightClickQuickMenu ? 1.0 : 0.0;
     if (name == "space_camera") return app_.uiPrefs_.spaceCamera ? 1.0 : 0.0;
+    if (name == "air_strokes") return app_.uiPrefs_.airStrokes ? 1.0 : 0.0;
     if (name == "space_held") return app_.spaceHeld_ ? 1.0 : 0.0;
     if (name == "radial_open") return app_.radial_.menu >= 0 ? 1.0 : 0.0;
     if (name == "radial_menu") return double(app_.radial_.menu); // -1: none open
@@ -607,6 +618,26 @@ double Demo::query(const std::string& name, bool& known) const {
     }
     if (name == "selection_shown") return app_.drag_ == App::Drag::Select && app_.selectMoved_ ? 1.0 : 0.0;
     if (name == "symmetry_x") return app_.symmetry_.x ? 1.0 : 0.0;
+    // Radial and local symmetry (#63): the count while radial is on (0 off), its axis (0 X, 1 Y, 2 Z), local (1 on),
+    // the copies every stroke makes, the brush cursors drawn last frame, the local centre.
+    if (name == "symmetry_radial") return app_.symmetry_.radialOn() ? double(app_.symmetry_.radial) : 0.0;
+    if (name == "radial_axis") return double(app_.symmetry_.radialAxis);
+    if (name == "symmetry_local") return app_.symmetry_.local ? 1.0 : 0.0;
+    if (name == "symmetry_copies") return double(Sculptor::copies(app_.symmetry_).size());
+    if (name == "cursor_copies") return double(app_.symmetryCopiesDrawn_);
+    if (name == "symmetry_pivot_x") return double(app_.symmetry_.pivot.x);
+    // Timeline position (#63): 1 at the top of the viewport; the strip's top edge and the axis gizmo's centre as
+    // fractions of the canvas height from its top (-1: the strip isn't shown).
+    if (name == "timeline_top") return app_.uiPrefs_.timelineTop ? 1.0 : 0.0;
+    if (name == "timeline_y" || name == "axis_gizmo_y") {
+        const auto c = app_.canvasRect();
+        if (name == "timeline_y")
+            return app_.timelineStripY_ < 0.0f ? -1.0 : double((app_.timelineStripY_ - c.y) / std::max(c.h, 1.0f));
+        const auto ends = app_.axisGizmoLayout();
+        float y = 0.0f;
+        for (const auto& e : ends) y += e.at.y;
+        return double((y / float(ends.size()) - c.y) / std::max(c.h, 1.0f));
+    }
     if (name == "hidden") {
         size_t n = 0;
         for (uint8_t h : m.hidden) n += h != 0;
@@ -910,7 +941,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         steps_.push_back([this, line, name, u, v, times](float t) {
             const int index = app_.doc_.findSubtool(name);
             if (index < 0) {
-                fail(line, "no SubTool named \"" + name + "\"");
+                fail(line, "no Part named \"" + name + "\"");
                 return true;
             }
             // The point of its on-screen bounds nearest (U, V) where it's the front SubTool and no panel covers it.
@@ -943,7 +974,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
                 }
             }
             if (!found) {
-                fail(line, "SubTool \"" + name + "\" can't be clicked (hidden, covered or off screen)");
+                fail(line, "Part \"" + name + "\" can't be clicked (hidden, covered or off screen)");
                 return true;
             }
             if (t == 0.0f) { // hover for a frame first
@@ -1342,6 +1373,16 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             r = call("POST", "/api/capture/" + capture + "/finish", "");
             if (r.status != 200) fail(line, "finish refused: " + std::to_string(r.status) + " " + r.body + r.error);
         });
+    } else if (verb == "input_style") {
+        // input_style zbrush|sculptforge|blender|maya: as Preferences > Input sets it (scripts written for one style)
+        if (!need(1)) return false;
+        const std::string n = w[1];
+        const int style = n == "zbrush" ? 0 : n == "sculptforge" ? 1 : n == "blender" ? 2 : n == "maya" ? 3 : -1;
+        if (style < 0) {
+            fail(line, "input_style takes zbrush, sculptforge, blender or maya");
+            return false;
+        }
+        run([this, style] { app_.setInputStyle(style); });
     } else if (verb == "env") {
         if (!need(2)) return false;
         std::string value = restOf(lineText_, 2);

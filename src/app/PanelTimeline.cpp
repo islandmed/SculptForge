@@ -1,8 +1,8 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The Sculpt Timeline strip (docs/guide/timeline.md): every step of the history as a tick along the bottom of the
-// canvas. Drag the scrubber to see the model at any point, click a tick to go there; sculpting from an earlier
+// The Sculpt Timeline strip (docs/guide/timeline.md): every step of the history as a tick along the top (the
+// default) or the bottom of the canvas. Drag the scrubber to see the model at any point, click a tick to go there; sculpting from an earlier
 // point starts a branch and the old continuation stays as a lane above the track (click it to switch back).
 // Right-click a stroke to re-tune its strength. Timelapse renders the history as a turntable video. The data
 // side is core/Timeline.h; Help > Benchmark (proof mode) is in ProofMode.cpp.
@@ -157,7 +157,8 @@ void App::registerTimelineUiActions() {
         Timeline::saveWithProject = ui().saveHistory;
     }
     add("view.timeline", "Sculpt Timeline", ICON_LC_HISTORY, "Edit",
-        "Show or hide the history strip along the bottom of the canvas: every stroke and operation as a tick. Drag "
+        "Show or hide the history strip along the top or bottom of the canvas (Preferences > Interface > Timeline "
+        "position): every stroke and operation as a tick. Drag "
         "to see the model at any point, click to go there; sculpting from an earlier point keeps the old "
         "continuation as a branch. Right-click a stroke to change its strength.",
         [this, ui] {
@@ -165,8 +166,16 @@ void App::registerTimelineUiActions() {
             savePrefs(ui(), configDir_, uiConfigDeterministic_);
         },
         [ui] { return ui().visible; });
+    add("view.timeline_top", "Top of viewport", nullptr, "Preferences > Interface",
+        "Timeline position: the Sculpt Timeline strip runs along the top of the viewport, below the top shelf and away "
+        "from the brushes on the bottom shelf (the default). Store Config keeps it.",
+        [this] { uiPrefs_.timelineTop = true; }, [this] { return uiPrefs_.timelineTop; });
+    add("view.timeline_bottom", "Bottom", nullptr, "Preferences > Interface",
+        "Timeline position: the Sculpt Timeline strip runs along the bottom of the viewport, above the brush shelf. "
+        "Store Config keeps it.",
+        [this] { uiPrefs_.timelineTop = false; }, [this] { return !uiPrefs_.timelineTop; });
     add("timeline.timelapse", "Export timelapse...", ICON_LC_FILM, "Edit",
-        "Render the history of the active SubTool as a turntable timelapse video (1080p or 4K MP4, no captions).",
+        "Render the history of the active Part as a turntable timelapse video (1080p or 4K MP4, no captions).",
         [ui] { ui().timelapseDialog = true; });
     add("help.benchmark", "Benchmark (proof mode)", ICON_LC_GAUGE, "Help",
         "Measure how responsive sculpting is on this computer: a scripted stroke on 5, 20 and 33 million triangle "
@@ -346,7 +355,7 @@ void App::drawTimelineUi() {
         s.timelapseDialog = false;
     }
     if (ImGui::BeginPopupModal("Export timelapse", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextWrapped(tr("The history of the active SubTool (%zu steps up to the cursor) played as a turntable."), t->cursor());
+        ImGui::TextWrapped(tr("The history of the active Part (%zu steps up to the cursor) played as a turntable."), t->cursor());
         ImGui::RadioButton("1080p", &s.timelapseRes, 0);
         ImGui::SameLine();
         ImGui::RadioButton("4K", &s.timelapseRes, 1);
@@ -364,13 +373,19 @@ void App::drawTimelineUi() {
         ImGui::EndPopup();
     }
 
-    // The strip: along the bottom of the canvas.
+    // The strip: along the bottom of the canvas, or its top (Preferences > Interface > Timeline position, #63:
+    // away from the brush shelf). At the top it sits below the top shelf (the canvas starts there) and what else
+    // the canvas shows at its top (the axis gizmo, the update banner) moves down below it (timelineTopInset_).
     const CanvasRect c = canvasRect();
     const float sc = uiScale_;
+    const bool top = uiPrefs_.timelineTop;
+    timelineTopInset_ = 0.0f;
+    timelineStripY_ = -1.0f;
     if (c.w < 200 || c.h < 150 || hideUi_) return;
     const float margin = 10 * sc;
     if (!s.visible) {
-        ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + c.h - 4 * sc), ImGuiCond_Always, ImVec2(0.5f, 1.0f));
+        if (top) ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + 4 * sc), ImGuiCond_Always, ImVec2(0.5f, 0.0f));
+        else ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + c.h - 4 * sc), ImGuiCond_Always, ImVec2(0.5f, 1.0f));
         ImGui::SetNextWindowBgAlpha(0.85f);
         if (ImGui::Begin("##timeline_tab", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
                                                         ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
@@ -382,6 +397,8 @@ void App::drawTimelineUi() {
                 savePrefs(s, configDir_, uiConfigDeterministic_);
             }
             ui::HelpText("Sculpt Timeline", nullptr, "Open the history strip.", "Edit");
+            timelineStripY_ = ImGui::GetWindowPos().y;
+            if (top) timelineTopInset_ = ImGui::GetWindowPos().y + ImGui::GetWindowSize().y - c.y;
         }
         ImGui::End();
         return;
@@ -390,7 +407,10 @@ void App::drawTimelineUi() {
     const int lanes = std::min<int>(3, int(branches.size()));
     const float laneH = 7 * sc, trackH = 26 * sc;
     const float height = 30 * sc + trackH + float(lanes) * (laneH + 3 * sc);
-    ImGui::SetNextWindowPos(ImVec2(c.x + margin, c.y + c.h - margin - height), ImGuiCond_Always);
+    const float stripY = top ? c.y + margin : c.y + c.h - margin - height;
+    ImGui::SetNextWindowPos(ImVec2(c.x + margin, stripY), ImGuiCond_Always);
+    timelineStripY_ = stripY;
+    if (top) timelineTopInset_ = margin + height;
     ImGui::SetNextWindowSize(ImVec2(c.w - 2 * margin, height), ImGuiCond_Always);
     ImGui::SetNextWindowBgAlpha(0.88f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8 * sc, 5 * sc));
@@ -428,14 +448,14 @@ void App::drawTimelineUi() {
         savePrefs(s, configDir_, uiConfigDeterministic_);
     }
     ui::HelpText("Save with project", nullptr,
-                 "Also save the history beside the project as <name>.sfhist (strokes, masks, polypaint, visibility; "
+                 "Also save the history beside the project as <name>.sfhist (strokes, masks, vertex paint, visibility; "
                  "a topology change cuts it). Opening the project brings it back.",
                  "Edit > Sculpt Timeline");
     ImGui::SameLine();
     if (ImGui::SmallButton(ICON_LC_FILM)) s.timelapseDialog = true;
     ui::HelpText("Export timelapse", nullptr, "Render this history as a turntable timelapse video.", "Edit > Sculpt Timeline");
     ImGui::SameLine();
-    if (ImGui::SmallButton(ICON_LC_CHEVRON_DOWN)) {
+    if (ImGui::SmallButton(top ? ICON_LC_CHEVRON_UP : ICON_LC_CHEVRON_DOWN)) {
         s.visible = false;
         savePrefs(s, configDir_, uiConfigDeterministic_);
     }

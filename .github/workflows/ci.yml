@@ -13,18 +13,82 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Compiler cache (ccache). Every job compiles through ccache and starts from the newest cache of the same job; ccache
+# hashes the compiler and the preprocessed source with every flag, so a hit is the object file that compiler would
+# produce, and anything changed compiles fresh. Caches are saved only by push and workflow_dispatch runs (main, or a
+# maintainer's own branch): pull_request runs, forks included, only restore them (actions/cache/restore), so nothing a
+# pull request builds can end up in another run. GitHub scopes caches by branch as well: a branch reads its own and
+# main's, never another branch's. Release packages (packages.yml) restore main's caches and never save from a tag.
+# Keys are ccache-ci-<job>.<commit>: the dot keeps one job's prefix from matching another's (one key may start with another's).
+# The suite runs as parallel ctest entries (sculptforge_tests is split into shards, CMakeLists.txt), every test as before.
+# Free runners in parallel: the slowest test sets are split over several standard runners (matrix shard K of N runs
+# every N-th ctest entry, `ctest -I K,,N`; the shards together run every test once). The jobs branch protection
+# requires ("Linux x86_64", "Windows", ...) are the small result jobs at the end.
+# Runners: repository variables SF_RUNNER_LINUX, SF_RUNNER_LINUX_ARM, SF_RUNNER_MAC, SF_RUNNER_WIN name other runners
+# for the build and test jobs (unset: GitHub's standard ones); the jobs that read the repository's change list stay on
+# GitHub's runners. No job here gets a secret.
+# The release packages are built by packages.yml (on pushes to main), the Flatpak check for pull requests is flatpak.yml.
+
 jobs:
+  # Pushes and pull requests that change only the website (not its phone page, website/link, which is built into the
+  # app) or release paperwork skip the build and test jobs; their required checks then pass as skipped.
+  changes:
+    name: Changes
+    runs-on: ubuntu-24.04
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - id: diff
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          base=$BASE
+          [ "$EVENT" = push ] && base=$BEFORE
+          code=true
+          if [ "$EVENT" != workflow_dispatch ] && [ -n "$base" ] && [ "$base" != 0000000000000000000000000000000000000000 ]; then
+            # (the compare API lists at most 300 files: more than that counts as a code change)
+            if files=$(gh api "repos/$REPO/compare/$base...$HEAD" --jq '.files | if length >= 300 then error("many") else .[].filename end'); then
+              code=false
+              while IFS= read -r f; do
+                case "$f" in
+                  website/link/*) code=true ;;
+                  website/*|.github/workflows/pages.yml|.github/workflows/download-stats.yml|packaging/arch/*|tools/publish/*|scripts/release.sh|docs/releasing.md) ;;
+                  '') ;;
+                  *) code=true ;;
+                esac
+              done <<< "$files"
+            fi
+          fi
+          echo "code=$code" | tee -a "$GITHUB_OUTPUT"
+
+
   build:
-    name: ${{ matrix.name }}
+    name: ${{ matrix.name }} (${{ matrix.shard }}/${{ matrix.shards }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { name: Linux x86_64, os: ubuntu-24.04 }
-          - { name: Linux ARM64, os: ubuntu-24.04-arm }
-          - { name: macOS, os: macos-15 }
-          - { name: Windows, os: windows-2022 }
+          - { name: Linux x86_64, key: linux-x86_64, shard: 1, shards: 2, os: "${{ vars.SF_RUNNER_LINUX || 'ubuntu-24.04' }}" }
+          - { name: Linux x86_64, key: linux-x86_64, shard: 2, shards: 2, os: "${{ vars.SF_RUNNER_LINUX || 'ubuntu-24.04' }}" }
+          - { name: Linux ARM64, key: linux-arm64, shard: 1, shards: 2, os: "${{ vars.SF_RUNNER_LINUX_ARM || 'ubuntu-24.04-arm' }}" }
+          - { name: Linux ARM64, key: linux-arm64, shard: 2, shards: 2, os: "${{ vars.SF_RUNNER_LINUX_ARM || 'ubuntu-24.04-arm' }}" }
+          - { name: macOS, key: macos, shard: 1, shards: 1, os: "${{ vars.SF_RUNNER_MAC || 'macos-15' }}" }
+          - { name: Windows, key: windows, shard: 1, shards: 3, os: "${{ vars.SF_RUNNER_WIN || 'windows-2022' }}" }
+          - { name: Windows, key: windows, shard: 2, shards: 3, os: "${{ vars.SF_RUNNER_WIN || 'windows-2022' }}" }
+          - { name: Windows, key: windows, shard: 3, shards: 3, os: "${{ vars.SF_RUNNER_WIN || 'windows-2022' }}" }
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_BASEDIR: ${{ github.workspace }}
+      CCACHE_MAXSIZE: 500M
+      CCACHE_DEPEND: 'true' # include files from the compiler's own dependency list (-MD, /showIncludes): no extra preprocessor run
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -32,24 +96,76 @@ jobs:
           python-version: '3.13'
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
-        run: sudo ./packaging/linux/install-build-deps.sh
+        run: |
+          sudo ./packaging/linux/install-build-deps.sh
+          sudo apt-get install -y --no-install-recommends ccache xvfb libgl1-mesa-dri
+      - name: ccache (macOS; the release binary, pinned by hash)
+        if: runner.os == 'macOS'
+        run: |
+          curl -fsSLO https://github.com/ccache/ccache/releases/download/v4.14.2/ccache-4.14.2-darwin.tar.gz
+          echo "cf240009630b605b775c7c5c7b7105a3b196c79f31af322c1557969aa28003fc  ccache-4.14.2-darwin.tar.gz" | shasum -a 256 -c
+          tar xzf ccache-4.14.2-darwin.tar.gz -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/ccache-4.14.2-darwin" >> "$GITHUB_PATH"
+      - name: ccache (Windows; the release binary, pinned by hash, standing in for cl.exe)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $zip = 'ccache-4.14.2-windows-x86_64.zip'
+          Invoke-WebRequest "https://github.com/ccache/ccache/releases/download/v4.14.2/$zip" -OutFile $zip
+          if ((Get-FileHash $zip -Algorithm SHA256).Hash -ne '6993CE645E53192CEC592EE23186200B574AC4C59097ECDE8D9CFD681B47AE84') {
+            throw 'ccache archive hash mismatch'
+          }
+          Expand-Archive $zip -DestinationPath $env:RUNNER_TEMP
+          $dir = "$env:RUNNER_TEMP\ccache-4.14.2-windows-x86_64"
+          "$dir" >> $env:GITHUB_PATH
+          # MSBuild runs "cl.exe" from CLToolPath (see Configure): ccache under that name, in a folder of its own, which
+          # runs the real cl.exe from the PATH MSBuild sets up.
+          $cl = "$env:RUNNER_TEMP\ccache-as-cl"
+          New-Item -ItemType Directory $cl | Out-Null
+          Copy-Item "$dir\ccache.exe" "$cl\cl.exe"
+          "SF_CCACHE_CL=$($cl -replace '\\', '/')" >> $env:GITHUB_ENV
+      - name: Compiler cache (restore)
+        uses: actions/cache/restore@v5
+        with:
+          path: .ccache
+          key: ccache-ci-${{ matrix.key }}.${{ github.sha }}
+          restore-keys: ccache-ci-${{ matrix.key }}.
       - name: NumPy for the Python API test
         run: python -m pip install numpy
       - name: Configure
+        if: runner.os != 'Windows'
         run: >
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSCULPTFORGE_USE_SYSTEM_SDL=OFF
-          -DSCULPTFORGE_BUILD_PYTHON=ON -DPython_EXECUTABLE="${{ env.pythonLocation }}/${{ runner.os == 'Windows' && 'python.exe' || 'bin/python3' }}"
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          -DSCULPTFORGE_BUILD_PYTHON=ON -DPython_EXECUTABLE="${{ env.pythonLocation }}/bin/python3"
+      - name: Configure (Visual Studio generator, as the release builds; ccache as cl.exe, one compiler per file)
+        if: runner.os == 'Windows'
+        run: >
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSCULPTFORGE_USE_SYSTEM_SDL=OFF
+          -DCMAKE_VS_GLOBALS="CLToolExe=cl.exe;CLToolPath=${{ env.SF_CCACHE_CL }};TrackFileAccess=false;UseMultiToolTask=true;EnforceProcessCountAcrossBuilds=true"
+          -DSCULPTFORGE_BUILD_PYTHON=ON -DPython_EXECUTABLE="${{ env.pythonLocation }}/python.exe"
       - name: Build
-        run: cmake --build build --config Release --parallel 4
-      - name: Test (C++ and Python API)
-        run: ctest --test-dir build -C Release --output-on-failure -LE ui
-      - name: UI tests (real app, Xvfb + Mesa)
+        run: |
+          ccache -z
+          cmake --build build --config Release --parallel 4
+          ccache -s -v
+      - name: Compiler cache (save; not from pull requests; one shard saves)
+        if: github.event_name != 'pull_request' && matrix.shard == 1
+        uses: actions/cache/save@v5
+        with:
+          path: .ccache
+          key: ccache-ci-${{ matrix.key }}.${{ github.sha }}
+      # Every test in one parallel ctest run (UI tests too, where there is a display), so no core idles while the
+      # last tests of one group finish.
+      - name: Test (C++, Python API, UI tests with Xvfb + Mesa)
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get install -y xvfb libgl1-mesa-dri
           xvfb-run -a -s "-screen 0 1920x1080x24" env LIBGL_ALWAYS_SOFTWARE=1 \
-            ctest --test-dir build -C Release --output-on-failure -L ui
-      - name: UI tests (real app, Mesa llvmpipe)
+            ctest --test-dir build -C Release --output-on-failure -j 4 -I '${{ matrix.shard }},,${{ matrix.shards }}'
+      - name: Test (C++ and Python API; UI tests need a display)
+        if: runner.os == 'macOS'
+        run: ctest --test-dir build -C Release --output-on-failure -LE ui -j 4 -I '${{ matrix.shard }},,${{ matrix.shards }}'
+      - name: Test (C++, Python API, UI tests with Mesa llvmpipe)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
@@ -61,57 +177,62 @@ jobs:
           }
           7z e mesa.7z x64/opengl32.dll x64/libgallium_wgl.dll -obuild/Release -y | Out-Null
           $env:GALLIUM_DRIVER = 'llvmpipe'
-          ctest --test-dir build -C Release --output-on-failure -L ui
+          ctest --test-dir build -C Release --output-on-failure -j 4 -I '${{ matrix.shard }},,${{ matrix.shards }}'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: UI test screenshots
         if: always() && runner.os != 'macOS'
         uses: actions/upload-artifact@v7
         with:
-          name: ui-shots-${{ matrix.os }}
+          name: ui-shots-${{ matrix.key }}-${{ matrix.shard }}
           path: build/ui-shots
           if-no-files-found: ignore
-
-  # The Flatpak (packaging/flatpak), built as the release builds it, installed, and a UI test run inside the sandbox.
-  flatpak:
-    name: Flatpak x86_64
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-      - run: sudo apt-get update && sudo apt-get install -y flatpak flatpak-builder xvfb
-      - name: Build the bundle
-        run: packaging/flatpak/build.sh dist
-      - name: Install it and run UI tests inside the sandbox (Xvfb, Mesa from the runtime)
-        run: |
-          flatpak install --user -y --noninteractive dist/*.flatpak
-          for t in sculpt_basics blender_bridge spacemouse; do
-            xvfb-run -a -s "-screen 0 1920x1080x24" \
-              flatpak run --env=LIBGL_ALWAYS_SOFTWARE=1 org.sculptforge.SculptForge \
-                --ui-test "$PWD/tests/ui/$t.sfui" --ui-out "$PWD/flatpak-ui/$t"
-          done
 
   # The Blender add-on inside Blender itself (the bpy wheel is Blender as a Python module), against
   # sculptforge-cli: the oldest supported Blender (4.2 LTS, Python 3.11) and the newest.
   blender-addon:
     name: Blender add-on (bpy ${{ matrix.bpy }})
-    runs-on: ubuntu-24.04
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ${{ vars.SF_RUNNER_LINUX || 'ubuntu-24.04' }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - { bpy: '4.2.0', python: '3.11' }
           - { bpy: '5.2.3', python: '3.13' }
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_BASEDIR: ${{ github.workspace }}
+      CCACHE_MAXSIZE: 300M
+      CCACHE_DEPEND: 'true'
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
-      - run: sudo ./packaging/linux/install-build-deps.sh
+      - run: |
+          sudo ./packaging/linux/install-build-deps.sh
+          sudo apt-get install -y --no-install-recommends ccache
+      - name: Compiler cache (restore)
+        uses: actions/cache/restore@v5
+        with:
+          path: .ccache
+          key: ccache-ci-blender-${{ matrix.bpy }}.${{ github.sha }}
+          restore-keys: ccache-ci-blender-${{ matrix.bpy }}.
       - name: bpy and numpy
         run: python -m pip install "bpy==${{ matrix.bpy }}" numpy
       - name: Build sculptforge-cli
         run: |
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSCULPTFORGE_USE_SYSTEM_SDL=OFF -DSCULPTFORGE_BUILD_APP=OFF
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSCULPTFORGE_USE_SYSTEM_SDL=OFF -DSCULPTFORGE_BUILD_APP=OFF \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           cmake --build build --target sculptforge-cli --parallel 4
+          ccache -s -v
+      - name: Compiler cache (save; not from pull requests)
+        if: github.event_name != 'pull_request'
+        uses: actions/cache/save@v5
+        with:
+          path: .ccache
+          key: ccache-ci-blender-${{ matrix.bpy }}.${{ github.sha }}
       - name: Add-on round trip in Blender
         run: python tests/blender/test_in_blender.py -- --cli build/sculptforge-cli
       - name: Add-on exchange code and package
@@ -122,8 +243,10 @@ jobs:
   # VFX Reference Platform (vfxplatform.com): GCC 14.2 with glibc 2.28 (CY2026, EL8)
   # or glibc 2.34 (CY2027, EL9), C++20, Python 3.13.
   vfx-platform:
-    name: VFX Reference Platform ${{ matrix.cy }} (${{ matrix.image }})
-    runs-on: ubuntu-24.04
+    name: VFX Reference Platform ${{ matrix.cy }} build (${{ matrix.image }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ${{ vars.SF_RUNNER_LINUX || 'ubuntu-24.04' }}
     container: ${{ matrix.image }}
     strategy:
       fail-fast: false
@@ -132,23 +255,50 @@ jobs:
           - { cy: CY2026, image: 'rockylinux:8', glibc: '2.28' }
           - { cy: CY2027, image: 'rockylinux:9', glibc: '2.34' }
     steps:
-      - run: dnf -y install git
+      - run: dnf -y install git tar gzip zstd # zstd: actions/cache compresses with it (gzip is several times slower)
       - uses: actions/checkout@v7
       - run: ./packaging/linux/install-build-deps.sh
+      - name: ccache (the static release binary, pinned by hash)
+        run: |
+          curl -fsSLO https://github.com/ccache/ccache/releases/download/v4.14.2/ccache-4.14.2-linux-x86_64-musl-static.tar.gz
+          echo "d540ba01f160addbd3dd5e18eda9bd34005591b095c09ac8ae9d0a1b655e7ef5  ccache-4.14.2-linux-x86_64-musl-static.tar.gz" | sha256sum -c
+          tar xzf ccache-4.14.2-linux-x86_64-musl-static.tar.gz -C /opt
+          echo "/opt/ccache-4.14.2-linux-x86_64-musl-static" >> "$GITHUB_PATH"
+          # (In a container job the github.workspace expression gives the host's path; $GITHUB_WORKSPACE is the container's.)
+          echo "CCACHE_DIR=$GITHUB_WORKSPACE/.ccache" >> "$GITHUB_ENV"
+          echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+          echo "CCACHE_MAXSIZE=500M" >> "$GITHUB_ENV"
+          echo "CCACHE_DEPEND=true" >> "$GITHUB_ENV"
+      - name: Compiler cache (restore)
+        uses: actions/cache/restore@v5
+        with:
+          path: .ccache
+          key: ccache-ci-${{ matrix.cy }}.${{ github.sha }}
+          restore-keys: ccache-ci-${{ matrix.cy }}.
       - name: Python 3.13 (python-build-standalone via uv)
         run: |
           curl -LsSf https://astral.sh/uv/0.9.5/install.sh | sh
           ~/.local/bin/uv venv --python 3.13 /opt/py313
           ~/.local/bin/uv pip install --python /opt/py313/bin/python numpy
           echo "PYTHON313=/opt/py313/bin/python" >> "$GITHUB_ENV"
-      - name: Build and test with GCC 14
+      - name: Build with GCC 14
         run: |
           source /opt/rh/gcc-toolset-14/enable
           gcc --version | head -1
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSCULPTFORGE_USE_SYSTEM_SDL=OFF \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DSCULPTFORGE_BUILD_PYTHON=ON -DPython_EXECUTABLE="$PYTHON313"
+          ccache -z
           cmake --build build --parallel 4
-          ctest --test-dir build --output-on-failure -LE ui
+          ccache -s -v
+      - name: Compiler cache (save; not from pull requests)
+        if: github.event_name != 'pull_request'
+        uses: actions/cache/save@v5
+        with:
+          path: .ccache
+          key: ccache-ci-${{ matrix.cy }}.${{ github.sha }}
+      - name: Test
+        run: ctest --test-dir build --output-on-failure -LE ui -j 4
       - name: Check binary compatibility (glibc <= ${{ matrix.glibc }})
         run: |
           for f in build/sculptforge build/sculptforge-cli build/sculptforge*.so; do
@@ -156,3 +306,27 @@ jobs:
             echo "$f needs $max"
             [ "$(printf '%s\n' "GLIBC_${{ matrix.glibc }}" "$max" | sort -V | tail -1)" = "GLIBC_${{ matrix.glibc }}" ]
           done
+
+  # The checks branch protection requires, by name. Each passes when the build and test jobs passed or were skipped
+  # (a website-only change); a failure anywhere fails them all, and the run shows which job failed.
+  result:
+    name: ${{ matrix.check }}
+    needs: [changes, build, blender-addon, vfx-platform]
+    if: always()
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        check:
+          - Linux x86_64
+          - Linux ARM64
+          - macOS
+          - Windows
+          - VFX Reference Platform CY2026 (rockylinux:8)
+          - VFX Reference Platform CY2027 (rockylinux:9)
+    steps:
+      - env:
+          RESULTS: ${{ needs.changes.result }} ${{ needs.build.result }} ${{ needs.blender-addon.result }} ${{ needs.vfx-platform.result }}
+        run: |
+          echo "changes, build, blender-addon, vfx-platform: $RESULTS"
+          for r in $RESULTS; do case $r in success|skipped) ;; *) exit 1 ;; esac; done

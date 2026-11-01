@@ -23,7 +23,7 @@ namespace sf {
 
 namespace {
 
-constexpr const char* kZSpheresPath = "Tool > ZSpheres";
+constexpr const char* kZSpheresPath = "Tool > Forge Spheres";
 
 const char* modeName(int m) { return m == 0 ? "Draw" : m == 1 ? "Move" : "Scale"; } // App::ZSphereMode order
 
@@ -53,14 +53,14 @@ void App::registerZSphereUiActions() {
         actions_.add(std::move(a));
     };
     const auto active = [this] { return zsphereActive(); };
-    add("zsphere.new", "New ZSphere", [this] { runCommand("zsphere_new"); }, nullptr, nullptr,
-        "Add a ZSphere SubTool: one root sphere to block out a body, creature or plant from. Drag on a sphere to grow "
+    add("zsphere.new", "New Forge Sphere", [this] { runCommand("zsphere_new"); }, nullptr, nullptr,
+        "Add a Forge Sphere Part: one root sphere to block out a body, creature or plant from. Drag on a sphere to grow "
         "limbs from it, Move and Scale them into proportion, check the skin with Preview (A), then Make Mesh.",
         "zsphere_new");
     const auto mode = [this](ZSphereMode m) {
         return [this, m] {
             zsphereMode_ = m;
-            status_ = std::string("ZSpheres: ") + modeName(int(m)) +
+            status_ = std::string("Forge Spheres: ") + modeName(int(m)) +
                       (m == ZSphereMode::Draw    ? " - drag on a sphere to grow a new one; click a link to add a joint"
                        : m == ZSphereMode::Move ? " - drag a sphere to move it"
                                                 : " - drag a sphere up or right to grow it, down or left to shrink it");
@@ -80,8 +80,8 @@ void App::registerZSphereUiActions() {
         "zsphere_preview", "A");
     add("zsphere.make_mesh", "Make Mesh",
         [this] { runCommand("zsphere_make_mesh", {{"resolution", double(zsphereResolution_)}}); }, active, nullptr,
-        "Build the skin as a new, sculptable SubTool right below (watertight quads, one polygroup per link), like "
-        "ZBrush's Make Adaptive Skin. The ZSphere SubTool is hidden and kept: show it to change the proportions and "
+        "Build the skin as a new, sculptable Part right below (watertight quads, one face group per link), like "
+        "ZBrush's Make Adaptive Skin. The Forge Sphere Part is hidden and kept: show it to change the proportions and "
         "make a new mesh.",
         "zsphere_make_mesh");
 }
@@ -142,7 +142,7 @@ bool App::zsphereMouseDown(float x, float y, SDL_Keymod mod) {
     RayHit hit;
     if (!pick(x, y, hit)) return false; // the background navigates
     if (doc_.mesh.zspherePreview) {
-        status_ = "ZSpheres: Preview is on (A turns it off to edit the spheres)";
+        status_ = "Forge Spheres: Preview is on (A turns it off to edit the spheres)";
         return true;
     }
     bool link = false;
@@ -150,14 +150,14 @@ bool App::zsphereMouseDown(float x, float y, SDL_Keymod mod) {
     if (i < 0 || size_t(i) >= doc_.mesh.zspheres.size()) return true;
     if (mod & SDL_KMOD_ALT) { // delete the sphere and what grows from it
         if (link || i == 0) {
-            status_ = i == 0 && !link ? "ZSpheres: the root sphere stays" : "ZSpheres: Alt+click a sphere to delete it";
+            status_ = i == 0 && !link ? "Forge Spheres: the root sphere stays" : "Forge Spheres: Alt+click a sphere to delete it";
             return true;
         }
         std::vector<ZSphere> s = doc_.mesh.zspheres;
         const size_t before = s.size();
         zsphereDelete(s, i, symmetry_);
-        doc_.replaceMeshUndoable(zsphereMesh(s, false), "ZSphere delete");
-        status_ = "ZSpheres: deleted " + std::to_string(before - s.size()) + " spheres; " + std::to_string(s.size()) + " left";
+        doc_.replaceMeshUndoable(zsphereMesh(s, false), "Forge Sphere delete");
+        status_ = "Forge Spheres: deleted " + std::to_string(before - s.size()) + " spheres; " + std::to_string(s.size()) + " left";
         return true;
     }
     ZSphereDrag& d = zsDrag_;
@@ -171,15 +171,15 @@ bool App::zsphereMouseDown(float x, float y, SDL_Keymod mod) {
     if (d.op == ZSphereMode::Draw && link) { // a joint on the link, then the drag places it
         zsphereInsert(d.start, i, symmetry_, &d.sphere);
         d.op = ZSphereMode::Move;
-        d.label = "ZSphere insert";
+        d.label = "Forge Sphere insert";
         d.changed = true;
         doc_.mesh = zsphereMesh(d.start, false);
         doc_.mesh.topologyDirty = true;
         doc_.bvh.build(doc_.mesh);
     } else if (d.op == ZSphereMode::Draw) {
-        d.label = "ZSphere add";
+        d.label = "Forge Sphere add";
     } else {
-        d.label = d.op == ZSphereMode::Move ? "ZSphere move" : "ZSphere scale";
+        d.label = d.op == ZSphereMode::Move ? "Forge Sphere move" : "Forge Sphere scale";
     }
     if (d.op == ZSphereMode::Move) {
         glm::vec3 o, dir;
@@ -213,7 +213,7 @@ void App::zsphereDragTo(float x, float y) {
         const float wpp = worldPerPixel(c);
         const float r = moved > 3.0f * uiScale_ && wpp > 0.0f ? std::max(moved * wpp, 0.02f * z.radius) : 0.5f * z.radius;
         zsphereAdd(s, d.sphere, c, r, symmetry_);
-        status_ = "ZSpheres: new sphere, radius " + std::to_string(r).substr(0, 5);
+        status_ = "Forge Spheres: new sphere, radius " + std::to_string(r).substr(0, 5);
         break;
     }
     case ZSphereMode::Move: {
@@ -241,7 +241,7 @@ void App::zsphereRelease() {
         Mesh after = std::move(doc_.mesh);
         doc_.mesh = std::move(d.before);
         doc_.replaceMeshUndoable(std::move(after), d.label);
-        status_ = std::string("ZSpheres: ") + d.label + "; " + std::to_string(doc_.mesh.zspheres.size()) + " spheres";
+        status_ = std::string("Forge Spheres: ") + d.label + "; " + std::to_string(doc_.mesh.zspheres.size()) + " spheres";
     }
     d = {};
 }

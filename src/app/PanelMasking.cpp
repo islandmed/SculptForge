@@ -33,7 +33,29 @@ std::string symmetryAxes(const Symmetry& s) { return std::string(s.x ? "x" : "")
 
 } // namespace
 
+void App::refreshSymmetryPivot() {
+    if (!symmetry_.local) return;
+    if (doc_.sculptor.strokeActive() || solverBusy()) return; // (the centre holds still during a stroke)
+    const uint64_t key = doc_.undo.revision() * 0x9E3779B97F4A7C15ull ^ (uint64_t(doc_.activeSubtool) << 40) ^
+                         uint64_t(doc_.mesh.vertexCount()) ^ (uint64_t(doc_.subtools.size()) << 56);
+    if (key == symmetryPivotKey_) return;
+    symmetryPivotKey_ = key;
+    symmetry_.pivot = symmetryPivot(doc_.mesh);
+}
+
+Args App::withSymmetryArgs(Args args) {
+    refreshSymmetryPivot();
+    args["symmetry"] = symmetryAxes(symmetry_);
+    if (symmetry_.radialOn()) {
+        args["radial"] = double(symmetry_.radial);
+        args["radial_axis"] = std::string(1, char('x' + symmetry_.radialAxis));
+    }
+    if (symmetry_.local) args["local"] = true;
+    return args;
+}
+
 void App::beginMaskStroke(float x, float y) {
+    refreshSymmetryPivot();
     // Masks are not layered, so the stroke always targets the base (its weight is never 0).
     // Ctrl+Alt erases, and so does the pen's eraser end (set to Invert or Erase mask).
     strokeInvert_ = (inputMods() & SDL_KMOD_ALT) != 0 ||
@@ -111,8 +133,7 @@ void App::maskSelectMouseUp() {
     // Mask the inside, or unmask it with Alt (Mask Strength sets how much), mirrored by the symmetry like a mask
     // stroke (#51). A shape that covers none of the model clears the mask instead (ZBrush).
     runSelection("mask_rect", "mask_lasso",
-                 {{"unmask", alt}, {"strength", double(maskStrength_)}, {"symmetry", symmetryAxes(symmetry_)},
-                  {"clear_outside", !alt}});
+                 withSymmetryArgs({{"unmask", alt}, {"strength", double(maskStrength_)}, {"clear_outside", !alt}}));
 }
 
 App::HeldBrush App::heldBrush() const {
@@ -123,12 +144,12 @@ App::HeldBrush App::heldBrush() const {
 
 std::vector<App::HeldBrushItem> App::heldBrushItems(HeldBrush held) {
     if (held == HeldBrush::Mask)
-        return {{"mask.pen", "MaskPen", "Dots", ICON_LC_PEN_TOOL, SelectShape::Pen},
-                {"mask.lasso", "MaskLasso", "Lasso", ICON_LC_LASSO, SelectShape::Lasso},
-                {"mask.rect", "MaskRect", "Rect", ICON_LC_SQUARE_DASHED, SelectShape::Rect}};
+        return {{"mask.pen", "Mask Pen", "Dots", ICON_LC_PEN_TOOL, SelectShape::Pen},
+                {"mask.lasso", "Mask Lasso", "Lasso", ICON_LC_LASSO, SelectShape::Lasso},
+                {"mask.rect", "Mask Rectangle", "Rect", ICON_LC_SQUARE_DASHED, SelectShape::Rect}};
     if (held == HeldBrush::Select)
-        return {{"select.rect", "SelectRect", "Rect", ICON_LC_SQUARE_DASHED, SelectShape::Rect},
-                {"select.lasso", "SelectLasso", "Lasso", ICON_LC_LASSO, SelectShape::Lasso}};
+        return {{"select.rect", "Select Rectangle", "Rect", ICON_LC_SQUARE_DASHED, SelectShape::Rect},
+                {"select.lasso", "Select Lasso", "Lasso", ICON_LC_LASSO, SelectShape::Lasso}};
     return {};
 }
 
@@ -180,7 +201,7 @@ void App::drawMaskingSection() {
     const float third = (ImGui::GetContentRegionAvail().x - 2 * style.ItemSpacing.x) / 3.0f;
     const float half = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) * 0.5f;
     if (ImGui::Button(tr("Clear##mask"), ImVec2(third, 0))) runCommand("mask_clear");
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Unmask everything (MaskPen: Ctrl + drag background)"));
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Unmask everything (Mask Pen: Ctrl + drag background)"));
     ImGui::SameLine();
     if (ImGui::Button(tr("Invert##mask"), ImVec2(third, 0))) runCommand("mask_invert");
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Ctrl + click background"));
@@ -203,9 +224,9 @@ void App::drawMaskingSection() {
     ImGui::SameLine();
     ImGui::SetNextItemWidth(-1);
     ui::SliderInside("##cavitythreshold", &cavityThreshold_, -0.2f, 0.5f, "Threshold %.2f");
-    if (ImGui::Button(tr("By polygroup"), ImVec2(half, 0)))
+    if (ImGui::Button(tr("By face group"), ImVec2(half, 0)))
         runCommand("mask_by_polygroup", {{"group", double(maskGroup_)}});
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Mask one polygroup (replaces the mask)"));
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Mask one face group (replaces the mask)"));
     ImGui::SameLine();
     // The group id as a drag field the size of the button beside it (Ctrl+click or double-click types a number),
     // rather than an input with tiny - and + buttons.
@@ -227,9 +248,9 @@ void App::drawMaskingSection() {
     ImGui::SameLine();
     ImGui::SetNextItemWidth(-1);
     tray::SliderInt("##maskborderrings", &maskBorderRings_, 1, 20, "Rings %d");
-    ui::Checkbox("Polygroup borders##maskborder", &maskBorderGroups_);
-    ui::HelpText("Polygroup borders", nullptr,
-                 "By border also masks where polygroups meet (ZBrush: Mask by polygroup border).", "Tool > Masking");
+    ui::Checkbox("Face Group borders##maskborder", &maskBorderGroups_);
+    ui::HelpText("Face Group borders", nullptr,
+                 "By border also masks where face groups meet (ZBrush: Mask by polygroup border).", "Tool > Masking");
     ImGui::SameLine();
     ui::Checkbox("Soft##maskborder", &maskBorderSoft_);
     ui::HelpText("Soft", nullptr, "By border fades the mask from the border towards the innermost ring.",

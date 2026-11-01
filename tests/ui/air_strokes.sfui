@@ -1,0 +1,88 @@
+# #62: Preferences > Input > Start strokes off the model (off by default: a drag on the background turns the view).
+run new_sphere subdivisions=4
+key f
+camera 0 0
+snapshot
+
+# Off: a left drag from the background onto the model turns the view and leaves the surface alone.
+expect_value air_strokes == 0
+remember camera_yaw yaw0
+drag_path -0.3 0.5 0.5 0.5
+expect_value camera_yaw != $yaw0
+expect_value moved == 0
+expect_value can_undo == 0
+
+# On (the checkbox): the same drag sculpts from where it reaches the surface; the camera stays put.
+camera 0 0
+click "Preferences##palette.preferences"
+click "Input##preferences.input"
+hold ctrl
+hover "Start strokes off the model##input.air_strokes"
+expect_help "background"
+hold none
+click "Start strokes off the model##input.air_strokes"
+expect_value air_strokes == 1
+key escape
+remember camera_yaw yaw1
+remember camera_pitch pitch1
+drag_path -0.3 0.5 0.5 0.5
+expect_value camera_yaw == $yaw1
+expect_value camera_pitch == $pitch1
+expect_value moved > 0
+expect_value can_undo == 1
+shot air_strokes
+
+# A drag that never reaches the model does nothing at all.
+key ctrl+z
+expect_value can_undo == 0
+drag_path -0.3 -0.3 -0.3 1.3
+expect_value camera_yaw == $yaw1
+expect_value can_undo == 0
+
+# Ctrl: a mask stroke from the background; a Ctrl+click on the background still inverts the mask.
+expect_value masked == 0
+hold ctrl
+drag_path -0.3 0.4 0.5 0.4
+hold none
+expect_value masked > 0
+expect_value camera_yaw == $yaw1
+remember masked m0
+hold ctrl
+drag_path -0.3 -0.05 -0.3 -0.05
+hold none
+expect_value masked > $m0
+key ctrl+shift+a
+expect_value masked == 0
+
+# Shift: a smooth stroke from the background.
+snapshot
+hold shift
+drag_path -0.3 0.6 0.5 0.6
+hold none
+expect_value camera_yaw == $yaw1
+expect_value moved > 0
+
+# Navigation still works: right drag turns, Alt+drag pans.
+button_drag right 0.12 0.5 0.12 0.7
+expect_value camera_pitch != $pitch1
+remember camera_pan pan0
+hold alt
+drag_path -0.3 0.5 -0.3 0.8
+hold none
+expect_value camera_pan != $pan0
+
+# With the pen: a tip drag from the background onto the model sculpts, the view stays.
+camera 0 0
+remember camera_yaw yaw2
+snapshot
+pen_drag 0.12 0.5 0.5 0.5
+expect_value camera_yaw == $yaw2
+expect_value moved > 0
+pen_out
+
+# Shift+L turns it off again: the drag turns the view.
+key shift+l
+expect_value air_strokes == 0
+expect_value shortcut_conflicts == 0
+drag_path -0.3 0.5 0.5 0.5
+expect_value camera_yaw != $yaw2

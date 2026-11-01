@@ -19,7 +19,7 @@
   <link rel="stylesheet" href="../style.css?v=17">
   <script src="../motion.js?v=10" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
-  <script src="search-index.js?v=41" defer></script>
+  <script src="search-index.js?v=43" defer></script>
 </head>
 <body class="guide-page" data-prev="welcome.html" data-next="coming-from-zbrush.html">
   <div class="scroll-progress" aria-hidden="true"></div>
@@ -45,33 +45,71 @@
           <input type="search" id="guide-q" placeholder="Search the guide" aria-label="Search the guide" autocomplete="off">
           <div class="search-results" id="guide-results" hidden></div>
         </div>
-        <nav class="toc" aria-label="User guide"><a class="toc-home" href="index.html">Contents</a><p class="toc-group">Getting started</p><ul><li><a href="welcome.html">Welcome to SculptForge</a></li><li><a href="whats-new.html" class="current" aria-current="page">What&#x27;s new</a><ul class="toc-sections"><li><a href="#version-0104">Version 0.10.4</a></li><li><a href="#version-0103">Version 0.10.3</a></li><li><a href="#version-0102">Version 0.10.2</a></li><li><a href="#version-0101">Version 0.10.1</a></li><li><a href="#version-097">Version 0.9.7</a></li><li><a href="#version-096">Version 0.9.6</a></li><li><a href="#version-095">Version 0.9.5</a></li><li><a href="#version-094">Version 0.9.4</a></li><li><a href="#version-093">Version 0.9.3</a></li><li><a href="#version-092">Version 0.9.2</a></li><li><a href="#version-091">Version 0.9.1</a></li><li><a href="#version-090">Version 0.9.0</a></li><li><a href="#version-081">Version 0.8.1</a></li><li><a href="#version-08">Version 0.8</a></li><li><a href="#version-07">Version 0.7</a></li><li><a href="#version-06">Version 0.6</a></li><li><a href="#version-05">Version 0.5</a></li><li><a href="#version-042">Version 0.4.2</a></li><li><a href="#version-041">Version 0.4.1</a></li><li><a href="#version-04">Version 0.4</a></li><li><a href="#version-03">Version 0.3</a></li><li><a href="#version-02">Version 0.2</a></li><li><a href="#version-01">Version 0.1</a></li></ul></li><li><a href="coming-from-zbrush.html">Coming from ZBrush</a></li><li><a href="installing.html">Installing SculptForge</a></li><li><a href="interface.html">The interface</a></li><li><a href="navigation.html">Navigating the view</a></li></ul><p class="toc-group">Sculpting</p><ul><li><a href="sculpting.html">Sculpting and brushes</a></li><li><a href="brush-lab.html">Brush Lab and sharing brushes</a></li><li><a href="masking.html">Masking</a></li><li><a href="polygroups.html">Polygroups and visibility</a></li><li><a href="subtools.html">SubTools</a></li><li><a href="zspheres.html">ZSpheres</a></li><li><a href="polypaint.html">Polypaint and materials</a></li><li><a href="texture-painting.html">Texture painting</a></li><li><a href="pbr-painting.html">Material painting (PBR)</a></li><li><a href="layers.html">Sculpt layers and blend shapes</a></li><li><a href="facial-shapes.html">Facial shapes and live face</a></li><li><a href="subdivision-levels.html">Subdivision levels</a></li><li><a href="micro-levels.html">Micro levels: hundreds of millions of polygons</a></li><li><a href="dynamic-topology.html">Dynamic topology</a></li><li><a href="timeline.html">Sculpt Timeline and timelapse</a></li><li><a href="gizmo.html">Moving, rotating and posing (Gizmo 3D)</a></li><li><a href="geometry.html">Subdivide, remesh, decimate and LODs</a></li><li><a href="retopology.html">Quad retopology and detail projection</a></li></ul><p class="toc-group">AI and capture</p><ul><li><a href="generate-3d.html">Image and text to 3D</a></li><li><a href="splats.html">Gaussian splats</a></li><li><a href="scan-to-splat.html">Scan an object into a splat</a></li><li><a href="scan-to-sculptable.html">From scan to sculptable mesh</a></li><li><a href="phone-capture.html">Phone capture and AR</a></li></ul><p class="toc-group">Files and pipelines</p><ul><li><a href="baking.html">Baking normal and displacement maps</a></li><li><a href="exporting.html">Exporting, Unreal and ZBrush</a></li><li><a href="export-presets.html">Export presets</a></li><li><a href="blender.html">Working with Blender</a></li><li><a href="maya.html">Working with Maya</a></li><li><a href="projects.html">Projects, autosave and QuickSave</a></li><li><a href="scripting.html">Scripting and automation</a></li><li><a href="studios.html">SculptForge for studios</a></li></ul><p class="toc-group">Reference</p><ul><li><a href="shortcuts.html">Keyboard and mouse</a></li><li><a href="performance.html">Performance and big meshes</a></li><li><a href="troubleshooting.html">Troubleshooting and FAQ</a></li><li><a href="glossary.html">Glossary</a></li></ul></nav>
+        <nav class="toc" aria-label="User guide"><a class="toc-home" href="index.html">Contents</a><p class="toc-group">Getting started</p><ul><li><a href="welcome.html">Welcome to SculptForge</a></li><li><a href="whats-new.html" class="current" aria-current="page">What&#x27;s new</a><ul class="toc-sections"><li><a href="#version-0105">Version 0.10.5</a></li><li><a href="#version-0104">Version 0.10.4</a></li><li><a href="#version-0103">Version 0.10.3</a></li><li><a href="#version-0102">Version 0.10.2</a></li><li><a href="#version-0101">Version 0.10.1</a></li><li><a href="#version-097">Version 0.9.7</a></li><li><a href="#version-096">Version 0.9.6</a></li><li><a href="#version-095">Version 0.9.5</a></li><li><a href="#version-094">Version 0.9.4</a></li><li><a href="#version-093">Version 0.9.3</a></li><li><a href="#version-092">Version 0.9.2</a></li><li><a href="#version-091">Version 0.9.1</a></li><li><a href="#version-090">Version 0.9.0</a></li><li><a href="#version-081">Version 0.8.1</a></li><li><a href="#version-08">Version 0.8</a></li><li><a href="#version-07">Version 0.7</a></li><li><a href="#version-06">Version 0.6</a></li><li><a href="#version-05">Version 0.5</a></li><li><a href="#version-042">Version 0.4.2</a></li><li><a href="#version-041">Version 0.4.1</a></li><li><a href="#version-04">Version 0.4</a></li><li><a href="#version-03">Version 0.3</a></li><li><a href="#version-02">Version 0.2</a></li><li><a href="#version-01">Version 0.1</a></li></ul></li><li><a href="coming-from-zbrush.html">Coming from ZBrush</a></li><li><a href="installing.html">Installing SculptForge</a></li><li><a href="interface.html">The interface</a></li><li><a href="navigation.html">Navigating the view</a></li></ul><p class="toc-group">Sculpting</p><ul><li><a href="sculpting.html">Sculpting and brushes</a></li><li><a href="brush-lab.html">Brush Lab and sharing brushes</a></li><li><a href="masking.html">Masking</a></li><li><a href="face-groups.html">Face Groups and visibility</a></li><li><a href="selection-sets.html">Selection sets and morph targets</a></li><li><a href="parts.html">Parts</a></li><li><a href="forge-spheres.html">Forge Spheres</a></li><li><a href="vertex-paint.html">Vertex Paint and materials</a></li><li><a href="texture-painting.html">Texture painting</a></li><li><a href="uv-editor.html">UV Editor</a></li><li><a href="pbr-painting.html">Material painting (PBR)</a></li><li><a href="layers.html">Sculpt layers and blend shapes</a></li><li><a href="facial-shapes.html">Facial shapes and live face</a></li><li><a href="subdivision-levels.html">Subdivision levels</a></li><li><a href="micro-levels.html">Micro levels: hundreds of millions of polygons</a></li><li><a href="dynamic-topology.html">Dynamic topology</a></li><li><a href="timeline.html">Sculpt Timeline and timelapse</a></li><li><a href="gizmo.html">Moving, rotating and posing (Gizmo)</a></li><li><a href="geometry.html">Subdivide, remesh, decimate and LODs</a></li><li><a href="retopology.html">Quad retopology and detail projection</a></li></ul><p class="toc-group">AI and capture</p><ul><li><a href="generate-3d.html">Image and text to 3D</a></li><li><a href="splats.html">Gaussian splats</a></li><li><a href="scan-to-splat.html">Scan an object into a splat</a></li><li><a href="scan-to-sculptable.html">From scan to sculptable mesh</a></li><li><a href="phone-capture.html">Phone capture and AR</a></li></ul><p class="toc-group">Files and pipelines</p><ul><li><a href="baking.html">Baking normal and displacement maps</a></li><li><a href="exporting.html">Exporting, Unreal and ZBrush</a></li><li><a href="export-presets.html">Export presets</a></li><li><a href="blender.html">Working with Blender</a></li><li><a href="maya.html">Working with Maya</a></li><li><a href="projects.html">Projects, autosave and snapshots</a></li><li><a href="scripting.html">Scripting and automation</a></li><li><a href="studios.html">SculptForge for studios</a></li></ul><p class="toc-group">Reference</p><ul><li><a href="shortcuts.html">Keyboard and mouse</a></li><li><a href="performance.html">Performance and big meshes</a></li><li><a href="troubleshooting.html">Troubleshooting and FAQ</a></li><li><a href="glossary.html">Glossary</a></li></ul></nav>
       </div>
     </div>
     <main class="guide-main" id="top">
       <article class="guide-article">
 <h1 id="whats-new">What&#x27;s new</h1>
 <p>What changed in each version of SculptForge, newest first, with links to the chapters that explain it. This chapter opens by itself the first time you start a new version; you can always find it again under <strong>Help &gt; What&#x27;s New</strong>. Every detail is in the <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md" rel="noopener">changelog</a>.</p>
-<h2 id="version-0104">Version 0.10.4<a class="anchor" href="#version-0104" aria-label="Link to this section">#</a></h2>
+<h2 id="version-0105">Version 0.10.5<a class="anchor" href="#version-0105" aria-label="Link to this section">#</a></h2>
+<ul>
+<li>
+<strong>Selection sets</strong> (<strong>Tool &gt; Selection Sets</strong>): store as many named snapshots of a Part&#x27;s mask, face groups, visibility, vertex paint, UVs and shape as you like, and restore them at any subdivision level, not only the one they were stored at. Combine two sets (union, intersect, subtract), restore one onto the current mask or visibility the same way, or take a quick set from the visible faces. Every step is one undo step, and the sets are saved with the project. See <a href="selection-sets.html">Selection sets</a>.
+</li>
+<li>
+<strong>Morph brush and Morph to Set</strong>: a set with its shape is a morph target. The new <strong>Morph</strong> brush pulls the surface back toward it (<kbd>Alt</kbd> pushes away), and <strong>Morph to Set</strong> blends the whole Part toward it by any amount, within the mask, at any subdivision level.
+</li>
+<li>
+<strong>Sets for pipelines</strong>: <code>selection_set_*</code> commands for scripts, <code>sculptforge-cli</code> and the AI assistant, <code>doc.selection_set()</code> / <code>doc.set_selection_set()</code> in Python, <code>.sfsets</code> files to move sets between Parts and scenes, and USD exports that carry them as GeomSubsets and primvars (read back on import).
+</li>
+<li>
+<strong>UV Editor</strong> (<strong>Tool &gt; Texture Map &gt; UV Editor</strong>, <kbd>Alt</kbd>+<kbd>U</kbd>): the Part&#x27;s UVs flat over the UDIM tiles, drawn by the graphics card so a million triangles stay smooth. Draw seams on the model with the <strong>Seam Tool</strong> (or take them from face groups, island borders or sharp edges), then <strong>Unwrap</strong>: <strong>Least Stretch</strong>, <strong>Conformal</strong>, <strong>By Face Groups</strong>, <strong>Planar</strong>, <strong>Unfold Islands</strong> or <strong>Auto Seams</strong>, with closed and tangled pieces cut for you. <strong>Pack</strong> into one tile or across UDIM tiles, <strong>Set</strong> and <strong>Match</strong> texel density, lay islands into <strong>trim sheet</strong> strips, and select vertices, edges, faces or islands (in the view or on the model) to move, rotate, scale, pin, weld, split, straighten and flip them. The model shows stretch, texel density, islands and a checker live while you edit, and a painted texture moves with every change so the model keeps its look. Every step is one undo step and a <code>uv_*</code> command for scripts. See <a href="uv-editor.html">UV Editor</a>.
+</li>
+</ul>
+<ul>
+<li>
+<strong>Fixed: the viewport on some Windows PCs</strong> (#29): on displays whose window uses another colour format (seen with NVIDIA and high-resolution screens) the model never appeared and the cursor left trails. The view now reaches the window on every format, and falls back to drawing directly if a driver still refuses.
+</li>
+<li>
+<strong>Features use SculptForge&#x27;s own names</strong> (Parts, Forge Spheres, Vertex Paint, Face Groups, Library, Lit Spheres, Quad Remesh, Send to ZBrush, Snapshot...); searching for ZBrush terms still finds them, and MatCaps are now Lit Spheres. The table is in <a href="coming-from-zbrush.html#zbrush-terms-in-sculptforge">Coming from ZBrush</a>.
+</li>
+<li>
+<strong>New installs start with the SculptForge keys</strong>, and the first start asks what you are coming from (ZBrush, Blender, Maya or new to sculpting) to pick the key style. Your saved style is kept; ZBrush&#x27;s keys are <strong>ZBrush-style</strong> in <strong>Preferences &gt; Input</strong>. See <a href="shortcuts.html#zbrush-style-keys">Keyboard and mouse</a>.
+</li>
+</ul>
 <h3 id="from-your-requests-on-github">From your requests on GitHub<a class="anchor" href="#from-your-requests-on-github" aria-label="Link to this section">#</a></h3>
 <ul>
 <li>
-<strong>Insert your own mesh</strong> (#34): <strong>Append &gt; Insert on the model</strong> now takes a copy of another SubTool or an <code>.obj</code>, <code>.ply</code> or <code>.glb</code> file, placed, sized and turned by the drag like the shapes. See <a href="subtools.html">SubTools</a>.
+<strong>Start strokes off the model</strong> (#62): an option in <strong>Preferences &gt; Input</strong>, off by default, and <kbd>Shift</kbd>+<kbd>L</kbd> to turn it on and off. With it on, a left-drag that starts on the background sculpts once it reaches the model instead of turning the view. See <a href="navigation.html#mouse-and-pen">Navigation</a>.
 </li>
 <li>
-<strong>Keep Masked</strong> for Voxel Remesh, Decimate and QRemesh (#43): the masked part keeps its triangles and detail exactly; only the rest is rebuilt and joined to it. See <a href="geometry.html">Geometry</a>.
+<strong>Radial and local symmetry</strong> (#63): <strong>R</strong> in <strong>Transform &gt; Symmetry</strong> (and on the top shelf) repeats every stroke around the X, Y or Z axis, 2 to 64 times (<strong>Radial Count</strong>), together with the X / Y / Z mirrors. Every brush, mask, vertex paint and texture stroke, the mask and select shapes, Dynamic Topology and Insert follow it, and the brush cursor shows on every copy. <strong>Local</strong> puts the planes and the axis through the active Part&#x27;s centre. Saved with the project and scriptable (<code>radial</code>, <code>radial_axis</code>, <code>local</code>). See <a href="sculpting.html#radial-symmetry">Sculpting</a>.
+</li>
+<li>
+<strong>The Sculpt Timeline is at the top of the viewport</strong> (#63), away from the brushes on the bottom shelf. <strong>Preferences &gt; Interface &gt; Timeline position</strong> puts it back at the bottom; Store Config keeps the choice. See <a href="timeline.html">Sculpt Timeline</a>.
+</li>
+</ul>
+<h2 id="version-0104">Version 0.10.4<a class="anchor" href="#version-0104" aria-label="Link to this section">#</a></h2>
+<h3 id="from-your-requests-on-github-1">From your requests on GitHub<a class="anchor" href="#from-your-requests-on-github-1" aria-label="Link to this section">#</a></h3>
+<ul>
+<li>
+<strong>Insert your own mesh</strong> (#34): <strong>Append &gt; Insert on the model</strong> now takes a copy of another Part or an <code>.obj</code>, <code>.ply</code> or <code>.glb</code> file, placed, sized and turned by the drag like the shapes. See <a href="parts.html">Parts</a>.
+</li>
+<li>
+<strong>Keep Masked</strong> for Voxel Remesh, Decimate and Quad Remesh (#43): the masked part keeps its triangles and detail exactly; only the rest is rebuilt and joined to it. See <a href="geometry.html">Geometry</a>.
 </li>
 <li>
 <strong>Hold Space and drag to move the camera</strong> (#43): an option in <strong>Preferences &gt; Input</strong>, off by default. See <a href="navigation.html">Navigation</a>.
 </li>
 <li>
-<strong>Triple-click</strong> another SubTool in the viewport to select and frame it (#43).
+<strong>Triple-click</strong> another Part in the viewport to select and frame it (#43).
 </li>
 <li>
-<strong>Twelve new alphas</strong> (Pores, Cracks, Scales, Rivets, Stitches, Fabric Weave, Bark, Rock Strata, Wrinkles, Skin Folds, Hair Strands, Dot Grid) and <strong>six new VDM brushes</strong> (Rivet, Stitches, Skin Fold, Wrinkle Line, Crack, Rock Ledge), with thumbnails in the LightBox (#43). See <a href="sculpting.html">Sculpting</a>.
+<strong>Twelve new alphas</strong> (Pores, Cracks, Scales, Rivets, Stitches, Fabric Weave, Bark, Rock Strata, Wrinkles, Skin Folds, Hair Strands, Dot Grid) and <strong>six new VDM brushes</strong> (Rivet, Stitches, Skin Fold, Wrinkle Line, Crack, Rock Ledge), with thumbnails in the Library (#43). See <a href="sculpting.html">Sculpting</a>.
 </li>
 <li>
-<strong>Mask from the mesh border</strong> (#61): <strong>Tool &gt; Masking &gt; By border</strong> masks open edges (and polygroup borders), so sculpting leaves them in place. See <a href="masking.html">Masking</a>.
+<strong>Mask from the mesh border</strong> (#61): <strong>Tool &gt; Masking &gt; By border</strong> masks open edges (and face group borders), so sculpting leaves them in place. See <a href="masking.html">Masking</a>.
 </li>
 <li>
 <strong>SculptForge in Spanish</strong> (#44): <strong>Preferences &gt; Interface &gt; Language &gt; Español</strong>.
@@ -83,17 +121,17 @@
 <strong>Radial (pie) menus</strong> (#45): hold <strong>T</strong> (brushes) or <strong>Y</strong> (masking), flick and let go; make your own in <strong>Preferences &gt; Input &gt; Radial Menus</strong>. See <a href="sculpting.html#radial-menus">Sculpting</a>.
 </li>
 <li>
-<strong>Focal Shift works with alphas</strong> (#60): -100 shows the whole alpha, 0 rounds it off, +100 leaves a soft point (alpha brushes are softer at the default 0 than before; set -100 for the old crisp look).
+<strong>Falloff works with alphas</strong> (#60): -100 shows the whole alpha, 0 rounds it off, +100 leaves a soft point (alpha brushes are softer at the default 0 than before; set -100 for the old crisp look).
 </li>
 <li>
-<strong>SelectRect and SelectLasso</strong> follow X / Y / Z symmetry, like the mask versions (#51).
+<strong>Select Rectangle and Select Lasso</strong> follow X / Y / Z symmetry, like the mask versions (#51).
 </li>
 </ul>
 <h3 id="become-an-insider">Become an Insider<a class="anchor" href="#become-an-insider" aria-label="Link to this section">#</a></h3>
 <p>SculptForge stays free for everyone. Insiders will get each release about two weeks early, starting with SculptForge 1.0. <strong>Help &gt; Support SculptForge</strong> opens the page to join.</p>
 <p>When SculptForge starts for the first time, after an update, and otherwise at most once a week, a card shows the ways to support it: <strong>Supporter</strong>, <strong>Insider</strong> and <strong>Studio</strong> memberships and a one-time gift, each opening its checkout page in your browser. <strong>Maybe later</strong>, <kbd>Esc</kbd> or a click outside closes it; <strong>I&#x27;m already a supporter</strong> hides it for good, and <strong>Preferences &gt; Support</strong> turns it off. It never shows while you work, and nothing about you is sent anywhere.</p>
 <h2 id="version-0103">Version 0.10.3<a class="anchor" href="#version-0103" aria-label="Link to this section">#</a></h2>
-<h3 id="from-your-requests-on-github-1">From your requests on GitHub<a class="anchor" href="#from-your-requests-on-github-1" aria-label="Link to this section">#</a></h3>
+<h3 id="from-your-requests-on-github-2">From your requests on GitHub<a class="anchor" href="#from-your-requests-on-github-2" aria-label="Link to this section">#</a></h3>
 <ul>
 <li>
 <strong>Alternate smooth</strong> (#40): start smoothing with Shift held, then let go of Shift while still pressing, and the rest of the stroke smooths without shrinking the form. <strong>Brush &gt; Smooth keeps volume</strong> makes it the default. See <a href="sculpting.html">Sculpting</a>.
@@ -105,7 +143,7 @@
 <strong>Pen tablets in mouse mode</strong> (#54): <strong>Preferences &gt; Tablet &gt; Mouse mode (relative)</strong> stops the cursor jumping back when you lift the pen.
 </li>
 <li>
-<strong>Axis gizmo</strong>: click X, Y or Z to snap to that view (#43). <strong>Undo and Redo</strong> on the right shelf, <strong>Continuous</strong> in the stroke picker, <strong>SubTool thumbnails</strong>, and <strong>Insert on the model</strong> follows symmetry. See <a href="navigation.html">Navigation</a> and <a href="subtools.html">SubTools</a>.
+<strong>Axis gizmo</strong>: click X, Y or Z to snap to that view (#43). <strong>Undo and Redo</strong> on the right shelf, <strong>Continuous</strong> in the stroke picker, <strong>Part thumbnails</strong>, and <strong>Insert on the model</strong> follows symmetry. See <a href="navigation.html">Navigation</a> and <a href="parts.html">Parts</a>.
 </li>
 <li>
 <strong>macOS</strong> (#41): reopening in full screen keeps the menu bar and window buttons reachable.
@@ -114,10 +152,10 @@
 <h3 id="support-sculptforge">Support SculptForge<a class="anchor" href="#support-sculptforge" aria-label="Link to this section">#</a></h3>
 <p>SculptForge stays free for everyone. <strong>Help &gt; Support SculptForge</strong> opens the page where you can become a member. Insiders will get each release about two weeks early, starting with SculptForge 1.0.</p>
 <h2 id="version-0102">Version 0.10.2<a class="anchor" href="#version-0102" aria-label="Link to this section">#</a></h2>
-<h3 id="qremesh-2">QRemesh 2<a class="anchor" href="#qremesh-2" aria-label="Link to this section">#</a></h3>
+<h3 id="quad-remesh-2">Quad Remesh 2<a class="anchor" href="#quad-remesh-2" aria-label="Link to this section">#</a></h3>
 <p>A new quad remesher is now the default in <strong>Tool &gt; Remesh</strong> and <strong>Tool &gt; Geometry</strong>: two to fifty times fewer poles than before at the same accuracy, edge loops that follow the forms (round the mouth and nose), exact symmetry, and a quality report after each run. The previous method is still there as <strong>Legacy</strong>, and pieces with closed guide loops use it for now. See <a href="retopology.html">Quad retopology</a>.</p>
 <h3 id="kelvinlet-brushes-and-capture-from-view">Kelvinlet brushes and Capture from view<a class="anchor" href="#kelvinlet-brushes-and-capture-from-view" aria-label="Link to this section">#</a></h3>
-<p><strong>KelvinGrab</strong>, <strong>KelvinTwist</strong>, <strong>KelvinScale</strong> and <strong>KelvinSnake</strong> move the surface like elastic clay, with a Squash slider from rubber to firm clay; they&#x27;re at their best below about 10 million triangles for now. <strong>Capture from view</strong> (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd>) turns any detail into an alpha or a vector displacement brush, and <strong>Detail Clone</strong> stamps it along a stroke. See <a href="sculpting.html">Sculpting</a>.</p>
+<p><strong>KelvinGrab</strong>, <strong>KelvinTwist</strong>, <strong>KelvinScale</strong> and <strong>Elastic Tendril</strong> move the surface like elastic clay, with a Squash slider from rubber to firm clay; they&#x27;re at their best below about 10 million triangles for now. <strong>Capture from view</strong> (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd>) turns any detail into an alpha or a vector displacement brush, and <strong>Detail Clone</strong> stamps it along a stroke. See <a href="sculpting.html">Sculpting</a>.</p>
 <h3 id="also">Also<a class="anchor" href="#also" aria-label="Link to this section">#</a></h3>
 <ul>
 <li>
@@ -140,7 +178,7 @@ The local API added in 0.10.1 is removed; SculptForge doesn&#x27;t listen for ot
 <strong>Focal length</strong> (#26): <strong>Draw &gt; Camera</strong>, 15-300 mm with 35 / 50 / 85 / 135 presets, saved with the project.
 </li>
 <li>
-<strong>More primitives</strong> (#31): Cylinder, Cone, Torus, Capsule, Icosphere and Quad Sphere in <strong>Tool &gt; SubTool &gt; Append</strong>, plus <strong>Insert on the model</strong> (#34): choose a shape, then drag on the surface to add it.
+<strong>More primitives</strong> (#31): Cylinder, Cone, Torus, Capsule, Icosphere and Quad Sphere in <strong>Tool &gt; Parts &gt; Append</strong>, plus <strong>Insert on the model</strong> (#34): choose a shape, then drag on the surface to add it.
 </li>
 <li>
 <strong>Continuous</strong> in the Stroke palette keeps the brush working while you hold it still, and an X / Y / Z gizmo shows the view&#x27;s direction (#31).
@@ -175,12 +213,12 @@ The status bar shows only the file name of what you open.
 <h2 id="version-097">Version 0.9.7<a class="anchor" href="#version-097" aria-label="Link to this section">#</a></h2>
 <h3 id="faster-big-brushes-on-dense-meshes">Faster big brushes on dense meshes<a class="anchor" href="#faster-big-brushes-on-dense-meshes" aria-label="Link to this section">#</a></h3>
 <p>A large brush on a model of 20 million triangles or more keeps up much better: on a 21-million-triangle sphere with a 200-pixel brush, the brush now trails the pointer by half as far, a frame takes a third less time, the first dab appears in half the time, and lifting the pen no longer pauses for up to a second while waiting dabs are placed. See <a href="performance.html">Performance</a>.</p>
-<h3 id="right-click-for-the-quickmenu">Right click for the QuickMenu<a class="anchor" href="#right-click-for-the-quickmenu" aria-label="Link to this section">#</a></h3>
-<p>A right click on the canvas opens the QuickMenu under the cursor, as in ZBrush (Space still does too). A right drag turns the view as before, and <strong>Preferences &gt; Input &gt; Right click opens the QuickMenu</strong> turns it off. See <a href="sculpting.html#the-quickmenu">The QuickMenu</a>.</p>
+<h3 id="right-click-for-the-quick-menu">Right click for the Quick Menu<a class="anchor" href="#right-click-for-the-quick-menu" aria-label="Link to this section">#</a></h3>
+<p>A right click on the canvas opens the Quick Menu under the cursor, as in ZBrush (Space still does too). A right drag turns the view as before, and <strong>Preferences &gt; Input &gt; Right click opens the Quick Menu</strong> turns it off. See <a href="sculpting.html#the-quick-menu">The Quick Menu</a>.</p>
 <h3 id="fixes">Fixes<a class="anchor" href="#fixes" aria-label="Link to this section">#</a></h3>
 <ul>
 <li>
-The orthographic view (<kbd>Numpad 5</kbd>) shades like the perspective one: MatCaps and the lights no longer look inside out.
+The orthographic view (<kbd>Numpad 5</kbd>) shades like the perspective one: Lit Spheres and the lights no longer look inside out.
 </li>
 <li>
 Dynamic topology with symmetry now adds detail on the mirrored side too when the model&#x27;s two sides aren&#x27;t built from mirrored polygons (a QRemeshed head, say): before, only the side under the brush got the new triangles. See <a href="dynamic-topology.html">Dynamic topology</a>.
@@ -188,9 +226,9 @@ Dynamic topology with symmetry now adds detail on the mirrored side too when the
 </ul>
 <h2 id="version-096">Version 0.9.6<a class="anchor" href="#version-096" aria-label="Link to this section">#</a></h2>
 <h3 id="extract">Extract<a class="anchor" href="#extract" aria-label="Link to this section">#</a></h3>
-<p>Mask part of a SubTool and <strong>Tool &gt; SubTool &gt; Extract</strong> turns it into a shell that fits the surface exactly: a helmet, a strap, a piece of armour. Set <strong>Thick</strong>, <strong>E Smt</strong> and <strong>Double</strong> while the preview shows, then <strong>Accept</strong> keeps it as a new SubTool (and <kbd>Ctrl</kbd>+<kbd>Z</kbd> takes it away again). <strong>TCorne</strong> and <strong>TBorder</strong> give the rim triangles instead of quads. See <a href="subtools.html#extract-a-shell">Extract a shell</a>.</p>
+<p>Mask part of a Part and <strong>Tool &gt; Parts &gt; Extract</strong> turns it into a shell that fits the surface exactly: a helmet, a strap, a piece of armour. Set <strong>Thick</strong>, <strong>E Smt</strong> and <strong>Double</strong> while the preview shows, then <strong>Accept</strong> keeps it as a new Part (and <kbd>Ctrl</kbd>+<kbd>Z</kbd> takes it away again). <strong>TCorne</strong> and <strong>TBorder</strong> give the rim triangles instead of quads. See <a href="parts.html#extract-a-shell">Extract a shell</a>.</p>
 <h3 id="mirror-and-weld">Mirror And Weld<a class="anchor" href="#mirror-and-weld" aria-label="Link to this section">#</a></h3>
-<p><strong>Tool &gt; Geometry &gt; Modify Topology &gt; Mirror And Weld</strong> mirrors one side of a model onto the other across X, Y or Z and welds the seam into one watertight mesh, keeping polygroups and polypaint. <strong>Tool &gt; Deformation &gt; Mirror</strong> flips a SubTool. See <a href="geometry.html#mirror-and-weld">Mirror And Weld</a>.</p>
+<p><strong>Tool &gt; Geometry &gt; Modify Topology &gt; Mirror And Weld</strong> mirrors one side of a model onto the other across X, Y or Z and welds the seam into one watertight mesh, keeping face groups and vertex paint. <strong>Tool &gt; Deformation &gt; Mirror</strong> flips a Part. See <a href="geometry.html#mirror-and-weld">Mirror And Weld</a>.</p>
 <h3 id="a-flat-background">A flat background<a class="anchor" href="#a-flat-background" aria-label="Link to this section">#</a></h3>
 <p><strong>Preferences &gt; Display &gt; Background</strong> (also in the Render palette) switches the view from the gradient to a flat colour you pick. Store Config keeps it, and projects keep their own. See <a href="interface.html#the-background">The background</a>.</p>
 <h3 id="flatpak">Flatpak<a class="anchor" href="#flatpak" aria-label="Link to this section">#</a></h3>
@@ -214,16 +252,16 @@ SculptForge now keeps a log file, <code>sculptforge.log</code>, in its settings 
 </li>
 </ul>
 <h2 id="version-095">Version 0.9.5<a class="anchor" href="#version-095" aria-label="Link to this section">#</a></h2>
-<h3 id="zspheres">ZSpheres<a class="anchor" href="#zspheres" aria-label="Link to this section">#</a></h3>
-<p>Block out a body, creature or plant from connected spheres, the ZBrush way: <strong>Tool &gt; ZSpheres &gt; New ZSphere</strong>, drag on a sphere to grow a limb, Move and Scale it into proportion, Alt+click to delete, with Symmetry mirroring every edit. <strong>Preview</strong> (<kbd>A</kbd>) shows the skin, and <strong>Make Mesh</strong> turns it into a sculptable, all-quad SubTool with a polygroup per limb, keeping the ZSpheres to change later. See <a href="zspheres.html">ZSpheres</a>.</p>
+<h3 id="forge-spheres">Forge Spheres<a class="anchor" href="#forge-spheres" aria-label="Link to this section">#</a></h3>
+<p>Block out a body, creature or plant from connected spheres, the ZBrush way: <strong>Tool &gt; Forge Spheres &gt; New Forge Sphere</strong>, drag on a sphere to grow a limb, Move and Scale it into proportion, Alt+click to delete, with Symmetry mirroring every edit. <strong>Preview</strong> (<kbd>A</kbd>) shows the skin, and <strong>Make Mesh</strong> turns it into a sculptable, all-quad Part with a face group per limb, keeping the Forge Spheres to change later. See <a href="forge-spheres.html">Forge Spheres</a>.</p>
 <h3 id="blender-keys">Blender keys<a class="anchor" href="#blender-keys" aria-label="Link to this section">#</a></h3>
 <p><strong>Preferences &gt; Input &gt; Style &gt; Blender</strong> brings Blender&#x27;s navigation and Sculpt Mode keys: middle-drag to orbit (Alt+drag with a pen), the numpad views, F / Shift+F, V S P I G C K for brushes, M for the mask. You can also import a keymap you exported from Blender. See <a href="shortcuts.html#blender-keys">Blender keys</a>.</p>
 <h3 id="flat-shading">Flat shading<a class="anchor" href="#flat-shading" aria-label="Link to this section">#</a></h3>
-<p><strong>Material &gt; Shading &gt; Flat</strong> shows every polygon as its own facet, to read a low-poly blockout&#x27;s planes and check exactly what a brush did; <strong>This SubTool</strong> keeps one SubTool smooth or flat whatever the scene says. See <a href="polypaint.html">Polypaint and materials</a>.</p>
+<p><strong>Material &gt; Shading &gt; Flat</strong> shows every polygon as its own facet, to read a low-poly blockout&#x27;s planes and check exactly what a brush did; <strong>This Part</strong> keeps one Part smooth or flat whatever the scene says. See <a href="vertex-paint.html">Vertex Paint and materials</a>.</p>
 <h3 id="spacemouse-experimental">SpaceMouse (experimental)<a class="anchor" href="#spacemouse-experimental" aria-label="Link to this section">#</a></h3>
 <p>A 3Dconnexion SpaceMouse now moves the view: twist, tilt and push the cap to turn, pan and zoom around the model with one hand while the other holds the pen, in every input style and even mid-stroke. The two side buttons frame the model and show the front. <strong>Preferences &gt; Input &gt; SpaceMouse</strong> sets the speed, the dead zone, turntable rotation, a dominant-axis mode, inverts any axis, and maps the buttons. It reads the device directly, without 3Dconnexion&#x27;s driver, and hasn&#x27;t been tried on real hardware yet: see <a href="navigation.html#spacemouse-experimental">SpaceMouse</a> if yours doesn&#x27;t show up.</p>
-<h3 id="your-own-matcaps">Your own MatCaps<a class="anchor" href="#your-own-matcaps" aria-label="Link to this section">#</a></h3>
-<p><strong>Material &gt; Load MatCap...</strong> turns any lit-sphere image (PNG, JPG or EXR) into a material, and images you put in <strong>Documents/SculptForge/MatCaps</strong> show up in the material list, even while SculptForge is running. Right-click one and choose <strong>Remove</strong> to send it to the trash. Projects carry the MatCap they use, so they look the same on any computer. See <a href="polypaint.html#your-own-matcaps">Your own MatCaps</a>.</p>
+<h3 id="your-own-lit-spheres">Your own Lit Spheres<a class="anchor" href="#your-own-lit-spheres" aria-label="Link to this section">#</a></h3>
+<p><strong>Material &gt; Load Lit Sphere...</strong> turns any image (PNG, JPG or EXR) into a material, and images you put in <strong>Documents/SculptForge/MatCaps</strong> show up in the material list, even while SculptForge is running. Right-click one and choose <strong>Remove</strong> to send it to the trash. Projects carry the Lit Sphere they use, so they look the same on any computer. See <a href="vertex-paint.html#your-own-lit-spheres">Your own Lit Spheres</a>.</p>
 <h3 id="fixes-2">Fixes<a class="anchor" href="#fixes-2" aria-label="Link to this section">#</a></h3>
 <ul>
 <li>
@@ -268,11 +306,11 @@ Idle, SculptForge no longer keeps your graphics card busy: it draws a new frame 
 <h2 id="version-090">Version 0.9.0<a class="anchor" href="#version-090" aria-label="Link to this section">#</a></h2>
 <p>Maquette to performance: scan an object or a clay maquette with your phone, turn the scan into a clean mesh you can sculpt and animate, give a head the 52 ARKit facial shapes, and drive them live with your own face.</p>
 <h3 id="facial-shapes-and-live-face">Facial shapes and live face<a class="anchor" href="#facial-shapes-and-live-face" aria-label="Link to this section">#</a></h3>
-<p><strong>Tool &gt; Facial Shapes &gt; Generate Facial Shapes</strong> gives a sculpted head the 52 Apple ARKit blend shapes (<code>eyeBlinkLeft</code>, <code>jawOpen</code>, <code>mouthSmileRight</code>, ...) as sculpt layers, fitted to its proportions from a template head with those shapes (ICT-FaceKit, MIT licence). Eyes, teeth and tongue SubTools get theirs too. Fix any shape by sculpting into its layer, check them with the <strong>Face test</strong> presets and sliders, and export them with their ARKit names to GLB, USD, FBX and Blender (as shape keys). <code>face_weights</code> drives them live from a face feed, and recorded takes play in the viewport and bake into a glTF animation or USD time samples. <code>new_head</code> starts a scene with a human head to sculpt on. See <a href="facial-shapes.html">Facial shapes and live face</a>.</p>
+<p><strong>Tool &gt; Facial Shapes &gt; Generate Facial Shapes</strong> gives a sculpted head the 52 Apple ARKit blend shapes (<code>eyeBlinkLeft</code>, <code>jawOpen</code>, <code>mouthSmileRight</code>, ...) as sculpt layers, fitted to its proportions from a template head with those shapes (ICT-FaceKit, MIT licence). Eyes, teeth and tongue Parts get theirs too. Fix any shape by sculpting into its layer, check them with the <strong>Face test</strong> presets and sliders, and export them with their ARKit names to GLB, USD, FBX and Blender (as shape keys). <code>face_weights</code> drives them live from a face feed, and recorded takes play in the viewport and bake into a glTF animation or USD time samples. <code>new_head</code> starts a scene with a human head to sculpt on. See <a href="facial-shapes.html">Facial shapes and live face</a>.</p>
 <h3 id="scan-an-object-into-a-splat">Scan an object into a splat<a class="anchor" href="#scan-an-object-into-a-splat" aria-label="Link to this section">#</a></h3>
 <p>Film an object with your phone, or take photos all around it, and SculptForge trains a Gaussian splat from it on your own graphics card. The splat appears in the viewport after a few hundred steps and sharpens while it trains; you can orbit around it, stop when it&#x27;s good enough, or cancel. Pick <strong>Video...</strong> or <strong>Photos Folder...</strong> under <strong>Splats &gt; Train from capture</strong>, or drop a video onto the window. The free Brush trainer is offered as a one-click download the first time. See <a href="scan-to-splat.html">Scan an object into a splat</a>.</p>
 <h3 id="make-sculptable-from-a-scan-to-a-production-asset">Make sculptable: from a scan to a production asset<a class="anchor" href="#make-sculptable-from-a-scan-to-a-production-asset" aria-label="Link to this section">#</a></h3>
-<p>One click in the <strong>Splats</strong> palette turns a Gaussian-splat capture into a clean SubTool you can sculpt, rig and animate: a watertight surface with the floaters and background gone and open bottoms sealed, quad topology at a Game, Film or Sculpt budget, edge loops round the eyes and mouth and along the nasolabial folds when the capture is a head (mirrored across the face), and the capture&#x27;s colours as polypaint or a texture. A crop box cuts away the table or the room; Review shows the face landmarks to nudge before remeshing. The splats stay, hidden. Five million splats take about ten seconds on a laptop. See <a href="scan-to-sculptable.html">From scan to sculptable mesh</a>.</p>
+<p>One click in the <strong>Splats</strong> palette turns a Gaussian-splat capture into a clean Part you can sculpt, rig and animate: a watertight surface with the floaters and background gone and open bottoms sealed, quad topology at a Game, Film or Sculpt budget, edge loops round the eyes and mouth and along the nasolabial folds when the capture is a head (mirrored across the face), and the capture&#x27;s colours as vertex paint or a texture. A crop box cuts away the table or the room; Review shows the face landmarks to nudge before remeshing. The splats stay, hidden. Five million splats take about ten seconds on a laptop. See <a href="scan-to-sculptable.html">From scan to sculptable mesh</a>.</p>
 <h3 id="your-phone-as-sculptforges-camera">Your phone as SculptForge&#x27;s camera<a class="anchor" href="#your-phone-as-sculptforges-camera" aria-label="Link to this section">#</a></h3>
 <p><strong>File &gt; Capture from phone</strong> shows a QR code: scan it and your phone&#x27;s browser can send SculptForge a scan (walk round an object for 20 to 60 seconds), a photo to turn into a model, or a splat file from a scanning app. Tap <strong>View in AR</strong> to see your sculpt standing on your desk, updated as you sculpt, and <strong>Face capture</strong> to drive a character&#x27;s facial shapes with your own face, live. No app to install. See <a href="phone-capture.html">Phone capture and AR</a>.</p>
 <h2 id="version-081">Version 0.8.1<a class="anchor" href="#version-081" aria-label="Link to this section">#</a></h2>
@@ -283,26 +321,26 @@ Idle, SculptForge no longer keeps your graphics card busy: it draws a new frame 
 <strong>ZBrush zoom direction.</strong> With the ZBrush input style, dragging up zooms out on every zoom drag, as in ZBrush. See <a href="navigation.html">Navigation</a>.
 </li>
 <li>
-<strong>Ctrl and Ctrl+Shift brushes.</strong> Hold <kbd>Ctrl</kbd> and the left shelf shows the mask brush; with <kbd>Ctrl</kbd> held the Brush and Stroke pickers pick MaskPen, MaskLasso or MaskRect. <kbd>Ctrl</kbd>+<kbd>Shift</kbd> does the same for SelectRect and SelectLasso. See <a href="masking.html">Masking</a>.
+<strong>Ctrl and Ctrl+Shift brushes.</strong> Hold <kbd>Ctrl</kbd> and the left shelf shows the mask brush; with <kbd>Ctrl</kbd> held the Brush and Stroke pickers pick Mask Pen, Mask Lasso or Mask Rectangle. <kbd>Ctrl</kbd>+<kbd>Shift</kbd> does the same for Select Rectangle and Select Lasso. See <a href="masking.html">Masking</a>.
 </li>
 <li>
-<strong>Group by UVs.</strong> One polygroup per UV island, in <strong>Tool &gt; Polygroups</strong>. See <a href="polygroups.html">Polygroups and visibility</a>.
+<strong>Group by UVs.</strong> One face group per UV island, in <strong>Tool &gt; Face Groups</strong>. See <a href="face-groups.html">Face Groups and visibility</a>.
 </li>
 </ul>
 <h3 id="texture-painting-one-click-to-start-and-faster">Texture painting: one click to start, and faster<a class="anchor" href="#texture-painting-one-click-to-start-and-faster" aria-label="Link to this section">#</a></h3>
-<p>With the Paint brush on, a SubTool without a texture now shows <strong>New Texture</strong> on the top shelf and in the Color palette: click it and SculptForge unwraps the model if it has no UVs (Auto UV, in the background) and gives it a texture, so the next stroke paints texels. Big brushes on 4K textures paint four to five times faster. See <a href="texture-painting.html">Texture painting</a>.</p>
+<p>With the Paint brush on, a Part without a texture now shows <strong>New Texture</strong> on the top shelf and in the Color palette: click it and SculptForge unwraps the model if it has no UVs (Auto UV, in the background) and gives it a texture, so the next stroke paints texels. Big brushes on 4K textures paint four to five times faster. See <a href="texture-painting.html">Texture painting</a>.</p>
 <h3 id="bring-your-ztools-over">Bring your ZTools over<a class="anchor" href="#bring-your-ztools-over" aria-label="Link to this section">#</a></h3>
-<p>ZBrush&#x27;s <code>.ZTL</code> files are proprietary, but a free plug-in for ZBrush now converts them once, and then SculptForge opens the <code>.ZTL</code> itself, every SubTool with its polygroups, polypaint, mask and UVs. See <a href="coming-from-zbrush.html#bring-your-ztools-over">Coming from ZBrush</a>.</p>
+<p>ZBrush&#x27;s <code>.ZTL</code> files are proprietary, but a free plug-in for ZBrush now converts them once, and then SculptForge opens the <code>.ZTL</code> itself, every Part with its face groups, vertex paint, mask and UVs. See <a href="coming-from-zbrush.html#bring-your-ztools-over">Coming from ZBrush</a>.</p>
 <h2 id="version-08">Version 0.8<a class="anchor" href="#version-08" aria-label="Link to this section">#</a></h2>
-<p>Dynamic topology, vector displacement brushes, QRemesh Guides, and sculpt layers on every subdivision level.</p>
+<p>Dynamic topology, vector displacement brushes, Quad Remesh Guides, and sculpt layers on every subdivision level.</p>
 <h3 id="dynamic-topology-sculptris-pro">Dynamic topology (Sculptris Pro)<a class="anchor" href="#dynamic-topology-sculptris-pro" aria-label="Link to this section">#</a></h3>
 <p>Turn on <strong>Dynamic</strong> on the top shelf and the brush adds triangles where it needs detail and removes them where it doesn&#x27;t: pull a sphere into horns or fingers without stretching, block in from a ball without remeshing. <strong>Detail</strong> sets how small the triangles get, relative to the brush (zoom in for finer ones) or, with <strong>Constant detail</strong>, one size for the whole mesh. Symmetry makes mirrored triangles, borders and masks are kept, and each stroke is one small undo step. See <a href="dynamic-topology.html">Dynamic topology</a>.</p>
 <h3 id="vector-displacement-brushes">Vector displacement brushes<a class="anchor" href="#vector-displacement-brushes" aria-label="Link to this section">#</a></h3>
-<p>One drag stamps a whole shape, overhangs and all: the new <strong>VDM</strong> brush presses a vector displacement map, so a horn can lean over, an ear can curl and scales can overlap, which no alpha can do. Four maps come with it (Horn, Ear Curl, Scales, Nostril); make your own by sculpting on a <strong>VDM Plane</strong> and clicking <strong>Create VDM</strong>, or load the EXRs Blender&#x27;s VDM Brush Baker makes (and export yours for Blender). The new <strong>DragDot</strong> stroke slides a stamp into place. See <a href="sculpting.html#vector-displacement-brushes">Vector displacement brushes</a>.</p>
+<p>One drag stamps a whole shape, overhangs and all: the new <strong>VDM</strong> brush presses a vector displacement map, so a horn can lean over, an ear can curl and scales can overlap, which no alpha can do. Four maps come with it (Horn, Ear Curl, Scales, Nostril); make your own by sculpting on a <strong>VDM Plane</strong> and clicking <strong>Create VDM</strong>, or load the EXRs Blender&#x27;s VDM Brush Baker makes (and export yours for Blender). The new <strong>Slide Stamp</strong> stroke slides a stamp into place. See <a href="sculpting.html#vector-displacement-brushes">Vector displacement brushes</a>.</p>
 <h3 id="zbrush-keys-in-blenders-sculpt-mode">ZBrush keys in Blender&#x27;s Sculpt Mode<a class="anchor" href="#zbrush-keys-in-blenders-sculpt-mode" aria-label="Link to this section">#</a></h3>
-<p>The Blender add-on has a new preference, <strong>ZBrush-style keys in Sculpt Mode</strong>: S, U and O for Draw Size, Strength and Focal Shift, B for the brushes by their ZBrush names, Space for the quick menu, Alt to dig in, Ctrl to mask, Ctrl+Shift to hide, D and Shift+D for subdivision levels, and more. See <a href="blender.html#zbrush-style-keys-in-sculpt-mode">Working with Blender</a>.</p>
+<p>The Blender add-on has a new preference, <strong>ZBrush-style keys in Sculpt Mode</strong>: S, U and O for Draw Size, Strength and Falloff, B for the brushes by their ZBrush names, Space for the quick menu, Alt to dig in, Ctrl to mask, Ctrl+Shift to hide, D and Shift+D for subdivision levels, and more. See <a href="blender.html#zbrush-style-keys-in-sculpt-mode">Working with Blender</a>.</p>
 <h3 id="draw-the-edge-loops-you-want">Draw the edge loops you want<a class="anchor" href="#draw-the-edge-loops-you-want" aria-label="Link to this section">#</a></h3>
-<p><strong>QRemesh Guides</strong> are ZBrush&#x27;s ZRemesher Guides brush: draw curves on the sculpt, around the eyes, the mouth or a joint, and QRemesh puts an edge loop on each one and turns the flow around it to follow. A curve that ends where it started becomes a loop that closes cleanly, symmetry mirrors what you draw, and <strong>Curves Strength</strong> sets how far around a curve the flow follows it. Guides are kept with each SubTool and saved in the project. See <a href="retopology.html#qremesh-guides">QRemesh Guides</a>.</p>
+<p><strong>Quad Remesh Guides</strong> work like ZBrush&#x27;s ZRemesher Guides brush: draw curves on the sculpt, around the eyes, the mouth or a joint, and Quad Remesh puts an edge loop on each one and turns the flow around it to follow. A curve that ends where it started becomes a loop that closes cleanly, symmetry mirrors what you draw, and <strong>Curves Strength</strong> sets how far around a curve the flow follows it. Guides are kept with each Part and saved in the project. See <a href="retopology.html#quad-remesh-guides">Quad Remesh Guides</a>.</p>
 <h3 id="sculpt-layers-on-every-subdivision-level">Sculpt layers on every subdivision level<a class="anchor" href="#sculpt-layers-on-every-subdivision-level" aria-label="Link to this section">#</a></h3>
 <p>Sculpt layers now have a guide section on how they work with subdivision levels, like ZBrush&#x27;s 3D Layers: record a layer at the top, step down and up, divide, reconstruct or delete levels, save, and it&#x27;s still there, with one weight for every level. See <a href="layers.html#layers-and-subdivision-levels">Layers and subdivision levels</a>.</p>
 <h2 id="version-07">Version 0.7<a class="anchor" href="#version-07" aria-label="Link to this section">#</a></h2>
@@ -311,30 +349,30 @@ Idle, SculptForge no longer keeps your graphics card busy: it draws a new frame 
 <p>SculptForge now follows ZBrush&#x27;s keys and gestures by default. A ZBrush sculptor tried an earlier version and put it down because it didn&#x27;t feel like ZBrush; this release goes through every habit of the first hour. <a href="coming-from-zbrush.html">Coming from ZBrush</a> lists what&#x27;s the same, what&#x27;s different and every shortcut side by side.</p>
 <ul>
 <li>
-<strong>S, U, I, O</strong> open Draw Size, Z Intensity, RGB Intensity and Focal Shift under the cursor, and <kbd>Space</kbd> opens the QuickMenu with all of them plus the brush, stroke, alpha and material.
+<strong>S, U, I, O</strong> open Draw Size, Intensity, RGB Intensity and Falloff under the cursor, and <kbd>Space</kbd> opens the Quick Menu with all of them plus the brush, stroke, alpha and material.
 </li>
 <li>
-<strong>Focal Shift</strong> shapes the brush falloff, shown as the cursor&#x27;s inner ring. <strong>RGB Intensity</strong> gives painting a strength of its own, and <strong>Smooth keeps its own Z Intensity</strong>, so a gentle brush still smooths properly.
+<strong>Falloff</strong> shapes the brush falloff, shown as the cursor&#x27;s inner ring. <strong>RGB Intensity</strong> gives painting a strength of its own, and <strong>Smooth keeps its own Intensity</strong>, so a gentle brush still smooths properly.
 </li>
 <li>
-<strong>ZBrush&#x27;s brush letters</strong>: B C B ClayBuildup, B D S DamStandard, B M V Move, B I N Inflate...
+<strong>ZBrush&#x27;s brush letters</strong>: B C B Clay Block, B D S Sharp Crease, B M V Move, B I N Inflate...
 </li>
 <li>
 <strong>Masking</strong>: <kbd>Ctrl</kbd>+click the model blurs the mask, <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click sharpens it; <kbd>Ctrl</kbd>+<kbd>A</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd>, <kbd>Ctrl</kbd>+<kbd>I</kbd>, <kbd>Ctrl</kbd>+<kbd>H</kbd> and <kbd>Ctrl</kbd>+<kbd>W</kbd> (group masked) work as in ZBrush.
 </li>
 <li>
-<strong>Strokes and the view</strong>: <kbd>Shift</kbd> pressed mid-stroke draws a straight line; <kbd>Shift</kbd>+click, let go and drag rolls the view; <kbd>Shift</kbd>+<kbd>Alt</kbd>+click frames a SubTool; <kbd>L</kbd> toggles LazyMouse and <kbd>V</kbd> swaps colours.
+<strong>Strokes and the view</strong>: <kbd>Shift</kbd> pressed mid-stroke draws a straight line; <kbd>Shift</kbd>+click, let go and drag rolls the view; <kbd>Shift</kbd>+<kbd>Alt</kbd>+click frames a Part; <kbd>L</kbd> toggles Lazy Stroke and <kbd>V</kbd> swaps colours.
 </li>
 <li>
 <strong>Visibility</strong>: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+click on a partly hidden mesh hides the group, as in ZBrush.
 </li>
 <li>
-<strong>Prefer the old keys?</strong> <strong>Preferences &gt; Input &gt; Style &gt; SculptForge</strong> brings back the number keys for brushes, <kbd>I</kbd> for Z Intensity and the <kbd>Ctrl</kbd>+drag zoom.
+<strong>Prefer the old keys?</strong> <strong>Preferences &gt; Input &gt; Style &gt; SculptForge</strong> brings back the number keys for brushes, <kbd>I</kbd> for Intensity and the <kbd>Ctrl</kbd>+drag zoom.
 </li>
 </ul>
 <p>See <a href="sculpting.html">Sculpting and brushes</a>, <a href="masking.html">Masking</a> and <a href="shortcuts.html">Keyboard and mouse</a>.</p>
 <h3 id="works-with-blender">Works with Blender<a class="anchor" href="#works-with-blender" aria-label="Link to this section">#</a></h3>
-<p>Keep Blender for your scene and sculpt in SculptForge: the new <strong>SculptForge Bridge</strong> add-on for Blender 4.2 and newer sends the selected objects to SculptForge with one click (starting it if needed), and <strong>File &gt; Blender &gt; Send to Blender</strong> sends them back. The objects update in place, keeping their transform, materials and modifiers; quads, UVs, colours, the mask and face sets (polygroups) come across both ways. See <a href="blender.html">Working with Blender</a>.</p>
+<p>Keep Blender for your scene and sculpt in SculptForge: the new <strong>SculptForge Bridge</strong> add-on for Blender 4.2 and newer sends the selected objects to SculptForge with one click (starting it if needed), and <strong>File &gt; Blender &gt; Send to Blender</strong> sends them back. The objects update in place, keeping their transform, materials and modifiers; quads, UVs, colours, the mask and face sets (face groups) come across both ways. See <a href="blender.html">Working with Blender</a>.</p>
 <h2 id="version-06">Version 0.6<a class="anchor" href="#version-06" aria-label="Link to this section">#</a></h2>
 <p>Performance: half the memory, a view that turns twice as fast, quicker brushes on huge meshes, and SculptForge now tells you when there&#x27;s a new version.</p>
 <h3 id="lighter-sculpts">Lighter sculpts<a class="anchor" href="#lighter-sculpts" aria-label="Link to this section">#</a></h3>
@@ -375,7 +413,7 @@ Opening a big model or dividing it sends it to the graphics card about 40% faste
 <h3 id="update-notifications">Update notifications<a class="anchor" href="#update-notifications" aria-label="Link to this section">#</a></h3>
 <p>Once a day SculptForge looks on its website for a newer version, and if there is one, a small banner says what&#x27;s in it, with <strong>What&#x27;s new</strong>, <strong>Download</strong>, <strong>Later</strong> and <strong>Skip this version</strong>. It downloads one small file and sends nothing about you or your computer. Turn it off under <strong>Preferences &gt; Updates</strong>, or check by hand with <strong>Help &gt; Check for updates</strong>. Builds from a package manager (such as the AUR package) leave the checking to the package manager.</p>
 <h2 id="version-05">Version 0.5<a class="anchor" href="#version-05" aria-label="Link to this section">#</a></h2>
-<p>The ZBrush workflow core: subdivision levels, quad retopology, map baking, the Gizmo 3D, and speed at tens of millions of polygons.</p>
+<p>The ZBrush workflow core: subdivision levels, quad retopology, map baking, the Gizmo, and speed at tens of millions of polygons.</p>
 <h3 id="subdivision-levels">Subdivision levels<a class="anchor" href="#subdivision-levels" aria-label="Link to this section">#</a></h3>
 <p>Sculpt one model at several resolutions, as with ZBrush&#x27;s SDiv: big forms low, fine detail high, and back down without losing anything.</p>
 <ul>
@@ -386,17 +424,17 @@ Opening a big model or dividing it sends it to the graphics card about 40% faste
 <strong>Lower Res</strong> / <strong>Higher Res</strong> (<kbd>Shift</kbd>+<kbd>D</kbd> / <kbd>D</kbd>) and the <strong>SDiv</strong> slider step between levels. Detail sculpted high rides along when you reshape low, and edits high show up softened below. Stepping back and forth is instant, even at millions of polygons.
 </li>
 <li>
-Mask, polypaint, paint layers, polygroups, hidden faces, UVs and sculpt layers follow the levels.
+Mask, vertex paint, paint layers, face groups, hidden faces, UVs and sculpt layers follow the levels.
 </li>
 <li>
-<strong>Del Lower</strong>, <strong>Del Higher</strong> and <strong>Reconstruct Subdiv</strong> (find the lower levels of a model subdivided elsewhere). Undo walks back through strokes and level changes; projects save every level; the SubTool list shows &quot;SDiv 3/5&quot;.
+<strong>Del Lower</strong>, <strong>Del Higher</strong> and <strong>Reconstruct Subdiv</strong> (find the lower levels of a model subdivided elsewhere). Undo walks back through strokes and level changes; projects save every level; the Parts list shows &quot;SDiv 3/5&quot;.
 </li>
 <li>
 <kbd>Ctrl</kbd>+<kbd>D</kbd> now divides with levels; the old one-way <strong>Subdivide</strong> is still in <strong>Tool &gt; Geometry</strong>.
 </li>
 </ul>
 <p>See <a href="subdivision-levels.html">Subdivision levels</a>.</p>
-<h3 id="gizmo-3d-move-scale-rotate-and-pose">Gizmo 3D: move, scale, rotate and pose<a class="anchor" href="#gizmo-3d-move-scale-rotate-and-pose" aria-label="Link to this section">#</a></h3>
+<h3 id="gizmo-move-scale-rotate-and-pose">Gizmo: move, scale, rotate and pose<a class="anchor" href="#gizmo-move-scale-rotate-and-pose" aria-label="Link to this section">#</a></h3>
 <p>ZBrush&#x27;s Gizmo 3D, with the same keys: <kbd>W</kbd> Move, <kbd>E</kbd> Scale, <kbd>R</kbd> Rotate, <kbd>Q</kbd> back to Draw (also on the top shelf and in the <strong>Transform</strong> palette).</p>
 <ul>
 <li>
@@ -409,18 +447,18 @@ Mask, polypaint, paint layers, polygroups, hidden faces, UVs and sculpt layers f
 <strong>Pivot tools</strong>: <kbd>Alt</kbd>+drag the gizmo to move it alone, <strong>Reset</strong>, <strong>To Surface</strong>, World or Surface axes.
 </li>
 <li>
-<strong>Numeric entry</strong> in the Gizmo 3D panel, <strong>All SubTools</strong> (Transpose All), one undo step per drag, sculpt layers move with the surface, and the <code>transform</code> command for scripts.
+<strong>Numeric entry</strong> in the Gizmo panel, <strong>All Parts</strong> (Transpose All), one undo step per drag, sculpt layers move with the surface, and the <code>transform</code> command for scripts.
 </li>
 <li>
 Fast on big models: a drag frame on 1.3 million triangles takes about 10 ms.
 </li>
 </ul>
-<p><kbd>W</kbd> no longer toggles the wireframe: use <kbd>Shift</kbd>+<kbd>F</kbd> (as in ZBrush) or <strong>PolyF</strong> on the right shelf. See <a href="gizmo.html">Moving, rotating and posing</a>.</p>
+<p><kbd>W</kbd> no longer toggles the wireframe: use <kbd>Shift</kbd>+<kbd>F</kbd> (as in ZBrush) or <strong>Wire</strong> on the right shelf. See <a href="gizmo.html">Moving, rotating and posing</a>.</p>
 <h3 id="normal-displacement-and-ao-map-baking">Normal, displacement and AO map baking<a class="anchor" href="#normal-displacement-and-ao-map-baking" aria-label="Link to this section">#</a></h3>
 <p>Bake the detail of a high-poly sculpt into maps on a low-poly&#x27;s UVs, for game engines and renderers: <strong>Tool &gt; Bake</strong>.</p>
 <ul>
 <li>
-<strong>Six maps in one go</strong>: tangent-space normal, object-space normal, displacement (16-bit PNG with mid-grey = 0, plus a 32-bit EXR in world units), ambient occlusion, cavity and colour (polypaint or texture).
+<strong>Six maps in one go</strong>: tangent-space normal, object-space normal, displacement (16-bit PNG with mid-grey = 0, plus a 32-bit EXR in world units), ambient occlusion, cavity and colour (vertex paint or texture).
 </li>
 <li>
 <strong>Right in every engine.</strong> Tangent-space maps use MikkTSpace tangents, as Blender, Unreal, Unity and Godot do; pick the OpenGL or DirectX green convention.
@@ -429,7 +467,7 @@ Fast on big models: a drag frame on 1.3 million triangles takes about 10 ms.
 <strong>Check it on the model.</strong> The low-poly shows its baked normal map in the viewport as soon as the bake ends, next to the high-poly.
 </li>
 <li>
-<strong>ZBrush-style controls</strong>: source SubTool, 1K-8K, anti-aliasing, automatic or manual front and rear ray distances, padding around UV islands. Bakes run in the background on every core, with progress and Cancel.
+<strong>ZBrush-style controls</strong>: source Part, 1K-8K, anti-aliasing, automatic or manual front and rear ray distances, padding around UV islands. Bakes run in the background on every core, with progress and Cancel.
 </li>
 <li>
 <strong>Send to Unreal</strong> brings the normal map along, set up as a normal map. The <code>bake</code> command does it all from scripts.
@@ -439,10 +477,10 @@ Fast on big models: a drag frame on 1.3 million triangles takes about 10 ms.
 <h3 id="quad-retopology-and-detail-projection">Quad retopology and detail projection<a class="anchor" href="#quad-retopology-and-detail-projection" aria-label="Link to this section">#</a></h3>
 <ul>
 <li>
-<strong>QRemesh</strong> (<strong>Tool &gt; Geometry</strong>, like ZRemesher) rebuilds a sculpt as clean quads whose edge loops follow the forms, near a <strong>Target Polygons</strong> count, in the background. <strong>Keep Groups</strong>, <strong>Adaptive Size</strong>, <strong>Use Polypaint</strong>, <strong>Symmetry</strong> and <strong>Half / Same / Double</strong> work as in ZBrush.
+<strong>Quad Remesh</strong> (<strong>Tool &gt; Geometry</strong>, like ZRemesher) rebuilds a sculpt as clean quads whose edge loops follow the forms, near a <strong>Target Polygons</strong> count, in the background. <strong>Keep Groups</strong>, <strong>Adaptive Size</strong>, <strong>Use Vertex Paint</strong>, <strong>Symmetry</strong> and <strong>Half / Same / Double</strong> work as in ZBrush.
 </li>
 <li>
-<strong>ProjectAll</strong> (<strong>Tool &gt; SubTool &gt; Project</strong>) puts the sculpted detail and polypaint back onto the divided quads, with <strong>Dist</strong>, <strong>Mean</strong> and <strong>PA Blur</strong>, and respects the mask.
+<strong>Project All</strong> (<strong>Tool &gt; Parts &gt; Project</strong>) puts the sculpted detail and vertex paint back onto the divided quads, with <strong>Dist</strong>, <strong>Mean</strong> and <strong>PA Blur</strong>, and respects the mask.
 </li>
 </ul>
 <p>See <a href="retopology.html">Quad retopology and detail projection</a>.</p>
@@ -456,7 +494,7 @@ Fast on big models: a drag frame on 1.3 million triangles takes about 10 ms.
 <strong>Strokes send the graphics card only what they changed.</strong> Before, a dab with symmetry on a subdivided model re-sent most of the mesh.
 </li>
 <li>
-<strong>Fast undo</strong>: undo keeps only the vertices a stroke changed, and the first polypaint stroke on a model no longer copies the whole mesh for undo.
+<strong>Fast undo</strong>: undo keeps only the vertices a stroke changed, and the first vertex paint stroke on a model no longer copies the whole mesh for undo.
 </li>
 <li>
 <strong>Less memory</strong>: about 30% less per triangle for a sculpting mesh.
@@ -465,7 +503,7 @@ Fast on big models: a drag frame on 1.3 million triangles takes about 10 ms.
 <strong>Faster projects</strong>: saving and opening big projects is faster, and projects over 4 GB save (ZIP64).
 </li>
 <li>
-<strong>Preferences &gt; Performance</strong>: Antialiasing (Off to 8x), <strong>Fast Navigation</strong> (big scenes drop antialiasing while the view moves), Multithreading, what your last stroke cost per dab, and the memory the scene holds. A SubTool too big for the graphics card is left out of the view with a message, instead of failing.
+<strong>Preferences &gt; Performance</strong>: Antialiasing (Off to 8x), <strong>Fast Navigation</strong> (big scenes drop antialiasing while the view moves), Multithreading, what your last stroke cost per dab, and the memory the scene holds. A Part too big for the graphics card is left out of the view with a message, instead of failing.
 </li>
 <li>
 <code>sculptforge --bench</code> measures your machine.
@@ -475,19 +513,19 @@ Fast on big models: a drag frame on 1.3 million triangles takes about 10 ms.
 <h3 id="polish">Polish<a class="anchor" href="#polish" aria-label="Link to this section">#</a></h3>
 <ul>
 <li>
-<strong>Your paint survives Auto UV and retopology.</strong> Auto UV on a painted SubTool moves the texture and its layers onto the new UVs. Voxel Remesh and QRemesh have a <strong>Keep Texture</strong> option (on by default) that unwraps the new surface and projects the texture onto it, and merging SubTools keeps their textures in one. Each is a single undo step. See <a href="texture-painting.html#uvs-and-geometry">Texture painting</a>.
+<strong>Your paint survives Auto UV and retopology.</strong> Auto UV on a painted Part moves the texture and its layers onto the new UVs. Voxel Remesh and Quad Remesh have a <strong>Keep Texture</strong> option (on by default) that unwraps the new surface and projects the texture onto it, and merging Parts keeps their textures in one. Each is a single undo step. See <a href="texture-painting.html#uvs-and-geometry">Texture painting</a>.
 </li>
 <li>
 <strong>Faster, safer Auto UV on dense sculpts:</strong> no more crash or folded UVs on dense smooth meshes, and a million-triangle sculpt unwraps in a quarter of a minute or so. Decimate keeps the texture exact across UV seams.
 </li>
 <li>
-<strong>Subdivision levels, polished.</strong> Tools that rebuild the mesh (remesh, Decimate, QRemesh, Subdivide, Delete Hidden, merge and split) tell you they removed the levels and that the level you were on became the new base; <kbd>Ctrl</kbd>+<kbd>Z</kbd> brings them all back. Sculpt layers&#x27; fine detail turns with a low level you pose with the Gizmo, and SubTools you aren&#x27;t working on no longer hold cached levels in memory.
+<strong>Subdivision levels, polished.</strong> Tools that rebuild the mesh (remesh, Decimate, Quad Remesh, Subdivide, Delete Hidden, merge and split) tell you they removed the levels and that the level you were on became the new base; <kbd>Ctrl</kbd>+<kbd>Z</kbd> brings them all back. Sculpt layers&#x27; fine detail turns with a low level you pose with the Gizmo, and Parts you aren&#x27;t working on no longer hold cached levels in memory.
 </li>
 <li>
-<strong>QRemesh symmetry follows your model.</strong> Symmetry (now on by default) mirrors across the model&#x27;s own middle, so a model away from the centre comes out mirror-symmetric too. If the model isn&#x27;t symmetric, QRemesh remeshes it whole and tells you. Eyes, teeth and rivets get their own quads instead of disappearing, and thin hard-edged parts such as blades and fins keep both sides and their edges. See <a href="retopology.html">Quad retopology</a>.
+<strong>Quad Remesh symmetry follows your model.</strong> Symmetry (now on by default) mirrors across the model&#x27;s own middle, so a model away from the centre comes out mirror-symmetric too. If the model isn&#x27;t symmetric, Quad Remesh remeshes it whole and tells you. Eyes, teeth and rivets get their own quads instead of disappearing, and thin hard-edged parts such as blades and fins keep both sides and their edges. See <a href="retopology.html">Quad retopology</a>.
 </li>
 <li>
-<strong>Tidier top shelf:</strong> the <strong>Vertex / Texture</strong> paint target only shows when the SubTool has a texture.
+<strong>Tidier top shelf:</strong> the <strong>Vertex / Texture</strong> paint target only shows when the Part has a texture.
 </li>
 <li>
 <strong>Exports checked by other tools:</strong> textured GLB, USD/USDZ, FBX and OBJ files were checked with the Khronos validator, OpenUSD and ufbx, and the texture is the right way up in each. A model saved as <code>my scene.obj</code> now writes <code>my_scene.mtl</code> so other apps find it. See <a href="exporting.html#3d-printing">Exporting</a>.
@@ -504,13 +542,13 @@ Fast on big models: a drag frame on 1.3 million triangles takes about 10 ms.
 <strong>New Texture.</strong> Pick a size and click <strong>New Texture</strong>: the Paint brush, <strong>Rgb</strong> sculpting, fills, cavity paint and colour picking (<kbd>C</kbd>) now work on the texture, with the mask, symmetry, pen pressure and alphas. Strokes never paint through to the far side, and seams stay invisible.
 </li>
 <li>
-<strong>Vertex or Texture.</strong> A toggle on the top shelf chooses where paint goes for each SubTool.
+<strong>Vertex or Texture.</strong> A toggle on the top shelf chooses where paint goes for each Part.
 </li>
 <li>
 <strong>The same paint layers.</strong> <strong>Tool &gt; Paint Layers</strong> works on the texture&#x27;s layers: blend modes, opacity, merge, flatten, all undoable.
 </li>
 <li>
-<strong>Convert both ways</strong>, <strong>Show UVs</strong>, <strong>Import / Export Texture</strong> (PNG). Projects save textures and their layers, and model exports write the texture next to the model (OBJ <code>.mtl</code>, glTF, USD, FBX, GoZ).
+<strong>Convert both ways</strong>, <strong>Show UVs</strong>, <strong>Import / Export Texture</strong> (PNG). Projects save textures and their layers, and model exports write the texture next to the model (OBJ <code>.mtl</code>, glTF, USD, FBX, GoZ-compatible files).
 </li>
 </ul>
 <p>See <a href="texture-painting.html">Texture painting</a>.</p>
@@ -534,29 +572,29 @@ Fast on big models: a drag frame on 1.3 million triangles takes about 10 ms.
 <h3 id="mask-and-isolate-with-a-lasso-or-rectangle">Mask and isolate with a lasso or rectangle<a class="anchor" href="#mask-and-isolate-with-a-lasso-or-rectangle" aria-label="Link to this section">#</a></h3>
 <ul>
 <li>
-<strong>MaskLasso and MaskRect.</strong> Pick the shape at the top of <strong>Tool &gt; Masking</strong>, then <kbd>Ctrl</kbd>+drag to mask everything inside it; add <kbd>Alt</kbd> to unmask. The drag can start on the model or beside it.
+<strong>Mask Lasso and Mask Rectangle.</strong> Pick the shape at the top of <strong>Tool &gt; Masking</strong>, then <kbd>Ctrl</kbd>+drag to mask everything inside it; add <kbd>Alt</kbd> to unmask. The drag can start on the model or beside it.
 </li>
 <li>
-<strong>SelectLasso.</strong> In <strong>Tool &gt; Visibility</strong>, pick <strong>SelectLasso</strong> next to SelectRect, then <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+drag a free-hand shape to keep only what&#x27;s inside (add <kbd>Alt</kbd> to hide it instead).
+<strong>Select Lasso.</strong> In <strong>Tool &gt; Visibility</strong>, pick <strong>Select Lasso</strong> next to Select Rectangle, then <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+drag a free-hand shape to keep only what&#x27;s inside (add <kbd>Alt</kbd> to hide it instead).
 </li>
 </ul>
-<p>See <a href="masking.html#mask-with-a-lasso-or-rectangle">Mask with a lasso or rectangle</a> and <a href="polygroups.html">Polygroups and visibility</a>.</p>
+<p>See <a href="masking.html#mask-with-a-lasso-or-rectangle">Mask with a lasso or rectangle</a> and <a href="face-groups.html">Face Groups and visibility</a>.</p>
 <h3 id="a-material-made-for-sculpting">A material made for sculpting<a class="anchor" href="#a-material-made-for-sculpting" aria-label="Link to this section">#</a></h3>
-<p>The new <strong>Sculpt</strong> material is the default: plain clay under a strong key light, with crisp highlights and deep shading in the creases, so even small strokes stay easy to read. The other materials are still in the material picker (<kbd>M</kbd>), and projects keep the material they were saved with. See <a href="polypaint.html">Polypaint and materials</a>.</p>
+<p>The new <strong>Sculpt</strong> material is the default: plain clay under a strong key light, with crisp highlights and deep shading in the creases, so even small strokes stay easy to read. The other materials are still in the material picker (<kbd>M</kbd>), and projects keep the material they were saved with. See <a href="vertex-paint.html">Vertex Paint and materials</a>.</p>
 <h3 id="quads-stay-quads">Quads stay quads<a class="anchor" href="#quads-stay-quads" aria-label="Link to this section">#</a></h3>
-<p>Models you bring in from ZBrush (GoZ) or as OBJ, FBX, PLY or USD keep their quads: <strong>PolyF</strong> shows them as quads, and exporting writes them back as quads. Subdivide turns each quad into four, voxel remesh now gives an even grid of quads (like DynaMesh), and new cubes and planes are made of quads. See <a href="geometry.html#quads-and-triangles">Quads and triangles</a>.</p>
+<p>Models you bring in from ZBrush (Send to ZBrush) or as OBJ, FBX, PLY or USD keep their quads: <strong>Wire</strong> shows them as quads, and exporting writes them back as quads. Subdivide turns each quad into four, voxel remesh now gives an even grid of quads (like DynaMesh), and new cubes and planes are made of quads. See <a href="geometry.html#quads-and-triangles">Quads and triangles</a>.</p>
 <h3 id="paint-layers">Paint layers<a class="anchor" href="#paint-layers" aria-label="Link to this section">#</a></h3>
-<p>Polypaint now has layers, like Photoshop: each SubTool can have a stack of colour layers with their own opacity, visibility, lock and blend mode (Multiply, Screen, Overlay, Soft Light, Add and more). Painting on a layer never destroys what&#x27;s underneath, and you can merge, flatten, duplicate and reorder layers. ZBrush has never had this. Find it in <strong>Tool &gt; Paint Layers</strong>, and see <a href="polypaint.html#paint-layers">Paint layers</a>.</p>
+<p>Vertex Paint now has layers, like Photoshop: each Part can have a stack of colour layers with their own opacity, visibility, lock and blend mode (Multiply, Screen, Overlay, Soft Light, Add and more). Painting on a layer never destroys what&#x27;s underneath, and you can merge, flatten, duplicate and reorder layers. ZBrush has never had this. Find it in <strong>Tool &gt; Paint Layers</strong>, and see <a href="vertex-paint.html#paint-layers">Paint layers</a>.</p>
 <figure class="shot"><a href="images/paint-layers.jpg" class="zoom"><img src="images/paint-layers.jpg" alt="The Paint Layers sub-palette with three layers and their blend modes" width="960" height="613" loading="lazy" decoding="async"></a><figcaption>The Paint Layers sub-palette with three layers and their blend modes</figcaption></figure>
 <h3 id="easier-to-install">Easier to install<a class="anchor" href="#easier-to-install" aria-label="Link to this section">#</a></h3>
 <p>The <a href="installing.html">download links</a> now always get the newest version, and there are one-command installers for Windows, macOS and Linux.</p>
 <h2 id="version-03">Version 0.3<a class="anchor" href="#version-03" aria-label="Link to this section">#</a></h2>
 <ul>
 <li>
-<strong>SubTools</strong>: several separate meshes in one scene. Append, duplicate, split, merge, solo, and <kbd>Alt</kbd>+click to select. See <a href="subtools.html">SubTools</a>.
+<strong>Parts</strong>: several separate meshes in one scene. Append, duplicate, split, merge, solo, and <kbd>Alt</kbd>+click to select. See <a href="parts.html">Parts</a>.
 </li>
 <li>
-<strong>A ZBrush-style interface</strong>: shelves around the canvas, alphabetical palettes, the LightBox (<kbd>,</kbd>), the brush, stroke, alpha and material pickers, hold-<kbd>Ctrl</kbd> help on every control and a command palette (<kbd>F3</kbd>). See <a href="interface.html">The interface</a>.
+<strong>A ZBrush-style interface</strong>: shelves around the canvas, alphabetical palettes, the Library (<kbd>,</kbd>), the brush, stroke, alpha and material pickers, hold-<kbd>Ctrl</kbd> help on every control and a command palette (<kbd>F3</kbd>). See <a href="interface.html">The interface</a>.
 </li>
 <li>
 <strong>Graphics tablets</strong>: pen pressure, the eraser end and pen buttons. See <a href="sculpting.html">Sculpting and brushes</a>.
@@ -574,13 +612,13 @@ Fast on big models: a drag frame on 1.3 million triangles takes about 10 ms.
 <h2 id="version-02">Version 0.2<a class="anchor" href="#version-02" aria-label="Link to this section">#</a></h2>
 <ul>
 <li>
-<a href="masking.html">Masking</a>, <a href="polygroups.html">polygroups and visibility</a>, and <a href="polypaint.html">polypaint with MatCaps</a>.
+<a href="masking.html">Masking</a>, <a href="face-groups.html">face groups and visibility</a>, and <a href="vertex-paint.html">vertex paint with Lit Spheres</a>.
 </li>
 <li>
-New brushes: DamStandard, ClayBuildup, SnakeHook, Trim, Layer and Nudge, with strokes and alphas.
+New brushes: Sharp Crease, Clay Block, Tendril, Trim, Layer and Nudge, with strokes and alphas.
 </li>
 <li>
-<a href="projects.html">Project files</a> with autosave, recent files and QuickSave, and <a href="exporting.html">GoZ exchange with ZBrush</a>.
+<a href="projects.html">Project files</a> with autosave, recent files and snapshots, and <a href="exporting.html">exchange with ZBrush (Send to ZBrush)</a>.
 </li>
 </ul>
 <h2 id="version-01">Version 0.1<a class="anchor" href="#version-01" aria-label="Link to this section">#</a></h2>
@@ -590,7 +628,7 @@ New brushes: DamStandard, ClayBuildup, SnakeHook, Trim, Layer and Nudge, with st
       <p class="guide-meta fine">Also in the app: <strong>Help &gt; User Guide</strong> (<kbd>Shift</kbd>+<kbd>F1</kbd>).
         Found a mistake? <a href="https://github.com/islandmed/SculptForge/edit/main/docs/guide/whats-new.md">Edit this page on GitHub</a>.</p>
     </main>
-    <aside class="on-page" aria-label="On this page"><p>On this page</p><ul><li><a href="#version-0104">Version 0.10.4</a></li><li><a href="#version-0103">Version 0.10.3</a></li><li><a href="#version-0102">Version 0.10.2</a></li><li><a href="#version-0101">Version 0.10.1</a></li><li><a href="#version-097">Version 0.9.7</a></li><li><a href="#version-096">Version 0.9.6</a></li><li><a href="#version-095">Version 0.9.5</a></li><li><a href="#version-094">Version 0.9.4</a></li><li><a href="#version-093">Version 0.9.3</a></li><li><a href="#version-092">Version 0.9.2</a></li><li><a href="#version-091">Version 0.9.1</a></li><li><a href="#version-090">Version 0.9.0</a></li><li><a href="#version-081">Version 0.8.1</a></li><li><a href="#version-08">Version 0.8</a></li><li><a href="#version-07">Version 0.7</a></li><li><a href="#version-06">Version 0.6</a></li><li><a href="#version-05">Version 0.5</a></li><li><a href="#version-042">Version 0.4.2</a></li><li><a href="#version-041">Version 0.4.1</a></li><li><a href="#version-04">Version 0.4</a></li><li><a href="#version-03">Version 0.3</a></li><li><a href="#version-02">Version 0.2</a></li><li><a href="#version-01">Version 0.1</a></li></ul></aside>
+    <aside class="on-page" aria-label="On this page"><p>On this page</p><ul><li><a href="#version-0105">Version 0.10.5</a></li><li><a href="#version-0104">Version 0.10.4</a></li><li><a href="#version-0103">Version 0.10.3</a></li><li><a href="#version-0102">Version 0.10.2</a></li><li><a href="#version-0101">Version 0.10.1</a></li><li><a href="#version-097">Version 0.9.7</a></li><li><a href="#version-096">Version 0.9.6</a></li><li><a href="#version-095">Version 0.9.5</a></li><li><a href="#version-094">Version 0.9.4</a></li><li><a href="#version-093">Version 0.9.3</a></li><li><a href="#version-092">Version 0.9.2</a></li><li><a href="#version-091">Version 0.9.1</a></li><li><a href="#version-090">Version 0.9.0</a></li><li><a href="#version-081">Version 0.8.1</a></li><li><a href="#version-08">Version 0.8</a></li><li><a href="#version-07">Version 0.7</a></li><li><a href="#version-06">Version 0.6</a></li><li><a href="#version-05">Version 0.5</a></li><li><a href="#version-042">Version 0.4.2</a></li><li><a href="#version-041">Version 0.4.1</a></li><li><a href="#version-04">Version 0.4</a></li><li><a href="#version-03">Version 0.3</a></li><li><a href="#version-02">Version 0.2</a></li><li><a href="#version-01">Version 0.1</a></li></ul></aside>
   </div>
   <footer class="footer">
     <div class="wrap footer-grid">
@@ -605,9 +643,8 @@ New brushes: DamStandard, ClayBuildup, SnakeHook, Trim, Layer and Nudge, with st
         <a href="https://github.com/islandmed/SculptForge/issues">Report a problem</a>
         <a href="https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md">AI services &amp; privacy</a>
       </div>
-      <p class="fine trademarks">SculptForge is an independent project, not affiliated with or endorsed by Maxon or
-        any other company named in this guide. ZBrush is a trademark of Maxon. All other trademarks belong to their
-        owners.</p>
+      <p class="fine trademarks">ZBrush, GoZ, MatCap and other ZBrush feature names are trademarks of Maxon Computer
+        GmbH. SculptForge is not affiliated with or endorsed by Maxon. All other trademarks belong to their owners.</p>
     </div>
   </footer>
 </body>

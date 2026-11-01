@@ -83,7 +83,7 @@ The finished splat is saved as a PLY next to the capture:
 - for a folder: `<folder>/splat/<folder name>.ply`
 - for a video: `<video name>-splat/<video name>.ply` beside the video
 
-A copy goes into the **Splats** tab of the LightBox, so you can open it again later. The `work` folder beside
+A copy goes into the **Splats** tab of the Library, so you can open it again later. The `work` folder beside
 the result holds the frames, the camera positions and the logs (`brush.log`, `colmap.log`); you can delete it.
 
 The splat comes in centred and upright: SculptForge uses the camera positions to put the object at the middle of

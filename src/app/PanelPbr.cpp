@@ -357,7 +357,7 @@ void App::prewarmTexturePaint() {
     prewarmCenter_ = hit.position;
     prewarmRadius_ = r;
     std::vector<glm::vec3> centers;
-    for (const glm::vec3& mirror : Sculptor::mirrors(symmetry_)) centers.push_back(hit.position * mirror);
+    for (const SymCopy& mirror : Sculptor::copies(symmetry_)) centers.push_back(mirror.point(hit.position));
     prewarmTexturePainting(m, &doc_.bvh, centers, r * 1.25f); // a little wider: the pen moves before it lands
 }
 

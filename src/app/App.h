@@ -134,7 +134,8 @@ public:
     void queueFile(FileAction action, std::string path);
 
 private:
-    enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, SubToolClick, Select, Gizmo, Guide, Sculptable, ZSphere, Insert, Capture };
+    enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, SubToolClick, Select, Gizmo, Guide, Sculptable, ZSphere, Insert, Capture,
+                      AirStroke, UvTool }; // AirStroke: a stroke begun off the model, waiting to reach it (#62)
 
     void handleEvent(const SDL_Event& e);
     void onMouseDown(float x, float y, Uint8 button);
@@ -148,6 +149,15 @@ private:
     bool pick(float x, float y, RayHit& hit) const; // the active SubTool (what brushes work on)
     BrushType activeBrush() const;
     void beginStroke(float x, float y, const RayHit& hit);
+    // Preferences > Input > Start strokes off the model (#62): a left press on the background waits as
+    // Drag::AirStroke; the stroke begins where the drag first reaches the surface (airStrokeTo, Input.cpp).
+    bool airStrokeMouseDown(float x, float y, SDL_Keymod mod);
+    void airStrokeTo(float x, float y);
+    void airStrokeRelease();
+    void drawAirStrokeIndicator();
+    bool airMask_ = false;            // the waiting stroke masks (Ctrl held at the press)
+    bool airMoved_ = false;           // it moved past the click slop (a Ctrl+click still inverts the mask)
+    float airX_ = 0.0f, airY_ = 0.0f; // where it was pressed
     void strokeTo(float x, float y);
     void dabAt(float x, float y, float pressure = -1.0f); // pressure < 0: strokePressure()
     void endStroke();
@@ -219,6 +229,14 @@ private:
     float radiusPx_ = 60.0f;
     float strength_ = 0.5f;
     Symmetry symmetry_;
+    // Local symmetry's centre (symmetry_.pivot) follows the active Part: worked out again, outside strokes, when
+    // the Part, its vertex count or the undo history changed (refreshSymmetryPivot, PanelMasking.cpp).
+    uint64_t symmetryPivotKey_ = ~uint64_t(0);
+    void refreshSymmetryPivot();
+    // The symmetry arguments of the commands that follow the brushes' symmetry (symmetry, radial, radial_axis,
+    // local), added to `args`.
+    Args withSymmetryArgs(Args args);
+    int symmetryCopiesDrawn_ = 0; // brush cursors the last drawSurfaceCursor drew (UI tests: cursor_copies)
     bool invertToggle_ = false;
     bool frontFacesOnly_ = false;
     bool pressureStrength_ = true;
@@ -337,6 +355,10 @@ private:
     void drawSupportUi();               // the first-run welcome and the one reminder note
     void drawSupportersSection();       // Help > About: the names from docs/supporters.txt, as plain text
     bool showWelcome_ = false;          // the first start (no project.json yet), or Help > Welcome
+    // project.json "input_style": the key style an install started with (the welcome's "Coming from" choice, or
+    // SculptForge for a new install), used while ui.json (Store Config) names none; -1: an install from before it,
+    // which keeps the ZBrush-style keys it had.
+    int startInputStyle_ = -1;
     double sculptSeconds_ = 0.0;        // cumulative time in strokes (project.json)
     bool supportReminderDone_ = false;  // the reminder was shown (or turned off) once: never again (project.json)
     bool supportReminderOpen_ = false;
@@ -656,6 +678,27 @@ private:
     // Texture Map sub-palette (PanelTexture.cpp): texture painting on UVs, Auto UV, the UV view.
     void drawTextureMapContents();
     void registerTextureUiActions();
+    // UV Editor (PanelUvEditor.cpp): the window with the 2D UV layout and its tools, the 3D Seam / Select tool, the
+    // seams and colours on the model, a background unwrap. UvEditorUi (that file) does the work.
+    friend struct UvEditorUi;
+    void registerUvEditorActions();
+    void drawUvEditor();
+    void drawUvEditorOverlay(); // the marked seams on the model, the 3D tool's cursor
+    void pollUvEditor();
+    void uvEditorChanged(); // a uv_* command ran: the editor's caches are stale
+    bool uvEditorKey(SDL_Keycode key, SDL_Keymod mod); // keys over the UV view (true: taken)
+    bool uvToolActive() const;
+    bool uvToolMouseDown(float x, float y, SDL_Keymod mod);
+    void uvToolDragTo(float x, float y);
+    void uvToolRelease();
+    const MeshOverlay* uvEditorOverlay(uint32_t subtool); // what syncScene hands the renderer for the model
+    bool uvEditorBusy() const;
+    // UI test values: uv_editor_open, uv_islands, uv_seams, uv_selected, uv_select_mode, uv_pins, uv_tiles,
+    // uv_stretch_x1000, uv_flipped_x1000, uv_density, uv_max_u, uv_unwrapping, uv_unwraps, uv_tool,
+    // uv_view_triangles, uv_overlay; NaN for other names.
+    double uvEditorTestValue(const std::string& name);
+    std::shared_ptr<struct UvEditorState> uvEditor_;
+    bool showUvEditor_ = false;
     void startAutoUv();
     void startNewTexture(); // New Texture on the top shelf / Color palette: Auto UV first when there are no UVs
     void pollAutoUv();
@@ -1114,6 +1157,7 @@ private:
     void drawPalette_Stroke();
     void drawPalette_Tool();
     void drawPalette_Transform();
+    void drawRadialSymmetryControls(); // Transform > Symmetry: radial symmetry's toggle, count and axis (Palettes.cpp)
     void drawAlphaSection();
     void drawLayersContents();
     // Paint Layers sub-palette (PanelPaintLayers.cpp).
@@ -1125,6 +1169,15 @@ private:
     float paintOpacityDrag_ = -1.0f;  // opacity before the slider drag (-1 = not dragging)
     void drawGameExportContents();
     void drawVisibilitySection();
+    // Tool > Selection Sets (PanelSelectionSets.cpp).
+    void drawSelectionSetsSection();
+    char setNameBuffer_[64] = "Set 1";
+    uint32_t setChannels_ = 1 | 2 | 8; // kSetMask | kSetPolygroups | kSetVisibility (core/SelectionSets.h)
+    std::string selectedSet_, combineWith_;
+    int setMode_ = 0; // Replace, Union, Intersect, Subtract
+    float morphAmount_ = 1.0f;
+    bool renamingSet_ = false;
+    char setRenameBuffer_[64] = "";
     void drawGeometrySection(); // PanelGeometry.cpp: Divide, SDiv, Lower / Higher Res, Del Lower / Higher, Reconstruct
     bool smt_ = true;           // Tool > Geometry > Smt: Divide smooths
     float sdivSlider_ = 1.0f;   // the SDiv slider while dragged (1-based)
@@ -1348,7 +1401,7 @@ private:
         float move[3] = {0, 0, 0}, rotate[3] = {0, 0, 0}, scale = 100.0f;
     } gizmo_;
     // ---- end Gizmo 3D ----
-    // ---- ZBrush feel (Input.cpp, docs/zbrush-parity.md) ----
+    // ---- ZBrush feel (Input.cpp, docs/guide/coming-from-zbrush.md) ----
     // Preferences > Input (the ZBrush or SculptForge key style), the Space QuickMenu, the intensities and Focal
     // Shift (U / I / O), ZBrush's mask and polygroup keys, Shift-constrained straight strokes and the
     // Shift+click, release Shift, drag roll.
@@ -1565,6 +1618,8 @@ private:
     std::shared_ptr<struct TimelineUiState> timelineUi_;
     std::shared_ptr<struct ProofState> proof_;
     void drawTimelineUi();            // once a frame from drawUi: keeps the timeline attached and draws the strip
+    float timelineTopInset_ = 0.0f;   // how far down the canvas the strip (or its tab) reaches at the top; 0 at the bottom
+    float timelineStripY_ = -1.0f;    // the strip's (or tab's) top edge in window pixels this frame (-1: not shown)
     void registerTimelineUiActions(); // view.timeline, timeline.timelapse, help.benchmark
     void startTimelapse(const std::string& path, int width, int height, float seconds, int fps);
     bool timelapseStep(double budgetSeconds); // renders frames for up to the budget; false when finished

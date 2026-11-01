@@ -135,7 +135,7 @@ no undo step. A take is JSON Lines (`take.jsonl`, one message per line, phone cl
 ## AR export
 
 `exportArModel` (`io/ArExport.h`): visible triangles only; each part reduced to its share of 80,000 triangles
-(vertex clustering first above 3 M triangles, then quadric decimation); polypaint and textures baked into one
+(vertex clustering first above 3 M triangles, then quadric decimation); vertex paint and textures baked into one
 1024 px texture on new Auto UVs (AR Quick Look ignores vertex colours); centred, base at y = 0, scaled to the
 requested size in metres; written with the regular GLB and USDZ exporters. Runs on a worker thread from a snapshot.
 While the phone has viewed the model in the last 10 minutes, a change to the scene re-exports it (at most every

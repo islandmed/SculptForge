@@ -8,7 +8,7 @@
 | Linux | No | Yes | No | Browser | **Yes (native)** |
 | Focus | Sculpting | General 3D suite | Sculpting (mobile-first) | Demo | **Desktop sculpting only** |
 | Very high poly counts | Excellent | Good | Good | Limited | Goal: excellent |
-| ZBrush-style controls | — | Partial (keymap) | Partial | No | **Yes, by default** |
+| ZBrush-style controls | — | Partial (keymap) | Partial | No | **Yes (ZBrush-style keys)** |
 | Headless / scriptable core | Limited (ZScript) | Python (whole app) | No | No | **Yes (core library + commands)** |
 | AI assistant | Limited | Add-ons only | No | No | **Free built-in AI or bring your own: brushes, image/text to 3D** |
 | Image to 3D | No | Add-ons only | No | No | **Free Hunyuan3D / TRELLIS.2 / SF3D via Hugging Face, paid fal.ai / Meshy, local generators** |
@@ -17,7 +17,7 @@
 | Unreal Engine | FBX export / GoZ-style bridges | FBX export | No | No | **Send to Unreal (live, no plugin), LODs + morph targets in one FBX** |
 | Agent control (MCP) | No | Add-ons only | No | No | **Built in: `sculptforge-cli --mcp`** |
 | Blend shapes / LODs / GLB | Via export plugins | Yes (general 3D) | Partial | No | **Built in, one click** |
-| Open file formats | Proprietary .ZTL | .blend | Proprietary | OBJ | **OBJ, FBX, glTF, PLY, STL, USD/USDZ, GoZ** |
+| Open file formats | Proprietary .ZTL | .blend | Proprietary | OBJ | **OBJ, FBX, glTF, PLY, STL, USD/USDZ, GoZ-compatible** |
 
 Where SculptForge aims to win:
 
@@ -75,25 +75,25 @@ rendering/animation (use Blender).
 ## Phase 2 — Detail & workflow (v0.2–0.3)
 
 - ✅ Masking: Ctrl paints / Ctrl+Alt erases the mask, invert, clear, blur, sharpen, grow, shrink,
-  mask by cavity and by polygroup; every brush and polypaint respect the mask
-- ✅ Polygroups (auto by normals, by connectivity, by UVs, from mask, merge visible) and ZBrush-style visibility:
+  mask by cavity and by face group; every brush and vertex paint respect the mask
+- ✅ Face Groups (auto by normals, by connectivity, by UVs, from mask, merge visible) and ZBrush-style visibility:
   Ctrl+Shift isolate / hide a group, rectangle hide, show all, invert, delete hidden; Ctrl / Ctrl+Shift switch
   the brush to the mask / selection brushes (ZBrush)
-- ✅ SubTools: separate meshes in one scene, each with its own undo history; append (primitives or files),
-  duplicate, delete, rename, show/hide, solo, reorder, merge down / merge visible, split by polygroups or pieces,
+- ✅ Parts: separate meshes in one scene, each with its own undo history; append (primitives or files),
+  duplicate, delete, rename, show/hide, solo, reorder, merge down / merge visible, split by face groups or pieces,
   Alt+click to select. Saved in projects (format 2) and exported as separate objects to OBJ, glTF, FBX (an LOD
-  group per SubTool), USD and GoZ; multi-object files open as SubTools
+  group per Part), USD and GoZ-compatible; multi-object files open as Parts
 - ✅ UI tests: `.sfui` scripts drive the real app (clicks, typing, strokes) with screenshots, in CI
 - ✅ Multiresolution: subdivision levels you can step up/down while keeping detail (v0.5)
 - ✅ Dynamic topology (local remeshing under the brush, Sculptris Pro style) (v0.8)
 - ✅ Alphas (round, square, noise or any grayscale image) and stroke types (dots, drag-rect, spray, lazy mouse)
-- ✅ MaskLasso / MaskRect and SelectLasso (v0.4); 📋 stencils, MaskCurve
-- ✅ More brushes: Clay Buildup, Dam Standard, Snake Hook, Trim (dynamic), Layer, Nudge
-- ✅ MatCap materials (seven built in, with a high-contrast Sculpt default since v0.4), with cavity shading on top
+- ✅ Mask Lasso / Mask Rectangle and Select Lasso (v0.4); 📋 stencils, MaskCurve
+- ✅ More brushes: Clay Block, Sharp Crease, Tendril, Trim (dynamic), Layer, Nudge
+- ✅ Lit Sphere materials (seven built in, with a high-contrast Sculpt default since v0.4), with cavity shading on top
 - 📋 Ambient occlusion shading
-- ✅ Project file format (`.sfproj`: mesh, layers, mask, polypaint, polygroups, visibility, UVs, splats, brushes,
+- ✅ Project file format (`.sfproj`: mesh, layers, mask, vertex paint, face groups, visibility, UVs, splats, brushes,
   view settings), quit-with-unsaved-changes prompt, recent files, autosave with restore
-- ✅ ZBrush GoZ interchange: `.GoZ` import/export with polygroups, mask, polypaint and UVs, plus the GoZ bridge
+- ✅ ZBrush GoZ-compatible interchange: `.GoZ` import/export with face groups, mask, vertex paint and UVs, plus Send to ZBrush
   (Send / Receive) on Windows and macOS. The format follows the GoB add-on; the live bridge has not yet been
   tested against a running ZBrush
 - 📋 Multithreaded brush evaluation, partial GPU uploads per BVH node
@@ -111,13 +111,13 @@ always-latest downloads.
 Ranked by what sculptors cite most on the ZBrush, Polycount, Blender and Mudbox forums:
 
 - ✅ Multiresolution subdivision levels (step up and down, keep detail, reconstruct)
-- ✅ ZRemesher-class quad retopology (QRemesh: target count, Adaptive Size, Keep Groups, polypaint density,
-  symmetry) plus ProjectAll detail transfer (v0.5); ✅ curve guides (QRemesh Guides, v0.8)
+- ✅ ZRemesher-class quad retopology (Quad Remesh: target count, Adaptive Size, Keep Groups, vertex paint density,
+  symmetry) plus Project All detail transfer (v0.5); ✅ curve guides (Quad Remesh Guides, v0.8)
 - ✅ Automatic UV unwrapping (Auto UV, xatlas) and texture painting on UV maps (v0.4.2)
 - ✅ Normal / displacement / AO / cavity / colour map baking with MikkTSpace tangents and a viewport preview (v0.5)
 - ✅ Performance at 20-100M polygons, multithreaded brushes, fast undo (benchmark, partial GPU uploads, Fast
   Navigation; v0.5)
-- ✅ Gizmo 3D for moving, scaling, rotating and posing parts (W / E / R, masked falloff, Transpose All) (v0.5)
+- ✅ Gizmo for moving, scaling, rotating and posing parts (W / E / R, masked falloff, Transpose All) (v0.5)
 
 ## Done in v0.6 — performance
 
@@ -131,8 +131,8 @@ Ranked by what sculptors cite most on the ZBrush, Polycount, Blender and Mudbox 
 
 ## Done in v0.7 — ZBrush feel and Blender
 
-- ✅ ZBrush's keys and gestures by default (S / U / I / O sliders, Space QuickMenu, Focal Shift, RGB Intensity,
-  Smooth's own Z Intensity, ZBrush brush letters, mask and visibility gestures); the 0.6 keys as a preference
+- ✅ ZBrush-style keys and gestures (now an option in Preferences > Input; S / U / I / O sliders, Space Quick Menu, Falloff, RGB Intensity,
+  Smooth's own Intensity, ZBrush brush letters, mask and visibility gestures); the 0.6 keys as a preference
 - ✅ Blender bridge: the SculptForge Bridge add-on for Blender 4.2+, objects update in place with transforms,
   UVs, colours, mask and face sets
 - 📋 Next: mmap project open, an HD Geometry equivalent
@@ -141,16 +141,16 @@ Ranked by what sculptors cite most on the ZBrush, Polycount, Blender and Mudbox 
 
 - ✅ Dynamic topology (Sculptris Pro): the Dynamic toggle and Detail, mirrored remeshing with symmetry, small undo
   steps, under 15 ms per dab at 1M triangles
-- ✅ QRemesh Guides: draw the edge loops QRemesh follows
+- ✅ Quad Remesh Guides: draw the edge loops Quad Remesh follows
 - ✅ Sculpt layers on every subdivision level (record at the top, step, divide, delete levels)
-- ✅ Vector displacement brushes: the VDM brush (DragRect / DragDot), built-in Horn / Ear Curl / Scales /
+- ✅ Vector displacement brushes: the VDM brush (Drag Stamp / Slide Stamp), built-in Horn / Ear Curl / Scales /
   Nostril, Create VDM from a VDM plane, Blender-compatible OpenEXR in and out
 - ✅ Blender add-on: ZBrush-style keys in Sculpt Mode (a preference)
 
 ## In development for v0.9 — maquette to performance
 
 - ✅ Facial shapes: the 52 ARKit blend shapes generated on any sculpted humanoid head (template fit + deformation
-  transfer, eyes / teeth / tongue SubTools, symmetry, subdivision levels), Face test, export with ARKit names to
+  transfer, eyes / teeth / tongue Parts, symmetry, subdivision levels), Face test, export with ARKit names to
   GLB / USD / FBX / Blender shape keys
 - ✅ Live face: `face_weights` (partial updates, no undo), takes played and baked to glTF animation / USD time samples
 - 📋 Next for faces: FBX blend-shape animation, take animation over the Blender bridge, an image-based landmark
@@ -186,12 +186,12 @@ Ranked by what sculptors cite most on the ZBrush, Polycount, Blender and Mudbox 
 
 - 📋 Boolean merge/subtract on the voxel pipeline; sharper voxel remesh (signed distance instead of occupancy)
 - ✅ Quads: imported quads kept, shown and exported as quads, quad subdivision and quad voxel remesh (v0.4);
-  ZRemesher-class retopology from triangle meshes (QRemesh, v0.5)
-- ✅ Polypaint: Paint brush, RGB while sculpting, colour pick, fill (respecting the mask), cavity paint;
-  exported to PLY, glTF, OBJ, USD and GoZ; Photoshop-style paint layers with blend modes (v0.4)
+  ZRemesher-class retopology from triangle meshes (Quad Remesh, v0.5)
+- ✅ Vertex Paint: Paint brush, RGB while sculpting, colour pick, fill (respecting the mask), cavity paint;
+  exported to PLY, glTF, OBJ, USD and GoZ-compatible; Photoshop-style paint layers with blend modes (v0.4)
 - ✅ Texture painting on UV maps (resolution independent of the mesh), with the same paint layers; Auto UV,
-  polypaint <-> texture, PNG next to OBJ / glTF / USD / FBX / GoZ exports (v0.4.2)
-- ✅ Textures survive Auto UV, voxel remesh, QRemesh, Decimate and merges (Keep Texture, v0.5); textured
+  vertex paint <-> texture, PNG next to OBJ / glTF / USD / FBX / GoZ-compatible exports (v0.4.2)
+- ✅ Textures survive Auto UV, voxel remesh, Quad Remesh, Decimate and merges (Keep Texture, v0.5); textured
   exports validated with the Khronos glTF validator, OpenUSD and ufbx (v0.5)
 - ✅ One-click **New Texture** while painting (Auto UV first), parallel texture dabs: 4-5x faster at 4K (0.8.1)
 - 📋 UV editing (seams, relax, pack options), UDIM tiles; ✅ texture baking (normal/displacement, v0.5)

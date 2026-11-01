@@ -2,7 +2,7 @@
 
 Subdivision levels let you sculpt one model at several resolutions, as with ZBrush's **SDiv**: block in the big
 forms on a light version of the mesh, add pores and wrinkles on a dense one, and go back down to change the
-silhouette without losing the detail. Every SubTool has its own levels.
+silhouette without losing the detail. Every Part has its own levels.
 
 ![A cube cage, a middle level and the top level of the same sculpt](images/subdivision-levels.jpg)
 
@@ -20,7 +20,7 @@ Everything is in **Tool > Geometry**:
 | **Reconstruct Subdiv** | | Finds a lower level for a mesh that was subdivided elsewhere |
 
 Under the buttons the palette says where you are ("SDiv 3 of 5") and how many triangles the base and the top
-have. The **SubTool** list shows the level of every SubTool that has them ("SDiv 3/5").
+have. The **Part** list shows the level of every Part that has them ("SDiv 3/5").
 
 ## Divide
 
@@ -33,7 +33,7 @@ can step back down at any time.
 - **Smt** (next to Divide) smooths the new level, rounding off the shape the way ZBrush does. Turn it off to
   divide flat: the new level keeps the hard edges and flat faces of the one below, for hard-surface pieces.
 - Divide always adds the level on top. If you are at a lower level it steps to the highest first.
-- Mask, polypaint, paint layers and UVs are interpolated onto the new level; polygroups and hidden faces carry
+- Mask, vertex paint, paint layers and UVs are interpolated onto the new level; face groups and hidden faces carry
   over; sculpt layers are divided with the shape.
 - How far you can divide depends on your computer's memory: about 160 million triangles with 32 GB (each
   triangle of a divided model takes about 90 bytes, plus some room while dividing). Divide says so when the next
@@ -66,8 +66,8 @@ What happens to your sculpting when you change level:
 | Shape | Carried up as detail, softened down (see above) |
 | Sculpt layers | Each layer has its own detail on every level, kept relative to the surface like the shape's: rotate or reshape a low level and a layer's wrinkles turn and bend with it. Weights apply to all levels. See [Layers and subdivision levels](layers.md#layers-and-subdivision-levels) |
 | Mask | Copied down to the vertices below, interpolated up where it changed |
-| Polypaint and paint layers | As the mask: paint at a low level for broad colour, at a high level for detail. Painting low only changes the higher levels where you painted |
-| Polygroups, hidden faces | Copied down to the parent faces, inherited up by the faces they contain |
+| Vertex Paint and paint layers | As the mask: paint at a low level for broad colour, at a high level for detail. Painting low only changes the higher levels where you painted |
+| Face Groups, hidden faces | Copied down to the parent faces, inherited up by the faces they contain |
 | UVs | Copied down and interpolated up |
 | Texture | Shared by every level (it lives on the UVs) |
 
@@ -91,7 +91,7 @@ keeping the dense mesh exactly as it was. Press it again for more levels.
   leaves the mesh alone.
 - The vertices of the new lower level sit on the dense mesh's corner vertices, as in ZBrush.
 
-> **Tip:** The **Cube** from **Tool > SubTool > Append** is a regular quad grid, so Reconstruct Subdiv takes it
+> **Tip:** The **Cube** from **Tool > Parts > Append** is a regular quad grid, so Reconstruct Subdiv takes it
 > down to a 3 x 3 cube in four steps.
 
 ## Undo, projects and exporting
@@ -100,17 +100,17 @@ keeping the dense mesh exactly as it was. Press it again for more levels.
   so undo walks back through your strokes and level changes in the order you made them. Divide, Del Lower,
   Del Higher and Reconstruct are single undo steps. Steps share the levels they didn't change, so they cost
   little memory.
-- **Projects** (`.sfproj`) save every level of every SubTool and open at the level you saved at. They use
+- **Projects** (`.sfproj`) save every level of every Part and open at the level you saved at. They use
   project format 5 (sculpt-layer detail relative to the surface), so older SculptForge versions ask you to update
   before opening them. Projects saved with format 4 open as before and are converted as they load.
-- **Exports and GoZ** write the current level. To write another one, step to it first, or use the
-  `subdiv_export` command (`subdiv_export path=base.obj level=1` writes the base cage of every visible SubTool,
+- **Exports and Send to ZBrush** write the current level. To write another one, step to it first, or use the
+  `subdiv_export` command (`subdiv_export path=base.obj level=1` writes the base cage of every visible Part,
   in any export format). LODs and **Send to Unreal** start from the current level too.
-- **Tools that rebuild the mesh** (Voxel Remesh, Decimate, QRemesh, Subdivide, Delete hidden, merging and
-  splitting SubTools) work on the level you are on, including what you just sculpted there, and make a new mesh
+- **Tools that rebuild the mesh** (Voxel Remesh, Decimate, Quad Remesh, Subdivide, Delete hidden, merging and
+  splitting Parts) work on the level you are on, including what you just sculpted there, and make a new mesh
   without levels: that level becomes the new base. The status line says so, e.g. *Subdivision levels removed:
   SDiv 3 of 5 kept as the new base (undo restores them)*. <kbd>Ctrl</kbd>+<kbd>Z</kbd> brings every level back,
-  at the level you were on. Merging and splitting SubTools can't be undone (as in ZBrush), so step to the level
+  at the level you were on. Merging and splitting Parts can't be undone (as in ZBrush), so step to the level
   you want to keep first, or save before.
 
 > **Note:** **Subdivide** (in **Tool > Geometry**, below Divide) is still there: it replaces the mesh with a
@@ -129,7 +129,7 @@ Every control is a command you can run in the console, from a script or over MCP
 | `subdiv_delete_lower`, `subdiv_delete_higher` | Del Lower, Del Higher |
 | `subdiv_reconstruct` | Reconstruct Subdiv |
 | `subdiv_info` | List the levels and their triangle counts |
-| `subdiv_export path=base.obj level=1` | Export the visible SubTools at a level |
+| `subdiv_export path=base.obj level=1` | Export the visible Parts at a level |
 
 ## Speed and memory
 
@@ -144,8 +144,8 @@ Measured on an Apple M1 Pro (Asahi Linux), a cube divided four times to 6.5 mill
 | Memory for all levels | 120 MB | 480 MB |
 
 SculptForge keeps the two levels you visited last ready to show, so going back and forth between a low and a
-high level (the usual rhythm) is instant. Only the active SubTool keeps them: selecting another SubTool frees
-that memory (50-170 MB for a SubTool with 1.8 million triangles at the top), and the first level change after
+high level (the usual rhythm) is instant. Only the active Part keeps them: selecting another Part frees
+that memory (50-170 MB for a Part with 1.8 million triangles at the top), and the first level change after
 you come back takes a moment longer (about 0.1 s at that size) while the level is prepared again.
 
 > **ZBrush:** Divide, Smt, Lower Res, Higher Res, SDiv, Del Lower, Del Higher and Reconstruct Subdiv work as in

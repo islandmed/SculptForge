@@ -6,14 +6,33 @@ agree your work is licensed under the same terms.
 ## Ground rules
 
 - **Clean-room only.** Do not contribute code, shaders, brushes, alphas, icons or
-  other assets copied or decompiled from ZBrush or any other proprietary
-  product. Re-implementing well-known published techniques is fine.
+  other assets copied or decompiled from any proprietary product. Re-implementing well-known published techniques is fine.
 - Keep `src/core` free of UI and GPU dependencies so it stays testable and
   scriptable.
 - New editor operations should be registered as commands in
   `src/core/Commands.cpp` so they are available to the UI, scripting and the
   AI assistant alike.
 - Add or update tests in `tests/` for core behaviour changes.
+
+## Developer Certificate of Origin
+
+SculptForge uses the [Developer Certificate of Origin 1.1](https://developercertificate.org) (DCO). There is no
+CLA: you keep the copyright to your work and license it under GPL-3.0-or-later.
+
+Sign off every commit with `git commit -s`, which adds a line like this to the commit message:
+
+```
+Signed-off-by: Your Name <you@example.com>
+```
+
+By signing off you certify, as the DCO says, that the contribution is your own original work, or that you have
+the right to submit it under the project's license (for example, code under a compatible open-source license,
+with its notice kept). You also certify that it is not copied or derived from proprietary software, its SDKs,
+decompiled or disassembled code, its documentation or its assets.
+Describing how a feature behaves from the outside, and implementing published techniques, is fine.
+
+Forgot the sign-off? `git commit --amend -s` fixes the last commit, and `git rebase --signoff main` the whole
+branch.
 
 ## Workflow
 
@@ -31,7 +50,11 @@ trailing underscore for private members. A `.clang-format` is provided.
 
 See [README.md#building](README.md#building). On Linux, `packaging/linux/install-build-deps.sh` installs the
 build dependencies. `ctest` runs the unit tests; `cpack` in the build folder makes the platform's packages.
-Releases are built by `.github/workflows/release.yml` when a `v*` tag is pushed.
+`ctest -j 4` runs them four at a time: the `sculptforge_tests` suite is registered as eight shards
+(`sculptforge_tests_0of8` ...), each with its own temporary folder. Run the binary itself for a quick check:
+`./build/sculptforge_tests qremesh` runs the tests whose names contain "qremesh", `--shard 1/4` one shard, and
+each test prints how long it took.
+Releases are built by `.github/workflows/release.yml` when a `v*` tag is pushed; [docs/releasing.md](docs/releasing.md) has the process.
 
 ### UI tests
 
@@ -50,7 +73,8 @@ take under a second. They use a throwaway settings folder and never touch your o
 the script and saves `FAIL-line-N.png`, and clicking a missing item lists similarly named items. Clicks
 scroll panels as needed, and clicking an item a person couldn't reach (off screen) fails. CI runs the UI
 tests on Linux under Xvfb and on Windows with Mesa's software OpenGL, and uploads the screenshots as an
-artifact.
+artifact. CI compiles through ccache (see the comment at the top of `.github/workflows/ci.yml`). Releases: see
+[docs/releasing.md](docs/releasing.md).
 
 ### Windows, from Linux
 

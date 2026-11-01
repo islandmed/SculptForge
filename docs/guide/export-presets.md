@@ -8,7 +8,7 @@ preset**. SculptForge has presets for the common targets, and you can write your
 
 1. Open **Tool > Texture Map**. Under **Material Channels**, choose a preset in the list next to **Export
    Maps...** (hover a preset for what it writes).
-2. Click **Export Maps...** and pick a folder. The files are named after the SubTool.
+2. Click **Export Maps...** and pick a folder. The files are named after the Part.
 
 From a script or the console: `export_maps preset=unreal folder=/path/to/maps name=Rock`.
 `export_maps list=true` lists the presets and their maps.
@@ -18,7 +18,7 @@ preset always writes a complete set. Maps marked optional below are written only
 
 ## Built-in presets
 
-| Preset | Files (for a SubTool called Rock) | Normal |
+| Preset | Files (for a Part called Rock) | Normal |
 | --- | --- | --- |
 | `unreal` | `T_Rock_BC` (base colour; opacity in alpha when painted), `T_Rock_N`, `T_Rock_ORM` (R occlusion, G roughness, B metallic); optional `T_Rock_E` (emissive), `T_Rock_H` (16-bit height) | DirectX |
 | `unity_urp` | `Rock_BaseMap`, `Rock_Normal`, `Rock_MetallicSmoothness` (R metallic, A smoothness = 1 - roughness); optional `Rock_Occlusion`, `Rock_Emission`, `Rock_Height` | OpenGL |

@@ -59,7 +59,7 @@ key ctrl+z
 click "Scales##vdm2"
 expect_status VDM: Scales
 click "Stroke##palette.stroke"
-click "DragDot##stroke"
+click "Slide Stamp##stroke"
 key escape
 expect_value stroke_type == 2
 snapshot

@@ -71,6 +71,15 @@ struct NormalMapView {
     bool flipGreen = false; // DirectX convention (green down)
 };
 
+// What the UV Editor shows on the model (app/PanelUvEditor.cpp): a colour per triangle (stretch, texel density,
+// islands, the selection) and / or a checker on the UVs. `serial` changes whenever the colours or the checker do.
+struct MeshOverlay {
+    uint64_t serial = 0;
+    std::vector<uint32_t> colors; // per triangle, 0xBBGGRR (sRGB); empty = the usual colours
+    bool checker = false;         // a UDIM-tinted checker on the UVs instead of the base colour
+    float checkerScale = 8.0f;    // checker squares per UV unit
+};
+
 // One mesh of the scene for Renderer::syncScene: a SubTool, keyed by its stable id.
 struct SceneMesh {
     uint32_t id = 0;
@@ -82,6 +91,7 @@ struct SceneMesh {
                             // outlining the triangles, quad diagonals included, until they are)
     bool flat = false;      // flat shading: each triangle shows its own face normal (faceted)
     bool pbr = false;       // the view shades PBR: upload the texture's material channels and their tangents
+    const MeshOverlay* overlay = nullptr; // the UV Editor's view of the active mesh (must outlive the frame)
 };
 
 // Part of the target the 3D view is drawn into (framebuffer pixels, origin bottom-left); the rest is
@@ -223,8 +233,13 @@ private:
     GLuint captureFbo_[2] = {}, captureRb_[3] = {};
     // drawView's multisampled target; viewFailed_ = the sample count that couldn't be made at this size.
     bool viewTarget(int width, int height, int samples);
-    GLuint viewFbo_ = 0, viewRb_[2] = {};
+    // viewResolveFbo_ is a single-sample RGBA8 copy: a multisample resolve must match formats exactly, and the
+    // window's own framebuffer can be another format (10-bit or sRGB on some Windows drivers), so the resolve
+    // goes there first and a plain blit (which may convert) takes it to the window. If even that blit errors,
+    // directView_ makes later frames draw straight to the window without antialiasing.
+    GLuint viewFbo_ = 0, viewResolveFbo_ = 0, viewRb_[3] = {};
     int viewW_ = 0, viewH_ = 0, viewSamples_ = 0, viewFailed_ = 0;
+    bool directView_ = false;
     int captureW_ = 0, captureH_ = 0;
     GLuint emptyVao_ = 0;
     bool thumbnailPass_ = false; // draw(): transparent background, no gradient (renderMeshThumbnail)
@@ -256,6 +271,9 @@ private:
         bool tangentsFromMaterial = false;  // tangentTexture holds matTangents (not the baked preview's)
         bool hasTangents = false, tangentsStale = true, normalFlipGreen = false;
         bool hasColors = false, hasMask = false, hasGroups = false, hasUvs = false;
+        const MeshOverlay* overlay = nullptr; // this frame's (SceneMesh::overlay)
+        uint64_t overlaySerial = 0;           // the one uploaded
+        bool overlayColors = false;           // the per-triangle data holds overlay colours, not polygroups
         bool fresh = true; // nothing uploaded yet
         bool regrid = false; // a stroke's vertex left the position grid (prepareStrokeUpload): the next sync re-sends everything
         bool outOfMemory = false; // the last full upload ran out of GPU memory: not drawn
@@ -387,7 +405,7 @@ private:
         GLuint id = 0;
         GLint view = -1, proj = -1, gridOrigin = -1, gridStep = -1, viewport = -1, projScale = -1, baseColor = -1, paint = -1,
               showMask = -1, groups = -1, matcap = -1, matcapCavity = -1, dim = -1, primBase = -1, hasPaint = -1,
-              normalFlipY = -1, twoSided = -1;
+              normalFlipY = -1, twoSided = -1, checker = -1, checkerScale = -1;
         GLint hasOrm = -1, hasEmissive = -1, hasMatNormal = -1, envLevels = -1, exposure = -1, toneMap = -1, material = -1,
               pbrCavity = -1, viewToEnv = -1, sh = -1;
         GLint ghostGroups = -1, ghostRange = -1, ghostEdge = -1, ghostA = -1, ghostB = -1, ghostC = -1, ghostBound = -1, ghostKind = -1, ghostFocal = -1;

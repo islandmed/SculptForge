@@ -51,5 +51,5 @@ hold none
 expect_value masked > 0
 
 click "Preferences##palette.preferences"
-click "ZBrush##input.style_zbrush"
+click "ZBrush-style##input.style_zbrush"
 expect_value input_style == 0

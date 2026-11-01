@@ -2,25 +2,25 @@
 
 This chapter covers getting your sculpt out of SculptForge: the export formats and what each one keeps, LOD
 chains for games, sending a mesh straight into a running Unreal Editor, and exchanging models with ZBrush
-through GoZ. To keep everything (SubTools, layers, mask, polypaint, brushes) use a project file instead; see
-[Projects, autosave and QuickSave](projects.md).
+with Send to ZBrush. To keep everything (Parts, layers, mask, vertex paint, brushes) use a project file instead; see
+[Projects, autosave and snapshots](projects.md).
 
 ## Export formats at a glance
 
-Exports write every **visible** SubTool. Hidden SubTools are left out. Exporting doesn't rename the document
+Exports write every **visible** Part. Hidden Parts are left out. Exporting doesn't rename the document
 or mark it saved, so your next <kbd>Ctrl</kbd>+<kbd>S</kbd> still saves the project.
 
 | Format | Where in the app | Keeps | Use it for |
 |---|---|---|---|
-| glTF binary (`.glb`) | **File > Export GLB...** (<kbd>Ctrl</kbd>+<kbd>E</kbd>) | One node per SubTool, sculpt layers as morph targets, polypaint as vertex colour, UVs and the painted texture (embedded) | Games, Blender, three.js, web viewers |
+| glTF binary (`.glb`) | **File > Export GLB...** (<kbd>Ctrl</kbd>+<kbd>E</kbd>) | One node per Part, sculpt layers as morph targets, vertex paint as vertex colour, UVs and the painted texture (embedded) | Games, Blender, three.js, web viewers |
 | LOD chain (`.glb` per level) | **File > Export LOD Chain...** | As GLB, one file per level, blend shapes on every level | Game engines |
-| OpenUSD (`.usda`, `.usdz`) | **File > Export USD / USDZ...** | One Mesh prim per SubTool, quads, layers as UsdSkel blend shapes, polypaint as `displayColor`, UVs (`primvars:st`) and the painted texture through a preview material (inside a USDZ), loaded splats | Film pipelines, Omniverse, Apple AR Quick Look |
+| OpenUSD (`.usda`, `.usdz`) | **File > Export USD / USDZ...** | One Mesh prim per Part, quads, layers as UsdSkel blend shapes, vertex paint as `displayColor`, UVs (`primvars:st`) and the painted texture through a preview material (inside a USDZ), loaded splats | Film pipelines, Omniverse, Apple AR Quick Look |
 | FBX for Unreal (`.fbx`) | **File > Export FBX for Unreal...** | Unreal naming and scale, quads, UVs, LOD group, layers as blend shapes, the painted texture as a PNG beside it | Unreal Engine (by hand) |
-| Wavefront OBJ (`.obj`) | **File > Export OBJ...** | One `o` object per SubTool, quads, polygroups as `g` groups, polypaint as vertex colour, UVs, the painted texture through a `.mtl` (`map_Kd`) and a PNG beside it. Layers are baked into the current blend | Any 3D app, ZBrush |
-| ZBrush GoZ (`.GoZ`) | **File > ZBrush (GoZ) > Export GoZ...** | Quads, polygroups, mask, polypaint, UVs, the painted texture as a PNG beside it | ZBrush |
-| STL (`.stl`) | **File > ZBrush (GoZ) > Export STL...** | Geometry only (triangles), visible SubTools merged, in millimetres with Z up | [3D printing](#3d-printing) |
-| PLY (`.ply`) | `export_ply` command | Geometry, quads and polypaint, visible SubTools merged | Scan tools, MeshLab, Blender |
-| FBX (general) | `export_fbx` command | One model per SubTool, quads, UVs, blend shapes, optional LOD groups, the painted texture | Other FBX pipelines |
+| Wavefront OBJ (`.obj`) | **File > Export OBJ...** | One `o` object per Part, quads, face groups as `g` groups, vertex paint as vertex colour, UVs, the painted texture through a `.mtl` (`map_Kd`) and a PNG beside it. Layers are baked into the current blend | Any 3D app, ZBrush |
+| ZBrush GoZ-compatible (`.GoZ`) | **File > Send to ZBrush > Export GoZ-compatible file...** | Quads, face groups, mask, vertex paint, UVs, the painted texture as a PNG beside it | ZBrush |
+| STL (`.stl`) | **File > Send to ZBrush > Export STL...** | Geometry only (triangles), visible Parts merged, in millimetres with Z up | [3D printing](#3d-printing) |
+| PLY (`.ply`) | `export_ply` command | Geometry, quads and vertex paint, visible Parts merged | Scan tools, MeshLab, Blender |
+| FBX (general) | `export_fbx` command | One model per Part, quads, UVs, blend shapes, optional LOD groups, the painted texture | Other FBX pipelines |
 
 The GLB, LOD chain and FBX for Unreal exports are also in the **Tool** palette under **Export**, together with
 the LOD and Unreal settings.
@@ -31,9 +31,9 @@ only hold triangles.
 
 ![The Tool > Export sub-palette with a generated LOD chain and the Unreal Engine settings](images/export.jpg)
 
-UVs are kept through OBJ, FBX, USD, glTF and GoZ, in and out. A SubTool with a painted
+UVs are kept through OBJ, FBX, USD, glTF and GoZ-compatible files, in and out. A Part with a painted
 [texture](texture-painting.md) is exported with it: the PNG is written next to the file as
-`<name>_color.png` (`<name>_<SubTool>_color.png` with several SubTools) and referenced by the model, or embedded
+`<name>_color.png` (`<name>_<SubTool>_color.png` with several Parts) and referenced by the model, or embedded
 in GLB and USDZ files. Spaces in the file name become `_` in the names of the files written beside it
 (`my scene.obj` gets `my_scene.mtl` and `my_scene_color.png`), because OBJ and MTL separate file names with
 spaces. **Tool > Texture Map > Auto UV** gives any sculpt UVs before export. Normal, displacement and other maps
@@ -59,11 +59,11 @@ UV convention), checked colour by colour against SculptForge's own sampling. The
 
 ## Export a model
 
-1. Show the SubTools you want to export and hide the others (the eye icon in **Tool > SubTool**).
+1. Show the Parts you want to export and hide the others (the eye icon in **Tool > Parts**).
 2. Choose the export in the **File** palette and pick a file name.
 3. The status line confirms the export ("Exported ...").
 
-A SubTool with [subdivision levels](subdivision-levels.md) is exported at the level you are on. To write the base
+A Part with [subdivision levels](subdivision-levels.md) is exported at the level you are on. To write the base
 cage (or any other level) without stepping to it, use `subdiv_export path=base.obj level=1`.
 
 From a script, each format is one command:
@@ -78,14 +78,14 @@ sculptforge-cli -c 'open path=bust.sfproj; export_stl path=bust.stl; export_ply 
 
 ## 3D printing
 
-**File > ZBrush (GoZ) > Export STL...** writes every visible SubTool as one binary STL, ready for a slicer
+**File > Send to ZBrush > Export STL...** writes every visible Part as one binary STL, ready for a slicer
 (PrusaSlicer, Cura, Bambu Studio, OrcaSlicer ...). The status line gives the printed size, for example
 "Exported lion.stl (47214 triangles, 320.8 x 206.6 x 436.4 mm)": width, depth and height as the slicer shows them.
 
 - **Size:** 1 unit in SculptForge is 1 m, so 1 unit becomes 1000 mm. To print at a given height, use
   `export_stl path=lion.stl height_mm=80`, or scale the model in the slicer.
-- **One solid:** overlapping SubTools go into the file as they are, which some slicers and print services
-  reject. **Merge visible** them ([SubTools](subtools.md#merge-subtools)) and
+- **One solid:** overlapping Parts go into the file as they are, which some slicers and print services
+  reject. **Merge visible** them ([Parts](parts.md#merge-parts)) and
   [Remesh](geometry.md#voxel-remesh) to turn them into one closed surface first.
 - **Detail:** printers resolve about 0.05-0.1 mm, so millions of triangles rarely help.
   [Decimate](geometry.md#decimate) makes the file smaller without visible loss.
@@ -110,7 +110,7 @@ objects cheaply. SculptForge builds it with quadric decimation, keeping blend sh
    preview; click **Generate LOD chain** to build it again.
 
 The LOD chain export writes `<name>_LOD0.glb`, `<name>_LOD1.glb` and so on next to the path you choose. With
-several visible SubTools, each SubTool is decimated on its own.
+several visible Parts, each Part is decimated on its own.
 
 ```sh
 sculptforge-cli -c 'open path=rock.obj; export_lods path=out/rock.glb levels=4 ratio=0.5'
@@ -129,7 +129,7 @@ Python remote execution.
 |---|---|
 | No sculpt layers | A **static mesh** `SM_<Name>` with the LOD chain from **Tool > Export** |
 | Sculpt layers | A **skeletal mesh** `SK_<Name>` with one **morph target** per layer (Unreal adds a single root bone) |
-| Several visible SubTools | One FBX model per SubTool, combined into one asset on import |
+| Several visible Parts | One FBX model per Part, combined into one asset on import |
 | Any | A material slot `M_Clay`, and the real-world size from **Height** |
 | A baked normal map ([Tool > Bake](baking.md)) | The texture `T_<Name>_N`, set up as a normal map (Unreal on this computer only) |
 | A texture with [material channels](pbr-painting.md) | `T_<Name>_BC`, `T_<Name>_N` (DirectX) and `T_<Name>_ORM` (occlusion, roughness, metallic), plus `T_<Name>_E` when emissive is painted, and a material `M_<Name>` built from them and assigned to the mesh (Unreal on this computer only; see [Export presets](export-presets.md)) |
@@ -184,43 +184,43 @@ sculptforge-cli -c 'open path=statue.obj; export_unreal folder=out height_cm=200
 > stand-in editor that speaks the same protocol but not yet against every Unreal version. If an import fails,
 > Unreal's **Output Log** shows the importer's messages.
 
-## Exchange models with ZBrush (GoZ)
+## Exchange models with ZBrush (Send to ZBrush)
 
-SculptForge reads and writes ZBrush's GoZ format and can talk to a running ZBrush through the GoZ bridge on
-Windows and macOS. The commands are in **File > ZBrush (GoZ)**:
+SculptForge reads and writes ZBrush's GoZ format and can talk to a running ZBrush through the **Send to ZBrush** on
+Windows and macOS. The commands are in **File > Send to ZBrush**:
 
 | Item | What it does |
 |---|---|
-| **Send to ZBrush** | Writes every visible SubTool to the shared GoZ folder and tells ZBrush (starting it if needed). Each SubTool arrives as its own ZBrush SubTool. Turns on **Receive automatically** |
-| **Receive from ZBrush** | Loads what ZBrush last sent with GoZ. Each object updates the SubTool it was sent from (one undo step), or becomes a new SubTool |
-| **Receive automatically** | Checks once a second for a new GoZ send from ZBrush and receives it |
-| **Custom GoZ folder** | Use another GoZ folder, for example inside a Wine prefix |
-| **Import GoZ...** | Opens a `.GoZ` file, replacing the scene |
-| **Export GoZ...** | Writes a `.GoZ` file. With several visible SubTools, one file per SubTool next to the path |
-| **Export STL...** | Writes a binary STL of the visible SubTools |
+| **Send to ZBrush** | Writes every visible Part to the shared bridge folder and tells ZBrush (starting it if needed). Each Part arrives as its own ZBrush SubTool. Turns on **Receive automatically** |
+| **Receive from ZBrush** | Loads what ZBrush last sent. Each object updates the Part it was sent from (one undo step), or becomes a new Part |
+| **Receive automatically** | Checks once a second for a new send from ZBrush and receives it |
+| **Custom bridge folder (optional)** | Use another bridge folder, for example inside a Wine prefix |
+| **Import GoZ-compatible file...** | Opens a `.GoZ` file, replacing the scene |
+| **Export GoZ-compatible file...** | Writes a `.GoZ` file. With several visible Parts, one file per Part next to the path |
+| **Export STL...** | Writes a binary STL of the visible Parts |
 
-The default GoZ folder is `C:\Users\Public\Pixologic` on Windows and `/Users/Shared/Pixologic` on macOS.
-ZBrush doesn't run on Linux, so there the bridge needs a custom folder; GoZ files still import and export.
+The default bridge folder is `C:\Users\Public\Pixologic` on Windows and `/Users/Shared/Pixologic` on macOS.
+ZBrush doesn't run on Linux, so there the bridge needs a custom folder; GoZ-compatible files still import and export.
 
 ### A round trip
 
-1. In SculptForge, choose **File > ZBrush (GoZ) > Send to ZBrush**. ZBrush starts or comes forward with the
-   SubTools. If ZBrush was not running and does not import them, press **GoZ** in ZBrush.
+1. In SculptForge, choose **File > Send to ZBrush > Send**. ZBrush starts or comes forward with the
+   Parts. If ZBrush was not running and does not import them, press **GoZ** in ZBrush.
 2. Work in ZBrush, then press **GoZ** there to send the model back.
-3. SculptForge receives it automatically and updates the matching SubTools. Each update is an undo step on
-   that SubTool.
+3. SculptForge receives it automatically and updates the matching Parts. Each update is an undo step on
+   that Part.
 
-GoZ keeps polygroups, mask, polypaint and UVs. Quads from ZBrush stay quads: PolyF shows them as quads, and
-they go back to ZBrush as the same quads. GoZ has no hidden-face flag, so hidden faces are sent like
+The bridge keeps face groups, mask, vertex paint and UVs. Quads from ZBrush stay quads: Wire shows them as quads, and
+they go back to ZBrush as the same quads. The format has no hidden-face flag, so hidden faces are sent like
 any others.
 
 > **ZBrush:** SculptForge can't read ZBrush's own `.ZTL` and `.ZPR` files (they are proprietary and
-> undocumented). Bring models over with GoZ, export OBJ or FBX from ZBrush, or convert your ZTools once with the
-> **SculptForge ZTool Export** plug-in for ZBrush, after which SculptForge opens the `.ZTL` itself (see
+> undocumented). Bring models over with Send to ZBrush, export OBJ or FBX from ZBrush, or convert your ZTools once with the
+> **SculptForge ZTL Export** plug-in for ZBrush, after which SculptForge opens the `.ZTL` itself (see
 > [Coming from ZBrush](coming-from-zbrush.md#bring-your-ztools-over)). Subdivision levels don't come across:
 > SculptForge receives the mesh at the level you sent.
 
-> **Note:** The GoZ bridge follows the format of the open-source Blender GoZ add-on (GoB) and is tested with
+> **Note:** Send to ZBrush follows the format of the open-source Blender GoZ add-on (GoB) and is tested with
 > files, but has not yet been tested against a live ZBrush. If a send does not arrive, export a `.GoZ` file
 > and import it in ZBrush by hand, and please report it (**Help > Report a problem**).
 
@@ -231,7 +231,7 @@ From scripts: `goz_export path=`, `goz_import path=`, `goz_send`, `goz_receive` 
 
 To sculpt Blender objects in SculptForge and send them back into the same objects, use the SculptForge Bridge
 add-on and **File > Blender**: see [Working with Blender](blender.md). For a one-off exchange, OBJ, FBX and glTF
-all carry SubTools, UVs and quads both ways.
+all carry Parts, UVs and quads both ways.
 
 ## Maya
 
@@ -242,8 +242,8 @@ Maya and **File > Maya**: see [Working with Maya](maya.md).
 
 - [Working with Blender](blender.md): the Blender add-on
 - [Working with Maya](maya.md): the Maya shelf script
-- [Projects, autosave and QuickSave](projects.md): save everything, not just the mesh
-- [SubTools](subtools.md): which SubTools are exported
+- [Projects, autosave and snapshots](projects.md): save everything, not just the mesh
+- [Parts](parts.md): which Parts are exported
 - [Layers and blend shapes](layers.md): what becomes morph targets
 - [Subdivide, Remesh, Decimate and LODs](geometry.md): decimate before exporting
 - [Gaussian splats](splats.md): saving splats

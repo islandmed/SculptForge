@@ -162,10 +162,10 @@ void App::drawPaintLayersContents() {
                 ui::HelpText(name.c_str(), nullptr,
                              l ? "A paint layer. Click to paint on it, double-click to rename, right-click for more. "
                                  "Layers composite bottom to top with their blend mode and opacity."
-                             : texture ? "The base colour layer of the SubTool's texture. Always opaque; layers above it "
+                             : texture ? "The base colour layer of the Part's texture. Always opaque; layers above it "
                                          "blend over it."
-                               : "The base colour layer: the SubTool's polypaint. Always opaque; layers above it blend "
-                                 "over it. With only Base, polypaint works exactly as before.",
+                               : "The base colour layer: the Part's vertex paint. Always opaque; layers above it blend "
+                                 "over it. With only Base, vertex paint works exactly as before.",
                              kPath);
                 if (l && ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
                     renamingPaintLayer_ = i;

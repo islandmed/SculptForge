@@ -43,7 +43,7 @@ std::string App::matcapFolder() const { return library_.user.empty() ? std::stri
 
 // Custom MatCaps (#15): the studio folders (SCULPTFORGE_MATCAP_PATH), then the library's MatCaps folder.
 void App::loadMatcapLibrary() {
-    for (const std::string& m : loadMatcapFolders(studioMatcapDirs())) SDL_Log("MatCaps: %s", m.c_str());
+    for (const std::string& m : loadMatcapFolders(studioMatcapDirs())) SDL_Log("Lit Spheres: %s", m.c_str());
     rescanMatcapFolder();
 }
 
@@ -70,7 +70,7 @@ void App::rescanMatcapFolder() {
         CustomMatcap m;
         std::string err;
         if (readMatcapImage(path, m, err)) addCustomMatcap(std::move(m));
-        else SDL_Log("MatCaps: skipped %s", err.c_str());
+        else SDL_Log("Lit Spheres: skipped %s", err.c_str());
     }
     for (const auto& [path, stamp] : matcapFolderSeen_)
         if (!now.count(path))
@@ -88,10 +88,10 @@ void App::materialListShown() {
 void App::registerPaintUiCommands() {
     // A view setting, so it lives with the app (scripts: --script "set_material name=Chrome").
     commands_.add({"set_material",
-                   "Viewport material: a built-in MatCap (Sculpt, the default, is made for reading strokes), one of "
-                   "your own (load_matcap) or studio (soft clay lighting in the Base colour). Polypaint multiplies "
-                   "the matcap; cavity shading stays on.",
-                   {{"name", ParamSpec::Type::String, "A MatCap's name (Soft Clay, Sculpt, Red Wax, Clay, Skin, Chrome, "
+                   "Viewport material: a built-in Lit Sphere (Sculpt, the default, is made for reading strokes), one of "
+                   "your own (load_matcap) or studio (soft clay lighting in the Base colour). Vertex Paint multiplies "
+                   "the lit sphere; cavity shading stays on.",
+                   {{"name", ParamSpec::Type::String, "A Lit Sphere's name (Soft Clay, Sculpt, Red Wax, Clay, Skin, Chrome, "
                                                       "White, Bronze or a custom one) or studio.", true}},
                    [this](Document&, const Args& a) -> CommandResult {
                        const std::string name = argString(a, "name");
@@ -105,12 +105,12 @@ void App::registerPaintUiCommands() {
                        return {true, std::string("Material: ") + matcapName(index)};
                    }});
     commands_.add({"load_matcap",
-                   "Load a MatCap: a lit-sphere image (PNG, JPG or EXR; a non-square image is cropped to its centre) "
+                   "Load a Lit Sphere: a lit-sphere image (PNG, JPG or EXR; a non-square image is cropped to its centre) "
                    "becomes a viewport material named after the file, and the view uses it. It is copied into the "
                    "library's MatCaps folder (Documents/SculptForge/MatCaps), so it is there next time; projects "
                    "that use it carry a copy.",
                    {{"path", ParamSpec::Type::String, "The image file.", true},
-                    {"keep", ParamSpec::Type::Bool, "Copy it into the MatCaps folder (default true).", false}},
+                    {"keep", ParamSpec::Type::Bool, "Copy it into the library's MatCaps folder (default true).", false}},
                    [this](Document&, const Args& a) -> CommandResult {
                        CustomMatcap m;
                        std::string err;
@@ -130,7 +130,7 @@ void App::registerPaintUiCommands() {
                            } else {
                                const std::u8string s = to.u8string();
                                m.path.assign(s.begin(), s.end());
-                               kept = " (kept in MatCaps)";
+                               kept = " (kept in the MatCaps folder)";
                            }
                        }
                        hiddenMatcapFiles_.erase(m.path);
@@ -139,14 +139,14 @@ void App::registerPaintUiCommands() {
                        return {true, std::string("Material: ") + matcapName(index) + kept};
                    }});
     commands_.add({"remove_matcap",
-                   "Remove one of your MatCaps from the material lists. One from the library's MatCaps folder goes to "
+                   "Remove one of your Lit Spheres from the material lists. One from the library's MatCaps folder goes to "
                    "the trash (the Recycle Bin on Windows); where that isn't possible (macOS for now) it is hidden "
-                   "for this session and its file stays put. Built-in MatCaps can't be removed.",
-                   {{"name", ParamSpec::Type::String, "The MatCap's name.", true}},
+                   "for this session and its file stays put. Built-in Lit Spheres can't be removed.",
+                   {{"name", ParamSpec::Type::String, "The Lit Sphere's name.", true}},
                    [this](Document&, const Args& a) -> CommandResult {
                        const std::string name = argString(a, "name");
                        const int index = findMatcap(name);
-                       if (index < 0) return {false, "No MatCap called '" + name + "'"};
+                       if (index < 0) return {false, "No Lit Sphere called '" + name + "'"};
                        if (!isCustomMatcap(index)) return {false, std::string(matcapName(index)) + " is built in"};
                        const std::string shown = matcapName(index), path = customMatcap(index)->path;
                        namespace fs = std::filesystem;
@@ -242,7 +242,7 @@ void App::registerPaintUiCommands() {
                    }});
     // The scene's shading; SubTools can override it (subtool_shading). Also the preference for new sessions.
     commands_.add({"set_shading",
-                   "Viewport shading for every SubTool that doesn't set its own (subtool_shading): smooth (the "
+                   "Viewport shading for every Part that doesn't set its own (subtool_shading): smooth (the "
                    "default) or flat, where each polygon shows its own face, so the mesh's structure reads.",
                    {{"mode", ParamSpec::Type::String, "smooth or flat.", true}},
                    [this](Document&, const Args& a) -> CommandResult {
@@ -347,7 +347,7 @@ void App::pickColorUnderCursor() {
         return;
     }
     if (!doc_.mesh.hasColors()) {
-        status_ = "The mesh has no polypaint to pick from";
+        status_ = "The mesh has no vertex paint to pick from";
         return;
     }
     doc_.paintColor = sampleColor(doc_.mesh, hit.triangle, hit.position);
@@ -427,8 +427,8 @@ void App::drawPalette_Color() {
     ImGui::BeginDisabled(!doc_.mesh.hasColors() && !paintsTexture(doc_.mesh));
     if (ImGui::Button(tr("Clear"), ImVec2(half, 0))) runCommand("paint_clear");
     ImGui::EndDisabled();
-    ui::HelpText("Clear", nullptr, "Remove all polypaint from the SubTool, paint layers included (undoable).", "Color");
-    ImGui::Checkbox(tr("Show polypaint"), &renderSettings_.showPolypaint);
+    ui::HelpText("Clear", nullptr, "Remove all vertex paint from the Part, paint layers included (undoable).", "Color");
+    ImGui::Checkbox(tr("Show vertex paint"), &renderSettings_.showPolypaint);
     if (hasTexture(doc_.mesh)) {
         ImGui::SameLine();
         ImGui::Checkbox(tr("Texture##show"), &renderSettings_.showTexture);
@@ -440,11 +440,11 @@ void App::drawPalette_Color() {
 // SubTool's own).
 void App::drawPalette_Material() {
     sf::drawMaterialGrid(*this, GridMode::Palette); // Pickers.cpp, as in the material picker (M)
-    if (ImGui::Button(tr("Load MatCap..."), ImVec2(-1, 0))) loadMatcapDialog();
-    ui::HelpText("Load MatCap", nullptr,
-                 "Use a MatCap image of your own: a lit sphere filling a square PNG, JPG or EXR. It joins the list "
+    if (ImGui::Button(tr("Load Lit Sphere..."), ImVec2(-1, 0))) loadMatcapDialog();
+    ui::HelpText("Load Lit Sphere", nullptr,
+                 "Use a Lit Sphere image of your own: a lit sphere filling a square PNG, JPG or EXR. It joins the list "
                  "and is kept in Documents/SculptForge/MatCaps; images you put in that folder show up when a material list "
-                 "opens. Right-click one of your MatCaps to remove it.",
+                 "opens. Right-click one of your Lit Spheres to remove it.",
                  "Material");
     ImGui::ColorEdit3(tr("Base colour"), &renderSettings_.baseColor.x, ImGuiColorEditFlags_NoInputs);
     ui::HelpText("Base colour", nullptr, "Colour of the Studio material (the clay colour).", "Material");
@@ -515,7 +515,7 @@ void App::drawViewportShadingControls() {
 void App::drawShadingControls() {
     ImGui::TextDisabled("%s", tr("Shading"));
     ui::Segmented(*this, {"material.smooth", "material.flat"});
-    ImGui::TextDisabled("%s", tr("This SubTool"));
+    ImGui::TextDisabled("%s", tr("This Part"));
     ui::Segmented(*this, {"subtool.shading_default", "subtool.shading_smooth", "subtool.shading_flat"});
 }
 

@@ -105,6 +105,47 @@ bool computeAutoUv(const std::vector<glm::vec3>& positions, const std::vector<gl
     return true;
 }
 
+bool computeAutoCharts(const std::vector<glm::vec3>& positions, const std::vector<glm::uvec3>& triangles,
+                       std::vector<uint32_t>& chartOfTriangle, int& charts, std::string& error) {
+    chartOfTriangle.assign(triangles.size(), 0);
+    charts = 0;
+    if (positions.empty() || triangles.empty()) {
+        error = "There is no mesh to cut into charts";
+        return false;
+    }
+    std::unique_ptr<xatlas::Atlas, void (*)(xatlas::Atlas*)> atlas(xatlas::Create(), xatlas::Destroy);
+    xatlas::MeshDecl decl;
+    decl.vertexPositionData = positions.data();
+    decl.vertexPositionStride = sizeof(glm::vec3);
+    decl.vertexCount = uint32_t(positions.size());
+    decl.indexData = triangles.data();
+    decl.indexCount = uint32_t(triangles.size() * 3);
+    decl.indexFormat = xatlas::IndexFormat::UInt32;
+    if (xatlas::AddMesh(atlas.get(), decl, 1) != xatlas::AddMeshError::Success) {
+        error = "Couldn't cut the piece into charts";
+        return false;
+    }
+    xatlas::AddMeshJoin(atlas.get());
+    xatlas::ChartOptions options;
+    xatlas::PackOptions pack;
+    pack.resolution = 256; // (only the charts matter)
+    pack.padding = 0;
+    pack.blockAlign = true;
+    xatlas::Generate(atlas.get(), options, pack);
+    if (atlas->meshCount != 1) {
+        error = "Couldn't cut the piece into charts";
+        return false;
+    }
+    const xatlas::Mesh& m = atlas->meshes[0];
+    for (uint32_t c = 0; c < m.chartCount; ++c)
+        for (uint32_t k = 0; k < m.chartArray[c].faceCount; ++k) {
+            const uint32_t f = m.chartArray[c].faceArray[k];
+            if (f < chartOfTriangle.size()) chartOfTriangle[f] = c;
+        }
+    charts = int(m.chartCount);
+    return true;
+}
+
 bool computeAutoUv(const Mesh& mesh, AutoUvResult& out, std::string& error, const AutoUvProgress& progress) {
     const int res = mesh.texture ? std::max(mesh.texture->width, mesh.texture->height) : kDefaultTextureSize;
     return computeAutoUv(mesh.positions, mesh.triangles, res, out, error, progress);

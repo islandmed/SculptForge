@@ -19,7 +19,7 @@ Blender GoZ add-on by Daniel Grauer, JoseConseco and contributors; no GoB code i
 - **No sockets**: nothing to configure, nothing listening, works in sandboxes that allow files, and a crash on one
   side leaves the other unaffected. Polling is a `stat` of one file a second.
 - **.GoZ** (docs/goz.md) already carries everything both sides keep per mesh: positions, triangles and quads,
-  per-corner UVs, per-vertex polypaint and mask, per-face polygroups. SculptForge reads and writes it, and it is
+  per-corner UVs, per-vertex vertex paint and mask, per-face face groups. SculptForge reads and writes it, and it is
   simple to write from Python with numpy. A second mesh format was not needed.
 
 ## The folder
@@ -62,7 +62,7 @@ Windows).
   it loaded last (not "greater": a deleted folder restarts at 1). It reads the revision once a
   second rather than trusting file times (Windows copies keep them; FAT and network drives store them coarsely).
 - `name` is the exact Blender object name (UTF-8); the .GoZ's own name is GoB's ASCII escape of it. In SculptForge
-  it is the SubTool's `gozName` (shared with GoZ; saved in projects), so the next send updates the same object.
+  it is the Part's `gozName` (shared with GoZ; saved in projects), so the next send updates the same object.
 - `file` must be a plain file name in the same folder (`..`, `/`, `\` and `:` are refused).
 - `matrix_world` (Blender -> SculptForge only): the object's matrix, rows as Blender prints them, Z-up. The .GoZ
   holds the mesh in object space. SculptForge places it with `A * M * A^-1` where `A` maps Blender
@@ -97,9 +97,9 @@ quads, reversed back for a mirrored object.
 | Blender | GoZ / SculptForge |
 |---|---|
 | active UV map (per loop) | UVs per face corner (V flipped in the file, as GoB does) |
-| active colour attribute, point or corner domain (`color_srgb`) | polypaint (sRGB bytes; corner colours are averaged per vertex) |
+| active colour attribute, point or corner domain (`color_srgb`) | vertex paint (sRGB bytes; corner colours are averaged per vertex) |
 | `.sculpt_mask` (float, point) | mask (1 = masked). A send without a mask section removes `.sculpt_mask` |
-| `.sculpt_face_set` (int, face) | polygroup = face set - 1 (16-bit, renumbered if out of range) |
+| `.sculpt_face_set` (int, face) | face group = face set - 1 (16-bit, renumbered if out of range) |
 
 ## Starting SculptForge
 
