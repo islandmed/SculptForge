@@ -279,8 +279,10 @@ void UploadOrder::dirtyRuns(const Mesh& mesh, std::vector<std::pair<uint32_t, ui
         if (mesh.dirtyBlocks[b])
             for (size_t w = b * kWordsPerBlock; w < (b + 1) * kWordsPerBlock && w < mesh.dirtyBits.size(); ++w)
                 dirty += size_t(std::popcount(mesh.dirtyBits[w]));
-    if (dirty * 4 > nv || mesh.dirtyBits.size() * 64 < nv) {
-        out.emplace_back(0, ns); // a good part of the mesh (or no per-vertex marks): everything, in one go
+    if (dirty * 4 > nv * 3 || mesh.dirtyBits.size() * 64 < nv) {
+        // Most of the mesh (or no per-vertex marks): everything, in one go. (Above a quarter, as before, a large
+        // brush at 21M triangles re-packed the two thirds it hadn't touched every frame: 78 ms against 14-30.)
+        out.emplace_back(0, ns);
         return;
     }
     auto mark = [&](uint32_t slot) {

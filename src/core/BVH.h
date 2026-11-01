@@ -29,8 +29,9 @@ public:
     void queryVertices(const Mesh& mesh, const glm::vec3& center, float radius, std::vector<uint32_t>& out) const;
     // Appends every triangle whose bounds touch the sphere (cleared first; hidden ones included).
     void queryTriangles(const Mesh& mesh, const glm::vec3& center, float radius, std::vector<uint32_t>& out) const;
-    // Updates bounds after the given vertices moved. Bounds only ever grow
-    // conservatively for ancestors, which keeps queries correct.
+    // Updates bounds after the given vertices moved. A few leaves grow their ancestors' bounds (conservatively,
+    // which keeps queries correct); many leaves (a big brush) recompute their ancestors from their children, in
+    // parallel.
     void refit(const Mesh& mesh, std::span<const uint32_t> movedVerts);
     // refit() after only vertices the last queryVertices() returned moved (brush dabs): the query already
     // found the leaves holding them, so this skips looking them up.
@@ -83,6 +84,7 @@ private:
     size_t unusedEntries_ = 0, editsSinceBuild_ = 0;
     static constexpr uint32_t kNoLeaf = ~0u;
     void editLeaf(uint32_t leaf);
+    void refitAncestors(std::span<const uint32_t> leaves); // refitLeaves for many leaves, in parallel
     void splitLeaf(const Mesh& mesh, uint32_t leaf);
 
     mutable IndexBits vertBits_;               // queryVertices: the vertices found so far
@@ -90,6 +92,7 @@ private:
     mutable std::vector<uint32_t> queryTasks_, queryNext_;
     mutable std::vector<std::vector<uint32_t>> queryParts_;
     IndexBits leafBits_; // refit: the leaves to recompute
+    std::vector<uint8_t> nodeDirty_; // refitAncestors: the inner nodes to recompute (all 0 between calls)
     std::vector<uint32_t> scratchLeaves_;
     mutable std::vector<uint32_t> stack_;
 };

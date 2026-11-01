@@ -141,6 +141,17 @@ private:
     float residual_ = 0.0f;
 };
 
+// How many dabs may wait to be placed before the queue is thinned: about `backlogSeconds` of work at what a dab
+// costs now (dabSeconds, 0 = not measured yet), never fewer than `minDabs`; `fixed` >= 0 is a fixed limit
+// instead (SF_STROKE_BACKLOG). A light mesh keeps hundreds of dabs (a fast small brush keeps its spacing); a heavy
+// one only a few, so the brush stays near the pointer and releasing doesn't place a second of waiting dabs.
+inline size_t strokeBacklogLimit(double dabSeconds, long fixed = -1, double backlogSeconds = 0.05, size_t minDabs = 4) {
+    if (fixed >= 0) return size_t(fixed);
+    size_t limit = minDabs;
+    if (dabSeconds > 0.0) limit = std::max(limit, size_t(std::min(backlogSeconds / dabSeconds, 1e6)));
+    return limit;
+}
+
 // Dabs waiting to be placed.
 class DabQueue {
 public:

@@ -580,6 +580,7 @@ constexpr int kCaretTickMs = 530;      // a text field has the keyboard: redraw 
 constexpr double kAfterChangeSeconds = 0.25; // a poller changed something: draw for this long
 constexpr double kStrokeBudgetSeconds = 0.010; // a frame's share of placing a stroke's dabs; the rest waits for the next
 constexpr double kStrokeBacklogSeconds = 0.05; // queued dabs beyond this much work are thinned (strokeTo)
+constexpr size_t kStrokeBacklogMinDabs = 4;    // ... but never fewer dabs than this waiting
 
 } // namespace
 
@@ -1127,7 +1128,9 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     drag_ = Drag::Stroke;
     playingLayer_ = -1;
     if (strokeType_ == StrokeType::DragRect || strokeType_ == StrokeType::DragDot) doc_.sculptor.holdTopology(); // (they re-stamp)
-    clearLods();
+    // (Only when there are LODs: clearing forgets which mesh was shown, so the next frame sent the whole mesh
+    // again, 0.3 s at 21M triangles before the first dab showed.)
+    if (!lods_.empty() || previewLod_ >= 0) clearLods();
     beginPaintStroke();
     if (doc_.sculptor.dyntopo.enabled && strokeSculpt_ && !dyntopoBlocker(doc_.mesh).empty())
         status_ = "Dynamic is on, but this SubTool has subdivision levels: sculpting without remeshing";
@@ -1240,17 +1243,15 @@ void App::strokeTo(float x, float y) {
     if (interactiveStrokes_) {
         // Too far behind the pointer: place every second waiting dab only (a wider spacing under load). The limit
         // is in time, not dabs: what the last dabs cost says how many are kStrokeBacklogSeconds of work, and never
-        // fewer than 24. A light mesh places hundreds of dabs a frame, so a small brush moved fast keeps its spacing
-        // (several input samples arrive before each frame). SF_STROKE_BACKLOG=0 never drops dabs; a number is a
-        // fixed limit in dabs.
+        // fewer than kStrokeBacklogMinDabs. A light mesh places hundreds of dabs a frame, so a small brush moved
+        // fast keeps its spacing (several input samples arrive before each frame); on a heavy mesh the brush stays
+        // near the pointer (a floor of 24 dabs was a second of work behind it at 21M triangles, and releasing
+        // placed all of them). SF_STROKE_BACKLOG=0 never drops dabs; a number is a fixed limit in dabs.
         static const long fixedLimit = [] {
             const char* env = std::getenv("SF_STROKE_BACKLOG");
             return env && *env ? std::max(0L, std::strtol(env, nullptr, 10)) : -1L;
         }();
-        size_t limit = fixedLimit >= 0 ? size_t(fixedLimit) : size_t(24);
-        if (fixedLimit < 0 && dabSeconds_ > 0.0)
-            limit = std::max(limit, size_t(std::min(kStrokeBacklogSeconds / dabSeconds_, 1e6)));
-        dabQueue_.thin(limit);
+        dabQueue_.thin(strokeBacklogLimit(dabSeconds_, fixedLimit, kStrokeBacklogSeconds, kStrokeBacklogMinDabs));
     } else {
         drainStrokeDabs(0.0); // scripts, UI tests and recordings place every dab at once, as before
     }

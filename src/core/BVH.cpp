@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/BVH.h"
 
+#include "core/AtomicRef.h"
 #include "core/ThreadPool.h"
 
 #include <algorithm>
@@ -13,6 +14,7 @@ namespace sf {
 namespace {
 
 constexpr uint32_t kLeafSize = 16;
+constexpr size_t kParallelRefitLeaves = 4096; // fewer: the serial walk up is cheaper than waking threads
 
 bool rayBox(const AABB& b, const glm::vec3& o, const glm::vec3& invDir, float tMax) {
     glm::vec3 t0 = (b.min - o) * invDir;
@@ -365,6 +367,10 @@ void BVH::refitLeaves(const Mesh& mesh, std::span<const uint32_t> leaves) {
     poolFor(leaves.size(), [&](size_t b, size_t e) {
         for (size_t i = b; i < e; ++i) nodes_[leaves[i]].box = leafBox(mesh, nodes_[leaves[i]]);
     }, 512);
+    if (leaves.size() >= kParallelRefitLeaves) {
+        refitAncestors(leaves);
+        return;
+    }
     // Grow ancestors until one already contains the new bounds (a union, so the order doesn't matter).
     for (uint32_t li : leaves) {
         AABB box = nodes_[li].box;
@@ -378,6 +384,75 @@ void BVH::refitLeaves(const Mesh& mesh, std::span<const uint32_t> leaves) {
             box = pb;
         }
     }
+}
+
+// A big brush refits hundreds of thousands of leaves, and walking each one's ancestors on one thread cost more
+// than the leaves themselves (13 ms a dab at 21M triangles). Here the ancestors are flagged in parallel (each once:
+// the thread that flags a node first goes on up, the others stop there), then recomputed from their children:
+// bottom-up within subtrees taken in parallel, then the few nodes above those subtrees. Every box is the union
+// of its children's (tighter than growing the old one), so the result doesn't depend on the thread count.
+void BVH::refitAncestors(std::span<const uint32_t> leaves) {
+    if (nodeDirty_.size() < nodes_.size()) nodeDirty_.resize(nodes_.size(), 0); // (all 0 between calls)
+    poolFor(leaves.size(), [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i)
+            for (uint32_t ni = leaves[i]; ni != 0;) {
+                ni = nodes_[ni].parent;
+                if (AtomicRef<uint8_t>(nodeDirty_[ni]).exchange(1, std::memory_order_relaxed)) break;
+            }
+    }, 1024);
+    auto inner = [&](uint32_t ni) { return nodes_[ni].count == 0 && nodes_[ni].first != kNoLeaf; };
+    auto dirtyInner = [&](uint32_t ni) { return inner(ni) && nodeDirty_[ni]; };
+    auto recompute = [&](uint32_t ni) {
+        Node& n = nodes_[ni];
+        AABB box = nodes_[n.first].box;
+        box.expand(nodes_[n.first + 1].box);
+        n.box = box;
+        nodeDirty_[ni] = 0;
+    };
+    // The subtrees: dirty nodes split breadth first until there are enough; the split ones are done last.
+    constexpr size_t kTasks = 128;
+    std::vector<uint32_t>& tasks = queryTasks_;
+    std::vector<uint32_t>& next = queryNext_;
+    std::vector<uint32_t> aboveNodes;
+    tasks.clear();
+    if (dirtyInner(0)) tasks.push_back(0);
+    for (bool split = true; split && tasks.size() < kTasks;) {
+        split = false;
+        next.clear();
+        for (uint32_t ni : tasks) {
+            const uint32_t c = nodes_[ni].first;
+            if (!dirtyInner(c) && !dirtyInner(c + 1)) {
+                next.push_back(ni);
+                continue;
+            }
+            split = true;
+            aboveNodes.push_back(ni);
+            for (uint32_t k : {c, c + 1})
+                if (dirtyInner(k)) next.push_back(k);
+        }
+        tasks.swap(next);
+    }
+    // Each subtree post-order: a node once both its dirty children are done.
+    poolFor(tasks.size(), [&](size_t b, size_t e) {
+        std::vector<std::pair<uint32_t, bool>> stack;
+        for (size_t t = b; t < e; ++t) {
+            stack.assign(1, {tasks[t], false});
+            while (!stack.empty()) {
+                auto [ni, childrenDone] = stack.back();
+                stack.pop_back();
+                if (childrenDone) {
+                    recompute(ni);
+                    continue;
+                }
+                stack.push_back({ni, true});
+                const uint32_t c = nodes_[ni].first;
+                for (uint32_t k : {c, c + 1})
+                    if (dirtyInner(k)) stack.push_back({k, false});
+            }
+        }
+    }, 1, 2);
+    // Then the nodes above them, deepest first (they were split in breadth-first order).
+    for (auto it = aboveNodes.rbegin(); it != aboveNodes.rend(); ++it) recompute(*it);
 }
 
 void BVH::editLeaf(uint32_t leaf) {
@@ -528,7 +603,7 @@ bool BVH::degraded() const {
 size_t BVH::memoryBytes() const {
     auto bytes = [](const auto& v) { return v.capacity() * sizeof(v[0]); };
     return bytes(nodes_) + bytes(triIndices_) + bytes(triLeaf_) + bytes(leafCap_) + bytes(editedLeaves_) + bytes(leafEdited_) + vertBits_.memoryBytes() + leafBits_.memoryBytes() +
-           bytes(queryLeaves_) + bytes(scratchLeaves_) + bytes(stack_);
+           bytes(queryLeaves_) + bytes(scratchLeaves_) + bytes(stack_) + bytes(nodeDirty_);
 }
 
 void BVH::refitAll(const Mesh& mesh) {

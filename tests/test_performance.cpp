@@ -298,6 +298,42 @@ TEST(index_bits_list_members_in_order) {
     CHECK(std::is_sorted(a.begin(), a.end()));
 }
 
+TEST(bvh_refit_of_many_leaves_in_parallel) {
+    // A big brush refits so many leaves that their ancestors are recomputed in parallel (BVH::refitAncestors):
+    // the tree then finds exactly what brute force does, the same on one thread, and after the vertices move
+    // back (the boxes shrink) as well.
+    Document d = sphereDoc(7);
+    const std::vector<glm::vec3> start = d.mesh.positions;
+    std::vector<uint32_t> moved;
+    const glm::vec3 c(0.0f, 0.0f, 1.0f);
+    d.bvh.queryVertices(d.mesh, c, 1.3f, moved);
+    CHECK(d.bvh.queriedLeaves().size() > 4096); // (the parallel path)
+    auto check = [&](BVH& bvh) {
+        std::vector<uint32_t> found;
+        bool ok = true;
+        for (int i = 0; i < 24; ++i) {
+            const glm::vec3 q = glm::normalize(glm::vec3(std::sin(float(i)), std::cos(float(i) * 1.3f), 0.7f)) * 1.05f;
+            bvh.queryVertices(d.mesh, q, 0.12f, found);
+            size_t brute = 0;
+            for (const glm::vec3& p : d.mesh.positions) brute += glm::distance(p, q) <= 0.12f;
+            RayHit h;
+            const bool hit = bvh.raycast(d.mesh, q * 3.0f, -q, h);
+            ok = ok && found.size() == brute && hit;
+        }
+        return ok;
+    };
+    for (uint32_t v : moved) d.mesh.positions[v] *= 1.0f + 0.15f * (1.0f + std::sin(float(v) * 0.01f));
+    BVH serialTree = d.bvh;
+    d.bvh.refitQueried(d.mesh);
+    serially([&] { serialTree.refit(d.mesh, moved); });
+    CHECK(check(d.bvh));
+    CHECK(check(serialTree));
+    // Back where they were: the boxes shrink.
+    d.mesh.positions = start;
+    d.bvh.refit(d.mesh, moved);
+    CHECK(check(d.bvh));
+}
+
 TEST(bvh_query_lists_inside_vertices_in_order) {
     Document d = sphereDoc(7);
     std::vector<uint32_t> found, brute;

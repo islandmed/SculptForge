@@ -180,3 +180,21 @@ TEST(dab_queue_under_the_limit_is_untouched) {
     one.push({1.0f, 1.0f, 1.0f});
     CHECK(one.thin(1) == 0 && one.size() == 1);
 }
+
+TEST(stroke_backlog_keeps_a_heavy_brush_near_the_pointer) {
+    // About 50 ms of dabs may wait: a 45 ms dab on a 21M-triangle mesh keeps the floor of 4 (0.9.6 kept 24, a
+    // second behind the pointer), a cheap dab keeps hundreds so a fast small brush keeps its spacing.
+    CHECK(strokeBacklogLimit(0.045) == 4);
+    CHECK(strokeBacklogLimit(0.0001) == 500);
+    CHECK(strokeBacklogLimit(0.0) == 4);        // not measured yet
+    CHECK(strokeBacklogLimit(0.045, 0) == 0);   // SF_STROKE_BACKLOG=0: never thinned
+    CHECK(strokeBacklogLimit(0.0001, 10) == 10); // a fixed limit
+    // Thinned to the limit, the newest dab stays.
+    DabQueue q;
+    for (int i = 0; i < 30; ++i) q.push(PathDab{float(i), 0.0f, 1.0f});
+    q.thin(strokeBacklogLimit(0.045));
+    CHECK(q.size() <= 4 && !q.empty());
+    PathDab last{};
+    while (!q.empty()) last = q.pop();
+    CHECK(last.x == 29.0f);
+}
