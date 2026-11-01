@@ -18,6 +18,7 @@
 #include "core/FrameGovernor.h"
 #include "core/HardwareProfile.h"
 #include "core/ThreadPool.h"
+#include "core/TierConfig.h"
 
 #include <SDL3/SDL.h>
 
@@ -48,6 +49,9 @@ struct HwProfileUi {
     std::deque<Pending> pending;   // frames waiting for their GPU time
     uint64_t revision = 0;         // performanceSettingsRevision() when last applied
     int displayHz = 0;
+    PowerSource power = PowerSource::Unknown;
+    double nextPowerCheck = 0.0;   // seconds (SDL ticks)
+    TierConfig tier;               // what currentTierConfig() holds
     double lastCpuMs = 0.0, lastGpuMs = -1.0;
     bool overridesOpen = false;
 };
@@ -75,6 +79,17 @@ bool calibrationDisabled() {
     return v && *v && *v != '0';
 }
 
+// Battery or mains (SDL_GetPowerInfo): a laptop on battery drops to draft brushes and 60 Hz (core/TierConfig.h).
+PowerSource powerSource() {
+    switch (SDL_GetPowerInfo(nullptr, nullptr)) {
+    case SDL_POWERSTATE_ON_BATTERY: return PowerSource::Battery;
+    case SDL_POWERSTATE_NO_BATTERY:
+    case SDL_POWERSTATE_CHARGING:
+    case SDL_POWERSTATE_CHARGED: return PowerSource::AC;
+    default: return PowerSource::Unknown;
+    }
+}
+
 int displayRefreshHz(SDL_Window* window) {
     if (!window) return 0;
     const SDL_DisplayID display = SDL_GetDisplayForWindow(window);
@@ -94,11 +109,13 @@ void App::initHardwareProfile() {
     hwProfile_ = std::make_shared<HwProfileUi>();
     HwProfileUi& hw = *hwProfile_;
     hw.displayHz = displayRefreshHz(window_);
+    hw.power = powerSource();
     // The calibrate command (console, MCP) measures the GPU too while the app runs.
     setGpuCalibrator([this](HardwareProfile& out, std::string&) {
         HardwareProfile cached;
         const ProfileOverrides keep = loadHardwareProfile(hardwareProfilePath(), cached) ? cached.overrides : hwProfile_->profile.overrides;
-        out = calibrateNow(false, keep);
+        const bool same = cached.hardware.glRenderer == hwProfile_->profile.hardware.glRenderer;
+        out = calibrateNow(false, keep, same ? &cached.measuredTier : nullptr);
         std::string error;
         saveHardwareProfile(hardwareProfilePath(), out, error);
         // Applied on the next frame (the command saved it; the revision check reloads it).
@@ -138,8 +155,12 @@ void App::applyHardwareProfile(const HardwareProfile& p, bool announce) {
     HwProfileUi& hw = *hwProfile_;
     hw.profile = p;
     hw.active = true;
+    // The tier's knobs for this power source and display; its target Hz is the governor's (60 / 120 / 144).
+    hw.tier = tierConfigFor(p, hw.power, hw.displayHz);
+    setCurrentTierConfig(hw.tier);
     PerformanceSettings s = p.settings;
-    if (!p.overrides.targetFps) s.targetFps = hw.displayHz >= 119 ? 120 : 60; // 120 where the display can show it
+    s.targetFps = hw.tier.targetHz;
+    s.uploadBudgetMBPerFrame = hw.tier.uploadBudgetMBPerFrame;
     hw.profile.settings.targetFps = s.targetFps;
     setCurrentPerformanceSettings(s);
     GovernorConfig cfg;
@@ -160,7 +181,8 @@ void App::finishCalibration() {
     HwProfileUi& hw = *hwProfile_;
     HardwareProfile cached;
     const ProfileOverrides keep = loadHardwareProfile(hardwareProfilePath(), cached) ? cached.overrides : hw.profile.overrides;
-    const HardwareProfile p = hw.calibrator->profile(keep);
+    const bool same = !cached.hardware.glRenderer.empty() && cached.hardware.glRenderer == hw.profile.hardware.glRenderer;
+    const HardwareProfile p = hw.calibrator->profile(keep, same ? &cached.measuredTier : nullptr);
     hw.calibrator.reset();
     std::string error;
     hw.saved = saveHardwareProfile(hardwareProfilePath(), p, error);
@@ -225,12 +247,22 @@ void App::hardwareProfileFrameEnd() {
     }
     if (changed && hw.profile.overrides.governor && !hw.profile.overrides.motionProxyThreshold)
         setGovernedBudgets(hw.governor.budget(), hw.governor.proxyThreshold());
-    // The display may change (the window moved to a 120 Hz screen): follow it.
-    if (frame % 600 == 0) {
+    // The display (the window moved to a 120 Hz screen) or the power source (unplugged) may change: every few
+    // seconds, look; a change re-applies the profile with the new tier configuration.
+    if (const double t = double(SDL_GetTicksNS()) * 1e-9; t >= hw.nextPowerCheck) {
+        hw.nextPowerCheck = t + 5.0;
         const int hz = displayRefreshHz(window_);
-        if (hz != hw.displayHz) {
+        const PowerSource power = powerSource();
+        if (hz != hw.displayHz || power != hw.power) {
+            const bool battery = power == PowerSource::Battery, wasBattery = hw.power == PowerSource::Battery;
             hw.displayHz = hz;
-            if (!hw.profile.overrides.targetFps) hw.governor.setTargetFps(hz >= 119 ? 120 : 60);
+            hw.power = power;
+            const HardwareProfile p = hw.profile;
+            applyHardwareProfile(p, false);
+            if (battery != wasBattery)
+                status_ = battery ? "On battery: draft brushes (normals and cavity at pen release), " + std::to_string(hw.tier.targetHz) + " Hz"
+                                  : "On mains power: " + std::string(hw.tier.draftBrushMode ? "draft" : "continuous") + " brushes, " +
+                                        std::to_string(hw.tier.targetHz) + " Hz";
         }
     }
     // The set_performance_override or calibrate command changed the profile: take it up.
@@ -372,6 +404,11 @@ void App::drawPerformanceProfileSection() {
                       "\n" + std::to_string(s.threads) + " threads" +
                       (s.threads != ThreadPool::shared().threads() ? " (after a restart; now " + std::to_string(ThreadPool::shared().threads()) + ")" : std::string()) +
                       ", target " + std::to_string(s.targetFps) + " fps";
+    const TierConfig& tc = hw.tier;
+    set += "\n" + std::string(tc.draftBrushMode ? "Draft brushes (normals and cavity at pen release)" : "Continuous brushes") +
+           ", active " + formatTriangles(tc.activeTriangleBudget) + " triangles, cache up to " + formatMegabytes(tc.residentCacheCapMB) +
+           (tc.zeroCopyUMA ? ", zero-copy (shared memory)" : "") +
+           (tc.onBattery() ? "\nOn battery" : tc.power == PowerSource::AC ? "\nOn mains power" : "");
     ImGui::TextWrapped("%s", set.c_str());
     ImGui::LogText("%s", set.c_str());
 
@@ -394,12 +431,12 @@ void App::drawPerformanceProfileSection() {
     if (ImGui::TreeNode("Manual overrides")) {
         ProfileOverrides o = p.overrides;
         bool edited = false;
-        const char* tiers[] = {"Automatic", "Software (safe mode)", "Laptop", "Workstation", "Monster"};
+        const char* tiers[] = {"Tier: automatic", "Software (safe mode)", "Laptop / Budget", "Workstation"};
         int tierIndex = 0;
         ProfileTier forced;
         if (!o.tier.empty() && tierFromName(o.tier, forced)) tierIndex = int(forced) + 1;
         ImGui::SetNextItemWidth(-1.0f);
-        if (ImGui::Combo("##perf.tier", &tierIndex, tiers, 5)) {
+        if (ImGui::Combo("##perf.tier", &tierIndex, tiers, 4)) {
             o.tier = tierIndex == 0 ? std::string() : std::string(tierName(ProfileTier(tierIndex - 1)));
             edited = true;
         }
@@ -427,6 +464,9 @@ void App::drawPerformanceProfileSection() {
             number("Threads (next start)", threads, uint64_t(p.automatic.threads), 1.0, "");
             o.threads = int(threads);
         }
+        const char* draftNames[] = {"Draft brushes: automatic", "Draft brushes: always", "Draft brushes: never"};
+        ImGui::SetNextItemWidth(-1.0f);
+        if (ImGui::Combo("##perf.draft", &o.draftBrush, draftNames, 3)) edited = true;
         const char* fpsNames[] = {"Target: automatic", "30 fps", "60 fps", "120 fps", "144 fps"};
         const int fpsValues[] = {0, 30, 60, 120, 144};
         int fpsIndex = 0;

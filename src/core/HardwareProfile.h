@@ -5,7 +5,10 @@
 //
 // What the computer is (HardwareInfo: the GPU's OpenGL strings and memory, system RAM, CPU threads, SIMD, OS)
 // and how fast it measured (Calibration: triangle throughput, buffer upload bandwidth, brush dab cost, memory
-// bandwidth) map to a profile tier (Software / Laptop / Workstation / Monster) with concrete settings
+// bandwidth) map to a profile tier with concrete settings. Two main tiers: Laptop / Budget (8-16 GB RAM, a 2-4 GB
+// GPU or Apple Silicon's unified memory, thermal and battery limits) and Workstation (64 GB+ RAM and a 16 GB+
+// discrete GPU that measures fast), plus a Software safe mode for llvmpipe and friends. core/TierConfig.h turns the
+// profile, the power source and the display into the knobs the renderer and brushes read. Settings:
 // (PerformanceSettings: render triangle budget, motion proxy threshold, VRAM budget, ...). The mapping uses
 // the measurements and memory sizes, never GPU names: names only tell unified from discrete memory and spot a
 // software renderer (llvmpipe and friends).
@@ -33,8 +36,9 @@ enum class GpuKind { Unknown, Discrete, Integrated, Unified, Software };
 const char* gpuKindName(GpuKind kind); // "discrete", "integrated", "unified", "software", "unknown"
 GpuKind gpuKindFromName(const std::string& name);
 
-enum class ProfileTier { Software, Laptop, Workstation, Monster };
-const char* tierName(ProfileTier tier); // "Software", "Laptop", "Workstation", "Monster"
+enum class ProfileTier { Software, Laptop, Workstation };
+const char* tierName(ProfileTier tier); // "Software", "Laptop", "Workstation"
+// Also accepts "llvmpipe" / "safe" (Software), "budget" (Laptop) and "monster" (Workstation), in any case.
 bool tierFromName(const std::string& name, ProfileTier& out);
 
 // What the computer is. GPU fields stay empty / 0 where no OpenGL context was probed (sculptforge-cli).
@@ -108,6 +112,7 @@ struct ProfileOverrides {
     int threads = 0;
     int targetFps = 0;
     bool governor = true;                 // the adaptive frame governor (off: the budgets stay as set)
+    int draftBrush = 0;                   // TierConfig::draftBrushMode: 0 automatic, 1 always, 2 never
     bool any() const;
 };
 
@@ -150,7 +155,10 @@ std::string recalibrationReason(const HardwareProfile* cached, const HardwareInf
 
 // --- JSON output (sculptforge --calibrate, the calibrate / performance_profile commands) ---
 constexpr const char* kCalibrationSchema = "sculptforge.calibration/1";
-Json calibrationJson(const HardwareProfile& profile);
+// `tier`: the tier configuration to report (core/TierConfig.h); default: the profile's on an unknown power source
+// and display.
+struct TierConfig;
+Json calibrationJson(const HardwareProfile& profile, const TierConfig* tier = nullptr);
 // Checks `j` has every field of kCalibrationSchema with the right types; `error` names the first problem.
 bool validateCalibrationJson(const Json& j, std::string& error);
 

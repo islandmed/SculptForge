@@ -33,7 +33,8 @@ public:
     // Marks calibration skipped: the profile is mapped from the probe alone.
     void skip();
     // The result (valid once done()), mapped with `overrides`.
-    HardwareProfile profile(const ProfileOverrides& overrides = {}) const;
+    // `previous`: the tier of the same GPU's last calibration (kept when the measurement is close to a boundary).
+    HardwareProfile profile(const ProfileOverrides& overrides = {}, const ProfileTier* previous = nullptr) const;
 
 private:
     static constexpr int kStages = 5; // probe, triangles, upload, memory, dab
@@ -67,7 +68,7 @@ private:
 void applyCachedThreadCount();
 
 // Calibrates now, blocking (about 2-3 s; quick: about 1 s). Needs a current OpenGL context.
-HardwareProfile calibrateNow(bool quick, const ProfileOverrides& overrides);
+HardwareProfile calibrateNow(bool quick, const ProfileOverrides& overrides, const ProfileTier* previous = nullptr);
 
 // sculptforge --calibrate [--calibrate-quick] [--calibrate-no-save]: a hidden window and context, calibrate, print
 // the JSON (schema sculptforge.calibration/1) to stdout, save it as the cached profile. Returns the exit code.

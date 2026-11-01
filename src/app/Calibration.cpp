@@ -3,6 +3,7 @@
 #include "app/Calibration.h"
 
 #include "core/ThreadPool.h"
+#include "core/TierConfig.h"
 #include "render/GL.h"
 
 #include <SDL3/SDL.h>
@@ -562,7 +563,9 @@ void Calibrator::skip() {
     stage_ = kStages;
 }
 
-HardwareProfile Calibrator::profile(const ProfileOverrides& overrides) const { return mapProfile(hw_, cal_, overrides); }
+HardwareProfile Calibrator::profile(const ProfileOverrides& overrides, const ProfileTier* previous) const {
+    return mapProfile(hw_, cal_, overrides, previous);
+}
 
 void applyCachedThreadCount() {
     HardwareProfile cached;
@@ -570,10 +573,10 @@ void applyCachedThreadCount() {
         ThreadPool::setSharedThreadCount(cached.settings.threads);
 }
 
-HardwareProfile calibrateNow(bool quick, const ProfileOverrides& overrides) {
+HardwareProfile calibrateNow(bool quick, const ProfileOverrides& overrides, const ProfileTier* previous) {
     Calibrator c(quick);
     while (c.step()) {}
-    return c.profile(overrides);
+    return c.profile(overrides, previous); // the same GPU as last time: its tier holds near a boundary
 }
 
 int runCalibrateCommandLine(bool quick, bool save) {
@@ -603,8 +606,22 @@ int runCalibrateCommandLine(bool quick, bool save) {
         HardwareProfile cached;
         const std::string path = hardwareProfilePath();
         const bool hadCache = loadHardwareProfile(path, cached);
-        const HardwareProfile p = calibrateNow(quick, hadCache ? cached.overrides : ProfileOverrides{});
-        const Json j = calibrationJson(p);
+        HardwareInfo now;
+        probeHardware(now);
+        const bool sameGpu = hadCache && cached.hardware.glRenderer == now.glRenderer && cached.hardware.glVendor == now.glVendor;
+        const HardwareProfile p = calibrateNow(quick, hadCache ? cached.overrides : ProfileOverrides{}, sameGpu ? &cached.measuredTier : nullptr);
+        // The tier configuration for this power source and the primary display.
+        PowerSource power = PowerSource::Unknown;
+        switch (SDL_GetPowerInfo(nullptr, nullptr)) {
+        case SDL_POWERSTATE_ON_BATTERY: power = PowerSource::Battery; break;
+        case SDL_POWERSTATE_NO_BATTERY:
+        case SDL_POWERSTATE_CHARGING:
+        case SDL_POWERSTATE_CHARGED: power = PowerSource::AC; break;
+        default: break;
+        }
+        const SDL_DisplayMode* mode = SDL_GetCurrentDisplayMode(SDL_GetPrimaryDisplay());
+        const TierConfig tier = tierConfigFor(p, power, mode ? int(mode->refresh_rate + 0.5f) : 0);
+        const Json j = calibrationJson(p, &tier);
         std::string error;
         if (!validateCalibrationJson(j, error)) {
             std::fprintf(stderr, "calibration JSON is invalid: %s\n", error.c_str());

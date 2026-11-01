@@ -9,6 +9,7 @@
 #include "core/Commands.h"
 #include "core/FrameGovernor.h"
 #include "core/HardwareProfile.h"
+#include "core/TierConfig.h"
 
 #include <cmath>
 #include <cstdlib>
@@ -144,23 +145,29 @@ TEST(hw_profile_mapping) {
         CHECK(p.settings.renderTriangleBudget <= 4'000'000);
         CHECK(p.settings.maxTextureSize <= 4096);
     }
-    // A big discrete card on a big machine.
+    // A 16 GB+ discrete card on a 64 GB machine that measures fast: Workstation.
     {
         const HardwareProfile p = mapProfile(machine("NVIDIA Corporation", "NVIDIA GeForce RTX 4090/PCIe/SSE2", 24564, 65536, 32),
                                              measured(15000.0, 25.0, 0.2, 40.0));
-        CHECK(p.tier == ProfileTier::Monster);
+        CHECK(p.tier == ProfileTier::Workstation);
         CHECK(p.settings.renderTriangleBudget >= 100'000'000);
         CHECK(p.settings.vramBudgetMB == 24564 * 4 / 5);
         CHECK(p.settings.threads == 16); // the thread pool's limit
-        CHECK(p.reason.find("Monster") != std::string::npos);
+        CHECK(p.reason.find("Workstation") != std::string::npos);
         CHECK(p.reason.find("RTX 4090") != std::string::npos);
     }
-    // A mid card: measured as a workstation, its 8 GB keep it there.
+    // A fast card with 8 GB: Laptop / Budget, and the reason says why.
     {
-        const HardwareProfile p = mapProfile(machine("NVIDIA Corporation", "NVIDIA GeForce RTX 3070/PCIe/SSE2", 8192, 32768),
+        const HardwareProfile p = mapProfile(machine("NVIDIA Corporation", "NVIDIA GeForce RTX 3070/PCIe/SSE2", 8192, 65536),
                                              measured(8000.0));
-        CHECK(p.tier == ProfileTier::Workstation);
-        CHECK(p.reason.find("capped by GPU memory") != std::string::npos);
+        CHECK(p.tier == ProfileTier::Laptop);
+        CHECK(p.reason.find("video memory") != std::string::npos);
+    }
+    // 16 GB of video memory but 32 GB of RAM: Laptop / Budget.
+    {
+        const HardwareProfile p = mapProfile(machine("AMD", "AMD Radeon RX 7800 XT", 16368, 32768), measured(6000.0));
+        CHECK(p.tier == ProfileTier::Laptop);
+        CHECK(p.reason.find("RAM") != std::string::npos);
     }
     // An integrated GPU on a 16 GB laptop.
     {
@@ -175,12 +182,15 @@ TEST(hw_profile_mapping) {
         CHECK(p.tier == ProfileTier::Laptop);
         CHECK(p.settings.maxTextureSize <= 8192);
     }
-    // Unified memory: two thirds of the RAM for the GPU.
+    // Unified memory (Apple Silicon): two thirds of the RAM for the GPU, even when the driver reports all of it;
+    // Laptop / Budget however fast it measures.
     {
-        const HardwareProfile p = mapProfile(machine("Mesa", "Apple M1 Pro (G13S C0)", 0, 32768, 10), measured(2000.0));
+        const HardwareProfile p = mapProfile(machine("Mesa", "Apple M1 Pro (G13S C0)", 31667, 31667, 10), measured(2000.0));
         CHECK(p.hardware.gpuKind == GpuKind::Unified);
-        CHECK(p.settings.vramBudgetMB == 32768 * 2 / 3);
-        CHECK(p.tier == ProfileTier::Workstation);
+        CHECK(p.settings.vramBudgetMB == 31667 * 2 / 3);
+        CHECK(p.tier == ProfileTier::Laptop);
+        const HardwareProfile big = mapProfile(machine("Apple", "Apple M2 Ultra", 0, 196608, 24), measured(6000.0));
+        CHECK(big.tier == ProfileTier::Laptop);
     }
     // Measurements decide, not names: an unknown GPU that measures like software is safe mode.
     CHECK(mapProfile(machine("Weird", "Mystery GPU", 4096, 16384), measured(20.0)).tier == ProfileTier::Software);
@@ -188,19 +198,41 @@ TEST(hw_profile_mapping) {
     {
         const HardwareProfile a = mapProfile(machine("NVIDIA Corporation", "NVIDIA RTX A4000", 16384, 65536), measured(4000.0));
         const HardwareProfile b = mapProfile(machine("NVIDIA Corporation", "NVIDIA GeForce RTX 4070 Ti SUPER", 16384, 65536), measured(4000.0));
+        CHECK(a.tier == ProfileTier::Workstation);
         CHECK(a.tier == b.tier);
         CHECK(sameSettings(a.settings, b.settings));
     }
-    // Nothing measured (skipped): a guess from memory sizes, never above Workstation.
+    // Nothing measured (skipped): from the GPU type and memory sizes.
     {
         Calibration skipped;
         skipped.skipped = true;
         CHECK(mapProfile(machine("NVIDIA Corporation", "NVIDIA GeForce RTX 4090", 24564, 65536), skipped).tier == ProfileTier::Workstation);
         CHECK(mapProfile(machine("Intel", "Intel(R) UHD Graphics", 0, 8192), skipped).tier == ProfileTier::Laptop);
     }
-    // Slow brushes or memory cap the tier.
+    // Slow brushes keep a big machine at Laptop / Budget.
     CHECK(mapProfile(machine("NVIDIA Corporation", "NVIDIA GeForce RTX 4090", 24564, 65536), measured(15000.0, 25.0, 5.0)).tier ==
           ProfileTier::Laptop);
+    // A re-calibration of the same GPU holds its tier near the boundary (and only there).
+    {
+        const HardwareInfo h = machine("NVIDIA Corporation", "NVIDIA GeForce RTX 4080", 16384, 65536);
+        const ProfileTier ws = ProfileTier::Workstation, laptop = ProfileTier::Laptop;
+        CHECK(mapProfile(h, measured(950.0)).tier == ProfileTier::Laptop);
+        CHECK(mapProfile(h, measured(950.0), {}, &ws).tier == ProfileTier::Workstation);
+        CHECK(mapProfile(h, measured(950.0), {}, &ws).reason.find("close to the boundary") != std::string::npos);
+        CHECK(mapProfile(h, measured(800.0), {}, &ws).tier == ProfileTier::Laptop);
+        CHECK(mapProfile(h, measured(1050.0), {}, &laptop).tier == ProfileTier::Laptop);
+        CHECK(mapProfile(h, measured(1200.0), {}, &laptop).tier == ProfileTier::Workstation);
+        CHECK(mapProfile(h, measured(55.0), {}, &laptop).tier == ProfileTier::Laptop);
+        CHECK(mapProfile(h, measured(40.0), {}, &laptop).tier == ProfileTier::Software);
+        // The saved tier settles a reload the same way.
+        const std::string path = tempPath("sf_hw_sticky.json");
+        std::string error;
+        CHECK(saveHardwareProfile(path, mapProfile(h, measured(950.0), {}, &ws), error));
+        HardwareProfile back;
+        CHECK(loadHardwareProfile(path, back) && back.tier == ProfileTier::Workstation);
+        std::error_code ec;
+        std::filesystem::remove(path, ec);
+    }
     // Deterministic, and sane everywhere.
     for (double tri : {10.0, 100.0, 900.0, 1500.0, 4000.0, 6000.0, 30000.0}) {
         const HardwareInfo h = machine("NVIDIA Corporation", "NVIDIA GeForce RTX 4080", 16384, 65536);
@@ -227,13 +259,14 @@ TEST(hw_profile_mapping) {
 }
 
 TEST(hw_profile_overrides) {
-    const HardwareInfo h = machine("NVIDIA Corporation", "NVIDIA GeForce RTX 3060", 12288, 32768);
+    const HardwareInfo h = machine("NVIDIA Corporation", "NVIDIA GeForce RTX 4090", 24564, 131072);
     ProfileOverrides o;
     o.tier = "Laptop";
     o.renderTriangleBudget = 5'000'000;
     o.threads = 3;
     const HardwareProfile p = mapProfile(h, measured(3000.0), o);
     CHECK(p.tier == ProfileTier::Laptop);
+    CHECK(p.measuredTier == ProfileTier::Workstation);
     CHECK(p.reason.find("by hand") != std::string::npos);
     CHECK(p.settings.renderTriangleBudget == 5'000'000);
     CHECK(p.settings.motionProxyThreshold == 5'000'000); // follows the budget
@@ -243,7 +276,9 @@ TEST(hw_profile_overrides) {
     CHECK(!ProfileOverrides{}.any());
     // A tier name in any case, and the safe-mode alias.
     ProfileTier t;
-    CHECK(tierFromName("monster", t) && t == ProfileTier::Monster);
+    CHECK(tierFromName("workstation", t) && t == ProfileTier::Workstation);
+    CHECK(tierFromName("Budget", t) && t == ProfileTier::Laptop);
+    CHECK(tierFromName("monster", t) && t == ProfileTier::Workstation);
     CHECK(tierFromName("llvmpipe", t) && t == ProfileTier::Software);
     CHECK(!tierFromName("fast", t));
 }
@@ -332,7 +367,9 @@ TEST(hw_calibration_json_schema) {
     CHECK(Json::parse(j.dump(true), parsed, error));
     CHECK(validateCalibrationJson(parsed, error));
     CHECK(parsed["schema"].asString() == kCalibrationSchema);
-    CHECK(parsed["profile"].asString() == "Workstation");
+    CHECK(parsed["profile"].asString() == "Laptop");
+    CHECK(parsed["tier_config"]["zero_copy_uma"].asBool());
+    CHECK(parsed["tier_config"]["draft_brush_mode"].asBool());
     CHECK(parsed["hardware"]["gpu_kind"].asString() == "unified");
     CHECK(parsed["settings"]["render_triangle_budget"].asNumber() > 0);
     CHECK(!parsed["network"].asBool());
@@ -364,6 +401,13 @@ TEST(hw_calibration_json_schema) {
     }
     {
         Json bad = parsed;
+        Json tc = parsed["tier_config"];
+        tc.set("draft_brush_mode", 1.0);
+        bad.set("tier_config", tc);
+        CHECK(!validateCalibrationJson(bad, error));
+    }
+    {
+        Json bad = parsed;
         bad.set("schema", "sculptforge.calibration/0");
         CHECK(!validateCalibrationJson(bad, error));
     }
@@ -388,13 +432,19 @@ TEST(hw_profile_commands) {
     CHECK(r.ok);
     CHECK(currentPerformanceSettings().renderTriangleBudget == 12'000'000);
     CHECK(renderTriangleBudget() == 12'000'000);
-    r = registry.execute(doc, "set_performance_override", {{"name", std::string("tier")}, {"value", std::string("Monster")}});
+    r = registry.execute(doc, "set_performance_override", {{"name", std::string("tier")}, {"value", std::string("Workstation")}});
     CHECK(r.ok);
     r = registry.execute(doc, "performance_profile");
     CHECK(Json::parse(r.message, j, error));
-    CHECK(j["profile"].asString() == "Monster");
+    CHECK(j["profile"].asString() == "Workstation");
     CHECK(j["settings"]["render_triangle_budget"].asNumber() == 12'000'000);
-    CHECK(j["overrides"]["tier"].asString() == "Monster");
+    CHECK(j["overrides"]["tier"].asString() == "Workstation");
+    r = registry.execute(doc, "set_performance_override", {{"name", std::string("draft_brush")}, {"value", std::string("off")}});
+    CHECK(r.ok);
+    r = registry.execute(doc, "performance_profile");
+    CHECK(Json::parse(r.message, j, error));
+    CHECK(j["overrides"]["draft_brush"].asString() == "off");
+    CHECK(!j["tier_config"]["draft_brush_mode"].asBool());
     r = registry.execute(doc, "set_performance_override", {{"name", std::string("tier")}, {"value", std::string("auto")}});
     CHECK(r.ok);
     r = registry.execute(doc, "set_performance_override", {{"name", std::string("warp_drive")}, {"value", std::string("1")}});
@@ -613,4 +663,60 @@ TEST(governor_target_120) {
     CHECK(g.budget() < g60.budget()); // half the frame time, fewer triangles
     g60.setTargetFps(120);
     CHECK(std::abs(g60.targetMs() - 1000.0 / 120.0) < 1e-9);
+}
+
+TEST(hw_tier_config) {
+    // Laptop / Budget: 2M active triangles, draft brushes, a quarter of the RAM for caches.
+    const HardwareProfile laptop = mapProfile(machine("Intel", "Mesa Intel(R) Xe Graphics (TGL GT2)", 0, 16384, 8), measured(400.0, 4.0));
+    TierConfig c = tierConfigFor(laptop, PowerSource::AC, 60);
+    CHECK(c.tier == ProfileTier::Laptop);
+    CHECK(c.activeTriangleBudget == 2'000'000);
+    CHECK(c.draftBrushMode);
+    CHECK(c.residentCacheCapMB == 4096);
+    CHECK(c.zeroCopyUMA); // an integrated GPU shares the memory
+    CHECK(c.targetHz == 60);
+    // Workstation: 8M+ active, continuous brushes, the display's rate.
+    const HardwareProfile ws = mapProfile(machine("NVIDIA Corporation", "NVIDIA GeForce RTX 4090", 24564, 131072, 32), measured(15000.0, 25.0));
+    c = tierConfigFor(ws, PowerSource::AC, 144);
+    CHECK(c.tier == ProfileTier::Workstation);
+    CHECK(c.activeTriangleBudget >= 8'000'000);
+    CHECK(!c.draftBrushMode);
+    CHECK(!c.zeroCopyUMA);
+    CHECK(c.targetHz == 144);
+    CHECK(tierConfigFor(ws, PowerSource::AC, 120).targetHz == 120);
+    CHECK(tierConfigFor(ws, PowerSource::AC, 165).targetHz == 144);
+    CHECK(tierConfigFor(ws, PowerSource::AC, 0).targetHz == 60);
+    CHECK(tierConfigFor(ws, PowerSource::Unknown, 59).targetHz == 60);
+    // On battery: draft brushes, half the uploads, 60 Hz.
+    const TierConfig b = tierConfigFor(ws, PowerSource::Battery, 144);
+    CHECK(b.onBattery());
+    CHECK(b.draftBrushMode);
+    CHECK(b.targetHz == 60);
+    CHECK(b.uploadBudgetMBPerFrame == std::max<uint64_t>(c.uploadBudgetMBPerFrame / 2, 4));
+    // Overrides win: draft never, a fixed target.
+    ProfileOverrides o;
+    o.draftBrush = 2;
+    o.targetFps = 120;
+    const TierConfig forced = tierConfigFor(mapProfile(ws.hardware, ws.calibration, o), PowerSource::Battery, 60);
+    CHECK(!forced.draftBrushMode);
+    CHECK(forced.targetHz == 120);
+    // Apple Silicon: unified memory, zero-copy.
+    const HardwareProfile mac = mapProfile(machine("Apple", "Apple M3 Max", 0, 65536, 16), measured(3000.0));
+    CHECK(tierConfigFor(mac, PowerSource::AC, 120).zeroCopyUMA);
+    CHECK(tierConfigFor(mac, PowerSource::AC, 120).targetHz == 120);
+    // Software: safe mode at 60 Hz at most.
+    const HardwareProfile sw = mapProfile(machine("Mesa", "llvmpipe (LLVM 19.1.0, 256 bits)", 0, 16384), measured(40.0));
+    CHECK(tierConfigFor(sw, PowerSource::AC, 144).targetHz == 60);
+    CHECK(tierConfigFor(sw, PowerSource::AC, 144).activeTriangleBudget <= 500'000);
+    // The process-wide copy.
+    const uint64_t rev = tierConfigRevision();
+    setCurrentTierConfig(b);
+    CHECK(tierConfigRevision() == rev + 1);
+    CHECK(currentTierConfig().onBattery());
+    setCurrentTierConfig(TierConfig{});
+    // JSON.
+    const Json j = tierConfigJson(b);
+    CHECK(j["power"].asString() == "battery");
+    CHECK(j["on_battery"].asBool());
+    CHECK(j["target_hz"].asNumber() == 60);
 }

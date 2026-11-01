@@ -7,6 +7,7 @@
 #include "core/Commands.h"
 #include "core/Document.h"
 #include "core/Sculpt.h"
+#include "core/TierConfig.h"
 
 #include <algorithm>
 #include <atomic>
@@ -113,20 +114,27 @@ const char* tierName(ProfileTier tier) {
     case ProfileTier::Software: return "Software";
     case ProfileTier::Laptop: return "Laptop";
     case ProfileTier::Workstation: return "Workstation";
-    case ProfileTier::Monster: return "Monster";
     }
     return "Laptop";
 }
 
 bool tierFromName(const std::string& name, ProfileTier& out) {
     const std::string n = lower(name);
-    for (ProfileTier t : {ProfileTier::Software, ProfileTier::Laptop, ProfileTier::Workstation, ProfileTier::Monster})
+    for (ProfileTier t : {ProfileTier::Software, ProfileTier::Laptop, ProfileTier::Workstation})
         if (n == lower(tierName(t))) {
             out = t;
             return true;
         }
     if (n == "llvmpipe" || n == "safe") {
         out = ProfileTier::Software;
+        return true;
+    }
+    if (n == "budget" || n == "laptop/budget") {
+        out = ProfileTier::Laptop;
+        return true;
+    }
+    if (n == "monster") { // the 0.9.8 development builds' third tier
+        out = ProfileTier::Workstation;
         return true;
     }
     return false;
@@ -363,14 +371,16 @@ TierLimits limits(ProfileTier t) {
     switch (t) {
     case ProfileTier::Software: return {250'000, 4 * kM, 1 * kM, 1024, 16, 4096, 20 * kM, 16 * kM};
     case ProfileTier::Laptop: return {2 * kM, 40 * kM, 8 * kM, 2048, 64, 8192, 120 * kM, 256 * kM};
-    case ProfileTier::Workstation: return {8 * kM, 150 * kM, 30 * kM, 6144, 128, 16384, 500 * kM, 1024 * kM};
-    case ProfileTier::Monster: return {30 * kM, 600 * kM, 100 * kM, 12288, 256, 16384, 2000 * kM, 4096 * kM};
+    case ProfileTier::Workstation: return {8 * kM, 600 * kM, 40 * kM, 12288, 256, 16384, 2000 * kM, 4096 * kM};
     }
     return limits(ProfileTier::Laptop);
 }
 
+// Workstation: a discrete GPU with 16 GB or more and 64 GB or more of RAM (what the OS reports is a little less
+// than the label: 16 GB cards say about 15.9 GB, 64 GB machines about 62.5 GB), which also measures fast.
+constexpr uint64_t kWorkstationVramMB = 15 * 1024, kWorkstationRamMB = 60 * 1024;
 // Thresholds on measured triangle throughput (million small triangles per second, trivial shading).
-constexpr double kSoftwareBelowM = 60.0, kWorkstationFromM = 1000.0, kMonsterFromM = 5000.0;
+constexpr double kSoftwareBelowM = 60.0, kWorkstationFromM = 1000.0;
 
 // A re-calibration of the same GPU keeps its previous tier when the new measurement lands within this factor of
 // the boundary between the two (measurements vary a little from run to run, more on a busy machine).
@@ -378,52 +388,49 @@ constexpr double kStickyBand = 1.15;
 
 ProfileTier tierFromMeasurements(const HardwareInfo& hw, const Calibration& c, const ProfileTier* previous, std::string& why) {
     char buf[256];
-    ProfileTier t;
     if (hw.gpuKind == GpuKind::Software) {
         why = "a software renderer (" + hw.glRenderer + "): safe mode";
         return ProfileTier::Software;
     }
-    if (c.trianglesPerSecondM > 0.0) {
-        if (c.trianglesPerSecondM < kSoftwareBelowM) t = ProfileTier::Software;
-        else if (c.trianglesPerSecondM < kWorkstationFromM) t = ProfileTier::Laptop;
-        else if (c.trianglesPerSecondM < kMonsterFromM) t = ProfileTier::Workstation;
-        else t = ProfileTier::Monster;
-        std::snprintf(buf, sizeof buf, "%.0fM triangles/s", c.trianglesPerSecondM);
+    const double tri = c.trianglesPerSecondM;
+    if (tri > 0.0) {
+        std::snprintf(buf, sizeof buf, "%.0fM triangles/s", tri);
         why = buf;
-        if (previous && std::abs(int(*previous) - int(t)) == 1) {
-            const ProfileTier upper = int(*previous) > int(t) ? *previous : t;
-            const double boundary = upper == ProfileTier::Laptop ? kSoftwareBelowM
-                                    : upper == ProfileTier::Workstation ? kWorkstationFromM
-                                                                        : kMonsterFromM;
-            if (c.trianglesPerSecondM >= boundary / kStickyBand && c.trianglesPerSecondM <= boundary * kStickyBand) {
-                t = *previous;
-                why += ", kept " + std::string(tierName(t)) + " (close to the boundary)";
-            }
-        }
     } else {
-        // Nothing measured: a conservative guess from the memory sizes.
-        const uint64_t gpu = usableGpuMemoryMB(hw);
-        t = ProfileTier::Laptop;
-        if (gpu >= 8192 && hw.ramMB >= 24 * 1024) t = ProfileTier::Workstation;
-        why = "not calibrated, from memory sizes";
+        why = "not calibrated";
     }
-    // Memory caps: a fast GPU with little memory, or a machine with little RAM, can't hold the big scenes.
-    const uint64_t gpu = usableGpuMemoryMB(hw);
-    auto cap = [&](ProfileTier most, const char* reason) {
-        if (int(t) > int(most)) {
-            t = most;
-            why += std::string(", capped by ") + reason;
+    // Too slow for anything but safe mode, whatever the GPU says it is.
+    if (tri > 0.0 && tri < kSoftwareBelowM) {
+        if (previous && *previous == ProfileTier::Laptop && tri >= kSoftwareBelowM / kStickyBand) {
+            why += ", kept Laptop (close to the boundary)";
+            return ProfileTier::Laptop;
         }
-    };
-    if (gpu && gpu < 3072) cap(ProfileTier::Laptop, "GPU memory");
-    else if (gpu && gpu < 10240) cap(ProfileTier::Workstation, "GPU memory");
-    if (hw.ramMB && hw.ramMB < 8 * 1024) cap(ProfileTier::Laptop, "system memory");
-    else if (hw.ramMB && hw.ramMB < 24 * 1024) cap(ProfileTier::Workstation, "system memory");
-    if (c.dabMs > 3.0) cap(ProfileTier::Laptop, "brush speed");
-    if (c.memoryGBps > 0.0 && c.memoryGBps < 4.0) cap(ProfileTier::Laptop, "memory bandwidth");
-    if (t != ProfileTier::Software && c.trianglesPerSecondM > 0.0 && c.trianglesPerSecondM < kSoftwareBelowM)
-        t = ProfileTier::Software;
-    return t;
+        why += ", safe mode";
+        return ProfileTier::Software;
+    }
+    // Workstation needs the memory (a 16 GB+ discrete GPU, 64 GB+ RAM) and the measured speed. Everything else,
+    // including Apple Silicon and other unified-memory machines, is Laptop / Budget.
+    const uint64_t gpu = usableGpuMemoryMB(hw);
+    std::string missing;
+    if (hw.gpuKind != GpuKind::Discrete) missing = std::string("no discrete GPU (") + gpuKindName(hw.gpuKind) + ")";
+    else if (gpu < kWorkstationVramMB) missing = formatMegabytes(gpu) + " of video memory";
+    if (missing.empty() && hw.ramMB && hw.ramMB < kWorkstationRamMB) missing = formatMegabytes(hw.ramMB) + " RAM";
+    if (missing.empty() && c.dabMs > 3.0) missing = "slow brushes";
+    if (missing.empty() && c.memoryGBps > 0.0 && c.memoryGBps < 4.0) missing = "slow memory";
+    if (missing.empty() && tri > 0.0 && tri < kWorkstationFromM) {
+        if (previous && *previous == ProfileTier::Workstation && tri >= kWorkstationFromM / kStickyBand) {
+            why += ", kept Workstation (close to the boundary)";
+            return ProfileTier::Workstation;
+        }
+        missing = "GPU throughput";
+    }
+    if (missing.empty() && previous && *previous == ProfileTier::Laptop && tri > 0.0 && tri < kWorkstationFromM * kStickyBand) {
+        why += ", kept Laptop (close to the boundary)";
+        return ProfileTier::Laptop;
+    }
+    if (missing.empty()) return ProfileTier::Workstation;
+    why += ", Laptop / Budget: " + missing;
+    return ProfileTier::Laptop;
 }
 
 } // namespace
@@ -480,7 +487,8 @@ PerformanceSettings applyOverrides(const PerformanceSettings& a, const ProfileOv
 
 bool ProfileOverrides::any() const {
     return !tier.empty() || renderTriangleBudget || motionProxyThreshold || vramBudgetMB || uploadBudgetMBPerFrame ||
-           maxTextureSize || maxSubdivisionTriangles || microTriangleLimit || threads || targetFps || !governor;
+           maxTextureSize || maxSubdivisionTriangles || microTriangleLimit || threads || targetFps || !governor ||
+           draftBrush;
 }
 
 HardwareProfile mapProfile(const HardwareInfo& hardware, const Calibration& calibration, const ProfileOverrides& overrides,
@@ -617,6 +625,7 @@ Json overridesJson(const ProfileOverrides& o) {
     if (o.threads) j.set("threads", o.threads);
     if (o.targetFps) j.set("target_fps", o.targetFps);
     if (!o.governor) j.set("governor", false);
+    if (o.draftBrush) j.set("draft_brush", o.draftBrush == 1 ? "on" : "off");
     return j;
 }
 
@@ -633,6 +642,7 @@ void overridesFromJson(const Json& j, ProfileOverrides& o) {
     o.threads = int(j["threads"].asNumber());
     o.targetFps = int(j["target_fps"].asNumber());
     o.governor = j["governor"].asBool(true);
+    o.draftBrush = j["draft_brush"].asString() == "on" ? 1 : j["draft_brush"].asString() == "off" ? 2 : 0;
 }
 
 } // namespace
@@ -728,7 +738,7 @@ bool needsRecalibration(const HardwareProfile* cached, const HardwareInfo& curre
     return !recalibrationReason(cached, current).empty();
 }
 
-Json calibrationJson(const HardwareProfile& p) {
+Json calibrationJson(const HardwareProfile& p, const TierConfig* tier) {
     Json j = Json::object();
     j.set("schema", kCalibrationSchema);
     j.set("app_version", p.hardware.appVersion);
@@ -739,6 +749,7 @@ Json calibrationJson(const HardwareProfile& p) {
     j.set("settings", settingsJson(p.settings));
     j.set("automatic", settingsJson(p.automatic));
     j.set("overrides", overridesJson(p.overrides));
+    j.set("tier_config", tierConfigJson(tier ? *tier : tierConfigFor(p, PowerSource::Unknown, 0)));
     j.set("network", false); // calibration never uses the network (no telemetry)
     return j;
 }
@@ -770,6 +781,7 @@ bool validateCalibrationJson(const Json& j, std::string& error) {
     need(j, "$", "automatic", T::Object);
     need(j, "$", "overrides", T::Object);
     need(j, "$", "network", T::Bool);
+    need(j, "$", "tier_config", T::Object);
     if (!error.empty()) return false;
     ProfileTier tier;
     if (!tierFromName(j["profile"].asString(), tier)) {
@@ -799,6 +811,12 @@ bool validateCalibrationJson(const Json& j, std::string& error) {
         if (error.empty() && s["render_triangle_budget"].asNumber() <= 0) error = std::string(which) + ".render_triangle_budget must be > 0";
         if (error.empty() && s["threads"].asNumber() < 1) error = std::string(which) + ".threads must be >= 1";
     }
+    const Json& tc = j["tier_config"];
+    need(tc, "tier_config", "tier", T::String);
+    need(tc, "tier_config", "power", T::String);
+    for (const char* k : {"resident_cache_cap_mb", "active_triangle_budget", "upload_budget_mb_per_frame", "target_hz"})
+        need(tc, "tier_config", k, T::Number);
+    for (const char* k : {"draft_brush_mode", "zero_copy_uma", "on_battery"}) need(tc, "tier_config", k, T::Bool);
     return error.empty();
 }
 
@@ -950,7 +968,7 @@ bool setOverride(ProfileOverrides& o, const std::string& name, const std::string
         if (clear) o.tier.clear();
         else if (tierFromName(text, t)) o.tier = tierName(t);
         else {
-            error = "tier must be Software, Laptop, Workstation, Monster or auto";
+            error = "tier must be Software, Laptop (or Budget), Workstation or auto";
             return false;
         }
     } else if (name == "render_triangle_budget") o.renderTriangleBudget = u;
@@ -962,7 +980,15 @@ bool setOverride(ProfileOverrides& o, const std::string& name, const std::string
     else if (name == "micro_triangle_limit") o.microTriangleLimit = u;
     else if (name == "threads") o.threads = int(u);
     else if (name == "target_fps") o.targetFps = int(u);
-    else if (name == "governor") o.governor = clear ? true : value != 0.0 || text == "on" || text == "true";
+    else if (name == "draft_brush") {
+        if (clear) o.draftBrush = 0;
+        else if (text == "on" || text == "true" || value == 1.0) o.draftBrush = 1;
+        else if (text == "off" || text == "false" || (text.empty() && value == 2.0)) o.draftBrush = 2;
+        else {
+            error = "draft_brush must be on, off or auto";
+            return false;
+        }
+    } else if (name == "governor") o.governor = clear ? true : value != 0.0 || text == "on" || text == "true";
     else {
         error = "unknown setting " + name;
         return false;
@@ -975,7 +1001,7 @@ bool setOverride(ProfileOverrides& o, const std::string& name, const std::string
 void registerHardwareProfileCommands(CommandRegistry& registry) {
     registry.add({"performance_profile",
                   "The hardware profile as JSON (schema sculptforge.calibration/1): the GPU, its memory, RAM, CPU threads "
-                  "and SIMD, what calibration measured, the tier (Software / Laptop / Workstation / Monster) and its "
+                  "and SIMD, what calibration measured, the tier (Software safe mode, Laptop / Budget, Workstation) and its "
                   "settings (render triangle budget, motion proxy threshold, VRAM budget, ...). Nothing is sent anywhere.",
                   {},
                   [](Document&, const Args&) -> CommandResult {
@@ -1032,10 +1058,10 @@ void registerHardwareProfileCommands(CommandRegistry& registry) {
                   }});
     registry.add({"set_performance_override",
                   "Override one setting of the performance profile by hand (kept across re-calibrations), or give it "
-                  "back to the profile with value=auto. Settings: tier (Software, Laptop, Workstation, Monster), "
+                  "back to the profile with value=auto. Settings: tier (Software, Laptop, Workstation), "
                   "render_triangle_budget, motion_proxy_threshold, vram_budget_mb, upload_budget_mb_per_frame, "
                   "max_texture_size, max_subdivision_triangles, micro_triangle_limit, threads (next start), target_fps, "
-                  "governor (on / off).",
+                  "draft_brush (on / off: normals and cavity at pen release), governor (on / off).",
                   {{"name", ParamSpec::Type::String, "The setting.", true},
                    {"value", ParamSpec::Type::String, "A number, a tier name, on / off, or auto.", true}},
                   [](Document&, const Args& a) -> CommandResult {
