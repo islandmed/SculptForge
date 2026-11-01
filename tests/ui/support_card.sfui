@@ -1,0 +1,82 @@
+# The support card at launch (Support.h, PanelSupportCard.cpp): shown on the first start, after an update and at
+# most once a week; never for a supporter, never in tests. Its buttons only ask for the fixed Stripe links (UI tests
+# never start a browser).
+run new_sphere subdivisions=3
+# A UI test is a test-mode start: no card.
+expect_value support_card_open == 0
+support_card first_run test_mode
+expect_value support_card_open == 0
+
+# The first start after install.
+support_card first_run
+expect_value support_card_open == 1
+wait_idle
+wait 1.2
+expect_text Free for everyone,
+expect_text Insiders will get each release about two weeks early, starting with SculptForge 1.0.
+expect_text MOST POPULAR
+expect_text $20
+shot first_run
+# Clicks on the card never reach the canvas or the shortcuts underneath; a tier opens its Stripe checkout.
+click "Become an Insider##card.insider"
+expect_value support_requests == 1
+expect_status https://buy.stripe.com/dRmdR94eH4D06qD9ux4F202
+wait 0.4
+expect_value support_card_open == 0
+
+# At most once a week: not three days later, then again after seven.
+support_card days=3
+expect_value support_card_open == 0
+support_card days=7
+expect_value support_card_open == 1
+wait 0.8
+click "Give once##card.once"
+expect_value support_requests == 2
+expect_status https://buy.stripe.com/4gM7sL8uXc5s4iv5eh4F200
+wait 0.4
+
+# The first start of a new version, with a way to What's New; Esc closes it.
+support_card updated
+expect_value support_card_open == 1
+wait_idle
+wait 1.2
+expect_text What's new
+shot updated
+key Escape
+wait 0.4
+expect_value support_card_open == 0
+expect_value support_requests == 2
+
+# Maybe later.
+support_card days=8
+expect_value support_card_open == 1
+wait 0.8
+click "Maybe later##card.later"
+wait 0.4
+expect_value support_card_open == 0
+
+# Preferences > Support: turned off, it doesn't show.
+click "Preferences##palette.preferences"
+click "Support##preferences.support"
+click "Show the support card at launch"
+expect_value support_card_enabled == 0
+support_card days=30
+expect_value support_card_open == 0
+click "Show the support card at launch"
+expect_value support_card_enabled == 1
+
+# "I'm already a supporter" hides it for good, after updates too.
+support_card days=30
+expect_value support_card_open == 1
+wait 0.8
+click "I'm already a supporter##card.supporter_already"
+wait 0.4
+expect_value support_card_open == 0
+expect_value supporter == 1
+support_card days=30
+expect_value support_card_open == 0
+support_card updated
+expect_value support_card_open == 0
+support_card first_run
+expect_value support_card_open == 0
+expect_value support_requests == 2

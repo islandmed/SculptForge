@@ -246,6 +246,15 @@ bool App::init(const AppOptions& options) {
         fontIcons_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontLucide), int(assets::fontLucide_size),
                                                     20.0f * scale, &big, kIconRanges);
     }
+    { // The support card's display sizes (PanelSupportCard.cpp): Latin only, so the atlas grows by a few glyphs.
+        static const ImWchar kCardRanges[] = {0x0020, 0x00FF, 0x2014, 0x2014, 0x2019, 0x2019, 0x2026, 0x2026, 0};
+        fontCardTitle_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontSemiBold),
+                                                        int(assets::fontSemiBold_size), 40.0f * scale, &fontConfig, kCardRanges);
+        fontCardHead_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontSemiBold),
+                                                       int(assets::fontSemiBold_size), 21.0f * scale, &fontConfig, kCardRanges);
+        fontCardBody_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontRegular),
+                                                       int(assets::fontRegular_size), 16.5f * scale, &fontConfig, kCardRanges);
+    }
     addHelpFonts(scale); // Ctrl-help titles (Inter SemiBold) and the console (ProggyClean)
     guide_.addFonts(scale); // User Guide headings
     if (recording) {
@@ -632,7 +641,8 @@ bool App::backgroundBusy() const {
     auto running = [](const auto& f) { return f.valid() && f.wait_for(std::chrono::seconds(0)) != std::future_status::ready; };
     return running(pendingBrush_) || running(pendingGenerator_) || running(pendingModels_) || running(pendingUnreal_) ||
            running(pendingComfyCheck_) || galleryBusy() || thumbs_.busy() || libraryScanner_.busy() || autoUv_ ||
-           bakeBusy() || qremesh_ || voxelRemesh_ || updateJob_ || splatTrainBusy() || sculptableBusy() || phoneBusy();
+           bakeBusy() || qremesh_ || voxelRemesh_ || updateJob_ || splatTrainBusy() || sculptableBusy() || phoneBusy() ||
+           supportCardLoading();
 }
 
 void App::redrawIn(double seconds) {
@@ -1048,6 +1058,7 @@ void App::handleEvent(const SDL_Event& event) {
     if (strayMouseMotion(event)) return;  // neither the canvas nor the UI follows a driver's stray mouse events
     SDL_Event e = event;
     mapPenPosition(e); // a tablet in mouse mode moves the cursor relatively (#54), for the canvas and the UI
+    if (supportCardEvent(e)) return;  // the support card at launch takes clicks and keys while open
     if (radialMouseEvent(e)) return;  // clicks on an open radial menu, and the buttons that open one (RadialMenu.cpp)
     ImGui_ImplSDL3_ProcessEvent(&e);
     const ImGuiIO& io = ImGui::GetIO();
@@ -2078,6 +2089,7 @@ void App::drawUi() {
     drawSupportUi(); // the first-run welcome, the one support reminder (PanelSupport.cpp)
     guide_.draw(*this);  // Help > User Guide
     drawHelpConsoleUi(); // console, command palette, Controls (F1), Ctrl-hover help: last, on top
+    drawSupportCard();   // the support card at launch, over everything (PanelSupportCard.cpp)
 }
 
 void App::drawLayersContents() {

@@ -14,6 +14,14 @@ All notable changes to SculptForge are listed here. The format follows
   boundary). **Polygroup borders** also masks where polygroups meet (ZBrush: Mask by polygroup border), **Soft**
   fades the mask inwards; one undo step. A closed mesh masks nothing and the status bar says it has no open edges
   (`mask_border rings=2 polygroups=true soft=true`).
+- The support card at launch: a full-window card over a bronze sculpt rendered in SculptForge, with the Supporter
+  ($5 / month), Insider ($20 / month, "Insiders will get each release about two weeks early, starting with
+  SculptForge 1.0.") and Studio ($250 / month) memberships and a one-time gift, each opening its Stripe checkout in
+  the browser. It shows only while starting: the first time, after each update (with a link to What's New), and
+  otherwise at most once every 7 days; never mid-session, in tests, renders, demos or CI (`SF_NO_SUPPORT_CARD=1`
+  also turns it off). Maybe later, Esc or a click outside closes it; "I'm already a supporter" hides it for good
+  (stored in project.json; there are no accounts). Preferences > Support turns it off. Its picture is decoded on a
+  worker thread only when it shows. The donate page's first screen is redesigned to match (light and dark).
 - Radial (pie) menus (#45): up to 8 menus of up to 8 items, each item any action the command palette (F3) finds
   (brushes, tools, commands, toggles). Hold a menu's key, flick toward an item and let go to run it; tap the key and
   the pie stays open for a click. A menu can also open from a mouse button (middle, back, forward) or a pen side

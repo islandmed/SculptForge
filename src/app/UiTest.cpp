@@ -556,6 +556,9 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "subtools") return double(doc.subtoolCount());
     if (name == "support_requests") return double(app_.supportPageRequests_); // Support SculptForge clicks
     if (name == "welcome_open") return app_.showWelcome_ ? 1.0 : 0.0;
+    if (name == "support_card_open") return app_.supportCardOpen() ? 1.0 : 0.0; // the support card at launch
+    if (name == "supporter") return app_.supportCardPrefs_.supporter ? 1.0 : 0.0;
+    if (name == "support_card_enabled") return app_.supportCardPrefs_.enabled ? 1.0 : 0.0;
     if (name == "subtool_thumbnails") { // SubTool panel thumbnails rendered (#43)
         double n = 0.0;
         for (const auto& [id, tex] : app_.subtoolThumbs_) n += tex ? 1.0 : 0.0;
@@ -1359,6 +1362,28 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
                     return;
                 }
             }
+        });
+    } else if (verb == "support_card") {
+        // The launch decision for the support card (Support.h), as a start would make it: `first_run`, `updated` (a
+        // new version since it last showed), `days=N` (the clock N days after it last showed) and `test_mode` (how
+        // every UI test, render and CI run starts: never shown).
+        bool firstRun = false, updated = false, testMode = false;
+        double days = 0.0;
+        for (size_t i = 1; i < w.size(); ++i) {
+            if (w[i] == "first_run") firstRun = true;
+            else if (w[i] == "updated") updated = true;
+            else if (w[i] == "test_mode") testMode = true;
+            else if (w[i].rfind("days=", 0) == 0) days = std::atof(w[i].c_str() + 5);
+            else {
+                error = "support_card: unknown option '" + w[i] + "'";
+                return false;
+            }
+        }
+        run([this, firstRun, updated, testMode, days] {
+            SupportCardPrefs& p = app_.supportCardPrefs_;
+            if (updated) p.shownVersion = "0.0.0";
+            const int64_t base = p.shownAt > 0 ? p.shownAt : int64_t(1'800'000'000);
+            app_.launchSupportCard(firstRun, base + int64_t(days * 86400.0), testMode);
         });
     } else if (verb == "wait") {
         if (!need(1)) return false;

@@ -18,8 +18,10 @@ the GPL covers the program, not your models.
 SculptForge stays free and works the same for everyone. If it helps your work, **Help > Support SculptForge...**
 opens [sculptforge.app/donate.html](https://sculptforge.app/donate.html) in your browser, where you can become a
 member. That is all it does: the app has no payment code, no account and no licence check. Supporters are thanked
-by name in **Help > About**. After about ten hours of sculpting, SculptForge shows one small note about this along
-the bottom of the canvas, once, and never again after you close it.
+by name in **Help > About**. While SculptForge starts (the first time, after an update, and at most once a week
+otherwise) a card shows the memberships; **I'm already a supporter** hides it for good and **Preferences > Support**
+turns it off. After about ten hours of sculpting, SculptForge also shows one small note about this along the bottom
+of the canvas, once, and never again after you close it.
 
 ## What you can do with it
 

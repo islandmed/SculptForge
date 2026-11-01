@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Supporting SculptForge (memberships on the website; the app stays free and behaves the same for everyone). The
-// app only ever opens kSupportUrl in the browser: no payment code, no network, no tracking, no licence checks.
-// Pure helpers, unit tested: the supporters list compiled in from docs/supporters.txt (shown as plain text in
-// Help > About) and when the one optional reminder may show.
+// app only ever opens the fixed links below in the browser (the donate page and its four Stripe checkout pages): no
+// payment code, no network, no tracking, no licence checks. Pure helpers, unit tested: the supporters list compiled
+// in from docs/supporters.txt (shown as plain text in Help > About), when the one optional reminder may show, and
+// when the support card may show at launch.
 #pragma once
 
 #include <algorithm>
@@ -17,7 +18,13 @@
 namespace sf {
 
 inline constexpr const char* kSupportUrl = "https://sculptforge.app/donate.html";
-// What Insider members get, early access starts with 1.0 (Tony, 2026-11-01).
+// The same Stripe checkout links as website/donate.html (tests/test_support.cpp checks they match).
+inline constexpr const char* kSupportUrlSupporter = "https://buy.stripe.com/aFacN5h1t6L8cP14ad4F201"; // $5 / month
+inline constexpr const char* kSupportUrlInsider = "https://buy.stripe.com/dRmdR94eH4D06qD9ux4F202";   // $20 / month
+inline constexpr const char* kSupportUrlStudio = "https://buy.stripe.com/9B63cv8uXb1og1dfSV4F203";    // $250 / month
+inline constexpr const char* kSupportUrlOnce = "https://buy.stripe.com/4gM7sL8uXc5s4iv5eh4F200";      // one-time gift
+// What Insider members get; early access starts with 1.0. Worded the same in the app, on the donate page and in
+// What's New (tests/test_support.cpp checks the donate page).
 inline constexpr const char* kInsiderNote =
     "Insiders will get each release about two weeks early, starting with SculptForge 1.0.";
 
@@ -99,6 +106,33 @@ inline double addSculptTime(double total, double dt) {
 inline bool supportReminderDue(double sculptSeconds, double sessionSeconds, bool stroking, bool alreadyShown) {
     return !alreadyShown && !stroking && sculptSeconds >= kSupportReminderSculptSeconds &&
            sessionSeconds >= kSupportReminderSessionSeconds;
+}
+
+// --- The support card at launch (PanelSupportCard.cpp) ---
+// Shown only while the app starts, never mid-session: on the first start after install, on the first start of each
+// new version, and otherwise at most once every seven days. Never once "I'm already a supporter" was chosen or it was
+// turned off in Preferences > Support, and never in tests, renders, demos, benchmarks or CI (testMode).
+inline constexpr int64_t kSupportCardIntervalSeconds = 7 * 24 * 3600;
+
+struct SupportCardPrefs {
+    bool enabled = true;         // Preferences > Support > Show the support card at launch
+    bool supporter = false;      // "I'm already a supporter": never again
+    int64_t shownAt = 0;         // seconds since 1970 when it last showed (0: never)
+    std::string shownVersion;    // the version it last showed in ("" before 0.10.4)
+};
+
+enum class SupportCardReason { None, FirstRun, Updated, Weekly };
+
+inline SupportCardReason supportCardDue(const SupportCardPrefs& p, bool firstRun, std::string_view version, int64_t now,
+                                        bool testMode) {
+    if (testMode || !p.enabled || p.supporter) return SupportCardReason::None;
+    if (firstRun) return SupportCardReason::FirstRun;
+    if (p.shownVersion != version) return SupportCardReason::Updated;
+    const int64_t since = now - p.shownAt;
+    // (a clock set far back counts as due, so a damaged value can't hide it for good, nor show it every start)
+    if (p.shownAt <= 0 || since >= kSupportCardIntervalSeconds || since <= -kSupportCardIntervalSeconds)
+        return SupportCardReason::Weekly;
+    return SupportCardReason::None;
 }
 
 } // namespace sf
