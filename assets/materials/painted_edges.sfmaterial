@@ -16,7 +16,7 @@
       "name": "Paint",
       "fill": {
         "material": {"channels": ["base_color", "roughness", "metallic", "height"], "color": [0.62, 0.16, 0.1], "roughness": 0.55, "metallic": 0.0, "height": 0.53},
-        "mask": [{"kind": "generator", "generator": "edge_wear", "level": 0.5, "softness": 0.08, "breakup": 0.9, "scale": 0.025, "seed": 5},
+        "mask": [{"kind": "generator", "generator": "edge_wear", "level": 0.42, "softness": 0.08, "breakup": 0.55, "scale": 0.025, "seed": 5},
                  {"kind": "invert"}]
       }
     },

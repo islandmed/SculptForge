@@ -607,7 +607,7 @@ void registerMeshMapCommands(CommandRegistry& reg) {
              "occlusion, curvature, thickness, position, world normal and ID (polygroups). bake makes them, info "
              "describes them, clear drops them, live=true re-bakes the changed tiles after sculpting (in the app). "
              "Derived data: not saved, not an undo step.",
-             {{"action", T::String, "bake (default), info or clear.", false},
+             {{"action", T::String, "bake (default), info, clear, or live (with live=true/false).", false},
               {"maps", T::String, "Comma list: ao, curvature, thickness, position, world_normal, id, or all (default).", false},
               {"ao_rays", T::Number, "Ambient occlusion rays per texel (default 24).", false},
               {"ao_distance", T::Number, "How far occluders count, a fraction of the Part's size (default 0.05).", false},
@@ -625,7 +625,14 @@ void registerMeshMapCommands(CommandRegistry& reg) {
                      mutableTexture(m).meshMaps.reset();
                      return {true, "Mesh Maps cleared"};
                  }
-                 if (action != "bake") return {false, "action must be bake, info or clear"};
+                 if (action == "live") {
+                     if (!tex.meshMaps) return {false, "No Mesh Maps yet (mesh_maps action=bake)"};
+                     auto set = std::make_shared<MeshMapSet>(*tex.meshMaps);
+                     set->live = argBool(a, "live", true);
+                     mutableTexture(m).meshMaps = std::move(set);
+                     return {true, std::string("Mesh Maps live updates ") + (argBool(a, "live", true) ? "on" : "off")};
+                 }
+                 if (action != "bake") return {false, "action must be bake, info, clear or live"};
                  uint32_t kinds = kAllMeshMaps;
                  std::string err;
                  if (a.contains("maps") && !parseMeshMaps(argString(a, "maps"), kinds, err)) return {false, err};

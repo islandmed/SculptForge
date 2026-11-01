@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/App.h"
+#include "core/LayerStack.h"
 #include "app/ShellQuote.h"
 #include "app/SpaceCamera.h"
 #include "app/AsyncStroke.h"
@@ -170,6 +171,8 @@ bool App::init(const AppOptions& options) {
         return false;
     }
     renderer_.setEnvironmentWake([] { wakeMainLoop(); }); // (PBR view: a new environment's lighting is ready)
+    // Fill layers ask for Mesh Maps: the app bakes them on a worker thread (PanelFill.cpp, updateMeshMaps).
+    setMeshMapRequester([this](Document&) { meshMapsWanted_ = true; });
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -644,7 +647,7 @@ bool App::backgroundBusy() const {
     return running(pendingBrush_) || running(pendingGenerator_) || running(pendingModels_) || running(pendingUnreal_) ||
            running(pendingComfyCheck_) || galleryBusy() || thumbs_.busy() || libraryScanner_.busy() || autoUv_ ||
            bakeBusy() || qremesh_ || voxelRemesh_ || updateJob_ || splatTrainBusy() || sculptableBusy() || phoneBusy() ||
-           supportCardLoading() || renderer_.environmentPending();
+           supportCardLoading() || renderer_.environmentPending() || meshMapsBusy();
 }
 
 void App::redrawIn(double seconds) {
@@ -1943,6 +1946,10 @@ Mesh& App::displayedMesh() {
 
 void App::syncScene() {
     if (solverBusy()) return; // the solver thread is changing the mesh: the GPU keeps what it has (AsyncStroke.cpp)
+    // Fill layers: Mesh Maps bakes started and landed (live after sculpting), and a painted mask's tiles evaluated.
+    updateMeshMaps();
+    if (paintsTexture(doc_.mesh) && doc_.mesh.texture->fillRevision != doc_.mesh.texture->revision)
+        updateFillLayers(doc_.mesh, mutableTexture(doc_.mesh));
     // The active SubTool's slot shows the LOD being previewed instead of the sculpt.
     Mesh& shown = displayedMesh();
     if (&shown != lastDisplayed_) shown.topologyDirty = true;

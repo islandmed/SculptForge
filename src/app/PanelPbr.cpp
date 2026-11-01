@@ -379,6 +379,7 @@ double App::benchmarkDrawMs(int frames) {
 }
 
 double App::pbrTestValue(const std::string& name) const {
+    if (const double v = fillTestValue(name); !std::isnan(v)) return v;
     const Mesh& m = doc_.mesh;
     const bool tex = hasTexture(m);
     if (name == "material_channels") {

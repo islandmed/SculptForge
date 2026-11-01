@@ -23,7 +23,7 @@
       "name": "Polished Edges",
       "fill": {
         "material": {"channels": ["base_color", "roughness", "metallic"], "color": [0.78, 0.79, 0.8], "roughness": 0.18, "metallic": 1.0},
-        "mask": [{"kind": "generator", "generator": "edge_wear", "level": 0.55, "softness": 0.2, "breakup": 0.6, "scale": 0.03, "seed": 3}]
+        "mask": [{"kind": "generator", "generator": "edge_wear", "level": 0.45, "softness": 0.2, "breakup": 0.45, "scale": 0.03, "seed": 3}]
       }
     },
     {

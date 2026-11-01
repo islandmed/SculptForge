@@ -682,6 +682,20 @@ private:
     void registerPbrUiActions();
     double benchmarkDrawMs(int frames); // PanelPbr.cpp: UI tests' draw_ms
     double pbrTestValue(const std::string& name) const; // UI test values (UiTest.cpp), NaN when not one of ours
+    // Fill layers, Material Recipes and Mesh Maps (PanelFill.cpp).
+    struct MeshMapJob;
+    std::shared_ptr<MeshMapJob> meshMapJob_; // a Mesh Maps bake on a worker thread (full, or the tiles near a change)
+    bool meshMapsWanted_ = false;            // bake the active Part's Mesh Maps in full (Bake, or a Fill layer asked)
+    uint64_t meshMapsRevision_ = 0;          // the undo revision the live update last looked at
+    std::string meshMapStatus_;
+    double lastMeshMapUpdateMs_ = 0.0;
+    uint64_t meshMapUpdates_ = 0;
+    glm::vec3 fillColorEdit_{1.0f};
+    bool fillColorEditing_ = false;
+    void updateMeshMaps();      // once a frame (syncScene): starts and lands Mesh Maps bakes
+    bool meshMapsBusy() const;
+    void drawFillLayerControls(); // Tool > Paint Layers, below the layer list
+    double fillTestValue(const std::string& name) const;
     int exportPresetChoice_ = 0;
     // Dense textured meshes: while the Paint brush hovers, the texture painting caches for the area under it are
     // built ahead of the first dab (PanelPbr.cpp; TexturePainter::prewarm).
