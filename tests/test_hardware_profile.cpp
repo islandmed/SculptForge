@@ -182,15 +182,28 @@ TEST(hw_profile_mapping) {
         CHECK(p.tier == ProfileTier::Laptop);
         CHECK(p.settings.maxTextureSize <= 8192);
     }
-    // Unified memory (Apple Silicon): two thirds of the RAM for the GPU, even when the driver reports all of it;
-    // Laptop / Budget however fast it measures.
+    // Unified memory (Apple Silicon): two thirds of the RAM for the GPU, even when the driver reports all of it.
+    // With 32 GB it is Laptop / Budget however fast it measures; with 64 GB+ and the same measured thresholds as a
+    // discrete GPU, Workstation (Max / Ultra).
     {
         const HardwareProfile p = mapProfile(machine("Mesa", "Apple M1 Pro (G13S C0)", 31667, 31667, 10), measured(2000.0));
         CHECK(p.hardware.gpuKind == GpuKind::Unified);
         CHECK(p.settings.vramBudgetMB == 31667 * 2 / 3);
         CHECK(p.tier == ProfileTier::Laptop);
+        CHECK(p.reason.find("RAM") != std::string::npos);
         const HardwareProfile big = mapProfile(machine("Apple", "Apple M2 Ultra", 0, 196608, 24), measured(6000.0));
-        CHECK(big.tier == ProfileTier::Laptop);
+        CHECK(big.tier == ProfileTier::Workstation);
+        CHECK(big.settings.vramBudgetMB == 196608 * 2 / 3);
+        const HardwareProfile max = mapProfile(machine("Apple", "Apple M3 Max", 0, 65536, 16), measured(3000.0));
+        CHECK(max.tier == ProfileTier::Workstation);
+        // ... but not when it measures slowly, or its brushes or memory are slow.
+        CHECK(mapProfile(machine("Apple", "Apple M3 Max", 0, 65536, 16), measured(700.0)).tier == ProfileTier::Laptop);
+        CHECK(mapProfile(machine("Apple", "Apple M3 Max", 0, 65536, 16), measured(3000.0, 10.0, 4.0)).tier == ProfileTier::Laptop);
+        CHECK(mapProfile(machine("Apple", "Apple M3 Max", 0, 65536, 16), measured(3000.0, 10.0, 0.5, 3.0)).tier == ProfileTier::Laptop);
+        // A big APU (shared memory) the same way.
+        const HardwareProfile apu = mapProfile(machine("AMD", "AMD Radeon 8060S Graphics (radeonsi, gfx1151)", 0, 131072, 32), measured(2500.0));
+        CHECK(apu.hardware.gpuKind == GpuKind::Integrated);
+        CHECK(apu.tier == ProfileTier::Workstation);
     }
     // Measurements decide, not names: an unknown GPU that measures like software is safe mode.
     CHECK(mapProfile(machine("Weird", "Mystery GPU", 4096, 16384), measured(20.0)).tier == ProfileTier::Software);
@@ -701,9 +714,15 @@ TEST(hw_tier_config) {
     CHECK(!forced.draftBrushMode);
     CHECK(forced.targetHz == 120);
     // Apple Silicon: unified memory, zero-copy.
+    // A 64 GB Apple Silicon Workstation: zero-copy, continuous brushes plugged in, draft on battery.
     const HardwareProfile mac = mapProfile(machine("Apple", "Apple M3 Max", 0, 65536, 16), measured(3000.0));
+    CHECK(mac.tier == ProfileTier::Workstation);
     CHECK(tierConfigFor(mac, PowerSource::AC, 120).zeroCopyUMA);
     CHECK(tierConfigFor(mac, PowerSource::AC, 120).targetHz == 120);
+    CHECK(!tierConfigFor(mac, PowerSource::AC, 120).draftBrushMode);
+    CHECK(tierConfigFor(mac, PowerSource::Battery, 120).draftBrushMode);
+    CHECK(tierConfigFor(mac, PowerSource::Battery, 120).zeroCopyUMA);
+    CHECK(tierConfigFor(mac, PowerSource::Battery, 120).targetHz == 60);
     // Software: safe mode at 60 Hz at most.
     const HardwareProfile sw = mapProfile(machine("Mesa", "llvmpipe (LLVM 19.1.0, 256 bits)", 0, 16384), measured(40.0));
     CHECK(tierConfigFor(sw, PowerSource::AC, 144).targetHz == 60);

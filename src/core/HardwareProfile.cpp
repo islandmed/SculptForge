@@ -408,11 +408,13 @@ ProfileTier tierFromMeasurements(const HardwareInfo& hw, const Calibration& c, c
         why += ", safe mode";
         return ProfileTier::Software;
     }
-    // Workstation needs the memory (a 16 GB+ discrete GPU, 64 GB+ RAM) and the measured speed. Everything else,
-    // including Apple Silicon and other unified-memory machines, is Laptop / Budget.
-    const uint64_t gpu = usableGpuMemoryMB(hw);
+    // Workstation needs the memory and the measured speed: a 16 GB+ discrete GPU, or a GPU sharing the system memory
+    // (Apple Silicon Max / Ultra, big APUs), whose pool is two thirds of the RAM; and 64 GB+ RAM either way.
+    // Everything else is Laptop / Budget.
+    const bool sharedMemory = hw.gpuKind == GpuKind::Unified || hw.gpuKind == GpuKind::Integrated;
+    const uint64_t gpu = sharedMemory ? (hw.ramMB ? hw.ramMB * 2 / 3 : hw.vramMB) : usableGpuMemoryMB(hw);
     std::string missing;
-    if (hw.gpuKind != GpuKind::Discrete) missing = std::string("no discrete GPU (") + gpuKindName(hw.gpuKind) + ")";
+    if (hw.gpuKind != GpuKind::Discrete && !sharedMemory) missing = std::string("GPU type ") + gpuKindName(hw.gpuKind);
     else if (gpu < kWorkstationVramMB) missing = formatMegabytes(gpu) + " of video memory";
     if (missing.empty() && hw.ramMB && hw.ramMB < kWorkstationRamMB) missing = formatMegabytes(hw.ramMB) + " RAM";
     if (missing.empty() && c.dabMs > 3.0) missing = "slow brushes";

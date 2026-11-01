@@ -63,10 +63,11 @@ app `calibrate` measures the GPU too.
 
 Two main tiers and a safe mode:
 
-- **Workstation**: a discrete GPU with 16 GB or more (15 GB reported), 64 GB or more of RAM (60 GB reported),
-  at least 1000M triangles/s, dabs under 3 ms, memory over 4 GB/s.
-- **Laptop / Budget**: everything else, including Apple Silicon and other unified memory machines (8-16 GB RAM,
-  2-4 GB GPUs, thermal and battery limits).
+- **Workstation**: 64 GB or more of RAM (60 GB reported) and either a discrete GPU with 16 GB or more (15 GB
+  reported) or a GPU sharing the system memory (Apple Silicon Max / Ultra, big APUs), whose pool counts as two
+  thirds of the RAM; and in both cases at least 1000M triangles/s, dabs under 3 ms, memory over 4 GB/s.
+- **Laptop / Budget**: everything else (8-32 GB RAM, 2-8 GB GPUs, Apple Silicon with less than 64 GB, thermal and
+  battery limits).
 - **Software** (safe mode): a software renderer, or under 60M triangles/s.
 
 A re-calibration of the same GPU keeps the previous tier while the new triangle throughput is within 15% of the
@@ -98,10 +99,11 @@ changes when it does):
 | `activeTriangleBudget` | 0.5M | 2M | 8M+ (half the render budget, at most 64M) |
 | `uploadBudgetMBPerFrame` | the profile's | the profile's | the profile's |
 | `draftBrushMode` (normals and cavity at pen release) | on | on | off (continuous) |
-| `zeroCopyUMA` | the GPU shares system memory: unified or integrated | | |
+| `zeroCopyUMA` | the GPU shares system memory: unified or integrated, in any tier (a 64 GB+ Apple Silicon Workstation too) | | |
 | `targetHz` | 60 | 60 / 120 / 144 from the display | 60 / 120 / 144 from the display |
 
-The app reads the power source with `SDL_GetPowerInfo` at start and every 5 seconds. On battery: draft brushes,
+The app reads the power source with `SDL_GetPowerInfo` at start and every 5 seconds. On battery, whatever the tier
+(an Apple Silicon Workstation is a laptop too): draft brushes,
 half the upload budget and 60 Hz (unless set by hand), and the status bar says so. The `draft_brush` override
 (on / off) wins over both. `draftBrushMode` is a flag for the brush engine; the brushes don't read it yet.
 
@@ -142,8 +144,8 @@ cores), so the CPU numbers here are low (memory bandwidth measured 23 GB/s on a 
 "gl_renderer": "Apple M1 Pro (G13S C0)", "gl_version": "4.6 (Core Profile) Mesa 26.1.8", "gpu_kind": "unified",
 "vram_mb": 31667 (GL_NVX_gpu_memory_info: all of the RAM), "timer_query": true, "cpu_threads": 10, "simd": ["neon"]
 measurements: 1358M triangles/s (GPU timer), upload 12.8 GB/s, dab 0.37 ms (2.5k vertices), memory 5.9 GB/s, 607 ms
-profile: Laptop ("Detected Apple M1 Pro (G13S C0), 20.6 GB unified -> Laptop (1358M triangles/s, Laptop / Budget:
-         no discrete GPU (unified))")
+profile: Laptop (32 GB of RAM is under the 64 GB Workstation needs; this run predates the unified-memory rule, so its
+         reason read "no discrete GPU"; it now reads "30.9 GB RAM")
 settings: render budget 11.3M, motion proxy from 11.3M, GPU memory 20.6 GB, uploads 50 MB/frame, textures 8192,
           subdivision 120M, micro-triangles 256M, 10 threads, 60 fps
 tier_config: cache 4 GB, active 2M, uploads 25 MB/frame (battery), draft brushes, zero-copy UMA, 60 Hz, on battery

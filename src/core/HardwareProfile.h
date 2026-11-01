@@ -5,9 +5,10 @@
 //
 // What the computer is (HardwareInfo: the GPU's OpenGL strings and memory, system RAM, CPU threads, SIMD, OS)
 // and how fast it measured (Calibration: triangle throughput, buffer upload bandwidth, brush dab cost, memory
-// bandwidth) map to a profile tier with concrete settings. Two main tiers: Laptop / Budget (8-16 GB RAM, a 2-4 GB
-// GPU or Apple Silicon's unified memory, thermal and battery limits) and Workstation (64 GB+ RAM and a 16 GB+
-// discrete GPU that measures fast), plus a Software safe mode for llvmpipe and friends. core/TierConfig.h turns the
+// bandwidth) map to a profile tier with concrete settings. Two main tiers: Laptop / Budget (8-32 GB RAM, a 2-8 GB
+// GPU or smaller Apple Silicon, thermal and battery limits) and Workstation (64 GB+ RAM with a 16 GB+ discrete GPU,
+// or with a GPU sharing that memory, e.g. Apple Silicon Max / Ultra or a big APU, whose pool counts as two thirds of
+// the RAM; and fast measurements either way), plus a Software safe mode for llvmpipe and friends. core/TierConfig.h turns the
 // profile, the power source and the display into the knobs the renderer and brushes read. Settings:
 // (PerformanceSettings: render triangle budget, motion proxy threshold, VRAM budget, ...). The mapping uses
 // the measurements and memory sizes, never GPU names: names only tell unified from discrete memory and spot a

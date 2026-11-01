@@ -11,8 +11,9 @@ All notable changes to SculptForge are listed here. The format follows
   the version changes, SculptForge spends about a second or two (under a small overlay; Esc skips) measuring
   triangle throughput, upload bandwidth, brush speed and memory bandwidth, and probes the GPU (OpenGL strings,
   video memory through GL_NVX_gpu_memory_info, GL_ATI_meminfo, GLX_MESA_query_renderer, amdgpu sysfs, DXGI or
-  CGL), RAM, threads, SIMD and OS. The result picks a profile: **Laptop / Budget**, **Workstation** (16 GB+
-  discrete GPU, 64 GB+ RAM) or a **Software** safe mode for llvmpipe, with a render triangle budget, motion proxy
+  CGL), RAM, threads, SIMD and OS. The result picks a profile: **Laptop / Budget**, **Workstation** (64 GB+ RAM
+  with a 16 GB+ discrete GPU, or Apple Silicon Max / Ultra and big APUs, that measure fast) or a **Software** safe
+  mode for llvmpipe, with a render triangle budget, motion proxy
   threshold, GPU memory and upload budgets, texture, subdivision and micro-triangle limits and the thread count.
   Cached in the settings folder; no network use. A one-line status bar message says what was found.
 - Preferences > Performance shows what was detected and measured ("Detected <GPU>, <memory> -> Workstation"),
