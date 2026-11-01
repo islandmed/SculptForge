@@ -65,7 +65,7 @@ Timeline::Kind Timeline::classify(const UndoRecord& r) {
 bool Timeline::fastShape(const UndoRecord& r) {
     return !r.positions.empty() && r.layer == -1 && r.layerOffsets.empty() && r.mask.empty() && r.colors.empty() &&
            r.paintAlpha.empty() && !r.paint && r.hidden.empty() && r.polygroups.empty() && !r.textureTiles &&
-           !r.texture && !r.mesh && !r.subdiv && !r.topology && !r.subtool;
+           !r.texture && !r.mesh && !r.subdiv && !r.topology && !r.subtool && !r.uv;
 }
 
 void Timeline::reset() {
@@ -758,7 +758,7 @@ struct Reader {
 };
 
 bool savable(const UndoRecord& r) {
-    return !r.mesh && !r.subdiv && !r.topology && !r.subtool && !r.texture && !r.textureTiles && !r.paint &&
+    return !r.mesh && !r.subdiv && !r.topology && !r.subtool && !r.texture && !r.textureTiles && !r.paint && !r.uv &&
            r.layerOffsets.empty() && r.layer == -1 && r.paintLayer == -1 && r.paintAlpha.empty();
 }
 

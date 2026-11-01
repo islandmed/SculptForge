@@ -101,6 +101,21 @@ struct TextureStackUndo {
     size_t bytes() const;
 };
 
+// The UVs and UV flags (seams, pins; core/Uv.h) before a UV edit. capture() holds the whole arrays; commit()
+// (with the mesh after the edit) keeps only the corners that changed when that is smaller. Applying swaps them
+// with the mesh's, so the record then holds the inverse.
+struct UvUndo {
+    bool sparse = false;
+    std::vector<glm::vec2> uvs;      // whole: the old array (empty = the mesh had none)
+    std::vector<uint8_t> flags;      // whole: the old flags (empty = none)
+    UndoChannel<glm::vec2> uvCorners; // sparse: old UVs of changed corners
+    UndoChannel<uint8_t> flagCorners; // sparse: old flags of changed corners
+    static std::unique_ptr<UvUndo> capture(const Mesh& mesh);
+    void commit(const Mesh& mesh);
+    void swapWith(Mesh& mesh);
+    size_t bytes() const;
+};
+
 // Adding or removing a whole SubTool (Extract's Accept; core/Document.h). Applied by the undo / redo commands,
 // which see the whole scene: the record itself leaves the mesh alone.
 struct SubtoolStep;
@@ -145,11 +160,12 @@ struct UndoRecord {
     std::unique_ptr<SubdivUndo> subdiv;
     std::unique_ptr<TopologyUndo> topology;
     std::shared_ptr<SubtoolStep> subtool; // (shared: SubtoolStep is defined in core/Document.h)
+    std::unique_ptr<UvUndo> uv;           // UVs, seams and pins (UV Editor, core/Uv.h)
     std::unique_ptr<MicroUndo> micro;     // micro-displacement tiles of a stroke, or a micro level added / removed (core/Micro.h)
 
     bool empty() const {
         return positions.empty() && mask.empty() && colors.empty() && paintAlpha.empty() && hidden.empty() &&
-               polygroups.empty() && !mesh && !paint && !textureTiles && !texture && !subdiv && !topology && !subtool && !micro;
+               polygroups.empty() && !mesh && !paint && !textureTiles && !texture && !subdiv && !topology && !subtool && !micro && !uv;
     }
     size_t approxBytes() const;
 

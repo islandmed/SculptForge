@@ -72,6 +72,10 @@ add_library(sculptforge_core STATIC
   src/core/PaintLayer.cpp
   src/core/Texture.cpp
   src/core/TextureCommands.cpp
+  src/core/Uv.cpp
+  src/core/UvCommands.cpp
+  src/core/UvPack.cpp
+  src/core/UvUnwrap.cpp
   src/core/TileImage.cpp
   src/core/TextureChannels.cpp
   src/core/TextureChannelCommands.cpp

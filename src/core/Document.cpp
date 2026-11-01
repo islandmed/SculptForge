@@ -53,6 +53,7 @@ void Document::markClean() {
 
 void Document::selectSubtool(int i) {
     if (i < 0 || i >= subtoolCount() || i == activeSubtool) return;
+    uvSelection.clear();
     // Check the active SubTool back in, then check `i` out. Swapping keeps each
     // mesh's GPU dirty state, so the renderer doesn't re-upload anything.
     auto swapIn = [this](SubTool& s) {
