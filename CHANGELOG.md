@@ -19,7 +19,7 @@ All notable changes to SculptForge are listed here. The format follows
   Saved with the project (`viewport_shading mode=pbr environment=outdoor_sky exposure=0.5 tone_map=agx`).
 - Mesh Maps bake: **Tool > Bake** adds **Curvature** (convex edges bright, creases dark, from the surface's mean
   curvature at a set radius), **Thickness** (how far rays travel inside), **Position** (16-bit) and **ID** (a colour
-  per polygroup or per Part) to the normal, world normal, displacement, AO, cavity and colour maps. The source can
+  per face group or per Part) to the normal, world normal, displacement, AO, cavity and colour maps. The source can
   be the Part's own **top subdivision level** (baked onto its lowest level) or its **micro level** (onto its base),
   besides other Parts. UVs outside 0..1 bake as **UDIM tiles** (`name_normal.1001.png`, `1002`, ...). The bake runs
   on a worker thread with progress and Cancel (`bake source=subdivision maps=normal,ao,curvature,thickness,position,id`).
@@ -27,6 +27,18 @@ All notable changes to SculptForge are listed here. The format follows
   texture's own UVs and size, tile by tile on every core, for Fill layers to read. After sculpting, only the tiles
   near the change are baked again, from a compact copy of the nearby triangles, and the result matches a full bake
   texel for texel (2K maps of an 82k-triangle Part: about 10 s in full, about 0.5 s for a local change).
+- Fill layers: **Tool > Paint Layers > + Fill Layer** lays a material (colour, roughness, metallic, height) over the
+  whole Part through a mask built from effects: **Edge Wear**, **Dirt**, **Gradient**, **Thickness** and **Light
+  Direction** generators reading the Mesh Maps, **Noise** in 3D (no UV seams), a **Paint** mask painted with the
+  Paint brush, **Levels**, **Blur**, **Invert** and **Fill**, each with its own settings and blend. Fill layers sit
+  in the layer stack with paint layers, re-evaluate tile by tile when their settings, painted mask or the Mesh Maps
+  change, undo like any edit and are saved with the project (format 7). With **Live** on, sculpting re-bakes only
+  the Mesh Maps tiles near the stroke on a worker thread and the Fill layers follow the new form
+  (`fill_layer generator=edge_wear color=#e0e0e8 metallic=1`, `mesh_maps action=live live=true`).
+- Material Recipes: **Worn Metal**, **Painted Edges**, **Dirt and Dust** and **Rusted Iron**, stacks of Fill layers
+  kept as small `.sfmaterial` text files, laid on a Part in one undoable step from **Tool > Paint Layers >
+  Material Recipe**. Save your own from a Part's Fill layers (`material_recipe name=worn_metal`,
+  `material_recipe action=save path=mine.sfmaterial`).
 ## [0.10.5] - 2026-11-01
 ### Added
 - **Radial symmetry** (#63): **R** in Transform > Symmetry and on the top shelf repeats strokes around the X, Y or Z

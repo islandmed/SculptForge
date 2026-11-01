@@ -5,6 +5,24 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.10.6
+
+- **PBR viewport** (**Material > Viewport Shading > PBR**): see the texture's material as a game engine shows it,
+  lit by an environment: Studio, Photo Studio, Small Studio or Outdoor Sky, with exposure, rotation, the
+  environment behind the model and a choice of tone map. Painted height and normals catch the light. It stays as
+  fast as Lit Sphere on a 20-million-triangle Part. See [Material painting](pbr-painting.md#the-pbr-viewport).
+- **Fill layers** (**Tool > Paint Layers > + Fill Layer**): lay a material over the whole Part through a mask of
+  effects (edge wear, dirt, gradient, thickness, light direction, 3D noise, a painted mask, levels, blur) instead
+  of painting it by hand. Change it any time. See [Fill layers](fill-layers.md).
+- **Wear that follows the sculpt**: Fill layers read the Part's Mesh Maps (occlusion, curvature, thickness and
+  more), and after each stroke only the part of the maps near the stroke is baked again in the background, so
+  chipped paint and dirt move with the form while you sculpt.
+- **Material Recipes**: Worn Metal, Painted Edges, Dirt and Dust and Rusted Iron in one click, and your own saved
+  as small files.
+- **More maps from Tool > Bake**: curvature, thickness, position and ID; bake a Part's top subdivision level (or
+  micro level) onto its lowest level without a second Part; UDIM tiles bake as one set of files per tile. See
+  [Baking](baking.md).
+
 ## Version 0.10.5
 
 - **Selection sets** (**Tool > Selection Sets**): store as many named snapshots of a Part's mask, face groups,

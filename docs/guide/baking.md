@@ -35,13 +35,34 @@ The maps go onto the **active** Part, so select the low-poly before baking.
 | Map | File | What it holds |
 |---|---|---|
 | **Normal (tangent)** | `<name>_normal.png` | The high-poly's surface direction relative to the low-poly, in tangent space. The map for game engines |
-| **Normal (object)** | `<name>_normal_object.png` | The high-poly's normals in model space. For tools that want object-space maps |
+| **Normal (object / world)** | `<name>_normal_object.png` | The high-poly's normals in model space (Parts have no transform of their own, so this is also the world normal). For tools that want object-space maps |
 | **Displacement** | `<name>_displacement.png` and `.exr` | The distance from the low-poly to the high-poly along the low-poly's normal |
 | **Ambient Occlusion** | `<name>_ao.png` | How much of the sky each point sees: darker in creases, folds and cavities |
 | **Cavity** | `<name>_cavity.png` | The fine surface curvature: mid-grey where the surface is smooth, dark in cracks, light on ridges |
 | **Colour** | `<name>_color.png` | The source's vertex paint, or its painted texture |
+| **Curvature** | `<name>_curvature.png` | How the surface bends: mid-grey flat, brighter on convex edges and ridges, darker in creases. A bend of the **curvature radius** (2% of the model's size by default) is fully bright or dark. Drives edge wear |
+| **Thickness** | `<name>_thickness.png` | How far rays travel through the high-poly before leaving it: dark where it is thin (ears, fins, blades). Drives translucency |
+| **Position** | `<name>_position.png` (16-bit) | Each point's place in the bounding box, as red, green and blue. Drives gradients and noise without UV seams |
+| **ID** | `<name>_id.png` | A flat colour per face group (or per Part, `id=parts`), to pick areas in other programs |
 
 `<name>` is the low-poly Part's name. Colour is skipped when the source has neither vertex paint nor a texture.
+
+![Tool > Bake with the Part's own top subdivision level as the source and the Mesh Maps ticked](images/bake-mesh-maps.jpg)
+
+### Bake from the Part's own levels
+
+A Part with subdivision levels can bake its sculpted detail onto itself: choose **Own top subdivision level** as
+the **Source**, and the top level is baked onto the lowest level's UVs (give the lowest level UVs first). A Part
+with a micro level offers **Own micro level**, baked onto its base. No second Part, no matching: the levels share
+their UVs.
+
+### UDIM tiles
+
+When the low-poly's UVs go beyond the 0..1 square (UDIM tiles, for example from the
+[UV Editor](uv-editor.md)), every tile bakes as its own set of maps: `<name>_normal.1001.png`,
+`<name>_normal.1002.png`, ... (1001 + u + 10 v, the usual numbering).
+
+The same maps, baked on the texture's own UVs, feed [Fill layers](fill-layers.md) inside SculptForge.
 
 ### Tangent-space normal maps that look right everywhere
 
@@ -108,7 +129,7 @@ on the same computer; for one on another computer, import the PNG by hand. See
 
 | Command | What it does |
 |---|---|
-| `bake` | Bake onto the active Part and write the maps. Options: `source=all` or a Part name, `maps=normal,object_normal,displacement,ao,cavity,color` (or `all`), `size=2048` (512 to 8192, or `1k`...`8k`), `out=folder`, `name=prefix`, `front=0.02` and `rear=0.02` (fractions of the model's size, or `auto`), `samples=2`, `padding=8`, `ao_rays=48`, `ao_distance=0.05`, `green=opengl` or `directx`, `displacement_scale=` (world units at white), `exr=true` |
+| `bake` | Bake onto the active Part and write the maps. Options: `source=all`, a Part name, `subdivision` or `micro`, `maps=normal,object_normal,displacement,ao,cavity,color,curvature,thickness,position,id` (or `all`), `udim=true`, `thickness_rays=24`, `thickness_distance=0.1`, `curvature_radius=0.02`, `id=polygroups` or `parts`, `size=2048` (512 to 8192, or `1k`...`8k`), `out=folder`, `name=prefix`, `front=0.02` and `rear=0.02` (fractions of the model's size, or `auto`), `samples=2`, `padding=8`, `ao_rays=48`, `ao_distance=0.05`, `green=opengl` or `directx`, `displacement_scale=` (world units at white), `exr=true` |
 
 For example, from the console or `sculptforge-cli`:
 
