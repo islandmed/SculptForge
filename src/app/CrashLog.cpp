@@ -27,6 +27,9 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <unistd.h>
+#if defined(__linux__)
+#include <sys/prctl.h>
+#endif
 #if __has_include(<execinfo.h>)
 #include <execinfo.h>
 #define SF_HAVE_BACKTRACE 1
@@ -296,6 +299,9 @@ void action(const std::string& what) {
 void quietSystemCrashDialog() {
 #if defined(_WIN32)
     SetErrorMode(SetErrorMode(0) | SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+#elif defined(__linux__)
+    // No core dump either: systemd-coredump would store one and the desktop would pop a crash notice per test run.
+    prctl(PR_SET_DUMPABLE, 0, 0, 0, 0);
 #endif
 }
 
