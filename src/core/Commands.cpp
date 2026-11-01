@@ -175,7 +175,7 @@ CommandRegistry::CommandRegistry() {
              if (!ok) return {false, err};
              if (m.triangleCount() > 0) objects.push_back({"", std::move(m)});
              std::erase_if(objects, [](const MeshObject& o) { return o.mesh.triangleCount() == 0; });
-             std::string msg = "Opened " + path;
+             std::string msg = "Opened " + std::filesystem::path(path).filename().string();  // file name only: status shows in screen recordings
              const bool hasMesh = !objects.empty();
              if (hasMesh) {
                  size_t tris = 0, quads = 0, layers = 0;
