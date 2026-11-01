@@ -74,6 +74,11 @@ add_library(sculptforge_core STATIC
   src/core/SurfaceQuery.cpp
   src/core/QRemesh.cpp
   src/core/QRemeshGuides.cpp
+  src/core/QRemesh2.cpp
+  src/core/QRemesh2Proxy.cpp
+  src/core/QRemesh2Field.cpp
+  src/core/QRemesh2Param.cpp
+  src/core/QuadQuality.cpp
   src/core/ZSpheres.cpp
   src/core/Projection.cpp
   src/core/RetopoCommands.cpp

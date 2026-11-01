@@ -1,0 +1,333 @@
+// SculptForge - open source digital sculpting
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// QRemesh 2: curvature and the cross field on the proxy surface.
+//
+// Curvature: the per-edge dihedral angle tensor of Cohen-Steiner & Morvan ("Restricted Delaunay triangulations and
+// normal cycle", 2003), summed per triangle and smoothed over about one quad, so a dense sculpt's pores and
+// scratches don't steer the edge flow but its brow, lips and limbs do.
+//
+// Cross field: a 4-RoSy field per triangle as u = e^{4 i theta} (Ray, Vallet, Li & Levy, "N-symmetry direction
+// field design", 2008; Knoppel, Crane, Pinkall & Schroder, "Globally optimal direction fields", 2013): the
+// connection Laplacian (smoothness) plus a pull towards the principal curvature directions weighted by how
+// anisotropic the bending is, with feature edges (open edges, borders, hard edges, guides) as fixed directions.
+// One sparse Hermitian system, solved by preconditioned conjugate gradients with deterministic reductions.
+#include "core/QRemesh2.h"
+
+#include "core/QRemesh2Solver.h"
+#include "core/ThreadPool.h"
+
+#include <cstdio>
+#include <cstdlib>
+
+#include <algorithm>
+#include <cmath>
+#include <numbers>
+
+namespace sf::qr2 {
+
+namespace {
+
+constexpr double kPi = std::numbers::pi;
+using cd = std::complex<double>;
+
+float angleIn(const Frames& f, uint32_t t, const vec3& v) { return std::atan2(glm::dot(v, f.e2[t]), glm::dot(v, f.e1[t])); }
+
+double wrapHalfPi(double a) { // to (-pi/4, pi/4]
+    const double q = kPi / 2.0;
+    return a - q * std::round(a / q);
+}
+
+// Deterministic block reductions.
+template <class F>
+double blockSum(size_t n, F&& term) {
+    const size_t block = 8192, blocks = (n + block - 1) / block;
+    std::vector<double> part(blocks, 0.0);
+    poolFor(n, [&](size_t b, size_t e) {
+        double s = 0.0;
+        for (size_t i = b; i < e; ++i) s += term(i);
+        part[b / block] = s;
+    }, block);
+    double s = 0.0;
+    for (double p : part) s += p;
+    return s;
+}
+
+} // namespace
+
+void Frames::build(const Proxy& p) {
+    const size_t nt = p.T.size();
+    e1.resize(nt), e2.resize(nt), n.resize(nt), area.resize(nt);
+    for (size_t t = 0; t < nt; ++t) {
+        const glm::uvec3 tri = p.T[t];
+        const vec3 a = p.P[tri.y] - p.P[tri.x], b = p.P[tri.z] - p.P[tri.x];
+        const vec3 c = glm::cross(a, b);
+        area[t] = 0.5f * glm::length(c);
+        n[t] = safeNormalize(c);
+        e1[t] = safeNormalize(a - n[t] * glm::dot(n[t], a), vec3(1, 0, 0));
+        e2[t] = glm::cross(n[t], e1[t]);
+    }
+}
+
+Curvature computeCurvature(const Proxy& p, const Frames& f, float radius) {
+    const size_t nt = p.T.size();
+    // Per triangle 3x3 symmetric tensor (xx, xy, xz, yy, yz, zz), area-weighted sums.
+    std::vector<std::array<float, 6>> tensor(nt, std::array<float, 6>{});
+    double edgeSum = 0.0;
+    size_t edgeCount = 0;
+    for (uint32_t t = 0; t < nt; ++t)
+        for (int k = 0; k < 3; ++k) {
+            const uint32_t c = 3 * t + uint32_t(k), o = p.opp[c];
+            const vec3 e = p.P[p.T[t][(k + 1) % 3]] - p.P[p.T[t][k]];
+            const float len = glm::length(e);
+            edgeSum += len, ++edgeCount;
+            if (o == kNone || o < c) continue;
+            const uint32_t g = o / 3;
+            const vec3 ed = e / std::max(len, 1e-30f);
+            // Signed dihedral angle: positive where the surface bends away from its normal (convex).
+            const float beta = std::atan2(glm::dot(glm::cross(f.n[t], f.n[g]), ed), glm::dot(f.n[t], f.n[g]));
+            const float w = 0.5f * beta * len;
+            const std::array<float, 6> m{w * ed.x * ed.x, w * ed.x * ed.y, w * ed.x * ed.z,
+                                         w * ed.y * ed.y, w * ed.y * ed.z, w * ed.z * ed.z};
+            for (int i = 0; i < 6; ++i) tensor[t][i] += m[i], tensor[g][i] += m[i];
+        }
+    const float meanEdge = edgeCount ? float(edgeSum / double(edgeCount)) : 1.0f;
+    // Smoothing: area-weighted averages over edge neighbours; diffusion reaches about meanEdge * sqrt(rounds).
+    const int rounds = std::clamp(int(std::lround(double(radius / meanEdge) * double(radius / meanEdge))), 1, 60);
+    std::vector<float> area(f.area);
+    std::vector<std::array<float, 6>> next(nt);
+    // tensor holds sums (curvature x area); smooth the sums and the areas together.
+    for (int r = 0; r < rounds; ++r) {
+        std::vector<float> nextArea(nt);
+        poolFor(nt, [&](size_t b, size_t e) {
+            for (size_t t = b; t < e; ++t) {
+                std::array<float, 6> s = tensor[t];
+                float a = area[t];
+                for (int k = 0; k < 3; ++k) {
+                    const uint32_t o = p.opp[3 * t + size_t(k)];
+                    if (o == kNone || p.feature[3 * t + size_t(k)]) continue; // don't blur across feature lines
+                    const uint32_t g = o / 3;
+                    for (int i = 0; i < 6; ++i) s[i] += tensor[g][i];
+                    a += area[g];
+                }
+                const float w = 1.0f / float(1 + 3);
+                for (int i = 0; i < 6; ++i) next[t][i] = s[i] * w;
+                nextArea[t] = a * w;
+            }
+        });
+        tensor.swap(next);
+        area.swap(nextArea);
+    }
+    Curvature c;
+    c.angle.resize(nt), c.anisotropy.resize(nt), c.magnitude.resize(nt);
+    for (size_t t = 0; t < nt; ++t) {
+        const auto& m = tensor[t];
+        const float inv = 1.0f / std::max(area[t], 1e-30f);
+        auto apply = [&](const vec3& v) {
+            return vec3(m[0] * v.x + m[1] * v.y + m[2] * v.z, m[1] * v.x + m[3] * v.y + m[4] * v.z,
+                        m[2] * v.x + m[4] * v.y + m[5] * v.z) * inv;
+        };
+        const vec3 a1 = apply(f.e1[t]), a2 = apply(f.e2[t]);
+        const float xx = glm::dot(f.e1[t], a1), xy = glm::dot(f.e2[t], a1), yy = glm::dot(f.e2[t], a2);
+        c.angle[t] = 0.5f * std::atan2(2.0f * xy, xx - yy);
+        c.anisotropy[t] = std::sqrt((xx - yy) * (xx - yy) + 4.0f * xy * xy);
+        c.magnitude[t] = 0.5f * std::abs(xx + yy) + 0.5f * c.anisotropy[t];
+    }
+    return c;
+}
+
+bool solveCrossField(const Proxy& p, const Frames& f, const Curvature& curv, const FieldSettings& s, CrossField& out,
+                     const std::function<bool()>& cancelled) {
+    const size_t nt = p.T.size();
+    // Fixed triangles: those with a feature edge, along the longest one.
+    std::vector<uint8_t> fixed(nt, 0);
+    std::vector<cd> z(nt, cd(0.0, 0.0)), target(nt, cd(0.0, 0.0));
+    std::vector<double> weight(nt, 0.0);
+    for (uint32_t t = 0; t < nt; ++t) {
+        float best = -1.0f;
+        for (int k = 0; k < 3; ++k) {
+            if (!p.feature[3 * t + uint32_t(k)]) continue;
+            const vec3 e = p.P[p.T[t][(k + 1) % 3]] - p.P[p.T[t][k]];
+            const float l = glm::length(e);
+            if (l > best) {
+                best = l;
+                const double a = angleIn(f, t, e);
+                z[t] = std::polar(1.0, 4.0 * a);
+            }
+        }
+        if (best > 0.0f) {
+            fixed[t] = 1;
+            continue;
+        }
+        // Curvature: anisotropy times the quad size is the bend across one quad (radians); full weight from ~17 degrees.
+        const glm::uvec3 tri = p.T[t];
+        const double h = (double(p.size[tri.x]) + double(p.size[tri.y]) + double(p.size[tri.z])) / 3.0;
+        const double bend = std::min(1.0, double(curv.anisotropy[t]) * h / 0.3);
+        weight[t] = double(s.alignWeight) * bend * bend;
+        target[t] = std::polar(1.0, 4.0 * double(curv.angle[t]));
+        if (t < s.guideAngle.size() && !std::isnan(s.guideAngle[t]) && s.guideWeight[t] > 0.0f) {
+            // A soft guide replaces the curvature pull near the curve.
+            const double gw = double(s.guideWeight[t]);
+            target[t] = (1.0 - std::min(gw, 1.0)) * target[t] * weight[t] + gw * 10.0 * std::polar(1.0, 4.0 * double(s.guideAngle[t]));
+            weight[t] = std::abs(target[t]);
+            target[t] = weight[t] > 0.0 ? target[t] / weight[t] : cd(1.0, 0.0);
+        }
+    }
+    // Transport factors per corner: from the twin triangle's frame into this one's.
+    std::vector<cd> transport(3 * nt, cd(0.0, 0.0));
+    for (uint32_t t = 0; t < nt; ++t)
+        for (int k = 0; k < 3; ++k) {
+            const uint32_t c = 3 * t + uint32_t(k), o = p.opp[c];
+            if (o == kNone) continue;
+            const uint32_t g = o / 3;
+            const vec3 e = p.P[p.T[t][(k + 1) % 3]] - p.P[p.T[t][k]];
+            const double at = angleIn(f, t, e), ag = angleIn(f, g, e);
+            transport[c] = std::polar(1.0, 4.0 * (at - ag));
+        }
+    // System: for free t, (deg + w) z_t - sum r z_g = w target (+ fixed neighbours).
+    std::vector<double> diag(nt, 1.0);
+    std::vector<cd> rhs(nt, cd(0.0, 0.0));
+    for (uint32_t t = 0; t < nt; ++t) {
+        if (fixed[t]) continue;
+        double d = weight[t];
+        cd b = weight[t] * target[t];
+        for (int k = 0; k < 3; ++k) {
+            const uint32_t c = 3 * t + uint32_t(k), o = p.opp[c];
+            if (o == kNone) continue;
+            d += 1.0;
+            if (fixed[o / 3]) b += transport[c] * z[o / 3];
+        }
+        diag[t] = std::max(d, 1e-12);
+        rhs[t] = b;
+    }
+    // The system over the free triangles, preconditioned by multigrid.
+    std::vector<uint32_t> fid(nt, kNone), freeTris;
+    for (uint32_t t = 0; t < nt; ++t)
+        if (!fixed[t]) fid[t] = uint32_t(freeTris.size()), freeTris.push_back(t);
+    const size_t nfree = freeTris.size();
+    std::vector<cd> x(nfree), b(nfree);
+    if (nfree > 0) {
+        SparseMatrix<cd> A;
+        std::vector<std::pair<uint64_t, cd>> trips;
+        trips.reserve(nfree * 4);
+        for (uint32_t i = 0; i < nfree; ++i) {
+            const uint32_t t = freeTris[i];
+            trips.push_back({(uint64_t(i) << 32) | i, cd(diag[t], 0.0)});
+            for (int k = 0; k < 3; ++k) {
+                const uint32_t c = 3 * t + uint32_t(k), o = p.opp[c];
+                if (o == kNone || fixed[o / 3]) continue;
+                trips.push_back({(uint64_t(i) << 32) | fid[o / 3], -transport[c]});
+            }
+            b[i] = rhs[t];
+            x[i] = weight[t] > 0.0 ? target[t] : cd(0.0, 0.0);
+        }
+        // A tiny shift keeps a closed surface's system definite.
+        double meanDiag = 0.0;
+        for (uint32_t i = 0; i < nfree; ++i) meanDiag += diag[freeTris[i]];
+        meanDiag /= double(nfree);
+        for (uint32_t i = 0; i < nfree; ++i) trips.push_back({(uint64_t(i) << 32) | i, cd(1e-4 * meanDiag, 0.0)});
+        A.build(nfree, trips);
+        Multigrid<cd> mg;
+        mg.build(A);
+        bool stop = false;
+        // Inverse power iteration (the smoothest field, Knoppel et al. 2013) with the alignment and the fixed
+        // triangles as a steady pull: x <- A^-1 (sigma x / |x| + b). Where nothing pulls, the field is the smoothest
+        // one rather than noise.
+        int its = 0;
+        if (x.empty()) x.assign(nfree, cd(0.0, 0.0));
+        {
+            double bn = 0.0;
+            for (const cd& v : b) bn += std::norm(v);
+            bn = std::sqrt(bn / double(nfree));
+            // Start: the pull, or a constant phase where there is none.
+            for (uint32_t i = 0; i < nfree; ++i)
+                if (std::abs(x[i]) == 0.0) x[i] = cd(1.0, 0.0);
+            const double sigma = std::max(bn, 1e-3 * meanDiag) * 1.0;
+            std::vector<cd> rhsk(nfree);
+            for (int round = 0; round < 6; ++round) {
+                double xn = 0.0;
+                for (const cd& v : x) xn += std::norm(v);
+                xn = std::sqrt(xn / double(nfree)) + 1e-300;
+                for (uint32_t i = 0; i < nfree; ++i) rhsk[i] = sigma * x[i] / xn + b[i];
+                std::vector<cd> nx(x);
+                its += pcg<cd>([&](const std::vector<cd>& in, std::vector<cd>& o) { A.mul(in, o); }, &mg, A.diag, rhsk, nx,
+                               1e-5, 200, cancelled, stop);
+                if (stop) return false;
+                x.swap(nx);
+            }
+        }
+        if (std::getenv("SF_QREMESH_TIMING"))
+            std::fprintf(stderr, "  cross field: %zu free triangles, %zu levels, %d iterations\n", nfree, mg.levels(), its);
+    }
+    out.theta.resize(nt);
+    for (size_t t = 0; t < nt; ++t) {
+        const cd v = fixed[t] ? z[t] : x[fid[t]];
+        out.theta[t] = std::abs(v) > 1e-30 ? float(std::arg(v) / 4.0) : 0.0f;
+    }
+    // A few rounds of local smoothing of the normalised field (the linear solve shrinks |u| near singularities and
+    // under-smooths there).
+    for (int round = 0; round < 4; ++round) {
+        std::vector<float> nextTheta(out.theta);
+        poolFor(nt, [&](size_t b, size_t e) {
+            for (size_t t = b; t < e; ++t) {
+                if (fixed[t]) continue;
+                cd s = std::polar(1.0, 4.0 * double(out.theta[t])) * (1.0 + weight[t]);
+                s += weight[t] * target[t];
+                for (int k = 0; k < 3; ++k) {
+                    const size_t c = 3 * t + size_t(k);
+                    const uint32_t o = p.opp[c];
+                    if (o == kNone) continue;
+                    s += transport[c] * std::polar(1.0, 4.0 * double(out.theta[o / 3]));
+                }
+                if (std::abs(s) > 1e-30) nextTheta[t] = float(std::arg(s) / 4.0);
+            }
+        });
+        out.theta.swap(nextTheta);
+    }
+    computeMatching(p, f, out);
+    return true;
+}
+
+void computeMatching(const Proxy& p, const Frames& f, CrossField& field) {
+    const size_t nt = p.T.size(), nv = p.P.size();
+    field.match.assign(3 * nt, 0);
+    std::vector<float> eps(3 * nt, 0.0f); // field rotation across the edge, beyond the matching
+    for (uint32_t t = 0; t < nt; ++t)
+        for (int k = 0; k < 3; ++k) {
+            const uint32_t c = 3 * t + uint32_t(k), o = p.opp[c];
+            if (o == kNone) continue;
+            const uint32_t g = o / 3;
+            const vec3 e = p.P[p.T[t][(k + 1) % 3]] - p.P[p.T[t][k]];
+            const double moved = double(field.theta[t]) - angleIn(f, t, e) + angleIn(f, g, e);
+            const double d = double(field.theta[g]) - moved;
+            const long q = std::lround(d / (kPi / 2.0));
+            field.match[c] = int8_t(((q % 4) + 4) % 4);
+            eps[c] = float(d - double(q) * kPi / 2.0);
+        }
+    // Singularity index: (sum of eps going round + angle defect) / (pi/2), interior vertices only.
+    field.vertexIndex.assign(nv, 0);
+    std::vector<double> angleSum(nv, 0.0), epsSum(nv, 0.0);
+    std::vector<uint8_t> open(nv, 0);
+    for (uint32_t t = 0; t < nt; ++t)
+        for (int k = 0; k < 3; ++k) {
+            const uint32_t v = p.T[t][k];
+            const vec3 a = p.P[p.T[t][(k + 1) % 3]] - p.P[v], b = p.P[p.T[t][(k + 2) % 3]] - p.P[v];
+            angleSum[v] += std::atan2(double(glm::length(glm::cross(a, b))), double(glm::dot(a, b)));
+            // Going round v counter-clockwise, triangle t hands over to the twin across the edge (T[k+2] -> v).
+            const uint32_t c = 3 * t + uint32_t((k + 2) % 3);
+            if (p.opp[c] == kNone) open[v] = 1;
+            else epsSum[v] += double(eps[c]);
+            if (p.opp[3 * t + uint32_t(k)] == kNone) open[v] = 1;
+        }
+    field.singularities = 0;
+    for (uint32_t v = 0; v < nv; ++v) {
+        if (open[v]) continue;
+        const double defect = 2.0 * kPi - angleSum[v];
+        const long q = std::lround((epsSum[v] + defect) / (kPi / 2.0));
+        field.vertexIndex[v] = int8_t(std::clamp<long>(q, -4, 4));
+        if (q != 0) ++field.singularities;
+    }
+    (void)wrapHalfPi;
+}
+
+} // namespace sf::qr2
