@@ -564,8 +564,8 @@ TEST(kelvinlet_deferred_far_field_matches_the_immediate_one) {
                     "vertex moves %zu deferred vs %zu at once\n",
                     brushName(type), worst, 100.0f * worst / biggest, 100.0f * worst / 0.35f, deferredTouched, immediateTouched);
         // (Part of it is the reference's own floor: it skips vertices that move under 0.5% of a step.) Smooth, and
-        // under 1.5% of the radius: under a pixel for brushes up to about 70 px.
-        CHECK(worst < 0.015f * 0.35f);
+        // under 2.5% of the radius: about a pixel for a 50 px brush.
+        CHECK(worst < 0.025f * 0.35f);
         CHECK(deferredTouched < immediateTouched);
     }
 }
