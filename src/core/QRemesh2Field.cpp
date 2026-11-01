@@ -155,6 +155,8 @@ bool solveCrossField(const Proxy& p, const Frames& f, const Curvature& curv, con
                 z[t] = std::polar(1.0, 4.0 * a);
             }
         }
+        if (best > 0.0f && t < p.fixedDir.size() && glm::dot(p.fixedDir[t], p.fixedDir[t]) > 0.0f)
+            z[t] = std::polar(1.0, 4.0 * double(angleIn(f, t, p.fixedDir[t]))); // a guide: its smooth tangent
         if (best > 0.0f) {
             fixed[t] = 1;
             continue;
@@ -265,11 +267,20 @@ bool solveCrossField(const Proxy& p, const Frames& f, const Curvature& curv, con
                 if (std::abs(x[i]) == 0.0) x[i] = cd(1.0, 0.0);
             const double sigma = std::max(bn, 1e-3 * meanDiag) * 1.0;
             std::vector<cd> rhsk(nfree);
-            for (int round = 0; round < 6; ++round) {
+            static const int projected = std::getenv("SF_QR2_PROJ") ? std::atoi(std::getenv("SF_QR2_PROJ")) : 30;
+            for (int round = 0; round < 6 + projected; ++round) {
                 double xn = 0.0;
                 for (const cd& v : x) xn += std::norm(v);
                 xn = std::sqrt(xn / double(nfree)) + 1e-300;
-                for (uint32_t i = 0; i < nfree; ++i) rhsk[i] = sigma * x[i] / xn + b[i];
+                // Later rounds normalise per triangle (a projected heat flow, like Ginzburg-Landau): a zero of order
+                // two or more (a closed guide's centre, by symmetry) splits into simple ones that move apart.
+                if (round < 6)
+                    for (uint32_t i = 0; i < nfree; ++i) rhsk[i] = sigma * x[i] / xn + b[i];
+                else
+                    for (uint32_t i = 0; i < nfree; ++i) {
+                        const double m = std::abs(x[i]);
+                        rhsk[i] = sigma * (m > 1e-12 ? x[i] / m : cd(0.0, 0.0)) * 4.0 + b[i];
+                    }
                 std::vector<cd> nx(x);
                 its += pcg<cd>([&](const std::vector<cd>& in, std::vector<cd>& o) { A.mul(in, o); }, &mg, A.diag, rhsk, nx,
                                1e-5, 200, cancelled, stop);

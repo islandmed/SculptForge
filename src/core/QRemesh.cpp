@@ -2075,6 +2075,7 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
                          partArea[i], budget[i], r.mesh.quads.size());
         qm.P.insert(qm.P.end(), r.mesh.P.begin(), r.mesh.P.end());
         for (const glm::uvec4& q : r.mesh.quads) qm.quads.push_back(q + glm::uvec4(base));
+        for (const glm::uvec3& t : r.mesh.tris) qm.tris.push_back(t + glm::uvec3(base));
         seam.insert(seam.end(), r.seam.begin(), r.seam.end());
     }
     parts.clear();

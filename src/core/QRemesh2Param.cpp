@@ -80,6 +80,20 @@ public:
         }
         m.erase(std::remove_if(m.begin(), m.end(), [](const Term& t) { return std::abs(t.a) < 1e-9; }), m.end());
         if (m.empty()) return; // redundant (or inconsistent, which the least squares then can't satisfy)
+        // An all-integer row with integer coefficients: divide by their common factor (a parity row such as
+        // 2a - 2b + 2c = 0 then keeps a pivot with coefficient 1, so integers stay integer).
+        {
+            bool allInt = std::abs(k - std::round(k)) < 1e-9;
+            long g = 0;
+            for (const Term& t : m) {
+                if (kind_[t.var] == 0 || std::abs(t.a - std::round(t.a)) > 1e-9) allInt = false;
+                else g = std::gcd(g, std::labs(std::lround(t.a)));
+            }
+            if (allInt && g > 1 && std::abs(k / double(g) - std::round(k / double(g))) < 1e-9) {
+                for (Term& t : m) t.a /= double(g);
+                k /= double(g);
+            }
+        }
         // Pivot: a real unknown with the largest coefficient; else an integer one with coefficient +-1, lowest kind.
         int best = -1;
         for (size_t i = 0; i < m.size(); ++i)
@@ -91,6 +105,11 @@ public:
                     best = int(i);
         if (best < 0) {
             ++lost_;
+            if (std::getenv("SF_QR2_LOST")) {
+                std::fprintf(stderr, "    lost integer:");
+                for (const Term& t : m) std::fprintf(stderr, " %g*[k%d]", t.a, kind_[t.var]);
+                std::fprintf(stderr, " + %g\n", k);
+            }
             for (size_t i = 0; i < m.size(); ++i)
                 if (best < 0 || std::abs(m[i].a) > std::abs(m[size_t(best)].a)) best = int(i);
         }
@@ -775,11 +794,42 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
         }
         out.uv[c] = vec2(float(val[0]), float(val[1]));
     }
+    if (timing) {
+        double worst = 0.0;
+        size_t off = 0;
+        for (uint32_t c = 0; c < nc; ++c) {
+            if (!p.feature[c]) continue;
+            const uint32_t t = c / 3, k = c % 3;
+            const vec3 e = p.P[p.T[t][(k + 1) % 3]] - p.P[p.T[t][k]];
+            const int coord = axisOfEdge(t, e) == 0 ? 1 : 0;
+            for (uint32_t cc : {c, 3 * t + (k + 1) % 3}) {
+                const double v = coord ? out.uv[cc].y : out.uv[cc].x;
+                const double d = std::abs(v - std::round(v));
+                worst = std::max(worst, d);
+                off += d > 0.01;
+            }
+        }
+        std::fprintf(stderr, "  grid map: feature corners off their lattice line: %zu (worst %.3f)\n", off, worst);
+    }
     out.flipped = 0;
     for (uint32_t t = 0; t < nt; ++t) {
         const vec2 a = out.uv[3 * t], b = out.uv[3 * t + 1], c = out.uv[3 * t + 2];
         const float area = (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y);
         if (!(area > 0.0f)) ++out.flipped;
+    }
+    if (timing) {
+        std::vector<uint8_t> fv(nv, 0);
+        for (uint32_t c = 0; c < nc; ++c)
+            if (p.feature[c]) fv[p.T[c / 3][c % 3]] = fv[p.T[c / 3][(c % 3 + 1) % 3]] = 1;
+        size_t nearF = 0, nearS = 0;
+        for (uint32_t t = 0; t < nt; ++t) {
+            const vec2 a = out.uv[3 * t], b = out.uv[3 * t + 1], c = out.uv[3 * t + 2];
+            if ((b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y) > 0.0f) continue;
+            bool f2 = false, s2 = false;
+            for (int k = 0; k < 3; ++k) f2 |= fv[p.T[t][k]] != 0, s2 |= field.vertexIndex[p.T[t][k]] != 0;
+            nearF += f2, nearS += s2;
+        }
+        std::fprintf(stderr, "  grid map: flipped triangles touching a feature %zu, a singularity %zu\n", nearF, nearS);
     }
     out.cutEdges = cutEdges;
     out.integerVars = intFree.size();

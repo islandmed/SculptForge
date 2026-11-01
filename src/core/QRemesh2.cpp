@@ -152,13 +152,13 @@ void applyGuides(Proxy& p, const std::vector<QRemeshGuide>& guides, float streng
     for (const QRemeshGuide& g : guides) {
         if (g.points.size() < 2) continue;
         SegmentBVH curve;
+        std::vector<vec3> curveA, curveB;
         {
-            std::vector<vec3> a, b;
-            for (size_t i = 0; i + 1 < g.points.size(); ++i) a.push_back(g.points[i]), b.push_back(g.points[i + 1]);
-            if (g.closed) a.push_back(g.points.back()), b.push_back(g.points.front());
-            segA.insert(segA.end(), a.begin(), a.end());
-            segB.insert(segB.end(), b.begin(), b.end());
-            curve.build(a, b);
+            for (size_t i = 0; i + 1 < g.points.size(); ++i) curveA.push_back(g.points[i]), curveB.push_back(g.points[i + 1]);
+            if (g.closed) curveA.push_back(g.points.back()), curveB.push_back(g.points.front());
+            segA.insert(segA.end(), curveA.begin(), curveA.end());
+            segB.insert(segB.end(), curveB.begin(), curveB.end());
+            curve.build(curveA, curveB);
         }
         // Snap samples to proxy vertices.
         std::vector<uint32_t> snapped;
@@ -224,10 +224,27 @@ void applyGuides(Proxy& p, const std::vector<QRemeshGuide>& guides, float streng
                 chain.push_back(v);
             }
         }
+        if (std::getenv("SF_QREMESH_TIMING")) {
+            double len = 0.0;
+            for (size_t i = 0; i + 1 < chain.size(); ++i) len += glm::length(p.P[chain[i]] - p.P[chain[i + 1]]);
+            std::fprintf(stderr, "  guide: %zu samples, %zu snapped, chain %zu vertices, length %.3f, closed %d (ends %u %u)\n", g.points.size(), snapped.size(), chain.size(), len, int(g.closed), chain.front(), chain.back());
+        }
         for (size_t i = 0; i + 1 < chain.size(); ++i) {
             const auto it = corners.find(edgeKey(chain[i], chain[i + 1]));
             if (it == corners.end()) continue;
-            for (uint32_t c : it->second) p.feature[c] = 1;
+            for (uint32_t c : it->second) {
+                p.feature[c] = 1;
+                if (p.guide.size() != 3 * nt) p.guide.assign(3 * nt, 0);
+                p.guide[c] = 1;
+                SurfaceHit hit;
+                const vec3 mid = 0.5f * (p.P[chain[i]] + p.P[chain[i + 1]]);
+                if (curve.closestPoint(mid, 4.0f * h, hit)) {
+                    vec3 dir = curveB[hit.prim] - curveA[hit.prim];
+                    if (glm::dot(dir, p.P[chain[i + 1]] - p.P[chain[i]]) < 0.0f) dir = -dir;
+                    if (p.fixedDir.size() != nt) p.fixedDir.assign(nt, vec3(0.0f));
+                    p.fixedDir[c / 3] = safeNormalize(dir);
+                }
+            }
             for (uint32_t v : {chain[i], chain[i + 1]}) {
                 if (onGuide[v]) continue;
                 SurfaceHit hit;
@@ -256,7 +273,7 @@ void applyGuides(Proxy& p, const std::vector<QRemeshGuide>& guides, float streng
     if (segA.empty()) return;
     SegmentBVH all;
     all.build(segA, segB);
-    const float reach = h * (0.5f + 5.5f * std::clamp(strength, 0.0f, 1.0f));
+    const float reach = h * (0.5f + 5.5f * std::clamp(strength, 0.0f, 1.0f)) * (std::getenv("SF_QR2_GREACH") ? float(std::atof(std::getenv("SF_QR2_GREACH"))) : 1.0f);
     fs.guideAngle.assign(nt, std::numeric_limits<float>::quiet_NaN());
     fs.guideWeight.assign(nt, 0.0f);
     for (uint32_t t = 0; t < nt; ++t) {
@@ -280,7 +297,7 @@ struct Poly {
 
 // The integer lattice of the map as a polygon mesh: proxy vertices rounding to the same lattice point (within a
 // triangle's chart) are one vertex, placed on the point; lattice neighbours are joined; faces traced counter-clockwise.
-Poly extractLattice(const Proxy& p, const Frames& fr, const GridMap& map) {
+Poly extractLattice(const Proxy& p, const Frames& fr, const GridMap& map, float h) {
     const size_t nv = p.P.size(), nt = p.T.size();
     std::vector<ivec2> L(3 * nt);
     for (size_t c = 0; c < 3 * nt; ++c) L[c] = {int(std::lround(map.uv[c].x)), int(std::lround(map.uv[c].y))};
@@ -289,15 +306,66 @@ Poly extractLattice(const Proxy& p, const Frames& fr, const GridMap& map) {
         const vec2 a = map.uv[3 * t], b = map.uv[3 * t + 1], c = map.uv[3 * t + 2];
         flipped[t] = !((b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y) > 0.0f);
     }
-    UF uf(nv);
-    for (uint32_t t = 0; t < nt; ++t)
+    // Lattice points no proxy corner rounds to (where the map stretches, often along a seam or a feature line next
+    // to a singularity) become extra nodes: every integer point inside a triangle that none of its corners
+    // represents, the same point from neighbouring triangles merged by position.
+    struct Virt {
+        uint32_t tri, node;
+        ivec2 g;
+    };
+    std::vector<Virt> virt;
+    std::vector<vec3> virtPos, virtNrm;
+    std::vector<uint8_t> virtOpen;
+    {
+        std::unordered_map<uint64_t, uint32_t> byPos;
+        const float q = 1e-4f * std::max(h, 1e-12f);
+        for (uint32_t t = 0; t < nt; ++t) {
+            if (flipped[t]) continue;
+            const vec2 a = map.uv[3 * t], b = map.uv[3 * t + 1], c = map.uv[3 * t + 2];
+            const float det = (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y);
+            if (!(det > 1e-9f)) continue;
+            const vec2 lo = glm::min(a, glm::min(b, c)), hi = glm::max(a, glm::max(b, c));
+            if (hi.x - lo.x > 64.0f || hi.y - lo.y > 64.0f) continue;
+            for (int gy = int(std::ceil(lo.y - 1e-4f)); gy <= int(std::floor(hi.y + 1e-4f)); ++gy)
+                for (int gx = int(std::ceil(lo.x - 1e-4f)); gx <= int(std::floor(hi.x + 1e-4f)); ++gx) {
+                    const ivec2 g(gx, gy);
+                    if (L[3 * t] == g || L[3 * t + 1] == g || L[3 * t + 2] == g) continue;
+                    const vec2 pt{float(gx), float(gy)};
+                    const float w1 = ((pt.x - a.x) * (c.y - a.y) - (c.x - a.x) * (pt.y - a.y)) / det;
+                    const float w2 = ((b.x - a.x) * (pt.y - a.y) - (pt.x - a.x) * (b.y - a.y)) / det;
+                    const float w0 = 1.0f - w1 - w2;
+                    if (std::min({w0, w1, w2}) < -1e-4f) continue;
+                    const vec3 at = w0 * p.P[p.T[t].x] + w1 * p.P[p.T[t].y] + w2 * p.P[p.T[t].z];
+                    const uint64_t key = (uint64_t(uint32_t(int64_t(std::floor(at.x / q)) & 0x1fffff)) << 42) |
+                                         (uint64_t(uint32_t(int64_t(std::floor(at.y / q)) & 0x1fffff)) << 21) |
+                                         uint64_t(uint32_t(int64_t(std::floor(at.z / q)) & 0x1fffff));
+                    auto [it, inserted] = byPos.try_emplace(key, uint32_t(virtPos.size()));
+                    if (inserted) {
+                        virtPos.push_back(at);
+                        virtNrm.push_back(fr.n[t]);
+                        virtOpen.push_back(0);
+                    }
+                    // On an open edge of the proxy (the weight of the opposite corner is ~0)?
+                    const float w[3] = {w0, w1, w2};
+                    for (int k = 0; k < 3; ++k)
+                        if (w[(k + 2) % 3] < 1e-4f && p.opp[3 * t + uint32_t(k)] == kNone) virtOpen[it->second] = 1;
+                    virt.push_back({t, it->second, g});
+                }
+        }
+    }
+    const size_t nn = nv + virtPos.size();
+    // Folded triangles (the map turned over) would merge unrelated lattice points: they don't join anything.
+    UF uf(nn);
+    for (uint32_t t = 0; t < nt; ++t) {
+        if (flipped[t]) continue;
         for (int i = 0; i < 3; ++i) {
             const int j = (i + 1) % 3;
             if (L[3 * t + size_t(i)] == L[3 * t + size_t(j)]) uf.unite(p.T[t][i], p.T[t][j]);
         }
-    std::vector<uint32_t> cluster(nv, kNone);
+    }
+    std::vector<uint32_t> cluster(nn, kNone);
     uint32_t nc = 0;
-    for (uint32_t v = 0; v < nv; ++v) {
+    for (uint32_t v = 0; v < nn; ++v) {
         const uint32_t r = uf.find(v);
         if (cluster[r] == kNone) cluster[r] = nc++;
         cluster[v] = cluster[r];
@@ -327,19 +395,39 @@ Poly extractLattice(const Proxy& p, const Frames& fr, const GridMap& map) {
             }
         }
     }
+    for (size_t i = 0; i < virtPos.size(); ++i) {
+        const uint32_t cl = cluster[nv + i];
+        pos[cl] = virtPos[i];
+        fit[cl] = 0.0f;
+        nrm[cl] += virtNrm[i];
+    }
     for (auto& n : nrm) n = safeNormalize(n);
     // Lattice edges.
     std::vector<std::vector<uint32_t>> adj(nc);
+    auto link = [&](uint32_t a, uint32_t b) {
+        if (a == b) return;
+        adj[a].push_back(b);
+        adj[b].push_back(a);
+    };
     for (uint32_t t = 0; t < nt; ++t)
-        for (int i = 0; i < 3; ++i) {
+        for (int i = 0; i < 3 && !flipped[t]; ++i) {
             const int j = (i + 1) % 3;
             const ivec2 d = L[3 * t + size_t(i)] - L[3 * t + size_t(j)];
             if (std::abs(d.x) + std::abs(d.y) != 1) continue;
-            const uint32_t a = cluster[p.T[t][i]], b = cluster[p.T[t][j]];
-            if (a == b) continue;
-            adj[a].push_back(b);
-            adj[b].push_back(a);
+            link(cluster[p.T[t][i]], cluster[p.T[t][j]]);
         }
+    for (size_t i = 0; i < virt.size(); ++i) {
+        const Virt& v = virt[i];
+        const uint32_t a = cluster[nv + v.node];
+        for (int k = 0; k < 3; ++k) {
+            const ivec2 d = L[3 * v.tri + uint32_t(k)] - v.g;
+            if (std::abs(d.x) + std::abs(d.y) == 1) link(a, cluster[p.T[v.tri][k]]);
+        }
+        for (size_t j = i + 1; j < virt.size() && virt[j].tri == v.tri; ++j) {
+            const ivec2 d = virt[j].g - v.g;
+            if (std::abs(d.x) + std::abs(d.y) == 1) link(a, cluster[nv + virt[j].node]);
+        }
+    }
     for (auto& a : adj) {
         std::sort(a.begin(), a.end());
         a.erase(std::unique(a.begin(), a.end()), a.end());
@@ -434,20 +522,68 @@ Poly extractLattice(const Proxy& p, const Frames& fr, const GridMap& map) {
     for (uint32_t t = 0; t < nt; ++t)
         for (int k = 0; k < 3; ++k)
             if (p.opp[3 * t + uint32_t(k)] == kNone) openCl[cluster[p.T[t][k]]] = openCl[cluster[p.T[t][(k + 1) % 3]]] = 1;
-    std::vector<uint32_t> remap(nc, kNone);
-    for (auto& f : faces) {
-        if (f.size() < 3 || f.size() > 32) continue;
-        if (f.size() >= 5) {
+    for (size_t i = 0; i < virtOpen.size(); ++i)
+        if (virtOpen[i]) openCl[cluster[nv + i]] = 1;
+    // The outside walk (along the open edges) can bite into the surface where links along the open edge are missing:
+    // each run of inside vertices between two open-edge vertices is a face of its own, else it would be a hole.
+    {
+        std::vector<std::vector<uint32_t>> bites;
+        for (const auto& f : faces) {
             size_t onB = 0;
             for (uint32_t v : f) onB += openCl[v];
-            if (onB * 10 >= f.size() * 6) continue;
+            if (f.size() <= 32 && onB != f.size()) continue;
+            if (onB == 0 || onB == f.size()) continue;
+            const size_t n = f.size();
+            size_t start = 0;
+            while (!openCl[f[start]]) ++start;
+            for (size_t k = 0; k < n;) {
+                const size_t i = (start + k) % n;
+                if (!openCl[f[(i + 1) % n]]) {
+                    std::vector<uint32_t> bite{f[i]};
+                    size_t j = (i + 1) % n, steps = 0;
+                    while (!openCl[f[j]] && steps < n) bite.push_back(f[j]), j = (j + 1) % n, ++steps;
+                    bite.push_back(f[j]);
+                    if (bite.size() >= 3 && bite.size() <= 16 && bite.front() != bite.back()) bites.push_back(bite);
+                    k += steps + 1;
+                } else {
+                    ++k;
+                }
+            }
+        }
+        if (std::getenv("SF_QREMESH_TIMING") && !bites.empty()) std::fprintf(stderr, "  v2 %zu bites refilled\n", bites.size());
+        faces.insert(faces.end(), bites.begin(), bites.end());
+    }
+    std::vector<uint32_t> remap(nc, kNone);
+    for (auto& f : faces) {
+        if (f.size() < 3 || f.size() > 32) {
+            if (std::getenv("SF_QREMESH_TIMING") && f.size() > 32) std::fprintf(stderr, "  v2 dropped a face of %zu sides\n", f.size());
+            continue;
+        }
+        if (f.size() >= 5) { // the outside traces along the open edges only; a face by them is kept (else a hole)
+            size_t onB = 0;
+            for (uint32_t v : f) onB += openCl[v];
+            if (onB == f.size() || (f.size() > 12 && onB * 10 >= f.size() * 8)) {
+                if (std::getenv("SF_QREMESH_TIMING")) {
+                    std::fprintf(stderr, "  v2 outside face: %zu sides, %zu open:", f.size(), onB);
+                    for (uint32_t v : f) std::fprintf(stderr, " (%.3f %.3f %.3f)", pos[v].x, pos[v].y, pos[v].z);
+                    std::fprintf(stderr, "\n");
+                }
+                continue;
+            }
         }
         {
             std::unordered_map<uint64_t, int> seen;
             bool twice = false;
             for (size_t a = 0; a < f.size(); ++a)
                 if (++seen[edgeKey(f[a], f[(a + 1) % f.size()])] == 2) twice = true;
-            if (twice) continue;
+            if (twice) {
+                if (std::getenv("SF_QREMESH_TIMING")) {
+                    std::fprintf(stderr, "  v2 face with a repeated edge: %zu sides:", f.size());
+                    for (uint32_t v : f) std::fprintf(stderr, " (%.3f %.3f %.3f)", pos[v].x, pos[v].y, pos[v].z);
+                    std::fprintf(stderr, "\n");
+                }
+                continue;
+            }
         }
         for (uint32_t& v : f) {
             if (remap[v] == kNone) {
@@ -488,7 +624,7 @@ void splitEven(const std::vector<vec3>& P, const std::vector<uint32_t>& f, std::
 
 // Odd faces (triangles, pentagons) are paired along short paths of faces: each edge crossed gets a middle vertex,
 // so every face on the path gains two (or the ends one) and becomes even; then even faces are split into quads.
-std::vector<glm::uvec4> allQuads(Poly& pm) {
+std::vector<glm::uvec4> allQuads(Poly& pm, std::vector<glm::uvec3>& leftover) {
     // Big faces first: cut faces of 6+ sides into even pieces along short diagonals where possible.
     {
         std::vector<std::vector<uint32_t>> next;
@@ -603,25 +739,26 @@ std::vector<glm::uvec4> allQuads(Poly& pm) {
     std::vector<glm::uvec4> quads;
     for (const auto& f : pm.faces) {
         if (f.size() % 2 == 0) splitEven(pm.P, f, quads);
-        else if (f.size() == 3) { // left over (no partner): a degenerate quad would be worse; split into three
-            const uint32_t c = uint32_t(pm.P.size());
-            pm.P.push_back((pm.P[f[0]] + pm.P[f[1]] + pm.P[f[2]]) / 3.0f);
-            const uint32_t m01 = uint32_t(pm.P.size());
-            (void)m01;
-            quads.push_back({f[0], f[1], f[2], c}); // keeps the mesh closed; rare
+        else { // an odd face left without a partner (rare): quads and one triangle, so the surface stays closed
+            const size_t n = f.size();
+            size_t i = 1;
+            for (; i + 3 < n; i += 2) quads.push_back({f[0], f[i], f[i + 1], f[i + 2]});
+            leftover.push_back({f[0], f[i], f[i + 1]});
         }
     }
     return quads;
 }
 
 // Doublets (an inside vertex with two quads) merge the two quads; unused vertices go.
-void cleanQuads(std::vector<vec3>& P, std::vector<glm::uvec4>& quads) {
+void cleanQuads(std::vector<vec3>& P, std::vector<glm::uvec4>& quads, std::vector<glm::uvec3>& tris) {
     for (int pass = 0; pass < 4; ++pass) {
         const size_t nv = P.size();
         std::vector<std::vector<uint32_t>> vq(nv);
         for (uint32_t f = 0; f < quads.size(); ++f)
             for (int k = 0; k < 4; ++k) vq[quads[f][k]].push_back(f);
         std::vector<uint8_t> dead(quads.size(), 0), touched(nv, 0);
+        for (const auto& t : tris)
+            for (int k = 0; k < 3; ++k) touched[t[k]] = 1; // a triangle's corner is no doublet
         auto rotated = [&](uint32_t f, uint32_t v) {
             glm::uvec4 r = quads[f];
             for (int k = 0; k < 4 && r.x != v; ++k) r = {r.y, r.z, r.w, r.x};
@@ -651,6 +788,11 @@ void cleanQuads(std::vector<vec3>& P, std::vector<glm::uvec4>& quads) {
     std::vector<vec3> Q;
     for (auto& f : quads)
         for (int k = 0; k < 4; ++k) {
+            if (remap[f[k]] == kNone) remap[f[k]] = uint32_t(Q.size()), Q.push_back(P[f[k]]);
+            f[k] = remap[f[k]];
+        }
+    for (auto& f : tris)
+        for (int k = 0; k < 3; ++k) {
             if (remap[f[k]] == kNone) remap[f[k]] = uint32_t(Q.size()), Q.push_back(P[f[k]]);
             f[k] = remap[f[k]];
         }
@@ -778,9 +920,80 @@ void relaxLoops(std::vector<vec3>& P, const std::vector<glm::uvec4>& quads, cons
 
 } // namespace
 
+namespace {
+
+// Quads forming a 2-manifold: every edge in at most two quads, wound opposite ways, and each vertex's quads one fan.
+bool quadsManifold(size_t nv, const std::vector<glm::uvec4>& quads) {
+    std::unordered_map<uint64_t, std::pair<int, int>> edges;
+    for (const auto& q : quads)
+        for (int k = 0; k < 4; ++k) {
+            const uint32_t a = q[k], b = q[(k + 1) % 4];
+            if (a == b) return false;
+            auto& e = edges[edgeKey(a, b)];
+            ++(a < b ? e.first : e.second);
+        }
+    for (auto& [key, e] : edges)
+        if (e.first > 1 || e.second > 1) return false;
+    // Fans: corners (prev, next) around each vertex must chain into one cycle or path.
+    std::vector<std::vector<std::pair<uint32_t, uint32_t>>> fan(nv);
+    for (const auto& q : quads)
+        for (int k = 0; k < 4; ++k) fan[q[k]].push_back({q[(k + 3) % 4], q[(k + 1) % 4]});
+    for (const auto& c : fan) {
+        if (c.size() < 2) continue;
+        std::unordered_map<uint32_t, size_t> byNext;
+        for (size_t i = 0; i < c.size(); ++i) byNext[c[i].second] = i;
+        size_t start = 0;
+        for (size_t i = 0; i < c.size(); ++i) {
+            bool hasPrev = false;
+            for (size_t j = 0; j < c.size(); ++j) hasPrev |= c[j].first == c[i].second;
+            if (!hasPrev) start = i;
+        }
+        std::vector<uint8_t> seen(c.size(), 0);
+        size_t walked = 0, cur = start;
+        while (!seen[cur]) {
+            seen[cur] = 1;
+            ++walked;
+            const auto it = byNext.find(c[cur].first);
+            if (it == byNext.end()) break;
+            cur = it->second;
+        }
+        if (walked != c.size()) return false;
+    }
+    return true;
+}
+
+bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QRemeshOptions& opt, float diag,
+                     const std::vector<QRemeshGuide>& guides, const std::function<bool(float)>& report,
+                     FieldPieceResult& out, bool& cancelled, float density);
+
+} // namespace
+
 bool remeshPieceV2(const WorkMesh& piece, int axis, double wantQuads, const QRemeshOptions& opt, float diag,
                    const std::vector<QRemeshGuide>& guides, const std::function<bool(float)>& report,
                    FieldPieceResult& out, bool& cancelled) {
+    for (const QRemeshGuide& g : guides)
+        if (g.closed || (axis >= 0 && g.points.size() >= 2 && std::abs(g.points.front()[axis]) < 1e-5f * diag &&
+                         std::abs(g.points.back()[axis]) < 1e-5f * diag)) { // a loop across the symmetry plane, halved
+            // Closed loops (round an eye) don't yet come out clean in the map; the legacy method handles them.
+            out.why = "closed guide loop";
+            return false;
+        }
+    const float densities[2] = {2.5f, 3.2f};
+    for (float d : densities) {
+        out = FieldPieceResult{};
+        const bool ok = remeshPieceOnce(piece, axis, wantQuads, opt, diag, guides, report, out, cancelled, d);
+        if (cancelled) return false;
+        if (ok && quadsManifold(out.mesh.P.size(), out.mesh.quads)) return true;
+        if (ok) out.why = "not manifold";
+    }
+    return false;
+}
+
+namespace {
+
+bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QRemeshOptions& opt, float diag,
+                     const std::vector<QRemeshGuide>& guides, const std::function<bool(float)>& report,
+                     FieldPieceResult& out, bool& cancelled, float density) {
     static const bool timing = std::getenv("SF_QREMESH_TIMING") != nullptr;
     const auto start = std::chrono::steady_clock::now();
     auto mark = [&](const char* what) {
@@ -873,7 +1086,7 @@ bool remeshPieceV2(const WorkMesh& piece, int axis, double wantQuads, const QRem
     ps.keepGroups = opt.keepGroups;
     // About three proxy edges per quad edge, at most ~400k proxy triangles.
     const float minEdge = float(std::sqrt(area / (0.433 * 400000.0)));
-    const float L0 = std::max(h0 / tune("SF_QR2_DENSITY", 2.5f), minEdge);
+    const float L0 = std::max(h0 / tune("SF_QR2_DENSITY", density), minEdge);
     // Dense input (many times the proxy's triangles): decimate in parallel blocks first.
     qr::WorkMesh pre;
     const double proxyTris = area / (0.433 * double(L0) * double(L0));
@@ -1049,7 +1262,7 @@ bool remeshPieceV2(const WorkMesh& piece, int axis, double wantQuads, const QRem
         vf.build(smooth.P.size(), smooth.T);
         std::vector<uint8_t> pinned(smooth.P.size(), 0);
         for (uint32_t c = 0; c < smooth.feature.size(); ++c)
-            if (smooth.feature[c]) pinned[smooth.T[c / 3][c % 3]] = pinned[smooth.T[c / 3][(c % 3 + 1) % 3]] = 1;
+            if (smooth.feature[c] && (smooth.guide.empty() || !smooth.guide[c])) pinned[smooth.T[c / 3][c % 3]] = pinned[smooth.T[c / 3][(c % 3 + 1) % 3]] = 1;
         std::vector<vec3> next(smooth.P.size());
         for (int r = 0; r < rounds; ++r) {
             parallelFor(smooth.P.size(), [&](size_t b, size_t e) {
@@ -1091,6 +1304,7 @@ bool remeshPieceV2(const WorkMesh& piece, int axis, double wantQuads, const QRem
     if (!fa.empty()) proxyFeatures.build(fa, fb);
 
     std::vector<glm::uvec4> quads;
+    std::vector<glm::uvec3> tris;
     std::vector<vec3> qp;
     const CrossField fieldStart = field;
     // The map is solved on the smoothed proxy, which has less area than the real one: scale the sizes to match.
@@ -1115,7 +1329,7 @@ bool remeshPieceV2(const WorkMesh& piece, int axis, double wantQuads, const QRem
         out.flippedTriangles = map.flipped;
         out.attempts = attempt + 1;
         mark("grid map");
-        Poly poly = extractLattice(proxy, frames, map);
+        Poly poly = extractLattice(proxy, frames, map, h0);
         if (timing) {
             std::map<size_t, size_t> sizes;
             for (const auto& f : poly.faces) ++sizes[f.size()];
@@ -1123,9 +1337,11 @@ bool remeshPieceV2(const WorkMesh& piece, int axis, double wantQuads, const QRem
             for (auto [k, c] : sizes) std::fprintf(stderr, " %zu:%zu", k, c);
             std::fprintf(stderr, "\n");
         }
-        quads = allQuads(poly);
+        tris.clear();
+        quads = allQuads(poly, tris);
+        if (timing && !tris.empty()) std::fprintf(stderr, "  v2 %zu odd faces left without a partner\n", tris.size());
         qp = std::move(poly.P);
-        cleanQuads(qp, quads);
+        cleanQuads(qp, quads, tris);
         mark("extract");
         const double ratio = double(quads.size()) / wantQuads;
         if (quads.empty() || attempt == 1 || std::abs(ratio - 1.0) < 0.12) break;
@@ -1138,6 +1354,51 @@ bool remeshPieceV2(const WorkMesh& piece, int axis, double wantQuads, const QRem
     }
     if (!step(0.85f)) return false;
 
+    // Symmetry: the half's only open edges should lie on the plane. Where the map left lattice points on the plane
+    // out, the open boundary bites into the surface (a path of open edges leaving the plane and coming back): close
+    // each bite with a face (a middle vertex on the plane when it is odd) and split it into quads.
+    if (axis >= 0) {
+        auto onPlane = [&](uint32_t v) { return std::abs(qp[v][axis]) < 0.05f * h0; };
+        std::unordered_map<uint64_t, int> use;
+        std::unordered_map<uint64_t, std::pair<uint32_t, uint32_t>> dir; // open edge -> (from, to) as wound
+        for (const auto& q : quads)
+            for (int k = 0; k < 4; ++k) {
+                ++use[edgeKey(q[k], q[(k + 1) % 4])];
+                dir[edgeKey(q[k], q[(k + 1) % 4])] = {q[k], q[(k + 1) % 4]};
+            }
+        std::unordered_map<uint32_t, uint32_t> nextOf; // reversed winding: the hole's own order
+        for (auto [key, n] : use) {
+            if (n != 1) continue;
+            const auto [a, b] = dir[key];
+            if (onPlane(a) && onPlane(b)) continue;
+            nextOf[b] = a;
+        }
+        size_t fixedBites = 0;
+        std::unordered_set<uint32_t> done;
+        for (auto [startV, unused] : nextOf) {
+            (void)unused;
+            if (!onPlane(startV) || done.count(startV)) continue;
+            std::vector<uint32_t> path{startV};
+            uint32_t v = startV;
+            while (nextOf.count(v) && path.size() < 64) {
+                v = nextOf[v];
+                path.push_back(v);
+                if (onPlane(v)) break;
+            }
+            done.insert(startV);
+            if (path.size() < 3 || !onPlane(path.back())) continue;
+            if (path.size() % 2 == 1) { // odd: a middle vertex on the plane
+                vec3 m = 0.5f * (qp[path.front()] + qp[path.back()]);
+                m[axis] = 0.0f;
+                path.push_back(uint32_t(qp.size()));
+                qp.push_back(m);
+            }
+            splitEven(qp, path, quads);
+            ++fixedBites;
+        }
+        if (timing && fixedBites) std::fprintf(stderr, "  v2 %zu bites at the symmetry plane closed\n", fixedBites);
+    }
+
     // 6. Loop-aware relaxation and projection.
     RelaxTargets rt;
     rt.surface = &surface;
@@ -1147,11 +1408,25 @@ bool remeshPieceV2(const WorkMesh& piece, int axis, double wantQuads, const QRem
     rt.proxyBvh = &proxyBvh;
     rt.h = h0;
     std::vector<uint8_t> feat;
+    // Vertices on the symmetry plane's open edges stay exactly on the plane through the relaxation.
+    std::vector<uint32_t> planeVerts;
+    if (axis >= 0) {
+        std::unordered_map<uint64_t, int> use;
+        for (const auto& q : quads)
+            for (int k = 0; k < 4; ++k) ++use[edgeKey(q[k], q[(k + 1) % 4])];
+        for (auto [key, n] : use) {
+            if (n != 1) continue;
+            const uint32_t a = uint32_t(key >> 32), b = uint32_t(key & 0xffffffffu);
+            if (std::abs(qp[a][axis]) < 0.05f * h0 && std::abs(qp[b][axis]) < 0.05f * h0) planeVerts.push_back(a), planeVerts.push_back(b);
+        }
+    }
     relaxLoops(qp, quads, rt, std::max(opt.smoothIterations, 0), feat);
+    for (uint32_t v : planeVerts) qp[v][axis] = 0.0f;
     mark("relax");
 
     out.mesh.P = std::move(qp);
     out.mesh.quads = std::move(quads);
+    out.mesh.tris = std::move(tris);
     out.mesh.feature = feat;
     out.seam.assign(out.mesh.P.size(), 0);
     if (axis >= 0) {
@@ -1163,10 +1438,15 @@ bool remeshPieceV2(const WorkMesh& piece, int axis, double wantQuads, const QRem
             const uint32_t a = uint32_t(key >> 32), b = uint32_t(key & 0xffffffffu);
             if (std::abs(out.mesh.P[a][axis]) < 0.05f * h0 && std::abs(out.mesh.P[b][axis]) < 0.05f * h0)
                 out.seam[a] = out.seam[b] = 1;
+            else if (timing)
+                std::fprintf(stderr, "  v2 open edge off the seam: (%.3f %.3f %.3f) (%.3f %.3f %.3f)\n", out.mesh.P[a].x, out.mesh.P[a].y,
+                             out.mesh.P[a].z, out.mesh.P[b].x, out.mesh.P[b].y, out.mesh.P[b].z);
         }
     }
     (void)diag;
     return step(0.95f);
 }
+
+} // namespace
 
 } // namespace sf::qr
