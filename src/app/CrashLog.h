@@ -20,7 +20,8 @@ void note(const std::string& line);
 // Something about to be done (a command): logged before it runs, so even a crash no handler sees leaves it as the
 // log's last line, and named by a crash note. A repeat of the last one isn't written again.
 void action(const std::string& what);
-// For --crash-test: no system crash dialog after the note (Windows Error Reporting would wait for a click).
+// For --crash-test: no system crash dialog after the note (Windows Error Reporting would wait for a click), and on
+// Linux no core dump (systemd-coredump would keep one and notify the desktop on every test run).
 void quietSystemCrashDialog();
 // The session ended normally (the next start doesn't call it a crash).
 void stop();
