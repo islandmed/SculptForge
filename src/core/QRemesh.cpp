@@ -2130,6 +2130,7 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
         m.pairQuad(t, t + 1);
     }
     for (const glm::uvec3& t : qm.tris) m.triangles.push_back(t);
+    if (!m.quadPartners.empty()) m.quadPartners.resize(m.triangles.size(), Mesh::kNoQuad); // the triangles after the quads
     if (!report(0.96f)) return false;
 
     // Attributes from the closest point of the original sculpt.

@@ -705,7 +705,7 @@ std::vector<glm::uvec4> allQuads(Poly& pm, std::vector<glm::uvec3>& leftover) {
         uint32_t goal = kNone;
         uint64_t openEdge = 0;
         uint32_t openFace = kNone;
-        for (size_t qi = 0; qi < queue.size() && goal == kNone && queue.size() < 4000; ++qi) {
+        for (size_t qi = 0; qi < queue.size() && goal == kNone; ++qi) {
             const uint32_t fi = queue[qi];
             const auto& f = pm.faces[fi];
             for (size_t k = 0; k < f.size() && goal == kNone; ++k) {
@@ -797,6 +797,142 @@ void cleanQuads(std::vector<vec3>& P, std::vector<glm::uvec4>& quads, std::vecto
             f[k] = remap[f[k]];
         }
     P.swap(Q);
+}
+
+// --- Manifold repair ------------------------------------------------------------------------------------------------
+
+// Makes the quads a 2-manifold where extraction left defects (rare, around folds of the map): quads on an edge used
+// more than twice or twice the same way are taken out and the holes they leave refilled as polygons (paired off
+// into quads like any odd face), and a vertex whose quads form several fans gets one copy per fan.
+// Returns how many defects were repaired.
+size_t repairManifold(std::vector<vec3>& P, std::vector<glm::uvec4>& quads, std::vector<glm::uvec3>& tris) {
+    size_t repaired = 0;
+    // Edges used badly (triangles left over count as faces too).
+    {
+        std::vector<std::vector<uint32_t>> faces;
+        for (const auto& q : quads) faces.push_back({q.x, q.y, q.z, q.w});
+        for (const auto& t : tris) faces.push_back({t.x, t.y, t.z});
+        std::unordered_map<uint64_t, std::vector<std::pair<uint32_t, bool>>> use; // edge -> (face, a<b forwards)
+        for (uint32_t f = 0; f < faces.size(); ++f)
+            for (size_t k = 0; k < faces[f].size(); ++k) {
+                const uint32_t x = faces[f][k], y = faces[f][(k + 1) % faces[f].size()];
+                use[edgeKey(x, y)].push_back({f, x < y});
+            }
+        std::vector<uint8_t> drop(faces.size(), 0);
+        for (auto& [key, list] : use) {
+            const bool bad = list.size() > 2 || (list.size() == 2 && list[0].second == list[1].second);
+            if (!bad) continue;
+            for (auto [f, fw] : list) drop[f] = 1;
+            ++repaired;
+        }
+        for (uint32_t f = 0; f < faces.size(); ++f) {
+            std::vector<uint32_t> s2 = faces[f];
+            std::sort(s2.begin(), s2.end());
+            if (std::adjacent_find(s2.begin(), s2.end()) != s2.end()) drop[f] = 1, ++repaired;
+        }
+        if (repaired) {
+            std::unordered_map<uint64_t, int> keptUse;
+            std::unordered_map<uint64_t, std::pair<uint32_t, uint32_t>> keptDir;
+            for (uint32_t f = 0; f < faces.size(); ++f) {
+                if (drop[f]) continue;
+                for (size_t k = 0; k < faces[f].size(); ++k) {
+                    const uint32_t x = faces[f][k], y = faces[f][(k + 1) % faces[f].size()];
+                    ++keptUse[edgeKey(x, y)];
+                    keptDir[edgeKey(x, y)] = {x, y};
+                }
+            }
+            std::unordered_map<uint32_t, std::vector<uint32_t>> next;
+            std::unordered_set<uint64_t> seen;
+            for (uint32_t f = 0; f < faces.size(); ++f) {
+                if (!drop[f]) continue;
+                for (size_t k = 0; k < faces[f].size(); ++k) {
+                    const uint64_t key = edgeKey(faces[f][k], faces[f][(k + 1) % faces[f].size()]);
+                    if (!seen.insert(key).second) continue;
+                    const auto it = keptUse.find(key);
+                    if (it == keptUse.end() || it->second != 1) continue;
+                    const auto [x, y] = keptDir[key];
+                    next[y].push_back(x);
+                }
+            }
+            Poly pm;
+            pm.P = P;
+            for (uint32_t f = 0; f < faces.size(); ++f)
+                if (!drop[f]) pm.faces.push_back(faces[f]);
+            std::unordered_map<uint32_t, size_t> used;
+            for (auto& [start, outs] : next) {
+                while (used[start] < outs.size()) {
+                    std::vector<uint32_t> loop{start};
+                    uint32_t v = start;
+                    bool closed = false;
+                    for (int steps = 0; steps < 200; ++steps) {
+                        auto it = next.find(v);
+                        if (it == next.end() || used[v] >= it->second.size()) break;
+                        const uint32_t w = it->second[used[v]++];
+                        if (w == start) {
+                            closed = true;
+                            break;
+                        }
+                        const auto again = std::find(loop.begin(), loop.end(), w);
+                        if (again != loop.end()) { // a figure eight: emit the inner loop, keep walking
+                            std::vector<uint32_t> inner(again, loop.end());
+                            if (inner.size() >= 3) pm.faces.push_back(inner);
+                            loop.erase(again + 1, loop.end());
+                            v = w;
+                            continue;
+                        }
+                        loop.push_back(w);
+                        v = w;
+                    }
+                    if (closed && loop.size() >= 3) pm.faces.push_back(loop);
+                    if (!closed) break;
+                }
+            }
+            std::vector<glm::uvec3> left;
+            quads = allQuads(pm, left);
+            P = std::move(pm.P);
+            tris = std::move(left);
+        }
+    }
+    // Pinched vertices: one copy per fan.
+    {
+        const size_t nv = P.size();
+        std::vector<std::vector<std::pair<uint32_t, int>>> corners(nv); // (quad, corner index)
+        for (uint32_t f = 0; f < quads.size(); ++f)
+            for (int k = 0; k < 4; ++k) corners[quads[f][k]].push_back({f, k});
+        for (uint32_t v = 0; v < nv; ++v) {
+            const auto& c = corners[v];
+            if (c.size() < 2) continue;
+            // Union corners sharing an edge at v (the next vertex of one is the previous of another).
+            std::vector<uint32_t> parent(c.size());
+            std::iota(parent.begin(), parent.end(), 0u);
+            auto find = [&](uint32_t x) {
+                while (parent[x] != x) x = parent[x] = parent[parent[x]];
+                return x;
+            };
+            for (size_t i = 0; i < c.size(); ++i)
+                for (size_t j = 0; j < c.size(); ++j) {
+                    if (i == j) continue;
+                    const glm::uvec4 qi = quads[c[i].first], qj = quads[c[j].first];
+                    if (qi[(c[i].second + 1) % 4] == qj[(c[j].second + 3) % 4]) parent[find(uint32_t(i))] = find(uint32_t(j));
+                }
+            std::unordered_map<uint32_t, uint32_t> copyOf;
+            for (size_t i = 0; i < c.size(); ++i) copyOf.emplace(find(uint32_t(i)), 0);
+            if (copyOf.size() < 2) continue;
+            ++repaired;
+            bool firstFan = true;
+            for (auto& [root, id] : copyOf) {
+                if (firstFan) {
+                    id = v;
+                    firstFan = false;
+                } else {
+                    id = uint32_t(P.size());
+                    P.push_back(P[v]);
+                }
+            }
+            for (size_t i = 0; i < c.size(); ++i) quads[c[i].first][c[i].second] = copyOf[find(uint32_t(i))];
+        }
+    }
+    return repaired;
 }
 
 // --- Relaxation -----------------------------------------------------------------------------------------------------
@@ -923,11 +1059,18 @@ void relaxLoops(std::vector<vec3>& P, const std::vector<glm::uvec4>& quads, cons
 namespace {
 
 // Quads forming a 2-manifold: every edge in at most two quads, wound opposite ways, and each vertex's quads one fan.
-bool quadsManifold(size_t nv, const std::vector<glm::uvec4>& quads) {
+bool quadsManifold(size_t nv, const std::vector<glm::uvec4>& quads, const std::vector<glm::uvec3>& tris = {}) {
     std::unordered_map<uint64_t, std::pair<int, int>> edges;
     for (const auto& q : quads)
         for (int k = 0; k < 4; ++k) {
             const uint32_t a = q[k], b = q[(k + 1) % 4];
+            if (a == b) return false;
+            auto& e = edges[edgeKey(a, b)];
+            ++(a < b ? e.first : e.second);
+        }
+    for (const auto& t : tris)
+        for (int k = 0; k < 3; ++k) {
+            const uint32_t a = t[k], b = t[(k + 1) % 3];
             if (a == b) return false;
             auto& e = edges[edgeKey(a, b)];
             ++(a < b ? e.first : e.second);
@@ -983,7 +1126,7 @@ bool remeshPieceV2(const WorkMesh& piece, int axis, double wantQuads, const QRem
         out = FieldPieceResult{};
         const bool ok = remeshPieceOnce(piece, axis, wantQuads, opt, diag, guides, report, out, cancelled, d);
         if (cancelled) return false;
-        if (ok && quadsManifold(out.mesh.P.size(), out.mesh.quads)) return true;
+        if (ok && quadsManifold(out.mesh.P.size(), out.mesh.quads, out.mesh.tris)) return true;
         if (ok) out.why = "not manifold";
     }
     return false;
@@ -1342,6 +1485,11 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
         if (timing && !tris.empty()) std::fprintf(stderr, "  v2 %zu odd faces left without a partner\n", tris.size());
         qp = std::move(poly.P);
         cleanQuads(qp, quads, tris);
+        for (int round = 0; round < 3 && !quadsManifold(qp.size(), quads, tris); ++round) {
+            const size_t n = repairManifold(qp, quads, tris);
+            cleanQuads(qp, quads, tris);
+            if (timing) std::fprintf(stderr, "  v2 repaired %zu manifold defects: %zu quads, %zu triangles, %zu vertices\n", n, quads.size(), tris.size(), qp.size());
+        }
         mark("extract");
         const double ratio = double(quads.size()) / wantQuads;
         if (quads.empty() || attempt == 1 || std::abs(ratio - 1.0) < 0.12) break;

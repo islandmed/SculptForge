@@ -559,6 +559,13 @@ void App::drawPalette_Tool() {
     }
     if (subpalette("tool.remesh", "Remesh")) {
         tray::Section section;
+        // QRemesh (quad retopology) first: the same controls and settings as in Tool > Geometry.
+        ImGui::PushID("remesh_qremesh");
+        Demo::pushScope("Remesh QRemesh");
+        drawQRemeshContents();
+        Demo::popScope();
+        ImGui::PopID();
+        tray::GroupLabel(*this, "Voxel Remesh");
         const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
         if (voxelRemesh_) { // remeshing a painted SubTool in the background (PanelRetopo.cpp)
             ImGui::ProgressBar(voxelRemesh_->progress->load(), ImVec2(half, 0), "Remeshing...");

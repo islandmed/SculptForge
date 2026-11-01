@@ -103,6 +103,7 @@ void App::startQRemesh() {
     if (qremesh_ || doc_.mesh.triangleCount() == 0) return;
     if (doc_.sculptor.strokeActive()) endStroke();
     QRemeshOptions o;
+    o.method = retopo_.method == 1 ? QRemeshMethod::Legacy : QRemeshMethod::V2;
     o.targetQuads = std::clamp(retopo_.target, 16, 2'000'000);
     o.adaptive = retopo_.adaptive;
     o.keepGroups = retopo_.keepGroups;
@@ -122,6 +123,7 @@ void App::startQRemesh() {
     job->triangles = doc_.mesh.triangleCount();
     job->keepOriginal = retopo_.keepOriginal;
     job->args = {{"target", double(o.targetQuads)}, {"adaptive", double(o.adaptive)}};
+    if (o.method == QRemeshMethod::Legacy) job->args["method"] = std::string("legacy");
     if (o.keepGroups) job->args["keep_groups"] = true;
     if (!o.detectEdges) job->args["detect_edges"] = false;
     if (o.usePolypaint) job->args["use_polypaint"] = true;
@@ -254,7 +256,10 @@ void App::pollQRemesh() {
     }
     if (index != doc_.activeSubtool) doc_.selectSubtool(index);
     if (doc_.sculptor.strokeActive()) endStroke();
+    lastQRemeshStats_ = *job->stats;
+    haveQRemeshStats_ = true;
     CommandResult r{true, applyQRemesh(doc_, std::move(*job->result), job->keepOriginal, *job->stats) + *job->textureNote};
+    lastQRemeshSubtool_ = doc_.activeSubtoolInfo().id;
     if (const std::string notice = doc_.takeNotice(); !notice.empty()) r.message += ". " + notice; // levels dropped
     status_ = r.message;
     lastCommandOk_ = true;
@@ -286,6 +291,16 @@ void App::drawQRemeshContents() {
         ImGui::TextDisabled("%zu polygons", faceCount(doc_.mesh));
     }
 
+    {
+        static const char* methods[] = {"QRemesh 2", "Legacy"};
+        ImGui::SetNextItemWidth(-1);
+        ImGui::Combo("##qmethod", &retopo_.method, methods, 2);
+        ui::HelpText("Method", nullptr,
+                     "QRemesh 2 (default): a curvature-aligned layout solved as one integer grid over the whole model, "
+                     "so poles appear only where the form needs them and edge loops run unbroken; open guide curves "
+                     "become exact edge loops. Legacy: the method of SculptForge 0.9 (more poles, a split look).",
+                     kQRemeshPath);
+    }
     ImGui::SetNextItemWidth(-1);
     tray::SliderInt("##qtarget", &retopo_.target, 100, 200000, "Target Polygons %d", ImGuiSliderFlags_Logarithmic);
     ui::HelpText("Target Polygons", nullptr,
@@ -346,6 +361,29 @@ void App::drawQRemeshContents() {
         drawKeepTextureCheckbox("Keep Texture##qremesh", kQRemeshPath);
     }
     drawQRemeshGuideControls();
+    drawQRemeshReport();
+}
+
+void App::drawQRemeshReport() {
+    if (!haveQRemeshStats_ || lastQRemeshSubtool_ != doc_.activeSubtoolInfo().id) return;
+    const QRemeshStats& st = lastQRemeshStats_;
+    const QuadQuality& q = st.quality;
+    if (q.quads == 0) return;
+    tray::GroupLabel(*this, "Quality Report");
+    ImGui::TextDisabled("%s: %zu quads in %.1f s", st.method == QRemeshMethod::Legacy ? "Legacy" : "QRemesh 2", q.quads,
+                        st.seconds);
+    ImGui::TextDisabled("Poles: %zu  (3 edges %zu, 5 edges %zu, other %zu)", q.poles, q.valence[3], q.valence[5],
+                        q.poles - q.valence[3] - q.valence[5]);
+    ImGui::TextDisabled("Corners off square: %.1f deg mean, %.0f deg worst 1%%", double(q.angleDeviation),
+                        double(q.angleDeviationMax));
+    if (q.measured)
+        ImGui::TextDisabled("Distance to the sculpt: %.3f%% mean, %.2f%% max", double(q.meanDistance), double(q.hausdorff));
+    if (st.fallbackPieces) ImGui::TextDisabled("%zu piece(s) used the legacy method", st.fallbackPieces);
+    ui::HelpText("Quality Report", nullptr,
+                 "How clean the new topology is: poles are vertices with other than four edges (fewer is cleaner), "
+                 "corners off square measure how far quad corners are from 90 degrees, and the distance is how far the "
+                 "new surface strays from the sculpt (in % of its size; ProjectAll brings fine detail back).",
+                 kQRemeshPath);
 }
 
 // ---------------------------------------------------------------------------
