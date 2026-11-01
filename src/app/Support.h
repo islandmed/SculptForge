@@ -21,7 +21,7 @@ inline constexpr const char* kSupportUrl = "https://sculptforge.app/donate.html"
 // The same Stripe checkout links as website/donate.html (tests/test_support.cpp checks they match).
 inline constexpr const char* kSupportUrlSupporter = "https://buy.stripe.com/aFacN5h1t6L8cP14ad4F201"; // $5 / month
 inline constexpr const char* kSupportUrlInsider = "https://buy.stripe.com/dRmdR94eH4D06qD9ux4F202";   // $20 / month
-inline constexpr const char* kSupportUrlStudio = "https://buy.stripe.com/9B63cv8uXb1og1dfSV4F203";    // $250 / month
+inline constexpr const char* kSupportUrlStudio = "https://buy.stripe.com/3cI00j12v5H4g1dgWZ4F204";    // $150 / month (up to 10 artists)
 inline constexpr const char* kSupportUrlOnce = "https://buy.stripe.com/4gM7sL8uXc5s4iv5eh4F200";      // one-time gift
 // What Insider members get; early access starts with 1.0. Worded the same in the app, on the donate page and in
 // What's New (tests/test_support.cpp checks the donate page).

@@ -30,7 +30,7 @@ All notable changes to SculptForge are listed here. The format follows
   (`mask_border rings=2 polygroups=true soft=true`).
 - The support card at launch: a full-window card over a bronze sculpt rendered in SculptForge, with the Supporter
   ($5 / month), Insider ($20 / month, "Insiders will get each release about two weeks early, starting with
-  SculptForge 1.0.") and Studio ($250 / month) memberships and a one-time gift, each opening its Stripe checkout in
+  SculptForge 1.0.") and Studio ($150 / month for up to 10 artists) memberships and a one-time gift, each opening its Stripe checkout in
   the browser. It shows only while starting: the first time, after each update (with a link to What's New), and
   otherwise at most once every 7 days; never mid-session, in tests, renders, demos or CI (`SF_NO_SUPPORT_CARD=1`
   also turns it off). Maybe later, Esc or a click outside closes it; "I'm already a supporter" hides it for good

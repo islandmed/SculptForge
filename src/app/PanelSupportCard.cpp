@@ -459,9 +459,9 @@ void App::drawSupportCard() {
          "Each release about two weeks early, starting with SculptForge 1.0. A monthly vote on what gets built "
          "next, and the monthly Supporter Pack of brushes, alphas and VDMs.",
          "Become an Insider", "Become an Insider##card.insider", kSupportUrlInsider},
-        {"Studio", "$250", "/ month",
-         "Your logo on the website and README, Insider access for up to 10 artists and priority triage of your "
-         "pipeline bugs.",
+        {"Studio", "$150", "/ month",
+         "Insider access for up to 10 artists ($15 each), priority triage of your pipeline bugs, monthly "
+         "invoices and your logo on the website and README.",
          "Studio membership", "Studio membership##card.studio", kSupportUrlStudio},
     };
     const float gap = 18.0f * k, footer = 58.0f * k, tierH = 262.0f * k;
