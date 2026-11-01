@@ -6,6 +6,8 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-01
+
 ### Added
 - **Micro levels: hundreds of millions of sculptable polygons** (**Tool > Geometry > Micro**, `micro_*`
   commands). Above the highest subdivision level a SubTool can carry a micro level: per triangle a regular grid of
