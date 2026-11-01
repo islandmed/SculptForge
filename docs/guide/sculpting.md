@@ -159,6 +159,20 @@ Smooth keeps a Z Intensity of its own, as in ZBrush, so a gentle Standard stroke
 speed. Hold <kbd>Shift</kbd> (or pick the Smooth brush) and the Z Intensity slider shows **Smooth Z Intensity**:
 change it there, or hold <kbd>Shift</kbd> and press <kbd>U</kbd>. It starts at 50.
 
+### Smooth that keeps the volume
+
+The plain smooth evens out bumps by pulling each point towards its neighbours, so with every pass the form
+shrinks a little too: a cheek flattens, a sphere gets smaller. The other smooth keeps the volume: it removes the
+bumps but leaves the form where it is (a Taubin smooth, one step in and a slightly larger one back out).
+
+- **Alternate smooth**, as in ZBrush: start a stroke with <kbd>Shift</kbd> held, then let go of <kbd>Shift</kbd>
+  while still pressing. The rest of the stroke uses the other smooth, and the status line says which.
+- **Smooth keeps volume** in the **Brush** palette makes the volume-keeping smooth the one <kbd>Shift</kbd> and
+  the Smooth brush use; letting go of <kbd>Shift</kbd> mid-stroke then switches to the plain one. Saved with the
+  project.
+
+On a micro level (see [Micro levels](micro-levels.md)) Smooth is always the plain one for now.
+
 ![The Draw palette](images/draw-palette.jpg)
 
 ## Sculpt, Paint, Zadd, Zsub, Rgb and Front
@@ -458,7 +472,9 @@ also have a **Pressure curve** setting that makes them respond to a light or a f
 - a pressure curve for all brushes (Soft, Linear or Firm, or set **Curve**, **Minimum**, **Maximum**, **Threshold**
   and **Full pressure at** yourself), applied before each brush's own curve;
 - the eraser end (default **Invert**, like holding <kbd>Alt</kbd>) and the side buttons (default:
-  lower button right-click to rotate the view, upper button **Invert**, third button **Pan view**).
+  lower button right-click to rotate the view, upper button **Invert**, third button **Pan view**);
+- **Mouse mode (relative)**, for a tablet whose driver is set to mouse mode: the pen moves the cursor by how far
+  it moves, and putting it down elsewhere on the tablet leaves the cursor where it was.
 
 **Store Config** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) keeps these settings. Setup notes for Windows
 Ink, macOS and Linux are in

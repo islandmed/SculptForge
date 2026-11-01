@@ -6,6 +6,22 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Preferences > Tablet > Mouse mode (relative) (#54): for tablets whose driver is set to mouse mode, the pen moves
+  the cursor by how far it moves, like a mouse.
+- Alternate smooth (#40, as in ZBrush): start a stroke with Shift held, then let go of Shift while still pressing,
+  and the rest of the stroke smooths without shrinking the form (a Taubin smooth). Brush > Smooth keeps volume
+  makes that the Shift / Smooth brush smooth (letting go of Shift then switches to the plain one).
+- Ctrl+drag on the background with MaskPen draws a mask rectangle while dragging (#48) and masks what it covers;
+  one that covers none of the model clears the mask, as before (and as in ZBrush, without DynaMesh's remesh).
+
+### Fixed
+- Pen tablets in mouse (relative) mode (#54): lifting the pen and putting it down elsewhere made the cursor jump
+  back to where the pen was on the tablet. Turn on Preferences > Tablet > Mouse mode.
+- MaskLasso and MaskRect ignored symmetry (#51): the mirror image of the shape is masked too now, as with mask
+  strokes. A Ctrl+click on the model with MaskLasso or MaskRect blurs the mask (Ctrl+Alt+click sharpens it), as
+  with MaskPen; it did nothing. A lasso or rectangle that covers none of the model clears the mask.
+
 ## [0.10.2] - 2026-11-01
 
 ### Removed

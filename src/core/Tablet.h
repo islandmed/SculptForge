@@ -4,13 +4,14 @@
 // Graphics tablet settings (Preferences > Tablet), independent of SDL so they
 // can be unit tested: the global pressure curve applied to every pen sample
 // before a brush's own pressure curve, what the eraser end and the pen's side
-// buttons do, and the stroke-start pressure guard. The app's event handling
+// buttons do, the stroke-start pressure guard and the mouse mode (PenCursor). The app's event handling
 // lives in src/app/Tablet.cpp; docs/tablet.md is the user guide.
 #pragma once
 
 #include "core/Json.h"
 
 #include <array>
+#include <cstdint>
 #include <string>
 
 namespace sf {
@@ -57,6 +58,9 @@ struct TabletSettings {
     // Lower button: right-click (drag to rotate, as with a Wacom's default mapping); upper: Alt (invert);
     // third: pan.
     std::array<PenAction, kPenButtons> buttons{PenAction::RightClick, PenAction::Invert, PenAction::PanView};
+    // Mouse mode (#54): the tablet driver is set to move the cursor relatively, like a mouse, so the pen's
+    // reported position isn't where the cursor is (PenCursor).
+    bool mouseMode = false;
 };
 
 Json toJson(const TabletSettings& t);
@@ -82,6 +86,32 @@ private:
     float raw_ = 1.0f;
     bool sinceDown_ = false;
     bool everSampled_ = false;
+};
+
+// Where the pen puts the cursor. In pen mode that is where the pen reports it is. In mouse mode (the driver's
+// relative mode, TabletSettings::mouseMode) the pen moves the cursor by how far it moves, like a mouse: lifting
+// it away and putting it down elsewhere on the tablet leaves the cursor where it was. Windows Ink reports the
+// pen's place on the tablet even then, so following it made the cursor jump back (#54). The app passes every pen
+// position (the pen's own events and SDL's mouse events for the pen) through map().
+class PenCursor {
+public:
+    // A pen silent this long was lifted away (the driver may not say it left): the next position starts afresh.
+    static constexpr uint64_t kLiftedNs = 150000000ull;
+
+    bool mouseMode = false;
+
+    // The pen came into range or left it: in mouse mode its next position moves the cursor from where it is.
+    void proximity() { anchored_ = false; }
+    // Something else (the mouse) moved the cursor to x, y.
+    void cursorAt(float x, float y);
+    // A pen position (window pixels) at time nowNs -> the cursor's position, in place.
+    void map(float& x, float& y, uint64_t nowNs);
+
+private:
+    float offsetX_ = 0.0f, offsetY_ = 0.0f; // mouse mode: cursor = pen + offset
+    float cursorX_ = 0.0f, cursorY_ = 0.0f;
+    bool haveCursor_ = false, anchored_ = false;
+    uint64_t lastNs_ = 0;
 };
 
 } // namespace sf

@@ -69,7 +69,11 @@
 //                            the tray, -1 when closed); OP is == != < <= > >=; N may be $NAME, $NAME*K,
 //                            $NAME+K or $NAME-K (see remember)
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
-//                            moved_masked (masked vertices that moved),
+//                            moved_masked (masked vertices that moved), mask_soft (vertices partly masked),
+//                            selection_shown (1 while a rectangle / lasso selection is drawn), symmetry_x,
+//                            tablet_mouse_mode (Preferences > Tablet > Mouse mode),
+//                            smooth_keep_volume (Brush > Smooth keeps volume), stroke_keep_volume (1 when Smooth
+//                            dabs keep the volume now: the option, flipped by letting go of Shift mid-stroke),
 //                            moved_out (summed movement along the snapshot's normals: > 0 out, < 0 in),
 //                            pen_pressure (raw), brush_pressure (after the curve; 1 for the mouse),
 //                            stroking (1 while a stroke is open), cursor_x / cursor_y (the brush cursor, pixels),
@@ -149,6 +153,7 @@
 //                            on the background to rotate the view; stray: a plain mouse event at X Y after every
 //                            pen sample, as some tablet drivers send (Ugee on X11, #7)
 //   pen_pressure P           a pressure sample from the hovering pen (e.g. a stale value before a stroke)
+//   pen_enter U V            the pen comes into range at a point on the model (put down elsewhere, no hover)
 //   pen_out                  the pen leaves proximity
 //   mouse_move U V           a plain mouse (not the pen) moves to a point on the model, e.g. the stray mouse
 //                            events Windows Ink sends beside the pen's
@@ -398,6 +403,8 @@ double Demo::query(const std::string& name, bool& known) const {
     }
     // ZBrush feel (Input.cpp): the intensities and Focal Shift as shown (0-100, -100..100).
     if (name == "z_intensity") return std::round(app_.strength_ * 100.0f);
+    if (name == "smooth_keep_volume") return app_.smoothKeepVolume_ ? 1.0 : 0.0;
+    if (name == "stroke_keep_volume") return app_.dabSettings().smoothKeepVolume ? 1.0 : 0.0; // (Smooth's dabs)
     if (name == "smooth_intensity") return std::round(app_.smoothStrength_ * 100.0f);
     if (name == "rgb_intensity") return std::round(app_.rgbIntensity_ * 100.0f);
     if (name == "focal_shift") return std::round(app_.focalShift_ * 100.0f);
@@ -556,6 +563,13 @@ double Demo::query(const std::string& name, bool& known) const {
         for (float v : m.mask) n += v > 0.5f;
         return double(n);
     }
+    if (name == "mask_soft") { // vertices partly masked (a blurred edge)
+        size_t n = 0;
+        for (float v : m.mask) n += v > 0.01f && v < 0.99f;
+        return double(n);
+    }
+    if (name == "selection_shown") return app_.drag_ == App::Drag::Select && app_.selectMoved_ ? 1.0 : 0.0;
+    if (name == "symmetry_x") return app_.symmetry_.x ? 1.0 : 0.0;
     if (name == "hidden") {
         size_t n = 0;
         for (uint8_t h : m.hidden) n += h != 0;
@@ -584,6 +598,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "pen_pressure") return app_.penTracker_.raw();
     if (name == "brush_pressure") return app_.strokePressure();
     if (name == "stroking") return app_.drag_ == App::Drag::Stroke ? 1.0 : 0.0;
+    if (name == "tablet_mouse_mode") return app_.uiPrefs_.tablet.mouseMode ? 1.0 : 0.0;
     if (name == "cursor_x") return app_.mouseX_;
     if (name == "cursor_y") return app_.mouseY_;
     if (name == "surface_cursor") return app_.surfaceCursorShown_ ? 1.0 : 0.0;
@@ -1482,6 +1497,16 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             const float k = std::min(t / seconds, 1.0f);
             penMove(from->x + (to->x - from->x) * k, from->y + (to->y - from->y) * k);
             return t >= seconds;
+        });
+        wait(0.05f);
+    } else if (verb == "pen_enter") {
+        // The pen comes into range at u, v straight away (put down elsewhere on the tablet, no hover there).
+        if (!need(2)) return false;
+        run([this, u = num(1, 0.5f), v = num(2, 0.5f)] {
+            if (penIn_) penProximity(false);
+            penProximity(true);
+            const ImVec2 p = onModel(u, v);
+            penMove(p.x, p.y);
         });
         wait(0.05f);
     } else if (verb == "pen_drag") {

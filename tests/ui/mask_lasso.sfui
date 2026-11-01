@@ -1,7 +1,11 @@
 # MaskLasso, MaskRect and SelectLasso on the real UI: Ctrl+drag selections mask and unmask,
-# Ctrl+Shift+drag lassos hide, and every selection is one undo step.
+# Ctrl+Shift+drag lassos hide, and every selection is one undo step. Then symmetry and Ctrl+click on the model
+# with MaskLasso (#51), and MaskPen's Ctrl+drag rectangle from the background (#48).
 run new_sphere subdivisions=5
 expect_value masked == 0
+# (Symmetry X is on by default: off for the first part, so the shapes mask only what they cover.)
+key x
+expect_value symmetry_x == 0
 
 # The shapes sit at the top of Tool > Masking, with Ctrl-hover help.
 click "Masking"
@@ -42,6 +46,14 @@ expect_value masked > $unmasked
 key ctrl+z
 expect_value masked == $unmasked
 
+# A Ctrl+drag selection that covers none of the model clears the mask (ZBrush); undo brings it back.
+hold ctrl
+drag_path 1.3 -0.3 1.6 0.0
+hold none
+expect_value masked == 0
+key ctrl+z
+expect_value masked == $unmasked
+
 # Ctrl+click on the background still inverts the mask with MaskLasso / MaskRect.
 hold ctrl
 drag_path 1.4 0.5 1.4 0.5
@@ -49,6 +61,37 @@ hold none
 expect_value masked > $unmasked
 key ctrl+z
 expect_value masked == $unmasked
+
+# Symmetry X (#51): the lasso around the left half masks the right half too, as a mask stroke would.
+click "MaskLasso##mask.lasso"
+click "Clear##mask"
+key x
+expect_value symmetry_x == 1
+hold ctrl
+drag_path -0.2 -0.2 0.45 -0.2 0.55 0.5 0.45 1.2 -0.2 1.2
+hold none
+expect_value masked > $lasso*1.6
+remember masked lasso_mirrored
+shot lasso_symmetry
+
+# Ctrl+click on the model with MaskLasso blurs the mask, Ctrl+Alt+click sharpens it, as with MaskPen (#51).
+expect_value mask_soft == 0
+hold ctrl
+drag_path 0.5 0.3 0.5 0.3
+hold none
+expect_value mask_soft > 20
+remember mask_soft blurred
+hold ctrl+alt
+drag_path 0.5 0.3 0.5 0.3
+hold none
+expect_value mask_soft < $blurred
+key ctrl+z
+key ctrl+z
+expect_value mask_soft == 0
+expect_value masked == $lasso_mirrored
+click "Clear##mask"
+key x
+expect_value symmetry_x == 0
 
 # MaskPen again: Ctrl+drag on the model paints with the brush.
 click "MaskPen##mask.pen"
@@ -58,6 +101,34 @@ stroke 0.3 0.3 0.7 0.3
 hold none
 expect_value masked > 50
 expect_value masked < $lasso
+click "Clear##mask"
+
+# MaskPen, Ctrl+drag starting on the background (#48): a mask rectangle is drawn while dragging and masks what it
+# covers (the left half); one that covers none of the model clears the mask, as before.
+hold ctrl
+drag_path -0.3 -0.3 0.45 1.3 keep
+expect_value selection_shown == 1
+shot pen_rect_drawing
+release
+hold none
+expect_value selection_shown == 0
+expect_value masked > 2000
+expect_value masked < 7000
+remember masked pen_rect
+hold ctrl
+drag_path 1.3 -0.3 1.6 0.0 keep
+expect_value selection_shown == 1
+release
+hold none
+expect_value masked == 0
+key ctrl+z
+expect_value masked == $pen_rect
+# A Ctrl+click on the background still inverts.
+hold ctrl
+drag_path 1.4 0.5 1.4 0.5
+hold none
+expect_value masked > $pen_rect
+key ctrl+z
 click "Clear##mask"
 
 # SelectLasso in Tool > Visibility: Ctrl+Shift+drag keeps the inside, Ctrl+Shift+Alt+drag hides it.

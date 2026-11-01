@@ -119,7 +119,7 @@ action registry, the same source as the Controls window.
 
 | Action | Keys | What it does |
 |---|---|---|
-| Clear Mask | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> | Unmask everything (also: Ctrl+drag on the background). |
+| Clear Mask | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> | Unmask everything (also: Ctrl+drag on the background, away from the model). |
 | Divide | <kbd>Ctrl</kbd>+<kbd>D</kbd> | Add a subdivision level: four times the polygons, and the lower levels are kept, so you can step down to shape big forms and back up to the detail. Quads stay quads (Catmull-Clark). Smt off divides without smoothing. |
 | Group Masked | <kbd>Ctrl</kbd>+<kbd>W</kbd> | Turn the masked part into a new polygroup and clear the mask (ZBrush Ctrl+W). With nothing masked, everything visible becomes one group. |
 | Higher Res | <kbd>D</kbd> | Step one subdivision level up (more polygons, for detail). Edits made below carry the detail along. |

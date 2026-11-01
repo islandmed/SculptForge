@@ -343,3 +343,61 @@ TEST(mask_rect_and_lasso) {
     CHECK(!registry().execute(e, "mask_lasso", {}).ok); // points is required
     CHECK(!registry().execute(e, "mask_rect", {{"view_proj", std::string("1 2 3")}}).ok);
 }
+
+TEST(mask_rect_and_lasso_symmetry_and_clear_outside) {
+    // #51: with symmetry the mirror image of the shape is masked too, as a mask stroke mirrors. A rectangle over
+    // x in -1..-0.4 (the front view spans the bounds) masks x < -0.4*r and, mirrored in X, x > 0.4*r.
+    Document d = makeDoc(makeIcosphere(3));
+    const Mesh& m = d.mesh;
+    const Args rect = {{"x0", -1.0}, {"y0", -1.0}, {"x1", -0.4}, {"y1", 1.0}, {"symmetry", std::string("x")}};
+    CHECK(registry().execute(d, "mask_rect", rect).ok);
+    int wrong = 0, left = 0, right = 0;
+    for (uint32_t v = 0; v < m.vertexCount(); ++v) {
+        const float x = m.positions[v].x;
+        if (std::abs(std::abs(x) - 0.4f) < 0.05f) continue; // (the rectangle's edge)
+        if ((m.mask[v] == 1.0f) != (std::abs(x) > 0.4f)) ++wrong;
+        left += m.mask[v] == 1.0f && x < 0.0f;
+        right += m.mask[v] == 1.0f && x > 0.0f;
+    }
+    CHECK(wrong == 0);
+    CHECK(left > 0 && left == right);
+    // Y and Z mirror through the same centre; a lasso takes it too. Bad axes are an error.
+    Document y = makeDoc(makeIcosphere(3));
+    CHECK(registry().execute(y, "mask_lasso", {{"points", std::string("-1.5 0.5  1.5 0.5  1.5 1.5  -1.5 1.5")},
+                                               {"symmetry", std::string("Y")}}).ok);
+    wrong = 0;
+    for (uint32_t v = 0; v < y.mesh.vertexCount(); ++v) {
+        const float py = y.mesh.positions[v].y;
+        if (std::abs(std::abs(py) - 0.5f) < 0.05f) continue;
+        if ((y.mesh.mask[v] == 1.0f) != (std::abs(py) > 0.5f)) ++wrong;
+    }
+    CHECK(wrong == 0 && countMasked(y.mesh) > 0);
+    CHECK(!registry().execute(y, "mask_rect", {{"symmetry", std::string("xw")}}).ok);
+
+    // clear_outside (#48, ZBrush's Ctrl+drag on the background): a shape that covers none of the model clears the
+    // mask, as one undo step; one that covers some masks as usual; without it a miss changes nothing.
+    const size_t before = countMasked(m);
+    CHECK(registry().execute(d, "mask_rect", {{"x0", 5.0}, {"y0", 5.0}, {"x1", 6.0}, {"y1", 6.0}}).ok);
+    CHECK(countMasked(m) == before);
+    CHECK(registry().execute(d, "mask_rect", {{"x0", 5.0}, {"y0", 5.0}, {"x1", 6.0}, {"y1", 6.0}, {"clear_outside", true}}).ok);
+    CHECK(countMasked(m, 0.0f) == 0);
+    CHECK(registry().execute(d, "undo").ok);
+    CHECK(countMasked(m) == before);
+    CHECK(registry().execute(d, "mask_rect", {{"x0", -0.1}, {"y0", -0.1}, {"x1", 0.1}, {"y1", 0.1}, {"clear_outside", true}}).ok);
+    CHECK(countMasked(m) > before);
+    // Nothing masked and nothing covered: no undo step.
+    Document e = makeDoc(makeIcosphere(2));
+    CHECK(registry().execute(e, "mask_rect", {{"x0", 5.0}, {"y0", 5.0}, {"x1", 6.0}, {"y1", 6.0}, {"clear_outside", true}}).ok);
+    CHECK(!e.undo.canUndo());
+    // Hidden parts don't count as covered.
+    Document h = makeDoc(makeIcosphere(3));
+    maskHalf(h.mesh, 0.5f);
+    h.mesh.ensureHidden();
+    for (uint32_t t = 0; t < h.mesh.triangleCount(); ++t) {
+        const glm::uvec3 tri = h.mesh.triangles[t];
+        h.mesh.hidden[t] = uint8_t(h.mesh.positions[tri.x].x < 0.0f || h.mesh.positions[tri.y].x < 0.0f ||
+                                   h.mesh.positions[tri.z].x < 0.0f);
+    }
+    CHECK(registry().execute(h, "mask_rect", {{"x0", -1.0}, {"y0", -1.0}, {"x1", -0.6}, {"y1", 1.0}, {"clear_outside", true}}).ok);
+    CHECK(countMasked(h.mesh, 0.0f) == 0);
+}

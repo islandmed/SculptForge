@@ -13,6 +13,7 @@
 #include <glm/glm.hpp>
 
 #include <cstdint>
+#include <vector>
 
 namespace sf {
 
@@ -44,7 +45,15 @@ bool maskByPolygroup(Mesh& mesh, uint32_t group, bool add);
 // project inside `shape` (NDC under `viewProj`, see ScreenSelect.h) gain
 // `strength` (0-1) of mask, or lose it with `unmask`. Vertices behind the
 // camera count as outside; the far side of the model is selected too.
-bool maskInShape(Mesh& mesh, const glm::mat4& viewProj, const ScreenPolygon& shape, float strength, bool unmask);
+// `mirrors` (Sculptor::mirrors of the symmetry) also selects each vertex whose
+// mirror image projects inside, as the brushes mirror (#51); empty = none.
+bool maskInShape(Mesh& mesh, const glm::mat4& viewProj, const ScreenPolygon& shape, float strength, bool unmask,
+                 const std::vector<glm::vec3>& mirrors = {});
+// Whether any visible vertex (or, with `mirrors`, its mirror image) projects
+// inside `shape`: a selection that covers none of the model clears the mask
+// instead (ZBrush: Ctrl+drag on the background).
+bool shapeCoversMesh(const Mesh& mesh, const glm::mat4& viewProj, const ScreenPolygon& shape,
+                     const std::vector<glm::vec3>& mirrors = {});
 
 // Registers mask_clear, mask_all, mask_invert, mask_blur, mask_sharpen,
 // mask_grow, mask_shrink, mask_by_cavity, mask_by_polygroup, mask_rect and

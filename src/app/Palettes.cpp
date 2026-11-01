@@ -230,6 +230,12 @@ void App::drawPalette_Brush() {
     ImGui::SameLine();
     ImGui::Checkbox("Invert (Alt)", &invertToggle_);
     ui::HelpText("Invert", "Alt", "Brushes subtract instead of add (ZBrush Zsub). Holding Alt flips it for one stroke.", "Brush");
+    ImGui::Checkbox("Smooth keeps volume##smooth_keep_volume", &smoothKeepVolume_);
+    ui::HelpText("Smooth keeps volume", nullptr,
+                 "The Smooth brush (and Shift) removes bumps without shrinking the form, instead of the plain smooth "
+                 "that also flattens it. Either way, let go of Shift while still pressing a Shift-smooth stroke to "
+                 "switch to the other smooth for the rest of the stroke (ZBrush's alternate smooth).",
+                 "Brush");
     if (BrushRecipe* recipe = doc_.activeBrush >= 0 && doc_.activeBrush < int(doc_.brushes.size())
                                   ? &doc_.brushes[size_t(doc_.activeBrush)]
                                   : nullptr) {
