@@ -102,8 +102,8 @@ updating when it should (a driver that misbehaves), start SculptForge with the e
 
 On a very dense mesh a dab can cost more than a frame. The dabs of a stroke then wait in a queue that
 SculptForge works through for a few milliseconds each frame, reading the pen or mouse in between, so a fast
-curve stays a curve; if the brush falls far behind, every second waiting dab is left out (a wider spacing)
-so it catches up. `sculptforge --run "new_sphere" --measure-stroke 3,200` draws a fast circle for three seconds
+curve stays a curve; once more than about 50 ms of dabs are waiting, every second waiting dab is left out (a
+wider spacing), so the brush stays close to the pointer and stops soon after you lift the pen. `sculptforge --run "new_sphere" --measure-stroke 3,200` draws a fast circle for three seconds
 with a 200-pixel brush and prints how far the dabs strayed from it and the frame times.
 `SF_STROKE_IMMEDIATE=1` places every dab as soon as the pointer moves (versions before 0.9.6),
 `SF_STROKE_BACKLOG=0` never leaves dabs out, and `SF_STROKE_LOG=1` logs the queue each frame.

@@ -5,6 +5,15 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Next version
+
+### Faster big brushes on dense meshes
+
+A large brush on a model of 20 million triangles or more keeps up much better: on a 21-million-triangle sphere
+with a 200-pixel brush, the brush now trails the pointer by half as far, a frame takes a third less time, the
+first dab appears in half the time, and lifting the pen no longer pauses for up to a second while waiting dabs
+are placed. See [Performance](performance.md).
+
 ## Version 0.9.6
 
 ### Extract

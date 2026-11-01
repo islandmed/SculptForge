@@ -12,6 +12,63 @@ sculptforge-cli --bench ...                     # the same without the GPU (CI, 
 Machine for all figures: Apple M1 Pro (8 performance + 2 efficiency cores, 32 GB unified memory, 30 GB usable
 under Asahi Linux), integrated GPU, Mesa 26.1 (OpenGL 4.6). How the benchmark works is described under v0.5 below.
 
+## Next version: big brushes on dense meshes (feat/perf-pass)
+
+What a user feels on a heavy model is a large brush: how far it trails the pointer, how long a frame takes, and
+what happens on press and release. Measured with the stroke the app draws itself (pointer read once per pass of
+the loop, as a busy program gets it):
+
+```
+sculptforge --run "new_sphere subdivisions=10; subdiv_divide; subdiv_divide" --measure-stroke 3,200
+```
+
+A 21M-triangle sphere (10.5M vertices, two levels made by Divide), a 200 px brush (about 3.3M vertices per
+dab, X symmetry), a fast two-turn circle in 3 s. M1 Pro, Release build; repeated runs agree within a few ms.
+
+| | 0.9.6 | After |
+|---|---:|---:|
+| Frame, mean / worst | 98 / 182 ms | **65 / 111 ms** |
+| Brush behind the pointer, mean / worst | 293 / 544 px | **137 / 189 px** |
+| Press to the first dab on screen | 361 ms | **157 ms** |
+| Release | 990 ms | **67-130 ms** |
+| Dabs off the circle, worst | 6.9 px | 2.6 px |
+
+Where a frame's time went in 0.9.6 (timers around each step): the dab 50-72 ms (normals 18-29, BVH refit
+17-23, brush 14-18), the renderer's sync 28-78 ms, the draw about 1 ms. What changed, in order of what it saved:
+
+1. **The stroke queue's floor.** The backlog limit was about 50 ms of dabs but never fewer than 24; at 45 ms a
+   dab that is a second of work behind the pointer, and releasing placed all of it. The floor is 4 now
+   (`strokeBacklogLimit`, core/StrokePath.h). Light meshes are unchanged (the time limit allows hundreds).
+2. **Upload: changed blocks up to three quarters.** `UploadOrder::dirtyRuns` sent the whole mesh once a quarter
+   of the vertices changed; a 200 px brush changes about a third, so every frame re-packed 10.5M vertices
+   (cavity included): 78 ms. The changed blocks now: 14-30 ms.
+3. **BVH refit.** The leaf boxes were recomputed in parallel but each leaf's ancestors walked up on one thread:
+   6.5 ms per mirror. With 4,096+ leaves the ancestors are flagged in parallel and recomputed from their children
+   in parallel subtrees (`BVH::refitAncestors`): BVH 21-23 -> 8.5 ms a dab; at 33M (benchmark, large
+   Standard) 5.4 -> 2.9 ms.
+4. **Press.** Starting a stroke cleared the LODs even when there were none, which made the renderer treat the
+   mesh as new: a full upload of positions and faces before the first dab showed.
+5. **Normals.** The vertices to recompute were each moved vertex and its neighbour ring; on levels made by
+   Divide the ring is worked out per vertex (7.3 ms of the 22). Now the corners of the triangles in the BVH leaves
+   the dab's queries listed (a superset: every triangle with a moved vertex is in one). Frames 71 -> 65 ms.
+6. **Upload runs.** `dirtyRuns` walked the changed vertices on one thread (3.7 ms); with 65,536+ it marks the
+   GPU blocks in parallel (0.4 ms).
+
+Tried and dropped: keeping each triangle's corners from `clusterBounds`' first pass for its radius pass (the
+culling bounds, 9 ms a frame here): no faster (8.7 against 8.8-9.8 ms), the pass is bound by memory, not by the
+second read.
+
+33M benchmark (`--bench --bench-sizes 33 --bench-no-project`): large Standard dab 44.6 -> 41.8 ms; every other row
+within run-to-run noise (the benchmark's dabs touch 7% of the mesh, so the upload and queue changes don't show
+there).
+
+What a frame still costs at 21M with this brush: the dab about 45-50 ms (normals about 15 ms computing, brush
+about 17 ms, BVH about 8.5 ms) and the sync about 28 ms (upload about 19 ms, of which the cavity term about a
+quarter; culling bounds about 9 ms). Each step is already parallel and scales with the 3.3M vertices under the
+brush; the next gains need a sampling profiler (perf) to see where the loops stall. Candidates: the cavity term
+computed in the normals pass instead of from each vertex's ring at upload, face normals shared between a
+triangle's corners, the double-precision volume in `clusterBounds`.
+
 ## v0.9: Make sculptable (feat/sculptable)
 
 Splat capture to a sculptable SubTool (`splat_to_mesh`, core/Sculptable.h): the built-in test head capture

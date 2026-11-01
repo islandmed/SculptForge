@@ -6,6 +6,27 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Large brushes on dense meshes are faster and stay closer to the pointer. Measured on a 21M-triangle sphere
+  with a 200 px brush (`--measure-stroke 3,200`, M1 Pro):
+
+  | | 0.9.6 | Now |
+  |---|---|---|
+  | Frame | 98 ms | 65 ms |
+  | Brush behind the pointer, mean / worst | 293 / 544 px | 137 / 189 px |
+  | Press to first dab on screen | 361 ms | 157 ms |
+  | Release | 990 ms | 67-130 ms |
+
+  The 33M-triangle benchmark's large Standard dab goes from 44.6 to 41.8 ms; the other rows are unchanged.
+  - The stroke queue keeps about 50 ms of dabs, at least 4 (it kept at least 24: a second of work behind the
+    pointer at 21M, all placed on release).
+  - The BVH refit of a big dab recomputes the ancestors of its leaves in parallel (13 ms on one thread before).
+  - A dab's normals are recomputed for the corners of the BVH leaves its queries listed instead of every moved
+    vertex's neighbour ring (7 ms a dab on levels made by Divide).
+  - The GPU upload sends the changed blocks until three quarters of the mesh changed (it re-sent the whole
+    mesh above a quarter: 78 ms a frame against 14-30), and finds them in parallel (3.7 -> 0.4 ms).
+  - Starting a stroke no longer re-uploads the whole mesh when there are no LODs.
+
 ## [0.9.6] - 2026-10-31
 
 The same evening as 0.9.5, the next batch from your reports and from askNK's review: Extract and Mirror And Weld,
