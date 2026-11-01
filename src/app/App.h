@@ -5,6 +5,7 @@
 #include "ai/BrushAssistant.h"
 #include "app/Actions.h"
 #include "app/AssetLibrary.h"
+#include "app/AxisGizmo.h"
 #include "app/CommandPalette.h"
 #include "app/Config.h"
 #include "app/Console.h"
@@ -1147,6 +1148,8 @@ private:
     bool rememberWindow_ = false;
     bool fullscreenAfterFirstFrame_ = false; // macOS: the saved full screen, entered once the window is on screen (#41)
     void drawAxisGizmo();
+    std::array<AxisGizmoEnd, 6> axisGizmoLayout() const; // the gizmo's ends on screen now (AxisGizmo.h)
+    bool axisGizmoMouseDown(float x, float y);          // a click on an end: that side view (#43)
     // Insert on the model (#34): the primitive chosen in Append > Insert; a drag on the surface places it.
     std::string insertType_;
     glm::vec3 insertAt_{0.0f}, insertNormal_{0.0f, 1.0f, 0.0f};

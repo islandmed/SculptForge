@@ -32,6 +32,7 @@
 //   gizmo_hover HANDLE       move the mouse onto a Gizmo 3D handle (it lights up, for screenshots)
 //   drag_landmark N DX DY [S] left-drag Make sculptable's face landmark N (0-7, FaceLandmarks order) by DX DY pixels
 //   orbit DX DY              right-drag on the background, in pixels (with the held modifiers)
+//   axis_click +x|-x|+y|-y|+z|-z  click that end of the axis gizmo in the canvas corner (it snaps to that side view)
 //   button_drag middle|right X0 Y0 X1 Y1 [S]  drag with that button in window fractions (with the held modifiers)
 //   expect_shortcut ACTION KEYS  the action's effective keys, e.g. expect_shortcut view.front Numpad 1
 //   camera YAW PITCH         set the view's angles in degrees (0 0 = the front view), e.g. for guide screenshots
@@ -827,6 +828,24 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             SDL_GetWindowSize(app_.window_, &ww, &wh);
             return ImVec2((x0 + (x1 - x0) * u) * float(ww), (y0 + (y1 - y0) * u) * float(wh));
         }, seconds);
+        run([this] { SDL_SetModState(held_); });
+        wait(0.1f);
+    } else if (verb == "axis_click") {
+        // axis_click +x|-x|+y|-y|+z|-z: click that end of the axis gizmo (Draw > Camera > Axes, #43)
+        if (!need(1)) return false;
+        static const char* const names[6] = {"+x", "+y", "+z", "-x", "-y", "-z"};
+        const auto found = std::find_if(std::begin(names), std::end(names), [&](const char* n) { return w[1] == n; });
+        if (found == std::end(names)) {
+            error = "axis_click takes +x, -x, +y, -y, +z or -z";
+            return false;
+        }
+        const size_t end = size_t(found - std::begin(names));
+        auto at = std::make_shared<ImVec2>();
+        run([this, at, end] {
+            const AxisGizmoEnd e = app_.axisGizmoLayout()[end];
+            *at = ImVec2(e.at.x, e.at.y);
+        });
+        stroke([at](float) { return *at; }, 0.2f);
         run([this] { SDL_SetModState(held_); });
         wait(0.1f);
     } else if (verb == "click_subtool") {
