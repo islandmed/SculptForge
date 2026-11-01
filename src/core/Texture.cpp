@@ -621,11 +621,13 @@ std::vector<uint8_t>& PaintTexture::target(int layer) {
     return layers[size_t(layer)].rgba;
 }
 
-size_t PaintTexture::bytes() const {
+size_t PaintTexture::colourBytes() const {
     size_t n = pixels.size() + base.size() + coverage.size() + sizeof(PaintTexture);
     for (const auto& l : layers) n += l.rgba.size() + sizeof(TextureLayer);
-    return n + channelBytes(*this);
+    return n;
 }
+
+size_t PaintTexture::bytes() const { return colourBytes() + channelBytes(*this); }
 
 std::shared_ptr<PaintTexture> makeTexture(int width, int height) {
     auto t = std::make_shared<PaintTexture>();
@@ -840,6 +842,7 @@ struct UvTileIndex {
     std::vector<uint8_t> triTiles;  // 4 per triangle: tile x0, y0, x1, y1 (x0 > x1: none); tiles per side <= 256
     std::vector<uint32_t> binStart; // tilesX * tilesY + 1
     std::vector<uint32_t> bins;
+    size_t bytes = 0; // set once built (texturePaintCacheBytes)
 };
 
 // One tile's texels: the triangle and barycentrics (b1, b2 as 16 bits) of each, kNoTri where no island reaches.
@@ -861,7 +864,14 @@ struct TexelMapCache {
     std::vector<std::unique_ptr<TexelMapTile>> tiles;
     size_t live = 0;
     uint64_t clock = 0;
+    // Bytes of the tiles' maps, kept as they are built and dropped, so memory readouts never walk `tiles`.
+    std::atomic<size_t> bytes{0};
 };
+
+static size_t texelMapBytes(const TexelMapTile& t) {
+    return sizeof(TexelMapTile) + t.tri.size() * sizeof(uint32_t) + t.bary.size() * sizeof(uint16_t) +
+           t.extras.size() * sizeof(TexelMapTile::Extra);
+}
 
 namespace {
 
@@ -914,7 +924,7 @@ std::shared_ptr<const UvTileIndex> buildUvIndex(const Mesh& m, int width, int he
     uint32_t running = 0;
     for (size_t k = 0; k < tiles; ++k) {
         idx->binStart[k] = running;
-        for (size_t b = 0; b < blocks; ++b) {
+        for (size_t b = 0; b < blocks; ++b) { // (per tile, the blocks in order)
             const uint32_t n = counts[b * tiles + k];
             counts[b * tiles + k] = running; // now: where block b writes into bin k
             running += n;
@@ -926,6 +936,7 @@ std::shared_ptr<const UvTileIndex> buildUvIndex(const Mesh& m, int width, int he
         uint32_t* at = &counts[b * tiles];
         for (size_t i = b * per; i < std::min(nt, (b + 1) * per); ++i) forTiles(i, [&](size_t k) { idx->bins[at[k]++] = uint32_t(i); });
     });
+    idx->bytes = sizeof(UvTileIndex) + idx->triTiles.size() + (idx->binStart.size() + idx->bins.size()) * sizeof(uint32_t);
     return idx;
 }
 
@@ -1152,12 +1163,10 @@ void clearTexturePaintCaches() {
 size_t texturePaintCacheBytes() {
     std::lock_guard lock(gPaintCacheMutex);
     size_t n = 0;
-    for (const PaintCacheEntry& e : gPaintCache) {
-        if (e.index) n += e.index->triTiles.size() + (e.index->binStart.size() + e.index->bins.size()) * sizeof(uint32_t);
+    for (const PaintCacheEntry& e : gPaintCache) { // (counters only: safe while a dab builds texel maps)
+        if (e.index) n += e.index->bytes;
         if (e.coverage) n += e.coverage->size();
-        if (e.maps)
-            for (const auto& t : e.maps->tiles)
-                if (t) n += t->tri.size() * 4 + t->bary.size() * 2 + t->extras.size() * sizeof(TexelMapTile::Extra);
+        if (e.maps) n += e.maps->bytes.load(std::memory_order_relaxed);
     }
     return n;
 }
@@ -1231,6 +1240,7 @@ size_t TexturePainter::dabTiles(const DabContext& c, const Paint& paint, bool co
         std::sort(old.begin(), old.end());
         for (const auto& [used, i] : old) {
             if (cache.live + missing <= kTexelMapBudget) break;
+            cache.bytes.fetch_sub(texelMapBytes(*cache.tiles[i]), std::memory_order_relaxed);
             cache.tiles[i].reset();
             --cache.live;
         }
@@ -1248,6 +1258,7 @@ size_t TexturePainter::dabTiles(const DabContext& c, const Paint& paint, bool co
         if (!slot) {
             slot = buildTexelMap(mesh, c.tex, idx, ti);
             slot->used = cache.clock;
+            cache.bytes.fetch_add(texelMapBytes(*slot), std::memory_order_relaxed);
         }
         const TexelMapTile& map = *slot;
         if (c.s <= 0.0f) return; // prewarm: only the texel maps

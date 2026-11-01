@@ -251,6 +251,10 @@ private:
     // symmetry, the brush, its alpha, recipe and VDM can change mid-stroke without the solver thread seeing a
     // half-written value (they take effect from the next batch, as they did from the next dab before). The
     // alpha and the recipe are the stroke's own copies (strokeAlpha_, strokeRecipe_), which nothing changes.
+    // Never on the solver thread: the painted texture and PBR channels (Mesh::texture: its tiles, shown() and dirty
+    // tiles are edited on the main thread only, and the Texture Map panel runs texture commands). Painting strokes
+    // stay in the frame loop (asyncStrokeAllowed), and nothing a batch does (dabAt without paint, the sculptor,
+    // prepareStrokeUpload, which refuses slots with UVs) reads mesh->texture.
     struct DabSettings {
         float radiusPx = 60.0f, strength = 0.5f, smoothStrength = 0.5f, focal = 0.0f, maskStrength = 1.0f;
         float sprayScatter = 1.0f;

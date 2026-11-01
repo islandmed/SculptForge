@@ -121,6 +121,8 @@ struct PaintTexture {
     // The array painting writes into (layer -1 = Base: `pixels` without layers).
     std::vector<uint8_t>& target(int layer);
     size_t bytes() const;
+    // Without the material channel tiles (TileImage::liveBytes counts those, safe from any thread).
+    size_t colourBytes() const;
 };
 
 // Bytes of the texture-painting caches shared by every texture on the same UVs (UV tile bins, coverage, texel

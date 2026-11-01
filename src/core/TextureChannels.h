@@ -152,7 +152,9 @@ void channelViewTexels(const PaintTexture& tex, Channel c, int x0, int y0, int x
 void syncChannelView(PaintTexture& tex, Channel c);
 
 // --- Memory ---
-// Bytes of material channel images (bases, composites and layer channels).
+// Bytes of material channel images (bases, composites and layer channels). Walks the tiles: call it only where
+// the texture is edited (the main thread), never while a dab may run elsewhere; TileImage::liveBytes is the
+// thread-safe total.
 size_t channelBytes(const PaintTexture& tex);
 
 // texture_channels, paint_material, channel_view, texture_layer_channel.

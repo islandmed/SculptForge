@@ -77,8 +77,7 @@ MemoryUse documentMemory(const Document& doc) {
         u.mesh += m.memoryBytes();
         if (m.texture && std::find(seen.begin(), seen.end(), m.texture.get()) == seen.end()) {
             seen.push_back(m.texture.get());
-            u.textures += m.texture->bytes();
-            u.channels += channelBytes(*m.texture);
+            u.textures += m.texture->colourBytes();
         }
         u.bvh += (active ? doc.bvh : st.bvh).memoryBytes();
         u.levels += subdivBytes(m);
@@ -90,6 +89,10 @@ MemoryUse documentMemory(const Document& doc) {
             u.gpu += m.vertexCount() * (12 + (m.hasColors() ? 4 : 0) + (m.hasMask() ? 1 : 0)) * 11 / 10 +
                      m.triangleCount() * (6 + (m.hasPolygroups() ? 2 : 0));
     }
+    // Material channel tiles from the atomic count (every texture, copies and undo steps): no tile walk here, so
+    // the readout is safe whatever else is painting.
+    u.channels = TileImage::liveBytes();
+    u.textures += u.channels;
     u.paintCaches = texturePaintCacheBytes();
     return u;
 }
