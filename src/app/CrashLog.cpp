@@ -136,7 +136,14 @@ void onSignal(int sig) {
     std::raise(sig);
 }
 #else
+LPTOP_LEVEL_EXCEPTION_FILTER g_previousFilter = nullptr;
+
 LONG WINAPI onException(EXCEPTION_POINTERS* info) {
+    // An uncaught C++ exception (MSVC's code 0xE06D7363): the C runtime's own filter, which this one replaced,
+    // turns it into std::terminate, where onTerminate writes the exception's text. Hand it on.
+    constexpr DWORD kCppException = 0xE06D7363;
+    if (info && info->ExceptionRecord && info->ExceptionRecord->ExceptionCode == kCppException && g_previousFilter)
+        return g_previousFilter(info);
     if (!g_crashing.exchange(true)) {
         crashHeader("unhandled exception");
         const EXCEPTION_RECORD* r = info ? info->ExceptionRecord : nullptr;
@@ -245,7 +252,7 @@ void start(const std::string& folder) {
     SDL_SetLogOutputFunction(onSdlLog, nullptr);
     std::set_terminate(onTerminate);
 #if defined(_WIN32)
-    SetUnhandledExceptionFilter(onException);
+    g_previousFilter = SetUnhandledExceptionFilter(onException);
     ULONG guarantee = 64 * 1024; // room for the note after a stack overflow
     SetThreadStackGuarantee(&guarantee);
     std::signal(SIGABRT, onAbortSignal);
