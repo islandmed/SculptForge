@@ -73,6 +73,8 @@ const char* glyphFor(AssetKind k) {
         return ICON_LC_IMAGE;
     case AssetKind::Splat:
         return ICON_LC_SPARKLES;
+    case AssetKind::Vdm:
+        return ICON_LC_STAMP;
     }
     return ICON_LC_BOX;
 }
@@ -228,6 +230,15 @@ void LightBox::rootEntries(App& app, std::vector<AssetEntry>& out) {
             }
             out.push_back(std::move(e));
         }
+        // Vector displacement brushes from the library (built-ins are in the VDM picker).
+        for (const auto& v : app.doc_.vdms) {
+            if (v->builtin) continue;
+            AssetEntry e;
+            e.kind = AssetKind::Vdm;
+            e.name = v->name;
+            e.path = v->path;
+            out.push_back(std::move(e));
+        }
         break;
     case LibraryTab::Alpha: {
         for (int i = 0; i < 3; ++i) {
@@ -360,6 +371,10 @@ ImTextureID LightBox::thumbnail(App& app, const AssetEntry& e) {
         return t.alpha(builtinAlpha(e.index));
     case AssetKind::Material:
         return t.material(e.index);
+    case AssetKind::Vdm: {
+        const int i = findVdm(app.doc_, e.name);
+        return i >= 0 ? t.vdm(app.doc_.vdms[size_t(i)]) : ImTextureID(0);
+    }
     default:
         return ImTextureID(0);
     }
@@ -427,6 +442,9 @@ void LightBox::activate(App& app, const AssetEntry& e, bool append) {
     }
     case AssetKind::BrushFile:
         app.runCommand("brush_load", {{"path", e.path}});
+        return;
+    case AssetKind::Vdm: // the VDM brush with this map (Detail Clone keeps the brush, swapping its map)
+        app.runCommand("vdm_set", {{"name", e.name}});
         return;
     case AssetKind::Alpha:
         app.runCommand("brush_set_alpha", {{"name", lower(kAlphaNames[std::clamp(e.index, 0, 2)])}});

@@ -96,7 +96,7 @@ void App::snakeHookTo(float x, float y) {
     p.strokeDelta = delta / float(steps);
     for (int i = 0; i < steps; ++i) {
         p.center = grabLast_;
-        doc_.sculptor.dab(doc_.mesh, doc_.bvh, BrushType::SnakeHook, p, symmetry_);
+        doc_.sculptor.dab(doc_.mesh, doc_.bvh, strokeBrush_, p, symmetry_); // SnakeHook or KelvinSnake
         grabLast_ += p.strokeDelta;
     }
 }

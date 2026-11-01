@@ -128,6 +128,43 @@ void drawBrushIcon(ImDrawList* dl, ImVec2 c, float r, int type) {
         break;
     }
     case BrushType::Inflate: dl->AddCircle(c, r * 0.45f, hi, 24, w); break;
+    case BrushType::KelvinGrab: { // a soft bulge with a drag arrow
+        dl->AddCircle(c, r * 0.5f, hi, 32, w * 0.6f);
+        const ImVec2 a(c.x - r * 0.1f, c.y + r * 0.1f), b(c.x + r * 0.5f, c.y - r * 0.5f);
+        dl->AddLine(a, b, hi, w);
+        dl->AddTriangleFilled(b, ImVec2(b.x - r * 0.3f, b.y + r * 0.02f), ImVec2(b.x - r * 0.02f, b.y + r * 0.3f), hi);
+        break;
+    }
+    case BrushType::KelvinTwist: { // a swirl
+        ImVec2 pts[24];
+        for (int i = 0; i < 24; ++i) {
+            const float t = float(i) / 23.0f, ang = t * 5.0f, rr = r * (0.1f + 0.45f * t);
+            pts[i] = ImVec2(c.x + std::cos(ang) * rr, c.y - std::sin(ang) * rr);
+        }
+        dl->AddPolyline(pts, 24, hi, 0, w);
+        break;
+    }
+    case BrushType::KelvinScale: // four arrows pointing in
+        for (int k = 0; k < 4; ++k) {
+            const float ang = 0.785f + 1.5708f * float(k);
+            const ImVec2 o(c.x + std::cos(ang) * r * 0.6f, c.y + std::sin(ang) * r * 0.6f);
+            const ImVec2 i(c.x + std::cos(ang) * r * 0.2f, c.y + std::sin(ang) * r * 0.2f);
+            dl->AddLine(o, i, hi, w * 0.8f);
+        }
+        break;
+    case BrushType::KelvinSnake: { // a tapering hook
+        ImVec2 pts[12];
+        for (int i = 0; i < 12; ++i) {
+            const float t = float(i) / 11.0f;
+            pts[i] = ImVec2(c.x - r * 0.4f + r * 0.8f * t, c.y + r * 0.35f - r * 0.75f * t * t);
+        }
+        for (int i = 0; i + 1 < 12; ++i) dl->AddLine(pts[i], pts[i + 1], hi, w * (1.4f - float(i) / 11.0f));
+        break;
+    }
+    case BrushType::DetailClone: // a row of stamps
+        for (int k = -1; k <= 1; ++k)
+            dl->AddCircleFilled(ImVec2(c.x + r * 0.42f * float(k), c.y + r * 0.12f * float(k)), r * 0.16f, hi, 16);
+        break;
     case BrushType::Pinch:
         dl->AddLine(ImVec2(c.x - r * 0.5f, c.y - r * 0.4f), ImVec2(c.x, c.y), hi, w);
         dl->AddLine(ImVec2(c.x + r * 0.5f, c.y - r * 0.4f), ImVec2(c.x, c.y), hi, w);
@@ -286,6 +323,11 @@ void App::registerShellActions() {
         "Slides the surface sideways along the stroke.",
         "Vector displacement: one DragRect stamps a whole shape with overhangs (horn, ear curl, scales, nostril, or "
         "your own from a VDM plane). Pick the map under Brush > Vector Displacement.",
+        "Elastic move (Kelvinlets): drags the surface like real clay, with no falloff edge; Squash makes it bulge.",
+        "Elastic twist: drag right to turn the surface clockwise around where you pressed, left to turn it back.",
+        "Elastic pinch / swell: drag left to pinch the surface toward where you pressed, right to swell it.",
+        "Elastic SnakeHook: pulls smooth, tapering horns and tendrils out along the stroke.",
+        "Stamps the VDM brush's map along the stroke, each copy turned to follow it. Capture one with Capture from view.",
     };
     static_assert(std::size(kBrushHelp) == size_t(BrushType::Count));
     for (int i = 0; i < int(BrushType::Count); ++i) {

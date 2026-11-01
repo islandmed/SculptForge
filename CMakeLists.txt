@@ -232,6 +232,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/Selection.cpp
     src/app/PanelBrushes.cpp
     src/app/PanelVdm.cpp
+    src/app/PanelKelvinlet.cpp
     src/app/PanelFace.cpp
     src/app/PanelBrushLibrary.cpp
     src/app/PanelBrushGallery.cpp

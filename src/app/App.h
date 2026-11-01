@@ -28,6 +28,7 @@
 #include "core/SpaceMouse.h"
 #include "core/Tablet.h"
 #include "core/UpdateCheck.h"
+#include "core/ViewCapture.h"
 #include "core/Texture.h"
 #include "io/ArExport.h"
 #include "link/PhoneLink.h"
@@ -117,7 +118,7 @@ public:
     void queueFile(FileAction action, std::string path);
 
 private:
-    enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, SubToolClick, Select, Gizmo, Guide, Sculptable, ZSphere };
+    enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, SubToolClick, Select, Gizmo, Guide, Sculptable, ZSphere, Capture };
 
     void handleEvent(const SDL_Event& e);
     void onMouseDown(float x, float y, Uint8 button);
@@ -418,6 +419,32 @@ private:
     float faceTakeTime_ = 0.0f;
     std::mutex faceTakeMutex_;
     std::string pendingFaceTake_; // set by the file dialog thread
+    // Kelvinlet brushes and Alpha / VDM from viewport (PanelKelvinlet.cpp, core/Kelvinlet.h, core/ViewCapture.h).
+    bool kelvinStrokeBrush() const; // KelvinGrab / Twist / Scale: the drag drives the brush, not dabs
+    void kelvinBegin(const RayHit& hit);
+    void kelvinTo(float x, float y);
+    void drawKelvinletSection();
+    void registerKelvinletActions();
+    bool captureMouseDown(float x, float y); // true while Capture from view is armed (it takes the drag)
+    void captureMouseMove(float x, float y);
+    void captureMouseUp();
+    void drawCaptureOverlay(); // the square being dragged and the result window
+    void drawCaptureWindow();
+    void recapture();
+    bool kelvinUiValue(const std::string& name, double& out) const; // UI test values (UiTest.cpp)
+    struct CaptureUi {
+        bool armed = false, circle = false, open = false, haveFrame = false;
+        glm::vec2 anchor{0.0f}, current{0.0f};
+        CaptureFrame frame;
+        CaptureOptions options;
+        BrushAlpha alpha;
+        std::shared_ptr<const VectorDisplacement> vdm;
+        CaptureInfo alphaInfo, vdmInfo;
+        std::string error;
+        char name[64] = "Captured";
+    } capture_;
+    glm::vec3 kelvinCenter_{0.0f};
+    float kelvinRadius_ = 0.0f, kelvinLastX_ = 0.0f;
     static void SDLCALL onVdmChosen(void* userdata, const char* const* files, int filter);
     static void SDLCALL onVdmExportChosen(void* userdata, const char* const* files, int filter);
     friend void drawVdmGrid(App&, GridMode);

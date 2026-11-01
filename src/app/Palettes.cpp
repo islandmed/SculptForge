@@ -242,6 +242,10 @@ void App::drawPalette_Brush() {
             }
         }
     }
+    if (subpalette("brush.kelvinlet", "Kelvinlet & Capture")) {
+        tray::Section section;
+        drawKelvinletSection(); // PanelKelvinlet.cpp
+    }
     if (subpalette("brush.vdm", "Vector Displacement")) {
         tray::Section section;
         drawVdmSection(); // PanelVdm.cpp

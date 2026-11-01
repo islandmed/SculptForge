@@ -476,6 +476,7 @@ void App::initActions() {
     registerSplatTrainUi();    // Splats > Train from capture (PanelSplatTrain.cpp)
     registerSculptableUiActions(); // Splats > Make sculptable (PanelSculptable.cpp)
     registerVdmActions();      // Brush > Vector Displacement (PanelVdm.cpp)
+    registerKelvinletActions(); // Brush > Kelvinlet & Capture: Capture from view (PanelKelvinlet.cpp)
     registerFaceUiActions();   // Tool > Facial Shapes, face_take_play / face_take_stop (PanelFace.cpp)
     registerPerformanceUiActions(); // Preferences > Performance (PanelPerformance.cpp)
     registerInputActions();     // ZBrush keys: U I O, Space, L, V, Ctrl+A / I / H / W..., the input style (Input.cpp)

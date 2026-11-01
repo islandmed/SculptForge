@@ -41,7 +41,8 @@ UiLayout standardLayout() {
                     "subtool.solo", "view.splats"};
     l.bottomShelf = {"brush.standard", "brush.clay",    "brush.claybuildup", "brush.damstandard", "brush.move",
                      "brush.smooth",   "brush.inflate", "brush.pinch",       "brush.flatten",     "brush.crease",
-                     "brush.trim",     "brush.snakehook", "brush.layer",     "brush.nudge",       "brush.paint",
+                     "brush.trim",     "brush.snakehook", "brush.layer",     "brush.nudge",       "brush.kelvingrab",
+                     "brush.detailclone", "brush.paint",
                      "widget.add_brush"};
     return l;
 }
