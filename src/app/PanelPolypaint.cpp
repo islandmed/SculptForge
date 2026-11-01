@@ -232,7 +232,11 @@ const BrushRecipe* App::strokeRecipe() const {
 void App::paintAt(const DabParams& dab) {
     DabParams p = dab;
     p.strength = rgbIntensity_ * dabStrengthScale_; // paint has its own strength (ZBrush RGB Intensity)
-    if (texturePainter_.active()) texturePainter_.dab(doc_.mesh, doc_.bvh, p, doc_.paintColor, symmetry_);
+    if (texturePainter_.active()) { // the brush material: colour plus the material channels it paints
+        BrushMaterial m = doc_.paintMaterial;
+        m.color = doc_.paintColor;
+        texturePainter_.dab(doc_.mesh, doc_.bvh, p, m, symmetry_);
+    }
     else if (!paintsTexture(doc_.mesh)) paintDab(doc_.sculptor, doc_.mesh, doc_.bvh, p, doc_.paintColor, symmetry_);
 }
 
@@ -240,9 +244,11 @@ void App::beginPaintStroke() {
     paintSnapshot_.reset();
     const Mesh& m = doc_.mesh;
     if (strokePaint_ && paintsTexture(m)) { // texture painting: tiles go into the stroke's undo step
-        if (!texturePainter_.begin(doc_.mesh)) {
+        if (!texturePainter_.begin(doc_.mesh, doc_.paintMaterial.channels)) {
             const PaintTexture& t = *m.texture;
-            if (t.activeLayer >= 0 && t.activeLayer < int(t.layers.size()))
+            if (!(doc_.paintMaterial.channels & enabledChannelMask(t)))
+                status_ = "The brush paints no channel this texture has (Color > Material)";
+            else if (t.activeLayer >= 0 && t.activeLayer < int(t.layers.size()))
                 status_ = "Texture layer '" + t.layers[size_t(t.activeLayer)].name + "' is " +
                           (t.layers[size_t(t.activeLayer)].locked ? "locked" : "hidden");
         }
@@ -272,6 +278,19 @@ void App::pickColorUnderCursor() {
     if (!pick(mouseX_, mouseY_, hit)) return;
     if (paintsTexture(doc_.mesh)) {
         doc_.paintColor = sampleTextureAt(doc_.mesh, hit.triangle, hit.position);
+        if (hasMaterialChannels(*doc_.mesh.texture)) {
+            // C picks every channel: the brush material becomes the texture's material under the cursor, and the
+            // brush then paints all of the texture's channels.
+            BrushMaterial picked = doc_.paintMaterial;
+            sampleMaterialAt(doc_.mesh, hit.triangle, hit.position, picked);
+            doc_.paintMaterial = picked;
+            doc_.paintMaterial.color = doc_.paintColor;
+            char buf[160];
+            std::snprintf(buf, sizeof buf, "Picked the material: %s, roughness %.2f, metallic %.2f (every channel)",
+                          colorToHex(doc_.paintColor).c_str(), double(picked.roughness), double(picked.metallic));
+            status_ = buf;
+            return;
+        }
         status_ = "Paint colour " + colorToHex(doc_.paintColor) + " (from the texture)";
         return;
     }
@@ -315,7 +334,8 @@ void App::drawPalette_Color() {
         ImGui::PopID();
         if (i % 5 != 4) ImGui::SameLine();
     }
-    ImGui::TextDisabled("C over the model picks its colour");
+    ImGui::TextDisabled(paintsTexture(doc_.mesh) && hasMaterialChannels(*doc_.mesh.texture) ? "C over the model picks its material" : "C over the model picks its colour");
+    drawBrushMaterialContents(); // per-channel brush values when the texture has material channels (PanelPbr.cpp)
     {
         const Mesh& m = doc_.mesh;
         const bool layered = !m.paintLayers.empty() && m.activePaintLayer >= 0 && m.activePaintLayer < int(m.paintLayers.size());

@@ -1591,6 +1591,8 @@ void App::syncScene() {
         SubTool& s = doc_.subtools[size_t(i)];
         const bool active = i == doc_.activeSubtool;
         Mesh* mesh = active ? &shown : &s.mesh;
+        // Solo channel view (channel_view): the texture's shown texels follow before the renderer uploads them.
+        if (mesh->texture) syncChannelView(*mesh->texture, doc_.channelView);
         const bool flat = s.shading == Shading::Flat || (s.shading == Shading::Default && renderSettings_.flatShading);
         scene.push_back({s.id, mesh, active, s.visible, bakeNormalMap(s.id, *mesh), renderSettings_.wireframe, flat});
     }

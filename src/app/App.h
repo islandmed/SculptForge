@@ -499,6 +499,16 @@ private:
     bool textureAfterAutoUv_ = false;    // the running Auto UV came from New Texture: make the texture after it
     int textureSizeChoice_ = 1;          // 1K, 2K, 4K, 8K
     bool showUvView_ = false;            // Texture Map > Show UVs
+    // Material channels (PanelPbr.cpp): channel toggles, the solo channel view and map export under Texture Map,
+    // the brush material (per-channel values and swatches) in the Color palette, and per-channel chips on the
+    // Paint Layers rows (enable, blend, opacity).
+    void drawTextureChannelsContents();
+    void drawBrushMaterialContents();
+    // The channel chips of texture layer `layer` (a row under its name).
+    Args drawLayerChannelChips(int layer); // the texture_layer_channel arguments to run (empty: nothing clicked)
+    void registerPbrUiActions();
+    double pbrTestValue(const std::string& name) const; // UI test values (UiTest.cpp), NaN when not one of ours
+    int exportPresetChoice_ = 0;
     // Bake sub-palette (PanelBake.cpp): normal / displacement / AO / cavity / colour maps from a high-poly onto
     // the active SubTool's UVs (core/Bake.h), on a worker thread, and the baked normal map shown on the model.
     void drawBakeContents();

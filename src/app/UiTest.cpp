@@ -80,6 +80,11 @@
 //                            painting goes into the texture), texture_layers, active_texture_layer,
 //                            texture_painted (texels of the texture composite that aren't white),
 //                            texture_mean_r / texture_mean_g / texture_mean_b (mean composite, sRGB 0-255),
+//                            material_channels (material channels on the texture, base colour not counted),
+//                            channel_view (0 = colour, else the solo channel: 1 roughness ... 7 opacity),
+//                            brush_channels (bit mask of what the brush paints), roughness_painted (texels whose
+//                            roughness differs from the default), shown_mean_r (mean red the viewport is sent),
+//                            layer_channel_<id> (1 when the active texture layer has channel <id> on, e.g. roughness)
 //                            auto_uv_running, qremesh_running (QRemesh working in the background),
 //                            qremesh_guides (guide curves on the active SubTool), qremesh_guide_loops (closed ones),
 //                            guides_mode (1 while the QRemesh Guides brush is picked),
@@ -351,6 +356,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "active_texture_layer") return hasTexture(m) && !m.texture->layers.empty() ? double(m.texture->activeLayer) : -1.0;
     if (name == "auto_uv_running") return app_.autoUv_ ? 1.0 : 0.0;
     if (const double v = app_.bakeTestValue(name); !std::isnan(v)) return v;
+    if (const double v = app_.pbrTestValue(name); !std::isnan(v)) return v; // material_channels, channel_view, ...
     if (const double v = app_.splatTrainTestValue(name); !std::isnan(v)) return v; // splat_training, ...
     if (const double v = app_.sculptableTestValue(name); !std::isnan(v)) return v;
     if (name == "qremesh_running") return app_.qremesh_ ? 1.0 : 0.0;

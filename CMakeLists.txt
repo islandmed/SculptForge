@@ -241,6 +241,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelPolypaint.cpp
     src/app/PanelPaintLayers.cpp
     src/app/PanelTexture.cpp
+    src/app/PanelPbr.cpp
     src/app/PanelGeometry.cpp
     src/app/Gizmo.cpp
     src/app/PanelBake.cpp
