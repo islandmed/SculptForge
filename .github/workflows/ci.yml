@@ -97,7 +97,7 @@ jobs:
         run: |
           ccache -z
           cmake --build build --config Release --parallel 4
-          ccache -s
+          ccache -s -v
       - name: Compiler cache (save; not from pull requests)
         if: github.event_name != 'pull_request'
         uses: actions/cache/save@v5
@@ -169,7 +169,7 @@ jobs:
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSCULPTFORGE_USE_SYSTEM_SDL=OFF -DSCULPTFORGE_BUILD_APP=OFF \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           cmake --build build --target sculptforge-cli --parallel 4
-          ccache -s
+          ccache -s -v
       - name: Compiler cache (save; not from pull requests)
         if: github.event_name != 'pull_request'
         uses: actions/cache/save@v5
@@ -196,7 +196,7 @@ jobs:
           - { cy: CY2026, image: 'rockylinux:8', glibc: '2.28' }
           - { cy: CY2027, image: 'rockylinux:9', glibc: '2.34' }
     steps:
-      - run: dnf -y install git tar gzip
+      - run: dnf -y install git tar gzip zstd # zstd: actions/cache compresses with it (gzip is several times slower)
       - uses: actions/checkout@v7
       - run: ./packaging/linux/install-build-deps.sh
       - name: ccache (the static release binary, pinned by hash)
@@ -230,7 +230,7 @@ jobs:
             -DSCULPTFORGE_BUILD_PYTHON=ON -DPython_EXECUTABLE="$PYTHON313"
           ccache -z
           cmake --build build --parallel 4
-          ccache -s
+          ccache -s -v
       - name: Compiler cache (save; not from pull requests)
         if: github.event_name != 'pull_request'
         uses: actions/cache/save@v5
