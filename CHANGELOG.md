@@ -6,6 +6,12 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.9.7] - 2026-10-31
+
+Speed first: big brushes on dense meshes take a third less time per frame, trail the pen by half as far and no
+longer pause when you lift it. Also from your reports: a right click opens the QuickMenu (#22), dynamic topology
+with symmetry remeshes both sides of an asymmetric mesh (#23) and the orthographic view shades correctly (#24).
+
 ### Added
 - A right click on the canvas opens the QuickMenu under the cursor, as in ZBrush (#22). Pressed and let go
   without moving more than 4 px, beside the model or on it; the view waits until the press moves past that, so

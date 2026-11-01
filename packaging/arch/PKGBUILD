@@ -1,6 +1,6 @@
 # Maintainer: The SculptForge contributors <https://github.com/islandmed/SculptForge>
 pkgname=sculptforge
-pkgver=0.9.6
+pkgver=0.9.7
 pkgrel=1
 pkgdesc="Free, open-source digital sculpting app with ZBrush-style tools, for artists and game pipelines"
 arch=('x86_64' 'aarch64')

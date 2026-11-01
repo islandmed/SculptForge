@@ -5,7 +5,7 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
-## Next version
+## Version 0.9.7
 
 ### Faster big brushes on dense meshes
 
