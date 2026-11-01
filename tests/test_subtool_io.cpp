@@ -179,7 +179,7 @@ TEST(subtool_project_v2_round_trip) {
     CHECK(readStoredZip(path, entries, err));
     Json manifest;
     CHECK(!entries.empty() && Json::parse(std::string(entries[0].data.begin(), entries[0].data.end()), manifest, err));
-    CHECK(manifest["version"].asNumber() == kProjectVersionWithoutMicro && manifest["subtools"].size() == 3);
+    CHECK(manifest["version"].asNumber() == kProjectBaseWriteVersion && manifest["subtools"].size() == 3);
     CHECK(manifest["active_subtool"].asNumber() == 1 && !manifest.has("mesh"));
     CHECK(manifest["subtools"][1]["goz_name"].asString() == "Eye_ZB");
 

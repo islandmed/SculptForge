@@ -799,9 +799,9 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
     Writer w;
     Json manifest = Json::object();
     manifest.set("format", kFormatName);
-    manifest.set("version", kProjectVersion);
+    ProjectVersionNeed version; // the lowest format the content needs (set again once the SubTools are written)
+    manifest.set("version", version.version);
     manifest.set("app_version", SCULPTFORGE_VERSION);
-    bool anyMicro = false; // projects without micro levels stay format 6, so 0.9.7 and older still open them
 
     // Every SubTool with its mesh, layers and state; blobs live under subtools/<i>/.
     Json subtools = Json::array();
@@ -833,7 +833,7 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
             mj.set("displacement_packed", w.add(p + "displacement.pack", Scalar::U8, 1, packedBytes, std::move(packed)));
             if (mm.hasMask()) mj.set("mask", w.externalBytes(p + "mask.bin", mm.mask));
             st.set("micro", std::move(mj));
-            anyMicro = true;
+            version.need(7);
         }
         const std::string& gozName = active ? doc.gozName : s.gozName;
         if (!gozName.empty()) st.set("goz_name", gozName);
@@ -847,7 +847,6 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
     }
     manifest.set("subtools", std::move(subtools));
     manifest.set("active_subtool", doc.activeSubtool);
-    if (!anyMicro) manifest.set("version", kProjectVersionWithoutMicro);
 
     Json brushes = Json::array();
     for (const auto& b : doc.brushes) brushes.push(b.toJson());
@@ -893,6 +892,7 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
         for (const auto& [key, value] : doc.projectSettings.members())
             if (!isCoreKey(key)) manifest.set(key, value);
 
+    manifest.set("version", version.version);
     const std::string text = manifest.dump(true);
     w.entries.insert(w.entries.begin(), ZipEntry{kManifestName, std::vector<uint8_t>(text.begin(), text.end())});
     // The preview goes second, so loadProjectThumbnail finds it after reading two local headers.
