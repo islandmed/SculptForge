@@ -147,6 +147,7 @@ constexpr GLbitfield GL_COLOR_BUFFER_BIT = 0x4000;
     X(void, UseProgram, GLuint)                                                              \
     X(GLint, GetUniformLocation, GLuint, const GLchar*)                                      \
     X(void, UniformMatrix4fv, GLint, GLsizei, GLboolean, const GLfloat*)                     \
+    X(void, UniformMatrix3fv, GLint, GLsizei, GLboolean, const GLfloat*)                     \
     X(void, Uniform3fv, GLint, GLsizei, const GLfloat*)                                      \
     X(void, Uniform4fv, GLint, GLsizei, const GLfloat*)                                      \
     X(void, DrawElements, GLenum, GLsizei, GLenum, const void*)                              \

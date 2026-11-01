@@ -73,6 +73,7 @@ add_library(sculptforge_core STATIC
   src/core/Texture.cpp
   src/core/TextureCommands.cpp
   src/core/TileImage.cpp
+  src/core/EnvironmentMath.cpp
   src/core/TextureChannels.cpp
   src/core/TextureChannelCommands.cpp
   src/core/LayerStackIO.cpp
@@ -137,6 +138,13 @@ embed_files(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedFace.cpp sf::assets
   faceTemplateData ${CMAKE_CURRENT_SOURCE_DIR}/assets/face/ict-arkit.sfface)
 target_sources(sculptforge_core PRIVATE src/core/Face.cpp src/core/FaceCommands.cpp
   ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedFace.cpp)
+# The PBR viewport's bundled environments (core/EnvironmentMath.h): CC0 HDRIs from Poly Haven, 512 x 256
+# (THIRD_PARTY_NOTICES.md).
+embed_files(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedHdri.cpp sf::assets
+  hdriPhotoStudio ${CMAKE_CURRENT_SOURCE_DIR}/assets/hdri/brown_photostudio_02.hdr
+  hdriSmallStudio ${CMAKE_CURRENT_SOURCE_DIR}/assets/hdri/studio_small_09.hdr
+  hdriOutdoorSky ${CMAKE_CURRENT_SOURCE_DIR}/assets/hdri/kloofendal_48d_partly_cloudy_puresky.hdr)
+target_sources(sculptforge_core PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedHdri.cpp)
 target_include_directories(sculptforge_core PUBLIC src PRIVATE third_party/stb third_party/ufbx third_party/xatlas third_party/mikktspace third_party/tinyexr)
 if(WIN32)
   target_link_libraries(sculptforge_core PRIVATE shell32) # core/Trash.cpp: the Recycle Bin

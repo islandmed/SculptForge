@@ -6,6 +6,18 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- PBR viewport: **Material > Viewport Shading** switches between **Lit Sphere** (the default) and **PBR**, which
+  shows the texture's material channels as a game engine or renderer does: GGX reflections from a prefiltered
+  environment, diffuse light from its spherical harmonics, multiple-scattering energy for rough metals, exposure
+  and an ACES, AgX or Reinhard tone map. Painted Normal and Height channels bend the shading through MikkTSpace
+  tangents. Four environments: **Studio** (generated) and three CC0 HDRIs from Poly Haven (**Photo Studio**,
+  **Small Studio**, **Outdoor Sky**), plus `.hdr` / `.exr` files from `SCULPTFORGE_HDRI_PATH`; rotation, the
+  environment behind the model and a cavity term that keeps sculpted detail readable. Parts without a material
+  texture use a roughness and metallic set there. A new environment is prepared on a worker thread, and a
+  20.9-million-triangle mesh draws in about 8 ms in PBR next to about 6 ms with Lit Sphere (Apple M1 Pro).
+  Saved with the project (`viewport_shading mode=pbr environment=outdoor_sky exposure=0.5 tone_map=agx`).
+
 ## [0.10.4] - 2026-11-01
 
 ### Added

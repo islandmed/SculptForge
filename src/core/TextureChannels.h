@@ -151,6 +151,16 @@ void channelViewTexels(const PaintTexture& tex, Channel c, int x0, int y0, int x
 // a change of channel redoes everything and marks the texture dirty.
 void syncChannelView(PaintTexture& tex, Channel c);
 
+// --- PBR viewport ---
+// Which packed planes the PBR viewport needs for this texture: bit 0 = ORM (AO, roughness, metallic, opacity;
+// any of them enabled), bit 1 = normal (Normal or Height enabled), bit 2 = emissive.
+uint32_t pbrViewPlanes(const PaintTexture& tex);
+// The packed RGBA8 texels of [x0, x1) x [y0, y1) (clamped to the texture) for the renderer, each plane into its
+// own rectangle-sized buffer (rows bottom-up, (x1 - x0) * 4 bytes per row; null = skip): ORM in linear units,
+// the effective tangent-space normal (Normal with Height's normal combined), emissive as stored (sRGB).
+void pbrViewTexels(const PaintTexture& tex, int x0, int y0, int x1, int y1, uint8_t* orm, uint8_t* normal,
+                   uint8_t* emissive);
+
 // --- Memory ---
 // Bytes of material channel images (bases, composites and layer channels). Walks the tiles: call it only where
 // the texture is edited (the main thread), never while a dab may run elsewhere; TileImage::liveBytes is the

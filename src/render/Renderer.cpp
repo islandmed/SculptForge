@@ -4,7 +4,9 @@
 #include "render/MicroRenderer.h"
 
 #include "core/Matcap.h"
+#include "core/Tangents.h"
 #include "core/Texture.h"
+#include "core/TextureChannels.h"
 #include "core/ThreadPool.h"
 #include "core/TierConfig.h"
 #include "core/UploadOrder.h"
@@ -13,6 +15,9 @@
 
 #include <algorithm>
 #include <atomic>
+#include <bit>
+#include <chrono>
+#include <thread>
 #include <cstdlib>
 #include <limits>
 #include <vector>
@@ -267,6 +272,12 @@ in FragData {
     flat int vPrimBase;
 };
 uniform sampler2D uPaintTex; // sRGB texture: samples come back linear
+#ifdef PBR
+uniform sampler2D uOrmTex;      // PBR view: AO, roughness, metallic, opacity (linear)
+uniform sampler2D uEmissiveTex; // PBR view: emissive (sRGB)
+uniform int uHasOrm;
+uniform int uHasEmissive;
+#endif
 #ifdef NORMALMAP
 uniform sampler2D uNormalTex; // baked tangent-space normal map (linear RGB)
 uniform int uHasPaint;        // 1: a painted texture is bound to uPaintTex too
@@ -376,6 +387,70 @@ vec3 viewRay() {
     vec2 ndc = (gl_FragCoord.xy - uViewport.xy) / uViewport.zw * 2.0 - 1.0;
     return normalize(vec3(-ndc / uProjScale, 1.0));
 }
+#ifdef PBR
+// PBR viewport (core/EnvironmentMath.h): Cook-Torrance GGX through the split sum (the environment prefiltered per
+// roughness level in the mips of uEnvTex, the BRDF's scale and bias in uBrdfLut), diffuse from the environment's
+// SH9 (already cosine-convolved and divided by pi), exposure, then a tone map. Directions are turned from view
+// space into the environment's with uViewToEnv (the inverse view rotation and the environment's yaw).
+uniform sampler2D uEnvTex;
+uniform sampler2D uBrdfLut;
+uniform vec3 uSH[9];
+uniform mat3 uViewToEnv;
+uniform float uEnvLevels; // the roughest level's mip
+uniform float uExposure;  // stops
+uniform int uToneMap;     // sf::ToneMap: 0 ACES, 1 AgX, 2 Reinhard, 3 none
+uniform vec2 uMaterial;   // roughness, metallic of a mesh without a PBR texture
+uniform float uPbrCavity; // how much creases darken (the sculpt's curvature), 0 = none
+vec3 envSample(vec3 dirView, float lod) {
+    vec3 d = uViewToEnv * dirView;
+    vec2 uv = vec2(atan(d.x, -d.z) / 6.2831853 + 0.5, acos(clamp(d.y, -1.0, 1.0)) / 3.14159265);
+    return textureLod(uEnvTex, uv, lod).rgb;
+}
+vec3 shIrradiance(vec3 dirView) {
+    vec3 d = uViewToEnv * dirView;
+    vec3 r = uSH[0] * 0.282095 + uSH[1] * (0.488603 * d.y) + uSH[2] * (0.488603 * d.z) + uSH[3] * (0.488603 * d.x) +
+             uSH[4] * (1.092548 * d.x * d.y) + uSH[5] * (1.092548 * d.y * d.z) + uSH[6] * (0.315392 * (3.0 * d.z * d.z - 1.0)) +
+             uSH[7] * (1.092548 * d.x * d.z) + uSH[8] * (0.546274 * (d.x * d.x - d.y * d.y));
+    return max(r, vec3(0.0));
+}
+// Keep in sync with sf::toneMap (core/EnvironmentMath.cpp).
+vec3 toneMapped(vec3 c) {
+    c = max(c, vec3(0.0));
+    if (uToneMap == 0) return clamp((c * (2.51 * c + 0.03)) / (c * (2.43 * c + 0.59) + 0.14), 0.0, 1.0);
+    if (uToneMap == 1) {
+        mat3 inset = mat3(0.842479, 0.0423282, 0.0423756, 0.0784336, 0.878468, 0.0784336, 0.0792237, 0.0791661, 0.879142);
+        mat3 outset = mat3(1.19688, -0.0528968, -0.0529716, -0.0980209, 1.15190, -0.0980435, -0.0990297, -0.0989612, 1.15107);
+        vec3 x = inset * c;
+        x = clamp((log2(max(x, vec3(1e-10))) + 12.47393) / 16.5, 0.0, 1.0);
+        const float p = 0.6060606;
+        vec3 lo = 0.5 * pow(x / p, vec3(2.2)), hi = 1.0 - 0.5 * pow((1.0 - x) / (1.0 - p), vec3(1.6));
+        x = mix(lo, hi, step(vec3(p), x));
+        return clamp(pow(max(outset * x, vec3(0.0)), vec3(2.2)), 0.0, 1.0);
+    }
+    if (uToneMap == 2) {
+        float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+        return l > 0.0 ? clamp(c * (l * (1.0 + l / 36.0) / (1.0 + l) / l), 0.0, 1.0) : vec3(0.0);
+    }
+    return clamp(c, 0.0, 1.0);
+}
+vec3 pbrShade(vec3 albedo, vec3 n, vec3 v, float rough, float metal, float ao, float curvature, vec3 emissive) {
+    rough = clamp(rough, 0.03, 1.0);
+    metal = clamp(metal, 0.0, 1.0);
+    float NdotV = max(dot(n, v), 1e-4);
+    vec3 F0 = mix(vec3(0.04), albedo, metal);
+    vec3 F = F0 + (max(vec3(1.0 - rough), F0) - F0) * pow(1.0 - NdotV, 5.0);
+    vec2 ab = texture(uBrdfLut, vec2(NdotV, rough)).rg;
+    vec3 irr = shIrradiance(n);
+    vec3 spec = envSample(reflect(-v, n), rough * uEnvLevels) * (F0 * ab.x + ab.y);
+    // Multiple scattering (Fdez-Aguera 2019): rough metals keep the energy single scattering loses.
+    float ess = ab.x + ab.y;
+    spec += (F0 * ab.x + ab.y) * (1.0 - ess) / max(ess, 1e-3) * F0 * irr;
+    vec3 diffuse = (1.0 - F) * (1.0 - metal) * albedo * irr;
+    float specOcc = clamp(pow(NdotV + ao, exp2(-16.0 * rough - 1.0)) - 1.0 + ao, 0.0, 1.0); // Lagarde & de Rousiers
+    float cavity = 1.0 - uPbrCavity * 0.6 * smoothstep(0.0, 0.16, curvature);
+    return ((diffuse * ao + spec * specOcc) * cavity + emissive) * exp2(uExposure);
+}
+#endif
 void main() {
 #ifdef MICRO
     microFetch();
@@ -419,6 +494,25 @@ void main() {
     if (!gl_FrontFacing && uTwoSided == 1) n = -n;
 #endif
     vec3 v = viewRay();
+#ifdef PBR
+    {
+        float rough = uMaterial.x, metal = uMaterial.y, ao = 1.0;
+        vec3 emissive = vec3(0.0);
+#ifdef TEXTURED
+        if (uHasOrm == 1) {
+            vec4 orm = texture(uOrmTex, vUv);
+            ao = orm.r;
+            rough = orm.g;
+            metal = orm.b;
+        }
+        if (uHasEmissive == 1) emissive = texture(uEmissiveTex, vUv).rgb;
+#endif
+        vec3 c = toneMapped(pbrShade(albedo, n, v, rough, metal, ao, curvature, emissive));
+        if (uShowMask == 1) c *= 1.0 - 0.75 * clamp(V_MASK, 0.0, 1.0);
+        fragColor = finish(c);
+        return;
+    }
+#endif
     if (uMatcap == 1) {
         // View-aligned basis so the material stays put towards the edges of a perspective view.
         vec3 bx = normalize(vec3(v.z, 0.0, -v.x));
@@ -516,6 +610,51 @@ void main() {
 }
 )";
 
+// The PBR view's environment behind the model: the view ray of each pixel into the prefiltered environment at
+// the background's blur, exposed and tone mapped like the shading.
+const char* kEnvBgFS = R"(#version 330 core
+in vec2 vUv;
+out vec4 fragColor;
+uniform mat4 uInvProj;
+uniform float uLod;
+uniform sampler2D uEnvTex;
+uniform mat3 uViewToEnv;
+uniform float uExposure;
+uniform int uToneMap;
+vec3 envSample(vec3 dirView, float lod) {
+    vec3 d = uViewToEnv * dirView;
+    vec2 uv = vec2(atan(d.x, -d.z) / 6.2831853 + 0.5, acos(clamp(d.y, -1.0, 1.0)) / 3.14159265);
+    return textureLod(uEnvTex, uv, lod).rgb;
+}
+// Keep in sync with sf::toneMap (core/EnvironmentMath.cpp).
+vec3 toneMapped(vec3 c) {
+    c = max(c, vec3(0.0));
+    if (uToneMap == 0) return clamp((c * (2.51 * c + 0.03)) / (c * (2.43 * c + 0.59) + 0.14), 0.0, 1.0);
+    if (uToneMap == 1) {
+        mat3 inset = mat3(0.842479, 0.0423282, 0.0423756, 0.0784336, 0.878468, 0.0784336, 0.0792237, 0.0791661, 0.879142);
+        mat3 outset = mat3(1.19688, -0.0528968, -0.0529716, -0.0980209, 1.15190, -0.0980435, -0.0990297, -0.0989612, 1.15107);
+        vec3 x = inset * c;
+        x = clamp((log2(max(x, vec3(1e-10))) + 12.47393) / 16.5, 0.0, 1.0);
+        const float p = 0.6060606;
+        vec3 lo = 0.5 * pow(x / p, vec3(2.2)), hi = 1.0 - 0.5 * pow((1.0 - x) / (1.0 - p), vec3(1.6));
+        x = mix(lo, hi, step(vec3(p), x));
+        return clamp(pow(max(outset * x, vec3(0.0)), vec3(2.2)), 0.0, 1.0);
+    }
+    if (uToneMap == 2) {
+        float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+        return l > 0.0 ? clamp(c * (l * (1.0 + l / 36.0) / (1.0 + l) / l), 0.0, 1.0) : vec3(0.0);
+    }
+    return clamp(c, 0.0, 1.0);
+}
+void main() {
+    vec4 p = uInvProj * vec4(vUv * 2.0 - 1.0, 1.0, 1.0);
+    vec3 dir = abs(p.w) > 1e-6 ? normalize(p.xyz / p.w) : vec3(0.0, 0.0, -1.0);
+    vec3 c = toneMapped(envSample(dir, uLod) * exp2(uExposure));
+    float noise = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
+    fragColor = vec4(pow(c, vec3(1.0 / 2.2)) + (noise - 0.5) / 255.0, 1.0);
+}
+)";
+
 // 3D Gaussian splats (EWA projection of each 3D covariance to a screen-space ellipse).
 const char* kSplatVS = R"(#version 330 core
 layout(location = 0) in uint aIndex;
@@ -577,6 +716,9 @@ constexpr GLenum kTexture2 = 0x84C2; // GL_TEXTURE2 (matcap)
 constexpr GLenum kTexture5 = 0x84C5; // kTexture5 (baked normal map)
 constexpr GLenum kTexture6 = 0x84C6; // kTexture6 (its tangents)
 constexpr GLenum kRgb = 0x1907, kRgb8 = 0x8051; // GL_RGB, GL_RGB8
+// PBR view: ORM 8, emissive 9, environment 10, BRDF table 11.
+constexpr GLenum kTexture8 = 0x84C8, kTexture9 = 0x84C9, kTexture10 = 0x84CA, kTexture11 = 0x84CB;
+constexpr GLenum kRgb16f = 0x881B, kRg16f = 0x822F, kRg = 0x8227, kRepeat = 0x2901, kMaxLevel = 0x813D;
 
 GLuint compile(GLenum type, const char* src, std::string& error, const char* prefix = nullptr) {
     GLuint s = gl::CreateShader(type);
@@ -689,8 +831,8 @@ bool Renderer::init(std::string& error) {
 const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     if (features & (kTextured | kNormalMap)) features |= kTextured | kPrim;
     // (micro levels: no per-vertex paint, per-triangle data or predictive preview)
-    if (features & kMicro) features &= kMicro | kFlat;
-    MeshProgram& p = programs_[features & 127];
+    if (features & kMicro) features &= kMicro | kFlat | kPbr;
+    MeshProgram& p = programs_[features & 255];
     if (p.id) return &p;
     std::string prefix = "#version 330 core\n";
     if (features & kMicro) prefix += "#define MICRO\n";
@@ -700,6 +842,7 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     if (features & kNormalMap) prefix += "#define NORMALMAP\n";
     if (features & kFlat) prefix += "#define FLAT\n";
     if (features & kGhost) prefix += "#define GHOST\n";
+    if (features & kPbr) prefix += "#define PBR\n";
     const std::string vs = prefix + ((features & kMicro) ? microVertexShaderSource() : kMeshVS), fs = prefix + kMeshFS,
                       gs = prefix + kMeshGS;
     p.id = link(vs.c_str(), fs.c_str(), programError_, nullptr, (features & kTextured) ? gs.c_str() : nullptr);
@@ -731,6 +874,15 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     p.ghostBound = at("uGhostBound");
     p.ghostKind = at("uGhostKind");
     p.ghostFocal = at("uGhostFocal");
+    p.hasOrm = at("uHasOrm");
+    p.hasEmissive = at("uHasEmissive");
+    p.envLevels = at("uEnvLevels");
+    p.exposure = at("uExposure");
+    p.toneMap = at("uToneMap");
+    p.material = at("uMaterial");
+    p.pbrCavity = at("uPbrCavity");
+    p.viewToEnv = at("uViewToEnv");
+    p.sh = at("uSH");
     // Texture units: groups 1, matcap 2, UVs 3, painted texture 4, normal map 5, tangents 6, cluster table 7.
     gl::UseProgram(p.id);
     gl::Uniform1i(at("uGroupIds"), 1);
@@ -740,6 +892,10 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     gl::Uniform1i(at("uNormalTex"), 5);
     gl::Uniform1i(at("uTangents"), 6);
     gl::Uniform1i(at("uClusterPrims"), 7);
+    gl::Uniform1i(at("uOrmTex"), 8);
+    gl::Uniform1i(at("uEmissiveTex"), 9);
+    gl::Uniform1i(at("uEnvTex"), 10);
+    gl::Uniform1i(at("uBrdfLut"), 11);
     gl::UseProgram(0);
     return &p;
 }
@@ -871,6 +1027,8 @@ void Renderer::freeSlot(MeshSlot& s) {
     gl::DeleteTextures(1, &s.uvTexture);
     if (s.paintTexture) gl::DeleteTextures(1, &s.paintTexture);
     if (s.normalTexture) gl::DeleteTextures(1, &s.normalTexture);
+    for (GLuint* t : {&s.ormTexture, &s.matNormalTexture, &s.emissiveTexture})
+        if (*t) gl::DeleteTextures(1, t);
     if (s.tangentData) gl::DeleteBuffers(1, &s.tangentData);
     if (s.tangentTexture) gl::DeleteTextures(1, &s.tangentTexture);
     gl::DeleteVertexArrays(1, &s.vao);
@@ -894,6 +1052,7 @@ size_t Renderer::gpuBytes() const {
         total += s.patchBytes;
         if (s.proxyAllocated) total += (s.order.triangleCount() / 4) * 3 * sizeof(uint16_t);
         if (s.paintTexture) total += size_t(s.textureW) * size_t(s.textureH) * 4 * 4 / 3; // with mipmaps
+        total += size_t(std::popcount(s.pbrPlanes)) * size_t(s.textureW) * size_t(s.textureH) * 4 * 4 / 3;
         if (s.micro) total += s.micro->gpuBytes();
     }
     return total;
@@ -907,6 +1066,11 @@ void Renderer::shutdown() {
     matcapTextures_.clear();
     matcapHashes_.clear();
     matcapRevision_ = 0;
+    for (GLuint* t : {&envTexture_, &brdfTexture_})
+        if (*t) gl::DeleteTextures(1, t);
+    envIndex_ = envFailedIndex_ = -1;
+    if (envBgProgram_) gl::DeleteProgram(envBgProgram_);
+    envBgProgram_ = 0;
     gl::DeleteVertexArrays(1, &emptyVao_);
     for (MeshProgram& p : programs_) {
         if (p.id) gl::DeleteProgram(p.id);
@@ -1122,6 +1286,15 @@ int hiddenDiagonal(const Mesh& mesh, uint32_t t) {
 
 } // namespace
 
+// The lighting of an environment is built on a worker thread (decode, prefilter, SH9: a few hundred ms); the view
+// keeps the environment it has until the new one is ready (the very first one is waited for).
+struct Renderer::EnvJob {
+    int index = -1;
+    std::atomic<bool> done{false};
+    bool ok = false;
+    EnvironmentLighting light;
+};
+
 bool Renderer::outOfMemory(uint32_t id) const {
     for (const MeshSlot& s : slots_)
         if (s.id == id) return s.outOfMemory;
@@ -1130,6 +1303,7 @@ bool Renderer::outOfMemory(uint32_t id) const {
 
 void Renderer::syncScene(const std::vector<SceneMesh>& scene) {
     syncMatcaps();
+    if (envJob_ && envJob_->done) ensureEnvironment(envJob_->index); // (a new environment is ready: upload it)
     // Free the slots of SubTools that are gone (deleted, merged, a new scene).
     for (auto it = slots_.begin(); it != slots_.end();) {
         const bool live = std::any_of(scene.begin(), scene.end(), [&](const SceneMesh& m) { return m.id == it->id; });
@@ -1143,7 +1317,7 @@ void Renderer::syncScene(const std::vector<SceneMesh>& scene) {
     drawList_.clear();
     for (const SceneMesh& m : scene) {
         if (!m.visible || !m.mesh) continue; // hidden: keeps its dirty state until shown
-        sync(slot(m.id), *m.mesh, m.normalMap, m.wireframe && m.active);
+        sync(slot(m.id), *m.mesh, m.normalMap, m.wireframe && m.active, m.pbr);
         drawList_.push_back({m.id, m.active, m.flat});
     }
 }
@@ -1813,7 +1987,7 @@ void Renderer::drawPatches(const MeshSlot& s, GLenum mode, Part part, GLint prim
     if (primBaseLocation >= 0) gl::Uniform1i(primBaseLocation, -1);
 }
 
-void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, bool wireframe) {
+void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, bool wireframe, bool pbr) {
     if (mesh.micro && microMatches(mesh)) { // a micro level draws its own way (render/MicroRenderer.h)
         if (!s.micro) s.micro = std::make_shared<MicroRenderer>();
         s.outOfMemory = !s.micro->sync(mesh);
@@ -1923,7 +2097,7 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     // Small meshes draw in full while the view moves too (their proxy would save little).
     constexpr size_t kProxyMinTriangles = size_t(1) << 18;
     if (proxyUsed_ && !s.outOfMemory && s.drawnTriangles >= kProxyMinTriangles) buildProxies(s, mesh);
-    syncTexture(s, mesh);
+    syncTexture(s, mesh, pbr);
     syncNormalMap(s, mesh, normalMap);
 
     // Optional per-vertex attributes: a full upload when they appear (or the
@@ -1965,71 +2139,160 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
 }
 
 // The painted texture (core/Texture.h): a full upload when it is new or replaced, then only the rectangle
-// painted since this slot's last upload (PaintTexture::revision / dirtyFrom), with fresh mipmaps.
-void Renderer::syncTexture(MeshSlot& s, Mesh& mesh) {
+// painted since this slot's last upload (PaintTexture::revision / dirtyFrom), with fresh mipmaps. In the PBR view
+// the material channels go up the same way as packed planes (pbrViewTexels): ORM, normal and emissive.
+void Renderer::syncTexture(MeshSlot& s, Mesh& mesh, bool pbr) {
     PaintTexture* tex = s.hasUvs ? mesh.texture.get() : nullptr;
+    GLuint* planeTex[3] = {&s.ormTexture, &s.matNormalTexture, &s.emissiveTexture};
+    const uint32_t want = tex && pbr ? pbrViewPlanes(*tex) : 0u;
+    for (int b = 0; b < 3; ++b)
+        if (!(want & (1u << b)) && *planeTex[b]) {
+            gl::DeleteTextures(1, planeTex[b]);
+            *planeTex[b] = 0;
+        }
     if (!tex) {
         if (s.paintTexture) gl::DeleteTextures(1, &s.paintTexture);
         s.paintTexture = 0;
         s.textureSerial = 0;
+        s.pbrPlanes = 0;
         return;
     }
     const bool fresh = !s.paintTexture || s.textureSerial != tex->serial || s.textureW != tex->width || s.textureH != tex->height;
-    if (!fresh && s.textureRevision == tex->revision) return;
+    // Planes to send whole: new ones, or all of them with a new texture.
+    const uint32_t wholePlanes = fresh || s.pbrSerial != tex->serial ? want : want & ~s.pbrPlanes;
+    s.pbrPlanes &= want;
+    if (!fresh && s.textureRevision == tex->revision && !wholePlanes) return;
     gl::PixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    const bool rect = !fresh && s.textureRevision >= tex->dirtyFrom && tex->dirtyMin.x < tex->dirtyMax.x && tex->dirtyMin.y < tex->dirtyMax.y;
+    const bool changed = fresh || s.textureRevision != tex->revision;
+    // Calls fn(x0, y0, x1, y1) for the runs of dirty tiles along each tile row of the dirty rectangle.
+    auto dirtyRuns = [&](auto&& fn) {
+        const int tx0 = tex->dirtyMin.x / kTextureTile, tx1 = (tex->dirtyMax.x - 1) / kTextureTile;
+        for (int ty = tex->dirtyMin.y / kTextureTile; ty <= (tex->dirtyMax.y - 1) / kTextureTile; ++ty)
+            for (int tx = tx0; tx <= tx1;) {
+                if (!tex->tileDirty(tx, ty)) {
+                    ++tx;
+                    continue;
+                }
+                const int start = tx;
+                while (tx <= tx1 && tex->tileDirty(tx, ty)) ++tx;
+                fn(start * kTextureTile, ty * kTextureTile, std::min(tx * kTextureTile, tex->width),
+                   std::min((ty + 1) * kTextureTile, tex->height));
+            }
+    };
+    auto setParams = [] {
+        gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GLint(GL_LINEAR_MIPMAP_LINEAR));
+        gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GLint(GL_LINEAR));
+        gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GLint(GL_CLAMP_TO_EDGE));
+        gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GLint(GL_CLAMP_TO_EDGE));
+    };
     if (fresh) {
         if (!s.paintTexture) gl::GenTextures(1, &s.paintTexture);
         gl::BindTexture(GL_TEXTURE_2D, s.paintTexture);
         gl::TexImage2D(GL_TEXTURE_2D, 0, GLint(GL_SRGB8_ALPHA8), tex->width, tex->height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
                        tex->shown().data());
-        gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GLint(GL_LINEAR_MIPMAP_LINEAR));
-        gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GLint(GL_LINEAR));
-        gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GLint(GL_CLAMP_TO_EDGE));
-        gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GLint(GL_CLAMP_TO_EDGE));
+        setParams();
         s.textureSerial = tex->serial;
         s.textureW = tex->width;
         s.textureH = tex->height;
-    } else {
+        gl::GenerateMipmap(GL_TEXTURE_2D);
+    } else if (changed) {
         gl::BindTexture(GL_TEXTURE_2D, s.paintTexture);
-        const bool rect = s.textureRevision >= tex->dirtyFrom && tex->dirtyMin.x < tex->dirtyMax.x && tex->dirtyMin.y < tex->dirtyMax.y;
         gl::PixelStorei(GL_UNPACK_ROW_LENGTH, tex->width);
         auto upload = [&](int x0, int y0, int x1, int y1) {
             x1 = std::min(x1, tex->width), y1 = std::min(y1, tex->height);
             gl::TexSubImage2D(GL_TEXTURE_2D, 0, x0, y0, x1 - x0, y1 - y0, GL_RGBA, GL_UNSIGNED_BYTE,
                               tex->shown().data() + (size_t(y0) * size_t(tex->width) + size_t(x0)) * 4);
         };
-        if (!rect) {
-            upload(0, 0, tex->width, tex->height);
-        } else {
-            // Only the dirty tiles of the rectangle, as runs along each tile row.
-            const int tx0 = tex->dirtyMin.x / kTextureTile, tx1 = (tex->dirtyMax.x - 1) / kTextureTile;
-            for (int ty = tex->dirtyMin.y / kTextureTile; ty <= (tex->dirtyMax.y - 1) / kTextureTile; ++ty)
-                for (int tx = tx0; tx <= tx1;) {
-                    if (!tex->tileDirty(tx, ty)) {
-                        ++tx;
-                        continue;
-                    }
-                    const int start = tx;
-                    while (tx <= tx1 && tex->tileDirty(tx, ty)) ++tx;
-                    upload(start * kTextureTile, ty * kTextureTile, tx * kTextureTile, (ty + 1) * kTextureTile);
-                }
-        }
+        if (!rect) upload(0, 0, tex->width, tex->height);
+        else dirtyRuns(upload); // only the dirty tiles of the rectangle, as runs along each tile row
         gl::PixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+        gl::GenerateMipmap(GL_TEXTURE_2D);
     }
-    gl::GenerateMipmap(GL_TEXTURE_2D);
+    // PBR planes: packed rectangle by rectangle (a staging buffer the size of what is sent).
+    std::vector<uint8_t> staging;
+    for (int b = 0; b < 3; ++b) {
+        const uint32_t bit = 1u << b;
+        if (!(want & bit)) continue;
+        const bool whole = (wholePlanes & bit) || !rect;
+        if (!whole && !changed) continue;
+        GLuint& t = *planeTex[b];
+        const GLint format = b == 2 ? GLint(GL_SRGB8_ALPHA8) : GLint(GL_RGBA8);
+        auto pack = [&](int x0, int y0, int x1, int y1) {
+            staging.assign(size_t(x1 - x0) * size_t(y1 - y0) * 4, 0);
+            pbrViewTexels(*tex, x0, y0, x1, y1, b == 0 ? staging.data() : nullptr, b == 1 ? staging.data() : nullptr,
+                          b == 2 ? staging.data() : nullptr);
+        };
+        if (whole) {
+            if (!t) gl::GenTextures(1, &t);
+            gl::BindTexture(GL_TEXTURE_2D, t);
+            pack(0, 0, tex->width, tex->height);
+            gl::TexImage2D(GL_TEXTURE_2D, 0, format, tex->width, tex->height, 0, GL_RGBA, GL_UNSIGNED_BYTE, staging.data());
+            setParams();
+        } else {
+            gl::BindTexture(GL_TEXTURE_2D, t);
+            // (one texel wider for the normal: the height's normal reads its neighbours)
+            const int pad = b == 1 ? 1 : 0;
+            dirtyRuns([&](int x0, int y0, int x1, int y1) {
+                x0 = std::max(0, x0 - pad), y0 = std::max(0, y0 - pad);
+                x1 = std::min(tex->width, x1 + pad), y1 = std::min(tex->height, y1 + pad);
+                pack(x0, y0, x1, y1);
+                gl::TexSubImage2D(GL_TEXTURE_2D, 0, x0, y0, x1 - x0, y1 - y0, GL_RGBA, GL_UNSIGNED_BYTE, staging.data());
+            });
+        }
+        gl::GenerateMipmap(GL_TEXTURE_2D);
+        s.pbrPlanes |= bit;
+    }
+    s.pbrSerial = tex->serial;
     gl::BindTexture(GL_TEXTURE_2D, 0);
     s.textureRevision = tex->revision;
     tex->clearDirty();
 }
 
+// Tangents (MikkTSpace, per mesh corner) into the slot's texture buffer, in draw order (the clusters' order,
+// without hidden triangles), like the UVs.
+void Renderer::uploadTangents(MeshSlot& s, const std::vector<glm::vec4>& all) {
+    if (!s.tangentData) gl::GenBuffers(1, &s.tangentData);
+    if (!s.tangentTexture) gl::GenTextures(1, &s.tangentTexture);
+    std::vector<glm::vec4> tans(s.drawnOrder.size() * 3);
+    for (size_t i = 0; i < s.drawnOrder.size(); ++i)
+        if (size_t(s.drawnOrder[i]) * 3 + 3 <= all.size()) std::copy_n(all.data() + size_t(s.drawnOrder[i]) * 3, 3, tans.data() + i * 3);
+    gl::BindBuffer(GL_TEXTURE_BUFFER, s.tangentData);
+    gl::BufferData(GL_TEXTURE_BUFFER, GLsizeiptr(tans.size() * sizeof(glm::vec4)), tans.data(), GL_STATIC_DRAW);
+    gl::BindTexture(GL_TEXTURE_BUFFER, s.tangentTexture);
+    gl::TexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, s.tangentData);
+    gl::BindTexture(GL_TEXTURE_BUFFER, 0);
+    gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
+    s.hasTangents = true;
+    s.tangentsStale = false;
+    s.bytes[7] = s.drawnOrder.size() * 3 * (sizeof(glm::vec2) + sizeof(glm::vec4));
+}
+
 // The baked normal map preview: the map uploads when its serial changes, the tangents (in draw order, without
-// hidden triangles, like the UVs) whenever the faces were re-uploaded too.
+// hidden triangles, like the UVs) whenever the faces were re-uploaded too. Without a preview, the PBR view's
+// material normal (syncTexture) gets tangents computed here, once per UV layout.
 void Renderer::syncNormalMap(MeshSlot& s, const Mesh& mesh, const NormalMapView* nm) {
     if (!nm || !s.hasUvs) {
         if (s.normalTexture) gl::DeleteTextures(1, &s.normalTexture);
         s.normalTexture = 0;
         s.normalSerial = 0;
-        s.hasTangents = false;
+        if (!s.hasUvs || !(s.pbrPlanes & 2u)) {
+            s.hasTangents = false;
+            s.tangentsFromMaterial = false;
+            std::vector<glm::vec4>().swap(s.matTangents);
+            s.matTangentKey = 0;
+            return;
+        }
+        const uint64_t key = meshUvFingerprint(mesh) ^ (uint64_t(mesh.vertexCount()) << 32) ^ uint64_t(mesh.triangleCount());
+        if (s.matTangentKey != key || s.matTangents.size() != mesh.uvs.size()) {
+            s.matTangents = computeTangents(mesh);
+            s.matTangentKey = key;
+            s.tangentsStale = true;
+        }
+        if (!s.tangentsFromMaterial) s.tangentsStale = true;
+        s.tangentsFromMaterial = true;
+        s.normalFlipGreen = false;
+        if (s.tangentsStale || !s.hasTangents) uploadTangents(s, s.matTangents);
         return;
     }
     if (!s.normalTexture || s.normalSerial != nm->serial) {
@@ -2046,23 +2309,100 @@ void Renderer::syncNormalMap(MeshSlot& s, const Mesh& mesh, const NormalMapView*
         s.normalSerial = nm->serial;
         s.tangentsStale = true;
     }
+    if (s.tangentsFromMaterial) s.tangentsStale = true;
+    s.tangentsFromMaterial = false;
     s.normalFlipGreen = nm->flipGreen;
     if (!s.tangentsStale && s.hasTangents) return;
-    if (!s.tangentData) gl::GenBuffers(1, &s.tangentData);
-    if (!s.tangentTexture) gl::GenTextures(1, &s.tangentTexture);
-    // In draw order (the clusters' order, without hidden triangles), like the UVs.
-    const std::vector<glm::vec4>& all = *nm->tangents;
-    std::vector<glm::vec4> tans(s.drawnOrder.size() * 3);
-    for (size_t i = 0; i < s.drawnOrder.size(); ++i) std::copy_n(all.data() + size_t(s.drawnOrder[i]) * 3, 3, tans.data() + i * 3);
-    gl::BindBuffer(GL_TEXTURE_BUFFER, s.tangentData);
-    gl::BufferData(GL_TEXTURE_BUFFER, GLsizeiptr(tans.size() * sizeof(glm::vec4)), tans.data(), GL_STATIC_DRAW);
-    gl::BindTexture(GL_TEXTURE_BUFFER, s.tangentTexture);
-    gl::TexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, s.tangentData);
-    gl::BindTexture(GL_TEXTURE_BUFFER, 0);
-    gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
-    s.hasTangents = true;
-    s.tangentsStale = false;
-    s.bytes[7] = s.drawnOrder.size() * 3 * (sizeof(glm::vec2) + sizeof(glm::vec4));
+    uploadTangents(s, *nm->tangents);
+}
+
+// ---------------------------------------------------------------------------
+// PBR view: image-based lighting
+// ---------------------------------------------------------------------------
+
+bool Renderer::ensureEnvironment(int index) {
+    if (index < 0 || index >= environmentCount()) index = 0;
+    if (envFailedIndex_ == index) index = 0; // (a file that failed once: the built-in studio instead)
+    if (!brdfTexture_) {
+        const std::vector<glm::vec2> lut = brdfLut(kBrdfLutSize);
+        gl::GenTextures(1, &brdfTexture_);
+        gl::BindTexture(GL_TEXTURE_2D, brdfTexture_);
+        gl::PixelStorei(GL_UNPACK_ALIGNMENT, 4);
+        gl::TexImage2D(GL_TEXTURE_2D, 0, GLint(kRg16f), kBrdfLutSize, kBrdfLutSize, 0, kRg, GL_FLOAT, lut.data());
+        gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GLint(GL_LINEAR));
+        gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GLint(GL_LINEAR));
+        gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GLint(GL_CLAMP_TO_EDGE));
+        gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GLint(GL_CLAMP_TO_EDGE));
+    }
+    if (envIndex_ == index && envTexture_ && !envJob_) return true;
+    if (!envJob_ || envJob_->index != index) {
+        auto job = std::make_shared<EnvJob>();
+        job->index = index;
+        envJob_ = job;
+        std::thread([job, wake = envWake_] {
+            std::string error;
+            job->ok = buildEnvironmentLighting(job->index, job->light, error);
+            job->done = true;
+            if (wake) wake();
+        }).detach();
+    }
+    if (!envJob_->done) {
+        if (envTexture_) return true; // the old one meanwhile
+        while (!envJob_->done) std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    std::shared_ptr<EnvJob> job = std::move(envJob_);
+    if (!job->ok) {
+        envFailedIndex_ = job->index;
+        if (job->index == 0) return envTexture_ != 0;
+        return ensureEnvironment(0);
+    }
+    const EnvironmentLighting& light = job->light;
+    if (!envTexture_) gl::GenTextures(1, &envTexture_);
+    gl::BindTexture(GL_TEXTURE_2D, envTexture_);
+    gl::PixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    for (size_t k = 0; k < light.levels.size(); ++k) {
+        const EnvImage& l = light.levels[k];
+        gl::TexImage2D(GL_TEXTURE_2D, GLint(k), GLint(kRgb16f), l.width, l.height, 0, kRgb, GL_FLOAT, l.texels.data());
+    }
+    gl::TexParameteri(GL_TEXTURE_2D, kMaxLevel, GLint(light.levels.size()) - 1);
+    gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GLint(GL_LINEAR_MIPMAP_LINEAR));
+    gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GLint(GL_LINEAR));
+    gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GLint(kRepeat));
+    gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GLint(GL_CLAMP_TO_EDGE));
+    gl::BindTexture(GL_TEXTURE_2D, 0);
+    envSh_ = light.sh;
+    envIndex_ = job->index;
+    return true;
+}
+
+bool Renderer::environmentPending() const { return envJob_ != nullptr; }
+
+uint32_t Renderer::pbrPlanes(uint32_t id) const {
+    for (const auto& s : slots_)
+        if (s.id == id) return s.pbrPlanes;
+    return 0;
+}
+
+void Renderer::setPbrUniforms(const MeshProgram& p, const RenderSettings& settings, bool textured, const MeshSlot& s) {
+    if (p.envLevels < 0 && p.material < 0) return; // (not a PBR program)
+    gl::ActiveTexture(kTexture10);
+    gl::BindTexture(GL_TEXTURE_2D, envTexture_);
+    gl::ActiveTexture(kTexture11);
+    gl::BindTexture(GL_TEXTURE_2D, brdfTexture_);
+    gl::ActiveTexture(kTexture8);
+    gl::BindTexture(GL_TEXTURE_2D, textured ? s.ormTexture : 0);
+    gl::ActiveTexture(kTexture9);
+    gl::BindTexture(GL_TEXTURE_2D, textured ? s.emissiveTexture : 0);
+    gl::ActiveTexture(GL_TEXTURE0);
+    gl::Uniform1i(p.hasOrm, textured && s.ormTexture ? 1 : 0);
+    gl::Uniform1i(p.hasEmissive, textured && s.emissiveTexture ? 1 : 0);
+    gl::Uniform1f(p.envLevels, float(kEnvLevels - 1));
+    gl::Uniform1f(p.exposure, settings.exposure);
+    gl::Uniform1i(p.toneMap, int(settings.toneMap));
+    gl::Uniform2f(p.material, std::clamp(settings.pbrRoughness, 0.0f, 1.0f), std::clamp(settings.pbrMetallic, 0.0f, 1.0f));
+    gl::Uniform1f(p.pbrCavity, std::clamp(settings.pbrCavity, 0.0f, 1.0f));
+    gl::UniformMatrix3fv(p.viewToEnv, 1, GL_FALSE, glm::value_ptr(frameViewToEnv_));
+    gl::Uniform3fv(p.sh, 9, glm::value_ptr(envSh_.c[0]));
 }
 
 GLuint Renderer::paintTexture(uint32_t id) const {
@@ -2254,13 +2594,46 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
         }
     } scissorOff{inset};
 
-    // Background: charcoal with a radial vignette (or the flat colour cleared above).
-    gl::Disable(GL_DEPTH_TEST);
-    gl::UseProgram(bgProgram_);
-    gl::BindVertexArray(emptyVao_);
-    if (!thumbnailPass_ && settings.gradientBackground) gl::DrawArrays(GL_TRIANGLES, 0, 3);
-
     const glm::mat4 view = camera.view(), proj = camera.projection();
+    // PBR view: the environment's lighting (built when it first shows), and the rotation from view space into it.
+    // (Thumbnails use whatever environment the view has: their settings must not start another build.)
+    const bool pbr = settings.pbr() && (thumbnailPass_ ? envTexture_ != 0 : ensureEnvironment(settings.environment));
+    if (pbr) {
+        const float yaw = glm::radians(settings.environmentRotation);
+        const glm::mat3 spin(glm::vec3(std::cos(yaw), 0.0f, -std::sin(yaw)), glm::vec3(0.0f, 1.0f, 0.0f),
+                             glm::vec3(std::sin(yaw), 0.0f, std::cos(yaw)));
+        frameViewToEnv_ = spin * glm::transpose(glm::mat3(view));
+    }
+
+    // Background: charcoal with a radial vignette (or the flat colour cleared above); in the PBR view optionally
+    // the environment itself, blurred.
+    gl::Disable(GL_DEPTH_TEST);
+    gl::BindVertexArray(emptyVao_);
+    if (!thumbnailPass_ && pbr && settings.environmentBackground) {
+        if (!envBgProgram_) {
+            std::string error;
+            envBgProgram_ = link(kBgVS, kEnvBgFS, error);
+        }
+        if (envBgProgram_) {
+            gl::UseProgram(envBgProgram_);
+            auto at = [&](const char* n) { return gl::GetUniformLocation(envBgProgram_, n); };
+            const glm::mat4 invProj = glm::inverse(proj);
+            gl::UniformMatrix4fv(at("uInvProj"), 1, GL_FALSE, glm::value_ptr(invProj));
+            gl::UniformMatrix3fv(at("uViewToEnv"), 1, GL_FALSE, glm::value_ptr(frameViewToEnv_));
+            gl::Uniform1f(at("uLod"), std::clamp(settings.backgroundBlur, 0.0f, 1.0f) * float(kEnvLevels - 1));
+            gl::Uniform1f(at("uExposure"), settings.exposure);
+            gl::Uniform1i(at("uToneMap"), int(settings.toneMap));
+            gl::Uniform1i(at("uEnvTex"), 10);
+            gl::ActiveTexture(kTexture10);
+            gl::BindTexture(GL_TEXTURE_2D, envTexture_);
+            gl::ActiveTexture(GL_TEXTURE0);
+            gl::DrawArrays(GL_TRIANGLES, 0, 3);
+        }
+    } else if (!thumbnailPass_ && settings.gradientBackground) {
+        gl::UseProgram(bgProgram_);
+        gl::DrawArrays(GL_TRIANGLES, 0, 3);
+    }
+
     frameView_ = view;
     frameProj_ = proj;
     frameViewport_ = inset ? glm::vec4(float(viewport.x), float(viewport.y), float(viewport.w), float(viewport.h))
@@ -2294,7 +2667,7 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
         gl::ActiveTexture(unit);
         gl::BindTexture(GL_TEXTURE_BUFFER, 0);
     }
-    for (GLenum unit : {kTexture5, GL_TEXTURE4, kTexture2}) {
+    for (GLenum unit : {kTexture11, kTexture10, kTexture9, kTexture8, kTexture5, GL_TEXTURE4, kTexture2}) {
         gl::ActiveTexture(unit);
         gl::BindTexture(GL_TEXTURE_2D, 0);
     }
@@ -2432,9 +2805,10 @@ void Renderer::drawClusters(const MeshSlot& s, const std::vector<uint32_t>& clus
 
 // One mesh. Mask and polygroup colours are for the SubTool being edited; polypaint shows on all of them.
 void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings) {
-    const MeshProgram* p = meshProgram(kMicro | (flat ? kFlat : 0));
+    const MeshProgram* p = meshProgram(kMicro | (flat ? kFlat : 0) | (settings.pbr() && envTexture_ ? kPbr : 0));
     if (!p) return;
     gl::UseProgram(p->id);
+    setPbrUniforms(*p, settings, false, s);
     gl::UniformMatrix4fv(p->view, 1, GL_FALSE, glm::value_ptr(frameView_));
     gl::UniformMatrix4fv(p->proj, 1, GL_FALSE, glm::value_ptr(frameProj_));
     gl::Uniform4fv(p->viewport, 1, glm::value_ptr(frameViewport_));
@@ -2466,13 +2840,16 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     }
     // A painted texture shows through the textured program (polypaint still multiplies it).
     const bool textured = s.hasUvs && s.paintTexture && settings.showPolypaint && settings.showTexture;
-    // A baked normal map preview bends the shading normal (core/Bake.h).
-    const bool normalMapped = s.hasUvs && s.normalTexture && s.hasTangents;
+    const bool pbr = settings.pbr() && envTexture_;
+    // A baked normal map preview bends the shading normal (core/Bake.h), and in the PBR view the texture's
+    // Normal / Height channels do (syncTexture's material normal, with tangents from syncNormalMap).
+    const GLuint normalTex = s.normalTexture ? s.normalTexture : (pbr && textured ? s.matNormalTexture : 0);
+    const bool normalMapped = s.hasUvs && normalTex && s.hasTangents;
     const int groups = active && settings.showPolygroups ? (s.hasGroups ? 1 : 2) : 0;
     // (Not through the textured program's geometry shader: those meshes are sculpted without the preview.)
     const bool ghost = active && s.id == ghostId_ && !ghost_.empty() && !settings.motionProxy && !textured && !normalMapped;
     const int features = (s.hasColors || s.hasMask ? kPaint : 0) | (groups == 1 ? kPrim : 0) | (textured ? kTextured : 0) |
-                         (normalMapped ? kNormalMap : 0) | (flat ? kFlat : 0);
+                         (normalMapped ? kNormalMap : 0) | (flat ? kFlat : 0) | (pbr ? kPbr : 0);
     const MeshProgram* p = meshProgram(features);
     if (!p) return;
     const auto bind = [&](const MeshProgram* p) {
@@ -2499,12 +2876,13 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     }
     if (normalMapped) {
         gl::ActiveTexture(kTexture5);
-        gl::BindTexture(GL_TEXTURE_2D, s.normalTexture);
+        gl::BindTexture(GL_TEXTURE_2D, normalTex);
         gl::ActiveTexture(kTexture6);
         gl::BindTexture(GL_TEXTURE_BUFFER, s.tangentTexture);
         gl::Uniform1i(p->hasPaint, textured ? 1 : 0);
-        gl::Uniform1i(p->normalFlipY, s.normalFlipGreen ? 1 : 0);
+        gl::Uniform1i(p->normalFlipY, s.normalTexture && s.normalFlipGreen ? 1 : 0);
     }
+    if (pbr) setPbrUniforms(*p, settings, textured, s);
     gl::ActiveTexture(kTexture7);
     gl::BindTexture(GL_TEXTURE_BUFFER, s.primTexture);
     gl::ActiveTexture(GL_TEXTURE1);

@@ -422,6 +422,20 @@ void App::registerShellActions() {
     flag("view.polypaint", "Paint", ICON_LC_PALETTE, "Render", "", &renderSettings_.showPolypaint,
          "Show polypaint colours (off: plain material).");
     // Shading (Material palette, Tool > Display): the scene's, and the active SubTool's own.
+    // Viewport shading (Material > Viewport Shading): Lit Sphere or PBR.
+    add({"view.shading_lit_sphere", "Lit Sphere", nullptr,
+         "Lit Sphere shading (the default): the chosen material sphere or the studio lights, made for reading forms "
+         "while sculpting.",
+         "Material > Viewport Shading", "", "viewport_shading",
+         [this] { runCommand("viewport_shading", {{"mode", std::string("lit_sphere")}}); },
+         [this] { return !renderSettings_.pbr(); }, nullptr});
+    add({"view.shading_pbr", "PBR", nullptr,
+         "PBR shading: the texture's material channels (base colour, roughness, metallic, normal, height, AO, emissive) "
+         "lit by an environment, as a game engine or renderer shows them. Meshes without a material use the roughness "
+         "and metallic set here.",
+         "Material > Viewport Shading", "", "viewport_shading",
+         [this] { runCommand("viewport_shading", {{"mode", std::string("pbr")}}); },
+         [this] { return renderSettings_.pbr(); }, nullptr});
     add({"material.smooth", "Smooth", nullptr,
          "Smooth shading (the default): normals blend across polygons, so the surface reads as one form.", "Material", "",
          "", [this] { runCommand("set_shading", {{"mode", std::string("smooth")}}); },

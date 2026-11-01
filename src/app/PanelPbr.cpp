@@ -360,6 +360,23 @@ void App::prewarmTexturePaint() {
     prewarmTexturePainting(m, &doc_.bvh, centers, r * 1.25f); // a little wider: the pen moves before it lands
 }
 
+// Benchmarks (UI tests' print draw_ms): the 3D view drawn `frames` times into the window's framebuffer, waiting
+// for the GPU each time, in milliseconds per frame.
+double App::benchmarkDrawMs(int frames) {
+    int w = 0, h = 0;
+    SDL_GetWindowSizeInPixels(window_, &w, &h);
+    if (w <= 0 || h <= 0) return 0.0;
+    syncScene();
+    renderer_.draw(camera_, w, h, renderSettings_, canvasViewport(w, h));
+    gl::Finish();
+    const Uint64 start = SDL_GetTicksNS();
+    for (int i = 0; i < frames; ++i) {
+        renderer_.draw(camera_, w, h, renderSettings_, canvasViewport(w, h));
+        gl::Finish();
+    }
+    return double(SDL_GetTicksNS() - start) * 1e-6 / double(std::max(frames, 1));
+}
+
 double App::pbrTestValue(const std::string& name) const {
     const Mesh& m = doc_.mesh;
     const bool tex = hasTexture(m);
@@ -370,6 +387,12 @@ double App::pbrTestValue(const std::string& name) const {
         return n;
     }
     if (name == "channel_view") return double(int(doc_.channelView));
+    if (name == "frame_ms") return frameSeconds_ * 1000.0; // (smoothed frame interval; fixed in UI tests)
+    if (name == "draw_ms") return const_cast<App*>(this)->benchmarkDrawMs(20); // the 3D view drawn 20 times, GPU included
+    if (name == "view_pbr") return renderSettings_.pbr() ? 1.0 : 0.0;
+    if (name == "environment") return double(renderSettings_.environment);
+    if (name == "environment_pending") return renderer_.environmentPending() ? 1.0 : 0.0;
+    if (name == "pbr_planes") return double(renderer_.pbrPlanes(doc_.activeSubtoolInfo().id));
     if (name == "brush_channels") return double(doc_.paintMaterial.channels);
     if (name == "roughness_painted") {
         if (!tex || !channelEnabled(*m.texture, Channel::Roughness)) return 0.0;

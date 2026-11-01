@@ -166,6 +166,57 @@ void App::registerPaintUiCommands() {
                        return {true, "Removed " + shown + " for this session; delete " + path +
                                          " to remove it for good (" + err + ")"};
                    }});
+    // Viewport shading: Lit Sphere or PBR (render/Renderer.h RenderSettings, core/EnvironmentMath.h).
+    commands_.add({"viewport_shading",
+                   "Viewport shading: lit_sphere (the material sphere or studio lights, the default) or pbr (the "
+                   "texture's material channels lit by an environment: GGX reflections, diffuse light from the "
+                   "environment, exposure and a tone map). Only changes what the view shows.",
+                   {{"mode", ParamSpec::Type::String, "lit_sphere or pbr (default: unchanged).", false},
+                    {"environment", ParamSpec::Type::String,
+                     "studio, photo_studio, small_studio, outdoor_sky, or a file name from SCULPTFORGE_HDRI_PATH.", false},
+                    {"rotation", ParamSpec::Type::Number, "Environment rotation in degrees about the up axis.", false},
+                    {"exposure", ParamSpec::Type::Number, "Exposure in stops (-6 to 6; default 0).", false},
+                    {"tone_map", ParamSpec::Type::String, "aces (default), agx, reinhard or none.", false},
+                    {"background", ParamSpec::Type::Bool, "Show the environment behind the model.", false},
+                    {"blur", ParamSpec::Type::Number, "Background blur, 0 (sharp) to 1.", false},
+                    {"roughness", ParamSpec::Type::Number, "Roughness of meshes without a material texture (0-1).", false},
+                    {"metallic", ParamSpec::Type::Number, "Metallic of meshes without a material texture (0-1).", false},
+                    {"cavity", ParamSpec::Type::Number, "How much creases darken under PBR, 0-1 (default 0.5).", false}},
+                   [this](Document&, const Args& a) -> CommandResult {
+                       RenderSettings v = renderSettings_;
+                       if (a.contains("mode")) {
+                           const std::string m = argString(a, "mode");
+                           if (m == "pbr") v.shading = RenderSettings::Shading::Pbr;
+                           else if (m == "lit_sphere" || m == "litsphere" || m == "lit" || m == "matcap")
+                               v.shading = RenderSettings::Shading::LitSphere;
+                           else return {false, "mode must be lit_sphere or pbr"};
+                       }
+                       if (a.contains("environment")) {
+                           const int e = findEnvironment(argString(a, "environment"));
+                           if (e < 0) {
+                               std::string names;
+                               for (const EnvironmentInfo& i : environments()) names += (names.empty() ? "" : ", ") + i.id;
+                               return {false, "Unknown environment (" + names + ")"};
+                           }
+                           v.environment = e;
+                       }
+                       if (a.contains("tone_map") && !parseToneMap(argString(a, "tone_map"), v.toneMap))
+                           return {false, "tone_map must be aces, agx, reinhard or none"};
+                       v.environmentRotation = float(std::fmod(argNumber(a, "rotation", v.environmentRotation), 360.0));
+                       v.exposure = std::clamp(float(argNumber(a, "exposure", v.exposure)), -6.0f, 6.0f);
+                       v.environmentBackground = argBool(a, "background", v.environmentBackground);
+                       v.backgroundBlur = std::clamp(float(argNumber(a, "blur", v.backgroundBlur)), 0.0f, 1.0f);
+                       v.pbrRoughness = std::clamp(float(argNumber(a, "roughness", v.pbrRoughness)), 0.0f, 1.0f);
+                       v.pbrMetallic = std::clamp(float(argNumber(a, "metallic", v.pbrMetallic)), 0.0f, 1.0f);
+                       v.pbrCavity = std::clamp(float(argNumber(a, "cavity", v.pbrCavity)), 0.0f, 1.0f);
+                       renderSettings_ = v;
+                       if (!v.pbr()) return {true, "Viewport shading: Lit Sphere"};
+                       char buf[200];
+                       std::snprintf(buf, sizeof buf, "Viewport shading: PBR, %s, %+.1f EV, %s%s",
+                                     environments()[size_t(v.environment)].label.c_str(), double(v.exposure),
+                                     toneMapLabel(v.toneMap), v.environmentBackground ? ", background on" : "");
+                       return {true, buf};
+                   }});
     // The view's background (#21). Also the preference for new sessions.
     commands_.add({"set_background",
                    "The viewport background: gradient (the default charcoal radial gradient) or flat, one solid "
@@ -398,6 +449,67 @@ void App::drawPalette_Material() {
     ImGui::ColorEdit3(tr("Base colour"), &renderSettings_.baseColor.x, ImGuiColorEditFlags_NoInputs);
     ui::HelpText("Base colour", nullptr, "Colour of the Studio material (the clay colour).", "Material");
     drawShadingControls();
+    drawViewportShadingControls();
+}
+
+// Material > Viewport Shading: Lit Sphere or PBR, and the PBR view's environment. Every change runs
+// viewport_shading, so scripts and the console see the same thing.
+void App::drawViewportShadingControls() {
+    ImGui::Spacing();
+    ImGui::TextDisabled("%s", tr("Viewport Shading"));
+    ui::Segmented(*this, {"view.shading_lit_sphere", "view.shading_pbr"});
+    if (!renderSettings_.pbr()) return;
+    RenderSettings& v = renderSettings_;
+    const auto& envs = environments();
+    const int current = std::clamp(v.environment, 0, int(envs.size()) - 1);
+    ImGui::SetNextItemWidth(-1);
+    if (ImGui::BeginCombo("##environment", envs[size_t(current)].label.c_str())) {
+        for (int i = 0; i < int(envs.size()); ++i) {
+            if (ImGui::Selectable(envs[size_t(i)].label.c_str(), i == current))
+                runCommand("viewport_shading", {{"environment", envs[size_t(i)].id}});
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", envs[size_t(i)].credit.c_str());
+        }
+        ImGui::EndCombo();
+    }
+    ui::HelpText("Environment", nullptr,
+                 "The light around the model: Studio (generated), Photo Studio, Small Studio and Outdoor Sky. HDR "
+                 "files (.hdr, .exr) in the folders of SCULPTFORGE_HDRI_PATH are listed after them.",
+                 "Material > Viewport Shading");
+    // Sliders change the view live and run the command once when let go (one console line per change).
+    auto slider = [&](const char* label, const char* key, float* value, float lo, float hi, const char* fmt, const char* help) {
+        ImGui::SetNextItemWidth(-1);
+        ImGui::SliderFloat(label, value, lo, hi, fmt);
+        if (ImGui::IsItemDeactivatedAfterEdit()) runCommand("viewport_shading", {{key, double(*value)}});
+        ui::HelpText(label + 2, nullptr, help, "Material > Viewport Shading");
+    };
+    slider("##Exposure", "exposure", &v.exposure, -6.0f, 6.0f, tr("Exposure %+.1f EV"),
+           "Brightness of the light in stops: +1 doubles it.");
+    slider("##Rotation", "rotation", &v.environmentRotation, -180.0f, 180.0f, tr("Rotation %.0f deg"),
+           "Turns the environment about the up axis, moving the highlights.");
+    ImGui::SetNextItemWidth(-1);
+    if (ImGui::BeginCombo("##tonemap", (std::string(tr("Tone map")) + ": " + toneMapLabel(v.toneMap)).c_str())) {
+        for (int i = 0; i < kToneMapCount; ++i)
+            if (ImGui::Selectable(toneMapLabel(ToneMap(i)), int(v.toneMap) == i))
+                runCommand("viewport_shading", {{"tone_map", std::string(toneMapId(ToneMap(i)))}});
+        ImGui::EndCombo();
+    }
+    ui::HelpText("Tone map", nullptr,
+                 "How bright light maps to the screen: ACES (filmic contrast), AgX (softer, keeps bright colours from "
+                 "going flat), Reinhard (gentle) or None.",
+                 "Material > Viewport Shading");
+    bool background = v.environmentBackground;
+    if (ui::Checkbox("Show environment##envbg", &background))
+        runCommand("viewport_shading", {{"background", background}});
+    ui::HelpText("Show environment", nullptr, "Show the environment behind the model instead of the background.",
+                 "Material > Viewport Shading");
+    if (v.environmentBackground)
+        slider("##Blur", "blur", &v.backgroundBlur, 0.0f, 1.0f, tr("Blur %.2f"), "How soft the environment behind the model is.");
+    slider("##Roughness", "roughness", &v.pbrRoughness, 0.0f, 1.0f, tr("Roughness %.2f"),
+           "Roughness of Parts without a material texture (their colour comes from polypaint or the base colour).");
+    slider("##Metallic", "metallic", &v.pbrMetallic, 0.0f, 1.0f, tr("Metallic %.2f"),
+           "Metallic of Parts without a material texture.");
+    slider("##Cavity", "cavity", &v.pbrCavity, 0.0f, 1.0f, tr("Cavity %.2f"),
+           "How much the sculpt's creases darken, so detail reads under even light. 0 is plain PBR.");
 }
 
 void App::drawShadingControls() {

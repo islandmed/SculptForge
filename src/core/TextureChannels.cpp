@@ -420,6 +420,57 @@ void channelViewTexels(const PaintTexture& t, Channel c, int x0, int y0, int x1,
     }, 16, 4);
 }
 
+uint32_t pbrViewPlanes(const PaintTexture& t) {
+    uint32_t planes = 0;
+    for (Channel c : {Channel::AO, Channel::Roughness, Channel::Metallic, Channel::Opacity})
+        if (channelEnabled(t, c)) planes |= 1u;
+    if (channelEnabled(t, Channel::Normal) || channelEnabled(t, Channel::Height)) planes |= 2u;
+    if (channelEnabled(t, Channel::Emissive)) planes |= 4u;
+    return planes;
+}
+
+void pbrViewTexels(const PaintTexture& t, int x0, int y0, int x1, int y1, uint8_t* orm, uint8_t* normal, uint8_t* emissive) {
+    const int rw = x1 - x0, rx = x0, ry = y0; // the caller's rectangle
+    x0 = std::max(x0, 0), y0 = std::max(y0, 0);
+    const int cx1 = std::min(x1, t.width), cy1 = std::min(y1, t.height);
+    if (x0 >= cx1 || y0 >= cy1) return;
+    const TileImage* img[4] = {};
+    const Channel ormCh[4] = {Channel::AO, Channel::Roughness, Channel::Metallic, Channel::Opacity};
+    float def[4];
+    for (int k = 0; k < 4; ++k) {
+        img[k] = channelEnabled(t, ormCh[k]) ? &channelImage(t, ormCh[k]) : nullptr;
+        def[k] = channelFormat(ormCh[k]).defaultValue[0];
+    }
+    const TileImage* em = channelEnabled(t, Channel::Emissive) ? &channelImage(t, Channel::Emissive) : nullptr;
+    const bool nrm = normal && (channelEnabled(t, Channel::Normal) || channelEnabled(t, Channel::Height));
+    auto u8 = [](float v) { return uint8_t(std::lround(std::clamp(v, 0.0f, 1.0f) * 255.0f)); };
+    poolFor(size_t(cy1 - y0), [&](size_t b, size_t e) {
+        for (int y = y0 + int(b); y < y0 + int(e); ++y) {
+            const size_t row = size_t(y - ry) * size_t(rw);
+            for (int x = x0; x < cx1; ++x) {
+                const size_t i = (row + size_t(x - rx)) * 4;
+                if (orm) {
+                    for (int k = 0; k < 4; ++k) orm[i + size_t(k)] = u8(img[k] ? img[k]->value(x, y) : def[k]);
+                }
+                if (normal) {
+                    glm::vec3 n(0, 0, 1);
+                    if (nrm) n = effectiveNormalAt(t, x, y);
+                    normal[i] = u8(n.x * 0.5f + 0.5f);
+                    normal[i + 1] = u8(n.y * 0.5f + 0.5f);
+                    normal[i + 2] = u8(n.z * 0.5f + 0.5f);
+                    normal[i + 3] = 255;
+                }
+                if (emissive) {
+                    float v[4] = {0, 0, 0, 0};
+                    if (em) em->values(x, y, v);
+                    for (int k = 0; k < 3; ++k) emissive[i + size_t(k)] = u8(v[k]);
+                    emissive[i + 3] = 255;
+                }
+            }
+        }
+    }, 16, 4);
+}
+
 void syncChannelView(PaintTexture& t, Channel c) {
     if (c == Channel::BaseColor || !channelEnabled(t, c)) {
         if (t.viewChannel != Channel::BaseColor) {

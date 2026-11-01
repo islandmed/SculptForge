@@ -1997,4 +1997,6 @@ void clearTextureLayer(PaintTexture& t, int layer) {
     compositeTextureAll(t);
 }
 
+uint64_t meshUvFingerprint(const Mesh& mesh) { return uvFingerprint(mesh); }
+
 } // namespace sf

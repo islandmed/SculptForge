@@ -125,6 +125,8 @@ struct PaintTexture {
     size_t colourBytes() const;
 };
 
+// A fingerprint of the mesh's UVs (sampled; changes when the layout does), for caches keyed by UV layout.
+uint64_t meshUvFingerprint(const Mesh& mesh);
 // Bytes of the texture-painting caches shared by every texture on the same UVs (UV tile bins, coverage, texel
 // maps of dense meshes): Preferences > Performance.
 size_t texturePaintCacheBytes();

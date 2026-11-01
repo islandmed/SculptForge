@@ -169,6 +169,7 @@ bool App::init(const AppOptions& options) {
         SDL_Log("%s", err.c_str());
         return false;
     }
+    renderer_.setEnvironmentWake([] { wakeMainLoop(); }); // (PBR view: a new environment's lighting is ready)
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -643,7 +644,7 @@ bool App::backgroundBusy() const {
     return running(pendingBrush_) || running(pendingGenerator_) || running(pendingModels_) || running(pendingUnreal_) ||
            running(pendingComfyCheck_) || galleryBusy() || thumbs_.busy() || libraryScanner_.busy() || autoUv_ ||
            bakeBusy() || qremesh_ || voxelRemesh_ || updateJob_ || splatTrainBusy() || sculptableBusy() || phoneBusy() ||
-           supportCardLoading();
+           supportCardLoading() || renderer_.environmentPending();
 }
 
 void App::redrawIn(double seconds) {
@@ -1757,6 +1758,7 @@ void App::runCommand(const std::string& name, const Args& args) {
         name != "export_unreal" && name.rfind("unreal_", 0) != 0 && name != "save_obj" && name != "save_project" &&
         name != "mesh_info" && name.rfind("brush_", 0) != 0 && name.rfind("splat_", 0) != 0 && name != "mesh_to_splats" &&
         name != "set_color" && name != "set_material" && name != "load_matcap" && name != "set_shading" && name != "subtool_shading" &&
+        name != "viewport_shading" &&
         name != "export_ply" && name != "face_weights" &&
         name != "face_preset" && name.rfind("face_take", 0) != 0 && name != "face_landmarks_detect") {
         clearLods();
@@ -1954,7 +1956,8 @@ void App::syncScene() {
         // Solo channel view (channel_view): the texture's shown texels follow before the renderer uploads them.
         if (mesh->texture) syncChannelView(*mesh->texture, doc_.channelView);
         const bool flat = s.shading == Shading::Flat || (s.shading == Shading::Default && renderSettings_.flatShading);
-        scene.push_back({s.id, mesh, active, s.visible, bakeNormalMap(s.id, *mesh), renderSettings_.wireframe, flat});
+        scene.push_back({s.id, mesh, active, s.visible, bakeNormalMap(s.id, *mesh), renderSettings_.wireframe, flat,
+                         renderSettings_.pbr()});
     }
     renderer_.syncScene(scene);
     renderer_.syncSplats(doc_.splats, doc_.splatsVersion);
