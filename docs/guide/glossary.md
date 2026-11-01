@@ -68,7 +68,7 @@ for what is planned.
 | Texture palette | Not yet as a palette of texture images. **Tool > Texture Map > Import Texture** loads an image onto the UVs |
 | Transpose, Gizmo 3D (Move W, Scale E, Rotate R) | **Gizmo**: same keys, arrows, rings and boxes; masked parts stay, Falloff softens the joint. See [Gizmo](gizmo.md) |
 | Transpose All | **All Parts** in the Gizmo panel. See [Gizmo](gizmo.md#all-parts) |
-| UV Master (Unwrap) | **Tool > Texture Map > Auto UV** (`uv_auto`). UVs that come in with a model are kept. Seams and UV editing not yet. See [Texture painting](texture-painting.md) |
+| UV Master (Unwrap), UV editing | The **UV Editor** (<kbd>Shift</kbd>+<kbd>U</kbd>): seams on the model, Least Stretch, Conformal, By Face Groups, Planar and Unfold unwraps, UDIM packing, texel density, trim sheets (`uv_unwrap`, `uv_pack`...). **Tool > Texture Map > Auto UV** (`uv_auto`) is the one-click unwrap. See [UV Editor](uv-editor.md) |
 | VDM brush, 3D alpha, Create VDM brush from the VDM plane | The **VDM** brush and **Brush > Vector Displacement**: built-in maps, **Load VDM...** (EXR), **New VDM Plane**, **Create VDM**, **Export EXR...**. See [Vector displacement brushes](sculpting.md#vector-displacement-brushes) |
 | Zadd / Zsub | **Add** / **Sub** on the top shelf; <kbd>Alt</kbd> flips for one stroke |
 | ZPlugin | No in-app plugin system yet. Automate with the Python module, `sculptforge-cli` and MCP ([Scripting](scripting.md)) |
@@ -114,7 +114,10 @@ for what is planned.
 | MikkTSpace | The standard way of computing tangents that game engines share, so tangent-space normal maps look the same everywhere. See [Baking](baking.md) |
 | Normal map | A map of surface directions that makes a low-poly shade like the high-poly. Tangent-space maps are relative to the surface (for engines), object-space maps to the model. See [Baking](baking.md) |
 | Texel | One pixel of a texture. Texture painting paints texels; their 3D position on the model decides the brush falloff |
-| UV island | A piece of the surface flattened into the texture square. Auto UV cuts the model into islands along seams |
+| UV island | A piece of the surface flattened into the texture square. Unwrap and Auto UV cut the model into islands along seams. See [UV Editor](uv-editor.md) |
+| UDIM tile | One unit square of UV space, numbered 1001 (u and v between 0 and 1), 1002 to its right, ten per row: a Part's islands can spread over several, each its own texture. See [UV Editor](uv-editor.md#packing-and-udim-tiles) |
+| Texel density | Texels of the texture per unit of surface length: equal density makes detail look the same size everywhere. See [UV Editor](uv-editor.md#texel-density) |
+| Trim sheet | A texture of horizontal strips that repeat left to right; islands are laid into a strip. See [UV Editor](uv-editor.md#trim-sheets) |
 | Antialiasing (AA) | Smoothing the 3D view's edges with several samples per pixel (Off, 2x, 4x, 8x in **Preferences > Performance**). See [Performance](performance.md) |
 | BVH | Bounding volume hierarchy: the structure SculptForge uses to find the surface under the cursor and the vertices under a brush. Its update time is shown per dab in **Preferences > Performance** |
 | Dab | One step of a brush along a stroke. Its cost per dab decides whether a stroke keeps up with the display (under 16 ms at 60 Hz). See [Performance](performance.md) |

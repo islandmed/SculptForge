@@ -41,7 +41,7 @@ Features use SculptForge's own names. The ideas are the ones you know; here is w
 | SelectRect, SelectLasso | **Select Rectangle**, **Select Lasso** | **Tool > Visibility** |
 | FiberMesh, LightCap | Not yet | |
 | ZScript, ZPlugin | Script commands and the Python module | See [Scripting](scripting.md) |
-| Decimation Master, UV Master, Projection Master | **Decimate**, **Auto UV**, **Generate > Stamp** | See [Geometry](geometry.md#decimate) and [Texture painting](texture-painting.md) |
+| Decimation Master, UV Master, Projection Master | **Decimate**, the **UV Editor** (and **Auto UV**), **Generate > Stamp** | See [Geometry](geometry.md#decimate), [UV Editor](uv-editor.md) and [Texture painting](texture-painting.md) |
 
 The command palette (<kbd>F3</kbd>) finds every feature by its ZBrush name too: type `SubTool`, `ZSphere`,
 `Polypaint` or `MatCap` and it shows the SculptForge command, as in "Forge Spheres (ZBrush users: ZSpheres)". The

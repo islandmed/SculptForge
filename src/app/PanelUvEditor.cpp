@@ -6,8 +6,8 @@
 //
 // - Select vertices, edges, faces or islands (1-4) by clicking or dragging a box (Shift adds, Ctrl removes), or
 //   on the model with Select in 3D; move, rotate and scale them with the box's handles or G / R / S.
-// - Mark and clear seams on the model with the Seam tool (drag along edges; Alt clears), or from polygroups,
-//   island borders or sharp edges; Unwrap (least stretch, conformal, by polygroups, planar, unfold, auto seams),
+// - Mark and clear seams on the model with the Seam tool (drag along edges; Alt clears), or from face groups,
+//   island borders or sharp edges; Unwrap (least stretch, conformal, by face groups, planar, unfold, auto seams),
 //   Pack into one tile or across UDIM tiles, set or match texel density, lay islands into trim sheet strips,
 //   pin, weld, split, straighten and flip.
 // - The model shows the same colours live: islands, stretch or texel density, the selection and a checker, so
@@ -45,7 +45,7 @@ constexpr int kSizes[] = {1024, 2048, 4096, 8192};
 constexpr const char* kSizeLabels[] = {"1K", "2K", "4K", "8K"};
 constexpr UvUnwrapMethod kMethods[] = {UvUnwrapMethod::Isometric, UvUnwrapMethod::Conformal, UvUnwrapMethod::Polygroups,
                                        UvUnwrapMethod::Planar,    UvUnwrapMethod::Unfold,    UvUnwrapMethod::Auto};
-constexpr const char* kColorLabels[] = {"Islands", "Stretch", "Texel Density", "Plain"};
+constexpr const char* kColorLabels[] = {"Islands", "Stretch", "Density", "Plain"};
 constexpr const char* kImageLabels[] = {"No Image", "Checker", "Texture"};
 
 bool ctrlKey(SDL_Keymod mod) { return (mod & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) != 0; }
@@ -323,7 +323,7 @@ struct UvEditorUi {
             default: break;
             }
             glm::vec3 model = c;
-            if (s.faceSel[t] == 1) c = kSelect, a = 0.62f, model = glm::mix(c, kSelect, 1.0f);
+            if (s.faceSel[t] == 1) model = glm::mix(c, kSelect, s.color == 1 || s.color == 2 ? 0.55f : 0.85f), c = model, a = 0.66f;
             else if (s.faceSel[t] == 2) model = glm::mix(model, kSelect, 0.45f);
             const uint32_t fc = pack(c, a);
             s.faceCol[t * 3] = s.faceCol[t * 3 + 1] = s.faceCol[t * 3 + 2] = fc;
@@ -569,7 +569,7 @@ struct UvEditorUi {
                     s.stretch[t] = uvTriangleStretchAt(m, uint32_t(t), s.topo, s.stretchCache);
                     const glm::vec3 c = s.stretch[t] < 0.0f ? glm::vec3(0.85f, 0.2f, 0.85f) : uvHeatColor(std::clamp(s.stretch[t] * 3.0f, 0.0f, 1.0f));
                     if (s.faceSel[t] != 1) s.faceCol[t * 3] = s.faceCol[t * 3 + 1] = s.faceCol[t * 3 + 2] = pack(c, 0.72f);
-                    if (!s.overlay.colors.empty()) s.overlay.colors[t] = pack(s.faceSel[t] ? glm::mix(c, kSelect, s.faceSel[t] == 1 ? 1.0f : 0.45f) : c, 1.0f) & 0x00FFFFFFu;
+                    if (!s.overlay.colors.empty()) s.overlay.colors[t] = pack(s.faceSel[t] ? glm::mix(c, kSelect, s.faceSel[t] == 1 ? 0.55f : 0.45f) : c, 1.0f) & 0x00FFFFFFu;
                 }
             }, 1 << 14);
             s.gpu.setColors(s.faceCol, s.edgeCol, s.moving);
@@ -828,8 +828,8 @@ void App::registerUvEditorActions() {
     add("uv.unwrap", "Unwrap", ICON_LC_UNFOLD_HORIZONTAL, "", [this] { uvUi(*this, uvEditor_).unwrap(); }, nullptr,
         [this] { return doc_.mesh.triangleCount() > 0 && !(uvEditor_ && uvEditor_->job); },
         "Unwrap with the chosen method: the selected faces (fitted where they were), or the whole Part (packed). Least "
-        "Stretch keeps angles and lengths along the marked seams; Conformal keeps angles; By Polygroups cuts along the "
-        "polygroup borders too; Planar projects each piece; Unfold flattens the current islands again in place, keeping "
+        "Stretch keeps angles and lengths along the marked seams; Conformal keeps angles; By Face Groups cuts along the "
+        "face group borders too; Planar projects each piece; Unfold flattens the current islands again in place, keeping "
         "pins; Auto Seams finds its own. Closed pieces get cut automatically. Big meshes unwrap in the background.",
         "uv_unwrap");
     add("uv.pack", "Pack", ICON_LC_PACKAGE, "", [this] { uvUi(*this, uvEditor_).run("uv_pack", uvUi(*this, uvEditor_).packArgs()); },
@@ -841,9 +841,9 @@ void App::registerUvEditorActions() {
         selected, "Mark the selected edges (or the border of the selected faces) as seams: Unwrap cuts there.", "uv_seam");
     add("uv.seam_clear", "Clear Seam", nullptr, "", [runUv] { runUv("uv_seam", {{"op", std::string("clear")}}); }, nullptr,
         selected, "Clear the seams on the selected edges (or the border of the selected faces).", "uv_seam");
-    add("uv.seam_polygroups", "From Polygroups", nullptr, "", [runUv] { runUv("uv_seam", {{"op", std::string("polygroups")}}); },
-        nullptr, nullptr, "Mark every polygroup border as a seam.", "uv_seam");
-    add("uv.seam_islands", "From Islands", nullptr, "", [runUv] { runUv("uv_seam", {{"op", std::string("islands")}}); }, nullptr,
+    add("uv.seam_polygroups", "Face Groups", nullptr, "", [runUv] { runUv("uv_seam", {{"op", std::string("polygroups")}}); },
+        nullptr, nullptr, "Mark every face group border as a seam.", "uv_seam");
+    add("uv.seam_islands", "Island Borders", nullptr, "", [runUv] { runUv("uv_seam", {{"op", std::string("islands")}}); }, nullptr,
         uvs, "Mark every current UV island border as a seam (keeps an imported layout's cuts for Unwrap).", "uv_seam");
     add("uv.seam_angle", "Sharp Edges", nullptr, "",
         [this, runUv] { runUv("uv_seam", {{"op", std::string("angle")}, {"angle", double(uvEditor_ ? uvEditor_->seamAngle : 60.0f)}}); },
@@ -988,7 +988,7 @@ void App::drawUvEditor() {
     if (ImGui::Combo("##uvcolor", &s.color, kColorLabels, 4)) s.colorsDirty = true;
     ui::HelpText("Colours", nullptr,
                  "What the faces show, here and on the model: Islands (a colour each), Stretch (green: true to the surface; "
-                 "yellow to red: stretched or squashed; magenta: folded over), Texel Density (blue: fewer texels than the "
+                 "yellow to red: stretched or squashed; magenta: folded over), Density (texel density; blue: fewer texels than the "
                  "mean, red: more) or Plain.",
                  kPath);
     nextOnLine(110 * scale, style.ItemSpacing.x);
@@ -1138,7 +1138,7 @@ void App::drawUvEditor() {
                 const bool on = int(i) == s.strip;
                 dl->AddRectFilled(a, b, on ? IM_COL32(240, 136, 46, 38) : IM_COL32(120, 160, 255, 14));
                 dl->AddRect(a, b, on ? IM_COL32(240, 136, 46, 200) : IM_COL32(150, 180, 255, 90), 0, 0, on ? 2.0f : 1.0f);
-                dl->AddText(ImVec2(b.x + 6 * scale, a.y + 2 * scale), on ? IM_COL32(255, 180, 110, 255) : IM_COL32(160, 180, 220, 200),
+                dl->AddText(ImVec2(b.x - ImGui::CalcTextSize(strips[i].name.c_str()).x - 6 * scale, a.y + 3 * scale), on ? IM_COL32(255, 180, 110, 255) : IM_COL32(160, 180, 220, 200),
                             strips[i].name.c_str());
             }
     }
@@ -1240,7 +1240,7 @@ void App::drawUvEditor() {
         ImGui::Combo("##uvmethod", &s.method, labels, 6);
         ui::HelpText("Method", nullptr,
                      "Least Stretch: angles and lengths, along the marked seams (the default). Conformal (LSCM): angles only. "
-                     "By Polygroups: also cuts along the polygroup borders. Planar: each piece projected flat. Unfold Islands: "
+                     "By Face Groups: also cuts along the face group borders. Planar: each piece projected flat. Unfold Islands: "
                      "the current islands flattened again where they are, keeping pins. Auto Seams: finds its own seams.",
                      kPath);
         if (kMethods[std::clamp(s.method, 0, 5)] == UvUnwrapMethod::Isometric || kMethods[s.method] == UvUnwrapMethod::Polygroups ||

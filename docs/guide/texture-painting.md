@@ -32,7 +32,8 @@ by hand, with more choices.
 4. Press <kbd>P</kbd> and paint. Draw Size, RGB Intensity, pen pressure, the stroke type, the alpha, symmetry and the
    mask work as they do for vertex paint.
 
-Click **Show UVs** to see the texture with the UV layout drawn over it, below the buttons. Paint on the model and
+Click **Show UVs** to see the texture with the UV layout drawn over it, below the buttons, or open the
+[UV Editor](uv-editor.md) (<kbd>Shift</kbd>+<kbd>U</kbd>) to cut seams, unwrap, pack and edit the UVs. Paint on the model and
 watch the texture fill in.
 
 ## Vertex or Texture
@@ -125,7 +126,7 @@ texture after giving it UVs.
   a texture come out white.
 - Auto UV on dense meshes: the islands are kept to about 4,000 triangles each, so a million-triangle sculpt
   unwraps in a quarter of a minute or so and gets a few hundred islands.
-- UVs outside the 0-1 square (tiles, UDIMs) aren't painted.
+- UVs outside the 0-1 square (other UDIM tiles) aren't painted yet; the [UV Editor](uv-editor.md) lays them out.
 
 > **ZBrush:** ZBrush paints polypaint and converts it to a texture afterwards (**Texture Map > New From
 > Polypaint**). SculptForge can do both: paint the texture directly, or bake vertex paint with **Vertex Paint >

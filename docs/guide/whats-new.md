@@ -7,6 +7,16 @@ chapter opens by itself the first time you start a new version; you can always f
 
 ## Version 0.10.5
 
+- **UV Editor** (**Tool > Texture Map > UV Editor**, <kbd>Shift</kbd>+<kbd>U</kbd>): the Part's UVs flat over the UDIM
+  tiles, drawn by the graphics card so a million triangles stay smooth. Draw seams on the model with the **Seam
+  Tool** (or take them from face groups, island borders or sharp edges), then **Unwrap**: **Least Stretch**,
+  **Conformal**, **By Face Groups**, **Planar**, **Unfold Islands** or **Auto Seams**, with closed and tangled pieces
+  cut for you. **Pack** into one tile or across UDIM tiles, **Set** and **Match** texel density, lay islands into
+  **trim sheet** strips, and select vertices, edges, faces or islands (in the view or on the model) to move, rotate,
+  scale, pin, weld, split, straighten and flip them. The model shows stretch, texel density, islands and a checker
+  live while you edit, and a painted texture moves with every change so the model keeps its look. Every step is one
+  undo step and a `uv_*` command for scripts. See [UV Editor](uv-editor.md).
+
 - **Selection sets** (**Tool > Selection Sets**): store as many named snapshots of a Part's mask, face groups,
   visibility, vertex paint, UVs and shape as you like, and restore them at any subdivision level, not only the one
   they were stored at. Combine two sets (union, intersect, subtract), restore one onto the current mask or

@@ -3,7 +3,7 @@
 //
 // Unwrapping (UV Editor > Unwrap, uv_unwrap):
 //
-// 1. The surface is cut into pieces along the marked seams (with Polygroups, the polygroup borders too; Unfold
+// 1. The surface is cut into pieces along the marked seams (By Face Groups: the face group borders too; Unfold
 //    keeps the current islands). Without marked seams, a mesh that has UVs is cut along its island borders.
 // 2. A piece that isn't a topological disk (a closed shell, a tube, a handle) gets extra cuts: the edges no dual
 //    spanning tree crosses, pruned back to the loops that matter; a closed shell is first split across its middle.
@@ -55,7 +55,7 @@ const char* uvUnwrapMethodLabel(UvUnwrapMethod m) {
     case UvUnwrapMethod::Auto: return "Auto Seams";
     case UvUnwrapMethod::Conformal: return "Conformal (LSCM)";
     case UvUnwrapMethod::Isometric: return "Least Stretch";
-    case UvUnwrapMethod::Polygroups: return "By Polygroups";
+    case UvUnwrapMethod::Polygroups: return "By Face Groups";
     case UvUnwrapMethod::Planar: return "Planar";
     case UvUnwrapMethod::Unfold: return "Unfold Islands";
     }
@@ -72,6 +72,7 @@ bool parseUvUnwrapMethod(const std::string& id, UvUnwrapMethod& m) {
     if (id == "lscm" || id == "angle") return m = UvUnwrapMethod::Conformal, true;
     if (id == "arap" || id == "stretch" || id == "least_stretch") return m = UvUnwrapMethod::Isometric, true;
     if (id == "xatlas") return m = UvUnwrapMethod::Auto, true;
+    if (id == "face_groups" || id == "groups") return m = UvUnwrapMethod::Polygroups, true;
     return false;
 }
 

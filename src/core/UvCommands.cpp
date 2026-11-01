@@ -130,7 +130,7 @@ void registerUvCommands(CommandRegistry& reg) {
     reg.add({"uv_unwrap",
              "Unwrap the active Part's UVs (UV Editor > Unwrap). Methods: isometric (least stretch: angles and lengths, "
              "along the marked seams; the default), conformal (LSCM: angles, along the seams), polygroups (cut along "
-             "the polygroup borders and the seams), planar (each piece projected flat), unfold (flatten the current "
+             "the face group borders and the seams), planar (each piece projected flat), unfold (flatten the current "
              "islands again in place, keeping pinned corners), auto (finds its own seams, xatlas). Pieces that are "
              "closed or looped get extra cuts. The result is packed into the 0-1 tile, or across UDIM tiles. With a UV "
              "selection only the selected faces are unwrapped (fitted where they were). A painted texture moves onto "
@@ -211,7 +211,7 @@ void registerUvCommands(CommandRegistry& reg) {
     reg.add({"uv_seam",
              "Mark or clear UV seams on the active Part (seams are where Unwrap cuts). op: mark / clear (the UV "
              "Editor's selected edges, or the border of its selected faces), path (mark the shortest edge path from "
-             "vertex `from` to vertex `to`; clear=true clears it), polygroups (every polygroup border), islands (every "
+             "vertex `from` to vertex `to`; clear=true clears it), polygroups (every face group border), islands (every "
              "current UV island border), angle (edges sharper than `angle` degrees), clear_all. One undo step.",
              {{"op", T::String, "mark, clear, path, polygroups, islands, angle or clear_all", true},
               {"from", T::Number, "path: the vertex to start at", false},
@@ -246,7 +246,7 @@ void registerUvCommands(CommandRegistry& reg) {
                      const std::vector<uint32_t> path = uvEdgePath(m, uint32_t(from), uint32_t(to));
                      if (path.empty()) return {false, "Those vertices aren't connected"};
                      uvSetSeams(m, twin, path, !argBool(a, "clear", false));
-                 } else if (op == "polygroups") {
+                 } else if (op == "polygroups" || op == "face_groups") {
                      uvSeamsFromPolygroups(m, twin);
                  } else if (op == "islands") {
                      if (!m.hasUvs()) return {false, kNoUvs};
@@ -266,13 +266,13 @@ void registerUvCommands(CommandRegistry& reg) {
 
     reg.add({"uv_select",
              "Set the UV Editor's selection on the active Part (what the other uv_* commands work on). op: all, none, "
-             "invert, island (the island of triangle `face`), face (triangle `face`), polygroup (every face of polygroup "
+             "invert, island (the island of triangle `face`), face (triangle `face`), polygroup (every face of face group "
              "`group`), rect (faces touching u0 v0 u1 v1), seams (the marked seam edges), mode (just switch to `mode`). "
              "`mode` (vertex, edge, face, island) converts the selection; `add` adds to it instead of replacing it.",
              {{"op", T::String, "all, none, invert, island, face, polygroup, rect, seams or mode", true},
               {"mode", T::String, "vertex, edge, face or island", false},
               {"face", T::Number, "island / face: a triangle index", false},
-              {"group", T::Number, "polygroup: its id", false},
+              {"group", T::Number, "polygroup: the face group id", false},
               {"u0", T::Number, "rect: lower u", false},
               {"v0", T::Number, "rect: lower v", false},
               {"u1", T::Number, "rect: upper u", false},
