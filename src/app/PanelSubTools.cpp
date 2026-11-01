@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -290,7 +291,7 @@ void App::drawSubToolsContents() {
                 dl->AddRectFilled(thumbAt, t1, ImGui::ColorConvertFloat4ToU32(kThumbWell), 3.0f * scale);
                 const auto tex = subtoolThumbs_.find(s.id);
                 if (tex != subtoolThumbs_.end() && tex->second)
-                    dl->AddImageRounded(ImTextureID(tex->second), thumbAt, t1, ImVec2(0, 0), ImVec2(1, 1),
+                    dl->AddImageRounded(ImTextureID(uintptr_t(tex->second)), thumbAt, t1, ImVec2(0, 0), ImVec2(1, 1),
                                         IM_COL32(255, 255, 255, s.visible ? 255 : 110), 3.0f * scale);
                 else
                     dl->AddCircle(ImVec2(thumbAt.x + thumb * 0.5f, thumbAt.y + thumb * 0.5f), thumb * 0.28f,

@@ -9,6 +9,7 @@
 #include <glm/glm.hpp>
 
 #include <array>
+#include <cstddef>
 
 namespace sf {
 
