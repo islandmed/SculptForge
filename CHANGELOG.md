@@ -6,6 +6,25 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- **Micro levels: hundreds of millions of sculptable polygons** (**Tool > Geometry > Micro**, `micro_*`
+  commands). Above the highest subdivision level a SubTool can carry a micro level: per triangle a regular grid of
+  16-bit heights along the interpolated normal of the smooth (Phong-tessellated) base, instead of a mesh.
+  300 million micro triangles take 374 MB (1.25 bytes each; the whole app about 0.8 GB), where a mesh of that size
+  would need about 27 GB. Unlike ZBrush's HD Geometry the whole model is sculptable at once.
+  - Brushes: Standard, Clay, Clay Buildup, Smooth, Inflate, Flatten, Trim, Layer, Pinch / Crease / Dam Standard
+    (as height sharpening), Mask; symmetry, Focal Shift, pressure and the mask apply. Big brushes are evaluated on
+    a coarser grid and interpolated (scale-adaptive). Move reshapes the base below the micro level and the detail
+    rides along (dual scale); "Move along normals" moves the micro surface itself.
+  - Viewport: the micro surface is evaluated on the GPU per frame, with a level of detail per cluster and a
+    triangle budget (2M on a laptop profile, 8M on a workstation, `RenderSettings::renderTriangleBudget`), crack
+    free; the shading keeps every micro detail. 300M micro triangles orbit at 70+ fps with 4x antialiasing (M1 Pro).
+  - Bake Micro (to a mesh), Export Displacement (32-bit EXR or 16-bit PNG, scalar or vector, over the base UVs).
+  - Undo: a packed journal per stroke (tiles in Morton order, each tile's change predicted and packed).
+  - Very large levels stay out of core in a sparse memory-mapped file (only what you touch is in memory).
+  - Projects: format 7 when a SubTool has a micro level (others stay format 6 for older versions).
+  - `sculptforge --bench-micro --bench-sizes 33,100,300` measures it. Guide chapter "Micro levels".
+
 ## [0.9.7] - 2026-10-31
 
 Speed first: big brushes on dense meshes take a third less time per frame, trail the pen by half as far and no

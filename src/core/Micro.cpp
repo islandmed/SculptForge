@@ -485,6 +485,20 @@ bool microRaycast(const Mesh& m, const BVH& bvh, const glm::vec3& origin, const 
     const float reach = mm.bulgeMax + float(mm.rangeMax) * mm.step;
     std::vector<uint32_t> cand;
     bvh.queryTriangles(m, base.position, 2.0f * reach + 1e-7f, cand);
+    // Only the triangles whose own reach (their bulge and displacement range) the ray passes through.
+    const glm::vec3 inv(1.0f / (std::abs(dir.x) > 1e-20f ? dir.x : 1e-20f), 1.0f / (std::abs(dir.y) > 1e-20f ? dir.y : 1e-20f),
+                        1.0f / (std::abs(dir.z) > 1e-20f ? dir.z : 1e-20f));
+    std::erase_if(cand, [&](uint32_t t) {
+        if (t == base.triangle) return false;
+        MicroTriangle T;
+        T.set(m, t, mm.n);
+        const float grow = triangleBulge(T) + float(mm.triRange[t]) * mm.step;
+        const glm::vec3 lo = glm::min(T.p[0], glm::min(T.p[1], T.p[2])) - grow, hi = glm::max(T.p[0], glm::max(T.p[1], T.p[2])) + grow;
+        const glm::vec3 t0 = (lo - origin) * inv, t1 = (hi - origin) * inv;
+        const glm::vec3 tn = glm::min(t0, t1), tf = glm::max(t0, t1);
+        const float enter = std::max({tn.x, tn.y, tn.z, 0.0f}), leave = std::min({tf.x, tf.y, tf.z});
+        return enter > leave;
+    });
     if (std::find(cand.begin(), cand.end(), base.triangle) == cand.end()) cand.push_back(base.triangle);
     constexpr size_t kMaxCandidates = 4096;
     if (cand.size() > kMaxCandidates) { // a huge displacement range: rank by distance and keep the nearest

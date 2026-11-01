@@ -33,34 +33,35 @@ You can read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<
 15. [Sculpt layers and blend shapes](layers.md)
 16. [Facial shapes and live face](facial-shapes.md)
 17. [Subdivision levels](subdivision-levels.md)
-18. [Dynamic topology](dynamic-topology.md)
-19. [Moving, rotating and posing (Gizmo 3D)](gizmo.md)
-20. [Subdivide, remesh, decimate and LODs](geometry.md)
-21. [Quad retopology and detail projection](retopology.md)
+18. [Micro levels: hundreds of millions of polygons](micro-levels.md)
+19. [Dynamic topology](dynamic-topology.md)
+20. [Moving, rotating and posing (Gizmo 3D)](gizmo.md)
+21. [Subdivide, remesh, decimate and LODs](geometry.md)
+22. [Quad retopology and detail projection](retopology.md)
 
 ## AI and capture
 
-22. [Image and text to 3D](generate-3d.md)
-23. [Gaussian splats](splats.md)
-24. [Scan an object into a splat](scan-to-splat.md)
-25. [From scan to sculptable mesh](scan-to-sculptable.md)
-26. [Phone capture and AR](phone-capture.md)
+23. [Image and text to 3D](generate-3d.md)
+24. [Gaussian splats](splats.md)
+25. [Scan an object into a splat](scan-to-splat.md)
+26. [From scan to sculptable mesh](scan-to-sculptable.md)
+27. [Phone capture and AR](phone-capture.md)
 
 ## Files and pipelines
 
-27. [Baking normal and displacement maps](baking.md)
-28. [Exporting, Unreal and ZBrush](exporting.md)
-29. [Working with Blender](blender.md)
-30. [Projects, autosave and QuickSave](projects.md)
-31. [Scripting and automation](scripting.md)
-32. [SculptForge for studios](studios.md)
+28. [Baking normal and displacement maps](baking.md)
+29. [Exporting, Unreal and ZBrush](exporting.md)
+30. [Working with Blender](blender.md)
+31. [Projects, autosave and QuickSave](projects.md)
+32. [Scripting and automation](scripting.md)
+33. [SculptForge for studios](studios.md)
 
 ## Reference
 
-33. [Keyboard and mouse](shortcuts.md)
-34. [Performance and big meshes](performance.md)
-35. [Troubleshooting and FAQ](troubleshooting.md)
-36. [Glossary](glossary.md)
+34. [Keyboard and mouse](shortcuts.md)
+35. [Performance and big meshes](performance.md)
+36. [Troubleshooting and FAQ](troubleshooting.md)
+37. [Glossary](glossary.md)
 
 ## Getting help
 

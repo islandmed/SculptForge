@@ -12,6 +12,69 @@ sculptforge-cli --bench ...                     # the same without the GPU (CI, 
 Machine for all figures: Apple M1 Pro (8 performance + 2 efficiency cores, 32 GB unified memory, 30 GB usable
 under Asahi Linux), integrated GPU, Mesa 26.1 (OpenGL 4.6). How the benchmark works is described under v0.5 below.
 
+## Micro-displacement levels: 300M-1B sculptable triangles (feat/micromesh)
+
+```
+sculptforge --bench-micro --bench-sizes 33,100,300 [--bench-micro-level 5] [--bench-brushes TEXT]
+sculptforge-cli --bench-micro ...      # without the GPU: memory, brush and shading times
+```
+
+A micro level (core/Micro.h) stores the surface above the highest subdivision level as one 16-bit height per
+point of a regular grid on each base triangle, along the interpolated normal of the Phong-tessellated base.
+Micro triangles are never stored: brushes evaluate them on the CPU, the renderer in its vertex shader
+(render/MicroRenderer.h). The benchmark divides a bench sphere to the size, sculpts strokes of 30 dabs with X
+symmetry (two dabs a step) and orbits. M1 Pro, Release; the machine was shared with other jobs during these runs
+(load average 10-20), so treat single rows as +/-30%.
+
+Memory and frames:
+
+| | 33M (Micro 4) | 104M (Micro 4) | 299M (Micro 4) | 299M (Micro 5) | **1.02B (Micro 5)** |
+|---|---:|---:|---:|---:|---:|
+| Base triangles | 130k | 406k | 1.2M | 292k | 995k |
+| Micro level in memory | 42 MB | 130 MB | 374 MB | 332 MB | 1131 MB |
+| per micro triangle / micro vertex | 1.25 / 2.50 B | 1.25 / 2.50 B | 1.25 / 2.50 B | 1.11 / 2.22 B | 1.11 / 2.22 B |
+| Process RSS, everything | 263 MB | 432 MB | 801 MB | 710 MB | **1713 MB** |
+| GPU buffers | 125 MB | 392 MB | 1128 MB | 997 MB | 3398 MB |
+| Divide to micro | 5 ms | 32 ms | 60 ms | 29 ms | 93 ms |
+| First shading + upload | 0.1 s | 0.7 s | 1.2 s | 1.7 s | 5.1 s |
+| Orbit, 4x AA | 8.3 ms | 9.7 ms | 14.0 ms | 8.9 ms | 13.4 ms |
+| Orbit, no AA / moving | 5.0 / 2.9 ms | 6.6 / 4.7 ms | 10.4 / 4.5 ms | 6.2 / 4.1 ms | 11.3 / 5.0 ms |
+| Triangles drawn (still / moving) | 4.3M / 1.1M | 3.9M / 1.0M | 3.4M / 0.9M | 3.4M / 0.9M | 3.0M / 0.8M |
+| Save / open project | 31 / 61 ms | 71 / 100 ms | 217 / 285 ms | 187 / 264 ms | 649 / 489 ms |
+
+The same 300M as a plain mesh would need about 27 GB (90 B per triangle, see 33M below). The frame time follows
+the triangle budget and the number of base triangles on screen, not the micro triangle count: 33M at Micro 4
+and 299M at Micro 5 (130k and 292k base triangles) both draw in 8-9 ms. Patches of one or four triangles are
+drawn unrolled (gl_VertexID), not instanced: instancing them cost 21 ms a moving frame at 299M, unrolled 4.4 ms.
+
+Brushes, per dab step (both mirrors), GPU upload included:
+
+| | 33M | 104M | 299M (Micro 4) | 299M (Micro 5) | 1.02B (Micro 5) |
+|---|---:|---:|---:|---:|---:|
+| Standard (r 0.12, ~64 px) | 2.4 ms | 11 ms | 13 ms | 17 ms | 39 ms |
+| Standard, 300 px (r 0.56) | 13.5 ms | 56 ms | 115 ms | 48 ms | 283 ms |
+| Smooth (large, r 0.4) | 9.4 ms | 21 ms | 50 ms | 44 ms | 54 ms |
+| Move, 300 px (base cage) | 13 ms | 19 ms | 58 ms (45 after the pick fix) | 22 ms | 55 ms |
+| Undo step, Standard stroke (30 dabs) | 0.6 MB | 1.7 MB | 4.7 MB | 3.4 MB | 11.2 MB |
+
+Scale-adaptive brushes: a dab is evaluated on grid points `stride` apart (about 48 across its radius) and
+interpolated in between, so the evaluation (the "kernel" column of the report) stays bounded; writing the
+interpolated values, stitching and the GPU upload still grow with the points under the brush. The 300 px grab
+(Move) deforms the base cage and doesn't touch the micro level at all: 20 ms at 31M against 45 ms at 299M (Micro 4,
+ten times the base triangles) in one run; at Micro 5 (2.4x the base) 22 ms. Picking at 299M went from 37 to 11 ms
+once the candidates were filtered by their own displacement range along the ray.
+
+Undo journal: tiles in Morton order, each the stroke's change predicted from its neighbour and packed (minimum +
+bit width): about a third of whole tiles. A short stroke stays under the 500 KB target (10 dabs of r 0.15 at
+5M: 31 KB); the benchmark's 30-dab strokes over 300M are 2-5 MB, limited by the rounding noise each dab leaves
+(2-4 bits per point). A whole-surface edit (micro_noise) keeps whole tiles.
+
+What a frame still costs: the CPU shading (normals, curvature) of what a dab changed, about 20 ns per grid point,
+within a budget per frame (TierConfig::shadeBudgetPoints, 3M: the rest of a big dab's normals follow over the next
+frames); the first full shading of a level (1-5 s). Candidates: shading on the GPU from the displacement texture
+(needs the edge neighbours in the fragment shader), and storing the coarse part of big strokes on a coarse grid
+(multires-style) so a 300 px dab writes thousands of points instead of millions.
+
 ## Next version: big brushes on dense meshes (feat/perf-pass)
 
 What a user feels on a heavy model is a large brush: how far it trails the pointer, how long a frame takes, and
