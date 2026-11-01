@@ -257,6 +257,21 @@ brush, built-in or custom. Choose one from the **Alpha** tile on the left shelf 
 | **Round** | The plain round falloff (no alpha). The default. |
 | **Square** | A square stamp with soft edges. |
 | **Noise** | A noisy stamp for rough, organic texture. |
+| **Pores** | Scattered skin pores of mixed sizes (use with Zsub to press them in). |
+| **Cracks** | A web of thin cracks, as in dry earth, old paint or stone. |
+| **Scales** | Overlapping rounded scales in offset rows, for reptiles and fish. |
+| **Rivets** | A three by three grid of round rivet heads, for armour and machines. |
+| **Stitches** | A seam with cross stitches along it (drag along the seam with DragRect or a stroke). |
+| **Fabric Weave** | Threads woven over and under, for cloth and canvas. |
+| **Bark** | Rough vertical ridges and furrows, as on tree bark. |
+| **Rock Strata** | Stepped layers of rock, wavy and broken, for cliffs and stone. |
+| **Wrinkles** | Fine parallel wrinkle lines, for skin around eyes, knuckles and necks. |
+| **Skin Folds** | Soft, broad folds of skin, for bellies, elbows and heavy brows. |
+| **Hair Strands** | Long flowing strands, for hair, fur and feathers (drag along the flow). |
+| **Dot Grid** | An even grid of soft dots, for studs, textures and patterns. |
+
+All of them are made by SculptForge itself the first time they're needed (no image files are downloaded or
+shipped). They show in the alpha picker and in the LightBox's **Alpha** tab (`brush_set_alpha name=cracks`).
 
 To use your own image:
 
@@ -286,7 +301,10 @@ overhang, as nothing made with a height ever can.
 ### Stamp a VDM
 
 1. Open the **Brush** palette and its **Vector Displacement** section, and click a map: **Horn**, **Ear Curl**,
-   **Scales** or **Nostril**. The **VDM** brush becomes the brush and the stroke becomes **DragRect**. (While the
+   **Scales**, **Nostril**, **Rivet** (a domed head whose rim overhangs), **Stitches** (thread bars across a seam,
+   drawing it together), **Skin Fold** (a roll of skin hanging over a crease), **Wrinkle Line** (a fine pinched
+   crease), **Crack** (a jagged split whose sides part) or **Rock Ledge** (a stepped shelf jutting out over the
+   layer below). They're also in the LightBox's **Brush** tab. The **VDM** brush becomes the brush and the stroke becomes **DragRect**. (While the
    VDM brush is the brush, the Alpha tile on the left shelf shows its map, and the alpha picker lists the maps
    first. The VDM brush is also in the brush picker: <kbd>B</kbd> <kbd>V</kbd> <kbd>D</kbd>.)
 2. Click on the model where the stamp should sit and drag: the drag's length sets the size and its direction

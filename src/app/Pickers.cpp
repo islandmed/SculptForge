@@ -231,8 +231,8 @@ void pickerTitle(const char* icon, const char* title, const char* hint) {
 }
 
 const BrushAlpha& builtinAlpha(int i) {
-    static const std::array<BrushAlpha, 3> alphas = {BrushAlpha::round(), BrushAlpha::square(), BrushAlpha::noise()};
-    return alphas[size_t(std::clamp(i, 0, 2))];
+    const auto& all = BrushAlpha::builtins(); // Round, Square, Noise and the generated patterns (#43)
+    return all[size_t(std::clamp(i, 0, int(all.size()) - 1))];
 }
 
 } // namespace
@@ -833,19 +833,18 @@ void drawAlphaGrid(App& app, GridMode mode) {
     const float tile = 64.0f * app.uiScale_;
     const int columns = columnsFor(tile, mode);
     const BrushAlpha& current = app.doc_.brushAlpha;
-    static const char* const names[] = {"Round", "Square", "Noise"};
-    static const char* const help[] = {"The plain round falloff (no alpha).", "A square stamp with soft edges.",
-                                       "A noisy stamp for rough, organic texture."};
     sectionHeader("Built-in");
     int column = 0;
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < int(BrushAlpha::builtins().size()); ++i) {
         tileGrid(column, columns);
-        const bool on = lower(current.name) == lower(names[i]) || (i == 0 && current.empty());
+        const std::string& name = builtinAlpha(i).name;
+        const std::string help = BrushAlpha::builtinHelp(name);
+        const bool on = lower(current.name) == lower(name) || (i == 0 && current.empty());
         const ImTextureID tex = app.thumbs_.alpha(builtinAlpha(i));
-        if (AssetTile((std::string(names[i]) + "##alpha").c_str(), tex, ICON_LC_CIRCLE_DASHED, names[i], tile, on))
-            app.runCommand("brush_set_alpha", {{"name", lower(names[i])}});
-        quickInfo(tex, ICON_LC_CIRCLE_DASHED, names[i], help[i]);
-        ui::HelpText(names[i], nullptr, help[i], "Alpha");
+        if (AssetTile((name + "##alpha").c_str(), tex, ICON_LC_CIRCLE_DASHED, name.c_str(), tile, on))
+            app.runCommand("brush_set_alpha", {{"name", name}});
+        quickInfo(tex, ICON_LC_CIRCLE_DASHED, name.c_str(), help.c_str());
+        ui::HelpText(name.c_str(), nullptr, help.c_str(), "Alpha");
     }
     // The loaded image alpha, then images in the library's Alphas folder.
     const bool custom = !current.empty() && lower(current.name) != "square" && lower(current.name) != "noise";

@@ -1,0 +1,51 @@
+# #43: twelve more built-in alphas and six more VDM brushes, made in code at first use, with thumbnails in the
+# LightBox (Alpha and Brush tabs) and in the Alpha picker; a double-click uses one.
+run new_sphere subdivisions=5
+key ,
+expect_value lightbox_open == 1
+click "LightBox/Alpha"
+expect "LightBox/Round"
+expect "LightBox/Pores"
+expect "LightBox/Cracks"
+expect "LightBox/Fabric Weave"
+wait_idle 60
+shot lightbox_alphas
+# The rest are further along the strip; the filter finds them.
+type "LightBox/##lbfilter" hair
+expect "LightBox/Hair Strands"
+expect_not "LightBox/Round"
+type "LightBox/##lbfilter" fold
+expect "LightBox/Skin Folds"
+type "LightBox/##lbfilter" weave
+expect "LightBox/Fabric Weave"
+type "LightBox/##lbfilter" bark
+expect "LightBox/Bark"
+type "LightBox/##lbfilter" grid
+expect "LightBox/Dot Grid"
+wait_idle 60
+shot lightbox_alphas_filtered
+type "LightBox/##lbfilter" crack
+double_click "LightBox/Cracks"
+expect_status Alpha 'Cracks'
+snapshot
+stroke 0.3 0.5 0.7 0.5
+expect_value moved > 100
+
+# The VDM brushes, built-in ones included, in the Brush tab.
+click "LightBox/Brush"
+type "LightBox/##lbfilter" horn
+expect "LightBox/Horn"
+type "LightBox/##lbfilter" ledge
+expect "LightBox/Rock Ledge"
+type "LightBox/##lbfilter" line
+expect "LightBox/Wrinkle Line"
+wait_idle 60
+shot lightbox_vdms
+type "LightBox/##lbfilter" fold
+expect "LightBox/Skin Fold"
+type "LightBox/##lbfilter" rivet
+double_click "LightBox/Rivet"
+expect_status VDM 'Rivet'
+expect_value brush_type == 14
+key ,
+expect_value lightbox_open == 0

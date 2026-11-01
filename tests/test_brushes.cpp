@@ -470,3 +470,46 @@ TEST(spray_and_spacing_are_deterministic) {
     CHECK(pts.size() == 1 && std::abs(pts[0].x - 110.0f) < 1e-3f);
     CHECK(std::string(strokeTypeName(StrokeType::LazyMouse)) == "LazyMouse");
 }
+
+TEST(alpha_generated_builtins) {
+    // #43: twelve patterns made in code (no image files), after Round, Square and Noise.
+    const auto& all = BrushAlpha::builtins();
+    CHECK(all.size() == 15);
+    CHECK(all[0].empty() && all[0].name == "Round" && all[1].name == "Square" && all[2].name == "Noise");
+    for (size_t i = 3; i < all.size(); ++i) {
+        const BrushAlpha& a = all[i];
+        CHECK(a.width == 128 && a.height == 128 && a.values.size() == 128u * 128u);
+        float lo = 1.0f, hi = 0.0f, border = 0.0f;
+        double sum = 0.0;
+        for (int y = 0; y < a.height; ++y)
+            for (int x = 0; x < a.width; ++x) {
+                const float v = a.values[size_t(y) * size_t(a.width) + size_t(x)];
+                lo = std::min(lo, v);
+                hi = std::max(hi, v);
+                sum += v;
+                if (x == 0 || y == 0 || x == a.width - 1 || y == a.height - 1) border = std::max(border, v);
+            }
+        const double mean = sum / double(a.values.size());
+        CHECK(lo >= 0.0f && hi <= 1.0f && hi > 0.5f); // a real stamp, in range
+        CHECK(mean > 0.02 && mean < 0.8);             // a pattern, not a blank or a flat plateau
+        CHECK(border < 0.05f);                        // fades out at the edge, so dabs leave no square
+        if (border >= 0.05f || mean <= 0.02 || mean >= 0.8)
+            std::printf("  %s: mean %.3f border %.3f\n", a.name.c_str(), mean, double(border));
+        CHECK(!BrushAlpha::builtinHelp(a.name).empty());
+        BrushAlpha byName;
+        CHECK(BrushAlpha::builtin(a.name, byName) && byName.values == a.values);
+        for (size_t j = 3; j < i; ++j) CHECK(all[j].values != a.values); // all different
+    }
+    // Names work in any case, with spaces, '_' or '-'.
+    BrushAlpha out;
+    CHECK(BrushAlpha::builtin("fabric_weave", out) && out.name == "Fabric Weave");
+    CHECK(BrushAlpha::builtin("ROCK-STRATA", out) && out.name == "Rock Strata");
+    CHECK(BrushAlpha::builtin("skinfolds", out) && out.name == "Skin Folds");
+    // And through the command.
+    Document d = planeDoc();
+    CommandRegistry reg;
+    CHECK(reg.execute(d, "brush_set_alpha", {{"name", std::string("hair strands")}}).ok);
+    CHECK(d.brushAlpha.name == "Hair Strands");
+    CommandResult bad = reg.execute(d, "brush_set_alpha", {{"name", std::string("star")}});
+    CHECK(!bad.ok && bad.message.find("cracks") != std::string::npos);
+}

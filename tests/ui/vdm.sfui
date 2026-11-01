@@ -2,7 +2,7 @@
 # sets size and turn) and DragDot, Alt digs in, undo; the stroke comes back with the next brush; then sculpt a VDM
 # plane, Create VDM (saved to the library) and stamp the new brush on the sphere.
 expect_value vdm_files == 0
-expect_value vdms == 4
+expect_value vdms == 10
 run new_sphere subdivisions=6
 click "Brush##palette.brush"
 click "Brush/##totray"
@@ -97,9 +97,9 @@ shot vdm-plane
 click "Create VDM##vdm.create"
 expect_status Created VDM 'Bump Spike'
 expect_value vdm_files == 1
-expect_value vdms == 5
+expect_value vdms == 11
 expect_value brush_type == 14
-expect "Bump Spike##vdm4"
+expect "Bump Spike##vdm10"
 wait_idle 30
 shot created
 

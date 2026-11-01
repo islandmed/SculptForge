@@ -83,7 +83,7 @@ struct VdmLibrary {
 
 TEST(vdm_builtins_are_bounded_and_overhang) {
     const auto& all = builtinVdms();
-    CHECK(all.size() == 4);
+    CHECK(all.size() == 10); // Horn, Ear Curl, Scales, Nostril and the six from #43
     for (const auto& v : all) {
         CHECK(v->builtin && v->width == 256 && v->height == 256);
         CHECK(v->extent() > 0.1f && v->extent() < 2.0f);
@@ -99,6 +99,8 @@ TEST(vdm_builtins_are_bounded_and_overhang) {
         float lateral = 0.0f;
         for (const glm::vec3& d : v->vectors) lateral = std::max(lateral, std::hypot(d.x, d.y));
         CHECK(lateral > 0.06f);
+        if (lateral <= 0.06f || v->extent() <= 0.1f || border >= 1e-4f)
+            std::printf("  %s: lateral %.3f extent %.3f border %g\n", v->name.c_str(), lateral, v->extent(), border);
         CHECK(builtinVdm(v->name) == v);
     }
     // The horn's tip leans over past its base toward the map's top (+Y): an overhang.
@@ -345,7 +347,7 @@ TEST(vdm_library_commands) {
     { std::ofstream(lib.root / "user" / "broken.sfvdm", std::ios::binary) << "nope"; }
     const auto messages = loadBrushLibrary(d, lib.paths());
     CHECK(messages.size() == 1); // broken.sfvdm
-    CHECK(d.vdms.size() == 5 && findVdm(d, "studio lump") == 4);
+    CHECK(d.vdms.size() == builtinVdms().size() + 1 && findVdm(d, "studio lump") == int(builtinVdms().size()));
     fs::remove(lib.root / "user" / "broken.sfvdm");
 
     CHECK(run(d, "vdm_new_plane", {{"resolution", 64.0}}));

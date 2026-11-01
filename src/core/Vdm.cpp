@@ -422,6 +422,116 @@ VectorDisplacement makeNostrilVdm(int size) {
     });
 }
 
+namespace {
+
+// 1 inside the stamp, 0 from 0.95 radii out: the generated maps below leave the square's rim where it was.
+float rimFade(float x, float y) { return 1.0f - smooth01((std::sqrt(x * x + y * y) - 0.55f) / 0.4f); }
+
+// Distance from p to the segment a-b, and the closest point on it.
+float toSegment(glm::vec2 p, glm::vec2 a, glm::vec2 b, glm::vec2& closest) {
+    const glm::vec2 v = b - a;
+    const float t = std::clamp(glm::dot(p - a, v) / std::max(glm::dot(v, v), 1e-12f), 0.0f, 1.0f);
+    closest = a + v * t;
+    return glm::length(p - closest);
+}
+
+// A smooth, repeatable wiggle (sums of sines) for crack and wrinkle lines.
+float wiggle(float t, float seed) {
+    return 0.6f * std::sin(t * 3.1f + seed) + 0.3f * std::sin(t * 7.3f + seed * 2.1f) + 0.1f * std::sin(t * 17.0f + seed);
+}
+
+} // namespace
+
+VectorDisplacement makeRivetVdm(int size) {
+    // A domed head on a short neck, its rim bulging out over the plate a little.
+    return generate("Rivet", size, [](float x, float y) {
+        const float rho = std::sqrt(x * x + y * y), r = 0.42f;
+        if (rho >= r + 0.2f) return glm::vec3(x, y, 0.0f);
+        const glm::vec2 radial = rho > 1e-6f ? glm::vec2(x, y) / rho : glm::vec2(0.0f);
+        if (rho < r) {
+            const float s = rho / r;
+            const float z = 0.06f + 0.24f * std::sqrt(std::max(0.0f, 1.0f - s * s)); // head on a 0.06 neck
+            const float out = 0.07f * smooth01((s - 0.55f) / 0.45f);                    // the rim overhangs
+            return glm::vec3(glm::vec2(x, y) + radial * out, z);
+        }
+        // The neck: from under the rim down to the plate.
+        const float t = (rho - r) / 0.2f;
+        const float z = 0.06f * (1.0f - smooth01(t));
+        const float in = -0.04f * (1.0f - t) * (1.0f - smooth01(t));
+        return glm::vec3(glm::vec2(x, y) + radial * in, z);
+    });
+}
+
+VectorDisplacement makeStitchesVdm(int size) {
+    // Three raised thread bars across a seam (drag along the seam: the stamp's Y); the threads draw the two sides
+    // of the seam together, so the skin bunches toward it.
+    return generate("Stitches", size, [](float x, float y) {
+        const float fade = rimFade(x, y);
+        float z = -0.06f * (1.0f - smooth01(std::abs(x) / 0.08f)); // the seam line itself
+        for (int k = -1; k <= 1; ++k) {
+            const float cy = float(k) * 0.33f;
+            glm::vec2 c;
+            const float d = toSegment(glm::vec2(x, y), glm::vec2(-0.32f, cy - 0.08f), glm::vec2(0.32f, cy + 0.08f), c);
+            z = std::max(z, 0.11f * std::sqrt(std::max(0.0f, 1.0f - smooth01(d / 0.07f))));
+        }
+        const float gather = -0.1f * std::tanh(x / 0.12f) * std::exp(-x * x / 0.12f);
+        return glm::vec3(x + gather * fade, y, z * fade);
+    });
+}
+
+VectorDisplacement makeSkinFoldVdm(int size) {
+    // A heavy roll of skin hanging over a crease (the stamp's bottom, -Y), as over an eyelid or a belly.
+    return generate("Skin Fold", size, [](float x, float y) {
+        const float crease = -0.15f + 0.25f * x * x;
+        const float d = y - crease; // above the crease > 0
+        const float fade = rimFade(x, y);
+        const float roll = d > 0.0f ? std::exp(-d * d / 0.08f) : std::exp(-d * d / 0.004f);
+        const float z = 0.22f * roll - 0.06f * std::exp(-d * d / 0.003f); // a deep line where it folds under
+        const float hang = d > 0.0f ? -0.16f * std::exp(-d * d / 0.03f) : 0.0f; // slides down over the crease
+        return glm::vec3(x, y + hang * fade, z * fade);
+    });
+}
+
+VectorDisplacement makeWrinkleVdm(int size) {
+    // A fine crease: skin pinched in from both sides and pressed down along a slightly wavy line (along X).
+    return generate("Wrinkle Line", size, [](float x, float y) {
+        const float line = 0.06f * wiggle(x * 1.2f, 0.7f);
+        const float d = y - line;
+        const float along = smooth01((0.8f - std::abs(x)) / 0.35f); // tapered ends
+        const float fade = rimFade(x, y) * along;
+        const float pinch = -0.12f * std::tanh(d / 0.06f) * std::exp(-d * d / 0.05f);
+        const float z = -0.18f * std::exp(-d * d / 0.002f) + 0.04f * std::exp(-d * d / 0.03f);
+        return glm::vec3(x, y + pinch * fade, z * fade);
+    });
+}
+
+VectorDisplacement makeCrackVdm(int size) {
+    // A jagged crack (along Y) whose sides split apart and break downward into it.
+    return generate("Crack", size, [](float x, float y) {
+        const float line = 0.12f * wiggle(y * 1.6f, 2.3f);
+        const float d = x - line;
+        const float along = smooth01((0.85f - std::abs(y)) / 0.3f);
+        const float fade = rimFade(x, y) * along;
+        const float width = 0.03f + 0.03f * (0.5f + 0.5f * std::sin(y * 9.0f));
+        const float split = 0.09f * std::tanh(d / width) * std::exp(-d * d / 0.04f); // the sides move apart
+        const float z = -0.28f * std::exp(-d * d / (width * width)) + 0.02f * std::exp(-d * d / 0.02f);
+        return glm::vec3(x + split * fade, y, z * fade);
+    });
+}
+
+VectorDisplacement makeRockLedgeVdm(int size) {
+    // A stepped shelf of rock strata whose upper layer juts out over the one below (toward -Y): an overhang.
+    return generate("Rock Ledge", size, [](float x, float y) {
+        const float fade = rimFade(x, y);
+        const float edge = -0.05f + 0.05f * wiggle(x * 2.0f, 4.1f);
+        const float t = smooth01((y - edge) / 0.18f); // 0 below the ledge, 1 on top
+        const float lip = std::exp(-(y - edge - 0.1f) * (y - edge - 0.1f) / 0.01f);
+        const float z = 0.2f * t + 0.03f * wiggle(x * 4.0f + y * 3.0f, 1.3f) * t;
+        const float jut = -0.14f * lip; // the lip pushed out over the lower layer
+        return glm::vec3(x, y + jut * fade, z * fade);
+    });
+}
+
 const std::vector<std::shared_ptr<const VectorDisplacement>>& builtinVdms() {
     static const std::vector<std::shared_ptr<const VectorDisplacement>> all = [] {
         std::vector<std::shared_ptr<const VectorDisplacement>> v;
@@ -429,6 +539,13 @@ const std::vector<std::shared_ptr<const VectorDisplacement>>& builtinVdms() {
         v.push_back(std::make_shared<const VectorDisplacement>(makeEarCurlVdm()));
         v.push_back(std::make_shared<const VectorDisplacement>(makeScalesVdm()));
         v.push_back(std::make_shared<const VectorDisplacement>(makeNostrilVdm()));
+        // #43: six more, made here in code like the four above (no files).
+        v.push_back(std::make_shared<const VectorDisplacement>(makeRivetVdm()));
+        v.push_back(std::make_shared<const VectorDisplacement>(makeStitchesVdm()));
+        v.push_back(std::make_shared<const VectorDisplacement>(makeSkinFoldVdm()));
+        v.push_back(std::make_shared<const VectorDisplacement>(makeWrinkleVdm()));
+        v.push_back(std::make_shared<const VectorDisplacement>(makeCrackVdm()));
+        v.push_back(std::make_shared<const VectorDisplacement>(makeRockLedgeVdm()));
         return v;
     }();
     return all;

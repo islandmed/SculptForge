@@ -101,10 +101,9 @@ std::string dateText(int64_t t) {
 }
 
 const BrushAlpha& builtinAlpha(int i) {
-    static const BrushAlpha alphas[] = {BrushAlpha::round(), BrushAlpha::square(), BrushAlpha::noise()};
-    return alphas[std::clamp(i, 0, 2)];
+    const auto& all = BrushAlpha::builtins(); // Round, Square, Noise and the generated patterns (#43)
+    return all[size_t(std::clamp(i, 0, int(all.size()) - 1))];
 }
-const char* const kAlphaNames[] = {"Round", "Square", "Noise"};
 
 void SDLCALL onFolderChosen(void* userdata, const char* const* files, int) {
     wakeMainLoop(); // a file dialog answered (maybe on another thread): redraw now
@@ -230,9 +229,8 @@ void LightBox::rootEntries(App& app, std::vector<AssetEntry>& out) {
             }
             out.push_back(std::move(e));
         }
-        // Vector displacement brushes from the library (built-ins are in the VDM picker).
+        // Vector displacement brushes: the built-ins (#43: thumbnails here too), then the library's.
         for (const auto& v : app.doc_.vdms) {
-            if (v->builtin) continue;
             AssetEntry e;
             e.kind = AssetKind::Vdm;
             e.name = v->name;
@@ -241,11 +239,11 @@ void LightBox::rootEntries(App& app, std::vector<AssetEntry>& out) {
         }
         break;
     case LibraryTab::Alpha: {
-        for (int i = 0; i < 3; ++i) {
+        for (int i = 0; i < int(BrushAlpha::builtins().size()); ++i) {
             AssetEntry e;
             e.kind = AssetKind::Alpha;
             e.index = i;
-            e.name = kAlphaNames[i];
+            e.name = builtinAlpha(i).name;
             out.push_back(std::move(e));
         }
         const auto files = scan(userDir, false);
@@ -447,7 +445,7 @@ void LightBox::activate(App& app, const AssetEntry& e, bool append) {
         app.runCommand("vdm_set", {{"name", e.name}});
         return;
     case AssetKind::Alpha:
-        app.runCommand("brush_set_alpha", {{"name", lower(kAlphaNames[std::clamp(e.index, 0, 2)])}});
+        app.runCommand("brush_set_alpha", {{"name", builtinAlpha(e.index).name}});
         return;
     case AssetKind::AlphaFile:
         app.runCommand("brush_set_alpha", {{"path", e.path}, {"invert", app.alphaInvert_}});

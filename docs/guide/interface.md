@@ -57,7 +57,7 @@ Interface > Palettes strictly A-Z (ZBrush order)**.
 |---|---|
 | **File** | New Sphere, New Plane, Open, Open Recent, Save, Save As, autosave interval, Import and every export (OBJ, GLB, LOD chain, USD/USDZ, FBX for Unreal, Send to Unreal, splats), ZBrush (GoZ), Quit |
 | **Edit** | Undo and Redo (with the name of the step), Paste brush |
-| **Alpha** | The brush alphas: Round, Square, Noise, images from your library, Load image, Invert loaded image |
+| **Alpha** | The brush alphas: Round, Square, Noise and twelve patterns (Pores, Cracks, Scales...), images from your library, Load image, Invert loaded image |
 | **Brush** | AI Brush (Brush Lab), Community brushes, Paste brush, your custom brushes, Front faces only, Invert (Alt), the recipe editor for a custom brush, and every brush as a thumbnail grid with a filter |
 | **Color** | The Paint brush, RGB while sculpting, the paint colour and swatches, Fill, Fill masked, Cavity, Clear, Show polypaint |
 | **Draw** | Draw Size, Z Intensity, RGB Intensity, Focal Shift, Sculpt/Paint, Zadd/Zsub, Rgb, Front, and the tablet options (Pressure > strength, Pressure > size) with a pen readout |
@@ -219,7 +219,8 @@ brushes](brush-lab.md)).
 
 - **Stroke** (click the Stroke tile): Dots, DragRect, Spray and LazyMouse, with Scatter for Spray and Lazy
   radius for LazyMouse. See [Sculpting and brushes](sculpting.md).
-- **Alpha** (click the Alpha tile): Round, Square and Noise, the image alpha you loaded, images in your
+- **Alpha** (click the Alpha tile): Round, Square, Noise and the twelve built-in patterns (Pores, Cracks, Scales,
+  Rivets, Stitches, Fabric Weave, Bark, Rock Strata, Wrinkles, Skin Folds, Hair Strands, Dot Grid), the image alpha you loaded, images in your
   library's Alphas folder, **Load image...** and **Invert loaded image**.
 - **Material** (<kbd>M</kbd>, or click the Material tile): the MatCaps and Studio. Point at a material to
   preview it on the model; click to keep it. Closing the picker without clicking puts the old material back.
@@ -245,8 +246,8 @@ start-up (see [Preferences](#interface-preferences)).
 |---|---|---|
 | **Project** | Projects (`.sfproj`) in your library and recently opened projects | Open the project |
 | **Tool** | Sphere, Plane and Cube, and model files in your library | Open (replaces the scene) |
-| **Brush** | Every brush: built-in, custom and `.sfbrush` files | Select or load the brush |
-| **Alpha** | Round, Square, Noise and images in your Alphas folder | Use as the brush alpha |
+| **Brush** | Every brush: built-in, custom and `.sfbrush` files, and the VDM brushes (built-in ones too) | Select or load the brush |
+| **Alpha** | Round, Square, Noise, the twelve built-in patterns and images in your Alphas folder | Use as the brush alpha |
 | **Material** | The MatCaps (your own included) and Studio | Use the material |
 | **Image** | Reference images in your library | A menu: Generate 3D, relief, inflate, project onto the model, use as alpha |
 | **Splats** | Gaussian splat captures (`.ply`, `.splat`) | Open the capture as a reference |

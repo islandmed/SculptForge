@@ -71,15 +71,22 @@ bool writeVdmFile(const std::string& path, const VectorDisplacement& vdm, std::s
 bool loadVdm(const std::string& path, VectorDisplacement& out, std::string& error, const VdmImportOptions& opt = {});
 bool isVdmFile(const std::string& path);
 
-// --- Built-ins (procedural, CC0): Horn, Ear Curl, Scales, Nostril ---
+// --- Built-ins (procedural, made in code; CC0): Horn, Ear Curl, Scales, Nostril, Rivet, Stitches, Skin Fold,
+// Wrinkle Line, Crack, Rock Ledge ---
 
 const std::vector<std::shared_ptr<const VectorDisplacement>>& builtinVdms();
 std::shared_ptr<const VectorDisplacement> builtinVdm(const std::string& name); // case-insensitive; null if unknown
-// The four generators (exposed for tests; `size` texels a side).
+// The generators (exposed for tests; `size` texels a side).
 VectorDisplacement makeHornVdm(int size = 256);
 VectorDisplacement makeEarCurlVdm(int size = 256);
 VectorDisplacement makeScalesVdm(int size = 256);
 VectorDisplacement makeNostrilVdm(int size = 256);
+VectorDisplacement makeRivetVdm(int size = 256);
+VectorDisplacement makeStitchesVdm(int size = 256);
+VectorDisplacement makeSkinFoldVdm(int size = 256);
+VectorDisplacement makeWrinkleVdm(int size = 256);
+VectorDisplacement makeCrackVdm(int size = 256);
+VectorDisplacement makeRockLedgeVdm(int size = 256);
 
 // --- Create VDM from a plane (ZBrush: Brush > Create > from the VDM plane; Blender: VDM Brush Baker) ---
 

@@ -31,6 +31,10 @@ All notable changes to SculptForge are listed here. The format follows
 - **Preferences > Input > Hold Space and drag to move the camera** (#43, off by default since ZBrush's Space opens
   the QuickMenu): with Space held, left-drag rotates, right- or middle-drag pans and Ctrl+drag zooms, anywhere on
   the canvas; never while typing in a text field.
+- Twelve more built-in alphas (#43): Pores, Cracks, Scales, Rivets, Stitches, Fabric Weave, Bark, Rock Strata,
+  Wrinkles, Skin Folds, Hair Strands and Dot Grid; and six more VDM brushes: Rivet, Stitches, Skin Fold, Wrinkle
+  Line, Crack and Rock Ledge. All are generated in code the first time they're used (no downloaded or bundled
+  image files), with thumbnails in the pickers and the LightBox (whose Brush tab now lists the built-in VDMs too).
 - SubTool thumbnails in the SubTool list (#43), drawn from each SubTool's existing GPU buffers (no upload, the
   motion proxy on dense meshes), one per frame at most and only once a change has settled, never during a stroke.
 
