@@ -77,6 +77,12 @@ void App::setLiveApi(bool on) {
     const bool started = st->server.start(opt, [weak, token](const link::HttpRequest& req) {
         auto s = weak.lock();
         if (!s) return link::HttpResponse::json(503, R"({"ok":false,"message":"stopped"})");
+        // Not for web pages: browsers send Origin, and a rebound DNS name shows in Host.
+        if (!req.header("origin").empty())
+            return link::HttpResponse::json(403, R"({"ok":false,"message":"requests from web pages are refused"})");
+        const std::string host = req.header("host");
+        if (!host.empty() && host.rfind("127.0.0.1", 0) != 0 && host.rfind("localhost", 0) != 0)
+            return link::HttpResponse::json(403, R"({"ok":false,"message":"only 127.0.0.1"})");
         if (req.header("x-sculptforge-token") != token)
             return link::HttpResponse::json(401, R"({"ok":false,"message":"missing or wrong X-SculptForge-Token"})");
         if (req.method == "GET" && req.path == "/info") {

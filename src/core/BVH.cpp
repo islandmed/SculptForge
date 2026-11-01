@@ -195,11 +195,14 @@ bool BVH::raycast(const Mesh& mesh, const glm::vec3& origin, const glm::vec3& di
     uint32_t bestTri = 0;
     bool found = false;
 
-    stack_.clear();
-    stack_.push_back(0);
-    while (!stack_.empty()) {
-        const Node& n = nodes_[stack_.back()];
-        stack_.pop_back();
+    // Per thread: the UI (the surface cursor, picks) casts rays while the predictive-stroke thread sculpts;
+    // a shared stack mixed their traversals (strokes then differed from the serial path).
+    thread_local std::vector<uint32_t> stack;
+    stack.clear();
+    stack.push_back(0);
+    while (!stack.empty()) {
+        const Node& n = nodes_[stack.back()];
+        stack.pop_back();
         if (!rayBox(n.box, origin, invDir, best)) continue;
         if (n.count > 0) {
             for (uint32_t i = n.first; i < n.first + n.count; ++i) {
@@ -214,8 +217,8 @@ bool BVH::raycast(const Mesh& mesh, const glm::vec3& origin, const glm::vec3& di
                 }
             }
         } else if (n.first != kNoLeaf) { // (kNoLeaf: a leaf dynamic edits emptied)
-            stack_.push_back(n.first);
-            stack_.push_back(n.first + 1);
+            stack.push_back(n.first);
+            stack.push_back(n.first + 1);
         }
     }
     if (!found) return false;
@@ -234,11 +237,14 @@ void BVH::queryTriangles(const Mesh& mesh, const glm::vec3& center, float radius
     out.clear();
     if (nodes_.empty()) return;
     const float r2 = radius * radius;
-    stack_.clear();
-    stack_.push_back(0);
-    while (!stack_.empty()) {
-        const Node& n = nodes_[stack_.back()];
-        stack_.pop_back();
+    // Per thread: the UI (the surface cursor, picks) casts rays while the predictive-stroke thread sculpts;
+    // a shared stack mixed their traversals (strokes then differed from the serial path).
+    thread_local std::vector<uint32_t> stack;
+    stack.clear();
+    stack.push_back(0);
+    while (!stack.empty()) {
+        const Node& n = nodes_[stack.back()];
+        stack.pop_back();
         if (!sphereBox(n.box, center, r2)) continue;
         if (n.count > 0) {
             for (uint32_t i = n.first; i < n.first + n.count; ++i) {
@@ -250,8 +256,8 @@ void BVH::queryTriangles(const Mesh& mesh, const glm::vec3& center, float radius
                 if (sphereBox(b, center, r2)) out.push_back(triIndices_[i]);
             }
         } else if (n.first != kNoLeaf) {
-            stack_.push_back(n.first);
-            stack_.push_back(n.first + 1);
+            stack.push_back(n.first);
+            stack.push_back(n.first + 1);
         }
     }
 }

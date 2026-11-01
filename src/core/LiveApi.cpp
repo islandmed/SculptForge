@@ -56,6 +56,13 @@ bool unbase64(const std::string& in, std::string& out) {
     return true;
 }
 
+// The snapshot mesh_set_positions checks: this SubTool (its id), its topology and its undo revision, so a write is
+// refused after another SubTool became active, a duplicate with the same topology, or any edit since mesh_read.
+std::string liveToken(const Document& doc) {
+    return std::to_string(doc.activeSubtoolInfo().id) + "-" + std::to_string(doc.undo.revision()) + "-" +
+           std::to_string(topologyHash(doc.mesh));
+}
+
 } // namespace
 
 uint64_t topologyHash(const Mesh& mesh) {
@@ -85,7 +92,7 @@ void registerLiveApiCommands(CommandRegistry& reg) {
                  j.set("subtool_index", double(doc.activeSubtool));
                  j.set("vertices", double(m.vertexCount()));
                  j.set("triangles", double(m.triangleCount()));
-                 j.set("topology", std::to_string(topologyHash(m)));
+                 j.set("topology", liveToken(doc));
                  j.set("positions", base64(m.positions.data(), m.positions.size() * sizeof(glm::vec3)));
                  if (argBool(a, "indices", true)) {
                      std::vector<uint32_t> idx;
@@ -104,8 +111,10 @@ void registerLiveApiCommands(CommandRegistry& reg) {
               {"label", T::String, "Undo label (default 'Set positions').", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  Mesh& m = doc.mesh;
-                 if (argString(a, "topology") != std::to_string(topologyHash(m)))
-                     return {false, "The SubTool's topology changed since mesh_read (or another SubTool is active)"};
+                 if (argString(a, "topology") != liveToken(doc))
+                     return {false, "The SubTool changed since mesh_read (another SubTool is active, or it was edited)"};
+                 if (!m.layers.empty())
+                     return {false, "This SubTool has sculpt layers: mesh_set_positions only writes SubTools without layers for now"};
                  std::string bytes;
                  if (!unbase64(argString(a, "positions"), bytes)) return {false, "positions is not valid base64"};
                  if (bytes.size() != m.positions.size() * sizeof(glm::vec3))
