@@ -4,8 +4,9 @@ click "Help##palette.help"
 click "What's New##help.whats_new"
 expect_value guide_open == 1
 expect_guide whats-new.md
+expect_text "Version 0.10.4"
+expect_text "Keep Masked"
 expect_text "Version 0.10.3"
-expect_text "Alternate smooth"
 expect_text "Version 0.10.2"
 expect_text "Version 0.9.6"
 expect_text "Extract"
@@ -22,7 +23,7 @@ expect_text "Version 0.6"
 expect_text "Version 0.5"
 expect_text "Version 0.4.2"
 # The newest section is on screen.
-expect_text "Alternate smooth"
+expect_text "Insert your own mesh"
 shot whats-new
 
 # The end of the chapter: a quiet line about supporting SculptForge; its button only asks for the website's page

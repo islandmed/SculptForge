@@ -6,6 +6,8 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.4] - 2026-11-01
+
 ### Added
 - Insert your own mesh (#34): **Append > Insert on the model > Active SubTool's copy...** (another SubTool) or
   **From file...** (`.obj`, `.ply`, `.glb`), dragged onto the surface like the shapes: centred, sized by the drag,

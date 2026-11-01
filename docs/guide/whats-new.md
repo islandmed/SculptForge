@@ -5,6 +5,22 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.10.4
+
+### From your requests on GitHub
+
+- **Insert your own mesh** (#34): **Append > Insert on the model** now takes a copy of another SubTool or an
+  `.obj`, `.ply` or `.glb` file, placed, sized and turned by the drag like the shapes. See [SubTools](subtools.md).
+- **Keep Masked** for Voxel Remesh, Decimate and QRemesh (#43): the masked part keeps its triangles and detail
+  exactly; only the rest is rebuilt and joined to it. See [Geometry](geometry.md).
+- **Hold Space and drag to move the camera** (#43): an option in **Preferences > Input**, off by default. See
+  [Navigation](navigation.md).
+- **Triple-click** another SubTool in the viewport to select and frame it (#43).
+- **Twelve new alphas** (Pores, Cracks, Scales, Rivets, Stitches, Fabric Weave, Bark, Rock Strata, Wrinkles, Skin
+  Folds, Hair Strands, Dot Grid) and **six new VDM brushes** (Rivet, Stitches, Skin Fold, Wrinkle Line, Crack, Rock
+  Ledge), with thumbnails in the LightBox (#43). See [Sculpting](sculpting.md).
+- **SelectRect and SelectLasso** follow X / Y / Z symmetry, like the mask versions (#51).
+
 ## Version 0.10.3
 
 ### From your requests on GitHub
