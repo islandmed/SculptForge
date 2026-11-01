@@ -8,7 +8,9 @@
 #include "core/KeepMasked.h"
 #include "core/QRemesh.h"
 
+#include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <functional>
 #include <set>

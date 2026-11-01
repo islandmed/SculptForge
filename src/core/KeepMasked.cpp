@@ -173,12 +173,12 @@ bool stitchKeptTriangles(const Mesh& source, const std::vector<uint8_t>& keep, c
     // other half of any quad cut in two.
     std::vector<float> inKept(source.vertexCount(), 0.0f);
     for (uint32_t v : keptSource) inKept[v] = 1.0f;
-    const std::vector<float> near = nearestValues(source.positions, inKept, remeshed.positions);
+    const std::vector<float> nearKept = nearestValues(source.positions, inKept, remeshed.positions);
     const size_t rt = remeshed.triangleCount();
     std::vector<uint8_t> stay(rt, 1);
     for (size_t t = 0; t < rt; ++t) {
         const glm::uvec3& tri = remeshed.triangles[t];
-        if (near[tri.x] > 0.5f || near[tri.y] > 0.5f || near[tri.z] > 0.5f) stay[t] = 0;
+        if (nearKept[tri.x] > 0.5f || nearKept[tri.y] > 0.5f || nearKept[tri.z] > 0.5f) stay[t] = 0;
     }
     auto dropHalfQuads = [&] {
         if (remeshed.quadPartners.size() != rt) return;
