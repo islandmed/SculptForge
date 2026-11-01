@@ -406,7 +406,17 @@ void App::registerShellActions() {
          "Polyframe: show the polygons of the active SubTool (Shift+F).");
     flag("view.polygroups", "Groups", ICON_LC_SHAPES, "Render", "", &renderSettings_.showPolygroups,
          "Colour each polygroup of the active SubTool.");
-    flag("view.mask", "Mask", ICON_LC_DROPLET, "Render", "", &renderSettings_.showMask, "Darken masked areas.");
+    flag("view.mask", "Mask", ICON_LC_DROPLET, "Render", "", &renderSettings_.showMask,
+         "Show or hide the mask (masked areas drawn darker). Hiding it keeps the mask: masked areas stay protected "
+         "from brushes until you clear it.");
+    if (const Action* shown = actions_.find("view.mask")) { // say so, since a hidden mask still protects (#43)
+        Action a = *shown;
+        a.run = [this] {
+            renderSettings_.showMask = !renderSettings_.showMask;
+            status_ = renderSettings_.showMask ? "Mask shown" : "Mask hidden (still masking; Clear Mask removes it)";
+        };
+        actions_.add(std::move(a));
+    }
     flag("view.polypaint", "Paint", ICON_LC_PALETTE, "Render", "", &renderSettings_.showPolypaint,
          "Show polypaint colours (off: plain material).");
     // Shading (Material palette, Tool > Display): the scene's, and the active SubTool's own.

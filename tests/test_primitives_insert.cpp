@@ -8,6 +8,9 @@
 #include "core/Json.h"
 #include "core/Primitives.h"
 
+#include <algorithm>
+#include <cmath>
+
 using namespace sf;
 
 TEST(primitives_closed_and_outward) {
@@ -47,4 +50,42 @@ TEST(insert_primitive_on_surface) {
     CHECK(reg.execute(doc, "undo", {}).ok);
     CHECK(doc.mesh.triangleCount() == before);
     CHECK(!reg.execute(doc, "insert_primitive", {{"type", std::string("teapot")}, {"x", 0.0}, {"y", 0.0}, {"z", 0.0}}).ok);
+}
+
+TEST(insert_primitive_mirrors_with_symmetry) {
+    // #43: with symmetry on, Insert adds a mirrored copy across each plane, as one undo step.
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "new_sphere", {{"subdivisions", 3.0}}).ok);
+    const size_t before = doc.mesh.triangleCount();
+    const Args at = {{"type", std::string("cone")}, {"x", 1.0}, {"y", 0.0}, {"z", 0.0},
+                     {"nx", 1.0}, {"ny", 0.0}, {"nz", 0.0}, {"size", 0.3}, {"twist", 30.0}};
+    CHECK(reg.execute(doc, "insert_primitive", at).ok);
+    const size_t one = doc.mesh.triangleCount() - before;
+    CHECK(reg.execute(doc, "undo", {}).ok);
+
+    Args mirrored = at;
+    mirrored["symmetry"] = std::string("x");
+    CHECK(reg.execute(doc, "insert_primitive", mirrored).ok);
+    CHECK(doc.mesh.triangleCount() == before + 2 * one);
+    // The copy reaches out along -X, and is not inside out: the outermost point's normal faces away.
+    size_t minI = 0, maxI = 0;
+    for (size_t i = 0; i < doc.mesh.positions.size(); ++i) {
+        if (doc.mesh.positions[i].x < doc.mesh.positions[minI].x) minI = i;
+        if (doc.mesh.positions[i].x > doc.mesh.positions[maxI].x) maxI = i;
+    }
+    CHECK(doc.mesh.positions[minI].x < -1.1f);
+    CHECK(std::abs(doc.mesh.positions[minI].x + doc.mesh.positions[maxI].x) < 1e-3f);
+    CHECK(doc.mesh.normals[minI].x < 0.0f);
+    CHECK(doc.mesh.normals[maxI].x > 0.0f);
+    CHECK(reg.execute(doc, "undo", {}).ok); // one step takes both away
+    CHECK(doc.mesh.triangleCount() == before);
+
+    // Z symmetry on a point on the Z plane would copy it onto itself: only the X copy is added.
+    mirrored["symmetry"] = std::string("xz");
+    CHECK(reg.execute(doc, "insert_primitive", mirrored).ok);
+    CHECK(doc.mesh.triangleCount() == before + 2 * one);
+    CHECK(reg.execute(doc, "undo", {}).ok);
+    mirrored["symmetry"] = std::string("q");
+    CHECK(!reg.execute(doc, "insert_primitive", mirrored).ok);
 }

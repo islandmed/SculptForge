@@ -127,7 +127,14 @@ bool App::init(const AppOptions& options) {
     }
     if (rememberWindow_) { // #35: where and how big it was last time
         if (saved.placed) SDL_SetWindowPosition(window_, saved.x, saved.y);
+#if defined(__APPLE__)
+        // #41: full screen on macOS is its own Space, entered from a window already on screen and key; entered
+        // here, before the first frame, the menu bar and traffic lights couldn't be revealed. The loop enters it
+        // after the first swap instead.
+        if (saved.fullscreen) fullscreenAfterFirstFrame_ = true;
+#else
         if (saved.fullscreen) SDL_SetWindowFullscreen(window_, true);
+#endif
         else if (saved.maximized) SDL_MaximizeWindow(window_);
     }
     {
@@ -303,6 +310,7 @@ void App::shutdown() {
     if (refTexture_) gl::DeleteTextures(1, &refTexture_);
     gallery_.reset(); // its preview textures need the GL context
     thumbs_.clear();
+    clearSubtoolThumbnails();
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
@@ -974,6 +982,11 @@ int App::run() {
         hardwareProfileFrameEnd();
         if (proof_) proofBeforeSwap(fbW, fbH); // Help > Benchmark: timing, video capture, the scripted pointer
         SDL_GL_SwapWindow(window_);
+        if (fullscreenAfterFirstFrame_) { // (#41, macOS: the window is shown now; raise it, then full screen)
+            fullscreenAfterFirstFrame_ = false;
+            SDL_RaiseWindow(window_);
+            SDL_SetWindowFullscreen(window_, true);
+        }
         mark();
         if (phases == 7 && phase[6] - phase[0] > frameLogMs)
             SDL_Log("frame %.1f ms: events %.1f, dabs %.1f, UI %.1f, ghost + sync %.1f, draw %.1f, UI draw + swap %.1f",
@@ -1133,6 +1146,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
     if (blenderStyle() && blenderNavigationDown(button)) return; // middle / Alt+left / right drags navigate
     if (mayaStyle() && mayaNavigationDown(button)) return;       // Alt+left / middle / right: orbit / pan / zoom
     if (button == SDL_BUTTON_LEFT) {
+        if (axisGizmoMouseDown(x, y)) return;   // the axis gizmo's ends snap to a side view (#43)
         if (zsphereMouseDown(x, y, mod)) return; // a ZSphere SubTool takes clicks on it (PanelZSpheres.cpp)
         if (polygroupMouseDown(x, y, mod)) return;
         if (maskSelectMouseDown(x, y, mod)) return;
@@ -1317,7 +1331,8 @@ void App::onMouseUp() {
         const float px = std::max(insertPx_, 12.0f * uiScale_);
         const float dist = glm::length(camera_.position() - insertAt_);
         const float worldPerPx = 2.0f * dist * std::tan(camera_.fovY * 0.5f) / std::max(canvasRect().h, 1.0f);
-        runCommand("insert_primitive", {{"type", insertType_}, {"x", double(insertAt_.x)}, {"y", double(insertAt_.y)},
+        const std::string symmetry = std::string(symmetry_.x ? "x" : "") + (symmetry_.y ? "y" : "") + (symmetry_.z ? "z" : "");
+        runCommand("insert_primitive", {{"type", insertType_}, {"symmetry", symmetry}, {"x", double(insertAt_.x)}, {"y", double(insertAt_.y)},
                                         {"z", double(insertAt_.z)}, {"nx", double(insertNormal_.x)},
                                         {"ny", double(insertNormal_.y)}, {"nz", double(insertNormal_.z)},
                                         {"size", double(2.0f * px * worldPerPx)},
@@ -1870,6 +1885,8 @@ void App::syncScene() {
     }
     renderer_.syncScene(scene);
     renderer_.syncSplats(doc_.splats, doc_.splatsVersion);
+    if (subtoolPanelShown_) updateSubtoolThumbnails(); // from the buffers just synced (PanelSubTools.cpp)
+    subtoolPanelShown_ = false;
 }
 
 void App::setLayerWeight(int index, float weight) {
@@ -2940,26 +2957,47 @@ bool App::drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col) {
     return true;
 }
 
-void App::drawAxisGizmo() {
-    // The world axes as the camera sees them, top left of the canvas, under the UI: red X, green Y, blue Z;
-    // the axes pointing away are drawn first and dimmer.
-    ImDrawList* dl = ImGui::GetBackgroundDrawList();
+std::array<AxisGizmoEnd, 6> App::axisGizmoLayout() const {
+    // Top left of the canvas: the timeline strip is at the bottom.
     const CanvasRect canvas = canvasRect();
     const float s = 34.0f * uiScale_;
-    const ImVec2 c(canvas.x + s + 18.0f * uiScale_, canvas.y + s + 18.0f * uiScale_); // top left: the timeline strip is at the bottom
-    const glm::mat3 rot(camera_.view());
-    struct Axis { glm::vec3 d; ImU32 col; const char* name; };
-    Axis axes[3] = {{rot * glm::vec3(1, 0, 0), IM_COL32(230, 80, 80, 255), "X"},
-                    {rot * glm::vec3(0, 1, 0), IM_COL32(110, 200, 90, 255), "Y"},
-                    {rot * glm::vec3(0, 0, 1), IM_COL32(80, 140, 240, 255), "Z"}};
-    std::sort(std::begin(axes), std::end(axes), [](const Axis& a, const Axis& b) { return a.d.z < b.d.z; });
-    for (const Axis& a : axes) {
-        const ImVec2 tip(c.x + a.d.x * s, c.y - a.d.y * s);
-        const ImU32 col = a.d.z < -0.2f ? (a.col & 0x00ffffffu) | 0x90000000u : a.col;
-        dl->AddLine(c, tip, col, 2.0f * uiScale_);
-        dl->AddCircleFilled(tip, 7.0f * uiScale_, col);
-        const ImVec2 ts = ImGui::CalcTextSize(a.name);
-        dl->AddText(ImVec2(tip.x - ts.x * 0.5f, tip.y - ts.y * 0.5f), IM_COL32(20, 20, 22, 255), a.name);
+    return axisGizmoEnds(glm::mat3(camera_.view()), glm::vec2(canvas.x + s + 18.0f * uiScale_, canvas.y + s + 18.0f * uiScale_), s);
+}
+
+bool App::axisGizmoMouseDown(float x, float y) {
+    // A click on an end snaps to that side view, orthographic (#43, as in Blender's navigation gizmo).
+    if (!uiPrefs_.showAxes) return false;
+    const auto ends = axisGizmoLayout();
+    const int hit = axisGizmoHit(ends, x, y, 9.0f * uiScale_);
+    if (hit < 0) return false;
+    if (const Action* a = actions_.find(axisGizmoView(ends[size_t(hit)].axis, ends[size_t(hit)].negative).action); a && a->run) a->run();
+    return true;
+}
+
+void App::drawAxisGizmo() {
+    // The world axes as the camera sees them, under the UI: red X, green Y, blue Z, a labelled ball at the
+    // positive end and a plain one at the negative end; the ends pointing away are drawn first and dimmer. A click
+    // on an end snaps to that side (axisGizmoMouseDown); the end under the mouse gets a ring.
+    ImDrawList* dl = ImGui::GetBackgroundDrawList();
+    auto ends = axisGizmoLayout();
+    const glm::vec2 c = (ends[0].at + ends[3].at) * 0.5f;
+    const ImVec2 mouse = ImGui::GetIO().MousePos;
+    const int hover = ImGui::GetIO().WantCaptureMouse ? -1 : axisGizmoHit(ends, mouse.x, mouse.y, 9.0f * uiScale_);
+    const AxisGizmoEnd hovered = hover >= 0 ? ends[size_t(hover)] : AxisGizmoEnd{};
+    std::sort(ends.begin(), ends.end(), [](const AxisGizmoEnd& a, const AxisGizmoEnd& b) { return a.depth < b.depth; });
+    static constexpr ImU32 colours[3] = {IM_COL32(230, 80, 80, 255), IM_COL32(110, 200, 90, 255), IM_COL32(80, 140, 240, 255)};
+    static constexpr const char* names[3] = {"X", "Y", "Z"};
+    for (const AxisGizmoEnd& e : ends) {
+        const ImVec2 tip(e.at.x, e.at.y);
+        ImU32 col = e.depth < -0.2f ? (colours[e.axis] & 0x00ffffffu) | 0x90000000u : colours[e.axis];
+        if (e.negative) col = (col & 0xff000000u) | ((col & 0x00fefefeu) >> 1); // the negative end: darker
+        else dl->AddLine(ImVec2(c.x, c.y), tip, col, 2.0f * uiScale_);
+        dl->AddCircleFilled(tip, (e.negative ? 5.5f : 7.0f) * uiScale_, col);
+        if (hover >= 0 && e.axis == hovered.axis && e.negative == hovered.negative)
+            dl->AddCircle(tip, 9.0f * uiScale_, IM_COL32(255, 255, 255, 220), 0, 1.5f * uiScale_);
+        if (e.negative) continue;
+        const ImVec2 ts = ImGui::CalcTextSize(names[e.axis]);
+        dl->AddText(ImVec2(tip.x - ts.x * 0.5f, tip.y - ts.y * 0.5f), IM_COL32(20, 20, 22, 255), names[e.axis]);
     }
 }
 

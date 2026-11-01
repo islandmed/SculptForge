@@ -14,6 +14,18 @@ All notable changes to SculptForge are listed here. The format follows
   makes that the Shift / Smooth brush smooth (letting go of Shift then switches to the plain one).
 - Ctrl+drag on the background with MaskPen draws a mask rectangle while dragging (#48) and masks what it covers;
   one that covers none of the model clears the mask, as before (and as in ZBrush, without DynaMesh's remesh).
+- Axis gizmo (#43): click an end of the X / Y / Z gizmo in the canvas corner to snap to that side view
+  (orthographic), as in Blender; the negative ends are drawn too and the end under the pointer is ringed.
+- Undo and Redo on the right shelf (#43); stored layouts get them at the top once (layout version 3).
+- **Continuous** is also in the left shelf's stroke picker, under the stroke tiles (#43).
+- Insert on the model respects X / Y / Z symmetry (#43): a mirrored copy on the other side, one undo step
+  (`insert_primitive symmetry=x`).
+- SubTool thumbnails in the SubTool list (#43), drawn from each SubTool's existing GPU buffers (no upload, the
+  motion proxy on dense meshes), one per frame at most and only once a change has settled, never during a stroke.
+
+### Changed
+- The Mask display toggle (right shelf, <kbd>Ctrl</kbd>+<kbd>H</kbd>) says in its help and the status bar that a
+  hidden mask still masks (#43).
 
 ### Fixed
 - Pen tablets in mouse (relative) mode (#54): lifting the pen and putting it down elsewhere made the cursor jump
@@ -21,6 +33,8 @@ All notable changes to SculptForge are listed here. The format follows
 - MaskLasso and MaskRect ignored symmetry (#51): the mirror image of the shape is masked too now, as with mask
   strokes. A Ctrl+click on the model with MaskLasso or MaskRect blurs the mask (Ctrl+Alt+click sharpens it), as
   with MaskPen; it did nothing. A lasso or rectangle that covers none of the model clears the mask.
+- macOS (#41): reopening in full screen (restored from the last session, #35) left the menu bar and window buttons
+  unreachable until another display was clicked; full screen is now entered after the window is on screen.
 
 ## [0.10.2] - 2026-11-01
 
