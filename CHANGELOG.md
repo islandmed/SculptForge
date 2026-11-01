@@ -6,6 +6,8 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.5] - 2026-11-01
+
 ### Changed
 - Faster CI and releases with the same tests (docs/releasing.md):
   - **Compiler caching:** compiles go through ccache, cached only by pushes to main and maintainers' own runs.
@@ -33,6 +35,9 @@ All notable changes to SculptForge are listed here. The format follows
   `selection_set_morph` (Morph to Set) blends the whole Part toward it by an amount, within the mask. Python:
   `Document.selection_sets`, `selection_set(name)` and `set_selection_set(name, mask=..., ...)` push and pull sets as
   NumPy arrays.
+
+### Fixed
+- The viewport now appears on Windows setups whose window uses another colour format (seen on NVIDIA with high-resolution displays): the view was drawn but never reached the window, so the cursor left trails and the model never showed (#29).
 
 ## [0.10.4] - 2026-11-01
 

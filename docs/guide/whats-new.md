@@ -18,6 +18,9 @@ chapter opens by itself the first time you start a new version; you can always f
 - **Sets for pipelines**: `selection_set_*` commands for scripts, `sculptforge-cli` and the AI assistant,
   `doc.selection_set()` / `doc.set_selection_set()` in Python, `.sfsets` files to move sets between Parts and
   scenes, and USD exports that carry them as GeomSubsets and primvars (read back on import).
+- **Fixed: the viewport on some Windows PCs** (#29): on displays whose window uses another colour format (seen with
+  NVIDIA and high-resolution screens) the model never appeared and the cursor left trails. The view now reaches the
+  window on every format, and falls back to drawing directly if a driver still refuses.
 
 ## Version 0.10.4
 
