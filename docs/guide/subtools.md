@@ -25,7 +25,9 @@ The list is in **Tool > SubTool**, which is open in the right tray by default.
 
 ![The SubTool sub-palette with several SubTools, the active one highlighted](images/subtools.jpg)
 
-Each row shows the SubTool's name, its triangle count and an eye.
+Each row shows a small picture of the SubTool, its name, its triangle count and an eye. The pictures are drawn from
+the model the viewport already has on the graphics card, so they cost almost nothing even on very dense SubTools,
+and they catch up a moment after you stop changing a SubTool (not during a stroke).
 
 | To | Do this |
 |---|---|
@@ -54,6 +56,9 @@ Click **Append** and choose:
 
 - **Sphere**, **Cube** or **Plane**: a new primitive placed beside the visible model (to the right, on +X), sized
   to about a third of the largest visible SubTool.
+- **Insert on the model**: choose a shape, then drag on the active SubTool's surface to add it there as a new
+  polygroup (the drag sets its size and turns it). With **Symmetry** X, Y or Z on, a mirrored copy goes on the other
+  side too, in the same undo step; a shape inserted right on a mirror plane isn't doubled.
 - **From file...**: a model (`.obj`, `.fbx`, `.glb`, `.gltf`, `.ply`, `.stl`, `.GoZ`, `.usda`, `.usd`, `.usdz`) or
   a project (`.sfproj`). A file with several objects adds one SubTool per object.
 

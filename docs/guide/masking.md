@@ -16,9 +16,11 @@ from cavities or polygroups.
 - Masking is not a layer and isn't affected by sculpt layers: a mask stroke always works on the model itself.
 - Mask strokes and mask commands are undoable like any other change.
 
-To see the mask, keep **Mask** on in the right shelf (it is on by default). The same toggle is **Show mask** in
-**Tool > Masking**, and **Show Mask** in the **Render** palette. Turning it off hides the darkening; the mask
-still protects the surface.
+To see the mask, keep **Mask** on in the right shelf (it is on by default; <kbd>Ctrl</kbd>+<kbd>H</kbd> toggles it,
+as ZBrush's View Mask). The same toggle is **Show mask** in **Tool > Masking**, and **Show Mask** in the **Render**
+palette. Turning it off hides the darkening without clearing the mask: it still protects the surface, the status
+bar says so, and turning it on again shows the same mask. **Clear Mask** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd>)
+is what removes it.
 
 ## Paint a mask
 

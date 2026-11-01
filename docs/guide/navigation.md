@@ -17,6 +17,11 @@ view with a 35 degree field of view, or orthographic (<kbd>Numpad 5</kbd>): no f
 shrink with depth. The front, side and top views (<kbd>Numpad 1</kbd>, <kbd>3</kbd>, <kbd>7</kbd>) switch to
 orthographic until you rotate again, as in Blender.
 
+The X / Y / Z gizmo in the top left of the canvas (**Draw > Camera > Axes**) shows the world axes as the camera
+sees them. Click an end to look from that side, as in Blender: **X** the right view, **Y** the top, **Z** the front,
+and the plain dot at the other end of each axis the left, bottom or back view. These are orthographic like the
+numpad views. The end under the pointer gets a ring.
+
 Navigation starts only on the canvas. A drag that begins on a shelf, a tray or a palette never moves the
 camera.
 
@@ -42,6 +47,7 @@ camera.
 | Zoom | Mouse wheel; <kbd>Alt</kbd>+left-drag on the background, then let go of <kbd>Alt</kbd> and keep dragging; <kbd>Ctrl</kbd>+right-drag; <kbd>Ctrl</kbd>+middle-drag; with the SculptForge input style also <kbd>Ctrl</kbd>+left-drag on the background |
 | Frame the model | <kbd>F</kbd> (Blender style: <kbd>Home</kbd>), or **Frame** on the right shelf |
 | Front, right, top view | <kbd>Numpad 1</kbd>, <kbd>Numpad 3</kbd>, <kbd>Numpad 7</kbd>; <kbd>Ctrl</kbd> for the back, left and bottom |
+| Front, side, top or bottom view with the mouse | Click an end of the axis gizmo in the canvas corner |
 | Orthographic on or off | <kbd>Numpad 5</kbd> |
 | Turn in 15 degree steps | <kbd>Numpad 4</kbd> / <kbd>Numpad 6</kbd> (around), <kbd>Numpad 8</kbd> / <kbd>Numpad 2</kbd> (over); <kbd>Numpad 9</kbd>: the other side |
 | Frame the active SubTool | <kbd>Numpad .</kbd> |

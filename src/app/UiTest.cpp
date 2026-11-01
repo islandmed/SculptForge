@@ -32,6 +32,7 @@
 //   gizmo_hover HANDLE       move the mouse onto a Gizmo 3D handle (it lights up, for screenshots)
 //   drag_landmark N DX DY [S] left-drag Make sculptable's face landmark N (0-7, FaceLandmarks order) by DX DY pixels
 //   orbit DX DY              right-drag on the background, in pixels (with the held modifiers)
+//   axis_click +x|-x|+y|-y|+z|-z  click that end of the axis gizmo in the canvas corner (it snaps to that side view)
 //   button_drag middle|right X0 Y0 X1 Y1 [S]  drag with that button in window fractions (with the held modifiers)
 //   expect_shortcut ACTION KEYS  the action's effective keys, e.g. expect_shortcut view.front Numpad 1
 //   camera YAW PITCH         set the view's angles in degrees (0 0 = the front view), e.g. for guide screenshots
@@ -58,7 +59,9 @@
 //                            background_r / background_g / background_b (the flat colour, 0-255), subtool_shading (0 Scene, 1 Smooth, 2 Flat),
 //                            custom_matcaps (MatCaps loaded from images), material_custom (1 when the view uses
 //                            one), matcap_files (images in the library's MatCaps folder),
-//                            subtools (count), active_subtool (index, 0 = top), visible_subtools,
+//                            support_requests (times Support SculptForge was clicked; never opens a browser in tests),
+//                            welcome_open (the first-run welcome shown),
+//                            subtools (count), subtool_thumbnails (SubTool panel thumbnails rendered), active_subtool (index, 0 = top), visible_subtools,
 //                            extract_preview (1 while an Extract preview waits for Accept), open_edges (edges of
 //                            the active SubTool with one triangle: 0 = watertight),
 //                            edited_subtools (SubTools with undo history), user_brushes (brushes in the
@@ -76,6 +79,7 @@
 //                            dabs keep the volume now: the option, flipped by letting go of Shift mid-stroke),
 //                            moved_out (summed movement along the snapshot's normals: > 0 out, < 0 in),
 //                            pen_pressure (raw), brush_pressure (after the curve; 1 for the mouse),
+//                            stroke_continuous (Stroke > Continuous, 1 on),
 //                            stroking (1 while a stroke is open), cursor_x / cursor_y (the brush cursor, pixels),
 //                            surface_cursor (1 when the brush ring last drawn lay on the surface, #25),
 //                            cursor_follows_surface (Preferences > Input, 1 on),
@@ -418,6 +422,7 @@ double Demo::query(const std::string& name, bool& known) const {
     }
     if (name == "lazy_mouse") return app_.strokeType_ == StrokeType::LazyMouse ? 1.0 : 0.0;
     if (name == "stroke_type") return double(int(app_.strokeType_)); // 0 Dots, 1 DragRect, 2 DragDot, 3 Spray, 4 LazyMouse
+    if (name == "stroke_continuous") return app_.strokeContinuous_ ? 1.0 : 0.0; // Continuous (#31)
     if (name == "vdms") return double(app_.doc_.vdms.size());
     if (double kv = 0.0; app_.kelvinUiValue(name, kv)) return kv; // capture_*, kelvin_* (PanelKelvinlet.cpp)
     // Facial shapes (PanelFace.cpp): landmarks placed, placing them, a take playing, and face_<shape>: that layer's weight.
@@ -529,6 +534,13 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "guide_hits") return double(app_.guide_.searchHits());
     const Document& doc = app_.doc_;
     if (name == "subtools") return double(doc.subtoolCount());
+    if (name == "support_requests") return double(app_.supportPageRequests_); // Support SculptForge clicks
+    if (name == "welcome_open") return app_.showWelcome_ ? 1.0 : 0.0;
+    if (name == "subtool_thumbnails") { // SubTool panel thumbnails rendered (#43)
+        double n = 0.0;
+        for (const auto& [id, tex] : app_.subtoolThumbs_) n += tex ? 1.0 : 0.0;
+        return n;
+    }
     if (name == "active_subtool") return double(doc.activeSubtool);
     if (name == "extract_preview") return doc.extractPreviewCurrent() ? 1.0 : 0.0;
     if (name == "open_edges") {
@@ -842,6 +854,24 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             SDL_GetWindowSize(app_.window_, &ww, &wh);
             return ImVec2((x0 + (x1 - x0) * u) * float(ww), (y0 + (y1 - y0) * u) * float(wh));
         }, seconds);
+        run([this] { SDL_SetModState(held_); });
+        wait(0.1f);
+    } else if (verb == "axis_click") {
+        // axis_click +x|-x|+y|-y|+z|-z: click that end of the axis gizmo (Draw > Camera > Axes, #43)
+        if (!need(1)) return false;
+        static const char* const names[6] = {"+x", "+y", "+z", "-x", "-y", "-z"};
+        const auto found = std::find_if(std::begin(names), std::end(names), [&](const char* n) { return w[1] == n; });
+        if (found == std::end(names)) {
+            error = "axis_click takes +x, -x, +y, -y, +z or -z";
+            return false;
+        }
+        const size_t end = size_t(found - std::begin(names));
+        auto at = std::make_shared<ImVec2>();
+        run([this, at, end] {
+            const AxisGizmoEnd e = app_.axisGizmoLayout()[end];
+            *at = ImVec2(e.at.x, e.at.y);
+        });
+        stroke([at](float) { return *at; }, 0.2f);
         run([this] { SDL_SetModState(held_); });
         wait(0.1f);
     } else if (verb == "click_subtool") {

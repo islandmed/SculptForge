@@ -991,6 +991,23 @@ void UserGuide::drawPage(App& app) {
         else if (b.kind == BlockKind::Image || b.kind == BlockKind::Table || b.kind == BlockKind::Code) gap = 16.0f * s;
         y += h + gap;
     }
+    if (place_.chapter == page && currentFile() == "whats-new.md") {
+        // The end of What's New: a quiet line about supporting SculptForge (it only opens the website's page).
+        const float y0 = origin.y + y + 8.0f * s;
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        dl->AddLine(ImVec2(origin.x, y0), ImVec2(origin.x + width, y0), theme::u32(theme::sectionRule));
+        ImGui::SetCursorScreenPos(ImVec2(origin.x, y0 + 14.0f * s));
+        if (bodyFont()) ImGui::PushFont(bodyFont());
+        ImGui::PushTextWrapPos(origin.x + width);
+        ImGui::TextUnformatted("SculptForge is free and open source, and stays that way. If it helps your work, "
+                               "you can support its development.");
+        ImGui::PopTextWrapPos();
+        if (bodyFont()) ImGui::PopFont();
+        ImGui::Spacing();
+        ImGui::SetCursorScreenPos(ImVec2(origin.x, ImGui::GetCursorScreenPos().y));
+        if (ImGui::Button("Support SculptForge##whats_new")) app.openSupportPage();
+        y = ImGui::GetCursorScreenPos().y - origin.y;
+    }
     ImGui::SetCursorScreenPos(start);
     ImGui::Dummy(ImVec2(avail, y + pad * 2.0f));
     // Scroll to where navigation asked (positions are known now).

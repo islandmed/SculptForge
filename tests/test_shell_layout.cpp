@@ -9,12 +9,20 @@
 #include "app/ShellGeometry.h"
 
 #include <cmath>
+#include <string>
+#include <vector>
 
 using namespace sf;
 
 namespace {
 
 bool near(float a, float b) { return std::abs(a - b) < 0.01f; }
+
+Json shelfJson(const std::vector<std::string>& ids) {
+    Json a = Json::array();
+    for (const auto& id : ids) a.push(id);
+    return a;
+}
 
 bool rectIs(const CanvasRect& r, float x, float y, float w, float h) {
     return near(r.x, x) && near(r.y, y) && near(r.w, w) && near(r.h, h);
@@ -131,4 +139,23 @@ TEST(shell_camera_notch_inset) {
     CHECK(g.canvas.y == plain.canvas.y + 37.0f && g.canvas.h == plain.canvas.h - 37.0f);
     CHECK(g.rightTray.y == plain.rightTray.y + 37.0f);
     CHECK(computeShell(l, 1728, 1117, 1.0f, 5000.0f).notchBand.h <= 1117.0f * 0.25f); // never eats the window
+}
+
+TEST(shell_right_shelf_undo_redo) {
+    // #43: Undo and Redo top the right shelf; a layout stored before them (version < 3) gets them on load, once.
+    const UiLayout l = standardLayout();
+    CHECK(l.rightShelf.size() > 3 && l.rightShelf[0] == "edit.undo" && l.rightShelf[1] == "edit.redo");
+    Json old = toJson(l);
+    old.set("version", 2.0);
+    old.set("rightShelf", shelfJson({"view.frame", "view.mask"}));
+    UiLayout back;
+    std::string err;
+    CHECK(fromJson(old, back, err));
+    CHECK(back.rightShelf.size() == 5 && back.rightShelf[0] == "edit.undo" && back.rightShelf[1] == "edit.redo" &&
+          back.rightShelf[3] == "view.frame");
+    // A current layout the user took them out of stays without them.
+    Json now = toJson(l);
+    now.set("rightShelf", shelfJson({"view.frame"}));
+    CHECK(fromJson(now, back, err));
+    CHECK(back.rightShelf.size() == 1);
 }

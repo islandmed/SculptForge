@@ -8,14 +8,17 @@
 #include "app/App.h"
 #include "app/Theme.h"
 #include "core/Multires.h"
+#include "render/GL.h"
 
 #include <cctype>
 #include <imgui_internal.h>
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <string>
+#include <vector>
 
 namespace sf {
 
@@ -28,6 +31,7 @@ constexpr ImVec4 kListWell = theme::rgb(0x1c1c1f);          // the recessed area
 constexpr ImVec4 kRowSelected = theme::rgb(0xffffff, 0.09f); // the active row: lighter neutral, plus the accent bar
 constexpr ImVec4 kRowHover = theme::rgb(0xffffff, 0.11f);
 constexpr ImVec4 kRowPressed = theme::rgb(0xffffff, 0.14f);
+constexpr ImVec4 kThumbWell = theme::rgb(0x000000, 0.22f); // behind a SubTool thumbnail (#43)
 
 const SDL_DialogFileFilter kAppendFilters[] = {
     {"Models and projects", "obj;fbx;glb;gltf;ply;stl;GoZ;goz;usda;usd;usdz;sfproj"}, {"All files", "*"}};
@@ -121,7 +125,62 @@ void App::subtoolClickRelease() {
     subtoolClickFrame_ = false;
 }
 
+void App::updateSubtoolThumbnails() {
+    // #43: what each SubTool looks like now; the schedule picks at most one to render this frame, from the GPU
+    // buffers syncScene just brought up to date (never a CPU render, never a re-upload: cheap on 30M+ meshes).
+    std::vector<uint32_t> ids;
+    ids.reserve(doc_.subtools.size());
+    const double now = double(SDL_GetTicksNS()) * 1e-9; // (the main loop's clock, as redrawAt_)
+    for (int i = 0; i < doc_.subtoolCount(); ++i) {
+        const SubTool& s = doc_.subtools[size_t(i)];
+        const Mesh& m = doc_.subtoolMesh(i);
+        const UndoStack& undo = i == doc_.activeSubtool ? doc_.undo : s.undo;
+        uint64_t key = undo.revision();
+        for (uint64_t part : {uint64_t(m.triangleCount()), uint64_t(m.vertexCount()), uint64_t(s.visible),
+                              uint64_t(s.shading), uint64_t(renderSettings_.matcap + 1), uint64_t(renderSettings_.showPolypaint)})
+            key = key * 1099511628211ull ^ part;
+        subtoolThumbSchedule_.observe(s.id, key, now);
+        ids.push_back(s.id);
+    }
+    for (uint32_t gone : subtoolThumbSchedule_.keepOnly(ids))
+        if (auto it = subtoolThumbs_.find(gone); it != subtoolThumbs_.end()) {
+            gl::DeleteTextures(1, &it->second);
+            subtoolThumbs_.erase(it);
+        }
+    const bool busy = drag_ != Drag::None || strokeFinishing_ || solverBusy() || doc_.sculptor.strokeActive();
+    uint32_t id = 0;
+    double wakeAt = 0.0;
+    if (subtoolThumbSchedule_.due(now, busy, id, wakeAt)) {
+        constexpr int kPixels = 96; // shown at about 34 px: crisp on HiDPI
+        std::vector<uint8_t> rgba;
+        std::string error;
+        if (renderer_.renderSubtoolThumbnail(id, 30.0f, -15.0f, kPixels, renderSettings_, rgba, error)) {
+            unsigned& tex = subtoolThumbs_[id];
+            if (!tex) gl::GenTextures(1, &tex);
+            gl::BindTexture(GL_TEXTURE_2D, tex);
+            gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            gl::PixelStorei(GL_UNPACK_ALIGNMENT, 1);
+            gl::TexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGBA8), kPixels, kPixels, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+            gl::BindTexture(GL_TEXTURE_2D, 0);
+        }
+        subtoolThumbSchedule_.rendered(id); // (one that couldn't render, e.g. hidden before its first upload, waits for a change)
+        uint32_t next = 0;
+        if (subtoolThumbSchedule_.due(now, busy, next, wakeAt)) wakeAt = now; // another waiting: the next frame
+    }
+    if (wakeAt > 0.0) redrawAt_ = redrawAt_ > 0.0 ? std::min(redrawAt_, wakeAt) : wakeAt;
+}
+
+void App::clearSubtoolThumbnails() {
+    for (auto& [id, tex] : subtoolThumbs_) gl::DeleteTextures(1, &tex);
+    subtoolThumbs_.clear();
+    subtoolThumbSchedule_.keepOnly({});
+}
+
 void App::drawSubToolsContents() {
+    subtoolPanelShown_ = true; // its thumbnails keep up while it shows (updateSubtoolThumbnails)
     const float scale = uiScale_;
     const int count = doc_.subtoolCount();
     const int active = doc_.activeSubtool;
@@ -131,7 +190,10 @@ void App::drawSubToolsContents() {
     int selectIndex = -1, toggleIndex = -1, deleteIndex = -1, duplicateIndex = -1, renameIndex = -1;
     std::string renameTo;
     const ImVec2 cellPad(6.0f * scale, 4.0f * scale);
-    const float rowH = ImGui::GetTextLineHeight() + 2.0f * cellPad.y;
+    // Each row starts with the SubTool's thumbnail (#43); the text is centred on its height.
+    const float thumb = 30.0f * scale, lineH = ImGui::GetTextLineHeight();
+    const float innerH = std::max(lineH, thumb), textDy = (innerH - lineH) * 0.5f;
+    const float rowH = innerH + 2.0f * cellPad.y;
     const float listH = rowH * float(std::min(count, kListRows)) + 2.0f;
     ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, cellPad);
     // The list sits in a recessed well, no outline. The active row is a lighter neutral with the accent only as the
@@ -159,7 +221,10 @@ void App::drawSubToolsContents() {
             ImGui::PushID(int(s.id));
             ImGui::TableNextRow(ImGuiTableRowFlags_None, rowH);
             ImGui::TableSetColumnIndex(0);
+            const ImVec2 thumbAt = ImGui::GetCursorScreenPos();
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + thumb + 6.0f * scale);
             if (renamingSubtool_ == s.id) {
+                ImGui::SetCursorPosY(ImGui::GetCursorPosY() + textDy);
                 ImGui::SetNextItemWidth(-1);
                 if (focusRename_) {
                     ImGui::SetKeyboardFocusHere();
@@ -178,11 +243,14 @@ void App::drawSubToolsContents() {
                 }
             } else {
                 if (!s.visible) ImGui::PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_TextDisabled]);
+                ImGui::PushStyleVar(ImGuiStyleVar_SelectableTextAlign, ImVec2(0.0f, 0.5f));
                 if (ImGui::Selectable(s.name.c_str(), isActive,
                                       ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap |
-                                          ImGuiSelectableFlags_AllowDoubleClick | ImGuiSelectableFlags_NoAutoClosePopups) &&
+                                          ImGuiSelectableFlags_AllowDoubleClick | ImGuiSelectableFlags_NoAutoClosePopups,
+                                      ImVec2(0.0f, innerH)) &&
                     !isActive)
                     selectIndex = i;
+                ImGui::PopStyleVar();
                 if (!s.visible) ImGui::PopStyleColor();
                 if (isActive) {
                     const ImVec2 r0 = ImGui::GetItemRectMin(), r1 = ImGui::GetItemRectMax();
@@ -216,19 +284,35 @@ void App::drawSubToolsContents() {
                     listedActiveSubtool_ = s.id;
                 }
             }
+            {
+                // The thumbnail, or a quiet placeholder until it's rendered (updateSubtoolThumbnails).
+                ImDrawList* dl = ImGui::GetWindowDrawList();
+                const ImVec2 t1(thumbAt.x + thumb, thumbAt.y + thumb);
+                dl->AddRectFilled(thumbAt, t1, ImGui::ColorConvertFloat4ToU32(kThumbWell), 3.0f * scale);
+                const auto tex = subtoolThumbs_.find(s.id);
+                if (tex != subtoolThumbs_.end() && tex->second)
+                    dl->AddImageRounded(ImTextureID(uintptr_t(tex->second)), thumbAt, t1, ImVec2(0, 0), ImVec2(1, 1),
+                                        IM_COL32(255, 255, 255, s.visible ? 255 : 110), 3.0f * scale);
+                else
+                    dl->AddCircle(ImVec2(thumbAt.x + thumb * 0.5f, thumbAt.y + thumb * 0.5f), thumb * 0.28f,
+                                  ImGui::GetColorU32(style.Colors[ImGuiCol_TextDisabled]), 0, 1.0f * scale);
+            }
             ImGui::TableSetColumnIndex(1);
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + textDy);
             if (const std::string sdiv = subdivLevelText(doc_.subtoolMesh(i)); !sdiv.empty()) {
                 ImVec4 col = style.Colors[isActive ? ImGuiCol_Text : ImGuiCol_TextDisabled];
                 if (isActive) col.w *= 0.75f;
                 ImGui::TextColored(col, "%s", sdiv.c_str());
             }
             ImGui::TableSetColumnIndex(2);
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + textDy);
             const std::string tris = shortCount(doc_.subtoolMesh(i).triangleCount());
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(tris.c_str()).x);
             ImVec4 trisCol = style.Colors[isActive ? ImGuiCol_Text : ImGuiCol_TextDisabled];
             if (isActive) trisCol.w *= 0.75f; // readable on the highlight
             ImGui::TextColored(trisCol, "%s", tris.c_str());
             ImGui::TableSetColumnIndex(3);
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + textDy);
             const ImVec2 eyePos = ImGui::GetCursorScreenPos();
             const ImVec2 eyeSize(ImGui::GetContentRegionAvail().x, ImGui::GetTextLineHeight());
             if (ImGui::InvisibleButton(("##eye " + s.name).c_str(), eyeSize)) toggleIndex = i;
@@ -286,7 +370,7 @@ void App::drawSubToolsContents() {
                 std::string label = t;
                 label[0] = char(std::toupper(static_cast<unsigned char>(label[0])));
                 if (label == "Quadsphere") label = "Quad Sphere";
-                if (ImGui::MenuItem(label.c_str(), nullptr, insertType_ == t)) {
+                if (ImGui::MenuItem((label + "##insert").c_str(), nullptr, insertType_ == t)) { // (Append's own Cone is beside it)
                     insertType_ = t;
                     status_ = "Insert " + label + ": drag on the model (the drag sets its size). Esc stops.";
                 }

@@ -1,0 +1,33 @@
+# Supporting SculptForge: Help > Support SculptForge..., the first-run welcome and the supporters in Help > About.
+# Every one only asks for sculptforge.app/donate.html (UI tests never start a browser); nothing else changes.
+run new_sphere subdivisions=3
+expect_value welcome_open == 0
+expect_value support_requests == 0
+
+# Help > Support SculptForge...
+click "Help##palette.help"
+expect "Support SculptForge...##help.support"
+click "Support SculptForge...##help.support"
+expect_value support_requests == 1
+expect_status sculptforge.app/donate.html
+
+# The welcome (shown by itself on the first start; Help > Welcome from the command palette here).
+key f3
+type "##Command palette" "welcome"
+key enter
+expect_value welcome_open == 1
+expect_text "SculptForge is free. If it helps your work, consider supporting it."
+shot welcome
+click "Support SculptForge##welcome"
+expect_value support_requests == 2
+click "Close##welcome"
+expect_value welcome_open == 0
+
+# Help > About: the supporters list is empty for now, so it invites the first one.
+click "Help##palette.help"
+click "About SculptForge##help.about"
+expect_text "Supporters"
+expect_text "Be the first: sculptforge.app/donate.html"
+shot about_supporters
+click "Support SculptForge##about"
+expect_value support_requests == 3

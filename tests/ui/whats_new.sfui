@@ -23,3 +23,9 @@ expect_text "Version 0.4.2"
 # The newest section is on screen.
 expect_text "QRemesh 2"
 shot whats-new
+
+# The end of the chapter: a quiet line about supporting SculptForge; its button only asks for the website's page
+# (UI tests never start a browser).
+expect_text "If it helps your work, you can support its development."
+expect "Support SculptForge##whats_new"
+expect_value support_requests == 0

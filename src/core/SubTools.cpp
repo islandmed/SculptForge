@@ -7,6 +7,7 @@
 #include "core/Multires.h"
 #include "core/Polygroups.h"
 #include "core/Primitives.h"
+#include "core/Sculpt.h"
 #include "core/TextureTransfer.h"
 
 #include <cctype>
@@ -14,6 +15,8 @@
 #include <filesystem>
 #include <map>
 #include <numeric>
+#include <utility>
+#include <vector>
 
 namespace sf {
 
@@ -304,10 +307,19 @@ void registerSubToolCommands(CommandRegistry& reg) {
               {"x", T::Number, "surface point x", true}, {"y", T::Number, "surface point y", true}, {"z", T::Number, "surface point z", true},
               {"nx", T::Number, "surface normal x", false}, {"ny", T::Number, "surface normal y", false}, {"nz", T::Number, "surface normal z", false},
               {"size", T::Number, "size in scene units (default 0.2)", false},
-              {"twist", T::Number, "turn about the normal in degrees (default 0)", false}},
+              {"twist", T::Number, "turn about the normal in degrees (default 0)", false},
+              {"symmetry", T::String, "mirror axes, e.g. \"x\" or \"xz\": a mirrored copy across each plane (#43; default none)", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  const std::string blocked = dyntopoBlocker(doc.mesh);
                  if (!blocked.empty()) return {false, "Can't insert: " + blocked};
+                 Symmetry sym{false, false, false};
+                 for (char ch : argString(a, "symmetry")) {
+                     const char l = char(std::tolower(static_cast<unsigned char>(ch)));
+                     if (l == 'x') sym.x = true;
+                     else if (l == 'y') sym.y = true;
+                     else if (l == 'z') sym.z = true;
+                     else return {false, "symmetry takes the axes x, y and z"};
+                 }
                  const std::string type = argString(a, "type", "sphere");
                  const float size = float(std::max(argNumber(a, "size", 0.2), 1e-4));
                  Mesh prim;
@@ -342,11 +354,31 @@ void registerSubToolCommands(CommandRegistry& reg) {
                  for (uint32_t g : doc.mesh.polygroups) group = std::max(group, g);
                  for (auto& g : prim.polygroups) g = group + 1;
                  prim.recomputeAllNormals();
-                 Mesh merged = mergeMeshes({&doc.mesh, &prim});
-                 const size_t tris = prim.triangleCount();
+                 // Symmetry: a mirrored copy across each enabled plane (through the centre, as the brushes mirror),
+                 // in the same polygroup and the same undo step. A copy that would land on one already there
+                 // (inserted on a plane itself) is left out.
+                 std::vector<Mesh> copies;
+                 std::vector<glm::vec3> placed{at};
+                 for (const glm::vec3& m : Sculptor::mirrors(sym)) {
+                     const glm::vec3 centre = at * m;
+                     if (std::any_of(placed.begin(), placed.end(),
+                                     [&](const glm::vec3& p) { return glm::length(centre - p) < size * 0.25f; }))
+                         continue;
+                     placed.push_back(centre);
+                     Mesh copy = prim;
+                     for (auto& p : copy.positions) p *= m;
+                     if (m.x * m.y * m.z < 0.0f) // a reflection turns the triangles inside out: wind them back
+                         for (auto& t : copy.triangles) std::swap(t.y, t.z);
+                     copy.recomputeAllNormals();
+                     copies.push_back(std::move(copy));
+                 }
+                 std::vector<const Mesh*> parts{&doc.mesh, &prim};
+                 for (const Mesh& c2 : copies) parts.push_back(&c2);
+                 Mesh merged = mergeMeshes(parts);
+                 const size_t tris = prim.triangleCount() * (1 + copies.size());
                  doc.replaceMeshUndoable(std::move(merged), "Insert " + type);
-                 return {true, "Inserted a " + type + " (" + std::to_string(tris) + " triangles, polygroup " +
-                                   std::to_string(group + 1) + ")"};
+                 return {true, "Inserted " + (copies.empty() ? "a " + type : std::to_string(copies.size() + 1) + " " + type + "s (mirrored)") +
+                                   " (" + std::to_string(tris) + " triangles, polygroup " + std::to_string(group + 1) + ")"};
              }});
 
     reg.add({"subtool_duplicate", "Copy a SubTool (with its layers and attributes) and make the copy active.",

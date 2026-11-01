@@ -2935,5 +2935,45 @@ bool Renderer::renderMeshThumbnail(Mesh& mesh, const Camera& camera, int size, c
     return ok;
 }
 
+bool Renderer::renderSubtoolThumbnail(uint32_t id, float yaw, float pitch, int size, const RenderSettings& settings,
+                                      std::vector<uint8_t>& rgba, std::string& error) {
+    const MeshSlot* s = nullptr;
+    for (const MeshSlot& slot : slots_)
+        if (slot.id == id) s = &slot;
+    if (!s || s->fresh || s->outOfMemory || (!s->micro && s->drawnTriangles == 0) || !s->box.valid()) return false;
+    constexpr GLenum kFramebufferBinding = 0x8CA6, kViewport = 0x0BA2;
+    GLint fbo = 0, viewport[4] = {};
+    gl::GetIntegerv(kFramebufferBinding, &fbo);
+    gl::GetIntegerv(kViewport, viewport);
+
+    Camera camera;
+    camera.aspect = 1.0f;
+    camera.yaw = glm::radians(yaw);
+    camera.pitch = glm::radians(pitch);
+    camera.frame(s->box);
+    camera.distance *= 0.6f; // (frame leaves room around the model for the view; a thumbnail fills its tile)
+    RenderSettings thumb = settings;
+    thumb.showMask = thumb.showPolygroups = thumb.wireframe = false;
+    thumb.dimInactive = false;
+    constexpr size_t kProxyTriangles = size_t(1) << 20; // a big mesh: its lighter proxy, where current, is plenty at this size
+    thumb.motionProxy = s->drawnTriangles >= kProxyTriangles;
+    bool flat = false;
+    for (const DrawItem& item : drawList_)
+        if (item.id == id) flat = item.flat;
+    std::vector<DrawItem> scene;
+    scene.swap(drawList_);
+    drawList_.push_back({id, false, flat}); // (not active: no ghost, draft or mask on it)
+    const bool proxyUsed = proxyUsed_;
+    thumbnailPass_ = true;
+    const bool ok = renderToImage(camera, size, size, thumb, rgba, error);
+    thumbnailPass_ = false;
+    proxyUsed_ = proxyUsed; // (what the view drew decides which proxies sync keeps current)
+    drawList_.swap(scene);
+
+    gl::BindFramebuffer(GL_FRAMEBUFFER, GLuint(fbo));
+    gl::Viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+    return ok;
+}
+
 } // namespace sf
 

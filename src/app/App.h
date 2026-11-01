@@ -5,12 +5,15 @@
 #include "ai/BrushAssistant.h"
 #include "app/Actions.h"
 #include "app/AssetLibrary.h"
+#include "app/AxisGizmo.h"
 #include "app/CommandPalette.h"
 #include "app/Config.h"
 #include "app/Console.h"
 #include "app/LightBox.h"
 #include "app/Pickers.h"
 #include "app/ShellGeometry.h"
+#include "app/Support.h"
+#include "app/SubtoolThumbnails.h"
 #include "app/Thumbnails.h"
 #include "app/UiLayout.h"
 #include "app/UserGuide.h"
@@ -52,6 +55,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace sf {
@@ -325,6 +329,15 @@ private:
     bool lastCommandOk_ = true; // result of the last runCommand (UI tests check it)
     bool showHelp_ = false;
     bool showAbout_ = false;
+    // Supporting SculptForge (Support.h): the app only ever opens kSupportUrl in the browser; nothing else changes.
+    void openSupportPage();
+    void drawSupportUi();               // the first-run welcome and the one reminder note
+    void drawSupportersSection();       // Help > About: the names from docs/supporters.txt, as plain text
+    bool showWelcome_ = false;          // the first start (no project.json yet), or Help > Welcome
+    double sculptSeconds_ = 0.0;        // cumulative time in strokes (project.json)
+    bool supportReminderDone_ = false;  // the reminder was shown (or turned off) once: never again (project.json)
+    bool supportReminderOpen_ = false;
+    int supportPageRequests_ = 0;       // UI tests: how often the page was asked for (only opened when interactive)
 
     // Results from asynchronous native file dialogs (called off the main thread).
     struct PendingFile {
@@ -951,6 +964,13 @@ private:
     float subtoolClickX_ = 0.0f, subtoolClickY_ = 0.0f;
     uint32_t renamingSubtool_ = 0; // SubTool id being renamed inline (0: none)
     uint32_t listedActiveSubtool_ = 0; // the list scrolls to the active SubTool when it changes
+    // SubTool thumbnails (#43): rendered from each SubTool's GPU buffers while the SubTools panel shows, one per frame
+    // at most, a change once it has settled (SubtoolThumbnails.h); GL textures by SubTool id.
+    SubtoolThumbnailSchedule subtoolThumbSchedule_;
+    std::unordered_map<uint32_t, unsigned> subtoolThumbs_;
+    bool subtoolPanelShown_ = false; // drawn this frame
+    void updateSubtoolThumbnails();  // after syncScene, GL current
+    void clearSubtoolThumbnails();
     bool focusRename_ = false;
     char renameBuffer_[128] = "";
     // Not-undoable SubTool commands wait for a confirmation popup.
@@ -1146,7 +1166,10 @@ private:
     static WindowState loadWindowState();
     void saveWindowState() const;
     bool rememberWindow_ = false;
+    bool fullscreenAfterFirstFrame_ = false; // macOS: the saved full screen, entered once the window is on screen (#41)
     void drawAxisGizmo();
+    std::array<AxisGizmoEnd, 6> axisGizmoLayout() const; // the gizmo's ends on screen now (AxisGizmo.h)
+    bool axisGizmoMouseDown(float x, float y);          // a click on an end: that side view (#43)
     // Insert on the model (#34): the primitive chosen in Append > Insert; a drag on the surface places it.
     std::string insertType_;
     glm::vec3 insertAt_{0.0f}, insertNormal_{0.0f, 1.0f, 0.0f};
