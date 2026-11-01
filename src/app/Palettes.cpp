@@ -418,6 +418,7 @@ void App::drawPalette_Help() {
     menuAction(*this, "help.feedback");
     menuAction(*this, "help.benchmark");
     ImGui::Separator();
+    menuAction(*this, "help.support");
     menuAction(*this, "help.about");
 }
 

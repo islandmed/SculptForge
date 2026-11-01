@@ -218,7 +218,8 @@ if(SCULPTFORGE_BUILD_APP)
     fontRegular ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Inter-Regular.ttf
     fontSemiBold ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Inter-SemiBold.ttf
     fontLucide ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/lucide.ttf
-    appIcon ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-256.png)
+    appIcon ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-256.png
+    supporters ${CMAKE_CURRENT_SOURCE_DIR}/docs/supporters.txt) # Help > About (never empty: it starts with comments)
   include(cmake/EmbedGuide.cmake)
   embed_guide(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedGuide.cpp ${CMAKE_CURRENT_SOURCE_DIR}/docs/guide)
   add_executable(sculptforge
@@ -275,6 +276,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelPhone.cpp
     src/app/PanelProject.cpp
     src/app/PanelSubTools.cpp
+    src/app/PanelSupport.cpp
     src/app/PanelExtract.cpp
     src/app/PanelTimeline.cpp
     src/app/ProofMode.cpp

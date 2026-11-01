@@ -1999,9 +1999,12 @@ void App::drawUi() {
             ImGui::SameLine();
             if (ImGui::Button("AI services & privacy"))
                 SDL_OpenURL("https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md");
+            ImGui::Spacing();
+            drawSupportersSection(); // PanelSupport.cpp
         }
         ImGui::End();
     }
+    drawSupportUi(); // the first-run welcome, the one support reminder (PanelSupport.cpp)
     guide_.draw(*this);  // Help > User Guide
     drawHelpConsoleUi(); // console, command palette, Controls (F1), Ctrl-hover help: last, on top
 }

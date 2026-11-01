@@ -18,6 +18,7 @@
 #include <imgui.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cctype>
 #include <chrono>
 #include <cstdlib>
@@ -97,6 +98,10 @@ void App::initProject() {
         checkUpdates_ = prefs["check_updates"].asBool(checkUpdates_);
         updateCheckedAt_ = int64_t(prefs["update_checked_at"].asNumber(0));
         if (prefs["update_skipped"].isString()) updateSkipped_ = prefs["update_skipped"].asString();
+        sculptSeconds_ = addSculptTime(prefs["sculpt_seconds"].asNumber(0.0), 0.0);
+        supportReminderDone_ = prefs["support_reminder_done"].asBool(false);
+    } else {
+        showWelcome_ = options_.uiTest.empty() && options_.demo.empty(); // the first start: no prefs yet
     }
     recentFiles_ = pruneRecentFiles(std::move(recentFiles_), fileExists);
     saveProjectPrefs(); // records this version, so What's New shows once
@@ -134,6 +139,8 @@ void App::saveProjectPrefs() {
     prefs.set("check_updates", checkUpdates_);
     prefs.set("update_checked_at", double(updateCheckedAt_));
     if (!updateSkipped_.empty()) prefs.set("update_skipped", updateSkipped_);
+    prefs.set("sculpt_seconds", std::floor(sculptSeconds_)); // for the one support reminder (Support.h); stays here
+    prefs.set("support_reminder_done", supportReminderDone_);
     std::ofstream(fsPath(prefDir_ + "project.json"), std::ios::binary | std::ios::trunc) << prefs.dump(true);
 }
 
@@ -150,6 +157,15 @@ void App::rememberRecent(const std::string& path) {
 void App::tickProject(float dt) {
     updateTitle();
     if (!interactive() || prefDir_.empty()) return;
+    // Sculpting time, for the one optional support reminder (Support.h): counted here, kept in project.json.
+    const bool stroking = doc_.sculptor.strokeActive();
+    if (stroking) sculptSeconds_ = addSculptTime(sculptSeconds_, double(dt));
+    if (supportReminderDue(sculptSeconds_, double(SDL_GetTicks()) * 1e-3, stroking, supportReminderDone_)) {
+        supportReminderDone_ = true; // once only
+        supportReminderOpen_ = true;
+        saveProjectPrefs();
+        redrawAt_ = double(SDL_GetTicksNS()) * 1e-9; // (a frame to show it, asleep or not)
+    }
     if (!doc_.dirty()) {
         autosaveTimer_ = 0.0f;
         if (autosaveWritten_) { // nothing left to recover

@@ -430,6 +430,12 @@ void App::initActions() {
         "(Preferences > Updates).");
     add("help.about", "About SculptForge", "Help", nullptr, [this] { showAbout_ = true; }, ICON_LC_INFO, nullptr, nullptr, nullptr,
         "Version, licence and the open-source components SculptForge is built with.");
+    add("help.support", "Support SculptForge...", "Help", nullptr, [this] { openSupportPage(); }, ICON_LC_HEART, nullptr,
+        nullptr, nullptr,
+        "SculptForge is free and stays free. If it helps your work, you can support its development: opens "
+        "sculptforge.app/donate.html in your browser. Nothing in the app changes either way.");
+    add("help.welcome", "Welcome", "Help", nullptr, [this] { showWelcome_ = true; }, ICON_LC_SPARKLES, nullptr, nullptr,
+        nullptr, "The welcome note shown the first time SculptForge starts.");
     add("help.website", "Website & documentation", "Help", nullptr, [] { SDL_OpenURL("https://sculptforge.app/"); },
         ICON_LC_BOOK_OPEN, nullptr, nullptr, nullptr, "Open the SculptForge website and user guide in your browser.");
     add("help.report", "Report a problem", "Help", nullptr, [] { SDL_OpenURL("https://github.com/islandmed/SculptForge/issues"); },
