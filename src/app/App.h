@@ -1345,7 +1345,7 @@ private:
         float move[3] = {0, 0, 0}, rotate[3] = {0, 0, 0}, scale = 100.0f;
     } gizmo_;
     // ---- end Gizmo 3D ----
-    // ---- ZBrush feel (Input.cpp, docs/zbrush-parity.md) ----
+    // ---- ZBrush feel (Input.cpp, docs/guide/coming-from-zbrush.md) ----
     // Preferences > Input (the ZBrush or SculptForge key style), the Space QuickMenu, the intensities and Focal
     // Shift (U / I / O), ZBrush's mask and polygroup keys, Shift-constrained straight strokes and the
     // Shift+click, release Shift, drag roll.

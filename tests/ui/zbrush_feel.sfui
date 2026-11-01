@@ -1,4 +1,4 @@
-# The ZBrush feel (docs/zbrush-parity.md): U / I / O at the cursor, Smooth's own Z Intensity, ZBrush's brush
+# The ZBrush-style keys (docs/guide/coming-from-zbrush.md): U / I / O at the cursor, Smooth's own Z Intensity, ZBrush's brush
 # letters, L, V, Space QuickMenu, the mask keys (Ctrl+A, Ctrl+Shift+A, Ctrl+I, Ctrl+H), Ctrl+click to blur and
 # Ctrl+Alt+click to sharpen the mask, Ctrl+W, Ctrl+Shift+click on a partly hidden mesh, Shift-constrained
 # straight strokes, Shift+click / release Shift / drag to roll, and the ZBrush / SculptForge input styles.
