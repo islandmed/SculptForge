@@ -36,7 +36,8 @@ UiLayout standardLayout() {
                   "transform.symmetry_x",   "transform.symmetry_y", "transform.symmetry_z",    "sep",                 "draw.pressure_strength",
                   "draw.pressure_size", "widget.points"};
     l.leftShelf = {"widget.tile.brush", "widget.tile.stroke", "widget.tile.alpha", "widget.tile.material", "widget.color"};
-    l.rightShelf = {"view.frame", "widget.nav.move", "widget.nav.zoom", "widget.nav.rotate", "sep",
+    l.rightShelf = {"edit.undo",  "edit.redo",       "sep",
+                    "view.frame", "widget.nav.move", "widget.nav.zoom", "widget.nav.rotate", "sep",
                     "view.polyf", "view.polygroups", "view.mask",       "view.polypaint",    "sep",
                     "subtool.solo", "view.splats"};
     l.bottomShelf = {"brush.standard", "brush.clay",    "brush.claybuildup", "brush.damstandard", "brush.move",
@@ -101,6 +102,11 @@ bool fromJson(const Json& j, UiLayout& l, std::string& error) {
     }
     readStrings(j["leftShelf"], out.leftShelf);
     readStrings(j["rightShelf"], out.rightShelf);
+    // Version 3 added Undo and Redo at the top of the right shelf (#43): put them into stored ones.
+    if (int(j["version"].asNumber(1)) < 3 && j["rightShelf"].isArray() &&
+        std::find(out.rightShelf.begin(), out.rightShelf.end(), "edit.undo") == out.rightShelf.end() &&
+        std::find(out.rightShelf.begin(), out.rightShelf.end(), "edit.redo") == out.rightShelf.end())
+        out.rightShelf.insert(out.rightShelf.begin(), {"edit.undo", "edit.redo", "sep"});
     readStrings(j["bottomShelf"], out.bottomShelf);
     flag("consoleOpen", out.consoleOpen);
     number("consoleHeight", out.consoleHeight);
