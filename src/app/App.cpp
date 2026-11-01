@@ -1029,9 +1029,11 @@ int App::run() {
 // Input
 // ---------------------------------------------------------------------------
 
-void App::handleEvent(const SDL_Event& e) {
-    if (dropPenMouseEvent(e)) return; // pen side buttons are mapped in Tablet.cpp, not left to SDL
-    if (strayMouseMotion(e)) return;  // neither the canvas nor the UI follows a driver's stray mouse events
+void App::handleEvent(const SDL_Event& event) {
+    if (dropPenMouseEvent(event)) return; // pen side buttons are mapped in Tablet.cpp, not left to SDL
+    if (strayMouseMotion(event)) return;  // neither the canvas nor the UI follows a driver's stray mouse events
+    SDL_Event e = event;
+    mapPenPosition(e); // a tablet in mouse mode moves the cursor relatively (#54), for the canvas and the UI
     ImGui_ImplSDL3_ProcessEvent(&e);
     const ImGuiIO& io = ImGui::GetIO();
 
@@ -1173,7 +1175,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
             const SDL_Keymod keys = SDL_GetModState();
             drag_ = (keys & SDL_KMOD_SHIFT) ? Drag::Pan : ctrlDown(keys) ? Drag::Zoom : Drag::Orbit;
         } else if (maskMod && !(mod & SDL_KMOD_ALT) && previewLod_ < 0) {
-            drag_ = Drag::MaskCanvas; // click inverts, drag clears (or zooms without a mask)
+            drag_ = Drag::MaskCanvas; // click inverts, drag draws a mask rectangle (PanelMasking.cpp)
             maskCanvasX_ = x;
             maskCanvasY_ = y;
             maskCanvasMoved_ = false;
@@ -1369,6 +1371,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     strokeBrush_ = activeBrush();
     straight_ = {};
     straight_.shiftAtStart = (inputMods() & SDL_KMOD_SHIFT) != 0;
+    strokeAltSmooth_ = false;
     strokeInvert_ = invertToggle_ != (((inputMods() & SDL_KMOD_ALT) != 0) || (erasing() && eraserAction() == PenAction::Invert));
     // Shift still smooths geometry while the Paint brush is active (ZBrush behaviour).
     strokePaint_ = strokeBrush_ != BrushType::Smooth && (paintMode_ || paintRgb_);
@@ -1453,6 +1456,12 @@ void App::strokeTo(float x, float y) {
         pointerLatest_ = glm::vec2(x, y);
         pointerLatestAt_ = double(SDL_GetTicksNS()) * 1e-9;
         penPredictor_.add(pointerLatest_, pointerLatestAt_);
+    }
+    // ZBrush's alternate smooth (#40): Shift let go while the stroke it began goes on.
+    if (strokeBrush_ == BrushType::Smooth && straight_.shiftAtStart && !strokeAltSmooth_ && !strokeMask_ &&
+        !(inputMods() & SDL_KMOD_SHIFT)) {
+        strokeAltSmooth_ = true;
+        status_ = smoothKeepVolume_ ? "Smooth: plain (Shift let go)" : "Smooth: keeping volume (Shift let go)";
     }
     if (maskClickPending_) { // Ctrl+press on the model: a drag past the click slop paints the mask after all
         if (std::hypot(x - maskClickX_, y - maskClickY_) < 4.0f) return;
@@ -1617,6 +1626,7 @@ void App::dabAt(float x, float y, float pressure) {
                cam.worldPerPixel(hit.position, dabView_ ? dabView_->canvas.h : canvasHeight()) * dabRadiusScale_;
     // Smooth keeps its own Z Intensity (ZBrush), whether picked or held with Shift.
     p.strength = (st.brush == BrushType::Smooth ? st.smoothStrength : st.strength) * dabStrengthScale_;
+    p.keepVolume = st.brush == BrushType::Smooth && st.smoothKeepVolume;
     p.pressure = st.pressureStrength ? pressure : 1.0f;
     p.invert = st.invert;
     p.frontFacesOnly = st.frontFacesOnly;

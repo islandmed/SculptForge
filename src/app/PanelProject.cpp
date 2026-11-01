@@ -245,6 +245,7 @@ void App::storeProjectSettings() {
     brush.set("radius_px", double(radiusPx_));
     brush.set("strength", double(strength_));
     brush.set("smooth_strength", double(smoothStrength_));
+    brush.set("smooth_keep_volume", smoothKeepVolume_);
     brush.set("rgb_intensity", double(rgbIntensity_));
     brush.set("focal_shift", double(focalShift_));
     brush.set("invert", invertToggle_);
@@ -341,6 +342,7 @@ void App::applyProjectSettings() {
         rgbIntensity_ = std::clamp(rgbIntensity_, 0.0f, 1.0f);
         focalShift_ = std::clamp(focalShift_, -1.0f, 1.0f);
         readBool(b, "invert", invertToggle_);
+        readBool(b, "smooth_keep_volume", smoothKeepVolume_);
         readBool(b, "front_faces_only", frontFacesOnly_);
         readBool(b, "pressure_strength", pressureStrength_);
         readVec3(b["paint_color"], doc_.paintColor);

@@ -59,6 +59,9 @@ namespace {
 
 glm::vec3 projectOnPlane(const glm::vec3& v, const glm::vec3& n) { return v - n * glm::dot(v, n); }
 
+// Smooth's keep-volume steps (Sculptor::taubinShrink): Taubin's own values, pass band 1/lambda + 1/mu = 0.1.
+constexpr float kTaubinLambda = 0.6307f, kTaubinMu = -0.6732f;
+
 // --- Procedural 3D patterns (deterministic, so texture sticks to the surface) ---
 
 uint32_t hash3(int x, int y, int z) {
@@ -569,6 +572,8 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     const float strokeLen = glm::length(p.strokeDelta);
     const glm::vec3 strokeDir = strokeLen > 1e-12f ? p.strokeDelta / strokeLen : glm::vec3(0.0f);
     if (type == BrushType::Layer) prepareLayer(mesh, r * 0.08f * std::clamp(p.strength, 0.0f, 1.0f));
+    const bool keepVolume = type == BrushType::Smooth && p.keepVolume;
+    if (keepVolume) taubinShrink(mesh);
 
     scratch_.resize(verts_.size());
     // Each vertex's offset depends only on the positions before the dab (and, for Layer, on its own state).
@@ -592,6 +597,18 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
             auto ring = mesh.neighbors(v);
             if (ring.empty()) break;
             glm::vec3 avg(0.0f);
+            if (keepVolume) {
+                // The inflate half of the Taubin step, from the shrunk positions (neighbours outside the brush
+                // didn't shrink).
+                for (uint32_t n : ring) {
+                    const auto at = std::lower_bound(shrunkIndex_.begin(), shrunkIndex_.end(), std::make_pair(n, 0u));
+                    avg += at != shrunkIndex_.end() && at->first == n ? shrunk_[at->second] : pos[n];
+                }
+                avg /= static_cast<float>(ring.size());
+                const glm::vec3 q = shrunk_[i];
+                d = (q + kTaubinMu * (avg - q) - x) * std::min(1.0f, s * f);
+                break;
+            }
             for (uint32_t n : ring) avg += pos[n];
             avg /= static_cast<float>(ring.size());
             d = (avg - x) * std::min(1.0f, s * f);
@@ -688,6 +705,29 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
 
     displaceAll(mesh, verts_, scratch_);
     finishDab(mesh, bvh, clock);
+}
+
+// Taubin's lambda | mu smoothing ("A signal processing approach to fair surface design", 1995): a Laplacian step
+// forward (lambda), then a slightly larger one back (mu < -lambda). Bumps (high frequencies) shrink in both steps;
+// the large form (low frequencies) shrinks in the first and grows back in the second, so the volume stays.
+void Sculptor::taubinShrink(const Mesh& mesh) {
+    const auto& pos = mesh.positions;
+    shrunk_.resize(verts_.size());
+    shrunkIndex_.resize(verts_.size());
+    for (size_t i = 0; i < verts_.size(); ++i) shrunkIndex_[i] = {verts_[i], uint32_t(i)};
+    std::sort(shrunkIndex_.begin(), shrunkIndex_.end());
+    poolFor(verts_.size(), [&](size_t begin, size_t end) {
+        for (size_t i = begin; i < end; ++i) {
+            const uint32_t v = verts_[i];
+            auto ring = mesh.neighbors(v);
+            shrunk_[i] = pos[v];
+            if (ring.empty()) continue;
+            glm::vec3 avg(0.0f);
+            for (uint32_t n : ring) avg += pos[n];
+            avg /= static_cast<float>(ring.size());
+            shrunk_[i] += kTaubinLambda * (avg - pos[v]);
+        }
+    });
 }
 
 // The BVH after a mirror's dab moved (some of) the vertices its query returned, verts_ (the kernel ran since

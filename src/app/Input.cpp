@@ -98,7 +98,7 @@ void App::registerInputActions() {
     add("mask.all", "Mask All", ICON_LC_SQUARE, "Tool > Masking", "Ctrl+A", "Mask the whole visible SubTool.",
         [this] { runCommand("mask_all"); });
     add("mask.clear", "Clear Mask", ICON_LC_ERASER, "Tool > Masking", "Ctrl+Shift+A",
-        "Unmask everything (also: Ctrl+drag on the background).", [this] { runCommand("mask_clear"); });
+        "Unmask everything (also: Ctrl+drag on the background, away from the model).", [this] { runCommand("mask_clear"); });
     add("mask.invert", "Invert Mask", ICON_LC_FLIP_HORIZONTAL_2, "Tool > Masking", "Ctrl+I",
         "Mask what is unmasked and unmask what is masked (also: Ctrl+click the background).",
         [this] { runCommand("mask_invert"); });

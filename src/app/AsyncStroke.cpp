@@ -310,6 +310,7 @@ App::DabSettings App::dabSettings() const {
     st.radiusPx = radiusPx_;
     st.strength = strength_;
     st.smoothStrength = smoothStrength_;
+    st.smoothKeepVolume = smoothKeepVolume_ != strokeAltSmooth_;
     st.focal = focalShift_;
     st.maskStrength = maskStrength_;
     st.sprayScatter = sprayScatter_;

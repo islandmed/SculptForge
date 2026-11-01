@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <string>
 
 namespace sf {
 
@@ -26,6 +27,8 @@ bool ctrlDown(SDL_Keymod mod) { return (mod & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) !=
 bool anyMasked(const Mesh& mesh) {
     return std::any_of(mesh.mask.begin(), mesh.mask.end(), [](float m) { return m > 0.0f; });
 }
+
+std::string symmetryAxes(const Symmetry& s) { return std::string(s.x ? "x" : "") + (s.y ? "y" : "") + (s.z ? "z" : ""); }
 
 } // namespace
 
@@ -62,14 +65,20 @@ void App::maskClickRelease() {
     if (anyMasked(doc_.mesh)) runCommand(sharpen ? "mask_sharpen" : "mask_blur");
 }
 
-// ZBrush convention: Ctrl+drag on the background clears the mask. With nothing masked the SculptForge input
-// style zooms instead, as it did before masking existed; the ZBrush style does nothing.
+// ZBrush convention: Ctrl+drag on the background with MaskPen draws a mask rectangle (#48) that masks what it
+// covers, and clears the mask when it covers none of the model. With nothing masked the SculptForge input style
+// zooms instead, as it did before masking existed.
 void App::maskCanvasMove(float x, float y) {
     if (maskCanvasMoved_) return;
     if (std::hypot(x - maskCanvasX_, y - maskCanvasY_) < kMaskDragThresholdPx) return;
     maskCanvasMoved_ = true;
-    if (anyMasked(doc_.mesh)) runCommand("mask_clear");
-    else if (uiPrefs_.inputStyle == 1) drag_ = Drag::Zoom;
+    if (uiPrefs_.inputStyle == 1 && !anyMasked(doc_.mesh)) {
+        drag_ = Drag::Zoom;
+        return;
+    }
+    // (MaskLasso and MaskRect draw their own shape from the press on: maskSelectMouseDown.)
+    beginSelection(maskCanvasX_, maskCanvasY_, SelectTarget::Mask, SelectShape::Rect);
+    selectionMove(x, y);
 }
 
 void App::maskCanvasRelease() {
@@ -87,14 +96,22 @@ bool App::maskSelectMouseDown(float x, float y, SDL_Keymod mod) {
 void App::maskSelectMouseUp() {
     const bool alt = (inputMods() & SDL_KMOD_ALT) != 0;
     if (!selectMoved_) {
-        // A click on the background inverts the mask, as with MaskPen; on the model it does nothing.
+        // A click on the background inverts the mask, as with MaskPen; on the model it blurs the mask (Alt:
+        // sharpens it), as with MaskPen and as in ZBrush whichever mask brush is picked (#51).
         doc_.syncBvh();
         RayHit hit;
-        if (!alt && !pick(selectPath_.front().x, selectPath_.front().y, hit)) runCommand("mask_invert");
+        if (!pick(selectPath_.front().x, selectPath_.front().y, hit)) {
+            if (!alt) runCommand("mask_invert");
+        } else if (anyMasked(doc_.mesh) && !blenderStyle()) {
+            runCommand(alt ? "mask_sharpen" : "mask_blur");
+        }
         return;
     }
-    // Mask the inside, or unmask it with Alt (Mask Strength sets how much).
-    runSelection("mask_rect", "mask_lasso", {{"unmask", alt}, {"strength", double(maskStrength_)}});
+    // Mask the inside, or unmask it with Alt (Mask Strength sets how much), mirrored by the symmetry like a mask
+    // stroke (#51). A shape that covers none of the model clears the mask instead (ZBrush).
+    runSelection("mask_rect", "mask_lasso",
+                 {{"unmask", alt}, {"strength", double(maskStrength_)}, {"symmetry", symmetryAxes(symmetry_)},
+                  {"clear_outside", !alt}});
 }
 
 App::HeldBrush App::heldBrush() const {
