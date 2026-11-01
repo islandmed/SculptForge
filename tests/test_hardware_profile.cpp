@@ -382,7 +382,7 @@ TEST(hw_calibration_json_schema) {
     CHECK(parsed["schema"].asString() == kCalibrationSchema);
     CHECK(parsed["profile"].asString() == "Laptop");
     CHECK(parsed["tier_config"]["zero_copy_uma"].asBool());
-    CHECK(parsed["tier_config"]["draft_brush_mode"].asBool());
+    CHECK(!parsed["tier_config"]["draft_brush_mode"].asBool()); // draft brushes only on battery or Software
     CHECK(parsed["hardware"]["gpu_kind"].asString() == "unified");
     CHECK(parsed["settings"]["render_triangle_budget"].asNumber() > 0);
     CHECK(!parsed["network"].asBool());
@@ -679,12 +679,12 @@ TEST(governor_target_120) {
 }
 
 TEST(hw_tier_config) {
-    // Laptop / Budget: 2M active triangles, draft brushes, a quarter of the RAM for caches.
+    // Laptop / Budget: 2M active triangles, continuous brushes on mains, a quarter of the RAM for caches.
     const HardwareProfile laptop = mapProfile(machine("Intel", "Mesa Intel(R) Xe Graphics (TGL GT2)", 0, 16384, 8), measured(400.0, 4.0));
     TierConfig c = tierConfigFor(laptop, PowerSource::AC, 60);
     CHECK(c.tier == ProfileTier::Laptop);
     CHECK(c.activeTriangleBudget == 2'000'000);
-    CHECK(c.draftBrushMode);
+    CHECK(!c.draftBrushMode);
     CHECK(c.residentCacheCapMB == 4096);
     CHECK(c.zeroCopyUMA); // an integrated GPU shares the memory
     CHECK(c.targetHz == 60);
