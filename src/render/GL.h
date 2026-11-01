@@ -147,6 +147,7 @@ constexpr GLbitfield GL_COLOR_BUFFER_BIT = 0x4000;
     X(void, UseProgram, GLuint)                                                              \
     X(GLint, GetUniformLocation, GLuint, const GLchar*)                                      \
     X(void, UniformMatrix4fv, GLint, GLsizei, GLboolean, const GLfloat*)                     \
+    X(void, UniformMatrix3fv, GLint, GLsizei, GLboolean, const GLfloat*)                     \
     X(void, Uniform3fv, GLint, GLsizei, const GLfloat*)                                      \
     X(void, Uniform4fv, GLint, GLsizei, const GLfloat*)                                      \
     X(void, DrawElements, GLenum, GLsizei, GLenum, const void*)                              \
@@ -171,6 +172,7 @@ constexpr GLbitfield GL_COLOR_BUFFER_BIT = 0x4000;
     X(void, RenderbufferStorage, GLenum, GLenum, GLsizei, GLsizei)                           \
     X(void, RenderbufferStorageMultisample, GLenum, GLsizei, GLenum, GLsizei, GLsizei)       \
     X(void, BlitFramebuffer, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLbitfield, GLenum) \
+    X(void, FramebufferTexture2D, GLenum, GLenum, GLenum, GLuint, GLint)                    \
     X(void, TexBuffer, GLenum, GLenum, GLuint)                                               \
     X(void, VertexAttribIPointer, GLuint, GLint, GLenum, GLsizei, const void*)               \
     X(void, VertexAttribDivisor, GLuint, GLuint)                                             \

@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Polypaint.h"
+#include "core/Uv.h"
 #include "core/MapExport.h"
 
 #include "core/Commands.h"
@@ -403,6 +404,7 @@ void registerPaintCommands(CommandRegistry& registry) {
                   }});
     registerPaintLayerCommands(registry); // paint_layer_* (core/PaintLayer.cpp)
     registerTextureCommands(registry);    // texture_*, uv_auto, paint_target (core/TextureCommands.cpp)
+    registerUvCommands(registry);         // uv_unwrap, uv_pack, uv_seam, uv_select, ... (core/UvCommands.cpp)
     registerTextureChannelCommands(registry); // texture_channels, paint_material, channel_view (core/TextureChannelCommands.cpp)
     registerMapExportCommands(registry);      // export_maps (core/MapExport.cpp)
 }

@@ -101,6 +101,21 @@ struct TextureStackUndo {
     size_t bytes() const;
 };
 
+// The UVs and UV flags (seams, pins; core/Uv.h) before a UV edit. capture() holds the whole arrays; commit()
+// (with the mesh after the edit) keeps only the corners that changed when that is smaller. Applying swaps them
+// with the mesh's, so the record then holds the inverse.
+struct UvUndo {
+    bool sparse = false;
+    std::vector<glm::vec2> uvs;      // whole: the old array (empty = the mesh had none)
+    std::vector<uint8_t> flags;      // whole: the old flags (empty = none)
+    UndoChannel<glm::vec2> uvCorners; // sparse: old UVs of changed corners
+    UndoChannel<uint8_t> flagCorners; // sparse: old flags of changed corners
+    static std::unique_ptr<UvUndo> capture(const Mesh& mesh);
+    void commit(const Mesh& mesh);
+    void swapWith(Mesh& mesh);
+    size_t bytes() const;
+};
+
 // The Selection Sets list before a set was stored, renamed, deleted or picked as the Morph target
 // (core/SelectionSets.h); applying swaps it with the mesh's. Sets are immutable and shared, so this holds pointers.
 struct SelectionSetsUndo {
@@ -154,6 +169,7 @@ struct UndoRecord {
     std::unique_ptr<SubdivUndo> subdiv;
     std::unique_ptr<TopologyUndo> topology;
     std::shared_ptr<SubtoolStep> subtool; // (shared: SubtoolStep is defined in core/Document.h)
+    std::unique_ptr<UvUndo> uv;           // UVs, seams and pins (UV Editor, core/Uv.h)
     std::unique_ptr<MicroUndo> micro;     // micro-displacement tiles of a stroke, or a micro level added / removed (core/Micro.h)
     UndoChannel<glm::vec2> uvs;           // per corner (index = triangle * 3 + corner)
     std::unique_ptr<SelectionSetsUndo> sets;
@@ -161,7 +177,7 @@ struct UndoRecord {
     bool empty() const {
         return positions.empty() && mask.empty() && colors.empty() && paintAlpha.empty() && hidden.empty() &&
                polygroups.empty() && !mesh && !paint && !textureTiles && !texture && !subdiv && !topology && !subtool && !micro &&
-               uvs.empty() && !sets;
+               uvs.empty() && !sets && !uv;
     }
     size_t approxBytes() const;
 

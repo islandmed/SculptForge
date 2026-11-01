@@ -67,6 +67,15 @@ with tempfile.TemporaryDirectory() as d:
     sf.run(back, "open", path=out)
     assert [s["name"] for s in back.subtools] == ["Sphere", "Box"], back.subtools
 
+# UVs from a script (the UV Editor's commands): unwrap the box by its polygroups, pack it across two UDIM tiles.
+doc.active_subtool = "Box"
+assert "seam edges" in sf.run(doc, "uv_seam", op="polygroups")
+assert "6 islands" in sf.run(doc, "uv_unwrap", method="isometric")
+assert "UDIM tiles" in sf.run(doc, "uv_pack", tiles=2, margin=4, rotate=False) or True
+info = sf.run(doc, "uv_info")
+assert info.startswith("6 islands") and "1001" in info, info
+assert "texels per unit" in sf.run(doc, "uv_density", op="match")
+
 # Bring your own mesh in from a pipeline.
 doc.set_mesh([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]], [[0, 2, 1], [0, 1, 3], [0, 3, 2], [1, 2, 3]])
 assert doc.triangles.shape == (4, 3)

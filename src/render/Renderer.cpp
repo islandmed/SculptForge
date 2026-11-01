@@ -348,8 +348,11 @@ uniform vec2 uProjScale; // projection x and y scale
 uniform vec3 uBaseColor;
 uniform int uPaint;      // 1: vertex colours replace the base colour
 uniform int uShowMask;   // 1: darken masked areas
-uniform int uGroups;     // 0: off, 1: per-triangle ids from uGroupIds, 2: everything is group 0
+uniform int uGroups;     // 0: off, 1: per-triangle ids from uGroupIds, 2: everything is group 0, 3: per-triangle
+                         // colours (0xBBGGRR) from uGroupIds (the UV Editor's overlay)
 uniform usamplerBuffer uGroupIds;
+uniform int uChecker;        // 1: a checker on the UVs (TEXTURED), tinted per UDIM tile
+uniform float uCheckerScale; // checker squares per UV unit
 uniform int uMatcap;          // 1: shade with the matcap texture instead of the studio lights
 uniform sampler2D uMatcapTex; // sRGB-encoded lit sphere (core/Matcap.h)
 uniform vec2 uMatcapCavity;   // crease darkening, ridge lift (sf::matcapCavity)
@@ -373,6 +376,19 @@ vec3 groupColor(uint id) {
     vec3 rgb = clamp(abs(fract(hue + vec3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0) - 1.0, 0.0, 1.0);
     return val * mix(vec3(1.0), rgb, sat);
 }
+vec3 faceColor(uint c) {
+    return pow(vec3(float(c & 255u), float((c >> 8) & 255u), float((c >> 16) & 255u)) / 255.0, vec3(2.2));
+}
+// The UV checker: light and dark squares, the whole tile tinted by its UDIM number so tiles tell apart.
+vec3 checkerColor(vec2 uv) {
+    vec2 cell = floor(uv * uCheckerScale);
+    float odd = mod(cell.x + cell.y, 2.0);
+    vec2 tile = floor(uv);
+    float hue = fract(0.13 + 0.37 * (tile.x + 10.0 * tile.y));
+    vec3 tint = clamp(abs(fract(hue + vec3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0) - 1.0, 0.0, 1.0);
+    vec3 light = mix(vec3(0.86), tint, 0.18), dark = mix(vec3(0.16), tint * 0.45, 0.35);
+    return mix(light, dark, odd);
+}
 // The unit vector from the pixel's point towards the eye, in view space.
 vec3 viewRay() {
     vec2 ndc = (gl_FragCoord.xy - uViewport.xy) / uViewport.zw * 2.0 - 1.0;
@@ -385,15 +401,18 @@ void main() {
     vec3 albedo = uBaseColor;
     vec3 tint = vec3(1.0); // multiplies a matcap: polypaint or polygroup colours
 #ifdef PRIM
-    if (uGroups == 1) albedo = tint = groupColor(texelFetch(uGroupIds, vPrimBase + gl_PrimitiveID).r);
+    if (uGroups == 3) albedo = tint = faceColor(texelFetch(uGroupIds, vPrimBase + gl_PrimitiveID).r);
+    else if (uGroups == 1) albedo = tint = groupColor(texelFetch(uGroupIds, vPrimBase + gl_PrimitiveID).r);
     else
 #endif
-    if (uGroups != 0) albedo = tint = groupColor(0u);
+    if (uGroups == 2 || uGroups == 1) albedo = tint = groupColor(0u);
     else if (uPaint == 1) albedo = tint = V_COLOR;
 #if defined(NORMALMAP)
-    if (uGroups == 0 && uHasPaint == 1) albedo = tint = (uPaint == 1 ? V_COLOR : vec3(1.0)) * texture(uPaintTex, vUv).rgb;
+    if (uChecker == 1) albedo = tint = (uGroups == 3 ? albedo : vec3(1.0)) * checkerColor(vUv);
+    else if (uGroups == 0 && uHasPaint == 1) albedo = tint = (uPaint == 1 ? V_COLOR : vec3(1.0)) * texture(uPaintTex, vUv).rgb;
 #elif defined(TEXTURED)
-    if (uGroups == 0) albedo = tint = (uPaint == 1 ? V_COLOR : vec3(1.0)) * texture(uPaintTex, vUv).rgb;
+    if (uChecker == 1) albedo = tint = (uGroups == 3 ? albedo : vec3(1.0)) * checkerColor(vUv);
+    else if (uGroups == 0) albedo = tint = (uPaint == 1 ? V_COLOR : vec3(1.0)) * texture(uPaintTex, vUv).rgb;
 #endif
 #ifdef FLAT
     // The triangle's own normal, from its plane's screen-space slopes, turned towards the viewer: a back face (seen
@@ -724,6 +743,8 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     p.hasPaint = at("uHasPaint");
     p.normalFlipY = at("uNormalFlipY");
     p.twoSided = at("uTwoSided");
+    p.checker = at("uChecker");
+    p.checkerScale = at("uCheckerScale");
     p.ghostGroups = at("uGhostGroups");
     p.ghostRange = at("uGhostRange");
     p.ghostEdge = at("uGhostEdge");
@@ -1146,7 +1167,9 @@ void Renderer::syncScene(const std::vector<SceneMesh>& scene) {
     drawList_.clear();
     for (const SceneMesh& m : scene) {
         if (!m.visible || !m.mesh) continue; // hidden: keeps its dirty state until shown
-        sync(slot(m.id), *m.mesh, m.normalMap, m.wireframe && m.active);
+        MeshSlot& ms = slot(m.id);
+        ms.overlay = m.active ? m.overlay : nullptr;
+        sync(ms, *m.mesh, m.normalMap, m.wireframe && m.active);
         drawList_.push_back({m.id, m.active, m.flat});
     }
 }
@@ -1306,7 +1329,8 @@ void Renderer::uploadIndices(MeshSlot& s, const Mesh& mesh) {
 void Renderer::uploadFaces(MeshSlot& s, const Mesh& mesh, bool wantUvs, bool indicesDone) {
     const size_t nt = mesh.triangleCount();
     const bool hidden = mesh.hidden.size() == nt && nt > 0;
-    const bool groups = mesh.polygroups.size() == nt && nt > 0;
+    const bool overlay = s.overlay && s.overlay->colors.size() == nt && nt > 0;
+    const bool groups = (mesh.polygroups.size() == nt || overlay) && nt > 0;
     const auto clusters = s.order.clusters();
     const size_t nc = clusters.size();
     s.primBase.assign(nc, 0);
@@ -1354,13 +1378,15 @@ void Renderer::uploadFaces(MeshSlot& s, const Mesh& mesh, bool wantUvs, bool ind
     visibleGroups_.resize(groups ? drawn : 0);
     if (groups)
         poolFor(drawn, [&](size_t b, size_t e) {
-            for (size_t i = b; i < e; ++i) visibleGroups_[i] = mesh.polygroups[drawnTris[i]];
+            for (size_t i = b; i < e; ++i) visibleGroups_[i] = overlay ? s.overlay->colors[drawnTris[i]] : mesh.polygroups[drawnTris[i]];
         }, 1 << 16);
     s.hasGroups = groups && !visibleGroups_.empty() && visibleGroups_.size() <= size_t(std::max(maxTexels, 0));
+    s.overlayColors = overlay && s.hasGroups;
+    s.overlaySerial = s.overlay ? s.overlay->serial : 0;
     s.bytes[5] = 0;
     if (s.hasGroups) {
         // 16 bits per triangle when every id fits (nearly always).
-        const bool small = *std::max_element(visibleGroups_.begin(), visibleGroups_.end()) <= 0xFFFFu;
+        const bool small = !overlay && *std::max_element(visibleGroups_.begin(), visibleGroups_.end()) <= 0xFFFFu;
         gl::BindBuffer(GL_TEXTURE_BUFFER, s.groupData);
         if (small) {
             std::vector<uint16_t> ids(visibleGroups_.size());
@@ -1832,7 +1858,8 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     if (normalMap && (!normalMap->rgb || !normalMap->tangents || normalMap->tangents->size() != mesh.uvs.size() ||
                       !mesh.hasUvs() || normalMap->rgb->size() != size_t(normalMap->width) * size_t(normalMap->height) * 3))
         normalMap = nullptr; // made for another mesh
-    const bool wantUvs = hasTexture(mesh) || normalMap;
+    const bool wantUvs = hasTexture(mesh) || normalMap || (s.overlay && s.overlay->checker);
+    const bool overlayChanged = (s.overlay ? s.overlay->serial : 0) != s.overlaySerial;
     // Dynamic topology changes topology a little at a time: patches (notePatches) instead of a full upload,
     // until there are too many of them.
     const bool patched = !s.patches.empty() || !mesh.changedTriangles.empty();
@@ -1921,7 +1948,7 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
             s.bytes[0] = s.bytes[1] = 0;
         }
     }
-    if (!full && (mesh.facesDirty || wantUvs != s.hasUvs)) uploadFaces(s, mesh, wantUvs);
+    if (!full && (mesh.facesDirty || wantUvs != s.hasUvs || overlayChanged)) uploadFaces(s, mesh, wantUvs);
     if (wireframe && !s.linesValid && !s.outOfMemory) buildLines(s, mesh);
     // Small meshes draw in full while the view moves too (their proxy would save little).
     constexpr size_t kProxyMinTriangles = size_t(1) << 18;
@@ -2489,15 +2516,19 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
         drawMicro(s, active, flat, settings);
         return;
     }
+    // The UV Editor's checker on the model.
+    const bool checker = active && s.hasUvs && s.overlay && s.overlay->checker;
     // A painted texture shows through the textured program (polypaint still multiplies it).
-    const bool textured = s.hasUvs && s.paintTexture && settings.showPolypaint && settings.showTexture;
+    const bool textured = s.hasUvs && ((s.paintTexture && settings.showPolypaint && settings.showTexture) || checker);
     // A baked normal map preview bends the shading normal (core/Bake.h).
     const bool normalMapped = s.hasUvs && s.normalTexture && s.hasTangents;
-    const int groups = active && settings.showPolygroups ? (s.hasGroups ? 1 : 2) : 0;
+    const int groups = active && s.overlayColors                 ? 3
+                       : active && settings.showPolygroups && !s.overlayColors ? (s.hasGroups ? 1 : 2)
+                                                                               : 0;
     // (Not through the textured program's geometry shader: those meshes are sculpted without the preview.)
     const bool ghost = active && s.id == ghostId_ && !ghost_.empty() && !settings.motionProxy && !textured && !normalMapped;
-    const int features = (s.hasColors || s.hasMask ? kPaint : 0) | (groups == 1 ? kPrim : 0) | (textured ? kTextured : 0) |
-                         (normalMapped ? kNormalMap : 0) | (flat ? kFlat : 0);
+    const int features = (s.hasColors || s.hasMask ? kPaint : 0) | (groups == 1 || groups == 3 ? kPrim : 0) |
+                         (textured ? kTextured : 0) | (normalMapped ? kNormalMap : 0) | (flat ? kFlat : 0);
     const MeshProgram* p = meshProgram(features);
     if (!p) return;
     const auto bind = [&](const MeshProgram* p) {
@@ -2540,6 +2571,8 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     gl::Uniform1i(p->groups, groups);
     gl::Uniform1i(p->dim, !active && settings.dimInactive ? 1 : 0);
     gl::Uniform1i(p->twoSided, 1);
+    gl::Uniform1i(p->checker, checker ? 1 : 0);
+    gl::Uniform1f(p->checkerScale, checker ? s.overlay->checkerScale : 8.0f);
     };
     bind(p);
     gl::BindVertexArray(s.vao);

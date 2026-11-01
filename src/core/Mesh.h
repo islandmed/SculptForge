@@ -102,6 +102,9 @@ public:
     std::vector<uint8_t> hidden;
     // Per triangle corner (3 per triangle, in triangle order): texture coordinates.
     std::vector<glm::vec2> uvs;
+    // Per triangle corner (empty = none): UV editing flags (core/Uv.h), kUvSeam on the edge from this corner to
+    // the next (a marked seam, kept on both sides of the edge) and kUvPin (the corner's UV stays put on Unwrap).
+    std::vector<uint8_t> uvFlags;
     // Per triangle: the triangle it forms a quad with (kNoQuad = a plain triangle; empty = no quads). Imported
     // quads are split into two triangles that keep each other here, so the wireframe and the exporters can
     // show and write them as quads again. Pairs are symmetric and share one edge, wound oppositely;
@@ -114,6 +117,7 @@ public:
     bool hasPolygroups() const { return !polygroups.empty(); }
     bool hasHidden() const { return !hidden.empty(); }
     bool hasUvs() const { return !uvs.empty(); }
+    bool hasUvFlags() const { return !uvFlags.empty(); }
     bool hasQuads() const { return !quadPartners.empty(); }
 
     float maskAt(uint32_t v) const { return mask.empty() ? 0.0f : mask[v]; }

@@ -16,6 +16,23 @@ All notable changes to SculptForge are listed here. The format follows
   `stroke`, `vdm_stamp`, `mask_rect`, `mask_lasso`, `hide_rect`, `hide_lasso`, `insert_primitive` and `insert_mesh`.
 - **Preferences > Interface > Timeline position** (#63): the Sculpt Timeline strip at the top of the viewport (the
   new default, away from the brush shelf) or at the bottom; Store Config keeps it.
+- **UV Editor** (Tool > Texture Map > UV Editor, Alt+U): a window with the active Part's UV layout over the UDIM
+  tile grid, drawn on the GPU (pan, zoom, a checker or the painted texture behind). Select vertices, edges, faces or
+  islands (1-4) by click or box, or on the model with **Select in 3D**; move, rotate and scale with the selection's
+  handles or G / R / S (X / Y lock an axis, Ctrl snaps). **Seam Tool**: drag on the model to mark seams along the
+  shortest edge paths (Alt clears); seams also from face groups, island borders or sharp edges, and show in red on
+  the model. **Unwrap**: Least Stretch (LSCM, then as-rigid-as-possible), Conformal (LSCM), By Face Groups, Planar,
+  Unfold Islands (keeps pins) and Auto Seams (xatlas), solved with a multigrid preconditioner (a 1.3M-triangle
+  sphere unwraps in seconds); closed, looped and tangled pieces get cut automatically; selected faces unwrap in
+  place. **Pack** into one tile or across UDIM tiles with a margin, rotation and equal texel density, by island
+  outline or box (whichever fits larger), or at a fixed texel density spilling into more tiles. **Texel density**:
+  set, match and pick, with a density heat map. **Trim sheets**: lay islands into horizontal strips (count, heights
+  or v ranges), fitted to the width or keeping proportions. **Pin**, **Weld**, **Split**, **Straighten**, **Flip**,
+  **Rotate 90**. The model shows islands, stretch or density colours and a UDIM-tinted checker live during edits, and
+  **Paint stays on the model** re-projects a painted texture (every layer) onto each new layout in the same undo
+  step. Seams and pins are saved in projects. Commands: `uv_unwrap`, `uv_pack`, `uv_seam`, `uv_select`,
+  `uv_transform`, `uv_edit`, `uv_density`, `uv_trim`, `uv_info` (scripts, CLI, Python, MCP); guide chapter UV
+  Editor.
 - **Preferences > Input > Start strokes off the model** (#62, off by default) and **Toggle strokes off the model**
   (<kbd>Shift</kbd>+<kbd>L</kbd>): a left-drag that starts on the background begins a stroke, which touches the model
   once the cursor reaches it (Lazy Stroke and the stroke path start there, so nothing jumps). Ctrl (mask) and Shift

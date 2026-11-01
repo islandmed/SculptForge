@@ -18,6 +18,16 @@ chapter opens by itself the first time you start a new version; you can always f
 - **Sets for pipelines**: `selection_set_*` commands for scripts, `sculptforge-cli` and the AI assistant,
   `doc.selection_set()` / `doc.set_selection_set()` in Python, `.sfsets` files to move sets between Parts and
   scenes, and USD exports that carry them as GeomSubsets and primvars (read back on import).
+- **UV Editor** (**Tool > Texture Map > UV Editor**, <kbd>Alt</kbd>+<kbd>U</kbd>): the Part's UVs flat over the UDIM
+  tiles, drawn by the graphics card so a million triangles stay smooth. Draw seams on the model with the **Seam
+  Tool** (or take them from face groups, island borders or sharp edges), then **Unwrap**: **Least Stretch**,
+  **Conformal**, **By Face Groups**, **Planar**, **Unfold Islands** or **Auto Seams**, with closed and tangled pieces
+  cut for you. **Pack** into one tile or across UDIM tiles, **Set** and **Match** texel density, lay islands into
+  **trim sheet** strips, and select vertices, edges, faces or islands (in the view or on the model) to move, rotate,
+  scale, pin, weld, split, straighten and flip them. The model shows stretch, texel density, islands and a checker
+  live while you edit, and a painted texture moves with every change so the model keeps its look. Every step is one
+  undo step and a `uv_*` command for scripts. See [UV Editor](uv-editor.md).
+
 - **Fixed: the viewport on some Windows PCs** (#29): on displays whose window uses another colour format (seen with
   NVIDIA and high-resolution screens) the model never appeared and the cursor left trails. The view now reaches the
   window on every format, and falls back to drawing directly if a driver still refuses.

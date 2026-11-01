@@ -172,6 +172,12 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Zoom in | <kbd>Numpad Plus</kbd> | Move the view closer. |
 | Zoom out | <kbd>Numpad Minus</kbd> | Move the view back. |
 
+### UV Editor
+
+| Action | Keys | What it does |
+|---|---|---|
+| UV Editor | <kbd>Alt</kbd>+<kbd>U</kbd> | Open the UV Editor: the Part's UV layout in 2D over the UDIM tiles. Select vertices, edges, faces or islands (here or on the model), move, rotate and scale them, mark seams, unwrap, pack, set texel density and lay islands into trim sheet strips. Stretch and texel density show live on the model while you edit. |
+
 <!-- END GENERATED: shortcuts -->
 
 ## Mouse and pen gestures
