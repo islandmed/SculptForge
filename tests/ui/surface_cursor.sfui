@@ -1,0 +1,51 @@
+# The brush cursor follows the surface (#25): over the model the ring lies on it, turned to the surface and
+# pressed onto its shape, at the brush's real size there; off the model it is the flat screen ring. A preference
+# in Preferences > Input (on by default), kept by Store Config.
+run new_head
+camera 35 10
+key f
+expect_value cursor_follows_surface == 1
+
+# On the cheek, seen at an angle: the ring lies on the surface.
+hover_model 0.62 0.55
+expect_value surface_cursor == 1
+shot on-surface
+
+# From the front with X symmetry (on by default): the mirrored ring shows, fainter, on the other cheek.
+camera 0 0
+key f
+hover_model 0.3 0.55
+expect_value surface_cursor == 1
+shot symmetry
+camera 35 10
+key f
+
+# A bigger brush: the ring wraps around the curve.
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+hover_model 0.6 0.4
+expect_value surface_cursor == 1
+shot on-surface-big
+
+# Off the model: the flat screen ring.
+hover_window 0.68 0.5
+expect_value surface_cursor == 0
+shot off-surface
+
+# Preferences > Input turns it off.
+click "Preferences##palette.preferences"
+click "Input##preferences.input"
+expect "Cursor follows surface##input.surface_cursor"
+click "Cursor follows surface##input.surface_cursor"
+expect_value cursor_follows_surface == 0
+key escape
+hover_model 0.6 0.4
+expect_value surface_cursor == 0
+shot flat-ring

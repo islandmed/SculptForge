@@ -17,7 +17,7 @@
   <meta property="og:url" content="https://sculptforge.app/">
   <link rel="canonical" href="https://sculptforge.app/">
   <script type="application/ld+json">
-  {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "SculptForge", "url": "https://sculptforge.app/", "applicationCategory": "MultimediaApplication", "applicationSubCategory": "3D sculpting", "operatingSystem": "Windows 10, Windows 11, macOS, Linux", "softwareVersion": "0.9.7", "description": "Free, open-source digital sculpting: an alternative to ZBrush and Mudbox for VFX, animation and game studios.", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "downloadUrl": "https://github.com/islandmed/SculptForge/releases/latest", "image": "https://sculptforge.app/img/social-preview.png?v=3", "sameAs": ["https://github.com/islandmed/SculptForge"]}
+  {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "SculptForge", "url": "https://sculptforge.app/", "applicationCategory": "MultimediaApplication", "applicationSubCategory": "3D sculpting", "operatingSystem": "Windows 10, Windows 11, macOS, Linux", "softwareVersion": "0.10.1", "description": "Free, open-source digital sculpting: an alternative to ZBrush and Mudbox for VFX, animation and game studios.", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "downloadUrl": "https://github.com/islandmed/SculptForge/releases/latest", "image": "https://sculptforge.app/img/social-preview.png?v=3", "sameAs": ["https://github.com/islandmed/SculptForge"]}
   </script>
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="style.css?v=17">
@@ -66,16 +66,17 @@
           </ul>
         </div>
         <figure class="hero-video">
-          <video id="hero-video" poster="media/poster-showcase.jpg?v=3" autoplay muted loop playsinline preload="metadata"
+          <video id="hero-video" poster="media/poster-showcase.jpg?v=4" autoplay muted loop playsinline preload="metadata"
                  aria-label="Weathering a detailed lion head and turning it to stone in SculptForge">
-            <source src="media/showcase-mobile.mp4?v=3" type="video/mp4" media="(max-width: 620px)">
-            <source src="media/showcase.mp4?v=3" type="video/mp4">
+            <source src="media/showcase-mobile.mp4?v=4" type="video/mp4" media="(max-width: 620px)">
+            <source src="media/showcase-4k.mp4?v=4" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
+            <source src="media/showcase.mp4?v=4" type="video/mp4">
           </video>
           <script>
             if (matchMedia("(max-width: 620px)").matches)
-              document.getElementById("hero-video").poster = "media/poster-showcase-mobile.jpg?v=3";
+              document.getElementById("hero-video").poster = "media/poster-showcase-mobile.jpg?v=4";
           </script>
-          <figcaption>Real recording of SculptForge, scripted demo at 1080p.</figcaption>
+          <figcaption>Real recording of SculptForge, scripted demo rendered at 4K.</figcaption>
         </figure>
       </div>
     </section>
@@ -97,10 +98,18 @@
     <section id="whats-new" class="section alt">
       <div class="wrap">
         <h2>What's new in 0.9</h2>
-        <p class="section-lede">New in 0.9.7: faster big brushes on dense meshes and a right-click QuickMenu. New in 0.9.6: Extract, Mirror And Weld and a Flatpak. New in 0.9.5: ZSpheres, Blender keys, flat shading, your own MatCaps and SpaceMouse support. New in 0.9.4: Soft Clay grey exports and self-updating AppImages. New in 0.9.3: a cleaner look, made for reading your sculpt. Before that, maquette to performance: scan a clay maquette with your phone, sculpt on the scan,
+        <p class="section-lede">New in 0.10: micro levels for hundreds of millions of polygons, material painting (PBR), the Sculpt Timeline and a built-in benchmark. New in 0.9.7: faster big brushes on dense meshes and a right-click QuickMenu. New in 0.9.6: Extract, Mirror And Weld and a Flatpak. New in 0.9.5: ZSpheres, Blender keys, flat shading, your own MatCaps and SpaceMouse support. New in 0.9.4: Soft Clay grey exports and self-updating AppImages. New in 0.9.3: a cleaner look, made for reading your sculpt. Before that, maquette to performance: scan a clay maquette with your phone, sculpt on the scan,
           give the head its facial shapes and drive them with your own face. <a href="guide/whats-new.html">Everything that changed</a> ·
           <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">changelog</a></p>
         <div class="grid">
+          <article class="card">
+            <h3>Hundreds of millions of polygons, material painting <small>new in 0.10</small></h3>
+            <p><strong>Micro levels</strong> sculpt about a billion triangles in under 2 GB of memory. Paint roughness,
+              metal, normal and height alongside colour and export maps for Unreal, Unity, glTF and Godot. Scrub back
+              through every stroke in the <strong>Sculpt Timeline</strong>, run <strong>Help &gt; Benchmark</strong> on your
+              own machine, and get Maya navigation, focal length and more primitives.
+              <a href="guide/whats-new.html">What's new</a></p>
+          </article>
           <article class="card">
             <h3>Faster big brushes, right-click QuickMenu <small>new in 0.9.7</small></h3>
             <p>On a 21-million-triangle model a 200-pixel brush now takes a third less time per frame, trails the pen
@@ -448,7 +457,10 @@ rez-env sculptforge -- sculptforge troll.usda \
         </div>
 
         <div class="demo">
-          <video aria-label="Sculpting a snarl on a lion as a blend shape, generating LODs and sending to Unreal" src="media/game-ready.mp4?v=3" poster="media/poster-game-ready.jpg?v=3" muted loop playsinline preload="none" data-inview tabindex="0"></video>
+          <video aria-label="Sculpting a snarl on a lion as a blend shape, generating LODs and sending to Unreal" poster="media/poster-game-ready.jpg?v=4" muted loop playsinline preload="none" data-inview tabindex="0">
+            <source src="media/game-ready-4k.mp4?v=4" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
+            <source src="media/game-ready.mp4?v=4" type="video/mp4">
+          </video>
           <div>
             <h3>Blend shapes, LODs and Unreal</h3>
             <p>Sculpt a snarl on its own layer and play it back. Generate a LOD chain in one click: even the
@@ -458,7 +470,10 @@ rez-env sculptforge -- sculptforge troll.usda \
         </div>
 
         <div class="demo reverse">
-          <video aria-label="Converting between a sculpt and Gaussian splats" src="media/splats.mp4?v=2" poster="media/poster-splats.jpg?v=2" muted loop playsinline preload="none" data-inview tabindex="0"></video>
+          <video aria-label="Converting between a sculpt and Gaussian splats" poster="media/poster-splats.jpg?v=4" muted loop playsinline preload="none" data-inview tabindex="0">
+            <source src="media/splats-4k.mp4?v=4" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
+            <source src="media/splats.mp4?v=4" type="video/mp4">
+          </video>
           <div>
             <h3>Gaussian splats, both ways</h3>
             <p>Turn a sculpt into Gaussian splats for web viewers and engines, and turn splat captures into
@@ -518,7 +533,7 @@ rez-env sculptforge -- sculptforge troll.usda \
     <section id="download" class="section alt">
       <div class="wrap">
         <h2>Download</h2>
-        <p class="section-lede">Version 0.9.7. All builds come from the
+        <p class="section-lede">Version 0.10.1. All builds come from the
           <a href="https://github.com/islandmed/SculptForge/releases/latest">latest GitHub release</a>, with
           SHA-256 checksums.</p>
         <div class="downloads">

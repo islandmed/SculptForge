@@ -30,37 +30,41 @@ You can read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<
 12. [ZSpheres](zspheres.md)
 13. [Polypaint and materials](polypaint.md)
 14. [Texture painting](texture-painting.md)
-15. [Sculpt layers and blend shapes](layers.md)
-16. [Facial shapes and live face](facial-shapes.md)
-17. [Subdivision levels](subdivision-levels.md)
-18. [Dynamic topology](dynamic-topology.md)
-19. [Moving, rotating and posing (Gizmo 3D)](gizmo.md)
-20. [Subdivide, remesh, decimate and LODs](geometry.md)
-21. [Quad retopology and detail projection](retopology.md)
+15. [Material painting (PBR)](pbr-painting.md)
+16. [Sculpt layers and blend shapes](layers.md)
+17. [Facial shapes and live face](facial-shapes.md)
+18. [Subdivision levels](subdivision-levels.md)
+19. [Micro levels: hundreds of millions of polygons](micro-levels.md)
+20. [Dynamic topology](dynamic-topology.md)
+21. [Sculpt Timeline and timelapse](timeline.md)
+22. [Moving, rotating and posing (Gizmo 3D)](gizmo.md)
+23. [Subdivide, remesh, decimate and LODs](geometry.md)
+24. [Quad retopology and detail projection](retopology.md)
 
 ## AI and capture
 
-22. [Image and text to 3D](generate-3d.md)
-23. [Gaussian splats](splats.md)
-24. [Scan an object into a splat](scan-to-splat.md)
-25. [From scan to sculptable mesh](scan-to-sculptable.md)
-26. [Phone capture and AR](phone-capture.md)
+25. [Image and text to 3D](generate-3d.md)
+26. [Gaussian splats](splats.md)
+27. [Scan an object into a splat](scan-to-splat.md)
+28. [From scan to sculptable mesh](scan-to-sculptable.md)
+29. [Phone capture and AR](phone-capture.md)
 
 ## Files and pipelines
 
-27. [Baking normal and displacement maps](baking.md)
-28. [Exporting, Unreal and ZBrush](exporting.md)
-29. [Working with Blender](blender.md)
-30. [Projects, autosave and QuickSave](projects.md)
-31. [Scripting and automation](scripting.md)
-32. [SculptForge for studios](studios.md)
+30. [Baking normal and displacement maps](baking.md)
+31. [Exporting, Unreal and ZBrush](exporting.md)
+32. [Export presets](export-presets.md)
+33. [Working with Blender](blender.md)
+34. [Projects, autosave and QuickSave](projects.md)
+35. [Scripting and automation](scripting.md)
+36. [SculptForge for studios](studios.md)
 
 ## Reference
 
-33. [Keyboard and mouse](shortcuts.md)
-34. [Performance and big meshes](performance.md)
-35. [Troubleshooting and FAQ](troubleshooting.md)
-36. [Glossary](glossary.md)
+37. [Keyboard and mouse](shortcuts.md)
+38. [Performance and big meshes](performance.md)
+39. [Troubleshooting and FAQ](troubleshooting.md)
+40. [Glossary](glossary.md)
 
 ## Getting help
 

@@ -159,6 +159,7 @@ public:
     bool empty() const { return q_.empty(); }
     size_t size() const { return q_.size(); }
     void clear() { q_.clear(); }
+    const std::deque<PathDab>& items() const { return q_; } // oldest first (the predictive preview draws them)
     PathDab pop() {
         PathDab d = q_.front();
         q_.pop_front();

@@ -5,8 +5,10 @@
 #include "core/BVH.h"
 #include "core/Dyntopo.h"
 #include "core/Mesh.h"
+#include "core/Micro.h"
 #include "core/Multires.h"
 #include "core/ThreadPool.h"
+#include "core/TileImage.h"
 
 #include <deque>
 #include <memory>
@@ -67,11 +69,21 @@ struct PackedTexels {
 
 // Old texels of the 64x64 tiles a texture-paint stroke touched in one layer (core/Texture.h);
 // applying swaps them with the texture.
+// Material channels (core/TextureChannels.h) are kept per (layer, channel) as the old tile pointers of the
+// channel's TileImage: nothing is copied, the tiles are shared with the image until it overwrites them.
+struct TextureChannelTiles {
+    int layer = -1;      // -1 = Base
+    uint8_t channel = 0; // Channel
+    std::vector<uint32_t> tiles;
+    std::vector<std::shared_ptr<TileImage::Tile>> old; // per tile; null = the image's fill
+    size_t bytes() const;
+};
 struct TextureTileUndo {
     int layer = -1;
-    PackedTexels texels;
+    PackedTexels texels; // base colour (no tiles when the stroke painted only material channels)
+    std::vector<TextureChannelTiles> channels;
     void swapWith(Mesh& mesh);
-    size_t bytes() const { return texels.bytes(); }
+    size_t bytes() const;
 };
 
 // The texture before a texture edit (create, delete, layer edits, conversions, fills). captureTexture
@@ -110,6 +122,7 @@ inline constexpr int kActivePaintLayer = -2;
 //  - subdiv: a subdivision level step or level edit (core/Multires.h), applied on its own
 //  - topology: the slots a dynamic-topology stroke changed (core/Dyntopo.h), applied before the channels
 //  - subtool: a SubTool added to the scene (Extract), taken out on undo and put back on redo
+//  - micro: the grid tiles a stroke on a micro level changed, or a whole micro level (core/Micro.h)
 // Record old values before changing them (ensureX() the attribute first);
 // undo allocates a missing attribute so values can always be restored.
 struct UndoRecord {
@@ -132,10 +145,11 @@ struct UndoRecord {
     std::unique_ptr<SubdivUndo> subdiv;
     std::unique_ptr<TopologyUndo> topology;
     std::shared_ptr<SubtoolStep> subtool; // (shared: SubtoolStep is defined in core/Document.h)
+    std::unique_ptr<MicroUndo> micro;     // micro-displacement tiles of a stroke, or a micro level added / removed (core/Micro.h)
 
     bool empty() const {
         return positions.empty() && mask.empty() && colors.empty() && paintAlpha.empty() && hidden.empty() &&
-               polygroups.empty() && !mesh && !paint && !textureTiles && !texture && !subdiv && !topology && !subtool;
+               polygroups.empty() && !mesh && !paint && !textureTiles && !texture && !subdiv && !topology && !subtool && !micro;
     }
     size_t approxBytes() const;
 
@@ -149,7 +163,24 @@ struct UndoRecord {
     static UndoRecord capturePolygroups(const Mesh& mesh, std::string label, std::span<const uint32_t> tris = {});
 };
 
+// Watches an UndoStack: the Sculpt Timeline (core/Timeline.h) keeps its history tree in step with it. Held by the
+// stack (UndoStack::listener), so it moves with it (each SubTool's history has its own).
+struct UndoListener {
+    virtual ~UndoListener() = default;
+    // A step was pushed (it is the stack's last undo step); `discardedRedo` holds the redo steps the push is about
+    // to drop (redo_.back() is the next redo) and may be moved from.
+    virtual void undoPushed(UndoRecord& pushed, std::deque<UndoRecord>& discardedRedo) = 0;
+    // Around UndoStack::undo / redo applying `r` to `mesh`.
+    virtual void undoApplying(UndoRecord& r, Mesh& mesh, bool isUndo) = 0;
+    virtual void undoApplied(UndoRecord& r, Mesh& mesh, bool isUndo) = 0;
+    virtual void undoDroppedOldest() = 0; // the byte budget dropped the oldest undo step
+    virtual void undoCleared() = 0;
+};
+
+class Timeline;
+
 class UndoStack {
+    friend class Timeline; // moves steps between undo and redo without applying them (core/Timeline.h)
 public:
     UndoStack() = default;
     UndoStack(UndoStack&&) = default; // move-only (records own mesh snapshots)
@@ -176,6 +207,7 @@ public:
     size_t undoBytes() const;
 
     size_t byteBudget = size_t(1) << 30; // 1 GiB
+    std::shared_ptr<UndoListener> listener; // the Sculpt Timeline (core/Timeline.h), if one watches this history
 
 private:
     static void apply(UndoRecord& r, Mesh& mesh, BVH& bvh);

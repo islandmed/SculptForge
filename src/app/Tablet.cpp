@@ -164,6 +164,11 @@ float App::strokePressure() const {
 SDL_Keymod App::inputMods() const {
     SDL_Keymod mods = SDL_GetModState();
     if (blenderStyle()) mods = blenderMods(mods); // Blender's Ctrl inverts, its Mask brush masks (Input.cpp)
+    if (mayaStyle()) { // Maya: Ctrl inverts (as ZBrush's Alt), Ctrl+Alt masks (as ZBrush's Ctrl)
+        const bool ctrl = (mods & SDL_KMOD_CTRL) != 0, alt = (mods & SDL_KMOD_ALT) != 0, shift = (mods & SDL_KMOD_SHIFT) != 0;
+        if (ctrl && alt) mods = SDL_Keymod((mods & ~SDL_KMOD_ALT) | SDL_KMOD_LCTRL);
+        else if (ctrl && !shift) mods = SDL_Keymod((mods & ~SDL_KMOD_CTRL) | SDL_KMOD_LALT);
+    }
     for (int b = 1; b <= kPenButtons; ++b) {
         if (!(penButtons_ & (1u << b))) continue;
         const PenAction a = uiPrefs_.tablet.buttons[size_t(b - 1)];
@@ -182,7 +187,8 @@ void App::firstDab(float x, float y) {
     }
     firstDabPending_ = false;
     lastStrokePressure_ = strokePressure();
-    dabAt(x, y, lastStrokePressure_);
+    if (asyncStroke_) dabQueue_.push({x, y, lastStrokePressure_}); // the solver thread places it (AsyncStroke.cpp)
+    else dabAt(x, y, lastStrokePressure_);
 }
 
 // SDL has no pen names, so on Linux read the kernel's input device list; elsewhere the pen stays unnamed.

@@ -37,10 +37,44 @@ Open **Preferences** and click **Performance**.
 | Control | What it does |
 |---|---|
 | **Antialiasing** (Off, 2x, 4x, 8x) | How many samples per pixel the 3D view uses to smooth edges. 4x is the default. More samples look smoother and cost more on huge meshes. If the graphics card can't make room for them, the view quietly uses fewer and the panel says so |
-| **Fast Navigation** | While you rotate, pan or zoom a scene of 10 million triangles or more, draw it without antialiasing and draw big meshes as a lighter version with about a fifth of their triangles, so the view keeps up. The full mesh, smooth again, is back as soon as the view stops. On by default |
+| **Fast Navigation** | While you rotate, pan or zoom a scene bigger than the hardware profile's motion proxy threshold (see below), draw it without antialiasing and draw big meshes as a lighter version with about a fifth of their triangles, so the view keeps up. The full mesh, smooth again, is back as soon as the view stops. On by default |
+| **Predictive Strokes** | The brush is worked out on its own thread while the view keeps drawing at full speed. The dabs it hasn't finished show at once as a preview on the surface, and the brush cursor and the stroke's head are drawn where the pen is about to be, so on a heavy mesh the surface moves under the pen straight away and lifting the pen never waits. The finished sculpt is exactly the same as with it off. On by default (painting, masking, dynamic topology, Move, Snake Hook and the drag strokes work as before) |
+| **Draft Strokes** | With Predictive Strokes: while you sculpt, the brush only moves the surface, the moved part is shaded from its facets, and the smooth shading, the cavities and the rest are worked out once when you lift the pen. Lighter on laptops and on battery. Inflate and the plane brushes use the surface's direction from the stroke's start, so the result can differ slightly from a full stroke. Off by default |
 | **Multithreading** | Run brushes, normal and picking updates and project saving on every core (the number of threads is shown beside it). The results are exactly the same with it off; turn it off only to compare speeds or rule it out when something goes wrong |
 | **Last stroke** | What your last stroke cost per dab: **Brush** (finding and moving the vertices), **Normals** (shading), **BVH** (the structure that finds the surface under the cursor), and the **GPU upload** per frame |
 | **Memory** | What the scene holds: the meshes, the BVHs, the subdivision levels kept for stepping between them, the undo history (up to 1 GB; the oldest steps are dropped beyond that) and, roughly, the graphics card's buffers |
+
+## The hardware profile
+
+The first time you start SculptForge, a small window says **Getting to know this computer** for a second or two:
+it checks how fast your graphics card draws and receives data, how fast a brush runs and how fast the memory is,
+and picks settings to match. It does this once, and again only when you change the graphics card, update its
+driver or install a new version. Press <kbd>Esc</kbd> or **Skip** to skip it; the settings then come from the
+type of graphics card and the memory sizes. Nothing is sent anywhere: the results stay in your settings folder.
+
+There are two main profiles and a safe mode:
+
+| Profile | For | What changes |
+|---|---|---|
+| **Laptop / Budget** | laptops and most desktops: 8-32 GB of memory, a 2-8 GB graphics card, most Apple Silicon Macs | a moderate number of triangles drawn while the view moves; brushes shade continuously on mains power |
+| **Workstation** | 64 GB of memory or more, and a graphics card with 16 GB or more or an Apple Silicon Max / Ultra (or another chip whose graphics share the memory) that measures as fast | more triangles drawn per frame, larger textures and subdivision limits, shading updated with every dab |
+| **Software** (safe mode) | no graphics driver, so the drawing happens on the processor (llvmpipe) | the lightest settings, no antialiasing |
+
+On a laptop running on battery, whatever its profile, SculptForge switches to draft brushes, sends less data to the graphics card per
+frame and aims for 60 frames a second, and the status bar says so; plugged in again, it goes back.
+
+At the top of **Preferences > Performance**:
+
+| Control | What it does |
+|---|---|
+| **Detected ...** | the graphics card, its memory and the profile, and why |
+| Measured numbers | triangles drawn per second, upload speed, the cost of a brush dab, memory speed, the processor and the system |
+| Settings | how many triangles the view draws per frame, from what size big scenes use their lighter version while moving, memory and upload budgets, texture and subdivision limits, threads, the target frame rate (60, or 120 / 144 on a fast display) |
+| **Frame Governor** | while the view moves, watch how long frames take and draw big scenes' lighter version sooner or later to hold the target frame rate. It only changes what you see while moving, never the model. On by default |
+| **Re-calibrate** | measure again (your overrides are kept) |
+| **Manual overrides** | choose the profile yourself, or set any of the numbers (empty = automatic); **Back to automatic** clears them. Overrides are saved at once and kept when you re-calibrate |
+
+From a shell, `sculptforge --calibrate` measures and prints the result as JSON.
 
 Like the other preferences, these last until you quit; **Preferences > Config > Store Config** keeps them. Every
 setting is also in the <kbd>F3</kbd> command palette (type "antialiasing", "fast navigation" or
@@ -78,6 +112,41 @@ many small triangles at once; it then spreads the work over several dabs. Undoin
 connections, which takes about a tenth of a second per million triangles. `sculptforge --bench --bench-dyntopo`
 measures it on your machine.
 
+## Proof mode: see it for yourself
+
+**Help > Benchmark** (or `sculptforge --benchmark`) shows how responsive sculpting is on your own computer,
+measured the way it feels rather than the way a developer measures it. For each size, 5, 20 and 33 million
+triangles (and 100 million when there is enough free memory), it builds a sphere with subdivision levels, then
+plays a scripted pen stroke into the same code your mouse and pen go through, 240 pointer samples a second: a
+figure eight with a 60-pixel brush, the same with a 240-pixel brush, then a turn of the view. It replaces the
+scene, so save your work first; <kbd>Esc</kbd> stops it.
+
+While it runs, a panel in the corner shows:
+
+- **fps** and the **frame time**: the median (p50), and the 95th and 99th percentile, the slow frames you
+  would notice as a hitch.
+- **Stroke trails pointer**: how far the stroke on screen is behind the pointer, in milliseconds (from the
+  pointer sample the newest drawn dab belongs to until that frame is handed to the display; the display's
+  own refresh comes on top) and in pixels along the path.
+- The memory SculptForge uses.
+
+Vertical sync is off during the run so frame times aren't capped at the display's rate (tick **Keep vertical
+sync on** to measure with it). At the end a table sums up each mesh and phase, and two files are written: a video
+of the run with the panel in it (needs [ffmpeg](https://ffmpeg.org/); recording costs a millisecond or two per
+frame) and a JSON file with the results, your processor, graphics card, memory, operating system and the
+SculptForge version and commit. In the app they go to the `benchmarks` folder in SculptForge's settings folder
+(**Open folder** in the results); from the command line, to the current folder:
+
+```
+sculptforge --benchmark --benchmark-sizes 5,20,33 --benchmark-out mine.json --benchmark-video mine.mp4
+```
+
+`--benchmark-no-video` skips the video, `--benchmark-vsync` keeps vertical sync on, `--benchmark-seconds 6`
+sets the length of each stroke, and `--size 1920x1080` the window (a tiling window manager may choose another
+size; the result records the one used). Share a result on the
+[benchmarks page](https://sculptforge.app/benchmarks/) as its
+[format description](https://github.com/islandmed/SculptForge/blob/main/docs/benchmark.md) explains.
+
 ## Measuring your own machine
 
 `sculptforge --bench` builds a sphere at 4, 16 and 32 million triangles and measures every brush, undo,
@@ -106,7 +175,13 @@ curve stays a curve; once more than about 50 ms of dabs are waiting, every secon
 wider spacing), so the brush stays close to the pointer and stops soon after you lift the pen. `sculptforge --run "new_sphere" --measure-stroke 3,200` draws a fast circle for three seconds
 with a 200-pixel brush and prints how far the dabs strayed from it and the frame times.
 `SF_STROKE_IMMEDIATE=1` places every dab as soon as the pointer moves (versions before 0.9.6),
-`SF_STROKE_BACKLOG=0` never leaves dabs out, and `SF_STROKE_LOG=1` logs the queue each frame.
+`SF_STROKE_BACKLOG=0` never leaves dabs out, and `SF_STROKE_LOG=1` logs the queue each frame (with Predictive
+Strokes, each batch the brush thread places and what packing it for the graphics card cost).
+`SF_PREDICTIVE_STROKE=0` / `1` and `SF_DRAFT_STROKE=0` / `1` override the two preferences, and
+`SF_FRAME_LOG=16` logs every frame slower than 16 ms with where its time went. `tools/bench_strokes.sh` in the
+source runs the stroke measurement on 5, 21 and 33 million triangle spheres and prints the frame times (mean,
+95th and 99th percentile), how far the surface and the preview trail the pointer, press and release, for one
+build or two side by side.
 
 The `perf_info` command (also in the [Console](scripting.md)) prints the threads in use and the memory the
 scene holds; `set_multithreading enabled=false` turns multithreading off from a script.

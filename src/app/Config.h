@@ -34,12 +34,22 @@ struct UiPrefs {
                                 // 2 Blender (middle-drag orbit, numpad views, Blender's sculpt keys; Input.cpp)
     bool emulateNumpad = false; // Blender style: the 1-9 and 0 keys above the letters act as the numpad (laptops)
     bool rightClickQuickMenu = true; // a right click on the canvas (no drag) opens the QuickMenu, as in ZBrush (#22)
+    bool showAxes = true;              // Draw > Camera > Axes: the X / Y / Z gizmo in the canvas corner (#31)
+    bool liveApi = false;              // Preferences > Input > Local API: other programs run commands (app/LiveApi.cpp, #36)
+    bool cursorFollowsSurface = true; // the brush ring lies on the surface under the pointer, as in SculptGL (#25)
     TabletSettings tablet;      // Preferences > Tablet: pressure curve, eraser, pen buttons
     SpaceMouseSettings spaceMouse; // Preferences > Input > SpaceMouse
     // Preferences > Performance (PanelPerformance.cpp).
     int antialiasing = 4;       // samples per pixel in the 3D view: 1 (off), 2, 4 or 8
     bool fastNavigation = true; // big scenes draw without antialiasing while the view moves
     bool multithreading = true; // brushes, normals and BVH updates on every core (off: one thread)
+    // Sculpt strokes solved on their own thread with a GPU preview of the dabs still to come, the cursor and the
+    // stroke's head predicted a frame ahead (app/AsyncStroke.cpp). Off: the dabs are placed in the frame loop.
+    bool predictiveStrokes = false; // experimental in 0.10 (Preferences > Performance)
+    // Draft strokes (with predictive strokes): dabs move the vertices only; the normals, cavities and culling
+    // bounds of what they touched are worked out once, when the pen lifts (Sculptor::draftStrokes). Off by
+    // default; meant for laptops and battery (a hardware tier will turn it on).
+    bool draftStrokes = false;
     // Dynamic topology (Draw palette): false = the detail follows the brush size on screen (Sculptris Pro);
     // true = one detail size for the whole mesh.
     bool dyntopoConstantDetail = false;

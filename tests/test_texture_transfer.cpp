@@ -362,3 +362,121 @@ TEST(texture_transfer_speed_at_4k_on_a_million_triangles) {
     CHECK(ms(t0, t1) < 5000.0);
     CHECK(ms(t2, t3) < 20000.0);
 }
+
+// --- Material channels (core/TextureChannels.h) travel with the texture ---
+
+namespace {
+
+float roughPattern(const glm::vec3& p) { return 0.5f + 0.35f * std::sin(3.0f * p.x + 0.3f); }
+float heightPattern(const glm::vec3& p) { return 0.5f + 0.3f * std::cos(2.0f * p.y); }
+
+// Paints the patterns into Base roughness / height and a layer's metallic coverage (in the top half).
+void paintChannelPatterns(Mesh& m) {
+    PaintTexture& tex = mutableTexture(m);
+    for (Channel c : {Channel::Roughness, Channel::Height, Channel::Metallic}) setChannelEnabled(tex, c, true);
+    const int layer = addTextureLayer(tex, "Metal");
+    TileImage& rough = tex.channels[size_t(Channel::Roughness)].base;
+    TileImage& height = tex.channels[size_t(Channel::Height)].base;
+    TileImage& metal = tex.layers[size_t(layer)].channels[size_t(Channel::Metallic)].image;
+    bakeTexels(m, tex, [&](uint32_t t, float b0, float b1, float b2, int x, int y) {
+        const glm::uvec3 tv = m.triangles[t];
+        const glm::vec3 p = m.positions[tv.x] * b0 + m.positions[tv.y] * b1 + m.positions[tv.z] * b2;
+        const float r[1] = {roughPattern(p)}, h[1] = {heightPattern(p)}, mt[2] = {1.0f, p.y > 0.0f ? 1.0f : 0.0f};
+        rough.setValues(x, y, r);
+        height.setValues(x, y, h);
+        metal.setValues(x, y, mt);
+    }, false);
+    compositeTextureAll(tex);
+}
+
+// Error of the channels against the patterns at random points (metallic: 1 above y = 0.15, 0 below -0.15).
+struct ChannelErrors {
+    ErrorStats rough, height;
+    float metalWrong = 0; // fraction of clear-cut points with the wrong metal value
+};
+ChannelErrors channelErrors(const Mesh& m) {
+    std::vector<float> er, eh;
+    int wrong = 0, counted = 0;
+    for (const SurfacePoint& s : randomPoints(m, 3000, 11)) {
+        const glm::vec3 p = pointOf(m, s);
+        BrushMaterial got;
+        if (!sampleMaterialAt(m, s.tri, p, got)) continue;
+        er.push_back(std::abs(got.roughness - roughPattern(p)));
+        eh.push_back(std::abs(got.height - heightPattern(p)));
+        if (std::abs(p.y) > 0.15f) {
+            ++counted;
+            wrong += (got.metallic > 0.5f) != (p.y > 0.0f);
+        }
+    }
+    ChannelErrors out;
+    out.rough = errorStats(er);
+    out.height = errorStats(eh);
+    out.metalWrong = counted ? float(wrong) / float(counted) : 1.0f;
+    return out;
+}
+
+} // namespace
+
+TEST(texture_transfer_carries_material_channels) {
+    CommandRegistry reg;
+    // Auto UV again (same surface): Base channels and layer channels move exactly up to resampling.
+    {
+        Document doc = paintedSphere(3, 1024, 512);
+        paintChannelPatterns(doc.mesh);
+        const ChannelErrors before = channelErrors(doc.mesh);
+        CHECK(reg.execute(doc, "uv_auto", {{"resolution", 1024.0}}).ok);
+        const PaintTexture& t = *doc.mesh.texture;
+        CHECK(channelEnabled(t, Channel::Roughness) && channelEnabled(t, Channel::Height) && channelEnabled(t, Channel::Metallic));
+        CHECK(t.layers.size() == 1 && t.layers[0].channels[size_t(Channel::Metallic)].image.valid());
+        CHECK(channelImage(t, Channel::Height).bits() == 16);
+        const ChannelErrors after = channelErrors(doc.mesh);
+        std::printf("  auto uv channels: roughness mean %.4f -> %.4f, height %.4f -> %.4f, metal wrong %.3f\n", before.rough.mean,
+                    after.rough.mean, before.height.mean, after.height.mean, after.metalWrong);
+        CHECK(after.rough.mean < 0.01f && after.rough.p99 < 0.05f);
+        CHECK(after.height.mean < 0.01f && after.height.p99 < 0.05f);
+        CHECK(after.metalWrong < 0.02f);
+    }
+    // Voxel remesh (new surface): the closest old point's channels.
+    {
+        Document doc = paintedSphere(4, 1024, 1024);
+        paintChannelPatterns(doc.mesh);
+        const CommandResult r = reg.execute(doc, "remesh", {{"resolution", 96.0}});
+        CHECK(r.ok && r.message.find("texture kept") != std::string::npos);
+        const ChannelErrors after = channelErrors(doc.mesh);
+        std::printf("  remesh channels: roughness mean %.4f p99 %.4f, height mean %.4f, metal wrong %.3f\n", after.rough.mean,
+                    after.rough.p99, after.height.mean, after.metalWrong);
+        CHECK(channelEnabled(*doc.mesh.texture, Channel::Metallic));
+        CHECK(after.rough.mean < 0.02f && after.rough.p99 < 0.08f);
+        CHECK(after.height.mean < 0.02f);
+        CHECK(after.metalWrong < 0.03f);
+    }
+    // Merging: a part without the channel reads its default (roughness 0.65).
+    {
+        Document doc = paintedSphere(3, 1024, 512);
+        paintChannelPatterns(doc.mesh);
+        Mesh second = makeIcosphere(3, 0.5f);
+        for (auto& p : second.positions) p += glm::vec3(2.0f, 0.0f, 0.0f);
+        second.recomputeAllNormals();
+        AutoUvResult uv;
+        std::string err;
+        CHECK(computeAutoUv(second.positions, second.triangles, 512, uv, err));
+        second.uvs = uv.uvs;
+        second.texture = makeTexture(1024, 1024);
+        second.paintToTexture = true;
+        doc.addSubtool(second, "Second", false);
+        CHECK(reg.execute(doc, "subtool_merge_visible", {}).ok);
+        CHECK(channelEnabled(*doc.mesh.texture, Channel::Roughness));
+        std::vector<float> first, other;
+        for (const auto& s : randomPoints(doc.mesh, 3000, 5)) {
+            const glm::vec3 p = pointOf(doc.mesh, s);
+            BrushMaterial got;
+            CHECK(sampleMaterialAt(doc.mesh, s.tri, p, got));
+            if (p.x > 1.2f) other.push_back(std::abs(got.roughness - 0.65f));
+            else first.push_back(std::abs(got.roughness - roughPattern(p)));
+        }
+        const ErrorStats a = errorStats(first), b = errorStats(other);
+        std::printf("  merged channels: painted part roughness mean %.4f, plain part %.4f\n", a.mean, b.max);
+        CHECK(a.mean < 0.02f);
+        CHECK(b.max < 0.02f);
+    }
+}

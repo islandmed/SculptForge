@@ -206,10 +206,23 @@ bool Sculptor::beginStroke(const Mesh& mesh, std::string label, int layer) {
         colored_.assign(words, 0);
     }
     ++strokeId_;
+    draft_ = draftStrokes && !dyntopo.enabled;
+    draftStrokes = false; // (asked for per stroke)
+    draftLeaves_.clear();
     strokeDiagonal_ = 0.0f;
     lastRemesh_ = false;
     topologyHeld_ = false;
+    microMesh_ = nullptr;
     active_ = true;
+    return true;
+}
+
+bool Sculptor::microReady(Mesh& mesh) {
+    if (!mesh.micro || !microMatches(mesh)) return false;
+    if (!micro_.active() || microMesh_ != &mesh) {
+        micro_.begin(mesh);
+        microMesh_ = &mesh;
+    }
     return true;
 }
 
@@ -431,6 +444,17 @@ void Sculptor::displaceAll(Mesh& mesh, std::span<const uint32_t> verts, std::spa
     }, kBlock);
 }
 
+void Sculptor::flushDraft(Mesh& mesh, const BVH& bvh) {
+    if (!draft_ || draftLeaves_.empty()) return;
+    std::sort(draftLeaves_.begin(), draftLeaves_.end());
+    draftLeaves_.erase(std::unique(draftLeaves_.begin(), draftLeaves_.end()), draftLeaves_.end());
+    dabLeaves_.swap(draftLeaves_);
+    draft_ = false; // (updateDabNormals in full)
+    updateDabNormals(mesh, bvh);
+    draft_ = true;
+    draftLeaves_.clear();
+}
+
 UndoRecord Sculptor::endStroke() {
     if (dynTopo_.active()) {
         Mesh& mesh = *dynTopo_.strokeMesh();
@@ -444,6 +468,8 @@ UndoRecord Sculptor::endStroke() {
             record_.topology = std::move(topo);
         }
     }
+    if (micro_.active() && microMesh_) record_.micro = micro_.end(*microMesh_);
+    microMesh_ = nullptr;
     clearRecorded();
     active_ = false;
     grabVerts_.clear();
@@ -453,6 +479,18 @@ UndoRecord Sculptor::endStroke() {
 
 void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Symmetry sym) {
     if (!active_) return;
+    if (microReady(mesh)) { // a micro level: the grid takes the dab (core/MicroSculpt.cpp)
+        const double k0 = micro_.findMs + micro_.kernelMs, s0 = micro_.stitchMs;
+        const uint64_t pts = micro_.points;
+        for (const glm::vec3& m : mirrors(sym))
+            micro_.dab(mesh, bvh, type, p.center * m, p.viewDir * m, p.radius, p.strength * std::clamp(p.pressure, 0.0f, 1.0f),
+                       p.invert, p.focal, p.alphaUp * m, false, 0.0f);
+        timings.kernelMs += micro_.findMs + micro_.kernelMs - k0;
+        timings.normalsMs += micro_.stitchMs - s0;
+        timings.vertices += micro_.points - pts;
+        ++timings.dabs;
+        return;
+    }
     if (type != BrushType::Move) {
         const bool useAlpha = p.alpha && !p.alpha->empty(); // (the reach dabSingle gives the brush)
         const float reach = useAlpha ? 1.4143f : type == BrushType::ClayBuildup ? 1.3f : 1.0f;
@@ -461,6 +499,7 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
     dabVerts_.clear();
     dabLeaves_.clear();
     for (const glm::vec3& m : mirrors(sym)) {
+        frameWanted_ = m == glm::vec3(1.0f); // (the unmirrored pass records lastFrame)
         DabParams mp = p;
         mp.center *= m;
         mp.viewDir *= m;
@@ -503,6 +542,10 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     areaCenter /= wsum;
     float nlen = glm::length(areaNormal);
     areaNormal = nlen > 1e-12f ? areaNormal / nlen : -p.viewDir;
+    if (frameWanted_) {
+        lastFrame = {p.center, areaNormal, areaCenter, true};
+        frameWanted_ = false;
+    }
 
     const float s = std::clamp(p.strength, 0.0f, 1.0f) * std::clamp(p.pressure, 0.0f, 1.0f);
     const float sign = p.invert ? -1.0f : 1.0f;
@@ -658,8 +701,35 @@ void Sculptor::finishDab(Mesh& mesh, BVH& bvh, std::chrono::steady_clock::time_p
 // as it remeshed, so there the rings are used.
 void Sculptor::updateDabNormals(Mesh& mesh, const BVH& bvh) {
     auto clock = std::chrono::steady_clock::now();
+    if (curvature_.size() != mesh.vertexCount() || curvatureMesh_ != &mesh) {
+        curvature_.assign(mesh.vertexCount(), 0.0f);
+        curvatureFilled_ = false;
+        curvatureMesh_ = &mesh;
+    }
+    if (draft_ && !dynTopo_.active() && !dabLeaves_.empty()) {
+        // A draft: the vertices go up with the normals and cavity terms they had (filled in once for the mesh).
+        if (!curvatureFilled_) {
+            poolFor(mesh.vertexCount(), [&](size_t b, size_t e) {
+                for (size_t v = b; v < e; ++v) curvature_[v] = mesh.curvatureAt(uint32_t(v));
+            }, 8192);
+            curvatureFilled_ = true;
+        }
+        mesh.markDirtyAround(dabLeaves_.size(), 64, [&](size_t b, size_t e, IndexBits& set) {
+            for (size_t i = b; i < e; ++i)
+                for (uint32_t t : bvh.leafTriangles(dabLeaves_[i])) {
+                    const glm::uvec3& tri = mesh.triangles[t];
+                    set.insertLocal(tri.x);
+                    set.insertLocal(tri.y);
+                    set.insertLocal(tri.z);
+                }
+        });
+        draftLeaves_.insert(draftLeaves_.end(), dabLeaves_.begin(), dabLeaves_.end());
+        dabLeaves_.clear();
+        timings.normalsMs += lapMs(clock);
+        return;
+    }
     if (dynTopo_.active() || dabLeaves_.empty()) {
-        mesh.updateNormals(dabVerts_);
+        mesh.updateNormals(dabVerts_, curvature_.data());
     } else {
         mesh.updateNormalsAround(dabLeaves_.size(), 64, [&](size_t b, size_t e, IndexBits& set) {
             for (size_t i = b; i < e; ++i)
@@ -669,7 +739,7 @@ void Sculptor::updateDabNormals(Mesh& mesh, const BVH& bvh) {
                     set.insertLocal(tri.y);
                     set.insertLocal(tri.z);
                 }
-        });
+        }, curvature_.data());
     }
     dabLeaves_.clear();
     timings.normalsMs += lapMs(clock);
@@ -677,6 +747,10 @@ void Sculptor::updateDabNormals(Mesh& mesh, const BVH& bvh) {
 
 void Sculptor::dabRecipe(Mesh& mesh, BVH& bvh, const BrushRecipe& recipe, const DabParams& p, Symmetry sym) {
     if (!active_) return;
+    if (mesh.micro && microMatches(mesh)) { // recipes aren't grid brushes: a micro level gets the Standard dab
+        dab(mesh, bvh, BrushType::Standard, p, sym);
+        return;
+    }
     remeshDab(mesh, bvh, p, sym, 1.0f, 1.0f);
     DabParams base = p;
     base.pressure = std::pow(std::clamp(p.pressure, 0.0f, 1.0f), recipe.pressureCurve);
@@ -684,6 +758,7 @@ void Sculptor::dabRecipe(Mesh& mesh, BVH& bvh, const BrushRecipe& recipe, const 
     dabVerts_.clear();
     dabLeaves_.clear();
     for (const glm::vec3& m : mirrors(sym)) {
+        frameWanted_ = m == glm::vec3(1.0f); // (the unmirrored pass records lastFrame)
         DabParams mp = base;
         mp.center *= m;
         mp.viewDir *= m;
@@ -759,6 +834,10 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
     areaCenter /= wsum;
     float nlen = glm::length(areaNormal);
     areaNormal = nlen > 1e-12f ? areaNormal / nlen : -p.viewDir;
+    if (frameWanted_) {
+        lastFrame = {p.center, areaNormal, areaCenter, true};
+        frameWanted_ = false;
+    }
 
     glm::vec3 strokeDir = p.strokeDelta;
     float strokeLen = glm::length(strokeDir);
@@ -829,6 +908,12 @@ void Sculptor::beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym)
     grabAll_.clear();
     grabLeaves_.clear();
     if (!active_) return;
+    // A micro level (core/Micro.h): Move deforms the base cage below it (dual scale: the detail is relative to the
+    // base, so it rides along in its local frame), unless asked to move the micro surface along its normals.
+    if (microMoveAlongNormals && microReady(mesh)) {
+        for (const glm::vec3& m : mirrors(sym)) micro_.beginGrab(mesh, bvh, p.center * m, p.radius, p.focal, m);
+        return;
+    }
     for (const glm::vec3& m : mirrors(sym)) {
         glm::vec3 c = p.center * m;
         brushVertices(mesh, bvh, c, p.radius, verts_);
@@ -856,6 +941,14 @@ void Sculptor::beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym)
 }
 
 void Sculptor::grab(Mesh& mesh, BVH& bvh, const glm::vec3& delta) {
+    if (micro_.active() && microMesh_ == &mesh) {
+        const double k0 = micro_.kernelMs, s0 = micro_.stitchMs;
+        micro_.grab(mesh, delta);
+        timings.kernelMs += micro_.kernelMs - k0;
+        timings.normalsMs += micro_.stitchMs - s0;
+        ++timings.dabs;
+        return;
+    }
     if (grabVerts_.empty()) return;
     auto clock = std::chrono::steady_clock::now();
     // One mirror after another (a vertex may be in two), each in parallel.
@@ -881,6 +974,10 @@ void Sculptor::grab(Mesh& mesh, BVH& bvh, const glm::vec3& delta) {
 // Puts every vertex the current stroke moved back to its stroke-start position.
 void Sculptor::restoreStroke(Mesh& mesh, BVH& bvh) {
     if (!active_) return;
+    if (micro_.active() && microMesh_ == &mesh) {
+        micro_.restore(mesh);
+        return;
+    }
     topologyHeld_ = true; // (positions come back, topology wouldn't)
     // Polypaint laid down by the stroke so far (Paint brush / RGB while sculpting).
     if (!record_.colors.empty() && mesh.hasColors()) {

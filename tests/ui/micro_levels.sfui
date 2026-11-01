@@ -1,0 +1,29 @@
+# Micro-displacement levels (Tool > Geometry > Micro): Divide to Micro stores the surface above the highest level
+# as displacement grids, the viewport draws it, Standard and Move sculpt it, undo steps back, Delete Micro removes it.
+run new_sphere subdivisions=5
+orbit 30 -15
+click "Geometry##tool.geometry"
+expect "Geometry/Divide to Micro"
+click "Geometry/Divide to Micro"
+expect_status "Divided to micro"
+expect "Geometry/Bake Micro"
+expect_text "Micro 4"
+run micro_noise amplitude=0.003 scale=40
+shot micro-noise
+
+# Standard (B S T) on the micro surface.
+key b
+key s
+key t
+stroke 0.3 0.4 0.7 0.45
+stroke 0.35 0.55 0.65 0.6
+shot micro-strokes
+key ctrl+z
+key ctrl+z
+expect_status "Undo"
+
+# Delete Micro takes it away; undo brings it back.
+click "Geometry/Delete Micro"
+expect "Geometry/Divide to Micro"
+key ctrl+z
+expect "Geometry/Bake Micro"

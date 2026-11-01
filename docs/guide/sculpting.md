@@ -138,6 +138,11 @@ The brush cursor shows two rings, as in ZBrush: the outer one is the Draw Size, 
 (where the brush works at half strength). Masking, painting, Move and SnakeHook follow Focal Shift too; custom
 brushes made in Brush Lab keep their own tip shape.
 
+Over the model, the rings lie on the surface, as in SculptGL: they turn with the surface under the pointer, bend
+over its bumps and curves, and show the brush's real size there, with a short line pointing out of the surface.
+With symmetry on, a fainter ring shows where the mirrored brush lands. Off the model the rings are flat circles.
+**Preferences > Input > Cursor follows surface** (on by default) switches back to flat rings everywhere.
+
 The <kbd>S</kbd>, <kbd>U</kbd>, <kbd>I</kbd> and <kbd>O</kbd> pop-ups take the mouse or the keyboard: drag the
 slider and release to close it, or type a number and press <kbd>Enter</kbd> (a minus first for a negative Focal
 Shift). <kbd>Esc</kbd> closes the pop-up without typing anything new.

@@ -1,0 +1,34 @@
+# Hardware profile (PanelPerformanceProfile.cpp): with SF_HW_PROFILE_IN_TESTS=1 (set by CMake for this test only,
+# in the test's temporary settings folder) the app calibrates over the first frames like a first launch, then
+# Preferences > Performance shows what it detected and measured, the settings, the frame governor, Re-calibrate and
+# the manual overrides. Real GPU, so only the words are checked, not the numbers.
+run new_sphere
+# (Calibration takes one step per frame, so it is over within the first frames here.)
+wait 1
+expect_no_text Getting to know this computer
+click "Preferences##palette.preferences"
+click "Performance##preferences.performance"
+wait_for "Frame Governor" 10
+expect_text Hardware profile
+expect_text Detected
+expect_text Triangles
+expect_text View budget
+expect_text Motion proxy from
+expect_text Re-calibrate
+hold ctrl
+hover "Frame Governor"
+expect_help "target frame rate"
+hold none
+# The governor toggles off and on (saved in the profile).
+click "Frame Governor"
+expect_status Frame governor off
+click "Frame Governor"
+expect_status Frame governor on
+# The manual overrides open.
+click "Manual overrides"
+expect_text Draft brushes: automatic
+shot panel
+# Re-calibrate runs the overlay again and finishes.
+click "Re-calibrate"
+wait 1
+expect_status Calibrated for this computer

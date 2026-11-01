@@ -1,0 +1,55 @@
+# The Maya input style (#32): Alt+left orbits, Alt+middle pans, Alt+right zooms (on the model too, without
+# sculpting); Ctrl inverts a stroke, Ctrl+Alt masks; back to the ZBrush style.
+run new_sphere subdivisions=4
+click "Preferences##palette.preferences"
+click "Input##preferences.input"
+click "Maya##input.style_maya"
+expect_value input_style == 3
+expect_value shortcut_conflicts == 0
+click "Preferences##palette.preferences"
+mouse_move 0.5 0.5
+key f
+
+# A plain drag adds, Ctrl+drag subtracts.
+snapshot
+stroke 0.3 0.5 0.7 0.5
+expect_value moved_out > 0
+key ctrl+z
+snapshot
+hold ctrl
+stroke 0.3 0.5 0.7 0.5
+hold none
+expect_value moved_out < 0
+key ctrl+z
+
+# Alt+left on the model orbits and doesn't sculpt.
+snapshot
+remember camera_yaw y0
+hold alt
+stroke 0.3 0.5 0.7 0.5
+hold none
+expect_value moved == 0
+expect_value camera_yaw != $y0
+# Alt+middle pans.
+remember camera_pan p0
+hold alt
+button_drag middle 0.4 0.5 0.6 0.5
+hold none
+expect_value camera_pan != $p0
+# Alt+right zooms.
+remember camera_distance d0
+hold alt
+button_drag right 0.5 0.4 0.5 0.6
+hold none
+expect_value camera_distance != $d0
+
+# Ctrl+Alt+drag on the model masks.
+key f
+hold ctrl+alt
+stroke 0.3 0.5 0.7 0.5
+hold none
+expect_value masked > 0
+
+click "Preferences##palette.preferences"
+click "ZBrush##input.style_zbrush"
+expect_value input_style == 0

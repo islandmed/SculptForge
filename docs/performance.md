@@ -12,7 +12,347 @@ sculptforge-cli --bench ...                     # the same without the GPU (CI, 
 Machine for all figures: Apple M1 Pro (8 performance + 2 efficiency cores, 32 GB unified memory, 30 GB usable
 under Asahi Linux), integrated GPU, Mesa 26.1 (OpenGL 4.6). How the benchmark works is described under v0.5 below.
 
-## Next version: big brushes on dense meshes (feat/perf-pass)
+## Next version: predictive strokes (feat/zero-latency)
+
+A stroke on a heavy mesh used to run in the frame loop: each frame placed a dab (45-50 ms at 21M with a 200 px
+brush), re-packed what it moved for the GPU (about 28 ms) and only then drew. Now the brush runs on its own
+thread and the frame loop only commits what it finished, so the view draws at the display's rate whatever a dab
+costs; what the brush hasn't finished is drawn ahead of it by the GPU.
+
+```
+tools/bench_strokes.sh [-s 5,21,33] [-n RUNS] [-r RADIUS_PX] BINARY [BINARY_B]   # A/B runs interleaved
+```
+
+It runs `sculptforge --run SCENE --measure-stroke 3,R` (a fast two-turn circle, X symmetry) on 5.2M
+(`new_sphere subdivisions=8; subdiv_divide`), 21.0M (two Divides) and 33.6M triangles
+(`new_sphere triangles=2100000; subdiv_divide; subdiv_divide`) and averages SculptForge's own figures.
+
+**How to read the figures below.** They were taken on the M1 Pro while other agents were building and testing on
+the same machine (load average 9 to 45 on 10 cores during the runs), so absolute times are two to four times
+those of an idle machine and vary from run to run (0.9.7 measured 65 ms frames at 21M on an idle machine; here
+71-180 ms). A and B were interleaved run by run, two runs each, so they saw the same load. "A" is main (0.9.7)
+with only the measurement additions, "B" this branch with Predictive Strokes on (the default).
+
+- Frame: the interval between frames on screen, mean / p95 / p99 (120 Hz display, vsync).
+- Surface lag: how far round the circle the last dab whose result is on the GPU is behind the pointer.
+- Preview lag: the same for the preview's head (B; for A it is the surface).
+- Press: from the press to the first frame on screen that shows it (B: the preview of the first dab); first
+  surface: until the first dab's own result is on screen.
+- Release: how long letting go holds up the UI; until done: until the last dab's result is on screen.
+
+200 px brush:
+
+| Mesh | | Frame mean / p95 / p99 | Surface lag | Preview lag | Press | First surface | Release | Until done |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| 5.2M | A | 47.0 / 98.5 / 134 ms | 95 px | 95 px | 98 ms | 98 ms | 31 ms | 44 ms |
+| | B | **8.4 / 11.3 / 14.3 ms** | 72 px | **1.0 px** | **24 ms** | 68 ms | **0 ms** | 64 ms |
+| 21.0M | A | 71.0 / 245 / 651 ms | 37 px | 37 px | 623 ms | 623 ms | 1.4 ms | 8 ms |
+| | B | **8.8 / 14.1 / 17.6 ms** | 198 px | **1.5 px** | **14 ms** | 144 ms | **0 ms** | 224 ms |
+| 33.6M | A | 169 / 311 / 323 ms | 245 px | 245 px | 315 ms | 315 ms | 374 ms | 493 ms |
+| | B | **12.2 / 22.8 / 27.0 ms** | 307 px | **4.1 px** | **13 ms** | 264 ms | **0 ms** | 500 ms |
+
+60 and 240 px brushes (the sizes proof mode reported stalls with):
+
+| Mesh, brush | | Frame mean / p95 / p99 | Surface lag | Preview lag | Press | Release | Until done |
+|---|---|---:|---:|---:|---:|---:|---:|
+| 21.0M, 60 px | A | 14.8 / 22.1 / 26.2 ms | 16 px | 16 px | 26 ms | 5 ms | 10 ms |
+| | B | **8.4 / 9.9 / 11.4 ms** | 31 px | **0.7 px** | **8 ms** | 0 ms | 33 ms |
+| 33.6M, 60 px | A | 24.9 / 31.6 / 34.8 ms | 48 px | 48 px | 34 ms | 31 ms | 42 ms |
+| | B | **8.9 / 14.3 / 17.2 ms** | 63 px | **1.9 px** | **13 ms** | 0 ms | 82 ms |
+| 21.0M, 240 px | A | 215 / 433 / 433 ms | 283 px | 283 px | 582 ms | 544 ms | 675 ms |
+| | B | **10.2 / 18.5 / 23.8 ms** | 465 px | **3.1 px** | **21 ms** | 0 ms | 1132 ms |
+| 33.6M, 240 px | A | 292 / 636 / 636 ms | 226 px | 226 px | 779 ms | 826 ms | 1362 ms |
+| | B | **12.8 / 27.2 / 31.1 ms** | 337 px | 117 px* | **11 ms** | 0 ms | 1689 ms |
+
+\* One of the two runs had a preview lag of 230 px, the other 4 px; repeated runs with the head logged gave
+4 px and couldn't reproduce it (a tiling window manager resizing the window mid-stroke, which other agents'
+windows did during these runs, also moves the canvas under the scripted circle).
+
+What the figures say:
+
+- **Frames no longer depend on the brush.** B's frames are 8-13 ms on average at every size, p99 11-31 ms,
+  where A's worst frames were 0.3 to 1.2 s (the solver and the upload ran inside the frame). The long stalls proof
+  mode saw are gone: the biggest was a vertex leaving the GPU's position grid (a big brush raising the surface),
+  which re-packed the whole mesh inside a frame (seconds at 33M); it is re-packed on the brush thread now, and
+  the stroke's end work (exact culling bounds of everything it moved) runs there too, so release is 0 ms.
+- **The brush trails the pointer by a few pixels on screen**, where it trailed by 40-280 px: the preview shows
+  every dab not yet solved, and the pen's next position. The surface itself (the solver's result) still trails
+  by as much as before, or more on a loaded machine (B batches dabs so that packing stays under half the work,
+  so the real surface updates less often); when it lands it replaces the preview without a visible jump: with
+  `SF_MEASURE_POP=1` the view changes by 0.055 (mean, 0-255) when a batch replaces its preview, against 0.36 if
+  there were no preview (5M, 200 px).
+- **Press** is the first frame (8-24 ms, the preview of the first dab); the first dab's own result follows when
+  the solver has it.
+- **Until done** is longer for B with big brushes: B places every queued dab after the pen lifts (the preview
+  already shows them) and A's frame loop thinned more. It doesn't hold anything up: the UI keeps going, and a new
+  stroke or command first finishes the old one.
+- The targets set for this work were 33M with a 200 px brush at 60 fps (frames under 16.7 ms), the brush under
+  20 px behind the pointer, press and release under 50 ms. Met on this loaded machine: press (13 ms), release
+  (0 ms), the brush on screen behind the pointer (4 px), the mean frame at 21M (8.8 ms). Not met: 33M frames are
+  12.2 ms mean but 22.8 / 27.0 ms at p95 / p99. Those frames wait on the GPU (`SF_FRAME_LOG=16`: the time is
+  in the swap, drawing 33M triangles; the preview costs about 1-2 ms of it), not on the CPU.
+
+### Where a batch's time goes (21M, 200 px, `SF_STROKE_LOG=1`, loaded)
+
+The solver thread: the dab 160-300 ms (kernel 50-115, normals 65-150, BVH 25-50), then packing the upload
+110-180 ms before this work, 25-45 ms after it (vertices 25-40, bounds under 1.5). On an idle machine divide by
+about four. The main thread's commit (glBufferSubData of 30-55 MB): 2-3 ms, occasionally 10.
+
+What changed, in order:
+
+1. **Predictive strokes** (app/AsyncStroke.cpp). The queued dabs go to a solver thread in batches; each frame
+   the finished batch is committed and the next one starts. The mesh, its BVH and the sculptor belong to the
+   solver while it runs (syncScene and the pollers wait; every path that edits the document ends the stroke
+   first). The dabs, their order and parameters are the frame loop's (each batch sees the view as it was when it
+   began), so the result is the same bit for bit: `SF_MEASURE_VERIFY=1` replays the measured stroke without the
+   thread and checks undo.
+2. **The preview** (render/Ghost.h, the GHOST shader variant). The dabs not yet on the GPU (in flight, queued, and
+   the stroke's head where the pen will be a frame later, core/PenPredictor.h) move the uploaded vertices as each
+   brush kernel would; the kernels are differentiated forward (height gradient and Laplacian over the tangent
+   plane) for the bent normal and the cavity term, with no extra varyings (a tiled GPU writes every vertex's
+   outputs to memory). Each dab's surface point comes from a sphere fitted to the last two placed dabs (their
+   normals turn by an angle over the distance between them): centre within 0.003-0.07 r, normal within 1-5
+   degrees (measured with a debug log since removed). Only the clusters a ghost dab reaches use it. The brush cursor is drawn at the
+   predicted pen position too.
+3. **Two-part upload** (Renderer::prepareStrokeUpload / commitStrokeUpload). The solver thread packs the dirty
+   vertices and the culling bounds; the GL thread only calls glBufferSubData. The cavity term comes from the
+   normals pass (Mesh::curvatureAt from each vertex's triangles, the ring average on a manifold) instead of a
+   second walk of every vertex's ring (packing 110 -> 30 ms a batch at 21M, loaded). Clusters a stroke moved get
+   bounds round their vertices' boxes (found while packing) without a normal cone; exact ones at the end.
+4. **No stalls**: the position grid re-pack and the end-of-stroke bounds on the solver thread (above); batches
+   sized so packing stays under half the work, and after release every dab left in one batch with the end
+   work (21M, 240 px: until done 2.9 -> 0.6 s).
+5. **Mesh::recomputeAllNormals** sums each vertex's own triangles in parallel when the topology is known (same
+   order, same bits, no face array): it summed on one thread, which dominated full-history timeline seeks.
+
+Not done: persistent-mapped upload buffers (the commit is 2-3 ms, not worth the complexity on GL 3.3 / macOS
+4.1); per-vertex dirty bitsets per cluster beyond what UploadOrder already does; normals in the shader (they
+are already 2 x 11-bit octahedral in 12-byte vertices since v0.6). The CPU dab itself (kernel, normals, BVH) is
+unchanged: it bounds how soon the real surface catches up, not the frame rate.
+
+### Draft strokes (33.6M, measured both ways)
+
+`SF_DRAFT_STROKE=1` (Preferences > Performance > Draft Strokes): dabs only move vertices and refit the BVH;
+the moved clusters draw with per-pixel face normals; normals, cavities and exact bounds are worked out once at
+pen lift, on the solver thread. Interleaved, two runs each, A = draft off, B = draft on:
+
+| Brush | | Frame mean / p95 / p99 | Surface lag | Press | First surface | Until done |
+|---|---|---:|---:|---:|---:|---:|
+| 200 px | off | 12.4 / 24.6 / 28.6 ms | 438 px | 14 ms | 476 ms | 1182 ms |
+| | draft | 13.6 / 27.0 / 30.6 ms | 445 px | 38 ms | 523 ms | 2985 ms |
+| 240 px | off | 12.8 / 26.6 / 30.9 ms | 281 px | 18 ms | 757 ms | 1988 ms |
+| | draft | 13.8 / 29.0 / 32.1 ms | 427 px | 22 ms | 719 ms | 3070 ms |
+
+On this machine draft strokes don't pay: the frames were never CPU-bound (the solver is on its own thread), the
+dab saves its normals pass but the stroke's end then recomputes the normals of everything the stroke touched,
+so the last result arrives later. (The draft runs coincided with the heaviest load of the session, 18-45.)
+It should help where the solver's cores are the bottleneck and energy matters (a laptop on battery, fewer
+cores): off by default, for the hardware tiers to turn on.
+
+## Micro-displacement levels: 300M-1B sculptable triangles (feat/micromesh)
+
+```
+sculptforge --bench-micro --bench-sizes 33,100,300 [--bench-micro-level 5] [--bench-brushes TEXT]
+sculptforge-cli --bench-micro ...      # without the GPU: memory, brush and shading times
+```
+
+A micro level (core/Micro.h) stores the surface above the highest subdivision level as one 16-bit height per
+point of a regular grid on each base triangle, along the interpolated normal of the Phong-tessellated base.
+Micro triangles are never stored: brushes evaluate them on the CPU, the renderer in its vertex shader
+(render/MicroRenderer.h). The benchmark divides a bench sphere to the size, sculpts strokes of 30 dabs with X
+symmetry (two dabs a step) and orbits. M1 Pro, Release; the machine was shared with other jobs during these runs
+(load average 10-20), so treat single rows as +/-30%.
+
+Memory and frames:
+
+| | 33M (Micro 4) | 104M (Micro 4) | 299M (Micro 4) | 299M (Micro 5) | **1.02B (Micro 5)** |
+|---|---:|---:|---:|---:|---:|
+| Base triangles | 130k | 406k | 1.2M | 292k | 995k |
+| Micro level in memory | 42 MB | 130 MB | 374 MB | 332 MB | 1131 MB |
+| per micro triangle / micro vertex | 1.25 / 2.50 B | 1.25 / 2.50 B | 1.25 / 2.50 B | 1.11 / 2.22 B | 1.11 / 2.22 B |
+| Process RSS, everything | 263 MB | 432 MB | 801 MB | 710 MB | **1713 MB** |
+| GPU buffers | 125 MB | 392 MB | 1128 MB | 997 MB | 3398 MB |
+| Divide to micro | 5 ms | 32 ms | 60 ms | 29 ms | 93 ms |
+| First shading + upload | 0.1 s | 0.7 s | 1.2 s | 1.7 s | 5.1 s |
+| Orbit, 4x AA | 8.3 ms | 9.7 ms | 14.0 ms | 8.9 ms | 13.4 ms |
+| Orbit, no AA / moving | 5.0 / 2.9 ms | 6.6 / 4.7 ms | 10.4 / 4.5 ms | 6.2 / 4.1 ms | 11.3 / 5.0 ms |
+| Triangles drawn (still / moving) | 4.3M / 1.1M | 3.9M / 1.0M | 3.4M / 0.9M | 3.4M / 0.9M | 3.0M / 0.8M |
+| Save / open project | 31 / 61 ms | 71 / 100 ms | 217 / 285 ms | 187 / 264 ms | 649 / 489 ms |
+
+The same 300M as a plain mesh would need about 27 GB (90 B per triangle, see 33M below). The frame time follows
+the triangle budget and the number of base triangles on screen, not the micro triangle count: 33M at Micro 4
+and 299M at Micro 5 (130k and 292k base triangles) both draw in 8-9 ms. Patches of one or four triangles are
+drawn unrolled (gl_VertexID), not instanced: instancing them cost 21 ms a moving frame at 299M, unrolled 4.4 ms.
+
+Brushes, per dab step (both mirrors), GPU upload included:
+
+| | 33M | 104M | 299M (Micro 4) | 299M (Micro 5) | 1.02B (Micro 5) |
+|---|---:|---:|---:|---:|---:|
+| Standard (r 0.12, ~64 px) | 2.4 ms | 11 ms | 13 ms | 17 ms | 39 ms |
+| Standard, 300 px (r 0.56) | 13.5 ms | 56 ms | 115 ms | 48 ms | 283 ms |
+| Smooth (large, r 0.4) | 9.4 ms | 21 ms | 50 ms | 44 ms | 54 ms |
+| Move, 300 px (base cage) | 13 ms | 19 ms | 58 ms (45 after the pick fix) | 22 ms | 55 ms |
+| Undo step, Standard stroke (30 dabs) | 0.6 MB | 1.7 MB | 4.7 MB | 3.4 MB | 11.2 MB |
+
+Scale-adaptive brushes: a dab is evaluated on grid points `stride` apart (about 48 across its radius) and
+interpolated in between, so the evaluation (the "kernel" column of the report) stays bounded; writing the
+interpolated values, stitching and the GPU upload still grow with the points under the brush. The 300 px grab
+(Move) deforms the base cage and doesn't touch the micro level at all: 20 ms at 31M against 45 ms at 299M (Micro 4,
+ten times the base triangles) in one run; at Micro 5 (2.4x the base) 22 ms. Picking at 299M went from 37 to 11 ms
+once the candidates were filtered by their own displacement range along the ray.
+
+Undo journal: tiles in Morton order, each the stroke's change predicted from its neighbour and packed (minimum +
+bit width): about a third of whole tiles. A short stroke stays under the 500 KB target (10 dabs of r 0.15 at
+5M: 31 KB); the benchmark's 30-dab strokes over 300M are 2-5 MB, limited by the rounding noise each dab leaves
+(2-4 bits per point). A whole-surface edit (micro_noise) keeps whole tiles.
+
+What a frame still costs: the CPU shading (normals, curvature) of what a dab changed, about 20 ns per grid point,
+within a budget per frame (TierConfig::shadeBudgetPoints, 3M: the rest of a big dab's normals follow over the next
+frames); the first full shading of a level (1-5 s). Candidates: shading on the GPU from the displacement texture
+(needs the edge neighbours in the fragment shader), and storing the coarse part of big strokes on a coarse grid
+(multires-style) so a 300 px dab writes thousands of points instead of millions.
+## Hardware profile, calibration and the frame governor (feat/hw-profile)
+
+SculptForge measures the computer it runs on and sets its budgets from what it measured. Code:
+`src/core/HardwareProfile.*` (probe types, mapping, cache, JSON, commands), `src/core/TierConfig.*` (the knobs other
+modules read), `src/core/FrameGovernor.*` (run-time adaptation), `src/app/Calibration.*` (OpenGL probe and GPU
+benchmarks, `--calibrate`), `src/app/PanelPerformanceProfile.cpp` (first-launch flow, Preferences > Performance).
+Nothing in it uses the network.
+
+### When it runs
+
+On first launch, and again when `GL_VENDOR`, `GL_RENDERER` or `GL_VERSION` (which carries the driver version)
+or the app version changes, or when the cache holds only a CPU calibration from `sculptforge-cli`. The result
+is cached in `<settings folder>/hardware_profile.json` (Linux `~/.local/share/SculptForge/SculptForge/`, macOS
+`~/Library/Application Support/SculptForge/SculptForge/`, Windows `%APPDATA%\SculptForge\SculptForge\`). In the
+app it runs over the first frames, one step per frame under a small overlay (Esc or Skip skips it; the profile
+then comes from the probe alone). UI tests, renders, recordings, demos and the `--measure-*` runs never
+calibrate and keep the fixed defaults (Fast Navigation at 10 million triangles), so their results don't depend
+on the machine. `SF_NO_CALIBRATION=1` skips it too.
+
+```
+sculptforge --calibrate [--calibrate-quick] [--calibrate-no-save]   # prints JSON (schema sculptforge.calibration/1)
+sculptforge-cli -c 'calibrate'              # CPU half only (no OpenGL); GPU numbers from the cache
+sculptforge-cli -c 'performance_profile'    # the cached profile as JSON
+sculptforge-cli -c 'set_performance_override name=render_triangle_budget value=12000000'   # value=auto clears
+```
+
+The same three commands are in the command registry, so the console, scripts and MCP clients have them; in the
+app `calibrate` measures the GPU too.
+
+### What it probes
+
+| | How |
+|---|---|
+| GPU | `GL_VENDOR`, `GL_RENDERER`, `GL_VERSION`, `GL_MAX_TEXTURE_SIZE`, timer queries (`GL_TIME_ELAPSED`) |
+| Memory type | Software (llvmpipe, softpipe, SwiftShader, GDI Generic, Microsoft Basic Render), unified (Apple GPUs on macOS and Asahi), integrated or discrete, from the renderer string, refined by `GLX_RENDERER_UNIFIED_MEMORY_ARCHITECTURE_MESA` / `..._ACCELERATED_MESA` where available. Only the memory type comes from names; tiers come from measurements and memory sizes |
+| Video memory | the first that answers: `GL_NVX_gpu_memory_info` (NVIDIA; Mesa's radeonsi and asahi too), `GL_ATI_meminfo` (free memory only), `GLX_MESA_query_renderer` (Mesa on X11), amdgpu's `mem_info_vram_total` in sysfs (Linux, also on Wayland), DXGI (Windows), CGL (macOS). Unified memory counts at most two thirds of the RAM (Metal's working set), whatever the driver reports |
+| Machine | RAM, hardware threads, SIMD (SSE4.2 / AVX2 / AVX-512 on x86, NEON / SVE on ARM) and what the build uses, OS, CPU brand (x86 cpuid, macOS sysctl, the device tree on ARM Linux) |
+
+### What it measures (about 0.5-1.5 s of work; medians of 5 runs, 3 quick)
+
+| Measurement | Work |
+|---|---|
+| Triangle throughput | a 512 x 256 quad grid (262k triangles, about 4 pixels each, like a whole sculpt on screen) drawn instanced into a 1024 x 1024 offscreen target, every instance in front of the last; the instance count is chosen for about 25 ms a run; GL timer queries, else glFinish around the CPU clock |
+| Upload bandwidth | `glBufferSubData` of a 32 MB buffer, waited for (glFinish) |
+| Brush dab | 20 Standard dabs (X symmetry, radius 0.12) on a generated 1M-triangle sphere, undone between runs |
+| Memory bandwidth | `memcpy` of 64 MB |
+
+### Profiles
+
+Two main tiers and a safe mode:
+
+- **Workstation**: 64 GB or more of RAM (60 GB reported) and either a discrete GPU with 16 GB or more (15 GB
+  reported) or a GPU sharing the system memory (Apple Silicon Max / Ultra, big APUs), whose pool counts as two
+  thirds of the RAM; and in both cases at least 1000M triangles/s, dabs under 3 ms, memory over 4 GB/s.
+- **Laptop / Budget**: everything else (8-32 GB RAM, 2-8 GB GPUs, Apple Silicon with less than 64 GB, thermal and
+  battery limits).
+- **Software** (safe mode): a software renderer, or under 60M triangles/s.
+
+A re-calibration of the same GPU keeps the previous tier while the new triangle throughput is within 15% of the
+boundary, so a busy machine doesn't flip between tiers. Settings, before overrides:
+
+| Setting | How |
+|---|---|
+| `render_triangle_budget` | half a 60 Hz frame of the measured throughput, clamped per tier (Software 0.25-4M, Laptop 2-40M, Workstation 8-600M) |
+| `motion_proxy_threshold` | the budget (at least 262k): scenes over it draw the motion proxy while the view moves |
+| `vram_budget_mb` | 80% of dedicated memory; unified: two thirds of RAM; integrated: half of RAM; software: a quarter |
+| `upload_budget_mb_per_frame` | a quarter of a 60 Hz frame at the measured upload bandwidth (4-1024 MB) |
+| `max_texture_size` | the GL limit, at most 4096 / 8192 / 16384 by tier, 8192 under 2 GB of GPU memory |
+| `max_subdivision_triangles` | the smaller of half the RAM at 100 bytes per triangle and the GPU budget at 16 bytes per triangle, capped by tier |
+| `micro_triangle_limit` | a quarter of the GPU budget at 8 bytes per micro-triangle, capped by tier |
+| `threads` | hardware threads (at most 16, the pool's limit); half in safe mode, where llvmpipe draws on the same cores. Applies at the next start |
+| `target_fps` | 60, 120 or 144 from the display (`TierConfig::targetHz`) |
+
+Every setting can be overridden by hand (Preferences > Performance > Manual overrides, or `set_performance_override`),
+and overrides survive re-calibration.
+
+### TierConfig (core/TierConfig.h)
+
+What feat/micromesh and feat/zero-latency read, through `currentTierConfig()` (thread-safe; `tierConfigRevision()`
+changes when it does):
+
+| Field | Software | Laptop / Budget | Workstation |
+|---|---|---|---|
+| `residentCacheCapMB` | RAM / 8, at most 1 GB | RAM / 4, at most 4 GB | RAM x 2/5, at most 64 GB |
+| `activeTriangleBudget` | 0.5M | 2M | 8M+ (half the render budget, at most 64M) |
+| `uploadBudgetMBPerFrame` | the profile's | the profile's | the profile's |
+| `draftBrushMode` (normals and cavity at pen release) | on | off (on battery: on) | off (on battery: on) |
+| `zeroCopyUMA` | the GPU shares system memory: unified or integrated, in any tier (a 64 GB+ Apple Silicon Workstation too) | | |
+| `targetHz` | 60 | 60 / 120 / 144 from the display | 60 / 120 / 144 from the display |
+
+The app reads the power source with `SDL_GetPowerInfo` at start and every 5 seconds. On battery, whatever the tier
+(an Apple Silicon Workstation is a laptop too): draft brushes,
+half the upload budget and 60 Hz (unless set by hand), and the status bar says so. The `draft_brush` override
+(on / off) wins over both. `draftBrushMode` is a flag for the brush engine; the brushes don't read it yet.
+
+### Render triangle budget and the frame governor
+
+`renderTriangleBudget()` (core/HardwareProfile.h) is the number of triangles the 3D view may draw per frame to
+hold the target frame rate; `motionProxyThreshold()` is where Fast Navigation switches big scenes to their
+motion proxy. The frame governor (core/FrameGovernor.h) adjusts both from real frames:
+
+- Inputs per drawn frame: CPU time from input to swap (without the vsync wait), GPU time from a `GL_TIME_ELAPSED`
+  query read up to 4 frames later (never waiting), triangles drawn, the scene's full triangle count, whether
+  the view is moving and whether the proxy was used. Only moving frames count: still frames draw everything in
+  full and the governor can't change them. Frames over 250 ms (dialogs, loading) are ignored.
+- Every 20 counted frames it takes the medians. Above the target frame time it lowers the budget (aiming at 80%
+  of the frame, at most halving it); under 60% it raises it (at most 1.25x) when the budget is what limits the
+  view. In between it holds (the dead band). After a change, 5 frames are ignored.
+- Raising the budget past the scene's size would switch the proxy off; it only does when the predicted full
+  frame stays under 90% of the target, so the view never flips between proxy and full detail.
+- Bounds: an eighth to four times the profile's budget. It changes only how much is drawn, never the mesh.
+
+Today's renderer uses the governed threshold for the motion proxy (Preferences > Performance > Fast Navigation;
+`SF_FAST_NAVIGATION_TRIANGLES` still overrides it for tests).
+
+**How micromesh consumes it:** read `renderTriangleBudget()` once per frame (an atomic load) and amplify
+micro-displacement only until the frame's drawn triangles reach it, finest where the screen-space error is
+largest; keep the generated micro-triangles under `currentPerformanceSettings().microTriangleLimit` and their
+pages under `currentTierConfig().residentCacheCapMB`. Report the triangles actually drawn through
+`Renderer::lastDrawnTriangles()` so the governor sees them; it then raises or lowers the budget continuously
+(continuous level of detail converges without the proxy's step, see the `governor_converges_*` tests).
+
+### This machine
+
+Apple M1 Pro under Asahi Linux, on battery, with about 35 other processes compiling (load average 35 on 10
+cores), so the CPU numbers here are low (memory bandwidth measured 23 GB/s on a quieter run, dabs 0.07 ms on a
+0.2M sphere):
+
+```
+"gl_renderer": "Apple M1 Pro (G13S C0)", "gl_version": "4.6 (Core Profile) Mesa 26.1.8", "gpu_kind": "unified",
+"vram_mb": 31667 (GL_NVX_gpu_memory_info: all of the RAM), "timer_query": true, "cpu_threads": 10, "simd": ["neon"]
+measurements: 1358M triangles/s (GPU timer), upload 12.8 GB/s, dab 0.37 ms (2.5k vertices), memory 5.9 GB/s, 607 ms
+profile: Laptop (32 GB of RAM is under the 64 GB Workstation needs; this run predates the unified-memory rule, so its
+         reason read "no discrete GPU"; it now reads "30.9 GB RAM")
+settings: render budget 11.3M, motion proxy from 11.3M, GPU memory 20.6 GB, uploads 50 MB/frame, textures 8192,
+          subdivision 120M, micro-triangles 256M, 10 threads, 60 fps
+tier_config: cache 4 GB, active 2M, uploads 25 MB/frame (battery), draft brushes, zero-copy UMA, 60 Hz, on battery
+```
+
+Across runs on the busy machine the triangle throughput ranged 913-1410M/s and upload 4.3-21 GB/s.
+
+## 0.9.7: big brushes on dense meshes (feat/perf-pass)
 
 What a user feels on a heavy model is a large brush: how far it trails the pointer, how long a frame takes, and
 what happens on press and release. Measured with the stroke the app draws itself (pointer read once per pass of

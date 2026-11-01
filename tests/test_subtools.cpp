@@ -183,6 +183,6 @@ TEST(subtool_append_file) {
     CHECK(doc.subtoolCount() == 2 && doc.activeSubtoolInfo().name == "sf_subtool_eye");
     CHECK(doc.mesh.triangleCount() == makeIcosphere(1).triangleCount());
     CHECK(!reg.execute(doc, "subtool_append", {{"path", tempPath("sf_missing.obj")}}).ok);
-    CHECK(!reg.execute(doc, "subtool_append", {{"type", std::string("torus")}}).ok);
+    CHECK(!reg.execute(doc, "subtool_append", {{"type", std::string("teapot")}}).ok);
     std::filesystem::remove(path);
 }

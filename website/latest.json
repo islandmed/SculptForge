@@ -1,11 +1,11 @@
 {
-  "version": "0.9.7",
+  "version": "0.10.1",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Big brushes on dense meshes: a third faster per frame, about half the lag behind the pen, no pause when you lift it",
-    "A right click on the canvas opens the QuickMenu, as in ZBrush",
-    "Dynamic topology with symmetry now remeshes both sides of a QRemeshed or asymmetric mesh",
-    "Fixed: the orthographic view (Numpad 5) shaded MatCaps and lights inside out"
+    "Micro levels: sculpt hundreds of millions of polygons (about a billion in under 2 GB)",
+    "Material painting (PBR): roughness, metal, normal, height and more, with export presets for Unreal, Unity, glTF and Godot",
+    "Sculpt Timeline, Help > Benchmark, and settings tuned to your computer on first start",
+    "From your feedback: Maya navigation, focal length, more primitives and Insert on the model, a brush ring that follows the surface"
   ]
 }

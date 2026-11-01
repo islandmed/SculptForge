@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SculptForge Benchmarks</title>
+  <meta name="description" content="How responsive sculpting in SculptForge is on real computers: proof mode results submitted by users, with frame times and how far the stroke trails the pen on 5 to 100 million triangle meshes.">
+  <!-- Proof mode results (sculptforge --benchmark, Help > Benchmark). Data: results.json beside this page, kept by
+       tools/benchmark/submit.py; format in docs/benchmark.md. -->
+  <style>
+    @font-face { font-family: "Inter"; src: url("../fonts/Inter-Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+    @font-face { font-family: "Inter"; src: url("../fonts/Inter-SemiBold.ttf") format("truetype"); font-weight: 600 700; font-display: swap; }
+    :root {
+      color-scheme: dark;
+      --bg: #0f0f12; --panel: #1b1b21; --border: #2a2a31;
+      --text: #ececf1; --muted: #a3a3ad; --accent: #f28c3c; --accent-2: #ffb06a; --good: #7fc28a; --warn: #e2b155; --bad: #e5604a;
+    }
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]) { color-scheme: light; --bg: #f6f6f8; --panel: #ffffff; --border: #dcdce2; --text: #18181c; --muted: #5d5d66; --accent-2: #b5560f; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text);
+           font: 400 16px/1.5 "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    main { max-width: 1100px; margin: 0 auto; padding: 32px 16px 64px; }
+    h1 { font-size: 1.9rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+    h2 { font-size: 1.15rem; margin: 32px 0 8px; }
+    a { color: var(--accent-2); }
+    .muted { color: var(--muted); }
+    .small { font-size: 0.85rem; }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin: 16px 0; }
+    .filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 16px 0; }
+    select { font: inherit; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; }
+    .scroll { overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: 0.92rem; }
+    th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    th { color: var(--muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    td.num { text-align: right; }
+    .ok { color: var(--good); } .meh { color: var(--warn); } .slow { color: var(--bad); }
+    code { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; font-size: 0.9em; }
+    .empty { padding: 24px; text-align: center; }
+  </style>
+</head>
+<body>
+<main>
+  <p class="small"><a href="../index.html">SculptForge</a></p>
+  <h1>Benchmarks</h1>
+  <p class="muted">How responsive sculpting is on real computers, measured by SculptForge's proof mode and submitted by the
+    people who ran it. Each row is one mesh size of one run.</p>
+
+  <div class="card small">
+    <strong>What the numbers mean.</strong> Proof mode plays a scripted pen stroke (240 pointer samples a second) through the
+    same code a real pen goes through, on spheres of 5, 20 and 33 million triangles (100 million with enough memory).
+    <em>Frame</em> is the time per frame: the median (p50) and the 95th / 99th percentile, the hitches you feel.
+    <em>Trails</em> is how far the stroke on screen is behind the pointer: from the pointer sample to the frame that shows it
+    handed to the display, in milliseconds, and the same distance along the path in pixels. Lower is better everywhere.
+    Vertical sync is off unless noted. Every run also records a video with these numbers on screen.
+  </div>
+
+  <div class="filters">
+    <label>Mesh <select id="size"><option value="">all sizes</option></select></label>
+    <label>Phase <select id="phase">
+      <option value="stroke">60 px brush stroke</option>
+      <option value="large brush stroke">240 px brush stroke</option>
+      <option value="orbit">turning the view</option>
+    </select></label>
+    <span class="muted small" id="count"></span>
+  </div>
+
+  <div class="scroll">
+    <table>
+      <thead><tr>
+        <th>Mesh</th><th>Processor</th><th>Graphics</th><th>RAM</th><th class="num">fps</th>
+        <th class="num">Frame p50</th><th class="num">p95</th><th class="num">p99</th>
+        <th class="num">Trails p50</th><th class="num">p95</th><th>Version</th><th>By</th><th>Video</th>
+      </tr></thead>
+      <tbody id="rows"><tr><td colspan="13" class="empty muted">Loading results...</td></tr></tbody>
+    </table>
+  </div>
+
+  <h2>Run it yourself</h2>
+  <p>In SculptForge: <strong>Help &gt; Benchmark</strong>. From a terminal: <code>sculptforge --benchmark</code>. Both write a
+    JSON result and an MP4 of the run.</p>
+  <h2>Submit a result</h2>
+  <ol>
+    <li>Run it on a quiet machine (close other heavy programs).</li>
+    <li>Check the file: <code>python3 tools/benchmark/submit.py check result.json</code>.</li>
+    <li>Add it: <code>python3 tools/benchmark/submit.py add result.json --name "your name" --video https://...</code>, and
+      open a pull request with the change to <code>website/benchmarks/results.json</code>, or attach the JSON to an
+      <a href="https://github.com/islandmed/SculptForge/issues">issue</a>.</li>
+  </ol>
+  <p class="small muted">The file format: <a href="https://github.com/islandmed/SculptForge/blob/main/docs/benchmark.md">docs/benchmark.md</a>.</p>
+</main>
+<script>
+(function () {
+  "use strict";
+  const rows = document.getElementById("rows"), sizeSel = document.getElementById("size"),
+        phaseSel = document.getElementById("phase"), count = document.getElementById("count");
+  let results = [];
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const ms = (v) => (typeof v === "number" ? v.toFixed(v < 10 ? 1 : 0) + " ms" : "-");
+  // Frame-time colour: under a 60 Hz frame, under two, slower.
+  const cls = (v) => (typeof v !== "number" ? "" : v <= 16.7 ? "ok" : v <= 33.4 ? "meh" : "slow");
+  function cell(v, unit) { return `<td class="num ${cls(v)}">${unit ? unit(v) : ms(v)}</td>`; }
+  function render() {
+    const size = sizeSel.value, phase = phaseSel.value, out = [];
+    for (const r of results) {
+      for (const run of r.runs || []) {
+        if (size && run.label !== size) continue;
+        const ph = (run.phases || []).find((p) => p.name === phase);
+        if (!ph) continue;
+        out.push({ r, run, ph });
+      }
+    }
+    out.sort((a, b) => (a.run.triangles - b.run.triangles) || ((a.ph.frame_ms || {}).p50 - (b.ph.frame_ms || {}).p50));
+    count.textContent = out.length ? `${out.length} row${out.length === 1 ? "" : "s"}` : "";
+    if (!out.length) {
+      rows.innerHTML = `<tr><td colspan="13" class="empty muted">No results yet${size || phase ? " for this choice" : ""}. Be the first: run proof mode and submit yours.</td></tr>`;
+      return;
+    }
+    rows.innerHTML = out.map(({ r, run, ph }) => {
+      const hw = r.hardware || {}, f = ph.frame_ms || {}, lag = ph.lag_ms, px = ph.lag_px;
+      const trails = (o, p) => (o ? `${o[p].toFixed(0)} ms` + (px ? ` / ${px[p].toFixed(0)} px` : "") : "-");
+      return `<tr><td>${esc(run.label)}</td><td>${esc(hw.cpu)}</td><td>${esc((hw.gpu || "").split(",")[0])}</td>` +
+        `<td>${esc(hw.ram_gb)} GB</td><td class="num">${esc(ph.fps)}</td>` +
+        cell(f.p50) + cell(f.p95) + cell(f.p99) +
+        `<td class="num">${trails(lag, "p50")}</td><td class="num">${trails(lag, "p95")}</td>` +
+        `<td>${esc((r.sculptforge || {}).version)}${r.vsync ? " (vsync)" : ""}</td><td>${esc(r.name)}</td>` +
+        `<td>${r.video ? `<a href="${esc(r.video)}" rel="nofollow noopener">watch</a>` : "-"}</td></tr>`;
+    }).join("");
+  }
+  fetch("results.json", { cache: "no-cache" })
+    .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
+    .then((data) => {
+      results = Array.isArray(data.results) ? data.results : [];
+      const sizes = [...new Set(results.flatMap((r) => (r.runs || []).map((x) => x.label)))];
+      const tris = Object.fromEntries(results.flatMap((r) => (r.runs || []).map((x) => [x.label, x.triangles])));
+      sizes.sort((a, b) => tris[a] - tris[b]).forEach((s) => sizeSel.add(new Option(s + " triangles", s)));
+      render();
+    })
+    .catch(() => { rows.innerHTML = '<tr><td colspan="13" class="empty muted">The results could not be loaded.</td></tr>'; });
+  sizeSel.addEventListener("change", render);
+  phaseSel.addEventListener("change", render);
+})();
+</script>
+</body>
+</html>
