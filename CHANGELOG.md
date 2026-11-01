@@ -34,6 +34,14 @@ All notable changes to SculptForge are listed here. The format follows
   towards the viewer by that ray too (the direction from the eye, which an orthographic view can put inside
   the model, turned them away). UI test ortho_shading (a new `luma@X,Y` value reads the last screenshot): the
   same sphere in both views matches within 1 brightness level, where 0.9.6 was up to 38 off.
+- Dynamic topology with symmetry remeshes the mirrored side of a model whose sides aren't mirrored polygon for
+  polygon (#23; a QRemeshed head in the report). Splits, collapses and flips are found under the brush and done
+  on the mirror images of the same edges; without images (nothing to pair the vertices with) the other side only
+  moved and kept its coarse triangles: a stroke left 2,199 triangles along its path and 33 along its mirror image.
+  An edge under a mirror image of the brush whose image on the brush's side is missing is now remeshed where it
+  is (2,260 there). Symmetric meshes still get exactly mirrored topology (the 1M dynamic topology benchmark's times
+  are unchanged). Test `dyntopo_symmetry_remeshes_both_sides_of_an_asymmetric_mesh` (a turned sphere, then
+  random strokes with X and Z symmetry, valid after every dab, undone exactly).
 
 ## [0.9.6] - 2026-10-31
 

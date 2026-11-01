@@ -18,6 +18,9 @@ are placed. See [Performance](performance.md).
 
 - The orthographic view (<kbd>Numpad 5</kbd>) shades like the perspective one: MatCaps and the lights no longer
   look inside out.
+- Dynamic topology with symmetry now adds detail on the mirrored side too when the model's two sides aren't
+  built from mirrored polygons (a QRemeshed head, say): before, only the side under the brush got the new
+  triangles. See [Dynamic topology](dynamic-topology.md).
 
 ## Version 0.9.6
 
