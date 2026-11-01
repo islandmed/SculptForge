@@ -373,3 +373,48 @@ TEST(hidden_geometry_skipped_by_pick_and_brushes) {
     CHECK(reg.execute(d, "show_all").ok);
     for (uint32_t v = 0; v < d.mesh.vertexCount() / 2; ++v) CHECK(d.mesh.positions[v] == before[v]);
 }
+
+TEST(visibility_selection_with_symmetry) {
+    // #51 follow-up: with symmetry the mirror image of a SelectRect / SelectLasso counts too, as for the mask ones.
+    Document d = makeDoc(makeIcosphere(3));
+    CommandRegistry reg;
+    const std::string identity = "1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"; // NDC = world
+    // Keep a box on the right (x > 0.5) with X symmetry: the matching box on the left stays visible too.
+    CHECK(reg.execute(d, "hide_rect", {{"x0", 0.5}, {"y0", -2.0}, {"x1", 2.0}, {"y1", 2.0}, {"view_proj", identity},
+                                       {"symmetry", std::string("x")}}).ok);
+    int wrong = 0;
+    for (uint32_t t = 0; t < d.mesh.triangleCount(); ++t) {
+        const float x = centroid(d.mesh, t).x;
+        if (std::abs(std::abs(x) - 0.5f) > 1e-3f && d.mesh.triangleHidden(t) != (std::abs(x) < 0.5f)) ++wrong;
+    }
+    CHECK(wrong == 0 && hiddenCount(d.mesh) > 0);
+    CHECK(reg.execute(d, "undo").ok);
+
+    // Alt (inside): hide the box and its mirror image.
+    CHECK(reg.execute(d, "hide_rect", {{"x0", 0.5}, {"y0", -2.0}, {"x1", 2.0}, {"y1", 2.0}, {"view_proj", identity},
+                                       {"inside", true}, {"symmetry", std::string("x")}}).ok);
+    wrong = 0;
+    for (uint32_t t = 0; t < d.mesh.triangleCount(); ++t) {
+        const float x = centroid(d.mesh, t).x;
+        if (std::abs(std::abs(x) - 0.5f) > 1e-3f && d.mesh.triangleHidden(t) != (std::abs(x) > 0.5f)) ++wrong;
+    }
+    CHECK(wrong == 0);
+    CHECK(reg.execute(d, "show_all").ok);
+
+    // A lasso on the top (y > 0.5) with Y symmetry keeps the bottom cap as well; without symmetry only the top.
+    const std::string top = "-2 0.5  2 0.5  2 2  -2 2";
+    CHECK(reg.execute(d, "hide_lasso", {{"points", top}, {"view_proj", identity}, {"symmetry", std::string("y")}}).ok);
+    size_t bottomVisible = 0, middleVisible = 0;
+    for (uint32_t t = 0; t < d.mesh.triangleCount(); ++t) {
+        const float y = centroid(d.mesh, t).y;
+        if (y < -0.55f) bottomVisible += !d.mesh.triangleHidden(t);
+        if (std::abs(y) < 0.45f) middleVisible += !d.mesh.triangleHidden(t);
+    }
+    CHECK(bottomVisible > 0 && middleVisible == 0);
+    CHECK(reg.execute(d, "undo").ok);
+    CHECK(reg.execute(d, "hide_lasso", {{"points", top}, {"view_proj", identity}}).ok);
+    bottomVisible = 0;
+    for (uint32_t t = 0; t < d.mesh.triangleCount(); ++t) bottomVisible += centroid(d.mesh, t).y < -0.55f && !d.mesh.triangleHidden(t);
+    CHECK(bottomVisible == 0);
+    CHECK(!reg.execute(d, "hide_rect", {{"symmetry", std::string("w")}}).ok);
+}

@@ -8,11 +8,13 @@
 // changed. The mask_* commands wrap them with an undo step.
 #pragma once
 
+#include "core/Commands.h"
 #include "core/Mesh.h"
 
 #include <glm/glm.hpp>
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace sf {
@@ -54,6 +56,10 @@ bool maskInShape(Mesh& mesh, const glm::mat4& viewProj, const ScreenPolygon& sha
 // instead (ZBrush: Ctrl+drag on the background).
 bool shapeCoversMesh(const Mesh& mesh, const glm::mat4& viewProj, const ScreenPolygon& shape,
                      const std::vector<glm::vec3>& mirrors = {});
+
+// The "symmetry" argument of a command ("x", "xz" ...) as mirror sign vectors (Sculptor::mirrors, the first one
+// the identity); just the identity without it. False, saying why, for anything but the axes x, y and z.
+bool symmetryMirrorsArg(const Args& a, std::vector<glm::vec3>& mirrors, std::string& error);
 
 // Registers mask_clear, mask_all, mask_invert, mask_blur, mask_sharpen,
 // mask_grow, mask_shrink, mask_by_cavity, mask_by_polygroup, mask_rect and

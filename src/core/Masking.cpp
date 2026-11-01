@@ -58,8 +58,16 @@ bool repeatPass(Mesh& mesh, int iterations, F next) {
     return changed;
 }
 
+
+float smoothstep01(float e0, float e1, float x) {
+    float t = std::clamp((x - e0) / std::max(e1 - e0, 1e-6f), 0.0f, 1.0f);
+    return t * t * (3.0f - 2.0f * t);
+}
+
+} // namespace
+
 // The "symmetry" argument ("x", "xz" ...) as mirror sign vectors (Sculptor::mirrors); none without it.
-bool symmetryArg(const Args& a, std::vector<glm::vec3>& mirrors, std::string& error) {
+bool symmetryMirrorsArg(const Args& a, std::vector<glm::vec3>& mirrors, std::string& error) {
     Symmetry sym{false, false, false};
     for (char c : argString(a, "symmetry")) {
         const char l = char(std::tolower(static_cast<unsigned char>(c)));
@@ -74,13 +82,6 @@ bool symmetryArg(const Args& a, std::vector<glm::vec3>& mirrors, std::string& er
     mirrors = Sculptor::mirrors(sym);
     return true;
 }
-
-float smoothstep01(float e0, float e1, float x) {
-    float t = std::clamp((x - e0) / std::max(e1 - e0, 1e-6f), 0.0f, 1.0f);
-    return t * t * (3.0f - 2.0f * t);
-}
-
-} // namespace
 
 bool maskClear(Mesh& mesh) {
     if (!mesh.hasMask()) return false;
@@ -331,7 +332,7 @@ void registerMaskingCommands(CommandRegistry& registry) {
                  std::string error;
                  if (!viewProjArg(doc.mesh, a, vp, error) || !shape(a, points, error)) return {false, error};
                  std::vector<glm::vec3> mirrors;
-                 if (!symmetryArg(a, mirrors, error)) return {false, error};
+                 if (!symmetryMirrorsArg(a, mirrors, error)) return {false, error};
                  const ScreenPolygon polygon(points);
                  const bool unmask = argBool(a, "unmask", false);
                  if (argBool(a, "clear_outside", false) && !shapeCoversMesh(doc.mesh, vp, polygon, mirrors)) {

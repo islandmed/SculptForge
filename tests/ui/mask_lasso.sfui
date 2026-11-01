@@ -153,3 +153,23 @@ key ctrl+z
 expect_value hidden == $kept
 click "Show all"
 expect_value hidden == 0
+
+# SelectLasso with symmetry X (#51 follow-up): Ctrl+Shift+Alt+drag hides the inside and its mirror image too, as the
+# mask selections do.
+expect_value symmetry_x == 0
+hold ctrl+shift+alt
+drag_path 0.05 0.3 0.3 0.3 0.3 0.7 0.05 0.7
+hold none
+expect_value hidden > 100
+remember hidden one_side
+key ctrl+z
+expect_value hidden == 0
+key x
+expect_value symmetry_x == 1
+hold ctrl+shift+alt
+drag_path 0.05 0.3 0.3 0.3 0.3 0.7 0.05 0.7
+hold none
+expect_value hidden > $one_side*1.6
+shot hide_lasso_symmetry
+key ctrl+z
+expect_value hidden == 0

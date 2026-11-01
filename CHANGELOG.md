@@ -53,6 +53,8 @@ All notable changes to SculptForge are listed here. The format follows
 - MaskLasso and MaskRect ignored symmetry (#51): the mirror image of the shape is masked too now, as with mask
   strokes. A Ctrl+click on the model with MaskLasso or MaskRect blurs the mask (Ctrl+Alt+click sharpens it), as
   with MaskPen; it did nothing. A lasso or rectangle that covers none of the model clears the mask.
+- SelectRect and SelectLasso (hide / show) ignored symmetry (#51 follow-up): with X / Y / Z on, the mirror image of
+  the shape counts as inside too, as with MaskRect and MaskLasso (`hide_rect` / `hide_lasso symmetry=x`).
 - macOS (#41): reopening in full screen (restored from the last session, #35) left the menu bar and window buttons
   unreachable until another display was clicked; full screen is now entered after the window is on screen.
 

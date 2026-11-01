@@ -4,6 +4,7 @@
 
 #include "core/Commands.h"
 #include "core/Dyntopo.h"
+#include "core/Masking.h"
 #include "core/Multires.h"
 #include "core/Polygroups.h"
 #include "core/Primitives.h"
@@ -246,14 +247,9 @@ bool normalizedPiece(const Mesh& source, float size, Mesh& out) {
 // point, +Y along the normal, turned by twist, with mirrored copies for symmetry; merged into the active
 // SubTool as one new polygroup, one undo step.
 CommandResult insertPiece(Document& doc, Mesh prim, const Args& a, const std::string& label) {
-    Symmetry sym{false, false, false};
-    for (char ch : argString(a, "symmetry")) {
-        const char l = char(std::tolower(static_cast<unsigned char>(ch)));
-        if (l == 'x') sym.x = true;
-        else if (l == 'y') sym.y = true;
-        else if (l == 'z') sym.z = true;
-        else return {false, "symmetry takes the axes x, y and z"};
-    }
+    std::vector<glm::vec3> mirrors;
+    std::string error;
+    if (!symmetryMirrorsArg(a, mirrors, error)) return {false, error};
     const float size = float(std::max(argNumber(a, "size", 0.2), 1e-4));
     glm::vec3 n(float(argNumber(a, "nx", 0.0)), float(argNumber(a, "ny", 1.0)), float(argNumber(a, "nz", 0.0)));
     n = glm::length(n) > 1e-8f ? glm::normalize(n) : glm::vec3(0, 1, 0);
@@ -283,7 +279,7 @@ CommandResult insertPiece(Document& doc, Mesh prim, const Args& a, const std::st
     // (inserted on a plane itself) is left out.
     std::vector<Mesh> copies;
     std::vector<glm::vec3> placed{at};
-    for (const glm::vec3& m : Sculptor::mirrors(sym)) {
+    for (const glm::vec3& m : mirrors) {
         const glm::vec3 centre = at * m;
         if (std::any_of(placed.begin(), placed.end(),
                         [&](const glm::vec3& p) { return glm::length(centre - p) < size * 0.25f; }))

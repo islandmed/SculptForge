@@ -80,6 +80,10 @@ it, including triangles on the far side of the model. A lasso that crosses itsel
 encloses twice. You can press or release <kbd>Alt</kbd> while dragging; what counts is whether it is held when
 you let go.
 
+With symmetry on (**X**, **Y**, **Z** on the top shelf), the mirror image of the shape counts as inside too, as with
+the mask selections: keeping the left eye keeps the right one, and hiding one ear hides both
+(`hide_rect` / `hide_lasso symmetry=x`).
+
 SculptForge refuses a change that would hide everything, as ZBrush does. Every visibility change is one undo
 step, so <kbd>Ctrl</kbd>+<kbd>Z</kbd> brings back what you just hid.
 
