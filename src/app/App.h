@@ -229,6 +229,14 @@ private:
     float radiusPx_ = 60.0f;
     float strength_ = 0.5f;
     Symmetry symmetry_;
+    // Local symmetry's centre (symmetry_.pivot) follows the active Part: worked out again, outside strokes, when
+    // the Part, its vertex count or the undo history changed (refreshSymmetryPivot, PanelMasking.cpp).
+    uint64_t symmetryPivotKey_ = ~uint64_t(0);
+    void refreshSymmetryPivot();
+    // The symmetry arguments of the commands that follow the brushes' symmetry (symmetry, radial, radial_axis,
+    // local), added to `args`.
+    Args withSymmetryArgs(Args args);
+    int symmetryCopiesDrawn_ = 0; // brush cursors the last drawSurfaceCursor drew (UI tests: cursor_copies)
     bool invertToggle_ = false;
     bool frontFacesOnly_ = false;
     bool pressureStrength_ = true;
@@ -1112,6 +1120,7 @@ private:
     void drawPalette_Stroke();
     void drawPalette_Tool();
     void drawPalette_Transform();
+    void drawRadialSymmetryControls(); // Transform > Symmetry: radial symmetry's toggle, count and axis (Palettes.cpp)
     void drawAlphaSection();
     void drawLayersContents();
     // Paint Layers sub-palette (PanelPaintLayers.cpp).
@@ -1572,6 +1581,8 @@ private:
     std::shared_ptr<struct TimelineUiState> timelineUi_;
     std::shared_ptr<struct ProofState> proof_;
     void drawTimelineUi();            // once a frame from drawUi: keeps the timeline attached and draws the strip
+    float timelineTopInset_ = 0.0f;   // how far down the canvas the strip (or its tab) reaches at the top; 0 at the bottom
+    float timelineStripY_ = -1.0f;    // the strip's (or tab's) top edge in window pixels this frame (-1: not shown)
     void registerTimelineUiActions(); // view.timeline, timeline.timelapse, help.benchmark
     void startTimelapse(const std::string& path, int width, int height, float seconds, int fps);
     bool timelapseStep(double budgetSeconds); // renders frames for up to the budget; false when finished

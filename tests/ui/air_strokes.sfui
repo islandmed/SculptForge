@@ -48,7 +48,7 @@ expect_value masked > 0
 expect_value camera_yaw == $yaw1
 remember masked m0
 hold ctrl
-drag_path -0.3 -0.3 -0.3 -0.3
+drag_path -0.3 -0.05 -0.3 -0.05
 hold none
 expect_value masked > $m0
 key ctrl+shift+a

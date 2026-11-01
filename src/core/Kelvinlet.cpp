@@ -669,14 +669,14 @@ void Sculptor::kelvinletStep(Mesh& mesh, BVH& bvh, BrushType type, const Kelvinl
     kelvinOverBudget_ = false;
     dabVerts_.clear();
     dabLeaves_.clear();
-    for (const glm::vec3& m : mirrors(sym)) {
+    for (const SymCopy& m : copies(sym)) {
         KelvinletStep ms = step;
-        ms.center *= m;
-        ms.delta *= m;
-        ms.travel *= m;
-        ms.viewDir *= m;
+        ms.center = m.point(step.center);
+        ms.delta = m.dir(step.delta);
+        ms.travel = m.dir(step.travel);
+        ms.viewDir = m.dir(step.viewDir);
         // The rotation axis is a pseudovector: a mirror flips it once more (det = -1 for an odd mirror count).
-        ms.axis = step.axis * m * (m.x * m.y * m.z);
+        ms.axis = m.dir(step.axis) * m.handedness();
         kelvinletSingle(mesh, bvh, k, ms);
     }
     if (kelvinletFarPending()) { // one group of the far field's vertices catches up (see KelvinFarField)
@@ -739,13 +739,8 @@ void Sculptor::dabKelvinlet(Mesh& mesh, BVH& bvh, BrushType type, const DabParam
 void Sculptor::cloneStamp(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym) {
     dabVerts_.clear();
     dabLeaves_.clear();
-    for (const glm::vec3& m : mirrors(sym)) {
-        DabParams mp = p;
-        mp.center *= m;
-        mp.viewDir *= m;
-        mp.strokeDelta *= m;
-        mp.alphaUp *= m;
-        dabVdmSingle(mesh, bvh, mp, m.x * m.y * m.z);
+    for (const SymCopy& m : copies(sym)) {
+        dabVdmSingle(mesh, bvh, transformed(p, m), m.handedness());
     }
     updateDabNormals(mesh, bvh);
 }

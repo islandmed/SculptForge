@@ -300,6 +300,10 @@ void App::storeProjectSettings() {
     sym.set("x", symmetry_.x);
     sym.set("y", symmetry_.y);
     sym.set("z", symmetry_.z);
+    sym.set("radial", symmetry_.radialEnabled); // radial symmetry (#63): on, its count and axis
+    sym.set("radial_count", double(symmetry_.radial));
+    sym.set("radial_axis", double(symmetry_.radialAxis));
+    sym.set("local", symmetry_.local); // around the active Part's centre
     s.set("symmetry", std::move(sym));
 
     Json gizmo = Json::object(); // Gizmo 3D (Gizmo.cpp): where the pivot is and the options
@@ -395,6 +399,16 @@ void App::applyProjectSettings() {
         readBool(sym, "x", symmetry_.x);
         readBool(sym, "y", symmetry_.y);
         readBool(sym, "z", symmetry_.z);
+        symmetry_.radialEnabled = false; // (older projects have none)
+        symmetry_.local = false;
+        readBool(sym, "radial", symmetry_.radialEnabled);
+        readBool(sym, "local", symmetry_.local);
+        float count = float(symmetry_.radial), axis = float(symmetry_.radialAxis);
+        readFloat(sym, "radial_count", count);
+        readFloat(sym, "radial_axis", axis);
+        symmetry_.radial = std::clamp(int(std::lround(count)), 2, Symmetry::kMaxRadial);
+        symmetry_.radialAxis = std::clamp(int(std::lround(axis)), 0, 2);
+        symmetryPivotKey_ = ~uint64_t(0);
     }
     if (const Json& g = s["gizmo"]; g.isObject()) {
         gizmo_.centreKey = ~uint64_t(0);
@@ -623,7 +637,8 @@ void App::drawUpdateBanner() {
     if (!updateAvailable_) return;
     const UpdateInfo& u = *updateAvailable_;
     const CanvasRect c = canvasRect(); // top centre of the 3D view, clear of the shelves
-    ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + 12.0f * uiScale_), ImGuiCond_Always, ImVec2(0.5f, 0.0f));
+    ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + timelineTopInset_ + 12.0f * uiScale_), ImGuiCond_Always,
+                            ImVec2(0.5f, 0.0f)); // (below the timeline strip when it is at the top)
     ImGui::SetNextWindowBgAlpha(0.96f);
     const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
                                    ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |

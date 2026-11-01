@@ -119,8 +119,8 @@ size_t paintDab(Sculptor& sculptor, Mesh& mesh, const BVH& bvh, const DabParams&
     static thread_local std::vector<uint32_t> verts;
     auto clock = std::chrono::steady_clock::now();
     size_t changed = 0;
-    for (const glm::vec3& m : Sculptor::mirrors(sym)) {
-        const glm::vec3 center = p.center * m, viewDir = p.viewDir * m;
+    for (const SymCopy& m : Sculptor::copies(sym)) {
+        const glm::vec3 center = m.point(p.center), viewDir = m.dir(p.viewDir);
         brushVertices(mesh, bvh, center, p.radius, verts);
         for (uint32_t v : verts) {
             if (p.frontFacesOnly && v < mesh.normals.size() && glm::dot(mesh.normals[v], viewDir) > 0.0f) continue;

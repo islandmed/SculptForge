@@ -7,11 +7,13 @@
 #include "core/Dyntopo.h"
 #include "core/Kelvinlet.h"
 #include "core/Mesh.h"
+#include "core/Symmetry.h"
 #include "core/Undo.h"
 
 #include <chrono>
 #include <functional>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -72,9 +74,17 @@ struct DabParams {
     bool keepVolume = false;
 };
 
-struct Symmetry {
-    bool x = true, y = false, z = false;
-};
+// Local symmetry's centre for a Part: the middle of its bounding box (in parallel).
+glm::vec3 symmetryPivot(const Mesh& mesh);
+// A dab's parameters for one copy: its centre, view direction, stroke delta and alpha orientation moved by it.
+inline DabParams transformed(const DabParams& p, const SymCopy& c) {
+    DabParams o = p;
+    o.center = c.point(p.center);
+    o.viewDir = c.dir(p.viewDir);
+    o.strokeDelta = c.dir(p.strokeDelta);
+    o.alphaUp = c.dir(p.alphaUp);
+    return o;
+}
 
 // --- Shared brush helpers (every brush, including future paint/mask brushes, goes through these) ---
 
@@ -193,8 +203,10 @@ public:
     // micro displacement along its normals instead.
     bool microMoveAlongNormals = false;
     MicroStroke& microStroke() { return micro_; }
-    // Mirror sign vectors for the enabled symmetry axes (always starts with (1,1,1)).
+    // Mirror sign vectors for the enabled symmetry axes (always starts with (1,1,1)); ignores radial and local.
     static std::vector<glm::vec3> mirrors(Symmetry sym);
+    // Every copy of a stroke (core/Symmetry.h, symmetryCopies), the identity first.
+    static std::vector<SymCopy> copies(Symmetry sym) { return symmetryCopies(sym); }
 
     // Puts every vertex the current stroke moved (or painted) back the way it
     // started (the stroke stays open). DragRect re-stamps from scratch while dragging.
@@ -260,7 +272,7 @@ private:
     bool topologyHeld_ = false;
     glm::vec3 lastCenter_{0.0f};
     float lastRadius_ = 0.0f, lastEdge_ = 0.0f;
-    std::vector<glm::vec3> lastMirrors_;
+    std::vector<SymCopy> lastMirrors_;
 
     bool active_ = false;
     bool frameWanted_ = false; // the next dabSingle records lastFrame
@@ -287,10 +299,10 @@ private:
     std::vector<uint8_t> firstTouch_;
     std::vector<uint32_t> blockFirst_;
     // Move brush: each mirror's vertices and weights (grabMirrors_: where each mirror's run ends, and its
-    // signs), every vertex once (sorted), and the BVH leaves holding them.
+    // matrix), every vertex once (sorted), and the BVH leaves holding them.
     std::vector<uint32_t> grabVerts_;
     std::vector<float> grabWeights_;
-    std::vector<std::pair<size_t, glm::vec3>> grabMirrors_;
+    std::vector<std::pair<size_t, glm::mat3>> grabMirrors_;
     std::vector<uint32_t> grabAll_, grabLeaves_;
 
     // Layer brush: per-stroke height already applied to each vertex.

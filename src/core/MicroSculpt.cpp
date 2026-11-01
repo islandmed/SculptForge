@@ -527,7 +527,7 @@ void MicroStroke::widen(MicroMesh& mm, float need) {
     strokeStep_ = mm.step;
 }
 
-void MicroStroke::beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, float radius, float focal, const glm::vec3& mirror) {
+void MicroStroke::beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, float radius, float focal, const glm::mat3& mirror) {
     if (!active_ || !m.micro) return;
     MicroMesh& mm = *m.micro;
     const uint32_t n = mm.n;
@@ -590,7 +590,7 @@ void MicroStroke::grab(Mesh& m, const glm::vec3& delta) {
     size_t weightBase = 0;
     for (const GrabMirror& gm : grabMirrors_) {
         const uint32_t cm = n / gm.stride, cs = (cm + 1) * (cm + 2) / 2;
-        const glm::vec3 dm = delta * gm.mirror;
+        const glm::vec3 dm = gm.mirror * delta;
         poolFor(gm.tris, [&](size_t b, size_t e) {
             thread_local std::vector<float> coarse;
             coarse.resize(cs);

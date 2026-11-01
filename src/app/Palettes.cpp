@@ -694,12 +694,27 @@ void App::drawPalette_Tool() {
     }
 }
 
+// Radial symmetry (#63): the toggle with Local, then the count and the axis.
+void App::drawRadialSymmetryControls() {
+    segmented(*this, {"transform.symmetry_radial", "transform.symmetry_local"});
+    ImGui::BeginDisabled(!symmetry_.radialEnabled);
+    ImGui::SetNextItemWidth(-FLT_MIN);
+    tray::SliderInt("##radialcount", &symmetry_.radial, 2, Symmetry::kMaxRadial, tr("Radial Count %d"));
+    ui::HelpText("Radial Count", nullptr,
+                 "How many copies radial symmetry makes of every stroke, turned evenly around the axis (2 to 64). With "
+                 "X, Y or Z on too, each mirror image gets its copies.",
+                 "Transform > Symmetry");
+    segmented(*this, {"transform.radial_axis_x", "transform.radial_axis_y", "transform.radial_axis_z"});
+    ImGui::EndDisabled();
+}
+
 void App::drawPalette_Transform() {
     const tray::Style style; // quiet check marks
     ImGui::TextDisabled("%s", tr("Gizmo"));
     drawGizmoContents(false);
     ImGui::TextDisabled("%s", tr("Symmetry"));
     segmented(*this, {"transform.symmetry_x", "transform.symmetry_y", "transform.symmetry_z"});
+    drawRadialSymmetryControls();
     actionRow(*this, {"view.frame", "subtool.solo"});
     actionRow(*this, {"view.polyf"});
 }

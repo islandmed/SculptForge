@@ -247,7 +247,7 @@ public:
     void dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& center, const glm::vec3& viewDir, float radius,
              float strength, bool invert, float focal, const glm::vec3& alphaUp, bool maskBrush, float maskStrength);
     // Move: captures the points within the dab (with each mirror's signs), then moves them along their normals.
-    void beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, float radius, float focal, const glm::vec3& mirror);
+    void beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, float radius, float focal, const glm::mat3& mirror);
     void grab(Mesh& m, const glm::vec3& delta);
     // Puts every grid point the stroke changed back (the stroke stays open).
     void restore(Mesh& m);
@@ -283,7 +283,7 @@ private:
     float baseEdge_ = 0.0f; // the base's average edge length
     // Move: per mirror its triangles and, per triangle, weight and direction of its coarse grid points.
     struct GrabMirror {
-        glm::vec3 mirror{1.0f};
+        glm::mat3 mirror{1.0f};
         uint32_t stride = 1, firstTri = 0, tris = 0;
     };
     std::vector<GrabMirror> grabMirrors_;

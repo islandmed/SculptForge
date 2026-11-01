@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Vdm.h"
+#include "core/Masking.h"
 
 #include "core/BrushLibrary.h"
 #include "core/Commands.h"
@@ -925,10 +926,8 @@ void registerVdmCommands(CommandRegistry& registry) {
                       p.alphaUp = up * std::cos(angle) - right * std::sin(angle);
                       p.vdm = doc.brushVdm.get();
                       Symmetry sym{false, false, false};
-                      const std::string axes = lower(argString(a, "symmetry"));
-                      sym.x = axes.find('x') != std::string::npos;
-                      sym.y = axes.find('y') != std::string::npos;
-                      sym.z = axes.find('z') != std::string::npos;
+                      std::string symError;
+                      if (!symmetryArg(a, doc.mesh, sym, symError)) return {false, symError};
                       if (!doc.sculptor.beginStroke(doc.mesh, "VDM", doc.activeLayer))
                           return {false, "Active layer weight is 0 - raise it to sculpt into the layer"};
                       doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::Vdm, p, sym);

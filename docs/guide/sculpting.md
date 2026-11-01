@@ -499,10 +499,37 @@ X and Z together give four-way symmetry.
 
 Symmetry mirrors across the scene's axes through the origin. Models that are centred on the origin, such as
 SculptForge's primitives and most character exports, mirror correctly. If a stroke lands in the wrong place on
-the other side, the model is off-centre.
+the other side, the model is off-centre: turn on **Local** (below).
 
-> **ZBrush:** this is ZBrush's world symmetry with the >X< axis on. Local symmetry, radial symmetry and
-> topological (poseable) symmetry are not available yet.
+### Radial symmetry
+
+Radial symmetry repeats every stroke around an axis, for wheels, flowers, columns, crowns and other round
+ornaments. Turn it on with **R** on the top shelf or in **Transform > Symmetry**, then set:
+
+- **Radial Count**: how many copies, evenly spaced around the axis (2 to 64; 8 to start with).
+- **X axis**, **Y axis** or **Z axis**: the axis the copies turn around (Y, up, by default).
+
+Radial symmetry works with the mirror axes: with **X** on as well, each copy is also mirrored, so 8 radial copies
+make 16. It applies wherever symmetry does: every brush and stroke type, mask and smooth strokes, vertex paint and
+texture painting, Mask Rectangle / Mask Lasso and Select Rectangle / Select Lasso, Dynamic Topology (new triangles
+appear on every copy) and Insert on the model. The brush cursor shows on every copy, so you can see where each
+one lands.
+
+### Local symmetry
+
+**Local** (next to **R** in **Transform > Symmetry**) puts the mirror planes and the radial axis through the
+middle of the active Part (the centre of its bounding box) instead of the world origin. Use it for a Part that
+isn't centred on the origin, such as a button on a jacket or a wheel on a car. The centre follows the Part: it is
+worked out again when you switch Parts or after an edit.
+
+**R** and **Local** have no default key; you can assign one (see [The interface](interface.md)). Projects save
+the symmetry settings, radial and local included. Scripts and `sculptforge-cli` use the same settings: commands
+that take `symmetry` (`stroke`, `vdm_stamp`, `mask_rect`, `mask_lasso`, `hide_rect`, `hide_lasso`,
+`insert_primitive`, `insert_mesh`) also take `radial` (the count), `radial_axis` (`x`, `y` or `z`) and `local`
+(`true` for the Part's centre), for example `stroke points=... symmetry=x radial=8 radial_axis=y`.
+
+> **ZBrush:** **R** is ZBrush's (R) radial symmetry with Radial Count, and **Local** is its Local Symmetry (about
+> the Part's centre). Topological (poseable) symmetry is not available yet.
 
 ## Pen pressure and tablets
 

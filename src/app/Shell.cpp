@@ -396,6 +396,21 @@ void App::registerShellActions() {
     flag("transform.symmetry_x", "X", nullptr, "Transform", "X", &symmetry_.x, "Mirror strokes across X (left and right).");
     flag("transform.symmetry_y", "Y", nullptr, "Transform", "", &symmetry_.y, "Mirror strokes across Y (top and bottom).");
     flag("transform.symmetry_z", "Z", nullptr, "Transform", "", &symmetry_.z, "Mirror strokes across Z (front and back).");
+    flag("transform.symmetry_radial", "R", nullptr, "Transform", "", &symmetry_.radialEnabled,
+         "Radial symmetry: repeat strokes around an axis (Radial Count copies, Transform palette).");
+    flag("transform.symmetry_local", "Local", nullptr, "Transform", "", &symmetry_.local,
+         "Local symmetry: mirror and turn strokes about the active Part's centre instead of the world origin.");
+    for (int axis = 0; axis < 3; ++axis) { // the axis radial copies turn around
+        Action a;
+        a.id = std::string("transform.radial_axis_") + char('x' + axis);
+        a.label = std::string(1, char('X' + axis)) + " axis";
+        a.palette = "Transform";
+        a.description = std::string("Radial symmetry turns its copies around the ") + char('X' + axis) +
+                        (axis == 1 ? " axis (up, the default)." : " axis.");
+        a.run = [this, axis] { symmetry_.radialAxis = axis; };
+        a.checked = [this, axis] { return symmetry_.radialAxis == axis; };
+        actions_.add(std::move(a));
+    }
     flag("ui.brush_lab", "AI Brush", ICON_LC_SPARKLES, "Brush", "", &showBrushLab_,
          "Brush Lab: describe a brush in words and AI builds it; tweak the recipe with sliders.");
     flag("ui.generate3d", "Generate 3D", ICON_LC_WAND_SPARKLES, "Generate", "", &showImageTo3D_,

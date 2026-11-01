@@ -1382,12 +1382,12 @@ size_t TexturePainter::dab(Mesh& mesh, const BVH& bvh, const DabParams& p, const
 
     using Mirror = DabMirror;
     std::vector<Mirror> mirrors;
-    for (const glm::vec3& m : Sculptor::mirrors(sym)) {
+    for (const SymCopy& m : Sculptor::copies(sym)) {
         Mirror mi;
-        mi.center = p.center * m;
-        mi.viewDir = p.viewDir * m;
+        mi.center = m.point(p.center);
+        mi.viewDir = m.dir(p.viewDir);
         // The alpha's frame on the view plane (as recipe brushes orient it).
-        glm::vec3 aUp = p.alphaUp * m;
+        glm::vec3 aUp = m.dir(p.alphaUp);
         aUp -= mi.viewDir * glm::dot(aUp, mi.viewDir);
         mi.aUp = glm::length(aUp) > 1e-6f ? glm::normalize(aUp) : glm::vec3(0, 1, 0);
         mi.aRight = glm::cross(mi.aUp, -mi.viewDir);

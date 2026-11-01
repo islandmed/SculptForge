@@ -43,6 +43,9 @@ struct UiPrefs {
                               // reaches the surface instead of turning the view (off: it turns the view, ZBrush)
     bool showAxes = true;              // Draw > Camera > Axes: the X / Y / Z gizmo in the canvas corner (#31)
     bool cursorFollowsSurface = true; // the brush ring lies on the surface under the pointer, as in SculptGL (#25)
+    // Preferences > Interface > Timeline position (#63): the Sculpt Timeline strip along the top of the viewport
+    // (true, the default: clear of the brush shelf below it) or its bottom.
+    bool timelineTop = true;
     TabletSettings tablet;      // Preferences > Tablet: pressure curve, eraser, pen buttons
     SpaceMouseSettings spaceMouse; // Preferences > Input > SpaceMouse
     // Preferences > Performance (PanelPerformance.cpp).

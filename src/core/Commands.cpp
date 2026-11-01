@@ -651,13 +651,7 @@ CommandRegistry::CommandRegistry() {
              st.curve = argBool(a, "curve", true);
              st.spacing = float(argNumber(a, "spacing", -1.0));
              st.seed = uint32_t(std::max(argNumber(a, "seed", 1.0), 0.0));
-             for (char c : argString(a, "symmetry")) {
-                 const char l = char(std::tolower(static_cast<unsigned char>(c)));
-                 if (l == 'x') st.symmetry.x = true;
-                 else if (l == 'y') st.symmetry.y = true;
-                 else if (l == 'z') st.symmetry.z = true;
-                 else return {false, "symmetry takes the axes x, y and z"};
-             }
+             if (!symmetryArg(a, doc.mesh, st.symmetry, err)) return {false, err};
 
              // Resolve the brush: a library recipe (exact name, then any case), then a built-in type.
              const std::string name = argString(a, "brush");
@@ -818,7 +812,15 @@ CommandRegistry::CommandRegistry() {
     registerProjectCommands(*this); // keep last (core/Project.cpp)
 }
 
-void CommandRegistry::add(Command cmd) { commands_.push_back(std::move(cmd)); }
+void CommandRegistry::add(Command cmd) {
+    // The commands that follow the brushes' symmetry take radial and local symmetry too (#63).
+    static const char* const kSymmetric[] = {"stroke", "vdm_stamp", "mask_rect", "mask_lasso", "hide_rect",
+                                             "hide_lasso", "insert_primitive", "insert_mesh"};
+    for (const char* name : kSymmetric)
+        if (cmd.name == name)
+            for (ParamSpec& p : radialSymmetryParams()) cmd.params.push_back(std::move(p));
+    commands_.push_back(std::move(cmd));
+}
 
 const Command* CommandRegistry::find(const std::string& name) const {
     for (const auto& c : commands_)

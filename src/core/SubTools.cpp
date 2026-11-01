@@ -247,9 +247,9 @@ bool normalizedPiece(const Mesh& source, float size, Mesh& out) {
 // point, +Y along the normal, turned by twist, with mirrored copies for symmetry; merged into the active
 // SubTool as one new polygroup, one undo step.
 CommandResult insertPiece(Document& doc, Mesh prim, const Args& a, const std::string& label) {
-    std::vector<glm::vec3> mirrors;
+    std::vector<SymCopy> mirrors;
     std::string error;
-    if (!symmetryMirrorsArg(a, mirrors, error)) return {false, error};
+    if (!symmetryCopiesArg(a, doc.mesh, mirrors, error)) return {false, error};
     const float size = float(std::max(argNumber(a, "size", 0.2), 1e-4));
     glm::vec3 n(float(argNumber(a, "nx", 0.0)), float(argNumber(a, "ny", 1.0)), float(argNumber(a, "nz", 0.0)));
     n = glm::length(n) > 1e-8f ? glm::normalize(n) : glm::vec3(0, 1, 0);
@@ -274,30 +274,34 @@ CommandResult insertPiece(Document& doc, Mesh prim, const Args& a, const std::st
     for (uint32_t g : doc.mesh.polygroups) group = std::max(group, g);
     prim.polygroups.assign(prim.triangles.size(), group + 1);
     prim.recomputeAllNormals();
-    // Symmetry: a mirrored copy across each enabled plane (through the centre, as the brushes mirror),
-    // in the same polygroup and the same undo step. A copy that would land on one already there
-    // (inserted on a plane itself) is left out.
+    // Symmetry: a copy for each mirror image and radial turn (about the same centre as the brushes'), in the
+    // same polygroup and the same undo step. A copy that would land on one already there (inserted on a plane
+    // or the radial axis itself) is left out.
     std::vector<Mesh> copies;
     std::vector<glm::vec3> placed{at};
-    for (const glm::vec3& m : mirrors) {
-        const glm::vec3 centre = at * m;
+    for (const SymCopy& m : mirrors) {
+        const glm::vec3 centre = m.point(at);
         if (std::any_of(placed.begin(), placed.end(),
                         [&](const glm::vec3& p) { return glm::length(centre - p) < size * 0.25f; }))
             continue;
         placed.push_back(centre);
         Mesh copy = prim;
-        for (auto& p : copy.positions) p *= m;
-        if (m.x * m.y * m.z < 0.0f) // a reflection turns the triangles inside out: wind them back
+        for (auto& p : copy.positions) p = m.point(p);
+        if (m.handedness() < 0.0f) // a reflection turns the triangles inside out: wind them back
             for (auto& t : copy.triangles) std::swap(t.y, t.z);
         copy.recomputeAllNormals();
         copies.push_back(std::move(copy));
     }
+    bool radial = false; // (a copy turned other than by a half turn: not just mirrored)
+    for (const SymCopy& m : mirrors)
+        for (int i = 0; i < 3; ++i)
+            for (int j = 0; j < 3; ++j) radial = radial || (i != j && m.m[i][j] != 0.0f);
     std::vector<const Mesh*> parts{&doc.mesh, &prim};
     for (const Mesh& c2 : copies) parts.push_back(&c2);
     Mesh merged = mergeMeshes(parts);
     const size_t tris = prim.triangleCount() * (1 + copies.size());
     doc.replaceMeshUndoable(std::move(merged), "Insert " + label);
-    return {true, "Inserted " + (copies.empty() ? "a " + label : std::to_string(copies.size() + 1) + " " + label + "s (mirrored)") +
+    return {true, "Inserted " + (copies.empty() ? "a " + label : std::to_string(copies.size() + 1) + " " + label + (radial ? "s (radial)" : "s (mirrored)")) +
                       " (" + std::to_string(tris) + " triangles, face group " + std::to_string(group + 1) + ")"};
 }
 

@@ -56,6 +56,7 @@ Json toJson(const UiPrefs& p) {
     j.set("spaceCamera", p.spaceCamera);
     j.set("airStrokes", p.airStrokes);
     j.set("cursorFollowsSurface", p.cursorFollowsSurface);
+    j.set("timelinePosition", std::string(p.timelineTop ? "top" : "bottom"));
     j.set("showAxes", p.showAxes);
     j.set("alphabeticalPalettes", p.alphabeticalPalettes);
     j.set("language", p.language);
@@ -98,6 +99,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.spaceCamera = j["spaceCamera"].asBool(p.spaceCamera);
     p.airStrokes = j["airStrokes"].asBool(p.airStrokes);
     p.cursorFollowsSurface = j["cursorFollowsSurface"].asBool(p.cursorFollowsSurface);
+    if (j["timelinePosition"].isString()) p.timelineTop = j["timelinePosition"].asString() != "bottom";
     p.showAxes = j["showAxes"].asBool(p.showAxes);
     p.alphabeticalPalettes = j["alphabeticalPalettes"].asBool(p.alphabeticalPalettes);
     if (j["language"].isString()) p.language = languageCode(languageFromCode(j["language"].asString()));
@@ -1088,6 +1090,9 @@ void drawInterfaceSection(App& app) {
         ui::HelpText("Shelf tiles", nullptr, "How big the brush tiles on the bottom shelf are. Small leaves the most room for the model.",
                      "Preferences > Interface");
     }
+    // Timeline position (#63): the Sculpt Timeline strip at the top of the viewport (the default) or the bottom.
+    ImGui::TextDisabled("%s", tr("Timeline position"));
+    ui::Segmented(app, {"view.timeline_top", "view.timeline_bottom"});
     static const char* kScales[] = {"Automatic", "100%", "125%", "150%", "175%", "200%"};
     static const float kScaleValues[] = {0.0f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f};
     int current = 0;

@@ -160,7 +160,7 @@ expect_value camera_distance == $d0
 # --- Visibility: Ctrl+Shift+click on a partly hidden mesh hides the group clicked ---
 # Hide the top with Ctrl+Shift+Alt+drag, then Ctrl+Shift+click the equator band (the new group).
 hold ctrl+shift+alt
-drag_path -0.2 -0.2 1.2 0.2
+drag_path -0.2 -0.05 1.2 0.2
 hold none
 expect_value hidden > 0
 remember hidden h1

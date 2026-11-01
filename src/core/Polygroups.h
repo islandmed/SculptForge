@@ -9,6 +9,7 @@
 #pragma once
 
 #include "core/Mesh.h"
+#include "core/Symmetry.h"
 
 #include <glm/glm.hpp>
 
@@ -50,13 +51,13 @@ std::vector<uint8_t> hiddenInverted(const Mesh& mesh);
 // Rectangle selection in normalised device coordinates (-1..1, y up) under
 // `viewProj`: triangles whose centre projects inside stay visible and the rest
 // are hidden, or with `hideInside` the inside is hidden instead. Triangles
-// behind the camera count as outside. `mirrors` (Sculptor::mirrors of the symmetry): a triangle whose mirror
-// image's centre projects inside counts as inside too (#51); empty = none.
+// behind the camera count as outside. `mirrors` (Sculptor::copies of the symmetry): a triangle whose mirror
+// image's or radial copy's centre projects inside counts as inside too (#51, #63); empty = none.
 std::vector<uint8_t> hiddenByRect(const Mesh& mesh, const glm::mat4& viewProj, glm::vec2 rectMin, glm::vec2 rectMax,
-                                  bool hideInside, const std::vector<glm::vec3>& mirrors = {});
+                                  bool hideInside, const std::vector<SymCopy>& mirrors = {});
 // The same with a lasso: a closed polygon of NDC points (even-odd inside test).
 std::vector<uint8_t> hiddenByLasso(const Mesh& mesh, const glm::mat4& viewProj, const std::vector<glm::vec2>& lasso,
-                                   bool hideInside, const std::vector<glm::vec3>& mirrors = {});
+                                   bool hideInside, const std::vector<SymCopy>& mirrors = {});
 
 // True when every triangle of `group` is visible and no other is.
 bool polygroupIsolated(const Mesh& mesh, uint32_t group);
