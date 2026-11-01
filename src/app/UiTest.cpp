@@ -59,7 +59,7 @@
 //                            background_r / background_g / background_b (the flat colour, 0-255), subtool_shading (0 Scene, 1 Smooth, 2 Flat),
 //                            custom_matcaps (MatCaps loaded from images), material_custom (1 when the view uses
 //                            one), matcap_files (images in the library's MatCaps folder),
-//                            subtools (count), active_subtool (index, 0 = top), visible_subtools,
+//                            subtools (count), subtool_thumbnails (SubTool panel thumbnails rendered), active_subtool (index, 0 = top), visible_subtools,
 //                            extract_preview (1 while an Extract preview waits for Accept), open_edges (edges of
 //                            the active SubTool with one triangle: 0 = watertight),
 //                            edited_subtools (SubTools with undo history), user_brushes (brushes in the
@@ -525,6 +525,11 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "guide_hits") return double(app_.guide_.searchHits());
     const Document& doc = app_.doc_;
     if (name == "subtools") return double(doc.subtoolCount());
+    if (name == "subtool_thumbnails") { // SubTool panel thumbnails rendered (#43)
+        double n = 0.0;
+        for (const auto& [id, tex] : app_.subtoolThumbs_) n += tex ? 1.0 : 0.0;
+        return n;
+    }
     if (name == "active_subtool") return double(doc.activeSubtool);
     if (name == "extract_preview") return doc.extractPreviewCurrent() ? 1.0 : 0.0;
     if (name == "open_edges") {

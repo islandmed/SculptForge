@@ -310,6 +310,7 @@ void App::shutdown() {
     if (refTexture_) gl::DeleteTextures(1, &refTexture_);
     gallery_.reset(); // its preview textures need the GL context
     thumbs_.clear();
+    clearSubtoolThumbnails();
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
@@ -1874,6 +1875,8 @@ void App::syncScene() {
     }
     renderer_.syncScene(scene);
     renderer_.syncSplats(doc_.splats, doc_.splatsVersion);
+    if (subtoolPanelShown_) updateSubtoolThumbnails(); // from the buffers just synced (PanelSubTools.cpp)
+    subtoolPanelShown_ = false;
 }
 
 void App::setLayerWeight(int index, float weight) {

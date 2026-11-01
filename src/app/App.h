@@ -12,6 +12,7 @@
 #include "app/LightBox.h"
 #include "app/Pickers.h"
 #include "app/ShellGeometry.h"
+#include "app/SubtoolThumbnails.h"
 #include "app/Thumbnails.h"
 #include "app/UiLayout.h"
 #include "app/UserGuide.h"
@@ -53,6 +54,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace sf {
@@ -951,6 +953,13 @@ private:
     float subtoolClickX_ = 0.0f, subtoolClickY_ = 0.0f;
     uint32_t renamingSubtool_ = 0; // SubTool id being renamed inline (0: none)
     uint32_t listedActiveSubtool_ = 0; // the list scrolls to the active SubTool when it changes
+    // SubTool thumbnails (#43): rendered from each SubTool's GPU buffers while the SubTools panel shows, one per frame
+    // at most, a change once it has settled (SubtoolThumbnails.h); GL textures by SubTool id.
+    SubtoolThumbnailSchedule subtoolThumbSchedule_;
+    std::unordered_map<uint32_t, unsigned> subtoolThumbs_;
+    bool subtoolPanelShown_ = false; // drawn this frame
+    void updateSubtoolThumbnails();  // after syncScene, GL current
+    void clearSubtoolThumbnails();
     bool focusRename_ = false;
     char renameBuffer_[128] = "";
     // Not-undoable SubTool commands wait for a confirmation popup.
