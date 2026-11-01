@@ -1,0 +1,28 @@
+# Pictures for the guide's Kelvinlet and Capture sections (crop with make_images.py or by hand):
+#   build/sculptforge --ui-test tools/guide/kelvinlet_shots.sfui --ui-out build/guide-shots/kelvinlet
+run new_sphere subdivisions=8
+run kelvinlet_settings squash=1
+wait_idle 30
+click "KelvinGrab##brush.kelvingrab"
+stroke 0.70 0.40 0.86 0.30
+stroke 0.30 0.70 0.20 0.82
+run stroke brush=KelvinTwist points="0,0,2 0.25,0,2" radius=0.35 strength=1
+wait_idle 60
+shot kelvinlet-brushes
+
+# A detail captured from the model and cloned along a stroke.
+run new_sphere subdivisions=8
+run vdm_set name=horn
+run vdm_stamp point=0,0,2 view=0,0,-1 radius=0.18 angle=30
+run stroke brush=DamStandard points="-0.12,-0.1,2 0.12,-0.14,2" radius=0.03
+wait_idle 30
+key ctrl+alt+c
+view_drag 0.355 0.42 0.47 0.6
+wait_value capture_open == 1
+wait_idle 60
+shot capture-from-view
+click "Detail Clone##capture"
+run kelvinlet_settings clone_spacing=1.1
+stroke 0.30 0.70 0.62 0.74
+wait_idle 60
+shot detail-clone

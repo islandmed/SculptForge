@@ -25,7 +25,7 @@ works on the active SubTool, and only on parts that are visible and not masked.
 
 ## Built-in brushes
 
-SculptForge has fourteen sculpting brushes plus the Paint brush. The first ten have number keys; all of them
+SculptForge has nineteen sculpting brushes plus the Paint brush. The first ten have number keys; all of them
 are on the bottom shelf by default and in the brush picker.
 
 | Brush | Key | What it does | With <kbd>Alt</kbd> |
@@ -44,12 +44,18 @@ are on the bottom shelf by default and in the brush picker.
 | **Trim** | | Trim Dynamic: shaves away everything above a plane for hard surfaces. | Fills up to the plane |
 | **Layer** | | Raises the surface to one fixed height per stroke; overlapping passes never stack. | Lowers to a fixed depth |
 | **Nudge** | | Slides the surface sideways along the stroke without lifting it. | No change |
+| **VDM** | | Stamps a vector displacement map, overhangs and all (see [below](#vector-displacement-brushes)). | Digs the shape in |
+| **KelvinGrab** | | Elastic move: drags the surface like real clay, with no falloff edge (see [Kelvinlet brushes](#kelvinlet-brushes)). | No change |
+| **KelvinTwist** | | Press and drag right to turn the surface clockwise around that point, left to turn it back. | Turns the other way |
+| **KelvinScale** | | Press and drag left to pinch the surface toward that point, right to swell it. | The other way |
+| **KelvinSnake** | | An elastic SnakeHook: smooth horns and tendrils that taper as they stretch. | No change |
+| **DetailClone** | | Paints copies of a captured detail (the VDM brush's map) along the stroke, each turned to follow it. | Digs them in |
 | **Paint** | <kbd>P</kbd> | Paints colour without sculpting. See [Polypaint and materials](polypaint.md). | Paints back to white |
 
 Notes on particular brushes:
 
-- **Move** and **SnakeHook** move the surface with the cursor instead of placing dabs, so stroke types
-  (Dots, Spray and so on) don't apply to them.
+- **Move**, **SnakeHook** and the Kelvinlet brushes (except Detail Clone) move the surface with the cursor
+  instead of placing dabs, so stroke types (Dots, Spray and so on) don't apply to them.
 - **Layer** sets its height from the brush size and **Z Intensity**. Pen pressure lowers the height when
   **Pressure > Strength** is on, so you can feather the edge of a layer.
 - **Trim** gives crisp planes on cylinders and edges. Use it with **Front** on when you work on thin shapes.
@@ -326,6 +332,83 @@ angle=30`, `vdm_new_plane`, `vdm_capture name="My horn" exr=horn.exr`, `vdm_expo
 > **ZBrush:** the VDM brush works like ZBrush's VDM brushes with DragRect or DragDot. Not available yet:
 > several VDMs in one brush (ZBrush's *Create Multiple Alpha Brush*), MidValue and the alpha options for 3D
 > alphas, and reading ZBrush's own brush files.
+
+## Kelvinlet brushes
+
+**KelvinGrab**, **KelvinTwist**, **KelvinScale** and **KelvinSnake** move the surface the way an elastic solid
+moves when you push, twist or squeeze it. Each is the exact solution of the equations of elasticity for a
+softened point load (the "regularized Kelvinlets" of de Goes and James, SIGGRAPH 2017), so the surface follows
+your hand like clay: there is no falloff edge to see, the deformation fades smoothly over about twice the brush
+radius, and the material around it reacts the way real material does.
+
+![KelvinGrab pulls with symmetry and Squash at 100, and a KelvinTwist in the middle: no falloff edge anywhere](images/kelvinlet-brushes.jpg)
+
+- **KelvinGrab** works like Move: press on the model and drag; the point under the cursor goes where the cursor
+  goes and the surface around it follows elastically.
+- **KelvinTwist** turns the surface around where you pressed, about the view direction. Drag right to turn
+  clockwise, left to turn back; the turn is strongest at the centre and fades out, and every ring keeps its
+  shape (a true rotation), so twisted shapes keep their volume. Good for twisting horns, tentacles, folds of cloth
+  and spiral shells.
+- **KelvinScale** pinches (drag left) or swells (drag right) the surface toward or away from where you pressed.
+  It never folds the surface through the centre, however hard you pinch.
+- **KelvinSnake** pulls horns, tentacles and spikes out along the stroke like SnakeHook, but its pull narrows as it
+  travels, so shapes taper to a tip by themselves.
+
+Their settings are in **Brush > Kelvinlet & Capture**:
+
+- **Squash** (0-100) is how the material keeps its volume (its Poisson's ratio). At 0 it's rubbery: pulling it
+  just stretches it. At 100 it's incompressible clay: pressing in makes the surface bulge up around your thumb and
+  pulling out draws the sides in, as clay does. 50 is the default.
+- **Sharpness** gives the brush a tighter, more pointed peak at its centre while keeping its soft reach, for
+  pulling out points and tips.
+
+**Z Intensity** sets how strongly the surface follows (50 and above: the grabbed point follows the cursor
+exactly), pen pressure scales it, and like every brush they respect symmetry, the mask, hidden parts and sculpt
+layers, and each stroke is one undo step. They don't remesh with dynamic topology on (like Move).
+
+> **How it stays fast:** a Kelvinlet's influence never quite reaches zero, so each move works out how far its
+> effect is still bigger than a few thousandths of the brush radius and only touches the points inside that
+> distance, fading the last part smoothly to nothing. A fast drag between two frames is worked out in small pieces
+> in one pass, so the brush keeps up on meshes of tens of millions of triangles (see
+> [Performance](performance.md)).
+
+## Capture an alpha or a VDM from the model
+
+Any detail you have sculpted can become a brush in two seconds: **Capture from view**
+(<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd>, or the button in **Brush > Kelvinlet & Capture**).
+
+![A horn captured from the sphere (the window: its height alpha and VDM) and cloned along a stroke below it](images/capture-from-view.jpg)
+
+1. Press <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd> and drag a square over the detail, corner to corner (hold
+   <kbd>Shift</kbd> as you press to drag a circle from its centre instead). <kbd>Esc</kbd> cancels.
+2. The **Capture from view** window shows two results, side by side:
+   - a **height alpha**: the surface's height toward you, measured from a plane fitted to the surface and
+     scaled to black-to-white;
+   - a **vector displacement map**: the true 3D offset of every point from a smooth base surface, in that base's
+     own frame, so overhangs and sideways leans come along.
+3. Adjust if needed: **Base Smoothing** decides what counts as detail (0 measures from a flat plane, the whole
+   shape; higher takes more of the broad form away, so a wrinkle captured on a curved forehead stamps flat),
+   **Edge Fade** blends the border out, **Resolution** sets the pixels, **Fit plane** and **Invert** apply to the
+   alpha. Changes capture again from the same square.
+4. Use it: **Use as Alpha** (it shapes every brush), **Use as VDM** (the VDM brush stamps it with DragRect),
+   **Detail Clone** (paint copies along strokes) or **Save to Library**: the alpha goes to your LightBox
+   **Alphas** folder as a PNG and the VDM to your brush library, both with thumbnails (the VDM also shows in the
+   LightBox **Brush** tab, the alpha picker and Brush > Vector Displacement).
+
+The square is captured along your view, so look at the detail straight on. The capture takes about a tenth of a
+second for a small detail and a second or so for a large patch of a 20-million-triangle model.
+
+> **ZBrush:** this is "GrabDoc" for alphas, and more: ZBrush can only make a VDM from its special VDM plane,
+> here any detail on any model becomes one. The commands `capture_alpha` and `capture_vdm` do the same from a
+> script.
+
+### Detail Clone
+
+**DetailClone** stamps the VDM brush's map (a captured one or any other) along your stroke, one copy every stamp
+width, each turned so its top points the way the stroke goes: rows of scales, rivets, stitches or warts that
+follow a curve. **Clone Spacing** sets the distance between copies (1 = edge to edge) and **Clone follows
+stroke** can keep every copy upright instead. Draw Size sets their size and Z Intensity their depth; a click
+without moving stamps one. Each copy is shaped to the surface under it.
 
 ## Symmetry
 
