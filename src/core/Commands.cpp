@@ -11,6 +11,7 @@
 #include "core/EnginePresets.h"
 #include "core/ExtractMirror.h"
 #include "core/Face.h"
+#include "core/HardwareProfile.h"
 #include "core/ImageTo3D.h"
 #include "core/Masking.h"
 #include "core/Multires.h"
@@ -774,6 +775,7 @@ CommandRegistry::CommandRegistry() {
     registerTransformCommands(*this); // transform (core/MeshTransform.h)
     registerExtractMirrorCommands(*this); // extract, mirror_and_weld, mirror (core/ExtractMirror.h)
     registerPerformanceCommands(*this); // perf_info, set_multithreading (core/Benchmark.cpp)
+    registerHardwareProfileCommands(*this); // performance_profile, calibrate, set_performance_override (core/HardwareProfile.cpp)
     registerPaintCommands(*this); // core/Polypaint.cpp
     registerGozCommands(*this); // goz_import/export/send/receive, export_stl (io/GozCommands.cpp)
     registerBlenderCommands(*this); // blender_send/receive (io/BlenderCommands.cpp)

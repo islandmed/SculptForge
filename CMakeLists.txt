@@ -32,6 +32,8 @@ add_library(sculptforge_core STATIC
   src/core/ThreadPool.cpp
   src/core/UploadOrder.cpp
   src/core/Benchmark.cpp
+  src/core/HardwareProfile.cpp
+  src/core/FrameGovernor.cpp
   src/core/Sculpt.cpp
   src/core/Dyntopo.cpp
   src/core/DyntopoCommands.cpp
