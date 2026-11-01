@@ -27,7 +27,7 @@ jobs:
           - { name: Windows, os: windows-2022 }
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.13'
       - name: Install Linux dependencies
@@ -102,7 +102,7 @@ jobs:
           - { bpy: '5.2.3', python: '3.13' }
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
       - run: sudo ./packaging/linux/install-build-deps.sh
