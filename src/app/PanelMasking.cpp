@@ -211,6 +211,28 @@ void App::drawMaskingSection() {
     ImGui::SetNextItemWidth(-1);
     if (ImGui::DragInt("##maskgroup", &maskGroup_, 0.1f, 0, 1 << 30, "Group %d", ImGuiSliderFlags_AlwaysClamp))
         maskGroup_ = std::max(0, maskGroup_);
+
+    // Mask from the mesh border (#61): open edges, optionally polygroup borders, a few rings wide.
+    if (ImGui::Button("By border##mask", ImVec2(half, 0)))
+        runCommand("mask_border", {{"rings", double(maskBorderRings_)},
+                                   {"polygroups", maskBorderGroups_},
+                                   {"soft", maskBorderSoft_},
+                                   {"strength", double(maskStrength_)}});
+    ui::HelpText("By border", nullptr,
+                 "Mask the open edges of the mesh and the edge rings inside them, so sculpting never moves the "
+                 "border (Blender: Mask from mesh boundary). Replaces the mask and uses the mask strength. A closed "
+                 "mesh has no open edges.",
+                 "Tool > Masking");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(-1);
+    tray::SliderInt("##maskborderrings", &maskBorderRings_, 1, 20, "Rings %d");
+    ui::Checkbox("Polygroup borders##maskborder", &maskBorderGroups_);
+    ui::HelpText("Polygroup borders", nullptr,
+                 "By border also masks where polygroups meet (ZBrush: Mask by polygroup border).", "Tool > Masking");
+    ImGui::SameLine();
+    ui::Checkbox("Soft##maskborder", &maskBorderSoft_);
+    ui::HelpText("Soft", nullptr, "By border fades the mask from the border towards the innermost ring.",
+                 "Tool > Masking");
 }
 
 } // namespace sf

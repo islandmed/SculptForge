@@ -43,6 +43,16 @@ bool maskByCavity(Mesh& mesh, float strength, float threshold);
 // With `add` the existing mask is kept, otherwise it is replaced.
 bool maskByPolygroup(Mesh& mesh, uint32_t group, bool add);
 
+// Vertices on an open edge (an edge of only one triangle) and, with `polygroups`, where the visible triangles
+// around a vertex have more than one polygroup: 1 for those, 0 elsewhere.
+std::vector<uint8_t> borderVertices(const Mesh& mesh, bool polygroups);
+// Mask from the mesh border (#61; Blender: Mask from mesh boundary, ZBrush: Mask by polygroup border): the
+// border vertices and `rings - 1` edge rings inside them (rings 1-20) get `strength` (0-1) of mask, fading
+// towards the innermost ring with `soft`. `polygroups` also masks polygroup borders. With `add` the mask
+// grows (each vertex keeps the larger value), otherwise it is replaced. `found` gets the number of border
+// vertices: 0 on a closed mesh (nothing to mask).
+bool maskBorder(Mesh& mesh, int rings, bool polygroups, bool soft, float strength, bool add, size_t* found = nullptr);
+
 // Mask selections (ZBrush MaskLasso / MaskRect): visible vertices that
 // project inside `shape` (NDC under `viewProj`, see ScreenSelect.h) gain
 // `strength` (0-1) of mask, or lose it with `unmask`. Vertices behind the
@@ -62,8 +72,8 @@ bool shapeCoversMesh(const Mesh& mesh, const glm::mat4& viewProj, const ScreenPo
 bool symmetryMirrorsArg(const Args& a, std::vector<glm::vec3>& mirrors, std::string& error);
 
 // Registers mask_clear, mask_all, mask_invert, mask_blur, mask_sharpen,
-// mask_grow, mask_shrink, mask_by_cavity, mask_by_polygroup, mask_rect and
-// mask_lasso.
+// mask_grow, mask_shrink, mask_by_cavity, mask_by_polygroup, mask_border,
+// mask_rect and mask_lasso.
 void registerMaskingCommands(CommandRegistry& registry);
 
 } // namespace sf

@@ -457,6 +457,9 @@ private:
     int maskIterations_ = 1;
     float cavityThreshold_ = 0.02f;
     int maskGroup_ = 0;
+    int maskBorderRings_ = 2;        // Tool > Masking > By border: width in edge rings (#61)
+    bool maskBorderGroups_ = false;  // ... polygroup borders too
+    bool maskBorderSoft_ = false;    // ... fading inwards
     float maskCanvasX_ = 0.0f, maskCanvasY_ = 0.0f;
     bool maskCanvasMoved_ = false;
     // Polygroups & visibility (PanelPolygroups.cpp): Ctrl+Shift click/drag.

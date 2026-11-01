@@ -3,7 +3,7 @@
 A mask protects part of the model from change. Masked areas are drawn darker, and every brush, the Paint
 brush and colour fills leave them alone. This chapter covers painting masks with <kbd>Ctrl</kbd>, masking
 with a lasso or rectangle, the background gestures, and the **Tool > Masking** controls for inverting, blurring, growing and building masks
-from cavities or polygroups.
+from cavities, polygroups or the mesh border.
 
 ![A mask painted on the lion's mane, with the Masking sub-palette](images/masking.jpg)
 
@@ -128,6 +128,10 @@ Open **Tool > Masking** (the Tool palette is in the right tray by default). Ever
 | **By cavity** | Mask concave areas (creases, folds, pores), replacing the current mask. | `mask_by_cavity` |
 | **threshold** | How concave a spot must be for **By cavity** (-0.2 to 0.5, default 0.02). 0 masks anything concave; higher values keep only deep creases. | `threshold=` |
 | **By polygroup** | Mask one polygroup, replacing the current mask. The number field next to it is the polygroup id. | `mask_by_polygroup` |
+| **By border** | Mask the open edges of the mesh (edges with only one face) and the rings of edges inside them, replacing the current mask, so sculpting keeps the border in place. Uses **Mask Strength**. A closed mesh has no open edges, and the status bar says so. | `mask_border` |
+| **Rings** | How wide **By border** masks, in rings of edges from the border (1 to 20, default 2; 1 masks the border vertices only). | `rings=` |
+| **Polygroup borders** | **By border** also masks where polygroups meet (ZBrush: Mask by polygroup border). | `polygroups=true` |
+| **Soft** | **By border** fades the mask from the border towards the innermost ring. | `soft=true` |
 
 Mask operations only change visible parts of the model; hidden parts keep their mask. **Clear** is the
 exception and frees everything.
@@ -161,6 +165,18 @@ The quickest way works without knowing the group's number:
 group, then open the console (<kbd>`</kbd>) and read the `isolate_polygroup group=N` line. Enter that number in
 the field next to **By polygroup** and click it.
 
+### Sculpt without breaking the border
+
+A plane, a cloth panel or a part cut from a larger model has an open border that should stay where it is, for
+example to keep it lined up with the piece it joins:
+
+1. Set **Rings** to how wide the protected strip should be.
+2. Click **By border**. The open edges and the rings inside them are masked.
+3. Sculpt freely; the border doesn't move. Tick **Soft** first for a gradual transition into the sculpted area.
+
+Tick **Polygroup borders** to also protect the seams between polygroups. This is Blender's *Mask from mesh
+boundary* (and, with face sets, *Mask from face set boundary*).
+
 ### A soft-edged mask
 
 Paint the mask, then click **Blur** a few times (or set **passes** to 3-5 first). **Sharpen** does the
@@ -184,6 +200,7 @@ you can mask an area and fill the rest with a colour. See [Polypaint and materia
 | `mask_blur`, `mask_sharpen`, `mask_grow`, `mask_shrink` | `iterations` (1-100, default 1) |
 | `mask_by_cavity` | `strength` (0-1, default 1), `threshold` (-1 to 1, default 0.02) |
 | `mask_by_polygroup` | `group` (required), `add=true` to add to the current mask instead of replacing it |
+| `mask_border` | `rings` (1-20, default 1), `polygroups=true` to also mask polygroup borders, `soft=true` to fade inwards, `strength` (0-1, default 1), `add=true` to add to the current mask |
 | `mask_rect` | `x0 y0 x1 y1` (-1 to 1, y up), `unmask`, `strength` (0-1, default 1), optional `view_proj` matrix; without a view the rectangle spans the mesh seen from the front |
 | `mask_lasso` | `points` (required): the outline as `"x0 y0 x1 y1 ..."`, at least 3 points in the same -1 to 1 space; `unmask`, `strength`, `view_proj` as for `mask_rect` |
 

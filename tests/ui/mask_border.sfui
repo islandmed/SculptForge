@@ -1,0 +1,43 @@
+# #61: Tool > Masking > By border masks the open edges of the mesh (Blender: Mask from mesh boundary), so
+# sculpting keeps the border in place. Rings widens it; a closed mesh says it has no open edges.
+run new_plane resolution=32
+expect_value open_edges == 128
+expect_value masked == 0
+camera 0 60
+key f
+
+click "Masking"
+expect "By border##mask"
+hold ctrl
+hover "By border##mask"
+expect_help "open edges"
+hold none
+
+# Default 2 rings: the rim of 128 vertices and the 120 inside it; one undo step.
+click "By border##mask"
+expect_status 128 border vertices
+expect_value masked == 248
+expect_value can_undo == 1
+shot border_masked
+
+# A stroke across the whole plane moves the inside but not the masked border.
+snapshot
+stroke -0.1 0.5 1.1 0.5
+expect_value moved > 0
+expect_value moved_masked == 0
+key ctrl+z
+key ctrl+z
+expect_value masked == 0
+
+# Soft fades the mask inwards.
+click "Soft##maskborder"
+click "By border##mask"
+expect_value masked >= 128
+expect_value mask_soft > 0
+key ctrl+z
+
+# A closed sphere has no open edges: nothing is masked and the status says why.
+run new_sphere subdivisions=3
+click "By border##mask"
+expect_status No open edges: the mesh is closed
+expect_value masked == 0
