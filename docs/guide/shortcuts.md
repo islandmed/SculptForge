@@ -178,7 +178,7 @@ action registry, the same source as the Controls window.
 | Hide a polygroup | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+click it |
 | Show everything | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+click the background |
 | Hide outside a rectangle or lasso | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+drag (add <kbd>Alt</kbd>: hide inside); **SelectRect** or **SelectLasso** in **Tool > Visibility** |
-| Select a SubTool | <kbd>Alt</kbd>+click it in the view (<kbd>Shift</kbd>+<kbd>Alt</kbd>+click: select and frame it) |
+| Select a SubTool | <kbd>Alt</kbd>+click it in the view (<kbd>Shift</kbd>+<kbd>Alt</kbd>+click, or a triple-click on another SubTool: select and frame it) |
 | Move, scale or rotate with the Gizmo 3D | <kbd>W</kbd>, <kbd>E</kbd> or <kbd>R</kbd>, then drag a handle; hold <kbd>Shift</kbd> to snap (15 degrees, the grid, 10%) |
 | Move the gizmo only | <kbd>Alt</kbd>+drag a gizmo handle |
 | Put the gizmo's pivot on the model | <kbd>Alt</kbd>+click the model in Move, Scale or Rotate mode |

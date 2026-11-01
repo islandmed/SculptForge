@@ -1076,8 +1076,11 @@ void App::handleEvent(const SDL_Event& event) {
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
         lastInputPen_ = e.button.which == SDL_PEN_MOUSEID;
         // Strokes and navigation start only on the canvas, never on the shell around it.
-        if (!io.WantCaptureMouse && canvasRect().contains(e.button.x, e.button.y))
+        if (!io.WantCaptureMouse && canvasRect().contains(e.button.x, e.button.y)) {
+            mouseClicks_ = e.button.clicks;
             onMouseDown(e.button.x, e.button.y, e.button.button);
+            mouseClicks_ = 1;
+        }
         break;
     case SDL_EVENT_MOUSE_BUTTON_UP:
         // A right click that didn't drag: the QuickMenu (#22). (SDL's click for a pen button doesn't count: a pen
@@ -1155,6 +1158,17 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         if (faceMouseDown(x, y, mod)) return;  // placing facial landmarks (PanelFace.cpp)
         if (sculptableMouseDown(x, y)) return; // Make sculptable: landmarks, crop box (PanelSculptable.cpp)
         if (captureMouseDown(x, y)) return;    // Capture from view: the drag draws the square (PanelKelvinlet.cpp)
+        // A triple-click on another SubTool makes it the active one and frames it (#43). (Its first two clicks
+        // don't sculpt it: brushes work on the active SubTool only.)
+        if (mouseClicks_ >= 3 && !(mod & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)) &&
+            insertType_.empty() && doc_.subtoolCount() > 1) {
+            const int target = pickSubtool(x, y);
+            if (target >= 0 && target != doc_.activeSubtool) {
+                runCommand("subtool_select", {{"index", double(target)}});
+                frameActiveSubtool();
+                return;
+            }
+        }
         // Alt+click on another SubTool selects it (ZBrush); Alt+drag stays an inverted stroke or a pan.
         // Shift+Alt+click selects and frames it (ZBrush), the active one too.
         const bool frameClick = (mod & SDL_KMOD_ALT) && (mod & SDL_KMOD_SHIFT) && !ctrlDown(mod);

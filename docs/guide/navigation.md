@@ -54,7 +54,7 @@ camera.
 
 Zoom drags go the ZBrush way: drag up to zoom out, down to zoom in. The SculptForge input style
 (**Preferences > Input**) reverses them: drag up to come closer.
-| Frame one SubTool | <kbd>Shift</kbd>+<kbd>Alt</kbd>+click it (it becomes the active SubTool) |
+| Frame one SubTool | <kbd>Shift</kbd>+<kbd>Alt</kbd>+click it, or triple-click another SubTool (it becomes the active SubTool) |
 
 "Background" means any part of the canvas where the cursor isn't over the model. A left-drag that starts on
 the model sculpts instead, so with a pen or a one-button mouse, start rotations beside the model. When the

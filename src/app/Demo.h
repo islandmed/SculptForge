@@ -110,7 +110,7 @@ private:
 
     // Input injection.
     void mouseMotion(float x, float y, SDL_MouseID which = 0); // which = SDL_PEN_MOUSEID: synthesized from a pen
-    void mouseButton(bool down, int button, SDL_MouseID which = 0);
+    void mouseButton(bool down, int button, SDL_MouseID which = 0, int clicks = 1);
     // Pen events as SDL3 sends them (UiTest.cpp): the pen's own event, then the mouse event SDL synthesizes.
     void penProximity(bool in);
     void penMove(float x, float y);                 // PEN_MOTION (+ mouse motion), touching or hovering

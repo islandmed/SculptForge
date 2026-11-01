@@ -31,7 +31,7 @@ and they catch up a moment after you stop changing a SubTool (not during a strok
 
 | To | Do this |
 |---|---|
-| Select a SubTool | Click its row, or <kbd>Alt</kbd>+click it in the viewport |
+| Select a SubTool | Click its row, or <kbd>Alt</kbd>+click it in the viewport; triple-click another SubTool in the viewport to select it and frame it |
 | Rename it | Double-click the row (or right-click > **Rename**), type, press <kbd>Enter</kbd> |
 | Hide or show it | Click the eye at the end of the row |
 | Duplicate or delete it | Right-click the row > **Duplicate** or **Delete...** |

@@ -51,8 +51,9 @@
 //   expect_help TEXT         the Ctrl-hover help box shown this frame contains TEXT (hold ctrl, then hover)
 //   clipboard TEXT           put TEXT on the clipboard (to test pasting, e.g. a brush code)
 //   expect_clipboard TEXT    the clipboard contains TEXT (after a copy)
-//   click_subtool NAME [U V] left-click SubTool NAME in the viewport (with the held modifiers, e.g.
-//                            hold alt to select it); U V: fractions of its on-screen bounds
+//   click_subtool NAME [U V [N]] left-click SubTool NAME in the viewport (with the held modifiers, e.g.
+//                            hold alt to select it); U V: fractions of its on-screen bounds; N clicks in a row
+//                            (3 = a triple-click)
 //   expect_value NAME OP N   triangles, vertices, layers, brushes, masked, hidden, groups, colored,
 //                            can_undo, dirty, splats, show_polygroups, show_mask, show_mesh, wireframe,
 //                            flat_shading (the scene's: 1 Flat), gradient_background (1 Gradient, 0 Flat Colour),
@@ -878,7 +879,8 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (!need(1)) return false;
         const std::string name = w[1];
         const float u = num(2, 0.5f), v = num(3, 0.5f);
-        steps_.push_back([this, line, name, u, v](float t) {
+        const int times = std::clamp(int(num(4, 1.0f)), 1, 3); // click_subtool NAME U V 3: a triple-click
+        steps_.push_back([this, line, name, u, v, times](float t) {
             const int index = app_.doc_.findSubtool(name);
             if (index < 0) {
                 fail(line, "no SubTool named \"" + name + "\"");
@@ -921,8 +923,10 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
                 mouseMotion(p.x, p.y);
                 return false;
             }
-            mouseButton(true, SDL_BUTTON_LEFT);
-            mouseButton(false, SDL_BUTTON_LEFT);
+            for (int c = 1; c <= times; ++c) { // SDL counts the clicks of a quick series
+                mouseButton(true, SDL_BUTTON_LEFT, 0, c);
+                mouseButton(false, SDL_BUTTON_LEFT, 0, c);
+            }
             return true;
         });
         wait(0.1f);
