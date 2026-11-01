@@ -23,6 +23,7 @@ struct MultiresStack;
 struct SubdivTopology;
 struct ImplicitAdjacency;
 struct MicroMesh;
+struct SelectionSetList;
 
 // The vertices or triangles around a vertex (Mesh::neighbors, Mesh::vertexTriangles), in ascending order: a view
 // of the mesh's adjacency lists or, where the mesh's adjacency is implicit, the list itself. Use it like a span
@@ -203,6 +204,11 @@ public:
     // spheres and their links, or the skin while `zspherePreview`). Copies, undo steps and projects carry it.
     std::vector<ZSphere> zspheres;
     bool zspherePreview = false;
+
+    // Selection Sets (core/SelectionSets.h): named snapshots of the mask, polygroups, vertex paint, hidden faces, UVs
+    // and shape, immutable and shared by copies of the mesh (undo steps swap the whole list). They belong to the
+    // Part, not to one subdivision level: stepping levels keeps them. Null = none.
+    std::shared_ptr<const SelectionSetList> selectionSets;
 
     size_t vertexCount() const { return positions.size(); }
     size_t triangleCount() const { return triangles.size(); }

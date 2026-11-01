@@ -72,4 +72,29 @@ doc.set_mesh([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]], [[0, 2, 1], [0, 1, 3]
 assert doc.triangles.shape == (4, 3)
 assert "Document" in repr(doc) and sf.__version__
 assert '"name":"remesh"' in sf.tool_schema()
+# Selection sets: push arrays in, pull them back, restore through a command.
+sf.run(doc, "new_sphere", subdivisions=3)
+n = doc.vertices.shape[0]
+top = [1.0 if v[1] > 0 else 0.0 for v in doc.vertices]
+assert "Stored" in doc.set_selection_set("Top", mask=top, positions=doc.vertices)
+assert [s["name"] for s in doc.selection_sets] == ["Top"]
+assert doc.selection_sets[0]["channels"] == ["mask", "morph"] and doc.selection_sets[0]["fits"]
+pulled = doc.selection_set("Top")
+assert pulled["mask"].shape == (n,) and pulled["positions"].shape == (n, 3) and float(pulled["mask"].sum()) == sum(top)
+sf.run(doc, "selection_set_restore", name="Top")
+assert float(doc.mask.sum()) == sum(top)
+sf.run(doc, "selection_set_store", name="Shown", channels="visibility")
+assert doc.selection_set("Shown")["hidden"].sum() == 0
+sets_path = os.path.join(tempfile.mkdtemp(), "sets.sfsets")
+sf.run(doc, "selection_sets_export", path=sets_path)
+other = sf.Document()
+sf.run(other, "new_sphere", subdivisions=3)
+sf.run(other, "selection_sets_import", path=sets_path)
+assert len(other.selection_sets) == 2
+try:
+    doc.set_selection_set("Bad", mask=[1.0, 0.0])
+    raise AssertionError("expected ValueError")
+except ValueError:
+    pass
+
 print("python api ok:", sf.__version__)

@@ -1,0 +1,67 @@
+# Tool > Selection Sets: store the mask under a name, clear it, restore it (one undo step), a quick set from the
+# visible faces, and a shape set as the Morph brush's target pulling a sculpted bump back.
+run new_sphere subdivisions=5
+run mask_rect x0=-1 y0=0.3 x1=1 y1=1
+expect_value masked > 100
+remember masked stored
+key f
+
+click "Selection Sets##tool.selection_sets"
+expect "Store##selsets"
+expect_text No sets yet
+hold ctrl
+hover "Store##selsets"
+expect_help "named set"
+hold none
+type "##setname" Head
+click "Store##selsets"
+expect_status Stored selection set 'Head'
+expect_value selection_sets == 1
+expect "Head##set0"
+
+# Restore brings the mask back exactly; undo takes it away again, redo restores it.
+run mask_clear
+expect_value masked == 0
+click "Restore##selsets"
+expect_status Restored selection set 'Head'
+expect_value masked == $stored
+key ctrl+z
+expect_value masked == 0
+key ctrl+shift+z
+expect_value masked == $stored
+shot selection_sets_restored
+
+# Quick set from the visible faces.
+click "From Visible##selsets"
+expect_status Stored selection set 'Visible'
+expect_value selection_sets == 2
+
+# A shape set: the Morph Target button picks the Morph brush, whose strokes pull a bump back.
+run mask_clear
+click "Shape##setch"
+type "##setname" Rest
+click "Store##selsets"
+expect_value selection_sets == 3
+click "Rest##set2"
+click "Morph Target##selsets"
+expect_status Morph brush now pulls toward selection set 'Rest'
+expect_value morph_target == 1
+expect_value morph_brush == 1
+snapshot
+run stroke points="-0.3,0,2 0.3,0,2" brush=Standard radius=0.4 strength=1
+run stroke points="-0.3,0,2 0.3,0,2" brush=Standard radius=0.4 strength=1
+expect_value moved_max > 0.01
+remember moved_max bump
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+expect_value moved_max < $bump
+shot selection_sets_morph
+
+# Delete is undoable.
+click "Delete##selsets"
+expect_value selection_sets == 2
+expect_value morph_target == 0
+key ctrl+z
+expect_value selection_sets == 3
+expect_value morph_target == 1

@@ -403,6 +403,9 @@ const char* brushTypeDescription(int type) {
     case BrushType::DetailClone:
         return "Paints copies of a captured detail along the stroke, each turned to follow it. Capture any detail on "
                "the model with Capture from view (Ctrl+Alt+C), or pick a VDM.";
+    case BrushType::Morph:
+        return "Pulls the surface back toward a stored shape: pick a selection set with Shape as the Morph Target in "
+               "Tool > Selection Sets. Alt pushes away. Works at any subdivision level.";
     default:
         return "";
     }

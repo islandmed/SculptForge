@@ -34,6 +34,7 @@ const char* brushName(BrushType type) {
     case BrushType::KelvinScale: return "KelvinScale";
     case BrushType::KelvinSnake: return "KelvinSnake";
     case BrushType::DetailClone: return "DetailClone";
+    case BrushType::Morph: return "Morph";
     default: return "?";
     }
 }
@@ -492,6 +493,8 @@ UndoRecord Sculptor::endStroke() {
 
 void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Symmetry sym) {
     if (!active_) return;
+    // Morph: nothing without a target (Tool > Selection Sets > Morph Target); not on micro levels (no grid shapes).
+    if (type == BrushType::Morph && (mesh.micro || !morphTarget(mesh))) return;
     if (isKelvinletBrush(type)) { // Kelvinlet.cpp (no remeshing: they move the surface, as Move does)
         dabKelvinlet(mesh, bvh, type, p, sym);
         return;
@@ -508,7 +511,7 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
         ++timings.dabs;
         return;
     }
-    if (type != BrushType::Move) {
+    if (type != BrushType::Move && type != BrushType::Morph) { // (Morph needs the vertices the target has)
         const bool useAlpha = p.alpha && !p.alpha->empty(); // (the reach dabSingle gives the brush)
         const float reach = useAlpha ? kAlphaReach : type == BrushType::ClayBuildup ? 1.3f : 1.0f;
         remeshDab(mesh, bvh, p, sym, type == BrushType::Smooth ? 2.0f : 1.0f, reach);
@@ -579,6 +582,8 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     if (type == BrushType::Layer) prepareLayer(mesh, r * 0.08f * std::clamp(p.strength, 0.0f, 1.0f));
     const bool keepVolume = type == BrushType::Smooth && p.keepVolume;
     if (keepVolume) taubinShrink(mesh);
+    const std::vector<glm::vec3>* morph = type == BrushType::Morph ? morphTarget(mesh) : nullptr;
+    if (type == BrushType::Morph && !morph) return;
 
     scratch_.resize(verts_.size());
     // Each vertex's offset depends only on the positions before the dab (and, for Layer, on its own state).
@@ -707,6 +712,10 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
         case BrushType::Nudge:
             // Slide the surface sideways along the stroke without lifting it.
             d = projectOnPlane(p.strokeDelta, nrm[v]) * (f * std::min(1.0f, 0.4f + s));
+            break;
+        case BrushType::Morph:
+            // Toward the morph target (away from it, by a quarter as much, with Alt).
+            d = ((*morph)[v] - x) * (p.invert ? -0.25f * s * f : std::min(1.0f, s * f));
             break;
         default:
             break;

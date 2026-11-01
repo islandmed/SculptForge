@@ -45,6 +45,7 @@ add_library(sculptforge_core STATIC
   src/core/Document.cpp
   src/core/Commands.cpp
   src/core/Polygroups.cpp
+  src/core/SelectionSets.cpp
   src/core/ScreenSelect.cpp
   src/core/SubTools.cpp
   src/core/ExtractMirror.cpp
@@ -259,6 +260,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/AssetLibrary.cpp
     src/app/PanelMasking.cpp
     src/app/PanelPolygroups.cpp
+    src/app/PanelSelectionSets.cpp
     src/app/Selection.cpp
     src/app/PanelBrushes.cpp
     src/app/PanelVdm.cpp
