@@ -45,14 +45,14 @@ TierConfig tierConfigFor(const HardwareProfile& p, PowerSource power, int displa
     }
     c.uploadBudgetMBPerFrame = std::max<uint64_t>(s.uploadBudgetMBPerFrame, 4);
     c.zeroCopyUMA = p.hardware.gpuKind == GpuKind::Unified || p.hardware.gpuKind == GpuKind::Integrated;
-    // Draft brushes only where they save work: Software, and on battery (below). Measured on a Laptop-tier M1 Pro at
-    // 33M they were no faster (frames are GPU-bound) and the last dab landed later after release.
-    c.draftBrushMode = p.tier == ProfileTier::Software;
+    // Draft brushes are not chosen by any tier: measured on a Laptop-tier M1 Pro at 33M they were no faster (frames
+    // are GPU-bound), the last dab landed later, and a draft stroke isn't yet identical to a full one. The override
+    // (Preferences) still turns them on.
+    c.draftBrushMode = false;
     c.targetHz = p.overrides.targetFps ? p.overrides.targetFps : targetHzForDisplay(displayHz);
     if (p.tier == ProfileTier::Software) c.targetHz = std::min(c.targetHz, 60);
     if (c.onBattery()) {
-        // On battery: less heat and power. Draft brushes, half the uploads, 60 Hz (unless set by hand).
-        c.draftBrushMode = true;
+        // On battery: less heat and power. Half the uploads, 60 Hz (unless set by hand).
         c.uploadBudgetMBPerFrame = std::max<uint64_t>(c.uploadBudgetMBPerFrame / 2, 4);
         if (!p.overrides.targetFps) c.targetHz = 60;
     }

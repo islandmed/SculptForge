@@ -22,13 +22,13 @@ hover "Predictive Strokes"
 expect_help "exactly the same"
 hold none
 
-# Predictive Strokes: off by default (experimental in 0.10), on and off again.
-expect_value predictive_strokes == 0
-click "Predictive Strokes"
+# Predictive Strokes: on by default, off and on again.
 expect_value predictive_strokes == 1
 click "Predictive Strokes"
 expect_value predictive_strokes == 0
 expect_status "Predictive strokes off"
+click "Predictive Strokes"
+expect_value predictive_strokes == 1
 
 # Antialiasing off and back; 8x.
 click "AA Off##perf.aa_1"

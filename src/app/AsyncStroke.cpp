@@ -452,8 +452,17 @@ uint64_t App::meshStateHash(const Mesh& mesh) {
     return h;
 }
 
+static uint64_t positionsHash(const Mesh& mesh) {
+    uint64_t h = 1469598103934665603ull;
+    const auto* p = reinterpret_cast<const uint8_t*>(mesh.positions.data());
+    for (size_t i = 0; i < mesh.positions.size() * sizeof(glm::vec3); ++i) h = (h ^ p[i]) * 1099511628211ull;
+    return h;
+}
+
 bool App::verifyStroke(uint64_t before, const std::vector<glm::vec2>& dabs, const std::vector<float>& radii) {
     const uint64_t after = meshStateHash(doc_.mesh);
+    const uint64_t afterPositions = positionsHash(doc_.mesh);
+    const std::vector<glm::vec3> afterNormals = doc_.mesh.normals;
     runCommand("undo", {});
     const uint64_t undone = meshStateHash(doc_.mesh);
     const bool undoOk = undone == before;
@@ -477,6 +486,16 @@ bool App::verifyStroke(uint64_t before, const std::vector<glm::vec2>& dabs, cons
         return meshStateHash(doc_.mesh);
     };
     const uint64_t replay = place();
+    const bool samePositions = positionsHash(doc_.mesh) == afterPositions;
+    size_t normalDiffs = 0;
+    float maxNormalDiff = 0.0f;
+    for (size_t i = 0; i < afterNormals.size() && i < doc_.mesh.normals.size(); ++i)
+        if (afterNormals[i] != doc_.mesh.normals[i]) {
+            ++normalDiffs;
+            maxNormalDiff = std::max(maxNormalDiff, glm::length(afterNormals[i] - doc_.mesh.normals[i]));
+        }
+    std::printf("verify: positions %s; %zu normals differ (largest %.3g)\n", samePositions ? "identical" : "DIFFERENT",
+                normalDiffs, double(maxNormalDiff));
     // And once more: the frame-loop path against itself (anything here that isn't deterministic shows).
     runCommand("undo", {});
     const uint64_t again = place();

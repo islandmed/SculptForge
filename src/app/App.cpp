@@ -2853,6 +2853,8 @@ bool App::drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col) {
     // Only what brushes work on: the active, visible SubTool with an up-to-date BVH (a stale one, after a
     // whole-mesh change, is rebuilt at the next press; until then the flat ring shows), not an LOD preview.
     if (previewLod_ >= 0 || doc_.bvhDirty) return false;
+    // Not while the solver thread is moving this mesh (predictive strokes): reading it then races the dabs.
+    if (solverBusy() || (asyncStroke_ && drag_ == Drag::Stroke)) return false;
     RayHit hit;
     if (!pick(mouseX_, mouseY_, hit)) return false; // one ray, as a press would cast
     // The world radius a dab here gets (App::firstDab / the brushes: Draw Size times world size of a pixel).

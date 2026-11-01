@@ -6,6 +6,17 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- **Predictive strokes are on by default**: big brushes on dense meshes keep up with the pen (21M triangles: frames
+  about 9 ms instead of 70, the brush 1-2 px behind the pointer instead of 40, no pause when you lift the pen). The
+  result is identical, bit for bit, to a stroke placed without them (checked by `ui_stroke_resize`).
+- Draft strokes are no longer chosen by any hardware tier or on battery (they measured no faster and aren't yet
+  identical to a full stroke); the Draft Strokes setting still turns them on.
+
+### Fixed
+- The brush ring that follows the surface (#25) read the mesh while a predictive stroke's thread was changing it,
+  which could change where that stroke's dabs landed; it now shows the flat ring during such strokes.
+
 ## [0.10.1] - 2026-11-01
 
 0.10.0 was tagged but never published (its Windows build failed); everything in it ships here.

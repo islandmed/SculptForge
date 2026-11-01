@@ -703,7 +703,7 @@ TEST(hw_tier_config) {
     // On battery: draft brushes, half the uploads, 60 Hz.
     const TierConfig b = tierConfigFor(ws, PowerSource::Battery, 144);
     CHECK(b.onBattery());
-    CHECK(b.draftBrushMode);
+    CHECK(!b.draftBrushMode); // no tier picks draft brushes, battery included
     CHECK(b.targetHz == 60);
     CHECK(b.uploadBudgetMBPerFrame == std::max<uint64_t>(c.uploadBudgetMBPerFrame / 2, 4));
     // Overrides win: draft never, a fixed target.
@@ -720,7 +720,7 @@ TEST(hw_tier_config) {
     CHECK(tierConfigFor(mac, PowerSource::AC, 120).zeroCopyUMA);
     CHECK(tierConfigFor(mac, PowerSource::AC, 120).targetHz == 120);
     CHECK(!tierConfigFor(mac, PowerSource::AC, 120).draftBrushMode);
-    CHECK(tierConfigFor(mac, PowerSource::Battery, 120).draftBrushMode);
+    CHECK(!tierConfigFor(mac, PowerSource::Battery, 120).draftBrushMode);
     CHECK(tierConfigFor(mac, PowerSource::Battery, 120).zeroCopyUMA);
     CHECK(tierConfigFor(mac, PowerSource::Battery, 120).targetHz == 60);
     // Software: safe mode at 60 Hz at most.

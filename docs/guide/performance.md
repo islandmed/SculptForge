@@ -60,7 +60,7 @@ There are two main profiles and a safe mode:
 | **Workstation** | 64 GB of memory or more, and a graphics card with 16 GB or more or an Apple Silicon Max / Ultra (or another chip whose graphics share the memory) that measures as fast | more triangles drawn per frame, larger textures and subdivision limits, shading updated with every dab |
 | **Software** (safe mode) | no graphics driver, so the drawing happens on the processor (llvmpipe) | the lightest settings, no antialiasing |
 
-On a laptop running on battery, whatever its profile, SculptForge switches to draft brushes, sends less data to the graphics card per
+On a laptop running on battery, whatever its profile, SculptForge sends less data to the graphics card per
 frame and aims for 60 frames a second, and the status bar says so; plugged in again, it goes back.
 
 At the top of **Preferences > Performance**:

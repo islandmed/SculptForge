@@ -79,7 +79,7 @@ bool calibrationDisabled() {
     return v && *v && *v != '0';
 }
 
-// Battery or mains (SDL_GetPowerInfo): a laptop on battery drops to draft brushes and 60 Hz (core/TierConfig.h).
+// Battery or mains (SDL_GetPowerInfo): a laptop on battery sends less per frame and drops to 60 Hz (core/TierConfig.h).
 PowerSource powerSource() {
     switch (SDL_GetPowerInfo(nullptr, nullptr)) {
     case SDL_POWERSTATE_ON_BATTERY: return PowerSource::Battery;
@@ -263,7 +263,7 @@ void App::hardwareProfileFrameEnd() {
             const HardwareProfile p = hw.profile;
             applyHardwareProfile(p, false);
             if (battery != wasBattery)
-                status_ = battery ? "On battery: draft brushes (normals and cavity at pen release), " + std::to_string(hw.tier.targetHz) + " Hz"
+                status_ = battery ? "On battery: lighter uploads, " + std::to_string(hw.tier.targetHz) + " Hz"
                                   : "On mains power: " + std::string(hw.tier.draftBrushMode ? "draft" : "continuous") + " brushes, " +
                                         std::to_string(hw.tier.targetHz) + " Hz";
         }

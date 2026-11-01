@@ -297,12 +297,12 @@ changes when it does):
 | `residentCacheCapMB` | RAM / 8, at most 1 GB | RAM / 4, at most 4 GB | RAM x 2/5, at most 64 GB |
 | `activeTriangleBudget` | 0.5M | 2M | 8M+ (half the render budget, at most 64M) |
 | `uploadBudgetMBPerFrame` | the profile's | the profile's | the profile's |
-| `draftBrushMode` (normals and cavity at pen release) | on | off (on battery: on) | off (on battery: on) |
+| `draftBrushMode` (normals and cavity at pen release) | off | off | off (the Draft Strokes setting turns them on) |
 | `zeroCopyUMA` | the GPU shares system memory: unified or integrated, in any tier (a 64 GB+ Apple Silicon Workstation too) | | |
 | `targetHz` | 60 | 60 / 120 / 144 from the display | 60 / 120 / 144 from the display |
 
 The app reads the power source with `SDL_GetPowerInfo` at start and every 5 seconds. On battery, whatever the tier
-(an Apple Silicon Workstation is a laptop too): draft brushes,
+(an Apple Silicon Workstation is a laptop too): no draft brushes (they are a manual setting),
 half the upload budget and 60 Hz (unless set by hand), and the status bar says so. The `draft_brush` override
 (on / off) wins over both. `draftBrushMode` is a flag for the brush engine; the brushes don't read it yet.
 
