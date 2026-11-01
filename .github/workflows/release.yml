@@ -22,7 +22,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing tag to (re)build, e.g. v0.1.0
+        description: Existing tag to (re)build, e.g. v0.1.0 (a dry run also takes a branch or commit)
         required: true
       dry_run:
         description: Everything but publishing
@@ -48,6 +48,7 @@ jobs:
     outputs:
       run-id: ${{ steps.find.outputs.run-id }}
       sha: ${{ steps.find.outputs.sha }}
+      tag: ${{ steps.find.outputs.tag }}
     steps:
       - uses: actions/checkout@v7
         with: { ref: '${{ env.TAG }}' }
@@ -61,9 +62,15 @@ jobs:
           sha=$(git rev-parse HEAD)
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
           version=$(sed -n 's/^project(SculptForge VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
-          if [ "v$version" != "$TAG" ]; then
+          if [ "$DRY_RUN" = true ] && ! git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            # A dry run of a branch or commit: its packages are named for the version it carries.
+            echo "Dry run of $TAG ($sha), packages named v$version"
+            echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          elif [ "v$version" != "$TAG" ]; then
             echo "::error::$TAG tags a commit whose CMakeLists.txt says $version. Fix: delete the tag, bump the version (or tag v$version), tag again."
             exit 1
+          else
+            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           fi
           if [ "$DRY_RUN" = true ] && [ -n "$PROMOTE_RUN" ]; then
             run=$(gh api "repos/$REPO/actions/runs/$PROMOTE_RUN" \
@@ -96,7 +103,7 @@ jobs:
     uses: ./.github/workflows/packages.yml
     with:
       ref: ${{ needs.locate.outputs.sha }}
-      tag: ${{ github.event.inputs.tag || github.ref_name }}
+      tag: ${{ needs.locate.outputs.tag }}
 
   smoke:
     name: Smoke test ${{ matrix.name }}
