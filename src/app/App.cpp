@@ -85,7 +85,7 @@ App::~App() = default;
 bool App::init(const AppOptions& options) {
     options_ = options;
     const bool recording = !options.recordPath.empty() || !options.uiTest.empty();
-    const bool headless = !options.renderPath.empty() || recording;
+    const bool headless = !options.renderPath.empty() || recording || !options.timelapsePath.empty();
     // UI tests run in a hidden window that never has focus; SDL drops joystick input without focus otherwise, and
     // the scripted SpaceMouse is a virtual joystick (UiTest.cpp).
     if (!options.uiTest.empty()) SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
@@ -114,7 +114,8 @@ bool App::init(const AppOptions& options) {
     const SDL_WindowFlags flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY |
                                   (headless ? SDL_WINDOW_HIDDEN : 0) |
                                   (options.fullscreen && !headless ? SDL_WINDOW_FULLSCREEN : 0);
-    const int winW = recording ? options.width : 1600, winH = recording ? options.height : 960;
+    const bool sized = recording || options.benchmark; // proof mode: --size (1920x1080 by default)
+    const int winW = sized ? options.width : 1600, winH = sized ? options.height : 960;
     window_ = SDL_CreateWindow("SculptForge", winW, winH, flags);
     if (!window_) {
         SDL_Log("SDL_CreateWindow failed: %s", SDL_GetError());
@@ -632,6 +633,8 @@ uint64_t App::frameKey() const {
 int App::run() {
     if (!options_.renderPath.empty()) return renderHeadless();
     if (!options_.recordPath.empty() || !options_.uiTest.empty()) return runRecording();
+    if (!options_.timelapsePath.empty()) return runTimelapseCli(); // (PanelTimeline.cpp)
+    if (options_.benchmark) startProofMode();                     // runs in this loop (ProofMode.cpp)
     if (g_wakeEvent == 0) g_wakeEvent = SDL_RegisterEvents(1);
     // Dabs are queued and placed within a time budget each frame (strokeTo). SF_STROKE_IMMEDIATE=1 places them all
     // as each pointer sample arrives, as before 0.9.6 (for comparison).
@@ -820,6 +823,7 @@ int App::run() {
         renderSettings_.motionProxy = false; // (other renders, e.g. project thumbnails, draw in full)
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         hardwareProfileFrameEnd();
+        if (proof_) proofBeforeSwap(fbW, fbH); // Help > Benchmark: timing, video capture, the scripted pointer
         SDL_GL_SwapWindow(window_);
         ++framesDrawn;
         if (sm.started && !sm.moving) { // the press is on screen: start moving round the circle
@@ -1671,6 +1675,7 @@ void App::drawUi() {
     drawBrushGallery();
     if (showImageTo3D_) drawImageTo3D();
     drawPhoneWindow(); // File > Capture from phone (PanelPhone.cpp)
+    drawTimelineUi();  // the Sculpt Timeline strip, timelapse, proof mode HUD (PanelTimeline.cpp, ProofMode.cpp)
     pollAlphaFile();
     pollVdm();
     if (previewLod_ >= 0) {

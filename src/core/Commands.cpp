@@ -28,6 +28,7 @@
 #include "core/Sculptable.h"
 #include "core/Splats.h"
 #include "core/TextureTransfer.h"
+#include "core/Timeline.h"
 #include "core/Voxel.h"
 #include "io/FbxIO.h"
 #include "io/GltfIO.h"
@@ -778,6 +779,7 @@ CommandRegistry::CommandRegistry() {
     registerExtractMirrorCommands(*this); // extract, mirror_and_weld, mirror (core/ExtractMirror.h)
     registerPerformanceCommands(*this); // perf_info, set_multithreading (core/Benchmark.cpp)
     registerHardwareProfileCommands(*this); // performance_profile, calibrate, set_performance_override (core/HardwareProfile.cpp)
+    registerTimelineCommands(*this); // timeline_info / seek / select / retune / save / load (core/Timeline.h)
     registerPaintCommands(*this); // core/Polypaint.cpp
     registerGozCommands(*this); // goz_import/export/send/receive, export_stl (io/GozCommands.cpp)
     registerBlenderCommands(*this); // blender_send/receive (io/BlenderCommands.cpp)

@@ -72,6 +72,29 @@ All notable changes to SculptForge are listed here. The format follows
   1/255. Lighter meshes keep the per-triangle dab.
 - Project format 7 stores material channels. It is written only when a texture has them: other projects are
   still saved as format 6, and every older project opens as before.
+- **Sculpt Timeline**: every stroke and operation is a tick on a strip along the bottom of the canvas. Drag the
+  scrubber to see the model at any point of the session, click a step to go there. Sculpting from an earlier
+  point no longer throws the later steps away: they stay as a branch (a lane above the track) you can switch
+  back to, with undo / redo working on the active branch as before. Right-click a stroke to re-tune its strength
+  (0 removes it, 2 doubles it) without redoing the strokes after it; where later strokes overlap it they keep
+  their own displacement on top (they aren't sculpted again; see the guide's Sculpt Timeline chapter). Seeking
+  reuses undo's per-stroke deltas, swaps runs of strokes at once with one normal / BVH / GPU update, and jumps
+  from full checkpoints every 16 steps (within 1 GB; fewer on huge meshes) for long seeks. Each SubTool keeps
+  its own timeline. Commands `timeline_info`, `timeline_seek`, `timeline_select`, `timeline_retune`,
+  `timeline_save`, `timeline_load`; UI test timeline.
+- **Save with project** (in the timeline's header) also writes the history beside the project as
+  `<name>.sfhist` (strokes, masks, polypaint, visibility, polygroups, branches, re-tuned strengths; a topology
+  change cuts it). Opening the project brings it back when the mesh matches. The project format is unchanged.
+- **Export timelapse**: the history rendered as a turntable video, the model building up stroke by stroke while
+  the camera goes once around it (1080p or 4K MP4, no captions; needs ffmpeg). Also
+  `sculptforge project.sfproj --timelapse out.mp4 [--size 3840x2160] [--timelapse-seconds 20]`.
+- **Proof mode** (**Help > Benchmark**, `sculptforge --benchmark`): a scripted 240 Hz pen stroke through the
+  same input handlers a real pen uses, with a 60 px and a 240 px brush and a turn of the view, on 5, 20 and 33
+  million triangle meshes (100 million when free memory allows). A live HUD shows fps, frame time p50 / p95 /
+  p99, how far the stroke trails the pointer (ms and px) and memory; the run is recorded to an MP4 with the HUD in
+  it and written as a JSON result with the processor, graphics card, memory, OS, version and commit.
+  `docs/benchmark.md` describes the format, `tools/benchmark/submit.py` checks results and adds them to
+  `website/benchmarks/results.json`, which the new benchmarks page lists.
 
 ## [0.9.7] - 2026-10-31
 

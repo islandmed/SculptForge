@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Project.h"
 #include "core/Micro.h"
+#include "core/Timeline.h"
 
 #include "core/Multires.h"
 
@@ -1157,6 +1158,8 @@ CommandResult openProjectCommand(Document& doc, const std::string& path) {
     std::string err;
     if (!loadProject(path, doc, err)) return {false, err};
     std::string msg = "Opened project " + std::filesystem::path(path).filename().string() + " (";
+    // The Sculpt Timeline saved beside it, if it matches (only into the app's own scene: not thumbnails, scratch opens).
+    const int histories = &doc == Timeline::historyDocument ? loadHistorySidecar(doc, path) : 0;
     if (doc.subtoolCount() > 1) msg += std::to_string(doc.subtoolCount()) + " SubTools, ";
     size_t tris = 0, layers = 0;
     for (int i = 0; i < doc.subtoolCount(); ++i) {
@@ -1166,6 +1169,7 @@ CommandResult openProjectCommand(Document& doc, const std::string& path) {
     msg += std::to_string(tris) + " triangles";
     if (layers) msg += ", " + std::to_string(layers) + " layers";
     if (!doc.splats.empty()) msg += ", " + std::to_string(doc.splats.size()) + " splats";
+    if (histories > 0) msg += ", with its history";
     return {true, msg + ")"};
 }
 
@@ -1187,6 +1191,9 @@ void registerProjectCommands(CommandRegistry& registry) {
                       if (!saveProject(path, doc, err)) return {false, err};
                       doc.path = path;
                       doc.markClean();
+                      // The Sculpt Timeline's history beside it (<name>.sfhist), when the app asks for it.
+                      if (Timeline::saveWithProject && &doc == Timeline::historyDocument && !saveHistorySidecar(doc, path, &err))
+                          return {true, "Saved project " + path + " (the history wasn't saved: " + err + ")"};
                       return {true, "Saved project " + path};
                   }});
     registry.add({"open_project", "Open a SculptForge project (.sfproj), replacing the current scene.",

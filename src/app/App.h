@@ -77,6 +77,15 @@ struct AppOptions {
     float measureStroke = 0.0f; // --measure-stroke S: a scripted fast circle stroke, report its path and frame times
     float measureStrokeRadius = 0.0f; // --measure-stroke S,R: the brush radius in screen pixels
     float measureIdle = 0.0f; // --measure-idle S: after a settling pause, count the frames drawn in S idle seconds, exit
+    // --timelapse out.mp4: render the opened project's history (its .sfhist) as a turntable timelapse and exit.
+    std::string timelapsePath;
+    float timelapseSeconds = 20.0f;
+    // --benchmark: proof mode (ProofMode.cpp), then exit. Sizes in millions of triangles (empty: 5, 20, 33 and
+    // 100 when memory allows); outputs default to the current folder.
+    bool benchmark = false;
+    std::string benchmarkSizes, benchmarkOut, benchmarkVideo;
+    bool benchmarkNoVideo = false, benchmarkVsync = false;
+    float benchmarkStrokeSeconds = 6.0f;
 };
 
 class Demo;
@@ -1254,6 +1263,20 @@ private:
     bool spaceMouseMoving_ = false;
     int spaceMouseLastButton_ = -1; // for Preferences: "Button N pressed"
     // ---- end SpaceMouse ----
+    // ---- Sculpt Timeline (PanelTimeline.cpp, core/Timeline.h) and proof mode (ProofMode.cpp) ----
+    // The history strip along the bottom of the canvas, the timelapse export, and Help > Benchmark: a scripted
+    // stroke through the input handlers on 5M..100M+ meshes with a live HUD, an MP4 and a JSON result.
+    std::shared_ptr<struct TimelineUiState> timelineUi_;
+    std::shared_ptr<struct ProofState> proof_;
+    void drawTimelineUi();            // once a frame from drawUi: keeps the timeline attached and draws the strip
+    void registerTimelineUiActions(); // view.timeline, timeline.timelapse, help.benchmark
+    void startTimelapse(const std::string& path, int width, int height, float seconds, int fps);
+    bool timelapseStep(double budgetSeconds); // renders frames for up to the budget; false when finished
+    int runTimelapseCli();                    // sculptforge FILE --timelapse out.mp4
+    void startProofMode();                    // Help > Benchmark, sculptforge --benchmark
+    void proofBeforeSwap(int fbW, int fbH);   // the interactive loop, after drawing a frame, before showing it
+    void drawProofUi();
+    // ---- end Sculpt Timeline ----
 };
 
 } // namespace sf

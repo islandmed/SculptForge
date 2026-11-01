@@ -170,6 +170,7 @@
 #include "core/Multires.h"
 #include "core/Script.h"
 #include "core/ThreadPool.h"
+#include "core/Timeline.h"
 #include "link/HttpServer.h"
 
 #include <imgui_internal.h>
@@ -460,6 +461,13 @@ double Demo::query(const std::string& name, bool& known) const {
         const AABB b = m.bounds();
         const int k = name.back() == 'x' ? 0 : name.back() == 'y' ? 1 : 2;
         return name[0] == 'c' ? b.center()[k] : b.extent()[k];
+    }
+    if (name == "timeline_steps" || name == "timeline_cursor" || name == "timeline_branches") { // (core/Timeline.h)
+        Timeline* t = Timeline::of(app_.doc_.undo);
+        if (!t) return 0.0;
+        return name == "timeline_steps" ? double(t->path().size() - 1)
+               : name == "timeline_cursor" ? double(t->cursor())
+                                           : double(t->branches().size());
     }
     if (name == "can_undo") return app_.doc_.undo.canUndo() ? 1.0 : 0.0;
     if (name == "dirty") return app_.doc_.dirty() ? 1.0 : 0.0;
