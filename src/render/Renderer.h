@@ -128,10 +128,17 @@ public:
         std::vector<uint32_t> movedClusters;
         std::vector<ClusterBounds> bounds; // of movedClusters
         std::vector<uint8_t> blockChanged, blockMoved; // scratch, per block
+        double packMs = 0.0, boundsMs = 0.0;           // where prepare's time went
         size_t bytes() const { return data.size() * sizeof(PackedVertex); }
     };
-    bool prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out);
+    // `curvature` (optional, by vertex): the cavity term of every vertex the mesh marked dirty, already worked
+    // out (Sculptor::strokeCurvature).
+    bool prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out, const float* curvature = nullptr);
     void commitStrokeUpload(StrokeUpload& up);
+    // The stroke uploads gave the clusters they moved quick culling bounds (around their vertices' boxes, which
+    // packing finds anyway, without the normal cone, so they are never culled as facing away); at the stroke's
+    // end this works out the exact ones (GL thread, the mesh no longer changing).
+    void refineStrokeBounds(uint32_t id, const Mesh& mesh);
 
     // Bytes of GPU buffers and textures the mesh slots hold.
     size_t gpuBytes() const;
@@ -210,6 +217,10 @@ private:
         size_t drawnTriangles = 0;
         size_t vertexCapacity = 0;
         std::vector<uint64_t> blockHash; // per UploadOrder block: hashes of its packed positions, and the rest
+        std::vector<AABB> blockBox;      // per UploadOrder block: its vertices' box as last packed
+        // Clusters whose culling bounds a stroke upload set from blockBox (a sphere round the box, no normal cone,
+        // the old volume): refineStrokeBounds makes them exact.
+        std::vector<uint32_t> looseClusters;
         size_t bytes[8] = {}; // GPU sizes: vertices, indices, lines, colours, mask, groups, prims, uvs + tangents
 
         // Dynamic topology (Mesh::changedTriangles, core/Dyntopo.h): the clusters whose triangles changed since
@@ -283,6 +294,7 @@ private:
     std::vector<const void*> drawOffsets_;
     std::vector<GLint> drawBases_;
     std::vector<uint32_t> drawClusters_;
+    std::vector<uint32_t> ghostClusters_; // drawSlot: the clusters a ghost dab reaches
     bool cullBackfaces_ = false; // the last cull(): back faces can't show (so the GPU may skip them too)
     std::vector<uint32_t> cullScratch_;
     size_t lastDrawn_ = 0;
@@ -296,7 +308,7 @@ private:
         GLint view = -1, proj = -1, gridOrigin = -1, gridStep = -1, viewport = -1, projScale = -1, baseColor = -1, paint = -1,
               showMask = -1, groups = -1, matcap = -1, matcapCavity = -1, dim = -1, primBase = -1, hasPaint = -1,
               normalFlipY = -1, twoSided = -1;
-        GLint ghostGroups = -1, ghostRange = -1, ghostEps = -1, ghostEdge = -1, ghostA = -1, ghostB = -1, ghostC = -1, ghostBound = -1, ghostKind = -1, ghostFocal = -1;
+        GLint ghostGroups = -1, ghostRange = -1, ghostEdge = -1, ghostA = -1, ghostB = -1, ghostC = -1, ghostBound = -1, ghostKind = -1, ghostFocal = -1;
     };
     static constexpr int kPaint = 1, kPrim = 2, kTextured = 4, kNormalMap = 8, kFlat = 16, kGhost = 32;
     MeshProgram programs_[64];

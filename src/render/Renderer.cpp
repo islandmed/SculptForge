@@ -65,15 +65,23 @@ uniform vec4 uGhostBound[8];
 uniform ivec2 uGhostRange[8]; // [first, end) of each run
 uniform ivec2 uGhostKind;    // kernel (sf::GhostKind), inverted
 uniform float uGhostFocal;
-uniform float uGhostEps;     // the tangent step for the bent normal and the curvature
 uniform float uGhostEdge;    // the mesh's edge length under the brush (the cavity term's scale)
-float ghostFalloff(float d, float r) {
-    float t = clamp(1.0 - d / r, 0.0, 1.0);
-    if (uGhostFocal != 0.0) t = pow(t, exp2(2.0 * clamp(uGhostFocal, -1.0, 1.0)));
-    return t * t * (3.0 - 2.0 * t);
+// The falloff and its first two derivatives in the distance (brushFalloff with Focal Shift).
+vec3 ghostFalloff(float d, float r) {
+    float u = clamp(1.0 - d / r, 0.0, 1.0);
+    if (u <= 0.0) return vec3(0.0);
+    if (uGhostFocal == 0.0) // (the plain smoothstep: t = u)
+        return vec3(u * u * (3.0 - 2.0 * u), -6.0 * u * (1.0 - u) / r, (6.0 - 12.0 * u) / (r * r));
+    float k = exp2(2.0 * clamp(uGhostFocal, -1.0, 1.0));
+    float t = pow(u, k), dt = -k * t / (u * r), ddt = k * (k - 1.0) * t / (u * u * r * r);
+    return vec3(t * t * (3.0 - 2.0 * t), 6.0 * t * (1.0 - t) * dt, (6.0 - 12.0 * t) * dt * dt + 6.0 * t * (1.0 - t) * ddt);
 }
 vec3 onPlane(vec3 v, vec3 n) { return v - n * dot(v, n); }
-vec3 ghostMove(vec3 x, vec3 n, int first, int end) {
+// Moves x as the dabs [first, end) would, and follows what the moves do to the surface seen as a height field
+// over the vertex's tangent plane (normal n): the height's gradient g (in that plane) and its Laplacian lap
+// (forward differentiation of each kernel's height change; lateral moves don't count). The shading normal is
+// then n - g, and the cavity term changes by the edge length over four times lap (curvatureAt).
+vec3 ghostMove(vec3 x, vec3 n, int first, int end, inout vec3 g, inout float lap) {
     float sgn = uGhostKind.y != 0 ? -1.0 : 1.0;
     int kind = uGhostKind.x;
     for (int i = first; i < end; ++i) {
@@ -82,30 +90,64 @@ vec3 ghostMove(vec3 x, vec3 n, int first, int end) {
         float dist = length(x - c);
         if (dist >= r) continue;
         float w = uGhostC[i].w;
-        float f = ghostFalloff(dist, r) * w;
+        vec3 F = ghostFalloff(dist, r) * w; // f, f', f'' in the distance
+        float f = F.x;
         float s = uGhostB[i].w;
         vec3 an = uGhostB[i].xyz;
         vec3 ac = uGhostC[i].xyz;
-        if (kind == 1) x += an * (sgn * s * r * 0.06 * f);
-        else if (kind == 2) x += n * (sgn * s * r * 0.05 * f);
-        else if (kind == 3) {
-            float h = dot(x - (ac + an * (sgn * r * 0.05 * s)), an);
-            if (sgn * h < 0.0) x -= an * (h * f);
-        } else if (kind == 4) {
-            float e = clamp((1.0 - dist / r) / 0.35, 0.0, 1.0);
-            float h = dot(x - (ac + an * (sgn * r * 0.08 * s)), an);
-            if (sgn * h < 0.0) x -= an * (h * e * e * (3.0 - 2.0 * e) * w);
-        } else if (kind == 5) {
-            x -= an * (dot(x - ac, an) * s * f * (uGhostKind.y != 0 ? -0.5 : 1.0));
-        } else if (kind == 6) {
-            x += an * (-sgn * s * r * 0.05 * f * f) + onPlane(c - x, an) * (0.25 * s * f);
-        } else if (kind == 7) {
+        vec3 radial = onPlane(x - c, n);
+        float rl = length(radial);
+        radial = rl > 1e-12 ? radial / rl : vec3(0.0);
+        float inv = 1.0 / max(dist, r * 1e-3);
+        float cn = dot(an, n);              // the kernel moves along an: the height changes by cn per unit
+        vec3 dh = onPlane(an, n) + cn * g;  // gradient of dot(x, an) over the surface
+        float radialLap = F.z + F.y * inv;  // Laplacian of f
+        if (kind == 1 || kind == 2) {       // Standard (along the area normal), Inflate (along the vertex's)
+            float a = sgn * s * r * (kind == 1 ? 0.06 : 0.05);
+            float k = kind == 1 ? cn : 1.0;
+            x += (kind == 1 ? an : n) * (a * f);
+            g += radial * (k * a * F.y);
+            lap += k * a * radialLap;
+        } else if (kind == 3 || kind == 4) { // Clay, Clay Buildup: everything below a plane pulled up to it
+            float h = dot(x - (ac + an * (sgn * r * (kind == 3 ? 0.05 : 0.08) * s)), an);
+            if (sgn * h < 0.0) {
+                vec3 W = F; // the pull's profile and its derivatives
+                if (kind == 4) {
+                    float e = clamp((1.0 - dist / r) / 0.35, 0.0, 1.0), de = e > 0.0 && e < 1.0 ? -1.0 / (0.35 * r) : 0.0;
+                    W = vec3(e * e * (3.0 - 2.0 * e), 6.0 * e * (1.0 - e) * de, (6.0 - 12.0 * e) * de * de) * w;
+                }
+                x -= an * (h * W.x);
+                lap -= cn * (2.0 * W.y * dot(radial, dh) + W.x * cn * lap + h * (W.z + W.y * inv));
+                g -= cn * (W.x * dh + h * W.y * radial);
+            }
+        } else if (kind == 5) { // Flatten
+            float m = s * (uGhostKind.y != 0 ? -0.5 : 1.0);
+            float h = dot(x - ac, an);
+            x -= an * (h * m * f);
+            lap -= cn * m * (2.0 * F.y * dot(radial, dh) + f * cn * lap + h * radialLap);
+            g -= cn * m * (f * dh + h * F.y * radial);
+        } else if (kind == 6) { // Crease: a valley of f^2, the sides pinched in
+            float a = -sgn * s * r * 0.05;
+            x += an * (a * f * f) + onPlane(c - x, an) * (0.25 * s * f);
+            g += radial * (cn * a * 2.0 * f * F.y);
+            lap += cn * a * (2.0 * (F.y * F.y + f * F.z) + 2.0 * f * F.y * inv);
+        } else if (kind == 7) { // Pinch: sideways only
             x += onPlane(c - x, an) * (sgn * 0.2 * s * f);
-        } else if (kind == 8) {
-            x += an * (-sgn * s * r * 0.08 * f * f * f * f) + onPlane(c - x, an) * (0.3 * s * f);
-        } else if (kind == 9) {
+        } else if (kind == 8) { // Dam Standard: f^4, the sides pinched in
+            float a = -sgn * s * r * 0.08;
+            float f3 = f * f * f;
+            x += an * (a * f3 * f) + onPlane(c - x, an) * (0.3 * s * f);
+            g += radial * (cn * a * 4.0 * f3 * F.y);
+            lap += cn * a * (12.0 * f * f * F.y * F.y + 4.0 * f3 * F.z + 4.0 * f3 * F.y * inv);
+        } else if (kind == 9) { // Trim: what sticks out above a plane cut off
             float h = dot(x - (ac - an * (sgn * r * 0.02 * s)), an);
-            if (sgn * h > 0.0) x -= an * (h * min(1.0, sqrt(f) * (0.5 + s)));
+            if (sgn * h > 0.0) {
+                float q = sqrt(max(f, 0.0)) * (0.5 + s);
+                float m = min(1.0, q), dm = q < 1.0 && f > 1e-6 ? (0.5 + s) * F.y / (2.0 * sqrt(f)) : 0.0;
+                x -= an * (h * m);
+                lap -= cn * (2.0 * dm * dot(radial, dh) + m * cn * lap + h * dm * inv);
+                g -= cn * (m * dh + h * dm * radial);
+            }
         }
     }
     return x;
@@ -118,26 +160,15 @@ void main() {
     float curvature = float(int(aNormal >> 22) - 512) / 511.0; // sign(c) sqrt(|c|), render/Clusters.h
     curvature *= abs(curvature);
 #ifdef GHOST
-    for (int g = 0; g < uGhostGroups; ++g) {
-        if (distance(world, uGhostBound[g].xyz) >= uGhostBound[g].w) continue;
-        int first = uGhostRange[g].x, end = uGhostRange[g].y;
-        vec3 m0 = ghostMove(world, normal, first, end);
-        if (m0 == world) continue;
-        // The moved point and four neighbours on its tangent plane moved alike: the displaced surface's normal
-        // (central differences) and the change of the cavity term, which is the edge length over four times the
-        // Laplacian of the move along the normal (Renderer.cpp curvatureAt: neighbour average above the vertex).
-        vec3 t1 = normalize(abs(normal.x) < 0.9 ? cross(normal, vec3(1.0, 0.0, 0.0)) : cross(normal, vec3(0.0, 1.0, 0.0)));
-        vec3 t2 = cross(normal, t1);
-        float e = uGhostEps;
-        vec3 a1 = ghostMove(world + t1 * e, normal, first, end), b1 = ghostMove(world - t1 * e, normal, first, end);
-        vec3 a2 = ghostMove(world + t2 * e, normal, first, end), b2 = ghostMove(world - t2 * e, normal, first, end);
-        float h0 = dot(m0 - world, normal);
-        float lap = (dot(a1 - world - t1 * e, normal) + dot(b1 - world + t1 * e, normal) + dot(a2 - world - t2 * e, normal) +
-                     dot(b2 - world + t2 * e, normal) - 4.0 * h0) / (e * e);
+    // The moved position, normal and cavity term (one evaluation per vertex, no extra varyings: a tiled GPU
+    // writes every vertex's outputs to memory and reads them back).
+    for (int k = 0; k < uGhostGroups; ++k) {
+        if (distance(world, uGhostBound[k].xyz) >= uGhostBound[k].w) continue;
+        vec3 g = vec3(0.0);
+        float lap = 0.0;
+        world = ghostMove(world, normal, uGhostRange[k].x, uGhostRange[k].y, g, lap);
+        normal = normalize(normal - g);
         curvature = clamp(curvature + 0.25 * uGhostEdge * lap, -1.0, 1.0);
-        vec3 bent = cross(a1 - b1, a2 - b2);
-        if (dot(bent, bent) > 1e-30) normal = normalize(dot(bent, normal) < 0.0 ? -bent : bent);
-        world = m0;
     }
 #endif
     vec4 p = uView * vec4(world, 1.0);
@@ -634,7 +665,6 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     p.twoSided = at("uTwoSided");
     p.ghostGroups = at("uGhostGroups");
     p.ghostRange = at("uGhostRange");
-    p.ghostEps = at("uGhostEps");
     p.ghostEdge = at("uGhostEdge");
     p.ghostA = at("uGhostA");
     p.ghostB = at("uGhostB");
@@ -916,21 +946,8 @@ void Renderer::drawSplats(const glm::mat4& view, const glm::mat4& proj, int fbWi
 namespace {
 
 // Signed curvature at vertex `v`: how far the neighbour average sits above (crease, > 0) or below (ridge, < 0)
-// the surface, relative to the local edge length.
-float curvatureAt(const Mesh& mesh, uint32_t v) {
-    const auto ring = mesh.neighbors(v);
-    if (ring.empty()) return 0.0f;
-    glm::vec3 avg(0.0f);
-    float edge = 0.0f;
-    const glm::vec3 p = mesh.positions[v];
-    for (uint32_t n : ring) {
-        avg += mesh.positions[n];
-        edge += glm::distance(mesh.positions[n], p);
-    }
-    avg /= float(ring.size());
-    edge /= float(ring.size());
-    return edge > 0.0f ? glm::dot(mesh.normals[v], avg - p) / edge : 0.0f;
-}
+// the surface, relative to the local edge length (Mesh::curvatureAt).
+float curvatureAt(const Mesh& mesh, uint32_t v) { return mesh.curvatureAt(v); }
 
 using Runs = std::vector<std::pair<uint32_t, uint32_t>>;
 
@@ -1082,6 +1099,7 @@ void Renderer::uploadVertices(MeshSlot& s, const Mesh& mesh, bool full) {
     // Per block, hashes of what it last sent (positions; normals and curvature): a block a dab marked but didn't
     // change (paint, mask) isn't sent again, and a cluster whose positions didn't move keeps its bounds and proxy.
     s.blockHash.resize(nb * 2, 0);
+    s.blockBox.resize(nb);
     blockChanged_.assign(nb, 0);
     blockMoved_.assign(nb, 0);
     bool everything = full;
@@ -1089,12 +1107,15 @@ void Renderer::uploadVertices(MeshSlot& s, const Mesh& mesh, bool full) {
         PackedVertex* out = static_cast<PackedVertex*>(dst);
         bool inside = true;
         uint64_t hp = 0, hn = 0;
+        AABB box;
         for (uint32_t i = b; i < e; ++i) {
             const uint32_t v = order[i];
             PackedVertex pv{}; // packed here and stored once: `out` may be mapped GPU memory, slow to read back
-            if (v < nv) // (else a vertex dynamic topology removed, which only patched clusters named)
+            if (v < nv) { // (else a vertex dynamic topology removed, which only patched clusters named)
                 inside &= packVertex(s.grid, mesh.positions[v], normals ? mesh.normals[v] : glm::vec3(0.0f, 0.0f, 1.0f),
                                      curvatureAt(mesh, v), pv);
+                box.expand(mesh.positions[v]);
+            }
             out[i - b] = pv;
             hp = (hp ^ (uint64_t(pv.pos[0]) | uint64_t(pv.pos[1]) << 32)) * 0x100000001B3ull + i;
             hn = (hn ^ pv.normal) * 0x100000001B3ull + i;
@@ -1104,7 +1125,9 @@ void Renderer::uploadVertices(MeshSlot& s, const Mesh& mesh, bool full) {
                 blockChanged_[g] = blockMoved_[g] || s.blockHash[g * 2 + 1] != hn;
                 s.blockHash[g * 2] = hp;
                 s.blockHash[g * 2 + 1] = hn;
+                s.blockBox[g] = box;
                 hp = hn = 0;
+                box = AABB();
             }
         }
         if (!inside) outside.store(true, std::memory_order_relaxed);
@@ -2336,13 +2359,14 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     // A baked normal map preview bends the shading normal (core/Bake.h).
     const bool normalMapped = s.hasUvs && s.normalTexture && s.hasTangents;
     const int groups = active && settings.showPolygroups ? (s.hasGroups ? 1 : 2) : 0;
-    const bool ghost = active && s.id == ghostId_ && !ghost_.empty() && !settings.motionProxy;
+    // (Not through the textured program's geometry shader: those meshes are sculpted without the preview.)
+    const bool ghost = active && s.id == ghostId_ && !ghost_.empty() && !settings.motionProxy && !textured && !normalMapped;
     const int features = (s.hasColors || s.hasMask ? kPaint : 0) | (groups == 1 ? kPrim : 0) | (textured ? kTextured : 0) |
-                         (normalMapped ? kNormalMap : 0) | (flat ? kFlat : 0) | (ghost ? kGhost : 0);
+                         (normalMapped ? kNormalMap : 0) | (flat ? kFlat : 0);
     const MeshProgram* p = meshProgram(features);
     if (!p) return;
+    const auto bind = [&](const MeshProgram* p) {
     gl::UseProgram(p->id);
-    if (ghost) setGhostUniforms(*p);
     gl::UniformMatrix4fv(p->view, 1, GL_FALSE, glm::value_ptr(frameView_));
     gl::UniformMatrix4fv(p->proj, 1, GL_FALSE, glm::value_ptr(frameProj_));
     gl::Uniform3fv(p->gridOrigin, 1, glm::value_ptr(s.grid.origin));
@@ -2381,6 +2405,8 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     gl::Uniform1i(p->groups, groups);
     gl::Uniform1i(p->dim, !active && settings.dimInactive ? 1 : 0);
     gl::Uniform1i(p->twoSided, 1);
+    };
+    bind(p);
     gl::BindVertexArray(s.vao);
     // Constant values for the attribute arrays that are disabled.
     if (!s.hasColors) gl::VertexAttrib4f(2, 1.0f, 1.0f, 1.0f, 1.0f);
@@ -2391,7 +2417,30 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     cull(s, frameCull_, settings.motionProxy && !perTriangle && !(active && settings.wireframe));
     // The back faces left in clusters along the silhouette: the GPU skips them too when they can't show.
     if (cullBackfaces_) gl::Enable(GL_CULL_FACE);
+    // The predictive preview (render/Ghost.h): the clusters a ghost dab reaches draw with the GHOST program, the
+    // rest as usual (most of the mesh, which then doesn't pay for the preview).
+    ghostClusters_.clear();
+    if (ghost) {
+        size_t kept = 0;
+        for (uint32_t c : drawClusters_) {
+            const ClusterBounds& b = s.bounds[c];
+            bool reached = b.radius < 0.0f;
+            for (size_t i = 0; i < ghost_.dabs.size() && !reached; ++i)
+                reached = glm::distance(b.center, ghost_.dabs[i].center) < b.radius + ghost_.dabs[i].radius * 1.05f;
+            if (reached) ghostClusters_.push_back(c);
+            else drawClusters_[kept++] = c;
+        }
+        drawClusters_.resize(kept);
+    }
     drawClusters(s, drawClusters_, GL_TRIANGLES, Part::Triangles, perTriangle ? p->primBase : -1);
+    if (!ghostClusters_.empty()) {
+        if (const MeshProgram* pg = meshProgram(features | kGhost)) {
+            bind(pg);
+            setGhostUniforms(*pg);
+            drawClusters(s, ghostClusters_, GL_TRIANGLES, Part::Triangles, perTriangle ? pg->primBase : -1);
+            bind(p);
+        }
+    }
     if (!s.patches.empty() && s.patchVao) { // dynamic topology: what changed since the layout (in full while moving)
         gl::BindVertexArray(s.patchVao);
         if (!s.patchColorsOn) gl::VertexAttrib4f(2, 1.0f, 1.0f, 1.0f, 1.0f);
@@ -2432,14 +2481,12 @@ void Renderer::setGhostUniforms(const MeshProgram& p) {
     glm::vec4 bound[GhostStroke::kMaxMirrors];
     GLint range[GhostStroke::kMaxMirrors * 2];
     int groups = 0;
-    float minRadius = 1e30f;
     const size_t n = ghost_.dabs.size();
     for (size_t i = 0; i < n; ++i) {
         const GhostDab& d = ghost_.dabs[i];
         a[i] = glm::vec4(d.center, d.radius);
         b[i] = glm::vec4(d.normal, d.strength);
         c[i] = glm::vec4(d.areaCenter, d.weight);
-        minRadius = std::min(minRadius, d.radius);
         const bool next = i == 0 || d.mirror != ghost_.dabs[i - 1].mirror;
         if (next) {
             if (groups == int(GhostStroke::kMaxMirrors)) break;
@@ -2465,17 +2512,18 @@ void Renderer::setGhostUniforms(const MeshProgram& p) {
     gl::Uniform4fv(p.ghostC, GLsizei(n), glm::value_ptr(c[0]));
     gl::Uniform2i(p.ghostKind, GLint(ghost_.kind), ghost_.invert ? 1 : 0);
     gl::Uniform1f(p.ghostFocal, ghost_.focal);
-    gl::Uniform1f(p.ghostEps, std::max(minRadius, 1e-6f) * 0.02f);
     gl::Uniform1f(p.ghostEdge, ghost_.edge);
 }
 
-bool Renderer::prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out) {
+bool Renderer::prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out, const float* curvature) {
     out.id = id;
     out.ready = false;
     out.data.clear();
     out.ranges.clear();
     out.movedClusters.clear();
     out.bounds.clear();
+    out.packMs = out.boundsMs = 0.0;
+    const auto clock = std::chrono::steady_clock::now();
     MeshSlot* found = nullptr;
     for (MeshSlot& s : slots_)
         if (s.id == id) found = &s;
@@ -2518,16 +2566,22 @@ bool Renderer::prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out) {
     out.data.resize(total);
     std::atomic<bool> outside{false};
     std::vector<uint64_t> hashes(nb * 2, 0); // (written per block, then compared: a failed prepare keeps the old)
+    std::vector<AABB> boxes(nb);
+    s.blockBox.resize(nb);
     poolFor(pieces.size(), [&](size_t i0, size_t i1) {
         for (size_t pi = i0; pi < i1; ++pi) {
             const Piece& pc = pieces[pi];
             PackedVertex* dst = out.data.data() + pc.offset;
             bool inside = true;
             uint64_t hp = 0, hn = 0;
+            AABB box;
             for (uint32_t i = pc.begin; i < pc.end; ++i) {
                 const uint32_t v = order[i];
                 PackedVertex pv{};
-                if (v < nv) inside &= packVertex(s.grid, mesh.positions[v], mesh.normals[v], curvatureAt(mesh, v), pv);
+                if (v < nv) {
+                    inside &= packVertex(s.grid, mesh.positions[v], mesh.normals[v], curvature ? curvature[v] : curvatureAt(mesh, v), pv);
+                    box.expand(mesh.positions[v]);
+                }
                 dst[i - pc.begin] = pv;
                 hp = (hp ^ (uint64_t(pv.pos[0]) | uint64_t(pv.pos[1]) << 32)) * 0x100000001B3ull + i;
                 hn = (hn ^ pv.normal) * 0x100000001B3ull + i;
@@ -2537,7 +2591,9 @@ bool Renderer::prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out) {
                     hashes[g * 2 + 1] = hn;
                     out.blockMoved[g] = s.blockHash[g * 2] != hp;
                     out.blockChanged[g] = out.blockMoved[g] || s.blockHash[g * 2 + 1] != hn;
+                    boxes[g] = box;
                     hp = hn = 0;
+                    box = AABB();
                 }
             }
             if (!inside) outside.store(true, std::memory_order_relaxed);
@@ -2547,11 +2603,13 @@ bool Renderer::prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out) {
         s.regrid = true; // the next syncScene makes a new grid and sends everything (the mesh stays dirty)
         return false;
     }
+    out.packMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - clock).count();
     // The changed blocks' GPU ranges and where they are in `data`.
     for (const Piece& pc : pieces)
         for (uint32_t b = pc.begin; b < pc.end;) {
             const uint32_t e = std::min(pc.end, (b & ~(UploadOrder::kBlock - 1)) + UploadOrder::kBlock);
             const size_t g = b >> UploadOrder::kBlockShift;
+            s.blockBox[g] = boxes[g];
             if (out.blockChanged[g]) {
                 s.blockHash[g * 2] = hashes[g * 2];
                 s.blockHash[g * 2 + 1] = hashes[g * 2 + 1];
@@ -2570,11 +2628,28 @@ bool Renderer::prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out) {
             const uint32_t c = s.order.clusterOfSlot(g << UploadOrder::kBlockShift);
             if (out.movedClusters.empty() || c > out.movedClusters.back()) out.movedClusters.push_back(c);
         }
+    // Their quick bounds: a sphere round their blocks' boxes, no normal cone (never culled as facing away), the
+    // volume as it was (a stroke doesn't turn the mesh inside out); refineStrokeBounds makes them exact.
     out.bounds.resize(out.movedClusters.size());
-    poolFor(out.movedClusters.size(), [&](size_t i0, size_t i1) {
-        for (size_t i = i0; i < i1; ++i) out.bounds[i] = clusterBounds(mesh, s.order, out.movedClusters[i]);
-    }, 1, 2);
+    const auto layout = s.order.clusters();
+    for (size_t i = 0; i < out.movedClusters.size(); ++i) {
+        const uint32_t c = out.movedClusters[i];
+        AABB box;
+        for (uint32_t g = layout[c].firstVertex >> UploadOrder::kBlockShift,
+                      ge = (layout[c].firstVertex + layout[c].vertexCount + UploadOrder::kBlock - 1) >> UploadOrder::kBlockShift;
+             g < ge && g < nb; ++g)
+            if (s.blockBox[g].valid()) box.expand(s.blockBox[g]);
+        ClusterBounds& cb = out.bounds[i];
+        cb = ClusterBounds();
+        if (box.valid()) {
+            cb.center = box.center();
+            cb.radius = glm::length(box.max - box.min) * 0.5f;
+        }
+        cb.coneAngle = -1.0f;
+        cb.volume = c < s.bounds.size() ? s.bounds[c].volume : 0.0;
+    }
     mesh.clearDirty();
+    out.boundsMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - clock).count() - out.packMs;
     out.ready = true;
     return true;
 }
@@ -2601,6 +2676,7 @@ void Renderer::commitStrokeUpload(StrokeUpload& up) {
             s.bounds[up.movedClusters[i]] = up.bounds[i];
             s.proxyStale[up.movedClusters[i]] = 1;
         }
+        s.looseClusters.insert(s.looseClusters.end(), up.movedClusters.begin(), up.movedClusters.end());
         s.box = AABB();
         s.volume = 0.0;
         for (const ClusterBounds& b : s.bounds) {
@@ -2609,6 +2685,35 @@ void Renderer::commitStrokeUpload(StrokeUpload& up) {
                 s.box.expand(b.center - glm::vec3(b.radius));
                 s.box.expand(b.center + glm::vec3(b.radius));
             }
+        }
+    }
+}
+
+void Renderer::refineStrokeBounds(uint32_t id, const Mesh& mesh) {
+    MeshSlot* found = nullptr;
+    for (MeshSlot& s : slots_)
+        if (s.id == id) found = &s;
+    if (!found || found->looseClusters.empty()) return;
+    MeshSlot& s = *found;
+    std::sort(s.looseClusters.begin(), s.looseClusters.end());
+    s.looseClusters.erase(std::unique(s.looseClusters.begin(), s.looseClusters.end()), s.looseClusters.end());
+    const size_t nc = s.order.clusters().size();
+    if (s.fresh || mesh.topologyDirty || s.bounds.size() != nc) { // (a full upload since makes them anyway)
+        s.looseClusters.clear();
+        return;
+    }
+    poolFor(s.looseClusters.size(), [&](size_t i0, size_t i1) {
+        for (size_t i = i0; i < i1; ++i)
+            if (s.looseClusters[i] < nc) s.bounds[s.looseClusters[i]] = clusterBounds(mesh, s.order, s.looseClusters[i]);
+    }, 1, 2);
+    s.looseClusters.clear();
+    s.volume = 0.0;
+    s.box = AABB();
+    for (const ClusterBounds& b : s.bounds) {
+        s.volume += b.volume;
+        if (b.radius >= 0.0f) {
+            s.box.expand(b.center - glm::vec3(b.radius));
+            s.box.expand(b.center + glm::vec3(b.radius));
         }
     }
 }

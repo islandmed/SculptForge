@@ -8,6 +8,8 @@
 #
 #   tools/bench_strokes.sh [options] BINARY [BINARY_B]
 #
+# A binary may carry its own environment: VAR=VAL[,VAR=VAL...]@BINARY (e.g. SF_PREDICTIVE_STROKE=0@build/sculptforge
+# against build/sculptforge compares predictive strokes off and on with one build).
 #   -s SIZES   comma list of 5, 21, 33 (default all three)
 #   -n RUNS    runs per size and binary (default 3); with two binaries the runs alternate A, B, A, B...
 #   -r PX      brush radius in screen pixels (default 200)
@@ -30,11 +32,11 @@ while getopts "s:n:r:t:e:h" opt; do
     r) radius=$OPTARG ;;
     t) seconds=$OPTARG ;;
     e) envs+=("$OPTARG") ;;
-    *) sed -n '5,18p' "$0"; exit 1 ;;
+    *) sed -n "5,21p" "$0"; exit 1 ;;
     esac
 done
 shift $((OPTIND - 1))
-[ $# -ge 1 ] || { sed -n '5,18p' "$0"; exit 1; }
+[ $# -ge 1 ] || { sed -n "5,21p" "$0"; exit 1; }
 bins=("$@")
 
 scene_for() {
@@ -54,10 +56,15 @@ for size in "${sizeList[@]}"; do
     for ((i = 1; i <= runs; i++)); do
         for b in "${!bins[@]}"; do
             bin=${bins[$b]}
+            own=()
+            if [[ $bin == *@* ]]; then
+                IFS=, read -ra own <<<"${bin%%@*}"
+                bin=${bin#*@}
+            fi
             label=$([ "$b" = 0 ] && echo A || echo B)
-            out=$(env ${envs[@]+"${envs[@]}"} "$bin" --run "$scene" --measure-stroke "$seconds,$radius" 2>&1 || true)
+            out=$(env ${envs[@]+"${envs[@]}"} ${own[@]+"${own[@]}"} "$bin" --run "$scene" --measure-stroke "$seconds,$radius" 2>&1 || true)
             line=$(printf '%s\n' "$out" | grep -A3 '^Stroke' || true)
-            echo "== ${size}M  $label run $i  ($bin)"
+            echo "== ${size}M  $label run $i  (${bins[$b]})"
             printf '%s\n' "$line"
             # The machine-readable line: frames mean, worst, surface lag mean, preview lag mean, press, release.
             printf '%s\n' "$out" | sed -n "s/^bench: /$size $label /p" >>"$results"

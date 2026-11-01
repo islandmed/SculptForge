@@ -663,8 +663,9 @@ void Sculptor::finishDab(Mesh& mesh, BVH& bvh, std::chrono::steady_clock::time_p
 // as it remeshed, so there the rings are used.
 void Sculptor::updateDabNormals(Mesh& mesh, const BVH& bvh) {
     auto clock = std::chrono::steady_clock::now();
+    if (curvature_.size() != mesh.vertexCount()) curvature_.assign(mesh.vertexCount(), 0.0f);
     if (dynTopo_.active() || dabLeaves_.empty()) {
-        mesh.updateNormals(dabVerts_);
+        mesh.updateNormals(dabVerts_, curvature_.data());
     } else {
         mesh.updateNormalsAround(dabLeaves_.size(), 64, [&](size_t b, size_t e, IndexBits& set) {
             for (size_t i = b; i < e; ++i)
@@ -674,7 +675,7 @@ void Sculptor::updateDabNormals(Mesh& mesh, const BVH& bvh) {
                     set.insertLocal(tri.y);
                     set.insertLocal(tri.z);
                 }
-        });
+        }, curvature_.data());
     }
     dabLeaves_.clear();
     timings.normalsMs += lapMs(clock);

@@ -62,6 +62,7 @@ void App::StrokeSolver::loop() {
         }
         probe.clear();
         double spent = 0.0;
+        const SculptTimings before = app.doc_.sculptor.timings;
         app.dabView_ = &view;
         for (const PathDab& d : batch) {
             const auto t0 = std::chrono::steady_clock::now();
@@ -72,7 +73,18 @@ void App::StrokeSolver::loop() {
         static const char* slow = std::getenv("SF_SOLVER_DELAY_MS"); // (a slower solver, for testing the preview)
         if (slow && *slow) std::this_thread::sleep_for(std::chrono::milliseconds(std::atoi(slow)));
         dabSeconds = batch.empty() ? 0.0 : spent / double(batch.size());
-        uploadReady = prepare && app.renderer_.prepareStrokeUpload(uploadId, app.doc_.mesh, upload);
+        const auto prepStart = std::chrono::steady_clock::now();
+        uploadReady = prepare && app.renderer_.prepareStrokeUpload(uploadId, app.doc_.mesh, upload, app.doc_.sculptor.strokeCurvature());
+        static const bool log = std::getenv("SF_STROKE_LOG") != nullptr;
+        if (log) {
+            const SculptTimings& t = app.doc_.sculptor.timings;
+            SDL_Log("solver: %zu dabs %.1f ms (kernel %.1f, normals %.1f, BVH %.1f), upload packed in %.1f ms (vertices %.1f, "
+                    "bounds %.1f), %.1f MB",
+                    batch.size(), spent * 1000.0, t.kernelMs - before.kernelMs, t.normalsMs - before.normalsMs,
+                    t.bvhMs - before.bvhMs,
+                    std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - prepStart).count(),
+                    upload.packMs, upload.boundsMs, double(upload.bytes()) / 1e6);
+        }
         {
             std::lock_guard<std::mutex> lock(mutex_);
             done = true;
@@ -137,8 +149,11 @@ void App::commitSolverBatch() {
         batch.swap(s.batch);
     }
     if (s.uploadReady) {
+        const auto t0 = std::chrono::steady_clock::now();
         renderer_.commitStrokeUpload(s.upload);
         s.uploadReady = false;
+        static const bool log = std::getenv("SF_STROKE_LOG") != nullptr;
+        if (log) SDL_Log("commit: %.1f ms", std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
     } else {
         syncScene(); // (the regular sync: a new grid, or a mesh the two-part upload doesn't handle)
     }
@@ -215,6 +230,7 @@ void App::pumpStroke() {
 }
 
 void App::finishStrokeNow() {
+    if (asyncStroke_) renderer_.refineStrokeBounds(doc_.activeSubtoolInfo().id, displayedMesh()); // (the quick ones)
     strokeFinishing_ = false;
     asyncStroke_ = false;
     renderer_.setGhost(0, GhostStroke());

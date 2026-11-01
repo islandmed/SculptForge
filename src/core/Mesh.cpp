@@ -601,7 +601,7 @@ void Mesh::recomputeAllNormals() {
     markAllDirty();
 }
 
-void Mesh::updateNormals(std::span<const uint32_t> verts) {
+void Mesh::updateNormals(std::span<const uint32_t> verts, float* curvature) {
     // The vertices whose normal changes: the moved ones and every neighbour, gathered as a set and listed in
     // index order; then each one's normal from its faces, in its triangle order (as recomputeAllNormals sums
     // them). The set, and every normal computed from it, doesn't depend on the thread count.
@@ -613,13 +613,33 @@ void Mesh::updateNormals(std::span<const uint32_t> verts) {
             for (uint32_t u : neighbors(v)) set.insertLocal(u);
         }
     });
-    finishNormals();
+    finishNormals(curvature);
 }
 
-void Mesh::updateNormalsAround(size_t count, size_t grain, const std::function<void(size_t, size_t, IndexBits&)>& fill) {
+void Mesh::updateNormalsAround(size_t count, size_t grain, const std::function<void(size_t, size_t, IndexBits&)>& fill,
+                               float* curvature) {
     if (!beginNormalSet()) return;
     normalBits_.insertParallel(count, grain, fill);
-    finishNormals();
+    finishNormals(curvature);
+}
+
+float Mesh::curvatureAt(uint32_t v) const {
+    if (v >= positions.size() || v >= normals.size()) return 0.0f;
+    const glm::vec3 p = positions[v];
+    glm::vec3 around(0.0f);
+    float edges = 0.0f;
+    uint32_t corners = 0;
+    for (uint32_t ti : vertexTriangles(v)) {
+        const glm::uvec3& t = triangles[ti];
+        for (int k = 0; k < 3; ++k)
+            if (t[k] != v) {
+                const glm::vec3& q = positions[t[k]];
+                around += q;
+                edges += glm::distance(q, p);
+                ++corners;
+            }
+    }
+    return corners && edges > 0.0f ? glm::dot(normals[v], around - p * float(corners)) / edges : 0.0f;
 }
 
 bool Mesh::beginNormalSet() {
@@ -630,7 +650,7 @@ bool Mesh::beginNormalSet() {
     return true;
 }
 
-void Mesh::finishNormals() {
+void Mesh::finishNormals(float* curvature) {
     // Listing the set also marks it dirty: its words are laid out like dirtyBits, and each 2048-vertex dirty
     // block lies in one of its chunks (so no two threads write the same word).
     static_assert(IndexBits::kChunk % kDirtyBlock == 0);
@@ -657,9 +677,31 @@ void Mesh::finishNormals() {
                 }
             const uint32_t v = scratchVerts_[i];
             glm::vec3 sum(0.0f);
-            for (uint32_t ti : vertexTriangles(v)) sum += faceNormal(positions, triangles[ti]);
+            if (!curvature) {
+                for (uint32_t ti : vertexTriangles(v)) sum += faceNormal(positions, triangles[ti]);
+                const float len = glm::length(sum);
+                if (len > 1e-20f) normals[v] = sum / len;
+                continue;
+            }
+            // With the cavity term (curvatureAt) from the same corners.
+            const glm::vec3 p = positions[v];
+            glm::vec3 around(0.0f);
+            float edges = 0.0f;
+            uint32_t corners = 0;
+            for (uint32_t ti : vertexTriangles(v)) {
+                const glm::uvec3& t = triangles[ti];
+                sum += faceNormal(positions, t);
+                for (int k = 0; k < 3; ++k)
+                    if (t[k] != v) {
+                        const glm::vec3& q = positions[t[k]];
+                        around += q;
+                        edges += glm::distance(q, p);
+                        ++corners;
+                    }
+            }
             const float len = glm::length(sum);
             if (len > 1e-20f) normals[v] = sum / len;
+            curvature[v] = corners && edges > 0.0f ? glm::dot(normals[v], around - p * float(corners)) / edges : 0.0f;
         }
     }, 4096);
 }

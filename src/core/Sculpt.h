@@ -125,6 +125,11 @@ public:
     // DragDot; restoreStroke) put positions back, not topology. restoreStroke holds it too.
     void holdTopology() { topologyHeld_ = true; }
 
+    // The cavity term (Mesh::curvatureAt) of every vertex whose normal this stroke's dabs updated, by vertex,
+    // worked out with the normals (the renderer packs it instead of walking the rings again); null outside a
+    // stroke. Entries of other vertices are stale.
+    const float* strokeCurvature() const { return active_ && !curvature_.empty() ? curvature_.data() : nullptr; }
+
     // Mirror sign vectors for the enabled symmetry axes (always starts with (1,1,1)).
     static std::vector<glm::vec3> mirrors(Symmetry sym);
 
@@ -169,6 +174,7 @@ private:
 
     std::vector<uint32_t> verts_, dabVerts_; // one mirror's vertices; every mirror's (for the normals)
     std::vector<uint32_t> dabLeaves_;        // the BVH leaves every mirror's query listed (the normals' set)
+    std::vector<float> curvature_;           // strokeCurvature
     std::vector<glm::vec3> scratch_;
     std::vector<float> weights_, influence_;
     std::vector<uint8_t> firstTouch_;

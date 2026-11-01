@@ -344,6 +344,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "antialiasing") return double(app_.uiPrefs_.antialiasing);
     if (name == "view_samples") return double(app_.perf_.samplesWanted);
     if (name == "multithreading") return ThreadPool::shared().serial() ? 0.0 : 1.0;
+    if (name == "predictive_strokes") return app_.predictiveStrokes() ? 1.0 : 0.0;
     if (name == "last_stroke_dabs") return double(app_.perf_.lastStroke.dabs);
     if (name == "texture_size") return hasTexture(m) ? double(m.texture->width) : 0.0;
     if (name == "paint_texture") return paintsTexture(m) ? 1.0 : 0.0;

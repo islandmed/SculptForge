@@ -1,8 +1,8 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The predictive stroke preview (render/Ghost.h) against the brush solver it stands in for, and the pen
-// prediction (core/PenPredictor.h).
+// The predictive stroke preview (render/Ghost.h) against the brush solver it stands in for, the cavity term the
+// normals pass hands the renderer (Mesh::curvatureAt), and the pen prediction (core/PenPredictor.h).
 #include "TestHarness.h"
 
 #include "core/PenPredictor.h"
@@ -123,6 +123,51 @@ TEST(ghost_kinds_cover_the_displacement_brushes) {
     CHECK(ghostFalloff(0.0f, 1.0f, 0.0f) == brushFalloff(0.0f, 1.0f, 0.0f));
     for (float f : {-0.7f, 0.0f, 0.5f})
         for (float d : {0.1f, 0.5f, 0.9f}) CHECK(std::abs(ghostFalloff(d, 1.0f, f) - brushFalloff(d, 1.0f, f)) < 1e-6f);
+}
+
+TEST(curvature_from_triangles_matches_the_ring_average) {
+    // Mesh::curvatureAt (the renderer's cavity term) from each vertex's triangles is the old average over its
+    // ring on a closed manifold; the normals pass that writes it alongside gives the same numbers and normals.
+    Mesh m = makeIcosphere(4);
+    for (size_t v = 0; v < m.positions.size(); ++v)
+        m.positions[v] *= 1.0f + 0.05f * std::sin(float(v) * 1.7f);
+    m.recomputeAllNormals();
+    float worst = 0.0f;
+    for (uint32_t v = 0; v < m.vertexCount(); ++v) {
+        glm::vec3 avg(0.0f);
+        float edge = 0.0f;
+        const auto ring = m.neighbors(v);
+        for (uint32_t n : ring) {
+            avg += m.positions[n];
+            edge += glm::distance(m.positions[n], m.positions[v]);
+        }
+        avg /= float(ring.size());
+        edge /= float(ring.size());
+        const float ringCurvature = glm::dot(m.normals[v], avg - m.positions[v]) / edge;
+        worst = std::max(worst, std::abs(ringCurvature - m.curvatureAt(v)));
+    }
+    CHECK(worst < 1e-4f);
+
+    Mesh a = m, b = m;
+    std::vector<uint32_t> moved;
+    for (uint32_t v = 0; v < a.vertexCount(); v += 7) {
+        a.positions[v] *= 1.02f;
+        b.positions[v] *= 1.02f;
+        moved.push_back(v);
+    }
+    std::vector<float> curvature(a.vertexCount(), -99.0f);
+    a.updateNormals(moved, curvature.data());
+    b.updateNormals(moved);
+    CHECK(a.normals == b.normals);
+    float off = 0.0f;
+    size_t written = 0;
+    for (uint32_t v = 0; v < a.vertexCount(); ++v) {
+        if (curvature[v] == -99.0f) continue;
+        ++written;
+        off = std::max(off, std::abs(curvature[v] - a.curvatureAt(v)));
+    }
+    CHECK(written >= moved.size());
+    CHECK(off < 1e-5f);
 }
 
 TEST(pen_predictor_extrapolates_steady_motion) {

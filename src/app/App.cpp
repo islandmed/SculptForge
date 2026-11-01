@@ -637,6 +637,13 @@ int App::run() {
     const char* continuousEnv = std::getenv("SF_CONTINUOUS_REDRAW");
     const bool continuous = continuousEnv && *continuousEnv && *continuousEnv != '0';
     const bool logRedraw = std::getenv("SF_REDRAW_LOG") != nullptr; // why each frame is drawn (bug reports)
+    // SF_FRAME_LOG=ms: every frame slower than that, with where its time went.
+    const double frameLogMs = std::getenv("SF_FRAME_LOG") ? std::atof(std::getenv("SF_FRAME_LOG")) : -1.0;
+    double phase[10] = {};
+    int phases = 0;
+    const auto mark = [&] {
+        if (frameLogMs >= 0.0 && phases < 10) phase[phases++] = double(SDL_GetTicksNS()) * 1e-6;
+    };
     auto seconds = [] { return double(SDL_GetTicksNS()) * 1e-9; };
     // --measure-idle: let start-up settle (first frames, the LightBox's thumbnails), then count.
     constexpr double kMeasureSettle = 3.0;
@@ -726,7 +733,10 @@ int App::run() {
             }
             ++wakeUps;
         }
+        phases = 0;
+        mark();
         while (SDL_PollEvent(&e)) onEvent(e);
+        mark();
         if (options_.measureStroke > 0.0f && !sm.started && t0 - started >= kMeasureSettle && !backgroundBusy()) {
             const CanvasRect c = canvasRect();
             sm.cx = c.x + c.w * 0.5f;
@@ -796,6 +806,7 @@ int App::run() {
         // for a limited time, then look at the pointer again.
         if (asyncStroke_) pumpStroke();
         else drainStrokeDabs(kStrokeBudgetSeconds);
+        mark();
         Uint64 now = SDL_GetTicksNS();
         float dt = float(double(now - lastTicks) * 1e-9);
         lastTicks = now;
@@ -846,10 +857,12 @@ int App::run() {
         ImGui::NewFrame();
         drawUi();
         ImGui::Render();
+        mark();
 
         buildGhost(); // the dabs not on the GPU yet, drawn as a preview (predictive strokes)
         const auto syncStart = std::chrono::steady_clock::now();
         syncScene();
+        mark();
         notePerformanceFrame(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - syncStart).count());
         const int samples = viewSamples();
         renderSettings_.motionProxy = perf_.proxyNow; // big meshes draw their lighter proxy while the view moves
@@ -875,8 +888,14 @@ int App::run() {
             }
         }
         renderSettings_.motionProxy = false; // (other renders, e.g. project thumbnails, draw in full)
+        mark();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window_);
+        mark();
+        if (phases == 7 && phase[6] - phase[0] > frameLogMs)
+            SDL_Log("frame %.1f ms: events %.1f, dabs %.1f, UI %.1f, ghost + sync %.1f, draw %.1f, UI draw + swap %.1f",
+                    phase[6] - phase[0], phase[1] - phase[0], phase[2] - phase[1], phase[3] - phase[2], phase[4] - phase[3],
+                    phase[5] - phase[4], phase[6] - phase[5]);
         ++framesDrawn;
         {
             const double frameNow = seconds();
