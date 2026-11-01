@@ -215,9 +215,20 @@ private:
         return true;
     }
 
-    // Gauss-Seidel sweep on A x = b, forwards or backwards.
+    // Smoothing on A x = b: damped Jacobi in parallel on big levels (two sweeps), Gauss-Seidel (forwards or
+    // backwards, so the V-cycle stays symmetric) on small ones.
     static void sweep(const SparseMatrix<S>& A, const std::vector<S>& b, std::vector<S>& x, bool forwards) {
         const size_t n = A.n;
+        if (n > 20000) {
+            std::vector<S> r(n);
+            for (int k = 0; k < 2; ++k) {
+                A.mul(x, r);
+                poolFor(n, [&](size_t b0, size_t e0) {
+                    for (size_t i = b0; i < e0; ++i) x[i] += (0.7 / A.diag[i]) * (b[i] - r[i]);
+                });
+            }
+            return;
+        }
         for (size_t s = 0; s < n; ++s) {
             const size_t i = forwards ? s : n - 1 - s;
             S r = b[i];

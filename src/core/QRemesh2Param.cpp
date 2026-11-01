@@ -749,7 +749,7 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
             std::vector<std::pair<double, uint32_t>> dist;
             for (uint32_t i : left) dist.push_back({std::abs(y[i] - std::round(y[i])), i});
             std::sort(dist.begin(), dist.end());
-            static const double frac = std::getenv("SF_QR2_ROUND") ? std::atof(std::getenv("SF_QR2_ROUND")) : 0.5;
+            static const double frac = std::getenv("SF_QR2_ROUND") ? std::atof(std::getenv("SF_QR2_ROUND")) : 0.7;
             size_t take = std::max<size_t>(1, size_t(double(left.size()) * frac + 0.999));
             while (take < dist.size() && dist[take].first < 0.08) ++take;
             if (left.size() <= 8) take = left.size();
@@ -761,9 +761,9 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
             std::vector<uint32_t> rest;
             for (size_t k = take; k < dist.size(); ++k) rest.push_back(dist[k].second);
             left.swap(rest);
-            static const double midTol = std::getenv("SF_QR2_TOL") ? std::atof(std::getenv("SF_QR2_TOL")) : 1e-3;
+            static const double midTol = std::getenv("SF_QR2_TOL") ? std::atof(std::getenv("SF_QR2_TOL")) : 1e-2;
             if (useIntBlock) factorInts(fixed);
-            iters += conjugateGradients(op, rhs, fixed, y, left.empty() ? 1e-5 : midTol, left.empty() ? 2000 : 500, cancelled, stop, precond);
+            iters += conjugateGradients(op, rhs, fixed, y, left.empty() ? 1e-4 : midTol, left.empty() ? 2000 : 500, cancelled, stop, precond);
             if (stop) return false;
             ++rounds;
         }

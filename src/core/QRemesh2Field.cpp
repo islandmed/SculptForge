@@ -272,7 +272,8 @@ bool solveCrossField(const Proxy& p, const Frames& f, const Curvature& curv, con
             std::vector<cd> rhsk(nfree);
             static const int projected = std::getenv("SF_QR2_PROJ") ? std::atoi(std::getenv("SF_QR2_PROJ")) : 30;
             std::vector<double> local; // per free triangle: the projected rounds' weight (empty: not run)
-            for (int round = 0; round < 6 + projected; ++round) {
+            int lastRound = 6 + projected;
+            for (int round = 0; round < lastRound; ++round) {
                 if (round == 6) {
                     // Zeros of order two or more (four poles merged by symmetry, as inside a closed guide loop) are
                     // split by projected rounds around them, strongly there and lightly elsewhere; none: done.
@@ -288,7 +289,11 @@ bool solveCrossField(const Proxy& p, const Frames& f, const Curvature& curv, con
                     for (uint32_t t = 0; t < nt; ++t)
                         for (int k = 0; k < 3; ++k)
                             if (std::abs(probe.vertexIndex[p.T[t][k]]) >= 2 && ring[t] < 0) ring[t] = 0, queue.push_back(t);
-                    if (queue.empty()) break;
+                    if (queue.empty()) { // none: a few light projected rounds everywhere (they smooth the field)
+                        local.assign(nfree, sigma * 4.0);
+                        lastRound = 6 + 8;
+                        continue;
+                    }
                     for (size_t qi = 0; qi < queue.size(); ++qi) {
                         const uint32_t t = queue[qi];
                         if (ring[t] >= 30) continue;
@@ -318,7 +323,7 @@ bool solveCrossField(const Proxy& p, const Frames& f, const Curvature& curv, con
                     }
                 std::vector<cd> nx(x);
                 its += pcg<cd>([&](const std::vector<cd>& in, std::vector<cd>& o) { A.mul(in, o); }, &mg, A.diag, rhsk, nx,
-                               1e-5, 200, cancelled, stop);
+                               round < 3 ? 1e-3 : 1e-5, 200, cancelled, stop);
                 if (stop) return false;
                 x.swap(nx);
             }
