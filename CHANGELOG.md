@@ -24,7 +24,9 @@ All notable changes to SculptForge are listed here. The format follows
 - **Quality report** after QRemesh, in the status line, the QRemesh panel and the `qremesh` command's message:
   poles (by valence), how far quad corners are from square, and the distance to the sculpt (mean and Hausdorff).
   `quality=false` skips the measuring.
-- Dense sculpts are decimated in parallel blocks to a working resolution first: DENSESUMMARY
+- Dense sculpts are decimated in parallel blocks to a working resolution first. A sculpted sphere at 2k / 5k /
+  10k quads (M1 Pro, 10 cores, shared with other jobs): 1.3M triangles 3.1-6.4 s (peak 0.36 GB), 5.2M 6.6-8.6 s
+  (1.3 GB), 21M about 20 s (4.7 GB); eight poles each time. The quality report adds a few seconds at 21M.
 - Tests: test_qremesh2.cpp (eight poles on a sphere, determinism, exact symmetry, hard edges and groups, the
   command); `SF_QREMESH_BENCH=<dir>` runs the comparison with the legacy method and writes the results as OBJ,
   `SF_BENCH_LIMITS=1` times 1.3M / 5.2M / 21M-triangle sculpts with their peak memory.

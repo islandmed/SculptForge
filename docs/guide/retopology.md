@@ -127,7 +127,8 @@ On smooth sculpts with Adaptive Size the corners are a few degrees further from 
 the grid bends to vary the quad size instead of adding poles. Set Adaptive Size to 0 for the squarest grid.
 
 A 1.3-million-triangle sculpt takes about 4 seconds to 5,000 quads on a 10-core M1 Pro; denser sculpts are first
-decimated in parallel blocks to a working resolution (DENSE21).
+decimated in parallel blocks to a working resolution: 5.2 million triangles take 7 to 9 seconds (1.3 GB at most)
+and 21 million about 20 seconds (4.7 GB), at 2,000 to 10,000 quads.
 
 The legacy method (**Method > Legacy**, `method=legacy`) is the Instant Meshes style field-aligned method of
 SculptForge 0.9 (Jakob, Tarini, Panozzo and Sorkine-Hornung, 2015): faster on small models but with many more
