@@ -96,8 +96,8 @@ void registerRetopoCommands(CommandRegistry& reg) {
               {"adaptive", T::Number, "Adaptive Size 0-1: 0 = even quads, 1 = small quads in curved areas, big "
                                       "ones on flat areas. Default 0.5.", false},
               {"keep_groups", T::Bool, "Keep Groups: edge loops follow the polygroup borders and the groups are kept.", false},
-              {"detect_edges", T::Bool, "Detect Edges: hard edges (faces meeting at more than 50 degrees) get an edge "
-                                        "loop. Default true.", false},
+              {"detect_edges", T::Bool, "Detect Edges: hard edges get an edge loop (v2: faces meeting at more than about "
+                                        "60 degrees along a line a few quads long; legacy: over 50 degrees). Default true.", false},
               {"use_polypaint", T::Bool, "Use the polypaint as a density guide: red areas get up to 4x the quads, blue "
                                          "areas down to a quarter.", false},
               {"symmetry", T::String, "Mirror the topology across x, y or z. The mirror plane is found from the model (the "
@@ -107,7 +107,8 @@ void registerRetopoCommands(CommandRegistry& reg) {
                                              "for the world's centre).", false},
               {"keep_original", T::Bool, "Keep the original as a hidden SubTool below (for project_all). Default false.", false},
               {"smooth", T::Number, "Relaxation passes on the surface (0-30). Default 6.", false},
-              {"seed", T::Number, "Random start of the direction field (results are repeatable per seed).", false},
+              {"seed", T::Number, "Legacy method: random start of the direction field (results are repeatable per seed). "
+                                  "QRemesh 2 has no random start.", false},
               {"keep_texture", T::Bool, "Keep a painted texture: Auto UV the result and project the texture onto it. "
                                         "Default true.", false},
               {"guides", T::Bool, "Follow the SubTool's QRemesh Guides (curves drawn with qremesh_guide): an edge loop "

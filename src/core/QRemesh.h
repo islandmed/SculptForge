@@ -1,7 +1,9 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// QRemesh (Geometry > QRemesh, like ZBrush's ZRemesher): automatic quad retopology. A field-aligned method
+// QRemesh (Tool > Remesh / Tool > Geometry > QRemesh, like ZBrush's ZRemesher): automatic quad retopology. Two
+// methods: QRemesh 2, the default (an integer-grid map, core/QRemesh2.cpp), and the legacy one described here,
+// which shares the steps around it (symmetry, guides, pieces, attributes). The legacy method is a field-aligned method
 // after Instant Field-Aligned Meshes (Jakob, Tarini, Panozzo, Sorkine-Hornung, SIGGRAPH Asia 2015; the
 // reference code is BSD-3, this is a fresh implementation of the parts we need):
 //

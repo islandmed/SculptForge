@@ -1594,7 +1594,58 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
         }
     }
     relaxLoops(qp, quads, rt, std::max(opt.smoothIterations, 0), feat);
-    for (uint32_t v : planeVerts) qp[v][axis] = 0.0f;
+    // Untangle: a quad turned against its neighbours (a fold left by a repair) gets its vertices moved to their
+    // neighbours' average and back onto the sculpt.
+    {
+        const size_t nv = qp.size();
+        std::vector<std::vector<uint32_t>> nbq(nv), vq(nv);
+        for (uint32_t f = 0; f < quads.size(); ++f)
+            for (int k = 0; k < 4; ++k) {
+                vq[quads[f][k]].push_back(f);
+                nbq[quads[f][k]].push_back(quads[f][(k + 1) % 4]);
+                nbq[quads[f][k]].push_back(quads[f][(k + 3) % 4]);
+            }
+        std::vector<uint8_t> isFeat(nv, 0);
+        for (size_t v = 0; v < nv && v < feat.size(); ++v) isFeat[v] = feat[v];
+        for (uint32_t v : planeVerts) isFeat[v] = 1;
+        size_t untangled = 0;
+        for (int it = 0; it < 8; ++it) {
+            std::vector<vec3> qn(quads.size());
+            for (uint32_t f = 0; f < quads.size(); ++f) {
+                const glm::uvec4 q = quads[f];
+                qn[f] = safeNormalize(glm::cross(qp[q.z] - qp[q.x], qp[q.w] - qp[q.y]), vec3(0.0f));
+            }
+            std::vector<uint32_t> bad;
+            for (uint32_t f = 0; f < quads.size(); ++f) {
+                vec3 around(0.0f);
+                for (int k = 0; k < 4; ++k)
+                    for (uint32_t g : vq[quads[f][k]]) around += qn[g];
+                if (glm::dot(qn[f], around - 4.0f * qn[f]) < 0.0f)
+                    for (int k = 0; k < 4; ++k) bad.push_back(quads[f][k]);
+            }
+            if (bad.empty()) break;
+            std::sort(bad.begin(), bad.end());
+            bad.erase(std::unique(bad.begin(), bad.end()), bad.end());
+            for (uint32_t v : bad) {
+                if (isFeat[v] || nbq[v].empty()) continue;
+                vec3 c(0.0f);
+                for (uint32_t u : nbq[v]) c += qp[u];
+                c /= float(nbq[v].size());
+                SurfaceHit hit;
+                qp[v] = surface.closestPoint(c, 2.0f * h0, hit) ? hit.position : c;
+                ++untangled;
+            }
+        }
+        if (timing && untangled) std::fprintf(stderr, "  v2 untangled %zu vertex moves\n", untangled);
+    }
+    for (uint32_t v : planeVerts) { // onto the sculpt, then exactly onto the plane (a symmetric sculpt meets it there)
+        for (int it = 0; it < 3; ++it) {
+            qp[v][axis] = 0.0f;
+            SurfaceHit hit;
+            if (surface.closestPoint(qp[v], 2.0f * h0, hit)) qp[v] = hit.position;
+        }
+        qp[v][axis] = 0.0f;
+    }
     mark("relax");
 
     out.mesh.P = std::move(qp);

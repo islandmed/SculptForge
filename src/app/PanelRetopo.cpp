@@ -334,7 +334,7 @@ void App::drawQRemeshContents() {
     ImGui::SameLine();
     ImGui::SetCursorPosX(x0 + half + style.ItemSpacing.x); // the right column, inside the section indent
     ImGui::Checkbox("Detect Edges", &retopo_.detectEdges);
-    ui::HelpText("Detect Edges", nullptr, "Hard edges (faces meeting at more than 50 degrees) get an edge loop, so they stay sharp.",
+    ui::HelpText("Detect Edges", nullptr, "Hard edges get an edge loop, so they stay sharp (QRemesh 2: faces meeting at more than about 60 degrees along a line at least a few quads long; legacy: more than 50 degrees).",
                  kQRemeshPath);
     ImGui::Checkbox("Use Polypaint", &retopo_.usePolypaint);
     ui::HelpText("Use Polypaint", nullptr,

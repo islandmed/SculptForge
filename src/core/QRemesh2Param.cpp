@@ -431,15 +431,6 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
         for (uint32_t v = 0; v < el.size(); ++v)
             if (el.eliminated(v)) maxLen = std::max(maxLen, el.expr(v).size()), total += el.expr(v).size();
         std::fprintf(stderr, "  grid map: expressions max %zu terms, %zu in all\n", maxLen, total);
-        for (uint32_t v = 0; v < el.size(); ++v)
-            if (el.eliminated(v) && el.expr(v).size() == maxLen) {
-                int kinds[4] = {};
-                for (const Term& t : el.expr(v)) ++kinds[el.kind(t.var)];
-                std::fprintf(stderr, "    var %u kind %d: terms real %d seam %d feature %d sing %d, first coefs %g %g %g\n", v,
-                             el.kind(v), kinds[0], kinds[1], kinds[2], kinds[3], el.expr(v)[0].a, el.expr(v)[1].a,
-                             el.expr(v)[2].a);
-                break;
-            }
     }
     // 4. Free unknowns. The reduced system C^T K C y = C^T (b - K d) (x = C y + d) is applied without forming it:
     // the cut tree makes C fill in (a transition is the composition of everything below it), C^T K C would not fit.
