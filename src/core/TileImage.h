@@ -36,6 +36,11 @@ public:
         bool uniform = false;
         std::array<uint16_t, 4> value{}; // the uniform tile's texel (in component units: 0-255 or 0-65535)
         std::vector<uint8_t> data;       // a dense tile: kTileImageTexels * texelBytes(), rows of 64 texels
+        size_t counted = 0;              // what this tile added to liveBytes() (taken back when it goes)
+        Tile() = default;
+        Tile(const Tile&) = delete;
+        Tile& operator=(const Tile&) = delete;
+        ~Tile();
     };
     using TilePtr = std::shared_ptr<Tile>;
 
@@ -101,6 +106,11 @@ public:
     size_t uniqueBytes() const;
     // Same size, format and texels (tiles compared by value).
     bool sameTexels(const TileImage& other) const;
+
+    // Bytes of every tile alive in the process (all images, their copies and undo steps), kept in an atomic
+    // counter as tiles are made and freed: safe to read from any thread at any time (memory readouts), unlike
+    // bytes(), which walks an image's tiles and must run where the image is edited.
+    static size_t liveBytes();
 
     // A fill value from components in 0..1.
     static std::array<uint16_t, 4> toUnits(int bits, float r, float g = 0, float b = 0, float a = 0);

@@ -3,12 +3,15 @@
 #include "core/TileImage.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstring>
 
 namespace sf {
 
 namespace {
+
+std::atomic<size_t> gLiveTileBytes{0}; // TileImage::liveBytes
 
 // Writes `value` (component units) as one raw texel of `comps` components of `bits`.
 void putTexel(uint8_t* out, const std::array<uint16_t, 4>& value, int comps, int bits) {
@@ -30,6 +33,10 @@ std::array<uint16_t, 4> readTexel(const uint8_t* p, int comps, int bits) {
 }
 
 } // namespace
+
+TileImage::Tile::~Tile() { gLiveTileBytes.fetch_sub(counted, std::memory_order_relaxed); }
+
+size_t TileImage::liveBytes() { return gLiveTileBytes.load(std::memory_order_relaxed); }
 
 std::array<uint16_t, 4> TileImage::toUnits(int bits, float r, float g, float b, float a) {
     const float m = bits == 16 ? 65535.0f : 255.0f;
@@ -62,6 +69,8 @@ uint8_t* TileImage::writableTile(size_t index) {
         const int tb = texelBytes();
         for (size_t i = 0; i < size_t(kTileImageTexels); ++i) std::memcpy(&made->data[i * size_t(tb)], px, size_t(tb));
     }
+    made->counted = sizeof(Tile) + made->data.size();
+    gLiveTileBytes.fetch_add(made->counted, std::memory_order_relaxed);
     t = std::move(made);
     return t->data.data();
 }
@@ -76,6 +85,8 @@ void TileImage::fillTile(size_t index, const std::array<uint16_t, 4>& value) {
     auto t = std::make_shared<Tile>();
     t->uniform = true;
     t->value = value;
+    t->counted = sizeof(Tile);
+    gLiveTileBytes.fetch_add(t->counted, std::memory_order_relaxed);
     tiles_[index] = std::move(t);
 }
 

@@ -122,6 +122,16 @@ void App::drawTextureChannelsContents() {
     const Mesh& m = doc_.mesh;
     if (!hasTexture(m)) return;
     const PaintTexture& t = *m.texture;
+    // Commands that edit the texture replace it (captureTexture: the old one goes into the undo step and may be
+    // freed), so `t` is only valid until one runs: they wait in `pending` until everything is drawn.
+    std::vector<std::pair<std::string, Args>> pending;
+    struct RunPending {
+        App& app;
+        std::vector<std::pair<std::string, Args>>& list;
+        ~RunPending() {
+            for (auto& [name, args] : list) app.runCommand(name, args);
+        }
+    } runPending{*this, pending};
     const ImGuiStyle& style = ImGui::GetStyle();
     ImGui::SeparatorText("Material Channels");
     // Channel toggles, two per row.
@@ -132,7 +142,7 @@ void App::drawTextureChannelsContents() {
         if (column) ImGui::SameLine(half + style.ItemSpacing.x + ImGui::GetCursorStartPos().x);
         const std::string label = std::string(channelFormat(c).label) + "##texchan";
         if (ImGui::Checkbox(label.c_str(), &on))
-            runCommand("texture_channels", {{on ? "enable" : "disable", std::string(channelFormat(c).id)}});
+            pending.push_back({"texture_channels", {{on ? "enable" : "disable", std::string(channelFormat(c).id)}}});
         ui::HelpText(channelFormat(c).label, nullptr,
                      (channelHelp(c) + " Turning a channel on costs no memory until it is painted; turning it off "
                                        "discards its paint (undoable).")
@@ -149,12 +159,12 @@ void App::drawTextureChannelsContents() {
     ImGui::SetNextItemWidth(-1);
     if (ImGui::BeginCombo("##channelview", viewLabel)) {
         if (ImGui::Selectable("Normal view", doc_.channelView == Channel::BaseColor))
-            runCommand("channel_view", {{"channel", std::string("off")}});
+            pending.push_back({"channel_view", {{"channel", std::string("off")}}});
         for (Channel c : kMaterialChannels) {
             if (!channelEnabled(t, c)) continue;
             const std::string label = std::string("Solo ") + channelFormat(c).label;
             if (ImGui::Selectable(label.c_str(), doc_.channelView == c))
-                runCommand("channel_view", {{"channel", std::string(channelFormat(c).id)}});
+                pending.push_back({"channel_view", {{"channel", std::string(channelFormat(c).id)}}});
         }
         ImGui::EndCombo();
     }

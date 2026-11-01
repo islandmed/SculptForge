@@ -18,7 +18,9 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <atomic>
 #include <filesystem>
+#include <thread>
 
 using namespace sf;
 
@@ -686,4 +688,71 @@ TEST(texture_dab_tile_path_matches_triangle_path) {
                 islandPainted, worst, gutterMismatch);
     CHECK(islandPainted > 10000);
     CHECK(worst <= 1);
+}
+
+TEST(texture_memory_readouts_are_safe_while_painting) {
+    // Memory readouts (TileImage::liveBytes, texturePaintCacheBytes) run while a worker paints material dabs on a
+    // dense mesh (texel tiles, texel maps built on the fly) and edits channels: the counters are atomics, so the
+    // readers never walk tiles that are being replaced. Afterwards every tile is accounted for.
+    const size_t before = TileImage::liveBytes();
+    {
+        Mesh base = makeIcosphere(6);
+        sphericalUvs(base);
+        BVH bvh;
+        bvh.build(base);
+        std::atomic<bool> done{false};
+        std::atomic<size_t> reads{0}, maxSeen{0};
+        std::thread reader([&] {
+            while (!done.load()) {
+                const size_t live = TileImage::liveBytes();
+                const size_t caches = texturePaintCacheBytes();
+                maxSeen = std::max(maxSeen.load(), live + caches);
+                ++reads;
+            }
+        });
+        std::thread painter([&] {
+            for (int round = 0; round < 6; ++round) {
+                Mesh m = base;
+                m.texture = makeTexture(1024, 1024);
+                m.paintToTexture = true;
+                for (Channel c : {Channel::Roughness, Channel::Height, Channel::Normal}) setChannelEnabled(*m.texture, c, true);
+                if (round % 2) addTextureLayer(*m.texture, "Layer");
+                TexturePainter::setPath(round % 3 == 2 ? TexturePainter::Path::Triangles : TexturePainter::Path::Tiles);
+                BrushMaterial mat = rustyMetal();
+                mat.channels = channelBit(Channel::BaseColor) | channelBit(Channel::Roughness) | channelBit(Channel::Height) |
+                               channelBit(Channel::Normal);
+                TexturePainter p;
+                CHECK(p.begin(m, mat.channels));
+                DabParams d = dab(glm::vec3(0, 0, 1), 0.3f, 0.7f);
+                d.viewDir = glm::vec3(0, 0, -1);
+                for (int i = 0; i < 8; ++i) {
+                    d.center = glm::normalize(glm::vec3(-0.5f + 0.13f * float(i), 0.1f * float(round), 1.0f));
+                    p.dab(m, bvh, d, mat, Symmetry{true, false, false});
+                }
+                UndoRecord rec;
+                p.end(rec);
+                if (rec.textureTiles) rec.textureTiles->swapWith(m); // undo swaps tile pointers
+                setChannelEnabled(*m.texture, Channel::Height, false);
+            }
+            TexturePainter::setPath(TexturePainter::Path::Auto);
+            done = true;
+        });
+        painter.join();
+        reader.join();
+        CHECK(reads.load() > 10);
+        CHECK(maxSeen.load() > before);
+    }
+    CHECK(TileImage::liveBytes() == before); // every tile made was freed and taken off the count
+}
+
+TEST(texture_edits_replace_the_texture_object) {
+    // Why the UI defers texture commands until it has drawn: a command that edits the texture gives the mesh a
+    // copy and keeps the old one only as an undo step's packed tiles, so a reference held across the command
+    // points at freed memory (the Texture Map panel crashed this way under load).
+    Document doc = makeDoc(texturedPlane(8, 256));
+    std::weak_ptr<PaintTexture> old = doc.mesh.texture;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "texture_channels", {{"enable", std::string("roughness")}}).ok);
+    CHECK(old.expired());
+    CHECK(channelEnabled(*doc.mesh.texture, Channel::Roughness));
 }
