@@ -10,7 +10,8 @@ animate.
 
 ## The usual workflow
 
-1. Select the sculpt and open **Tool > Geometry**. Under **QRemesh**, turn on **Keep Original**.
+1. Select the sculpt and open **Tool > Remesh** (the same QRemesh controls are also under **Tool > Geometry**).
+   Under **QRemesh**, turn on **Keep Original**.
 2. Set **Target Polygons** (for example 5000) and click **QRemesh**. It runs in the background: a progress bar
    replaces the button, and **Cancel** stops it. The result replaces the SubTool, and the sculpt as it was is
    kept as a hidden SubTool called "*name* Original" right below it.
@@ -25,16 +26,17 @@ Both steps are single undo steps (<kbd>Ctrl</kbd>+<kbd>Z</kbd>).
 
 ## QRemesh
 
-**Tool > Geometry > QRemesh** works on the active SubTool.
+**Tool > Remesh > QRemesh** (also under **Tool > Geometry**) works on the active SubTool.
 
 | Control | What it does |
 |---|---|
-| **QRemesh** | Starts the retopology. The status line reports the result, e.g. "QRemesh: 4987 quads from 47214 triangles (100% quads) in 1.0 s" |
+| **QRemesh** | Starts the retopology. The status line reports the result and its quality, e.g. "QRemesh: 5072 quads from 47214 triangles (100% quads) in 6.5 s. Quality: 260 poles (141 x3, 113 x5, 6 other), corners 8.5 deg off square, distance to the sculpt 0.106% mean / 1.27% max of its size" |
+| **Method** | **QRemesh 2** (the default): the whole layout is solved at once as an integer grid, so poles appear only where the form needs them and loops run unbroken. **Legacy**: the method of SculptForge 0.9, kept for comparison and for closed guide loops |
 | **Target Polygons** | About how many quads to make (100 to 200,000 on the slider, more from scripts). The result is usually within 5% of it |
 | **Half / Same / Double** | Set the target to half, the same as or twice the SubTool's current polygon count |
 | **Adaptive Size** | 0 makes quads all about the same size. Higher values make smaller quads where the surface curves and bigger ones on flat areas, for the same total |
 | **Keep Groups** | Edge loops run exactly along the polygroup borders, and the result keeps the polygroups |
-| **Detect Edges** | Hard edges, where faces meet at more than 50 degrees, get an edge loop, so boxes and bevels stay crisp (on by default) |
+| **Detect Edges** | Hard edges get an edge loop, so boxes and bevels stay crisp (on by default). QRemesh 2 takes faces meeting at more than about 60 degrees along a line at least a few quads long (a scan's or a sculpt's deep creases are left to the flow); the legacy method any edge over 50 degrees |
 | **Use Polypaint** | Paint where you want density: red areas get up to four times the quads, blue areas down to a quarter, white areas are unchanged |
 | **Symmetry** | Remesh one half and mirror it, welded on the seam, for exactly symmetric topology (on by default). It mirrors on the axis chosen in the **Transform** palette (X if none), across the model's own middle plane: the world's centre plane when the model is symmetric about it, otherwise the plane through the model's middle, so a model moved away from the centre works too. A model that isn't mirror-symmetric is remeshed whole instead, and the status line says "Symmetry off: the model isn't mirror-symmetric"; one that is nearly symmetric (a bump on one side) gets mirrored topology that follows each side's own surface |
 | **Keep Original** | Keep the SubTool as it was, hidden, below the new one, ready for ProjectAll. Off: the SubTool is replaced, as in ZBrush (undo brings it back) |
@@ -42,6 +44,7 @@ Both steps are single undo steps (<kbd>Ctrl</kbd>+<kbd>Z</kbd>).
 | **QRemesh Guides** | Picks the guides brush: draw curves on the model for the edge loops to follow. See [QRemesh Guides](#qremesh-guides) |
 | **Delete Last** / **Clear** | Delete the last guide curve drawn (with its mirror copies), or all of them |
 | **Curves Strength** | How far around each guide the edge flow follows it: 0 = only the loop on the curve, 100 = about six quads to each side (default 50) |
+| **Quality Report** | Shown after a QRemesh of the active SubTool: the poles (vertices with other than four edges, by how many edges), how far quad corners are from square (mean and worst 1%), and how far the new surface is from the sculpt (mean and maximum, in % of its size) |
 
 What happens to your data:
 
@@ -75,11 +78,61 @@ What happens to your data:
 
 ### How it works
 
-QRemesh is a field-aligned method after *Instant Field-Aligned Meshes* (Jakob, Tarini, Panozzo and
-Sorkine-Hornung, 2015). It smooths a cross field (the directions the quad edges should take) over the surface
-from coarse to fine, places a grid of the wanted size along it, extracts the polygons where neighbouring grid
-corners meet, splits every polygon into quads and relaxes them back onto the sculpt. It is fast: about 2 seconds
-for a 1.3-million-triangle sculpt to 5,000 quads, and 6 seconds to 100,000 quads, on a 10-core desktop.
+QRemesh 2 builds the layout the way recent research quad remeshers do (integer-grid maps, as in *Mixed-Integer
+Quadrangulation*, Bommes, Zimmer and Kobbelt 2009, and *Integer-Grid Maps for Reliable Quad Meshing*, Bommes et
+al. 2013), in its own implementation:
+
+1. **A working surface.** The sculpt is brought to about three triangle edges per quad edge with even
+   triangles (dense sculpts are first decimated in parallel blocks), keeping open edges, polygroup borders
+   (**Keep Groups**) and real hard edges (**Detect Edges**; creases shorter than two quads or softer than about 55
+   degrees at the quad scale are sculpt detail, not hard edges) on their exact place.
+2. **Curvature and directions.** The principal curvature directions, smoothed over about one quad, and a
+   smooth cross field (the directions the edges take) solved over the whole surface at once: it follows the
+   curvature where the surface clearly bends one way (limbs, lips, brows, ridges), the feature lines exactly,
+   and is as smooth as possible elsewhere. It is solved on a copy of the surface smoothed at the quad scale, so
+   pores and scratches don't add poles. Polypaint density turns it the way a change of density needs.
+3. **The grid.** A seamless parametrization whose integer lines are the edge loops: feature lines and guides lie
+   exactly on grid lines, singularities (the poles) exactly on grid points, and across the seams the grid only
+   turns by quarter turns. Its integer unknowns are rounded nearest-first, each round followed by a re-solve.
+4. **Extraction** of that grid at the target density (not split from a coarser one), every face a quad; the
+   rare places where the grid folds are repaired locally and stay all quads.
+5. **Loop-aware relaxation**: smoothing on the sculpt in which a vertex can slide along a loop that runs over a
+   ridge but not off it, then projection onto the sculpt.
+
+With **Symmetry** one half is remeshed with the mirror plane as a feature line and mirrored, so the field and
+the result are exactly symmetric. The result is the same every time for the same settings.
+
+![The lion scan at 5,000 quads. Left: the legacy method, 1,028 poles. Right: QRemesh 2, 199 poles, with loops along the mane and round the muzzle and a clean box on the base](images/qremesh2-compare.jpg)
+
+Compared with the legacy method on the same models and targets, QRemesh 2 has a quarter to a fiftieth of the
+poles at the same distance to the sculpt (poles, then the mean angle of quad corners off 90 degrees, then the mean
+distance in % of the model's size; legacy first):
+
+| Model | Target | Poles | Corners off square | Distance |
+|---|---|---|---|---|
+| Lion scan (47k triangles) | 2,000 | 433 to 116 | 22.7° to 7.8° | 0.295% to 0.290% |
+| | 5,000 | 1,028 to 199 | 18.2° to 7.9° | 0.125% to 0.120% |
+| | 10,000 | 1,665 to 398 | 14.5° to 8.3° | 0.059% to 0.060% |
+| ICT head (28k, symmetry) | 2,000 | 269 to 91 | 12.6° to 8.9° | 0.108% to 0.101% |
+| | 5,000 | 511 to 114 | 8.8° to 8.0° | 0.039% to 0.040% |
+| | 10,000 | 727 to 214 | 6.6° to 7.7° | 0.015% to 0.018% |
+| Creature from a sphere (82k, symmetry) | 2,000 | 96 to 22 | 4.6° to 8.5° | 0.035% to 0.037% |
+| | 10,000 | 308 to 37 | 3.4° to 6.8° | 0.007% to 0.007% |
+| Hard-surface part (3 boxes) | 2,000 | 56 to 24 | 2.0° to 0.7° | 0.082% to 0.000% |
+| | 10,000 | 24 to 28 | 0.3° to 0.7° | 0.000% to 0.000% |
+| Sculpted sphere (1.3M) | 2,000 | 84 to 8 | 4.3° to 3.9° | 0.037% to 0.035% |
+| | 10,000 | 401 to 8 | 4.3° to 5.2° | 0.008% to 0.007% |
+
+On smooth sculpts with Adaptive Size the corners are a few degrees further from square than the legacy method's:
+the grid bends to vary the quad size instead of adding poles. Set Adaptive Size to 0 for the squarest grid.
+
+A 1.3-million-triangle sculpt takes about 4 seconds to 5,000 quads on a 10-core M1 Pro; denser sculpts are first
+decimated in parallel blocks to a working resolution: 5.2 million triangles take 7 to 9 seconds (1.3 GB at most)
+and 21 million about 20 seconds (4.7 GB), at 2,000 to 10,000 quads.
+
+The legacy method (**Method > Legacy**, `method=legacy`) is the Instant Meshes style field-aligned method of
+SculptForge 0.9 (Jakob, Tarini, Panozzo and Sorkine-Hornung, 2015): faster on small models but with many more
+poles, and its result is extracted at twice the spacing and split, which shows as paired loops.
 
 > **ZBrush:** QRemesh Guides are ZBrush's ZRemesher Guides brush, and Curves Strength its slider of that name.
 > Keep Groups, Use Polypaint, Adaptive Size, Half / Same / Double and symmetry work as you know them. There is no
@@ -88,7 +141,9 @@ for a 1.3-million-triangle sculpt to 5,000 quads, and 6 seconds to 100,000 quads
 ## QRemesh Guides
 
 Draw curves on the sculpt and QRemesh puts an edge loop along each one, and turns the flow around it to follow,
-like ZBrush's ZRemesher Guides brush. Use them where the topology has to work for animation: rings around the
+like ZBrush's ZRemesher Guides brush. With QRemesh 2 an open curve is an exact edge loop: the grid line lies on it.
+Closed loops (round an eye) and loops across the symmetry plane are, for now, done by the legacy method for that
+piece (the status line says so). Use them where the topology has to work for animation: rings around the
 eyes and the mouth, loops around the shoulders, elbows and knees, a line down the middle of a muscle.
 
 ![Left: QRemesh on its own. Middle: loops drawn round the eyes and the mouth with QRemesh Guides. Right: QRemesh again, with an edge loop on every curve and rings around them](images/qremesh-guides.jpg)
@@ -167,7 +222,7 @@ straight along the normal, it takes the closest point within **Dist**.
 
 | Command | Options |
 |---|---|
-| `qremesh` | `target` (16 to 2,000,000, default 5000), `adaptive` (0-1, default 0.5), `keep_groups`, `detect_edges` (default true), `use_polypaint`, `symmetry` (`x`, `y` or `z`; off by default in scripts; the mirror plane is found from the model), `symmetry_center` (use this plane instead, e.g. `0` for the world's centre), `keep_original`, `smooth` (relaxation passes, default 6), `seed`, `keep_texture` (default true), `guides` (follow the SubTool's QRemesh Guides, default true), `curves_strength` (0-100, default 50) |
+| `qremesh` | `method` (`v2`, the default, or `legacy`), `quality` (report poles, corner angles and the distance to the sculpt, default true), `target` (16 to 2,000,000, default 5000), `adaptive` (0-1, default 0.5), `keep_groups`, `detect_edges` (default true), `use_polypaint`, `symmetry` (`x`, `y` or `z`; off by default in scripts; the mirror plane is found from the model), `symmetry_center` (use this plane instead, e.g. `0` for the world's centre), `keep_original`, `smooth` (relaxation passes, default 6), `seed` (legacy method only; QRemesh 2 has no random start), `keep_texture` (default true), `guides` (follow the SubTool's QRemesh Guides, default true), `curves_strength` (0-100, default 50) |
 | `qremesh_guide` | `points` (the curve, `"x,y,z x,y,z ..."`), `view` (project the points onto the surface along this direction, as a stroke from the camera; default: each point to the closest surface point), `symmetry` (`x`, `xz`...; mirror the curve) |
 | `qremesh_guide_delete_last`, `qremesh_guides_clear`, `qremesh_guides_info` | Delete the last curve, delete all, list them |
 | `project_all` | `distance` (0.001-1, default 0.02), `mean`, `blur` (0-20), `geometry` (default true), `polypaint` (default true), `source` (one SubTool's name instead of all visible ones) |

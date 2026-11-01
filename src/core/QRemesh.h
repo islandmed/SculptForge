@@ -1,7 +1,9 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// QRemesh (Geometry > QRemesh, like ZBrush's ZRemesher): automatic quad retopology. A field-aligned method
+// QRemesh (Tool > Remesh / Tool > Geometry > QRemesh, like ZBrush's ZRemesher): automatic quad retopology. Two
+// methods: QRemesh 2, the default (an integer-grid map, core/QRemesh2.cpp), and the legacy one described here,
+// which shares the steps around it (symmetry, guides, pieces, attributes). The legacy method is a field-aligned method
 // after Instant Field-Aligned Meshes (Jakob, Tarini, Panozzo, Sorkine-Hornung, SIGGRAPH Asia 2015; the
 // reference code is BSD-3, this is a fresh implementation of the parts we need):
 //
@@ -38,7 +40,13 @@ namespace sf {
 class CommandRegistry;
 struct Document;
 
+// QRemesh's methods. V2 (the default): a curvature-aligned cross field and an integer-grid map, poles only where
+// the field needs them, guides as exact edge loops, the result at the target density (core/QRemesh2.cpp).
+// Legacy: the 0.9 method (Instant Meshes style position field, extracted at twice the spacing and split).
+enum class QRemeshMethod { V2 = 0, Legacy = 1 };
+
 struct QRemeshOptions {
+    QRemeshMethod method = QRemeshMethod::V2;
     int targetQuads = 5000;  // ZBrush's Target Polygons Count (here in polygons, not thousands)
     float adaptive = 0.5f;   // Adaptive Size: 0 = even quads, 1 = sizes follow the curvature strongly
     bool keepGroups = false; // edge loops along polygroup borders; the result keeps the groups
@@ -57,7 +65,26 @@ struct QRemeshOptions {
     // flow follows it (0 = only the loop on the curve itself, 1 = about six quads to each side).
     std::vector<QRemeshGuide> guides;
     float guideStrength = 0.5f;
+    // Measure the result against the source after remeshing (QRemeshStats::quality): poles, valences, angles and the
+    // distance to the sculpt. Costs a closest-point query per vertex of both.
+    bool measureQuality = true;
 };
+
+// How good a quad mesh is (the quality report shown after QRemesh).
+struct QuadQuality {
+    size_t vertices = 0, quads = 0, triangles = 0;
+    size_t poles = 0;               // inside vertices with other than four edges
+    size_t valence[8] = {};         // inside vertices by edge count: [2] .. [6], [7] = 7 or more
+    size_t boundaryPoles = 0;       // vertices on open edges with other than three edges
+    float angleDeviation = 0.0f;    // mean |corner angle - 90| over the quads, degrees
+    float angleDeviationMax = 0.0f; // 99th percentile, degrees
+    float edgeLengthCv = 0.0f;      // spread of the edge lengths (standard deviation / mean)
+    float hausdorff = 0.0f;         // symmetric Hausdorff distance to the source, in % of the bounding-box diagonal
+    float meanDistance = 0.0f;      // mean distance to the source, same units
+    bool measured = false;          // distances filled in
+};
+// Valences and angles of `mesh` (faces as exported); with `source`, also the distances to it.
+QuadQuality quadQuality(const Mesh& mesh, const Mesh* source = nullptr);
 
 struct QRemeshStats {
     size_t quads = 0, triangles = 0; // faces of the result (triangles only for degenerate leftovers)
@@ -72,6 +99,10 @@ struct QRemeshStats {
     size_t guides = 0;           // QRemesh Guides used
     size_t guidesSkipped = 0;    // guides left out: mostly off the surface (the SubTool moved since)
     double seconds = 0;
+    QRemeshMethod method = QRemeshMethod::V2;
+    size_t fallbackPieces = 0;   // V2: pieces it couldn't do well, remeshed with the legacy method
+    size_t singularities = 0;    // V2: cross-field singularities (poles the layout needs)
+    QuadQuality quality;         // with measureQuality
 };
 
 // Fraction 0..1 of the whole job; return false to cancel. Called from the thread running qremesh.
@@ -98,6 +129,8 @@ TopologyReport topologyReport(const Mesh& mesh);
 // SubTool as it was goes right below it ("<name> Original"), ready to ProjectAll the detail back from.
 // Returns the status message.
 std::string applyQRemesh(Document& doc, Mesh result, bool keepOriginal, const QRemeshStats& stats);
+// The quality report as text for the status line ("" when empty).
+std::string qualitySummary(const QuadQuality& quality);
 
 // qremesh (core/RetopoCommands.cpp) and project_all (core/Projection.h).
 void registerRetopoCommands(CommandRegistry& registry);

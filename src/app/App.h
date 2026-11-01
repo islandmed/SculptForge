@@ -768,6 +768,7 @@ private:
     };
     std::unique_ptr<QRemeshJob> qremesh_;
     struct RetopoSettings {
+        int method = 0; // 0 = QRemesh 2 (QRemeshMethod::V2), 1 = Legacy
         int target = 5000;
         float adaptive = 0.5f;
         bool keepGroups = false, detectEdges = true, usePolypaint = false, symmetry = true, keepOriginal = false;
@@ -775,6 +776,11 @@ private:
         int projectBlur = 0;
         bool projectMean = false, projectGeometry = true, projectPolypaint = true;
     } retopo_;
+    // The last QRemesh's quality report (shown under the QRemesh controls while that SubTool is active).
+    QRemeshStats lastQRemeshStats_;
+    uint64_t lastQRemeshSubtool_ = 0;
+    bool haveQRemeshStats_ = false;
+    void drawQRemeshReport();
     // QRemesh Guides (PanelRetopo.cpp, core/QRemeshGuides.h): the "QRemesh Guides" brush draws curves on the
     // surface for QRemesh to follow. It is a mode beside the brushes: picking any brush (or the Gizmo) leaves it.
     void setGuidesMode(bool on);

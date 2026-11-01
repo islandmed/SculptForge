@@ -27,6 +27,20 @@ int symmetryAxisArg(const std::string& s) {
 
 } // namespace
 
+std::string qualitySummary(const QuadQuality& q) {
+    if (q.quads == 0) return {};
+    char s[256];
+    std::snprintf(s, sizeof s, ". Quality: %zu poles (%zu x3, %zu x5, %zu other), corners %.1f deg off square", q.poles,
+                  q.valence[3], q.valence[5], q.poles - q.valence[3] - q.valence[5], double(q.angleDeviation));
+    std::string out = s;
+    if (q.measured) {
+        std::snprintf(s, sizeof s, ", distance to the sculpt %.3f%% mean / %.2f%% max of its size", double(q.meanDistance),
+                      double(q.hausdorff));
+        out += s;
+    }
+    return out;
+}
+
 std::string applyQRemesh(Document& doc, Mesh result, bool keepOriginal, const QRemeshStats& st) {
     const size_t before = doc.mesh.triangleCount();
     if (keepOriginal) {
@@ -54,7 +68,11 @@ std::string applyQRemesh(Document& doc, Mesh result, bool keepOriginal, const QR
     if (st.guidesSkipped)
         sym += "; " + std::to_string(st.guidesSkipped) + (st.guidesSkipped == 1 ? " guide is" : " guides are") +
                " off the surface and were ignored (draw them again after moving the SubTool)";
-    char buf[512];
+    if (st.method == QRemeshMethod::Legacy) sym += "; legacy method";
+    else if (st.fallbackPieces)
+        sym += "; " + std::to_string(st.fallbackPieces) + (st.fallbackPieces == 1 ? " piece" : " pieces") + " used the legacy method";
+    sym += qualitySummary(st.quality);
+    char buf[768];
     std::snprintf(buf, sizeof buf, "QRemesh: %zu quads%s from %zu triangles (%.0f%% quads%s) in %.1f s%s%s", st.quads,
                   st.triangles ? (" + " + std::to_string(st.triangles) + " triangles").c_str() : "", before,
                   faces ? 100.0 * double(st.quads) / double(faces) : 0.0,
@@ -70,11 +88,16 @@ void registerRetopoCommands(CommandRegistry& reg) {
              "layers are baked; mask and polypaint carry over. Undoable. Use project_all afterwards (from a kept "
              "original) to bring fine detail back onto a divided copy.",
              {{"target", T::Number, "Target polygon (quad) count, 16-2000000. Default 5000.", false},
+              {"method", T::String, "'v2' (default): QRemesh 2, a curvature-aligned integer-grid layout with poles only "
+                                    "where the form needs them, guides as exact edge loops and a quality report. "
+                                    "'legacy': the 0.9 method.", false},
+              {"quality", T::Bool, "Measure the result (poles, valences, corner angles, distance to the sculpt) and "
+                                   "report it. Default true.", false},
               {"adaptive", T::Number, "Adaptive Size 0-1: 0 = even quads, 1 = small quads in curved areas, big "
                                       "ones on flat areas. Default 0.5.", false},
               {"keep_groups", T::Bool, "Keep Groups: edge loops follow the polygroup borders and the groups are kept.", false},
-              {"detect_edges", T::Bool, "Detect Edges: hard edges (faces meeting at more than 50 degrees) get an edge "
-                                        "loop. Default true.", false},
+              {"detect_edges", T::Bool, "Detect Edges: hard edges get an edge loop (v2: faces meeting at more than about "
+                                        "60 degrees along a line a few quads long; legacy: over 50 degrees). Default true.", false},
               {"use_polypaint", T::Bool, "Use the polypaint as a density guide: red areas get up to 4x the quads, blue "
                                          "areas down to a quarter.", false},
               {"symmetry", T::String, "Mirror the topology across x, y or z. The mirror plane is found from the model (the "
@@ -84,7 +107,8 @@ void registerRetopoCommands(CommandRegistry& reg) {
                                              "for the world's centre).", false},
               {"keep_original", T::Bool, "Keep the original as a hidden SubTool below (for project_all). Default false.", false},
               {"smooth", T::Number, "Relaxation passes on the surface (0-30). Default 6.", false},
-              {"seed", T::Number, "Random start of the direction field (results are repeatable per seed).", false},
+              {"seed", T::Number, "Legacy method: random start of the direction field (results are repeatable per seed). "
+                                  "QRemesh 2 has no random start.", false},
               {"keep_texture", T::Bool, "Keep a painted texture: Auto UV the result and project the texture onto it. "
                                         "Default true.", false},
               {"guides", T::Bool, "Follow the SubTool's QRemesh Guides (curves drawn with qremesh_guide): an edge loop "
@@ -95,6 +119,11 @@ void registerRetopoCommands(CommandRegistry& reg) {
              [](Document& doc, const Args& a) -> CommandResult {
                  if (doc.mesh.triangleCount() == 0) return {false, "QRemesh: the SubTool is empty"};
                  QRemeshOptions o;
+                 const std::string method = argString(a, "method");
+                 if (method == "legacy" || method == "Legacy") o.method = QRemeshMethod::Legacy;
+                 else if (!method.empty() && method != "v2" && method != "V2")
+                     return {false, "QRemesh: method must be v2 or legacy"};
+                 o.measureQuality = argBool(a, "quality", true);
                  o.targetQuads = int(std::clamp(argNumber(a, "target", 5000), 16.0, 2'000'000.0));
                  o.adaptive = float(std::clamp(argNumber(a, "adaptive", 0.5), 0.0, 1.0));
                  o.keepGroups = argBool(a, "keep_groups", false);

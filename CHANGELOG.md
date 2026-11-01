@@ -25,6 +25,35 @@ All notable changes to SculptForge are listed here. The format follows
   quoted so nothing in them is interpreted (and refused on Windows when they contain shell characters).
 - The brush ring that follows the surface (#25) read the mesh while a predictive stroke's thread was changing it,
   which could change where that stroke's dabs landed; it now shows the flat ring during such strokes.
+### Added
+- **QRemesh 2**, the new default quad retopology (**Tool > Remesh > QRemesh**, also under **Tool > Geometry**;
+  `qremesh method=v2`). The layout is solved over the whole model at once as an integer grid: a smooth cross field
+  that follows the principal curvature (smoothed over about one quad) and the feature lines, then a seamless
+  parametrization whose grid lines are the edge loops, with feature lines and guides on grid lines and the poles
+  on grid points, extracted at the target density. Poles appear only where the form needs them (a sphere gets
+  exactly eight, a box one per corner) and loops run unbroken; open QRemesh Guides are exact edge loops; hard
+  edges and polygroup borders (Keep Groups) are kept on their exact place; polypaint density adds the pole pairs a
+  change of density needs; symmetry mirrors the field and the result exactly; the result is deterministic.
+  Loop-aware relaxation lets vertices slide along loops on ridges but not off them. Against the legacy method on
+  the lion scan, the ICT head, a creature sculpted from a sphere and a hard-surface part at 2k / 5k / 10k quads:
+  a quarter to a fiftieth of the poles at the same distance to the sculpt (lion 5k: 1,028 → 199 poles, corners
+  18.2° → 7.9° off square; ICT head 5k: 511 → 114; creature 10k: 308 → 37; a 1.3M-triangle sculpt at 10k:
+  401 → 8; boxes: one pole per corner and 0.000% distance). The full table is in the guide (Quad retopology >
+  How it works). A 1.3M-triangle sculpt takes about 4 s to 5,000 quads.
+- **Quality report** after QRemesh, in the status line, the QRemesh panel and the `qremesh` command's message:
+  poles (by valence), how far quad corners are from square, and the distance to the sculpt (mean and Hausdorff).
+  `quality=false` skips the measuring.
+- Dense sculpts are decimated in parallel blocks to a working resolution first. A sculpted sphere at 2k / 5k /
+  10k quads (M1 Pro, 10 cores, shared with other jobs): 1.3M triangles 3.1-6.4 s (peak 0.36 GB), 5.2M 6.6-8.6 s
+  (1.3 GB), 21M about 20 s (4.7 GB); eight poles each time. The quality report adds a few seconds at 21M.
+- Tests: test_qremesh2.cpp (eight poles on a sphere, determinism, exact symmetry, hard edges and groups, the
+  command); `SF_QREMESH_BENCH=<dir>` runs the comparison with the legacy method and writes the results as OBJ,
+  `SF_BENCH_LIMITS=1` times 1.3M / 5.2M / 21M-triangle sculpts with their peak memory.
+
+### Changed
+- The 0.9 QRemesh is kept as **Method > Legacy** (`qremesh method=legacy`). Closed QRemesh Guide loops (round an
+  eye, or across the symmetry plane) still use it for that piece for now, and a piece QRemesh 2 can't do cleanly
+  falls back to it; the status line says so.
 
 ## [0.10.1] - 2026-11-01
 
