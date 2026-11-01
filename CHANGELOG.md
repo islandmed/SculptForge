@@ -11,9 +11,8 @@ All notable changes to SculptForge are listed here. The format follows
   default). SculptForge no longer listens on any port for other programs.
 
 ### Changed
-- **Predictive strokes are on by default**: big brushes on dense meshes keep up with the pen (21M triangles: frames
-  about 9 ms instead of 70, the brush 1-2 px behind the pointer instead of 40, no pause when you lift the pen). The
-  result is identical, bit for bit, to a stroke placed without them (checked by `ui_stroke_resize`).
+- Predictive strokes stay an experiment, off by default (Preferences > Performance): a surface-cursor race that
+  could change a stroke is fixed, but a stroke is not yet identical to one placed without them in every run.
 - Draft strokes are no longer chosen by any hardware tier or on battery (they measured no faster and aren't yet
   identical to a full stroke); the Draft Strokes setting still turns them on.
 
