@@ -132,7 +132,7 @@ TEST(painted_mask_protects_from_brushes) {
 TEST(mask_commands_registered) {
     const std::string schema = registry().toolSchemaJson();
     for (const char* name : {"mask_clear", "mask_all", "mask_invert", "mask_blur", "mask_sharpen", "mask_grow",
-                             "mask_shrink", "mask_by_cavity", "mask_by_polygroup", "mask_rect", "mask_lasso"}) {
+                             "mask_shrink", "mask_by_cavity", "mask_by_polygroup", "mask_border", "mask_rect", "mask_lasso"}) {
         CHECK(registry().find(name) != nullptr);
         CHECK(schema.find(std::string("\"") + name + "\"") != std::string::npos);
     }
@@ -400,4 +400,82 @@ TEST(mask_rect_and_lasso_symmetry_and_clear_outside) {
     }
     CHECK(registry().execute(h, "mask_rect", {{"x0", -1.0}, {"y0", -1.0}, {"x1", -0.6}, {"y1", 1.0}, {"clear_outside", true}}).ok);
     CHECK(countMasked(h.mesh, 0.0f) == 0);
+}
+
+// #61: Mask from the mesh border.
+TEST(mask_border_masks_plane_rim_and_rings_widen_it) {
+    Document d = makeDoc(makePlane(8)); // 9 x 9 vertices: a rim of 32, then rings of 24, 16, 8 and the centre
+    auto onRim = [](const glm::vec3& p) { return std::max(std::abs(p.x), std::abs(p.z)) > 0.99f; };
+    CommandResult r = registry().execute(d, "mask_border");
+    CHECK(r.ok);
+    CHECK(r.message.find("32 border vertices") != std::string::npos);
+    CHECK(countMasked(d.mesh) == 32);
+    bool rimOnly = true;
+    for (uint32_t v = 0; v < d.mesh.vertexCount(); ++v) rimOnly &= (d.mesh.mask[v] == 1.0f) == onRim(d.mesh.positions[v]);
+    CHECK(rimOnly);
+    CHECK(d.undo.canUndo());
+
+    // Two rings: the rim and the ring inside it (replacing the mask), then three soft rings.
+    CHECK(registry().execute(d, "mask_border", {{"rings", 2.0}}).ok);
+    CHECK(countMasked(d.mesh) == 56);
+    CHECK(registry().execute(d, "mask_border", {{"rings", 3.0}, {"soft", true}}).ok);
+    CHECK(countMasked(d.mesh, 0.0f) == 56 + 16);
+    float rim = 0.0f, inner = 1.0f;
+    for (uint32_t v = 0; v < d.mesh.vertexCount(); ++v) {
+        if (onRim(d.mesh.positions[v])) rim = std::max(rim, d.mesh.mask[v]);
+        else if (d.mesh.mask[v] > 0.0f) inner = std::min(inner, d.mesh.mask[v]);
+    }
+    CHECK(rim == 1.0f && inner < 0.5f); // full on the border, fading inwards
+
+    // Each is one undo step, back to no mask.
+    CHECK(registry().execute(d, "undo").ok);
+    CHECK(countMasked(d.mesh, 0.0f) == 56 && countMasked(d.mesh, 0.999f) == 56);
+    CHECK(registry().execute(d, "undo").ok);
+    CHECK(countMasked(d.mesh) == 32);
+    CHECK(registry().execute(d, "undo").ok);
+    CHECK(countMasked(d.mesh, 0.0f) == 0);
+
+    // Add keeps the current mask; strength sets the value.
+    maskHalf(d.mesh, 0.5f);
+    const size_t half = countMasked(d.mesh);
+    CHECK(registry().execute(d, "mask_border", {{"add", true}, {"strength", 0.25}}).ok);
+    CHECK(countMasked(d.mesh) == half);
+    CHECK(countMasked(d.mesh, 0.0f) > half);
+    // Ring counts are clamped (to 20), which fills this small plane.
+    CHECK(registry().execute(d, "mask_border", {{"rings", 1000.0}}).ok);
+    CHECK(countMasked(d.mesh) == d.mesh.vertexCount());
+}
+
+TEST(mask_border_closed_mesh_masks_nothing) {
+    Document d = makeDoc(makeIcosphere(3));
+    CommandResult r = registry().execute(d, "mask_border", {{"rings", 3.0}});
+    CHECK(r.ok);
+    CHECK(r.message.find("No open edges: the mesh is closed") != std::string::npos);
+    CHECK(countMasked(d.mesh, 0.0f) == 0);
+    CHECK(!d.undo.canUndo());
+    // Nor are there polygroup borders on a mesh of one polygroup.
+    r = registry().execute(d, "mask_border", {{"polygroups", true}});
+    CHECK(r.message.find("No open edges") != std::string::npos);
+    CHECK(!d.undo.canUndo());
+}
+
+TEST(mask_border_polygroup_borders) {
+    Document d = makeDoc(makeIcosphere(3));
+    Mesh& m = d.mesh;
+    m.polygroups.assign(m.triangleCount(), 0);
+    for (uint32_t t = 0; t < m.triangleCount(); ++t) {
+        const glm::uvec3 tri = m.triangles[t];
+        m.polygroups[t] = m.positions[tri.x].y + m.positions[tri.y].y + m.positions[tri.z].y > 0.0f ? 1u : 0u;
+    }
+    CHECK(registry().execute(d, "mask_border", {{"polygroups", true}}).ok);
+    const size_t seam = countMasked(m);
+    CHECK(seam > 0 && seam < m.vertexCount() / 4);
+    bool nearEquator = true;
+    for (uint32_t v = 0; v < m.vertexCount(); ++v)
+        if (m.mask[v] > 0.5f) nearEquator &= std::abs(m.positions[v].y) < 0.25f;
+    CHECK(nearEquator);
+    CHECK(registry().execute(d, "mask_border", {{"polygroups", true}, {"rings", 3.0}}).ok);
+    CHECK(countMasked(m) > seam);
+    // Without polygroups the closed sphere still has no border to mask.
+    CHECK(registry().execute(d, "mask_border").message.find("No open edges") != std::string::npos);
 }
