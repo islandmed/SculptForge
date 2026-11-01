@@ -330,8 +330,10 @@ private:
     bool lastCommandOk_ = true; // result of the last runCommand (UI tests check it)
     bool showHelp_ = false;
     bool showAbout_ = false;
-    // Supporting SculptForge (Support.h): the app only ever opens kSupportUrl in the browser; nothing else changes.
+    // Supporting SculptForge (Support.h): the app only ever opens the donate page or its Stripe checkout links in the
+    // browser; nothing else changes.
     void openSupportPage();
+    void openSupportLink(const char* url); // one of the Support.h links (UI tests: the status bar only)
     void drawSupportUi();               // the first-run welcome and the one reminder note
     void drawSupportersSection();       // Help > About: the names from docs/supporters.txt, as plain text
     bool showWelcome_ = false;          // the first start (no project.json yet), or Help > Welcome
@@ -339,6 +341,22 @@ private:
     bool supportReminderDone_ = false;  // the reminder was shown (or turned off) once: never again (project.json)
     bool supportReminderOpen_ = false;
     int supportPageRequests_ = 0;       // UI tests: how often the page was asked for (only opened when interactive)
+    // The support card at launch (PanelSupportCard.cpp): decided once while starting, never mid-session.
+    struct SupportCard; // its animation state and the background picture (loaded on a worker thread)
+    struct SupportCardDelete { void operator()(SupportCard* c) const; }; // (defined where SupportCard is)
+    std::unique_ptr<SupportCard, SupportCardDelete> supportCard_;
+    SupportCardPrefs supportCardPrefs_;          // project.json
+    SupportCardReason supportCardReason_ = SupportCardReason::None;
+    bool supportCardTestMode() const;            // tests, renders, demos, benchmarks, CI: never
+    void launchSupportCard(bool firstRun, int64_t now, bool testMode); // shows it if supportCardDue
+    void showSupportCard(SupportCardReason reason); // (also Preferences > Support > Show it now)
+    void closeSupportCard(bool supporter);
+    bool supportCardOpen() const;
+    bool supportCardLoading() const; // its picture still decoding (backgroundBusy)
+    bool supportCardEvent(const SDL_Event& e); // input while it's open goes to it, not the canvas or shortcuts
+    void drawSupportCard();
+    void drawSupportPrefs();                    // Preferences > Support
+    bool welcomeAfterCard_ = false;             // the first-run welcome waits until the card closes
 
     // Results from asynchronous native file dialogs (called off the main thread).
     struct PendingFile {
@@ -1114,6 +1132,7 @@ private:
     void pollAlphaFile();
     ShellGeometry shell_;      // this frame's regions (drawShell)
     ImFont* fontSmall_ = nullptr, *fontTiny_ = nullptr, *fontIcons_ = nullptr, *fontBold_ = nullptr;
+    ImFont* fontCardTitle_ = nullptr, *fontCardHead_ = nullptr, *fontCardBody_ = nullptr; // the support card (Latin only)
     std::string dropdown_;     // palette open as a drop-down ("" = none)
     float dropdownX_ = 0.0f;
     bool openDropdown_ = false;

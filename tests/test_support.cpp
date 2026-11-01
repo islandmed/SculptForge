@@ -7,6 +7,8 @@
 
 #include "app/Support.h"
 
+#include <fstream>
+#include <iterator>
 #include <string>
 
 using namespace sf;
@@ -62,4 +64,40 @@ TEST(support_reminder_timing) {
     CHECK(!supportReminderDue(ten, session, false, true));         // once only (shown or dismissed)
     CHECK(supportReminderDue(ten, session, false, false));
     CHECK(supportReminderDue(ten * 3.0, session * 6.0, false, false));
+}
+
+TEST(support_card_links_match_the_website) {
+    // The card opens the same four Stripe checkout pages as the donate page (never links of its own).
+    std::ifstream f(std::string(SF_TEST_DATA_DIR) + "/../../website/donate.html", std::ios::binary);
+    CHECK(f.good());
+    const std::string page{std::istreambuf_iterator<char>(f), {}};
+    for (const char* url : {kSupportUrlSupporter, kSupportUrlInsider, kSupportUrlStudio, kSupportUrlOnce}) {
+        CHECK(std::string(url).rfind("https://buy.stripe.com/", 0) == 0);
+        CHECK(page.find(std::string("href=\"") + url + "\"") != std::string::npos);
+    }
+    CHECK(page.find(kInsiderNote) != std::string::npos); // the same honest wording on both
+}
+
+TEST(support_card_timing) {
+    const int64_t day = 24 * 3600, now = 1'800'000'000;
+    SupportCardPrefs p;
+    // The first start after install, then the first start of each new version.
+    CHECK(supportCardDue(p, true, "0.10.4", now, false) == SupportCardReason::FirstRun);
+    CHECK(supportCardDue(p, false, "0.10.4", now, false) == SupportCardReason::Updated); // from a version before it
+    p.shownVersion = "0.10.4";
+    p.shownAt = now;
+    CHECK(supportCardDue(p, false, "0.10.4", now + 60, false) == SupportCardReason::None);
+    CHECK(supportCardDue(p, false, "0.10.4", now + 6 * day, false) == SupportCardReason::None); // at most once a week
+    CHECK(supportCardDue(p, false, "0.10.4", now + 7 * day, false) == SupportCardReason::Weekly);
+    CHECK(supportCardDue(p, false, "0.10.5", now + day, false) == SupportCardReason::Updated);
+    CHECK(supportCardDue(p, false, "0.10.4", now - 30 * day, false) == SupportCardReason::Weekly); // clock set back
+    CHECK(supportCardDue(p, false, "0.10.4", now - day, false) == SupportCardReason::None);
+    // Never in tests, renders or CI; never once turned off; never for a supporter.
+    CHECK(supportCardDue(p, true, "0.10.5", now + 30 * day, true) == SupportCardReason::None);
+    SupportCardPrefs off = p;
+    off.enabled = false;
+    CHECK(supportCardDue(off, true, "0.10.5", now + 30 * day, false) == SupportCardReason::None);
+    SupportCardPrefs member = p;
+    member.supporter = true;
+    CHECK(supportCardDue(member, true, "0.10.5", now + 30 * day, false) == SupportCardReason::None);
 }

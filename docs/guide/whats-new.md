@@ -32,8 +32,14 @@ chapter opens by itself the first time you start a new version; you can always f
 
 ### Become an Insider
 
-SculptForge stays free for everyone. Insiders will get each release about two weeks early, starting with SculptForge 1.0. **Help > Support SculptForge**
-opens the page to join.
+SculptForge stays free for everyone. Insiders will get each release about two weeks early, starting with
+SculptForge 1.0. **Help > Support SculptForge** opens the page to join.
+
+When SculptForge starts for the first time, after an update, and otherwise at most once a week, a card shows the
+ways to support it: **Supporter**, **Insider** and **Studio** memberships and a one-time gift, each opening its
+checkout page in your browser. **Maybe later**, <kbd>Esc</kbd> or a click outside closes it; **I'm already a
+supporter** hides it for good, and **Preferences > Support** turns it off. It never shows while you work, and
+nothing about you is sent anywhere.
 
 ## Version 0.10.3
 

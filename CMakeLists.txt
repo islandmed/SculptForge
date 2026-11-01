@@ -223,7 +223,8 @@ if(SCULPTFORGE_BUILD_APP)
     fontSemiBold ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Inter-SemiBold.ttf
     fontLucide ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/lucide.ttf
     appIcon ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-256.png
-    supporters ${CMAKE_CURRENT_SOURCE_DIR}/docs/supporters.txt) # Help > About (never empty: it starts with comments)
+    supporters ${CMAKE_CURRENT_SOURCE_DIR}/docs/supporters.txt # Help > About (never empty: it starts with comments)
+    supportCard ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/support-card.jpg) # the support card's picture (decoded only when it shows)
   include(cmake/EmbedGuide.cmake)
   embed_guide(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedGuide.cpp ${CMAKE_CURRENT_SOURCE_DIR}/docs/guide)
   add_executable(sculptforge
@@ -284,6 +285,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelProject.cpp
     src/app/PanelSubTools.cpp
     src/app/PanelSupport.cpp
+    src/app/PanelSupportCard.cpp
     src/app/PanelExtract.cpp
     src/app/PanelTimeline.cpp
     src/app/ProofMode.cpp

@@ -475,6 +475,10 @@ void App::drawPalette_Preferences() {
         tray::Section section;
         drawUpdatesSection();
     }
+    if (subpalette("preferences.support", "Support")) {
+        tray::Section section;
+        drawSupportPrefs(); // the support card at launch (PanelSupportCard.cpp)
+    }
     if (subpalette("preferences.autosave", "Autosave")) {
         tray::Section section;
         ImGui::SetNextItemWidth(-1);
