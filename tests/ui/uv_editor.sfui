@@ -81,6 +81,16 @@ shot moved
 key ctrl+z
 expect_value uv_max_u == $before_move
 
+# Box select in the view (islands touched by the box), then a click on empty space clears it.
+run uv_select op=none
+expect_value uv_selected == 0
+drag 0.33 0.45 0.45 0.62
+expect_value uv_selected > 0
+shot box-select
+drag 0.31 0.235 0.31 0.235
+expect_value uv_selected == 0
+run uv_select op=island face=20000
+
 # Trim sheet: the selected island laid into the second of four strips.
 click "UV Editor/Trim Sheet"
 run uv_trim strip=2 strips=4 fit_width=true
