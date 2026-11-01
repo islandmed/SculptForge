@@ -1,0 +1,320 @@
+name: Packages
+
+# The release packages (.deb, AppImage, .tar.gz, Flatpak, .rpm and VFX Reference Platform tarballs, .dmg, Windows
+# installer and .zip), each built and tested exactly as a release ships them. It runs on every push to main that
+# changes the app, so a tagged release can promote the packages of the commit it tags instead of building them again
+# (.github/workflows/release.yml); the release workflow also calls it to build from scratch when there are none.
+#
+# Integrity: the release promotes only artifacts of a successful run of THIS workflow on a push to main for exactly
+# the tagged commit (checked in release.yml). Compiler caches are restored here but saved only by branch runs (pushes
+# to main, maintainers' own dispatches): never from a tag (a release that calls this builds from main's cache and
+# writes nothing) and never from a pull request (this workflow doesn't run on pull requests). See ci.yml for ccache.
+# Runners: repository variables SF_RUNNER_* (Settings > Secrets and variables > Actions > Variables) name other
+# runners for these build-and-test jobs; unset, they are GitHub's standard ones. No job here gets a secret.
+
+on:
+  push:
+    branches: [main]
+    paths: # everything but the website (its phone page, website/link, is built into the app) and release paperwork
+      - '**'
+      - '!website/**'
+      - website/link/**
+      - '!.github/workflows/pages.yml'
+      - '!.github/workflows/download-stats.yml'
+      - '!packaging/arch/**'
+      - '!tools/publish/**'
+      - '!scripts/release.sh'
+      - '!docs/releasing.md'
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: Commit or tag to build
+        type: string
+        required: true
+      tag:
+        description: Release tag, e.g. v1.2.3 (names the AppImage and the VFX tarballs)
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: packages-${{ inputs.ref || github.ref }}
+  cancel-in-progress: true # a newer push to main supersedes; a tag of the older commit then builds its own
+
+env:
+  REF: ${{ inputs.ref || github.sha }}
+  CCACHE_MAXSIZE: 500M
+  CCACHE_DEPEND: 'true'
+  # Saved by branch runs only: never a tag, never a pull request.
+  SAVE_CACHE: ${{ !startsWith(github.ref, 'refs/tags/') && github.event_name != 'pull_request' }}
+
+jobs:
+  linux:
+    name: Linux ${{ matrix.arch }} (.deb, AppImage, .tar.gz)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x86_64, os: "${{ vars.SF_RUNNER_LINUX_OLD || 'ubuntu-22.04' }}", ld: x86_64 }
+          - { arch: arm64, os: "${{ vars.SF_RUNNER_LINUX_OLD_ARM || 'ubuntu-22.04-arm' }}", ld: aarch64 }
+    steps:
+      - uses: actions/checkout@v7
+        with: { ref: '${{ env.REF }}' }
+      - name: Tag (the release's, or v<project version>)
+        run: echo "TAG=${{ inputs.tag }}" | sed "s/^TAG=$/TAG=v$(sed -n 's/^project(SculptForge VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)/" >> "$GITHUB_ENV"
+      - run: |
+          sudo ./packaging/linux/install-build-deps.sh
+          sudo apt-get install -y --no-install-recommends ccache xvfb libgl1-mesa-dri
+          echo "CCACHE_DIR=$GITHUB_WORKSPACE/.ccache" >> "$GITHUB_ENV"
+          echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+      - uses: actions/cache/restore@v5
+        with:
+          path: .ccache
+          key: ccache-pkg-linux-${{ matrix.arch }}.${{ github.sha }}
+          restore-keys: ccache-pkg-linux-${{ matrix.arch }}.
+      - name: Build
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DSCULPTFORGE_USE_SYSTEM_SDL=OFF \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          cmake --build build --parallel 4
+          ccache -s
+      - if: env.SAVE_CACHE == 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: .ccache
+          key: ccache-pkg-linux-${{ matrix.arch }}.${{ github.sha }}
+      - name: Test (every test, UI tests under Xvfb + Mesa)
+        run: |
+          xvfb-run -a -s "-screen 0 1920x1080x24" env LIBGL_ALWAYS_SOFTWARE=1 \
+            ctest --test-dir build --output-on-failure -j 4
+      - name: .deb and .tar.gz
+        run: cd build && cpack -G "DEB;TGZ"
+      - name: AppImage
+        run: |
+          DESTDIR=$PWD/AppDir cmake --install build
+          # Named the AppImage way (SculptForge-1.2.3-x86_64.AppImage, no "linux"), with update information so
+          # AppImageUpdate and similar tools can update it from the newest GitHub release (the .zsync file). The
+          # AppDir's root gets PNG icons (AppImage managers cannot use the SVG), and appimagetool checks it (#17).
+          packaging/linux/build-appimage.sh AppDir "${TAG#v}" ${{ matrix.ld }} build
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux-${{ matrix.arch }}
+          path: |
+            build/*.deb
+            build/*.tar.gz
+            build/*.AppImage
+            build/*.AppImage.zsync
+
+  # Built in the freedesktop SDK (packaging/flatpak/build.sh), installed, and UI tests run inside the sandbox.
+  flatpak:
+    name: Flatpak ${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x86_64, os: "${{ vars.SF_RUNNER_LINUX || 'ubuntu-24.04' }}" }
+          - { arch: aarch64, os: "${{ vars.SF_RUNNER_LINUX_ARM || 'ubuntu-24.04-arm' }}" }
+    steps:
+      - uses: actions/checkout@v7
+        with: { ref: '${{ env.REF }}' }
+      - name: flatpak and flatpak-builder
+        run: sudo apt-get update && sudo apt-get install -y flatpak flatpak-builder xvfb
+      - uses: actions/cache/restore@v5
+        with:
+          path: build-flatpak/state/ccache
+          key: ccache-pkg-flatpak-${{ matrix.arch }}.${{ github.sha }}
+          restore-keys: ccache-pkg-flatpak-${{ matrix.arch }}.
+      - name: Build the bundle (packaging/flatpak/org.sculptforge.SculptForge.yml; the SDK's ccache)
+        run: SF_FLATPAK_CCACHE=1 packaging/flatpak/build.sh dist
+      - if: env.SAVE_CACHE == 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: build-flatpak/state/ccache
+          key: ccache-pkg-flatpak-${{ matrix.arch }}.${{ github.sha }}
+      - name: Install it and run UI tests inside the sandbox (Xvfb, Mesa from the runtime)
+        run: |
+          flatpak install --user -y --noninteractive dist/*.flatpak
+          for t in sculpt_basics blender_bridge spacemouse release_smoke; do
+            [ -f "tests/ui/$t.sfui" ] || continue # (release_smoke: newer than some tags a release may rebuild)
+            xvfb-run -a -s "-screen 0 1920x1080x24" \
+              flatpak run --env=LIBGL_ALWAYS_SOFTWARE=1 org.sculptforge.SculptForge \
+                --ui-test "$PWD/tests/ui/$t.sfui" --ui-out "$PWD/flatpak-ui/$t"
+          done
+      - uses: actions/upload-artifact@v7
+        with:
+          name: flatpak-${{ matrix.arch }}
+          path: dist/*.flatpak
+
+  vfx:
+    name: ${{ matrix.label }} ${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # CY2026: EL8 / glibc 2.28 also gives the .rpm for RHEL 8, 9, 10 and Fedora.
+          - { label: 'RPM + VFX CY2026', suffix: vfx2026, cy: CY2026, generators: 'RPM;TGZ', image: 'rockylinux:8', arch: x86_64, ccarch: x86_64, os: "${{ vars.SF_RUNNER_LINUX || 'ubuntu-24.04' }}" }
+          - { label: 'RPM + VFX CY2026', suffix: vfx2026, cy: CY2026, generators: 'RPM;TGZ', image: 'rockylinux:8', arch: arm64, ccarch: aarch64, os: "${{ vars.SF_RUNNER_LINUX_ARM || 'ubuntu-24.04-arm' }}" }
+          - { label: 'VFX CY2027', suffix: vfx2027, cy: CY2027, generators: 'TGZ', image: 'rockylinux:9', arch: x86_64, ccarch: x86_64, os: "${{ vars.SF_RUNNER_LINUX || 'ubuntu-24.04' }}" }
+          - { label: 'VFX CY2027', suffix: vfx2027, cy: CY2027, generators: 'TGZ', image: 'rockylinux:9', arch: arm64, ccarch: aarch64, os: "${{ vars.SF_RUNNER_LINUX_ARM || 'ubuntu-24.04-arm' }}" }
+    steps:
+      - run: dnf -y install git tar gzip zstd
+      - uses: actions/checkout@v7
+        with: { ref: '${{ env.REF }}' }
+      - name: Tag (the release's, or v<project version>)
+        run: echo "TAG=${{ inputs.tag }}" | sed "s/^TAG=$/TAG=v$(sed -n 's/^project(SculptForge VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)/" >> "$GITHUB_ENV"
+      - run: ./packaging/linux/install-build-deps.sh
+      - name: ccache (the static release binary, pinned by hash)
+        run: |
+          f=ccache-4.14.2-linux-${{ matrix.ccarch }}-musl-static.tar.gz
+          curl -fsSLO "https://github.com/ccache/ccache/releases/download/v4.14.2/$f"
+          case ${{ matrix.ccarch }} in
+            x86_64) sum=d540ba01f160addbd3dd5e18eda9bd34005591b095c09ac8ae9d0a1b655e7ef5 ;;
+            aarch64) sum=2be524bbccfc7e9ff0085d110da7dc9964de983bd92d29acf3b872e557194945 ;;
+          esac
+          echo "$sum  $f" | sha256sum -c
+          tar xzf "$f" -C /opt
+          echo "/opt/${f%.tar.gz}" >> "$GITHUB_PATH"
+          echo "CCACHE_DIR=$GITHUB_WORKSPACE/.ccache" >> "$GITHUB_ENV"
+          echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+      - uses: actions/cache/restore@v5
+        with:
+          path: .ccache
+          key: ccache-pkg-${{ matrix.suffix }}-${{ matrix.arch }}.${{ github.sha }}
+          # CI's job for the same image and compiler (x86_64) shares most object files.
+          restore-keys: |
+            ccache-pkg-${{ matrix.suffix }}-${{ matrix.arch }}.
+            ccache-ci-${{ matrix.cy }}.
+      - name: Python 3.13
+        run: |
+          curl -LsSf https://astral.sh/uv/0.9.5/install.sh | sh
+          ~/.local/bin/uv venv --python 3.13 /opt/py313
+          ~/.local/bin/uv pip install --python /opt/py313/bin/python numpy
+          echo "PYTHON313=/opt/py313/bin/python" >> "$GITHUB_ENV"
+      - name: Build with GCC 14
+        run: |
+          source /opt/rh/gcc-toolset-14/enable
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DSCULPTFORGE_USE_SYSTEM_SDL=OFF \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DSCULPTFORGE_BUILD_PYTHON=ON -DPython_EXECUTABLE="$PYTHON313" -DSCULPTFORGE_PYTHON_INSTALL_DIR=lib/sculptforge/python
+          cmake --build build --parallel 4
+          ccache -s
+      - if: env.SAVE_CACHE == 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: .ccache
+          key: ccache-pkg-${{ matrix.suffix }}-${{ matrix.arch }}.${{ github.sha }}
+      - name: Test and package
+        run: |
+          # UI tests need a display; they run under Xvfb in the Linux jobs above and in CI.
+          ctest --test-dir build --output-on-failure -LE ui -j 4
+          cd build
+          cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME=SculptForge-${TAG#v}-linux-${{ matrix.arch }}-${{ matrix.suffix }}
+          if [ "${{ matrix.generators }}" = "RPM;TGZ" ]; then cpack -G RPM; fi
+      - uses: actions/upload-artifact@v7
+        with:
+          name: vfx-${{ matrix.suffix }}-${{ matrix.arch }}
+          path: |
+            build/*.rpm
+            build/*.tar.gz
+
+  macos:
+    name: macOS (universal .dmg)
+    runs-on: ${{ vars.SF_RUNNER_MAC || 'macos-15' }}
+    steps:
+      - uses: actions/checkout@v7
+        with: { ref: '${{ env.REF }}' }
+      - name: ccache (the release binary, pinned by hash)
+        run: |
+          curl -fsSLO https://github.com/ccache/ccache/releases/download/v4.14.2/ccache-4.14.2-darwin.tar.gz
+          echo "cf240009630b605b775c7c5c7b7105a3b196c79f31af322c1557969aa28003fc  ccache-4.14.2-darwin.tar.gz" | shasum -a 256 -c
+          tar xzf ccache-4.14.2-darwin.tar.gz -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/ccache-4.14.2-darwin" >> "$GITHUB_PATH"
+          echo "CCACHE_DIR=$GITHUB_WORKSPACE/.ccache" >> "$GITHUB_ENV"
+          echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+      - uses: actions/cache/restore@v5
+        with:
+          path: .ccache
+          key: ccache-pkg-macos.${{ github.sha }}
+          restore-keys: ccache-pkg-macos.
+      - name: Build
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSCULPTFORGE_USE_SYSTEM_SDL=OFF \
+            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          cmake --build build --parallel 4
+          ccache -s
+      - if: env.SAVE_CACHE == 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: .ccache
+          key: ccache-pkg-macos.${{ github.sha }}
+      - name: Test
+        # UI tests need a display; they run under Xvfb in the Linux jobs above and in CI.
+        run: ctest --test-dir build --output-on-failure -LE ui -j 4
+      - name: Package (signed ad-hoc inside CPack, see cmake/MacSign.cmake)
+        run: cd build && cpack -G DragNDrop
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos
+          path: build/*.dmg
+
+  windows:
+    name: Windows x64 (installer, .zip)
+    runs-on: ${{ vars.SF_RUNNER_WIN || 'windows-2022' }}
+    steps:
+      - uses: actions/checkout@v7
+        with: { ref: '${{ env.REF }}' }
+      - name: ccache (the release binary, pinned by hash, standing in for cl.exe)
+        shell: pwsh
+        run: |
+          $zip = 'ccache-4.14.2-windows-x86_64.zip'
+          Invoke-WebRequest "https://github.com/ccache/ccache/releases/download/v4.14.2/$zip" -OutFile $zip
+          if ((Get-FileHash $zip -Algorithm SHA256).Hash -ne '6993CE645E53192CEC592EE23186200B574AC4C59097ECDE8D9CFD681B47AE84') {
+            throw 'ccache archive hash mismatch'
+          }
+          Expand-Archive $zip -DestinationPath $env:RUNNER_TEMP
+          $dir = "$env:RUNNER_TEMP\ccache-4.14.2-windows-x86_64"
+          "$dir" >> $env:GITHUB_PATH
+          $cl = "$env:RUNNER_TEMP\ccache-as-cl"
+          New-Item -ItemType Directory $cl | Out-Null
+          Copy-Item "$dir\ccache.exe" "$cl\cl.exe"
+          "SF_CCACHE_CL=$($cl -replace '\\', '/')" >> $env:GITHUB_ENV
+          "CCACHE_DIR=$env:GITHUB_WORKSPACE\.ccache" >> $env:GITHUB_ENV
+          "CCACHE_BASEDIR=$env:GITHUB_WORKSPACE" >> $env:GITHUB_ENV
+      - uses: actions/cache/restore@v5
+        with:
+          path: .ccache
+          key: ccache-pkg-windows.${{ github.sha }}
+          # CI's Windows job (same compiler; it adds the Python module) shares most object files.
+          restore-keys: |
+            ccache-pkg-windows.
+            ccache-ci-windows.
+      - name: Build (Visual Studio generator; ccache as cl.exe, one compiler per file)
+        run: |
+          cmake -S . -B build -DSCULPTFORGE_USE_SYSTEM_SDL=OFF `
+            -DCMAKE_VS_GLOBALS="CLToolExe=cl.exe;CLToolPath=${{ env.SF_CCACHE_CL }};TrackFileAccess=false;UseMultiToolTask=true;EnforceProcessCountAcrossBuilds=true"
+          cmake --build build --config Release --parallel 4
+          ccache -s
+      - if: env.SAVE_CACHE == 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: .ccache
+          key: ccache-pkg-windows.${{ github.sha }}
+      - name: Test
+        # UI tests need a display; they run in CI with Mesa's software OpenGL.
+        run: ctest --test-dir build -C Release --output-on-failure -LE ui -j 4
+      - name: Package
+        run: cd build && cpack -C Release -G "NSIS;ZIP"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows
+          path: |
+            build/*.exe
+            build/*.zip
