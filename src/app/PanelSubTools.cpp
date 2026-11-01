@@ -35,6 +35,7 @@ constexpr ImVec4 kThumbWell = theme::rgb(0x000000, 0.22f); // behind a SubTool t
 
 const SDL_DialogFileFilter kAppendFilters[] = {
     {"Models and projects", "obj;fbx;glb;gltf;ply;stl;GoZ;goz;usda;usd;usdz;sfproj"}, {"All files", "*"}};
+const SDL_DialogFileFilter kInsertFilters[] = {{"Meshes (OBJ, PLY, GLB)", "obj;ply;glb;gltf"}, {"All files", "*"}};
 
 void SDLCALL onAppendChosen(void* userdata, const char* const* files, int) {
     wakeMainLoop(); // a file dialog answered (maybe on another thread): redraw now
@@ -375,6 +376,28 @@ void App::drawSubToolsContents() {
                     status_ = "Insert " + label + ": drag on the model (the drag sets its size). Esc stops.";
                 }
             }
+            ImGui::Separator();
+            // Your own mesh (#34): a copy of another SubTool, or a model file you choose.
+            if (ImGui::BeginMenu("Active SubTool's copy...", count > 1)) {
+                for (int i = 0; i < count; ++i) {
+                    if (i == active) continue;
+                    const std::string& name = doc_.subtools[size_t(i)].name;
+                    const bool chosen = insertType_ == "mesh" && insertMeshKey_ == "subtool" && insertMeshValue_ == name;
+                    if (ImGui::MenuItem((name + "##insertcopy" + std::to_string(i)).c_str(), nullptr, chosen)) {
+                        insertType_ = "mesh";
+                        insertMeshKey_ = "subtool";
+                        insertMeshValue_ = name;
+                        status_ = "Insert a copy of " + name + ": drag on the model (the drag sets its size). Esc stops.";
+                    }
+                }
+                ImGui::EndMenu();
+            }
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayNormal))
+                ImGui::SetTooltip(count > 1 ? "Insert a copy of another SubTool into the active one"
+                                            : "Append another SubTool first");
+            if (ImGui::MenuItem("From file...##insert"))
+                SDL_ShowOpenFileDialog(onAppendChosen, &dialogRequests_[int(FileAction::InsertMesh)], window_,
+                                       kInsertFilters, 2, nullptr, false);
             ImGui::EndMenu();
         }
         if (ImGui::MenuItem("From file..."))

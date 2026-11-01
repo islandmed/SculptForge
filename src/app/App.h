@@ -124,7 +124,7 @@ public:
     ThumbnailCache& thumbnails() { return thumbs_; }
     void shutdown();
 
-    enum class FileAction { OpenObj, SaveObj, ExportGlb, ExportLods, SaveBrush, LoadBrush, OpenImage, ExportUsd, SaveSplats, ExportUnreal, SaveProject, AppendSubtool, ComfyWorkflow, LoadMatcap, Count };
+    enum class FileAction { OpenObj, SaveObj, ExportGlb, ExportLods, SaveBrush, LoadBrush, OpenImage, ExportUsd, SaveSplats, ExportUnreal, SaveProject, AppendSubtool, ComfyWorkflow, LoadMatcap, InsertMesh, Count };
     struct DialogRequest {
         App* app;
         FileAction action;
@@ -1171,7 +1171,10 @@ private:
     std::array<AxisGizmoEnd, 6> axisGizmoLayout() const; // the gizmo's ends on screen now (AxisGizmo.h)
     bool axisGizmoMouseDown(float x, float y);          // a click on an end: that side view (#43)
     // Insert on the model (#34): the primitive chosen in Append > Insert; a drag on the surface places it.
+    // "mesh" inserts your own mesh instead: insertMeshKey_ is "subtool" (a SubTool's name) or "file" (a path
+    // chosen in the file dialog), insertMeshValue_ the name or path (insert_mesh).
     std::string insertType_;
+    std::string insertMeshKey_, insertMeshValue_;
     glm::vec3 insertAt_{0.0f}, insertNormal_{0.0f, 1.0f, 0.0f};
     float insertX_ = 0.0f, insertY_ = 0.0f, insertPx_ = 0.0f;
     bool readUiConfig(const std::string& path, std::string& err);

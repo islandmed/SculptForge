@@ -1164,6 +1164,19 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (file.is_relative()) file = std::filesystem::path(std::u8string(scriptDir_.begin(), scriptDir_.end())) / file;
         const auto u8 = file.lexically_normal().u8string();
         run([this, path = std::string(u8.begin(), u8.end())] { app_.openPathConfirmed(path); });
+    } else if (verb == "choose_file") { // choose_file insert|append <path>: what a native file dialog would answer
+        if (!need(2)) return false;
+        App::FileAction action;
+        if (w[1] == "insert") action = App::FileAction::InsertMesh;
+        else if (w[1] == "append") action = App::FileAction::AppendSubtool;
+        else {
+            error = "'choose_file' takes insert or append";
+            return false;
+        }
+        auto file = std::filesystem::path(std::u8string(w[2].begin(), w[2].end()));
+        if (file.is_relative()) file = std::filesystem::path(std::u8string(scriptDir_.begin(), scriptDir_.end())) / file;
+        const auto u8 = file.lexically_normal().u8string();
+        run([this, action, path = std::string(u8.begin(), u8.end())] { app_.queueFile(action, path); });
     } else if (verb == "copy") {
         if (!need(2)) return false;
         namespace fs = std::filesystem;

@@ -20,6 +20,10 @@ All notable changes to SculptForge are listed here. The format follows
 - **Continuous** is also in the left shelf's stroke picker, under the stroke tiles (#43).
 - Insert on the model respects X / Y / Z symmetry (#43): a mirrored copy on the other side, one undo step
   (`insert_primitive symmetry=x`).
+- Insert your own mesh (#34): **Append > Insert on the model > Active SubTool's copy...** (another SubTool) or
+  **From file...** (`.obj`, `.ply`, `.glb`), dragged onto the surface like the shapes: centred, sized by the drag,
+  its up axis along the normal, turned by the drag and mirrored by symmetry, one undo step
+  (`insert_mesh subtool=<name>|file=<path>`).
 - SubTool thumbnails in the SubTool list (#43), drawn from each SubTool's existing GPU buffers (no upload, the
   motion proxy on dense meshes), one per frame at most and only once a change has settled, never during a stroke.
 

@@ -1332,12 +1332,19 @@ void App::onMouseUp() {
         const float dist = glm::length(camera_.position() - insertAt_);
         const float worldPerPx = 2.0f * dist * std::tan(camera_.fovY * 0.5f) / std::max(canvasRect().h, 1.0f);
         const std::string symmetry = std::string(symmetry_.x ? "x" : "") + (symmetry_.y ? "y" : "") + (symmetry_.z ? "z" : "");
-        runCommand("insert_primitive", {{"type", insertType_}, {"symmetry", symmetry}, {"x", double(insertAt_.x)}, {"y", double(insertAt_.y)},
-                                        {"z", double(insertAt_.z)}, {"nx", double(insertNormal_.x)},
-                                        {"ny", double(insertNormal_.y)}, {"nz", double(insertNormal_.z)},
-                                        {"size", double(2.0f * px * worldPerPx)},
-                                        // the drag's direction on screen turns it about the normal
-                                        {"twist", insertPx_ > 4.0f ? double(glm::degrees(std::atan2(mouseY_ - insertY_, mouseX_ - insertX_))) : 0.0}});
+        Args args{{"symmetry", symmetry}, {"x", double(insertAt_.x)}, {"y", double(insertAt_.y)},
+                  {"z", double(insertAt_.z)}, {"nx", double(insertNormal_.x)},
+                  {"ny", double(insertNormal_.y)}, {"nz", double(insertNormal_.z)},
+                  {"size", double(2.0f * px * worldPerPx)},
+                  // the drag's direction on screen turns it about the normal
+                  {"twist", insertPx_ > 4.0f ? double(glm::degrees(std::atan2(mouseY_ - insertY_, mouseX_ - insertX_))) : 0.0}};
+        if (insertType_ == "mesh") { // your own mesh: a SubTool's copy or a file (insert_mesh)
+            args[insertMeshKey_] = insertMeshValue_;
+            runCommand("insert_mesh", args);
+        } else {
+            args["type"] = insertType_;
+            runCommand("insert_primitive", args);
+        }
     }
     if (drag_ == Drag::Stroke && maskClickPending_) maskClickRelease(); // Ctrl+click: blur / sharpen the mask
     else if (drag_ == Drag::Stroke && asyncStroke_) {
@@ -1729,7 +1736,8 @@ void SDLCALL onFileChosen(void* userdata, const char* const* files, int) {
 
 void App::queueFile(FileAction action, std::string path) {
     if (action != FileAction::OpenObj && action != FileAction::LoadBrush && action != FileAction::OpenImage &&
-        action != FileAction::AppendSubtool && action != FileAction::ComfyWorkflow && !path.empty() &&
+        action != FileAction::AppendSubtool && action != FileAction::ComfyWorkflow && action != FileAction::InsertMesh &&
+        !path.empty() &&
         std::filesystem::path(std::u8string(path.begin(), path.end())).extension().empty())
         path += action == FileAction::SaveObj      ? ".obj"
                 : action == FileAction::SaveBrush  ? ".sfbrush"
@@ -1853,6 +1861,13 @@ void App::processPendingFiles() {
             break;
         case FileAction::ComfyWorkflow: setComfyWorkflow(f.path, comfyPickingText_); break;
         case FileAction::LoadMatcap: runCommand("load_matcap", {{"path", f.path}}); break;
+        case FileAction::InsertMesh: // Append > Insert on the model > From file (#34): the next drag inserts it
+            insertType_ = "mesh";
+            insertMeshKey_ = "file";
+            insertMeshValue_ = f.path;
+            status_ = "Insert " + std::filesystem::path(std::u8string(f.path.begin(), f.path.end())).filename().string() +
+                      ": drag on the model (the drag sets its size). Esc stops.";
+            break;
         case FileAction::Count: break;
         }
     }

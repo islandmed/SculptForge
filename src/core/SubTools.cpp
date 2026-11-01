@@ -9,6 +9,9 @@
 #include "core/Primitives.h"
 #include "core/Sculpt.h"
 #include "core/TextureTransfer.h"
+#include "io/GltfIO.h"
+#include "io/ObjIO.h"
+#include "io/PlyIO.h"
 
 #include <cctype>
 #include <algorithm>
@@ -196,6 +199,112 @@ void replaceWithPieces(Document& doc, int index, std::vector<Mesh> pieces) {
     doc.removeSubtool(index);
 }
 
+// Reads the mesh in a model file for insert_mesh (#34): OBJ, PLY or GLB / glTF through the importers, every
+// object in it as one mesh. Nothing but the file itself is read.
+bool loadInsertMesh(const std::string& path, Mesh& out, std::string& error) {
+    std::string ext = std::filesystem::path(std::u8string(path.begin(), path.end())).extension().string();
+    for (char& ch : ext) ch = char(std::tolower(static_cast<unsigned char>(ch)));
+    bool ok = false;
+    if (ext == ".obj") ok = loadObj(path, out, error);
+    else if (ext == ".glb" || ext == ".gltf") ok = loadGltf(path, out, error);
+    else if (ext == ".ply") {
+        SplatCloud splats;
+        PlyContent content = PlyContent::Mesh;
+        ok = loadPly(path, out, splats, content, error);
+        if (ok && content != PlyContent::Mesh) {
+            error = path + " holds splats or points, not a mesh";
+            return false;
+        }
+    } else {
+        error = "Insert takes .obj, .ply or .glb files";
+        return false;
+    }
+    if (!ok && error.empty()) error = "Couldn't read " + path;
+    return ok;
+}
+
+// The shape of `source` for inserting: its triangles and quads only (no mask, paint, UVs, layers or levels),
+// centred on its bounds and scaled so its largest side is `size`. False if it has no triangles.
+bool normalizedPiece(const Mesh& source, float size, Mesh& out) {
+    if (source.triangleCount() == 0 || source.vertexCount() == 0) return false;
+    out = Mesh();
+    out.positions = source.positions;
+    out.triangles = source.triangles;
+    if (source.hasQuads()) out.quadPartners = source.quadPartners;
+    out.polygroups.assign(out.triangles.size(), 0u);
+    const AABB box = out.bounds();
+    const glm::vec3 e = box.extent();
+    const float largest = std::max({e.x, e.y, e.z});
+    const float scale = largest > 1e-12f ? size / largest : 1.0f;
+    const glm::vec3 centre = box.center();
+    for (auto& p : out.positions) p = (p - centre) * scale;
+    out.sanitizeAttributes();
+    return true;
+}
+
+// Places `prim` (built around the origin, its axis +Y) where insert_primitive / insert_mesh say: on the surface
+// point, +Y along the normal, turned by twist, with mirrored copies for symmetry; merged into the active
+// SubTool as one new polygroup, one undo step.
+CommandResult insertPiece(Document& doc, Mesh prim, const Args& a, const std::string& label) {
+    Symmetry sym{false, false, false};
+    for (char ch : argString(a, "symmetry")) {
+        const char l = char(std::tolower(static_cast<unsigned char>(ch)));
+        if (l == 'x') sym.x = true;
+        else if (l == 'y') sym.y = true;
+        else if (l == 'z') sym.z = true;
+        else return {false, "symmetry takes the axes x, y and z"};
+    }
+    const float size = float(std::max(argNumber(a, "size", 0.2), 1e-4));
+    glm::vec3 n(float(argNumber(a, "nx", 0.0)), float(argNumber(a, "ny", 1.0)), float(argNumber(a, "nz", 0.0)));
+    n = glm::length(n) > 1e-8f ? glm::normalize(n) : glm::vec3(0, 1, 0);
+    // Rotate +Y onto the normal.
+    const glm::vec3 y(0, 1, 0);
+    glm::mat3 rot(1.0f);
+    const float c = glm::dot(y, n);
+    if (c < -0.9999f) rot = glm::mat3(1, 0, 0, 0, -1, 0, 0, 0, -1);
+    else if (c < 0.9999f) {
+        const glm::vec3 v = glm::cross(y, n);
+        const glm::mat3 k(0, v.z, -v.y, -v.z, 0, v.x, v.y, -v.x, 0);
+        rot = glm::mat3(1.0f) + k + k * k * (1.0f / (1.0f + c));
+    }
+    const float twist = glm::radians(float(argNumber(a, "twist", 0.0)));
+    if (twist != 0.0f) { // about the primitive's own axis (Y) first, then onto the normal
+        const float cs = std::cos(twist), sn = std::sin(twist);
+        rot = rot * glm::mat3(cs, 0, -sn, 0, 1, 0, sn, 0, cs);
+    }
+    const glm::vec3 at(float(argNumber(a, "x", 0.0)), float(argNumber(a, "y", 0.0)), float(argNumber(a, "z", 0.0)));
+    for (auto& p : prim.positions) p = at + rot * p;
+    uint32_t group = 0;
+    for (uint32_t g : doc.mesh.polygroups) group = std::max(group, g);
+    prim.polygroups.assign(prim.triangles.size(), group + 1);
+    prim.recomputeAllNormals();
+    // Symmetry: a mirrored copy across each enabled plane (through the centre, as the brushes mirror),
+    // in the same polygroup and the same undo step. A copy that would land on one already there
+    // (inserted on a plane itself) is left out.
+    std::vector<Mesh> copies;
+    std::vector<glm::vec3> placed{at};
+    for (const glm::vec3& m : Sculptor::mirrors(sym)) {
+        const glm::vec3 centre = at * m;
+        if (std::any_of(placed.begin(), placed.end(),
+                        [&](const glm::vec3& p) { return glm::length(centre - p) < size * 0.25f; }))
+            continue;
+        placed.push_back(centre);
+        Mesh copy = prim;
+        for (auto& p : copy.positions) p *= m;
+        if (m.x * m.y * m.z < 0.0f) // a reflection turns the triangles inside out: wind them back
+            for (auto& t : copy.triangles) std::swap(t.y, t.z);
+        copy.recomputeAllNormals();
+        copies.push_back(std::move(copy));
+    }
+    std::vector<const Mesh*> parts{&doc.mesh, &prim};
+    for (const Mesh& c2 : copies) parts.push_back(&c2);
+    Mesh merged = mergeMeshes(parts);
+    const size_t tris = prim.triangleCount() * (1 + copies.size());
+    doc.replaceMeshUndoable(std::move(merged), "Insert " + label);
+    return {true, "Inserted " + (copies.empty() ? "a " + label : std::to_string(copies.size() + 1) + " " + label + "s (mirrored)") +
+                      " (" + std::to_string(tris) + " triangles, polygroup " + std::to_string(group + 1) + ")"};
+}
+
 } // namespace
 
 void registerSubToolCommands(CommandRegistry& reg) {
@@ -300,26 +409,21 @@ void registerSubToolCommands(CommandRegistry& reg) {
                  return {true, "Appended SubTool " + doc.subtools[size_t(i)].name + " (" + countText(tris) + ")"};
              }});
 
+    const std::vector<ParamSpec> placeParams{
+        {"x", T::Number, "surface point x", true}, {"y", T::Number, "surface point y", true}, {"z", T::Number, "surface point z", true},
+        {"nx", T::Number, "surface normal x", false}, {"ny", T::Number, "surface normal y", false}, {"nz", T::Number, "surface normal z", false},
+        {"size", T::Number, "size in scene units (default 0.2)", false},
+        {"twist", T::Number, "turn about the normal in degrees (default 0)", false},
+        {"symmetry", T::String, "mirror axes, e.g. \"x\" or \"xz\": a mirrored copy across each plane (#43; default none)", false}};
+    std::vector<ParamSpec> primitiveParams{{"type", T::String, "sphere, cube, cylinder, cone, torus, capsule or quadsphere", false}};
+    primitiveParams.insert(primitiveParams.end(), placeParams.begin(), placeParams.end());
     reg.add({"insert_primitive",
              "Insert a primitive into the active SubTool where the surface is (#34): its axis along the surface "
              "normal, its centre on the surface, as one new polygroup; one undoable step.",
-             {{"type", T::String, "sphere, cube, cylinder, cone, torus, capsule or quadsphere", false},
-              {"x", T::Number, "surface point x", true}, {"y", T::Number, "surface point y", true}, {"z", T::Number, "surface point z", true},
-              {"nx", T::Number, "surface normal x", false}, {"ny", T::Number, "surface normal y", false}, {"nz", T::Number, "surface normal z", false},
-              {"size", T::Number, "size in scene units (default 0.2)", false},
-              {"twist", T::Number, "turn about the normal in degrees (default 0)", false},
-              {"symmetry", T::String, "mirror axes, e.g. \"x\" or \"xz\": a mirrored copy across each plane (#43; default none)", false}},
+             primitiveParams,
              [](Document& doc, const Args& a) -> CommandResult {
                  const std::string blocked = dyntopoBlocker(doc.mesh);
                  if (!blocked.empty()) return {false, "Can't insert: " + blocked};
-                 Symmetry sym{false, false, false};
-                 for (char ch : argString(a, "symmetry")) {
-                     const char l = char(std::tolower(static_cast<unsigned char>(ch)));
-                     if (l == 'x') sym.x = true;
-                     else if (l == 'y') sym.y = true;
-                     else if (l == 'z') sym.z = true;
-                     else return {false, "symmetry takes the axes x, y and z"};
-                 }
                  const std::string type = argString(a, "type", "sphere");
                  const float size = float(std::max(argNumber(a, "size", 0.2), 1e-4));
                  Mesh prim;
@@ -331,54 +435,39 @@ void registerSubToolCommands(CommandRegistry& reg) {
                  else if (type == "capsule") prim = makeCapsule(24, size);
                  else if (type == "quadsphere") prim = makeQuadSphere(8, size);
                  else return {false, "Unknown primitive '" + type + "'"};
-                 glm::vec3 n(float(argNumber(a, "nx", 0.0)), float(argNumber(a, "ny", 1.0)), float(argNumber(a, "nz", 0.0)));
-                 n = glm::length(n) > 1e-8f ? glm::normalize(n) : glm::vec3(0, 1, 0);
-                 // Rotate +Y onto the normal.
-                 const glm::vec3 y(0, 1, 0);
-                 glm::mat3 rot(1.0f);
-                 const float c = glm::dot(y, n);
-                 if (c < -0.9999f) rot = glm::mat3(1, 0, 0, 0, -1, 0, 0, 0, -1);
-                 else if (c < 0.9999f) {
-                     const glm::vec3 v = glm::cross(y, n);
-                     const glm::mat3 k(0, v.z, -v.y, -v.z, 0, v.x, v.y, -v.x, 0);
-                     rot = glm::mat3(1.0f) + k + k * k * (1.0f / (1.0f + c));
+                 return insertPiece(doc, std::move(prim), a, type);
+             }});
+
+    std::vector<ParamSpec> meshParams{
+        {"subtool", T::String, "insert a copy of this SubTool (by name)", false},
+        {"file", T::String, "insert the mesh in this model file (.obj, .ply or .glb)", false}};
+    meshParams.insert(meshParams.end(), placeParams.begin(), placeParams.end());
+    reg.add({"insert_mesh",
+             "Insert your own mesh into the active SubTool where the surface is (#34), placed like insert_primitive: "
+             "a copy of another SubTool or a model file, scaled so its largest side is `size`, its up (+Y) axis "
+             "along the surface normal, as one new polygroup; one undoable step.",
+             meshParams,
+             [](Document& doc, const Args& a) -> CommandResult {
+                 const std::string blocked = dyntopoBlocker(doc.mesh);
+                 if (!blocked.empty()) return {false, "Can't insert: " + blocked};
+                 if (a.contains("subtool") == a.contains("file")) return {false, "Give subtool= or file="};
+                 Mesh source;
+                 std::string label;
+                 if (a.contains("subtool")) {
+                     label = argString(a, "subtool");
+                     const int i = doc.findSubtool(label);
+                     if (i < 0) return {false, "No SubTool named '" + label + "'"};
+                     source = doc.subtoolMesh(i);
+                 } else {
+                     const std::string path = argString(a, "file");
+                     std::string error;
+                     if (!loadInsertMesh(path, source, error)) return {false, error};
+                     label = fileStem(path);
                  }
-                 const float twist = glm::radians(float(argNumber(a, "twist", 0.0)));
-                 if (twist != 0.0f) { // about the primitive's own axis (Y) first, then onto the normal
-                     const float cs = std::cos(twist), sn = std::sin(twist);
-                     rot = rot * glm::mat3(cs, 0, -sn, 0, 1, 0, sn, 0, cs);
-                 }
-                 const glm::vec3 at(float(argNumber(a, "x", 0.0)), float(argNumber(a, "y", 0.0)), float(argNumber(a, "z", 0.0)));
-                 for (auto& p : prim.positions) p = at + rot * p;
-                 uint32_t group = 0;
-                 for (uint32_t g : doc.mesh.polygroups) group = std::max(group, g);
-                 for (auto& g : prim.polygroups) g = group + 1;
-                 prim.recomputeAllNormals();
-                 // Symmetry: a mirrored copy across each enabled plane (through the centre, as the brushes mirror),
-                 // in the same polygroup and the same undo step. A copy that would land on one already there
-                 // (inserted on a plane itself) is left out.
-                 std::vector<Mesh> copies;
-                 std::vector<glm::vec3> placed{at};
-                 for (const glm::vec3& m : Sculptor::mirrors(sym)) {
-                     const glm::vec3 centre = at * m;
-                     if (std::any_of(placed.begin(), placed.end(),
-                                     [&](const glm::vec3& p) { return glm::length(centre - p) < size * 0.25f; }))
-                         continue;
-                     placed.push_back(centre);
-                     Mesh copy = prim;
-                     for (auto& p : copy.positions) p *= m;
-                     if (m.x * m.y * m.z < 0.0f) // a reflection turns the triangles inside out: wind them back
-                         for (auto& t : copy.triangles) std::swap(t.y, t.z);
-                     copy.recomputeAllNormals();
-                     copies.push_back(std::move(copy));
-                 }
-                 std::vector<const Mesh*> parts{&doc.mesh, &prim};
-                 for (const Mesh& c2 : copies) parts.push_back(&c2);
-                 Mesh merged = mergeMeshes(parts);
-                 const size_t tris = prim.triangleCount() * (1 + copies.size());
-                 doc.replaceMeshUndoable(std::move(merged), "Insert " + type);
-                 return {true, "Inserted " + (copies.empty() ? "a " + type : std::to_string(copies.size() + 1) + " " + type + "s (mirrored)") +
-                                   " (" + std::to_string(tris) + " triangles, polygroup " + std::to_string(group + 1) + ")"};
+                 Mesh piece;
+                 if (!normalizedPiece(source, float(std::max(argNumber(a, "size", 0.2), 1e-4)), piece))
+                     return {false, label + " has no mesh to insert"};
+                 return insertPiece(doc, std::move(piece), a, label);
              }});
 
     reg.add({"subtool_duplicate", "Copy a SubTool (with its layers and attributes) and make the copy active.",

@@ -59,6 +59,10 @@ Click **Append** and choose:
 - **Insert on the model**: choose a shape, then drag on the active SubTool's surface to add it there as a new
   polygroup (the drag sets its size and turns it). With **Symmetry** X, Y or Z on, a mirrored copy goes on the other
   side too, in the same undo step; a shape inserted right on a mirror plane isn't doubled.
+  To insert your own mesh, choose **Active SubTool's copy...** and pick another SubTool (it stays as it is), or
+  **From file...** and pick an `.obj`, `.ply` or `.glb` file; then drag as with the shapes. The mesh is centred,
+  scaled so its largest side matches the drag, and stood on the surface along its own up (+Y) axis. Esc stops
+  inserting. (Command: `insert_mesh subtool=<name>` or `insert_mesh file=<path>`.)
 - **From file...**: a model (`.obj`, `.fbx`, `.glb`, `.gltf`, `.ply`, `.stl`, `.GoZ`, `.usda`, `.usd`, `.usdz`) or
   a project (`.sfproj`). A file with several objects adds one SubTool per object.
 
