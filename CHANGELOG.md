@@ -6,6 +6,41 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- **Predictive Strokes** (Preferences > Performance, on by default): a sculpt stroke's brush is worked out on its
+  own thread while the view keeps drawing at the display's rate. The dabs not finished yet are drawn as a GPU
+  preview on the surface (each brush's kernel in the vertex shader, with its shading and cavities), and the brush
+  cursor and the stroke's head are drawn where the pen will be a frame later. When a dab's result reaches the GPU
+  it replaces its preview in the same frame. Lifting the pen never waits. The finished sculpt is the same, bit for
+  bit, as with it off (`--measure-stroke` with `SF_MEASURE_VERIFY=1` replays the stroke and checks undo).
+  Painting, masking, dynamic topology, Move, Snake Hook and the drag strokes work as before.
+- **Draft Strokes** (Preferences > Performance, off by default; meant for laptops and battery): with Predictive
+  Strokes, the brush only moves the surface during the stroke; normals, cavities and culling bounds are worked out
+  once when the pen lifts.
+- `tools/bench_strokes.sh`: the big-brush stroke benchmark on 5M, 21M and 33M triangles, one build or two
+  interleaved (docs/performance.md). `new_sphere triangles=N` makes a sphere of about N triangles.
+  `--measure-stroke` reports frame p95 / p99, the preview's lag, and when the first and last dab reach the screen.
+
+### Changed
+- Big brushes on dense meshes no longer slow the view. `tools/bench_strokes.sh`, 200 px brush, M1 Pro shared
+  with other builds (load 9-45, so both columns are slower than on an idle machine; A/B interleaved):
+
+  | | 0.9.7 frame mean / p99 | Now | Brush on screen behind the pointer, 0.9.7 / now | Press | Release |
+  |---|---|---|---|---|---|
+  | 5.2M | 47 / 134 ms | 8.4 / 14 ms | 95 / 1 px | 98 -> 24 ms | 31 -> 0 ms |
+  | 21M | 71 / 651 ms | 8.8 / 18 ms | 37 / 1.5 px | 623 -> 14 ms | 1 -> 0 ms |
+  | 33.6M | 169 / 323 ms | 12.2 / 27 ms | 245 / 4 px | 315 -> 13 ms | 374 -> 0 ms |
+
+  With 60 and 240 px brushes at 21M and 33.6M the p99 frame is 11-31 ms (0.9.7: 26-636 ms). The solved surface
+  itself still trails as before; the preview covers it (docs/performance.md, "Predictive strokes").
+- Packing a stroke's vertices for the GPU no longer walks every vertex's neighbours again: the cavity term comes
+  from the normals pass. Clusters a stroke moved get quick culling bounds, made exact when it ends.
+- `Mesh::recomputeAllNormals` (new meshes, undo of big changes, timeline seeks) runs in parallel.
+
+### Fixed
+- A big brush that raised the surface past the GPU's position grid stalled the view for seconds on dense meshes
+  (the whole mesh was re-packed inside a frame); it is re-packed on the brush thread now.
+
 ## [0.9.7] - 2026-10-31
 
 Speed first: big brushes on dense meshes take a third less time per frame, trail the pen by half as far and no

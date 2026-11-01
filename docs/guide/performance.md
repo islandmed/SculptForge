@@ -38,6 +38,8 @@ Open **Preferences** and click **Performance**.
 |---|---|
 | **Antialiasing** (Off, 2x, 4x, 8x) | How many samples per pixel the 3D view uses to smooth edges. 4x is the default. More samples look smoother and cost more on huge meshes. If the graphics card can't make room for them, the view quietly uses fewer and the panel says so |
 | **Fast Navigation** | While you rotate, pan or zoom a scene of 10 million triangles or more, draw it without antialiasing and draw big meshes as a lighter version with about a fifth of their triangles, so the view keeps up. The full mesh, smooth again, is back as soon as the view stops. On by default |
+| **Predictive Strokes** | The brush is worked out on its own thread while the view keeps drawing at full speed. The dabs it hasn't finished show at once as a preview on the surface, and the brush cursor and the stroke's head are drawn where the pen is about to be, so on a heavy mesh the surface moves under the pen straight away and lifting the pen never waits. The finished sculpt is exactly the same as with it off. On by default (painting, masking, dynamic topology, Move, Snake Hook and the drag strokes work as before) |
+| **Draft Strokes** | With Predictive Strokes: while you sculpt, the brush only moves the surface, the moved part is shaded from its facets, and the smooth shading, the cavities and the rest are worked out once when you lift the pen. Lighter on laptops and on battery. Inflate and the plane brushes use the surface's direction from the stroke's start, so the result can differ slightly from a full stroke. Off by default |
 | **Multithreading** | Run brushes, normal and picking updates and project saving on every core (the number of threads is shown beside it). The results are exactly the same with it off; turn it off only to compare speeds or rule it out when something goes wrong |
 | **Last stroke** | What your last stroke cost per dab: **Brush** (finding and moving the vertices), **Normals** (shading), **BVH** (the structure that finds the surface under the cursor), and the **GPU upload** per frame |
 | **Memory** | What the scene holds: the meshes, the BVHs, the subdivision levels kept for stepping between them, the undo history (up to 1 GB; the oldest steps are dropped beyond that) and, roughly, the graphics card's buffers |
@@ -106,7 +108,13 @@ curve stays a curve; once more than about 50 ms of dabs are waiting, every secon
 wider spacing), so the brush stays close to the pointer and stops soon after you lift the pen. `sculptforge --run "new_sphere" --measure-stroke 3,200` draws a fast circle for three seconds
 with a 200-pixel brush and prints how far the dabs strayed from it and the frame times.
 `SF_STROKE_IMMEDIATE=1` places every dab as soon as the pointer moves (versions before 0.9.6),
-`SF_STROKE_BACKLOG=0` never leaves dabs out, and `SF_STROKE_LOG=1` logs the queue each frame.
+`SF_STROKE_BACKLOG=0` never leaves dabs out, and `SF_STROKE_LOG=1` logs the queue each frame (with Predictive
+Strokes, each batch the brush thread places and what packing it for the graphics card cost).
+`SF_PREDICTIVE_STROKE=0` / `1` and `SF_DRAFT_STROKE=0` / `1` override the two preferences, and
+`SF_FRAME_LOG=16` logs every frame slower than 16 ms with where its time went. `tools/bench_strokes.sh` in the
+source runs the stroke measurement on 5, 21 and 33 million triangle spheres and prints the frame times (mean,
+95th and 99th percentile), how far the surface and the preview trail the pointer, press and release, for one
+build or two side by side.
 
 The `perf_info` command (also in the [Console](scripting.md)) prints the threads in use and the memory the
 scene holds; `set_multithreading enabled=false` turns multithreading off from a script.

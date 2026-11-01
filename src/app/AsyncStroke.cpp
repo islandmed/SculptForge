@@ -368,6 +368,10 @@ void App::buildGhost() {
         const bool moving = glm::length(penPredictor_.velocity()) > 20.0f; // px / s
         if (moving && gap > 0.2f * spacing)
             pending.push_back({head.x, head.y, lastStrokePressure_, std::min(1.0f, gap / spacing)});
+        static const bool debug = std::getenv("SF_GHOST_DEBUG") != nullptr;
+        if (debug && glm::distance(head, glm::vec2(mouseX_, mouseY_)) > 30.0f)
+            SDL_Log("ghost: head %.0f %.0f pointer %.0f %.0f latest %.0f %.0f from %.0f %.0f v %.0f", head.x, head.y, mouseX_, mouseY_,
+                    pointerLatest_.x, pointerLatest_.y, from.x, from.y, glm::length(penPredictor_.velocity()));
     }
     if (!pending.empty()) {
         ghostHead_ = glm::vec2(pending.back().x, pending.back().y);

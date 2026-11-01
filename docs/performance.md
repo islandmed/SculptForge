@@ -12,7 +12,144 @@ sculptforge-cli --bench ...                     # the same without the GPU (CI, 
 Machine for all figures: Apple M1 Pro (8 performance + 2 efficiency cores, 32 GB unified memory, 30 GB usable
 under Asahi Linux), integrated GPU, Mesa 26.1 (OpenGL 4.6). How the benchmark works is described under v0.5 below.
 
-## Next version: big brushes on dense meshes (feat/perf-pass)
+## Next version: predictive strokes (feat/zero-latency)
+
+A stroke on a heavy mesh used to run in the frame loop: each frame placed a dab (45-50 ms at 21M with a 200 px
+brush), re-packed what it moved for the GPU (about 28 ms) and only then drew. Now the brush runs on its own
+thread and the frame loop only commits what it finished, so the view draws at the display's rate whatever a dab
+costs; what the brush hasn't finished is drawn ahead of it by the GPU.
+
+```
+tools/bench_strokes.sh [-s 5,21,33] [-n RUNS] [-r RADIUS_PX] BINARY [BINARY_B]   # A/B runs interleaved
+```
+
+It runs `sculptforge --run SCENE --measure-stroke 3,R` (a fast two-turn circle, X symmetry) on 5.2M
+(`new_sphere subdivisions=8; subdiv_divide`), 21.0M (two Divides) and 33.6M triangles
+(`new_sphere triangles=2100000; subdiv_divide; subdiv_divide`) and averages SculptForge's own figures.
+
+**How to read the figures below.** They were taken on the M1 Pro while other agents were building and testing on
+the same machine (load average 9 to 45 on 10 cores during the runs), so absolute times are two to four times
+those of an idle machine and vary from run to run (0.9.7 measured 65 ms frames at 21M on an idle machine; here
+71-180 ms). A and B were interleaved run by run, two runs each, so they saw the same load. "A" is main (0.9.7)
+with only the measurement additions, "B" this branch with Predictive Strokes on (the default).
+
+- Frame: the interval between frames on screen, mean / p95 / p99 (120 Hz display, vsync).
+- Surface lag: how far round the circle the last dab whose result is on the GPU is behind the pointer.
+- Preview lag: the same for the preview's head (B; for A it is the surface).
+- Press: from the press to the first frame on screen that shows it (B: the preview of the first dab); first
+  surface: until the first dab's own result is on screen.
+- Release: how long letting go holds up the UI; until done: until the last dab's result is on screen.
+
+200 px brush:
+
+| Mesh | | Frame mean / p95 / p99 | Surface lag | Preview lag | Press | First surface | Release | Until done |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| 5.2M | A | 47.0 / 98.5 / 134 ms | 95 px | 95 px | 98 ms | 98 ms | 31 ms | 44 ms |
+| | B | **8.4 / 11.3 / 14.3 ms** | 72 px | **1.0 px** | **24 ms** | 68 ms | **0 ms** | 64 ms |
+| 21.0M | A | 71.0 / 245 / 651 ms | 37 px | 37 px | 623 ms | 623 ms | 1.4 ms | 8 ms |
+| | B | **8.8 / 14.1 / 17.6 ms** | 198 px | **1.5 px** | **14 ms** | 144 ms | **0 ms** | 224 ms |
+| 33.6M | A | 169 / 311 / 323 ms | 245 px | 245 px | 315 ms | 315 ms | 374 ms | 493 ms |
+| | B | **12.2 / 22.8 / 27.0 ms** | 307 px | **4.1 px** | **13 ms** | 264 ms | **0 ms** | 500 ms |
+
+60 and 240 px brushes (the sizes proof mode reported stalls with):
+
+| Mesh, brush | | Frame mean / p95 / p99 | Surface lag | Preview lag | Press | Release | Until done |
+|---|---|---:|---:|---:|---:|---:|---:|
+| 21.0M, 60 px | A | 14.8 / 22.1 / 26.2 ms | 16 px | 16 px | 26 ms | 5 ms | 10 ms |
+| | B | **8.4 / 9.9 / 11.4 ms** | 31 px | **0.7 px** | **8 ms** | 0 ms | 33 ms |
+| 33.6M, 60 px | A | 24.9 / 31.6 / 34.8 ms | 48 px | 48 px | 34 ms | 31 ms | 42 ms |
+| | B | **8.9 / 14.3 / 17.2 ms** | 63 px | **1.9 px** | **13 ms** | 0 ms | 82 ms |
+| 21.0M, 240 px | A | 215 / 433 / 433 ms | 283 px | 283 px | 582 ms | 544 ms | 675 ms |
+| | B | **10.2 / 18.5 / 23.8 ms** | 465 px | **3.1 px** | **21 ms** | 0 ms | 1132 ms |
+| 33.6M, 240 px | A | 292 / 636 / 636 ms | 226 px | 226 px | 779 ms | 826 ms | 1362 ms |
+| | B | **12.8 / 27.2 / 31.1 ms** | 337 px | 117 px* | **11 ms** | 0 ms | 1689 ms |
+
+\* One of the two runs had a preview lag of 230 px, the other 4 px; repeated runs with `SF_GHOST_DEBUG=1` gave
+4 px and couldn't reproduce it (a tiling window manager resizing the window mid-stroke, which other agents'
+windows did during these runs, also moves the canvas under the scripted circle).
+
+What the figures say:
+
+- **Frames no longer depend on the brush.** B's frames are 8-13 ms on average at every size, p99 11-31 ms,
+  where A's worst frames were 0.3 to 1.2 s (the solver and the upload ran inside the frame). The long stalls proof
+  mode saw are gone: the biggest was a vertex leaving the GPU's position grid (a big brush raising the surface),
+  which re-packed the whole mesh inside a frame (seconds at 33M); it is re-packed on the brush thread now, and
+  the stroke's end work (exact culling bounds of everything it moved) runs there too, so release is 0 ms.
+- **The brush trails the pointer by a few pixels on screen**, where it trailed by 40-280 px: the preview shows
+  every dab not yet solved, and the pen's next position. The surface itself (the solver's result) still trails
+  by as much as before, or more on a loaded machine (B batches dabs so that packing stays under half the work,
+  so the real surface updates less often); when it lands it replaces the preview without a visible jump: with
+  `SF_MEASURE_POP=1` the view changes by 0.055 (mean, 0-255) when a batch replaces its preview, against 0.36 if
+  there were no preview (5M, 200 px).
+- **Press** is the first frame (8-24 ms, the preview of the first dab); the first dab's own result follows when
+  the solver has it.
+- **Until done** is longer for B with big brushes: B places every queued dab after the pen lifts (the preview
+  already shows them) and A's frame loop thinned more. It doesn't hold anything up: the UI keeps going, and a new
+  stroke or command first finishes the old one.
+- The targets set for this work were 33M with a 200 px brush at 60 fps (frames under 16.7 ms), the brush under
+  20 px behind the pointer, press and release under 50 ms. Met on this loaded machine: press (13 ms), release
+  (0 ms), the brush on screen behind the pointer (4 px), the mean frame at 21M (8.8 ms). Not met: 33M frames are
+  12.2 ms mean but 22.8 / 27.0 ms at p95 / p99. Those frames wait on the GPU (`SF_FRAME_LOG=16`: the time is
+  in the swap, drawing 33M triangles; the preview costs about 1-2 ms of it), not on the CPU.
+
+### Where a batch's time goes (21M, 200 px, `SF_STROKE_LOG=1`, loaded)
+
+The solver thread: the dab 160-300 ms (kernel 50-115, normals 65-150, BVH 25-50), then packing the upload
+110-180 ms before this work, 25-45 ms after it (vertices 25-40, bounds under 1.5). On an idle machine divide by
+about four. The main thread's commit (glBufferSubData of 30-55 MB): 2-3 ms, occasionally 10.
+
+What changed, in order:
+
+1. **Predictive strokes** (app/AsyncStroke.cpp). The queued dabs go to a solver thread in batches; each frame
+   the finished batch is committed and the next one starts. The mesh, its BVH and the sculptor belong to the
+   solver while it runs (syncScene and the pollers wait; every path that edits the document ends the stroke
+   first). The dabs, their order and parameters are the frame loop's (each batch sees the view as it was when it
+   began), so the result is the same bit for bit: `SF_MEASURE_VERIFY=1` replays the measured stroke without the
+   thread and checks undo.
+2. **The preview** (render/Ghost.h, the GHOST shader variant). The dabs not yet on the GPU (in flight, queued, and
+   the stroke's head where the pen will be a frame later, core/PenPredictor.h) move the uploaded vertices as each
+   brush kernel would; the kernels are differentiated forward (height gradient and Laplacian over the tangent
+   plane) for the bent normal and the cavity term, with no extra varyings (a tiled GPU writes every vertex's
+   outputs to memory). Each dab's surface point comes from a sphere fitted to the last two placed dabs (their
+   normals turn by an angle over the distance between them): centre within 0.003-0.07 r, normal within 1-5
+   degrees (`SF_GHOST_DEBUG=1`). Only the clusters a ghost dab reaches use it. The brush cursor is drawn at the
+   predicted pen position too.
+3. **Two-part upload** (Renderer::prepareStrokeUpload / commitStrokeUpload). The solver thread packs the dirty
+   vertices and the culling bounds; the GL thread only calls glBufferSubData. The cavity term comes from the
+   normals pass (Mesh::curvatureAt from each vertex's triangles, the ring average on a manifold) instead of a
+   second walk of every vertex's ring (packing 110 -> 30 ms a batch at 21M, loaded). Clusters a stroke moved get
+   bounds round their vertices' boxes (found while packing) without a normal cone; exact ones at the end.
+4. **No stalls**: the position grid re-pack and the end-of-stroke bounds on the solver thread (above); batches
+   sized so packing stays under half the work, and after release every dab left in one batch with the end
+   work (21M, 240 px: until done 2.9 -> 0.6 s).
+5. **Mesh::recomputeAllNormals** sums each vertex's own triangles in parallel when the topology is known (same
+   order, same bits, no face array): it summed on one thread, which dominated full-history timeline seeks.
+
+Not done: persistent-mapped upload buffers (the commit is 2-3 ms, not worth the complexity on GL 3.3 / macOS
+4.1); per-vertex dirty bitsets per cluster beyond what UploadOrder already does; normals in the shader (they
+are already 2 x 11-bit octahedral in 12-byte vertices since v0.6). The CPU dab itself (kernel, normals, BVH) is
+unchanged: it bounds how soon the real surface catches up, not the frame rate.
+
+### Draft strokes (33.6M, measured both ways)
+
+`SF_DRAFT_STROKE=1` (Preferences > Performance > Draft Strokes): dabs only move vertices and refit the BVH;
+the moved clusters draw with per-pixel face normals; normals, cavities and exact bounds are worked out once at
+pen lift, on the solver thread. Interleaved, two runs each, A = draft off, B = draft on:
+
+| Brush | | Frame mean / p95 / p99 | Surface lag | Press | First surface | Until done |
+|---|---|---:|---:|---:|---:|---:|
+| 200 px | off | 12.4 / 24.6 / 28.6 ms | 438 px | 14 ms | 476 ms | 1182 ms |
+| | draft | 13.6 / 27.0 / 30.6 ms | 445 px | 38 ms | 523 ms | 2985 ms |
+| 240 px | off | 12.8 / 26.6 / 30.9 ms | 281 px | 18 ms | 757 ms | 1988 ms |
+| | draft | 13.8 / 29.0 / 32.1 ms | 427 px | 22 ms | 719 ms | 3070 ms |
+
+On this machine draft strokes don't pay: the frames were never CPU-bound (the solver is on its own thread), the
+dab saves its normals pass but the stroke's end then recomputes the normals of everything the stroke touched,
+so the last result arrives later. (The draft runs coincided with the heaviest load of the session, 18-45.)
+It should help where the solver's cores are the bottleneck and energy matters (a laptop on battery, fewer
+cores): off by default, for the hardware tiers to turn on.
+
+## 0.9.7: big brushes on dense meshes (feat/perf-pass)
 
 What a user feels on a heavy model is a large brush: how far it trails the pointer, how long a frame takes, and
 what happens on press and release. Measured with the stroke the app draws itself (pointer read once per pass of
