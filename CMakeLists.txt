@@ -71,6 +71,7 @@ add_library(sculptforge_core STATIC
   src/core/Micro.cpp
   src/core/MicroSculpt.cpp
   src/core/MicroCommands.cpp
+  src/core/MicroStore.cpp
   src/core/MultiresCommands.cpp
   src/core/AutoUv.cpp
   src/core/TextureTransfer.cpp

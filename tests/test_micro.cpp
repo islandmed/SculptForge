@@ -431,3 +431,68 @@ TEST(micro_memory_and_dab_time) {
                 ms, bytesPerMicroTriangle);
     if (std::getenv("SF_BENCH_LIMITS")) CHECK(ms < 10.0);
 }
+
+TEST(micro_tile_codec_round_trip) {
+    const uint32_t S = 45;
+    std::vector<int16_t> v(S * 5, 0);
+    for (uint32_t k = 0; k < S; ++k) v[S + k] = int16_t(int(k) * 7 - 100); // a spread tile
+    for (uint32_t k = 0; k < S; ++k) v[3 * S + k] = int16_t(12345);        // constant, not zero
+    v[4 * S] = -32767, v[4 * S + 1] = 32767;                                // the full range
+    std::vector<uint8_t> packed;
+    microPackTiles(v.data(), 5, S, packed);
+    CHECK(packed.size() < v.size() * 2);
+    std::vector<int16_t> back(v.size(), 0);
+    CHECK(microUnpackTiles(packed.data(), packed.size(), 5, S, back.data()));
+    CHECK(back == v);
+    CHECK(!microUnpackTiles(packed.data(), packed.size() - 1, 5, S, back.data())); // damaged
+}
+
+TEST(micro_out_of_core_store) {
+    MicroStore s;
+    std::string err;
+    const size_t n = size_t(64) << 20; // 128 MB of address space, untouched
+    const bool mapped = s.assignMapped(n, err);
+    CHECK(s.size() == n);
+    if (mapped) {
+        CHECK(s.mapped());
+        CHECK(s.residentBytes() < (size_t(8) << 20)); // holes take no memory
+        s[12345] = 77;
+        s[n - 1] = -5;
+        MicroStore copy = s;
+        CHECK(copy.mapped() && copy[12345] == 77 && copy[n - 1] == -5 && copy[0] == 0);
+    }
+    // A micro level kept out of core sculpts, undoes and saves like one in memory.
+    Document doc = makeDoc(makeBenchSphere(20000));
+    CHECK(microDivide(doc.mesh, 3, err, 1));
+    CHECK(doc.mesh.micro->disp.mapped() == mapped);
+    Symmetry sym;
+    doc.sculptor.beginStroke(doc.mesh, "Standard");
+    doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::Standard, dabAt(glm::vec3(0, 0, 1), 0.3f), sym);
+    doc.undo.push(doc.sculptor.endStroke());
+    CHECK(watertight(doc.mesh));
+    const std::vector<int16_t> sculpted = doc.mesh.micro->disp;
+    const std::string path = tempPath("sf_micro_ooc.sfproj");
+    CHECK(saveProject(path, doc, err));
+    Document loaded;
+    CHECK(loadProject(path, loaded, err));
+    CHECK(loaded.mesh.micro && loaded.mesh.micro->disp == sculpted);
+    std::filesystem::remove(path);
+}
+
+TEST(micro_adaptive_brush_matches_full) {
+    // A big brush evaluated on a coarse stride lands close to the same brush on every point.
+    Document a = microDoc(4), b = microDoc(4);
+    Symmetry sym;
+    a.sculptor.microStroke().adaptive = false;
+    for (Document* d : {&a, &b}) {
+        d->sculptor.beginStroke(d->mesh, "Standard");
+        d->sculptor.dab(d->mesh, d->bvh, BrushType::Standard, dabAt(glm::vec3(0, 0, 1), 0.6f, 1.0f), sym);
+        d->undo.push(d->sculptor.endStroke());
+    }
+    CHECK(b.sculptor.microStroke().lastStride > 1);
+    CHECK(a.sculptor.microStroke().lastStride == 1);
+    const float ha = frontHeight(a), hb = frontHeight(b);
+    CHECK(ha > 1.01f);
+    CHECK(std::abs(ha - hb) < (ha - 1.0f) * 0.02f);
+    CHECK(watertight(b.mesh));
+}

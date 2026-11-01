@@ -36,6 +36,7 @@
 #pragma once
 
 #include "core/Mesh.h"
+#include "core/MicroStore.h"
 
 #include <cstdint>
 #include <functional>
@@ -62,7 +63,7 @@ struct MicroMesh {
     uint32_t samples = 3;     // grid points per base triangle: (n + 1)(n + 2) / 2
     float step = 1e-6f;       // world units per integer unit of `disp`
     uint32_t baseTriangles = 0, baseVertices = 0;
-    std::vector<int16_t> disp;      // baseTriangles * samples
+    MicroStore disp;                // baseTriangles * samples (in memory or out of core: core/MicroStore.h)
     std::vector<uint8_t> mask;      // empty, or one per grid point (0 = free, 255 = masked)
     std::vector<uint16_t> triRange; // per base triangle: the largest |disp| (an upper bound; brushes find triangles with it)
     uint16_t rangeMax = 0;          // the largest triRange (an upper bound)
@@ -147,12 +148,16 @@ glm::vec3 microPointAt(const Mesh& m, uint32_t tri, const float w[3], glm::vec3*
 // --- Operations (no undo; see the commands) ---
 // Adds a micro level of `level` (1..kMaxLevel) to the mesh: its current level must be the highest (or it has no
 // subdivision levels). The surface starts as S (smooth, d = 0).
-bool microDivide(Mesh& m, int level, std::string& error);
+// `outOfCore`: 1 = keep the displacements in a memory-mapped file (core/MicroStore.h), 0 = in memory, -1 = decide
+// (out of core when they'd take more than a quarter of this computer's memory, or SF_MICRO_OUT_OF_CORE=1).
+bool microDivide(Mesh& m, int level, std::string& error, int outOfCore = -1);
+// The -1 rule of microDivide for `points` grid points.
+bool microWantsOutOfCore(size_t points);
 // Removes the micro level.
 void microDelete(Mesh& m);
 // Gives a loaded mesh (with normals) a micro level from saved data: `disp` holds baseTriangles * samples values
 // (`mask` that many or none). Works out the derived data (ranges, bulge, edge neighbours).
-bool microAttach(Mesh& m, int level, float step, std::vector<int16_t> disp, std::vector<uint8_t> mask, std::string& error);
+bool microAttach(Mesh& m, int level, float step, MicroStore disp, std::vector<uint8_t> mask, std::string& error);
 // A regular mesh of the micro surface at micro level `level` (<= the micro level): shared points welded, the base
 // triangles' UVs, polygroups and hidden flags carried to their micro triangles, mask from the micro mask. Fails
 // when it would exceed `maxTriangles` (0 = what subdivision Divide allows on this computer).

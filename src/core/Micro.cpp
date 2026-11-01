@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <limits>
 #include <mutex>
@@ -269,7 +270,17 @@ float triangleBulge(const MicroTriangle& T) {
 
 } // namespace
 
-bool microDivide(Mesh& m, int level, std::string& error) {
+bool microWantsOutOfCore(size_t points) {
+    if (const char* e = std::getenv("SF_MICRO_OUT_OF_CORE"); e && *e) return std::string(e) == "1";
+    size_t memory = 0;
+#if defined(_SC_PHYS_PAGES)
+    const long pages = sysconf(_SC_PHYS_PAGES), page = sysconf(_SC_PAGESIZE);
+    if (pages > 0 && page > 0) memory = size_t(pages) * size_t(page);
+#endif
+    return memory && points * 2 > memory / 4;
+}
+
+bool microDivide(Mesh& m, int level, std::string& error, int outOfCore) {
     if (level < 1 || level > MicroMesh::kMaxLevel) {
         error = "Micro level must be 1 to " + std::to_string(MicroMesh::kMaxLevel);
         return false;
@@ -314,7 +325,12 @@ bool microDivide(Mesh& m, int level, std::string& error) {
     mm->samples = (mm->n + 1) * (mm->n + 2) / 2;
     mm->baseTriangles = uint32_t(nt);
     mm->baseVertices = uint32_t(m.vertexCount());
-    mm->disp.assign(nt * mm->samples, 0);
+    if (outOfCore < 0 ? microWantsOutOfCore(nt * mm->samples) : outOfCore == 1) {
+        std::string why;
+        mm->disp.assignMapped(nt * mm->samples, why); // (falls back to memory)
+    } else {
+        mm->disp.assign(nt * mm->samples, 0);
+    }
     mm->triRange.assign(nt, 0);
     mm->dirtyBits.assign((nt + 63) / 64, 0);
     mm->ensureTopology(m);
@@ -351,7 +367,7 @@ bool microDivide(Mesh& m, int level, std::string& error) {
     return true;
 }
 
-bool microAttach(Mesh& m, int level, float step, std::vector<int16_t> disp, std::vector<uint8_t> mask, std::string& error) {
+bool microAttach(Mesh& m, int level, float step, MicroStore disp, std::vector<uint8_t> mask, std::string& error) {
     if (level < 1 || level > MicroMesh::kMaxLevel || !(step > 0.0f) || !std::isfinite(step)) {
         error = "Project micro level is invalid";
         return false;

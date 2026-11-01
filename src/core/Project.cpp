@@ -826,7 +826,11 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
             Json mj = Json::object();
             mj.set("level", mm.level);
             mj.set("step", double(mm.step));
-            mj.set("displacement", w.int16s(p + "displacement.bin", mm.disp.data(), mm.disp.size()));
+            // Tiles packed (delta + per-tile range, core/MicroStore.h): untouched tiles are 3 bytes.
+            std::vector<uint8_t> packed;
+            microPackTiles(mm.disp.data(), mm.baseTriangles, mm.samples, packed);
+            const size_t packedBytes = packed.size();
+            mj.set("displacement_packed", w.add(p + "displacement.pack", Scalar::U8, 1, packedBytes, std::move(packed)));
             if (mm.hasMask()) mj.set("mask", w.externalBytes(p + "mask.bin", mm.mask));
             st.set("micro", std::move(mj));
             anyMicro = true;
@@ -981,10 +985,32 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
                 }
                 const uint32_t n = 1u << level;
                 const size_t count = s.mesh.triangleCount() * size_t((n + 1) * (n + 2) / 2);
-                std::vector<int16_t> disp;
+                const uint32_t samples = (n + 1) * (n + 2) / 2;
+                MicroStore disp;
                 std::vector<uint8_t> mask;
-                if (!r.int16s(mj["displacement"], "micro displacement", count, disp) ||
-                    (mj["mask"].isObject() && !r.bytes(mj["mask"], "micro mask", count, mask))) {
+                if (const Json& pj = mj["displacement_packed"]; pj.isObject()) { // tiles packed (MicroStore.h)
+                    std::vector<uint8_t> packed;
+                    const size_t bytes = countOf(pj["count"]);
+                    if (bytes == size_t(-1) || !r.bytes(pj, "micro displacement", bytes, packed)) {
+                        error = r.error.empty() ? "Project micro displacement is invalid" : r.error;
+                        return false;
+                    }
+                    std::string why;
+                    if (microWantsOutOfCore(count)) disp.assignMapped(count, why);
+                    else disp.assign(count, 0);
+                    if (!microUnpackTiles(packed.data(), packed.size(), s.mesh.triangleCount(), samples, disp.data())) {
+                        error = "Project micro displacement is damaged";
+                        return false;
+                    }
+                } else {
+                    std::vector<int16_t> plain;
+                    if (!r.int16s(mj["displacement"], "micro displacement", count, plain)) {
+                        error = r.error;
+                        return false;
+                    }
+                    disp = std::move(plain);
+                }
+                if (mj["mask"].isObject() && !r.bytes(mj["mask"], "micro mask", count, mask)) {
                     error = r.error;
                     return false;
                 }
