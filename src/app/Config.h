@@ -39,6 +39,18 @@ struct UiPrefs {
     bool emulateNumpad = false; // Blender style: the 1-9 and 0 keys above the letters act as the numpad (laptops)
     bool rightClickQuickMenu = true; // a right click on the canvas (no drag) opens the QuickMenu, as in ZBrush (#22)
     bool spaceCamera = false; // hold Space and drag to move the camera (#43; off: Space opens the QuickMenu)
+    // Zoom drags (#32): the Maya style zooms with a sideways drag (right = in), as Maya's own dolly; false makes it
+    // vertical as the other styles. invertZoom turns every zoom drag around.
+    bool mayaZoomHorizontal = true;
+    bool invertZoom = false;
+    // Along the normal (from the discussions): 0 = with the invert key (Alt; Ctrl in the Blender and Maya styles),
+    // 1 = always, 2 = never. For Move, Tendril, Elastic Tendril and KelvinGrab.
+    int alongNormal = 0;
+    // Brush falloff options (from the discussions): Connected only, View falloff (App::connectedOnly_ / viewFalloff_).
+    bool connectedOnly = false;
+    bool viewFalloff = false;
+    // Dynamic topology: how much Smooth remeshes, 0-1 (DyntopoSettings::smoothRemesh; 1 as before).
+    float dyntopoSmoothRemesh = 1.0f;
     bool airStrokes = false;  // start strokes off the model (#62): a left-drag on the background sculpts once it
                               // reaches the surface instead of turning the view (off: it turns the view, ZBrush)
     bool showAxes = true;              // Draw > Camera > Axes: the X / Y / Z gizmo in the canvas corner (#31)

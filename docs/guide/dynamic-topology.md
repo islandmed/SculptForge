@@ -36,6 +36,19 @@ Under the brush, edges longer than the target are split, edges much shorter are 
 triangles are evened out. Outside the brush nothing changes, so you can have big triangles on the back of a head
 and fine ones around the eyes.
 
+## Smooth remesh
+
+Smoothing (<kbd>Shift</kbd>) with Dynamic on also simplifies by default: it remeshes toward triangles twice the
+size, so the smoothed area gets coarser, as in Sculptris Pro. **Smooth remesh** under **Draw > Dynamic topology**
+sets how much (from the discussions):
+
+- **Smooth only** (0): Shift only smooths; the triangles stay as they are.
+- **Light** (50): it remeshes toward triangles one and a half times the size.
+- **Simplify** (100, the default): as before.
+
+It is a preference (Store Config keeps it) and is saved with the project; from a script,
+`dyntopo smooth_remesh=0`.
+
 ## What it keeps and what it doesn't
 
 - **Symmetry.** With X (or Y, Z) symmetry on, both sides are remeshed together and get mirrored triangles, not

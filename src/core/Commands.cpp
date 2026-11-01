@@ -28,6 +28,7 @@
 #include "core/Project.h"
 #include "core/QRemesh.h"
 #include "core/ZSpheres.h"
+#include "core/Deform.h"
 #include "core/Sculptable.h"
 #include "core/Splats.h"
 #include "core/TextureTransfer.h"
@@ -562,6 +563,13 @@ CommandRegistry::CommandRegistry() {
                                                           : T::String;
             params.push_back({rp.key, type, rp.help, false});
         }
+        params.push_back({"connectedOnly", T::Bool,
+                          "Only reach the surface joined to the point under the cursor (the other leg, the next finger "
+                          "stay). Default false.",
+                          false});
+        params.push_back({"viewFalloff", T::Bool,
+                          "Measure the falloff on screen: a cylinder through the model along the view. Default false.",
+                          false});
         add({"brush_create",
              "Create (or update, by name) a custom sculpting brush from a recipe and make it the active brush. "
              "Omitted parameters use neutral defaults.",
@@ -618,6 +626,7 @@ CommandRegistry::CommandRegistry() {
     registerRetopoCommands(*this); // qremesh, project_all (RetopoCommands.cpp)
     registerQRemeshGuideCommands(*this); // qremesh_guide, ... (QRemeshGuides.cpp)
     registerZSphereCommands(*this);      // zsphere_new, ... (ZSpheres.cpp)
+    registerDeformCommands(*this);       // deform_polish, deform_relax, deform_smooth, deform_balloon (Deform.cpp)
 
     add({"stroke",
          "Apply a brush along a path on the active Part, like dragging the cursor in the viewport (one undo "

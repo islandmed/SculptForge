@@ -318,6 +318,8 @@ App::DabSettings App::dabSettings() const {
     st.pressureStrength = pressureStrength_;
     st.invert = strokeInvert_;
     st.frontFacesOnly = frontFacesOnly_;
+    st.connectedOnly = uiPrefs_.connectedOnly;
+    st.viewFalloff = uiPrefs_.viewFalloff;
     st.mask = strokeMask_;
     st.paint = strokePaint_;
     st.sculpt = strokeSculpt_;

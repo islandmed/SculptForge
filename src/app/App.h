@@ -284,6 +284,7 @@ private:
         float sprayScatter = 1.0f;
         bool smoothKeepVolume = false; // Smooth keeps the volume (smoothKeepVolume_, or the alternate smooth)
         bool pressureSize = false, pressureStrength = true, invert = false, frontFacesOnly = false;
+        bool connectedOnly = false, viewFalloff = false; // the falloff options (Brush palette)
         bool mask = false, paint = false, sculpt = true, visible = true;
         BrushType brush = BrushType::Standard;
         StrokeType strokeType = StrokeType::Dots;
@@ -343,6 +344,16 @@ private:
     BrushType strokeBrush_ = BrushType::Standard;
     bool strokeInvert_ = false;
     glm::vec3 grabPlanePoint_{0.0f}, grabLast_{0.0f};
+    // Along the normal (from the discussions): Move, Tendril, Elastic Tendril and KelvinGrab strokes that began with
+    // the invert key held (Preferences > Input > Along the normal) slide along the average normal under the brush
+    // at the press instead of the view plane. alongNormalTarget: where the cursor puts the grabbed point.
+    bool strokeAlongNormal_ = false;
+    glm::vec3 alongNormalDir_{0.0f, 0.0f, 1.0f};
+    glm::vec3 alongNormalAnchor_{0.0f};
+    float alongNormalStartY_ = 0.0f;
+    bool alongNormalBrush(BrushType t) const;
+    void beginAlongNormal(const RayHit& hit, float radius);
+    glm::vec3 alongNormalTarget(float x, float y) const;
 
     std::string status_;
     bool lastCommandOk_ = true; // result of the last runCommand (UI tests check it)
@@ -918,6 +929,25 @@ private:
     int zsphereAt(float x, float y, bool* link = nullptr) const; // sphere (or link's child) under the cursor, or -1
     float worldPerPixel(const glm::vec3& at) const;       // world size of one canvas pixel at `at`'s depth
     ZSphereMode zsphereMode_ = ZSphereMode::Draw;
+    bool zspherePlaceChild_ = false; // Draw: the drag moves the new sphere away from its parent (Ctrl does it too)
+    int zsphereSelected_ = -1;      // the sphere last clicked or added (Delete Selected, the menu); -1 none
+    // The right-click menu on a sphere: armed by a right press on one, opened if it was a click.
+    struct ZSphereMenu {
+        bool armed = false, open = false;
+        int sphere = -1;
+        bool link = false;
+        float x = 0.0f, y = 0.0f;
+    } zsMenu_;
+    bool zsphereRightDown(float x, float y); // a right press on a sphere arms the menu
+    float deformAmount_[4] = {50.0f, 50.0f, 50.0f, 50.0f}; // Tool > Deformation: Polish, Relax, Smooth, Balloon
+    bool deformKeepVolume_ = false;
+    float zoomDragAmount(float dx, float dy) const; // Drag::Zoom's step (App.cpp)
+    void drawZSphereMenu();
+    bool zsMenuShown_ = false; // the menu was drawn this frame (UI tests)
+    // Delete, Insert (a joint on the link to its parent) or Set as root on sphere `i`, symmetric, one undo step.
+    enum class ZSphereEdit { Delete, Insert, SetRoot };
+    void zsphereEdit(ZSphereEdit edit, int i);
+    int zsphereSelection() const; // zsphereSelected_ when it is still a sphere, else -1
     int zsphereResolution_ = 128;                         // Make Mesh resolution
     struct ZSphereDrag {
         ZSphereMode op = ZSphereMode::Draw; // what this drag does (a Draw click on a link then moves the new joint)
@@ -927,6 +957,8 @@ private:
         glm::vec3 grab{0.0f};          // Move: the centre's offset from the grab plane's hit
         float x = 0.0f, y = 0.0f;      // where the press was
         bool changed = false;
+        bool place = false;            // Draw: the new sphere follows the cursor (Drag places child, Ctrl)
+        int added = -1;                // Draw: the new sphere's index
         const char* label = "";
     } zsDrag_;
     const BrushRecipe* strokeRecipe() const; // recipe the current stroke sculpts with (none for Smooth / paint only)

@@ -143,6 +143,8 @@ void App::dragDotTo(float x, float y) {
     p.pressure = pressureStrength_ ? pressure : 1.0f;
     p.invert = strokeInvert_;
     p.frontFacesOnly = frontFacesOnly_;
+    p.connectedOnly = uiPrefs_.connectedOnly;
+    p.viewFalloff = uiPrefs_.viewFalloff;
     p.focal = focalShift_;
     p.alpha = &doc_.brushAlpha;
     p.alphaUp = screenUpVector(0.0f);

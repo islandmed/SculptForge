@@ -66,6 +66,10 @@ struct BrushRecipe {
 
     // Masking
     bool frontFacesOnly = false;
+    // Falloff options (DabParams::connectedOnly / viewFalloff), on with the app's own or on their own. Written to
+    // the recipe's JSON only when on, so other recipes' files stay as they were.
+    bool connectedOnly = false;
+    bool viewFalloff = false;
     float cavityMask = 0.0f; // -1..1: >0 only affects cavities, <0 only ridges/peaks
 
     // Library bookkeeping, not part of the recipe: never written by toJson().

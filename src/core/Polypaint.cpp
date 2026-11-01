@@ -125,10 +125,12 @@ size_t paintDab(Sculptor& sculptor, Mesh& mesh, const BVH& bvh, const DabParams&
     size_t changed = 0;
     for (const SymCopy& m : Sculptor::copies(sym)) {
         const glm::vec3 center = m.point(p.center), viewDir = m.dir(p.viewDir);
-        brushVertices(mesh, bvh, center, p.radius, verts);
+        static thread_local ConnectedScratch connected;
+        brushRegion(mesh, bvh, center, viewDir, p.radius, p.connectedOnly, p.viewFalloff, verts, connected);
         for (uint32_t v : verts) {
             if (p.frontFacesOnly && v < mesh.normals.size() && glm::dot(mesh.normals[v], viewDir) > 0.0f) continue;
-            const float w = brushFalloff(glm::distance(mesh.positions[v], center), p.radius, p.focal) * s * vertexInfluence(mesh, v);
+            const float w = brushFalloff(brushDistance(mesh.positions[v], center, viewDir, p.viewFalloff), p.radius, p.focal) * s *
+                            vertexInfluence(mesh, v);
             if (w <= 0.0f) continue;
             sculptor.recordColor(mesh, v);
             paintVertex(mesh, v, color, w, p.invert); // Alt paints Base back to white, erases a layer

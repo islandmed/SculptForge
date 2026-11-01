@@ -1,0 +1,63 @@
+# Brush falloff options (from the discussions, Blender's proportional editing): Connected only keeps a stroke to
+# the piece under the cursor (a small ball pressed into a big one: only the ball moves), View falloff reaches
+# through the model along the view (the back of the sphere moves too). Both are in the Brush palette and saved
+# with the preferences.
+run new_sphere subdivisions=5
+run insert_primitive type=sphere x=0 y=0 z=1 nx=0 ny=0 nz=1 size=0.5
+camera 0 0
+zoom 0.4
+click "Inflate##brush.inflate"
+click "Brush##palette.brush"
+expect "Connected only##draw.connected_only"
+hold ctrl
+hover "Connected only##draw.connected_only"
+expect_help "other leg"
+hover "View falloff##draw.view_falloff"
+expect_help "through the model"
+hold none
+click "Brush##palette.brush"
+expect_value connected_only == 0
+expect_value view_falloff == 0
+
+# Plain: the stroke on the ball also swells the big sphere around it.
+snapshot
+stroke 0.48 0.5 0.52 0.5
+remember moved plain
+expect_value moved > 0
+key ctrl+z
+expect_value moved == 0
+
+# Connected only: just the ball (642 vertices).
+click "Brush##palette.brush"
+click "Connected only##draw.connected_only"
+click "Brush##palette.brush"
+expect_value connected_only == 1
+stroke 0.48 0.5 0.52 0.5
+expect_value moved > 0
+expect_value moved <= 642
+expect_value moved < $plain
+shot connected
+key ctrl+z
+click "Brush##palette.brush"
+click "Connected only##draw.connected_only"
+click "Brush##palette.brush"
+expect_value connected_only == 0
+
+# View falloff on the plain sphere: the back moves too, so many more vertices.
+run new_sphere subdivisions=4
+camera 0 0
+snapshot
+stroke 0.48 0.5 0.52 0.5
+remember moved front
+key ctrl+z
+click "Brush##palette.brush"
+click "View falloff##draw.view_falloff"
+click "Brush##palette.brush"
+expect_value view_falloff == 1
+stroke 0.48 0.5 0.52 0.5
+expect_value moved > $front*1.6
+key ctrl+z
+click "Brush##palette.brush"
+click "View falloff##draw.view_falloff"
+click "Brush##palette.brush"
+expect_value view_falloff == 0

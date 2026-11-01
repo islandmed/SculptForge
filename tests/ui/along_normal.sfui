@@ -1,0 +1,58 @@
+# Along the normal (from the discussions): Move, Tendril and the elastic brushes, started with Alt held, move the
+# surface along the average normal under the brush instead of across the screen. A drag up and to the right on the
+# sphere's right side: plainly it moves up as much as out; with Alt it only moves out. Preferences > Input > Along
+# the normal: Always does it without the key, Never turns it off.
+run new_sphere subdivisions=5
+camera 0 0
+click "Move##brush.move"
+
+# Plain Move: up and out.
+snapshot
+stroke 0.86 0.5 0.98 0.38
+expect_value stroke_along_normal == 0
+remember moved_sum plain
+expect_value moved_out < $plain*0.75
+key ctrl+z
+
+# Alt: straight out along the normal.
+hold alt
+stroke 0.86 0.5 0.98 0.38
+hold none
+expect_value stroke_along_normal == 1
+remember moved_sum along
+expect_value moved_sum > 0
+expect_value moved_out > $along*0.9
+shot move_along_normal
+key ctrl+z
+expect_value moved == 0
+
+# Tendril with Alt pulls straight out too.
+click "Tendril##brush.snakehook"
+hold alt
+stroke 0.86 0.5 0.98 0.38
+hold none
+expect_value stroke_along_normal == 1
+remember moved_sum tendril
+expect_value moved_out > $tendril*0.85
+key ctrl+z
+
+# KelvinGrab with Alt.
+click "KelvinGrab##brush.kelvingrab"
+hold alt
+stroke 0.86 0.5 0.98 0.38
+hold none
+expect_value stroke_along_normal == 1
+expect_value moved > 0
+key ctrl+z
+
+# Preferences: Always (no key), Never (the key does nothing).
+click "Move##brush.move"
+click "Preferences##palette.preferences"
+click "Input##preferences.input"
+expect "##input.along_normal"
+hold ctrl
+hover "##input.along_normal"
+expect_help "average normal"
+hold none
+click "Preferences##palette.preferences"
+expect_value along_normal == 0

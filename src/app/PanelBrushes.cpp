@@ -78,7 +78,8 @@ void App::snakeHookTo(float x, float y) {
     const glm::vec3 n = camera_.forward();
     const float denom = glm::dot(dir, n);
     if (std::abs(denom) < 1e-6f) return;
-    const glm::vec3 target = origin + dir * (glm::dot(grabLast_ - origin, n) / denom);
+    // Along the normal (App::beginAlongNormal): the tip slides out along the normal at the press.
+    const glm::vec3 target = strokeAlongNormal_ ? alongNormalTarget(x, y) : origin + dir * (glm::dot(grabLast_ - origin, n) / denom);
 
     const float pressure = strokePressure();
     DabParams p;
@@ -88,6 +89,8 @@ void App::snakeHookTo(float x, float y) {
     p.pressure = pressureStrength_ ? pressure : 1.0f;
     p.invert = strokeInvert_;
     p.focal = focalShift_;
+    p.connectedOnly = uiPrefs_.connectedOnly;
+    p.viewFalloff = uiPrefs_.viewFalloff;
     p.alpha = &doc_.brushAlpha;
     p.alphaUp = screenUpVector(0.0f);
     // Small steps keep the tip under the cursor and the pulled surface even.
@@ -119,6 +122,8 @@ void App::dragRectTo(float x, float y) {
     p.pressure = pressureStrength_ ? pressure : 1.0f;
     p.invert = strokeInvert_;
     p.frontFacesOnly = frontFacesOnly_;
+    p.connectedOnly = uiPrefs_.connectedOnly;
+    p.viewFalloff = uiPrefs_.viewFalloff;
     p.focal = focalShift_;
     p.alpha = &doc_.brushAlpha;
     p.alphaUp = glm::normalize(q * glm::vec3(drag.x, -drag.y, 0.0f)); // the alpha's top follows the drag

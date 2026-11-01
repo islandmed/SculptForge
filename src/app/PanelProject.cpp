@@ -304,11 +304,14 @@ void App::storeProjectSettings() {
     brush.set("focal_shift", double(focalShift_));
     brush.set("invert", invertToggle_);
     brush.set("front_faces_only", frontFacesOnly_);
+    brush.set("connected_only", uiPrefs_.connectedOnly);
+    brush.set("view_falloff", uiPrefs_.viewFalloff);
     brush.set("pressure_strength", pressureStrength_);
     brush.set("pressure_size", pressureSize_);
     brush.set("paint_color", vec3Json(doc_.paintColor));
     brush.set("dynamic", doc_.sculptor.dyntopo.enabled); // dynamic topology (core/Dyntopo.h)
     brush.set("dynamic_detail", double(doc_.sculptor.dyntopo.detail));
+    brush.set("dynamic_smooth_remesh", double(doc_.sculptor.dyntopo.smoothRemesh));
     brush.set("vdm", doc_.brushVdm ? doc_.brushVdm->name : std::string()); // by name: the map stays in the library
     s.set("brush", std::move(brush));
 
@@ -425,12 +428,16 @@ void App::applyProjectSettings() {
         readBool(b, "invert", invertToggle_);
         readBool(b, "smooth_keep_volume", smoothKeepVolume_);
         readBool(b, "front_faces_only", frontFacesOnly_);
+        readBool(b, "connected_only", uiPrefs_.connectedOnly);
+        readBool(b, "view_falloff", uiPrefs_.viewFalloff);
         readBool(b, "pressure_strength", pressureStrength_);
         readVec3(b["paint_color"], doc_.paintColor);
         readBool(b, "pressure_size", pressureSize_);
         readBool(b, "dynamic", doc_.sculptor.dyntopo.enabled);
         readFloat(b, "dynamic_detail", doc_.sculptor.dyntopo.detail);
         doc_.sculptor.dyntopo.detail = std::clamp(doc_.sculptor.dyntopo.detail, 0.0f, 1.0f);
+        readFloat(b, "dynamic_smooth_remesh", doc_.sculptor.dyntopo.smoothRemesh);
+        doc_.sculptor.dyntopo.smoothRemesh = std::clamp(doc_.sculptor.dyntopo.smoothRemesh, 0.0f, 1.0f);
         if (const int vdm = b["vdm"].isString() ? findVdm(doc_, b["vdm"].asString()) : -1; vdm >= 0)
             doc_.brushVdm = doc_.vdms[size_t(vdm)];
     }

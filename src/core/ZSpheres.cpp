@@ -326,6 +326,25 @@ bool zsphereInsert(std::vector<ZSphere>& s, int child, Symmetry sym, int* added)
     return true;
 }
 
+bool zsphereSetRoot(std::vector<ZSphere>& s, int i) {
+    if (!validIndex(s, i) || i == 0) return false;
+    // Turn the path from i up to the root around.
+    int at = i, below = -1;
+    while (at >= 0) {
+        const int up = s[size_t(at)].parent;
+        s[size_t(at)].parent = below;
+        below = at;
+        at = up;
+    }
+    // Swap indices 0 and i.
+    std::swap(s[0], s[size_t(i)]);
+    for (ZSphere& z : s) {
+        if (z.parent == 0) z.parent = i;
+        else if (z.parent == i) z.parent = 0;
+    }
+    return true;
+}
+
 Json zspheresToJson(const std::vector<ZSphere>& s) {
     Json out = Json::array();
     for (const ZSphere& z : s) {
@@ -457,6 +476,20 @@ void registerZSphereCommands(CommandRegistry& reg) {
                  if (!zsphereInsert(s, int(argNumber(a, "index", -1)), symmetryArg(a), &added))
                      return {false, "index must be from 1 to " + std::to_string(s.size() - 1)};
                  return applyEdit(doc, std::move(s), "Forge Sphere insert", "Inserted sphere " + std::to_string(added));
+             }});
+    reg.add({"zsphere_set_root",
+             "Make sphere `index` of the active Forge Sphere Part the root (index 0): the armature keeps its shape and "
+             "links, and grows from there. The old root takes the sphere's index.",
+             {{"index", T::Number, "Sphere index (1 or more).", true}},
+             [](Document& doc, const Args& a) -> CommandResult {
+                 auto s = doc.mesh.zspheres;
+                 if (s.empty()) return {false, kNotZSphere};
+                 const int i = int(argNumber(a, "index", -1));
+                 if (!zsphereSetRoot(s, i))
+                     return {false, i == 0 ? "Sphere 0 is the root already"
+                                           : "index must be from 1 to " + std::to_string(s.size() - 1)};
+                 return applyEdit(doc, std::move(s), "Forge Sphere set root",
+                                  "Sphere " + std::to_string(i) + " is the root now (index 0)");
              }});
     reg.add({"zsphere_preview",
              "Show the skin over the active Forge Sphere Part's spheres instead of the spheres (ZBrush's Preview, A).",

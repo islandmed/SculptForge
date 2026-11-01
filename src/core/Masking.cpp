@@ -336,7 +336,7 @@ void Sculptor::dabMask(Mesh& mesh, const BVH& bvh, const DabParams& p, Symmetry 
     std::vector<float>& mask = mesh.ensureMask();
     for (const SymCopy& mirror : copies(sym)) {
         const glm::vec3 center = mirror.point(p.center), viewDir = mirror.dir(p.viewDir);
-        brushVertices(mesh, bvh, center, p.radius, verts_);
+        brushRegion(mesh, bvh, center, viewDir, p.radius, p.connectedOnly, p.viewFalloff, verts_, connected_);
         // New values in parallel; recording and writing them in order.
         weights_.resize(verts_.size());
         poolFor(verts_.size(), [&](size_t b, size_t e) {
@@ -344,7 +344,7 @@ void Sculptor::dabMask(Mesh& mesh, const BVH& bvh, const DabParams& p, Symmetry 
                 const uint32_t v = verts_[i];
                 weights_[i] = -1.0f; // unchanged
                 if (p.frontFacesOnly && glm::dot(mesh.normals[v], viewDir) > 0.0f) continue;
-                const float a = s * brushFalloff(glm::distance(mesh.positions[v], center), p.radius, p.focal);
+                const float a = s * brushFalloff(brushDistance(mesh.positions[v], center, viewDir, p.viewFalloff), p.radius, p.focal);
                 if (a <= 0.0f) continue;
                 const float m = p.invert ? mask[v] * (1.0f - a) : mask[v] + (1.0f - mask[v]) * a;
                 if (m != mask[v]) weights_[i] = m;

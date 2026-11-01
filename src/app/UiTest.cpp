@@ -405,6 +405,23 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "guides_mode") return app_.guidesMode_ ? 1.0 : 0.0;
     if (name == "zspheres") return double(m.zspheres.size());
     if (name == "zsphere_preview") return m.zspherePreview ? 1.0 : 0.0;
+    if (name == "zsphere_selected") return double(app_.zsphereSelection());
+    if (name == "zsphere_menu") return app_.zsMenuShown_ ? 1.0 : 0.0;
+    if (name == "zsphere_place_child") return app_.zspherePlaceChild_ ? 1.0 : 0.0;
+    if (name.rfind("zsphere_out", 0) == 0) { // zsphere_out2: how far sphere 2 is from its parent, in the parent's radii
+        const size_t i = size_t(std::atoi(name.c_str() + 11));
+        if (i == 0 || i >= m.zspheres.size()) return -1.0;
+        const ZSphere& p = m.zspheres[size_t(m.zspheres[i].parent)];
+        return double(glm::distance(m.zspheres[i].center, p.center) / p.radius);
+    }
+    if (name == "zsphere_root_x") return m.zspheres.empty() ? 0.0 : double(m.zspheres[0].center.x);
+    if (name == "connected_only") return app_.uiPrefs_.connectedOnly ? 1.0 : 0.0;
+    if (name == "view_falloff") return app_.uiPrefs_.viewFalloff ? 1.0 : 0.0;
+    if (name == "smooth_remesh") return std::round(app_.doc_.sculptor.dyntopo.smoothRemesh * 100.0f);
+    if (name == "invert_zoom") return app_.uiPrefs_.invertZoom ? 1.0 : 0.0;
+    if (name == "maya_zoom_horizontal") return app_.uiPrefs_.mayaZoomHorizontal ? 1.0 : 0.0;
+    if (name == "along_normal") return double(app_.uiPrefs_.alongNormal);
+    if (name == "stroke_along_normal") return app_.strokeAlongNormal_ ? 1.0 : 0.0;
     if (name.rfind("zsphere_x", 0) == 0 || name.rfind("zsphere_r", 0) == 0) { // zsphere_x2, zsphere_r2: sphere 2's x / radius
         const size_t i = size_t(std::atoi(name.c_str() + 9));
         if (i >= m.zspheres.size()) return -1.0;

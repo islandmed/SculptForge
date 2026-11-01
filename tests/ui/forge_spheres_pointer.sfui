@@ -1,0 +1,88 @@
+# Forge Spheres with the pointer only (#8): Drag places child makes one Draw drag move the new sphere away from its
+# parent (Ctrl+drag does the same with it off), the new sphere is selected, Delete Selected / Insert Between /
+# Set as Root work on it, and a right click on a sphere opens a menu with the same (a right drag still turns the
+# view). Symmetry X is on, so arms come in pairs.
+run zsphere_new radius=1
+run subtool_visibility index=0 visible=false
+wait 0.3
+click "Forge Spheres##tool.zspheres"
+expect "ZSpheres/Drag places child"
+hold ctrl
+hover "ZSpheres/Drag places child"
+expect_help "moves the new sphere away"
+hover "ZSpheres/Delete Selected"
+expect_help "selected sphere"
+hold none
+
+# Off (the default): a Draw drag sizes the new sphere on the parent's surface, about one radius out.
+expect_value zsphere_place_child == 0
+view_drag 0.515 0.518 0.545 0.518
+expect_value zspheres == 3
+expect_value zsphere_out1 < 1.05
+expect_value zsphere_selected == 1
+key ctrl+z
+expect_value zspheres == 1
+
+# On: the same drag pulls the new sphere out, at half the parent's size.
+click "ZSpheres/Drag places child"
+expect_value zsphere_place_child == 1
+view_drag 0.515 0.518 0.600 0.518
+expect_value zspheres == 3
+expect_value zsphere_out1 > 1.4
+expect_value zsphere_r1 == 0.5
+expect_value zsphere_x2 < -1.0
+expect_status "Forge Sphere add"
+expect_value zsphere_selected == 1
+shot placed
+key ctrl+z
+click "ZSpheres/Drag places child"
+expect_value zsphere_place_child == 0
+
+# Ctrl+drag places too, with the toggle off.
+hold ctrl
+view_drag 0.515 0.518 0.600 0.518
+hold none
+expect_value zspheres == 3
+expect_value zsphere_out1 > 1.4
+
+# Insert Between on the selected arm: a joint (and its mirror), selected.
+click "ZSpheres/Insert Between"
+expect_value zspheres == 5
+expect_status "Forge Sphere insert"
+expect_value zsphere_selected == 3
+
+# Delete Selected: the joint and the arm beyond it go (both sides); the root stays.
+click "ZSpheres/Delete Selected"
+expect_value zspheres == 1
+expect_value zsphere_selected == -1
+key ctrl+z
+expect_value zspheres == 5
+
+# A right drag on a sphere still turns the view and opens nothing.
+remember camera_yaw yaw
+button_drag right 0.5 0.518 0.56 0.518
+expect_value zsphere_menu == 0
+expect_value camera_yaw != $yaw
+camera 0 0
+wait 0.1
+
+# A right click on the arm: its menu. Set as Root makes it the root (index 0), one undo step.
+remember zsphere_root_x rootx
+button_drag right 0.585 0.518 0.585 0.518 0.05
+expect_value zsphere_menu == 1
+expect "Forge Sphere menu/Set as Root"
+shot menu
+click "Forge Sphere menu/Set as Root"
+expect_value zsphere_menu == 0
+expect_value zsphere_root_x > 1.0
+expect_value zspheres == 5
+expect_status "set root"
+key ctrl+z
+expect_value zsphere_root_x == $rootx
+
+# The root's own menu can't delete it.
+button_drag right 0.41 0.518 0.41 0.518 0.05
+expect_value zsphere_menu == 1
+click "Forge Sphere menu/Delete Sphere"
+expect_value zspheres == 5
+key escape
