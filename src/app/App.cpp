@@ -1316,7 +1316,9 @@ void App::onMouseUp() {
         runCommand("insert_primitive", {{"type", insertType_}, {"x", double(insertAt_.x)}, {"y", double(insertAt_.y)},
                                         {"z", double(insertAt_.z)}, {"nx", double(insertNormal_.x)},
                                         {"ny", double(insertNormal_.y)}, {"nz", double(insertNormal_.z)},
-                                        {"size", double(2.0f * px * worldPerPx)}});
+                                        {"size", double(2.0f * px * worldPerPx)},
+                                        // the drag's direction on screen turns it about the normal
+                                        {"twist", insertPx_ > 4.0f ? double(glm::degrees(std::atan2(mouseY_ - insertY_, mouseX_ - insertX_))) : 0.0}});
     }
     if (drag_ == Drag::Stroke && maskClickPending_) maskClickRelease(); // Ctrl+click: blur / sharpen the mask
     else if (drag_ == Drag::Stroke && asyncStroke_) {

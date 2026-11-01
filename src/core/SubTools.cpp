@@ -303,7 +303,8 @@ void registerSubToolCommands(CommandRegistry& reg) {
              {{"type", T::String, "sphere, cube, cylinder, cone, torus, capsule or quadsphere", false},
               {"x", T::Number, "surface point x", true}, {"y", T::Number, "surface point y", true}, {"z", T::Number, "surface point z", true},
               {"nx", T::Number, "surface normal x", false}, {"ny", T::Number, "surface normal y", false}, {"nz", T::Number, "surface normal z", false},
-              {"size", T::Number, "size in scene units (default 0.2)", false}},
+              {"size", T::Number, "size in scene units (default 0.2)", false},
+              {"twist", T::Number, "turn about the normal in degrees (default 0)", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  const std::string blocked = dyntopoBlocker(doc.mesh);
                  if (!blocked.empty()) return {false, "Can't insert: " + blocked};
@@ -329,6 +330,11 @@ void registerSubToolCommands(CommandRegistry& reg) {
                      const glm::vec3 v = glm::cross(y, n);
                      const glm::mat3 k(0, v.z, -v.y, -v.z, 0, v.x, v.y, -v.x, 0);
                      rot = glm::mat3(1.0f) + k + k * k * (1.0f / (1.0f + c));
+                 }
+                 const float twist = glm::radians(float(argNumber(a, "twist", 0.0)));
+                 if (twist != 0.0f) { // about the primitive's own axis (Y) first, then onto the normal
+                     const float cs = std::cos(twist), sn = std::sin(twist);
+                     rot = rot * glm::mat3(cs, 0, -sn, 0, 1, 0, sn, 0, cs);
                  }
                  const glm::vec3 at(float(argNumber(a, "x", 0.0)), float(argNumber(a, "y", 0.0)), float(argNumber(a, "z", 0.0)));
                  for (auto& p : prim.positions) p = at + rot * p;
