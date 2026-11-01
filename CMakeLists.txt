@@ -28,6 +28,7 @@ include(cmake/Dependencies.cmake)
 add_library(sculptforge_core STATIC
   src/core/Mesh.cpp
   src/core/BVH.cpp
+  src/core/SurfaceCursor.cpp
   src/core/IndexBits.cpp
   src/core/ThreadPool.cpp
   src/core/UploadOrder.cpp

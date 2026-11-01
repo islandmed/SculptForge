@@ -6,6 +6,14 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- The brush cursor follows the surface (#25), as in SculptGL: over the model the Draw Size and Focal Shift rings
+  lie on the surface under the pointer, turned to its (smoothed) direction and pressed onto its shape, at the
+  brush's real size there, with a short normal line; with symmetry on, a fainter mirrored ring shows too. Every
+  brush (sculpt, paint, mask, dynamic topology). A few dozen BVH ray casts per drawn frame, no pass over the mesh
+  (0.09 ms on 5M triangles), and the idle view still draws nothing. **Preferences > Input > Cursor follows
+  surface** (on by default) brings back the flat screen rings.
+
 ## [0.9.7] - 2026-10-31
 
 Speed first: big brushes on dense meshes take a third less time per frame, trail the pen by half as far and no
