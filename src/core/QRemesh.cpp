@@ -2020,6 +2020,7 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
         const std::function<bool(float)> pieceReport = [&](float f) { return report(f0 + (f1 - f0) * f); };
         PieceResult r;
         double want = budget[i];
+        bool doneByV2 = false;
         if (opt.method == QRemeshMethod::V2) {
             qr::FieldPieceResult fr;
             bool cancelled = false;
@@ -2033,6 +2034,7 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
             if (ok && !fr.mesh.quads.empty()) {
                 r.mesh = std::move(fr.mesh);
                 r.seam = std::move(fr.seam);
+                doneByV2 = true;
             } else {
                 ++st.fallbackPieces;
                 if (timing) std::fprintf(stderr, "  piece %zu: QRemesh 2 fell back to legacy (%s)\n", i, fr.why.c_str());
@@ -2051,7 +2053,7 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
         // The lattice round a guide can go wrong by chance (where the field's singularities land, which the
         // smallest rounding differences move): a broken loop or a fan by a guide is tried with other starts for
         // the field, keeping the best.
-        for (uint32_t seed = 1; seed <= 2 && r.guideDefects > 0 && !r.mesh.quads.empty() && opt.method == QRemeshMethod::Legacy; ++seed) {
+        for (uint32_t seed = 1; seed <= 2 && r.guideDefects > 0 && !r.mesh.quads.empty() && !doneByV2; ++seed) {
             QRemeshOptions again = opt;
             again.seed = opt.seed + seed * 7919u;
             PieceResult other;
