@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/ViewCapture.h"
 
+#include "core/AtomicRef.h"
 #include "core/BVH.h"
 #include "core/BrushLibrary.h"
 #include "core/Commands.h"
@@ -312,7 +313,8 @@ bool captureVdmFromView(const Mesh& mesh, const BVH& bvh, const CaptureFrame& f,
         const auto it = std::lower_bound(cand.begin(), cand.end(), v);
         return it != cand.end() && *it == v ? int64_t(it - cand.begin()) : -1;
     };
-    // 2. Connected to the surface under the centre (flood fill over the candidates).
+    // 2. Connected to the surface under the centre: a flood fill over the candidates, a ring at a time, each ring
+    // in parallel (a vertex joins once: an atomic flag).
     int64_t seed = -1;
     float best = kInf;
     for (size_t i = 0; i < cand.size(); ++i)
@@ -324,18 +326,25 @@ bool captureVdmFromView(const Mesh& mesh, const BVH& bvh, const CaptureFrame& f,
         error = "Nothing to capture there: drag over the model";
         return false;
     }
-    std::vector<uint8_t> inRegion(cand.size(), 0);
-    std::deque<uint32_t> queue{uint32_t(seed)};
+    std::vector<uint32_t> inRegion(cand.size(), 0);
     inRegion[size_t(seed)] = 1;
-    while (!queue.empty()) {
-        const uint32_t i = queue.front();
-        queue.pop_front();
-        for (uint32_t nb : mesh.neighbors(cand[i])) {
-            const int64_t j = candIndex(nb);
-            if (j < 0 || !ok[size_t(j)] || inRegion[size_t(j)]) continue;
-            inRegion[size_t(j)] = 1;
-            queue.push_back(uint32_t(j));
-        }
+    std::vector<uint32_t> frontier{uint32_t(seed)};
+    while (!frontier.empty()) {
+        constexpr size_t kBlock = 1024;
+        std::vector<std::vector<uint32_t>> next((frontier.size() + kBlock - 1) / kBlock);
+        poolFor(frontier.size(), [&](size_t b, size_t e) {
+            std::vector<uint32_t>& out = next[b / kBlock];
+            for (size_t q = b; q < e; ++q)
+                for (uint32_t nb : mesh.neighbors(cand[frontier[q]])) {
+                    const int64_t j = candIndex(nb);
+                    if (j < 0 || !ok[size_t(j)]) continue;
+                    AtomicRef<uint32_t> flag(inRegion[size_t(j)]);
+                    if (flag.load(std::memory_order_relaxed) || flag.exchange(1, std::memory_order_relaxed)) continue;
+                    out.push_back(uint32_t(j));
+                }
+        }, kBlock);
+        frontier.clear();
+        for (const auto& part : next) frontier.insert(frontier.end(), part.begin(), part.end());
     }
     std::vector<uint32_t> region; // sorted (cand is)
     for (size_t i = 0; i < cand.size(); ++i)
@@ -349,39 +358,59 @@ bool captureVdmFromView(const Mesh& mesh, const BVH& bvh, const CaptureFrame& f,
         const auto it = std::lower_bound(region.begin(), region.end(), v);
         return it != region.end() && *it == v ? int64_t(it - region.begin()) : -1;
     };
-    // Adjacency inside the region (CSR) and the rim (vertices with a neighbour outside it).
+    // Adjacency inside the region (CSR, counted then filled in parallel) and the rim (vertices with a neighbour
+    // outside it).
     std::vector<uint32_t> start(n + 1, 0), adj;
     std::vector<uint8_t> rim(n, 0);
-    double edgeSum = 0.0;
-    size_t edgeCount = 0;
-    for (size_t i = 0; i < n; ++i) {
-        start[i] = uint32_t(adj.size());
-        for (uint32_t nb : mesh.neighbors(region[i])) {
-            const int64_t j = local(nb);
-            if (j < 0) {
-                rim[i] = 1;
-                continue;
+    constexpr size_t kAdjBlock = 4096;
+    std::vector<double> edgeParts((n + kAdjBlock - 1) / kAdjBlock, 0.0);
+    poolFor(n, [&](size_t b, size_t e) {
+        double sum = 0.0;
+        for (size_t i = b; i < e; ++i) {
+            uint32_t count = 0;
+            for (uint32_t nb : mesh.neighbors(region[i])) {
+                if (local(nb) < 0) {
+                    rim[i] = 1;
+                    continue;
+                }
+                ++count;
+                sum += glm::distance(mesh.positions[region[i]], mesh.positions[nb]);
             }
-            adj.push_back(uint32_t(j));
-            edgeSum += glm::distance(mesh.positions[region[i]], mesh.positions[nb]);
-            ++edgeCount;
+            start[i + 1] = count;
         }
-    }
-    start[n] = uint32_t(adj.size());
+        edgeParts[b / kAdjBlock] = sum;
+    }, kAdjBlock);
+    for (size_t i = 0; i < n; ++i) start[i + 1] += start[i];
+    adj.resize(start[n]);
+    poolFor(n, [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) {
+            uint32_t k = start[i];
+            for (uint32_t nb : mesh.neighbors(region[i]))
+                if (const int64_t j = local(nb); j >= 0) adj[k++] = uint32_t(j);
+        }
+    }, kAdjBlock);
+    double edgeSum = 0.0;
+    for (double part : edgeParts) edgeSum += part;
+    const size_t edgeCount = adj.size();
     const float meanEdge = edgeCount ? float(edgeSum / double(edgeCount)) : half * 0.01f;
     std::vector<glm::vec3> X(n);
     for (size_t i = 0; i < n; ++i) X[i] = mesh.positions[region[i]];
-    // The region's triangles (each once: from its lowest-numbered vertex).
+    // The region's triangles (each once: from its lowest-numbered vertex), gathered per block in parallel.
+    std::vector<std::vector<glm::uvec3>> triParts((n + kAdjBlock - 1) / kAdjBlock);
+    poolFor(n, [&](size_t b, size_t e) {
+        std::vector<glm::uvec3>& out = triParts[b / kAdjBlock];
+        for (size_t i = b; i < e; ++i)
+            for (uint32_t t : mesh.vertexTriangles(region[i])) {
+                const glm::uvec3 tri = mesh.triangles[t];
+                if (std::min({tri.x, tri.y, tri.z}) != region[i]) continue;
+                if (mesh.hasHidden() && mesh.triangleHidden(t)) continue;
+                const int64_t a = local(tri.x), bb = local(tri.y), c = local(tri.z);
+                if (a < 0 || bb < 0 || c < 0) continue;
+                out.emplace_back(uint32_t(a), uint32_t(bb), uint32_t(c));
+            }
+    }, kAdjBlock);
     std::vector<glm::uvec3> tris;
-    for (size_t i = 0; i < n; ++i)
-        for (uint32_t t : mesh.vertexTriangles(region[i])) {
-            const glm::uvec3 tri = mesh.triangles[t];
-            if (std::min({tri.x, tri.y, tri.z}) != region[i]) continue;
-            if (mesh.hasHidden() && mesh.triangleHidden(t)) continue;
-            const int64_t a = local(tri.x), b = local(tri.y), c = local(tri.z);
-            if (a < 0 || b < 0 || c < 0) continue;
-            tris.emplace_back(uint32_t(a), uint32_t(b), uint32_t(c));
-        }
+    for (const auto& part : triParts) tris.insert(tris.end(), part.begin(), part.end());
     if (tris.empty()) {
         error = "Too few points in the square";
         return false;

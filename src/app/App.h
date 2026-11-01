@@ -423,6 +423,9 @@ private:
     bool kelvinStrokeBrush() const; // KelvinGrab / Twist / Scale: the drag drives the brush, not dabs
     void kelvinBegin(const RayHit& hit);
     void kelvinTo(float x, float y);
+    void kelvinAdvance();  // applies a bounded part of the move the cursor asked for
+    void kelvinCatchUp();  // every frame: the rest of a long move, a frame at a time
+    void kelvinFinish();   // the stroke ends: all of it
     void drawKelvinletSection();
     void registerKelvinletActions();
     bool captureMouseDown(float x, float y); // true while Capture from view is armed (it takes the drag)
@@ -445,6 +448,9 @@ private:
     } capture_;
     glm::vec3 kelvinCenter_{0.0f};
     float kelvinRadius_ = 0.0f, kelvinLastX_ = 0.0f;
+    glm::vec3 kelvinTarget_{0.0f}; // KelvinGrab: where the cursor wants the grabbed point
+    float kelvinPending_ = 0.0f;   // Twist / Scale: the turn or scale still to apply
+    float kelvinAmount_ = 1.0f;
     static void SDLCALL onVdmChosen(void* userdata, const char* const* files, int filter);
     static void SDLCALL onVdmExportChosen(void* userdata, const char* const* files, int filter);
     friend void drawVdmGrid(App&, GridMode);

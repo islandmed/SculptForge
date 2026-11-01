@@ -445,6 +445,131 @@ TEST(capture_vdm_on_a_curved_surface_keeps_only_the_detail) {
     CHECK(band < 0.15f * centre); // (what is left: the sphere is not quite a quadric over so wide a square)
 }
 
+TEST(kelvinlet_lattice_proxy_matches_the_exact_field) {
+    // The far field interpolated from the lattice against the exact kernel everywhere: the error metric is the largest
+    // difference over all vertices as a fraction of the largest displacement (and of the brush radius).
+    for (BrushType type : {BrushType::KelvinGrab, BrushType::KelvinTwist, BrushType::KelvinScale}) {
+        std::vector<glm::vec3> result[2], start;
+        for (int pass = 0; pass < 2; ++pass) {
+            Document d = makeDoc(makeIcosphere(7, 1.0f));
+            start = d.mesh.positions;
+            d.sculptor.kelvinlet.proxyMinVertices = pass == 0 ? size_t(1) << 40 : 0;
+            d.syncBvh();
+            CHECK(d.sculptor.beginStroke(d.mesh, "proxy"));
+            KelvinletStep step;
+            step.center = glm::normalize(glm::vec3(0.5f, 0.0f, 0.86f)); // (off the mirror plane: a twist there cancels)
+            step.radius = 0.4f;
+            step.delta = step.travel = glm::vec3(0.12f, 0.05f, 0.0f);
+            step.substeps = 3;
+            step.axis = glm::vec3(0.0f, 0.0f, 1.0f);
+            step.angle = 0.4f;
+            step.logScale = -0.3f;
+            d.sculptor.kelvinletStep(d.mesh, d.bvh, type, step, Symmetry{true, false, false});
+            d.undo.push(d.sculptor.endStroke());
+            result[pass] = d.mesh.positions;
+        }
+        float worst = 0.0f, biggest = 0.0f;
+        for (size_t v = 0; v < start.size(); ++v) {
+            worst = std::max(worst, glm::distance(result[0][v], result[1][v]));
+            biggest = std::max(biggest, glm::distance(result[0][v], start[v]));
+        }
+        std::printf("  %s lattice proxy: worst error %.2e = %.3f%% of the largest move, %.3f%% of the radius\n",
+                    brushName(type), worst, 100.0f * worst / biggest, 100.0f * worst / 0.4f);
+        // The step's own size: how far it moves the centre (the 0.5% floor below which a vertex's move is skipped is
+        // part of both runs' difference, so the bound is against it).
+        const float stepSize = type == BrushType::KelvinGrab ? glm::length(glm::vec3(0.12f, 0.05f, 0.0f))
+                               : type == BrushType::KelvinTwist ? 0.4f * 0.4f
+                                                                : 0.3f * 0.4f;
+        std::printf("    = %.3f%% of the step\n", 100.0f * worst / stepSize);
+        CHECK(biggest > 0.01f);
+        CHECK(worst < 0.01f * stepSize); // under 1% of the step
+    }
+}
+
+TEST(kelvinlet_tightens_its_cutoff_over_the_vertex_budget) {
+    auto touched = [](size_t budget) {
+        Document d = makeDoc(makeIcosphere(7, 1.0f));
+        d.sculptor.kelvinlet.vertexBudget = budget;
+        d.syncBvh();
+        CHECK(d.sculptor.beginStroke(d.mesh, "budget"));
+        KelvinletStep step;
+        step.center = glm::vec3(0.0f, 0.0f, 1.0f);
+        step.radius = 0.5f;
+        step.delta = glm::vec3(0.01f, 0.0f, 0.0f);
+        uint64_t last = 0;
+        for (int i = 0; i < 3; ++i) { // (the first move measures the density, the next ones predict from it)
+            const uint64_t before = d.sculptor.timings.vertices;
+            d.sculptor.kelvinletStep(d.mesh, d.bvh, BrushType::KelvinGrab, step, Symmetry{false, false, false});
+            last = d.sculptor.timings.vertices - before;
+        }
+        const bool over = d.sculptor.kelvinletOverBudget();
+        d.undo.push(d.sculptor.endStroke());
+        return std::make_pair(last, over);
+    };
+    const auto [free, freeOver] = touched(size_t(1) << 40);
+    const auto [tight, tightOver] = touched(10000);
+    std::printf("  vertices a move: %llu without a budget, %llu with a 10k budget\n", (unsigned long long)free,
+                (unsigned long long)tight);
+    CHECK(!freeOver && tightOver);
+    CHECK(tight < free);
+}
+
+TEST(kelvinlet_deferred_far_field_matches_the_immediate_one) {
+    // A drag of ten moves with the far field deferred to the lattice (every move) against all of it at once: after
+    // the stroke's end the two surfaces agree within a small fraction of the drag. Undo puts everything back.
+    for (BrushType type : {BrushType::KelvinGrab, BrushType::KelvinTwist}) {
+        std::vector<glm::vec3> result[2], start;
+        size_t deferredTouched = 0, immediateTouched = 0;
+        for (int pass = 0; pass < 2; ++pass) {
+            Document d = makeDoc(makeIcosphere(7, 1.0f));
+            start = d.mesh.positions;
+            d.sculptor.kelvinlet.deferMinVertices = pass == 0 ? size_t(1) << 40 : 2000;
+            d.syncBvh();
+            CHECK(d.sculptor.beginStroke(d.mesh, "far"));
+            KelvinletStep step;
+            step.center = glm::normalize(glm::vec3(0.4f, 0.1f, 0.9f));
+            step.radius = 0.35f;
+            step.delta = glm::vec3(0.03f, 0.01f, 0.0f);
+            step.axis = glm::vec3(0.0f, 0.0f, 1.0f);
+            step.angle = 0.08f;
+            for (int i = 0; i < 10; ++i) {
+                const uint64_t before = d.sculptor.timings.vertices;
+                d.sculptor.kelvinletStep(d.mesh, d.bvh, type, step, Symmetry{true, false, false});
+                (pass == 0 ? immediateTouched : deferredTouched) += d.sculptor.timings.vertices - before;
+                if (type == BrushType::KelvinGrab) step.center += step.delta;
+            }
+            CHECK(pass == 0 || d.sculptor.kelvinletFarPending());
+            d.sculptor.flushDetailClone(d.mesh, d.bvh, Symmetry{true, false, false}); // the stroke's end
+            CHECK(!d.sculptor.kelvinletFarPending());
+            d.undo.push(d.sculptor.endStroke());
+            result[pass] = d.mesh.positions;
+            if (pass == 1) {
+                d.undo.undo(d.mesh, d.bvh);
+                float back = 0.0f;
+                for (size_t v = 0; v < start.size(); ++v) back = std::max(back, glm::distance(d.mesh.positions[v], start[v]));
+                CHECK(back < 1e-6f);
+            }
+        }
+        float worst = 0.0f, biggest = 0.0f;
+        size_t at = 0;
+        for (size_t v = 0; v < start.size(); ++v) {
+            const float e = glm::distance(result[0][v], result[1][v]);
+            if (e > worst) worst = e, at = v;
+            biggest = std::max(biggest, glm::distance(result[0][v], start[v]));
+        }
+        std::printf("  (worst at %.3f from the first centre, moved %.4f / %.4f)\n",
+                    glm::distance(start[at], glm::normalize(glm::vec3(0.4f, 0.1f, 0.9f))),
+                    glm::distance(result[0][at], start[at]), glm::distance(result[1][at], start[at]));
+        std::printf("  %s deferred far field: worst %.2e = %.2f%% of the largest move (%.3f%% of the radius); "
+                    "vertex moves %zu deferred vs %zu at once\n",
+                    brushName(type), worst, 100.0f * worst / biggest, 100.0f * worst / 0.35f, deferredTouched, immediateTouched);
+        // (Part of it is the reference's own floor: it skips vertices that move under 0.5% of a step.) Smooth, and
+        // under 1.5% of the radius: under a pixel for brushes up to about 70 px.
+        CHECK(worst < 0.015f * 0.35f);
+        CHECK(deferredTouched < immediateTouched);
+    }
+}
+
 TEST(kelvinlet_is_deterministic_with_threads) {
     std::vector<glm::vec3> result[2];
     for (int pass = 0; pass < 2; ++pass) {

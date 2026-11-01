@@ -10,7 +10,10 @@
 #include "core/Vdm.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <functional>
+#include <unordered_map>
 #include <vector>
 
 namespace sf {
@@ -200,6 +203,194 @@ struct RadialTable {
 
 } // namespace
 
+// ---------------------------------------------------------------------------
+// The deferred far field (dense meshes)
+// ---------------------------------------------------------------------------
+//
+// Over a large region, most vertices are in the far field, where the move is a small fraction of the step and
+// smooth. There the field (times 1 - the near weight) is added to a coarse lattice in world space, kept once per
+// group of vertices (vertex index mod kGroups); each frame one group's vertices take what their lattice gathered
+// since their last turn and that lattice starts over. Every vertex gets the near part of every move at once and
+// the far part within kGroups frames (all of it when the stroke ends or the pointer rests: flushKelvinletFar).
+
+struct KelvinFarField {
+    static constexpr int kGroups = 6;
+    uint64_t stroke = 0;
+    float h = 0.0f;         // lattice spacing (world)
+    int turn = 0;           // the group whose turn is next
+    std::unordered_map<uint64_t, uint32_t> index; // lattice point -> slot
+    std::vector<glm::ivec3> point;               // slot -> lattice point
+    std::vector<std::array<glm::vec3, kGroups>> acc;
+    glm::vec3 lo[kGroups], hi[kGroups];          // per group: the bounds of what it gathered since its turn
+    bool any[kGroups] = {};
+    static uint64_t key(const glm::ivec3& p) {
+        return (uint64_t(uint32_t(p.x + (1 << 20)) & 0x1fffff) << 42) | (uint64_t(uint32_t(p.y + (1 << 20)) & 0x1fffff) << 21) |
+               uint64_t(uint32_t(p.z + (1 << 20)) & 0x1fffff);
+    }
+    bool pending() const {
+        for (bool a : any)
+            if (a) return true;
+        return false;
+    }
+};
+
+namespace {
+
+// 1 within 0.6 of the radius of the load's path, a smoothstep to 0 at 1.2 radii: the near field.
+float nearWeight(float d, float radius) {
+    const float t = std::clamp((d - 0.6f * radius) / (0.6f * radius), 0.0f, 1.0f);
+    return 1.0f - t * t * (3.0f - 2.0f * t);
+}
+
+} // namespace
+
+void Sculptor::gatherKelvinletFar(const std::function<glm::vec3(const glm::vec3&)>& displacement, const glm::vec3& a,
+                                  const glm::vec3& ab, float radius, const glm::vec3& mid, float reach) {
+    KelvinFarField& f = *kelvinFar_;
+    const float h = f.h;
+    const glm::ivec3 i0 = glm::ivec3(glm::floor((mid - glm::vec3(reach)) / h));
+    const glm::ivec3 i1 = glm::ivec3(glm::ceil((mid + glm::vec3(reach)) / h));
+    const glm::ivec3 dim = i1 - i0 + glm::ivec3(1);
+    const size_t count = size_t(dim.x) * size_t(dim.y) * size_t(dim.z);
+    const float ab2 = glm::dot(ab, ab), reach2 = (reach + 1.8f * h) * (reach + 1.8f * h);
+    std::vector<glm::vec3> value(count, glm::vec3(0.0f));
+    std::vector<uint8_t> used(count, 0);
+    poolFor(count, [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) {
+            const glm::ivec3 q = i0 + glm::ivec3(int(i % size_t(dim.x)), int((i / size_t(dim.x)) % size_t(dim.y)),
+                                                  int(i / (size_t(dim.x) * size_t(dim.y))));
+            const glm::vec3 p = glm::vec3(q) * h;
+            if (glm::dot(p - mid, p - mid) > reach2) continue;
+            const float t = ab2 > 0.0f ? std::clamp(glm::dot(p - a, ab) / ab2, 0.0f, 1.0f) : 0.0f;
+            const float w = 1.0f - nearWeight(glm::distance(p, a + ab * t), radius);
+            if (w <= 0.0f) continue;
+            value[i] = displacement(p) * w;
+            used[i] = 1;
+        }
+    }, 1024);
+    for (size_t i = 0; i < count; ++i) {
+        if (!used[i]) continue;
+        const glm::ivec3 q = i0 + glm::ivec3(int(i % size_t(dim.x)), int((i / size_t(dim.x)) % size_t(dim.y)),
+                                              int(i / (size_t(dim.x) * size_t(dim.y))));
+        auto [it, fresh] = f.index.try_emplace(KelvinFarField::key(q), uint32_t(f.point.size()));
+        if (fresh) {
+            f.point.push_back(q);
+            f.acc.emplace_back();
+            f.acc.back().fill(glm::vec3(0.0f));
+        }
+        for (glm::vec3& slot : f.acc[it->second]) slot += value[i];
+    }
+    const glm::vec3 lo = glm::vec3(i0) * h, hi = glm::vec3(i1) * h;
+    for (int g = 0; g < KelvinFarField::kGroups; ++g) {
+        f.lo[g] = f.any[g] ? glm::min(f.lo[g], lo) : lo;
+        f.hi[g] = f.any[g] ? glm::max(f.hi[g], hi) : hi;
+        f.any[g] = true;
+    }
+}
+
+// One group's turn: its vertices in the bounds its lattice gathered take the interpolated field.
+void Sculptor::applyKelvinletFarGroup(Mesh& mesh, BVH& bvh, int g) {
+    KelvinFarField& f = *kelvinFar_;
+    if (!f.any[g]) return;
+    auto clock = std::chrono::steady_clock::now();
+    const float h = f.h;
+    const glm::ivec3 i0 = glm::ivec3(glm::floor(f.lo[g] / h)), i1 = glm::ivec3(glm::ceil(f.hi[g] / h));
+    const glm::ivec3 dim = i1 - i0 + glm::ivec3(2);
+    std::vector<glm::vec3> dense(size_t(dim.x) * size_t(dim.y) * size_t(dim.z), glm::vec3(0.0f));
+    for (size_t s = 0; s < f.point.size(); ++s) {
+        const glm::ivec3 q = f.point[s] - i0;
+        glm::vec3& v = f.acc[s][size_t(g)];
+        if (q.x < 0 || q.y < 0 || q.z < 0 || q.x >= dim.x || q.y >= dim.y || q.z >= dim.z) {
+            v = glm::vec3(0.0f); // (outside every bound gathered since the turn: nothing there)
+            continue;
+        }
+        dense[(size_t(q.z) * size_t(dim.y) + size_t(q.y)) * size_t(dim.x) + size_t(q.x)] = v;
+        v = glm::vec3(0.0f);
+    }
+    f.any[g] = false;
+    const auto& pos = mesh.positions;
+    const glm::vec3 c = 0.5f * (f.lo[g] + f.hi[g]), ext = f.hi[g] - f.lo[g], meshExt = mesh.bounds().extent();
+    const double volume = double(ext.x) * double(ext.y) * double(ext.z);
+    const double meshVolume = std::max(1e-30, double(meshExt.x) * double(meshExt.y) * double(meshExt.z));
+    if (volume > 0.05 * meshVolume) {
+        // A box over much of the model: this group's vertices directly (every kGroups-th index), not a BVH query
+        // that would list all the others too.
+        const size_t nv = mesh.vertexCount(), mine = (nv + KelvinFarField::kGroups - 1 - size_t(g)) / KelvinFarField::kGroups;
+        constexpr size_t kBlock = 1 << 16;
+        std::vector<std::vector<uint32_t>> parts((mine + kBlock - 1) / kBlock);
+        const glm::vec3 lo = f.lo[g], hi = f.hi[g];
+        poolFor(mine, [&](size_t b, size_t e) {
+            auto& out = parts[b / kBlock];
+            for (size_t k = b; k < e; ++k) {
+                const uint32_t v = uint32_t(k * KelvinFarField::kGroups + size_t(g));
+                const glm::vec3 p = pos[v];
+                if (p.x < lo.x || p.y < lo.y || p.z < lo.z || p.x > hi.x || p.y > hi.y || p.z > hi.z) continue;
+                if (mesh.hasHidden() && mesh.vertexHidden(v)) continue;
+                out.push_back(v);
+            }
+        }, kBlock);
+        verts_.clear();
+        for (const auto& part : parts) verts_.insert(verts_.end(), part.begin(), part.end());
+    } else {
+        brushVertices(mesh, bvh, c, 0.5f * glm::length(ext), verts_);
+        std::erase_if(verts_, [&](uint32_t v) { return int(v % uint32_t(KelvinFarField::kGroups)) != g; });
+    }
+    scratch_.resize(verts_.size());
+    poolFor(verts_.size(), [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) {
+            const glm::vec3 gp = pos[verts_[i]] / h - glm::vec3(i0);
+            const int x = int(std::floor(gp.x)), y = int(std::floor(gp.y)), z = int(std::floor(gp.z));
+            if (x < 0 || y < 0 || z < 0 || x >= dim.x - 1 || y >= dim.y - 1 || z >= dim.z - 1) {
+                scratch_[i] = glm::vec3(0.0f);
+                continue;
+            }
+            const glm::vec3 fr = gp - glm::vec3(float(x), float(y), float(z));
+            auto at = [&](int dx, int dy, int dz) {
+                return dense[(size_t(z + dz) * size_t(dim.y) + size_t(y + dy)) * size_t(dim.x) + size_t(x + dx)];
+            };
+            const glm::vec3 c00 = glm::mix(at(0, 0, 0), at(1, 0, 0), fr.x), c10 = glm::mix(at(0, 1, 0), at(1, 1, 0), fr.x);
+            const glm::vec3 c01 = glm::mix(at(0, 0, 1), at(1, 0, 1), fr.x), c11 = glm::mix(at(0, 1, 1), at(1, 1, 1), fr.x);
+            scratch_[i] = glm::mix(glm::mix(c00, c10, fr.y), glm::mix(c01, c11, fr.y), fr.z);
+        }
+    }, 4096);
+    size_t kept = 0;
+    const float keep2 = (1e-4f * h) * (1e-4f * h);
+    for (size_t i = 0; i < verts_.size(); ++i)
+        if (glm::dot(scratch_[i], scratch_[i]) > keep2) {
+            verts_[kept] = verts_[i];
+            scratch_[kept++] = scratch_[i];
+        }
+    verts_.resize(kept);
+    scratch_.resize(kept);
+    if (verts_.empty()) return;
+    displaceAll(mesh, verts_, scratch_);
+    timings.kernelMs += lapMs(clock);
+    bvh.refit(mesh, verts_);
+    timings.bvhMs += lapMs(clock);
+    timings.vertices += verts_.size();
+    dabVerts_.insert(dabVerts_.end(), verts_.begin(), verts_.end());
+    kelvinRingNormals_ = true;
+}
+
+bool Sculptor::kelvinletFarPending() const {
+    return active_ && kelvinFar_ && kelvinFar_->stroke == strokeId_ && kelvinFar_->pending();
+}
+
+void Sculptor::flushKelvinletFar(Mesh& mesh, BVH& bvh, bool all) {
+    if (!kelvinletFarPending()) return;
+    dabVerts_.clear();
+    dabLeaves_.clear();
+    KelvinFarField& f = *kelvinFar_;
+    for (int i = 0; i < KelvinFarField::kGroups; ++i) {
+        applyKelvinletFarGroup(mesh, bvh, f.turn);
+        f.turn = (f.turn + 1) % KelvinFarField::kGroups;
+        if (!all) break;
+    }
+    dabLeaves_.clear();
+    kelvinRingNormals_ = false;
+    updateDabNormals(mesh, bvh);
+}
+
 void Sculptor::kelvinletSingle(Mesh& mesh, BVH& bvh, const KelvinletKernel& k, const KelvinletStep& s) {
     auto clock = std::chrono::steady_clock::now();
     float amount = 0.0f, moveScale = 0.0f; // the step's size, and about how far it moves the centre (world)
@@ -209,85 +400,177 @@ void Sculptor::kelvinletSingle(Mesh& mesh, BVH& bvh, const KelvinletKernel& k, c
     case KelvinletKind::Scale: amount = std::abs(s.logScale), moveScale = amount * s.radius; break;
     }
     if (!(amount > 0.0f)) return;
+    if (kelvinStroke_ != strokeId_) { // per stroke: the region size the last move found
+        kelvinStroke_ = strokeId_;
+        kelvinLastVerts_ = 0;
+        kelvinLastCut_ = 0.0f;
+    }
     // Adaptive cutoff: where this step's displacement falls below epsilon = 4% of its largest (the window takes the
     // rest smoothly to 0), so a slow drag of tiny steps still moves the surface and a fast one doesn't drag the whole
-    // mesh into the pass.
+    // mesh into the pass. Over the vertex budget (the last move's density says how many the cutoff will find) the
+    // fraction rises toward 10%: a tighter region on very dense meshes.
     float peak = 0.0f;
     for (int i = 0; i <= 32; ++i) peak = std::max(peak, k.envelope(1.5f * s.radius * float(i) / 32.0f));
-    const float epsilon = std::max(0.04f * amount * peak, 1e-7f * s.radius);
-    const float cut = k.cutoff(amount, epsilon, 3.0f * s.radius);
+    const glm::vec3 travel0 = k.kind == KelvinletKind::Grab ? (glm::length(s.travel) > 0.0f ? s.travel : s.delta) : glm::vec3(0.0f);
+    const float maxDist = 3.0f * s.radius;
+    float fraction = 0.04f;
+    float cut = k.cutoff(amount, std::max(fraction * amount * peak, 1e-7f * s.radius), maxDist);
+    const size_t budget = std::max<size_t>(kelvinlet.vertexBudget, 1000);
+    if (kelvinLastVerts_ > 0 && kelvinLastCut_ > 0.0f) {
+        const float reach = cut + 0.5f * glm::length(travel0), lastReach = kelvinLastCut_;
+        const double predicted = double(kelvinLastVerts_) * double(reach * reach) / double(lastReach * lastReach);
+        if (predicted > double(budget)) {
+            fraction = std::min(0.10f, float(0.04 * predicted / double(budget)));
+            cut = k.cutoff(amount, std::max(fraction * amount * peak, 1e-7f * s.radius), maxDist);
+        }
+    }
     if (!(cut > 0.0f)) return;
     // Grab: the load point travels from `center` to `center + travel` in `substeps` pieces, each a linear Kelvinlet
     // applied to where the vertex is by then (forward Euler on the flow), all in one pass: one query, one move,
     // one normal and BVH update however far the cursor jumped since the last frame.
     const bool grab = k.kind == KelvinletKind::Grab;
-    const glm::vec3 travel = grab ? (glm::length(s.travel) > 0.0f ? s.travel : s.delta) : glm::vec3(0.0f);
+    const glm::vec3 travel = travel0;
     const int n = grab ? std::clamp(s.substeps, 1, 64) : 1;
+    RadialTable table;
+    table.build(k, cut);
+    const float cut2 = cut * cut;
+    const glm::vec3 dStep = s.delta / float(n), cStep = travel / float(n);
+    // The displacement of a point that starts at x0 (exact: the kernel through the table).
+    auto displacement = [&](const glm::vec3& x0) {
+        glm::vec3 x = x0;
+        switch (k.kind) {
+        case KelvinletKind::Grab: {
+            glm::vec3 c = s.center;
+            for (int j = 0; j < n; ++j, c += cStep) {
+                const glm::vec3 r = x - c;
+                const float r2 = glm::dot(r, r);
+                if (r2 >= cut2) continue;
+                float A, B;
+                table.at(r2, A, B);
+                x += A * dStep + B * glm::dot(r, dStep) * r;
+            }
+            break;
+        }
+        case KelvinletKind::Twist: {
+            const glm::vec3 r = x - s.center;
+            const float r2 = glm::dot(r, r);
+            if (r2 >= cut2) break;
+            float t, w;
+            table.at(r2, t, w);
+            const float theta = s.angle * t, co = std::cos(theta), si = std::sin(theta);
+            const glm::vec3 rot = r * co + glm::cross(s.axis, r) * si + s.axis * (glm::dot(s.axis, r) * (1.0f - co));
+            x += (rot - r) * w;
+            break;
+        }
+        case KelvinletKind::Scale: {
+            const glm::vec3 r = x - s.center;
+            const float r2 = glm::dot(r, r);
+            if (r2 >= cut2 || r2 < 1e-24f) break;
+            // The radial flow dr/dt = s t(r) r in midpoint steps, t from the table (clamped at the cutoff).
+            const int steps = std::clamp(int(std::ceil(amount / 0.2f)), 1, 8);
+            const float h = s.logScale / float(steps);
+            const float len0 = std::sqrt(r2), lim = cut2 * 0.999f;
+            float len = len0, t, w;
+            for (int j = 0; j < steps; ++j) {
+                table.at(std::min(len * len, lim), t, w);
+                const float midLen = len * std::exp(0.5f * h * t);
+                table.at(std::min(midLen * midLen, lim), t, w);
+                len *= std::exp(h * t);
+            }
+            table.at(r2, t, w);
+            x += r * ((len / len0 - 1.0f) * w);
+            break;
+        }
+        }
+        return x - x0;
+    };
     const glm::vec3 mid = s.center + 0.5f * travel;
-    brushVertices(mesh, bvh, mid, cut + 0.5f * glm::length(travel), verts_);
-    if (verts_.empty()) return;
+    const float reach = cut + 0.5f * glm::length(travel);
     const auto& pos = mesh.positions;
+    // A region bigger than kelvinlet.deferMinVertices (from the last move's density): the far field goes to the
+    // lattice (gatherKelvinletFar), only the near field's vertices are moved now.
+    const float nearReach = 1.2f * s.radius + 0.5f * glm::length(travel);
+    const bool defer = kelvinLastVerts_ > 0 && kelvinLastCut_ > 0.0f && reach > nearReach &&
+                       double(kelvinLastVerts_) * double(reach * reach) / double(kelvinLastCut_ * kelvinLastCut_) >
+                           double(kelvinlet.deferMinVertices);
+    if (defer) {
+        if (!kelvinFar_) kelvinFar_ = std::make_shared<KelvinFarField>();
+        if (kelvinFar_->stroke != strokeId_) {
+            *kelvinFar_ = KelvinFarField{};
+            kelvinFar_->stroke = strokeId_;
+            kelvinFar_->h = 0.1f * s.radius;
+        }
+        gatherKelvinletFar(displacement, s.center, travel, s.radius, mid, reach);
+        brushVertices(mesh, bvh, mid, nearReach, verts_);
+        kelvinLastVerts_ = size_t(double(verts_.size()) * double(reach * reach) / double(nearReach * nearReach));
+    } else {
+        brushVertices(mesh, bvh, mid, reach, verts_);
+        kelvinLastVerts_ = verts_.size();
+    }
+    kelvinLastCut_ = reach;
+    kelvinOverBudget_ = kelvinOverBudget_ || kelvinLastVerts_ > budget;
+    if (verts_.empty()) return;
     if (s.frontFacesOnly) {
         const auto& nrm = mesh.normals;
         std::erase_if(verts_, [&](uint32_t v) { return glm::dot(nrm[v], s.viewDir) > 0.0f; });
         if (verts_.empty()) return;
     }
-    RadialTable table;
-    table.build(k, cut);
-    const float cut2 = cut * cut;
-    const glm::vec3 dStep = s.delta / float(n), cStep = travel / float(n);
     scratch_.resize(verts_.size());
-    poolFor(verts_.size(), [&](size_t b, size_t e) {
-        for (size_t i = b; i < e; ++i) {
-            const glm::vec3 x0 = pos[verts_[i]];
-            glm::vec3 x = x0;
-            switch (k.kind) {
-            case KelvinletKind::Grab: {
-                glm::vec3 c = s.center;
-                for (int j = 0; j < n; ++j, c += cStep) {
-                    const glm::vec3 r = x - c;
-                    const float r2 = glm::dot(r, r);
-                    if (r2 >= cut2) continue;
-                    float A, B;
-                    table.at(r2, A, B);
-                    x += A * dStep + B * glm::dot(r, dStep) * r;
+    if (defer) {
+        const glm::vec3 a = s.center, ab = travel;
+        const float ab2 = glm::dot(ab, ab);
+        poolFor(verts_.size(), [&](size_t b, size_t e) {
+            for (size_t i = b; i < e; ++i) {
+                const glm::vec3 x0 = pos[verts_[i]];
+                const float t = ab2 > 0.0f ? std::clamp(glm::dot(x0 - a, ab) / ab2, 0.0f, 1.0f) : 0.0f;
+                const float w = nearWeight(glm::distance(x0, a + ab * t), s.radius);
+                scratch_[i] = w > 0.0f ? displacement(x0) * w : glm::vec3(0.0f);
+            }
+        }, 2048);
+    } else
+    // Many vertices: the smooth part of the field (beyond half the radius from the load's path) is evaluated on a
+    // coarse lattice of points around the region and interpolated (trilinear); the near field stays exact. The
+    // lattice spacing is a fortieth of the region, a tenth of the radius at most: the interpolation error is about
+    // (h / e)^2 / 8 of the move (well under 1% of it, a fraction of a pixel; tests/test_kelvinlet.cpp checks it).
+    if (verts_.size() > kelvinlet.proxyMinVertices) {
+        const float h = std::min(0.06f * s.radius, 2.0f * reach / 48.0f);
+        const glm::vec3 lo = mid - glm::vec3(reach + h);
+        const int dim = std::min(128, int(std::ceil(2.0f * (reach + h) / h)) + 2);
+        const float cell = 2.0f * (reach + h) / float(dim - 1);
+        std::vector<glm::vec3> lattice(size_t(dim) * size_t(dim) * size_t(dim));
+        poolFor(lattice.size(), [&](size_t b, size_t e) {
+            for (size_t i = b; i < e; ++i) {
+                const size_t ix = i % size_t(dim), iy = (i / size_t(dim)) % size_t(dim), iz = i / (size_t(dim) * size_t(dim));
+                lattice[i] = displacement(lo + glm::vec3(float(ix), float(iy), float(iz)) * cell);
+            }
+        }, 1024);
+        const float near = (k.kind == KelvinletKind::Scale ? 0.75f : 0.5f) * s.radius + cell;
+        const glm::vec3 a = s.center, ab = travel;
+        const float ab2 = glm::dot(ab, ab);
+        poolFor(verts_.size(), [&](size_t b, size_t e) {
+            for (size_t i = b; i < e; ++i) {
+                const glm::vec3 x0 = pos[verts_[i]];
+                const float t = ab2 > 0.0f ? std::clamp(glm::dot(x0 - a, ab) / ab2, 0.0f, 1.0f) : 0.0f;
+                if (glm::distance(x0, a + ab * t) < near) {
+                    scratch_[i] = displacement(x0);
+                    continue;
                 }
-                break;
+                const glm::vec3 g = (x0 - lo) / cell;
+                const int x = std::clamp(int(g.x), 0, dim - 2), y = std::clamp(int(g.y), 0, dim - 2), z = std::clamp(int(g.z), 0, dim - 2);
+                const glm::vec3 f = glm::clamp(g - glm::vec3(float(x), float(y), float(z)), 0.0f, 1.0f);
+                auto at = [&](int dx, int dy, int dz) {
+                    return lattice[(size_t(z + dz) * size_t(dim) + size_t(y + dy)) * size_t(dim) + size_t(x + dx)];
+                };
+                const glm::vec3 c00 = glm::mix(at(0, 0, 0), at(1, 0, 0), f.x), c10 = glm::mix(at(0, 1, 0), at(1, 1, 0), f.x);
+                const glm::vec3 c01 = glm::mix(at(0, 0, 1), at(1, 0, 1), f.x), c11 = glm::mix(at(0, 1, 1), at(1, 1, 1), f.x);
+                scratch_[i] = glm::mix(glm::mix(c00, c10, f.y), glm::mix(c01, c11, f.y), f.z);
             }
-            case KelvinletKind::Twist: {
-                const glm::vec3 r = x - s.center;
-                const float r2 = glm::dot(r, r);
-                if (r2 >= cut2) break;
-                float t, w;
-                table.at(r2, t, w);
-                const float theta = s.angle * t, co = std::cos(theta), si = std::sin(theta);
-                const glm::vec3 rot = r * co + glm::cross(s.axis, r) * si + s.axis * (glm::dot(s.axis, r) * (1.0f - co));
-                x += (rot - r) * w;
-                break;
-            }
-            case KelvinletKind::Scale: {
-                const glm::vec3 r = x - s.center;
-                const float r2 = glm::dot(r, r);
-                if (r2 >= cut2 || r2 < 1e-24f) break;
-                // The radial flow dr/dt = s t(r) r in midpoint steps, t from the table (clamped at the cutoff).
-                const int steps = std::clamp(int(std::ceil(amount / 0.2f)), 1, 8);
-                const float h = s.logScale / float(steps);
-                const float len0 = std::sqrt(r2), lim = cut2 * 0.999f;
-                float len = len0, t, w;
-                for (int j = 0; j < steps; ++j) {
-                    table.at(std::min(len * len, lim), t, w);
-                    const float midLen = len * std::exp(0.5f * h * t);
-                    table.at(std::min(midLen * midLen, lim), t, w);
-                    len *= std::exp(h * t);
-                }
-                table.at(r2, t, w);
-                x += r * ((len / len0 - 1.0f) * w);
-                break;
-            }
-            }
-            scratch_[i] = x - x0;
-        }
-    }, 2048);
+        }, 4096);
+    } else {
+        poolFor(verts_.size(), [&](size_t b, size_t e) {
+            for (size_t i = b; i < e; ++i) scratch_[i] = displacement(pos[verts_[i]]);
+        }, 2048);
+    }
     // Only what moves noticeably this step goes on (undo, normals, the BVH): the far part of the region moves
     // less than 0.5% of the step, which adds up to less than 0.5% of the whole drag.
     const float keep = 5e-3f * moveScale, keep2 = keep * keep;
@@ -318,6 +601,7 @@ void Sculptor::kelvinletSingle(Mesh& mesh, BVH& bvh, const KelvinletKernel& k, c
 void Sculptor::kelvinletStep(Mesh& mesh, BVH& bvh, BrushType type, const KelvinletStep& step, Symmetry sym) {
     if (!active_ || !isKelvinletBrush(type) || type == BrushType::DetailClone) return;
     const KelvinletKernel k = makeKelvinletKernel(kindOf(type), step.radius, kelvinlet, type == BrushType::KelvinSnake);
+    kelvinOverBudget_ = false;
     dabVerts_.clear();
     dabLeaves_.clear();
     for (const glm::vec3& m : mirrors(sym)) {
@@ -329,6 +613,10 @@ void Sculptor::kelvinletStep(Mesh& mesh, BVH& bvh, BrushType type, const Kelvinl
         // The rotation axis is a pseudovector: a mirror flips it once more (det = -1 for an odd mirror count).
         ms.axis = step.axis * m * (m.x * m.y * m.z);
         kelvinletSingle(mesh, bvh, k, ms);
+    }
+    if (kelvinletFarPending()) { // one group of the far field's vertices catches up (see KelvinFarField)
+        applyKelvinletFarGroup(mesh, bvh, kelvinFar_->turn);
+        kelvinFar_->turn = (kelvinFar_->turn + 1) % KelvinFarField::kGroups;
     }
     if (kelvinRingNormals_) dabLeaves_.clear(); // (a mirror that moved little: rings for every mirror's vertices)
     kelvinRingNormals_ = false;
@@ -432,6 +720,7 @@ void Sculptor::dabDetailClone(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry
 }
 
 void Sculptor::flushDetailClone(Mesh& mesh, BVH& bvh, Symmetry sym) {
+    flushKelvinletFar(mesh, bvh, true); // (and the deferred far field of a Kelvinlet stroke)
     if (!active_ || clone_.stroke != strokeId_ || !clone_.pending || clone_.stamped) return;
     DabParams q = clone_.first;
     cloneStamp(mesh, bvh, q, sym);

@@ -10,6 +10,8 @@
 #include "core/Undo.h"
 
 #include <chrono>
+#include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -139,6 +141,12 @@ public:
     // Detail Clone: a stroke that never moved has its one stamp waiting (for a direction): this presses it.
     // Call before endStroke() (harmless for every other brush).
     void flushDetailClone(Mesh& mesh, BVH& bvh, Symmetry sym);
+    // A dense Kelvinlet stroke defers part of its far field (Kelvinlet.cpp, KelvinFarField): whether some is still
+    // waiting, and applying it (one group of vertices, or all; flushDetailClone applies all at a stroke's end).
+    bool kelvinletFarPending() const;
+    void flushKelvinletFar(Mesh& mesh, BVH& bvh, bool all);
+    // The last kelvinletStep found more vertices than kelvinlet.vertexBudget (the app then moves less per frame).
+    bool kelvinletOverBudget() const { return kelvinOverBudget_; }
 
     // Mirror sign vectors for the enabled symmetry axes (always starts with (1,1,1)).
     static std::vector<glm::vec3> mirrors(Symmetry sym);
@@ -164,6 +172,14 @@ private:
         glm::vec3 last{0.0f};
     } clone_;
     bool kelvinRingNormals_ = false; // a Kelvinlet pass moved only part of what it queried
+    std::shared_ptr<struct KelvinFarField> kelvinFar_;
+    void gatherKelvinletFar(const std::function<glm::vec3(const glm::vec3&)>& displacement, const glm::vec3& a,
+                            const glm::vec3& ab, float radius, const glm::vec3& mid, float reach);
+    void applyKelvinletFarGroup(Mesh& mesh, BVH& bvh, int group);
+    bool kelvinOverBudget_ = false;  // the last kelvinletStep's region held more than kelvinlet.vertexBudget vertices
+    uint64_t kelvinStroke_ = 0;
+    size_t kelvinLastVerts_ = 0;     // the last move's region: its vertex count and reach (the next one's prediction)
+    float kelvinLastCut_ = 0.0f;
     uint64_t snakeStroke_ = 0;
     float snakeTravel_ = 0.0f;
     void finishDab(Mesh& mesh, BVH& bvh, std::chrono::steady_clock::time_point clock);

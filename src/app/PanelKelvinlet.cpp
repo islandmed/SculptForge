@@ -54,7 +54,8 @@ void App::kelvinBegin(const RayHit& hit) {
     const float pressure = pressureSize_ ? std::max(strokePressure(), 0.05f) : 1.0f;
     kelvinCenter_ = hit.position;
     kelvinRadius_ = radiusPx_ * pressure * camera_.worldPerPixel(hit.position, canvasHeight());
-    grabPlanePoint_ = grabLast_ = hit.position;
+    grabPlanePoint_ = grabLast_ = kelvinTarget_ = hit.position;
+    kelvinPending_ = 0.0f;
     kelvinLastX_ = lastX_;
     lastDabScreen_ = glm::vec2(lastX_, lastY_);
 }
@@ -62,12 +63,7 @@ void App::kelvinBegin(const RayHit& hit) {
 void App::kelvinTo(float x, float y) {
     if (strokeProbe_) strokeProbe_->emplace_back(x, y); // --measure-stroke counts each drag step as a dab
     const float pressure = pressureStrength_ ? strokePressure() : 1.0f;
-    const float amount = std::min(1.0f, 2.0f * strength_) * pressure;
-    KelvinletStep step;
-    step.radius = kelvinRadius_;
-    step.viewDir = camera_.forward();
-    step.axis = -camera_.forward();
-    step.frontFacesOnly = frontFacesOnly_;
+    kelvinAmount_ = std::min(1.0f, 2.0f * strength_) * pressure;
     if (strokeBrush_ == BrushType::KelvinGrab) {
         // The grabbed point follows the cursor in the plane through it facing the camera (as Move).
         glm::vec3 origin, dir;
@@ -75,36 +71,81 @@ void App::kelvinTo(float x, float y) {
         const glm::vec3 n = camera_.forward();
         const float denom = glm::dot(dir, n);
         if (std::abs(denom) < 1e-6f) return;
-        const glm::vec3 target = origin + dir * (glm::dot(grabPlanePoint_ - origin, n) / denom);
-        const glm::vec3 delta = target - grabLast_;
-        // One pass integrates the drag in pieces (the elastic flow, not one big shear).
-        step.center = grabLast_;
-        step.delta = delta * amount;
-        step.travel = delta;
-        step.substeps = std::clamp(int(std::ceil(glm::length(delta) / (0.4f * kelvinRadius_))), 1, 8);
-        static const bool log = std::getenv("SF_KELVIN_LOG") != nullptr;
-        const SculptTimings before = doc_.sculptor.timings;
-        doc_.sculptor.kelvinletStep(doc_.mesh, doc_.bvh, strokeBrush_, step, symmetry_);
-        if (log) {
-            const SculptTimings& t = doc_.sculptor.timings;
-            SDL_Log("kelvin: %d pieces, %llu vertices, kernel %.1f normals %.1f bvh %.1f ms (renderer sync so far %.0f ms in %llu frames)", step.substeps,
-                    (unsigned long long)(t.vertices - before.vertices), t.kernelMs - before.kernelMs,
-                    t.normalsMs - before.normalsMs, t.bvhMs - before.bvhMs, perf_.strokeSyncMs, (unsigned long long)perf_.strokeFrames);
-        }
-        grabLast_ = target;
+        kelvinTarget_ = origin + dir * (glm::dot(grabPlanePoint_ - origin, n) / denom);
     } else {
         // Twist / Scale: the drag's sideways distance in brush radii (Alt reverses).
-        const float dx = (x - kelvinLastX_) / std::max(radiusPx_, 1.0f) * amount * (strokeInvert_ ? -1.0f : 1.0f);
-        if (dx == 0.0f) return;
-        step.center = kelvinCenter_;
-        const float total = strokeBrush_ == BrushType::KelvinTwist ? -dx * 0.5f * kPi : dx * 0.6f;
-        // (Rotations about one axis compose exactly, and Scale integrates its own flow: one pass.)
-        if (strokeBrush_ == BrushType::KelvinTwist) step.angle = total;
-        else step.logScale = total;
-        doc_.sculptor.kelvinletStep(doc_.mesh, doc_.bvh, strokeBrush_, step, symmetry_);
+        const float dx = (x - kelvinLastX_) / std::max(radiusPx_, 1.0f) * kelvinAmount_ * (strokeInvert_ ? -1.0f : 1.0f);
+        kelvinPending_ += strokeBrush_ == BrushType::KelvinTwist ? -dx * 0.5f * kPi : dx * 0.6f;
     }
     kelvinLastX_ = x;
     lastDabScreen_ = glm::vec2(x, y);
+    kelvinAdvance();
+}
+
+// Applies what the cursor asked for since the last move, at most a bounded amount per frame (about one brush radius
+// of travel, a 0.3 rad turn or a 0.2 log-scale step): a fast drag over a dense mesh then costs a bounded frame and
+// the rest comes in the next frames (kelvinCatchUp runs every frame, also when the pointer stopped).
+void App::kelvinAdvance() {
+    if (drag_ != Drag::Stroke || !kelvinStrokeBrush()) return;
+    KelvinletStep step;
+    step.radius = kelvinRadius_;
+    step.viewDir = camera_.forward();
+    step.axis = -camera_.forward();
+    step.frontFacesOnly = frontFacesOnly_;
+    static const bool log = std::getenv("SF_KELVIN_LOG") != nullptr;
+    const SculptTimings before = doc_.sculptor.timings;
+    // Over budget last time (the vertices a move touched): smaller pieces per frame.
+    const float share = doc_.sculptor.kelvinletOverBudget() ? 0.5f : 1.0f;
+    if (strokeBrush_ == BrushType::KelvinGrab) {
+        glm::vec3 delta = kelvinTarget_ - grabLast_;
+        const float len = glm::length(delta), most = share * kelvinRadius_;
+        if (len < 1e-7f * kelvinRadius_) return;
+        if (len > most) delta *= most / len;
+        // One pass integrates the move in pieces (the elastic flow, not one big shear).
+        step.center = grabLast_;
+        step.delta = delta * kelvinAmount_;
+        step.travel = delta;
+        step.substeps = std::clamp(int(std::ceil(glm::length(delta) / (0.4f * kelvinRadius_))), 1, 3);
+        doc_.sculptor.kelvinletStep(doc_.mesh, doc_.bvh, strokeBrush_, step, symmetry_);
+        grabLast_ += delta;
+    } else {
+        const float most = share * (strokeBrush_ == BrushType::KelvinTwist ? 0.3f : 0.2f);
+        if (std::abs(kelvinPending_) < 1e-6f) return;
+        const float now = std::clamp(kelvinPending_, -most, most);
+        kelvinPending_ -= now;
+        step.center = kelvinCenter_;
+        // (Rotations about one axis compose exactly, and Scale integrates its own flow: one pass.)
+        if (strokeBrush_ == BrushType::KelvinTwist) step.angle = now;
+        else step.logScale = now;
+        doc_.sculptor.kelvinletStep(doc_.mesh, doc_.bvh, strokeBrush_, step, symmetry_);
+    }
+    if (log) {
+        const SculptTimings& t = doc_.sculptor.timings;
+        SDL_Log("kelvin: %llu vertices, kernel %.1f normals %.1f bvh %.1f ms (renderer sync so far %.0f ms in %llu frames)",
+                (unsigned long long)(t.vertices - before.vertices), t.kernelMs - before.kernelMs,
+                t.normalsMs - before.normalsMs, t.bvhMs - before.bvhMs, perf_.strokeSyncMs,
+                (unsigned long long)perf_.strokeFrames);
+    }
+}
+
+void App::kelvinCatchUp() {
+    if (drag_ != Drag::Stroke || !kelvinStrokeBrush()) return;
+    const float left = strokeBrush_ == BrushType::KelvinGrab ? glm::length(kelvinTarget_ - grabLast_) / std::max(kelvinRadius_, 1e-9f)
+                                                             : std::abs(kelvinPending_);
+    if (left > 1e-6f) kelvinAdvance();
+    else if (doc_.sculptor.kelvinletFarPending()) doc_.sculptor.flushKelvinletFar(doc_.mesh, doc_.bvh, false); // resting: the far field catches up
+    else return;
+    redrawIn(0.0); // more to do: the next frame comes even if the pointer rests
+}
+
+void App::kelvinFinish() {
+    if (drag_ != Drag::Stroke || !kelvinStrokeBrush()) return;
+    for (int i = 0; i < 64; ++i) { // the rest of the move before the stroke ends
+        const float left = strokeBrush_ == BrushType::KelvinGrab ? glm::length(kelvinTarget_ - grabLast_) / std::max(kelvinRadius_, 1e-9f)
+                                                                 : std::abs(kelvinPending_);
+        if (left < 1e-6f) break;
+        kelvinAdvance();
+    }
 }
 
 // ---------------------------------------------------------------------------

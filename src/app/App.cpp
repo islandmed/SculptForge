@@ -755,6 +755,7 @@ int App::run() {
             }
         }
         drainStrokeDabs(kStrokeBudgetSeconds); // the stroke's queued dabs, for a limited time: then look at the pointer again
+        kelvinCatchUp(); // a long Kelvinlet move, a bounded part per frame (PanelKelvinlet.cpp)
         Uint64 now = SDL_GetTicksNS();
         float dt = float(double(now - lastTicks) * 1e-9);
         lastTicks = now;
@@ -1387,6 +1388,7 @@ void App::dabAt(float x, float y, float pressure) {
 void App::endStroke() {
     drainStrokeDabs(0.0); // the dabs still waiting belong to this stroke
     doc_.sculptor.flushDetailClone(doc_.mesh, doc_.bvh, symmetry_); // a Detail Clone click
+    kelvinFinish(); // the rest of a Kelvinlet move (PanelKelvinlet.cpp)
     strokeMask_ = false;
     maskClickPending_ = false; // (a command can end a Ctrl+click before its release)
     firstDabPending_ = false;
