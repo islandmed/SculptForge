@@ -10,6 +10,8 @@
 #include "app/App.h"
 #include "app/CrashLog.h"
 #include "app/Ui.h"
+#include "core/Bake.h"
+#include "core/Micro.h"
 #include "core/Multires.h"
 #include "core/Script.h"
 
@@ -271,6 +273,26 @@ void App::initActions() {
         [this] { return subdivCurrentLevel(doc_.mesh) + 1 < subdivLevelCount(doc_.mesh); });
     add("geometry.reconstruct", "Reconstruct Subdiv", "Tool > Geometry", nullptr, [this] { runCommand("subdiv_reconstruct"); },
         nullptr, "subdiv_reconstruct", nullptr, [this] { return subdivCurrentLevel(doc_.mesh) == 0; });
+    // Micro-displacement levels (Tool > Geometry > Micro; core/Micro.h).
+    add("geometry.micro_divide", "Divide to Micro", "Tool > Geometry", nullptr,
+        [this] { runCommand("micro_divide", {{"level", double(microSlider_)}}); }, ICON_LC_GRID_3X3, "micro_divide", nullptr,
+        [this] { return !hasMicro(doc_.mesh) && subdivCurrentLevel(doc_.mesh) + 1 >= subdivLevelCount(doc_.mesh); },
+        "Store the surface above the highest level as micro displacements: hundreds of millions of sculptable "
+        "triangles in a fraction of the memory (300M take about 0.4 GB). The Micro slider sets how fine.");
+    add("geometry.micro_delete", "Delete Micro", "Tool > Geometry", nullptr, [this] { runCommand("micro_delete"); }, nullptr,
+        "micro_delete", nullptr, [this] { return hasMicro(doc_.mesh); });
+    add("geometry.micro_bake", "Bake Micro", "Tool > Geometry", nullptr, [this] { runCommand("micro_bake"); }, nullptr, "micro_bake",
+        nullptr, [this] { return hasMicro(doc_.mesh); },
+        "Turn the micro level into a regular mesh in a new SubTool (for export or tools that need real geometry).");
+    add("geometry.micro_export", "Export Displacement", "Tool > Geometry", nullptr,
+        [this] {
+            const std::string path = (std::filesystem::path(defaultBakeFolder(doc_)) / (doc_.assetName() + "_micro_displacement.exr")).string();
+            runCommand("micro_export_displacement", {{"path", path}});
+        },
+        nullptr, "micro_export_displacement", nullptr, [this] { return hasMicro(doc_.mesh) && doc_.mesh.hasUvs(); },
+        "Write the micro level as a 32-bit EXR displacement map over the base UVs (next to the project).");
+    add("geometry.micro_noise", "Micro Surface Noise", "Tool > Geometry", nullptr, [this] { runCommand("micro_noise"); }, nullptr,
+        "micro_noise", nullptr, [this] { return hasMicro(doc_.mesh); });
     // Tool > SubTool > Extract, Tool > Geometry > Modify Topology, Tool > Deformation (PanelExtract.cpp).
     add("subtool.extract", "Extract", "Tool > SubTool", nullptr, [this] { runExtract(); }, nullptr, "extract", nullptr,
         [this] { return doc_.mesh.hasMask(); },

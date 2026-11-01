@@ -880,6 +880,7 @@ private:
     void drawGeometrySection(); // PanelGeometry.cpp: Divide, SDiv, Lower / Higher Res, Del Lower / Higher, Reconstruct
     bool smt_ = true;           // Tool > Geometry > Smt: Divide smooths
     float sdivSlider_ = 1.0f;   // the SDiv slider while dragged (1-based)
+    float microSlider_ = 4.0f;  // Tool > Geometry > Micro: the micro level the next Divide to micro makes
     bool sdivHeld_ = false;
     void drawSubToolsContents();
     // PanelExtract.cpp: Tool > SubTool > Extract, Tool > Geometry > Modify Topology (Mirror And Weld) and
