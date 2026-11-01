@@ -215,6 +215,9 @@ shelf, which opens the stroke picker, or from the **Stroke** palette.
 The setting slider appears under the stroke tiles when **Spray** or **LazyMouse** is selected. With LazyMouse,
 the viewport draws the string between the cursor and the brush point.
 
+**Continuous**, under the stroke tiles in the stroke picker and in the **Stroke** palette, keeps the brush working
+while you hold it still on the model (30 dabs a second), with any stroke type.
+
 Notes:
 
 - With **DragRect**, the stamp is placed where you first click. While you drag, it is redrawn at the new size

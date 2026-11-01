@@ -1,0 +1,82 @@
+# #43: the axis gizmo snaps to side views, Undo / Redo on the right shelf, Continuous in the left shelf's
+# stroke picker, the mask shown and hidden without clearing it, Insert mirrored by symmetry, SubTool thumbnails.
+run new_sphere subdivisions=4
+key f
+
+# The axis gizmo (top left of the canvas): a click on an end looks from that side, orthographic.
+expect_value camera_ortho == 0
+axis_click +x
+expect_value camera_yaw > 89.9
+expect_value camera_yaw < 90.1
+expect_value camera_pitch == 0
+expect_value camera_ortho == 1
+expect_value camera_aligned == 1
+shot axis_right
+axis_click +y
+expect_value camera_pitch < -89.9
+expect_value camera_aligned == 1
+axis_click -x
+expect_value camera_yaw < -89.9
+expect_value camera_pitch == 0
+axis_click +z
+expect_value camera_yaw == 0
+expect_value camera_pitch == 0
+shot axis_front
+
+# Undo and Redo top the right shelf.
+expect "Undo##edit.undo"
+expect "Redo##edit.redo"
+expect_value can_undo == 0
+stroke 0.3 0.4 0.7 0.5
+expect_value can_undo == 1
+click "Undo##edit.undo"
+expect_value can_undo == 0
+expect_status Undo
+click "Redo##edit.redo"
+expect_value can_undo == 1
+shot shelf_undo_redo
+
+# Continuous sits in the left shelf's stroke picker, beside the strokes.
+expect_value stroke_continuous == 0
+click "##tile.stroke"
+wait 0.1
+expect "Continuous##stroke.continuous"
+shot stroke_picker_continuous
+click "Continuous##stroke.continuous"
+expect_value stroke_continuous == 1
+key escape
+
+# The right shelf's Mask hides the mask and shows it again; it stays on the model meanwhile.
+key ctrl+a
+expect_value masked > 1000
+remember masked all
+click "Mask##view.mask"
+expect_value show_mask == 0
+expect_value masked == $all
+expect_status Mask hidden
+shot mask_hidden
+click "Mask##view.mask"
+expect_value show_mask == 1
+expect_value masked == $all
+key ctrl+shift+a
+expect_value masked == 0
+
+# Insert on the model with X symmetry (on by default): a mirrored copy, one undo step.
+remember triangles base
+click "SubTools/Append"
+hover "Insert on the model"
+click "Cone##insert"
+stroke 0.8 0.45 0.86 0.45
+expect_status 2 cones (mirrored)
+expect_value triangles > $base
+shot insert_mirrored
+key ctrl+z
+expect_value triangles == $base
+key escape
+
+# SubTool thumbnails: each row shows its SubTool, rendered from the GPU mesh.
+click "SubTools/Append"
+click "Cube"
+expect_value subtools == 2
+wait_value subtool_thumbnails == 2 10
+shot subtool_thumbnails
