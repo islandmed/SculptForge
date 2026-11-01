@@ -67,6 +67,9 @@ add_library(sculptforge_core STATIC
   src/core/PaintLayer.cpp
   src/core/Texture.cpp
   src/core/TextureCommands.cpp
+  src/core/TileImage.cpp
+  src/core/TextureChannels.cpp
+  src/core/TextureChannelCommands.cpp
   src/core/Multires.cpp
   src/core/MultiresCommands.cpp
   src/core/AutoUv.cpp

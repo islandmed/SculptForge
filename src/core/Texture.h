@@ -31,6 +31,7 @@
 #include "core/Mesh.h"
 #include "core/PaintLayer.h"
 #include "core/Sculpt.h"
+#include "core/TextureChannels.h"
 
 #include <cstdint>
 #include <atomic>
@@ -60,6 +61,7 @@ struct TextureLayer {
     BlendMode blend = BlendMode::Normal;
     bool visible = true;
     bool locked = false; // locked layers can't be painted, filled, cleared or merged
+    LayerChannels channels; // material channels (core/TextureChannels.h); [BaseColor] only says whether colour shows
 };
 
 struct PaintTexture {
@@ -69,6 +71,18 @@ struct PaintTexture {
     std::vector<uint8_t> base;       // the Base layer while `layers` is not empty
     std::vector<TextureLayer> layers;
     int activeLayer = -1;            // the layer painting writes into (-1 = Base)
+    // Material channels (core/TextureChannels.h): Roughness, Metallic, Normal, Height, AO, Emissive, Opacity.
+    ChannelPlanes channels;
+    float heightNormalStrength = 4.0f; // how steep the Height channel's normal is (heightNormalAt)
+    // Solo channel view (syncChannelView): what the renderer uploads instead of `pixels` while viewChannel is
+    // not BaseColor. A cache: not saved or undone.
+    std::vector<uint8_t> viewPixels;
+    Channel viewChannel = Channel::BaseColor;
+    uint64_t viewRevision = 0;
+    // The RGBA8 texels the viewport shows: the composite, or the solo channel.
+    const std::vector<uint8_t>& shown() const {
+        return viewChannel != Channel::BaseColor && viewPixels.size() == pixels.size() ? viewPixels : pixels;
+    }
 
     // GPU sync (see Renderer): `revision` counts changes; texels changed since `dirtyFrom` lie in
     // [dirtyMin, dirtyMax), inside the kTextureTile tiles flagged in `dirtyTiles`. A view that last uploaded
@@ -141,22 +155,42 @@ glm::vec3 sampleTextureAt(const Mesh& mesh, uint32_t triangle, const glm::vec3& 
 class TexturePainter {
 public:
     // False (and nothing starts) when the mesh doesn't paint into a texture or the target layer is locked/hidden.
-    bool begin(Mesh& mesh);
+    // `channels`: channelBit(...) of what the stroke may paint (BaseColor and/or material channels; those the
+    // texture doesn't enable are dropped).
+    bool begin(Mesh& mesh, uint32_t channels = 1u);
+    uint32_t channels() const { return channels_; }
     bool active() const { return active_; }
     // Paints `color` (linear) under the brush, `p.invert` paints Base back to white / erases a layer.
     // Returns the number of texels changed.
     size_t dab(Mesh& mesh, const BVH& bvh, const DabParams& p, const glm::vec3& color, Symmetry sym);
+    // The same with a material: every channel the brush has and the texture enables gets its value (BaseColor
+    // only when `material.channels` has it), with the same falloff, coverage and undo.
+    size_t dab(Mesh& mesh, const BVH& bvh, const DabParams& p, const BrushMaterial& material, Symmetry sym);
     // Ends the stroke: the touched tiles become `record.textureTiles` (nothing when no texel changed).
     void end(UndoRecord& record);
 
 private:
+    // A material channel the stroke paints in one tile: the tile before the stroke (kept for undo; null = the
+    // image's fill) and the writable texels.
+    struct ChannelTile {
+        TileImage::TilePtr original;
+        const uint8_t* origTexels = nullptr; // dense original texels, or one texel (origStride 0)
+        int origStride = 0;                  // bytes between texels of `origTexels` (0: uniform)
+        uint8_t origValue[8] = {};           // the original's texel when uniform / null
+        uint8_t* texels = nullptr;           // the image's writable tile
+    };
     struct Tile {
         std::vector<uint8_t> original; // the tile before the stroke (kTextureTile^2 RGBA)
         std::vector<float> coverage;   // stroke coverage per texel
         std::vector<uint32_t> stamp;   // last dab that wrote the texel
+        std::array<ChannelTile, kChannelCount> channels; // [c] valid when the stroke paints channel c
     };
+    // The images material channel c paints into (the target layer's or Base), null when the stroke doesn't paint c.
+    TileImage* channelTarget(PaintTexture& tex, int c) const;
+    uint32_t channels_ = 1u; // what the stroke paints (channelBit; BaseColor = bit 0)
     // The tile's stroke record, made on first touch (thread-safe).
-    Tile& tile(uint32_t index, const std::vector<uint8_t>& target, int width, int height);
+    // Also makes the tile of every material channel the stroke paints writable.
+    Tile& tile(uint32_t index, const std::vector<uint8_t>& target, int width, int height, PaintTexture& tex);
     struct DabTri { // a triangle under the brush (mirror `mirror`), with the texel box the dab can reach
         uint32_t tri = 0;
         int mirror = 0;

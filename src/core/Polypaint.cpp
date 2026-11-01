@@ -402,6 +402,7 @@ void registerPaintCommands(CommandRegistry& registry) {
                   }});
     registerPaintLayerCommands(registry); // paint_layer_* (core/PaintLayer.cpp)
     registerTextureCommands(registry);    // texture_*, uv_auto, paint_target (core/TextureCommands.cpp)
+    registerTextureChannelCommands(registry); // texture_channels, paint_material, channel_view (core/TextureChannelCommands.cpp)
 }
 
 } // namespace sf
