@@ -49,10 +49,12 @@ Json toJson(const UiPrefs& p) {
     j.set("libraryFolder", p.libraryFolder);
     j.set("cameraNotch", double(p.cameraNotch));
     j.set("turntable", p.turntable);
-    j.set("inputStyle", std::string(p.inputStyle == 2 ? "blender" : p.inputStyle == 1 ? "sculptforge" : "zbrush"));
+    j.set("inputStyle", std::string(p.inputStyle == 3 ? "maya" : p.inputStyle == 2 ? "blender" : p.inputStyle == 1 ? "sculptforge" : "zbrush"));
     j.set("emulateNumpad", p.emulateNumpad);
     j.set("rightClickQuickMenu", p.rightClickQuickMenu);
     j.set("cursorFollowsSurface", p.cursorFollowsSurface);
+    j.set("liveApi", p.liveApi);
+    j.set("showAxes", p.showAxes);
     j.set("alphabeticalPalettes", p.alphabeticalPalettes);
     j.set("tablet", toJson(p.tablet));
     j.set("spaceMouse", toJson(p.spaceMouse));
@@ -85,11 +87,13 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.turntable = j["turntable"].asBool(p.turntable);
     if (j["inputStyle"].isString()) {
         const std::string style = j["inputStyle"].asString();
-        p.inputStyle = style == "blender" ? 2 : style == "sculptforge" ? 1 : 0;
+        p.inputStyle = style == "maya" ? 3 : style == "blender" ? 2 : style == "sculptforge" ? 1 : 0;
     }
     p.emulateNumpad = j["emulateNumpad"].asBool(p.emulateNumpad);
     p.rightClickQuickMenu = j["rightClickQuickMenu"].asBool(p.rightClickQuickMenu);
     p.cursorFollowsSurface = j["cursorFollowsSurface"].asBool(p.cursorFollowsSurface);
+    p.liveApi = j["liveApi"].asBool(p.liveApi);
+    p.showAxes = j["showAxes"].asBool(p.showAxes);
     p.alphabeticalPalettes = j["alphabeticalPalettes"].asBool(p.alphabeticalPalettes);
     fromJson(j["tablet"], p.tablet);
     fromJson(j["spaceMouse"], p.spaceMouse);
@@ -536,6 +540,75 @@ void App::saveRecentActions() {
 // ---------------------------------------------------------------------------
 // Store / restore
 // ---------------------------------------------------------------------------
+
+
+namespace {
+std::string windowStatePath() {
+    std::string dir;
+    if (char* pref = SDL_GetPrefPath("SculptForge", "SculptForge")) {
+        dir = pref;
+        SDL_free(pref);
+    }
+    return dir.empty() ? std::string() : dir + "window.json";
+}
+} // namespace
+
+App::WindowState App::loadWindowState() {
+    WindowState st;
+    const std::string path = windowStatePath();
+    std::ifstream f(path);
+    if (path.empty() || !f) return st;
+    Json j;
+    std::string err;
+    if (!Json::parse(std::string(std::istreambuf_iterator<char>(f), {}), j, err)) return st;
+    st.w = std::clamp(int(j["w"].asNumber(st.w)), 640, 16384);
+    st.h = std::clamp(int(j["h"].asNumber(st.h)), 400, 16384);
+    st.maximized = j["maximized"].asBool(false);
+    st.fullscreen = j["fullscreen"].asBool(false);
+    if (j["x"].isNumber() && j["y"].isNumber()) {
+        const int x = int(j["x"].asNumber()), y = int(j["y"].asNumber());
+        // Only where a display still shows at least a corner of the title bar (a monitor may have gone).
+        int count = 0;
+        if (SDL_DisplayID* displays = SDL_GetDisplays(&count)) {
+            for (int i = 0; i < count && !st.placed; ++i) {
+                SDL_Rect r;
+                if (SDL_GetDisplayUsableBounds(displays[i], &r) && x + 100 > r.x && x < r.x + r.w - 100 && y >= r.y - 10 &&
+                    y < r.y + r.h - 50) {
+                    st.x = x;
+                    st.y = y;
+                    st.placed = true;
+                }
+            }
+            SDL_free(displays);
+        }
+    }
+    return st;
+}
+
+void App::saveWindowState() const {
+    if (!rememberWindow_ || !window_) return;
+    const std::string path = windowStatePath();
+    if (path.empty()) return;
+    const SDL_WindowFlags flags = SDL_GetWindowFlags(window_);
+    const bool maximized = (flags & SDL_WINDOW_MAXIMIZED) != 0, fullscreen = (flags & SDL_WINDOW_FULLSCREEN) != 0;
+    WindowState st = loadWindowState(); // keep the normal size while maximised or full screen
+    if (!maximized && !fullscreen && !(flags & SDL_WINDOW_MINIMIZED)) {
+        SDL_GetWindowSize(window_, &st.w, &st.h);
+        SDL_GetWindowPosition(window_, &st.x, &st.y);
+        st.placed = true;
+    }
+    Json j;
+    j.set("w", double(st.w));
+    j.set("h", double(st.h));
+    if (st.placed) {
+        j.set("x", double(st.x));
+        j.set("y", double(st.y));
+    }
+    j.set("maximized", maximized);
+    j.set("fullscreen", fullscreen);
+    std::ofstream out(path);
+    out << j.dump(true);
+}
 
 std::string App::uiConfigPath() const { return configDir_.empty() ? std::string() : configDir_ + "ui.json"; }
 

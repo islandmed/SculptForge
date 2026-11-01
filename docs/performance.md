@@ -297,7 +297,7 @@ changes when it does):
 | `residentCacheCapMB` | RAM / 8, at most 1 GB | RAM / 4, at most 4 GB | RAM x 2/5, at most 64 GB |
 | `activeTriangleBudget` | 0.5M | 2M | 8M+ (half the render budget, at most 64M) |
 | `uploadBudgetMBPerFrame` | the profile's | the profile's | the profile's |
-| `draftBrushMode` (normals and cavity at pen release) | on | on | off (continuous) |
+| `draftBrushMode` (normals and cavity at pen release) | on | off (on battery: on) | off (on battery: on) |
 | `zeroCopyUMA` | the GPU shares system memory: unified or integrated, in any tier (a 64 GB+ Apple Silicon Workstation too) | | |
 | `targetHz` | 60 | 60 / 120 / 144 from the display | 60 / 120 / 144 from the display |
 

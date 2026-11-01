@@ -104,6 +104,134 @@ Mesh makeCube(int resolution, float size) {
     return weldImported(raw);
 }
 
+namespace {
+// Flips every triangle when the closed mesh's signed volume is negative (so all primitives face outwards).
+void faceOutwards(Mesh& m) {
+    double vol = 0.0;
+    for (const auto& t : m.triangles)
+        vol += glm::dot(glm::dvec3(m.positions[t[0]]), glm::cross(glm::dvec3(m.positions[t[1]]), glm::dvec3(m.positions[t[2]])));
+    if (vol < 0.0)
+        for (auto& t : m.triangles) std::swap(t[1], t[2]);
+}
+
+// A surface of revolution about Y from a profile of (radius, height) points, bottom to top. A radius of 0 is a
+// pole (a triangle fan); everything else is rings of quads. group[k] is the polygroup between points k and k+1.
+Mesh revolve(const std::vector<glm::vec2>& profile, const std::vector<uint32_t>& group, int segments) {
+    Mesh raw;
+    const int n = std::max(segments, 3);
+    std::vector<uint32_t> start(profile.size());
+    for (size_t k = 0; k < profile.size(); ++k) {
+        start[k] = uint32_t(raw.positions.size());
+        const glm::vec2 q = profile[k];
+        if (q.x <= 1e-6f) raw.positions.push_back({0.0f, q.y, 0.0f});
+        else
+            for (int i = 0; i < n; ++i) {
+                const float a = 6.28318530718f * float(i) / float(n);
+                raw.positions.push_back({q.x * std::cos(a), q.y, -q.x * std::sin(a)});
+            }
+    }
+    for (size_t k = 0; k + 1 < profile.size(); ++k) {
+        const bool pa = profile[k].x <= 1e-6f, pb = profile[k + 1].x <= 1e-6f;
+        if (pa && pb) continue;
+        for (int i = 0; i < n; ++i) {
+            const uint32_t i1 = uint32_t((i + 1) % n);
+            const uint32_t a = pa ? start[k] : start[k] + uint32_t(i), b = pa ? start[k] : start[k] + i1;
+            const uint32_t c = pb ? start[k + 1] : start[k + 1] + uint32_t(i), d = pb ? start[k + 1] : start[k + 1] + i1;
+            if (pa) raw.triangles.push_back({a, c, d});
+            else if (pb) raw.triangles.push_back({a, c, b});
+            else {
+                raw.triangles.push_back({a, c, b});
+                raw.triangles.push_back({b, c, d});
+                raw.pairQuad(uint32_t(raw.triangles.size() - 2), uint32_t(raw.triangles.size() - 1));
+                raw.polygroups.push_back(group[k]);
+            }
+            raw.polygroups.push_back(group[k]);
+        }
+    }
+    faceOutwards(raw);
+    return weldImported(raw);
+}
+
+// Profile points from a to b in `steps` even steps (b included, a not).
+void addLine(std::vector<glm::vec2>& pr, std::vector<uint32_t>& gr, glm::vec2 b, int steps, uint32_t group) {
+    const glm::vec2 a = pr.back();
+    for (int i = 1; i <= steps; ++i) {
+        pr.push_back(glm::mix(a, b, float(i) / float(steps)));
+        gr.push_back(group);
+    }
+}
+} // namespace
+
+Mesh makeCylinder(int segments, float size) {
+    const float r = size * 0.3f, h = size * 0.5f;
+    std::vector<glm::vec2> pr{{0.0f, -h}};
+    std::vector<uint32_t> gr;
+    addLine(pr, gr, {r, -h}, 4, 1);
+    addLine(pr, gr, {r, h}, std::max(4, segments / 2), 2);
+    addLine(pr, gr, {0.0f, h}, 4, 3);
+    return revolve(pr, gr, segments);
+}
+
+Mesh makeCone(int segments, float size) {
+    const float r = size * 0.4f, h = size * 0.5f;
+    std::vector<glm::vec2> pr{{0.0f, -h}};
+    std::vector<uint32_t> gr;
+    addLine(pr, gr, {r, -h}, 4, 1);
+    addLine(pr, gr, {0.0f, h}, std::max(4, segments / 2), 2);
+    return revolve(pr, gr, segments);
+}
+
+Mesh makeCapsule(int segments, float size) {
+    const float r = size * 0.25f, h = size * 0.5f - r;
+    const int arc = std::max(4, segments / 4);
+    std::vector<glm::vec2> pr{{0.0f, -h - r}};
+    std::vector<uint32_t> gr;
+    for (int i = 1; i <= arc; ++i) {
+        const float a = 1.5707963f * float(i) / float(arc);
+        pr.push_back({r * std::sin(a), -h - r * std::cos(a)});
+        gr.push_back(1);
+    }
+    addLine(pr, gr, {r, h}, std::max(4, segments / 3), 2);
+    for (int i = 1; i <= arc; ++i) {
+        const float a = 1.5707963f * float(i) / float(arc);
+        pr.push_back({r * std::cos(a), h + r * std::sin(a)});
+        gr.push_back(3);
+    }
+    pr.back().x = 0.0f;
+    return revolve(pr, gr, segments);
+}
+
+Mesh makeTorus(int segments, float size) {
+    const float tube = size * 0.15f, R = size * 0.5f - tube;
+    const int n = std::max(segments, 6), m = std::max(segments / 2, 4);
+    Mesh raw;
+    for (int i = 0; i < n; ++i)
+        for (int j = 0; j < m; ++j) {
+            const float a = 6.28318530718f * float(i) / float(n), b = 6.28318530718f * float(j) / float(m);
+            const float rr = R + tube * std::cos(b);
+            raw.positions.push_back({rr * std::cos(a), tube * std::sin(b), -rr * std::sin(a)});
+        }
+    for (int i = 0; i < n; ++i)
+        for (int j = 0; j < m; ++j) {
+            const uint32_t a = uint32_t(i * m + j), b = uint32_t(i * m + (j + 1) % m);
+            const uint32_t c = uint32_t(((i + 1) % n) * m + j), d = uint32_t(((i + 1) % n) * m + (j + 1) % m);
+            raw.triangles.push_back({a, c, b});
+            raw.triangles.push_back({b, c, d});
+            raw.pairQuad(uint32_t(raw.triangles.size() - 2), uint32_t(raw.triangles.size() - 1));
+            raw.polygroups.push_back(1);
+            raw.polygroups.push_back(1);
+        }
+    faceOutwards(raw);
+    return weldImported(raw);
+}
+
+Mesh makeQuadSphere(int resolution, float size) {
+    Mesh m = makeCube(resolution, 2.0f);
+    for (auto& p : m.positions) p = glm::normalize(p) * (size * 0.5f);
+    m.recomputeAllNormals();
+    return m;
+}
+
 Mesh loopSubdivide(const Mesh& src) {
     const uint32_t nv = static_cast<uint32_t>(src.vertexCount());
 

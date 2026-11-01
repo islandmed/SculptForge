@@ -67,7 +67,7 @@ std::vector<ProofMeshSize> proofDefaultSizes(size_t available) {
     auto fits = [&](const ProofMeshSize& s) {
         return available > 0 && s.millions * 1e6 * s.bytesPerTriangle * 1.25 < double(available);
     };
-    if (ProofMeshSize big{100, "100M", nullptr, 150}; fits(big)) sizes.push_back(big);
+    if (ProofMeshSize bigSize{100, "100M", nullptr, 150}; fits(bigSize)) sizes.push_back(bigSize);
     for (const ProofMeshSize& s : proofExtraSizes())
         if (fits(s)) sizes.push_back(s);
     return sizes;
@@ -526,24 +526,24 @@ void App::drawProofUi() {
     const CanvasRect c = canvasRect();
     ImDrawList* dl = ImGui::GetForegroundDrawList();
     ImFont* font = ImGui::GetFont();
-    const float big = ImGui::GetFontSize() * 1.35f, small = ImGui::GetFontSize() * 1.05f;
+    const float bigSize = ImGui::GetFontSize() * 1.35f, smallSize = ImGui::GetFontSize() * 1.05f;
     const ImVec2 at(c.x + 14 * sc, c.y + 14 * sc);
     const std::string brand = std::string("SculptForge ") + SCULPTFORGE_VERSION + " (" + SF_GIT_COMMIT + ")  -  proof mode";
     const char* lines[] = {brand.c_str(), p.hudTitle.c_str(), p.hudLine2.c_str(), p.hudLine3.c_str()};
     float w = 0, h = 0;
     for (int i = 0; i < 4; ++i) {
-        const ImVec2 s = font->CalcTextSizeA(i == 1 ? big : small, 1e9f, 0.0f, lines[i]);
+        const ImVec2 s = font->CalcTextSizeA(i == 1 ? bigSize : smallSize, 1e9f, 0.0f, lines[i]);
         w = std::max(w, s.x);
         h += s.y + 3 * sc;
     }
     dl->AddRectFilled(ImVec2(at.x - 10 * sc, at.y - 8 * sc), ImVec2(at.x + w + 10 * sc, at.y + h + 6 * sc), IM_COL32(12, 12, 14, 215), 6 * sc);
     float y = at.y;
     for (int i = 0; i < 4; ++i) {
-        const float size = i == 1 ? big : small;
+        const float size = i == 1 ? bigSize : smallSize;
         dl->AddText(font, size, ImVec2(at.x, y), i == 0 ? theme::u32(theme::textDim) : i == 1 ? theme::u32(theme::textBright) : theme::u32(theme::text), lines[i]);
         y += font->CalcTextSizeA(size, 1e9f, 0.0f, lines[i]).y + 3 * sc;
     }
-    if (p.pressed && !p.samples.empty()) { // where the pointer is: a small cross the stroke follows
+    if (p.pressed && !p.samples.empty()) { // where the pointer is: a smallSize cross the stroke follows
         const glm::vec2 q = p.samples.back().p;
         dl->AddLine(ImVec2(q.x - 7 * sc, q.y), ImVec2(q.x + 7 * sc, q.y), theme::u32(theme::accent), 2 * sc);
         dl->AddLine(ImVec2(q.x, q.y - 7 * sc), ImVec2(q.x, q.y + 7 * sc), theme::u32(theme::accent), 2 * sc);
@@ -745,13 +745,13 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                 ph.lagPx.push_back(p.samples.back().s - p.samples[best].s);
                 // The same for what is on screen ahead of the solved surface: the predictive preview's head.
                 const glm::vec2 h = ghostHeadValid_ ? ghostHead_ : d;
-                size_t near = p.samples.size() - 1;
+                size_t nearest = p.samples.size() - 1;
                 float nearDist = 1e30f;
                 for (size_t i = p.samples.size(); i-- > 0 && p.samples.size() - i < 2000;) {
                     const float dist = glm::length(p.samples[i].p - h);
-                    if (dist < nearDist) nearDist = dist, near = i;
+                    if (dist < nearDist) nearDist = dist, nearest = i;
                 }
-                ph.previewLagPx.push_back(p.samples.back().s - p.samples[near].s);
+                ph.previewLagPx.push_back(p.samples.back().s - p.samples[nearest].s);
             }
             // ... then the new samples go to the input handler, as the next frame's events would.
             for (; p.sent < p.samples.size(); ++p.sent)

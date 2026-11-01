@@ -45,7 +45,9 @@ TierConfig tierConfigFor(const HardwareProfile& p, PowerSource power, int displa
     }
     c.uploadBudgetMBPerFrame = std::max<uint64_t>(s.uploadBudgetMBPerFrame, 4);
     c.zeroCopyUMA = p.hardware.gpuKind == GpuKind::Unified || p.hardware.gpuKind == GpuKind::Integrated;
-    c.draftBrushMode = p.tier != ProfileTier::Workstation;
+    // Draft brushes only where they save work: Software, and on battery (below). Measured on a Laptop-tier M1 Pro at
+    // 33M they were no faster (frames are GPU-bound) and the last dab landed later after release.
+    c.draftBrushMode = p.tier == ProfileTier::Software;
     c.targetHz = p.overrides.targetFps ? p.overrides.targetFps : targetHzForDisplay(displayHz);
     if (p.tier == ProfileTier::Software) c.targetHz = std::min(c.targetHz, 60);
     if (c.onBattery()) {

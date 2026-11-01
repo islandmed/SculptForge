@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Material painting (PBR) - SculptForge User Guide</title>
+  <meta name="description" content="A painted texture can carry more than colour. Turn on material channels and the Paint brush paints how rough, how metallic, how bumpy and how bright the surface is, all in one stroke, the way game engines and renderers describe materials (physically based rendering, PBR). Every channel lives on the ">
+  <meta name="theme-color" content="#111114">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" type="image/svg+xml" href="../img/favicon.svg?v=2">
+  <link rel="icon" type="image/png" href="../img/favicon-64.png?v=2">
+  <link rel="apple-touch-icon" href="../img/icon-256.png?v=2">
+  <link rel="canonical" href="https://sculptforge.app/guide/pbr-painting.html">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Material painting (PBR) - SculptForge User Guide">
+  <meta property="og:description" content="A painted texture can carry more than colour. Turn on material channels and the Paint brush paints how rough, how metallic, how bumpy and how bright the surface is, all in one stroke, the way game engines and renderers describe materials (physically based rendering, PBR). Every channel lives on the ">
+  <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=3">
+  <meta property="og:url" content="https://sculptforge.app/guide/pbr-painting.html">
+  <link rel="stylesheet" href="../style.css?v=17">
+  <script src="../motion.js?v=10" defer></script>
+  <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+  <script src="search-index.js?v=40" defer></script>
+</head>
+<body class="guide-page" data-prev="texture-painting.html" data-next="layers.html">
+  <div class="scroll-progress" aria-hidden="true"></div>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="../index.html"><img src="../img/logo.svg?v=2" alt="" width="34" height="34"><span>SculptForge</span></a>
+      <nav aria-label="Main">
+        <a href="../index.html#features">Features</a>
+        <a href="../index.html#demos">Demos</a>
+        <a href="../brushes.html">Brushes</a>
+        <a href="index.html" aria-current="page">Guide</a>
+        <a class="nav-dl" href="../index.html#download">Download</a>
+        <a class="gh" href="https://github.com/islandmed/SculptForge">GitHub</a>
+      </nav>
+    </div>
+  </header>
+  <div class="wrap guide-layout">
+    <div class="guide-side">
+      <button class="toc-toggle" type="button" aria-expanded="false" aria-controls="guide-toc">
+        <span>Contents</span><span class="toc-current">Material painting (PBR)</span></button>
+      <div id="guide-toc" class="toc-panel">
+        <div class="guide-search" role="search">
+          <input type="search" id="guide-q" placeholder="Search the guide" aria-label="Search the guide" autocomplete="off">
+          <div class="search-results" id="guide-results" hidden></div>
+        </div>
+        <nav class="toc" aria-label="User guide"><a class="toc-home" href="index.html">Contents</a><p class="toc-group">Getting started</p><ul><li><a href="welcome.html">Welcome to SculptForge</a></li><li><a href="whats-new.html">What&#x27;s new</a></li><li><a href="coming-from-zbrush.html">Coming from ZBrush</a></li><li><a href="installing.html">Installing SculptForge</a></li><li><a href="interface.html">The interface</a></li><li><a href="navigation.html">Navigating the view</a></li></ul><p class="toc-group">Sculpting</p><ul><li><a href="sculpting.html">Sculpting and brushes</a></li><li><a href="brush-lab.html">Brush Lab and sharing brushes</a></li><li><a href="masking.html">Masking</a></li><li><a href="polygroups.html">Polygroups and visibility</a></li><li><a href="subtools.html">SubTools</a></li><li><a href="zspheres.html">ZSpheres</a></li><li><a href="polypaint.html">Polypaint and materials</a></li><li><a href="texture-painting.html">Texture painting</a></li><li><a href="pbr-painting.html" class="current" aria-current="page">Material painting (PBR)</a><ul class="toc-sections"><li><a href="#the-channels">The channels</a></li><li><a href="#turn-channels-on">Turn channels on</a></li><li><a href="#paint-a-material">Paint a material</a></li><li><a href="#layers-and-channels">Layers and channels</a></li><li><a href="#see-one-channel-on-its-own">See one channel on its own</a></li><li><a href="#height-and-normals">Height and normals</a></li><li><a href="#carrying-channels-through-geometry-changes">Carrying channels through geometry changes</a></li><li><a href="#projects">Projects</a></li><li><a href="#commands">Commands</a></li><li><a href="#limitations">Limitations</a></li></ul></li><li><a href="layers.html">Sculpt layers and blend shapes</a></li><li><a href="facial-shapes.html">Facial shapes and live face</a></li><li><a href="subdivision-levels.html">Subdivision levels</a></li><li><a href="micro-levels.html">Micro levels: hundreds of millions of polygons</a></li><li><a href="dynamic-topology.html">Dynamic topology</a></li><li><a href="timeline.html">Sculpt Timeline and timelapse</a></li><li><a href="gizmo.html">Moving, rotating and posing (Gizmo 3D)</a></li><li><a href="geometry.html">Subdivide, remesh, decimate and LODs</a></li><li><a href="retopology.html">Quad retopology and detail projection</a></li></ul><p class="toc-group">AI and capture</p><ul><li><a href="generate-3d.html">Image and text to 3D</a></li><li><a href="splats.html">Gaussian splats</a></li><li><a href="scan-to-splat.html">Scan an object into a splat</a></li><li><a href="scan-to-sculptable.html">From scan to sculptable mesh</a></li><li><a href="phone-capture.html">Phone capture and AR</a></li></ul><p class="toc-group">Files and pipelines</p><ul><li><a href="baking.html">Baking normal and displacement maps</a></li><li><a href="exporting.html">Exporting, Unreal and ZBrush</a></li><li><a href="export-presets.html">Export presets</a></li><li><a href="blender.html">Working with Blender</a></li><li><a href="projects.html">Projects, autosave and QuickSave</a></li><li><a href="scripting.html">Scripting and automation</a></li><li><a href="studios.html">SculptForge for studios</a></li></ul><p class="toc-group">Reference</p><ul><li><a href="shortcuts.html">Keyboard and mouse</a></li><li><a href="performance.html">Performance and big meshes</a></li><li><a href="troubleshooting.html">Troubleshooting and FAQ</a></li><li><a href="glossary.html">Glossary</a></li></ul></nav>
+      </div>
+    </div>
+    <main class="guide-main" id="top">
+      <article class="guide-article">
+<h1 id="material-painting-pbr">Material painting (PBR)</h1>
+<p>A painted texture can carry more than colour. Turn on <strong>material channels</strong> and the Paint brush paints how rough, how metallic, how bumpy and how bright the surface is, all in one stroke, the way game engines and renderers describe materials (physically based rendering, PBR). Every channel lives on the same UVs and paint layers as the colour from <a href="texture-painting.html">Texture painting</a>, and goes out to Unreal, Unity, Godot, Blender, glTF and USD with <a href="export-presets.html">Export presets</a>.</p>
+<figure class="shot"><a href="images/pbr-solo-roughness.jpg" class="zoom"><img src="images/pbr-solo-roughness.jpg" alt="Solo roughness view: a glossy horizontal stroke on Base and a rough vertical stroke on a layer" width="1200" height="720" loading="lazy" decoding="async"></a><figcaption>Solo roughness view: a glossy horizontal stroke on Base and a rough vertical stroke on a layer</figcaption></figure>
+<h2 id="the-channels">The channels<a class="anchor" href="#the-channels" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table><thead><tr><th>Channel</th><th>What it holds</th><th>Stored as</th></tr></thead><tbody><tr><td>Base Color</td><td>The surface colour. Always there.</td><td>8-bit sRGB (the texture you already paint)</td></tr><tr><td>Roughness</td><td>0 is mirror-like, 1 fully matte. Starts at 0.65.</td><td>8-bit</td></tr><tr><td>Metallic</td><td>0 for paint, stone, skin, plastic; 1 for bare metal. Starts at 0.</td><td>8-bit</td></tr><tr><td>Normal</td><td>Fine surface direction, a tangent-space normal map (OpenGL, green up). Starts flat.</td><td>8-bit RGB</td></tr><tr><td>Height</td><td>Painted relief, 0.5 = none. Also adds to the normal (&quot;height to normal&quot;).</td><td>16-bit</td></tr><tr><td>Ambient Occlusion</td><td>How much light reaches crevices, 1 = open.</td><td>8-bit</td></tr><tr><td>Emissive</td><td>Light the surface gives off, black = none.</td><td>8-bit sRGB</td></tr><tr><td>Opacity</td><td>1 = opaque. Exported in the base colour&#x27;s alpha.</td><td>8-bit</td></tr></tbody></table></div>
+<p>A channel you turn on costs no memory until you paint it: channels are stored as 64 x 64 tiles, and a tile nobody painted is not stored at all (a tile of one value is stored as that one value). Turning a channel off discards what was painted in it; <strong>Undo</strong> brings it back.</p>
+<h2 id="turn-channels-on">Turn channels on<a class="anchor" href="#turn-channels-on" aria-label="Link to this section">#</a></h2>
+<ol>
+<li>
+Give the SubTool a texture (<a href="texture-painting.html">Texture painting</a>).
+</li>
+<li>
+Open <strong>Tool &gt; Texture Map</strong>. Under <strong>Material Channels</strong>, tick the channels you want (for a typical game asset: Roughness, Metallic and Normal; add Height to paint relief, Ambient Occlusion to paint dirt into crevices).
+</li>
+<li>
+<strong>Channel memory</strong> below the ticks shows what the painted tiles use; the same number, for every SubTool, is in <strong>Preferences &gt; Performance</strong> under Memory.
+</li>
+</ol>
+<h2 id="paint-a-material">Paint a material<a class="anchor" href="#paint-a-material" aria-label="Link to this section">#</a></h2>
+<p>Open the <strong>Color</strong> palette. With a material texture, a <strong>Material</strong> section appears under the swatches:</p>
+<figure class="shot"><a href="images/pbr-brush-material.jpg" class="zoom"><img src="images/pbr-brush-material.jpg" alt="Color &gt; Material: material swatches, and per channel a tick, value swatches and a slider; Material Channels in Tool &gt; Texture Map" width="1200" height="720" loading="lazy" decoding="async"></a><figcaption>Color &gt; Material: material swatches, and per channel a tick, value swatches and a slider; Material Channels in Tool &gt; Texture Map</figcaption></figure>
+<ul>
+<li>
+<strong>Material swatches</strong> set the colour, roughness and metallic at once (bare metal, gold, copper, rust, gloss paint, rubber, stone, clay) and make the brush paint those channels.
+</li>
+<li>
+One row per channel: the tick says whether the brush paints that channel; the five grey squares pick 0, 25, 50, 75 or 100%; the slider sets any value. Normal has two tilt sliders (0, 0 paints a flat normal). Emissive has a colour.
+</li>
+</ul>
+<p>Untick Base Color to paint only roughness (a wet patch, a polished edge) without touching the colour. Every stroke is one undo step for all the channels it painted. The brush&#x27;s falloff, alpha, pen pressure, symmetry and mask apply to every channel alike; erasing (<kbd>Alt</kbd>) paints Base back to each channel&#x27;s default and makes layers transparent.</p>
+<p><strong>C over the model picks the whole material</strong>: the colour and every channel under the cursor become the brush material, and the brush then paints all of the texture&#x27;s channels.</p>
+<h2 id="layers-and-channels">Layers and channels<a class="anchor" href="#layers-and-channels" aria-label="Link to this section">#</a></h2>
+<p>Paint layers (<a href="texture-painting.html#paint-layers-on-a-texture">Texture painting</a>) hold every channel. In <strong>Tool &gt; Paint Layers</strong>, each layer row gets a row of <strong>channel chips</strong> (BC, R, M, N, H, AO, E, Op):</p>
+<ul>
+<li>
+<strong>Click</strong> a chip to turn that channel of the layer on or off. A rust layer can carry colour and roughness but leave metallic alone; a scratches layer can affect only the normal.
+</li>
+<li>
+<strong>Right-click</strong> a chip for the channel&#x27;s <strong>blend mode</strong> and <strong>opacity</strong>. The ten paint-layer blend modes work per channel (Multiply on roughness halves it where you paint, Screen brightens AO...). The Normal channel adds <strong>Normal Combine</strong>, which lays the layer&#x27;s normal detail onto the normals below instead of replacing them. A chip with a <code>*</code> uses a blend mode other than Normal or less than full opacity.
+</li>
+<li>
+The layer&#x27;s own opacity, visibility and lock apply to all its channels.
+</li>
+</ul>
+<p>Merge down and Flatten keep the look of every channel. Duplicate copies a layer with its channels.</p>
+<h2 id="see-one-channel-on-its-own">See one channel on its own<a class="anchor" href="#see-one-channel-on-its-own" aria-label="Link to this section">#</a></h2>
+<p><strong>Tool &gt; Texture Map &gt; Normal view</strong> opens a list: pick <strong>Solo Roughness</strong> (or any enabled channel) and the model shows just that channel, in grey for roughness, metallic, height, AO and opacity, as colours for the normal (with the height&#x27;s normal in it) and in colour for emissive. Painting updates it live. Pick <strong>Normal view</strong> to go back. The viewport doesn&#x27;t yet render the channels together as a lit PBR material; the solo view is how you check them for now.</p>
+<h2 id="height-and-normals">Height and normals<a class="anchor" href="#height-and-normals" aria-label="Link to this section">#</a></h2>
+<p>Height is stored with 16 bits, so slow ramps don&#x27;t band. Its slope becomes a normal that is combined onto the Normal channel (Normal Combine) wherever a normal is shown or exported, so painting height also gives the shading detail. <code>texture_channels height_normal_strength=4</code> sets how steep that normal is (0: height adds no normal).</p>
+<h2 id="carrying-channels-through-geometry-changes">Carrying channels through geometry changes<a class="anchor" href="#carrying-channels-through-geometry-changes" aria-label="Link to this section">#</a></h2>
+<p>Auto UV, Voxel Remesh, QRemesh and merging SubTools move every channel and every layer&#x27;s channels onto the new UVs, as they do the colour. A part without a channel takes that channel&#x27;s default when SubTools merge.</p>
+<h2 id="projects">Projects<a class="anchor" href="#projects" aria-label="Link to this section">#</a></h2>
+<p>Projects with material channels are saved as format 7 (SculptForge 0.10 and later opens them). A project without material channels is still saved as format 6, so older versions keep opening it. Older projects open as they did.</p>
+<h2 id="commands">Commands<a class="anchor" href="#commands" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table><thead><tr><th>Command</th><th>What it does</th></tr></thead><tbody><tr><td><code>texture_channels enable=roughness,metallic,normal</code></td><td>Turn channels on (<code>disable=...</code> off; no arguments lists them)</td></tr><tr><td><code>paint_material roughness=0.2 metallic=1 color=c0c0c8</code></td><td>Set the brush material; <code>channels=all</code> / <code>channels=roughness</code> say exactly what it paints</td></tr><tr><td><code>texture_layer_channel channel=normal blend=normal_combine</code></td><td>A layer&#x27;s channel settings (<code>enabled</code>, <code>blend</code>, <code>opacity</code>; <code>layer</code> or <code>index</code>)</td></tr><tr><td><code>channel_view channel=roughness</code></td><td>Solo a channel in the viewport (<code>off</code> to go back)</td></tr><tr><td><code>export_maps preset=unreal folder=...</code></td><td>Write the maps (<a href="export-presets.html">Export presets</a>)</td></tr></tbody></table></div>
+<h2 id="limitations">Limitations<a class="anchor" href="#limitations" aria-label="Link to this section">#</a></h2>
+<ul>
+<li>
+The viewport shows one channel at a time (solo view); a lit PBR preview with environment lighting is planned.
+</li>
+<li>
+Fill layers, generators (edge wear, dirt), mesh-map bakes as layer inputs, filters and material recipes are planned; today the stack is paint layers.
+</li>
+<li>
+One texture per SubTool (no UDIM tiles yet).
+</li>
+<li>
+Memory: colour, roughness, metallic, height and AO on Base plus three layers, each with a few big strokes, take about 370 MB at 4K and 1.5 GB at 8K (most of it the colour layers); a layer painted everywhere adds about 200 MB of channels at 4K and 800 MB at 8K. Preferences &gt; Performance shows the numbers for your scene. Paint at 4K unless you need 8K.
+</li>
+<li>
+Export Maps takes a few seconds at 4K and about ten at 8K (PNG compression).
+</li>
+</ul>
+      </article>
+      <nav class="pager" aria-label="Previous and next chapter"><a class="prev" rel="prev" href="texture-painting.html"><span>Previous</span>Texture painting</a><a class="next" rel="next" href="layers.html"><span>Next</span>Sculpt layers and blend shapes</a></nav>
+      <p class="guide-meta fine">Also in the app: <strong>Help &gt; User Guide</strong> (<kbd>Shift</kbd>+<kbd>F1</kbd>).
+        Found a mistake? <a href="https://github.com/islandmed/SculptForge/edit/main/docs/guide/pbr-painting.md">Edit this page on GitHub</a>.</p>
+    </main>
+    <aside class="on-page" aria-label="On this page"><p>On this page</p><ul><li><a href="#the-channels">The channels</a></li><li><a href="#turn-channels-on">Turn channels on</a></li><li><a href="#paint-a-material">Paint a material</a></li><li><a href="#layers-and-channels">Layers and channels</a></li><li><a href="#see-one-channel-on-its-own">See one channel on its own</a></li><li><a href="#height-and-normals">Height and normals</a></li><li><a href="#carrying-channels-through-geometry-changes">Carrying channels through geometry changes</a></li><li><a href="#projects">Projects</a></li><li><a href="#commands">Commands</a></li><li><a href="#limitations">Limitations</a></li></ul></aside>
+  </div>
+  <footer class="footer">
+    <div class="wrap footer-grid">
+      <div>
+        <a class="brand" href="../index.html"><img src="../img/logo.svg?v=2" alt="" width="28" height="28"><span>SculptForge</span></a>
+        <p class="fine">Copyright © 2026 The SculptForge contributors.<br>The SculptForge User Guide is part of
+          SculptForge, licensed under the <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
+      </div>
+      <div class="links">
+        <a href="index.html">User guide</a>
+        <a href="https://github.com/islandmed/SculptForge">Source code</a>
+        <a href="https://github.com/islandmed/SculptForge/issues">Report a problem</a>
+        <a href="https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md">AI services &amp; privacy</a>
+      </div>
+      <p class="fine trademarks">SculptForge is an independent project, not affiliated with or endorsed by Maxon or
+        any other company named in this guide. ZBrush is a trademark of Maxon. All other trademarks belong to their
+        owners.</p>
+    </div>
+  </footer>
+</body>
+</html>

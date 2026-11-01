@@ -116,11 +116,18 @@ bool App::init(const AppOptions& options) {
                                   (headless ? SDL_WINDOW_HIDDEN : 0) |
                                   (options.fullscreen && !headless ? SDL_WINDOW_FULLSCREEN : 0);
     const bool sized = recording || options.benchmark; // proof mode: --size (1920x1080 by default)
-    const int winW = sized ? options.width : 1600, winH = sized ? options.height : 960;
+    rememberWindow_ = !sized && !headless && options.demo.empty() && !options.fullscreen;
+    const WindowState saved = rememberWindow_ ? loadWindowState() : WindowState{};
+    const int winW = sized ? options.width : saved.w, winH = sized ? options.height : saved.h;
     window_ = SDL_CreateWindow("SculptForge", winW, winH, flags);
     if (!window_) {
         SDL_Log("SDL_CreateWindow failed: %s", SDL_GetError());
         return false;
+    }
+    if (rememberWindow_) { // #35: where and how big it was last time
+        if (saved.placed) SDL_SetWindowPosition(window_, saved.x, saved.y);
+        if (saved.fullscreen) SDL_SetWindowFullscreen(window_, true);
+        else if (saved.maximized) SDL_MaximizeWindow(window_);
     }
     {
         Image icon;
@@ -179,6 +186,9 @@ bool App::init(const AppOptions& options) {
     float scale = SDL_GetWindowDisplayScale(window_) / (density > 0.0f ? density : 1.0f);
     if (scale <= 0.0f) scale = 1.0f;
     initUiConfig(headless || !options.demo.empty()); // ui.json (layout, shortcuts, UI scale); never for tests and videos
+    // Preferences > Input > Local API, or SF_LOCAL_API=1 for this run (scripts, CI)
+    if ((uiPrefs_.liveApi || (std::getenv("SF_LOCAL_API") && *std::getenv("SF_LOCAL_API") == '1')) && !headless && options.demo.empty())
+        setLiveApi(true);
     if (!headless && uiPrefs_.uiScale > 0.0f) scale = uiPrefs_.uiScale;
     if (recording) scale = float(options.height) / 900.0f; // UI sized for the video, not this screen
     uiScale_ = scale;
@@ -284,6 +294,12 @@ bool App::init(const AppOptions& options) {
 }
 
 void App::shutdown() {
+    saveWindowState();
+    if (liveApi_) { // stop serving; the preference stays on for next time
+        const bool keep = uiPrefs_.liveApi;
+        setLiveApi(false);
+        uiPrefs_.liveApi = keep;
+    }
     if (doc_.sculptor.strokeActive()) endStroke();
     solver_.reset(); // (its thread uses the renderer)
     flushBrushEdits();
@@ -756,6 +772,7 @@ int App::run() {
         phases = 0;
         mark();
         while (SDL_PollEvent(&e)) onEvent(e);
+        pollLiveApi(); // commands from other programs (app/LiveApi.cpp)
         mark();
         // (The window must have settled too: a window manager that maximises it late, on a busy machine, changes
         // the canvas and with it the brush's size in the world mid-stroke.)
@@ -856,6 +873,16 @@ int App::run() {
         }
         // The stroke's queued dabs: handed to the solver thread (predictive strokes, AsyncStroke.cpp), or placed here
         // for a limited time, then look at the pointer again.
+        // Continuous (#31): a pointer held still keeps dabbing where it is, 30 times a second.
+        if (strokeContinuous_ && drag_ == Drag::Stroke && !firstDabPending_ && dabQueue_.empty() &&
+            strokeBrush_ != BrushType::Move && strokeBrush_ != BrushType::SnakeHook && strokeType_ != StrokeType::DragRect &&
+            strokeType_ != StrokeType::DragDot) {
+            const double nowS = double(SDL_GetTicksNS()) * 1e-9;
+            if (nowS - strokeMovedAt_ > 0.05 && nowS - continuousDabAt_ > 1.0 / 30.0) {
+                dabQueue_.push({lastX_, lastY_, lastStrokePressure_});
+                continuousDabAt_ = nowS;
+            }
+        }
         if (asyncStroke_) pumpStroke();
         else drainStrokeDabs(kStrokeBudgetSeconds);
         mark();
@@ -1106,6 +1133,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
     rightClick_.y = y;
     rightClick_.dx = rightClick_.dy = 0.0f;
     if (blenderStyle() && blenderNavigationDown(button)) return; // middle / Alt+left / right drags navigate
+    if (mayaStyle() && mayaNavigationDown(button)) return;       // Alt+left / middle / right: orbit / pan / zoom
     if (button == SDL_BUTTON_LEFT) {
         if (zsphereMouseDown(x, y, mod)) return; // a ZSphere SubTool takes clicks on it (PanelZSpheres.cpp)
         if (polygroupMouseDown(x, y, mod)) return;
@@ -1132,6 +1160,15 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         }
         RayHit hit;
         const bool maskMod = ctrlDown(mod) && !(mod & SDL_KMOD_SHIFT);
+        if (!insertType_.empty() && !maskMod && previewLod_ < 0 && pick(x, y, hit)) { // Append > Insert (#34)
+            drag_ = Drag::Insert;
+            insertAt_ = hit.position;
+            insertNormal_ = hit.normal;
+            insertX_ = x;
+            insertY_ = y;
+            insertPx_ = 0.0f;
+            return;
+        }
         if (previewLod_ < 0 && pick(x, y, hit)) {
             if (maskMod) beginMaskStroke(x, y);
             else beginStroke(x, y, hit);
@@ -1164,6 +1201,17 @@ void App::onMouseDown(float x, float y, Uint8 button) {
 
 // Blender: middle-drag orbits, Shift+middle pans, Ctrl+middle zooms; Alt+left-drag is the emulated middle button
 // (pens, trackpads); the right button drags the same way. True when the press started navigating.
+bool App::mayaNavigationDown(Uint8 button) {
+    const SDL_Keymod keys = SDL_GetModState(); // the keyboard itself, before inputMods' Maya mapping
+    if (!(keys & SDL_KMOD_ALT) || ctrlDown(keys) || (keys & SDL_KMOD_SHIFT)) return false; // Alt alone navigates
+    if (button == SDL_BUTTON_LEFT) drag_ = Drag::Orbit;
+    else if (button == SDL_BUTTON_MIDDLE) drag_ = Drag::Pan;
+    else if (button == SDL_BUTTON_RIGHT) drag_ = Drag::Zoom;
+    else return false;
+    rightClick_.pending = false;
+    return true;
+}
+
 bool App::blenderNavigationDown(Uint8 button) {
     const SDL_Keymod keys = SDL_GetModState(); // the keyboard itself: blenderMods turns Ctrl into the invert
     const bool emulated = button == SDL_BUTTON_LEFT && (keys & SDL_KMOD_ALT);
@@ -1266,6 +1314,16 @@ void App::onMouseUp() {
     orbitStarted_ = false;
     panFromAlt_ = false;
     if (drag_ == Drag::Select) selectionMouseUp();
+    if (drag_ == Drag::Insert) {
+        // The drag's length on screen, as a size at the surface point's depth (at least a small default).
+        const float px = std::max(insertPx_, 12.0f * uiScale_);
+        const float dist = glm::length(camera_.position() - insertAt_);
+        const float worldPerPx = 2.0f * dist * std::tan(camera_.fovY * 0.5f) / std::max(canvasRect().h, 1.0f);
+        runCommand("insert_primitive", {{"type", insertType_}, {"x", double(insertAt_.x)}, {"y", double(insertAt_.y)},
+                                        {"z", double(insertAt_.z)}, {"nx", double(insertNormal_.x)},
+                                        {"ny", double(insertNormal_.y)}, {"nz", double(insertNormal_.z)},
+                                        {"size", double(2.0f * px * worldPerPx)}});
+    }
     if (drag_ == Drag::Stroke && maskClickPending_) maskClickRelease(); // Ctrl+click: blur / sharpen the mask
     else if (drag_ == Drag::Stroke && asyncStroke_) {
         // Predictive strokes: letting go doesn't wait for the dabs still to place; the solver carries on and
@@ -1286,6 +1344,11 @@ void App::onMouseUp() {
 }
 
 void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
+    if (key == SDLK_ESCAPE && !insertType_.empty()) { // Append > Insert (#34) off
+        insertType_.clear();
+        status_ = "Insert off";
+        return;
+    }
     if (captureShortcutKey(key, mod)) return; // Ctrl+Alt+click a button, then press its new key
     if (key == SDLK_ESCAPE && capture_.armed) { // Capture from view waiting for its square (PanelKelvinlet.cpp)
         capture_.armed = false;
@@ -1387,6 +1450,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
 }
 
 void App::strokeTo(float x, float y) {
+    strokeMovedAt_ = double(SDL_GetTicksNS()) * 1e-9; // (Continuous dabs wait for the pointer to rest)
     if (asyncStroke_) {
         pointerLatest_ = glm::vec2(x, y);
         pointerLatestAt_ = double(SDL_GetTicksNS()) * 1e-9;
@@ -1880,6 +1944,12 @@ void App::drawUi() {
     drawSplatTrainOverlay(); // splat training progress (PanelSplatTrain.cpp)
     drawSculptableOverlay(); // Make sculptable: crop box, face landmarks (PanelSculptable.cpp)
     drawCaptureOverlay();    // Capture from view: the square, the result window (PanelKelvinlet.cpp)
+    if (uiPrefs_.showAxes) drawAxisGizmo(); // X / Y / Z in the canvas corner (#31)
+    if (drag_ == Drag::Insert) { // the size the insert will get
+        insertPx_ = std::hypot(mouse.x - insertX_, mouse.y - insertY_);
+        ImGui::GetForegroundDrawList()->AddCircle(ImVec2(insertX_, insertY_), std::max(insertPx_, 12.0f * uiScale_),
+                                                  theme::u32(theme::accent), 48, 2.0f * uiScale_);
+    }
     // In Gizmo mode (and with the QRemesh Guides brush) the brush ring shows only while Ctrl masks or Shift smooths.
     const bool ringOff = gizmoActive() || (guidesMode_ && !(inputMods() & SDL_KMOD_SHIFT)) || sculptableHot() || zsphereActive();
     if (((!ImGui::GetIO().WantCaptureMouse && canvasRect().contains(mouse.x, mouse.y)) || drag_ == Drag::Stroke) &&
@@ -2858,6 +2928,29 @@ bool App::drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col) {
         dl->AddCircleFilled(c0, 2.0f * uiScale_, col);
     }
     return true;
+}
+
+void App::drawAxisGizmo() {
+    // The world axes as the camera sees them, top left of the canvas, under the UI: red X, green Y, blue Z;
+    // the axes pointing away are drawn first and dimmer.
+    ImDrawList* dl = ImGui::GetBackgroundDrawList();
+    const CanvasRect canvas = canvasRect();
+    const float s = 34.0f * uiScale_;
+    const ImVec2 c(canvas.x + s + 18.0f * uiScale_, canvas.y + s + 18.0f * uiScale_); // top left: the timeline strip is at the bottom
+    const glm::mat3 rot(camera_.view());
+    struct Axis { glm::vec3 d; ImU32 col; const char* name; };
+    Axis axes[3] = {{rot * glm::vec3(1, 0, 0), IM_COL32(230, 80, 80, 255), "X"},
+                    {rot * glm::vec3(0, 1, 0), IM_COL32(110, 200, 90, 255), "Y"},
+                    {rot * glm::vec3(0, 0, 1), IM_COL32(80, 140, 240, 255), "Z"}};
+    std::sort(std::begin(axes), std::end(axes), [](const Axis& a, const Axis& b) { return a.d.z < b.d.z; });
+    for (const Axis& a : axes) {
+        const ImVec2 tip(c.x + a.d.x * s, c.y - a.d.y * s);
+        const ImU32 col = a.d.z < -0.2f ? (a.col & 0x00ffffffu) | 0x90000000u : a.col;
+        dl->AddLine(c, tip, col, 2.0f * uiScale_);
+        dl->AddCircleFilled(tip, 7.0f * uiScale_, col);
+        const ImVec2 ts = ImGui::CalcTextSize(a.name);
+        dl->AddText(ImVec2(tip.x - ts.x * 0.5f, tip.y - ts.y * 0.5f), IM_COL32(20, 20, 22, 255), a.name);
+    }
 }
 
 void App::drawBrushCursor() {

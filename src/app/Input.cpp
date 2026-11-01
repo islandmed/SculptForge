@@ -87,6 +87,10 @@ void App::registerInputActions() {
         "LazyMouse on or off: the brush trails the cursor on a string, for steady lines.",
         [this] { strokeType_ = strokeType_ == StrokeType::LazyMouse ? StrokeType::Dots : StrokeType::LazyMouse; },
         [this] { return strokeType_ == StrokeType::LazyMouse; });
+    add("stroke.continuous", "Continuous", ICON_LC_REPEAT, "Stroke", "",
+        "Continuous on or off: while you hold the brush still on the model it keeps adding, 30 dabs a second "
+        "(build up a bump without moving). Not for Move, Snake Hook or the drag strokes.",
+        [this] { strokeContinuous_ = !strokeContinuous_; }, [this] { return strokeContinuous_; });
     add("color.switch", "Switch Color", ICON_LC_ARROW_LEFT_RIGHT, "Color", "V",
         "Swap the main and the secondary colour.", [this] { std::swap(doc_.paintColor, secondaryColor_); });
 
@@ -126,6 +130,11 @@ void App::registerInputActions() {
         "the same for pens and trackpads, Ctrl inverts a stroke, Shift smooths, F / Shift+F set radius and strength, "
         "V S P I G C K pick brushes and M the mask brush, Home frames everything. Rotation switches to Turntable.",
         [this] { setInputStyle(2); }, [this] { return uiPrefs_.inputStyle == 2; });
+    add("input.style_maya", "Maya", nullptr, "Preferences > Input", "",
+        "Maya's view controls: Alt+left-drag orbits, Alt+middle-drag pans, Alt+right-drag zooms, anywhere on the "
+        "canvas. Ctrl inverts a stroke, Ctrl+Alt masks (Ctrl+Alt+drag on the background clears the mask), Shift "
+        "smooths, Ctrl+Shift hides and shows. ZBrush's keys stay for everything else.",
+        [this] { setInputStyle(3); }, [this] { return uiPrefs_.inputStyle == 3; });
     add("input.emulate_numpad", "Emulate Numpad", nullptr, "Preferences > Input", "",
         "Blender style: the number keys above the letters work as the numpad (1 front, 3 right, 7 top, 5 "
         "orthographic...), for keyboards without one.",
@@ -227,14 +236,14 @@ void App::registerViewActions() {
 }
 
 void App::setInputStyle(int style) {
-    uiPrefs_.inputStyle = std::clamp(style, 0, 2);
+    uiPrefs_.inputStyle = std::clamp(style, 0, 3);
     if (blenderStyle()) uiPrefs_.turntable = true; // Blender orbits as a turntable; Preferences > Input changes it
     maskBrush_.on = false;
     applyInputStyle();
 }
 
 void App::applyInputStyle() {
-    const int style = std::clamp(uiPrefs_.inputStyle, 0, 2);
+    const int style = std::clamp(uiPrefs_.inputStyle, 0, 3) == 3 ? 0 : std::clamp(uiPrefs_.inputStyle, 0, 2); // Maya keeps ZBrush keys
     const bool sf = style == 1;
     // One row per action whose key depends on the style: ZBrush, SculptForge, Blender (Blender 4.2 - 5.x defaults).
     struct Keys {
@@ -388,7 +397,7 @@ bool App::importBlenderKeymap(const std::string& path) {
 }
 
 void App::drawInputStyleRow(float width) {
-    ui::Segmented(*this, {"input.style_zbrush", "input.style_sculptforge", "input.style_blender"}, width);
+    ui::Segmented(*this, {"input.style_zbrush", "input.style_sculptforge", "input.style_blender", "input.style_maya"}, width);
 }
 
 void App::drawInputSection() {
@@ -408,6 +417,15 @@ void App::drawInputSection() {
     if (ui::Checkbox("Cursor follows surface##input.surface_cursor", &surfaceCursor))
         uiPrefs_.cursorFollowsSurface = surfaceCursor;
     ui::HelpAction(*this, "input.surface_cursor");
+    bool liveApi = uiPrefs_.liveApi;
+    if (ui::Checkbox("Local API for other programs##input.local_api", &liveApi)) {
+        uiPrefs_.liveApi = liveApi;
+        setLiveApi(liveApi);
+    }
+    ui::HelpText("Local API for other programs", nullptr,
+                 "Lets tools on this computer (SymSolv, scripts, add-ons) run SculptForge commands in the open app: "
+                 "127.0.0.1 only, with a token in api.json in the settings folder. See Scripting in the guide.",
+                 "Preferences > Input");
     ui::ActionButton(*this, "input.import_blender", ImVec2(-FLT_MIN, 0), ui::Look::IconLabel);
     ImGui::TextDisabled("Rotation");
     ImGui::SameLine();

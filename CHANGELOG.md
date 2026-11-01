@@ -6,7 +6,30 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-11-01
+
+0.10.0 was tagged but never published (its Windows build failed); everything in it ships here.
+
 ### Added
+- **Local API for other programs** (#36): Preferences > Input > Local API (or `SF_LOCAL_API=1`) serves commands to
+  programs on this computer on 127.0.0.1 with a token in `api.json`; new `mesh_read` and `mesh_set_positions`
+  read the active SubTool's coordinates and write them back as one undoable step (topology checked).
+- **Maya navigation style** (#32): Preferences > Input > Maya: Alt+left orbits, Alt+middle pans, Alt+right zooms;
+  Ctrl inverts, Ctrl+Alt masks.
+- **Focal length** (#26): Draw > Camera > Focal Length (15-300 mm, full-frame) with 35 / 50 / 85 / 135 presets,
+  saved with the project.
+- **More primitives** (#31): Append > Cylinder, Cone, Torus, Capsule, Icosphere, Quad Sphere (quads, one polygroup
+  per part); **Insert on the model** (#34): pick a primitive in Append > Insert and drag on the surface to add it
+  along the normal, sized by the drag (`insert_primitive`); **Continuous** stroke option (keeps dabbing while the
+  brush rests); an **X / Y / Z axis gizmo** in the canvas corner (Draw > Camera > Axes).
+- SculptForge remembers its window size, position, maximised and full-screen state (#35).
+
+### Fixed
+- The viewport could keep old frames on screen (cursor trails, popups burned in, the mesh not drawn) on some
+  drivers, NVIDIA on Windows among them (#29): the view now resets the scissor, colour and depth write state before
+  it clears.
+- Windows builds: proof mode's `small` / `near` names clashed with Windows headers.
+
 - **Micro levels: hundreds of millions of sculptable polygons** (**Tool > Geometry > Micro**, `micro_*`
   commands). Above the highest subdivision level a SubTool can carry a micro level: per triangle a regular grid of
   16-bit heights along the interpolated normal of the smooth (Phong-tessellated) base, instead of a mesh.

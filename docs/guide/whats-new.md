@@ -5,6 +5,53 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.10.1
+
+### From your feedback on GitHub
+
+- **Maya navigation** (#32): **Preferences > Input > Maya**. Alt+left orbits, Alt+middle pans, Alt+right zooms.
+- **Focal length** (#26): **Draw > Camera**, 15-300 mm with 35 / 50 / 85 / 135 presets, saved with the project.
+- **More primitives** (#31): Cylinder, Cone, Torus, Capsule, Icosphere and Quad Sphere in **Tool > SubTool >
+  Append**, plus **Insert on the model** (#34): choose a shape, then drag on the surface to add it.
+- **Continuous** in the Stroke palette keeps the brush working while you hold it still, and an X / Y / Z gizmo
+  shows the view's direction (#31).
+- **Local API** (#36): other programs on your computer (symmetry tools, scripts) can run commands in the open
+  app. Off by default; see [Scripting](scripting.md).
+- The window opens where and how big you left it (#35), and a drawing problem on some graphics drivers that left
+  trails in the viewport is fixed (#29).
+
+### Micro levels: hundreds of millions of polygons
+
+**Tool > Geometry > Micro** adds a micro-displacement level above your top subdivision level: up to about a
+billion sculptable triangles in under 2 GB of memory, drawn at the detail your screen can show. Move reshapes the
+base and the detail rides along. Bake it down or export displacement maps. See
+[Micro levels](micro-levels.md).
+
+### Material painting (PBR)
+
+Paint roughness, metallic, normal, height, AO, emissive and opacity alongside colour, per paint layer, and export
+packed maps with presets for Unreal, Unity, glTF, Godot, Blender and USD. Texture brushes are much faster on
+dense meshes. See [Material painting](pbr-painting.md) and [Export presets](export-presets.md).
+
+### Sculpt Timeline and proof mode
+
+Scrub back through every stroke, branch from any point, retune an old stroke's strength, and export a timelapse
+turntable. **Help > Benchmark** runs a scripted stroke on 5M to 33M triangles with a live readout and records a
+video and a report you can share. See [Sculpt Timeline](timeline.md) and [Performance](performance.md).
+
+### Hardware profile
+
+On first start SculptForge measures your computer for a second and picks settings for it (Laptop, Workstation or
+a safe mode); on battery it saves power. See **Preferences > Performance**.
+
+### Also new
+
+- The brush ring lies on the surface and follows its shape (#25). **Preferences > Input > Cursor follows surface**
+  turns it off.
+- Faster normals on big meshes. **Predictive strokes** (a GPU preview of each dab ahead of the solver) are in
+  **Preferences > Performance** as an experiment.
+- The status bar shows only the file name of what you open.
+
 ## Version 0.9.7
 
 ### Faster big brushes on dense meshes
