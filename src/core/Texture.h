@@ -64,6 +64,9 @@ struct TextureLayer {
     LayerChannels channels; // material channels (core/TextureChannels.h); [BaseColor] only says whether colour shows
 };
 
+struct UvTileIndex;   // (Texture.cpp)
+struct TexelMapCache; // (Texture.cpp)
+
 struct PaintTexture {
     int width = 0, height = 0;
     uint64_t serial = 0; // unique per texture object (makeTexture / copies), for GPU caches
@@ -104,6 +107,14 @@ struct PaintTexture {
         const size_t i = size_t(y) * size_t(width) + size_t(x);
         return (coverage[i >> 3] >> (i & 7)) & 1;
     }
+
+    // Texel tiles -> surface (the texture brush on dense meshes): the UV triangles binned per kTextureTile tile
+    // (built once per UV layout and size, with `coverage`), and per tile, made when a brush first reaches it, the
+    // triangle and barycentrics of every texel (island texels, and gutter texels with their nearest island
+    // point). A dab then costs the texels it reaches, not the triangles under it. Caches: shared by copies, not
+    // saved or undone.
+    std::shared_ptr<const UvTileIndex> uvIndex;
+    std::shared_ptr<TexelMapCache> texelMaps;
 
     size_t texelCount() const { return size_t(width) * size_t(height); }
     // The array painting writes into (layer -1 = Base: `pixels` without layers).
@@ -188,6 +199,24 @@ private:
     // The images material channel c paints into (the target layer's or Base), null when the stroke doesn't paint c.
     TileImage* channelTarget(PaintTexture& tex, int c) const;
     uint32_t channels_ = 1u; // what the stroke paints (channelBit; BaseColor = bit 0)
+
+public:
+    // Which dab path to use: Auto (texel tiles on dense meshes: under 64 texels per triangle), Tiles or Triangles
+    // (tests compare them).
+    enum class Path { Auto, Tiles, Triangles };
+    static void setPath(Path path);
+
+private:
+    // Dense meshes (texels outnumber what each triangle covers): the brush finds the texture tiles under it from
+    // the BVH leaves (no per-triangle work), then paints every texel of those tiles from its cached triangle and
+    // barycentrics (PaintTexture::texelMaps), tiles in parallel. Costs the texels reached, not the triangles.
+    struct DabContext;
+    bool useTilePath(const Mesh& mesh, PaintTexture& tex) const;
+    template <class Paint> // paint(tile record, texel in tile, x, y, coverage)
+    size_t dabTiles(const DabContext& ctx, const Paint& paint, bool composite,
+                    std::vector<std::pair<glm::ivec2, glm::ivec2>>& rects);
+    std::vector<uint32_t> touched_;     // tiles a dab reaches
+    std::vector<uint8_t> touchedFlag_;  // per tile
     // The tile's stroke record, made on first touch (thread-safe).
     // Also makes the tile of every material channel the stroke paints writable.
     Tile& tile(uint32_t index, const std::vector<uint8_t>& target, int width, int height, PaintTexture& tex);

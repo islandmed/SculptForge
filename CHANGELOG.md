@@ -28,6 +28,11 @@ All notable changes to SculptForge are listed here. The format follows
 - Preferences > Performance and `perf_info` show the memory of textures and their material channels.
 
 ### Changed
+- Texture painting on dense meshes costs the texels a dab reaches instead of the triangles under it: the brush
+  finds the texture tiles under it from the BVH and paints each texel from a cached triangle-and-barycentrics
+  map, tiles in parallel. A 0.35-radius dab with X symmetry on a 21M-triangle sphere: 4K 150-360 ms -> 24-39 ms,
+  8K 240-350 ms -> 39-55 ms (M1 Pro, ranges over a busy and a quiet machine); results match the old dab within
+  1/255. Lighter meshes keep the per-triangle dab.
 - Project format 7 stores material channels. It is written only when a texture has them: other projects are
   still saved as format 6, and every older project opens as before.
 

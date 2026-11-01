@@ -501,6 +501,7 @@ TEST(material_dense_mesh_benchmark) {
     auto ms = [](auto a, auto b) { return std::chrono::duration<double, std::milli>(b - a).count(); };
     std::printf("  tris / tex / radius: colour dab ms, 5-channel dab ms (ratio)\n");
     for (int level : {7, 9, 10}) {
+        if (const char* only = std::getenv("SF_BENCH_DENSE_LEVEL"); only && std::atoi(only) != level) continue; // e.g. 10 = 21M only
         const auto tb = now();
         // One mesh per size, shared by every measurement (a 21M copy would cost gigabytes).
         Document doc;
@@ -516,20 +517,25 @@ TEST(material_dense_mesh_benchmark) {
                     double(residentBytes()) / 1e9);
         for (int size : {4096, 8192}) {
             for (float radius : {0.05f, 0.35f}) {
-                double t[2] = {0, 0};
-                for (int pass = 0; pass < 2; ++pass) {
+                // Pass 0: colour with the per-triangle dab (as 0.10 shipped); 1: colour with texel tiles; 2: five
+                // channels with texel tiles. `cold`: the first dab of pass 1 (the UV bins and texel tiles are made).
+                double t[3] = {0, 0, 0}, cold = 0;
+                for (int pass = 0; pass < 3; ++pass) {
+                    TexturePainter::setPath(pass == 0 ? TexturePainter::Path::Triangles : TexturePainter::Path::Auto);
                     Mesh& m = base;
                     m.texture = makeTexture(size, size);
                     m.paintToTexture = true;
                     BrushMaterial mat = rustyMetal();
-                    mat.channels = pass ? five : channelBit(Channel::BaseColor);
-                    if (pass)
+                    mat.channels = pass == 2 ? five : channelBit(Channel::BaseColor);
+                    if (pass == 2)
                         for (Channel c : {Channel::Roughness, Channel::Metallic, Channel::Height, Channel::AO}) setChannelEnabled(*m.texture, c, true);
                     TexturePainter painter;
                     CHECK(painter.begin(m, mat.channels));
                     DabParams p = dab(glm::vec3(0, 0, 1), radius, 0.5f);
                     p.viewDir = glm::vec3(0, 0, -1);
+                    const auto c0 = now();
                     painter.dab(m, bvh, p, mat, Symmetry{true, false, false}); // warm-up (first touch of the tiles)
+                    if (pass == 1) cold = ms(c0, now());
                     for (int i = 0; i < 10; ++i) {
                         p.center = glm::normalize(glm::vec3(-0.15f + 0.03f * float(i), 0.2f, 1.0f));
                         const auto t0 = now();
@@ -540,8 +546,9 @@ TEST(material_dense_mesh_benchmark) {
                     painter.end(rec);
                     t[pass] /= 10.0;
                 }
-                std::printf("    %5.1fM / %dK / %.2f: %7.2f ms, %7.2f ms (%.2fx)\n", double(base.triangleCount()) / 1e6, size / 1024,
-                            radius, t[0], t[1], t[1] / t[0]);
+                TexturePainter::setPath(TexturePainter::Path::Auto);
+                std::printf("    %5.1fM / %dK / %.2f: triangles %7.2f ms -> tiles %6.2f ms (first dab %6.0f ms), 5 channels %6.2f ms (%.2fx)\n",
+                            double(base.triangleCount()) / 1e6, size / 1024, radius, t[0], t[1], cold, t[2], t[2] / t[1]);
             }
             // Memory: 5 channels, Base plus 3 layers, each with a big stroke on every channel; then one layer painted
             // everywhere (its tiles all dense), and export_maps of the result.
@@ -589,4 +596,73 @@ TEST(material_dense_mesh_benchmark) {
                         double(full) / 1e6, double(rss2 - std::min(rss0, rss2)) / 1e6, exportMs);
         }
     }
+}
+
+TEST(texture_dab_tile_path_matches_triangle_path) {
+    // The texel-tile dab (dense meshes) paints what the per-triangle dab paints: island texels within 1/255 in the
+    // colour and every channel, on Base and on a layer, with X symmetry and a mask; gutter texels may pick another
+    // nearby triangle, so they are only required to be painted.
+    Mesh base = makeIcosphere(6); // 82k triangles on a 1K texture: the tile path's case
+    sphericalUvs(base);
+    base.ensureMask();
+    for (uint32_t v = 0; v < base.vertexCount(); ++v) base.mask[v] = base.positions[v].y > 0.3f ? 0.7f : 0.0f;
+    BVH bvh;
+    bvh.build(base);
+    std::shared_ptr<PaintTexture> out[2];
+    for (int pass = 0; pass < 2; ++pass) {
+        TexturePainter::setPath(pass ? TexturePainter::Path::Tiles : TexturePainter::Path::Triangles);
+        Mesh m = base;
+        m.texture = makeTexture(1024, 1024);
+        m.paintToTexture = true;
+        for (Channel c : {Channel::Roughness, Channel::Height, Channel::Normal}) setChannelEnabled(*m.texture, c, true);
+        BrushMaterial mat = rustyMetal();
+        mat.normal = glm::normalize(glm::vec3(0.3f, -0.2f, 1.0f));
+        mat.channels = channelBit(Channel::BaseColor) | channelBit(Channel::Roughness) | channelBit(Channel::Height) |
+                       channelBit(Channel::Normal);
+        for (int layer = 0; layer < 2; ++layer) {
+            if (layer) addTextureLayer(*m.texture, "Layer");
+            TexturePainter painter;
+            CHECK(painter.begin(m, mat.channels));
+            DabParams p = dab(glm::vec3(0, 0, 1), layer ? 0.15f : 0.4f, 0.6f);
+            p.viewDir = glm::vec3(0, 0, -1);
+            for (int i = 0; i < 6; ++i) {
+                p.center = glm::normalize(glm::vec3(-0.4f + 0.15f * float(i), 0.25f * float(layer) - 0.1f, 1.0f));
+                CHECK(painter.dab(m, bvh, p, mat, Symmetry{true, false, false}) > 0);
+            }
+            UndoRecord rec;
+            painter.end(rec);
+            CHECK(rec.textureTiles != nullptr);
+            mat.color = glm::vec3(0.1f, 0.5f, 0.9f);
+            mat.roughness = 0.9f;
+        }
+        out[pass] = m.texture;
+    }
+    TexturePainter::setPath(TexturePainter::Path::Auto);
+    const PaintTexture& a = *out[0];
+    const PaintTexture& b = *out[1];
+    int worst = 0;
+    size_t islandPainted = 0, gutterMismatch = 0;
+    for (int y = 0; y < a.height; ++y)
+        for (int x = 0; x < a.width; ++x) {
+            const size_t i = size_t(y) * size_t(a.width) + size_t(x);
+            const bool island = a.covered(x, y);
+            int d = 0;
+            for (int k = 0; k < 3; ++k) d = std::max(d, std::abs(int(a.pixels[i * 4 + size_t(k)]) - int(b.pixels[i * 4 + size_t(k)])));
+            for (Channel c : {Channel::Roughness, Channel::Height, Channel::Normal}) {
+                float va[4], vb[4];
+                channelImage(a, c).values(x, y, va);
+                channelImage(b, c).values(x, y, vb);
+                for (int k = 0; k < channelFormat(c).components; ++k) d = std::max(d, int(std::lround(std::abs(va[k] - vb[k]) * 255.0f)));
+            }
+            if (island) {
+                worst = std::max(worst, d);
+                islandPainted += a.pixels[i * 4] != 255 || a.pixels[i * 4 + 2] != 255;
+            } else {
+                gutterMismatch += d > 1;
+            }
+        }
+    std::printf("  tile vs triangle dab: %zu island texels painted, worst difference %d/255, %zu gutter texels differ\n",
+                islandPainted, worst, gutterMismatch);
+    CHECK(islandPainted > 10000);
+    CHECK(worst <= 1);
 }

@@ -11,6 +11,8 @@
 #include <atomic>
 #include <cmath>
 #include <cstring>
+#include <limits>
+#include <cstdio>
 #include <thread>
 
 namespace sf {
@@ -799,6 +801,364 @@ TexturePainter::Tile& TexturePainter::tile(uint32_t index, const std::vector<uin
     return t;
 }
 
+// --- Texel-tile dabs for dense meshes ---
+
+namespace {
+
+struct DabMirror {
+    glm::vec3 center, viewDir, aUp, aRight;
+    uint32_t stamp;
+};
+
+std::atomic<int> gDabPath{0}; // TexturePainter::Path
+
+constexpr uint32_t kNoTri = UINT32_MAX;
+constexpr size_t kTexelMapBudget = 4096; // cached texel tiles (32 KB each): 128 MB at most
+
+uint64_t mixKey(uint64_t h, uint64_t v) { return (h ^ (v + 0x9E3779B97F4A7C15ull + (h << 6) + (h >> 2))) * 1099511628211ull; }
+
+} // namespace
+
+// The UV triangles binned per kTextureTile tile: each triangle in every tile its UV box (grown by the gutter)
+// touches, in triangle order.
+struct UvTileIndex {
+    uint64_t key = 0;
+    int tilesX = 0, tilesY = 0;
+    std::vector<uint8_t> triTiles;  // 4 per triangle: tile x0, y0, x1, y1 (x0 > x1: none); tiles per side <= 256
+    std::vector<uint32_t> binStart; // tilesX * tilesY + 1
+    std::vector<uint32_t> bins;
+};
+
+// One tile's texels: the triangle and barycentrics (b1, b2 as 16 bits) of each, kNoTri where no island reaches.
+struct TexelMapTile {
+    std::vector<uint32_t> tri;
+    std::vector<uint16_t> bary;
+    // Texels more than one island triangle covers (overlapping UVs, e.g. mirrored halves), in texel order: the
+    // other triangles, painted after the first as the per-triangle dab would.
+    struct Extra {
+        uint16_t li;
+        uint16_t b1, b2;
+        uint32_t tri;
+    };
+    std::vector<Extra> extras;
+    uint64_t used = 0;
+};
+struct TexelMapCache {
+    uint64_t key = 0;
+    std::vector<std::unique_ptr<TexelMapTile>> tiles;
+    size_t live = 0;
+    uint64_t clock = 0;
+};
+
+namespace {
+
+uint64_t texelMapKey(const Mesh& m, const PaintTexture& t) {
+    uint64_t h = mixKey(uvFingerprint(m), m.triangleCount());
+    h = mixKey(h, uint64_t(t.width) << 32 | uint64_t(t.height));
+    return mixKey(h, t.coverageUvs);
+}
+
+std::shared_ptr<const UvTileIndex> buildUvIndex(const Mesh& m, const PaintTexture& t, uint64_t key) {
+    auto idx = std::make_shared<UvTileIndex>();
+    idx->key = key;
+    idx->tilesX = tileCount(t.width);
+    idx->tilesY = tileCount(t.height);
+    const size_t nt = m.triangleCount();
+    idx->triTiles.resize(nt * 4);
+    const float w = float(t.width), h = float(t.height), pad = float(kTextureGutter + 1);
+    const int tx1max = idx->tilesX - 1, ty1max = idx->tilesY - 1;
+    poolFor(nt, [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) {
+            uint8_t* o = &idx->triTiles[i * 4];
+            const glm::vec2 a = m.uvs[i * 3], c = m.uvs[i * 3 + 1], d = m.uvs[i * 3 + 2];
+            const float minX = std::min({a.x, c.x, d.x}) * w - 0.5f - pad, maxX = std::max({a.x, c.x, d.x}) * w - 0.5f + pad;
+            const float minY = std::min({a.y, c.y, d.y}) * h - 0.5f - pad, maxY = std::max({a.y, c.y, d.y}) * h - 0.5f + pad;
+            if (!(minX <= maxX && minY <= maxY) || maxX < 0.0f || maxY < 0.0f || minX >= w || minY >= h) {
+                o[0] = 1, o[1] = 0, o[2] = 0, o[3] = 0;
+                continue;
+            }
+            o[0] = uint8_t(std::clamp(int(std::floor(minX)) / kTextureTile, 0, tx1max));
+            o[1] = uint8_t(std::clamp(int(std::floor(minY)) / kTextureTile, 0, ty1max));
+            o[2] = uint8_t(std::clamp(int(std::ceil(maxX)) / kTextureTile, 0, tx1max));
+            o[3] = uint8_t(std::clamp(int(std::ceil(maxY)) / kTextureTile, 0, ty1max));
+        }
+    }, 65536);
+    const size_t tiles = size_t(idx->tilesX) * size_t(idx->tilesY);
+    idx->binStart.assign(tiles + 1, 0);
+    for (size_t i = 0; i < nt; ++i) {
+        const uint8_t* o = &idx->triTiles[i * 4];
+        if (o[0] > o[2]) continue;
+        for (int ty = o[1]; ty <= o[3]; ++ty)
+            for (int tx = o[0]; tx <= o[2]; ++tx) ++idx->binStart[size_t(ty) * size_t(idx->tilesX) + size_t(tx) + 1];
+    }
+    for (size_t k = 0; k < tiles; ++k) idx->binStart[k + 1] += idx->binStart[k];
+    idx->bins.resize(idx->binStart[tiles]);
+    std::vector<uint32_t> fill(idx->binStart.begin(), idx->binStart.end() - 1);
+    for (size_t i = 0; i < nt; ++i) {
+        const uint8_t* o = &idx->triTiles[i * 4];
+        if (o[0] > o[2]) continue;
+        for (int ty = o[1]; ty <= o[3]; ++ty)
+            for (int tx = o[0]; tx <= o[2]; ++tx) idx->bins[fill[size_t(ty) * size_t(idx->tilesX) + size_t(tx)]++] = uint32_t(i);
+    }
+    return idx;
+}
+
+// The texel map of tile `ti`: every island texel's triangle (exact top-left rule, as rasterizeUvTriangle), and
+// every gutter texel's nearest island point within kTextureGutter texels.
+std::unique_ptr<TexelMapTile> buildTexelMap(const Mesh& m, const PaintTexture& t, const UvTileIndex& idx, size_t ti) {
+    auto map = std::make_unique<TexelMapTile>();
+    constexpr size_t n = size_t(kTextureTile) * kTextureTile;
+    map->tri.assign(n, kNoTri);
+    map->bary.assign(n * 2, 0);
+    std::vector<float> dist(n, std::numeric_limits<float>::max());
+    const int x0 = int(ti % size_t(idx.tilesX)) * kTextureTile, y0 = int(ti / size_t(idx.tilesX)) * kTextureTile;
+    const int x1 = std::min(x0 + kTextureTile, t.width) - 1, y1 = std::min(y0 + kTextureTile, t.height) - 1;
+    auto put = [&](size_t li, uint32_t tri, const glm::vec3& b) {
+        map->tri[li] = tri;
+        map->bary[li * 2] = uint16_t(std::lround(std::clamp(b.y, 0.0f, 1.0f) * 65535.0f));
+        map->bary[li * 2 + 1] = uint16_t(std::lround(std::clamp(b.z, 0.0f, 1.0f) * 65535.0f));
+    };
+    for (uint32_t k = idx.binStart[ti]; k < idx.binStart[ti + 1]; ++k) {
+        const uint32_t tri = idx.bins[k];
+        const TriSetup s(m.uvs[size_t(tri) * 3], m.uvs[size_t(tri) * 3 + 1], m.uvs[size_t(tri) * 3 + 2], t.width, t.height);
+        visitTriangle(s, t.width, t.height, kTextureGutter, &t, x0, y0, x1, y1, [&](int x, int y, const glm::vec3& b, bool inside) {
+            const size_t li = size_t(y - y0) * kTextureTile + size_t(x - x0);
+            if (dist[li] < 0.0f) { // an island texel that already has a triangle: overlapping UVs
+                if (inside)
+                    map->extras.push_back({uint16_t(li), uint16_t(std::lround(std::clamp(b.y, 0.0f, 1.0f) * 65535.0f)),
+                                           uint16_t(std::lround(std::clamp(b.z, 0.0f, 1.0f) * 65535.0f)), tri});
+                return;
+            }
+            if (inside) {
+                dist[li] = -1.0f;
+                put(li, tri, b);
+                return;
+            }
+            const glm::vec2 q = s.t[0] * b.x + s.t[1] * b.y + s.t[2] * b.z, c(float(x) + 0.5f, float(y) + 0.5f);
+            const float d2 = glm::dot(q - c, q - c);
+            if (d2 < dist[li]) {
+                dist[li] = d2;
+                put(li, tri, b);
+            }
+        });
+    }
+    std::stable_sort(map->extras.begin(), map->extras.end(),
+                     [](const TexelMapTile::Extra& a, const TexelMapTile::Extra& b) { return a.li < b.li; });
+    return map;
+}
+
+// The tiles a triangle spanning several tiles can paint under the brush sphere: the affine texel -> 3D map turns
+// the sphere into an ellipse in texel space (as the per-triangle dab clips), grown by the gutter. False if none.
+bool sphereTiles(const Mesh& m, uint32_t tri, int w, int h, const glm::vec3& center, float r2, int& tx0, int& ty0, int& tx1, int& ty1) {
+    const TriSetup su(m.uvs[size_t(tri) * 3], m.uvs[size_t(tri) * 3 + 1], m.uvs[size_t(tri) * 3 + 2], w, h);
+    if (!su.valid) return false;
+    const glm::uvec3& tv = m.triangles[tri];
+    const glm::vec3 P0 = m.positions[tv.x], P1 = m.positions[tv.y], P2 = m.positions[tv.z];
+    const glm::vec2 e1 = su.t[1] - su.t[0], e2 = su.t[2] - su.t[0];
+    const float det = e1.x * e2.y - e1.y * e2.x;
+    if (std::abs(det) < 1e-12f) return false;
+    const glm::vec3 q1 = P1 - P0, q2 = P2 - P0;
+    const glm::vec3 Ax = (q1 * e2.y - q2 * e1.y) / det, Ay = (q2 * e1.x - q1 * e2.x) / det;
+    const float mxx = glm::dot(Ax, Ax), mxy = glm::dot(Ax, Ay), myy = glm::dot(Ay, Ay);
+    const float mdet = mxx * myy - mxy * mxy;
+    int x0 = 0, y0 = 0, x1 = w - 1, y1 = h - 1;
+    if (mdet > 1e-30f) {
+        const glm::vec3 rel = center - P0;
+        const float bx = glm::dot(Ax, rel), by = glm::dot(Ay, rel);
+        const float dx = (myy * bx - mxy * by) / mdet, dy = (mxx * by - mxy * bx) / mdet;
+        const glm::vec3 closest = P0 + Ax * dx + Ay * dy;
+        const float k = r2 - glm::dot(closest - center, closest - center);
+        if (k < 0.0f) return false;
+        const float hx = std::sqrt(k * myy / mdet), hy = std::sqrt(k * mxx / mdet);
+        const glm::vec2 c = su.t[0] + glm::vec2(dx, dy);
+        x0 = int(std::floor(c.x - hx)) - kTextureGutter - 1, x1 = int(std::ceil(c.x + hx)) + kTextureGutter + 1;
+        y0 = int(std::floor(c.y - hy)) - kTextureGutter - 1, y1 = int(std::ceil(c.y + hy)) + kTextureGutter + 1;
+    }
+    int bx0, by0, bx1, by1;
+    su.bounds(w, h, kTextureGutter, bx0, by0, bx1, by1);
+    x0 = std::max(x0, bx0), y0 = std::max(y0, by0), x1 = std::min(x1, bx1), y1 = std::min(y1, by1);
+    if (x0 > x1 || y0 > y1) return false;
+    tx0 = x0 / kTextureTile, ty0 = y0 / kTextureTile, tx1 = x1 / kTextureTile, ty1 = y1 / kTextureTile;
+    return true;
+}
+
+} // namespace
+
+void TexturePainter::setPath(Path path) { gDabPath = int(path); }
+
+struct TexturePainter::DabContext {
+    Mesh& mesh;
+    const BVH& bvh;
+    const DabParams& p;
+    PaintTexture& tex;
+    std::vector<uint8_t>& target;
+    float s;
+    bool useAlpha, masked, normals;
+    float r, r2;
+    const std::vector<DabMirror>& mirrors;
+};
+
+bool TexturePainter::useTilePath(const Mesh& mesh, PaintTexture& tex) const {
+    const Path path = Path(gDabPath.load());
+    if (path == Path::Triangles) return false;
+    if (tileCount(tex.width) > 256 || tileCount(tex.height) > 256) return false;
+    if (path == Path::Auto && mesh.triangleCount() * 64 < tex.texelCount()) return false;
+    const uint64_t key = texelMapKey(mesh, tex);
+    if (!tex.uvIndex || tex.uvIndex->key != key) tex.uvIndex = buildUvIndex(mesh, tex, key);
+    if (!tex.texelMaps || tex.texelMaps->key != key) {
+        auto cache = std::make_shared<TexelMapCache>();
+        cache->key = key;
+        cache->tiles.resize(size_t(tex.uvIndex->tilesX) * size_t(tex.uvIndex->tilesY));
+        tex.texelMaps = std::move(cache);
+    }
+    return true;
+}
+
+template <class Paint>
+size_t TexturePainter::dabTiles(const DabContext& c, const Paint& paint, bool composite,
+                                std::vector<std::pair<glm::ivec2, glm::ivec2>>& rects) {
+    const UvTileIndex& idx = *c.tex.uvIndex;
+    TexelMapCache& cache = *c.tex.texelMaps;
+    const Mesh& mesh = c.mesh;
+    const int w = c.tex.width, h = c.tex.height;
+    // 1. The tiles under the brush: every tile a triangle of a BVH leaf touching the sphere can reach.
+    const size_t tiles = cache.tiles.size();
+    touchedFlag_.assign(tiles, 0);
+    touched_.clear();
+    struct Leaf {
+        std::span<const uint32_t> tris;
+        uint32_t mirror;
+    };
+    std::vector<Leaf> leaves;
+    for (uint32_t mi = 0; mi < uint32_t(c.mirrors.size()); ++mi)
+        c.bvh.forEachLeafInSphere(c.mirrors[mi].center, c.r, [&](std::span<const uint32_t> tris) { leaves.push_back({tris, mi}); });
+    // The leaves' triangles mark their tiles on every core (a flag set from two threads is still just set).
+    poolFor(leaves.size(), [&](size_t b, size_t e) {
+        for (size_t k = b; k < e; ++k) {
+            const glm::vec3& center = c.mirrors[leaves[k].mirror].center;
+            for (uint32_t t : leaves[k].tris) {
+                const uint8_t* o = &idx.triTiles[size_t(t) * 4];
+                if (o[0] > o[2]) continue;
+                int tx0 = o[0], ty0 = o[1], tx1 = o[2], ty1 = o[3];
+                // A triangle wider than a tile (big triangles, UV seams): only the tiles the sphere can reach.
+                if ((tx1 - tx0 > 1 || ty1 - ty0 > 1) && !sphereTiles(mesh, t, w, h, center, c.r2, tx0, ty0, tx1, ty1)) continue;
+                for (int ty = ty0; ty <= ty1; ++ty)
+                    for (int tx = tx0; tx <= tx1; ++tx) {
+                        uint8_t& flag = touchedFlag_[size_t(ty) * size_t(idx.tilesX) + size_t(tx)];
+                        std::atomic_ref<uint8_t> f(flag);
+                        if (!f.load(std::memory_order_relaxed)) f.store(1, std::memory_order_relaxed);
+                    }
+            }
+        }
+    }, 256);
+    for (uint32_t i = 0; i < uint32_t(tiles); ++i)
+        if (touchedFlag_[i]) touched_.push_back(i);
+    if (touched_.empty()) return 0;
+    // 2. Room in the texel map cache: drop the least recently used tiles this dab doesn't need.
+    ++cache.clock;
+    size_t missing = 0;
+    for (uint32_t i : touched_) {
+        if (cache.tiles[i]) cache.tiles[i]->used = cache.clock;
+        else ++missing;
+    }
+    if (cache.live + missing > kTexelMapBudget) {
+        std::vector<std::pair<uint64_t, uint32_t>> old;
+        for (uint32_t i = 0; i < uint32_t(tiles); ++i)
+            if (cache.tiles[i] && !touchedFlag_[i]) old.push_back({cache.tiles[i]->used, i});
+        std::sort(old.begin(), old.end());
+        for (const auto& [used, i] : old) {
+            if (cache.live + missing <= kTexelMapBudget) break;
+            cache.tiles[i].reset();
+            --cache.live;
+        }
+    }
+    cache.live += missing;
+    // 3. Every texel of those tiles, tiles in parallel (each texel in one tile: the same result on any thread count).
+    struct Result {
+        glm::ivec2 lo{INT32_MAX}, hi{INT32_MIN};
+        size_t changed = 0;
+    };
+    std::vector<Result> results(touched_.size());
+    ThreadPool::shared().run(touched_.size(), [&](size_t job) {
+        const uint32_t ti = touched_[job];
+        std::unique_ptr<TexelMapTile>& slot = cache.tiles[ti];
+        if (!slot) {
+            slot = buildTexelMap(mesh, c.tex, idx, ti);
+            slot->used = cache.clock;
+        }
+        const TexelMapTile& map = *slot;
+        Result& res = results[job];
+        const int x0 = int(ti % uint32_t(idx.tilesX)) * kTextureTile, y0 = int(ti / uint32_t(idx.tilesX)) * kTextureTile;
+        const int x1 = std::min(x0 + kTextureTile, w), y1 = std::min(y0 + kTextureTile, h);
+        Tile* rec = nullptr;
+        uint32_t last = kNoTri;
+        bool lastHidden = false;
+        glm::vec3 P0{}, P1{}, P2{}, N0{}, N1{}, N2{}, faceN{};
+        float m0 = 0, m1 = 0, m2 = 0;
+        size_t extra = 0;
+        // One texel from one of its triangles, for every mirror (each mirror writes a texel once).
+        auto texel = [&](int x, int y, size_t li, uint32_t tri, uint16_t ub1, uint16_t ub2) {
+                if (tri != last) {
+                    last = tri;
+                    lastHidden = mesh.triangleHidden(tri);
+                    const glm::uvec3& tv = mesh.triangles[tri];
+                    P0 = mesh.positions[tv.x], P1 = mesh.positions[tv.y], P2 = mesh.positions[tv.z];
+                    if (c.normals) N0 = mesh.normals[tv.x], N1 = mesh.normals[tv.y], N2 = mesh.normals[tv.z];
+                    faceN = glm::cross(P1 - P0, P2 - P0);
+                    if (c.masked) m0 = mesh.mask[tv.x], m1 = mesh.mask[tv.y], m2 = mesh.mask[tv.z];
+                }
+                if (lastHidden) return;
+                const float b1 = float(ub1) / 65535.0f, b2 = float(ub2) / 65535.0f;
+                const glm::vec3 b(1.0f - b1 - b2, b1, b2);
+                const glm::vec3 P = P0 * b.x + P1 * b.y + P2 * b.z;
+                for (const DabMirror& mi : c.mirrors) {
+                    const glm::vec3 o = P - mi.center;
+                    const float d2 = glm::dot(o, o);
+                    if (d2 >= c.r2) continue;
+                    const glm::vec3 N = c.normals ? N0 * b.x + N1 * b.y + N2 * b.z : faceN;
+                    if (glm::dot(N, mi.viewDir) > 0.0f) continue;
+                    const float f = c.useAlpha ? c.p.alpha->sample(glm::dot(o, mi.aRight) / c.r, glm::dot(o, mi.aUp) / c.r)
+                                               : brushFalloff(std::sqrt(d2), c.r, c.p.focal);
+                    const float wgt = f * c.s * (1.0f - std::clamp(m0 * b.x + m1 * b.y + m2 * b.z, 0.0f, 1.0f));
+                    if (wgt <= 0.0f) continue;
+                    if (!rec) rec = &tile(ti, c.target, w, h, c.tex);
+                    Tile& t = *rec;
+                    if (t.stamp[li] == mi.stamp) continue;
+                    t.stamp[li] = mi.stamp;
+                    float& acc = t.coverage[li];
+                    acc += std::min(wgt, 1.0f) * (1.0f - acc);
+                    paint(t, li, x, y, acc);
+                    res.lo = glm::min(res.lo, glm::ivec2(x, y));
+                    res.hi = glm::max(res.hi, glm::ivec2(x + 1, y + 1));
+                    ++res.changed;
+                }
+        };
+        for (int y = y0; y < y1; ++y)
+            for (int x = x0; x < x1; ++x) {
+                const size_t li = size_t(y - y0) * kTextureTile + size_t(x - x0);
+                const uint32_t tri = map.tri[li];
+                if (tri == kNoTri) continue;
+                texel(x, y, li, tri, map.bary[li * 2], map.bary[li * 2 + 1]);
+                for (; extra < map.extras.size() && map.extras[extra].li <= li; ++extra)
+                    if (map.extras[extra].li == li)
+                        texel(x, y, li, map.extras[extra].tri, map.extras[extra].b1, map.extras[extra].b2);
+            }
+        if (composite && res.changed && !c.tex.layers.empty() && c.tex.base.size() == c.tex.pixels.size())
+            for (int y = res.lo.y; y < res.hi.y; ++y)
+                for (int x = res.lo.x; x < res.hi.x; ++x) {
+                    const size_t i = size_t(y) * size_t(w) + size_t(x);
+                    compositeTexel(c.tex, i, &c.tex.pixels[i * 4]);
+                }
+    });
+    size_t changed = 0;
+    for (const Result& res : results)
+        if (res.changed) {
+            changed += res.changed;
+            rects.push_back({res.lo, res.hi});
+        }
+    return changed;
+}
+
 // A dab in two passes: (1) per mirror, the triangles under the brush and the texel box each can reach, in a
 // fixed order; (2) the texture's 16-row bands in parallel, each visiting its triangles in that same order. A
 // texel lies in one band, so it sees exactly the writes it would get serially: the result doesn't depend on
@@ -844,12 +1204,8 @@ size_t TexturePainter::dab(Mesh& mesh, const BVH& bvh, const DabParams& p, const
     const bool normals = mesh.normals.size() == mesh.vertexCount();
     const float r = p.radius, r2 = r * r;
 
-    struct Mirror {
-        glm::vec3 center, viewDir, aUp, aRight;
-        uint32_t stamp;
-    };
+    using Mirror = DabMirror;
     std::vector<Mirror> mirrors;
-    dabTris_.clear();
     for (const glm::vec3& m : Sculptor::mirrors(sym)) {
         Mirror mi;
         mi.center = p.center * m;
@@ -860,8 +1216,31 @@ size_t TexturePainter::dab(Mesh& mesh, const BVH& bvh, const DabParams& p, const
         mi.aUp = glm::length(aUp) > 1e-6f ? glm::normalize(aUp) : glm::vec3(0, 1, 0);
         mi.aRight = glm::cross(mi.aUp, -mi.viewDir);
         mi.stamp = ++dab_;
-        const int mirror = int(mirrors.size());
         mirrors.push_back(mi);
+    }
+    // Dense meshes: texel tiles instead of triangles (dabTiles).
+    if (useTilePath(mesh, tex)) {
+        const DabContext ctx{mesh, bvh, p, tex, target, s, useAlpha, masked, normals, r, r2, mirrors};
+        std::vector<std::pair<glm::ivec2, glm::ivec2>> rects;
+        const size_t changed = dabTiles(ctx, [&](Tile& t, size_t li, int x, int y, float acc) {
+            if (paintColor)
+                paintTexel(&target[(size_t(y) * size_t(w) + size_t(x)) * 4], &t.original[li * 4], onLayer, color, acc, p.invert);
+            for (const ChanJob& j : jobs) {
+                const ChannelTile& ct = t.channels[size_t(j.c)];
+                paintChannelTexel(ct.texels + li * size_t(j.tb), ct.origTexels + li * size_t(ct.origStride), j.n, j.bits,
+                                  onLayer, j.val, j.def, acc, p.invert, j.normal);
+            }
+        }, paintColor, rects);
+        for (const auto& [lo, hi] : rects) {
+            if (!tex.layers.empty())
+                for (const ChanJob& j : jobs) compositeChannel(tex, Channel(j.c), lo.x, lo.y, hi.x, hi.y);
+            tex.markDirty(lo.x, lo.y, hi.x, hi.y);
+        }
+        return changed;
+    }
+    dabTris_.clear();
+    for (int mirror = 0; mirror < int(mirrors.size()); ++mirror) {
+        const Mirror& mi = mirrors[size_t(mirror)];
         bvh.queryTriangles(mesh, mi.center, r, tris_);
         for (uint32_t ti : tris_) {
             if (mesh.triangleHidden(ti)) continue;
