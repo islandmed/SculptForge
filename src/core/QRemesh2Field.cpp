@@ -271,7 +271,39 @@ bool solveCrossField(const Proxy& p, const Frames& f, const Curvature& curv, con
             const double sigma = nfree < nt ? tune_sigma * meanDiag : std::max(bn, 1e-3 * meanDiag);
             std::vector<cd> rhsk(nfree);
             static const int projected = std::getenv("SF_QR2_PROJ") ? std::atoi(std::getenv("SF_QR2_PROJ")) : 30;
+            std::vector<double> local; // per free triangle: the projected rounds' weight (empty: not run)
             for (int round = 0; round < 6 + projected; ++round) {
+                if (round == 6) {
+                    // Zeros of order two or more (four poles merged by symmetry, as inside a closed guide loop) are
+                    // split by projected rounds around them, strongly there and lightly elsewhere; none: done.
+                    CrossField probe;
+                    probe.theta.resize(nt);
+                    for (size_t t = 0; t < nt; ++t) {
+                        const cd v = fixed[t] ? z[t] : x[fid[t]];
+                        probe.theta[t] = std::abs(v) > 1e-30 ? float(std::arg(v) / 4.0) : 0.0f;
+                    }
+                    computeMatching(p, f, probe);
+                    std::vector<int> ring(nt, -1);
+                    std::vector<uint32_t> queue;
+                    for (uint32_t t = 0; t < nt; ++t)
+                        for (int k = 0; k < 3; ++k)
+                            if (std::abs(probe.vertexIndex[p.T[t][k]]) >= 2 && ring[t] < 0) ring[t] = 0, queue.push_back(t);
+                    if (queue.empty()) break;
+                    for (size_t qi = 0; qi < queue.size(); ++qi) {
+                        const uint32_t t = queue[qi];
+                        if (ring[t] >= 30) continue;
+                        for (int k = 0; k < 3; ++k) {
+                            const uint32_t o = p.opp[3 * t + uint32_t(k)];
+                            if (o == kNone || ring[o / 3] >= 0) continue;
+                            ring[o / 3] = ring[t] + 1;
+                            queue.push_back(o / 3);
+                        }
+                    }
+                    const double strong = std::max(bn, 1e-3 * meanDiag) * 4.0;
+                    local.assign(nfree, sigma);
+                    for (uint32_t i = 0; i < nfree; ++i)
+                        if (ring[freeTris[i]] >= 0) local[i] = strong;
+                }
                 double xn = 0.0;
                 for (const cd& v : x) xn += std::norm(v);
                 xn = std::sqrt(xn / double(nfree)) + 1e-300;
@@ -282,7 +314,7 @@ bool solveCrossField(const Proxy& p, const Frames& f, const Curvature& curv, con
                 else
                     for (uint32_t i = 0; i < nfree; ++i) {
                         const double m = std::abs(x[i]);
-                        rhsk[i] = sigma * (m > 1e-12 ? x[i] / m : cd(0.0, 0.0)) * 4.0 + b[i];
+                        rhsk[i] = local[i] * (m > 1e-12 ? x[i] / m : cd(0.0, 0.0)) + b[i];
                     }
                 std::vector<cd> nx(x);
                 its += pcg<cd>([&](const std::vector<cd>& in, std::vector<cd>& o) { A.mul(in, o); }, &mg, A.diag, rhsk, nx,

@@ -552,6 +552,7 @@ Poly extractLattice(const Proxy& p, const Frames& fr, const GridMap& map, float 
             size_t onB = 0;
             for (uint32_t v : f) onB += openCl[v];
             if (f.size() <= 32 && onB != f.size()) continue;
+            if (onB * 10 < f.size() * 6 && f.size() <= 400) continue; // kept whole above
             if (onB == 0 || onB == f.size()) continue;
             const size_t n = f.size();
             size_t start = 0;
@@ -575,9 +576,14 @@ Poly extractLattice(const Proxy& p, const Frames& fr, const GridMap& map, float 
     }
     std::vector<uint32_t> remap(nc, kNone);
     for (auto& f : faces) {
-        if (f.size() < 3 || f.size() > 32) {
-            if (std::getenv("SF_QREMESH_TIMING") && f.size() > 32) std::fprintf(stderr, "  v2 dropped a face of %zu sides\n", f.size());
-            continue;
+        if (f.size() < 3) continue;
+        if (f.size() > 32) { // the outside of an open surface, or a big hole in a closed one (kept, split later)
+            size_t onB = 0;
+            for (uint32_t v : f) onB += openCl[v];
+            if (onB * 10 >= f.size() * 6 || f.size() > 400) {
+                if (std::getenv("SF_QREMESH_TIMING")) std::fprintf(stderr, "  v2 dropped a face of %zu sides\n", f.size());
+                continue;
+            }
         }
         if (f.size() >= 5) { // the outside traces along the open edges only; a face by them is kept (else a hole)
             size_t onB = 0;
@@ -1135,8 +1141,8 @@ bool remeshPieceV2(const WorkMesh& piece, int axis, double wantQuads, const QRem
                    const std::vector<QRemeshGuide>& guides, const std::function<bool(float)>& report,
                    FieldPieceResult& out, bool& cancelled) {
     for (const QRemeshGuide& g : guides)
-        if (g.closed || (axis >= 0 && g.points.size() >= 2 && std::abs(g.points.front()[axis]) < 1e-5f * diag &&
-                         std::abs(g.points.back()[axis]) < 1e-5f * diag)) { // a loop across the symmetry plane, halved
+        if (!std::getenv("SF_QR2_LOOPS") && (g.closed || (axis >= 0 && g.points.size() >= 2 && std::abs(g.points.front()[axis]) < 1e-5f * diag &&
+                         std::abs(g.points.back()[axis]) < 1e-5f * diag))) { // a loop across the symmetry plane, halved
             // Closed loops (round an eye) don't yet come out clean in the map; the legacy method handles them.
             out.why = "closed guide loop";
             return false;
