@@ -57,6 +57,10 @@ struct UiPrefs {
     // Preferences > Display: the view's background (#21), a gradient or a flat display (sRGB) colour.
     bool gradientBackground = true;
     glm::vec3 backgroundColor{0.165f, 0.165f, 0.173f};
+    // File > Maya (#42). Kept in <prefs>/maya.json, never in ui.json, so a shared UI layout can't point the bridge
+    // at a folder: it is set only by the user's own pick (App::setMayaFolder).
+    std::string mayaFolder;        // "" = the bridge is off
+    bool mayaAutoReceive = false;  // Get automatically: check that folder's manifest once a second
 };
 
 Json toJson(const UiPrefs& prefs);

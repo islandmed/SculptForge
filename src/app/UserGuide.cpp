@@ -435,6 +435,7 @@ std::string UserGuide::chapterFor(const std::string& palette, const std::string&
     if (starts("Draw") || starts("Stroke") || starts("Alpha")) return "sculpting.md";
     if (starts("Color") || starts("Material")) return "polypaint.md";
     if (starts("File > Blender")) return "blender.md";
+    if (starts("File > Maya")) return "maya.md";
     if (starts("File > Capture from phone") || actionId == "file.capture_phone") return "phone-capture.md";
     if (starts("File > Export") || idStarts("file.export") || actionId == "file.send_unreal" || actionId == "file.save_splats" ||
         starts("File > GoZ"))

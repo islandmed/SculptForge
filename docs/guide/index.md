@@ -55,16 +55,17 @@ You can read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<
 31. [Exporting, Unreal and ZBrush](exporting.md)
 32. [Export presets](export-presets.md)
 33. [Working with Blender](blender.md)
-34. [Projects, autosave and QuickSave](projects.md)
-35. [Scripting and automation](scripting.md)
-36. [SculptForge for studios](studios.md)
+34. [Working with Maya](maya.md)
+35. [Projects, autosave and QuickSave](projects.md)
+36. [Scripting and automation](scripting.md)
+37. [SculptForge for studios](studios.md)
 
 ## Reference
 
-37. [Keyboard and mouse](shortcuts.md)
-38. [Performance and big meshes](performance.md)
-39. [Troubleshooting and FAQ](troubleshooting.md)
-40. [Glossary](glossary.md)
+38. [Keyboard and mouse](shortcuts.md)
+39. [Performance and big meshes](performance.md)
+40. [Troubleshooting and FAQ](troubleshooting.md)
+41. [Glossary](glossary.md)
 
 ## Getting help
 

@@ -1174,6 +1174,14 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (file.is_relative()) file = std::filesystem::path(std::u8string(scriptDir_.begin(), scriptDir_.end())) / file;
         const auto u8 = file.lexically_normal().u8string();
         run([this, path = std::string(u8.begin(), u8.end())] { app_.openPathConfirmed(path); });
+    } else if (verb == "choose_file" && w.size() > 2 && w[1] == "maya_folder") {
+        // choose_file maya_folder <folder>: what File > Maya > Exchange folder's dialog would answer (relative to the
+        // working directory, like copy's destination).
+        run([this, to = w[2]] {
+            const std::string d = expandLibrary(to);
+            const auto u8 = std::filesystem::absolute(std::filesystem::path(std::u8string(d.begin(), d.end()))).lexically_normal().u8string();
+            app_.setMayaFolder(std::string(u8.begin(), u8.end()));
+        });
     } else if (verb == "choose_file") { // choose_file insert|append <path>: what a native file dialog would answer
         if (!need(2)) return false;
         App::FileAction action;

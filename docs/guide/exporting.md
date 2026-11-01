@@ -233,9 +233,15 @@ To sculpt Blender objects in SculptForge and send them back into the same object
 add-on and **File > Blender**: see [Working with Blender](blender.md). For a one-off exchange, OBJ, FBX and glTF
 all carry SubTools, UVs and quads both ways.
 
+## Maya
+
+To sculpt Maya meshes in SculptForge and send them back into the same objects, use the SculptForge shelf for
+Maya and **File > Maya**: see [Working with Maya](maya.md).
+
 ## See also
 
 - [Working with Blender](blender.md): the Blender add-on
+- [Working with Maya](maya.md): the Maya shelf script
 - [Projects, autosave and QuickSave](projects.md): save everything, not just the mesh
 - [SubTools](subtools.md): which SubTools are exported
 - [Layers and blend shapes](layers.md): what becomes morph targets

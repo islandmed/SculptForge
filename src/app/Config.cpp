@@ -112,7 +112,7 @@ void fromJson(const Json& j, UiPrefs& p) {
 
 namespace {
 
-enum UiFileKind { kSaveUi, kLoadUi, kRunScript, kLibraryFolder, kBlenderKeymap, kUiFileKinds };
+enum UiFileKind { kSaveUi, kLoadUi, kRunScript, kLibraryFolder, kBlenderKeymap, kMayaFolder, kUiFileKinds };
 
 struct UiFileRequest {
     App* app = nullptr;
@@ -384,6 +384,19 @@ void App::initActions() {
         nullptr, "blender_receive", nullptr, nullptr,
         "Load what Blender last sent with the add-on's Send to SculptForge. Each object updates its SubTool (undoable) "
         "or becomes a new one; this happens by itself while Receive automatically is on.");
+    // Maya bridge (PanelMaya.cpp, integrations/maya, #42): off until an exchange folder is chosen.
+    add("file.send_maya", "Send to Maya", "File > Maya", nullptr, [this] { sendToMaya(); }, ICON_LC_SEND, "maya_send",
+        nullptr, nullptr,
+        "Send the visible SubTools to Maya (OBJ with quads and UVs) through the exchange folder you chose; Get from "
+        "SculptForge on Maya's SculptForge shelf loads them, replacing the objects they came from by name.");
+    add("file.receive_maya", "Get from Maya", "File > Maya", nullptr, [this] { receiveFromMaya(); }, nullptr,
+        "maya_receive", nullptr, nullptr,
+        "Load what Maya last sent with the shelf's Send to SculptForge. Each object replaces the SubTool with its name "
+        "(undoable) or becomes a new one.");
+    add("file.maya_folder", "Exchange folder...", "File > Maya", nullptr, [this] { chooseMayaFolder(); },
+        ICON_LC_FOLDER_OPEN, nullptr, nullptr, nullptr,
+        "Choose the folder SculptForge and Maya exchange meshes through (pick the same one in Maya's shelf script). "
+        "SculptForge reads and writes only there, and only when you send or get.");
     add("brush.paste", "Paste brush", "Brush", "Ctrl+V", [this] { pasteBrush(); }, ICON_LC_CLIPBOARD_PASTE, nullptr, nullptr,
         nullptr, "Add the brush on the clipboard: a brush code someone shared, or the text of a .sfbrush file.");
     add("brush.size_down", "Smaller brush", "Draw", "[", [this] { radiusPx_ = std::max(2.0f, radiusPx_ / 1.1f); }, nullptr,
@@ -705,6 +718,12 @@ void App::importBlenderKeymapDialog() {
     SDL_ShowOpenFileDialog(onUiFileChosen, &g_requests[kBlenderKeymap], window_, kBlenderKeymapFilters, 2, nullptr, false);
 }
 
+void App::chooseMayaFolder() { // the only way the Maya bridge gets a folder: the user picks it (PanelMaya.cpp)
+    const std::string start = uiPrefs_.mayaFolder;
+    SDL_ShowOpenFolderDialog(onUiFileChosen, &g_requests[kMayaFolder], window_, start.empty() ? nullptr : start.c_str(),
+                             false);
+}
+
 void App::loadUiDialog() {
     SDL_ShowOpenFileDialog(onUiFileChosen, &g_requests[kLoadUi], window_, kUiFilters, 1, nullptr, false);
 }
@@ -815,6 +834,8 @@ void App::drawHelpConsoleUi() {
                 }
             } else if (kind == kBlenderKeymap) {
                 importBlenderKeymap(path);
+            } else if (kind == kMayaFolder) {
+                setMayaFolder(path);
             } else if (kind == kRunScript) {
                 setConsoleOpen(true);
                 console_.queueScriptFile(path);

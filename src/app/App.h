@@ -874,6 +874,18 @@ private:
     bool blenderAutoReceive_ = true;   // load whatever Blender sends while SculptForge runs
     int64_t blenderSeenRevision_ = -1; // revision last loaded (or present at start, which is not loaded)
     Uint64 blenderLastPollNs_ = 0, blenderLastBeatNs_ = 0;
+    // Maya bridge (PanelMaya.cpp, io/MayaBridge.h, #42): off until the user picks an exchange folder
+    // (uiPrefs_.mayaFolder); with Get automatically on, that one folder's manifest is checked once a second.
+    void drawMayaMenu();
+    void pollMaya();
+    void sendToMaya();
+    void receiveFromMaya();
+    void chooseMayaFolder();
+    void setMayaFolder(const std::string& folder);
+    int64_t mayaSeenRevision_ = -1;  // revision last loaded (or present when the folder was chosen / at start)
+    long long mayaManifestStamp_ = 0; // its modification time and size then (the cheap check before reading it)
+    bool mayaInitialised_ = false;
+    Uint64 mayaLastPollNs_ = 0;
 
     // Phone link (PanelPhone.cpp, link/PhoneLink.h): File > Capture from phone. The server runs only while the
     // window is open; captures land in <library>/Captures and run the command for their kind; AR models are
