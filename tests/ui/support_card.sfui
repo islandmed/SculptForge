@@ -14,7 +14,7 @@ wait_idle
 wait 1.2
 expect_text Free for everyone,
 expect_text Insiders will get each release about two weeks early, starting with SculptForge 1.0.
-expect_text MOST POPULAR
+expect_text RECOMMENDED
 expect_text $20
 shot first_run
 # Clicks on the card never reach the canvas or the shortcuts underneath; a tier opens its Stripe checkout.

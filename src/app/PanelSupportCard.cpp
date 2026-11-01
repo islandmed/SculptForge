@@ -500,13 +500,13 @@ void App::drawSupportCard() {
         const float ix = p0.x + 24.0f * k;
         float ty = p0.y + 24.0f * k;
         if (featured) { // the badge, on the card's top edge
-            const float bw = paint.spaced(boldUi, 11.0f, ImVec2(0, 0), 0, "MOST POPULAR", 1.6f, false) + 24.0f * k;
+            const float bw = paint.spaced(boldUi, 11.0f, ImVec2(0, 0), 0, "RECOMMENDED", 1.6f, false) + 24.0f * k;
             const ImVec2 b0(p0.x + (tierW - bw) * 0.5f, p0.y - 12.0f * k), b1(b0.x + bw, b0.y + 24.0f * k);
             glow(dl, b0, b1, 12.0f * k, 10.0f * k, 0xf0882e, 0.6f * appear, 6);
             dl->AddRectFilled(b0, b1, col(0xf6994d, appear), 12.0f * k);
             const float th = 11.0f * k;
             paint.spaced(boldUi, 11.0f, ImVec2(b0.x + 12.0f * k, b0.y + (24.0f * k - th) * 0.5f - 0.5f * k),
-                         col(0x1a0d04, appear), "MOST POPULAR", 1.6f);
+                         col(0x1a0d04, appear), "RECOMMENDED", 1.6f);
         }
         paint.text(headFont, 21.0f, ImVec2(ix, ty), col(0xffffff, appear), tier.name);
         ty += 34.0f * k;
