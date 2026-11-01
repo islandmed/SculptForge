@@ -17,6 +17,7 @@ licenses require.
 | [tinyexr](https://github.com/syoyo/tinyexr) | 1.0.13 | BSD 3-Clause License (includes OpenEXR code under the OpenEXR BSD licence) | OpenEXR reading and writing for vector displacement maps (Brush > Vector Displacement). Vendored in third_party/tinyexr; uses stb's zlib. |
 | [Instant Meshes](https://github.com/wjakob/instant-meshes) | formulas only, nothing vendored | BSD 3-Clause License | QRemesh (Tool > Geometry): the field formulas in src/core/QRemesh.cpp (extrinsic 4-RoSy orientation / position compatibility, the middle point of two tangent planes, lattice rounding) follow its reference code. The rest of QRemesh is our own. |
 | QRemesh 2 (published methods, no third-party code) | — | — | The default QRemesh method (src/core/QRemesh2*.cpp) is our own implementation of published techniques: integer-grid maps / mixed-integer quadrangulation (Bommes, Zimmer & Kobbelt 2009; Bommes, Campen, Ebke, Alliez & Kobbelt 2013), N-RoSy fields as complex powers and the smoothest field by inverse power iteration (Ray, Vallet, Li & Lévy 2008; Knöppel, Crane, Pinkall & Schröder 2013), the dihedral curvature tensor (Cohen-Steiner & Morvan 2003), isotropic remeshing (Botsch & Kobbelt 2004) and smoothed aggregation multigrid. No code from QuadWild (GPL-3), libigl (MPL-2.0), CoMISo or Instant Meshes is included. |
+| [GoB](https://github.com/JoseConseco/GoB) | format reference only, nothing vendored | GNU GPL 3 | The .GoZ file layout that Send to ZBrush and the .GoZ import/export read and write (src/io/GozIO.cpp, docs/goz.md) follows this open-source Blender add-on, credited with thanks. No code from it is included. |
 | [Inter typeface](https://github.com/rsms/inter) | 4.1 | SIL Open Font License 1.1 | User interface font, embedded in the desktop app. Vendored in assets/fonts. |
 | [ICT-FaceKit](https://github.com/ICT-VGL/ICT-FaceKit) (ICT Face Model Light) | commit on master, 2020 | MIT License | The template head of Generate Facial Shapes (Tool > Facial Shapes): its neutral skin, mouth and eye sockets and its 53 ARKit-style expression shapes, converted by tools/face/build_ict_template.py into assets/face/ict-arkit.sfface (embedded). Not the separately licensed full ICT Face Model. |
 | [libcurl](https://curl.se) | system library | curl License (MIT/X derivate) | HTTPS for optional AI features on Linux and macOS. Linked dynamically from the operating system; Windows uses the built-in WinHTTP instead. |
@@ -619,6 +620,30 @@ https://github.com/ICT-VGL/ICT-FaceKit — MIT License. The "ICT Face Model Ligh
 meshes) is released under this licence; SculptForge uses its neutral mesh and expression shapes as the template
 head for Generate Facial Shapes (assets/face/ict-arkit.sfface, see assets/face/README.md). Core contributors:
 Kalle Bladin, Owen Ingraham, Yajie Zhao, Pratusha Prasad, Xinglei Ren, Bipin Kishore, Marcel Ramos.
+
+```
+MIT License
+
+Copyright (c) 2020 USC Institute for Creative Technologies
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
 
 ## QR Code generator
 
