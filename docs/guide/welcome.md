@@ -15,6 +15,12 @@ and no telemetry.
 It is free software under the GNU General Public License v3.0 or later. You own everything you make with it:
 the GPL covers the program, not your models.
 
+SculptForge stays free and works the same for everyone. If it helps your work, **Help > Support SculptForge...**
+opens [sculptforge.app/donate.html](https://sculptforge.app/donate.html) in your browser, where you can become a
+member. That is all it does: the app has no payment code, no account and no licence check. Supporters are thanked
+by name in **Help > About**. After about ten hours of sculpting, SculptForge shows one small note about this along
+the bottom of the canvas, once, and never again after you close it.
+
 ## What you can do with it
 
 - **Sculpt** with fourteen built-in brushes (Standard, Clay, Clay Buildup, Dam Standard, Move, Smooth,
