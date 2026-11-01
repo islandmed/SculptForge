@@ -1363,6 +1363,7 @@ private:
     bool dropPenMouseEvent(const SDL_Event& e) const; // SDL's version-dependent clicks for pen buttons
     bool strayMouseMotion(const SDL_Event& e) const;  // a driver's mouse motion beside the pen's (Tablet.cpp)
     void keepImGuiOnPen();                            // after ImGui_ImplSDL3_NewFrame (Tablet.cpp)
+    void mapPenPosition(SDL_Event& e);                // mouse mode: the pen moves the cursor relatively (Tablet.cpp)
     void handlePenEvent(const SDL_Event& e);
     void penButton(int button, bool down, float x, float y);
     void penLeft(); // out of proximity: ends what the pen was doing
@@ -1374,6 +1375,7 @@ private:
     void drawTabletSection();         // Preferences > Tablet
     void detectPenName();
     PenPressureTracker penTracker_;
+    PenCursor penCursor_; // where the pen puts the cursor (Preferences > Tablet > Mouse mode)
     bool penInProximity_ = false, penTouching_ = false, penEraser_ = false;
     Uint64 lastPenNs_ = 0; // when the last pen event arrived (see onMouseMove)
     uint32_t penButtons_ = 0; // bit N: pen button N is held

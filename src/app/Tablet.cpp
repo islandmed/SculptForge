@@ -57,6 +57,35 @@ void App::keepImGuiOnPen() {
     ImGui::GetIO().AddMousePosEvent(mouseX_, mouseY_);
 }
 
+// A tablet in mouse mode (Preferences > Tablet): the pen reports where it is on the tablet, but the cursor moves by
+// how far it moves, like a mouse. Every pen position, the pen's own events and SDL's mouse events for the pen, goes
+// through penCursor_ before anything reads it (#54: lifting the pen and putting it down elsewhere made the cursor
+// jump back). The mouse moving the cursor in between moves where the pen carries on from.
+void App::mapPenPosition(SDL_Event& e) {
+    penCursor_.mouseMode = uiPrefs_.tablet.mouseMode;
+    const Uint64 now = SDL_GetTicksNS();
+    switch (e.type) {
+    case SDL_EVENT_PEN_PROXIMITY_IN:
+    case SDL_EVENT_PEN_PROXIMITY_OUT: penCursor_.proximity(); break;
+    case SDL_EVENT_PEN_DOWN:
+    case SDL_EVENT_PEN_UP: penCursor_.map(e.ptouch.x, e.ptouch.y, now); break;
+    case SDL_EVENT_PEN_MOTION: penCursor_.map(e.pmotion.x, e.pmotion.y, now); break;
+    case SDL_EVENT_PEN_AXIS: penCursor_.map(e.paxis.x, e.paxis.y, now); break;
+    case SDL_EVENT_PEN_BUTTON_DOWN:
+    case SDL_EVENT_PEN_BUTTON_UP: penCursor_.map(e.pbutton.x, e.pbutton.y, now); break;
+    case SDL_EVENT_MOUSE_MOTION:
+        if (e.motion.which == SDL_PEN_MOUSEID) penCursor_.map(e.motion.x, e.motion.y, now);
+        else penCursor_.cursorAt(e.motion.x, e.motion.y);
+        break;
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+    case SDL_EVENT_MOUSE_BUTTON_UP:
+        if (e.button.which == SDL_PEN_MOUSEID) penCursor_.map(e.button.x, e.button.y, now);
+        break;
+    default:
+        break;
+    }
+}
+
 void App::handlePenEvent(const SDL_Event& e) {
     lastPenNs_ = SDL_GetTicksNS();
     switch (e.type) {
@@ -255,6 +284,14 @@ void App::drawTabletSection() {
         ImGui::TextColored(col(ui::color::textDim), "%s", info.c_str());
     }
 
+    // --- Pen or mouse mode (#54) ---
+    ImGui::Checkbox("Mouse mode (relative)##tablet_mouse_mode", &t.mouseMode);
+    ui::HelpText("Mouse mode", nullptr,
+                 "Turn on if the tablet driver is set to Mouse mode: the pen moves the cursor by how far it moves, and "
+                 "lifting it and putting it down elsewhere leaves the cursor where it was. Off (Pen mode): the cursor "
+                 "is where the pen is.",
+                 path);
+
     // --- Live pressure ---
     const float raw = penTracker_.raw(), curved = t.curve.apply(raw);
     char overlay[64];
@@ -422,11 +459,13 @@ void App::drawTabletSection() {
                 kButtonHelp[b]);
     if (ImGui::SmallButton(ICON_LC_ROTATE_CCW "  Tablet defaults")) {
         const PressureCurve keep = t.curve;
+        const bool mouseMode = t.mouseMode; // (follows the driver's setting, not a preference)
         t = TabletSettings();
         t.curve = keep;
+        t.mouseMode = mouseMode;
     }
     ui::HelpText("Tablet defaults", nullptr, "Eraser: Invert; lower button: Right-click; upper button: Invert (Alt); third "
-                                             "button: Pan view. The curve stays.", path);
+                                             "button: Pan view. The curve and Mouse mode stay.", path);
     ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::textDim));
     ImGui::PushTextWrapPos(0.0f);
     ImGui::TextUnformatted("Store Config (Ctrl+Shift+I) keeps these settings.");

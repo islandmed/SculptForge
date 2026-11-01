@@ -137,3 +137,45 @@ expect_value cursor_x > $pen_x
 pen_out
 mouse_move 0.1 0.9
 expect_value cursor_x < $pen_x
+
+# Mouse mode (#54, a tablet driver set to relative): the pen moves the cursor by how far it moves, like a mouse.
+# Lifting it and putting it down elsewhere on the tablet leaves the cursor where it was (it used to jump back to
+# where the pen is on the tablet); moving it again carries on from there.
+click "Preferences##palette.preferences"
+click "Mouse mode (relative)##tablet_mouse_mode"
+expect_value tablet_mouse_mode == 1
+key escape
+pen_hover 0.4 0.5
+remember cursor_x rel_x
+remember cursor_y rel_y
+pen_out
+pen_enter 0.85 0.2
+expect_value cursor_x >= $rel_x-0.5
+expect_value cursor_x <= $rel_x+0.5
+expect_value cursor_y >= $rel_y-0.5
+expect_value cursor_y <= $rel_y+0.5
+pen_hover 0.95 0.2
+expect_value cursor_x > $rel_x+5
+# A pen stroke in mouse mode sculpts at the cursor.
+snapshot
+pen_out
+pen_enter 0.85 0.2
+pen_stroke 0.85 0.2 0.9 0.2 0.8 0.8
+expect_value moved > 0
+key ctrl+z
+# The mouse moving the cursor in between: the pen carries on from where the mouse left it.
+pen_out
+mouse_move 0.2 0.7
+remember cursor_x mouse_x
+pen_enter 0.9 0.1
+expect_value cursor_x >= $mouse_x-0.5
+expect_value cursor_x <= $mouse_x+0.5
+# Pen mode again: the cursor is where the pen is.
+pen_out
+click "Preferences##palette.preferences"
+click "Mouse mode (relative)##tablet_mouse_mode"
+expect_value tablet_mouse_mode == 0
+key escape
+pen_enter 0.85 0.2
+expect_value cursor_x > $rel_x+5
+pen_out

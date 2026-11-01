@@ -9,6 +9,10 @@ Open **Preferences > Tablet** to check the pen and tune it:
 
 - **Pen**: whether a pen has been seen, whether it is in range or touching (and with which end), the display
   server, and on Linux the device's name. SDL 3.4 and later also says whether it's a pen display or a tablet.
+- **Mouse mode (relative)**: turn it on when the tablet driver is set to mouse mode (Wacom: Mapping > Mode >
+  Mouse; XP-Pen and Huion: Relative / Mouse mode). The pen then moves the cursor by how far it moves, like a
+  mouse, and lifting it to put it down elsewhere on the tablet leaves the cursor where it was. Off (pen mode,
+  the default): the cursor is where the pen is.
 - **Pressure meter**: the pressure the tablet reports, and what brushes get after the curve below.
 - **Draw-test area**: draw in it with the pen; the stroke is as thick as the brush pressure and the line along
   the bottom plots the pressure along the stroke. Good for checking a light touch and a full press.
@@ -76,13 +80,17 @@ that pressure arrives at all, run `libinput debug-events` and look for `TABLET_T
   SculptForge follows only the pen, so a mouse takes over once the pen leaves the tablet's range (or a second
   after its last event, for drivers that never say it left).
 
+- **The cursor jumps back to where it was when you put the pen down elsewhere** (the tablet in mouse or
+  relative mode, #54): turn on **Mouse mode (relative)** in Preferences > Tablet. Windows Ink reports where the
+  pen is on the tablet even in mouse mode, which SculptForge 0.10.2 and earlier followed.
+
 ## For developers
 
 The settings and the curve are in `src/core/Tablet.h` (unit tests: `tests/test_tablet.cpp`); the pen event
 handling and the preferences panel in `src/app/Tablet.cpp`. UI tests drive a simulated pen with real SDL pen
 events plus the mouse events SDL synthesizes from them: `pen_stroke`, `pen_drag_item`, `pen_button`,
-`pen_hover`, `pen_drag`, `pen_pressure` and `pen_out` (documented in `src/app/UiTest.cpp`); `tests/ui/tablet.sfui`
-covers pressure, the curve, Pressure > Size, the eraser, side buttons, leaving proximity and the panel, and
+`pen_hover`, `pen_enter`, `pen_drag`, `pen_pressure` and `pen_out` (documented in `src/app/UiTest.cpp`); `tests/ui/tablet.sfui`
+covers pressure, the curve, Pressure > Size, the eraser, side buttons, leaving proximity, mouse mode and the panel, and
 `tests/ui/pen_navigation.sfui` view drags with the pen tip, with and without a driver's stray mouse events, and
 `tests/ui/pen_windows_ink.sfui` pen taps on menus, the Move button and the S slider with Windows Ink's stray
 mouse events.

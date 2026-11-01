@@ -1029,9 +1029,11 @@ int App::run() {
 // Input
 // ---------------------------------------------------------------------------
 
-void App::handleEvent(const SDL_Event& e) {
-    if (dropPenMouseEvent(e)) return; // pen side buttons are mapped in Tablet.cpp, not left to SDL
-    if (strayMouseMotion(e)) return;  // neither the canvas nor the UI follows a driver's stray mouse events
+void App::handleEvent(const SDL_Event& event) {
+    if (dropPenMouseEvent(event)) return; // pen side buttons are mapped in Tablet.cpp, not left to SDL
+    if (strayMouseMotion(event)) return;  // neither the canvas nor the UI follows a driver's stray mouse events
+    SDL_Event e = event;
+    mapPenPosition(e); // a tablet in mouse mode moves the cursor relatively (#54), for the canvas and the UI
     ImGui_ImplSDL3_ProcessEvent(&e);
     const ImGuiIO& io = ImGui::GetIO();
 

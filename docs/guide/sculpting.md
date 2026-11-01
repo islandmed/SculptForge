@@ -458,7 +458,9 @@ also have a **Pressure curve** setting that makes them respond to a light or a f
 - a pressure curve for all brushes (Soft, Linear or Firm, or set **Curve**, **Minimum**, **Maximum**, **Threshold**
   and **Full pressure at** yourself), applied before each brush's own curve;
 - the eraser end (default **Invert**, like holding <kbd>Alt</kbd>) and the side buttons (default:
-  lower button right-click to rotate the view, upper button **Invert**, third button **Pan view**).
+  lower button right-click to rotate the view, upper button **Invert**, third button **Pan view**);
+- **Mouse mode (relative)**, for a tablet whose driver is set to mouse mode: the pen moves the cursor by how far
+  it moves, and putting it down elsewhere on the tablet leaves the cursor where it was.
 
 **Store Config** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) keeps these settings. Setup notes for Windows
 Ink, macOS and Linux are in

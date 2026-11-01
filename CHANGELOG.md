@@ -6,6 +6,14 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Preferences > Tablet > Mouse mode (relative) (#54): for tablets whose driver is set to mouse mode, the pen moves
+  the cursor by how far it moves, like a mouse.
+
+### Fixed
+- Pen tablets in mouse (relative) mode (#54): lifting the pen and putting it down elsewhere made the cursor jump
+  back to where the pen was on the tablet. Turn on Preferences > Tablet > Mouse mode.
+
 ## [0.10.2] - 2026-11-01
 
 ### Removed

@@ -76,6 +76,8 @@ If no pen is detected or pressure doesn't change:
 - **Linux:** check that the system sees the pen as a tablet (for example in your desktop's tablet settings).
 - If the cursor moves but strokes have no pressure, test in another application to see whether the driver
   reports pressure at all.
+- **The cursor jumps back when you put the pen down elsewhere:** the tablet driver is set to mouse (relative)
+  mode. Turn on **Preferences > Tablet > Mouse mode (relative)**.
 
 ## AI services
 

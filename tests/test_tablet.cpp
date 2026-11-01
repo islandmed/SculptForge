@@ -8,6 +8,7 @@
 #include "core/Tablet.h"
 
 #include <cmath>
+#include <string>
 
 using namespace sf;
 
@@ -113,4 +114,71 @@ TEST(pen_pressure_tracker_guards_stroke_start) {
     CHECK(near(t.raw(), 0.15f));
     t.sample(5.0f);
     CHECK(near(t.raw(), 1.0f));
+}
+
+TEST(pen_cursor_mouse_mode_moves_relatively) {
+    // Pen mode: the cursor is where the pen is.
+    PenCursor c;
+    float x = 100.0f, y = 50.0f;
+    c.map(x, y, 1000);
+    CHECK(near(x, 100.0f) && near(y, 50.0f));
+    // Mouse mode (#54): the cursor starts where it is (at the mouse), and moves as far as the pen does.
+    c.mouseMode = true;
+    c.cursorAt(400.0f, 300.0f);
+    c.proximity();
+    x = 100.0f, y = 50.0f;
+    c.map(x, y, 2000);
+    CHECK(near(x, 400.0f) && near(y, 300.0f));
+    x = 130.0f, y = 40.0f;
+    c.map(x, y, 3000);
+    CHECK(near(x, 430.0f) && near(y, 290.0f));
+    // Lifted out of range and put down elsewhere on the tablet: the cursor stays, then moves on from there.
+    c.proximity();
+    c.proximity();
+    x = 900.0f, y = 700.0f;
+    c.map(x, y, 4000);
+    CHECK(near(x, 430.0f) && near(y, 290.0f));
+    x = 910.0f, y = 705.0f;
+    c.map(x, y, 5000);
+    CHECK(near(x, 440.0f) && near(y, 295.0f));
+    // A driver that never says the pen left: a pause longer than kLiftedNs counts as lifting it.
+    x = 10.0f, y = 10.0f;
+    c.map(x, y, 5000 + PenCursor::kLiftedNs + 1);
+    CHECK(near(x, 440.0f) && near(y, 295.0f));
+    // The same position again (SDL's mouse event for the pen, right after the pen's own) maps the same.
+    x = 10.0f, y = 10.0f;
+    c.map(x, y, 5000 + PenCursor::kLiftedNs + 2);
+    CHECK(near(x, 440.0f) && near(y, 295.0f));
+    // The mouse moves the cursor in between: the pen carries on from there.
+    c.cursorAt(20.0f, 30.0f);
+    x = 15.0f, y = 10.0f;
+    c.map(x, y, 5000 + PenCursor::kLiftedNs + 3);
+    CHECK(near(x, 20.0f) && near(y, 30.0f));
+    // Positions that aren't numbers are left alone and don't move the cursor.
+    x = NAN, y = 5.0f;
+    c.map(x, y, 5000 + PenCursor::kLiftedNs + 4);
+    CHECK(std::isnan(x));
+    x = 25.0f, y = 10.0f;
+    c.map(x, y, 5000 + PenCursor::kLiftedNs + 5);
+    CHECK(near(x, 30.0f) && near(y, 30.0f));
+    // Back to pen mode: the pen's own position again.
+    c.mouseMode = false;
+    x = 25.0f, y = 10.0f;
+    c.map(x, y, 5000 + PenCursor::kLiftedNs + 6);
+    CHECK(near(x, 25.0f) && near(y, 10.0f));
+}
+
+TEST(tablet_settings_mouse_mode_round_trip) {
+    TabletSettings t;
+    CHECK(!t.mouseMode);
+    t.mouseMode = true;
+    TabletSettings back;
+    fromJson(toJson(t), back);
+    CHECK(back.mouseMode);
+    Json j;
+    std::string err;
+    CHECK(Json::parse(R"({"mouseMode":"yes"})", j, err)); // not a bool: unchanged
+    TabletSettings d;
+    fromJson(j, d);
+    CHECK(!d.mouseMode);
 }
