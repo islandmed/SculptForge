@@ -1064,12 +1064,10 @@ void App::handleEvent(const SDL_Event& event) {
         break;
     case SDL_EVENT_WINDOW_FOCUS_LOST:
         if (radial_.hold != RadialHold::None) closeRadialMenu(); // its key or button's release won't come here
+        spaceHeld_ = false; // Space let go in another window never reaches us
         break;
     case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
         if (e.window.windowID == SDL_GetWindowID(window_)) requestQuit();
-        break;
-    case SDL_EVENT_WINDOW_FOCUS_LOST:
-        spaceHeld_ = false; // Space let go in another window never reaches us
         break;
     case SDL_EVENT_PEN_PROXIMITY_IN:
     case SDL_EVENT_PEN_PROXIMITY_OUT:
