@@ -64,6 +64,11 @@ void App::StrokeSolver::loop() {
         double spent = 0.0;
         const SculptTimings before = app.doc_.sculptor.timings;
         app.dabView_ = &view;
+        if (finalize) { // a draft stroke's end: every normal and cavity term it touched
+            const auto t0 = std::chrono::steady_clock::now();
+            app.doc_.sculptor.flushDraft(app.doc_.mesh, app.doc_.bvh);
+            spent += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+        }
         for (const PathDab& d : batch) {
             const auto t0 = std::chrono::steady_clock::now();
             app.dabAt(d.x, d.y, d.pressure);
@@ -75,6 +80,7 @@ void App::StrokeSolver::loop() {
         dabSeconds = batch.empty() ? 0.0 : spent / double(batch.size());
         const auto prepStart = std::chrono::steady_clock::now();
         uploadReady = prepare && app.renderer_.prepareStrokeUpload(uploadId, app.doc_.mesh, upload, app.doc_.sculptor.strokeCurvature());
+        if (finalize && uploadReady) app.renderer_.refineStrokeBoundsInto(uploadId, app.doc_.mesh, upload);
         static const bool log = std::getenv("SF_STROKE_LOG") != nullptr;
         if (log) {
             const SculptTimings& t = app.doc_.sculptor.timings;
@@ -103,6 +109,14 @@ bool App::predictiveStrokes() const {
         return v && *v ? (*v == '0' ? 0 : 1) : -1;
     }();
     return env >= 0 ? env == 1 : uiPrefs_.predictiveStrokes;
+}
+
+bool App::draftStrokes() const {
+    static const int env = [] {
+        const char* v = std::getenv("SF_DRAFT_STROKE");
+        return v && *v ? (*v == '0' ? 0 : 1) : -1;
+    }();
+    return predictiveStrokes() && (env >= 0 ? env == 1 : uiPrefs_.draftStrokes);
 }
 
 bool App::asyncStrokeAllowed() const {
@@ -212,6 +226,20 @@ void App::pumpStroke() {
     if (!solver_) solver_ = std::make_unique<StrokeSolver>(*this);
     if (solver_->busy()) return;
     if (solver_->done) commitSolverBatch();
+    if (dabQueue_.empty() && strokeFinishing_ && !solver_->finalize) {
+        // Released: the stroke's end work on the solver thread too (a draft's normals and cavities, the exact
+        // culling bounds of what it moved), then the end.
+        StrokeSolver& s = *solver_;
+        s.batch.clear();
+        s.finalize = true;
+        s.view.camera = camera_;
+        s.view.canvas = canvasRect();
+        s.view.probe = nullptr;
+        s.uploadId = doc_.activeSubtoolInfo().id;
+        s.prepare = &displayedMesh() == &doc_.mesh;
+        s.start();
+        return;
+    }
     if (dabQueue_.empty()) {
         if (strokeFinishing_) finishStrokeNow(); // released, and every dab is on the GPU
         return;
@@ -226,10 +254,14 @@ void App::pumpStroke() {
     s.view.probe = strokeProbe_ ? &s.probe : nullptr;
     s.uploadId = doc_.activeSubtoolInfo().id;
     s.prepare = &displayedMesh() == &doc_.mesh; // (a previewed LOD shows instead: nothing to pack)
+    renderer_.setDraftNormals(doc_.sculptor.draftActive() ? s.uploadId : 0);
     s.start();
 }
 
 void App::finishStrokeNow() {
+    if (solver_) solver_->finalize = false;
+    doc_.sculptor.flushDraft(doc_.mesh, doc_.bvh); // (a draft stroke ended here rather than on the solver thread)
+    renderer_.setDraftNormals(0);
     if (asyncStroke_) renderer_.refineStrokeBounds(doc_.activeSubtoolInfo().id, displayedMesh()); // (the quick ones)
     strokeFinishing_ = false;
     asyncStroke_ = false;
@@ -397,15 +429,25 @@ bool App::verifyStroke(uint64_t before, const std::vector<glm::vec2>& dabs) {
     const bool wasAsync = asyncStroke_;
     asyncStroke_ = false;
     haveLastDab_ = false;
-    doc_.syncBvh();
-    doc_.sculptor.beginStroke(doc_.mesh, brushName(strokeBrush_), doc_.activeLayer);
-    for (const glm::vec2& d : dabs) dabAt(d.x, d.y, 1.0f);
-    UndoRecord r = doc_.sculptor.endStroke();
-    const uint64_t replay = meshStateHash(doc_.mesh);
+    const auto place = [&] {
+        doc_.syncBvh();
+        haveLastDab_ = false;
+        doc_.sculptor.draftStrokes = draftStrokes(); // (the measured stroke is one the solver thread takes)
+        doc_.sculptor.beginStroke(doc_.mesh, brushName(strokeBrush_), doc_.activeLayer);
+        for (const glm::vec2& d : dabs) dabAt(d.x, d.y, 1.0f);
+        doc_.sculptor.flushDraft(doc_.mesh, doc_.bvh);
+        doc_.undo.push(doc_.sculptor.endStroke());
+        return meshStateHash(doc_.mesh);
+    };
+    const uint64_t replay = place();
+    // And once more: the frame-loop path against itself (anything here that isn't deterministic shows).
+    runCommand("undo", {});
+    const uint64_t again = place();
     asyncStroke_ = wasAsync;
     const bool same = replay == after;
-    std::printf("verify: undo %s; %zu dabs replayed without the solver thread: %s\n", undoOk ? "restores the mesh" : "DIFFERS",
-                dabs.size(), same ? "identical" : "DIFFERENT");
+    std::printf("verify: undo %s; %zu dabs replayed without the solver thread: %s (replayed twice: %s)\n",
+                undoOk ? "restores the mesh" : "DIFFERS", dabs.size(), same ? "identical" : "DIFFERENT",
+                again == replay ? "identical" : "DIFFERENT");
     std::fflush(stdout);
     return undoOk && same;
 }

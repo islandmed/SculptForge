@@ -33,6 +33,7 @@ struct App::StrokeSolver {
     double dabSeconds = 0.0;      // the batch's mean cost per dab
     uint32_t uploadId = 0;        // the active SubTool's renderer slot
     bool prepare = true;          // pack the upload on the thread
+    bool finalize = false;        // before the batch: Sculptor::flushDraft (a draft stroke's end)
     Renderer::StrokeUpload upload;
     bool uploadReady = false; // packed (else the main thread's syncScene sends the change)
     bool done = false;        // a finished batch waits for its commit

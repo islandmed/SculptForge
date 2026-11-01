@@ -240,6 +240,7 @@ private:
     bool asyncStroke_ = false;         // this stroke's dabs go to the solver thread
     bool strokeFinishing_ = false;     // released: the solver places the last dabs, the UI carries on
     bool predictiveStrokes() const;    // the preference (and its environment override)
+    bool draftStrokes() const;         // Draft Strokes (SF_DRAFT_STROKE=0 / 1 overrides)
     bool asyncStrokeAllowed() const;   // the stroke beginning now may use the solver thread
     bool solverBusy() const;
     void solverWait();                 // waits for the dabs in flight and commits them

@@ -660,6 +660,10 @@ int App::run() {
     // The brush behind the pointer is measured twice: the surface (the last dab whose result is on the GPU) and
     // the preview (the predictive stroke's head, render/Ghost.h; the surface when there is none). Release is how
     // long letting go holds up the UI, then how long until the last dab is on screen.
+    struct MeasureView {
+        float distance, aspect, w, h;
+        bool operator==(const MeasureView&) const = default;
+    };
     struct StrokeMeasure {
         bool started = false, moving = false; // moving: the press's first frame is on screen, the pointer moves
         bool releasing = false;               // let go: waiting for the last dab to reach the screen
@@ -669,6 +673,9 @@ int App::run() {
         uint64_t frames = 0, samples = 0, lagSamples = 0;
         float cx = 0.0f, cy = 0.0f, r = 0.0f;
         std::vector<glm::vec2> dabs;
+        MeasureView view{};     // the view before the stroke (it starts once this has held still for a second)
+        double viewSince = 0.0;
+        std::vector<double> frameTimes; // seconds, for the percentiles
         // SF_MEASURE_VERIFY=1: the mesh before the stroke, to check undo and replay the dabs (verifyStroke).
         uint64_t before = 0;
         // SF_MEASURE_SNAPSHOT=prefix: the canvas at a few points of the stroke, as prefix-N.png.
@@ -737,7 +744,18 @@ int App::run() {
         mark();
         while (SDL_PollEvent(&e)) onEvent(e);
         mark();
-        if (options_.measureStroke > 0.0f && !sm.started && t0 - started >= kMeasureSettle && !backgroundBusy()) {
+        // (The window must have settled too: a window manager that maximises it late, on a busy machine, changes
+        // the canvas and with it the brush's size in the world mid-stroke.)
+        if (options_.measureStroke > 0.0f && !sm.started) {
+            const CanvasRect c = canvasRect();
+            const MeasureView v{camera_.distance, camera_.aspect, c.w, c.h};
+            if (!(v == sm.view)) {
+                sm.view = v;
+                sm.viewSince = t0;
+            }
+        }
+        if (options_.measureStroke > 0.0f && !sm.started && t0 - started >= kMeasureSettle && t0 - sm.viewSince >= 1.0 &&
+            !backgroundBusy()) {
             const CanvasRect c = canvasRect();
             sm.cx = c.x + c.w * 0.5f;
             sm.cy = c.y + c.h * 0.5f;
@@ -774,6 +792,12 @@ int App::run() {
                 std::sort(off.begin(), off.end());
                 const auto pct = [&](double q) { return off.empty() ? 0.0f : off[std::min(off.size() - 1, size_t(q * off.size()))]; };
                 const double frameMean = sm.frames ? sm.sumFrames / double(sm.frames) * 1000.0 : 0.0;
+                std::sort(sm.frameTimes.begin(), sm.frameTimes.end());
+                const auto framePct = [&](double q) {
+                    return sm.frameTimes.empty() ? 0.0
+                                                 : sm.frameTimes[std::min(sm.frameTimes.size() - 1, size_t(q * double(sm.frameTimes.size())))] * 1000.0;
+                };
+                std::printf("  frame percentiles: p50 %.1f ms, p95 %.1f ms, p99 %.1f ms\n", framePct(0.5), framePct(0.95), framePct(0.99));
                 const double lagMean = sm.lagSamples ? sm.sumLag / double(sm.lagSamples) : 0.0;
                 const double previewMean = sm.lagSamples ? sm.sumPreviewLag / double(sm.lagSamples) : 0.0;
                 std::printf("Stroke (%s%s): %zu dabs from %llu pointer samples in %.1f s, circle radius %.0f px, brush radius %.0f px\n"
@@ -787,15 +811,19 @@ int App::run() {
                             sm.firstSurfaceMs, (unsigned long long)sm.frames, frameMean, sm.maxFrame * 1000.0, lagMean, sm.maxLag,
                             previewMean, sm.maxPreviewLag, releaseMs, releaseDoneMs);
                 // tools/bench_strokes.sh reads this line.
-                std::printf("bench: %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f\n", frameMean, sm.maxFrame * 1000.0, lagMean, previewMean,
-                            sm.pressMs, sm.firstSurfaceMs, releaseMs, releaseDoneMs);
+                std::printf("bench: %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f\n", frameMean, sm.maxFrame * 1000.0, lagMean,
+                            previewMean, sm.pressMs, sm.firstSurfaceMs, releaseMs, releaseDoneMs, framePct(0.95), framePct(0.99));
                 if (popProbe_ && popCommits_ > 0)
                     std::printf("pop: when the solver's dabs replace their preview the view changes by %.3f on average "
                                 "(worst %.3f); without the preview those dabs would change it by %.3f (%llu commits)\n",
                                 popWith_ / double(popCommits_), popWorst_, popWithout_ / double(popCommits_),
                                 (unsigned long long)popCommits_);
                 std::fflush(stdout);
-                if (verify && !verifyStroke(sm.before, sm.dabs)) return 1;
+                const MeasureView now{camera_.distance, camera_.aspect, canvasRect().w, canvasRect().h};
+                if (verify && !(now == sm.view))
+                    std::printf("verify: skipped (the view changed during the stroke: distance %.3f -> %.3f, canvas %.0fx%.0f -> %.0fx%.0f)\n",
+                                double(sm.view.distance), double(now.distance), double(sm.view.w), double(sm.view.h), double(now.w), double(now.h));
+                else if (verify && !verifyStroke(sm.before, sm.dabs)) return 1;
                 // The test (ui_stroke_path, a light sphere): every dab placed, all of them on the circle.
                 const float spacing = std::max(1.0f, radiusPx_ * 0.15f);
                 const double expected = 4.0 * 3.14159265358979 * double(sm.r) / double(spacing);
@@ -912,6 +940,7 @@ int App::run() {
             const double now = seconds();
             sm.maxFrame = std::max(sm.maxFrame, now - sm.lastFrame);
             sm.sumFrames += now - sm.lastFrame;
+            sm.frameTimes.push_back(now - sm.lastFrame);
             sm.lastFrame = now;
             ++sm.frames;
             if (!sm.dabs.empty()) { // how far round the circle the brush is behind the pointer, on screen now
@@ -1208,7 +1237,7 @@ void App::onMouseUp() {
         // Predictive strokes: letting go doesn't wait for the dabs still to place; the solver carries on and
         // pumpStroke ends the stroke once they are on screen (anything that needs the document first ends it).
         strokeFinishing_ = true;
-        if (!solverBusy() && dabQueue_.empty()) endStroke();
+        // (even with nothing left to place: the stroke's end work runs on the solver thread, pumpStroke)
     } else if (drag_ == Drag::Stroke) endStroke();
     if (drag_ == Drag::MaskCanvas) maskCanvasRelease();
     if (drag_ == Drag::SubToolClick) subtoolClickRelease();
@@ -1245,6 +1274,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     strokeSculpt_ = !(strokePaint_ && paintMode_);
     const BrushRecipe* recipe = strokeRecipe();
     haveLastDab_ = false;
+    doc_.sculptor.draftStrokes = draftStrokes() && asyncStrokeAllowed(); // (AsyncStroke.cpp)
     if (!doc_.sculptor.beginStroke(doc_.mesh,
                                    !strokeSculpt_ ? std::string("Paint") : recipe ? recipe->name : brushName(strokeBrush_),
                                    strokeSculpt_ ? doc_.activeLayer : -1)) {

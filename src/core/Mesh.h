@@ -213,6 +213,9 @@ public:
     // gives the corners of the BVH leaves its query listed, which is cheaper than every moved vertex's ring.
     void updateNormalsAround(size_t count, size_t grain, const std::function<void(size_t, size_t, IndexBits&)>& fill,
                              float* curvature = nullptr);
+    // Marks the vertices fill() lists dirty for the GPU without recomputing their normals (a draft stroke, whose
+    // normals wait for its end: Sculptor::draftStrokes).
+    void markDirtyAround(size_t count, size_t grain, const std::function<void(size_t, size_t, IndexBits&)>& fill);
     // The renderer's cavity term at `v` (render/Clusters.h): how far the average of the other corners of its
     // triangles sits above the vertex along its normal (> 0 in a crease), over their mean distance. Each
     // neighbour of an inner vertex of a manifold is the corner of two of its triangles, so this is the average
@@ -288,7 +291,7 @@ public:
 private:
     void finishTopology();
     bool beginNormalSet(); // updateNormals: room for the set (false: no topology)
-    void finishNormals(float* curvature);  // ... then each member's normal (and curvatureAt)
+    void finishNormals(float* curvature, bool computeNormals = true); // ... then each member's normal (and curvatureAt)
     IndexRing implicitTriangles(uint32_t v) const;
     IndexRing implicitNeighbors(uint32_t v) const;
 

@@ -2419,25 +2419,33 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     if (cullBackfaces_) gl::Enable(GL_CULL_FACE);
     // The predictive preview (render/Ghost.h): the clusters a ghost dab reaches draw with the GHOST program, the
     // rest as usual (most of the mesh, which then doesn't pay for the preview).
-    ghostClusters_.clear();
-    if (ghost) {
+    // A draft stroke (Sculptor::draftStrokes) left the normals of the clusters it moved as they were: those draw
+    // with normals from the moved triangles themselves (the FLAT program's per-pixel face normals) until it ends.
+    const bool draft = active && s.id == draftId_ && !perTriangle && s.looseMark.size() == s.bounds.size();
+    for (auto& list : extraClusters_) list.clear();
+    if (ghost || draft) {
         size_t kept = 0;
         for (uint32_t c : drawClusters_) {
             const ClusterBounds& b = s.bounds[c];
-            bool reached = b.radius < 0.0f;
-            for (size_t i = 0; i < ghost_.dabs.size() && !reached; ++i)
-                reached = glm::distance(b.center, ghost_.dabs[i].center) < b.radius + ghost_.dabs[i].radius * 1.05f;
-            if (reached) ghostClusters_.push_back(c);
+            bool reached = false;
+            if (ghost) {
+                reached = b.radius < 0.0f;
+                for (size_t i = 0; i < ghost_.dabs.size() && !reached; ++i)
+                    reached = glm::distance(b.center, ghost_.dabs[i].center) < b.radius + ghost_.dabs[i].radius * 1.05f;
+            }
+            const bool rough = draft && s.looseMark[c];
+            if (reached || rough) extraClusters_[(reached ? 1 : 0) | (rough ? 2 : 0)].push_back(c);
             else drawClusters_[kept++] = c;
         }
         drawClusters_.resize(kept);
     }
     drawClusters(s, drawClusters_, GL_TRIANGLES, Part::Triangles, perTriangle ? p->primBase : -1);
-    if (!ghostClusters_.empty()) {
-        if (const MeshProgram* pg = meshProgram(features | kGhost)) {
+    for (int k = 1; k < 4; ++k) {
+        if (extraClusters_[k].empty()) continue;
+        if (const MeshProgram* pg = meshProgram(features | ((k & 1) ? kGhost : 0) | ((k & 2) ? kFlat : 0))) {
             bind(pg);
-            setGhostUniforms(*pg);
-            drawClusters(s, ghostClusters_, GL_TRIANGLES, Part::Triangles, perTriangle ? pg->primBase : -1);
+            if (k & 1) setGhostUniforms(*pg);
+            drawClusters(s, extraClusters_[k], GL_TRIANGLES, Part::Triangles, -1);
             bind(p);
         }
     }
@@ -2522,6 +2530,9 @@ bool Renderer::prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out, c
     out.ranges.clear();
     out.movedClusters.clear();
     out.bounds.clear();
+    out.exactClusters.clear();
+    out.exactBounds.clear();
+    out.regrid = false;
     out.packMs = out.boundsMs = 0.0;
     const auto clock = std::chrono::steady_clock::now();
     MeshSlot* found = nullptr;
@@ -2556,18 +2567,25 @@ bool Renderer::prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out, c
         size_t offset;
     };
     std::vector<Piece> pieces;
-    size_t total = 0;
-    for (const auto& [b, e] : runs)
-        for (uint32_t c = b; c < e; c += kPiece) {
-            const uint32_t ce = std::min(e, c + kPiece);
-            pieces.push_back({c, ce, total});
-            total += ce - c;
-        }
-    out.data.resize(total);
+    const auto cut = [&] {
+        pieces.clear();
+        size_t total = 0;
+        for (const auto& [b, e] : runs)
+            for (uint32_t c = b; c < e; c += kPiece) {
+                const uint32_t ce = std::min(e, c + kPiece);
+                pieces.push_back({c, ce, total});
+                total += ce - c;
+            }
+        out.data.resize(total);
+    };
+    cut();
     std::atomic<bool> outside{false};
     std::vector<uint64_t> hashes(nb * 2, 0); // (written per block, then compared: a failed prepare keeps the old)
     std::vector<AABB> boxes(nb);
     s.blockBox.resize(nb);
+    PositionGrid grid = s.grid;
+    bool everything = false;
+    const auto pack = [&] {
     poolFor(pieces.size(), [&](size_t i0, size_t i1) {
         for (size_t pi = i0; pi < i1; ++pi) {
             const Piece& pc = pieces[pi];
@@ -2579,7 +2597,7 @@ bool Renderer::prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out, c
                 const uint32_t v = order[i];
                 PackedVertex pv{};
                 if (v < nv) {
-                    inside &= packVertex(s.grid, mesh.positions[v], mesh.normals[v], curvature ? curvature[v] : curvatureAt(mesh, v), pv);
+                    inside &= packVertex(grid, mesh.positions[v], mesh.normals[v], curvature ? curvature[v] : curvatureAt(mesh, v), pv);
                     box.expand(mesh.positions[v]);
                 }
                 dst[i - pc.begin] = pv;
@@ -2589,7 +2607,7 @@ bool Renderer::prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out, c
                     const size_t g = i >> UploadOrder::kBlockShift;
                     hashes[g * 2] = hp;
                     hashes[g * 2 + 1] = hn;
-                    out.blockMoved[g] = s.blockHash[g * 2] != hp;
+                    out.blockMoved[g] = everything || s.blockHash[g * 2] != hp;
                     out.blockChanged[g] = out.blockMoved[g] || s.blockHash[g * 2 + 1] != hn;
                     boxes[g] = box;
                     hp = hn = 0;
@@ -2599,9 +2617,21 @@ bool Renderer::prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out, c
             if (!inside) outside.store(true, std::memory_order_relaxed);
         }
     }, 1, 2);
+    };
+    pack();
     if (outside.load()) {
-        s.regrid = true; // the next syncScene makes a new grid and sends everything (the mesh stays dirty)
-        return false;
+        // A vertex left the position grid: a new one round the mesh, and every vertex packed again, here on this
+        // thread (the GL thread keeps drawing with the old grid and data until the commit swaps both; the
+        // regular sync did this in the frame, a stall of seconds at 33M triangles).
+        grid = PositionGrid::around(meshBounds(mesh));
+        runs.assign(1, {0u, uint32_t(ns)});
+        cut();
+        everything = true;
+        outside = false;
+        pack();
+        if (outside.load()) return false; // (can't happen: the grid holds the mesh)
+        out.regrid = true;
+        out.grid = grid;
     }
     out.packMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - clock).count();
     // The changed blocks' GPU ranges and where they are in `data`.
@@ -2662,6 +2692,7 @@ void Renderer::commitStrokeUpload(StrokeUpload& up) {
         if (s.id == up.id) found = &s;
     if (!found) return;
     MeshSlot& s = *found;
+    if (up.regrid) s.grid = up.grid; // (with every vertex, packed on it)
     if (!up.ranges.empty()) {
         gl::BindBuffer(GL_ARRAY_BUFFER, s.vertexBuffer);
         for (const StrokeUpload::Range& r : up.ranges)
@@ -2677,6 +2708,17 @@ void Renderer::commitStrokeUpload(StrokeUpload& up) {
             s.proxyStale[up.movedClusters[i]] = 1;
         }
         s.looseClusters.insert(s.looseClusters.end(), up.movedClusters.begin(), up.movedClusters.end());
+        s.looseMark.resize(s.bounds.size(), 0);
+        for (uint32_t c : up.movedClusters) s.looseMark[c] = 1;
+    }
+    if (up.exact) { // the stroke's end (refineStrokeBoundsInto): exact bounds for every cluster it moved
+        s.bounds.resize(s.order.clusters().size());
+        for (size_t i = 0; i < up.exactClusters.size(); ++i)
+            if (up.exactClusters[i] < s.bounds.size()) s.bounds[up.exactClusters[i]] = up.exactBounds[i];
+        s.looseClusters.clear();
+        std::fill(s.looseMark.begin(), s.looseMark.end(), 0);
+    }
+    if (!up.movedClusters.empty() || up.exact) {
         s.box = AABB();
         s.volume = 0.0;
         for (const ClusterBounds& b : s.bounds) {
@@ -2689,11 +2731,40 @@ void Renderer::commitStrokeUpload(StrokeUpload& up) {
     }
 }
 
+void Renderer::setDraftNormals(uint32_t id) { draftId_ = id; }
+
+void Renderer::refineStrokeBoundsInto(uint32_t id, const Mesh& mesh, StrokeUpload& up) {
+    up.exact = false;
+    up.exactClusters.clear();
+    up.exactBounds.clear();
+    MeshSlot* found = nullptr;
+    for (MeshSlot& s : slots_)
+        if (s.id == id) found = &s;
+    if (!found) return;
+    MeshSlot& s = *found;
+    const size_t nc = s.order.clusters().size();
+    if (s.fresh || mesh.topologyDirty || s.bounds.size() != nc) return;
+    // Those moved before and those this upload moves (the main thread doesn't touch the list while we run).
+    up.exactClusters = s.looseClusters;
+    up.exactClusters.insert(up.exactClusters.end(), up.movedClusters.begin(), up.movedClusters.end());
+    std::sort(up.exactClusters.begin(), up.exactClusters.end());
+    up.exactClusters.erase(std::unique(up.exactClusters.begin(), up.exactClusters.end()), up.exactClusters.end());
+    while (!up.exactClusters.empty() && up.exactClusters.back() >= nc) up.exactClusters.pop_back();
+    up.exactBounds.resize(up.exactClusters.size());
+    poolFor(up.exactClusters.size(), [&](size_t i0, size_t i1) {
+        for (size_t i = i0; i < i1; ++i) up.exactBounds[i] = clusterBounds(mesh, s.order, up.exactClusters[i]);
+    }, 1, 2);
+    up.exact = true;
+    up.ready = true;
+}
+
 void Renderer::refineStrokeBounds(uint32_t id, const Mesh& mesh) {
     MeshSlot* found = nullptr;
     for (MeshSlot& s : slots_)
         if (s.id == id) found = &s;
-    if (!found || found->looseClusters.empty()) return;
+    if (!found) return;
+    std::fill(found->looseMark.begin(), found->looseMark.end(), 0);
+    if (found->looseClusters.empty()) return;
     MeshSlot& s = *found;
     std::sort(s.looseClusters.begin(), s.looseClusters.end());
     s.looseClusters.erase(std::unique(s.looseClusters.begin(), s.looseClusters.end()), s.looseClusters.end());

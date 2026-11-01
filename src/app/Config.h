@@ -43,6 +43,10 @@ struct UiPrefs {
     // Sculpt strokes solved on their own thread with a GPU preview of the dabs still to come, the cursor and the
     // stroke's head predicted a frame ahead (app/AsyncStroke.cpp). Off: the dabs are placed in the frame loop.
     bool predictiveStrokes = true;
+    // Draft strokes (with predictive strokes): dabs move the vertices only; the normals, cavities and culling
+    // bounds of what they touched are worked out once, when the pen lifts (Sculptor::draftStrokes). Off by
+    // default; meant for laptops and battery (a hardware tier will turn it on).
+    bool draftStrokes = false;
     // Dynamic topology (Draw palette): false = the detail follows the brush size on screen (Sculptris Pro);
     // true = one detail size for the whole mesh.
     bool dyntopoConstantDetail = false;

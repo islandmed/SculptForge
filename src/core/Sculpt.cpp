@@ -206,6 +206,9 @@ bool Sculptor::beginStroke(const Mesh& mesh, std::string label, int layer) {
         colored_.assign(words, 0);
     }
     ++strokeId_;
+    draft_ = draftStrokes && !dyntopo.enabled;
+    draftStrokes = false; // (asked for per stroke)
+    draftLeaves_.clear();
     strokeDiagonal_ = 0.0f;
     lastRemesh_ = false;
     topologyHeld_ = false;
@@ -429,6 +432,17 @@ void Sculptor::displaceAll(Mesh& mesh, std::span<const uint32_t> verts, std::spa
             if (layered) target[v] += dk / weight;
         }
     }, kBlock);
+}
+
+void Sculptor::flushDraft(Mesh& mesh, const BVH& bvh) {
+    if (!draft_ || draftLeaves_.empty()) return;
+    std::sort(draftLeaves_.begin(), draftLeaves_.end());
+    draftLeaves_.erase(std::unique(draftLeaves_.begin(), draftLeaves_.end()), draftLeaves_.end());
+    dabLeaves_.swap(draftLeaves_);
+    draft_ = false; // (updateDabNormals in full)
+    updateDabNormals(mesh, bvh);
+    draft_ = true;
+    draftLeaves_.clear();
 }
 
 UndoRecord Sculptor::endStroke() {
@@ -663,7 +677,33 @@ void Sculptor::finishDab(Mesh& mesh, BVH& bvh, std::chrono::steady_clock::time_p
 // as it remeshed, so there the rings are used.
 void Sculptor::updateDabNormals(Mesh& mesh, const BVH& bvh) {
     auto clock = std::chrono::steady_clock::now();
-    if (curvature_.size() != mesh.vertexCount()) curvature_.assign(mesh.vertexCount(), 0.0f);
+    if (curvature_.size() != mesh.vertexCount() || curvatureMesh_ != &mesh) {
+        curvature_.assign(mesh.vertexCount(), 0.0f);
+        curvatureFilled_ = false;
+        curvatureMesh_ = &mesh;
+    }
+    if (draft_ && !dynTopo_.active() && !dabLeaves_.empty()) {
+        // A draft: the vertices go up with the normals and cavity terms they had (filled in once for the mesh).
+        if (!curvatureFilled_) {
+            poolFor(mesh.vertexCount(), [&](size_t b, size_t e) {
+                for (size_t v = b; v < e; ++v) curvature_[v] = mesh.curvatureAt(uint32_t(v));
+            }, 8192);
+            curvatureFilled_ = true;
+        }
+        mesh.markDirtyAround(dabLeaves_.size(), 64, [&](size_t b, size_t e, IndexBits& set) {
+            for (size_t i = b; i < e; ++i)
+                for (uint32_t t : bvh.leafTriangles(dabLeaves_[i])) {
+                    const glm::uvec3& tri = mesh.triangles[t];
+                    set.insertLocal(tri.x);
+                    set.insertLocal(tri.y);
+                    set.insertLocal(tri.z);
+                }
+        });
+        draftLeaves_.insert(draftLeaves_.end(), dabLeaves_.begin(), dabLeaves_.end());
+        dabLeaves_.clear();
+        timings.normalsMs += lapMs(clock);
+        return;
+    }
     if (dynTopo_.active() || dabLeaves_.empty()) {
         mesh.updateNormals(dabVerts_, curvature_.data());
     } else {

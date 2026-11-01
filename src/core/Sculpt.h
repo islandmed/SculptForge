@@ -130,6 +130,16 @@ public:
     // stroke. Entries of other vertices are stale.
     const float* strokeCurvature() const { return active_ && !curvature_.empty() ? curvature_.data() : nullptr; }
 
+    // Draft strokes (Preferences > Performance > Draft Strokes): when set before beginStroke (it asks once), dabs move the vertices
+    // and refit the BVH but leave the normals and the cavity term as they were (the brushes that read normals see
+    // the stroke-start ones, so the result differs slightly from a full stroke); the vertices are only marked
+    // for the GPU. flushDraft works out every normal and cavity term the stroke touched, once (the app calls
+    // it before endStroke). Not with dynamic topology.
+    bool draftStrokes = false;
+    bool draftActive() const { return draft_; }
+    bool draftPending() const { return draft_ && !draftLeaves_.empty(); }
+    void flushDraft(Mesh& mesh, const BVH& bvh);
+
     // Mirror sign vectors for the enabled symmetry axes (always starts with (1,1,1)).
     static std::vector<glm::vec3> mirrors(Symmetry sym);
 
@@ -175,6 +185,10 @@ private:
     std::vector<uint32_t> verts_, dabVerts_; // one mirror's vertices; every mirror's (for the normals)
     std::vector<uint32_t> dabLeaves_;        // the BVH leaves every mirror's query listed (the normals' set)
     std::vector<float> curvature_;           // strokeCurvature
+    bool curvatureFilled_ = false;           // every entry current (a draft stroke packs them as they are)
+    const Mesh* curvatureMesh_ = nullptr;    // the mesh curvature_ is for
+    bool draft_ = false;                     // this stroke is a draft
+    std::vector<uint32_t> draftLeaves_;      // the BVH leaves its dabs touched (flushDraft)
     std::vector<glm::vec3> scratch_;
     std::vector<float> weights_, influence_;
     std::vector<uint8_t> firstTouch_;

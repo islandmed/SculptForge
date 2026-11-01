@@ -94,6 +94,16 @@ void App::registerPerformanceUiActions() {
         "the dabs still being worked out as a preview on the surface, with the cursor and the stroke's head drawn "
         "where the pen is about to be. On a heavy mesh the surface moves under the pen at once and lifting the pen "
         "is instant. The finished sculpt is exactly the same either way.");
+    add("perf.draft_strokes", "Draft Strokes",
+        [this] {
+            uiPrefs_.draftStrokes = !uiPrefs_.draftStrokes;
+            status_ = uiPrefs_.draftStrokes ? "Draft strokes on" : "Draft strokes off";
+        },
+        [this] { return uiPrefs_.draftStrokes; },
+        "With Predictive Strokes: while you sculpt, the brush only moves the surface and shades the moved part from "
+        "its facets; the smooth shading, the cavities and the rest are worked out once when you lift the pen. "
+        "Lighter on laptops and on battery. Brushes that follow the surface's direction (Inflate, the plane brushes) "
+        "use its direction from the stroke's start, so the result can differ slightly from a full stroke.");
 }
 
 void App::applyPerformancePrefs() { ThreadPool::shared().setSerial(!uiPrefs_.multithreading); }
@@ -148,6 +158,9 @@ void App::drawPerformanceSection() {
     bool predictive = uiPrefs_.predictiveStrokes;
     if (ImGui::Checkbox("Predictive Strokes", &predictive)) actions_.find("perf.predictive_strokes")->run();
     ui::HelpAction(*this, "perf.predictive_strokes");
+    bool draft = uiPrefs_.draftStrokes;
+    if (ImGui::Checkbox("Draft Strokes", &draft)) actions_.find("perf.draft_strokes")->run();
+    ui::HelpAction(*this, "perf.draft_strokes");
 
     // --- Threads ---
     bool threads = !ThreadPool::shared().serial();

@@ -129,6 +129,11 @@ public:
         std::vector<ClusterBounds> bounds; // of movedClusters
         std::vector<uint8_t> blockChanged, blockMoved; // scratch, per block
         double packMs = 0.0, boundsMs = 0.0;           // where prepare's time went
+        bool regrid = false;                           // every vertex, packed on a new grid
+        PositionGrid grid;
+        bool exact = false;                            // refineStrokeBoundsInto: exact bounds to set
+        std::vector<uint32_t> exactClusters;
+        std::vector<ClusterBounds> exactBounds;
         size_t bytes() const { return data.size() * sizeof(PackedVertex); }
     };
     // `curvature` (optional, by vertex): the cavity term of every vertex the mesh marked dirty, already worked
@@ -139,6 +144,12 @@ public:
     // packing finds anyway, without the normal cone, so they are never culled as facing away); at the stroke's
     // end this works out the exact ones (GL thread, the mesh no longer changing).
     void refineStrokeBounds(uint32_t id, const Mesh& mesh);
+    // A draft stroke on SubTool `id` (0: none): the clusters its uploads moved draw with per-pixel face normals
+    // (theirs are stale) until refineStrokeBounds.
+    void setDraftNormals(uint32_t id);
+    // refineStrokeBounds on the solver thread at a stroke's end, after prepareStrokeUpload: the exact bounds go
+    // into `up` and commitStrokeUpload sets them.
+    void refineStrokeBoundsInto(uint32_t id, const Mesh& mesh, StrokeUpload& up);
 
     // Bytes of GPU buffers and textures the mesh slots hold.
     size_t gpuBytes() const;
@@ -221,6 +232,7 @@ private:
         // Clusters whose culling bounds a stroke upload set from blockBox (a sphere round the box, no normal cone,
         // the old volume): refineStrokeBounds makes them exact.
         std::vector<uint32_t> looseClusters;
+        std::vector<uint8_t> looseMark; // per cluster: in looseClusters
         size_t bytes[8] = {}; // GPU sizes: vertices, indices, lines, colours, mask, groups, prims, uvs + tangents
 
         // Dynamic topology (Mesh::changedTriangles, core/Dyntopo.h): the clusters whose triangles changed since
@@ -294,7 +306,8 @@ private:
     std::vector<const void*> drawOffsets_;
     std::vector<GLint> drawBases_;
     std::vector<uint32_t> drawClusters_;
-    std::vector<uint32_t> ghostClusters_; // drawSlot: the clusters a ghost dab reaches
+    std::vector<uint32_t> extraClusters_[4]; // drawSlot: clusters a ghost dab reaches (1), a draft moved (2), both
+    uint32_t draftId_ = 0;                   // setDraftNormals
     bool cullBackfaces_ = false; // the last cull(): back faces can't show (so the GPU may skip them too)
     std::vector<uint32_t> cullScratch_;
     size_t lastDrawn_ = 0;

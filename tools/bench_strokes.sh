@@ -63,17 +63,17 @@ for size in "${sizeList[@]}"; do
             fi
             label=$([ "$b" = 0 ] && echo A || echo B)
             out=$(env ${envs[@]+"${envs[@]}"} ${own[@]+"${own[@]}"} "$bin" --run "$scene" --measure-stroke "$seconds,$radius" 2>&1 || true)
-            line=$(printf '%s\n' "$out" | grep -A3 '^Stroke' || true)
+            line=$(printf '%s\n' "$out" | grep -E '^Stroke|^  (off|press|brush|release|frame)' || true)
             echo "== ${size}M  $label run $i  (${bins[$b]})"
             printf '%s\n' "$line"
-            # The machine-readable line: frames mean, worst, surface lag mean, preview lag mean, press, release.
+            # The machine-readable line: frames mean, worst, surface lag, preview lag, press, first surface, release, until done, p95, p99.
             printf '%s\n' "$out" | sed -n "s/^bench: /$size $label /p" >>"$results"
         done
     done
 done
 
 echo
-echo "Means (ms / px): size, binary, frame mean, frame worst, surface lag, preview lag, press, first surface, release, release until done"
+echo "Means (ms / px): size, binary, frame mean, frame worst, surface lag, preview lag, press, first surface, release, release until done, frame p95, frame p99"
 awk '{ k = $1 " " $2; n[k]++; for (i = 3; i <= NF; i++) s[k, i] += $i; nf[k] = NF }
      END { for (k in n) { printf "%-6s", k; for (i = 3; i <= nf[k]; i++) printf " %8.1f", s[k, i] / n[k]; printf "   (%d runs)\n", n[k] } }' \
     "$results" | sort -n
