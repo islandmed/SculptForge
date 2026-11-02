@@ -124,7 +124,7 @@ Separate pieces that don&#x27;t touch stay separate pieces; overlapping ones are
 The new surface is made of even quads (the original&#x27;s quads are rebuilt, not kept).
 </li>
 <li>
-<strong>Keep Masked</strong> (off by default): masked areas keep their triangles exactly, detail included, and only the rest is remeshed. The new surface is joined to the masked area along the mask&#x27;s edge by a narrow strip of triangles, so the model stays closed. A triangle counts as masked when all three of its corners are at least half masked. If the mask&#x27;s edge is too ragged or too thin to join up at this resolution, the status line says so and nothing changes (smooth or grow the mask, or raise the resolution). Command: <code>remesh keep_masked=true</code>.
+<strong>Keep Masked</strong> (off by default): masked areas keep their triangles exactly, detail included, and only the rest is remeshed. The new surface is joined to the masked area along the mask&#x27;s edge by a narrow strip of triangles, so the model stays closed. A triangle counts as masked when all three of its corners are at least half masked. A ragged mask edge is tidied by itself (#67): where it touches itself the corner triangles are remeshed, masked spots smaller than the new polygons are remeshed with the rest, and narrow gaps between masked areas are kept; the status line says when it did. If it still can&#x27;t be joined, the status line says what to change (blur or grow the mask, or unmask where two parts overlap) and nothing changes. Command: <code>remesh keep_masked=true</code>.
 </li>
 </ul>
 <p>To remesh several Parts into one, first combine them with <strong>Merge visible...</strong> or <strong>Merge down...</strong> in <a href="parts.html#merge-parts">Parts</a>.</p>

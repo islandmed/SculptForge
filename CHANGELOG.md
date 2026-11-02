@@ -6,6 +6,8 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.6] - 2026-11-01
+
 ### Added
 - Packs and macros (#20): `.sfpack` files bring brushes, alphas, Lit Spheres, Material Recipes, VDMs, keymaps, pie
   menus and macros in one file (format: `docs/pack-format.md`). **File > Install Pack...**, a dropped file or

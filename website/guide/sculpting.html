@@ -148,7 +148,7 @@ Press the letter on the badge to pick that brush. For example <kbd>B</kbd>, <kbd
 <strong>Smooth keeps volume</strong> in the <strong>Brush</strong> palette makes the volume-keeping smooth the one <kbd>Shift</kbd> and the Smooth brush use; letting go of <kbd>Shift</kbd> mid-stroke then switches to the plain one. Saved with the project.
 </li>
 </ul>
-<p>On a micro level (see <a href="micro-levels.html">Micro levels</a>) Smooth is always the plain one for now.</p>
+<p>On a micro level (see <a href="micro-levels.html">Micro levels</a>) Smooth is always the plain one for now. On a quad mesh (after Quad Remesh, or an imported quad model) Smooth follows the quads&#x27; own edges, never their diagonals, so the quads keep their shape (#69).</p>
 <figure class="shot"><a href="images/draw-palette.jpg" class="zoom"><img src="images/draw-palette.jpg" alt="The Draw palette" width="400" height="310" loading="lazy" decoding="async"></a><figcaption>The Draw palette</figcaption></figure>
 <h2 id="sculpt-paint-add-sub-rgb-and-front">Sculpt, Paint, Add, Sub, Rgb and Front<a class="anchor" href="#sculpt-paint-add-sub-rgb-and-front" aria-label="Link to this section">#</a></h2>
 <p>These toggles sit on the top shelf and in the <strong>Draw</strong> palette:</p>
@@ -177,7 +177,7 @@ Press the letter on the badge to pick that brush. For example <kbd>B</kbd>, <kbd
 Click an item to give it your own <strong>label</strong> and <strong>icon</strong>, or <strong>Change action</strong>. The arrows reorder items (the first points up, the rest go clockwise); the cross removes one.
 </li>
 <li>
-<strong>Key</strong> sets the key that opens the menu (it is an ordinary shortcut, so <strong>Preferences &gt; Hotkeys</strong> lists it too). The button next to it can also open the menu while held: the middle, back or forward mouse button, or one of the pen&#x27;s side buttons. That button then stops doing what it did before (a pen button&#x27;s Preferences &gt; Tablet mapping, the middle button&#x27;s pan).
+<strong>Key</strong> sets the key that opens the menu (it is an ordinary shortcut, so <strong>Preferences &gt; Hotkeys</strong> lists it too). The button next to it can also open the menu while held: the middle, right, back or forward mouse button, or one of the pen&#x27;s side buttons. That button then stops doing what it did before (a pen button&#x27;s Preferences &gt; Tablet mapping, the middle button&#x27;s pan, the right button&#x27;s turn). A mouse button opens the menu only with no modifier key held (#74): <kbd>Alt</kbd>+middle still pans, <kbd>Alt</kbd>+right still zooms in the Maya style, and <kbd>Shift</kbd>+right-drag still turns the view, so a menu on the right button never leaves you without a way to turn it (the panel says how).
 </li>
 <li>
 <strong>Export...</strong> saves the menu as a small <code>.json</code> file to share; <strong>Import...</strong> loads one. A menu file holds only action names, never anything that runs: names this version doesn&#x27;t know are left out.
@@ -390,7 +390,7 @@ a pressure curve for all brushes (Soft, Linear or Firm, or set <strong>Curve</st
 the eraser end (default <strong>Invert</strong>, like holding <kbd>Alt</kbd>) and the side buttons (default: lower button right-click to rotate the view, upper button <strong>Invert</strong>, third button <strong>Pan view</strong>). A side button can open a <a href="#radial-menus">radial menu</a> instead (Preferences &gt; Input &gt; Radial Menus).
 </li>
 <li>
-<strong>Mouse mode (relative)</strong>, for a tablet whose driver is set to mouse mode: the pen moves the cursor by how far it moves, and putting it down elsewhere on the tablet leaves the cursor where it was.
+<strong>Mouse mode (relative)</strong>, for a tablet whose driver is set to mouse mode: the pen moves the cursor by how far it moves, and putting it down elsewhere on the tablet leaves the cursor where it was. The brush follows the system cursor the driver moves, so brush, arrow and clicks always agree (#72).
 </li>
 </ul>
 <p><strong>Store Config</strong> (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) keeps these settings. Setup notes for Windows Ink, macOS and Linux are in <a href="https://github.com/islandmed/SculptForge/blob/main/docs/tablet.md" rel="noopener">docs/tablet.md</a>.</p>
