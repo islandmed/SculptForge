@@ -993,7 +993,8 @@ void Sculptor::dabRecipe(Mesh& mesh, BVH& bvh, const BrushRecipe& recipe, const 
         dab(mesh, bvh, BrushType::Standard, p, sym);
         return;
     }
-    remeshDab(mesh, bvh, p, sym, 1.0f, 1.0f);
+    const bool useAlpha = p.alpha && !p.alpha->empty(); // (an alpha reaches its square's corners, #75)
+    remeshDab(mesh, bvh, p, sym, 1.0f, useAlpha ? kAlphaReach : 1.0f);
     DabParams base = p;
     base.pressure = std::pow(std::clamp(p.pressure, 0.0f, 1.0f), recipe.pressureCurve);
     base.frontFacesOnly = p.frontFacesOnly || recipe.frontFacesOnly;
@@ -1012,13 +1013,16 @@ void Sculptor::dabRecipe(Mesh& mesh, BVH& bvh, const BrushRecipe& recipe, const 
 
 void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const DabParams& p) {
     auto clock = std::chrono::steady_clock::now();
-    brushRegion(mesh, bvh, p.center, p.viewDir, p.radius, p.connectedOnly, p.viewFalloff, verts_, connected_);
+    // An alpha (if any) modulates the recipe's tip, oriented on the view-facing plane. Focal Shift shifts the tip
+    // (0 keeps the recipe's own Hardness / Tip Sharpness), and so the alpha with it. With an alpha the region
+    // reaches the stamp's corners and, below 0, the round tip opens up toward 1 as alphaFalloff does, so at -100
+    // the whole alpha shows (#75; the built-in brushes got this in #60).
+    const bool useAlpha = p.alpha && !p.alpha->empty();
+    brushRegion(mesh, bvh, p.center, p.viewDir, p.radius * (useAlpha ? kAlphaReach : 1.0f), p.connectedOnly,
+                p.viewFalloff, verts_, connected_);
     if (verts_.empty()) return;
     const auto& pos = mesh.positions;
     const auto& nrm = mesh.normals;
-    // An alpha (if any) modulates the recipe's tip, oriented on the view-facing plane. Focal Shift shifts the tip
-    // (0 keeps the recipe's own Hardness / Tip Sharpness), and so the alpha with it.
-    const bool useAlpha = p.alpha && !p.alpha->empty();
     glm::vec3 aUp = projectOnPlane(p.alphaUp, p.viewDir);
     aUp = glm::length(aUp) > 1e-6f ? glm::normalize(aUp) : glm::vec3(0, 1, 0);
     const glm::vec3 aRight = glm::cross(aUp, -p.viewDir);
@@ -1045,6 +1049,7 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         float t = std::clamp((1.0f - brushDistance(p, pos[v]) / rad) / edge, 0.0f, 1.0f);
         if (p.focal != 0.0f) t = std::pow(t, std::exp2(2.0f * std::clamp(p.focal, -1.0f, 1.0f))); // (brushFalloff's)
         float w = std::pow(t * t * (3.0f - 2.0f * t), exponent);
+        if (useAlpha && p.focal < 0.0f) w += (1.0f - w) * std::min(-p.focal, 1.0f); // (alphaFalloff's)
         acc.normal += nrm[v] * w;
         acc.center += pos[v] * w;
         acc.weight += w;

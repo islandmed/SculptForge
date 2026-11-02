@@ -5,6 +5,11 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.10.7
+
+- **Full alphas on custom brushes**: at Focal Shift -100, Clay Slab and the other custom and Community brushes now
+  show the whole alpha to its corners, as the built-in brushes do (#75).
+
 ## Version 0.10.6
 
 - **PBR viewport** (**Material > Viewport Shading > PBR**): see the texture's material as a game engine shows it,
