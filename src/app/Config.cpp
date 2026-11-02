@@ -512,10 +512,10 @@ void App::initActions() {
         [this] { return brushSettings_.shareSizeIntensity; }, nullptr,
         "On: Draw Size and Z Intensity stay as they are when you pick another brush (as before 0.10.8); Falloff, "
         "RGB Intensity, the stroke and the alpha still follow each brush. Off (the default): every brush keeps its own.");
-    add("brush.size_down", "Smaller brush", "Draw", "[", [this] { radiusPx_ = std::max(2.0f, radiusPx_ / 1.1f); }, nullptr,
-        nullptr, nullptr, nullptr, "Make the brush 10% smaller (hold to repeat).");
-    add("brush.size_up", "Larger brush", "Draw", "]", [this] { radiusPx_ = std::min(800.0f, radiusPx_ * 1.1f); }, nullptr,
-        nullptr, nullptr, nullptr, "Make the brush 10% larger (hold to repeat).");
+    add("brush.size_down", "Smaller brush", "Draw", "[", [this] { radiusPx_ = drawSizeStep(radiusPx_, -1, false); }, nullptr,
+        nullptr, nullptr, nullptr, "Make the brush 10% smaller (hold to repeat; Shift+[ steps one pixel).");
+    add("brush.size_up", "Larger brush", "Draw", "]", [this] { radiusPx_ = drawSizeStep(radiusPx_, 1, false); }, nullptr,
+        nullptr, nullptr, nullptr, "Make the brush 10% larger (hold to repeat; Shift+] steps one pixel).");
     add("transform.symmetry_x", "Symmetry X", "Transform", "X", [this] { symmetry_.x = !symmetry_.x; }, ICON_LC_FLIP_HORIZONTAL_2,
         nullptr, [this] { return symmetry_.x; }, nullptr, "Mirror strokes across the X axis (left / right).");
     add("view.wireframe", "Wireframe", "Render", "Shift+F", [this] { renderSettings_.wireframe = !renderSettings_.wireframe; },

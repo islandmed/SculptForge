@@ -317,10 +317,10 @@ shelf, which opens the stroke picker, or from the **Stroke** palette.
 | **Drag Stamp** | Click and drag one stamp: the drag length sets its size and its direction the rotation. Great with alphas. | None |
 | **Slide Stamp** | Click and drag one stamp of the brush's Draw Size: it slides over the surface under the cursor and lands where you let go. Great for VDMs. | None |
 | **Spray** | Scattered dabs of random size, strength and rotation, for organic texture. | **Scatter** (0 to 2, default 1): how far dabs land from the cursor, as a fraction of the brush size. |
-| **Lazy Stroke** | The brush trails the cursor on a string, for smooth, steady lines. | **Lazy radius** (1 to 300 px, default 40): longer is steadier. |
+| **Lazy Stroke** | Dots with **Steady Stroke** on: the brush trails the cursor on a string, for smooth, steady lines. | **Steady radius** (1 to 300 px, default 40): longer is steadier. |
 
-The setting slider appears under the stroke tiles when **Spray** or **Lazy Stroke** is selected. With Lazy Stroke,
-the viewport draws the string between the cursor and the brush point.
+**Scatter** appears under the stroke tiles when **Spray** is selected. **Steady Stroke** works with every stroke
+type; see [Precision work](#precision-work).
 
 **Continuous**, under the stroke tiles in the stroke picker and in the **Stroke** palette, keeps the brush working
 while you hold it still on the model (30 dabs a second), with any stroke type.
@@ -334,8 +334,55 @@ Notes:
 - Mask strokes (<kbd>Ctrl</kbd>) always use dots, even when Drag Stamp or Slide Stamp is selected.
 - Custom brushes set their own dab spacing and can add jitter (see [Brush Lab](brush-lab.md)).
 
-> **ZBrush:** Drag Stamp, Slide Stamp, Spray and Lazy Stroke match ZBrush's DragRect, DragDot, Spray and LazyMouse. Freehand and Dots are the same thing here.
+> **ZBrush:** Drag Stamp, Slide Stamp, Spray and Steady Stroke match ZBrush's DragRect, DragDot, Spray and LazyMouse. Freehand and Dots are the same thing here.
 > Roll and curve strokes are not available yet.
+
+## Precision work
+
+Pores, wrinkles, jewellery and hard-surface trims need a brush that goes exactly where you mean, at exactly the
+size you mean. These tools work with every brush and every stroke type.
+
+**Steady Stroke** (<kbd>L</kbd>, or the checkbox in the stroke picker). The brush trails the cursor on a string
+and only moves once the string is taut, so hand shake never reaches the surface. It works with Dots, Drag Stamp,
+Slide Stamp and Spray. The viewport draws the string and a faint circle of its length. **Steady radius** sets the
+length (longer is steadier). **Catch up on release** (on by default) finishes the line to where the cursor is when
+you let go; turn it off to end the line a string's length behind.
+
+**World Size** (**Draw** palette). Draw Size is normally in screen pixels, so the brush gets smaller on the model
+as you zoom in. With World Size on, the size is kept in model units instead: a 0.4 mm pore brush stays 0.4 mm
+whether you are looking at the whole head or one eyelid. Every Draw Size slider shows both numbers, for example
+**Draw Size 12 px 0.40 mm**; the mm figure is the brush radius on the surface under the cursor (a model unit is a
+metre, as when exporting for 3D printing).
+
+**Finer size control.**
+
+| Do this | Change |
+|---|---|
+| <kbd>[</kbd> / <kbd>]</kbd> | 10% smaller / larger |
+| <kbd>Shift</kbd>+<kbd>[</kbd> / <kbd>Shift</kbd>+<kbd>]</kbd> | 1 px smaller / larger (0.5 px below 2 px) |
+| <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+right-drag | Scrub the size finely: 100 px to the right is about 1.5 times larger |
+
+Draw Size goes down to 0.5 px. Small brushes space their dabs closer together, so a 1 px stroke is still one
+continuous line, and the cursor adds a small cross so you can see where a tiny brush is. The size, in px and mm,
+shows next to the cursor for a moment after it changes (all the time with World Size on).
+
+**Precision drag** (<kbd>Shift</kbd>+<kbd>Alt</kbd>, held while drawing). Start the stroke, then hold
+<kbd>Shift</kbd>+<kbd>Alt</kbd>: the brush moves at a quarter of the pen's speed, drawn as a blue ring with a line
+back to the pen, and works at **Precision Intensity** (stroke picker, default 10). Let go and the brush glides back
+under the pen as you keep moving; it never jumps. Hold the keys after the stroke has started: at the press,
+<kbd>Shift</kbd>+<kbd>Alt</kbd> still selects and frames a Part (ZBrush and SculptForge styles), and in the Blender
+style <kbd>Alt</kbd>+click still navigates. The same works in every input style.
+
+**A pressure curve for each brush.** Every brush keeps its own pen pressure curve, applied after the tablet's
+curve. Edit it in **Brush Lab** (under the recipe sliders) or in **Preferences > Tablet** (under the tablet's
+curve); both edit the brush you are holding. Drag a point, double-click the curve to add one (up to 5), right-click
+a point to remove it. The presets are **Soft**, **Linear**, **Firm** and **Fine detail**: Fine detail keeps light
+pressure very light and tops out below full strength, for pores and fine lines. Curves are saved as you change
+them.
+
+**Accuracy.** The brush centre sits exactly under the cursor at any zoom and on HiDPI screens (to a fraction of a
+pixel), and the surface point under the brush is lightly filtered, so strokes on very dense meshes don't wobble
+with every tiny bump. A real step in the surface is followed at once.
 
 ## Alphas
 

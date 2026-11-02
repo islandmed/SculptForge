@@ -33,7 +33,7 @@ for what is planned.
 | Groups By Normals | **Tool > Face Groups > By normals** with an angle (`polygroup_auto_by_normals`) |
 | Bake, Multi Map Exporter (normal / displacement / AO maps) | **Tool > Bake** (`bake`): tangent and object-space normal, displacement, AO, cavity and colour maps from a high-poly Part onto a low-poly's UVs. See [Baking](baking.md) |
 | Layers (sculpt layers) | **Tool > Layers**: sculpt layers with weights, exported as blend shapes. See [Layers](layers.md) |
-| LazyMouse | **Lazy Stroke** stroke type (Stroke palette) |
+| LazyMouse | **Steady Stroke** (<kbd>L</kbd>, every stroke type) and the **Lazy Stroke** stroke type |
 | LightBox | **Library**, <kbd>,</kbd> (comma) |
 | Live Boolean | Not yet |
 | Local symmetry, radial symmetry | **Transform > Symmetry**: **R** (radial symmetry, Radial Count 2-64 around X, Y or Z, combined with the X / Y / Z mirrors) and **Local** (about the active Part's centre). See [Sculpting](sculpting.md#radial-symmetry) |
@@ -62,7 +62,7 @@ for what is planned.
 | Spotlight | Not yet |
 | Preferences > Performance, Preferences > Mem | **Preferences > Performance**: Antialiasing, Fast Navigation, Multithreading, the last stroke's cost and memory. See [Performance](performance.md) |
 | Store Config | **Store Config**, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> (**Preferences > Config**) |
-| Stroke (Dots, DragRect, DragDot, Spray) | **Stroke** types Dots, Drag Stamp, Slide Stamp, Spray, Lazy Stroke (<kbd>L</kbd> toggles Lazy Stroke) |
+| Stroke (Dots, DragRect, DragDot, Spray) | **Stroke** types Dots, Drag Stamp, Slide Stamp, Spray, Lazy Stroke (<kbd>L</kbd> toggles Steady Stroke) |
 | SubTool | **Part**: same idea, <kbd>Alt</kbd>+click to select. See [Parts](parts.md) |
 | Texture Map, New From Polypaint | **Tool > Texture Map**: **New Texture** (1K-8K) and paint straight into it, or **Vertex Paint > Texture**. See [Texture painting](texture-painting.md) |
 | Texture palette | Not yet as a palette of texture images. **Tool > Texture Map > Import Texture** loads an image onto the UVs |

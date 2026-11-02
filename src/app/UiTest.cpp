@@ -42,6 +42,7 @@
 //   expect_shortcut ACTION KEYS  the action's effective keys, e.g. expect_shortcut view.front Numpad 1
 //   camera YAW PITCH         set the view's angles in degrees (0 0 = the front view), e.g. for guide screenshots
 //   zoom FACTOR / look X Y Z  move the camera FACTOR times closer / turn it about (and look at) the point X Y Z
+//   camera_distance D        put the camera D model units from the point it looks at (extreme zoom)
 //   run COMMANDS             sculptforge-cli commands, e.g. run new_sphere subdivisions=4 ($SCRIPT_DIR: the script's folder)
 //   drop FILE                as if FILE were dropped onto the window (relative to the script's folder)
 //   env NAME VALUE           set an environment variable; $SCRIPT_DIR is the script's folder
@@ -133,7 +134,15 @@
 //                            size_popup_open (the S / U / I / O slider), size_knob_x / size_knob_y (its knob, pixels),
 //                            quickmenu_open, right_click_menu, space_camera, space_held, air_strokes, radial_open / radial_menu (-1 none) / radial_held /
 //                            radial_hover / radial_ran (radial menus: open, the menu, held by its key or button, the
-//                            slot pointed at, the slot run last), radial_menus, radial_slots_N, lazy_mouse, input_style (0 ZBrush, 1 SculptForge, 2 Blender), turntable,
+//                            slot pointed at, the slot run last), radial_menus, radial_slots_N, lazy_mouse (the Lazy Stroke type),
+//                            steady_stroke (Steady Stroke on, any type), steady_lag (px from the pointer to the brush on
+//                            its string), steady_catch_up, world_size, world_radius_mm, draw_size_exact (px, unrounded),
+//                            precision_active (Shift+Alt mid-stroke), precision_lag (px from the pointer to the brush),
+//                            brush_curve_points / brush_curve_half (the current brush's
+//                            pressure curve: its points, its value at half pressure x100), brush_curves (brushes with
+//                            their own curve), dab_error_px (the last stroke's dab furthest from its cursor
+//                            position, projected back), dab_jitter / dab_jitter_raw (its depth wobble with / without
+//                            the pick filter, x1000 radii), dabs, pixel_density (2 on a HiDPI screen), input_style (0 ZBrush, 1 SculptForge, 2 Blender), turntable,
 //                            camera_ortho, mask_brush (Blender's Mask brush on), shortcut_conflicts (keys two actions
 //                            claim), brush_type (BrushType
 //                            index, -1 for a custom brush or Paint), last_dab_x / last_dab_y (window pixels), paint_r
@@ -503,6 +512,33 @@ double Demo::query(const std::string& name, bool& known) const {
         return name == "size_popup_open" ? (open ? 1.0 : 0.0) : name == "size_knob_x" ? knob.x : knob.y;
     }
     if (name == "lazy_mouse") return app_.strokeType_ == StrokeType::LazyMouse ? 1.0 : 0.0;
+    // Precision work (Precision.cpp)
+    if (name == "steady_stroke") return app_.steadyOn() ? 1.0 : 0.0;
+    if (name == "steady_lag") return double(glm::distance(app_.lazyMouse_.point, app_.steadyCursor_)); // px
+    if (name == "steady_catch_up") return app_.steadyCatchUp_ ? 1.0 : 0.0;
+    if (name == "world_size") return app_.worldSize_ ? 1.0 : 0.0;
+    if (name == "world_radius_mm") return double(app_.worldRadius_ * kMmPerUnit);
+    if (name == "draw_size_exact") return double(app_.radiusPx_);
+    if (name == "precision_active") return app_.precisionActive_ ? 1.0 : 0.0;
+    if (name == "precision_lag") // px between the brush and the pointer
+        return double(glm::distance(app_.precision_.point, glm::vec2(app_.mouseX_, app_.mouseY_)));
+    if (name == "brush_curve_points") {
+        const PressurePoints* c = app_.activeBrushCurve();
+        return c ? double(c->count) : 2.0;
+    }
+    if (name == "brush_curve_half") { // the current brush's curve at half pressure, x100
+        const PressurePoints* c = app_.activeBrushCurve();
+        return std::round(double(c ? c->apply(0.5f) : 0.5f) * 100.0);
+    }
+    if (name == "brush_curves") return double(app_.brushCurves_.size());
+    if (name == "dab_error_px") return double(app_.dabAccuracy_.maxErrorPx); // the last stroke's worst dab, px
+    if (name == "dab_jitter_raw" || name == "dab_jitter") { // x1000: mean depth wobble per dab, in brush radii
+        const auto& a = app_.dabAccuracy_;
+        const double n = std::max(1, a.count - 2);
+        return 1000.0 * (name == "dab_jitter" ? a.jitterFiltered : a.jitterRaw) / n;
+    }
+    if (name == "pixel_density") return double(SDL_GetWindowPixelDensity(app_.window_));
+    if (name == "dabs") return double(app_.dabAccuracy_.count);
     if (name == "stroke_type") return double(int(app_.strokeType_)); // 0 Dots, 1 DragRect, 2 DragDot, 3 Spray, 4 LazyMouse
     if (name == "stroke_continuous") return app_.strokeContinuous_ ? 1.0 : 0.0; // Continuous (#31)
     if (name == "vdms") return double(app_.doc_.vdms.size());
@@ -1326,6 +1362,10 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     } else if (verb == "zoom") { // zoom FACTOR: the camera's distance divided by FACTOR
         if (!need(1)) return false;
         run([this, f = num(1, 1)] { app_.camera_.distance /= std::max(float(f), 1e-3f); });
+        wait(0.1f);
+    } else if (verb == "camera_distance") { // camera_distance D: the camera this far from its target (extreme zoom)
+        if (!need(1)) return false;
+        run([this, d = num(1, 4)] { app_.camera_.distance = std::max(float(d), 1e-4f); });
         wait(0.1f);
     } else if (verb == "look") { // look X Y Z: the camera turns about (and looks at) this point
         if (!need(3)) return false;

@@ -37,6 +37,7 @@ inline constexpr ZBrushName kZBrushNames[] = {
     {"Snapshot", "QuickSave", false},
     {"Gizmo", "Gizmo 3D, Transpose", false},
     {"Lazy Stroke", "LazyMouse", false},
+    {"Steady Stroke", "LazyMouse", false},
     {"Wire", "PolyF", true},
     {"Wireframe", "PolyFrame", false},
     {"Face Group", "Polygroups", false},

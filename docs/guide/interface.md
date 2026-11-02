@@ -262,8 +262,8 @@ brushes](brush-lab.md)).
 
 ### Stroke, Alpha and Material pickers
 
-- **Stroke** (click the Stroke tile): Dots, Drag Stamp, Spray and Lazy Stroke, with Scatter for Spray and Lazy
-  radius for Lazy Stroke. See [Sculpting and brushes](sculpting.md).
+- **Stroke** (click the Stroke tile): Dots, Drag Stamp, Spray and Lazy Stroke, with Scatter for Spray, Steady
+  Stroke (and its radius) and Precision Intensity. See [Sculpting and brushes](sculpting.md).
 - **Alpha** (click the Alpha tile): Round, Square, Noise and the twelve built-in patterns (Pores, Cracks, Scales,
   Rivets, Stitches, Fabric Weave, Bark, Rock Strata, Wrinkles, Skin Folds, Hair Strands, Dot Grid), the image alpha you loaded, images in your
   library's Alphas folder, **Load image...** and **Invert loaded image**.

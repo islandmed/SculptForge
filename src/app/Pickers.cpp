@@ -794,12 +794,8 @@ void drawStrokeGrid(App& app, GridMode mode) {
         ImGui::SliderFloat("##scatter", &app.sprayScatter_, 0.0f, 2.0f, "Scatter %.2f");
         ui::HelpText("Scatter", nullptr, "How far spray dabs land from the cursor, as a fraction of the brush size.",
                      "Stroke");
-    } else if (app.strokeType_ == StrokeType::LazyMouse) {
-        ImGui::SetNextItemWidth(-1);
-        ImGui::SliderFloat("##lazy", &app.lazyMouse_.radius, 1.0f, 300.0f, "Lazy radius %.0f px");
-        ui::HelpText("Lazy radius", nullptr, "Length of the string the brush trails on: longer = steadier lines.",
-                     "Stroke");
     }
+    app.drawPrecisionOptions(); // Steady Stroke for every stroke type, Precision Intensity (Precision.cpp)
 }
 
 void drawVdmGrid(App& app, GridMode mode) {
@@ -1130,7 +1126,7 @@ void drawPickers(App& app) {
                           ? Def{"Draw Size", "S",
                                 "Brush radius in screen pixels. Drag, or type a number and press Enter. [ and ] also "
                                 "change it.",
-                                &app.radiusPx_, 2.0f, 800.0f, 1.0f}
+                                &app.radiusPx_, kMinDrawSizePx, kMaxDrawSizePx, 1.0f}
                       : which == PickerUi::Slider::ZIntensity
                           ? Def{s.sliderSmooth ? "Smooth Intensity" : "Intensity", "U",
                                 s.sliderSmooth ? "How strongly Smooth works (it keeps its own value, as in ZBrush: hold "
@@ -1191,6 +1187,8 @@ void drawPickers(App& app) {
             char fmt[64];
             if (!s.sliderTyped.empty())
                 std::snprintf(fmt, sizeof fmt, "%s %s_", d.name, s.sliderTyped.c_str());
+            else if (which == PickerUi::Slider::DrawSize)
+                std::snprintf(fmt, sizeof fmt, "%s", app.drawSizeLabel().c_str()); // (px and mm, Precision.cpp)
             else
                 std::snprintf(fmt, sizeof fmt, "%s %%.0f", d.name);
             if (which == PickerUi::Slider::DrawSize) {

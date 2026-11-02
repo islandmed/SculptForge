@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/BrushSettings.h"
+#include "core/Precision.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -24,7 +25,7 @@ void readFloat(const Json& j, const char* key, float& v) {
 } // namespace
 
 void BrushToolSettings::clamp() {
-    radiusPx = std::clamp(radiusPx, 2.0f, 800.0f);
+    radiusPx = clampDrawSize(radiusPx); // (0.5 px and up: core/Precision.h)
     strength = std::clamp(strength, 0.0f, 1.0f);
     focal = std::clamp(focal, -1.0f, 1.0f);
     rgbIntensity = std::clamp(rgbIntensity, 0.0f, 1.0f);

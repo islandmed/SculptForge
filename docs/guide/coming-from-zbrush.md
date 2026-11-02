@@ -33,7 +33,7 @@ Features use SculptForge's own names. The ideas are the ones you know; here is w
 | Sculptris Pro | **Dynamic Topology** | **Dynamic** on the top shelf. See [Dynamic topology](dynamic-topology.md) |
 | QuickSave | **Snapshot** | **File > Save Snapshot**, the Library's **Snapshots** tab. See [Projects](projects.md#snapshots) |
 | Transpose, Gizmo 3D, Transpose All | **Gizmo**, **All Parts** | <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd>. See [Gizmo](gizmo.md) |
-| LazyMouse | **Lazy Stroke** | Stroke palette, <kbd>L</kbd> |
+| LazyMouse | **Steady Stroke** (every stroke type) | Stroke picker, <kbd>L</kbd> |
 | PolyFrame (PolyF) | **Wireframe** (**Wire** on the shelf) | Right shelf, <kbd>Shift</kbd>+<kbd>F</kbd> |
 | QuickMenu | **Quick Menu** | <kbd>Space</kbd> or a right click |
 | DamStandard | **Sharp Crease** brush | <kbd>B</kbd> <kbd>D</kbd> <kbd>S</kbd>. See [Sculpting](sculpting.md) |
@@ -98,7 +98,7 @@ either. See [Keyboard and mouse](shortcuts.md#zbrush-style-keys) for the full li
   <kbd>B</kbd> <kbd>P</kbd> <kbd>I</kbd> Pinch.
 - **Brush settings.** <kbd>S</kbd> Draw Size, <kbd>U</kbd> Intensity, <kbd>I</kbd> RGB Intensity (ZBrush-style
   keys), <kbd>O</kbd> Falloff, each as a slider under the cursor; <kbd>[</kbd> and <kbd>]</kbd> step the size;
-  <kbd>Space</kbd> opens the Quick Menu; <kbd>L</kbd> toggles Lazy Stroke. The cursor's outer ring is the Draw
+  <kbd>Space</kbd> opens the Quick Menu; <kbd>L</kbd> toggles Steady Stroke. The cursor's outer ring is the Draw
   Size, the inner ring the Falloff. See [Sculpting and brushes](sculpting.md).
 - **Masking.** <kbd>Ctrl</kbd> paints a mask and <kbd>Ctrl</kbd>+<kbd>Alt</kbd> erases it; <kbd>Ctrl</kbd>+click
   the model blurs it and <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click sharpens it; <kbd>Ctrl</kbd>+click the background
@@ -169,7 +169,7 @@ The SculptForge column is with the ZBrush-style keys on.
 | Brush pop-up | <kbd>B</kbd> | <kbd>B</kbd> |
 | Draw Size / Z Intensity / RGB Intensity / Focal Shift | <kbd>S</kbd> / <kbd>U</kbd> / <kbd>I</kbd> / <kbd>O</kbd> | Same keys: Draw Size / Intensity / RGB Intensity / Falloff |
 | QuickMenu | <kbd>Space</kbd> or right-click | Quick Menu: <kbd>Space</kbd> or right-click (a right drag navigates) |
-| LazyMouse | <kbd>L</kbd> | Lazy Stroke: <kbd>L</kbd> |
+| LazyMouse | <kbd>L</kbd> | Steady Stroke: <kbd>L</kbd> |
 | Pick colour / switch colour | <kbd>C</kbd> / <kbd>V</kbd> | Same |
 | Symmetry | <kbd>X</kbd> | <kbd>X</kbd> |
 | Undo / redo | <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> | Same (also <kbd>Ctrl</kbd>+<kbd>Y</kbd>) |
