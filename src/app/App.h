@@ -361,7 +361,7 @@ private:
     bool lastCommandOk_ = true; // result of the last runCommand (UI tests check it)
     bool showHelp_ = false;
     bool showAbout_ = false;
-    // Supporting SculptForge (Support.h): the app only ever opens the donate page or its Stripe checkout links in the
+    // Supporting SculptForge (Support.h): the app only ever opens the membership page or its Stripe checkout links in the
     // browser; nothing else changes.
     void openSupportPage();
     void openDiscordPage(); // kDiscordUrl in the browser (UI tests: the status bar only)

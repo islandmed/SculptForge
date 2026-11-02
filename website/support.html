@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Membership</title>
+  <meta name="description" content="SculptForge memberships from $5 a month: your name in the credits, a monthly brush and alpha pack, a roadmap vote, and priority support for studios. Insiders will get each release about two weeks early, starting with SculptForge 1.0.">
+  <meta name="theme-color" content="#111114" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f6f5f3" media="(prefers-color-scheme: light)">
+  <meta name="color-scheme" content="dark light">
+  <link rel="icon" type="image/svg+xml" href="img/favicon.svg?v=2">
+  <link rel="icon" type="image/png" href="img/favicon-64.png?v=2">
+  <link rel="apple-touch-icon" href="img/icon-256.png?v=2">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="SculptForge Membership">
+  <meta property="og:description" content="Memberships from $5 a month: credits, a monthly brush and alpha pack, a roadmap vote and priority support.">
+  <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=3">
+  <meta property="og:url" content="https://sculptforge.app/support.html">
+  <link rel="canonical" href="https://sculptforge.app/support.html">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="style.css?v=18">
+  <link rel="preload" as="image" type="image/webp" fetchpriority="high" media="(min-width: 621px)"
+        imagesrcset="media/support-hero-1280.webp 1280w, media/support-hero-1920.webp 1920w" imagesizes="100vw">
+  <style>
+    /* The first screen: a stage with a bronze sculpt rendered in SculptForge, and the memberships rising onto it.
+       The stage is always dark (it's a render); the rest of the page follows the system's light or dark setting. */
+    .support-page { --tier-bg: rgba(19, 19, 23, 0.88); --tier-border: rgba(255, 255, 255, 0.09); --tier-text: #a9a9b2;
+                   --tier-title: #fff; --tier-shadow: 0 24px 60px rgba(0, 0, 0, 0.55); }
+    .stage { position: relative; isolation: isolate; overflow: hidden; background: #0c0c0f; color: #ececf1;
+             min-height: min(66vh, 640px); display: flex; align-items: flex-start; padding: 56px 0 190px; }
+    .stage-art { position: absolute; inset: -3%; z-index: -2; transform: translate3d(var(--px, 0px), var(--py, 0px), 0) scale(1.03);
+                 transition: transform 0.6s cubic-bezier(.2, .7, .2, 1); animation: stage-in 1.6s cubic-bezier(.2, .7, .2, 1) both; }
+    .stage-art img { width: 100%; height: 100%; object-fit: cover; object-position: 72% 30%; }
+    @keyframes stage-in { from { opacity: 0; scale: 1.05; } to { opacity: 1; scale: 1; } }
+    /* Darkening for the words on the left and the cards below. */
+    .stage::before { content: ""; position: absolute; inset: 0; z-index: -1;
+                     background: linear-gradient(90deg, rgba(12, 12, 15, 0.94) 0%, rgba(12, 12, 15, 0.72) 38%, rgba(12, 12, 15, 0) 66%),
+                                 linear-gradient(180deg, rgba(15, 15, 18, 0) 52%, #0f0f12 100%); }
+    /* A light passing over the sculpt now and then. */
+    .stage::after { content: ""; position: absolute; inset: -20% -40%; z-index: -1; pointer-events: none;
+                    background: linear-gradient(105deg, transparent 42%, rgba(255, 243, 226, 0.09) 50%, transparent 58%);
+                    transform: translateX(-60%); animation: sweep 7s cubic-bezier(.45, 0, .25, 1) 0.9s infinite; }
+    @keyframes sweep { 0% { transform: translateX(-60%); } 28%, 100% { transform: translateX(60%); } }
+    .stage .wrap { width: 100%; }
+    .stage-copy { max-width: 560px; animation: rise 0.8s cubic-bezier(.2, .7, .2, 1) both; }
+    .stage .eyebrow { letter-spacing: 0.22em; font-size: 0.78rem; color: #ffb06a; }
+    .stage h1 { font-size: clamp(2.4rem, 5vw, 3.9rem); line-height: 1.05; margin: 0.35em 0 0.45em; color: #fff; }
+    .stage h1 .accent { display: block; }
+    .stage .lede { color: #cfcfd6; margin-bottom: 18px; }
+    .promise { display: flex; gap: 12px; align-items: flex-start; color: #f2e6da; font-size: 1.05rem; margin: 0; max-width: 34em; }
+    .promise::before { content: ""; flex: none; width: 9px; height: 9px; margin-top: 0.55em; border-radius: 50%; background: #ff9a45;
+                       box-shadow: 0 0 0 5px rgba(255, 154, 69, 0.18); }
+    .stage .thanks { background: rgba(242, 140, 60, 0.12); border: 1px solid rgba(242, 140, 60, 0.4); border-radius: 12px;
+                     padding: 12px 16px; color: #f2e6da; }
+
+    .tiers-wrap { position: relative; z-index: 1; margin-top: -170px; padding-bottom: 24px; }
+    .tiers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; align-items: stretch; }
+    .tier { position: relative; display: flex; flex-direction: column; gap: 12px; padding: 28px 26px 26px; border-radius: 18px;
+            background: var(--tier-bg); border: 1px solid var(--tier-border); box-shadow: var(--tier-shadow);
+            -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+            animation: rise 0.7s cubic-bezier(.2, .7, .2, 1) both; animation-delay: calc(0.15s + var(--i, 0) * 0.08s);
+            transition: translate 0.25s cubic-bezier(.2, .7, .2, 1), border-color 0.25s; }
+    .tier:hover { translate: 0 -4px; border-color: rgba(255, 255, 255, 0.2); }
+    .tier h2 { margin: 0; font-size: 1.3rem; color: var(--tier-title); }
+    .tier .price { margin: 0; color: var(--tier-title); font-size: 2.7rem; font-weight: 700; line-height: 1; letter-spacing: -0.02em; }
+    .tier .price span { color: var(--tier-text); font-size: 1rem; font-weight: 500; letter-spacing: 0; margin-left: 6px; }
+    .tier p { color: var(--tier-text); font-size: 0.95rem; margin: 0; }
+    .tier p strong { color: var(--tier-title); font-weight: 600; }
+    .tier .cta { margin-top: auto; padding-top: 10px; }
+    .tier .btn { display: block; text-align: center; padding: 13px 20px; background: rgba(255, 255, 255, 0.05);
+                 border-color: rgba(255, 255, 255, 0.2); color: var(--tier-title); transition: background 0.2s, border-color 0.2s; }
+    .tier .btn:hover { background: rgba(255, 255, 255, 0.11); border-color: rgba(255, 255, 255, 0.4); }
+    .tier.featured { --tier-bg: linear-gradient(180deg, rgba(42, 29, 18, 0.94), rgba(20, 18, 21, 0.94));
+                     border: 1.5px solid #f6994d; margin-top: -12px; margin-bottom: 12px;
+                     box-shadow: 0 0 0 1px rgba(246, 153, 77, 0.25), 0 0 46px rgba(240, 136, 46, 0.30), var(--tier-shadow); }
+    .tier.featured::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none;
+                            box-shadow: 0 0 60px rgba(240, 136, 46, 0.35); animation: breathe 3.2s ease-in-out infinite; }
+    .tier.featured:hover { border-color: #ffb06a; }
+    .tier.featured p { color: #d9d0c6; }
+    .tier.featured .price { color: var(--tier-title); }
+    .tier.featured .btn { background: linear-gradient(180deg, #ffa95e, #e8782c); border-color: transparent; color: #1a0d04;
+                          box-shadow: 0 8px 26px rgba(240, 136, 46, 0.35); }
+    .tier.featured .btn:hover { filter: brightness(1.07); }
+    .badge { position: absolute; top: -13px; left: 50%; transform: translateX(-50%); margin: 0; padding: 4px 13px;
+             border-radius: 999px; background: #f6994d; color: #1a0d04 !important; font-size: 0.7rem !important; font-weight: 700;
+             letter-spacing: 0.16em; text-transform: uppercase; white-space: nowrap; box-shadow: 0 0 18px rgba(240, 136, 46, 0.5); }
+    .tier .btn:focus-visible, .one-time .btn:focus-visible { outline: 2px solid #ffb06a; outline-offset: 3px; }
+    .one-time { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; margin: 26px 0 0;
+            padding: 18px 22px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel);
+            animation: rise 0.7s cubic-bezier(.2, .7, .2, 1) 0.5s both; }
+    .one-time p { margin: 0; color: var(--muted); }
+    .one-time strong { color: var(--text); }
+    .support-fine { margin-top: 18px; }
+    @keyframes rise { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
+    @keyframes breathe { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+
+    @media (max-width: 900px) {
+      .stage { min-height: 0; padding: 48px 0 150px; }
+      .stage::before { background: linear-gradient(90deg, rgba(12, 12, 15, 0.94) 0%, rgba(12, 12, 15, 0.62) 72%, rgba(12, 12, 15, 0.3) 100%),
+                                   linear-gradient(180deg, rgba(12, 12, 15, 0) 50%, rgba(12, 12, 15, 1) 100%); }
+      .tiers-wrap { margin-top: -110px; }
+      .tiers { grid-template-columns: 1fr; gap: 26px; max-width: 520px; margin: 0 auto; }
+      .tier.featured { order: -1; margin: 0; }
+    }
+    @media (max-width: 620px) {
+      .stage { padding: 0 0 36px; }
+      .tiers-wrap { margin-top: 0; padding-top: 22px; }
+      .stage-art { inset: 0; height: 108vw; }
+      .stage-art img { object-position: 50% 0; }
+      .stage-copy { padding-top: 78vw; } /* the lion first, the words under it */
+      .stage::before { background: linear-gradient(180deg, rgba(12, 12, 15, 0) 40vw, rgba(12, 12, 15, 0.85) 82vw, #0c0c0f 106vw); }
+      .stage h1 { font-size: 2.3rem; }
+      .one-time { padding: 16px; }
+      .one-time .btn { width: 100%; text-align: center; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .stage-art, .stage-copy, .tier, .one-time, .tier.featured::after { animation: none; }
+      .stage::after { display: none; }
+      .stage-art, .tier, .tier .btn { transition: none; }
+    }
+    /* Light: the stage stays a dark render; the cards and the page around them turn light. */
+    @media (prefers-color-scheme: light) {
+      :root { color-scheme: light; }
+      .support-page { --bg: #f6f5f3; --bg-alt: #efede9; --panel: #ffffff; --border: #e2dfda; --text: #1c1c21; --muted: #5d5d66;
+                     --accent-2: #b8561a; --tier-bg: rgba(255, 255, 255, 0.97); --tier-border: #e2dfda; --tier-text: #55555e;
+                     --tier-title: #16161a; --tier-shadow: 0 24px 50px rgba(20, 16, 12, 0.16); }
+      .support-page .nav { background: rgba(246, 245, 243, 0.86); }
+      .support-page .nav nav a { color: #55555e; }
+      .support-page .brand, .support-page .nav nav a.gh { color: var(--text); }
+      .support-page .nav nav a.nav-support { color: #b8561a; border-color: rgba(184, 86, 26, 0.5); }
+      .support-page .nav nav a.nav-support:hover { color: #fff; background: #c8621f; }
+      .support-page .nav-toggle span { background: var(--text); }
+      .support-page a { color: #a84d14; }
+      .support-page .stage a { color: #ffb06a; }
+      .support-page code { background: #ebe8e3; }
+      .tier .btn { background: #f4f2ef; border-color: #d8d4ce; }
+      .tier .btn:hover { background: #ebe7e1; border-color: #bdb7ae; }
+      .tier:hover { border-color: #cfc9c1; }
+      .tier.featured { --tier-bg: linear-gradient(180deg, #fff1e3, #ffffff 60%);
+                       box-shadow: 0 0 0 1px rgba(246, 153, 77, 0.25), 0 0 40px rgba(240, 136, 46, 0.22), var(--tier-shadow); }
+      .tier.featured::after { box-shadow: 0 0 50px rgba(240, 136, 46, 0.25); }
+      .tier.featured p { color: #4d4239; }
+      .tier.featured .price { color: var(--tier-title); }
+      .one-time .btn { background: #f4f2ef; border-color: #d8d4ce; color: var(--text); }
+      .support-page .footer { background: var(--bg-alt); }
+    }
+  </style>
+  <script src="motion.js?v=11" defer></script>
+  <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+  </head>
+<body class="support-page">
+  <div class="scroll-progress" aria-hidden="true"></div>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="index.html"><img src="img/logo.svg?v=2" alt="" width="34" height="34"><span>SculptForge</span></a>
+      <nav aria-label="Main">
+        <a href="index.html#features">Features</a>
+        <a href="index.html#demos">Demos</a>
+        <a href="brushes.html">Brushes</a>
+        <a href="guide/index.html">Guide</a>
+        <a href="studios.html">Studios</a>
+        <a class="nav-support" href="support.html">Support</a>
+        <a class="nav-dl" href="index.html#download">Download</a>
+        <a class="gh" href="https://discord.gg/gWrYkEmQhH">Discord</a>
+        <a class="gh" href="https://github.com/islandmed/SculptForge">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="stage" aria-labelledby="support-title">
+      <div class="stage-art" aria-hidden="true">
+        <picture>
+          <source type="image/webp" media="(max-width: 620px)" srcset="media/support-hero-mobile.webp">
+          <source media="(max-width: 620px)" srcset="media/support-hero-mobile.jpg">
+          <source type="image/webp" srcset="media/support-hero-1280.webp 1280w, media/support-hero-1920.webp 1920w" sizes="100vw">
+          <img src="media/support-hero-1920.jpg" srcset="media/support-hero-1280.jpg 1280w, media/support-hero-1920.jpg 1920w"
+               sizes="100vw" width="1920" height="1080" alt="" fetchpriority="high">
+        </picture>
+      </div>
+      <div class="wrap">
+        <div class="stage-copy">
+          <p class="eyebrow">SculptForge Membership</p>
+          <h1 id="support-title">Membership: <span class="accent">more for the artists who use it.</span></h1>
+          <p class="thanks" id="thanks" hidden><strong>Welcome aboard!</strong> Your membership is active. Check your
+            email for the receipt; Insider invites go out within a couple of days.</p>
+          <p class="lede">SculptForge itself stays free, with no ads, no accounts and no telemetry. A membership is a
+            monthly subscription with its own benefits: your name in the credits, a monthly brush and alpha pack, a
+            vote on the roadmap and, for studios, priority support.</p>
+          <p class="promise">Insiders will get each release about two weeks early, starting with SculptForge 1.0.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="tiers-wrap" aria-label="Memberships">
+      <div class="wrap">
+        <div class="tiers">
+          <article class="tier" style="--i: 0">
+            <h2>Supporter</h2><p class="price">$5<span>/ month</span></p>
+            <p>Your name in the <strong>credits</strong>: the app's Supporters list and this site (optional, any name
+              you choose).</p>
+            <p class="cta"><a class="btn" href="https://buy.stripe.com/aFacN5h1t6L8cP14ad4F201" rel="noopener">Join as a Supporter</a></p>
+          </article>
+          <article class="tier featured" style="--i: 1">
+            <p class="badge">Recommended</p>
+            <h2>Insider</h2><p class="price">$20<span>/ month</span></p>
+            <p>The monthly <strong>Supporter Pack</strong> of brushes, alphas and VDMs (free to everyone after three
+              months), a <strong>monthly roadmap vote</strong> on what gets built next, and your name in the
+              credits.</p>
+            <p><strong>Insiders will get each release about two weeks early, starting with SculptForge 1.0.</strong>
+              Early builds come from the same release pipeline as public builds.</p>
+            <p class="cta"><a class="btn" href="https://buy.stripe.com/dRmdR94eH4D06qD9ux4F202" rel="noopener">Become an Insider</a></p>
+          </article>
+          <article class="tier" style="--i: 2">
+            <h2>Studio</h2><p class="price">$150<span>/ month</span></p>
+            <p><strong>Insider benefits for up to 10 artists</strong> ($15 each), <strong>priority bug triage and
+              support</strong> for your pipeline, your <strong>logo</strong> on this site and the project README, and
+              monthly invoices. Custom features and
+              integration work are quoted separately: <a href="mailto:hello@sculptforge.app">hello@sculptforge.app</a>.</p>
+            <p class="cta"><a class="btn" href="https://buy.stripe.com/3cI00j12v5H4g1dgWZ4F204" rel="noopener">Studio membership</a></p>
+          </article>
+        </div>
+        <div class="one-time">
+          <p><strong>One-time Supporter:</strong> your name in the credits, no subscription. Pay what you want, $5
+            minimum.</p>
+          <a class="btn" href="https://buy.stripe.com/4gM7sL8uXc5s4iv5eh4F200" rel="noopener">One-time Supporter</a>
+        </div>
+        <p class="fine support-fine">Members get private channels on Discord:
+          <a href="https://discord.gg/gWrYkEmQhH" rel="noopener">join the SculptForge community</a> and tell us your
+          membership after checkout.</p>
+        <p class="fine support-fine">Insider builds will be shared through a private GitHub repository: give your
+          GitHub username at checkout and you'll get an invite before SculptForge 1.0, when early access starts. Supporter Packs become free for everyone after three months,
+          and each Insider release becomes the public release about two weeks later.
+          <a href="https://billing.stripe.com/p/login/4gM7sL8uXc5s4iv5eh4F200" rel="noopener">Manage or cancel your
+          membership</a>.</p>
+        <p class="fine">Payments are handled by Stripe (cards, Apple Pay, Google Pay); SculptForge never sees your
+          card details. Memberships are subscriptions to SculptForge benefits; cancel anytime in the
+          <a href="https://billing.stripe.com/p/login/4gM7sL8uXc5s4iv5eh4F200" rel="noopener">customer portal</a>.</p>
+      </div>
+    </section>
+
+    <section class="section alt">
+      <div class="wrap">
+        <h2>Where membership revenue goes</h2>
+        <ul>
+          <li><strong>Code signing</strong> for Windows and macOS, so installers open without security warnings</li>
+          <li><strong>Test hardware</strong>: graphics cards, pen tablets and SpaceMice that people report problems with</li>
+          <li><strong>Development time</strong> for the features you ask for on GitHub</li>
+          <li><strong>Running costs</strong>: the sculptforge.app domain and the relay that links your phone for capture</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <h2>Other ways to help</h2>
+        <ul>
+          <li><a href="https://github.com/islandmed/SculptForge">Star the project on GitHub</a> and tell other artists about it</li>
+          <li><a href="https://github.com/islandmed/SculptForge/issues">Report bugs and request features</a></li>
+          <li><a href="https://discord.gg/gWrYkEmQhH">Join the community on Discord</a>: questions, tips and work in progress</li>
+          <li><a href="brushes.html">Share your brushes</a> with the community</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-grid">
+      <div>
+        <a class="brand" href="index.html"><img src="img/logo.svg?v=2" alt="" width="28" height="28"><span>SculptForge</span></a>
+        <p class="fine">Copyright © 2026 The SculptForge contributors. SculptForge is licensed under the
+          <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
+      </div>
+      <div class="links">
+        <a href="guide/index.html">User Guide</a>
+        <a href="brushes.html">Community brushes</a>
+        <a href="zbrush-alternative.html">For ZBrush users</a>
+        <a href="mudbox-alternative.html">For Mudbox users</a>
+        <a href="zbrush-linux.html">Sculpting on Linux</a>
+        <a href="press.html">Press kit</a>
+        <a href="support.html">Membership</a>
+        <a href="https://github.com/islandmed/SculptForge">Source code</a>
+        <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
+      </div>
+      <p class="fine trademarks">SculptForge is an independent project, not affiliated with or endorsed by Autodesk or
+        Maxon. Mudbox and Maya are trademarks of Autodesk; ZBrush, GoZ, MatCap, FiberMesh, LightCap and other ZBrush feature names are trademarks of Maxon Computer GmbH. The site uses no cookies.
+        Visits are counted anonymously with <a href="https://www.goatcounter.com/">GoatCounter</a>.</p>
+    </div>
+  </footer>
+  <script>
+    if (new URLSearchParams(location.search).has('thanks')) document.getElementById('thanks').hidden = false;
+    // The sculpt drifts a little with the pointer (not with "reduce motion", not on touch screens).
+    (() => {
+      const stage = document.querySelector('.stage'), art = document.querySelector('.stage-art');
+      if (!stage || !art || matchMedia('(prefers-reduced-motion: reduce), (hover: none)').matches) return;
+      stage.addEventListener('pointermove', (e) => {
+        const r = stage.getBoundingClientRect();
+        art.style.setProperty('--px', `${((e.clientX - r.left) / r.width - 0.5) * -14}px`);
+        art.style.setProperty('--py', `${((e.clientY - r.top) / r.height - 0.5) * -10}px`);
+      });
+      stage.addEventListener('pointerleave', () => { art.style.setProperty('--px', '0px'); art.style.setProperty('--py', '0px'); });
+    })();
+  </script>
+</body>
+</html>

@@ -19,7 +19,7 @@ TEST(supporters_parse_skips_comments_and_blanks) {
     const auto names = parseSupporters("# header\nAda Lovelace\r\n  Grace Hopper  \n\nLinus\n");
     CHECK(names.size() == 3);
     CHECK(names[0] == "Ada Lovelace" && names[1] == "Grace Hopper" && names[2] == "Linus");
-    CHECK(std::string(kSupportUrl) == "https://sculptforge.app/donate.html");
+    CHECK(std::string(kSupportUrl) == "https://sculptforge.app/support.html");
     CHECK(std::string(kDiscordUrl) == "https://discord.gg/gWrYkEmQhH");
 }
 
@@ -68,8 +68,8 @@ TEST(support_reminder_timing) {
 }
 
 TEST(support_card_links_match_the_website) {
-    // The card opens the same four Stripe checkout pages as the donate page (never links of its own).
-    std::ifstream f(std::string(SF_TEST_DATA_DIR) + "/../../website/donate.html", std::ios::binary);
+    // The card opens the same four Stripe checkout pages as the membership page (never links of its own).
+    std::ifstream f(std::string(SF_TEST_DATA_DIR) + "/../../website/support.html", std::ios::binary);
     CHECK(f.good());
     const std::string page{std::istreambuf_iterator<char>(f), {}};
     for (const char* url : {kSupportUrlSupporter, kSupportUrlInsider, kSupportUrlStudio, kSupportUrlOnce}) {

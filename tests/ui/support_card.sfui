@@ -38,7 +38,7 @@ expect_value support_card_open == 0
 support_card days=7
 expect_value support_card_open == 1
 wait 0.8
-click "Give once##card.once"
+click "One-time Supporter##card.once"
 expect_value support_requests == 2
 expect_status https://buy.stripe.com/4gM7sL8uXc5s4iv5eh4F200
 wait 0.4

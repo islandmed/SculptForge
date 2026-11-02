@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Supporting SculptForge (memberships on the website; the app stays free and behaves the same for everyone). The
-// app only ever opens the fixed links below in the browser (the donate page, its four Stripe checkout pages and the
+// app only ever opens the fixed links below in the browser (the membership page, its four Stripe checkout pages and the
 // community Discord invite): no
 // payment code, no network, no tracking, no licence checks. Pure helpers, unit tested: the supporters list compiled
 // in from docs/supporters.txt (shown as plain text in Help > About), when the one optional reminder may show, and
@@ -18,16 +18,16 @@
 
 namespace sf {
 
-inline constexpr const char* kSupportUrl = "https://sculptforge.app/donate.html";
+inline constexpr const char* kSupportUrl = "https://sculptforge.app/support.html";
 // The official community Discord (a permanent invite; the same link as on the website and in the README).
 inline constexpr const char* kDiscordUrl = "https://discord.gg/gWrYkEmQhH";
-// The same Stripe checkout links as website/donate.html (tests/test_support.cpp checks they match).
+// The same Stripe checkout links as website/support.html (tests/test_support.cpp checks they match).
 inline constexpr const char* kSupportUrlSupporter = "https://buy.stripe.com/aFacN5h1t6L8cP14ad4F201"; // $5 / month
 inline constexpr const char* kSupportUrlInsider = "https://buy.stripe.com/dRmdR94eH4D06qD9ux4F202";   // $20 / month
 inline constexpr const char* kSupportUrlStudio = "https://buy.stripe.com/3cI00j12v5H4g1dgWZ4F204";    // $150 / month (up to 10 artists)
-inline constexpr const char* kSupportUrlOnce = "https://buy.stripe.com/4gM7sL8uXc5s4iv5eh4F200";      // one-time gift
-// What Insider members get; early access starts with 1.0. Worded the same in the app, on the donate page and in
-// What's New (tests/test_support.cpp checks the donate page).
+inline constexpr const char* kSupportUrlOnce = "https://buy.stripe.com/4gM7sL8uXc5s4iv5eh4F200";      // one-time Supporter (pay what you want, $5 minimum)
+// What Insider members get; early access starts with 1.0. Worded the same in the app, on the membership page and in
+// What's New (tests/test_support.cpp checks the membership page).
 inline constexpr const char* kInsiderNote =
     "Insiders will get each release about two weeks early, starting with SculptForge 1.0.";
 

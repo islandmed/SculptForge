@@ -82,8 +82,13 @@ All notable changes to SculptForge are listed here. The format follows
   Connected only.
 - The official community Discord (https://discord.gg/gWrYkEmQhH): **Help > Join the Discord...**, a button on the
   support card at launch (it opens the invite and leaves the card open), a link in the first-run welcome, the top
-  bar and footer of every website page, the donate page (members get private channels), the README and
+  bar and footer of every website page, the membership page (members get private channels), the README and
   CONTRIBUTING.md (questions on Discord; bugs still go to GitHub issues).
+
+### Changed
+- The website's membership page is now `support.html` (titled Membership; the old address redirects there) and lists
+  what each membership includes. Help > Support SculptForge, the welcome, the reminder and the launch card open it
+  and describe the membership benefits; the one-time option is now the One-time Supporter (pay what you want).
 
 ### Fixed
 - Maya input style (#32): <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+drag erases the mask instead of starting
