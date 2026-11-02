@@ -1,0 +1,149 @@
+# Posts to the community Discord's #announcements channel through a channel webhook stored in the
+# DISCORD_ANNOUNCE_WEBHOOK secret; without the secret the job skips. No checkout of untrusted code, no other secrets.
+# Message text comes only from this repository or the release itself (tag, URL), never from issues or pull requests.
+#
+# - A release: "SculptForge vX.Y.Z is out", the release's feed highlights, the download link and the release URL.
+#   The Release workflow publishes with GITHUB_TOKEN, and GitHub sends no `release` event for that, so its
+#   successful run (workflow_run) triggers the post; `release: published` covers a release published by hand.
+#   release.sh step "site" writes the highlights to website/latest.json on main after the release is out, so the
+#   job waits (up to FEED_WAIT_MINUTES) for the feed to name this version, then posts without highlights if it never does.
+# - Run workflow: posts .github/announcements/<file> (at most 2000 characters), with an optional embed image: a
+#   path under website/ that is already live on sculptforge.app.
+name: Discord announcement
+
+on:
+  release:
+    types: [published]
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      file:
+        description: "Markdown file in .github/announcements/ (e.g. membership.md)"
+        required: true
+        type: string
+      image:
+        description: "Optional embed image: a path under website/ (e.g. website/media/looks/forge-tokyo-night.png)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: discord-announce
+  cancel-in-progress: false
+
+jobs:
+  post:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.ref || github.event.repository.default_branch }}
+          sparse-checkout: |
+            .github/announcements/
+            website/latest.json
+          sparse-checkout-cone-mode: false
+      - name: Post to Discord
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_ANNOUNCE_WEBHOOK }}
+          EVENT: ${{ github.event_name }}
+          FILE: ${{ inputs.file }}
+          IMAGE: ${{ inputs.image }}
+          REL_TAG: ${{ github.event.release.tag_name }}
+          REL_URL: ${{ github.event.release.html_url }}
+          REL_PRERELEASE: ${{ github.event.release.prerelease }}
+          RUN_STARTED: ${{ github.event.workflow_run.run_started_at }}
+          BRANCH: ${{ github.event.repository.default_branch }}
+          REPO: ${{ github.repository }}
+          API_URL: ${{ github.api_url }}
+          GH_TOKEN: ${{ github.token }}
+          FEED_WAIT_MINUTES: "45"
+        run: |
+          python3 - <<'EOF'
+          import json, os, pathlib, re, subprocess, sys, time, urllib.request
+          hook = os.environ.get("WEBHOOK", "")
+          if not hook:
+              print("DISCORD_ANNOUNCE_WEBHOOK is not set; nothing to post."); sys.exit(0)
+          SITE, UA = "https://sculptforge.app", "SculptForge-announce"
+          event, env = os.environ["EVENT"], os.environ.get
+          payload = {"username": "SculptForge", "avatar_url": f"{SITE}/img/icon-256.png",  # not the webhook's default name
+                     "allowed_mentions": {"parse": []}}
+
+          def api(path):
+              req = urllib.request.Request(env("API_URL", "https://api.github.com") + path, headers={
+                  "Authorization": "Bearer " + env("GH_TOKEN", ""), "Accept": "application/vnd.github+json",
+                  "User-Agent": UA})
+              with urllib.request.urlopen(req, timeout=30) as r:
+                  return json.load(r)
+
+          if event == "workflow_dispatch":
+              base = pathlib.Path(".github/announcements").resolve()
+              name = env("FILE", "").strip().removeprefix(".github/announcements/")
+              path = (base / name).resolve()
+              if base not in path.parents or path.suffix != ".md" or not path.is_file():
+                  sys.exit(f"file: want a .md file inside .github/announcements/, got {name!r}")
+              text = path.read_text(encoding="utf-8").strip()
+              image = env("IMAGE", "").strip()
+              if image:
+                  if (not re.fullmatch(r"website/[A-Za-z0-9._/-]+\.(png|jpe?g|gif|webp)", image)
+                          or ".." in image.split("/")):
+                      sys.exit(f"image: want an image path under website/, got {image!r}")
+                  if subprocess.run(["git", "cat-file", "-e", "HEAD:" + image]).returncode:
+                      sys.exit(f"image: {image} is not in the repository")
+                  payload["embeds"] = [{"image": {"url": f"{SITE}/{image.removeprefix('website/')}"}}]
+              what = path.name
+          else:
+              if event == "release":
+                  tag, url, pre = env("REL_TAG", ""), env("REL_URL", ""), env("REL_PRERELEASE") == "true"
+              else:  # workflow_run: the release this Release run published (none when it only re-uploaded)
+                  started = env("RUN_STARTED", "")
+                  new = [r for r in api(f"/repos/{env('REPO')}/releases?per_page=10")
+                         if not r["draft"] and (r.get("published_at") or "") >= started
+                         and r["author"]["login"] == "github-actions[bot]"]
+                  if not started or not new:
+                      print("This Release run published no new release; nothing to post."); sys.exit(0)
+                  tag, url, pre = new[0]["tag_name"], new[0]["html_url"], new[0]["prerelease"]
+              m = re.fullmatch(r"v(\d+\.\d+\.\d+)", tag)
+              if pre or not m:
+                  print(f"{tag} is a prerelease or not vX.Y.Z; nothing to post."); sys.exit(0)
+              version, highlights = m[1], []
+              deadline = time.time() + 60 * float(env("FEED_WAIT_MINUTES", "45"))
+              while True:
+                  subprocess.run(["git", "fetch", "-q", "--depth=1", "origin", env("BRANCH", "main")], check=True)
+                  shown = subprocess.run(["git", "show", "FETCH_HEAD:website/latest.json"],
+                                         capture_output=True, text=True)
+                  try:
+                      feed = json.loads(shown.stdout)
+                  except ValueError:
+                      feed = {}
+                  if feed.get("version") == version:
+                      highlights = [h.strip() for h in feed.get("highlights", []) if isinstance(h, str) and h.strip()][:6]
+                      break
+                  if time.time() >= deadline:
+                      print(f"::warning::website/latest.json never said {version}; posting without highlights"); break
+                  time.sleep(60)
+              while True:
+                  lines = [f"**SculptForge v{version} is out**"] + [f"• {h}" for h in highlights]
+                  if not highlights:
+                      lines.append(f"What's new: {SITE}/guide/whats-new.html")
+                  text = "\n".join(lines + [f"Download: {SITE}", f"Release notes: {url}"])
+                  if len(text) <= 2000 or not highlights:
+                      break
+                  highlights.pop()
+              payload["flags"] = 4  # no link previews: the post itself is the summary
+              what = tag
+          if not text:
+              sys.exit("the message is empty")
+          if len(text) > 2000:
+              sys.exit(f"the message has {len(text)} characters; Discord allows 2000")
+          payload["content"] = text
+          req = urllib.request.Request(hook, data=json.dumps(payload).encode(),
+                                       headers={"Content-Type": "application/json", "User-Agent": UA})
+          with urllib.request.urlopen(req, timeout=30) as r:
+              print(what, len(text), r.status)
+          EOF
