@@ -4,7 +4,7 @@
 """Checks proof mode results (sculptforge --benchmark) and adds them to the website's list.
 
     submit.py check result.json [...]          validate and print a summary
-    submit.py add result.json --name NAME [--video URL] [--results website/benchmarks/results.json]
+    submit.py add result.json --name NAME [--machine TEXT] [--video URL] [--results website/benchmarks/results.json]
     submit.py selftest                          check the validator against a made-up result
 
 The format is described in docs/benchmark.md (schema "sculptforge-benchmark/1").
@@ -87,7 +87,9 @@ def validate(doc):
             need(ph, "frames", "num", pw)
             need(ph, "fps", "num", pw)
             pct(ph, "frame_ms", pw)
-            if isinstance(ph, dict) and "brush_radius_px" in ph:
+            if isinstance(ph, dict) and "worst_stall_ms" in ph and not _num(ph["worst_stall_ms"]):
+                errs.append(f"{pw}.worst_stall_ms: expected a number >= 0")
+            if isinstance(ph, dict) and "brush_radius_px" in ph and ph.get("brush") != "Move":
                 pct(ph, "lag_ms", pw)
                 pct(ph, "lag_px", pw)
     return errs
@@ -102,30 +104,47 @@ def summary(doc):
         for ph in run["phases"]:
             f = ph["frame_ms"]
             s = f"  {run['label']:>6} {ph['name']:<20} {ph['fps']:6.1f} fps  frame p50 {f['p50']:5.1f}  p95 {f['p95']:5.1f}  p99 {f['p99']:5.1f} ms"
+            if "worst_stall_ms" in ph:
+                s += f"  stall {ph['worst_stall_ms']:.0f} ms"
             if "lag_ms" in ph:
                 s += f"  trails {ph['lag_ms']['p50']:.0f} ms / {ph['lag_px']['p50']:.0f} px (p95 {ph['lag_ms']['p95']:.0f} ms)"
             lines.append(s)
     return "\n".join(lines)
 
 
-def compact(doc, name, video):
+def compact(doc, name, video, machine=None):
     """The entry the website lists: everything but the long settings text."""
+    settings = doc["settings"]
     entry = {
         "name": name,
         "date": doc["date"],
         "sculptforge": doc["sculptforge"],
-        "hardware": {k: doc["hardware"].get(k) for k in ("cpu", "gpu", "ram_gb", "logical_cores", "os")},
-        "vsync": doc["settings"]["vsync"],
+        "hardware": {k: doc["hardware"][k] for k in ("cpu", "gpu", "ram_gb", "logical_cores", "os", "framebuffer")
+                     if k in doc["hardware"]},
+        "vsync": settings["vsync"],
         "runs": [],
     }
+    if machine:
+        entry["machine"] = machine
+    for k in ("scene", "stroke_set"):
+        if k in settings:
+            entry[k] = settings[k]
     if video:
         entry["video"] = video
     for run in doc["runs"]:
         r = {"label": run["label"], "triangles": run["triangles"], "phases": []}
+        for k in ("peak_ram_mb", "gpu_buffers_mb", "vram_used_mb", "worst_stall_ms"):
+            if k in run:
+                r[k] = run[k]
         for ph in run["phases"]:
             p = {"name": ph["name"], "fps": ph["fps"], "frame_ms": ph["frame_ms"]}
+            for k in ("brush", "worst_stall_ms"):
+                if k in ph:
+                    p[k] = ph[k]
+            if "brush_radius_px" in ph:
+                p["brush_radius_px"] = ph["brush_radius_px"]
             if "lag_ms" in ph:
-                p.update(brush_radius_px=ph.get("brush_radius_px"), lag_ms=ph["lag_ms"], lag_px=ph["lag_px"])
+                p.update(lag_ms=ph["lag_ms"], lag_px=ph["lag_px"])
             r["phases"].append(p)
         entry["runs"].append(r)
     return entry
@@ -164,7 +183,7 @@ def cmd_add(args):
         return 1
     results_path = pathlib.Path(args.results)
     data = load(results_path) if results_path.exists() else {"schema": "sculptforge-benchmark-list/1", "results": []}
-    entry = compact(doc, args.name, args.video)
+    entry = compact(doc, args.name, args.video, args.machine)
     key = (entry["name"], entry["date"])
     if any((e.get("name"), e.get("date")) == key for e in data["results"]):
         print("Already listed")
@@ -190,6 +209,14 @@ def cmd_selftest(_args):
     del bad["hardware"]["gpu"]
     assert len(validate(bad)) == 2, validate(bad)
     assert compact(good, "me", None)["runs"][0]["phases"][0]["lag_px"] == pct
+    std = json.loads(json.dumps(good))
+    std["settings"].update(scene="standard-15m", stroke_set="standard/1")
+    std["runs"][0].update(label="15M", peak_ram_mb=4000, gpu_buffers_mb=900, worst_stall_ms=45.5)
+    std["runs"][0]["phases"][0].update(name="clay small", brush="Clay", worst_stall_ms=45.5)
+    assert validate(std) == [], validate(std)
+    e = compact(std, "me", None, "a laptop")
+    assert e["scene"] == "standard-15m" and e["machine"] == "a laptop" and e["runs"][0]["worst_stall_ms"] == 45.5
+    assert e["runs"][0]["phases"][0]["brush"] == "Clay"
     print("selftest ok")
     return 0
 
@@ -203,6 +230,7 @@ def main():
     a.add_argument("file")
     a.add_argument("--name", required=True)
     a.add_argument("--video", default=None)
+    a.add_argument("--machine", default=None, help="free text: the computer (model, cooling, power mode...)")
     a.add_argument("--results", default=str(DEFAULT_RESULTS))
     sub.add_parser("selftest")
     args = ap.parse_args()

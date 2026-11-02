@@ -29,6 +29,12 @@ std::vector<ProofMeshSize> proofDefaultSizes(size_t availableBytes);
 // Register at start-up: proofExtraSizes().push_back({300, "300M micro-displaced", builder, bytes});
 std::vector<ProofMeshSize>& proofExtraSizes();
 
+// The standard scenes (`sculptforge --benchmark standard-15m`, Help > Benchmark): a procedural head of 15M or 33M
+// triangles (core makeBenchHead) and a fixed stroke set (Clay small / medium / large, Move, Smooth, a 240 px Clay
+// brush, then an orbit). Names: "standard-15m", "standard-33m", "standard" (both). Empty for any other name.
+std::vector<ProofMeshSize> proofStandardScene(const std::string& name);
+inline constexpr const char* kProofStrokeSet = "standard/1"; // bump when the standard stroke set changes
+
 // Memory the system can still hand out (Linux MemAvailable, macOS / Windows free + reclaimable); 0 = unknown.
 size_t availableMemoryBytes();
 size_t totalMemoryBytes();

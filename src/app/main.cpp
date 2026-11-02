@@ -65,6 +65,8 @@ void usage() {
         "  --benchmark              Proof mode: a scripted stroke on 5M / 20M / 33M (and 100M when memory\n"
         "                           allows) triangle meshes through the input handlers, with a live HUD; writes a\n"
         "                           JSON result and an MP4 of the run and exits (docs/benchmark.md)\n"
+        "  --benchmark standard-15m The standard scene: a 15M triangle head, Clay S/M/L, Move, Smooth and a 240 px\n"
+        "                           brush (standard-33m: 33M; standard: both). The numbers on sculptforge.app/benchmarks\n"
         "  --benchmark-sizes 5,20   Proof mode mesh sizes in millions of triangles\n"
         "  --benchmark-out FILE     Where the JSON result goes (default: sculptforge-benchmark-<time>.json here)\n"
         "  --benchmark-video FILE   Where the MP4 goes; --benchmark-no-video records none\n"
@@ -158,7 +160,18 @@ int main(int argc, char** argv) {
         }
         else if (a == "--timelapse") options.timelapsePath = next();
         else if (a == "--timelapse-seconds") options.timelapseSeconds = std::max(2.0f, float(std::atof(next().c_str())));
-        else if (a == "--benchmark") options.benchmark = true;
+        else if (a == "--benchmark") {
+            options.benchmark = true;
+            // An optional scene name: sculptforge --benchmark standard-15m
+            if (i + 1 < argc && std::string(argv[i + 1]).rfind("standard", 0) == 0) {
+                options.benchmarkScene = argv[++i];
+                if (options.benchmarkScene != "standard" && options.benchmarkScene != "standard-15m" &&
+                    options.benchmarkScene != "standard-33m") {
+                    std::fprintf(stderr, "Unknown benchmark scene %s (standard-15m, standard-33m or standard)\n", argv[i]);
+                    return 1;
+                }
+            }
+        }
         else if (a == "--benchmark-sizes") options.benchmarkSizes = next();
         else if (a == "--benchmark-out") options.benchmarkOut = next();
         else if (a == "--benchmark-video") options.benchmarkVideo = next();

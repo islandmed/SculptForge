@@ -4,9 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SculptForge Benchmarks</title>
-  <meta name="description" content="How responsive sculpting in SculptForge is on real computers: proof mode results submitted by users, with frame times and how far the stroke trails the pen on 5 to 100 million triangle meshes.">
-  <!-- Proof mode results (sculptforge --benchmark, Help > Benchmark). Data: results.json beside this page, kept by
-       tools/benchmark/submit.py; format in docs/benchmark.md. -->
+  <meta name="description" content="Sculpting 15 and 33 million triangles in SculptForge, measured: frame times, stroke lag, worst stall and memory on real computers. One command reproduces it on yours.">
+  <meta property="og:title" content="SculptForge benchmarks: 15M and 33M triangles, measured">
+  <meta property="og:description" content="Frame time p50/p95/p99, stroke lag, worst stall and memory on a 15 and 33 million triangle head. Run sculptforge --benchmark standard-15m and compare for yourself.">
+  <meta property="og:url" content="https://sculptforge.app/benchmarks/">
+  <link rel="canonical" href="https://sculptforge.app/benchmarks/">
+  <link rel="icon" type="image/svg+xml" href="../img/favicon.svg?v=2">
+  <!-- Proof mode results (sculptforge --benchmark standard-15m, Help > Benchmark). Data: results.json beside this
+       page, kept by tools/benchmark/submit.py; format in docs/benchmark.md. -->
   <style>
     @font-face { font-family: "Inter"; src: url("../fonts/Inter-Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
     @font-face { font-family: "Inter"; src: url("../fonts/Inter-SemiBold.ttf") format("truetype"); font-weight: 600 700; font-display: swap; }
@@ -16,131 +21,220 @@
       --text: #ececf1; --muted: #a3a3ad; --accent: #f28c3c; --accent-2: #ffb06a; --good: #7fc28a; --warn: #e2b155; --bad: #e5604a;
     }
     @media (prefers-color-scheme: light) {
-      :root:not([data-theme="dark"]) { color-scheme: light; --bg: #f6f6f8; --panel: #ffffff; --border: #dcdce2; --text: #18181c; --muted: #5d5d66; --accent-2: #b5560f; }
+      :root:not([data-theme="dark"]) { color-scheme: light; --bg: #f6f6f8; --panel: #ffffff; --border: #dcdce2; --text: #18181c; --muted: #5d5d66; --accent-2: #b5560f; --good: #2f7d3b; --warn: #8a6400; --bad: #b8321e; }
     }
     * { box-sizing: border-box; }
     body { margin: 0; background: var(--bg); color: var(--text);
-           font: 400 16px/1.5 "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-    main { max-width: 1100px; margin: 0 auto; padding: 32px 16px 64px; }
-    h1 { font-size: 1.9rem; margin: 0 0 4px; letter-spacing: -0.01em; }
-    h2 { font-size: 1.15rem; margin: 32px 0 8px; }
+           font: 400 16px/1.55 "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    main { max-width: 1160px; margin: 0 auto; padding: 24px 16px 64px; }
+    h1 { font-size: clamp(1.7rem, 4vw, 2.4rem); line-height: 1.15; margin: 8px 0 8px; letter-spacing: -0.015em; }
+    h2 { font-size: 1.25rem; margin: 40px 0 10px; }
     a { color: var(--accent-2); }
     .muted { color: var(--muted); }
-    .small { font-size: 0.85rem; }
-    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin: 16px 0; }
-    .filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 16px 0; }
+    .small { font-size: 0.86rem; }
+    .lede { font-size: 1.08rem; max-width: 760px; }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin: 16px 0; }
+    .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; padding: 0; margin: 16px 0; list-style: none; counter-reset: s; }
+    .steps li { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; counter-increment: s; min-width: 0; }
+    .steps li::before { content: counter(s); display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+                        background: var(--accent); color: #111; font-weight: 700; margin-right: 8px; }
+    .steps strong { font-size: 1.02rem; }
+    .steps p { margin: 8px 0 0; }
+    .filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 12px 0; }
     select { font: inherit; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; }
-    .scroll { overflow-x: auto; }
-    table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: 0.92rem; }
-    th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
-    th { color: var(--muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
-    td.num { text-align: right; }
+    .scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
+    table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: 0.9rem; }
+    th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; vertical-align: top; }
+    tbody tr:last-child td { border-bottom: 0; }
+    th { color: var(--muted); font-weight: 600; font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.04em; background: var(--panel); }
+    td.num, th.num { text-align: right; }
+    td.machine { white-space: normal; min-width: 220px; max-width: 320px; }
+    details summary { cursor: pointer; color: var(--muted); font-size: 0.82rem; }
+    details dl { margin: 6px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 0.82rem; }
+    details dt { color: var(--muted); }
+    details dd { margin: 0; overflow-wrap: anywhere; }
     .ok { color: var(--good); } .meh { color: var(--warn); } .slow { color: var(--bad); }
-    code { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; font-size: 0.9em; }
-    .empty { padding: 24px; text-align: center; }
+    code, pre { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; font-size: 0.9em; }
+    code { padding: 1px 6px; }
+    pre { padding: 10px 12px; overflow-x: auto; margin: 8px 0 0; }
+    pre code { border: 0; padding: 0; background: none; }
+    .empty { padding: 24px; text-align: center; white-space: normal; }
+    .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 12px; }
+    .grid2 .card { margin: 0; min-width: 0; }
+    footer { border-top: 1px solid var(--border); margin-top: 48px; padding-top: 16px; }
   </style>
 </head>
 <body>
 <main>
-  <p class="small"><a href="../index.html">SculptForge</a></p>
-  <h1>Benchmarks</h1>
-  <p class="muted">How responsive sculpting is on real computers, measured by SculptForge's proof mode and submitted by the
-    people who ran it. Each row is one mesh size of one run.</p>
+  <p class="small"><a href="../index.html">SculptForge</a> / <a href="../guide/performance.html">Performance guide</a></p>
+  <h1>15 and 33 million triangles, measured</h1>
+  <p class="lede muted">Can an open-source sculpting app handle high-poly work? Don't take our word for it. These are
+    SculptForge's own numbers on a 15 and a 33 million triangle head, from a benchmark anyone can run with one command,
+    on the same scene with the same strokes. Run it on your computer and compare.</p>
 
-  <div class="card small">
-    <strong>What the numbers mean.</strong> Proof mode plays a scripted pen stroke (240 pointer samples a second) through the
-    same code a real pen goes through, on spheres of 5, 20 and 33 million triangles (100 million with enough memory).
-    <em>Frame</em> is the time per frame: the median (p50) and the 95th / 99th percentile, the hitches you feel.
-    <em>Trails</em> is how far the stroke on screen is behind the pointer: from the pointer sample to the frame that shows it
-    handed to the display, in milliseconds, and the same distance along the path in pixels. Lower is better everywhere.
-    Vertical sync is off unless noted. Every run also records a video with these numbers on screen.
+  <h2 id="run">Run it yourself in 3 steps</h2>
+  <ol class="steps">
+    <li><strong>Get SculptForge</strong>
+      <p>Install the <a href="../index.html#download">latest release</a> (free, Linux, macOS, Windows). Close
+        anything heavy: builds, games, renders.</p></li>
+    <li><strong>Run the standard scene</strong>
+      <p><strong>Help &gt; Benchmark</strong>, choose <em>Standard 15M</em> or <em>33M</em>, Start. Or from a terminal:</p>
+      <pre><code>sculptforge --benchmark standard-15m
+sculptforge --benchmark standard-33m</code></pre></li>
+    <li><strong>Read the result</strong>
+      <p>About a minute per size. A table shows the numbers; a JSON file and an MP4 of the run (with the numbers on
+        screen) are saved. <a href="#submit">Send the JSON</a> to be listed here.</p></li>
+  </ol>
+
+  <div class="grid2">
+    <div class="card small">
+      <strong>The scene.</strong> A procedural head (skull, brow, nose, jaw, ears) built from a formula, so it's
+      identical everywhere, with subdivision levels: about 15 or 33 million triangles. A scripted pen stroke
+      (a figure eight, 240 pointer samples a second) goes through the same code a real pen does, with each brush in
+      turn: <strong>Clay</strong> at 25, 60 and 120 px, <strong>Move</strong> (80 px), <strong>Smooth</strong> (60 px)
+      and a <strong>240 px</strong> Clay brush, then an orbit. Vertical sync off; the window size used is in each result.
+    </div>
+    <div class="card small">
+      <strong>The numbers.</strong> <em>Frame p50 / p95 / p99</em>: time per frame, the median and the slow ones
+      you'd feel (16.7 ms is 60 fps). <em>Lag</em>: how far the stroke on screen trails the pointer, in pixels along
+      the path. <em>Worst stall</em>: the longest the screen froze, including lifting the pen. <em>Peak RAM</em>:
+      the most memory SculptForge held; <em>GPU</em>: its vertex and index buffers (on unified-memory machines like
+      Apple silicon these share RAM). Lower is better everywhere.
+    </div>
   </div>
 
+  <h2 id="results">Results</h2>
   <div class="filters">
-    <label>Mesh <select id="size"><option value="">all sizes</option></select></label>
-    <label>Phase <select id="phase">
-      <option value="stroke">60 px brush stroke</option>
-      <option value="large brush stroke">240 px brush stroke</option>
-      <option value="orbit">turning the view</option>
-    </select></label>
+    <label>Scene <select id="scene"></select></label>
+    <label>Stroke <select id="phase"></select></label>
     <span class="muted small" id="count"></span>
   </div>
-
   <div class="scroll">
     <table>
       <thead><tr>
-        <th>Mesh</th><th>Processor</th><th>Graphics</th><th>RAM</th><th class="num">fps</th>
-        <th class="num">Frame p50</th><th class="num">p95</th><th class="num">p99</th>
-        <th class="num">Trails p50</th><th class="num">p95</th><th>Version</th><th>By</th><th>Video</th>
+        <th>Machine</th><th>OS</th><th>Processor</th><th>Graphics</th><th class="num">RAM</th><th>Build</th>
+        <th class="num">fps</th><th class="num">Frame p50</th><th class="num">p95</th><th class="num">p99</th>
+        <th class="num">Lag p50</th><th class="num">p95</th><th class="num">Worst stall</th>
+        <th class="num">Peak RAM</th><th class="num">GPU</th><th>Video</th>
       </tr></thead>
-      <tbody id="rows"><tr><td colspan="13" class="empty muted">Loading results...</td></tr></tbody>
+      <tbody id="rows"><tr><td colspan="16" class="empty muted">Loading results...</td></tr></tbody>
     </table>
   </div>
+  <p class="small muted">Worst stall, peak RAM and GPU memory are for the whole run of that size (every stroke).
+    Colours: green within a 60 Hz frame (16.7 ms), amber within two, red slower. Raw data:
+    <a href="results.json">results.json</a>.</p>
 
-  <h2>Run it yourself</h2>
-  <p>In SculptForge: <strong>Help &gt; Benchmark</strong>. From a terminal: <code>sculptforge --benchmark</code>. Both write a
-    JSON result and an MP4 of the run.</p>
-  <h2>Submit a result</h2>
-  <ol>
-    <li>Run it on a quiet machine (close other heavy programs).</li>
-    <li>Check the file: <code>python3 tools/benchmark/submit.py check result.json</code>.</li>
-    <li>Add it: <code>python3 tools/benchmark/submit.py add result.json --name "your name" --video https://...</code>, and
-      open a pull request with the change to <code>website/benchmarks/results.json</code>, or attach the JSON to an
-      <a href="https://github.com/islandmed/SculptForge/issues">issue</a>.</li>
-  </ol>
-  <p class="small muted">The file format: <a href="https://github.com/islandmed/SculptForge/blob/main/docs/benchmark.md">docs/benchmark.md</a>.</p>
-  <p class="muted small">ZBrush, GoZ, MatCap, FiberMesh, LightCap and other ZBrush feature names are trademarks of Maxon Computer GmbH. SculptForge is not affiliated with or endorsed by Maxon.</p>
+  <h2 id="submit">Submit your result</h2>
+  <div class="grid2">
+    <div class="card">
+      <strong>The easy way: an issue</strong>
+      <p class="small">Open a <a href="https://github.com/islandmed/SculptForge/issues/new?template=benchmark_result.yml">Benchmark
+        result</a> issue, describe the computer, and paste the JSON file. We check it and add it here.</p>
+    </div>
+    <div class="card">
+      <strong>The direct way: a pull request</strong>
+      <p class="small">From a clone of the repository:</p>
+      <pre><code>python3 tools/benchmark/submit.py check result.json
+python3 tools/benchmark/submit.py add result.json \
+  --name "your handle" --machine "laptop model" \
+  --video https://...</code></pre>
+      <p class="small">and open a pull request with the change to <code>website/benchmarks/results.json</code>.</p>
+    </div>
+  </div>
+  <p class="small muted">SculptForge itself uploads nothing: the benchmark only writes files on your computer.
+    The format: <a href="https://github.com/islandmed/SculptForge/blob/main/docs/benchmark.md">docs/benchmark.md</a>.</p>
+
+  <h2>Comparing with other apps</h2>
+  <p class="small">This page lists SculptForge results only. We don't run, publish or test against other sculpting
+    applications' numbers or output. If you use another app, sculpt a similar mesh there and judge for yourself.</p>
+
+  <footer>
+    <p class="muted small">SculptForge is an independent open-source project, not affiliated with or endorsed by Maxon.
+      ZBrush, GoZ, MatCap, FiberMesh, LightCap and other ZBrush feature names are trademarks of Maxon Computer GmbH.
+      All other trademarks belong to their owners.</p>
+  </footer>
 </main>
 <script>
 (function () {
   "use strict";
-  const rows = document.getElementById("rows"), sizeSel = document.getElementById("size"),
-        phaseSel = document.getElementById("phase"), count = document.getElementById("count");
+  const $ = (id) => document.getElementById(id);
+  const rows = $("rows"), sceneSel = $("scene"), phaseSel = $("phase"), count = $("count");
+  const SCENES = [["standard-15m", "Standard 15M (head)", "15M"], ["standard-33m", "Standard 33M (head)", "33M"],
+                  ["spheres", "Spheres, older runs", ""]];
+  const STANDARD_PHASES = [["clay small", "Clay 25 px"], ["clay medium", "Clay 60 px"], ["clay large", "Clay 120 px"],
+                           ["move", "Move 80 px"], ["smooth", "Smooth 60 px"], ["240 px brush", "Clay 240 px"], ["orbit", "Orbit"]];
+  const SPHERE_PHASES = [["stroke", "60 px brush"], ["large brush stroke", "240 px brush"], ["orbit", "Orbit"]];
   let results = [];
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  const ms = (v) => (typeof v === "number" ? v.toFixed(v < 10 ? 1 : 0) + " ms" : "-");
-  // Frame-time colour: under a 60 Hz frame, under two, slower.
-  const cls = (v) => (typeof v !== "number" ? "" : v <= 16.7 ? "ok" : v <= 33.4 ? "meh" : "slow");
-  function cell(v, unit) { return `<td class="num ${cls(v)}">${unit ? unit(v) : ms(v)}</td>`; }
+  const num = (v) => typeof v === "number" && isFinite(v);
+  const ms = (v) => (num(v) ? v.toFixed(v < 10 ? 1 : 0) + " ms" : "-");
+  const px = (v) => (num(v) ? v.toFixed(0) + " px" : "-");
+  const mb = (v) => (num(v) ? (v >= 1024 ? (v / 1024).toFixed(1) + " GB" : v.toFixed(0) + " MB") : "-");
+  const cls = (v) => (!num(v) ? "" : v <= 16.7 ? "ok" : v <= 33.4 ? "meh" : "slow");
+  const td = (html, c) => `<td class="num ${c || ""}">${html}</td>`;
+  // Runs of the chosen scene: standard results by label; anything without a scene is a sphere run.
+  function runsFor(r, scene) {
+    const runs = r.runs || [];
+    if (scene === "spheres") return r.scene ? [] : runs;
+    if (r.scene !== scene && r.scene !== "standard") return [];
+    const label = SCENES.find((x) => x[0] === scene)[2];
+    return runs.filter((x) => x.label === label);
+  }
+  function fillPhases() {
+    const list = sceneSel.value === "spheres" ? SPHERE_PHASES : STANDARD_PHASES, keep = phaseSel.value;
+    phaseSel.innerHTML = "";
+    list.forEach(([v, t]) => phaseSel.add(new Option(t, v)));
+    if (list.some(([v]) => v === keep)) phaseSel.value = keep;
+  }
+  function machineCell(r, run) {
+    const hw = r.hardware || {}, fb = hw.framebuffer;
+    const items = [["CPU", hw.cpu], ["Cores", hw.logical_cores], ["RAM", num(hw.ram_gb) ? hw.ram_gb + " GB" : ""],
+                   ["GPU", hw.gpu], ["OS", hw.os], ["Window", Array.isArray(fb) ? fb.join(" x ") : ""],
+                   ["Mesh", num(run.triangles) ? (run.triangles / 1e6).toFixed(1) + "M triangles" : run.label],
+                   ["Date", (r.date || "").slice(0, 10)], ["Vsync", r.vsync ? "on" : "off"]];
+    return `<td class="machine"><strong>${esc(r.name || "anonymous")}</strong>` +
+      (r.machine ? `<div class="small muted">${esc(r.machine)}</div>` : "") +
+      `<details><summary>Full hardware</summary><dl>` +
+      items.filter(([, v]) => v !== "" && v != null).map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("") +
+      `</dl></details></td>`;
+  }
   function render() {
-    const size = sizeSel.value, phase = phaseSel.value, out = [];
-    for (const r of results) {
-      for (const run of r.runs || []) {
-        if (size && run.label !== size) continue;
+    const scene = sceneSel.value, phase = phaseSel.value, out = [];
+    for (const r of results)
+      for (const run of runsFor(r, scene)) {
         const ph = (run.phases || []).find((p) => p.name === phase);
-        if (!ph) continue;
-        out.push({ r, run, ph });
+        if (ph) out.push({ r, run, ph });
       }
-    }
-    out.sort((a, b) => (a.run.triangles - b.run.triangles) || ((a.ph.frame_ms || {}).p50 - (b.ph.frame_ms || {}).p50));
-    count.textContent = out.length ? `${out.length} row${out.length === 1 ? "" : "s"}` : "";
+    out.sort((a, b) => (a.run.triangles - b.run.triangles) || (((a.ph.frame_ms || {}).p50 || 0) - ((b.ph.frame_ms || {}).p50 || 0)));
+    count.textContent = out.length ? `${out.length} result${out.length === 1 ? "" : "s"}` : "";
     if (!out.length) {
-      rows.innerHTML = `<tr><td colspan="13" class="empty muted">No results yet${size || phase ? " for this choice" : ""}. Be the first: run proof mode and submit yours.</td></tr>`;
+      rows.innerHTML = '<tr><td colspan="16" class="empty muted">No results for this scene yet. Run it and <a href="#submit">send yours</a>.</td></tr>';
       return;
     }
     rows.innerHTML = out.map(({ r, run, ph }) => {
-      const hw = r.hardware || {}, f = ph.frame_ms || {}, lag = ph.lag_ms, px = ph.lag_px;
-      const trails = (o, p) => (o ? `${o[p].toFixed(0)} ms` + (px ? ` / ${px[p].toFixed(0)} px` : "") : "-");
-      return `<tr><td>${esc(run.label)}</td><td>${esc(hw.cpu)}</td><td>${esc((hw.gpu || "").split(",")[0])}</td>` +
-        `<td>${esc(hw.ram_gb)} GB</td><td class="num">${esc(ph.fps)}</td>` +
-        cell(f.p50) + cell(f.p95) + cell(f.p99) +
-        `<td class="num">${trails(lag, "p50")}</td><td class="num">${trails(lag, "p95")}</td>` +
-        `<td>${esc((r.sculptforge || {}).version)}${r.vsync ? " (vsync)" : ""}</td><td>${esc(r.name)}</td>` +
-        `<td>${r.video ? `<a href="${esc(r.video)}" rel="nofollow noopener">watch</a>` : "-"}</td></tr>`;
+      const hw = r.hardware || {}, f = ph.frame_ms || {}, lag = ph.lag_px || {}, app = r.sculptforge || {};
+      const commit = app.commit && /^[0-9a-f]{7,40}$/.test(app.commit)
+        ? ` <a class="small" href="https://github.com/islandmed/SculptForge/commit/${app.commit}">${app.commit}</a>` : "";
+      const video = r.video && /^https:\/\//.test(r.video) ? `<a href="${esc(r.video)}" rel="nofollow noopener">watch</a>` : "-";
+      const stall = num(run.worst_stall_ms) ? run.worst_stall_ms : ph.worst_stall_ms;
+      const gpu = num(run.vram_used_mb) && !/Apple|unified/i.test(hw.gpu || "") ? run.vram_used_mb : run.gpu_buffers_mb;
+      return "<tr>" + machineCell(r, run) +
+        `<td>${esc((hw.os || "").replace(/\s*\(.*\)$/, ""))}</td><td>${esc(hw.cpu)}</td><td>${esc((hw.gpu || "").split(",")[0])}</td>` +
+        td(num(hw.ram_gb) ? esc(hw.ram_gb) + " GB" : "-") + `<td>${esc(app.version)}${commit}</td>` +
+        td(num(ph.fps) ? ph.fps.toFixed(0) : "-") + td(ms(f.p50), cls(f.p50)) + td(ms(f.p95), cls(f.p95)) + td(ms(f.p99), cls(f.p99)) +
+        td(phase === "orbit" ? "-" : px(lag.p50)) + td(phase === "orbit" ? "-" : px(lag.p95)) +
+        td(ms(stall), num(stall) ? (stall <= 100 ? "ok" : stall <= 500 ? "meh" : "slow") : "") +
+        td(mb(run.peak_ram_mb)) + td(mb(gpu)) + `<td>${video}</td></tr>`;
     }).join("");
   }
+  SCENES.forEach(([v, t]) => sceneSel.add(new Option(t, v)));
+  fillPhases();
+  sceneSel.addEventListener("change", () => { fillPhases(); render(); });
+  phaseSel.addEventListener("change", render);
   fetch("results.json", { cache: "no-cache" })
     .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
-    .then((data) => {
-      results = Array.isArray(data.results) ? data.results : [];
-      const sizes = [...new Set(results.flatMap((r) => (r.runs || []).map((x) => x.label)))];
-      const tris = Object.fromEntries(results.flatMap((r) => (r.runs || []).map((x) => [x.label, x.triangles])));
-      sizes.sort((a, b) => tris[a] - tris[b]).forEach((s) => sizeSel.add(new Option(s + " triangles", s)));
-      render();
-    })
-    .catch(() => { rows.innerHTML = '<tr><td colspan="13" class="empty muted">The results could not be loaded.</td></tr>'; });
-  sizeSel.addEventListener("change", render);
-  phaseSel.addEventListener("change", render);
+    .then((data) => { results = Array.isArray(data.results) ? data.results : []; render(); })
+    .catch(() => { rows.innerHTML = '<tr><td colspan="16" class="empty muted">The results could not be loaded.</td></tr>'; });
 })();
 </script>
 </body>

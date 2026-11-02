@@ -37,6 +37,12 @@ All notable changes to SculptForge are listed here. The format follows
   without XWayland, stays sharp at fractional scales and reads pen pressure through tablet-v2. A test checks the
   Linux build's SDL has both the Wayland and X11 drivers, and the RHEL/Rocky builds now include libdecor (title
   bars on GNOME Wayland).
+### Added
+- Standard benchmark scenes: `sculptforge --benchmark standard-15m` (and `standard-33m`, or `standard` for both;
+  also Help > Benchmark) sculpts a procedural 15 or 33 million triangle head with Clay at 25, 60 and 120 px, Move,
+  Smooth and a 240 px brush, and reports frame time p50/p95/p99, stroke lag in pixels, the worst stall, peak RAM and
+  graphics memory. The [benchmarks page](https://sculptforge.app/benchmarks/) lists results, explains how to run it
+  in three steps and how to submit yours (`tools/benchmark/submit.py` or the new **Benchmark result** issue form).
 
 ## [0.10.6] - 2026-11-01
 

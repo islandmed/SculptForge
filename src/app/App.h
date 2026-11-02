@@ -93,6 +93,7 @@ struct AppOptions {
     // --benchmark: proof mode (ProofMode.cpp), then exit. Sizes in millions of triangles (empty: 5, 20, 33 and
     // 100 when memory allows); outputs default to the current folder.
     bool benchmark = false;
+    std::string benchmarkScene; // --benchmark standard-15m | standard-33m | standard: a standard scene (ProofMode.h)
     std::string benchmarkSizes, benchmarkOut, benchmarkVideo;
     bool benchmarkNoVideo = false, benchmarkVsync = false;
     float benchmarkStrokeSeconds = 6.0f;
@@ -827,6 +828,7 @@ private:
     void hardwareProfileFrameBegin();
     void hardwareProfileFrameEnd(); // before the swap: feeds the governor, runs a calibration step
     void drawHardwareProfileOverlay(); // calibration progress over the first frames (Esc skips)
+    bool hardwareCalibrating() const;  // a calibration is running (proof mode waits for it)
     void drawPerformanceProfileSection();
     void registerPerformanceProfileUiActions();
     bool hardwareProfileGoverns() const; // the profile's motion proxy threshold applies (else the fixed default)

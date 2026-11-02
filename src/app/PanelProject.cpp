@@ -130,7 +130,7 @@ void App::initProject() {
         const bool onNewLook = uiPrefs_.look.look == int(looks::LookId::ForgeTerminal) && uiPrefs_.shellLayout == 1;
         newLookCard_ = !newLookCardDone_ && !onNewLook && !uiConfigDeterministic_;
     } else {
-        showWelcome_ = options_.uiTest.empty() && options_.demo.empty(); // the first start: no prefs yet
+        showWelcome_ = options_.uiTest.empty() && options_.demo.empty() && !options_.benchmark; // the first start: no prefs yet
         startInputStyle_ = uiPrefs_.inputStyle; // a new install: SculptForge's keys until the welcome's choice
         newLookCardDone_ = true; // a new install starts in the new look (or ui.json's): nothing to announce
     }

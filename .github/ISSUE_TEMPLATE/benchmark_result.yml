@@ -1,0 +1,57 @@
+name: Benchmark result
+description: Share a proof mode result (sculptforge --benchmark standard-15m) for the benchmarks page
+title: "Benchmark result: "
+labels: [benchmark]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for measuring! Run `sculptforge --benchmark standard-15m` (or Help > Benchmark) on a quiet machine,
+        then paste the JSON file it wrote below. A maintainer checks it with `tools/benchmark/submit.py` and adds it
+        to [sculptforge.app/benchmarks](https://sculptforge.app/benchmarks/). How it works: [docs/benchmark.md](https://github.com/islandmed/SculptForge/blob/main/docs/benchmark.md).
+
+        Please share SculptForge results only. We don't list numbers from other sculpting applications.
+  - type: dropdown
+    id: scene
+    attributes:
+      label: Scene
+      options:
+        - standard-15m
+        - standard-33m
+        - standard (both)
+        - spheres (sculptforge --benchmark with no scene)
+    validations:
+      required: true
+  - type: input
+    id: name
+    attributes:
+      label: Name to show
+      description: Your name or handle as it should appear in the table (leave empty for "anonymous").
+  - type: input
+    id: machine
+    attributes:
+      label: Machine
+      description: The computer, e.g. "Framework 16, Ryzen 7 7840HS, Radeon 7700S, plugged in, performance mode".
+    validations:
+      required: true
+  - type: textarea
+    id: json
+    attributes:
+      label: Result JSON
+      description: The whole sculptforge-benchmark-*.json file.
+      render: json
+    validations:
+      required: true
+  - type: input
+    id: video
+    attributes:
+      label: Video link (optional)
+      description: The MP4 proof mode recorded, uploaded somewhere public (YouTube, PeerTube...).
+  - type: checkboxes
+    id: ok
+    attributes:
+      label: Listing
+      options:
+        - label: The run was on a quiet machine (no builds, games or renders running at the same time)
+        - label: I'm happy for this result to be listed publicly on sculptforge.app/benchmarks
+          required: true
