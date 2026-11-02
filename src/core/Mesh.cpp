@@ -454,6 +454,33 @@ IndexRing Mesh::implicitTriangles(uint32_t v) const {
     return r;
 }
 
+IndexRing Mesh::quadNeighbors(uint32_t v) const {
+    const IndexRing ring = neighbors(v);
+    if (ring.size() > IndexRing::kCapacity) return ring; // (a fan this wide is no quad mesh)
+    // The far ends of the diagonals at v (at most one per triangle around it).
+    uint32_t skip[IndexRing::kCapacity];
+    uint32_t ns = 0;
+    for (uint32_t t : vertexTriangles(v)) {
+        const uint32_t u = quadPartnerAt(t);
+        if (u == kNoQuad) continue;
+        const int e = quadDiagonal(t, u);
+        if (e < 0) continue;
+        const glm::uvec3& tri = triangles[t];
+        const uint32_t a = tri[e], b = tri[(e + 1) % 3];
+        if (a == v || b == v) skip[ns++ % IndexRing::kCapacity] = a == v ? b : a;
+    }
+    if (ns == 0) return ring;
+    IndexRing r;
+    uint32_t n = 0;
+    for (uint32_t w : ring) {
+        bool diagonal = false;
+        for (uint32_t i = 0; i < std::min<uint32_t>(ns, IndexRing::kCapacity) && !diagonal; ++i) diagonal = skip[i] == w;
+        if (!diagonal) r.buf_[n++] = w;
+    }
+    r.size_ = n;
+    return n ? r : ring;
+}
+
 IndexRing Mesh::implicitNeighbors(uint32_t v) const {
     // The ring follows from the same layout: Catmull-Clark joins a corner to the edge points of its edges and the
     // face points of its polygons, an edge point to the edge's ends and face points, and a face point to the

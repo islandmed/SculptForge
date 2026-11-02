@@ -27,10 +27,13 @@ Mesh unmaskedPart(const Mesh& source, const std::vector<uint8_t>& keep);
 // Puts the kept triangles of `source` (keep[t] != 0, positions, mask, paint, groups and UVs unchanged) into
 // `remeshed` (a rebuild of the whole mesh or of its unmasked part): the remeshed surface over and next to
 // them is cut away and each edge loop of the kept area is bridged to the cut's matching edge loop with a
-// strip of triangles. Sculpt layers, levels and paint layers are dropped (the remeshers bake them). Fails,
-// saying why, when the masked area's edges can't be matched up (for example a mask edge that touches
-// itself, or detail finer than the remesh); `out` is then untouched.
+// strip of triangles. Sculpt layers, levels and paint layers are dropped (the remeshers bake them). Spots where
+// the new surface meets itself (voxel remeshing leaves them where parts of a model touch) are fine. A mask edge
+// the stitch can't follow is tidied and tried again (#67): triangles where the edge touches itself and masked
+// spots smaller than the new polygons are remeshed, narrow gaps between masked areas are kept; `note` (when
+// given) then says so, else it is cleared. Fails, saying what to change, when even that can't be joined up;
+// `out` is then untouched.
 bool stitchKeptTriangles(const Mesh& source, const std::vector<uint8_t>& keep, const Mesh& remeshed, Mesh& out,
-                         std::string& error);
+                         std::string& error, std::string* note = nullptr);
 
 } // namespace sf

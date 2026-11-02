@@ -60,7 +60,7 @@ void normalsOf(const Mesh& m, const std::vector<vec3>& P, std::vector<vec3>& N) 
 }
 
 vec3 laplacian(const Mesh& m, const std::vector<vec3>& P, uint32_t v) {
-    const IndexRing ring = m.neighbors(v);
+    const IndexRing ring = m.polygonNeighbors(v);
     vec3 avg(0.0f);
     for (uint32_t n : ring) avg += P[n];
     return avg / float(ring.size()) - P[v];
