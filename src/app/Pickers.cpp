@@ -1009,7 +1009,9 @@ bool pickerOpen() { return st().open || st().slider >= 0; }
 void PickerUi::sizePopup(App& app, Slider which) {
     State& s = st();
     s.slider = int(which);
-    s.sliderSmooth = app.activeBrush() == BrushType::Smooth;
+    // Smooth's own Intensity when Smooth is the brush or (ZBrush) Shift is held. Not Shift in the Blender style:
+    // there Shift+F is the brush's Strength, as in Blender, and Shift has no smoothing meaning for a key.
+    s.sliderSmooth = app.blenderStyle() ? app.brush_ == BrushType::Smooth : app.activeBrush() == BrushType::Smooth;
     // The brush cursor's own position (SDL's window coordinates, the brush ring's centre) rather than ImGui's
     // MousePos: on Windows ImGui's comes from the global cursor minus the window position while no button is held,
     // and pen drivers' stray mouse events move it too, so the slider opened away from the cursor (#9).

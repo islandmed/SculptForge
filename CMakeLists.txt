@@ -59,6 +59,7 @@ add_library(sculptforge_core STATIC
   src/core/Json.cpp
   src/core/BrushRecipe.cpp
   src/core/BrushSettings.cpp
+  src/core/AlphaOptions.cpp
   src/core/BrushLibrary.cpp
   src/core/Image.cpp
   src/core/ImageTo3D.cpp

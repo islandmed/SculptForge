@@ -290,6 +290,7 @@ private:
         bool pressureSize = false, pressureStrength = true, invert = false, frontFacesOnly = false;
         bool connectedOnly = false, viewFalloff = false; // the falloff options (Brush palette)
         bool mask = false, paint = false, sculpt = true, visible = true;
+        AlphaOptions alphaOptions; // Follow stroke direction, Angle, Angle jitter (#76; Tile is the alpha's own)
         BrushType brush = BrushType::Standard;
         StrokeType strokeType = StrokeType::Dots;
         Symmetry symmetry;
@@ -568,6 +569,13 @@ private:
     glm::vec3 dragAnchorHit_{0.0f};
     float dabRadiusScale_ = 1.0f, dabStrengthScale_ = 1.0f, dabAngle_ = 0.0f; // per-dab overrides
     bool alphaInvert_ = false;
+    // Alpha options (#76, core/AlphaOptions.h): the Alpha palette's Follow stroke direction, Angle, Angle jitter and
+    // Tile, kept per brush (#78). The rake and the jitter's seed start again with each stroke (dabAt).
+    AlphaOptions alphaOptions_;
+    AlphaRake alphaRake_;
+    uint32_t alphaSeed_ = 1;
+    float lastDabAngle_ = 0.0f; // radians (UI tests: last_dab_angle)
+    void drawAlphaOptions();
     std::mutex alphaMutex_;
     std::string pendingAlphaPath_; // set by the file dialog thread
     // Vector displacement brushes (PanelVdm.cpp, core/Vdm.h): the Brush palette's Vector Displacement section,
@@ -1549,6 +1557,8 @@ public:
 private:
     void initBrushSettings();
     void syncBrushSettings(); // every frame, outside strokes
+    void syncAlphaTile();     // the brush's Tile onto the current alpha
+    void registerAlphaOptionsCommand(); // brush_alpha_options (#76)
     std::string brushSettingsPath() const;
     BrushSettingsStore brushSettings_;
     std::string brushSettingsKey_; // the brush the live values belong to

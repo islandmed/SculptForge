@@ -282,6 +282,15 @@ const Generated kGenerated[] = {
 
 float BrushAlpha::sample(float u, float v) const {
     if (u < -1.0f || u > 1.0f || v < -1.0f || v > 1.0f) return 0.0f;
+    if (tiled()) { // each tile shows the whole alpha: its own -1..1 square
+        auto wrap = [](float t, int n) {
+            const float s = (t * 0.5f + 0.5f) * float(n);
+            const float f = std::min(s - std::floor(s), 1.0f);
+            return f * 2.0f - 1.0f;
+        };
+        u = wrap(u, tileX);
+        v = wrap(v, tileY);
+    }
     if (empty()) return brushFalloff(std::sqrt(u * u + v * v), 1.0f);
     // Bilinear lookup; pixel centres span the -1..1 square.
     const float px = std::clamp((u * 0.5f + 0.5f) * float(width) - 0.5f, 0.0f, float(width - 1));
@@ -297,7 +306,7 @@ float BrushAlpha::sample(float u, float v) const {
 
 float BrushAlpha::stamp(float u, float v, float focal) const {
     const float d = std::sqrt(u * u + v * v);
-    if (empty()) return d < 1.0f ? brushFalloff(d, 1.0f, focal) : 0.0f;
+    if (empty() && !tiled()) return d < 1.0f ? brushFalloff(d, 1.0f, focal) : 0.0f;
     const float a = sample(u, v);
     return a > 0.0f ? a * alphaFalloff(d, 1.0f, focal) : 0.0f;
 }

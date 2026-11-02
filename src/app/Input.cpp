@@ -155,20 +155,27 @@ void App::registerInputActions() {
         "and with Ctrl held too a drag zooms (#43). Off by default: in ZBrush, Space opens the Quick Menu (with this "
         "on, a right click still does). Typing a space in a text field is never taken.",
         [this] { uiPrefs_.spaceCamera = !uiPrefs_.spaceCamera; }, [this] { return uiPrefs_.spaceCamera; });
+    add("input.emulate_3_button", "Emulate 3 Button Mouse", nullptr, "Preferences > Input", "",
+        "Blender style: Alt+left-drag always turns the view (Shift pans, Ctrl zooms), as Blender's Emulate 3 Button "
+        "Mouse preference does, for pens and trackpads. Off (as Blender's default keymap, 5.1 and later): Alt+left-drag "
+        "on the model masks and Ctrl+Alt+left-drag unmasks; beside the model it still turns the view (#77).",
+        [this] { uiPrefs_.emulate3Button = !uiPrefs_.emulate3Button; }, [this] { return uiPrefs_.emulate3Button; });
     add("input.air_strokes", "Start strokes off the model", nullptr, "Preferences > Input", "",
         "A left-drag that starts on the background begins a brush stroke instead of turning the view; the brush "
         "touches the model once the cursor reaches it (#62). Ctrl (mask) and Shift (smooth) work the same way, and "
         "a Ctrl+click on the background still inverts the mask. The view still turns with a right-drag or a pen "
         "button set to Right click, pans with Alt+drag or a middle-drag, and moves with Space held if Hold Space is "
-        "on; with Blender or Maya keys, Alt+left-drag orbits. Shift+L turns it on and off.",
+        "on; with Maya keys, Alt+left-drag orbits, with Blender keys beside the model. Shift+L (View > Lock camera) "
+        "turns it on and off.",
         [this] { uiPrefs_.airStrokes = !uiPrefs_.airStrokes; }, [this] { return uiPrefs_.airStrokes; });
-    add("input.toggle_air_strokes", "Toggle strokes off the model", nullptr, "Preferences > Input", "Shift+L",
-        "Turn Preferences > Input > Start strokes off the model on or off: with it on, a left-drag on the background "
-        "sculpts once it reaches the model instead of turning the view (#62).",
+    add("input.toggle_air_strokes", "Lock camera", nullptr, "View", "Shift+L",
+        "Lock the camera for left-drags: a drag that starts on the background sculpts once it reaches the model "
+        "instead of turning the view (Preferences > Input > Start strokes off the model, #62). The status bar shows "
+        "CAMERA LOCKED while it is on. Right-drag or Alt+drag still move the view. Shift+L turns it on and off.",
         [this] {
             uiPrefs_.airStrokes = !uiPrefs_.airStrokes;
-            status_ = uiPrefs_.airStrokes ? "Strokes start off the model: right-drag or Alt+drag to move the view"
-                                          : "Strokes off the model: off (a drag on the background turns the view)";
+            status_ = uiPrefs_.airStrokes ? "Camera locked: drags start strokes; right-drag or Alt+drag to move the view"
+                                          : "Camera unlocked: a drag on the background turns the view";
         },
         [this] { return uiPrefs_.airStrokes; });
     add("input.surface_cursor", "Cursor follows surface", nullptr, "Preferences > Input", "",
@@ -345,10 +352,14 @@ void App::frameActiveSubtool() {
 
 SDL_Keymod App::blenderMods(SDL_Keymod keyboard) const {
     // What the sculpting code reads: Alt inverts, Ctrl masks, Shift smooths (the ZBrush meanings). Blender inverts
-    // with Ctrl and masks with the Mask brush; its Alt is the emulated middle button, so it means nothing here.
+    // with Ctrl and masks with the Mask brush, or (5.1+, #77) with Alt held: Alt+drag masks, Ctrl+Alt+drag unmasks.
+    // With Emulate 3 Button Mouse, Alt is the emulated middle button and means nothing here.
     SDL_Keymod out = keyboard & SDL_KMOD_SHIFT;
     const bool ctrl = (keyboard & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) != 0;
-    if (maskBrushActive()) {
+    if ((keyboard & SDL_KMOD_ALT) && !uiPrefs_.emulate3Button) {
+        out = SDL_KMOD_LCTRL; // the mask brush, as ZBrush's Ctrl (not with Shift: that would hide)
+        if (ctrl) out = SDL_Keymod(out | SDL_KMOD_LALT); // ... unmasking, as ZBrush's Ctrl+Alt
+    } else if (maskBrushActive()) {
         if (!(keyboard & SDL_KMOD_SHIFT)) out |= SDL_KMOD_LCTRL; // Shift still smooths the surface
         if (ctrl) out |= SDL_KMOD_LALT;                          // Ctrl unmasks
     } else if (ctrl) {
@@ -443,6 +454,11 @@ void App::drawInputSection() {
     if (ui::Checkbox("Hold Space and drag to move the camera##input.space_camera", &spaceCamera))
         uiPrefs_.spaceCamera = spaceCamera;
     ui::HelpAction(*this, "input.space_camera");
+    if (blenderStyle()) {
+        bool emulate = uiPrefs_.emulate3Button;
+        if (ui::Checkbox("Emulate 3 Button Mouse##input.emulate_3_button", &emulate)) uiPrefs_.emulate3Button = emulate;
+        ui::HelpAction(*this, "input.emulate_3_button");
+    }
     if (mayaStyle()) {
         int zoom = uiPrefs_.mayaZoomHorizontal ? 0 : 1;
         ImGui::TextDisabled("%s", tr("Zoom drag"));

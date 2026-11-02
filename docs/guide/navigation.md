@@ -32,9 +32,10 @@ camera.
 > the model follows the cursor. The right-shelf Move, Zoom and Rotate buttons work as in ZBrush.
 
 > **Blender:** with **Preferences > Input > Style** on **Blender**, middle-drag rotates, <kbd>Shift</kbd>+middle-drag
-> pans and <kbd>Ctrl</kbd>+middle-drag zooms. With a pen or a trackpad, <kbd>Alt</kbd>+left-drag does the same
-> (add <kbd>Shift</kbd> to pan, <kbd>Ctrl</kbd> to zoom), anywhere on the canvas, as Blender's Emulate 3 Button
-> Mouse. The numpad views, <kbd>Numpad .</kbd> and <kbd>Home</kbd> frame as in Blender. See
+> pans and <kbd>Ctrl</kbd>+middle-drag zooms. With a pen or a trackpad, <kbd>Alt</kbd>+left-drag beside the model
+> does the same (add <kbd>Shift</kbd> to pan, anywhere; <kbd>Ctrl</kbd> to zoom); on the model it masks, as in
+> Blender 5.1 and later. Turn on **Preferences > Input > Emulate 3 Button Mouse** to make <kbd>Alt</kbd>+left-drag
+> turn the view everywhere, as that Blender preference does. The numpad views, <kbd>Numpad .</kbd> and <kbd>Home</kbd> frame as in Blender. See
 > [Blender keys](shortcuts.md#blender-keys).
 
 ## Mouse and pen
@@ -52,7 +53,7 @@ camera.
 | Turn in 15 degree steps | <kbd>Numpad 4</kbd> / <kbd>Numpad 6</kbd> (around), <kbd>Numpad 8</kbd> / <kbd>Numpad 2</kbd> (over); <kbd>Numpad 9</kbd>: the other side |
 | Frame the active Part | <kbd>Numpad .</kbd> |
 | Frame one Part | <kbd>Shift</kbd>+<kbd>Alt</kbd>+click it, or triple-click another Part (it becomes the active Part) |
-| Sculpt from the background | Turn on **Preferences > Input > Start strokes off the model**, or press <kbd>Shift</kbd>+<kbd>L</kbd> (**Toggle strokes off the model**): a left-drag that starts beside the model sculpts once it reaches the surface |
+| Sculpt from the background | Turn on **Preferences > Input > Start strokes off the model**, **View > Lock camera**, or press <kbd>Shift</kbd>+<kbd>L</kbd>: a left-drag that starts beside the model sculpts once it reaches the surface |
 | Move the camera with Space held | Turn on **Preferences > Input > Hold Space and drag to move the camera**, then hold <kbd>Space</kbd>: left-drag rotates, right- or middle-drag pans, <kbd>Ctrl</kbd>+drag zooms, anywhere on the canvas (on the model too) |
 
 Zoom drags: drag up to come closer, down to back away. With the ZBrush-style keys (**Preferences > Input**)
@@ -62,7 +63,8 @@ they go the ZBrush way: drag up to zoom out, down to zoom in.
 Quick Menu. With it on, <kbd>Space</kbd> no longer opens the Quick Menu (a right click still does), and a space typed in
 a text field is never taken.
 
-**Start strokes off the model** is off by default. With it on (a label at the top of the canvas says so), a
+**Start strokes off the model** (also **View > Lock camera**) is off by default. With it on (a label at the top of
+the canvas says so, and in the SculptForge layout the status bar shows **CAMERA LOCKED**), a
 left-drag on the background no longer rotates: it waits, and the brush starts where the cursor first reaches the
 model, so strokes that begin at the silhouette never turn the view by accident. <kbd>Ctrl</kbd> (mask) and
 <kbd>Shift</kbd> (smooth) strokes start the same way, and a <kbd>Ctrl</kbd>+click on the background still inverts

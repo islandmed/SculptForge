@@ -61,9 +61,19 @@ expect_text Draw Size
 key escape
 key shift+f
 expect_text Intensity
-key escape
+expect_no_text Smooth Intensity               # Blender's Shift+F is the brush's Strength, not Smooth's (#77)
+key 3
+key 0
+key enter
+expect_value z_intensity == 30
+key u
+key 5
+key 0
+key enter
+expect_value z_intensity == 50
 
-# --- Sculpting: a plain drag adds, Ctrl+drag subtracts, Alt+drag navigates instead of sculpting ---
+# --- Sculpting: a plain drag adds, Ctrl+drag subtracts; Alt+drag on the model masks and Ctrl+Alt+drag unmasks
+# (Blender 5.1+, #77); Alt+drag beside the model and Alt+Shift+drag navigate ---
 snapshot
 stroke 0.3 0.5 0.7 0.5
 expect_value moved_out > 0
@@ -80,7 +90,38 @@ hold alt
 stroke 0.3 0.5 0.7 0.5
 hold none
 expect_value moved == 0
+expect_value camera_yaw == $y0
+expect_value masked > 100
+remember masked am
+hold ctrl+alt
+stroke 0.3 0.5 0.7 0.5
+hold none
+expect_value masked < $am
+expect_value camera_yaw == $y0
+key alt+m
+expect_value masked == 0
+hold alt
+drag_path -0.3 0.5 -0.1 0.2
+hold none
 expect_value camera_yaw != $y0
+expect_value masked == 0
+key home
+# Preferences > Input > Emulate 3 Button Mouse: Alt+left-drag turns the view on the model too.
+click "Preferences##palette.preferences"      # (Input is still open from the top of the script)
+click "Emulate 3 Button Mouse##input.emulate_3_button"
+expect_value emulate_3_button == 1
+key escape
+remember camera_yaw y0
+hold alt
+stroke 0.3 0.5 0.7 0.5
+hold none
+expect_value moved == 0
+expect_value masked == 0
+expect_value camera_yaw != $y0
+click "Preferences##palette.preferences"      # (Input is still open from the top of the script)
+click "Emulate 3 Button Mouse##input.emulate_3_button"
+expect_value emulate_3_button == 0
+key escape
 remember camera_pan p0
 hold alt+shift
 stroke 0.3 0.5 0.7 0.5

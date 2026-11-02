@@ -111,7 +111,6 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Save UI... | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> | Save the layout, shortcuts and interface preferences to a file you can share. |
 | Shelves | <kbd>Tab</kbd> | Hide or show the shelves and trays around the canvas. |
 | Store Config | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> | Keep the current layout, shortcuts and interface preferences for future sessions. Like ZBrush, SculptForge never saves them on its own. |
-| Toggle strokes off the model | <kbd>Shift</kbd>+<kbd>L</kbd> | Turn Preferences > Input > Start strokes off the model on or off: with it on, a left-drag on the background sculpts once it reaches the model instead of turning the view (#62). |
 
 ### Render
 
@@ -177,6 +176,12 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Action | Keys | What it does |
 |---|---|---|
 | UV Editor | <kbd>Alt</kbd>+<kbd>U</kbd> | Open the UV Editor: the Part's UV layout in 2D over the UDIM tiles. Select vertices, edges, faces or islands (here or on the model), move, rotate and scale them, mark seams, unwrap, pack, set texel density and lay islands into trim sheet strips. Stretch and texel density show live on the model while you edit. |
+
+### View
+
+| Action | Keys | What it does |
+|---|---|---|
+| Lock camera | <kbd>Shift</kbd>+<kbd>L</kbd> | Lock the camera for left-drags: a drag that starts on the background sculpts once it reaches the model instead of turning the view (Preferences > Input > Start strokes off the model, #62). The status bar shows CAMERA LOCKED while it is on. Right-drag or Alt+drag still move the view. Shift+L turns it on and off. |
 
 <!-- END GENERATED: shortcuts -->
 
@@ -301,15 +306,16 @@ style, turns zoom drags around (the mouse wheel stays as it is).
 ## Blender keys
 
 With **Preferences > Input > Style** on **Blender** (also at the top of the Controls window, <kbd>F1</kbd>), the
-view and the sculpt keys work as in Blender 4.2 and later, Sculpt Mode. Compared with the table above, these
+view and the sculpt keys work as in Blender 4.2 and later, Sculpt Mode (with 5.1's Alt mask). Compared with the table above, these
 change in the Blender style:
 
 | To | Blender style |
 |---|---|
-| Rotate | Middle-drag, or <kbd>Alt</kbd>+left-drag (pens, trackpads: Blender's Emulate 3 Button Mouse), or left-drag beside the model |
+| Rotate | Middle-drag, or <kbd>Alt</kbd>+left-drag beside the model (everywhere with **Preferences > Input > Emulate 3 Button Mouse**, for pens and trackpads), or left-drag beside the model |
 | Pan | <kbd>Shift</kbd>+middle-drag, or <kbd>Alt</kbd>+<kbd>Shift</kbd>+left-drag |
 | Zoom | Mouse wheel, <kbd>Ctrl</kbd>+middle-drag (up: closer), <kbd>Alt</kbd>+<kbd>Ctrl</kbd>+left-drag, <kbd>Numpad Plus</kbd> / <kbd>Numpad Minus</kbd> |
 | Invert the brush (subtract) | Hold <kbd>Ctrl</kbd> while sculpting |
+| Mask / unmask | <kbd>Alt</kbd>+drag / <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+drag on the model (Blender 5.1 and later), or the Mask brush (<kbd>M</kbd>) |
 | Smooth | Hold <kbd>Shift</kbd> while sculpting |
 | Front, right, top view | <kbd>Numpad 1</kbd>, <kbd>Numpad 3</kbd>, <kbd>Numpad 7</kbd>; with <kbd>Ctrl</kbd>: back, left, bottom |
 | Orthographic on or off | <kbd>Numpad 5</kbd> (the axis views turn it on until you rotate again) |

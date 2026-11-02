@@ -26,6 +26,9 @@ struct BrushAlpha {
     // bring it back (core/BrushSettings.h). Empty for the built-ins.
     std::string path;
     bool inverted = false;
+    // Tile (#76, core/AlphaOptions.h): the alpha repeated tileX x tileY times inside the stamp (1 x 1: once).
+    int tileX = 1, tileY = 1;
+    bool tiled() const { return tileX > 1 || tileY > 1; }
 
     bool empty() const { return values.empty(); }
     // u, v in brush-local -1..1 (v points up); 0 outside the stamp.

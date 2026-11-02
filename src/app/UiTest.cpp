@@ -461,12 +461,21 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "draw_size") return std::round(app_.radiusPx_);
     if (name == "brush_settings_saved") return double(app_.brushSettingsStore().savedCount()); // (#78)
     if (name == "share_brush_size") return app_.brushSettingsStore().shareSizeIntensity ? 1.0 : 0.0;
+    if (name == "alpha_follow") return app_.alphaOptions_.followStroke ? 1.0 : 0.0; // alpha options (#76)
+    if (name == "alpha_angle") return std::round(app_.alphaOptions_.angle);
+    if (name == "alpha_tile_x") return double(app_.doc_.brushAlpha.tileX);
+    if (name == "alpha_tile_y") return double(app_.doc_.brushAlpha.tileY);
+    if (name == "last_dab_angle") { // degrees, -180..180: the alpha's turn on the last dab
+        const float d = std::remainder(glm::degrees(app_.lastDabAngle_), 360.0f);
+        return std::round(d);
+    }
     if (name == "quickmenu_open") return app_.quickMenu_.open ? 1.0 : 0.0;
     if (name == "right_click_menu") return app_.uiPrefs_.rightClickQuickMenu ? 1.0 : 0.0;
     if (name == "space_camera") return app_.uiPrefs_.spaceCamera ? 1.0 : 0.0;
     if (name == "look") return double(app_.uiPrefs_.look.look); // 0 Classic, 1 Forge Terminal, 2 Phosphor, 3 Blueprint
     if (name == "shell_layout") return double(app_.uiPrefs_.shellLayout); // 0 ZBrush-style, 1 SculptForge
     if (name == "air_strokes") return app_.uiPrefs_.airStrokes ? 1.0 : 0.0;
+    if (name == "emulate_3_button") return app_.uiPrefs_.emulate3Button ? 1.0 : 0.0; // Blender style (#77)
     if (name == "space_held") return app_.spaceHeld_ ? 1.0 : 0.0;
     if (name == "radial_open") return app_.radial_.menu >= 0 ? 1.0 : 0.0;
     if (name == "radial_menu") return double(app_.radial_.menu); // -1: none open

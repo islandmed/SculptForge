@@ -615,6 +615,9 @@ void App::drawPalette_Render() {
     ImGui::Checkbox(tr("Show Splats"), &renderSettings_.showSplats);
     ImGui::EndDisabled();
     ui::HelpAction(*this, "view.splats");
+    bool lockCamera = uiPrefs_.airStrokes; // #62: drags on the background start strokes (Shift+L)
+    if (ui::Checkbox("Lock camera##view.lock_camera", &lockCamera)) uiPrefs_.airStrokes = lockCamera;
+    ui::HelpAction(*this, "input.toggle_air_strokes");
     drawBackgroundControls("render");
     actionRow(*this, {"view.frame", "view.fullscreen"});
     actionRow(*this, {"ui.lightbox", "ui.console"}); // (the SculptForge layout's View menu: they left the shelf)

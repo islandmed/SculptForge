@@ -31,6 +31,7 @@ void BrushToolSettings::clamp() {
     sprayScatter = std::clamp(sprayScatter, 0.0f, 4.0f);
     lazyRadius = std::clamp(lazyRadius, 0.0f, 400.0f);
     if (int(stroke) < 0 || stroke >= StrokeType::Count) stroke = StrokeType::Dots;
+    alphaOptions.clamp();
 }
 
 Json BrushToolSettings::toJson() const {
@@ -45,6 +46,14 @@ Json BrushToolSettings::toJson() const {
     j.set("alpha", alphaName);
     if (!alphaPath.empty()) j.set("alpha_path", alphaPath);
     if (alphaInvert) j.set("alpha_invert", true);
+    const AlphaOptions& a = alphaOptions;
+    if (a.followStroke) j.set("alpha_follow_stroke", true);
+    if (a.angle != 0.0f) j.set("alpha_angle", double(a.angle));
+    if (a.jitter != 0.0f) j.set("alpha_angle_jitter", double(a.jitter));
+    if (a.tileX != 1 || a.tileY != 1) {
+        j.set("alpha_tile_x", a.tileX);
+        j.set("alpha_tile_y", a.tileY);
+    }
     return j;
 }
 
@@ -63,6 +72,12 @@ void BrushToolSettings::applyJson(const Json& j) {
         alphaPath = j["alpha_path"].isString() ? j["alpha_path"].asString() : std::string();
         alphaInvert = j["alpha_invert"].asBool(false);
     }
+    AlphaOptions& a = alphaOptions;
+    a.followStroke = j["alpha_follow_stroke"].asBool(a.followStroke);
+    readFloat(j, "alpha_angle", a.angle);
+    readFloat(j, "alpha_angle_jitter", a.jitter);
+    a.tileX = int(j["alpha_tile_x"].asNumber(a.tileX));
+    a.tileY = int(j["alpha_tile_y"].asNumber(a.tileY));
     clamp();
 }
 

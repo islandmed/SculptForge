@@ -1416,8 +1416,9 @@ void App::onMouseDown(float x, float y, Uint8 button) {
     }
 }
 
-// Blender: middle-drag orbits, Shift+middle pans, Ctrl+middle zooms; Alt+left-drag is the emulated middle button
-// (pens, trackpads); the right button drags the same way. True when the press started navigating.
+// Blender: middle-drag orbits, Shift+middle pans, Ctrl+middle zooms; Alt+left-drag beside the model (anywhere with
+// Emulate 3 Button Mouse) is the emulated middle button (pens, trackpads); the right button drags the same way. True
+// when the press started navigating.
 bool App::mayaNavigationDown(Uint8 button) {
     const SDL_Keymod keys = SDL_GetModState(); // the keyboard itself, before inputMods' Maya mapping
     if (!(keys & SDL_KMOD_ALT) || ctrlDown(keys) || (keys & SDL_KMOD_SHIFT)) return false; // Alt alone navigates
@@ -1431,7 +1432,12 @@ bool App::mayaNavigationDown(Uint8 button) {
 
 bool App::blenderNavigationDown(Uint8 button) {
     const SDL_Keymod keys = SDL_GetModState(); // the keyboard itself: blenderMods turns Ctrl into the invert
-    const bool emulated = button == SDL_BUTTON_LEFT && (keys & SDL_KMOD_ALT);
+    // Alt+left: Blender 5.1+ masks with it on the model (blenderMods, #77); beside the model, or always with
+    // Preferences > Input > Emulate 3 Button Mouse, it is the emulated middle button.
+    RayHit hit;
+    const bool emulated = button == SDL_BUTTON_LEFT && (keys & SDL_KMOD_ALT) &&
+                          (uiPrefs_.emulate3Button || (keys & SDL_KMOD_SHIFT) || previewLod_ >= 0 ||
+                           !pick(mouseX_, mouseY_, hit)); // (Alt+Shift: unbound in Blender, pans here anywhere)
     if (button != SDL_BUTTON_MIDDLE && button != SDL_BUTTON_RIGHT && !emulated) return false;
     drag_ = (keys & SDL_KMOD_SHIFT) ? Drag::Pan : ctrlDown(keys) ? Drag::Zoom : Drag::Orbit;
     return true;
@@ -1888,6 +1894,7 @@ void App::dabAt(float x, float y, float pressure) {
         if (strokeRadiusProbe_) strokeRadiusProbe_->push_back(st.radiusPx);
     }
     const Camera& cam = dabView_ ? dabView_->camera : camera_;
+    const glm::vec2 pathPoint(x, y); // (before any scatter: the rake follows the stroke itself)
     const BrushRecipe* recipe = st.recipe;
     if (recipe && recipe->jitter > 0.0f) {
         // Deterministic per-stroke scatter (xorshift).
@@ -1935,6 +1942,15 @@ void App::dabAt(float x, float y, float pressure) {
         return;
     }
     p.alpha = st.alpha;
+    // Alpha options (#76): the fixed angle, the jitter and (Follow stroke direction) Blender's Rake, on top of
+    // Spray's own turn. Custom and Community brushes get them too: dabRecipe turns their alpha by alphaUp.
+    if (!haveLastDab_) {
+        alphaRake_.reset(pathPoint);
+        alphaSeed_ = 0x9e3779b9u;
+    }
+    alphaRake_.update(pathPoint);
+    dabAngle_ += alphaDabAngle(st.alphaOptions, alphaRake_, alphaSeed_);
+    lastDabAngle_ = dabAngle_;
     p.alphaUp = cam.orientation() * glm::vec3(-std::sin(dabAngle_), std::cos(dabAngle_), 0.0f); // screenUpVector
     p.vdm = st.vdm;
     p.strokeDelta = haveLastDab_ ? hit.position - lastDabHit_ : glm::vec3(0.0f);

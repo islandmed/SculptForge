@@ -7,6 +7,7 @@
 // so nothing jumps the first time. Reset Brush to Default puts back the shipped values.
 #pragma once
 
+#include "core/AlphaOptions.h"
 #include "core/Json.h"
 #include "core/Stroke.h"
 
@@ -27,6 +28,7 @@ struct BrushToolSettings {
     std::string alphaName = "Round";
     std::string alphaPath;
     bool alphaInvert = false;
+    AlphaOptions alphaOptions; // Follow stroke direction, Angle, Angle jitter, Tile (#76)
 
     bool operator==(const BrushToolSettings&) const = default;
     void clamp();

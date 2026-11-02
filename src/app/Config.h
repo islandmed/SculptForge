@@ -40,6 +40,9 @@ struct UiPrefs {
     bool emulateNumpad = false; // Blender style: the 1-9 and 0 keys above the letters act as the numpad (laptops)
     bool rightClickQuickMenu = true; // a right click on the canvas (no drag) opens the QuickMenu, as in ZBrush (#22)
     bool spaceCamera = false; // hold Space and drag to move the camera (#43; off: Space opens the QuickMenu)
+    // Blender style (#77): off, as Blender 5.1+'s default keymap, Alt+left-drag on the model masks (Ctrl+Alt unmasks)
+    // and turns the view only beside the model; on (Blender's Emulate 3 Button Mouse) it always turns the view.
+    bool emulate3Button = false;
     // Zoom drags (#32): the Maya style zooms with a sideways drag (right = in), as Maya's own dolly; false makes it
     // vertical as the other styles. invertZoom turns every zoom drag around.
     bool mayaZoomHorizontal = true;

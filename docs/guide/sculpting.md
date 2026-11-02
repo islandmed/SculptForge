@@ -381,9 +381,24 @@ points up the screen; with **Drag Stamp** it follows the drag direction instead.
 
 From a script: `brush_set_alpha name=square`, or `brush_set_alpha path=bark.png invert=true`.
 
+### Alpha options
+
+Under the preview in the **Alpha** palette:
+
+| Option | What it does |
+|---|---|
+| **Follow stroke direction** | The alpha turns with the stroke, its top pointing the way you draw: scales, stitches and hair line up along the stroke. Small wobbles are smoothed out, as with Blender's Rake: the direction is taken again each time the cursor has gone 20 pixels. |
+| **Angle** | Turns the alpha by a fixed angle (-180 to 180 degrees, counter-clockwise), on its own or on top of the stroke's direction. |
+| **Angle jitter** | Turns each dab by a random angle, up to this many degrees either way, to break up repeats. |
+| **Tile across** / **Tile down** | Repeats the alpha 1 to 8 times across and down inside the brush; the preview shows the result. |
+
+They work with every brush, custom and Community brushes included, and each brush keeps its own (see
+[Each brush keeps its own settings](#each-brush-keeps-its-own-settings)). From a script:
+`brush_alpha_options follow_stroke=true angle=30 angle_jitter=10 tile_x=2 tile_y=2`.
+
 > **ZBrush:** there is no alpha library browser with hundreds of alphas yet, and alpha options such as
-> MidValue, Rf (radial fade) or tiling are not available. Any grayscale image works, including alphas you
-> already have as PNG.
+> MidValue or Rf (radial fade) are not available. Any grayscale image works, including alphas you already have as
+> PNG.
 
 ## Vector displacement brushes
 
