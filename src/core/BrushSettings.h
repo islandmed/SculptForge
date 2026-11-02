@@ -42,7 +42,7 @@ std::string brushSettingsKey(const std::string& builtinName, const std::string& 
 class BrushSettingsStore {
 public:
     // Preferences > Brushes > Share size and intensity across brushes: Draw Size and Z Intensity stay as they are
-    // when switching (the behaviour before 0.10.7); the rest still follows the brush.
+    // when switching (the behaviour before 0.10.8); the rest still follows the brush.
     bool shareSizeIntensity = false;
 
     // A switch from `from` (whose live values are `current`) to `to`: what `to` uses now.

@@ -499,7 +499,7 @@ void App::initActions() {
     add("brush.share_size", "Share size and intensity across brushes", "Preferences > Input", nullptr,
         [this] { setShareBrushSize(!brushSettings_.shareSizeIntensity); }, nullptr, nullptr,
         [this] { return brushSettings_.shareSizeIntensity; }, nullptr,
-        "On: Draw Size and Z Intensity stay as they are when you pick another brush (as before 0.10.7); Falloff, "
+        "On: Draw Size and Z Intensity stay as they are when you pick another brush (as before 0.10.8); Falloff, "
         "RGB Intensity, the stroke and the alpha still follow each brush. Off (the default): every brush keeps its own.");
     add("brush.size_down", "Smaller brush", "Draw", "[", [this] { radiusPx_ = std::max(2.0f, radiusPx_ / 1.1f); }, nullptr,
         nullptr, nullptr, nullptr, "Make the brush 10% smaller (hold to repeat).");

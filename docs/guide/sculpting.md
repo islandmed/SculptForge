@@ -169,7 +169,7 @@ yet in the session starts from the values you have now, so nothing jumps.
 - **Brush > Reset Brush to Default** puts the current brush back to the values SculptForge ships with and
   forgets what you saved for it.
 - **Preferences > Input > Share size and intensity across brushes** (off by default) keeps Draw Size and
-  Intensity the same for every brush, as before 0.10.7. Falloff, RGB Intensity, the stroke and the alpha still
+  Intensity the same for every brush, as before 0.10.8. Falloff, RGB Intensity, the stroke and the alpha still
   follow each brush.
 
 ### Smooth's own Intensity

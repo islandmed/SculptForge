@@ -7,6 +7,10 @@ chapter opens by itself the first time you start a new version; you can always f
 
 ## Version 0.10.8
 
+- **Each brush keeps its own settings**: Draw Size, Intensity, Falloff, RGB Intensity, stroke and alpha follow
+  the brush, custom and Community brushes included. **Brush > Save Brush Settings** keeps them for the next start,
+  **Reset Brush to Default** puts back the shipped values, and **Preferences > Input > Share size and intensity
+  across brushes** keeps the old way (#78). See [Sculpting](sculpting.md#each-brush-keeps-its-own-settings).
 - **Alpha options** (**Alpha** palette): **Follow stroke direction** turns the alpha along the stroke, smoothed as
   Blender's Rake does; **Angle** and **Angle jitter** turn it by a fixed or a random amount; **Tile** repeats it
   inside the brush. They work with custom and Community brushes too, and each brush keeps its own (#76). See
@@ -33,10 +37,6 @@ chapter opens by itself the first time you start a new version; you can always f
   **Keep my layout**. Coming from ZBrush? **Preferences > Interface > Look > ZBrush-style layout** (or the button in
   the welcome) brings back the palette bar and the two-row shelf. Six more colour schemes, Match my desktop theme,
   Phosphor, Blueprint and the Classic look are there too. See [The interface](interface.md#looks-and-layouts).
-- **Each brush keeps its own settings**: Draw Size, Intensity, Falloff, RGB Intensity, stroke and alpha follow
-  the brush, custom and Community brushes included. **Brush > Save Brush Settings** keeps them for the next start,
-  **Reset Brush to Default** puts back the shipped values, and **Preferences > Input > Share size and intensity
-  across brushes** keeps the old way (#78). See [Sculpting](sculpting.md#each-brush-keeps-its-own-settings).
 
 ## Version 0.10.6
 

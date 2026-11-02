@@ -6,6 +6,29 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Alpha options in the Alpha palette (#76, requested by rodrigomoretto): **Follow stroke direction** turns the alpha
+  along the stroke with Blender's Rake smoothing (the direction is taken again every 20 pixels), **Angle** and **Angle
+  jitter** turn it by a fixed or a random amount per dab, and **Tile across / down** repeat it 1 to 8 times inside
+  the brush. They work with custom and Community brushes, are kept per brush, and the preview shows the tiling.
+  Scripts: `brush_alpha_options`.
+- **View > Lock camera** (Shift+L, the same switch as Preferences > Input > Start strokes off the model) and a
+  **CAMERA LOCKED** chip in the status bar while it is on (#62 follow-up).
+- Blender style: **Preferences > Input > Emulate 3 Button Mouse** (off by default): Alt+left-drag turns the view
+  everywhere, as before.
+- Each brush keeps its own settings (#78, requested by dCo3lh0 and on Discord): Draw Size, Z Intensity, Falloff, RGB
+  Intensity, the stroke (with Spray's scatter and Lazy Stroke's radius) and the alpha follow the brush, custom and
+  Community brushes included. Switching back brings back the values that brush had this session; a brush not used yet
+  starts from the current values. **Brush > Save Brush Settings** keeps them for every start (`brush-settings.json`
+  in the user data folder), **Brush > Reset Brush to Default** restores the shipped values, and **Preferences >
+  Input > Share size and intensity across brushes** (off by default) keeps Draw Size and Z Intensity shared as before.
+
+### Fixed
+- Blender style: Alt+left-drag on the model masks and Ctrl+Alt+left-drag unmasks, as Blender 5.1+'s default
+  sculpt keymap does, instead of turning the view (#77, reported by TheRedWaxPolice). Beside the model Alt+drag still
+  turns the view, and Alt+Shift+drag pans anywhere. Shift+F (Strength) sets the brush's Intensity instead of Smooth's.
+- UI test runs remove their temporary settings folder when they pass (thousands of runs had filled `/tmp`).
+
 ## [0.10.7] - 2026-11-01
 
 ### Changed
@@ -27,29 +50,10 @@ All notable changes to SculptForge are listed here. The format follows
   Insiders repository and posts to #insiders (`.github/workflows/insider-preview.yml`).
 
 ### Fixed
-- Blender style: Alt+left-drag on the model masks and Ctrl+Alt+left-drag unmasks, as Blender 5.1+'s default
-  sculpt keymap does, instead of turning the view (#77, reported by TheRedWaxPolice). Beside the model Alt+drag still
-  turns the view, and Alt+Shift+drag pans anywhere. Shift+F (Strength) sets the brush's Intensity instead of Smooth's.
-- UI test runs remove their temporary settings folder when they pass (thousands of runs had filled `/tmp`).
 - Custom and Community brushes (Clay Slab and other presets) show the whole alpha at Focal Shift -100, as the
   built-in brushes do since #60: the stamp reaches its square's corners instead of being cut by the preset's round
   tip (#75, reported by rodrigomoretto). At the default Focal Shift presets look as before; saved presets are unchanged.
 ### Added
-- Alpha options in the Alpha palette (#76, requested by rodrigomoretto): **Follow stroke direction** turns the alpha
-  along the stroke with Blender's Rake smoothing (the direction is taken again every 20 pixels), **Angle** and **Angle
-  jitter** turn it by a fixed or a random amount per dab, and **Tile across / down** repeat it 1 to 8 times inside
-  the brush. They work with custom and Community brushes, are kept per brush, and the preview shows the tiling.
-  Scripts: `brush_alpha_options`.
-- **View > Lock camera** (Shift+L, the same switch as Preferences > Input > Start strokes off the model) and a
-  **CAMERA LOCKED** chip in the status bar while it is on (#62 follow-up).
-- Blender style: **Preferences > Input > Emulate 3 Button Mouse** (off by default): Alt+left-drag turns the view
-  everywhere, as before.
-- Each brush keeps its own settings (#78, requested by dCo3lh0 and on Discord): Draw Size, Z Intensity, Falloff, RGB
-  Intensity, the stroke (with Spray's scatter and Lazy Stroke's radius) and the alpha follow the brush, custom and
-  Community brushes included. Switching back brings back the values that brush had this session; a brush not used yet
-  starts from the current values. **Brush > Save Brush Settings** keeps them for every start (`brush-settings.json`
-  in the user data folder), **Brush > Reset Brush to Default** restores the shipped values, and **Preferences >
-  Input > Share size and intensity across brushes** (off by default) keeps Draw Size and Z Intensity shared as before.
 - A new default look: new installs start in **Forge Terminal** with the **Tokyo Night** colours and the
   **SculptForge layout** (menus by task: File, Edit, Sculpt, Paint, Mesh, View, Render, Help, whose sections are the
   palettes; a status bar; a one-row tool shelf). Existing installs keep their look and layout, and see a one-time card,
