@@ -20,6 +20,7 @@ gate still runs every check that needs no render.
 """
 
 import argparse
+import atexit
 import calendar
 import datetime
 import json
@@ -73,8 +74,27 @@ def quote(text):
     return '"' + str(text).replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
+_SANDBOX = None
+
+
+def sandbox():
+    """A throwaway home for the app's settings, data and log, so renders never touch the user's own (their
+    sculptforge.log rotates on every start: crash evidence would be lost). Returns (env, log dir)."""
+    global _SANDBOX
+    if _SANDBOX is None:
+        root = Path(tempfile.mkdtemp(prefix="sf-drops-"))
+        atexit.register(shutil.rmtree, root, True)
+        env = dict(os.environ, XDG_DATA_HOME=str(root / "data"), XDG_CONFIG_HOME=str(root / "config"),
+                   XDG_CACHE_HOME=str(root / "cache"), APPDATA=str(root / "data"), LOCALAPPDATA=str(root / "data"),
+                   SDL_APP_ID=os.environ.get("SDL_APP_ID", "sculptforge-agent"))
+        for d in ("data", "config", "cache", "log"):
+            (root / d).mkdir()
+        _SANDBOX = (env, str(root / "log"))
+    return _SANDBOX
+
+
 def run_cli(cli, command):
-    r = subprocess.run([cli, "-c", command], capture_output=True, text=True, timeout=300)
+    r = subprocess.run([cli, "-c", command], capture_output=True, text=True, timeout=300, env=sandbox()[0])
     return r.returncode == 0, (r.stdout + r.stderr).strip()
 
 
@@ -188,8 +208,9 @@ def render(app, c, item, out, size="512x384"):
     script, view, zoom = render_setup(c, item)
     out = Path(out)
     out.unlink(missing_ok=True)
-    env = dict(os.environ, SDL_APP_ID=os.environ.get("SDL_APP_ID", "sculptforge-agent"))
-    cmd = [app, "--render", str(out), "--size", size, "--view", view, "--zoom", zoom, "--run", script]
+    env, log_dir = sandbox()
+    cmd = [app, "--render", str(out), "--size", size, "--view", view, "--zoom", zoom, "--log-dir", log_dir,
+           "--run", script]
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=300, env=env)
     if r.returncode != 0 or not out.is_file():
         return (r.stdout + r.stderr).strip()[-400:] or f"exit code {r.returncode}"
@@ -274,6 +295,8 @@ def gate(c, history, app=None, work=None, baselines=None, cli=None):
                  min(m.get("render_change", 0.02), 0.05) / 0.05)
         recent = [d.get("kind") for d in history[-7:]]  # variety: a kind not seen this week wins over a nicer repeat
         score += 2.0 if c["kind"] not in recent else -1.5 * recent.count(c["kind"])
+        if recent and recent[-1] == c["kind"]:  # never the same kind two days running while another one passes
+            score -= 10.0
     c["gate"] = {"ok": not reasons, "reasons": reasons, "score": round(score, 3), "metrics": m}
     return c["gate"]
 
