@@ -29,6 +29,7 @@ struct RenderSettings {
     bool showPolypaint = true;   // vertex colours replace baseColor when the mesh has them
     bool showTexture = true;     // with showPolypaint: a SubTool's painted texture (core/Texture.h) multiplies in
     bool showMask = true;        // masked areas render darker (ZBrush style)
+    float maskDarkness = 0.7f;   // how dark: 0 = no tint .. 1 = ZBrush-dark (Preferences > Interface > Mask darkness)
     bool showPolygroups = false; // colour each polygroup (see polygroupColor)
     int matcap = defaultMatcap(); // built-in MatCap material (core/Matcap.h), Soft Clay; -1 = studio clay lighting
     bool showMesh = true;
@@ -229,7 +230,7 @@ public:
 private:
     void drawSplats(const glm::mat4& view, const glm::mat4& proj, int fbWidth, int fbHeight, float opacity);
 
-    GLuint wireProgram_ = 0, bgProgram_ = 0, splatProgram_ = 0;
+    GLuint wireProgram_ = 0, wireLineProgram_ = 0, bgProgram_ = 0, splatProgram_ = 0;
     // Splats: per-splat data in a texture buffer, drawn as instanced quads in back-to-front order.
     GLuint splatVao_ = 0, splatData_ = 0, splatTexture_ = 0, splatOrder_ = 0;
     GLsizei splatCount_ = 0;
@@ -412,7 +413,7 @@ private:
     struct MeshProgram {
         GLuint id = 0;
         GLint view = -1, proj = -1, gridOrigin = -1, gridStep = -1, viewport = -1, projScale = -1, baseColor = -1, paint = -1,
-              showMask = -1, groups = -1, matcap = -1, matcapCavity = -1, dim = -1, primBase = -1, hasPaint = -1,
+              showMask = -1, maskDarkness = -1, groups = -1, matcap = -1, matcapCavity = -1, dim = -1, primBase = -1, hasPaint = -1,
               normalFlipY = -1, twoSided = -1, checker = -1, checkerScale = -1;
         GLint hasOrm = -1, hasEmissive = -1, hasMatNormal = -1, envLevels = -1, exposure = -1, toneMap = -1, material = -1,
               pbrCavity = -1, viewToEnv = -1, sh = -1;

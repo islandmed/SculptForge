@@ -405,9 +405,11 @@ void App::drawPalette_Draw() {
             }
         }
     }
-    if (doc_.sculptor.dyntopo.enabled && !dyntopoBlocker(doc_.mesh).empty())
-        hint(*this, "This Part has subdivision levels, so strokes don't remesh it: delete the lower (or higher) levels "
-             "first.");
+    if (doc_.sculptor.dyntopo.enabled && !dyntopoBlocker(doc_.mesh).empty() && doc_.mesh.multires) {
+        hint(*this, "This Part has subdivision levels, so strokes don't remesh it. Freeze Levels keeps the level shown "
+             "as one plain mesh (Ctrl+Z brings the levels back).");
+        actionRow(*this, {"draw.dynamic_freeze"});
+    }
     // Focal length (#26): the perspective view's lens in mm on a 36 x 24 mm frame (vertical field of view);
     // saved with the project as the camera's fov_y.
     tray::GroupLabel(*this, "Camera");

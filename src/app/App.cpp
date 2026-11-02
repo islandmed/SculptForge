@@ -1702,7 +1702,8 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     if (!lods_.empty() || previewLod_ >= 0) clearLods();
     beginPaintStroke();
     if (doc_.sculptor.dyntopo.enabled && strokeSculpt_ && !dyntopoBlocker(doc_.mesh).empty())
-        status_ = "Dynamic is on, but this Part has subdivision levels: sculpting without remeshing";
+        status_ = "Dynamic is on, but this Part has subdivision levels: sculpting without remeshing (Draw > Freeze "
+                  "Levels + Dynamic)";
     lastX_ = x;
     lastY_ = y;
     strokePath_.reset(x, y);
@@ -2300,6 +2301,7 @@ void App::drawUi() {
     // An Extract preview goes once its source changes or another SubTool is picked (strokes aren't commands).
     if (doc_.extractPreview.id && !doc_.sculptor.strokeActive()) doc_.dropExtractPreview(true);
     drawProjectPopups();
+    drawDynamicOffer();
     if (hideUi_) return; // demos: clean beauty shots
     // Draw order (ui-spec §12): shells, LightBox, floating windows, then pop-ups and help.
     drawShell();

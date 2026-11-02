@@ -41,6 +41,7 @@
 //   button_drag middle|right X0 Y0 X1 Y1 [S]  drag with that button in window fractions (with the held modifiers)
 //   expect_shortcut ACTION KEYS  the action's effective keys, e.g. expect_shortcut view.front Numpad 1
 //   camera YAW PITCH         set the view's angles in degrees (0 0 = the front view), e.g. for guide screenshots
+//   draw_size PX             set Draw Size (the brush radius, screen pixels)
 //   zoom FACTOR / look X Y Z  move the camera FACTOR times closer / turn it about (and look at) the point X Y Z
 //   run COMMANDS             sculptforge-cli commands, e.g. run new_sphere subdivisions=4 ($SCRIPT_DIR: the script's folder)
 //   drop FILE                as if FILE were dropped onto the window (relative to the script's folder)
@@ -1327,6 +1328,10 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (!need(1)) return false;
         run([this, f = num(1, 1)] { app_.camera_.distance /= std::max(float(f), 1e-3f); });
         wait(0.1f);
+    } else if (verb == "draw_size") { // draw_size PX: Draw Size (the brush radius in screen pixels), as the S slider
+        if (!need(1)) return false;
+        run([this, px = num(1, 50)] { app_.radiusPx_ = std::clamp(float(px), 2.0f, 800.0f); });
+        wait(0.05f);
     } else if (verb == "look") { // look X Y Z: the camera turns about (and looks at) this point
         if (!need(3)) return false;
         run([this, x = num(1, 0), y = num(2, 0), z = num(3, 0)] { app_.camera_.target = glm::vec3(float(x), float(y), float(z)); });

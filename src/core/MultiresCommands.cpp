@@ -87,6 +87,15 @@ void registerSubdivCommands(CommandRegistry& reg) {
                  return result(ok, msg);
              }});
 
+    reg.add({"subdiv_freeze",
+             "Freeze Levels: keep the level shown as a plain mesh and delete every other subdivision level (one undo "
+             "step), e.g. before Dynamic topology, which needs a mesh without levels.",
+             {}, [](Document& doc, const Args&) -> CommandResult {
+                 std::string msg;
+                 const bool ok = freezeLevelsUndoable(doc, msg);
+                 return result(ok, msg);
+             }});
+
     reg.add({"subdiv_delete_higher",
              "Del Higher: delete the subdivision levels above the current one (and the detail sculpted on them).", {},
              [](Document& doc, const Args&) -> CommandResult {

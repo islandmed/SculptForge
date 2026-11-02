@@ -1,0 +1,18 @@
+run ui_look look=classic layout=zbrush
+run new_sphere
+run subdiv_divide
+run subdiv_divide
+key f
+camera 0 0
+click "Clay##brush.clay"
+draw_size 19
+key x
+expect_value symmetry_x == 1
+stroke 0.30 0.40 0.45 0.45
+stroke 0.30 0.55 0.45 0.60 0.6
+shot clay_small
+click "Standard##brush.standard"
+stroke 0.30 0.70 0.45 0.72
+shot standard_small
+zoom 3
+shot zoomed

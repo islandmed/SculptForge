@@ -14,6 +14,7 @@
 #include "app/Ui.h"
 #include "app/I18n.h"
 #include "core/Matcap.h"
+#include "core/Multires.h"
 #include "core/Polypaint.h"
 #include "core/Texture.h"
 
@@ -414,6 +415,11 @@ void App::registerShellActions() {
          "under the brush become triangles and UVs are dropped (Undo brings them back).",
          "Draw", "", "dyntopo", [this] { setDynamic(!doc_.sculptor.dyntopo.enabled); },
          [this] { return doc_.sculptor.dyntopo.enabled; }, nullptr});
+    add({"draw.dynamic_freeze", "Freeze Levels + Dynamic", nullptr,
+         "Keep the subdivision level shown as a plain mesh, delete the other levels and turn Dynamic on (one undo "
+         "step for the levels: Ctrl+Z brings them back).",
+         "Draw", "", "dyntopo", [this] { freezeLevelsAndDynamic(); }, nullptr,
+         [this] { return bool(doc_.mesh.multires); }});
     // Masking and visibility selection shapes (Tool > Masking, Tool > Visibility), named as in ZBrush.
     auto shape = [this](std::string id, std::string label, std::string palette, SelectShape* target, SelectShape value,
                         std::string description) {
@@ -2189,11 +2195,49 @@ void App::setDynamic(bool on) {
         const std::string why = dyntopoBlocker(doc_.mesh);
         if (!why.empty()) {
             status_ = why;
+            // Levels: offer to freeze them right there (a review hit a dead end here on the default sphere).
+            if (doc_.mesh.multires) openDynamicOffer_ = true;
             return;
         }
     }
     doc_.sculptor.dyntopo.enabled = on;
     status_ = dyntopoSummary(doc_.sculptor.dyntopo);
+}
+
+void App::freezeLevelsAndDynamic() {
+    if (!doc_.mesh.multires) {
+        setDynamic(true);
+        return;
+    }
+    runCommand("dyntopo", {{"enabled", true}, {"freeze_levels", true}});
+}
+
+void App::drawDynamicOffer() {
+    static constexpr const char* kPopup = "##dynamic_offer";
+    if (openDynamicOffer_) {
+        openDynamicOffer_ = false;
+        ImGui::OpenPopup(kPopup);
+    }
+    // A plain pop-up (not modal): a click anywhere else closes it.
+    if (!ImGui::BeginPopup(kPopup)) return;
+    Demo::pushScope("Dynamic");
+    if (!doc_.mesh.multires) {
+        ImGui::CloseCurrentPopup();
+    } else {
+        ImGui::Text(tr("This Part has %d subdivision levels (%s)."), subdivLevelCount(doc_.mesh),
+                    subdivLevelText(doc_.mesh).c_str());
+        ImGui::TextDisabled("%s", tr("Dynamic needs one plain mesh: Freeze keeps the level shown and removes the "
+                                     "others (Ctrl+Z brings them back)."));
+        ImGui::Spacing();
+        if (ImGui::Button(tr("Freeze Levels and Turn On Dynamic"))) {
+            ImGui::CloseCurrentPopup();
+            freezeLevelsAndDynamic();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button(tr("Cancel")) || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
+    }
+    Demo::popScope();
+    ImGui::EndPopup();
 }
 
 void App::drawDetailSlider(const char* id) {

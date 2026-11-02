@@ -171,6 +171,10 @@ private:
     // Dynamic topology (ZBrush's Sculptris Pro, core/Dyntopo.h): turns it on or off (not on a mesh with
     // subdivision levels), saying so in the status bar; the Detail slider.
     void setDynamic(bool on);
+    // Dynamic on a Part with subdivision levels: Freeze Levels (one undo step), then Dynamic on.
+    void freezeLevelsAndDynamic();
+    void drawDynamicOffer(); // the pop-up setDynamic opens instead of a dead-end message
+    bool openDynamicOffer_ = false;
     void drawDetailSlider(const char* id);
 
     void runCommand(const std::string& name, const Args& args = {});
