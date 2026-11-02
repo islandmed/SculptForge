@@ -76,8 +76,20 @@ TEST(support_card_links_match_the_website) {
         CHECK(std::string(url).rfind("https://buy.stripe.com/", 0) == 0);
         CHECK(page.find(std::string("href=\"") + url + "\"") != std::string::npos);
     }
-    CHECK(page.find(kInsiderNote) != std::string::npos); // the same honest wording on both
+    CHECK(page.find(kFreeReleaseNote) != std::string::npos); // the same honest wording on both
     CHECK(page.find(std::string("href=\"") + kDiscordUrl + "\"") != std::string::npos); // the same community invite
+}
+
+TEST(studio_offer_matches_the_website) {
+    // Founding Studio: one switch in Support.h and one in website/studio-offer.js, set the same way, same $300 link.
+    std::ifstream f(std::string(SF_TEST_DATA_DIR) + "/../../website/studio-offer.js", std::ios::binary);
+    CHECK(f.good());
+    const std::string js{std::istreambuf_iterator<char>(f), {}};
+    CHECK(std::string(kSupportUrlStudioRegular).rfind("https://buy.stripe.com/", 0) == 0);
+    CHECK(std::string(kSupportUrlStudioFounding).rfind("https://buy.stripe.com/", 0) == 0);
+    CHECK(js.find(std::string("const STUDIO_URL = '") + kSupportUrlStudioRegular + "'") != std::string::npos);
+    CHECK(js.find(kFoundingStudioOpen ? "const FOUNDING_STUDIO_OPEN = true;" : "const FOUNDING_STUDIO_OPEN = false;") !=
+          std::string::npos);
 }
 
 TEST(support_card_timing) {

@@ -9,6 +9,10 @@ chapter opens by itself the first time you start a new version; you can always f
 
 - **A clearer membership card**: the three memberships side by side with what each one gets you, in your look's
   colours. **Maybe later** now hides it for 30 days.
+- **New memberships**: Supporters get the credits (in the app and on the website), the monthly pack and a vote;
+  Insiders also get daily drops and preview builds about a week early; Studio covers the whole company with a
+  custom studio build (Founding Studio: the first 10 studios lock in $150 a month). Every release stays free for
+  everyone; bug-fix and security releases go out to everyone the same day.
 - **Full alphas on custom brushes**: at Focal Shift -100, Clay Slab and the other custom and Community brushes now
   show the whole alpha to its corners, as the built-in brushes do (#75).
 - **A new look**: new installs start in **Forge Terminal** with the Tokyo Night colours and the **SculptForge
@@ -152,8 +156,8 @@ chapter opens by itself the first time you start a new version; you can always f
 
 ### Become an Insider
 
-SculptForge stays free for everyone. Insiders will get each release about two weeks early, starting with
-SculptForge 1.0. **Help > Support SculptForge** opens the page to join.
+SculptForge stays free for everyone. Every release stays free for everyone; bug-fix and security releases go out
+to everyone the same day. **Help > Support SculptForge** opens the page to join.
 
 When SculptForge starts for the first time, after an update, and otherwise at most once a week, a card shows the
 ways to support it: **Supporter**, **Insider** and **Studio** memberships and the one-time Supporter, each opening its
@@ -180,7 +184,7 @@ nothing about you is sent anywhere.
 ### Support SculptForge
 
 SculptForge stays free for everyone. **Help > Support SculptForge** opens the page where you can become a
-member. Insiders will get each release about two weeks early, starting with SculptForge 1.0.
+member. Every release stays free for everyone; bug-fix and security releases go out to everyone the same day.
 
 ## Version 0.10.2
 

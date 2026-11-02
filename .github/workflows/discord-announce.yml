@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       file:
-        description: "Markdown file in .github/announcements/ (e.g. membership.md)"
+        description: "Markdown file in .github/announcements/ (e.g. membership-v2.md)"
         required: true
         type: string
       image:

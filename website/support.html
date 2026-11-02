@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Membership</title>
-  <meta name="description" content="SculptForge memberships from $5 a month: your name in the credits, a monthly brush and alpha pack, a roadmap vote, and priority support for studios. Insiders will get each release about two weeks early, starting with SculptForge 1.0.">
+  <meta name="description" content="SculptForge memberships from $5 a month: your name in the credits, a monthly pack and a vote on what gets built; Insider daily drops and preview builds; Studio custom builds for the whole company. Every release stays free for everyone.">
   <meta name="theme-color" content="#111114" media="(prefers-color-scheme: dark)">
   <meta name="theme-color" content="#f6f5f3" media="(prefers-color-scheme: light)">
   <meta name="color-scheme" content="dark light">
@@ -13,7 +13,7 @@
   <link rel="apple-touch-icon" href="img/icon-256.png?v=2">
   <meta property="og:type" content="website">
   <meta property="og:title" content="SculptForge Membership">
-  <meta property="og:description" content="Memberships from $5 a month: credits, a monthly brush and alpha pack, a roadmap vote and priority support.">
+  <meta property="og:description" content="Memberships from $5 a month: credits, a monthly pack, the feature vote, Insider daily drops and preview builds, and Studio custom builds.">
   <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=3">
   <meta property="og:url" content="https://sculptforge.app/support.html">
   <link rel="canonical" href="https://sculptforge.app/support.html">
@@ -65,7 +65,23 @@
     .tier .price { margin: 0; color: var(--tier-title); font-size: 2.7rem; font-weight: 700; line-height: 1; letter-spacing: -0.02em; }
     .tier .price span { color: var(--tier-text); font-size: 1rem; font-weight: 500; letter-spacing: 0; margin-left: 6px; }
     .tier p { color: var(--tier-text); font-size: 0.95rem; margin: 0; }
-    .tier p strong { color: var(--tier-title); font-weight: 600; }
+    .tier p strong, .tier li strong { color: var(--tier-title); font-weight: 600; }
+    .tier .perks { margin: 0; padding: 0; list-style: none; color: var(--tier-text); font-size: 0.95rem; }
+    .tier .perks li { position: relative; margin: 0 0 8px; padding-left: 22px; }
+    .tier .perks li::before { content: "✓"; position: absolute; left: 0; color: #ff9a45; font-weight: 700; }
+    .tier.featured .perks { color: #d9d0c6; }
+    .tier .price s { color: var(--tier-text); font-size: 1.1rem; font-weight: 500; letter-spacing: 0; margin-left: 10px; }
+    .tier .price .now { color: var(--tier-title); font-size: inherit; font-weight: inherit; letter-spacing: inherit; margin: 0; }
+    .tier .badge.founding { background: var(--panel, #141417); color: #ffb06a !important; border: 1.5px solid #f6994d;
+                            text-transform: none; letter-spacing: 0; font-size: 0.78rem !important; white-space: normal;
+                            width: max-content; max-width: calc(100% - 28px); text-align: center; line-height: 1.35; }
+    .tier.studio { padding-top: 46px; }
+    .compare-wrap { margin-top: 26px; }
+    .tiers-compare td, .tiers-compare th { white-space: normal; }
+    .tiers-compare td { text-align: center; color: var(--text); }
+    .tiers-compare th:nth-child(2), .tiers-compare td:nth-child(2) { background: none; }
+    .tiers-compare th:nth-child(3), .tiers-compare td:nth-child(3) { background: rgba(242, 140, 60, 0.07); }
+    .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
     .tier .cta { margin-top: auto; padding-top: 10px; }
     .tier .btn { display: block; text-align: center; padding: 13px 20px; background: rgba(255, 255, 255, 0.05);
                  border-color: rgba(255, 255, 255, 0.2); color: var(--tier-title); transition: background 0.2s, border-color 0.2s; }
@@ -139,13 +155,14 @@
       .tier.featured { --tier-bg: linear-gradient(180deg, #fff1e3, #ffffff 60%);
                        box-shadow: 0 0 0 1px rgba(246, 153, 77, 0.25), 0 0 40px rgba(240, 136, 46, 0.22), var(--tier-shadow); }
       .tier.featured::after { box-shadow: 0 0 50px rgba(240, 136, 46, 0.25); }
-      .tier.featured p { color: #4d4239; }
+      .tier.featured p, .tier.featured .perks { color: #4d4239; }
       .tier.featured .price { color: var(--tier-title); }
       .one-time .btn { background: #f4f2ef; border-color: #d8d4ce; color: var(--text); }
       .support-page .footer { background: var(--bg-alt); }
     }
   </style>
   <script src="motion.js?v=11" defer></script>
+  <script src="studio-offer.js?v=1" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   </head>
 <body class="support-page">
@@ -184,10 +201,10 @@
           <h1 id="support-title">Membership: <span class="accent">more for the artists who use it.</span></h1>
           <p class="thanks" id="thanks" hidden><strong>Welcome aboard!</strong> Your membership is active. Check your
             email for the receipt; Insider invites go out within a couple of days.</p>
-          <p class="lede">SculptForge itself stays free, with no ads, no accounts and no telemetry. A membership is a
-            monthly subscription with its own benefits: your name in the credits, a monthly brush and alpha pack, a
-            vote on the roadmap and, for studios, priority support.</p>
-          <p class="promise">Insiders will get each release about two weeks early, starting with SculptForge 1.0.</p>
+          <p class="lede">SculptForge itself stays free, with no ads, no accounts and no telemetry, and nothing in the
+            app is ever paywalled. Members pay for time and influence: your name in the credits, a say in what gets
+            built, daily drops, preview builds and, for studios, a SculptForge built for your team.</p>
+          <p class="promise">Every release stays free for everyone; bug-fix and security releases go out to everyone the same day.</p>
         </div>
       </div>
     </section>
@@ -197,28 +214,61 @@
         <div class="tiers">
           <article class="tier" style="--i: 0">
             <h2>Supporter</h2><p class="price">$5<span>/ month</span></p>
-            <p>Your name in the <strong>credits</strong>: the app's Supporters list and this site (optional, any name
-              you choose).</p>
+            <ul class="perks">
+              <li>Your name in the <strong>credits</strong>, in the app and on the <a href="supporters.html">website</a></li>
+              <li>The <strong>#members</strong> channel on Discord</li>
+              <li>A vote in the <strong>monthly feature vote</strong></li>
+              <li>The <strong>monthly pack</strong> at month end</li>
+            </ul>
             <p class="cta"><a class="btn" href="https://buy.stripe.com/aFacN5h1t6L8cP14ad4F201" rel="noopener">Join as a Supporter</a></p>
           </article>
           <article class="tier featured" style="--i: 1">
             <p class="badge">Recommended</p>
             <h2>Insider</h2><p class="price">$20<span>/ month</span></p>
-            <p>The monthly <strong>Supporter Pack</strong> of brushes, alphas and VDMs (free to everyone after three
-              months), a <strong>monthly roadmap vote</strong> on what gets built next, and your name in the
-              credits.</p>
-            <p><strong>Insiders will get each release about two weeks early, starting with SculptForge 1.0.</strong>
-              Early builds come from the same release pipeline as public builds.</p>
+            <ul class="perks">
+              <li>Everything in Supporter</li>
+              <li><strong>Propose options</strong> for the vote</li>
+              <li>A <strong>daily drop</strong>: a brush, alpha or VDM almost every day</li>
+              <li><strong>Preview builds</strong> of the next release, about a week early</li>
+              <li>The <strong>monthly dev Q&amp;A</strong></li>
+            </ul>
             <p class="cta"><a class="btn" href="https://buy.stripe.com/dRmdR94eH4D06qD9ux4F202" rel="noopener">Become an Insider</a></p>
           </article>
-          <article class="tier" style="--i: 2">
-            <h2>Studio</h2><p class="price">$150<span>/ month</span></p>
-            <p><strong>Insider benefits for up to 10 artists</strong> ($15 each), <strong>priority bug triage and
-              support</strong> for your pipeline, your <strong>logo</strong> on this site and the project README, and
-              monthly invoices. Custom features and
-              integration work are quoted separately: <a href="mailto:hello@sculptforge.app">hello@sculptforge.app</a>.</p>
-            <p class="cta"><a class="btn" href="https://buy.stripe.com/3cI00j12v5H4g1dgWZ4F204" rel="noopener">Studio membership</a></p>
+          <article class="tier studio" style="--i: 2">
+            <p class="badge founding" data-founding>Founding Studio: first 10 studios lock in $150/month for good</p>
+            <h2>Studio</h2><p class="price"><span class="now" data-studio-price>$150</span><s data-founding>$300</s><span>/ month</span></p>
+            <ul class="perks">
+              <li><strong>Insider for every artist</strong> in your company, no seat count</li>
+              <li>A <strong>custom studio build</strong> with your presets, keymaps, packs, shelves and pipeline defaults</li>
+              <li><strong>Custom content</strong>: brushes, alphas and VDMs from your own references, macros and presets</li>
+              <li><strong>Guided development</strong>: your requests go first, with a monthly call or async review</li>
+              <li><strong>Priority triage</strong>, a private team channel and your logo on the website and README</li>
+            </ul>
+            <p class="fine">Up to 5 custom items a month (brushes, alphas, macros or presets); larger features are quoted
+              separately. Your assets stay private to your studio and are never used for anything else.
+              <a href="studios.html#membership">For studios</a>.</p>
+            <p class="cta"><a class="btn" data-studio-link href="https://buy.stripe.com/3cI00j12v5H4g1dgWZ4F204" rel="noopener">Studio membership</a></p>
           </article>
+        </div>
+        <div class="table-wrap compare-wrap">
+          <table class="compare tiers-compare">
+            <caption class="visually-hidden">What each membership includes</caption>
+            <thead><tr><th scope="col">Included</th><th scope="col">Supporter $5</th><th scope="col">Insider $20</th><th scope="col">Studio <span data-studio-price>$150</span></th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Name in the credits (app and website)</th><td>✓</td><td>✓</td><td>✓ (your logo too)</td></tr>
+              <tr><th scope="row">#members on Discord</th><td>✓</td><td>✓</td><td>✓ and a private team channel</td></tr>
+              <tr><th scope="row">Vote in the monthly feature vote</th><td>✓</td><td>✓</td><td>✓</td></tr>
+              <tr><th scope="row">Monthly pack at month end</th><td>✓</td><td>✓</td><td>✓</td></tr>
+              <tr><th scope="row">Propose options for the vote</th><td></td><td>✓</td><td>✓</td></tr>
+              <tr><th scope="row">Daily drop (brush, alpha or VDM)</th><td></td><td>✓</td><td>✓</td></tr>
+              <tr><th scope="row">Preview builds, about a week early</th><td></td><td>✓</td><td>✓</td></tr>
+              <tr><th scope="row">Monthly dev Q&amp;A</th><td></td><td>✓</td><td>✓</td></tr>
+              <tr><th scope="row">Artists covered</th><td>1</td><td>1</td><td>Your whole company</td></tr>
+              <tr><th scope="row">Custom studio build and custom content</th><td></td><td></td><td>✓ (up to 5 items a month)</td></tr>
+              <tr><th scope="row">Guided development</th><td></td><td></td><td>✓</td></tr>
+              <tr><th scope="row">Priority triage (reviewed within 2 business days; no fix-time guarantee)</th><td></td><td></td><td>✓</td></tr>
+            </tbody>
+          </table>
         </div>
         <div class="one-time">
           <p><strong>One-time Supporter:</strong> your name in the credits, no subscription. Pay what you want, $5
@@ -228,9 +278,9 @@
         <p class="fine support-fine">Members get private channels on Discord:
           <a href="https://discord.gg/gWrYkEmQhH" rel="noopener">join the SculptForge community</a> and tell us your
           membership after checkout.</p>
-        <p class="fine support-fine">Insider builds will be shared through a private GitHub repository: give your
-          GitHub username at checkout and you'll get an invite before SculptForge 1.0, when early access starts. Supporter Packs become free for everyone after three months,
-          and each Insider release becomes the public release about two weeks later.
+        <p class="fine support-fine">Insider preview builds and Studio builds are shared through a private GitHub repository: give your
+          GitHub username at checkout and you'll get an invite to the private repository. Every release stays free
+          for everyone; bug-fix and security releases go out to everyone the same day.
           <a href="https://billing.stripe.com/p/login/4gM7sL8uXc5s4iv5eh4F200" rel="noopener">Manage or cancel your
           membership</a>.</p>
         <p class="fine">Payments are handled by Stripe (cards, Apple Pay, Google Pay); SculptForge never sees your
@@ -280,6 +330,7 @@
         <a href="benchmarks/">Benchmarks: 15M and 33M</a>
         <a href="press.html">Press kit</a>
         <a href="support.html">Membership</a>
+        <a href="supporters.html">Supporters</a>
         <a href="https://github.com/islandmed/SculptForge">Source code</a>
         <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
       </div>
