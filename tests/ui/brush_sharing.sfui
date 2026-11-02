@@ -1,6 +1,7 @@
 # Brush sharing: brushes refined in Brush Lab are saved to the library, shared as a brush code
 # (right-click > Copy brush code), deleted, and pasted back with Ctrl+V or Brush Lab's Paste brush.
 # UI tests get an empty library of their own in --ui-out/brush-library.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 expect_value user_brushes == 0
 expect_value library_files == 0
 # The Brush palette (with the custom brushes) goes into the right tray; Brush Lab opens from the top shelf.

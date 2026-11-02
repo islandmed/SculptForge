@@ -9,6 +9,12 @@ chapter opens by itself the first time you start a new version; you can always f
 
 - **Full alphas on custom brushes**: at Focal Shift -100, Clay Slab and the other custom and Community brushes now
   show the whole alpha to its corners, as the built-in brushes do (#75).
+- **A new look**: new installs start in **Forge Terminal** with the Tokyo Night colours and the **SculptForge
+  layout**: menus by task (File, Edit, Sculpt, Paint, Mesh, View, Render, Help) holding every palette, a status
+  bar and a one-row tool shelf. If you are updating, nothing changes until you say so: a card offers **Try it** or
+  **Keep my layout**. Coming from ZBrush? **Preferences > Interface > Look > ZBrush-style layout** (or the button in
+  the welcome) brings back the palette bar and the two-row shelf. Six more colour schemes, Match my desktop theme,
+  Phosphor, Blueprint and the Classic look are there too. See [The interface](interface.md#looks-and-layouts).
 
 ## Version 0.10.6
 

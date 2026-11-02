@@ -1,5 +1,6 @@
 # Backface culling (#68): Tool > Display > Backface culling skips the back faces of every Part, also on open meshes
 # (which otherwise draw both sides). Off by default. Brushes then work only on faces that are drawn.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_plane resolution=64
 expect_value backface_culling == 0
 camera 0 -60

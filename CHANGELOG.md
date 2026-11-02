@@ -10,6 +10,22 @@ All notable changes to SculptForge are listed here. The format follows
 - Custom and Community brushes (Clay Slab and other presets) show the whole alpha at Focal Shift -100, as the
   built-in brushes do since #60: the stamp reaches its square's corners instead of being cut by the preset's round
   tip (#75, reported by rodrigomoretto). At the default Focal Shift presets look as before; saved presets are unchanged.
+### Added
+- A new default look: new installs start in **Forge Terminal** with the **Tokyo Night** colours and the
+  **SculptForge layout** (menus by task: File, Edit, Sculpt, Paint, Mesh, View, Render, Help, whose sections are the
+  palettes; a status bar; a one-row tool shelf). Existing installs keep their look and layout, and see a one-time card,
+  "SculptForge has a new look", with **Try it** and **Keep my layout**. The welcome offers **Coming from ZBrush? Use the
+  ZBrush-style layout** in one click, and Preferences > Interface > Look switches any time. The look is remembered
+  without Store Config. Also in Preferences > Interface > Look: the **Classic** look, **Forge Terminal** with Tokyo
+  Night, Catppuccin Mocha, Gruvbox Dark, Nord, Rosé Pine, Kanagawa or Everforest colours or **Match my desktop
+  theme** (on Linux, the Omarchy theme's colours when Omarchy is installed), **Phosphor** (green or amber, optional scanlines and glow on the interface only) and **Blueprint**.
+  Scripts: `ui_look`.
+
+### Fixed
+- Switching looks no longer grows the interface's minimum window size each time (the Sculpt Timeline strip covered
+  the axis gizmo at 2400x1350).
+- A stored SculptForge-layout UI configuration without shelves gets the SculptForge layout's shelves, not the
+  ZBrush-style ones.
 
 ## [0.10.6] - 2026-11-01
 

@@ -2,6 +2,7 @@
 # once a second in the app), Send to Blender writes the SubTools back, and a second send from Blender updates
 # the SubTool it came from (undoable) and adds the new object. The sends are staged from tests/ui/data/blender
 # into an exchange folder in the working directory (the build folder under ctest).
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_sphere subdivisions=3
 env SCULPTFORGE_BLENDER_EXCHANGE sf_ui_blender
 copy data/blender/send1 sf_ui_blender/to_sculptforge

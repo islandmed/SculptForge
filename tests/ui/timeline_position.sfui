@@ -1,6 +1,7 @@
 # Timeline position (#63): the Sculpt Timeline strip runs along the top of the viewport by default, away from the
 # brush shelf, below the top shelf, with the axis gizmo below it; Preferences > Interface puts it back at the
 # bottom, and Store Config keeps the choice.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_sphere subdivisions=4
 stroke 0.35 0.40 0.60 0.45
 expect_value timeline_top == 1

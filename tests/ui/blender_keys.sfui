@@ -2,6 +2,7 @@
 # the numpad views (orthographic until turned), Blender's sculpt-mode brush letters, F / Shift+F, Ctrl to invert,
 # M for the Mask brush, H / Shift+H / Alt+H, Alt+1 / Alt+2, Emulate Numpad, the Controls window, a keymap
 # exported from Blender, and back to the ZBrush style with its keys intact.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_sphere subdivisions=4
 # New installs start with the SculptForge keys; this script is about the ZBrush-style ones.
 expect_value input_style == 1

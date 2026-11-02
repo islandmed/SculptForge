@@ -1,5 +1,6 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include "app/Theme.h"
 #include "app/CommandPalette.h"
 
 #include "app/App.h"
@@ -285,9 +286,9 @@ void CommandPalette::draw(App& app, const CanvasRect& area) {
                     if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogText("\n%s  %s  %s", trAction(a.id, a.label), trPath(a.palette).c_str(), chord.c_str());
                     rows->ChannelsSetCurrent(0);
                     if (r == selected_)
-                        rows->AddRectFilled(p, ImVec2(p.x + w, p.y + rowH), IM_COL32(0xf0, 0x88, 0x2e, 0x30), 4.0f * s);
+                        rows->AddRectFilled(p, ImVec2(p.x + w, p.y + rowH), IM_COL32(0xf0, 0x88, 0x2e, 0x30), theme::rounding(4.0f * s));
                     else if (hovered)
-                        rows->AddRectFilled(p, ImVec2(p.x + w, p.y + rowH), IM_COL32(0xff, 0xff, 0xff, 0x0a), 4.0f * s);
+                        rows->AddRectFilled(p, ImVec2(p.x + w, p.y + rowH), IM_COL32(0xff, 0xff, 0xff, 0x0a), theme::rounding(4.0f * s));
                 }
             }
             rows->ChannelsMerge();

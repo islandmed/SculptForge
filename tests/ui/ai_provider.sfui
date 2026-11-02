@@ -1,5 +1,6 @@
 # Brush Lab's AI provider panel: Free by default, local-model helpers for OpenAI-compatible.
 # Brush Lab floats over the canvas, closed until the top shelf's AI Brush opens it.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 expect_not "Brush Lab/Create"
 click "AI Brush"
 expect "Brush Lab"

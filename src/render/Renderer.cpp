@@ -620,9 +620,11 @@ out vec4 fragColor;
 // Neutral charcoal, lightest a little above the middle (behind the model) and falling off in a soft
 // radial vignette down to the shade of the shelves around it, so the model reads against it without a
 // coloured cast and the canvas meets the shell without a darker band. A little noise hides banding.
+uniform vec3 uCentre; // RenderSettings::gradientCentre: vec3(0.215, 0.215, 0.222) in the Classic look
+uniform vec3 uEdge;   // gradientEdge: the shell's shade (Theme shellBg #1b1b1d), so there's no step at the seams
 void main() {
-    vec3 centre = vec3(0.215, 0.215, 0.222);
-    vec3 edge = vec3(0.106, 0.106, 0.114); // the shell's shade (Theme shellBg #1b1b1d): no step at the seams
+    vec3 centre = uCentre;
+    vec3 edge = uEdge;
     float d = length((vUv - vec2(0.5, 0.56)) * vec2(1.0, 1.15));
     float t = smoothstep(0.05, 0.85, d);
     vec3 c = mix(centre, edge, t);
@@ -2684,6 +2686,8 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
         }
     } else if (!thumbnailPass_ && settings.gradientBackground) {
         gl::UseProgram(bgProgram_);
+        gl::Uniform3fv(gl::GetUniformLocation(bgProgram_, "uCentre"), 1, glm::value_ptr(settings.gradientCentre));
+        gl::Uniform3fv(gl::GetUniformLocation(bgProgram_, "uEdge"), 1, glm::value_ptr(settings.gradientEdge));
         gl::DrawArrays(GL_TRIANGLES, 0, 3);
     }
 

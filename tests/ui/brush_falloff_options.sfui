@@ -2,6 +2,7 @@
 # the piece under the cursor (a small ball pressed into a big one: only the ball moves), View falloff reaches
 # through the model along the view (the back of the sphere moves too). Both are in the Brush palette and saved
 # with the preferences.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_sphere subdivisions=5
 run insert_primitive type=sphere x=0 y=0 z=1 nx=0 ny=0 nz=1 size=0.5
 camera 0 0

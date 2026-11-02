@@ -39,8 +39,10 @@ struct UiLayout {
 };
 
 UiLayout standardLayout(); // the built-in default
+UiLayout standardLayout(int shellLayout); // 0 the ZBrush-style layout (the same), 1 the SculptForge layout
 Json toJson(const UiLayout& layout);
-// Unknown ids are dropped, not fatal; false only for unreadable JSON.
-bool fromJson(const Json& j, UiLayout& layout, std::string& error);
+// Unknown ids are dropped, not fatal; false only for unreadable JSON. What the file leaves out (a shelf it never
+// stored) comes from standardLayout(shellLayout): the SculptForge layout's shelves for a SculptForge-layout file.
+bool fromJson(const Json& j, UiLayout& layout, std::string& error, int shellLayout = 0);
 
 } // namespace sf

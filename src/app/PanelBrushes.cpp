@@ -3,6 +3,7 @@
 //
 // Brush options panel (stroke type, lazy mouse, spray, alpha) and the
 // stroke handling of the SnakeHook brush and the DragRect stroke.
+#include "app/Theme.h"
 #include "app/App.h"
 #include "app/Ui.h"
 
@@ -42,7 +43,7 @@ void App::drawAlphaSection() {
     const float s = uiScale_;
     auto preview = [](ImDrawList* dl, const BrushAlpha& a, ImVec2 p0, float size, int cells) {
         const float cell = size / float(cells);
-        dl->AddRectFilled(p0, ImVec2(p0.x + size, p0.y + size), IM_COL32(0, 0, 0, 255), 3.0f);
+        dl->AddRectFilled(p0, ImVec2(p0.x + size, p0.y + size), IM_COL32(0, 0, 0, 255), theme::rounding(3.0f));
         for (int y = 0; y < cells; ++y)
             for (int x = 0; x < cells; ++x) {
                 const float u = (float(x) + 0.5f) / float(cells) * 2.0f - 1.0f, v = 1.0f - (float(y) + 0.5f) / float(cells) * 2.0f;

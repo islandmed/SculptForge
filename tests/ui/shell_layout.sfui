@@ -1,6 +1,7 @@
 # The ZBrush-style shell (docs/ui-design.md §2-3): the canvas framed by shelves, the alphabetical palette bar,
 # palettes in drop-downs and trays, the tray dividers, Tab and the layout presets. CMake also runs this script
 # at 1920x1080 (ui_shell_layout_1080).
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_sphere subdivisions=4
 expect "SubTools/Append"            # right tray: the Tool palette with its SubTool sub-palette open
 expect_value right_tray == 1

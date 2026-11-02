@@ -1,6 +1,7 @@
 # Help > Check for updates: a newer version shows the banner (Skip this version hides it), the same or an older one
 # says SculptForge is up to date, and a feed that can't be read says so. The feed is a local file here
 # (SF_UPDATE_FEED); UI tests never check automatically.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_sphere subdivisions=3
 env SF_UPDATE_FEED $SCRIPT_DIR/data/update_newer.json
 click "Help##palette.help"

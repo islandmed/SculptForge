@@ -2,6 +2,7 @@
 # in the test's temporary settings folder) the app calibrates over the first frames like a first launch, then
 # Preferences > Performance shows what it detected and measured, the settings, the frame governor, Re-calibrate and
 # the manual overrides. Real GPU, so only the words are checked, not the numbers.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_sphere
 # (Calibration takes one step per frame, so it is over within the first frames here.)
 wait 1

@@ -10,6 +10,7 @@
 #include "app/Demo.h"
 #include "app/Shell.h"
 #include "app/Theme.h"
+#include "app/LookSchemes.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
 #include "core/Matcap.h"
@@ -40,6 +41,37 @@ constexpr ImGuiWindowFlags kShellFlags = ImGuiWindowFlags_NoDecoration | ImGuiWi
 
 const char* const kShelfWindows[kShelfCount] = {"##TopShelf", "##LeftShelf", "##RightShelf", "##BottomShelf"};
 
+CanvasRect g_focus; // the tile under the pointer this frame (tiled looks draw its border in the accent)
+
+bool sameRect(const CanvasRect& a, const CanvasRect& b) {
+    return a.w > 0.0f && a.h > 0.0f && std::abs(a.x - b.x) < 0.5f && std::abs(a.y - b.y) < 0.5f && std::abs(a.w - b.w) < 0.5f &&
+           std::abs(a.h - b.h) < 0.5f;
+}
+
+// A tiled look's frame around one region: a thin border (the accent on the focused tile), Blueprint's corner marks.
+void tileFrame(ImDrawList* dl, const CanvasRect& r, bool focused) {
+    if (!theme::look.tiled || r.w <= 0.0f || r.h <= 0.0f) return;
+    const ImFontAtlas* atlas = ImGui::GetIO().Fonts;
+    const float s = atlas && !atlas->Fonts.empty() ? atlas->Fonts[0]->FontSize / 15.0f : 1.0f; // the UI scale
+    const float t = std::max(1.0f, std::floor(s + 0.25f)) * (focused ? 2.0f : 1.0f); // 2 px on the focused tile
+    const ImVec2 a(r.x, r.y), b(r.x + r.w, r.y + r.h);
+    dl->PushClipRect(a, b, false);
+    dl->AddRect(ImVec2(a.x + t * 0.5f, a.y + t * 0.5f), ImVec2(b.x - t * 0.5f, b.y - t * 0.5f),
+                theme::u32(focused ? theme::focusBorder : theme::tileBorder), 0.0f, 0, t);
+    if (theme::look.headers == theme::LookStyle::Headers::Grid) { // registration marks at the corners
+        const float k = std::min(9.0f, std::min(r.w, r.h) * 0.3f);
+        const ImU32 c = theme::u32(theme::accent, focused ? 1.0f : 0.75f);
+        const float w = 2.0f * t;
+        for (int i = 0; i < 4; ++i) {
+            const float x = i & 1 ? b.x - w * 0.5f : a.x + w * 0.5f, y = i & 2 ? b.y - w * 0.5f : a.y + w * 0.5f;
+            const float dx = i & 1 ? -k : k, dy = i & 2 ? -k : k;
+            dl->AddLine(ImVec2(x, y), ImVec2(x + dx, y), c, w);
+            dl->AddLine(ImVec2(x, y), ImVec2(x, y + dy), c, w);
+        }
+    }
+    dl->PopClipRect();
+}
+
 bool beginShellWindow(const char* name, const CanvasRect& r, const ImVec4& bg, ImVec2 padding,
                       ImGuiWindowFlags extra = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse) {
     ImGui::SetNextWindowPos(ImVec2(r.x, r.y));
@@ -52,6 +84,7 @@ bool beginShellWindow(const char* name, const CanvasRect& r, const ImVec4& bg, I
     const bool open = ImGui::Begin(name, nullptr, kShellFlags | extra);
     ImGui::PopStyleColor();
     ImGui::PopStyleVar(4);
+    if (open) tileFrame(ImGui::GetWindowDrawList(), r, sameRect(r, g_focus));
     return open;
 }
 
@@ -248,7 +281,7 @@ bool drawShelfTile(App& app, const Action& a, ImVec2 size) {
         const bool mode = ui::IsModeAction(a.id);
         const ImVec4 bg = on ? (mode ? (hovered ? theme::accentHover : theme::accent) : hovered ? theme::toggleOnHover : theme::toggleOn)
                              : held ? theme::buttonPressed : hovered ? theme::buttonHover : theme::frame;
-        dl->AddRectFilled(p0, p1, theme::u32(bg, alpha), 4.0f * s);
+        dl->AddRectFilled(p0, p1, theme::u32(bg, alpha), theme::rounding(4.0f * s));
         if (on && !mode) ui::DrawOnMark(dl, p0, p1, true);
         // Two text levels only: actions and hovered items in text, options that are off in textOff (readable, so
         // off doesn't look disabled); disabled items are faded by alpha.
@@ -261,7 +294,7 @@ bool drawShelfTile(App& app, const Action& a, ImVec2 size) {
     // Tile: a square picture (brush thumbnail or icon) with the name under it.
     const float pic = std::min(size.x, size.y - capH);
     const ImVec2 q0(p0.x + (size.x - pic) * 0.5f, p0.y), q1(q0.x + pic, q0.y + pic);
-    dl->AddRectFilled(p0, p1, theme::u32(hovered ? theme::buttonHover : theme::tile, hovered ? 0.55f : 0.0f), 4.0f * s);
+    dl->AddRectFilled(p0, p1, theme::u32(hovered ? theme::buttonHover : theme::tile, hovered ? 0.55f : 0.0f), theme::rounding(4.0f * s));
     ImTextureID tex = type >= 0 ? app.thumbnails().brush(type) : ImTextureID(0);
     if (a.id == "draw.paint") { // the Paint brush's own preview (Pickers.cpp)
         BrushItem paint;
@@ -270,14 +303,14 @@ bool drawShelfTile(App& app, const Action& a, ImVec2 size) {
     }
     if (tex) {
         dl->AddImageRounded(tex, ImVec2(q0.x + 2 * s, q0.y + 2 * s), ImVec2(q1.x - 2 * s, q1.y - 2 * s), ImVec2(0, 0),
-                            ImVec2(1, 1), IM_COL32(255, 255, 255, int(255 * alpha)), 4.0f * s);
+                            ImVec2(1, 1), IM_COL32(255, 255, 255, int(255 * alpha)), theme::rounding(4.0f * s));
     } else if (type >= 0) {
         drawBrushIcon(dl, ImVec2((q0.x + q1.x) * 0.5f, (q0.y + q1.y) * 0.5f), pic * 0.36f, type);
     } else {
         dl->AddCircleFilled(ImVec2((q0.x + q1.x) * 0.5f, (q0.y + q1.y) * 0.5f), pic * 0.36f, theme::u32(theme::tile), 32);
         centredText(dl, app.fontIcons_, q0, q1, theme::u32(on ? theme::accent : theme::text, alpha), a.icon ? a.icon : "?");
     }
-    if (on) dl->AddRect(p0, p1, theme::u32(theme::accent), 4.0f * s, 0, 2.0f * s);
+    if (on) dl->AddRect(p0, p1, theme::u32(theme::accent), theme::rounding(4.0f * s), 0, 2.0f * s);
     // The hotkey digit (1-9, 0) in the corner, as ZBrush shows brush shortcuts.
     const std::string key = app.actions().shortcutText(a.id);
     if (key.size() == 1 && caption)
@@ -584,6 +617,67 @@ void App::registerShellActions() {
     for (int i = 0; i < 3; ++i)
         add({"ui.preset." + std::to_string(i + 1), std::to_string(i + 1), nullptr, kPresetHelp[i], "Preferences > Layout", "",
              "", [this, i] { applyPreset(i); }, nullptr, nullptr});
+    // Preferences > Interface > Look: the looks and the two layouts, also from F3 and scripts (ui_look).
+    for (int i = 0; i < int(looks::LookId::Count); ++i) {
+        const looks::LookId look = looks::LookId(i);
+        add({std::string("ui.look.") + looks::lookKey(look), std::string("Look: ") + looks::lookName(look), ICON_LC_PALETTE,
+             std::string("Switch the interface to the ") + looks::lookName(look) + " look (Preferences > Interface > Look).",
+             "Preferences > Interface > Look", "", "",
+             [this, i] {
+                 uiPrefs_.look.look = i;
+                 if (i != 0) setShellLayout(1); // the looks come with the SculptForge layout (Preferences can switch back)
+                 lookDirty_ = true;
+             },
+             [this, i] { return uiPrefs_.look.look == i; }, nullptr});
+    }
+    add({"ui.layout.sculptforge", "SculptForge layout", ICON_LC_LAYOUT_DASHBOARD,
+         "Menus by task (File, Edit, Sculpt, Paint, Mesh, View, Render, Help), a status bar and a one-row tool shelf.",
+         "Preferences > Interface > Look", "", "", [this] { setShellLayout(1); lookDirty_ = true; },
+         [this] { return uiPrefs_.shellLayout == 1; }, nullptr});
+    add({"ui.layout.zbrush", "ZBrush-style layout", ICON_LC_LAYOUT_TEMPLATE,
+         "The alphabetical palette bar and the two-row top shelf, as ZBrush users expect.", "Preferences > Interface > Look", "",
+         "", [this] { setShellLayout(0); lookDirty_ = true; }, [this] { return uiPrefs_.shellLayout == 0; }, nullptr});
+    commands_.add({"ui_look",
+                   "Interface look and layout (Preferences > Interface > Look). Only changes how the interface looks.",
+                   {{"look", ParamSpec::Type::String, "classic, forge, phosphor or blueprint (default: unchanged).", false},
+                    {"scheme", ParamSpec::Type::String,
+                     "Forge Terminal's colours: tokyo_night, catppuccin_mocha, gruvbox_dark, nord, rose_pine, kanagawa or everforest.",
+                     false},
+                    {"match_omarchy", ParamSpec::Type::Bool, "Forge Terminal: match the desktop theme (the current Omarchy theme's colours, Linux).", false},
+                    {"phosphor", ParamSpec::Type::String, "Phosphor's colour: green or amber.", false},
+                    {"effects", ParamSpec::Type::Bool, "Phosphor's scanlines and glow (on the interface only).", false},
+                    {"layout", ParamSpec::Type::String, "sculptforge or zbrush (default: the look's, else unchanged).", false},
+                    {"card", ParamSpec::Type::Bool, "Show the one-time \"SculptForge has a new look\" card (for tests).", false}},
+                   [this](Document&, const Args& a) -> CommandResult {
+                       theme::LookSettings& l = uiPrefs_.look;
+                       int layoutKind = uiPrefs_.shellLayout;
+                       if (a.contains("look")) {
+                           const std::string key = argString(a, "look");
+                           const looks::LookId id = looks::lookFromKey(key);
+                           if (id == looks::LookId::Classic && key != "classic") return {false, "look must be classic, forge, phosphor or blueprint"};
+                           l.look = int(id);
+                           if (id != looks::LookId::Classic) layoutKind = 1;
+                       }
+                       if (a.contains("scheme")) {
+                           const std::string key = argString(a, "scheme");
+                           if (!looks::findScheme(key)) return {false, "Unknown scheme " + key};
+                           l.scheme = key;
+                       }
+                       if (a.contains("match_omarchy")) l.matchOmarchy = argBool(a, "match_omarchy", false);
+                       if (a.contains("phosphor")) l.amber = argString(a, "phosphor") == "amber";
+                       if (a.contains("effects")) l.effects = argBool(a, "effects", false);
+                       if (a.contains("layout")) {
+                           const std::string k = argString(a, "layout");
+                           if (k != "sculptforge" && k != "zbrush") return {false, "layout must be sculptforge or zbrush"};
+                           layoutKind = k == "sculptforge" ? 1 : 0;
+                       }
+                       setShellLayout(layoutKind);
+                       lookDirty_ = true;
+                       if (a.contains("card")) newLookCard_ = argBool(a, "card", false);
+                       return {true, std::string("Look: ") + looks::lookName(looks::LookId(l.look)) +
+                                         (layoutKind == 1 ? ", SculptForge layout" : ", ZBrush-style layout")};
+                   }});
+
     int count = 0;
     const PaletteDef* list = palettes(count);
     for (int i = 0; i < count; ++i) {
@@ -643,14 +737,14 @@ float App::topInset() const {
 ShellGeometry App::shellGeometry() const {
     int w = 0, h = 0;
     SDL_GetWindowSize(window_, &w, &h);
-    return computeShell(layout_, float(w), float(h), uiScale_, topInset());
+    return computeShell(layout_, float(w), float(h), uiScale_, topInset(), shellMetrics());
 }
 
 CanvasRect App::canvasRect() const {
     int w = 0, h = 0;
     SDL_GetWindowSize(window_, &w, &h);
     if (hideUi_) return {0.0f, 0.0f, float(std::max(w, 1)), float(std::max(h, 1))};
-    return computeShell(layout_, float(w), float(h), uiScale_, topInset()).canvas;
+    return computeShell(layout_, float(w), float(h), uiScale_, topInset(), shellMetrics()).canvas;
 }
 
 void App::canvasRay(float x, float y, glm::vec3& origin, glm::vec3& dir) const {
@@ -685,7 +779,7 @@ void App::updateCameraAspect() {
 void App::noteLayoutChanged() {}
 
 void App::applyPreset(int preset) {
-    UiLayout l = standardLayout();
+    UiLayout l = standardLayout(uiPrefs_.shellLayout);
     l.customize = layout_.customize;
     l.consoleOpen = layout_.consoleOpen;
     l.consoleHeight = layout_.consoleHeight;
@@ -742,12 +836,30 @@ void App::movePaletteToTray(const std::string& id, bool right) {
 void App::drawCanvasFrame() {
     const CanvasRect c = shell_.canvas;
     ImDrawList* dl = ImGui::GetBackgroundDrawList();
+    if (theme::look.tiled) { // the 3D view is a tile too: its border just outside it, in the gap
+        const float t = std::max(1.0f, std::floor(uiScale_));
+        const CanvasRect frame{c.x - t, c.y - t, c.w + 2.0f * t, c.h + 2.0f * t};
+        tileFrame(dl, frame, sameRect(c, g_focus));
+        return;
+    }
     dl->AddRect(ImVec2(c.x - 1.0f, c.y - 1.0f), ImVec2(c.x + c.w + 1.0f, c.y + c.h + 1.0f), theme::u32(theme::canvasBorder));
 }
 
 void App::drawShell() {
     const ImGuiViewport* vp = ImGui::GetMainViewport();
-    shell_ = computeShell(layout_, vp->Size.x, vp->Size.y, uiScale_, topInset());
+    if (lookDirty_) { // Preferences > Interface > Look changed: applied here, outside any pushed style
+        lookDirty_ = false;
+        applyLook();
+    }
+    shell_ = computeShell(layout_, vp->Size.x, vp->Size.y, uiScale_, topInset(), shellMetrics());
+    {
+        const ImVec2 m = ImGui::GetIO().MousePos;
+        g_focus = {};
+        for (const CanvasRect* r : {&shell_.title, &shell_.paletteBar, &shell_.topShelf, &shell_.leftShelf, &shell_.rightShelf,
+                                    &shell_.bottomShelf, &shell_.leftTray, &shell_.rightTray, &shell_.console, &shell_.canvas})
+            if (r->w > 0.0f && r->h > 0.0f && r->contains(m.x, m.y)) g_focus = *r;
+        focusRect_ = g_focus;
+    }
     if (shell_.notchBand.h > 0.0f) // the band beside the camera: plain shell colour, so it reads as part of the bezel
         ImGui::GetBackgroundDrawList()->AddRectFilled(ImVec2(0, 0), ImVec2(shell_.notchBand.w, shell_.notchBand.h),
                                                       theme::u32(theme::shellBg));
@@ -764,9 +876,11 @@ void App::drawShell() {
         statusSince_ = ImGui::GetTime();
         if (!lastCommandOk_) redrawIn(6.05); // the error colour below goes after 6 s, idle or not
     }
+    drawLookChrome();
     drawCanvasFrame();
-    drawTitleStrip(shell_);
-    if (layout_.paletteBarVisible) drawPaletteBar(shell_);
+    if (sculptForgeLayout()) drawStatusBar(shell_);
+    else drawTitleStrip(shell_);
+    if (layout_.paletteBarVisible && !sculptForgeLayout()) drawPaletteBar(shell_);
     if (shell_.shelves) {
         drawShelf(kShelfTop, shell_.topShelf);
         drawShelf(kShelfLeft, shell_.leftShelf);
@@ -777,7 +891,8 @@ void App::drawShell() {
         drawDivider(false, shell_.leftDivider);
         drawDivider(true, shell_.rightDivider);
     }
-    drawPaletteDropdown();
+    if (sculptForgeLayout()) drawTaskMenu();
+    else drawPaletteDropdown();
     finishShelfDrag();
 }
 
@@ -798,7 +913,7 @@ void App::drawTitleStrip(const ShellGeometry& g) {
 
     // App mark and name.
     ImGui::SetCursorPos(ImVec2(8.0f * s, textY));
-    ImGui::TextColored(theme::accent, ICON_LC_BOX);
+    ImGui::TextColored(theme::brand, ICON_LC_BOX); // the brand mark keeps its orange in every look
     ImGui::SameLine(0.0f, 5.0f * s);
     if (fontBold_) ImGui::PushFont(fontBold_);
     ImGui::TextUnformatted("SculptForge");
@@ -907,7 +1022,7 @@ void App::drawTitleStrip(const ShellGeometry& g) {
         const ImVec2 p = ImGui::GetCursorScreenPos();
         const bool clicked = ImGui::InvisibleButton("##search", ImVec2(searchW, buttonH));
         const bool hovered = ImGui::IsItemHovered();
-        dl->AddRectFilled(p, ImVec2(p.x + searchW, p.y + buttonH), theme::u32(hovered ? theme::frameHover : theme::frame), 3.0f * s);
+        dl->AddRectFilled(p, ImVec2(p.x + searchW, p.y + buttonH), theme::u32(hovered ? theme::frameHover : theme::frame), theme::rounding(3.0f * s));
         const float ty = p.y + (buttonH - ImGui::GetFontSize()) * 0.5f;
         dl->AddText(ImVec2(p.x + 7.0f * s, ty), theme::u32(theme::textDim), tr(ICON_LC_SEARCH "  Search"));
         const ImVec2 kw = ImGui::CalcTextSize("F3");
@@ -926,7 +1041,7 @@ void App::drawTitleStrip(const ShellGeometry& g) {
         const bool hovered = ImGui::IsItemHovered();
         if (hovered)
             dl->AddRectFilled(p, ImVec2(p.x + windowButtonW, p.y + buttonH),
-                              theme::u32(close ? theme::danger : theme::frameHover), 3.0f * s);
+                              theme::u32(close ? theme::danger : theme::frameHover), theme::rounding(3.0f * s));
         const char* glyph = close ? ICON_LC_X : ICON_LC_MINUS;
         const ImVec2 gs = ImGui::CalcTextSize(glyph);
         dl->AddText(ImVec2(p.x + (windowButtonW - gs.x) * 0.5f, p.y + (buttonH - ImGui::GetFontSize()) * 0.5f),
@@ -981,7 +1096,7 @@ void App::drawPaletteBar(const ShellGeometry& g) {
         ImGui::PushStyleColor(ImGuiCol_Button, open ? theme::header : ImVec4(0, 0, 0, 0));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme::headerHover);
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, theme::header);
-        ImGui::PushStyleColor(ImGuiCol_Text, inTray ? theme::accent : open ? theme::textOnAccent : theme::text);
+        ImGui::PushStyleColor(ImGuiCol_Text, inTray ? theme::accent : open ? theme::textHover : theme::text);
         const bool gap = !uiPrefs_.alphabeticalPalettes && (k == 2 || (help >= 0 && k + 1 == order.size()));
         if (i) ImGui::SameLine(0.0f, gap ? 10.0f * s : -1.0f); // small gaps after File, Edit and before Help
         const std::string label = std::string(tr(p.name)) + "##palette." + p.id;
@@ -1007,6 +1122,506 @@ void App::drawPaletteBar(const ShellGeometry& g) {
     ImGui::End();
 }
 
+// ---------------------------------------------------------------------------
+// Looks and the SculptForge layout (Preferences > Interface > Look)
+// ---------------------------------------------------------------------------
+
+ShellMetrics App::shellMetrics() const {
+    const float gap = theme::look.tiled ? theme::look.gap : 0.0f;
+    if (sculptForgeLayout()) return sculptForgeMetrics(gap);
+    ShellMetrics m;
+    m.gap = gap;
+    if (gap > 0.0f) m.dividerW = 0.0f; // the gaps beside the trays are the dividers
+    return m;
+}
+
+void App::setShellLayout(int layoutKind) {
+    layoutKind = std::clamp(layoutKind, 0, 1);
+    if (uiPrefs_.shellLayout == layoutKind) return;
+    uiPrefs_.shellLayout = layoutKind;
+    // The shelves change to that layout's standard ones; the trays, the console and the Library stay as they are.
+    UiLayout l = standardLayout(layoutKind);
+    l.customize = layout_.customize;
+    l.leftTray = layout_.leftTray;
+    l.rightTray = layout_.rightTray;
+    l.leftTrayOpen = layout_.leftTrayOpen;
+    l.rightTrayOpen = layout_.rightTrayOpen;
+    l.leftTrayWidth = layout_.leftTrayWidth;
+    l.rightTrayWidth = layout_.rightTrayWidth;
+    l.openSubpalettes = layout_.openSubpalettes;
+    l.consoleOpen = layout_.consoleOpen;
+    l.consoleHeight = layout_.consoleHeight;
+    l.lightboxOpen = layout_.lightboxOpen;
+    l.lightboxRows = layout_.lightboxRows;
+    l.lightboxTab = layout_.lightboxTab;
+    l.lightboxBottom = layout_.lightboxBottom;
+    l.leftHanded = layout_.leftHanded;
+    l.shelfTiles = layout_.shelfTiles;
+    layout_ = std::move(l);
+    dropdown_.clear();
+    updateCameraAspect();
+}
+
+void App::applyLook() {
+    std::string message;
+    // From a fresh style: the looks set colours and some sizes, and ScaleAllSizes on the style of an earlier call
+    // would scale what they leave alone once more each time (the minimum window size grew until the Sculpt
+    // Timeline strip covered the axis gizmo at 2400x1350).
+    const float hoverDelay = ImGui::GetStyle().HoverDelayNormal; // Preferences > Interface (Ui.cpp)
+    ImGui::GetStyle() = ImGuiStyle();
+    ImGui::GetStyle().HoverDelayNormal = hoverDelay;
+    theme::applyLook(uiPrefs_.look, &message);
+    ImGui::GetStyle().ScaleAllSizes(uiScale_);
+    const bool mono = theme::look.monoLabels || theme::look.monoAll;
+    if (fontInterSmall_) {
+        fontSmall_ = mono && fontMonoSmall_ ? fontMonoSmall_ : fontInterSmall_;
+        fontTiny_ = mono && fontMonoTiny_ ? fontMonoTiny_ : fontInterTiny_;
+        fontBold_ = mono && fontMonoBold_ ? fontMonoBold_ : fontInterBold_;
+    }
+    ImGui::GetIO().FontDefault = theme::look.monoAll && fontMono_ ? fontMono_ : nullptr; // nullptr: Inter, the first font
+    ImVec4 centre, edge; // the 3D view's gradient background (a flat background the user picked stays as it is)
+    theme::lookViewportGradient(centre, edge);
+    renderSettings_.gradientCentre = glm::vec3(centre.x, centre.y, centre.z);
+    renderSettings_.gradientEdge = glm::vec3(edge.x, edge.y, edge.z);
+    if (!message.empty()) {
+        status_ = message;
+        lastCommandOk_ = false;
+    }
+    updateCameraAspect();
+    redrawIn(0.0);
+}
+
+// The wallpaper in a tiled look's gaps, and Phosphor's optional effects. Nothing here ever covers the 3D view.
+void App::drawLookChrome() {
+    if (!theme::look.tiled) return;
+    const ImGuiViewport* vp = ImGui::GetMainViewport();
+    const float W = vp->Size.x, H = vp->Size.y, s = uiScale_;
+    const CanvasRect& c = shell_.canvas;
+    ImDrawList* bg = ImGui::GetBackgroundDrawList();
+    const ImU32 wall = theme::u32(theme::gapBg);
+    // Four bands around the canvas.
+    bg->AddRectFilled(ImVec2(0, 0), ImVec2(W, c.y), wall);
+    bg->AddRectFilled(ImVec2(0, c.y + c.h), ImVec2(W, H), wall);
+    bg->AddRectFilled(ImVec2(0, c.y), ImVec2(c.x, c.y + c.h), wall);
+    bg->AddRectFilled(ImVec2(c.x + c.w, c.y), ImVec2(W, c.y + c.h), wall);
+    if (theme::look.headers == theme::LookStyle::Headers::Grid) { // drafting paper in the gaps
+        const float step = 12.0f * s;
+        const ImU32 fine = theme::u32(theme::accent, 0.07f), major = theme::u32(theme::accent, 0.16f);
+        auto outsideCanvas = [&](float x0, float y0, float x1, float y1) { return x1 <= c.x || x0 >= c.x + c.w || y1 <= c.y || y0 >= c.y + c.h; };
+        for (int i = 0; float(i) * step < W; ++i) {
+            const float x = std::floor(float(i) * step) + 0.5f;
+            const ImU32 col = i % 5 == 0 ? major : fine;
+            if (outsideCanvas(x, 0, x + 1, H)) bg->AddLine(ImVec2(x, 0), ImVec2(x, H), col);
+            else {
+                bg->AddLine(ImVec2(x, 0), ImVec2(x, c.y), col);
+                bg->AddLine(ImVec2(x, c.y + c.h), ImVec2(x, H), col);
+            }
+        }
+        for (int i = 0; float(i) * step < H; ++i) {
+            const float y = std::floor(float(i) * step) + 0.5f;
+            const ImU32 col = i % 5 == 0 ? major : fine;
+            if (outsideCanvas(0, y, W, y + 1)) bg->AddLine(ImVec2(0, y), ImVec2(W, y), col);
+            else {
+                bg->AddLine(ImVec2(0, y), ImVec2(c.x, y), col);
+                bg->AddLine(ImVec2(c.x + c.w, y), ImVec2(W, y), col);
+            }
+        }
+    }
+    if (theme::look.glow && g_focus.w > 0.0f) { // a soft phosphor bloom around the focused tile, in the gap
+        for (int k = 1; k <= 4; ++k) {
+            const float d = float(k) * s;
+            bg->AddRect(ImVec2(g_focus.x - d, g_focus.y - d), ImVec2(g_focus.x + g_focus.w + d, g_focus.y + g_focus.h + d),
+                        theme::u32(theme::accent, 0.28f / float(k)), 0.0f, 0, 1.0f * s);
+        }
+    }
+    if (theme::look.scanlines) { // over the chrome (shells, menus, pop-ups), never over the 3D view
+        ImDrawList* fg = ImGui::GetForegroundDrawList();
+        const float step = std::max(2.0f, std::floor(3.0f * s));
+        const ImU32 line = IM_COL32(0, 0, 0, 46);
+        for (float y = 0.5f; y < H; y += step) {
+            if (y < c.y || y > c.y + c.h) fg->AddLine(ImVec2(0, y), ImVec2(W, y), line);
+            else {
+                fg->AddLine(ImVec2(0, y), ImVec2(c.x - 1.0f, y), line);
+                fg->AddLine(ImVec2(c.x + c.w + 1.0f, y), ImVec2(W, y), line);
+            }
+        }
+    }
+}
+
+namespace {
+
+std::string upper(std::string s) {
+    for (auto& c : s) c = char(std::toupper(static_cast<unsigned char>(c)));
+    return s;
+}
+
+struct StatusModule {
+    const char* icon;
+    std::string label; // "brush"
+    std::string value; // "Clay"
+    bool mode = false; // the mode block (filled with the accent)
+};
+
+} // namespace
+
+void App::drawStatusBar(const ShellGeometry& g) {
+    const float s = uiScale_;
+    if (!beginShellWindow("##TitleStrip", g.title, theme::shellBg, ImVec2(0.0f, 0.0f))) {
+        ImGui::End();
+        return;
+    }
+    using Status = theme::LookStyle::Status;
+    const Status style = theme::look.status == Status::Plain ? Status::Modules : theme::look.status;
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    const ImVec2 o(g.title.x, g.title.y);
+    const float h = g.title.h;
+    const float inset = theme::look.tiled ? std::max(1.0f, std::floor(s)) : 0.0f; // inside the tile border
+    if (!theme::look.tiled)
+        dl->AddLine(ImVec2(o.x, o.y + h - 1.0f), ImVec2(o.x + g.title.w, o.y + h - 1.0f), theme::u32(theme::border));
+    if (theme::look.headers == theme::LookStyle::Headers::Grid) { // Blueprint: the bar is a drawing's title block
+        const float step = 6.0f * s;
+        for (float x = o.x + step; x < o.x + g.title.w; x += step)
+            dl->AddLine(ImVec2(std::floor(x) + 0.5f, o.y + inset), ImVec2(std::floor(x) + 0.5f, o.y + h - inset), theme::u32(theme::accent, 0.035f));
+    }
+    // The bar's readouts in the look's small font: monospace in the looks, Inter in Classic.
+    ImFont* monoSmall = theme::look.id != 0 && fontMonoSmall_ ? fontMonoSmall_ : fontSmall_ ? fontSmall_ : ImGui::GetFont();
+    ImFont* bold = fontBold_ ? fontBold_ : ImGui::GetFont();
+    auto textW = [](ImFont* f, const std::string& t) { return f->CalcTextSizeA(f->FontSize, FLT_MAX, 0.0f, t.c_str()).x; };
+    auto textAt = [&](ImFont* f, float x, const ImVec4& col, const std::string& t) {
+        dl->AddText(f, f->FontSize, ImVec2(std::floor(x), std::floor(o.y + (h - f->FontSize) * 0.5f)), theme::u32(col), t.c_str());
+        return x + textW(f, t);
+    };
+
+    // Brand: the cube in the SculptForge orange, the name.
+    float x = o.x + 12.0f * s;
+    x = textAt(ImGui::GetFont(), x, theme::brand, ICON_LC_BOX) + 6.0f * s;
+    const bool caps = style == Status::Terminal;
+    x = textAt(bold, x, theme::textBright, caps ? "SCULPTFORGE" : "SculptForge");
+    x += (style == Status::TitleBlock ? 14.0f : 18.0f) * s;
+    if (style == Status::TitleBlock || style == Status::Terminal) {
+        dl->AddLine(ImVec2(std::floor(x) + 0.5f, o.y + inset), ImVec2(std::floor(x) + 0.5f, o.y + h - inset), theme::u32(theme::tileBorder));
+        x += 8.0f * s;
+    }
+
+    // The task menus.
+    int menuCount = 0;
+    const TaskMenuDef* menus = taskMenus(menuCount);
+    const int openMenu = dropdown_.empty() ? -1 : taskMenuOf(dropdown_);
+    ImFont* menuFont = style == Status::Modules ? ImGui::GetFont() : monoSmall;
+    for (int i = 0; i < menuCount; ++i) {
+        const TaskMenuDef& m = menus[i];
+        const std::string shown = style == Status::Modules ? std::string(tr(m.name)) : upper(tr(m.name));
+        const float w = textW(menuFont, shown) + 16.0f * s;
+        ImGui::SetCursorScreenPos(ImVec2(x, o.y + inset));
+        const std::string id = std::string(tr(m.name)) + "##menu." + m.id;
+        const bool pressed = ImGui::InvisibleButton(id.c_str(), ImVec2(w, h - 2.0f * inset));
+        const bool hovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup);
+        const bool open = openMenu == i;
+        const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
+        if (open || hovered) {
+            if (style == Status::Terminal && open) dl->AddRectFilled(a, b, theme::u32(theme::accent)); // inverse video
+            else dl->AddRectFilled(a, b, theme::u32(open ? theme::selection : theme::headerHover, open ? 1.0f : 0.7f));
+        }
+        if (open && style != Status::Terminal) dl->AddRectFilled(ImVec2(a.x, b.y - 2.0f * s), b, theme::u32(theme::accent));
+        const ImVec4 col = open ? (style == Status::Terminal ? theme::textOnAccent : theme::textBright) : theme::text;
+        textAt(menuFont, a.x + 8.0f * s, col, shown);
+        ImGui::LogText("%s", tr(m.name));
+        ui::HelpText(m.name, nullptr, "Open this menu. Its sections are the palettes of the ZBrush-style layout.", "Menus");
+        // Click to open or close; while one is open, pointing at another menu switches to it, as in a menu bar.
+        const bool switchTo = openMenu >= 0 && !open && hovered;
+        if (pressed || switchTo) {
+            if (open && pressed) {
+                dropdown_.clear();
+            } else {
+                // The section shown last, else the first one; one that sits in a tray is already on screen, so the
+                // menu opens on the next one (a menu whose sections are all in trays flashes the tray instead).
+                auto inTray = [&](const std::string& id) {
+                    return std::count(layout_.leftTray.begin(), layout_.leftTray.end(), id) +
+                               std::count(layout_.rightTray.begin(), layout_.rightTray.end(), id) >
+                           0;
+                };
+                std::string section = menuSection_[m.id];
+                if (section.empty() || taskMenuOf(section) != i || inTray(section)) {
+                    section.clear();
+                    for (int k = 0; k < 6 && m.sections[k] && section.empty(); ++k)
+                        if (!inTray(m.sections[k])) section = m.sections[k];
+                }
+                if (section.empty()) {
+                    flashPalette_ = m.sections[0];
+                    flashStart_ = ImGui::GetTime();
+                } else {
+                    dropdown_ = section;
+                    menuX_ = a.x;
+                    openDropdown_ = true;
+                }
+            }
+        }
+        x += w + (style == Status::Modules ? 2.0f : 0.0f) * s;
+    }
+    const float menusEnd = x + 12.0f * s;
+
+    // Right side, measured first: window controls, search, the layout presets as workspaces, then the modules.
+    const float buttonH = h - 2.0f * inset - 8.0f * s;
+    const float winW = buttonH + 8.0f * s;
+    const float searchW = 150.0f * s;
+    float right = o.x + g.title.w - 6.0f * s - inset;
+    const float closeX = right - 2.0f * winW - 2.0f * s;
+    right = closeX - 10.0f * s;
+    const float searchX = right - searchW;
+    right = searchX - 10.0f * s;
+    const float wsW = buttonH + 4.0f * s;
+    const float presetsX = right - 3.0f * wsW - 2.0f * s;
+    right = presetsX - 14.0f * s;
+
+    // Modules: mode, brush, document, triangles, frame rate.
+    std::vector<StatusModule> mods;
+    {
+        const char* mode = paintMode_ ? "Paint" : "Sculpt";
+        for (const char* t : {"tool.move", "tool.scale", "tool.rotate"})
+            if (const Action* a = actions_.find(t); a && a->checked && a->checked()) mode = a->label.c_str();
+        mods.push_back({ICON_LC_SQUARE_TERMINAL, "mode", upper(tr(mode)), true});
+        std::string brush = brushName(brush_);
+        if (doc_.activeBrush >= 0 && doc_.activeBrush < int(doc_.brushes.size())) brush = doc_.brushes[size_t(doc_.activeBrush)].name;
+        mods.push_back({ICON_LC_BRUSH, "brush", brush});
+        std::string name = doc_.path.empty() ? std::string(tr("Untitled"))
+                                             : std::filesystem::path(std::u8string(doc_.path.begin(), doc_.path.end())).filename().string();
+        if (doc_.dirty()) name += " *";
+        mods.push_back({ICON_LC_FILE, "file", name});
+        size_t tris = 0;
+        for (int i = 0; i < doc_.subtoolCount(); ++i) tris += doc_.subtoolMesh(i).triangleCount();
+        mods.push_back({ICON_LC_TRIANGLE, "tris", shortCount(tris)});
+        if (ImGui::GetTime() - fpsShownAt_ > 0.5 || fpsShown_ < 0.0f) {
+            fpsShown_ = ImGui::GetIO().Framerate;
+            fpsShownAt_ = ImGui::GetTime();
+        }
+        char fps[16];
+        std::snprintf(fps, sizeof fps, "%3.0f", fpsShown_);
+        mods.push_back({ICON_LC_ACTIVITY, "fps", fps});
+    }
+    ImFont* labelFont = theme::look.id != 0 && fontMonoTiny_ ? fontMonoTiny_ : fontTiny_ ? fontTiny_ : monoSmall;
+    auto moduleW = [&](const StatusModule& m) {
+        switch (style) {
+        case Status::Terminal:
+            return m.mode ? textW(monoSmall, "[" + m.value + "]") + 10.0f * s : textW(monoSmall, m.label + ":" + m.value);
+        case Status::TitleBlock:
+            return textW(labelFont, upper(m.label)) + 6.0f * s + textW(m.mode ? monoSmall : monoSmall, m.value) + 20.0f * s;
+        default:
+            return m.mode ? textW(monoSmall, m.value) + 20.0f * s : textW(monoSmall, std::string(m.icon) + " " + m.value);
+        }
+    };
+    const float sepW = style == Status::Terminal ? textW(monoSmall, " | ") : style == Status::TitleBlock ? 0.0f : 16.0f * s;
+    // Drop the least important modules (from the file name inwards) until they fit beside the menus.
+    std::vector<int> shown = {0, 1, 2, 3, 4};
+    auto total = [&] {
+        float w = 0.0f;
+        for (size_t k = 0; k < shown.size(); ++k) w += moduleW(mods[size_t(shown[k])]) + (k ? sepW : 0.0f);
+        return w;
+    };
+    for (int drop : {2, 4, 1})
+        if (total() > right - menusEnd - 120.0f * s) shown.erase(std::remove(shown.begin(), shown.end(), drop), shown.end());
+    float mx = right - total();
+    const float modulesX = mx;
+    for (size_t k = 0; k < shown.size(); ++k) {
+        const StatusModule& m = mods[size_t(shown[k])];
+        const float w = moduleW(m);
+        if (k) {
+            if (style == Status::Terminal) textAt(monoSmall, mx, theme::textDim, " | ");
+            mx += sepW;
+        }
+        const float y0 = o.y + inset, y1 = o.y + h - inset;
+        switch (style) {
+        case Status::Terminal:
+            if (m.mode) {
+                dl->AddRectFilled(ImVec2(mx, y0 + 5.0f * s), ImVec2(mx + w, y1 - 5.0f * s), theme::u32(theme::accent));
+                textAt(monoSmall, mx + 5.0f * s, theme::textOnAccent, "[" + m.value + "]");
+            } else {
+                const float lx = textAt(monoSmall, mx, theme::textDim, m.label + ":");
+                textAt(monoSmall, lx, theme::text, m.value);
+            }
+            break;
+        case Status::TitleBlock: {
+            dl->AddLine(ImVec2(std::floor(mx) + 0.5f, y0), ImVec2(std::floor(mx) + 0.5f, y1), theme::u32(theme::tileBorder));
+            const float lx = textAt(labelFont, mx + 10.0f * s, theme::textDim, upper(m.label)) + 6.0f * s;
+            textAt(monoSmall, lx, m.mode ? theme::accent : theme::textBright, m.value);
+            break;
+        }
+        default:
+            if (m.mode) {
+                dl->AddRectFilled(ImVec2(mx, y0 + 4.0f * s), ImVec2(mx + w, y1 - 4.0f * s), theme::u32(theme::accent));
+                textAt(monoSmall, mx + 10.0f * s, theme::textOnAccent, m.value);
+            } else {
+                const float ix = textAt(monoSmall, mx, theme::accent, m.icon);
+                textAt(monoSmall, ix + textW(monoSmall, " "), theme::text, m.value);
+            }
+        }
+        mx += w;
+    }
+    if (style == Status::TitleBlock)
+        dl->AddLine(ImVec2(std::floor(mx + 10.0f * s) + 0.5f, o.y + inset), ImVec2(std::floor(mx + 10.0f * s) + 0.5f, o.y + h - inset),
+                    theme::u32(theme::tileBorder));
+
+    // The status message between the menus and the modules: what just happened.
+    {
+        const std::string msg = layout_.customize ? std::string(tr("Customize: Ctrl+Alt+drag to move or remove items")) : tr(status_);
+        const float avail = modulesX - menusEnd - 16.0f * s;
+        if (!msg.empty() && avail > 60.0f * s) {
+            const bool error = !layout_.customize && !lastCommandOk_ && ImGui::GetTime() - statusSince_ < 6.0;
+            const std::string text = (style == Status::Terminal ? "> " : "") + msg;
+            textAt(monoSmall, menusEnd, error ? theme::danger : theme::textDim, elide(monoSmall, text, avail));
+        }
+    }
+
+    // Layout presets 1 2 3, drawn as workspaces.
+    for (int i = 1; i <= 3; ++i) {
+        const std::string id = "ui.preset." + std::to_string(i);
+        ImGui::SetCursorScreenPos(ImVec2(presetsX + float(i - 1) * (wsW + 1.0f * s), o.y + (h - buttonH) * 0.5f));
+        const Action* a = actions_.find(id);
+        const bool clicked = ImGui::InvisibleButton((std::to_string(i) + "##" + id).c_str(), ImVec2(wsW, buttonH));
+        const bool hovered = ImGui::IsItemHovered();
+        const ImVec2 a0 = ImGui::GetItemRectMin(), a1 = ImGui::GetItemRectMax();
+        if (hovered) dl->AddRectFilled(a0, a1, theme::u32(theme::headerHover));
+        const std::string n = std::to_string(i);
+        textAt(monoSmall, a0.x + (wsW - textW(monoSmall, n)) * 0.5f, hovered ? theme::textBright : theme::textDim, n);
+        if (clicked && a && a->run) a->run();
+        ui::HelpAction(*this, id.c_str());
+    }
+
+    // Search: opens the command palette (F3), which also finds every palette of the ZBrush-style layout.
+    {
+        ImGui::SetCursorScreenPos(ImVec2(searchX, o.y + (h - buttonH) * 0.5f));
+        const bool clicked = ImGui::InvisibleButton("##search", ImVec2(searchW, buttonH));
+        const bool hovered = ImGui::IsItemHovered();
+        const ImVec2 p = ImGui::GetItemRectMin();
+        dl->AddRectFilled(p, ImVec2(p.x + searchW, p.y + buttonH), theme::u32(hovered ? theme::frameHover : theme::frame));
+        if (theme::look.tiled) dl->AddRect(p, ImVec2(p.x + searchW, p.y + buttonH), theme::u32(theme::tileBorder));
+        const char* prompt = style == Status::Terminal ? "> search" : style == Status::TitleBlock ? ICON_LC_SEARCH " SEARCH" : ICON_LC_SEARCH " search";
+        textAt(monoSmall, p.x + 8.0f * s, theme::textDim, prompt);
+        textAt(monoSmall, p.x + searchW - textW(monoSmall, "F3") - 8.0f * s, theme::accent, "F3");
+        if (clicked) {
+            if (const Action* a = actions_.find("ui.command_palette"); a && a->run) a->run();
+        }
+        ui::HelpText("Search", "F3", "Find any command, palette, brush or material by name and run it.", "Title");
+    }
+
+    // Window controls: minimise, and close (asks to save changes first).
+    for (int k = 0; k < 2; ++k) {
+        const bool close = k == 1;
+        ImGui::SetCursorScreenPos(ImVec2(closeX + float(k) * (winW + 2.0f * s), o.y + (h - buttonH) * 0.5f));
+        const bool clicked = ImGui::InvisibleButton(close ? "Close##window" : "Minimize##window", ImVec2(winW, buttonH));
+        const bool hovered = ImGui::IsItemHovered();
+        const ImVec2 p = ImGui::GetItemRectMin();
+        if (hovered) dl->AddRectFilled(p, ImVec2(p.x + winW, p.y + buttonH), theme::u32(close ? theme::danger : theme::frameHover));
+        centredText(dl, nullptr, p, ImVec2(p.x + winW, p.y + buttonH), theme::u32(hovered && close ? theme::textOnAccent : theme::textDim),
+                    close ? ICON_LC_X : ICON_LC_MINUS);
+        if (close) {
+            if (clicked) requestQuit();
+            ui::HelpAction(*this, "file.quit");
+        } else {
+            if (clicked) SDL_MinimizeWindow(window_);
+            ui::HelpText("Minimize", nullptr, "Minimize the SculptForge window.", "Title");
+        }
+    }
+    ImGui::End();
+}
+
+// A task menu's drop-down: its sections (palettes) down the left, the chosen one beside them, under its header (whose
+// tray icon still pins it to a tray). dropdown_ is the chosen palette, so ui.palette.* and F3 open it in its menu.
+void App::drawTaskMenu() {
+    if (openDropdown_) {
+        ImGui::OpenPopup("##palettedropdown");
+        openDropdown_ = false;
+    }
+    if (dropdown_.empty()) return;
+    const int menuIndex = taskMenuOf(dropdown_);
+    const PaletteDef* def = findPalette(dropdown_);
+    if (menuIndex < 0 || !def) {
+        dropdown_.clear();
+        return;
+    }
+    int count = 0;
+    const TaskMenuDef& menu = taskMenus(count)[menuIndex];
+    menuSection_[menu.id] = dropdown_;
+    int sections = 0;
+    while (sections < 6 && menu.sections[sections]) ++sections;
+    const float s = uiScale_;
+    const ImGuiViewport* vp = ImGui::GetMainViewport();
+    const float listW = sections > 1 ? 168.0f * s : 0.0f, bodyW = 320.0f * s;
+    const float pad = std::round(6.0f * s);
+    const float w = listW + bodyW + 2.0f * pad + (sections > 1 ? pad : 0.0f);
+    const float y = shell_.title.y + shell_.title.h + (theme::look.tiled ? 2.0f * s : 0.0f);
+    float x = menuX_;
+    if (x <= 0.0f) { // opened by F3 or a key: under its name in the status bar
+        x = shell_.title.x + 150.0f * s;
+        for (int i = 0; i < menuIndex; ++i) x += ImGui::CalcTextSize(taskMenus(count)[i].name).x + 18.0f * s;
+    }
+    ImGui::SetNextWindowPos(ImVec2(std::clamp(x, 4.0f * s, vp->Size.x - w - 4.0f * s), y));
+    ImGui::SetNextWindowSizeConstraints(ImVec2(w, 0), ImVec2(w, vp->Size.y - y - 8.0f * s));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(pad, pad));
+    const bool open = ImGui::BeginPopup("##palettedropdown");
+    ImGui::PopStyleVar();
+    if (!open) {
+        dropdown_.clear();
+        menuX_ = 0.0f;
+        return;
+    }
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    if (sections > 1) {
+        ImGui::BeginGroup();
+        ImFont* capFont = fontTiny_ ? fontTiny_ : ImGui::GetFont();
+        ImGui::PushFont(capFont);
+        ImGui::TextColored(theme::textDim, "%s", upper(tr(menu.name)).c_str());
+        ImGui::PopFont();
+        for (int k = 0; k < sections; ++k) {
+            const PaletteDef* p = findPalette(menu.sections[k]);
+            if (!p) continue;
+            const std::string title = tr(menu.titles[k] ? menu.titles[k] : p->name);
+            const bool current = dropdown_ == p->id;
+            const bool inTray = std::count(layout_.leftTray.begin(), layout_.leftTray.end(), p->id) +
+                                    std::count(layout_.rightTray.begin(), layout_.rightTray.end(), p->id) >
+                                0;
+            const float rowH = 28.0f * s;
+            const bool clicked = ImGui::InvisibleButton((title + "##section." + p->id).c_str(), ImVec2(listW, rowH));
+            const bool hovered = ImGui::IsItemHovered();
+            const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
+            if (current || hovered) dl->AddRectFilled(a, b, theme::u32(current ? theme::selection : theme::headerHover, current ? 1.0f : 0.6f));
+            if (current) dl->AddRectFilled(a, ImVec2(a.x + 2.0f * s, b.y), theme::u32(theme::accent));
+            const float ty = std::floor(a.y + (rowH - ImGui::GetFontSize()) * 0.5f);
+            dl->AddText(ImVec2(a.x + 10.0f * s, ty), theme::u32(current ? theme::accent : theme::textDim), p->icon);
+            dl->AddText(ImVec2(a.x + 34.0f * s, ty), theme::u32(current ? theme::textBright : theme::text), title.c_str());
+            if (inTray) dl->AddText(ImVec2(b.x - 22.0f * s, ty), theme::u32(theme::textDim), ICON_LC_PANEL_RIGHT);
+            if (clicked) {
+                if (inTray) {
+                    flashPalette_ = p->id;
+                    flashStart_ = ImGui::GetTime();
+                } else {
+                    dropdown_ = p->id;
+                }
+            }
+            ui::HelpText(title.c_str(), nullptr, inTray ? "This palette is in a tray: click to find it there." : "Show this section.",
+                         tr(menu.name));
+        }
+        ImGui::EndGroup();
+        const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
+        const float lineX = std::floor(b.x + pad * 0.5f) + 0.5f;
+        dl->AddLine(ImVec2(lineX, a.y), ImVec2(lineX, std::max(b.y, ImGui::GetWindowPos().y + ImGui::GetWindowHeight() - pad)),
+                    theme::u32(theme::tileBorder));
+        ImGui::SameLine(0.0f, pad);
+    }
+    ImGui::BeginGroup();
+    def = findPalette(dropdown_); // a section click may have changed it
+    if (def) {
+        Demo::pushScope(def->name);
+        if (def->scope) Demo::pushScope(def->scope);
+        const std::string id = dropdown_;
+        if (paletteHeader(id.c_str(), false, true)) drawPaletteBody(id);
+        if (def->scope) Demo::popScope();
+        Demo::popScope();
+    }
+    ImGui::EndGroup();
+    if (ImGui::IsKeyPressed(ImGuiKey_Escape) && !ImGui::IsAnyItemActive()) ImGui::CloseCurrentPopup();
+    ImGui::EndPopup();
+}
+
 bool App::paletteHeader(const char* id, bool inTray, bool right) {
     const PaletteDef* def = findPalette(id);
     if (!def) return false;
@@ -1016,7 +1631,18 @@ bool App::paletteHeader(const char* id, bool inTray, bool right) {
     const ImVec2 p = ImGui::GetCursorScreenPos();
     const float w = ImGui::GetContentRegionAvail().x;
     const bool collapsed = inTray && std::count(collapsedPalettes_.begin(), collapsedPalettes_.end(), id) > 0;
-    dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), theme::u32(theme::header), 3.0f * s);
+    using Headers = theme::LookStyle::Headers;
+    const Headers headers = theme::look.headers;
+    if (headers != Headers::Ascii) dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), theme::u32(theme::header), theme::rounding(3.0f * s));
+    if (headers == Headers::Grid) { // drafting grid in the header, a cyan base line
+        const float step = 6.0f * s;
+        const ImU32 g = theme::u32(theme::accent, 0.10f);
+        for (float x = p.x + step; x < p.x + w; x += step) dl->AddLine(ImVec2(std::floor(x) + 0.5f, p.y), ImVec2(std::floor(x) + 0.5f, p.y + h), g);
+        for (float y = p.y + step; y < p.y + h; y += step) dl->AddLine(ImVec2(p.x, std::floor(y) + 0.5f), ImVec2(p.x + w, std::floor(y) + 0.5f), g);
+        dl->AddLine(ImVec2(p.x, p.y + h - 0.5f), ImVec2(p.x + w, p.y + h - 0.5f), theme::u32(theme::accent, 0.8f));
+    } else if (headers == Headers::Bar) { // a terminal pane's title: the accent rule under it
+        dl->AddLine(ImVec2(p.x, p.y + h - 0.5f), ImVec2(p.x + w, p.y + h - 0.5f), theme::u32(theme::accent, 0.7f));
+    }
 
     // Tray icon: in a drop-down it moves the palette into the right tray (Shift: left) or can be dragged to one;
     // in a tray it sends the palette back to the bar.
@@ -1038,15 +1664,30 @@ bool App::paletteHeader(const char* id, bool inTray, bool right) {
     const bool titleClicked = ImGui::InvisibleButton("##title", ImVec2(std::max(1.0f, w - 2.0f * h), h));
     const bool titleHovered = ImGui::IsItemHovered();
     if (fontBold_) ImGui::PushFont(fontBold_);
-    dl->AddText(ImVec2(p.x + h + 2.0f * s, p.y + (h - ImGui::GetFontSize()) * 0.5f),
-                theme::u32(titleHovered && inTray ? theme::textOnAccent : theme::text), tr(def->name));
+    {
+        std::string title = tr(def->name);
+        if (theme::look.upperHeaders)
+            for (auto& c : title) c = char(std::toupper(static_cast<unsigned char>(c)));
+        if (headers == Headers::Ascii) title = "[ " + title + " ]";
+        const ImVec2 tp(p.x + h + 2.0f * s, p.y + (h - ImGui::GetFontSize()) * 0.5f);
+        const ImVec4 col = titleHovered && inTray ? theme::textHover : headers == Headers::Bar || headers == Headers::Ascii ? theme::accent : theme::text;
+        dl->AddText(tp, theme::u32(col), title.c_str());
+        if (headers == Headers::Ascii) { // [ TOOL ]--------------- up to the end icon
+            const float x0 = tp.x + ImGui::CalcTextSize(title.c_str()).x + 4.0f * s, x1 = p.x + w - h - 2.0f * s;
+            ImFont* f = ImGui::GetFont();
+            const float cw = f->CalcTextSizeA(f->FontSize, FLT_MAX, 0.0f, "\xe2\x94\x80").x;
+            std::string run;
+            for (float x = x0; cw > 0.0f && x + cw <= x1; x += cw) run += "\xe2\x94\x80";
+            dl->AddText(ImVec2(x0, tp.y), theme::u32(theme::accent, 0.55f), run.c_str());
+        }
+    }
     ImGui::LogText("%s", tr(def->name));
     if (fontBold_) ImGui::PopFont();
     ImGui::SameLine();
     const bool endClicked = ImGui::InvisibleButton(inTray ? "##collapse" : "##close", ImVec2(h, h));
     const bool endHovered = ImGui::IsItemHovered();
     centredText(dl, nullptr, ImVec2(p.x + w - h, p.y), ImVec2(p.x + w, p.y + h),
-                theme::u32(endHovered ? theme::textOnAccent : theme::textDim),
+                theme::u32(endHovered ? theme::textHover : theme::textDim),
                 inTray ? (collapsed ? ICON_LC_CHEVRON_RIGHT : ICON_LC_CHEVRON_DOWN) : ICON_LC_X);
     ImGui::PopStyleVar();
     ImGui::Dummy(ImVec2(0, 2.0f * s));
@@ -1144,7 +1785,7 @@ void App::drawTray(bool right, const CanvasRect& r) {
             if (t < 0.9) {
                 const float a = float(0.45 * (1.0 - t / 0.9));
                 ImGui::GetWindowDrawList()->AddRectFilled(top, ImVec2(top.x + ImGui::GetContentRegionAvail().x, top.y + 24.0f * s),
-                                                          theme::u32(theme::accent, a), 3.0f * s);
+                                                          theme::u32(theme::accent, a), theme::rounding(3.0f * s));
             } else {
                 flashPalette_.clear();
             }
@@ -1208,7 +1849,7 @@ void App::drawDivider(bool right, const CanvasRect& r) {
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const float cx = std::floor(r.x + r.w * 0.5f), cy = r.y + r.h * 0.5f;
     const ImU32 grip = theme::u32(hovered || active ? theme::accent : theme::textDim, hovered || active ? 1.0f : 0.5f);
-    dl->AddRectFilled(ImVec2(cx - 1.0f * s, cy - 16.0f * s), ImVec2(cx + 1.0f * s, cy + 16.0f * s), grip, 1.0f * s);
+    dl->AddRectFilled(ImVec2(cx - 1.0f * s, cy - 16.0f * s), ImVec2(cx + 1.0f * s, cy + 16.0f * s), grip, theme::rounding(1.0f * s));
     ImGui::End();
 }
 
@@ -1457,17 +2098,17 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
         ImDrawList* dl = ImGui::GetWindowDrawList();
         const bool on = found >= 0 && doc_.activeBrush == found && !paintMode_;
-        if (ImGui::IsItemHovered()) dl->AddRectFilled(a, b, theme::u32(theme::buttonHover, 0.55f), 4.0f * s);
+        if (ImGui::IsItemHovered()) dl->AddRectFilled(a, b, theme::u32(theme::buttonHover, 0.55f), theme::rounding(4.0f * s));
         const float capH = (fontSmall_ ? fontSmall_->FontSize : 12.0f) + 2.0f * s;
         const float pic = size.y - capH;
         ImTextureID tex = found >= 0 ? thumbs_.recipe(doc_.brushes[size_t(found)]) : ImTextureID(0);
         const ImVec2 c((a.x + b.x) * 0.5f, a.y + pic * 0.5f);
         if (tex) dl->AddImageRounded(tex, ImVec2(c.x - pic * 0.5f, a.y), ImVec2(c.x + pic * 0.5f, a.y + pic), ImVec2(0, 0), ImVec2(1, 1),
-                                     IM_COL32_WHITE, 4.0f * s);
+                                     IM_COL32_WHITE, theme::rounding(4.0f * s));
         else drawBrushIcon(dl, c, pic * 0.36f, int(BrushType::Standard));
         dl->AddText(fontSmall_, fontSmall_ ? fontSmall_->FontSize : 12.0f, ImVec2(a.x + 2.0f * s, a.y), theme::u32(theme::accent),
                     ICON_LC_SPARKLE);
-        if (on) dl->AddRect(a, b, theme::u32(theme::accent), 4.0f * s, 0, 2.0f * s);
+        if (on) dl->AddRect(a, b, theme::u32(theme::accent), theme::rounding(4.0f * s), 0, 2.0f * s);
         centredText(dl, fontSmall_, ImVec2(a.x, b.y - capH), b, theme::u32(found < 0 ? theme::textDim : on ? theme::accent : theme::text),
                     elide(fontSmall_ ? fontSmall_ : ImGui::GetFont(), name, size.x).c_str());
         if (clicked && found >= 0) {
@@ -1615,7 +2256,7 @@ bool App::canvasNavButton(const char* id, const char* icon, const char* englishL
     }
     const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
     ImDrawList* dl = ImGui::GetWindowDrawList();
-    dl->AddRectFilled(a, b, theme::u32(active ? theme::accent : hovered ? theme::buttonHover : theme::frame), 4.0f * s);
+    dl->AddRectFilled(a, b, theme::u32(active ? theme::accent : hovered ? theme::buttonHover : theme::frame), theme::rounding(4.0f * s));
     const float capH = (fontTiny_ ? fontTiny_->FontSize : 10.0f) + 2.0f * s;
     const ImU32 fg = theme::u32(active ? theme::textOnAccent : theme::text);
     centredText(dl, fontIcons_, a, ImVec2(b.x, b.y - capH + 2.0f * s), fg, icon);
@@ -1639,8 +2280,8 @@ bool tileFrame(const char* id, ImVec2 size, ImFont* font, const std::string& cap
     const float capH = (font ? font->FontSize : 12.0f) + 4.0f * s;
     pic0 = a;
     pic1 = ImVec2(b.x, b.y - capH);
-    dl->AddRectFilled(pic0, pic1, theme::u32(theme::tile), 4.0f * s);
-    if (hovered) dl->AddRect(pic0, pic1, theme::u32(theme::accent, 0.8f), 4.0f * s, 0, 1.5f * s);
+    dl->AddRectFilled(pic0, pic1, theme::u32(theme::tile), theme::rounding(4.0f * s));
+    if (hovered) dl->AddRect(pic0, pic1, theme::u32(theme::accent, 0.8f), theme::rounding(4.0f * s), 0, 1.5f * s);
     centredText(dl, font, ImVec2(a.x, b.y - capH), b, theme::u32(hovered ? theme::text : theme::textDim),
                 elide(font ? font : ImGui::GetFont(), caption, size.x).c_str());
     ImGui::LogText("%s", caption.c_str());
@@ -1677,7 +2318,7 @@ void App::drawBrushTile(const char* id, ImVec2 size) {
     const float r = (b.x - a.x) * 0.36f;
     if (tex) {
         dl->AddImageRounded(tex, ImVec2(a.x + 2 * s, a.y + 2 * s), ImVec2(b.x - 2 * s, b.y - 2 * s), ImVec2(0, 0), ImVec2(1, 1),
-                            IM_COL32_WHITE, 4.0f * s);
+                            IM_COL32_WHITE, theme::rounding(4.0f * s));
     } else if (guidesMode_) { // QRemesh Guides (PanelRetopo.cpp)
         dl->AddCircleFilled(c, r, theme::u32(theme::tile), 32);
         centredText(dl, fontIcons_, a, b, IM_COL32(255, 196, 64, 255), ICON_LC_SPLINE);
@@ -1719,7 +2360,7 @@ void App::drawStrokeTile(const char* id, ImVec2 size) {
         }
         break;
     case StrokeType::DragRect:
-        dl->AddRect(at(0.22f, 0.26f), at(0.78f, 0.74f), col, 2.0f * s, 0, 1.5f * s);
+        dl->AddRect(at(0.22f, 0.26f), at(0.78f, 0.74f), col, theme::rounding(2.0f * s), 0, 1.5f * s);
         dl->AddLine(at(0.3f, 0.66f), at(0.7f, 0.34f), col, 1.5f * s);
         dl->AddTriangleFilled(at(0.7f, 0.34f), at(0.6f, 0.36f), at(0.67f, 0.44f), col);
         break;
@@ -1766,7 +2407,7 @@ void App::drawAlphaTile(const char* id, ImVec2 size) {
         const bool clicked = tileFrame(id, size, fontSmall_, doc_.brushVdm->name, s, a, b);
         if (ImTextureID tex = thumbs_.vdm(doc_.brushVdm))
             ImGui::GetWindowDrawList()->AddImageRounded(tex, ImVec2(a.x + 2 * s, a.y + 2 * s), ImVec2(b.x - 2 * s, b.y - 2 * s),
-                                                        ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, 4.0f * s);
+                                                        ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, theme::rounding(4.0f * s));
         if (clicked) openPicker(Picker::Alpha, ImVec2(ImGui::GetItemRectMax().x + 4.0f * s, ImGui::GetItemRectMin().y));
         ui::HelpText("VDM", nullptr, "The VDM brush's vector displacement map. Click to pick another.", "Left shelf");
         return;
@@ -1776,11 +2417,11 @@ void App::drawAlphaTile(const char* id, ImVec2 size) {
     ImTextureID tex = thumbs_.alpha(doc_.brushAlpha);
     if (tex) {
         dl->AddImageRounded(tex, ImVec2(a.x + 2 * s, a.y + 2 * s), ImVec2(b.x - 2 * s, b.y - 2 * s), ImVec2(0, 0), ImVec2(1, 1),
-                            IM_COL32_WHITE, 4.0f * s);
+                            IM_COL32_WHITE, theme::rounding(4.0f * s));
     } else {
         constexpr int kCells = 26;
         const float inset = 6.0f * s, cell = (b.x - a.x - 2.0f * inset) / kCells;
-        dl->AddRectFilled(ImVec2(a.x + inset, a.y + inset), ImVec2(b.x - inset, b.y - inset), IM_COL32(0, 0, 0, 255), 3.0f * s);
+        dl->AddRectFilled(ImVec2(a.x + inset, a.y + inset), ImVec2(b.x - inset, b.y - inset), IM_COL32(0, 0, 0, 255), theme::rounding(3.0f * s));
         for (int y = 0; y < kCells; ++y)
             for (int x = 0; x < kCells; ++x) {
                 const float u = (float(x) + 0.5f) / kCells * 2.0f - 1.0f, v = 1.0f - (float(y) + 0.5f) / kCells * 2.0f;

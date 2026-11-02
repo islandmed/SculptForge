@@ -1,6 +1,7 @@
 # Kelvinlet brushes and Capture from view: KelvinGrab from the bottom shelf drags the sphere out elastically (undo
 # puts it back), Twist and Scale act where they press, the Kelvinlet section's Squash slider; then Ctrl+Alt+C, a
 # square dragged over a sculpted detail, the capture window, and Detail Clone stamping the capture along a stroke.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_sphere subdivisions=7
 wait_idle 30
 

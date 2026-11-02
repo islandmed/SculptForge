@@ -2,6 +2,7 @@
 # letters, L, V, Space QuickMenu, the mask keys (Ctrl+A, Ctrl+Shift+A, Ctrl+I, Ctrl+H), Ctrl+click to blur and
 # Ctrl+Alt+click to sharpen the mask, Ctrl+W, Ctrl+Shift+click on a partly hidden mesh, Shift-constrained
 # straight strokes, Shift+click / release Shift / drag to roll, and the ZBrush / SculptForge input styles.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_sphere subdivisions=5
 # New installs start with the SculptForge keys; this script is about the ZBrush-style ones.
 expect_value input_style == 1

@@ -44,7 +44,20 @@ constexpr BottomShelfSize bottomShelfSize(int tiles) {
 // windows 1920 logical px wide or more.
 float trayWidth(float stored, float logicalWindowWidth);
 
+// The sizes that differ between the ZBrush-style layout (the defaults: shell:: above) and the SculptForge layout,
+// and the gap of a tiled look (Preferences > Interface > Look), logical px.
+struct ShellMetrics {
+    float titleH = shell::kTitleH, paletteBarH = shell::kPaletteBarH, topShelfH = shell::kTopShelfH;
+    float dividerW = shell::kDividerW;
+    float gap = 0.0f; // tiles: every region is inset so `gap` px of wallpaper shows between them and at the edges
+                      // (bars and shelves grow by the gap first, so what's inside keeps its size); the dividers
+                      // become the gaps beside the trays
+    float grow = 0.0f; // (internal) added to the bars' and shelves' sizes
+};
+ShellMetrics sculptForgeMetrics(float gap); // the SculptForge layout: menus in the status bar, a one-row tool shelf
+
 // `topInset` (window px) keeps everything below a camera notch or other unsafe band at the top.
-ShellGeometry computeShell(const UiLayout& layout, float width, float height, float scale, float topInset = 0.0f);
+ShellGeometry computeShell(const UiLayout& layout, float width, float height, float scale, float topInset = 0.0f,
+                           const ShellMetrics& metrics = ShellMetrics());
 
 } // namespace sf

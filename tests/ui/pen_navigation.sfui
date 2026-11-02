@@ -2,6 +2,7 @@
 # input styles. Some tablet drivers (a Ugee pen on X11, Windows Ink) send stray mouse events at an old position
 # between the pen's; SDL keeps one cursor position for both, so its relative motion jumped back and forth and the
 # view only shook. With the stray events the view must move exactly as without them.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_sphere subdivisions=4
 snapshot
 

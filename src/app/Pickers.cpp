@@ -3,6 +3,7 @@
 //
 // Pop-up pickers (ZBrush's brush, stroke, alpha and material pop-ups), the
 // Draw Size / Strength sliders at the cursor, and the thumbnail tile.
+#include "app/Theme.h"
 #include "app/Pickers.h"
 
 #include "app/App.h"
@@ -27,15 +28,18 @@ namespace sf {
 
 namespace {
 
-// Theme tokens (docs/ui-design.md section 10).
-constexpr ImU32 kAccent = IM_COL32(240, 136, 46, 255);
-constexpr ImU32 kTileBg = IM_COL32(42, 42, 46, 255);
-constexpr ImU32 kTileHover = IM_COL32(54, 54, 59, 255);
-constexpr ImU32 kTileBorder = IM_COL32(18, 18, 20, 255);
-constexpr ImU32 kGlyph = IM_COL32(140, 140, 144, 255);
-constexpr ImU32 kText = IM_COL32(216, 216, 216, 255);
-constexpr ImU32 kTextDim = IM_COL32(140, 140, 144, 255);
-constexpr ImU32 kPanelBg = IM_COL32(37, 37, 40, 252); // #252528, pop-ups
+// Theme tokens (docs/ui-design.md section 10): the Classic look's values, or the current look's tokens.
+ImU32 lookColor(ImU32 classic, const ImVec4& token, float alpha = 1.0f) {
+    return theme::look.id == 0 ? classic : theme::u32(token, alpha);
+}
+ImU32 kAccent() { return lookColor(IM_COL32(240, 136, 46, 255), theme::accent); }
+ImU32 kTileBg() { return lookColor(IM_COL32(42, 42, 46, 255), theme::tile); }
+ImU32 kTileHover() { return lookColor(IM_COL32(54, 54, 59, 255), theme::headerHover); }
+ImU32 kTileBorder() { return lookColor(IM_COL32(18, 18, 20, 255), theme::tileBorder); }
+ImU32 kGlyph() { return lookColor(IM_COL32(140, 140, 144, 255), theme::textDim); }
+ImU32 kText() { return lookColor(IM_COL32(216, 216, 216, 255), theme::text); }
+ImU32 kTextDim() { return lookColor(IM_COL32(140, 140, 144, 255), theme::textDim); }
+ImU32 kPanelBg() { return lookColor(IM_COL32(37, 37, 40, 252), theme::panelBg, 0.99f); } // #252528, pop-ups
 // The left tray's colour field. These should become theme tokens (Theme.h) once the theme settles.
 constexpr ImU32 kFieldEdge = IM_COL32(14, 14, 16, 255);       // 1 px around the SV square, hue strip and swatches
 constexpr ImU32 kFieldHairline = IM_COL32(255, 255, 255, 28); // inner highlight that lifts a swatch off the tray
@@ -166,11 +170,11 @@ void quickInfo(ImTextureID tex, const char* glyph, const std::string& title, con
     else if (glyph) {
         ImGui::Dummy(ImVec2(big, big));
         ImDrawList* dl = ImGui::GetWindowDrawList();
-        dl->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), kTileBg, 4.0f);
+        dl->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), kTileBg(), theme::rounding(4.0f));
         const float fs = ImGui::GetFontSize() * 3.0f;
         const ImVec2 sz = ImGui::GetFont()->CalcTextSizeA(fs, FLT_MAX, 0, glyph);
         const ImVec2 c = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()).GetCenter();
-        dl->AddText(ImGui::GetFont(), fs, ImVec2(c.x - sz.x * 0.5f, c.y - sz.y * 0.5f), kGlyph, glyph);
+        dl->AddText(ImGui::GetFont(), fs, ImVec2(c.x - sz.x * 0.5f, c.y - sz.y * 0.5f), kGlyph(), glyph);
     }
     ImGui::TextUnformatted(title.c_str());
     if (!text.empty()) {
@@ -193,10 +197,10 @@ bool beginPickerWindow(const char* title, float width) {
     ImGui::SetNextWindowPos(pos, ImGuiCond_Appearing);
     ImGui::SetNextWindowSizeConstraints(ImVec2(width, 0), ImVec2(width, vp->Size.y - 60.0f));
     if (s.openedFrame == ImGui::GetFrameCount()) ImGui::SetNextWindowFocus();
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 6.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, theme::rounding(6.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10, 8));
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, kPanelBg);
-    ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(64, 64, 70, 255));
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, kPanelBg());
+    ImGui::PushStyleColor(ImGuiCol_Border, lookColor(IM_COL32(64, 64, 70, 255), theme::tileBorder));
     const bool visible = ImGui::Begin(title, nullptr,
                                       ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                                           ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
@@ -250,38 +254,38 @@ bool AssetTile(const char* id, ImTextureID texture, const char* glyph, const std
     const bool hovered = ImGui::IsItemHovered();
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const ImVec2 t0 = p, t1(p.x + thumbSize, p.y + thumbSize);
-    dl->AddRectFilled(t0, t1, hovered ? kTileHover : kTileBg, 4.0f);
+    dl->AddRectFilled(t0, t1, hovered ? kTileHover() : kTileBg(), theme::rounding(4.0f));
     if (texture) {
         const float pad = 2.0f;
         dl->AddImageRounded(texture, ImVec2(t0.x + pad, t0.y + pad), ImVec2(t1.x - pad, t1.y - pad), ImVec2(0, 0),
-                            ImVec2(1, 1), dim ? IM_COL32(255, 255, 255, 110) : IM_COL32_WHITE, 3.0f);
+                            ImVec2(1, 1), dim ? IM_COL32(255, 255, 255, 110) : IM_COL32_WHITE, theme::rounding(3.0f));
     } else if (glyph) {
         const float fs = std::round(thumbSize * 0.36f);
         const ImVec2 gs = ImGui::GetFont()->CalcTextSizeA(fs, FLT_MAX, 0, glyph);
         dl->AddText(ImGui::GetFont(), fs,
-                    ImVec2(std::round((t0.x + t1.x - gs.x) * 0.5f), std::round((t0.y + t1.y - gs.y) * 0.5f)), kGlyph,
+                    ImVec2(std::round((t0.x + t1.x - gs.x) * 0.5f), std::round((t0.y + t1.y - gs.y) * 0.5f)), kGlyph(),
                     glyph);
     }
     dl->AddRect(t0, t1,
-                selected  ? kAccent
-                : hovered ? IM_COL32(90, 90, 96, 255)
-                          : kTileBorder,
-                4.0f, 0, selected ? 2.0f : 1.0f);
+                selected  ? kAccent()
+                : hovered ? lookColor(IM_COL32(90, 90, 96, 255), theme::textDim)
+                          : kTileBorder(),
+                theme::rounding(4.0f), 0, selected ? 2.0f : 1.0f);
     if (badge && *badge) {
         // The orange key of the brush pop-up: press it to pick this tile.
         const float fs = ImGui::GetFontSize();
         const ImVec2 bs = ImGui::CalcTextSize(badge);
         const ImVec2 b1(t1.x - 3.0f, t0.y + 3.0f + fs + 2.0f), b0(b1.x - std::max(bs.x + 8.0f, fs + 2.0f), t0.y + 3.0f);
-        dl->AddRectFilled(b0, b1, kAccent, 3.0f);
-        dl->AddText(ImVec2(std::round((b0.x + b1.x - bs.x) * 0.5f), b0.y + 1.0f), IM_COL32(20, 20, 22, 255), badge);
+        dl->AddRectFilled(b0, b1, kAccent(), theme::rounding(3.0f));
+        dl->AddText(ImVec2(std::round((b0.x + b1.x - bs.x) * 0.5f), b0.y + 1.0f), lookColor(IM_COL32(20, 20, 22, 255), theme::textOnAccent), badge);
         ImGui::LogText(" [%s]", badge);
     }
     const std::string shown = elide(label, thumbSize);
     const ImVec2 ls = ImGui::CalcTextSize(shown.c_str());
     dl->AddText(ImVec2(std::round(p.x + (thumbSize - ls.x) * 0.5f), t1.y + 2.0f),
                 selected ? IM_COL32(255, 255, 255, 255)
-                : dim    ? kTextDim
-                         : kText,
+                : dim    ? kTextDim()
+                         : kText(),
                 shown.c_str());
     ImGui::LogText(" %s", label.c_str()); // drawn directly: tell the log (UI tests read it) too
     if (hovered) {
@@ -313,11 +317,11 @@ void AssetTileHoverGlow() {
         ImDrawList* dl;
         ~PopClip() { dl->PopClipRect(); }
     } pop{dl};
-    dl->AddRectFilled(ImVec2(a.x + 3, a.y + 5), ImVec2(b.x + 3, b.y + 5), IM_COL32(0, 0, 0, 90), 8.0f);
-    dl->AddRectFilled(a, b, IM_COL32(48, 48, 53, 255), 6.0f);
+    dl->AddRectFilled(ImVec2(a.x + 3, a.y + 5), ImVec2(b.x + 3, b.y + 5), IM_COL32(0, 0, 0, 90), theme::rounding(8.0f));
+    dl->AddRectFilled(a, b, lookColor(IM_COL32(48, 48, 53, 255), theme::header), theme::rounding(6.0f));
     dl->AddImageRounded(g.tex, ImVec2(a.x + 3, a.y + 3), ImVec2(b.x - 3, b.y - 3), ImVec2(0, 0), ImVec2(1, 1),
-                        IM_COL32_WHITE, 5.0f);
-    dl->AddRect(a, b, IM_COL32(240, 136, 46, 160), 6.0f, 0, 1.5f);
+                        IM_COL32_WHITE, theme::rounding(5.0f));
+    dl->AddRect(a, b, lookColor(IM_COL32(240, 136, 46, 160), theme::accent, 0.63f), theme::rounding(6.0f), 0, 1.5f);
 }
 
 // ---------------------------------------------------------------------------
@@ -628,7 +632,7 @@ void drawBrushGrid(App& app, GridMode mode) {
                 x = 0.0f;
             x += w + 3.0f;
             const bool on = !typed.empty() && typed[0] == char('a' + k);
-            if (on) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(kAccent));
+            if (on) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(kAccent()));
             if (ImGui::SmallButton(text)) {
                 if (popup)
                     s.typed = std::string(1, char('a' + k));
@@ -1147,9 +1151,9 @@ void drawPickers(App& app) {
         if (!s.sliderPlaced) s.sliderPos = ImVec2(s.sliderAt.x - w * 0.5f, s.sliderAt.y - ImGui::GetFrameHeight() * 0.5f);
         ImGui::SetNextWindowPos(s.sliderPos, ImGuiCond_Always);
         if (s.sliderFrame == ImGui::GetFrameCount()) ImGui::SetNextWindowFocus();
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 6.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, theme::rounding(6.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, kPanelBg);
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, kPanelBg());
         bool close = false;
         if (ImGui::Begin((std::string(d.name) + "##cursor").c_str(), nullptr,
                          ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
@@ -1352,12 +1356,12 @@ void App::drawColorWidget(float width) {
                      ImGui::ColorConvertFloat4ToU32(ImVec4(r1, g1, b1, 1)), stripW * 0.5f,
                      i == 0 ? ImDrawFlags_RoundCornersTop : i == 5 ? ImDrawFlags_RoundCornersBottom : ImDrawFlags_RoundCornersNone);
     }
-    dl->AddRect(hs, hsMax, kFieldEdge, stripW * 0.5f, 0, 1.0f * s);
+    dl->AddRect(hs, hsMax, kFieldEdge, theme::rounding(stripW * 0.5f), 0, 1.0f * s);
     const float ny = std::clamp(hs.y + h * squareH, hs.y + 2.5f * s, hsMax.y - 2.5f * s);
     const ImVec2 na(hs.x - 1.0f * s, ny - 1.5f * s), nb(hsMax.x + 1.0f * s, ny + 1.5f * s);
-    dl->AddRect(ImVec2(na.x - 1.0f * s, na.y - 1.0f * s), ImVec2(nb.x + 1.0f * s, nb.y + 1.0f * s), kMarkerDark, 2.0f * s, 0,
+    dl->AddRect(ImVec2(na.x - 1.0f * s, na.y - 1.0f * s), ImVec2(nb.x + 1.0f * s, nb.y + 1.0f * s), kMarkerDark, theme::rounding(2.0f * s), 0,
                 1.0f * s);
-    dl->AddRectFilled(na, nb, kMarkerLight, 1.5f * s);
+    dl->AddRectFilled(na, nb, kMarkerLight, theme::rounding(1.5f * s));
 
     ImGui::PopStyleVar();
     ImGui::PopID();

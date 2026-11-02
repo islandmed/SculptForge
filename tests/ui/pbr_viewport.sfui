@@ -2,6 +2,7 @@
 # CC0 HDRIs), exposure, tone map and the environment behind the model. The texture's material channels are uploaded
 # as ORM, normal and emissive planes; a painted height shows through tangent-space normals. Settings are saved with
 # the project. Files are written to the working directory (the build folder).
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_sphere subdivisions=5
 run uv_auto resolution=1024
 run texture_create size=1024

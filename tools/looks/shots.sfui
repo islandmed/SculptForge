@@ -1,0 +1,135 @@
+# Screenshots of the interface looks (Preferences > Interface > Look) for choosing the default. Run from the
+# source folder, at each size:
+#   build/sculptforge --ui-test tools/looks/shots.sfui --ui-out build/look-shots/1600 --size 1600x960
+#   build/sculptforge --ui-test tools/looks/shots.sfui --ui-out build/look-shots/2400 --size 2400x1350
+# A realistic state: the lion head, a brush active, the Parts palette open in the tray, the pointer on the model.
+run open path=assets/demo/lion-head.glb
+wait_idle 20
+
+run ui_look look=classic layout=zbrush
+run open path=assets/demo/lion-head.glb
+wait_idle 20
+click "Clay##brush.clay"
+hover_model 0.52 0.42
+wait 0.3
+shot classic-zbrush-layout
+
+run ui_look look=forge scheme=tokyo_night
+run open path=assets/demo/lion-head.glb
+wait_idle 20
+click "Clay##brush.clay"
+hover_model 0.52 0.42
+wait 0.3
+shot forge-tokyo-night
+click "Sculpt##menu.sculpt"
+wait 0.3
+shot forge-tokyo-night-menu
+key escape
+
+run ui_look scheme=catppuccin_mocha
+run open path=assets/demo/lion-head.glb
+wait_idle 20
+click "Clay##brush.clay"
+hover_model 0.52 0.42
+wait 0.3
+shot forge-catppuccin-mocha
+run ui_look scheme=gruvbox_dark
+run open path=assets/demo/lion-head.glb
+wait_idle 20
+click "Clay##brush.clay"
+hover_model 0.52 0.42
+wait 0.3
+shot forge-gruvbox-dark
+run ui_look scheme=nord
+run open path=assets/demo/lion-head.glb
+wait_idle 20
+click "Clay##brush.clay"
+hover_model 0.52 0.42
+wait 0.3
+shot forge-nord
+run ui_look scheme=rose_pine
+run open path=assets/demo/lion-head.glb
+wait_idle 20
+click "Clay##brush.clay"
+hover_model 0.52 0.42
+wait 0.3
+shot forge-rose-pine
+run ui_look scheme=kanagawa
+run open path=assets/demo/lion-head.glb
+wait_idle 20
+click "Clay##brush.clay"
+hover_model 0.52 0.42
+wait 0.3
+shot forge-kanagawa
+run ui_look scheme=everforest
+run open path=assets/demo/lion-head.glb
+wait_idle 20
+click "Clay##brush.clay"
+hover_model 0.52 0.42
+wait 0.3
+shot forge-everforest
+run ui_look scheme=tokyo_night match_omarchy=true
+run open path=assets/demo/lion-head.glb
+wait_idle 20
+click "Clay##brush.clay"
+hover_model 0.52 0.42
+wait 0.3
+shot forge-match-omarchy
+run ui_look match_omarchy=false
+
+run ui_look look=phosphor phosphor=green effects=false
+run open path=assets/demo/lion-head.glb
+wait_idle 20
+click "Clay##brush.clay"
+hover_model 0.52 0.42
+wait 0.3
+shot phosphor-green
+click "Edit##menu.edit"
+click "Preferences##section.preferences"
+click "Interface##preferences.interface"
+wait 0.3
+shot phosphor-green-menu
+key escape
+run ui_look phosphor=green effects=true
+run open path=assets/demo/lion-head.glb
+wait_idle 20
+click "Clay##brush.clay"
+hover_model 0.52 0.42
+wait 0.3
+shot phosphor-green-effects
+run ui_look phosphor=amber effects=false
+run open path=assets/demo/lion-head.glb
+wait_idle 20
+click "Clay##brush.clay"
+hover_model 0.52 0.42
+wait 0.3
+shot phosphor-amber
+
+run ui_look look=blueprint
+run open path=assets/demo/lion-head.glb
+wait_idle 20
+click "Clay##brush.clay"
+hover_model 0.52 0.42
+wait 0.3
+shot blueprint
+click "Render##menu.render"
+wait_idle 20
+wait 0.3
+shot blueprint-menu
+key escape
+
+run ui_look look=classic layout=sculptforge
+run open path=assets/demo/lion-head.glb
+wait_idle 20
+click "Clay##brush.clay"
+hover_model 0.52 0.42
+wait 0.3
+shot classic-sculptforge-layout
+
+# The 0.10.7 default (Forge Terminal, Tokyo Night, SculptForge layout) with the one-time card an updated install sees.
+run ui_look look=forge scheme=tokyo_night layout=sculptforge
+run ui_look card=true
+run open path=assets/demo/lion-head.glb
+wait_idle 20
+wait 0.3
+shot new-look-card

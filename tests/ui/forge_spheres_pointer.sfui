@@ -2,6 +2,7 @@
 # parent (Ctrl+drag does the same with it off), the new sphere is selected, Delete Selected / Insert Between /
 # Set as Root work on it, and a right click on a sphere opens a menu with the same (a right drag still turns the
 # view). Symmetry X is on, so arms come in pairs.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run zsphere_new radius=1
 run subtool_visibility index=0 visible=false
 wait 0.3

@@ -1,5 +1,6 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include "app/Theme.h"
 #include "app/LightBox.h"
 
 #include "app/App.h"
@@ -584,7 +585,7 @@ void LightBox::drawHeader(App& app, float width) {
         ImGui::PopStyleColor(4);
         if (on) {
             const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
-            dl->AddRectFilled(ImVec2(a.x + 4, b.y - 2), ImVec2(b.x - 4, b.y), kAccent, 1.0f);
+            dl->AddRectFilled(ImVec2(a.x + 4, b.y - 2), ImVec2(b.x - 4, b.y), kAccent, theme::rounding(1.0f));
         }
         static const char* const tips[] = {
             "Your projects (.sfproj) and recently opened projects.",
@@ -920,9 +921,9 @@ void LightBox::draw(App& app, const CanvasRect& canvas) {
         const float s = 64.0f * scale;
         ImDrawList* fg = ImGui::GetForegroundDrawList();
         const ImVec2 a(io.MousePos.x - s * 0.5f, io.MousePos.y - s * 0.5f), b(a.x + s, a.y + s);
-        fg->AddRectFilled(a, b, IM_COL32(42, 42, 46, 220), 4.0f);
-        if (tex) fg->AddImageRounded(tex, a, b, ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, 220), 4.0f);
-        fg->AddRect(a, b, kAccent, 4.0f, 0, 1.5f);
+        fg->AddRectFilled(a, b, IM_COL32(42, 42, 46, 220), theme::rounding(4.0f));
+        if (tex) fg->AddImageRounded(tex, a, b, ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, 220), theme::rounding(4.0f));
+        fg->AddRect(a, b, kAccent, theme::rounding(4.0f), 0, 1.5f);
     }
     if (pressing_ && !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
         if (tileDrag_ && canvas.contains(io.MousePos.x, io.MousePos.y) && !ImGui::GetCurrentContext()->HoveredWindow)

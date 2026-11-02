@@ -67,7 +67,8 @@
 //                            custom_matcaps (MatCaps loaded from images), material_custom (1 when the view uses
 //                            one), matcap_files (images in the library's MatCaps folder),
 //                            support_requests (times Support SculptForge was clicked; never opens a browser in tests),
-//                            welcome_open (the first-run welcome shown),
+//                            welcome_open (the first-run welcome shown), new_look_card_open (the one-time
+//                            "SculptForge has a new look" card),
 //                            subtools (count), subtool_thumbnails (SubTool panel thumbnails rendered), active_subtool (index, 0 = top), visible_subtools,
 //                            extract_preview (1 while an Extract preview waits for Accept), open_edges (edges of
 //                            the active SubTool with one triangle: 0 = watertight),
@@ -85,6 +86,7 @@
 //                            symmetry_copies (copies every stroke makes), cursor_copies (brush cursors drawn),
 //                            symmetry_pivot_x (local symmetry's centre), timeline_top (1: the strip at the top),
 //                            timeline_y / axis_gizmo_y (their tops / centre, fractions of the canvas from its top),
+//                            style_window_min (ImGui's minimum window height, unscaled px: 32 in every look),
 //                            tablet_mouse_mode (Preferences > Tablet > Mouse mode), os_cursor_x / os_cursor_y,
 //                            ui_mouse_x / ui_mouse_y (where ImGui sees the pointer), backface_culling, drawn_triangles,
 //                            viewport_cursor (the system cursor: 0 arrow, 1 text, 7 hand, 100 crosshair; #73),
@@ -192,6 +194,7 @@
 //   spacemouse_button N      press and release button N (1 = left side button, 2 = right)
 //   spacemouse_unplug        unplug it
 //   expect_value spacemouse_connected (1 when the app opened it), spacemouse_moving (1 while it moves the view)
+//   expect_value look (0 Classic, 1 Forge Terminal, 2 Phosphor, 3 Blueprint), shell_layout (0 ZBrush-style, 1 SculptForge)
 #include "app/App.h"
 
 #ifndef SDL_PEN_INPUT_IN_PROXIMITY
@@ -459,6 +462,8 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "quickmenu_open") return app_.quickMenu_.open ? 1.0 : 0.0;
     if (name == "right_click_menu") return app_.uiPrefs_.rightClickQuickMenu ? 1.0 : 0.0;
     if (name == "space_camera") return app_.uiPrefs_.spaceCamera ? 1.0 : 0.0;
+    if (name == "look") return double(app_.uiPrefs_.look.look); // 0 Classic, 1 Forge Terminal, 2 Phosphor, 3 Blueprint
+    if (name == "shell_layout") return double(app_.uiPrefs_.shellLayout); // 0 ZBrush-style, 1 SculptForge
     if (name == "air_strokes") return app_.uiPrefs_.airStrokes ? 1.0 : 0.0;
     if (name == "space_held") return app_.spaceHeld_ ? 1.0 : 0.0;
     if (name == "radial_open") return app_.radial_.menu >= 0 ? 1.0 : 0.0;
@@ -594,6 +599,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "discord_requests") return double(app_.discordRequests_); // Join the community on Discord clicks
     if (name == "support_requests") return double(app_.supportPageRequests_); // Support SculptForge clicks
     if (name == "welcome_open") return app_.showWelcome_ ? 1.0 : 0.0;
+    if (name == "new_look_card_open") return app_.newLookCard_ ? 1.0 : 0.0; // "SculptForge has a new look" (0.10.7)
     if (name == "support_card_open") return app_.supportCardOpen() ? 1.0 : 0.0; // the support card at launch
     if (name == "supporter") return app_.supportCardPrefs_.supporter ? 1.0 : 0.0;
     if (name == "support_card_enabled") return app_.supportCardPrefs_.enabled ? 1.0 : 0.0;
@@ -654,6 +660,8 @@ double Demo::query(const std::string& name, bool& known) const {
     // Timeline position (#63): 1 at the top of the viewport; the strip's top edge and the axis gizmo's centre as
     // fractions of the canvas height from its top (-1: the strip isn't shown).
     if (name == "timeline_top") return app_.uiPrefs_.timelineTop ? 1.0 : 0.0;
+    // The style's minimum window height in unscaled px (32): switching looks must not scale it again each time.
+    if (name == "style_window_min") return double(ImGui::GetStyle().WindowMinSize.y / std::max(app_.uiScale_, 0.01f));
     if (name == "timeline_y" || name == "axis_gizmo_y") {
         const auto c = app_.canvasRect();
         if (name == "timeline_y")

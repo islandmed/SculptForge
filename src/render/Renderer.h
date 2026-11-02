@@ -43,6 +43,10 @@ struct RenderSettings {
     // The view's background: the charcoal radial gradient (default) or one flat display (sRGB) colour (#21).
     bool gradientBackground = true;
     glm::vec3 backgroundColor{0.165f, 0.165f, 0.173f};
+    // The gradient's colours (display sRGB): behind the model and at the edges. The interface look sets them
+    // (Preferences > Interface > Look); these are the Classic look's charcoal.
+    glm::vec3 gradientCentre{0.215f, 0.215f, 0.222f};
+    glm::vec3 gradientEdge{0.106f, 0.106f, 0.114f};
     // Micro-displacement levels (render/MicroRenderer.h): the most triangles a frame draws for them (their level
     // of detail drops to fit; a hardware profile may set it), and the micro edge length to aim for on screen.
     size_t renderTriangleBudget = 0; // 0 = TierConfig::activeTriangleBudget (core/TierConfig.h)
