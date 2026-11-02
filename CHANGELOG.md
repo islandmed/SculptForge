@@ -6,6 +6,15 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Tablets (a Wacom Intuos 3 report): a tablet plugged in after launch works without a restart ("Tablet connected" /
+  "Tablet disconnected" in the status bar), also through Wacom Bridge; on Windows, pressure now also comes from the
+  Wacom driver with "Use Windows Ink" off (Wintab); a pen without pressure draws at full strength instead of not at
+  all, and Preferences > Input and > Tablet say "Pressure: on" or "not detected" with a troubleshooting link. The
+  view no longer jumps when the pen comes back into range elsewhere or leaves mid-drag. The active Part changes only
+  with the keyboard's Alt and a quick click (not with a pen button set to Alt, a long pen press or quick pen taps),
+  and the status bar says "Active Part: <name> (Alt+click)".
+
 ## [0.10.7] - 2026-11-01
 
 ### Changed

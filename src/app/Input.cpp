@@ -443,6 +443,7 @@ void App::drawInputSection() {
     if (ui::Checkbox("Hold Space and drag to move the camera##input.space_camera", &spaceCamera))
         uiPrefs_.spaceCamera = spaceCamera;
     ui::HelpAction(*this, "input.space_camera");
+    drawPressureStatus(); // the pen's pressure, with the troubleshooting link (Tablet.cpp)
     if (mayaStyle()) {
         int zoom = uiPrefs_.mayaZoomHorizontal ? 0 : 1;
         ImGui::TextDisabled("%s", tr("Zoom drag"));

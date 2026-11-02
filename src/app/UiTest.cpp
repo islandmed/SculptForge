@@ -94,6 +94,7 @@
 //                            dabs keep the volume now: the option, flipped by letting go of Shift mid-stroke),
 //                            moved_out (summed movement along the snapshot's normals: > 0 out, < 0 in),
 //                            pen_pressure (raw), brush_pressure (after the curve; 1 for the mouse),
+//                            pressure_status (0 no pen yet, 1 on, 2 not detected, 3 not known yet),
 //                            stroke_continuous (Stroke > Continuous, 1 on),
 //                            stroking (1 while a stroke is open), cursor_x / cursor_y (the brush cursor, pixels),
 //                            surface_cursor (1 when the brush ring last drawn lay on the surface, #25),
@@ -181,6 +182,11 @@
 //   pen_pressure P           a pressure sample from the hovering pen (e.g. a stale value before a stroke)
 //   pen_enter U V            the pen comes into range at a point on the model (put down elsewhere, no hover)
 //   pen_out                  the pen leaves proximity
+//   tablet_plug [NAME]       a tablet plugged in while running (default name: a generic HID mouse); its pen gets
+//                            a new id
+//   tablet_unplug            ... and unplugged
+//   pen_new                  the next pen has a new id, without a device event (Wacom Bridge, eraser on Wayland)
+//   click_subtool NAME U V 1 pen [S]   tap the Part with the pen tip instead (held S seconds)
 //   os_cursor U V | off      where the system cursor is (a tablet driver in mouse mode moves it, #72); off: unknown
 //   mouse_move U V           a plain mouse (not the pen) moves to a point on the model, e.g. the stray mouse
 //                            events Windows Ink sends beside the pen's
@@ -697,6 +703,10 @@ double Demo::query(const std::string& name, bool& known) const {
         return name == "moved" ? count : name == "moved_max" ? maxD : name == "moved_sum" ? sum : out;
     }
     if (name == "pen_pressure") return app_.penTracker_.raw();
+    if (name == "pressure_status") { // 0 no pen yet, 1 on, 2 not detected, 3 not known yet
+        const std::string st = app_.pressureStatus();
+        return st == "Pressure: on" ? 1.0 : st == "Pressure: not detected" ? 2.0 : app_.penSeen_ ? 3.0 : 0.0;
+    }
     if (name == "brush_pressure") return app_.strokePressure();
     if (name == "stroking") return app_.drag_ == App::Drag::Stroke ? 1.0 : 0.0;
     if (name == "tablet_mouse_mode") return app_.uiPrefs_.tablet.mouseMode ? 1.0 : 0.0;
@@ -982,7 +992,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         const std::string name = w[1];
         const float u = num(2, 0.5f), v = num(3, 0.5f);
         const int times = std::clamp(int(num(4, 1.0f)), 1, 3); // click_subtool NAME U V 3: a triple-click
-        steps_.push_back([this, line, name, u, v, times](float t) {
+        const bool pen = w.back() == "pen" || (w.size() > 5 && w[5] == "pen"); // taps with the pen tip instead
+        const float hold = pen && w.size() > 6 ? num(6, 0.0f) : 0.0f;        // ... held this long
+        steps_.push_back([this, line, name, u, v, times, pen, hold](float t) {
             const int index = app_.doc_.findSubtool(name);
             if (index < 0) {
                 fail(line, "no Part named \"" + name + "\"");
@@ -1019,6 +1031,25 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             }
             if (!found) {
                 fail(line, "Part \"" + name + "\" can't be clicked (hidden, covered or off screen)");
+                return true;
+            }
+            if (pen) {
+                if (t == 0.0f) {
+                    if (!penIn_) penProximity(true);
+                    penMove(p.x, p.y);
+                    return false;
+                }
+                if (!penDown_) {
+                    penTouch(true, false);
+                    penPressure(0.5f);
+                    if (hold <= 0.0f) {
+                        penTouch(false, false);
+                        return true;
+                    }
+                    return false;
+                }
+                if (t < hold) return false;
+                penTouch(false, false);
                 return true;
             }
             if (t == 0.0f) { // hover for a frame first
@@ -1859,6 +1890,27 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     } else if (verb == "spacemouse_unplug") {
         run([this] { detachVirtualSpaceMouse(); });
         wait(0.1f);
+    } else if (verb == "tablet_plug") {
+        // A tablet plugged in while the app runs: its mouse device appears (NAME as SDL reports it; a generic one,
+        // as on Windows or with Wacom Bridge, counts once its pen comes into range), and its pen has a new id.
+        const std::string name = w.size() > 1 ? restOf(lineText_, 1) : std::string("HID-compliant mouse");
+        run([this, name] {
+            if (penIn_) penProximity(false);
+            ++testPen_;
+            testTabletMouse_ = 100 + uint32_t(testPen_);
+            app_.tabletNote(app_.tabletHotplug_.mouseAdded(testTabletMouse_, name), name);
+        });
+        wait(0.05f);
+    } else if (verb == "tablet_unplug") {
+        run([this] { app_.tabletNote(app_.tabletHotplug_.mouseRemoved(testTabletMouse_), {}); });
+        wait(0.05f);
+    } else if (verb == "pen_new") {
+        // A pen with an id not seen before and no device event (a Wacom Bridge session reconnecting, the eraser
+        // end on Wayland).
+        run([this] {
+            if (penIn_) penProximity(false);
+            ++testPen_;
+        });
     } else if (verb == "pen_out") {
         run([this] { penProximity(false); });
         wait(0.05f);
@@ -1928,7 +1980,7 @@ void Demo::penProximity(bool in) {
     SDL_Event e{};
     e.type = in ? SDL_EVENT_PEN_PROXIMITY_IN : SDL_EVENT_PEN_PROXIMITY_OUT;
     e.pproximity.windowID = SDL_GetWindowID(app_.window_);
-    e.pproximity.which = kTestPen;
+    e.pproximity.which = testPen_;
     penIn_ = in;
     if (!in) penDown_ = penEraser_ = false;
     penState_ = in ? SDL_PEN_INPUT_IN_PROXIMITY : 0; // leaving releases the tip and every button
@@ -1939,7 +1991,7 @@ void Demo::penMove(float x, float y) {
     SDL_Event e{};
     e.type = SDL_EVENT_PEN_MOTION;
     e.pmotion.windowID = SDL_GetWindowID(app_.window_);
-    e.pmotion.which = kTestPen;
+    e.pmotion.which = testPen_;
     e.pmotion.pen_state = penState_;
     e.pmotion.x = x;
     e.pmotion.y = y;
@@ -1952,7 +2004,7 @@ void Demo::penPressure(float pressure) {
     SDL_Event e{};
     e.type = SDL_EVENT_PEN_AXIS;
     e.paxis.windowID = SDL_GetWindowID(app_.window_);
-    e.paxis.which = kTestPen;
+    e.paxis.which = testPen_;
     e.paxis.pen_state = penState_;
     e.paxis.x = penAt_.x;
     e.paxis.y = penAt_.y;
@@ -1969,7 +2021,7 @@ void Demo::penTouch(bool down, bool eraser) {
     SDL_Event e{};
     e.type = down ? SDL_EVENT_PEN_DOWN : SDL_EVENT_PEN_UP;
     e.ptouch.windowID = SDL_GetWindowID(app_.window_);
-    e.ptouch.which = kTestPen;
+    e.ptouch.which = testPen_;
     e.ptouch.pen_state = penState_;
     e.ptouch.x = penAt_.x;
     e.ptouch.y = penAt_.y;
@@ -1986,7 +2038,7 @@ void Demo::penButtonEvent(int button, bool down) {
     SDL_Event e{};
     e.type = down ? SDL_EVENT_PEN_BUTTON_DOWN : SDL_EVENT_PEN_BUTTON_UP;
     e.pbutton.windowID = SDL_GetWindowID(app_.window_);
-    e.pbutton.which = kTestPen;
+    e.pbutton.which = testPen_;
     e.pbutton.pen_state = penState_;
     e.pbutton.x = penAt_.x;
     e.pbutton.y = penAt_.y;

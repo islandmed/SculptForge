@@ -5,6 +5,14 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.10.8
+
+- **Tablets**: plug a tablet in while SculptForge runs and it just works ("Tablet connected" in the status bar),
+  also through Wacom Bridge. On Windows, pressure works with the Wacom driver's **Use Windows Ink** on or off.
+  **Preferences > Input** shows whether pressure is detected, with a troubleshooting link. The view no longer jumps
+  when the pen comes back into range, and the active Part changes only with **Alt+click** on the keyboard; the
+  status bar names the new Part. See [Troubleshooting](troubleshooting.md#pen-tablets).
+
 ## Version 0.10.7
 
 - **A clearer membership card**: the three memberships side by side with what each one gets you, in your look's
