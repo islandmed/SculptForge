@@ -62,7 +62,11 @@ phone_request GET /ar/model.usdz 200
 phone_request GET /ar/model.glb 200
 expect_text "On the phone:"
 wait 3
-stroke 0.3 0.93 0.7 0.93   # (below the window)
+# The window covers the middle of the canvas and its height depends on the machine (a Network row appears with
+# more than one address, e.g. Tailscale): drag it aside by its title bar, then stroke across the sphere.
+drag 0.33 0.147 0.78 0.147
+wait 0.2
+stroke 0.3 0.5 0.7 0.5
 wait 0.3
 wait_idle 120
 expect_value phone_ar_version == 2
