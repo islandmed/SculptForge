@@ -10,3 +10,6 @@
 - **Dry run** (before the VDM was switched off): 14 days, 14 drops, all 8 kinds, 2 duplicate weaves rejected. Folder ~/Work/look-mockups/drops/ (overview.png, README.txt, rejected/). Nothing posted.
 - **Tests:** `insider_drops` ctest (determinism, blank/flat/seam/hard-edge/torn/duplicate rejected, every kind packs). Full ctest -j3 before the rebase: 117/118; `ui_phone_link` also fails on main (`phone_ar_version is 1, expected 2`), so not from this branch. Rebased on 0.10.7 main: full ctest 118/118, selftest ok, hold → approve → post tested against a local server.
 - **SHA:** 1bc7554 (code; REPORT.md commit on top). Renders run in a temp settings/data/log home; the same kind never wins two days running.
+- **Status (stop 11-02):** done, pushed, green (40c3127). Nothing uncommitted, nothing running.
+- **Left:** Tony: INSIDERS_REPO_TOKEN + a first commit in sculptforge-insiders. Later: real VDM shapes (horn set, ear, nostril, scale plate, rivet), then remove "vdm" from generate.DISABLED.
+- **Resume:** coordinator merges feat/daily-drops; approve drops 11-02..11-08 with dispatch `date=… approve=true`.
