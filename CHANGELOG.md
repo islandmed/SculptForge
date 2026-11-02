@@ -122,6 +122,8 @@ All notable changes to SculptForge are listed here. The format follows
   zooms (Maya style) and <kbd>Shift</kbd>+right turns the view, whatever menu is on the button.
 - glTF import rejects malformed accessor and buffer sizes instead of crashing or reading out of bounds (reported by
   @Agapenordev in #70).
+- Paint Layers: picking a Material Recipe, or changing a Fill layer, from the panel could crash: the panel kept
+  reading the texture the command had just replaced. Its commands now run once the panel is drawn.
 
 ## [0.10.5] - 2026-11-01
 ### Added

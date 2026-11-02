@@ -152,12 +152,23 @@ void App::drawFillLayerControls() {
     const Mesh& mesh = doc_.mesh;
     if (!hasTexture(mesh)) return;
     const PaintTexture& t = *mesh.texture;
+    // Commands that edit the texture replace it (the old one goes into the undo step and may be freed), so `t`, the
+    // Fill layer and its effects below are only valid until one runs: they wait until the panel is drawn.
+    std::vector<std::pair<std::string, Args>> pending;
+    struct RunPending {
+        App& app;
+        std::vector<std::pair<std::string, Args>>& list;
+        ~RunPending() {
+            for (auto& [name, args] : list) app.runCommand(name, args);
+        }
+    } runPending{*this, pending};
+    auto run = [&pending](const char* name, Args args) { pending.emplace_back(name, std::move(args)); };
     const ImGuiStyle& style = ImGui::GetStyle();
     ImGui::Spacing();
     ImGui::TextDisabled("%s", tr("Fill Layers"));
     const float half = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) * 0.5f;
     if (ImGui::Button(ICON_LC_PLUS " Fill Layer##fill", ImVec2(half, 0)))
-        runCommand("fill_layer", {{"name", std::string("Fill")}, {"color", colorToHex(doc_.paintColor)}});
+        run("fill_layer", {{"name", std::string("Fill")}, {"color", colorToHex(doc_.paintColor)}});
     ui::HelpText("New Fill Layer", nullptr,
                  "Add a Fill layer: a material over the whole Part through a mask you build from effects (Edge Wear, "
                  "Dirt, Gradient, Thickness, Light Direction, Noise, a painted mask, Levels, Blur, Invert). Change it any "
@@ -167,12 +178,12 @@ void App::drawFillLayerControls() {
     ImGui::SetNextItemWidth(-1);
     if (ImGui::BeginCombo("##recipe", tr("Material Recipe"))) {
         for (const MaterialRecipe& r : builtinMaterialRecipes()) {
-            if (ImGui::Selectable((r.name + "##recipe").c_str())) runCommand("material_recipe", {{"name", r.id}});
+            if (ImGui::Selectable((r.name + "##recipe").c_str())) run("material_recipe", {{"name", r.id}});
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", r.description.c_str());
         }
         for (const PackContentItem& it : packMaterials()) // from installed packs, tagged with the pack's name
             if (ImGui::Selectable((it.label() + "##recipe" + it.file).c_str()))
-                runCommand("material_recipe", {{"path", it.file}});
+                run("material_recipe", {{"path", it.file}});
         ImGui::EndCombo();
     }
     ui::HelpText("Material Recipe", nullptr,
@@ -198,7 +209,7 @@ void App::drawFillLayerControls() {
                      kFillPath);
         ImGui::SameLine();
         bool live = !maps || maps->live;
-        if (ui::Checkbox("Live##meshmaps", &live) && maps) runCommand("mesh_maps", {{"action", std::string("live")}, {"live", live}});
+        if (ui::Checkbox("Live##meshmaps", &live) && maps) run("mesh_maps", {{"action", std::string("live")}, {"live", live}});
         ImGui::SameLine();
         if (ImGui::SmallButton(tr("Bake##meshmaps"))) meshMapsWanted_ = true;
     }
@@ -220,7 +231,7 @@ void App::drawFillLayerControls() {
     if (ImGui::ColorEdit3("##fillcolor", &col.x, ImGuiColorEditFlags_NoInputs)) fillColorEdit_ = srgbToLinear(col), fillColorEditing_ = true;
     if (ImGui::IsItemDeactivatedAfterEdit() && fillColorEditing_) {
         fillColorEditing_ = false;
-        runCommand("fill_layer", withLayer({{"action", std::string("set")}, {"color", colorToHex(fillColorEdit_)}}));
+        run("fill_layer", withLayer({{"action", std::string("set")}, {"color", colorToHex(fillColorEdit_)}}));
     }
     ui::HelpText("Fill colour", nullptr, "The base colour the Fill layer lays down.", kFillPath);
     for (Channel c : {Channel::BaseColor, Channel::Roughness, Channel::Metallic, Channel::Height}) {
@@ -232,7 +243,7 @@ void App::drawFillLayerControls() {
                 const bool has = k == int(c) ? on : (f.material.channels & (1u << k)) != 0;
                 if (has) list += std::string(list.empty() ? "" : ",") + channelFormat(k).id;
             }
-            if (!list.empty()) runCommand("fill_layer", withLayer({{"action", std::string("set")}, {"channels", list}}));
+            if (!list.empty()) run("fill_layer", withLayer({{"action", std::string("set")}, {"channels", list}}));
         }
     }
     auto materialSlider = [&](const char* id, const char* key, float value, const char* fmt, Channel c) {
@@ -240,7 +251,7 @@ void App::drawFillLayerControls() {
         ImGui::SetNextItemWidth(-1);
         float v = value;
         ImGui::SliderFloat(id, &v, 0.0f, 1.0f, fmt);
-        if (ImGui::IsItemDeactivatedAfterEdit()) runCommand("fill_layer", withLayer({{"action", std::string("set")}, {key, double(v)}}));
+        if (ImGui::IsItemDeactivatedAfterEdit()) run("fill_layer", withLayer({{"action", std::string("set")}, {key, double(v)}}));
     };
     materialSlider("##fillrough", "roughness", f.material.roughness, "Roughness %.2f", Channel::Roughness);
     materialSlider("##fillmetal", "metallic", f.material.metallic, "Metallic %.2f", Channel::Metallic);
@@ -260,7 +271,7 @@ void App::drawFillLayerControls() {
             return withLayer(std::move(a));
         };
         bool enabled = e.enabled;
-        if (ui::Checkbox("##on", &enabled)) runCommand("fill_layer", effectArgs({{"enabled", enabled}}));
+        if (ui::Checkbox("##on", &enabled)) run("fill_layer", effectArgs({{"enabled", enabled}}));
         ImGui::SameLine();
         ImGui::TextUnformatted(title.c_str());
         if (k > 0) {
@@ -269,7 +280,7 @@ void App::drawFillLayerControls() {
             if (ImGui::BeginCombo("##blend", maskBlendId(e.blend))) {
                 for (int b = 0; b < kMaskBlendCount; ++b)
                     if (ImGui::Selectable(maskBlendId(MaskBlend(b)), int(e.blend) == b))
-                        runCommand("fill_layer", effectArgs({{"blend", std::string(maskBlendId(MaskBlend(b)))}}));
+                        run("fill_layer", effectArgs({{"blend", std::string(maskBlendId(MaskBlend(b)))}}));
                 ImGui::EndCombo();
             }
         }
@@ -279,7 +290,7 @@ void App::drawFillLayerControls() {
             ImGui::SetNextItemWidth(-1);
             float v = value;
             ImGui::SliderFloat(id, &v, lo, hi, fmt);
-            if (ImGui::IsItemDeactivatedAfterEdit()) runCommand("fill_layer", effectArgs({{key, double(v)}}));
+            if (ImGui::IsItemDeactivatedAfterEdit()) run("fill_layer", effectArgs({{key, double(v)}}));
         };
         switch (e.kind) {
         case MaskEffectKind::Generator:
@@ -304,16 +315,16 @@ void App::drawFillLayerControls() {
         }
         ImGui::PopID();
     }
-    if (remove >= 0) runCommand("fill_layer", withLayer({{"action", std::string("remove_effect")}, {"effect", double(remove)}}));
+    if (remove >= 0) run("fill_layer", withLayer({{"action", std::string("remove_effect")}, {"effect", double(remove)}}));
     ImGui::SetNextItemWidth(-1);
     if (ImGui::BeginCombo("##addeffect", tr("Add mask effect"))) {
         for (int g = 0; g < kGeneratorKindCount; ++g)
             if (ImGui::Selectable((std::string(generatorLabel(GeneratorKind(g))) + "##gen").c_str()))
-                runCommand("fill_layer", withLayer({{"action", std::string("effect")}, {"generator", std::string(generatorId(GeneratorKind(g)))}}));
+                run("fill_layer", withLayer({{"action", std::string("effect")}, {"generator", std::string(generatorId(GeneratorKind(g)))}}));
         for (MaskEffectKind k : {MaskEffectKind::Noise, MaskEffectKind::Paint, MaskEffectKind::Levels, MaskEffectKind::Blur,
                                  MaskEffectKind::Invert, MaskEffectKind::Fill})
             if (ImGui::Selectable((std::string(maskEffectLabel(k)) + "##kind").c_str()))
-                runCommand("fill_layer", withLayer({{"action", std::string("effect")}, {"kind", std::string(maskEffectId(k))}}));
+                run("fill_layer", withLayer({{"action", std::string("effect")}, {"kind", std::string(maskEffectId(k))}}));
         ImGui::EndCombo();
     }
     ui::HelpText("Add mask effect", nullptr,
