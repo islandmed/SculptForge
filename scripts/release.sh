@@ -210,9 +210,9 @@ PY
     fi
     # The Website workflow deploys main's site and the newest tag's guide; check what visitors get.
     for _ in $(seq 40); do
-        if curl -fsSL "https://sculptforge.app/latest.json?$(date +%s)" | grep -q "\"version\": \"$V\""; then
+        if curl -fsSL "https://sculptforge.app/latest.json?$(date +%s)" | grep "\"version\": \"$V\"" >/dev/null; then
             ok "sculptforge.app/latest.json says $V"
-            curl -fsSL "https://sculptforge.app/guide/whats-new.html?$(date +%s)" | grep -q "Version $V" ||
+            curl -fsSL "https://sculptforge.app/guide/whats-new.html?$(date +%s)" | grep "Version $V" >/dev/null ||
                 die "the live guide's What's New doesn't show $V" "gh workflow run pages.yml -R $REPO (it takes the guide from the newest tag), wait, run again"
             ok "the live guide shows Version $V"
             return
