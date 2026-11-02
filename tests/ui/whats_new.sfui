@@ -1,11 +1,13 @@
 # Help > What's New opens the guide's What's New chapter (it also opens by itself once after an update).
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_sphere subdivisions=3
 click "Help##palette.help"
 click "What's New##help.whats_new"
 expect_value guide_open == 1
 expect_guide whats-new.md
+expect_text "Version 0.10.7"
+expect_text "A new look"
 expect_text "Version 0.10.6"
-expect_text "Wear that follows the sculpt"
 expect_text "Version 0.10.5"
 expect_text "Version 0.10.4"
 expect_text "Version 0.10.3"

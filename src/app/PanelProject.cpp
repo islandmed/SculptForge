@@ -7,6 +7,7 @@
 // sessions; --render, --record and demos run straight through.
 #include "app/App.h"
 #include "app/Support.h"
+#include "app/LookSchemes.h"
 #include "app/CrashLog.h"
 #include "core/SplatCapture.h"
 #include "app/Ui.h"
@@ -111,9 +112,26 @@ void App::initProject() {
         supportCardPrefs_.supporter = prefs["supporter"].asBool(false);
         supportCardPrefs_.shownAt = int64_t(prefs["support_card_shown_at"].asNumber(0));
         if (prefs["support_card_version"].isString()) supportCardPrefs_.shownVersion = prefs["support_card_version"].asString();
+        // The look (0.10.7): what the last session used, unless ui.json names one. An install from before 0.10.7
+        // remembers neither and keeps the Classic look with the ZBrush-style layout; the new-look card offers the
+        // new default once (PanelSupport.cpp).
+        newLookCardDone_ = prefs["new_look_card_done"].asBool(false);
+        if (!uiPrefs_.lookSaved && !uiConfigDeterministic_) {
+            UiPrefs saved = uiPrefs_;
+            if (!lookFromJson(prefs["ui_look"], saved)) {
+                saved.look.look = int(looks::LookId::Classic);
+                saved.shellLayout = 0;
+            }
+            uiPrefs_.look = saved.look;
+            setShellLayout(saved.shellLayout);
+            lookDirty_ = true;
+        }
+        const bool onNewLook = uiPrefs_.look.look == int(looks::LookId::ForgeTerminal) && uiPrefs_.shellLayout == 1;
+        newLookCard_ = !newLookCardDone_ && !onNewLook && !uiConfigDeterministic_;
     } else {
         showWelcome_ = options_.uiTest.empty() && options_.demo.empty(); // the first start: no prefs yet
         startInputStyle_ = uiPrefs_.inputStyle; // a new install: SculptForge's keys until the welcome's choice
+        newLookCardDone_ = true; // a new install starts in the new look (or ui.json's): nothing to announce
     }
     recentFiles_ = pruneRecentFiles(std::move(recentFiles_), fileExists);
     saveProjectPrefs(); // records this version, so What's New shows once
@@ -163,6 +181,12 @@ void App::saveProjectPrefs() {
     prefs.set("supporter", supportCardPrefs_.supporter);
     prefs.set("support_card_shown_at", double(supportCardPrefs_.shownAt));
     if (!supportCardPrefs_.shownVersion.empty()) prefs.set("support_card_version", supportCardPrefs_.shownVersion);
+    if (!uiConfigDeterministic_) {
+        Json look = Json::object();
+        lookToJson(uiPrefs_, look);
+        prefs.set("ui_look", std::move(look));
+    }
+    prefs.set("new_look_card_done", newLookCardDone_);
     std::ofstream(fsPath(prefDir_ + "project.json"), std::ios::binary | std::ios::trunc) << prefs.dump(true);
 }
 

@@ -125,3 +125,11 @@ click "Clay##brush.clay"
 hover_model 0.52 0.42
 wait 0.3
 shot classic-sculptforge-layout
+
+# The 0.10.7 default (Forge Terminal, Tokyo Night, SculptForge layout) with the one-time card an updated install sees.
+run ui_look look=forge scheme=tokyo_night layout=sculptforge
+run ui_look card=true
+run open path=assets/demo/lion-head.glb
+wait_idle 20
+wait 0.3
+shot new-look-card

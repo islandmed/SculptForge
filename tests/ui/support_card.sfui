@@ -1,6 +1,7 @@
 # The support card at launch (Support.h, PanelSupportCard.cpp): shown on the first start, after an update and at
 # most once a week; never for a supporter, never in tests. Its buttons only ask for the fixed Stripe links (UI tests
 # never start a browser).
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_sphere subdivisions=3
 # A UI test is a test-mode start: no card.
 expect_value support_card_open == 0

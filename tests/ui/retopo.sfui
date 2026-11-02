@@ -1,6 +1,7 @@
 # Quad retopology and detail projection: Geometry > QRemesh (ZBrush's ZRemesher) rebuilds a sculpted sphere as
 # clean quads in the background, keeping the original as a hidden SubTool; after dividing the retopo twice,
 # SubTool > Project > ProjectAll brings the sculpted detail back.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_sphere subdivisions=6
 run stroke points="-0.6,0.35,2 0,0.55,2 0.6,0.35,2" brush=Standard radius=0.16 strength=1
 run stroke points="-0.55,-0.35,2 0.55,-0.4,2" brush=Crease radius=0.12 strength=1

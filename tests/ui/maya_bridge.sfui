@@ -3,6 +3,7 @@
 # back, and with Get automatically on a second send from Maya replaces the SubTool by name (undoable) and adds
 # the new object. The sends are staged from tests/ui/data/maya into a folder in the working directory (the build
 # folder under ctest).
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_sphere subdivisions=3
 copy data/maya/send1 sf_ui_maya/maya_to_sculptforge
 

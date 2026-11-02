@@ -6,17 +6,26 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- A new default look: new installs start in **Forge Terminal** with the **Tokyo Night** colours and the
+  **SculptForge layout** (menus by task: File, Edit, Sculpt, Paint, Mesh, View, Render, Help, whose sections are the
+  palettes; a status bar; a one-row tool shelf). Existing installs keep their look and layout, and see a one-time card,
+  "SculptForge has a new look", with **Try it** and **Keep my layout**. The welcome offers **Coming from ZBrush? Use the
+  ZBrush-style layout** in one click, and Preferences > Interface > Look switches any time. The look is remembered
+  without Store Config. Also in Preferences > Interface > Look: the **Classic** look, **Forge Terminal** with Tokyo
+  Night, Catppuccin Mocha, Gruvbox Dark, Nord, Rosé Pine, Kanagawa or Everforest colours or **Match my desktop
+  theme** (on Linux, the Omarchy theme's colours when Omarchy is installed), **Phosphor** (green or amber, optional scanlines and glow on the interface only) and **Blueprint**.
+  Scripts: `ui_look`.
+
+### Fixed
+- Switching looks no longer grows the interface's minimum window size each time (the Sculpt Timeline strip covered
+  the axis gizmo at 2400x1350).
+- A stored SculptForge-layout UI configuration without shelves gets the SculptForge layout's shelves, not the
+  ZBrush-style ones.
+
 ## [0.10.6] - 2026-11-01
 
 ### Added
-- Interface looks (Preferences > Interface > Look), for choosing SculptForge's own default (Classic stays the default
-  for now): **Forge Terminal** (tiles with gaps and thin borders, the focused one highlighted, JetBrains Mono labels and
-  a status bar; Tokyo Night, Catppuccin Mocha, Gruvbox Dark, Nord, Rosé Pine, Kanagawa or Everforest colours, or
-  **Match my Omarchy theme** on Linux), **Phosphor** (green or amber CRT, monospace, ASCII rules, optional scanlines and
-  glow on the interface only) and **Blueprint** (deep blue, cyan line work, grid headers, technical numbers). The looks
-  come with the new **SculptForge layout**: menus by task (File, Edit, Sculpt, Paint, Mesh, View, Render, Help) whose
-  sections are the palettes, a status bar and a one-row tool shelf; the **ZBrush-style layout** stays one setting away
-  and F3 still finds every palette. Scripts: `ui_look`.
 - Packs and macros (#20): `.sfpack` files bring brushes, alphas, Lit Spheres, Material Recipes, VDMs, keymaps, pie
   menus and macros in one file (format: `docs/pack-format.md`). **File > Install Pack...**, a dropped file or
   **Library > Packs** shows a review first (counts by type, every item, the license text, the author; a Supporter

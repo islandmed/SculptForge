@@ -1,6 +1,7 @@
 # Radial menus on mouse buttons (#74): a plain press of the button opens the pie; with a modifier held the button
 # keeps its navigation (Alt+middle pans). A menu on the right button opens on a plain right-drag, while Alt+right
 # still zooms in the Maya style and Shift+right still turns the view in the ZBrush style.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_sphere subdivisions=4
 
 # The middle button (sculpting.json): a plain press opens the pie, a right flick runs Inflate.

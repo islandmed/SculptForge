@@ -1,9 +1,11 @@
 # The interface
 
-SculptForge's window is laid out like ZBrush's: a canvas in the middle, shelves of the most-used controls
-around it, a bar of alphabetical palettes that hold every function, and trays at the sides where palettes can
-stay open. This chapter walks through each region, the pop-up pickers, the Library, the built-in help, and
-how to rearrange the interface and keep your changes.
+SculptForge's window has a canvas in the middle, shelves of the most-used controls around it, palettes that
+hold every function, and trays at the sides where palettes can stay open. It comes in two layouts: the
+**SculptForge layout** (the default since 0.10.7), with menus by task, and the **ZBrush-style layout**, with a bar
+of alphabetical palettes. Both hold the same palettes; see [Looks and layouts](#looks-and-layouts) to switch. This
+chapter walks through each region, the pop-up pickers, the Library, the built-in help, and how to rearrange the
+interface and keep your changes. The pictures show the ZBrush-style layout.
 
 ![The SculptForge window with its main regions labelled](images/interface-overview.jpg)
 
@@ -22,6 +24,49 @@ how to rearrange the interface and keep your changes.
 
 Press <kbd>Tab</kbd> to hide the shelves and trays for a bigger canvas, and again to bring them back. The
 palette bar stays, so every function is still one click away.
+
+## Looks and layouts
+
+**Preferences > Interface > Look** sets how the interface looks and how it is laid out. Neither changes your
+models, brushes or shortcuts.
+
+**Layout**:
+
+- **SculptForge** (the default for new installs): a status bar along the top with the task menus **File, Edit,
+  Sculpt, Paint, Mesh, View, Render** and **Help**, the document name and scene statistics; a one-row top shelf
+  (Sculpt/Paint, Draw, Move, Scale, Rotate, Add/Sub, Rgb, Draw Size, Intensity, Dynamic, symmetry). Every palette
+  is a section of one menu: **File** (File, Script), **Edit** (Edit, Preferences), **Sculpt** (Brush, Draw &
+  Tablet, Stroke, Alpha, Symmetry & Gizmo), **Paint** (Vertex Paint & Color), **Mesh** (Parts & Geometry, which is
+  the Tool palette, and Generate 3D), **View** (Display), **Render** (Materials, Gaussian Splats) and **Help**. Pin
+  a section to a tray as you would a palette. Brush Lab, Front and the pressure options are under **Sculpt**, the
+  Library and the console under **View > Display**, and <kbd>F3</kbd> finds everything.
+- **ZBrush-style**: the alphabetical palette bar and the two-row top shelf described in the rest of this chapter.
+  Coming from ZBrush? The welcome shown at the first start has **Coming from ZBrush? Use the ZBrush-style layout**,
+  one click.
+
+Switching the layout swaps the shelves for that layout's standard ones; the trays and what is in them stay.
+
+**Look** (the colours and style):
+
+- **Forge Terminal** (the default): tiles with small gaps and thin borders, the panel under the pointer
+  highlighted, JetBrains Mono for labels and numbers. **Colours** picks the scheme: **Tokyo Night** (the default),
+  Catppuccin Mocha, Gruvbox Dark, Nord, Rosé Pine, Kanagawa or Everforest. **Match my desktop theme** uses your
+  Omarchy theme's colours when Omarchy is installed (Linux; the option shows only then). SculptForge never changes
+  the theme; toggle it again after switching themes.
+- **Classic**: the dark grey interface with the orange accent that SculptForge had before 0.10.7.
+- **Phosphor**: green or amber on black, monospace, with optional scanlines and glow on the interface (never on
+  the 3D view).
+- **Blueprint**: deep blue with cyan and white line work.
+
+Choosing Forge Terminal, Phosphor or Blueprint also switches to the SculptForge layout; you can pick the
+ZBrush-style layout again right after. The look and layout are remembered for the next start without
+[Store Config](#store-config-and-friends) (Store Config keeps them in your UI configuration too).
+
+**Updating from an older version** keeps the look and layout you had. A card, **SculptForge has a new look**,
+shows once: **Try it** switches to Forge Terminal with Tokyo Night and the SculptForge layout; **Keep my layout**
+changes nothing. Either way, Preferences > Interface > Look changes it later.
+
+In scripts: `ui_look look=forge scheme=tokyo_night layout=sculptforge` (or `look=classic layout=zbrush`).
 
 ## The title strip
 
@@ -425,6 +470,7 @@ Config keeps it.
 
 | Setting | Default | What it does |
 |---|---|---|
+| **Look** and **Layout** | Forge Terminal, Tokyo Night, SculptForge | See [Looks and layouts](#looks-and-layouts) |
 | **Language** | English | The interface language: **English** or **Español** (see below) |
 | **Viewport cursor** | Crosshair | The pointer over the 3D view: a crosshair, or the arrow (#73). Panels, menus and popups always show the arrow |
 | **Popup Info (Ctrl+hover help)** | On | Ctrl-hover help boxes |

@@ -204,13 +204,13 @@ std::string omarchyThemeDir() {
 bool readOmarchyTheme(Palette& out, std::string& name, std::string& error) {
     const std::string dir = omarchyThemeDir();
     if (dir.empty()) {
-        error = "No Omarchy theme found (~/.config/omarchy/current/theme)";
+        error = "Match my desktop theme: no Omarchy theme found (~/.config/omarchy/current/theme)";
         return false;
     }
     const std::filesystem::path d(dir);
     const std::string colors = readFile(d / "colors.toml"), alacritty = readFile(d / "alacritty.toml");
     if (!paletteFromOmarchy(colors, alacritty, out)) {
-        error = "The Omarchy theme has no colours SculptForge can read (colors.toml or alacritty.toml)";
+        error = "Match my desktop theme: the Omarchy theme has no colours SculptForge can read (colors.toml or alacritty.toml)";
         return false;
     }
     name = trim(readFile(d.parent_path() / "theme.name"));

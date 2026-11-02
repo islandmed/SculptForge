@@ -3,6 +3,7 @@
 # a resting cap inside the dead zone does nothing; Preferences > Input > SpaceMouse inverts axes, locks the
 # rotation to a turntable and turns it off; the side buttons frame and show the front; a pen stroke held while the
 # view turns stays one stroke; unplugging and plugging back in works; every input style.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_sphere subdivisions=4
 snapshot
 expect_value spacemouse_connected == 0

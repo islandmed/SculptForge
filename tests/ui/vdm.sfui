@@ -1,6 +1,7 @@
 # Vector displacement brushes (Brush > Vector Displacement): pick a built-in VDM, stamp it with DragRect (the drag
 # sets size and turn) and DragDot, Alt digs in, undo; the stroke comes back with the next brush; then sculpt a VDM
 # plane, Create VDM (saved to the library) and stamp the new brush on the sphere.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 expect_value vdm_files == 0
 expect_value vdms == 10
 run new_sphere subdivisions=6

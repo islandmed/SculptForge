@@ -1,4 +1,5 @@
 # Core loop on the real UI: sculpt, undo/redo, masking, polygroups, visibility.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_sphere subdivisions=5
 expect_value can_undo == 0
 click "Clay##brush.clay"

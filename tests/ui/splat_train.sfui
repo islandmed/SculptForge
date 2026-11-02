@@ -2,6 +2,7 @@
 # _FFMPEG at tests/tools/fake_splat_tools.cpp, which writes a checkpoint every 250 steps). The capture is the
 # synthetic phone capture in tests/data/splat_capture (photos + AR poses). Checks the live preview, orbiting
 # while it trains, the progress overlay, Good enough - stop, Cancel, a trainer crash and the Brush prompt.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 env FAKE_BRUSH_MS_PER_EXPORT 150
 env FAKE_BRUSH_FAIL_AT -1
 copy ../data/splat_capture ui-shots/splat_train/capture

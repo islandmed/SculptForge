@@ -373,6 +373,11 @@ private:
     // SculptForge for a new install), used while ui.json (Store Config) names none; -1: an install from before it,
     // which keeps the ZBrush-style keys it had.
     int startInputStyle_ = -1;
+    // "SculptForge has a new look" (0.10.7, PanelSupport.cpp): once, for an install from before it that kept the
+    // Classic look or the ZBrush-style layout. Done once either button or its close box is used.
+    bool newLookCard_ = false;
+    bool newLookCardDone_ = false;
+    void chooseNewLook(bool tryIt);
     double sculptSeconds_ = 0.0;        // cumulative time in strokes (project.json)
     bool supportReminderDone_ = false;  // the reminder was shown (or turned off) once: never again (project.json)
     bool supportReminderOpen_ = false;

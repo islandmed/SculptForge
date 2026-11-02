@@ -100,7 +100,7 @@ void applyStyle();
 
 // What Preferences > Interface > Look holds (UiPrefs::look).
 struct LookSettings {
-    int look = 0;                        // looks::LookId: 0 Classic (the default), Forge Terminal, Phosphor, Blueprint
+    int look = 1;                        // looks::LookId: 0 Classic, 1 Forge Terminal (the default), Phosphor, Blueprint
     std::string scheme = "tokyo_night";  // Forge Terminal's colour scheme (looks::schemes)
     bool matchOmarchy = false;           // Forge Terminal: the colours of the current Omarchy theme (Linux, read-only)
     bool amber = false;                  // Phosphor: amber instead of green

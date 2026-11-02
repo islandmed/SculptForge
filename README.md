@@ -74,8 +74,10 @@ files keep face groups, mask and vertex paint), as OBJ, FBX or GLB, or convert a
 
 ## Features
 
-**A ZBrush-style interface**
-- Shelves around the canvas, alphabetical palettes holding every tool, a Library (`,`) of thumbnails, the
+**An interface ZBrush users can find their way around**
+- Task menus (File, Edit, Sculpt, Paint, Mesh, View, Render, Help) in the Forge Terminal look by default, or the
+  ZBrush-style layout with alphabetical palettes in one click (Preferences > Interface > Look)
+- Shelves around the canvas, palettes holding every tool, a Library (`,`) of thumbnails, the
   brush picker (`B`, type letters to pick), hold-Ctrl help on every button, a command palette (F3) and a script
   console (`` ` ``), and a fully customizable layout with Store Config. See [docs/ui-design.md](docs/ui-design.md).
 - A built-in **user guide** (Help > User Guide, Shift+F1) with search, also on the

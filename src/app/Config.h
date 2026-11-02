@@ -59,11 +59,13 @@ struct UiPrefs {
     // Preferences > Interface > Timeline position (#63): the Sculpt Timeline strip along the top of the viewport
     // (true, the default: clear of the brush shelf below it) or its bottom.
     bool timelineTop = true;
-    // Preferences > Interface > Look: the colours and style of the interface (Theme.h; Classic is the default), and
-    // the shell's layout: 0 the ZBrush-style layout (the alphabetical palette bar, two-row top shelf), 1 the
-    // SculptForge layout (task menus File, Edit, Sculpt, Paint, Mesh, View, Render, Help, a status bar, one-row shelf).
+    // Preferences > Interface > Look: the colours and style of the interface (Theme.h; new installs get Forge
+    // Terminal with Tokyo Night), and the shell's layout: 0 the ZBrush-style layout (the alphabetical palette bar,
+    // two-row top shelf), 1 the SculptForge layout (the default: task menus File, Edit, Sculpt, Paint, Mesh, View,
+    // Render, Help, a status bar, one-row shelf). Remembered in project.json too, without Store Config.
     theme::LookSettings look;
-    int shellLayout = 0;
+    int shellLayout = 1;
+    bool lookSaved = false; // ui.json named the look or layout (not saved itself); one from before 0.10.7 didn't
     // Preferences > Interface > Viewport cursor (#73): the system cursor over the 3D view, 0 = crosshair (the
     // default, as most sculpting apps), 1 = the arrow. Panels, menus and popups always show their own.
     int viewportCursor = 0;
@@ -97,6 +99,10 @@ struct UiPrefs {
 };
 
 Json toJson(const UiPrefs& prefs);
+// Just the look and the layout ("look" and "layout" keys): ui.json's prefs, and project.json's "ui_look", which
+// remembers them without Store Config. lookFromJson says whether `j` named either.
+void lookToJson(const UiPrefs& prefs, Json& j);
+bool lookFromJson(const Json& j, UiPrefs& prefs);
 void fromJson(const Json& j, UiPrefs& prefs);
 
 namespace config {

@@ -1,5 +1,6 @@
 # The Maya input style (#32): Alt+left orbits, Alt+middle pans, Alt+right zooms (on the model too, without
 # sculpting); Ctrl inverts a stroke, Ctrl+Alt masks; back to the ZBrush style.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_sphere subdivisions=4
 click "Preferences##palette.preferences"
 click "Input##preferences.input"

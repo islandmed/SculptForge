@@ -5,6 +5,7 @@
 // the one optional reminder after ten hours of sculpting. Each only opens kSupportUrl in the browser (Support.h);
 // the app is the same for everyone, so nothing here checks, sends or stores anything else.
 #include "app/App.h"
+#include "app/LookSchemes.h"
 #include "app/Theme.h"
 
 #include <imgui.h>
@@ -73,6 +74,22 @@ void App::drawSupportersSection() {
     if (ImGui::Button("Support SculptForge##about")) openSupportPage();
 }
 
+void App::chooseNewLook(bool tryIt) {
+    newLookCard_ = false;
+    newLookCardDone_ = true;
+    if (tryIt) {
+        uiPrefs_.look.look = int(looks::LookId::ForgeTerminal);
+        uiPrefs_.look.scheme = "tokyo_night";
+        uiPrefs_.look.matchOmarchy = false;
+        setShellLayout(1);
+        lookDirty_ = true;
+        status_ = "The new look: Forge Terminal, SculptForge layout (Preferences > Interface > Look changes it)";
+    } else {
+        status_ = "Kept your layout (Preferences > Interface > Look has the new look)";
+    }
+    saveProjectPrefs();
+}
+
 void App::drawSupportUi() {
     const float s = uiScale_;
     const CanvasRect c = canvasRect();
@@ -113,6 +130,22 @@ void App::drawSupportUi() {
                 if (on) ImGui::PopStyleColor();
                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", o.help);
             }
+            // The layout (Preferences > Interface > Look): new installs start in the SculptForge layout.
+            ImGui::Spacing();
+            const bool zbrushLayout = uiPrefs_.shellLayout == 0;
+            ImGui::BeginDisabled(zbrushLayout);
+            if (ImGui::Button(zbrushLayout ? "Using the ZBrush-style layout##welcome.layout"
+                                           : "Coming from ZBrush? Use the ZBrush-style layout##welcome.layout")) {
+                setShellLayout(0);
+                lookDirty_ = true;
+                saveProjectPrefs(); // remembered for the next start, also without Store Config
+                status_ = "ZBrush-style layout (Preferences > Interface > Look switches back)";
+            }
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip("The alphabetical palette bar and the two-row top shelf. Preferences > Interface > Look "
+                                  "switches back to the SculptForge layout.");
+            ImGui::Spacing();
             if (ImGui::Button("Open the User Guide##welcome")) {
                 guide_.open();
                 showWelcome_ = false;
@@ -130,6 +163,25 @@ void App::drawSupportUi() {
             if (ImGui::Button("Close##welcome")) showWelcome_ = false;
         }
         ImGui::End();
+    }
+    if (newLookCard_ && !showWelcome_ && !supportCardOpen()) {
+        // Once, after updating from before 0.10.7 (PanelProject.cpp): the new default look, never forced.
+        ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + c.h - 16.0f * s), ImGuiCond_Always, ImVec2(0.5f, 1.0f));
+        ImGui::SetNextWindowSize(ImVec2(420.0f * s, 0.0f), ImGuiCond_Always);
+        const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize |
+                                       ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoFocusOnAppearing;
+        bool open = true;
+        if (ImGui::Begin("SculptForge has a new look##newlook", &open, flags)) {
+            ImGui::TextWrapped("Forge Terminal with the Tokyo Night colours, and the SculptForge layout: menus by task, a "
+                               "status bar and a one-row tool shelf. Your layout stays as it is unless you try it.");
+            ImGui::Spacing();
+            if (ImGui::Button("Try it##newlook")) chooseNewLook(true);
+            ImGui::SameLine();
+            if (ImGui::Button("Keep my layout##newlook")) chooseNewLook(false);
+            ImGui::TextDisabled("Either way: Preferences > Interface > Look changes it later.");
+        }
+        ImGui::End();
+        if (!open) chooseNewLook(false);
     }
     if (supportReminderOpen_) {
         // The one reminder: a small note along the bottom of the canvas, no focus taken, closed for good by any button.

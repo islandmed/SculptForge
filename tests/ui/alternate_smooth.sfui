@@ -1,6 +1,7 @@
 # Alternate smooth (#40, ZBrush): a stroke begun with Shift held smooths plainly (the sphere shrinks under it);
 # letting go of Shift while still pressing switches to the smooth that keeps the volume for the rest of the
 # stroke. Brush > Smooth keeps volume makes that the Shift smooth, and letting go then switches to the plain one.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_sphere subdivisions=5
 expect_value smooth_keep_volume == 0
 snapshot

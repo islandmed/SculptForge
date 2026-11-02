@@ -2,6 +2,7 @@
 # window and its QR code, a scan, a photo and a splat .ply uploaded into the Captures inbox (each upload loses a
 # chunk and resumes), View in AR (the model exported for the phone, then again after a stroke), and the live face
 # feed with a recorded take. Port 0: any free port, so tests can run side by side.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 env SCULPTFORGE_LINK_PORT 0
 run new_sphere subdivisions=4
 

@@ -1,5 +1,6 @@
 # Smooth / Flat shading (#11): the scene's shading in the Material palette, each SubTool's own override, both
 # saved in projects. Smooth stays the default. Files are written to the working directory (the build folder).
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_sphere subdivisions=2
 run subtool_append type=sphere size=0.6
 expect_value subtools == 2

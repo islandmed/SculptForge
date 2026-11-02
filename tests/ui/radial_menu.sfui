@@ -4,6 +4,7 @@
 # never reaches the model. A pen or mouse button set on a menu does the same as its key. Preferences > Input >
 # Radial Menus: a new menu, an item picked with the palette's search, a key; import and export of one menu (only
 # known actions are kept).
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_sphere subdivisions=3
 camera 0 0
 expect_value radial_menus == 2

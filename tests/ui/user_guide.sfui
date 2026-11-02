@@ -1,5 +1,6 @@
 # Help > User Guide: the embedded docs/guide reader. Open it from the Help palette, move between chapters,
 # search, follow a link, go back, and open a chapter from the Ctrl-hover help with F1.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_sphere subdivisions=3
 click "Help##palette.help"
 click "User Guide##help.guide"

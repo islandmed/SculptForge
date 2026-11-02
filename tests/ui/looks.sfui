@@ -1,15 +1,23 @@
 # The interface looks and the SculptForge layout (Preferences > Interface > Look): the task menus hold every palette
 # as a section, the ZBrush-style layout stays one setting away, and switching looks keeps everything working.
 run new_sphere subdivisions=3
+expect_value look == 1                      # the default (0.10.7): Forge Terminal, Tokyo Night, SculptForge layout
+expect_value shell_layout == 1
+expect "Sculpt##menu.sculpt"
+expect_not "Tool##palette.tool"
+
+# Classic with the ZBrush-style layout, then Forge Terminal brings the SculptForge layout back: the menus in the
+# status bar, no palette bar, a one-row shelf.
+run ui_look look=classic layout=zbrush
+wait 0.2
 expect_value look == 0
 expect_value shell_layout == 0
-expect "Tool##palette.tool"                 # the default: Classic, ZBrush-style palette bar
-
-# Forge Terminal brings the SculptForge layout: the menus in the status bar, no palette bar, a one-row shelf.
+expect "Tool##palette.tool"
 run ui_look look=forge scheme=nord
 wait 0.2
 expect_value look == 1
 expect_value shell_layout == 1
+expect_value style_window_min < 33           # switching looks doesn't scale the style again (2400x1350 gizmo overlap)
 expect "Sculpt##menu.sculpt"
 expect_not "Tool##palette.tool"
 expect_not "Library##ui.lightbox"           # moved off the shelf (View > Display, F3)
@@ -112,4 +120,34 @@ shot blueprint-zbrush-layout
 run ui_look look=classic
 wait 0.2
 expect_value look == 0
+expect "Tool##palette.tool"
+expect_value style_window_min < 33
+
+# The one-time card after updating from before 0.10.7: Keep my layout changes nothing, Try it switches.
+run ui_look card=true
+wait 0.2
+expect_value new_look_card_open == 1
+expect "Keep my layout##newlook"
+shot new-look-card
+click "Keep my layout##newlook"
+expect_value new_look_card_open == 0
+expect_value look == 0
+expect_value shell_layout == 0
+run ui_look card=true
+wait 0.2
+click "Try it##newlook"
+wait 0.2
+expect_value new_look_card_open == 0
+expect_value look == 1
+expect_value shell_layout == 1
+expect "Sculpt##menu.sculpt"
+
+# The welcome offers the ZBrush-style layout in one click.
+key f3
+type "##Command palette" "welcome"
+key enter
+expect_value welcome_open == 1
+click "Coming from ZBrush? Use the ZBrush-style layout##welcome.layout"
+wait 0.2
+expect_value shell_layout == 0
 expect "Tool##palette.tool"

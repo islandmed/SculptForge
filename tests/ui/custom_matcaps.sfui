@@ -1,5 +1,6 @@
 # Custom MatCaps (#15): Material > Load MatCap... (the dialog's command), the library's MatCaps folder, and
 # projects that carry their custom MatCap. Files are written to the working directory (the build folder).
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 expect_value custom_matcaps == 0
 
 # A project saved with a MatCap this machine doesn't have (Rose, embedded): it opens with it.

@@ -2,6 +2,7 @@
 # surface along the average normal under the brush instead of across the screen. A drag up and to the right on the
 # sphere's right side: plainly it moves up as much as out; with Alt it only moves out. Preferences > Input > Along
 # the normal: Always does it without the key, Never turns it off.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_sphere subdivisions=5
 camera 0 0
 click "Move##brush.move"

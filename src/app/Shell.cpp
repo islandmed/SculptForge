@@ -643,10 +643,11 @@ void App::registerShellActions() {
                     {"scheme", ParamSpec::Type::String,
                      "Forge Terminal's colours: tokyo_night, catppuccin_mocha, gruvbox_dark, nord, rose_pine, kanagawa or everforest.",
                      false},
-                    {"match_omarchy", ParamSpec::Type::Bool, "Forge Terminal: use the current Omarchy theme's colours (Linux).", false},
+                    {"match_omarchy", ParamSpec::Type::Bool, "Forge Terminal: match the desktop theme (the current Omarchy theme's colours, Linux).", false},
                     {"phosphor", ParamSpec::Type::String, "Phosphor's colour: green or amber.", false},
                     {"effects", ParamSpec::Type::Bool, "Phosphor's scanlines and glow (on the interface only).", false},
-                    {"layout", ParamSpec::Type::String, "sculptforge or zbrush (default: the look's, else unchanged).", false}},
+                    {"layout", ParamSpec::Type::String, "sculptforge or zbrush (default: the look's, else unchanged).", false},
+                    {"card", ParamSpec::Type::Bool, "Show the one-time \"SculptForge has a new look\" card (for tests).", false}},
                    [this](Document&, const Args& a) -> CommandResult {
                        theme::LookSettings& l = uiPrefs_.look;
                        int layoutKind = uiPrefs_.shellLayout;
@@ -672,6 +673,7 @@ void App::registerShellActions() {
                        }
                        setShellLayout(layoutKind);
                        lookDirty_ = true;
+                       if (a.contains("card")) newLookCard_ = argBool(a, "card", false);
                        return {true, std::string("Look: ") + looks::lookName(looks::LookId(l.look)) +
                                          (layoutKind == 1 ? ", SculptForge layout" : ", ZBrush-style layout")};
                    }});
@@ -1162,6 +1164,12 @@ void App::setShellLayout(int layoutKind) {
 
 void App::applyLook() {
     std::string message;
+    // From a fresh style: the looks set colours and some sizes, and ScaleAllSizes on the style of an earlier call
+    // would scale what they leave alone once more each time (the minimum window size grew until the Sculpt
+    // Timeline strip covered the axis gizmo at 2400x1350).
+    const float hoverDelay = ImGui::GetStyle().HoverDelayNormal; // Preferences > Interface (Ui.cpp)
+    ImGui::GetStyle() = ImGuiStyle();
+    ImGui::GetStyle().HoverDelayNormal = hoverDelay;
     theme::applyLook(uiPrefs_.look, &message);
     ImGui::GetStyle().ScaleAllSizes(uiScale_);
     const bool mono = theme::look.monoLabels || theme::look.monoAll;

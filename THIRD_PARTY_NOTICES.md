@@ -561,7 +561,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-Omarchy's own themes are never bundled: "Match my Omarchy theme" reads the colours of the theme installed on the
+Omarchy's own themes are never bundled: "Match my desktop theme" reads the colours of the theme installed on the
 user's computer (`~/.config/omarchy/current/theme`, or `~/.local/state/omarchy/current/theme`) at run time.
 
 ## libcurl

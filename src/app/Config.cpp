@@ -39,6 +39,30 @@ extern const unsigned char fontLucide[];
 extern const unsigned long long fontLucide_size;
 } // namespace assets
 
+void lookToJson(const UiPrefs& p, Json& j) {
+    Json look = Json::object();
+    look.set("name", std::string(looks::lookKey(looks::LookId(p.look.look))));
+    look.set("scheme", p.look.scheme);
+    look.set("matchOmarchy", p.look.matchOmarchy);
+    look.set("phosphor", std::string(p.look.amber ? "amber" : "green"));
+    look.set("effects", p.look.effects);
+    j.set("look", std::move(look));
+    j.set("layout", std::string(p.shellLayout == 1 ? "sculptforge" : "zbrush"));
+}
+
+bool lookFromJson(const Json& j, UiPrefs& p) {
+    if (!j.isObject()) return false;
+    if (const Json& look = j["look"]; look.isObject()) {
+        if (look["name"].isString()) p.look.look = int(looks::lookFromKey(look["name"].asString()));
+        if (look["scheme"].isString() && looks::findScheme(look["scheme"].asString())) p.look.scheme = look["scheme"].asString();
+        p.look.matchOmarchy = look["matchOmarchy"].asBool(p.look.matchOmarchy);
+        if (look["phosphor"].isString()) p.look.amber = look["phosphor"].asString() == "amber";
+        p.look.effects = look["effects"].asBool(p.look.effects);
+    }
+    if (j["layout"].isString()) p.shellLayout = j["layout"].asString() == "sculptforge" ? 1 : 0;
+    return j["look"].isObject() || j["layout"].isString();
+}
+
 Json toJson(const UiPrefs& p) {
     Json j = Json::object();
     j.set("popupInfo", p.popupInfo);
@@ -67,16 +91,7 @@ Json toJson(const UiPrefs& p) {
     j.set("timelinePosition", std::string(p.timelineTop ? "top" : "bottom"));
     j.set("showAxes", p.showAxes);
     j.set("alphabeticalPalettes", p.alphabeticalPalettes);
-    {
-        Json look = Json::object();
-        look.set("name", std::string(looks::lookKey(looks::LookId(p.look.look))));
-        look.set("scheme", p.look.scheme);
-        look.set("matchOmarchy", p.look.matchOmarchy);
-        look.set("phosphor", std::string(p.look.amber ? "amber" : "green"));
-        look.set("effects", p.look.effects);
-        j.set("look", std::move(look));
-    }
-    j.set("layout", std::string(p.shellLayout == 1 ? "sculptforge" : "zbrush"));
+    lookToJson(p, j);
     j.set("language", p.language);
     j.set("tablet", toJson(p.tablet));
     j.set("spaceMouse", toJson(p.spaceMouse));
@@ -131,14 +146,13 @@ void fromJson(const Json& j, UiPrefs& p) {
     if (j["timelinePosition"].isString()) p.timelineTop = j["timelinePosition"].asString() != "bottom";
     p.showAxes = j["showAxes"].asBool(p.showAxes);
     p.alphabeticalPalettes = j["alphabeticalPalettes"].asBool(p.alphabeticalPalettes);
-    if (const Json& look = j["look"]; look.isObject()) {
-        if (look["name"].isString()) p.look.look = int(looks::lookFromKey(look["name"].asString()));
-        if (look["scheme"].isString() && looks::findScheme(look["scheme"].asString())) p.look.scheme = look["scheme"].asString();
-        p.look.matchOmarchy = look["matchOmarchy"].asBool(p.look.matchOmarchy);
-        if (look["phosphor"].isString()) p.look.amber = look["phosphor"].asString() == "amber";
-        p.look.effects = look["effects"].asBool(p.look.effects);
+    // A ui.json from before 0.10.7 names neither: it was stored with the Classic look and the ZBrush-style layout,
+    // and keeps them (the new-look card offers the new default once, PanelSupport.cpp).
+    p.lookSaved = lookFromJson(j, p);
+    if (!p.lookSaved) {
+        p.look.look = int(looks::LookId::Classic);
+        p.shellLayout = 0;
     }
-    if (j["layout"].isString()) p.shellLayout = j["layout"].asString() == "sculptforge" ? 1 : 0;
     if (j["language"].isString()) p.language = languageCode(languageFromCode(j["language"].asString()));
     fromJson(j["tablet"], p.tablet);
     fromJson(j["spaceMouse"], p.spaceMouse);
@@ -741,13 +755,17 @@ bool App::readUiConfig(const std::string& path, std::string& err) {
         err = path + " is not a SculptForge UI configuration";
         return false;
     }
+    // The prefs first: they name the shell layout, whose standard shelves fill in what the file didn't store.
+    UiPrefs prefs = uiPrefs_;
+    fromJson(j["prefs"], prefs);
     UiLayout layout;
-    if (!fromJson(j["layout"], layout, err)) return false;
+    if (!fromJson(j["layout"], layout, err, prefs.shellLayout)) return false;
+    uiPrefs_ = std::move(prefs);
+    lookDirty_ = true;
     const bool customize = layout_.customize;
     layout_ = std::move(layout);
     layout_.customize = customize;
     actions_.overridesFromJson(j["shortcuts"]);
-    fromJson(j["prefs"], uiPrefs_);
     if (j.has("radialMenus")) applyRadialMenusJson(j["radialMenus"]); // (an older file keeps the menus there are)
     setLanguage(languageFromCode(uiPrefs_.language));
     applyPerformancePrefs();
@@ -1350,7 +1368,7 @@ void App::drawLookSection() {
         ui::HelpText(looks::lookName(id), nullptr,
                      i == 0   ? "The original dark grey look with the orange accent."
                      : i == 1 ? "Keyboard-first tiles with gaps and thin borders, monospace labels, a status bar, and the colours "
-                                "of a well-known terminal theme (or your Omarchy theme)."
+                                "of a well-known terminal theme (or your desktop theme)."
                      : i == 2 ? "A phosphor screen: green or amber on black, monospace, ASCII rules; optional scanlines on the interface."
                               : "Engineering paper: deep blue, cyan and white line work, grid headers, technical numbers.",
                      "Preferences > Interface > Look");
@@ -1384,15 +1402,17 @@ void App::drawLookSection() {
         ImGui::EndDisabled();
         ui::HelpText("Colours", nullptr, "Forge Terminal's colour scheme, from well-known open-source terminal themes.",
                      "Preferences > Interface > Look");
+        // Match my desktop theme: only where there is a theme to match (an Omarchy theme folder, Linux), or to
+        // switch it off again once that theme is gone.
         const bool omarchy = !looks::omarchyThemeDir().empty();
-        ImGui::BeginDisabled(!omarchy && !l.matchOmarchy);
-        if (ui::Checkbox("Match my Omarchy theme##look.omarchy", &l.matchOmarchy)) lookDirty_ = true;
-        ImGui::EndDisabled();
-        ui::HelpText("Match my Omarchy theme", nullptr,
-                     omarchy ? "Use the colours of your current Omarchy theme (read from its theme folder; SculptForge never "
-                               "changes it). After switching themes in Omarchy, toggle this to pick up the new colours."
-                             : "Omarchy (a Linux setup) wasn't found on this computer.",
-                     "Preferences > Interface > Look");
+        if (omarchy || l.matchOmarchy) {
+            if (ui::Checkbox("Match my desktop theme##look.omarchy", &l.matchOmarchy)) lookDirty_ = true;
+            if (!ImGui::GetIO().KeyCtrl) ImGui::SetItemTooltip("%s", tr("Uses your Omarchy theme's colours when Omarchy is installed"));
+            ui::HelpText("Match my desktop theme", nullptr,
+                         "Uses your Omarchy theme's colours when Omarchy is installed (read from its theme folder; SculptForge "
+                         "never changes it). After switching themes, toggle this to pick up the new colours.",
+                         "Preferences > Interface > Look");
+        }
     } else if (l.look == int(looks::LookId::Phosphor)) {
         if (ImGui::RadioButton(tr("Green##phosphor.green"), !l.amber)) {
             l.amber = false;

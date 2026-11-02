@@ -94,12 +94,12 @@ Json toJson(const UiLayout& l) {
     return j;
 }
 
-bool fromJson(const Json& j, UiLayout& l, std::string& error) {
+bool fromJson(const Json& j, UiLayout& l, std::string& error, int shellLayout) {
     if (!j.isObject()) {
         error = "The UI configuration is not a JSON object";
         return false;
     }
-    UiLayout out = standardLayout();
+    UiLayout out = standardLayout(shellLayout);
     auto flag = [&](const char* key, bool& v) { v = j[key].asBool(v); };
     auto number = [&](const char* key, float& v) { v = float(j[key].asNumber(v)); };
     flag("shelvesVisible", out.shelvesVisible);
