@@ -709,6 +709,12 @@ int App::run() {
     uint64_t framesDrawn = 0, wakeUps = 0, framesAtMeasure = 0, wakesAtMeasure = 0;
     std::clock_t cpuAtMeasure = 0; // processor time of every thread (the driver's included)
     bool measuring = false;
+    // Input while measuring (a pointer crossing the window on a shared desktop) restarts the count once it has
+    // passed: idle means no input. After kMeasureGiveUp seconds it counts whatever comes (the test's timeout).
+    constexpr double kMeasureGiveUp = 40.0;
+    double measureFrom = started + kMeasureSettle;
+    int measureRestarts = 0;
+    float lastMotionX = -1e9f, lastMotionY = -1e9f; // the mouse's last position, from its motion events
     Uint64 lastTicks = SDL_GetTicksNS();
     uint64_t lastKey = frameKey();
     bool draw = true;
@@ -749,17 +755,18 @@ int App::run() {
     while (running_) {
         const double t0 = seconds();
         if (options_.measureIdle > 0.0f) {
-            if (!measuring && t0 - started >= kMeasureSettle) {
+            if (!measuring && t0 >= measureFrom) {
                 measuring = true;
                 framesAtMeasure = framesDrawn;
                 wakesAtMeasure = wakeUps;
                 cpuAtMeasure = std::clock();
-            } else if (measuring && t0 - started >= kMeasureSettle + options_.measureIdle) {
+            } else if (measuring && t0 >= measureFrom + options_.measureIdle) {
                 const double fps = double(framesDrawn - framesAtMeasure) / double(options_.measureIdle);
                 const double cpu = 100.0 * double(std::clock() - cpuAtMeasure) / CLOCKS_PER_SEC / double(options_.measureIdle);
                 std::printf("Idle: %llu frames, %llu wake-ups in %.1f s: %.2f fps, CPU %.1f%% of one core (%s redraw)\n",
                             (unsigned long long)(framesDrawn - framesAtMeasure), (unsigned long long)(wakeUps - wakesAtMeasure),
                             double(options_.measureIdle), fps, cpu, continuous ? "continuous" : "on-demand");
+                if (measureRestarts > 0) std::printf("  (restarted %d times after input)\n", measureRestarts);
                 std::fflush(stdout);
                 // Idle is 0 fps; a pointer crossing the window draws about a second's worth. Every frame is 60+.
                 return continuous || fps < 5.0 ? 0 : 1;
@@ -779,6 +786,15 @@ int App::run() {
                 ev.type == SDL_EVENT_MOUSE_REMOVED || ev.type == SDL_EVENT_CLIPBOARD_UPDATE ||
                 (ev.type == SDL_EVENT_JOYSTICK_AXIS_MOTION && !spaceMouseDeflected()))
                 return; // nothing on screen changes (a hand resting on a SpaceMouse: inside its dead zone)
+            // A mouse motion event that doesn't move the mouse: what a window system sends when the cursor's shape
+            // changes or the window is refocused under a still pointer (the crosshair over the view, #73). Not input,
+            // and nothing to draw: counting it would make setting the cursor wake the idle loop.
+            if (ev.type == SDL_EVENT_MOUSE_MOTION && ev.motion.which != SDL_PEN_MOUSEID) {
+                const bool still = ev.motion.x == lastMotionX && ev.motion.y == lastMotionY;
+                lastMotionX = ev.motion.x;
+                lastMotionY = ev.motion.y;
+                if (still) return;
+            }
             draw = true;
             if (logRedraw) SDL_Log("redraw: event 0x%x", unsigned(ev.type));
             const bool input = (ev.type >= SDL_EVENT_KEY_DOWN && ev.type < SDL_EVENT_JOYSTICK_AXIS_MOTION) ||
@@ -787,6 +803,11 @@ int App::run() {
                                ev.type == SDL_EVENT_DROP_FILE;
             const double t = seconds();
             activeUntil_ = std::max(activeUntil_, t + (input ? std::max(0.75, double(uiPrefs_.tooltipDelay) + 0.5) : 0.1));
+            if (input && options_.measureIdle > 0.0f && t - started < kMeasureGiveUp) {
+                if (measuring) ++measureRestarts;
+                measuring = false;
+                measureFrom = std::max(measureFrom, activeUntil_ + 0.5);
+            }
         };
         SDL_Event e;
         if (!continuous && !draw) {
@@ -1194,7 +1215,8 @@ void App::updateMouseCursor() {
     io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
     const ImGuiMouseCursor ui = ImGui::GetMouseCursor();
     cursorKind_ = viewportCursorWanted() ? kCursorCrosshair : ui == ImGuiMouseCursor_None || io.MouseDrawCursor ? kCursorHidden : int(ui);
-    if (cursorKind_ == cursorShown_) return;
+    if (cursorKind_ == cursorShown_) return; // (the shape on screen already: nothing for the window system to do)
+    const bool wasHidden = cursorShown_ == kCursorHidden || cursorShown_ == -2;
     cursorShown_ = cursorKind_;
     if (cursorKind_ == kCursorHidden) {
         SDL_HideCursor();
@@ -1223,7 +1245,7 @@ void App::updateMouseCursor() {
     } else if (cursors_[slot]) {
         SDL_SetCursor(cursors_[slot]);
     }
-    SDL_ShowCursor();
+    if (wasHidden) SDL_ShowCursor();
 }
 
 BrushType App::activeBrush() const {

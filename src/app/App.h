@@ -1684,7 +1684,7 @@ private:
     bool strayMouseMotion(const SDL_Event& e) const;  // a driver's mouse motion beside the pen's (Tablet.cpp)
     void keepImGuiOnPen();                            // after ImGui_ImplSDL3_NewFrame (Tablet.cpp)
     bool systemCursorInWindow(float& x, float& y) const; // mouse mode (#72): the system cursor, window pixels
-    void mapPenPosition(SDL_Event& e);
+    void mapPenPosition(SDL_Event& e);                // mouse mode: the pen moves the cursor relatively (Tablet.cpp)
     // The system cursor (#73): ImGui's (resize handles, text fields, links) over the panels, a crosshair over the
     // 3D view where a brush acts (Preferences > Interface > Viewport cursor). Called after each ImGui::Render.
     void updateMouseCursor();
@@ -1693,7 +1693,7 @@ private:
     static constexpr int kCursorCrosshair = 100, kCursorHidden = -1;
     int cursorKind_ = 0;          // what updateMouseCursor last set: an ImGuiMouseCursor, kCursorCrosshair or kCursorHidden
     SDL_Cursor* cursors_[16] = {}; // system cursors by SDL_SystemCursor, made when first needed
-    int cursorShown_ = -2;         // (the kind on screen, so SDL_SetCursor runs only on a change)                // mouse mode: the pen moves the cursor relatively (Tablet.cpp)
+    int cursorShown_ = -2;         // (the kind on screen, so SDL_SetCursor runs only on a change; -2: none yet)
     void handlePenEvent(const SDL_Event& e);
     void penButton(int button, bool down, float x, float y);
     void penLeft(); // out of proximity: ends what the pen was doing
