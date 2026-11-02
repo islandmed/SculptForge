@@ -530,6 +530,7 @@ constexpr Entry kSpanish[] = {
     {"Popup Info opacity", "Opacidad de Popup Info"},
     {"Tooltip delay", "Retardo de las descripciones"},
     {"One sub-palette open", "Una subpaleta abierta"},
+    {"Reduce motion", "Reducir movimiento"},
     {"Auto collapse left tray", "Plegar sola la bandeja izquierda"},
     {"Auto collapse right tray", "Plegar sola la bandeja derecha"},
     {"Palettes strictly A-Z (ZBrush order)", "Paletas de la A a la Z (orden de ZBrush)"},

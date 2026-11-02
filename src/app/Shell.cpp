@@ -279,8 +279,12 @@ bool drawShelfTile(App& app, const Action& a, ImVec2 size) {
         // Right-shelf toggles are options (Mask, Paint, PolyF): on is a raised grey with an accent bar down the
         // side that faces the canvas, off is quiet; only a mode action gets the accent fill.
         const bool mode = ui::IsModeAction(a.id);
+        // Off: the fill eases into the accent-tinted hover (ui::DrawHover adds the look's ring).
+        const float h = disabled ? 0.0f : ui::HoverAmount(ImGui::GetItemID(), hovered || ui::HoveredOrFocused(ImGui::GetItemID()));
+        const ImVec4 rest = theme::frame, hot = theme::buttonHover;
+        const ImVec4 eased(rest.x + (hot.x - rest.x) * h, rest.y + (hot.y - rest.y) * h, rest.z + (hot.z - rest.z) * h, 1.0f);
         const ImVec4 bg = on ? (mode ? (hovered ? theme::accentHover : theme::accent) : hovered ? theme::toggleOnHover : theme::toggleOn)
-                             : held ? theme::buttonPressed : hovered ? theme::buttonHover : theme::frame;
+                             : held ? theme::buttonPressed : eased;
         dl->AddRectFilled(p0, p1, theme::u32(bg, alpha), theme::rounding(4.0f * s));
         if (on && !mode) ui::DrawOnMark(dl, p0, p1, true);
         // Two text levels only: actions and hovered items in text, options that are off in textOff (readable, so
@@ -294,6 +298,8 @@ bool drawShelfTile(App& app, const Action& a, ImVec2 size) {
     // Tile: a square picture (brush thumbnail or icon) with the name under it.
     const float pic = std::min(size.x, size.y - capH);
     const ImVec2 q0(p0.x + (size.x - pic) * 0.5f, p0.y), q1(q0.x + pic, q0.y + pic);
+    ui::TileLiftScope lift; // the tile lifts on hover; the layout stays
+    lift.lift = ui::BeginTileLift(p0, p1);
     dl->AddRectFilled(p0, p1, theme::u32(hovered ? theme::buttonHover : theme::tile, hovered ? 0.55f : 0.0f), theme::rounding(4.0f * s));
     ImTextureID tex = type >= 0 ? app.thumbnails().brush(type) : ImTextureID(0);
     if (a.id == "draw.paint") { // the Paint brush's own preview (Pickers.cpp)
@@ -2272,7 +2278,9 @@ bool App::canvasNavButton(const char* id, const char* icon, const char* englishL
 namespace {
 
 // Tile frame: the picture square and the caption under it. Returns true when clicked.
-bool tileFrame(const char* id, ImVec2 size, ImFont* font, const std::string& caption, float s, ImVec2& pic0, ImVec2& pic1) {
+// A left-shelf tile; it lifts on hover (`lift` ends when the caller has drawn the picture).
+bool tileFrame(const char* id, ImVec2 size, ui::TileLift& lift, ImFont* font, const std::string& caption, float s, ImVec2& pic0,
+               ImVec2& pic1) {
     const bool clicked = ImGui::InvisibleButton(id, size);
     const bool hovered = ImGui::IsItemHovered();
     const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
@@ -2280,10 +2288,10 @@ bool tileFrame(const char* id, ImVec2 size, ImFont* font, const std::string& cap
     const float capH = (font ? font->FontSize : 12.0f) + 4.0f * s;
     pic0 = a;
     pic1 = ImVec2(b.x, b.y - capH);
-    dl->AddRectFilled(pic0, pic1, theme::u32(theme::tile), theme::rounding(4.0f * s));
-    if (hovered) dl->AddRect(pic0, pic1, theme::u32(theme::accent, 0.8f), theme::rounding(4.0f * s), 0, 1.5f * s);
-    centredText(dl, font, ImVec2(a.x, b.y - capH), b, theme::u32(hovered ? theme::text : theme::textDim),
+    centredText(dl, font, ImVec2(a.x, b.y - capH), b, theme::u32(hovered ? theme::textHover : theme::textDim),
                 elide(font ? font : ImGui::GetFont(), caption, size.x).c_str());
+    lift = ui::BeginTileLift(pic0, pic1); // the picture lifts, the caption stays
+    dl->AddRectFilled(pic0, pic1, theme::u32(theme::tile), theme::rounding(4.0f * s));
     ImGui::LogText("%s", caption.c_str());
     return clicked;
 }
@@ -2301,7 +2309,8 @@ void App::drawBrushTile(const char* id, ImVec2 size) {
     // ZBrush: Ctrl held shows the mask brush, Ctrl+Shift the selection brush; a click picks among those.
     if (const HeldBrushItem* held = heldBrushCurrent(heldBrush())) {
         ImVec2 a, b;
-        const bool clicked = tileFrame(id, size, fontSmall_, held->brush, s, a, b);
+        ui::TileLiftScope lift;
+        const bool clicked = tileFrame(id, size, lift.lift, fontSmall_, held->brush, s, a, b);
         drawHeldBrushIcon(ImGui::GetWindowDrawList(), a, b, held->icon, heldBrush() == HeldBrush::Select);
         if (clicked) openPicker(Picker::Brush, ImVec2(ImGui::GetItemRectMax().x + 4.0f * s, ImGui::GetItemRectMin().y));
         ui::HelpText("Brush", "B", "Ctrl held: the mask brush (Ctrl+Shift: the selection brush). Click, or press B with Ctrl "
@@ -2311,7 +2320,8 @@ void App::drawBrushTile(const char* id, ImVec2 size) {
     const BrushRecipe* recipe = activeRecipe();
     const std::string name = guidesMode_ ? "Quad Remesh Guides" : paintMode_ ? "Paint" : recipe ? recipe->name : brushLabel(brush_);
     ImVec2 a, b;
-    const bool clicked = tileFrame(id, size, fontSmall_, name, s, a, b);
+    ui::TileLiftScope lift;
+    const bool clicked = tileFrame(id, size, lift.lift, fontSmall_, name, s, a, b);
     ImDrawList* dl = ImGui::GetWindowDrawList();
     ImTextureID tex = paintMode_ || guidesMode_ ? ImTextureID(0) : recipe ? thumbs_.recipe(*recipe) : thumbs_.brush(int(brush_));
     const ImVec2 c((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
@@ -2339,7 +2349,8 @@ void App::drawStrokeTile(const char* id, ImVec2 size) {
     const float s = uiScale_;
     if (const HeldBrushItem* held = heldBrushCurrent(heldBrush())) { // Ctrl / Ctrl+Shift: the mask's stroke
         ImVec2 a, b;
-        const bool clicked = tileFrame(id, size, fontSmall_, held->stroke, s, a, b);
+        ui::TileLiftScope lift;
+        const bool clicked = tileFrame(id, size, lift.lift, fontSmall_, held->stroke, s, a, b);
         drawHeldBrushIcon(ImGui::GetWindowDrawList(), a, b, held->icon, heldBrush() == HeldBrush::Select);
         if (clicked) openPicker(Picker::Stroke, ImVec2(ImGui::GetItemRectMax().x + 4.0f * s, ImGui::GetItemRectMin().y));
         ui::HelpText("Stroke", nullptr, "Ctrl held: the mask's stroke, Dots (Mask Pen), Lasso or Rect (Ctrl+Shift: the "
@@ -2347,7 +2358,8 @@ void App::drawStrokeTile(const char* id, ImVec2 size) {
         return;
     }
     ImVec2 a, b;
-    const bool clicked = tileFrame(id, size, fontSmall_, strokeTypeName(strokeType_), s, a, b);
+    ui::TileLiftScope lift;
+    const bool clicked = tileFrame(id, size, lift.lift, fontSmall_, strokeTypeName(strokeType_), s, a, b);
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const ImU32 col = IM_COL32(235, 235, 235, 230);
     const float w = b.x - a.x, h = b.y - a.y;
@@ -2404,7 +2416,8 @@ void App::drawAlphaTile(const char* id, ImVec2 size) {
     const float s = uiScale_;
     ImVec2 a, b;
     if (vdmBrushActive() && doc_.brushVdm) { // the VDM brush's 3D alpha (ZBrush shows VDMs in the alpha slot)
-        const bool clicked = tileFrame(id, size, fontSmall_, doc_.brushVdm->name, s, a, b);
+        ui::TileLiftScope lift;
+        const bool clicked = tileFrame(id, size, lift.lift, fontSmall_, doc_.brushVdm->name, s, a, b);
         if (ImTextureID tex = thumbs_.vdm(doc_.brushVdm))
             ImGui::GetWindowDrawList()->AddImageRounded(tex, ImVec2(a.x + 2 * s, a.y + 2 * s), ImVec2(b.x - 2 * s, b.y - 2 * s),
                                                         ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, theme::rounding(4.0f * s));
@@ -2412,7 +2425,8 @@ void App::drawAlphaTile(const char* id, ImVec2 size) {
         ui::HelpText("VDM", nullptr, "The VDM brush's vector displacement map. Click to pick another.", "Left shelf");
         return;
     }
-    const bool clicked = tileFrame(id, size, fontSmall_, doc_.brushAlpha.name, s, a, b);
+    ui::TileLiftScope lift;
+    const bool clicked = tileFrame(id, size, lift.lift, fontSmall_, doc_.brushAlpha.name, s, a, b);
     ImDrawList* dl = ImGui::GetWindowDrawList();
     ImTextureID tex = thumbs_.alpha(doc_.brushAlpha);
     if (tex) {
@@ -2439,7 +2453,8 @@ void App::drawMaterialTile(const char* id, ImVec2 size) {
     const float s = uiScale_;
     const int m = renderSettings_.matcap;
     ImVec2 a, b;
-    const bool clicked = tileFrame(id, size, fontSmall_, m < 0 ? std::string("Studio") : std::string(matcapName(m)), s, a, b);
+    ui::TileLiftScope lift;
+    const bool clicked = tileFrame(id, size, lift.lift, fontSmall_, m < 0 ? std::string("Studio") : std::string(matcapName(m)), s, a, b);
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const ImVec2 c((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
     const float r = (b.x - a.x) * 0.4f;

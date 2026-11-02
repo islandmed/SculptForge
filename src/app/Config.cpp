@@ -68,6 +68,7 @@ Json toJson(const UiPrefs& p) {
     j.set("popupInfo", p.popupInfo);
     j.set("helpOpacity", double(p.helpOpacity));
     j.set("tooltipDelay", double(p.tooltipDelay));
+    j.set("reduceMotion", p.reduceMotion);
     j.set("oneSubpalette", p.oneSubpalette);
     j.set("autoCollapseLeft", p.autoCollapseLeft);
     j.set("autoCollapseRight", p.autoCollapseRight);
@@ -116,6 +117,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.popupInfo = j["popupInfo"].asBool(p.popupInfo);
     p.helpOpacity = std::clamp(float(j["helpOpacity"].asNumber(p.helpOpacity)), 0.3f, 1.0f);
     p.tooltipDelay = std::clamp(float(j["tooltipDelay"].asNumber(p.tooltipDelay)), 0.0f, 3.0f);
+    p.reduceMotion = j["reduceMotion"].asBool(p.reduceMotion);
     p.oneSubpalette = j["oneSubpalette"].asBool(p.oneSubpalette);
     p.autoCollapseLeft = j["autoCollapseLeft"].asBool(p.autoCollapseLeft);
     p.autoCollapseRight = j["autoCollapseRight"].asBool(p.autoCollapseRight);
@@ -1001,6 +1003,7 @@ void App::drawHelpConsoleUi() {
         ImGui::PopStyleVar(3);
     }
     watchLayoutChanges();
+    ui::DrawHover(*this); // the hover and keyboard-focus rings, over every window
     ui::DrawHelp(*this); // last: on top of everything
 }
 
@@ -1162,6 +1165,10 @@ void drawInterfaceSection(App& app) {
     ui::SliderInside("##tooltip_delay", &p.tooltipDelay, 0.0f, 2.0f, "Tooltip delay %.1f s");
     ui::HelpText("Tooltip delay", nullptr,
                  "How long to point at an icon-only button (or a clipped label) before its name appears.",
+                 "Preferences > Interface");
+    ImGui::Checkbox(tr("Reduce motion"), &p.reduceMotion);
+    ui::HelpText("Reduce motion", nullptr,
+                 "Hover and focus highlights change colour only: no easing, and tiles don't lift or grow.",
                  "Preferences > Interface");
     ImGui::Checkbox(tr("One sub-palette open"), &p.oneSubpalette);
     ui::HelpText("One sub-palette open", nullptr,
@@ -1350,6 +1357,7 @@ void App::drawLookSection() {
         const bool hovered = ImGui::IsItemHovered(), current = l.look == i;
         const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
         ImDrawList* dl = ImGui::GetWindowDrawList();
+        const ui::TileLift lift = ui::BeginTileLift(a, b, 0.0f);
         auto col = [](unsigned hex) { return theme::u32(theme::rgb(hex)); };
         // A miniature of the look: its wallpaper, a bar with its accent, two tiles, its name in its text colour.
         dl->AddRectFilled(a, b, col(pal.crust));
@@ -1364,6 +1372,7 @@ void App::drawLookSection() {
         dl->AddText(f, f->FontSize, ImVec2(a.x + g + 6.0f * s, b.y - g - f->FontSize - 3.0f * s), col(pal.text), looks::lookName(id));
         dl->AddRect(a, b, theme::u32(current ? theme::accent : hovered ? theme::textDim : theme::tileBorder), 0.0f, 0,
                     current ? 2.0f * s : 1.0f * s);
+        ui::EndTileLift(lift, 0.0f);
         ImGui::LogText("%s", looks::lookName(id));
         ui::HelpText(looks::lookName(id), nullptr,
                      i == 0   ? "The original dark grey look with the orange accent."

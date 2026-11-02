@@ -23,6 +23,7 @@ struct UiPrefs {
     bool popupInfo = true;      // Ctrl+hover shows an item's description (ZBrush "Popup Info")
     float helpOpacity = 0.97f;  // Ctrl-help box opacity (ZBrush "Quick Info Opacity")
     float tooltipDelay = 0.5f;  // plain hover tooltips on icon-only buttons and clipped labels
+    bool reduceMotion = false;  // hover highlights change colour only: no easing, no lifting tiles (Ui.h)
     bool oneSubpalette = true;  // opening a sub-palette closes the others (Shift+click opens more)
     bool autoCollapseLeft = true, autoCollapseRight = false; // trays collapse palettes that would overflow
     float uiScale = 0.0f;       // 0 = follow the display; otherwise applied at the next start

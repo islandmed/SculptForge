@@ -12,6 +12,14 @@ All notable changes to SculptForge are listed here. The format follows
 - Tablet Mouse mode (Preferences > Tablet): on some Windows tablets the brush stopped following the pen in 0.10.7,
   because the system cursor reading stayed put while the pen moved. A reading that doesn't move with the pen is now
   ignored and the pen moves the brush relatively, from where it was, with no jump (#72).
+### Changed
+- Hover highlights that pop, in every look: buttons, menu items, shelf buttons and palette headers ease into an
+  accent-tinted fill with a crisp accent border and a brighter label in about 100 ms (Forge Terminal: the accent
+  border; Phosphor: an inverse-video glow; Blueprint: a cyan line glow; Classic: a subtle warm highlight), and
+  pressed is a touch darker. Brush, alpha, material and look tiles (shelves, pickers, Library) lift slightly with a
+  soft shadow and an accent glow ring, without moving anything; the active tile keeps its orange outline. Sliders
+  brighten, grow a knob and show their exact value. The keyboard focus gets the same ring. New **Preferences >
+  Interface > Reduce motion**: colour changes only, no easing or lifting. Animations draw frames only while they run.
 
 ## [0.10.7] - 2026-11-01
 

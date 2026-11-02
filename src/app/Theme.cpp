@@ -84,7 +84,7 @@ void applyStyle() {
     c[ImGuiCol_TableRowBgAlt] = rgb(0xffffff, 0.025f);
     c[ImGuiCol_TextSelectedBg] = rgb(0xf0882e, 0.30f);
     c[ImGuiCol_DragDropTarget] = accentHover;
-    c[ImGuiCol_NavCursor] = accent;
+    c[ImGuiCol_NavCursor] = ImVec4(0, 0, 0, 0); // the keyboard focus gets the hover ring instead (ui::DrawHover)
     c[ImGuiCol_ModalWindowDimBg] = rgb(0x000000, 0.45f);
 }
 
@@ -108,6 +108,19 @@ const std::vector<ImVec4>& classicTokens() {
 
 ImVec4 mixc(const ImVec4& a, const ImVec4& b, float t, float alpha = 1.0f) {
     return ImVec4(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t, alpha);
+}
+
+// Hover in every look: the accent tints the hover fills, a little in Classic (a warm highlight), more in the
+// terminal looks; pressed is a touch darker than hover (ui::DrawHover adds the ring).
+void tintHovers(looks::LookId id) {
+    const float k = id == looks::LookId::Classic ? 0.16f : id == looks::LookId::Phosphor ? 0.28f
+                    : id == looks::LookId::Blueprint ? 0.24f : 0.22f;
+    buttonHover = mixc(buttonHover, accent, k);
+    buttonPressed = mixc(buttonHover, rgb(0x000000), 0.22f);
+    headerHover = mixc(headerHover, accent, k * 0.9f);
+    frameHover = mixc(frameHover, accent, k * 0.6f);
+    toggleOffHover = mixc(toggleOffHover, accent, k);
+    toggleOnHover = mixc(toggleOnHover, accent, k * 0.7f);
 }
 
 ImVec4 g_gradCentre(0.215f, 0.215f, 0.222f, 1.0f), g_gradEdge(0.106f, 0.106f, 0.114f, 1.0f);
@@ -183,6 +196,7 @@ void applyLook(const LookSettings& settings, std::string* status) {
         for (size_t i = 0; i < std::size(kTokens); ++i) *kTokens[i] = classic[i];
         g_gradCentre = ImVec4(0.215f, 0.215f, 0.222f, 1.0f);
         g_gradEdge = ImVec4(0.106f, 0.106f, 0.114f, 1.0f);
+        tintHovers(id);
         applyStyle();
         syncUiColors();
         return;
@@ -227,6 +241,7 @@ void applyLook(const LookSettings& settings, std::string* status) {
     }
     for (size_t i = 0; i < std::size(kTokens); ++i) *kTokens[i] = classic[i];
     setTokens(palette, id);
+    tintHovers(id);
     applyStyle();
     ImGuiStyle& s = ImGui::GetStyle();
     s.WindowRounding = s.ChildRounding = s.PopupRounding = s.FrameRounding = s.GrabRounding = s.TabRounding = 0.0f;

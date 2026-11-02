@@ -254,6 +254,7 @@ bool AssetTile(const char* id, ImTextureID texture, const char* glyph, const std
     const bool hovered = ImGui::IsItemHovered();
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const ImVec2 t0 = p, t1(p.x + thumbSize, p.y + thumbSize);
+    const ui::TileLift lift = ui::BeginTileLift(t0, t1); // the thumbnail lifts on hover; its label stays
     dl->AddRectFilled(t0, t1, hovered ? kTileHover() : kTileBg(), theme::rounding(4.0f));
     if (texture) {
         const float pad = 2.0f;
@@ -280,6 +281,7 @@ bool AssetTile(const char* id, ImTextureID texture, const char* glyph, const std
         dl->AddText(ImVec2(std::round((b0.x + b1.x - bs.x) * 0.5f), b0.y + 1.0f), lookColor(IM_COL32(20, 20, 22, 255), theme::textOnAccent), badge);
         ImGui::LogText(" [%s]", badge);
     }
+    ui::EndTileLift(lift);
     const std::string shown = elide(label, thumbSize);
     const ImVec2 ls = ImGui::CalcTextSize(shown.c_str());
     dl->AddText(ImVec2(std::round(p.x + (thumbSize - ls.x) * 0.5f), t1.y + 2.0f),

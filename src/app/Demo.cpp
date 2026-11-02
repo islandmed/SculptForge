@@ -3,6 +3,7 @@
 #include "app/Demo.h"
 
 #include "app/App.h"
+#include "app/Ui.h"
 
 #include <imgui_internal.h>
 
@@ -48,6 +49,7 @@ ItemTable& items() {
 } // namespace
 
 void ImGuiTestEngineHook_ItemAdd(ImGuiContext* ctx, ImGuiID id, const ImRect& bb, const ImGuiLastItemData*) {
+    sf::ui::NoteItem(ctx, id, bb.Min, bb.Max); // the hover and focus rings (Ui.cpp)
     ImRect clip = bb;
     if (ctx && ctx->CurrentWindow) {
         clip = ctx->CurrentWindow->ClipRect;
@@ -62,6 +64,7 @@ void ImGuiTestEngineHook_ItemAdd(ImGuiContext* ctx, ImGuiID id, const ImRect& bb
 }
 
 void ImGuiTestEngineHook_ItemInfo(ImGuiContext* ctx, ImGuiID id, const char* label, ImGuiItemStatusFlags) {
+    sf::ui::NoteItemLabel(id);
     auto it = items().rects.find(id);
     if (!label || it == items().rects.end()) return;
     std::string text(label);
