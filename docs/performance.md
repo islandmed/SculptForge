@@ -26,14 +26,14 @@ a frame of work (at least 10 ms), the frame waits up to 12.5 ms for it (so light
 placed them) and otherwise keeps drawing, and the next frame commits it. The same dabs through either path give the
 same mesh, bit for bit, positions and normals (`ui_stroke_background`; `--measure-stroke 3,120` and `3,240` with
 `SF_MEASURE_VERIFY=1` on a subdivided sphere). The benchmark scene itself isn't reproducible to that level: two
-frame-loop runs with every dab placed differ by up to 0.26, as much as one of each. Load 3-4, frame p99 / worst
-stall ms, before -> after:
+frame-loop runs with every dab placed differ by up to 0.26, as much as one of each. Frame p99 / worst stall ms,
+before (quiet) -> after (provisional: load 3-4, the quiet run is still to do):
 
 | Phase | 15M | 33M |
 |---|---|---|
-| Clay large | 77 / 136 -> 31 / 34 | 129 / 161 -> 31 / 40 |
-| 240 px brush | 139 / 172 -> 31 / 36 | 297 / 323 -> 33 / 41 |
-| Pen lift (240 px) | 20 ms -> 0 | 153 ms -> 0 |
+| Clay large | 77 / 136 -> 31 / 34 | 139 / 154 -> 31 / 40 |
+| 240 px brush | 139 / 172 -> 31 / 36 | 306 / 325 -> 33 / 41 |
+| Pen lift (240 px) | 20 ms -> 0 | 162 ms -> 0 |
 
 On the sphere (`new_sphere subdivisions=9`) at 120 px (`--measure-stroke 3,120`, background dabs forced) the
 stroke places as many dabs (156 vs 141 in the frame loop) with about the same lag (62 vs 53 ms). Each 240 px dab at 33M still takes 100-200 ms, so the surface
