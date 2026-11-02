@@ -83,7 +83,7 @@ inline LookStyle look;
 
 // The fonts a look may switch to (App fills them in at start-up); nullptr = keep the default.
 struct LookFonts {
-    ImFont* mono = nullptr;      // 14 px, the numbers in sliders and readouts
+    ImFont* mono = nullptr;      // JetBrains Mono 15 px: the numbers in sliders and readouts
     ImFont* monoSmall = nullptr;
     ImFont* monoBold = nullptr;
 };

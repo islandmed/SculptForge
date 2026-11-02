@@ -68,6 +68,14 @@ click "Clay##brush.clay"
 hover_model 0.52 0.42
 wait 0.3
 shot forge-everforest
+run ui_look scheme=tokyo_night match_omarchy=true
+run open path=assets/demo/lion-head.glb
+wait_idle 20
+click "Clay##brush.clay"
+hover_model 0.52 0.42
+wait 0.3
+shot forge-match-omarchy
+run ui_look match_omarchy=false
 
 run ui_look look=phosphor phosphor=green effects=false
 run open path=assets/demo/lion-head.glb

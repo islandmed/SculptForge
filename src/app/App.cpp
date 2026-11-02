@@ -2220,7 +2220,9 @@ void App::drawUi() {
                                "version 3 or later. It comes with ABSOLUTELY NO WARRANTY.");
             ImGui::Spacing();
             ImGui::TextWrapped("Built with SDL 3 (zlib), Dear ImGui (MIT), GLM (MIT), stb (MIT/public domain), ufbx "
-                               "(MIT/public domain), xatlas (MIT), MikkTSpace (zlib) and the Inter typeface (SIL OFL 1.1). Quad Remesh follows Instant Meshes "
+                               "(MIT/public domain), xatlas (MIT), MikkTSpace (zlib), the Inter and JetBrains Mono typefaces "
+                               "(SIL OFL 1.1) and the MIT-licensed colours of the Forge Terminal look's schemes. Quad Remesh "
+                               "follows Instant Meshes "
                                "(BSD-3-Clause). The phone link uses QR Code generator (MIT), libdatachannel and libjuice (MPL-2.0), usrsctp "
                                "(BSD-3-Clause) and Mbed TLS (Apache-2.0). Uses libcurl (curl license) "
                                "where available.");

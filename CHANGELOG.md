@@ -7,6 +7,14 @@ All notable changes to SculptForge are listed here. The format follows
 ## [Unreleased]
 
 ### Added
+- Interface looks (Preferences > Interface > Look), for choosing SculptForge's own default (Classic stays the default
+  for now): **Forge Terminal** (tiles with gaps and thin borders, the focused one highlighted, JetBrains Mono labels and
+  a status bar; Tokyo Night, Catppuccin Mocha, Gruvbox Dark, Nord, Rosé Pine, Kanagawa or Everforest colours, or
+  **Match my Omarchy theme** on Linux), **Phosphor** (green or amber CRT, monospace, ASCII rules, optional scanlines and
+  glow on the interface only) and **Blueprint** (deep blue, cyan line work, grid headers, technical numbers). The looks
+  come with the new **SculptForge layout**: menus by task (File, Edit, Sculpt, Paint, Mesh, View, Render, Help) whose
+  sections are the palettes, a status bar and a one-row tool shelf; the **ZBrush-style layout** stays one setting away
+  and F3 still finds every palette. Scripts: `ui_look`.
 - Packs and macros (#20): `.sfpack` files bring brushes, alphas, Lit Spheres, Material Recipes, VDMs, keymaps, pie
   menus and macros in one file (format: `docs/pack-format.md`). **File > Install Pack...**, a dropped file or
   **Library > Packs** shows a review first (counts by type, every item, the license text, the author; a Supporter

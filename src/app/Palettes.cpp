@@ -616,6 +616,7 @@ void App::drawPalette_Render() {
     ui::HelpAction(*this, "view.splats");
     drawBackgroundControls("render");
     actionRow(*this, {"view.frame", "view.fullscreen"});
+    actionRow(*this, {"ui.lightbox", "ui.console"}); // (the SculptForge layout's View menu: they left the shelf)
 }
 
 void App::drawPalette_Script() {

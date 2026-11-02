@@ -480,6 +480,46 @@ Style:
 - Tray controls: every slider is a `ui::SliderInside` (ints through `tray::SliderInt`), never a stock grab over its label. Check marks in palettes are the text colour (`tray::Style`), not the accent. A row of controls fills the line in equal halves or thirds; a number beside a button is a drag field of the same size (no tiny - / + buttons). The active row of a list (Parts) is a lighter neutral (white ~9%) with a 2 px accent bar on its left, in a recessed well with no outline. Helper text is 12 px `textDim`.
 - The left tray's colour field is drawn by hand (`App::drawColorWidget`, Pickers.cpp): a rounded saturation/value square with a ring marker, a 10 px hue strip with a thin bar marker that stays inside its ends, and the main/second swatches as equal halves with a 1 px edge. One 4 px gap between all of them. The default main colour is a mid grey (second: white), so the swatches are neutral until the user picks a colour.
 
+### 10.1 Looks and the SculptForge layout (Preferences > Interface > Look)
+
+The tokens above are the **Classic** look (still the default). Three more looks give SculptForge its own face; each
+is a real theme, not a paint-over: `theme::applyLook()` (src/app/Theme.cpp) sets every token from a `looks::Palette`
+(src/app/LookSchemes.h: crust, mantle, base, surface0-2, overlay, subtext, text, bright, accent, accent2, red, green,
+yellow) and a `theme::LookStyle` that the shell reads (tiles, gap, corner radii, monospace, status bar and header
+styles, effects). Widgets keep reading `theme::*` tokens; hand-drawn corner radii go through `theme::rounding()`.
+The cube logo keeps the SculptForge orange (`theme::brand`) in every look; the accent never uses it otherwise.
+
+| Look | Feel | Specifics |
+|---|---|---|
+| **Forge Terminal** | a tiling window manager (Hyprland, Omarchy) | every region is a tile: 6 px gaps over a darker wallpaper, a 1 px border, 2 px in the accent on the tile under the pointer (focus follows the mouse); square corners, flat fills; JetBrains Mono for captions, headers, readouts and slider numbers (Inter stays for body text); palette headers with an accent rule; a Waybar-style status bar. Seven schemes: Tokyo Night (default), Catppuccin Mocha, Gruvbox Dark, Nord, Rosé Pine, Kanagawa, Everforest. **Match my Omarchy theme** (Linux) reads `colors.toml` (or `alacritty.toml`) from `~/.config/omarchy/current/theme` or `~/.local/state/omarchy/current/theme`, never writes. |
+| **Phosphor** | a CRT terminal | green (P1) or amber (P3) on near-black; monospace everywhere; `[ TOOL ]────` headers, `[+]` / `[-]` sections, `── Group ──` rules (box-drawing); inverse-video mode and menu; optional scanlines and a glow around the focused tile, on the interface only (never the 3D view), off by default. |
+| **Blueprint** | engineering paper / CAD | deep Prussian blue, cyan and white line work; drafting grid in the gaps and palette headers, registration marks at tile corners, dimension-line section rules; the status bar as a drawing's title block (`MODE SCULPT │ BRUSH Clay │ TRIS 47.2k`); technical monospace numbers. |
+
+Every look also tints the 3D view's gradient (`RenderSettings::gradientCentre` / `gradientEdge`); a flat background the
+user picked is left alone.
+
+**Layouts.** Picking one of the three looks switches to the **SculptForge layout**; the old one stays as the
+**ZBrush-style layout** (Preferences > Interface > Look > Layout, `ui_look layout=zbrush`), and works with any look.
+
+- Status bar (h 30): the cube and name, the task menus **File · Edit · Sculpt · Paint · Mesh · View · Render · Help**,
+  the status message, then modules (mode, brush, file, triangles, fps), the presets 1 2 3 as workspaces, search (F3),
+  minimise and close. No palette bar.
+- Task menus (`taskMenus()`, Palettes.cpp) hold whole palettes as sections, so every item has exactly one place: File
+  (File, Script), Edit (Edit, Preferences), Sculpt (Brush, Draw & Tablet, Stroke, Alpha, Symmetry & Gizmo), Paint
+  (Vertex Paint & Color), Mesh (Parts & Geometry = Tool, Generate 3D), View (Display = Render), Render (Materials,
+  Gaussian Splats), Help. A menu drops down with its sections on the left and the chosen one beside them, under its
+  usual header (the tray icon still pins it). A section already in a tray is skipped (clicking it flashes the tray).
+  `ui.palette.*`, F3 and old scripts still open any palette, inside its menu.
+- Tool shelf: one row (Sculpt | Paint, Draw | Move | Scale | Rotate, Add | Sub, Rgb, Draw Size, Intensity, Dynamic,
+  X Y Z R). Library, Brush Lab, Front and the pressure options moved to the menus (Sculpt > Draw & Tablet, View > Display) and F3; the
+  triangle counts to the status bar. Left, right and bottom shelves as before.
+- Tiles (`ShellMetrics::gap`, ShellGeometry.cpp): every region is inset by half the gap after growing by it, so its
+  contents keep their size; the dividers become the gaps beside the trays.
+
+Scripts and tests: `ui_look look=forge|phosphor|blueprint|classic scheme=nord phosphor=amber effects=true
+layout=sculptforge|zbrush`; `expect_value look`, `shell_layout`; tests/ui/looks.sfui; screenshots for choosing:
+tools/looks/shots.sfui.
+
 ---
 
 ## 11. Icons: recommendation = **Lucide** icon font merged into ImGui
