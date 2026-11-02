@@ -6,6 +6,12 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Linux: the native Wayland support is now documented (installing guide, site, README): every Linux package opens
+  without XWayland, stays sharp at fractional scales and reads pen pressure through tablet-v2. A test checks the
+  Linux build's SDL has both the Wayland and X11 drivers, and the RHEL/Rocky builds now include libdecor (title
+  bars on GNOME Wayland).
+
 ## [0.10.6] - 2026-11-01
 
 ### Added

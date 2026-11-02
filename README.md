@@ -300,6 +300,8 @@ app: F1 for Controls, Shift+F1 for the guide).
 Graphics tablets (Wacom, XP-Pen, Huion ...) work through the system's tablet driver on Windows (Windows Ink),
 macOS and Linux (Wayland / X11). Setup and mappings: [docs/tablet.md](docs/tablet.md).
 
+On Linux, SculptForge runs as a native Wayland window (no XWayland, sharp at fractional scales) or on X11.
+
 ## Project layout
 
 ```

@@ -17,6 +17,8 @@ elif command -v dnf >/dev/null 2>&1; then
     libX11-devel libXext-devel libXrandr-devel libXcursor-devel libXfixes-devel libXi-devel libXScrnSaver-devel \
     libXtst-devel libxkbcommon-devel wayland-devel wayland-protocols-devel mesa-libEGL-devel mesa-libGL-devel \
     dbus-devel systemd-devel libcurl-devel
+  # Window title bars on Wayland desktops without server-side decorations (GNOME); EL9+ has it in CRB, EL8 doesn't.
+  dnf -y install libdecor-devel 2>/dev/null || true
   # EL8/EL9 ship older system compilers. GCC 14 matches the VFX Reference Platform (CY2026/CY2027).
   dnf -y install gcc-toolset-14 2>/dev/null || dnf -y install gcc-toolset-13 2>/dev/null || true
 else
