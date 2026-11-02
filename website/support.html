@@ -84,12 +84,12 @@
     .badge { position: absolute; top: -13px; left: 50%; transform: translateX(-50%); margin: 0; padding: 4px 13px;
              border-radius: 999px; background: #f6994d; color: #1a0d04 !important; font-size: 0.7rem !important; font-weight: 700;
              letter-spacing: 0.16em; text-transform: uppercase; white-space: nowrap; box-shadow: 0 0 18px rgba(240, 136, 46, 0.5); }
-    .tier .btn:focus-visible, .gift .btn:focus-visible { outline: 2px solid #ffb06a; outline-offset: 3px; }
-    .gift { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; margin: 26px 0 0;
+    .tier .btn:focus-visible, .one-time .btn:focus-visible { outline: 2px solid #ffb06a; outline-offset: 3px; }
+    .one-time { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; margin: 26px 0 0;
             padding: 18px 22px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel);
             animation: rise 0.7s cubic-bezier(.2, .7, .2, 1) 0.5s both; }
-    .gift p { margin: 0; color: var(--muted); }
-    .gift strong { color: var(--text); }
+    .one-time p { margin: 0; color: var(--muted); }
+    .one-time strong { color: var(--text); }
     .support-fine { margin-top: 18px; }
     @keyframes rise { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
     @keyframes breathe { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
@@ -110,11 +110,11 @@
       .stage-copy { padding-top: 78vw; } /* the lion first, the words under it */
       .stage::before { background: linear-gradient(180deg, rgba(12, 12, 15, 0) 40vw, rgba(12, 12, 15, 0.85) 82vw, #0c0c0f 106vw); }
       .stage h1 { font-size: 2.3rem; }
-      .gift { padding: 16px; }
-      .gift .btn { width: 100%; text-align: center; }
+      .one-time { padding: 16px; }
+      .one-time .btn { width: 100%; text-align: center; }
     }
     @media (prefers-reduced-motion: reduce) {
-      .stage-art, .stage-copy, .tier, .gift, .tier.featured::after { animation: none; }
+      .stage-art, .stage-copy, .tier, .one-time, .tier.featured::after { animation: none; }
       .stage::after { display: none; }
       .stage-art, .tier, .tier .btn { transition: none; }
     }
@@ -141,7 +141,7 @@
       .tier.featured::after { box-shadow: 0 0 50px rgba(240, 136, 46, 0.25); }
       .tier.featured p { color: #4d4239; }
       .tier.featured .price { color: var(--tier-title); }
-      .gift .btn { background: #f4f2ef; border-color: #d8d4ce; color: var(--text); }
+      .one-time .btn { background: #f4f2ef; border-color: #d8d4ce; color: var(--text); }
       .support-page .footer { background: var(--bg-alt); }
     }
   </style>
@@ -220,7 +220,7 @@
             <p class="cta"><a class="btn" href="https://buy.stripe.com/3cI00j12v5H4g1dgWZ4F204" rel="noopener">Studio membership</a></p>
           </article>
         </div>
-        <div class="gift">
+        <div class="one-time">
           <p><strong>One-time Supporter:</strong> your name in the credits, no subscription. Pay what you want, $5
             minimum.</p>
           <a class="btn" href="https://buy.stripe.com/4gM7sL8uXc5s4iv5eh4F200" rel="noopener">One-time Supporter</a>

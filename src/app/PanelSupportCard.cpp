@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // The support card at launch: a full-window card over the app with a bronze sculpt render (rendered by SculptForge
-// itself, assets/branding/support-card.jpg), the three memberships and a one-time gift. When it may show is decided
+// itself, assets/branding/support-card.jpg), the three memberships and the one-time Supporter. When it may show is decided
 // once while starting (supportCardDue in Support.h): the first start, the first start of each new version, then at
 // most once a week; never mid-session, never for a supporter, never in tests, renders, demos or CI. Every button only
 // opens one of the fixed links in Support.h in the browser. The picture is decoded on a worker thread the first time
