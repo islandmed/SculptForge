@@ -5,7 +5,7 @@ click "What's New##help.whats_new"
 expect_value guide_open == 1
 expect_guide whats-new.md
 expect_text "Version 0.10.6"
-expect_text "Wear that follows the sculpt"
+expect_text "PBR viewport"
 expect_text "Version 0.10.5"
 expect_text "Version 0.10.4"
 expect_text "Version 0.10.3"

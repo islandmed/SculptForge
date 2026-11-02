@@ -12,14 +12,20 @@ support_card first_run
 expect_value support_card_open == 1
 wait_idle
 wait 1.2
-expect_text Free for everyone,
+expect_text SCULPTFORGE MEMBERSHIP
+expect_text Free and open source.
+expect_text Members keep it moving.
 expect_text Insiders will get each release about two weeks early, starting with SculptForge 1.0.
 expect_text RECOMMENDED
+expect_text $5
 expect_text $20
+expect_text $150
+expect_text The monthly Supporter Pack of brushes, alphas and VDMs
+expect_text Priority bug triage and support for your pipeline
 shot first_run
-# The community Discord in the footer opens the invite (kDiscordUrl) and leaves the card open.
-expect "Join the community on Discord##card.discord"
-click "Join the community on Discord##card.discord"
+# The members' Discord in the footer opens the invite (kDiscordUrl) and leaves the card open.
+expect "Join the members on Discord##card.discord"
+click "Join the members on Discord##card.discord"
 expect_value discord_requests == 1
 expect_status https://discord.gg/gWrYkEmQhH
 wait 0.4
@@ -55,12 +61,16 @@ wait 0.4
 expect_value support_card_open == 0
 expect_value support_requests == 2
 
-# Maybe later.
+# Maybe later: hidden for 30 days, past the weekly showing and a new version.
 support_card days=8
 expect_value support_card_open == 1
 wait 0.8
 click "Maybe later##card.later"
 wait 0.4
+expect_value support_card_open == 0
+support_card days=29
+expect_value support_card_open == 0
+support_card updated
 expect_value support_card_open == 0
 
 # Preferences > Support: turned off, it doesn't show.

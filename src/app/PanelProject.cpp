@@ -110,6 +110,7 @@ void App::initProject() {
         supportCardPrefs_.enabled = prefs["support_card"].asBool(true);
         supportCardPrefs_.supporter = prefs["supporter"].asBool(false);
         supportCardPrefs_.shownAt = int64_t(prefs["support_card_shown_at"].asNumber(0));
+        supportCardPrefs_.laterAt = int64_t(prefs["support_card_later_at"].asNumber(0));
         if (prefs["support_card_version"].isString()) supportCardPrefs_.shownVersion = prefs["support_card_version"].asString();
     } else {
         showWelcome_ = options_.uiTest.empty() && options_.demo.empty(); // the first start: no prefs yet
@@ -162,6 +163,7 @@ void App::saveProjectPrefs() {
     prefs.set("support_card", supportCardPrefs_.enabled); // the support card at launch (Support.h)
     prefs.set("supporter", supportCardPrefs_.supporter);
     prefs.set("support_card_shown_at", double(supportCardPrefs_.shownAt));
+    prefs.set("support_card_later_at", double(supportCardPrefs_.laterAt));
     if (!supportCardPrefs_.shownVersion.empty()) prefs.set("support_card_version", supportCardPrefs_.shownVersion);
     std::ofstream(fsPath(prefDir_ + "project.json"), std::ios::binary | std::ios::trunc) << prefs.dump(true);
 }

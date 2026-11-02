@@ -384,6 +384,7 @@ private:
     std::unique_ptr<SupportCard, SupportCardDelete> supportCard_;
     SupportCardPrefs supportCardPrefs_;          // project.json
     SupportCardReason supportCardReason_ = SupportCardReason::None;
+    int64_t supportCardNow_ = 0;                 // the clock when this start decided on the card ("Maybe later" counts from it)
     bool supportCardTestMode() const;            // tests, renders, demos, benchmarks, CI: never
     void launchSupportCard(bool firstRun, int64_t now, bool testMode); // shows it if supportCardDue
     void showSupportCard(SupportCardReason reason); // (also Preferences > Support > Show it now)

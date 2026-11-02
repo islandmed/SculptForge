@@ -113,15 +113,18 @@ inline bool supportReminderDue(double sculptSeconds, double sessionSeconds, bool
 
 // --- The support card at launch (PanelSupportCard.cpp) ---
 // Shown only while the app starts, never mid-session: on the first start after install, on the first start of each
-// new version, and otherwise at most once every seven days. Never once "I'm already a supporter" was chosen or it was
-// turned off in Preferences > Support, and never in tests, renders, demos, benchmarks or CI (testMode).
+// new version, and otherwise at most once every seven days. "Maybe later" hides it for 30 days, updates included. Never
+// once "I'm already a supporter" was chosen or it was turned off in Preferences > Support, and never in tests, renders,
+// demos, benchmarks or CI (testMode).
 inline constexpr int64_t kSupportCardIntervalSeconds = 7 * 24 * 3600;
+inline constexpr int64_t kSupportCardLaterSeconds = 30 * 24 * 3600;
 
 struct SupportCardPrefs {
     bool enabled = true;         // Preferences > Support > Show the support card at launch
     bool supporter = false;      // "I'm already a supporter": never again
     int64_t shownAt = 0;         // seconds since 1970 when it last showed (0: never)
     std::string shownVersion;    // the version it last showed in ("" before 0.10.4)
+    int64_t laterAt = 0;         // seconds since 1970 when "Maybe later" was chosen (0: never)
 };
 
 enum class SupportCardReason { None, FirstRun, Updated, Weekly };
@@ -130,6 +133,8 @@ inline SupportCardReason supportCardDue(const SupportCardPrefs& p, bool firstRun
                                         bool testMode) {
     if (testMode || !p.enabled || p.supporter) return SupportCardReason::None;
     if (firstRun) return SupportCardReason::FirstRun;
+    // (a clock set back before "Maybe later" ends the 30 days, so a damaged value can't hide it for good)
+    if (p.laterAt > 0 && now >= p.laterAt && now - p.laterAt < kSupportCardLaterSeconds) return SupportCardReason::None;
     if (p.shownVersion != version) return SupportCardReason::Updated;
     const int64_t since = now - p.shownAt;
     // (a clock set far back counts as due, so a damaged value can't hide it for good, nor show it every start)
