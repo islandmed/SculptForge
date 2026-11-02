@@ -6,6 +6,11 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Tablet Mouse mode (Preferences > Tablet): on some Windows tablets the brush stopped following the pen in 0.10.7,
+  because the system cursor reading stayed put while the pen moved. A reading that doesn't move with the pen is now
+  ignored and the pen moves the brush relatively, from where it was, with no jump (#72).
+
 ## [0.10.7] - 2026-11-01
 
 ### Changed
