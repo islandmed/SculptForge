@@ -78,10 +78,14 @@ void usage() {
 
 // UI tests must never read or change the user's real settings, recent files or
 // autosaves: point the per-user data directories at a fresh temporary folder.
+std::filesystem::path g_isolatedDir; // isolateSettings' folder, removed when the run ends well
+
 void isolateSettings() {
+    if (!g_isolatedDir.empty()) return; // (once: --run with --measure-stroke asks twice)
     std::error_code ec;
     const auto dir = std::filesystem::temp_directory_path(ec) /
                      ("sculptforge-ui-test-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    g_isolatedDir = dir;
     std::filesystem::create_directories(dir, ec);
     const std::string d = dir.string();
 #if defined(_WIN32)
@@ -213,5 +217,11 @@ int main(int argc, char** argv) {
     int code = app.run();
     app.shutdown();
     sf::crashlog::stop();
+    // The isolated folder (settings, the log, autosaves: a benchmark's 33M mesh is over a gigabyte) goes with a run
+    // that passed; a failed one keeps it, log included, to look at.
+    if (code == 0 && !g_isolatedDir.empty()) {
+        std::error_code ec;
+        std::filesystem::remove_all(g_isolatedDir, ec);
+    }
     return code;
 }

@@ -29,6 +29,7 @@
 #include <cmath>
 #include <condition_variable>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <ctime>
 #include <deque>
@@ -739,6 +740,13 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         }
         r.ramBytes = residentBytes();
         r.peakRamBytes = peakResidentBytes();
+        // SF_BENCH_MESH_OUT=prefix: the mesh's positions after every stroke (prefix-15M.bin: float x, y, z per
+        // vertex), to compare runs. (SF_STROKE_BACKLOG=0 places every dab, but the scene still differs a little from
+        // run to run on either stroke path; --measure-stroke with SF_MEASURE_VERIFY=1 compares the same dabs exactly.)
+        if (const char* out = std::getenv("SF_BENCH_MESH_OUT")) {
+            std::ofstream f(std::string(out) + "-" + r.label + ".bin", std::ios::binary);
+            f.write(reinterpret_cast<const char*>(doc_.mesh.positions.data()), std::streamsize(doc_.mesh.positions.size() * sizeof(glm::vec3)));
+        }
         ++p.sizeIndex;
         p.stage = p.sizeIndex < p.sizes.size() ? Stage::Announce : Stage::Finish;
     };

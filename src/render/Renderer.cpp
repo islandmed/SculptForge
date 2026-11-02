@@ -2094,9 +2094,21 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     const size_t ns = s.order.size();
     const bool ranged = !full && !dirtyRuns_.empty();
     const std::span<const uint32_t> order = s.order.fromGpu();
+    static const bool syncLog = std::getenv("SF_SYNC_LOG") != nullptr; // where a vertex upload's time went
+    auto lap = std::chrono::steady_clock::now();
+    const auto lapStart = lap;
+    double vertsMs = 0, boundsMs = 0, proxyMs = 0;
+    const auto lapMs = [](std::chrono::steady_clock::time_point& t) {
+        const auto now = std::chrono::steady_clock::now();
+        const double ms = std::chrono::duration<double, std::milli>(now - t).count();
+        t = now;
+        return ms;
+    };
     if (full || ranged) {
         uploadVertices(s, mesh, full);
+        if (syncLog) vertsMs = lapMs(lap);
         updateBounds(s, mesh, full, full); // (a full upload computed them while building)
+        if (syncLog) boundsMs = lapMs(lap);
     }
     if (full) {
         s.proxyAllocated = false; // sized for the old mesh
@@ -2128,7 +2140,9 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     if (wireframe && !s.linesValid && !s.outOfMemory) buildLines(s, mesh);
     // Small meshes draw in full while the view moves too (their proxy would save little).
     constexpr size_t kProxyMinTriangles = size_t(1) << 18;
+    if (syncLog) lapMs(lap);
     if (proxyUsed_ && !s.outOfMemory && s.drawnTriangles >= kProxyMinTriangles) buildProxies(s, mesh);
+    if (syncLog) proxyMs = lapMs(lap);
     syncTexture(s, mesh, pbr);
     syncNormalMap(s, mesh, normalMap);
 
@@ -2168,6 +2182,13 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     s.fresh = false;
     uploadPatches(s, mesh, wireframe); // (may ask for a full upload next time)
     mesh.clearDirty();
+    if (syncLog && (full || ranged)) {
+        size_t sent = 0;
+        for (const auto& [b0, e0] : dirtyRuns_) sent += e0 - b0;
+        SDL_Log("sync: %s %zu slots in %zu runs, %.1f ms (vertices %.1f, bounds %.1f, proxy %.1f)", full ? "full" : "ranged",
+                sent, dirtyRuns_.size(), std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - lapStart).count(),
+                vertsMs, boundsMs, proxyMs);
+    }
 }
 
 // The painted texture (core/Texture.h): a full upload when it is new or replaced, then only the rectangle
