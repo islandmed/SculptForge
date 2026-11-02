@@ -637,6 +637,8 @@ constexpr Entry kSpanish[] = {
     {"Multithreading", "Multihilo"},
     {"Predictive Strokes", "Trazos predictivos"},
     {"Draft Strokes", "Trazos de borrador"},
+    {"Live Move (Experimental)", "Mover en vivo (experimental)"},
+    {"Background Preview (Experimental)", "Vista previa en segundo plano (experimental)"},
     {"%d threads", "%d hilos"},
     {"Memory", "Memoria"},
     {"Hardware profile", "Perfil de hardware"},

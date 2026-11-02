@@ -153,13 +153,14 @@ bool App::backgroundDabs() const {
 }
 
 bool App::previewStrokes() const {
-    // SF_BG_GHOST=1 (a research prototype, docs/design/perf-moonshots.md): background dabs draw the predictive
-    // preview too (it never changes the mesh: the solver's dabs are the same), and the frame doesn't wait for them.
-    static const bool bgGhost = [] {
+    // Background Preview (Preferences > Performance, experimental; SF_BG_GHOST=0 / 1 overrides): background dabs
+    // draw the predictive preview too (it never changes the mesh: the solver's dabs are the same), and the frame
+    // doesn't wait for them.
+    static const int env = [] {
         const char* v = std::getenv("SF_BG_GHOST");
-        return v && *v == '1';
+        return v && *v ? (*v == '0' ? 0 : 1) : -1;
     }();
-    return predictiveStrokes() || (bgGhost && backgroundDabs());
+    return predictiveStrokes() || ((env >= 0 ? env == 1 : uiPrefs_.backgroundPreview) && backgroundDabs());
 }
 
 bool App::asyncStrokeAllowed() const {
@@ -309,12 +310,12 @@ void App::pumpStroke() {
         commitSolverBatch();
 }
 
-bool App::liveMoveEnabled() {
-    static const bool on = [] {
+bool App::liveMoveEnabled() const {
+    static const int env = [] {
         const char* v = std::getenv("SF_LIVE_MOVE");
-        return v && *v == '1';
+        return v && *v ? (*v == '0' ? 0 : 1) : -1;
     }();
-    return on;
+    return env >= 0 ? env == 1 : uiPrefs_.liveMove;
 }
 
 void App::commitLiveMove() {

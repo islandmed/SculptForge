@@ -665,6 +665,15 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME ui_stroke_background COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
     set_tests_properties(ui_stroke_background PROPERTIES LABELS ui TIMEOUT 60
                          ENVIRONMENT "SF_NO_UPDATE_CHECK=1;SF_MEASURE_VERIFY=1;SF_BACKGROUND_DABS=1")
+    # The same with Background Preview (experimental): the preview never changes the mesh and the frame no longer waits
+    # for a batch; the stroke still replays bit for bit.
+    add_test(NAME ui_stroke_background_preview COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
+    set_tests_properties(ui_stroke_background_preview PROPERTIES LABELS ui TIMEOUT 60
+                         ENVIRONMENT "SF_NO_UPDATE_CHECK=1;SF_MEASURE_VERIFY=1;SF_BACKGROUND_DABS=1;SF_BG_GHOST=1")
+    # And with the persistent upload (experimental, SF_PERSISTENT_UPLOAD): staging buffers instead of glBufferSubData.
+    add_test(NAME ui_stroke_persistent_upload COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
+    set_tests_properties(ui_stroke_persistent_upload PROPERTIES LABELS ui TIMEOUT 60
+                         ENVIRONMENT "SF_NO_UPDATE_CHECK=1;SF_MEASURE_VERIFY=1;SF_BACKGROUND_DABS=1;SF_BG_GHOST=1;SF_PERSISTENT_UPLOAD=1")
     # Predictive strokes with the brush size changing every frame mid-stroke: each batch of dabs keeps the size it
     # was handed (no data race with the solver thread), replaying the stroke without the thread gives the same
     # mesh, bit for bit, and its undo the mesh it started from.

@@ -1,0 +1,10 @@
+# research/perf-moonshots: PAUSED (usage stop), not pushed, NOT green-verified
+Status: 0.10.8 slice built (Release build OK), committed locally; no full ctest, no benchmarks yet (load never < 2).
+Done: three flagged prototypes on top of perf/bigbrush-p99 (merged in): Live Move (Prefs > Performance "Live Move (Experimental)", SF_LIVE_MOVE; GPU draws the Move drag via GhostKind::Move, one exact grab at release), Background Preview (Prefs toggle, SF_BG_GHOST; ghost on the background-dab path, frame no longer waits), Persistent upload (SF_PERSISTENT_UPLOAD only; GL_ARB_buffer_storage staging + glCopyBufferSubData + fences). Prefs saved in ui.json, Spanish strings, UiTest values live_move/background_preview.
+Tests: unit live_move_matches_the_grab passes (preview 1e-5, single grab vs per-frame 1e-6); ghost tests pass. NOT yet run: tests/ui/live_move.sfui, ui_stroke_background_preview, ui_stroke_persistent_upload (CMakeLists.txt), full ctest.
+Doc: docs/design/perf-moonshots.md (research with citations, ideas 1-8 incl. Focus Detail, ZBrush public-docs comparison); MEASUREMENTS and RECOMMENDATION placeholders still to fill.
+Next steps to resume:
+1. `cd build && SDL_APP_ID=sculptforge-agent nice -n 19 ionice -c3 ctest -R "ui_live_move|ui_stroke_background|ui_stroke_persistent|ghost" --output-on-failure`; fix, then full ctest -j3 (one machine-wide).
+2. At load < 2: scratchpad bench.sh pattern = `--benchmark standard-33m --benchmark-no-video` for A (no env), SF_BG_GHOST=1, SF_LIVE_MOVE=1, SF_PERSISTENT_UPLOAD=1, all; interleave A/all twice. Fill docs MEASUREMENTS/RECOMMENDATION (expect: Move fps, preview_lag_px vs lag_px, commit ms). Keep persistent upload env-only unless it gains.
+3. CHANGELOG [Unreleased] + What's New 0.10.8 lines (two Experimental toggles, off by default), push branch when green, update this report with numbers + SHA, message coordinator.
+Coordination: focusdetail agent (research/focus-detail) owns idea 8 data side; asked it to expose FocusDetail::tileLevel(tri) and report promotion latency/RSS/GPU MB at 1B.

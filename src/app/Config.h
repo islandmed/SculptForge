@@ -85,6 +85,11 @@ struct UiPrefs {
     // bounds of what they touched are worked out once, when the pen lifts (Sculptor::draftStrokes). Off by
     // default; meant for laptops and battery (a hardware tier will turn it on).
     bool draftStrokes = false;
+    // Experimental (docs/design/perf-moonshots.md), off by default. Live Move: the GPU draws a Move drag and the
+    // move is applied once when the pen lifts (SF_LIVE_MOVE=0 / 1 overrides). Background Preview: heavy meshes'
+    // background dabs draw the predictive preview too (SF_BG_GHOST=0 / 1 overrides).
+    bool liveMove = false;
+    bool backgroundPreview = false;
     // Dynamic topology (Draw palette): false = the detail follows the brush size on screen (Sculptris Pro);
     // true = one detail size for the whole mesh.
     bool dyntopoConstantDetail = false;

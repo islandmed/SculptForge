@@ -100,6 +100,8 @@ Json toJson(const UiPrefs& p) {
     j.set("multithreading", p.multithreading);
     j.set("predictiveStrokes", p.predictiveStrokes);
     j.set("draftStrokes", p.draftStrokes);
+    j.set("liveMove", p.liveMove);
+    j.set("backgroundPreview", p.backgroundPreview);
     j.set("dyntopoConstantDetail", p.dyntopoConstantDetail);
     j.set("flatShading", p.flatShading);
     j.set("viewportCursor", double(p.viewportCursor));
@@ -162,6 +164,8 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.multithreading = j["multithreading"].asBool(p.multithreading);
     p.predictiveStrokes = j["predictiveStrokes"].asBool(p.predictiveStrokes);
     p.draftStrokes = j["draftStrokes"].asBool(p.draftStrokes);
+    p.liveMove = j["liveMove"].asBool(p.liveMove);
+    p.backgroundPreview = j["backgroundPreview"].asBool(p.backgroundPreview);
     p.dyntopoConstantDetail = j["dyntopoConstantDetail"].asBool(p.dyntopoConstantDetail);
     p.flatShading = j["flatShading"].asBool(p.flatShading);
     p.viewportCursor = std::clamp(int(j["viewportCursor"].asNumber(p.viewportCursor)), 0, 1);

@@ -349,7 +349,7 @@ private:
     BrushType strokeBrush_ = BrushType::Standard;
     bool strokeInvert_ = false;
     glm::vec3 grabPlanePoint_{0.0f}, grabLast_{0.0f};
-    // Live Move (SF_LIVE_MOVE=1, a research prototype, docs/design/perf-moonshots.md): a Move drag on a plain mesh
+    // Live Move (Preferences > Performance, experimental; docs/design/perf-moonshots.md): a Move drag on a plain mesh
     // isn't applied frame by frame; the GPU draws it (render/Ghost.h, GhostKind::Move) from the grab's start, and
     // the whole move is applied once when the stroke ends (finishStrokeNow): one grab instead of one a frame.
     struct LiveMove {
@@ -357,7 +357,7 @@ private:
         glm::vec3 center{0.0f}, delta{0.0f};
         float radius = 0.0f, scale = 0.0f;
     } liveMove_;
-    static bool liveMoveEnabled();
+    bool liveMoveEnabled() const;      // the Live Move preference (and SF_LIVE_MOVE)
     void commitLiveMove();
     // Along the normal (from the discussions): Move, Tendril, Elastic Tendril and KelvinGrab strokes that began with
     // the invert key held (Preferences > Input > Along the normal) slide along the average normal under the brush
