@@ -601,6 +601,11 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME release_smoke COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_smoke.py
                                       --cli ${SCULPTFORGE_CLI_RUNNER} --out ${CMAKE_CURRENT_BINARY_DIR}/release-smoke)
     # Proof mode results: the validator and website list tool (tools/benchmark/submit.py, docs/benchmark.md).
+    # Insider daily drops (tools/drops): the generator is deterministic, the gate rejects blank, seamed, torn and
+    # duplicate candidates, and every kind makes a pack that passes the install checks.
+    add_test(NAME insider_drops COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/drops/drops.py selftest
+                                        --cli ${SCULPTFORGE_CLI_RUNNER})
+    set_tests_properties(insider_drops PROPERTIES TIMEOUT 300)
     add_test(NAME benchmark_submit COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/benchmark/submit.py selftest)
     add_test(NAME guide_site COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/guide/build_site.py --check
                                      --out ${CMAKE_CURRENT_BINARY_DIR}/guide-site)

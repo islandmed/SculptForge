@@ -1,0 +1,139 @@
+# Insider daily drop (tools/drops/drops.py): every day it builds sculptforge, makes the day's candidates (seeded by
+# the date), gates them on the standard test sculpt, packs the best one as an .sfpack and
+#   - posts it to #insiders (DISCORD_INSIDERS_WEBHOOK; skipped quietly when unset),
+#   - commits it to the private repo islandmed/sculptforge-insiders under drops/YYYY/MM/<date>/ (INSIDERS_REPO_TOKEN:
+#     a fine-grained token for that one repository with Contents: Read and write; skipped when unset).
+# On the 1st it also bundles last month's drops into "Insider Pack YYYY-MM" for Supporters (#members through
+# DISCORD_MEMBERS_WEBHOOK, kept under bundles/ in the private repo) and schedules it in the public pack listing
+# (listing.json on this repository's `packs` branch) for three months after the month ends. Each run publishes
+# the bundles whose public date has come: their .sfpack goes next to the listing and is marked released.
+# Only this repository's own code runs; no pull request or issue input reaches it.
+name: Insider drop
+
+on:
+  schedule:
+    - cron: "23 14 * * *"
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Drop date YYYY-MM-DD (default today, UTC)"
+        required: false
+      month:
+        description: "Also bundle this month YYYY-MM (default: last month, on the 1st only)"
+        required: false
+
+permissions:
+  contents: write # the `packs` branch (public listing)
+
+concurrency:
+  group: insider-drop
+
+jobs:
+  drop:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      HAS_INSIDERS: ${{ secrets.INSIDERS_REPO_TOKEN != '' }}
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_BASEDIR: ${{ github.workspace }}
+      CCACHE_MAXSIZE: 500M
+      CCACHE_DEPEND: 'true'
+    steps:
+      - uses: actions/checkout@v7
+      - name: Dates
+        env:
+          IN_DATE: ${{ inputs.date }}
+          IN_MONTH: ${{ inputs.month }}
+        run: |
+          DATE="${IN_DATE:-$(date -u +%F)}"
+          [[ "$DATE" =~ ^20[0-9][0-9]-[01][0-9]-[0-3][0-9]$ ]] || { echo "bad date '$DATE'"; exit 1; }
+          MONTH="$IN_MONTH"
+          if [ -z "$MONTH" ] && [ "${DATE:8:2}" = "01" ]; then MONTH=$(date -u -d "$DATE -1 day" +%Y-%m); fi
+          [ -z "$MONTH" ] || [[ "$MONTH" =~ ^20[0-9][0-9]-[01][0-9]$ ]] || { echo "bad month '$MONTH'"; exit 1; }
+          echo "DATE=$DATE" >> "$GITHUB_ENV"
+          echo "DROP_DIR=drops/${DATE:0:4}/${DATE:5:2}/$DATE" >> "$GITHUB_ENV"
+          echo "MONTH=$MONTH" >> "$GITHUB_ENV"
+      - name: Insider repository
+        if: env.HAS_INSIDERS == 'true'
+        uses: actions/checkout@v7
+        with:
+          repository: islandmed/sculptforge-insiders
+          token: ${{ secrets.INSIDERS_REPO_TOKEN }}
+          path: insiders
+      - name: Already done today?
+        run: |
+          if [ -f "insiders/$DROP_DIR/drop.json" ]; then echo "SKIP_DROP=1" >> "$GITHUB_ENV"; echo "$DATE already dropped"; fi
+      - name: Dependencies
+        run: |
+          sudo ./packaging/linux/install-build-deps.sh
+          sudo apt-get install -y --no-install-recommends ccache xvfb libgl1-mesa-dri
+      - name: Compiler cache (restore; CI's Linux cache)
+        uses: actions/cache/restore@v5
+        with:
+          path: .ccache
+          key: ccache-ci-linux-x86_64.${{ github.sha }}
+          restore-keys: ccache-ci-linux-x86_64.
+      - name: Build sculptforge and sculptforge-cli
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSCULPTFORGE_USE_SYSTEM_SDL=OFF -DSCULPTFORGE_BUILD_TESTS=OFF \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          cmake --build build --target sculptforge sculptforge-cli --parallel 4
+      - name: Make the drop
+        if: env.SKIP_DROP != '1'
+        run: |
+          mkdir -p insiders/drops
+          xvfb-run -a -s "-screen 0 1280x1024x24" env LIBGL_ALWAYS_SOFTWARE=1 \
+            python3 tools/drops/drops.py daily --date "$DATE" --out "$RUNNER_TEMP/out" \
+              --history insiders/drops/history.json --app build/sculptforge --cli build/sculptforge-cli
+      - name: Post to #insiders
+        if: env.SKIP_DROP != '1'
+        env:
+          DISCORD_INSIDERS_WEBHOOK: ${{ secrets.DISCORD_INSIDERS_WEBHOOK }}
+        run: |
+          [ -f "$RUNNER_TEMP/out/$DATE/drop.json" ] || { echo "no drop today"; exit 0; }
+          python3 tools/drops/drops.py post "$RUNNER_TEMP/out/$DATE" --webhook-env DISCORD_INSIDERS_WEBHOOK
+      - name: Bundle the month for Supporters
+        if: env.MONTH != '' && env.HAS_INSIDERS == 'true'
+        env:
+          DISCORD_MEMBERS_WEBHOOK: ${{ secrets.DISCORD_MEMBERS_WEBHOOK }}
+        run: |
+          B="insiders/bundles/$MONTH"
+          if [ -f "$B/bundle.json" ]; then echo "$MONTH already bundled"; exit 0; fi
+          python3 tools/drops/drops.py monthly --month "$MONTH" --drops insiders/drops --out "$B" --cli build/sculptforge-cli
+          python3 tools/drops/drops.py post "$B" --webhook-env DISCORD_MEMBERS_WEBHOOK
+      - name: Commit to the insider repository
+        if: env.HAS_INSIDERS == 'true'
+        run: |
+          if [ -f "$RUNNER_TEMP/out/$DATE/drop.json" ] || [ -f "$RUNNER_TEMP/out/$DATE/gate.json" ]; then
+            mkdir -p "insiders/$DROP_DIR" && cp -r "$RUNNER_TEMP/out/$DATE/." "insiders/$DROP_DIR/"
+          fi
+          cd insiders
+          git add -A .
+          if git diff --cached --quiet; then echo "nothing to commit"; exit 0; fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -qm "Drop $DATE${MONTH:+, Insider Pack $MONTH}"
+          git push -q
+      - name: Public pack listing (schedule and release)
+        if: env.HAS_INSIDERS == 'true'
+        run: |
+          P="$RUNNER_TEMP/packs"
+          mkdir -p "$P/insider"
+          if git fetch --depth=1 origin packs 2>/dev/null; then git --work-tree="$P" checkout FETCH_HEAD -- . && git reset -q; fi
+          for b in insiders/bundles/*/bundle.json; do
+            [ -f "$b" ] || continue
+            id=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['id'])" "$b")
+            grep -q "\"$id\"" "$P/listing.json" 2>/dev/null || python3 tools/drops/drops.py schedule --listing "$P/listing.json" --bundle "$(dirname "$b")"
+          done
+          [ -f "$P/listing.json" ] || exit 0
+          for id in $(python3 tools/drops/drops.py due --listing "$P/listing.json" --today "$DATE"); do
+            cp "insiders/bundles/${id#insider-pack-}/$id.sfpack" "$P/insider/"
+            cp "insiders/bundles/${id#insider-pack-}/$id.png" "$P/insider/" 2>/dev/null || true
+            python3 tools/drops/drops.py release --listing "$P/listing.json" --id "$id"
+            echo "released $id"
+          done
+          cd "$P"
+          git init -q -b packs
+          git add -A
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -qm "Pack listing $DATE"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" packs

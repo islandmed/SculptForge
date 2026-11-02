@@ -31,6 +31,10 @@ All notable changes to SculptForge are listed here. The format follows
   built-in brushes do since #60: the stamp reaches its square's corners instead of being cut by the preset's round
   tip (#75, reported by rodrigomoretto). At the default Focal Shift presets look as before; saved presets are unchanged.
 ### Added
+- Insider daily drops: almost every day a new alpha, brush, VDM or Kelvinlet preset, made by SculptForge's own
+  procedural tools and checked on a test sculpt (too faint, seams, torn surfaces and near-duplicates are left out),
+  posted to Insiders as an .sfpack. Supporters get the month's drops as one Insider Pack at month end, and everyone
+  gets that pack free three months later (`tools/drops/`, `.github/workflows/insider-drop.yml`).
 - A new default look: new installs start in **Forge Terminal** with the **Tokyo Night** colours and the
   **SculptForge layout** (menus by task: File, Edit, Sculpt, Paint, Mesh, View, Render, Help, whose sections are the
   palettes; a status bar; a one-row tool shelf). Existing installs keep their look and layout, and see a one-time card,
