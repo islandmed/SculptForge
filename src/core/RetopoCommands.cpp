@@ -147,16 +147,17 @@ void registerRetopoCommands(CommandRegistry& reg) {
                  if (argBool(a, "guides", true)) o.guides = doc.qremeshGuides;
                  o.guideStrength = float(std::clamp(argNumber(a, "curves_strength", 50.0), 0.0, 100.0) / 100.0);
                  Mesh out;
-                 std::string err;
+                 std::string err, keepNote;
                  QRemeshStats st;
                  if (keeping) { // remesh the unmasked part on its own, then put the masked part back beside it
                      if (!qremesh(unmaskedPart(doc.mesh, keep), o, out, err, {}, &st)) return {false, err};
                      Mesh stitched;
-                     if (!stitchKeptTriangles(doc.mesh, keep, out, stitched, err)) return {false, "Quad Remesh (Keep masked): " + err};
+                     if (!stitchKeptTriangles(doc.mesh, keep, out, stitched, err, &keepNote)) return {false, "Quad Remesh (Keep masked): " + err};
                      out = std::move(stitched);
                  } else if (!qremesh(doc.mesh, o, out, err, {}, &st)) return {false, err};
                  const std::string texture = carryTextureNote(doc.mesh, out, argBool(a, "keep_texture", true));
-                 return {true, applyQRemesh(doc, std::move(out), argBool(a, "keep_original", false), st) + texture};
+                 return {true, applyQRemesh(doc, std::move(out), argBool(a, "keep_original", false), st) + texture +
+                                   (keepNote.empty() ? "" : "; Keep masked: " + keepNote)};
              }});
 
     reg.add({"project_all",

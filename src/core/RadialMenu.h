@@ -26,7 +26,10 @@ constexpr size_t kRadialIdMax = 96;      // bytes in an action or icon id (longe
 constexpr size_t kRadialFileMax = 64 * 1024; // an imported menu file larger than this is refused unread
 
 // What opens a menu besides its key: a mouse button or a pen side button, held like the key.
-enum class RadialButton { None, MouseMiddle, MouseBack, MouseForward, PenLower, PenUpper, PenThird, Count };
+// MouseRight (#74): a plain right-drag opens the menu instead of turning the view (Maya's marking menus); the
+// view then turns with Shift+right-drag or the style's other ways. Mouse buttons open a menu only with no modifier
+// held (Alt+middle still pans, Alt+right zooms in the Maya style). Stored by id, so the order may change.
+enum class RadialButton { None, MouseMiddle, MouseBack, MouseForward, PenLower, PenUpper, PenThird, MouseRight, Count };
 const char* radialButtonId(RadialButton b);    // "mouse_middle" ... (stored in ui.json)
 const char* radialButtonLabel(RadialButton b); // "Middle mouse button" ... (Preferences > Input > Radial Menus)
 RadialButton radialButtonFromId(std::string_view id); // unknown: None

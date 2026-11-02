@@ -1,0 +1,60 @@
+# Radial menus on mouse buttons (#74): a plain press of the button opens the pie; with a modifier held the button
+# keeps its navigation (Alt+middle pans). A menu on the right button opens on a plain right-drag, while Alt+right
+# still zooms in the Maya style and Shift+right still turns the view in the ZBrush style.
+run new_sphere subdivisions=4
+
+# The middle button (sculpting.json): a plain press opens the pie, a right flick runs Inflate.
+radial_import data/radial/sculpting.json
+expect_value radial_menus == 3
+button_drag middle 0.5 0.5 0.57 0.5 0.3
+expect_value radial_open == 0
+expect_value radial_ran == 1
+expect_value brush_type == 4
+
+# Alt+middle pans the view, with no pie.
+remember camera_pan pan0
+hold alt
+button_drag middle 0.5 0.5 0.6 0.55 0.3
+hold none
+expect_value radial_open == 0
+expect_value camera_pan > $pan0+0.01
+
+# The right button (right_button.json): a plain right-drag opens the pie and runs the flicked item (a left flick:
+# Pinch), and the view doesn't turn.
+radial_import data/radial/right_button.json
+expect_value radial_menus == 4
+remember camera_yaw yaw0
+button_drag right 0.5 0.5 0.43 0.5 0.3
+expect_value radial_open == 0
+expect_value brush_type == 7
+expect_value camera_yaw >= $yaw0-0.0001
+expect_value camera_yaw <= $yaw0+0.0001
+
+# ZBrush style: Shift+right-drag still turns the view (the way to orbit while the right button opens the pie).
+hold shift
+button_drag right 0.5 0.5 0.62 0.5 0.3
+hold none
+expect_value radial_open == 0
+expect_value camera_yaw != $yaw0
+
+# Maya style: Alt+right zooms (horizontal drag) instead of opening the pie.
+click "Preferences##palette.preferences"
+click "Input##preferences.input"
+click "Maya##input.style_maya"
+expect_value input_style == 3
+key escape
+remember camera_distance dist0
+hold alt
+button_drag right 0.5 0.5 0.65 0.5 0.3
+hold none
+expect_value radial_open == 0
+expect_value camera_distance != $dist0
+# A plain right-drag still opens the pie in the Maya style (Maya's marking menus).
+button_drag right 0.5 0.5 0.57 0.5 0.3
+expect_value radial_open == 0
+expect_value brush_type == 4
+
+# Back to the ZBrush style for later tests.
+click "Preferences##palette.preferences"
+click "ZBrush-style##input.style_zbrush"
+key escape

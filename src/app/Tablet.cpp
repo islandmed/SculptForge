@@ -62,9 +62,41 @@ void App::keepImGuiOnPen() {
 // how far it moves, like a mouse. Every pen position, the pen's own events and SDL's mouse events for the pen, goes
 // through penCursor_ before anything reads it (#54: lifting the pen and putting it down elsewhere made the cursor
 // jump back). The mouse moving the cursor in between moves where the pen carries on from.
+//
+// #72: in mouse mode the driver moves the system cursor itself, so the system cursor is the one cursor, for the
+// brush circle and the panels alike; each pen position is replaced by it (the pen adds pressure and tilt). A
+// cursor of our own, moved by the pen's motion, drifted from the system's after the pen was lifted and put down
+// elsewhere, and clicks landed at the brush instead of the arrow.
+bool App::systemCursorInWindow(float& x, float& y) const {
+    if (demo_) { // UI tests: the system cursor a script set (os_cursor), or none
+        if (!testSystemCursor_) return false;
+        x = testSystemCursorX_;
+        y = testSystemCursorY_;
+        return true;
+    }
+    if (!window_) return false;
+    float gx = 0.0f, gy = 0.0f;
+    int wx = 0, wy = 0;
+    SDL_GetGlobalMouseState(&gx, &gy);
+    if (!SDL_GetWindowPosition(window_, &wx, &wy)) return false;
+    x = gx - float(wx);
+    y = gy - float(wy);
+    return std::isfinite(x) && std::isfinite(y);
+}
+
 void App::mapPenPosition(SDL_Event& e) {
     penCursor_.mouseMode = uiPrefs_.tablet.mouseMode;
     const Uint64 now = SDL_GetTicksNS();
+    if (penCursor_.mouseMode) {
+        float sx = 0.0f, sy = 0.0f;
+        const bool penPosition = e.type == SDL_EVENT_PEN_DOWN || e.type == SDL_EVENT_PEN_UP || e.type == SDL_EVENT_PEN_MOTION ||
+                                 e.type == SDL_EVENT_PEN_AXIS || e.type == SDL_EVENT_PEN_BUTTON_DOWN ||
+                                 e.type == SDL_EVENT_PEN_BUTTON_UP ||
+                                 ((e.type == SDL_EVENT_MOUSE_MOTION) && e.motion.which == SDL_PEN_MOUSEID) ||
+                                 ((e.type == SDL_EVENT_MOUSE_BUTTON_DOWN || e.type == SDL_EVENT_MOUSE_BUTTON_UP) &&
+                                  e.button.which == SDL_PEN_MOUSEID);
+        if (penPosition && systemCursorInWindow(sx, sy)) penCursor_.systemCursor(sx, sy);
+    }
     switch (e.type) {
     case SDL_EVENT_PEN_PROXIMITY_IN:
     case SDL_EVENT_PEN_PROXIMITY_OUT: penCursor_.proximity(); break;

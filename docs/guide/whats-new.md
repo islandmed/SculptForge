@@ -52,6 +52,18 @@ chapter opens by itself the first time you start a new version; you can always f
 - **The SculptForge Discord** (**Help > Join the Discord...**): the official community, for questions, tips and
   work in progress. It is also on the support card, in the welcome note and on the website. Bugs still go to
   **Help > Report a problem** (GitHub issues).
+- **Backface culling** (#68, **Tool > Display**): don't draw the back faces of the model, for speed on open meshes
+  and to see through their openings. Brushes then work only on what you see. Off by default.
+- **A crosshair over the view** (#73): the pointer is a crosshair where brushes act and the arrow over the panels.
+  **Preferences > Interface > Viewport cursor** brings the arrow back.
+- **A radial menu on the right button** (#74): choose **Right mouse button** for a menu in **Preferences > Input >
+  Radial Menus**; turn the view with <kbd>Shift</kbd>+right-drag then. A menu on a mouse button now opens only
+  without modifier keys, so <kbd>Alt</kbd>+middle still pans.
+- **Fixed: Smooth on quad meshes** (#69): smoothing a Quad Remesh result no longer shears the quads into zigzags.
+- **Fixed: Keep Masked remeshing** (#67): Voxel Remesh with Keep Masked works on real sculpts, tidies awkward mask
+  edges by itself, and says what to change when it can't.
+- **Fixed: tablet mouse mode** (#72): the brush stays on the system cursor after the pen is lifted and put down
+  elsewhere, and clicks land where the arrow is.
 
 ## Version 0.10.5
 

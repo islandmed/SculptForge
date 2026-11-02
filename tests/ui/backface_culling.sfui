@@ -1,0 +1,51 @@
+# Backface culling (#68): Tool > Display > Backface culling skips the back faces of every Part, also on open meshes
+# (which otherwise draw both sides). Off by default. Brushes then work only on faces that are drawn.
+run new_plane resolution=64
+expect_value backface_culling == 0
+camera 0 -60
+wait 0.6
+expect_value drawn_triangles > 0
+remember drawn_triangles top_off
+camera 0 60
+wait 0.6
+expect_value drawn_triangles == $top_off
+shot back-off
+
+click "Tool##palette.tool"
+click "Display##tool.display"
+expect "Backface culling##display"
+click "Backface culling##display"
+expect_value backface_culling == 1
+shot tool-display
+key escape
+camera 0 60
+wait 0.6
+expect_value drawn_triangles == 0
+shot back-on
+camera 0 -60
+wait 0.6
+expect_value drawn_triangles == $top_off
+
+# From below, the plane isn't drawn, so a stroke there finds nothing to sculpt.
+camera 0 60
+wait 0.6
+snapshot
+stroke 0.4 0.5 0.6 0.5
+expect_value moved == 0
+camera 0 -60
+wait 0.6
+stroke 0.4 0.5 0.6 0.5
+expect_value moved > 0
+key ctrl+z
+
+# A closed mesh looks the same either way.
+run new_sphere subdivisions=4
+camera 20 10
+wait 0.6
+remember drawn_triangles sphere_on
+click "Tool##palette.tool"
+click "Backface culling##display"
+expect_value backface_culling == 0
+key escape
+wait 0.6
+expect_value drawn_triangles >= $sphere_on

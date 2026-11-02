@@ -89,8 +89,10 @@ What happens to your data:
 - **Keep Masked** (off by default): masked areas keep their triangles exactly, detail included, and only the rest
   is remeshed. The new surface is joined to the masked area along the mask's edge by a narrow strip of triangles,
   so the model stays closed. A triangle counts as masked when all three of its corners are at least half masked.
-  If the mask's edge is too ragged or too thin to join up at this resolution, the status line says so and nothing
-  changes (smooth or grow the mask, or raise the resolution). Command: `remesh keep_masked=true`.
+  A ragged mask edge is tidied by itself (#67): where it touches itself the corner triangles are remeshed, masked
+  spots smaller than the new polygons are remeshed with the rest, and narrow gaps between masked areas are kept;
+  the status line says when it did. If it still can't be joined, the status line says what to change (blur or grow
+  the mask, or unmask where two parts overlap) and nothing changes. Command: `remesh keep_masked=true`.
 
 To remesh several Parts into one, first combine them with **Merge visible...** or **Merge down...** in
 [Parts](parts.md#merge-parts).

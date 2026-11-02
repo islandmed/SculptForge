@@ -242,14 +242,16 @@ CommandRegistry::CommandRegistry() {
                  return {false, "Remesh: everything is masked, so nothing would change"};
              Mesh m = voxelRemesh(doc.mesh, std::clamp(int(argNumber(a, "resolution", 200)), 32, 512), &err);
              if (m.triangleCount() == 0) return {false, err};
+             std::string keepNote;
              if (keeping) {
                  Mesh stitched;
-                 if (!stitchKeptTriangles(doc.mesh, keep, m, stitched, err)) return {false, "Remesh (Keep masked): " + err};
+                 if (!stitchKeptTriangles(doc.mesh, keep, m, stitched, err, &keepNote)) return {false, "Remesh (Keep masked): " + err};
                  m = std::move(stitched);
              }
              const std::string texture = carryTextureNote(doc.mesh, m, argBool(a, "keep_texture", true));
              doc.replaceMeshUndoable(std::move(m), "Remesh");
-             return {true, "Remeshed to " + std::to_string(doc.mesh.triangleCount()) + " triangles" + texture};
+             return {true, "Remeshed to " + std::to_string(doc.mesh.triangleCount()) + " triangles" + texture +
+                           (keepNote.empty() ? "" : "; Keep masked: " + keepNote)};
          }});
 
     add({"image_relief",
