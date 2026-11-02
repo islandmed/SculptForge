@@ -8,7 +8,7 @@ click "Help##palette.help"
 click "Check for updates##help.check_updates"
 wait_idle 20
 expect_text "SculptForge 99.0.0 is available"
-expect_text "starting with SculptForge 1.0"
+expect_text "bug-fix and security releases go out to everyone the same day"
 expect "Become an Insider"
 expect_text "Twice as fast"
 expect "Download"
