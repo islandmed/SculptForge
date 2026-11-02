@@ -31,6 +31,8 @@ public:
     void toggle() { open_ = !open_; }
     // Shows `tab` (its root) and opens the LightBox.
     void show(LibraryTab tab);
+    // Shows `folder` (absolute; "" = the root) in `tab` and opens the LightBox, e.g. the starter meshes.
+    void showFolder(LibraryTab tab, const std::string& folder);
     // Preferences > LightBox (the shell's Preferences palette calls this).
     void drawPreferences(App& app);
     // Height the strip takes over the canvas at `rows` rows (logical px x scale).

@@ -33,6 +33,7 @@
 #include "core/Deform.h"
 #include "core/Sculptable.h"
 #include "core/Splats.h"
+#include "core/StarterMeshes.h"
 #include "core/TextureTransfer.h"
 #include "core/Timeline.h"
 #include "core/Voxel.h"
@@ -822,6 +823,7 @@ CommandRegistry::CommandRegistry() {
     registerMayaCommands(*this); // maya_send/receive (io/MayaCommands.cpp)
     registerBakeCommands(*this); // bake (core/Bake.cpp)
     registerFaceCommands(*this); // face_shapes_generate, face_weights, ... (core/FaceCommands.cpp)
+    registerStarterMeshCommands(*this); // new_starter_mesh (core/StarterMeshes.h)
     registerPackCommands(*this);    // pack_install, pack_list, pack_remove, ... (core/Pack.h)
     registerMacroCommands(*this);   // macro_run, macro_list, macro_check (core/Macro.h)
     registerProjectCommands(*this); // keep last (core/Project.cpp)

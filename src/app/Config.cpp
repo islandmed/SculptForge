@@ -441,6 +441,10 @@ void App::initActions() {
         ICON_LC_FILE_PLUS, "new_sphere");
     add("file.new_plane", "New Plane", "File", nullptr, [this] { confirmDiscard([this] { runCommand("new_plane"); }); }, nullptr,
         "new_plane");
+    add("file.new_starter", "New from Starter Mesh...", "File", nullptr, [this] { showStarterMeshes(); }, nullptr, nullptr,
+        nullptr, nullptr,
+        "Start from a base mesh: human head, bust, full body, hand, foot, ear, eye, stylised and creature heads, "
+        "torso, or a bevelled box, cylinder, capsule or ring (Library > Tool > Starter meshes).");
     add("file.open", "Open...", "File", "Ctrl+O", [this] { confirmDiscard([this] { openFileDialog(); }); }, ICON_LC_FOLDER_OPEN,
         nullptr, nullptr, nullptr, "Open a project (.sfproj), a model (.obj, .glb, .fbx, .stl, .ply, .usd ...) or splats.");
     add("file.save", "Save", "File", "Ctrl+S", [this] { saveProjectAs(false); }, ICON_LC_SAVE, nullptr, nullptr, nullptr,

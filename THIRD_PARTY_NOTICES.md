@@ -22,6 +22,7 @@ licenses require.
 | [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) | 2.304 | SIL Open Font License 1.1 | The monospace font of the interface looks (Preferences > Interface > Look): labels, numbers and status bar. Regular and SemiBold, embedded in the desktop app. Vendored in assets/fonts. |
 | Colour schemes of the Forge Terminal look: [Tokyo Night](https://github.com/enkia/tokyo-night-vscode-theme), [Catppuccin](https://github.com/catppuccin/catppuccin) (Mocha), [Gruvbox](https://github.com/morhetz/gruvbox) (dark), [Nord](https://github.com/nordtheme/nord), [Rosé Pine](https://github.com/rose-pine/rose-pine-theme), [Kanagawa](https://github.com/rebelot/kanagawa.nvim), [Everforest](https://github.com/sainnhe/everforest) (dark) | colour values only | MIT License (each) | The published colour values of each scheme, as data in src/app/LookSchemes.cpp. No code from these projects is included. Credited with thanks below. |
 | [Poly Haven](https://polyhaven.com) HDRIs: Brown Photostudio 02, Studio Small 09 (Sergej Majboroda), Kloofendal 48d Partly Cloudy (Pure Sky) (Greg Zaal, sky edits by Jarod Guest) | 1K files, downsampled to 512 x 256 | CC0 1.0 (public domain) | Image-based lighting of the PBR viewport (Material > Viewport Shading). Vendored in assets/hdri and embedded. |
+| [MakeHuman](https://github.com/makehumancommunity/makehuman) base mesh hm08 | commit a8bc2d5 (base.obj, SHA-256 8e761e66...) | CC0 1.0 (public domain) | The human starter meshes (head, bust, full body, hand, foot, ear, stylised head, torso), cut and reshaped by tools/starter/build_starter_meshes.py into assets/starter (embedded). Only the CC0 mesh asset is used, no MakeHuman code (AGPL). See docs/starter-meshes.md. |
 | [ICT-FaceKit](https://github.com/ICT-VGL/ICT-FaceKit) (ICT Face Model Light) | commit on master, 2020 | MIT License | The template head of Generate Facial Shapes (Tool > Facial Shapes): its neutral skin, mouth and eye sockets and its 53 ARKit-style expression shapes, converted by tools/face/build_ict_template.py into assets/face/ict-arkit.sfface (embedded). Not the separately licensed full ICT Face Model. |
 | [libcurl](https://curl.se) | system library | curl License (MIT/X derivate) | HTTPS for optional AI features on Linux and macOS. Linked dynamically from the operating system; Windows uses the built-in WinHTTP instead. |
 | [QR Code generator](https://github.com/nayuki/QR-Code-generator) | 1.8.0 | MIT License | The phone link's pairing QR code (File > Capture from phone). Vendored in third_party/qrcodegen. |
@@ -767,6 +768,17 @@ assets/hdri/brown_photostudio_02.hdr and assets/hdri/studio_small_09.hdr (by Ser
 assets/hdri/kloofendal_48d_partly_cloudy_puresky.hdr (by Greg Zaal, sky edits by Jarod Guest) are the 1K Radiance files from Poly Haven,
 downsampled to 512 x 256. CC0 needs no attribution; it is given here as thanks. No other environment is bundled:
 the "Studio" environment is generated in code (src/core/EnvironmentMath.cpp).
+
+## MakeHuman base mesh
+
+https://github.com/makehumancommunity/makehuman — `makehuman/data/3dobjs/base.obj` (base mesh hm08) at commit
+a8bc2d54ff0ac92e78ff71431b1023eda42bf482, SHA-256 8e761e6624b8f54536409135d1636da63b32486a90d4897f84e121d144f6fb4c,
+downloaded 2026-11-01. The file's header reads: "This asset was explicitly released as CC0 in september 2020",
+copyright holders at the release: Data Collection AB, Joel Palmius, Jonas Hauquier. The repository's LICENSE.md
+(section C) releases the base mesh and the other assets under CC0 1.0 Universal; the full legal text is its
+LICENSE.ASSETS.md (https://creativecommons.org/publicdomain/zero/1.0/legalcode). CC0 needs no attribution; it is
+given here as thanks. The MakeHuman program code (AGPL) is not used. The starter meshes in assets/starter made from
+it are released under CC0 too.
 
 ## ICT-FaceKit
 

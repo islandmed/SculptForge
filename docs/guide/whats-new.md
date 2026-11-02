@@ -5,6 +5,14 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.10.8
+
+- **Starter meshes**: start a sculpt from a human head with eye and mouth loops, a bust, a full body in A-pose, a
+  hand, a foot, an ear, an eye, a stylised head, a creature head, a torso, or a bevelled box, cylinder, capsule or
+  ring, all clean quads at life size with subdivision levels ready. **File > New from Starter Mesh**, the Library's
+  **Tool > Starter meshes**, or **Start from a head** in the welcome. See
+  [Projects](projects.md#start-from-a-starter-mesh).
+
 ## Version 0.10.7
 
 - **A clearer membership card**: the three memberships side by side with what each one gets you, in your look's

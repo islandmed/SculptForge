@@ -1295,6 +1295,7 @@ private:
     friend void drawMaterialGrid(App&, GridMode);
     friend void drawStrokeGrid(App&, GridMode);
     void initLightBox();   // end of init(): library folders, thumbnail cache, actions, project thumbnails
+    void showStarterMeshes(); // the Library at Tool > Starter meshes (File > New from Starter Mesh, the welcome)
     void drawLightBoxUi(); // every frame from drawUi: thumbnails, the LightBox, pickers, size / strength pop-ups
     // The LightBox / picker shortcuts (, B M S) until the action registry dispatches keys.
     bool lightBoxKey(SDL_Keycode key, SDL_Keymod mod);

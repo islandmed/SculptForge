@@ -149,6 +149,24 @@ embed_files(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedFace.cpp sf::assets
   faceTemplateData ${CMAKE_CURRENT_SOURCE_DIR}/assets/face/ict-arkit.sfface)
 target_sources(sculptforge_core PRIVATE src/core/Face.cpp src/core/FaceCommands.cpp
   ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedFace.cpp)
+# Starter meshes (core/StarterMeshes.h): base cages in compressed projects, built by tools/starter/build.sh from
+# scratch or from the MakeHuman base mesh (CC0; docs/starter-meshes.md).
+embed_files(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedStarterMeshes.cpp sf::assets
+  starterHumanHead ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/human-head.sfproj.z
+  starterBust ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/bust.sfproj.z
+  starterFullBody ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/full-body.sfproj.z
+  starterHand ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/hand.sfproj.z
+  starterFoot ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/foot.sfproj.z
+  starterEar ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/ear.sfproj.z
+  starterEye ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/eye.sfproj.z
+  starterStylisedHead ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/stylised-head.sfproj.z
+  starterCreatureHead ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/creature-head.sfproj.z
+  starterTorso ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/torso.sfproj.z
+  starterRoundedBox ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/rounded-box.sfproj.z
+  starterCylinder ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/cylinder.sfproj.z
+  starterCapsule ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/capsule.sfproj.z
+  starterRing ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/ring.sfproj.z)
+target_sources(sculptforge_core PRIVATE src/core/StarterMeshes.cpp ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedStarterMeshes.cpp)
 # The PBR viewport's bundled environments (core/EnvironmentMath.h): CC0 HDRIs from Poly Haven, 512 x 256
 # (THIRD_PARTY_NOTICES.md).
 embed_files(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedHdri.cpp sf::assets

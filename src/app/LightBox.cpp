@@ -10,6 +10,7 @@
 #include "core/Matcap.h"
 #include "core/Primitives.h"
 #include "core/Project.h"
+#include "core/StarterMeshes.h"
 #include "render/GL.h"
 
 #include <IconsLucide.h>
@@ -29,6 +30,7 @@ namespace {
 
 namespace fs = std::filesystem;
 
+constexpr const char* kStarterFolder = "Starter meshes"; // the Tool tab's folder of core/StarterMeshes.h
 constexpr float kTile = 96.0f;   // thumbnail size (logical px)
 constexpr float kLabel = 22.0f;  // label under it
 constexpr float kGap = 8.0f;     // between tiles
@@ -128,6 +130,17 @@ void LightBox::show(LibraryTab tab) {
     }
 }
 
+void LightBox::showFolder(LibraryTab tab, const std::string& folder) {
+    open_ = true;
+    Place to{tab, folder};
+    if (to == place_) return;
+    back_.push_back(place_);
+    forward_.clear();
+    place_ = std::move(to);
+    filter_[0] = 0;
+    scrollTo_ = 0.0f;
+}
+
 void LightBox::folderChosen(const std::string& path) {
     std::lock_guard lock(folderMutex_);
     chosenFolder_ = path;
@@ -177,6 +190,7 @@ void LightBox::rootEntries(App& app, std::vector<AssetEntry>& out) {
     if (folders) {
         const bool builtinHasFiles = !builtinDir.empty() && (tab == LibraryTab::Tool || tab == LibraryTab::Image);
         if (builtinHasFiles) folderTile("Built-in", builtinDir);
+        if (tab == LibraryTab::Tool && !roots.starter.empty()) folderTile(kStarterFolder, roots.starter);
         if (!userDir.empty()) folderTile("User", userDir);
         for (const std::string& r : extraRoots_)
             folderTile(utf8(fsPath(r).filename()), r);
@@ -334,7 +348,16 @@ std::vector<AssetEntry> LightBox::entries(App& app) {
         up.name = "..";
         out.push_back(up);
         const LibraryTab tab = place_.tab;
-        if (const auto* list = app.libraryScanner_.get(
+        if (place_.folder == app.library_.starter) {
+            // In the set's order (heads first), named as the set names them.
+            for (const StarterMesh& m : starterMeshes()) {
+                AssetEntry e;
+                e.kind = AssetKind::Project;
+                e.name = m.name;
+                e.path = utf8(fsPath(place_.folder) / (std::string(m.id) + kProjectExtension));
+                out.push_back(std::move(e));
+            }
+        } else if (const auto* list = app.libraryScanner_.get(
                 place_.folder, libraryTabId(tab), [tab](const std::string& p) { return fileKindForTab(tab, p); },
                 tab == LibraryTab::QuickSave || tab == LibraryTab::Project))
             out.insert(out.end(), list->begin(), list->end());
@@ -398,7 +421,7 @@ void LightBox::activate(App& app, const AssetEntry& e, bool append) {
         // Leaving the folder a tab started in goes back to the tab's root.
         const LibraryRoots& r = app.library_;
         const std::string tabUser = r.user.empty() ? std::string() : r.user + "/" + libraryTabFolder(place_.tab);
-        const bool atTop = place_.folder == tabUser || place_.folder == r.builtin + "/demo" ||
+        const bool atTop = place_.folder == tabUser || place_.folder == r.builtin + "/demo" || place_.folder == r.starter ||
                            std::find(extraRoots_.begin(), extraRoots_.end(), place_.folder) != extraRoots_.end();
         navigate(app, {place_.tab, atTop ? std::string() : parent});
         return;
@@ -426,6 +449,11 @@ void LightBox::activate(App& app, const AssetEntry& e, bool append) {
     }
     case AssetKind::Project:
     case AssetKind::Mesh:
+        if (const StarterMesh* m = starterMeshForPath(app.library_.starter, e.path); m && !append) {
+            const std::string id = m->id;
+            app.confirmDiscard([&app, id] { app.runCommand("new_starter_mesh", {{"name", id}}); });
+            return;
+        }
         if (append)
             app.runCommand("subtool_append", {{"path", e.path}});
         else
@@ -505,6 +533,7 @@ void LightBox::contextMenu(App& app, const AssetEntry& e) {
 std::string LightBox::folderLabel(const App& app, const std::string& folder) const {
     const LibraryRoots& r = app.library_;
     if (!r.builtin.empty() && isUnder(folder, r.builtin)) return "Built-in";
+    if (!r.starter.empty() && isUnder(folder, r.starter)) return kStarterFolder;
     if (!r.user.empty() && isUnder(folder, r.user)) return "User";
     return utf8(fsPath(folder).filename());
 }
@@ -959,6 +988,14 @@ void LightBox::drawPreferences(App& app) {
 // App glue: library folders, actions, QuickSave, project thumbnails
 // ---------------------------------------------------------------------------
 
+void App::showStarterMeshes() {
+    if (library_.starter.empty()) {
+        status_ = "The starter meshes could not be unpacked (see the log)";
+        return;
+    }
+    lightbox_.showFolder(LibraryTab::Tool, library_.starter);
+}
+
 void App::initLightBox() {
     if (const char* base = SDL_GetBasePath()) library_.builtin = findBuiltinAssets(base);
     const bool recording = !options_.recordPath.empty() || !options_.renderPath.empty();
@@ -980,6 +1017,19 @@ void App::initLightBox() {
             SDL_Log("Library library: %s", err.c_str());
             library_.user.clear();
         }
+    }
+    // The starter meshes, unpacked where the thumbnails and the Tool tab's "Starter meshes" folder find them.
+    {
+        fs::path dir;
+        if (!options_.uiTest.empty())
+            dir = fsPath(library_.user).parent_path() / "starter-meshes";
+        else if (!prefDir_.empty())
+            dir = fsPath(prefDir_) / "starter-meshes";
+        std::string err;
+        if (!dir.empty() && writeStarterMeshes(utf8(dir), err))
+            library_.starter = utf8(dir);
+        else if (!dir.empty())
+            SDL_Log("Starter meshes: %s", err.c_str());
     }
     loadMatcapLibrary(); // custom MatCaps (PanelPolypaint.cpp): the library's MatCaps folder exists by now
     // Thumbnails are cached on disk for the artist; tests and recordings render fresh ones.

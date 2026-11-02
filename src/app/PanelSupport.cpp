@@ -8,6 +8,7 @@
 #include "app/LookSchemes.h"
 #include "app/Theme.h"
 
+#include <IconsLucide.h>
 #include <imgui.h>
 
 #include <algorithm>
@@ -145,6 +146,22 @@ void App::drawSupportUi() {
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
                 ImGui::SetTooltip("The alphabetical palette bar and the two-row top shelf. Preferences > Interface > Look "
                                   "switches back to the SculptForge layout.");
+            // A base mesh to start from (core/StarterMeshes.h), instead of the sphere.
+            ImGui::Spacing();
+            if (ImGui::Button(ICON_LC_USER_ROUND "  Start from a head##welcome")) {
+                confirmDiscard([this] { runCommand("new_starter_mesh", {{"name", std::string("human-head")}}); });
+                showWelcome_ = false;
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("A neutral human head with clean quads and eye and mouth loops, ready for a portrait.");
+            ImGui::SameLine();
+            if (ImGui::Button("More starter meshes##welcome")) {
+                showStarterMeshes();
+                showWelcome_ = false;
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Bust, full body, hand, foot, ear, eye, stylised and creature heads, torso and "
+                                  "bevelled primitives: Library > Tool > Starter meshes.");
             ImGui::Spacing();
             if (ImGui::Button("Open the User Guide##welcome")) {
                 guide_.open();
