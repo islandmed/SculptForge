@@ -1,19 +1,28 @@
 # Releasing SculptForge
 
-One page for whoever coordinates a release. `scripts/release.sh X.Y.Z` does the work; this explains the gates, what
-each step does, and how to recover.
+One page for whoever coordinates a release. One command does the work:
+
+```sh
+HIGHLIGHTS=highlights.txt CARD="Title|<strong>What</strong> users get ..." scripts/release.sh X.Y.Z --yes
+```
+
+It either stops within seconds, before anything is tagged, with the fix, or runs through to the end. This page explains
+the gates, what each step does, and how to recover.
 
 ## Gates (in this order; a release never skips one)
 
 1. **Merged tree, tested locally**: on main with the branches for this release merged, `ctest --test-dir build -j3`
    all green.
 2. **Version and words**:
-   - the version is set in CMakeLists.txt, CITATION.cff, packaging/rez/package.py and the metainfo `<release>`;
-   - CHANGELOG has a `## [X.Y.Z] - date` section;
-   - docs/guide/whats-new.md has `## Version X.Y.Z`, and tests/ui/whats_new.sfui checks it;
-   - website/guide is rebuilt (`python3 tools/guide/build_site.py`).
+   - written by people, on main before the release: CHANGELOG entries under `[Unreleased]`; docs/guide/whats-new.md
+     `## Version X.Y.Z`, with tests/ui/whats_new.sfui expecting it; the home page's "new in X.Y.Z" card and lede (or
+     `CARD=`); the 3-5 feed highlights (`HIGHLIGHTS=`);
+   - set by step `bump`: the version in CMakeLists.txt, CITATION.cff (with date-released), packaging/rez/package.py
+     and the metainfo `<release>`; CHANGELOG `[Unreleased]` becomes `## [X.Y.Z] - date` under a new empty
+     `[Unreleased]`; website/guide is rebuilt. Don't bump version files by hand.
 
-   `release.sh` step `check` verifies all of this.
+   Step `check` verifies all of this, plus what the steps after the tag need (PKGBUILD format, the Homebrew tap, the
+   Omarchy PR is open, the home page's version text), so nothing stops after the tag for a reason known before it.
 3. **CI and Packages green on main** for exactly that commit:
    - **CI** (ci.yml) runs every test on Linux x86_64 and ARM64, macOS, Windows, the VFX platforms and Blender.
    - **Packages** (packages.yml) builds every release package the way it ships, with its tests.
@@ -45,26 +54,34 @@ between smoke and publish that signs the promoted files, so promotion stays vali
 ## The script
 
 ```sh
-scripts/release.sh 0.10.4                        # all steps
-HIGHLIGHTS=highlights.txt scripts/release.sh 0.10.4 --from site
+HIGHLIGHTS=highlights.txt CARD="Title|html body" scripts/release.sh 0.10.4 --yes   # all steps
+HIGHLIGHTS=highlights.txt scripts/release.sh 0.10.4 --from site                    # resume
 scripts/release.sh 0.10.4 --only replies
 ```
 
+`CARD="title|html body[|lede]"` writes the card at the top of the #whats-new grid (`<h3>title <small>new in
+X.Y.Z</small></h3>`, the body and a What's new link) and starts the section lede with `New in X.Y.Z: lede.` (the lede
+defaults to the title). It is used only when the card is missing; a hand-written card wins.
+
 | step | does | skips when |
 |---|---|---|
-| check | gate 2, on a clean, up-to-date main, with gh logged in as islandmed | never (read-only) |
+| bump | refuses without What's New, its UI test, CHANGELOG entries, the card (or CARD) and HIGHLIGHTS; then sets the version files and CHANGELOG section, writes the card from CARD, rebuilds the guide, commits as islandmed, pushes main | each file already at X.Y.Z |
+| check | gate 2 and every precondition of the later steps, on a clean, up-to-date main, with gh logged in as islandmed | never (read-only) |
 | ci | waits for CI and Packages on main's commit; stops if either failed | the tag exists |
 | tag | asks, then tags main and pushes the tag (this publishes) | the tag is on GitHub |
 | release | waits for the Release run, then checks the assets and SHA256SUMS.txt | the release has SHA256SUMS.txt |
-| site | update feed (version + your highlights), home page version text, pushes; then checks the live site and guide | latest.json says X.Y.Z |
+| site | update feed (version + your highlights), home page version text, pushes; then waits for the live feed (10 min) and guide (5 min) | latest.json says X.Y.Z |
 | aur | packaging/arch/PKGBUILD: pkgver and the source checksum, computed by downloading the tag's tarball | already at X.Y.Z with that checksum |
 | brew | Homebrew cask through tools/publish/setup-channels.sh, after checking the .dmg's checksum here | the cask is at X.Y.Z |
 | omarchy | bumps the PKGBUILD on our branch of omacom/omarchy-pkgs#1800 (author islandmed noreply) | the PR is at X.Y.Z |
 | replies | writes `release-replies-X.Y.Z.md`: a draft per issue named in the CHANGELOG section; posts nothing | never |
 | status | winget PR state, links, reminders | never |
 
-The "new in X.Y.Z" card and lede on the home page, and the 3-5 feed highlights, are writing. The script checks
-they exist and stops with the fix if they don't; it never writes them.
+The highlights and the card's words are writing: the script never invents them. It checks they exist before
+tagging, and writes the card only from the words you pass in CARD.
+
+Scripting rule: under `set -o pipefail`, never end a pipe with `grep -q` or `head` (they close the pipe early and the
+writer fails); capture to a variable or file first, or let grep read everything (`grep ... >/dev/null`).
 
 ## When a step fails
 
@@ -74,7 +91,8 @@ don't pile them up for later.
 
 | failure | do |
 |---|---|
-| check: a version file or section missing | add it, commit, push main, resume from check |
+| bump/check: What's New, its test, the card or HIGHLIGHTS missing | write it, commit, push main (or pass CARD/HIGHLIGHTS), run again |
+| check: a version file missing | run step bump (`--only bump`), then resume from check |
 | ci: a CI or Packages job failed | runner hiccup (network, a timeout): `gh run rerun <id> --failed`. Real failure: fix on a branch, merge, start from check |
 | release: a smoke test failed | the package is broken: fix on main, delete the tag (`git push origin :vX.Y.Z; git tag -d vX.Y.Z`), release again |
 | release: publish failed after smoke passed | `gh workflow run release.yml -f tag=vX.Y.Z` (it promotes the same packages) |
