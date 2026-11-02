@@ -19,6 +19,7 @@
 #include "app/UserGuide.h"
 #include "ai/ComfyUI.h"
 #include "ai/ImageTo3DService.h"
+#include "core/BrushSettings.h"
 #include "core/Commands.h"
 #include "core/Image.h"
 #include "core/Macro.h"
@@ -1532,6 +1533,26 @@ private:
     bool strokeAltSmooth_ = false;
     float rgbIntensity_ = 1.0f;   // paint strength (ZBrush RGB Intensity, 100 by default)
     float focalShift_ = 0.0f;     // -1..1 (ZBrush Focal Shift -100..100)
+    // Per-brush settings (#78, BrushSettingsUi.cpp, core/BrushSettings.h): each frame, a brush switch stores the
+    // brush left and brings back the picked brush's own Draw Size, Z Intensity, Falloff, RGB Intensity, stroke and
+    // alpha. Save Brush Settings writes them (<app data>/brush-settings.json) so they load at startup; Reset Brush
+    // to Default puts back the shipped values. Off in demo videos and benchmarks (their scripts set every value).
+public:
+    std::string currentBrushKey() const; // "builtin:Clay", "custom:Clay Slab"
+    BrushToolSettings liveBrushSettings() const;
+    void applyBrushSettings(const BrushToolSettings& s);
+    void saveBrushSettings();  // Brush > Save Brush Settings
+    void resetBrushSettings(); // Brush > Reset Brush to Default
+    void setShareBrushSize(bool on);
+    const BrushSettingsStore& brushSettingsStore() const { return brushSettings_; }
+
+private:
+    void initBrushSettings();
+    void syncBrushSettings(); // every frame, outside strokes
+    std::string brushSettingsPath() const;
+    BrushSettingsStore brushSettings_;
+    std::string brushSettingsKey_; // the brush the live values belong to
+    bool brushSettingsOn_ = true;
     struct QuickMenu {
         bool open = false;
         ImVec2 at{0, 0};

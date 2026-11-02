@@ -78,7 +78,7 @@ click "Stroke##palette.stroke"
 click "Dots##stroke"
 key escape
 click "Horn##vdm0"
-expect_value stroke_type == 1
+expect_value stroke_type == 2                 # each brush keeps its own stroke (#78): the VDM brush its Slide Stamp
 click "Clay##brush.clay"
 expect_value stroke_type == 0
 

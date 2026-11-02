@@ -308,6 +308,7 @@ bool App::init(const AppOptions& options) {
     initBrushLibrary(); // before a project can bring its own brushes
     initProject(); // before opening anything, so it lands in the recent files
     initActions(); // the default shortcuts and every command, for keys, help and the command palette
+    initBrushSettings(); // each brush's own size, intensity, stroke and alpha (#78)
     initPhoneActions(); // File > Capture from phone (PanelPhone.cpp)
     initLightBox();
     runCommand("new_sphere");
@@ -2279,6 +2280,7 @@ void App::drawUi() {
     drawUvEditor();    // Tool > Texture Map > UV Editor (PanelUvEditor.cpp)
     drawTimelineUi();  // the Sculpt Timeline strip, timelapse, proof mode HUD (PanelTimeline.cpp, ProofMode.cpp)
     pollAlphaFile();
+    syncBrushSettings(); // a brush switch brings back that brush's own settings (#78); before pollVdm's stroke
     pollVdm();
     if (previewLod_ >= 0) {
         const CanvasRect c = canvasRect();

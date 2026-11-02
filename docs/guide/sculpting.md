@@ -157,6 +157,21 @@ With symmetry on, a fainter ring shows where the mirrored brush lands. Off the m
 The <kbd>S</kbd>, <kbd>U</kbd>, <kbd>I</kbd> and <kbd>O</kbd> pop-ups take the mouse or the keyboard: drag the
 slider and release to close it, or type a number and press <kbd>Enter</kbd> (a minus first for a negative Falloff). <kbd>Esc</kbd> closes the pop-up without typing anything new.
 
+### Each brush keeps its own settings
+
+Every brush remembers its own **Draw Size**, **Intensity**, **Falloff**, **RGB Intensity**, [stroke](#strokes)
+and [alpha](#alphas). That includes custom and Community brushes. Set up a small, sharp crease brush and a big
+Clay brush, and each one comes back the way you left it when you switch between them. A brush you haven't used
+yet in the session starts from the values you have now, so nothing jumps.
+
+- **Brush > Save Brush Settings** keeps the current brush's values for every new session (in
+  `brush-settings.json`, in SculptForge's user data folder).
+- **Brush > Reset Brush to Default** puts the current brush back to the values SculptForge ships with and
+  forgets what you saved for it.
+- **Preferences > Input > Share size and intensity across brushes** (off by default) keeps Draw Size and
+  Intensity the same for every brush, as before 0.10.7. Falloff, RGB Intensity, the stroke and the alpha still
+  follow each brush.
+
 ### Smooth's own Intensity
 
 Smooth keeps an Intensity of its own, as in ZBrush, so a gentle Standard stroke at 10 still smooths at full

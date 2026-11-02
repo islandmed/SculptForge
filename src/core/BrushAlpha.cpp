@@ -398,6 +398,8 @@ void registerBrushCommands(CommandRegistry& registry) {
                           auto stem = std::filesystem::path(std::u8string(path.begin(), path.end())).stem().u8string();
                           doc.brushAlpha = BrushAlpha::fromImage(img, std::string(stem.begin(), stem.end()),
                                                                  argBool(a, "invert", false));
+                          doc.brushAlpha.path = path;
+                          doc.brushAlpha.inverted = argBool(a, "invert", false);
                           return {true, "Alpha '" + doc.brushAlpha.name + "' (" + std::to_string(doc.brushAlpha.width) +
                                             "x" + std::to_string(doc.brushAlpha.height) + ")"};
                       }

@@ -468,6 +468,7 @@ void App::applyProjectSettings() {
         doc_.sculptor.dyntopo.smoothRemesh = std::clamp(doc_.sculptor.dyntopo.smoothRemesh, 0.0f, 1.0f);
         if (const int vdm = b["vdm"].isString() ? findVdm(doc_, b["vdm"].asString()) : -1; vdm >= 0)
             doc_.brushVdm = doc_.vdms[size_t(vdm)];
+        brushSettingsKey_ = currentBrushKey(); // the project's values belong to its brush (#78), nothing to swap
     }
     if (const Json& sym = s["symmetry"]; sym.isObject()) {
         readBool(sym, "x", symmetry_.x);

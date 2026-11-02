@@ -27,10 +27,17 @@ All notable changes to SculptForge are listed here. The format follows
   Insiders repository and posts to #insiders (`.github/workflows/insider-preview.yml`).
 
 ### Fixed
+- UI test runs remove their temporary settings folder when they pass (thousands of runs had filled `/tmp`).
 - Custom and Community brushes (Clay Slab and other presets) show the whole alpha at Focal Shift -100, as the
   built-in brushes do since #60: the stamp reaches its square's corners instead of being cut by the preset's round
   tip (#75, reported by rodrigomoretto). At the default Focal Shift presets look as before; saved presets are unchanged.
 ### Added
+- Each brush keeps its own settings (#78, requested by dCo3lh0 and on Discord): Draw Size, Z Intensity, Falloff, RGB
+  Intensity, the stroke (with Spray's scatter and Lazy Stroke's radius) and the alpha follow the brush, custom and
+  Community brushes included. Switching back brings back the values that brush had this session; a brush not used yet
+  starts from the current values. **Brush > Save Brush Settings** keeps them for every start (`brush-settings.json`
+  in the user data folder), **Brush > Reset Brush to Default** restores the shipped values, and **Preferences >
+  Input > Share size and intensity across brushes** (off by default) keeps Draw Size and Z Intensity shared as before.
 - A new default look: new installs start in **Forge Terminal** with the **Tokyo Night** colours and the
   **SculptForge layout** (menus by task: File, Edit, Sculpt, Paint, Mesh, View, Render, Help, whose sections are the
   palettes; a status bar; a one-row tool shelf). Existing installs keep their look and layout, and see a one-time card,

@@ -474,6 +474,9 @@ void App::drawInputSection() {
     bool airStrokes = uiPrefs_.airStrokes;
     if (ui::Checkbox("Start strokes off the model##input.air_strokes", &airStrokes)) uiPrefs_.airStrokes = airStrokes;
     ui::HelpAction(*this, "input.air_strokes");
+    bool shareSize = brushSettingsStore().shareSizeIntensity;
+    if (ui::Checkbox("Share size and intensity across brushes##brush.share_size", &shareSize)) setShareBrushSize(shareSize);
+    ui::HelpAction(*this, "brush.share_size");
     bool surfaceCursor = uiPrefs_.cursorFollowsSurface;
     if (ui::Checkbox("Cursor follows surface##input.surface_cursor", &surfaceCursor))
         uiPrefs_.cursorFollowsSurface = surfaceCursor;
