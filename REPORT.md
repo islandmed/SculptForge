@@ -4,5 +4,5 @@ p99 / stall ms, before (bench-baseline.txt, quiet) -> after (bench-after-load3.t
 Final code at load 7.7 (bench-after.txt): strokes p99 26-31 (15M), 29-54 (33M); 33M Move 5.8 s stall + clay-small 226 ms = load (Move doesn't use this path). Re-run `build/sculptforge --benchmark standard` quiet before publishing.
 Trade-off: 33M 240 px surface trails more (p50 31 -> 69-108 px) since each dab still costs 100-200 ms; dab counts match (101 vs 99).
 Quality: same dabs through both paths are bit-identical (ui_stroke_background; --measure-stroke 3,120/3,240 SF_MEASURE_VERIFY=1). Benchmark scene meshes aren't reproducible run to run on either path (two old-path runs differ 0.26), so cross-run 1e-5 isn't measurable there.
-Tests: full ctest -j3 117/118; ui_phone_link fails (phone_ar_version 1 != 2) identically on base 60001d4, pre-existing, not this branch.
+Tests: full ctest -j3 117/118; ui_phone_link fails (phone_ar_version 1 != 2) identically on base 60001d4: test-only, local multi-address Capture row; fixed on fix/phone-ar-reexport 40895b2 (not merged).
 SHA: code b372514, report 5207367+ on origin/perf/bigbrush-p99. CHANGELOG [Unreleased] + What's New 0.10.8 section added.
