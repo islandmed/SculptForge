@@ -660,6 +660,11 @@ if(SCULPTFORGE_BUILD_TESTS)
     # pointer's circle (#19).
     add_test(NAME ui_stroke_path COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
     set_tests_properties(ui_stroke_path PROPERTIES LABELS ui TIMEOUT 60 ENVIRONMENT "SF_NO_UPDATE_CHECK=1")
+    # Background dabs (a heavy mesh's stroke on the solver thread, no preview), forced on a light sphere: replaying
+    # the stroke in the frame loop gives the same mesh, bit for bit, and its undo the mesh it started from.
+    add_test(NAME ui_stroke_background COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
+    set_tests_properties(ui_stroke_background PROPERTIES LABELS ui TIMEOUT 60
+                         ENVIRONMENT "SF_NO_UPDATE_CHECK=1;SF_MEASURE_VERIFY=1;SF_BACKGROUND_DABS=1")
     # Predictive strokes with the brush size changing every frame mid-stroke: each batch of dabs keeps the size it
     # was handed (no data race with the solver thread), replaying the stroke without the thread gives the same
     # mesh, bit for bit, and its undo the mesh it started from.

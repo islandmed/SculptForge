@@ -5,6 +5,13 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.10.8
+
+- **Big brushes stay smooth on dense meshes**: on models from about 4 million triangles a stroke's dabs are worked
+  out beside the view, so a 240 px brush on 33 million triangles no longer freezes the view for a third of a
+  second at a time (slowest frames about 35 ms instead of 300), and letting go of the pen is instant. The stroke
+  itself comes out the same.
+
 ## Version 0.10.7
 
 - **A clearer membership card**: the three memberships side by side with what each one gets you, in your look's

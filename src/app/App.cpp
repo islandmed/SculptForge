@@ -992,7 +992,6 @@ int App::run() {
             pollPhone();
             pollAutoUv();
             pollUvEditor();
-        pollUvEditor();
             pollBake();
             pollQRemesh();
             pollSplatTrain();
@@ -1854,6 +1853,7 @@ void App::drainStrokeDabs(double budgetSeconds) {
     static const bool log = std::getenv("SF_STROKE_LOG") != nullptr; // per frame: dabs waiting, placed, ms
     const auto start = std::chrono::steady_clock::now();
     const size_t waiting = dabQueue_.size();
+    const SculptTimings before = doc_.sculptor.timings;
     size_t placed = 0;
     while (!dabQueue_.empty()) {
         const PathDab d = dabQueue_.pop();
@@ -1867,11 +1867,14 @@ void App::drainStrokeDabs(double budgetSeconds) {
             std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() >= budgetSeconds)
             break; // at least one dab per call, so a stroke always moves on
     }
-    if (log)
-        SDL_Log("stroke: %llu waiting, %llu placed in %.1f ms, %llu left", (unsigned long long)waiting,
-                (unsigned long long)placed,
+    if (log) {
+        const SculptTimings& t = doc_.sculptor.timings;
+        SDL_Log("stroke: %llu waiting, %llu placed in %.1f ms (kernel %.1f, normals %.1f, BVH %.1f, %llu vertices), %llu left",
+                (unsigned long long)waiting, (unsigned long long)placed,
                 std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count(),
-                (unsigned long long)dabQueue_.size());
+                t.kernelMs - before.kernelMs, t.normalsMs - before.normalsMs, t.bvhMs - before.bvhMs,
+                (unsigned long long)(t.vertices - before.vertices), (unsigned long long)dabQueue_.size());
+    }
 }
 
 void App::dabAt(float x, float y, float pressure) {

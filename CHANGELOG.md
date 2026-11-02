@@ -9,6 +9,11 @@ All notable changes to SculptForge are listed here. The format follows
 ## [0.10.7] - 2026-11-01
 
 ### Changed
+- Large brushes on dense meshes no longer stall the view: from 2 million vertices a stroke's dabs are placed on the
+  stroke thread (the same dabs, in the same order, as the frame loop places them; no preview), so a frame keeps
+  drawing while a 240 px dab moves millions of vertices, and a light batch is still waited for within the frame.
+  On the standard scene's 240 px brush the slowest frames drop from 139 ms (15M) and 306 ms (33M) to about 30 ms in
+  first runs, and lifting the pen no longer waits (162 ms at 33M). `SF_BACKGROUND_DABS=0` turns it off.
 - The membership card at launch is redesigned: the cube mark and the promise up top, the three memberships side by
   side with their perks checked off and one bold button each (Insider highlighted), and the members' Discord in the
   footer. It takes the current look's colours and opens in 150 ms. "Maybe later" now hides it for 30 days, updates
