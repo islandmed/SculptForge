@@ -203,9 +203,9 @@ Effort is for one focused agent; "w" = working weeks, including tests and docs.
 
 ### Phase 1: trust and pose (about 5 to 6 w; ships across 0.11.x)
 
-1. **Studio mode** (1 w). One policy (build flag, site policy file, `SF_STUDIO=1`, Preferences) enforced in
-   `ai::httpRequest*` and `Socket::listen`/`openMulticast`, local AI defaults, consent on the first use of each
-   remote service, new `SCULPTFORGE_*` build flags and a CI no-network proof. Design in §7.
+1. **Studio mode** (0.75 w, on top of the "AI tools" switch, which is off by default and ships in 0.10.8). One policy (build flag, site
+   policy file, `SF_STUDIO=1`, Preferences) that forces AI tools off or local, enforced as a backstop in
+   `ai::httpRequest*` and `Socket::listen`/`openMulticast`, new `SCULPTFORGE_*` build flags and a CI no-network proof. Design in §7.
 2. **SBOM and provenance** (0.5 w). CycloneDX SBOM per release (our sources plus vendored `third_party/`),
    GitHub artifact attestations (Sigstore, free) for every file, and a `verify` section in the docs.
 3. **Deterministic export** (1 w). Byte-identical exports for the same input, seed and build; CI hashes the
@@ -348,10 +348,25 @@ No telemetry, analytics, crash upload, account or licence server exists. Crash l
 (`src/app/CrashLog.cpp`). Hardware calibration never uses the network (`src/core/HardwareProfile.cpp`).
 Everything except rows 1 to 11 works air-gapped.
 
-#### Recommendation: one "Studio mode" switch, enforced at the two choke points
+#### Recommendation: Studio mode on top of the "AI tools" switch
 
-**Policy.** `NetworkPolicy::{Standard, Studio}`, resolved once at start-up. The strictest source wins, and a user
-can't loosen a policy set by an admin or the build:
+**Layer 1, the "AI tools" switch (maintainer-approved 2026-11-01, built by the gen3d-default task).** One switch,
+**off by default**, gates every AI feature: rows 2 to 7 and the AI commands in row 13. While it's off, none of
+that code makes a request, local or remote. The UI shows the features greyed out with "Turn on AI tools", and
+`brush_ai`, `image_to_3d`, `text_to_3d` and `comfyui_check` fail from the CLI, Python and MCP with "AI tools are
+off". Turning it on is the artist's explicit consent, so the enable dialog must name what goes where: "the
+Brush assistant sends your chat to text.pollinations.ai; Generate 3D uploads your image or prompt to Hugging Face
+Spaces; pick a local model to keep everything on this machine". That one dialog replaces the per-service consent
+proposed earlier. With layer 1 shipped, a default install makes no AI request at all, and only rows 1 (update check)
+and 8 (gallery) remain as calls the artist didn't explicitly start.
+
+The contract Studio mode needs from layer 1 (agreed with gen3d-default): one predicate, `aiToolsEnabled()`,
+checked at every AI entry point (UI and command registry); a setting in the user config;
+`SF_AI_TOOLS=0|1` in the environment for the CLI, Python and farm; and a way for a higher-level policy to
+**force it off or limit it to local**, which the artist can't override.
+
+**Layer 2, Studio mode: the whole network, set by IT.** `NetworkPolicy::{Standard, Studio}`, resolved once at
+start-up. The strictest source wins, and a user can't loosen a policy set by an admin or the build:
 
 1. build flag `SCULPTFORGE_STUDIO_DEFAULT=ON` (VFX-RP tarballs, rez, `.rpm`): starts in Studio mode;
 2. a site policy file, read-only to users: `$SCULPTFORGE_ROOT/policy.json`, `/etc/sculptforge/policy.json`,
@@ -359,54 +374,60 @@ can't loosen a policy set by an admin or the build:
 3. `SF_STUDIO=1` (alias `SF_OFFLINE=1`) in the environment (rez package, launcher, farm);
 4. Preferences > Privacy > **Studio mode** (the artist can turn it *on*, never off when 1 to 3 set it).
 
-**What Studio mode does.**
-- `ai::httpRequest*` refuses any host that isn't loopback or on the policy's allowlist
-  (`"allow": ["comfy.studio.internal", "ollama.farm:11434"]`, for on-prem AI), with the error
-  "Blocked by studio policy (host)". Rows 1, 2, 3, 4, 5, 6, 8 and 9 stop unless allowed.
-- `Socket::listen` and `openMulticast` refuse non-loopback addresses. Phone link (row 11) and Unreal network
-  mode stop; local Unreal (loopback, TTL 0) keeps working. `"allow_lan_listeners": true` in the policy file
-  re-enables them for studios that want phone capture.
-- Defaults change: the Brush assistant uses the local provider (Ollama/LM Studio on loopback) and Generate 3D
-  uses `inflate`/`command`. The `text_to_3d` fallback to `huggingface` becomes an error. The update check is off.
-- Browser links show the URL with a Copy button instead of opening the browser (some studios block it anyway).
-- The status bar shows a "Studio mode" badge. `sculptforge-cli --network-report` prints the effective policy and
-  every row above with allowed or blocked, for IT to paste into its review.
+```json
+{ "studio": true,
+  "ai_tools": "off",                         // "off" | "local" (loopback + allow list only) | "user"
+  "allow": ["comfy.studio.internal", "ollama.farm:11434"],
+  "allow_lan_listeners": false,
+  "update_check": false }
+```
 
-**Standard mode should also change** (so the public claims hold without Studio mode):
-- **First use of any third-party service asks once**, naming the host and the data ("Sends your chat to
-  text.pollinations.ai", "Uploads this image to microsoft-trellis-2.hf.space"), with Local and Cancel options.
-  Saved per service. CLI/Python/MCP need `--allow-remote` or `allow_remote=true` once per call (agents can't
-  silently upload).
-- The brush gallery fetches only on a **Browse** click, not on panel open.
-- Fix the `text_to_3d` silent switch (row 5).
+**What Studio mode does.**
+- **AI tools:** forced to the policy's `ai_tools` value, `off` by default. With `local`, the artist can turn AI
+  tools on, but the hosted services are hidden, and only loopback and allow-listed hosts (on-prem ComfyUI,
+  Ollama, LM Studio, a `command` generator) can be picked.
+- **Choke points, as the backstop:** `ai::httpRequest*` refuses any host that isn't loopback or on `allow` ("Blocked
+  by studio policy (host)"), so rows 1, 8 and 9 stop too, and anything a future feature adds is blocked even if
+  it forgets to check the policy. `Socket::listen` and `openMulticast` refuse non-loopback addresses: Phone link
+  and Unreal network mode stop, while local Unreal (loopback, TTL 0) keeps working.
+  `"allow_lan_listeners": true` re-enables them for studios that want phone capture.
+- The update check is off. Browser links show the URL with a Copy button instead of opening the browser.
+- The status bar shows a "Studio mode" badge. `sculptforge-cli --network-report` prints the effective policy, the
+  AI tools state and every row above as allowed or blocked, for IT to paste into its review.
+
+**Standard mode, the remaining fixes** (so the public claims hold without Studio mode):
+- The brush gallery fetches only on a **Browse** click, not when its panel opens.
+- Fix the `text_to_3d` silent switch (row 5): with an offline generator chosen, fail and say so.
+- The update check stays on by default for individuals (one GET, documented, one switch); Studio mode turns it off.
 
 **Build flags** (CMake, all compiled out, not merely hidden, so `strings` and the SBOM prove it):
 
 | Flag | Effect |
 |---|---|
 | `SCULPTFORGE_UPDATE_CHECK=OFF` | Exists. No update code or URL in the binary. |
-| `SCULPTFORGE_HOSTED_AI=OFF` (new) | Removes the Pollinations, Hugging Face, fal, Meshy and Anthropic clients and their URLs; local and loopback AI (Ollama, LM Studio, ComfyUI, command) stay. |
+| `SCULPTFORGE_HOSTED_AI=OFF` (new) | Removes the Pollinations, Hugging Face, fal, Meshy and Anthropic clients and their URLs. The AI tools switch then offers only local AI (Ollama, LM Studio, ComfyUI, command). |
+| `SCULPTFORGE_AI_TOOLS=OFF` (new) | Removes AI tools entirely (no switch, no commands). |
 | `SCULPTFORGE_PHONE_LINK=OFF` (new) | Removes the LAN HTTP server and WebRTC. |
 | `SCULPTFORGE_GALLERY=OFF` (new) | Removes the online brush gallery (studio brush shares still work). |
 | `SCULPTFORGE_NETWORK=OFF` (new) | All of the above, plus no libcurl at all, the splat tool download and Unreal LAN mode removed; loopback Unreal kept. The "air-gap build". |
 | `SCULPTFORGE_STUDIO_DEFAULT=ON` (new) | Starts in Studio mode (policy level 1); set for the VFX-RP tarballs, rez and `.rpm`. |
 
 **Proof (CI, so it can't regress):**
-- run ctest and the UI smoke test inside `unshare -rn` (no network namespace) with `SF_STUDIO=1`; any
+- run ctest and the UI smoke test inside `unshare -rn` (no network namespace) with `SF_STUDIO=1` (and separately with a default config, to prove AI tools off means no AI request); any
   non-loopback `connect()`/`bind()` seen by an `strace -f -e trace=network` wrapper fails the job;
 - a unit test that every row's entry point returns "Blocked by studio policy" under Studio mode;
 - for `SCULPTFORGE_NETWORK=OFF` builds: `nm`/`ldd` show no libcurl, and `strings` shows none of the hosted URLs;
 - a `tests/network_inventory` check: a grep for `httpRequest`, `listen(` and `openMulticast(` call sites must match
   the table above, so a new network call can't land without updating this audit.
 
-Effort: about 1 w (policy and choke points 0.5, defaults/consent/UI 0.25, flags and CI proof 0.25).
+Effort: about 0.75 w once AI tools ships (policy and choke points 0.4, UI/report 0.1, flags and CI proof 0.25).
 
 #### Public claims to correct now (they are inexact today)
 
 | Where | Today | Exact until Studio mode ships |
 |---|---|---|
 | `website/index.html` ("Nothing phones home"), `website/studios.html:395`, `docs/studios.md:4`, `docs/guide/studios.md:4` | "nothing phones home" / "works fully offline" | "No telemetry and no account. The only automatic request is a once-a-day update check (one switch turns it off). Everything works offline." |
-| `README.md:326`, `docs/guide/studios.md:143`, `docs/guide/troubleshooting.md:243`, `website/studios.html:396` | "AI features talk only to the service you choose" | "AI features are optional and run only when you use them. By default they use free hosted services (Pollinations for the Brush assistant, Hugging Face for Generate 3D); pick a local model to keep everything on your machine." |
+| `README.md:326`, `docs/guide/studios.md:143`, `docs/guide/troubleshooting.md:243`, `website/studios.html:396` | "AI features talk only to the service you choose" | Once AI tools ships: "AI tools are off until you turn them on. When on, the Brush assistant uses Pollinations and Generate 3D uses Hugging Face, unless you pick a local model." |
 | `website/index.html:542`, `docs/guide/generate-3d.md:259`, `README.md:326` | "no servers of its own" | "no servers of its own besides the static website the update check reads". |
 
 These go out with the next release's lockstep, alongside the guide and site.
@@ -489,6 +510,8 @@ feature does. The structure is two pillars, then the integration grid, which alr
         <ul>
           <li><strong>Offline by design.</strong> No accounts, no licence server, no telemetry. Everything works
             air-gapped.</li>
+          <li>⏳ <strong>AI is off until you turn it on.</strong> One switch; when it's off, no AI feature sends
+            anything anywhere.</li>
           <li>⏳ <strong>Studio mode.</strong> One switch (or a site policy file IT controls) blocks every network
             call and listener. AI runs on your own machines, and CI proves it with no network at all.</li>
           <li><strong>Nothing listens by default.</strong> No open ports until you open Phone capture. Bridges exchange files through one folder,
