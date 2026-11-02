@@ -48,6 +48,25 @@ UiLayout standardLayout() {
     return l;
 }
 
+UiLayout standardLayout(int shellLayout) {
+    UiLayout l = standardLayout();
+    if (shellLayout != 1) return l;
+    // The SculptForge layout: one tool row (the mode, the transform tools, add / subtract, the two sliders,
+    // dynamic topology, symmetry). Library, Brush Lab, Front, the pressure options and the triangle counts moved to
+    // the menus (Sculpt > Draw) and the status bar.
+    l.topShelf = {"draw.sculpt",          "draw.paint",           "sep",
+                  "tool.draw",            "tool.move",            "tool.scale",           "tool.rotate",       "sep",
+                  "draw.zadd",            "draw.zsub",            "draw.rgb",             "draw.paint_vertex", "draw.paint_texture",
+                  "draw.new_texture",     "sep",                  "widget.draw_size",     "widget.strength",   "sep",
+                  "draw.dynamic",         "widget.dyntopo_detail", "sep",
+                  "transform.symmetry_x", "transform.symmetry_y", "transform.symmetry_z", "transform.symmetry_radial"};
+    l.rightShelf = {"edit.undo",  "edit.redo",       "sep",
+                    "view.frame", "widget.nav.move", "widget.nav.zoom", "widget.nav.rotate", "sep",
+                    "view.polyf", "view.polygroups", "view.mask",       "view.polypaint",    "sep",
+                    "subtool.solo", "view.splats"};
+    return l;
+}
+
 Json toJson(const UiLayout& l) {
     Json j = Json::object();
     j.set("version", double(l.version));

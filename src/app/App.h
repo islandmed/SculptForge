@@ -1138,6 +1138,9 @@ public:
     // The part of the window the 3D view uses (logical px); the whole window while the UI is hidden.
     CanvasRect canvasRect() const;
     ShellGeometry shellGeometry() const; // every shell region for the current window (console rect, trays...)
+    // Preferences > Interface > Look: applies uiPrefs_.look (colours, style, fonts, the viewport background).
+    void applyLook();
+    void drawLookSection(); // Preferences > Interface > Look (Config.cpp)
     ImFont* smallFont() const { return fontSmall_; } // 12 px captions (shelf labels, tiles)
     ImFont* boldFont() const { return fontBold_; }   // SemiBold 15 (help titles)
 
@@ -1150,6 +1153,18 @@ private:
     void drawShell();
     void drawTitleStrip(const ShellGeometry& g);
     void drawPaletteBar(const ShellGeometry& g);
+    // The SculptForge layout (Preferences > Interface > Look): the status bar with the task menus, and a task menu's
+    // drop-down (its palettes as sections). Old palette ids keep working: a palette opens in its menu.
+    void drawStatusBar(const ShellGeometry& g);
+    void drawTaskMenu();
+    void drawLookChrome();    // a look's gaps, tile borders and effects (Shell.cpp)
+    ShellMetrics shellMetrics() const;
+    bool sculptForgeLayout() const { return uiPrefs_.shellLayout == 1; }
+    void setShellLayout(int layout); // swaps the shelves to that layout's standard ones
+    bool lookDirty_ = false;   // uiPrefs_.look or the layout changed: applied at the start of the next shell
+    CanvasRect focusRect_;     // the tile under the pointer (tiled looks highlight its border)
+    float menuX_ = 0.0f;       // where the open task menu drops from
+    std::map<std::string, std::string> menuSection_; // each task menu's last section (palette id)
     void drawShelf(int shelf, const CanvasRect& rect);
     void drawShelfItem(int shelf, int index, const std::string& item, bool vertical);
     bool shelfItemShown(const std::string& item) const;
@@ -1237,6 +1252,9 @@ private:
     void pollAlphaFile();
     ShellGeometry shell_;      // this frame's regions (drawShell)
     ImFont* fontSmall_ = nullptr, *fontTiny_ = nullptr, *fontIcons_ = nullptr, *fontBold_ = nullptr;
+    // JetBrains Mono (the looks' monospace) and the Inter fonts it stands in for while a look uses it.
+    ImFont* fontRegular_ = nullptr, *fontMono_ = nullptr, *fontMonoSmall_ = nullptr, *fontMonoTiny_ = nullptr, *fontMonoBold_ = nullptr;
+    ImFont* fontInterSmall_ = nullptr, *fontInterTiny_ = nullptr, *fontInterBold_ = nullptr;
     ImFont* fontCardTitle_ = nullptr, *fontCardHead_ = nullptr, *fontCardBody_ = nullptr; // the support card (Latin only)
     std::string dropdown_;     // palette open as a drop-down ("" = none)
     float dropdownX_ = 0.0f;

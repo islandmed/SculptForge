@@ -8,6 +8,7 @@
 // Load UI (Ctrl+L) share a layout as a file.
 #pragma once
 
+#include "app/Theme.h"
 #include "core/Json.h"
 #include "core/SpaceMouse.h"
 #include "core/Tablet.h"
@@ -58,6 +59,11 @@ struct UiPrefs {
     // Preferences > Interface > Timeline position (#63): the Sculpt Timeline strip along the top of the viewport
     // (true, the default: clear of the brush shelf below it) or its bottom.
     bool timelineTop = true;
+    // Preferences > Interface > Look: the colours and style of the interface (Theme.h; Classic is the default), and
+    // the shell's layout: 0 the ZBrush-style layout (the alphabetical palette bar, two-row top shelf), 1 the
+    // SculptForge layout (task menus File, Edit, Sculpt, Paint, Mesh, View, Render, Help, a status bar, one-row shelf).
+    theme::LookSettings look;
+    int shellLayout = 0;
     TabletSettings tablet;      // Preferences > Tablet: pressure curve, eraser, pen buttons
     SpaceMouseSettings spaceMouse; // Preferences > Input > SpaceMouse
     // Preferences > Performance (PanelPerformance.cpp).

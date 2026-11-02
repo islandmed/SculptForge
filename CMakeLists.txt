@@ -248,6 +248,8 @@ if(SCULPTFORGE_BUILD_APP)
     fontRegular ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Inter-Regular.ttf
     fontSemiBold ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Inter-SemiBold.ttf
     fontLucide ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/lucide.ttf
+    fontMono ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/JetBrainsMono-Regular.ttf # the looks (Preferences > Interface > Look)
+    fontMonoBold ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/JetBrainsMono-SemiBold.ttf
     appIcon ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-256.png
     supporters ${CMAKE_CURRENT_SOURCE_DIR}/docs/supporters.txt # Help > About (never empty: it starts with comments)
     supportCard ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/support-card.jpg) # the support card's picture (decoded only when it shows)
@@ -273,6 +275,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/ShellGeometry.cpp
     src/app/Palettes.cpp
     src/app/Theme.cpp
+    src/app/LookSchemes.cpp
     src/app/I18n.cpp
     src/app/I18nSpanish.cpp
     src/app/CommandPalette.cpp
@@ -516,7 +519,7 @@ if(SCULPTFORGE_BUILD_TESTS)
   # tests/test_main.cpp plus every tests/test_*.cpp (add a file to add tests; see tests/TestHarness.h).
   file(GLOB SCULPTFORGE_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_*.cpp)
   add_executable(sculptforge_tests ${SCULPTFORGE_TEST_SOURCES} src/cli/McpServer.cpp src/app/AssetLibrary.cpp
-                                   src/app/UiLayout.cpp src/app/ShellGeometry.cpp src/app/I18n.cpp src/app/I18nSpanish.cpp src/render/Camera.cpp
+                                   src/app/UiLayout.cpp src/app/ShellGeometry.cpp src/app/LookSchemes.cpp src/app/I18n.cpp src/app/I18nSpanish.cpp src/render/Camera.cpp
                                    src/render/Clusters.cpp src/render/Ghost.cpp)
   target_include_directories(sculptforge_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
   target_compile_definitions(sculptforge_tests PRIVATE SF_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")

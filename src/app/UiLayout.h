@@ -39,6 +39,7 @@ struct UiLayout {
 };
 
 UiLayout standardLayout(); // the built-in default
+UiLayout standardLayout(int shellLayout); // 0 the ZBrush-style layout (the same), 1 the SculptForge layout
 Json toJson(const UiLayout& layout);
 // Unknown ids are dropped, not fatal; false only for unreadable JSON.
 bool fromJson(const Json& j, UiLayout& layout, std::string& error);

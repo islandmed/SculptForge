@@ -42,6 +42,9 @@ ImVec4 rgba(ImU32 c, float alpha = -1.0f) {
 
 float uiScale() { return ImGui::GetFontSize() / 15.0f; }
 
+// A colour of the Classic look, or the current look's token.
+ImU32 lookColor(ImU32 classic, const ImVec4& token) { return theme::look.id == 0 ? classic : theme::u32(token); }
+
 bool itemHoveredForHelp() {
     return ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
 }
@@ -218,8 +221,8 @@ float KeycapsAt(ImDrawList* dl, ImVec2 p, const std::string& chord) {
             if (i) dimText("+");
             const ImVec2 ts = ImGui::CalcTextSize(keys[i].c_str());
             const ImVec2 a = p, b(p.x + ts.x + 2 * pad, p.y + h);
-            dl->AddRectFilled(a, b, IM_COL32(0x2c, 0x2c, 0x30, 0xff), 3.0f * s);
-            dl->AddRect(a, b, IM_COL32(0x4a, 0x4a, 0x50, 0xff), 3.0f * s);
+            dl->AddRectFilled(a, b, lookColor(IM_COL32(0x2c, 0x2c, 0x30, 0xff), theme::frame), theme::rounding(3.0f * s));
+            dl->AddRect(a, b, lookColor(IM_COL32(0x4a, 0x4a, 0x50, 0xff), theme::tileBorder), theme::rounding(3.0f * s));
             dl->AddText(ImVec2(a.x + pad, a.y + 1.0f * s), color::accent, keys[i].c_str());
             p.x = b.x;
         }
@@ -355,6 +358,14 @@ bool ActionButton(App& app, const char* actionId, ImVec2 size, Look look) {
 
 bool SliderInside(const char* id, float* v, float lo, float hi, const char* format, ImGuiSliderFlags flags) {
     const float w = ImGui::CalcItemWidth(), h = ImGui::GetFrameHeight();
+    // Looks with technical numbers draw the label in the monospace font, padded to the same frame height.
+    ImFont* numbers = theme::numberFont();
+    const float outerSize = ImGui::GetFontSize();
+    if (numbers) {
+        ImGui::PushFont(numbers);
+        const ImVec2 pad = ImGui::GetStyle().FramePadding;
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(pad.x, pad.y + (outerSize - ImGui::GetFontSize()) * 0.5f));
+    }
     const ImVec2 p = ImGui::GetCursorScreenPos();
     ImDrawList* dl = ImGui::GetWindowDrawList();
     // Frame and fill go underneath the slider (which draws a transparent frame on top).
@@ -369,6 +380,10 @@ bool SliderInside(const char* id, float* v, float lo, float hi, const char* form
     const bool changed = ImGui::SliderFloat(id, v, lo, hi, format ? tr(format) : format, flags);
     const bool active = ImGui::IsItemActive();
     ImGui::PopStyleColor(5);
+    if (numbers) {
+        ImGui::PopStyleVar();
+        ImGui::PopFont();
+    }
     dl->ChannelsSetCurrent(0);
     float t = 0.0f;
     if (hi > lo) {
@@ -424,7 +439,7 @@ void DrawHelp(App& app) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 6.0f * s);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f * s, 4.0f * s));
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, rgba(IM_COL32(0x18, 0x18, 0x1a, 0xff), std::clamp(prefs.helpOpacity, 0.3f, 1.0f)));
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, rgba(lookColor(IM_COL32(0x18, 0x18, 0x1a, 0xff), theme::shellBg), std::clamp(prefs.helpOpacity, 0.3f, 1.0f)));
     ImGui::PushStyleColor(ImGuiCol_Border, rgba(color::accent, 0.6f));
     const ImGuiWindowFlags flags = ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs |
                                    ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoFocusOnAppearing |
@@ -447,12 +462,12 @@ void DrawHelp(App& app) {
         {
             const ImVec2 a = ImGui::GetCursorScreenPos();
             dl->AddLine(ImVec2(a.x, a.y + 1.0f * s), ImVec2(a.x + ImGui::GetContentRegionAvail().x, a.y + 1.0f * s),
-                        IM_COL32(0x34, 0x34, 0x38, 0xff));
+                        lookColor(IM_COL32(0x34, 0x34, 0x38, 0xff), theme::sectionRule));
             ImGui::Dummy(ImVec2(0, 3.0f * s));
         }
         ImGui::PushTextWrapPos(0.0f);
         if (!alternate) {
-            ImGui::PushStyleColor(ImGuiCol_Text, rgba(IM_COL32(0xc8, 0xc8, 0xc8, 0xff)));
+            ImGui::PushStyleColor(ImGuiCol_Text, rgba(lookColor(IM_COL32(0xc8, 0xc8, 0xc8, 0xff), theme::text)));
             ImGui::TextUnformatted(r.description.empty() ? tr("No description yet.") : r.description.c_str());
             ImGui::PopStyleColor();
             if (r.hasCommand && !r.params.empty()) {
@@ -475,7 +490,7 @@ void DrawHelp(App& app) {
                 ImGui::SameLine();
                 ImGui::TextColored(rgba(color::textDim), "%s%s", typeName(p.type), p.required ? ", required" : "");
                 ImGui::Indent(10.0f * s);
-                ImGui::PushStyleColor(ImGuiCol_Text, rgba(IM_COL32(0xc8, 0xc8, 0xc8, 0xff)));
+                ImGui::PushStyleColor(ImGuiCol_Text, rgba(lookColor(IM_COL32(0xc8, 0xc8, 0xc8, 0xff), theme::text)));
                 ImGui::TextUnformatted(p.description.c_str());
                 ImGui::PopStyleColor();
                 ImGui::Unindent(10.0f * s);

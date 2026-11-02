@@ -60,15 +60,51 @@ const PaletteDef* findPalette(std::string_view id) {
     return nullptr;
 }
 
+const TaskMenuDef* taskMenus(int& count) {
+    // Every palette in exactly one menu (tests/ui/looks.sfui opens every section). View is how the model shows, Render how it
+    // is shaded (Lit Sphere materials, PBR) and the Gaussian splats.
+    static const TaskMenuDef kMenus[] = {
+        {"file", "File", {"file", "script", nullptr}, {nullptr, nullptr}},
+        {"edit", "Edit", {"edit", "preferences", nullptr}, {nullptr, nullptr}},
+        {"sculpt", "Sculpt", {"brush", "draw", "stroke", "alpha", "transform", nullptr}, {nullptr, "Draw & Tablet", nullptr, nullptr, "Symmetry & Gizmo"}},
+        {"paint", "Paint", {"color", nullptr}, {"Vertex Paint & Color"}},
+        {"mesh", "Mesh", {"tool", "generate", nullptr}, {"Parts & Geometry", "Generate 3D"}},
+        {"view", "View", {"render", nullptr}, {"Display"}},
+        {"render", "Render", {"material", "splats", nullptr}, {"Materials", "Gaussian Splats"}},
+        {"help", "Help", {"help", nullptr}, {nullptr}},
+    };
+    count = int(std::size(kMenus));
+    return kMenus;
+}
+
+int taskMenuOf(std::string_view paletteId) {
+    int count = 0;
+    const TaskMenuDef* menus = taskMenus(count);
+    for (int i = 0; i < count; ++i)
+        for (int k = 0; k < 6 && menus[i].sections[k]; ++k)
+            if (paletteId == menus[i].sections[k]) return i;
+    return -1;
+}
+
 namespace {
 
 // The hairline under each sub-palette header: opaque, a clear step above panelBg so the closed list reads as rows.
 // Should become a theme token (Theme.h).
-constexpr ImU32 kSectionRule = IM_COL32(54, 54, 60, 255);
+ImU32 sectionRule() { return theme::look.id == 0 ? IM_COL32(54, 54, 60, 255) : theme::u32(theme::sectionRule); }
 constexpr float kSectionHeaderH = 22.0f; // sub-palette header height, unscaled
 constexpr float kSectionInset = 8.0f;    // header titles and section content start this far in, unscaled
 // Check marks in the palettes: the text colour, so a column of options doesn't read as a row of accents.
-constexpr ImVec4 kCheckMark = theme::rgb(0xd8d8d8);
+ImVec4 checkMark() { return theme::look.id == 0 ? theme::rgb(0xd8d8d8) : theme::text; }
+
+// Phosphor's rules: a run of box-drawing lines from x0 to x1 on the text's centre line, in the current font.
+void asciiRule(ImDrawList* dl, float x0, float x1, float y, ImU32 col) {
+    ImFont* f = ImGui::GetFont();
+    const float cw = f->CalcTextSizeA(f->FontSize, FLT_MAX, 0.0f, "\xe2\x94\x80").x;
+    if (cw <= 0.0f || x1 - x0 < cw) return;
+    std::string run;
+    for (float x = x0; x + cw <= x1; x += cw) run += "\xe2\x94\x80";
+    dl->AddText(ImVec2(std::floor(x0), std::floor(y)), col, run.c_str());
+}
 
 // A row of equal-width action buttons filling the line.
 void actionRow(App& app, std::initializer_list<const char*> ids) {
@@ -135,16 +171,32 @@ Section::~Section() {
     ImGui::Dummy(ImVec2(0, 4.0f * s));
 }
 
-Style::Style() { ImGui::PushStyleColor(ImGuiCol_CheckMark, kCheckMark); }
+Style::Style() { ImGui::PushStyleColor(ImGuiCol_CheckMark, checkMark()); }
 
 Style::~Style() { ImGui::PopStyleColor(); }
 
 void GroupLabel(const App& app, const char* text) {
     const float s = ImGui::GetFontSize() / 15.0f;
     ImGui::Dummy(ImVec2(0, 2.0f * s));
+    if (theme::look.headers == theme::LookStyle::Headers::Ascii) { // "-- Extract -----------" in box-drawing lines
+        if (app.smallFont()) ImGui::PushFont(app.smallFont());
+        const ImVec2 p = ImGui::GetCursorScreenPos();
+        const float w = ImGui::GetContentRegionAvail().x, h = ImGui::GetTextLineHeight();
+        ImGui::Dummy(ImVec2(w, h + 2.0f * s));
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        const ImU32 rule = theme::u32(theme::textDim, 0.6f);
+        const std::string label = std::string(" ") + tr(text) + " ";
+        asciiRule(dl, p.x, p.x + 2.0f * ImGui::CalcTextSize("-").x, p.y, rule);
+        const float lx = p.x + 2.0f * ImGui::CalcTextSize("-").x;
+        dl->AddText(ImVec2(lx, p.y), theme::u32(theme::textDim), label.c_str());
+        asciiRule(dl, lx + ImGui::CalcTextSize(label.c_str()).x, p.x + w, p.y, rule);
+        ImGui::LogText("%s", tr(text));
+        if (app.smallFont()) ImGui::PopFont();
+        return;
+    }
     if (app.smallFont()) ImGui::PushFont(app.smallFont());
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    ImGui::PushStyleColor(ImGuiCol_Separator, ImGui::ColorConvertU32ToFloat4(kSectionRule));
+    ImGui::PushStyleColor(ImGuiCol_Separator, ImGui::ColorConvertU32ToFloat4(sectionRule()));
     ImGui::PushStyleVar(ImGuiStyleVar_SeparatorTextPadding, ImVec2(0.0f, 2.0f * s));
     ImGui::PushStyleVar(ImGuiStyleVar_SeparatorTextAlign, ImVec2(0.0f, 0.5f));
     ImGui::SeparatorText(tr(text));
@@ -181,10 +233,33 @@ bool App::subpalette(const char* id, const char* englishTitle) {
     // hovered or open, a hairline under it. The title lines up with the section's content (tray::Section). The accent
     // is kept for the current tool (docs/ui-design.md §10), so an open section shows by its fill and text only.
     ImDrawList* dl = ImGui::GetWindowDrawList();
+    using Headers = theme::LookStyle::Headers;
+    const Headers headers = theme::look.headers;
+    if (headers == Headers::Ascii) { // "[+] Geometry" / "[-] Geometry", no fill but the hover
+        if (hovered) dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), theme::u32(theme::headerHover, 0.6f));
+        const float ty = std::floor(p.y + (h - ImGui::GetFontSize()) * 0.5f);
+        dl->AddText(ImVec2(p.x + 2.0f * s, ty), theme::u32(isOpen ? theme::accent : theme::textDim), isOpen ? "[-]" : "[+]");
+        dl->AddText(ImVec2(p.x + 2.0f * s + ImGui::CalcTextSize("[-] ").x, ty), theme::u32(isOpen || hovered ? theme::textBright : theme::text),
+                    title);
+        ImGui::LogText("%s", title);
+        ui::HelpText(title, nullptr,
+                     "Click to open or close. Opening one closes the others (Shift+click keeps them open; Preferences > "
+                     "Interface).",
+                     "Tool");
+    } else {
     if (isOpen || hovered)
         dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), theme::u32(hovered ? theme::headerHover : theme::header, isOpen ? 0.9f : 0.6f),
-                          2.0f * s);
-    dl->AddLine(ImVec2(p.x, p.y + h - 0.5f * s), ImVec2(p.x + w, p.y + h - 0.5f * s), kSectionRule, 1.0f * s);
+                          theme::rounding(2.0f * s));
+    if (headers == Headers::Grid) { // a dimension line: the hairline in the accent with ticks at both ends
+        const float y = std::floor(p.y + h - 1.0f) + 0.5f;
+        const ImU32 c = theme::u32(theme::accent, isOpen ? 0.55f : 0.3f);
+        dl->AddLine(ImVec2(p.x, y), ImVec2(p.x + w, y), c, 1.0f);
+        dl->AddLine(ImVec2(p.x + 0.5f, y - 4.0f * s), ImVec2(p.x + 0.5f, y + 0.5f), c, 1.0f);
+        dl->AddLine(ImVec2(p.x + w - 0.5f, y - 4.0f * s), ImVec2(p.x + w - 0.5f, y + 0.5f), c, 1.0f);
+    } else {
+        dl->AddLine(ImVec2(p.x, p.y + h - 0.5f * s), ImVec2(p.x + w, p.y + h - 0.5f * s), sectionRule(), 1.0f * s);
+    }
+    if (isOpen && headers == Headers::Bar) dl->AddRectFilled(p, ImVec2(p.x + 2.0f * s, p.y + h), theme::u32(theme::accent));
     ImFont* font = ImGui::GetFont();
     const float chevronSize = ImGui::GetFontSize() * 0.8f;
     const char* chevron = isOpen ? ICON_LC_CHEVRON_DOWN : ICON_LC_CHEVRON_RIGHT;
@@ -198,6 +273,7 @@ bool App::subpalette(const char* id, const char* englishTitle) {
                  "Click to open or close. Opening one closes the others (Shift+click keeps them open; Preferences > "
                  "Interface).",
                  "Tool");
+    }
     if (clicked) {
         if (isOpen) {
             open.erase(std::remove(open.begin(), open.end(), id), open.end());

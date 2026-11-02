@@ -1,0 +1,115 @@
+# The interface looks and the SculptForge layout (Preferences > Interface > Look): the task menus hold every palette
+# as a section, the ZBrush-style layout stays one setting away, and switching looks keeps everything working.
+run new_sphere subdivisions=3
+expect_value look == 0
+expect_value shell_layout == 0
+expect "Tool##palette.tool"                 # the default: Classic, ZBrush-style palette bar
+
+# Forge Terminal brings the SculptForge layout: the menus in the status bar, no palette bar, a one-row shelf.
+run ui_look look=forge scheme=nord
+wait 0.2
+expect_value look == 1
+expect_value shell_layout == 1
+expect "Sculpt##menu.sculpt"
+expect_not "Tool##palette.tool"
+expect_not "Library##ui.lightbox"           # moved off the shelf (View > Display, F3)
+expect "Clay##brush.clay"
+expect "##drawsize"
+expect "SubTools/Append"                    # the Tool palette stays in the right tray
+shot forge
+
+# Every palette is a section of one menu.
+click "File##menu.file"
+click "File##section.file"
+expect "File/##totray"
+click "Script##section.script"
+expect "Script/##totray"
+key escape
+click "Edit##menu.edit"
+click "Edit##section.edit"
+expect "Edit/##totray"
+click "Preferences##section.preferences"
+expect "Preferences/##totray"
+key escape
+click "Sculpt##menu.sculpt"
+click "Brush##section.brush"
+expect "Brush/##totray"
+click "Draw & Tablet##section.draw"
+expect "Draw/##totray"
+click "Alpha##section.alpha"
+expect "Alpha/##totray"
+click "Symmetry & Gizmo##section.transform"
+expect "Transform/##totray"
+click "Stroke##section.stroke"
+expect "Stroke/##totray"
+shot sculpt-menu
+key escape
+click "Paint##menu.paint"
+expect "Color/##totray"
+key escape
+click "Mesh##menu.mesh"                     # Tool is in the tray, so the menu opens on Generate
+expect "Generate/##totray"
+key escape
+click "View##menu.view"
+expect "Render/##totray"
+key escape
+click "Render##menu.render"
+click "Materials##section.material"
+expect "Material/##totray"
+click "Gaussian Splats##section.splats"
+expect "Splats/##totray"
+key escape
+click "Help##menu.help"
+expect "Help/##totray"
+key escape
+
+# A section pinned from its menu goes to the tray, as from the palette bar.
+click "Sculpt##menu.sculpt"
+click "Stroke##section.stroke"
+click "Stroke/##totray"
+expect_value right_tray == 2                 # Tool and Stroke
+click "Sculpt##menu.sculpt"
+click "Brush##section.brush"
+expect "Brush/##totray"
+key escape
+
+# The other looks and colour schemes.
+run ui_look look=phosphor phosphor=amber effects=true
+wait 0.2
+expect_value look == 2
+expect "Sculpt##menu.sculpt"
+shot phosphor
+run ui_look look=blueprint
+wait 0.2
+expect_value look == 3
+shot blueprint
+run ui_look look=forge scheme=everforest
+wait 0.2
+run_fails ui_look scheme=solarized
+run_fails ui_look look=neon
+run_fails ui_look layout=tabs
+
+# The look cards in Preferences > Interface.
+click "Edit##menu.edit"
+click "Preferences##section.preferences"
+click "Interface##preferences.interface"
+click "Blueprint##look.blueprint"
+wait 0.2
+expect_value look == 3
+key escape
+
+# The ZBrush-style layout is one setting away and works with any look.
+run ui_look layout=zbrush
+wait 0.2
+expect_value shell_layout == 0
+expect "Tool##palette.tool"
+expect "Library##ui.lightbox"
+expect_not "Sculpt##menu.sculpt"
+click "Stroke##palette.stroke"
+expect "Stroke/##totray"
+key escape
+shot blueprint-zbrush-layout
+run ui_look look=classic
+wait 0.2
+expect_value look == 0
+expect "Tool##palette.tool"

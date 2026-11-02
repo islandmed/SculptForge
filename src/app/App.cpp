@@ -56,6 +56,10 @@ extern const unsigned char fontLucide[];
 extern const unsigned long long fontLucide_size;
 extern const unsigned char fontSemiBold[];
 extern const unsigned long long fontSemiBold_size;
+extern const unsigned char fontMono[];
+extern const unsigned long long fontMono_size;
+extern const unsigned char fontMonoBold[];
+extern const unsigned long long fontMonoBold_size;
 extern const unsigned char appIcon[];
 extern const unsigned long long appIcon_size;
 } // namespace assets
@@ -209,8 +213,8 @@ bool App::init(const AppOptions& options) {
     ImFontConfig fontConfig;
     fontConfig.FontDataOwnedByAtlas = false;
     fontConfig.OversampleH = 2;
-    io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontRegular), int(assets::fontRegular_size),
-                                   15.0f * scale, &fontConfig);
+    fontRegular_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontRegular), int(assets::fontRegular_size),
+                                                  15.0f * scale, &fontConfig);
     // Lucide icons (ISC/MIT) merged into the UI font, so ICON_LC_* strings work in any label.
     {
         static const ImWchar kIconRanges[] = {ICON_MIN_LC, ICON_MAX_LC, 0};
@@ -251,6 +255,30 @@ bool App::init(const AppOptions& options) {
         fontIcons_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontLucide), int(assets::fontLucide_size),
                                                     20.0f * scale, &big, kIconRanges);
     }
+    { // JetBrains Mono (SIL OFL) for the looks (Preferences > Interface > Look), with the icons and box drawing.
+        static const ImWchar kMonoRanges[] = {0x0020, 0x00FF, 0x2010, 0x2027, 0x2190, 0x21FF, 0x2500, 0x259F, 0x25A0, 0x25FF, 0};
+        static const ImWchar kIconRanges[] = {ICON_MIN_LC, ICON_MAX_LC, 0};
+        auto addMono = [&](const unsigned char* data, unsigned long long size, float px) {
+            ImFont* f = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(data), int(size), px * scale, &fontConfig, kMonoRanges);
+            ImFontConfig icons;
+            icons.MergeMode = true;
+            icons.PixelSnapH = true;
+            icons.FontDataOwnedByAtlas = false;
+            icons.GlyphMinAdvanceX = px * scale;
+            icons.GlyphOffset = ImVec2(0, px * 0.13f * scale);
+            io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontLucide), int(assets::fontLucide_size), px * scale,
+                                           &icons, kIconRanges);
+            return f;
+        };
+        fontMono_ = addMono(assets::fontMono, assets::fontMono_size, 15.0f);
+        fontMonoSmall_ = addMono(assets::fontMono, assets::fontMono_size, 12.0f);
+        fontMonoTiny_ = addMono(assets::fontMono, assets::fontMono_size, 10.5f);
+        fontMonoBold_ = addMono(assets::fontMonoBold, assets::fontMonoBold_size, 15.0f);
+        fontInterSmall_ = fontSmall_;
+        fontInterTiny_ = fontTiny_;
+        fontInterBold_ = fontBold_;
+        theme::fonts = {fontMono_, fontMonoSmall_, fontMonoBold_};
+    }
     { // The support card's display sizes (PanelSupportCard.cpp): Latin only, so the atlas grows by a few glyphs.
         static const ImWchar kCardRanges[] = {0x0020, 0x00FF, 0x2014, 0x2014, 0x2019, 0x2019, 0x2026, 0x2026, 0};
         fontCardTitle_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontSemiBold),
@@ -272,6 +300,7 @@ bool App::init(const AppOptions& options) {
         ImGui::GetCurrentContext()->TestEngineHookItems = true; // lets the demo find buttons by label
         io.IniFilename = nullptr;                               // fixed, reproducible layout
     }
+    applyLook(); // Preferences > Interface > Look (after the fonts it may switch to)
     ImGui_ImplSDL3_InitForOpenGL(window_, glContext_);
     ImGui_ImplOpenGL3_Init("#version 330 core");
 
