@@ -1,0 +1,4 @@
+# fix/gen3d-default: PAUSED (usage stop), committed locally, NOT pushed
+Done: default Hunyuan3D 2.1 (hfModelChosen migration), TRELLIS.2 no-token fallback + note, Preferences > AI token, one-time Hunyuan licence notice + tooltip; Quad Remesh default for generated models (core/GeneratedRemesh, worker thread, remesh=quad|voxel|false, levels); text_to_3d offline-service fix; docs/CHANGELOG/What's New 0.10.8; targeted tests (free_huggingface_models, generated_remesh*) pass. Lion head Quad Remesh 21.6 s (nice 19, load 3-5) vs voxel 0.8 s.
+Left: full ctest never finished (stopped). AI visibility switch NOT started (two conflicting pasted notes; awaiting Tony's choice).
+Resume: nice -n 19 ionice -c3 cmake --build build -j3; if `pgrep -x ctest` is empty: SDL_APP_ID=sculptforge-agent nice -n 19 ionice -c3 ctest --test-dir build -j3; green -> git push -u origin fix/gen3d-default, add SHA here, message coordinator.

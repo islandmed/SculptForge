@@ -5,6 +5,14 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.10.9
+
+- **Image to 3D with no setup**: the free default is now Hunyuan3D 2.1, which needs no token. TRELLIS.2 ("Best
+  detail") still needs a free Hugging Face token (**Preferences > AI**); without one, Hunyuan3D 2.1 runs instead
+  and the status line tells you. Your own model choice is kept. See [Image and text to 3D](generate-3d.md).
+- **Generated models arrive as clean quads**: Quad Remesh is now the default, with one subdivision level holding
+  the detail, so you can sculpt and subdivide straight away. Voxel remesh and Off are still in **Remesh**.
+
 ## Version 0.10.8
 
 - **Tablets in mouse mode work again**: on some Windows tablets with **Mouse mode** on (Preferences > Tablet) the

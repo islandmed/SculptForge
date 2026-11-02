@@ -6,13 +6,27 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Image and text to 3D work out of the box with no token: the free Hugging Face default is now **Hunyuan3D 2.1**,
+  for new installs and for everyone who never picked a model (an explicit choice is kept; a saved TRELLIS.2 is
+  kept when a token is saved too). TRELLIS.2 shows as "Best detail (needs token)".
+- TRELLIS.2 without a Hugging Face token no longer fails: Hunyuan3D 2.1 runs instead and the status line says
+  "TRELLIS.2 needs a free Hugging Face token (Preferences > AI); used Hunyuan3D 2.1 instead." The token can now be
+  set in the new **Preferences > AI** too.
+- Generated models get **Quad Remesh** by default instead of voxel remesh: clean quads (about resolution² / 2, 32768
+  at the default 256) with one subdivision level projected onto the model, ready to sculpt and subdivide. A voxel
+  pass cleans up holes and overlapping pieces first. It runs in the background with the progress bar (about 20 s
+  for a typical Hunyuan3D model). **Remesh** in Generate 3D also offers Voxel remesh and Off; the CLI takes
+  `remesh=quad|voxel|false` (`true` means quad) and `levels=0-2`. The status line says "remeshed to N quads".
+- The Hunyuan3D licence notice (the Tencent Hunyuan Community License doesn't cover use in the EU, UK or South
+  Korea) is shown once, the first time a Hunyuan3D model runs, and stays in the Model picker's tooltip.
+
 ## [0.10.8] - 2026-11-02
 
 ### Fixed
 - Tablet Mouse mode (Preferences > Tablet): on some Windows tablets the brush stopped following the pen in 0.10.7,
   because the system cursor reading stayed put while the pen moved. A reading that doesn't move with the pen is now
   ignored and the pen moves the brush relatively, from where it was, with no jump (#72).
-
 ## [0.10.7] - 2026-11-01
 
 ### Changed

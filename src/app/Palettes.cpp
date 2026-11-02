@@ -580,6 +580,10 @@ void App::drawPalette_Preferences() {
         tray::Section section;
         drawPerformanceSection();
     }
+    if (subpalette("preferences.ai", "AI")) {
+        tray::Section section;
+        drawAiPrefsSection();
+    }
     if (subpalette("preferences.updates", "Updates")) {
         tray::Section section;
         drawUpdatesSection();

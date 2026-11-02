@@ -696,7 +696,7 @@ void Demo::buildImageTo3D() {
         app_.showBrushLab_ = false;
         app_.aiSettings_.generatorService = "huggingface";
         app_.aiSettings_.hfModel = "hunyuan3d-2.1";
-        app_.remeshGenerated_ = true;
+        app_.generatedRemesh_ = int(GeneratedRemesh::Quad);
         app_.remeshResolution_ = 256;
         app_.openPath(app_.options_.demoAsset); // opens the Generate 3D panel with the drawing
         fadeFrom_ = fadeTo_ = 1.0f;

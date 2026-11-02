@@ -133,6 +133,8 @@ Json AiSettings::toJson() const {
     j.set("generatorCommand", generatorCommand);
     j.set("hfToken", hfToken);
     j.set("hfModel", hfModel);
+    j.set("hfModelChosen", hfModelChosen);
+    j.set("hunyuanNoticeShown", hunyuanNoticeShown);
     j.set("falKey", falKey);
     j.set("falModel", falModel);
     j.set("falEndpoint", falEndpoint);
@@ -164,7 +166,13 @@ AiSettings AiSettings::fromJson(const Json& j) {
     };
     text("generatorService", s.generatorService);
     text("hfToken", s.hfToken);
-    text("hfModel", s.hfModel);
+    // A model the user never chose follows the default. Files from before hfModelChosen: TRELLIS.2 was the
+    // default then, so it counts as chosen only with a saved token (it needs one); any other model was picked.
+    const std::string savedModel = j["hfModel"].asString();
+    s.hfModelChosen = j["hfModelChosen"].isBool() ? j["hfModelChosen"].asBool()
+                                                  : !savedModel.empty() && (savedModel != "trellis-2" || !s.hfToken.empty());
+    if (s.hfModelChosen && !savedModel.empty()) s.hfModel = savedModel;
+    s.hunyuanNoticeShown = j["hunyuanNoticeShown"].asBool();
     text("falKey", s.falKey);
     text("falModel", s.falModel);
     text("falEndpoint", s.falEndpoint);

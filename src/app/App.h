@@ -25,6 +25,7 @@
 #include "core/Pack.h"
 #include "core/Document.h"
 #include "core/Face.h"
+#include "core/GeneratedRemesh.h"
 #include "core/MeshTransform.h"
 #include "core/PenPredictor.h"
 #include "core/AutoUv.h"
@@ -192,6 +193,8 @@ private:
     bool loadReferenceImage(const std::string& path);
     void projectImageFromView();
     void startGenerator();
+    void showHunyuanNoticeOnce(); // the licence notice, once ever (saved in ai.json)
+    void drawAiPrefsSection();    // Preferences > AI: the Hugging Face token
     void pollGenerator();
     int renderHeadless();
     void openPath(const std::string& path);
@@ -467,7 +470,7 @@ private:
     bool comfyWorkflowsScanned_ = false;
     bool comfyPickingText_ = false;
     std::string comfyWorkflowError_;
-    bool remeshGenerated_ = true;
+    int generatedRemesh_ = int(GeneratedRemesh::Quad); // Generate 3D's Remesh: Quad (default), Voxel, Off
     int voxelResolution_ = 200;
     bool voxelKeepMasked_ = false; // Voxel Remesh's Keep Masked (#43)
     static constexpr const char* kKeepMaskedHelp =
@@ -476,7 +479,15 @@ private:
         "If the mask's edge is too ragged to join up, the status line says so and nothing changes.";
     bool keepTexture_ = true; // Keep Texture: remeshes carry a painted texture over (core/TextureTransfer.h)
     int remeshResolution_ = 256;
-    std::future<ai::GeneratorResult> pendingGenerator_;
+    // A generated model, made sculptable on the worker thread (Quad Remesh takes seconds).
+    struct GeneratedModel {
+        ai::GeneratorResult result;
+        std::shared_ptr<Mesh> remeshed; // null: Remesh off, or it failed (remeshError)
+        GeneratedRemeshStats stats;
+        std::string remeshError;
+    };
+    std::future<GeneratedModel> pendingGenerator_;
+    bool openHunyuanNotice_ = false;
     std::shared_ptr<ai::GenerationProgress> generatorProgress_;
     float generatorTime_ = 0.0f;
 

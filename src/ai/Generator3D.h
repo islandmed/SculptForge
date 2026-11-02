@@ -17,6 +17,7 @@ struct GeneratorResult {
     bool ok = false;
     std::string outputPath;
     std::string error;
+    std::string note; // shown with the result, e.g. which model ran instead of the chosen one
 };
 
 std::string defaultGeneratorCommand(const std::string& cliPath);
