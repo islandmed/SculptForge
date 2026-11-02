@@ -103,7 +103,7 @@ they want to sculpt fixes *on* a pose and send back a clean delta in the bind sp
 | Bridges | Blender (folder + manifest, .GoZ; no sockets), Maya 2022+ (folder + manifest, OBJ; no sockets), Unreal 5 (Python remote execution, static or skeletal mesh with morph targets), ZBrush (GoZ-compatible, plug-in runs inside ZBrush) | `src/io/*Bridge*`, `src/link/UnrealLink.*` |
 | Determinism | Seeded remesh, QRemesh, stroke jitter and scatter; deterministic deformers | `src/core/` |
 | Posing | Masked transforms with soft falloff at a joint ("mask the body, rotate the arm"). **No skeleton.** | `src/core/MeshTransform.h` |
-| Network | No telemetry, no account. **The update check is on by default** (one HTTPS GET of `latest.json` a day). It is off with Preferences, `SF_NO_UPDATE_CHECK` or `-DSCULPTFORGE_UPDATE_CHECK=OFF`, which the AUR package uses. Opt-in only: AI providers, the brush gallery, Send to Unreal (UDP multicast discovery), and Phone link (an HTTP listener that runs only while its panel is open). | `src/core/UpdateCheck.h`, `src/link/` |
+| Network | No telemetry, no account. **Automatic:** the daily update check, and the brush gallery index when its panel opens. **Remote by default when used:** the AI Brush assistant (Pollinations) and Generate 3D (Hugging Face). Listeners: Phone link (LAN, only while open), and a temporary Unreal call-back. Full audit in §7. | `src/ai/Http.cpp`, `src/link/Socket.cpp` |
 | Signing | macOS: **ad-hoc** unless `SCULPTFORGE_CODESIGN_IDENTITY` is set; Windows: unsigned; `SHA256SUMS.txt` per release. **No SBOM, no provenance attestation.** | `cmake/MacSign.cmake`, `release.yml` |
 
 ---
@@ -170,7 +170,7 @@ they want to sculpt fixes *on* a pose and send back a clean delta in the bind sp
 | USD mesh out (usda/usdz) | ● | ● | ○ | ○ | ✓ | — |
 | Stable prim paths | ● | ● | | | ◐ | P1 |
 | Deterministic, byte-identical export | ● | ○ | | | ◐ | P1 |
-| Update check off in studio builds, `SF_OFFLINE` | ● | ● | | | ◐ | P1 |
+| Studio mode: every network path off by policy, proven in CI | ● | ● | ○ | | ◐ | P1 |
 | SBOM + build provenance attestation | ● | ● | | | ✗ | P1 |
 | Pose for sculpting (UsdSkel skeleton in) | ● | ● | ● | ○ | ✗ | P1 |
 | Corrective blend shapes in bind space | ● | ● | ○ | | ✗ | P1 |
@@ -203,10 +203,9 @@ Effort is for one focused agent; "w" = working weeks, including tests and docs.
 
 ### Phase 1: trust and pose (about 5 to 6 w; ships across 0.11.x)
 
-1. **Studio-safe network defaults** (0.5 w). VFX-RP tarballs and the rez package build with
-   `SCULPTFORGE_UPDATE_CHECK=OFF`. `SF_OFFLINE=1` (and a `studio.json` policy file under `SCULPTFORGE_ROOT`)
-   disables every outbound path and every listener, and the app shows "Offline (studio policy)". A test asserts
-   that no socket is opened in offline mode (a seccomp/strace check in CI on Linux).
+1. **Studio mode** (1 w). One policy (build flag, site policy file, `SF_STUDIO=1`, Preferences) enforced in
+   `ai::httpRequest*` and `Socket::listen`/`openMulticast`, local AI defaults, consent on the first use of each
+   remote service, new `SCULPTFORGE_*` build flags and a CI no-network proof. Design in §7.
 2. **SBOM and provenance** (0.5 w). CycloneDX SBOM per release (our sources plus vendored `third_party/`),
    GitHub artifact attestations (Sigstore, free) for every file, and a `verify` section in the docs.
 3. **Deterministic export** (1 w). Byte-identical exports for the same input, seed and build; CI hashes the
@@ -317,16 +316,100 @@ Effort: about 2 w (placement 0.5, auto weights 0.5, weight painting 0.5, exporte
 Write-up for a security reviewer. Every claim must be true of the shipping build; items marked *(P1)* or
 *(P2)* are the roadmap, and the public version only lists them once they ship.
 
-**Network.**
-- No telemetry, analytics, crash upload, account or licence server. Crash logs are written locally only.
-- **No network listeners by default.** The only listener is Phone link's HTTP server, which runs only while its
-  panel is open and stops when it closes. Send to Unreal uses UDP multicast discovery only while the artist is
-  sending. The MCP server is stdio-only.
-- Outbound connections: the once-a-day update check (an HTTPS GET of a static `latest.json`; no identifiers: the server sees an IP address and a fixed `SculptForge/0.1` user agent;
-  off in Preferences, with `SF_NO_UPDATE_CHECK`, or at build time) and opt-in features the artist starts (AI
-  providers they configure, the community brush gallery). *(P1)* Studio builds ship with the update check off,
-  and `SF_OFFLINE=1` or a site policy file disables every network path, enforced and tested in CI.
-- Air-gapped use is fully supported: everything works with no network.
+**Network.** The audit below (0.10.7 source, 2026-11-01) is the basis for every network claim we make.
+Today, **two calls happen without a click** (the update check, and the brush gallery when its panel opens),
+and **two defaults send artists' content to third-party services** when they use them (the AI Brush
+assistant → Pollinations, and Generate 3D → Hugging Face). So "nothing phones home" and "AI talks only to the
+service you choose" are **not exactly true yet**. Studio mode (below) makes them true.
+
+#### Every outbound call and listener (verified in the tree)
+
+All HTTP goes through one function (`ai::httpRequest` / `httpRequestStream` in `src/ai/Http.cpp`, libcurl,
+user agent `SculptForge/0.1`). All sockets go through `src/link/Socket.cpp`. Those are the two choke points.
+
+| # | What | Destination | When | Data sent | Default |
+|---|---|---|---|---|---|
+| 1 | **Update check** | `https://sculptforge.app/latest.json`, then `https://islandmed.github.io/latest.json` if the first fails | **Automatic**: GUI start-up, at most once a day (not CLI or Python) | A GET with no body; the server sees the IP and the fixed user agent | **ON** (off in the AUR build; `SF_NO_UPDATE_CHECK`, Preferences) |
+| 2 | **AI Brush assistant, "Free"** | `https://text.pollinations.ai/openai` | User sends a chat message | The whole chat history (the artist's text and earlier replies), the current brush recipe when "refine" is on, our system prompt, `"referrer":"sculptforge"` | **Free is the default provider**, so a remote third party |
+| 2b | Free fallback | `http://localhost:11434` (Ollama) | **Automatic** after #2 fails | `/api/tags`, then the same chat | Loopback only |
+| 3 | Brush assistant, Anthropic / OpenAI-compatible | `api.anthropic.com` or the endpoint the user sets | User sends a message; "Find models" button | As #2, plus the API key header | Opt-in |
+| 4 | **Generate 3D from image** | Hugging Face Spaces (default `microsoft-trellis-2.hf.space`; also Hunyuan3D, Stable Fast 3D) | User clicks Generate; CLI/Python/MCP `image_to_3d` | The reference image (subject cropped, ≤ 1024 px), plus the HF token if set | **`huggingface` is the default service**, so a remote third party |
+| 5 | **Generate 3D from text** | HF Spaces (Hunyuan3D 2 / 2 mini Turbo) | User clicks Generate; `text_to_3d` | The prompt text (+ HF token) | Remote by default. **Bug:** `text_to_3d` silently swaps a saved `command`/`inflate` (offline) choice for `huggingface` (`src/ai/AiCommands.cpp`, `text_to_3d`) |
+| 6 | fal.ai / Meshy | `queue.fal.run`, `api.meshy.ai` | User action with that service picked | The image or prompt, plus the key; the result GLB is downloaded | Opt-in |
+| 7 | ComfyUI | `http://127.0.0.1:8188`, or the server the user sets | "Check server", Generate | The image or prompt, plus the workflow JSON | Loopback by default |
+| 8 | **Community brush gallery** | `raw.githubusercontent.com/islandmed/sculptforge-brushes` | **Automatic when the Brush gallery panel opens** (index), previews as they scroll in; install on click | GETs only (IP + user agent); results cached | Fetches on panel open |
+| 9 | Splat-training tools | `github.com` releases (Brush 0.3.0, COLMAP 4.2.1) | "Download" button | GET; checked against a pinned SHA-256, **then executed** | Opt-in |
+| 10 | Send to Unreal | UDP multicast `239.0.0.1`, plus a **temporary TCP listener** for the editor's call-back | Ctrl+U / menu / `unreal_send` | A ping; then a Python import script and the exported file paths | Loopback, TTL 0; "network" mode binds `0.0.0.0`, TTL 1 (LAN) |
+| 11 | **Phone link** | **Listener `0.0.0.0:8765`** (LAN) | Only while its window is open; token in the QR code + 6-digit pairing, 10-min expiry; WebRTC uses host candidates only (no STUN/TURN) | Serves the capture page; receives uploads; sends the active Part as USDZ/GLB to the phone | Off until opened |
+| 12 | Browser links | The system browser: site, guide, issues, Stripe, Discord, What's new, licence | Button click | Nothing from the app; the browser opens the URL | — |
+| 13 | MCP / CLI / Python | — | The commands above (`brush_ai`, `image_to_3d`, `text_to_3d`, `unreal_send`, `comfyui_check`, gallery install) can be run by scripts and AI agents | As per the row | MCP is stdio only; no listener |
+
+No telemetry, analytics, crash upload, account or licence server exists. Crash logs stay local
+(`src/app/CrashLog.cpp`). Hardware calibration never uses the network (`src/core/HardwareProfile.cpp`).
+Everything except rows 1 to 11 works air-gapped.
+
+#### Recommendation: one "Studio mode" switch, enforced at the two choke points
+
+**Policy.** `NetworkPolicy::{Standard, Studio}`, resolved once at start-up. The strictest source wins, and a user
+can't loosen a policy set by an admin or the build:
+
+1. build flag `SCULPTFORGE_STUDIO_DEFAULT=ON` (VFX-RP tarballs, rez, `.rpm`): starts in Studio mode;
+2. a site policy file, read-only to users: `$SCULPTFORGE_ROOT/policy.json`, `/etc/sculptforge/policy.json`,
+   `%ProgramData%\SculptForge\policy.json`, `/Library/Application Support/SculptForge/policy.json`;
+3. `SF_STUDIO=1` (alias `SF_OFFLINE=1`) in the environment (rez package, launcher, farm);
+4. Preferences > Privacy > **Studio mode** (the artist can turn it *on*, never off when 1 to 3 set it).
+
+**What Studio mode does.**
+- `ai::httpRequest*` refuses any host that isn't loopback or on the policy's allowlist
+  (`"allow": ["comfy.studio.internal", "ollama.farm:11434"]`, for on-prem AI), with the error
+  "Blocked by studio policy (host)". Rows 1, 2, 3, 4, 5, 6, 8 and 9 stop unless allowed.
+- `Socket::listen` and `openMulticast` refuse non-loopback addresses. Phone link (row 11) and Unreal network
+  mode stop; local Unreal (loopback, TTL 0) keeps working. `"allow_lan_listeners": true` in the policy file
+  re-enables them for studios that want phone capture.
+- Defaults change: the Brush assistant uses the local provider (Ollama/LM Studio on loopback) and Generate 3D
+  uses `inflate`/`command`. The `text_to_3d` fallback to `huggingface` becomes an error. The update check is off.
+- Browser links show the URL with a Copy button instead of opening the browser (some studios block it anyway).
+- The status bar shows a "Studio mode" badge. `sculptforge-cli --network-report` prints the effective policy and
+  every row above with allowed or blocked, for IT to paste into its review.
+
+**Standard mode should also change** (so the public claims hold without Studio mode):
+- **First use of any third-party service asks once**, naming the host and the data ("Sends your chat to
+  text.pollinations.ai", "Uploads this image to microsoft-trellis-2.hf.space"), with Local and Cancel options.
+  Saved per service. CLI/Python/MCP need `--allow-remote` or `allow_remote=true` once per call (agents can't
+  silently upload).
+- The brush gallery fetches only on a **Browse** click, not on panel open.
+- Fix the `text_to_3d` silent switch (row 5).
+
+**Build flags** (CMake, all compiled out, not merely hidden, so `strings` and the SBOM prove it):
+
+| Flag | Effect |
+|---|---|
+| `SCULPTFORGE_UPDATE_CHECK=OFF` | Exists. No update code or URL in the binary. |
+| `SCULPTFORGE_HOSTED_AI=OFF` (new) | Removes the Pollinations, Hugging Face, fal, Meshy and Anthropic clients and their URLs; local and loopback AI (Ollama, LM Studio, ComfyUI, command) stay. |
+| `SCULPTFORGE_PHONE_LINK=OFF` (new) | Removes the LAN HTTP server and WebRTC. |
+| `SCULPTFORGE_GALLERY=OFF` (new) | Removes the online brush gallery (studio brush shares still work). |
+| `SCULPTFORGE_NETWORK=OFF` (new) | All of the above, plus no libcurl at all, the splat tool download and Unreal LAN mode removed; loopback Unreal kept. The "air-gap build". |
+| `SCULPTFORGE_STUDIO_DEFAULT=ON` (new) | Starts in Studio mode (policy level 1); set for the VFX-RP tarballs, rez and `.rpm`. |
+
+**Proof (CI, so it can't regress):**
+- run ctest and the UI smoke test inside `unshare -rn` (no network namespace) with `SF_STUDIO=1`; any
+  non-loopback `connect()`/`bind()` seen by an `strace -f -e trace=network` wrapper fails the job;
+- a unit test that every row's entry point returns "Blocked by studio policy" under Studio mode;
+- for `SCULPTFORGE_NETWORK=OFF` builds: `nm`/`ldd` show no libcurl, and `strings` shows none of the hosted URLs;
+- a `tests/network_inventory` check: a grep for `httpRequest`, `listen(` and `openMulticast(` call sites must match
+  the table above, so a new network call can't land without updating this audit.
+
+Effort: about 1 w (policy and choke points 0.5, defaults/consent/UI 0.25, flags and CI proof 0.25).
+
+#### Public claims to correct now (they are inexact today)
+
+| Where | Today | Exact until Studio mode ships |
+|---|---|---|
+| `website/index.html` ("Nothing phones home"), `website/studios.html:395`, `docs/studios.md:4`, `docs/guide/studios.md:4` | "nothing phones home" / "works fully offline" | "No telemetry and no account. The only automatic request is a once-a-day update check (one switch turns it off). Everything works offline." |
+| `README.md:326`, `docs/guide/studios.md:143`, `docs/guide/troubleshooting.md:243`, `website/studios.html:396` | "AI features talk only to the service you choose" | "AI features are optional and run only when you use them. By default they use free hosted services (Pollinations for the Brush assistant, Hugging Face for Generate 3D); pick a local model to keep everything on your machine." |
+| `website/index.html:542`, `docs/guide/generate-3d.md:259`, `README.md:326` | "no servers of its own" | "no servers of its own besides the static website the update check reads". |
+
+These go out with the next release's lockstep, alongside the guide and site.
 
 **Files and code.**
 - File parsers (OBJ, FBX, glTF, PLY, USD/USDZ, images, .GoZ, brushes, packs) are tested against hostile and
@@ -406,10 +489,10 @@ feature does. The structure is two pillars, then the integration grid, which alr
         <ul>
           <li><strong>Offline by design.</strong> No accounts, no licence server, no telemetry. Everything works
             air-gapped.</li>
-          <li><strong>Nothing listens by default.</strong> No open ports. Bridges exchange files through one folder,
+          <li>⏳ <strong>Studio mode.</strong> One switch (or a site policy file IT controls) blocks every network
+            call and listener. AI runs on your own machines, and CI proves it with no network at all.</li>
+          <li><strong>Nothing listens by default.</strong> No open ports until you open Phone capture. Bridges exchange files through one folder,
             checked strictly, and nothing in it is ever run.</li>
-          <li>⏳ <strong>One switch for the whole studio.</strong> Studio builds ship with the update check off, and
-            one policy setting turns off every network path.</li>
           <li>⏳ <strong>Verifiable builds.</strong> Built in public CI, with checksums, an SBOM and signed build
             provenance for every file. Rebuild from source with the VFX Reference Platform toolchain.</li>
           <li><strong>Hardened file readers.</strong> Every importer is tested against hostile and malformed files.</li>
