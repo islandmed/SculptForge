@@ -41,6 +41,16 @@ void App::openSupportPage() {
                                        : std::string("Couldn't open ") + kSupportUrl + ": " + SDL_GetError();
 }
 
+void App::openDiscordPage() {
+    ++discordRequests_;
+    if (!interactive()) { // UI tests, renders and demos never start a browser
+        status_ = std::string("Join the community on Discord: ") + kDiscordUrl;
+        return;
+    }
+    status_ = SDL_OpenURL(kDiscordUrl) ? std::string("Opened the SculptForge Discord invite in your browser")
+                                       : std::string("Couldn't open ") + kDiscordUrl + ": " + SDL_GetError();
+}
+
 void App::drawSupportersSection() {
     ImGui::SeparatorText("Supporters");
     const std::vector<std::string>& names = supporterNames();
@@ -107,6 +117,10 @@ void App::drawSupportUi() {
                 guide_.open();
                 showWelcome_ = false;
             }
+            ImGui::SameLine();
+            if (ImGui::Button("Join the community on Discord##welcome")) openDiscordPage();
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Questions, tips and work in progress: opens the invite in your browser.");
             ImGui::Spacing();
             ImGui::Separator();
             ImGui::Spacing();

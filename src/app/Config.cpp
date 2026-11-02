@@ -497,6 +497,10 @@ void App::initActions() {
         nullptr, nullptr,
         "SculptForge is free and stays free. If it helps your work, you can support its development: opens "
         "sculptforge.app/donate.html in your browser. Nothing in the app changes either way.");
+    add("help.discord", "Join the Discord...", "Help", nullptr, [this] { openDiscordPage(); }, ICON_LC_MESSAGE_CIRCLE,
+        nullptr, nullptr, nullptr,
+        "The official SculptForge community on Discord: questions, tips and work in progress. Opens the invite in "
+        "your browser. Bugs still go to Report a problem (GitHub issues).");
     add("help.welcome", "Welcome", "Help", nullptr, [this] { showWelcome_ = true; }, ICON_LC_SPARKLES, nullptr, nullptr,
         nullptr, "The welcome note shown the first time SculptForge starts.");
     add("help.website", "Website & documentation", "Help", nullptr, [] { SDL_OpenURL("https://sculptforge.app/"); },

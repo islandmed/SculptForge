@@ -105,6 +105,10 @@ operating system, your graphics card and what you did just before the problem; s
 FAQ](troubleshooting.md) for what else helps. **Help > Website & documentation** opens the [SculptForge
 website](https://sculptforge.app/).
 
+For questions, tips and showing your work, **Help > Join the Discord...** opens the invite to the official
+[SculptForge Discord](https://discord.gg/gWrYkEmQhH) in your browser. Bugs still go to the issue tracker, so they can be tracked and
+fixed.
+
 ## See also
 
 - [Installing SculptForge](installing.md)

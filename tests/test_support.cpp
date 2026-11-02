@@ -20,6 +20,7 @@ TEST(supporters_parse_skips_comments_and_blanks) {
     CHECK(names.size() == 3);
     CHECK(names[0] == "Ada Lovelace" && names[1] == "Grace Hopper" && names[2] == "Linus");
     CHECK(std::string(kSupportUrl) == "https://sculptforge.app/donate.html");
+    CHECK(std::string(kDiscordUrl) == "https://discord.gg/gWrYkEmQhH");
 }
 
 TEST(supporters_names_are_sanitised) {
@@ -76,6 +77,7 @@ TEST(support_card_links_match_the_website) {
         CHECK(page.find(std::string("href=\"") + url + "\"") != std::string::npos);
     }
     CHECK(page.find(kInsiderNote) != std::string::npos); // the same honest wording on both
+    CHECK(page.find(std::string("href=\"") + kDiscordUrl + "\"") != std::string::npos); // the same community invite
 }
 
 TEST(support_card_timing) {

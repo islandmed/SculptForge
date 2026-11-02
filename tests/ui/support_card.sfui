@@ -17,6 +17,14 @@ expect_text Insiders will get each release about two weeks early, starting with 
 expect_text RECOMMENDED
 expect_text $20
 shot first_run
+# The community Discord in the footer opens the invite (kDiscordUrl) and leaves the card open.
+expect "Join the community on Discord##card.discord"
+click "Join the community on Discord##card.discord"
+expect_value discord_requests == 1
+expect_status https://discord.gg/gWrYkEmQhH
+wait 0.4
+expect_value support_card_open == 1
+expect_value support_requests == 0
 # Clicks on the card never reach the canvas or the shortcuts underneath; a tier opens its Stripe checkout.
 click "Become an Insider##card.insider"
 expect_value support_requests == 1

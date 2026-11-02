@@ -496,7 +496,7 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
   <meta property="og:image" content="{SITE}img/social-preview.png?v=3">
   <meta property="og:url" content="{url}">
   <link rel="stylesheet" href="../style.css?v=17">
-  <script src="../motion.js?v=10" defer></script>
+  <script src="../motion.js?v=11" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   <script src="search-index.js?v={len(chapters)}" defer></script>
 </head>
@@ -511,6 +511,7 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
         <a href="../brushes.html">Brushes</a>
         <a href="index.html" aria-current="page">Guide</a>
         <a class="nav-dl" href="../index.html#download">Download</a>
+        <a class="gh" href="https://discord.gg/gWrYkEmQhH">Discord</a>
         <a class="gh" href="https://github.com/islandmed/SculptForge">GitHub</a>
       </nav>
     </div>
@@ -547,6 +548,7 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
       <div class="links">
         <a href="index.html">User guide</a>
         <a href="https://github.com/islandmed/SculptForge">Source code</a>
+        <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
         <a href="https://github.com/islandmed/SculptForge/issues">Report a problem</a>
         <a href="https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md">AI services &amp; privacy</a>
       </div>
