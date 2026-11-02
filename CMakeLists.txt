@@ -36,6 +36,7 @@ add_library(sculptforge_core STATIC
   src/core/HardwareProfile.cpp
   src/core/FrameGovernor.cpp
   src/core/TierConfig.cpp
+  src/core/MemoryGuard.cpp
   src/core/Sculpt.cpp
   src/core/Dyntopo.cpp
   src/core/DyntopoCommands.cpp
@@ -298,6 +299,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelBrushGallery.cpp
     src/app/PanelPolypaint.cpp
     src/app/PanelPacks.cpp
+    src/app/MemoryConfirm.cpp
     src/app/PanelPaintLayers.cpp
     src/app/PanelTexture.cpp
     src/app/PanelUvEditor.cpp

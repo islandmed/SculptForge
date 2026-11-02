@@ -208,6 +208,8 @@ public:
     size_t gpuBytes() const;
     // Triangles the last draw() sent to the GPU (after culling), for the benchmark.
     size_t lastDrawnTriangles() const { return lastDrawn_; }
+    // The last syncScene left motion proxies to build (a few milliseconds of them a frame; the rest draw in full).
+    bool proxiesPending() const { return proxyPending_; }
 
     // Texture of matcap `index` (sRGB RGBA8, rows bottom-up) for UI previews; 0 if none (or a custom one not
     // uploaded yet: the next syncScene or draw does).
@@ -350,6 +352,7 @@ private:
     void buildLines(MeshSlot& s, const Mesh& mesh);
     void buildProxies(MeshSlot& s, const Mesh& mesh);
     bool proxyUsed_ = false; // the last draw() drew motion proxies: sync keeps them current
+    bool proxyPending_ = false; // (proxiesPending)
     // The ghost (setGhost), drawn on the slot ghostId_.
     GhostStroke ghost_;
     uint32_t ghostId_ = 0;

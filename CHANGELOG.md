@@ -18,6 +18,21 @@ All notable changes to SculptForge are listed here. The format follows
   included; the welcome's Support button and the ten-hour note open it too.
 
 ### Fixed
+- Help > Benchmark (and `--benchmark`) checks the memory free now before each scene instead of trusting the
+  computer's total: a scene that doesn't fit (15M needs about 2.2 GB free, 33M about 5 GB, plus a margin) is skipped
+  with a clear message ("33M skipped: needs ~5 GB free, 1.3 GB available. Close other apps and run again") rather
+  than running the system out of memory. The result lists skipped scenes; the command line exits with code 2.
+- Subdivide, Divide, Divide to a micro level and Voxel Remesh ask first ("Not enough free memory", Continue anyway or
+  Cancel) when the mesh they would build doesn't fit the memory free now.
+- Move on dense meshes no longer stalls: it worked out its whole region's normals and bounds again for every pointer
+  sample (several times a frame with a 240 Hz pen, more the slower the frame got: seconds at 33M under load). The
+  positions still follow every sample; the normals and bounds now follow once a frame, and the mesh comes out the
+  same, bit for bit.
+- The first orbit after a long stroke no longer stalls (180-300 ms at 33M): the moving view's lighter stand-ins for
+  the changed areas are rebuilt a few milliseconds a frame, the rest drawn in full detail until then.
+- Runs started by scripts and agents (`SDL_APP_ID=sculptforge-agent`, or `SF_ISOLATE=1`) use their own settings and
+  log folder for every mode (renders, `--bench`, `--calibrate` too), so they no longer write into your
+  sculptforge.log or move your session's log aside. Isolated runs remove their temporary folder when they pass.
 - Custom and Community brushes (Clay Slab and other presets) show the whole alpha at Focal Shift -100, as the
   built-in brushes do since #60: the stamp reaches its square's corners instead of being cut by the preset's round
   tip (#75, reported by rodrigomoretto). At the default Focal Shift presets look as before; saved presets are unchanged.

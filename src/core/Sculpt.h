@@ -175,7 +175,11 @@ public:
 
     // Move brush: capture the region once, then drag it by world deltas.
     void beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym);
-    void grab(Mesh& mesh, BVH& bvh, const glm::vec3& delta);
+    void grab(Mesh& mesh, BVH& bvh, const glm::vec3& delta); // grabMove, then grabFinish
+    // The two halves: the positions (each pointer sample), then the normals and the BVH of what moved (once a
+    // frame: they depend only on where the vertices ended up, so the mesh is the same, bit for bit).
+    void grabMove(Mesh& mesh, const glm::vec3& delta);
+    void grabFinish(Mesh& mesh, BVH& bvh);
 
     // Brushes that change mask or polypaint call these before writing
     // mesh.mask[v] / mesh.colors[v] (after ensureMask()/ensureColors()), so

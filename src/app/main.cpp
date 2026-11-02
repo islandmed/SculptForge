@@ -107,6 +107,28 @@ void isolateSettings() {
     }
 }
 
+// Runs by an agent or a script (SDL_APP_ID=sculptforge-agent, as ~/Work/CLAUDE.md asks for agent windows, or a
+// Claude Code shell) never touch the user's settings, log or hardware profile: a benchmark or render started there
+// wrote into the user's sculptforge.log and pushed the session's log to sculptforge-previous.log.
+// SF_ISOLATE=1 isolates any run, SF_ISOLATE=0 none of the automatic ones.
+bool automatedRun() {
+    const char* force = std::getenv("SF_ISOLATE");
+    if (force && *force) return *force != '0';
+    const char* appId = std::getenv("SDL_APP_ID");
+    const char* claude = std::getenv("CLAUDECODE");
+    return (appId && std::string(appId) == "sculptforge-agent") || (claude && *claude);
+}
+
+int finishIsolated(int code) {
+    // The isolated folder (settings, the log, autosaves: a benchmark's 33M mesh is over a gigabyte) goes with a run
+    // that passed; a failed one keeps it, log included, to look at.
+    if (code == 0 && !g_isolatedDir.empty()) {
+        std::error_code ec;
+        std::filesystem::remove_all(g_isolatedDir, ec);
+    }
+    return code;
+}
+
 } // namespace
 
 // --crash-test: crash the way real bugs do, after the log has started.
@@ -192,8 +214,9 @@ int main(int argc, char** argv) {
             return 1;
         }
     }
-    if (bench.run) return sf::runAppBenchmark(bench);
-    if (calibrate) return sf::runCalibrateCommandLine(calibrateQuick, calibrateSave);
+    if (automatedRun()) isolateSettings();
+    if (bench.run) return finishIsolated(sf::runAppBenchmark(bench));
+    if (calibrate) return finishIsolated(sf::runCalibrateCommandLine(calibrateQuick, calibrateSave));
     if (!options.uiTest.empty()) {
         if (!sizeGiven) options.width = 1600, options.height = 960;
         isolateSettings();
@@ -217,11 +240,5 @@ int main(int argc, char** argv) {
     int code = app.run();
     app.shutdown();
     sf::crashlog::stop();
-    // The isolated folder (settings, the log, autosaves: a benchmark's 33M mesh is over a gigabyte) goes with a run
-    // that passed; a failed one keeps it, log included, to look at.
-    if (code == 0 && !g_isolatedDir.empty()) {
-        std::error_code ec;
-        std::filesystem::remove_all(g_isolatedDir, ec);
-    }
-    return code;
+    return finishIsolated(code);
 }

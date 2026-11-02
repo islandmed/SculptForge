@@ -141,6 +141,7 @@ int runAppBenchmark(BenchCommandLine cl) {
             gl::Finish();
             const auto t = Clock::now();
             renderer.syncScene(scene(m));
+            while (renderer.proxiesPending()) renderer.syncScene(scene(m)); // (built a few ms a frame: all of them)
             gl::Finish();
             return msSince(t);
         };

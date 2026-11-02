@@ -194,6 +194,8 @@ void App::startVoxelRemesh() {
     if (voxelRemesh_) return;
     Args args{{"resolution", double(voxelResolution_)}};
     if (voxelKeepMasked_) args["keep_masked"] = true;
+    if (!memoryAllows("remesh", args, [this] { startVoxelRemesh(); })) return;
+    memoryConfirmed_ = true; // (checked: the remesh command below doesn't ask again)
     if (!hasTexture(doc_.mesh) || !keepTexture_) {
         if (hasTexture(doc_.mesh)) args["keep_texture"] = false; // Keep Texture off
         runCommand("remesh", args);

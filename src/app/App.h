@@ -348,6 +348,9 @@ private:
     BrushType strokeBrush_ = BrushType::Standard;
     bool strokeInvert_ = false;
     glm::vec3 grabPlanePoint_{0.0f}, grabLast_{0.0f};
+    bool grabPending_ = false; // Move: positions moved, normals and BVH not yet (queueGrab / flushGrab, once a frame)
+    void queueGrab(const glm::vec3& delta);
+    void flushGrab();
     // Along the normal (from the discussions): Move, Tendril, Elastic Tendril and KelvinGrab strokes that began with
     // the invert key held (Preferences > Input > Along the normal) slide along the average normal under the brush
     // at the press instead of the view plane. alongNormalTarget: where the cursor puts the grabbed point.
@@ -1564,6 +1567,16 @@ private:
     void drawPackReview();
     void drawNewPack();
     void drawMacroConfirm();
+    // Free memory before a big mesh (core/MemoryGuard.h): a command that would need more than is free asks first.
+    // Returns true to go on now; false: the dialog is open and `proceed` runs on Continue.
+    bool memoryAllows(const std::string& command, const Args& args, std::function<void()> proceed);
+    void drawMemoryConfirm();
+    struct MemoryConfirm {
+        bool open = false;
+        std::string what, message;
+        std::function<void()> proceed;
+    } memoryConfirm_;
+    bool memoryConfirmed_ = false; // the next memoryAllows passes (Continue was pressed)
     void drawMacroEditor();
     void drawPackKeymapRows();  // Preferences > Input: the enabled packs' keymaps
     void pollPackDialogs();
@@ -1783,6 +1796,7 @@ private:
     bool timelapseStep(double budgetSeconds); // renders frames for up to the budget; false when finished
     int runTimelapseCli();                    // sculptforge FILE --timelapse out.mp4
     void startProofMode();                    // Help > Benchmark, sculptforge --benchmark
+    bool proofSkippedScenes() const;          // the benchmark skipped a scene: too little free memory
     void proofBeforeSwap(int fbW, int fbH);   // the interactive loop, after drawing a frame, before showing it
     void drawProofUi();
     // ---- end Sculpt Timeline ----

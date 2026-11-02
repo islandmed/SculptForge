@@ -1341,6 +1341,7 @@ void Renderer::syncScene(const std::vector<SceneMesh>& scene) {
         it = slots_.erase(it);
     }
     drawList_.clear();
+    proxyPending_ = false;
     for (const SceneMesh& m : scene) {
         if (!m.visible || !m.mesh) continue; // hidden: keeps its dirty state until shown
         MeshSlot& ms = slot(m.id);
@@ -1689,23 +1690,38 @@ void Renderer::buildProxies(MeshSlot& s, const Mesh& mesh) {
         gl::BindVertexArray(0);
         s.proxyAllocated = true;
     }
-    std::vector<std::vector<uint16_t>> built(cullScratch_.size());
-    poolFor(cullScratch_.size(), [&](size_t i0, size_t i1) {
-        for (size_t i = i0; i < i1; ++i) {
-            const uint32_t c = cullScratch_[i];
-            ClusterBounds b = s.bounds[c];
-            if (!clusterProxy(mesh, s.order, c, s.order.clusterTriangles(c) / 4, built[i], b)) built[i].clear();
-            s.proxyBounds[c] = b;
-        }
-    }, 1, 2);
+    // A few milliseconds a frame: after a long stroke most of the front is stale, and building all of it in the first
+    // moving frame stalled the view (180-300 ms at 33M). Stale clusters draw in full detail until theirs is built.
+    constexpr double kProxyBudgetMs = 8.0;
+    constexpr size_t kProxyBatch = 1024; // clusters per parallel batch
+    const auto start = std::chrono::steady_clock::now();
+    std::vector<std::vector<uint16_t>> built;
     gl::BindVertexArray(s.proxyVao);
-    for (size_t i = 0; i < cullScratch_.size(); ++i) {
-        const uint32_t c = cullScratch_[i];
-        s.proxyCount[c] = uint32_t(built[i].size());
-        s.proxyStale[c] = 0;
-        if (!built[i].empty())
-            gl::BufferSubData(GL_ELEMENT_ARRAY_BUFFER, GLintptr(size_t(s.order.firstTriangle(c) / 4) * 3 * sizeof(uint16_t)),
-                              GLsizeiptr(built[i].size() * sizeof(uint16_t)), built[i].data());
+    for (size_t at = 0; at < cullScratch_.size();) {
+        const size_t n = std::min(kProxyBatch, cullScratch_.size() - at);
+        built.assign(n, {});
+        poolFor(n, [&](size_t i0, size_t i1) {
+            for (size_t i = i0; i < i1; ++i) {
+                const uint32_t c = cullScratch_[at + i];
+                ClusterBounds b = s.bounds[c];
+                if (!clusterProxy(mesh, s.order, c, s.order.clusterTriangles(c) / 4, built[i], b)) built[i].clear();
+                s.proxyBounds[c] = b;
+            }
+        }, 1, 2);
+        for (size_t i = 0; i < n; ++i) {
+            const uint32_t c = cullScratch_[at + i];
+            s.proxyCount[c] = uint32_t(built[i].size());
+            s.proxyStale[c] = 0;
+            if (!built[i].empty())
+                gl::BufferSubData(GL_ELEMENT_ARRAY_BUFFER, GLintptr(size_t(s.order.firstTriangle(c) / 4) * 3 * sizeof(uint16_t)),
+                                  GLsizeiptr(built[i].size() * sizeof(uint16_t)), built[i].data());
+        }
+        at += n;
+        if (at < cullScratch_.size() &&
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() > kProxyBudgetMs) {
+            proxyPending_ = true;
+            break;
+        }
     }
     gl::BindVertexArray(0);
 }
@@ -2182,7 +2198,7 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     s.fresh = false;
     uploadPatches(s, mesh, wireframe); // (may ask for a full upload next time)
     mesh.clearDirty();
-    if (syncLog && (full || ranged)) {
+    if (syncLog && (full || ranged || proxyMs > 1.0)) {
         size_t sent = 0;
         for (const auto& [b0, e0] : dirtyRuns_) sent += e0 - b0;
         SDL_Log("sync: %s %zu slots in %zu runs, %.1f ms (vertices %.1f, bounds %.1f, proxy %.1f)", full ? "full" : "ranged",
