@@ -776,7 +776,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
             d = nrm[v] * (sign * s * r * 0.05f * f);
             break;
         case BrushType::Smooth: {
-            auto ring = mesh.neighbors(v);
+            auto ring = mesh.polygonNeighbors(v);
             if (ring.empty()) break;
             glm::vec3 avg(0.0f);
             if (keepVolume) {
@@ -912,7 +912,7 @@ void Sculptor::taubinShrink(const Mesh& mesh) {
     poolFor(verts_.size(), [&](size_t begin, size_t end) {
         for (size_t i = begin; i < end; ++i) {
             const uint32_t v = verts_[i];
-            auto ring = mesh.neighbors(v);
+            auto ring = mesh.polygonNeighbors(v);
             shrunk_[i] = pos[v];
             if (ring.empty()) continue;
             glm::vec3 avg(0.0f);
@@ -1127,7 +1127,7 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
     if (r.smooth > 0.0f) {
         poolFor(verts_.size(), [&](size_t begin, size_t end) {
             for (size_t i = begin; i < end; ++i) {
-                auto ring = mesh.neighbors(verts_[i]);
+                auto ring = mesh.polygonNeighbors(verts_[i]);
                 if (ring.empty()) {
                     scratch_[i] = glm::vec3(0.0f);
                     continue;

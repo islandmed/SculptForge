@@ -798,6 +798,13 @@ void App::drawPalette_Tool() {
         ImGui::SameLine();
         ImGui::Checkbox(tr("Groups##display"), &renderSettings_.showPolygroups);
         ui::HelpAction(*this, "view.polygroups");
+        if (ImGui::Checkbox(tr("Backface culling##display"), &renderSettings_.backfaceCulling))
+            uiPrefs_.backfaceCulling = renderSettings_.backfaceCulling; // the default for the next session
+        ui::HelpText("Backface culling", nullptr,
+                     "Don't draw the back faces of the model: faster on dense meshes, and you see through the openings "
+                     "of open meshes (a scan, a garment) instead of their inside. Brushes then work only on faces you "
+                     "can see. Off by default; Store Config keeps it, projects keep their own.",
+                     "Tool > Display");
         ImGui::ColorEdit3(tr("Material colour"), &renderSettings_.baseColor.x, ImGuiColorEditFlags_NoInputs);
         ui::HelpText("Material colour", nullptr, "Colour of the Studio material (the clay colour).", "Tool > Display");
         drawShadingControls();

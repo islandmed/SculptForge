@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // The support card at launch: a full-window card over the app with a bronze sculpt render (rendered by SculptForge
-// itself, assets/branding/support-card.jpg), the three memberships and a one-time gift. When it may show is decided
+// itself, assets/branding/support-card.jpg), the three memberships and the one-time Supporter. When it may show is decided
 // once while starting (supportCardDue in Support.h): the first start, the first start of each new version, then at
 // most once a week; never mid-session, never for a supporter, never in tests, renders, demos or CI. Every button only
 // opens one of the fixed links in Support.h in the browser. The picture is decoded on a worker thread the first time
@@ -403,12 +403,12 @@ void App::drawSupportCard() {
         paint.text(boldUi, 13.0f, ImVec2(c0.x + 13.0f * k, c0.y + (28.0f * k - ts.y) * 0.5f), col(0xf2f2f2, A), chip.c_str());
         y += 44.0f * k;
     }
-    paint.spaced(boldUi, 12.5f, ImVec2(a.x + pad, y), col(0xffb06a, A), "SUPPORT SCULPTFORGE", 2.2f);
+    paint.spaced(boldUi, 12.5f, ImVec2(a.x + pad, y), col(0xffb06a, A), "SCULPTFORGE MEMBERSHIP", 2.2f);
     y += 30.0f * k;
     y += paint.text(titleFont, 40.0f, ImVec2(a.x + pad, y), col(0xffffff, A), "Free for everyone,").y;
     // The second line in the accent, with a soft glow.
     {
-        const char* line = "kept going by you.";
+        const char* line = "more for members.";
         for (int i = 0; i < 6; ++i) {
             const float ang = float(i) * 1.0472f, r = 3.0f * k;
             dl->AddText(titleFont, 40.0f * k, ImVec2(a.x + pad + std::cos(ang) * r, y + std::sin(ang) * r),
@@ -418,8 +418,8 @@ void App::drawSupportCard() {
     }
     y += 16.0f * k;
     y += paint.text(bodyFont, 16.5f, ImVec2(a.x + pad, y), col(0xc9c9d0, A),
-                    "SculptForge has no ads, no accounts and no telemetry, and every feature stays free for "
-                    "everyone. Memberships pay for code signing, test hardware and development time.",
+                    "SculptForge has no ads, no accounts and no telemetry, and every feature stays free. "
+                    "Memberships add credits, a monthly brush and alpha pack and a roadmap vote.",
                     colW - pad)
              .y;
     y += 14.0f * k;
@@ -453,15 +453,15 @@ void App::drawSupportCard() {
 
     // The three memberships.
     static const Tier kTiers[3] = {
-        {"Supporter", "$5", "/ month", "Your name in the app's Supporters list and on the website, if you like.",
-         "Support monthly", "Support monthly##card.supporter", kSupportUrlSupporter},
+        {"Supporter", "$5", "/ month", "Your name in the in-app and website credits, if you like.",
+         "Join as a Supporter", "Join as a Supporter##card.supporter", kSupportUrlSupporter},
         {"Insider", "$20", "/ month",
-         "Each release about two weeks early, starting with SculptForge 1.0. A monthly vote on what gets built "
-         "next, and the monthly Supporter Pack of brushes, alphas and VDMs.",
+         "The monthly Supporter Pack of brushes, alphas and VDMs (free to everyone after three months), a "
+         "monthly roadmap vote and your name in the credits.",
          "Become an Insider", "Become an Insider##card.insider", kSupportUrlInsider},
         {"Studio", "$150", "/ month",
-         "Insider access for up to 10 artists ($15 each), priority triage of your pipeline bugs, monthly "
-         "invoices and your logo on the website and README.",
+         "Insider benefits for up to 10 artists ($15 each), priority bug triage and support, monthly invoices "
+         "and your logo on the website and README.",
          "Studio membership", "Studio membership##card.studio", kSupportUrlStudio},
     };
     const float gap = 18.0f * k, footer = 58.0f * k, tierH = 262.0f * k;
@@ -542,7 +542,7 @@ void App::drawSupportCard() {
                    col(featured ? 0x1a0d04 : 0xf2f2f2, appear), tier.cta);
     }
 
-    // Footer: a one-time gift, the community Discord, "I'm already a supporter" and "Maybe later".
+    // Footer: the one-time Supporter (pay what you want), the community Discord, "I'm already a supporter" and "Maybe later".
     const float fy = b.y - footer * 0.5f;
     const float fa = easeOut((t - 0.45f) / 0.5f) * A;
     auto link = [&](const char* label, const char* id, ImVec2 at, unsigned hex, bool underline) {
@@ -556,17 +556,17 @@ void App::drawSupportCard() {
         return ImGui::IsItemClicked();
     };
     {
-        const char* lead = "Prefer a one-time gift?";
+        const char* lead = "No subscription?";
         const ImVec2 ls = paint.measure(bodyFont, 15.0f, lead);
         const float ly = std::floor(fy - ls.y * 0.5f);
         paint.text(bodyFont, 15.0f, ImVec2(a.x + pad, ly), col(0x9a9aa3, fa), lead);
-        if (link("Give once", "Give once##card.once", ImVec2(a.x + pad + ls.x + 8.0f * k, ly), 0xffb06a, true))
+        if (link("One-time Supporter", "One-time Supporter##card.once", ImVec2(a.x + pad + ls.x + 8.0f * k, ly), 0xffb06a, true))
             clicked = kSupportUrlOnce;
         // The community Discord: a secondary pill the weight of "Maybe later", with a drawn speech-bubble glyph (no
         // logo asset). It opens the invite and leaves the card open.
         const char* label = "Join the community on Discord";
         const ImVec2 ds = paint.measure(boldUi, 15.0f, label);
-        const ImVec2 gs = paint.measure(bodyFont, 15.0f, "Give once");
+        const ImVec2 gs = paint.measure(bodyFont, 15.0f, "One-time Supporter");
         const float glyph = 18.0f * k;
         const ImVec2 c0(std::floor(a.x + pad + ls.x + 8.0f * k + gs.x + 28.0f * k), fy - 19.0f * k);
         const ImVec2 c1(c0.x + 18.0f * k + glyph + 10.0f * k + ds.x + 22.0f * k, fy + 19.0f * k);
@@ -628,7 +628,7 @@ void App::drawSupportCard() {
 void App::drawSupportPrefs() {
     if (ImGui::Checkbox("Show the support card at launch", &supportCardPrefs_.enabled)) saveProjectPrefs();
     ui::HelpText("Show the support card at launch", nullptr,
-                 "A card with the memberships that support SculptForge, shown while it starts: the first time, after "
+                 "A card with the SculptForge memberships, shown while it starts: the first time, after "
                  "each update, and at most once a week otherwise. Never while you work.",
                  "Preferences > Support");
     if (ImGui::Checkbox("I'm a supporter", &supportCardPrefs_.supporter)) saveProjectPrefs();

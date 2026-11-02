@@ -267,7 +267,11 @@ bool App::radialMouseEvent(const SDL_Event& e) {
         return true;
     }
     if (e.button.which == SDL_PEN_MOUSEID) return false; // pen buttons come through radialPenButton
+    // Only a plain press opens a menu (#74): with Alt, Ctrl, Shift or the system key held the button keeps its
+    // navigation or tool binding (Alt+middle pans, Alt+right zooms in the Maya style, Shift+right turns the view).
+    if (SDL_GetModState() & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)) return false;
     const RadialButton b = button == SDL_BUTTON_MIDDLE ? RadialButton::MouseMiddle
+                           : button == SDL_BUTTON_RIGHT ? RadialButton::MouseRight
                            : button == SDL_BUTTON_X1   ? RadialButton::MouseBack
                            : button == SDL_BUTTON_X2   ? RadialButton::MouseForward
                                                        : RadialButton::None;
@@ -499,8 +503,21 @@ void App::drawRadialMenusSection() {
         }
         ui::HelpText("Button", nullptr,
                      "A mouse or pen button that opens this menu while held, besides the key. It then stops doing "
-                     "what it did before (a pen button's Preferences > Tablet mapping, the middle button's pan).",
+                     "what it did before (a pen button's Preferences > Tablet mapping, the middle button's pan, the "
+                     "right button's turn). Mouse buttons open it only when no modifier key is held: Alt+middle still "
+                     "pans, Alt+right still zooms (Maya style), Shift+right still turns the view.",
                      path);
+        if (m.button == RadialButton::MouseRight) {
+            // The view must stay reachable (#74): say how it turns now.
+            const char* how = blenderStyle() ? "middle-drag (or Alt+left-drag)"
+                              : mayaStyle()  ? "Alt+left-drag"
+                              : uiPrefs_.airStrokes ? "Shift+right-drag (Start strokes off the model is on, so a left-drag "
+                                                      "beside the model sculpts)"
+                                                    : "Shift+right-drag, or a left-drag beside the model";
+            ImGui::PushTextWrapPos(0.0f);
+            ImGui::TextDisabled("Right-drag opens this menu. Turn the view with %s.", how);
+            ImGui::PopTextWrapPos();
+        }
 
         // Items: one row each (the action, up / down / remove); the selected one also shows its own label and icon,
         // and Change action.

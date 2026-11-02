@@ -37,6 +37,9 @@ struct RenderSettings {
     bool dimInactive = true;   // SubTools other than the active one render slightly darker (ZBrush style)
     bool motionProxy = false;  // the view is moving (Fast Navigation): draw big meshes' lighter proxy (render/Clusters.h)
     bool flatShading = false;  // the scene's shading (Material palette): faceted; SubTools can override (core/Document.h)
+    // Backface culling (#68, Tool > Display): back faces are never drawn, on any mesh (closed or not, from any
+    // view). Off: they are skipped only where they can't show (a closed mesh seen from outside, Renderer::cull).
+    bool backfaceCulling = false;
     // The view's background: the charcoal radial gradient (default) or one flat display (sRGB) colour (#21).
     bool gradientBackground = true;
     glm::vec3 backgroundColor{0.165f, 0.165f, 0.173f};
@@ -398,6 +401,7 @@ private:
     std::vector<uint32_t> extraClusters_[4]; // drawSlot: clusters a ghost dab reaches (1), a draft moved (2), both
     uint32_t draftId_ = 0;                   // setDraftNormals
     bool cullBackfaces_ = false; // the last cull(): back faces can't show (so the GPU may skip them too)
+    bool forceBackfaces_ = false; // this frame: RenderSettings::backfaceCulling (#68), back faces never drawn
     std::vector<uint32_t> cullScratch_;
     size_t lastDrawn_ = 0;
     // The frame draw() is drawing: matrices, the view's rectangle (x, y, w, h) and its culling.

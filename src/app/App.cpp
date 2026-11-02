@@ -358,6 +358,10 @@ void App::shutdown() {
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
+    for (SDL_Cursor*& c : cursors_) {
+        if (c) SDL_DestroyCursor(c);
+        c = nullptr;
+    }
     renderer_.shutdown();
     if (glContext_) SDL_GL_DestroyContext(glContext_);
     if (window_) SDL_DestroyWindow(window_);
@@ -453,6 +457,7 @@ int App::runUiTest(int w, int h, int fps) {
         if (ImGuiContext* g = ImGui::GetCurrentContext()) demo_->setFrameText(g->LogBuffer.c_str());
         ImGui::LogFinish();
         ImGui::Render();
+        updateMouseCursor();
 
         prewarmTexturePaint(); // dense textured meshes: ready the area under the hovering Paint brush (PanelPbr.cpp)
         const auto syncStart = std::chrono::steady_clock::now();
@@ -619,6 +624,7 @@ int App::runRecording() {
         drawUi();
         demo_->drawOverlay();
         ImGui::Render();
+        updateMouseCursor();
 
         syncScene();
         ++frames;
@@ -732,6 +738,12 @@ int App::run() {
     uint64_t framesDrawn = 0, wakeUps = 0, framesAtMeasure = 0, wakesAtMeasure = 0;
     std::clock_t cpuAtMeasure = 0; // processor time of every thread (the driver's included)
     bool measuring = false;
+    // Input while measuring (a pointer crossing the window on a shared desktop) restarts the count once it has
+    // passed: idle means no input. After kMeasureGiveUp seconds it counts whatever comes (the test's timeout).
+    constexpr double kMeasureGiveUp = 40.0;
+    double measureFrom = started + kMeasureSettle;
+    int measureRestarts = 0;
+    float lastMotionX = -1e9f, lastMotionY = -1e9f; // the mouse's last position, from its motion events
     Uint64 lastTicks = SDL_GetTicksNS();
     uint64_t lastKey = frameKey();
     bool draw = true;
@@ -753,6 +765,7 @@ int App::run() {
         double releaseMs = 0.0, releaseAt = 0.0;
         uint64_t frames = 0, samples = 0, lagSamples = 0;
         float cx = 0.0f, cy = 0.0f, r = 0.0f;
+        double angle = 0.0; // the pointer's angle round the circle (0 at the press, 4 pi at the end)
         std::vector<glm::vec2> dabs;
         MeasureView view{};     // the view before the stroke (it starts once this has held still for a second)
         double viewSince = 0.0;
@@ -772,17 +785,18 @@ int App::run() {
     while (running_) {
         const double t0 = seconds();
         if (options_.measureIdle > 0.0f) {
-            if (!measuring && t0 - started >= kMeasureSettle) {
+            if (!measuring && t0 >= measureFrom) {
                 measuring = true;
                 framesAtMeasure = framesDrawn;
                 wakesAtMeasure = wakeUps;
                 cpuAtMeasure = std::clock();
-            } else if (measuring && t0 - started >= kMeasureSettle + options_.measureIdle) {
+            } else if (measuring && t0 >= measureFrom + options_.measureIdle) {
                 const double fps = double(framesDrawn - framesAtMeasure) / double(options_.measureIdle);
                 const double cpu = 100.0 * double(std::clock() - cpuAtMeasure) / CLOCKS_PER_SEC / double(options_.measureIdle);
                 std::printf("Idle: %llu frames, %llu wake-ups in %.1f s: %.2f fps, CPU %.1f%% of one core (%s redraw)\n",
                             (unsigned long long)(framesDrawn - framesAtMeasure), (unsigned long long)(wakeUps - wakesAtMeasure),
                             double(options_.measureIdle), fps, cpu, continuous ? "continuous" : "on-demand");
+                if (measureRestarts > 0) std::printf("  (restarted %d times after input)\n", measureRestarts);
                 std::fflush(stdout);
                 // Idle is 0 fps; a pointer crossing the window draws about a second's worth. Every frame is 60+.
                 return continuous || fps < 5.0 ? 0 : 1;
@@ -802,6 +816,15 @@ int App::run() {
                 ev.type == SDL_EVENT_MOUSE_REMOVED || ev.type == SDL_EVENT_CLIPBOARD_UPDATE ||
                 (ev.type == SDL_EVENT_JOYSTICK_AXIS_MOTION && !spaceMouseDeflected()))
                 return; // nothing on screen changes (a hand resting on a SpaceMouse: inside its dead zone)
+            // A mouse motion event that doesn't move the mouse: what a window system sends when the cursor's shape
+            // changes or the window is refocused under a still pointer (the crosshair over the view, #73). Not input,
+            // and nothing to draw: counting it would make setting the cursor wake the idle loop.
+            if (ev.type == SDL_EVENT_MOUSE_MOTION && ev.motion.which != SDL_PEN_MOUSEID) {
+                const bool still = ev.motion.x == lastMotionX && ev.motion.y == lastMotionY;
+                lastMotionX = ev.motion.x;
+                lastMotionY = ev.motion.y;
+                if (still) return;
+            }
             draw = true;
             if (logRedraw) SDL_Log("redraw: event 0x%x", unsigned(ev.type));
             const bool input = (ev.type >= SDL_EVENT_KEY_DOWN && ev.type < SDL_EVENT_JOYSTICK_AXIS_MOTION) ||
@@ -810,6 +833,11 @@ int App::run() {
                                ev.type == SDL_EVENT_DROP_FILE;
             const double t = seconds();
             activeUntil_ = std::max(activeUntil_, t + (input ? std::max(0.75, double(uiPrefs_.tooltipDelay) + 0.5) : 0.1));
+            if (input && options_.measureIdle > 0.0f && t - started < kMeasureGiveUp) {
+                if (measuring) ++measureRestarts;
+                measuring = false;
+                measureFrom = std::max(measureFrom, activeUntil_ + 0.5);
+            }
         };
         SDL_Event e;
         if (!continuous && !draw) {
@@ -856,8 +884,15 @@ int App::run() {
                 return 1;
             }
         } else if (sm.moving) {
-            const double u = std::min(1.0, (seconds() - sm.start) / double(options_.measureStroke));
-            const double a = u * 4.0 * 3.14159265358979;
+            // The pointer follows the clock, but moves at most kMaxPointerStep per pass: the stroke follows the chords
+            // between samples, and on a slow frame rate (software GL on a busy machine: 100 ms frames and more) the
+            // chords would cut well inside the circle, or one long frame would skip the whole stroke. Above 30 fps
+            // the clock alone sets it; below, the stroke takes longer and is checked just as strictly.
+            constexpr double kMaxPointerStep = 0.25; // radians (a chord's middle 0.8% of the radius inside the circle)
+            const double clock = std::min(1.0, (seconds() - sm.start) / double(options_.measureStroke)) * 4.0 * 3.14159265358979;
+            const double a = std::min(clock, sm.angle + kMaxPointerStep);
+            const double u = a / (4.0 * 3.14159265358979);
+            sm.angle = a;
             // SF_MEASURE_RESIZE=1: the brush size changes every frame mid-stroke, as [ and ] would (the solver thread
             // must see each batch's own size: ui_stroke_resize, with verify).
             static const bool resize = std::getenv("SF_MEASURE_RESIZE") != nullptr;
@@ -897,7 +932,7 @@ int App::run() {
                             "  brush behind the pointer: surface mean %.0f px, worst %.0f px; preview mean %.0f px, worst %.0f px\n"
                             "  release %.0f ms (last dab on screen after %.0f ms)\n",
                             interactiveStrokes_ ? "queued" : "immediate", predictiveStrokes() ? ", predictive" : "", sm.dabs.size(),
-                            (unsigned long long)sm.samples, double(options_.measureStroke), double(sm.r), double(radiusPx_),
+                            (unsigned long long)sm.samples, sm.releaseAt - sm.start, double(sm.r), double(radiusPx_),
                             double(pct(0.5)), double(pct(0.95)), double(off.empty() ? 0.0f : off.back()), sm.pressMs,
                             sm.firstSurfaceMs, (unsigned long long)sm.frames, frameMean, sm.maxFrame * 1000.0, lagMean, sm.maxLag,
                             previewMean, sm.maxPreviewLag, releaseMs, releaseDoneMs);
@@ -919,7 +954,11 @@ int App::run() {
                 const float spacing = std::max(1.0f, radiusPx_ * 0.15f);
                 const double expected = 4.0 * 3.14159265358979 * double(sm.r) / double(spacing);
                 if (std::getenv("SF_MEASURE_RESIZE")) return 0; // (the spacing changed with the size: verify checked it)
-                return double(sm.dabs.size()) >= 0.9 * expected && !off.empty() && off.back() < spacing ? 0 : 1;
+                const bool enough = double(sm.dabs.size()) >= 0.9 * expected, onCircle = !off.empty() && off.back() < spacing;
+                if (!enough || !onCircle)
+                    std::printf("Stroke check failed: %zu dabs (want %.0f or more), worst %.1f px off the circle (want under %.1f)\n",
+                                sm.dabs.size(), 0.9 * expected, double(off.empty() ? 0.0f : off.back()), double(spacing));
+                return enough && onCircle ? 0 : 1;
             }
         }
         // The stroke's queued dabs: handed to the solver thread (predictive strokes, AsyncStroke.cpp), or placed here
@@ -993,6 +1032,7 @@ int App::run() {
         drawUi();
         drawHardwareProfileOverlay();
         ImGui::Render();
+        updateMouseCursor();
         mark();
 
         buildGhost(); // the dabs not on the GPU yet, drawn as a preview (predictive strokes)
@@ -1062,8 +1102,7 @@ int App::run() {
             sm.lastFrame = now;
             ++sm.frames;
             if (!sm.dabs.empty()) { // how far round the circle the brush is behind the pointer, on screen now
-                const double u = std::min(1.0, (now - sm.start) / double(options_.measureStroke));
-                const double pointer = std::fmod(u * 4.0 * 3.14159265358979, 2.0 * 3.14159265358979);
+                const double pointer = std::fmod(sm.angle, 2.0 * 3.14159265358979); // where the pointer was sent
                 const glm::vec2 d = sm.dabs.back();
                 double behind = pointer - std::atan2(double(d.y - sm.cy), double(d.x - sm.cx));
                 behind = std::remainder(behind, 2.0 * 3.14159265358979);
@@ -1177,7 +1216,76 @@ bool App::pick(float x, float y, RayHit& hit) const {
     if (!doc_.activeSubtoolInfo().visible) return false; // you can't sculpt what you can't see
     glm::vec3 origin, dir;
     canvasRay(x, y, origin, dir);
-    return surfaceRaycast(doc_.mesh, doc_.bvh, origin, dir, hit); // (the micro surface on a micro level)
+    return frontRaycast(origin, dir, hit);
+}
+
+// The surface under a ray as drawn: with Backface culling on (#68) a back face isn't drawn, so the ray goes on
+// through it to the next face it meets (a brush through the opening of an open mesh works on the far side).
+bool App::frontRaycast(const glm::vec3& origin, const glm::vec3& dir, RayHit& hit) const {
+    if (!surfaceRaycast(doc_.mesh, doc_.bvh, origin, dir, hit)) return false; // (the micro surface on a micro level)
+    if (!renderSettings_.backfaceCulling) return true;
+    glm::vec3 o = origin;
+    for (int i = 0; i < 16 && glm::dot(hit.normal, dir) > 0.0f; ++i) {
+        const glm::vec3 d = glm::normalize(dir);
+        o = hit.position + d * std::max(1e-6f, 1e-5f * glm::distance(origin, hit.position)); // just past it
+        if (!surfaceRaycast(doc_.mesh, doc_.bvh, o, dir, hit)) return false;
+    }
+    return glm::dot(hit.normal, dir) <= 0.0f;
+}
+
+// The crosshair (#73): over the 3D view, where a click sculpts, paints or masks, or while a stroke runs (it may
+// drag over a panel). Not over the panels or windows floating above the view (ImGui has the pointer), a gizmo
+// handle, while the view turns or pans, or where ImGui asks for a cursor of its own (a resize handle on the edge).
+bool App::viewportCursorWanted() const {
+    if (uiPrefs_.viewportCursor != 0) return false;
+    if (drag_ == Drag::Stroke || drag_ == Drag::MaskCanvas || drag_ == Drag::AirStroke) return true;
+    if (drag_ != Drag::None) return false;
+    if (ImGui::GetIO().WantCaptureMouse || !canvasRect().contains(mouseX_, mouseY_)) return false;
+    if (ImGui::GetMouseCursor() != ImGuiMouseCursor_Arrow) return false;
+    if (gizmoActive() && gizmo_.hover != GizmoHandle::None) return false;
+    return true;
+}
+
+// The system cursor, set here rather than by ImGui's backend (which knows no crosshair, and would not put its own
+// back after another was set): ImGui's choice, or the crosshair over the view. Decided after the frame's UI, from
+// that frame's hover state, so a window floating over the view never makes it flicker. SDL_SetCursor runs only
+// when the kind changes.
+void App::updateMouseCursor() {
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
+    const ImGuiMouseCursor ui = ImGui::GetMouseCursor();
+    cursorKind_ = viewportCursorWanted() ? kCursorCrosshair : ui == ImGuiMouseCursor_None || io.MouseDrawCursor ? kCursorHidden : int(ui);
+    if (cursorKind_ == cursorShown_) return; // (the shape on screen already: nothing for the window system to do)
+    const bool wasHidden = cursorShown_ == kCursorHidden || cursorShown_ == -2;
+    cursorShown_ = cursorKind_;
+    if (cursorKind_ == kCursorHidden) {
+        SDL_HideCursor();
+        return;
+    }
+    SDL_SystemCursor id = SDL_SYSTEM_CURSOR_DEFAULT;
+    switch (cursorKind_) {
+    case kCursorCrosshair: id = SDL_SYSTEM_CURSOR_CROSSHAIR; break;
+    case ImGuiMouseCursor_TextInput: id = SDL_SYSTEM_CURSOR_TEXT; break;
+    case ImGuiMouseCursor_ResizeAll: id = SDL_SYSTEM_CURSOR_MOVE; break;
+    case ImGuiMouseCursor_ResizeNS: id = SDL_SYSTEM_CURSOR_NS_RESIZE; break;
+    case ImGuiMouseCursor_ResizeEW: id = SDL_SYSTEM_CURSOR_EW_RESIZE; break;
+    case ImGuiMouseCursor_ResizeNESW: id = SDL_SYSTEM_CURSOR_NESW_RESIZE; break;
+    case ImGuiMouseCursor_ResizeNWSE: id = SDL_SYSTEM_CURSOR_NWSE_RESIZE; break;
+    case ImGuiMouseCursor_Hand: id = SDL_SYSTEM_CURSOR_POINTER; break;
+    case ImGuiMouseCursor_Wait: id = SDL_SYSTEM_CURSOR_WAIT; break;
+    case ImGuiMouseCursor_Progress: id = SDL_SYSTEM_CURSOR_PROGRESS; break;
+    case ImGuiMouseCursor_NotAllowed: id = SDL_SYSTEM_CURSOR_NOT_ALLOWED; break;
+    default: break;
+    }
+    const size_t slot = size_t(id) < std::size(cursors_) ? size_t(id) : 0;
+    if (!cursors_[slot]) cursors_[slot] = SDL_CreateSystemCursor(id);
+    if (!cursors_[slot] && id != SDL_SYSTEM_CURSOR_DEFAULT) { // (a system without this one: the arrow)
+        if (!cursors_[0]) cursors_[0] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_DEFAULT);
+        if (cursors_[0]) SDL_SetCursor(cursors_[0]);
+    } else if (cursors_[slot]) {
+        SDL_SetCursor(cursors_[slot]);
+    }
+    if (wasHidden) SDL_ShowCursor();
 }
 
 BrushType App::activeBrush() const {

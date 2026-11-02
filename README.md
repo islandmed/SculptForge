@@ -24,7 +24,8 @@
   <a href="#features">Features</a> ·
   <a href="#building">Build from source</a> ·
   <a href="CONTRIBUTING.md">Contribute</a> ·
-  <a href="https://discord.gg/gWrYkEmQhH">Discord</a>
+  <a href="https://discord.gg/gWrYkEmQhH">Discord</a> ·
+  <a href="https://sculptforge.app/support.html">Membership</a>
 </p>
 
 <p align="center">

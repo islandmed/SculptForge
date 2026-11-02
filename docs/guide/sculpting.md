@@ -175,7 +175,9 @@ bumps but leaves the form where it is (a Taubin smooth, one step in and a slight
   the Smooth brush use; letting go of <kbd>Shift</kbd> mid-stroke then switches to the plain one. Saved with the
   project.
 
-On a micro level (see [Micro levels](micro-levels.md)) Smooth is always the plain one for now.
+On a micro level (see [Micro levels](micro-levels.md)) Smooth is always the plain one for now. On a quad mesh
+(after Quad Remesh, or an imported quad model) Smooth follows the quads' own edges, never their diagonals, so the
+quads keep their shape (#69).
 
 ![The Draw palette](images/draw-palette.jpg)
 
@@ -258,9 +260,12 @@ Both keys are free in every input style. Make your own in **Preferences > Input 
 - Click an item to give it your own **label** and **icon**, or **Change action**. The arrows reorder items (the
   first points up, the rest go clockwise); the cross removes one.
 - **Key** sets the key that opens the menu (it is an ordinary shortcut, so **Preferences > Hotkeys** lists it
-  too). The button next to it can also open the menu while held: the middle, back or forward mouse button, or one
-  of the pen's side buttons. That button then stops doing what it did before (a pen button's
-  Preferences > Tablet mapping, the middle button's pan).
+  too). The button next to it can also open the menu while held: the middle, right, back or forward mouse button,
+  or one of the pen's side buttons. That button then stops doing what it did before (a pen button's
+  Preferences > Tablet mapping, the middle button's pan, the right button's turn). A mouse button opens the menu
+  only with no modifier key held (#74): <kbd>Alt</kbd>+middle still pans, <kbd>Alt</kbd>+right still zooms in the
+  Maya style, and <kbd>Shift</kbd>+right-drag still turns the view, so a menu on the right button never leaves you
+  without a way to turn it (the panel says how).
 - **Export...** saves the menu as a small `.json` file to share; **Import...** loads one. A menu file holds only
   action names, never anything that runs: names this version doesn't know are left out.
 - **Restore default menus** brings back Brushes and Masking.
@@ -599,7 +604,8 @@ also have a **Pressure curve** setting that makes them respond to a light or a f
   lower button right-click to rotate the view, upper button **Invert**, third button **Pan view**). A side button
   can open a [radial menu](#radial-menus) instead (Preferences > Input > Radial Menus).
 - **Mouse mode (relative)**, for a tablet whose driver is set to mouse mode: the pen moves the cursor by how far
-  it moves, and putting it down elsewhere on the tablet leaves the cursor where it was.
+  it moves, and putting it down elsewhere on the tablet leaves the cursor where it was. The brush follows the
+  system cursor the driver moves, so brush, arrow and clicks always agree (#72).
 
 **Store Config** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) keeps these settings. Setup notes for Windows
 Ink, macOS and Linux are in

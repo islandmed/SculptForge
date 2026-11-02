@@ -87,6 +87,8 @@ Json toJson(const UiPrefs& p) {
     j.set("draftStrokes", p.draftStrokes);
     j.set("dyntopoConstantDetail", p.dyntopoConstantDetail);
     j.set("flatShading", p.flatShading);
+    j.set("viewportCursor", double(p.viewportCursor));
+    j.set("backfaceCulling", p.backfaceCulling);
     j.set("background", std::string(p.gradientBackground ? "gradient" : "flat"));
     Json bg = Json::array();
     for (int i = 0; i < 3; ++i) bg.push(double(p.backgroundColor[i]));
@@ -148,6 +150,8 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.draftStrokes = j["draftStrokes"].asBool(p.draftStrokes);
     p.dyntopoConstantDetail = j["dyntopoConstantDetail"].asBool(p.dyntopoConstantDetail);
     p.flatShading = j["flatShading"].asBool(p.flatShading);
+    p.viewportCursor = std::clamp(int(j["viewportCursor"].asNumber(p.viewportCursor)), 0, 1);
+    p.backfaceCulling = j["backfaceCulling"].asBool(p.backfaceCulling);
     if (j["background"].isString()) p.gradientBackground = j["background"].asString() != "flat";
     if (const Json& bg = j["backgroundColor"]; bg.size() == 3)
         for (int i = 0; i < 3; ++i) p.backgroundColor[i] = std::clamp(float(bg[size_t(i)].asNumber(p.backgroundColor[i])), 0.0f, 1.0f);
@@ -515,8 +519,8 @@ void App::initActions() {
         "Version, licence and the open-source components SculptForge is built with.");
     add("help.support", "Support SculptForge...", "Help", nullptr, [this] { openSupportPage(); }, ICON_LC_HEART, nullptr,
         nullptr, nullptr,
-        "SculptForge is free and stays free. If it helps your work, you can support its development: opens "
-        "sculptforge.app/donate.html in your browser. Nothing in the app changes either way.");
+        "SculptForge is free and stays free. Memberships add your name to the credits, a monthly brush and "
+        "alpha pack and a roadmap vote: opens sculptforge.app/support.html in your browser. Nothing in the app changes either way.");
     add("help.discord", "Join the Discord...", "Help", nullptr, [this] { openDiscordPage(); }, ICON_LC_MESSAGE_CIRCLE,
         nullptr, nullptr, nullptr,
         "The official SculptForge community on Discord: questions, tips and work in progress. Opens the invite in "
@@ -751,6 +755,7 @@ bool App::readUiConfig(const std::string& path, std::string& err) {
     doc_.sculptor.dyntopo.constantDetail = uiPrefs_.dyntopoConstantDetail;
     doc_.sculptor.dyntopo.smoothRemesh = uiPrefs_.dyntopoSmoothRemesh;
     renderSettings_.flatShading = uiPrefs_.flatShading;
+    renderSettings_.backfaceCulling = uiPrefs_.backfaceCulling;
     renderSettings_.gradientBackground = uiPrefs_.gradientBackground;
     renderSettings_.backgroundColor = uiPrefs_.backgroundColor;
     return true;
@@ -1109,6 +1114,19 @@ void drawInterfaceSection(App& app) {
         ui::HelpText("Language", nullptr,
                      "The language of menus, palettes, shelves and messages. Brush and tool names (Quad Remesh, Forge Spheres, "
                      "Clay Block...) stay as they are. Store Config keeps it for the next start.",
+                     "Preferences > Interface");
+    }
+    // Viewport cursor (#73).
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(tr("Viewport cursor"));
+    const char* const kCursors[] = {"Crosshair##viewport_cursor", "Arrow##viewport_cursor"};
+    for (int i = 0; i < 2; ++i) {
+        ImGui::SameLine();
+        if (ImGui::RadioButton(tr(kCursors[i]), p.viewportCursor == i)) p.viewportCursor = i;
+        ui::HelpText("Viewport cursor", nullptr,
+                     "The pointer over the 3D view: a crosshair (the default, as in most sculpting apps) or the arrow. "
+                     "Panels, menus and popups always show the arrow (or their own resize and text cursors). Store "
+                     "Config keeps it.",
                      "Preferences > Interface");
     }
     ImGui::Checkbox(tr("Popup Info (Ctrl+hover help)"), &p.popupInfo);

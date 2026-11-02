@@ -7,6 +7,7 @@
 #include "core/SubTools.h"
 
 #include <algorithm>
+#include <string>
 #include <limits>
 #include <map>
 #include <unordered_map>
@@ -36,22 +37,40 @@ namespace {
 uint64_t directedKey(uint32_t a, uint32_t b) { return (uint64_t(a) << 32) | b; }
 
 // The closed loops of open edges of `tris`, each in the direction its triangle runs along it (the triangle on
-// its left). False when that isn't a set of simple loops: an edge used twice the same way, or a vertex where
-// two loops meet.
-bool boundaryLoops(const std::vector<glm::uvec3>& tris, std::vector<std::vector<uint32_t>>& loops) {
+// its left). An edge is open where more triangles run along it one way than the other, so an edge where the
+// surface meets itself (four triangles, as voxel remeshing leaves where two parts of a model touch) is not
+// open (#67: the stitch used to refuse every such surface). False when the open edges aren't a set of simple
+// loops: an edge open twice over, or a vertex where two loops meet (each such vertex is added to `pinches`).
+bool boundaryLoops(const std::vector<glm::uvec3>& tris, std::vector<std::vector<uint32_t>>& loops,
+                   std::vector<uint32_t>* pinches = nullptr) {
     loops.clear();
     std::unordered_map<uint64_t, int> used;
     used.reserve(tris.size() * 3);
     for (const glm::uvec3& t : tris)
         for (int e = 0; e < 3; ++e)
-            if (++used[directedKey(t[e], t[(e + 1) % 3])] > 1) return false;
+            if (t[e] != t[(e + 1) % 3]) ++used[directedKey(t[e], t[(e + 1) % 3])];
     std::unordered_map<uint32_t, uint32_t> next;
-    std::unordered_set<uint32_t> hasIn;
+    std::unordered_map<uint32_t, int> outs, ins;
+    bool ok = true;
     for (const auto& [key, n] : used) {
         const uint32_t a = uint32_t(key >> 32), b = uint32_t(key & 0xffffffffu);
-        if (used.count(directedKey(b, a))) continue;
-        if (!next.emplace(a, b).second || !hasIn.insert(b).second) return false;
+        const auto back = used.find(directedKey(b, a));
+        const int open = n - (back == used.end() ? 0 : back->second);
+        if (open <= 0) continue;
+        if (open > 1) {
+            ok = false;
+            if (pinches) pinches->push_back(a);
+        }
+        next.emplace(a, b);
+        ++outs[a];
+        ++ins[b];
     }
+    for (const auto& [v, n] : outs)
+        if (n > 1 || ins[v] > 1) {
+            ok = false;
+            if (pinches) pinches->push_back(v);
+        }
+    if (!ok) return false;
     std::unordered_set<uint32_t> seen;
     std::vector<uint32_t> starts;
     for (const auto& [a, b] : next) starts.push_back(a);
@@ -128,24 +147,31 @@ Mesh keptPiece(const Mesh& source, const std::vector<uint8_t>& keep, std::vector
     return k;
 }
 
-} // namespace
+// Why one stitch failed, for stitchKeptTriangles to adjust the kept area and try again.
+struct StitchFailure {
+    enum Kind { None, KeptPinch, OpenEdge, Cut, Unmatched, Join } kind = None;
+    std::vector<uint32_t> pinches;  // KeptPinch: source vertices where the masked area's edge touches itself
+    std::vector<uint32_t> tooSmall; // Unmatched: a source vertex of each kept piece no cut was made around
+};
 
-bool stitchKeptTriangles(const Mesh& source, const std::vector<uint8_t>& keep, const Mesh& remeshed, Mesh& out,
-                         std::string& error) {
-    const size_t nt = source.triangleCount();
-    if (keep.size() != nt || std::find(keep.begin(), keep.end(), 1) == keep.end()) {
-        error = "Nothing is masked";
-        return false;
-    }
+// One stitch. `cutRings`: cut that many more rings of the new surface away round the masked area (a wider strip
+// for the bridge, past spots where the new surface folds or meets itself next to the mask's edge).
+bool stitchOnce(const Mesh& source, const std::vector<uint8_t>& keep, const Mesh& remeshed, Mesh& out,
+                std::string& error, StitchFailure& why, int cutRings) {
     std::vector<uint32_t> keptSource;
     const Mesh kept = keptPiece(source, keep, keptSource);
 
     // The masked area's edge loops (in the kept piece's numbering). A loop made only of the source's own open
     // edges is a hole the source already had: it stays open. One partly on them can't be joined up.
     std::vector<std::vector<uint32_t>> keptLoops;
-    if (!boundaryLoops(kept.triangles, keptLoops)) {
-        error = "The masked area's edge touches itself; smooth or grow the mask a little";
-        return false;
+    {
+        std::vector<uint32_t> pinches;
+        if (!boundaryLoops(kept.triangles, keptLoops, &pinches)) {
+            error = "The masked area's edge touches itself; smooth or grow the mask a little";
+            why.kind = StitchFailure::KeptPinch;
+            for (uint32_t v : pinches) why.pinches.push_back(keptSource[v]);
+            return false;
+        }
     }
     {
         std::unordered_set<uint64_t> sourceEdges;
@@ -160,7 +186,8 @@ bool stitchKeptTriangles(const Mesh& source, const std::vector<uint8_t>& keep, c
             }
             if (open == loop.size()) continue;
             if (open > 0) {
-                error = "The masked area reaches an open edge of the mesh";
+                error = "The masked area reaches an open edge of the mesh; unmask the strip along the open edge";
+                why.kind = StitchFailure::OpenEdge;
                 return false;
             }
             inner.push_back(std::move(loop));
@@ -188,19 +215,27 @@ bool stitchKeptTriangles(const Mesh& source, const std::vector<uint8_t>& keep, c
         }
     };
     dropHalfQuads();
-    // Where the cut leaves two open loops meeting at a vertex, cut the triangles around it too.
-    for (int pass = 0; pass < 8; ++pass) {
-        std::unordered_map<uint64_t, int> used;
+    for (int ring = 0; ring < cutRings; ++ring) {
+        std::vector<uint8_t> cutCorner(remeshed.vertexCount(), 0);
         for (size_t t = 0; t < rt; ++t)
-            if (stay[t])
-                for (int e = 0; e < 3; ++e) ++used[directedKey(remeshed.triangles[t][e], remeshed.triangles[t][(e + 1) % 3])];
-        std::unordered_map<uint32_t, int> starts;
-        for (const auto& [key, n] : used)
-            if (!used.count(directedKey(uint32_t(key & 0xffffffffu), uint32_t(key >> 32)))) ++starts[uint32_t(key >> 32)];
-        std::unordered_set<uint32_t> pinch;
-        for (const auto& [v, n] : starts)
-            if (n > 1) pinch.insert(v);
-        if (pinch.empty()) break;
+            if (!stay[t])
+                for (int c = 0; c < 3; ++c) cutCorner[remeshed.triangles[t][c]] = 1;
+        for (size_t t = 0; t < rt; ++t) {
+            const glm::uvec3& tri = remeshed.triangles[t];
+            if (cutCorner[tri.x] || cutCorner[tri.y] || cutCorner[tri.z]) stay[t] = 0;
+        }
+        dropHalfQuads();
+    }
+    // Where the cut leaves two open loops meeting at a vertex (or runs along a spot where the new surface meets
+    // itself), cut the triangles around it too.
+    for (int pass = 0; pass < 32; ++pass) {
+        std::vector<glm::uvec3> stayed;
+        for (size_t t = 0; t < rt; ++t)
+            if (stay[t]) stayed.push_back(remeshed.triangles[t]);
+        std::vector<std::vector<uint32_t>> loops;
+        std::vector<uint32_t> pinches;
+        if (boundaryLoops(stayed, loops, &pinches) || pinches.empty()) break;
+        const std::unordered_set<uint32_t> pinch(pinches.begin(), pinches.end());
         for (size_t t = 0; t < rt; ++t) {
             const glm::uvec3& tri = remeshed.triangles[t];
             if (pinch.count(tri.x) || pinch.count(tri.y) || pinch.count(tri.z)) stay[t] = 0;
@@ -219,7 +254,8 @@ bool stitchKeptTriangles(const Mesh& source, const std::vector<uint8_t>& keep, c
         rest.layers.clear();
         rest.base.clear();
         if (!boundaryLoops(rest.triangles, restLoops)) {
-            error = "Couldn't cut the remeshed surface cleanly around the mask; try a higher resolution";
+            error = "Couldn't cut the remeshed surface cleanly around the mask";
+            why.kind = StitchFailure::Cut;
             return false;
         }
         std::vector<glm::vec3> keptPoints, restPoints;
@@ -234,10 +270,15 @@ bool stitchKeptTriangles(const Mesh& source, const std::vector<uint8_t>& keep, c
         const std::vector<float> nearestLoop =
             keptPoints.empty() ? std::vector<float>(restPoints.size(), -1.0f) : nearestValues(keptPoints, keptLoopId, restPoints);
         std::vector<int> votedFor(restLoops.size(), -1);
+        std::vector<uint8_t> voted(keptLoops.size(), 0); // a cut's loop runs near it at all
         size_t at = 0;
         for (size_t r = 0; r < restLoops.size(); ++r) {
             std::map<int, size_t> votes;
-            for (size_t i = 0; i < restLoops[r].size(); ++i) ++votes[int(nearestLoop[at++])];
+            for (size_t i = 0; i < restLoops[r].size(); ++i) {
+                const int id = int(nearestLoop[at++]);
+                ++votes[id];
+                if (id >= 0 && size_t(id) < voted.size()) voted[size_t(id)] = 1;
+            }
             size_t best = 0;
             for (const auto& [id, n] : votes)
                 if (id >= 0 && n > best) {
@@ -255,12 +296,19 @@ bool stitchKeptTriangles(const Mesh& source, const std::vector<uint8_t>& keep, c
         for (int r : match)
             if (r >= 0) matched[size_t(r)] = 1;
         if (std::find(match.begin(), match.end(), -1) != match.end()) {
-            error = "Part of the mask is too thin for this resolution; grow the mask or raise the resolution";
+            // No cut's loop of its own: a masked spot smaller than the new surface's polygons (no new vertex lies
+            // nearest to it, so nothing was cut around it), or two masked areas so close that one cut opened
+            // round both.
+            error = "Part of the mask is too thin for this resolution";
+            why.kind = StitchFailure::Unmatched;
+            for (size_t l = 0; l < keptLoops.size(); ++l)
+                if (match[l] < 0 && !voted[l]) why.tooSmall.push_back(keptSource[keptLoops[l][0]]);
             return false;
         }
         if (std::find(matched.begin(), matched.end(), 0) == matched.end()) break;
         if (attempt == 1) {
-            error = "Couldn't match the remeshed surface to the mask's edge; smooth the mask or raise the resolution";
+            error = "Couldn't match the remeshed surface to the mask's edge";
+            why.kind = StitchFailure::Unmatched;
             return false;
         }
         // Leftover loops: drop the small pieces of the new surface they belong to, then look again.
@@ -280,7 +328,8 @@ bool stitchKeptTriangles(const Mesh& source, const std::vector<uint8_t>& keep, c
         for (size_t r = 0; r < restLoops.size(); ++r) (matched[r] ? neededPieces : strayPieces).insert(find(restLoops[r][0]));
         for (uint32_t p : strayPieces)
             if (neededPieces.count(p) || pieceTris[p] * 10 > rest.triangleCount()) {
-                error = "Couldn't match the remeshed surface to the mask's edge; smooth the mask or raise the resolution";
+                error = "Couldn't match the remeshed surface to the mask's edge";
+                why.kind = StitchFailure::Unmatched;
                 return false;
             }
         // Map the stray pieces back to the remeshed triangles (extractTriangles keeps the order).
@@ -337,13 +386,153 @@ bool stitchKeptTriangles(const Mesh& source, const std::vector<uint8_t>& keep, c
     merged.rebuildTopology();
     merged.recomputeAllNormals();
 
-    const TopologyReport after = topologyReport(merged);
-    if (!after.manifold() || (topologyReport(source).boundaryEdges == 0 && after.boundaryEdges != 0)) {
-        error = "Couldn't join the masked area to the remeshed surface cleanly; smooth the mask or raise the resolution";
+    // The join must not add defects: the result may only meet itself where the new surface or the kept piece
+    // already did (voxel remeshing leaves such spots where parts of a model touch), and stays closed when the
+    // source was.
+    const TopologyReport after = topologyReport(merged), restReport = topologyReport(rest), keptReport = topologyReport(kept);
+    if (after.nonManifoldEdges > restReport.nonManifoldEdges + keptReport.nonManifoldEdges ||
+        after.nonManifoldVertices > restReport.nonManifoldVertices + keptReport.nonManifoldVertices ||
+        (topologyReport(source).boundaryEdges == 0 && after.boundaryEdges != 0)) {
+        error = "Couldn't join the masked area to the remeshed surface cleanly";
+        why.kind = StitchFailure::Join;
         return false;
     }
     out = std::move(merged);
     return true;
+}
+
+// Every triangle of `keep` connected (through shared corners) to one with a corner in `seeds`, unkept.
+void dropPieces(const Mesh& source, std::vector<uint8_t>& keep, const std::vector<uint32_t>& seeds) {
+    std::vector<uint32_t> parent(source.vertexCount());
+    for (uint32_t v = 0; v < parent.size(); ++v) parent[v] = v;
+    auto find = [&](uint32_t v) {
+        while (parent[v] != v) v = parent[v] = parent[parent[v]];
+        return v;
+    };
+    for (size_t t = 0; t < keep.size(); ++t)
+        if (keep[t]) {
+            const glm::uvec3& tri = source.triangles[t];
+            parent[find(tri.y)] = find(tri.x);
+            parent[find(tri.z)] = find(tri.x);
+        }
+    std::unordered_set<uint32_t> drop;
+    for (uint32_t v : seeds) drop.insert(find(v));
+    for (size_t t = 0; t < keep.size(); ++t)
+        if (keep[t] && drop.count(find(source.triangles[t].x))) keep[t] = 0;
+}
+
+// Morphological closing of the kept area by `rings` rings of vertices (grown, then shrunk back): gaps and notches
+// up to about 2 x rings edges across are filled with the source's own triangles, the rest of the edge stays.
+void closeKept(const Mesh& source, std::vector<uint8_t>& keep, int rings) {
+    const size_t nv = source.vertexCount();
+    std::vector<uint8_t> in(nv, 0), next(nv, 0);
+    for (size_t t = 0; t < keep.size(); ++t)
+        if (keep[t])
+            for (int c = 0; c < 3; ++c) in[source.triangles[t][c]] = 1;
+    for (int pass = 0; pass < 2 * rings; ++pass) {
+        const bool grow = pass < rings;
+        for (uint32_t v = 0; v < nv; ++v) {
+            uint8_t x = in[v];
+            for (uint32_t n : source.neighbors(v)) x = grow ? uint8_t(x | in[n]) : uint8_t(x & in[n]);
+            next[v] = x;
+        }
+        in.swap(next);
+    }
+    for (size_t t = 0; t < keep.size(); ++t) {
+        const glm::uvec3& tri = source.triangles[t];
+        if (in[tri.x] && in[tri.y] && in[tri.z]) keep[t] = 1;
+    }
+}
+
+} // namespace
+
+bool stitchKeptTriangles(const Mesh& source, const std::vector<uint8_t>& keepIn, const Mesh& remeshed, Mesh& out,
+                         std::string& error, std::string* note) {
+    const size_t nt = source.triangleCount();
+    if (keepIn.size() != nt || std::find(keepIn.begin(), keepIn.end(), 1) == keepIn.end()) {
+        error = "Nothing is masked";
+        return false;
+    }
+    // A mask edge the stitch can't follow is tidied and tried again (#67): where the edge touches itself, the
+    // triangles at that corner are remeshed; masked spots smaller than the new polygons are remeshed with the
+    // rest; a join that folds gets a wider cut (1, then 2 more rings of the new surface); narrow gaps and notches
+    // between masked areas are kept too (a closing of 1, 2, then 4 rings).
+    std::vector<uint8_t> keep = keepIn;
+    StitchFailure first;
+    size_t pinchFixes = 0;
+    int rings = 0, cutRings = 0;
+    for (int attempt = 0; attempt < 24; ++attempt) {
+        StitchFailure why;
+        std::string err;
+        if (stitchOnce(source, keep, remeshed, out, err, why, cutRings)) {
+            if (note) {
+                size_t added = 0, removed = 0;
+                for (size_t t = 0; t < nt; ++t) {
+                    added += keep[t] && !keepIn[t];
+                    removed += !keep[t] && keepIn[t];
+                }
+                note->clear();
+                if (added || removed) {
+                    *note = "the mask's edge was tidied to fit the new surface (";
+                    if (added) *note += std::to_string(added) + " triangles in narrow gaps kept";
+                    if (added && removed) *note += ", ";
+                    if (removed) *note += std::to_string(removed) + " triangles at tight corners or small spots remeshed";
+                    *note += ")";
+                }
+            }
+            return true;
+        }
+        if (first.kind == StitchFailure::None) {
+            first = why;
+            error = err;
+        }
+        bool changed = false;
+        if (why.kind == StitchFailure::KeptPinch && !why.pinches.empty() && pinchFixes < 8) {
+            const std::unordered_set<uint32_t> pinch(why.pinches.begin(), why.pinches.end());
+            for (size_t t = 0; t < nt; ++t) {
+                const glm::uvec3& tri = source.triangles[t];
+                if (keep[t] && (pinch.count(tri.x) || pinch.count(tri.y) || pinch.count(tri.z))) {
+                    keep[t] = 0;
+                    changed = true;
+                }
+            }
+            ++pinchFixes;
+        } else if (why.kind == StitchFailure::Unmatched && !why.tooSmall.empty()) {
+            dropPieces(source, keep, why.tooSmall);
+            changed = true;
+        } else if ((why.kind == StitchFailure::Join || why.kind == StitchFailure::Cut) && cutRings < 2) {
+            ++cutRings;
+            changed = true;
+        } else if (why.kind != StitchFailure::OpenEdge && rings < 4) {
+            rings = rings ? rings * 2 : 1;
+            const std::vector<uint8_t> before = keep;
+            closeKept(source, keep, rings);
+            changed = keep != before;
+        }
+        if (!changed) break;
+        if (std::find(keep.begin(), keep.end(), 1) == keep.end()) break;
+        if (std::find(keep.begin(), keep.end(), 0) == keep.end()) break;
+    }
+    // Still no clean join: say what to change.
+    switch (first.kind) {
+    case StitchFailure::KeptPinch:
+        error = "The masked area's edge touches itself (" + std::to_string(first.pinches.size()) +
+                (first.pinches.size() == 1 ? " place" : " places") +
+                "); blur the mask (Tool > Masking > Blur) or grow it by 2 passes, then try again";
+        break;
+    case StitchFailure::OpenEdge:
+        break; // (its own message says what to do)
+    case StitchFailure::Unmatched:
+        error = "Two masked areas are too close together, one is too small for this resolution, or the mask runs inside "
+                "another part of the model; grow the mask by 2-3 passes (Tool > Masking > Grow) to join them, unmask the "
+                "small spots, or unmask where the parts overlap";
+        break;
+    default:
+        error = "Couldn't join the masked area to the remeshed surface; blur the mask (Tool > Masking > Blur) so its "
+                "edge is smoother, or grow it by 2 passes, then try again";
+        break;
+    }
+    return false;
 }
 
 } // namespace sf

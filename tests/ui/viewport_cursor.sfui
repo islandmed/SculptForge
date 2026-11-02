@@ -1,0 +1,35 @@
+# The viewport cursor (#73): a crosshair over the 3D view where brushes act, the arrow over panels, menus and
+# popups (and their own resize and text cursors there). Preferences > Interface > Viewport cursor: Crosshair (the
+# default) or Arrow.
+run new_sphere subdivisions=3
+hover_model 0.5 0.5
+wait 0.1
+expect_value viewport_cursor == 100
+hover "Tool##palette.tool"
+expect_value viewport_cursor == 0
+hover_model 0.3 0.6
+wait 0.1
+expect_value viewport_cursor == 100
+# The pen hovering over the view: the crosshair too.
+pen_hover 0.5 0.5
+wait 0.1
+expect_value viewport_cursor == 100
+pen_out
+
+# A window floating over the view (Preferences) has the arrow; the view beside it the crosshair.
+click "Preferences##palette.preferences"
+click "Interface##preferences.interface"
+expect "Crosshair##viewport_cursor"
+hover "Arrow##viewport_cursor"
+expect_value viewport_cursor == 0
+click "Arrow##viewport_cursor"
+key escape
+hover_model 0.5 0.5
+wait 0.1
+expect_value viewport_cursor == 0
+click "Preferences##palette.preferences"
+click "Crosshair##viewport_cursor"
+key escape
+hover_model 0.5 0.5
+wait 0.1
+expect_value viewport_cursor == 100

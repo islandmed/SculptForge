@@ -1,0 +1,13 @@
+{
+  "format": "sculptforge-radial-menu",
+  "version": 1,
+  "menu": {
+    "name": "Right button",
+    "button": "mouse_right",
+    "slots": [
+      {"action": "brush.smooth"},
+      {"action": "brush.inflate"},
+      {"action": "brush.pinch"}
+    ]
+  }
+}

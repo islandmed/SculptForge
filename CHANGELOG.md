@@ -6,6 +6,8 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.6] - 2026-11-01
+
 ### Added
 - Interface looks (Preferences > Interface > Look), for choosing SculptForge's own default (Classic stays the default
   for now): **Forge Terminal** (tiles with gaps and thin borders, the focused one highlighted, JetBrains Mono labels and
@@ -90,12 +92,48 @@ All notable changes to SculptForge are listed here. The format follows
   Connected only.
 - The official community Discord (https://discord.gg/gWrYkEmQhH): **Help > Join the Discord...**, a button on the
   support card at launch (it opens the invite and leaves the card open), a link in the first-run welcome, the top
-  bar and footer of every website page, the donate page (members get private channels), the README and
+  bar and footer of every website page, the membership page (members get private channels), the README and
   CONTRIBUTING.md (questions on Discord; bugs still go to GitHub issues).
+
+### Changed
+- The website's membership page is now `support.html` (titled Membership; the old address redirects there) and lists
+  what each membership includes. Help > Support SculptForge, the welcome, the reminder and the launch card open it
+  and describe the membership benefits; the one-time option is now the One-time Supporter (pay what you want).
+- Backface culling (#68): **Tool > Display > Backface culling** skips the back faces of every Part, closed or open,
+  from any view: you see through the openings of open meshes, and brushes and picking work only on the faces drawn.
+  Off by default; Store Config keeps it, projects keep their own. An 8M-triangle open mesh seen from behind: 3.1 ms
+  -> 0.7 ms a frame; a closed 20M sculpt is unchanged (its hidden back faces were already skipped).
+- Viewport cursor (#73): a crosshair over the 3D view where brushes act; the arrow (or the resize, text and link
+  cursors) over panels, menus, popups and gizmo handles. **Preferences > Interface > Viewport cursor**: Crosshair
+  (default) or Arrow.
+- A radial menu on the right mouse button (#74): **Preferences > Input > Radial Menus** offers **Right mouse
+  button**; a plain right-drag then opens the pie (as Maya's marking menus) and the view turns with
+  <kbd>Shift</kbd>+right-drag or the style's other ways (the panel says which). Off by default.
 
 ### Fixed
 - Maya input style (#32): <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+drag erases the mask instead of starting
   the <kbd>Ctrl</kbd>+<kbd>Shift</kbd> visibility selection.
+- Smooth on Quad Remesh results (#69): smoothing averaged every neighbour along a triangle edge, quad diagonals
+  included, so a vertex at one end of a diagonal was pulled along it and the quads sheared into zigzags. Smooth (the
+  brush, Shift, recipes' smoothing and Tool > Deformation > Smooth) now averages the polygon's own edges. 30 smooth
+  strokes on a remeshed sphere: corner angle error 3.9 -> 3.3 degrees (it was 8.8); on the lion head 8.7 -> 9.7
+  (was 19.5). Triangle meshes are unchanged.
+- Keep Masked remeshing (#67): Voxel Remesh with Keep Masked failed on real models ("Couldn't cut the remeshed
+  surface cleanly") at every resolution, because the voxel surface touches itself where parts of a model meet (a
+  lion's mane) and the join refused any such surface. Those spots are now fine; a mask edge that touches itself is
+  tidied at those corners, masked spots smaller than the new polygons are remeshed, narrow gaps between masked areas
+  are kept, and the strip is widened where the join folds (the status line says when the mask was tidied). When it
+  still can't be joined, the message says what to change (blur or grow the mask, by how much, or unmask where parts
+  overlap). Lion head and marble bust, four masks, two resolutions: 0 of 16 joined before, 16 of 16 now.
+- Tablet mouse mode (#72): after lifting the pen and putting it down elsewhere, the brush and the system arrow moved
+  together but apart, and clicks landed at the brush. In mouse mode the system cursor is now the one cursor for the
+  brush and the panels (read with every pen position; the pen adds pressure and tilt).
+- Radial menus on mouse buttons open only on a plain press (#74): <kbd>Alt</kbd>+middle pans, <kbd>Alt</kbd>+right
+  zooms (Maya style) and <kbd>Shift</kbd>+right turns the view, whatever menu is on the button.
+- glTF import rejects malformed accessor and buffer sizes instead of crashing or reading out of bounds (reported by
+  @Agapenordev in #70).
+- Paint Layers: picking a Material Recipe, or changing a Fill layer, from the panel could crash: the panel kept
+  reading the texture the command had just replaced. Its commands now run once the panel is drawn.
 
 ## [0.10.5] - 2026-11-01
 ### Added

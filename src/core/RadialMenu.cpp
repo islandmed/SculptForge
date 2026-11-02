@@ -25,6 +25,7 @@ constexpr ButtonName kButtons[int(RadialButton::Count)] = {
     {"pen_lower", "Pen lower button"},
     {"pen_upper", "Pen upper button"},
     {"pen_third", "Pen third button"},
+    {"mouse_right", "Right mouse button"},
 };
 
 // An id from a file: a string of sensible length the vocabulary knows, or "".

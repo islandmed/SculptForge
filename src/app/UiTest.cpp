@@ -85,7 +85,9 @@
 //                            symmetry_copies (copies every stroke makes), cursor_copies (brush cursors drawn),
 //                            symmetry_pivot_x (local symmetry's centre), timeline_top (1: the strip at the top),
 //                            timeline_y / axis_gizmo_y (their tops / centre, fractions of the canvas from its top),
-//                            tablet_mouse_mode (Preferences > Tablet > Mouse mode),
+//                            tablet_mouse_mode (Preferences > Tablet > Mouse mode), os_cursor_x / os_cursor_y,
+//                            ui_mouse_x / ui_mouse_y (where ImGui sees the pointer), backface_culling, drawn_triangles,
+//                            viewport_cursor (the system cursor: 0 arrow, 1 text, 7 hand, 100 crosshair; #73),
 //                            smooth_keep_volume (Brush > Smooth keeps volume), stroke_keep_volume (1 when Smooth
 //                            dabs keep the volume now: the option, flipped by letting go of Shift mid-stroke),
 //                            moved_out (summed movement along the snapshot's normals: > 0 out, < 0 in),
@@ -177,6 +179,7 @@
 //   pen_pressure P           a pressure sample from the hovering pen (e.g. a stale value before a stroke)
 //   pen_enter U V            the pen comes into range at a point on the model (put down elsewhere, no hover)
 //   pen_out                  the pen leaves proximity
+//   os_cursor U V | off      where the system cursor is (a tablet driver in mouse mode moves it, #72); off: unknown
 //   mouse_move U V           a plain mouse (not the pen) moves to a point on the model, e.g. the stray mouse
 //                            events Windows Ink sends beside the pen's
 //
@@ -692,6 +695,17 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "brush_pressure") return app_.strokePressure();
     if (name == "stroking") return app_.drag_ == App::Drag::Stroke ? 1.0 : 0.0;
     if (name == "tablet_mouse_mode") return app_.uiPrefs_.tablet.mouseMode ? 1.0 : 0.0;
+    if (name == "backface_culling") return app_.renderSettings_.backfaceCulling ? 1.0 : 0.0;
+    if (name == "draw_ms") return app_.benchmarkDrawMs(30); // the 3D view drawn 30 times: ms per frame
+    if (name == "drawn_triangles") { // the 3D view drawn once more now: the triangles it drew
+        app_.benchmarkDrawMs(0);
+        return double(app_.renderer_.lastDrawnTriangles());
+    }
+    if (name == "viewport_cursor") return app_.cursorKind_; // the system cursor: 0 arrow, 100 crosshair (#73)
+    if (name == "os_cursor_x") return app_.testSystemCursorX_;
+    if (name == "os_cursor_y") return app_.testSystemCursorY_;
+    if (name == "ui_mouse_x") return ImGui::GetIO().MousePos.x; // where the panels see the pointer
+    if (name == "ui_mouse_y") return ImGui::GetIO().MousePos.y;
     if (name == "cursor_x") return app_.mouseX_;
     if (name == "cursor_y") return app_.mouseY_;
     if (name == "surface_cursor") return app_.surfaceCursorShown_ ? 1.0 : 0.0;
@@ -1769,6 +1783,19 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         run([this, p = num(1, 0)] {
             if (!penIn_) penProximity(true);
             penPressure(p);
+        });
+    } else if (verb == "os_cursor") {
+        // Where the system cursor is, as a tablet driver in mouse mode moves it (#72): `os_cursor U V` on the model,
+        // `os_cursor off` (the default) for a system that can't say.
+        if (!need(1)) return false;
+        const bool off = w[1] == "off";
+        if (!off && !need(2)) return false;
+        run([this, off, u = off ? 0.0f : num(1, 0.5f), v = off ? 0.0f : num(2, 0.5f)] {
+            app_.testSystemCursor_ = !off;
+            if (off) return;
+            const ImVec2 p = onModel(u, v);
+            app_.testSystemCursorX_ = p.x;
+            app_.testSystemCursorY_ = p.y;
         });
     } else if (verb == "mouse_move") {
         if (!need(2)) return false;

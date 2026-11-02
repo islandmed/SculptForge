@@ -104,13 +104,20 @@ public:
     void proximity() { anchored_ = false; }
     // Something else (the mouse) moved the cursor to x, y.
     void cursorAt(float x, float y);
+    // Where the system cursor is (window pixels), read just before the next map(). In mouse mode the driver moves
+    // the system cursor itself, so that is the cursor: map() returns it for the brush and the panels alike (#72:
+    // a cursor of our own, moved by the pen's motion, drifted away from the system's after the pen was lifted and
+    // put down elsewhere, and clicks landed at the brush, not the arrow). Without one (a system that can't say),
+    // the pen's motion moves the cursor on from where it was.
+    void systemCursor(float x, float y);
     // A pen position (window pixels) at time nowNs -> the cursor's position, in place.
     void map(float& x, float& y, uint64_t nowNs);
 
 private:
     float offsetX_ = 0.0f, offsetY_ = 0.0f; // mouse mode: cursor = pen + offset
     float cursorX_ = 0.0f, cursorY_ = 0.0f;
-    bool haveCursor_ = false, anchored_ = false;
+    float systemX_ = 0.0f, systemY_ = 0.0f;
+    bool haveCursor_ = false, anchored_ = false, haveSystem_ = false;
     uint64_t lastNs_ = 0;
 };
 

@@ -94,6 +94,24 @@
 <li>
 <strong>The SculptForge Discord</strong> (<strong>Help &gt; Join the Discord...</strong>): the official community, for questions, tips and work in progress. It is also on the support card, in the welcome note and on the website. Bugs still go to <strong>Help &gt; Report a problem</strong> (GitHub issues).
 </li>
+<li>
+<strong>Backface culling</strong> (#68, <strong>Tool &gt; Display</strong>): don&#x27;t draw the back faces of the model, for speed on open meshes and to see through their openings. Brushes then work only on what you see. Off by default.
+</li>
+<li>
+<strong>A crosshair over the view</strong> (#73): the pointer is a crosshair where brushes act and the arrow over the panels. <strong>Preferences &gt; Interface &gt; Viewport cursor</strong> brings the arrow back.
+</li>
+<li>
+<strong>A radial menu on the right button</strong> (#74): choose <strong>Right mouse button</strong> for a menu in <strong>Preferences &gt; Input &gt; Radial Menus</strong>; turn the view with <kbd>Shift</kbd>+right-drag then. A menu on a mouse button now opens only without modifier keys, so <kbd>Alt</kbd>+middle still pans.
+</li>
+<li>
+<strong>Fixed: Smooth on quad meshes</strong> (#69): smoothing a Quad Remesh result no longer shears the quads into zigzags.
+</li>
+<li>
+<strong>Fixed: Keep Masked remeshing</strong> (#67): Voxel Remesh with Keep Masked works on real sculpts, tidies awkward mask edges by itself, and says what to change when it can&#x27;t.
+</li>
+<li>
+<strong>Fixed: tablet mouse mode</strong> (#72): the brush stays on the system cursor after the pen is lifted and put down elsewhere, and clicks land where the arrow is.
+</li>
 </ul>
 <h2 id="version-0105">Version 0.10.5<a class="anchor" href="#version-0105" aria-label="Link to this section">#</a></h2>
 <ul>
@@ -172,7 +190,7 @@
 </ul>
 <h3 id="become-an-insider">Become an Insider<a class="anchor" href="#become-an-insider" aria-label="Link to this section">#</a></h3>
 <p>SculptForge stays free for everyone. Insiders will get each release about two weeks early, starting with SculptForge 1.0. <strong>Help &gt; Support SculptForge</strong> opens the page to join.</p>
-<p>When SculptForge starts for the first time, after an update, and otherwise at most once a week, a card shows the ways to support it: <strong>Supporter</strong>, <strong>Insider</strong> and <strong>Studio</strong> memberships and a one-time gift, each opening its checkout page in your browser. <strong>Maybe later</strong>, <kbd>Esc</kbd> or a click outside closes it; <strong>I&#x27;m already a supporter</strong> hides it for good, and <strong>Preferences &gt; Support</strong> turns it off. It never shows while you work, and nothing about you is sent anywhere.</p>
+<p>When SculptForge starts for the first time, after an update, and otherwise at most once a week, a card shows the ways to support it: <strong>Supporter</strong>, <strong>Insider</strong> and <strong>Studio</strong> memberships and the one-time Supporter, each opening its checkout page in your browser. <strong>Maybe later</strong>, <kbd>Esc</kbd> or a click outside closes it; <strong>I&#x27;m already a supporter</strong> hides it for good, and <strong>Preferences &gt; Support</strong> turns it off. It never shows while you work, and nothing about you is sent anywhere.</p>
 <h2 id="version-0103">Version 0.10.3<a class="anchor" href="#version-0103" aria-label="Link to this section">#</a></h2>
 <h3 id="from-your-requests-on-github-2">From your requests on GitHub<a class="anchor" href="#from-your-requests-on-github-2" aria-label="Link to this section">#</a></h3>
 <ul>

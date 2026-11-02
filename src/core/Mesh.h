@@ -248,6 +248,14 @@ public:
         if (implicit_) return implicitTriangles(v);
         return {vtList_.data() + vtOffsets_[v], vtList_.data() + (vtEnds_.empty() ? vtOffsets_[v + 1] : vtEnds_[v])};
     }
+    // The vertices sharing a polygon edge with `v`: neighbors() less the far ends of the quad diagonals at `v`
+    // (each quad is stored as two triangles; its diagonal is no edge of the polygon). Smoothing averages this ring:
+    // with the diagonals, a vertex on one end of a quad's diagonal and not the other is pulled along it, which
+    // shears a quad mesh into zigzags (#69). Without quads, neighbors() itself.
+    IndexRing polygonNeighbors(uint32_t v) const {
+        if (quadPartners.empty()) return neighbors(v);
+        return quadNeighbors(v);
+    }
     // True when the adjacency follows from the subdivision level this mesh is (see rebuildTopology).
     bool implicitAdjacency() const { return bool(implicit_); }
 
@@ -311,6 +319,7 @@ private:
     void finishNormals(float* curvature, bool computeNormals = true); // ... then each member's normal (and curvatureAt)
     IndexRing implicitTriangles(uint32_t v) const;
     IndexRing implicitNeighbors(uint32_t v) const;
+    IndexRing quadNeighbors(uint32_t v) const;
 
     // Vertex adjacency (CSR), or, on a mesh that is a level made by Divide (whose triangles are the ones its
     // subdivision topology generates), that topology and two small indexes into it: the triangles and rings

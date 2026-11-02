@@ -170,6 +170,38 @@ remember cursor_x mouse_x
 pen_enter 0.9 0.1
 expect_value cursor_x >= $mouse_x-0.5
 expect_value cursor_x <= $mouse_x+0.5
+# #72: the driver moves the system cursor itself, and that is the one cursor for the brush and the panels. The pen
+# lifted, the cursor moved elsewhere, the pen put down at another point: brush, panels and system cursor agree.
+pen_out
+os_cursor 0.3 0.6
+remember os_cursor_x os_x
+remember os_cursor_y os_y
+pen_enter 0.85 0.2
+expect_value cursor_x >= $os_x-1.5
+expect_value cursor_x <= $os_x+1.5
+expect_value cursor_y >= $os_y-1.5
+expect_value cursor_y <= $os_y+1.5
+expect_value ui_mouse_x >= $os_x-1.5
+expect_value ui_mouse_x <= $os_x+1.5
+os_cursor 0.4 0.55
+remember os_cursor_x os_x
+remember os_cursor_y os_y
+pen_hover 0.9 0.15
+expect_value cursor_x >= $os_x-1.5
+expect_value cursor_x <= $os_x+1.5
+expect_value ui_mouse_y >= $os_y-1.5
+expect_value ui_mouse_y <= $os_y+1.5
+pen_out
+mouse_move 0.65 0.35
+os_cursor 0.65 0.35
+remember os_cursor_x os_x
+remember os_cursor_y os_y
+pen_enter 0.1 0.9
+expect_value cursor_x >= $os_x-1.5
+expect_value cursor_x <= $os_x+1.5
+expect_value ui_mouse_x >= $os_x-1.5
+expect_value ui_mouse_x <= $os_x+1.5
+os_cursor off
 # Pen mode again: the cursor is where the pen is.
 pen_out
 click "Preferences##palette.preferences"

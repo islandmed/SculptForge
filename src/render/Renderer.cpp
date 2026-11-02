@@ -2619,6 +2619,7 @@ void Renderer::endCapture(std::vector<uint8_t>& rgba) {
 void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, const RenderSettings& settings,
                     const Viewport& viewport) {
     syncMatcaps();
+    forceBackfaces_ = settings.backfaceCulling && !thumbnailPass_; // (#68; thumbnails show the whole Part)
     // Known state before the clears: a scissor box, colour mask or depth mask left over from another pass (UI,
     // overlays, calibration) makes glClear partial. Some drivers (NVIDIA on Windows, #29) then show old frames
     // under the cursor and stale depth hides the mesh.
@@ -2779,6 +2780,22 @@ void Renderer::cull(const MeshSlot& s, const CullView& frame, bool proxy) {
     proxy = proxy && s.proxyCount.size() == s.drawCount.size() && s.proxyBounds.size() == s.drawCount.size();
     CullView v = frame;
     const glm::vec3 e = v.eye;
+    // Backface culling on (#68): back faces go on any mesh from any view, the GPU skipping each one and whole
+    // clusters facing away going first (in perspective: an orthographic view has no eye to judge them from).
+    if (forceBackfaces_) {
+        v.backfaces = !v.ortho;
+        cullBackfaces_ = true;
+        const size_t n = std::min(s.bounds.size(), s.drawCount.size());
+        for (uint32_t c = 0; c < n; ++c) {
+            if (s.drawCount[c] == 0 || !insideFrustum(v, s.bounds[c])) continue;
+            if (proxy && s.proxyCount[c] > 0 && !s.proxyStale[c]) {
+                if (!facingAway(v, s.proxyBounds[c])) proxyClusters_.push_back(c);
+            } else if (!facingAway(v, s.bounds[c])) {
+                drawClusters_.push_back(c);
+            }
+        }
+        return;
+    }
     v.backfaces = !v.ortho && s.closed && s.volume > 0.0 && !s.anyHidden && s.box.valid() &&
                   (e.x < s.box.min.x || e.y < s.box.min.y || e.z < s.box.min.z || e.x > s.box.max.x || e.y > s.box.max.y ||
                    e.z > s.box.max.z);

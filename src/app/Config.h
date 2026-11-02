@@ -64,6 +64,12 @@ struct UiPrefs {
     // SculptForge layout (task menus File, Edit, Sculpt, Paint, Mesh, View, Render, Help, a status bar, one-row shelf).
     theme::LookSettings look;
     int shellLayout = 0;
+    // Preferences > Interface > Viewport cursor (#73): the system cursor over the 3D view, 0 = crosshair (the
+    // default, as most sculpting apps), 1 = the arrow. Panels, menus and popups always show their own.
+    int viewportCursor = 0;
+    // Tool > Display > Backface culling (#68): skip the back faces of every Part (faster on dense meshes; see
+    // through open meshes). Off by default; a preference, projects keep their own.
+    bool backfaceCulling = false;
     TabletSettings tablet;      // Preferences > Tablet: pressure curve, eraser, pen buttons
     SpaceMouseSettings spaceMouse; // Preferences > Input > SpaceMouse
     // Preferences > Performance (PanelPerformance.cpp).

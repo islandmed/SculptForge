@@ -339,7 +339,7 @@ bool App::pickWith(const DabView& view, float x, float y, RayHit& hit) const {
     if (!view.settings.visible) return false;
     glm::vec3 origin, dir;
     view.camera.screenRay(x - view.canvas.x, y - view.canvas.y, view.canvas.w, view.canvas.h, origin, dir);
-    return surfaceRaycast(doc_.mesh, doc_.bvh, origin, dir, hit);
+    return frontRaycast(origin, dir, hit);
 }
 
 glm::vec2 App::predictedPointer() const {

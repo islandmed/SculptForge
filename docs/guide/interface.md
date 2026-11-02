@@ -426,6 +426,7 @@ Config keeps it.
 | Setting | Default | What it does |
 |---|---|---|
 | **Language** | English | The interface language: **English** or **Español** (see below) |
+| **Viewport cursor** | Crosshair | The pointer over the 3D view: a crosshair, or the arrow (#73). Panels, menus and popups always show the arrow |
 | **Popup Info (Ctrl+hover help)** | On | Ctrl-hover help boxes |
 | **Popup Info opacity** | 0.97 | How solid the help box is |
 | **Tooltip delay** | 0.5 s | How long to point at an icon-only button before its name appears |
