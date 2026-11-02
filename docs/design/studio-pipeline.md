@@ -203,7 +203,7 @@ Effort is for one focused agent; "w" = working weeks, including tests and docs.
 
 ### Phase 1: trust and pose (about 5 to 6 w; ships across 0.11.x)
 
-1. **Studio mode** (0.75 w, on top of the "AI tools" switch, which is off by default and ships in 0.10.8). One policy (build flag, site
+1. **Studio mode** (0.75 w, on top of the "AI tools" consent gate from gen3d-default, whose form is pending the maintainer). One policy (build flag, site
    policy file, `SF_STUDIO=1`, Preferences) that forces AI tools off or local, enforced as a backstop in
    `ai::httpRequest*` and `Socket::listen`/`openMulticast`, new `SCULPTFORGE_*` build flags and a CI no-network proof. Design in §7.
 2. **SBOM and provenance** (0.5 w). CycloneDX SBOM per release (our sources plus vendored `third_party/`),
@@ -350,15 +350,17 @@ Everything except rows 1 to 11 works air-gapped.
 
 #### Recommendation: Studio mode on top of the "AI tools" switch
 
-**Layer 1, the "AI tools" switch (maintainer-approved 2026-11-01, built by the gen3d-default task).** One switch,
-**off by default**, gates every AI feature: rows 2 to 7 and the AI commands in row 13. While it's off, none of
-that code makes a request, local or remote. The UI shows the features greyed out with "Turn on AI tools", and
-`brush_ai`, `image_to_3d`, `text_to_3d` and `comfyui_check` fail from the CLI, Python and MCP with "AI tools are
-off". Turning it on is the artist's explicit consent, so the enable dialog must name what goes where: "the
-Brush assistant sends your chat to text.pollinations.ai; Generate 3D uploads your image or prompt to Hugging Face
-Spaces; pick a local model to keep everything on this machine". That one dialog replaces the per-service consent
-proposed earlier. With layer 1 shipped, a default install makes no AI request at all, and only rows 1 (update check)
-and 8 (gallery) remain as calls the artist didn't explicitly start.
+**Layer 1, the "AI tools" gate (being built by the gen3d-default task; the exact form is waiting on the
+maintainer).** Two variants are on the table: (a) one switch, **off by default**; or (b) AI features visible by
+default, behind a **consent card** shown before the first AI request, plus a show/hide switch. Studio mode works
+with either, because it depends on only one property: **no AI code makes any request, local or remote, until the
+artist has consented** (turned the switch on, or accepted the card). The gate covers rows 2 to 7 and the AI
+commands in row 13. Until consent, the CLI, Python and MCP fail `brush_ai`, `image_to_3d`, `text_to_3d` and
+`comfyui_check` with a clear message. The consent step must name what goes where: "the Brush assistant sends your
+chat to text.pollinations.ai; Generate 3D uploads your image or prompt to Hugging Face Spaces; pick a local model
+to keep everything on this machine". That one step replaces the per-service consent proposed earlier. Once the
+gate ships, a default install makes no AI request without consent, and only rows 1 (update check) and 8
+(gallery) remain as calls the artist didn't explicitly start.
 
 The contract Studio mode needs from layer 1 (agreed with gen3d-default): one predicate, `aiToolsEnabled()`,
 checked at every AI entry point (UI and command registry); a setting in the user config;
@@ -413,7 +415,7 @@ start-up. The strictest source wins, and a user can't loosen a policy set by an 
 | `SCULPTFORGE_STUDIO_DEFAULT=ON` (new) | Starts in Studio mode (policy level 1); set for the VFX-RP tarballs, rez and `.rpm`. |
 
 **Proof (CI, so it can't regress):**
-- run ctest and the UI smoke test inside `unshare -rn` (no network namespace) with `SF_STUDIO=1` (and separately with a default config, to prove AI tools off means no AI request); any
+- run ctest and the UI smoke test inside `unshare -rn` (no network namespace) with `SF_STUDIO=1` (and separately with a default config, to prove that no AI request happens before consent); any
   non-loopback `connect()`/`bind()` seen by an `strace -f -e trace=network` wrapper fails the job;
 - a unit test that every row's entry point returns "Blocked by studio policy" under Studio mode;
 - for `SCULPTFORGE_NETWORK=OFF` builds: `nm`/`ldd` show no libcurl, and `strings` shows none of the hosted URLs;
@@ -427,7 +429,7 @@ Effort: about 0.75 w once AI tools ships (policy and choke points 0.4, UI/report
 | Where | Today | Exact until Studio mode ships |
 |---|---|---|
 | `website/index.html` ("Nothing phones home"), `website/studios.html:395`, `docs/studios.md:4`, `docs/guide/studios.md:4` | "nothing phones home" / "works fully offline" | "No telemetry and no account. The only automatic request is a once-a-day update check (one switch turns it off). Everything works offline." |
-| `README.md:326`, `docs/guide/studios.md:143`, `docs/guide/troubleshooting.md:243`, `website/studios.html:396` | "AI features talk only to the service you choose" | Once AI tools ships: "AI tools are off until you turn them on. When on, the Brush assistant uses Pollinations and Generate 3D uses Hugging Face, unless you pick a local model." |
+| `README.md:326`, `docs/guide/studios.md:143`, `docs/guide/troubleshooting.md:243`, `website/studios.html:396` | "AI features talk only to the service you choose" | Once the AI gate ships: "AI tools ask before they send anything. When on, the Brush assistant uses Pollinations and Generate 3D uses Hugging Face, unless you pick a local model." |
 | `website/index.html:542`, `docs/guide/generate-3d.md:259`, `README.md:326` | "no servers of its own" | "no servers of its own besides the static website the update check reads". |
 
 These go out with the next release's lockstep, alongside the guide and site.
@@ -510,8 +512,8 @@ feature does. The structure is two pillars, then the integration grid, which alr
         <ul>
           <li><strong>Offline by design.</strong> No accounts, no licence server, no telemetry. Everything works
             air-gapped.</li>
-          <li>⏳ <strong>AI is off until you turn it on.</strong> One switch; when it's off, no AI feature sends
-            anything anywhere.</li>
+          <li>⏳ <strong>AI asks first.</strong> No AI feature sends anything anywhere until you say yes,
+            and IT can switch it off for everyone.</li>
           <li>⏳ <strong>Studio mode.</strong> One switch (or a site policy file IT controls) blocks every network
             call and listener. AI runs on your own machines, and CI proves it with no network at all.</li>
           <li><strong>Nothing listens by default.</strong> No open ports until you open Phone capture. Bridges exchange files through one folder,
