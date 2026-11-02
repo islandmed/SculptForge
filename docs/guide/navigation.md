@@ -22,6 +22,12 @@ sees them. Click an end to look from that side, as in Blender: **X** the right v
 and the plain dot at the other end of each axis the left, bottom or back view. These are orthographic like the
 numpad views. The end under the pointer gets a ring.
 
+**Draw > Camera > Gizmo size** makes the axes **Small**, **Medium** (the default) or **Large**; they grow with the
+UI scale too, and clicking an end works at every size. **View Figure** (beside **Axes**, off until you turn it on)
+adds a small shaded head in the corner that turns with the camera, so you can tell front from back at a glance.
+Click it to look from the nearest side: the front, back, left, right, top or bottom view, orthographic like the
+axes.
+
 Navigation starts only on the canvas. A drag that begins on a shelf, a tray or a palette never moves the
 camera.
 

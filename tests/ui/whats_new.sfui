@@ -5,8 +5,9 @@ click "Help##palette.help"
 click "What's New##help.whats_new"
 expect_value guide_open == 1
 expect_guide whats-new.md
+expect_text "Version 0.10.8"
+expect_text "View Figure"
 expect_text "Version 0.10.7"
-expect_text "A new look"
 expect_text "Version 0.10.6"
 expect_text "Version 0.10.5"
 expect_text "Version 0.10.4"

@@ -6,6 +6,12 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- **Gizmo size** (Draw > Camera): the corner axes come in Small, Medium (as before, the default) and Large, on top
+  of the UI scale; clicking an end still snaps to that side at every size. Saved in the preferences.
+- **View Figure** (Draw > Camera, beside Axes, off by default): a small shaded head in the canvas corner that turns
+  with the camera; click it to snap to the nearest side view. Requested on Discord.
+
 ## [0.10.7] - 2026-11-01
 
 ### Changed

@@ -5,6 +5,13 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.10.8
+
+- **Smaller (or larger) corner axes**: **Draw > Camera > Gizmo size** sets Small, Medium or Large
+  ([Navigation](navigation.md)).
+- **View Figure**: turn it on beside **Axes** for a small head in the corner that turns with the view; click it to
+  snap to the nearest side.
+
 ## Version 0.10.7
 
 - **A clearer membership card**: the three memberships side by side with what each one gets you, in your look's

@@ -23,6 +23,7 @@
 #include "core/EnginePresets.h"
 #include "link/UnrealLink.h"
 #include "core/BrushLibrary.h"
+#include "core/Benchmark.h"
 #include "core/Decimate.h"
 #include "core/ImageTo3D.h"
 #include "core/Project.h"
@@ -2299,6 +2300,7 @@ void App::drawUi() {
     drawSculptableOverlay(); // Make sculptable: crop box, face landmarks (PanelSculptable.cpp)
     drawCaptureOverlay();    // Capture from view: the square, the result window (PanelKelvinlet.cpp)
     if (uiPrefs_.showAxes) drawAxisGizmo(); // X / Y / Z in the canvas corner (#31)
+    if (uiPrefs_.showViewFigure) drawViewFigure();
     drawAirStrokeIndicator(); // Start strokes off the model is on (#62, Input.cpp)
     if (drag_ == Drag::Insert) { // the size the insert will get
         insertPx_ = std::hypot(mouse.x - insertX_, mouse.y - insertY_);
@@ -3310,16 +3312,32 @@ bool App::drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col) {
 std::array<AxisGizmoEnd, 6> App::axisGizmoLayout() const {
     // Top left of the canvas, below the timeline strip when that is at the top (timelineTopInset_).
     const CanvasRect canvas = canvasRect();
-    const float s = 34.0f * uiScale_;
+    const float s = 34.0f * axisGizmoUnit();
     return axisGizmoEnds(glm::mat3(camera_.view()),
                          glm::vec2(canvas.x + s + 18.0f * uiScale_, canvas.y + timelineTopInset_ + s + 18.0f * uiScale_), s);
 }
 
+float App::axisGizmoUnit() const { return uiScale_ * axisGizmoScale(uiPrefs_.axisGizmoSize); }
+
+float App::viewFigureRadius() const { return 34.0f * axisGizmoUnit(); }
+
+glm::vec2 App::viewFigureCentre() const {
+    // In the axes' place when they are off, else just below them.
+    const CanvasRect canvas = canvasRect();
+    const float r = viewFigureRadius();
+    const float top = canvas.y + timelineTopInset_ + 18.0f * uiScale_;
+    const float below = uiPrefs_.showAxes ? 2.0f * 34.0f * axisGizmoUnit() + 14.0f * uiScale_ : 0.0f;
+    return glm::vec2(canvas.x + 18.0f * uiScale_ + 34.0f * axisGizmoUnit(), top + below + r);
+}
+
 bool App::axisGizmoMouseDown(float x, float y) {
-    // A click on an end snaps to that side view, orthographic (#43, as in Blender's navigation gizmo).
-    if (!uiPrefs_.showAxes) return false;
+    // A click on an end snaps to that side view, orthographic (#43, as in Blender's navigation gizmo); a click on
+    // the View Figure to the side view nearest the current one.
     const auto ends = axisGizmoLayout();
-    const int hit = axisGizmoHit(ends, x, y, 9.0f * uiScale_);
+    int hit = uiPrefs_.showAxes ? axisGizmoHit(ends, x, y, 9.0f * axisGizmoUnit()) : -1;
+    if (hit < 0 && uiPrefs_.showViewFigure &&
+        glm::length(glm::vec2(x, y) - viewFigureCentre()) <= viewFigureRadius())
+        hit = axisGizmoFacing(ends);
     if (hit < 0) return false;
     if (const Action* a = actions_.find(axisGizmoView(ends[size_t(hit)].axis, ends[size_t(hit)].negative).action); a && a->run) a->run();
     return true;
@@ -3330,10 +3348,11 @@ void App::drawAxisGizmo() {
     // positive end and a plain one at the negative end; the ends pointing away are drawn first and dimmer. A click
     // on an end snaps to that side (axisGizmoMouseDown); the end under the mouse gets a ring.
     ImDrawList* dl = ImGui::GetBackgroundDrawList();
+    const float unit = axisGizmoUnit();
     auto ends = axisGizmoLayout();
     const glm::vec2 c = (ends[0].at + ends[3].at) * 0.5f;
     const ImVec2 mouse = ImGui::GetIO().MousePos;
-    const int hover = ImGui::GetIO().WantCaptureMouse ? -1 : axisGizmoHit(ends, mouse.x, mouse.y, 9.0f * uiScale_);
+    const int hover = ImGui::GetIO().WantCaptureMouse ? -1 : axisGizmoHit(ends, mouse.x, mouse.y, 9.0f * unit);
     const AxisGizmoEnd hovered = hover >= 0 ? ends[size_t(hover)] : AxisGizmoEnd{};
     std::sort(ends.begin(), ends.end(), [](const AxisGizmoEnd& a, const AxisGizmoEnd& b) { return a.depth < b.depth; });
     static constexpr ImU32 colours[3] = {IM_COL32(230, 80, 80, 255), IM_COL32(110, 200, 90, 255), IM_COL32(80, 140, 240, 255)};
@@ -3342,14 +3361,63 @@ void App::drawAxisGizmo() {
         const ImVec2 tip(e.at.x, e.at.y);
         ImU32 col = e.depth < -0.2f ? (colours[e.axis] & 0x00ffffffu) | 0x90000000u : colours[e.axis];
         if (e.negative) col = (col & 0xff000000u) | ((col & 0x00fefefeu) >> 1); // the negative end: darker
-        else dl->AddLine(ImVec2(c.x, c.y), tip, col, 2.0f * uiScale_);
-        dl->AddCircleFilled(tip, (e.negative ? 5.5f : 7.0f) * uiScale_, col);
+        else dl->AddLine(ImVec2(c.x, c.y), tip, col, 2.0f * unit);
+        dl->AddCircleFilled(tip, (e.negative ? 5.5f : 7.0f) * unit, col);
         if (hover >= 0 && e.axis == hovered.axis && e.negative == hovered.negative)
-            dl->AddCircle(tip, 9.0f * uiScale_, IM_COL32(255, 255, 255, 220), 0, 1.5f * uiScale_);
+            dl->AddCircle(tip, 9.0f * unit, IM_COL32(255, 255, 255, 220), 0, 1.5f * unit);
         if (e.negative) continue;
-        const ImVec2 ts = ImGui::CalcTextSize(names[e.axis]);
-        dl->AddText(ImVec2(tip.x - ts.x * 0.5f, tip.y - ts.y * 0.5f), IM_COL32(20, 20, 22, 255), names[e.axis]);
+        // The letter shrinks with the ball (Small) but never grows past the UI font.
+        const float fontSize = ImGui::GetFontSize() * std::min(1.0f, unit / std::max(uiScale_, 0.01f));
+        const ImVec2 ts = ImGui::GetFont()->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, names[e.axis]);
+        dl->AddText(ImGui::GetFont(), fontSize, ImVec2(tip.x - ts.x * 0.5f, tip.y - ts.y * 0.5f), IM_COL32(20, 20, 22, 255),
+                    names[e.axis]);
     }
+}
+
+void App::drawViewFigure() {
+    // A low-resolution copy of the benchmark's procedural head (our own formula, core/Benchmark.cpp), turned with
+    // the camera and shaded on the CPU into the background draw list: facing triangles only, far ones first. A
+    // click snaps to the nearest side view (axisGizmoMouseDown); a ring shows under the pointer.
+    static const Mesh head = makeBenchHead(3000);
+    static std::vector<std::pair<float, uint32_t>> order;
+    ImDrawList* dl = ImGui::GetBackgroundDrawList();
+    const glm::vec2 c = viewFigureCentre();
+    const float r = viewFigureRadius();
+    const float k = r / 1.25f; // the head with its neck is about 2.5 units tall
+    const glm::mat3 rot(camera_.view());
+    const glm::vec3 light = glm::normalize(glm::vec3(-0.45f, 0.6f, 0.75f));
+    order.clear();
+    for (uint32_t t = 0; t < uint32_t(head.triangles.size()); ++t) {
+        const glm::uvec3 f = head.triangles[t];
+        const glm::vec3 n = rot * (head.normals[f.x] + head.normals[f.y] + head.normals[f.z]);
+        if (n.z <= 0.0f) continue;
+        const float depth = (rot * (head.positions[f.x] + head.positions[f.y] + head.positions[f.z])).z;
+        order.emplace_back(depth, t);
+    }
+    std::sort(order.begin(), order.end());
+    auto at = [&](uint32_t v) {
+        const glm::vec3 p = rot * head.positions[v];
+        return ImVec2(c.x + p.x * k, c.y - p.y * k);
+    };
+    // Raw triangles with a colour per corner (smooth shading, no anti-aliasing fringe between triangles).
+    auto shade = [&](uint32_t v) {
+        const float lit = 0.22f + 0.78f * std::max(0.0f, glm::dot(glm::normalize(rot * head.normals[v]), light));
+        const int g = int(std::clamp(lit, 0.0f, 1.0f) * 205.0f + 30.0f);
+        return IM_COL32(g, std::min(255, g + 4), std::min(255, g + 12), 255);
+    };
+    const ImVec2 uv = ImGui::GetDrawListSharedData()->TexUvWhitePixel;
+    dl->PrimReserve(int(order.size()) * 3, int(order.size()) * 3);
+    for (const auto& [depth, t] : order) {
+        const glm::uvec3 f = head.triangles[t];
+        const ImDrawIdx base = ImDrawIdx(dl->_VtxCurrentIdx);
+        for (int i = 0; i < 3; ++i) dl->PrimWriteVtx(at(f[i]), uv, shade(f[i]));
+        dl->PrimWriteIdx(base);
+        dl->PrimWriteIdx(ImDrawIdx(base + 1));
+        dl->PrimWriteIdx(ImDrawIdx(base + 2));
+    }
+    const ImVec2 mouse = ImGui::GetIO().MousePos;
+    if (!ImGui::GetIO().WantCaptureMouse && glm::length(glm::vec2(mouse.x, mouse.y) - c) <= r)
+        dl->AddCircle(ImVec2(c.x, c.y), r, IM_COL32(255, 255, 255, 140), 0, 1.5f * uiScale_);
 }
 
 void App::drawBrushCursor() {

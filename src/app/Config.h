@@ -55,6 +55,8 @@ struct UiPrefs {
     bool airStrokes = false;  // start strokes off the model (#62): a left-drag on the background sculpts once it
                               // reaches the surface instead of turning the view (off: it turns the view, ZBrush)
     bool showAxes = true;              // Draw > Camera > Axes: the X / Y / Z gizmo in the canvas corner (#31)
+    int axisGizmoSize = 1;             // Draw > Camera > Gizmo size: 0 Small, 1 Medium, 2 Large (axisGizmoScale)
+    bool showViewFigure = false;       // Draw > Camera > View Figure: a small shaded head that turns with the view
     bool cursorFollowsSurface = true; // the brush ring lies on the surface under the pointer, as in SculptGL (#25)
     // Preferences > Interface > Timeline position (#63): the Sculpt Timeline strip along the top of the viewport
     // (true, the default: clear of the brush shelf below it) or its bottom.
