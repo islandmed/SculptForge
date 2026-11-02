@@ -724,6 +724,7 @@ int App::run() {
         double releaseMs = 0.0, releaseAt = 0.0;
         uint64_t frames = 0, samples = 0, lagSamples = 0;
         float cx = 0.0f, cy = 0.0f, r = 0.0f;
+        double angle = 0.0; // the pointer's angle round the circle (0 at the press, 4 pi at the end)
         std::vector<glm::vec2> dabs;
         MeasureView view{};     // the view before the stroke (it starts once this has held still for a second)
         double viewSince = 0.0;
@@ -827,8 +828,15 @@ int App::run() {
                 return 1;
             }
         } else if (sm.moving) {
-            const double u = std::min(1.0, (seconds() - sm.start) / double(options_.measureStroke));
-            const double a = u * 4.0 * 3.14159265358979;
+            // The pointer follows the clock, but moves at most kMaxPointerStep per pass: the stroke follows the chords
+            // between samples, and on a slow frame rate (software GL on a busy machine: 100 ms frames and more) the
+            // chords would cut well inside the circle, or one long frame would skip the whole stroke. Above 30 fps
+            // the clock alone sets it; below, the stroke takes longer and is checked just as strictly.
+            constexpr double kMaxPointerStep = 0.25; // radians (a chord's middle 0.8% of the radius inside the circle)
+            const double clock = std::min(1.0, (seconds() - sm.start) / double(options_.measureStroke)) * 4.0 * 3.14159265358979;
+            const double a = std::min(clock, sm.angle + kMaxPointerStep);
+            const double u = a / (4.0 * 3.14159265358979);
+            sm.angle = a;
             // SF_MEASURE_RESIZE=1: the brush size changes every frame mid-stroke, as [ and ] would (the solver thread
             // must see each batch's own size: ui_stroke_resize, with verify).
             static const bool resize = std::getenv("SF_MEASURE_RESIZE") != nullptr;
@@ -868,7 +876,7 @@ int App::run() {
                             "  brush behind the pointer: surface mean %.0f px, worst %.0f px; preview mean %.0f px, worst %.0f px\n"
                             "  release %.0f ms (last dab on screen after %.0f ms)\n",
                             interactiveStrokes_ ? "queued" : "immediate", predictiveStrokes() ? ", predictive" : "", sm.dabs.size(),
-                            (unsigned long long)sm.samples, double(options_.measureStroke), double(sm.r), double(radiusPx_),
+                            (unsigned long long)sm.samples, sm.releaseAt - sm.start, double(sm.r), double(radiusPx_),
                             double(pct(0.5)), double(pct(0.95)), double(off.empty() ? 0.0f : off.back()), sm.pressMs,
                             sm.firstSurfaceMs, (unsigned long long)sm.frames, frameMean, sm.maxFrame * 1000.0, lagMean, sm.maxLag,
                             previewMean, sm.maxPreviewLag, releaseMs, releaseDoneMs);
@@ -890,7 +898,11 @@ int App::run() {
                 const float spacing = std::max(1.0f, radiusPx_ * 0.15f);
                 const double expected = 4.0 * 3.14159265358979 * double(sm.r) / double(spacing);
                 if (std::getenv("SF_MEASURE_RESIZE")) return 0; // (the spacing changed with the size: verify checked it)
-                return double(sm.dabs.size()) >= 0.9 * expected && !off.empty() && off.back() < spacing ? 0 : 1;
+                const bool enough = double(sm.dabs.size()) >= 0.9 * expected, onCircle = !off.empty() && off.back() < spacing;
+                if (!enough || !onCircle)
+                    std::printf("Stroke check failed: %zu dabs (want %.0f or more), worst %.1f px off the circle (want under %.1f)\n",
+                                sm.dabs.size(), 0.9 * expected, double(off.empty() ? 0.0f : off.back()), double(spacing));
+                return enough && onCircle ? 0 : 1;
             }
         }
         // The stroke's queued dabs: handed to the solver thread (predictive strokes, AsyncStroke.cpp), or placed here
@@ -1033,8 +1045,7 @@ int App::run() {
             sm.lastFrame = now;
             ++sm.frames;
             if (!sm.dabs.empty()) { // how far round the circle the brush is behind the pointer, on screen now
-                const double u = std::min(1.0, (now - sm.start) / double(options_.measureStroke));
-                const double pointer = std::fmod(u * 4.0 * 3.14159265358979, 2.0 * 3.14159265358979);
+                const double pointer = std::fmod(sm.angle, 2.0 * 3.14159265358979); // where the pointer was sent
                 const glm::vec2 d = sm.dabs.back();
                 double behind = pointer - std::atan2(double(d.y - sm.cy), double(d.x - sm.cx));
                 behind = std::remainder(behind, 2.0 * 3.14159265358979);

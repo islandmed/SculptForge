@@ -88,6 +88,8 @@ All notable changes to SculptForge are listed here. The format follows
 ### Fixed
 - Maya input style (#32): <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+drag erases the mask instead of starting
   the <kbd>Ctrl</kbd>+<kbd>Shift</kbd> visibility selection.
+- Paint Layers: picking a Material Recipe, or changing a Fill layer, from the panel could crash: the panel kept
+  reading the texture the command had just replaced. Its commands now run once the panel is drawn.
 
 ## [0.10.5] - 2026-11-01
 ### Added

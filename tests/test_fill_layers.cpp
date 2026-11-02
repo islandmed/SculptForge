@@ -17,7 +17,9 @@
 #include "core/TextureChannels.h"
 #include "core/Undo.h"
 
+#include <atomic>
 #include <cmath>
+#include <thread>
 
 using namespace sf;
 
@@ -297,4 +299,88 @@ TEST(material_recipes_are_data_and_wear_the_model) {
     MaterialRecipe bad;
     std::string err;
     CHECK(!parseMaterialRecipe("{\"format\":\"other\"}", bad, err));
+}
+
+// The app's live re-bake (App::updateMeshMaps): the update runs on a worker thread while the main thread keeps
+// using the maps it updates (Fill layers evaluate from them, the texture is replaced by the next command, the Part
+// is sculpted again). Many rounds in a row, each landing as the app lands it, end equal to a full bake of the
+// final shape. (Under ThreadSanitizer or AddressSanitizer this catches shared writes and stale reads.)
+TEST(mesh_maps_live_rebake_on_a_worker_while_fill_layers_evaluate) {
+    Mesh m = trenchPart();
+    const MeshMapSettings st = quickMaps();
+    auto maps = std::make_shared<MeshMapSet>();
+    std::string err;
+    CHECK(bakeMeshMaps(m, 1024, 1024, kAllMeshMaps, st, *maps, err));
+    m.texture->meshMaps = maps;
+    FillLayer wear;
+    wear.material.channels = channelBit(Channel::BaseColor) | channelBit(Channel::Roughness);
+    MaskEffect e;
+    e.generator = GeneratorKind::EdgeWear;
+    e.level = 0.6f;
+    wear.effects.push_back(e);
+    MaskEffect blur;
+    blur.kind = MaskEffectKind::Blur;
+    blur.radius = 4.0f;
+    wear.effects.push_back(blur);
+    addFillLayer(m, *m.texture, "Edges", wear);
+    int landed = 0;
+    for (int round = 0; round < 6; ++round) {
+        // Sculpt a dent somewhere new.
+        const glm::vec2 c(-0.6f + 0.24f * float(round), 0.5f - 0.2f * float(round));
+        for (glm::vec3& p : m.positions) {
+            const float d = glm::distance(glm::vec2(p.x, p.z), c);
+            if (d < 0.12f) p.y -= 0.05f * (0.5f + 0.5f * std::cos(d / 0.12f * 3.14159265f));
+        }
+        m.recomputeAllNormals();
+        std::vector<uint32_t> moved;
+        const AABB region = changedRegion(*m.texture->meshMaps, m, &moved);
+        CHECK(region.valid());
+        auto up = std::make_shared<MeshMapUpdate>();
+        if (!prepareMeshMapUpdate(m, m.texture->meshMaps, region, std::move(moved), *up)) continue;
+        std::atomic<bool> done{false};
+        std::thread worker([up, &done] {
+            runMeshMapUpdate(*up);
+            done = true;
+        });
+        // Meanwhile: the Fill layers evaluate from the maps being updated, and a command replaces the texture
+        // (its undo step keeps the old one, which then goes).
+        int evaluations = 0;
+        do {
+            std::shared_ptr<PaintTexture> old = m.texture;
+            PaintTexture& t = mutableTexture(m);
+            evaluateFillLayers(m, t, nullptr);
+            old.reset();
+            ++evaluations;
+        } while (!done && evaluations < 50);
+        worker.join();
+        CHECK(up->ok);
+        if (m.texture->meshMaps != up->base) continue; // (as the app: only onto the set it was made from)
+        std::shared_ptr<MeshMapSet> set = applyMeshMapUpdate(*up);
+        CHECK(set != nullptr);
+        mutableTexture(m).meshMaps = std::move(set);
+        evaluateFillLayers(m, *m.texture, &up->tiles);
+        ++landed;
+    }
+    CHECK(landed >= 5);
+    CHECK(!changedRegion(*m.texture->meshMaps, m).valid());
+    MeshMapSet full;
+    CHECK(bakeMeshMaps(m, 1024, 1024, kAllMeshMaps, st, full, err));
+    size_t differ = 0;
+    const MeshMapSet& live = *m.texture->meshMaps;
+    for (int k = 0; k < kMeshMapCount; ++k) {
+        if (MeshMapKind(k) == MeshMapKind::Position) continue; // (keeps the first bake's box)
+        for (int y = 0; y < 1024; y += 3)
+            for (int x = 0; x < 1024; x += 3) {
+                float a[4] = {}, b[4] = {};
+                live.images[size_t(k)].values(x, y, a);
+                full.images[size_t(k)].values(x, y, b);
+                for (int i = 0; i < 3; ++i)
+                    if (std::abs(a[i] - b[i]) > 1.0f / 255.0f) {
+                        ++differ;
+                        break;
+                    }
+            }
+    }
+    std::printf("  %d of 6 updates landed; %zu sampled texels differ from a full bake\n", landed, differ);
+    CHECK(differ == 0);
 }
