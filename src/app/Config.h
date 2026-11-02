@@ -58,6 +58,12 @@ struct UiPrefs {
     // Preferences > Interface > Timeline position (#63): the Sculpt Timeline strip along the top of the viewport
     // (true, the default: clear of the brush shelf below it) or its bottom.
     bool timelineTop = true;
+    // Preferences > Interface > Viewport cursor (#73): the system cursor over the 3D view, 0 = crosshair (the
+    // default, as most sculpting apps), 1 = the arrow. Panels, menus and popups always show their own.
+    int viewportCursor = 0;
+    // Tool > Display > Backface culling (#68): skip the back faces of every Part (faster on dense meshes; see
+    // through open meshes). Off by default; a preference, projects keep their own.
+    bool backfaceCulling = false;
     TabletSettings tablet;      // Preferences > Tablet: pressure curve, eraser, pen buttons
     SpaceMouseSettings spaceMouse; // Preferences > Input > SpaceMouse
     // Preferences > Performance (PanelPerformance.cpp).

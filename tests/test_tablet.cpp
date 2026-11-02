@@ -168,6 +168,40 @@ TEST(pen_cursor_mouse_mode_moves_relatively) {
     CHECK(near(x, 25.0f) && near(y, 10.0f));
 }
 
+TEST(pen_cursor_mouse_mode_follows_the_system_cursor) {
+    // #72: in mouse mode the driver moves the system cursor; when the system says where it is, that is the cursor
+    // for every pen position (no cursor of our own to drift from it).
+    PenCursor c;
+    c.mouseMode = true;
+    c.cursorAt(400.0f, 300.0f);
+    c.proximity();
+    float x = 100.0f, y = 50.0f;
+    c.systemCursor(400.0f, 300.0f);
+    c.map(x, y, 1000);
+    CHECK(near(x, 400.0f) && near(y, 300.0f));
+    // The pen lifted, put down at another point, the driver's cursor moved elsewhere meanwhile: the system's.
+    c.proximity();
+    x = 900.0f, y = 700.0f;
+    c.systemCursor(250.0f, 120.0f);
+    c.map(x, y, 2000);
+    CHECK(near(x, 250.0f) && near(y, 120.0f));
+    // The driver moves its cursor less (or more) than the pen moved on the tablet: still the system's.
+    x = 950.0f, y = 700.0f;
+    c.systemCursor(260.0f, 121.0f);
+    c.map(x, y, 3000);
+    CHECK(near(x, 260.0f) && near(y, 121.0f));
+    // One reading per position: without a new one the pen carries on from the last (a system that can't say).
+    x = 960.0f, y = 705.0f;
+    c.map(x, y, 4000);
+    CHECK(near(x, 270.0f) && near(y, 126.0f));
+    // Pen mode ignores the system cursor (#54's case: the driver's mouse events land slightly off the pen).
+    c.mouseMode = false;
+    x = 50.0f, y = 60.0f;
+    c.systemCursor(300.0f, 300.0f);
+    c.map(x, y, 5000);
+    CHECK(near(x, 50.0f) && near(y, 60.0f));
+}
+
 TEST(tablet_settings_mouse_mode_round_trip) {
     TabletSettings t;
     CHECK(!t.mouseMode);

@@ -265,6 +265,7 @@ void App::storeProjectSettings() {
     render.set("show_splats", renderSettings_.showSplats);
     render.set("splat_opacity", double(renderSettings_.splatOpacity));
     render.set("flat_shading", renderSettings_.flatShading);
+    render.set("backface_culling", renderSettings_.backfaceCulling);
     render.set("background", std::string(renderSettings_.gradientBackground ? "gradient" : "flat"));
     render.set("background_color", vec3Json(renderSettings_.backgroundColor));
     render.set("matcap", renderSettings_.matcap < 0 ? std::string() : std::string(matcapName(renderSettings_.matcap)));
@@ -362,6 +363,7 @@ void App::applyProjectSettings() {
         readFloat(r, "splat_opacity", renderSettings_.splatOpacity);
         // Projects from before the setting: the preferred shading.
         renderSettings_.flatShading = r["flat_shading"].asBool(uiPrefs_.flatShading);
+        renderSettings_.backfaceCulling = r["backface_culling"].asBool(uiPrefs_.backfaceCulling);
         // Viewport shading; projects from before it: Lit Sphere.
         {
             RenderSettings& v = renderSettings_;

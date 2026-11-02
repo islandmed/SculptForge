@@ -329,6 +329,10 @@ void App::shutdown() {
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
+    for (SDL_Cursor*& c : cursors_) {
+        if (c) SDL_DestroyCursor(c);
+        c = nullptr;
+    }
     renderer_.shutdown();
     if (glContext_) SDL_GL_DestroyContext(glContext_);
     if (window_) SDL_DestroyWindow(window_);
@@ -424,6 +428,7 @@ int App::runUiTest(int w, int h, int fps) {
         if (ImGuiContext* g = ImGui::GetCurrentContext()) demo_->setFrameText(g->LogBuffer.c_str());
         ImGui::LogFinish();
         ImGui::Render();
+        updateMouseCursor();
 
         prewarmTexturePaint(); // dense textured meshes: ready the area under the hovering Paint brush (PanelPbr.cpp)
         const auto syncStart = std::chrono::steady_clock::now();
@@ -590,6 +595,7 @@ int App::runRecording() {
         drawUi();
         demo_->drawOverlay();
         ImGui::Render();
+        updateMouseCursor();
 
         syncScene();
         ++frames;
@@ -964,6 +970,7 @@ int App::run() {
         drawUi();
         drawHardwareProfileOverlay();
         ImGui::Render();
+        updateMouseCursor();
         mark();
 
         buildGhost(); // the dabs not on the GPU yet, drawn as a preview (predictive strokes)
@@ -1148,7 +1155,75 @@ bool App::pick(float x, float y, RayHit& hit) const {
     if (!doc_.activeSubtoolInfo().visible) return false; // you can't sculpt what you can't see
     glm::vec3 origin, dir;
     canvasRay(x, y, origin, dir);
-    return surfaceRaycast(doc_.mesh, doc_.bvh, origin, dir, hit); // (the micro surface on a micro level)
+    return frontRaycast(origin, dir, hit);
+}
+
+// The surface under a ray as drawn: with Backface culling on (#68) a back face isn't drawn, so the ray goes on
+// through it to the next face it meets (a brush through the opening of an open mesh works on the far side).
+bool App::frontRaycast(const glm::vec3& origin, const glm::vec3& dir, RayHit& hit) const {
+    if (!surfaceRaycast(doc_.mesh, doc_.bvh, origin, dir, hit)) return false; // (the micro surface on a micro level)
+    if (!renderSettings_.backfaceCulling) return true;
+    glm::vec3 o = origin;
+    for (int i = 0; i < 16 && glm::dot(hit.normal, dir) > 0.0f; ++i) {
+        const glm::vec3 d = glm::normalize(dir);
+        o = hit.position + d * std::max(1e-6f, 1e-5f * glm::distance(origin, hit.position)); // just past it
+        if (!surfaceRaycast(doc_.mesh, doc_.bvh, o, dir, hit)) return false;
+    }
+    return glm::dot(hit.normal, dir) <= 0.0f;
+}
+
+// The crosshair (#73): over the 3D view, where a click sculpts, paints or masks, or while a stroke runs (it may
+// drag over a panel). Not over the panels or windows floating above the view (ImGui has the pointer), a gizmo
+// handle, while the view turns or pans, or where ImGui asks for a cursor of its own (a resize handle on the edge).
+bool App::viewportCursorWanted() const {
+    if (uiPrefs_.viewportCursor != 0) return false;
+    if (drag_ == Drag::Stroke || drag_ == Drag::MaskCanvas || drag_ == Drag::AirStroke) return true;
+    if (drag_ != Drag::None) return false;
+    if (ImGui::GetIO().WantCaptureMouse || !canvasRect().contains(mouseX_, mouseY_)) return false;
+    if (ImGui::GetMouseCursor() != ImGuiMouseCursor_Arrow) return false;
+    if (gizmoActive() && gizmo_.hover != GizmoHandle::None) return false;
+    return true;
+}
+
+// The system cursor, set here rather than by ImGui's backend (which knows no crosshair, and would not put its own
+// back after another was set): ImGui's choice, or the crosshair over the view. Decided after the frame's UI, from
+// that frame's hover state, so a window floating over the view never makes it flicker. SDL_SetCursor runs only
+// when the kind changes.
+void App::updateMouseCursor() {
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
+    const ImGuiMouseCursor ui = ImGui::GetMouseCursor();
+    cursorKind_ = viewportCursorWanted() ? kCursorCrosshair : ui == ImGuiMouseCursor_None || io.MouseDrawCursor ? kCursorHidden : int(ui);
+    if (cursorKind_ == cursorShown_) return;
+    cursorShown_ = cursorKind_;
+    if (cursorKind_ == kCursorHidden) {
+        SDL_HideCursor();
+        return;
+    }
+    SDL_SystemCursor id = SDL_SYSTEM_CURSOR_DEFAULT;
+    switch (cursorKind_) {
+    case kCursorCrosshair: id = SDL_SYSTEM_CURSOR_CROSSHAIR; break;
+    case ImGuiMouseCursor_TextInput: id = SDL_SYSTEM_CURSOR_TEXT; break;
+    case ImGuiMouseCursor_ResizeAll: id = SDL_SYSTEM_CURSOR_MOVE; break;
+    case ImGuiMouseCursor_ResizeNS: id = SDL_SYSTEM_CURSOR_NS_RESIZE; break;
+    case ImGuiMouseCursor_ResizeEW: id = SDL_SYSTEM_CURSOR_EW_RESIZE; break;
+    case ImGuiMouseCursor_ResizeNESW: id = SDL_SYSTEM_CURSOR_NESW_RESIZE; break;
+    case ImGuiMouseCursor_ResizeNWSE: id = SDL_SYSTEM_CURSOR_NWSE_RESIZE; break;
+    case ImGuiMouseCursor_Hand: id = SDL_SYSTEM_CURSOR_POINTER; break;
+    case ImGuiMouseCursor_Wait: id = SDL_SYSTEM_CURSOR_WAIT; break;
+    case ImGuiMouseCursor_Progress: id = SDL_SYSTEM_CURSOR_PROGRESS; break;
+    case ImGuiMouseCursor_NotAllowed: id = SDL_SYSTEM_CURSOR_NOT_ALLOWED; break;
+    default: break;
+    }
+    const size_t slot = size_t(id) < std::size(cursors_) ? size_t(id) : 0;
+    if (!cursors_[slot]) cursors_[slot] = SDL_CreateSystemCursor(id);
+    if (!cursors_[slot] && id != SDL_SYSTEM_CURSOR_DEFAULT) { // (a system without this one: the arrow)
+        if (!cursors_[0]) cursors_[0] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_DEFAULT);
+        if (cursors_[0]) SDL_SetCursor(cursors_[0]);
+    } else if (cursors_[slot]) {
+        SDL_SetCursor(cursors_[slot]);
+    }
+    SDL_ShowCursor();
 }
 
 BrushType App::activeBrush() const {

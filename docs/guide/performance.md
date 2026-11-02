@@ -99,7 +99,10 @@ setting is also in the <kbd>F3</kbd> command palette (type "antialiasing", "fast
   instead of failing: hide other Parts or step down a subdivision level.
 - **Closed meshes draw faster.** Parts of a mesh that face away from you are skipped when the mesh is closed
   (no holes or hidden parts) and you look at it from outside. A mesh with holes, hidden polygons, or a view from
-  inside it draws everything, which can take about twice as long on huge meshes.
+  inside it draws everything, which can take about twice as long on huge meshes. **Tool > Display > Backface
+  culling** (#68, off by default) skips the back faces of any mesh, open or closed, from any view: an open scan
+  seen from behind then draws almost nothing (8M triangles: 3.1 ms down to 0.7 ms a frame), and you see through its
+  openings. Brushes then work only on the faces drawn.
 - **Undo** keeps only what each stroke changed, so a stroke on a 33 million triangle mesh undoes in a few tens of
   milliseconds, and the history holds many such strokes within its 1 GB.
 
