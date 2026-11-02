@@ -88,6 +88,8 @@ All notable changes to SculptForge are listed here. The format follows
 ### Fixed
 - Maya input style (#32): <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+drag erases the mask instead of starting
   the <kbd>Ctrl</kbd>+<kbd>Shift</kbd> visibility selection.
+- glTF import rejects malformed accessor and buffer sizes instead of crashing or reading out of bounds (reported by
+  @Agapenordev in #70).
 
 ## [0.10.5] - 2026-11-01
 ### Added
