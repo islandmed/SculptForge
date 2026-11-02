@@ -7,10 +7,6 @@ chapter opens by itself the first time you start a new version; you can always f
 
 ## Version 0.10.7
 
-- **Each brush keeps its own settings**: Draw Size, Intensity, Falloff, RGB Intensity, stroke and alpha follow
-  the brush, custom and Community brushes included. **Brush > Save Brush Settings** keeps them for the next start,
-  **Reset Brush to Default** puts back the shipped values, and **Preferences > Input > Share size and intensity
-  across brushes** keeps the old way (#78). See [Sculpting](sculpting.md#each-brush-keeps-its-own-settings).
 - **A clearer membership card**: the three memberships side by side with what each one gets you, in your look's
   colours. **Maybe later** now hides it for 30 days.
 - **New memberships**: Supporters get the credits (in the app and on the website), the monthly pack and a vote;
@@ -25,6 +21,10 @@ chapter opens by itself the first time you start a new version; you can always f
   **Keep my layout**. Coming from ZBrush? **Preferences > Interface > Look > ZBrush-style layout** (or the button in
   the welcome) brings back the palette bar and the two-row shelf. Six more colour schemes, Match my desktop theme,
   Phosphor, Blueprint and the Classic look are there too. See [The interface](interface.md#looks-and-layouts).
+- **Each brush keeps its own settings**: Draw Size, Intensity, Falloff, RGB Intensity, stroke and alpha follow
+  the brush, custom and Community brushes included. **Brush > Save Brush Settings** keeps them for the next start,
+  **Reset Brush to Default** puts back the shipped values, and **Preferences > Input > Share size and intensity
+  across brushes** keeps the old way (#78). See [Sculpting](sculpting.md#each-brush-keeps-its-own-settings).
 
 ## Version 0.10.6
 
