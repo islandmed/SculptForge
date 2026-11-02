@@ -461,6 +461,7 @@ int App::runUiTest(int w, int h, int fps) {
 
         prewarmTexturePaint(); // dense textured meshes: ready the area under the hovering Paint brush (PanelPbr.cpp)
         const auto syncStart = std::chrono::steady_clock::now();
+        updateFocusDetail(); // (a streamed micro level: promote what the camera and brush need, before the upload)
         syncScene();
         notePerformanceFrame(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - syncStart).count());
         viewSamples(); // keeps Fast Navigation's view of the camera current (UI tests read view_samples)
@@ -2075,6 +2076,8 @@ void App::openPath(const std::string& path) {
         installBrushFile(path);
     } else if (ext == kPackExtension) { // a pack: the review screen first, nothing is installed yet
         reviewPackFile(path);
+    } else if (ext == ".sfdetail") { // Focus Detail (prototype): a streamed micro level
+        openFocusDetail(path);
     } else if (ext == ".exr" || ext == ".sfvdm") { // a vector displacement map for the VDM brush
         runCommand("vdm_set", {{"path", path}, {"swap_yz", vdmImport_.swapYZ}, {"flip_x", vdmImport_.flipX},
                                {"flip_y", vdmImport_.flipY}, {"flip_z", vdmImport_.flipZ}, {"scale", double(vdmImport_.scale)}});

@@ -5,6 +5,7 @@
 // shading, baking down and displacement maps. The brushes are in MicroSculpt.cpp, the commands in
 // MicroCommands.cpp.
 #include "core/Micro.h"
+#include "core/FocusDetail.h"
 
 #include "core/BakeImage.h"
 #include "core/BVH.h"
@@ -844,6 +845,7 @@ void MicroUndo::swapWith(Mesh& m) {
     }
     if (!m.micro || !microMatches(m) || m.micro->samples != samples) return;
     MicroMesh& mm = mutableMicro(m);
+    if (mm.focus) mm.focus->ensureFull(mm, tris, true); // (undo writes full tiles only)
     const size_t S = samples;
     // Values kept in another step size (the range grew since): convert to the current one.
     if (!journal && step != mm.step && step > 0.0f) {

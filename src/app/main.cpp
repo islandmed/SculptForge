@@ -4,6 +4,7 @@
 #include "app/Bench.h"
 #include "app/Calibration.h"
 #include "app/CrashLog.h"
+#include "core/FocusDetail.h"
 #include "core/Pack.h"
 
 #include <SDL3/SDL_main.h>
@@ -67,6 +68,8 @@ void usage() {
         "                           JSON result and an MP4 of the run and exits (docs/benchmark.md)\n"
         "  --benchmark standard-15m The standard scene: a 15M triangle head, Clay S/M/L, Move, Smooth and a 240 px\n"
         "                           brush (standard-33m: 33M; standard: both). The numbers on sculptforge.app/benchmarks\n"
+        "  --benchmark standard-1b  Experimental Focus Detail: a billion micro triangle head streamed from disk\n"
+        "  --focus-detail FILE      Experimental: open a Focus Detail file (.sfdetail)\n"
         "  --benchmark-sizes 5,20   Proof mode mesh sizes in millions of triangles\n"
         "  --benchmark-out FILE     Where the JSON result goes (default: sculptforge-benchmark-<time>.json here)\n"
         "  --benchmark-video FILE   Where the MP4 goes; --benchmark-no-video records none\n"
@@ -166,12 +169,13 @@ int main(int argc, char** argv) {
             if (i + 1 < argc && std::string(argv[i + 1]).rfind("standard", 0) == 0) {
                 options.benchmarkScene = argv[++i];
                 if (options.benchmarkScene != "standard" && options.benchmarkScene != "standard-15m" &&
-                    options.benchmarkScene != "standard-33m") {
-                    std::fprintf(stderr, "Unknown benchmark scene %s (standard-15m, standard-33m or standard)\n", argv[i]);
+                    options.benchmarkScene != "standard-33m" && options.benchmarkScene != "standard-1b") {
+                    std::fprintf(stderr, "Unknown benchmark scene %s (standard-15m, standard-33m, standard or standard-1b)\n", argv[i]);
                     return 1;
                 }
             }
         }
+        else if (a == "--focus-detail") options.openPath = next(); // a .sfdetail file (prototype)
         else if (a == "--benchmark-sizes") options.benchmarkSizes = next();
         else if (a == "--benchmark-out") options.benchmarkOut = next();
         else if (a == "--benchmark-video") options.benchmarkVideo = next();
@@ -193,6 +197,17 @@ int main(int argc, char** argv) {
     if (!options.uiTest.empty()) {
         if (!sizeGiven) options.width = 1600, options.height = 960;
         isolateSettings();
+    }
+    if (options.benchmarkScene == "standard-1b") { // the asset first (written once, a few seconds), before any window
+#if defined(_WIN32)
+        std::fprintf(stderr, "standard-1b (experimental Focus Detail) needs Linux or macOS for now\n");
+        return 1;
+#endif
+        std::string error;
+        if (sf::focusStandard1bPath(error, [](const std::string& s) { std::fprintf(stderr, "%s\n", s.c_str()); }).empty()) {
+            std::fprintf(stderr, "standard-1b: %s\n", error.c_str());
+            return 1;
+        }
     }
     if (options.benchmark && !sizeGiven) options.width = 1920, options.height = 1080;
     if (options.benchmark || !options.timelapsePath.empty()) isolateSettings(); // the user's settings and files untouched

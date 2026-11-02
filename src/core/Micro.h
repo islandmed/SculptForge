@@ -49,6 +49,7 @@ namespace sf {
 
 class BVH;
 class CommandRegistry;
+class FocusDetail;
 struct Document;
 struct RayHit;
 enum class BrushType;
@@ -85,6 +86,9 @@ struct MicroMesh {
     // its GPU copy while the serial stays.
     uint64_t serial = 0;
     static uint64_t newSerial();
+    // Focus Detail (core/FocusDetail.h, prototype): set when the level streams from a detail file. Tiles outside
+    // the focus hold a coarse grid; brushes and undo make the tiles they change full first (ensureFull).
+    std::shared_ptr<FocusDetail> focus;
 
     size_t microTriangles() const { return size_t(baseTriangles) * n * n; }
     size_t microVertices() const; // unique grid points (shared edges and corners counted once)

@@ -6,6 +6,7 @@
 #include "core/Commands.h"
 #include "core/Document.h"
 #include "core/Micro.h"
+#include "core/FocusDetail.h"
 #include "core/Multires.h"
 #include "core/Polypaint.h"
 #include "core/Primitives.h"
@@ -328,6 +329,12 @@ bool parseBenchArg(int argc, char** argv, int& i, BenchCommandLine& cl) {
     } else if (a == "--bench-micro-level") {
         cl.options.micro = true;
         cl.options.microLevel = std::clamp(std::atoi(next().c_str()), 1, 7);
+    } else if (a == "--bench-focus") {
+        cl.run = true;
+        cl.options.focus = true;
+    } else if (a == "--bench-focus-base") {
+        cl.options.focus = true;
+        cl.options.focusBase = size_t(std::max(100, std::atoi(next().c_str())));
     } else if (a == "--bench-out") {
         cl.outPath = next();
     } else {
@@ -661,7 +668,8 @@ std::string runMicroBenchmark(const BenchOptions& o, const BenchGpu* gpu) {
 
 std::string runBenchmark(const BenchOptions& o, const BenchGpu* gpu) {
     if (o.dyntopo) return runDyntopoBenchmark(o, gpu);
-    if (o.micro) return runMicroBenchmark(o, gpu);
+    if (o.micro && !o.focus) return runMicroBenchmark(o, gpu);
+    if (o.focus) return runFocusBenchmark(o);
     auto log = [&](const std::string& s) {
         if (o.log) o.log(s);
     };
