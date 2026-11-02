@@ -1054,6 +1054,10 @@ void App::initLightBox() {
         "Save a timestamped snapshot of the whole scene to your library (the last 10 are kept). "
         "Your project file is not changed. Find them in the Library's Snapshots tab.",
         [this] { quickSave(); });
+    add("render.save_image", "Save Render", ICON_LC_CAMERA, "Material", "",
+        "Render the view (without the interface) at twice its size to a PNG in your library: Library > Image "
+        "lists it, and the status bar names the file.",
+        [this] { saveRender(); });
 
     // ZBrush opens the LightBox at startup on the Project tab (never in tests, renders or recordings).
     if (uiPrefs_.lightboxAtStartup && interactive() && options_.uiTest.empty() && options_.openPath.empty() &&
@@ -1109,6 +1113,55 @@ void App::quickSave() {
     pruneQuickSaves(folder);
     libraryScanner_.invalidate();
     status_ = "Saved " + utf8(fsPath(path).filename());
+    lastCommandOk_ = true;
+}
+
+void App::saveRender() {
+    if (library_.user.empty()) {
+        status_ = "Save Render needs a library folder (Preferences > Library)";
+        return;
+    }
+    const std::string folder = library_.user + "/Images";
+    std::error_code ec;
+    fs::create_directories(fsPath(folder), ec);
+    const std::time_t t = std::time(nullptr);
+    std::tm tm{};
+#if defined(_WIN32)
+    localtime_s(&tm, &t);
+#else
+    localtime_r(&t, &tm);
+#endif
+    char buf[64];
+    std::strftime(buf, sizeof buf, "Render %Y-%m-%d %H-%M-%S", &tm);
+    std::string path = folder + "/" + buf + ".png";
+    for (int serial = 1; fs::exists(fsPath(path), ec); ++serial)
+        path = folder + "/" + buf + " (" + std::to_string(serial) + ").png";
+    // The canvas's shape at twice its size (at most 4096 px wide): what you see, without the interface.
+    const CanvasRect c = canvasRect();
+    const float aspect = c.h > 1.0f ? c.w / c.h : 1.0f;
+    Image img;
+    img.width = std::clamp(int(c.w * 2.0f), 512, 4096);
+    img.height = std::max(1, int(float(img.width) / aspect));
+    Camera cam = camera_;
+    cam.aspect = aspect;
+    RenderSettings settings = renderSettings_;
+    settings.dimInactive = false; // every Part at full brightness
+    settings.showMask = false;
+    constexpr GLenum kFramebufferBinding = 0x8CA6, kViewport = 0x0BA2;
+    GLint fbo = 0, viewport[4] = {};
+    gl::GetIntegerv(kFramebufferBinding, &fbo);
+    gl::GetIntegerv(kViewport, viewport);
+    std::string err;
+    const bool ok = renderer_.renderToImage(cam, img.width, img.height, settings, img.rgba, err) && img.savePng(path, err);
+    gl::BindFramebuffer(GL_FRAMEBUFFER, GLuint(fbo));
+    gl::Viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+    if (!ok) {
+        status_ = "Save Render failed: " + err;
+        lastCommandOk_ = false;
+        return;
+    }
+    libraryScanner_.invalidate();
+    status_ = "Saved " + utf8(fsPath(path).filename()) + " (Library > Image)";
     lastCommandOk_ = true;
 }
 

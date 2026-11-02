@@ -6,6 +6,17 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- "Your first sculpt in 10 minutes" (docs/guide/first-sculpt.md): a twelve-step lesson for complete beginners that
+  turns the default sphere into a mushroom house: masked Move strokes for the walls and an overhanging cap, colour
+  filled through the mask, Divide twice, a door and framed windows carved with Crease and Clay, raised spots
+  painted with a hard-edged Paint brush, PBR shading and a saved render. The welcome has a big **Start the 10-minute
+  lesson** button, and **Help > Your first sculpt (10 min)** opens it. Its screenshots come from
+  tests/ui/first_sculpt.sfui, which ctest runs so the lesson keeps working. The website links it from the homepage
+  and the guide index.
+- **Render > Materials > Save Render**: the view without the interface at twice its size, saved as a PNG in the
+  library's Images folder (Library > Image).
+
 ## [0.10.7] - 2026-11-01
 
 ### Changed

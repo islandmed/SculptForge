@@ -1299,6 +1299,7 @@ private:
     // The LightBox / picker shortcuts (, B M S) until the action registry dispatches keys.
     bool lightBoxKey(SDL_Keycode key, SDL_Keymod mod);
     void quickSave();                  // file.quicksave: a timestamped project in <library>/QuickSave
+    void saveRender();                 // render.save_image: the view as a PNG in <library>/Images
     LibraryRoots library_;
     FolderScanner libraryScanner_;
     // ---- end LightBox (B) ----

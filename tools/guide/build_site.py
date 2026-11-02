@@ -624,9 +624,10 @@ def check(index: Page, chapters) -> list:
         if old_name[:-5] + ".md" in pages:
             problems.append(f"REDIRECTS: {old_name} is a chapter again; remove the redirect")
     used = {src for p in pages.values() for src in p.images}
-    for img in sorted((SRC / "images").glob("*")):
-        if f"images/{img.name}" not in used:
-            problems.append(f"images/{img.name}: not used by any page")
+    for img in sorted(f for f in (SRC / "images").rglob("*") if f.is_file()):  # also images/<chapter>/*
+        rel = img.relative_to(SRC).as_posix()
+        if rel not in used:
+            problems.append(f"{rel}: not used by any page")
     return problems
 
 

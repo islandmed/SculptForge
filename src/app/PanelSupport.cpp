@@ -8,6 +8,7 @@
 #include "app/LookSchemes.h"
 #include "app/Theme.h"
 
+#include <IconsLucide.h>
 #include <imgui.h>
 
 #include <algorithm>
@@ -99,6 +100,16 @@ void App::drawSupportUi() {
         ImGui::SetNextWindowSize(ImVec2(440.0f * s, 0.0f), ImGuiCond_Appearing);
         const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize;
         if (ImGui::Begin("Welcome to SculptForge", &showWelcome_, flags)) {
+            // New to sculpting: the lesson first, big (docs/guide/first-sculpt.md).
+            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+            if (ImGui::Button(ICON_LC_GRADUATION_CAP "  Start the 10-minute lesson##welcome.lesson", ImVec2(-1, 40.0f * s))) {
+                guide_.open("first-sculpt.md");
+                showWelcome_ = false;
+            }
+            ImGui::PopStyleColor();
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Your first sculpt: a little mushroom house from this sphere, step by step, in about ten minutes.");
+            ImGui::Spacing();
             ImGui::TextWrapped("Hold Ctrl over any control to see what it does. The User Guide (Shift+F1) explains every "
                                "tool, and Coming from ZBrush lists what is where.");
             // The keys to start with (Preferences > Input changes them later; Store Config keeps them).

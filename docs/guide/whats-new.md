@@ -5,6 +5,16 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.10.8
+
+- **Your first sculpt in 10 minutes**: a step-by-step lesson for people who have never sculpted. Turn the
+  default sphere into a little mushroom house with a spotted red cap, a door and glowing windows, using masks,
+  Move, Inflate, Crease and Clay, Vertex Paint and PBR shading, and save a render to share. Start it from the
+  welcome's **Start the 10-minute lesson** button or **Help > Your first sculpt (10 min)**. See
+  [Your first sculpt](first-sculpt.md).
+- **Save Render** (**Render > Materials**): the view without the interface, at twice its size, as a PNG in your
+  Library (**Library > Image**).
+
 ## Version 0.10.7
 
 - **A clearer membership card**: the three memberships side by side with what each one gets you, in your look's
