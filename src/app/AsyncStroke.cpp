@@ -152,6 +152,16 @@ bool App::backgroundDabs() const {
     return env >= 0 ? env == 1 : doc_.mesh.vertexCount() >= kBackgroundDabVertices;
 }
 
+bool App::previewStrokes() const {
+    // SF_BG_GHOST=1 (a research prototype, docs/design/perf-moonshots.md): background dabs draw the predictive
+    // preview too (it never changes the mesh: the solver's dabs are the same), and the frame doesn't wait for them.
+    static const bool bgGhost = [] {
+        const char* v = std::getenv("SF_BG_GHOST");
+        return v && *v == '1';
+    }();
+    return predictiveStrokes() || (bgGhost && backgroundDabs());
+}
+
 bool App::asyncStrokeAllowed() const {
     // Sculpt strokes of queued dabs only: Move, Snake Hook and the drag strokes work in strokeTo itself; painting,
     // masking and dynamic topology (which changes the layout the renderer packs for) stay in the frame loop.
@@ -295,11 +305,28 @@ void App::pumpStroke() {
     s.start();
     // Background dabs: a batch is waited for here up to a frame's share of work, so a light one shows in this frame
     // as in the frame loop's own path; a heavier one goes on while the frame draws, and the next frame commits it.
-    if (!predictiveStrokes() && dabSeconds_ > 0.0 && s.waitFor(kBackgroundBatchSeconds * 1.25) && s.done)
+    if (!previewStrokes() && dabSeconds_ > 0.0 && s.waitFor(kBackgroundBatchSeconds * 1.25) && s.done)
         commitSolverBatch();
 }
 
+bool App::liveMoveEnabled() {
+    static const bool on = [] {
+        const char* v = std::getenv("SF_LIVE_MOVE");
+        return v && *v == '1';
+    }();
+    return on;
+}
+
+void App::commitLiveMove() {
+    if (!liveMove_.active) return;
+    liveMove_.active = false;
+    // One grab with the whole move: the weights are the grab's own, so this is the sum of the per-frame grabs.
+    if (glm::dot(liveMove_.delta, liveMove_.delta) > 0.0f) doc_.sculptor.grab(doc_.mesh, doc_.bvh, liveMove_.delta);
+    renderer_.setGhost(0, GhostStroke());
+}
+
 void App::finishStrokeNow() {
+    commitLiveMove();
     if (solver_) solver_->finalize = false;
     doc_.sculptor.flushDraft(doc_.mesh, doc_.bvh); // (a draft stroke ended here rather than on the solver thread)
     renderer_.setDraftNormals(0);
@@ -369,7 +396,7 @@ bool App::pickWith(const DabView& view, float x, float y, RayHit& hit) const {
 }
 
 glm::vec2 App::predictedPointer() const {
-    if (!predictiveStrokes() || drag_ != Drag::Stroke || !asyncStroke_) return glm::vec2(mouseX_, mouseY_);
+    if (!previewStrokes() || drag_ != Drag::Stroke || !asyncStroke_) return glm::vec2(mouseX_, mouseY_);
     // To when this frame reaches the screen: about a frame after the newest sample.
     const double ahead = std::clamp(frameSeconds_, 0.004, PenPredictor::kMaxAhead);
     return penPredictor_.predict(pointerLatestAt_ + ahead, pointerLatest_);
@@ -401,11 +428,30 @@ bool App::ghostSurface(const glm::vec3& origin, const glm::vec3& dir, glm::vec3&
 void App::buildGhost() {
     ghostHeadValid_ = false;
     const uint32_t id = doc_.activeSubtoolInfo().id;
+    if (liveMove_.active) { // Live Move: one "dab" per mirror, the whole move so far
+        GhostStroke g;
+        g.kind = GhostKind::Move;
+        g.focal = focalShift_;
+        std::vector<SymCopy> mirrors = Sculptor::copies(symmetry_);
+        if (mirrors.size() > GhostStroke::kMaxMirrors) mirrors.resize(GhostStroke::kMaxMirrors);
+        for (uint32_t m = 0; m < mirrors.size(); ++m) {
+            GhostDab d;
+            d.center = mirrors[m].point(liveMove_.center);
+            d.radius = liveMove_.radius;
+            d.normal = mirrors[m].m * liveMove_.delta;
+            d.strength = liveMove_.scale;
+            d.areaCenter = d.center;
+            d.mirror = m;
+            g.dabs.push_back(d);
+        }
+        renderer_.setGhost(id, g);
+        return;
+    }
     static const bool noGhost = [] { // SF_GHOST=0: the solver thread without the preview (for comparison)
         const char* v = std::getenv("SF_GHOST");
         return v && *v == '0';
     }();
-    if (!asyncStroke_ || !solver_ || !predictiveStrokes() || noGhost) {
+    if (!asyncStroke_ || !solver_ || !previewStrokes() || noGhost) {
         renderer_.setGhost(id, GhostStroke());
         return;
     }

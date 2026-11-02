@@ -25,6 +25,8 @@ using GLchar = char;
 using GLubyte = unsigned char;
 using GLsizeiptr = std::ptrdiff_t;
 using GLintptr = std::ptrdiff_t;
+using GLuint64 = uint64_t;
+using GLsync = struct __GLsync*;
 
 constexpr GLenum GL_FALSE = 0;
 constexpr GLenum GL_TRUE = 1;
@@ -193,7 +195,23 @@ constexpr GLbitfield GL_COLOR_BUFFER_BIT = 0x4000;
     X(void, DrawElementsBaseVertex, GLenum, GLsizei, GLenum, const void*, GLint)             \
     X(void*, MapBufferRange, GLenum, GLintptr, GLsizeiptr, GLbitfield)                       \
     X(GLboolean, UnmapBuffer, GLenum)                                                        \
+    X(void, CopyBufferSubData, GLenum, GLenum, GLintptr, GLintptr, GLsizeiptr)               \
+    X(GLsync, FenceSync, GLenum, GLbitfield)                                                 \
+    X(GLenum, ClientWaitSync, GLsync, GLbitfield, GLuint64)                                  \
+    X(void, DeleteSync, GLsync)                                                              \
     X(void, MultiDrawElementsBaseVertex, GLenum, const GLsizei*, GLenum, const void* const*, GLsizei, const GLint*)
+
+// Optional (GL 4.4 / GL_ARB_buffer_storage; macOS stops at 4.1): null when missing.
+#define SF_GL_OPTIONAL(X) X(void, BufferStorage, GLenum, GLsizeiptr, const void*, GLbitfield)
+
+constexpr GLenum GL_COPY_READ_BUFFER = 0x8F36;
+constexpr GLenum GL_COPY_WRITE_BUFFER = 0x8F37;
+constexpr GLenum GL_SYNC_GPU_COMMANDS_COMPLETE = 0x9117;
+constexpr GLbitfield GL_SYNC_FLUSH_COMMANDS_BIT = 0x00000001;
+constexpr GLenum GL_TIMEOUT_EXPIRED = 0x911B;
+constexpr GLenum GL_WAIT_FAILED = 0x911D;
+constexpr GLbitfield GL_MAP_PERSISTENT_BIT = 0x0040;
+constexpr GLbitfield GL_MAP_COHERENT_BIT = 0x0080;
 
 namespace gl {
 
@@ -201,6 +219,7 @@ namespace gl {
     using PFN_##name = ret(SF_GLAPI*)(__VA_ARGS__);      \
     extern PFN_##name name;
 SF_GL_FUNCTIONS(SF_GL_DECLARE)
+SF_GL_OPTIONAL(SF_GL_DECLARE)
 #undef SF_GL_DECLARE
 
 using GenericProc = void (*)();

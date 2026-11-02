@@ -1710,6 +1710,11 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
         p.connectedOnly = uiPrefs_.connectedOnly;
         p.viewFalloff = uiPrefs_.viewFalloff;
         doc_.sculptor.beginGrab(doc_.mesh, doc_.bvh, p, symmetry_);
+        liveMove_ = {};
+        if (liveMoveEnabled() && !p.connectedOnly && !p.viewFalloff && !doc_.mesh.micro && !doc_.mesh.hasMask() &&
+            !doc_.mesh.hasHidden() && doc_.mesh.layers.empty() && !doc_.sculptor.dyntopo.enabled &&
+            &displayedMesh() == &doc_.mesh)
+            liveMove_ = {true, p.center, glm::vec3(0.0f), p.radius, std::clamp(p.strength * 2.0f, 0.0f, 1.0f)};
         grabPlanePoint_ = grabLast_ = hit.position;
         beginAlongNormal(hit, p.radius);
         return;
@@ -1758,7 +1763,8 @@ void App::strokeTo(float x, float y) {
     const BrushRecipe* recipe = strokeRecipe();
     if (strokeBrush_ == BrushType::Move && !recipe && strokeSculpt_ && strokeAlongNormal_) {
         const glm::vec3 p = alongNormalTarget(x, y);
-        doc_.sculptor.grab(doc_.mesh, doc_.bvh, p - grabLast_);
+        if (liveMove_.active) liveMove_.delta += p - grabLast_;
+        else doc_.sculptor.grab(doc_.mesh, doc_.bvh, p - grabLast_);
         grabLast_ = p;
         return;
     }
@@ -1770,7 +1776,8 @@ void App::strokeTo(float x, float y) {
         if (std::abs(denom) < 1e-6f) return;
         float t = glm::dot(grabPlanePoint_ - origin, n) / denom;
         glm::vec3 p = origin + dir * t;
-        doc_.sculptor.grab(doc_.mesh, doc_.bvh, p - grabLast_);
+        if (liveMove_.active) liveMove_.delta += p - grabLast_;
+        else doc_.sculptor.grab(doc_.mesh, doc_.bvh, p - grabLast_);
         grabLast_ = p;
         return;
     }

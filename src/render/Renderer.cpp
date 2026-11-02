@@ -75,6 +75,7 @@ uniform ivec2 uGhostRange[8]; // [first, end) of each run
 uniform ivec2 uGhostKind;    // kernel (sf::GhostKind), inverted
 uniform float uGhostFocal;
 uniform float uGhostEdge;    // the mesh's edge length under the brush (the cavity term's scale)
+vec3 ghostStart;             // the vertex as uploaded (Live Move measures its falloff there)
 // The falloff and its first two derivatives in the distance (brushFalloff with Focal Shift).
 vec3 ghostFalloff(float d, float r) {
     float u = clamp(1.0 - d / r, 0.0, 1.0);
@@ -96,7 +97,7 @@ vec3 ghostMove(vec3 x, vec3 n, int first, int end, inout vec3 g, inout float lap
     for (int i = first; i < end; ++i) {
         vec3 c = uGhostA[i].xyz;
         float r = uGhostA[i].w;
-        float dist = length(x - c);
+        float dist = length((kind == 10 ? ghostStart : x) - c);
         if (dist >= r) continue;
         float w = uGhostC[i].w;
         vec3 F = ghostFalloff(dist, r) * w; // f, f', f'' in the distance
@@ -148,6 +149,10 @@ vec3 ghostMove(vec3 x, vec3 n, int first, int end, inout vec3 g, inout float lap
             x += an * (a * f3 * f) + onPlane(c - x, an) * (0.3 * s * f);
             g += radial * (cn * a * 4.0 * f3 * F.y);
             lap += cn * a * (12.0 * f * f * F.y * F.y + 4.0 * f3 * F.z + 4.0 * f3 * F.y * inv);
+        } else if (kind == 10) { // Live Move: x0 + d w(x0) (dist from x0), normals by the inverse transpose
+            vec3 gw = (ghostStart - c) * (s * F.y * inv);
+            x += an * (s * f);
+            g += gw * (cn / max(1.0 + dot(gw, an), 1e-3));
         } else if (kind == 9) { // Trim: what sticks out above a plane cut off
             float h = dot(x - (ac - an * (sgn * r * 0.02 * s)), an);
             if (sgn * h > 0.0) {
@@ -171,8 +176,9 @@ void main() {
 #ifdef GHOST
     // The moved position, normal and cavity term (one evaluation per vertex, no extra varyings: a tiled GPU
     // writes every vertex's outputs to memory and reads them back).
+    ghostStart = world;
     for (int k = 0; k < uGhostGroups; ++k) {
-        if (distance(world, uGhostBound[k].xyz) >= uGhostBound[k].w) continue;
+        if (distance(uGhostKind.x == 10 ? ghostStart : world, uGhostBound[k].xyz) >= uGhostBound[k].w) continue;
         vec3 g = vec3(0.0);
         float lap = 0.0;
         world = ghostMove(world, normal, uGhostRange[k].x, uGhostRange[k].y, g, lap);
@@ -1085,6 +1091,11 @@ size_t Renderer::gpuBytes() const {
 
 void Renderer::shutdown() {
     for (auto& s : slots_) freeSlot(s);
+    for (Staging& st : persist_) {
+        if (st.fence) gl::DeleteSync(st.fence);
+        if (st.buffer) gl::DeleteBuffers(1, &st.buffer); // (unmaps it)
+        st = Staging();
+    }
     slots_.clear();
     drawList_.clear();
     if (!matcapTextures_.empty()) gl::DeleteTextures(GLsizei(matcapTextures_.size()), matcapTextures_.data());
@@ -3115,6 +3126,8 @@ bool Renderer::prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out, c
     out.id = id;
     out.ready = false;
     out.data.clear();
+    out.packed = 0;
+    out.staged = false;
     out.ranges.clear();
     out.movedClusters.clear();
     out.bounds.clear();
@@ -3162,7 +3175,9 @@ bool Renderer::prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out, c
                 pieces.push_back({c, ce, total});
                 total += ce - c;
             }
-        out.data.resize(total);
+        out.staged = out.stagingPtr && total <= out.stagingCap;
+        out.packed = total;
+        out.data.resize(out.staged ? 0 : total);
     };
     cut();
     std::atomic<bool> outside{false};
@@ -3175,7 +3190,7 @@ bool Renderer::prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out, c
     poolFor(pieces.size(), [&](size_t i0, size_t i1) {
         for (size_t pi = i0; pi < i1; ++pi) {
             const Piece& pc = pieces[pi];
-            PackedVertex* dst = out.data.data() + pc.offset;
+            PackedVertex* dst = out.dst() + pc.offset;
             bool inside = true;
             uint64_t hp = 0, hn = 0;
             AABB box;
@@ -3279,7 +3294,18 @@ void Renderer::commitStrokeUpload(StrokeUpload& up) {
     if (!found) return;
     MeshSlot& s = *found;
     if (up.regrid) s.grid = up.grid; // (with every vertex, packed on it)
-    if (!up.ranges.empty()) {
+    if (!up.ranges.empty() && up.staged && up.stagingIndex >= 0) { // (packed into a staging buffer: the GPU copies)
+        Staging& st = persist_[up.stagingIndex];
+        gl::BindBuffer(GL_COPY_READ_BUFFER, st.buffer);
+        gl::BindBuffer(GL_COPY_WRITE_BUFFER, s.vertexBuffer);
+        for (const StrokeUpload::Range& r : up.ranges)
+            gl::CopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, GLintptr(r.offset * sizeof(PackedVertex)),
+                                  GLintptr(size_t(r.begin) * sizeof(PackedVertex)),
+                                  GLsizeiptr(size_t(r.end - r.begin) * sizeof(PackedVertex)));
+        gl::BindBuffer(GL_COPY_READ_BUFFER, 0);
+        gl::BindBuffer(GL_COPY_WRITE_BUFFER, 0);
+        st.fence = gl::FenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0); // (bindStrokeUpload waits before it's reused)
+    } else if (!up.ranges.empty()) {
         gl::BindBuffer(GL_ARRAY_BUFFER, s.vertexBuffer);
         for (const StrokeUpload::Range& r : up.ranges)
             gl::BufferSubData(GL_ARRAY_BUFFER, GLintptr(size_t(r.begin) * sizeof(PackedVertex)),
@@ -3319,10 +3345,47 @@ void Renderer::commitStrokeUpload(StrokeUpload& up) {
 
 void Renderer::setDraftNormals(uint32_t id) { draftId_ = id; }
 
+bool Renderer::persistentUpload() {
+    static const bool on = [] {
+        const char* v = std::getenv("SF_PERSISTENT_UPLOAD");
+        return v && *v == '1' && gl::BufferStorage != nullptr;
+    }();
+    return on;
+}
+
 void Renderer::bindStrokeUpload(uint32_t id, StrokeUpload& up) {
     up.slot = nullptr;
     for (MeshSlot& s : slots_)
         if (s.id == id) up.slot = &s;
+    up.stagingPtr = nullptr;
+    up.stagingCap = 0;
+    up.stagingIndex = -1;
+    up.staged = false;
+    if (!persistentUpload()) return;
+    // Two buffers in turn: the one lent now was last copied from two commits ago (its fence has nearly always
+    // passed). 4M vertices (48 MB) each; a bigger batch packs into `data` as before.
+    constexpr size_t kCap = size_t(4) << 20;
+    const int k = stagingNext_;
+    stagingNext_ ^= 1;
+    Staging& st = persist_[k];
+    if (st.fence) {
+        gl::ClientWaitSync(st.fence, GL_SYNC_FLUSH_COMMANDS_BIT, 1'000'000'000ull);
+        gl::DeleteSync(st.fence);
+        st.fence = nullptr;
+    }
+    if (!st.buffer) {
+        gl::GenBuffers(1, &st.buffer);
+        gl::BindBuffer(GL_COPY_READ_BUFFER, st.buffer);
+        const GLbitfield flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
+        gl::BufferStorage(GL_COPY_READ_BUFFER, GLsizeiptr(kCap * sizeof(PackedVertex)), nullptr, flags);
+        st.ptr = gl::MapBufferRange(GL_COPY_READ_BUFFER, 0, GLsizeiptr(kCap * sizeof(PackedVertex)), flags);
+        gl::BindBuffer(GL_COPY_READ_BUFFER, 0);
+        st.cap = st.ptr ? kCap : 0;
+    }
+    if (!st.ptr) return;
+    up.stagingPtr = static_cast<PackedVertex*>(st.ptr);
+    up.stagingCap = st.cap;
+    up.stagingIndex = k;
 }
 
 void Renderer::refineStrokeBoundsInto(uint32_t id, const Mesh& mesh, StrokeUpload& up) {

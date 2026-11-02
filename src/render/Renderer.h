@@ -184,7 +184,16 @@ public:
         bool exact = false;                            // refineStrokeBoundsInto: exact bounds to set
         std::vector<uint32_t> exactClusters;
         std::vector<ClusterBounds> exactBounds;
-        size_t bytes() const { return data.size() * sizeof(PackedVertex); }
+        size_t bytes() const { return packed * sizeof(PackedVertex); }
+        size_t packed = 0; // vertices packed (in data, or the staging buffer)
+        // Persistent upload (SF_PERSISTENT_UPLOAD=1, a research prototype): bindStrokeUpload lends a persistently
+        // mapped staging buffer; prepare packs straight into it when the batch fits (`staged`), and commit has
+        // the GPU copy the ranges into the vertex buffer (no glBufferSubData of the packed data on the GL thread).
+        PackedVertex* stagingPtr = nullptr;
+        size_t stagingCap = 0; // vertices
+        int stagingIndex = -1;
+        bool staged = false;
+        PackedVertex* dst() { return staged ? stagingPtr : data.data(); }
     };
     // `curvature` (optional, by vertex): the cavity term of every vertex the mesh marked dirty, already worked
     // out (Sculptor::strokeCurvature).
@@ -247,6 +256,14 @@ private:
     GLuint viewFbo_ = 0, viewResolveFbo_ = 0, viewRb_[3] = {};
     int viewW_ = 0, viewH_ = 0, viewSamples_ = 0, viewFailed_ = 0;
     bool directView_ = false;
+    struct Staging { // the persistent upload's buffers (StrokeUpload::stagingPtr), used in turn
+        GLuint buffer = 0;
+        void* ptr = nullptr;
+        size_t cap = 0; // vertices
+        GLsync fence = nullptr;
+    } persist_[2];
+    int stagingNext_ = 0;
+    static bool persistentUpload();
     int captureW_ = 0, captureH_ = 0;
     GLuint emptyVao_ = 0;
     bool thumbnailPass_ = false; // draw(): transparent background, no gradient (renderMeshThumbnail)
