@@ -588,6 +588,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "guide_hits") return double(app_.guide_.searchHits());
     const Document& doc = app_.doc_;
     if (name == "subtools") return double(doc.subtoolCount());
+    if (name == "discord_requests") return double(app_.discordRequests_); // Join the community on Discord clicks
     if (name == "support_requests") return double(app_.supportPageRequests_); // Support SculptForge clicks
     if (name == "welcome_open") return app_.showWelcome_ ? 1.0 : 0.0;
     if (name == "support_card_open") return app_.supportCardOpen() ? 1.0 : 0.0; // the support card at launch

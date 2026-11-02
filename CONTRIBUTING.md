@@ -96,5 +96,8 @@ Demos live in `src/app/Demo.cpp`; they drive the real UI (buttons are found by t
 
 ## Community
 
+Questions, tips and work in progress: join the [SculptForge Discord](https://discord.gg/gWrYkEmQhH). Bugs and feature requests still go
+to [GitHub issues](https://github.com/islandmed/SculptForge/issues), so they can be tracked and fixed.
+
 Everyone taking part is expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md). Report security issues
 privately, as described in [SECURITY.md](SECURITY.md).

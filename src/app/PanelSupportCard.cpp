@@ -468,6 +468,7 @@ void App::drawSupportCard() {
     const float tierW = (size.x - pad * 2.0f - gap * 2.0f) / 3.0f;
     const float tierTop = b.y - footer - tierH;
     const char* clicked = nullptr;
+    bool discord = false; // the Discord pill in the footer (opens the invite, keeps the card)
     for (int i = 0; i < 3; ++i) {
         const Tier& tier = kTiers[i];
         const bool featured = i == 1;
@@ -541,7 +542,7 @@ void App::drawSupportCard() {
                    col(featured ? 0x1a0d04 : 0xf2f2f2, appear), tier.cta);
     }
 
-    // Footer: a one-time gift, "I'm already a supporter" and "Maybe later".
+    // Footer: a one-time gift, the community Discord, "I'm already a supporter" and "Maybe later".
     const float fy = b.y - footer * 0.5f;
     const float fa = easeOut((t - 0.45f) / 0.5f) * A;
     auto link = [&](const char* label, const char* id, ImVec2 at, unsigned hex, bool underline) {
@@ -561,6 +562,32 @@ void App::drawSupportCard() {
         paint.text(bodyFont, 15.0f, ImVec2(a.x + pad, ly), col(0x9a9aa3, fa), lead);
         if (link("Give once", "Give once##card.once", ImVec2(a.x + pad + ls.x + 8.0f * k, ly), 0xffb06a, true))
             clicked = kSupportUrlOnce;
+        // The community Discord: a secondary pill the weight of "Maybe later", with a drawn speech-bubble glyph (no
+        // logo asset). It opens the invite and leaves the card open.
+        const char* label = "Join the community on Discord";
+        const ImVec2 ds = paint.measure(boldUi, 15.0f, label);
+        const ImVec2 gs = paint.measure(bodyFont, 15.0f, "Give once");
+        const float glyph = 18.0f * k;
+        const ImVec2 c0(std::floor(a.x + pad + ls.x + 8.0f * k + gs.x + 28.0f * k), fy - 19.0f * k);
+        const ImVec2 c1(c0.x + 18.0f * k + glyph + 10.0f * k + ds.x + 22.0f * k, fy + 19.0f * k);
+        ImGui::SetCursorScreenPos(c0);
+        ImGui::InvisibleButton("Join the community on Discord##card.discord", ImVec2(c1.x - c0.x, c1.y - c0.y));
+        const bool hot = ImGui::IsItemHovered();
+        if (ImGui::IsItemClicked()) discord = true;
+        dl->AddRectFilled(c0, c1, col(0xffffff, (hot ? 0.12f : 0.06f) * fa), 19.0f * k);
+        dl->AddRect(c0, c1, col(0xffffff, (hot ? 0.35f : 0.18f) * fa), 19.0f * k, 0, std::max(1.0f, k));
+        {
+            const unsigned ink = hot ? 0xffffff : 0xb9bcff;
+            const ImVec2 g0(c0.x + 18.0f * k, fy - glyph * 0.42f), g1(g0.x + glyph, fy + glyph * 0.30f);
+            dl->AddRectFilled(g0, g1, col(ink, fa), 5.0f * k);
+            dl->AddTriangleFilled(ImVec2(g0.x + 4.0f * k, g1.y - 1.0f), ImVec2(g0.x + 10.0f * k, g1.y - 1.0f),
+                                  ImVec2(g0.x + 3.0f * k, g1.y + 5.0f * k), col(ink, fa));
+            const float my = (g0.y + g1.y) * 0.5f, r = 1.6f * k;
+            for (int i = -1; i <= 1; ++i)
+                dl->AddCircleFilled(ImVec2((g0.x + g1.x) * 0.5f + float(i) * 4.5f * k, my), r, col(0x0e0e11, fa));
+        }
+        paint.text(boldUi, 15.0f, ImVec2(std::floor(c0.x + 18.0f * k + glyph + 10.0f * k), std::floor(fy - ds.y * 0.5f)),
+                   col(0xf2f2f2, fa), label);
     }
     bool later = false, supporter = false;
     {
@@ -587,6 +614,8 @@ void App::drawSupportCard() {
         if (clicked) {
             openSupportLink(clicked);
             closeSupportCard(false);
+        } else if (discord) {
+            openDiscordPage(); // the card stays: a membership may still follow
         } else if (supporter) {
             closeSupportCard(true);
         } else if (later || outside || ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {

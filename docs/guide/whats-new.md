@@ -49,6 +49,9 @@ chapter opens by itself the first time you start a new version; you can always f
 - **Connected only and View falloff** (from the discussions): brush options that keep a stroke to the piece under
   the cursor (the other leg, the next finger stay put) or reach through the model along the view, as Blender's
   proportional editing. See [Sculpting](sculpting.md#falloff-options).
+- **The SculptForge Discord** (**Help > Join the Discord...**): the official community, for questions, tips and
+  work in progress. It is also on the support card, in the welcome note and on the website. Bugs still go to
+  **Help > Report a problem** (GitHub issues).
 
 ## Version 0.10.5
 

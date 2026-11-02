@@ -240,6 +240,8 @@ constexpr Entry kSpanish[] = {
     {"Check for updates", "Buscar actualizaciones"},
     {"Command palette", "Paleta de comandos"},
     {"Website & documentation", "Web y documentación"},
+    {"Join the Discord", "Únete al Discord"},
+    {"Join the community on Discord", "Únete a la comunidad en Discord"},
     {"Report a problem", "Informar de un problema"},
     {"Open log folder", "Abrir la carpeta de registros"},
     {"Fixes & suggestions", "Correcciones y sugerencias"},

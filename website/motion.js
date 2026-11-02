@@ -73,14 +73,14 @@
   }
 
   // --- Site menu: when the header links don't fit beside the logo (a narrow window, a tablet or a phone), the
-  // secondary links move into a menu behind a button; Download and GitHub stay in the bar. Measured, not a fixed
+  // secondary links move into a menu behind a button; Download, Discord and GitHub stay in the bar. Measured, not a fixed
   // breakpoint, since pages have different links. ---
   const siteHeader = document.querySelector(".nav");
   const mainNav = siteHeader?.querySelector("nav");
   if (siteHeader && mainNav) {
     const inner = siteHeader.querySelector(".nav-inner"), brand = siteHeader.querySelector(".brand");
     const items = [...mainNav.querySelectorAll("a:not(.gh):not(.nav-dl)")];
-    const gh = mainNav.querySelector("a.gh");
+    const ghs = [...mainNav.querySelectorAll("a.gh")]; // Discord and GitHub
     if (!brand.hasAttribute("aria-label")) brand.setAttribute("aria-label", brand.textContent.trim());
     const menu = document.createElement("div");
     menu.className = "nav-menu";
@@ -89,7 +89,7 @@
     const list = document.createElement("div");
     list.className = "wrap";
     for (const a of items) list.append(a.cloneNode(true));
-    if (gh) list.append(Object.assign(gh.cloneNode(true), { className: "menu-gh" }));
+    for (const gh of ghs) list.append(Object.assign(gh.cloneNode(true), { className: "menu-gh" }));
     menu.append(list);
     siteHeader.append(menu);
     const btn = document.createElement("button");
@@ -112,7 +112,7 @@
       if (e.key === "Escape" && !menu.hidden) { setOpen(false); btn.focus(); }
     });
     // Compact: the secondary links go into the menu (too wide for the bar, or already hidden by the phone layout
-    // in style.css). Tight: on the narrowest screens GitHub goes too, so Download and the button fit by the logo.
+    // in style.css). Tight: on the narrowest screens Discord and GitHub go too, so Download and the button fit by the logo.
     // Tiny: below that (the smallest phones) the logo drops its name.
     const tooWide = () => {
       const pad = getComputedStyle(inner);

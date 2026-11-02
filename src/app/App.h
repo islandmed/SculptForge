@@ -364,6 +364,7 @@ private:
     // Supporting SculptForge (Support.h): the app only ever opens the donate page or its Stripe checkout links in the
     // browser; nothing else changes.
     void openSupportPage();
+    void openDiscordPage(); // kDiscordUrl in the browser (UI tests: the status bar only)
     void openSupportLink(const char* url); // one of the Support.h links (UI tests: the status bar only)
     void drawSupportUi();               // the first-run welcome and the one reminder note
     void drawSupportersSection();       // Help > About: the names from docs/supporters.txt, as plain text
@@ -375,6 +376,7 @@ private:
     double sculptSeconds_ = 0.0;        // cumulative time in strokes (project.json)
     bool supportReminderDone_ = false;  // the reminder was shown (or turned off) once: never again (project.json)
     bool supportReminderOpen_ = false;
+    int discordRequests_ = 0;           // UI tests: how often the Discord invite was asked for
     int supportPageRequests_ = 0;       // UI tests: how often the page was asked for (only opened when interactive)
     // The support card at launch (PanelSupportCard.cpp): decided once while starting, never mid-session.
     struct SupportCard; // its animation state and the background picture (loaded on a worker thread)

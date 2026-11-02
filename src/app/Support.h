@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Supporting SculptForge (memberships on the website; the app stays free and behaves the same for everyone). The
-// app only ever opens the fixed links below in the browser (the donate page and its four Stripe checkout pages): no
+// app only ever opens the fixed links below in the browser (the donate page, its four Stripe checkout pages and the
+// community Discord invite): no
 // payment code, no network, no tracking, no licence checks. Pure helpers, unit tested: the supporters list compiled
 // in from docs/supporters.txt (shown as plain text in Help > About), when the one optional reminder may show, and
 // when the support card may show at launch.
@@ -18,6 +19,8 @@
 namespace sf {
 
 inline constexpr const char* kSupportUrl = "https://sculptforge.app/donate.html";
+// The official community Discord (a permanent invite; the same link as on the website and in the README).
+inline constexpr const char* kDiscordUrl = "https://discord.gg/gWrYkEmQhH";
 // The same Stripe checkout links as website/donate.html (tests/test_support.cpp checks they match).
 inline constexpr const char* kSupportUrlSupporter = "https://buy.stripe.com/aFacN5h1t6L8cP14ad4F201"; // $5 / month
 inline constexpr const char* kSupportUrlInsider = "https://buy.stripe.com/dRmdR94eH4D06qD9ux4F202";   // $20 / month

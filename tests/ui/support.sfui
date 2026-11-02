@@ -11,6 +11,14 @@ click "Support SculptForge...##help.support"
 expect_value support_requests == 1
 expect_status sculptforge.app/donate.html
 
+# Help > Join the Discord... (the official community invite; nothing else changes).
+click "Help##palette.help"
+expect "Join the Discord...##help.discord"
+click "Join the Discord...##help.discord"
+expect_value discord_requests == 1
+expect_status https://discord.gg/gWrYkEmQhH
+expect_value support_requests == 1
+
 # The welcome (shown by itself on the first start; Help > Welcome from the command palette here).
 key f3
 type "##Command palette" "welcome"
@@ -20,6 +28,9 @@ expect_text "SculptForge is free. If it helps your work, consider supporting it.
 shot welcome
 click "Support SculptForge##welcome"
 expect_value support_requests == 2
+click "Join the community on Discord##welcome"
+expect_value discord_requests == 2
+expect_value welcome_open == 1
 click "Close##welcome"
 expect_value welcome_open == 0
 

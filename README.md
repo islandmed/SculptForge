@@ -23,7 +23,8 @@
   <a href="https://sculptforge.app/guide/"><b>User guide</b></a> ·
   <a href="#features">Features</a> ·
   <a href="#building">Build from source</a> ·
-  <a href="CONTRIBUTING.md">Contribute</a>
+  <a href="CONTRIBUTING.md">Contribute</a> ·
+  <a href="https://discord.gg/gWrYkEmQhH">Discord</a>
 </p>
 
 <p align="center">
@@ -324,7 +325,8 @@ where, and for the licences of the AI models.
 ## Contributing
 
 Contributions are welcome: bug reports, brushes, docs and code. Read [CONTRIBUTING.md](CONTRIBUTING.md)
-and the [Code of Conduct](CODE_OF_CONDUCT.md). Please report security issues privately (see
+and the [Code of Conduct](CODE_OF_CONDUCT.md). For questions, tips and showing your work, join the
+[SculptForge Discord](https://discord.gg/gWrYkEmQhH); bugs and feature requests go to [GitHub issues](https://github.com/islandmed/SculptForge/issues). Please report security issues privately (see
 [SECURITY.md](SECURITY.md)).
 
 ## License
