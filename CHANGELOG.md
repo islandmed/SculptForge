@@ -6,6 +6,8 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.7] - 2026-11-01
+
 ### Changed
 - The membership card at launch is redesigned: the cube mark and the promise up top, the three memberships side by
   side with their perks checked off and one bold button each (Insider highlighted), and the members' Discord in the
