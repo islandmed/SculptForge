@@ -1,11 +1,12 @@
 # feat/daily-drops: Insider daily drops
-- **What:** `tools/drops/` (stdlib Python). The generator makes 8 kinds (noise, scales, weaves, pores, wrinkles, trims, Kelvinlet presets, VDMs), seeded by the date. The gate checks: faint, seams, hard stamp edges, clipping, torn surface (normals flip on the test sphere), near-duplicate (pHash + settings), weak change on the test sculpt; it scores the rest with a variety bonus. Packs are built with `pack_create` (install checks).
+- **What:** `tools/drops/` (stdlib Python). The generator makes 7 kinds in the rotation (noise, scales, weaves, pores, wrinkles, trims, Kelvinlet presets), seeded by the date. VDM is off until it makes recognisable shapes (coordinator review). The gate checks: faint, seams, hard stamp edges, clipping, torn surface (normals flip on the test sphere), near-duplicate (pHash + settings), weak change on the test sculpt; it scores the rest with a variety bonus. Packs are built with `pack_create` (install checks).
 - **Workflow** `.github/workflows/insider-drop.yml`: daily 14:23 UTC + dispatch.
   - Builds the app (CI ccache), makes the drop, posts it to #insiders.
   - Commits it to islandmed/sculptforge-insiders `drops/YYYY/MM/<date>/`.
   - On the 1st: "Insider Pack YYYY-MM" to #members, and a public-listing entry (`packs` branch, `listing.json`) released 3 months after the month ends.
   - Any secret unset: that part is skipped.
+  - **Hold** (the default before 2026-11-09, or repo var DROPS_HOLD=true): build, artifact `drop-<date>`, commit marked held; no post or bundle. Release with dispatch `date=<date> approve=true`, which posts the committed (reviewed) drop. Approving needs INSIDERS_REPO_TOKEN.
 - **Tony:** secret `INSIDERS_REPO_TOKEN` = fine-grained PAT, *Only select repositories: islandmed/sculptforge-insiders*, permission **Contents: Read and write** (Metadata read-only is automatic); nothing else. Also secrets `DISCORD_INSIDERS_WEBHOOK` (#insiders) and `DISCORD_MEMBERS_WEBHOOK` (#members).
-- **Dry run:** 14 days, 14 drops, all 8 kinds, 2 duplicate weaves rejected. Folder ~/Work/look-mockups/drops/ (overview.png, README.txt, rejected/). Nothing posted.
-- **Tests:** `insider_drops` ctest (determinism, blank/flat/seam/hard-edge/torn/duplicate rejected, every kind packs). Full ctest -j3 before the rebase: 117/118; `ui_phone_link` also fails on main (`phone_ar_version is 1, expected 2`), so not from this branch. After the rebase: 116/118; ui_performance passes alone (it failed only under load avg 20+).
-- **SHA:** 7b9855a (code; REPORT.md commit on top)
+- **Dry run** (before the VDM was switched off): 14 days, 14 drops, all 8 kinds, 2 duplicate weaves rejected. Folder ~/Work/look-mockups/drops/ (overview.png, README.txt, rejected/). Nothing posted.
+- **Tests:** `insider_drops` ctest (determinism, blank/flat/seam/hard-edge/torn/duplicate rejected, every kind packs). Full ctest -j3 before the rebase: 117/118; `ui_phone_link` also fails on main (`phone_ar_version is 1, expected 2`), so not from this branch. Rebased on 0.10.7 main: full ctest 118/118, selftest ok, hold → approve → post tested against a local server.
+- **SHA:** 0922eaf (code; REPORT.md commit on top)
