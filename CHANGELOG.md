@@ -6,6 +6,11 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Custom and Community brushes (Clay Slab and other presets) show the whole alpha at Focal Shift -100, as the
+  built-in brushes do since #60: the stamp reaches its square's corners instead of being cut by the preset's round
+  tip (#75, reported by rodrigomoretto). At the default Focal Shift presets look as before; saved presets are unchanged.
+
 ## [0.10.6] - 2026-11-01
 
 ### Added

@@ -6,6 +6,7 @@
 #include "TestHarness.h"
 
 #include "core/BrushAlpha.h"
+#include "core/BrushRecipe.h"
 #include "core/Commands.h"
 #include "core/Primitives.h"
 #include "core/Sculpt.h"
@@ -441,6 +442,57 @@ TEST(focal_shift_reaches_clay_buildup_and_recipes) {
     p.focal = 0.0f;
     stroke(b, BrushType::ClayBuildup, p);
     CHECK(a.mesh.positions == b.mesh.positions);
+}
+
+// #75: custom and Community (recipe) brushes show the whole alpha at Focal Shift -100, as the built-ins do (#60):
+// a DragRect-style single stamp of a corner-reaching alpha with Clay Slab displaces the square's corners, not
+// only the round tip inside the brush circle. At 0 the preset keeps its own round tip.
+TEST(custom_brush_full_alpha_at_focal_minus_100) {
+    BrushRecipe slab;
+    bool found = false;
+    for (const BrushRecipe& r : builtinBrushRecipes())
+        if (r.name == "Clay Slab") slab = r, found = true;
+    CHECK(found);
+    BrushAlpha full;
+    full.name = "Full";
+    full.width = full.height = 8;
+    full.values.assign(64, 1.0f); // (white to its corners)
+    BrushAlpha bark;
+    CHECK(BrushAlpha::builtin("bark", bark));
+
+    const float radius = 0.3f;
+    const glm::vec3 corner(0.26f, 0, 0.26f); // (0.37 out: past the brush circle, inside the stamp's square)
+    auto stampWith = [&](const BrushAlpha& alpha, float focal) {
+        Document d = planeDoc();
+        DabParams p = dabAt(glm::vec3(0), radius);
+        p.alpha = &alpha;
+        p.alphaUp = glm::vec3(0, 0, -1);
+        p.focal = focal;
+        d.sculptor.beginStroke(d.mesh, slab.name);
+        d.sculptor.dabRecipe(d.mesh, d.bvh, slab, p, kNoSymmetry);
+        d.undo.push(d.sculptor.endStroke());
+        return d;
+    };
+    // Movement summed over the stamp's four corner regions (outside the circle, inside the square).
+    auto cornerSum = [&](const Document& d) {
+        float sum = 0.0f;
+        for (const glm::vec3& v : d.mesh.positions) {
+            const float cheb = std::max(std::abs(v.x), std::abs(v.z));
+            if (glm::length(glm::vec2(v.x, v.z)) > radius * 1.05f && cheb < radius * 0.98f) sum += std::abs(v.y);
+        }
+        return sum;
+    };
+
+    const Document hard = stampWith(full, -1.0f), soft = stampWith(full, 0.0f);
+    const float centre = hard.mesh.positions[nearest(hard.mesh, glm::vec3(0))].y;
+    CHECK(centre > 0.0f);
+    for (glm::vec3 c : {corner, glm::vec3(-corner.x, 0, corner.z), glm::vec3(corner.x, 0, -corner.z), -corner})
+        CHECK(hard.mesh.positions[nearest(hard.mesh, c)].y > 0.5f * centre); // the corner texels are displaced
+    CHECK(soft.mesh.positions[nearest(soft.mesh, corner)].y == 0.0f); // (0: the preset's own round tip)
+    CHECK(cornerSum(soft) == 0.0f && cornerSum(hard) > 0.0f);
+
+    // Bark reaches its corners too; at -100 they move, at 0 they don't.
+    CHECK(cornerSum(stampWith(bark, -1.0f)) > 0.0f && cornerSum(stampWith(bark, 0.0f)) == 0.0f);
 }
 
 TEST(brush_set_alpha_command) {
