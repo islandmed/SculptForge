@@ -116,6 +116,8 @@ All notable changes to SculptForge are listed here. The format follows
   brush and the panels (read with every pen position; the pen adds pressure and tilt).
 - Radial menus on mouse buttons open only on a plain press (#74): <kbd>Alt</kbd>+middle pans, <kbd>Alt</kbd>+right
   zooms (Maya style) and <kbd>Shift</kbd>+right turns the view, whatever menu is on the button.
+- glTF import rejects malformed accessor and buffer sizes instead of crashing or reading out of bounds (reported by
+  @Agapenordev in #70).
 
 ## [0.10.5] - 2026-11-01
 ### Added

@@ -742,7 +742,7 @@ struct Reader {
             return;
         }
         v.resize(size_t(n));
-        std::memcpy(v.data(), p, size_t(n) * sizeof(T));
+        if (n) std::memcpy(v.data(), p, size_t(n) * sizeof(T));
         p += n * sizeof(T);
     }
     std::string str() {

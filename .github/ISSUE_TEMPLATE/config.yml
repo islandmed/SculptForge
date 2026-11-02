@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Chat on the community Discord
+    url: https://discord.gg/gWrYkEmQhH
+    about: Quick questions, sharing sculpts, the monthly challenge and hanging out.
   - name: Questions and ideas
     url: https://github.com/islandmed/SculptForge/discussions
     about: Ask for help, share sculpts and brushes, discuss ideas.
