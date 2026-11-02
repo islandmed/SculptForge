@@ -23,6 +23,9 @@ each step does, and how to recover.
    (x86_64 and arm64) and the .rpm. Publishing waits for every one.
 5. **Lockstep**: the site, update feed, live guide, AUR, Homebrew and Omarchy all say X.Y.Z, and issue replies are
    drafted. Read the drafts, then post them.
+   - **Discord**: the #announcements post is automatic once the `DISCORD_ANNOUNCE_WEBHOOK` secret is set
+     (.github/workflows/discord-announce.yml). It waits for step `site` to put this version's highlights in
+     website/latest.json (up to 45 minutes). Other posts: .github/announcements/*.md, Actions > Discord announcement.
 
 ## Build once, promote
 
