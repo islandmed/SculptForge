@@ -1,0 +1,9 @@
+# fix/inbox-0107 (0.10.8): #78, #76, #77, #62 + UI-test /tmp cleanup
+- #78 per-brush settings: each brush (custom/Community too) keeps size, intensity, falloff, RGB, stroke, alpha; Brush > Save Brush Settings (brush-settings.json) / Reset Brush to Default; Preferences > Input > Share size and intensity across brushes. core/BrushSettings, app/BrushSettingsUi.cpp.
+- #76 Alpha palette: Follow stroke direction (Blender Rake: 20 px step), Angle, Angle jitter, Tile across/down; per brush; recipe brushes via alphaUp; `brush_alpha_options`. core/AlphaOptions.
+- #77 Blender 5.1+ keymap (checked blender_default.py, commit 57871a5727): Alt+LMB on model masks, Ctrl+Alt unmasks, beside model orbits; new Preferences > Input > Emulate 3 Button Mouse keeps old orbit. Also Shift+F now sets Intensity, not Smooth's.
+- #62: Shift+L was only in Preferences + a viewport label; added View > Lock camera + CAMERA LOCKED status-bar chip.
+- UI tests delete their isolated /tmp folder on success (main.cpp). ui_vdm updated: VDM brush now remembers its own stroke.
+- Tests: test_brush_settings, test_alpha_options, ui_brush_settings, ui_alpha_options, ui_blender_keys, ui_air_strokes, ui_whats_new. Full ctest -j3 on rebased tree: 119/119 passed.
+- CHANGELOG [Unreleased] + What's New 0.10.8; guide: sculpting, navigation, shortcuts (regenerated). REPLIES.md: one reply per issue.
+- S/U keys (askNK): dropped per coordinator (fix/size-keys covers it).

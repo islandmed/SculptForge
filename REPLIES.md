@@ -1,0 +1,13 @@
+# Issue replies (post after the release that carries each fix)
+
+## #78 (SculptForge 0.10.8)
+Done in SculptForge 0.10.8: every brush now keeps its own Draw Size, Intensity, Falloff, RGB Intensity, stroke and alpha, custom and Community brushes included. Set up a small sharp crease brush and a big soft Clay, and each one comes back the way you left it when you switch. **Brush > Save Brush Settings** keeps the current brush's values for every start, and **Brush > Reset Brush to Default** puts the shipped values back if a brush gets misconfigured. If you liked one size for everything, **Preferences > Input > Share size and intensity across brushes** keeps that. Thanks for the clear write-up (and to everyone who asked on Discord). -- the SculptForge developer
+
+## #76 (SculptForge 0.10.8)
+Added in SculptForge 0.10.8, in the **Alpha** palette: **Follow stroke direction** turns the alpha along the stroke, with the same smoothing as Blender's Rake (the direction updates every 20 pixels, so small wobbles don't twist it). **Angle** sets a fixed turn, **Angle jitter** a random one per dab, and **Tile across / down** repeat the alpha up to 8 x 8 inside the brush (the preview shows it). They work with custom and Community brushes too, and each brush remembers its own. Scripts: `brush_alpha_options follow_stroke=true angle=30 tile_x=2 tile_y=2`. Thanks for the detailed comparison with Blender and ZBrush. -- the SculptForge developer
+
+## #77 (SculptForge 0.10.8)
+You're right, thanks! Blender 5.1 added Alt+left-drag as a temporary mask brush in Sculpt Mode (Ctrl+Alt erases the mask), and our Blender style still followed the older keymap, where Alt+left-drag is the emulated middle button. In SculptForge 0.10.8 the Blender style matches Blender 5.1+: Alt+left-drag on the model masks and Ctrl+Alt+left-drag unmasks; beside the model it still turns the view. If you prefer the old way (pens, trackpads), turn on **Preferences > Input > Emulate 3 Button Mouse**, as in Blender. While checking this I also fixed Shift+F, which changed Smooth's intensity instead of the brush's Strength. -- the SculptForge developer
+
+## #62 (closed; follow-up comment, SculptForge 0.10.8)
+For everyone asking for a camera lock: it's there. **View > Lock camera**, or **Shift+L** to toggle it, makes drags that start beside the model sculpt instead of orbiting (the same switch as Preferences > Input > Start strokes off the model). In SculptForge 0.10.8 it's also in the View menu, and the status bar shows **CAMERA LOCKED** while it's on, so you always know which mode you're in. Right-drag or Alt+drag still move the view. -- the SculptForge developer
