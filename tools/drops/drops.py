@@ -260,7 +260,7 @@ def gate(c, history, app=None, work=None, baselines=None, cli=None):
                     sfimage.hamming(h, int(d["phash"], 16)) <= DUPLICATE_BITS:
                 reasons.append(f"near-duplicate of {d.get('date')} {d.get('name')}")
                 break
-    if not reasons and c["type"] in ("brush", "macro"):  # no image of its own and no render: compare the numbers
+    if not reasons:  # the same recipe again (a weave with the same threads ...): compare the settings
         for d in history:
             if d.get("kind") == c["kind"] and d.get("params") and _param_distance(d["params"], c["params"]) < 0.05:
                 reasons.append(f"near-duplicate settings of {d.get('date')} {d.get('name')}")
@@ -279,7 +279,7 @@ def gate(c, history, app=None, work=None, baselines=None, cli=None):
 def _param_distance(a, b):
     keys = [k for k in a if isinstance(a.get(k), (int, float)) and isinstance(b.get(k), (int, float))
             and not isinstance(a.get(k), bool)]
-    if any(a.get(k) != b.get(k) for k in a if isinstance(a.get(k), (str, bool))):
+    if not keys or any(a.get(k) != b.get(k) for k in a if isinstance(a.get(k), (str, bool))):
         return 1.0
     return sum(abs(a[k] - b[k]) for k in keys) / max(1, len(keys))
 
