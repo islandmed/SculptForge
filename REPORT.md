@@ -5,3 +5,4 @@
 - .github/workflows/insider-preview.yml: dispatch (label) or push preview/*; promotes the commit's tested Packages artifacts (or builds them), prerelease in islandmed/sculptforge-insiders, posts via DISCORD_INSIDERS_WEBHOOK; skips quietly without INSIDERS_REPO_TOKEN (fine-grained PAT, only that repo, Contents: read & write). That repo needs at least one commit.
 - STRIPE.md: descriptions (all < 350 chars). Founding Studio's is already pasted.
 - Tests: ui_support_card, ui_support, ui_packs, test_support pass; full ctest -j3: 116/117 pass (ui_update_check fixed after the run); ui_phone_link fails here and on main's build too (load 29, environmental), CI decides
+- CI green on the branch (run 41394233516, every platform, ui_phone_link included).
