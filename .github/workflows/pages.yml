@@ -3,7 +3,7 @@ name: Website
 on:
   push:
     branches: [main]
-    paths: ['website/**', '.github/workflows/pages.yml']
+    paths: ['website/**', 'docs/supporters.txt', '.github/workflows/pages.yml']
   workflow_dispatch:
 
 permissions:
@@ -40,6 +40,9 @@ jobs:
             rm -rf website/guide
             git archive "$tag" website/guide website/sitemap.xml | tar -x
           fi
+      # The credits page always matches docs/supporters.txt on main.
+      - name: Supporters page
+        run: python3 tools/guide/build_site.py --supporters
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:
@@ -81,6 +84,8 @@ jobs:
             rm -rf website/guide
             git archive "$tag" website/guide website/sitemap.xml | tar -x
           fi
+      - name: Supporters page
+        run: python3 tools/guide/build_site.py --supporters
       - name: Push website/ to islandmed/islandmed.github.io
         env:
           KEY: ${{ secrets.MIRROR_DEPLOY_KEY }}

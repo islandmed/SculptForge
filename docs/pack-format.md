@@ -37,7 +37,7 @@ in its type's folder, with its type's extension. Anything else is refused.
   "format": "sculptforge-pack",
   "formatVersion": 1,
   "id": "supporter-2026-11",
-  "name": "Supporter Pack November 2026",
+  "name": "Monthly pack November 2026",
   "version": "1.0",
   "author": "The SculptForge developer",
   "license": "CC-BY-4.0",
@@ -65,7 +65,7 @@ in its type's folder, with its type's extension. Anything else is refused.
 | `description` | no | At most 1000 bytes; may hold line breaks. |
 | `minAppVersion` | no | The oldest SculptForge that may install it; newer than the running app: refused. |
 | `preview` | no | `preview.png` or `preview.jpg`, which must be in the archive. |
-| `channel` | no | Lower-case letters, digits and `-`. `"insider"` marks a Supporter Pack. **Display only**: it changes a label, nothing else; there is no DRM and anyone can install the file. |
+| `channel` | no | Lower-case letters, digits and `-`. `"insider"` marks the monthly pack or an Insider drop (shown as **Member pack**). **Display only**: it changes a label, nothing else; there is no DRM and anyone can install the file. |
 | `contents` | yes | A list of `{"type", "path"}`. Types: `brush`, `alpha`, `matcap`, `material`, `vdm`, `keymap`, `piemenu`, `macro`. |
 
 Text values must be valid UTF-8 without control characters. The JSON is parsed strictly: a key given twice,

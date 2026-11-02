@@ -11,7 +11,7 @@ Use **File > Install Pack...**, drop a `.sfpack` file on the window, or click **
 
 | The review shows | |
 |---|---|
-| **Name, version and author** | As the pack's maker wrote them. **Supporter Pack** marks the monthly pack for supporters. |
+| **Name, version and author** | As the pack's maker wrote them. **Member pack** marks the monthly pack or an Insider drop. |
 | **License** | The license name, and the license text from the pack on the right. |
 | **Contains** | How many brushes, alphas, Lit Spheres, Material Recipes, VDMs, keymaps, pie menus and macros, with every item listed by name. |
 | **Replaces the installed version** | When an older version of the same pack is installed. |
@@ -21,7 +21,7 @@ says which file and why (for example *"../evil.sfbrush" leaves its folder*), and
 
 Installed packs live in SculptForge's own data folder, each in its own folder. A pack never replaces a built-in
 brush or one of your own: a pack brush called like an existing one shows the pack's name after its own, for
-example **Clay (Supporter Pack)**.
+example **Clay (Member pack)**.
 
 ## Where pack items show up
 
@@ -57,7 +57,7 @@ menus, your changed shortcuts (as a keymap) and your macros. Tick what goes in, 
 and description, and click **Save Pack...**. The file is checked exactly as an install would check it before it
 is written.
 
-Tick **Supporter Pack (insider channel)** for a pack meant for supporters. It only changes the label shown in the
+Tick **Member pack (insider channel)** for the monthly pack or an Insider drop. It only changes the label shown in the
 review and the pack list; anyone can install the file.
 
 To build a pack from a folder in a script, lay the folder out like a pack (`brushes/`, `alphas/`, `matcaps/`,

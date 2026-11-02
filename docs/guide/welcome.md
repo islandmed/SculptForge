@@ -16,8 +16,10 @@ and no telemetry.
 It is free software under the GNU General Public License v3.0 or later. You own everything you make with it:
 the GPL covers the program, not your models.
 
-SculptForge stays free and works the same for everyone. Memberships add your name to the credits, a monthly
-brush and alpha pack and a roadmap vote: **Help > Support SculptForge...** opens [sculptforge.app/support.html](https://sculptforge.app/support.html) in your browser, where you can become a
+SculptForge stays free and works the same for everyone; nothing is ever paywalled. Memberships add your name to
+the credits, the monthly pack and a vote on what gets built, and for Insiders daily drops and preview builds about
+a week early (every release stays free for everyone; bug-fix and security releases go out to everyone the same
+day): **Help > Support SculptForge...** opens [sculptforge.app/support.html](https://sculptforge.app/support.html) in your browser, where you can become a
 member. That is all it does: the app has no payment code, no account and no licence check. Supporters are thanked
 by name in **Help > About**. While SculptForge starts (the first time, after an update, and at most once a week
 otherwise) a card shows the memberships; **I'm already a supporter** hides it for good and **Preferences > Support**

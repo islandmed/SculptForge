@@ -327,6 +327,20 @@ SculptForge has no telemetry, no account and no servers of its own. AI features 
 directly to the service you choose. See [docs/ai-services.md](docs/ai-services.md) for exactly what is sent
 where, and for the licences of the AI models.
 
+## Membership
+
+SculptForge is free, and nothing in the app is ever paywalled: members pay for time and influence.
+**[Supporter](https://sculptforge.app/support.html)** ($5 / month): your name in the
+[credits](https://sculptforge.app/supporters.html), #members on Discord, a vote in the monthly feature vote and
+the monthly pack. **Insider** ($20 / month): also proposing vote options, a daily drop (a brush, alpha or VDM),
+preview builds of the next release about a week early and the monthly dev Q&A. Every release stays free for
+everyone; bug-fix and security releases go out to everyone the same day. **[Studio](https://sculptforge.app/studios.html#membership)**
+($300 / month; Founding Studio: the first 10 studios lock in $150 / month for good): Insider for every artist in
+the company, a custom studio build and custom content, guided development, priority triage, a private team
+channel and your logo here. Larger custom features are quoted separately.
+
+<!-- Studio members' logos go here. -->
+
 ## Contributing
 
 Contributions are welcome: bug reports, brushes, docs and code. Read [CONTRIBUTING.md](CONTRIBUTING.md)

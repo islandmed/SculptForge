@@ -1,4 +1,4 @@
-# Packs and macros (#20): a pack made from a folder laid out like one (as the monthly Supporter Pack is), the review
+# Packs and macros (#20): a pack made from a folder laid out like one (as the monthly pack is), the review
 # screen before install (what's inside, the license, the author; nothing is installed until Install), Library >
 # Packs (off, on, details), its items in the lists tagged with the pack's name, a hostile pack refused with a clear
 # message, and a macro: recorded, saved, found with F3, confirmed before its first run, run as one undo step.
@@ -21,7 +21,7 @@ expect_value pack_review_macro == 1
 expect_value packs_installed == 0
 wait_idle 30
 expect_text Demo Pack  1.0
-expect_text Supporter Pack
+expect_text Member pack
 expect_text Test Author
 expect_text CC0-1.0
 expect_text CC0 1.0 Universal
