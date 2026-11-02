@@ -112,7 +112,7 @@ void App::initProject() {
         supportCardPrefs_.shownAt = int64_t(prefs["support_card_shown_at"].asNumber(0));
         if (prefs["support_card_version"].isString()) supportCardPrefs_.shownVersion = prefs["support_card_version"].asString();
     } else {
-        showWelcome_ = options_.uiTest.empty() && options_.demo.empty(); // the first start: no prefs yet
+        showWelcome_ = options_.uiTest.empty() && options_.demo.empty() && !options_.benchmark; // the first start: no prefs yet
         startInputStyle_ = uiPrefs_.inputStyle; // a new install: SculptForge's keys until the welcome's choice
     }
     recentFiles_ = pruneRecentFiles(std::move(recentFiles_), fileExists);

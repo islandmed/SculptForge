@@ -276,6 +276,8 @@ void App::hardwareProfileFrameEnd() {
     }
 }
 
+bool App::hardwareCalibrating() const { return hwProfile_ && hwProfile_->calibrator; }
+
 void App::drawHardwareProfileOverlay() {
     if (!hwProfile_ || !hwProfile_->calibrator) return;
     HwProfileUi& hw = *hwProfile_;

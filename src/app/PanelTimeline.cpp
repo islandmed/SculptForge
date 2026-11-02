@@ -178,8 +178,8 @@ void App::registerTimelineUiActions() {
         "Render the history of the active Part as a turntable timelapse video (1080p or 4K MP4, no captions).",
         [ui] { ui().timelapseDialog = true; });
     add("help.benchmark", "Benchmark (proof mode)", ICON_LC_GAUGE, "Help",
-        "Measure how responsive sculpting is on this computer: a scripted stroke on 5, 20 and 33 million triangle "
-        "meshes (and 100 million when there is memory for it) through the same code a pen uses, with a live "
+        "Measure how responsive sculpting is on this computer: the standard scene (a 15 or 33 million triangle head; "
+        "Clay small, medium and large, Move, Smooth and a 240 px brush) through the same code a pen uses, with a live "
         "display of frame times and how far the stroke trails the pointer. Writes a video and a JSON result you can "
         "share. Replaces the scene.",
         [this] { startProofMode(); });

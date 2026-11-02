@@ -73,6 +73,10 @@ std::string runBenchmark(const BenchOptions& options, const BenchGpu* gpu = null
 
 // The benchmark mesh: about `triangles` triangles, with subdivision levels.
 Mesh makeBenchSphere(size_t triangles);
+// Proof mode's standard scenes (standard-15m, standard-33m; docs/benchmark.md): a procedural head (skull, brow,
+// eye sockets, nose, cheekbones, jaw, ears, neck) of about `triangles` triangles, with subdivision levels. Made
+// from a formula, not a file, so every build and platform sculpts the same surface.
+Mesh makeBenchHead(size_t triangles);
 
 // Resident memory of this process in bytes (0 where unknown).
 size_t residentBytes();

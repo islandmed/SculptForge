@@ -74,6 +74,16 @@ std::vector<ProofMeshSize> proofDefaultSizes(size_t available) {
     return sizes;
 }
 
+std::vector<ProofMeshSize> proofStandardScene(const std::string& name) {
+    // ~150 bytes a triangle like the spheres; the head is built the same way (a cube's quads, divided).
+    const ProofMeshSize s15{15, "15M", [](size_t t) { return makeBenchHead(t); }, 150};
+    const ProofMeshSize s33{33, "33M", [](size_t t) { return makeBenchHead(t); }, 150};
+    if (name == "standard-15m") return {s15};
+    if (name == "standard-33m") return {s33};
+    if (name == "standard") return {s15, s33};
+    return {};
+}
+
 size_t availableMemoryBytes() {
 #if defined(_WIN32)
     MEMORYSTATUSEX m{};
@@ -203,6 +213,12 @@ Percentiles percentiles(std::vector<double> v) {
     p.mean /= double(v.size());
     return p;
 }
+// The longest the app went without showing a frame in a phase: its slowest frame, or lifting the pen.
+double worstStallMs(const std::vector<double>& frameMs, double releaseMs) {
+    double w = releaseMs;
+    for (double f : frameMs) w = std::max(w, f);
+    return w;
+}
 Json percentilesJson(const Percentiles& p) {
     Json j = Json::object();
     auto r = [](double x) { return std::round(x * 100.0) / 100.0; };
@@ -307,10 +323,47 @@ struct PhaseSpec {
     const char* name;
     float radiusPx; // 0 = an orbit, no stroke
     double seconds;
+    BrushType brush = BrushType::Standard;
+    float strength = 0.35f;
+    float pathScale = 1.0f; // the figure eight's size (Move drags the surface along: a smaller one)
 };
+
+// The standard scenes' stroke set (kProofStrokeSet): the same figure eight with each brush in turn, on one mesh.
+std::vector<PhaseSpec> standardPhases(double seconds) {
+    return {{"clay small", 25.0f, seconds, BrushType::Clay, 0.35f},
+            {"clay medium", 60.0f, seconds, BrushType::Clay, 0.35f},
+            {"clay large", 120.0f, seconds, BrushType::Clay, 0.35f},
+            {"move", 80.0f, seconds, BrushType::Move, 0.25f, 0.4f},
+            {"smooth", 60.0f, seconds, BrushType::Smooth, 0.5f},
+            {"240 px brush", 240.0f, seconds, BrushType::Clay, 0.35f},
+            {"orbit", 0.0f, 3.0}};
+}
+
+const char* proofBrushName(BrushType b) {
+    switch (b) {
+    case BrushType::Clay: return "Clay";
+    case BrushType::Move: return "Move";
+    case BrushType::Smooth: return "Smooth";
+    default: return "Standard";
+    }
+}
+
+// The graphics memory free now in KB, from the driver (GL_NVX_gpu_memory_info, else GL_ATI_meminfo); -1 = the
+// driver doesn't say. Unified-memory GPUs (Apple, integrated) report system memory, shared with everything else.
+long long driverFreeVramKb() {
+    GLint v[4] = {-1, -1, -1, -1};
+    while (gl::GetError() != GL_NO_ERROR) {}
+    gl::GetIntegerv(0x9049, v); // GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX
+    if (gl::GetError() == GL_NO_ERROR && v[0] >= 0) return v[0];
+    v[0] = -1;
+    gl::GetIntegerv(0x87FB, v); // VBO_FREE_MEMORY_ATI
+    if (gl::GetError() == GL_NO_ERROR && v[0] >= 0) return v[0];
+    return -1;
+}
 
 struct PhaseResult {
     std::string name;
+    std::string brush;
     float radiusPx = 0;
     double seconds = 0, pathPx = 0, releaseMs = 0; // releaseMs: lifting the pen (the dabs still queued, the undo step)
     double releaseDoneMs = 0; // until the stroke has ended (predictive strokes: the solver thread's last dabs on screen)
@@ -324,6 +377,9 @@ struct SizeResult {
     size_t triangles = 0, vertices = 0;
     double buildSeconds = 0;
     size_t ramBytes = 0, peakRamBytes = 0;
+    size_t gpuBufferBytes = 0;   // the most the renderer's vertex and index buffers held (documentMemory().gpu)
+    long long vramUsedKb = -1;   // the most the driver's free graphics memory dropped from before the build (-1: unknown)
+    long long vramFreeBeforeKb = -1;
     std::vector<PhaseResult> phases;
 };
 
@@ -333,6 +389,8 @@ struct ProofState {
     enum class Stage { Intro, Announce, Build, Settle, Phase, Finish, Results };
     Stage stage = Stage::Intro;
     bool cli = false, video = true, vsync = false;
+    std::string scene; // "standard-15m", "standard-33m", "standard", or empty (the sphere sizes)
+    int sceneChoice = 0; // the Intro's choice: 0 standard-15m, 1 standard-33m, 2 standard, 3 spheres
     double strokeSeconds = 6.0;
     std::string jsonPath, videoPath;
     std::vector<ProofMeshSize> sizes;
@@ -350,6 +408,9 @@ struct ProofState {
     std::vector<Sample> samples;
     std::vector<glm::vec2> dabs;
     size_t sent = 1; // samples handed to onMouseMove (the first went to onMouseDown)
+    // The samples the newest dab / preview head were last matched to: the stroke only moves forward, so the
+    // next match is searched from there on (the figure eight crosses itself; an older pass is never the match).
+    size_t dabFrom = 0, previewFrom = 0;
     bool pressed = false;
     bool releasing = false; // let go: the phase ends with the stroke (predictive strokes finish after the release)
     double releaseAt = 0;
@@ -413,7 +474,12 @@ void App::startProofMode() {
     p->video = !options_.benchmarkNoVideo;
     p->vsync = options_.benchmarkVsync;
     p->strokeSeconds = std::max(1.0f, options_.benchmarkStrokeSeconds);
-    p->sizes = options_.benchmarkSizes.empty() ? proofDefaultSizes(availableMemoryBytes()) : parseSizes(options_.benchmarkSizes);
+    // The CLI's scene, or for Help > Benchmark the standard 15M scene (the Intro offers the others).
+    p->scene = options_.benchmarkScene;
+    if (p->scene.empty() && !p->cli && options_.benchmarkSizes.empty()) p->scene = "standard-15m";
+    p->sceneChoice = p->scene == "standard-33m" ? 1 : p->scene == "standard" ? 2 : p->scene.empty() ? 3 : 0;
+    p->sizes = !p->scene.empty() ? proofStandardScene(p->scene)
+               : options_.benchmarkSizes.empty() ? proofDefaultSizes(availableMemoryBytes()) : parseSizes(options_.benchmarkSizes);
     if (p->sizes.empty()) p->sizes = proofDefaultSizes(availableMemoryBytes());
     const std::string stamp = fileStamp();
     std::filesystem::path dir = std::filesystem::current_path();
@@ -426,7 +492,8 @@ void App::startProofMode() {
     };
     p->jsonPath = !options_.benchmarkOut.empty() ? options_.benchmarkOut : u8(dir / ("sculptforge-benchmark-" + stamp + ".json"));
     p->videoPath = !options_.benchmarkVideo.empty() ? options_.benchmarkVideo : u8(dir / ("sculptforge-benchmark-" + stamp + ".mp4"));
-    p->phases = {{"stroke", 60.0f, p->strokeSeconds}, {"large brush stroke", 240.0f, p->strokeSeconds}, {"orbit", 0.0f, 3.0}};
+    if (!p->scene.empty()) p->phases = standardPhases(p->strokeSeconds);
+    else p->phases = {{"stroke", 60.0f, p->strokeSeconds}, {"large brush stroke", 240.0f, p->strokeSeconds}, {"orbit", 0.0f, 3.0}};
     p->stage = p->cli ? ProofState::Stage::Announce : ProofState::Stage::Intro;
     p->radiusBefore = radiusPx_;
     p->strengthBefore = strength_;
@@ -446,10 +513,22 @@ void App::drawProofUi() {
                                "same code your pen goes through (240 samples a second), with a normal and a large brush, "
                                "and turns the view.");
             ImGui::Spacing();
-            std::string sizes;
-            for (const auto& s : p.sizes) sizes += (sizes.empty() ? "" : ", ") + s.label;
-            ImGui::Text("Meshes: %s triangles", sizes.c_str());
-            ImGui::TextDisabled("(100M runs when free memory allows: %.1f GB free now)", double(availableMemoryBytes()) / double(1u << 30));
+            static const char* const kScenes[] = {"Standard 15M: a 15 million triangle head",
+                                                  "Standard 33M: a 33 million triangle head",
+                                                  "Standard 15M and 33M", "Spheres: 5M, 20M, 33M (100M with the memory)"};
+            ImGui::TextUnformatted("Scene");
+            for (int i = 0; i < 4; ++i)
+                if (ImGui::RadioButton(kScenes[i], p.sceneChoice == i)) {
+                    p.sceneChoice = i;
+                    p.scene = i == 0 ? "standard-15m" : i == 1 ? "standard-33m" : i == 2 ? "standard" : "";
+                    p.sizes = p.scene.empty() ? proofDefaultSizes(availableMemoryBytes()) : proofStandardScene(p.scene);
+                    if (!p.scene.empty()) p.phases = standardPhases(p.strokeSeconds);
+                    else p.phases = {{"stroke", 60.0f, p.strokeSeconds}, {"large brush stroke", 240.0f, p.strokeSeconds}, {"orbit", 0.0f, 3.0}};
+                }
+            if (!p.scene.empty())
+                ImGui::TextDisabled("Clay at 25, 60 and 120 px, Move, Smooth, a 240 px brush, then an orbit: the scene the "
+                                    "website's table uses (same as sculptforge --benchmark %s)", p.scene.c_str());
+            ImGui::TextDisabled("%.1f GB of memory free now (33M needs about 6 GB)", double(availableMemoryBytes()) / double(1u << 30));
             ImGui::Spacing();
             ImGui::TextWrapped("A live display shows the frame rate, frame times (median, 95th, 99th percentile), how far "
                                "the stroke trails the pointer, and memory. The result is saved as JSON beside a video "
@@ -479,8 +558,8 @@ void App::drawProofUi() {
         bool open = true;
         if (ImGui::Begin("Benchmark results", &open, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse)) {
             if (!p.error.empty()) ImGui::TextColored(theme::danger, "%s", p.error.c_str());
-            if (ImGui::BeginTable("##proof", 7, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
-                for (const char* h : {"Mesh", "Phase", "fps", "frame p50", "frame p95", "frame p99", "trails pointer p50 / p95"})
+            if (ImGui::BeginTable("##proof", 8, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+                for (const char* h : {"Mesh", "Phase", "fps", "frame p50", "frame p95", "frame p99", "worst stall", "trails pointer p50 / p95"})
                     ImGui::TableSetupColumn(h);
                 ImGui::TableHeadersRow();
                 for (const SizeResult& r : p.results)
@@ -499,6 +578,8 @@ void App::drawProofUi() {
                         ImGui::Text("%.1f ms", f.p95);
                         ImGui::TableNextColumn();
                         ImGui::Text("%.1f ms", f.p99);
+                        ImGui::TableNextColumn();
+                        ImGui::Text("%.0f ms", worstStallMs(ph.frameMs, ph.releaseMs));
                         ImGui::TableNextColumn();
                         if (ph.lagMs.empty()) ImGui::TextDisabled("-");
                         else ImGui::Text("%.0f / %.0f ms, %.0f / %.0f px", l.p50, l.p95, lp.p50, lp.p95);
@@ -616,19 +697,21 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         r.phases.push_back({});
         r.phases.back().name = spec.name;
         r.phases.back().radiusPx = spec.radiusPx;
+        if (spec.radiusPx > 0) r.phases.back().brush = proofBrushName(spec.brush);
         p.stageStart = p.lastFrame = nowSeconds(); // (not counting what the last phase's release cost)
         p.samples.clear();
         p.dabs.clear();
         p.sent = 1;
+        p.dabFrom = p.previewFrom = 0;
         if (spec.radiusPx > 0) {
-            brush_ = BrushType::Standard;
+            brush_ = spec.brush;
             doc_.activeBrush = -1;
             paintMode_ = false;
             radiusPx_ = spec.radiusPx;
-            strength_ = 0.35f;
+            strength_ = spec.strength;
             p.cx = c.x + c.w * 0.5f;
             p.cy = c.y + c.h * 0.5f;
-            p.R = 0.26f * std::min(c.w, c.h);
+            p.R = 0.26f * std::min(c.w, c.h) * spec.pathScale;
             const glm::vec2 q = strokePoint(p, 0.0);
             p.samples.push_back({now, q, 0.0});
             p.lastSample = now;
@@ -645,6 +728,10 @@ void App::proofBeforeSwap(int fbW, int fbH) {
     auto nextPhase = [&] {
         SizeResult& r = p.results.back();
         if (r.phases.back().seconds == 0) r.phases.back().seconds = now - p.stageStart; // (a stroke set it at its release)
+        r.gpuBufferBytes = std::max(r.gpuBufferBytes, documentMemory(doc_).gpu);
+        if (r.vramFreeBeforeKb >= 0)
+            if (const long long freeKb = driverFreeVramKb(); freeKb >= 0)
+                r.vramUsedKb = std::max(r.vramUsedKb, std::max(0LL, r.vramFreeBeforeKb - freeKb));
         ++p.phaseIndex;
         if (p.phaseIndex < p.phases.size()) {
             beginPhase();
@@ -658,6 +745,10 @@ void App::proofBeforeSwap(int fbW, int fbH) {
 
     switch (p.stage) {
     case Stage::Announce: { // show "Building ..." for one frame, then build
+        if (hardwareCalibrating()) { // (first launch: measure this computer first, not while the benchmark runs)
+            p.hudTitle = "Waiting for the hardware check to finish...";
+            break;
+        }
         if (p.sizeIndex == 0 && p.results.empty()) {
             if (lightbox_.open()) lightbox_.toggle(); // the canvas clear (it opens at start-up)
             if (!p.vsync) SDL_GL_SetSwapInterval(0);
@@ -683,6 +774,8 @@ void App::proofBeforeSwap(int fbW, int fbH) {
     case Stage::Build: {
         const ProofMeshSize& s = p.sizes[p.sizeIndex];
         doc_.setMesh(makeIcosphere(1)); // free the last mesh (and its history) first
+        gl::Finish();
+        const long long vramBefore = driverFreeVramKb();
         resetPeakResidentBytes();
         const double t0 = nowSeconds();
         const size_t tris = size_t(s.millions * 1e6);
@@ -693,6 +786,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         r.vertices = m.vertexCount();
         doc_.setMesh(std::move(m), "Benchmark");
         r.buildSeconds = nowSeconds() - t0;
+        r.vramFreeBeforeKb = vramBefore;
         p.results.push_back(r);
         camera_.frame(sceneBounds());
         camera_.yaw = 0.0f;
@@ -740,20 +834,22 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                 const glm::vec2 d = p.dabs.back();
                 size_t best = p.samples.size() - 1;
                 float bestDist = 1e30f;
-                for (size_t i = p.samples.size(); i-- > 0 && p.samples.size() - i < 2000;) {
+                for (size_t i = p.samples.size(); i-- > p.dabFrom && p.samples.size() - i < 2000;) {
                     const float dist = glm::length(p.samples[i].p - d);
                     if (dist < bestDist) bestDist = dist, best = i;
                 }
+                p.dabFrom = best;
                 ph.lagMs.push_back((now - p.samples[best].t) * 1000.0);
                 ph.lagPx.push_back(p.samples.back().s - p.samples[best].s);
                 // The same for what is on screen ahead of the solved surface: the predictive preview's head.
                 const glm::vec2 h = ghostHeadValid_ ? ghostHead_ : d;
                 size_t nearest = p.samples.size() - 1;
                 float nearDist = 1e30f;
-                for (size_t i = p.samples.size(); i-- > 0 && p.samples.size() - i < 2000;) {
+                for (size_t i = p.samples.size(); i-- > p.previewFrom && p.samples.size() - i < 2000;) {
                     const float dist = glm::length(p.samples[i].p - h);
                     if (dist < nearDist) nearDist = dist, nearest = i;
                 }
+                p.previewFrom = nearest;
                 ph.previewLagPx.push_back(p.samples.back().s - p.samples[nearest].s);
             }
             // ... then the new samples go to the input handler, as the next frame's events would.
@@ -825,6 +921,10 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         settings.set("video", p.video);
         settings.set("pointer_hz", kPointerHz);
         settings.set("stroke_seconds", p.strokeSeconds);
+        if (!p.scene.empty()) {
+            settings.set("scene", p.scene);
+            settings.set("stroke_set", kProofStrokeSet);
+        }
         settings.set("input", "scripted pointer samples into App::onMouseMove (the mouse / pen handler)");
         settings.set("lag", "pointer sample time to SwapWindow of the frame showing its dab (display scan-out not included)");
         root.set("settings", settings);
@@ -837,18 +937,27 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             run.set("build_seconds", std::round(r.buildSeconds * 100) / 100);
             run.set("ram_mb", double(r.ramBytes >> 20));
             run.set("peak_ram_mb", double(r.peakRamBytes >> 20));
+            run.set("gpu_buffers_mb", double(r.gpuBufferBytes >> 20));
+            if (r.vramUsedKb > 0) run.set("vram_used_mb", double(r.vramUsedKb >> 10)); // (0: the driver's number never moved, as on unified memory)
+            double stall = 0;
+            for (const PhaseResult& ph : r.phases) stall = std::max(stall, worstStallMs(ph.frameMs, ph.releaseMs));
+            run.set("worst_stall_ms", std::round(stall * 10) / 10);
             Json phases = Json::array();
             for (const PhaseResult& ph : r.phases) {
                 Json j = Json::object();
                 j.set("name", ph.name);
+                if (!ph.brush.empty()) j.set("brush", ph.brush);
                 if (ph.radiusPx > 0) j.set("brush_radius_px", double(ph.radiusPx));
+                j.set("worst_stall_ms", std::round(worstStallMs(ph.frameMs, ph.releaseMs) * 10) / 10);
                 j.set("seconds", std::round(ph.seconds * 100) / 100);
                 j.set("frames", double(ph.frameMs.size()));
                 j.set("fps", ph.seconds > 0 ? std::round(double(ph.frameMs.size()) / ph.seconds * 10) / 10 : 0.0);
                 j.set("frame_ms", percentilesJson(percentiles(ph.frameMs)));
                 if (ph.radiusPx > 0) {
-                    j.set("lag_ms", percentilesJson(percentiles(ph.lagMs)));
-                    j.set("lag_px", percentilesJson(percentiles(ph.lagPx)));
+                    if (!ph.lagMs.empty()) { // (Move drags the surface without dabs: no stroke to trail the pointer)
+                        j.set("lag_ms", percentilesJson(percentiles(ph.lagMs)));
+                        j.set("lag_px", percentilesJson(percentiles(ph.lagPx)));
+                    }
                     j.set("dabs", double(ph.dabs));
                     j.set("pointer_samples", double(ph.samples));
                     j.set("path_px", std::round(ph.pathPx));
@@ -871,18 +980,23 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             if (!f) p.error += (p.error.empty() ? "" : "; ") + ("couldn't write " + p.jsonPath);
         }
         // A summary on the terminal too.
-        std::printf("SculptForge %s (%s) proof mode on %s | %s\n", SCULPTFORGE_VERSION, SF_GIT_COMMIT,
-                    root["hardware"]["cpu"].asString().c_str(), p.gpu.c_str());
-        for (const SizeResult& r : p.results)
+        std::printf("SculptForge %s (%s) proof mode%s%s on %s | %s\n", SCULPTFORGE_VERSION, SF_GIT_COMMIT,
+                    p.scene.empty() ? "" : ", scene ", p.scene.c_str(), root["hardware"]["cpu"].asString().c_str(), p.gpu.c_str());
+        for (const SizeResult& r : p.results) {
+            std::printf("  %-5s peak RAM %zu MB, GPU buffers %zu MB%s, worst stall %.0f ms\n", r.label.c_str(), r.peakRamBytes >> 20,
+                        r.gpuBufferBytes >> 20, r.vramUsedKb > 0 ? (", driver VRAM used " + std::to_string(r.vramUsedKb >> 10) + " MB").c_str() : "",
+                        [&] { double w = 0; for (const PhaseResult& ph : r.phases) w = std::max(w, worstStallMs(ph.frameMs, ph.releaseMs)); return w; }());
             for (const PhaseResult& ph : r.phases) {
                 const Percentiles f = percentiles(ph.frameMs), l = percentiles(ph.lagMs), lp = percentiles(ph.lagPx);
                 std::printf("  %-5s %-19s %6.1f fps  frame p50 %5.1f p95 %5.1f p99 %5.1f ms", r.label.c_str(), ph.name.c_str(),
                             ph.seconds > 0 ? double(ph.frameMs.size()) / ph.seconds : 0.0, f.p50, f.p95, f.p99);
+                std::printf("  stall %5.0f ms", worstStallMs(ph.frameMs, ph.releaseMs));
                 if (ph.radiusPx > 0)
                     std::printf("  trails %4.0f ms / %4.0f px (p95 %4.0f ms / %4.0f px), preview %4.0f px, release %.0f ms (done %.0f ms)",
                                 l.p50, lp.p50, l.p95, lp.p95, percentiles(ph.previewLagPx).p50, ph.releaseMs, ph.releaseDoneMs);
                 std::printf("\n");
             }
+        }
         std::printf("Result: %s%s%s\n", p.jsonPath.c_str(), p.video ? "\nVideo: " : "", p.video ? p.videoPath.c_str() : "");
         if (!p.error.empty()) std::printf("Note: %s\n", p.error.c_str());
         std::fflush(stdout);

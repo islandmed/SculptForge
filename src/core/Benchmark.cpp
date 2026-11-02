@@ -135,21 +135,65 @@ void registerPerformanceCommands(CommandRegistry& registry) {
                   }});
 }
 
-Mesh makeBenchSphere(size_t triangles) {
-    // A cube of r x r quads per side has 12 r^2 triangles; each Divide multiplies that by 4.
-    int levels = 1, res = 1;
-    for (; levels <= 8; ++levels) {
+namespace {
+
+// A cube of r x r quads per side has 12 r^2 triangles; each Divide multiplies that by 4.
+void benchResolution(size_t triangles, int& res, int& levels) {
+    for (levels = 1; levels <= 8; ++levels) {
         res = std::max(1, int(std::lround(std::sqrt(double(triangles) / (12.0 * std::pow(4.0, levels))))));
         if (res <= 40) break;
     }
+}
+
+// The standard scenes' head, as a displacement of the unit sphere: y up, +z the face. Every feature is broad
+// (several base cells wide) so the 15M and 33M bases, which differ in resolution, give the same shape.
+glm::vec3 headPoint(glm::vec3 d) {
+    auto g = [](float a, float b) { return std::exp(-(a * a + b * b)); }; // a 2D Gaussian
+    const float ax = std::abs(d.x);
+    float r = 1.0f;
+    const float front = std::max(0.0f, d.z);
+    r += 0.06f * std::max(0.0f, -d.z) * std::max(0.0f, d.y + 0.2f);                 // the back of the skull
+    r += 0.10f * front * g(d.x / 0.40f, (d.y - 0.30f) / 0.08f);                       // brow ridge
+    r -= 0.13f * front * g((ax - 0.30f) / 0.14f, (d.y - 0.14f) / 0.11f);              // eye sockets
+    r += 0.28f * front * g(d.x / 0.12f, (d.y + 0.02f) / 0.22f);                       // nose
+    r += 0.07f * front * g((ax - 0.45f) / 0.16f, (d.y + 0.05f) / 0.11f);              // cheekbones
+    r += 0.06f * front * g(d.x / 0.22f, (d.y + 0.33f) / 0.07f);                       // lips
+    r += 0.09f * front * g(d.x / 0.20f, (d.y + 0.62f) / 0.12f);                       // chin
+    r += 0.20f * g((ax - 0.98f) / 0.10f, d.y / 0.20f) * g((d.z + 0.05f) / 0.16f, 0.0f); // ears
+    glm::vec3 p = d * r;
+    // Narrower than deep, taller than wide; the jaw tapers below the cheeks, a neck below that.
+    p.x *= 0.80f;
+    p.z *= 0.95f;
+    const float jaw = std::clamp((-d.y - 0.15f) / 0.55f, 0.0f, 1.0f);
+    p.x *= 1.0f - 0.18f * jaw * jaw;
+    p.z += 0.05f * jaw * front;
+    if (d.y < -0.70f) { // the neck: a stub of cylinder under the jaw
+        const float t = std::clamp((-d.y - 0.70f) / 0.30f, 0.0f, 1.0f);
+        const float k = 1.0f - 0.30f * t;
+        p.x *= k;
+        p.z = p.z * k - 0.05f * t;
+        p.y -= 0.12f * t;
+    }
+    p.y *= 1.08f;
+    return p;
+}
+
+Mesh benchMesh(size_t triangles, bool head) {
+    int levels = 1, res = 1;
+    benchResolution(triangles, res, levels);
     Mesh m = makeCube(res, 2.0f);
-    for (auto& p : m.positions) p = glm::normalize(p);
+    for (auto& p : m.positions) p = head ? headPoint(glm::normalize(p)) : glm::normalize(p);
     m.recomputeAllNormals();
     std::string error;
     for (int i = 0; i < levels; ++i)
         if (!subdivDivide(m, true, error, nullptr, size_t(1) << 40)) break;
     return m;
 }
+
+} // namespace
+
+Mesh makeBenchSphere(size_t triangles) { return benchMesh(triangles, false); }
+Mesh makeBenchHead(size_t triangles) { return benchMesh(triangles, true); }
 
 namespace {
 

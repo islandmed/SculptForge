@@ -566,3 +566,20 @@ TEST(zip_round_trip_and_zip64) {
         std::filesystem::remove(path);
     }
 }
+
+TEST(benchmark_standard_head) {
+    // Proof mode's standard scenes (standard-15m / standard-33m) sculpt a procedural head: the size asked for, a
+    // face (the nose the frontmost point, near the middle), taller than wide, the same every time it is built.
+    for (size_t want : {size_t(300000), size_t(1200000)}) {
+        const Mesh a = makeBenchHead(want), b = makeBenchHead(want);
+        CHECK(a.triangleCount() > want * 8 / 10 && a.triangleCount() < want * 12 / 10);
+        CHECK(a.positions == b.positions);
+        glm::vec3 lo(1e9f), hi(-1e9f), front(0.0f, 0.0f, -1e9f);
+        for (const glm::vec3& p : a.positions) {
+            lo = glm::min(lo, p), hi = glm::max(hi, p);
+            if (p.z > front.z) front = p;
+        }
+        CHECK(std::abs(front.x) < 0.05f && front.y > -0.3f && front.y < 0.2f && front.z > 1.0f);
+        CHECK(hi.y - lo.y > (hi.x - lo.x) * 1.1f);
+    }
+}

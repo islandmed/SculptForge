@@ -5,6 +5,34 @@ measures how responsive sculpting is on a given computer and writes the result a
 of the run with the live numbers burned in. This page describes that file, how to submit one, and how the
 website's [benchmarks page](../website/benchmarks/index.html) lists them.
 
+## Standard scenes (what the website lists)
+
+`sculptforge --benchmark standard-15m` (or `standard-33m`, or `standard` for both; Help > Benchmark offers the
+same choice) runs the **standard scene**: a procedural head (`makeBenchHead` in `src/core/Benchmark.cpp`: skull,
+brow, eye sockets, nose, cheekbones, jaw, ears and neck as a displacement of a cube-sphere, then divided into
+subdivision levels like the spheres below) of about 15.0 or 33.2 million triangles. It is built from a formula,
+not loaded from a file, so every build on every platform sculpts the same surface. The stroke set
+(`settings.stroke_set` = `standard/1`; changed strokes get a new value) is the figure eight below, once per brush,
+on the same mesh in this order:
+
+| Phase | Brush | Radius | Strength |
+|---|---|---|---|
+| `clay small` | Clay | 25 px | 0.35 |
+| `clay medium` | Clay | 60 px | 0.35 |
+| `clay large` | Clay | 120 px | 0.35 |
+| `move` | Move | 80 px | 0.25 |
+| `smooth` | Smooth | 60 px | 0.5 |
+| `240 px brush` | Clay | 240 px | 0.35 |
+| `orbit` | (the view turns once in 3 s) | | |
+
+Each run adds `worst_stall_ms` (the longest frame, or lifting the pen if that took longer, over all phases; per
+phase too), `gpu_buffers_mb` (the most the renderer's vertex and index buffers held, an estimate that works on
+every GPU) and, where the driver reports free graphics memory (`GL_NVX_gpu_memory_info`, `GL_ATI_meminfo`),
+`vram_used_mb` (how far it dropped from before the mesh was built; on unified-memory GPUs this is system memory
+and other programs move it). `peak_ram_mb` is as below. The JSON's `settings.scene` names the scene.
+
+The sphere sweep below is what `sculptforge --benchmark` with no scene name runs.
+
 ## What is measured
 
 For each mesh size (default 5, 20 and 33 million triangles; 100 million when the free memory exceeds about
@@ -88,9 +116,11 @@ Field notes:
 1. Run proof mode on a quiet machine (close other heavy programs) with a release build or an official package.
 2. Check the file: `python3 tools/benchmark/submit.py check mine.json` validates it and prints a summary.
 3. Add it to the list: `python3 tools/benchmark/submit.py add mine.json --name "Your name or handle"
-   [--video https://...]` appends a compact entry to `website/benchmarks/results.json`. Open a pull request with
+   [--machine "the computer"] [--video https://...]` appends a compact entry to `website/benchmarks/results.json`. Open a pull request with
    that change, attach the full JSON (and a link to the video, e.g. uploaded to YouTube) in the description.
-   Results can also be attached to an issue for a maintainer to add.
+   Or open a **Benchmark result** issue (`.github/ISSUE_TEMPLATE/benchmark_result.yml`) and paste the JSON;
+   a maintainer checks it with `submit.py check` and adds it. Only SculptForge results are listed: we don't run,
+   test against or publish other sculpting applications' numbers or output.
 
 The benchmarks page (`website/benchmarks/index.html`) reads `results.json` and shows one row per mesh size and
 submission: frame time and lag percentiles per phase, hardware, version.

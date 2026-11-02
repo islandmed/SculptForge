@@ -117,8 +117,15 @@ measures it on your machine.
 
 ## Proof mode: see it for yourself
 
-**Help > Benchmark** (or `sculptforge --benchmark`) shows how responsive sculpting is on your own computer,
-measured the way it feels rather than the way a developer measures it. For each size, 5, 20 and 33 million
+**Help > Benchmark** (or `sculptforge --benchmark standard-15m`) shows how responsive sculpting is on your own
+computer, measured the way it feels rather than the way a developer measures it. Its **standard scenes** are the
+ones the [benchmarks page](https://sculptforge.app/benchmarks/) lists: a procedural head of 15 million
+(`standard-15m`) or 33 million (`standard-33m`) triangles, the same on every computer, sculpted with a fixed
+stroke set: Clay at 25, 60 and 120 pixels, Move, Smooth and a 240-pixel brush, then a turn of the view
+(`standard` runs both sizes). Each reports frame time (p50, p95, p99), how far the stroke trails the pointer in
+pixels, the worst stall (the longest the screen froze), and peak memory and graphics memory.
+
+Without a scene name (`sculptforge --benchmark`, or **Spheres** in the dialog) it runs the older size sweep: for each size, 5, 20 and 33 million
 triangles (and 100 million when there is enough free memory), it builds a sphere with subdivision levels, then
 plays a scripted pen stroke into the same code your mouse and pen go through, 240 pointer samples a second: a
 figure eight with a 60-pixel brush, the same with a 240-pixel brush, then a turn of the view. It replaces the
@@ -141,7 +148,8 @@ SculptForge version and commit. In the app they go to the `benchmarks` folder in
 (**Open folder** in the results); from the command line, to the current folder:
 
 ```
-sculptforge --benchmark --benchmark-sizes 5,20,33 --benchmark-out mine.json --benchmark-video mine.mp4
+sculptforge --benchmark standard-15m --benchmark-out mine.json --benchmark-video mine.mp4
+sculptforge --benchmark --benchmark-sizes 5,20,33 --benchmark-out spheres.json
 ```
 
 `--benchmark-no-video` skips the video, `--benchmark-vsync` keeps vertical sync on, `--benchmark-seconds 6`
