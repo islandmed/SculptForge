@@ -7,3 +7,5 @@
 - Tests: test_brush_settings, test_alpha_options, ui_brush_settings, ui_alpha_options, ui_blender_keys, ui_air_strokes, ui_whats_new. Full ctest -j3 on rebased tree: 119/119 passed.
 - CHANGELOG [Unreleased] + What's New 0.10.8; guide: sculpting, navigation, shortcuts (regenerated). REPLIES.md: one reply per issue.
 - S/U keys (askNK): dropped per coordinator (fix/size-keys covers it).
+- STATUS (paused 11-02): DONE and green. Tip bc174b5 pushed; local full ctest 119/119, CI run 41400365452 success. Nothing left to code.
+- Next steps: coordinator merges fix/inbox-0107 into 0.10.8; after release post REPLIES.md (#76 #77 #78, #62 follow-up); then `git worktree remove` this worktree.
