@@ -7,6 +7,8 @@ chapter opens by itself the first time you start a new version; you can always f
 
 ## Version 0.10.7
 
+- **A clearer membership card**: the three memberships side by side with what each one gets you, in your look's
+  colours. **Maybe later** now hides it for 30 days.
 - **Full alphas on custom brushes**: at Focal Shift -100, Clay Slab and the other custom and Community brushes now
   show the whole alpha to its corners, as the built-in brushes do (#75).
 - **A new look**: new installs start in **Forge Terminal** with the Tokyo Night colours and the **SculptForge

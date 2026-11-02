@@ -94,6 +94,14 @@ TEST(support_card_timing) {
     CHECK(supportCardDue(p, false, "0.10.5", now + day, false) == SupportCardReason::Updated);
     CHECK(supportCardDue(p, false, "0.10.4", now - 30 * day, false) == SupportCardReason::Weekly); // clock set back
     CHECK(supportCardDue(p, false, "0.10.4", now - day, false) == SupportCardReason::None);
+    // "Maybe later": 30 days, new versions included; then as before.
+    SupportCardPrefs later = p;
+    later.laterAt = now;
+    CHECK(supportCardDue(later, false, "0.10.4", now + 7 * day, false) == SupportCardReason::None);
+    CHECK(supportCardDue(later, false, "0.10.5", now + 29 * day, false) == SupportCardReason::None);
+    CHECK(supportCardDue(later, false, "0.10.5", now + 30 * day, false) == SupportCardReason::Updated);
+    CHECK(supportCardDue(later, false, "0.10.4", now + 30 * day, false) == SupportCardReason::Weekly);
+    CHECK(supportCardDue(later, false, "0.10.4", now - 30 * day, false) == SupportCardReason::Weekly); // clock set back
     // Never in tests, renders or CI; never once turned off; never for a supporter.
     CHECK(supportCardDue(p, true, "0.10.5", now + 30 * day, true) == SupportCardReason::None);
     SupportCardPrefs off = p;

@@ -6,6 +6,12 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- The membership card at launch is redesigned: the cube mark and the promise up top, the three memberships side by
+  side with their perks checked off and one bold button each (Insider highlighted), and the members' Discord in the
+  footer. It takes the current look's colours and opens in 150 ms. "Maybe later" now hides it for 30 days, updates
+  included; the welcome's Support button and the ten-hour note open it too.
+
 ### Fixed
 - Custom and Community brushes (Clay Slab and other presets) show the whole alpha at Focal Shift -100, as the
   built-in brushes do since #60: the stamp reaches its square's corners instead of being cut by the preset's round

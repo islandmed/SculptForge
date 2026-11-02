@@ -27,8 +27,14 @@ key enter
 expect_value welcome_open == 1
 expect_text "SculptForge is free. Memberships add credits, a monthly brush pack and a roadmap vote."
 shot welcome
+# Its Support button shows the membership card (each tier a click from its checkout) over the welcome.
 click "Support SculptForge##welcome"
-expect_value support_requests == 2
+expect_value support_card_open == 1
+wait 0.4
+expect_value support_requests == 1
+key Escape
+wait 0.4
+expect_value support_card_open == 0
 click "Join the community on Discord##welcome"
 expect_value discord_requests == 2
 expect_value welcome_open == 1
@@ -43,4 +49,4 @@ expect_text "starting with SculptForge 1.0"
 expect_text "Be the first: sculptforge.app/support.html"
 shot about_supporters
 click "Support SculptForge##about"
-expect_value support_requests == 3
+expect_value support_requests == 2

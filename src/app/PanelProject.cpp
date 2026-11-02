@@ -111,6 +111,7 @@ void App::initProject() {
         supportCardPrefs_.enabled = prefs["support_card"].asBool(true);
         supportCardPrefs_.supporter = prefs["supporter"].asBool(false);
         supportCardPrefs_.shownAt = int64_t(prefs["support_card_shown_at"].asNumber(0));
+        supportCardPrefs_.laterAt = int64_t(prefs["support_card_later_at"].asNumber(0));
         if (prefs["support_card_version"].isString()) supportCardPrefs_.shownVersion = prefs["support_card_version"].asString();
         // The look (0.10.7): what the last session used, unless ui.json names one. An install from before 0.10.7
         // remembers neither and keeps the Classic look with the ZBrush-style layout; the new-look card offers the
@@ -180,6 +181,7 @@ void App::saveProjectPrefs() {
     prefs.set("support_card", supportCardPrefs_.enabled); // the support card at launch (Support.h)
     prefs.set("supporter", supportCardPrefs_.supporter);
     prefs.set("support_card_shown_at", double(supportCardPrefs_.shownAt));
+    prefs.set("support_card_later_at", double(supportCardPrefs_.laterAt));
     if (!supportCardPrefs_.shownVersion.empty()) prefs.set("support_card_version", supportCardPrefs_.shownVersion);
     if (!uiConfigDeterministic_) {
         Json look = Json::object();
