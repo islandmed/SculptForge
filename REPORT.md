@@ -9,4 +9,4 @@
 - **Tony:** secret `INSIDERS_REPO_TOKEN` = fine-grained PAT, *Only select repositories: islandmed/sculptforge-insiders*, permission **Contents: Read and write** (Metadata read-only is automatic); nothing else. Also secrets `DISCORD_INSIDERS_WEBHOOK` (#insiders) and `DISCORD_MEMBERS_WEBHOOK` (#members).
 - **Dry run** (before the VDM was switched off): 14 days, 14 drops, all 8 kinds, 2 duplicate weaves rejected. Folder ~/Work/look-mockups/drops/ (overview.png, README.txt, rejected/). Nothing posted.
 - **Tests:** `insider_drops` ctest (determinism, blank/flat/seam/hard-edge/torn/duplicate rejected, every kind packs). Full ctest -j3 before the rebase: 117/118; `ui_phone_link` also fails on main (`phone_ar_version is 1, expected 2`), so not from this branch. Rebased on 0.10.7 main: full ctest 118/118, selftest ok, hold → approve → post tested against a local server.
-- **SHA:** 0922eaf (code; REPORT.md commit on top)
+- **SHA:** 1bc7554 (code; REPORT.md commit on top). Renders run in a temp settings/data/log home; the same kind never wins two days running.
