@@ -1,0 +1,40 @@
+# Discord intake: new #ideas / #help forum threads and #bug-reports messages become GitHub issues (labels
+# from-discord + idea|help|bug), the thread gets a "Tracked as #N" reply, and an issue's close goes back once.
+# Outbound polling only (no ports, no inbound webhooks); Discord text is quoted as data, attachments become links.
+# DISCORD_BOT_TOKEN is a read-only bot (View Channels + Read Message History on the 3 channels); without it the
+# job does nothing. Replies use the DISCORD_{IDEAS,HELP,BUGS}_WEBHOOK secrets that are set. At most 10 new
+# issues per run (INTAKE_MAX_NEW). Details: tools/discord_intake.py.
+name: Discord intake
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
+
+concurrency:
+  group: discord-intake
+  cancel-in-progress: false
+
+jobs:
+  intake:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: tools/discord_intake.py
+          sparse-checkout-cone-mode: false
+      - name: File new Discord posts as issues
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_GUILD_ID: ${{ vars.DISCORD_GUILD_ID }}
+          DISCORD_IDEAS_WEBHOOK: ${{ secrets.DISCORD_IDEAS_WEBHOOK }}
+          DISCORD_HELP_WEBHOOK: ${{ secrets.DISCORD_HELP_WEBHOOK }}
+          DISCORD_BUGS_WEBHOOK: ${{ secrets.DISCORD_BUGS_WEBHOOK }}
+          GITHUB_TOKEN: ${{ github.token }}
+          INTAKE_MAX_NEW: "10"
+        run: python3 -I tools/discord_intake.py

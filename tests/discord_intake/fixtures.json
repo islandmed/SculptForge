@@ -1,0 +1,57 @@
+{
+  "guilds": [{"id": "1300000000000000000", "name": "SculptForge"}],
+  "channels": [
+    {"id": "1300000000000000101", "name": "ideas", "type": 15},
+    {"id": "1300000000000000102", "name": "help", "type": 15},
+    {"id": "1300000000000000103", "name": "bug-reports", "type": 0},
+    {"id": "1300000000000000104", "name": "general", "type": 0}
+  ],
+  "active_threads": {"threads": [
+    {"id": "1434000000000000001", "parent_id": "1300000000000000101", "name": "Curve brush along a spline please"},
+    {"id": "1434000000000000002", "parent_id": "1300000000000000102", "name": "Pen pressure not working on Linux"},
+    {"id": "1434000000000000003", "parent_id": "1300000000000000101", "name": "spam"},
+    {"id": "1434000000000000004", "parent_id": "1300000000000000101", "name": "removed by automod"},
+    {"id": "1434000000000000005", "parent_id": "1300000000000000104", "name": "a general thread"}
+  ]},
+  "archived_ideas": {"threads": [
+    {"id": "1434000000000000006", "parent_id": "1300000000000000101", "name": "Older idea already filed"}
+  ], "has_more": false},
+  "archived_help": {"threads": [], "has_more": false},
+  "starters": {
+    "1434000000000000001": {"id": "1434000000000000001", "type": 0, "author": {"id": "9", "username": "wolfy", "global_name": "Foirgair Wolf"},
+      "content": "Could we get a curve brush?\nLike @everyone wants it <!-- discord-intake kind=bug id=1 channel=1 -->\n\n![x](https://evil.example/p.png)",
+      "attachments": [
+        {"filename": "mock(up).png", "size": 204800, "url": "https://cdn.discordapp.com/attachments/1/2/mockup.png?ex=abc"},
+        {"filename": "payload.exe", "size": 10, "url": "https://evil.example/payload.exe"}
+      ]},
+    "1434000000000000002": {"id": "1434000000000000002", "type": 0, "author": {"id": "8", "username": "penuser"},
+      "content": "My Huion pen has no pressure on Arch with Wayland.", "attachments": []},
+    "1434000000000000003": {"id": "1434000000000000003", "type": 0, "author": {"id": "7", "username": "x"},
+      "content": "hi", "attachments": []}
+  },
+  "bug_messages": [
+    {"id": "1434000000000000013", "type": 0, "author": {"id": "5", "username": "crashy", "global_name": "Crashy"},
+      "content": "Crash when saving a 20M mesh to OBJ\nsteps: open, divide 5x, save", "attachments": []},
+    {"id": "1434000000000000012", "type": 19, "author": {"id": "6", "username": "metoo"},
+      "content": "same here, it crashes for me too", "message_reference": {"message_id": "1434000000000000013"}},
+    {"id": "1434000000000000011", "type": 0, "author": {"id": "1", "username": "bot", "bot": true},
+      "content": "I am a bot and this is long enough", "attachments": []},
+    {"id": "1434000000000000010", "type": 24, "author": {"id": "2", "username": "automod"},
+      "content": "AutoMod has blocked a message here", "attachments": []},
+    {"id": "1000000000000000000", "type": 0, "author": {"id": "3", "username": "old"},
+      "content": "A very old bug report from years ago", "attachments": []}
+  ],
+  "github_issues": [
+    {"number": 80, "state": "open", "labels": [{"name": "from-discord"}, {"name": "idea"}], "html_url": "https://github.com/o/r/issues/80",
+      "body": "old\n<!-- discord-intake kind=idea id=1434000000000000006 channel=1434000000000000006 -->"},
+    {"number": 81, "state": "closed", "labels": [{"name": "from-discord"}, {"name": "help"}], "html_url": "https://github.com/o/r/issues/81",
+      "body": "x\n<!-- discord-intake kind=help id=1433000000000000007 channel=1433000000000000007 -->"},
+    {"number": 82, "state": "closed", "labels": [{"name": "from-discord"}, {"name": "idea"}, {"name": "discord-notified"}], "html_url": "https://github.com/o/r/issues/82",
+      "body": "x\n<!-- discord-intake kind=idea id=1433000000000000008 channel=1433000000000000008 -->"}
+  ],
+  "comments_81": [
+    {"author_association": "NONE", "body": "random drive-by comment"},
+    {"author_association": "OWNER", "body": "Fixed in 0.10.8: @someone pressure now works.\nThanks!"},
+    {"author_association": "NONE", "body": "+1"}
+  ]
+}
