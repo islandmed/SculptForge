@@ -37,7 +37,7 @@ void App::openSupportPage() {
         status_ = std::string("Support SculptForge: ") + kSupportUrl;
         return;
     }
-    status_ = SDL_OpenURL(kSupportUrl) ? std::string("Opened sculptforge.app/donate.html in your browser")
+    status_ = SDL_OpenURL(kSupportUrl) ? std::string("Opened sculptforge.app/support.html in your browser")
                                        : std::string("Couldn't open ") + kSupportUrl + ": " + SDL_GetError();
 }
 
@@ -55,7 +55,7 @@ void App::drawSupportersSection() {
     ImGui::SeparatorText("Supporters");
     const std::vector<std::string>& names = supporterNames();
     if (names.empty()) {
-        ImGui::TextDisabled("Be the first: sculptforge.app/donate.html");
+        ImGui::TextDisabled("Be the first: sculptforge.app/support.html");
     } else {
         ImGui::TextWrapped("Thank you to everyone who supports SculptForge:");
         // Plain text only (TextUnformatted: no format strings, markup or links), sanitised by parseSupporters.
@@ -124,7 +124,7 @@ void App::drawSupportUi() {
             ImGui::Spacing();
             ImGui::Separator();
             ImGui::Spacing();
-            ImGui::TextWrapped("SculptForge is free. If it helps your work, consider supporting it. %s", kInsiderNote);
+            ImGui::TextWrapped("SculptForge is free. Memberships add credits, a monthly brush pack and a roadmap vote. %s", kInsiderNote);
             if (ImGui::Button("Support SculptForge##welcome")) openSupportPage();
             ImGui::SameLine();
             if (ImGui::Button("Close##welcome")) showWelcome_ = false;
@@ -140,10 +140,10 @@ void App::drawSupportUi() {
                                        ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
         if (ImGui::Begin("##support_reminder", nullptr, flags)) {
             ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted("You've sculpted over ten hours in SculptForge. It's free; if it helps your work, "
-                                   "consider supporting it.");
+            ImGui::TextUnformatted("You've sculpted over ten hours in SculptForge. Memberships add credits, a monthly "
+                                   "brush pack and a roadmap vote.");
             ImGui::SameLine();
-            if (ImGui::SmallButton("Support...##reminder")) {
+            if (ImGui::SmallButton("Membership...##reminder")) {
                 openSupportPage();
                 supportReminderOpen_ = false;
             }
