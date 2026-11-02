@@ -20,7 +20,10 @@ import sfimage
 
 ALPHA_SIZE = 512
 VDM_SIZE = 192
-KINDS = ["noise", "scales", "weave", "pores", "wrinkles", "trims", "kelvinlet", "vdm"]
+KINDS = ["noise", "scales", "weave", "pores", "wrinkles", "trims", "kelvinlet"]  # in the daily rotation
+# Kept out of the rotation until they make useful, recognisable shapes (coordinator review 11-01: the VDMs read as a
+# blob or a horn on a sphere; wanted: a horn set, ear, nostril, scale plate, rivet ...). make("vdm", ...) still works.
+DISABLED = ["vdm"]
 PER_DAY = 6  # candidates per day; the gate keeps one
 
 

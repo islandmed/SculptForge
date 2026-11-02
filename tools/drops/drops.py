@@ -4,6 +4,8 @@
 """Insider daily drops: make the day's candidates, gate them, pack the best one, post it.
 
     drops.py daily  --date 2026-11-02 --out OUT --history H.json      # OUT/<date>/: .sfpack, preview.png, drop.json
+    drops.py daily  ... --hold                                          # held: not posted or bundled until approved
+    drops.py approve OUT/2026-11-02                                     # the coordinator's OK for a held drop
     drops.py post   OUT/2026-11-02 --webhook-env DISCORD_INSIDERS_WEBHOOK
     drops.py monthly --month 2026-11 --drops DROPS_ROOT --out OUT       # "Insider Pack 2026-11" for Supporters
     drops.py schedule --listing L.json --pack OUT/insider-pack-2026-11.sfpack --month 2026-11
@@ -304,7 +306,7 @@ def unique_name(c, history):
         rename(c, f"{c['name']} {n}")
 
 
-def daily(date, out, history, app, cli, keep_rejects=None):
+def daily(date, out, history, app, cli, keep_rejects=None, hold=False):
     """Builds the drop for DATE in OUT/<date>/ and appends it to `history`. Returns the drop or None."""
     work = Path(tempfile.mkdtemp(prefix=f"drop-{date}-"))
     try:
@@ -349,7 +351,7 @@ def daily(date, out, history, app, cli, keep_rejects=None):
         drop = {"date": date.isoformat(), "kind": best["kind"], "type": best["type"], "name": best["name"],
                 "description": best["description"], "item": item_name(best), "pack": pack.name if cli else None,
                 "preview": preview.name if preview.is_file() else None, "phash": best["gate"]["metrics"].get("phash"),
-                "params": best["params"], "score": best["gate"]["score"]}
+                "params": best["params"], "score": best["gate"]["score"], "held": hold}
         (day / "drop.json").write_text(json.dumps(drop, indent=2) + "\n")
         history.append(drop)
         return drop
@@ -391,6 +393,9 @@ def cmd_post(args):
         return 0
     day = Path(args.drop)
     meta = json.loads((day / ("bundle.json" if (day / "bundle.json").is_file() else "drop.json")).read_text())
+    if meta.get("held"):
+        print(f"{meta['name']} is held for approval; nothing posted.")
+        return 0
     files = [day / meta["preview"]] if meta.get("preview") else []
     files.append(day / meta["pack"])
     if meta.get("date"):
@@ -409,6 +414,7 @@ def cmd_post(args):
 def month_drops(root, month):
     y, m = month.split("-")
     found = [(json.loads(p.read_text()), p.parent) for p in Path(root, y, m).glob("*/drop.json")]
+    found = [d for d in found if not d[0].get("held")]  # held and never approved: not part of the bundle
     return sorted(found, key=lambda d: d[0]["date"])
 
 
@@ -500,13 +506,25 @@ def cmd_daily(args):
     if not app and not args.no_render:
         sys.exit("error: cannot find the sculptforge app for the renders (--app, or --no-render)")
     history = load_history(args.history)
-    drop = daily(generate.parse_date(args.date), args.out, history, app, cli)
+    drop = daily(generate.parse_date(args.date), args.out, history, app, cli, hold=args.hold)
     if args.history:
         Path(args.history).write_text(json.dumps(history, indent=2) + "\n")
     if not drop:
         print(f"{args.date}: every candidate was rejected; no drop today (see gate.json)")
         return 0
-    print(f"{args.date}: {drop['name']} ({drop['kind']}): {drop['description']}")
+    print(f"{args.date}: {drop['name']} ({drop['kind']}): {drop['description']}" + (" [held for approval]" if drop["held"] else ""))
+    return 0
+
+
+def cmd_approve(args):
+    """Releases a held drop (the coordinator's approval): it may then be posted and goes into the month's bundle."""
+    path = Path(args.drop) / "drop.json"
+    if not path.is_file():
+        sys.exit(f"error: no drop at {path}")
+    meta = json.loads(path.read_text())
+    meta["held"] = False
+    path.write_text(json.dumps(meta, indent=2) + "\n")
+    print(f"approved {meta['date']}: {meta['name']}")
     return 0
 
 
@@ -615,7 +633,7 @@ def cmd_selftest(args):
             failures.append(f"{k}: rejected every day of a week")
     if args.cli:
         with tempfile.TemporaryDirectory() as t:
-            for c in a + [generate.make(k, d) for k in ("kelvinlet", "vdm", "trims")]:
+            for c in a + [generate.make(k, d) for k in ("kelvinlet", "trims")]:
                 stage = Path(t) / c["kind"]
                 write_item(c, stage)
                 (stage / "LICENSE.txt").write_text(LICENSE_TEXT)
@@ -624,6 +642,15 @@ def cmd_selftest(args):
                               "Insider Drop test", c["description"])
                 except RuntimeError as e:
                     failures.append(f"{c['kind']}: {e}")
+    if any(k in generate.DISABLED for i in range(60) for k in generate.kinds_for(d + datetime.timedelta(days=i))):
+        failures.append("a disabled kind is in the rotation")
+    with tempfile.TemporaryDirectory() as t:
+        for day, held in (("02", False), ("03", True)):
+            f = Path(t, "2026", "11", f"2026-11-{day}")
+            f.mkdir(parents=True)
+            (f / "drop.json").write_text(json.dumps({"date": f"2026-11-{day}", "held": held}))
+        if [m["date"] for m, _ in month_drops(t, "2026-11")] != ["2026-11-02"]:
+            failures.append("a held drop went into the month's bundle")
     if (public_date("2026-11"), public_date("2026-12")) != ("2027-03-01", "2027-04-01"):
         failures.append(f"public dates: {public_date('2026-11')}, {public_date('2026-12')}")
     for f in failures:
@@ -642,7 +669,11 @@ def main():
     s.add_argument("--app")
     s.add_argument("--cli")
     s.add_argument("--no-render", action="store_true")
+    s.add_argument("--hold", action="store_true", help="mark the drop held: not posted or bundled until `approve`")
     s.set_defaults(fn=cmd_daily)
+    s = sub.add_parser("approve")
+    s.add_argument("drop", help="a day's folder (drop.json)")
+    s.set_defaults(fn=cmd_approve)
     s = sub.add_parser("post")
     s.add_argument("drop", help="a day's folder (drop.json) or a bundle folder (bundle.json)")
     s.add_argument("--webhook-env", default="DISCORD_INSIDERS_WEBHOOK")

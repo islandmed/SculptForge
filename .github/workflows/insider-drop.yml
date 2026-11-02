@@ -7,6 +7,10 @@
 # DISCORD_MEMBERS_WEBHOOK, kept under bundles/ in the private repo) and schedules it in the public pack listing
 # (listing.json on this repository's `packs` branch) for three months after the month ends. Each run publishes
 # the bundles whose public date has come: their .sfpack goes next to the listing and is marked released.
+# Hold mode (the default for drops dated before HOLD_UNTIL, or while the repository variable DROPS_HOLD is "true"):
+# the drop is built, uploaded as the run's artifact drop-<date> for the coordinator to review and committed to the
+# insider repository marked held, but not posted or bundled. Run this workflow by hand with that date and
+# approve=true to release it: the committed drop (the one reviewed, not a new one) is posted and joins the bundle.
 # Only this repository's own code runs; no pull request or issue input reaches it.
 name: Insider drop
 
@@ -21,6 +25,10 @@ on:
       month:
         description: "Also bundle this month YYYY-MM (default: last month, on the 1st only)"
         required: false
+      approve:
+        description: "Approve the held drop of `date` and post it (makes nothing new)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write # the `packs` branch (public listing)
@@ -33,6 +41,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
+      HOLD_UNTIL: "2026-11-09" # the first real drops wait for the coordinator's approval
       HAS_INSIDERS: ${{ secrets.INSIDERS_REPO_TOKEN != '' }}
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_BASEDIR: ${{ github.workspace }}
@@ -44,6 +53,8 @@ jobs:
         env:
           IN_DATE: ${{ inputs.date }}
           IN_MONTH: ${{ inputs.month }}
+          IN_APPROVE: ${{ inputs.approve }}
+          VAR_HOLD: ${{ vars.DROPS_HOLD }}
         run: |
           DATE="${IN_DATE:-$(date -u +%F)}"
           [[ "$DATE" =~ ^20[0-9][0-9]-[01][0-9]-[0-3][0-9]$ ]] || { echo "bad date '$DATE'"; exit 1; }
@@ -53,6 +64,11 @@ jobs:
           echo "DATE=$DATE" >> "$GITHUB_ENV"
           echo "DROP_DIR=drops/${DATE:0:4}/${DATE:5:2}/$DATE" >> "$GITHUB_ENV"
           echo "MONTH=$MONTH" >> "$GITHUB_ENV"
+          if [ "$IN_APPROVE" = "true" ]; then MODE=approve
+          elif [[ "$DATE" < "$HOLD_UNTIL" ]] || [ "$VAR_HOLD" = "true" ]; then MODE=hold
+          else MODE=post; fi
+          echo "MODE=$MODE" >> "$GITHUB_ENV"
+          echo "$DATE: $MODE"
       - name: Insider repository
         if: env.HAS_INSIDERS == 'true'
         uses: actions/checkout@v7
@@ -61,37 +77,58 @@ jobs:
           token: ${{ secrets.INSIDERS_REPO_TOKEN }}
           path: insiders
       - name: Already done today?
+        if: env.MODE != 'approve'
         run: |
           if [ -f "insiders/$DROP_DIR/drop.json" ]; then echo "SKIP_DROP=1" >> "$GITHUB_ENV"; echo "$DATE already dropped"; fi
       - name: Dependencies
+        if: env.MODE != 'approve' || env.MONTH != ''  # approving only posts what is already built
         run: |
           sudo ./packaging/linux/install-build-deps.sh
           sudo apt-get install -y --no-install-recommends ccache xvfb libgl1-mesa-dri
       - name: Compiler cache (restore; CI's Linux cache)
+        if: env.MODE != 'approve' || env.MONTH != ''
         uses: actions/cache/restore@v5
         with:
           path: .ccache
           key: ccache-ci-linux-x86_64.${{ github.sha }}
           restore-keys: ccache-ci-linux-x86_64.
       - name: Build sculptforge and sculptforge-cli
+        if: env.MODE != 'approve' || env.MONTH != ''
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSCULPTFORGE_USE_SYSTEM_SDL=OFF -DSCULPTFORGE_BUILD_TESTS=OFF \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           cmake --build build --target sculptforge sculptforge-cli --parallel 4
       - name: Make the drop
-        if: env.SKIP_DROP != '1'
+        if: env.SKIP_DROP != '1' && env.MODE != 'approve'
         run: |
           mkdir -p insiders/drops
           xvfb-run -a -s "-screen 0 1280x1024x24" env LIBGL_ALWAYS_SOFTWARE=1 \
             python3 tools/drops/drops.py daily --date "$DATE" --out "$RUNNER_TEMP/out" \
-              --history insiders/drops/history.json --app build/sculptforge --cli build/sculptforge-cli
+              --history insiders/drops/history.json --app build/sculptforge --cli build/sculptforge-cli \
+              $([ "$MODE" = hold ] && echo --hold)
+      - name: Drop for review (artifact)
+        if: env.SKIP_DROP != '1' && env.MODE != 'approve'
+        uses: actions/upload-artifact@v7
+        with:
+          name: drop-${{ env.DATE }}
+          path: ${{ runner.temp }}/out/${{ env.DATE }}
+          if-no-files-found: ignore
+          retention-days: 30
+      - name: Approve the held drop
+        if: env.MODE == 'approve'
+        run: |
+          [ "$HAS_INSIDERS" = true ] || { echo "approving needs INSIDERS_REPO_TOKEN (the held drop lives in the insider repo)"; exit 1; }
+          [ -f "insiders/$DROP_DIR/drop.json" ] || { echo "no held drop for $DATE in the insider repo"; exit 1; }
+          python3 tools/drops/drops.py approve "insiders/$DROP_DIR"
       - name: Post to #insiders
-        if: env.SKIP_DROP != '1'
+        if: env.SKIP_DROP != '1' && env.MODE != 'hold'
         env:
           DISCORD_INSIDERS_WEBHOOK: ${{ secrets.DISCORD_INSIDERS_WEBHOOK }}
         run: |
-          [ -f "$RUNNER_TEMP/out/$DATE/drop.json" ] || { echo "no drop today"; exit 0; }
-          python3 tools/drops/drops.py post "$RUNNER_TEMP/out/$DATE" --webhook-env DISCORD_INSIDERS_WEBHOOK
+          D="$RUNNER_TEMP/out/$DATE"
+          [ "$MODE" = approve ] && D="insiders/$DROP_DIR"
+          [ -f "$D/drop.json" ] || { echo "no drop today"; exit 0; }
+          python3 tools/drops/drops.py post "$D" --webhook-env DISCORD_INSIDERS_WEBHOOK
       - name: Bundle the month for Supporters
         if: env.MONTH != '' && env.HAS_INSIDERS == 'true'
         env:
@@ -104,14 +141,14 @@ jobs:
       - name: Commit to the insider repository
         if: env.HAS_INSIDERS == 'true'
         run: |
-          if [ -f "$RUNNER_TEMP/out/$DATE/drop.json" ] || [ -f "$RUNNER_TEMP/out/$DATE/gate.json" ]; then
+          if [ "$MODE" != approve ] && [ -f "$RUNNER_TEMP/out/$DATE/gate.json" ]; then
             mkdir -p "insiders/$DROP_DIR" && cp -r "$RUNNER_TEMP/out/$DATE/." "insiders/$DROP_DIR/"
           fi
           cd insiders
           git add -A .
           if git diff --cached --quiet; then echo "nothing to commit"; exit 0; fi
           git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-            commit -qm "Drop $DATE${MONTH:+, Insider Pack $MONTH}"
+            commit -qm "Drop $DATE ($MODE)${MONTH:+, Insider Pack $MONTH}"
           git push -q
       - name: Public pack listing (schedule and release)
         if: env.HAS_INSIDERS == 'true'
