@@ -1,0 +1,15 @@
+# Monthly sculpt challenge themes, one per line, used in order (month 1 = first line after the start month,
+# wrapping around). Format: Theme | one-line prompt. Add, reorder or replace lines any time; lines starting with #
+# are ignored.
+Creature Bust | Design a creature head and shoulders: anatomy that could really breathe.
+Stylized Hero | A character with big, readable shapes. Think animation, not photo.
+Ancient Relic | A carved artifact with wear, cracks and history.
+Skull Study | Any skull, real or invented. Focus on planes and structure.
+Tiny Monster | Something small and adorable that could still bite.
+Armored Knight | Hard-surface meets organic: plates, straps and the person underneath.
+Sea Creature | From the deep: tentacles, scales, shells or something new.
+Portrait of a Stranger | A human face with character: age, mood and story.
+Dragon | Head, full body or just an eye. Make it yours.
+Robot With Feelings | Mechanical, but expressive.
+Mythical Beast | Pick a myth from anywhere in the world and reimagine it.
+Your Pet as a Hero | Your pet (or a friend's), heroic proportions encouraged.

@@ -1,0 +1,78 @@
+# Monthly sculpt challenge on the community Discord: on the 1st it announces the month's theme (next line of
+# .github/challenges.txt), on the 24th a one-week reminder, on the last day "submissions closed, vote with 🔥".
+# Posts go through a channel webhook stored in the DISCORD_CHALLENGE_WEBHOOK secret; without the secret the job
+# skips. No checkout of untrusted code, no other secrets; the message text comes only from this repository.
+name: Monthly challenge
+
+on:
+  schedule:
+    - cron: "0 16 1 * *"      # theme announcement
+    - cron: "0 16 24 * *"     # one week left
+    - cron: "0 16 28-31 * *"  # closes on the last day of the month (the script checks)
+  workflow_dispatch:
+    inputs:
+      kind:
+        description: "Post now: announce, reminder or close"
+        required: true
+        default: announce
+        type: choice
+        options: [announce, reminder, close]
+
+permissions:
+  contents: read
+
+jobs:
+  post:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: .github/challenges.txt
+          sparse-checkout-cone-mode: false
+      - name: Post to Discord
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_CHALLENGE_WEBHOOK }}
+          KIND: ${{ inputs.kind }}
+          EVENT: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          python3 - <<'EOF'
+          import datetime, json, os, sys, urllib.request
+          hook = os.environ.get("WEBHOOK", "")
+          if not hook:
+              print("DISCORD_CHALLENGE_WEBHOOK is not set; nothing to post."); sys.exit(0)
+          today = datetime.date.today()
+          kind = os.environ.get("KIND") or ""
+          if os.environ["EVENT"] == "schedule":
+              sched = os.environ["SCHEDULE"]
+              if sched.startswith("0 16 1 "): kind = "announce"
+              elif sched.startswith("0 16 24 "): kind = "reminder"
+              else:
+                  if (today + datetime.timedelta(days=1)).month == today.month:
+                      print("Not the last day of the month."); sys.exit(0)
+                  kind = "close"
+          themes = [l.strip() for l in open(".github/challenges.txt", encoding="utf-8")
+                    if l.strip() and not l.lstrip().startswith("#")]
+          start = (2026, 11)  # November 2026 uses the first theme
+          idx = ((today.year - start[0]) * 12 + today.month - start[1]) % len(themes)
+          name, _, prompt = themes[idx].partition("|")
+          name, prompt = name.strip(), prompt.strip()
+          month = today.strftime("%B")
+          if kind == "announce":
+              text = (f"# 🏆 {month} challenge: **{name}**\n{prompt}\n\n"
+                      "Post your entry in this channel any time this month (WIPs welcome in #wip-and-feedback). "
+                      "Vote with 🔥 on your favourites. The winner gets **Featured Artist** and a spot on "
+                      "sculptforge.app. Any app is fine, but we'd love to see what you make in SculptForge!")
+          elif kind == "reminder":
+              text = f"⏰ One week left for the {month} challenge: **{name}**. Get those entries in!"
+          else:
+              text = (f"🔒 Submissions for the {month} challenge (**{name}**) are closed. Last chance to vote with 🔥. "
+                      "The winner is announced soon, and next month's theme drops tomorrow!")
+          body = json.dumps({"content": text, "username": "SculptForge Challenges",
+                             "allowed_mentions": {"parse": []}}).encode()
+          req = urllib.request.Request(hook, data=body, headers={"Content-Type": "application/json",
+                                                                 "User-Agent": "SculptForge-challenge"})
+          with urllib.request.urlopen(req, timeout=30) as r:
+              print(kind, name, r.status)
+          EOF
