@@ -126,6 +126,24 @@ The `.deb` and `.rpm` packages add SculptForge to your desktop's application men
 made executable first (`chmod +x SculptForge-*.AppImage`, or tick "Allow executing file as program" in your
 file manager's properties).
 
+### Wayland and X11
+
+Every Linux package (.deb, .rpm, AppImage, Flatpak, tar.gz) opens as a native Wayland window on a Wayland
+desktop, without XWayland, and as a normal X11 window on an X11 session. On Wayland the window stays sharp at
+fractional and HiDPI scales (125%, 150%, 200%), and title bars come from the desktop (or from libdecor on GNOME).
+
+To force X11 (for example, a screen recorder or remote-desktop tool that only captures X11 windows), start
+SculptForge with:
+
+```sh
+SDL_VIDEO_DRIVER=x11 sculptforge
+```
+
+Pen tablets work on both. On Wayland, pressure, tilt, the eraser end and side buttons come through the
+desktop's tablet protocol (tablet-v2), so the tablet must be set up in your desktop's settings rather than
+through X11 tools such as `xsetwacom`. If pressure doesn't respond, check **Preferences > Tablet** for the
+live pressure reading.
+
 ## What you see at start-up
 
 SculptForge opens a 1600 x 960 window with a sphere ready to sculpt and the **Library** open along the top of
