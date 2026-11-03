@@ -1058,7 +1058,7 @@ void drawPickers(App& app) {
         const float gridW = 6 * (64.0f * scale + 6.0f) + 20.0f + ImGui::GetStyle().ScrollbarSize;
         if (s.held != 0) { // Ctrl / Ctrl+Shift held: the mask or selection brushes (Brush and Stroke only)
             if (beginPickerWindow(s.picker == Picker::Brush ? "Brushes##picker" : "Strokes##picker",
-                                  3 * (64.0f * scale + 6.0f) + 20.0f)) {
+                                  (s.held == 1 ? 3 : 4) * (64.0f * scale + 6.0f) + 20.0f)) { // Ctrl+Shift: 4 Cut shapes a row
                 const bool strokes = s.picker == Picker::Stroke;
                 pickerTitle(strokes ? ICON_LC_SPLINE : ICON_LC_BRUSH,
                             s.held == 1 ? (strokes ? "Mask stroke (Ctrl)" : "Mask brushes (Ctrl)")
