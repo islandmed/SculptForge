@@ -30,7 +30,13 @@ TEST(spacemouse_device_ids) {
     CHECK(!isSpaceMouseDevice(0x046D, 0xC52B)); // a Logitech Unifying receiver
     CHECK(!isSpaceMouseDevice(0x046D, 0xC215, "Logitech Extreme 3D")); // a flight stick
     CHECK(isSpaceMouseDevice(0x046D, 0xC6AA, "3Dconnexion SpaceNavigator")); // by name
-    CHECK(!isSpaceMouseDevice(0x045E, 0x028E, "SpaceMouse")); // another vendor never
+    CHECK(!isSpaceMouseDevice(0x045E, 0x028E, "SpaceMouse")); // another vendor: not by a bare model name
+    // #104: no vendor id (Bluetooth on some systems), or a name that says 3Dconnexion, whatever the id.
+    CHECK(isSpaceMouseDevice(0x0000, 0x0000, "SpaceMouse Wireless BT"));
+    CHECK(isSpaceMouseDevice(0x1234, 0x0001, "3Dconnexion SpaceMouse Pro"));
+    CHECK(!isSpaceMouseDevice(0x0000, 0x0000, "Wireless Controller"));
+    CHECK(!isSpaceMouseDevice(0x1234, 0x0001, "3Dconnexion CadMouse"));
+    CHECK(!isSpaceMouseDevice(0x0000, 0x0000, "3Dconnexion Keyboard Pro"));
 }
 
 TEST(spacemouse_dead_zone) {

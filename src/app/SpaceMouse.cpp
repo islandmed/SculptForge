@@ -57,27 +57,40 @@ void App::spaceMouseScan() {
     if (spaceMouse_) return;
     int count = 0;
     SDL_JoystickID* ids = SDL_GetJoysticks(&count);
+    joysticksSeen_.clear();
     if (!ids) return;
     for (int i = 0; i < count && !spaceMouse_; ++i) {
         // UI tests take only their own virtual SpaceMouse, not one plugged into the machine running them.
         if (!options_.uiTest.empty() && !SDL_IsJoystickVirtual(ids[i])) continue;
         const char* name = SDL_GetJoystickNameForID(ids[i]);
-        if (!isSpaceMouseDevice(SDL_GetJoystickVendorForID(ids[i]), SDL_GetJoystickProductForID(ids[i]), name ? name : ""))
+        const uint16_t vendor = SDL_GetJoystickVendorForID(ids[i]), product = SDL_GetJoystickProductForID(ids[i]);
+        char seen[256];
+        std::snprintf(seen, sizeof seen, "%s (%04x:%04x)", name && *name ? name : "?", vendor, product);
+        auto skip = [&](const char* why) {
+            joysticksSeen_.push_back(std::string(seen) + ": " + why);
+            SDL_Log("SpaceMouse: skipped %s", joysticksSeen_.back().c_str());
+        };
+        if (!isSpaceMouseDevice(vendor, product, name ? name : "")) {
+            skip("not a SpaceMouse");
             continue;
+        }
         SDL_Joystick* j = SDL_OpenJoystick(ids[i]);
         if (!j) {
-            SDL_Log("SpaceMouse: cannot open %s: %s", name ? name : "?", SDL_GetError());
+            skip((std::string("cannot open: ") + SDL_GetError()).c_str());
             continue;
         }
         if (SDL_GetNumJoystickAxes(j) < kSmAxes) { // a 3Dconnexion device without a 6-DoF cap
+            skip((std::to_string(SDL_GetNumJoystickAxes(j)) + " axes, needs 6").c_str());
             SDL_CloseJoystick(j);
             continue;
         }
+        joysticksSeen_.push_back(std::string(seen) + ": in use");
         spaceMouse_ = j;
         spaceMouseId_ = ids[i];
         spaceMouseName_ = name && *name ? name : "SpaceMouse";
         spaceMouseButtonCount_ = std::max(SDL_GetNumJoystickButtons(j), 0);
         spaceMouseAxes_ = {};
+        spaceMouseReported_ = false;
         SDL_Log("SpaceMouse: %s (%04x:%04x, %d buttons)", spaceMouseName_.c_str(), SDL_GetJoystickVendor(j),
                 SDL_GetJoystickProduct(j), spaceMouseButtonCount_);
     }
@@ -138,6 +151,7 @@ void App::updateSpaceMouse(float dt) {
     if (!spaceMouse_) return;
     for (int i = 0; i < kSmAxes; ++i)
         spaceMouseAxes_[size_t(i)] = std::clamp(float(SDL_GetJoystickAxis(spaceMouse_, i)) / 32767.0f, -1.0f, 1.0f);
+    for (float v : spaceMouseAxes_) spaceMouseReported_ = spaceMouseReported_ || v != 0.0f;
     const SpaceMouseSettings& s = uiPrefs_.spaceMouse;
     const SpaceMouseMotion m = spaceMouseMotion(spaceMouseAxes_, dt, s);
     if (!m.any()) return;
@@ -190,6 +204,36 @@ void App::drawSpaceMouseSection() {
 #endif
         ImGui::PopTextWrapPos();
         ImGui::PopStyleColor();
+    }
+    // What SDL sees, so a report says why a device wasn't taken (#104); Copy puts it on the clipboard for an issue.
+    if (!spaceMouse_ || !spaceMouseReported_) {
+        ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::textDim));
+        ImGui::PushTextWrapPos(0.0f);
+        if (spaceMouse_)
+            ImGui::TextUnformatted(tr("Push the cap: if the bars below stay still, another program (3DxWare, spacenavd) "
+                                   "holds the SpaceMouse. See the Navigation page of the guide."));
+        if (joysticksSeen_.empty() && !spaceMouse_) ImGui::TextUnformatted(tr("No joysticks or game controllers seen."));
+        for (const std::string& d : joysticksSeen_) { // (wrapped: a name and its ids can be long)
+            ImGui::Bullet();
+            ImGui::TextUnformatted(d.c_str());
+        }
+        ImGui::PopTextWrapPos();
+        ImGui::PopStyleColor();
+        if (ImGui::SmallButton(ICON_LC_COPY "  Copy device report##spacemouse.report")) {
+            std::string r = std::string("SculptForge ") + SCULPTFORGE_VERSION + ", " + SDL_GetPlatform() + ", SDL " +
+                            std::to_string(SDL_MAJOR_VERSION) + "." + std::to_string(SDL_MINOR_VERSION) + "." +
+                            std::to_string(SDL_MICRO_VERSION) + "\nSpaceMouse: " +
+                            (spaceMouse_ ? spaceMouseName_ + (spaceMouseReported_ ? " (moving)" : " (no motion yet)")
+                                         : std::string("none")) +
+                            "\nJoysticks seen:";
+            for (const std::string& d : joysticksSeen_) r += "\n- " + d;
+            if (joysticksSeen_.empty()) r += " none";
+            SDL_SetClipboardText(r.c_str());
+        }
+        ui::HelpText("Copy device report", nullptr,
+                     "Copies what SculptForge sees (each joystick's name, USB ids and why it was or wasn't used) to "
+                     "paste into a bug report.",
+                     path);
     }
     ui::HelpText("SpaceMouse", nullptr,
                  "Experimental. A 3Dconnexion SpaceMouse moves the view with one hand while the other holds the pen: "
