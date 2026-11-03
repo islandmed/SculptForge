@@ -58,7 +58,7 @@ are there. Every step can be undone with <kbd>Ctrl</kbd>+<kbd>Z</kbd>, so experi
 
 > **Tip:** colour sticks to the surface, so it follows the shape when you sculpt it next.
 
-> **ZBrush-style layout:** the colour controls are in the **Color** palette on the palette bar; **Masking** is in
+> **ZBrush-style layout:** the colour controls are in the **Paint** menu on the palette bar; **Masking** is in
 > the **Tool** palette.
 
 ## 4. Pull out the cap
@@ -175,7 +175,7 @@ are there. Every step can be undone with <kbd>Ctrl</kbd>+<kbd>Z</kbd>, so experi
 
 ![Render > Materials with PBR shading and Save Render](images/first-sculpt/12-material.jpg)
 
-> **ZBrush-style layout:** **PBR** and **Save Render** are in the **Material** palette.
+> **ZBrush-style layout:** **PBR** and **Save Render** are in **Render > Materials**.
 
 Well done: that's a sculpt, painted and rendered.
 

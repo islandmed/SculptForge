@@ -14,7 +14,8 @@ hiding, reordering, merging and splitting Parts, and how they travel through fil
   Part, and switching Parts doesn't lose the history of the others.
 - Adding, deleting, reordering, merging and splitting Parts are **not undoable**, as in ZBrush. Merges and
   deletes ask for confirmation first.
-- The title strip shows the active Part and its place in the list, for example `Part Helmet (2/5)`.
+- The Parts list highlights the active Part. In the ZBrush-style layout the title strip also shows it and its place
+  in the list, for example `Part Helmet (2/5)`.
 
 > **ZBrush:** Parts work the way you expect: one active Part, the rest dimmed, Alt+click in the viewport to
 > switch. There is no folder grouping of Parts yet.

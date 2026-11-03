@@ -51,7 +51,7 @@ for what is planned.
 | Polypaint layers | **Tool > Paint Layers**: Photoshop-style colour layers with blend modes. See [Paint layers](vertex-paint.md#paint-layers) |
 | Project All (ProjectAll) | **Tool > Parts > Project > Project All** (`project_all`), with Dist, Mean and PA Blur; respects the mask. See [Quad retopology](retopology.md#project-all) |
 | Projection Master | Not yet. **Mesh > Generate 3D > Stamp** projects an image onto the model from the view |
-| QuickSave | **File > Save Snapshot** (title strip **Snapshot**, <kbd>9</kbd> in the ZBrush-style keys); the last 10 are kept in the Library **Snapshots** tab. See [Projects](projects.md#snapshots) |
+| QuickSave | **File > Save Snapshot** (<kbd>9</kbd> in the ZBrush-style keys); the last 10 are kept in the Library **Snapshots** tab. See [Projects](projects.md#snapshots) |
 | Rgb | **Rgb** on the top shelf (paint while sculpting) |
 | Rgb Intensity, Z Intensity, Focal Shift | Same keys: **RGB Intensity** (<kbd>I</kbd>), **Intensity** (<kbd>U</kbd>), **Falloff** (<kbd>O</kbd>) in **Sculpt > Draw & Tablet** and the Quick Menu |
 | Sculptris Pro, dynamic topology | **Dynamic** on the top shelf, with **Detail** (`dyntopo`). See [Dynamic topology](dynamic-topology.md) |

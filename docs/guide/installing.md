@@ -1,4 +1,4 @@
-# Installing SculptForge
+# Install SculptForge on Windows, macOS and Linux
 
 This chapter covers what SculptForge needs, which package to download for your system, what to expect the
 first time you open it, and how to build it from source.
@@ -98,6 +98,56 @@ set up. Only the runtime comes from Flathub: SculptForge itself is not published
 To build the Flatpak yourself from the source, install `flatpak` and `flatpak-builder` and run
 `packaging/flatpak/build.sh`; it writes `SculptForge-<version>-<arch>.flatpak`.
 
+## Windows
+
+Windows is where most SculptForge artists work. The notes below cover the first start, pen tablets and screen
+scaling.
+
+### SmartScreen
+
+The builds are not code-signed yet, so the first start may show "Windows protected your PC".
+
+1. Click **More info**.
+2. Click **Run anyway**.
+
+To confirm the file is the one we published, compare it with `SHA256SUMS.txt` on the release page.
+
+### Pen tablets: Windows Ink and Wintab
+
+SculptForge reads the pen through **Windows Ink**, the pen input built into Windows 10 and 11. When Windows Ink is
+off in the tablet driver, it takes the pressure from the driver's **Wintab** instead. Either way works; Windows Ink
+also gives the eraser end and tilt.
+
+- **Wacom**: Wacom Tablet Properties > **Mapping** > **Use Windows Ink**. You can set it for SculptForge only by
+  adding it as an application in Wacom Tablet Properties.
+- **Huion, XP-Pen, Gaomon, Ugee**: **Windows Ink** (sometimes "Windows Ink mode") in the driver's settings.
+- **Pen displays and Surface-type pens** use Windows Ink already.
+
+Check it in **Edit > Preferences > Tablet**: it shows "Pressure: on" once the pen has pressed, or "Pressure: not
+detected". A tablet plugged in while SculptForge runs works straight away. If pressure is missing, switch the
+driver's Windows Ink option and bring the pen back to the tablet.
+
+**Mouse mode.** Most drivers map the pen to the screen (pen mode): where the pen touches is where the cursor goes.
+If you set the driver to **Mouse** (relative) mode, the pen moves the cursor by how far it moves, like a mouse.
+Turn on **Edit > Preferences > Tablet > Mouse mode (relative)** to match it, or the cursor jumps when you put the
+pen down.
+
+Pen side buttons work as the driver sets them; a button set to **Right click** opens the
+[Quick Menu](sculpting.md#the-quick-menu). More in [Troubleshooting: pen tablets](troubleshooting.md#pen-tablets).
+
+### Screen scaling (DPI)
+
+SculptForge follows the **Scale** in Windows' **Settings > System > Display**, so text and buttons have the
+same size as in other apps at 125%, 150% or 200%. To make the interface larger or smaller than that, choose a
+size in **Edit > Preferences > Interface > UI scale** (**Automatic** follows Windows).
+
+### Where files go
+
+- Settings, brushes and the log: `%APPDATA%\SculptForge\SculptForge` (**Help > Open log folder** opens it).
+- Your library (projects, snapshots, alphas, Lit Spheres): `Documents\SculptForge`.
+
+See [Where settings live](troubleshooting.md#where-settings-live) for every file.
+
 ## Opening SculptForge for the first time
 
 The builds are not code-signed yet, so your operating system may warn you the first time.
@@ -115,10 +165,7 @@ Privacy & Security** and click **Open Anyway** next to the message about SculptF
 
 ### Windows: SmartScreen
 
-Windows may show "Windows protected your PC".
-
-1. Click **More info**.
-2. Click **Run anyway**.
+Windows may show "Windows protected your PC". See [Windows](#windows) below.
 
 ### Linux
 

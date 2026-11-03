@@ -65,7 +65,7 @@ The console buttons (also in **File > Script**):
 
 ## The command palette
 
-Press <kbd>F3</kbd> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>, or click **Search** in the title strip)
+Press <kbd>F3</kbd> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>, or click **Search** at the top right of the window)
 to search every command, brush and setting by name. <kbd>Enter</kbd> runs the highlighted entry;
 <kbd>Shift</kbd>+<kbd>Enter</kbd> opens it in the console so you can add parameters first. Commands that need
 parameters always open in the console. With an empty search, the palette lists what you used recently. See

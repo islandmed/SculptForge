@@ -88,7 +88,7 @@ like built-in ones. Their thumbnails carry a small sparkle when you put them on 
 
 You can choose a brush in several places:
 
-- **Bottom shelf**: click a tile. The active brush has an orange outline and the number key is shown in the
+- **Bottom shelf**: click a tile. The active brush is outlined in the accent colour and the number key is shown in the
   corner of each tile.
 - **Number keys**: <kbd>1</kbd> to <kbd>9</kbd> and <kbd>0</kbd> pick the first ten built-in brushes (see the
   table above); <kbd>P</kbd> toggles the Paint brush.
@@ -107,7 +107,7 @@ the `Brushes` folder of your Library library that aren't loaded yet; picking one
 The picker works the ZBrush way, by typing letters:
 
 1. Press <kbd>B</kbd>.
-2. Type the first letter of the brush. Only brushes starting with that letter stay, and each shows an orange
+2. Type the first letter of the brush. Only brushes starting with that letter stay, and each shows a highlighted
    key badge: the next letter that tells it apart from the others.
 3. Press the letter on the badge to pick that brush. For example <kbd>B</kbd>, <kbd>S</kbd>, <kbd>T</kbd>
    picks Standard, and with the brushes that ship, <kbd>B</kbd>, <kbd>C</kbd>, <kbd>L</kbd>
@@ -383,7 +383,7 @@ From a script: `brush_set_alpha name=square`, or `brush_set_alpha path=bark.png 
 
 ### Alpha options
 
-Under the preview in the **Alpha** palette:
+Under the preview in **Sculpt > Alpha**:
 
 | Option | What it does |
 |---|---|

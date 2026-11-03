@@ -1,8 +1,21 @@
-# Troubleshooting and FAQ
+# Troubleshooting: tablets, display, crashes and FAQ
 
 This chapter collects fixes for common problems: start-up and graphics errors, tablets, AI service messages,
 ComfyUI errors, the camera notch, first-launch warnings on macOS and Windows, where SculptForge keeps its
 settings, how to reset the interface, and how to report a bug.
+
+Quick answers:
+
+| Problem | Fix |
+|---|---|
+| No pen pressure on Windows | Switch **Windows Ink** in the tablet driver and bring the pen back ([Pen tablets](#pen-tablets)) |
+| The cursor jumps when the pen touches down | **Edit > Preferences > Tablet > Mouse mode (relative)** |
+| "Windows protected your PC" | **More info**, then **Run anyway** ([First launch warnings](#first-launch-warnings-on-macos-and-windows)) |
+| Text and buttons too small or too large | **Edit > Preferences > Interface > UI scale** ([details](#text-and-buttons-are-too-small-or-too-large)) |
+| Menus or shelves look wrong after an update | **Edit > Preferences > Config > Restore Standard UI** ([Reset the interface](#reset-the-interface)) |
+| Sculpting feels slow | [The viewport is slow](#the-viewport-is-slow) |
+| Lost work after a crash | [Recovering work after a crash](#recovering-work-after-a-crash) |
+| Want the ZBrush layout back | **Edit > Preferences > Interface > Look > Layout > ZBrush-style** |
 
 ## SculptForge doesn't start
 
@@ -40,7 +53,7 @@ documentation** opens links to it).
 
 ## The viewport is slow
 
-- Check the triangle count in the title strip (**Tris**). Millions of triangles on a laptop GPU are heavy;
+- Check the triangle count in the bar along the top of the window (**Tris**). Millions of triangles on a laptop GPU are heavy;
   **Tool > Geometry > Decimate** or a lower **Voxel Remesh** resolution brings it down. See
   [Subdivide, Remesh, Decimate and LODs](geometry.md).
 - Turn off **Wireframe** (<kbd>Shift</kbd>+<kbd>F</kbd>) on dense meshes.
@@ -76,7 +89,7 @@ If no pen is detected or pressure doesn't change:
 - Install or update the tablet maker's driver.
 - **Windows:** SculptForge reads pressure through Windows Ink, and through the driver's Wintab when Windows Ink is
   off (Wacom Tablet Properties > Mapping > **Use Windows Ink**). If pressure is still missing, switch that option
-  and bring the pen back to the tablet.
+  and bring the pen back to the tablet. See [Pen tablets on Windows](installing.md#pen-tablets-windows-ink-and-wintab).
 - **Linux:** check that the system sees the pen as a tablet (for example in your desktop's tablet settings).
 - If the cursor moves but strokes have no pressure, test in another application to see whether the driver
   reports pressure at all.

@@ -223,7 +223,7 @@ run instantly. The same tools are in **Mesh > Generate 3D** as **Relief**, **Inf
 
 Generated meshes are a starting point. A typical next pass:
 
-1. Check the size of the remeshed result in the title strip (Verts, Tris). If the detail is too soft, divide once more
+1. Check the size of the remeshed result in the bar along the top (the triangle count). If the detail is too soft, divide once more
    (<kbd>Ctrl</kbd>+<kbd>D</kbd>), or generate again with a higher **Resolution**. **Tool > Remesh** has Quad Remesh
    (first) and Voxel Remesh for another pass.
 2. Turn on **X** symmetry if the subject is symmetrical, and sculpt the forms with Clay Block, Move and Sharp Crease ([Sculpting and brushes](sculpting.md)).

@@ -1,14 +1,24 @@
 # SculptForge User Guide
 
-This guide explains every part of SculptForge, the free, open-source sculpting app for VFX, animation and games:
-how the interface is organised, how to sculpt, mask, paint (on vertices or textures) and manage Parts, how to generate models with AI,
-and how to get your work into a game engine, a film pipeline, Blender or ZBrush. It is written for SculptForge
-0.4.
+SculptForge is a free, open-source sculpting app for VFX, animation and games. This guide covers everything in
+it: the interface, sculpting, masking, painting, Parts, AI generation, and getting your work into a game engine,
+a film pipeline, Blender or ZBrush. It is written for SculptForge 0.10.
 
-You can read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<kbd>F1</kbd>) or on the
-[SculptForge website](https://sculptforge.app/guide/). New to sculpting? Make
-[your first sculpt in 10 minutes](first-sculpt.md). If you're coming from ZBrush, start with
-[Coming from ZBrush](coming-from-zbrush.md) and keep the [Glossary](glossary.md) at hand: it has SculptForge's names for ZBrush terms and the ZBrush-style keys.
+Read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<kbd>F1</kbd>) or on the
+[SculptForge website](https://sculptforge.app/guide/).
+
+## Start here
+
+| You want to | Read |
+|---|---|
+| Install it | [Install SculptForge](installing.md): downloads for Windows, macOS and Linux |
+| Set it up on Windows | [The Windows notes](installing.md#windows): SmartScreen, pen tablets (Windows Ink, Mouse mode), screen scaling |
+| Make your first sculpt | [Your first sculpt in 10 minutes](first-sculpt.md): a mushroom house from the default sphere |
+| Find your way around | [The interface](interface.md): the menus **File, Edit, Sculpt, Paint, Mesh, View, Render, Help**, the shelves and the Tool panel; [Navigating the view](navigation.md) |
+| Learn the brushes | [Sculpting and brushes](sculpting.md) |
+| Switch from ZBrush | [Coming from ZBrush](coming-from-zbrush.md) (the ZBrush-style layout and keys) and the [Glossary](glossary.md) |
+| Switch from Blender | [Blender keys](shortcuts.md#blender-keys), and [Working with Blender](blender.md) for the bridge add-on |
+| Fix a problem | [Troubleshooting](troubleshooting.md) |
 
 ![The SculptForge window with its main regions labelled](images/interface-overview.jpg)
 
@@ -18,7 +28,7 @@ You can read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<
 2. [Your first sculpt in 10 minutes](first-sculpt.md)
 3. [What's new](whats-new.md)
 4. [Coming from ZBrush](coming-from-zbrush.md)
-5. [Installing SculptForge](installing.md)
+5. [Install SculptForge on Windows, macOS and Linux](installing.md)
 6. [The interface](interface.md)
 7. [Navigating the view](navigation.md)
 
@@ -70,7 +80,7 @@ You can read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<
 
 42. [Keyboard and mouse](shortcuts.md)
 43. [Performance and big meshes](performance.md)
-44. [Troubleshooting and FAQ](troubleshooting.md)
+44. [Troubleshooting: tablets, display, crashes and FAQ](troubleshooting.md)
 45. [Glossary](glossary.md)
 
 ## Getting help

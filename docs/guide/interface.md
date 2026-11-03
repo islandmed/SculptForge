@@ -1,11 +1,11 @@
 # The interface
 
-SculptForge's window has a canvas in the middle, shelves of the most-used controls around it, palettes that
-hold every function, and trays at the sides where palettes can stay open. It comes in two layouts: the
-**SculptForge layout** (the default since 0.10.7), with menus by task, and the **ZBrush-style layout**, with a bar
-of alphabetical palettes. Both hold the same palettes; see [Looks and layouts](#looks-and-layouts) to switch. This
+SculptForge's window has the 3D view (the canvas) in the middle, shelves of the most-used controls around it,
+menus along the top that hold every function, and trays at the sides where panels can stay open. It comes in two
+layouts: the **SculptForge layout** (the default), with menus by task, and the **ZBrush-style layout**, with a bar
+of alphabetical palettes. Both hold the same controls; see [Looks and layouts](#looks-and-layouts) to switch. This
 chapter walks through each region, the pop-up pickers, the Library, the built-in help, and how to rearrange the
-interface and keep your changes. The pictures show the ZBrush-style layout.
+interface and keep your changes. The pictures show the default look and layout.
 
 ![The SculptForge window with its main regions labelled](images/interface-overview.jpg)
 
@@ -13,17 +13,20 @@ interface and keep your changes. The pictures show the ZBrush-style layout.
 
 | Region | Where | What it holds |
 |---|---|---|
-| Title strip | Top edge | Document name, scene statistics, status messages, Snapshot, layout presets, Menus, Search |
-| Palette bar | Under the title strip | The 16 palettes, which hold every function |
-| Top shelf | Above the canvas | Library, Sculpt/Paint, Add/Sub, Rgb, Draw Size, Intensity, symmetry, pressure |
-| Left shelf | Left of the canvas | Brush, Stroke, Alpha and Material tiles, the colour picker |
-| Canvas | Centre | The 3D view; strokes and navigation start only here |
+| Menu bar | Top edge | The menus **File, Edit, Sculpt, Paint, Mesh, View, Render, Help**; the status message; mode, brush, file name, triangles and frame rate; layout presets **1 2 3**; **Search** |
+| Top shelf | Under the menu bar | Sculpt/Paint, Draw/Move/Scale/Rotate, Add/Sub, Rgb, Draw Size, Intensity, Dynamic, symmetry |
+| Left shelf | Left of the canvas | Brush, Stroke, Alpha and Material tiles, the colour picker, Fill |
+| Canvas | Centre | The 3D view, with the Sculpt Timeline along its top; strokes and navigation start only here |
 | Right shelf | Right of the canvas | Undo and Redo, Frame, Move, Zoom and Rotate, display toggles, Solo |
+| Right tray | Far right | The **Tool** panel: the active Part, Parts, Layers, Geometry, Masking and more |
 | Bottom shelf | Below the canvas | Your quick brushes |
-| Trays | Far left and far right | Palettes you keep open; the right tray holds the Tool palette by default |
 
 Press <kbd>Tab</kbd> to hide the shelves and trays for a bigger canvas, and again to bring them back. The
-palette bar stays, so every function is still one click away.
+menu bar stays, so every function is still one click away.
+
+The **ZBrush-style layout** has a title strip and a bar of 16 alphabetical palettes instead of the menu bar, and
+a two-row top shelf; the rest is the same. See [The title strip](#the-title-strip-zbrush-style-layout) and
+[Palettes](#menus-and-palettes).
 
 ## Looks and layouts
 
@@ -40,7 +43,8 @@ models, brushes or shortcuts.
   the Tool palette, and Generate 3D), **View** (Display), **Render** (Materials, Gaussian Splats) and **Help**. Pin
   a section to a tray as you would a palette. Brush Lab, Front and the pressure options are under **Sculpt**, the
   Library and the console under **View > Display**, and <kbd>F3</kbd> finds everything.
-- **ZBrush-style**: the alphabetical palette bar and the two-row top shelf described in the rest of this chapter.
+- **ZBrush-style**: the alphabetical palette bar under a title strip, and a two-row top shelf (see [The title
+  strip](#the-title-strip-zbrush-style-layout) and [Top shelf](#top-shelf)).
   Coming from ZBrush? The welcome shown at the first start has **Coming from ZBrush? Use the ZBrush-style layout**,
   one click.
 
@@ -68,9 +72,26 @@ changes nothing. Either way, Edit > Preferences > Interface > Look changes it la
 
 In scripts: `ui_look look=forge scheme=tokyo_night layout=sculptforge` (or `look=classic layout=zbrush`).
 
-## The title strip
+## The menu bar
 
 From left to right:
+
+- **SculptForge** and the task menus **File, Edit, Sculpt, Paint, Mesh, View, Render, Help**. Click a menu to
+  open it: its sections are listed down the left (for example **Sculpt** has Brush, Draw & Tablet, Stroke,
+  Alpha and Symmetry & Gizmo) and the chosen one opens beside them. See [Menus and palettes](#menus-and-palettes).
+- **The status message**: the result of the last command or action. Errors show in red for a few seconds.
+- **Mode** (SCULPT, PAINT, MOVE...), the active **brush**, the **file name** (`*` after it means unsaved
+  changes), the **triangle** count of the scene and the **frame rate**. On a narrow window the least important
+  of these are left out.
+- **1**, **2**, **3**: the layout presets (see [Layout presets](#layout-presets)).
+- **Search** (<kbd>F3</kbd>): opens the [command palette](#the-command-palette).
+- **Minimize** and **Close** at the far right. Close asks to save changes first, as
+  <kbd>Ctrl</kbd>+<kbd>Q</kbd> does.
+
+## The title strip (ZBrush-style layout)
+
+In the ZBrush-style layout the top edge is a title strip instead, with the palette bar under it. From left to
+right:
 
 - **SculptForge** and the **document name** ("Untitled" until you save). A `*` after the name means there are
   unsaved changes; click the name to save (<kbd>Ctrl</kbd>+<kbd>S</kbd>).
@@ -87,35 +108,44 @@ From left to right:
 - **Minimize** and **Close** at the far right. Close asks to save changes first, as
   <kbd>Ctrl</kbd>+<kbd>Q</kbd> does.
 
-## Palettes
+## Menus and palettes
 
-Every function in SculptForge lives in one of 16 palettes. Click a palette's name in the palette bar and it
-drops down under the name. Click another name to switch, or press <kbd>Esc</kbd> or click outside to close it.
+Every function in SculptForge lives in one of 16 palettes. In the SculptForge layout each palette is a section
+of one task menu (the table below); in the ZBrush-style layout the palettes sit side by side in the palette bar.
+Either way, click the name and the palette drops down under it. Click another name to switch, or press
+<kbd>Esc</kbd> or click outside to close it.
 
-![**Sculpt > Stroke** open as a drop-down from the palette bar](images/palette-dropdown.jpg)
+![The Sculpt menu open on its Stroke section](images/palette-dropdown.jpg)
 
-The palette bar lists **File** and **Edit** first and **Help** last, where other desktop applications put
-them, and the rest in alphabetical order. If you prefer ZBrush's strict A to Z order, turn on **Preferences >
-Interface > Palettes strictly A-Z (ZBrush order)**.
+Menu paths in this guide name what you click in the SculptForge layout: **Edit > Preferences > Input** is the
+**Edit** menu, its **Preferences** section, then the **Input** sub-palette. **File** and **Edit** have a section
+of the same name, which paths leave out (**File > Save**). Paths starting with **Tool** are in the Tool panel in
+the right tray, in both layouts (it is also **Mesh > Parts & Geometry**). In the ZBrush-style layout, drop the
+menu: **Edit > Preferences > Input** is **Input** in the palette named **Preferences**, and **Sculpt > Stroke**
+is the palette named **Stroke**.
 
-| Palette | What's in it |
-|---|---|
-| **File** | New Sphere, New Plane, Open, Open Recent, Save, Save As, autosave interval, Import and every export (OBJ, GLB, LOD chain, USD/USDZ, FBX for Unreal, Send to Unreal, splats), Send to ZBrush, Quit |
-| **Edit** | Undo and Redo (with the name of the step), Paste brush |
-| **Alpha** | The brush alphas: Round, Square, Noise and twelve patterns (Pores, Cracks, Scales...), images from your library, Load image, Invert loaded image |
-| **Brush** | AI Brush (Brush Lab), Community brushes, Paste brush, your custom brushes, Front faces only, Invert (Alt), the recipe editor for a custom brush, and every brush as a thumbnail grid with a filter |
-| **Color** | The Paint brush, RGB while sculpting, the paint colour and swatches, Fill, Fill masked, Cavity, Clear, Show vertex paint |
-| **Draw** | Draw Size, Intensity, RGB Intensity, Falloff, Sculpt/Paint, Add/Sub, Rgb, Front, and the tablet options (Pressure > strength, Pressure > size) with a pen readout |
-| **Generate** | Generate 3D (image or text to 3D), Relief, Inflate and Stamp from an image, and the AI brush provider settings |
-| **Material** | The Lit Sphere materials (Soft Clay, the default, first), your own (**Load Lit Sphere...**) and Studio, Base colour, Smooth / Flat shading for the scene and the active Part |
-| **Preferences** | Config, Interface, Input, Hotkeys, Display, Library, Tablet, Performance, Updates and Autosave sub-palettes (see [Customizing the interface](#customizing-the-interface)) |
-| **Render** | Wireframe, Show Mesh, Show Vertex Paint, Show Mask, Show Face Groups, Show Splats, Background, Frame, Fullscreen |
-| **Script** | Console, Run script file, Copy session as script, Clear console |
-| **Splats** | Gaussian splat tools: show, flip, turn, fit, clean floaters, Make sculptable, sculpt to splats, save, clear |
-| **Stroke** | The stroke types (Dots, Drag Stamp, Spray, Lazy Stroke) and their settings |
-| **Tool** | The active Part with Open, Save and Import, and the Part, Layers, Paint Layers, Geometry, Remesh, Deformation, Masking, Face Groups, Visibility, Export and Display sub-palettes |
-| **Transform** | Draw, Move, Scale and Rotate (the [Gizmo](gizmo.md) with its pivot, axes, options and numeric entry), Symmetry X, Y and Z, Frame, Solo, Wire |
-| **Help** | Controls, User Guide, What's New, Command palette, Website & documentation, Report a problem, Support SculptForge..., About SculptForge |
+In the ZBrush-style layout, the palette bar lists **File** and **Edit** first and **Help** last, where other
+desktop applications put them, and the rest in alphabetical order. If you prefer ZBrush's strict A to Z order,
+turn on **Edit > Preferences > Interface > Palettes strictly A-Z (ZBrush order)**.
+
+| Palette | In the SculptForge layout | What's in it |
+|---|---|---|
+| **File** | File | New Sphere, New Plane, Open, Open Recent, Save, Save As, autosave interval, Import and every export (OBJ, GLB, LOD chain, USD/USDZ, FBX for Unreal, Send to Unreal, splats), Send to ZBrush, Quit |
+| **Edit** | Edit | Undo and Redo (with the name of the step), Paste brush |
+| **Alpha** | Sculpt > Alpha | The brush alphas: Round, Square, Noise and twelve patterns (Pores, Cracks, Scales...), images from your library, Load image, Invert loaded image |
+| **Brush** | Sculpt > Brush | AI Brush (Brush Lab), Community brushes, Paste brush, your custom brushes, Front faces only, Invert (Alt), the recipe editor for a custom brush, and every brush as a thumbnail grid with a filter |
+| **Color** | Paint | The Paint brush, RGB while sculpting, the paint colour and swatches, Fill, Fill masked, Cavity, Clear, Show vertex paint |
+| **Draw** | Sculpt > Draw & Tablet | Draw Size, Intensity, RGB Intensity, Falloff, Sculpt/Paint, Add/Sub, Rgb, Front, and the tablet options (Pressure > strength, Pressure > size) with a pen readout |
+| **Generate** | Mesh > Generate 3D | Generate 3D (image or text to 3D), Relief, Inflate and Stamp from an image, and the AI brush provider settings |
+| **Material** | Render > Materials | The Lit Sphere materials (Soft Clay, the default, first), your own (**Load Lit Sphere...**) and Studio, Base colour, Smooth / Flat shading for the scene and the active Part |
+| **Preferences** | Edit > Preferences | Config, Interface, Input, Hotkeys, Display, Library, Tablet, Performance, Updates and Autosave sub-palettes (see [Customizing the interface](#customizing-the-interface)) |
+| **Render** | View | Wireframe, Show Mesh, Show Vertex Paint, Show Mask, Show Face Groups, Show Splats, Background, Frame, Fullscreen |
+| **Script** | File > Script | Console, Run script file, Copy session as script, Clear console |
+| **Splats** | Render > Gaussian Splats | Gaussian splat tools: show, flip, turn, fit, clean floaters, Make sculptable, sculpt to splats, save, clear |
+| **Stroke** | Sculpt > Stroke | The stroke types (Dots, Drag Stamp, Spray, Lazy Stroke) and their settings |
+| **Tool** | Mesh > Parts & Geometry, and the right tray | The active Part with Open, Save and Import, and the Part, Layers, Paint Layers, Geometry, Remesh, Deformation, Masking, Face Groups, Visibility, Export and Display sub-palettes |
+| **Transform** | Sculpt > Symmetry & Gizmo | Draw, Move, Scale and Rotate (the [Gizmo](gizmo.md) with its pivot, axes, options and numeric entry), Symmetry X, Y and Z, Frame, Solo, Wire |
+| **Help** | Help | Controls, User Guide, What's New, Command palette, Website & documentation, Report a problem, Support SculptForge..., About SculptForge |
 
 ### Sub-palettes
 
@@ -132,12 +162,13 @@ others, or turn off **Edit > Preferences > Interface > One sub-palette open**.
 The trays are columns at the far left and far right of the window where palettes stay open while you work. The
 right tray is open by default and holds the **Tool** palette; the left tray starts closed and empty.
 
-- **Put a palette in a tray**: open it from the palette bar and click the tray icon at the left of its header.
+- **Put a palette in a tray**: open it from its menu (or the palette bar) and click the tray icon at the left of its header.
   It goes into the right tray; **Shift**+click the icon to put it in the left tray. You can also drag the icon
   onto a tray.
-- **Take it out again**: click the tray icon in its header inside the tray. The palette returns to the bar.
+- **Take it out again**: click the tray icon in its header inside the tray. The palette returns to its menu.
 - **Collapse it in place**: click its title (or the arrow at the right of the header).
-- **Find it**: a palette that is in a tray shows its name in orange in the palette bar. Clicking the name
+- **Find it**: a palette that is in a tray shows a tray icon beside its name in its menu (in the palette bar of
+  the ZBrush-style layout, its name in the accent colour). Clicking the name
   scrolls the tray to the palette and flashes its header.
 - **Open or close a tray**: click its divider, the thin strip with a grip between the tray and the shelves.
   **Drag** the divider to make the tray wider or narrower (240 to 480 pixels).
@@ -161,25 +192,22 @@ interface](#customizing-the-interface) to add items.
 
 ### Top shelf
 
-First row:
-
-- **Library** (<kbd>,</kbd>): shows or hides the [Library](#the-library).
 - **Sculpt** / **Paint** (<kbd>P</kbd>): brushes change the shape, or paint colour without sculpting.
+- **Draw**, **Move**, **Scale**, **Rotate** (<kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd>): sculpt, or
+  move, scale and rotate the Part with the [Gizmo](gizmo.md).
 - **Add** / **Sub**: brushes add to or subtract from the surface. Holding <kbd>Alt</kbd> flips it for one
   stroke.
 - **Rgb**: sculpt brushes paint the colour at the same time.
 - **Draw Size**: the brush radius in screen pixels (2 to 800).
 - **Intensity**: how strongly each dab changes the surface (1 to 100). While <kbd>Shift</kbd> is held it shows
   Smooth's own value.
+- **Dynamic**: [dynamic topology](dynamic-topology.md), with its **Detail** slider while it is on.
+- **X**, **Y**, **Z**: symmetry across each axis (<kbd>X</kbd> toggles X); **R** is radial symmetry.
 
-Second row:
-
-- **AI Brush**: opens Brush Lab (see [Brush Lab and sharing brushes](brush-lab.md)).
-- **Front**: front faces only, so brushes leave the far side of thin parts alone.
-- **X**, **Y**, **Z**: symmetry across each axis (<kbd>X</kbd> toggles X).
-- **Pressure > Strength** and **Pressure > Size**: what pen pressure controls.
-- **ActiveTris / TotalTris** at the right: the triangles you can see and sculpt (visible Parts, hidden
-  parts left out) and the total in the scene.
+The ZBrush-style layout's top shelf has two rows: **Library** (<kbd>,</kbd>), Sculpt/Paint, Add/Sub, Rgb, Draw
+Size and Intensity on the first; **AI Brush**, **Front**, symmetry, **Pressure > Strength** and **Pressure >
+Size**, and the **ActiveTris / TotalTris** count on the second. In the SculptForge layout these are in the
+**Sculpt** menu (AI Brush, Front, pressure) and **View** menu (Library).
 
 Draw Size and Intensity are sliders with the label inside, as in ZBrush: drag along them, or
 <kbd>Ctrl</kbd>+click to type a value.
@@ -211,14 +239,14 @@ unmasked area with the main colour.
 - **Solo**: shows only the active Part (available with two or more Parts).
 - **Splats**: shows or hides a Gaussian splat capture (only shown while one is loaded).
 
-Options that are on are a lighter grey with a thin orange line; orange fill marks only the current tool or mode. See [Navigating the view](navigation.md) for the camera.
+Options that are on are highlighted; a filled button in the accent colour marks only the current tool or mode. See [Navigating the view](navigation.md) for the camera.
 
 ### Bottom shelf
 
 A row of quick brushes: Standard, Clay, Clay Block, Sharp Crease, Move, Smooth, Inflate, Pinch, Flatten,
 Crease, Trim, Tendril, Layer, Nudge and Paint. The small digit in a tile's corner is its shortcut
 (<kbd>1</kbd> to <kbd>9</kbd> and <kbd>0</kbd> select the first ten built-in brushes, <kbd>P</kbd> is Paint).
-The active brush has an orange outline.
+The active brush is outlined in the accent colour.
 
 ![The bottom shelf of quick brushes](images/bottom-shelf.jpg)
 
@@ -368,7 +396,7 @@ The guide is built into SculptForge, so it works offline and always matches your
 
 ## The command palette
 
-Press <kbd>F3</kbd> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>, or click **Search** in the title strip)
+Press <kbd>F3</kbd> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>, or click **Search** at the top right)
 to find any action or command by name and run it. It opens at the top centre of the canvas.
 
 ![The command palette searching for subdivide](images/command-palette.jpg)
@@ -454,10 +482,10 @@ tab) doesn't count as a layout change.
 
 ### Layout presets
 
-The **1**, **2** and **3** buttons in the title strip (also in **Edit > Preferences > Config**) switch between three
-layouts:
+The **1**, **2** and **3** buttons at the top right (also in **Edit > Preferences > Config**) switch between three
+arrangements of the current layout:
 
-1. **Standard**: the Tool palette in the right tray and shelves around the canvas.
+1. **Standard**: the Tool panel in the right tray and shelves around the canvas.
 2. **Sculpt**: both trays closed, for the largest canvas.
 3. **Wide**: Brush, Stroke and Alpha in the left tray, Tool and Material in the right tray.
 
@@ -478,13 +506,13 @@ Config keeps it.
 | **Tooltip delay** | 0.5 s | How long to point at an icon-only button before its name appears |
 | **One sub-palette open** | On | Opening a sub-palette closes the others in that palette |
 | **Auto collapse left tray** / **right tray** | On / Off | Collapse other palettes in the tray when one wouldn't fit |
-| **Palettes strictly A-Z (ZBrush order)** | Off | Strict alphabetical palette bar instead of File and Edit first, Help last |
+| **Palettes strictly A-Z (ZBrush order)** | Off | ZBrush-style layout: strict alphabetical palette bar instead of File and Edit first, Help last |
 | **Left-handed layout** | Off | Mirrors the shelves and trays: tools on the right, navigation on the left |
 | **UI scale** | Automatic | Size of text and controls (100% to 200%); takes effect at the next start |
 | **Camera notch** | Automatic | Keeps the interface below a laptop's camera notch in fullscreen (see below) |
 
 **Language** changes the interface at once, without a restart; Store Config keeps it for the next start. In
-**Español** the palette bar, the palettes, the shelves, the Library, the command palette and the Ctrl-help titles
+**Español** the menus, the palettes, the shelves, the Library, the command palette and the Ctrl-help titles
 are in Spanish, while the names of tools and brushes stay in English, as Spanish-speaking sculptors use them (Parts,
 Quad Remesh, Forge Spheres, Library, Lit Sphere, Clay Block, Add). The command palette finds a command by its Spanish or its
 English name. Anything not translated yet (most Ctrl-help descriptions, this guide) shows in English. Scripts and
@@ -524,11 +552,11 @@ choice for the next session, and each project keeps the background it was saved 
 
 ![**Edit > Preferences** with the Config and Interface sub-palettes](images/preferences.jpg)
 
-### Fullscreen, the palette bar and the camera notch
+### Fullscreen, hiding panels and the camera notch
 
 - <kbd>F11</kbd> (or **View > Fullscreen**) fills the screen with SculptForge; press it again to go back to
   a window. `sculptforge --fullscreen` starts that way.
-- **Menus** in the title strip hides the palette bar; click it again to bring it back.
+- In the ZBrush-style layout, **Menus** in the title strip hides the palette bar; click it again to bring it back.
 - <kbd>Tab</kbd> hides the shelves and trays.
 - On MacBooks with a camera notch, SculptForge keeps the interface below the notch when it fills the screen
   and fills the band beside the notch with the shell colour. **Automatic** asks macOS for the safe area (on

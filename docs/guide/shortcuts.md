@@ -228,7 +228,7 @@ Some keys only mean something while a pop-up or panel has the keyboard.
 | Key | Action |
 |---|---|
 | A letter | Keep the brushes whose names start with the letters typed so far |
-| The orange letter on a tile | Pick that brush (<kbd>B</kbd> <kbd>S</kbd> <kbd>T</kbd> = Standard) |
+| The highlighted letter on a tile | Pick that brush (<kbd>B</kbd> <kbd>S</kbd> <kbd>T</kbd> = Standard) |
 | <kbd>Backspace</kbd> | Take back one letter |
 | <kbd>Enter</kbd> | Pick the first match |
 | <kbd>Esc</kbd> | Close |
