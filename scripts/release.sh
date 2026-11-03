@@ -8,8 +8,8 @@
 #   scripts/release.sh X.Y.Z --from site                  resume at a step (after fixing what stopped it)
 #   scripts/release.sh X.Y.Z --only replies              one step
 #   HIGHLIGHTS=file   the update feed's 3-5 highlight lines, one per line (needed until latest.json says X.Y.Z)
-#   CARD="title|html body[|lede]"  writes the home page's "new in X.Y.Z" card and lede if missing (step "bump";
-#                     the lede defaults to the title)
+#   (the home page's What's New area is written by tools/guide/build_site.py from docs/guide/whats-new.md: the
+#   version's ```features block, its tagline and pictures; CARD is no longer used)
 #
 # Steps: bump check ci tag release site aur brew omarchy replies status
 # bump sets every version file, rebuilds the guide and pushes main; check then verifies everything the later steps
@@ -136,9 +136,11 @@ gh_file() { gh api "repos/$1/contents/$2${3:+?ref=$3}" -q .content 2>/dev/null |
 
 # --- preconditions: what the steps after the tag need, checked before anything is tagged --------------------------
 
-# The home page's "new in X.Y.Z" card in #whats-new and the "New in X.Y.Z:" start of its lede (both written by people).
+# The home page's "new in X.Y.Z" card and "New in X.Y.Z:" lede in #whats-new, written by build_site.py (step bump) from
+# the version's ```features block in whats-new.md, which needs a date and a tagline.
 card_ok() { grep -qF "<small>new in $V</small>" website/index.html && grep -qF "class=\"section-lede\">New in $V:" website/index.html; }
-card_fix="add an <article class=\"card\"> with <h3>... <small>new in $V</small></h3> at the top of the #whats-new grid and start its section-lede with 'New in $V: ...', commit; or run with CARD=\"title|html body\" and step bump writes both"
+features_ok() { awk -v v="## Version $V" '$0==v{f=1;next} f&&/^## /{exit} f' docs/guide/whats-new.md | grep -q '^tagline: .'; }
+card_fix="give '## Version $V' in docs/guide/whats-new.md a \`\`\`features block (date: unreleased, tagline: ..., highlight: ..., cards), commit, push main, run again"
 feed_done() { grep -qF "\"version\": \"$V\"" website/latest.json; }
 # HIGHLIGHTS names a file of 3-5 non-empty lines.
 highlights_ok() {
@@ -170,8 +172,8 @@ dpi_ok() {
         die "the UI scale / DPI tests fail (ctest -L dpi; log: $b/release-dpi.log)" "fix them on a branch, merge to main, run again from step check"
     ok "UI scale tests (100-200 %, display-scale event) pass; Windows manifest declares PerMonitorV2"
 }
-# Everything the steps after the tag need that doesn't depend on the release existing. In mode "bump" a missing
-# card is fine when CARD is set (bump writes it).
+# Everything the steps after the tag need that doesn't depend on the release existing. The home page card is
+# checked through the features block until bump writes it.
 preflight() {
     local mode=${1:-} t auth pr state owner branch pk
     for t in git gh curl python3 base64 awk; do command -v "$t" >/dev/null || die "$t is not installed" "install $t"; done
@@ -179,16 +181,8 @@ preflight() {
     auth=$(gh auth status 2>&1 || true)
     grep -q "account $AUTHOR_NAME" <<<"$auth" || die "gh is not logged in as $AUTHOR_NAME" "gh auth login (or gh auth switch -u $AUTHOR_NAME)"
     words_ok
-    # site
-    if ! card_ok; then
-        if [ "$mode" = bump ] && [[ "${CARD:-}" == ?*"|"?* ]]; then
-            :
-        elif [ -n "${CARD:-}" ]; then
-            die "CARD must be \"title|html body\"" "CARD=\"Short title|<strong>What</strong> users get ...\" scripts/release.sh $V --from bump"
-        else
-            die "website/index.html has no 'new in $V' card and lede in What's new" "$card_fix"
-        fi
-    fi
+    # site (bump writes the home page's card from the features block)
+    card_ok || features_ok || die "docs/guide/whats-new.md: Version $V has no \`\`\`features block with a tagline" "$card_fix"
     if ! feed_done; then
         highlights_ok || die "HIGHLIGHTS must name a file with 3-5 highlight lines for the update feed (now: '${HIGHLIGHTS:-unset}')" "$highlights_fix"
     fi
@@ -215,15 +209,14 @@ preflight() {
 
 # --- steps --------------------------------------------------------------------------------------------------------
 
-# Sets every version file to X.Y.Z (and writes the home page card from CARD), rebuilds the guide, pushes main.
+# Sets every version file to X.Y.Z, rebuilds the guide and the home page's What's New area, pushes main.
 step_bump() {
     on_main
     preflight bump
-    local card="" out
-    card_ok || card=${CARD:-}
-    out=$(python3 - "$V" "$TODAY" "$card" <<'PY'
+    local out
+    out=$(python3 - "$V" "$TODAY" <<'PY'
 import re, sys
-v, today, card = sys.argv[1:]
+v, today = sys.argv[1:]
 ev = re.escape(v)
 new = {}
 
@@ -274,34 +267,11 @@ if not re.search(rf"^## \[{ev}\]", t, re.M):
         fail(f"{p}: [Unreleased] is empty, so there is nothing to release as {v}")
     new[p] = t[:m.start()] + f"## [Unreleased]\n\n## [{v}] - {today}\n" + t[m.end():]
 
-if card:
-    title, body, *rest = [s.strip() for s in card.split("|", 2)]
-    lede = (rest[0] if rest else re.sub(r"<[^>]+>", "", title)).rstrip(".")
-    p = "website/index.html"; t = load(p)
-    s = t.find('<section id="whats-new"')
-    if s < 0:
-        fail(f"{p} has no <section id=\"whats-new\">")
-    if f"<small>new in {v}</small>" not in t:
-        g = t.find('<div class="grid">', s)
-        if g < 0:
-            fail(f"{p}: no <div class=\"grid\"> in #whats-new")
-        at = t.index("\n", g) + 1
-        link = "" if "guide/whats-new.html" in body else ' <a href="guide/whats-new.html">What\'s new</a>'
-        t = (t[:at] + '          <article class="card">\n'
-             f"            <h3>{title} <small>new in {v}</small></h3>\n"
-             f"            <p>{body}{link}</p>\n"
-             "          </article>\n" + t[at:])
-    tag = '<p class="section-lede">'
-    if f"{tag}New in {v}:" not in t:
-        l = t.find(tag, s)
-        if l < 0:
-            fail(f"{p}: no section-lede paragraph in #whats-new")
-        l += len(tag)
-        t = t[:l] + f"New in {v}: {lede}. " + t[l:]
-    mm = ".".join(v.split(".")[:2])
-    t = re.sub(r"(<h2>What's new in )[0-9.]+(</h2>)", rf"\g<1>{mm}\g<2>", t, count=1)
-    t = re.sub(r'(class="new-badge"[^>]*><span>New in )[0-9.]+(</span>)', rf"\g<1>{mm}\g<2>", t, count=1)
-    new[p] = t
+p = "website/index.html"; t = load(p)  # "What's new in X.Y" and the hero badge
+mm = ".".join(v.split(".")[:2])
+t = re.sub(r"(<h2>What's new in )[0-9.]+(</h2>)", rf"\g<1>{mm}\g<2>", t, count=1)
+t = re.sub(r'(class="new-badge"[^>]*><span>New in )[0-9.]+(</span>)', rf"\g<1>{mm}\g<2>", t, count=1)
+new[p] = t
 
 for p, t in new.items():  # written only after every check passed, so a failure leaves the tree clean
     open(p, "w", encoding="utf-8").write(t)
@@ -309,8 +279,8 @@ for p, t in new.items():  # written only after every check passed, so a failure 
 PY
 ) || die "$out" "fix that file by hand (CHANGELOG entries and What's New are written by people), commit, push main"
     [ -n "$out" ] && echo "$out" | sed 's/^/   set: /'
-    card_ok || die "the card and lede written from CARD don't pass the check" "git checkout -- . and add them by hand: $card_fix"
-    python3 tools/guide/build_site.py >/dev/null
+    python3 tools/guide/build_site.py >/dev/null # the guide, and the home page's What's New area for $V
+    card_ok || die "website/index.html has no 'new in $V' card after build_site.py" "$card_fix"
     git add CMakeLists.txt CITATION.cff packaging/rez/package.py packaging/linux/org.sculptforge.SculptForge.metainfo.xml CHANGELOG.md website/index.html
     git add -A website/guide
     if git diff --cached --quiet; then

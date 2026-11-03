@@ -1,8 +1,9 @@
 # SculptForge User Guide
 
-SculptForge is a free, open-source sculpting app for VFX, animation and games. This guide covers everything in
-it: the interface, sculpting, masking, painting, Parts, AI generation, and getting your work into a game engine,
-a film pipeline, Blender or ZBrush. It is written for SculptForge 0.10.
+This guide explains every part of SculptForge, the free, open-source sculpting app for VFX, animation and games:
+how the interface is organised, how to sculpt, mask, paint (on vertices or textures) and manage Parts, how to generate models with AI,
+and how to get your work into a game engine, a film pipeline, Blender or ZBrush. It is updated with every
+release; [What's new](whats-new.md) lists what changed.
 
 Read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<kbd>F1</kbd>) or on the
 [SculptForge website](https://sculptforge.app/guide/).

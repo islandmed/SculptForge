@@ -3,7 +3,7 @@
 One page for whoever coordinates a release. One command does the work:
 
 ```sh
-HIGHLIGHTS=highlights.txt CARD="Title|<strong>What</strong> users get ..." scripts/release.sh X.Y.Z --yes
+HIGHLIGHTS=highlights.txt scripts/release.sh X.Y.Z --yes
 ```
 
 It either stops within seconds, before anything is tagged, with the fix, or runs through to the end. This page explains
@@ -15,8 +15,8 @@ the gates, what each step does, and how to recover.
    all green.
 2. **Version and words**:
    - written by people, on main before the release: CHANGELOG entries under `[Unreleased]`; docs/guide/whats-new.md
-     `## Version X.Y.Z`, with tests/ui/whats_new.sfui expecting it; the home page's "new in X.Y.Z" card and lede (or
-     `CARD=`); the 3-5 feed highlights (`HIGHLIGHTS=`);
+     `## Version X.Y.Z`, with tests/ui/whats_new.sfui expecting it; its ```features block (date: unreleased, a tagline,
+     highlights and cards: the app's What's New window, the guide, and the home page's card and lede come from it); the 3-5 feed highlights (`HIGHLIGHTS=`);
    - set by step `bump`: the version in CMakeLists.txt, CITATION.cff (with date-released), packaging/rez/package.py
      and the metainfo `<release>`; CHANGELOG `[Unreleased]` becomes `## [X.Y.Z] - date` under a new empty
      `[Unreleased]`; website/guide is rebuilt. Don't bump version files by hand.
@@ -54,18 +54,17 @@ between smoke and publish that signs the promoted files, so promotion stays vali
 ## The script
 
 ```sh
-HIGHLIGHTS=highlights.txt CARD="Title|html body" scripts/release.sh 0.10.4 --yes   # all steps
+HIGHLIGHTS=highlights.txt scripts/release.sh 0.10.4 --yes   # all steps
 HIGHLIGHTS=highlights.txt scripts/release.sh 0.10.4 --from site                    # resume
 scripts/release.sh 0.10.4 --only replies
 ```
 
-`CARD="title|html body[|lede]"` writes the card at the top of the #whats-new grid (`<h3>title <small>new in
-X.Y.Z</small></h3>`, the body and a What's new link) and starts the section lede with `New in X.Y.Z: lede.` (the lede
-defaults to the title). It is used only when the card is missing; a hand-written card wins.
+The home page's What's New area (between the `whats-new` markers in website/index.html) is written by
+`tools/guide/build_site.py` from whats-new.md: the newest three versions as cards, older ones as groups.
 
 | step | does | skips when |
 |---|---|---|
-| bump | refuses without What's New, its UI test, CHANGELOG entries, the card (or CARD) and HIGHLIGHTS; then sets the version files and CHANGELOG section, writes the card from CARD, rebuilds the guide, commits as islandmed, pushes main | each file already at X.Y.Z |
+| bump | refuses without What's New, its UI test, CHANGELOG entries, the version's features block and HIGHLIGHTS; then sets the version files, CHANGELOG section and the features block's date, rebuilds the guide and the home page's What's New area, commits as islandmed, pushes main | each file already at X.Y.Z |
 | check | gate 2 and every precondition of the later steps, on a clean, up-to-date main, with gh logged in as islandmed | never (read-only) |
 | ci | waits for CI and Packages on main's commit; stops if either failed | the tag exists |
 | tag | asks, then tags main and pushes the tag (this publishes) | the tag is on GitHub |
@@ -77,8 +76,8 @@ defaults to the title). It is used only when the card is missing; a hand-written
 | replies | writes `release-replies-X.Y.Z.md`: a draft per issue named in the CHANGELOG section; posts nothing | never |
 | status | winget PR state, links, reminders | never |
 
-The highlights and the card's words are writing: the script never invents them. It checks they exist before
-tagging, and writes the card only from the words you pass in CARD.
+The highlights and What's New's words are writing: the script never invents them. It checks they exist before
+tagging.
 
 Scripting rule: under `set -o pipefail`, never end a pipe with `grep -q` or `head` (they close the pipe early and the
 writer fails); capture to a variable or file first, or let grep read everything (`grep ... >/dev/null`).
@@ -91,7 +90,7 @@ don't pile them up for later.
 
 | failure | do |
 |---|---|
-| bump/check: What's New, its test, the card or HIGHLIGHTS missing | write it, commit, push main (or pass CARD/HIGHLIGHTS), run again |
+| bump/check: What's New, its features block, its test or HIGHLIGHTS missing | write it, commit, push main (or pass HIGHLIGHTS), run again |
 | check: a version file missing | run step bump (`--only bump`), then resume from check |
 | ci: a CI or Packages job failed | runner hiccup (network, a timeout): `gh run rerun <id> --failed`. Real failure: fix on a branch, merge, start from check |
 | release: a smoke test failed | the package is broken: fix on main, delete the tag (`git push origin :vX.Y.Z; git tag -d vX.Y.Z`), release again |
