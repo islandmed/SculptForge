@@ -51,7 +51,7 @@ click "Wire##view.polyf"
 run mask_clear
 
 # Extract without a mask says what it needs.
-expect_text "Mask what to extract first"
+expect_text "Mask first (Ctrl+drag)"
 
 # Saved views: save one, turn away, Numpad 0 comes back to it.
 camera 30 20

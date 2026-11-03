@@ -35,13 +35,16 @@ void App::drawExtractContents() {
     ui::ActionButton(*this, "subtool.extract", ImVec2(half, 0));
     ui::HelpAction(*this, "subtool.extract");
     ImGui::SameLine();
-    ui::ActionButton(*this, "subtool.extract_accept", ImVec2(-1, 0));
-    ui::HelpAction(*this, "subtool.extract_accept");
-    // Extract works on the mask: say so instead of leaving greyed-out buttons (a review read them as unclickable).
+    // Extract works on the mask: without one, say so where Accept would be (a review read the greyed-out buttons
+    // as unclickable); the row keeps its height.
     if (!doc_.mesh.hasMask() && !doc_.extractPreviewCurrent()) {
-        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-        ImGui::TextWrapped("%s", tr("Mask what to extract first (Ctrl+drag on the model)."));
-        ImGui::PopStyleColor();
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextDisabled("%s", tr("Mask first (Ctrl+drag)"));
+        ui::HelpText("Extract", nullptr, "Extract makes a shell from the masked area: mask it first (Ctrl+drag on the model).",
+                     "Tool > Parts > Extract");
+    } else {
+        ui::ActionButton(*this, "subtool.extract_accept", ImVec2(-1, 0));
+        ui::HelpAction(*this, "subtool.extract_accept");
     }
 
     // The settings: changing one while the preview shows extracts again, so the preview follows.
