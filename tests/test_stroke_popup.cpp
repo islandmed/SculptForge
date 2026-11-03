@@ -29,7 +29,7 @@ glm::vec2 centre(const StrokePopupGeometry& g, int item) { return g.itemMin(item
 } // namespace
 
 TEST(stroke_popup_items) {
-    CHECK(kStrokePopupItems == int(StrokeType::Count) + 5);
+    CHECK(kStrokePopupItems == int(StrokeType::Count) + 5 + 7);
     CHECK(strokePopupIsStroke(0));
     CHECK(strokePopupIsStroke(int(StrokeType::LazyMouse)));
     CHECK(!strokePopupIsStroke(kStrokePopupStrokes));
@@ -38,6 +38,15 @@ TEST(stroke_popup_items) {
     CHECK(strokeModifierLatch(StrokeModifier::Add) == StrokeLatch::None);
     CHECK(strokeModifierLatch(StrokeModifier::Sub) == StrokeLatch::None);
     CHECK(strokeModifierLatch(StrokeModifier::Select) == StrokeLatch::Select);
+    // The shapes (Discord 11-03): the mask shapes latch Mask, the Cut shapes Select.
+    CHECK(!strokePopupIsShape(strokePopupItem(StrokeModifier::Select)));
+    CHECK(strokePopupIsShape(strokePopupItem(StrokeShape::MaskPen)));
+    CHECK(strokePopupIsShape(kStrokePopupItems - 1));
+    CHECK(!strokePopupIsShape(kStrokePopupItems));
+    CHECK(strokePopupShape(strokePopupItem(StrokeShape::CutRect)) == StrokeShape::CutRect);
+    CHECK(strokeShapeLatch(StrokeShape::MaskRect) == StrokeLatch::Mask);
+    CHECK(strokeShapeLatch(StrokeShape::CutLine) == StrokeLatch::Select);
+    CHECK(strokeShapeLatch(StrokeShape::CutPolyline) == StrokeLatch::Select);
 }
 
 TEST(stroke_popup_every_item_hits_itself) {
@@ -56,6 +65,12 @@ TEST(stroke_popup_layout) {
     const int add = strokePopupItem(StrokeModifier::Add);
     CHECK(g.itemMin(add).x == g.itemMin(0).x);
     CHECK(g.itemMin(add).y >= g.itemMin(0).y + g.itemSize().y + g.header);
+    // The shapes below the modifiers, under a title of their own, five to a row.
+    const int pen = strokePopupItem(StrokeShape::MaskPen), line = strokePopupItem(StrokeShape::CutLine);
+    CHECK(g.itemMin(pen).x == g.itemMin(0).x);
+    CHECK(g.itemMin(pen).y >= g.itemMin(add).y + g.itemSize().y + g.header);
+    CHECK(g.itemMin(pen + 5).y > g.itemMin(pen).y);
+    CHECK(g.itemMin(line).y == g.itemMin(pen).y);
     // Everything fits inside the panel, with the padding left over.
     const glm::vec2 size = g.size();
     for (int i = 0; i < kStrokePopupItems; ++i) {
@@ -71,7 +86,8 @@ TEST(stroke_popup_misses) {
     CHECK(g.itemAt({-1.0f, 40.0f}) == -1);
     CHECK(g.itemAt({2.0f, 2.0f}) == -1);                      // the padding
     CHECK(g.itemAt({30.0f, g.pad + 4.0f}) == -1);             // the Stroke title
-    CHECK(g.itemAt({30.0f, g.sectionTop(true) + 4.0f}) == -1); // the Modifiers title
+    CHECK(g.itemAt({30.0f, g.sectionTop(1) + 4.0f}) == -1); // the Modifiers title
+    CHECK(g.itemAt({30.0f, g.sectionTop(2) + 4.0f}) == -1); // the Shapes title
     CHECK(g.itemAt({g.size().x + 10.0f, 50.0f}) == -1);
     CHECK(g.itemAt({NAN, 50.0f}) == -1);
     CHECK(g.itemAt({INFINITY, INFINITY}) == -1);

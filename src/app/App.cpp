@@ -103,6 +103,8 @@ bool App::init(const AppOptions& options) {
     if (!options.uiTest.empty()) SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
     // The pen tip's mouse events come from the app, not SDL (App::penMouseEvents, #95).
     SDL_SetHint(SDL_HINT_PEN_MOUSE_EVENTS, "0");
+    // Full screen on one monitor stays up when the pointer clicks on another (Windows multi-monitor, Discord).
+    SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "0");
     if (!headless && options.demo.empty()) applyCachedThreadCount(); // the hardware profile's threads, before any brush work
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
@@ -138,6 +140,8 @@ bool App::init(const AppOptions& options) {
         return false;
     }
     wintab_.open(window_); // Windows: pressure from a tablet driver without Windows Ink (Wintab.h)
+    // Focused from the start when the window system says so: the FOCUS_GAINED event can come before the loop runs.
+    windowFocused_ = (SDL_GetWindowFlags(window_) & SDL_WINDOW_INPUT_FOCUS) != 0;
     if (rememberWindow_) { // #35: where and how big it was last time
         if (saved.placed) SDL_SetWindowPosition(window_, saved.x, saved.y);
         if (restoresFullscreen(saved.fullscreen)) SDL_SetWindowFullscreen(window_, true);
@@ -627,6 +631,7 @@ bool App::wantsFrames(double now) const {
            !dabQueue_.empty() || // a stroke's dabs still waiting (drainStrokeDabs) are placed a few each frame
            strokeFinishing_ || solverBusy() || // the solver thread is placing a stroke's dabs (AsyncStroke.cpp)
            backgroundBusy() || playingLayer_ >= 0 || faceTakePlaying_ ||
+           timelapseBusy() || hardwareCalibrating() || // both render a step per frame: they stop when the frames do
            spaceMouseMoving() || // a held SpaceMouse cap sends no events, but the view keeps moving (SpaceMouse.cpp)
            perf_.framesStill < 10; // the view just moved: Fast Navigation's full-quality frame comes after it stops
 }
@@ -1444,8 +1449,10 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         if (captureMouseDown(x, y)) return;    // Capture from view: the drag draws the square (PanelKelvinlet.cpp)
         // A triple-click on another SubTool makes it the active one and frames it (#43). (Its first two clicks
         // don't sculpt it: brushes work on the active SubTool only.)
-        // Not from a pen: quick taps of a stippling pen counted as a triple-click and switched the Part.
-        if (mouseClicks_ >= 3 && !lastInputPen_ && !wintabPen_ && !(mod & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)) &&
+        // Not from a pen: quick taps of a stippling pen counted as a triple-click and switched the Part. Nor while
+        // a pen hovers: a Wacom side button set to Double Click (the Intuos 3 default) and a tap made one (Discord).
+        const bool penNear = penInProximity_ && SDL_GetTicksNS() - lastPenNs_ < 1000000000ull;
+        if (mouseClicks_ >= 3 && !lastInputPen_ && !wintabPen_ && !penNear && !(mod & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)) &&
             insertType_.empty() && doc_.subtoolCount() > 1) {
             const int target = pickSubtool(x, y);
             if (target >= 0 && target != doc_.activeSubtool) {

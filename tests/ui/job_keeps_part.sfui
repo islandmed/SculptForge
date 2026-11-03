@@ -1,0 +1,17 @@
+# Discord (Windows 11, Wacom): "the active Part switches by itself". A background job (here QRemesh) that finished
+# after another Part was picked made its own Part active again. Now its result goes onto its own Part, the Part the
+# user picked stays active, and the status bar says where the result went.
+run new_sphere subdivisions=6
+click "Geometry##tool.geometry"
+click "QRemesh/Quad Remesh"
+expect_value qremesh_running == 1
+# Another Part while it runs (appended: it becomes the active one).
+run subtool_append type=cube name=Cube
+expect_value active_subtool == 1
+wait_idle 120
+expect_value active_subtool == 1
+expect_status stays the active Part
+run subtool_select index=0
+expect_value quads > 100
+key ctrl+z
+expect_value quads == 0

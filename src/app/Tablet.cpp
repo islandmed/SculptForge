@@ -393,6 +393,8 @@ SDL_Keymod App::inputMods(bool latch) const {
     }
     if (latch) { // the stroke popup's Smooth / Mask / Select (StrokePopup.cpp)
         const StrokeLatchKeys k = strokeLatchKeys(strokeLatch());
+        // Mask latched: the mask is what a plain drag does, so a held Ctrl unmasks (as Ctrl+Alt; Discord 11-03).
+        if (k.ctrl && !k.shift && (mods & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) && !(mods & SDL_KMOD_SHIFT)) mods |= SDL_KMOD_LALT;
         if (k.shift) mods |= SDL_KMOD_LSHIFT;
         if (k.ctrl) mods |= SDL_KMOD_LCTRL;
     }

@@ -26,17 +26,27 @@ StrokeLatchKeys strokeLatchKeys(StrokeLatch latch);
 // Picking the latch that is on turns it off; picking another switches to it.
 StrokeLatch toggledStrokeLatch(StrokeLatch now, StrokeLatch picked);
 
-// The grid's items: the stroke types first (item i = StrokeType(i)), then the modifiers.
+// The grid's items: the stroke types first (item i = StrokeType(i)), then the modifiers, then the shapes.
 enum class StrokeModifier { Add, Sub, Smooth, Mask, Select, Count };
+// Shapes (Discord 11-03): a mask or Cut shape picked here latches Mask or Select with that shape, so a plain drag
+// masks with it or cuts with it, no Ctrl or Ctrl+Shift held (with the Mask latch on, Ctrl unmasks).
+enum class StrokeShape { MaskPen, MaskLasso, MaskRect, CutLine, CutLasso, CutRect, CutPolyline, Count };
 constexpr int kStrokePopupStrokes = int(StrokeType::Count);
 constexpr int kStrokePopupModifiers = int(StrokeModifier::Count);
-constexpr int kStrokePopupItems = kStrokePopupStrokes + kStrokePopupModifiers;
+constexpr int kStrokePopupShapes = int(StrokeShape::Count);
+constexpr int kStrokePopupItems = kStrokePopupStrokes + kStrokePopupModifiers + kStrokePopupShapes;
 inline bool strokePopupIsStroke(int item) { return item >= 0 && item < kStrokePopupStrokes; }
+inline bool strokePopupIsShape(int item) {
+    return item >= kStrokePopupStrokes + kStrokePopupModifiers && item < kStrokePopupItems;
+}
 inline StrokeModifier strokePopupModifier(int item) { return StrokeModifier(item - kStrokePopupStrokes); }
+inline StrokeShape strokePopupShape(int item) { return StrokeShape(item - kStrokePopupStrokes - kStrokePopupModifiers); }
 inline int strokePopupItem(StrokeModifier m) { return kStrokePopupStrokes + int(m); }
+inline int strokePopupItem(StrokeShape s) { return kStrokePopupStrokes + kStrokePopupModifiers + int(s); }
 StrokeLatch strokeModifierLatch(StrokeModifier m); // Smooth / Mask / Select; None for Add and Sub
+inline StrokeLatch strokeShapeLatch(StrokeShape s) { return s <= StrokeShape::MaskRect ? StrokeLatch::Mask : StrokeLatch::Select; }
 
-// Two sections, each a titled block of rows: Stroke, then Modifiers. All sizes in pixels (already scaled).
+// Three sections, each a titled block of rows: Stroke, Modifiers, Shapes. All sizes in pixels (already scaled).
 struct StrokePopupGeometry {
     float tile = 72.0f;   // the square icon area of an item
     float label = 30.0f;  // the item's label and key hint under the icon
@@ -48,7 +58,7 @@ struct StrokePopupGeometry {
     glm::vec2 itemSize() const { return {tile, tile + label}; }
     int rows(int count) const { return columns > 0 ? (count + columns - 1) / columns : 0; }
     glm::vec2 size() const;              // the whole panel
-    float sectionTop(bool modifiers) const; // a section's title, from the panel's top
+    float sectionTop(int section) const; // a section's title (0 Stroke, 1 Modifiers, 2 Shapes), from the panel's top
     glm::vec2 itemMin(int item) const;   // an item's top-left, from the panel's top-left
     int itemAt(glm::vec2 p) const;       // the item under p (panel space); -1 over a gap, a title or outside
 };

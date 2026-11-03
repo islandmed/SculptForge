@@ -232,6 +232,8 @@ void App::startTimelapse(const std::string& path, int width, int height, float s
     status_ = "Rendering the timelapse...";
 }
 
+bool App::timelapseBusy() const { return timelineUi_ && timelineUi_->job; }
+
 bool App::timelapseStep(double budgetSeconds) {
     if (!timelineUi_ || !timelineUi_->job) return false;
     TimelapseJob& j = *timelineUi_->job;

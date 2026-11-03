@@ -1,0 +1,18 @@
+# Two screens (Discord, Windows 11): with the pointer on the other screen and the focus in another app, whatever runs
+# here keeps drawing (progress bars, a remesh, a timelapse, the hardware calibration); only an idle app rests.
+run new_sphere subdivisions=6
+click "Geometry##tool.geometry"
+window_focus 0
+mouse_leave
+expect_value focus_frames == 0
+click "QRemesh/Quad Remesh"
+expect_value qremesh_running == 1
+expect_value wants_frames == 1
+wait_idle 120
+expect_status quads
+# Nothing runs now: with no focus and no pointer the app rests.
+wait 2
+expect_value wants_frames == 0
+window_focus 1
+key escape
+expect_value wants_frames == 1

@@ -354,14 +354,19 @@ Notes:
 ### The stroke popup
 
 Press <kbd>G</kbd> (<kbd>Z</kbd> in the Blender style) for a grid under the cursor, or click the grid button under
-the **Stroke** tile on the left shelf. The top row holds the stroke types, the bottom row the modifiers:
+the **Stroke** tile on the left shelf. The top row holds the stroke types, then come the modifiers and the shapes:
 
 | Modifier | What it does | Instead of holding |
 |---|---|---|
 | **Add** / **Sub** | Brushes add to or subtract from the surface (the same switch as Add / Sub on the top shelf). | <kbd>Alt</kbd> |
 | **Smooth** | Strokes smooth. | <kbd>Shift</kbd> |
-| **Mask** | Strokes paint the mask (<kbd>Alt</kbd> still unmasks). | <kbd>Ctrl</kbd> |
+| **Mask** | Strokes paint the mask (<kbd>Alt</kbd> or <kbd>Ctrl</kbd> unmasks). | <kbd>Ctrl</kbd> |
 | **Select** | Strokes draw the selection (hide) shape. | <kbd>Ctrl</kbd>+<kbd>Shift</kbd> |
+
+**Shapes** pick how Mask and Select draw: **Mask Pen**, **Mask Lasso** and **Mask Rect** turn Mask on with that
+shape, **Cut Line**, **Cut Lasso**, **Cut Rect** and **Cut Polyline** turn Select on with that Cut shape. A plain drag
+then masks or cuts with it, no keys held (with a mask shape, <kbd>Ctrl</kbd>+drag unmasks; **Tool > Cut** still sets
+Away, In, Add or Clip). The label next to the brush cursor names the shape. Pick it again to go back to sculpting.
 
 - **Hold and let go**: hold <kbd>G</kbd>, move over an item and let go. It opens with your current stroke under the
   pointer, so letting go without moving changes nothing. A pen hovering over the tablet works the same.

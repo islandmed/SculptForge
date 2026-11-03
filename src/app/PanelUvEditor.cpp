@@ -681,6 +681,7 @@ struct UvEditorUi {
             app.status_ = "Unwrapping: " + std::to_string(int(s.job->progress->load() * 100.0f)) + "%";
             return;
         }
+        if (app.jobWaitsForStroke()) return; // (the result lands when the stroke ends)
         const std::unique_ptr<UvEditorState::Job> job = std::move(s.job);
         ++s.unwraps;
         if (!job->done.get()) {
@@ -694,8 +695,7 @@ struct UvEditorUi {
             app.status_ = "Unwrap skipped: the mesh changed while it was being unwrapped";
             return;
         }
-        if (index != app.doc_.activeSubtool) app.doc_.selectSubtool(index);
-        if (app.doc_.sculptor.strokeActive()) app.endStroke();
+        const App::JobPart part(app, index);
         UvEditStep step(app.doc_, std::string("Unwrap (") + uvUnwrapMethodLabel(job->method) + ")", job->keepTexture);
         mesh().uvs = std::move(job->result->uvs);
         const std::string note = step.commit();

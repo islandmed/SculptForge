@@ -36,7 +36,8 @@
 //                            keep: leave the button down (a shot mid-drag), then `release`
 //   gizmo_hover HANDLE       move the mouse onto a Gizmo 3D handle (it lights up, for screenshots)
 //   stroke_popup_item ITEM [click] [S]  glide onto an item of the open stroke popup (dots drag_stamp slide_stamp spray
-//                            lazy add sub smooth mask select, or outside: just right of it); click: press and let go;
+//                            lazy add sub smooth mask select mask_pen mask_lasso mask_rect cut_line cut_lasso cut_rect
+//                            cut_polyline, or outside: just right of the panel); click: press and let go;
 //                            pen: with the pen, hovering (its tip taps for click)
 //   drag_landmark N DX DY [S] left-drag Make sculptable's face landmark N (0-7, FaceLandmarks order) by DX DY pixels
 //   orbit DX DY              right-drag on the background, in pixels (with the held modifiers)
@@ -142,7 +143,7 @@
 //                            size_popup_open (the S / U / I / O slider), size_knob_x / size_knob_y (its knob, pixels),
 //                            quickmenu_open, right_click_menu, space_camera, space_held, air_strokes, radial_open / radial_menu (-1 none) / radial_held /
 //                            radial_hover / radial_ran (radial menus: open, the menu, held by its key or button, the
-//                            slot pointed at, the slot run last), radial_menus, radial_slots_N, stroke_popup_open / stroke_popup_held / stroke_popup_hover / stroke_popup_picked (the stroke popup: items are strokes 0-4, then Add, Sub, Smooth, Mask, Select), stroke_latch (0 none, 1 Smooth, 2 Mask, 3 Select), invert_toggle, lazy_mouse (the Lazy Stroke type),
+//                            slot pointed at, the slot run last), radial_menus, radial_slots_N, stroke_popup_open / stroke_popup_held / stroke_popup_hover / stroke_popup_picked (the stroke popup: items are strokes 0-4, then Add, Sub, Smooth, Mask, Select, then the shapes 10-16), stroke_latch (0 none, 1 Smooth, 2 Mask, 3 Select), invert_toggle, lazy_mouse (the Lazy Stroke type),
 //                            steady_stroke (Steady Stroke on, any type), steady_lag (px from the pointer to the brush on
 //                            its string), steady_catch_up, world_size, world_radius_mm, draw_size_exact (px, unrounded),
 //                            precision_active (Shift+Alt mid-stroke), precision_lag (px from the pointer to the brush),
@@ -216,7 +217,8 @@
 //   pen_stream ink|huion     ink: the pen's events (and SDL's); huion: the driver also sends mouse events of its own
 //                            beside the pen's, a press at each touch whose release never comes
 //   window_focus 1|0         the window gains or loses keyboard focus; mouse_leave: the pointer leaves the window
-//                            (another screen); values: focus_frames (1 while focus keeps it drawing),
+//                            (another screen); values: focus_frames (1 while focus keeps it drawing), wants_frames (1
+//                            while anything keeps the idle loop drawing: input, a job, an animation),
 //                            pen_mouse_down, ui_left_down (the panels hold the left button), soft_cursor
 //   mouse_move U V           a plain mouse (not the pen) moves to a point on the model, e.g. the stray mouse
 //                            events Windows Ink sends beside the pen's
@@ -829,6 +831,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "panel_drag_scroll_y") return double(ui::DragScrollY());  // that panel's scroll after the last one
     if (name == "drag_cursor") return double(dragCursor_); // the system cursor during the last button_drag (#88)
     if (name == "viewport_cursor") return app_.cursorKind_; // the system cursor: 0 arrow, 100 crosshair (#73)
+    if (name == "wants_frames") return app_.wantsFrames(double(SDL_GetTicksNS()) * 1e-9) ? 1.0 : 0.0;
     if (name == "focus_frames") return app_.focusKeepsDrawing(double(SDL_GetTicksNS()) * 1e-9) ? 1.0 : 0.0;
     if (name == "pen_mouse_down") return app_.penMouseDown_ ? 1.0 : 0.0;
     if (name == "ui_left_down") return ImGui::IsMouseDown(ImGuiMouseButton_Left) ? 1.0 : 0.0;
@@ -1322,8 +1325,10 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         wait(0.1f);
     } else if (verb == "stroke_popup_item") {
         if (!need(1)) return false;
-        static const char* kItems[] = {"dots", "drag_stamp", "slide_stamp", "spray", "lazy",
-                                       "add",  "sub",        "smooth",      "mask",  "select"};
+        static const char* kItems[] = {"dots",      "drag_stamp", "slide_stamp", "spray",    "lazy",
+                                       "add",       "sub",        "smooth",      "mask",     "select",
+                                       "mask_pen",  "mask_lasso", "mask_rect",   "cut_line", "cut_lasso",
+                                       "cut_rect",  "cut_polyline"};
         static_assert(std::size(kItems) == size_t(kStrokePopupItems));
         int item = w[1] == "outside" ? -2 : -1;
         for (int i = 0; i < int(std::size(kItems)); ++i)
@@ -1346,7 +1351,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
                 if (pen && !penIn_) penProximity(true);
                 *from = pen && penIn_ ? penAt_ : mouse_;
                 ImVec2 last;
-                if (!app_.strokePopupItemScreen(item == -2 ? kStrokePopupItems - 1 : item, last)) {
+                if (!app_.strokePopupItemScreen(item == -2 ? strokePopupItem(StrokeModifier::Select) : item, last)) {
                     fail(line, "the stroke popup isn't open");
                     return true;
                 }
