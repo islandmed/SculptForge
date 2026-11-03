@@ -5,7 +5,6 @@ on:
     branches: [main]
   pull_request:
     types: [opened, synchronize, reopened, labeled]
-  merge_group: # the merge queue (docs/merge-queue.md): every PR is tested on top of main before it lands
   workflow_dispatch:
     inputs:
       full:
@@ -23,7 +22,7 @@ concurrency:
 # Compiler cache (ccache). Every job compiles through ccache and starts from the newest cache of the same job; ccache
 # hashes the compiler and the preprocessed source with every flag, so a hit is the object file that compiler would
 # produce, and anything changed compiles fresh. Caches are saved only by push and workflow_dispatch runs (main, or a
-# maintainer's own branch): pull_request and merge_group runs, forks included, only restore them (actions/cache/restore), so nothing a
+# maintainer's own branch): pull_request runs, forks included, only restore them (actions/cache/restore), so nothing a
 # pull request builds can end up in another run. GitHub scopes caches by branch as well: a branch reads its own and
 # main's, never another branch's. Release packages (packages.yml) restore main's caches and never save from a tag.
 # Keys are ccache-ci-<job>.<commit>: the dot keeps one job's prefix from matching another's (one key may start with another's).
@@ -41,7 +40,7 @@ jobs:
   # app), docs no build or test reads (docs/guide and docs/supporters.txt are built in), note fragments or release
   # paperwork skip the build and test jobs; their required checks then pass as skipped.
   # `full`: the slow platform checks (VFX Reference Platform containers, Blender add-on in Blender) run on main, in the
-  # merge queue, on a dispatch with full=true and on a pull request labelled full-ci; other branch runs skip them.
+  # merge queue's batch run (scripts/merge-queue.sh), on a dispatch with full=true and on a pull request labelled full-ci; other branch runs skip them.
   changes:
     name: Changes
     runs-on: ubuntu-24.04
@@ -55,9 +54,9 @@ jobs:
           REPO: ${{ github.repository }}
           EVENT: ${{ github.event_name }}
           BEFORE: ${{ github.event.before }}
-          BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
-          HEAD: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
-          FULL: ${{ github.ref == 'refs/heads/main' || github.event_name == 'merge_group' || inputs.full == true || contains(github.event.pull_request.labels.*.name, 'full-ci') }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          FULL: ${{ github.ref == 'refs/heads/main' || inputs.full == true || contains(github.event.pull_request.labels.*.name, 'full-ci') }}
         run: |
           echo "full=$FULL" | tee -a "$GITHUB_OUTPUT"
           base=$BASE

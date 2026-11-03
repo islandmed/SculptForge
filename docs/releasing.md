@@ -14,10 +14,14 @@ the gates, what each step does, and how to recover.
 1. **Merged tree, tested locally**: on main with the branches for this release merged, `ctest --test-dir build -j3`
    all green.
 2. **Version and words**:
-   - written by people, on main before the release: CHANGELOG entries under `[Unreleased]`; docs/guide/whats-new.md
-     `## Version X.Y.Z`, with tests/ui/whats_new.sfui expecting it; its ```features block (date: unreleased, a tagline,
-     highlights and cards: the app's What's New window, the guide, and the home page's card and lede come from it); the 3-5 feed highlights (`HIGHLIGHTS=`);
-   - set by step `bump`: the version in CMakeLists.txt, CITATION.cff (with date-released), packaging/rez/package.py
+   - written by people, on main before the release: one note fragment per branch, `changes/<branch>.md`
+     (changes/README.md: the What's New bullet, CHANGELOG entry and section, highlight, #testers bullets); in
+     docs/guide/whats-new.md `## Version X.Y.Z`, with tests/ui/whats_new.sfui expecting it, its ```features block
+     (date: unreleased, a tagline, highlights and cards: the app's What's New window, the guide, and the home page's
+     card and lede come from it). The 3-5 feed highlights are the version's `highlight:` lines (What's New and
+     fragments), or `HIGHLIGHTS=file` to override;
+   - set by step `bump`: the fragments go into CHANGELOG `[Unreleased]` and What's New and are deleted
+     (tools/release/assemble_notes.py); the version in CMakeLists.txt, CITATION.cff (with date-released), packaging/rez/package.py
      and the metainfo `<release>`; CHANGELOG `[Unreleased]` becomes `## [X.Y.Z] - date` under a new empty
      `[Unreleased]`; website/guide is rebuilt. Don't bump version files by hand.
 

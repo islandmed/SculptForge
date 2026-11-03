@@ -107,5 +107,5 @@ TEST(surface_cursor_cost_is_rays_not_mesh_passes) {
     }
     const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() / n;
     std::printf("  surface cursor on %zu triangles: %.3f ms per update\n", m.triangles.size(), ms);
-    CHECK(ms < 5.0);
+    CHECK(ms < timeLimit(5.0));
 }

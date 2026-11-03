@@ -7,7 +7,8 @@
 #   HIGHLIGHTS=notes.txt scripts/release.sh X.Y.Z --yes   every step, in order (the normal way: one command)
 #   scripts/release.sh X.Y.Z --from site                  resume at a step (after fixing what stopped it)
 #   scripts/release.sh X.Y.Z --only replies              one step
-#   HIGHLIGHTS=file   the update feed's 3-5 highlight lines, one per line (needed until latest.json says X.Y.Z)
+#   HIGHLIGHTS=file   the update feed's 3-5 highlight lines, one per line (default: the version's highlight: lines in
+#                     What's New and the note fragments, tools/release/assemble_notes.py X.Y.Z --highlights)
 #   (the home page's What's New area is written by tools/guide/build_site.py from docs/guide/whats-new.md: the
 #   version's ```features block, its tagline and pictures; CARD is no longer used)
 #

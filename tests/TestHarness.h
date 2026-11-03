@@ -10,6 +10,7 @@
 
 #include <cstddef>
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <functional>
 #include <string>
@@ -44,6 +45,15 @@ inline bool inShard(std::size_t index, int shard, int shards) {
     return shards <= 1 || index % static_cast<std::size_t>(shards) == static_cast<std::size_t>(shard);
 }
 
+// A wall-clock limit for a speed check: the value given on a developer machine, four times that on a CI runner
+// (CI or GITHUB_ACTIONS set: shared, often loaded virtual machines, where Windows runners have flaked at 1.1x), and
+// the value itself again with SF_BENCH_LIMITS=1, which is how benchmarks are judged.
+inline double timeLimit(double local) {
+    const char* strict = std::getenv("SF_BENCH_LIMITS");
+    if (strict && std::string(strict) == "1") return local;
+    return std::getenv("CI") || std::getenv("GITHUB_ACTIONS") ? local * 4.0 : local;
+}
+
 inline std::string tempPath(const char* name) { return (std::filesystem::temp_directory_path() / name).string(); }
 
 } // namespace sf::test
@@ -64,3 +74,4 @@ inline std::string tempPath(const char* name) { return (std::filesystem::temp_di
 
 using sf::test::makeDoc;
 using sf::test::tempPath;
+using sf::test::timeLimit;
