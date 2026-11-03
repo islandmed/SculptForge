@@ -9,10 +9,18 @@ becomes the long pole.
 """
 import re
 import sys
-import xml.etree.ElementTree as ET
+
+try:
+    import xml.etree.ElementTree as ET
+    ET.fromstring("<a/>")
+except ImportError:  # some system Pythons (Rocky 8's 3.12) ship a pyexpat that doesn't load
+    ET = None
 
 
 def main(argv):
+    if ET is None:
+        print("no XML parser in this Python: slowest-tests table skipped")
+        return 0
     if not argv or argv[0] == "--self-test":
         return self_test()
     try:
