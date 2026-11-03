@@ -141,8 +141,11 @@ window.
 
 ### Text and buttons are too small or too large
 
-**Preferences > Interface > UI scale** sets the size (Automatic, 100% to 200%). It takes effect the next time
-SculptForge starts, and only if you press **Store Config** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>).
+**Preferences > Interface > UI scale** sets the size (Automatic, 100% to 200%) and applies it at once. Press
+**Store Config** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) to keep it for the next start. **Automatic** uses
+the scale of the monitor the window is on: on Windows that is **Settings > Display > Scale**, per monitor, and the
+interface follows when you drag the window to another monitor. On Linux under X11 it comes from the desktop's
+font DPI (Xft.dpi); if Automatic looks wrong there, pick a size.
 
 ### My layout or shortcuts are gone after a restart
 

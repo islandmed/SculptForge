@@ -127,6 +127,7 @@ public:
     UiLayout& layout() { return layout_; }
     ThumbnailCache& thumbnails() { return thumbs_; }
     void shutdown();
+    void requestUiScale(); // Preferences > Interface > UI scale changed: rebuilt live before the next frame (#87)
 
     enum class FileAction { OpenObj, SaveObj, ExportGlb, ExportLods, SaveBrush, LoadBrush, OpenImage, ExportUsd, SaveSplats, ExportUnreal, SaveProject, AppendSubtool, ComfyWorkflow, LoadMatcap, InsertMesh, Count };
     struct DialogRequest {
@@ -213,6 +214,11 @@ private:
     int runUiTest(int width, int height, int fps);
     std::unique_ptr<Demo> demo_;
     float uiScale_ = 1.0f; // UI layout scale (fonts are rasterised at this scale)
+    bool uiScaleDirty_ = false;          // the UI scale may have changed: applyUiScale before the next frame
+    float displayScaleOverride_ = 0.0f;  // UI tests (display_scale): the display's content scale, 0 = the real one
+    float targetUiScale() const;         // what uiScale_ should be now (Preferences, the display; Config.cpp)
+    void applyUiScale();                 // rebuild fonts and style live when it changed (between frames)
+    void buildUiFonts(float scale);
     ImFont* fontCaption_ = nullptr;
     ImFont* fontCaptionSub_ = nullptr;
 

@@ -762,6 +762,7 @@ bool App::readUiConfig(const std::string& path, std::string& err) {
     if (!fromJson(j["layout"], layout, err, prefs.shellLayout)) return false;
     uiPrefs_ = std::move(prefs);
     lookDirty_ = true;
+    requestUiScale(); // its UI scale
     const bool customize = layout_.customize;
     layout_ = std::move(layout);
     layout_.customize = customize;
@@ -1204,12 +1205,15 @@ void drawInterfaceSection(App& app) {
     ImGui::SetNextItemWidth(-FLT_MIN);
     if (ImGui::BeginCombo("##ui_scale", (std::string(tr("UI scale:")) + " " + tr(kScales[current])).c_str())) {
         for (int i = 0; i < 6; ++i)
-            if (ImGui::Selectable(tr(kScales[i]), i == current)) p.uiScale = kScaleValues[i];
+            if (ImGui::Selectable(tr(kScales[i]), i == current)) {
+                p.uiScale = kScaleValues[i];
+                app.requestUiScale(); // live, from the next frame (#87)
+            }
         ImGui::EndCombo();
     }
     ui::HelpText("UI scale", nullptr,
-                 "Size of text and controls. Automatic follows the display. Takes effect the next time SculptForge starts "
-                 "(Store Config to keep it).",
+                 "Size of text and controls, applied at once. Automatic follows the display the window is on (Windows: "
+                 "Settings > Display > Scale, per monitor). Store Config keeps it for the next start.",
                  "Preferences > Interface");
     static const char* kRotation[] = {"Free (ZBrush)", "Turntable"};
     ImGui::SetNextItemWidth(-FLT_MIN);

@@ -5,6 +5,12 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.10.9
+
+- **UI scale works live**: **Preferences > Interface > UI scale** (100% to 200%) resizes text and panels at once,
+  no restart. **Automatic** follows the monitor the window is on, so on Windows moving it between a 100% and a
+  150% monitor rescales it right away (#87). See [The interface](interface.md#interface-preferences).
+
 ## Version 0.10.8
 
 - **Tablets in mouse mode work again**: on some Windows tablets with **Mouse mode** on (Preferences > Tablet) the

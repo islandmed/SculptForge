@@ -6,6 +6,12 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Preferences > Interface > UI scale applies at once: text, controls and panels resize live, no restart (#87).
+  Before, the choice waited for the next start and was lost unless Store Config saved it. Automatic now follows
+  the monitor the window is on: on Windows (per-monitor DPI v2, now declared in the app's manifest) dragging the
+  window between a 100 % and a 150 % monitor, or changing Settings > Display > Scale, rescales the UI right away.
+
 ## [0.10.8] - 2026-11-02
 
 ### Fixed

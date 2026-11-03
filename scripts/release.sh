@@ -155,6 +155,21 @@ words_ok() {
     grep -qF "expect_text \"Version $V\"" tests/ui/whats_new.sfui ||
         die "tests/ui/whats_new.sfui doesn't check Version $V" "update its first expect_text lines to the new section (the version and one line from it), commit, push main"
 }
+# UI scale / DPI (#87): the Windows manifest still asks for per-monitor DPI v2, and the "dpi" UI tests (100-200 %, a
+# display-scale event) pass on main's build. BUILD_DIR (default build) is the coordinator's tree, already built for
+# the full ctest; only the app is rebuilt here.
+dpi_ok() {
+    local b=${BUILD_DIR:-build} heavy=(nice -n 19 ionice -c3)
+    [ -x "$HOME/Work/.sf/heavy.sh" ] && heavy=("$HOME/Work/.sf/heavy.sh") # one heavy job machine-wide
+    grep -q '<dpiAwareness[^>]*>PerMonitorV2' packaging/windows/sculptforge.manifest 2>/dev/null &&
+        grep -q 'packaging/windows/sculptforge.manifest' CMakeLists.txt ||
+        die "the Windows build no longer declares per-monitor DPI v2" "restore packaging/windows/sculptforge.manifest and its target_sources line in CMakeLists.txt (git log -p -- packaging/windows)"
+    [ -f "$b/CTestTestfile.cmake" ] || die "no build tree at $b for the DPI UI tests" "cmake -S . -B $b -DCMAKE_BUILD_TYPE=Release, or BUILD_DIR=<your build> scripts/release.sh $V --from check"
+    "${heavy[@]}" cmake --build "$b" --target sculptforge -j3 >/dev/null || die "the app doesn't build in $b" "cmake --build $b --target sculptforge and fix the error"
+    SDL_APP_ID=sculptforge-agent "${heavy[@]}" ctest --test-dir "$b" -L dpi --output-on-failure >"$b/release-dpi.log" 2>&1 ||
+        die "the UI scale / DPI tests fail (ctest -L dpi; log: $b/release-dpi.log)" "fix them on a branch, merge to main, run again from step check"
+    ok "UI scale tests (100-200 %, display-scale event) pass; Windows manifest declares PerMonitorV2"
+}
 # Everything the steps after the tag need that doesn't depend on the release existing. In mode "bump" a missing
 # card is fine when CARD is set (bump writes it).
 preflight() {
@@ -316,6 +331,7 @@ step_check() {
         die "$T already tags $(git rev-list -n1 "$T"), not main's $(git rev-parse --short HEAD)" "if that is the release, continue: scripts/release.sh $V --from release; if not, pick the next version"
     fi
     ok "version files, CHANGELOG, What's New, metainfo and guide say $V at $(git rev-parse --short HEAD)"
+    dpi_ok
 }
 
 step_ci() {
