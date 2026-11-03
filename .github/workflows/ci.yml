@@ -153,12 +153,16 @@ jobs:
       # sources, the generated project), right after configure and before any compiling: a hit skips the minute or
       # more of checks (93 s on Windows). Exact key only: the runner image (compiler), Python and every CMake file, so
       # a changed CMakeLists.txt or option configures from scratch, as a fresh checkout would.
+      - name: Runner image (the compiler version, for the configure cache key)
+        id: image
+        shell: bash
+        run: echo "id=${ImageOS:-$RUNNER_OS}-${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
       - name: Configure cache (restore)
         id: cmake-cache
         uses: actions/cache/restore@v5
         with:
           path: build
-          key: cmake-ci-${{ matrix.key }}~${{ env.ImageOS }}-${{ env.ImageVersion }}-py${{ steps.py.outputs.python-version }}-${{ hashFiles('CMakeLists.txt', 'cmake/**', 'packaging/linux/install-build-deps.sh') }}
+          key: cmake-ci-${{ matrix.key }}~${{ steps.image.outputs.id }}-py${{ steps.py.outputs.python-version }}-${{ hashFiles('CMakeLists.txt', 'cmake/**', 'packaging/linux/install-build-deps.sh') }}
       - name: Configure
         if: runner.os != 'Windows'
         run: >
@@ -214,7 +218,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Slowest tests (job summary; tells which test to split when a shard is the long pole)
         if: always()
-        run: python tools/ci/slowest_tests.py build/ctest.xml >> "$GITHUB_STEP_SUMMARY"
+        run: python tools/ci/slowest_tests.py build/ctest.xml | tee -a "$GITHUB_STEP_SUMMARY"
         shell: bash
       - name: UI test screenshots
         if: always() && runner.os != 'macOS'
