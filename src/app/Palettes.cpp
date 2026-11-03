@@ -662,6 +662,9 @@ void App::drawPalette_Render() {
     ui::HelpAction(*this, "view.mask");
     ImGui::Checkbox(tr("Show Face Groups##render"), &renderSettings_.showPolygroups);
     ui::HelpAction(*this, "view.polygroups");
+    bool xray = renderSettings_.xray;
+    if (ui::Checkbox("X-Ray##render", &xray)) runCommand("xray", {{"on", xray}});
+    ui::HelpAction(*this, "view.xray");
     ImGui::BeginDisabled(doc_.splats.empty());
     ImGui::Checkbox(tr("Show Splats"), &renderSettings_.showSplats);
     ImGui::EndDisabled();
@@ -670,6 +673,8 @@ void App::drawPalette_Render() {
     if (ui::Checkbox("Lock camera##view.lock_camera", &lockCamera)) uiPrefs_.airStrokes = lockCamera;
     ui::HelpAction(*this, "input.toggle_air_strokes");
     drawBackgroundControls("render");
+    ImGui::TextDisabled("%s", tr("View resolution"));
+    ui::Segmented(*this, {"perf.res_100", "perf.res_75", "perf.res_50"});
     actionRow(*this, {"view.frame", "view.fullscreen"});
     actionRow(*this, {"ui.lightbox", "ui.console"}); // (the SculptForge layout's View menu: they left the shelf)
 }
@@ -755,7 +760,7 @@ void App::drawPalette_Tool() {
         tray::Section section;
         Demo::pushScope("Geometry");
         drawGeometrySection();
-        actionRow(*this, {"geometry.subdivide"});
+        actionRow(*this, {"geometry.subdivide", "geometry.close_holes"});
         const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
         if (ImGui::Button(tr("Decimate"), ImVec2(half, 0))) {
             Args args{{"ratio", double(decimateRatio_)}};

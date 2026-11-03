@@ -69,8 +69,23 @@ struct RenderSettings {
     float backgroundBlur = 0.4f;        // 0 = sharp .. 1 = the roughest level
     float pbrRoughness = 0.45f, pbrMetallic = 0.0f;
     float pbrCavity = 0.5f; // how much the sculpt's creases darken under PBR (0 = physically plain)
+    // Lit Sphere and studio lighting (#80): the light turned from where the material has it, in degrees about the
+    // view's up axis (yaw, + to the right) and its side axis (pitch, + up), its intensity (a multiplier) and an
+    // ambient term that lifts the shadows (a share of the colour). The defaults leave the material as it is.
+    float lightYaw = 0.0f, lightPitch = 0.0f;
+    float lightIntensity = 1.0f, lightAmbient = 0.0f;
+    // X-Ray (#80, #91): the other visible Parts are drawn see-through (only their nearest surface, at
+    // xrayOpacity), so the active Part shows through them; with no other Part shown, the active one is see-through.
+    bool xray = false;
+    float xrayOpacity = 0.3f;
+    // The 3D view's resolution as a share of the window's (#80): lower draws fewer pixels on slow GPUs and scales
+    // the picture up (Renderer::drawView). 1 = full resolution.
+    float resolutionScale = 1.0f;
     bool pbr() const { return shading == Shading::Pbr; }
 };
+
+// RenderSettings::lightYaw / lightPitch as a rotation of view-space directions (the shader's uLightRot).
+glm::mat3 lightRotation(float yawDegrees, float pitchDegrees);
 
 // A baked tangent-space normal map to preview on a mesh (core/Bake.h): RGB8 rows bottom-up, with the
 // MikkTSpace tangent + sign of every triangle corner it was baked against. `serial` changes with the data.
@@ -386,6 +401,11 @@ private:
     // level), the BRDF table (RG16F) and the SH9, built when the environment first shows or changes.
     bool ensureEnvironment(int index);
     void setPbrUniforms(const MeshProgram& p, const RenderSettings& settings, bool textured, const MeshSlot& s);
+    void setLightUniforms(const MeshProgram& p, const RenderSettings& settings) const;
+    float drawAlpha_ = 1.0f;     // the opacity the next meshes draw with (X-Ray's see-through Parts)
+    bool scaleFailed_ = false;   // the scaled view couldn't reach the window: full resolution from then on
+    bool keepBackfaces_ = false;
+    GLenum xrayCull_ = 0;        // X-Ray's lone Part: the faces this pass culls (GL_FRONT, then GL_BACK) // X-Ray's lone see-through Part: draw its back faces too (cull)
     GLuint envTexture_ = 0, brdfTexture_ = 0, envBgProgram_ = 0;
     struct EnvJob;
     std::shared_ptr<EnvJob> envJob_;
@@ -420,7 +440,8 @@ private:
         GLuint id = 0;
         GLint view = -1, proj = -1, gridOrigin = -1, gridStep = -1, viewport = -1, projScale = -1, baseColor = -1, paint = -1,
               showMask = -1, groups = -1, matcap = -1, matcapCavity = -1, dim = -1, primBase = -1, hasPaint = -1,
-              normalFlipY = -1, twoSided = -1, checker = -1, checkerScale = -1, tintShift = -1;
+              normalFlipY = -1, twoSided = -1, checker = -1, checkerScale = -1, tintShift = -1, lightRot = -1,
+              lightLevels = -1, alpha = -1;
         GLint hasOrm = -1, hasEmissive = -1, hasMatNormal = -1, envLevels = -1, exposure = -1, toneMap = -1, material = -1,
               pbrCavity = -1, viewToEnv = -1, sh = -1;
         GLint ghostGroups = -1, ghostRange = -1, ghostEdge = -1, ghostA = -1, ghostB = -1, ghostC = -1, ghostBound = -1, ghostKind = -1, ghostFocal = -1;

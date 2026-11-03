@@ -197,6 +197,7 @@ bool App::init(const AppOptions& options) {
     ai::setAiEnabled(ai::aiFeaturesAllowed(headless || !options.demo.empty() || aiSettings_.enabled));
     ai::registerAiCommands(commands_, [this] { return aiSettings_; });
     registerPaintUiCommands();
+    registerViewUiCommands(); // light, xray, view_resolution, save_render (PanelView.cpp)
     std::snprintf(falKey_, sizeof falKey_, "%s", aiSettings_.falKey.c_str());
     std::snprintf(falModel_, sizeof falModel_, "%s", aiSettings_.falModel.c_str());
     std::snprintf(meshyKey_, sizeof meshyKey_, "%s", aiSettings_.meshyKey.c_str());
@@ -976,6 +977,7 @@ int App::run() {
         const int samples = viewSamples();
         renderSettings_.motionProxy = perf_.proxyNow; // big meshes draw their lighter proxy while the view moves
         renderSettings_.materialTint = materialTintFor(doc_.paintColor); // (Color > Colour tints the material)
+        renderSettings_.resolutionScale = float(uiPrefs_.viewResolution) / 100.0f; // (#80; only the window's view)
         perf_.samplesUsed = renderer_.drawView(camera_, fbW, fbH, renderSettings_, canvasViewport(fbW, fbH), samples);
         if (snapshotEnv && *snapshotEnv && (sm.moving || sm.releasing)) {
             // Three points of the stroke, and the end (the frame the last dab reached the screen).
@@ -998,6 +1000,7 @@ int App::run() {
             }
         }
         renderSettings_.motionProxy = false; // (other renders, e.g. project thumbnails, draw in full)
+        renderSettings_.resolutionScale = 1.0f;
         mark();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         hardwareProfileFrameEnd();

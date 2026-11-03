@@ -98,6 +98,8 @@ constexpr GLbitfield GL_MAP_WRITE_BIT = 0x0002;
 constexpr GLbitfield GL_MAP_INVALIDATE_BUFFER_BIT = 0x0008;
 constexpr GLenum GL_UNSIGNED_SHORT = 0x1403;
 constexpr GLenum GL_CULL_FACE = 0x0B44;
+constexpr GLenum GL_FRONT = 0x0404;
+constexpr GLenum GL_BACK = 0x0405;
 constexpr GLenum GL_R16UI = 0x8234;
 constexpr GLenum GL_RED_INTEGER = 0x8D94;
 constexpr GLenum GL_R16I = 0x8233;
@@ -113,6 +115,7 @@ constexpr GLbitfield GL_COLOR_BUFFER_BIT = 0x4000;
     X(void, Scissor, GLint, GLint, GLsizei, GLsizei)                                         \
     X(void, Enable, GLenum)                                                                  \
     X(void, Disable, GLenum)                                                                 \
+    X(void, CullFace, GLenum)                                                                \
     X(void, DepthFunc, GLenum)                                                               \
     X(void, DepthMask, GLboolean)                                                            \
     X(void, ColorMask, GLboolean, GLboolean, GLboolean, GLboolean)                           \

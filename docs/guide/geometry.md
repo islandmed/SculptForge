@@ -109,6 +109,15 @@ vertex paint density and symmetry. **Project All** (**Tool > Parts > Project**) 
 the new topology after you divide it. Both have their own chapter: [Quad retopology and detail
 projection](retopology.md).
 
+## Close Holes
+
+**Tool > Geometry > Close Holes** caps every open boundary of the active Part, such as a hole, an open bottom or the
+rim of an extracted shell. The new patch's triangles are sized like the ones around the hole, and the patch follows
+the curve of the surface around it, so a hole in a sphere closes round, not flat. The rest of the Part is not changed.
+The patches get a [face group](face-groups.md) of their own, so you can mask or hide them in one click. Close Holes
+makes an open scan or an extracted part watertight without a remesh. <kbd>Ctrl</kbd>+<kbd>Z</kbd> brings the holes
+back.
+
 ## Decimate
 
 **Tool > Geometry > Decimate** reduces the triangle count while keeping the shape, using quadric edge collapse (the
@@ -201,6 +210,7 @@ each of them. Before a big change on a heavy sculpt:
 | `remesh` | `resolution` 32-512 voxels across the longest side (default 200); `keep_texture` (default true) |
 | `decimate` | `ratio` 0.01-1 of the triangles to keep (default 0.5), or `triangles` for an exact target |
 | `qremesh` | `target` quads (default 5000), `adaptive`, `keep_groups`, `detect_edges`, `use_polypaint`, `symmetry`, `keep_original`, `keep_texture`; see [Quad retopology](retopology.md#scripting) |
+| `close_holes` | `max_edges` closes only holes with at most that many boundary edges (default 0: all); `refine` (default true; false: as few triangles as possible); `new_group` (default true) |
 | `mirror_and_weld` | `axis` x, y, z or several, e.g. `xz` (default x); `side` positive (default) or negative |
 | `mirror` | `axis` (default x); `pivot` origin (default) or center |
 | `export_lods` | `path` (base name), `levels` 1-8 including LOD0 (default 4), `ratio` 0.1-0.9 (default 0.5) |

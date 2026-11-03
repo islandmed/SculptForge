@@ -369,12 +369,15 @@ uniform int uMatcap;          // 1: shade with the matcap texture instead of the
 uniform sampler2D uMatcapTex; // sRGB-encoded lit sphere (core/Matcap.h)
 uniform vec2 uMatcapCavity;   // crease darkening, ridge lift (sf::matcapCavity)
 uniform int uDim;             // 1: an inactive SubTool, shown a little darker and greyer
+uniform mat3 uLightRot;       // turns the light (Lit Sphere and studio) in view space (RenderSettings::lightYaw / Pitch)
+uniform vec2 uLightLevels;    // light intensity, ambient
+uniform float uAlpha;         // X-Ray: the see-through Parts' opacity (1 = opaque)
 uniform int uTwoSided;        // 1: back faces shade with the normal turned towards the viewer; 0: the motion proxy,
                               // whose folds face backwards on the outside of the surface
 out vec4 fragColor;
 vec4 finish(vec3 c) {
     if (uDim == 1) c = mix(c, vec3(dot(c, vec3(0.2126, 0.7152, 0.0722))), 0.25) * 0.72;
-    return vec4(pow(c, vec3(1.0 / 2.2)), 1.0);
+    return vec4(pow(c, vec3(1.0 / 2.2)), uAlpha);
 }
 // Keep in sync with sf::polygroupColor.
 vec3 groupColor(uint id) {
@@ -539,8 +542,9 @@ void main() {
         // View-aligned basis so the material stays put towards the edges of a perspective view.
         vec3 bx = normalize(vec3(v.z, 0.0, -v.x));
         vec3 by = cross(v, bx);
-        vec2 uv = vec2(dot(bx, n), dot(by, n)) * 0.495 + 0.5;
-        vec3 mc = pow(texture(uMatcapTex, uv).rgb, vec3(2.2));
+        vec3 ln = transpose(uLightRot) * n; // the normal turned against the light: the material's light turns
+        vec2 uv = vec2(dot(bx, ln), dot(by, ln)) * 0.495 + 0.5;
+        vec3 mc = pow(texture(uMatcapTex, uv).rgb, vec3(2.2)) * uLightLevels.x + uLightLevels.y * 0.6;
         // Starts above the curvature of a smooth sphere's own facets, so only real creases darken and a broad
         // stroke doesn't pool into a smear.
         float mcrease = smoothstep(0.03, 0.18, curvature);
@@ -550,8 +554,8 @@ void main() {
         fragColor = finish(c);
         return;
     }
-    vec3 key = normalize(vec3(0.45, 0.65, 0.6));
-    vec3 fill = normalize(vec3(-0.7, -0.1, 0.4));
+    vec3 key = uLightRot * normalize(vec3(0.45, 0.65, 0.6));
+    vec3 fill = uLightRot * normalize(vec3(-0.7, -0.1, 0.4));
     float diff = max((dot(n, key) + 0.25) / 1.25, 0.0);
     float fillL = max(dot(n, fill), 0.0) * 0.25;
     float hemi = 0.5 + 0.5 * n.y;
@@ -567,6 +571,7 @@ void main() {
     c *= mix(vec3(1.0), vec3(0.72, 0.55, 0.5), crease * 0.7); // warm, deeper colour in the cracks
     c += albedo * ridge * 0.3 * diff;                           // ridges catch the key light
     c += vec3(spec) * (1.0 - crease) + rim * vec3(0.8, 0.85, 1.0);
+    c = c * uLightLevels.x + albedo * uLightLevels.y * 0.6;
     if (uShowMask == 1) c *= 1.0 - 0.75 * clamp(V_MASK, 0.0, 1.0);
     fragColor = finish(c);
 }
@@ -886,6 +891,9 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     p.matcap = at("uMatcap");
     p.matcapCavity = at("uMatcapCavity");
     p.dim = at("uDim");
+    p.lightRot = at("uLightRot");
+    p.lightLevels = at("uLightLevels");
+    p.alpha = at("uAlpha");
     p.primBase = at("uPrimBase");
     p.hasPaint = at("uHasPaint");
     p.normalFlipY = at("uNormalFlipY");
@@ -2574,6 +2582,48 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
     gl::GetIntegerv(GL_MAX_SAMPLES, &maxSamples);
     samples = std::clamp(samples, 1, std::max(1, int(maxSamples)));
     if (directView_) samples = 1;
+    // Resolution scale (#80): the view drawn into a smaller target and scaled up into the window.
+    const float scale = std::clamp(settings.resolutionScale, 0.25f, 1.0f);
+    if (scale < 0.999f && !directView_ && !scaleFailed_) {
+        const int sw = std::max(1, int(std::lround(width * scale))), sh = std::max(1, int(std::lround(height * scale)));
+        const bool inset = viewport.w > 0 && viewport.h > 0;
+        Viewport small = viewport;
+        if (inset) {
+            small.x = int(std::lround(viewport.x * scale));
+            small.y = int(std::lround(viewport.y * scale));
+            small.w = std::max(1, int(std::lround(viewport.w * scale)));
+            small.h = std::max(1, int(std::lround(viewport.h * scale)));
+        }
+        int s = samples;
+        while (s > 1 && !viewTarget(sw, sh, s)) s /= 2;
+        if (s > 1 || viewTarget(sw, sh, 1)) {
+            gl::BindFramebuffer(GL_FRAMEBUFFER, viewFbo_);
+            draw(camera, sw, sh, settings, small);
+            for (int i = 0; i < 16 && gl::GetError() != GL_NO_ERROR; ++i) {
+            }
+            gl::BindFramebuffer(GL_READ_FRAMEBUFFER, viewFbo_);
+            gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, viewResolveFbo_);
+            gl::BlitFramebuffer(0, 0, sw, sh, 0, 0, sw, sh, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+            gl::BindFramebuffer(GL_FRAMEBUFFER, 0);
+            gl::Disable(GL_SCISSOR_TEST);
+            gl::Viewport(0, 0, width, height);
+            if (inset) { // the window around the view, as draw() leaves it
+                gl::ClearColor(viewport.surround.x, viewport.surround.y, viewport.surround.z, 1.0f);
+                gl::Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            }
+            gl::BindFramebuffer(GL_READ_FRAMEBUFFER, viewResolveFbo_);
+            gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+            if (inset)
+                gl::BlitFramebuffer(small.x, small.y, small.x + small.w, small.y + small.h, viewport.x, viewport.y,
+                                    viewport.x + viewport.w, viewport.y + viewport.h, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+            else gl::BlitFramebuffer(0, 0, sw, sh, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+            const GLenum blitError = gl::GetError();
+            gl::BindFramebuffer(GL_FRAMEBUFFER, 0);
+            if (blitError == GL_NO_ERROR) return s;
+            scaleFailed_ = true; // (don't try every frame)
+            SDL_Log("Scaled view copy to the window failed (GL error 0x%04x); drawing at full resolution", unsigned(blitError));
+        }
+    }
     while (samples > 1 && !viewTarget(width, height, samples)) samples /= 2;
     if (samples <= 1) {
         gl::BindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -2755,8 +2805,52 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
     gl::ActiveTexture(GL_TEXTURE0);
     gl::Enable(GL_POLYGON_OFFSET_FILL);
     gl::PolygonOffset(1.0f, 1.0f);
+    // X-Ray (#80, #91): the other Parts are see-through, or the active one when it is the only one shown.
+    const bool xray = settings.xray && !thumbnailPass_;
+    bool others = false;
     for (const DrawItem& item : drawList_)
-        if (const MeshSlot* s = findSlot(item.id); s && s->drawnTriangles > 0) drawSlot(*s, item.active, item.flat, settings);
+        if (const MeshSlot* s = findSlot(item.id); s && s->drawnTriangles > 0 && !item.active) others = true;
+    auto seeThrough = [&](const DrawItem& item) { return xray && (others ? !item.active : true); };
+    drawAlpha_ = 1.0f;
+    for (const DrawItem& item : drawList_)
+        if (const MeshSlot* s = findSlot(item.id); s && s->drawnTriangles > 0 && !seeThrough(item))
+            drawSlot(*s, item.active, item.flat, settings);
+    if (xray) {
+        gl::Enable(GL_BLEND);
+        gl::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        const float opacity = std::clamp(settings.xrayOpacity, 0.05f, 1.0f);
+        if (others) {
+            // Only each see-through Part's nearest surface: its depth first, then its colour where that depth is
+            // (no inside folds or back faces piling up), over the opaque active Part.
+            gl::ColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+            for (const DrawItem& item : drawList_)
+                if (const MeshSlot* s = findSlot(item.id); s && s->drawnTriangles > 0 && seeThrough(item))
+                    drawSlot(*s, item.active, item.flat, settings);
+            gl::ColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+            gl::DepthMask(GL_FALSE);
+            drawAlpha_ = opacity;
+            for (const DrawItem& item : drawList_)
+                if (const MeshSlot* s = findSlot(item.id); s && s->drawnTriangles > 0 && seeThrough(item))
+                    drawSlot(*s, item.active, item.flat, settings);
+        } else {
+            // The lone active Part: its back faces first, then its front faces over them, so its far side and
+            // insides show through in order (exact for a convex Part, close for the rest).
+            gl::DepthMask(GL_FALSE);
+            keepBackfaces_ = true;
+            drawAlpha_ = opacity;
+            for (GLenum cull : {GL_FRONT, GL_BACK}) {
+                xrayCull_ = cull;
+                for (const DrawItem& item : drawList_)
+                    if (const MeshSlot* s = findSlot(item.id); s && s->drawnTriangles > 0)
+                        drawSlot(*s, item.active, item.flat, settings);
+            }
+            xrayCull_ = 0;
+            keepBackfaces_ = false;
+        }
+        drawAlpha_ = 1.0f;
+        gl::DepthMask(GL_TRUE);
+        gl::Disable(GL_BLEND);
+    }
     proxyUsed_ = settings.motionProxy;
     gl::Disable(GL_POLYGON_OFFSET_FILL);
     for (GLenum unit : {kTexture7, kTexture6, GL_TEXTURE3, GL_TEXTURE1}) {
@@ -2835,7 +2929,7 @@ void Renderer::cull(const MeshSlot& s, const CullView& frame, bool proxy) {
         }
         return;
     }
-    v.backfaces = !v.ortho && s.closed && s.volume > 0.0 && !s.anyHidden && s.box.valid() &&
+    v.backfaces = !keepBackfaces_ && !v.ortho && s.closed && s.volume > 0.0 && !s.anyHidden && s.box.valid() &&
                   (e.x < s.box.min.x || e.y < s.box.min.y || e.z < s.box.min.z || e.x > s.box.max.x || e.y > s.box.max.y ||
                    e.z > s.box.max.z);
     auto reachesNear = [&](const ClusterBounds& b) {
@@ -2941,6 +3035,7 @@ void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const Render
     gl::Uniform1i(p->showMask, active && settings.showMask ? 1 : 0);
     gl::Uniform1i(p->groups, active && settings.showPolygroups ? 2 : 0);
     gl::Uniform1i(p->dim, !active && settings.dimInactive ? 1 : 0);
+    setLightUniforms(*p, settings);
     gl::Uniform1i(p->twoSided, 1);
     // Moving (Fast Navigation): a coarser target and half the budget, so orbiting stays smooth.
     const bool moving = settings.motionProxy;
@@ -2950,6 +3045,23 @@ void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const Render
     // (the budget is shared by the micro SubTools on screen: each gets it whole; one is the usual case)
     const_cast<MeshSlot&>(s).microDrawn = s.micro->draw(p->id, frameCull_, frameProj_, frameViewport_, budget, target);
     lastDrawn_ += s.microDrawn;
+}
+
+glm::mat3 lightRotation(float yawDegrees, float pitchDegrees) {
+    const float y = glm::radians(yawDegrees), p = glm::radians(pitchDegrees);
+    // Yaw about the view's up axis (+: the light moves right), then pitch about its side axis (+: up).
+    const glm::mat3 yaw(glm::vec3(std::cos(y), 0.0f, -std::sin(y)), glm::vec3(0.0f, 1.0f, 0.0f),
+                        glm::vec3(std::sin(y), 0.0f, std::cos(y)));
+    const glm::mat3 pitch(glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, std::cos(p), -std::sin(p)),
+                          glm::vec3(0.0f, std::sin(p), std::cos(p)));
+    return yaw * pitch;
+}
+
+void Renderer::setLightUniforms(const MeshProgram& p, const RenderSettings& settings) const {
+    const glm::mat3 r = lightRotation(settings.lightYaw, settings.lightPitch);
+    gl::UniformMatrix3fv(p.lightRot, 1, GL_FALSE, glm::value_ptr(r));
+    gl::Uniform2f(p.lightLevels, std::max(settings.lightIntensity, 0.0f), std::max(settings.lightAmbient, 0.0f));
+    gl::Uniform1f(p.alpha, drawAlpha_);
 }
 
 void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings) {
@@ -3016,6 +3128,7 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     gl::Uniform1i(p->showMask, active && settings.showMask && s.hasMask ? 1 : 0);
     gl::Uniform1i(p->groups, groups);
     gl::Uniform1i(p->dim, !active && settings.dimInactive ? 1 : 0);
+    setLightUniforms(*p, settings);
     gl::Uniform1i(p->twoSided, 1);
     gl::Uniform1i(p->checker, checker ? 1 : 0);
     gl::Uniform1f(p->checkerScale, checker ? s.overlay->checkerScale : 8.0f);
@@ -3030,7 +3143,8 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     const bool perTriangle = features & (kPrim | kTextured | kNormalMap); // (not kFlat: no per-triangle data)
     cull(s, frameCull_, settings.motionProxy && !perTriangle && !(active && settings.wireframe));
     // The back faces left in clusters along the silhouette: the GPU skips them too when they can't show.
-    if (cullBackfaces_) gl::Enable(GL_CULL_FACE);
+    if (cullBackfaces_ || xrayCull_) gl::Enable(GL_CULL_FACE);
+    if (xrayCull_) gl::CullFace(xrayCull_);
     // The predictive preview (render/Ghost.h): the clusters a ghost dab reaches draw with the GHOST program, the
     // rest as usual (most of the mesh, which then doesn't pay for the preview).
     // A draft stroke (Sculptor::draftStrokes) left the normals of the clusters it moved as they were: those draw
@@ -3083,6 +3197,7 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
         drawClusters(s, proxyClusters_, GL_TRIANGLES, Part::Proxy, -1);
     }
     gl::Disable(GL_CULL_FACE);
+    if (xrayCull_) gl::CullFace(GL_BACK);
 }
 
 // ---------------------------------------------------------------------------

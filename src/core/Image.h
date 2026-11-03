@@ -24,6 +24,8 @@ struct Image {
     static bool decode(const unsigned char* bytes, size_t size, Image& out, std::string& error);
     bool savePng(const std::string& path, std::string& error) const;
     bool encodePng(std::vector<uint8_t>& out) const;
+    // JPEG (no alpha: transparent pixels go over black) at `quality` 1-100.
+    bool saveJpg(const std::string& path, int quality, std::string& error) const;
     // Box-filtered copy whose longer side is at most `maxSide` (unchanged if already smaller).
     Image downscaled(int maxSide) const;
     // Crops to the opaque subject plus `margin` (fraction of its size) and centres

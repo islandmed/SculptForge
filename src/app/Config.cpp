@@ -109,6 +109,7 @@ Json toJson(const UiPrefs& p) {
     j.set("spaceMouse", toJson(p.spaceMouse));
     j.set("antialiasing", double(p.antialiasing));
     j.set("fastNavigation", p.fastNavigation);
+    j.set("viewResolution", double(p.viewResolution));
     j.set("multithreading", p.multithreading);
     j.set("predictiveStrokes", p.predictiveStrokes);
     j.set("draftStrokes", p.draftStrokes);
@@ -183,6 +184,10 @@ void fromJson(const Json& j, UiPrefs& p) {
     const int aa = int(j["antialiasing"].asNumber(p.antialiasing));
     p.antialiasing = aa >= 8 ? 8 : aa >= 4 ? 4 : aa >= 2 ? 2 : 1;
     p.fastNavigation = j["fastNavigation"].asBool(p.fastNavigation);
+    {
+        const int r = int(j["viewResolution"].asNumber(p.viewResolution));
+        p.viewResolution = r <= 50 ? 50 : r <= 75 ? 75 : 100;
+    }
     p.multithreading = j["multithreading"].asBool(p.multithreading);
     p.predictiveStrokes = j["predictiveStrokes"].asBool(p.predictiveStrokes);
     p.draftStrokes = j["draftStrokes"].asBool(p.draftStrokes);
@@ -353,6 +358,11 @@ void App::initActions() {
     add("edit.redo", "Redo", "Edit", "Ctrl+Shift+Z / Ctrl+Y", [this] { runCommand("redo"); }, ICON_LC_REDO_2, "redo", nullptr,
         [this] { return doc_.undo.canRedo(); });
     add("geometry.subdivide", "Subdivide", "Tool > Geometry", nullptr, [this] { runCommand("subdivide"); }, nullptr, "subdivide");
+    add("geometry.close_holes", "Close Holes", "Tool > Geometry", nullptr, [this] { runCommand("close_holes"); },
+        ICON_LC_CIRCLE_DOT, "close_holes", nullptr, nullptr,
+        "Cap every open boundary of the active Part (a hole, an open bottom, the rim of an extracted shell) with a "
+        "new patch sized like the polygons around it, so remeshing and sculpting see a closed surface. The rest of "
+        "the Part stays as it is; the patches get a face group of their own (#103).");
     // Subdivision levels (ZBrush Tool > Geometry; core/Multires.h).
     add("geometry.divide", "Divide", "Tool > Geometry", "Ctrl+D", [this] { runCommand("subdiv_divide", {{"smooth", smt_}}); },
         ICON_LC_GRID_2X2, "subdiv_divide", nullptr, nullptr,

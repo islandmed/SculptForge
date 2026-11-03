@@ -162,7 +162,9 @@ it smaller and bigger.
    reflections.
 3. Turn the view to a three-quarter angle, a little from above, and press <kbd>F</kbd>.
 4. Click **Save Render** at the bottom of **Render > Materials**. The status bar names the picture (twice the
-   size of the view); find it under **Library > Image**.
+   size of the view); find it under **Library > Image**. **Size** and the shape buttons (1:1, 16:9, 9:16, 4:3)
+   below it make a bigger or differently shaped picture, as a PNG or a JPG. **Light**, above it, turns the light
+   around the model.
 5. Press <kbd>Ctrl</kbd>+<kbd>S</kbd> to save the project.
 
 ![Render > Materials with PBR shading and Save Render](images/first-sculpt/12-material.jpg)

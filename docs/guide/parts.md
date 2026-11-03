@@ -84,6 +84,9 @@ You can also add files as Parts from elsewhere:
 - The eye on each row shows or hides that Part.
 - **Solo** shows only the active Part. Click it again to bring the others back. The **Solo** button on the right
   shelf does the same.
+- **X-Ray**, next to **Solo**, shows the active Part through the others: the other Parts turn see-through and only
+  their nearest surface shows. When only the active Part is shown, it is see-through itself. Click **X-Ray** again
+  to make them solid. **View > X-Ray** does the same.
 - **Unhide all** shows every Part.
 
 Hidden Parts aren't drawn, can't be selected with <kbd>Alt</kbd>+click, and are left out of exports.

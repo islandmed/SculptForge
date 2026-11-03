@@ -135,6 +135,9 @@
 //                            antialiasing (Preferences > Performance: 1, 2, 4, 8), view_samples (what the interactive
 //                            view draws with now: 1 while Fast Navigation moves a big scene), multithreading (1 on),
 //                            last_stroke_dabs (dabs of the last finished stroke)
+//                            xray (1 on), view_resolution (percent), light_yaw / light_pitch (degrees),
+//                            light_intensity, light_ambient, render_aspect (Save Render's shape: 0 view, 1 1:1, 2 16:9,
+//                            3 9:16, 4 4:3)
 //                            dynamic (1 while dynamic topology is on), dynamic_detail (its Detail, 0-100)
 //                            last_stroke_dabs (dabs of the last finished stroke), stroke_type (0 Dots, 1 DragRect,
 //                            2 DragDot, 3 Spray, 4 LazyMouse), vdms (VDM brush maps), vdm_files (.sfvdm in the library)
@@ -820,6 +823,13 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "stroking") return app_.drag_ == App::Drag::Stroke ? 1.0 : 0.0;
     if (name == "tablet_mouse_mode") return app_.uiPrefs_.tablet.mouseMode ? 1.0 : 0.0;
     if (name == "backface_culling") return app_.renderSettings_.backfaceCulling ? 1.0 : 0.0;
+    if (name == "xray") return app_.renderSettings_.xray ? 1.0 : 0.0;
+    if (name == "view_resolution") return double(app_.uiPrefs_.viewResolution);
+    if (name == "light_yaw") return double(app_.renderSettings_.lightYaw);
+    if (name == "light_pitch") return double(app_.renderSettings_.lightPitch);
+    if (name == "light_intensity") return double(app_.renderSettings_.lightIntensity);
+    if (name == "light_ambient") return double(app_.renderSettings_.lightAmbient);
+    if (name == "render_aspect") return double(app_.renderAspect_);
     if (name == "draw_ms") return app_.benchmarkDrawMs(30); // the 3D view drawn 30 times: ms per frame
     if (name == "drawn_triangles") { // the 3D view drawn once more now: the triangles it drew
         app_.benchmarkDrawMs(0);

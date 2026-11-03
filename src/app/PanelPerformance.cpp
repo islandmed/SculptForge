@@ -158,6 +158,12 @@ void App::drawPerformanceSection() {
     ui::HelpText("Antialiasing", nullptr,
                  "Samples per pixel in the 3D view: more smooths edges, fewer is faster on huge meshes.", kPath);
     ui::Segmented(*this, {"perf.aa_1", "perf.aa_2", "perf.aa_4", "perf.aa_8"});
+    ImGui::TextUnformatted(tr("View resolution"));
+    ui::HelpText("View resolution", nullptr,
+                 "Draw the 3D view at a share of the window's resolution and scale it up: 75% draws about half the "
+                 "pixels, 50% a quarter. For slow or integrated GPUs and big screens; Save Render stays sharp (#80).",
+                 kPath);
+    ui::Segmented(*this, {"perf.res_100", "perf.res_75", "perf.res_50"});
     bool fast = uiPrefs_.fastNavigation;
     if (ImGui::Checkbox(tr("Fast Navigation"), &fast)) actions_.find("perf.fast_navigation")->run();
     ui::HelpAction(*this, "perf.fast_navigation");

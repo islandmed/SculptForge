@@ -62,8 +62,8 @@ documentation** opens links to it).
   **Show** in **Render > Gaussian Splats** while you sculpt.
 - On laptops with two GPUs, make sure SculptForge runs on the dedicated one (in the GPU maker's control panel
   or the operating system's graphics settings).
-- **Edit > Preferences > Performance**: lower **Antialiasing** (or turn it off), keep **Fast Navigation** on, and look
-  at **Last stroke** to see whether brushes or the graphics card take the time. Step down a
+- **Edit > Preferences > Performance**: lower **Antialiasing** (or turn it off), try **View resolution** 75% or 50%,
+  keep **Fast Navigation** on, and look at **Last stroke** to see whether brushes or the graphics card take the time. Step down a
   [subdivision level](subdivision-levels.md) for big changes. See [Performance and big meshes](performance.md).
 - A Part missing from the view with "Not enough GPU memory" in the status bar didn't fit on the graphics
   card: hide other Parts or step down a level.

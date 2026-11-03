@@ -442,11 +442,13 @@ void App::registerShellActions() {
     // Cut (PanelCut.cpp, core/Cut.h): the same Ctrl+Shift drag, cutting instead of hiding.
     shape("cut.line", "Cut Line", "Tool > Cut", &hideShape_, SelectShape::CutLine,
           "Ctrl+Shift+drag a line: the shaded side is cut (Alt: the other side). Away removes it through the whole "
-          "Part and closes the cut flat; In steps it down by Depth; Add raises it.");
+          "Part and closes the cut flat; In steps it down by Depth; Add raises it; Clip presses it flat onto the line.");
     shape("cut.lasso", "Cut Lasso", "Tool > Cut", &hideShape_, SelectShape::CutLasso,
-          "Ctrl+Shift+drag a lasso: Away cuts a hole through the Part, In a pocket Depth deep, Add raises the shape.");
+          "Ctrl+Shift+drag a lasso: Away cuts a hole through the Part, In a pocket Depth deep, Add raises the shape, "
+          "Clip presses what lies outside it onto its outline.");
     shape("cut.rect", "Cut Rectangle", "Tool > Cut", &hideShape_, SelectShape::CutRect,
-          "Ctrl+Shift+drag a rectangle: Away cuts a hole through the Part, In a pocket Depth deep, Add a block.");
+          "Ctrl+Shift+drag a rectangle: Away cuts a hole through the Part, In a pocket Depth deep, Add a block, Clip "
+          "presses what lies outside it onto its edges.");
     shape("cut.polyline", "Cut Polyline", "Tool > Cut", &hideShape_, SelectShape::CutPolyline,
           "Ctrl+Shift+click points: click the first point to cut the polygon, double-click or Enter to cut along an "
           "open bent line (Alt: the other side), Esc to drop it.");
@@ -457,6 +459,10 @@ void App::registerShellActions() {
     cutMode("cut.away", "Away", 0, "Remove what the shape covers, through the whole Part, and close the cut with a flat cap.");
     cutMode("cut.in", "In", 1, "Cut a flat-bottomed pocket Depth deep where the shape covers the Part.");
     cutMode("cut.add", "Add", 2, "Add the shape, extruded Depth out of the surface, joined to the Part.");
+    cutMode("cut.clip", "Clip", 3,
+            "Remove nothing: press the shaded side of a line, or everything outside a lasso or rectangle, flat onto "
+            "the shape's outline, through the whole Part (#102). Hard-surface planes and clean silhouettes; the mask "
+            "holds parts back.");
     flag("draw.pressure_strength", "Pressure > Strength", nullptr, "Draw > Tablet", "", &pressureStrength_,
          "Pen pressure scales the brush strength.");
     flag("draw.pressure_size", "Pressure > Size", nullptr, "Draw > Tablet", "", &pressureSize_,

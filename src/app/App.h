@@ -593,7 +593,7 @@ private:
     void drawCutOverlay();
     void drawCutSection();
     bool maskFrontFacesOnly_ = false; // Mask Lasso / Rectangle: only vertices facing the viewer (#91.3)
-    int cutMode_ = 0;         // 0 Away, 1 In, 2 Add (core/Cut.h)
+    int cutMode_ = 0;         // 0 Away, 1 In, 2 Add, 3 Clip (core/Cut.h)
     float cutDepth_ = 0.1f;   // In / Add: fraction of the Part's size
     std::vector<ImVec2> cutPolyline_; // window pixels of the Polyline being placed
     // Screen selections (Selection.cpp): the rectangle or lasso dragged for
@@ -1439,7 +1439,23 @@ private:
     // The LightBox / picker shortcuts (, B M S) until the action registry dispatches keys.
     bool lightBoxKey(SDL_Keycode key, SDL_Keymod mod);
     void quickSave();                  // file.quicksave: a timestamped project in <library>/QuickSave
-    void saveRender();                 // render.save_image: the view as a PNG in <library>/Images
+    // Save Render (render.save_image, save_render): the view without the interface, by default as a PNG in
+    // <library>/Images at twice the view's size. `size` is the longer side (0 = twice the view, at most 4096),
+    // `aspect` width / height (0 = the view's); a different shape shows at least what the view shows.
+    struct RenderRequest {
+        int size = 0;
+        float aspect = 0.0f;
+        bool jpg = false;
+        std::string path; // "" = a new file in <library>/Images
+    };
+    bool saveRender(const RenderRequest& request, std::string& message);
+    void runSaveRender(); // with Material's size, shape and format (PanelView.cpp)
+    int renderAspect_ = 0, renderSize_ = 0; // Material > Save Render: indices into PanelView.cpp's lists
+    bool renderJpg_ = false;
+    // View controls (PanelView.cpp): X-Ray, the view's resolution, the light, Save Render's options.
+    void registerViewUiCommands();
+    void drawLightControls();
+    void drawSaveRenderControls();
     LibraryRoots library_;
     FolderScanner libraryScanner_;
     // ---- end LightBox (B) ----

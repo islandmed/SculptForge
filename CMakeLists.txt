@@ -71,6 +71,7 @@ add_library(sculptforge_core STATIC
   src/core/EnginePresets.cpp
   src/core/Masking.cpp
   src/core/Cut.cpp
+  src/core/CloseHoles.cpp
   src/core/BrushAlpha.cpp
   src/core/Stroke.cpp
   src/core/Precision.cpp
@@ -328,6 +329,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/AssetLibrary.cpp
     src/app/PanelMasking.cpp
     src/app/PanelCut.cpp
+    src/app/PanelView.cpp
     src/app/PanelPolygroups.cpp
     src/app/PanelSelectionSets.cpp
     src/app/Selection.cpp
