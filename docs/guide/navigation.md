@@ -62,7 +62,7 @@ they go the ZBrush way: drag up to zoom out, down to zoom in.
 Quick Menu. With it on, <kbd>Space</kbd> no longer opens the Quick Menu (a right click still does), and a space typed in
 a text field is never taken.
 
-**Start strokes off the model** is off by default. With it on (a label at the top of the canvas says so), a
+**Start strokes off the model** is off by default. With it on (a label at the top of the canvas says so for a few seconds; see [Hints and notices](interface.md#hints-and-notices)), a
 left-drag on the background no longer rotates: it waits, and the brush starts where the cursor first reaches the
 model, so strokes that begin at the silhouette never turn the view by accident. <kbd>Ctrl</kbd> (mask) and
 <kbd>Shift</kbd> (smooth) strokes start the same way, and a <kbd>Ctrl</kbd>+click on the background still inverts

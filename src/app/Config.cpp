@@ -1163,6 +1163,17 @@ void drawInterfaceSection(App& app) {
     ui::HelpText("Tooltip delay", nullptr,
                  "How long to point at an icon-only button (or a clipped label) before its name appears.",
                  "Preferences > Interface");
+    // Notices: mode chips over the 3D view and the like (Discord 11-02: "I don't need to see it there forever").
+    bool notices = p.showNotices;
+    if (ui::Checkbox(tr("Show hints and notices"), &notices)) app.setShowNotices(notices);
+    ui::HelpText("Show hints and notices", nullptr,
+                 "Short notices over the 3D view, such as \"Strokes start off the model\" for a few seconds after you turn "
+                 "that on. Off: none show. A notice's x hides just that one.",
+                 "Preferences > Interface");
+    ImGui::BeginDisabled(p.hiddenNotices.empty());
+    if (ImGui::Button(tr("Reset hidden notices"), ImVec2(-FLT_MIN, 0))) app.resetHiddenNotices();
+    ImGui::EndDisabled();
+    ui::HelpText("Reset hidden notices", nullptr, "Shows again the notices you hid with their x.", "Preferences > Interface");
     ImGui::Checkbox(tr("One sub-palette open"), &p.oneSubpalette);
     ui::HelpText("One sub-palette open", nullptr,
                  "Opening a sub-palette closes the others in that palette. Shift+click opens more than one.",

@@ -407,7 +407,7 @@ void Console::draw(App& app, const CanvasRect& rect) {
             x += bs + gap;
         }
         ImGui::SetCursorScreenPos(ImVec2(x, y));
-        if (ImGui::Button(ICON_LC_X "###console_close", ImVec2(bs, bs))) closeRequested_ = true;
+        if (ui::GlyphButton("###console_close", ICON_LC_X, ImVec2(bs, bs))) closeRequested_ = true;
         const std::string key = app.actions_.shortcutText("ui.console");
         ui::HelpText("Close the console", key.c_str(), "Hide the console. The log and the session script are kept.", "Script");
         ui::DelayedTooltip(("Close   " + key).c_str());

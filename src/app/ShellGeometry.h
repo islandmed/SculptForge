@@ -11,6 +11,16 @@
 
 namespace sf {
 
+// Whether a window saved as full screen opens full screen again (#35). Not on macOS (#41, #85): there full screen is a
+// Space of its own, and entered at start-up the traffic lights and menu bar can't be revealed; the window comes back
+// maximised instead.
+#if defined(__APPLE__)
+constexpr bool kMacWindows = true;
+#else
+constexpr bool kMacWindows = false;
+#endif
+constexpr bool restoresFullscreen(bool savedFullscreen, bool mac = kMacWindows) { return savedFullscreen && !mac; }
+
 struct ShellGeometry {
     CanvasRect notchBand;               // h 0 unless the top of the window is unsafe (camera notch)
     CanvasRect title, paletteBar;

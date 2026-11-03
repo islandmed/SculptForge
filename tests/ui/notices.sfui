@@ -1,0 +1,54 @@
+# Notices (Discord 11-02, ThinkingPolygons: "This is meant to be my default, I don't need to see it there forever").
+# A mode chip over the 3D view shows for a few seconds after its setting changes, then goes; its x hides it for good
+# (until Preferences > Interface > Reset hidden notices); Show hints and notices off hides them all.
+run ui_look look=classic layout=zbrush        # the Classic look and the ZBrush-style palette bar, as air_strokes.sfui
+run new_sphere subdivisions=3
+expect_value show_notices == 1
+expect_value hidden_notices == 0
+expect_value air_strokes_chip == 0            # off (the default): no chip
+
+# Turned on: the chip shows, then goes by itself; the setting stays on.
+click "Preferences##palette.preferences"
+click "Input##preferences.input"
+click "Start strokes off the model##input.air_strokes"
+expect_value air_strokes == 1
+expect_value air_strokes_chip == 1
+expect_text Strokes start off the model
+shot chip
+wait 4.5
+expect_value air_strokes_chip == 0
+expect_value air_strokes == 1
+expect_no_text Strokes start off the model
+
+# Off and on again: back for a few seconds; its x hides it for good.
+click "Start strokes off the model##input.air_strokes"
+click "Start strokes off the model##input.air_strokes"
+expect_value air_strokes_chip == 1
+key escape                                    # (a click outside the open Preferences only closes it)
+click "##hide_notice.air_strokes"
+expect_value air_strokes_chip == 0
+expect_value hidden_notices == 1
+expect_status notice hidden
+click "Preferences##palette.preferences"
+expect "Start strokes off the model##input.air_strokes"
+click "Start strokes off the model##input.air_strokes"
+click "Start strokes off the model##input.air_strokes"
+expect_value air_strokes_chip == 0
+
+# Reset hidden notices brings it back; Show hints and notices off hides every notice.
+click "Interface##preferences.interface"
+click "Reset hidden notices"
+expect_value hidden_notices == 0
+shot preferences-notices
+click "Show hints and notices"
+expect_value show_notices == 0
+click "Input##preferences.input"
+click "Start strokes off the model##input.air_strokes"
+click "Start strokes off the model##input.air_strokes"
+expect_value air_strokes_chip == 0
+click "Interface##preferences.interface"
+click "Show hints and notices"
+expect_value show_notices == 1
+click "Input##preferences.input"
+click "Start strokes off the model##input.air_strokes"
+expect_value air_strokes == 0

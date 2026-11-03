@@ -5,6 +5,18 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.10.9
+
+- **Brush previews fixed**: the shelf shows Tendril and Elastic Tendril as long horns pulled out past the ball, as
+  they behave in the viewport, and Layer and Nudge with clean shapes; previews are rebuilt once after updating.
+- **Library**: projects no longer show twice on Windows (#90); the close button stays on small screens and
+  <kbd>Esc</kbd> closes the Library (#80).
+- **Cleaner outlines**: the right shelf's outline draws correctly and the **x** buttons are centred (#98).
+- **Quieter notices**: **Strokes start off the model** shows its chip for a few seconds when you turn it on, then
+  it goes; click the chip's **x** to never see it again. **Preferences > Interface > Show hints and notices** turns
+  them all off, and **Reset hidden notices** brings them back.
+- **macOS**: a window closed in full screen reopens maximised, with the window buttons reachable (#85).
+
 ## Version 0.10.8
 
 - **Tablets in mouse mode work again**: on some Windows tablets with **Mouse mode** on (Preferences > Tablet) the

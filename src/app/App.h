@@ -158,6 +158,24 @@ private:
     void airStrokeTo(float x, float y);
     void airStrokeRelease();
     void drawAirStrokeIndicator();
+    // Notices (Preferences > Interface > Show hints and notices): a mode chip shows for a few seconds when its
+    // setting changes, never for good; its x (a click on it) hides it until Reset hidden notices.
+public:
+    bool noticeShown(const std::string& id) const; // notices are on and `id` isn't hidden
+    void hideNotice(const std::string& id);
+    void resetHiddenNotices();
+    void setShowNotices(bool on);
+private:
+    struct ModeChip {
+        bool seen = false, last = false; // the setting's value last frame (none before the first)
+        double until = 0.0;              // seconds (ImGui::GetTime): shown until then
+    };
+    static constexpr double kModeChipSeconds = 4.0;
+    // A chip over the top of the 3D view while `on` changed less than kModeChipSeconds ago; `id` names it for
+    // hideNotice. Returns whether it is shown this frame (UI tests read it).
+    bool drawModeChip(const char* id, bool on, const char* text, ModeChip& chip, float y);
+    ModeChip airStrokeChip_;
+    bool airStrokeChipShown_ = false;
     bool airMask_ = false;            // the waiting stroke masks (Ctrl held at the press)
     bool airMoved_ = false;           // it moved past the click slop (a Ctrl+click still inverts the mask)
     float airX_ = 0.0f, airY_ = 0.0f; // where it was pressed
@@ -1342,7 +1360,6 @@ private:
     static WindowState loadWindowState();
     void saveWindowState() const;
     bool rememberWindow_ = false;
-    bool fullscreenAfterFirstFrame_ = false; // macOS: the saved full screen, entered once the window is on screen (#41)
     void drawAxisGizmo();
     std::array<AxisGizmoEnd, 6> axisGizmoLayout() const; // the gizmo's ends on screen now (AxisGizmo.h)
     bool axisGizmoMouseDown(float x, float y);          // a click on an end: that side view (#43)

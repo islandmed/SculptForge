@@ -14,6 +14,7 @@
 #include "core/Tablet.h"
 
 #include <string>
+#include <vector>
 
 namespace sf {
 
@@ -54,6 +55,11 @@ struct UiPrefs {
     float dyntopoSmoothRemesh = 1.0f;
     bool airStrokes = false;  // start strokes off the model (#62): a left-drag on the background sculpts once it
                               // reaches the surface instead of turning the view (off: it turns the view, ZBrush)
+    // Preferences > Interface > Show hints and notices: mode chips over the 3D view (Strokes start off the model...)
+    // and other notices that would show every time. Off hides them all; a notice's own x hides just that one
+    // (`hiddenNotices`, App::hideNotice), until Reset hidden notices. Both are kept in project.json (no Store Config).
+    bool showNotices = true;
+    std::vector<std::string> hiddenNotices;
     bool showAxes = true;              // Draw > Camera > Axes: the X / Y / Z gizmo in the canvas corner (#31)
     bool cursorFollowsSurface = true; // the brush ring lies on the surface under the pointer, as in SculptGL (#25)
     // Preferences > Interface > Timeline position (#63): the Sculpt Timeline strip along the top of the viewport

@@ -117,6 +117,10 @@ void App::initProject() {
         // remembers neither and keeps the Classic look with the ZBrush-style layout; the new-look card offers the
         // new default once (PanelSupport.cpp).
         newLookCardDone_ = prefs["new_look_card_done"].asBool(false);
+        uiPrefs_.showNotices = prefs["show_notices"].asBool(true);
+        uiPrefs_.hiddenNotices.clear();
+        for (const Json& id : prefs["hidden_notices"].items())
+            if (id.isString() && uiPrefs_.hiddenNotices.size() < 256) uiPrefs_.hiddenNotices.push_back(id.asString());
         if (!uiPrefs_.lookSaved && !uiConfigDeterministic_) {
             UiPrefs saved = uiPrefs_;
             if (!lookFromJson(prefs["ui_look"], saved)) {
@@ -189,6 +193,10 @@ void App::saveProjectPrefs() {
         prefs.set("ui_look", std::move(look));
     }
     prefs.set("new_look_card_done", newLookCardDone_);
+    prefs.set("show_notices", uiPrefs_.showNotices); // (kept here, so they last without Store Config)
+    Json hidden = Json::array();
+    for (const std::string& id : uiPrefs_.hiddenNotices) hidden.push(id);
+    prefs.set("hidden_notices", std::move(hidden));
     std::ofstream(fsPath(prefDir_ + "project.json"), std::ios::binary | std::ios::trunc) << prefs.dump(true);
 }
 

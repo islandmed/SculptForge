@@ -312,6 +312,8 @@ Working with the strip:
 - Choose **1** to **4** rows of thumbnails.
 - **Open folder...** adds a folder of your own to the root of every tab.
 - On the Snapshots tab, **Save now** takes a snapshot.
+- The **x** at the right end of the header, or <kbd>Esc</kbd>, closes the Library (while you type in Filter,
+  <kbd>Esc</kbd> first leaves the field). The **x** stays on screen on small displays such as 1280x720.
 - Right-click a tile for **Open**, **Append as Part**, the image actions, **Show in file manager** and
   **Refresh thumbnail**.
 
@@ -524,10 +526,19 @@ choice for the next session, and each project keeps the background it was saved 
 
 ![The Preferences palette with the Config and Interface sub-palettes](images/preferences.jpg)
 
+### Hints and notices
+
+A setting that changes how strokes start, such as **Start strokes off the model** (Preferences > Input), shows a
+small chip over the top of the 3D view for a few seconds when you turn it on. Click the chip (its **x**) to stop
+showing it for good. **Preferences > Interface > Show hints and notices** (on by default) turns every such notice
+off; **Reset hidden notices** shows the ones you hid again. Both are remembered without Store Config.
+
 ### Fullscreen, the palette bar and the camera notch
 
 - <kbd>F11</kbd> (or **Render > Fullscreen**) fills the screen with SculptForge; press it again to go back to
-  a window. `sculptforge --fullscreen` starts that way.
+  a window. `sculptforge --fullscreen` starts that way. SculptForge reopens the way you left it; on macOS a window
+  closed in full screen reopens maximised instead, so the menu bar and the window buttons stay reachable (press
+  <kbd>F11</kbd> or the green button to go full screen again).
 - **Menus** in the title strip hides the palette bar; click it again to bring it back.
 - <kbd>Tab</kbd> hides the shelves and trays.
 - On MacBooks with a camera notch, SculptForge keeps the interface below the notch when it fills the screen

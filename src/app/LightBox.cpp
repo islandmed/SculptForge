@@ -186,7 +186,7 @@ void LightBox::rootEntries(App& app, std::vector<AssetEntry>& out) {
         std::vector<AssetEntry> files = scan(userDir, true);
         for (const std::string& p : app.recentFiles_)
             if (isProjectFile(p) &&
-                std::none_of(files.begin(), files.end(), [&](const AssetEntry& e) { return e.path == p; })) {
+                std::none_of(files.begin(), files.end(), [&](const AssetEntry& e) { return samePath(e.path, p); })) {
                 AssetEntry e;
                 e.kind = AssetKind::Project;
                 e.name = utf8(fsPath(p).stem());
@@ -651,14 +651,18 @@ void LightBox::drawHeader(App& app, float width) {
                               buttonW(ICON_LC_SMARTPHONE) + 8.0f * scale;
         const float feedbackW =
             buttonW(compactFeedback ? ICON_LC_MESSAGE_SQUARE_PLUS : ICON_LC_MESSAGE_SQUARE_PLUS "  Fixes & suggestions");
-        return saveW + filterW + rowsW + folderW + feedbackW + closeW + 4 * 8.0f * scale;
+        return saveW + filterW + rowsW + folderW + feedbackW + 4 * 8.0f * scale;
     };
-    const float room = right - leftEnd - 8.0f;
+    // The close button is pinned to the right edge (#80: on a 720p screen the group ran past it and hid it); the
+    // rest gets what is left between the tabs and it, clipped if even the compact group doesn't fit.
+    const float groupRight = right - closeW - 8.0f * scale;
+    const float room = groupRight - leftEnd - 8.0f;
     if (room < groupW()) compact = true;
     // A shorter filter before an icon-only "Fixes & suggestions" (it is the startup screen's way to reach us).
     if (room < groupW() && filterW - (groupW() - room) < 70.0f * scale) compactFeedback = true;
     if (room < groupW()) filterW = std::max(70.0f * scale, filterW - (groupW() - room));
-    ImGui::SetCursorScreenPos(ImVec2(std::max(leftEnd + 8.0f, right - groupW()), origin.y));
+    ImGui::SetCursorScreenPos(ImVec2(std::max(leftEnd + 8.0f, groupRight - groupW()), origin.y));
+    ImGui::PushClipRect(ImVec2(leftEnd, origin.y), ImVec2(groupRight, origin.y + kHeader * scale), true);
     if (quickTab) {
         if (ImGui::Button(compact ? ICON_LC_SAVE "###QuickSave now" : ICON_LC_SAVE "  Save now###QuickSave now"))
             app.quickSave();
@@ -698,9 +702,11 @@ void LightBox::drawHeader(App& app, float width) {
                       "https://github.com/islandmed/SculptForge/issues/new/choose";
     }
     ui::HelpAction(app, "help.feedback");
-    ImGui::SameLine(0, 8 * scale);
-    if (ImGui::Button(ICON_LC_X "##lbclose", ImVec2(closeW, 0))) open_ = false;
-    ui::HelpText("Close Library", ",", "Hide the Library (comma toggles it).", "Library");
+    ImGui::PopClipRect();
+    ImGui::SameLine();
+    ImGui::SetCursorScreenPos(ImVec2(right - closeW, origin.y));
+    if (ui::GlyphButton("##lbclose", ICON_LC_X, ImVec2(closeW, closeW))) open_ = false;
+    ui::HelpText("Close Library", ",", "Hide the Library (comma toggles it; Esc closes it).", "Library");
 
     const float y = origin.y + kHeader * scale - 2.0f;
     dl->AddLine(ImVec2(origin.x - 8, y), ImVec2(right + 8, y), kHeaderLine, 1.0f);
@@ -731,6 +737,10 @@ void LightBox::draw(App& app, const CanvasRect& canvas) {
     layout.lightboxTab = libraryTabId(place_.tab);
     layout.lightboxRows = std::clamp(layout.lightboxRows, 1, 4);
     app.libraryScanner_.poll(ImGui::GetTime());
+    // Esc closes the Library (#80), unless a picker, a pop-up or a text field has the keys (they take Esc first).
+    if (open_ && ImGui::IsKeyPressed(ImGuiKey_Escape, false) && !ImGui::GetIO().WantCaptureKeyboard &&
+        !ImGui::IsAnyItemActive() && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel))
+        open_ = false;
     if (!open_) {
         pressing_ = tileDrag_ = false;
         return;

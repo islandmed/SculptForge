@@ -622,7 +622,7 @@ void UserGuide::drawToolbar(App& app) {
     ui::HelpText("Search", "Ctrl+F", "Find every place in the guide that mentions all of these words.", "Help > User Guide");
     if (query_[0]) {
         ImGui::SameLine(0, 2.0f * s);
-        if (ImGui::Button(ICON_LC_X "##guide_clear")) query_[0] = '\0';
+        if (ui::GlyphButton("##guide_clear", ICON_LC_X, ImVec2(ImGui::GetFrameHeight(), 0))) query_[0] = '\0';
         ui::DelayedTooltip("Clear the search");
     }
     if (lastQuery_ != query_) {

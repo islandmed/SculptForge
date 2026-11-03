@@ -55,6 +55,8 @@ constexpr Entry kSpanish[] = {
     {"Green", "Verde"},
     {"Amber", "Ámbar"},
     {"Scanlines & glow", "Líneas de barrido y brillo"},
+    {"Show hints and notices", "Mostrar avisos y consejos"},
+    {"Reset hidden notices", "Restablecer avisos ocultos"},
     {"ZBrush-style", "Estilo ZBrush"},
     {"AI brush provider", "Proveedor del pincel IA"},
     {"Autosave", "Autoguardado"},

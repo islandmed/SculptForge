@@ -708,16 +708,80 @@ void App::airStrokeRelease() {
 }
 
 void App::drawAirStrokeIndicator() {
-    if (!uiPrefs_.airStrokes) return;
+    // (ThinkingPolygons, Discord 11-02: on for good, the chip shouldn't stay on screen for good.)
+    airStrokeChipShown_ = drawModeChip("air_strokes", uiPrefs_.airStrokes, tr("Strokes start off the model"), airStrokeChip_,
+                                       timelineTopInset_ + 10.0f * uiScale_); // (below a top timeline)
+}
+
+bool App::noticeShown(const std::string& id) const {
+    return uiPrefs_.showNotices &&
+           std::find(uiPrefs_.hiddenNotices.begin(), uiPrefs_.hiddenNotices.end(), id) == uiPrefs_.hiddenNotices.end();
+}
+
+void App::hideNotice(const std::string& id) {
+    if (std::find(uiPrefs_.hiddenNotices.begin(), uiPrefs_.hiddenNotices.end(), id) == uiPrefs_.hiddenNotices.end())
+        uiPrefs_.hiddenNotices.push_back(id);
+    saveProjectPrefs();
+}
+
+void App::setShowNotices(bool on) {
+    uiPrefs_.showNotices = on;
+    saveProjectPrefs();
+}
+
+void App::resetHiddenNotices() {
+    uiPrefs_.hiddenNotices.clear();
+    saveProjectPrefs();
+}
+
+bool App::drawModeChip(const char* id, bool on, const char* text, ModeChip& chip, float y) {
+    const double now = ImGui::GetTime(); // (the UI's clock, which UI tests step)
+    if (chip.seen && on != chip.last) {
+        chip.until = on ? now + kModeChipSeconds : 0.0;
+        if (on) // keep drawing through the fade (the redraw loop's clock is SDL's)
+            activeUntil_ = std::max(activeUntil_, double(SDL_GetTicksNS()) * 1e-9 + kModeChipSeconds + 0.1);
+    }
+    chip.seen = true;
+    chip.last = on;
+    if (!on || now >= chip.until || !noticeShown(id)) return false;
+    // Fades out over its last half second.
+    const float alpha = float(std::clamp((chip.until - now) / 0.5, 0.0, 1.0));
     const CanvasRect c = canvasRect();
-    const char* text = tr("Strokes start off the model");
-    const ImVec2 size = ImGui::CalcTextSize(text);
-    const float pad = 6.0f * uiScale_;
-    const ImVec2 at(c.x + (c.w - size.x) * 0.5f, c.y + timelineTopInset_ + 10.0f * uiScale_); // (below a top timeline)
-    ImDrawList* dl = ImGui::GetForegroundDrawList();
-    dl->AddRectFilled(ImVec2(at.x - pad, at.y - pad * 0.5f), ImVec2(at.x + size.x + pad, at.y + size.y + pad * 0.5f),
-                      IM_COL32(0, 0, 0, 110), 4.0f * uiScale_);
-    dl->AddText(at, theme::u32(theme::accent), text);
+    const float s = uiScale_, pad = 6.0f * s;
+    const char* close = ICON_LC_X;
+    const ImVec2 size = ImGui::CalcTextSize(text), xs = ImGui::CalcTextSize(close);
+    const ImVec2 box(size.x + xs.x + 3.0f * pad, size.y + pad);
+    const ImVec2 at(std::floor(c.x + (c.w - box.x) * 0.5f), std::floor(c.y + y - pad * 0.5f));
+    // A small window of its own, so a click on it is the chip's and never starts a stroke.
+    ImGui::SetNextWindowPos(at);
+    ImGui::SetNextWindowSize(box);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(1, 1));
+    const std::string name = std::string("##modechip.") + id;
+    bool hidden = false;
+    if (ImGui::Begin(name.c_str(), nullptr,
+                     ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoSavedSettings |
+                         ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove)) {
+        ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow()); // over a palette window under it, as drawn
+        hidden = ImGui::InvisibleButton((std::string("##hide_notice.") + id).c_str(), box);
+        const bool hovered = ImGui::IsItemHovered();
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        dl->AddRectFilled(at, ImVec2(at.x + box.x, at.y + box.y), IM_COL32(0, 0, 0, int(110 * alpha)), 4.0f * s);
+        dl->AddText(ImVec2(at.x + pad, at.y + pad * 0.5f), theme::u32(theme::accent, alpha), text);
+        ui::CentredGlyph(dl, nullptr, ImVec2(at.x + box.x - xs.x - 1.5f * pad, at.y), ImVec2(at.x + box.x - 0.5f * pad, at.y + box.y),
+                         theme::u32(hovered ? theme::text : theme::textDim, alpha), close);
+        ui::DelayedTooltip("Don't show this again (Preferences > Interface > Reset hidden notices brings it back)");
+        ImGui::LogText("%s", text);
+    }
+    ImGui::End();
+    ImGui::PopStyleVar(3);
+    if (hidden) {
+        hideNotice(id);
+        status_ = std::string(text) + ": notice hidden (Preferences > Interface > Reset hidden notices)";
+        return false;
+    }
+    return true;
 }
 
 } // namespace sf

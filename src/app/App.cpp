@@ -134,15 +134,11 @@ bool App::init(const AppOptions& options) {
     }
     if (rememberWindow_) { // #35: where and how big it was last time
         if (saved.placed) SDL_SetWindowPosition(window_, saved.x, saved.y);
-#if defined(__APPLE__)
-        // #41: full screen on macOS is its own Space, entered from a window already on screen and key; entered
-        // here, before the first frame, the menu bar and traffic lights couldn't be revealed. The loop enters it
-        // after the first swap instead.
-        if (saved.fullscreen) fullscreenAfterFirstFrame_ = true;
-#else
-        if (saved.fullscreen) SDL_SetWindowFullscreen(window_, true);
-#endif
-        else if (saved.maximized) SDL_MaximizeWindow(window_);
+        if (restoresFullscreen(saved.fullscreen)) SDL_SetWindowFullscreen(window_, true);
+        // #41, #85: on macOS full screen is a Space of its own; entered at start-up (before the first frame, or right
+        // after it) the menu bar and traffic lights couldn't be revealed. A window that was full screen comes back
+        // filling the screen as a maximised window instead (the green button, or F11, takes it full screen again).
+        else if (saved.maximized || saved.fullscreen) SDL_MaximizeWindow(window_);
     }
     {
         Image icon;
@@ -1072,11 +1068,6 @@ int App::run() {
         hardwareProfileFrameEnd();
         if (proof_) proofBeforeSwap(fbW, fbH); // Help > Benchmark: timing, video capture, the scripted pointer
         SDL_GL_SwapWindow(window_);
-        if (fullscreenAfterFirstFrame_) { // (#41, macOS: the window is shown now; raise it, then full screen)
-            fullscreenAfterFirstFrame_ = false;
-            SDL_RaiseWindow(window_);
-            SDL_SetWindowFullscreen(window_, true);
-        }
         mark();
         if (phases == 7 && phase[6] - phase[0] > frameLogMs)
             SDL_Log("frame %.1f ms: events %.1f, dabs %.1f, UI %.1f, ghost + sync %.1f, draw %.1f, UI draw + swap %.1f",

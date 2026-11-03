@@ -465,6 +465,9 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "look") return double(app_.uiPrefs_.look.look); // 0 Classic, 1 Forge Terminal, 2 Phosphor, 3 Blueprint
     if (name == "shell_layout") return double(app_.uiPrefs_.shellLayout); // 0 ZBrush-style, 1 SculptForge
     if (name == "air_strokes") return app_.uiPrefs_.airStrokes ? 1.0 : 0.0;
+    if (name == "air_strokes_chip") return app_.airStrokeChipShown_ ? 1.0 : 0.0; // the mode chip over the 3D view
+    if (name == "hidden_notices") return double(app_.uiPrefs_.hiddenNotices.size());
+    if (name == "show_notices") return app_.uiPrefs_.showNotices ? 1.0 : 0.0;
     if (name == "space_held") return app_.spaceHeld_ ? 1.0 : 0.0;
     if (name == "radial_open") return app_.radial_.menu >= 0 ? 1.0 : 0.0;
     if (name == "radial_menu") return double(app_.radial_.menu); // -1: none open
