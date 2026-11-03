@@ -8,8 +8,10 @@ of relearning. SculptForge has its own keymap and offers ZBrush-style, Blender a
 New installs start in SculptForge's own layout, with menus by task. For the alphabetical palette bar and the
 two-row top shelf you know, click **Coming from ZBrush? Use the ZBrush-style layout** in the welcome, or pick
 **Edit > Preferences > Interface > Look > Layout > ZBrush-style** (see [Looks and layouts](interface.md#looks-and-layouts)).
-The palette paths in this guide (**Tool > Parts**) work in both: in the SculptForge layout the palettes are
-sections of the menus, and <kbd>F3</kbd> finds any of them.
+Paths in this guide name the SculptForge layout's menus. In the ZBrush-style layout, leave out the menu:
+**Edit > Preferences > Input** is the palette named **Preferences**, **Sculpt > Stroke** the palette named
+**Stroke**; **Tool > Parts** is the same in both. See [Menus and palettes](interface.md#menus-and-palettes) for
+every palette's menu, and <kbd>F3</kbd> finds any of them by name.
 
 ## ZBrush terms in SculptForge
 
@@ -79,7 +81,7 @@ either. See [Keyboard and mouse](shortcuts.md#zbrush-style-keys) for the full li
 
 ## What's the same
 
-- **The layout.** Shelves around the canvas, palettes in alphabetical order in the palette bar and the trays,
+- **The layout** (in the ZBrush-style layout). Shelves around the canvas, palettes in alphabetical order in the palette bar and the trays,
   sub-palettes that fold, the Library on <kbd>,</kbd>, Ctrl-hover help on every control, Ctrl+Alt+click to
   assign a hotkey, **Store Config** on <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>. See
   [The interface](interface.md).

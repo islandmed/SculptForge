@@ -209,7 +209,7 @@ SculptForge keeps its settings in one folder per user:
 | `brush-gallery-cache/`, `brush-gallery.json` | Community brush gallery cache and its address |
 | `thumbs/` | Cached Library and picker thumbnails (safe to delete) |
 
-Your **library folder** (projects, tools, alphas, images, splats and QuickSaves shown in the Library) is
+Your **library folder** (projects, tools, alphas, images, splats and snapshots shown in the Library) is
 separate: `Documents/SculptForge` by default, changeable in **Edit > Preferences > Library > Library folder**.
 
 > **Tip:** To move settings to another computer, copy `ui.json`, `ai.json` and the `brushes` folder. For a

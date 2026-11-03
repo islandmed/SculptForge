@@ -1,19 +1,20 @@
-# Screenshots for the user guide (docs/guide/images). Run from the source folder:
+# Screenshots for the user guide (docs/guide/images), in the default look and layout (Forge Terminal, Tokyo Night,
+# the SculptForge layout's task menus). Run from the source folder:
 #   build/sculptforge --ui-test tools/guide/shots.sfui --ui-out build/guide-shots
 #   python3 tools/guide/make_images.py build/guide-shots
+# For the HiDPI check, run it again with --size 3200x1920 (the same layout at 2x) and look at the shots.
 # make_images.py crops, labels and compresses them into docs/guide/images.
+run ui_look look=forge scheme=tokyo_night layout=sculptforge
 run open path=assets/demo/lion-head.glb
 wait_idle 20
 shot overview
 
-# Palettes: a drop-down, then the same palette in the right tray.
-click "Draw##palette.draw"
+# Menus: the Sculpt menu on its Draw & Tablet and Stroke sections, then the Stroke palette in the right tray.
+click "Sculpt##menu.sculpt"
+click "Draw & Tablet##section.draw"
 shot draw-palette
-key escape
-click "File##palette.file"
+click "Stroke##section.stroke"
 shot palette-dropdown
-key escape
-click "Stroke##palette.stroke"
 click "Stroke/##totray"
 click "Tool/Parts"
 shot palette-tray
@@ -68,7 +69,8 @@ key backtick
 expect_value console_open == 0
 
 # Preferences: Config and Interface open (Shift+click keeps both).
-click "Preferences##palette.preferences"
+click "Edit##menu.edit"
+click "Preferences##section.preferences"
 click "Preferences/Config"
 hold shift
 click "Preferences/Interface"
@@ -77,35 +79,45 @@ shot preferences
 key escape
 
 # Brushes: Brush Lab, the Brush palette's custom brushes with their menu, the community gallery.
+click "Sculpt##menu.sculpt"
+click "Brush##section.brush"
 click "AI Brush"
 wait 0.3
 shot brush-lab
+click "Sculpt##menu.sculpt"
+click "Brush##section.brush"
 click "AI Brush"
-click "Brush##palette.brush"
+key escape
+click "Sculpt##menu.sculpt"
+click "Brush##section.brush"
 right_click "Wrinkle"
 wait 0.2
 shot brush-library
 key escape
 key escape
-click "Brush##palette.brush"
+click "Sculpt##menu.sculpt"
+click "Brush##section.brush"
 click "Community brushes##ui.brush_gallery"
 key escape
 wait_idle 30
 wait 1
 shot community-brushes
-click "Brush##palette.brush"
+click "Sculpt##menu.sculpt"
+click "Brush##section.brush"
 click "Community brushes##ui.brush_gallery"
 key escape
 expect_not "Community brushes/Share yours"
 
 
 # Generate 3D and the Tool > Export sub-palette.
-click "Generate##palette.generate"
+click "Mesh##menu.mesh"
+click "Generate 3D##section.generate"
 click "Generate 3D##ui.generate3d"
 drop ../../assets/demo/teddy-sketch.png
 wait 0.5
 shot generate-3d
-click "Generate##palette.generate"
+click "Mesh##menu.mesh"
+click "Generate 3D##section.generate"
 click "Generate 3D##ui.generate3d"
 key escape
 expect_not "Generate 3D/From image"
@@ -126,7 +138,7 @@ run mask_clear
 # Vertex Paint: cavity paint, with the Color palette.
 run paint_fill color=bone
 run paint_from_cavity color=4a2c18 strength=0.9
-click "Color##palette.color"
+click "Paint##menu.paint"
 wait 0.2
 shot polypaint
 key escape
@@ -194,15 +206,16 @@ click "Wire##view.polyf"
 # Gaussian splats made from the lion.
 run open path=assets/demo/lion-head.glb
 run mesh_to_splats
-click "Render##palette.render"
+click "View##menu.view"
 click "Show Mesh"
 key escape
-click "Splats##palette.splats"
+click "Render##menu.render"
+click "Gaussian Splats##section.splats"
 wait 0.3
 shot splats
 key escape
 run splat_clear
-click "Render##palette.render"
+click "View##menu.view"
 click "Show Mesh"
 key escape
 
@@ -339,7 +352,8 @@ camera 25 5
 zoom 1.6
 wait 0.2
 shot shading-smooth
-click "Material##palette.material"
+click "Render##menu.render"
+click "Materials##section.material"
 click "Flat##material.flat"
 run subtool_shading name=Eyes mode=smooth
 wait 0.2
@@ -354,7 +368,8 @@ run set_shading mode=smooth
 run new_sphere subdivisions=5
 run load_matcap path=tests/ui/data/Gold.png
 camera 20 10
-click "Material##palette.material"
+click "Render##menu.render"
+click "Materials##section.material"
 wait_idle 20
 wait 0.2
 shot custom-matcaps

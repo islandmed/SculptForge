@@ -177,7 +177,7 @@ To choose one:
   previous material back.
 - Open **Render > Materials**, or the **Material** tab of the Library.
 
-![The material picker with the seven Lit Spheres and Studio](images/material-picker.jpg)
+![The material picker with the built-in Lit Spheres and Studio](images/material-picker.jpg)
 
 Vertex Paint multiplies the material, and cavity shading stays on with every material (strongest with Sculpt). The
 material is saved with the project: projects saved with Studio open with Studio.

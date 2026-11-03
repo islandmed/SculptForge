@@ -5,7 +5,7 @@ ZBrush's **Sculptris Pro** and Blender's **Dyntopo** do. Pull a sphere out into 
 new shapes get triangles of their own instead of stretched ones; block in a creature from a ball without
 remeshing first.
 
-![A sphere with horns pulled out by Tendril with Dynamic on, in Polyframe and shaded](images/dynamic-topology.jpg)
+![A sphere with horns pulled out by Tendril with Dynamic on, as wireframe and shaded](images/dynamic-topology.jpg)
 
 ## Turn it on
 
@@ -90,7 +90,7 @@ triangles merges them over several dabs rather than all at once, to keep the bru
 
 ```
 dyntopo enabled=true detail=60
-stroke points="0.3,0.6,1 0.5,0.4,1" brush=SnakeHook radius=0.2 symmetry=x
+stroke points="0.3,0.6,1 0.5,0.4,1" brush=Tendril radius=0.2 symmetry=x
 dyntopo enabled=false
 ```
 

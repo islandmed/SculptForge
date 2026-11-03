@@ -39,7 +39,7 @@ of the canvas, once, and never again after you close it.
   face group. See [Masking](masking.md) and [Face Groups and visibility](face-groups.md).
 - **Keep separate meshes** as Parts (body, eyes, teeth, armour), each with its own undo history. See
   [Parts](parts.md).
-- **Paint colour** on the surface (vertex paint) and look at the model through seven Lit Sphere materials. See
+- **Paint colour** on the surface (vertex paint) and look at the model through the built-in Lit Sphere materials or your own. See
   [Vertex Paint and materials](vertex-paint.md).
 - **Sculpt layers** that double as blend shapes (morph targets), with live weights. See [Sculpt layers and
   blend shapes](layers.md).
