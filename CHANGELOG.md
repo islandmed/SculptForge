@@ -22,6 +22,10 @@ All notable changes to SculptForge are listed here. The format follows
   starts from the current values. **Brush > Save Brush Settings** keeps them for every start (`brush-settings.json`
   in the user data folder), **Brush > Reset Brush to Default** restores the shipped values, and **Preferences >
   Input > Share size and intensity across brushes** (off by default) keeps Draw Size and Z Intensity shared as before.
+- **Gizmo size** (Draw > Camera): the corner axes come in Small, Medium (as before, the default) and Large, on top
+  of the UI scale; clicking an end still snaps to that side at every size. Saved in the preferences.
+- **View Figure** (Draw > Camera, beside Axes, off by default): a small shaded head in the canvas corner that turns
+  with the camera; click it to snap to the nearest side view. Requested on Discord.
 
 ### Fixed
 - Blender style: Alt+left-drag on the model masks and Ctrl+Alt+left-drag unmasks, as Blender 5.1+'s default

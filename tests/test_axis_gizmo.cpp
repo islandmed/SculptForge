@@ -47,3 +47,36 @@ TEST(axis_gizmo_ends_snap_to_the_side_they_point_at) {
         CHECK(ends[size_t(i)].depth > 0.99f);
     }
 }
+
+TEST(axis_gizmo_hit_works_at_every_size) {
+    // Draw > Camera > Gizmo size: the ends and the click radius scale together, so each end is still the one hit.
+    Camera c;
+    c.yaw = glm::radians(30.0f);
+    c.pitch = glm::radians(-20.0f);
+    CHECK(axisGizmoScale(0) < axisGizmoScale(1) && axisGizmoScale(1) == 1.0f && axisGizmoScale(1) < axisGizmoScale(2));
+    for (int size = 0; size < 3; ++size)
+        for (float uiScale : {1.0f, 2.0f}) {
+            const float unit = uiScale * axisGizmoScale(size);
+            const auto ends = axisGizmoEnds(glm::mat3(c.view()), glm::vec2(200.0f, 200.0f), 34.0f * unit);
+            for (int i = 0; i < 6; ++i) {
+                const glm::vec2 p = ends[size_t(i)].at + glm::vec2(4.0f, -3.0f) * unit;
+                const int hit = axisGizmoHit(ends, p.x, p.y, 9.0f * unit);
+                CHECK(hit >= 0 && ends[size_t(hit)].axis == ends[size_t(i)].axis &&
+                      ends[size_t(hit)].negative == ends[size_t(i)].negative);
+            }
+            CHECK(axisGizmoHit(ends, 200.0f + 34.0f * unit * 2.0f, 200.0f, 9.0f * unit) == -1);
+        }
+}
+
+TEST(view_figure_snaps_to_the_nearest_side) {
+    // A view a little off the right side snaps to the right; one mostly from above snaps to the top.
+    Camera c;
+    c.yaw = glm::radians(70.0f);
+    c.pitch = glm::radians(-15.0f);
+    int facing = axisGizmoFacing(axisGizmoEnds(glm::mat3(c.view()), glm::vec2(0.0f), 30.0f));
+    CHECK(std::strcmp(axisGizmoView(facing % 3, facing >= 3).action, "view.right") == 0);
+    c.yaw = glm::radians(20.0f);
+    c.pitch = glm::radians(-60.0f);
+    facing = axisGizmoFacing(axisGizmoEnds(glm::mat3(c.view()), glm::vec2(0.0f), 30.0f));
+    CHECK(std::strcmp(axisGizmoView(facing % 3, facing >= 3).action, "view.top") == 0);
+}

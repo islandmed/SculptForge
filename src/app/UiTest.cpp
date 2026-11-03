@@ -679,6 +679,9 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "timeline_top") return app_.uiPrefs_.timelineTop ? 1.0 : 0.0;
     // The style's minimum window height in unscaled px (32): switching looks must not scale it again each time.
     if (name == "style_window_min") return double(ImGui::GetStyle().WindowMinSize.y / std::max(app_.uiScale_, 0.01f));
+    // Draw > Camera > Gizmo size and View Figure: the axes' length in unscaled px (34 at Medium), the figure shown.
+    if (name == "axis_gizmo_length") return double(34.0f * app_.axisGizmoUnit() / std::max(app_.uiScale_, 0.01f));
+    if (name == "view_figure") return app_.uiPrefs_.showViewFigure ? 1.0 : 0.0;
     if (name == "timeline_y" || name == "axis_gizmo_y") {
         const auto c = app_.canvasRect();
         if (name == "timeline_y")
@@ -994,6 +997,17 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         run([this, at, end] {
             const AxisGizmoEnd e = app_.axisGizmoLayout()[end];
             *at = ImVec2(e.at.x, e.at.y);
+        });
+        stroke([at](float) { return *at; }, 0.2f);
+        run([this] { SDL_SetModState(held_); });
+        wait(0.1f);
+    } else if (verb == "view_figure_click") {
+        // view_figure_click [DX DY]: click the View Figure (Draw > Camera), DX DY its radii from the centre
+        const float dx = num(1, 0.0f), dy = num(2, 0.0f);
+        auto at = std::make_shared<ImVec2>();
+        run([this, at, dx, dy] {
+            const glm::vec2 c = app_.viewFigureCentre() + glm::vec2(dx, dy) * app_.viewFigureRadius();
+            *at = ImVec2(c.x, c.y);
         });
         stroke([at](float) { return *at; }, 0.2f);
         run([this] { SDL_SetModState(held_); });

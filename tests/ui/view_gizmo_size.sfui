@@ -1,0 +1,56 @@
+# Draw > Camera (Discord request): Gizmo size Small / Medium / Large for the corner axes, and the View Figure, a
+# small shaded head that turns with the view; a click on it snaps to the nearest side view.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+run new_sphere subdivisions=4
+key f
+expect_value axis_gizmo_length == 34
+expect_value view_figure == 0
+
+# Gizmo size: Small and Large; a click on an end still snaps at either size.
+click "Draw##palette.draw"
+expect "View Figure##draw.view_figure"
+click "Small##view.gizmo_small"
+key escape
+expect_value axis_gizmo_length < 30
+shot small
+axis_click +x
+expect_value camera_yaw > 89.9
+expect_value camera_yaw < 90.1
+click "Draw##palette.draw"
+click "Large##view.gizmo_large"
+key escape
+expect_value axis_gizmo_length > 40
+shot large
+axis_click +z
+expect_value camera_yaw == 0
+expect_value camera_pitch == 0
+
+# View Figure on: turn the view a little off the right side, then a click on the figure looks from the right.
+click "Draw##palette.draw"
+click "Medium##view.gizmo_medium"
+click "View Figure##draw.view_figure"
+expect_value view_figure == 1
+key escape
+key numpad6
+key numpad6
+key numpad6
+key numpad6
+key numpad6
+expect_value camera_yaw > 70
+expect_value camera_yaw < 80
+shot view_figure
+view_figure_click
+expect_value camera_yaw > 89.9
+expect_value camera_yaw < 90.1
+expect_value camera_ortho == 1
+expect_value camera_aligned == 1
+shot view_figure_right
+
+# Off again: the same spot no longer snaps (and the axes still do).
+click "Draw##palette.draw"
+click "View Figure##draw.view_figure"
+expect_value view_figure == 0
+key escape
+key numpad6
+view_figure_click
+expect_value camera_yaw > 100

@@ -244,6 +244,15 @@ void App::registerViewActions() {
     add("view.top", "Top view", "Numpad 7", "Look down on the model (orthographic).", [this] { viewAxis(0.0f, -90.0f); });
     add("view.bottom", "Bottom view", "Ctrl+Numpad 7", "Look up at the model from below (orthographic).",
         [this] { viewAxis(0.0f, 90.0f); });
+    // Draw > Camera: the corner gizmo's size (Small / Medium / Large, saved in the preferences).
+    static constexpr const char* sizeIds[3] = {"view.gizmo_small", "view.gizmo_medium", "view.gizmo_large"};
+    static constexpr const char* sizeLabels[3] = {"Small", "Medium", "Large"};
+    for (int i = 0; i < 3; ++i)
+        add(sizeIds[i], sizeLabels[i], "",
+            "Gizmo size: how big the X / Y / Z axes and the View Figure are in the corner of the canvas. Grows with "
+            "the UI scale.",
+            [this, i] { uiPrefs_.axisGizmoSize = i; },
+            [this, i] { return uiPrefs_.axisGizmoSize == i; });
     add("view.ortho", "Orthographic", "Numpad 5",
         "Switch between a perspective and an orthographic view (no foreshortening: sizes don't shrink with depth).",
         [this] {

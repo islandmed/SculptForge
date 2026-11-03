@@ -430,6 +430,14 @@ void App::drawPalette_Draw() {
         }
         ui::Checkbox("Axes##draw.axes", &uiPrefs_.showAxes);
         ui::HelpText("Axes", nullptr, "Show the X / Y / Z directions in the corner of the canvas.", "Draw > Camera");
+        ImGui::SameLine();
+        ui::Checkbox("View Figure##draw.view_figure", &uiPrefs_.showViewFigure);
+        ui::HelpText("View Figure", nullptr,
+                     "Show a small shaded head in the corner of the canvas that turns with the view. Click it to look "
+                     "from the nearest side (front, back, left, right, top or bottom).",
+                     "Draw > Camera");
+        hint(*this, "Gizmo size");
+        segmented(*this, {"view.gizmo_small", "view.gizmo_medium", "view.gizmo_large"});
     }
     // Tablet: the same Pressure > Strength / Size toggles as the top shelf (not checkboxes), and the pen state as
     // a hint line.

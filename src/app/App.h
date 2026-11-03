@@ -1359,6 +1359,10 @@ private:
     void drawAxisGizmo();
     std::array<AxisGizmoEnd, 6> axisGizmoLayout() const; // the gizmo's ends on screen now (AxisGizmo.h)
     bool axisGizmoMouseDown(float x, float y);          // a click on an end: that side view (#43)
+    float axisGizmoUnit() const;                        // UI scale times Draw > Camera > Gizmo size
+    glm::vec2 viewFigureCentre() const;                 // Draw > Camera > View Figure: where it sits, how big
+    float viewFigureRadius() const;
+    void drawViewFigure();
     // Insert on the model (#34): the primitive chosen in Append > Insert; a drag on the surface places it.
     // "mesh" inserts your own mesh instead: insertMeshKey_ is "subtool" (a SubTool's name) or "file" (a path
     // chosen in the file dialog), insertMeshValue_ the name or path (insert_mesh).

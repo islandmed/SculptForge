@@ -25,6 +25,10 @@ chapter opens by itself the first time you start a new version; you can always f
   **Preferences > Input** shows whether pressure is detected, with a troubleshooting link. The view no longer jumps
   when the pen comes back into range, and the active Part changes only with **Alt+click** on the keyboard; the
   status bar names the new Part. See [Troubleshooting](troubleshooting.md#pen-tablets).
+- **Smaller (or larger) corner axes**: **Draw > Camera > Gizmo size** sets Small, Medium or Large
+  ([Navigation](navigation.md)).
+- **View Figure**: turn it on beside **Axes** for a small head in the corner that turns with the view; click it to
+  snap to the nearest side.
 
 ## Version 0.10.8
 

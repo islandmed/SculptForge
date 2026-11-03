@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // The axis gizmo in the canvas corner (Draw > Camera > Axes, #31): where its six ends sit on screen for a view,
-// which end a click lands on, and the side view each end snaps to (#43, as in Blender). Pure arithmetic (no
-// ImGui), so it can be unit tested.
+// which end a click lands on, and the side view each end snaps to (#43, as in Blender); its size (Small / Medium /
+// Large) and the View Figure's snap to the nearest side. Pure arithmetic (no ImGui), so it can be unit tested.
 #pragma once
 
 #include <glm/glm.hpp>
@@ -55,6 +55,18 @@ inline AxisGizmoView axisGizmoView(int axis, bool negative) {
                                                {"view.front", 0.0f, 0.0f},   {"view.left", -90.0f, 0.0f},
                                                {"view.bottom", 0.0f, 90.0f}, {"view.back", 180.0f, 0.0f}};
     return views[(negative ? 3 : 0) + (axis < 0 || axis > 2 ? 0 : axis)];
+}
+
+// Draw > Camera > Gizmo size: 0 Small, 1 Medium (the size before 0.10.8, the default), 2 Large. Multiplies the
+// gizmo's length, balls and click radius on top of the UI scale.
+inline float axisGizmoScale(int size) { return size <= 0 ? 0.65f : size == 1 ? 1.0f : 1.4f; }
+
+// The end facing the viewer most: the side view nearest the current one (a click on the View Figure snaps there).
+inline int axisGizmoFacing(const std::array<AxisGizmoEnd, 6>& ends) {
+    int best = 0;
+    for (int i = 1; i < 6; ++i)
+        if (ends[size_t(i)].depth > ends[size_t(best)].depth) best = i;
+    return best;
 }
 
 } // namespace sf

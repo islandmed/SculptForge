@@ -91,6 +91,8 @@ Json toJson(const UiPrefs& p) {
     j.set("cursorFollowsSurface", p.cursorFollowsSurface);
     j.set("timelinePosition", std::string(p.timelineTop ? "top" : "bottom"));
     j.set("showAxes", p.showAxes);
+    j.set("axisGizmoSize", std::string(p.axisGizmoSize == 0 ? "small" : p.axisGizmoSize == 2 ? "large" : "medium"));
+    j.set("showViewFigure", p.showViewFigure);
     j.set("alphabeticalPalettes", p.alphabeticalPalettes);
     lookToJson(p, j);
     j.set("language", p.language);
@@ -147,6 +149,11 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.cursorFollowsSurface = j["cursorFollowsSurface"].asBool(p.cursorFollowsSurface);
     if (j["timelinePosition"].isString()) p.timelineTop = j["timelinePosition"].asString() != "bottom";
     p.showAxes = j["showAxes"].asBool(p.showAxes);
+    if (j["axisGizmoSize"].isString()) {
+        const std::string size = j["axisGizmoSize"].asString();
+        p.axisGizmoSize = size == "small" ? 0 : size == "large" ? 2 : 1;
+    }
+    p.showViewFigure = j["showViewFigure"].asBool(p.showViewFigure);
     p.alphabeticalPalettes = j["alphabeticalPalettes"].asBool(p.alphabeticalPalettes);
     // A ui.json from before 0.10.7 names neither: it was stored with the Classic look and the ZBrush-style layout,
     // and keeps them (the new-look card offers the new default once, PanelSupport.cpp).
