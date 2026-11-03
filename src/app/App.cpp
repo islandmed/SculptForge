@@ -1583,6 +1583,7 @@ void App::onMouseUp() {
 }
 
 void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
+    if (cutPolylineKey(key)) return; // Enter ends a Cut Polyline, Esc drops it (PanelCut.cpp)
     if (key == SDLK_ESCAPE && radial_.menu >= 0) {
         closeRadialMenu();
         return;

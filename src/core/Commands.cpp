@@ -18,6 +18,7 @@
 #include "core/HardwareProfile.h"
 #include "core/ImageTo3D.h"
 #include "core/Masking.h"
+#include "core/Cut.h"
 #include "core/Multires.h"
 #include "core/Micro.h"
 #include "core/MeshTransform.h"
@@ -804,6 +805,7 @@ CommandRegistry::CommandRegistry() {
          }});
 
     registerMaskingCommands(*this);
+    registerCutCommands(*this); // cut (core/Cut.h)
     registerPolygroupCommands(*this);
     registerSelectionSetCommands(*this); // selection_set_* (core/SelectionSets.h)
     registerSubToolCommands(*this);
@@ -830,7 +832,7 @@ CommandRegistry::CommandRegistry() {
 void CommandRegistry::add(Command cmd) {
     // The commands that follow the brushes' symmetry take radial and local symmetry too (#63).
     static const char* const kSymmetric[] = {"stroke", "vdm_stamp", "mask_rect", "mask_lasso", "hide_rect",
-                                             "hide_lasso", "insert_primitive", "insert_mesh"};
+                                             "hide_lasso", "insert_primitive", "insert_mesh", "cut"};
     for (const char* name : kSymmetric)
         if (cmd.name == name)
             for (ParamSpec& p : radialSymmetryParams()) cmd.params.push_back(std::move(p));

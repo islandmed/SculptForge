@@ -67,13 +67,15 @@ void App::selectionMove(float x, float y) {
     const ImVec2 start = selectPath_.front();
     if (!selectMoved_ && std::abs(x - start.x) < kClickSlopPx && std::abs(y - start.y) < kClickSlopPx) return;
     selectMoved_ = true;
-    if (selectShape_ != SelectShape::Lasso) return; // a rectangle only needs the cursor
+    if (selectShape_ != SelectShape::Lasso && selectShape_ != SelectShape::CutLasso) return; // a rectangle or line only needs the cursor
     const ImVec2 last = selectPath_.back();
     if (std::hypot(x - last.x, y - last.y) >= kLassoSpacingPx) selectPath_.push_back(ImVec2(x, y));
 }
 
 void App::selectionMouseUp() {
-    if (selectTarget_ == SelectTarget::Hide)
+    if (isCutShape(selectShape_))
+        cutMouseUp(); // PanelCut.cpp
+    else if (selectTarget_ == SelectTarget::Hide)
         polygroupMouseUp();
     else
         maskSelectMouseUp();
@@ -111,7 +113,8 @@ bool App::runSelection(const char* rectCommand, const char* lassoCommand, Args a
 }
 
 void App::drawSelectionOverlay() {
-    if (drag_ != Drag::Select || !selectMoved_ || selectPath_.empty()) return;
+    drawCutOverlay(); // the Cut shapes draw their own (PanelCut.cpp)
+    if (drag_ != Drag::Select || !selectMoved_ || selectPath_.empty() || isCutShape(selectShape_)) return;
     // Visibility: green keeps the inside, red hides it (Alt). Mask: a dark veil masks, blue unmasks (Alt).
     const bool alt = (inputMods() & SDL_KMOD_ALT) != 0;
     ImU32 line, fill;

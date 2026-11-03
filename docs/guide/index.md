@@ -42,6 +42,7 @@ You can read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<
 23. [Sculpt Timeline and timelapse](timeline.md)
 24. [Moving, rotating and posing (Gizmo)](gizmo.md)
 25. [Subdivide, remesh, decimate and LODs](geometry.md)
+    - [Cut: line, lasso, rectangle and polyline](cut.md)
 26. [Quad retopology and detail projection](retopology.md)
 
 ## AI and capture

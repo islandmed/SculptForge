@@ -5,6 +5,16 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.10.9
+
+- **Cut**: one tool that cuts the active Part with a **Line**, **Lasso**, **Rectangle** or **Polyline**. **Away**
+  removes what the shape covers and closes the cut with a flat cap, **In** cuts a flat-bottomed pocket and **Add**
+  raises the shape out of the surface. The result stays watertight and follows the symmetry. Hold
+  <kbd>Ctrl</kbd>+<kbd>Shift</kbd> and pick a Cut shape, or open **Tool > Cut**. See [Cut](cut.md) (#101, #91).
+- **Mask: Front faces only**: Mask Lasso and Mask Rectangle can leave the far side alone
+  ([Masking](masking.md#mask-with-a-lasso-or-rectangle), #91).
+- **Duplicate Part** has a shortcut: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> ([Parts](parts.md)).
+
 ## Version 0.10.8
 
 - **Tablets in mouse mode work again**: on some Windows tablets with **Mouse mode** on (Preferences > Tablet) the

@@ -6,6 +6,16 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Cut (#101, #91): one tool that cuts the active Part with a Line, Lasso, Rectangle or Polyline drawn on the screen,
+  in the Ctrl+Shift brush picker and in Tool > Cut. Away removes what the shape covers through the whole Part and
+  closes the cut with a flat cap (a face group of its own), In cuts a flat-bottomed pocket Depth deep, Add extrudes
+  the shape out of the surface (boolean union). An exact boolean in screen space: the uncut surface and its mask,
+  colours, UVs and layers are kept, and the result is watertight. Follows X/Y/Z and radial symmetry; one undo step.
+  Scriptable as the `cut` command.
+- Mask Lasso and Mask Rectangle: Front faces only (#91), also `front_faces_only` on mask_lasso / mask_rect.
+- Duplicate Part shortcut: Ctrl+Shift+D (also Duplicate Part in the command palette).
+
 ## [0.10.8] - 2026-11-02
 
 ### Fixed
