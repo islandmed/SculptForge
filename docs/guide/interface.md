@@ -89,7 +89,7 @@ In scripts: `ui_look look=forge scheme=neutral outlines=subtle layout=sculptforg
 
 Your art is never uploaded or used for training. AI features run only when you use them and can be turned off.
 
-**Preferences > AI > Enable AI features** turns off everything AI: **AI Brush** (Brush Lab, where you describe a
+**Edit > Preferences > AI > Enable AI features** turns off everything AI: **AI Brush** (Brush Lab, where you describe a
 brush in words) and **Generate 3D** (image or text to a model) leave the shelves, menus and the command palette,
 their commands leave scripts, `sculptforge-cli` and the MCP tool list, and SculptForge makes no AI network calls.
 The offline image tools (**Relief**, **Inflate**, **Stamp**) and the MCP server stay. The first-run welcome asks

@@ -197,7 +197,7 @@ bumps but leaves the form where it is (a Taubin smooth, one step in and a slight
 
 ### Smooth face group borders
 
-**Smooth face group borders only** in the **Brush** palette turns Smooth (and <kbd>Shift</kbd>) into a border
+**Smooth face group borders only** in **Sculpt > Brush** turns Smooth (and <kbd>Shift</kbd>) into a border
 straightener: only the points on a border between [face groups](face-groups.md) move, each along the surface
 toward its neighbours on the border, so a jagged edge (a cuff, a collar, the hem of a shirt, a panel line) becomes
 a clean line while the rest of the model stays where it is. Corners where three or more groups meet stay put.
@@ -365,7 +365,7 @@ Slide Stamp and Spray. The viewport draws the string and a faint circle of its l
 length (longer is steadier). **Catch up on release** (on by default) finishes the line to where the cursor is when
 you let go; turn it off to end the line a string's length behind.
 
-**World Size** (**Draw** palette). Draw Size is normally in screen pixels, so the brush gets smaller on the model
+**World Size** (**Sculpt > Draw & Tablet**). Draw Size is normally in screen pixels, so the brush gets smaller on the model
 as you zoom in. With World Size on, the size is kept in model units instead: a 0.4 mm pore brush stays 0.4 mm
 whether you are looking at the whole head or one eyelid. Every Draw Size slider shows both numbers, for example
 **Draw Size 12 px 0.40 mm**; the mm figure is the brush radius on the surface under the cursor (a model unit is a
@@ -391,7 +391,7 @@ under the pen as you keep moving; it never jumps. Hold the keys after the stroke
 style <kbd>Alt</kbd>+click still navigates. The same works in every input style.
 
 **A pressure curve for each brush.** Every brush keeps its own pen pressure curve, applied after the tablet's
-curve. Edit it in **Brush Lab** (under the recipe sliders) or in **Preferences > Tablet** (under the tablet's
+curve. Edit it in **Brush Lab** (under the recipe sliders) or in **Edit > Preferences > Tablet** (under the tablet's
 curve); both edit the brush you are holding. Drag a point, double-click the curve to add one (up to 5), right-click
 a point to remove it. The presets are **Soft**, **Linear**, **Firm** and **Fine detail**: Fine detail keeps light
 pressure very light and tops out below full strength, for pores and fine lines. Curves are saved as you change

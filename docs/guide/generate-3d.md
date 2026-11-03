@@ -271,7 +271,7 @@ Without `service=`, commands use the settings you saved in the app. See
 
 ## Privacy and model licences
 
-- Your art is never uploaded or used for training. AI features run only when you use them and can be turned off. Off (**Preferences > AI**, or `SF_AI=off`) hides Generate 3D; Relief, Inflate and Stamp stay. See
+- Your art is never uploaded or used for training. AI features run only when you use them and can be turned off. Off (**Edit > Preferences > AI**, or `SF_AI=off`) hides Generate 3D; Relief, Inflate and Stamp stay. See
   [Turning AI off](interface.md#turning-ai-off).
 - SculptForge has no servers of its own and no telemetry. A hosted service receives only the prepared image
   (or your text) and your key or token, if any.
