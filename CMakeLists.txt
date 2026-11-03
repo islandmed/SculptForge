@@ -290,8 +290,7 @@ if(SCULPTFORGE_BUILD_APP)
     fontMono ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/JetBrainsMono-Regular.ttf # the looks (Preferences > Interface > Look)
     fontMonoBold ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/JetBrainsMono-SemiBold.ttf
     appIcon ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-256.png
-    supporters ${CMAKE_CURRENT_SOURCE_DIR}/docs/supporters.txt # Help > About (never empty: it starts with comments)
-    supportCard ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/support-card.jpg) # the support card's picture (decoded only when it shows)
+    supporters ${CMAKE_CURRENT_SOURCE_DIR}/docs/supporters.txt) # Help > About (never empty: it starts with comments)
   include(cmake/EmbedGuide.cmake)
   embed_guide(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedGuide.cpp ${CMAKE_CURRENT_SOURCE_DIR}/docs/guide)
   add_executable(sculptforge

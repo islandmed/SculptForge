@@ -248,7 +248,7 @@ void App::drawSupportUi() {
             ImGui::Spacing();
             ImGui::Separator();
             ImGui::Spacing();
-            ImGui::TextWrapped("SculptForge is free. Memberships add credits, a monthly pack, a feature vote and, for Insiders, daily drops and preview builds. %s", kFreeReleaseNote);
+            ImGui::TextWrapped("SculptForge is free. Memberships add credits, a monthly pack, a vote on what we build next and, for Insiders, daily drops and preview builds. %s", kFreeReleaseNote);
             if (ImGui::Button("Support SculptForge##welcome")) showSupportCard(SupportCardReason::Weekly); // the memberships
             ImGui::SameLine();
             if (ImGui::Button("Close##welcome")) showWelcome_ = false;
@@ -284,7 +284,7 @@ void App::drawSupportUi() {
         if (ImGui::Begin("##support_reminder", nullptr, flags)) {
             ImGui::AlignTextToFramePadding();
             ImGui::TextUnformatted("You've sculpted over ten hours in SculptForge. Memberships add credits, a monthly "
-                                   "brush pack and a roadmap vote.");
+                                   "brush pack and a vote on what we build next.");
             ImGui::SameLine();
             if (ImGui::SmallButton("Membership...##reminder")) {
                 showSupportCard(SupportCardReason::Weekly); // the memberships, each a click from its checkout

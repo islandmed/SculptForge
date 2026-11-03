@@ -422,7 +422,6 @@ private:
     void showSupportCard(SupportCardReason reason); // (also Preferences > Support > Show it now)
     void closeSupportCard(bool supporter);
     bool supportCardOpen() const;
-    bool supportCardLoading() const; // its picture still decoding (backgroundBusy)
     bool supportCardEvent(const SDL_Event& e); // input while it's open goes to it, not the canvas or shortcuts
     void drawSupportCard();
     void drawSupportPrefs();                    // Preferences > Support
