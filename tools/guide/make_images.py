@@ -255,11 +255,11 @@ def shading(shots: pathlib.Path):
 # PNG Save Render wrote into the test's library. The canvas crop leaves out the shelves; full-width shots show menus.
 FIRST_SCULPT_CANVAS = (110, 160, 1210, 860)
 FIRST_SCULPT = {
-    "01-sphere": (0, 0, 1600, 960), "02-mask": FIRST_SCULPT_CANVAS, "02-walls": FIRST_SCULPT_CANVAS,
-    "03-colour": (0, 0, 1210, 860), "04-cap": FIRST_SCULPT_CANVAS, "05-dome": FIRST_SCULPT_CANVAS,
-    "06-divide": FIRST_SCULPT_CANVAS, "07-door": FIRST_SCULPT_CANVAS, "08-windows": FIRST_SCULPT_CANVAS,
-    "09-spots": FIRST_SCULPT_CANVAS, "10-spots": FIRST_SCULPT_CANVAS, "11-paint": FIRST_SCULPT_CANVAS,
-    "12-material": (0, 0, 1210, 860), "12-render": None,
+    "01-sphere": (0, 0, 1600, 960), "02-tufts": FIRST_SCULPT_CANVAS, "03-face": FIRST_SCULPT_CANVAS,
+    "04-beak": FIRST_SCULPT_CANVAS, "05-divide": FIRST_SCULPT_CANVAS, "06-eyes": FIRST_SCULPT_CANVAS,
+    "07-brows": FIRST_SCULPT_CANVAS, "08-fill": FIRST_SCULPT_CANVAS, "09-face": FIRST_SCULPT_CANVAS,
+    "10-eyes": FIRST_SCULPT_CANVAS, "11-beak": FIRST_SCULPT_CANVAS, "12-material": (0, 0, 1210, 860),
+    "12-render": None,
 }
 
 
@@ -272,9 +272,17 @@ def first_sculpt(shots: pathlib.Path) -> list:
             renders = sorted((shots / "library").rglob("Render *.png"))
             if not renders:
                 raise SystemExit(f"no Save Render output under {shots}/library")
-            img = Image.open(renders[-1]).convert("RGB")
-            w, h = img.size  # the canvas's shape: trim to the model's middle
-            img = img.crop((w * 23 // 100, h * 12 // 100, w * 77 // 100, h * 88 // 100))
+            render = Image.open(renders[-1]).convert("RGB")  # Save Render: twice the canvas size
+            w, h = render.size
+            # What's New's card (600x340): the model's middle at the card's shape, downsampled from the 2x render.
+            ch = h * 72 // 100
+            cw = ch * WN_SIZE[0] // WN_SIZE[1]
+            card = render.crop(((w - cw) // 2, h * 13 // 100, (w + cw) // 2, h * 13 // 100 + ch))
+            card = card.resize(WN_SIZE, Image.LANCZOS)
+            card_path = OUT / "wn-first-sculpt.jpg"
+            card.save(card_path, "JPEG", quality=88, optimize=True, progressive=True)
+            made.append(card_path)
+            img = render.crop((w * 27 // 100, h * 10 // 100, w * 73 // 100, h * 90 // 100))
         else:
             img = Image.open(shots / f"{name}.png").convert("RGB").crop(box)
         width = 960 if box is None or box[2] - box[0] > 1100 else 720

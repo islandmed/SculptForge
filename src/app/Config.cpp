@@ -577,7 +577,7 @@ void App::initActions() {
         "the chapter about it.");
     add("help.first_sculpt", "Your first sculpt (10 min)", "Help", nullptr, [this] { guide_.open("first-sculpt.md"); },
         ICON_LC_GRADUATION_CAP, nullptr, nullptr, nullptr,
-        "A step-by-step lesson for complete beginners: a little mushroom house from the default sphere, painted and "
+        "A step-by-step lesson for complete beginners: a cute owl head from the default sphere, painted and "
         "rendered, in about ten minutes.");
     add("help.whats_new", "What's New", "Help", nullptr, [this] { showWhatsNew(); }, ICON_LC_SPARKLES, nullptr,
         nullptr, nullptr, "What changed in this version and the ones before it (opens once by itself after an update).");

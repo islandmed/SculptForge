@@ -1,4 +1,4 @@
-# Your first sculpt in 10 minutes (docs/guide/first-sculpt.md): a mushroom house from the default sphere, step by
+# Your first sculpt in 10 minutes (docs/guide/first-sculpt.md): a cute owl head from the default sphere, step by
 # step, in the default look (Forge Terminal, SculptForge layout). The guide's screenshots come from this run:
 #   build/sculptforge --ui-test tests/ui/first_sculpt.sfui --ui-out build/first-sculpt
 #   python3 tools/guide/make_images.py --first-sculpt build/first-sculpt
@@ -6,200 +6,208 @@
 expect_value look == 1
 expect_value shell_layout == 1
 
-# 1. A fresh sphere (File > New Sphere, Ctrl+N), seen from the front (F frames it).
+# 1. A fresh sphere (File > New Sphere, Ctrl+N), seen from the front (F frames it). X symmetry is on.
 key ctrl+n
 wait 0.2
 camera 0 0
 key f
 wait 0.2
 expect_value can_undo == 0
-expect_value symmetry_x == 1                # X on the top shelf: both sides at once
+expect_value symmetry_x == 1
 shot 01-sphere
 
-# 2. Mask the top: Tool > Masking > Mask Rectangle, then Ctrl+drag a box over the upper half. Move (4) with a big
-# brush (] grows it) pulls the bottom down: the walls grow taller while the masked top stays round.
-click "Masking"
-click "Mask Rectangle##mask.rect"
-hold ctrl
-drag_path -0.3 -0.15 1.3 0.5
-hold none
-expect_value masked > 10000
-shot 02-mask
+# 2. Ear tufts: Move (4), a medium brush, pull up and out from the top on each side (symmetry does the other).
 key 4
-remember draw_size s0
-key ]
-key ]
-key ]
-key ]
-key ]
-key ]
-key ]
-key ]
-key ]
-key ]
-key ]
-key ]
-key ]
-key ]
-key ]
-key ]
-key ]
-key ]
-key ]
-key ]
-key ]
-key ]
-expect_value draw_size > $s0*6
-view_drag 0.4125 0.66 0.4125 0.73 1.0
+key s
+key 1
+key 1
+key 0
+key enter
+expect_value draw_size == 110
+view_drag 0.3637 0.3437 0.3393 0.2463 1.0
 expect_value camera_yaw == 0
-shot 02-walls
+hover_window 0.97 0.5
+wait 0.6
+shot 02-tufts
 
-# 3. Colour while the mask is there: Paint > Fill paints what isn't masked. Cream for the walls; then Masking >
-# Invert and red for the cap. The colour edge sits exactly on the mask's edge.
-click "Paint##menu.paint"
-run set_color color=246,232,204
-click "Color/Fill"
-key escape
-expect_value colored > 0
-click "Invert##mask"
-click "Paint##menu.paint"
-run set_color color=214,32,28
-click "Color/Fill"
-shot 03-colour
-key escape
+# 3. The face: Alt+Clay (2) with a big brush digs two round hollows, one around each eye.
+key 2
+key s
+key 1
+key 2
+key 0
+key enter
+expect_value draw_size == 120
+hold alt
+stroke 0.36 0.47 0.36 0.47
+stroke 0.36 0.47 0.36 0.47
+stroke 0.36 0.47 0.36 0.47
+stroke 0.36 0.47 0.36 0.47
+hold none
+hover_window 0.97 0.5
+wait 0.6
+shot 03-face
 
-# 4. Masking > Blur softens the mask's edge. Move the upper sides out and down: a wide cap over the walls; a short
-# press on the top flattens it.
-click "Blur##mask"
-key [
-key [
-key [
-key [
-key [
-key [
-key [
-key [
-view_drag 0.31 0.465 0.21 0.53 1.0
-view_drag 0.4125 0.32 0.4125 0.37 0.8
-expect_value camera_yaw == 0
-expect_value camera_pitch == 0
-shot 04-cap
-
-# 5. Clear the mask (Ctrl+Shift+A). Inflate (5) the cap into a soft dome and the walls into a round little house.
-key ctrl+shift+a
-expect_value masked == 0
+# 4. The beak, on the middle line: Inflate (5) three clicks for a bump, Move (4) a short pull down to point it,
+# Smooth (3) once along it to tidy it.
 key 5
-stroke 0.2 0.15 0.8 0.15
-stroke 0.35 0.06 0.65 0.06
-stroke 0.25 0.78 0.75 0.78
-stroke 0.25 0.9 0.75 0.9
-key f
-wait 0.2
-shot 05-dome
+key s
+key 3
+key 0
+key enter
+expect_value draw_size == 30
+stroke 0.5 0.6 0.5 0.6
+stroke 0.5 0.6 0.5 0.6
+stroke 0.5 0.6 0.5 0.6
+key 4
+key s
+key 3
+key 0
+key enter
+expect_value draw_size == 30
+view_drag 0.4125 0.5386 0.4125 0.5711 0.6
+expect_value camera_yaw == 0
+key 3
+key s
+key 2
+key 4
+key enter
+expect_value draw_size == 24
+stroke 0.5 0.58 0.5 0.7
+hover_window 0.97 0.5
+wait 0.6
+shot 04-beak
 
-# 6. Divide twice (Ctrl+D): four times the polygons each time, so details and colours stay sharp.
+# 5. Divide three times (Ctrl+D): 5 million triangles, so the details and colours stay sharp.
 remember triangles t0
 key ctrl+d
 key ctrl+d
-wait_idle 30
-expect_value triangles >= $t0*16
-shot 06-divide
+key ctrl+d
+wait_idle 60
+expect_value triangles >= $t0*64
+hover_window 0.97 0.5
+wait 0.6
+shot 05-divide
 
-# 7. The door: Crease (6) with a smaller brush ([) cuts its outline, symmetry does the other side; Alt+Clay (2)
-# digs it in.
-key 6
-key [
-key [
-key [
-key [
-key [
-key [
-key [
-key [
-key [
-key [
-key [
-key [
-key [
-key [
-key [
-key [
-key [
-stroke 0.43 0.97 0.43 0.74
-stroke 0.43 0.97 0.43 0.74
-stroke 0.43 0.74 0.5 0.70
-stroke 0.43 0.74 0.5 0.70
-key 2
-hold alt
-stroke 0.5 0.96 0.5 0.75
-stroke 0.47 0.96 0.47 0.76
-hold none
-shot 07-door
-
-# 8. Round windows: a Clay dab (a click) for the frame, a smaller Alt+Clay dab in its middle for the glass.
-stroke 0.37 0.66 0.37 0.66
-stroke 0.37 0.66 0.37 0.66
-key [
-key [
-key [
-hold alt
-stroke 0.37 0.66 0.37 0.66
-stroke 0.37 0.66 0.37 0.66
-hold none
-shot 08-windows
-
-# 9. Spots: Inflate (5), three clicks on each spot, raises round bumps on the cap.
+# 6. Eyes: Inflate (5), three clicks in each hollow: big round eyeballs.
 key 5
-stroke 0.3 0.22 0.3 0.22
-stroke 0.3 0.22 0.3 0.22
-stroke 0.3 0.22 0.3 0.22
-stroke 0.14 0.36 0.14 0.36
-stroke 0.14 0.36 0.14 0.36
-stroke 0.14 0.36 0.14 0.36
-stroke 0.4 0.09 0.4 0.09
-stroke 0.4 0.09 0.4 0.09
-stroke 0.4 0.09 0.4 0.09
-stroke 0.36 0.38 0.36 0.38
-stroke 0.36 0.38 0.36 0.38
-stroke 0.36 0.38 0.36 0.38
-shot 09-spots
+key s
+key 5
+key 2
+key enter
+expect_value draw_size == 52
+stroke 0.37 0.47 0.37 0.47
+stroke 0.37 0.47 0.37 0.47
+stroke 0.37 0.47 0.37 0.47
+hover_window 0.97 0.5
+wait 0.6
+shot 06-eyes
 
-# 10. The Paint brush (P) with a hard edge: O, type -70, Enter (Falloff). White on every spot.
+# 7. Brows: Clay (2) strokes from between the eyes up and out over each eye.
+key 2
+key s
+key 3
+key 0
+key enter
+expect_value draw_size == 30
+stroke 0.49 0.38 0.27 0.3
+stroke 0.49 0.38 0.27 0.3
+hover_window 0.97 0.5
+wait 0.6
+shot 07-brows
+
+# 8. Colour: Paint > Fill, a warm brown everywhere.
+click "Paint##menu.paint"
+run set_color color=150,100,62
+click "Color/Fill"
+key escape
+shot 08-fill
+
+# 9. The Paint brush (P), soft: a big cream dab on each face disc.
 key p
+key s
+key 1
+key 0
+key 0
+key enter
+expect_value draw_size == 100
+mouse_move 0.6 0.5
+key o
+key 0
+key enter
+expect_value focal_shift == 0
+run set_color color=240,224,196
+stroke 0.37 0.47 0.37 0.47
+stroke 0.37 0.47 0.37 0.47
+hover_window 0.97 0.5
+wait 0.6
+shot 09-face
+
+# 10. A hard edge (O, -100, Enter) for the eyes: amber, a black pupil, a white glint.
 mouse_move 0.6 0.5
 key o
 key minus
+key 1
+key 0
+key 0
+key enter
+expect_value focal_shift == -100
+key s
+key 4
+key 4
+key enter
+expect_value draw_size == 44
+run set_color color=255,176,30
+stroke 0.37 0.47 0.37 0.47
+key s
+key 2
+key 4
+key enter
+expect_value draw_size == 24
+run set_color color=18,14,12
+stroke 0.375 0.47 0.375 0.47
+key s
+key 8
+key enter
+expect_value draw_size == 8
+run set_color color=255,255,255
+stroke 0.36 0.44 0.36 0.44
+hover_window 0.97 0.5
+wait 0.6
+shot 10-eyes
+
+# 11. An orange beak, and a soft darker brown on the tips of the tufts.
+key s
+key 1
+key 6
+key enter
+expect_value draw_size == 16
+run set_color color=240,150,48
+stroke 0.5 0.58 0.5 0.7
+stroke 0.488 0.58 0.494 0.69
+mouse_move 0.6 0.5
+key o
+key 0
+key enter
+expect_value focal_shift == 0
+key s
 key 7
 key 0
 key enter
-expect_value focal_shift == -70
-run set_color color=255,255,255
-stroke 0.3 0.22 0.3 0.22
-stroke 0.14 0.36 0.14 0.36
-stroke 0.4 0.09 0.4 0.09
-stroke 0.36 0.38 0.36 0.38
-hover_window 0.95 0.5
-shot 10-spots
-
-# 11. A wooden door and glowing windows.
-run set_color color=128,78,42
-stroke 0.5 0.96 0.5 0.76
-stroke 0.47 0.96 0.47 0.77
-run set_color color=255,206,58
-key [
-key [
-key [
-stroke 0.37 0.66 0.37 0.66
-stroke 0.37 0.66 0.37 0.66
+expect_value draw_size == 70
+run set_color color=96,60,36
+stroke 0.24 0.04 0.24 0.04
+stroke 0.24 0.04 0.24 0.04
 key p
-hover_window 0.95 0.5
-shot 11-paint
+hover_window 0.97 0.5
+wait 0.6
+shot 11-beak
 
-# 12. A material (M opens the picker), a three-quarter view, and Render > Materials > Save Render.
+# 12. Material and render: White (M), Render > Materials > PBR, a three-quarter view, Save Render.
 key m
 wait 0.3
 click "White##mat"
-camera -32 -6
+camera -28 -10
 key f
 wait 0.2
 click "Render##menu.render"

@@ -14,7 +14,7 @@ Read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<kbd>F1</
 |---|---|
 | Install it | [Install SculptForge](installing.md): downloads for Windows, macOS and Linux |
 | Set it up on Windows | [The Windows notes](installing.md#windows): SmartScreen, pen tablets (Windows Ink, Mouse mode), screen scaling |
-| Make your first sculpt | [Your first sculpt in 10 minutes](first-sculpt.md): a mushroom house from the default sphere |
+| Make your first sculpt | [Your first sculpt in 10 minutes](first-sculpt.md): a cute owl head from the default sphere |
 | Start from a head or body | [Starter meshes](projects.md#start-from-a-starter-mesh): base meshes with clean quads, **File > New from Starter Mesh** |
 | Find your way around | [The interface](interface.md): the menus **File, Edit, Sculpt, Paint, Mesh, View, Render, Help**, the shelves and the Tool panel; [Navigating the view](navigation.md) |
 | Learn the brushes | [Sculpting and brushes](sculpting.md) |
