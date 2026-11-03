@@ -8,7 +8,7 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.10.9
 
 ```features
-date: unreleased
+date: 2026-11-02
 tagline: Your first sculpt in ten minutes, starter meshes, brushes that keep their settings, and tablets that just work.
 highlight: Your first sculpt in 10 minutes: a beginner lesson from sphere to a rendered mushroom house
 highlight: Starter meshes: heads, a body, hands and clean primitives, all quads with levels ready
