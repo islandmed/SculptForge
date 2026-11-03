@@ -153,6 +153,7 @@ vec3 ghostMove(vec3 x, vec3 n, int first, int end, inout vec3 g, inout float lap
             vec3 gw = (ghostStart - c) * (s * F.y * inv);
             x += an * (s * f);
             g += gw * (cn / max(1.0 + dot(gw, an), 1e-3));
+            lap += cn * s * radialLap; // (the height change along the normal, as Standard's)
         } else if (kind == 9) { // Trim: what sticks out above a plane cut off
             float h = dot(x - (ac - an * (sgn * r * 0.02 * s)), an);
             if (sgn * h > 0.0) {
@@ -3517,4 +3518,5 @@ bool Renderer::renderSubtoolThumbnail(uint32_t id, float yaw, float pitch, int s
 }
 
 } // namespace sf
+
 

@@ -596,3 +596,4 @@ bool App::verifyStroke(uint64_t before, const std::vector<glm::vec2>& dabs, cons
 }
 
 } // namespace sf
+

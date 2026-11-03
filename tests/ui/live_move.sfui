@@ -41,6 +41,18 @@ shot live_move
 key ctrl+z
 expect_value moved == 0
 
+# Mid-drag: the graphics card draws the move, the mesh itself hasn't moved yet; letting go applies it.
+snapshot
+stroke 0.86 0.5 0.98 0.38 0.6 hold
+wait 0.3
+expect_value moved == 0
+shot live_move_dragging
+release
+expect_value moved_sum > $plain*0.999
+expect_value moved_sum < $plain*1.001
+key ctrl+z
+expect_value moved == 0
+
 # Twice in a row, then both undone.
 stroke 0.86 0.5 0.98 0.38
 stroke 0.80 0.6 0.90 0.7
@@ -50,8 +62,7 @@ key ctrl+z
 expect_value moved == 0
 
 # Background Preview: on and off again; Live Move off again.
-click "Preferences##palette.preferences"
-click "Performance##preferences.performance"
+click "Preferences##palette.preferences"                # (Performance stays open from before)
 expect_value background_preview == 0
 click "Background Preview (Experimental)"
 expect_value background_preview == 1

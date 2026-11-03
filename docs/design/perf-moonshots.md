@@ -135,6 +135,12 @@ micro level (or compressed on disk), and the GPU draws each tile at its own leve
   (docs/performance.md: Standard 64 px on 1.02B Micro 5 is 39 ms a step, 300 px 283 ms); drawing stays bounded
   by the screen. **A billion-triangle asset, editable locally at interactive rates on a 16 GB laptop**, is the
   claim to test; nothing here is measured yet, so no public claim until it is.
+- **Measured on the data side** (`research/focus-detail` @ 6184559, docs/design/focus-detail.md §5.1; 1B
+  triangles, shared machine, load ~4): promoting one tile 0.041 ms p50 / 0.051 ms p99, 65.5K tiles/s in parallel;
+  RSS 1147 MB with the focus on against 1526 MB with every tile at full level; GPU memory (estimated) 3130 MB with
+  today's renderer against 597 MB with per-tile resident levels (`FocusDetail::tileLevel(tri)` is in). So
+  promotion is far below a frame (a few hundred tiles a frame while orbiting is ~10 ms on one thread, ~5 ms spread
+  over the pool); the GPU side (per-tile levels in the MicroRenderer) is what turns the estimate into the 5x saving.
 - **Difference from (c)**: the focus follows the brush automatically (no mode to enter), the coarse remainder is
   the same surface at a lower micro level (not a separate HD layer), and GPU memory follows focus + screen.
 

@@ -5,12 +5,21 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
-## Version 0.10.8
+## Version 0.10.9
 
 - **Big brushes stay smooth on dense meshes**: on models from about 4 million triangles a stroke's dabs are worked
   out beside the view, so a 240 px brush on 33 million triangles no longer freezes the view for a third of a
   second at a time (slowest frames about 35 ms instead of 300), and letting go of the pen is instant. The stroke
   itself comes out the same.
+- **Live Move (experimental)**: Preferences > Performance > Live Move. The graphics card draws the Move brush's
+  drag from where the surface started, so it keeps up with the pen on any mesh size, and the move is applied once,
+  exactly, when you lift the pen ([Performance](performance.md)).
+- **Background Preview (experimental)**: Preferences > Performance > Background Preview. On dense meshes the dabs a
+  big brush is still working out show as a preview under the pen, so the stroke no longer trails behind it. The
+  finished sculpt is the same either way.
+
+## Version 0.10.8
+
 - **Tablets in mouse mode work again**: on some Windows tablets with **Mouse mode** on (Preferences > Tablet) the
   brush stopped following the pen in 0.10.7. When the system can't say where its cursor is, the pen now moves the
   brush by how far it moves, from where it was (#72).

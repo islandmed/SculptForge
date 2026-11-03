@@ -6,6 +6,22 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Experimental, off by default (Preferences > Performance): **Live Move** draws a Move drag on the GPU from the grab's
+  start positions and applies the whole move once at pen lift (one grab, equal to the per-frame grabs to 1e-6;
+  falls back with masks, hidden faces, sculpt layers, micro levels, Connected Only or View falloff;
+  `SF_LIVE_MOVE=0/1`); **Background Preview** draws the predictive preview for background dabs and no longer waits
+  for a batch within the frame (the solver's dabs are unchanged; `SF_BG_GHOST=0/1`). `SF_PERSISTENT_UPLOAD=1`
+  (developers): stroke uploads pack into persistently mapped staging buffers and are copied on the GPU.
+  Research and measurements: docs/design/perf-moonshots.md.
+
+### Changed
+- Large brushes on dense meshes no longer stall the view: from 2 million vertices a stroke's dabs are placed on the
+  stroke thread (the same dabs, in the same order, as the frame loop places them; no preview), so a frame keeps
+  drawing while a 240 px dab moves millions of vertices, and a light batch is still waited for within the frame.
+  On the standard scene's 240 px brush the slowest frames drop from 139 ms (15M) and 306 ms (33M) to about 30 ms in
+  first runs, and lifting the pen no longer waits (162 ms at 33M). `SF_BACKGROUND_DABS=0` turns it off.
+
 ## [0.10.8] - 2026-11-02
 
 ### Fixed
@@ -16,11 +32,6 @@ All notable changes to SculptForge are listed here. The format follows
 ## [0.10.7] - 2026-11-01
 
 ### Changed
-- Large brushes on dense meshes no longer stall the view: from 2 million vertices a stroke's dabs are placed on the
-  stroke thread (the same dabs, in the same order, as the frame loop places them; no preview), so a frame keeps
-  drawing while a 240 px dab moves millions of vertices, and a light batch is still waited for within the frame.
-  On the standard scene's 240 px brush the slowest frames drop from 139 ms (15M) and 306 ms (33M) to about 30 ms in
-  first runs, and lifting the pen no longer waits (162 ms at 33M). `SF_BACKGROUND_DABS=0` turns it off.
 - The membership card at launch is redesigned: the cube mark and the promise up top, the three memberships side by
   side with their perks checked off and one bold button each (Insider highlighted), and the members' Discord in the
   footer. It takes the current look's colours and opens in 150 ms. "Maybe later" now hides it for 30 days, updates

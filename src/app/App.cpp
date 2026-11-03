@@ -625,6 +625,7 @@ int App::runRecording() {
         demo_->drawOverlay();
         ImGui::Render();
         updateMouseCursor();
+        buildGhost(); // (the stroke preview, as run() draws it)
 
         syncScene();
         ++frames;
@@ -3408,3 +3409,4 @@ void App::drawBrushCursor() {
 }
 
 } // namespace sf
+
