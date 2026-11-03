@@ -1,11 +1,12 @@
 {
-  "version": "0.10.9",
+  "version": "0.10.10",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Each brush keeps its own settings; starter meshes and a first-sculpt lesson",
-    "Calmer, neutral looks: Outlines Off/Subtle/On, quiet hover, dismissable notices",
-    "Windows tablets: pen fixes, hotplug, Wintab pressure, better UI scaling",
-    "Image to 3D with no setup (Hunyuan3D 2.1), AI off switch, stroke popup and Cut tool"
+    "Close Holes caps every open boundary of a Part; Clip presses one side of a line, lasso or rectangle flat",
+    "X-Ray shows the active Part through the others; turn the light around the model from Render > Materials",
+    "First Sculpt lesson rebuilt: a cute owl head in about 10 minutes with built-in tools",
+    "More SpaceMouse devices recognised, also over Bluetooth",
+    "Mask and Cut shapes in the stroke popup (G), no keys held"
   ]
 }
