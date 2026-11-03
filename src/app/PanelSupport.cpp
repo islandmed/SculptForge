@@ -160,7 +160,7 @@ void App::drawSupportUi() {
             }
             ImGui::PopStyleColor();
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Your first sculpt: a little mushroom house from this sphere, step by step, in about ten minutes.");
+                ImGui::SetTooltip("Your first sculpt: a cute owl head from this sphere, step by step, in about ten minutes.");
             ImGui::Spacing();
             ImGui::TextWrapped("Hold Ctrl over any control to see what it does. The User Guide (Shift+F1) explains every "
                                "tool, and Coming from ZBrush lists what is where.");

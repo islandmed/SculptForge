@@ -10,12 +10,12 @@ three versions in full, then the older ones in groups. Every detail is in the
 ```features
 date: 2026-11-02
 tagline: Your first sculpt in ten minutes, starter meshes, brushes that keep their settings, and tablets that just work.
-highlight: Your first sculpt in 10 minutes: a beginner lesson from sphere to a rendered mushroom house
+highlight: Your first sculpt in 10 minutes: a beginner lesson from sphere to a rendered owl
 highlight: Starter meshes: heads, a body, hands and clean primitives, all quads with levels ready
 highlight: Each brush keeps its own size, intensity, stroke and alpha
 highlight: Tablets: plug in while running, pressure with or without Windows Ink, no camera jumps
 title: Your first sculpt
-line: A 12-step lesson that turns the default sphere into a painted, rendered mushroom house.
+line: A 12-step lesson that turns the default sphere into a painted, rendered owl head.
 image: images/wn-first-sculpt.jpg
 action: help.first_sculpt
 link: first-sculpt.md
@@ -63,8 +63,8 @@ action: guide:whats-new.md
   **Tool > Starter meshes**, or **Start from a head** in the welcome. See
   [Projects](projects.md#start-from-a-starter-mesh).
 - **Your first sculpt in 10 minutes**: a step-by-step lesson for people who have never sculpted. Turn the
-  default sphere into a little mushroom house with a spotted red cap, a door and glowing windows, using masks,
-  Move, Inflate, Crease and Clay, Vertex Paint and PBR shading, and save a render to share. Start it from the
+  default sphere into a cute owl head with ear tufts, big amber eyes and a little beak, using Move, Clay,
+  Inflate and Smooth, Vertex Paint and PBR shading, and save a render to share. Start it from the
   welcome's **Start the 10-minute lesson** button or **Help > Your first sculpt (10 min)**. See
   [Your first sculpt](first-sculpt.md).
 - **Save Render** (**Render > Materials**): the view without the interface, at twice its size, as a PNG in your

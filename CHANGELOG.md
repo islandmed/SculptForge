@@ -6,6 +6,12 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- "Your first sculpt in 10 minutes" makes a cute owl head instead of the mushroom house: ear tufts pulled with
+  Move, face discs dug with Alt+Clay, a beak, Divide three times, inflated eyes and Clay brows, then brown, cream,
+  amber and orange Vertex Paint and a PBR render. Every step sets the brush's size (brushes keep their own since
+  0.10.9). New step pictures and What's New card, made from tests/ui/first_sculpt.sfui and a 2x Save Render.
+
 ## [0.10.9] - 2026-11-02
 
 ### Added
