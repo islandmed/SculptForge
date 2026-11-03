@@ -499,7 +499,7 @@ step_replies() {
             echo
             echo "$lines"
             echo
-            echo "Thanks for reporting it. -- the SculptForge developer"
+            echo "Thanks for reporting it."
             echo
         done
     } > "$out"
