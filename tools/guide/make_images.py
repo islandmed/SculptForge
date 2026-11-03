@@ -71,6 +71,30 @@ WHATS_NEW = {
 }
 WN_SIZE = (600, 340)
 
+# Feature panels from tools/guide/feature_shots.py (one folder per UI test): name -> ("test/shot", crop, max width).
+FEATURE_CROPS = {
+    "bake": ("bake/high-and-baked-low", (0, 0, 1600, 960), MAX_WIDTH),
+    "bake-mesh-maps": ("bake/bake-palette", (1280, 280, 1600, 720), 320),
+    "blender-menu": ("blender_bridge/menu", (130, 0, 1010, 580), 880),
+    "capture-from-view": ("kelvinlet_capture/capture_window", (440, 140, 1200, 640), 760),
+    "fill-layer-panel": ("fill_layers/fill-layer-panel", (1280, 60, 1600, 960), 320),
+    "gizmo-pose": ("gizmo/posing-mid-drag", (110, 200, 1000, 860), 890),
+    "pbr-viewport": ("pbr_viewport/pbr-photo-studio", (0, 0, 1600, 960), MAX_WIDTH),
+    "pbr-environment": ("pbr_viewport/pbr-outdoor-background", (100, 85, 1215, 870), 960),
+    "pbr-brush-material": ("pbr_channels/brush-material", (280, 20, 640, 960), 360),
+    "pbr-solo-roughness": ("pbr_channels/solo-roughness", (300, 85, 1600, 870), 960),
+    "performance-panel": ("performance/performance-panel", (180, 20, 715, 800), 535),
+    "texture-painting": ("texture_paint/stroke", (0, 0, 1600, 960), MAX_WIDTH),
+    "timeline-strip": ("timeline/strokes", (100, 85, 1215, 640), 960),
+    "uv-editor": ("uv_editor/unwrapped", (100, 85, 1215, 870), 960),
+    "uv-editor-seams": ("uv_editor/seam-tool", (100, 85, 1215, 870), 960),
+    "uv-editor-stretch": ("uv_editor/stretch", (100, 85, 1215, 870), 960),
+    "uv-editor-trim": ("uv_editor/trim", (100, 85, 1215, 870), 960),
+    "uv-editor-udim": ("uv_editor/udim", (100, 85, 1215, 870), 960),
+    "vdm-brushes": ("vdm/stamped", (300, 40, 1600, 960), 960),
+    "facial-shapes-panel": ("face_shapes/head-neutral", (300, 40, 1600, 960), 960),
+}
+
 # The labelled overview: region name and box in window pixels (the SculptForge layout).
 REGIONS = [
     ("Menu bar", (0, 0, 1600, 40)),
@@ -261,6 +285,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("shots", type=pathlib.Path, help="folder with the screenshots (--ui-out of shots.sfui)")
     ap.add_argument("--preview", type=pathlib.Path, help="also write a contact sheet of every image here")
+    ap.add_argument("--features", type=pathlib.Path, help="also crop the feature panels from tools/guide/feature_shots.py's --out")
     ap.add_argument("--only", action="append", help="make only this image (repeatable), e.g. --only qremesh-guides")
     ap.add_argument("--first-sculpt", action="store_true",
                     help="the shots are tests/ui/first_sculpt.sfui's: make images/first-sculpt/*.jpg")
@@ -291,6 +316,14 @@ def main() -> int:
         if not wanted(name):
             continue
         src = args.shots / f"{shot}.png"
+        if not src.exists():
+            print(f"missing screenshot {src}", file=sys.stderr)
+            return 1
+        made.append(save(Image.open(src).convert("RGB").crop(box), name, width))
+    for name, (shot, box, width) in FEATURE_CROPS.items() if args.features else ():
+        if not wanted(name):
+            continue
+        src = args.features / f"{shot}.png"
         if not src.exists():
             print(f"missing screenshot {src}", file=sys.stderr)
             return 1
