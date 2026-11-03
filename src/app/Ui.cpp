@@ -75,7 +75,7 @@ bool focusedByKeyboard(ImGuiID id) {
     return id && g.NavCursorVisible && g.NavId == id && g.NavWindow;
 }
 
-bool itemHoveredForHelp() {bool itemHoveredForHelp() {
+bool itemHoveredForHelp() {
     return ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
 }
 
@@ -455,7 +455,7 @@ void DrawHover(App& app) {
         it = frame - it->second.frame > 120 ? g_anims.erase(it) : std::next(it);
 }
 
-void DelayedTooltip(const char* text) {void DelayedTooltip(const char* text) {
+void DelayedTooltip(const char* text) {
     if (!text || !*text || CtrlHeld()) return;
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal | ImGuiHoveredFlags_NoSharedDelay)) ImGui::SetTooltip("%s", tr(text));
 }

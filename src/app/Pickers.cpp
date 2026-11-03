@@ -312,8 +312,9 @@ void AssetTileHoverGlow() {
     a.x = std::clamp(a.x, vp->Pos.x + 2.0f, vp->Pos.x + vp->Size.x - s - 2.0f);
     a.y = std::clamp(a.y, vp->Pos.y + 2.0f, vp->Pos.y + vp->Size.y - s - 2.0f);
     const ImVec2 b(a.x + s, a.y + s);
-    // In the window's own draw list, unclipped: over the neighbouring tiles but under tooltips.
-    ImDrawList* dl = ImGui::GetWindowDrawList();
+    // On the foreground list, drawn last: over the neighbouring tiles and every other window (#86: in the window's
+    // own list, tiles in later child windows covered it).
+    ImDrawList* dl = ImGui::GetForegroundDrawList();
     dl->PushClipRect(vp->Pos, ImVec2(vp->Pos.x + vp->Size.x, vp->Pos.y + vp->Size.y), false);
     struct PopClip {
         ImDrawList* dl;
