@@ -26,7 +26,7 @@ Any of these opens it:
 
 - Drop an image file (PNG, JPG, BMP, TGA, PSD or GIF) onto the SculptForge window. The image is loaded as the
   picture for the **From image** tab and the window opens.
-- Open the **Generate** palette and click **Generate 3D**.
+- Open **Mesh > Generate 3D** and click **Generate 3D**.
 - Press <kbd>F3</kbd>, type `generate` and press <kbd>Enter</kbd>.
 
 The window has two tabs, **From image** and **From text**.
@@ -106,7 +106,7 @@ This runs each model author's own public demo on Hugging Face's shared ZeroGPU h
 
 If you never picked a model, SculptForge uses the default, so updates that change it reach you; a model you pick
 (and save) is kept. If you pick TRELLIS.2 without a token, Hunyuan3D 2.1 runs instead and the status line says
-"TRELLIS.2 needs a free Hugging Face token (Preferences > AI); used Hunyuan3D 2.1 instead."
+"TRELLIS.2 needs a free Hugging Face token (Edit > Preferences > AI); used Hunyuan3D 2.1 instead."
 
 The Hunyuan3D models' licence doesn't cover use in the European Union, the United Kingdom or South Korea. The
 first time a Hunyuan3D model runs, a notice says so, and it stays in the **Model** picker's tooltip. See
@@ -114,7 +114,7 @@ first time a Hunyuan3D model runs, a notice says so, and it stays in the **Model
 
 GPU time is rationed per person per day, there can be a queue at busy times, and a demo can be paused or
 changed by its owner. To raise the allowance, create a free token with read access at
-huggingface.co/settings/tokens and paste it into **HF token** or **Preferences > AI** (or set the `HF_TOKEN`
+huggingface.co/settings/tokens and paste it into **HF token** or **Edit > Preferences > AI** (or set the `HF_TOKEN`
 environment variable).
 When the allowance runs out you see "Hugging Face's free GPU time is used up for now"; add a token, wait for
 it to refill, or pick another model.
@@ -208,7 +208,7 @@ SculptForge. Keys in `ai.json` are readable only by your user account. See
 ## Quick shapes from an image (offline)
 
 The **From image** tab also has three offline tools under **Quick shapes (offline)**. They need no network and
-run instantly. The same tools are in the **Generate** palette as **Relief**, **Inflate** and **Stamp**.
+run instantly. The same tools are in **Mesh > Generate 3D** as **Relief**, **Inflate** and **Stamp**.
 
 | Tool | What it makes | Settings |
 |---|---|---|
@@ -223,7 +223,7 @@ run instantly. The same tools are in the **Generate** palette as **Relief**, **I
 
 Generated meshes are a starting point. A typical next pass:
 
-1. Check the size of the remeshed result in the title strip (Verts, Tris). If the detail is too soft, divide once more
+1. Check the size of the remeshed result in the bar along the top (the triangle count). If the detail is too soft, divide once more
    (<kbd>Ctrl</kbd>+<kbd>D</kbd>), or generate again with a higher **Resolution**. **Tool > Remesh** has Quad Remesh
    (first) and Voxel Remesh for another pass.
 2. Turn on **X** symmetry if the subject is symmetrical, and sculpt the forms with Clay Block, Move and Sharp Crease ([Sculpting and brushes](sculpting.md)).

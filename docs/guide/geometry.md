@@ -57,7 +57,7 @@ multiplies the triangle count by four and rounds off the shape slightly, like ZB
 > levels back). Voxel Remesh, Decimate and Quad Remesh do the same. To add triangles only where you sculpt, use
 > [Dynamic topology](dynamic-topology.md).
 
-> **Tip:** The title strip shows the vertex and triangle counts of the whole scene. A few million triangles sculpt
+> **Tip:** The bar along the top shows the triangle count of the whole scene. A few million triangles sculpt
 > smoothly on a recent GPU; go up a level only when you need finer detail.
 
 ## Voxel remesh
@@ -189,7 +189,7 @@ Subdivide, remesh, Quad Remesh, decimate, Mirror And Weld, Mirror and delete hid
 active Part. They can use a lot of memory on dense meshes, and undo keeps a full copy of the previous mesh for
 each of them. Before a big change on a heavy sculpt:
 
-- **Snapshot** (**File > Save Snapshot**, title strip) keeps a timestamped copy of the scene without touching your project file; see
+- **Snapshot** (**File > Save Snapshot**) keeps a timestamped copy of the scene without touching your project file; see
   [Projects](projects.md#snapshots).
 - **Duplicate** the Part to keep the old version side by side.
 

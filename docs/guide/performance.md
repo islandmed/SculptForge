@@ -3,10 +3,10 @@
 SculptForge is built to sculpt tens of millions of polygons. Brushes, normal updates and the picking structure
 run on every core of your processor, a stroke sends the graphics card only the part of the mesh it changed, and
 undo stores only the vertices a stroke touched, so it stays quick however big the model is. This chapter
-explains what to expect, the settings in **Preferences > Performance**, and how to get the most out of a big
+explains what to expect, the settings in **Edit > Preferences > Performance**, and how to get the most out of a big
 sculpt.
 
-![Preferences > Performance after a stroke: antialiasing, Fast Navigation, multithreading, what the stroke cost per dab, and memory](images/performance-panel.jpg)
+![Edit > Preferences > Performance after a stroke: antialiasing, Fast Navigation, multithreading, what the stroke cost per dab, and memory](images/performance-panel.jpg)
 
 ## What to expect
 
@@ -30,7 +30,7 @@ change to the graphics card is about a third.
 [Performance figures](https://github.com/islandmed/SculptForge/blob/main/docs/performance.md) has the full
 measurements, and how to run the same benchmark on your own machine.
 
-## Preferences > Performance
+## Edit > Preferences > Performance
 
 Open **Preferences** and click **Performance**.
 
@@ -63,7 +63,7 @@ There are two main profiles and a safe mode:
 On a laptop running on battery, whatever its profile, SculptForge sends less data to the graphics card per
 frame and aims for 60 frames a second, and the status bar says so; plugged in again, it goes back.
 
-At the top of **Preferences > Performance**:
+At the top of **Edit > Preferences > Performance**:
 
 | Control | What it does |
 |---|---|
@@ -76,7 +76,7 @@ At the top of **Preferences > Performance**:
 
 From a shell, `sculptforge --calibrate` measures and prints the result as JSON.
 
-Like the other preferences, these last until you quit; **Preferences > Config > Store Config** keeps them. Every
+Like the other preferences, these last until you quit; **Edit > Preferences > Config > Store Config** keeps them. Every
 setting is also in the <kbd>F3</kbd> command palette (type "antialiasing", "fast navigation" or
 "multithreading").
 

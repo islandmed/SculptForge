@@ -18,7 +18,7 @@ with <kbd>Alt</kbd>, <kbd>Shift</kbd>, masks, symmetry, strokes and alphas.
 
 ## Open Brush Lab
 
-Click **AI Brush** on the top shelf, or **AI Brush** at the top of the **Brush** palette. Brush Lab is a
+Click **AI Brush** on the top shelf, or **AI Brush** at the top of **Sculpt > Brush**. Brush Lab is a
 floating window; it opens at the top-left corner of the canvas the first time, and you can drag it anywhere.
 Click the button again, or the window's close box, to hide it. Not there? AI features are off: turn them on in
 **Preferences > AI** (see [Turning AI off](interface.md#turning-ai-off)).
@@ -45,7 +45,7 @@ your conversation so far. **Clear chat** starts a new conversation.
 ### Tune a brush with sliders
 
 Open the **Recipe** section of Brush Lab to see every value of the active custom brush. The same editor
-appears in the **Brush** palette as **Edit recipe: NAME** when a custom brush is active. Hover a slider for a
+appears in **Sculpt > Brush** as **Edit recipe: NAME** when a custom brush is active. Hover a slider for a
 description.
 
 | Setting | Range | What it does |
@@ -76,7 +76,7 @@ The name field at the top of the editor renames the brush when you press <kbd>En
 ## Choose an AI provider
 
 Brush Lab works out of the box with no account or key. Open the **AI provider** section of Brush Lab (also in
-**Generate > AI brush provider**) to choose another service.
+**Mesh > Generate 3D > AI brush provider**) to choose another service.
 
 | Provider | What you need | Notes |
 |---|---|---|
@@ -120,11 +120,11 @@ The library is a folder of `.sfbrush` files in the SculptForge settings folder:
 | macOS | `~/Library/Application Support/SculptForge/SculptForge/brushes` |
 | Windows | `%APPDATA%\SculptForge\SculptForge\brushes` |
 
-![The Custom brushes list in the Brush palette, with its right-click menu](images/brush-library.jpg)
+![The Custom brushes list in Sculpt > Brush, with its right-click menu](images/brush-library.jpg)
 
 ### The Custom brushes list
 
-The **Brush** palette lists every custom brush under **Custom brushes**. A small tag after a name says where
+**Sculpt > Brush** lists every custom brush under **Custom brushes**. A small tag after a name says where
 the brush comes from when it isn't simply yours or built in:
 
 | Tag | Meaning |
@@ -157,7 +157,7 @@ brushes.
 A brush code is the whole recipe in one line of text, starting with `sfbrush1:`. Paste it into a chat, an
 email, an issue or a forum post.
 
-- **Copy**: right-click a custom brush (in **Brush > Custom brushes** or the brush picker) and choose
+- **Copy**: right-click a custom brush (in **Sculpt > Brush > Custom brushes** or the brush picker) and choose
   **Copy brush code**.
 - **Paste**: copy a code, then press <kbd>Ctrl</kbd>+<kbd>V</kbd> over the viewport, click **Paste brush** in
   Brush Lab, or choose **Edit > Paste brush**. The brush is installed in your library and becomes active.
@@ -194,7 +194,7 @@ Projects (`.sfproj`) also store the brushes they use, so a scene opens with its 
 
 The community gallery is a public collection of free (CC0) brushes shared by other sculptors.
 
-1. Click **Community brushes** at the top of the **Brush** palette.
+1. Click **Community brushes** at the top of **Sculpt > Brush**.
 2. Search by name or description (scales, skin, stone...), or pick a tag from the **All tags** list.
 3. Click **Install** under a brush. It is downloaded, checked against its SHA-256 checksum, installed in your
    library and made active. Installed brushes show **Installed**.

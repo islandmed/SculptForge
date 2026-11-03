@@ -3,7 +3,7 @@
 This chapter is the reference for every default keyboard shortcut and mouse gesture in SculptForge. Inside the
 app, <kbd>F1</kbd> opens the same list as the Controls window, showing your own keys if you've changed any.
 
-SculptForge has four key styles, chosen in **Preferences > Input > Style** (and by the **Coming from** question the
+SculptForge has four key styles, chosen in **Edit > Preferences > Input > Style** (and by the **Coming from** question the
 first time SculptForge starts): **SculptForge** (the default for new installs), **ZBrush-style**, **Blender** and
 **Maya**. The main table shows the SculptForge style; the sections after it list what the
 [ZBrush-style](#zbrush-style-keys) and [Blender](#blender-keys) styles change. If you used an earlier version,
@@ -12,7 +12,7 @@ your saved style is kept.
 ## Changing shortcuts
 
 Every key below can be reassigned: hold <kbd>Ctrl</kbd>+<kbd>Alt</kbd> and click a button, then press the new
-key, or use **Preferences > Hotkeys**. Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> (Store Config) to
+key, or use **Edit > Preferences > Hotkeys**. Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> (Store Config) to
 keep your changes. See [Customizing the interface](interface.md#customizing-the-interface).
 
 On macOS, <kbd>Cmd</kbd> works wherever a shortcut says <kbd>Ctrl</kbd>. Single-letter shortcuts don't fire
@@ -193,7 +193,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Action | Gesture |
 |---|---|
 | Sculpt | Left-drag on the model |
-| Sculpt from beside the model | Turn on **Preferences > Input > Start strokes off the model** (or press <kbd>Shift</kbd>+<kbd>L</kbd>), then left-drag from the background onto the model; the view then turns with a right-drag (see [Navigation](navigation.md#mouse-and-pen)) |
+| Sculpt from beside the model | Turn on **Edit > Preferences > Input > Start strokes off the model** (or press <kbd>Shift</kbd>+<kbd>L</kbd>), then left-drag from the background onto the model; the view then turns with a right-drag (see [Navigation](navigation.md#mouse-and-pen)) |
 | Invert the brush (subtract) | Hold <kbd>Alt</kbd> while sculpting |
 | Smooth | Hold <kbd>Shift</kbd> while sculpting (works with any brush, and with Paint) |
 | Straight line | Press <kbd>Shift</kbd> after a stroke has started (45 degree steps) |
@@ -231,7 +231,7 @@ Some keys only mean something while a pop-up or panel has the keyboard.
 | Key | Action |
 |---|---|
 | A letter | Keep the brushes whose names start with the letters typed so far |
-| The orange letter on a tile | Pick that brush (<kbd>B</kbd> <kbd>S</kbd> <kbd>T</kbd> = Standard) |
+| The highlighted letter on a tile | Pick that brush (<kbd>B</kbd> <kbd>S</kbd> <kbd>T</kbd> = Standard) |
 | <kbd>Backspace</kbd> | Take back one letter |
 | <kbd>Enter</kbd> | Pick the first match |
 | <kbd>Esc</kbd> | Close |
@@ -271,7 +271,7 @@ Some keys only mean something while a pop-up or panel has the keyboard.
 
 ## ZBrush-style keys
 
-With **Preferences > Input > Style** on **ZBrush-style** (also at the top of the Controls window, <kbd>F1</kbd>,
+With **Edit > Preferences > Input > Style** on **ZBrush-style** (also at the top of the Controls window, <kbd>F1</kbd>,
 or **ZBrush** in the first-start **Coming from** question), the keys and gestures work as in ZBrush. Store Config
 (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) keeps the choice. Compared with the table above, these change:
 
@@ -289,7 +289,7 @@ these ZBrush-style keys and changes only the view controls (<kbd>Alt</kbd>+left,
 
 ## Maya keys
 
-With **Preferences > Input > Style** on **Maya** (#32), the view works as in Maya, on the model or beside it, as
+With **Edit > Preferences > Input > Style** on **Maya** (#32), the view works as in Maya, on the model or beside it, as
 long as <kbd>Alt</kbd> is the only key held:
 
 | To | Maya style |
@@ -302,19 +302,19 @@ long as <kbd>Alt</kbd> is the only key held:
 | Smooth | Hold <kbd>Shift</kbd> while sculpting |
 | Visibility gestures | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>, as in the other styles |
 
-Maya's default dolly follows a sideways drag, so that is the default here too. **Preferences > Input > Zoom
+Maya's default dolly follows a sideways drag, so that is the default here too. **Edit > Preferences > Input > Zoom
 drag** switches it to **Up and down** (drag up to zoom in) if you set Maya up that way. **Invert zoom**, in every
 style, turns zoom drags around (the mouse wheel stays as it is).
 
 ## Blender keys
 
-With **Preferences > Input > Style** on **Blender** (also at the top of the Controls window, <kbd>F1</kbd>), the
+With **Edit > Preferences > Input > Style** on **Blender** (also at the top of the Controls window, <kbd>F1</kbd>), the
 view and the sculpt keys work as in Blender 4.2 and later, Sculpt Mode (with 5.1's Alt mask). Compared with the table above, these
 change in the Blender style:
 
 | To | Blender style |
 |---|---|
-| Rotate | Middle-drag, or <kbd>Alt</kbd>+left-drag beside the model (everywhere with **Preferences > Input > Emulate 3 Button Mouse**, for pens and trackpads), or left-drag beside the model |
+| Rotate | Middle-drag, or <kbd>Alt</kbd>+left-drag beside the model (everywhere with **Edit > Preferences > Input > Emulate 3 Button Mouse**, for pens and trackpads), or left-drag beside the model |
 | Pan | <kbd>Shift</kbd>+middle-drag, or <kbd>Alt</kbd>+<kbd>Shift</kbd>+left-drag |
 | Zoom | Mouse wheel, <kbd>Ctrl</kbd>+middle-drag (up: closer), <kbd>Alt</kbd>+<kbd>Ctrl</kbd>+left-drag, <kbd>Numpad Plus</kbd> / <kbd>Numpad Minus</kbd> |
 | Invert the brush (subtract) | Hold <kbd>Ctrl</kbd> while sculpting |
@@ -336,17 +336,17 @@ change in the Blender style:
 | Wireframe | <kbd>Shift</kbd>+<kbd>Z</kbd> |
 
 Choosing the Blender style also sets **Rotation** to **Turntable**, as Blender orbits; change it back under
-**Preferences > Input** if you like. Blender's face sets are SculptForge's face groups, and its brushes map to the
+**Edit > Preferences > Input** if you like. Blender's face sets are SculptForge's face groups, and its brushes map to the
 nearest SculptForge brush. **Symmetry X**, **Paint** and the material picker have no key in the Blender style
 (they are on the shelves); give them one with <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click. Laptops without a numpad:
-turn on **Preferences > Input > Emulate Numpad** and the number row works as the numpad.
+turn on **Edit > Preferences > Input > Emulate Numpad** and the number row works as the numpad.
 
 The numpad views (<kbd>Numpad 1</kbd>, <kbd>3</kbd>, <kbd>7</kbd>, <kbd>5</kbd> ...) work in every style.
 
 ### Your own Blender keymap
 
 If you changed Blender's keys, export them in Blender (**Edit > Preferences > Keymap**, the **Export...** button
-next to the keymap name) and in SculptForge choose **Import Blender keymap...** under **Preferences > Input** or
+next to the keymap name) and in SculptForge choose **Import Blender keymap...** under **Edit > Preferences > Input** or
 at the top of the Controls window. SculptForge switches to the Blender style and takes, from the file's 3D View
 and Sculpt keymaps, the keys of every action it has an equivalent for: the views, the brushes above, the radius
 and strength, the mask, hiding, subdivision levels, undo and redo. Mouse buttons and keys for things

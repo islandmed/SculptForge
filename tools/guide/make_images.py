@@ -20,41 +20,42 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUT = ROOT / "docs" / "guide" / "images"
 FONT = ROOT / "assets" / "fonts" / "Inter-SemiBold.ttf"
 MAX_WIDTH = 1100
-ACCENT = (240, 136, 46)
+ACCENT = (122, 162, 247)  # Tokyo Night blue, the default look's accent
 
 # name: (screenshot, (x0, y0, x1, y1) crop in 1600x960 window pixels, max width)
 CROPS = {
-    "palette-dropdown": ("palette-dropdown", (0, 0, 620, 560), 620),
-    "palette-tray": ("palette-tray", (1276, 46, 1600, 520), 324),
-    "draw-palette": ("draw-palette", (240, 20, 640, 330), 400),
-    "lightbox": ("lightbox", (100, 100, 900, 300), 800),
-    "brush-picker": ("brush-picker", (250, 100, 740, 430), 490),
-    "stroke-picker": ("stroke-picker", (0, 200, 440, 360), 440),
-    "alpha-picker": ("alpha-picker", (0, 310, 600, 520), 600),
-    "material-picker": ("material-picker", (0, 330, 520, 590), 520),
-    "custom-matcaps": ("custom-matcaps", (382, 122, 900, 700), 518),
-    "ctrl-help": ("ctrl-help", (1040, 180, 1600, 420), 560),
-    "command-palette": ("command-palette", (340, 120, 980, 250), 640),
-    "console": ("console", (0, 690, 1280, 900), MAX_WIDTH),
-    "preferences": ("preferences", (440, 20, 790, 690), 350),
-    "right-shelf": ("overview", (1200, 110, 1290, 560), 90),
-    "bottom-shelf": ("overview", (0, 890, 1280, 960), MAX_WIDTH),
-    "sculpt-lion": ("overview", (0, 46, 1280, 900), 960),
-    "brush-lab": ("brush-lab", (110, 120, 580, 370), 470),
-    "brush-library": ("brush-library", (140, 40, 480, 960), 340),
-    "community-brushes": ("community-brushes", (390, 130, 1210, 820), 820),
-    "generate-3d": ("generate-3d", (882, 132, 1204, 862), 322),
-    "export": ("export", (1276, 46, 1600, 700), 324),
-    "masking": ("masking", (420, 46, 1600, 800), 960),
-    "polypaint": ("polypaint", (190, 20, 900, 800), 710),
-    "layers": ("layers", (1276, 46, 1600, 560), 324),
-    "paint-layers": ("paint-layers", (420, 46, 1600, 800), 960),
+    "palette-dropdown": ("palette-dropdown", (140, 0, 770, 295), 630),
+    "palette-tray": ("palette-tray", (1280, 560, 1600, 960), 320),
+    "draw-palette": ("draw-palette", (140, 0, 770, 600), 630),
+    "lightbox": ("lightbox", (90, 85, 1020, 230), 930),
+    "brush-picker": ("brush-picker", (250, 82, 725, 414), 475),
+    "stroke-picker": ("stroke-picker", (0, 190, 420, 450), 420),
+    "alpha-picker": ("alpha-picker", (0, 295, 575, 668), 575),
+    "material-picker": ("material-picker", (25, 320, 505, 545), 480),
+    "custom-matcaps": ("custom-matcaps", (436, 0, 980, 700), 544),
+    "ctrl-help": ("ctrl-help", (1060, 500, 1600, 740), 540),
+    "command-palette": ("command-palette", (355, 100, 960, 500), 605),
+    "console": ("console", (0, 698, 1275, 866), MAX_WIDTH),
+    "preferences": ("preferences", (180, 0, 715, 960), 535),
+    "right-shelf": ("overview", (1218, 90, 1278, 625), 60),
+    "bottom-shelf": ("overview", (0, 864, 1280, 960), MAX_WIDTH),
+    "sculpt-lion": ("overview", (0, 0, 1600, 960), 1100),
+    "brush-lab": ("brush-lab", (118, 102, 575, 332), 457),
+    "brush-library": ("brush-library", (405, 600, 765, 960), 360),
+    "community-brushes": ("community-brushes", (395, 138, 1205, 820), 810),
+    "generate-3d": ("generate-3d", (882, 102, 1198, 830), 316),
+    "export": ("export", (1280, 40, 1600, 780), 320),
+    "masking": ("masking", (300, 46, 1600, 800), 960),
+    "polypaint": ("polypaint", (230, 20, 1100, 800), 870),
+    "layers": ("layers", (1280, 40, 1600, 560), 320),
+    "paint-layers": ("paint-layers", (300, 46, 1600, 800), 960),
     "subtools": ("subtools", (380, 46, 1600, 900), 960),
     "polygroups": ("polygroups", (300, 100, 1600, 860), 960),
-    "splats": ("splats", (420, 46, 1600, 900), 960),
-    "user-guide": ("user-guide", (130, 140, 1190, 880), 1060),
+    "splats": ("splats", (300, 90, 1280, 865), 980),
+    "user-guide": ("user-guide", (138, 108, 1180, 842), 1042),
     "extract": ("extract", (380, 140, 1000, 740), 620),
     "make-sculptable-panel": ("sculptable-panel", (1276, 500, 1600, 960), 324),
+    "qremesh": ("qremesh", (0, 0, 1600, 960), MAX_WIDTH),
 }
 
 # What's New feature pictures (tools/guide/whats_new_shots.sfui): name: (screenshot, crop with the 600:340 shape), saved
@@ -71,16 +72,39 @@ WHATS_NEW = {
 }
 WN_SIZE = (600, 340)
 
-# The labelled overview: region name and box in window pixels.
+# Feature panels from tools/guide/feature_shots.py (one folder per UI test): name -> ("test/shot", crop, max width).
+FEATURE_CROPS = {
+    "bake": ("bake/high-and-baked-low", (0, 0, 1600, 960), MAX_WIDTH),
+    "bake-mesh-maps": ("bake/bake-palette", (1280, 280, 1600, 720), 320),
+    "blender-menu": ("blender_bridge/menu", (130, 0, 1010, 580), 880),
+    "capture-from-view": ("kelvinlet_capture/capture_window", (440, 140, 1200, 640), 760),
+    "fill-layer-panel": ("fill_layers/fill-layer-panel", (1280, 60, 1600, 960), 320),
+    "gizmo-pose": ("gizmo/posing-mid-drag", (110, 200, 1000, 860), 890),
+    "pbr-viewport": ("pbr_viewport/pbr-photo-studio", (0, 0, 1600, 960), MAX_WIDTH),
+    "pbr-environment": ("pbr_viewport/pbr-outdoor-background", (100, 85, 1215, 870), 960),
+    "pbr-brush-material": ("pbr_channels/brush-material", (280, 20, 640, 960), 360),
+    "pbr-solo-roughness": ("pbr_channels/solo-roughness", (300, 85, 1600, 870), 960),
+    "performance-panel": ("performance/performance-panel", (180, 20, 715, 800), 535),
+    "texture-painting": ("texture_paint/stroke", (0, 0, 1600, 960), MAX_WIDTH),
+    "timeline-strip": ("timeline/strokes", (100, 85, 1215, 640), 960),
+    "uv-editor": ("uv_editor/unwrapped", (100, 85, 1215, 870), 960),
+    "uv-editor-seams": ("uv_editor/seam-tool", (100, 85, 1215, 870), 960),
+    "uv-editor-stretch": ("uv_editor/stretch", (100, 85, 1215, 870), 960),
+    "uv-editor-trim": ("uv_editor/trim", (100, 85, 1215, 870), 960),
+    "uv-editor-udim": ("uv_editor/udim", (100, 85, 1215, 870), 960),
+    "vdm-brushes": ("vdm/stamped", (300, 40, 1600, 960), 960),
+    "facial-shapes-panel": ("face_shapes/head-neutral", (300, 40, 1600, 960), 960),
+}
+
+# The labelled overview: region name and box in window pixels (the SculptForge layout).
 REGIONS = [
-    ("Title strip", (0, 0, 1600, 24)),
-    ("Palette bar", (0, 24, 1276, 46)),
-    ("Top shelf", (8, 50, 1216, 114)),
-    ("Left shelf", (2, 118, 100, 640)),
-    ("Canvas", (102, 118, 1216, 895)),
-    ("Right shelf", (1218, 118, 1276, 560)),
-    ("Bottom shelf", (2, 897, 1276, 960)),
-    ("Right tray (Tool palette)", (1280, 50, 1600, 560)),
+    ("Menu bar", (0, 0, 1600, 40)),
+    ("Top shelf", (6, 44, 1270, 82)),
+    ("Left shelf", (8, 92, 102, 616)),
+    ("Canvas", (106, 90, 1212, 862)),
+    ("Right shelf", (1220, 90, 1276, 624)),
+    ("Bottom shelf", (6, 866, 1276, 958)),
+    ("Right tray (Tool panel)", (1282, 46, 1596, 956)),
 ]
 
 
@@ -103,7 +127,7 @@ def label(draw, xy, text, size=17, anchor="la"):
     f = font(size)
     x0, y0, x1, y1 = draw.textbbox(xy, text, font=f, anchor=anchor)
     draw.rounded_rectangle((x0 - 7, y0 - 4, x1 + 7, y1 + 5), radius=6, fill=ACCENT)
-    draw.text(xy, text, font=f, fill=(255, 255, 255), anchor=anchor)
+    draw.text(xy, text, font=f, fill=(26, 27, 38), anchor=anchor)  # dark on the light accent
 
 
 def overview(shots: pathlib.Path):
@@ -116,13 +140,12 @@ def overview(shots: pathlib.Path):
     d = ImageDraw.Draw(img)
     # Where each label sits, and the point its leader line goes to (None: the label is inside its region).
     spots = {
-        "Title strip": ((760, 170), (760, 12)), "Palette bar": ((420, 170), (420, 35)),
-        "Top shelf": ((1060, 170), (1060, 100)), "Left shelf": ((112, 400), None),
-        "Canvas": ((640, 800), None), "Right shelf": ((1206, 590), None),
-        "Bottom shelf": ((640, 880), None), "Right tray (Tool palette)": ((1440, 600), None),
+        "Menu bar": ((560, 150), (860, 20)), "Top shelf": ((900, 150), (900, 63)),
+        "Left shelf": ((112, 700), (55, 560)), "Canvas": ((660, 800), None), "Right shelf": ((1206, 700), (1248, 600)),
+        "Bottom shelf": ((1080, 800), (1080, 905)), "Right tray (Tool panel)": ((1440, 640), None),
     }
-    anchors = {"Left shelf": "lm", "Right shelf": "rm", "Canvas": "mm", "Bottom shelf": "mb",
-               "Right tray (Tool palette)": "mm"}
+    anchors = {"Left shelf": "lm", "Right shelf": "rm", "Canvas": "mm", "Bottom shelf": "mm",
+               "Right tray (Tool panel)": "mm"}
     for name, _ in REGIONS:
         at, target = spots[name]
         if target:
@@ -217,7 +240,7 @@ def shading(shots: pathlib.Path):
     box = (420, 120, 1000, 870)
     smooth = Image.open(shots / "shading-smooth.png").convert("RGB").crop(box)
     flat = Image.open(shots / "shading-flat.png").convert("RGB").crop(box)
-    rows = Image.open(shots / "shading-palette.png").convert("RGB").crop((384, 456, 700, 550))
+    rows = Image.open(shots / "shading-palette.png").convert("RGB").crop((625, 405, 972, 495))
     img = Image.new("RGB", (smooth.width * 2, smooth.height), (31, 31, 33))
     img.paste(smooth, (0, 0))
     img.paste(flat, (smooth.width, 0))
@@ -263,6 +286,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("shots", type=pathlib.Path, help="folder with the screenshots (--ui-out of shots.sfui)")
     ap.add_argument("--preview", type=pathlib.Path, help="also write a contact sheet of every image here")
+    ap.add_argument("--features", type=pathlib.Path, help="also crop the feature panels from tools/guide/feature_shots.py's --out")
     ap.add_argument("--only", action="append", help="make only this image (repeatable), e.g. --only qremesh-guides")
     ap.add_argument("--first-sculpt", action="store_true",
                     help="the shots are tests/ui/first_sculpt.sfui's: make images/first-sculpt/*.jpg")
@@ -293,6 +317,14 @@ def main() -> int:
         if not wanted(name):
             continue
         src = args.shots / f"{shot}.png"
+        if not src.exists():
+            print(f"missing screenshot {src}", file=sys.stderr)
+            return 1
+        made.append(save(Image.open(src).convert("RGB").crop(box), name, width))
+    for name, (shot, box, width) in FEATURE_CROPS.items() if args.features else ():
+        if not wanted(name):
+            continue
+        src = args.features / f"{shot}.png"
         if not src.exists():
             print(f"missing screenshot {src}", file=sys.stderr)
             return 1

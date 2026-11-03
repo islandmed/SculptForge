@@ -30,3 +30,20 @@ python3 tools/guide/build_site.py --check
 
 Crop rectangles for each image are in `make_images.py`; if the UI layout changes, look at the preview sheet and
 adjust them. Re-run cmake after adding or removing guide files so the app embeds them.
+
+## Menu paths
+
+The guide names the default **SculptForge layout**'s menus: **Edit > Preferences > Input**, **Sculpt > Stroke**,
+**Render > Materials**. **Tool > ...** paths stay, since the Tool palette is in the right tray in both layouts.
+`python3 tools/guide/menu_paths.py` rewrites ZBrush-style palette paths (**Preferences > Input**) in every
+chapter; ctest `guide_menu_paths` fails while any are left.
+
+## Feature panels
+
+Bake, fill layers, PBR, the UV Editor, Performance and other feature images come from the feature UI tests, run in
+the default look (tests written for the Classic look run from a converted copy):
+
+```sh
+python3 tools/guide/feature_shots.py --app build/sculptforge --out build/guide-features
+python3 tools/guide/make_images.py build/guide-shots --features build/guide-features
+```

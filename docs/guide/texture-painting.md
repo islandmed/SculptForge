@@ -14,7 +14,7 @@ symmetry, mask and paint layers with blend modes.
 ## Start in one click
 
 Press <kbd>P</kbd> for the Paint brush (or turn on **Rgb**). While the Part has no texture, **New Texture**
-appears on the top shelf and in the Color palette. Click it: if the model has no UVs, SculptForge runs **Auto
+appears on the top shelf and in the **Paint** menu. Click it: if the model has no UVs, SculptForge runs **Auto
 UV** first (in the background; the status bar shows its progress), then gives it a white texture (2K, or the size
 chosen in Tool > Texture Map) and switches painting to **Texture**. Paint away. The steps below do the same thing
 by hand, with more choices.
@@ -49,7 +49,7 @@ The model shows both: the vertex paint multiplied by the texture, over the mater
 the mesh's polygons, it is going into the vertices: check that **Texture** is lit, and that the Part carries no
 old vertex paint (Tool > Paint Layers, or **Vertex Paint > Texture** to move it into the texture). Texture paint itself
 is as sharp as the texture: a hard alpha gives the same texels on a two-triangle plane as on a dense mesh. Each Part keeps its own
-choice, saved in the project. **Show texture** (Texture Map, or the Color palette) hides the texture in the
+choice, saved in the project. **Show texture** (Texture Map, or the **Paint** menu) hides the texture in the
 viewport without deleting it.
 
 ## How texture painting works

@@ -31,9 +31,9 @@ them is an export, not a save. See [Exporting](exporting.md).
 - **File > Save** (<kbd>Ctrl</kbd>+<kbd>S</kbd>) saves to the current project. The first time, it asks for a file
   name.
 - **File > Save As...** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>) saves under a new name.
-- Clicking the document name in the title strip also saves.
+- In the ZBrush-style layout, clicking the document name in the title strip also saves.
 
-The title strip shows the document name with `*` after it while there are unsaved changes, and the window title
+The bar along the top shows the file name with `*` after it while there are unsaved changes, and the window title
 starts with `*`. Any edit in any Part counts, as do splat edits and layer weight changes.
 
 If you opened a model file (an OBJ, say) rather than a project, **Save** asks where to save a new `.sfproj`; the
@@ -97,7 +97,7 @@ Dropping an image or a `.sfbrush` file never asks, because it doesn't replace th
 
 While the scene has unsaved changes, SculptForge writes a recovery copy every few minutes (every 5 minutes by
 default; it waits until you finish a stroke). Change the interval, or turn it off with 0, in
-**Preferences > Autosave** or with the **Autosave (min)** slider in the File palette (0 to 60 minutes).
+**Edit > Preferences > Autosave** or with the **Autosave (min)** slider in the File palette (0 to 60 minutes).
 
 The recovery copy is `autosave.sfproj` in the SculptForge settings folder (see
 [Troubleshooting](troubleshooting.md) for where that is on your system). It is deleted once your work is saved or
@@ -115,7 +115,7 @@ The autosave also appears first in the Library **Snapshots** tab while it exists
 
 ## Snapshots
 
-**File > Save Snapshot** (also the **Snapshot** button in the title strip) saves a timestamped copy of the whole
+**File > Save Snapshot** (also the **Snapshot** button in the ZBrush-style layout's title strip) saves a timestamped copy of the whole
 scene (ZBrush users: QuickSave). Your project file, its name and its unsaved state are not changed, so a snapshot
 is safe to take before any risky step.
 
@@ -125,7 +125,7 @@ is safe to take before any risky step.
 - They appear in the Library **Snapshots** tab, newest first, labelled with their date and time. Double-click one
   to open it. The tab also has a **Save now** button.
 
-With the ZBrush-style keys (**Preferences > Input**) <kbd>9</kbd> takes a snapshot; otherwise it has no default
+With the ZBrush-style keys (**Edit > Preferences > Input**) <kbd>9</kbd> takes a snapshot; otherwise it has no default
 shortcut. To give it one, hold <kbd>Ctrl</kbd>+<kbd>Alt</kbd>, click the **Snapshot**
 button and press a key (see [The interface](interface.md)).
 
@@ -145,7 +145,7 @@ on first use with these sub-folders:
 | `Splats` | Splats | Gaussian splat captures |
 | `QuickSave` | Snapshots | Snapshots |
 
-Change it in **Preferences > Library > Library folder**, then Store Config (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>)
+Change it in **Edit > Preferences > Library > Library folder**, then Store Config (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>)
 to keep the setting.
 
 Press <kbd>,</kbd> (comma) to show the Library. The tabs that matter for projects:

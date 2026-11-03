@@ -69,7 +69,7 @@ Notes on particular brushes:
 
 Besides the built-in brushes, SculptForge ships seven custom brushes. They are *recipes*: data that you can
 open and change in [Brush Lab](brush-lab.md). They appear in the **Custom** section of the brush picker and
-in **Brush > Custom brushes**.
+in **Sculpt > Brush > Custom brushes**.
 
 | Brush | What it does |
 |---|---|
@@ -88,12 +88,12 @@ like built-in ones. Their thumbnails carry a small sparkle when you put them on 
 
 You can choose a brush in several places:
 
-- **Bottom shelf**: click a tile. The active brush has an orange outline and the number key is shown in the
+- **Bottom shelf**: click a tile. The active brush is outlined in the accent colour and the number key is shown in the
   corner of each tile.
 - **Number keys**: <kbd>1</kbd> to <kbd>9</kbd> and <kbd>0</kbd> pick the first ten built-in brushes (see the
   table above); <kbd>P</kbd> toggles the Paint brush.
 - **Brush tile** at the top of the left shelf: click it to open the brush picker beside it.
-- **Brush palette**: the same grid of thumbnails, with a filter field, plus your custom brush list.
+- **Sculpt > Brush**: the same grid of thumbnails, with a filter field, plus your custom brush list.
 - **Command palette** (<kbd>F3</kbd>): type the brush name and press <kbd>Enter</kbd>.
 
 ### The brush picker
@@ -107,7 +107,7 @@ the `Brushes` folder of your Library library that aren't loaded yet; picking one
 The picker works the ZBrush way, by typing letters:
 
 1. Press <kbd>B</kbd>.
-2. Type the first letter of the brush. Only brushes starting with that letter stay, and each shows an orange
+2. Type the first letter of the brush. Only brushes starting with that letter stay, and each shows a highlighted
    key badge: the next letter that tells it apart from the others.
 3. Press the letter on the badge to pick that brush. For example <kbd>B</kbd>, <kbd>S</kbd>, <kbd>T</kbd>
    picks Standard, and with the brushes that ship, <kbd>B</kbd>, <kbd>C</kbd>, <kbd>L</kbd>
@@ -129,7 +129,7 @@ and on custom brushes also **Copy brush code**, **Rename...**, **Save as .sfbrus
 ## Draw Size, Intensity, RGB Intensity and Falloff
 
 These values control every brush. Draw Size and Intensity are on the top shelf;
-all four are in the **Draw** palette and the [Quick Menu](#the-quick-menu).
+all four are in **Sculpt > Draw & Tablet** and the [Quick Menu](#the-quick-menu).
 
 | Setting | Range | Default | How to change it |
 |---|---|---|---|
@@ -153,7 +153,7 @@ Over the model, the rings lie on the surface: true circles in the plane of the s
 brush's real size there, with a short line pointing out of the surface. The plane follows the form averaged over
 the whole brush, so the rings stay round and steady over fine bumps and detail. With symmetry on (mirror or
 radial), a dot shows where each copy of the brush lands. Off the model the rings are flat circles.
-**Preferences > Cursor**: **Cursor follows surface** (on by default) switches back to flat rings everywhere, and
+**Edit > Preferences > Cursor**: **Cursor follows surface** (on by default) switches back to flat rings everywhere, and
 **Hide ring while stroking** (off by default) shows only the dot while a stroke runs. The crosshair pointer stays
 while you turn the view.
 
@@ -167,11 +167,11 @@ and [alpha](#alphas). That includes custom and Community brushes. Set up a small
 Clay brush, and each one comes back the way you left it when you switch between them. A brush you haven't used
 yet in the session starts from the values you have now, so nothing jumps.
 
-- **Brush > Save Brush Settings** keeps the current brush's values for every new session (in
+- **Sculpt > Brush > Save Brush Settings** keeps the current brush's values for every new session (in
   `brush-settings.json`, in SculptForge's user data folder).
-- **Brush > Reset Brush to Default** puts the current brush back to the values SculptForge ships with and
+- **Sculpt > Brush > Reset Brush to Default** puts the current brush back to the values SculptForge ships with and
   forgets what you saved for it.
-- **Preferences > Input > Share size and intensity across brushes** (off by default) keeps Draw Size and
+- **Edit > Preferences > Input > Share size and intensity across brushes** (off by default) keeps Draw Size and
   Intensity the same for every brush, as before 0.10.8. Falloff, RGB Intensity, the stroke and the alpha still
   follow each brush.
 
@@ -189,7 +189,7 @@ bumps but leaves the form where it is (a Taubin smooth, one step in and a slight
 
 - **Alternate smooth**, as in ZBrush: start a stroke with <kbd>Shift</kbd> held, then let go of <kbd>Shift</kbd>
   while still pressing. The rest of the stroke uses the other smooth, and the status line says which.
-- **Smooth keeps volume** in the **Brush** palette makes the volume-keeping smooth the one <kbd>Shift</kbd> and
+- **Smooth keeps volume** in **Sculpt > Brush** makes the volume-keeping smooth the one <kbd>Shift</kbd> and
   the Smooth brush use; letting go of <kbd>Shift</kbd> mid-stroke then switches to the plain one. Saved with the
   project.
 
@@ -197,11 +197,11 @@ On a micro level (see [Micro levels](micro-levels.md)) Smooth is always the plai
 (after Quad Remesh, or an imported quad model) Smooth follows the quads' own edges, never their diagonals, so the
 quads keep their shape (#69).
 
-![The Draw palette](images/draw-palette.jpg)
+![Sculpt > Draw & Tablet](images/draw-palette.jpg)
 
 ## Sculpt, Paint, Add, Sub, Rgb and Front
 
-These toggles sit on the top shelf and in the **Draw** palette:
+These toggles sit on the top shelf and in **Sculpt > Draw & Tablet**:
 
 | Control | What it does |
 |---|---|
@@ -210,12 +210,12 @@ These toggles sit on the top shelf and in the **Draw** palette:
 | **Rgb** | Sculpt brushes also paint the current colour as they sculpt (ZBrush: Rgb with Zadd). |
 | **Front** | Front faces only: brushes leave the far side of thin parts alone, such as the back of an ear or a cape. |
 
-The **Brush** palette has the same Front and invert settings as the checkboxes **Front faces only** and
+**Sculpt > Brush** has the same Front and invert settings as the checkboxes **Front faces only** and
 **Invert (Alt)**.
 
 ### Falloff options
 
-Two more checkboxes in the **Brush** palette change what a brush reaches, as Blender's proportional editing
+Two more checkboxes in **Sculpt > Brush** change what a brush reaches, as Blender's proportional editing
 does (from the discussions). Both work with every sculpt brush, recipes, VDM stamps, masking and vertex paint, and
 are saved with the preferences and the project (custom brushes can turn them on for themselves in the Brush Lab):
 
@@ -244,7 +244,7 @@ Move, Tendril, Elastic Tendril and KelvinGrab normally move the surface across t
 you start the stroke (<kbd>Ctrl</kbd> in the Blender and Maya styles, where that key inverts) and the surface moves
 along the average normal under the brush where you pressed instead (from the discussions): drag out and it pulls
 straight out of the surface, drag back and it pushes straight in, however the view is turned. When the normal
-points right at you, drag up to pull it out. **Preferences > Input > Along the normal** can make it **Always**
+points right at you, drag up to pull it out. **Edit > Preferences > Input > Along the normal** can make it **Always**
 (no key needed, handy with a pen) or **Never**.
 
 ## The Quick Menu
@@ -256,8 +256,8 @@ keep it open until you click elsewhere or press <kbd>Esc</kbd>. Clicking a tile 
 
 A right click on the canvas opens it too, as in ZBrush: press the right button and let go without moving, beside
 the model or on it, and the Quick Menu stays open at the cursor. A right drag still turns the view (and pans or
-zooms with <kbd>Alt</kbd> or <kbd>Ctrl</kbd>), and a pen button set to **Right click** (Preferences > Tablet)
-works the same way. Turn it off with **Preferences > Input > Right click opens the Quick Menu**.
+zooms with <kbd>Alt</kbd> or <kbd>Ctrl</kbd>), and a pen button set to **Right click** (Edit > Preferences > Tablet)
+works the same way. Turn it off with **Edit > Preferences > Input > Right click opens the Quick Menu**.
 
 ## Radial menus
 
@@ -272,18 +272,18 @@ click an item, or click in the middle or press <kbd>Esc</kbd> to close it. Three
 | <kbd>J</kbd> | **Strokes** | Dots, Drag Stamp, Slide Stamp, Spray, Lazy Stroke (see [Strokes](#strokes)) |
 
 All three keys are free in every input style. Installs that stored their radial menus before 0.10.9 get the
-Strokes menu from **Restore default menus** in Preferences > Input > Radial Menus.
+Strokes menu from **Restore default menus** in Edit > Preferences > Input > Radial Menus.
 
-Make your own in **Preferences > Input > Radial Menus** (up to 8 menus of 8 items each):
+Make your own in **Edit > Preferences > Input > Radial Menus** (up to 8 menus of 8 items each):
 
 - **+** adds a menu and opens a search for its first item. An item can be anything the command palette
   (<kbd>F3</kbd>) finds: a brush, a tool, a command or a toggle.
 - Click an item to give it your own **label** and **icon**, or **Change action**. The arrows reorder items (the
   first points up, the rest go clockwise); the cross removes one.
-- **Key** sets the key that opens the menu (it is an ordinary shortcut, so **Preferences > Hotkeys** lists it
+- **Key** sets the key that opens the menu (it is an ordinary shortcut, so **Edit > Preferences > Hotkeys** lists it
   too). The button next to it can also open the menu while held: the middle, right, back or forward mouse button,
   or one of the pen's side buttons. That button then stops doing what it did before (a pen button's
-  Preferences > Tablet mapping, the middle button's pan, the right button's turn). A mouse button opens the menu
+  Edit > Preferences > Tablet mapping, the middle button's pan, the right button's turn). A mouse button opens the menu
   only with no modifier key held (#74): <kbd>Alt</kbd>+middle still pans, <kbd>Alt</kbd>+right still zooms in the
   Maya style, and <kbd>Shift</kbd>+right-drag still turns the view, so a menu on the right button never leaves you
   without a way to turn it (the panel says how).
@@ -313,7 +313,7 @@ Smooth takes about 0.5 s, Balloon 0.7 s, Relax 0.9 s and Polish 2 s (Apple M1 Pr
 ## Strokes
 
 The stroke type decides how cursor movement becomes brush dabs. Choose it from the **Stroke** tile on the left
-shelf, which opens the stroke picker, or from the **Stroke** palette.
+shelf, which opens the stroke picker, or from **Sculpt > Stroke**.
 
 ![The stroke picker](images/stroke-picker.jpg)
 
@@ -328,7 +328,7 @@ shelf, which opens the stroke picker, or from the **Stroke** palette.
 **Scatter** appears under the stroke tiles when **Spray** is selected. **Steady Stroke** works with every stroke
 type; see [Precision work](#precision-work).
 
-**Continuous**, under the stroke tiles in the stroke picker and in the **Stroke** palette, keeps the brush working
+**Continuous**, under the stroke tiles in the stroke picker and in **Sculpt > Stroke**, keeps the brush working
 while you hold it still on the model (30 dabs a second), with any stroke type.
 
 Notes:
@@ -394,7 +394,7 @@ with every tiny bump. A real step in the surface is followed at once.
 
 An alpha is a grayscale stamp that shapes the brush tip: white is full effect, black is none. It affects every
 brush, built-in or custom. Choose one from the **Alpha** tile on the left shelf (the alpha picker) or the
-**Alpha** palette, which also shows a large preview of the current alpha.
+**Sculpt > Alpha**, which also shows a large preview of the current alpha.
 [Falloff](#draw-size-intensity-rgb-intensity-and-falloff) fades it as in ZBrush: set it to -100 to
 stamp the whole alpha (a crisp square, or a pattern out to its edges), 0 for a soft round fade, +100 for a soft
 point.
@@ -424,7 +424,7 @@ shipped). They show in the alpha picker and in the Library's **Alpha** tab (`bru
 
 To use your own image:
 
-1. Click **Load image...** in the alpha picker or the **Alpha** palette.
+1. Click **Load image...** in the alpha picker or **Sculpt > Alpha**.
 2. Choose a PNG, JPG, BMP, TGA, PSD or GIF. Colour images are converted to grayscale.
 3. Turn on **Invert loaded image** *before* loading if your image is white where it should have no effect.
 
@@ -436,7 +436,7 @@ From a script: `brush_set_alpha name=square`, or `brush_set_alpha path=bark.png 
 
 ### Alpha options
 
-Under the preview in the **Alpha** palette:
+Under the preview in **Sculpt > Alpha**:
 
 | Option | What it does |
 |---|---|
@@ -460,11 +460,11 @@ click: a horn, an ear, a cluster of scales, a nostril. An alpha can only push th
 displacement map (VDM) moves every point of the stamp in any direction, so the shape can lean over, curl and
 overhang, as nothing made with a height ever can.
 
-![Horns, an ear curl, scales and two nostrils, one stamp each, and Brush > Vector Displacement](images/vdm-brushes.jpg)
+![Horns, an ear curl, scales and two nostrils, one stamp each, and Sculpt > Brush > Vector Displacement](images/vdm-brushes.jpg)
 
 ### Stamp a VDM
 
-1. Open the **Brush** palette and its **Vector Displacement** section, and click a map: **Horn**, **Ear Curl**,
+1. Open **Sculpt > Brush** and its **Vector Displacement** section, and click a map: **Horn**, **Ear Curl**,
    **Scales**, **Nostril**, **Rivet** (a domed head whose rim overhangs), **Stitches** (thread bars across a seam,
    drawing it together), **Skin Fold** (a roll of skin hanging over a crease), **Wrinkle Line** (a fine pinched
    crease), **Crack** (a jagged split whose sides part) or **Rock Ledge** (a stepped shelf jutting out over the
@@ -489,7 +489,7 @@ overhang, as nothing made with a height ever can.
 
 ### Make your own VDM
 
-1. In **Brush > Vector Displacement**, click **New VDM Plane**. A flat 2 x 2 grid appears as a new Part,
+1. In **Sculpt > Brush > Vector Displacement**, click **New VDM Plane**. A flat 2 x 2 grid appears as a new Part,
    seen from the top, with its border masked (so the stamp blends into any surface); the other Parts are
    hidden. **Plane Res** sets how many quads it has (256 by default).
 2. Sculpt the shape with any brush: overhangs are welcome (Move, Tendril, Inflate). Divide the plane for finer
@@ -558,7 +558,7 @@ radius, and the material around it reacts the way real material does.
 - **Elastic Tendril** pulls horns, tentacles and spikes out along the stroke like Tendril, but its pull narrows as it
   travels, so shapes taper to a tip by themselves.
 
-Their settings are in **Brush > Kelvinlet & Capture**:
+Their settings are in **Sculpt > Brush > Kelvinlet & Capture**:
 
 - **Squash** (0-100) is how the material keeps its volume (its Poisson's ratio). At 0 it's rubbery: pulling it
   just stretches it. At 100 it's incompressible clay: pressing in makes the surface bulge up around your thumb and
@@ -580,7 +580,7 @@ layers, and each stroke is one undo step. They don't remesh with dynamic topolog
 ## Capture an alpha or a VDM from the model
 
 Any detail you have sculpted can become a brush in two seconds: **Capture from view**
-(<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd>, or the button in **Brush > Kelvinlet & Capture**).
+(<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd>, or the button in **Sculpt > Brush > Kelvinlet & Capture**).
 
 ![A horn captured from the sphere (the window: its height alpha and VDM) and cloned along a stroke below it](images/capture-from-view.jpg)
 
@@ -598,7 +598,7 @@ Any detail you have sculpted can become a brush in two seconds: **Capture from v
 4. Use it: **Use as Alpha** (it shapes every brush), **Use as VDM** (the VDM brush stamps it with Drag Stamp),
    **Detail Clone** (paint copies along strokes) or **Save to Library**: the alpha goes to your Library
    **Alphas** folder as a PNG and the VDM to your brush library, both with thumbnails (the VDM also shows in the
-   Library **Brush** tab, the alpha picker and Brush > Vector Displacement).
+   Library **Brush** tab, the alpha picker and Sculpt > Brush > Vector Displacement).
 
 The square is captured along your view, so look at the detail straight on. The capture takes about a tenth of a
 second for a small detail and a second or so for a large patch of a 20-million-triangle model.
@@ -623,7 +623,7 @@ Symmetry mirrors every stroke, including mask and paint strokes.
 - **Y** mirrors top and bottom, and **Z** mirrors front and back. They have no default key (you can assign one;
   see [The interface](interface.md)).
 
-The **X**, **Y** and **Z** buttons are on the top shelf and in the **Transform** palette. You can combine them:
+The **X**, **Y** and **Z** buttons are on the top shelf and in **Sculpt > Symmetry & Gizmo**. You can combine them:
 X and Z together give four-way symmetry.
 
 Symmetry mirrors across the scene's axes through the origin. Models that are centred on the origin, such as
@@ -633,7 +633,7 @@ the other side, the model is off-centre: turn on **Local** (below).
 ### Radial symmetry
 
 Radial symmetry repeats every stroke around an axis, for wheels, flowers, columns, crowns and other round
-ornaments. Turn it on with **R** on the top shelf or in **Transform > Symmetry**, then set:
+ornaments. Turn it on with **R** on the top shelf or in **Sculpt > Symmetry & Gizmo > Symmetry**, then set:
 
 - **Radial Count**: how many copies, evenly spaced around the axis (2 to 64; 8 to start with).
 - **X axis**, **Y axis** or **Z axis**: the axis the copies turn around (Y, up, by default).
@@ -646,7 +646,7 @@ one lands.
 
 ### Local symmetry
 
-**Local** (next to **R** in **Transform > Symmetry**) puts the mirror planes and the radial axis through the
+**Local** (next to **R** in **Sculpt > Symmetry & Gizmo > Symmetry**) puts the mirror planes and the radial axis through the
 middle of the active Part (the centre of its bounding box) instead of the world origin. Use it for a Part that
 isn't centred on the origin, such as a button on a jacket or a wheel on a car. The centre follows the Part: it is
 worked out again when you switch Parts or after an edit.
@@ -663,10 +663,10 @@ that take `symmetry` (`stroke`, `vdm_stamp`, `mask_rect`, `mask_lasso`, `hide_re
 ## Pen pressure and tablets
 
 SculptForge reads pen pressure from graphics tablets and pen displays through the operating system. When it
-receives pen input, the **Draw** palette shows **Pen pressure** with the current value; before that it says
+receives pen input, **Sculpt > Draw & Tablet** shows **Pen pressure** with the current value; before that it says
 **No pen detected**.
 
-Two toggles decide what pressure does. They are on the top shelf and in **Draw > Tablet**:
+Two toggles decide what pressure does. They are on the top shelf and in **Sculpt > Draw & Tablet > Tablet**:
 
 | Toggle | Default | Effect |
 |---|---|---|
@@ -678,14 +678,14 @@ also have a **Pressure curve** setting that makes them respond to a light or a f
 [Brush Lab](brush-lab.md)). If the pen moves the cursor but pressure does nothing, see
 [Troubleshooting](troubleshooting.md).
 
-**Preferences > Tablet** checks and tunes the pen:
+**Edit > Preferences > Tablet** checks and tunes the pen:
 
 - a pressure meter and a draw-test area, to see what the tablet reports at a light touch and a full press;
 - a pressure curve for all brushes (Soft, Linear or Firm, or set **Curve**, **Minimum**, **Maximum**, **Threshold**
   and **Full pressure at** yourself), applied before each brush's own curve;
 - the eraser end (default **Invert**, like holding <kbd>Alt</kbd>) and the side buttons (default:
   lower button right-click to rotate the view, upper button **Invert**, third button **Pan view**). A side button
-  can open a [radial menu](#radial-menus) instead (Preferences > Input > Radial Menus).
+  can open a [radial menu](#radial-menus) instead (Edit > Preferences > Input > Radial Menus).
 - **Mouse mode (relative)**: the pen moves the cursor by how far it moves, like a mouse, and putting it down
   elsewhere on the tablet leaves the cursor where it was, with the driver in pen mode or in its own mouse mode.
   While the pen is in range the arrow is drawn at the brush (the system's is hidden), so brush, arrow and clicks
@@ -705,7 +705,7 @@ Move, Smooth, Inflate, Pinch, Flatten, Crease, Trim, Tendril, Layer, Nudge and P
 - **Add a brush**: click the **+** tile at the end of the shelf and pick a brush, built-in or custom. Or
   right-click any tile in the brush picker and choose **Add to bottom shelf**.
 - **Remove a brush**: right-click its tile and choose **Remove from shelf**.
-- **Reorder**: turn on **Preferences > Config > Enable Customize**, then <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+drag a
+- **Reorder**: turn on **Edit > Preferences > Config > Enable Customize**, then <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+drag a
   tile to a new place.
 - **Change a brush's key**: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click its tile, then press the new key.
 

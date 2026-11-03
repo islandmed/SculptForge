@@ -657,6 +657,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME upstream_watch COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/upstream/test_upstream_watch.py)
     add_test(NAME guide_site COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/guide/build_site.py --check
                                      --out ${CMAKE_CURRENT_BINARY_DIR}/guide-site)
+    # Menu paths in the guide name the SculptForge layout's task menus (Edit > Preferences, not Preferences).
+    add_test(NAME guide_menu_paths COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/guide/menu_paths.py --check)
   endif()
 
   # The phone link's relay (services/link-worker, a Cloudflare Worker) under plain Node, when Node 20+ is installed.

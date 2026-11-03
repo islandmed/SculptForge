@@ -33,7 +33,7 @@ only hold triangles.
 
 UVs are kept through OBJ, FBX, USD, glTF and GoZ-compatible files, in and out. A Part with a painted
 [texture](texture-painting.md) is exported with it: the PNG is written next to the file as
-`<name>_color.png` (`<name>_<SubTool>_color.png` with several Parts) and referenced by the model, or embedded
+`<name>_color.png` (`<name>_<Part>_color.png` with several Parts) and referenced by the model, or embedded
 in GLB and USDZ files. Spaces in the file name become `_` in the names of the files written beside it
 (`my scene.obj` gets `my_scene.mtl` and `my_scene_color.png`), because OBJ and MTL separate file names with
 spaces. **Tool > Texture Map > Auto UV** gives any sculpt UVs before export. Normal, displacement and other maps
