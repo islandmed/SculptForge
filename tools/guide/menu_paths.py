@@ -55,7 +55,13 @@ BOLD_NAME = re.compile(r"\*\*(" + "|".join(MENUS) + r")\*\* palette\b")  # "the 
 
 def convert(text: str) -> str:
     out = []
+    zbrush_note = False
     for line in text.split("\n"):
+        # "> **ZBrush-style layout:** ..." notes name the palettes of that layout on purpose.
+        zbrush_note = line.startswith("> **ZBrush-style layout") or (zbrush_note and line.startswith(">"))
+        if zbrush_note:
+            out.append(line)
+            continue
         line = BOLD_NAME.sub(r"\1 palette", line)
         if line.startswith("| ") and line.count("|") > 2:
             # Tables: leave the first cell (other apps' names in the glossary and the ZBrush chapter).
