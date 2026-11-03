@@ -92,6 +92,30 @@ void App::registerInputActions() {
         "Lazy Stroke on or off: the brush trails the cursor on a string, for steady lines.",
         [this] { strokeType_ = strokeType_ == StrokeType::LazyMouse ? StrokeType::Dots : StrokeType::LazyMouse; },
         [this] { return strokeType_ == StrokeType::LazyMouse; });
+    // One action per stroke type (U13): the Strokes radial menu (J) and the command palette pick them directly.
+    {
+        static const char* const keys[] = {"dots", "drag_stamp", "slide_stamp", "spray", "lazy"};
+        static const char* const glyphs[] = {ICON_LC_ELLIPSIS, ICON_LC_SQUARE_DASHED_MOUSE_POINTER, ICON_LC_MOUSE_POINTER_2,
+                                             ICON_LC_SPRAY_CAN, ICON_LC_SPLINE_POINTER};
+        static const char* const help[] = {
+            "Stroke type Dots: even dabs along the path, the classic brush stroke.",
+            "Stroke type Drag Stamp: click and drag one stamp; the drag sets its size and rotation.",
+            "Stroke type Slide Stamp: drag one stamp of the brush's Draw Size over the surface; it lands where you let go.",
+            "Stroke type Spray: scattered dabs of random size and strength, for organic texture.",
+            "Stroke type Lazy Stroke: the brush trails the cursor on a string, for smooth, steady lines.",
+        };
+        static_assert(std::size(keys) == size_t(StrokeType::Count));
+        for (int i = 0; i < int(StrokeType::Count); ++i) {
+            const StrokeType type = StrokeType(i);
+            const std::string id = std::string("stroke.type.") + keys[i];
+            add(id.c_str(), strokeTypeName(type), glyphs[i], "Stroke", "", help[i],
+                [this, type] {
+                    strokeType_ = type;
+                    status_ = std::string("Stroke: ") + strokeTypeName(type);
+                },
+                [this, type] { return strokeType_ == type; });
+        }
+    }
     add("stroke.continuous", "Continuous", ICON_LC_REPEAT, "Stroke", "",
         "Continuous on or off: while you hold the brush still on the model it keeps adding, 30 dabs a second "
         "(build up a bump without moving). Not for Move, Tendril or the drag strokes.",
@@ -171,13 +195,19 @@ void App::registerInputActions() {
                                           : "Strokes off the model: off (a drag on the background turns the view)";
         },
         [this] { return uiPrefs_.airStrokes; });
-    add("input.surface_cursor", "Cursor follows surface", nullptr, "Preferences > Input", "",
-        "The brush ring lies on the model under the pointer, turned to the surface and pressed onto its bumps, at "
-        "the brush's real size there (as in SculptGL), with a short line along the surface's direction. With "
-        "symmetry on, the mirrored ring shows too. Off the model, and with this off, the ring is a flat circle on "
-        "the screen.",
+    add("input.surface_cursor", "Cursor follows surface", nullptr, "Preferences > Cursor", "",
+        "The brush ring lies on the model under the pointer: a circle at the brush's real size there, turned to the "
+        "form of the surface (averaged over the brush, so fine bumps don't make it wobble), with a short line along "
+        "the surface's direction. With symmetry on, a dot shows where each mirrored or radial copy lands. Off the "
+        "model, and with this off, the ring is a flat circle on the screen.",
         [this] { uiPrefs_.cursorFollowsSurface = !uiPrefs_.cursorFollowsSurface; },
         [this] { return uiPrefs_.cursorFollowsSurface; });
+    add("cursor.hide_ring_stroking", "Hide ring while stroking", nullptr, "Preferences > Cursor", "",
+        "While a stroke runs, show only the dot where the brush touches (and the symmetry dots), not the ring: "
+        "nothing between you and the surface you are shaping. Off by default: the ring shows the brush size "
+        "throughout.",
+        [this] { uiPrefs_.hideRingWhileStroking = !uiPrefs_.hideRingWhileStroking; },
+        [this] { return uiPrefs_.hideRingWhileStroking; });
     add("input.import_blender", "Import Blender keymap...", ICON_LC_FILE_INPUT, "Preferences > Input", "",
         "Use the keys from a keymap you exported in Blender (Preferences > Keymap > Export, a .py file). Switches "
         "to the Blender style, then takes the navigation and sculpt keys SculptForge has an equivalent for. The "
@@ -474,10 +504,6 @@ void App::drawInputSection() {
     bool airStrokes = uiPrefs_.airStrokes;
     if (ui::Checkbox("Start strokes off the model##input.air_strokes", &airStrokes)) uiPrefs_.airStrokes = airStrokes;
     ui::HelpAction(*this, "input.air_strokes");
-    bool surfaceCursor = uiPrefs_.cursorFollowsSurface;
-    if (ui::Checkbox("Cursor follows surface##input.surface_cursor", &surfaceCursor))
-        uiPrefs_.cursorFollowsSurface = surfaceCursor;
-    ui::HelpAction(*this, "input.surface_cursor");
     ui::ActionButton(*this, "input.import_blender", ImVec2(-FLT_MIN, 0), ui::Look::IconLabel);
     drawPackKeymapRows(); // keymaps from installed packs (PanelPacks.cpp)
     ImGui::TextDisabled("%s", tr("Rotation"));
@@ -492,6 +518,29 @@ void App::drawInputSection() {
                  "Preferences > Input");
     drawRadialMenusSection(); // RadialMenu.cpp
     drawSpaceMouseSection();  // SpaceMouse.cpp
+}
+
+// Preferences > Cursor (#88): the system cursor over the view and the brush ring.
+void App::drawCursorSection() {
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(tr("Viewport cursor"));
+    const char* const kCursors[] = {"Crosshair##viewport_cursor", "Arrow##viewport_cursor"};
+    for (int i = 0; i < 2; ++i) {
+        ImGui::SameLine();
+        if (ImGui::RadioButton(tr(kCursors[i]), uiPrefs_.viewportCursor == i)) uiPrefs_.viewportCursor = i;
+        ui::HelpText("Viewport cursor", nullptr,
+                     "The pointer over the 3D view: a crosshair (the default, as in most sculpting apps; it stays "
+                     "while the view turns) or the arrow. Panels, menus and popups always show the arrow (or their "
+                     "own resize and text cursors). Store Config keeps it.",
+                     "Preferences > Cursor");
+    }
+    bool surfaceCursor = uiPrefs_.cursorFollowsSurface;
+    if (ui::Checkbox("Cursor follows surface##input.surface_cursor", &surfaceCursor))
+        uiPrefs_.cursorFollowsSurface = surfaceCursor;
+    ui::HelpAction(*this, "input.surface_cursor");
+    bool hideRing = uiPrefs_.hideRingWhileStroking;
+    if (ui::Checkbox("Hide ring while stroking##cursor.hide_ring_stroking", &hideRing)) uiPrefs_.hideRingWhileStroking = hideRing;
+    ui::HelpAction(*this, "cursor.hide_ring_stroking");
 }
 
 void App::drawZIntensitySlider(const char* id) {
@@ -709,15 +758,9 @@ void App::airStrokeRelease() {
 
 void App::drawAirStrokeIndicator() {
     if (!uiPrefs_.airStrokes) return;
-    const CanvasRect c = canvasRect();
-    const char* text = tr("Strokes start off the model");
-    const ImVec2 size = ImGui::CalcTextSize(text);
-    const float pad = 6.0f * uiScale_;
-    const ImVec2 at(c.x + (c.w - size.x) * 0.5f, c.y + timelineTopInset_ + 10.0f * uiScale_); // (below a top timeline)
-    ImDrawList* dl = ImGui::GetForegroundDrawList();
-    dl->AddRectFilled(ImVec2(at.x - pad, at.y - pad * 0.5f), ImVec2(at.x + size.x + pad, at.y + size.y + pad * 0.5f),
-                      IM_COL32(0, 0, 0, 110), 4.0f * uiScale_);
-    dl->AddText(at, theme::u32(theme::accent), text);
+    // (below a top timeline; Don't show again and Preferences > Hints hide it, U11)
+    drawViewportHint("air_strokes", tr("Strokes start off the model"), theme::u32(theme::accent),
+                     canvasRect().y + timelineTopInset_ + 8.0f * uiScale_);
 }
 
 } // namespace sf

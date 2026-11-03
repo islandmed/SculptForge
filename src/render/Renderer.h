@@ -42,7 +42,7 @@ struct RenderSettings {
     bool backfaceCulling = false;
     // The view's background: the charcoal radial gradient (default) or one flat display (sRGB) colour (#21).
     bool gradientBackground = true;
-    glm::vec3 backgroundColor{0.165f, 0.165f, 0.173f};
+    glm::vec3 backgroundColor{0.168f, 0.168f, 0.168f};
     // The gradient's colours (display sRGB): behind the model and at the edges. The interface look sets them
     // (Preferences > Interface > Look); these are the Classic look's charcoal.
     glm::vec3 gradientCentre{0.215f, 0.215f, 0.222f};

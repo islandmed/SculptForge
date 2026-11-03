@@ -1234,12 +1234,14 @@ bool App::frontRaycast(const glm::vec3& origin, const glm::vec3& dir, RayHit& hi
     return glm::dot(hit.normal, dir) <= 0.0f;
 }
 
-// The crosshair (#73): over the 3D view, where a click sculpts, paints or masks, or while a stroke runs (it may
-// drag over a panel). Not over the panels or windows floating above the view (ImGui has the pointer), a gizmo
-// handle, while the view turns or pans, or where ImGui asks for a cursor of its own (a resize handle on the edge).
+// The crosshair (#73): over the 3D view, where a click sculpts, paints or masks, while a stroke runs (it may
+// drag over a panel) and while the view turns, pans or zooms (#88: the arrow flashing in for every orbit was
+// distracting). Not over the panels or windows floating above the view (ImGui has the pointer), a gizmo handle,
+// or where ImGui asks for a cursor of its own (a resize handle on the edge).
 bool App::viewportCursorWanted() const {
     if (uiPrefs_.viewportCursor != 0) return false;
     if (drag_ == Drag::Stroke || drag_ == Drag::MaskCanvas || drag_ == Drag::AirStroke) return true;
+    if (drag_ == Drag::Orbit || drag_ == Drag::Pan || drag_ == Drag::Zoom || drag_ == Drag::Roll) return true;
     if (drag_ != Drag::None) return false;
     if (ImGui::GetIO().WantCaptureMouse || !canvasRect().contains(mouseX_, mouseY_)) return false;
     if (ImGui::GetMouseCursor() != ImGuiMouseCursor_Arrow) return false;
@@ -2285,9 +2287,8 @@ void App::drawUi() {
         const CanvasRect c = canvasRect();
         std::string banner = "Previewing LOD" + std::to_string(previewLod_) + "  -  " +
                              std::to_string(lods_[previewLod_].triangleCount()) + " tris  (sculpting paused)";
-        ImVec2 size = ImGui::CalcTextSize(banner.c_str());
-        ImGui::GetForegroundDrawList()->AddText(ImVec2(c.x + (c.w - size.x) * 0.5f, c.y + c.h - size.y - 16.0f * uiScale_),
-                                                IM_COL32(255, 190, 120, 255), banner.c_str());
+        drawViewportHint("lod_preview", banner.c_str(), IM_COL32(255, 190, 120, 255),
+                         c.y + c.h - ImGui::GetFrameHeight() - 20.0f * uiScale_);
     }
     const ImVec2 mouse(mouseX_, mouseY_);
     drawGizmo(); // Gizmo 3D handles and panel (Gizmo.cpp)
@@ -3242,7 +3243,7 @@ void App::drawPalette_Splats() {
     drawSculptableSection(); // Make sculptable (PanelSculptable.cpp)
 }
 
-bool App::drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col) {
+bool App::drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col, bool ring) {
     // Only what brushes work on: the active, visible SubTool with an up-to-date BVH (a stale one, after a
     // whole-mesh change, is rebuilt at the next press; until then the flat ring shows), not an LOD preview.
     if (previewLod_ >= 0 || doc_.bvhDirty) return false;
@@ -3253,56 +3254,52 @@ bool App::drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col) {
     // The world radius a dab here gets (App::firstDab / the brushes: Draw Size times world size of a pixel).
     const float radius = radiusPx * camera_.worldPerPixel(hit.position, canvasHeight());
     if (!(radius > 0.0f) || !std::isfinite(radius)) return false;
-    // A steady normal (8 rays), the ring pressed onto the surface (48) and the Focal Shift ring (32): a few dozen
-    // BVH ray casts, only on frames that are drawn anyway, never a pass over the mesh.
+    // A steady normal over the brush's area (16 rays), then the ring and the Focal Shift ring as true circles in
+    // that plane (#88): no per-point pressing, so bumps can't bend or break the ring. Never a pass over the mesh.
     const glm::vec3 n = surfaceCursorNormal(doc_.mesh, doc_.bvh, hit, radius);
-    surfaceCursorRing(doc_.mesh, doc_.bvh, hit.position, n, radius, 48, cursorRing_);
-    const float focal = focalRingFraction(focalShift_);
-    surfaceCursorRing(doc_.mesh, doc_.bvh, hit.position, n, radius * focal, 32, cursorInner_);
+    surfaceCursorCircle(hit.position, n, radius, 64, cursorRing_);
+    surfaceCursorCircle(hit.position, n, radius * focalRingFraction(focalShift_), 48, cursorInner_);
 
     const glm::vec3 eye = camera_.position(), forward = camera_.forward();
     const bool ortho = camera_.ortho;
     auto facing = [&](const glm::vec3& p, const glm::vec3& pn) {
         return glm::dot(pn, ortho ? -forward : eye - p) > 0.0f;
     };
-    const ImU32 inner = IM_COL32(255, 255, 255, 90);
-    // Closed polyline through the points facing the camera; a point on the far side of a curve breaks the line.
-    auto drawRing = [&](const std::vector<SurfaceRingPoint>& ring, const SymCopy& m, ImU32 colour, float width) {
-        const size_t count = std::min<size_t>(ring.size(), 64);
+    auto drawRing = [&](const std::vector<glm::vec3>& points, ImU32 colour, float width) {
         ImVec2 sp[64];
-        bool ok[64];
-        for (size_t i = 0; i < count; ++i) {
-            const glm::vec3 q = m.point(ring[i].position);
-            ok[i] = facing(q, m.dir(ring[i].normal)) && gizmoProject(q, sp[i]);
-        }
-        for (size_t i = 0; i < count; ++i) {
-            const size_t j = (i + 1) % count;
-            if (ok[i] && ok[j]) dl->AddLine(sp[i], sp[j], colour, width);
-        }
+        const size_t count = std::min<size_t>(points.size(), 64);
+        for (size_t i = 0; i < count; ++i)
+            if (!gizmoProject(points[i], sp[i])) return; // (behind the camera: a huge brush close up)
+        dl->AddPolyline(sp, int(count), colour, ImDrawFlags_Closed, width);
     };
     auto fade = [](ImU32 colour, float k) {
         const ImU32 a = ImU32(float((colour >> IM_COL32_A_SHIFT) & 0xFF) * k);
         return (colour & ~IM_COL32_A_MASK) | (a << IM_COL32_A_SHIFT);
     };
-    // The mirrored and radial rings first (fainter), as the brush copies its dabs (Sculptor::copies; the first is
-    // this one): every copy's cursor shows.
+    // The mirrored and radial copies (Sculptor::copies; the first is this one) as dots where their dabs land
+    // (#88): one ring per copy crowded the view. A copy that lands on the cursor itself (hovering on the plane or
+    // the axis) or faces away adds nothing.
     refreshSymmetryPivot();
     const std::vector<SymCopy> mirrors = Sculptor::copies(symmetry_);
-    symmetryCopiesDrawn_ = 0;
-    for (size_t k = mirrors.size(); k-- > 0;) {
+    symmetryCopiesDrawn_ = 1; // this one
+    for (size_t k = 1; k < mirrors.size(); ++k) {
         const SymCopy& m = mirrors[k];
-        const bool self = k == 0;
-        // A copy that lands on the cursor's own ring (hovering on the plane or the axis) adds nothing.
-        if (!self && glm::length(m.point(hit.position) - hit.position) < radius * 0.05f) continue;
-        if (!self && !facing(m.point(hit.position), m.dir(n))) continue;
+        const glm::vec3 q = m.point(hit.position);
+        if (glm::length(q - hit.position) < radius * 0.05f || !facing(q, m.dir(n))) continue;
+        ImVec2 at;
+        if (!gizmoProject(q, at)) continue;
         ++symmetryCopiesDrawn_;
-        drawRing(cursorRing_, m, self ? col : fade(col, 0.45f), self ? 2.0f : 1.25f);
-        drawRing(cursorInner_, m, self ? inner : fade(inner, 0.6f), 1.0f);
+        dl->AddCircleFilled(at, 3.0f * uiScale_, IM_COL32(0, 0, 0, 110));
+        dl->AddCircleFilled(at, 2.25f * uiScale_, fade(col, 0.8f));
+    }
+    if (ring) {
+        drawRing(cursorRing_, col, 2.0f);
+        drawRing(cursorInner_, IM_COL32(255, 255, 255, 90), 1.0f);
     }
     // The surface's direction: a short line out of the centre (with a dot where the brush touches).
     ImVec2 c0, c1;
-    if (gizmoProject(hit.position, c0) && gizmoProject(hit.position + n * (radius * 0.4f), c1)) {
-        dl->AddLine(c0, c1, fade(col, 0.85f), 1.5f);
+    if (gizmoProject(hit.position, c0)) {
+        if (ring && gizmoProject(hit.position + n * (radius * 0.4f), c1)) dl->AddLine(c0, c1, fade(col, 0.85f), 1.5f);
         dl->AddCircleFilled(c0, 2.0f * uiScale_, col);
     }
     return true;
@@ -3384,11 +3381,18 @@ void App::drawBrushCursor() {
         const glm::vec3 pc = linearToSrgb(inverted ? glm::vec3(1.0f) : doc_.paintColor);
         col = ImGui::GetColorU32(ImVec4(pc.x, pc.y, pc.z, 0.9f));
     }
-    surfaceCursorShown_ = uiPrefs_.cursorFollowsSurface && drawSurfaceCursor(dl, r, col);
+    // Preferences > Cursor > Hide ring while stroking (#88): the dot and the symmetry dots stay.
+    const bool ring = !(uiPrefs_.hideRingWhileStroking && drag_ == Drag::Stroke);
+    surfaceCursorShown_ = uiPrefs_.cursorFollowsSurface && drawSurfaceCursor(dl, r, col, ring);
+    ringShown_ = ring;
     if (!surfaceCursorShown_) {
-        dl->AddCircle(c, r, col, 64, 1.5f);
-        // The inner ring is Focal Shift, as in ZBrush: where the falloff drops to half.
-        dl->AddCircle(c, r * focalRingFraction(focalShift_), IM_COL32(255, 255, 255, 90), 48, 1.0f);
+        if (ring) {
+            dl->AddCircle(c, r, col, 64, 1.5f);
+            // The inner ring is Focal Shift, as in ZBrush: where the falloff drops to half.
+            dl->AddCircle(c, r * focalRingFraction(focalShift_), IM_COL32(255, 255, 255, 90), 48, 1.0f);
+        } else {
+            dl->AddCircleFilled(c, 2.0f * uiScale_, col);
+        }
     }
     if (strokeType_ == StrokeType::LazyMouse && drag_ == Drag::Stroke) {
         // The string from the cursor to the lagging brush point.

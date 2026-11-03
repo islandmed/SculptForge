@@ -274,11 +274,7 @@ void App::drawFaceOverlay() {
         std::snprintf(banner, sizeof banner, "Landmark %d/8: click the %s  (the character's own side; its right is on "
                                              "your left from the front)",
                       facePlaceIndex_ + 1, faceLandmarkLabel(facePlaceIndex_));
-        const ImVec2 size = ImGui::CalcTextSize(banner);
-        const ImVec2 at(cr.x + (cr.w - size.x) * 0.5f, cr.y + timelineTopInset_ + 12.0f * s);
-        dl->AddRectFilled(ImVec2(at.x - 8 * s, at.y - 4 * s), ImVec2(at.x + size.x + 8 * s, at.y + size.y + 4 * s),
-                          IM_COL32(20, 20, 24, 210), 4.0f * s);
-        dl->AddText(at, IM_COL32(255, 196, 64, 255), banner);
+        drawViewportHint("face_landmarks", banner, IM_COL32(255, 196, 64, 255), cr.y + timelineTopInset_ + 8.0f * s);
     }
     dl->PopClipRect();
 }

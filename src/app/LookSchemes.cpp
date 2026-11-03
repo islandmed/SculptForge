@@ -20,6 +20,11 @@ constexpr const char* kLookNames[] = {"Classic", "Forge Terminal", "Phosphor", "
 // yellow. Values from each scheme's published palette; crust and mantle are darkened from its background where the
 // scheme has fewer background steps.
 const SchemeInfo kSchemes[] = {
+    // SculptForge's own (0.10.9, the default): neutral greys, so the model's colours read true, and one accent,
+    // the logo's orange. accent2 stays grey: one hue in the whole interface.
+    {"neutral", "Neutral", "SculptForge (original)", "GPL-3.0-or-later",
+     {0x111111, 0x191919, 0x202020, 0x2b2b2b, 0x363636, 0x494949, 0x777777, 0xaaaaaa, 0xd7d7d7, 0xf2f2f2, 0xf0882e,
+      0xaaaaaa, 0xe5604a, 0x8cbf6a, 0xe0b050, false}},
     {"tokyo_night", "Tokyo Night", "github.com/enkia/tokyo-night-vscode-theme", "MIT",
      {0x101118, 0x16161e, 0x1a1b26, 0x232535, 0x292e42, 0x414868, 0x6a73a0, 0xa9b1d6, 0xc0caf5, 0xdfe5ff, 0x7aa2f7,
       0xbb9af7, 0xf7768e, 0x9ece6a, 0xe0af68, false}},

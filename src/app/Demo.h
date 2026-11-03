@@ -134,6 +134,7 @@ private:
     ImVec2 mouse_{960, 540};
     bool buttonDown_ = false;
     bool buttonHeld_ = false; // orbit: right button pressed
+    int dragCursor_ = -1;     // the system cursor at the end of the last button_drag, before letting go
 
     struct Caption {
         std::string title, subtitle;

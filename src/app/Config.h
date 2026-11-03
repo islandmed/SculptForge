@@ -8,11 +8,13 @@
 // Load UI (Ctrl+L) share a layout as a file.
 #pragma once
 
+#include "app/LookSchemes.h"
 #include "app/Theme.h"
 #include "core/Json.h"
 #include "core/SpaceMouse.h"
 #include "core/Tablet.h"
 
+#include <set>
 #include <string>
 
 namespace sf {
@@ -57,6 +59,11 @@ struct UiPrefs {
                               // reaches the surface instead of turning the view (off: it turns the view, ZBrush)
     bool showAxes = true;              // Draw > Camera > Axes: the X / Y / Z gizmo in the canvas corner (#31)
     bool cursorFollowsSurface = true; // the brush ring lies on the surface under the pointer, as in SculptGL (#25)
+    bool hideRingWhileStroking = false; // Preferences > Cursor (#88): only the centre dot while a stroke runs
+    // Preferences > Hints (U11): the notes SculptForge shows over the 3D view. Each has Don't show again, which
+    // adds its id here; showHints off hides them all.
+    bool showHints = true;
+    std::set<std::string> hiddenHints;
     // Preferences > Interface > Timeline position (#63): the Sculpt Timeline strip along the top of the viewport
     // (true, the default: clear of the brush shelf below it) or its bottom.
     bool timelineTop = true;
@@ -67,7 +74,7 @@ struct UiPrefs {
     theme::LookSettings look;
     int shellLayout = 1;
     bool lookSaved = false; // ui.json named the look or layout (not saved itself); one from before 0.10.7 didn't
-    // Preferences > Interface > Viewport cursor (#73): the system cursor over the 3D view, 0 = crosshair (the
+    // Preferences > Cursor > Viewport cursor (#73): the system cursor over the 3D view, 0 = crosshair (the
     // default, as most sculpting apps), 1 = the arrow. Panels, menus and popups always show their own.
     int viewportCursor = 0;
     // Tool > Display > Backface culling (#68): skip the back faces of every Part (faster on dense meshes; see
@@ -92,7 +99,7 @@ struct UiPrefs {
     bool flatShading = false; // Material palette: the scene's shading at startup (false = Smooth, the default)
     // Preferences > Display: the view's background (#21), a gradient or a flat display (sRGB) colour.
     bool gradientBackground = true;
-    glm::vec3 backgroundColor{0.165f, 0.165f, 0.173f};
+    glm::vec3 backgroundColor{0.168f, 0.168f, 0.168f};
     // File > Maya (#42). Kept in <prefs>/maya.json, never in ui.json, so a shared UI layout can't point the bridge
     // at a folder: it is set only by the user's own pick (App::setMayaFolder).
     std::string mayaFolder;        // "" = the bridge is off
@@ -112,6 +119,13 @@ void drawConfigSection(App& app);    // Enable Customize, Store / Restore / Save
 void drawInterfaceSection(App& app); // UI scale, Popup Info, tooltips, sub-palettes, left-handed layout
 void drawHotkeysSection(App& app);   // every action's shortcut, click to reassign
 void drawLightBoxSection(App& app);  // show at startup, rows, placement, library folder
+// The Classic look's colours as a Palette (for its card; the look itself uses Theme.h's tokens).
+looks::Palette classicPalette();
+// A miniature of a look on its card, from a to b: its wallpaper, a bar with its accent, two tiles and `name` in its
+// text colour. `layout` 0 adds the ZBrush-style palette bar and two-row shelf, 1 the SculptForge menus and one-row
+// shelf (the first-run look picker); -1 neither (Preferences > Interface > Look).
+void drawLookMiniature(ImDrawList* dl, ImVec2 a, ImVec2 b, const looks::Palette& pal, const char* name, ImFont* font,
+                       float s, int layout = -1);
 } // namespace config
 
 } // namespace sf

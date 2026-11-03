@@ -41,26 +41,29 @@ constexpr ImGuiWindowFlags kShellFlags = ImGuiWindowFlags_NoDecoration | ImGuiWi
 
 const char* const kShelfWindows[kShelfCount] = {"##TopShelf", "##LeftShelf", "##RightShelf", "##BottomShelf"};
 
-CanvasRect g_focus; // the tile under the pointer this frame (tiled looks draw its border in the accent)
+CanvasRect g_focus; // the tile under the pointer this frame (Outlines on: its border a faint step lighter)
 
 bool sameRect(const CanvasRect& a, const CanvasRect& b) {
     return a.w > 0.0f && a.h > 0.0f && std::abs(a.x - b.x) < 0.5f && std::abs(a.y - b.y) < 0.5f && std::abs(a.w - b.w) < 0.5f &&
            std::abs(a.h - b.h) < 0.5f;
 }
 
-// A tiled look's frame around one region: a thin border (the accent on the focused tile), Blueprint's corner marks.
+// A tiled look's frame around one region: a thin border, Blueprint's corner marks.
 void tileFrame(ImDrawList* dl, const CanvasRect& r, bool focused) {
-    if (!theme::look.tiled || r.w <= 0.0f || r.h <= 0.0f) return;
+    // Outlines (Preferences > Interface > Look): off draws nothing; only on marks the tile under the pointer, and
+    // only with a faint step (applyLook's focusBorder), never a thicker or accent border.
+    if (!theme::look.tiled || theme::look.outlines == 0 || r.w <= 0.0f || r.h <= 0.0f) return;
+    focused = focused && theme::look.outlines == 2;
     const ImFontAtlas* atlas = ImGui::GetIO().Fonts;
     const float s = atlas && !atlas->Fonts.empty() ? atlas->Fonts[0]->FontSize / 15.0f : 1.0f; // the UI scale
-    const float t = std::max(1.0f, std::floor(s + 0.25f)) * (focused ? 2.0f : 1.0f); // 2 px on the focused tile
+    const float t = std::max(1.0f, std::floor(s + 0.25f));
     const ImVec2 a(r.x, r.y), b(r.x + r.w, r.y + r.h);
     dl->PushClipRect(a, b, false);
     dl->AddRect(ImVec2(a.x + t * 0.5f, a.y + t * 0.5f), ImVec2(b.x - t * 0.5f, b.y - t * 0.5f),
                 theme::u32(focused ? theme::focusBorder : theme::tileBorder), 0.0f, 0, t);
     if (theme::look.headers == theme::LookStyle::Headers::Grid) { // registration marks at the corners
         const float k = std::min(9.0f, std::min(r.w, r.h) * 0.3f);
-        const ImU32 c = theme::u32(theme::accent, focused ? 1.0f : 0.75f);
+        const ImU32 c = theme::u32(theme::accent, theme::look.outlines == 2 ? 0.75f : 0.35f);
         const float w = 2.0f * t;
         for (int i = 0; i < 4; ++i) {
             const float x = i & 1 ? b.x - w * 0.5f : a.x + w * 0.5f, y = i & 2 ? b.y - w * 0.5f : a.y + w * 0.5f;
@@ -647,11 +650,13 @@ void App::registerShellActions() {
                    "Interface look and layout (Preferences > Interface > Look). Only changes how the interface looks.",
                    {{"look", ParamSpec::Type::String, "classic, forge, phosphor or blueprint (default: unchanged).", false},
                     {"scheme", ParamSpec::Type::String,
-                     "Forge Terminal's colours: tokyo_night, catppuccin_mocha, gruvbox_dark, nord, rose_pine, kanagawa or everforest.",
+                     "Forge Terminal's colours: neutral, tokyo_night, catppuccin_mocha, gruvbox_dark, nord, rose_pine, kanagawa or everforest.",
                      false},
                     {"match_omarchy", ParamSpec::Type::Bool, "Forge Terminal: match the desktop theme (the current Omarchy theme's colours, Linux).", false},
                     {"phosphor", ParamSpec::Type::String, "Phosphor's colour: green or amber.", false},
                     {"effects", ParamSpec::Type::Bool, "Phosphor's scanlines and glow (on the interface only).", false},
+                    {"outlines", ParamSpec::Type::String, "The tiled looks' panel borders: off, subtle (the default) or on.", false},
+                    {"outline_opacity", ParamSpec::Type::Number, "How strong those borders are, 0-100 (default 100).", false},
                     {"layout", ParamSpec::Type::String, "sculptforge or zbrush (default: the look's, else unchanged).", false},
                     {"card", ParamSpec::Type::Bool, "Show the one-time \"SculptForge has a new look\" card (for tests).", false}},
                    [this](Document&, const Args& a) -> CommandResult {
@@ -672,6 +677,13 @@ void App::registerShellActions() {
                        if (a.contains("match_omarchy")) l.matchOmarchy = argBool(a, "match_omarchy", false);
                        if (a.contains("phosphor")) l.amber = argString(a, "phosphor") == "amber";
                        if (a.contains("effects")) l.effects = argBool(a, "effects", false);
+                       if (a.contains("outlines")) {
+                           const std::string o = argString(a, "outlines");
+                           if (o != "off" && o != "subtle" && o != "on") return {false, "outlines must be off, subtle or on"};
+                           l.outlines = o == "off" ? 0 : o == "on" ? 2 : 1;
+                       }
+                       if (a.contains("outline_opacity"))
+                           l.outlineOpacity = std::clamp(float(argNumber(a, "outline_opacity", 100.0)) / 100.0f, 0.0f, 1.0f);
                        if (a.contains("layout")) {
                            const std::string k = argString(a, "layout");
                            if (k != "sculptforge" && k != "zbrush") return {false, "layout must be sculptforge or zbrush"};
@@ -1233,7 +1245,7 @@ void App::drawLookChrome() {
             }
         }
     }
-    if (theme::look.glow && g_focus.w > 0.0f) { // a soft phosphor bloom around the focused tile, in the gap
+    if (theme::look.glow && theme::look.outlines == 2 && g_focus.w > 0.0f) { // a soft phosphor bloom around the focused tile, in the gap
         for (int k = 1; k <= 4; ++k) {
             const float d = float(k) * s;
             bg->AddRect(ImVec2(g_focus.x - d, g_focus.y - d), ImVec2(g_focus.x + g_focus.w + d, g_focus.y + g_focus.h + d),
@@ -2292,6 +2304,7 @@ bool tileFrame(const char* id, ImVec2 size, ui::TileLift& lift, ImFont* font, co
                 elide(font ? font : ImGui::GetFont(), caption, size.x).c_str());
     lift = ui::BeginTileLift(pic0, pic1); // the picture lifts, the caption stays
     dl->AddRectFilled(pic0, pic1, theme::u32(theme::tile), theme::rounding(4.0f * s));
+    if (hovered) dl->AddRectFilled(pic0, pic1, theme::u32(theme::buttonHover, 0.45f), theme::rounding(4.0f * s)); // (a faint fill)
     ImGui::LogText("%s", caption.c_str());
     return clicked;
 }

@@ -6,7 +6,7 @@ of relearning. SculptForge has its own keymap and offers ZBrush-style, Blender a
 **ZBrush-style** keys first (see [ZBrush-style keys](#zbrush-style-keys)) and your hands will feel at home.
 
 New installs start in SculptForge's own layout, with menus by task. For the alphabetical palette bar and the
-two-row top shelf you know, click **Coming from ZBrush? Use the ZBrush-style layout** in the welcome, or pick
+two-row top shelf you know, pick **Coming from: ZBrush** (keys and layout) or the **ZBrush-style layout** card in the welcome, or pick
 **Preferences > Interface > Look > Layout > ZBrush-style** (see [Looks and layouts](interface.md#looks-and-layouts)).
 The palette paths in this guide (**Tool > Parts**) work in both: in the SculptForge layout the palettes are
 sections of the menus, and <kbd>F3</kbd> finds any of them.

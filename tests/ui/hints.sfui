@@ -1,0 +1,33 @@
+# Viewport hints (U11): every note SculptForge shows over the 3D view has Don't show again, and Preferences > Hints
+# lists them, turns them all off, or shows them all again.
+run ui_look look=forge scheme=neutral layout=sculptforge
+run new_sphere subdivisions=3
+key f3
+type "##Command palette" "Start strokes off the model"
+key enter
+expect_value air_strokes == 1
+expect_text Strokes start off the model
+expect "Don't show again##hint.air_strokes"
+shot hint
+
+# Don't show again: gone, and the mode stays on.
+click "Don't show again##hint.air_strokes"
+expect_not "Don't show again##hint.air_strokes"
+expect_no_text Strokes start off the model
+expect_value air_strokes == 1
+
+# Preferences > Hints: the hint unticked; ticking it brings it back.
+click "Edit##menu.edit"
+click "Preferences##section.preferences"
+click "Hints##preferences.hints"
+expect "Show hints in the viewport##hints.show"
+click "Strokes start off the model##hints.air_strokes"
+expect "Don't show again##hint.air_strokes"
+shot hints-prefs
+
+# All off hides every hint; Show all hints again brings them back.
+click "Show hints in the viewport##hints.show"
+expect_not "Don't show again##hint.air_strokes"
+click "Show all hints again##hints.reset"
+expect "Don't show again##hint.air_strokes"
+key escape

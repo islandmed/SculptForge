@@ -149,10 +149,13 @@ With an [alpha](#alphas), Falloff works as in ZBrush: the alpha is multiplied by
 the whole alpha shows, hard to its edges (a Square alpha stamps the full square); at 0 the falloff softens it and
 rounds a square's corners; at +100 only a soft point in the middle is left.
 
-Over the model, the rings lie on the surface, as in SculptGL: they turn with the surface under the pointer, bend
-over its bumps and curves, and show the brush's real size there, with a short line pointing out of the surface.
-With symmetry on, a fainter ring shows where the mirrored brush lands. Off the model the rings are flat circles.
-**Preferences > Input > Cursor follows surface** (on by default) switches back to flat rings everywhere.
+Over the model, the rings lie on the surface: true circles in the plane of the surface under the pointer, at the
+brush's real size there, with a short line pointing out of the surface. The plane follows the form averaged over
+the whole brush, so the rings stay round and steady over fine bumps and detail. With symmetry on (mirror or
+radial), a dot shows where each copy of the brush lands. Off the model the rings are flat circles.
+**Preferences > Cursor**: **Cursor follows surface** (on by default) switches back to flat rings everywhere, and
+**Hide ring while stroking** (off by default) shows only the dot while a stroke runs. The crosshair pointer stays
+while you turn the view.
 
 The <kbd>S</kbd>, <kbd>U</kbd>, <kbd>I</kbd> and <kbd>O</kbd> pop-ups take the mouse or the keyboard: drag the
 slider and release to close it, or type a number and press <kbd>Enter</kbd> (a minus first for a negative Falloff). <kbd>Esc</kbd> closes the pop-up without typing anything new.
@@ -245,15 +248,18 @@ works the same way. Turn it off with **Preferences > Input > Right click opens t
 
 Radial (pie) menus put the tools you use most around the cursor. Hold a menu's key, flick the pointer toward an
 item and let go: it runs. Let go in the middle and nothing happens. Tap the key instead and the pie stays open:
-click an item, or click in the middle or press <kbd>Esc</kbd> to close it. Two menus are built in:
+click an item, or click in the middle or press <kbd>Esc</kbd> to close it. Three menus are built in:
 
 | Key | Menu | Items |
 |---|---|---|
 | <kbd>T</kbd> | **Brushes** | Standard, Clay Block, Move, Sharp Crease, Inflate, Pinch, Flatten, Tendril |
 | <kbd>Y</kbd> | **Masking** | Invert Mask, Mask Lasso, Clear Mask, Mask Rectangle, Mask All, Mask Pen, View Mask, Group Masked |
+| <kbd>J</kbd> | **Strokes** | Dots, Drag Stamp, Slide Stamp, Spray, Lazy Stroke (see [Strokes](#strokes)) |
 
-Both keys are free in every input style. Make your own in **Preferences > Input > Radial Menus** (up to 8 menus of
-8 items each):
+All three keys are free in every input style. Installs that stored their radial menus before 0.10.9 get the
+Strokes menu from **Restore default menus** in Preferences > Input > Radial Menus.
+
+Make your own in **Preferences > Input > Radial Menus** (up to 8 menus of 8 items each):
 
 - **+** adds a menu and opens a search for its first item. An item can be anything the command palette
   (<kbd>F3</kbd>) finds: a brush, a tool, a command or a toggle.

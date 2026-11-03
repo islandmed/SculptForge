@@ -90,6 +90,8 @@
 //                            tablet_mouse_mode (Preferences > Tablet > Mouse mode), os_cursor_x / os_cursor_y,
 //                            ui_mouse_x / ui_mouse_y (where ImGui sees the pointer), backface_culling, drawn_triangles,
 //                            viewport_cursor (the system cursor: 0 arrow, 1 text, 7 hand, 100 crosshair; #73),
+//                            panel_drag_scrolls (left / middle drags that scrolled a panel, #100), panel_drag_scroll_y,
+//                            drag_cursor (the same, at the end of the last button_drag, before letting go; #88),
 //                            smooth_keep_volume (Brush > Smooth keeps volume), stroke_keep_volume (1 when Smooth
 //                            dabs keep the volume now: the option, flipped by letting go of Shift mid-stroke),
 //                            moved_out (summed movement along the snapshot's normals: > 0 out, < 0 in),
@@ -97,6 +99,8 @@
 //                            stroke_continuous (Stroke > Continuous, 1 on),
 //                            stroking (1 while a stroke is open), cursor_x / cursor_y (the brush cursor, pixels),
 //                            surface_cursor (1 when the brush ring last drawn lay on the surface, #25),
+//                            cursor_ring (1 when the last brush cursor drawn had its ring; 0: the dot only, #88),
+//                            hide_ring_while_stroking (Preferences > Cursor, 1 on),
 //                            cursor_follows_surface (Preferences > Input, 1 on),
 //                            camera_yaw / camera_pitch / camera_roll (degrees),
 //                            camera_up (the view's up vector . world Y), camera_aligned (1 when looking along a world
@@ -462,6 +466,9 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "quickmenu_open") return app_.quickMenu_.open ? 1.0 : 0.0;
     if (name == "right_click_menu") return app_.uiPrefs_.rightClickQuickMenu ? 1.0 : 0.0;
     if (name == "space_camera") return app_.uiPrefs_.spaceCamera ? 1.0 : 0.0;
+    if (name == "look_outline_opacity") return double(std::lround(app_.uiPrefs_.look.outlineOpacity * 100.0f)); // percent
+    if (name == "look_outlines") return double(app_.uiPrefs_.look.outlines); // 0 off, 1 subtle, 2 on
+    if (name == "look_neutral") return app_.uiPrefs_.look.scheme == "neutral" ? 1.0 : 0.0; // Forge Terminal's Neutral colours
     if (name == "look") return double(app_.uiPrefs_.look.look); // 0 Classic, 1 Forge Terminal, 2 Phosphor, 3 Blueprint
     if (name == "hover_rings") return double(ui::HoverRingsShown()); // hover and focus rings drawn last frame
     if (name == "hover_lifts") return double(ui::HoverLiftsShown()); // tiles lifted last frame
@@ -709,6 +716,9 @@ double Demo::query(const std::string& name, bool& known) const {
         app_.benchmarkDrawMs(0);
         return double(app_.renderer_.lastDrawnTriangles());
     }
+    if (name == "panel_drag_scrolls") return double(ui::DragScrolls()); // #100: drags that scrolled a panel
+    if (name == "panel_drag_scroll_y") return double(ui::DragScrollY());  // that panel's scroll after the last one
+    if (name == "drag_cursor") return double(dragCursor_); // the system cursor during the last button_drag (#88)
     if (name == "viewport_cursor") return app_.cursorKind_; // the system cursor: 0 arrow, 100 crosshair (#73)
     if (name == "os_cursor_x") return app_.testSystemCursorX_;
     if (name == "os_cursor_y") return app_.testSystemCursorY_;
@@ -717,6 +727,8 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "cursor_x") return app_.mouseX_;
     if (name == "cursor_y") return app_.mouseY_;
     if (name == "surface_cursor") return app_.surfaceCursorShown_ ? 1.0 : 0.0;
+    if (name == "cursor_ring") return app_.ringShown_ ? 1.0 : 0.0;
+    if (name == "hide_ring_while_stroking") return app_.uiPrefs_.hideRingWhileStroking ? 1.0 : 0.0;
     if (name == "cursor_follows_surface") return app_.uiPrefs_.cursorFollowsSurface ? 1.0 : 0.0;
     if (name == "camera_yaw") return glm::degrees(app_.camera_.yaw);
     if (name == "camera_pitch") return glm::degrees(app_.camera_.pitch);
@@ -1086,6 +1098,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             const float u = std::min(t / seconds, 1.0f);
             mouseMotion(a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u);
             if (t < seconds) return false;
+            dragCursor_ = app_.cursorKind_; // (what the view showed while the drag ran)
             mouseButton(false, button);
             return true;
         });

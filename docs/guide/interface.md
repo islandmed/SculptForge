@@ -41,32 +41,45 @@ models, brushes or shortcuts.
   a section to a tray as you would a palette. Brush Lab, Front and the pressure options are under **Sculpt**, the
   Library and the console under **View > Display**, and <kbd>F3</kbd> finds everything.
 - **ZBrush-style**: the alphabetical palette bar and the two-row top shelf described in the rest of this chapter.
-  Coming from ZBrush? The welcome shown at the first start has **Coming from ZBrush? Use the ZBrush-style layout**,
-  one click.
+  Coming from ZBrush? In the welcome shown at the first start, pick the **ZBrush-style layout** card or **Coming
+  from: ZBrush** (which also sets the ZBrush-style keys).
 
 Switching the layout swaps the shelves for that layout's standard ones; the trays and what is in them stay.
 
 **Look** (the colours and style):
 
-- **Forge Terminal** (the default): tiles with small gaps and thin borders, the panel under the pointer
-  highlighted, JetBrains Mono for labels and numbers. **Colours** picks the scheme: **Tokyo Night** (the default),
-  Catppuccin Mocha, Gruvbox Dark, Nord, Rosé Pine, Kanagawa or Everforest. **Match my desktop theme** uses your
-  Omarchy theme's colours when Omarchy is installed (Linux; the option shows only then). SculptForge never changes
-  the theme; toggle it again after switching themes.
-- **Classic**: the dark grey interface with the orange accent that SculptForge had before 0.10.7.
+- **Forge Terminal** (the default): tiles with small gaps and thin borders, JetBrains Mono for labels and numbers.
+  **Colours** picks the scheme: **Neutral** (the default since 0.10.9: pure grey panels and the orange accent, so
+  your model's colours read true), Tokyo Night (the default in 0.10.7 and 0.10.8), Catppuccin Mocha, Gruvbox Dark,
+  Nord, Rosé Pine, Kanagawa or Everforest. **Match my desktop theme** uses your Omarchy theme's colours when Omarchy
+  is installed (Linux; the option shows only then). SculptForge never changes the theme; toggle it again after
+  switching themes.
+- **Classic**: the dark grey interface with the orange accent that SculptForge had before 0.10.7, now exactly
+  neutral grey (red, green and blue equal in every background, panel and frame colour).
 - **Phosphor**: green or amber on black, monospace, with optional scanlines and glow on the interface (never on
   the 3D view).
 - **Blueprint**: deep blue with cyan and white line work.
+
+**Outlines** (Forge Terminal, Phosphor and Blueprint) sets the panels' borders: **Subtle** (the default: faint
+borders, and nothing lights up under the pointer), **Off** (no borders; the gaps alone separate the panels) or
+**On** (clear borders, the panel under the pointer a faint step lighter). **Outline opacity** (0-100%, default
+100%) fades the borders further into the panels. Hovering a control only gives that control a faint fill, never a
+bright border.
+
+**The first start** shows three looks to pick from in the welcome: **Neutral**, **Forge Terminal** (Tokyo Night)
+and **ZBrush-style layout** (Classic with the palette bar). **Coming from** sets the keys and the layout together:
+ZBrush (ZBrush-style keys and layout), Blender, Maya or New to sculpting (their keys, the SculptForge layout).
+Help > Welcome shows it again.
 
 Choosing Forge Terminal, Phosphor or Blueprint also switches to the SculptForge layout; you can pick the
 ZBrush-style layout again right after. The look and layout are remembered for the next start without
 [Store Config](#store-config-and-friends) (Store Config keeps them in your UI configuration too).
 
 **Updating from an older version** keeps the look and layout you had. A card, **SculptForge has a new look**,
-shows once: **Try it** switches to Forge Terminal with Tokyo Night and the SculptForge layout; **Keep my layout**
+shows once: **Try it** switches to Forge Terminal with the Neutral colours and the SculptForge layout; **Keep my layout**
 changes nothing. Either way, Preferences > Interface > Look changes it later.
 
-In scripts: `ui_look look=forge scheme=tokyo_night layout=sculptforge` (or `look=classic layout=zbrush`).
+In scripts: `ui_look look=forge scheme=neutral outlines=subtle layout=sculptforge` (or `look=classic layout=zbrush`).
 
 ## The title strip
 
@@ -470,9 +483,8 @@ Config keeps it.
 
 | Setting | Default | What it does |
 |---|---|---|
-| **Look** and **Layout** | Forge Terminal, Tokyo Night, SculptForge | See [Looks and layouts](#looks-and-layouts) |
+| **Look**, **Outlines** and **Layout** | Forge Terminal, Neutral, Subtle, SculptForge | See [Looks and layouts](#looks-and-layouts) |
 | **Language** | English | The interface language: **English** or **Español** (see below) |
-| **Viewport cursor** | Crosshair | The pointer over the 3D view: a crosshair, or the arrow (#73). Panels, menus and popups always show the arrow |
 | **Popup Info (Ctrl+hover help)** | On | Ctrl-hover help boxes |
 | **Popup Info opacity** | 0.97 | How solid the help box is |
 | **Tooltip delay** | 0.5 s | How long to point at an icon-only button before its name appears |
@@ -490,6 +502,22 @@ are in Spanish, while the names of tools and brushes stay in English, as Spanish
 Quad Remesh, Forge Spheres, Library, Lit Sphere, Clay Block, Add). The command palette finds a command by its Spanish or its
 English name. Anything not translated yet (most Ctrl-help descriptions, this guide) shows in English. Scripts and
 `sculptforge-cli` commands are the same in every language.
+
+**Preferences > Cursor**:
+
+| Setting | Default | What it does |
+|---|---|---|
+| **Viewport cursor** | Crosshair | The pointer over the 3D view: a crosshair, or the arrow (#73). The crosshair stays while the view turns, pans or zooms. Panels, menus and popups always show the arrow |
+| **Cursor follows surface** | On | The brush ring lies on the model: a true circle at the brush's real size, in the plane of the surface (averaged over the brush, so bumps don't bend it), with a short line along the surface's direction. Symmetry and radial copies show as dots where their dabs land. Off: a flat ring on the screen |
+| **Hide ring while stroking** | Off | While a stroke runs, only the dot where the brush touches (and the symmetry dots) shows, not the ring |
+
+**Preferences > Hints**: **Show hints in the viewport** (on) and one box per hint (Strokes start off the model,
+Previewing an LOD, Face landmark steps). Each hint over the 3D view also has its own **Don't show again**; **Show
+all hints again** brings them all back. Store Config keeps them.
+
+**Scrolling panels with a pen**: on small screens a palette or tray that doesn't fit scrolls with the mouse wheel,
+and also with a **left-drag on empty space** in it (between and beside the controls) or a **middle-drag anywhere**
+on it, as you would scroll a list with a finger (#100).
 
 **Preferences > Input** sets the key **Style** (the first start sets it from your **Coming from** answer):
 **SculptForge** (the default for new installs): <kbd>1</kbd> to <kbd>9</kbd> and <kbd>0</kbd> pick the first ten
