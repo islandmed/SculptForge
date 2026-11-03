@@ -3254,7 +3254,7 @@ bool App::drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col, bool ring
     // The world radius a dab here gets (App::firstDab / the brushes: Draw Size times world size of a pixel).
     const float radius = radiusPx * camera_.worldPerPixel(hit.position, canvasHeight());
     if (!(radius > 0.0f) || !std::isfinite(radius)) return false;
-    // A steady normal over the brush's area (16 rays), then the ring and the Focal Shift ring as true circles in
+    // A steady normal over the brush's area (32 rays), then the ring and the Focal Shift ring as true circles in
     // that plane (#88): no per-point pressing, so bumps can't bend or break the ring. Never a pass over the mesh.
     const glm::vec3 n = surfaceCursorNormal(doc_.mesh, doc_.bvh, hit, radius);
     surfaceCursorCircle(hit.position, n, radius, 64, cursorRing_);
