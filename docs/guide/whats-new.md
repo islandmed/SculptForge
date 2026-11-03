@@ -5,14 +5,19 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.10.9
+
+- **Hover highlights that pop**: buttons, menus and shelves light up in your look's accent as you point at them,
+  tiles lift a little, sliders show their exact value, and the keyboard focus gets the same ring. Prefer less
+  movement? Turn on **Preferences > Interface > Reduce motion** ([Interface](interface.md)).
+- **Picker thumbnails on top**: the enlarged thumbnail you point at in a picker is no longer hidden under its
+  neighbours (#86).
+
 ## Version 0.10.8
 
 - **Tablets in mouse mode work again**: on some Windows tablets with **Mouse mode** on (Preferences > Tablet) the
   brush stopped following the pen in 0.10.7. When the system can't say where its cursor is, the pen now moves the
   brush by how far it moves, from where it was (#72).
-- **Hover highlights that pop**: buttons, menus and shelves light up in your look's accent as you point at them,
-  tiles lift a little, sliders show their exact value, and the keyboard focus gets the same ring. Prefer less
-  movement? Turn on **Preferences > Interface > Reduce motion** ([Interface](interface.md)).
 
 ## Version 0.10.7
 
