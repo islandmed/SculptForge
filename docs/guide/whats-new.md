@@ -98,6 +98,9 @@ action: guide:whats-new.md
   <kbd>Shift</kbd>+<kbd>Alt</kbd> while drawing to move the brush at a quarter of the pen's speed; and a pressure
   curve for each brush with a **Fine detail** preset. The brush centre now sits exactly under the cursor at any
   zoom. See [Precision work](sculpting.md#precision-work).
+- **UI scale works live**: **Preferences > Interface > UI scale** (100% to 200%) resizes text and panels at once,
+  no restart. **Automatic** follows the monitor the window is on, so on Windows moving it between a 100% and a
+  150% monitor rescales it right away (#87). See [The interface](interface.md#interface-preferences).
 
 ## Version 0.10.8
 

@@ -399,6 +399,12 @@ if(SCULPTFORGE_BUILD_APP)
     endif()
     configure_file(packaging/windows/sculptforge.rc ${CMAKE_CURRENT_BINARY_DIR}/sculptforge.rc @ONLY)
     target_sources(sculptforge PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/sculptforge.rc)
+    # Per-monitor DPI v2 from the first instruction (a window moved between 100 % and 150 % monitors stays sharp
+    # and SDL reports each monitor's scale); MSVC merges it into the manifest the linker writes. (SDL 3 also asks
+    # for it at start-up; the manifest covers what runs before, and other toolchains rely on that.)
+    if(MSVC)
+      target_sources(sculptforge PRIVATE packaging/windows/sculptforge.manifest)
+    endif()
   endif()
   if(APPLE)
     # App icon: build an .icns from the 1024 px PNG with Apple's own tools.
@@ -690,6 +696,13 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME ui_size_popup_scaled COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/size_popup.sfui
              --size 2400x1350 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/size_popup_scaled)
     set_tests_properties(ui_size_popup_scaled PROPERTIES LABELS ui TIMEOUT 300)
+    # UI scale (#87) at 1600x900, where Automatic in a test is exactly 100 %; label "dpi": release.sh step check runs them before the tag.
+    add_test(NAME ui_ui_scale_900 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/ui_scale.sfui
+             --size 1600x900 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/ui_scale_900)
+    set_tests_properties(ui_ui_scale_900 PROPERTIES LABELS "ui;dpi" TIMEOUT 300)
+    if(TEST ui_ui_scale)
+      set_tests_properties(ui_ui_scale PROPERTIES LABELS "ui;dpi")
+    endif()
     add_test(NAME ui_user_guide_1080 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/user_guide.sfui
              --size 1920x1080 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/user_guide_1080)
     set_tests_properties(ui_user_guide_1080 PROPERTIES LABELS ui TIMEOUT 300)
@@ -715,8 +728,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The system clipboard is one per desktop (one X server under CI's xvfb-run), and on X11 every SDL program asks a
     # new clipboard owner what it holds: a program that quits meanwhile makes the owner's answer fail (BadWindow).
     # Scripts that set, read or paste it (or click a Copy / Paste button) run alone under ctest -j.
-    foreach(t ${SCULPTFORGE_UI_TESTS} shell_layout_1080 help_console_1080 size_popup_scaled user_guide_1080)
-      string(REGEX REPLACE "_1080$|_scaled$" "" base ${t})
+    foreach(t ${SCULPTFORGE_UI_TESTS} shell_layout_1080 help_console_1080 size_popup_scaled user_guide_1080 ui_scale_900)
+      string(REGEX REPLACE "_1080$|_scaled$|_900$" "" base ${t})
       get_filename_component(base ${base} NAME_WE)
       set(script ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/${base}.sfui)
       get_filename_component(name ${t} NAME_WE)

@@ -4,6 +4,7 @@
 #include "core/LayerStack.h"
 #include "app/ShellQuote.h"
 #include "app/SpaceCamera.h"
+#include "app/UiScale.h"
 #include "app/AirStroke.h"
 #include "app/AsyncStroke.h"
 #include "app/Calibration.h"
@@ -200,105 +201,10 @@ bool App::init(const AppOptions& options) {
     std::snprintf(meshyKey_, sizeof meshyKey_, "%s", aiSettings_.meshyKey.c_str());
     std::snprintf(hfToken_, sizeof hfToken_, "%s", aiSettings_.hfToken.c_str());
     std::snprintf(comfyUrl_, sizeof comfyUrl_, "%s", aiSettings_.comfyUrl.c_str());
-    // Pixel density (Retina / Wayland scaling) is handled by the backend via the
-    // framebuffer scale; only scale the UI for any additional content scaling.
-    float density = SDL_GetWindowPixelDensity(window_);
-    float scale = SDL_GetWindowDisplayScale(window_) / (density > 0.0f ? density : 1.0f);
-    if (scale <= 0.0f) scale = 1.0f;
     initUiConfig(headless || !options.demo.empty()); // ui.json (layout, shortcuts, UI scale); never for tests and videos
-    if (!headless && uiPrefs_.uiScale > 0.0f) scale = uiPrefs_.uiScale;
-    if (recording) scale = float(options.height) / 900.0f; // UI sized for the video, not this screen
-    uiScale_ = scale;
-    theme::applyStyle();
-    ImGui::GetStyle().ScaleAllSizes(scale);
-    // Inter (SIL OFL), embedded in the binary. Rasterised at the final size for crisp text.
-    ImFontConfig fontConfig;
-    fontConfig.FontDataOwnedByAtlas = false;
-    fontConfig.OversampleH = 2;
-    fontRegular_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontRegular), int(assets::fontRegular_size),
-                                                  15.0f * scale, &fontConfig);
-    // Lucide icons (ISC/MIT) merged into the UI font, so ICON_LC_* strings work in any label.
-    {
-        static const ImWchar kIconRanges[] = {ICON_MIN_LC, ICON_MAX_LC, 0};
-        ImFontConfig icons;
-        icons.MergeMode = true;
-        icons.PixelSnapH = true;
-        icons.FontDataOwnedByAtlas = false;
-        icons.GlyphMinAdvanceX = 15.0f * scale;
-        icons.GlyphOffset = ImVec2(0, 2.0f * scale);
-        io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontLucide), int(assets::fontLucide_size),
-                                       15.0f * scale, &icons, kIconRanges);
-    }
-    // Shell fonts: 12 px captions and 10 px right-shelf labels (with icons), large shelf icons, SemiBold titles.
-    {
-        auto addIcons = [&](float size) {
-            static const ImWchar kIconRanges[] = {ICON_MIN_LC, ICON_MAX_LC, 0};
-            ImFontConfig icons;
-            icons.MergeMode = true;
-            icons.PixelSnapH = true;
-            icons.FontDataOwnedByAtlas = false;
-            icons.GlyphMinAdvanceX = size * scale;
-            icons.GlyphOffset = ImVec2(0, size * 0.13f * scale);
-            io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontLucide), int(assets::fontLucide_size),
-                                           size * scale, &icons, kIconRanges);
-        };
-        fontSmall_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontRegular),
-                                                    int(assets::fontRegular_size), 12.0f * scale, &fontConfig);
-        addIcons(12.0f);
-        fontTiny_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontRegular),
-                                                   int(assets::fontRegular_size), 10.5f * scale, &fontConfig);
-        fontBold_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontSemiBold),
-                                                   int(assets::fontSemiBold_size), 15.0f * scale, &fontConfig);
-        addIcons(15.0f);
-        static const ImWchar kIconRanges[] = {ICON_MIN_LC, ICON_MAX_LC, 0};
-        ImFontConfig big;
-        big.PixelSnapH = true;
-        big.FontDataOwnedByAtlas = false;
-        fontIcons_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontLucide), int(assets::fontLucide_size),
-                                                    20.0f * scale, &big, kIconRanges);
-    }
-    { // JetBrains Mono (SIL OFL) for the looks (Preferences > Interface > Look), with the icons and box drawing.
-        static const ImWchar kMonoRanges[] = {0x0020, 0x00FF, 0x2010, 0x2027, 0x2190, 0x21FF, 0x2500, 0x259F, 0x25A0, 0x25FF, 0};
-        static const ImWchar kIconRanges[] = {ICON_MIN_LC, ICON_MAX_LC, 0};
-        auto addMono = [&](const unsigned char* data, unsigned long long size, float px) {
-            ImFont* f = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(data), int(size), px * scale, &fontConfig, kMonoRanges);
-            ImFontConfig icons;
-            icons.MergeMode = true;
-            icons.PixelSnapH = true;
-            icons.FontDataOwnedByAtlas = false;
-            icons.GlyphMinAdvanceX = px * scale;
-            icons.GlyphOffset = ImVec2(0, px * 0.13f * scale);
-            io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontLucide), int(assets::fontLucide_size), px * scale,
-                                           &icons, kIconRanges);
-            return f;
-        };
-        fontMono_ = addMono(assets::fontMono, assets::fontMono_size, 15.0f);
-        fontMonoSmall_ = addMono(assets::fontMono, assets::fontMono_size, 12.0f);
-        fontMonoTiny_ = addMono(assets::fontMono, assets::fontMono_size, 10.5f);
-        fontMonoBold_ = addMono(assets::fontMonoBold, assets::fontMonoBold_size, 15.0f);
-        fontInterSmall_ = fontSmall_;
-        fontInterTiny_ = fontTiny_;
-        fontInterBold_ = fontBold_;
-        theme::fonts = {fontMono_, fontMonoSmall_, fontMonoBold_};
-    }
-    { // The support card's display sizes (PanelSupportCard.cpp): Latin only, so the atlas grows by a few glyphs.
-        static const ImWchar kCardRanges[] = {0x0020, 0x00FF, 0x2014, 0x2014, 0x2019, 0x2019, 0x2026, 0x2026, 0};
-        fontCardTitle_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontSemiBold),
-                                                        int(assets::fontSemiBold_size), 40.0f * scale, &fontConfig, kCardRanges);
-        fontCardHead_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontSemiBold),
-                                                       int(assets::fontSemiBold_size), 21.0f * scale, &fontConfig, kCardRanges);
-        fontCardBody_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontRegular),
-                                                       int(assets::fontRegular_size), 16.5f * scale, &fontConfig, kCardRanges);
-    }
-    addHelpFonts(scale); // Ctrl-help titles (Inter SemiBold) and the console (ProggyClean)
-    guide_.addFonts(scale); // User Guide headings
+    uiScale_ = targetUiScale(); // the style follows in applyLook below
+    buildUiFonts(uiScale_);
     if (recording) {
-        fontCaption_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontSemiBold),
-                                                      int(assets::fontSemiBold_size), float(options.height) * 0.042f,
-                                                      &fontConfig);
-        fontCaptionSub_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontRegular),
-                                                         int(assets::fontRegular_size), float(options.height) * 0.024f,
-                                                         &fontConfig);
         ImGui::GetCurrentContext()->TestEngineHookItems = true; // lets the demo find buttons by label
         io.IniFilename = nullptr;                               // fixed, reproducible layout
     }
@@ -447,6 +353,7 @@ int App::runUiTest(int w, int h, int fps) {
 
         hardwareProfileFrameBegin(); // (only with SF_HW_PROFILE_IN_TESTS=1: tests use fixed settings)
         Demo::beginFrame();
+        if (uiScaleDirty_) applyUiScale(); // (Preferences, a display-scale change: #87)
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         keepImGuiOnPen();
@@ -618,6 +525,7 @@ int App::runRecording() {
         updateCameraAspect();
 
         Demo::beginFrame();
+        if (uiScaleDirty_) applyUiScale(); // (Preferences, a display-scale change: #87)
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         keepImGuiOnPen();
@@ -1031,6 +939,7 @@ int App::run() {
         updateSpaceMouse(dt);
 
         hardwareProfileFrameBegin(); // the frame governor's CPU and GPU timing
+        if (uiScaleDirty_) applyUiScale(); // (Preferences, a display-scale change: #87)
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         keepImGuiOnPen();
@@ -1133,6 +1042,131 @@ int App::run() {
     return 0;
 }
 
+// The UI scale (Preferences > Interface > UI scale, #87). Automatic follows the window's display: on Windows
+// (per-monitor DPI v2) and with X11's Xft.dpi that is the content scale, and moving the window to a monitor at another
+// scale sends SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED. Tests and videos size the UI for their frame instead.
+float App::targetUiScale() const {
+    float automatic = 1.0f;
+    if (displayScaleOverride_ > 0.0f) automatic = displayScaleOverride_; // UI tests: display_scale
+    else if (!options_.recordPath.empty() || !options_.uiTest.empty()) automatic = float(options_.height) / 900.0f;
+    else if (window_) automatic = automaticUiScale(SDL_GetWindowDisplayScale(window_), SDL_GetWindowPixelDensity(window_));
+    return resolveUiScale(uiPrefs_.uiScale, automatic);
+}
+
+// Live, between frames (the atlas can't change inside one): the fonts rasterised again at the new size, the style
+// rebuilt from scratch (applyLook), and the shell lays itself out at uiScale_ on the next frame.
+void App::applyUiScale() {
+    uiScaleDirty_ = false;
+    const float scale = targetUiScale();
+    if (!uiScaleChanged(uiScale_, scale)) return;
+    SDL_Log("UI scale %.0f%%", double(scale * 100.0f));
+    uiScale_ = scale;
+    ImGui::GetIO().Fonts->Clear();
+    buildUiFonts(scale);
+    if (ImGui::GetIO().BackendRendererUserData) ImGui_ImplOpenGL3_DestroyFontsTexture(); // the next NewFrame uploads it
+    applyLook();
+}
+
+void App::requestUiScale() {
+    uiScaleDirty_ = true;
+    redrawIn(0.0);
+}
+
+// Every font the UI uses, rasterised at `scale` for crisp text (Dear ImGui 1.91 has no dynamic font sizes).
+void App::buildUiFonts(float scale) {
+    ImGuiIO& io = ImGui::GetIO();
+    const bool recording = !options_.recordPath.empty() || !options_.uiTest.empty();
+    // Inter (SIL OFL), embedded in the binary. Rasterised at the final size for crisp text.
+    ImFontConfig fontConfig;
+    fontConfig.FontDataOwnedByAtlas = false;
+    fontConfig.OversampleH = 2;
+    fontRegular_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontRegular), int(assets::fontRegular_size),
+                                                  15.0f * scale, &fontConfig);
+    // Lucide icons (ISC/MIT) merged into the UI font, so ICON_LC_* strings work in any label.
+    {
+        static const ImWchar kIconRanges[] = {ICON_MIN_LC, ICON_MAX_LC, 0};
+        ImFontConfig icons;
+        icons.MergeMode = true;
+        icons.PixelSnapH = true;
+        icons.FontDataOwnedByAtlas = false;
+        icons.GlyphMinAdvanceX = 15.0f * scale;
+        icons.GlyphOffset = ImVec2(0, 2.0f * scale);
+        io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontLucide), int(assets::fontLucide_size),
+                                       15.0f * scale, &icons, kIconRanges);
+    }
+    // Shell fonts: 12 px captions and 10 px right-shelf labels (with icons), large shelf icons, SemiBold titles.
+    {
+        auto addIcons = [&](float size) {
+            static const ImWchar kIconRanges[] = {ICON_MIN_LC, ICON_MAX_LC, 0};
+            ImFontConfig icons;
+            icons.MergeMode = true;
+            icons.PixelSnapH = true;
+            icons.FontDataOwnedByAtlas = false;
+            icons.GlyphMinAdvanceX = size * scale;
+            icons.GlyphOffset = ImVec2(0, size * 0.13f * scale);
+            io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontLucide), int(assets::fontLucide_size),
+                                           size * scale, &icons, kIconRanges);
+        };
+        fontSmall_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontRegular),
+                                                    int(assets::fontRegular_size), 12.0f * scale, &fontConfig);
+        addIcons(12.0f);
+        fontTiny_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontRegular),
+                                                   int(assets::fontRegular_size), 10.5f * scale, &fontConfig);
+        fontBold_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontSemiBold),
+                                                   int(assets::fontSemiBold_size), 15.0f * scale, &fontConfig);
+        addIcons(15.0f);
+        static const ImWchar kIconRanges[] = {ICON_MIN_LC, ICON_MAX_LC, 0};
+        ImFontConfig big;
+        big.PixelSnapH = true;
+        big.FontDataOwnedByAtlas = false;
+        fontIcons_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontLucide), int(assets::fontLucide_size),
+                                                    20.0f * scale, &big, kIconRanges);
+    }
+    { // JetBrains Mono (SIL OFL) for the looks (Preferences > Interface > Look), with the icons and box drawing.
+        static const ImWchar kMonoRanges[] = {0x0020, 0x00FF, 0x2010, 0x2027, 0x2190, 0x21FF, 0x2500, 0x259F, 0x25A0, 0x25FF, 0};
+        static const ImWchar kIconRanges[] = {ICON_MIN_LC, ICON_MAX_LC, 0};
+        auto addMono = [&](const unsigned char* data, unsigned long long size, float px) {
+            ImFont* f = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(data), int(size), px * scale, &fontConfig, kMonoRanges);
+            ImFontConfig icons;
+            icons.MergeMode = true;
+            icons.PixelSnapH = true;
+            icons.FontDataOwnedByAtlas = false;
+            icons.GlyphMinAdvanceX = px * scale;
+            icons.GlyphOffset = ImVec2(0, px * 0.13f * scale);
+            io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontLucide), int(assets::fontLucide_size), px * scale,
+                                           &icons, kIconRanges);
+            return f;
+        };
+        fontMono_ = addMono(assets::fontMono, assets::fontMono_size, 15.0f);
+        fontMonoSmall_ = addMono(assets::fontMono, assets::fontMono_size, 12.0f);
+        fontMonoTiny_ = addMono(assets::fontMono, assets::fontMono_size, 10.5f);
+        fontMonoBold_ = addMono(assets::fontMonoBold, assets::fontMonoBold_size, 15.0f);
+        fontInterSmall_ = fontSmall_;
+        fontInterTiny_ = fontTiny_;
+        fontInterBold_ = fontBold_;
+        theme::fonts = {fontMono_, fontMonoSmall_, fontMonoBold_};
+    }
+    { // The support card's display sizes (PanelSupportCard.cpp): Latin only, so the atlas grows by a few glyphs.
+        static const ImWchar kCardRanges[] = {0x0020, 0x00FF, 0x2014, 0x2014, 0x2019, 0x2019, 0x2026, 0x2026, 0};
+        fontCardTitle_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontSemiBold),
+                                                        int(assets::fontSemiBold_size), 40.0f * scale, &fontConfig, kCardRanges);
+        fontCardHead_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontSemiBold),
+                                                       int(assets::fontSemiBold_size), 21.0f * scale, &fontConfig, kCardRanges);
+        fontCardBody_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontRegular),
+                                                       int(assets::fontRegular_size), 16.5f * scale, &fontConfig, kCardRanges);
+    }
+    addHelpFonts(scale); // Ctrl-help titles (Inter SemiBold) and the console (ProggyClean)
+    guide_.addFonts(scale); // User Guide headings
+    if (recording) { // the demo captions, sized for the video
+        fontCaption_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontSemiBold),
+                                                      int(assets::fontSemiBold_size), float(options_.height) * 0.042f,
+                                                      &fontConfig);
+        fontCaptionSub_ = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(assets::fontRegular),
+                                                         int(assets::fontRegular_size), float(options_.height) * 0.024f,
+                                                         &fontConfig);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Input
 // ---------------------------------------------------------------------------
@@ -1162,6 +1196,10 @@ void App::handleEvent(const SDL_Event& event) {
     case SDL_EVENT_WINDOW_FOCUS_LOST:
         if (radial_.hold != RadialHold::None) closeRadialMenu(); // its key or button's release won't come here
         spaceHeld_ = false; // Space let go in another window never reaches us
+        break;
+    case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED: // dragged to a monitor at another scale, or the system setting changed
+    case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
+        if (e.window.windowID == SDL_GetWindowID(window_)) requestUiScale();
         break;
     case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
         if (e.window.windowID == SDL_GetWindowID(window_)) requestQuit();

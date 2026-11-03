@@ -493,7 +493,7 @@ Config keeps it.
 | **Auto collapse left tray** / **right tray** | On / Off | Collapse other palettes in the tray when one wouldn't fit |
 | **Palettes strictly A-Z (ZBrush order)** | Off | Strict alphabetical palette bar instead of File and Edit first, Help last |
 | **Left-handed layout** | Off | Mirrors the shelves and trays: tools on the right, navigation on the left |
-| **UI scale** | Automatic | Size of text and controls (100% to 200%); takes effect at the next start |
+| **UI scale** | Automatic | Size of text and controls (100% to 200%), applied at once; Automatic follows the monitor (see below) |
 | **Camera notch** | Automatic | Keeps the interface below a laptop's camera notch in fullscreen (see below) |
 
 **Language** changes the interface at once, without a restart; Store Config keeps it for the next start. In
@@ -502,6 +502,11 @@ are in Spanish, while the names of tools and brushes stay in English, as Spanish
 Quad Remesh, Forge Spheres, Library, Lit Sphere, Clay Block, Add). The command palette finds a command by its Spanish or its
 English name. Anything not translated yet (most Ctrl-help descriptions, this guide) shows in English. Scripts and
 `sculptforge-cli` commands are the same in every language.
+
+**UI scale** also applies at once: text, buttons, shelves and trays resize on the next frame; Store Config keeps it.
+**Automatic** uses the scale of the monitor the window is on (Windows: **Settings > Display > Scale**; macOS and
+Wayland: the display's scaling; X11: the desktop's font DPI). Drag the window to a monitor at another scale, or
+change the system setting, and the interface follows. A chosen size (100% to 200%) stays the same on every monitor.
 
 **Preferences > Cursor**:
 

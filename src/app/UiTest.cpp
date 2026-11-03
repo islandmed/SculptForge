@@ -216,6 +216,10 @@
 //   spacemouse_button N      press and release button N (1 = left side button, 2 = right)
 //   spacemouse_unplug        unplug it
 //   expect_value spacemouse_connected (1 when the app opened it), spacemouse_moving (1 while it moves the view)
+//   ui_scale PERCENT | auto  Preferences > Interface > UI scale (applied live, #87); display_scale PERCENT: the display's
+//                            content scale changes, with SDL's event (Windows DPI, another monitor)
+//   expect_value ui_scale (percent built now), font_height (default font, px), frame_height, panel_width (right
+//                            shelf, px), title_height
 //   expect_value look (0 Classic, 1 Forge Terminal, 2 Phosphor, 3 Blueprint), shell_layout (0 ZBrush-style, 1 SculptForge)
 #include "app/App.h"
 
@@ -735,6 +739,15 @@ double Demo::query(const std::string& name, bool& known) const {
     // fractions of the canvas height from its top (-1: the strip isn't shown).
     if (name == "timeline_top") return app_.uiPrefs_.timelineTop ? 1.0 : 0.0;
     // The style's minimum window height in unscaled px (32): switching looks must not scale it again each time.
+    if (name == "ui_scale") return std::round(double(app_.uiScale_) * 100.0); // percent, as built now (#87)
+    if (name == "font_height") { // the default UI font's size in pixels, as rasterised in the atlas
+        const ImGuiIO& io = ImGui::GetIO();
+        const ImFont* f = io.FontDefault ? io.FontDefault : io.Fonts->Fonts.empty() ? nullptr : io.Fonts->Fonts[0];
+        return f ? double(f->FontSize) : 0.0;
+    }
+    if (name == "frame_height") return double(ImGui::GetFrameHeight()); // a button's height: font + style padding
+    if (name == "panel_width") return double(app_.shell_.rightShelf.w); // the right shelf, 52 logical px
+    if (name == "title_height") return double(app_.shell_.title.h);
     if (name == "style_window_min") return double(ImGui::GetStyle().WindowMinSize.y / std::max(app_.uiScale_, 0.01f));
     // Draw > Camera > Gizmo size and View Figure: the axes' length in unscaled px (34 at Medium), the figure shown.
     if (name == "axis_gizmo_length") return double(34.0f * app_.axisGizmoUnit() / std::max(app_.uiScale_, 0.01f));
@@ -1560,6 +1573,26 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             r = call("POST", "/api/capture/" + capture + "/finish", "");
             if (r.status != 200) fail(line, "finish refused: " + std::to_string(r.status) + " " + r.body + r.error);
         });
+    } else if (verb == "ui_scale") { // ui_scale 175 | auto: as Preferences > Interface > UI scale picks it (#87)
+        if (!need(1)) return false;
+        const float v = w[1] == "auto" ? 0.0f : num(1, 100) / 100.0f;
+        run([this, v] {
+            app_.uiPrefs_.uiScale = v;
+            app_.requestUiScale();
+        });
+        wait(0.2f);
+    } else if (verb == "display_scale") {
+        // display_scale 150: the window's display now reports this content scale and SDL says so
+        // (SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED: Windows' per-monitor DPI, a move to a monitor at another scale)
+        if (!need(1)) return false;
+        run([this, v = num(1, 100) / 100.0f] {
+            app_.displayScaleOverride_ = v;
+            SDL_Event e{};
+            e.type = SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED;
+            e.window.windowID = SDL_GetWindowID(app_.window_);
+            app_.handleEvent(e);
+        });
+        wait(0.2f);
     } else if (verb == "input_style") {
         // input_style zbrush|sculptforge|blender|maya: as Preferences > Input sets it (scripts written for one style)
         if (!need(1)) return false;
