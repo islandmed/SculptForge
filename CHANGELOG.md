@@ -6,15 +6,16 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Posts in the Discord #ideas, #help and #bug-reports channels now become GitHub issues automatically (label
+  from-discord), with a "Tracked as #N" reply on Discord and the fix posted back when the issue is closed.
+
 ## [0.10.8] - 2026-11-02
 
 ### Fixed
 - Tablet Mouse mode (Preferences > Tablet): on some Windows tablets the brush stopped following the pen in 0.10.7,
   because the system cursor reading stayed put while the pen moved. A reading that doesn't move with the pen is now
   ignored and the pen moves the brush relatively, from where it was, with no jump (#72).
-### Added
-- Posts in the Discord #ideas, #help and #bug-reports channels now become GitHub issues automatically (label
-  from-discord), with a "Tracked as #N" reply on Discord and the fix posted back when the issue is closed.
 
 ## [0.10.7] - 2026-11-01
 

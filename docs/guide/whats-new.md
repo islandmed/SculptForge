@@ -5,6 +5,12 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.10.9
+
+- **Discord posts reach the tracker**: a new idea or help thread, or a bug report, on the
+  [SculptForge Discord](https://discord.gg/gWrYkEmQhH) becomes a GitHub issue within about half an hour. You get a
+  "Tracked as #N" reply in the thread, and the fix is posted back there when the issue is closed.
+
 ## Version 0.10.8
 
 - **Tablets in mouse mode work again**: on some Windows tablets with **Mouse mode** on (Preferences > Tablet) the
