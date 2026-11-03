@@ -74,6 +74,11 @@ action: guide:whats-new.md
   **Try it** button that opens the feature (switch the look, select the brush, open the membership card...).
   **Help > What's New** opens it again; <kbd>Esc</kbd> closes it. This chapter shows the last three versions in
   full and folds the older ones into short groups, on the website too.
+- **Image to 3D with no setup**: the free default is now Hunyuan3D 2.1, which needs no token. TRELLIS.2 ("Best
+  detail") still needs a free Hugging Face token (**Preferences > AI**); without one, Hunyuan3D 2.1 runs instead
+  and the status line tells you. Your own model choice is kept. See [Image and text to 3D](generate-3d.md).
+- **Generated models arrive as clean quads**: Quad Remesh is now the default, with one subdivision level holding
+  the detail, so you can sculpt and subdivide straight away. Voxel remesh and Off are still in **Remesh**.
 
 ## Version 0.10.8
 

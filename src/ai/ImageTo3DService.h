@@ -68,6 +68,11 @@ const std::vector<HfPreset>& hfPresets();
 // A Hunyuan3D model (Hugging Face preset or fal.ai id): its licence's territory note is shown where it's chosen.
 bool hunyuanModel(std::string_view id);
 extern const char* kHunyuanLicenceNote;
+// TRELLIS.2's Space needs a Hugging Face token; without one Hunyuan3D 2.1 runs instead, with this note.
+extern const char* kTrellisNoTokenNote;
+// The preset that runs for these settings (image presets, or text presets when `text`). An unknown id gets the
+// first preset; TRELLIS.2 without a token falls back to Hunyuan3D 2.1 and sets `note` to kTrellisNoTokenNote.
+const HfPreset& resolveHfPreset(const AiSettings& settings, bool text, std::string* note = nullptr);
 // Free text-to-3D models ("$PROMPT" in step args is the description).
 const std::vector<HfPreset>& hfTextPresets();
 

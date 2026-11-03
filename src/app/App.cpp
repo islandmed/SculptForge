@@ -2932,39 +2932,96 @@ void App::startGenerator() {
     aiSettings_.comfyUrl = comfyUrl_;
     // With no workflow chosen, ComfyUI runs the bundled one the panel shows (not saved, so updates reach it).
     ai::AiSettings settings = aiSettings_;
+    const bool hunyuan = settings.generatorService == "huggingface"
+                             ? ai::hunyuanModel(ai::resolveHfPreset(settings, textMode_).id)
+                             : settings.generatorService == "fal" && ai::hunyuanModel(settings.falModel);
+    if (hunyuan) showHunyuanNoticeOnce();
     if (settings.comfyImageWorkflow.empty()) settings.comfyImageWorkflow = comfyDefaultWorkflow(false);
     if (settings.comfyTextWorkflow.empty()) settings.comfyTextWorkflow = comfyDefaultWorkflow(true);
     auto stem = (std::filesystem::temp_directory_path() / ("sculptforge_generated_" + std::to_string(SDL_GetTicksNS()))).u8string();
     generatorTime_ = 0.0f;
     generatorProgress_ = std::make_shared<ai::GenerationProgress>();
     generatorProgress_->setStatus("Starting...");
-    auto promise = std::make_shared<std::promise<ai::GeneratorResult>>();
+    auto promise = std::make_shared<std::promise<GeneratedModel>>();
     pendingGenerator_ = promise->get_future();
     std::thread([promise, settings, in = refImagePath_, text = textMode_ ? std::string(textPrompt_) : std::string(),
-                 out = std::string(stem.begin(), stem.end()), progress = generatorProgress_] {
-        promise->set_value(text.empty() ? ai::generate3D(settings, in, out, progress.get())
-                                        : ai::generate3DFromText(settings, text, out, progress.get()));
+                 out = std::string(stem.begin(), stem.end()), progress = generatorProgress_,
+                 mode = GeneratedRemesh(generatedRemesh_), resolution = remeshResolution_] {
+        GeneratedModel g;
+        g.result = text.empty() ? ai::generate3D(settings, in, out, progress.get())
+                                : ai::generate3DFromText(settings, text, out, progress.get());
+        if (g.result.ok && mode != GeneratedRemesh::Off) {
+            // Made sculptable here, so the window stays responsive; the main thread opens the file and swaps this in.
+            Document scratch;
+            const CommandResult opened = CommandRegistry().execute(scratch, "open", {{"path", g.result.outputPath}});
+            progress->percent = 0;
+            progress->setStatus(mode == GeneratedRemesh::Quad ? "Making it sculptable: Quad Remesh..." : "Making it sculptable: Voxel Remesh...");
+            Mesh m;
+            if (!opened.ok) {
+                g.remeshError = opened.message;
+            } else if (remeshGenerated(scratch.mesh, mode, resolution, 1, m, g.remeshError, &g.stats, [progress](float f) {
+                           progress->percent = int(f * 100.0f);
+                           return !progress->cancel.load();
+                       })) {
+                g.remeshed = std::make_shared<Mesh>(std::move(m));
+            }
+        }
+        promise->set_value(std::move(g));
     }).detach();
 }
 
 void App::pollGenerator() {
     if (!pendingGenerator_.valid() || pendingGenerator_.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
         return;
-    ai::GeneratorResult r = pendingGenerator_.get();
+    GeneratedModel g = pendingGenerator_.get();
+    const ai::GeneratorResult& r = g.result;
+    const std::string note = r.note.empty() ? std::string() : " - " + r.note;
     if (!r.ok) {
-        status_ = "Image to 3D failed: " + r.error;
+        status_ = "Image to 3D failed: " + r.error + note;
         return;
     }
     runCommand("open", {{"path", r.outputPath}});
     std::error_code ec;
     std::filesystem::remove(std::filesystem::path(std::u8string(r.outputPath.begin(), r.outputPath.end())), ec);
     const size_t raw = doc_.mesh.triangleCount();
-    if (remeshGenerated_) runCommand("remesh", {{"resolution", double(remeshResolution_)}});
+    const auto mode = GeneratedRemesh(generatedRemesh_);
+    if (g.remeshed) doc_.replaceMeshUndoable(std::move(*g.remeshed), mode == GeneratedRemesh::Quad ? "Quad Remesh" : "Remesh");
     doc_.path.clear();
-    status_ = "Generated model imported (" + std::to_string(raw) + " tris" +
-              (remeshGenerated_ ? ", remeshed to " + std::to_string(doc_.mesh.triangleCount()) : std::string()) +
-              ") - ready to sculpt";
+    const std::string remeshNote = g.remeshed ? ", " + generatedRemeshNote(g.stats, mode) : std::string();
+    status_ = !g.remeshError.empty()
+                  ? "Generated model imported (" + std::to_string(raw) + " tris, not remeshed: " + g.remeshError + ")" + note
+                  : "Generated model imported (" + std::to_string(raw) + " tris" + remeshNote + ") - ready to sculpt" + note;
     updateTitle();
+}
+
+void App::showHunyuanNoticeOnce() {
+    if (aiSettings_.hunyuanNoticeShown) return;
+    aiSettings_.hunyuanNoticeShown = true;
+    openHunyuanNotice_ = true;
+    if (aiSettingsPath_.empty()) return;
+    // Only the flag: keys typed into the panel are saved when the user presses Save settings.
+    ai::AiSettings saved = ai::AiSettings::load(aiSettingsPath_);
+    saved.hunyuanNoticeShown = true;
+    std::string err;
+    saved.save(aiSettingsPath_, err);
+}
+
+void App::drawAiPrefsSection() {
+    ImGui::SetNextItemWidth(-1);
+    ImGui::InputTextWithHint("##hftoken", "Hugging Face token (hf_...)", hfToken_, sizeof hfToken_, ImGuiInputTextFlags_Password);
+    ui::HelpText("Hugging Face token", nullptr,
+                 "Free at huggingface.co/settings/tokens (read access). Raises the free daily allowance in "
+                 "Generate 3D, and TRELLIS.2 needs it. Empty = the HF_TOKEN environment variable.",
+                 "Preferences > AI");
+    if (ImGui::Button("Save", ImVec2(-1, 0))) {
+        // Saves the token into the settings as they are on disk, so other unsaved panel edits stay unsaved.
+        aiSettings_.hfToken = hfToken_;
+        ai::AiSettings saved = aiSettingsPath_.empty() ? aiSettings_ : ai::AiSettings::load(aiSettingsPath_);
+        saved.hfToken = hfToken_;
+        std::string err;
+        status_ = !aiSettingsPath_.empty() && saved.save(aiSettingsPath_, err) ? "Hugging Face token saved"
+                                                                               : "Save failed " + err;
+    }
 }
 
 std::string App::comfyDefaultWorkflow(bool text) {
@@ -3132,12 +3189,19 @@ void App::drawImageTo3D() {
             if (aiSettings_.hfModel == p.id) preview = p.label;
         if (ImGui::BeginCombo("Model", preview)) {
             for (const auto& p : presets)
-                if (ImGui::Selectable(p.label, aiSettings_.hfModel == p.id)) aiSettings_.hfModel = p.id;
+                if (ImGui::Selectable(p.label, aiSettings_.hfModel == p.id)) {
+                    aiSettings_.hfModel = p.id;
+                    aiSettings_.hfModelChosen = true;
+                }
             ImGui::EndCombo();
         }
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", ai::kHunyuanLicenceNote);
+        const bool hasToken = hfToken_[0] || !ai::AiSettings{}.resolvedHfToken().empty(); // field, else HF_TOKEN
         if (ai::hunyuanModel(aiSettings_.hfModel)) hint(ai::kHunyuanLicenceNote);
+        if (aiSettings_.hfModel == "trellis-2" && !hasToken)
+            hint("TRELLIS.2 needs a free Hugging Face token; without one, Hunyuan3D 2.1 runs instead.");
         ImGui::InputText("HF token", hfToken_, sizeof hfToken_, ImGuiInputTextFlags_Password);
-        hint(hfToken_[0] || std::getenv("HF_TOKEN")
+        hint(hasToken
                  ? "Runs on Hugging Face's shared GPUs with your account's free daily allowance."
                  : "Runs free on Hugging Face's shared GPUs with a small daily allowance. A free token "
                    "(huggingface.co/settings/tokens, read access) raises it; TRELLIS.2 needs one.");
@@ -3152,6 +3216,7 @@ void App::drawImageTo3D() {
                     std::snprintf(falModel_, sizeof falModel_, "%s", m.id);
             ImGui::EndCombo();
         }
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", ai::kHunyuanLicenceNote);
         ImGui::InputText("Model id", falModel_, sizeof falModel_);
         if (ai::hunyuanModel(falModel_)) hint(ai::kHunyuanLicenceNote);
         ImGui::InputText("API key", falKey_, sizeof falKey_, ImGuiInputTextFlags_Password);
@@ -3171,8 +3236,15 @@ void App::drawImageTo3D() {
         hint("Offline and instant, but only a puffy blockout of the outline - not a real reconstruction.");
     }
     if (serviceId != "inflate") {
-        ImGui::Checkbox("Remesh for sculpting", &remeshGenerated_);
-        if (remeshGenerated_) ImGui::SliderInt("Resolution", &remeshResolution_, 96, 400);
+        static const char* remeshModes[] = {"Quad Remesh", "Voxel remesh", "Off (raw mesh)"};
+        ImGui::Combo("Remesh", &generatedRemesh_, remeshModes, 3);
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+            ImGui::SetTooltip("Quad Remesh (default): clean quads ready for sculpting and subdividing, with one subdivision "
+                              "level holding the detail. Voxel remesh: an even, watertight triangle surface. Off: the "
+                              "model as the service made it.");
+        if (generatedRemesh_ != int(GeneratedRemesh::Off)) ImGui::SliderInt("Resolution", &remeshResolution_, 96, 400);
+        if (generatedRemesh_ == int(GeneratedRemesh::Quad))
+            ImGui::TextDisabled("About %d quads, then 1 subdivision level", generatedQuadTarget(remeshResolution_));
     }
     ImGui::PopItemWidth();
     if (pendingGenerator_.valid()) {
@@ -3183,6 +3255,17 @@ void App::drawImageTo3D() {
         if (ImGui::Button("Cancel", ImVec2(-1, 0)) && generatorProgress_) generatorProgress_->cancel = true;
     } else if (ImGui::Button("Generate 3D model", ImVec2(-1, 0))) {
         startGenerator();
+    }
+    if (openHunyuanNotice_) {
+        ImGui::OpenPopup("Hunyuan3D licence");
+        openHunyuanNotice_ = false;
+    }
+    ImGui::SetNextWindowSize(ImVec2(320 * scale, 0));
+    if (ImGui::BeginPopupModal("Hunyuan3D licence", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextWrapped("%s", ai::kHunyuanLicenceNote);
+        ImGui::TextDisabled("This stays in the Model tooltip.");
+        if (ImGui::Button("OK", ImVec2(-1, 0))) ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
     }
     if (ImGui::SmallButton("Save settings")) {
         aiSettings_.generatorCommand = generatorCommand_;

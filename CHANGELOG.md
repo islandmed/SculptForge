@@ -51,6 +51,28 @@ All notable changes to SculptForge are listed here. The format follows
   posted to Insiders as an .sfpack. Supporters get the month's drops as one Insider Pack at month end, and everyone
   gets that pack free three months later (`tools/drops/`, `.github/workflows/insider-drop.yml`).
 
+### Changed
+- What's New is a window now: after an update (and from **Help > What's New**) a centred card shows the version's main
+  features, each with a picture, one line and a **Try it** button that opens it (switch the look, open the membership
+  card, select the brush, open the benchmark...), plus the full release notes, the Discord and Close. It takes the
+  look's colours, fades in, follows the UI scale and works from the keyboard (Esc, Tab, Enter). The guide chapter and
+  the website page show the last three versions in full (a band with the date, the feature cards, "All changes"
+  folded) and the older ones as short groups (0.10.1 to 0.10.5, 0.9.x, 0.8 and earlier); the contents list follows.
+  The data is a ```features block per version in docs/guide/whats-new.md, read by the app and build_site.py alike.
+- Image and text to 3D work out of the box with no token: the free Hugging Face default is now **Hunyuan3D 2.1**,
+  for new installs and for everyone who never picked a model (an explicit choice is kept; a saved TRELLIS.2 is
+  kept when a token is saved too). TRELLIS.2 shows as "Best detail (needs token)".
+- TRELLIS.2 without a Hugging Face token no longer fails: Hunyuan3D 2.1 runs instead and the status line says
+  "TRELLIS.2 needs a free Hugging Face token (Preferences > AI); used Hunyuan3D 2.1 instead." The token can now be
+  set in the new **Preferences > AI** too.
+- Generated models get **Quad Remesh** by default instead of voxel remesh: clean quads (about resolution² / 2, 32768
+  at the default 256) with one subdivision level projected onto the model, ready to sculpt and subdivide. A voxel
+  pass cleans up holes and overlapping pieces first. It runs in the background with the progress bar (about 20 s
+  for a typical Hunyuan3D model). **Remesh** in Generate 3D also offers Voxel remesh and Off; the CLI takes
+  `remesh=quad|voxel|false` (`true` means quad) and `levels=0-2`. The status line says "remeshed to N quads".
+- The Hunyuan3D licence notice (the Tencent Hunyuan Community License doesn't cover use in the EU, UK or South
+  Korea) is shown once, the first time a Hunyuan3D model runs, and stays in the Model picker's tooltip.
+
 ### Fixed
 - Blender style: Alt+left-drag on the model masks and Ctrl+Alt+left-drag unmasks, as Blender 5.1+'s default
   sculpt keymap does, instead of turning the view (#77, reported by TheRedWaxPolice). Beside the model Alt+drag still
@@ -63,15 +85,6 @@ All notable changes to SculptForge are listed here. The format follows
   view no longer jumps when the pen comes back into range elsewhere or leaves mid-drag. The active Part changes only
   with the keyboard's Alt and a quick click (not with a pen button set to Alt, a long pen press or quick pen taps),
   and the status bar says "Active Part: <name> (Alt+click)".
-### Changed
-- What's New is a window now: after an update (and from **Help > What's New**) a centred card shows the version's main
-  features, each with a picture, one line and a **Try it** button that opens it (switch the look, open the membership
-  card, select the brush, open the benchmark...), plus the full release notes, the Discord and Close. It takes the
-  look's colours, fades in, follows the UI scale and works from the keyboard (Esc, Tab, Enter). The guide chapter and
-  the website page show the last three versions in full (a band with the date, the feature cards, "All changes"
-  folded) and the older ones as short groups (0.10.1 to 0.10.5, 0.9.x, 0.8 and earlier); the contents list follows.
-  The data is a ```features block per version in docs/guide/whats-new.md, read by the app and build_site.py alike.
-
 ## [0.10.8] - 2026-11-02
 
 ### Fixed

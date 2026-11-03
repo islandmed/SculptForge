@@ -29,7 +29,9 @@ struct AiSettings {
     // {input}/{output}) or "inflate" (offline).
     std::string generatorService = "huggingface";
     std::string hfToken;  // empty = HF_TOKEN from the environment (optional; raises the free quota)
-    std::string hfModel = "trellis-2"; // MIT; the default (hfPresets()[0])
+    std::string hfModel = "hunyuan3d-2.1"; // the default (hfPresets()[0]): free, no token
+    bool hfModelChosen = false;   // the user picked hfModel; otherwise loading resets it to the current default
+    bool hunyuanNoticeShown = false; // the one-time Hunyuan3D licence notice
     std::string generatorCommand;
     std::string falKey;   // empty = FAL_KEY from the environment
     std::string falModel = "fal-ai/trellis-2";

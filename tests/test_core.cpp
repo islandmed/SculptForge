@@ -29,6 +29,7 @@
 
 #include <cmath>
 #include <algorithm>
+#include <cstdlib>
 #include <cstring>
 #include <glm/gtc/matrix_transform.hpp>
 #include <cstdio>
@@ -1348,12 +1349,69 @@ TEST(free_huggingface_models) {
     CHECK(wellFormed && usesImage);
     ai::AiSettings defaults;
     CHECK(defaults.generatorService == "huggingface" && defaults.hfModel == presets[0].id);
-    CHECK(defaults.hfModel == "trellis-2"); // MIT, the default; Hunyuan3D carries its licence note
-    CHECK(!ai::hunyuanModel(defaults.hfModel) && ai::hunyuanModel("hunyuan3d-2.1") && ai::hunyuanModel("fal-ai/hunyuan-3d/v3.1/pro/image-to-3d"));
-    defaults.hfModel = "hunyuan3d-2.1";
-    defaults.hfToken = "hf_test";
-    ai::AiSettings loaded = ai::AiSettings::fromJson(defaults.toJson());
-    CHECK(loaded.hfModel == "hunyuan3d-2.1" && loaded.resolvedHfToken() == "hf_test");
+    CHECK(defaults.hfModel == "hunyuan3d-2.1" && !defaults.hfModelChosen); // free, works with no token
+    CHECK(ai::hunyuanModel(defaults.hfModel) && !ai::hunyuanModel("trellis-2") && ai::hunyuanModel("fal-ai/hunyuan-3d/v3.1/pro/image-to-3d"));
+    {
+        // Default selection: an explicit choice is kept; a model the user never chose follows the default.
+        ai::AiSettings chosen;
+        chosen.hfModel = "hunyuan3d-2-turbo";
+        chosen.hfModelChosen = true;
+        chosen.hfToken = "hf_test";
+        ai::AiSettings loaded = ai::AiSettings::fromJson(chosen.toJson());
+        CHECK(loaded.hfModel == "hunyuan3d-2-turbo" && loaded.hfModelChosen && loaded.resolvedHfToken() == "hf_test");
+        ai::AiSettings unchosen;
+        unchosen.hfModel = "trellis-2"; // saved by "Save settings" without picking a model
+        CHECK(ai::AiSettings::fromJson(unchosen.toJson()).hfModel == "hunyuan3d-2.1");
+        CHECK(ai::AiSettings::fromJson(Json::object()).hfModel == "hunyuan3d-2.1"); // new install
+        // ai.json from 0.10.8 and earlier (no hfModelChosen): TRELLIS.2 was the default, kept only with a token.
+        Json old = Json::object();
+        old.set("hfModel", "trellis-2");
+        CHECK(ai::AiSettings::fromJson(old).hfModel == "hunyuan3d-2.1" && !ai::AiSettings::fromJson(old).hfModelChosen);
+        old.set("hfToken", "hf_x");
+        CHECK(ai::AiSettings::fromJson(old).hfModel == "trellis-2");
+        Json picked = Json::object();
+        picked.set("hfModel", "stable-fast-3d");
+        CHECK(ai::AiSettings::fromJson(picked).hfModel == "stable-fast-3d");
+        // The licence notice is shown once, ever.
+        CHECK(!ai::AiSettings::fromJson(old).hunyuanNoticeShown);
+        ai::AiSettings noticed;
+        noticed.hunyuanNoticeShown = true;
+        CHECK(ai::AiSettings::fromJson(noticed.toJson()).hunyuanNoticeShown);
+    }
+    {
+        // TRELLIS.2 without a token falls back to Hunyuan3D 2.1 with a note; with one it runs. No token from the
+        // environment either, for the length of this block.
+        std::vector<std::pair<std::string, std::string>> savedEnv;
+        for (const char* name : {"HF_TOKEN", "HUGGING_FACE_HUB_TOKEN"}) {
+            if (const char* v = std::getenv(name)) savedEnv.emplace_back(name, v);
+#ifdef _WIN32
+            _putenv_s(name, "");
+#else
+            unsetenv(name);
+#endif
+        }
+        ai::AiSettings s;
+        std::string note;
+        CHECK(std::string(ai::resolveHfPreset(s, false, &note).id) == "hunyuan3d-2.1" && note.empty());
+        s.hfModel = "trellis-2";
+        CHECK(std::string(ai::resolveHfPreset(s, false, &note).id) == "hunyuan3d-2.1");
+        CHECK(note == ai::kTrellisNoTokenNote && note.find("Preferences > AI") != std::string::npos);
+        note.clear();
+        s.hfToken = "hf_test";
+        CHECK(std::string(ai::resolveHfPreset(s, false, &note).id) == "trellis-2" && note.empty());
+        s.hfModel = "no-such-model";
+        CHECK(std::string(ai::resolveHfPreset(s, false).id) == ai::hfPresets()[0].id);
+        s.hfModel = "hunyuan3d-2.1"; // not a text model: text uses the first text preset
+        CHECK(std::string(ai::resolveHfPreset(s, true).id) == ai::hfTextPresets()[0].id);
+        for (const auto& [name, value] : savedEnv) {
+#ifdef _WIN32
+            _putenv_s(name.c_str(), value.c_str());
+#else
+            setenv(name.c_str(), value.c_str(), 1);
+#endif
+        }
+    }
+    CHECK(std::string(ai::kHunyuanLicenceNote).find("EU, UK or South Korea") != std::string::npos);
     CHECK(ai::friendlyGradioError("You have exceeded your ZeroGPU quota (120s requested vs. 0s left).").find("free GPU time") !=
           std::string::npos);
     CHECK(ai::friendlyGradioError("some other failure") == "some other failure");
