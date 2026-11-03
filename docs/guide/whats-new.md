@@ -125,6 +125,15 @@ action: guide:whats-new.md
 - **No more running out of memory**: **Help > Benchmark** skips a scene your computer hasn't got the free memory
   for (and says how much to free), and Subdivide, Divide, Micro and Voxel Remesh ask first when the result
   wouldn't fit in the memory free now.
+- **Clay follows Intensity and pressure**: Clay and Clay Block build gently with a light pen or a low Intensity
+  instead of planing flat as at full strength (#83). See [Sculpting](sculpting.md#built-in-brushes).
+- **Alphas on micro levels**: Drag Stamp and every stroke stamp your alpha on a micro level too (#92).
+- **Brushes hold on at silhouettes**: a stroke sliding past the edge of a form in profile keeps sculpting while the
+  brush still covers it (#84).
+- **Smooth face group borders**: a Brush palette option that straightens jagged clothing edges between face
+  groups and leaves the rest alone (#81). See [Smooth face group borders](sculpting.md#smooth-face-group-borders).
+- **Colour tints the material**: pick a colour and Parts with no vertex paint take it on in the Lit Sphere
+  material. See [Vertex Paint and materials](vertex-paint.md#materials-lit-spheres).
 
 ## Version 0.10.8
 

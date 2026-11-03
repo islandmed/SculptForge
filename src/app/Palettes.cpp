@@ -322,6 +322,12 @@ void App::drawPalette_Brush() {
                  "that also flattens it. Either way, let go of Shift while still pressing a Shift-smooth stroke to "
                  "switch to the other smooth for the rest of the stroke (ZBrush's alternate smooth).",
                  "Brush");
+    ImGui::Checkbox(tr("Smooth face group borders only##smooth_group_borders"), &smoothGroupBorders_);
+    ui::HelpText("Smooth face group borders only", nullptr,
+                 "The Smooth brush (and Shift) straightens the borders between face groups and leaves everything "
+                 "else alone: a jagged clothing edge, a cuff or a panel line becomes a clean line along the surface. "
+                 "Corners where three groups meet stay where they are.",
+                 "Brush");
     if (BrushRecipe* recipe = doc_.activeBrush >= 0 && doc_.activeBrush < int(doc_.brushes.size())
                                   ? &doc_.brushes[size_t(doc_.activeBrush)]
                                   : nullptr) {

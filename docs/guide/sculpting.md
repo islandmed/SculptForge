@@ -18,7 +18,9 @@ symmetry and pen pressure. To design your own brushes, see [Brush Lab and sharin
    oldest steps are dropped beyond that.
 
 Dragging on the background never sculpts: it rotates the view (see [Navigation](navigation.md)). The brush only
-works on the active Part, and only on parts that are visible and not masked.
+works on the active Part, and only on parts that are visible and not masked. A stroke that started on the model
+keeps sculpting when it slides past the edge of a form seen in profile, as long as the brush circle still covers
+the model: the brush holds on to the silhouette (#84).
 
 > **ZBrush:** the modifiers are the ones you know. <kbd>Alt</kbd> flips Add and Sub for one stroke,
 > <kbd>Shift</kbd> smooths with any brush, <kbd>Ctrl</kbd> paints a mask (see [Masking](masking.md)).
@@ -31,7 +33,7 @@ are on the bottom shelf by default and in the brush picker.
 | Brush | Key | What it does | With <kbd>Alt</kbd> |
 |---|---|---|---|
 | **Standard** | <kbd>1</kbd> | Raises the surface along the stroke, the all-purpose brush. | Digs in |
-| **Clay** | <kbd>2</kbd> | Builds up clay that fills the hollows first, with a slightly flat top. | Carves away |
+| **Clay** | <kbd>2</kbd> | Builds up clay that fills the hollows first, with a slightly flat top. Intensity and pen pressure set how fast it builds. | Carves away |
 | **Smooth** | <kbd>3</kbd> | Relaxes the surface, evening out bumps. The same brush <kbd>Shift</kbd> gives you. | No change |
 | **Move** | <kbd>4</kbd> | Grabs the surface under the cursor and pulls it along, parallel to the screen. | No change |
 | **Inflate** | <kbd>5</kbd> | Swells the surface outward along its normals. | Deflates |
@@ -192,6 +194,15 @@ bumps but leaves the form where it is (a Taubin smooth, one step in and a slight
 - **Smooth keeps volume** in **Sculpt > Brush** makes the volume-keeping smooth the one <kbd>Shift</kbd> and
   the Smooth brush use; letting go of <kbd>Shift</kbd> mid-stroke then switches to the plain one. Saved with the
   project.
+
+### Smooth face group borders
+
+**Smooth face group borders only** in the **Brush** palette turns Smooth (and <kbd>Shift</kbd>) into a border
+straightener: only the points on a border between [face groups](face-groups.md) move, each along the surface
+toward its neighbours on the border, so a jagged edge (a cuff, a collar, the hem of a shirt, a panel line) becomes
+a clean line while the rest of the model stays where it is. Corners where three or more groups meet stay put.
+Group the clothing first (for example **Group masked** after masking it), then brush over the edge. Saved with the
+project (#81).
 
 On a micro level (see [Micro levels](micro-levels.md)) Smooth is always the plain one for now. On a quad mesh
 (after Quad Remesh, or an imported quad model) Smooth follows the quads' own edges, never their diagonals, so the
@@ -397,7 +408,7 @@ brush, built-in or custom. Choose one from the **Alpha** tile on the left shelf 
 **Sculpt > Alpha**, which also shows a large preview of the current alpha.
 [Falloff](#draw-size-intensity-rgb-intensity-and-falloff) fades it as in ZBrush: set it to -100 to
 stamp the whole alpha (a crisp square, or a pattern out to its edges), 0 for a soft round fade, +100 for a soft
-point.
+point. Alphas work on [micro levels](micro-levels.md) too, with every stroke type including Drag Stamp.
 
 ![The alpha picker](images/alpha-picker.jpg)
 

@@ -357,6 +357,7 @@ void microFetch() {
 uniform vec4 uViewport;  // the view's rectangle in window pixels
 uniform vec2 uProjScale; // projection x and y scale
 uniform vec3 uBaseColor;
+uniform vec3 uTintShift; // the material tint less 1 (0, the default, is no tint): the active colour, no vertex paint
 uniform int uPaint;      // 1: vertex colours replace the base colour
 uniform int uShowMask;   // 1: darken masked areas
 uniform int uGroups;     // 0: off, 1: per-triangle ids from uGroupIds, 2: everything is group 0, 3: per-triangle
@@ -473,8 +474,8 @@ void main() {
 #ifdef MICRO
     microFetch();
 #endif
-    vec3 albedo = uBaseColor;
-    vec3 tint = vec3(1.0); // multiplies a matcap: polypaint or polygroup colours
+    vec3 tint = vec3(1.0) + uTintShift; // multiplies a matcap: polypaint or polygroup colours, or the active colour
+    vec3 albedo = uBaseColor * tint;
 #ifdef PRIM
     if (uGroups == 3) albedo = tint = faceColor(texelFetch(uGroupIds, vPrimBase + gl_PrimitiveID).r);
     else if (uGroups == 1) albedo = tint = groupColor(texelFetch(uGroupIds, vPrimBase + gl_PrimitiveID).r);
@@ -878,6 +879,7 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     p.viewport = at("uViewport");
     p.projScale = at("uProjScale");
     p.baseColor = at("uBaseColor");
+    p.tintShift = at("uTintShift");
     p.paint = at("uPaint");
     p.showMask = at("uShowMask");
     p.groups = at("uGroups");
@@ -2914,6 +2916,12 @@ void Renderer::drawClusters(const MeshSlot& s, const std::vector<uint32_t>& clus
 }
 
 // One mesh. Mask and polygroup colours are for the SubTool being edited; polypaint shows on all of them.
+// The material tint a mesh gets (RenderSettings::colorTintsMaterial), less 1: Lit Sphere shading, no vertex paint.
+static glm::vec3 materialTintShift(const RenderSettings& settings, bool hasColors) {
+    if (!settings.colorTintsMaterial || settings.pbr() || hasColors) return glm::vec3(0.0f);
+    return settings.materialTint - glm::vec3(1.0f);
+}
+
 void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings) {
     const MeshProgram* p = meshProgram(kMicro | (flat ? kFlat : 0) | (settings.pbr() && envTexture_ ? kPbr : 0));
     if (!p) return;
@@ -2925,6 +2933,7 @@ void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const Render
     const bool orthographic = frameProj_[3][3] == 1.0f;
     gl::Uniform2f(p->projScale, orthographic ? 1e20f : frameProj_[0][0], orthographic ? 1e20f : frameProj_[1][1]);
     gl::Uniform3fv(p->baseColor, 1, glm::value_ptr(settings.baseColor));
+    gl::Uniform3fv(p->tintShift, 1, glm::value_ptr(materialTintShift(settings, s.hasColors)));
     gl::Uniform1i(p->matcap, matcapTexture(settings.matcap) ? 1 : 0);
     const MatcapCavity cavity = matcapCavity(settings.matcap);
     gl::Uniform2f(p->matcapCavity, cavity.crease, cavity.ridge);
@@ -2979,6 +2988,7 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     const bool orthographic = frameProj_[3][3] == 1.0f;
     gl::Uniform2f(p->projScale, orthographic ? 1e20f : frameProj_[0][0], orthographic ? 1e20f : frameProj_[1][1]);
     gl::Uniform3fv(p->baseColor, 1, glm::value_ptr(settings.baseColor));
+    gl::Uniform3fv(p->tintShift, 1, glm::value_ptr(materialTintShift(settings, s.hasColors)));
     gl::Uniform1i(p->matcap, matcapTexture(settings.matcap) ? 1 : 0);
     const MatcapCavity cavity = matcapCavity(settings.matcap);
     gl::Uniform2f(p->matcapCavity, cavity.crease, cavity.ridge);

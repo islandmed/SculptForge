@@ -64,6 +64,10 @@ All notable changes to SculptForge are listed here. The format follows
   <kbd>Shift</kbd>+<kbd>Alt</kbd> while drawing and the brush moves at a quarter of the pen's speed, at
   **Precision Intensity**. **A pressure curve per brush**: 2 to 5 points with Soft, Linear, Firm and Fine detail
   presets, in Brush Lab and Preferences > Tablet.
+- Smooth face group borders only (Brush palette): Smooth straightens the borders between face groups along the
+  surface and leaves the rest alone, for clean clothing edges (#81, thanks bossian0220).
+- Colour tints the material (Color palette, on by default): the current colour tints the Lit Sphere material of
+  Parts with no vertex paint; grey leaves it as it is (thanks ThinkingPolygons).
 
 ### Changed
 - What's New is a window now: after an update (and from **Help > What's New**) a centred card shows the version's main
@@ -174,6 +178,13 @@ All notable changes to SculptForge are listed here. The format follows
 - Runs started by scripts and agents (`SDL_APP_ID=sculptforge-agent`, or `SF_ISOLATE=1`) use their own settings and
   log folder for every mode (renders, `--bench`, `--calibrate` too), so they no longer write into your
   sculptforge.log or move your session's log aside. Isolated runs remove their temporary folder when they pass.
+- Clay and Clay Block follow Intensity and pen pressure: below the default Intensity a dab no longer planes the
+  surface all the way to its plane, so light strokes and low Intensity build gently instead of looking the same as
+  full strength (#83, thanks NimeNayota). Custom clay brushes and micro levels too.
+- Alphas work on micro levels: Drag Stamp and every other stroke stamp the alpha instead of a round dab (#92,
+  thanks Devon0209).
+- Strokes keep sculpting across a silhouette: when the cursor slides just past the edge of a form seen in profile
+  and the brush still covers it, the dab lands on the edge instead of stopping (#84, thanks Bro-Code-99).
 
 ## [0.10.8] - 2026-11-02
 

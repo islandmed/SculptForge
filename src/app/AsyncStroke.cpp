@@ -339,6 +339,7 @@ App::DabSettings App::dabSettings() const {
     st.strength = precisionActive_ ? precisionIntensity_ : strength_; // Shift+Alt mid-stroke (Precision.cpp)
     st.smoothStrength = smoothStrength_;
     st.smoothKeepVolume = smoothKeepVolume_ != strokeAltSmooth_;
+    st.smoothGroupBorders = smoothGroupBorders_;
     st.focal = focalShift_;
     st.maskStrength = maskStrength_;
     st.sprayScatter = sprayScatter_;

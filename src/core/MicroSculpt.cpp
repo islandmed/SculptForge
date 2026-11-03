@@ -13,6 +13,7 @@
 #include "core/FocusDetail.h"
 
 #include "core/BVH.h"
+#include "core/BrushAlpha.h"
 #include "core/Sculpt.h"
 #include "core/ThreadPool.h"
 #include "core/TierConfig.h"
@@ -266,7 +267,8 @@ void MicroStroke::stitch(const Mesh& m, MicroMesh& mm, std::span<const uint32_t>
 }
 
 void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& center, const glm::vec3& viewDir, float radius,
-                      float strength, bool invert, float focal, const glm::vec3& alphaUp, bool maskBrush, float maskStrength) {
+                      float strength, bool invert, float focal, const glm::vec3& alphaUp, bool maskBrush, float maskStrength,
+                      const BrushAlpha* alpha) {
     if (!active_ || !m.micro || radius <= 0.0f) return;
     if (!maskBrush && microBrushSupport(type) == 0) return;
     auto clock = std::chrono::steady_clock::now();
@@ -275,7 +277,9 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
     const float r = radius, r2 = r * r;
     const float s = std::clamp(strength, 0.0f, 1.0f);
     const float sign = invert ? -1.0f : 1.0f;
-    const float reach = type == BrushType::ClayBuildup && !maskBrush ? 1.3f : 1.0f;
+    // An alpha reaches its square's corners, the square ClayBuildup tip a little past the circle (as Sculpt.cpp).
+    const bool useAlpha = alpha && !alpha->empty() && !maskBrush;
+    const float reach = useAlpha ? kAlphaReach : type == BrushType::ClayBuildup && !maskBrush ? 1.3f : 1.0f;
 
     // The displacement range this dab may need: widened first (it costs precision) when what a dab adds could
     // pass it; a dab that still clips (planes far off) widens it for the next one.
@@ -401,8 +405,9 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
                         any = true;
                         continue;
                     }
-                    float f = brushFalloff(std::sqrt(dist2), r, focal);
-                    if (type == BrushType::ClayBuildup) { // square tip, rounded corners (as Sculpt.cpp)
+                    float f = useAlpha ? alpha->stamp(glm::dot(o, right) / r, glm::dot(o, up) / r, focal)
+                                       : brushFalloff(std::sqrt(dist2), r, focal);
+                    if (type == BrushType::ClayBuildup && !useAlpha) { // square tip, rounded corners (as Sculpt.cpp)
                         const float cheb = std::max(std::abs(glm::dot(o, right)), std::abs(glm::dot(o, up))) / r;
                         const float corner = std::clamp((1.3f - std::sqrt(dist2) / r) / 0.3f, 0.0f, 1.0f);
                         const float edge = std::clamp((1.0f - cheb) / 0.35f, 0.0f, 1.0f);
@@ -447,13 +452,13 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
                     case BrushType::Clay: {
                         const glm::vec3 pp = areaCenter + areaNormal * (sign * r * 0.05f * s);
                         const float h = glm::dot(p - pp, areaNormal);
-                        if (sign * h < 0.0f) delta = -h * f / facing;
+                        if (sign * h < 0.0f) delta = -h * f * clayPull(s) / facing;
                         break;
                     }
                     case BrushType::ClayBuildup: {
                         const glm::vec3 pp = areaCenter + areaNormal * (sign * r * 0.08f * s);
                         const float h = glm::dot(p - pp, areaNormal);
-                        if (sign * h < 0.0f) delta = -h * f / facing;
+                        if (sign * h < 0.0f) delta = -h * f * clayPull(s) / facing;
                         break;
                     }
                     case BrushType::Trim: {

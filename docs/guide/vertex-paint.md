@@ -182,6 +182,12 @@ To choose one:
 Vertex Paint multiplies the material, and cavity shading stays on with every material (strongest with Sculpt). The
 material is saved with the project: projects saved with Studio open with Studio.
 
+**Colour tints the material** (in the **Color** palette, on by default): on a Part with no vertex paint yet, the
+current colour tints its Lit Sphere material, as in ZBrush, so you can try a skin, stone or bronze tone without
+painting anything. The colour's hue and saturation tint it; grey (the starting colour) and black leave the material
+as it is, and the material keeps its own light and shade. Once a Part has vertex paint, the paint shows instead.
+PBR shading uses the material channels and is not tinted. Saved with the project.
+
 > **Tip:** **Sculpt** is the material to judge strokes with. The prettier ones (Skin, Red Wax) soften small
 > detail; switch to them for presenting.
 
