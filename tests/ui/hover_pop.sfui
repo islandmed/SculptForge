@@ -1,5 +1,6 @@
 # Hover highlights (0.10.8): in every look the hovered button or menu gets the look's ring, a tile lifts and draws
-# its own glow instead, and Preferences > Interface > Reduce motion keeps the highlight (colour only).
+# its own glow instead; Outlines (Off / Subtle, the default / On) sets how loud the ring is, and Preferences > Interface >
+# Reduce motion keeps the highlight (colour only).
 run new_sphere subdivisions=3
 expect_value reduce_motion == 0
 
@@ -14,7 +15,20 @@ hover "File##menu.file"
 wait 0.3
 expect_value hover_rings == 1
 expect_value hover_lifts == 0
-shot forge_menu
+shot forge_menu                             # Outlines Subtle (the default): one faint line
+run ui_look look=forge outlines=on
+wait 0.2
+hover "Edit##menu.edit"
+wait 0.3
+expect_value hover_rings == 1
+shot forge_menu_outlines_on
+run ui_look look=forge outlines=off
+wait 0.2
+hover "File##menu.file"
+wait 0.3
+expect_value hover_rings == 1               # the fill and label only, no line
+shot forge_menu_outlines_off
+run ui_look look=forge outlines=subtle
 
 run ui_look look=phosphor
 wait 0.2

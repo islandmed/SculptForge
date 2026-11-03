@@ -111,6 +111,11 @@ action: guide:whats-new.md
 - **Turn AI off**: **Preferences > AI > Enable AI features** (the welcome asks too). Off hides AI Brush and
   Generate 3D everywhere and SculptForge makes no AI network calls. Your art is never uploaded or used for training. AI features run only when you use them and can be turned off. Studios can set `SF_AI=off`.
   See [The interface](interface.md#turning-ai-off).
+- **Hover highlights that pop**: buttons, menus and shelves light up in your look's accent as you point at them,
+  tiles lift a little, sliders show their exact value, and the keyboard focus gets the same ring. Prefer less
+  movement? Turn on **Preferences > Interface > Reduce motion** ([Interface](interface.md)).
+- **Picker thumbnails on top**: the enlarged thumbnail you point at in a picker is no longer hidden under its
+  neighbours (#86).
 
 ## Version 0.10.8
 

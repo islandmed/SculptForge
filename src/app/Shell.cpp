@@ -2319,6 +2319,7 @@ bool tileFrame(const char* id, ImVec2 size, ui::TileLift& lift, ImFont* font, co
                 elide(font ? font : ImGui::GetFont(), caption, size.x).c_str());
     lift = ui::BeginTileLift(pic0, pic1); // the picture lifts, the caption stays
     dl->AddRectFilled(pic0, pic1, theme::u32(theme::tile), theme::rounding(4.0f * s));
+    if (hovered) dl->AddRectFilled(pic0, pic1, theme::u32(theme::buttonHover, 0.45f), theme::rounding(4.0f * s)); // (a faint fill)
     ImGui::LogText("%s", caption.c_str());
     return clicked;
 }

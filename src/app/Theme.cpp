@@ -179,6 +179,9 @@ void applyLook(const LookSettings& settings, std::string* status) {
                                                                                          : looks::LookId::Classic;
     look = LookStyle{};
     look.id = int(id);
+    // (The hover rings follow Outlines in every look: Classic has no panel borders, but a calm hover all the same.)
+    look.outlines = std::clamp(settings.outlines, 0, 2);
+    look.outlineOpacity = std::clamp(settings.outlineOpacity, 0.0f, 1.0f);
     if (id == looks::LookId::Classic) {
         for (size_t i = 0; i < std::size(kTokens); ++i) *kTokens[i] = classic[i];
         g_gradCentre = ImVec4(0.217f, 0.217f, 0.217f, 1.0f);

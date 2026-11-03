@@ -79,6 +79,7 @@ struct LookStyle {
     bool glow = false;
     bool upperHeaders = false; // palette headers in capitals
     int outlines = 1;         // tiled looks' panel borders: 0 off, 1 subtle (the default), 2 on (LookSettings)
+    float outlineOpacity = 1.0f; // Outline opacity (LookSettings), 0-1; the hover rings follow both
 };
 inline LookStyle look;
 

@@ -100,6 +100,14 @@ All notable changes to SculptForge are listed here. The format follows
   soft shadow and an accent glow ring, without moving anything; the active tile keeps its orange outline. Sliders
   brighten, grow a knob and show their exact value. The keyboard focus gets the same ring. New **Preferences >
   Interface > Reduce motion**: colour changes only, no easing or lifting. Animations draw frames only while they run.
+- Hover highlights that pop, in every look: buttons, menu items, shelf buttons and palette headers ease into an
+  accent-tinted fill with a crisp accent border and a brighter label in about 100 ms (Forge Terminal: the accent
+  border; Phosphor: an inverse-video glow; Blueprint: a cyan line glow; Classic: a subtle warm highlight), and
+  pressed is a touch darker. Brush, alpha, material and look tiles (shelves, pickers, Library) lift slightly with a
+  soft shadow and an accent glow ring, without moving anything; the active tile keeps its orange outline. Sliders
+  brighten, grow a knob and show their exact value. The keyboard focus gets the same ring. New **Preferences >
+  Interface > Reduce motion**: colour changes only, no easing or lifting. The rings follow **Outlines** (Off: the fill and label only; Subtle, the default: one faint line; On: the
+  look's full flavour) and **Outline opacity**. Animations draw frames only while they run.
 
 ### Fixed
 - Blender style: Alt+left-drag on the model masks and Ctrl+Alt+left-drag unmasks, as Blender 5.1+'s default
@@ -144,6 +152,8 @@ All notable changes to SculptForge are listed here. The format follows
   the MCP tool list, and stops every AI network call; the MCP server and the offline Relief / Inflate / Stamp stay.
   Saved at once. Studios: `SF_AI=off` (or `--no-ai`) turns it off and locks it. About and the website now say:
   "Your art is never uploaded or used for training. AI features run only when you use them and can be turned off."
+- The enlarged brush or alpha thumbnail you point at in a picker is drawn over its neighbours again, not
+  under them (#86, thanks tristratos).
 
 ## [0.10.8] - 2026-11-02
 

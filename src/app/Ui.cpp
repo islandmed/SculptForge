@@ -331,9 +331,19 @@ void drawRing(ImDrawList* dl, ImRect r, float t, float rounding, bool fill) {
                     rounding > 0.0f ? rounding + grow : 0.0f, 0, w);
     };
     const int look = theme::look.id;
+    // Outlines (Preferences > Interface > Look) sets how loud the ring is: Off none (the fill and label only), Subtle
+    // (the default) one faint line, On the look's full flavour; Outline opacity scales the lines.
+    const int outlines = theme::look.outlines;
+    const float op = theme::look.outlineOpacity;
     if (fill) dl->AddRectFilled(r.Min, r.Max, theme::u32(ac, (look == 2 ? 0.16f : look == 0 ? 0.07f : 0.10f) * t), rounding);
     // (Strokes sit half a stroke inside the rect, so the border is crisp and inside the item.)
     r.Min.x += 0.5f * px, r.Min.y += 0.5f * px, r.Max.x -= 0.5f * px, r.Max.y -= 0.5f * px;
+    if (outlines == 0 || op <= 0.0f) return;
+    t *= op;
+    if (outlines == 1) {
+        rect(0.0f, look == 0 ? theme::accentHover : ac, 0.40f, px);
+        return;
+    }
     switch (look) {
     case 0: // Classic: a subtle warm highlight
         rect(0.0f, theme::accentHover, 0.60f, px);
@@ -399,9 +409,9 @@ void EndTileLift(const TileLift& l, float rounding) {
     // The glow ring just outside the tile (the active tile's orange outline stays inside it).
     const ImRect r(ImVec2(c.x - h.x - px, c.y - h.y - px), ImVec2(c.x + h.x + px, c.y + h.y + px));
     drawRing(l.dl, r, l.t, theme::rounding(rounding * s), false);
-    if (theme::look.id != 2) // a soft second line: the glow (Phosphor's ring brings its own)
+    if (theme::look.id != 2 && theme::look.outlines == 2) // a soft second line: the glow (Phosphor's ring brings its own)
         l.dl->AddRect(ImVec2(r.Min.x - 1.5f * px, r.Min.y - 1.5f * px), ImVec2(r.Max.x + 1.5f * px, r.Max.y + 1.5f * px),
-                      theme::u32(theme::accent, 0.22f * l.t), theme::rounding(rounding * s) + 1.5f * px, 0, 2.0f * px);
+                      theme::u32(theme::accent, 0.22f * l.t * theme::look.outlineOpacity), theme::rounding(rounding * s) + 1.5f * px, 0, 2.0f * px);
     if (l.clip) l.dl->PopClipRect();
 }
 
@@ -500,7 +510,7 @@ bool ActionButton(App& app, const char* actionId, ImVec2 size, Look look) {
             auto mix = [h](const ImVec4& a, const ImVec4& b) {
                 return ImVec4(a.x + (b.x - a.x) * h, a.y + (b.y - a.y) * h, a.z + (b.z - a.z) * h, a.w + (b.w - a.w) * h);
             };
-            const bool inverse = theme::look.id == 2;
+            const bool inverse = theme::look.id == 2 && theme::look.outlines == 2; // (loud: Outlines On only)
             const ImVec4 fill = mix(ImGui::GetStyleColorVec4(ImGuiCol_Button), inverse ? theme::accent : theme::buttonHover);
             const ImVec4 ink = mix(ImGui::GetStyleColorVec4(ImGuiCol_Text), inverse ? theme::textOnAccent : theme::textHover);
             ImGui::PushStyleColor(ImGuiCol_Button, fill);
