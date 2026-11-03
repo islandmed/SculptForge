@@ -80,6 +80,16 @@ bool ensureUserLibrary(const std::string& root, std::string& error);
 // newest first. Hidden files (".x") are skipped. Never throws.
 std::vector<AssetEntry> listFolder(const std::string& dir, const std::function<AssetKind(const std::string&)>& accept,
                                    bool newestFirst = false);
+// Whether two paths name the same file (#90: the User folder is joined with "/", recent files are native "\\" on
+// Windows): "." and ".." resolved, doubled and trailing separators dropped; with Windows rules (the default there)
+// "\\" equals "/" and letters compare case-insensitively. Lexical only (no disk access): the Library calls it every frame.
+#if defined(_WIN32)
+constexpr bool kWindowsPaths = true;
+#else
+constexpr bool kWindowsPaths = false;
+#endif
+std::string pathKey(const std::string& path, bool windowsRules = kWindowsPaths);
+bool samePath(const std::string& a, const std::string& b, bool windowsRules = kWindowsPaths);
 // Seconds since the epoch of the last change of `path` (0 if missing).
 int64_t modifiedTime(const std::string& path);
 
@@ -114,7 +124,7 @@ private:
 
 // --- Thumbnail cache keys (spec: fnv1a64(kind|absPath|size|mtime|version)) ---
 
-constexpr int kThumbnailVersion = 3; // bump when thumbnails are rendered differently
+constexpr int kThumbnailVersion = 4; // bump when thumbnails are rendered differently
 uint64_t fnv1a64(std::string_view data, uint64_t seed = 0xcbf29ce484222325ull);
 std::string hex64(uint64_t v); // 16 lower-case hex digits
 // Key of a file's thumbnail: changes when the file is rewritten (size or time) or the renderer changes.

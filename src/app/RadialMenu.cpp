@@ -552,7 +552,7 @@ void App::drawRadialMenusSection() {
             if (ImGui::Button(ICON_LC_CHEVRON_DOWN "##radial.down", ImVec2(rowH, 0))) move = 1;
             ImGui::EndDisabled();
             ImGui::SameLine();
-            const bool remove = ImGui::Button(ICON_LC_X "##radial.remove", ImVec2(rowH, 0));
+            const bool remove = ui::GlyphButton("##radial.remove", ICON_LC_X, ImVec2(rowH, 0));
             if (selected) {
                 ImGui::Indent(rowH * 0.5f);
                 char label[kRadialLabelMax + 1];

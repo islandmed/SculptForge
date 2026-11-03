@@ -36,6 +36,11 @@ void DrawOnMark(ImDrawList* drawList, ImVec2 min, ImVec2 max, bool side = false)
 void Segmented(App& app, std::initializer_list<const char*> actionIds, float width = -1.0f);
 // ImGui::Checkbox with an outline round the box while it is unchecked, so an off box doesn't vanish on panelBg.
 bool Checkbox(const char* label, bool* v);
+// A one-icon button ("x", "-") with the glyph centred by its ink, not its advance and the icon font's baseline offset,
+// which left Lucide's X low and to one side (#98). `id` is an ImGui id ("##lbclose").
+bool GlyphButton(const char* id, const char* glyph, ImVec2 size);
+// Draws a one-icon `glyph` centred by its ink in the rect a..b (a longer text is centred by its size).
+void CentredGlyph(ImDrawList* drawList, ImFont* font, ImVec2 a, ImVec2 b, ImU32 col, const char* glyph);
 // Ctrl-hover help for the last item.
 void HelpText(const char* title, const char* shortcut, const char* description, const char* path = nullptr);
 void HelpAction(App& app, const char* actionId);

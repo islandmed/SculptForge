@@ -156,6 +156,30 @@ bool IsChoiceAction(std::string_view id) {
            id.substr(0, 16) == "subtool.shading_" || id.substr(0, 8) == "uv.mode_";
 }
 
+void CentredGlyph(ImDrawList* dl, ImFont* font, ImVec2 a, ImVec2 b, ImU32 col, const char* glyph) {
+    if (!font) font = ImGui::GetFont();
+    const float size = ImGui::GetFontSize() > 0.0f && font == ImGui::GetFont() ? ImGui::GetFontSize() : font->FontSize;
+    unsigned int c = 0;
+    const int n = ImTextCharFromUtf8(&c, glyph, nullptr);
+    const ImFontGlyph* g = n > 0 && glyph[n] == '\0' ? font->FindGlyphNoFallback(ImWchar(c)) : nullptr;
+    if (!g || g->X1 <= g->X0 || g->Y1 <= g->Y0) {
+        const ImVec2 ts = font->CalcTextSizeA(size, FLT_MAX, 0.0f, glyph);
+        dl->AddText(font, size, ImVec2(std::floor((a.x + b.x - ts.x) * 0.5f), std::floor((a.y + b.y - ts.y) * 0.5f)), col, glyph);
+        return;
+    }
+    // The ink box (X0..X1, Y0..Y1, offsets included) relative to where AddText puts the pen, at this size.
+    const float k = size / font->FontSize;
+    const float x = (a.x + b.x) * 0.5f - (g->X0 + g->X1) * 0.5f * k, y = (a.y + b.y) * 0.5f - (g->Y0 + g->Y1) * 0.5f * k;
+    dl->AddText(font, size, ImVec2(std::round(x), std::round(y)), col, glyph);
+}
+
+bool GlyphButton(const char* id, const char* glyph, ImVec2 size) {
+    const bool clicked = ImGui::Button(id, size);
+    CentredGlyph(ImGui::GetWindowDrawList(), nullptr, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(),
+                 ImGui::GetColorU32(ImGuiCol_Text), glyph);
+    return clicked;
+}
+
 bool Checkbox(const char* label, bool* v) {
     const bool changed = ImGui::Checkbox(tr(label), v);
     if (!*v) {

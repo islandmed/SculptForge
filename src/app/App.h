@@ -1481,7 +1481,6 @@ private:
     static WindowState loadWindowState();
     void saveWindowState() const;
     bool rememberWindow_ = false;
-    bool fullscreenAfterFirstFrame_ = false; // macOS: the saved full screen, entered once the window is on screen (#41)
     void drawAxisGizmo();
     std::array<AxisGizmoEnd, 6> axisGizmoLayout() const; // the gizmo's ends on screen now (AxisGizmo.h)
     bool axisGizmoMouseDown(float x, float y);          // a click on an end: that side view (#43)

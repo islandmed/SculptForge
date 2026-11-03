@@ -131,6 +131,12 @@ action: guide:whats-new.md
 - **Mask: Front faces only**: Mask Lasso and Mask Rectangle can leave the far side alone
   ([Masking](masking.md#mask-with-a-lasso-or-rectangle), #91).
 - **Duplicate Part** has a shortcut: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> ([Parts](parts.md)).
+- **Brush previews fixed**: the shelf shows Tendril and Elastic Tendril as long horns pulled out past the ball, as
+  they behave in the viewport, and Layer and Nudge with clean shapes; previews are rebuilt once after updating.
+- **Library**: projects no longer show twice on Windows (#90); the close button stays on small screens and
+  <kbd>Esc</kbd> closes the Library (#80).
+- **Cleaner outlines**: the right shelf's outline draws correctly and the **x** buttons are centred (#98).
+- **macOS**: a window closed in full screen reopens maximised, with the window buttons reachable (#85).
 
 ## Version 0.10.8
 

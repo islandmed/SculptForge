@@ -173,6 +173,17 @@ All notable changes to SculptForge are listed here. The format follows
   thanks Devon0209).
 - Strokes keep sculpting across a silhouette: when the cursor slides just past the edge of a form seen in profile
   and the brush still covers it, the dab lands on the edge instead of stopping (#84, thanks Bro-Code-99).
+- Brush shelf previews: Tendril and Elastic Tendril pull a long horn out past the ball (Tendril's preview re-aimed
+  every dab at the ball and dropped the dabs past its edge; scripted Tendril strokes now drag in the view plane as
+  the viewport does), and Layer and Nudge draw clean shapes instead of a pinched plateau and a torn ridge. Previews
+  are re-rendered once (thumbnail version 4). A new test sculpts every built-in brush's preview and checks its shape.
+- Library > Projects listed each project twice on Windows: recent files and the User folder spelled the same path
+  with different slashes (#90). Paths are now compared normalised, and without case on Windows.
+- The Library's close button stays on screen on small displays (1280x720), and Esc closes the Library (#80).
+- The right shelf's region outline is no longer drawn under its buttons, and the "x" buttons (Library, console,
+  window, palettes) are centred (#98).
+- macOS: a window closed in full screen reopens maximised instead of full screen, so the traffic lights and menu
+  bar stay reachable (#85, again after #41).
 
 ## [0.10.8] - 2026-11-02
 

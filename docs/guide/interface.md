@@ -367,6 +367,8 @@ Working with the strip:
 - Choose **1** to **4** rows of thumbnails.
 - **Open folder...** adds a folder of your own to the root of every tab.
 - On the Snapshots tab, **Save now** takes a snapshot.
+- The **x** at the right end of the header, or <kbd>Esc</kbd>, closes the Library (while you type in Filter,
+  <kbd>Esc</kbd> first leaves the field). The **x** stays on screen on small displays such as 1280x720.
 - Right-click a tile for **Open**, **Append as Part**, the image actions, **Show in file manager** and
   **Refresh thumbnail**.
 
@@ -603,7 +605,9 @@ choice for the next session, and each project keeps the background it was saved 
 ### Fullscreen, hiding panels and the camera notch
 
 - <kbd>F11</kbd> (or **View > Fullscreen**) fills the screen with SculptForge; press it again to go back to
-  a window. `sculptforge --fullscreen` starts that way.
+  a window. `sculptforge --fullscreen` starts that way. SculptForge reopens the way you left it; on macOS a window
+  closed in full screen reopens maximised instead, so the menu bar and the window buttons stay reachable (press
+  <kbd>F11</kbd> or the green button to go full screen again).
 - In the ZBrush-style layout, **Menus** in the title strip hides the palette bar; click it again to bring it back.
 - <kbd>Tab</kbd> hides the shelves and trays.
 - On MacBooks with a camera notch, SculptForge keeps the interface below the notch when it fills the screen

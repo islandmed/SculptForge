@@ -75,8 +75,10 @@ void tileFrame(ImDrawList* dl, const CanvasRect& r, bool focused) {
     dl->PopClipRect();
 }
 
+// `frame` false: the caller draws the tile's frame itself, after the contents (shelves, #98).
 bool beginShellWindow(const char* name, const CanvasRect& r, const ImVec4& bg, ImVec2 padding,
-                      ImGuiWindowFlags extra = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse) {
+                      ImGuiWindowFlags extra = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse,
+                      bool frame = true) {
     ImGui::SetNextWindowPos(ImVec2(r.x, r.y));
     ImGui::SetNextWindowSize(ImVec2(r.w, r.h));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, padding);
@@ -87,7 +89,7 @@ bool beginShellWindow(const char* name, const CanvasRect& r, const ImVec4& bg, I
     const bool open = ImGui::Begin(name, nullptr, kShellFlags | extra);
     ImGui::PopStyleColor();
     ImGui::PopStyleVar(4);
-    if (open) tileFrame(ImGui::GetWindowDrawList(), r, sameRect(r, g_focus));
+    if (open && frame) tileFrame(ImGui::GetWindowDrawList(), r, sameRect(r, g_focus));
     return open;
 }
 
@@ -219,11 +221,9 @@ void drawBrushIcon(ImDrawList* dl, ImVec2 c, float r, int type) {
 }
 
 // Glyph centred in a box, in `font` (or the current one).
+// (A lone icon is centred by its ink: ui::CentredGlyph.)
 void centredText(ImDrawList* dl, ImFont* font, ImVec2 a, ImVec2 b, ImU32 col, const char* text) {
-    if (!font) font = ImGui::GetFont();
-    const float size = font->FontSize;
-    const ImVec2 ts = font->CalcTextSizeA(size, FLT_MAX, 0.0f, text);
-    dl->AddText(font, size, ImVec2(std::floor((a.x + b.x - ts.x) * 0.5f), std::floor((a.y + b.y - ts.y) * 0.5f)), col, text);
+    ui::CentredGlyph(dl, font ? font : ImGui::GetFont(), a, b, col, text);
 }
 
 // Text clipped to `width` with an ellipsis.
@@ -1086,9 +1086,8 @@ void App::drawTitleStrip(const ShellGeometry& g) {
             dl->AddRectFilled(p, ImVec2(p.x + windowButtonW, p.y + buttonH),
                               theme::u32(close ? theme::danger : theme::frameHover), theme::rounding(3.0f * s));
         const char* glyph = close ? ICON_LC_X : ICON_LC_MINUS;
-        const ImVec2 gs = ImGui::CalcTextSize(glyph);
-        dl->AddText(ImVec2(p.x + (windowButtonW - gs.x) * 0.5f, p.y + (buttonH - ImGui::GetFontSize()) * 0.5f),
-                    theme::u32(hovered && close ? theme::text : theme::textDim), glyph);
+        ui::CentredGlyph(dl, nullptr, p, ImVec2(p.x + windowButtonW, p.y + buttonH),
+                         theme::u32(hovered && close ? theme::text : theme::textDim), glyph);
         if (close) {
             if (clicked) requestQuit();
             ui::HelpAction(*this, "file.quit");
@@ -1911,7 +1910,8 @@ void App::drawShelf(int shelf, const CanvasRect& r) {
                        : shelf == kShelfBottom ? ImVec2(6.0f * s, 3.0f * s)
                        : shelf == kShelfLeft   ? ImVec2(6.0f * s, 6.0f * s)
                                                : ImVec2(4.0f * s, 6.0f * s);
-    if (!beginShellWindow(kShelfWindows[shelf], r, theme::shellBg, pad)) {
+    if (!beginShellWindow(kShelfWindows[shelf], r, theme::shellBg, pad,
+                          ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse, false)) {
         ImGui::End();
         return;
     }
@@ -2005,6 +2005,9 @@ void App::drawShelf(int shelf, const CanvasRect& r) {
             ImGui::EndDragDropTarget();
         }
     }
+    // The frame last, over the shelf's buttons: drawn first, the right shelf's tall buttons covered its sides and
+    // the accent outline showed in pieces (#98).
+    tileFrame(dl, r, sameRect(r, g_focus));
     ImGui::End();
 }
 

@@ -319,6 +319,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/Console.cpp
     src/app/Config.cpp
     src/app/LightBox.cpp
+    src/app/BrushPreview.cpp
     src/app/Thumbnails.cpp
     src/app/Pickers.cpp
     src/app/UserGuide.cpp
@@ -568,7 +569,7 @@ endif()
 if(SCULPTFORGE_BUILD_TESTS)
   # tests/test_main.cpp plus every tests/test_*.cpp (add a file to add tests; see tests/TestHarness.h).
   file(GLOB SCULPTFORGE_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_*.cpp)
-  add_executable(sculptforge_tests ${SCULPTFORGE_TEST_SOURCES} src/cli/McpServer.cpp src/app/AssetLibrary.cpp
+  add_executable(sculptforge_tests ${SCULPTFORGE_TEST_SOURCES} src/cli/McpServer.cpp src/app/AssetLibrary.cpp src/app/BrushPreview.cpp
                                    src/app/UiLayout.cpp src/app/ShellGeometry.cpp src/app/LookSchemes.cpp src/app/I18n.cpp src/app/I18nSpanish.cpp src/render/Camera.cpp
                                    src/render/Clusters.cpp src/render/Ghost.cpp)
   target_include_directories(sculptforge_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
@@ -710,6 +711,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     if(TEST ui_ui_scale)
       set_tests_properties(ui_ui_scale PROPERTIES LABELS "ui;dpi")
     endif()
+    # The Library on a 1280x720 screen (#80): its close button stays on screen.
+    add_test(NAME ui_library_small_screen_720 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/library_small_screen.sfui
+             --size 1280x720 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/library_small_screen_720)
+    set_tests_properties(ui_library_small_screen_720 PROPERTIES LABELS ui TIMEOUT 300)
     add_test(NAME ui_user_guide_1080 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/user_guide.sfui
              --size 1920x1080 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/user_guide_1080)
     set_tests_properties(ui_user_guide_1080 PROPERTIES LABELS ui TIMEOUT 300)
