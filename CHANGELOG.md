@@ -43,6 +43,9 @@ All notable changes to SculptForge are listed here. The format follows
   and the guide index.
 - **Render > Materials > Save Render**: the view without the interface at twice its size, saved as a PNG in the
   library's Images folder (Library > Image).
+- Upstream watch for studios: a weekly check of OpenUSD, MaterialX, OpenColorIO, OpenEXR, OpenVDB, OpenSubdiv,
+  OpenTimelineIO, OpenAssetIO, the VFX Reference Platform, Blender, Unreal Engine, Godot, SDL3, Dear ImGui and Python
+  opens a tracking issue for each new release, plus a monthly "Upstream digest" (targets in `packaging/upstream.json`).
 
 ### Fixed
 - Blender style: Alt+left-drag on the model masks and Ctrl+Alt+left-drag unmasks, as Blender 5.1+'s default

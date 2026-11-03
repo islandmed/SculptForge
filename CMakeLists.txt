@@ -624,6 +624,8 @@ if(SCULPTFORGE_BUILD_TESTS)
                                       --cli ${SCULPTFORGE_CLI_RUNNER} --out ${CMAKE_CURRENT_BINARY_DIR}/release-smoke)
     # Proof mode results: the validator and website list tool (tools/benchmark/submit.py, docs/benchmark.md).
     add_test(NAME benchmark_submit COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/benchmark/submit.py selftest)
+    # The upstream watch (tools/upstream-watch, .github/workflows/upstream-watch.yml) against recorded API responses.
+    add_test(NAME upstream_watch COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/upstream/test_upstream_watch.py)
     add_test(NAME guide_site COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/guide/build_site.py --check
                                      --out ${CMAKE_CURRENT_BINARY_DIR}/guide-site)
   endif()
