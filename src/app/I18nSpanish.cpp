@@ -650,6 +650,11 @@ constexpr Entry kSpanish[] = {
     {"Plug it in. If 3DxWare is installed it may keep the device to itself: see the Navigation page of the guide.",
      "Conéctalo. Si 3DxWare está instalado puede quedarse con el dispositivo: consulta la página Navegación de la "
      "guía."},
+    {"Push the cap: if the bars below stay still, another program (3DxWare, spacenavd) holds the SpaceMouse. See the "
+     "Navigation page of the guide.",
+     "Mueve el mando: si las barras de abajo no se mueven, otro programa (3DxWare, spacenavd) tiene el SpaceMouse. "
+     "Consulta la página Navegación de la guía."},
+    {"No joysticks or game controllers seen.", "No se ve ningún joystick ni mando."},
     {"Plug it in. SculptForge reads it as a joystick (/dev/input): you need read access to it, and spacenavd may hold "
      "it. See the Navigation page of the guide.",
      "Conéctalo. SculptForge lo lee como un joystick (/dev/input): necesitas permiso de lectura, y spacenavd puede "

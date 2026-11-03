@@ -165,10 +165,18 @@ Store Config (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) keeps these setting
   absolute axes, which is how joysticks work. If the kernel reports them as relative motion, as it does for some
   older models, the SpaceMouse doesn't show up at all. Reading it through spacenavd isn't supported yet.
 
+**If it shows up but the view doesn't move** (the live bars stay still when you push the cap), another program
+holds the device: quit 3DxWare (or spacenavd on Linux) as above, then unplug and plug the SpaceMouse back in.
+
+**To report a problem**, open **Edit > Preferences > Input > SpaceMouse** and click **Copy device report** (shown until the cap has moved the view): it puts
+every joystick SculptForge sees on the clipboard, with its USB ids and why it was or wasn't used. Paste it into
+your issue.
+
 SculptForge recognises 3Dconnexion devices by their USB ids: everything under 3Dconnexion's own vendor id
 (SpaceMouse Compact, Wireless, Pro, Enterprise, Module, the Universal Receiver) except the CadMouse and the
 keyboards, and the older models sold under Logitech's id (SpaceNavigator, SpacePilot, SpaceExplorer, SpaceMouse
-Pro, SpaceBall 5000).
+Pro, SpaceBall 5000). A device that names itself 3Dconnexion counts whatever its ids, as does one whose system
+reports no vendor id (seen over Bluetooth) when its name says SpaceMouse or SpaceNavigator.
 
 ## Framing
 

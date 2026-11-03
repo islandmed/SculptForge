@@ -148,3 +148,26 @@ expect_value camera_yaw > 25
 remember camera_distance d3
 spacemouse 0 0.8 0 0 0 0 0.3
 expect_value camera_distance < $d3
+
+# #104: Preferences lists what SDL sees and why; a SpaceMouse that is open but has not moved gets the 3DxWare hint;
+# Copy device report puts the list on the clipboard; once the cap moves, the hint and the report go away.
+spacemouse_unplug
+click "Preferences##palette.preferences"
+hover "Copy device report##spacemouse.report"
+expect_text "No joysticks or game controllers seen."
+click "Copy device report##spacemouse.report"
+expect_clipboard SpaceMouse: none
+key escape
+spacemouse 0 0 0 0 0 0 0.2
+click "Preferences##palette.preferences"
+hover "Copy device report##spacemouse.report"
+expect_text "SpaceMouse Compact (UI test) (256f:c635): in use"
+expect_text "holds the SpaceMouse"
+click "Copy device report##spacemouse.report"
+expect_clipboard (256f:c635): in use
+shot spacemouse_report
+key escape
+spacemouse 0 0 0 0 0 0.8 0.2
+click "Preferences##palette.preferences"
+expect_no_text "holds the SpaceMouse"
+key escape

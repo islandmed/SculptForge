@@ -2016,6 +2016,10 @@ private:
     std::array<float, kSmAxes> spaceMouseAxes_{}; // the last values read, -1 .. 1 (Preferences shows them)
     bool spaceMouseMoving_ = false;
     int spaceMouseLastButton_ = -1; // for Preferences: "Button N pressed"
+    bool spaceMouseReported_ = false; // an axis has moved since the device was opened (else 3DxWare may hold it, #104)
+    // Every joystick SDL listed at the last scan and why it was or wasn't taken, for Preferences and the device
+    // report a user can paste into an issue (#104).
+    std::vector<std::string> joysticksSeen_;
     // ---- end SpaceMouse ----
     // ---- Sculpt Timeline (PanelTimeline.cpp, core/Timeline.h) and proof mode (ProofMode.cpp) ----
     // The history strip along the bottom of the canvas, the timelapse export, and Help > Benchmark: a scripted
