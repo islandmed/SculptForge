@@ -134,6 +134,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Action | Keys | What it does |
 |---|---|---|
 | Steady Stroke | <kbd>L</kbd> | Steady Stroke on or off, with every stroke type (Dots, Drag Stamp, Slide Stamp, Spray): the brush trails the cursor on a string and only moves once the string is taut, for steady lines without hand shake. |
+| Stroke popup | <kbd>G</kbd> | A grid at the cursor with the stroke types and the modifiers (Add / Sub, Smooth, Mask, Select). Hold the key, point at one and let go; or tap the key and click. Smooth, Mask and Select stay on without holding Shift or Ctrl, until you pick them again or another brush. |
 
 ### Tool
 

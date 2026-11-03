@@ -300,7 +300,7 @@ void App::registerKelvinletActions() {
 bool App::captureMouseDown(float x, float y) {
     if (!capture_.armed) return false;
     capture_.anchor = capture_.current = glm::vec2(x, y);
-    capture_.circle = (inputMods() & SDL_KMOD_SHIFT) != 0;
+    capture_.circle = (inputMods(false) & SDL_KMOD_SHIFT) != 0;
     drag_ = Drag::Capture;
     return true;
 }

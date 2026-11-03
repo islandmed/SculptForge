@@ -76,6 +76,11 @@ All notable changes to SculptForge are listed here. The format follows
   Scriptable as the `cut` command.
 - Mask Lasso and Mask Rectangle: Front faces only (#91), also `front_faces_only` on mask_lasso / mask_rect.
 - Duplicate Part shortcut: Ctrl+Shift+D (also Duplicate Part in the command palette).
+- Stroke popup: press G (Z in the Blender style; any key in Edit > Preferences > Hotkeys) or the new button under the Stroke
+  tile for a grid at the cursor with the stroke types and the modifiers Add / Sub, Smooth, Mask and Select. Hold the
+  key, point and let go (a hovering pen works too), or tap it and click. Smooth, Mask and Select stay on without
+  holding Shift or Ctrl until you pick them again or another brush; a label at the cursor shows which. A plain grid,
+  not a ring. (Suggested on Discord.)
 
 ### Changed
 - What's New is a window now: after an update (and from **Help > What's New**) a centred card shows the version's main

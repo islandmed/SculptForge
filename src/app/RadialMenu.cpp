@@ -185,6 +185,7 @@ void App::openRadialMenu(int menu, RadialHold hold, int code) {
     }
     if (drag_ != Drag::None) return; // not in the middle of a stroke or a view drag
     quickMenu_.open = false;
+    closeStrokePopup();
     const float s = uiScale_;
     // Keep the whole pie on the canvas; the flick is measured from wherever its centre ends up.
     const CanvasRect c = canvasRect();

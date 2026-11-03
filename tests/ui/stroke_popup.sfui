@@ -1,0 +1,131 @@
+# The stroke popup (Discord 11-02): G (Z in the Blender style) opens a grid at the cursor with the stroke types and
+# the modifiers Add / Sub, Smooth, Mask, Select, the current stroke under the pointer. Hold G, point, let go:
+# picked. Tap G: it stays open; a click on a stroke picks it and closes, a click on a modifier toggles it and stays
+# open, Esc or a click beside it closes it; the click never reaches the model. Smooth, Mask and Select latch:
+# strokes act as with Shift, Ctrl or Ctrl+Shift held, until picked again or another brush is picked; a drag beside
+# the model still turns the view. A pen hovering works as the mouse. The left shelf's button opens it too. CMake
+# runs this again with the UI scaled 1.5x (ui_stroke_popup_scaled).
+run new_sphere subdivisions=4
+camera 0 0
+expect_shortcut stroke.popup G
+expect_value shortcut_conflicts == 0
+expect_value stroke_type == 0
+expect_value stroke_latch == 0
+
+# Hold G: open, held, Dots under the pointer. Point at Spray and let go: Spray.
+hover_window 0.5 0.5
+key_down g
+expect_value stroke_popup_open == 1
+expect_value stroke_popup_held == 1
+expect_value stroke_popup_hover == 0
+shot open
+stroke_popup_item spray
+expect_value stroke_popup_hover == 3
+shot hover_spray
+key_up g
+expect_value stroke_popup_open == 0
+expect_value stroke_type == 3
+expect_value stroke_popup_picked == 3
+
+# Held, then let go beside the grid after a moment: closed, nothing picked.
+hover_window 0.5 0.5
+key_down g
+stroke_popup_item outside
+wait 0.3
+key_up g
+expect_value stroke_popup_open == 0
+expect_value stroke_type == 3
+expect_value stroke_popup_picked == 3
+
+# Tapped: it stays open. A click on Dots picks it and closes; the model isn't touched.
+hover_window 0.5 0.5
+snapshot
+key g
+expect_value stroke_popup_open == 1
+expect_value stroke_popup_held == 0
+stroke_popup_item dots click
+expect_value stroke_popup_open == 0
+expect_value stroke_type == 0
+expect_value stroking == 0
+expect_value moved == 0
+
+# Modifiers: a click toggles and the grid stays open. Sub, then Mask latched; Esc closes, they stay on.
+key g
+stroke_popup_item sub click
+expect_value invert_toggle == 1
+expect_value stroke_popup_open == 1
+stroke_popup_item mask click
+expect_value stroke_latch == 2
+expect_value stroke_popup_open == 1
+shot modifiers
+stroke_popup_item select
+shot hover_select
+key escape
+expect_value stroke_popup_open == 0
+expect_value stroke_latch == 2
+
+# Mask latched: a plain stroke masks (no Ctrl held) and doesn't move the surface; the label shows at the cursor.
+expect_value masked == 0
+hover_model 0.5 0.5
+shot mask_latched
+stroke 0.3 0.5 0.7 0.5
+expect_value masked > 50
+expect_value moved == 0
+remember masked m
+# A drag beside the model turns the view (a held Ctrl would invert the mask there instead).
+expect_value camera_aligned == 1
+view_drag 0.65 0.22 0.7 0.27
+expect_value masked == $m
+expect_value camera_aligned == 0
+camera 0 0
+
+# Tapped near the canvas edge (the grid moves left to stay on the canvas, so another item is under the pointer):
+# still a tap, it stays open and picks nothing. Then Mask picked again: off. Add back on.
+key g
+expect_value stroke_popup_open == 1
+expect_value stroke_type == 0
+stroke_popup_item mask click
+expect_value stroke_latch == 0
+stroke_popup_item add click
+expect_value invert_toggle == 0
+key escape
+
+# Picking another brush ends a latch.
+key g
+stroke_popup_item smooth click
+expect_value stroke_latch == 1
+key escape
+key 2
+expect_value stroke_latch == 0
+key 1
+
+# A pen hovering: hold G, hover over Slide Stamp, let go. Tapped open, the pen's tip taps Lazy Stroke.
+pen_hover 0.5 0.5
+key_down g
+stroke_popup_item slide_stamp pen
+expect_value stroke_popup_hover == 2
+key_up g
+expect_value stroke_type == 2
+key g
+stroke_popup_item lazy pen click
+expect_value stroke_popup_open == 0
+expect_value stroke_type == 4
+expect_value stroking == 0
+pen_out
+
+# The left shelf's button opens it (tapped open), a click on Dots closes it.
+click "Stroke popup##stroke.popup"
+expect_value stroke_popup_open == 1
+expect_value stroke_popup_held == 0
+shot from_shelf
+stroke_popup_item dots click
+expect_value stroke_popup_open == 0
+expect_value stroke_type == 0
+
+# The ZBrush style: G too. The Blender style: Z (its G is the Move brush, J the Strokes radial menu).
+input_style zbrush
+expect_shortcut stroke.popup G
+expect_value shortcut_conflicts == 0
+input_style blender
+expect_shortcut stroke.popup Z
+expect_value shortcut_conflicts == 0

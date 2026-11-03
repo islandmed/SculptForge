@@ -134,6 +134,7 @@ add_library(sculptforge_core STATIC
   src/core/UpdateCheck.cpp
   src/core/Tablet.cpp
   src/core/RadialMenu.cpp
+  src/core/StrokePopup.cpp
   src/core/SpaceMouse.cpp
   src/io/ObjIO.cpp
   src/io/FbxIO.cpp
@@ -371,6 +372,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/SpaceMouse.cpp
     src/app/Input.cpp
     src/app/RadialMenu.cpp
+    src/app/StrokePopup.cpp
     src/render/GL.cpp
     src/render/Camera.cpp
     src/render/Clusters.cpp
@@ -704,6 +706,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME ui_size_popup_scaled COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/size_popup.sfui
              --size 2400x1350 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/size_popup_scaled)
     set_tests_properties(ui_size_popup_scaled PROPERTIES LABELS ui TIMEOUT 300)
+    # The stroke popup on a UI scaled 1.5x: it opens under the cursor and its items are where they're drawn.
+    add_test(NAME ui_stroke_popup_scaled COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/stroke_popup.sfui
+             --size 2400x1350 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/stroke_popup_scaled)
+    set_tests_properties(ui_stroke_popup_scaled PROPERTIES LABELS ui TIMEOUT 300)
     # UI scale (#87) at 1600x900, where Automatic in a test is exactly 100 %; label "dpi": release.sh step check runs them before the tag.
     add_test(NAME ui_ui_scale_900 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/ui_scale.sfui
              --size 1600x900 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/ui_scale_900)
@@ -745,7 +751,7 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The system clipboard is one per desktop (one X server under CI's xvfb-run), and on X11 every SDL program asks a
     # new clipboard owner what it holds: a program that quits meanwhile makes the owner's answer fail (BadWindow).
     # Scripts that set, read or paste it (or click a Copy / Paste button) run alone under ctest -j.
-    foreach(t ${SCULPTFORGE_UI_TESTS} shell_layout_1080 help_console_1080 size_popup_scaled user_guide_1080 ui_scale_900)
+    foreach(t ${SCULPTFORGE_UI_TESTS} shell_layout_1080 help_console_1080 size_popup_scaled stroke_popup_scaled user_guide_1080 ui_scale_900)
       string(REGEX REPLACE "_1080$|_scaled$|_900$" "" base ${t})
       get_filename_component(base ${base} NAME_WE)
       set(script ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/${base}.sfui)

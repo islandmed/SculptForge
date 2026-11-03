@@ -35,7 +35,8 @@ UiLayout standardLayout() {
                   "draw.dynamic",      "widget.dyntopo_detail", "sep",
                   "transform.symmetry_x",   "transform.symmetry_y", "transform.symmetry_z",    "transform.symmetry_radial", "sep",                 "draw.pressure_strength",
                   "draw.pressure_size", "widget.points"};
-    l.leftShelf = {"widget.tile.brush", "widget.tile.stroke", "widget.tile.alpha", "widget.tile.material", "widget.color"};
+    l.leftShelf = {"widget.tile.brush", "widget.tile.stroke", "stroke.popup", "widget.tile.alpha", "widget.tile.material",
+                   "widget.color"};
     l.rightShelf = {"edit.undo",  "edit.redo",       "sep",
                     "view.frame", "widget.nav.move", "widget.nav.zoom", "widget.nav.rotate", "sep",
                     "view.polyf", "view.polygroups", "view.mask",       "view.polypaint",    "sep",
@@ -120,6 +121,12 @@ bool fromJson(const Json& j, UiLayout& l, std::string& error, int shellLayout) {
         out.topShelf.insert(at, {"draw.dynamic", "widget.dyntopo_detail", "sep"});
     }
     readStrings(j["leftShelf"], out.leftShelf);
+    // Version 4 added the stroke popup's button under the Stroke tile: put it into stored left shelves.
+    if (int(j["version"].asNumber(1)) < 4 && j["leftShelf"].isArray() &&
+        std::find(out.leftShelf.begin(), out.leftShelf.end(), "stroke.popup") == out.leftShelf.end()) {
+        const auto tile = std::find(out.leftShelf.begin(), out.leftShelf.end(), "widget.tile.stroke");
+        if (tile != out.leftShelf.end()) out.leftShelf.insert(tile + 1, "stroke.popup");
+    }
     readStrings(j["rightShelf"], out.rightShelf);
     // Version 3 added Undo and Redo at the top of the right shelf (#43): put them into stored ones.
     if (int(j["version"].asNumber(1)) < 3 && j["rightShelf"].isArray() &&

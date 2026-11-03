@@ -351,6 +351,29 @@ Notes:
 - Mask strokes (<kbd>Ctrl</kbd>) always use dots, even when Drag Stamp or Slide Stamp is selected.
 - Custom brushes set their own dab spacing and can add jitter (see [Brush Lab](brush-lab.md)).
 
+### The stroke popup
+
+Press <kbd>G</kbd> (<kbd>Z</kbd> in the Blender style) for a grid under the cursor, or click the grid button under
+the **Stroke** tile on the left shelf. The top row holds the stroke types, the bottom row the modifiers:
+
+| Modifier | What it does | Instead of holding |
+|---|---|---|
+| **Add** / **Sub** | Brushes add to or subtract from the surface (the same switch as Add / Sub on the top shelf). | <kbd>Alt</kbd> |
+| **Smooth** | Strokes smooth. | <kbd>Shift</kbd> |
+| **Mask** | Strokes paint the mask (<kbd>Alt</kbd> still unmasks). | <kbd>Ctrl</kbd> |
+| **Select** | Strokes draw the selection (hide) shape. | <kbd>Ctrl</kbd>+<kbd>Shift</kbd> |
+
+- **Hold and let go**: hold <kbd>G</kbd>, move over an item and let go. It opens with your current stroke under the
+  pointer, so letting go without moving changes nothing. A pen hovering over the tablet works the same.
+- **Tap and click**: tap <kbd>G</kbd> and the grid stays open. Click a stroke to pick it (the grid closes); click a
+  modifier to switch it (the grid stays open, so you can set a stroke too). <kbd>Esc</kbd> or a click beside the
+  grid closes it. The click never touches the model.
+- **Smooth, Mask and Select stay on** until you pick the same one again or pick another brush. A small label next
+  to the brush cursor shows which one is on. Dragging beside the model still turns the view.
+- The **Strokes** radial menu (<kbd>J</kbd>, see [Radial menus](#radial-menus)) picks a stroke type too; the popup
+  adds the modifiers and shows every choice at once.
+- Change the key in **Edit > Preferences > Hotkeys** (*Stroke popup*), or hold <kbd>Ctrl</kbd>+<kbd>Alt</kbd> and click the shelf button, then press the new key.
+
 > **ZBrush:** Drag Stamp, Slide Stamp, Spray and Steady Stroke match ZBrush's DragRect, DragDot, Spray and LazyMouse. Freehand and Dots are the same thing here.
 > Roll and curve strokes are not available yet.
 

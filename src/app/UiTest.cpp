@@ -35,6 +35,9 @@
 //                            move_view rotate_x rotate_y rotate_z rotate_view scale_x scale_y scale_z scale_uniform;
 //                            keep: leave the button down (a shot mid-drag), then `release`
 //   gizmo_hover HANDLE       move the mouse onto a Gizmo 3D handle (it lights up, for screenshots)
+//   stroke_popup_item ITEM [click] [S]  glide onto an item of the open stroke popup (dots drag_stamp slide_stamp spray
+//                            lazy add sub smooth mask select, or outside: just right of it); click: press and let go;
+//                            pen: with the pen, hovering (its tip taps for click)
 //   drag_landmark N DX DY [S] left-drag Make sculptable's face landmark N (0-7, FaceLandmarks order) by DX DY pixels
 //   orbit DX DY              right-drag on the background, in pixels (with the held modifiers)
 //   axis_click +x|-x|+y|-y|+z|-z  click that end of the axis gizmo in the canvas corner (it snaps to that side view)
@@ -139,7 +142,7 @@
 //                            size_popup_open (the S / U / I / O slider), size_knob_x / size_knob_y (its knob, pixels),
 //                            quickmenu_open, right_click_menu, space_camera, space_held, air_strokes, radial_open / radial_menu (-1 none) / radial_held /
 //                            radial_hover / radial_ran (radial menus: open, the menu, held by its key or button, the
-//                            slot pointed at, the slot run last), radial_menus, radial_slots_N, lazy_mouse (the Lazy Stroke type),
+//                            slot pointed at, the slot run last), radial_menus, radial_slots_N, stroke_popup_open / stroke_popup_held / stroke_popup_hover / stroke_popup_picked (the stroke popup: items are strokes 0-4, then Add, Sub, Smooth, Mask, Select), stroke_latch (0 none, 1 Smooth, 2 Mask, 3 Select), invert_toggle, lazy_mouse (the Lazy Stroke type),
 //                            steady_stroke (Steady Stroke on, any type), steady_lag (px from the pointer to the brush on
 //                            its string), steady_catch_up, world_size, world_radius_mm, draw_size_exact (px, unrounded),
 //                            precision_active (Shift+Alt mid-stroke), precision_lag (px from the pointer to the brush),
@@ -523,6 +526,12 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "emulate_3_button") return app_.uiPrefs_.emulate3Button ? 1.0 : 0.0; // Blender style (#77)
     if (name == "space_held") return app_.spaceHeld_ ? 1.0 : 0.0;
     if (name == "radial_open") return app_.radial_.menu >= 0 ? 1.0 : 0.0;
+    if (name == "stroke_popup_open") return app_.strokePopup_.open ? 1.0 : 0.0;
+    if (name == "stroke_popup_held") return app_.strokePopup_.open && app_.strokePopup_.held ? 1.0 : 0.0;
+    if (name == "stroke_popup_hover") return double(app_.strokePopup_.hover); // item: strokes 0-4, Add 5 ... Select 9
+    if (name == "stroke_popup_picked") return double(app_.strokePopup_.picked); // -1: none yet
+    if (name == "stroke_latch") return double(int(app_.strokeLatch())); // 0 none, 1 Smooth, 2 Mask, 3 Select
+    if (name == "invert_toggle") return app_.invertToggle_ ? 1.0 : 0.0;
     if (name == "radial_menu") return double(app_.radial_.menu); // -1: none open
     if (name == "radial_held") return app_.radial_.menu >= 0 && app_.radial_.hold != App::RadialHold::None ? 1.0 : 0.0;
     if (name == "radial_hover") return double(app_.radial_.hover);
@@ -1308,6 +1317,58 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
                     return true;
                 }
                 return false;
+            });
+        }
+        wait(0.1f);
+    } else if (verb == "stroke_popup_item") {
+        if (!need(1)) return false;
+        static const char* kItems[] = {"dots", "drag_stamp", "slide_stamp", "spray", "lazy",
+                                       "add",  "sub",        "smooth",      "mask",  "select"};
+        static_assert(std::size(kItems) == size_t(kStrokePopupItems));
+        int item = w[1] == "outside" ? -2 : -1;
+        for (int i = 0; i < int(std::size(kItems)); ++i)
+            if (w[1] == kItems[i]) item = i;
+        if (item == -1) {
+            error = "unknown stroke popup item '" + w[1] + "'";
+            return false;
+        }
+        bool click = false, pen = false;
+        float seconds = 0.2f;
+        for (size_t i = 2; i < w.size(); ++i) {
+            if (w[i] == "click") click = true;
+            else if (w[i] == "pen") pen = true;
+            else seconds = num(i, seconds);
+        }
+        auto from = std::make_shared<ImVec2>();
+        auto to = std::make_shared<ImVec2>();
+        steps_.push_back([this, line, item, from, to, seconds, pen](float t) {
+            if (t == 0.0f) {
+                if (pen && !penIn_) penProximity(true);
+                *from = pen && penIn_ ? penAt_ : mouse_;
+                ImVec2 last;
+                if (!app_.strokePopupItemScreen(item == -2 ? kStrokePopupItems - 1 : item, last)) {
+                    fail(line, "the stroke popup isn't open");
+                    return true;
+                }
+                *to = item == -2 ? ImVec2(last.x + 120.0f * app_.uiScale_, last.y) : last;
+            }
+            const float k = std::min(t / seconds, 1.0f);
+            const ImVec2 p(from->x + (to->x - from->x) * k, from->y + (to->y - from->y) * k);
+            if (pen) penMove(p.x, p.y); // hovering, the tip up
+            else mouseMotion(p.x, p.y);
+            return t >= seconds;
+        });
+        if (click) {
+            steps_.push_back([this, pen](float t) {
+                if (t == 0.0f) return false; // a frame of hover first
+                if (pen) {
+                    penTouch(true, false);
+                    penTouch(false, false);
+                } else {
+                    mouseButton(true, SDL_BUTTON_LEFT);
+                    mouseButton(false, SDL_BUTTON_LEFT);
+                }
+                return true;
             });
         }
         wait(0.1f);

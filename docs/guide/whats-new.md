@@ -137,6 +137,10 @@ action: guide:whats-new.md
   <kbd>Esc</kbd> closes the Library (#80).
 - **Cleaner outlines**: the right shelf's outline draws correctly and the **x** buttons are centred (#98).
 - **macOS**: a window closed in full screen reopens maximised, with the window buttons reachable (#85).
+- **Stroke popup**: press <kbd>G</kbd> (<kbd>Z</kbd> in the Blender style) or the button under the **Stroke**
+  tile for a grid at the cursor: the stroke types plus **Add**, **Sub**, **Smooth**, **Mask** and **Select**. Hold
+  the key, point and let go, or tap it and click. Smooth, Mask and Select stay on without holding
+  <kbd>Shift</kbd> or <kbd>Ctrl</kbd>. See [Strokes](sculpting.md#the-stroke-popup).
 
 ## Version 0.10.8
 
