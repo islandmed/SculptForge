@@ -125,6 +125,20 @@ All notable changes to SculptForge are listed here. The format follows
   Before, the choice waited for the next start and was lost unless Store Config saved it. Automatic now follows
   the monitor the window is on: on Windows (per-monitor DPI v2, now declared in the app's manifest) dragging the
   window between a 100 % and a 150 % monitor, or changing Settings > Display > Scale, rescales the UI right away.
+- The pen picks a brush, then stops clicking the panels and the canvas until the mouse is used (#95; Huion Kamvas,
+  display tablets, Wacom with Windows Ink on or off): SDL 3.2 keeps one "a pen is touching" flag for all pens, and
+  once Windows took a pen away while it touched (a drag capturing the mouse), it made no mouse events for any pen
+  again. SculptForge now makes the pen tip's mouse events from the pen's own and ignores SDL's, lets go of the
+  button whenever the pen leaves, and ignores the mouse presses some drivers (Huion) send beside the pen's, whose
+  release may never come. A replay test covers Windows Ink, a Huion-style pen + mouse stream, SDL's stuck state and
+  Wintab-style input.
+- Tablet Mouse mode (#72, 0.10.8): it followed the system cursor, which with the tablet driver in pen mode is where
+  the pen is, so it felt the same as Pen mode. Now only the pen's movement moves the cursor, with no jump when the
+  pen comes back elsewhere, and while the pen is in range the arrow is drawn at the brush (the system's, at the
+  pen's place on the tablet, is hidden), so arrow, brush and clicks agree.
+- With two screens, moving the pointer to the other screen made SculptForge draw as if it were in the background
+  until the pointer came back (Windows 11). It now keeps drawing after any input while its window has focus,
+  wherever the pointer is, and rests only when it loses focus.
 
 ## [0.10.8] - 2026-11-02
 

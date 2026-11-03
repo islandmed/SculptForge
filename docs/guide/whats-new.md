@@ -101,6 +101,13 @@ action: guide:whats-new.md
 - **UI scale works live**: **Preferences > Interface > UI scale** (100% to 200%) resizes text and panels at once,
   no restart. **Automatic** follows the monitor the window is on, so on Windows moving it between a 100% and a
   150% monitor rescales it right away (#87). See [The interface](interface.md#interface-preferences).
+- **The pen keeps working the panels**: with some tablets (Huion, pen displays, Wacom with Windows Ink on or off)
+  the pen picked one brush, then stopped clicking menus and the canvas until you used the mouse. SculptForge now
+  makes the pen's clicks itself (#95). See [Troubleshooting](troubleshooting.md#pen-tablets).
+- **Mouse mode is relative again**: with **Mouse mode** on (Preferences > Tablet) the pen moves the cursor by how
+  far it moves, whatever the driver's mode, and the arrow is drawn right at the brush (#72).
+- **Two screens**: SculptForge no longer slows down when the pointer is on your other screen; it rests only when
+  its window loses focus.
 
 ## Version 0.10.8
 

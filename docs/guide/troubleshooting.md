@@ -84,7 +84,13 @@ If no pen is detected or pressure doesn't change:
   quick click), a triple-click with the mouse or a click in the Parts list; the status bar names it and how. A
   tablet's ExpressKey set to Alt counts as the keyboard's Alt.
 - **The cursor jumps back when you put the pen down elsewhere:** the tablet driver is set to mouse (relative)
-  mode. Turn on **Preferences > Tablet > Mouse mode (relative)**.
+  mode. Turn on **Preferences > Tablet > Mouse mode (relative)**. It also makes the pen relative with the driver
+  in pen mode; the arrow is drawn at the brush while the pen is in range.
+- **The pen picks a brush, then stops clicking menus or the canvas until you use the mouse** (Huion, display
+  tablets, Wacom; 0.10.8 and earlier): update to 0.10.9 or later. If it still happens, tell us the tablet, its
+  driver version and whether Windows Ink is on.
+- **With two screens, the app slows down when the pointer is on the other screen:** fixed in 0.10.9; SculptForge
+  now rests only when its window loses focus.
 
 ## AI services
 

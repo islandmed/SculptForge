@@ -146,7 +146,8 @@ private:
     enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, SubToolClick, Select, Gizmo, Guide, Sculptable, ZSphere, Insert, Capture,
                       AirStroke, UvTool, SizeScrub }; // AirStroke: a stroke begun off the model, waiting to reach it (#62)
 
-    void handleEvent(const SDL_Event& e);
+    void handleEvent(const SDL_Event& e); // the pen's mouse events first (penMouseEvents), then dispatchEvent
+    void dispatchEvent(const SDL_Event& e);
     void onMouseDown(float x, float y, Uint8 button);
     void onMouseMove(float x, float y, float dx, float dy, bool fromPen);
     void onMouseUp();
@@ -1848,6 +1849,10 @@ private:
     // ---- end ZBrush feel ----
     // ---- Redraw on demand (App.cpp run()) ----
     bool wantsFrames(double now) const; // something animates or runs: keep drawing
+    bool focusKeepsDrawing(double now) const; // the window has focus and was just used (not: the pointer is over it)
+    static constexpr double kFocusedActiveSeconds = 2.0;
+    bool windowFocused_ = false; // keyboard focus (SDL_EVENT_WINDOW_FOCUS_GAINED / _LOST)
+    double lastInputAt_ = -1e9;  // seconds (SDL clock) of the last key, mouse or pen event
     uint64_t frameKey() const;          // changes when a poller changed what the window shows
     double activeUntil_ = 0.0;          // seconds: keep drawing until then (after input: hover, tooltips)
     double redrawAt_ = 0.0;             // seconds (SDL clock): draw one frame then, asleep or not (0: none)
@@ -1855,12 +1860,15 @@ public:
     void redrawIn(double seconds);      // something on screen changes by itself later (an error colour fading)
 private:
     // ---- Tablet (Tablet.cpp, core/Tablet.h, docs/tablet.md) ----
-    // SDL turns pen tip contact into left mouse button events (SDL_PEN_MOUSEID); the pen's own events
-    // add pressure, tilt, the eraser end and the side buttons, which are mapped in Preferences > Tablet.
-    bool dropPenMouseEvent(const SDL_Event& e) const; // SDL's version-dependent clicks for pen buttons
-    bool strayMouseMotion(const SDL_Event& e) const;  // a driver's mouse motion beside the pen's (Tablet.cpp)
+    // The pen tip is a left mouse button (SDL_PEN_MOUSEID) for the canvas and the UI. The app makes those mouse
+    // events from the pen's own (penMouseEvents), not SDL (#95); the pen's events add pressure, tilt, the eraser
+    // end and the side buttons, which are mapped in Preferences > Tablet.
+    bool dropPenMouseEvent(const SDL_Event& e) const; // SDL's own mouse events for the pen (Tablet.cpp)
+    void penMouseEvents(const SDL_Event& pen, bool before); // the pen tip's mouse events, made from the pen's
+    void sendPenMouse(SDL_EventType type, float x, float y, SDL_WindowID window);
+    bool strayMouseMotion(const SDL_Event& e) const;  // a driver's mouse events beside the pen's (Tablet.cpp)
     void keepImGuiOnPen();                            // after ImGui_ImplSDL3_NewFrame (Tablet.cpp)
-    bool systemCursorInWindow(float& x, float& y) const; // mouse mode (#72): the system cursor, window pixels
+    bool penSoftCursor() const; // mouse mode with the pen: the arrow is drawn at the brush (Tablet.cpp)
     void mapPenPosition(SDL_Event& e);                // mouse mode: the pen moves the cursor relatively (Tablet.cpp)
     // The system cursor (#73): ImGui's (resize handles, text fields, links) over the panels, a crosshair over the
     // 3D view where a brush acts (Preferences > Cursor > Viewport cursor). Called after each ImGui::Render.
@@ -1894,8 +1902,10 @@ private:
     bool wintabTip_ = false;
     Uint64 wintabNs_ = 0;     // the last Wintab packet
     bool penJump_ = false; // the pen just came into range: its first position doesn't move a drag (no jump)
-    bool testSystemCursor_ = false; // UI tests: a system cursor set by the script (os_cursor), else none
-    float testSystemCursorX_ = 0.0f, testSystemCursorY_ = 0.0f;
+    bool penMouseSending_ = false;  // dispatching a mouse event made from the pen (not SDL's)
+    bool penMouseDown_ = false;     // the pen tip's left button is down (as made by penMouseEvents)
+    SDL_PenID penMouseOwner_ = 0;   // the pen holding it
+    float penMouseX_ = 0.0f, penMouseY_ = 0.0f; // the pen's last position (window pixels, before mouse mode)
     PenCursor penCursor_; // where the pen puts the cursor (Preferences > Tablet > Mouse mode)
     bool penInProximity_ = false, penTouching_ = false, penEraser_ = false;
     Uint64 lastPenNs_ = 0; // when the last pen event arrived (see onMouseMove)

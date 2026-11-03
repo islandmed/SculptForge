@@ -91,7 +91,7 @@
 //                            symmetry_pivot_x (local symmetry's centre), timeline_top (1: the strip at the top),
 //                            timeline_y / axis_gizmo_y (their tops / centre, fractions of the canvas from its top),
 //                            style_window_min (ImGui's minimum window height, unscaled px: 32 in every look),
-//                            tablet_mouse_mode (Preferences > Tablet > Mouse mode), os_cursor_x / os_cursor_y,
+//                            tablet_mouse_mode (Preferences > Tablet > Mouse mode),
 //                            ui_mouse_x / ui_mouse_y (where ImGui sees the pointer), backface_culling, drawn_triangles,
 //                            viewport_cursor (the system cursor: 0 arrow, 1 text, 7 hand, 100 crosshair; #73),
 //                            panel_drag_scrolls (left / middle drags that scrolled a panel, #100), panel_drag_scroll_y,
@@ -182,13 +182,15 @@
 //                            STATUS (e.g. phone_request POST /api/ar 200 {"scope":"subtool","size":20})
 //                            (tools/guide/update_shortcuts.py puts it into docs/guide/shortcuts.md)
 //
-// Simulated graphics tablet: real SDL3 pen events, each followed by the mouse event SDL synthesizes
-// from it (SDL_PEN_MOUSEID), in SDL's order. The touch comes before its first pressure sample, as
+// Simulated graphics tablet: real SDL3 pen events, each followed by the mouse event SDL 3.2 synthesizes
+// from it (SDL_PEN_MOUSEID), in SDL's order (the app ignores those and makes its own, #95). The touch comes before its first pressure sample, as
 // with Windows Ink, and every frame carries 4 pen samples (a 240 Hz pen at 60 fps).
 //   pen_stroke U0 V0 U1 V1 P0 P1 [eraser] [leave] [S]   pen stroke across the model with pressure P0 -> P1;
 //                            eraser: the eraser end; leave: the pen leaves proximity before lifting
-//   pen_drag_item LABEL DX DY P0 P1 [stray X Y] [S]   pen stroke through the item's centre, DX DY pixels long (a
-//                            short one is a tap with a little jitter); stray: as for pen_drag
+//   pen_drag_item LABEL DX DY P0 P1 [stray X Y] [lost] [S]   pen stroke through the item's centre, DX DY pixels long
+//                            (a short one is a tap with a little jitter); stray: as for pen_drag; lost: SDL drops
+//                            the pen while it touches (out of proximity without lifting, then sdl_pen_mouse stuck
+//                            and a new pen id, as SDL 3.2 on Windows after WM_POINTERCAPTURECHANGED)
 //   pen_button N down|up     side button N (1 lower, 2 upper, 3 third) with SDL 3.4's synthesized click
 //   pen_hover U V [S]        move the hovering pen to a point on the model (drags the view while a
 //                            button mapped to rotate / pan / right-click is held)
@@ -203,7 +205,15 @@
 //   tablet_unplug            ... and unplugged
 //   pen_new                  the next pen has a new id, without a device event (Wacom Bridge, eraser on Wayland)
 //   click_subtool NAME U V 1 pen [S]   tap the Part with the pen tip instead (held S seconds)
-//   os_cursor U V | off      where the system cursor is (a tablet driver in mouse mode moves it, #72); off: unknown
+//   sdl_pen_mouse on|stuck   SDL's mouse events for the pen: on (SDL 3.2's), stuck (none, as after SDL dropped a
+//                            touching pen on Windows, #95; the app makes its own)
+//   pen_lost                 SDL drops the pen while it touches (WM_POINTERCAPTURECHANGED): it leaves proximity
+//                            without lifting, and SDL's pen mouse events stop (sdl_pen_mouse stuck)
+//   pen_stream ink|huion     ink: the pen's events (and SDL's); huion: the driver also sends mouse events of its own
+//                            beside the pen's, a press at each touch whose release never comes
+//   window_focus 1|0         the window gains or loses keyboard focus; mouse_leave: the pointer leaves the window
+//                            (another screen); values: focus_frames (1 while focus keeps it drawing),
+//                            pen_mouse_down, ui_left_down (the panels hold the left button), soft_cursor
 //   mouse_move U V           a plain mouse (not the pen) moves to a point on the model, e.g. the stray mouse
 //                            events Windows Ink sends beside the pen's
 //
@@ -804,8 +814,10 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "panel_drag_scroll_y") return double(ui::DragScrollY());  // that panel's scroll after the last one
     if (name == "drag_cursor") return double(dragCursor_); // the system cursor during the last button_drag (#88)
     if (name == "viewport_cursor") return app_.cursorKind_; // the system cursor: 0 arrow, 100 crosshair (#73)
-    if (name == "os_cursor_x") return app_.testSystemCursorX_;
-    if (name == "os_cursor_y") return app_.testSystemCursorY_;
+    if (name == "focus_frames") return app_.focusKeepsDrawing(double(SDL_GetTicksNS()) * 1e-9) ? 1.0 : 0.0;
+    if (name == "pen_mouse_down") return app_.penMouseDown_ ? 1.0 : 0.0;
+    if (name == "ui_left_down") return ImGui::IsMouseDown(ImGuiMouseButton_Left) ? 1.0 : 0.0;
+    if (name == "soft_cursor") return app_.penSoftCursor() ? 1.0 : 0.0; // Mouse mode: the app draws the arrow
     if (name == "ui_mouse_x") return ImGui::GetIO().MousePos.x; // where the panels see the pointer
     if (name == "ui_mouse_y") return ImGui::GetIO().MousePos.y;
     if (name == "cursor_x") return app_.mouseX_;
@@ -945,6 +957,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     auto strayOption = [&](size_t from, float& seconds) -> std::function<void()> {
         std::function<void()> stray;
         for (size_t i = from; i < w.size(); ++i) {
+            if (w[i] == "lost") continue; // (pen_drag_item's)
             if (w[i] == "stray" && i + 2 < w.size()) {
                 stray = [this, sx = num(i + 1, 0), sy = num(i + 2, 0)] {
                     int ww = 0, wh = 0;
@@ -1883,8 +1896,13 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             if (t > 3.0f) fail(line, notFound(label));
             return t > 3.0f;
         });
+        const bool lost = std::find(w.begin() + 6, w.end(), "lost") != w.end();
         penStroke([centre, dx, dy](float u) { return ImVec2(centre->x + dx * (u - 0.5f), centre->y + dy * (u - 0.5f)); }, p0, p1,
-                  false, false, seconds, strayEvent);
+                  false, lost, seconds, strayEvent);
+        if (lost) run([this] { // SDL dropped the touching pen (#95): its mouse events stop; it comes back as a new pen
+            sdlPenMouse_ = false;
+            ++testPen_;
+        });
         wait(0.1f);
     } else if (verb == "pen_button") {
         if (!need(2)) return false;
@@ -1945,19 +1963,35 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             if (!penIn_) penProximity(true);
             penPressure(p);
         });
-    } else if (verb == "os_cursor") {
-        // Where the system cursor is, as a tablet driver in mouse mode moves it (#72): `os_cursor U V` on the model,
-        // `os_cursor off` (the default) for a system that can't say.
+    } else if (verb == "sdl_pen_mouse") {
         if (!need(1)) return false;
-        const bool off = w[1] == "off";
-        if (!off && !need(2)) return false;
-        run([this, off, u = off ? 0.0f : num(1, 0.5f), v = off ? 0.0f : num(2, 0.5f)] {
-            app_.testSystemCursor_ = !off;
-            if (off) return;
-            const ImVec2 p = onModel(u, v);
-            app_.testSystemCursorX_ = p.x;
-            app_.testSystemCursorY_ = p.y;
+        run([this, on = w[1] != "stuck"] { sdlPenMouse_ = on; });
+    } else if (verb == "pen_lost") {
+        run([this] {
+            penProximity(false); // no pen up: SDL's "touching" flag stays set
+            sdlPenMouse_ = false;
+            ++testPen_; // SDL adds it again at its next proximity, with a new id
         });
+        wait(0.05f);
+    } else if (verb == "pen_stream") {
+        if (!need(1)) return false;
+        run([this, huion = w[1] == "huion"] { huionStream_ = huion; });
+    } else if (verb == "window_focus") {
+        if (!need(1)) return false;
+        run([this, in = num(1, 1) != 0.0f] {
+            SDL_Event e{};
+            e.type = in ? SDL_EVENT_WINDOW_FOCUS_GAINED : SDL_EVENT_WINDOW_FOCUS_LOST;
+            e.window.windowID = SDL_GetWindowID(app_.window_);
+            app_.handleEvent(e);
+        });
+    } else if (verb == "mouse_leave") {
+        run([this] {
+            SDL_Event e{};
+            e.type = SDL_EVENT_WINDOW_MOUSE_LEAVE;
+            e.window.windowID = SDL_GetWindowID(app_.window_);
+            app_.handleEvent(e);
+        });
+        wait(0.05f);
     } else if (verb == "mouse_move") {
         if (!need(2)) return false;
         run([this, u = num(1, 0.5f), v = num(2, 0.5f)] {
@@ -2122,7 +2156,8 @@ void Demo::penMove(float x, float y) {
     e.pmotion.y = y;
     penAt_ = ImVec2(x, y);
     app_.handleEvent(e);
-    mouseMotion(x, y, SDL_PEN_MOUSEID); // SDL moves the mouse with a touching or hovering pen
+    if (sdlPenMouse_) mouseMotion(x, y, SDL_PEN_MOUSEID); // SDL moves the mouse with a touching or hovering pen
+    if (huionStream_) mouseMotion(x, y, kDriverMouse);    // ... and the driver moves it too
 }
 
 void Demo::penPressure(float pressure) {
@@ -2153,8 +2188,11 @@ void Demo::penTouch(bool down, bool eraser) {
     e.ptouch.eraser = eraser;
     e.ptouch.down = down;
     app_.handleEvent(e);
-    if (down) mouseMotion(penAt_.x, penAt_.y, SDL_PEN_MOUSEID); // SDL_SendPenTouch: motion, then the left button
-    mouseButton(down, SDL_BUTTON_LEFT, SDL_PEN_MOUSEID);
+    if (sdlPenMouse_) {
+        if (down) mouseMotion(penAt_.x, penAt_.y, SDL_PEN_MOUSEID); // SDL_SendPenTouch: motion, then the left button
+        mouseButton(down, SDL_BUTTON_LEFT, SDL_PEN_MOUSEID);
+    }
+    if (huionStream_ && down) mouseButton(true, SDL_BUTTON_LEFT, kDriverMouse); // its release never comes
 }
 
 void Demo::penButtonEvent(int button, bool down) {
@@ -2172,7 +2210,7 @@ void Demo::penButtonEvent(int button, bool down) {
     app_.handleEvent(e);
     // SDL 3.4 also clicks a mouse button for it (1: right, 2: middle ...); the app must ignore that.
     static const int kMouse[] = {SDL_BUTTON_LEFT, SDL_BUTTON_RIGHT, SDL_BUTTON_MIDDLE, SDL_BUTTON_X1, SDL_BUTTON_X2};
-    if (button >= 1 && button < 5) mouseButton(down, kMouse[button], SDL_PEN_MOUSEID);
+    if (sdlPenMouse_ && button >= 1 && button < 5) mouseButton(down, kMouse[button], SDL_PEN_MOUSEID);
 }
 
 void Demo::penStroke(std::function<ImVec2(float u)> path, float p0, float p1, bool eraser, bool leave, float seconds,
