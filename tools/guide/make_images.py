@@ -213,13 +213,50 @@ def shading(shots: pathlib.Path):
     return save(img, "shading", 960)
 
 
+# The lesson in first-sculpt.md (tests/ui/first_sculpt.sfui): name -> crop in the 1600x960 window, or None for the
+# PNG Save Render wrote into the test's library. The canvas crop leaves out the shelves; full-width shots show menus.
+FIRST_SCULPT_CANVAS = (110, 160, 1210, 860)
+FIRST_SCULPT = {
+    "01-sphere": (0, 0, 1600, 960), "02-mask": FIRST_SCULPT_CANVAS, "02-walls": FIRST_SCULPT_CANVAS,
+    "03-colour": (0, 0, 1210, 860), "04-cap": FIRST_SCULPT_CANVAS, "05-dome": FIRST_SCULPT_CANVAS,
+    "06-divide": FIRST_SCULPT_CANVAS, "07-door": FIRST_SCULPT_CANVAS, "08-windows": FIRST_SCULPT_CANVAS,
+    "09-spots": FIRST_SCULPT_CANVAS, "10-spots": FIRST_SCULPT_CANVAS, "11-paint": FIRST_SCULPT_CANVAS,
+    "12-material": (0, 0, 1210, 860), "12-render": None,
+}
+
+
+def first_sculpt(shots: pathlib.Path) -> list:
+    out = OUT / "first-sculpt"
+    out.mkdir(parents=True, exist_ok=True)
+    made = []
+    for name, box in FIRST_SCULPT.items():
+        if box is None:
+            renders = sorted((shots / "library").rglob("Render *.png"))
+            if not renders:
+                raise SystemExit(f"no Save Render output under {shots}/library")
+            img = Image.open(renders[-1]).convert("RGB")
+            w, h = img.size  # the canvas's shape: trim to the model's middle
+            img = img.crop((w * 23 // 100, h * 12 // 100, w * 77 // 100, h * 88 // 100))
+        else:
+            img = Image.open(shots / f"{name}.png").convert("RGB").crop(box)
+        width = 960 if box is None or box[2] - box[0] > 1100 else 720
+        made.append(save(img, f"first-sculpt/{name}", width))
+    return made
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("shots", type=pathlib.Path, help="folder with the screenshots (--ui-out of shots.sfui)")
     ap.add_argument("--preview", type=pathlib.Path, help="also write a contact sheet of every image here")
     ap.add_argument("--only", action="append", help="make only this image (repeatable), e.g. --only qremesh-guides")
+    ap.add_argument("--first-sculpt", action="store_true",
+                    help="the shots are tests/ui/first_sculpt.sfui's: make images/first-sculpt/*.jpg")
     args = ap.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
+    if args.first_sculpt:
+        for p in first_sculpt(args.shots):
+            print(f"{p.relative_to(ROOT)}  {p.stat().st_size // 1024} KB")
+        return 0
     composed = {"interface-overview": overview, "remesh": remesh, "subdivision-levels": subdivision,
                 "qremesh-guides": qremesh_guides, "dynamic-topology": dyntopo,
                 "make-sculptable": make_sculptable, "shading": shading, "mirror-weld": mirror_weld}

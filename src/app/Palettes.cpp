@@ -548,6 +548,7 @@ void App::drawPalette_Generate() {
 void App::drawPalette_Help() {
     menuAction(*this, "help.controls");
     menuAction(*this, "help.guide");
+    menuAction(*this, "help.first_sculpt");
     menuAction(*this, "help.whats_new");
     menuAction(*this, "help.check_updates");
     menuAction(*this, "ui.command_palette");
