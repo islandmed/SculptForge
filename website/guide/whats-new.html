@@ -46,14 +46,132 @@
           <input type="search" id="guide-q" placeholder="Search the guide" aria-label="Search the guide" autocomplete="off">
           <div class="search-results" id="guide-results" hidden></div>
         </div>
-        <nav class="toc" aria-label="User guide"><a class="toc-home" href="index.html">Contents</a><p class="toc-group">Getting started</p><ul><li><a href="welcome.html">Welcome to SculptForge</a></li><li><a href="first-sculpt.html">Your first sculpt in 10 minutes</a></li><li><a href="whats-new.html" class="current" aria-current="page">What&#x27;s new</a><ul class="toc-sections"><li><a href="#version-0108">Version 0.10.8</a></li><li><a href="#version-0107">Version 0.10.7</a></li><li><a href="#version-0106">Version 0.10.6</a></li><li><a href="#versions-0101-to-0105">0.10.1 to 0.10.5</a></li><li><a href="#versions-09x">0.9.x</a></li><li><a href="#versions-08-and-earlier">0.8 and earlier</a></li></ul></li><li><a href="coming-from-zbrush.html">Coming from ZBrush</a></li><li><a href="installing.html">Install SculptForge on Windows, macOS and Linux</a></li><li><a href="interface.html">The interface</a></li><li><a href="navigation.html">Navigating the view</a></li></ul><p class="toc-group">Sculpting</p><ul><li><a href="sculpting.html">Sculpting and brushes</a></li><li><a href="brush-lab.html">Brush Lab and sharing brushes</a></li><li><a href="masking.html">Masking</a></li><li><a href="face-groups.html">Face Groups and visibility</a></li><li><a href="selection-sets.html">Selection sets and morph targets</a></li><li><a href="parts.html">Parts</a></li><li><a href="forge-spheres.html">Forge Spheres</a></li><li><a href="vertex-paint.html">Vertex Paint and materials</a></li><li><a href="texture-painting.html">Texture painting</a></li><li><a href="uv-editor.html">UV Editor</a></li><li><a href="pbr-painting.html">Material painting (PBR)</a></li><li><a href="fill-layers.html">Fill layers, Mesh Maps and Material Recipes</a></li><li><a href="layers.html">Sculpt layers and blend shapes</a></li><li><a href="facial-shapes.html">Facial shapes and live face</a></li><li><a href="subdivision-levels.html">Subdivision levels</a></li><li><a href="micro-levels.html">Micro levels: hundreds of millions of polygons</a></li><li><a href="dynamic-topology.html">Dynamic topology</a></li><li><a href="timeline.html">Sculpt Timeline and timelapse</a></li><li><a href="gizmo.html">Moving, rotating and posing (Gizmo)</a></li><li><a href="geometry.html">Subdivide, remesh, decimate and LODs</a></li><li><a href="cut.html">Cut: line, lasso, rectangle and polyline</a></li><li><a href="retopology.html">Quad retopology and detail projection</a></li></ul><p class="toc-group">AI and capture</p><ul><li><a href="generate-3d.html">Image and text to 3D</a></li><li><a href="splats.html">Gaussian splats</a></li><li><a href="scan-to-splat.html">Scan an object into a splat</a></li><li><a href="scan-to-sculptable.html">From scan to sculptable mesh</a></li><li><a href="phone-capture.html">Phone capture and AR</a></li></ul><p class="toc-group">Files and pipelines</p><ul><li><a href="baking.html">Baking normal and displacement maps</a></li><li><a href="exporting.html">Exporting, Unreal and ZBrush</a></li><li><a href="export-presets.html">Export presets</a></li><li><a href="blender.html">Working with Blender</a></li><li><a href="maya.html">Working with Maya</a></li><li><a href="projects.html">Projects, autosave and snapshots</a></li><li><a href="scripting.html">Scripting and automation</a></li><li><a href="packs-and-macros.html">Packs and macros</a></li><li><a href="studios.html">SculptForge for studios</a></li></ul><p class="toc-group">Reference</p><ul><li><a href="shortcuts.html">Keyboard and mouse</a></li><li><a href="performance.html">Performance and big meshes</a></li><li><a href="troubleshooting.html">Troubleshooting: tablets, display, crashes and FAQ</a></li><li><a href="glossary.html">Glossary</a></li></ul></nav>
+        <nav class="toc" aria-label="User guide"><a class="toc-home" href="index.html">Contents</a><p class="toc-group">Getting started</p><ul><li><a href="welcome.html">Welcome to SculptForge</a></li><li><a href="first-sculpt.html">Your first sculpt in 10 minutes</a></li><li><a href="whats-new.html" class="current" aria-current="page">What&#x27;s new</a><ul class="toc-sections"><li><a href="#version-0109">Version 0.10.9</a></li><li><a href="#version-0108">Version 0.10.8</a></li><li><a href="#version-0107">Version 0.10.7</a></li><li><a href="#versions-0101-to-0106">0.10.1 to 0.10.6</a></li><li><a href="#versions-09x">0.9.x</a></li><li><a href="#versions-08-and-earlier">0.8 and earlier</a></li></ul></li><li><a href="coming-from-zbrush.html">Coming from ZBrush</a></li><li><a href="installing.html">Install SculptForge on Windows, macOS and Linux</a></li><li><a href="interface.html">The interface</a></li><li><a href="navigation.html">Navigating the view</a></li></ul><p class="toc-group">Sculpting</p><ul><li><a href="sculpting.html">Sculpting and brushes</a></li><li><a href="brush-lab.html">Brush Lab and sharing brushes</a></li><li><a href="masking.html">Masking</a></li><li><a href="face-groups.html">Face Groups and visibility</a></li><li><a href="selection-sets.html">Selection sets and morph targets</a></li><li><a href="parts.html">Parts</a></li><li><a href="forge-spheres.html">Forge Spheres</a></li><li><a href="vertex-paint.html">Vertex Paint and materials</a></li><li><a href="texture-painting.html">Texture painting</a></li><li><a href="uv-editor.html">UV Editor</a></li><li><a href="pbr-painting.html">Material painting (PBR)</a></li><li><a href="fill-layers.html">Fill layers, Mesh Maps and Material Recipes</a></li><li><a href="layers.html">Sculpt layers and blend shapes</a></li><li><a href="facial-shapes.html">Facial shapes and live face</a></li><li><a href="subdivision-levels.html">Subdivision levels</a></li><li><a href="micro-levels.html">Micro levels: hundreds of millions of polygons</a></li><li><a href="dynamic-topology.html">Dynamic topology</a></li><li><a href="timeline.html">Sculpt Timeline and timelapse</a></li><li><a href="gizmo.html">Moving, rotating and posing (Gizmo)</a></li><li><a href="geometry.html">Subdivide, remesh, decimate and LODs</a></li><li><a href="cut.html">Cut: line, lasso, rectangle and polyline</a></li><li><a href="retopology.html">Quad retopology and detail projection</a></li></ul><p class="toc-group">AI and capture</p><ul><li><a href="generate-3d.html">Image and text to 3D</a></li><li><a href="splats.html">Gaussian splats</a></li><li><a href="scan-to-splat.html">Scan an object into a splat</a></li><li><a href="scan-to-sculptable.html">From scan to sculptable mesh</a></li><li><a href="phone-capture.html">Phone capture and AR</a></li></ul><p class="toc-group">Files and pipelines</p><ul><li><a href="baking.html">Baking normal and displacement maps</a></li><li><a href="exporting.html">Exporting, Unreal and ZBrush</a></li><li><a href="export-presets.html">Export presets</a></li><li><a href="blender.html">Working with Blender</a></li><li><a href="maya.html">Working with Maya</a></li><li><a href="projects.html">Projects, autosave and snapshots</a></li><li><a href="scripting.html">Scripting and automation</a></li><li><a href="packs-and-macros.html">Packs and macros</a></li><li><a href="studios.html">SculptForge for studios</a></li></ul><p class="toc-group">Reference</p><ul><li><a href="shortcuts.html">Keyboard and mouse</a></li><li><a href="performance.html">Performance and big meshes</a></li><li><a href="troubleshooting.html">Troubleshooting: tablets, display, crashes and FAQ</a></li><li><a href="glossary.html">Glossary</a></li></ul></nav>
       </div>
     </div>
     <main class="guide-main" id="top">
       <article class="guide-article">
 <h1 id="whats-new">What&#x27;s new</h1>
 <p>What changed in each version of SculptForge, newest first. The first time you start a new version, a window shows its main features, each with a <strong>Try it</strong> button; <strong>Help &gt; What&#x27;s New</strong> opens it again. Below are the last three versions in full, then the older ones in groups. Every detail is in the <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md" rel="noopener">changelog</a>.</p>
-<section class="wn-version" id="version-0108"><header class="wn-band"><h2>Version 0.10.8<a class="anchor" href="#version-0108" aria-label="Link to this version">#</a></h2><time datetime="2026-11-02">2026-11-02</time><p class="wn-tagline">Tablets in mouse mode follow the pen again.</p></header><details class="wn-all" open><summary>All changes</summary><div class="wn-body"><ul>
+<section class="wn-version" id="version-0109"><header class="wn-band"><h2>Version 0.10.9<a class="anchor" href="#version-0109" aria-label="Link to this version">#</a></h2><time datetime="2026-11-02">2026-11-02</time><p class="wn-tagline">Your first sculpt in ten minutes, starter meshes, brushes that keep their settings, and tablets that just work.</p></header><div class="wn-cards wn-n4"><article class="wn-card"><div class="wn-pic"><img src="images/wn-first-sculpt.jpg" alt="" width="600" height="340" loading="lazy" decoding="async"></div><div class="wn-card-body"><h3>Your first sculpt</h3><p>A 12-step lesson that turns the default sphere into a painted, rendered mushroom house.</p><a class="wn-more" href="first-sculpt.html">How it works<span aria-hidden="true"> &rarr;</span></a></div></article><article class="wn-card"><div class="wn-pic"><img src="images/wn-starter-meshes.jpg" alt="" width="600" height="340" loading="lazy" decoding="async"></div><div class="wn-card-body"><h3>Starter meshes</h3><p>Start from a head, bust, body, hand or clean primitive, all quads at life size.</p><a class="wn-more" href="projects.html#start-from-a-starter-mesh">How it works<span aria-hidden="true"> &rarr;</span></a></div></article><article class="wn-card"><div class="wn-pic"><img src="images/wn-brush-settings.jpg" alt="" width="600" height="340" loading="lazy" decoding="async"></div><div class="wn-card-body"><h3>Brushes keep their settings</h3><p>Size, intensity, falloff, stroke and alpha follow each brush; Save Brush Settings keeps them.</p><a class="wn-more" href="sculpting.html#each-brush-keeps-its-own-settings">How it works<span aria-hidden="true"> &rarr;</span></a></div></article><article class="wn-card"><div class="wn-pic"><img src="images/wn-whats-new.jpg" alt="" width="600" height="340" loading="lazy" decoding="async"></div><div class="wn-card-body"><h3>What&#x27;s New, redesigned</h3><p>The main features as cards with a Try it button; older versions fold into short groups.</p><a class="wn-more" href="whats-new.html">Read more<span aria-hidden="true"> &rarr;</span></a></div></article></div><details class="wn-all" open><summary>All changes</summary><div class="wn-body"><ul>
+<li>
+<strong>Each brush keeps its own settings</strong>: Draw Size, Intensity, Falloff, RGB Intensity, stroke and alpha follow the brush, custom and Community brushes included. <strong>Brush &gt; Save Brush Settings</strong> keeps them for the next start, <strong>Reset Brush to Default</strong> puts back the shipped values, and <strong>Preferences &gt; Input &gt; Share size and intensity across brushes</strong> keeps the old way (#78). See <a href="sculpting.html#each-brush-keeps-its-own-settings">Sculpting</a>.
+</li>
+<li>
+<strong>Alpha options</strong> (<strong>Alpha</strong> palette): <strong>Follow stroke direction</strong> turns the alpha along the stroke, smoothed as Blender&#x27;s Rake does; <strong>Angle</strong> and <strong>Angle jitter</strong> turn it by a fixed or a random amount; <strong>Tile</strong> repeats it inside the brush. They work with custom and Community brushes too, and each brush keeps its own (#76). See <a href="sculpting.html#alpha-options">Alpha options</a>.
+</li>
+<li>
+<strong>Blender style: Alt+drag masks</strong> on the model and Ctrl+Alt+drag unmasks, as in Blender 5.1 and later; beside the model Alt+drag still turns the view. <strong>Preferences &gt; Input &gt; Emulate 3 Button Mouse</strong> makes Alt+drag turn the view everywhere. Shift+F now sets the brush&#x27;s Intensity, not Smooth&#x27;s (#77).
+</li>
+<li>
+<strong>View &gt; Lock camera</strong> (<kbd>Shift</kbd>+<kbd>L</kbd>): drags that start beside the model sculpt instead of turning the view, and the status bar shows <strong>CAMERA LOCKED</strong> while it is on (#62).
+</li>
+<li>
+<strong>Tablets</strong>: plug a tablet in while SculptForge runs and it just works (&quot;Tablet connected&quot; in the status bar), also through Wacom Bridge. On Windows, pressure works with the Wacom driver&#x27;s <strong>Use Windows Ink</strong> on or off. <strong>Preferences &gt; Input</strong> shows whether pressure is detected, with a troubleshooting link. The view no longer jumps when the pen comes back into range, and the active Part changes only with <strong>Alt+click</strong> on the keyboard; the status bar names the new Part. See <a href="troubleshooting.html#pen-tablets">Troubleshooting</a>.
+</li>
+<li>
+<strong>Smaller (or larger) corner axes</strong>: <strong>Draw &gt; Camera &gt; Gizmo size</strong> sets Small, Medium or Large (<a href="navigation.html">Navigation</a>).
+</li>
+<li>
+<strong>View Figure</strong>: turn it on beside <strong>Axes</strong> for a small head in the corner that turns with the view; click it to snap to the nearest side.
+</li>
+<li>
+<strong>Starter meshes</strong>: start a sculpt from a human head with eye and mouth loops, a bust, a full body in A-pose, a hand, a foot, an ear, an eye, a stylised head, a creature head, a torso, or a bevelled box, cylinder, capsule or ring, all clean quads at life size with subdivision levels ready. <strong>File &gt; New from Starter Mesh</strong>, the Library&#x27;s <strong>Tool &gt; Starter meshes</strong>, or <strong>Start from a head</strong> in the welcome. See <a href="projects.html#start-from-a-starter-mesh">Projects</a>.
+</li>
+<li>
+<strong>Your first sculpt in 10 minutes</strong>: a step-by-step lesson for people who have never sculpted. Turn the default sphere into a little mushroom house with a spotted red cap, a door and glowing windows, using masks, Move, Inflate, Crease and Clay, Vertex Paint and PBR shading, and save a render to share. Start it from the welcome&#x27;s <strong>Start the 10-minute lesson</strong> button or <strong>Help &gt; Your first sculpt (10 min)</strong>. See <a href="first-sculpt.html">Your first sculpt</a>.
+</li>
+<li>
+<strong>Save Render</strong> (<strong>Render &gt; Materials</strong>): the view without the interface, at twice its size, as a PNG in your Library (<strong>Library &gt; Image</strong>).
+</li>
+</ul>
+<ul>
+<li>
+<strong>A new What&#x27;s New</strong>: after an update, a window shows the main features as cards with a picture, one line and a <strong>Try it</strong> button that opens the feature (switch the look, select the brush, open the membership card...). <strong>Help &gt; What&#x27;s New</strong> opens it again; <kbd>Esc</kbd> closes it. This chapter shows the last three versions in full and folds the older ones into short groups, on the website too.
+</li>
+<li>
+<strong>Image to 3D with no setup</strong>: the free default is now Hunyuan3D 2.1, which needs no token. TRELLIS.2 (&quot;Best detail&quot;) still needs a free Hugging Face token (<strong>Preferences &gt; AI</strong>); without one, Hunyuan3D 2.1 runs instead and the status line tells you. Your own model choice is kept. See <a href="generate-3d.html">Image and text to 3D</a>.
+</li>
+<li>
+<strong>Generated models arrive as clean quads</strong>: Quad Remesh is now the default, with one subdivision level holding the detail, so you can sculpt and subdivide straight away. Voxel remesh and Off are still in <strong>Remesh</strong>.
+</li>
+<li>
+<strong>Calm, clear hover</strong>: buttons, menus and shelves brighten a little as you point at them, tiles lift a little, sliders show their exact value, and the keyboard focus gets a ring as strong as your <strong>Outlines</strong> setting. Prefer less movement? Turn on <strong>Preferences &gt; Interface &gt; Reduce motion</strong> (<a href="interface.html">Interface</a>).
+</li>
+<li>
+<strong>Picker thumbnails on top</strong>: the enlarged thumbnail you point at in a picker is no longer hidden under its neighbours (#86).
+</li>
+<li>
+<strong>Focus Detail (experimental)</strong>: sculpt a head of a billion micro triangles from one compressed file. Detail loads where you look and where the brush is heading, and the rest shows a lighter version. Saving writes only what you changed. Try it with <code>sculptforge --benchmark standard-1b</code> (Linux and macOS for now).
+</li>
+<li>
+<strong>Precision work</strong> for pores, wrinkles, jewellery and trims: <strong>Steady Stroke</strong> (<kbd>L</kbd>) with every stroke type and a catch-up on release; <strong>World Size</strong>, so the brush keeps its size in mm on the surface as you zoom; Draw Size down to 0.5 px with <kbd>Shift</kbd>+<kbd>[</kbd> / <kbd>]</kbd> for 1 px steps; hold <kbd>Shift</kbd>+<kbd>Alt</kbd> while drawing to move the brush at a quarter of the pen&#x27;s speed; and a pressure curve for each brush with a <strong>Fine detail</strong> preset. The brush centre now sits exactly under the cursor at any zoom. See <a href="sculpting.html#precision-work">Precision work</a>.
+</li>
+<li>
+<strong>UI scale works live</strong>: <strong>Preferences &gt; Interface &gt; UI scale</strong> (100% to 200%) resizes text and panels at once, no restart. <strong>Automatic</strong> follows the monitor the window is on, so on Windows moving it between a 100% and a 150% monitor rescales it right away (#87). See <a href="interface.html#interface-preferences">The interface</a>.
+</li>
+<li>
+<strong>The pen keeps working the panels</strong>: with some tablets (Huion, pen displays, Wacom with Windows Ink on or off) the pen picked one brush, then stopped clicking menus and the canvas until you used the mouse. SculptForge now makes the pen&#x27;s clicks itself (#95). See <a href="troubleshooting.html#pen-tablets">Troubleshooting</a>.
+</li>
+<li>
+<strong>Mouse mode is relative again</strong>: with <strong>Mouse mode</strong> on (Preferences &gt; Tablet) the pen moves the cursor by how far it moves, whatever the driver&#x27;s mode, and the arrow is drawn right at the brush (#72).
+</li>
+<li>
+<strong>Two screens</strong>: SculptForge no longer slows down when the pointer is on your other screen; it rests only when its window loses focus.
+</li>
+<li>
+<strong>Turn AI off</strong>: <strong>Preferences &gt; AI &gt; Enable AI features</strong> (the welcome asks too). Off hides AI Brush and Generate 3D everywhere and SculptForge makes no AI network calls. Your art is never uploaded or used for training. AI features run only when you use them and can be turned off. Studios can set <code>SF_AI=off</code>. See <a href="interface.html#turning-ai-off">The interface</a>.
+</li>
+<li>
+<strong>Big brushes stay smooth on dense meshes</strong>: on models from about 4 million triangles a stroke&#x27;s dabs are worked out beside the view, so a 240 px brush on 33 million triangles no longer freezes the view for a third of a second at a time (slowest frames about 35 ms instead of 300), and letting go of the pen is instant. The stroke itself comes out the same.
+</li>
+<li>
+<strong>Move keeps up on dense meshes</strong>: Move no longer slows to a crawl on 33 million triangles with a fast pen, and the first orbit after a long stroke no longer hitches.
+</li>
+<li>
+<strong>No more running out of memory</strong>: <strong>Help &gt; Benchmark</strong> skips a scene your computer hasn&#x27;t got the free memory for (and says how much to free), and Subdivide, Divide, Micro and Voxel Remesh ask first when the result wouldn&#x27;t fit in the memory free now.
+</li>
+<li>
+<strong>Clay follows Intensity and pressure</strong>: Clay and Clay Block build gently with a light pen or a low Intensity instead of planing flat as at full strength (#83). See <a href="sculpting.html#built-in-brushes">Sculpting</a>.
+</li>
+<li>
+<strong>Alphas on micro levels</strong>: Drag Stamp and every stroke stamp your alpha on a micro level too (#92).
+</li>
+<li>
+<strong>Brushes hold on at silhouettes</strong>: a stroke sliding past the edge of a form in profile keeps sculpting while the brush still covers it (#84).
+</li>
+<li>
+<strong>Smooth face group borders</strong>: a Brush palette option that straightens jagged clothing edges between face groups and leaves the rest alone (#81). See <a href="sculpting.html#smooth-face-group-borders">Smooth face group borders</a>.
+</li>
+<li>
+<strong>Colour tints the material</strong>: pick a colour and Parts with no vertex paint take it on in the Lit Sphere material. See <a href="vertex-paint.html#materials-lit-spheres">Vertex Paint and materials</a>.
+</li>
+<li>
+<strong>Cut</strong>: one tool that cuts the active Part with a <strong>Line</strong>, <strong>Lasso</strong>, <strong>Rectangle</strong> or <strong>Polyline</strong>. <strong>Away</strong> removes what the shape covers and closes the cut with a flat cap, <strong>In</strong> cuts a flat-bottomed pocket and <strong>Add</strong> raises the shape out of the surface. The result stays watertight and follows the symmetry. Hold <kbd>Ctrl</kbd>+<kbd>Shift</kbd> and pick a Cut shape, or open <strong>Tool &gt; Cut</strong>. See <a href="cut.html">Cut</a> (#101, #91).
+</li>
+<li>
+<strong>Mask: Front faces only</strong>: Mask Lasso and Mask Rectangle can leave the far side alone (<a href="masking.html#mask-with-a-lasso-or-rectangle">Masking</a>, #91).
+</li>
+<li>
+<strong>Duplicate Part</strong> has a shortcut: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> (<a href="parts.html">Parts</a>).
+</li>
+<li>
+<strong>Brush previews fixed</strong>: the shelf shows Tendril and Elastic Tendril as long horns pulled out past the ball, as they behave in the viewport, and Layer and Nudge with clean shapes; previews are rebuilt once after updating.
+</li>
+<li>
+<strong>Library</strong>: projects no longer show twice on Windows (#90); the close button stays on small screens and <kbd>Esc</kbd> closes the Library (#80).
+</li>
+<li>
+<strong>Cleaner outlines</strong>: the right shelf&#x27;s outline draws correctly and the <strong>x</strong> buttons are centred (#98).
+</li>
+<li>
+<strong>macOS</strong>: a window closed in full screen reopens maximised, with the window buttons reachable (#85).
+</li>
+<li>
+<strong>Stroke popup</strong>: press <kbd>G</kbd> (<kbd>Z</kbd> in the Blender style) or the button under the <strong>Stroke</strong> tile for a grid at the cursor: the stroke types plus <strong>Add</strong>, <strong>Sub</strong>, <strong>Smooth</strong>, <strong>Mask</strong> and <strong>Select</strong>. Hold the key, point and let go, or tap it and click. Smooth, Mask and Select stay on without holding <kbd>Shift</kbd> or <kbd>Ctrl</kbd>. See <a href="sculpting.html#the-stroke-popup">Strokes</a>.
+</li>
+</ul></div></details></section>
+<section class="wn-version" id="version-0108"><header class="wn-band"><h2>Version 0.10.8<a class="anchor" href="#version-0108" aria-label="Link to this version">#</a></h2><time datetime="2026-11-02">2026-11-02</time><p class="wn-tagline">Tablets in mouse mode follow the pen again.</p></header><details class="wn-all"><summary>All changes</summary><div class="wn-body"><ul>
 <li>
 <strong>Tablets in mouse mode work again</strong>: on some Windows tablets with <strong>Mouse mode</strong> on (Preferences &gt; Tablet) the brush stopped following the pen in 0.10.7. When the system can&#x27;t say where its cursor is, the pen now moves the brush by how far it moves, from where it was (#72).
 </li>
@@ -78,7 +196,8 @@
 <strong>Benchmark your machine</strong> (<strong>Help &gt; Benchmark</strong>, or <code>sculptforge --benchmark standard-15m</code>): a procedural 15 or 33 million triangle head sculpted with Clay at 25, 60 and 120 px, Move, Smooth and a 240 px brush, reporting frame times (p50, p95, p99), stroke lag, the worst stall and memory. See <a href="performance.html#proof-mode-see-it-for-yourself">Performance</a>.
 </li>
 </ul></div></details></section>
-<section class="wn-version" id="version-0106"><header class="wn-band"><h2>Version 0.10.6<a class="anchor" href="#version-0106" aria-label="Link to this version">#</a></h2><time datetime="2026-11-01">2026-11-01</time><p class="wn-tagline">See materials as a game engine does, wear that follows the sculpt, and packs you can share.</p></header><div class="wn-cards wn-n3"><article class="wn-card"><div class="wn-pic"><img src="images/pbr-viewport.jpg" alt="" width="1100" height="660" loading="lazy" decoding="async"></div><div class="wn-card-body"><h3>PBR viewport</h3><p>See the texture&#x27;s material lit by an environment, as a game engine shows it.</p><a class="wn-more" href="pbr-painting.html#the-pbr-viewport">Read more<span aria-hidden="true"> &rarr;</span></a></div></article><article class="wn-card"><div class="wn-pic"><img src="images/fill-painted-edges.jpg" alt="" width="760" height="600" loading="lazy" decoding="async"></div><div class="wn-card-body"><h3>Fill layers</h3><p>Edge wear, dirt and gradients laid over the whole Part through a mask of effects.</p><a class="wn-more" href="fill-layers.html">Read more<span aria-hidden="true"> &rarr;</span></a></div></article><article class="wn-card"><div class="wn-pic"><img src="images/bake-mesh-maps.jpg" alt="" width="320" height="440" loading="lazy" decoding="async"></div><div class="wn-card-body"><h3>More maps to bake</h3><p>Curvature, thickness, position and ID, and UDIM tiles as one set of files per tile.</p><a class="wn-more" href="baking.html">Read more<span aria-hidden="true"> &rarr;</span></a></div></article></div><details class="wn-all"><summary>All changes</summary><div class="wn-body"><ul>
+<p class="wn-earlier">Earlier versions</p>
+<section class="wn-group" id="versions-0101-to-0106"><header class="wn-band wn-band-small"><h2>0.10.1 to 0.10.6<a class="anchor" href="#versions-0101-to-0106" aria-label="Link to these versions">#</a></h2></header><ul class="wn-highlights"><li><strong>PBR viewport</strong>: the texture&#x27;s material lit by an environment, as fast as Lit Sphere</li><li><strong>UV Editor</strong>: seams, unwrapping, UDIM packing and live stretch on the model</li><li><strong>Keep Masked remeshing</strong>: the masked part keeps its triangles and detail exactly</li><li><strong>Alternate smooth</strong>: let go of Shift mid-stroke to smooth without shrinking the form</li><li><strong>Quad Remesh 2</strong>: two to fifty times fewer poles, loops that follow the forms</li><li><strong>Micro levels</strong>: about a billion sculptable triangles in under 2 GB of memory</li></ul><details class="wn-all"><summary>All changes</summary><div class="wn-body"><h3 id="version-0106" class="wn-ver">Version 0.10.6<time datetime="2026-11-01">2026-11-01</time></h3><ul>
 <li>
 <strong>PBR viewport</strong> (<strong>Material &gt; Viewport Shading &gt; PBR</strong>): see the texture&#x27;s material as a game engine shows it, lit by an environment: Studio, Photo Studio, Small Studio or Outdoor Sky, with exposure, rotation, the environment behind the model and a choice of tone map. Painted height and normals catch the light. It stays as fast as Lit Sphere on a 20-million-triangle Part. See <a href="pbr-painting.html#the-pbr-viewport">Material painting</a>.
 </li>
@@ -136,9 +255,7 @@
 <li>
 <strong>Fixed: tablet mouse mode</strong> (#72): the brush stays on the system cursor after the pen is lifted and put down elsewhere, and clicks land where the arrow is.
 </li>
-</ul></div></details></section>
-<p class="wn-earlier">Earlier versions</p>
-<section class="wn-group" id="versions-0101-to-0105"><header class="wn-band wn-band-small"><h2>0.10.1 to 0.10.5<a class="anchor" href="#versions-0101-to-0105" aria-label="Link to these versions">#</a></h2></header><ul class="wn-highlights"><li><strong>UV Editor</strong>: seams, unwrapping, UDIM packing and live stretch on the model</li><li><strong>Keep Masked remeshing</strong>: the masked part keeps its triangles and detail exactly</li><li><strong>Alternate smooth</strong>: let go of Shift mid-stroke to smooth without shrinking the form</li><li><strong>Quad Remesh 2</strong>: two to fifty times fewer poles, loops that follow the forms</li><li><strong>Micro levels</strong>: about a billion sculptable triangles in under 2 GB of memory</li><li><strong>PBR painting</strong>: roughness, metallic, normal and height, exported for every engine</li></ul><details class="wn-all"><summary>All changes</summary><div class="wn-body"><h3 id="version-0105" class="wn-ver">Version 0.10.5<time datetime="2026-11-01">2026-11-01</time></h3><ul>
+</ul><h3 id="version-0105" class="wn-ver">Version 0.10.5<time datetime="2026-11-01">2026-11-01</time></h3><ul>
 <li>
 <strong>Selection sets</strong> (<strong>Tool &gt; Selection Sets</strong>): store as many named snapshots of a Part&#x27;s mask, face groups, visibility, vertex paint, UVs and shape as you like, and restore them at any subdivision level, not only the one they were stored at. Combine two sets (union, intersect, subtract), restore one onto the current mask or visibility the same way, or take a quick set from the visible faces. Every step is one undo step, and the sets are saved with the project. See <a href="selection-sets.html">Selection sets</a>.
 </li>
@@ -670,7 +787,7 @@ New brushes: Sharp Crease, Clay Block, Tendril, Trim, Layer and Nudge, with stro
       <p class="guide-meta fine">Also in the app: <strong>Help &gt; User Guide</strong> (<kbd>Shift</kbd>+<kbd>F1</kbd>).
         Found a mistake? <a href="https://github.com/islandmed/SculptForge/edit/main/docs/guide/whats-new.md">Edit this page on GitHub</a>.</p>
     </main>
-    <aside class="on-page" aria-label="On this page"><p>On this page</p><ul><li><a href="#version-0108">Version 0.10.8</a></li><li><a href="#version-0107">Version 0.10.7</a></li><li><a href="#version-0106">Version 0.10.6</a></li><li><a href="#versions-0101-to-0105">0.10.1 to 0.10.5</a></li><li><a href="#versions-09x">0.9.x</a></li><li><a href="#versions-08-and-earlier">0.8 and earlier</a></li></ul></aside>
+    <aside class="on-page" aria-label="On this page"><p>On this page</p><ul><li><a href="#version-0109">Version 0.10.9</a></li><li><a href="#version-0108">Version 0.10.8</a></li><li><a href="#version-0107">Version 0.10.7</a></li><li><a href="#versions-0101-to-0106">0.10.1 to 0.10.6</a></li><li><a href="#versions-09x">0.9.x</a></li><li><a href="#versions-08-and-earlier">0.8 and earlier</a></li></ul></aside>
   </div>
   <footer class="footer">
     <div class="wrap footer-grid">

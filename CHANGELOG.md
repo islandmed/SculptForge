@@ -6,6 +6,8 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.9] - 2026-11-02
+
 ### Added
 - Alpha options in the Alpha palette (#76, requested by rodrigomoretto): **Follow stroke direction** turns the alpha
   along the stroke with Blender's Rake smoothing (the direction is taken again every 20 pixels), **Angle** and **Angle
