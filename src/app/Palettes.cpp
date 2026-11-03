@@ -510,9 +510,13 @@ void App::drawPalette_File() {
 
 void App::drawPalette_Generate() {
     const tray::Style style; // quiet check marks
-    actionRow(*this, {"ui.generate3d"});
-    hint(*this, "Image or text to a sculptable 3D model: Hugging Face (free), fal.ai, Meshy, your ComfyUI server, your own "
-         "command, or an offline blockout.");
+    if (ai::aiEnabled()) {
+        actionRow(*this, {"ui.generate3d"});
+        hint(*this, "Image or text to a sculptable 3D model: Hugging Face (free), fal.ai, Meshy, your ComfyUI server, your own "
+             "command, or an offline blockout.");
+    } else {
+        hint(*this, "AI features are off (Preferences > AI): Relief, Inflate and Stamp work offline.");
+    }
     tray::GroupLabel(*this, "From an image");
     if (ImGui::Button(refImage_.empty() ? "Choose image...##generate" : "Change image...##generate", ImVec2(-1, 0))) {
         static const SDL_DialogFileFilter filters[] = {{"Images", "png;jpg;jpeg;bmp;tga;psd;gif"}, {"All files", "*"}};
@@ -542,7 +546,7 @@ void App::drawPalette_Generate() {
     if (ImGui::Button(tr("Stamp"), ImVec2(third, 0))) projectImageFromView();
     ui::HelpText("Stamp", nullptr, "Projects the image onto the model from this view as surface detail.", "Generate");
     ImGui::EndDisabled();
-    if (subpalette("generate.ai", "AI brush provider")) {
+    if (ai::aiEnabled() && subpalette("generate.ai", "AI brush provider")) {
         tray::Section section;
         drawAiSettings();
     }
@@ -616,7 +620,11 @@ void App::drawPalette_Preferences() {
     }
     if (subpalette("preferences.ai", "AI")) {
         tray::Section section;
-        drawAiPrefsSection();
+        drawAiPrefs(); // the switch (PanelAi.cpp)
+        if (ai::aiEnabled()) {
+            ImGui::Spacing();
+            drawAiPrefsSection(); // the Hugging Face token
+        }
     }
     if (subpalette("preferences.updates", "Updates")) {
         tray::Section section;

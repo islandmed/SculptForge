@@ -108,6 +108,9 @@ action: guide:whats-new.md
   far it moves, whatever the driver's mode, and the arrow is drawn right at the brush (#72).
 - **Two screens**: SculptForge no longer slows down when the pointer is on your other screen; it rests only when
   its window loses focus.
+- **Turn AI off**: **Preferences > AI > Enable AI features** (the welcome asks too). Off hides AI Brush and
+  Generate 3D everywhere and SculptForge makes no AI network calls. Your art is never uploaded or used for training. AI features run only when you use them and can be turned off. Studios can set `SF_AI=off`.
+  See [The interface](interface.md#turning-ai-off).
 
 ## Version 0.10.8
 

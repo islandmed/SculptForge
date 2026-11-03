@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "ai/ImageTo3DService.h"
+#include "ai/AiPolicy.h"
 
 #include "ai/ComfyUI.h"
 #include "ai/GradioClient.h"
@@ -525,6 +526,7 @@ std::string findModelUrl(const Json& result, std::string* extension) {
 
 GeneratorResult generate3D(const AiSettings& s, const std::string& imagePath, const std::string& outputStem,
                            GenerationProgress* progress) {
+    if (!aiEnabled()) return {false, {}, aiOffError()};
     if (s.generatorService == "meshy") return runMeshy(s, imagePath, outputStem, progress);
     if (s.generatorService == "command") {
         status(progress, "Running your generator...");
@@ -553,6 +555,7 @@ std::string falTextBody(const std::string& prompt) {
 
 GeneratorResult generate3DFromText(const AiSettings& s, const std::string& prompt, const std::string& outputStem,
                                    GenerationProgress* progress) {
+    if (!aiEnabled()) return {false, {}, aiOffError()};
     GeneratorResult result;
     if (prompt.find_first_not_of(" \t\r\n") == std::string::npos) {
         result.error = "Describe the model you want";

@@ -461,10 +461,7 @@ void App::registerShellActions() {
         a.checked = [this, axis] { return symmetry_.radialAxis == axis; };
         actions_.add(std::move(a));
     }
-    flag("ui.brush_lab", "AI Brush", ICON_LC_SPARKLES, "Brush", "", &showBrushLab_,
-         "Brush Lab: describe a brush in words and AI builds it; tweak the recipe with sliders.");
-    flag("ui.generate3d", "Generate 3D", ICON_LC_WAND_SPARKLES, "Generate", "", &showImageTo3D_,
-         "Turn an image or a description into a sculptable model (Hugging Face, fal.ai, Meshy, ComfyUI or offline).");
+    registerAiActions(); // AI Brush, Generate 3D: only while AI is on (PanelAi.cpp)
     flag("ui.brush_gallery", "Community brushes", ICON_LC_GLOBE, "Brush", "", &showBrushGallery_,
          "Browse, search and install brushes other sculptors shared.");
 

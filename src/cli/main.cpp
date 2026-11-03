@@ -4,6 +4,7 @@
 // sculptforge-cli: run SculptForge commands headless, for build farms, asset
 // pipelines and AI agents.
 #include "ai/AiCommands.h"
+#include "ai/AiPolicy.h"
 #include "ai/SplatTrainer.h"
 #include "cli/McpServer.h"
 #include "core/Benchmark.h"
@@ -33,6 +34,7 @@ void usage() {
         "      --schema               Print commands as LLM tool definitions (JSON)\n"
         "      --mcp                  Run as an MCP server on stdio (Claude Code, Claude Desktop, any MCP client)\n"
         "  -q, --quiet                Only print errors\n"
+        "      --no-ai                Leave the AI commands out (as SF_AI=off; Preferences > AI turns them off for good)\n"
         "      --no-packs             Safe mode: leave every installed pack out (pack_install still works)\n"
         "      --bench                Run the performance benchmark (CPU side; the app's --bench adds the GPU)\n"
         "      --bench-sizes 4,16,32  Benchmark sizes in millions of triangles\n"
@@ -56,7 +58,11 @@ void usage() {
 
 int main(int argc, char** argv) {
     sf::CommandRegistry registry;
-    // AI commands use the same settings file as the app (keys can also come from the environment).
+    // AI commands use the same settings file as the app (keys can also come from the environment), and only
+    // while AI is on there (Preferences > AI), SF_AI allows it and --no-ai isn't given (ai/AiPolicy.h).
+    for (int i = 1; i < argc; ++i)
+        if (std::string(argv[i]) == "--no-ai") sf::ai::setAiForcedOff(true);
+    sf::ai::setAiEnabled(sf::ai::aiFeaturesAllowed(sf::ai::AiSettings::load(sf::ai::defaultAiSettingsPath()).enabled));
     sf::ai::registerAiCommands(registry, [] { return sf::ai::AiSettings::load(sf::ai::defaultAiSettingsPath()); });
     // splat_train: trains in the foreground with the app's tool settings (ai/SplatTrainer.h).
     sf::ai::registerSplatTrainCommands(registry, [] { return sf::ai::SplatTrainSettings::load(sf::ai::defaultSplatTrainSettingsPath()); });
@@ -111,6 +117,8 @@ int main(int argc, char** argv) {
             return 0;
         } else if (sf::parseBenchArg(argc, argv, i, bench)) {
             // handled after the loop
+        } else if (a == "--no-ai") {
+            // read before the commands were registered
         } else if (a == "--no-packs") {
             sf::setPacksSafeMode(true);
         } else if (a == "-q" || a == "--quiet") {

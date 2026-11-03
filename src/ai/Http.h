@@ -5,6 +5,7 @@
 // so no extra dependency needs to be shipped. Call from a worker thread.
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <vector>
@@ -37,6 +38,9 @@ struct MultipartField {
 };
 // Builds the body; `contentTypeHeader` receives the matching "Content-Type: multipart/form-data; boundary=..." header.
 std::string multipartBody(const std::vector<MultipartField>& fields, std::string& contentTypeHeader);
+
+// Every request this process started (tests: the AI switch sends nothing while it is off).
+uint64_t httpRequestCount();
 
 inline HttpResponse httpPostJson(const std::string& url, const std::vector<std::string>& headers, const std::string& body,
                                  int timeoutSeconds = 120) {

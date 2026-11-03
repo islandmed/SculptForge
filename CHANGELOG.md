@@ -139,6 +139,11 @@ All notable changes to SculptForge are listed here. The format follows
 - With two screens, moving the pointer to the other screen made SculptForge draw as if it were in the background
   until the pointer came back (Windows 11). It now keeps drawing after any input while its window has focus,
   wherever the pointer is, and rests only when it loses focus.
+- Turn AI off: **Preferences > AI > Enable AI features** (also asked in the first-run welcome). Off hides AI Brush,
+  Generate 3D and their menu, shelf and command palette entries, removes the AI commands from scripts, the CLI and
+  the MCP tool list, and stops every AI network call; the MCP server and the offline Relief / Inflate / Stamp stay.
+  Saved at once. Studios: `SF_AI=off` (or `--no-ai`) turns it off and locks it. About and the website now say:
+  "Your art is never uploaded or used for training. AI features run only when you use them and can be turned off."
 
 ## [0.10.8] - 2026-11-02
 

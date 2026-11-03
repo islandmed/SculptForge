@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "ai/Http.h"
 
+#include <atomic>
 #include <chrono>
 #include <random>
 
@@ -15,6 +16,12 @@
 #endif
 
 namespace sf::ai {
+
+namespace {
+std::atomic<uint64_t> gRequests{0};
+}
+
+uint64_t httpRequestCount() { return gRequests; }
 
 HttpResponse httpRequest(const std::string& method, const std::string& url, const std::vector<std::string>& headers,
                          const std::string& body, int timeoutSeconds) {
@@ -68,6 +75,7 @@ struct Handle {
 HttpResponse httpRequestStream(const std::string& method, const std::string& url, const std::vector<std::string>& headers,
                                const std::string& body, int timeoutSeconds,
                                const std::function<bool(const char*, size_t)>& onData) {
+    ++gRequests;
     HttpResponse r;
     std::wstring wurl = widen(url);
     URL_COMPONENTS uc{};
@@ -151,6 +159,7 @@ size_t writeCallback(char* data, size_t size, size_t count, void* user) {
 HttpResponse httpRequestStream(const std::string& method, const std::string& url, const std::vector<std::string>& headers,
                                const std::string& body, int timeoutSeconds,
                                const std::function<bool(const char*, size_t)>& onData) {
+    ++gRequests;
     static std::once_flag once;
     std::call_once(once, [] { curl_global_init(CURL_GLOBAL_DEFAULT); });
 
@@ -190,6 +199,7 @@ HttpResponse httpRequestStream(const std::string& method, const std::string& url
 
 HttpResponse httpRequestStream(const std::string&, const std::string&, const std::vector<std::string>&, const std::string&, int,
                                const std::function<bool(const char*, size_t)>&) {
+    ++gRequests;
     HttpResponse r;
     r.error = "This build of SculptForge has no HTTP support (libcurl was not found at build time)";
     return r;

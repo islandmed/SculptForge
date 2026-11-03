@@ -20,7 +20,8 @@ with <kbd>Alt</kbd>, <kbd>Shift</kbd>, masks, symmetry, strokes and alphas.
 
 Click **AI Brush** on the top shelf, or **AI Brush** at the top of the **Brush** palette. Brush Lab is a
 floating window; it opens at the top-left corner of the canvas the first time, and you can drag it anywhere.
-Click the button again, or the window's close box, to hide it.
+Click the button again, or the window's close box, to hide it. Not there? AI features are off: turn them on in
+**Preferences > AI** (see [Turning AI off](interface.md#turning-ai-off)).
 
 ## Design a brush
 

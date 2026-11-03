@@ -507,7 +507,7 @@ void LightBox::contextMenu(App& app, const AssetEntry& e) {
         activate(app, e, false);
     if (mesh && ImGui::MenuItem(tr("Append as Part"), "Shift+double-click")) activate(app, e, true);
     if (e.kind == AssetKind::Image) {
-        if (ImGui::MenuItem(tr("Generate 3D..."))) app.openPath(e.path);
+        if (ai::aiEnabled() && ImGui::MenuItem(tr("Generate 3D..."))) app.openPath(e.path);
         if (ImGui::MenuItem(tr("Relief from image")))
             app.confirmDiscard([&app, p = e.path] { app.runCommand("image_relief", {{"path", p}}); });
         if (ImGui::MenuItem(tr("Inflate image")))
@@ -924,7 +924,7 @@ void LightBox::draw(App& app, const CanvasRect& canvas) {
             ImGui::TextDisabled("%s", e.name.c_str());
             ImGui::Separator();
             bool done = false;
-            if (ImGui::MenuItem(ICON_LC_SPARKLES "  Generate 3D...")) app.openPath(e.path), done = true;
+            if (ai::aiEnabled() && ImGui::MenuItem(ICON_LC_SPARKLES "  Generate 3D...")) app.openPath(e.path), done = true;
             if (ImGui::MenuItem(tr("Relief from image"))) {
                 app.confirmDiscard([&app, p = e.path] { app.runCommand("image_relief", {{"path", p}}); });
                 done = true;

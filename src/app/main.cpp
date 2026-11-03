@@ -4,6 +4,7 @@
 #include "app/Bench.h"
 #include "app/Calibration.h"
 #include "app/CrashLog.h"
+#include "ai/AiPolicy.h"
 #include "core/FocusDetail.h"
 #include "core/Pack.h"
 
@@ -46,6 +47,7 @@ void usage() {
         "  --ui-test FILE.sfui      Run a UI test script headless and exit (0 = pass); settings are isolated\n"
         "  --ui-out DIR             Where UI tests save screenshots\n"
         "  --fullscreen             Start filling the screen (F11 toggles)\n"
+        "  --no-ai                  Start with every AI feature off and locked (as SF_AI=off)\n"
         "  --no-packs               Safe mode: start without any installed pack (Library > Packs)\n"
         "  --blender                Load what the Blender add-on sent (it starts SculptForge this way)\n"
         "  --bench                  Run the performance benchmark (with GPU upload and orbit timings) and exit\n"
@@ -154,6 +156,7 @@ int main(int argc, char** argv) {
         else if (a == "--supersample") options.supersample = std::clamp(std::atoi(next().c_str()), 1, 4);
         else if (a == "--ui-test") options.uiTest = next();
         else if (a == "--fullscreen") options.fullscreen = true;
+        else if (a == "--no-ai") sf::ai::setAiForcedOff(true); // as SF_AI=off (ai/AiPolicy.h)
         else if (a == "--no-packs") sf::setPacksSafeMode(true); // safe mode: no installed pack is loaded
         else if (a == "--blender") options.blender = true;
         else if (a == "--ui-out") options.uiOutDir = next();

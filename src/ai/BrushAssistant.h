@@ -16,6 +16,8 @@
 namespace sf::ai {
 
 struct AiSettings {
+    // Preferences > AI > Enable AI features (ai/AiPolicy.h: SF_AI=off wins over it).
+    bool enabled = true;
     // Free: Pollinations' anonymous OpenAI-compatible endpoint (open models, no
     // key), falling back to a local Ollama if it is running.
     enum class Provider { Free, Anthropic, OpenAICompatible };
