@@ -6,6 +6,21 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Clay and Clay Block follow Intensity and pen pressure: below the default Intensity a dab no longer planes the
+  surface all the way to its plane, so light strokes and low Intensity build gently instead of looking the same as
+  full strength (#83, thanks NimeNayota). Custom clay brushes and micro levels too.
+- Alphas work on micro levels: Drag Stamp and every other stroke stamp the alpha instead of a round dab (#92,
+  thanks Devon0209).
+- Strokes keep sculpting across a silhouette: when the cursor slides just past the edge of a form seen in profile
+  and the brush still covers it, the dab lands on the edge instead of stopping (#84, thanks Bro-Code-99).
+
+### Added
+- Smooth face group borders only (Brush palette): Smooth straightens the borders between face groups along the
+  surface and leaves the rest alone, for clean clothing edges (#81, thanks bossian0220).
+- Colour tints the material (Color palette, on by default): the current colour tints the Lit Sphere material of
+  Parts with no vertex paint; grey leaves it as it is (thanks ThinkingPolygons).
+
 ## [0.10.8] - 2026-11-02
 
 ### Fixed

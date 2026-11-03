@@ -20,6 +20,7 @@
 #include <imgui_internal.h>
 #include "ai/Generator3D.h"
 #include "core/Micro.h"
+#include "core/Polypaint.h"
 #include "core/EnginePresets.h"
 #include "link/UnrealLink.h"
 #include "core/BrushLibrary.h"
@@ -1045,6 +1046,7 @@ int App::run() {
         notePerformanceFrame(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - syncStart).count());
         const int samples = viewSamples();
         renderSettings_.motionProxy = perf_.proxyNow; // big meshes draw their lighter proxy while the view moves
+        renderSettings_.materialTint = materialTintFor(doc_.paintColor); // (Color > Colour tints the material)
         perf_.samplesUsed = renderer_.drawView(camera_, fbW, fbH, renderSettings_, canvasViewport(fbW, fbH), samples);
         if (snapshotEnv && *snapshotEnv && (sm.moving || sm.releasing)) {
             // Three points of the stroke, and the end (the frame the last dab reached the screen).
@@ -1910,7 +1912,9 @@ void App::dabAt(float x, float y, float pressure) {
         dabAngle_ = s.angle;
     }
     RayHit hit;
-    if (!(dabView_ ? pickWith(*dabView_, x, y, hit) : pick(x, y, hit))) return;
+    // Off the surface but the brush still over it (sliding over a silhouette, #84): the nearest surface within it.
+    auto cast = [&](float cx, float cy, RayHit& h) { return dabView_ ? pickWith(*dabView_, cx, cy, h) : pick(cx, cy, h); };
+    if (!pickNearCursor(x, y, st.radiusPx * dabRadiusScale_, cast, hit)) return;
     if (pressure < 0.0f) pressure = strokePressure();
 
     DabParams p;
@@ -1921,6 +1925,7 @@ void App::dabAt(float x, float y, float pressure) {
     // Smooth keeps its own Z Intensity (ZBrush), whether picked or held with Shift.
     p.strength = (st.brush == BrushType::Smooth ? st.smoothStrength : st.strength) * dabStrengthScale_;
     p.keepVolume = st.brush == BrushType::Smooth && st.smoothKeepVolume;
+    p.groupBorders = st.brush == BrushType::Smooth && st.smoothGroupBorders;
     p.pressure = st.pressureStrength ? pressure : 1.0f;
     p.invert = st.invert;
     p.frontFacesOnly = st.frontFacesOnly;

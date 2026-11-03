@@ -5,6 +5,18 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.10.9
+
+- **Clay follows Intensity and pressure**: Clay and Clay Block build gently with a light pen or a low Intensity
+  instead of planing flat as at full strength (#83). See [Sculpting](sculpting.md#built-in-brushes).
+- **Alphas on micro levels**: Drag Stamp and every stroke stamp your alpha on a micro level too (#92).
+- **Brushes hold on at silhouettes**: a stroke sliding past the edge of a form in profile keeps sculpting while the
+  brush still covers it (#84).
+- **Smooth face group borders**: a Brush palette option that straightens jagged clothing edges between face
+  groups and leaves the rest alone (#81). See [Smooth face group borders](sculpting.md#smooth-face-group-borders).
+- **Colour tints the material**: pick a colour and Parts with no vertex paint take it on in the Lit Sphere
+  material. See [Vertex Paint and materials](vertex-paint.md#materials-lit-spheres).
+
 ## Version 0.10.8
 
 - **Tablets in mouse mode work again**: on some Windows tablets with **Mouse mode** on (Preferences > Tablet) the

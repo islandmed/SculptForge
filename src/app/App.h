@@ -286,6 +286,7 @@ private:
         float radiusPx = 60.0f, strength = 0.5f, smoothStrength = 0.5f, focal = 0.0f, maskStrength = 1.0f;
         float sprayScatter = 1.0f;
         bool smoothKeepVolume = false; // Smooth keeps the volume (smoothKeepVolume_, or the alternate smooth)
+        bool smoothGroupBorders = false; // Smooth moves face group borders only (smoothGroupBorders_, #81)
         bool pressureSize = false, pressureStrength = true, invert = false, frontFacesOnly = false;
         bool connectedOnly = false, viewFalloff = false; // the falloff options (Brush palette)
         bool mask = false, paint = false, sculpt = true, visible = true;
@@ -1527,6 +1528,7 @@ private:
     glm::vec2 constrainStroke(float x, float y);
     float smoothStrength_ = 0.5f; // Smooth's own Z Intensity (Shift+stroke, or the Smooth brush)
     bool smoothKeepVolume_ = false; // Brush > Smooth keeps volume: a Taubin smooth instead of the plain one (#40)
+    bool smoothGroupBorders_ = false; // Brush > Smooth face group borders only: straightens the borders (#81)
     // ZBrush's alternate smooth (#40): a stroke begun with Shift held that lets go of Shift while still pressing
     // smooths the other way (keeping the volume, or plainly when Smooth keeps volume) for the rest of the stroke.
     bool strokeAltSmooth_ = false;

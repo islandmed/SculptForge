@@ -27,6 +27,10 @@ struct RenderSettings {
     bool wireframe = false;
     glm::vec3 baseColor{0.62f, 0.58f, 0.53f}; // Studio's colour: a warm clay grey, like the default Soft Clay
     bool showPolypaint = true;   // vertex colours replace baseColor when the mesh has them
+    // The active colour tints the Lit Sphere material on meshes with no vertex paint (Color palette, as ZBrush's
+    // main colour does): materialTint multiplies the material there, white leaves it as it is (materialTintFor).
+    bool colorTintsMaterial = true;
+    glm::vec3 materialTint{1.0f};
     bool showTexture = true;     // with showPolypaint: a SubTool's painted texture (core/Texture.h) multiplies in
     bool showMask = true;        // masked areas render darker (ZBrush style)
     bool showPolygroups = false; // colour each polygroup (see polygroupColor)
@@ -413,7 +417,7 @@ private:
         GLuint id = 0;
         GLint view = -1, proj = -1, gridOrigin = -1, gridStep = -1, viewport = -1, projScale = -1, baseColor = -1, paint = -1,
               showMask = -1, groups = -1, matcap = -1, matcapCavity = -1, dim = -1, primBase = -1, hasPaint = -1,
-              normalFlipY = -1, twoSided = -1, checker = -1, checkerScale = -1;
+              normalFlipY = -1, twoSided = -1, checker = -1, checkerScale = -1, tintShift = -1;
         GLint hasOrm = -1, hasEmissive = -1, hasMatNormal = -1, envLevels = -1, exposure = -1, toneMap = -1, material = -1,
               pbrCavity = -1, viewToEnv = -1, sh = -1;
         GLint ghostGroups = -1, ghostRange = -1, ghostEdge = -1, ghostA = -1, ghostB = -1, ghostC = -1, ghostBound = -1, ghostKind = -1, ghostFocal = -1;

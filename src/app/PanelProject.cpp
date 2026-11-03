@@ -285,6 +285,7 @@ void App::storeProjectSettings() {
     render.set("wireframe", renderSettings_.wireframe);
     render.set("base_color", vec3Json(renderSettings_.baseColor));
     render.set("show_polypaint", renderSettings_.showPolypaint);
+    render.set("color_tints_material", renderSettings_.colorTintsMaterial);
     render.set("show_mask", renderSettings_.showMask);
     render.set("show_polygroups", renderSettings_.showPolygroups);
     render.set("show_mesh", renderSettings_.showMesh);
@@ -327,6 +328,7 @@ void App::storeProjectSettings() {
     brush.set("strength", double(strength_));
     brush.set("smooth_strength", double(smoothStrength_));
     brush.set("smooth_keep_volume", smoothKeepVolume_);
+    brush.set("smooth_group_borders", smoothGroupBorders_);
     brush.set("rgb_intensity", double(rgbIntensity_));
     brush.set("focal_shift", double(focalShift_));
     brush.set("invert", invertToggle_);
@@ -382,6 +384,7 @@ void App::applyProjectSettings() {
         readBool(r, "wireframe", renderSettings_.wireframe);
         readVec3(r["base_color"], renderSettings_.baseColor);
         readBool(r, "show_polypaint", renderSettings_.showPolypaint);
+        readBool(r, "color_tints_material", renderSettings_.colorTintsMaterial);
         readBool(r, "show_mask", renderSettings_.showMask);
         readBool(r, "show_polygroups", renderSettings_.showPolygroups);
         readBool(r, "show_mesh", renderSettings_.showMesh);
@@ -455,6 +458,7 @@ void App::applyProjectSettings() {
         focalShift_ = std::clamp(focalShift_, -1.0f, 1.0f);
         readBool(b, "invert", invertToggle_);
         readBool(b, "smooth_keep_volume", smoothKeepVolume_);
+        readBool(b, "smooth_group_borders", smoothGroupBorders_);
         readBool(b, "front_faces_only", frontFacesOnly_);
         readBool(b, "connected_only", uiPrefs_.connectedOnly);
         readBool(b, "view_falloff", uiPrefs_.viewFalloff);

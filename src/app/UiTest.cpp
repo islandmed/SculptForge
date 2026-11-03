@@ -92,6 +92,7 @@
 //                            viewport_cursor (the system cursor: 0 arrow, 1 text, 7 hand, 100 crosshair; #73),
 //                            smooth_keep_volume (Brush > Smooth keeps volume), stroke_keep_volume (1 when Smooth
 //                            dabs keep the volume now: the option, flipped by letting go of Shift mid-stroke),
+//                            smooth_group_borders (Brush > Smooth face group borders only, #81),
 //                            moved_out (summed movement along the snapshot's normals: > 0 out, < 0 in),
 //                            pen_pressure (raw), brush_pressure (after the curve; 1 for the mouse),
 //                            stroke_continuous (Stroke > Continuous, 1 on),
@@ -454,6 +455,7 @@ double Demo::query(const std::string& name, bool& known) const {
     // ZBrush feel (Input.cpp): the intensities and Focal Shift as shown (0-100, -100..100).
     if (name == "z_intensity") return std::round(app_.strength_ * 100.0f);
     if (name == "smooth_keep_volume") return app_.smoothKeepVolume_ ? 1.0 : 0.0;
+    if (name == "smooth_group_borders") return app_.smoothGroupBorders_ ? 1.0 : 0.0;
     if (name == "stroke_keep_volume") return app_.dabSettings().smoothKeepVolume ? 1.0 : 0.0; // (Smooth's dabs)
     if (name == "smooth_intensity") return std::round(app_.smoothStrength_ * 100.0f);
     if (name == "rgb_intensity") return std::round(app_.rgbIntensity_ * 100.0f);
