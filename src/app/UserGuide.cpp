@@ -1025,7 +1025,9 @@ float UserGuide::layoutBlocks(App& app, int first, int end, ImVec2 origin, float
 void UserGuide::prepareWhatsNew() {
     const int i = book_.find("whats-new.md");
     if (i < 0) return;
-    whatsNew_ = whatsnew::build(book_.chapters()[size_t(i)].doc, SCULPTFORGE_VERSION);
+    // SF_GUIDE_VERSION shows the chapter as of another version (ui_whats_new pins the newest section it checks).
+    const char* as = std::getenv("SF_GUIDE_VERSION");
+    whatsNew_ = whatsnew::build(book_.chapters()[size_t(i)].doc, as && *as ? as : SCULPTFORGE_VERSION);
     expanded_.clear();
     if (!whatsNew_.versions.empty()) expanded_[whatsNew_.versions[0].anchor] = true; // the newest one is open
 }
