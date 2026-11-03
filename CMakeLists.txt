@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(SculptForge VERSION 0.10.9 LANGUAGES C CXX)
+project(SculptForge VERSION 0.10.10 LANGUAGES C CXX)
 include(GNUInstallDirs)
 
 set(CMAKE_CXX_STANDARD 20)

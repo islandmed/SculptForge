@@ -8,9 +8,36 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.10.10
 
 ```features
-date: unreleased
+date: 2026-11-03
 tagline: Close Holes, Clip and X-Ray, light you can turn, a faster view on slow machines, and more SpaceMouse devices.
+highlight: Mask and Cut shapes in the stroke popup, no keys held
+highlight: Close Holes, Clip and X-Ray
 ```
+
+- **Shapes in the stroke popup**: press **G** and pick Mask Pen, Lasso or Rect, or Cut Line, Lasso, Rect or Polyline.
+  A plain drag then masks or cuts with that shape, no Ctrl or Ctrl+Shift held (with a mask shape on, Ctrl unmasks).
+  Pick it again to turn it off.
+- **Background jobs keep your Part**: a Quad Remesh, Voxel Remesh, Auto UV or Unwrap that finishes after you picked
+  another Part puts its result on its own Part; the Part you picked stays active.
+- **SpaceMouse detection** (#104): more 3Dconnexion devices are recognised (by name, also over Bluetooth), and **Edit
+  > Preferences > Input > SpaceMouse** lists every controller SculptForge sees, says when another program (3DxWare,
+  spacenavd) holds the device, and has **Copy device report** for bug reports.
+- **Also new since 0.10.9** (missing from its notes): the brush ring is a true circle lying on the surface, symmetry
+  copies show as dots, the crosshair stays while you turn the view, and **Preferences > Cursor > Hide ring while
+  stroking** leaves only the dot while you sculpt (#88); drag empty panel space, or middle-drag anywhere in a panel,
+  to scroll it with a pen (#100); Neutral is the default look for new installs; **Look > Outlines** (#98); the Strokes
+  ring on <kbd>J</kbd>.
+- **Close Holes**: **Tool > Geometry > Close Holes** caps every open boundary of a Part with a patch that follows the
+  curve of the surface around it.
+- **Clip**: **Tool > Cut > Clip** presses everything on one side of a line, or outside a lasso or rectangle, flat onto
+  the shape. Nothing is removed. Use it for hard-surface planes and clean silhouettes.
+- **X-Ray**: the **X-Ray** button next to **Solo** shows the active Part through the others. It is also in **View**.
+- **Light**: **Render > Materials > Light** turns the light around the model with a small pad, and sets its intensity
+  and ambient light.
+- **View resolution**: **View** or **Preferences > Performance** draws the 3D view at 75% or 50% for slow GPUs.
+- **Save Render** sizes (up to 4096 px), shapes (1:1, 16:9, 9:16, 4:3) and JPG.
+- **Membership card**: a cleaner look, with a calm warm light instead of the sculpt picture, and the perks now say it
+  plainly: members **vote on what we build next** (#feature-vote on Discord; anyone can suggest in #ideas).
 
 ## Version 0.10.9
 

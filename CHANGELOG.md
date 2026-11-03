@@ -6,11 +6,77 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.10] - 2026-11-03
+
 ### Changed
 - "Your first sculpt in 10 minutes" makes a cute owl head instead of the mushroom house: ear tufts pulled with
   Move, face discs dug with Alt+Clay, a beak, Divide three times, inflated eyes and Clay brows, then brown, cream,
   amber and orange Vertex Paint and a PBR render. Every step sets the brush's size (brushes keep their own since
   0.10.9). New step pictures and What's New card, made from tests/ui/first_sculpt.sfui and a 2x Save Render.
+- Faster CI for branches and pull requests: the VFX Reference Platform and Blender add-on checks run on main, in the
+  merge queue and on request (label `full-ci`, or a dispatch with full=true); Windows tests run on 4 runners; CMake's
+  configure checks are cached; old compiler caches are pruned so main's stay warm (prune-caches.yml); docs-only
+  changes skip the build; every test job lists its slowest tests in the job summary.
+- Release notes come from one note fragment per branch, `changes/<branch>.md` (changes/README.md);
+  `scripts/release.sh` step bump assembles them into CHANGELOG.md and What's New, and the update feed's highlights
+  default to the version's highlight lines.
+- SpaceMouse recognition (#104): a device whose name says 3Dconnexion counts whatever its USB ids, and one with no
+  vendor id (as some systems report Bluetooth devices) counts when its name says SpaceMouse / SpaceNavigator; the
+  CadMouse and the keyboards never do.
+- 0.10.9 notes, added late (they were lost in that release's merges; the code shipped in 0.10.9): brush cursor (#88,
+  TheRedWaxPolice, with rodrigomoretto): the ring is a true circle in the surface's tangent plane, symmetry and radial
+  copies are dots, the crosshair stays while the view turns, pans or zooms, and Preferences > Cursor has Hide ring
+  while stroking (off by default). Panels scroll with a left-drag on empty space or a middle-drag (#100, ebarranco).
+  Neutral is the default look for new installs; Look > Outlines and Outline opacity (#98); the Strokes radial menu on
+  J; viewport hints with Don't show again (Preferences > Hints).
+- The membership page (sculptforge.app/support.html), the studios page and the in-app membership card drop the lion
+  picture for a calm header: type, a warm glow in the site's orange and a faint grid; on the site it follows light and
+  dark mode. The picture is no longer embedded in the app (about 115 KB smaller).
+- Every paid membership lists **Vote on what we build next**: members vote in #feature-vote on Discord, anyone can
+  suggest in #ideas, and members' votes pick what ships. Insiders also propose the options.
+
+### Added
+- **Stroke popup > Shapes** (Discord, Darth): Mask Pen, Mask Lasso, Mask Rect, Cut Line, Cut Lasso, Cut Rect and Cut
+  Polyline. Picking one latches Mask or Select with that shape, so a plain drag masks or cuts with it; with Mask
+  latched a held Ctrl unmasks. The cursor label names the shape (e.g. "Cut Line").
+- SpaceMouse (#104, reported by fenixpoints): Preferences > Input > SpaceMouse lists each joystick SDL reports (name,
+  USB ids, and why it was or wasn't taken: not a SpaceMouse, cannot open, fewer than six axes), warns when the
+  SpaceMouse is open but no axis has moved (another program such as 3DxWare holds it), and **Copy device report**
+  copies that list with the version, platform and SDL version. Skipped devices are also logged.
+- **Close Holes** (Tool > Geometry, `close_holes`, #103): caps every open boundary of the active Part (a hole, an open
+  bottom, the rim of an extracted shell) with new triangles sized like the ones around it. The patch is faired into
+  the curvature around the hole, so a sphere closes round, not flat. The rest of the Part is not changed, and the
+  patches get a face group of their own. `max_edges` closes only the small holes. Thanks to the reporter of #103.
+- **Clip** mode for Cut (Tool > Cut, `cut mode=clip`, #102): a line or open polyline presses its shaded side flat onto
+  itself, and a lasso, rectangle or closed polyline presses everything outside it onto its outline. Points keep their
+  depth and nothing is removed. The cut goes through the whole Part, follows symmetry, and the mask holds points back.
+  Thanks to the reporter of #102.
+- **X-Ray** (`xray`, #80, #91): a button next to Solo in Tool > Parts, and a View checkbox. The other Parts turn
+  see-through and only their nearest surface shows, so the active Part shows through them. When only the active Part
+  is shown, it is see-through itself.
+- **Light controls** (Render > Materials > Light, `light`, #80): drag on the pad to turn the light of the Lit Sphere
+  and the studio shading. Intensity and Ambient sliders sit beside it, and Reset goes back to the material's own
+  light. The light is saved in the project.
+- **View resolution** (View and Preferences > Performance, `view_resolution`, #80): 100%, 75% or 50%. The 3D view is
+  drawn smaller and scaled up, which helps slow or integrated GPUs. Save Render stays at full resolution.
+- **Save Render** sizes, shapes and JPG (Render > Materials, `save_render`, #80): twice the view (as before) or 1080,
+  1920, 2048 or 4096 pixels on the longer side. Shapes: the view's, 1:1, 16:9, 9:16 or 4:3 (a narrower shape widens
+  the field of view, so the picture still shows what the view shows). Output is PNG or JPG.
+
+### Fixed
+- The active Part no longer switches by itself (Discord, Oslen): a background job (Quad Remesh, Voxel Remesh with Keep
+  Texture, Auto UV, UV Editor Unwrap) that finished after another Part was picked made its own Part active again, and
+  cut short a stroke in progress. Its result now goes onto its own Part, waits for a stroke to end, and the status bar
+  says where it went.
+- A triple-click no longer switches the Part while a pen is in range: a Wacom side button set to Double Click (the
+  Intuos 3 default) followed by a tap counted as one (Discord, Oslen).
+- With two screens, an unfocused window kept drawing only what a background job asked for: a Sculpt Timeline timelapse
+  render and the hardware calibration stopped until the pointer came back (Discord, Tiagoffcruz). Full screen no
+  longer minimises when you click on another monitor.
+- A Smooth, Mask or Select latch from the stroke popup came back after picking another brush and then the first one
+  again.
+- The Library's close button works on small screens at a large UI scale (#80). When the tabs don't fit beside it, they
+  fold into a drop-down, and the Sculpt Timeline no longer covers the Library's header (720p at 150%, ZBrush layout).
 
 ## [0.10.9] - 2026-11-02
 
