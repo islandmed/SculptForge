@@ -90,11 +90,11 @@ expect_value brush_type == 0
 key 3
 expect_value brush_type == 0
 
-# --- L: LazyMouse on and off; V: swap the main and secondary colour ---
+# --- L: Steady Stroke (ZBrush: LazyMouse) on and off, with any stroke type; V: swap the main and secondary colour ---
 key l
-expect_value lazy_mouse == 1
+expect_value steady_stroke == 1
 key l
-expect_value lazy_mouse == 0
+expect_value steady_stroke == 0
 remember paint_r red0
 key v
 expect_value paint_r != $red0
