@@ -48,7 +48,7 @@ paints the current colour along its stroke. The Smooth brush and <kbd>Shift</kbd
 
 - The **left shelf** has a colour picker (a square plus a hue strip), two swatches and a **Fill** button. Clicking
   the second swatch swaps it with the main colour, like ZBrush's Alternate.
-- The **Color** palette has a larger hue wheel with a hex value, ten preset swatches (white, near black, red,
+- The **Paint** menu has a larger hue wheel with a hex value, ten preset swatches (white, near black, red,
   orange, yellow, green, blue, purple, skin and brown) and the fill buttons.
 - Press <kbd>C</kbd> with the cursor over the model to pick the colour under it (the mesh needs vertex paint for this,
   or a texture while painting into the texture).
@@ -175,7 +175,7 @@ To choose one:
 - Press <kbd>M</kbd> for the material picker under the cursor, or click the **Material** tile on the left shelf.
   Point at a material to preview it on the model, click to keep it. <kbd>Esc</kbd> or clicking away puts the
   previous material back.
-- Open the **Material** palette, or the **Material** tab of the Library.
+- Open **Render > Materials**, or the **Material** tab of the Library.
 
 ![The material picker with the seven Lit Spheres and Studio](images/material-picker.jpg)
 
@@ -217,7 +217,7 @@ shading lights every polygon on its own, so you see the faces: how the mesh is b
 exactly what a stroke, crease or pinch did to the geometry, without smooth blending hiding small lumps. It helps
 most when blocking out forms on a low-poly base mesh.
 
-- **Material** palette > **Shading**: **Smooth** | **Flat** for the whole scene. The same buttons are in
+- **Render > Materials > Shading**: **Smooth** | **Flat** for the whole scene. The same buttons are in
   **Tool > Display**.
 - **This Part**: **Scene** (the default) follows the scene's shading; **Smooth** or **Flat** keeps the active
   Part that way whatever the scene says, for example a flat body with smooth eyes.

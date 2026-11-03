@@ -396,7 +396,7 @@ between the canvas and the bottom shelf. It works like ZBrush's ZScript window:
   ratio=0.5`. <kbd>Tab</kbd> completes command and parameter names, <kbd>Up</kbd> and <kbd>Down</kbd> recall
   earlier lines, and `help` (or `help remesh`) explains commands.
 - Drag the console's top edge to make it taller or shorter.
-- The **Script** palette has **Run script file...**, **Copy session as script** (every command you ran this
+- **File > Script** has **Run script file...**, **Copy session as script** (every command you ran this
   session, ready to replay, which makes it a macro recorder) and **Clear console**.
 
 ![The console after a few commands](images/console.jpg)
@@ -509,7 +509,7 @@ left-drag rotates, right- or middle-drag pans and <kbd>Ctrl</kbd>+drag zooms (se
 
 ### The background
 
-**Edit > Preferences > Display** (and the **Render** palette) sets the view's **Background**: **Gradient**, the
+**Edit > Preferences > Display** (and the **View** menu) sets the view's **Background**: **Gradient**, the
 charcoal radial gradient (the default), or **Flat Colour**, one solid colour without the gradient. Click the
 **Background colour** swatch to pick the colour; picking one switches to Flat Colour. **Store Config** keeps the
 choice for the next session, and each project keeps the background it was saved with. From a script:

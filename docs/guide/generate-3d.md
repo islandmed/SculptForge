@@ -26,7 +26,7 @@ Any of these opens it:
 
 - Drop an image file (PNG, JPG, BMP, TGA, PSD or GIF) onto the SculptForge window. The image is loaded as the
   picture for the **From image** tab and the window opens.
-- Open the **Generate** palette and click **Generate 3D**.
+- Open **Mesh > Generate 3D** and click **Generate 3D**.
 - Press <kbd>F3</kbd>, type `generate` and press <kbd>Enter</kbd>.
 
 The window has two tabs, **From image** and **From text**.
@@ -208,7 +208,7 @@ SculptForge. Keys in `ai.json` are readable only by your user account. See
 ## Quick shapes from an image (offline)
 
 The **From image** tab also has three offline tools under **Quick shapes (offline)**. They need no network and
-run instantly. The same tools are in the **Generate** palette as **Relief**, **Inflate** and **Stamp**.
+run instantly. The same tools are in **Mesh > Generate 3D** as **Relief**, **Inflate** and **Stamp**.
 
 | Tool | What it makes | Settings |
 |---|---|---|

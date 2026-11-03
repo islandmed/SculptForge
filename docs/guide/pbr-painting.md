@@ -35,7 +35,7 @@ what was painted in it; **Undo** brings it back.
 
 ## Paint a material
 
-Open the **Color** palette. With a material texture, a **Material** section appears under the swatches:
+Open the **Paint** menu. With a material texture, a **Material** section appears under the swatches:
 
 ![Paint > Material: material swatches, and per channel a tick, value swatches and a slider; Material Channels in Tool > Texture Map](images/pbr-brush-material.jpg)
 

@@ -41,7 +41,7 @@ The capture decides the quality far more than the settings do.
 
 ## Train a splat
 
-1. Open the **Splats** palette (the **Splats** menu, or press <kbd>F3</kbd> and type "train").
+1. Open **Render > Gaussian Splats** (or press <kbd>F3</kbd> and type "train").
 2. Under **Train from capture**, pick a preset: **Fast preview** or **Quality**.
 3. Click **Video...** and pick the video, or **Photos Folder...** and pick the folder of photos. You can also drop a
    video file onto the window. Captures sent from the phone link start by themselves.

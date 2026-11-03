@@ -105,7 +105,7 @@ on a laptop trackpad, or when the model fills the canvas and there is no backgro
 | **Zoom** | Zoom: drag up to come closer, down to move away |
 | **Rotate** | Orbit the view |
 
-The button stays orange while you drag. **Frame** is also in the **Render** and **Transform** palettes.
+The button stays orange while you drag. **Frame** is also in the **View** menu and **Sculpt > Symmetry & Gizmo**.
 
 ## SpaceMouse (experimental)
 
@@ -179,7 +179,7 @@ unusual scale.
 
 ## Display toggles that help navigation
 
-These live on the right shelf and in the **Render** palette:
+These live on the right shelf and in the **View** menu:
 
 - **Wire** (<kbd>Shift</kbd>+<kbd>F</kbd>): shows the polygons of the active Part over
   the surface, ZBrush's PolyFrame. Quads show as quads (see [Quads and triangles](geometry.md#quads-and-triangles)).

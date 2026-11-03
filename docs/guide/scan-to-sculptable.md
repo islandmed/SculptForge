@@ -13,7 +13,7 @@ colours as vertex paint or a texture. One click, in the background, with the spl
    `.usdz` onto the window. Place it with **Flip**, **Turn 90** and **Fit** if it arrives upside down.
 2. For a head, turn the view so you look at the face, roughly from the front (within about 40 degrees is
    enough). The face is looked for from the current view.
-3. In the **Splats** palette, under **From scan**, click **Make sculptable**.
+3. In **Render > Gaussian Splats**, under **From scan**, click **Make sculptable**.
 
 A progress bar and **Cancel** show while it works. When it's done:
 

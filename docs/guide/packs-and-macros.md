@@ -29,7 +29,7 @@ example **Clay (Member pack)**.
 |---|---|
 | Brushes and VDMs | The brush lists, the Brush picker and **Library > Brush**, tagged with the pack's name. |
 | Alphas | The Alpha picker (a **Packs** section) and **Library > Alpha**, as **Name (Pack)**. |
-| Lit Spheres | **Material** and **Library > Material**, as **Name (Pack)**. |
+| Lit Spheres | **Render > Materials** and **Library > Material**, as **Name (Pack)**. |
 | Material Recipes | The **Material Recipe** list under **Tool > Paint Layers > Fill**, as **Name (Pack)**. |
 | Keymaps | **Library > Packs > Details > Apply keymap**, and **Edit > Preferences > Input > Pack keymaps**. |
 | Pie menus | **Library > Packs > Details > Add pie menu** (it becomes one of your radial menus). |

@@ -8,7 +8,7 @@ pivot at the shoulder and swing the arm. It works like ZBrush's Gizmo 3D, with t
 
 ## The three modes
 
-Press a key, or click the button on the top shelf (they're also in the **Transform** palette):
+Press a key, or click the button on the top shelf (they're also in **Sculpt > Symmetry & Gizmo**):
 
 | Key | Mode | What you drag |
 |---|---|---|

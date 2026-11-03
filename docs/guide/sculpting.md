@@ -129,7 +129,7 @@ and on custom brushes also **Copy brush code**, **Rename...**, **Save as .sfbrus
 ## Draw Size, Intensity, RGB Intensity and Falloff
 
 These values control every brush. Draw Size and Intensity are on the top shelf;
-all four are in the **Draw** palette and the [Quick Menu](#the-quick-menu).
+all four are in **Sculpt > Draw & Tablet** and the [Quick Menu](#the-quick-menu).
 
 | Setting | Range | Default | How to change it |
 |---|---|---|---|
@@ -186,7 +186,7 @@ bumps but leaves the form where it is (a Taubin smooth, one step in and a slight
 
 - **Alternate smooth**, as in ZBrush: start a stroke with <kbd>Shift</kbd> held, then let go of <kbd>Shift</kbd>
   while still pressing. The rest of the stroke uses the other smooth, and the status line says which.
-- **Smooth keeps volume** in the **Brush** palette makes the volume-keeping smooth the one <kbd>Shift</kbd> and
+- **Smooth keeps volume** in **Sculpt > Brush** makes the volume-keeping smooth the one <kbd>Shift</kbd> and
   the Smooth brush use; letting go of <kbd>Shift</kbd> mid-stroke then switches to the plain one. Saved with the
   project.
 
@@ -198,7 +198,7 @@ quads keep their shape (#69).
 
 ## Sculpt, Paint, Add, Sub, Rgb and Front
 
-These toggles sit on the top shelf and in the **Draw** palette:
+These toggles sit on the top shelf and in **Sculpt > Draw & Tablet**:
 
 | Control | What it does |
 |---|---|
@@ -207,12 +207,12 @@ These toggles sit on the top shelf and in the **Draw** palette:
 | **Rgb** | Sculpt brushes also paint the current colour as they sculpt (ZBrush: Rgb with Zadd). |
 | **Front** | Front faces only: brushes leave the far side of thin parts alone, such as the back of an ear or a cape. |
 
-The **Brush** palette has the same Front and invert settings as the checkboxes **Front faces only** and
+**Sculpt > Brush** has the same Front and invert settings as the checkboxes **Front faces only** and
 **Invert (Alt)**.
 
 ### Falloff options
 
-Two more checkboxes in the **Brush** palette change what a brush reaches, as Blender's proportional editing
+Two more checkboxes in **Sculpt > Brush** change what a brush reaches, as Blender's proportional editing
 does (from the discussions). Both work with every sculpt brush, recipes, VDM stamps, masking and vertex paint, and
 are saved with the preferences and the project (custom brushes can turn them on for themselves in the Brush Lab):
 
@@ -307,7 +307,7 @@ Smooth takes about 0.5 s, Balloon 0.7 s, Relax 0.9 s and Polish 2 s (Apple M1 Pr
 ## Strokes
 
 The stroke type decides how cursor movement becomes brush dabs. Choose it from the **Stroke** tile on the left
-shelf, which opens the stroke picker, or from the **Stroke** palette.
+shelf, which opens the stroke picker, or from **Sculpt > Stroke**.
 
 ![The stroke picker](images/stroke-picker.jpg)
 
@@ -322,7 +322,7 @@ shelf, which opens the stroke picker, or from the **Stroke** palette.
 The setting slider appears under the stroke tiles when **Spray** or **Lazy Stroke** is selected. With Lazy Stroke,
 the viewport draws the string between the cursor and the brush point.
 
-**Continuous**, under the stroke tiles in the stroke picker and in the **Stroke** palette, keeps the brush working
+**Continuous**, under the stroke tiles in the stroke picker and in **Sculpt > Stroke**, keeps the brush working
 while you hold it still on the model (30 dabs a second), with any stroke type.
 
 Notes:
@@ -341,7 +341,7 @@ Notes:
 
 An alpha is a grayscale stamp that shapes the brush tip: white is full effect, black is none. It affects every
 brush, built-in or custom. Choose one from the **Alpha** tile on the left shelf (the alpha picker) or the
-**Alpha** palette, which also shows a large preview of the current alpha.
+**Sculpt > Alpha**, which also shows a large preview of the current alpha.
 [Falloff](#draw-size-intensity-rgb-intensity-and-falloff) fades it as in ZBrush: set it to -100 to
 stamp the whole alpha (a crisp square, or a pattern out to its edges), 0 for a soft round fade, +100 for a soft
 point.
@@ -371,7 +371,7 @@ shipped). They show in the alpha picker and in the Library's **Alpha** tab (`bru
 
 To use your own image:
 
-1. Click **Load image...** in the alpha picker or the **Alpha** palette.
+1. Click **Load image...** in the alpha picker or **Sculpt > Alpha**.
 2. Choose a PNG, JPG, BMP, TGA, PSD or GIF. Colour images are converted to grayscale.
 3. Turn on **Invert loaded image** *before* loading if your image is white where it should have no effect.
 
@@ -411,7 +411,7 @@ overhang, as nothing made with a height ever can.
 
 ### Stamp a VDM
 
-1. Open the **Brush** palette and its **Vector Displacement** section, and click a map: **Horn**, **Ear Curl**,
+1. Open **Sculpt > Brush** and its **Vector Displacement** section, and click a map: **Horn**, **Ear Curl**,
    **Scales**, **Nostril**, **Rivet** (a domed head whose rim overhangs), **Stitches** (thread bars across a seam,
    drawing it together), **Skin Fold** (a roll of skin hanging over a crease), **Wrinkle Line** (a fine pinched
    crease), **Crack** (a jagged split whose sides part) or **Rock Ledge** (a stepped shelf jutting out over the
@@ -570,7 +570,7 @@ Symmetry mirrors every stroke, including mask and paint strokes.
 - **Y** mirrors top and bottom, and **Z** mirrors front and back. They have no default key (you can assign one;
   see [The interface](interface.md)).
 
-The **X**, **Y** and **Z** buttons are on the top shelf and in the **Transform** palette. You can combine them:
+The **X**, **Y** and **Z** buttons are on the top shelf and in **Sculpt > Symmetry & Gizmo**. You can combine them:
 X and Z together give four-way symmetry.
 
 Symmetry mirrors across the scene's axes through the origin. Models that are centred on the origin, such as
@@ -610,7 +610,7 @@ that take `symmetry` (`stroke`, `vdm_stamp`, `mask_rect`, `mask_lasso`, `hide_re
 ## Pen pressure and tablets
 
 SculptForge reads pen pressure from graphics tablets and pen displays through the operating system. When it
-receives pen input, the **Draw** palette shows **Pen pressure** with the current value; before that it says
+receives pen input, **Sculpt > Draw & Tablet** shows **Pen pressure** with the current value; before that it says
 **No pen detected**.
 
 Two toggles decide what pressure does. They are on the top shelf and in **Sculpt > Draw & Tablet > Tablet**:

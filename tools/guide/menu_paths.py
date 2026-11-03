@@ -50,9 +50,13 @@ def phrase(m: re.Match) -> str:
     return (m.group(2) or "") + "**" + where + "** menu"
 
 
+BOLD_NAME = re.compile(r"\*\*(" + "|".join(MENUS) + r")\*\* palette\b")  # "the **Draw** palette"
+
+
 def convert(text: str) -> str:
     out = []
     for line in text.split("\n"):
+        line = BOLD_NAME.sub(r"\1 palette", line)
         if line.startswith("| ") and line.count("|") > 2:
             # Tables: leave the first cell (other apps' names in the glossary and the ZBrush chapter).
             first, rest = line[2:].split("|", 1)

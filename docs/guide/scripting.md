@@ -52,7 +52,7 @@ the bottom shelf. Drag its top edge to resize it.
 - `help` (or `?`) lists every command; `help remesh` explains one command and its parameters.
 - `clear` empties the log.
 
-The console buttons (also in the **Script** palette):
+The console buttons (also in **File > Script**):
 
 | Button | What it does |
 |---|---|

@@ -46,7 +46,7 @@ documentation** opens links to it).
 - Turn off **Wireframe** (<kbd>Shift</kbd>+<kbd>F</kbd>) on dense meshes.
 - Hide Parts you aren't working on, or **Solo** the active one.
 - A large Gaussian splat capture costs GPU time too: lower the count with **Clean floaters**, or untick
-  **Show** in the **Splats** palette while you sculpt.
+  **Show** in **Render > Gaussian Splats** while you sculpt.
 - On laptops with two GPUs, make sure SculptForge runs on the dedicated one (in the GPU maker's control panel
   or the operating system's graphics settings).
 - **Edit > Preferences > Performance**: lower **Antialiasing** (or turn it off), keep **Fast Navigation** on, and look
@@ -60,7 +60,7 @@ documentation** opens links to it).
 SculptForge reads pen pressure through the operating system's standard pen input, so most Wacom, XP-Pen, Huion
 and similar tablets, and pen displays, work without settings.
 
-1. Open the **Draw** palette. Under **Tablet** it shows "Pen pressure: 0.42" once the pen has come near the
+1. Open **Sculpt > Draw & Tablet**. Under **Tablet** it shows "Pen pressure: 0.42" once the pen has come near the
    tablet, or "No pen detected".
 2. **Pressure > strength** (on by default) and **Pressure > size** choose what pressure controls. They are
    also on the top shelf.

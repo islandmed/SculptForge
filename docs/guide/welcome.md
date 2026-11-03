@@ -6,8 +6,9 @@ explains what it is, what it can and can't do yet, and how the rest of this guid
 ## What SculptForge is
 
 SculptForge is a focused sculpting tool with the brushes, symmetry, masking and navigation that ZBrush artists
-already know, built around a ZBrush-style interface: shelves around a canvas, alphabetical palettes that hold
-every function, a Library of thumbnails and pop-up pickers. It runs natively on Windows, macOS and Linux,
+already know. Its menus are grouped by task (**File, Edit, Sculpt, Paint, Mesh, View, Render, Help**), with
+shelves around the canvas, a Library of thumbnails and pop-up pickers; a ZBrush-style layout with alphabetical
+palettes is one click away. It runs natively on Windows, macOS and Linux,
 starts in a moment, works offline and costs nothing. ZBrush's keys and gestures are one choice away: answer
 **ZBrush** when the first start asks what you are coming from, or pick **ZBrush-style** in **Edit > Preferences > Input**.
 See [Coming from ZBrush](coming-from-zbrush.md). There is no account, no subscription, no licence server
@@ -17,9 +18,9 @@ It is free software under the GNU General Public License v3.0 or later. You own 
 the GPL covers the program, not your models.
 
 SculptForge stays free and works the same for everyone; nothing is ever paywalled. Memberships add your name to
-the credits, the monthly pack and a vote on what gets built, and for Insiders daily drops and preview builds about
-a week early (every release stays free for everyone; bug-fix and security releases go out to everyone the same
-day): **Help > Support SculptForge...** opens [sculptforge.app/support.html](https://sculptforge.app/support.html) in your browser, where you can become a
+the credits, the monthly pack and a vote on what gets built. Insiders will get each release about two weeks
+early, starting with SculptForge 1.0 (every release stays free for everyone; bug-fix and security releases go out
+to everyone the same day): **Help > Support SculptForge...** opens [sculptforge.app/support.html](https://sculptforge.app/support.html) in your browser, where you can become a
 member. That is all it does: the app has no payment code, no account and no licence check. Supporters are thanked
 by name in **Help > About**. While SculptForge starts (the first time, after an update, and at most once a week
 otherwise) a card shows the memberships; **I'm already a supporter** hides it for good and **Edit > Preferences > Support**
@@ -28,8 +29,8 @@ of the canvas, once, and never again after you close it.
 
 ## What you can do with it
 
-- **Sculpt** with fourteen built-in brushes (Standard, Clay, Clay Block, Sharp Crease, Move, Smooth,
-  Inflate, Pinch, Flatten, Crease, Trim, Tendril, Layer and Nudge), four stroke types, brush alphas, X/Y/Z
+- **Sculpt** with more than twenty built-in brushes (Standard, Clay, Clay Block, Sharp Crease, Move, Smooth,
+  Inflate, Pinch, Flatten, Crease, Trim, Tendril, Layer, Nudge, VDM, the Kelvinlet brushes and more), four stroke types, brush alphas, X/Y/Z
   symmetry and tablet pressure. See [Sculpting and brushes](sculpting.md).
 - **Design brushes in words** with Brush Lab: describe "dry cracked mud" and an AI builds a brush recipe you
   can tweak with sliders, keep in your library and share as a file or a one-line brush code. See [Brush Lab
@@ -56,10 +57,9 @@ of the canvas, once, and never again after you close it.
 
 ## What it doesn't do yet
 
-SculptForge is young (version 0.8; see [What's new](whats-new.md)). Some things ZBrush artists rely on are
+SculptForge is young (version 0.10; see [What's new](whats-new.md)). Some things ZBrush artists rely on are
 still on the roadmap:
 
-- Quad Remesh curve guides.
 - Painting across UDIM tiles (the [UV Editor](uv-editor.md) lays them out; painting covers tile 1001).
 - Booleans and stencils.
 
@@ -71,7 +71,8 @@ files directly (bring models over with Send to ZBrush, the ZTL Export plug-in fo
 
 ## Coming from ZBrush
 
-Most habits carry over. You sculpt with a left drag, hold <kbd>Alt</kbd> to subtract and <kbd>Shift</kbd> to
+Most habits carry over, and **Edit > Preferences > Interface > Look > Layout > ZBrush-style** brings back the
+alphabetical palette bar. You sculpt with a left drag, hold <kbd>Alt</kbd> to subtract and <kbd>Shift</kbd> to
 smooth, drag on the background to rotate, <kbd>Alt</kbd>+drag to pan, and hold <kbd>Ctrl</kbd> to mask. The
 palettes have the names you expect (Alpha, Brush, Stroke, Tool, Transform...), the Tool palette holds the
 Parts (ZBrush's SubTool), Masking and Face Groups (Polygroups) sub-palettes, <kbd>B</kbd> opens the brush pop-up with the same letter keys
@@ -83,8 +84,8 @@ what differs and every shortcut side by side; the [Glossary](glossary.md) maps Z
 
 ## How this guide is organised
 
-- **Getting started**: [installing](installing.md), [the interface](interface.md) and [navigating the
-  view](navigation.md).
+- **Getting started**: [installing](installing.md) (with [Windows notes](installing.md#windows)), [the
+  interface](interface.md), [navigating the view](navigation.md) and [troubleshooting](troubleshooting.md).
 - **Sculpting**: brushes, Brush Lab, masking, face groups, Parts, vertex paint, layers and mesh operations.
 - **AI and capture**: generating models from images and text, and Gaussian splats.
 - **Files and pipelines**: exporting, projects, scripting and studio deployment.
@@ -102,8 +103,9 @@ and links between chapters. Two other kinds of help are always a keystroke away:
 ## Getting help and reporting problems
 
 **Help > Report a problem** opens the issue tracker on GitHub
-([github.com/islandmed/SculptForge/issues](https://github.com/islandmed/SculptForge/issues)). Include your
-operating system, your graphics card and what you did just before the problem; see [Troubleshooting and
+([github.com/islandmed/SculptForge/issues](https://github.com/islandmed/SculptForge/issues)). The form asks for
+your hardware: operating system, CPU and RAM, graphics card and driver, and your tablet and its driver if you use
+one. Add what you did just before the problem; see [Troubleshooting and
 FAQ](troubleshooting.md) for what else helps. **Help > Website & documentation** opens the [SculptForge
 website](https://sculptforge.app/).
 

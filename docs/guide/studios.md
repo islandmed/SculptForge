@@ -149,8 +149,9 @@ SculptForge is free for any number of artists, and nothing in the app is ever pa
 ($300 a month; **Founding Studio:** the first 10 studios lock in $150 a month for as long as they stay
 subscribed) covers your whole company, with no seat count:
 
-- **Insider for every artist:** the monthly pack, daily drops (a brush, alpha or VDM almost every day), preview
-  builds of the next release about a week early, the feature vote and the monthly dev Q&A.
+- **Insider for every artist:** the monthly pack, daily drops (a brush, alpha or VDM almost every day), the
+  feature vote and the monthly dev Q&A. Insiders will get each release about two weeks early, starting with
+  SculptForge 1.0.
 - **A custom studio build** with your presets, keymaps, packs, shelves and pipeline defaults baked in.
 - **Custom content:** brushes, alphas, VDMs, macros and pipeline presets made for your team.
 - **Guided development:** your requests go to the front of the roadmap, with a monthly call or async review
