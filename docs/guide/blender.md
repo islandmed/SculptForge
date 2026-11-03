@@ -104,7 +104,7 @@ add-on. The preferences list every key while it's on.
 | <kbd>X</kbd> | Symmetry X |
 | <kbd>Shift</kbd>+<kbd>F</kbd> | Wireframe (the wireframe overlay) |
 | <kbd>F</kbd> / <kbd>P</kbd> | Frame the model / perspective on and off |
-| <kbd>L</kbd> | Lazy Stroke (Blender: Stabilize Stroke) |
+| <kbd>L</kbd> | Steady Stroke (Blender: Stabilize Stroke) |
 | <kbd>W</kbd> / <kbd>E</kbd> / <kbd>R</kbd> | Move / Scale / Rotate |
 | <kbd>Shift</kbd>+drag | Smooth (Blender already does this) |
 

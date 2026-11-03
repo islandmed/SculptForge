@@ -348,8 +348,10 @@ void App::drawPalette_Brush() {
 void App::drawPalette_Draw() {
     const tray::Style style; // quiet check marks
     ImGui::SetNextItemWidth(-1);
-    ui::SliderInside("##drawsize", &radiusPx_, 2.0f, 800.0f, "Draw Size %.0f", ImGuiSliderFlags_Logarithmic);
-    ui::HelpText("Draw Size", "S", "Brush radius in screen pixels. [ and ] change it by 10%.", "Draw");
+    drawSizeSlider("##drawsize", "Draw",
+                   "Brush radius in screen pixels (0.5 to 800), and in mm on the surface under the cursor. [ and ] change "
+                   "it by 10%, Shift+[ and Shift+] by 1 px; Ctrl+Shift+right-drag scrubs it finely.");
+    ui::ActionButton(*this, "brush.world_size", ImVec2(-1, 0));
     ImGui::SetNextItemWidth(-1);
     drawZIntensitySlider("##strength");
     ImGui::SetNextItemWidth(-1);

@@ -57,9 +57,11 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Draw Size at cursor | <kbd>S</kbd> | A Draw Size slider under the cursor: drag it, or type a number and press Enter. |
 | Falloff at cursor | <kbd>O</kbd> | A Falloff slider under the cursor: below 0 a broad, hard brush tip, above 0 a soft point (-100..100). The inner ring of the brush cursor shows it. |
 | Intensity at cursor | <kbd>U</kbd> or <kbd>I</kbd> | A Intensity slider under the cursor: drag it, or type a number (1-100) and press Enter. Hold Shift (or pick Smooth) to set Smooth's own Intensity. |
-| Larger brush | <kbd>]</kbd> | Make the brush 10% larger (hold to repeat). |
+| Larger brush | <kbd>]</kbd> | Make the brush 10% larger (hold to repeat; Shift+] steps one pixel). |
+| Larger brush by 1 px | <kbd>Shift</kbd>+<kbd>]</kbd> | Make the brush one pixel larger (half a pixel below 2 px). |
 | Paint | <kbd>P</kbd> | Paint colour without sculpting (ZBrush Rgb on, Zadd off). Alt paints back to white, Shift still smooths. |
-| Smaller brush | <kbd>[</kbd> | Make the brush 10% smaller (hold to repeat). |
+| Smaller brush | <kbd>[</kbd> | Make the brush 10% smaller (hold to repeat; Shift+[ steps one pixel). |
+| Smaller brush by 1 px | <kbd>Shift</kbd>+<kbd>[</kbd> | Make the brush one pixel smaller (half a pixel below 2 px), down to 0.5 px. |
 
 ### Edit
 
@@ -131,7 +133,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 
 | Action | Keys | What it does |
 |---|---|---|
-| Lazy Stroke | <kbd>L</kbd> | Lazy Stroke on or off: the brush trails the cursor on a string, for steady lines. |
+| Steady Stroke | <kbd>L</kbd> | Steady Stroke on or off, with every stroke type (Dots, Drag Stamp, Slide Stamp, Spray): the brush trails the cursor on a string and only moves once the string is taut, for steady lines without hand shake. |
 
 ### Tool
 

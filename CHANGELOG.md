@@ -54,6 +54,16 @@ All notable changes to SculptForge are listed here. The format follows
   Detail loads in under and ahead of the brush and wherever the camera would show it; everything else shows a
   coarse version. Saving writes only the changed tiles. Try `sculptforge --benchmark standard-1b` or
   `sculptforge --focus-detail FILE.sfdetail`; design and numbers in docs/design/focus-detail.md.
+- Precision work (guide: Sculpting > Precision work). **Steady Stroke** (<kbd>L</kbd>) now works with every stroke
+  type (Dots, Drag Stamp, Slide Stamp, Spray), with **Catch up on release** (finish the line to the cursor) and the
+  string drawn to the lagging brush; the Lazy Stroke type is Dots with it on. **World Size** (Draw palette) keeps
+  Draw Size in model units, so the brush stays the same size on the surface as you zoom; every Draw Size slider
+  and the cursor show px and mm. Draw Size goes down to 0.5 px; <kbd>Shift</kbd>+<kbd>[</kbd> /
+  <kbd>Shift</kbd>+<kbd>]</kbd> step 1 px, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+right-drag scrubs the size finely,
+  and small brushes space their dabs closer so tiny strokes stay continuous. **Precision drag**: hold
+  <kbd>Shift</kbd>+<kbd>Alt</kbd> while drawing and the brush moves at a quarter of the pen's speed, at
+  **Precision Intensity**. **A pressure curve per brush**: 2 to 5 points with Soft, Linear, Firm and Fine detail
+  presets, in Brush Lab and Preferences > Tablet.
 
 ### Changed
 - What's New is a window now: after an update (and from **Help > What's New**) a centred card shows the version's main
@@ -107,6 +117,10 @@ All notable changes to SculptForge are listed here. The format follows
   under them (#86, thanks tristratos).
 - The enlarged brush or alpha thumbnail you point at in a picker is drawn over its neighbours again, not
   under them (#86, thanks tristratos).
+- The brush centre now sits exactly under the cursor at high zoom and on HiDPI screens: the brush's ray is worked
+  out from the camera directly, and the view is drawn on whole pixels where the rays are cast (it could be up to
+  half a pixel off). The surface point under the brush is lightly filtered, so strokes on dense meshes no longer
+  wobble.
 
 ## [0.10.8] - 2026-11-02
 

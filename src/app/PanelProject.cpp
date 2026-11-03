@@ -448,7 +448,7 @@ void App::applyProjectSettings() {
         readFloat(b, "smooth_strength", smoothStrength_);
         readFloat(b, "rgb_intensity", rgbIntensity_);
         readFloat(b, "focal_shift", focalShift_);
-        radiusPx_ = std::clamp(radiusPx_, 2.0f, 800.0f);
+        radiusPx_ = clampDrawSize(radiusPx_);
         strength_ = std::clamp(strength_, 0.0f, 1.0f);
         smoothStrength_ = std::clamp(smoothStrength_, 0.0f, 1.0f);
         rgbIntensity_ = std::clamp(rgbIntensity_, 0.0f, 1.0f);

@@ -92,6 +92,12 @@ action: guide:whats-new.md
 - **Focus Detail (experimental)**: sculpt a head of a billion micro triangles from one compressed file. Detail
   loads where you look and where the brush is heading, and the rest shows a lighter version. Saving writes only
   what you changed. Try it with `sculptforge --benchmark standard-1b` (Linux and macOS for now).
+- **Precision work** for pores, wrinkles, jewellery and trims: **Steady Stroke** (<kbd>L</kbd>) with every stroke
+  type and a catch-up on release; **World Size**, so the brush keeps its size in mm on the surface as you zoom;
+  Draw Size down to 0.5 px with <kbd>Shift</kbd>+<kbd>[</kbd> / <kbd>]</kbd> for 1 px steps; hold
+  <kbd>Shift</kbd>+<kbd>Alt</kbd> while drawing to move the brush at a quarter of the pen's speed; and a pressure
+  curve for each brush with a **Fine detail** preset. The brush centre now sits exactly under the cursor at any
+  zoom. See [Precision work](sculpting.md#precision-work).
 
 ## Version 0.10.8
 

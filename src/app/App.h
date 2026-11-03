@@ -33,6 +33,7 @@
 #include "core/AutoUv.h"
 #include "core/QRemesh.h"
 #include "core/RadialMenu.h"
+#include "core/Precision.h"
 #include "core/Stroke.h"
 #include "core/StrokePath.h"
 #include "core/SurfaceCursor.h"
@@ -142,7 +143,7 @@ public:
 
 private:
     enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, SubToolClick, Select, Gizmo, Guide, Sculptable, ZSphere, Insert, Capture,
-                      AirStroke, UvTool }; // AirStroke: a stroke begun off the model, waiting to reach it (#62)
+                      AirStroke, UvTool, SizeScrub }; // AirStroke: a stroke begun off the model, waiting to reach it (#62)
 
     void handleEvent(const SDL_Event& e);
     void onMouseDown(float x, float y, Uint8 button);
@@ -293,6 +294,8 @@ private:
     struct DabSettings {
         float radiusPx = 60.0f, strength = 0.5f, smoothStrength = 0.5f, focal = 0.0f, maskStrength = 1.0f;
         float sprayScatter = 1.0f;
+        float worldRadius = 0.0f; // World Size: the brush radius in model units (0: Draw Size in pixels)
+        PressurePoints pressureCurve; // the brush's own (after the tablet's global curve)
         bool smoothKeepVolume = false; // Smooth keeps the volume (smoothKeepVolume_, or the alternate smooth)
         bool pressureSize = false, pressureStrength = true, invert = false, frontFacesOnly = false;
         bool connectedOnly = false, viewFalloff = false; // the falloff options (Brush palette)
@@ -593,6 +596,64 @@ private:
     bool strokeContinuous_ = false; // Stroke > Continuous (#31): keep dabbing while the pointer rests
     double strokeMovedAt_ = 0.0, continuousDabAt_ = 0.0;
     LazyMouse lazyMouse_;
+    // Precision work (Precision.cpp, core/Precision.h). Steady Stroke (L) puts every stroke type's brush on
+    // lazyMouse_'s string, not only the Lazy Stroke type; Catch up finishes the line to the pointer on release.
+    bool steadyStroke_ = false;
+    bool steadyCatchUp_ = true;
+    bool steadyOn() const { return steadyStroke_ || strokeType_ == StrokeType::LazyMouse; }
+    glm::vec2 steadyCursor_{0.0f}; // where the pointer is (the string's far end) during a steady stroke
+    void steadyCatchUp(); // on release: the brush point runs on to the pointer
+    // World Size: Draw Size kept in model units, so the brush stays the same size on the surface as you zoom.
+    bool worldSize_ = false;
+    float worldRadius_ = 0.0f;   // model units (shown in mm)
+    float worldSyncedPx_ = 0.0f; // radiusPx_ as worldSize sync last set it (a different value: the user set it)
+    float cursorWorldPerPx_ = 0.0f; // at the surface under the pointer (0: not seen yet)
+    void syncWorldSize();           // every frame, outside strokes
+    std::string drawSizeLabel() const; // "Draw Size %.1f px  0.42 mm" (an ImGui slider format)
+    std::string drawSizeStatus() const; // "Draw Size 3.5 px (0.42 mm)"
+    void drawPrecisionCursor(ImDrawList* dl, ImVec2 cursor, float radius, ImU32 col);
+    void drawPrecisionOptions(); // the Stroke picker: Steady Stroke, its radius and catch-up, Precision Intensity
+    glm::vec3 cursorSurface_{0.0f}; // the surface point last under the cursor (World Size measures there)
+    bool haveCursorSurface_ = false;
+    float sizeReadoutPx_ = 0.0f;   // the size readout by the brush shows for a moment after a change
+    double sizeReadoutUntil_ = 0.0;
+    void drawSizeSlider(const char* id, const char* helpPath, const char* help);
+    // Shift+Alt held mid-stroke: the brush moves at a quarter of the pen's speed and dabs at Precision Intensity.
+    PrecisionDrag precision_;
+    bool precisionActive_ = false;
+    float precisionIntensity_ = 0.1f;
+    bool precisionHeld() const;
+    // Ctrl+Shift+right-drag: scrubs the Draw Size finely (Drag::SizeScrub).
+    float sizeScrubStart_ = 0.0f, sizeScrubDx_ = 0.0f;
+    // The surface pick under each dab, filtered along its ray so dense meshes don't wobble the stroke.
+    PickSmoother pickSmoother_;
+    struct DabAccuracy { // this stroke's dabs (UI tests): how far they land from the cursor, how much they wobble
+        float maxErrorPx = 0.0f;
+        double jitterRaw = 0.0, jitterFiltered = 0.0; // mean |second difference| of the depth, in brush radii
+        int count = 0;
+        float raw[2] = {0, 0}, filtered[2] = {0, 0};
+        void add(float t, float f, float radius) {
+            if (count >= 2 && radius > 0.0f) {
+                jitterRaw += std::abs(t - 2.0f * raw[1] + raw[0]) / radius;
+                jitterFiltered += std::abs(f - 2.0f * filtered[1] + filtered[0]) / radius;
+            }
+            raw[0] = raw[1], raw[1] = t, filtered[0] = filtered[1], filtered[1] = f;
+            ++count;
+        }
+    } dabAccuracy_;
+    // Each brush's own pressure curve (Brush Lab, Preferences > Tablet), keyed as per-brush settings are (#78:
+    // "builtin:<brush>", "custom:<recipe>"); <app data>/brush-curves.json keeps them.
+    std::map<std::string, PressurePoints> brushCurves_;
+    std::string pressureCurveKey() const;
+    std::string pressureCurveKey(BrushType type, const BrushRecipe* recipe) const;
+    std::string brushCurvesPath() const; // empty in tests and recordings
+    PressurePoints strokeCurve_;  // the curve of the brush this stroke draws with
+    PressurePoints& brushCurve(); // the current brush's (linear until edited)
+    const PressurePoints* activeBrushCurve() const;
+    void brushCurvesChanged();
+    void loadBrushCurves();
+    void drawPressureCurveEditor(const char* id, float width);
+    int curveDragPoint_ = -1;
     Spray spray_;
     float sprayScatter_ = 1.0f;          // jitter radius as a fraction of brush size
     glm::vec2 dragAnchor_{0.0f};         // DragRect: where the click landed (window pixels)

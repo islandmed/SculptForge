@@ -562,6 +562,10 @@ void App::drawTabletSection() {
                  path);
     t.curve.fullAt = std::max(t.curve.fullAt, t.curve.threshold + 0.05f);
 
+    // --- The current brush's own curve (after the one above; Brush Lab shows the same) ---
+    ImGui::Spacing();
+    drawPressureCurveEditor("prefs_brush_curve", width);
+
     // --- Pressure > Strength / Size: the same toggles as the top shelf ---
     ImGui::Spacing();
     const float tw = (width - ImGui::GetStyle().ItemSpacing.x) * 0.5f;

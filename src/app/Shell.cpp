@@ -762,7 +762,17 @@ CanvasRect App::canvasRect() const {
     int w = 0, h = 0;
     SDL_GetWindowSize(window_, &w, &h);
     if (hideUi_) return {0.0f, 0.0f, float(std::max(w, 1)), float(std::max(h, 1))};
-    return computeShell(layout_, float(w), float(h), uiScale_, topInset(), shellMetrics()).canvas;
+    CanvasRect c = computeShell(layout_, float(w), float(h), uiScale_, topInset(), shellMetrics()).canvas;
+    // On whole framebuffer pixels, as canvasViewport draws it: with a fractional rect (HiDPI, UI scales) the view
+    // was drawn up to half a pixel from where the rays for the brush were cast.
+    int pw = 0, ph = 0;
+    if (w > 0 && h > 0 && SDL_GetWindowSizeInPixels(window_, &pw, &ph) && pw > 0 && ph > 0) {
+        const float sx = float(pw) / float(w), sy = float(ph) / float(h);
+        const float x0 = std::round(c.x * sx) / sx, x1 = std::round((c.x + c.w) * sx) / sx;
+        const float y0 = std::round(c.y * sy) / sy, y1 = std::round((c.y + c.h) * sy) / sy;
+        c = {x0, y0, std::max(x1 - x0, 1.0f / sx), std::max(y1 - y0, 1.0f / sy)};
+    }
+    return c;
 }
 
 void App::canvasRay(float x, float y, glm::vec3& origin, glm::vec3& dir) const {
@@ -2022,8 +2032,10 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         ImGui::SetNextItemWidth(vertical ? 180.0f * s
                                          : std::clamp(item == "widget.draw_size" ? avail * 0.5f : avail, 120.0f * s, 180.0f * s));
         if (item == "widget.draw_size") {
-            ui::SliderInside("##drawsize", &radiusPx_, 2.0f, 800.0f, "Draw Size %.0f", ImGuiSliderFlags_Logarithmic);
-            ui::HelpText("Draw Size", "S", "Brush radius in screen pixels. [ and ] change it by 10%; Ctrl+click to type.", "Draw");
+            drawSizeSlider("##drawsize", "Draw",
+                           "Brush radius in screen pixels (0.5 to 800), and in mm on the surface under the cursor. [ and ] "
+                           "change it by 10%, Shift+[ and Shift+] by 1 px, Ctrl+Shift+right-drag scrubs it finely; "
+                           "Ctrl+click to type.");
         } else {
             drawZIntensitySlider("##strength");
         }

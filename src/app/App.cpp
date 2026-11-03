@@ -311,6 +311,7 @@ bool App::init(const AppOptions& options) {
     initProject(); // before opening anything, so it lands in the recent files
     initActions(); // the default shortcuts and every command, for keys, help and the command palette
     initBrushSettings(); // each brush's own size, intensity, stroke and alpha (#78)
+    loadBrushCurves(); // each brush's own pressure curve (Precision.cpp)
     initPhoneActions(); // File > Capture from phone (PanelPhone.cpp)
     initLightBox();
     runCommand("new_sphere");
@@ -956,7 +957,7 @@ int App::run() {
                                 double(sm.view.distance), double(now.distance), double(sm.view.w), double(sm.view.h), double(now.w), double(now.h));
                 else if (verify && !verifyStroke(sm.before, sm.dabs, sm.radii)) return 1;
                 // The test (ui_stroke_path, a light sphere): every dab placed, all of them on the circle.
-                const float spacing = std::max(1.0f, radiusPx_ * 0.15f);
+                const float spacing = dabSpacingPx(radiusPx_, 0.15f);
                 const double expected = 4.0 * 3.14159265358979 * double(sm.r) / double(spacing);
                 if (std::getenv("SF_MEASURE_RESIZE")) return 0; // (the spacing changed with the size: verify checked it)
                 const bool enough = double(sm.dabs.size()) >= 0.9 * expected, onCircle = !off.empty() && off.back() < spacing;
@@ -1347,6 +1348,14 @@ void App::onMouseDown(float x, float y, Uint8 button) {
             return;
         }
     }
+    if (button == SDL_BUTTON_RIGHT && ctrlDown(SDL_GetModState()) && (SDL_GetModState() & SDL_KMOD_SHIFT) &&
+        !(SDL_GetModState() & SDL_KMOD_ALT)) { // in every input style (Ctrl+right-drag still zooms)
+        drag_ = Drag::SizeScrub; // Ctrl+Shift+right-drag: Draw Size, finely (Precision.cpp)
+        sizeScrubStart_ = radiusPx_;
+        sizeScrubDx_ = 0.0f;
+        rightClick_.pending = false;
+        return;
+    }
     if (blenderStyle() && blenderNavigationDown(button)) return; // middle / Alt+left / right drags navigate
     if (mayaStyle() && mayaNavigationDown(button)) return;       // Alt+left / middle / right: orbit / pan / zoom
     if (button == SDL_BUTTON_LEFT) {
@@ -1518,6 +1527,10 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     case Drag::Capture: captureMouseMove(x, y); break;
     case Drag::ZSphere: zsphereDragTo(x, y); break;
     case Drag::AirStroke: airStrokeTo(x, y); break;
+    case Drag::SizeScrub:
+        sizeScrubDx_ += dx;
+        radiusPx_ = drawSizeScrub(sizeScrubStart_, sizeScrubDx_);
+        break;
     case Drag::None: break;
     }
 }
@@ -1590,6 +1603,8 @@ void App::onMouseUp() {
             runCommand("insert_primitive", args);
         }
     }
+    if (drag_ == Drag::Stroke && !maskClickPending_) steadyCatchUp(); // Steady Stroke: on to the pointer (Precision.cpp)
+    if (drag_ == Drag::SizeScrub) status_ = drawSizeStatus();
     if (drag_ == Drag::Stroke && maskClickPending_) maskClickRelease(); // Ctrl+click: blur / sharpen the mask
     else if (drag_ == Drag::Stroke && asyncStroke_) {
         // Predictive strokes: letting go doesn't wait for the dabs still to place; the solver carries on and
@@ -1684,11 +1699,20 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     straight_ = {};
     straight_.shiftAtStart = (inputMods() & SDL_KMOD_SHIFT) != 0;
     strokeAltSmooth_ = false;
+    precision_.reset(glm::vec2(x, y)); // (Precision.cpp)
+    dabAccuracy_ = {};
+    precisionActive_ = false;
+    steadyCursor_ = glm::vec2(x, y);
+    pickSmoother_.reset();
     strokeInvert_ = invertToggle_ != (((inputMods() & SDL_KMOD_ALT) != 0) || (erasing() && eraserAction() == PenAction::Invert));
     // Shift still smooths geometry while the Paint brush is active (ZBrush behaviour).
     strokePaint_ = strokeBrush_ != BrushType::Smooth && (paintMode_ || paintRgb_);
     strokeSculpt_ = !(strokePaint_ && paintMode_);
     const BrushRecipe* recipe = strokeRecipe();
+    { // the brush's own pressure curve (Precision.cpp)
+        const auto it = brushCurves_.find(pressureCurveKey(strokeBrush_, recipe));
+        strokeCurve_ = it == brushCurves_.end() ? PressurePoints() : it->second;
+    }
     haveLastDab_ = false;
     doc_.sculptor.draftStrokes = draftStrokes() && asyncStrokeAllowed(); // (AsyncStroke.cpp)
     if (!doc_.sculptor.beginStroke(doc_.mesh,
@@ -1785,6 +1809,12 @@ void App::strokeTo(float x, float y) {
         maskClickPending_ = false;
         firstDab(maskClickX_, maskClickY_);
     }
+    { // Shift+Alt held: the brush moves at a quarter of the pen's speed (Precision.cpp)
+        precisionActive_ = precisionHeld();
+        const glm::vec2 p = precision_.follow(glm::vec2(x, y), precisionActive_);
+        x = p.x;
+        y = p.y;
+    }
     const BrushRecipe* recipe = strokeRecipe();
     if (strokeBrush_ == BrushType::Move && !recipe && strokeSculpt_ && strokeAlongNormal_) {
         const glm::vec3 p = alongNormalTarget(x, y);
@@ -1812,6 +1842,12 @@ void App::strokeTo(float x, float y) {
         snakeHookTo(x, y);
         return;
     }
+    if (steadyOn()) { // Steady Stroke, with every stroke type: the brush trails the pointer on a string
+        steadyCursor_ = glm::vec2(x, y);
+        const glm::vec2 lazy = lazyMouse_.follow(steadyCursor_);
+        x = lazy.x;
+        y = lazy.y;
+    }
     if (strokeType_ == StrokeType::DragRect && !strokeMask_) { // mask strokes paint dots
         dragRectTo(x, y);
         return;
@@ -1819,11 +1855,6 @@ void App::strokeTo(float x, float y) {
     if (strokeType_ == StrokeType::DragDot && !strokeMask_) {
         dragDotTo(x, y);
         return;
-    }
-    if (strokeType_ == StrokeType::LazyMouse) {
-        const glm::vec2 lazy = lazyMouse_.follow(glm::vec2(x, y));
-        x = lazy.x;
-        y = lazy.y;
     }
     { // Shift pressed after the stroke began: a straight line (ZBrush)
         const glm::vec2 c = constrainStroke(x, y);
@@ -1852,7 +1883,7 @@ void App::strokeTo(float x, float y) {
     // dab of a long gap before the next look at the pointer made the gaps longer still, until the stroke was one
     // straight line. The interactive loop works through the queue for a limited time per frame (drainStrokeDabs),
     // and a gap between samples that is long is drawn as a curve (core/StrokePath.h).
-    const float spacing = std::max(1.0f, radiusPx_ * (recipe ? recipe->spacing : 0.15f));
+    const float spacing = dabSpacingPx(radiusPx_, recipe ? recipe->spacing : 0.15f); // (tiny brushes: closer)
     const float p0 = lastStrokePressure_, p1 = strokePressure();
     strokeScratch_.clear();
     // (a Shift line stays straight: no curve through its corner)
@@ -1942,12 +1973,37 @@ void App::dabAt(float x, float y, float pressure) {
     RayHit hit;
     if (!(dabView_ ? pickWith(*dabView_, x, y, hit) : pick(x, y, hit))) return;
     if (pressure < 0.0f) pressure = strokePressure();
+    pressure = st.pressureCurve.apply(pressure); // the brush's own curve, after the tablet's
+
+    const float canvasH = dabView_ ? dabView_->canvas.h : canvasHeight();
+    const float baseRadius = st.worldRadius > 0.0f ? st.worldRadius : st.radiusPx * cam.worldPerPixel(hit.position, canvasH);
+    { // The hit's distance along the ray, filtered: on dense meshes it jitters with every tiny bump (Precision.cpp)
+        const glm::vec3 eye = cam.position();
+        const glm::vec3 ray = cam.ortho ? cam.forward() : hit.position - eye;
+        const float len = glm::length(ray);
+        if (len > 1e-9f) {
+            const glm::vec3 dir = ray / len;
+            const glm::vec3 from = cam.ortho ? hit.position - dir * glm::dot(hit.position - eye, dir) : eye;
+            const float t = glm::dot(hit.position - from, dir);
+            const float filtered = pickSmoother_.filter(t, baseRadius * 0.5f);
+            hit.position = from + dir * filtered;
+            if (!dabView_) dabAccuracy_.add(t, filtered, baseRadius);
+        }
+    }
+    if (!dabView_) { // where the dab's centre shows on screen, against where it was asked for (UI tests: sub-pixel)
+        const CanvasRect cr = canvasRect();
+        const glm::vec4 clip = cam.projection() * cam.view() * glm::vec4(hit.position, 1.0f);
+        if (clip.w != 0.0f) {
+            const glm::vec2 ndc = glm::vec2(clip) / clip.w;
+            const glm::vec2 shown(cr.x + (ndc.x + 1.0f) * 0.5f * cr.w, cr.y + (1.0f - ndc.y) * 0.5f * cr.h);
+            dabAccuracy_.maxErrorPx = std::max(dabAccuracy_.maxErrorPx, glm::distance(shown, glm::vec2(x, y)));
+        }
+    }
 
     DabParams p;
     p.center = hit.position;
     p.viewDir = cam.forward();
-    p.radius = st.radiusPx * (st.pressureSize ? std::max(pressure, 0.05f) : 1.0f) *
-               cam.worldPerPixel(hit.position, dabView_ ? dabView_->canvas.h : canvasHeight()) * dabRadiusScale_;
+    p.radius = baseRadius * (st.pressureSize ? std::max(pressure, 0.05f) : 1.0f) * dabRadiusScale_;
     // Smooth keeps its own Z Intensity (ZBrush), whether picked or held with Shift.
     p.strength = (st.brush == BrushType::Smooth ? st.smoothStrength : st.strength) * dabStrengthScale_;
     p.keepVolume = st.brush == BrushType::Smooth && st.smoothKeepVolume;
@@ -2321,6 +2377,7 @@ void App::drawUi() {
     drawTimelineUi();  // the Sculpt Timeline strip, timelapse, proof mode HUD (PanelTimeline.cpp, ProofMode.cpp)
     pollAlphaFile();
     syncBrushSettings(); // a brush switch brings back that brush's own settings (#78); before pollVdm's stroke
+    syncWorldSize(); // World Size: the brush keeps its size on the surface as you zoom (Precision.cpp)
     pollVdm();
     if (previewLod_ >= 0) {
         const CanvasRect c = canvasRect();
@@ -2637,6 +2694,7 @@ void App::drawRecipeEditor(BrushRecipe& recipe) {
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", p.help);
     }
     ImGui::PopItemWidth();
+    drawPressureCurveEditor("lab_brush_curve", ImGui::GetContentRegionAvail().x); // this brush's own (Precision.cpp)
     const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
     if (ImGui::Button("Save .sfbrush...", ImVec2(half, 0))) saveFileDialog(FileAction::SaveBrush);
     ImGui::SameLine();
@@ -3584,12 +3642,7 @@ void App::drawBrushCursor() {
             dl->AddCircleFilled(c, 2.0f * uiScale_, col);
         }
     }
-    if (strokeType_ == StrokeType::LazyMouse && drag_ == Drag::Stroke) {
-        // The string from the cursor to the lagging brush point.
-        const ImVec2 lp(lazyMouse_.point.x, lazyMouse_.point.y);
-        dl->AddLine(c, lp, IM_COL32(255, 255, 255, 120), 1.0f);
-        dl->AddCircleFilled(lp, 3.0f, col);
-    }
+    drawPrecisionCursor(dl, c, r, col); // Steady Stroke's string, the precision drag, the size in mm (Precision.cpp)
 }
 
 } // namespace sf

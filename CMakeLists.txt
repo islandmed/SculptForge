@@ -71,6 +71,7 @@ add_library(sculptforge_core STATIC
   src/core/Masking.cpp
   src/core/BrushAlpha.cpp
   src/core/Stroke.cpp
+  src/core/Precision.cpp
   src/core/PathStroke.cpp
   src/core/Sha256.cpp
   src/core/BrushGallery.cpp
@@ -297,6 +298,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelPerformanceProfile.cpp
     src/app/CrashLog.cpp
     src/app/App.cpp
+    src/app/Precision.cpp
     src/app/AsyncStroke.cpp
     src/app/Demo.cpp
     src/app/UiTest.cpp

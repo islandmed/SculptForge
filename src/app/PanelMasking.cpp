@@ -73,6 +73,11 @@ void App::beginMaskStroke(float x, float y) {
     strokePath_.reset(x, y);
     dabQueue_.clear();
     lazyMouse_.reset(glm::vec2(x, y));
+    steadyCursor_ = glm::vec2(x, y);
+    precision_.reset(glm::vec2(x, y));
+    precisionActive_ = false;
+    pickSmoother_.reset();
+    strokeCurve_ = PressurePoints(); // (mask strokes: the tablet's curve only)
     // ZBrush: a Ctrl+click on the model blurs the mask (Ctrl+Alt+click sharpens it); only a drag paints. The
     // pen's eraser end set to Erase mask paints straight away.
     maskClickPending_ = ctrlDown(inputMods()) && !blenderStyle(); // (Blender's Mask brush dabs on a click)

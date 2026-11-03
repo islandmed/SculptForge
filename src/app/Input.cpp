@@ -88,10 +88,38 @@ void App::registerInputActions() {
         [this] { openQuickMenu(); }, [this] { return quickMenu_.open; });
 
     // Stroke and colour.
-    add("stroke.lazy", "Lazy Stroke", ICON_LC_SPLINE, "Stroke", "L",
-        "Lazy Stroke on or off: the brush trails the cursor on a string, for steady lines.",
-        [this] { strokeType_ = strokeType_ == StrokeType::LazyMouse ? StrokeType::Dots : StrokeType::LazyMouse; },
-        [this] { return strokeType_ == StrokeType::LazyMouse; });
+    // (The id stays stroke.lazy so keys people set keep working; the Lazy Stroke type is Dots on the string.)
+    add("stroke.lazy", "Steady Stroke", ICON_LC_SPLINE, "Stroke", "L",
+        "Steady Stroke on or off, with every stroke type (Dots, Drag Stamp, Slide Stamp, Spray): the brush trails "
+        "the cursor on a string and only moves once the string is taut, for steady lines without hand shake.",
+        [this] {
+            if (strokeType_ == StrokeType::LazyMouse) { // the Lazy Stroke type is on: L turns the string off
+                strokeType_ = StrokeType::Dots;
+                steadyStroke_ = false;
+            } else {
+                steadyStroke_ = !steadyStroke_;
+            }
+            status_ = steadyOn() ? "Steady Stroke on" : "Steady Stroke off";
+        },
+        [this] { return steadyOn(); });
+    add("stroke.steady_catch_up", "Catch up on release", ICON_LC_SPLINE, "Stroke", "",
+        "Steady Stroke: when you let go, the line runs on to where the cursor is, instead of stopping a string's "
+        "length behind it.",
+        [this] { steadyCatchUp_ = !steadyCatchUp_; }, [this] { return steadyCatchUp_; });
+    add("brush.world_size", "World Size", ICON_LC_RULER, "Draw", "",
+        "Keep the brush size in model units (mm) instead of screen pixels: it stays the same on the surface as you "
+        "zoom in and out, for pores, wrinkles and trims of an exact width.",
+        [this] {
+            worldSize_ = !worldSize_;
+            worldSyncedPx_ = -1.0f; // the size as it is now becomes the world size
+            status_ = worldSize_ ? "World Size on: the brush keeps its size on the surface" : "World Size off";
+        },
+        [this] { return worldSize_; });
+    add("brush.size_down_fine", "Smaller brush by 1 px", ICON_LC_MINUS, "Draw", "Shift+[",
+        "Make the brush one pixel smaller (half a pixel below 2 px), down to 0.5 px.",
+        [this] { radiusPx_ = drawSizeStep(radiusPx_, -1, true); });
+    add("brush.size_up_fine", "Larger brush by 1 px", ICON_LC_PLUS, "Draw", "Shift+]",
+        "Make the brush one pixel larger (half a pixel below 2 px).", [this] { radiusPx_ = drawSizeStep(radiusPx_, 1, true); });
     // One action per stroke type (U13): the Strokes radial menu (J) and the command palette pick them directly.
     {
         static const char* const keys[] = {"dots", "drag_stamp", "slide_stamp", "spray", "lazy"};
@@ -609,7 +637,8 @@ void App::groupMasked() {
 // ---------------------------------------------------------------------------
 
 glm::vec2 App::constrainStroke(float x, float y) {
-    if (straight_.shiftAtStart || !(inputMods() & SDL_KMOD_SHIFT)) {
+    // (Shift+Alt is the precision drag, not a Shift line)
+    if (straight_.shiftAtStart || !(inputMods() & SDL_KMOD_SHIFT) || precisionHeld()) {
         straight_.active = false;
         return {x, y};
     }
@@ -702,8 +731,7 @@ void App::drawQuickMenu() {
         ImGui::BeginGroup();
         const float sw = 150.0f * s;
         ImGui::SetNextItemWidth(sw);
-        ui::SliderInside("##qm_drawsize", &radiusPx_, 2.0f, 800.0f, "Draw Size %.0f", ImGuiSliderFlags_Logarithmic);
-        ui::HelpText("Draw Size", "S", "Brush radius in screen pixels.", "Quick Menu");
+        drawSizeSlider("##qm_drawsize", "Quick Menu", "Brush radius in screen pixels (0.5 to 800), and in mm on the surface.");
         float focal = focalShift_ * 100.0f;
         ImGui::SetNextItemWidth(sw);
         if (ui::SliderInside("##qm_focal", &focal, -100.0f, 100.0f, "Falloff %.0f")) focalShift_ = focal / 100.0f;
