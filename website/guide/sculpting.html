@@ -228,6 +228,26 @@ Mask strokes (<kbd>Ctrl</kbd>) always use dots, even when Drag Stamp or Slide St
 Custom brushes set their own dab spacing and can add jitter (see <a href="brush-lab.html">Brush Lab</a>).
 </li>
 </ul>
+<h3 id="the-stroke-popup">The stroke popup<a class="anchor" href="#the-stroke-popup" aria-label="Link to this section">#</a></h3>
+<p>Press <kbd>G</kbd> (<kbd>Z</kbd> in the Blender style) for a grid under the cursor, or click the grid button under the <strong>Stroke</strong> tile on the left shelf. The top row holds the stroke types, the bottom row the modifiers:</p>
+<div class="table-wrap"><table><thead><tr><th>Modifier</th><th>What it does</th><th>Instead of holding</th></tr></thead><tbody><tr><td><strong>Add</strong> / <strong>Sub</strong></td><td>Brushes add to or subtract from the surface (the same switch as Add / Sub on the top shelf).</td><td><kbd>Alt</kbd></td></tr><tr><td><strong>Smooth</strong></td><td>Strokes smooth.</td><td><kbd>Shift</kbd></td></tr><tr><td><strong>Mask</strong></td><td>Strokes paint the mask (<kbd>Alt</kbd> still unmasks).</td><td><kbd>Ctrl</kbd></td></tr><tr><td><strong>Select</strong></td><td>Strokes draw the selection (hide) shape.</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd></td></tr></tbody></table></div>
+<ul>
+<li>
+<strong>Hold and let go</strong>: hold <kbd>G</kbd>, move over an item and let go. It opens with your current stroke under the pointer, so letting go without moving changes nothing. A pen hovering over the tablet works the same.
+</li>
+<li>
+<strong>Tap and click</strong>: tap <kbd>G</kbd> and the grid stays open. Click a stroke to pick it (the grid closes); click a modifier to switch it (the grid stays open, so you can set a stroke too). <kbd>Esc</kbd> or a click beside the grid closes it. The click never touches the model.
+</li>
+<li>
+<strong>Smooth, Mask and Select stay on</strong> until you pick the same one again or pick another brush. A small label next to the brush cursor shows which one is on. Dragging beside the model still turns the view.
+</li>
+<li>
+The <strong>Strokes</strong> radial menu (<kbd>J</kbd>, see <a href="#radial-menus">Radial menus</a>) picks a stroke type too; the popup adds the modifiers and shows every choice at once.
+</li>
+<li>
+Change the key in <strong>Edit &gt; Preferences &gt; Hotkeys</strong> (<em>Stroke popup</em>), or hold <kbd>Ctrl</kbd>+<kbd>Alt</kbd> and click the shelf button, then press the new key.
+</li>
+</ul>
 <aside class="callout callout-zbrush"><p><strong>ZBrush:</strong> Drag Stamp, Slide Stamp, Spray and Steady Stroke match ZBrush&#x27;s DragRect, DragDot, Spray and LazyMouse. Freehand and Dots are the same thing here. Roll and curve strokes are not available yet.</p></aside>
 <h2 id="precision-work">Precision work<a class="anchor" href="#precision-work" aria-label="Link to this section">#</a></h2>
 <p>Pores, wrinkles, jewellery and hard-surface trims need a brush that goes exactly where you mean, at exactly the size you mean. These tools work with every brush and every stroke type.</p>
