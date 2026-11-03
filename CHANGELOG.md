@@ -46,6 +46,10 @@ All notable changes to SculptForge are listed here. The format follows
 - Upstream watch for studios: a weekly check of OpenUSD, MaterialX, OpenColorIO, OpenEXR, OpenVDB, OpenSubdiv,
   OpenTimelineIO, OpenAssetIO, the VFX Reference Platform, Blender, Unreal Engine, Godot, SDL3, Dear ImGui and Python
   opens a tracking issue for each new release, plus a monthly "Upstream digest" (targets in `packaging/upstream.json`).
+- Insider daily drops: almost every day a new alpha, brush, VDM or Kelvinlet preset, made by SculptForge's own
+  procedural tools and checked on a test sculpt (too faint, seams, torn surfaces and near-duplicates are left out),
+  posted to Insiders as an .sfpack. Supporters get the month's drops as one Insider Pack at month end, and everyone
+  gets that pack free three months later (`tools/drops/`, `.github/workflows/insider-drop.yml`).
 
 ### Fixed
 - Blender style: Alt+left-drag on the model masks and Ctrl+Alt+left-drag unmasks, as Blender 5.1+'s default
