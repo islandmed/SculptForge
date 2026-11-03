@@ -124,7 +124,44 @@ Methodology (`--bench-focus`):
 
 ### 5.1 Results
 
-RESULTS_PLACEHOLDER
+Measured 11-02 with `sculptforge-cli --bench-focus` (CPU only, 40 dabs a stroke) on a **shared machine, load average ~4**.
+Treat each row as ±30%. A quiet-machine run and the app's `--benchmark standard-1b` (real GPU memory and orbit frame
+times) are still to do; until then, the GPU rows are estimates from the renderer's 6 bytes per point.
+
+standard-1b: **1,019,215,872 micro triangles** (62,208 base triangles, micro level 7, 522M grid points).
+
+| | Result |
+|---|---:|
+| File on disk | 241 MB (0.24 B per micro triangle); written in 5.4 s |
+| **Open total** (map, base, coarse grids, upsample, BVH) | **0.41 s** |
+| RSS after open (focus on) | 1,147 MB; 1,256 MB after orbit + zoom |
+| RSS with every tile full (focus off) | 1,526 MB (decompressing all of them: 0.31 s) |
+| Promote one tile (decompress + edges + markDirty), p50 / p99 | 0.041 / 0.051 ms |
+| Promotion throughput, parallel | 65,540 tiles/s ≈ 1.07 G micro triangles/s |
+| Orbit + zoom, 240 frames: focus update p50 / p99 / max | 0.78 / 4.42 / 5.53 ms |
+| Orbit: tiles promoted; most waiting in one frame | 11,338; 1,132 (caught up within frames) |
+| Full tiles after zooming in | 11,594 of 62,208 (194 MB of the 512 MB budget) |
+| GPU buffers, today's renderer (estimate) | 3,130 MB |
+| GPU buffers, per-tile levels with this focus (estimate, perf-moonshots #8) | 597 MB |
+
+| Stroke (X symmetry, 240 Hz) | dab p50 | **dab p99** | tiles loaded while the brush waited | undo / redo | undo step |
+|---|---:|---:|---:|---:|---:|
+| Clay r 0.03 (~25 px) | 2.65 ms | **5.25 ms** | 225 | 27 / 27 ms | 2.6 MB |
+| Clay r 0.08 (~60 px) | 3.66 ms | **5.46 ms** | 620 | 25 / 24 ms | 5.6 MB |
+| Clay r 0.16 (~120 px) | 9.11 ms | **14.68 ms** | 1,656 | 53 / 53 ms | 12.2 MB |
+| Move r 0.1, micro surface | 1.07 ms | **1.57 ms** | 0 | 5 / 5 ms | 0.2 MB |
+| Move r 0.1, base cage (default) | 0.01 ms | **0.02 ms** | 0 | 0 / 0 ms | – |
+| Clay r 0.08, no prediction | 3.77 ms | 6.83 ms | 542 | 25 / 24 ms | 4.6 MB |
+
+| Save | Result |
+|---|---:|
+| Incremental save (1,687 dirty + 2,574 parked tiles) | 53 ms, 17.8 MB appended |
+| Whole file, for comparison | 5.4 s |
+
+The brief's targets: open < 10 s (0.41 s), RAM < 6 GB (1.1-1.5 GB CPU; adding the estimated 3.1 GB of GPU buffers on
+unified memory gives ~4.6 GB), Clay and Move p99 < 50 ms (≤ 15 ms) are all met in this run. Note that the run
+above predates mirrored prediction and the hover frames. The "tiles loaded while waiting" column was measured
+without them, so it overstates what prediction misses. The quiet run will remeasure it.
 
 ## 6. Honestly: what works, what's faked, what's missing
 
@@ -158,4 +195,17 @@ RESULTS_PLACEHOLDER
 
 ## 7. Recommended 0.11 scope
 
-RECOMMEND_PLACEHOLDER
+Data, not wishes. At 1B the dense CPU array (1 GB) is affordable; **the GPU copy (3.1 GB) and the renderer's first
+shading of every tile (~5 s at 1B) are what limit us.** So, in order:
+
+1. **Per-tile GPU levels** (perf-moonshots #8): coarse tiles hold 45 points on the GPU, not 8,385. Estimate 3.1 → 0.6 GB
+   at 1B. This is what makes 4B+ fit at all. Uses `FocusDetail::tileLevel()`, which already exists.
+2. **Shade coarse tiles at their own level** (45 points, then upsample): cuts first shading ~180×, so open-to-sculpt
+   becomes about a second.
+3. **Projects and Save in the app:** `.sfproj` references its `.sfdetail`; Ctrl+S calls `FocusDetail::save()` (53 ms
+   measured); compaction when garbage passes half the file.
+4. **Sparse CPU pool** (full tiles only, indexed per tile) once 1 and 2 land. Only needed beyond ~2B on 16 GB machines.
+5. Windows mapping (`CreateFileMapping`), masks on streamed tiles, and multiple streamed Parts.
+
+Leave for later: a middle level between coarse and full (the screen-error test promotes fast enough: ~65K tiles/s),
+and a GPU decompressor.
