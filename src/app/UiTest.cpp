@@ -45,6 +45,7 @@
 //   expect_shortcut ACTION KEYS  the action's effective keys, e.g. expect_shortcut view.front Numpad 1
 //   camera YAW PITCH         set the view's angles in degrees (0 0 = the front view), e.g. for guide screenshots
 //   zoom FACTOR / look X Y Z  move the camera FACTOR times closer / turn it about (and look at) the point X Y Z
+//   camera_distance D        put the camera D model units from the point it looks at (extreme zoom)
 //   run COMMANDS             sculptforge-cli commands, e.g. run new_sphere subdivisions=4 ($SCRIPT_DIR: the script's folder)
 //   drop FILE                as if FILE were dropped onto the window (relative to the script's folder)
 //   env NAME VALUE           set an environment variable; $SCRIPT_DIR is the script's folder
@@ -70,6 +71,9 @@
 //                            custom_matcaps (MatCaps loaded from images), material_custom (1 when the view uses
 //                            one), matcap_files (images in the library's MatCaps folder),
 //                            support_requests (times Support SculptForge was clicked; never opens a browser in tests),
+//                            whats_new_open, whats_new_cards, whats_new_tries (What's New and its Try it clicks),
+//                            whats_new_contents / whats_new_expanded (its guide chapter: contents entries, open sections),
+//                            custom_brush_active (a custom brush is the active one),
 //                            welcome_open (the first-run welcome shown), new_look_card_open (the one-time
 //                            "SculptForge has a new look" card),
 //                            subtools (count), subtool_thumbnails (SubTool panel thumbnails rendered), active_subtool (index, 0 = top), visible_subtools,
@@ -90,16 +94,22 @@
 //                            symmetry_pivot_x (local symmetry's centre), timeline_top (1: the strip at the top),
 //                            timeline_y / axis_gizmo_y (their tops / centre, fractions of the canvas from its top),
 //                            style_window_min (ImGui's minimum window height, unscaled px: 32 in every look),
-//                            tablet_mouse_mode (Preferences > Tablet > Mouse mode), os_cursor_x / os_cursor_y,
+//                            tablet_mouse_mode (Preferences > Tablet > Mouse mode),
 //                            ui_mouse_x / ui_mouse_y (where ImGui sees the pointer), backface_culling, drawn_triangles,
 //                            viewport_cursor (the system cursor: 0 arrow, 1 text, 7 hand, 100 crosshair; #73),
+//                            panel_drag_scrolls (left / middle drags that scrolled a panel, #100), panel_drag_scroll_y,
+//                            drag_cursor (the same, at the end of the last button_drag, before letting go; #88),
 //                            smooth_keep_volume (Brush > Smooth keeps volume), stroke_keep_volume (1 when Smooth
 //                            dabs keep the volume now: the option, flipped by letting go of Shift mid-stroke),
+//                            smooth_group_borders (Brush > Smooth face group borders only, #81),
 //                            moved_out (summed movement along the snapshot's normals: > 0 out, < 0 in),
 //                            pen_pressure (raw), brush_pressure (after the curve; 1 for the mouse),
+//                            pressure_status (0 no pen yet, 1 on, 2 not detected, 3 not known yet),
 //                            stroke_continuous (Stroke > Continuous, 1 on),
 //                            stroking (1 while a stroke is open), cursor_x / cursor_y (the brush cursor, pixels),
 //                            surface_cursor (1 when the brush ring last drawn lay on the surface, #25),
+//                            cursor_ring (1 when the last brush cursor drawn had its ring; 0: the dot only, #88),
+//                            hide_ring_while_stroking (Preferences > Cursor, 1 on),
 //                            cursor_follows_surface (Preferences > Input, 1 on),
 //                            camera_yaw / camera_pitch / camera_roll (degrees),
 //                            camera_up (the view's up vector . world Y), camera_aligned (1 when looking along a world
@@ -132,7 +142,15 @@
 //                            size_popup_open (the S / U / I / O slider), size_knob_x / size_knob_y (its knob, pixels),
 //                            quickmenu_open, right_click_menu, space_camera, space_held, air_strokes, radial_open / radial_menu (-1 none) / radial_held /
 //                            radial_hover / radial_ran (radial menus: open, the menu, held by its key or button, the
-//                            slot pointed at, the slot run last), radial_menus, radial_slots_N, stroke_popup_open / stroke_popup_held / stroke_popup_hover / stroke_popup_picked (the stroke popup: items are strokes 0-4, then Add, Sub, Smooth, Mask, Select), stroke_latch (0 none, 1 Smooth, 2 Mask, 3 Select), invert_toggle, lazy_mouse, input_style (0 ZBrush, 1 SculptForge, 2 Blender), turntable,
+//                            slot pointed at, the slot run last), radial_menus, radial_slots_N, stroke_popup_open / stroke_popup_held / stroke_popup_hover / stroke_popup_picked (the stroke popup: items are strokes 0-4, then Add, Sub, Smooth, Mask, Select), stroke_latch (0 none, 1 Smooth, 2 Mask, 3 Select), invert_toggle, lazy_mouse (the Lazy Stroke type),
+//                            steady_stroke (Steady Stroke on, any type), steady_lag (px from the pointer to the brush on
+//                            its string), steady_catch_up, world_size, world_radius_mm, draw_size_exact (px, unrounded),
+//                            precision_active (Shift+Alt mid-stroke), precision_lag (px from the pointer to the brush),
+//                            brush_curve_points / brush_curve_half (the current brush's
+//                            pressure curve: its points, its value at half pressure x100), brush_curves (brushes with
+//                            their own curve), dab_error_px (the last stroke's dab furthest from its cursor
+//                            position, projected back), dab_jitter / dab_jitter_raw (its depth wobble with / without
+//                            the pick filter, x1000 radii), dabs, pixel_density (2 on a HiDPI screen), input_style (0 ZBrush, 1 SculptForge, 2 Blender), turntable,
 //                            camera_ortho, mask_brush (Blender's Mask brush on), shortcut_conflicts (keys two actions
 //                            claim), brush_type (BrushType
 //                            index, -1 for a custom brush or Paint), last_dab_x / last_dab_y (window pixels), paint_r
@@ -168,13 +186,15 @@
 //                            STATUS (e.g. phone_request POST /api/ar 200 {"scope":"subtool","size":20})
 //                            (tools/guide/update_shortcuts.py puts it into docs/guide/shortcuts.md)
 //
-// Simulated graphics tablet: real SDL3 pen events, each followed by the mouse event SDL synthesizes
-// from it (SDL_PEN_MOUSEID), in SDL's order. The touch comes before its first pressure sample, as
+// Simulated graphics tablet: real SDL3 pen events, each followed by the mouse event SDL 3.2 synthesizes
+// from it (SDL_PEN_MOUSEID), in SDL's order (the app ignores those and makes its own, #95). The touch comes before its first pressure sample, as
 // with Windows Ink, and every frame carries 4 pen samples (a 240 Hz pen at 60 fps).
 //   pen_stroke U0 V0 U1 V1 P0 P1 [eraser] [leave] [S]   pen stroke across the model with pressure P0 -> P1;
 //                            eraser: the eraser end; leave: the pen leaves proximity before lifting
-//   pen_drag_item LABEL DX DY P0 P1 [stray X Y] [S]   pen stroke through the item's centre, DX DY pixels long (a
-//                            short one is a tap with a little jitter); stray: as for pen_drag
+//   pen_drag_item LABEL DX DY P0 P1 [stray X Y] [lost] [S]   pen stroke through the item's centre, DX DY pixels long
+//                            (a short one is a tap with a little jitter); stray: as for pen_drag; lost: SDL drops
+//                            the pen while it touches (out of proximity without lifting, then sdl_pen_mouse stuck
+//                            and a new pen id, as SDL 3.2 on Windows after WM_POINTERCAPTURECHANGED)
 //   pen_button N down|up     side button N (1 lower, 2 upper, 3 third) with SDL 3.4's synthesized click
 //   pen_hover U V [S]        move the hovering pen to a point on the model (drags the view while a
 //                            button mapped to rotate / pan / right-click is held)
@@ -184,7 +204,20 @@
 //   pen_pressure P           a pressure sample from the hovering pen (e.g. a stale value before a stroke)
 //   pen_enter U V            the pen comes into range at a point on the model (put down elsewhere, no hover)
 //   pen_out                  the pen leaves proximity
-//   os_cursor U V | off      where the system cursor is (a tablet driver in mouse mode moves it, #72); off: unknown
+//   tablet_plug [NAME]       a tablet plugged in while running (default name: a generic HID mouse); its pen gets
+//                            a new id
+//   tablet_unplug            ... and unplugged
+//   pen_new                  the next pen has a new id, without a device event (Wacom Bridge, eraser on Wayland)
+//   click_subtool NAME U V 1 pen [S]   tap the Part with the pen tip instead (held S seconds)
+//   sdl_pen_mouse on|stuck   SDL's mouse events for the pen: on (SDL 3.2's), stuck (none, as after SDL dropped a
+//                            touching pen on Windows, #95; the app makes its own)
+//   pen_lost                 SDL drops the pen while it touches (WM_POINTERCAPTURECHANGED): it leaves proximity
+//                            without lifting, and SDL's pen mouse events stop (sdl_pen_mouse stuck)
+//   pen_stream ink|huion     ink: the pen's events (and SDL's); huion: the driver also sends mouse events of its own
+//                            beside the pen's, a press at each touch whose release never comes
+//   window_focus 1|0         the window gains or loses keyboard focus; mouse_leave: the pointer leaves the window
+//                            (another screen); values: focus_frames (1 while focus keeps it drawing),
+//                            pen_mouse_down, ui_left_down (the panels hold the left button), soft_cursor
 //   mouse_move U V           a plain mouse (not the pen) moves to a point on the model, e.g. the stray mouse
 //                            events Windows Ink sends beside the pen's
 //
@@ -197,8 +230,13 @@
 //   spacemouse_button N      press and release button N (1 = left side button, 2 = right)
 //   spacemouse_unplug        unplug it
 //   expect_value spacemouse_connected (1 when the app opened it), spacemouse_moving (1 while it moves the view)
+//   ui_scale PERCENT | auto  Preferences > Interface > UI scale (applied live, #87); display_scale PERCENT: the display's
+//                            content scale changes, with SDL's event (Windows DPI, another monitor)
+//   expect_value ui_scale (percent built now), font_height (default font, px), frame_height, panel_width (right
+//                            shelf, px), title_height
 //   expect_value look (0 Classic, 1 Forge Terminal, 2 Phosphor, 3 Blueprint), shell_layout (0 ZBrush-style, 1 SculptForge)
 #include "app/App.h"
+#include "ai/Http.h"
 
 #ifndef SDL_PEN_INPUT_IN_PROXIMITY
 #define SDL_PEN_INPUT_IN_PROXIMITY (1u << 31) // SDL 3.4's flag; older SDL 3 never sets it
@@ -457,17 +495,35 @@ double Demo::query(const std::string& name, bool& known) const {
     // ZBrush feel (Input.cpp): the intensities and Focal Shift as shown (0-100, -100..100).
     if (name == "z_intensity") return std::round(app_.strength_ * 100.0f);
     if (name == "smooth_keep_volume") return app_.smoothKeepVolume_ ? 1.0 : 0.0;
+    if (name == "smooth_group_borders") return app_.smoothGroupBorders_ ? 1.0 : 0.0;
     if (name == "stroke_keep_volume") return app_.dabSettings().smoothKeepVolume ? 1.0 : 0.0; // (Smooth's dabs)
     if (name == "smooth_intensity") return std::round(app_.smoothStrength_ * 100.0f);
     if (name == "rgb_intensity") return std::round(app_.rgbIntensity_ * 100.0f);
     if (name == "focal_shift") return std::round(app_.focalShift_ * 100.0f);
     if (name == "draw_size") return std::round(app_.radiusPx_);
+    if (name == "brush_settings_saved") return double(app_.brushSettingsStore().savedCount()); // (#78)
+    if (name == "share_brush_size") return app_.brushSettingsStore().shareSizeIntensity ? 1.0 : 0.0;
+    if (name == "alpha_follow") return app_.alphaOptions_.followStroke ? 1.0 : 0.0; // alpha options (#76)
+    if (name == "alpha_angle") return std::round(app_.alphaOptions_.angle);
+    if (name == "alpha_tile_x") return double(app_.doc_.brushAlpha.tileX);
+    if (name == "alpha_tile_y") return double(app_.doc_.brushAlpha.tileY);
+    if (name == "last_dab_angle") { // degrees, -180..180: the alpha's turn on the last dab
+        const float d = std::remainder(glm::degrees(app_.lastDabAngle_), 360.0f);
+        return std::round(d);
+    }
     if (name == "quickmenu_open") return app_.quickMenu_.open ? 1.0 : 0.0;
     if (name == "right_click_menu") return app_.uiPrefs_.rightClickQuickMenu ? 1.0 : 0.0;
     if (name == "space_camera") return app_.uiPrefs_.spaceCamera ? 1.0 : 0.0;
+    if (name == "look_outline_opacity") return double(std::lround(app_.uiPrefs_.look.outlineOpacity * 100.0f)); // percent
+    if (name == "look_outlines") return double(app_.uiPrefs_.look.outlines); // 0 off, 1 subtle, 2 on
+    if (name == "look_neutral") return app_.uiPrefs_.look.scheme == "neutral" ? 1.0 : 0.0; // Forge Terminal's Neutral colours
     if (name == "look") return double(app_.uiPrefs_.look.look); // 0 Classic, 1 Forge Terminal, 2 Phosphor, 3 Blueprint
+    if (name == "hover_rings") return double(ui::HoverRingsShown()); // hover and focus rings drawn last frame
+    if (name == "hover_lifts") return double(ui::HoverLiftsShown()); // tiles lifted last frame
+    if (name == "reduce_motion") return app_.uiPrefs_.reduceMotion ? 1.0 : 0.0;
     if (name == "shell_layout") return double(app_.uiPrefs_.shellLayout); // 0 ZBrush-style, 1 SculptForge
     if (name == "air_strokes") return app_.uiPrefs_.airStrokes ? 1.0 : 0.0;
+    if (name == "emulate_3_button") return app_.uiPrefs_.emulate3Button ? 1.0 : 0.0; // Blender style (#77)
     if (name == "space_held") return app_.spaceHeld_ ? 1.0 : 0.0;
     if (name == "radial_open") return app_.radial_.menu >= 0 ? 1.0 : 0.0;
     if (name == "stroke_popup_open") return app_.strokePopup_.open ? 1.0 : 0.0;
@@ -481,6 +537,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "radial_hover") return double(app_.radial_.hover);
     if (name == "radial_ran") return double(app_.radial_.ran); // the slot run last, -1: none yet
     if (name == "radial_menus") return double(app_.radialMenus_.size());
+    if (name == "memory_confirm_open") return app_.memoryConfirm_.open ? 1.0 : 0.0; // "Not enough free memory"
     if (const double v = app_.packsTestValue(name); !std::isnan(v)) return v; // packs_installed, macro_recording, ...
     if (name.rfind("radial_slots_", 0) == 0) { // radial_slots_N: menu N's items (1-based), -1: no such menu
         const size_t i = size_t(std::max(0, std::atoi(name.c_str() + 13) - 1));
@@ -492,6 +549,33 @@ double Demo::query(const std::string& name, bool& known) const {
         return name == "size_popup_open" ? (open ? 1.0 : 0.0) : name == "size_knob_x" ? knob.x : knob.y;
     }
     if (name == "lazy_mouse") return app_.strokeType_ == StrokeType::LazyMouse ? 1.0 : 0.0;
+    // Precision work (Precision.cpp)
+    if (name == "steady_stroke") return app_.steadyOn() ? 1.0 : 0.0;
+    if (name == "steady_lag") return double(glm::distance(app_.lazyMouse_.point, app_.steadyCursor_)); // px
+    if (name == "steady_catch_up") return app_.steadyCatchUp_ ? 1.0 : 0.0;
+    if (name == "world_size") return app_.worldSize_ ? 1.0 : 0.0;
+    if (name == "world_radius_mm") return double(app_.worldRadius_ * kMmPerUnit);
+    if (name == "draw_size_exact") return double(app_.radiusPx_);
+    if (name == "precision_active") return app_.precisionActive_ ? 1.0 : 0.0;
+    if (name == "precision_lag") // px between the brush and the pointer
+        return double(glm::distance(app_.precision_.point, glm::vec2(app_.mouseX_, app_.mouseY_)));
+    if (name == "brush_curve_points") {
+        const PressurePoints* c = app_.activeBrushCurve();
+        return c ? double(c->count) : 2.0;
+    }
+    if (name == "brush_curve_half") { // the current brush's curve at half pressure, x100
+        const PressurePoints* c = app_.activeBrushCurve();
+        return std::round(double(c ? c->apply(0.5f) : 0.5f) * 100.0);
+    }
+    if (name == "brush_curves") return double(app_.brushCurves_.size());
+    if (name == "dab_error_px") return double(app_.dabAccuracy_.maxErrorPx); // the last stroke's worst dab, px
+    if (name == "dab_jitter_raw" || name == "dab_jitter") { // x1000: mean depth wobble per dab, in brush radii
+        const auto& a = app_.dabAccuracy_;
+        const double n = std::max(1, a.count - 2);
+        return 1000.0 * (name == "dab_jitter" ? a.jitterFiltered : a.jitterRaw) / n;
+    }
+    if (name == "pixel_density") return double(SDL_GetWindowPixelDensity(app_.window_));
+    if (name == "dabs") return double(app_.dabAccuracy_.count);
     if (name == "stroke_type") return double(int(app_.strokeType_)); // 0 Dots, 1 DragRect, 2 DragDot, 3 Spray, 4 LazyMouse
     if (name == "stroke_continuous") return app_.strokeContinuous_ ? 1.0 : 0.0; // Continuous (#31)
     if (name == "vdms") return double(app_.doc_.vdms.size());
@@ -607,9 +691,19 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "subtools") return double(doc.subtoolCount());
     if (name == "discord_requests") return double(app_.discordRequests_); // Join the community on Discord clicks
     if (name == "support_requests") return double(app_.supportPageRequests_); // Support SculptForge clicks
+    if (name == "ai_enabled") return ai::aiEnabled() ? 1.0 : 0.0; // Preferences > AI (PanelAi.cpp)
+    if (name == "http_requests") return double(ai::httpRequestCount()); // every request this process started
     if (name == "welcome_open") return app_.showWelcome_ ? 1.0 : 0.0;
     if (name == "new_look_card_open") return app_.newLookCard_ ? 1.0 : 0.0; // "SculptForge has a new look" (0.10.7)
     if (name == "support_card_open") return app_.supportCardOpen() ? 1.0 : 0.0; // the support card at launch
+    // What's New (WhatsNewPopup.cpp): open (1 while shown), its cards, Try it clicks; the guide chapter's contents
+    // entries (versions in full, then groups) and its open sections.
+    if (name == "whats_new_open") return app_.whatsNewOpen() ? 1.0 : 0.0;
+    if (name == "whats_new_cards") return app_.whatsNewVersion() ? double(app_.whatsNewVersion()->cards.size()) : 0.0;
+    if (name == "whats_new_tries") return double(app_.whatsNewTries_);
+    if (name == "whats_new_contents") return double(app_.guide_.whatsNewContents().size());
+    if (name == "whats_new_expanded") return double(app_.guide_.whatsNewExpanded());
+    if (name == "custom_brush_active") return app_.doc_.activeBrush >= 0 && !app_.paintMode_ ? 1.0 : 0.0;
     if (name == "supporter") return app_.supportCardPrefs_.supporter ? 1.0 : 0.0;
     if (name == "support_card_enabled") return app_.supportCardPrefs_.enabled ? 1.0 : 0.0;
     if (name == "subtool_thumbnails") { // SubTool panel thumbnails rendered (#43)
@@ -670,7 +764,19 @@ double Demo::query(const std::string& name, bool& known) const {
     // fractions of the canvas height from its top (-1: the strip isn't shown).
     if (name == "timeline_top") return app_.uiPrefs_.timelineTop ? 1.0 : 0.0;
     // The style's minimum window height in unscaled px (32): switching looks must not scale it again each time.
+    if (name == "ui_scale") return std::round(double(app_.uiScale_) * 100.0); // percent, as built now (#87)
+    if (name == "font_height") { // the default UI font's size in pixels, as rasterised in the atlas
+        const ImGuiIO& io = ImGui::GetIO();
+        const ImFont* f = io.FontDefault ? io.FontDefault : io.Fonts->Fonts.empty() ? nullptr : io.Fonts->Fonts[0];
+        return f ? double(f->FontSize) : 0.0;
+    }
+    if (name == "frame_height") return double(ImGui::GetFrameHeight()); // a button's height: font + style padding
+    if (name == "panel_width") return double(app_.shell_.rightShelf.w); // the right shelf, 52 logical px
+    if (name == "title_height") return double(app_.shell_.title.h);
     if (name == "style_window_min") return double(ImGui::GetStyle().WindowMinSize.y / std::max(app_.uiScale_, 0.01f));
+    // Draw > Camera > Gizmo size and View Figure: the axes' length in unscaled px (34 at Medium), the figure shown.
+    if (name == "axis_gizmo_length") return double(34.0f * app_.axisGizmoUnit() / std::max(app_.uiScale_, 0.01f));
+    if (name == "view_figure") return app_.uiPrefs_.showViewFigure ? 1.0 : 0.0;
     if (name == "timeline_y" || name == "axis_gizmo_y") {
         const auto c = app_.canvasRect();
         if (name == "timeline_y")
@@ -706,6 +812,10 @@ double Demo::query(const std::string& name, bool& known) const {
         return name == "moved" ? count : name == "moved_max" ? maxD : name == "moved_sum" ? sum : out;
     }
     if (name == "pen_pressure") return app_.penTracker_.raw();
+    if (name == "pressure_status") { // 0 no pen yet, 1 on, 2 not detected, 3 not known yet
+        const std::string st = app_.pressureStatus();
+        return st == "Pressure: on" ? 1.0 : st == "Pressure: not detected" ? 2.0 : app_.penSeen_ ? 3.0 : 0.0;
+    }
     if (name == "brush_pressure") return app_.strokePressure();
     if (name == "stroking") return app_.drag_ == App::Drag::Stroke ? 1.0 : 0.0;
     if (name == "tablet_mouse_mode") return app_.uiPrefs_.tablet.mouseMode ? 1.0 : 0.0;
@@ -715,14 +825,21 @@ double Demo::query(const std::string& name, bool& known) const {
         app_.benchmarkDrawMs(0);
         return double(app_.renderer_.lastDrawnTriangles());
     }
+    if (name == "panel_drag_scrolls") return double(ui::DragScrolls()); // #100: drags that scrolled a panel
+    if (name == "panel_drag_scroll_y") return double(ui::DragScrollY());  // that panel's scroll after the last one
+    if (name == "drag_cursor") return double(dragCursor_); // the system cursor during the last button_drag (#88)
     if (name == "viewport_cursor") return app_.cursorKind_; // the system cursor: 0 arrow, 100 crosshair (#73)
-    if (name == "os_cursor_x") return app_.testSystemCursorX_;
-    if (name == "os_cursor_y") return app_.testSystemCursorY_;
+    if (name == "focus_frames") return app_.focusKeepsDrawing(double(SDL_GetTicksNS()) * 1e-9) ? 1.0 : 0.0;
+    if (name == "pen_mouse_down") return app_.penMouseDown_ ? 1.0 : 0.0;
+    if (name == "ui_left_down") return ImGui::IsMouseDown(ImGuiMouseButton_Left) ? 1.0 : 0.0;
+    if (name == "soft_cursor") return app_.penSoftCursor() ? 1.0 : 0.0; // Mouse mode: the app draws the arrow
     if (name == "ui_mouse_x") return ImGui::GetIO().MousePos.x; // where the panels see the pointer
     if (name == "ui_mouse_y") return ImGui::GetIO().MousePos.y;
     if (name == "cursor_x") return app_.mouseX_;
     if (name == "cursor_y") return app_.mouseY_;
     if (name == "surface_cursor") return app_.surfaceCursorShown_ ? 1.0 : 0.0;
+    if (name == "cursor_ring") return app_.ringShown_ ? 1.0 : 0.0;
+    if (name == "hide_ring_while_stroking") return app_.uiPrefs_.hideRingWhileStroking ? 1.0 : 0.0;
     if (name == "cursor_follows_surface") return app_.uiPrefs_.cursorFollowsSurface ? 1.0 : 0.0;
     if (name == "camera_yaw") return glm::degrees(app_.camera_.yaw);
     if (name == "camera_pitch") return glm::degrees(app_.camera_.pitch);
@@ -855,6 +972,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     auto strayOption = [&](size_t from, float& seconds) -> std::function<void()> {
         std::function<void()> stray;
         for (size_t i = from; i < w.size(); ++i) {
+            if (w[i] == "lost") continue; // (pen_drag_item's)
             if (w[i] == "stray" && i + 2 < w.size()) {
                 stray = [this, sx = num(i + 1, 0), sy = num(i + 2, 0)] {
                     int ww = 0, wh = 0;
@@ -986,12 +1104,25 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         stroke([at](float) { return *at; }, 0.2f);
         run([this] { SDL_SetModState(held_); });
         wait(0.1f);
+    } else if (verb == "view_figure_click") {
+        // view_figure_click [DX DY]: click the View Figure (Draw > Camera), DX DY its radii from the centre
+        const float dx = num(1, 0.0f), dy = num(2, 0.0f);
+        auto at = std::make_shared<ImVec2>();
+        run([this, at, dx, dy] {
+            const glm::vec2 c = app_.viewFigureCentre() + glm::vec2(dx, dy) * app_.viewFigureRadius();
+            *at = ImVec2(c.x, c.y);
+        });
+        stroke([at](float) { return *at; }, 0.2f);
+        run([this] { SDL_SetModState(held_); });
+        wait(0.1f);
     } else if (verb == "click_subtool") {
         if (!need(1)) return false;
         const std::string name = w[1];
         const float u = num(2, 0.5f), v = num(3, 0.5f);
         const int times = std::clamp(int(num(4, 1.0f)), 1, 3); // click_subtool NAME U V 3: a triple-click
-        steps_.push_back([this, line, name, u, v, times](float t) {
+        const bool pen = w.back() == "pen" || (w.size() > 5 && w[5] == "pen"); // taps with the pen tip instead
+        const float hold = pen && w.size() > 6 ? num(6, 0.0f) : 0.0f;        // ... held this long
+        steps_.push_back([this, line, name, u, v, times, pen, hold](float t) {
             const int index = app_.doc_.findSubtool(name);
             if (index < 0) {
                 fail(line, "no Part named \"" + name + "\"");
@@ -1028,6 +1159,25 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             }
             if (!found) {
                 fail(line, "Part \"" + name + "\" can't be clicked (hidden, covered or off screen)");
+                return true;
+            }
+            if (pen) {
+                if (t == 0.0f) {
+                    if (!penIn_) penProximity(true);
+                    penMove(p.x, p.y);
+                    return false;
+                }
+                if (!penDown_) {
+                    penTouch(true, false);
+                    penPressure(0.5f);
+                    if (hold <= 0.0f) {
+                        penTouch(false, false);
+                        return true;
+                    }
+                    return false;
+                }
+                if (t < hold) return false;
+                penTouch(false, false);
                 return true;
             }
             if (t == 0.0f) { // hover for a frame first
@@ -1092,6 +1242,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             const float u = std::min(t / seconds, 1.0f);
             mouseMotion(a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u);
             if (t < seconds) return false;
+            dragCursor_ = app_.cursorKind_; // (what the view showed while the drag ran)
             mouseButton(false, button);
             return true;
         });
@@ -1321,6 +1472,10 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (!need(1)) return false;
         run([this, f = num(1, 1)] { app_.camera_.distance /= std::max(float(f), 1e-3f); });
         wait(0.1f);
+    } else if (verb == "camera_distance") { // camera_distance D: the camera this far from its target (extreme zoom)
+        if (!need(1)) return false;
+        run([this, d = num(1, 4)] { app_.camera_.distance = std::max(float(d), 1e-4f); });
+        wait(0.1f);
     } else if (verb == "look") { // look X Y Z: the camera turns about (and looks at) this point
         if (!need(3)) return false;
         run([this, x = num(1, 0), y = num(2, 0), z = num(3, 0)] { app_.camera_.target = glm::vec3(float(x), float(y), float(z)); });
@@ -1498,6 +1653,26 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             r = call("POST", "/api/capture/" + capture + "/finish", "");
             if (r.status != 200) fail(line, "finish refused: " + std::to_string(r.status) + " " + r.body + r.error);
         });
+    } else if (verb == "ui_scale") { // ui_scale 175 | auto: as Preferences > Interface > UI scale picks it (#87)
+        if (!need(1)) return false;
+        const float v = w[1] == "auto" ? 0.0f : num(1, 100) / 100.0f;
+        run([this, v] {
+            app_.uiPrefs_.uiScale = v;
+            app_.requestUiScale();
+        });
+        wait(0.2f);
+    } else if (verb == "display_scale") {
+        // display_scale 150: the window's display now reports this content scale and SDL says so
+        // (SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED: Windows' per-monitor DPI, a move to a monitor at another scale)
+        if (!need(1)) return false;
+        run([this, v = num(1, 100) / 100.0f] {
+            app_.displayScaleOverride_ = v;
+            SDL_Event e{};
+            e.type = SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED;
+            e.window.windowID = SDL_GetWindowID(app_.window_);
+            app_.handleEvent(e);
+        });
+        wait(0.2f);
     } else if (verb == "input_style") {
         // input_style zbrush|sculptforge|blender|maya: as Preferences > Input sets it (scripts written for one style)
         if (!need(1)) return false;
@@ -1788,8 +1963,13 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             if (t > 3.0f) fail(line, notFound(label));
             return t > 3.0f;
         });
+        const bool lost = std::find(w.begin() + 6, w.end(), "lost") != w.end();
         penStroke([centre, dx, dy](float u) { return ImVec2(centre->x + dx * (u - 0.5f), centre->y + dy * (u - 0.5f)); }, p0, p1,
-                  false, false, seconds, strayEvent);
+                  false, lost, seconds, strayEvent);
+        if (lost) run([this] { // SDL dropped the touching pen (#95): its mouse events stop; it comes back as a new pen
+            sdlPenMouse_ = false;
+            ++testPen_;
+        });
         wait(0.1f);
     } else if (verb == "pen_button") {
         if (!need(2)) return false;
@@ -1850,19 +2030,35 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             if (!penIn_) penProximity(true);
             penPressure(p);
         });
-    } else if (verb == "os_cursor") {
-        // Where the system cursor is, as a tablet driver in mouse mode moves it (#72): `os_cursor U V` on the model,
-        // `os_cursor off` (the default) for a system that can't say.
+    } else if (verb == "sdl_pen_mouse") {
         if (!need(1)) return false;
-        const bool off = w[1] == "off";
-        if (!off && !need(2)) return false;
-        run([this, off, u = off ? 0.0f : num(1, 0.5f), v = off ? 0.0f : num(2, 0.5f)] {
-            app_.testSystemCursor_ = !off;
-            if (off) return;
-            const ImVec2 p = onModel(u, v);
-            app_.testSystemCursorX_ = p.x;
-            app_.testSystemCursorY_ = p.y;
+        run([this, on = w[1] != "stuck"] { sdlPenMouse_ = on; });
+    } else if (verb == "pen_lost") {
+        run([this] {
+            penProximity(false); // no pen up: SDL's "touching" flag stays set
+            sdlPenMouse_ = false;
+            ++testPen_; // SDL adds it again at its next proximity, with a new id
         });
+        wait(0.05f);
+    } else if (verb == "pen_stream") {
+        if (!need(1)) return false;
+        run([this, huion = w[1] == "huion"] { huionStream_ = huion; });
+    } else if (verb == "window_focus") {
+        if (!need(1)) return false;
+        run([this, in = num(1, 1) != 0.0f] {
+            SDL_Event e{};
+            e.type = in ? SDL_EVENT_WINDOW_FOCUS_GAINED : SDL_EVENT_WINDOW_FOCUS_LOST;
+            e.window.windowID = SDL_GetWindowID(app_.window_);
+            app_.handleEvent(e);
+        });
+    } else if (verb == "mouse_leave") {
+        run([this] {
+            SDL_Event e{};
+            e.type = SDL_EVENT_WINDOW_MOUSE_LEAVE;
+            e.window.windowID = SDL_GetWindowID(app_.window_);
+            app_.handleEvent(e);
+        });
+        wait(0.05f);
     } else if (verb == "mouse_move") {
         if (!need(2)) return false;
         run([this, u = num(1, 0.5f), v = num(2, 0.5f)] {
@@ -1920,6 +2116,27 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     } else if (verb == "spacemouse_unplug") {
         run([this] { detachVirtualSpaceMouse(); });
         wait(0.1f);
+    } else if (verb == "tablet_plug") {
+        // A tablet plugged in while the app runs: its mouse device appears (NAME as SDL reports it; a generic one,
+        // as on Windows or with Wacom Bridge, counts once its pen comes into range), and its pen has a new id.
+        const std::string name = w.size() > 1 ? restOf(lineText_, 1) : std::string("HID-compliant mouse");
+        run([this, name] {
+            if (penIn_) penProximity(false);
+            ++testPen_;
+            testTabletMouse_ = 100 + uint32_t(testPen_);
+            app_.tabletNote(app_.tabletHotplug_.mouseAdded(testTabletMouse_, name), name);
+        });
+        wait(0.05f);
+    } else if (verb == "tablet_unplug") {
+        run([this] { app_.tabletNote(app_.tabletHotplug_.mouseRemoved(testTabletMouse_), {}); });
+        wait(0.05f);
+    } else if (verb == "pen_new") {
+        // A pen with an id not seen before and no device event (a Wacom Bridge session reconnecting, the eraser
+        // end on Wayland).
+        run([this] {
+            if (penIn_) penProximity(false);
+            ++testPen_;
+        });
     } else if (verb == "pen_out") {
         run([this] { penProximity(false); });
         wait(0.05f);
@@ -1989,7 +2206,7 @@ void Demo::penProximity(bool in) {
     SDL_Event e{};
     e.type = in ? SDL_EVENT_PEN_PROXIMITY_IN : SDL_EVENT_PEN_PROXIMITY_OUT;
     e.pproximity.windowID = SDL_GetWindowID(app_.window_);
-    e.pproximity.which = kTestPen;
+    e.pproximity.which = testPen_;
     penIn_ = in;
     if (!in) penDown_ = penEraser_ = false;
     penState_ = in ? SDL_PEN_INPUT_IN_PROXIMITY : 0; // leaving releases the tip and every button
@@ -2000,20 +2217,21 @@ void Demo::penMove(float x, float y) {
     SDL_Event e{};
     e.type = SDL_EVENT_PEN_MOTION;
     e.pmotion.windowID = SDL_GetWindowID(app_.window_);
-    e.pmotion.which = kTestPen;
+    e.pmotion.which = testPen_;
     e.pmotion.pen_state = penState_;
     e.pmotion.x = x;
     e.pmotion.y = y;
     penAt_ = ImVec2(x, y);
     app_.handleEvent(e);
-    mouseMotion(x, y, SDL_PEN_MOUSEID); // SDL moves the mouse with a touching or hovering pen
+    if (sdlPenMouse_) mouseMotion(x, y, SDL_PEN_MOUSEID); // SDL moves the mouse with a touching or hovering pen
+    if (huionStream_) mouseMotion(x, y, kDriverMouse);    // ... and the driver moves it too
 }
 
 void Demo::penPressure(float pressure) {
     SDL_Event e{};
     e.type = SDL_EVENT_PEN_AXIS;
     e.paxis.windowID = SDL_GetWindowID(app_.window_);
-    e.paxis.which = kTestPen;
+    e.paxis.which = testPen_;
     e.paxis.pen_state = penState_;
     e.paxis.x = penAt_.x;
     e.paxis.y = penAt_.y;
@@ -2030,15 +2248,18 @@ void Demo::penTouch(bool down, bool eraser) {
     SDL_Event e{};
     e.type = down ? SDL_EVENT_PEN_DOWN : SDL_EVENT_PEN_UP;
     e.ptouch.windowID = SDL_GetWindowID(app_.window_);
-    e.ptouch.which = kTestPen;
+    e.ptouch.which = testPen_;
     e.ptouch.pen_state = penState_;
     e.ptouch.x = penAt_.x;
     e.ptouch.y = penAt_.y;
     e.ptouch.eraser = eraser;
     e.ptouch.down = down;
     app_.handleEvent(e);
-    if (down) mouseMotion(penAt_.x, penAt_.y, SDL_PEN_MOUSEID); // SDL_SendPenTouch: motion, then the left button
-    mouseButton(down, SDL_BUTTON_LEFT, SDL_PEN_MOUSEID);
+    if (sdlPenMouse_) {
+        if (down) mouseMotion(penAt_.x, penAt_.y, SDL_PEN_MOUSEID); // SDL_SendPenTouch: motion, then the left button
+        mouseButton(down, SDL_BUTTON_LEFT, SDL_PEN_MOUSEID);
+    }
+    if (huionStream_ && down) mouseButton(true, SDL_BUTTON_LEFT, kDriverMouse); // its release never comes
 }
 
 void Demo::penButtonEvent(int button, bool down) {
@@ -2047,7 +2268,7 @@ void Demo::penButtonEvent(int button, bool down) {
     SDL_Event e{};
     e.type = down ? SDL_EVENT_PEN_BUTTON_DOWN : SDL_EVENT_PEN_BUTTON_UP;
     e.pbutton.windowID = SDL_GetWindowID(app_.window_);
-    e.pbutton.which = kTestPen;
+    e.pbutton.which = testPen_;
     e.pbutton.pen_state = penState_;
     e.pbutton.x = penAt_.x;
     e.pbutton.y = penAt_.y;
@@ -2056,7 +2277,7 @@ void Demo::penButtonEvent(int button, bool down) {
     app_.handleEvent(e);
     // SDL 3.4 also clicks a mouse button for it (1: right, 2: middle ...); the app must ignore that.
     static const int kMouse[] = {SDL_BUTTON_LEFT, SDL_BUTTON_RIGHT, SDL_BUTTON_MIDDLE, SDL_BUTTON_X1, SDL_BUTTON_X2};
-    if (button >= 1 && button < 5) mouseButton(down, kMouse[button], SDL_PEN_MOUSEID);
+    if (sdlPenMouse_ && button >= 1 && button < 5) mouseButton(down, kMouse[button], SDL_PEN_MOUSEID);
 }
 
 void Demo::penStroke(std::function<ImVec2(float u)> path, float p0, float p1, bool eraser, bool leave, float seconds,

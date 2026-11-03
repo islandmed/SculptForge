@@ -31,13 +31,13 @@ what was painted in it; **Undo** brings it back.
 2. Open **Tool > Texture Map**. Under **Material Channels**, tick the channels you want (for a typical game asset:
    Roughness, Metallic and Normal; add Height to paint relief, Ambient Occlusion to paint dirt into crevices).
 3. **Channel memory** below the ticks shows what the painted tiles use; the same number, for every Part, is in
-   **Preferences > Performance** under Memory.
+   **Edit > Preferences > Performance** under Memory.
 
 ## Paint a material
 
-Open the **Color** palette. With a material texture, a **Material** section appears under the swatches:
+Open the **Paint** menu. With a material texture, a **Material** section appears under the swatches:
 
-![Color > Material: material swatches, and per channel a tick, value swatches and a slider; Material Channels in Tool > Texture Map](images/pbr-brush-material.jpg)
+![Paint > Material: material swatches, and per channel a tick, value swatches and a slider; Material Channels in Tool > Texture Map](images/pbr-brush-material.jpg)
 
 
 - **Material swatches** set the colour, roughness and metallic at once (bare metal, gold, copper, rust, gloss
@@ -71,7 +71,7 @@ Merge down and Flatten keep the look of every channel. Duplicate copies a layer 
 
 ## The PBR viewport
 
-**Material > Viewport Shading** switches the view between **Lit Sphere** (the default, made for reading forms
+**Render > Materials > Viewport Shading** switches the view between **Lit Sphere** (the default, made for reading forms
 while sculpting) and **PBR**, which lights the material channels the way game engines and renderers do: rough
 surfaces spread the light, metals reflect the environment in their own colour, painted height and normals catch
 the light, emissive glows.
@@ -137,6 +137,6 @@ material channels is still saved as format 6, so older versions keep opening it.
 - One texture per Part (UDIM tiles bake as files, [Baking](baking.md), but paint goes into one texture).
 - Memory: colour, roughness, metallic, height and AO on Base plus three layers, each with a few big strokes,
   take about 370 MB at 4K and 1.5 GB at 8K (most of it the colour layers); a layer painted everywhere adds about
-  200 MB of channels at 4K and 800 MB at 8K. Preferences > Performance shows the numbers for your scene. Paint at
+  200 MB of channels at 4K and 800 MB at 8K. Edit > Preferences > Performance shows the numbers for your scene. Paint at
   4K unless you need 8K.
 - Export Maps takes a few seconds at 4K and about ten at 8K (PNG compression).

@@ -111,6 +111,26 @@ bool isImageFile(const std::string& path) {
 bool isBrushFile(const std::string& path) { return lowerExt(path) == ".sfbrush"; }
 bool isProjectFile(const std::string& path) { return lowerExt(path) == ".sfproj"; }
 
+std::string pathKey(const std::string& path, bool windowsRules) {
+    std::string s = path;
+    if (windowsRules) std::replace(s.begin(), s.end(), '\\', '/');
+    const std::u8string g = fsPath(s).lexically_normal().generic_u8string();
+    s.assign(g.begin(), g.end());
+    if (windowsRules) {
+        std::replace(s.begin(), s.end(), '\\', '/');
+        for (char& c : s) c = char(std::tolower(static_cast<unsigned char>(c)));
+    }
+    std::string out; // doubled separators once, no trailing one (but keep a root "/")
+    for (char c : s)
+        if (c != '/' || out.empty() || out.back() != '/') out += c;
+    while (out.size() > 1 && out.back() == '/') out.pop_back();
+    return out;
+}
+
+bool samePath(const std::string& a, const std::string& b, bool windowsRules) {
+    return a == b || pathKey(a, windowsRules) == pathKey(b, windowsRules);
+}
+
 AssetKind fileKindForTab(LibraryTab tab, const std::string& path) {
     switch (tab) {
     case LibraryTab::Project:

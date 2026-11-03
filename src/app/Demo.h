@@ -40,6 +40,7 @@ public:
     void update(float dt);   // before the UI is built: plays the timeline
     void drawOverlay();      // inside the ImGui frame: captions and cursor
     bool finished() const { return step_ >= steps_.size(); }
+    float clock() const { return clock_; } // seconds of the script so far (its own time, not the wall clock)
     int frameStride() const { return stride_; } // >1 while fast-forwarding through waits
     // The recording's virtual camera: the part of the window the video shows (its centre and zoom, 1 = all of it),
     // eased between the targets set by zoomTo/zoomToItem. Captions and the fade stay the same size on screen.
@@ -134,6 +135,7 @@ private:
     ImVec2 mouse_{960, 540};
     bool buttonDown_ = false;
     bool buttonHeld_ = false; // orbit: right button pressed
+    int dragCursor_ = -1;     // the system cursor at the end of the last button_drag, before letting go
 
     struct Caption {
         std::string title, subtitle;
@@ -164,10 +166,16 @@ private:
     std::string expandLibrary(std::string text) const; // $LIBRARY -> the LightBox library folder (UiTest.cpp)
     SDL_Keymod held_ = SDL_KMOD_NONE; // modifiers held by `hold` (Ctrl to mask, Ctrl+Shift to hide...)
     // Simulated pen (pen_* steps).
-    static constexpr SDL_PenID kTestPen = 1;
+    SDL_PenID testPen_ = 1;        // tablet_plug gives the next pen a new id, as SDL does
+    uint32_t testTabletMouse_ = 0; // the simulated tablet's mouse device (tablet_plug / tablet_unplug)
     bool penIn_ = false, penDown_ = false, penEraser_ = false;
     ImVec2 penAt_{960, 540}; // the simulated pen (mouse_ is SDL's shared cursor, which stray mouse events move too)
     SDL_PenInputFlags penState_ = 0;
+    // The pen's mouse events as SDL 3.2 makes them (true), or none: SDL after it dropped a touching pen (#95,
+    // sdl_pen_mouse / pen_lost). A Huion-style driver also sends mouse events of its own (pen_stream huion).
+    bool sdlPenMouse_ = true;
+    bool huionStream_ = false;
+    static constexpr SDL_MouseID kDriverMouse = 7; // the driver's own mouse device
     // `snapshot` saves the active mesh; moved* values compare against it. `remember` keeps values for $NAME.
     std::vector<glm::vec3> basePositions_, baseNormals_;
     std::map<std::string, double> remembered_;

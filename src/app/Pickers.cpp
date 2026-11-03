@@ -254,6 +254,7 @@ bool AssetTile(const char* id, ImTextureID texture, const char* glyph, const std
     const bool hovered = ImGui::IsItemHovered();
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const ImVec2 t0 = p, t1(p.x + thumbSize, p.y + thumbSize);
+    const ui::TileLift lift = ui::BeginTileLift(t0, t1); // the thumbnail lifts on hover; its label stays
     dl->AddRectFilled(t0, t1, hovered ? kTileHover() : kTileBg(), theme::rounding(4.0f));
     if (texture) {
         const float pad = 2.0f;
@@ -280,6 +281,7 @@ bool AssetTile(const char* id, ImTextureID texture, const char* glyph, const std
         dl->AddText(ImVec2(std::round((b0.x + b1.x - bs.x) * 0.5f), b0.y + 1.0f), lookColor(IM_COL32(20, 20, 22, 255), theme::textOnAccent), badge);
         ImGui::LogText(" [%s]", badge);
     }
+    ui::EndTileLift(lift);
     const std::string shown = elide(label, thumbSize);
     const ImVec2 ls = ImGui::CalcTextSize(shown.c_str());
     dl->AddText(ImVec2(std::round(p.x + (thumbSize - ls.x) * 0.5f), t1.y + 2.0f),
@@ -310,8 +312,9 @@ void AssetTileHoverGlow() {
     a.x = std::clamp(a.x, vp->Pos.x + 2.0f, vp->Pos.x + vp->Size.x - s - 2.0f);
     a.y = std::clamp(a.y, vp->Pos.y + 2.0f, vp->Pos.y + vp->Size.y - s - 2.0f);
     const ImVec2 b(a.x + s, a.y + s);
-    // In the window's own draw list, unclipped: over the neighbouring tiles but under tooltips.
-    ImDrawList* dl = ImGui::GetWindowDrawList();
+    // On the foreground list, drawn last: over the neighbouring tiles and every other window (#86: in the window's
+    // own list, tiles in later child windows covered it).
+    ImDrawList* dl = ImGui::GetForegroundDrawList();
     dl->PushClipRect(vp->Pos, ImVec2(vp->Pos.x + vp->Size.x, vp->Pos.y + vp->Size.y), false);
     struct PopClip {
         ImDrawList* dl;
@@ -794,12 +797,8 @@ void drawStrokeGrid(App& app, GridMode mode) {
         ImGui::SliderFloat("##scatter", &app.sprayScatter_, 0.0f, 2.0f, "Scatter %.2f");
         ui::HelpText("Scatter", nullptr, "How far spray dabs land from the cursor, as a fraction of the brush size.",
                      "Stroke");
-    } else if (app.strokeType_ == StrokeType::LazyMouse) {
-        ImGui::SetNextItemWidth(-1);
-        ImGui::SliderFloat("##lazy", &app.lazyMouse_.radius, 1.0f, 300.0f, "Lazy radius %.0f px");
-        ui::HelpText("Lazy radius", nullptr, "Length of the string the brush trails on: longer = steadier lines.",
-                     "Stroke");
     }
+    app.drawPrecisionOptions(); // Steady Stroke for every stroke type, Precision Intensity (Precision.cpp)
 }
 
 void drawVdmGrid(App& app, GridMode mode) {
@@ -1009,7 +1008,9 @@ bool pickerOpen() { return st().open || st().slider >= 0; }
 void PickerUi::sizePopup(App& app, Slider which) {
     State& s = st();
     s.slider = int(which);
-    s.sliderSmooth = app.activeBrush() == BrushType::Smooth;
+    // Smooth's own Intensity when Smooth is the brush or (ZBrush) Shift is held. Not Shift in the Blender style:
+    // there Shift+F is the brush's Strength, as in Blender, and Shift has no smoothing meaning for a key.
+    s.sliderSmooth = app.blenderStyle() ? app.brush_ == BrushType::Smooth : app.activeBrush() == BrushType::Smooth;
     // The brush cursor's own position (SDL's window coordinates, the brush ring's centre) rather than ImGui's
     // MousePos: on Windows ImGui's comes from the global cursor minus the window position while no button is held,
     // and pen drivers' stray mouse events move it too, so the slider opened away from the cursor (#9).
@@ -1128,7 +1129,7 @@ void drawPickers(App& app) {
                           ? Def{"Draw Size", "S",
                                 "Brush radius in screen pixels. Drag, or type a number and press Enter. [ and ] also "
                                 "change it.",
-                                &app.radiusPx_, 2.0f, 800.0f, 1.0f}
+                                &app.radiusPx_, kMinDrawSizePx, kMaxDrawSizePx, 1.0f}
                       : which == PickerUi::Slider::ZIntensity
                           ? Def{s.sliderSmooth ? "Smooth Intensity" : "Intensity", "U",
                                 s.sliderSmooth ? "How strongly Smooth works (it keeps its own value, as in ZBrush: hold "
@@ -1189,6 +1190,8 @@ void drawPickers(App& app) {
             char fmt[64];
             if (!s.sliderTyped.empty())
                 std::snprintf(fmt, sizeof fmt, "%s %s_", d.name, s.sliderTyped.c_str());
+            else if (which == PickerUi::Slider::DrawSize)
+                std::snprintf(fmt, sizeof fmt, "%s", app.drawSizeLabel().c_str()); // (px and mm, Precision.cpp)
             else
                 std::snprintf(fmt, sizeof fmt, "%s %%.0f", d.name);
             if (which == PickerUi::Slider::DrawSize) {

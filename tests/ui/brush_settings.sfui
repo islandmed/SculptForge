@@ -1,0 +1,74 @@
+# #78: every brush keeps its own Draw Size, Z Intensity, alpha... Picking another brush and coming back brings its
+# values back; Save Brush Settings keeps them for the next start; Reset Brush to Default puts back the shipped ones;
+# Preferences > Input > Share size and intensity across brushes keeps size and intensity as before.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+run new_sphere subdivisions=3
+key f
+click "Standard##brush.standard"
+expect_value draw_size == 60
+expect_value brush_settings_saved == 0
+key ]
+key ]
+remember draw_size std
+run brush_set_alpha name=pores
+wait 0.1
+remember alpha_width std_alpha
+expect_value alpha_width > 0
+
+# A brush not used yet starts from the current values (nothing jumps), then keeps its own.
+click "Clay##brush.clay"
+expect_value draw_size == $std
+key [
+key [
+key [
+remember draw_size clay
+run brush_set_alpha name=round
+wait 0.1
+expect_value alpha_width == 0
+click "Standard##brush.standard"
+expect_value draw_size == $std
+expect_value alpha_width == $std_alpha
+click "Clay##brush.clay"
+expect_value draw_size == $clay
+expect_value alpha_width == 0
+
+# A custom brush has its own too.
+run brush_create name="Test Slab" depth=0.4
+wait 0.1                                      # (the switch is picked up on the next frame)
+key ]
+key ]
+key ]
+key ]
+remember draw_size slab
+click "Clay##brush.clay"
+expect_value draw_size == $clay
+run brush_create name="Test Slab" depth=0.4
+wait 0.1                                      # (the switch is picked up on the next frame)
+expect_value draw_size == $slab
+
+# Save Brush Settings, then Reset Brush to Default.
+click "Brush##palette.brush"
+click "Save Brush Settings##brush.save_settings"
+expect_value brush_settings_saved == 1
+expect_status "Saved this brush's settings"
+click "Reset Brush to Default##brush.reset_settings"
+expect_value brush_settings_saved == 0
+expect_value draw_size == 60
+expect_value z_intensity == 50
+expect_status "default settings"
+click "Brush##palette.brush"                  # (closed again: the shelf's tiles are clickable)
+
+# Share size and intensity across brushes: size and intensity stay; the alpha still follows the brush.
+click "Standard##brush.standard"
+expect_value draw_size == $std
+expect_value share_brush_size == 0
+click "Preferences##palette.preferences"
+click "Input##preferences.input"
+click "Share size and intensity across brushes##brush.share_size"
+expect_value share_brush_size == 1
+key escape
+click "Clay##brush.clay"
+expect_value draw_size == $std
+expect_value alpha_width == 0
+click "Standard##brush.standard"
+expect_value alpha_width == $std_alpha

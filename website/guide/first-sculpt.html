@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Your first sculpt in 10 minutes - SculptForge User Guide</title>
+  <meta name="description" content="Never sculpted before? In about ten minutes this lesson turns the default sphere into a little mushroom house: a glossy red cap with raised white spots, a round cream house under it, a wooden door and glowing windows. It ends with a render you can share. You only need the built-in brushes, a mouse (">
+  <meta name="theme-color" content="#111114">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" type="image/svg+xml" href="../img/favicon.svg?v=2">
+  <link rel="icon" type="image/png" href="../img/favicon-64.png?v=2">
+  <link rel="apple-touch-icon" href="../img/icon-256.png?v=2">
+  <link rel="canonical" href="https://sculptforge.app/guide/first-sculpt.html">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Your first sculpt in 10 minutes - SculptForge User Guide">
+  <meta property="og:description" content="Never sculpted before? In about ten minutes this lesson turns the default sphere into a little mushroom house: a glossy red cap with raised white spots, a round cream house under it, a wooden door and glowing windows. It ends with a render you can share. You only need the built-in brushes, a mouse (">
+  <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=3">
+  <meta property="og:url" content="https://sculptforge.app/guide/first-sculpt.html">
+  <link rel="stylesheet" href="../style.css?v=19">
+  <script src="../motion.js?v=11" defer></script>
+  <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+  <script src="search-index.js?v=47" defer></script>
+</head>
+<body class="guide-page" data-prev="welcome.html" data-next="whats-new.html">
+  <div class="scroll-progress" aria-hidden="true"></div>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="../index.html"><img src="../img/logo.svg?v=2" alt="" width="34" height="34"><span>SculptForge</span></a>
+      <nav aria-label="Main">
+        <a href="../index.html#features">Features</a>
+        <a href="../index.html#demos">Demos</a>
+        <a href="../brushes.html">Brushes</a>
+        <a href="index.html" aria-current="page">Guide</a>
+        <a class="nav-dl" href="../index.html#download">Download</a>
+        <a class="gh" href="https://discord.gg/gWrYkEmQhH">Discord</a>
+        <a class="gh" href="https://github.com/islandmed/SculptForge">GitHub</a>
+      </nav>
+    </div>
+  </header>
+  <div class="wrap guide-layout">
+    <div class="guide-side">
+      <button class="toc-toggle" type="button" aria-expanded="false" aria-controls="guide-toc">
+        <span>Contents</span><span class="toc-current">Your first sculpt in 10 minutes</span></button>
+      <div id="guide-toc" class="toc-panel">
+        <div class="guide-search" role="search">
+          <input type="search" id="guide-q" placeholder="Search the guide" aria-label="Search the guide" autocomplete="off">
+          <div class="search-results" id="guide-results" hidden></div>
+        </div>
+        <nav class="toc" aria-label="User guide"><a class="toc-home" href="index.html">Contents</a><p class="toc-group">Getting started</p><ul><li><a href="welcome.html">Welcome to SculptForge</a></li><li><a href="first-sculpt.html" class="current" aria-current="page">Your first sculpt in 10 minutes</a><ul class="toc-sections"><li><a href="#1-start-with-a-sphere">1. Start with a sphere</a></li><li><a href="#2-mask-the-top-pull-down-the-walls">2. Mask the top, pull down the walls</a></li><li><a href="#3-colour-the-cap-and-the-walls">3. Colour the cap and the walls</a></li><li><a href="#4-pull-out-the-cap">4. Pull out the cap</a></li><li><a href="#5-round-it-out-with-inflate">5. Round it out with Inflate</a></li><li><a href="#6-divide-twice">6. Divide twice</a></li><li><a href="#7-cut-a-door">7. Cut a door</a></li><li><a href="#8-make-round-windows">8. Make round windows</a></li><li><a href="#9-raise-the-spots">9. Raise the spots</a></li><li><a href="#10-paint-the-spots-white">10. Paint the spots white</a></li><li><a href="#11-paint-the-door-and-windows">11. Paint the door and windows</a></li><li><a href="#12-shade-it-and-save-a-render">12. Shade it and save a render</a></li><li><a href="#whats-next">What&#x27;s next</a></li></ul></li><li><a href="whats-new.html">What&#x27;s new</a></li><li><a href="coming-from-zbrush.html">Coming from ZBrush</a></li><li><a href="installing.html">Install SculptForge on Windows, macOS and Linux</a></li><li><a href="interface.html">The interface</a></li><li><a href="navigation.html">Navigating the view</a></li></ul><p class="toc-group">Sculpting</p><ul><li><a href="sculpting.html">Sculpting and brushes</a></li><li><a href="brush-lab.html">Brush Lab and sharing brushes</a></li><li><a href="masking.html">Masking</a></li><li><a href="face-groups.html">Face Groups and visibility</a></li><li><a href="selection-sets.html">Selection sets and morph targets</a></li><li><a href="parts.html">Parts</a></li><li><a href="forge-spheres.html">Forge Spheres</a></li><li><a href="vertex-paint.html">Vertex Paint and materials</a></li><li><a href="texture-painting.html">Texture painting</a></li><li><a href="uv-editor.html">UV Editor</a></li><li><a href="pbr-painting.html">Material painting (PBR)</a></li><li><a href="fill-layers.html">Fill layers, Mesh Maps and Material Recipes</a></li><li><a href="layers.html">Sculpt layers and blend shapes</a></li><li><a href="facial-shapes.html">Facial shapes and live face</a></li><li><a href="subdivision-levels.html">Subdivision levels</a></li><li><a href="micro-levels.html">Micro levels: hundreds of millions of polygons</a></li><li><a href="dynamic-topology.html">Dynamic topology</a></li><li><a href="timeline.html">Sculpt Timeline and timelapse</a></li><li><a href="gizmo.html">Moving, rotating and posing (Gizmo)</a></li><li><a href="geometry.html">Subdivide, remesh, decimate and LODs</a></li><li><a href="cut.html">Cut: line, lasso, rectangle and polyline</a></li><li><a href="retopology.html">Quad retopology and detail projection</a></li></ul><p class="toc-group">AI and capture</p><ul><li><a href="generate-3d.html">Image and text to 3D</a></li><li><a href="splats.html">Gaussian splats</a></li><li><a href="scan-to-splat.html">Scan an object into a splat</a></li><li><a href="scan-to-sculptable.html">From scan to sculptable mesh</a></li><li><a href="phone-capture.html">Phone capture and AR</a></li></ul><p class="toc-group">Files and pipelines</p><ul><li><a href="baking.html">Baking normal and displacement maps</a></li><li><a href="exporting.html">Exporting, Unreal and ZBrush</a></li><li><a href="export-presets.html">Export presets</a></li><li><a href="blender.html">Working with Blender</a></li><li><a href="maya.html">Working with Maya</a></li><li><a href="projects.html">Projects, autosave and snapshots</a></li><li><a href="scripting.html">Scripting and automation</a></li><li><a href="packs-and-macros.html">Packs and macros</a></li><li><a href="studios.html">SculptForge for studios</a></li></ul><p class="toc-group">Reference</p><ul><li><a href="shortcuts.html">Keyboard and mouse</a></li><li><a href="performance.html">Performance and big meshes</a></li><li><a href="troubleshooting.html">Troubleshooting: tablets, display, crashes and FAQ</a></li><li><a href="glossary.html">Glossary</a></li></ul></nav>
+      </div>
+    </div>
+    <main class="guide-main" id="top">
+      <article class="guide-article">
+<h1 id="your-first-sculpt-in-10-minutes">Your first sculpt in 10 minutes</h1>
+<p>Never sculpted before? In about ten minutes this lesson turns the default sphere into a little mushroom house: a glossy red cap with raised white spots, a round cream house under it, a wooden door and glowing windows. It ends with a render you can share. You only need the built-in brushes, a mouse (a pen tablet is nicer, but not required) and these twelve steps.</p>
+<figure class="shot"><a href="images/first-sculpt/12-render.jpg" class="zoom"><img src="images/first-sculpt/12-render.jpg" alt="The finished mushroom house" width="960" height="947" loading="lazy" decoding="async"></a><figcaption>The finished mushroom house</figcaption></figure>
+<p>The lesson uses the default look: the <strong>SculptForge layout</strong>, with the menus <strong>File, Edit, Sculpt, Paint, Mesh, View, Render, Help</strong> along the top, a tool shelf under them, the brushes along the bottom and the <strong>Tool</strong> panel on the right. If you switched to the <strong>ZBrush-style layout</strong>, the <strong>ZBrush-style layout</strong> notes say where things are there. Every step can be undone with <kbd>Ctrl</kbd>+<kbd>Z</kbd>, so experiment freely.</p>
+<aside class="callout callout-tip"><p><strong>Tip:</strong> <strong>Help &gt; Your first sculpt (10 min)</strong> opens this lesson inside SculptForge any time; <kbd>Shift</kbd>+<kbd>F1</kbd> hides it and shows it again where you left off.</p></aside>
+<h2 id="1-start-with-a-sphere">1. Start with a sphere<a class="anchor" href="#1-start-with-a-sphere" aria-label="Link to this section">#</a></h2>
+<p><strong>Goal:</strong> a fresh sphere, seen from the front.</p>
+<ol>
+<li>
+Press <kbd>Ctrl</kbd>+<kbd>N</kbd> (<strong>File &gt; New Sphere</strong>).
+</li>
+<li>
+Press <kbd>F</kbd> to frame it. To look around: drag on the empty background to rotate, <kbd>Alt</kbd> + drag on the background to move the view, scroll to zoom. Press <kbd>F</kbd> again whenever you lose it.
+</li>
+<li>
+Check that <strong>X</strong> is lit on the tool shelf: symmetry is on, so everything you do on one side happens on the other.
+</li>
+</ol>
+<figure class="shot"><a href="images/first-sculpt/01-sphere.jpg" class="zoom"><img src="images/first-sculpt/01-sphere.jpg" alt="The default sphere in the SculptForge layout" width="960" height="576" loading="lazy" decoding="async"></a><figcaption>The default sphere in the SculptForge layout</figcaption></figure>
+<aside class="callout callout-tip"><p><strong>Tip:</strong> right-drag anywhere rotates the view too, even over the model. See <a href="navigation.html">Navigating the view</a>.</p></aside>
+<h2 id="2-mask-the-top-pull-down-the-walls">2. Mask the top, pull down the walls<a class="anchor" href="#2-mask-the-top-pull-down-the-walls" aria-label="Link to this section">#</a></h2>
+<p><strong>Goal:</strong> a taller house body under a round top.</p>
+<ol>
+<li>
+In the <strong>Tool</strong> panel on the right, open <strong>Masking</strong> and click <strong>Mask Rectangle</strong>.
+</li>
+<li>
+Hold <kbd>Ctrl</kbd> and drag a box from the empty background over the upper half of the sphere. The top turns dark: it is masked, and brushes leave it alone.
+</li>
+<li>
+Pick <strong>Move</strong>: press <kbd>4</kbd>, or click <strong>Move</strong> on the bottom shelf. Press <kbd>]</kbd> many times (or drag <strong>Draw Size</strong> on the tool shelf) until the brush circle is wider than the sphere.
+</li>
+<li>
+Drag from the bottom of the sphere straight down a little. The lower half stretches into walls.
+</li>
+</ol>
+<figure class="shot"><a href="images/first-sculpt/02-mask.jpg" class="zoom"><img src="images/first-sculpt/02-mask.jpg" alt="The upper half masked" width="720" height="458" loading="lazy" decoding="async"></a><figcaption>The upper half masked</figcaption></figure>
+<figure class="shot"><a href="images/first-sculpt/02-walls.jpg" class="zoom"><img src="images/first-sculpt/02-walls.jpg" alt="The walls pulled down" width="720" height="458" loading="lazy" decoding="async"></a><figcaption>The walls pulled down</figcaption></figure>
+<aside class="callout callout-tip"><p><strong>Tip:</strong> a big brush moves a big area smoothly; a small one pulls a point. Try both and undo.</p></aside>
+<h2 id="3-colour-the-cap-and-the-walls">3. Colour the cap and the walls<a class="anchor" href="#3-colour-the-cap-and-the-walls" aria-label="Link to this section">#</a></h2>
+<p><strong>Goal:</strong> a red cap and cream walls, with a clean line between them.</p>
+<ol>
+<li>
+Open <strong>Paint</strong>. In <strong>Vertex Paint &amp; Color</strong>, pick a warm cream in the colour wheel and click <strong>Fill</strong>. Fill paints what isn&#x27;t masked: the walls.
+</li>
+<li>
+In <strong>Masking</strong>, click <strong>Invert</strong>: now the walls are masked.
+</li>
+<li>
+Open <strong>Paint</strong> again, click the red swatch, then <strong>Fill</strong>: the cap.
+</li>
+</ol>
+<figure class="shot"><a href="images/first-sculpt/03-colour.jpg" class="zoom"><img src="images/first-sculpt/03-colour.jpg" alt="Filling the cap red" width="960" height="682" loading="lazy" decoding="async"></a><figcaption>Filling the cap red</figcaption></figure>
+<aside class="callout callout-tip"><p><strong>Tip:</strong> colour sticks to the surface, so it follows the shape when you sculpt it next.</p></aside>
+<aside class="callout callout-note"><p><strong>ZBrush-style layout:</strong> the colour controls are in the <strong>Color</strong> palette on the palette bar; <strong>Masking</strong> is in the <strong>Tool</strong> palette.</p></aside>
+<h2 id="4-pull-out-the-cap">4. Pull out the cap<a class="anchor" href="#4-pull-out-the-cap" aria-label="Link to this section">#</a></h2>
+<p><strong>Goal:</strong> a wide cap that hangs over the walls.</p>
+<ol>
+<li>
+In <strong>Masking</strong>, click <strong>Blur</strong> once: the mask&#x27;s edge gets a little softer, so the cap bends smoothly.
+</li>
+<li>
+Keep <strong>Move</strong> and make the brush smaller with <kbd>[</kbd>, about half the sphere.
+</li>
+<li>
+Start just inside the sphere&#x27;s left edge, right above the line, and drag out to the left and a little down. Symmetry pulls the right side too.
+</li>
+<li>
+Press down a little on the very top of the cap to flatten it.
+</li>
+</ol>
+<figure class="shot"><a href="images/first-sculpt/04-cap.jpg" class="zoom"><img src="images/first-sculpt/04-cap.jpg" alt="The cap pulled out over the walls" width="720" height="458" loading="lazy" decoding="async"></a><figcaption>The cap pulled out over the walls</figcaption></figure>
+<aside class="callout callout-tip"><p><strong>Tip:</strong> if the view turns instead, you started on the background. Undo and start the drag a little further inside the sphere.</p></aside>
+<h2 id="5-round-it-out-with-inflate">5. Round it out with Inflate<a class="anchor" href="#5-round-it-out-with-inflate" aria-label="Link to this section">#</a></h2>
+<p><strong>Goal:</strong> a puffy dome and a round little house.</p>
+<ol>
+<li>
+Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> to clear the mask.
+</li>
+<li>
+Pick <strong>Inflate</strong>: press <kbd>5</kbd>. Drag across the top of the cap twice, then across the lower walls twice.
+</li>
+</ol>
+<figure class="shot"><a href="images/first-sculpt/05-dome.jpg" class="zoom"><img src="images/first-sculpt/05-dome.jpg" alt="Cap and walls inflated" width="720" height="458" loading="lazy" decoding="async"></a><figcaption>Cap and walls inflated</figcaption></figure>
+<aside class="callout callout-tip"><p><strong>Tip:</strong> hold <kbd>Shift</kbd> and drag to smooth with any brush, whenever a stroke leaves a lump.</p></aside>
+<h2 id="6-divide-twice">6. Divide twice<a class="anchor" href="#6-divide-twice" aria-label="Link to this section">#</a></h2>
+<p><strong>Goal:</strong> enough polygons for crisp details and colours.</p>
+<ol>
+<li>
+Press <kbd>Ctrl</kbd>+<kbd>D</kbd> twice (<strong>Tool &gt; Geometry &gt; Divide</strong>). Each Divide makes four polygons out of every one and smooths the shape: about 1.3 million triangles now.
+</li>
+</ol>
+<figure class="shot"><a href="images/first-sculpt/06-divide.jpg" class="zoom"><img src="images/first-sculpt/06-divide.jpg" alt="Divided twice: the same shape, smoother" width="720" height="458" loading="lazy" decoding="async"></a><figcaption>Divided twice: the same shape, smoother</figcaption></figure>
+<aside class="callout callout-tip"><p><strong>Tip:</strong> sculptors block out the big shape on a light mesh, then divide for details. <kbd>Shift</kbd>+<kbd>D</kbd> and <kbd>D</kbd> step down and up the levels. See <a href="subdivision-levels.html">Subdivision levels</a>.</p></aside>
+<h2 id="7-cut-a-door">7. Cut a door<a class="anchor" href="#7-cut-a-door" aria-label="Link to this section">#</a></h2>
+<p><strong>Goal:</strong> a door with real depth.</p>
+<ol>
+<li>
+Pick <strong>Crease</strong>: press <kbd>6</kbd>. Make the brush small with <kbd>[</kbd>.
+</li>
+<li>
+Drag up one side of the door, from the bottom of the wall, twice; symmetry cuts the other side. Then a short stroke over the top, towards the middle.
+</li>
+<li>
+Pick <strong>Clay</strong>: press <kbd>2</kbd>. Hold <kbd>Alt</kbd> and drag up inside the door twice: Clay digs in.
+</li>
+</ol>
+<figure class="shot"><a href="images/first-sculpt/07-door.jpg" class="zoom"><img src="images/first-sculpt/07-door.jpg" alt="The door cut and dug in" width="720" height="458" loading="lazy" decoding="async"></a><figcaption>The door cut and dug in</figcaption></figure>
+<aside class="callout callout-tip"><p><strong>Tip:</strong> without <kbd>Alt</kbd>, Clay builds up; with it, it carves. <strong>Pinch</strong> (<kbd>8</kbd>) along a crease makes it even sharper.</p></aside>
+<h2 id="8-make-round-windows">8. Make round windows<a class="anchor" href="#8-make-round-windows" aria-label="Link to this section">#</a></h2>
+<p><strong>Goal:</strong> two framed windows.</p>
+<ol>
+<li>
+Keep <strong>Clay</strong>. Click twice (without dragging) beside the door, halfway up the wall: a round frame. Symmetry adds the second window.
+</li>
+<li>
+Make the brush smaller with <kbd>[</kbd>, hold <kbd>Alt</kbd> and click twice in the same spot: the glass sinks into the frame.
+</li>
+</ol>
+<figure class="shot"><a href="images/first-sculpt/08-windows.jpg" class="zoom"><img src="images/first-sculpt/08-windows.jpg" alt="Two framed windows" width="720" height="458" loading="lazy" decoding="async"></a><figcaption>Two framed windows</figcaption></figure>
+<aside class="callout callout-tip"><p><strong>Tip:</strong> a click is one dab of the brush: perfect for buttons, eyes and rivets.</p></aside>
+<h2 id="9-raise-the-spots">9. Raise the spots<a class="anchor" href="#9-raise-the-spots" aria-label="Link to this section">#</a></h2>
+<p><strong>Goal:</strong> round bumps on the cap.</p>
+<ol>
+<li>
+Pick <strong>Inflate</strong>: press <kbd>5</kbd>.
+</li>
+<li>
+Click three times on each spot: a few on each side of the cap and a couple near the top.
+</li>
+</ol>
+<figure class="shot"><a href="images/first-sculpt/09-spots.jpg" class="zoom"><img src="images/first-sculpt/09-spots.jpg" alt="Spots raised on the cap" width="720" height="458" loading="lazy" decoding="async"></a><figcaption>Spots raised on the cap</figcaption></figure>
+<aside class="callout callout-tip"><p><strong>Tip:</strong> remember where you put them: the next step paints them white.</p></aside>
+<h2 id="10-paint-the-spots-white">10. Paint the spots white<a class="anchor" href="#10-paint-the-spots-white" aria-label="Link to this section">#</a></h2>
+<p><strong>Goal:</strong> crisp white spots.</p>
+<ol>
+<li>
+Press <kbd>P</kbd> (or click <strong>Paint</strong> on the tool shelf): the brush now paints colour without changing the shape.
+</li>
+<li>
+Give it a hard edge: with the cursor over the canvas press <kbd>O</kbd> (<strong>Falloff</strong>), type <code>-70</code> and press <kbd>Enter</kbd>.
+</li>
+<li>
+Pick white and click once on every spot.
+</li>
+</ol>
+<figure class="shot"><a href="images/first-sculpt/10-spots.jpg" class="zoom"><img src="images/first-sculpt/10-spots.jpg" alt="White spots" width="720" height="458" loading="lazy" decoding="async"></a><figcaption>White spots</figcaption></figure>
+<aside class="callout callout-tip"><p><strong>Tip:</strong> <kbd>C</kbd> over the model picks up the colour under the cursor, and <kbd>Alt</kbd> paints back towards white. See <a href="vertex-paint.html">Vertex Paint</a>.</p></aside>
+<h2 id="11-paint-the-door-and-windows">11. Paint the door and windows<a class="anchor" href="#11-paint-the-door-and-windows" aria-label="Link to this section">#</a></h2>
+<p><strong>Goal:</strong> a wooden door and glowing windows.</p>
+<ol>
+<li>
+Pick a warm brown and paint inside the door.
+</li>
+<li>
+Pick a bright yellow, make the brush a little smaller with <kbd>[</kbd>, and click on the windows.
+</li>
+<li>
+Press <kbd>P</kbd> again to go back to sculpting.
+</li>
+</ol>
+<figure class="shot"><a href="images/first-sculpt/11-paint.jpg" class="zoom"><img src="images/first-sculpt/11-paint.jpg" alt="The door and windows painted" width="720" height="458" loading="lazy" decoding="async"></a><figcaption>The door and windows painted</figcaption></figure>
+<h2 id="12-shade-it-and-save-a-render">12. Shade it and save a render<a class="anchor" href="#12-shade-it-and-save-a-render" aria-label="Link to this section">#</a></h2>
+<p><strong>Goal:</strong> a picture of your sculpt to share.</p>
+<ol>
+<li>
+Press <kbd>M</kbd> over the canvas and click <strong>White</strong>: a clean material that shows your colours.
+</li>
+<li>
+Open <strong>Render &gt; Materials</strong> and click <strong>PBR</strong> under <strong>Viewport Shading</strong>: studio lighting with soft reflections.
+</li>
+<li>
+Turn the view to a three-quarter angle, a little from above, and press <kbd>F</kbd>.
+</li>
+<li>
+Click <strong>Save Render</strong> at the bottom of <strong>Render &gt; Materials</strong>. The status bar names the picture (twice the size of the view); find it under <strong>Library &gt; Image</strong>.
+</li>
+<li>
+Press <kbd>Ctrl</kbd>+<kbd>S</kbd> to save the project.
+</li>
+</ol>
+<figure class="shot"><a href="images/first-sculpt/12-material.jpg" class="zoom"><img src="images/first-sculpt/12-material.jpg" alt="Render &gt; Materials with PBR shading and Save Render" width="960" height="682" loading="lazy" decoding="async"></a><figcaption>Render &gt; Materials with PBR shading and Save Render</figcaption></figure>
+<aside class="callout callout-note"><p><strong>ZBrush-style layout:</strong> <strong>PBR</strong> and <strong>Save Render</strong> are in the <strong>Material</strong> palette.</p></aside>
+<p>Well done: that&#x27;s a sculpt, painted and rendered.</p>
+<h2 id="whats-next">What&#x27;s next<a class="anchor" href="#whats-next" aria-label="Link to this section">#</a></h2>
+<ul>
+<li>
+Share it in <strong>#show-your-sculpts</strong> on the <a href="https://discord.gg/gWrYkEmQhH" rel="noopener">SculptForge Discord</a>. We&#x27;d love to see it.
+</li>
+<li>
+Try every brush and the keys that change them: <a href="sculpting.html">Sculpting and brushes</a>.
+</li>
+<li>
+Masks by lasso, rectangle and cavity: <a href="masking.html">Masking</a>.
+</li>
+<li>
+Paint layers, cavity paint and Lit Sphere materials: <a href="vertex-paint.html">Vertex Paint and materials</a>.
+</li>
+<li>
+Find your way around the menus and shelves: <a href="interface.html">The interface</a>.
+</li>
+</ul>
+      </article>
+      <nav class="pager" aria-label="Previous and next chapter"><a class="prev" rel="prev" href="welcome.html"><span>Previous</span>Welcome to SculptForge</a><a class="next" rel="next" href="whats-new.html"><span>Next</span>What&#x27;s new</a></nav>
+      <p class="guide-meta fine">Also in the app: <strong>Help &gt; User Guide</strong> (<kbd>Shift</kbd>+<kbd>F1</kbd>).
+        Found a mistake? <a href="https://github.com/islandmed/SculptForge/edit/main/docs/guide/first-sculpt.md">Edit this page on GitHub</a>.</p>
+    </main>
+    <aside class="on-page" aria-label="On this page"><p>On this page</p><ul><li><a href="#1-start-with-a-sphere">1. Start with a sphere</a></li><li><a href="#2-mask-the-top-pull-down-the-walls">2. Mask the top, pull down the walls</a></li><li><a href="#3-colour-the-cap-and-the-walls">3. Colour the cap and the walls</a></li><li><a href="#4-pull-out-the-cap">4. Pull out the cap</a></li><li><a href="#5-round-it-out-with-inflate">5. Round it out with Inflate</a></li><li><a href="#6-divide-twice">6. Divide twice</a></li><li><a href="#7-cut-a-door">7. Cut a door</a></li><li><a href="#8-make-round-windows">8. Make round windows</a></li><li><a href="#9-raise-the-spots">9. Raise the spots</a></li><li><a href="#10-paint-the-spots-white">10. Paint the spots white</a></li><li><a href="#11-paint-the-door-and-windows">11. Paint the door and windows</a></li><li><a href="#12-shade-it-and-save-a-render">12. Shade it and save a render</a></li><li><a href="#whats-next">What&#x27;s next</a></li></ul></aside>
+  </div>
+  <footer class="footer">
+    <div class="wrap footer-grid">
+      <div>
+        <a class="brand" href="../index.html"><img src="../img/logo.svg?v=2" alt="" width="28" height="28"><span>SculptForge</span></a>
+        <p class="fine">Copyright © 2026 The SculptForge contributors.<br>The SculptForge User Guide is part of
+          SculptForge, licensed under the <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
+      </div>
+      <div class="links">
+        <a href="index.html">User guide</a>
+        <a href="../supporters.html">Supporters</a>
+        <a href="https://github.com/islandmed/SculptForge">Source code</a>
+        <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
+        <a href="https://github.com/islandmed/SculptForge/issues">Report a problem</a>
+        <a href="https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md">AI services &amp; privacy</a>
+      </div>
+      <p class="fine trademarks">ZBrush, GoZ, MatCap and other ZBrush feature names are trademarks of Maxon Computer
+        GmbH. SculptForge is not affiliated with or endorsed by Maxon. All other trademarks belong to their owners.</p>
+    </div>
+  </footer>
+</body>
+</html>

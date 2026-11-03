@@ -14,11 +14,15 @@
 // its own thread), and a JSON result with the hardware and version is written at the end.
 #include "app/ProofMode.h"
 
+#include "core/FocusDetail.h"
+#include "core/Micro.h"
+
 #include "app/App.h"
 #include "app/ShellQuote.h"
 #include "app/Theme.h"
 
 #include "core/Benchmark.h"
+#include "core/MemoryGuard.h"
 #include "core/Primitives.h"
 #include "core/Timeline.h"
 
@@ -29,6 +33,7 @@
 #include <cmath>
 #include <condition_variable>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <ctime>
 #include <deque>
@@ -81,28 +86,20 @@ std::vector<ProofMeshSize> proofStandardScene(const std::string& name) {
     if (name == "standard-15m") return {s15};
     if (name == "standard-33m") return {s33};
     if (name == "standard") return {s15, s33};
+    if (name == "standard-1b") { // Focus Detail (prototype): ~1.02 billion micro triangles from a detail file
+        const ProofMeshSize s1b{1019, "1B Focus Detail", [](size_t) {
+                                    Mesh m;
+                                    std::string err;
+                                    const std::string path = focusStandard1bPath(err);
+                                    if (path.empty() || !FocusDetail::open(path, m, err)) { // (main checked the asset first)
+                                        std::fprintf(stderr, "standard-1b: %s\n", err.c_str());
+                                        return makeBenchHead(size_t(1) << 20);
+                                    }
+                                    return m;
+                                }, 5};
+        return {s1b};
+    }
     return {};
-}
-
-size_t availableMemoryBytes() {
-#if defined(_WIN32)
-    MEMORYSTATUSEX m{};
-    m.dwLength = sizeof m;
-    return GlobalMemoryStatusEx(&m) ? size_t(m.ullAvailPhys) : 0;
-#elif defined(__APPLE__)
-    vm_statistics64_data_t vm{};
-    mach_msg_type_number_t count = HOST_VM_INFO64_COUNT;
-    if (host_statistics64(mach_host_self(), HOST_VM_INFO64, reinterpret_cast<host_info64_t>(&vm), &count) != KERN_SUCCESS) return 0;
-    return size_t(vm.free_count + vm.inactive_count + vm.purgeable_count) * size_t(vm_page_size);
-#else
-    std::ifstream f("/proc/meminfo");
-    std::string key;
-    size_t kb = 0;
-    std::string unit;
-    while (f >> key >> kb >> unit)
-        if (key == "MemAvailable:") return kb * 1024;
-    return 0;
-#endif
 }
 
 size_t totalMemoryBytes() {
@@ -381,6 +378,8 @@ struct SizeResult {
     long long vramUsedKb = -1;   // the most the driver's free graphics memory dropped from before the build (-1: unknown)
     long long vramFreeBeforeKb = -1;
     std::vector<PhaseResult> phases;
+    MemoryCheck memory;  // free memory before the build
+    std::string skipped; // not built: too little free memory (benchmarkSkippedMessage)
 };
 
 } // namespace
@@ -467,6 +466,11 @@ std::vector<ProofMeshSize> parseSizes(const std::string& list) {
 
 } // namespace
 
+bool App::proofSkippedScenes() const {
+    if (!proof_) return false;
+    return std::any_of(proof_->results.begin(), proof_->results.end(), [](const SizeResult& r) { return !r.skipped.empty(); });
+}
+
 void App::startProofMode() {
     if (proof_ && proof_->stage != ProofState::Stage::Results && proof_->stage != ProofState::Stage::Intro) return;
     auto p = std::make_shared<ProofState>();
@@ -528,7 +532,21 @@ void App::drawProofUi() {
             if (!p.scene.empty())
                 ImGui::TextDisabled("Clay at 25, 60 and 120 px, Move, Smooth, a 240 px brush, then an orbit: the scene the "
                                     "website's table uses (same as sculptforge --benchmark %s)", p.scene.c_str());
-            ImGui::TextDisabled("%.1f GB of memory free now (33M needs about 6 GB)", double(availableMemoryBytes()) / double(1u << 30));
+            { // What each scene needs free (a scene without it is skipped), against what is free now.
+                const size_t free = availableMemoryBytes();
+                std::string need, shortOf;
+                for (const ProofMeshSize& s : p.sizes) {
+                    const MemoryCheck c = checkMemory(size_t(s.millions * 1e6 * s.bytesPerTriangle), free);
+                    const std::string gb = formatGigabytes(c.needBytes + memoryMargin(c.needBytes));
+                    need += (need.empty() ? "" : ", ") + s.label + " about " + gb;
+                    if (!c.enough) shortOf += (shortOf.empty() ? "" : ", ") + s.label;
+                }
+                ImGui::TextDisabled("%s of memory free now (%s)", free ? formatGigabytes(free).c_str() : "Unknown amount",
+                                    need.c_str());
+                if (!shortOf.empty())
+                    ImGui::TextColored(theme::danger, "Not enough free memory for %s: it will be skipped. Close other apps first.",
+                                       shortOf.c_str());
+            }
             ImGui::Spacing();
             ImGui::TextWrapped("A live display shows the frame rate, frame times (median, 95th, 99th percentile), how far "
                                "the stroke trails the pointer, and memory. The result is saved as JSON beside a video "
@@ -739,6 +757,13 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         }
         r.ramBytes = residentBytes();
         r.peakRamBytes = peakResidentBytes();
+        // SF_BENCH_MESH_OUT=prefix: the mesh's positions after every stroke (prefix-15M.bin: float x, y, z per
+        // vertex), to compare runs. (SF_STROKE_BACKLOG=0 places every dab, but the scene still differs a little from
+        // run to run on either stroke path; --measure-stroke with SF_MEASURE_VERIFY=1 compares the same dabs exactly.)
+        if (const char* out = std::getenv("SF_BENCH_MESH_OUT")) {
+            std::ofstream f(std::string(out) + "-" + r.label + ".bin", std::ios::binary);
+            f.write(reinterpret_cast<const char*>(doc_.mesh.positions.data()), std::streamsize(doc_.mesh.positions.size() * sizeof(glm::vec3)));
+        }
         ++p.sizeIndex;
         p.stage = p.sizeIndex < p.sizes.size() ? Stage::Announce : Stage::Finish;
     };
@@ -775,6 +800,22 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         const ProofMeshSize& s = p.sizes[p.sizeIndex];
         doc_.setMesh(makeIcosphere(1)); // free the last mesh (and its history) first
         gl::Finish();
+        // Free memory now, not the computer's total: with other programs holding the rest a 33M scene ran a system
+        // out of memory. Too little: this scene is skipped (and said so), the next one tried.
+        const MemoryCheck memory = checkMemory(size_t(s.millions * 1e6 * s.bytesPerTriangle));
+        if (!memory.enough) {
+            SizeResult r;
+            r.label = s.label;
+            r.memory = memory;
+            r.skipped = benchmarkSkippedMessage(s.label, memory);
+            SDL_Log("Benchmark: %s", r.skipped.c_str());
+            p.error += (p.error.empty() ? "" : "; ") + r.skipped;
+            p.results.push_back(r);
+            p.hudTitle = r.skipped;
+            ++p.sizeIndex;
+            p.stage = p.sizeIndex < p.sizes.size() ? Stage::Announce : Stage::Finish;
+            break;
+        }
         const long long vramBefore = driverFreeVramKb();
         resetPeakResidentBytes();
         const double t0 = nowSeconds();
@@ -782,7 +823,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         Mesh m = s.build ? s.build(tris) : makeBenchSphere(tris);
         SizeResult r;
         r.label = s.label;
-        r.triangles = m.triangleCount();
+        r.triangles = m.micro && m.micro->focus ? microTriangleCount(m) : m.triangleCount(); // (Focus Detail: its micro triangles)
         r.vertices = m.vertexCount();
         doc_.setMesh(std::move(m), "Benchmark");
         r.buildSeconds = nowSeconds() - t0;
@@ -928,8 +969,17 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         settings.set("input", "scripted pointer samples into App::onMouseMove (the mouse / pen handler)");
         settings.set("lag", "pointer sample time to SwapWindow of the frame showing its dab (display scan-out not included)");
         root.set("settings", settings);
-        Json runs = Json::array();
+        Json runs = Json::array(), skipped = Json::array();
         for (const SizeResult& r : p.results) {
+            if (!r.skipped.empty()) {
+                Json k = Json::object();
+                k.set("label", r.label);
+                k.set("need_mb", double(r.memory.needBytes >> 20));
+                k.set("available_mb", double(r.memory.availableBytes >> 20));
+                k.set("message", r.skipped);
+                skipped.push(k);
+                continue;
+            }
             Json run = Json::object();
             run.set("label", r.label);
             run.set("triangles", double(r.triangles));
@@ -972,6 +1022,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             runs.push(run);
         }
         root.set("runs", runs);
+        if (skipped.size() > 0) root.set("skipped", skipped); // (a result with skipped scenes isn't published)
         if (p.video) root.set("video", std::filesystem::path(p.videoPath).filename().string());
         if (!p.error.empty()) root.set("notes", p.error);
         {
@@ -983,6 +1034,10 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         std::printf("SculptForge %s (%s) proof mode%s%s on %s | %s\n", SCULPTFORGE_VERSION, SF_GIT_COMMIT,
                     p.scene.empty() ? "" : ", scene ", p.scene.c_str(), root["hardware"]["cpu"].asString().c_str(), p.gpu.c_str());
         for (const SizeResult& r : p.results) {
+            if (!r.skipped.empty()) {
+                std::printf("  %s\n", r.skipped.c_str());
+                continue;
+            }
             std::printf("  %-5s peak RAM %zu MB, GPU buffers %zu MB%s, worst stall %.0f ms\n", r.label.c_str(), r.peakRamBytes >> 20,
                         r.gpuBufferBytes >> 20, r.vramUsedKb > 0 ? (", driver VRAM used " + std::to_string(r.vramUsedKb >> 10) + " MB").c_str() : "",
                         [&] { double w = 0; for (const PhaseResult& ph : r.phases) w = std::max(w, worstStallMs(ph.frameMs, ph.releaseMs)); return w; }());

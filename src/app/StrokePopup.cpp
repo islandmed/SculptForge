@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // The stroke popup (Discord 11-02: "a popup for stroke type selection; the constant Ctrl+Shift / Alt combinations
-// interrupt the thought process"). One key (stroke.popup: G, J in the Blender style) or the left shelf's button
+// interrupt the thought process"). One key (stroke.popup: G, N in the Blender style) or the left shelf's button
 // opens a plain grid at the cursor, the current stroke under the pointer: the stroke types, then Add / Sub and
 // the latched modifiers Smooth, Mask and Select. Hold the key, point, let go: picked (a pen hovering works the
 // same). Tap the key: the grid stays open; a click on a stroke picks it and closes, a click on a modifier toggles

@@ -88,10 +88,62 @@ void App::registerInputActions() {
         [this] { openQuickMenu(); }, [this] { return quickMenu_.open; });
 
     // Stroke and colour.
-    add("stroke.lazy", "Lazy Stroke", ICON_LC_SPLINE, "Stroke", "L",
-        "Lazy Stroke on or off: the brush trails the cursor on a string, for steady lines.",
-        [this] { strokeType_ = strokeType_ == StrokeType::LazyMouse ? StrokeType::Dots : StrokeType::LazyMouse; },
-        [this] { return strokeType_ == StrokeType::LazyMouse; });
+    // (The id stays stroke.lazy so keys people set keep working; the Lazy Stroke type is Dots on the string.)
+    add("stroke.lazy", "Steady Stroke", ICON_LC_SPLINE, "Stroke", "L",
+        "Steady Stroke on or off, with every stroke type (Dots, Drag Stamp, Slide Stamp, Spray): the brush trails "
+        "the cursor on a string and only moves once the string is taut, for steady lines without hand shake.",
+        [this] {
+            if (strokeType_ == StrokeType::LazyMouse) { // the Lazy Stroke type is on: L turns the string off
+                strokeType_ = StrokeType::Dots;
+                steadyStroke_ = false;
+            } else {
+                steadyStroke_ = !steadyStroke_;
+            }
+            status_ = steadyOn() ? "Steady Stroke on" : "Steady Stroke off";
+        },
+        [this] { return steadyOn(); });
+    add("stroke.steady_catch_up", "Catch up on release", ICON_LC_SPLINE, "Stroke", "",
+        "Steady Stroke: when you let go, the line runs on to where the cursor is, instead of stopping a string's "
+        "length behind it.",
+        [this] { steadyCatchUp_ = !steadyCatchUp_; }, [this] { return steadyCatchUp_; });
+    add("brush.world_size", "World Size", ICON_LC_RULER, "Draw", "",
+        "Keep the brush size in model units (mm) instead of screen pixels: it stays the same on the surface as you "
+        "zoom in and out, for pores, wrinkles and trims of an exact width.",
+        [this] {
+            worldSize_ = !worldSize_;
+            worldSyncedPx_ = -1.0f; // the size as it is now becomes the world size
+            status_ = worldSize_ ? "World Size on: the brush keeps its size on the surface" : "World Size off";
+        },
+        [this] { return worldSize_; });
+    add("brush.size_down_fine", "Smaller brush by 1 px", ICON_LC_MINUS, "Draw", "Shift+[",
+        "Make the brush one pixel smaller (half a pixel below 2 px), down to 0.5 px.",
+        [this] { radiusPx_ = drawSizeStep(radiusPx_, -1, true); });
+    add("brush.size_up_fine", "Larger brush by 1 px", ICON_LC_PLUS, "Draw", "Shift+]",
+        "Make the brush one pixel larger (half a pixel below 2 px).", [this] { radiusPx_ = drawSizeStep(radiusPx_, 1, true); });
+    // One action per stroke type (U13): the Strokes radial menu (J) and the command palette pick them directly.
+    {
+        static const char* const keys[] = {"dots", "drag_stamp", "slide_stamp", "spray", "lazy"};
+        static const char* const glyphs[] = {ICON_LC_ELLIPSIS, ICON_LC_SQUARE_DASHED_MOUSE_POINTER, ICON_LC_MOUSE_POINTER_2,
+                                             ICON_LC_SPRAY_CAN, ICON_LC_SPLINE_POINTER};
+        static const char* const help[] = {
+            "Stroke type Dots: even dabs along the path, the classic brush stroke.",
+            "Stroke type Drag Stamp: click and drag one stamp; the drag sets its size and rotation.",
+            "Stroke type Slide Stamp: drag one stamp of the brush's Draw Size over the surface; it lands where you let go.",
+            "Stroke type Spray: scattered dabs of random size and strength, for organic texture.",
+            "Stroke type Lazy Stroke: the brush trails the cursor on a string, for smooth, steady lines.",
+        };
+        static_assert(std::size(keys) == size_t(StrokeType::Count));
+        for (int i = 0; i < int(StrokeType::Count); ++i) {
+            const StrokeType type = StrokeType(i);
+            const std::string id = std::string("stroke.type.") + keys[i];
+            add(id.c_str(), strokeTypeName(type), glyphs[i], "Stroke", "", help[i],
+                [this, type] {
+                    strokeType_ = type;
+                    status_ = std::string("Stroke: ") + strokeTypeName(type);
+                },
+                [this, type] { return strokeType_ == type; });
+        }
+    }
     add("stroke.continuous", "Continuous", ICON_LC_REPEAT, "Stroke", "",
         "Continuous on or off: while you hold the brush still on the model it keeps adding, 30 dabs a second "
         "(build up a bump without moving). Not for Move, Tendril or the drag strokes.",
@@ -155,29 +207,42 @@ void App::registerInputActions() {
         "and with Ctrl held too a drag zooms (#43). Off by default: in ZBrush, Space opens the Quick Menu (with this "
         "on, a right click still does). Typing a space in a text field is never taken.",
         [this] { uiPrefs_.spaceCamera = !uiPrefs_.spaceCamera; }, [this] { return uiPrefs_.spaceCamera; });
+    add("input.emulate_3_button", "Emulate 3 Button Mouse", nullptr, "Preferences > Input", "",
+        "Blender style: Alt+left-drag always turns the view (Shift pans, Ctrl zooms), as Blender's Emulate 3 Button "
+        "Mouse preference does, for pens and trackpads. Off (as Blender's default keymap, 5.1 and later): Alt+left-drag "
+        "on the model masks and Ctrl+Alt+left-drag unmasks; beside the model it still turns the view (#77).",
+        [this] { uiPrefs_.emulate3Button = !uiPrefs_.emulate3Button; }, [this] { return uiPrefs_.emulate3Button; });
     add("input.air_strokes", "Start strokes off the model", nullptr, "Preferences > Input", "",
         "A left-drag that starts on the background begins a brush stroke instead of turning the view; the brush "
         "touches the model once the cursor reaches it (#62). Ctrl (mask) and Shift (smooth) work the same way, and "
         "a Ctrl+click on the background still inverts the mask. The view still turns with a right-drag or a pen "
         "button set to Right click, pans with Alt+drag or a middle-drag, and moves with Space held if Hold Space is "
-        "on; with Blender or Maya keys, Alt+left-drag orbits. Shift+L turns it on and off.",
+        "on; with Maya keys, Alt+left-drag orbits, with Blender keys beside the model. Shift+L (View > Lock camera) "
+        "turns it on and off.",
         [this] { uiPrefs_.airStrokes = !uiPrefs_.airStrokes; }, [this] { return uiPrefs_.airStrokes; });
-    add("input.toggle_air_strokes", "Toggle strokes off the model", nullptr, "Preferences > Input", "Shift+L",
-        "Turn Preferences > Input > Start strokes off the model on or off: with it on, a left-drag on the background "
-        "sculpts once it reaches the model instead of turning the view (#62).",
+    add("input.toggle_air_strokes", "Lock camera", nullptr, "View", "Shift+L",
+        "Lock the camera for left-drags: a drag that starts on the background sculpts once it reaches the model "
+        "instead of turning the view (Preferences > Input > Start strokes off the model, #62). The status bar shows "
+        "CAMERA LOCKED while it is on. Right-drag or Alt+drag still move the view. Shift+L turns it on and off.",
         [this] {
             uiPrefs_.airStrokes = !uiPrefs_.airStrokes;
-            status_ = uiPrefs_.airStrokes ? "Strokes start off the model: right-drag or Alt+drag to move the view"
-                                          : "Strokes off the model: off (a drag on the background turns the view)";
+            status_ = uiPrefs_.airStrokes ? "Camera locked: drags start strokes; right-drag or Alt+drag to move the view"
+                                          : "Camera unlocked: a drag on the background turns the view";
         },
         [this] { return uiPrefs_.airStrokes; });
-    add("input.surface_cursor", "Cursor follows surface", nullptr, "Preferences > Input", "",
-        "The brush ring lies on the model under the pointer, turned to the surface and pressed onto its bumps, at "
-        "the brush's real size there (as in SculptGL), with a short line along the surface's direction. With "
-        "symmetry on, the mirrored ring shows too. Off the model, and with this off, the ring is a flat circle on "
-        "the screen.",
+    add("input.surface_cursor", "Cursor follows surface", nullptr, "Preferences > Cursor", "",
+        "The brush ring lies on the model under the pointer: a circle at the brush's real size there, turned to the "
+        "form of the surface (averaged over the brush, so fine bumps don't make it wobble), with a short line along "
+        "the surface's direction. With symmetry on, a dot shows where each mirrored or radial copy lands. Off the "
+        "model, and with this off, the ring is a flat circle on the screen.",
         [this] { uiPrefs_.cursorFollowsSurface = !uiPrefs_.cursorFollowsSurface; },
         [this] { return uiPrefs_.cursorFollowsSurface; });
+    add("cursor.hide_ring_stroking", "Hide ring while stroking", nullptr, "Preferences > Cursor", "",
+        "While a stroke runs, show only the dot where the brush touches (and the symmetry dots), not the ring: "
+        "nothing between you and the surface you are shaping. Off by default: the ring shows the brush size "
+        "throughout.",
+        [this] { uiPrefs_.hideRingWhileStroking = !uiPrefs_.hideRingWhileStroking; },
+        [this] { return uiPrefs_.hideRingWhileStroking; });
     add("input.import_blender", "Import Blender keymap...", ICON_LC_FILE_INPUT, "Preferences > Input", "",
         "Use the keys from a keymap you exported in Blender (Preferences > Keymap > Export, a .py file). Switches "
         "to the Blender style, then takes the navigation and sculpt keys SculptForge has an equivalent for. The "
@@ -238,6 +303,15 @@ void App::registerViewActions() {
     add("view.top", "Top view", "Numpad 7", "Look down on the model (orthographic).", [this] { viewAxis(0.0f, -90.0f); });
     add("view.bottom", "Bottom view", "Ctrl+Numpad 7", "Look up at the model from below (orthographic).",
         [this] { viewAxis(0.0f, 90.0f); });
+    // Draw > Camera: the corner gizmo's size (Small / Medium / Large, saved in the preferences).
+    static constexpr const char* sizeIds[3] = {"view.gizmo_small", "view.gizmo_medium", "view.gizmo_large"};
+    static constexpr const char* sizeLabels[3] = {"Small", "Medium", "Large"};
+    for (int i = 0; i < 3; ++i)
+        add(sizeIds[i], sizeLabels[i], "",
+            "Gizmo size: how big the X / Y / Z axes and the View Figure are in the corner of the canvas. Grows with "
+            "the UI scale.",
+            [this, i] { uiPrefs_.axisGizmoSize = i; },
+            [this, i] { return uiPrefs_.axisGizmoSize == i; });
     add("view.ortho", "Orthographic", "Numpad 5",
         "Switch between a perspective and an orthographic view (no foreshortening: sizes don't shrink with depth).",
         [this] {
@@ -290,7 +364,7 @@ void App::applyInputStyle() {
         {"draw.paint", {"P", "P", ""}},
         {"ui.picker.material", {"M", "M", ""}},
         {"stroke.lazy", {"L", "L", "L / Shift+S"}},
-        {"stroke.popup", {"G", "G", "J"}}, // (Blender's G is its Move brush)
+        {"stroke.popup", {"G", "G", "N"}}, // (Blender's G is its Move brush; J opens the Strokes radial menu)
         {"mask.clear", {"Ctrl+Shift+A", "Ctrl+Shift+A", "Alt+M / Ctrl+Shift+A"}},
         {"geometry.lower_res", {"Shift+D", "Shift+D", "Alt+1 / Shift+D"}},
         {"geometry.higher_res", {"D", "D", "Alt+2 / D"}},
@@ -347,10 +421,14 @@ void App::frameActiveSubtool() {
 
 SDL_Keymod App::blenderMods(SDL_Keymod keyboard) const {
     // What the sculpting code reads: Alt inverts, Ctrl masks, Shift smooths (the ZBrush meanings). Blender inverts
-    // with Ctrl and masks with the Mask brush; its Alt is the emulated middle button, so it means nothing here.
+    // with Ctrl and masks with the Mask brush, or (5.1+, #77) with Alt held: Alt+drag masks, Ctrl+Alt+drag unmasks.
+    // With Emulate 3 Button Mouse, Alt is the emulated middle button and means nothing here.
     SDL_Keymod out = keyboard & SDL_KMOD_SHIFT;
     const bool ctrl = (keyboard & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) != 0;
-    if (maskBrushActive()) {
+    if ((keyboard & SDL_KMOD_ALT) && !uiPrefs_.emulate3Button) {
+        out = SDL_KMOD_LCTRL; // the mask brush, as ZBrush's Ctrl (not with Shift: that would hide)
+        if (ctrl) out = SDL_Keymod(out | SDL_KMOD_LALT); // ... unmasking, as ZBrush's Ctrl+Alt
+    } else if (maskBrushActive()) {
         if (!(keyboard & SDL_KMOD_SHIFT)) out |= SDL_KMOD_LCTRL; // Shift still smooths the surface
         if (ctrl) out |= SDL_KMOD_LALT;                          // Ctrl unmasks
     } else if (ctrl) {
@@ -445,6 +523,12 @@ void App::drawInputSection() {
     if (ui::Checkbox("Hold Space and drag to move the camera##input.space_camera", &spaceCamera))
         uiPrefs_.spaceCamera = spaceCamera;
     ui::HelpAction(*this, "input.space_camera");
+    if (blenderStyle()) {
+        bool emulate = uiPrefs_.emulate3Button;
+        if (ui::Checkbox("Emulate 3 Button Mouse##input.emulate_3_button", &emulate)) uiPrefs_.emulate3Button = emulate;
+        ui::HelpAction(*this, "input.emulate_3_button");
+    }
+    drawPressureStatus(); // the pen's pressure, with the troubleshooting link (Tablet.cpp)
     if (mayaStyle()) {
         int zoom = uiPrefs_.mayaZoomHorizontal ? 0 : 1;
         ImGui::TextDisabled("%s", tr("Zoom drag"));
@@ -476,10 +560,9 @@ void App::drawInputSection() {
     bool airStrokes = uiPrefs_.airStrokes;
     if (ui::Checkbox("Start strokes off the model##input.air_strokes", &airStrokes)) uiPrefs_.airStrokes = airStrokes;
     ui::HelpAction(*this, "input.air_strokes");
-    bool surfaceCursor = uiPrefs_.cursorFollowsSurface;
-    if (ui::Checkbox("Cursor follows surface##input.surface_cursor", &surfaceCursor))
-        uiPrefs_.cursorFollowsSurface = surfaceCursor;
-    ui::HelpAction(*this, "input.surface_cursor");
+    bool shareSize = brushSettingsStore().shareSizeIntensity;
+    if (ui::Checkbox("Share size and intensity across brushes##brush.share_size", &shareSize)) setShareBrushSize(shareSize);
+    ui::HelpAction(*this, "brush.share_size");
     ui::ActionButton(*this, "input.import_blender", ImVec2(-FLT_MIN, 0), ui::Look::IconLabel);
     drawPackKeymapRows(); // keymaps from installed packs (PanelPacks.cpp)
     ImGui::TextDisabled("%s", tr("Rotation"));
@@ -494,6 +577,29 @@ void App::drawInputSection() {
                  "Preferences > Input");
     drawRadialMenusSection(); // RadialMenu.cpp
     drawSpaceMouseSection();  // SpaceMouse.cpp
+}
+
+// Preferences > Cursor (#88): the system cursor over the view and the brush ring.
+void App::drawCursorSection() {
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(tr("Viewport cursor"));
+    const char* const kCursors[] = {"Crosshair##viewport_cursor", "Arrow##viewport_cursor"};
+    for (int i = 0; i < 2; ++i) {
+        ImGui::SameLine();
+        if (ImGui::RadioButton(tr(kCursors[i]), uiPrefs_.viewportCursor == i)) uiPrefs_.viewportCursor = i;
+        ui::HelpText("Viewport cursor", nullptr,
+                     "The pointer over the 3D view: a crosshair (the default, as in most sculpting apps; it stays "
+                     "while the view turns) or the arrow. Panels, menus and popups always show the arrow (or their "
+                     "own resize and text cursors). Store Config keeps it.",
+                     "Preferences > Cursor");
+    }
+    bool surfaceCursor = uiPrefs_.cursorFollowsSurface;
+    if (ui::Checkbox("Cursor follows surface##input.surface_cursor", &surfaceCursor))
+        uiPrefs_.cursorFollowsSurface = surfaceCursor;
+    ui::HelpAction(*this, "input.surface_cursor");
+    bool hideRing = uiPrefs_.hideRingWhileStroking;
+    if (ui::Checkbox("Hide ring while stroking##cursor.hide_ring_stroking", &hideRing)) uiPrefs_.hideRingWhileStroking = hideRing;
+    ui::HelpAction(*this, "cursor.hide_ring_stroking");
 }
 
 void App::drawZIntensitySlider(const char* id) {
@@ -533,7 +639,8 @@ void App::groupMasked() {
 // ---------------------------------------------------------------------------
 
 glm::vec2 App::constrainStroke(float x, float y) {
-    if (straight_.shiftAtStart || !(inputMods() & SDL_KMOD_SHIFT)) {
+    // (Shift+Alt is the precision drag, not a Shift line)
+    if (straight_.shiftAtStart || !(inputMods() & SDL_KMOD_SHIFT) || precisionHeld()) {
         straight_.active = false;
         return {x, y};
     }
@@ -627,8 +734,7 @@ void App::drawQuickMenu() {
         ImGui::BeginGroup();
         const float sw = 150.0f * s;
         ImGui::SetNextItemWidth(sw);
-        ui::SliderInside("##qm_drawsize", &radiusPx_, 2.0f, 800.0f, "Draw Size %.0f", ImGuiSliderFlags_Logarithmic);
-        ui::HelpText("Draw Size", "S", "Brush radius in screen pixels.", "Quick Menu");
+        drawSizeSlider("##qm_drawsize", "Quick Menu", "Brush radius in screen pixels (0.5 to 800), and in mm on the surface.");
         float focal = focalShift_ * 100.0f;
         ImGui::SetNextItemWidth(sw);
         if (ui::SliderInside("##qm_focal", &focal, -100.0f, 100.0f, "Falloff %.0f")) focalShift_ = focal / 100.0f;
@@ -712,15 +818,9 @@ void App::airStrokeRelease() {
 
 void App::drawAirStrokeIndicator() {
     if (!uiPrefs_.airStrokes) return;
-    const CanvasRect c = canvasRect();
-    const char* text = tr("Strokes start off the model");
-    const ImVec2 size = ImGui::CalcTextSize(text);
-    const float pad = 6.0f * uiScale_;
-    const ImVec2 at(c.x + (c.w - size.x) * 0.5f, c.y + timelineTopInset_ + 10.0f * uiScale_); // (below a top timeline)
-    ImDrawList* dl = ImGui::GetForegroundDrawList();
-    dl->AddRectFilled(ImVec2(at.x - pad, at.y - pad * 0.5f), ImVec2(at.x + size.x + pad, at.y + size.y + pad * 0.5f),
-                      IM_COL32(0, 0, 0, 110), 4.0f * uiScale_);
-    dl->AddText(at, theme::u32(theme::accent), text);
+    // (below a top timeline; Don't show again and Preferences > Hints hide it, U11)
+    drawViewportHint("air_strokes", tr("Strokes start off the model"), theme::u32(theme::accent),
+                     canvasRect().y + timelineTopInset_ + 8.0f * uiScale_);
 }
 
 } // namespace sf

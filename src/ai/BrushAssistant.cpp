@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "ai/BrushAssistant.h"
+#include "ai/AiPolicy.h"
 
 #include "ai/Http.h"
 #include "core/BrushLibrary.h"
@@ -133,6 +134,8 @@ Json AiSettings::toJson() const {
     j.set("generatorCommand", generatorCommand);
     j.set("hfToken", hfToken);
     j.set("hfModel", hfModel);
+    j.set("hfModelChosen", hfModelChosen);
+    j.set("hunyuanNoticeShown", hunyuanNoticeShown);
     j.set("falKey", falKey);
     j.set("falModel", falModel);
     j.set("falEndpoint", falEndpoint);
@@ -142,6 +145,7 @@ Json AiSettings::toJson() const {
     j.set("comfyUrl", comfyUrl);
     j.set("comfyImageWorkflow", comfyImageWorkflow);
     j.set("comfyTextWorkflow", comfyTextWorkflow);
+    j.set("enabled", enabled);
     return j;
 }
 
@@ -164,7 +168,13 @@ AiSettings AiSettings::fromJson(const Json& j) {
     };
     text("generatorService", s.generatorService);
     text("hfToken", s.hfToken);
-    text("hfModel", s.hfModel);
+    // A model the user never chose follows the default. Files from before hfModelChosen: TRELLIS.2 was the
+    // default then, so it counts as chosen only with a saved token (it needs one); any other model was picked.
+    const std::string savedModel = j["hfModel"].asString();
+    s.hfModelChosen = j["hfModelChosen"].isBool() ? j["hfModelChosen"].asBool()
+                                                  : !savedModel.empty() && (savedModel != "trellis-2" || !s.hfToken.empty());
+    if (s.hfModelChosen && !savedModel.empty()) s.hfModel = savedModel;
+    s.hunyuanNoticeShown = j["hunyuanNoticeShown"].asBool();
     text("falKey", s.falKey);
     text("falModel", s.falModel);
     text("falEndpoint", s.falEndpoint);
@@ -174,6 +184,7 @@ AiSettings AiSettings::fromJson(const Json& j) {
     text("comfyUrl", s.comfyUrl);
     s.comfyImageWorkflow = j["comfyImageWorkflow"].asString();
     s.comfyTextWorkflow = j["comfyTextWorkflow"].asString();
+    s.enabled = j["enabled"].asBool(true);
     return s;
 }
 
@@ -373,6 +384,10 @@ std::string modelsUrl(const std::string& chatEndpoint) {
 
 std::vector<std::string> listModels(const AiSettings& s, std::string& error) {
     std::vector<std::string> out;
+    if (!aiEnabled()) {
+        error = aiOffError();
+        return out;
+    }
     HttpResponse r = httpRequest("GET", modelsUrl(s.endpoint), requestHeaders(s), {}, 5);
     if (!r.error.empty()) {
         error = "Nothing is answering at " + s.endpoint + " - is Ollama or LM Studio running? (" + r.error + ")";
@@ -390,6 +405,10 @@ std::vector<std::string> listModels(const AiSettings& s, std::string& error) {
 }
 
 std::string smallestOllamaModel(std::string& error) {
+    if (!aiEnabled()) {
+        error = aiOffError();
+        return {};
+    }
     HttpResponse r = httpRequest("GET", "http://localhost:11434/api/tags", {}, {}, 2);
     Json j;
     if (r.status != 200 || !Json::parse(r.body, j, error)) return {};
@@ -407,6 +426,11 @@ std::string smallestOllamaModel(std::string& error) {
 
 BrushSuggestion requestBrush(const AiSettings& s, const std::vector<ChatMessage>& history,
                              std::string* rawAssistantJson) {
+    if (!aiEnabled()) {
+        BrushSuggestion out;
+        out.error = aiOffError();
+        return out;
+    }
     if (s.provider == AiSettings::Provider::Anthropic && s.resolvedKey().empty()) {
         BrushSuggestion out;
         out.error = "No Anthropic API key - add one in AI settings or set ANTHROPIC_API_KEY, or switch to Free.";

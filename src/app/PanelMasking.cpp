@@ -73,6 +73,11 @@ void App::beginMaskStroke(float x, float y) {
     strokePath_.reset(x, y);
     dabQueue_.clear();
     lazyMouse_.reset(glm::vec2(x, y));
+    steadyCursor_ = glm::vec2(x, y);
+    precision_.reset(glm::vec2(x, y));
+    precisionActive_ = false;
+    pickSmoother_.reset();
+    strokeCurve_ = PressurePoints(); // (mask strokes: the tablet's curve only)
     // ZBrush: a Ctrl+click on the model blurs the mask (Ctrl+Alt+click sharpens it); only a drag paints. The
     // pen's eraser end set to Erase mask paints straight away.
     maskClickPending_ = ctrlDown(inputMods()) && !blenderStyle(); // (Blender's Mask brush dabs on a click)
@@ -133,7 +138,8 @@ void App::maskSelectMouseUp() {
     // Mask the inside, or unmask it with Alt (Mask Strength sets how much), mirrored by the symmetry like a mask
     // stroke (#51). A shape that covers none of the model clears the mask instead (ZBrush).
     runSelection("mask_rect", "mask_lasso",
-                 withSymmetryArgs({{"unmask", alt}, {"strength", double(maskStrength_)}, {"clear_outside", !alt}}));
+                 withSymmetryArgs({{"unmask", alt}, {"strength", double(maskStrength_)}, {"clear_outside", !alt},
+                                   {"front_faces_only", maskFrontFacesOnly_}}));
 }
 
 App::HeldBrush App::heldBrush() const {
@@ -149,7 +155,11 @@ std::vector<App::HeldBrushItem> App::heldBrushItems(HeldBrush held) {
                 {"mask.rect", "Mask Rectangle", "Rect", ICON_LC_SQUARE_DASHED, SelectShape::Rect}};
     if (held == HeldBrush::Select)
         return {{"select.rect", "Select Rectangle", "Rect", ICON_LC_SQUARE_DASHED, SelectShape::Rect},
-                {"select.lasso", "Select Lasso", "Lasso", ICON_LC_LASSO, SelectShape::Lasso}};
+                {"select.lasso", "Select Lasso", "Lasso", ICON_LC_LASSO, SelectShape::Lasso},
+                {"cut.line", "Cut Line", "Line", ICON_LC_SLASH, SelectShape::CutLine},
+                {"cut.lasso", "Cut Lasso", "Lasso", ICON_LC_SCISSORS, SelectShape::CutLasso},
+                {"cut.rect", "Cut Rectangle", "Rect", ICON_LC_SQUARE_DASHED, SelectShape::CutRect},
+                {"cut.polyline", "Cut Polyline", "Polyline", ICON_LC_WAYPOINTS, SelectShape::CutPolyline}};
     return {};
 }
 
@@ -183,7 +193,8 @@ bool App::drawHeldBrushGrid(HeldBrush held, bool strokes) {
         }
         const std::string help = strokes ? std::string("Stroke of ") + it.brush + ". " + (a ? a->description : "")
                                          : (a ? a->description : std::string());
-        ui::HelpText(label, nullptr, help.c_str(), held == HeldBrush::Mask ? "Tool > Masking" : "Tool > Visibility");
+        ui::HelpText(label, nullptr, help.c_str(),
+                     held == HeldBrush::Mask ? "Tool > Masking" : isCutShape(it.shape) ? "Tool > Cut" : "Tool > Visibility");
     }
     return picked;
 }
@@ -194,6 +205,13 @@ void App::drawMaskingSection() {
     ImGui::TextDisabled("%s", tr(maskShape_ == SelectShape::Pen ? "(Ctrl paints, Ctrl+Alt erases)"
                                                              : "(Ctrl masks, Ctrl+Alt unmasks)"));
     ui::Segmented(*this, {"mask.pen", "mask.lasso", "mask.rect"});
+    if (maskShape_ != SelectShape::Pen) { // #91.3
+        ImGui::Checkbox(tr("Front faces only##mask"), &maskFrontFacesOnly_);
+        ui::HelpText("Front faces only", nullptr,
+                     tr("Mask Lasso and Mask Rectangle mask only what faces you: the far side and folds turned away "
+                        "stay as they are."),
+                     "Tool > Masking");
+    }
     ImGui::SetNextItemWidth(-1);
     ui::SliderInside("##maskstrength", &maskStrength_, 0.01f, 1.0f, "Mask Strength %.2f");
 

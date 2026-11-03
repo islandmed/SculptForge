@@ -1,0 +1,64 @@
+# #76: alpha options in the Alpha palette. Follow stroke direction turns the alpha along the stroke (Blender's Rake
+# smoothing), Angle adds a fixed turn, Tile repeats the alpha in the dab; all kept per brush (#78), and custom
+# (recipe) brushes turn their alpha the same way.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+run new_sphere subdivisions=4
+key f
+click "Standard##brush.standard"
+run brush_set_alpha name=scales
+wait 0.1
+click "Alpha##palette.alpha"
+expect "Follow stroke direction##alpha.follow_stroke"
+hold ctrl
+hover "Follow stroke direction##alpha.follow_stroke"
+expect_help "Rake"
+hold none
+click "Follow stroke direction##alpha.follow_stroke"
+expect_value alpha_follow == 1
+click "Alpha##palette.alpha"
+
+# Left to right: the alpha's top points right (-90); right to left: left (90).
+stroke 0.2 0.5 0.8 0.5
+expect_value last_dab_angle >= -91
+expect_value last_dab_angle <= -89
+stroke 0.8 0.45 0.2 0.45
+expect_value last_dab_angle >= 89
+expect_value last_dab_angle <= 91
+shot follow_stroke
+
+# A fixed angle on its own, and on top of the stroke's direction.
+run brush_alpha_options follow_stroke=false angle=30
+stroke 0.2 0.5 0.8 0.5
+expect_value last_dab_angle == 30
+run brush_alpha_options follow_stroke=true angle=30
+stroke 0.2 0.5 0.8 0.5
+expect_value last_dab_angle == -60
+
+# Tile, and every option is the brush's own.
+run brush_alpha_options tile_x=3 tile_y=2
+wait 0.1
+expect_value alpha_tile_x == 3
+expect_value alpha_tile_y == 2
+click "Alpha##palette.alpha"
+shot tiled
+click "Alpha##palette.alpha"
+click "Clay##brush.clay"
+wait 0.1
+run brush_alpha_options follow_stroke=false angle=0 tile_x=1 tile_y=1
+wait 0.1
+expect_value alpha_tile_x == 1
+click "Standard##brush.standard"
+wait 0.1
+expect_value alpha_follow == 1
+expect_value alpha_angle == 30
+expect_value alpha_tile_x == 3
+
+# A custom brush follows the stroke too.
+run brush_create name="Rake Test" depth=0.4
+wait 0.1
+run brush_alpha_options follow_stroke=true angle=0 tile_x=1 tile_y=1
+snapshot
+stroke 0.2 0.5 0.8 0.5
+expect_value last_dab_angle >= -91
+expect_value last_dab_angle <= -89
+expect_value moved > 0

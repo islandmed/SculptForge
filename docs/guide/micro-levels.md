@@ -35,7 +35,8 @@ triangles draws faster than Micro 4 on 1.2 million.
 
 These brushes work on micro levels: **Standard**, **Clay**, **Clay Block**, **Smooth**, **Inflate**,
 **Flatten**, **Trim**, **Layer**, **Pinch**, **Crease**, **Sharp Crease** and **Mask** (with
-<kbd>Ctrl</kbd>). Symmetry, Falloff, pressure and the mask work as usual, and every stroke is one undo step.
+<kbd>Ctrl</kbd>). Symmetry, Falloff, pressure, alphas (Drag Stamp included) and the mask work as usual, and every
+stroke is one undo step.
 
 - A micro level stores one height per point, so it moves the surface in and out, never sideways. **Pinch**,
   **Crease** and **Sharp Crease** sharpen the height profile instead of pulling points together (the result

@@ -61,7 +61,7 @@ std::string radialActionId(int menu) { return "radial.menu" + std::to_string(men
 
 ImVec4 col(ImU32 c) { return ImGui::ColorConvertU32ToFloat4(c); }
 
-const char* const kDefaultKeys[] = {"T", "Y"}; // free in every input style (tests/ui/radial_menu.sfui checks)
+const char* const kDefaultKeys[] = {"T", "Y", "J"}; // free in every input style (tests/ui/radial_menu.sfui checks)
 
 } // namespace
 
@@ -76,7 +76,13 @@ std::vector<RadialMenu> App::defaultRadialMenus() {
     for (const char* id : {"mask.invert", "mask.lasso", "mask.clear", "mask.rect", "mask.all", "mask.pen",
                            "view.mask", "polygroup.group_masked"})
         masking.slots.push_back({id, std::string_view(id) == "view.mask" ? "View Mask" : "", ""}); // (its own: "Mask")
-    return {brushes, masking};
+    // The stroke types on one ring (U13, as 3D-Coat's stroke pop-up; single ring, as every radial menu here).
+    RadialMenu strokes;
+    strokes.name = "Strokes";
+    for (const char* id : {"stroke.type.dots", "stroke.type.drag_stamp", "stroke.type.slide_stamp", "stroke.type.spray",
+                           "stroke.type.lazy"})
+        strokes.slots.push_back({id, "", ""});
+    return {brushes, masking, strokes};
 }
 
 bool App::radialSlotAction(std::string_view id) const {
@@ -547,7 +553,7 @@ void App::drawRadialMenusSection() {
             if (ImGui::Button(ICON_LC_CHEVRON_DOWN "##radial.down", ImVec2(rowH, 0))) move = 1;
             ImGui::EndDisabled();
             ImGui::SameLine();
-            const bool remove = ImGui::Button(ICON_LC_X "##radial.remove", ImVec2(rowH, 0));
+            const bool remove = ui::GlyphButton("##radial.remove", ICON_LC_X, ImVec2(rowH, 0));
             if (selected) {
                 ImGui::Indent(rowH * 0.5f);
                 char label[kRadialLabelMax + 1];
@@ -655,7 +661,7 @@ void App::drawRadialMenusSection() {
         radialEdit_ = RadialEdit();
         status_ = "Default radial menus restored - Store Config (Ctrl+Shift+I) keeps them";
     }
-    ui::HelpText("Restore default menus", nullptr, "Back to the two built-in menus: Brushes (T) and Masking (Y).", path);
+    ui::HelpText("Restore default menus", nullptr, "Back to the three built-in menus: Brushes (T), Masking (Y) and Strokes (J).", path);
     ImGui::TextColored(col(ui::color::textDim), "Store Config keeps them");
 }
 

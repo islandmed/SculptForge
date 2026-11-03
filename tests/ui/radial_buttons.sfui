@@ -6,7 +6,7 @@ run new_sphere subdivisions=4
 
 # The middle button (sculpting.json): a plain press opens the pie, a right flick runs Inflate.
 radial_import data/radial/sculpting.json
-expect_value radial_menus == 3
+expect_value radial_menus == 4
 button_drag middle 0.5 0.5 0.57 0.5 0.3
 expect_value radial_open == 0
 expect_value radial_ran == 1
@@ -23,7 +23,7 @@ expect_value camera_pan > $pan0+0.01
 # The right button (right_button.json): a plain right-drag opens the pie and runs the flicked item (a left flick:
 # Pinch), and the view doesn't turn.
 radial_import data/radial/right_button.json
-expect_value radial_menus == 4
+expect_value radial_menus == 5
 remember camera_yaw yaw0
 button_drag right 0.5 0.5 0.43 0.5 0.3
 expect_value radial_open == 0

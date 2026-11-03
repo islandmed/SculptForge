@@ -1,6 +1,6 @@
 # The viewport cursor (#73): a crosshair over the 3D view where brushes act, the arrow over panels, menus and
-# popups (and their own resize and text cursors there). Preferences > Interface > Viewport cursor: Crosshair (the
-# default) or Arrow.
+# popups (and their own resize and text cursors there). It stays while the view turns (#88: no arrow flashing in
+# for each orbit). Preferences > Cursor > Viewport cursor: Crosshair (the default) or Arrow.
 run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_sphere subdivisions=3
 hover_model 0.5 0.5
@@ -17,9 +17,15 @@ wait 0.1
 expect_value viewport_cursor == 100
 pen_out
 
+# Turning the view (right-drag on the background): still the crosshair, not the arrow.
+remember camera_yaw yaw0
+button_drag right 0.2 0.5 0.3 0.45
+expect_value camera_yaw != $yaw0
+expect_value drag_cursor == 100
+
 # A window floating over the view (Preferences) has the arrow; the view beside it the crosshair.
 click "Preferences##palette.preferences"
-click "Interface##preferences.interface"
+click "Cursor##preferences.cursor"
 expect "Crosshair##viewport_cursor"
 hover "Arrow##viewport_cursor"
 expect_value viewport_cursor == 0

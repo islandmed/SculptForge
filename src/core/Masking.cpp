@@ -290,22 +290,33 @@ namespace {
 
 // Vertex v, or one of its mirror images, projects inside the shape.
 bool inShape(const Mesh& mesh, const glm::mat4& viewProj, const ScreenPolygon& shape,
-             const std::vector<SymCopy>& mirrors, uint32_t v) {
+             const std::vector<SymCopy>& mirrors, uint32_t v, const glm::mat4* invViewProj = nullptr) {
+    // With `invViewProj` (Front faces only), the point's normal must face the viewer: against the view ray
+    // through it, which works for perspective and orthographic views alike.
+    auto facing = [&](const glm::vec3& n, glm::vec2 ndc) {
+        if (!invViewProj || v >= mesh.normals.size()) return true;
+        const glm::vec4 a = *invViewProj * glm::vec4(ndc, -1.0f, 1.0f), b = *invViewProj * glm::vec4(ndc, 1.0f, 1.0f);
+        return glm::dot(n, glm::vec3(b) / b.w - glm::vec3(a) / a.w) < 0.0f;
+    };
     glm::vec2 ndc;
-    if (projectToNdc(viewProj, mesh.positions[v], ndc) && shape.contains(ndc)) return true;
+    const glm::vec3 n = v < mesh.normals.size() ? mesh.normals[v] : glm::vec3(0.0f);
+    if (projectToNdc(viewProj, mesh.positions[v], ndc) && shape.contains(ndc) && facing(n, ndc)) return true;
     for (const SymCopy& m : mirrors)
-        if (!m.identity() && projectToNdc(viewProj, m.point(mesh.positions[v]), ndc) && shape.contains(ndc)) return true;
+        if (!m.identity() && projectToNdc(viewProj, m.point(mesh.positions[v]), ndc) && shape.contains(ndc) &&
+            facing(m.dir(n), ndc))
+            return true;
     return false;
 }
 
 } // namespace
 
 bool maskInShape(Mesh& mesh, const glm::mat4& viewProj, const ScreenPolygon& shape, float strength, bool unmask,
-                 const std::vector<SymCopy>& mirrors) {
+                 const std::vector<SymCopy>& mirrors, bool frontFacesOnly) {
     if (mesh.vertexCount() == 0 || !shape.valid()) return false;
     const float s = std::clamp(strength, 0.0f, 1.0f);
+    const glm::mat4 inv = glm::inverse(viewProj);
     return maskPass(mesh, [&](const std::vector<float>& m, uint32_t v) {
-        if (!inShape(mesh, viewProj, shape, mirrors, v)) return m[v];
+        if (!inShape(mesh, viewProj, shape, mirrors, v, frontFacesOnly ? &inv : nullptr)) return m[v];
         return unmask ? m[v] * (1.0f - s) : m[v] + (1.0f - m[v]) * s;
     });
 }
@@ -458,6 +469,10 @@ void registerMaskingCommands(CommandRegistry& registry) {
                                  "When the shape covers none of the model, clear the mask instead (ZBrush: Ctrl+drag on "
                                  "the background). Default false.",
                                  false};
+    const ParamSpec frontFaces{"front_faces_only", T::Bool,
+                               "Only vertices facing the viewer: the far side of the model, and folds turned away, "
+                               "are left as they are (#91.3). Default false.",
+                               false};
     auto selection = [&registry](std::string name, std::string description, std::vector<ParamSpec> params,
                                  std::function<bool(const Args&, std::vector<glm::vec2>&, std::string&)> shape) {
         registry.add(
@@ -481,7 +496,8 @@ void registerMaskingCommands(CommandRegistry& registry) {
                  }
                  const std::string label = unmask ? "Unmask" : "Mask";
                  UndoRecord record = UndoRecord::captureMask(doc.mesh, label);
-                 if (!maskInShape(doc.mesh, vp, polygon, float(argNumber(a, "strength", 1.0)), unmask, mirrors))
+                 if (!maskInShape(doc.mesh, vp, polygon, float(argNumber(a, "strength", 1.0)), unmask, mirrors,
+                                  argBool(a, "front_faces_only", false)))
                      return {true, label + ": mask unchanged"};
                  doc.undo.push(std::move(record));
                  doc.modified = true;
@@ -501,7 +517,8 @@ void registerMaskingCommands(CommandRegistry& registry) {
          strength,
          viewProj,
          symmetry,
-         clearOutside},
+         clearOutside,
+         frontFaces},
         [](const Args& a, std::vector<glm::vec2>& points, std::string&) {
             const float x0 = float(argNumber(a, "x0", -1)), y0 = float(argNumber(a, "y0", -1));
             const float x1 = float(argNumber(a, "x1", 1)), y1 = float(argNumber(a, "y1", 1));
@@ -518,7 +535,8 @@ void registerMaskingCommands(CommandRegistry& registry) {
          strength,
          viewProj,
          symmetry,
-         clearOutside},
+         clearOutside,
+         frontFaces},
         lassoArg);
 }
 

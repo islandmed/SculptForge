@@ -1,0 +1,50 @@
+# S and U change Draw Size and Z Intensity at the cursor in the default (SculptForge) and ZBrush input styles,
+# also after a click on a panel (askNK's review: "the shortcut keys for brush size and intensity" seemed not to work).
+run new_sphere subdivisions=4
+
+input_style sculptforge
+mouse_move 0.5 0.5
+remember draw_size s0
+key s
+expect_value size_popup_open == 1
+drag_path 0.5 0.5 0.8 0.5 keep
+release
+expect_value size_popup_open == 0
+expect_value draw_size > $s0
+
+mouse_move 0.5 0.5
+remember z_intensity z0
+key u
+expect_value size_popup_open == 1
+drag_path 0.5 0.5 0.3 0.5 keep
+release
+expect_value size_popup_open == 0
+expect_value z_intensity < $z0
+
+input_style zbrush
+mouse_move 0.4 0.6
+remember draw_size s1
+key s
+expect_value size_popup_open == 1
+drag_path 0.4 0.6 0.2 0.6 keep
+release
+expect_value draw_size < $s1
+
+mouse_move 0.4 0.6
+remember z_intensity z1
+key u
+expect_value size_popup_open == 1
+drag_path 0.4 0.6 0.7 0.6 keep
+release
+expect_value z_intensity > $z1
+
+# After a click on a panel, the keys still reach the canvas.
+click Layers
+mouse_move 0.5 0.5
+key s
+expect_value size_popup_open == 1
+key escape
+key u
+expect_value size_popup_open == 1
+key escape
+expect_value size_popup_open == 0

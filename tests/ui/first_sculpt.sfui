@@ -1,0 +1,232 @@
+# Your first sculpt in 10 minutes (docs/guide/first-sculpt.md): a mushroom house from the default sphere, step by
+# step, in the default look (Forge Terminal, SculptForge layout). The guide's screenshots come from this run:
+#   build/sculptforge --ui-test tests/ui/first_sculpt.sfui --ui-out build/first-sculpt
+#   python3 tools/guide/make_images.py --first-sculpt build/first-sculpt
+# and ctest runs it (ui_first_sculpt) so the lesson keeps working.
+expect_value look == 1
+expect_value shell_layout == 1
+
+# 1. A fresh sphere (File > New Sphere, Ctrl+N), seen from the front (F frames it).
+key ctrl+n
+wait 0.2
+camera 0 0
+key f
+wait 0.2
+expect_value can_undo == 0
+expect_value symmetry_x == 1                # X on the top shelf: both sides at once
+shot 01-sphere
+
+# 2. Mask the top: Tool > Masking > Mask Rectangle, then Ctrl+drag a box over the upper half. Move (4) with a big
+# brush (] grows it) pulls the bottom down: the walls grow taller while the masked top stays round.
+click "Masking"
+click "Mask Rectangle##mask.rect"
+hold ctrl
+drag_path -0.3 -0.15 1.3 0.5
+hold none
+expect_value masked > 10000
+shot 02-mask
+key 4
+remember draw_size s0
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+expect_value draw_size > $s0*6
+view_drag 0.4125 0.66 0.4125 0.73 1.0
+expect_value camera_yaw == 0
+shot 02-walls
+
+# 3. Colour while the mask is there: Paint > Fill paints what isn't masked. Cream for the walls; then Masking >
+# Invert and red for the cap. The colour edge sits exactly on the mask's edge.
+click "Paint##menu.paint"
+run set_color color=246,232,204
+click "Color/Fill"
+key escape
+expect_value colored > 0
+click "Invert##mask"
+click "Paint##menu.paint"
+run set_color color=214,32,28
+click "Color/Fill"
+shot 03-colour
+key escape
+
+# 4. Masking > Blur softens the mask's edge. Move the upper sides out and down: a wide cap over the walls; a short
+# press on the top flattens it.
+click "Blur##mask"
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+view_drag 0.31 0.465 0.21 0.53 1.0
+view_drag 0.4125 0.32 0.4125 0.37 0.8
+expect_value camera_yaw == 0
+expect_value camera_pitch == 0
+shot 04-cap
+
+# 5. Clear the mask (Ctrl+Shift+A). Inflate (5) the cap into a soft dome and the walls into a round little house.
+key ctrl+shift+a
+expect_value masked == 0
+key 5
+stroke 0.2 0.15 0.8 0.15
+stroke 0.35 0.06 0.65 0.06
+stroke 0.25 0.78 0.75 0.78
+stroke 0.25 0.9 0.75 0.9
+key f
+wait 0.2
+shot 05-dome
+
+# 6. Divide twice (Ctrl+D): four times the polygons each time, so details and colours stay sharp.
+remember triangles t0
+key ctrl+d
+key ctrl+d
+wait_idle 30
+expect_value triangles >= $t0*16
+shot 06-divide
+
+# 7. The door: Crease (6) with a smaller brush ([) cuts its outline, symmetry does the other side; Alt+Clay (2)
+# digs it in.
+key 6
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+stroke 0.43 0.97 0.43 0.74
+stroke 0.43 0.97 0.43 0.74
+stroke 0.43 0.74 0.5 0.70
+stroke 0.43 0.74 0.5 0.70
+key 2
+hold alt
+stroke 0.5 0.96 0.5 0.75
+stroke 0.47 0.96 0.47 0.76
+hold none
+shot 07-door
+
+# 8. Round windows: a Clay dab (a click) for the frame, a smaller Alt+Clay dab in its middle for the glass.
+stroke 0.37 0.66 0.37 0.66
+stroke 0.37 0.66 0.37 0.66
+key [
+key [
+key [
+hold alt
+stroke 0.37 0.66 0.37 0.66
+stroke 0.37 0.66 0.37 0.66
+hold none
+shot 08-windows
+
+# 9. Spots: Inflate (5), three clicks on each spot, raises round bumps on the cap.
+key 5
+stroke 0.3 0.22 0.3 0.22
+stroke 0.3 0.22 0.3 0.22
+stroke 0.3 0.22 0.3 0.22
+stroke 0.14 0.36 0.14 0.36
+stroke 0.14 0.36 0.14 0.36
+stroke 0.14 0.36 0.14 0.36
+stroke 0.4 0.09 0.4 0.09
+stroke 0.4 0.09 0.4 0.09
+stroke 0.4 0.09 0.4 0.09
+stroke 0.36 0.38 0.36 0.38
+stroke 0.36 0.38 0.36 0.38
+stroke 0.36 0.38 0.36 0.38
+shot 09-spots
+
+# 10. The Paint brush (P) with a hard edge: O, type -70, Enter (Falloff). White on every spot.
+key p
+mouse_move 0.6 0.5
+key o
+key minus
+key 7
+key 0
+key enter
+expect_value focal_shift == -70
+run set_color color=255,255,255
+stroke 0.3 0.22 0.3 0.22
+stroke 0.14 0.36 0.14 0.36
+stroke 0.4 0.09 0.4 0.09
+stroke 0.36 0.38 0.36 0.38
+hover_window 0.95 0.5
+shot 10-spots
+
+# 11. A wooden door and glowing windows.
+run set_color color=128,78,42
+stroke 0.5 0.96 0.5 0.76
+stroke 0.47 0.96 0.47 0.77
+run set_color color=255,206,58
+key [
+key [
+key [
+stroke 0.37 0.66 0.37 0.66
+stroke 0.37 0.66 0.37 0.66
+key p
+hover_window 0.95 0.5
+shot 11-paint
+
+# 12. A material (M opens the picker), a three-quarter view, and Render > Materials > Save Render.
+key m
+wait 0.3
+click "White##mat"
+camera -32 -6
+key f
+wait 0.2
+click "Render##menu.render"
+click "Materials##section.material"
+click "PBR##view.shading_pbr"
+wait_idle 30
+wait 1
+shot 12-material
+click "Material/Save Render##render.save_image"
+expect_status Saved Render
+key escape
+
+# The ways in: Help > Your first sculpt (10 min), and the welcome's big button, open this chapter.
+click "Help##menu.help"
+click "Your first sculpt (10 min)##help.first_sculpt"
+expect_value guide_open == 1
+expect_guide first-sculpt.md
+expect_text Your first sculpt in 10 minutes
+shot guide
+key shift+f1
+expect_value guide_open == 0
+key f3
+type "##Command palette" "welcome"
+key enter
+expect_value welcome_open == 1
+shot welcome
+click "Start the 10-minute lesson##welcome.lesson"
+expect_value welcome_open == 0
+expect_value guide_open == 1
+expect_guide first-sculpt.md

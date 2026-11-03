@@ -153,9 +153,10 @@ int strokePath(Document& doc, const BrushRecipe* recipe, BrushType type, const P
             for (size_t i = 1; i < samples.size(); ++i) doc.sculptor.grab(mesh, doc.bvh, samples[i] - samples[i - 1]);
             dabs = int(samples.size());
         }
-    } else if ((type == BrushType::KelvinGrab || type == BrushType::KelvinSnake) && !recipe) {
-        // Elastic grab and Snake: the grabbed point follows the path (in the view plane, as the cursor drags it;
-        // a ray would hit the surface behind a pulled shape), in small steps.
+    } else if ((type == BrushType::SnakeHook || type == BrushType::KelvinGrab || type == BrushType::KelvinSnake) && !recipe) {
+        // Tendril, Elastic grab and Elastic Tendril: the grabbed point follows the path (in the view plane, as the
+        // cursor drags it in App::snakeHookTo; a ray would hit the surface behind a pulled shape, or miss past the
+        // silhouette), in small steps.
         RayHit hit;
         if (project(samples.front(), hit)) {
             DabParams p = base;

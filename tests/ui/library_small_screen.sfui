@@ -1,0 +1,22 @@
+# The Library on a small screen (#80): run at 1280x720 by CMake (ui_library_small_screen). The close button stays on
+# screen and clickable, and Esc closes the Library.
+run new_sphere subdivisions=3
+key ,
+expect_value lightbox_open == 1
+click "Library/Brush"
+wait_idle 60
+shot library-brush
+click "Library/##lbclose"
+expect_value lightbox_open == 0
+
+key ,
+expect_value lightbox_open == 1
+key escape
+expect_value lightbox_open == 0
+
+# The right shelf's outline is drawn over its buttons, not under them (#98).
+run ui_look look=forge
+wait 0.2
+hover_window 0.79 0.4
+wait_idle 30
+shot right-shelf-outline

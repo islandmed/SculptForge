@@ -1,0 +1,36 @@
+# Weekly (Mondays 14:23 UTC) and on demand: compares packaging/upstream.json with the latest upstream releases
+# (tools/upstream-watch, public JSON APIs only) and opens one "upstream" issue per newer item, plus the
+# "Upstream digest YYYY-MM" issue that collects the month. Deduplicated by title, so reruns open nothing new.
+name: Upstream watch
+
+on:
+  schedule:
+    - cron: "23 14 * * 1"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
+
+concurrency:
+  group: upstream-watch
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: |
+            tools/upstream-watch
+            packaging/upstream.json
+            tests/upstream
+            tests/data/upstream
+          sparse-checkout-cone-mode: false
+      - name: Unit tests (recorded responses)
+        run: python3 -I tests/upstream/test_upstream_watch.py
+      - name: Check upstream and file issues
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 -I tools/upstream-watch/upstream_watch.py run --repo "${{ github.repository }}"

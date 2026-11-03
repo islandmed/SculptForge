@@ -3,6 +3,7 @@
 #include "app/Demo.h"
 
 #include "app/App.h"
+#include "app/Ui.h"
 
 #include <imgui_internal.h>
 
@@ -48,6 +49,7 @@ ItemTable& items() {
 } // namespace
 
 void ImGuiTestEngineHook_ItemAdd(ImGuiContext* ctx, ImGuiID id, const ImRect& bb, const ImGuiLastItemData*) {
+    sf::ui::NoteItem(ctx, id, bb.Min, bb.Max); // the hover and focus rings (Ui.cpp)
     ImRect clip = bb;
     if (ctx && ctx->CurrentWindow) {
         clip = ctx->CurrentWindow->ClipRect;
@@ -62,6 +64,7 @@ void ImGuiTestEngineHook_ItemAdd(ImGuiContext* ctx, ImGuiID id, const ImRect& bb
 }
 
 void ImGuiTestEngineHook_ItemInfo(ImGuiContext* ctx, ImGuiID id, const char* label, ImGuiItemStatusFlags) {
+    sf::ui::NoteItemLabel(id);
     auto it = items().rects.find(id);
     if (!label || it == items().rects.end()) return;
     std::string text(label);
@@ -696,7 +699,7 @@ void Demo::buildImageTo3D() {
         app_.showBrushLab_ = false;
         app_.aiSettings_.generatorService = "huggingface";
         app_.aiSettings_.hfModel = "hunyuan3d-2.1";
-        app_.remeshGenerated_ = true;
+        app_.generatedRemesh_ = int(GeneratedRemesh::Quad);
         app_.remeshResolution_ = 256;
         app_.openPath(app_.options_.demoAsset); // opens the Generate 3D panel with the drawing
         fadeFrom_ = fadeTo_ = 1.0f;

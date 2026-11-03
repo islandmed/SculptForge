@@ -24,6 +24,7 @@ struct App::StrokeSolver {
     void start();
     bool busy() const { return busy_.load(std::memory_order_acquire); }
     void wait(); // until the batch in flight is done
+    bool waitFor(double seconds); // ... or at most this long; true: it is done
 
     App& app;
     // While busy, owned by the thread (the main thread only reads batch, to draw the preview).

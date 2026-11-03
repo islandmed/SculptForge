@@ -1,4 +1,4 @@
-# The stroke popup (Discord 11-02): G (J in the Blender style) opens a grid at the cursor with the stroke types and
+# The stroke popup (Discord 11-02): G (N in the Blender style) opens a grid at the cursor with the stroke types and
 # the modifiers Add / Sub, Smooth, Mask, Select, the current stroke under the pointer. Hold G, point, let go:
 # picked. Tap G: it stays open; a click on a stroke picks it and closes, a click on a modifier toggles it and stays
 # open, Esc or a click beside it closes it; the click never reaches the model. Smooth, Mask and Select latch:
@@ -119,10 +119,10 @@ stroke_popup_item dots click
 expect_value stroke_popup_open == 0
 expect_value stroke_type == 0
 
-# The ZBrush style: G too. The Blender style: J (its G is the Move brush).
+# The ZBrush style: G too. The Blender style: N (its G is the Move brush, J the Strokes radial menu).
 input_style zbrush
 expect_shortcut stroke.popup G
 expect_value shortcut_conflicts == 0
 input_style blender
-expect_shortcut stroke.popup J
+expect_shortcut stroke.popup N
 expect_value shortcut_conflicts == 0

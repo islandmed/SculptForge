@@ -76,6 +76,7 @@ rez-env sculptforge -- sculptforge
 
 | Variable | Effect |
 |---|---|
+| `SF_AI` | `off`: every AI feature off and locked (app, `sculptforge-cli`, MCP, Python); `on`: on whatever was saved. `--no-ai` does the same as `off` for one start |
 | `SCULPTFORGE_BRUSH_PATH` | Read-only studio brush folders (`:`-separated, `;` on Windows) |
 | `SCULPTFORGE_STUDIO_BRUSHES` | With the Rez package: appended to `SCULPTFORGE_BRUSH_PATH` |
 | `SCULPTFORGE_BRUSH_GALLERY` | Use another community brush gallery index (a URL or a folder), for example an in-house mirror |
@@ -149,8 +150,9 @@ SculptForge is free for any number of artists, and nothing in the app is ever pa
 ($300 a month; **Founding Studio:** the first 10 studios lock in $150 a month for as long as they stay
 subscribed) covers your whole company, with no seat count:
 
-- **Insider for every artist:** the monthly pack, daily drops (a brush, alpha or VDM almost every day), preview
-  builds of the next release about a week early, the feature vote and the monthly dev Q&A.
+- **Insider for every artist:** the monthly pack, daily drops (a brush, alpha or VDM almost every day), the
+  feature vote and the monthly dev Q&A. Insiders will get each release about two weeks early, starting with
+  SculptForge 1.0.
 - **A custom studio build** with your presets, keymaps, packs, shelves and pipeline defaults baked in.
 - **Custom content:** brushes, alphas, VDMs, macros and pipeline presets made for your team.
 - **Guided development:** your requests go to the front of the roadmap, with a monthly call or async review
@@ -184,7 +186,7 @@ for anything else.
 
 Send, in one email or a message in your team channel:
 
-- **What to bake in:** your exported keymap and layout (**Preferences > Interface**), brush presets and packs
+- **What to bake in:** your exported keymap and layout (**Edit > Preferences > Interface**), brush presets and packs
   (`.sfbrush`, `.sfpack`), shelf setup, and the pipeline defaults you want (export format and preset, units
   and scale, up axis, naming pattern, texture packing, ZBrush Bridge folder).
 - **References for custom content:** images or scans you own, with a line on what each item should do.

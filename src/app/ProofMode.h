@@ -35,8 +35,7 @@ std::vector<ProofMeshSize>& proofExtraSizes();
 std::vector<ProofMeshSize> proofStandardScene(const std::string& name);
 inline constexpr const char* kProofStrokeSet = "standard/1"; // bump when the standard stroke set changes
 
-// Memory the system can still hand out (Linux MemAvailable, macOS / Windows free + reclaimable); 0 = unknown.
-size_t availableMemoryBytes();
+// (Free memory now: availableMemoryBytes, core/MemoryGuard.h.)
 size_t totalMemoryBytes();
 // CPU model, logical cores, RAM, OS: the "hardware" object of the result (the GPU is added by the app).
 Json describeHardware();

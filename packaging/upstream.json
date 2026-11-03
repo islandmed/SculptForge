@@ -1,0 +1,37 @@
+{
+  "_comment": "Versions SculptForge targets, checked weekly by .github/workflows/upstream-watch.yml (tools/upstream-watch). Bump an item when its upstream issue is done. track: minor/major compares only those parts (patch releases don't open issues).",
+  "items": [
+    {"name": "OpenUSD", "version": "26.11", "track": "minor", "source": {"kind": "github", "repo": "PixarAnimationStudios/OpenUSD"},
+     "why": "USD export/import and the studio pipeline (docs/studios.md)."},
+    {"name": "MaterialX", "version": "1.39.5", "source": {"kind": "github", "repo": "AcademySoftwareFoundation/MaterialX"}},
+    {"name": "OpenColorIO", "version": "2.6.0", "source": {"kind": "github", "repo": "AcademySoftwareFoundation/OpenColorIO"}},
+    {"name": "OpenEXR", "version": "3.5", "track": "minor", "source": {"kind": "github", "repo": "AcademySoftwareFoundation/openexr"},
+     "why": "We read and write EXR through tinyexr; check the new version's files still load."},
+    {"name": "OpenVDB", "version": "14.0.0", "source": {"kind": "github", "repo": "AcademySoftwareFoundation/openvdb"}},
+    {"name": "OpenSubdiv", "version": "3.8.0", "source": {"kind": "github", "repo": "PixarAnimationStudios/OpenSubdiv"}},
+    {"name": "OpenTimelineIO", "version": "0.18.1", "source": {"kind": "github", "repo": "AcademySoftwareFoundation/OpenTimelineIO", "prerelease": true}},
+    {"name": "OpenAssetIO", "version": "1.0.2", "source": {"kind": "github", "repo": "OpenAssetIO/OpenAssetIO"}},
+    {"name": "VFX Reference Platform", "version": "CY2027",
+     "source": {"kind": "github_dir", "repo": "ves-tech/vfxplatform", "path": "_data/platforms", "name": "^CY(\\d{4})\\.yml$"},
+     "notes": "https://vfxplatform.com/", "why": "Update the table in docs/studios.md, the rez package and the CI VFX builds."},
+    {"name": "Blender", "version": "5.2", "track": "minor", "source": {"kind": "endoflife", "product": "blender"},
+     "notes": "https://www.blender.org/download/releases/{major}-{minor}/", "why": "Add it to the bpy matrix in ci.yml and test the Blender bridge."},
+    {"name": "Unreal Engine", "version": "5.8", "track": "minor",
+     "source": {"kind": "page_title", "url": "https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-engine-5-8-release-notes",
+                "title": "Unreal Engine (\\d+\\.\\d+) Release Notes"},
+     "notes": "https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-engine-{major}-{minor}-release-notes"},
+    {"name": "Godot", "version": "4.7", "track": "minor", "source": {"kind": "github", "repo": "godotengine/godot", "tag": "^(\\d+(?:\\.\\d+)*)-stable$"},
+     "notes": "https://godotengine.org/releases/{major}.{minor}/"},
+    {"name": "SDL3", "version": "3.2", "track": "minor", "source": {"kind": "github", "repo": "libsdl-org/SDL", "tag": "^release-(3\\.\\d+\\.\\d+)$"},
+     "why": "Pinned in cmake/Dependencies.cmake (3.2.30)."},
+    {"name": "Dear ImGui", "version": "1.91.9", "source": {"kind": "github", "repo": "ocornut/imgui"},
+     "why": "Pinned in cmake/Dependencies.cmake."},
+    {"name": "Python", "version": "3.13", "track": "minor", "source": {"kind": "endoflife", "product": "python"},
+     "notes": "https://docs.python.org/{major}.{minor}/whatsnew/{major}.{minor}.html",
+     "why": "The module follows the VFX Reference Platform's Python; test it on the new version, switch when the platform does."}
+  ],
+  "skipped": {
+    "Houdini": "SideFX publishes no public release-notes RSS or JSON",
+    "Maya": "Autodesk publishes no public release-notes RSS or JSON"
+  }
+}

@@ -3,7 +3,7 @@
 This chapter is the reference for every default keyboard shortcut and mouse gesture in SculptForge. Inside the
 app, <kbd>F1</kbd> opens the same list as the Controls window, showing your own keys if you've changed any.
 
-SculptForge has four key styles, chosen in **Preferences > Input > Style** (and by the **Coming from** question the
+SculptForge has four key styles, chosen in **Edit > Preferences > Input > Style** (and by the **Coming from** question the
 first time SculptForge starts): **SculptForge** (the default for new installs), **ZBrush-style**, **Blender** and
 **Maya**. The main table shows the SculptForge style; the sections after it list what the
 [ZBrush-style](#zbrush-style-keys) and [Blender](#blender-keys) styles change. If you used an earlier version,
@@ -12,7 +12,7 @@ your saved style is kept.
 ## Changing shortcuts
 
 Every key below can be reassigned: hold <kbd>Ctrl</kbd>+<kbd>Alt</kbd> and click a button, then press the new
-key, or use **Preferences > Hotkeys**. Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> (Store Config) to
+key, or use **Edit > Preferences > Hotkeys**. Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> (Store Config) to
 keep your changes. See [Customizing the interface](interface.md#customizing-the-interface).
 
 On macOS, <kbd>Cmd</kbd> works wherever a shortcut says <kbd>Ctrl</kbd>. Single-letter shortcuts don't fire
@@ -57,9 +57,11 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Draw Size at cursor | <kbd>S</kbd> | A Draw Size slider under the cursor: drag it, or type a number and press Enter. |
 | Falloff at cursor | <kbd>O</kbd> | A Falloff slider under the cursor: below 0 a broad, hard brush tip, above 0 a soft point (-100..100). The inner ring of the brush cursor shows it. |
 | Intensity at cursor | <kbd>U</kbd> or <kbd>I</kbd> | A Intensity slider under the cursor: drag it, or type a number (1-100) and press Enter. Hold Shift (or pick Smooth) to set Smooth's own Intensity. |
-| Larger brush | <kbd>]</kbd> | Make the brush 10% larger (hold to repeat). |
+| Larger brush | <kbd>]</kbd> | Make the brush 10% larger (hold to repeat; Shift+] steps one pixel). |
+| Larger brush by 1 px | <kbd>Shift</kbd>+<kbd>]</kbd> | Make the brush one pixel larger (half a pixel below 2 px). |
 | Paint | <kbd>P</kbd> | Paint colour without sculpting (ZBrush Rgb on, Zadd off). Alt paints back to white, Shift still smooths. |
-| Smaller brush | <kbd>[</kbd> | Make the brush 10% smaller (hold to repeat). |
+| Smaller brush | <kbd>[</kbd> | Make the brush 10% smaller (hold to repeat; Shift+[ steps one pixel). |
+| Smaller brush by 1 px | <kbd>Shift</kbd>+<kbd>[</kbd> | Make the brush one pixel smaller (half a pixel below 2 px), down to 0.5 px. |
 
 ### Edit
 
@@ -108,10 +110,10 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Load UI... | <kbd>Ctrl</kbd>+<kbd>L</kbd> | Load a layout file someone shared (or you saved with Save UI). |
 | Radial menu 1: Brushes | <kbd>T</kbd> | Hold the key, flick toward an item and let go to run it; or tap the key and click one. Edit it in Preferences > Input > Radial Menus. |
 | Radial menu 2: Masking | <kbd>Y</kbd> | Hold the key, flick toward an item and let go to run it; or tap the key and click one. Edit it in Preferences > Input > Radial Menus. |
+| Radial menu 3: Strokes | <kbd>J</kbd> | Hold the key, flick toward an item and let go to run it; or tap the key and click one. Edit it in Preferences > Input > Radial Menus. |
 | Save UI... | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> | Save the layout, shortcuts and interface preferences to a file you can share. |
 | Shelves | <kbd>Tab</kbd> | Hide or show the shelves and trays around the canvas. |
 | Store Config | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> | Keep the current layout, shortcuts and interface preferences for future sessions. Like ZBrush, SculptForge never saves them on its own. |
-| Toggle strokes off the model | <kbd>Shift</kbd>+<kbd>L</kbd> | Turn Preferences > Input > Start strokes off the model on or off: with it on, a left-drag on the background sculpts once it reaches the model instead of turning the view (#62). |
 
 ### Render
 
@@ -131,8 +133,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 
 | Action | Keys | What it does |
 |---|---|---|
-| Lazy Stroke | <kbd>L</kbd> | Lazy Stroke on or off: the brush trails the cursor on a string, for steady lines. |
-| Stroke popup | <kbd>G</kbd> | A grid at the cursor with the stroke types and the modifiers (Add / Sub, Smooth, Mask, Select). Hold the key, point at one and let go; or tap the key and click. Smooth, Mask and Select stay on without holding Shift or Ctrl, until you pick them again or another brush. |
+| Steady Stroke | <kbd>L</kbd> | Steady Stroke on or off, with every stroke type (Dots, Drag Stamp, Slide Stamp, Spray): the brush trails the cursor on a string and only moves once the string is taut, for steady lines without hand shake. |
 
 ### Tool
 
@@ -179,6 +180,12 @@ generated from SculptForge's action registry, the same source as the Controls wi
 |---|---|---|
 | UV Editor | <kbd>Alt</kbd>+<kbd>U</kbd> | Open the UV Editor: the Part's UV layout in 2D over the UDIM tiles. Select vertices, edges, faces or islands (here or on the model), move, rotate and scale them, mark seams, unwrap, pack, set texel density and lay islands into trim sheet strips. Stretch and texel density show live on the model while you edit. |
 
+### View
+
+| Action | Keys | What it does |
+|---|---|---|
+| Lock camera | <kbd>Shift</kbd>+<kbd>L</kbd> | Lock the camera for left-drags: a drag that starts on the background sculpts once it reaches the model instead of turning the view (Preferences > Input > Start strokes off the model, #62). The status bar shows CAMERA LOCKED while it is on. Right-drag or Alt+drag still move the view. Shift+L turns it on and off. |
+
 <!-- END GENERATED: shortcuts -->
 
 ## Mouse and pen gestures
@@ -186,7 +193,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Action | Gesture |
 |---|---|
 | Sculpt | Left-drag on the model |
-| Sculpt from beside the model | Turn on **Preferences > Input > Start strokes off the model** (or press <kbd>Shift</kbd>+<kbd>L</kbd>), then left-drag from the background onto the model; the view then turns with a right-drag (see [Navigation](navigation.md#mouse-and-pen)) |
+| Sculpt from beside the model | Turn on **Edit > Preferences > Input > Start strokes off the model** (or press <kbd>Shift</kbd>+<kbd>L</kbd>), then left-drag from the background onto the model; the view then turns with a right-drag (see [Navigation](navigation.md#mouse-and-pen)) |
 | Invert the brush (subtract) | Hold <kbd>Alt</kbd> while sculpting |
 | Smooth | Hold <kbd>Shift</kbd> while sculpting (works with any brush, and with Paint) |
 | Straight line | Press <kbd>Shift</kbd> after a stroke has started (45 degree steps) |
@@ -224,7 +231,7 @@ Some keys only mean something while a pop-up or panel has the keyboard.
 | Key | Action |
 |---|---|
 | A letter | Keep the brushes whose names start with the letters typed so far |
-| The orange letter on a tile | Pick that brush (<kbd>B</kbd> <kbd>S</kbd> <kbd>T</kbd> = Standard) |
+| The highlighted letter on a tile | Pick that brush (<kbd>B</kbd> <kbd>S</kbd> <kbd>T</kbd> = Standard) |
 | <kbd>Backspace</kbd> | Take back one letter |
 | <kbd>Enter</kbd> | Pick the first match |
 | <kbd>Esc</kbd> | Close |
@@ -264,7 +271,7 @@ Some keys only mean something while a pop-up or panel has the keyboard.
 
 ## ZBrush-style keys
 
-With **Preferences > Input > Style** on **ZBrush-style** (also at the top of the Controls window, <kbd>F1</kbd>,
+With **Edit > Preferences > Input > Style** on **ZBrush-style** (also at the top of the Controls window, <kbd>F1</kbd>,
 or **ZBrush** in the first-start **Coming from** question), the keys and gestures work as in ZBrush. Store Config
 (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) keeps the choice. Compared with the table above, these change:
 
@@ -282,7 +289,7 @@ these ZBrush-style keys and changes only the view controls (<kbd>Alt</kbd>+left,
 
 ## Maya keys
 
-With **Preferences > Input > Style** on **Maya** (#32), the view works as in Maya, on the model or beside it, as
+With **Edit > Preferences > Input > Style** on **Maya** (#32), the view works as in Maya, on the model or beside it, as
 long as <kbd>Alt</kbd> is the only key held:
 
 | To | Maya style |
@@ -295,22 +302,23 @@ long as <kbd>Alt</kbd> is the only key held:
 | Smooth | Hold <kbd>Shift</kbd> while sculpting |
 | Visibility gestures | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>, as in the other styles |
 
-Maya's default dolly follows a sideways drag, so that is the default here too. **Preferences > Input > Zoom
+Maya's default dolly follows a sideways drag, so that is the default here too. **Edit > Preferences > Input > Zoom
 drag** switches it to **Up and down** (drag up to zoom in) if you set Maya up that way. **Invert zoom**, in every
 style, turns zoom drags around (the mouse wheel stays as it is).
 
 ## Blender keys
 
-With **Preferences > Input > Style** on **Blender** (also at the top of the Controls window, <kbd>F1</kbd>), the
-view and the sculpt keys work as in Blender 4.2 and later, Sculpt Mode. Compared with the table above, these
+With **Edit > Preferences > Input > Style** on **Blender** (also at the top of the Controls window, <kbd>F1</kbd>), the
+view and the sculpt keys work as in Blender 4.2 and later, Sculpt Mode (with 5.1's Alt mask). Compared with the table above, these
 change in the Blender style:
 
 | To | Blender style |
 |---|---|
-| Rotate | Middle-drag, or <kbd>Alt</kbd>+left-drag (pens, trackpads: Blender's Emulate 3 Button Mouse), or left-drag beside the model |
+| Rotate | Middle-drag, or <kbd>Alt</kbd>+left-drag beside the model (everywhere with **Edit > Preferences > Input > Emulate 3 Button Mouse**, for pens and trackpads), or left-drag beside the model |
 | Pan | <kbd>Shift</kbd>+middle-drag, or <kbd>Alt</kbd>+<kbd>Shift</kbd>+left-drag |
 | Zoom | Mouse wheel, <kbd>Ctrl</kbd>+middle-drag (up: closer), <kbd>Alt</kbd>+<kbd>Ctrl</kbd>+left-drag, <kbd>Numpad Plus</kbd> / <kbd>Numpad Minus</kbd> |
 | Invert the brush (subtract) | Hold <kbd>Ctrl</kbd> while sculpting |
+| Mask / unmask | <kbd>Alt</kbd>+drag / <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+drag on the model (Blender 5.1 and later), or the Mask brush (<kbd>M</kbd>) |
 | Smooth | Hold <kbd>Shift</kbd> while sculpting |
 | Front, right, top view | <kbd>Numpad 1</kbd>, <kbd>Numpad 3</kbd>, <kbd>Numpad 7</kbd>; with <kbd>Ctrl</kbd>: back, left, bottom |
 | Orthographic on or off | <kbd>Numpad 5</kbd> (the axis views turn it on until you rotate again) |
@@ -328,17 +336,17 @@ change in the Blender style:
 | Wireframe | <kbd>Shift</kbd>+<kbd>Z</kbd> |
 
 Choosing the Blender style also sets **Rotation** to **Turntable**, as Blender orbits; change it back under
-**Preferences > Input** if you like. Blender's face sets are SculptForge's face groups, and its brushes map to the
+**Edit > Preferences > Input** if you like. Blender's face sets are SculptForge's face groups, and its brushes map to the
 nearest SculptForge brush. **Symmetry X**, **Paint** and the material picker have no key in the Blender style
 (they are on the shelves); give them one with <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click. Laptops without a numpad:
-turn on **Preferences > Input > Emulate Numpad** and the number row works as the numpad.
+turn on **Edit > Preferences > Input > Emulate Numpad** and the number row works as the numpad.
 
 The numpad views (<kbd>Numpad 1</kbd>, <kbd>3</kbd>, <kbd>7</kbd>, <kbd>5</kbd> ...) work in every style.
 
 ### Your own Blender keymap
 
 If you changed Blender's keys, export them in Blender (**Edit > Preferences > Keymap**, the **Export...** button
-next to the keymap name) and in SculptForge choose **Import Blender keymap...** under **Preferences > Input** or
+next to the keymap name) and in SculptForge choose **Import Blender keymap...** under **Edit > Preferences > Input** or
 at the top of the Controls window. SculptForge switches to the Blender style and takes, from the file's 3D View
 and Sculpt keymaps, the keys of every action it has an equivalent for: the views, the brushes above, the radius
 and strength, the mask, hiding, subdivision levels, undo and redo. Mouse buttons and keys for things

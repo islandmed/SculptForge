@@ -10,6 +10,7 @@
 #include "core/Matcap.h"
 #include "core/Primitives.h"
 #include "core/Project.h"
+#include "core/StarterMeshes.h"
 #include "render/GL.h"
 
 #include <IconsLucide.h>
@@ -29,6 +30,7 @@ namespace {
 
 namespace fs = std::filesystem;
 
+constexpr const char* kStarterFolder = "Starter meshes"; // the Tool tab's folder of core/StarterMeshes.h
 constexpr float kTile = 96.0f;   // thumbnail size (logical px)
 constexpr float kLabel = 22.0f;  // label under it
 constexpr float kGap = 8.0f;     // between tiles
@@ -128,6 +130,17 @@ void LightBox::show(LibraryTab tab) {
     }
 }
 
+void LightBox::showFolder(LibraryTab tab, const std::string& folder) {
+    open_ = true;
+    Place to{tab, folder};
+    if (to == place_) return;
+    back_.push_back(place_);
+    forward_.clear();
+    place_ = std::move(to);
+    filter_[0] = 0;
+    scrollTo_ = 0.0f;
+}
+
 void LightBox::folderChosen(const std::string& path) {
     std::lock_guard lock(folderMutex_);
     chosenFolder_ = path;
@@ -177,6 +190,7 @@ void LightBox::rootEntries(App& app, std::vector<AssetEntry>& out) {
     if (folders) {
         const bool builtinHasFiles = !builtinDir.empty() && (tab == LibraryTab::Tool || tab == LibraryTab::Image);
         if (builtinHasFiles) folderTile("Built-in", builtinDir);
+        if (tab == LibraryTab::Tool && !roots.starter.empty()) folderTile(kStarterFolder, roots.starter);
         if (!userDir.empty()) folderTile("User", userDir);
         for (const std::string& r : extraRoots_)
             folderTile(utf8(fsPath(r).filename()), r);
@@ -186,7 +200,7 @@ void LightBox::rootEntries(App& app, std::vector<AssetEntry>& out) {
         std::vector<AssetEntry> files = scan(userDir, true);
         for (const std::string& p : app.recentFiles_)
             if (isProjectFile(p) &&
-                std::none_of(files.begin(), files.end(), [&](const AssetEntry& e) { return e.path == p; })) {
+                std::none_of(files.begin(), files.end(), [&](const AssetEntry& e) { return samePath(e.path, p); })) {
                 AssetEntry e;
                 e.kind = AssetKind::Project;
                 e.name = utf8(fsPath(p).stem());
@@ -334,7 +348,16 @@ std::vector<AssetEntry> LightBox::entries(App& app) {
         up.name = "..";
         out.push_back(up);
         const LibraryTab tab = place_.tab;
-        if (const auto* list = app.libraryScanner_.get(
+        if (place_.folder == app.library_.starter) {
+            // In the set's order (heads first), named as the set names them.
+            for (const StarterMesh& m : starterMeshes()) {
+                AssetEntry e;
+                e.kind = AssetKind::Project;
+                e.name = m.name;
+                e.path = utf8(fsPath(place_.folder) / (std::string(m.id) + kProjectExtension));
+                out.push_back(std::move(e));
+            }
+        } else if (const auto* list = app.libraryScanner_.get(
                 place_.folder, libraryTabId(tab), [tab](const std::string& p) { return fileKindForTab(tab, p); },
                 tab == LibraryTab::QuickSave || tab == LibraryTab::Project))
             out.insert(out.end(), list->begin(), list->end());
@@ -398,7 +421,7 @@ void LightBox::activate(App& app, const AssetEntry& e, bool append) {
         // Leaving the folder a tab started in goes back to the tab's root.
         const LibraryRoots& r = app.library_;
         const std::string tabUser = r.user.empty() ? std::string() : r.user + "/" + libraryTabFolder(place_.tab);
-        const bool atTop = place_.folder == tabUser || place_.folder == r.builtin + "/demo" ||
+        const bool atTop = place_.folder == tabUser || place_.folder == r.builtin + "/demo" || place_.folder == r.starter ||
                            std::find(extraRoots_.begin(), extraRoots_.end(), place_.folder) != extraRoots_.end();
         navigate(app, {place_.tab, atTop ? std::string() : parent});
         return;
@@ -426,6 +449,11 @@ void LightBox::activate(App& app, const AssetEntry& e, bool append) {
     }
     case AssetKind::Project:
     case AssetKind::Mesh:
+        if (const StarterMesh* m = starterMeshForPath(app.library_.starter, e.path); m && !append) {
+            const std::string id = m->id;
+            app.confirmDiscard([&app, id] { app.runCommand("new_starter_mesh", {{"name", id}}); });
+            return;
+        }
         if (append)
             app.runCommand("subtool_append", {{"path", e.path}});
         else
@@ -479,7 +507,7 @@ void LightBox::contextMenu(App& app, const AssetEntry& e) {
         activate(app, e, false);
     if (mesh && ImGui::MenuItem(tr("Append as Part"), "Shift+double-click")) activate(app, e, true);
     if (e.kind == AssetKind::Image) {
-        if (ImGui::MenuItem(tr("Generate 3D..."))) app.openPath(e.path);
+        if (ai::aiEnabled() && ImGui::MenuItem(tr("Generate 3D..."))) app.openPath(e.path);
         if (ImGui::MenuItem(tr("Relief from image")))
             app.confirmDiscard([&app, p = e.path] { app.runCommand("image_relief", {{"path", p}}); });
         if (ImGui::MenuItem(tr("Inflate image")))
@@ -505,6 +533,7 @@ void LightBox::contextMenu(App& app, const AssetEntry& e) {
 std::string LightBox::folderLabel(const App& app, const std::string& folder) const {
     const LibraryRoots& r = app.library_;
     if (!r.builtin.empty() && isUnder(folder, r.builtin)) return "Built-in";
+    if (!r.starter.empty() && isUnder(folder, r.starter)) return kStarterFolder;
     if (!r.user.empty() && isUnder(folder, r.user)) return "User";
     return utf8(fsPath(folder).filename());
 }
@@ -651,14 +680,18 @@ void LightBox::drawHeader(App& app, float width) {
                               buttonW(ICON_LC_SMARTPHONE) + 8.0f * scale;
         const float feedbackW =
             buttonW(compactFeedback ? ICON_LC_MESSAGE_SQUARE_PLUS : ICON_LC_MESSAGE_SQUARE_PLUS "  Fixes & suggestions");
-        return saveW + filterW + rowsW + folderW + feedbackW + closeW + 4 * 8.0f * scale;
+        return saveW + filterW + rowsW + folderW + feedbackW + 4 * 8.0f * scale;
     };
-    const float room = right - leftEnd - 8.0f;
+    // The close button is pinned to the right edge (#80: on a 720p screen the group ran past it and hid it); the
+    // rest gets what is left between the tabs and it, clipped if even the compact group doesn't fit.
+    const float groupRight = right - closeW - 8.0f * scale;
+    const float room = groupRight - leftEnd - 8.0f;
     if (room < groupW()) compact = true;
     // A shorter filter before an icon-only "Fixes & suggestions" (it is the startup screen's way to reach us).
     if (room < groupW() && filterW - (groupW() - room) < 70.0f * scale) compactFeedback = true;
     if (room < groupW()) filterW = std::max(70.0f * scale, filterW - (groupW() - room));
-    ImGui::SetCursorScreenPos(ImVec2(std::max(leftEnd + 8.0f, right - groupW()), origin.y));
+    ImGui::SetCursorScreenPos(ImVec2(std::max(leftEnd + 8.0f, groupRight - groupW()), origin.y));
+    ImGui::PushClipRect(ImVec2(leftEnd, origin.y), ImVec2(groupRight, origin.y + kHeader * scale), true);
     if (quickTab) {
         if (ImGui::Button(compact ? ICON_LC_SAVE "###QuickSave now" : ICON_LC_SAVE "  Save now###QuickSave now"))
             app.quickSave();
@@ -698,9 +731,11 @@ void LightBox::drawHeader(App& app, float width) {
                       "https://github.com/islandmed/SculptForge/issues/new/choose";
     }
     ui::HelpAction(app, "help.feedback");
-    ImGui::SameLine(0, 8 * scale);
-    if (ImGui::Button(ICON_LC_X "##lbclose", ImVec2(closeW, 0))) open_ = false;
-    ui::HelpText("Close Library", ",", "Hide the Library (comma toggles it).", "Library");
+    ImGui::PopClipRect();
+    ImGui::SameLine();
+    ImGui::SetCursorScreenPos(ImVec2(right - closeW, origin.y));
+    if (ui::GlyphButton("##lbclose", ICON_LC_X, ImVec2(closeW, closeW))) open_ = false;
+    ui::HelpText("Close Library", ",", "Hide the Library (comma toggles it; Esc closes it).", "Library");
 
     const float y = origin.y + kHeader * scale - 2.0f;
     dl->AddLine(ImVec2(origin.x - 8, y), ImVec2(right + 8, y), kHeaderLine, 1.0f);
@@ -731,6 +766,10 @@ void LightBox::draw(App& app, const CanvasRect& canvas) {
     layout.lightboxTab = libraryTabId(place_.tab);
     layout.lightboxRows = std::clamp(layout.lightboxRows, 1, 4);
     app.libraryScanner_.poll(ImGui::GetTime());
+    // Esc closes the Library (#80), unless a picker, a pop-up or a text field has the keys (they take Esc first).
+    if (open_ && ImGui::IsKeyPressed(ImGuiKey_Escape, false) && !ImGui::GetIO().WantCaptureKeyboard &&
+        !ImGui::IsAnyItemActive() && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel))
+        open_ = false;
     if (!open_) {
         pressing_ = tileDrag_ = false;
         return;
@@ -895,7 +934,7 @@ void LightBox::draw(App& app, const CanvasRect& canvas) {
             ImGui::TextDisabled("%s", e.name.c_str());
             ImGui::Separator();
             bool done = false;
-            if (ImGui::MenuItem(ICON_LC_SPARKLES "  Generate 3D...")) app.openPath(e.path), done = true;
+            if (ai::aiEnabled() && ImGui::MenuItem(ICON_LC_SPARKLES "  Generate 3D...")) app.openPath(e.path), done = true;
             if (ImGui::MenuItem(tr("Relief from image"))) {
                 app.confirmDiscard([&app, p = e.path] { app.runCommand("image_relief", {{"path", p}}); });
                 done = true;
@@ -959,6 +998,14 @@ void LightBox::drawPreferences(App& app) {
 // App glue: library folders, actions, QuickSave, project thumbnails
 // ---------------------------------------------------------------------------
 
+void App::showStarterMeshes() {
+    if (library_.starter.empty()) {
+        status_ = "The starter meshes could not be unpacked (see the log)";
+        return;
+    }
+    lightbox_.showFolder(LibraryTab::Tool, library_.starter);
+}
+
 void App::initLightBox() {
     if (const char* base = SDL_GetBasePath()) library_.builtin = findBuiltinAssets(base);
     const bool recording = !options_.recordPath.empty() || !options_.renderPath.empty();
@@ -980,6 +1027,19 @@ void App::initLightBox() {
             SDL_Log("Library library: %s", err.c_str());
             library_.user.clear();
         }
+    }
+    // The starter meshes, unpacked where the thumbnails and the Tool tab's "Starter meshes" folder find them.
+    {
+        fs::path dir;
+        if (!options_.uiTest.empty())
+            dir = fsPath(library_.user).parent_path() / "starter-meshes";
+        else if (!prefDir_.empty())
+            dir = fsPath(prefDir_) / "starter-meshes";
+        std::string err;
+        if (!dir.empty() && writeStarterMeshes(utf8(dir), err))
+            library_.starter = utf8(dir);
+        else if (!dir.empty())
+            SDL_Log("Starter meshes: %s", err.c_str());
     }
     loadMatcapLibrary(); // custom MatCaps (PanelPolypaint.cpp): the library's MatCaps folder exists by now
     // Thumbnails are cached on disk for the artist; tests and recordings render fresh ones.
@@ -1054,6 +1114,10 @@ void App::initLightBox() {
         "Save a timestamped snapshot of the whole scene to your library (the last 10 are kept). "
         "Your project file is not changed. Find them in the Library's Snapshots tab.",
         [this] { quickSave(); });
+    add("render.save_image", "Save Render", ICON_LC_CAMERA, "Material", "",
+        "Render the view (without the interface) at twice its size to a PNG in your library: Library > Image "
+        "lists it, and the status bar names the file.",
+        [this] { saveRender(); });
 
     // ZBrush opens the LightBox at startup on the Project tab (never in tests, renders or recordings).
     if (uiPrefs_.lightboxAtStartup && interactive() && options_.uiTest.empty() && options_.openPath.empty() &&
@@ -1109,6 +1173,55 @@ void App::quickSave() {
     pruneQuickSaves(folder);
     libraryScanner_.invalidate();
     status_ = "Saved " + utf8(fsPath(path).filename());
+    lastCommandOk_ = true;
+}
+
+void App::saveRender() {
+    if (library_.user.empty()) {
+        status_ = "Save Render needs a library folder (Preferences > Library)";
+        return;
+    }
+    const std::string folder = library_.user + "/Images";
+    std::error_code ec;
+    fs::create_directories(fsPath(folder), ec);
+    const std::time_t t = std::time(nullptr);
+    std::tm tm{};
+#if defined(_WIN32)
+    localtime_s(&tm, &t);
+#else
+    localtime_r(&t, &tm);
+#endif
+    char buf[64];
+    std::strftime(buf, sizeof buf, "Render %Y-%m-%d %H-%M-%S", &tm);
+    std::string path = folder + "/" + buf + ".png";
+    for (int serial = 1; fs::exists(fsPath(path), ec); ++serial)
+        path = folder + "/" + buf + " (" + std::to_string(serial) + ").png";
+    // The canvas's shape at twice its size (at most 4096 px wide): what you see, without the interface.
+    const CanvasRect c = canvasRect();
+    const float aspect = c.h > 1.0f ? c.w / c.h : 1.0f;
+    Image img;
+    img.width = std::clamp(int(c.w * 2.0f), 512, 4096);
+    img.height = std::max(1, int(float(img.width) / aspect));
+    Camera cam = camera_;
+    cam.aspect = aspect;
+    RenderSettings settings = renderSettings_;
+    settings.dimInactive = false; // every Part at full brightness
+    settings.showMask = false;
+    constexpr GLenum kFramebufferBinding = 0x8CA6, kViewport = 0x0BA2;
+    GLint fbo = 0, viewport[4] = {};
+    gl::GetIntegerv(kFramebufferBinding, &fbo);
+    gl::GetIntegerv(kViewport, viewport);
+    std::string err;
+    const bool ok = renderer_.renderToImage(cam, img.width, img.height, settings, img.rgba, err) && img.savePng(path, err);
+    gl::BindFramebuffer(GL_FRAMEBUFFER, GLuint(fbo));
+    gl::Viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+    if (!ok) {
+        status_ = "Save Render failed: " + err;
+        lastCommandOk_ = false;
+        return;
+    }
+    libraryScanner_.invalidate();
+    status_ = "Saved " + utf8(fsPath(path).filename()) + " (Library > Image)";
     lastCommandOk_ = true;
 }
 

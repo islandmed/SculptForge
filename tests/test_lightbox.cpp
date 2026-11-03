@@ -233,3 +233,21 @@ TEST(brush_popup_letter_keys) {
     CHECK(letterBadges(names, filterByTyped(names, ""), "").empty());
     CHECK(typedName("Clay Buildup!") == "claybuildup");
 }
+
+// #90: Library > Projects listed each project twice on Windows: the User folder is joined with "/", recent files are
+// native "\" paths, and the two were compared as text.
+TEST(library_same_path) {
+    const bool win = true;
+    CHECK(samePath("C:\\Users\\Ann\\Documents\\SculptForge\\Projects\\Head.sfproj",
+                   "C:/Users/Ann/Documents/SculptForge/Projects/Head.sfproj", win));
+    CHECK(samePath("C:\\Users\\Ann\\Documents\\SculptForge/Projects/head.SFPROJ",
+                   "c:/users/ann/documents/sculptforge\\projects\\Head.sfproj", win));
+    CHECK(samePath("C:/Users/Ann//Documents/./SculptForge/Projects/../Projects/Head.sfproj",
+                   "C:\\Users\\Ann\\Documents\\SculptForge\\Projects\\Head.sfproj", win));
+    CHECK(!samePath("C:/Users/Ann/Projects/Head.sfproj", "C:/Users/Ann/Projects/Hand.sfproj", win));
+    CHECK(pathKey("C:\\A\\B\\", win) == "c:/a/b");
+    // Elsewhere case matters and "\" is a character of the name, but the rest still normalises.
+    CHECK(samePath("/home/ann/SculptForge//Projects/./Head.sfproj", "/home/ann/SculptForge/Projects/Head.sfproj", false));
+    CHECK(!samePath("/home/ann/Projects/Head.sfproj", "/home/ann/Projects/head.sfproj", false));
+    CHECK(samePath("/a/b.sfproj", "/a/b.sfproj"));
+}

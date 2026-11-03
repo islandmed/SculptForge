@@ -665,6 +665,34 @@ UndoRecord Sculptor::endStroke() {
     return std::move(record_);
 }
 
+int groupBorderNeighbours(const Mesh& mesh, uint32_t v, uint32_t out[3]) {
+    if (!mesh.hasPolygroups()) return 0;
+    int count = 0;
+    const auto tris = mesh.vertexTriangles(v);
+    for (uint32_t t : tris) {
+        const glm::uvec3 tr = mesh.triangles[t];
+        for (int k = 0; k < 3; ++k) {
+            const uint32_t n = tr[k];
+            if (n == v) continue;
+            bool seen = false;
+            for (int i = 0; i < count && !seen; ++i) seen = out[i] == n;
+            if (seen) continue;
+            // The edge v-n: a border when the triangles sharing it don't all have one group.
+            const uint32_t g = mesh.polygroupAt(t);
+            bool border = false;
+            for (uint32_t u : tris) {
+                if (u == t) continue;
+                const glm::uvec3 o = mesh.triangles[u];
+                if ((o.x == n || o.y == n || o.z == n) && mesh.polygroupAt(u) != g) border = true;
+            }
+            if (!border) continue;
+            out[count++] = n;
+            if (count == 3) return 3;
+        }
+    }
+    return count;
+}
+
 void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Symmetry sym) {
     if (!active_) return;
     // Morph: nothing without a target (Tool > Selection Sets > Morph Target); not on micro levels (no grid shapes).
@@ -678,7 +706,7 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
         const uint64_t pts = micro_.points;
         for (const SymCopy& m : copies(sym))
             micro_.dab(mesh, bvh, type, m.point(p.center), m.dir(p.viewDir), p.radius, p.strength * std::clamp(p.pressure, 0.0f, 1.0f),
-                       p.invert, p.focal, m.dir(p.alphaUp), false, 0.0f);
+                       p.invert, p.focal, m.dir(p.alphaUp), false, 0.0f, p.alpha);
         timings.kernelMs += micro_.findMs + micro_.kernelMs - k0;
         timings.normalsMs += micro_.stitchMs - s0;
         timings.vertices += micro_.points - pts;
@@ -752,7 +780,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     const float strokeLen = glm::length(p.strokeDelta);
     const glm::vec3 strokeDir = strokeLen > 1e-12f ? p.strokeDelta / strokeLen : glm::vec3(0.0f);
     if (type == BrushType::Layer) prepareLayer(mesh, r * 0.08f * std::clamp(p.strength, 0.0f, 1.0f));
-    const bool keepVolume = type == BrushType::Smooth && p.keepVolume;
+    const bool keepVolume = type == BrushType::Smooth && p.keepVolume && !p.groupBorders;
     if (keepVolume) taubinShrink(mesh);
     const std::vector<glm::vec3>* morph = type == BrushType::Morph ? morphTarget(mesh) : nullptr;
     if (type == BrushType::Morph && !morph) return;
@@ -776,6 +804,13 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
             d = nrm[v] * (sign * s * r * 0.05f * f);
             break;
         case BrushType::Smooth: {
+            if (p.groupBorders) { // along the border, on the tangent plane; junctions and inner vertices stay
+                uint32_t nb[3];
+                if (groupBorderNeighbours(mesh, v, nb) != 2) break;
+                const glm::vec3 mid = 0.5f * (pos[nb[0]] + pos[nb[1]]);
+                d = projectOnPlane(mid - x, nrm[v]) * std::min(1.0f, s * f);
+                break;
+            }
             auto ring = mesh.polygonNeighbors(v);
             if (ring.empty()) break;
             glm::vec3 avg(0.0f);
@@ -805,7 +840,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
             // Raise a plane slightly above the surface and pull everything below up to it.
             glm::vec3 planePoint = areaCenter + areaNormal * (sign * r * 0.05f * s);
             float h = glm::dot(x - planePoint, areaNormal);
-            if (sign * h < 0.0f) d = -areaNormal * (h * f);
+            if (sign * h < 0.0f) d = -areaNormal * (h * f * clayPull(s));
             break;
         }
         case BrushType::Crease: {
@@ -847,7 +882,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
             }
             glm::vec3 planePoint = areaCenter + areaNormal * (sign * r * 0.08f * s);
             float h = glm::dot(x - planePoint, areaNormal);
-            if (sign * h < 0.0f) d = -areaNormal * (h * w);
+            if (sign * h < 0.0f) d = -areaNormal * (h * w * clayPull(s));
             break;
         }
         case BrushType::SnakeHook: {
@@ -1110,7 +1145,7 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         case BrushRecipe::Plane::Clay: {
             glm::vec3 planePoint = areaCenter + areaNormal * (sign * rad * 0.06f * s);
             float hc = glm::dot(x - planePoint, areaNormal);
-            if (sign * hc < 0.0f) d -= areaNormal * (hc * f * r.planeAmount);
+            if (sign * hc < 0.0f) d -= areaNormal * (hc * f * r.planeAmount * clayPull(s));
             break;
         }
         case BrushRecipe::Plane::Flatten: d -= areaNormal * (h * s * f * r.planeAmount); break;
@@ -1188,7 +1223,12 @@ void Sculptor::beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym)
 }
 
 void Sculptor::grab(Mesh& mesh, BVH& bvh, const glm::vec3& delta) {
-    if (micro_.active() && microMesh_ == &mesh) {
+    grabMove(mesh, delta);
+    grabFinish(mesh, bvh);
+}
+
+void Sculptor::grabMove(Mesh& mesh, const glm::vec3& delta) {
+    if (micro_.active() && microMesh_ == &mesh) { // (a micro level moves and stitches in one go)
         const double k0 = micro_.kernelMs, s0 = micro_.stitchMs;
         micro_.grab(mesh, delta);
         timings.kernelMs += micro_.kernelMs - k0;
@@ -1210,12 +1250,17 @@ void Sculptor::grab(Mesh& mesh, BVH& bvh, const glm::vec3& delta) {
         begin = end;
     }
     timings.kernelMs += lapMs(clock);
+    ++timings.dabs;
+    timings.vertices += grabAll_.size();
+}
+
+void Sculptor::grabFinish(Mesh& mesh, BVH& bvh) {
+    if (grabVerts_.empty() || (micro_.active() && microMesh_ == &mesh)) return;
+    auto clock = std::chrono::steady_clock::now();
     mesh.updateNormals(grabAll_);
     timings.normalsMs += lapMs(clock);
     bvh.refitLeaves(mesh, grabLeaves_);
     timings.bvhMs += lapMs(clock);
-    ++timings.dabs;
-    timings.vertices += grabAll_.size();
 }
 
 // Puts every vertex the current stroke moved back to its stroke-start position.

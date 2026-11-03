@@ -1,6 +1,7 @@
-# The brush cursor follows the surface (#25): over the model the ring lies on it, turned to the surface and
-# pressed onto its shape, at the brush's real size there; off the model it is the flat screen ring. A preference
-# in Preferences > Input (on by default), kept by Store Config.
+# The brush cursor follows the surface (#25): over the model the ring lies on it, a true circle in the plane of the
+# surface there (#88: not bent over each bump), at the brush's real size; off the model it is the flat screen ring.
+# Symmetry copies show as dots, not rings (#88). Preferences > Cursor: Cursor follows surface (on by default) and
+# Hide ring while stroking (off by default), kept by Store Config.
 run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_head
 camera 35 10
@@ -12,11 +13,12 @@ hover_model 0.62 0.55
 expect_value surface_cursor == 1
 shot on-surface
 
-# From the front with X symmetry (on by default): the mirrored ring shows, fainter, on the other cheek.
+# From the front with X symmetry (on by default): a dot shows where the mirrored dab lands on the other cheek.
 camera 0 0
 key f
 hover_model 0.3 0.55
 expect_value surface_cursor == 1
+expect_value cursor_copies == 2
 shot symmetry
 camera 35 10
 key f
@@ -40,9 +42,31 @@ hover_window 0.68 0.5
 expect_value surface_cursor == 0
 shot off-surface
 
-# Preferences > Input turns it off.
+# While stroking the ring stays by default...
+drag_path 0.4 0.4 0.7 0.5 keep
+expect_value cursor_ring == 1
+release
+# ...Preferences > Cursor > Hide ring while stroking leaves only the dot during a stroke.
 click "Preferences##palette.preferences"
-click "Input##preferences.input"
+click "Cursor##preferences.cursor"
+expect "Hide ring while stroking##cursor.hide_ring_stroking"
+expect_value hide_ring_while_stroking == 0
+click "Hide ring while stroking##cursor.hide_ring_stroking"
+expect_value hide_ring_while_stroking == 1
+key escape
+drag_path 0.4 0.4 0.7 0.5 keep
+expect_value cursor_ring == 0
+shot hidden-ring-stroking
+release
+hover_model 0.6 0.4
+expect_value cursor_ring == 1
+click "Preferences##palette.preferences"
+click "Hide ring while stroking##cursor.hide_ring_stroking"
+expect_value hide_ring_while_stroking == 0
+key escape
+
+# Preferences > Cursor turns it off.
+click "Preferences##palette.preferences"
 expect "Cursor follows surface##input.surface_cursor"
 click "Cursor follows surface##input.surface_cursor"
 expect_value cursor_follows_surface == 0

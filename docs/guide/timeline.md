@@ -1,7 +1,7 @@
 # Sculpt Timeline and timelapse
 
 Every stroke and operation you make is a step on the **Sculpt Timeline**, the strip along the top of the
-canvas (or its bottom: **Preferences > Interface > Timeline position**). Drag its scrubber to see the model at any point of the session, click a step to go back there, and keep
+canvas (or its bottom: **Edit > Preferences > Interface > Timeline position**). Drag its scrubber to see the model at any point of the session, click a step to go back there, and keep
 sculpting from it: the steps you had made after it are not thrown away as with a plain undo, they stay as a
 branch you can switch back to. You can change how strongly a past stroke shows without redoing the strokes
 after it, and render the whole history as a turntable timelapse video.

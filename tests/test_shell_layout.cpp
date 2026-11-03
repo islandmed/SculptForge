@@ -179,3 +179,15 @@ TEST(shell_left_shelf_stroke_popup) {
     CHECK(fromJson(now, back, err));
     CHECK(back.leftShelf.size() == 1);
 }
+
+// #85 (regression of #41): on macOS a window saved full screen comes back maximised, never straight into full screen
+// (its traffic lights couldn't be reached); elsewhere it comes back full screen.
+TEST(window_restore_fullscreen) {
+    CHECK(!restoresFullscreen(true, true));
+    CHECK(!restoresFullscreen(false, true));
+    CHECK(restoresFullscreen(true, false));
+    CHECK(!restoresFullscreen(false, false));
+#if defined(__APPLE__)
+    CHECK(!restoresFullscreen(true));
+#endif
+}

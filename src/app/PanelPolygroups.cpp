@@ -24,6 +24,7 @@ bool ctrlShiftDown(SDL_Keymod mod) {
 } // namespace
 
 bool App::polygroupMouseDown(float x, float y, SDL_Keymod mod) {
+    if (cutPolylineMouseDown(x, y, mod)) return true; // Cut Polyline places points (PanelCut.cpp)
     if (!ctrlShiftDown(mod) || previewLod_ >= 0) return false;
     beginSelection(x, y, SelectTarget::Hide, hideShape_);
     return true;

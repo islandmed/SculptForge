@@ -104,7 +104,7 @@ add-on. The preferences list every key while it's on.
 | <kbd>X</kbd> | Symmetry X |
 | <kbd>Shift</kbd>+<kbd>F</kbd> | Wireframe (the wireframe overlay) |
 | <kbd>F</kbd> / <kbd>P</kbd> | Frame the model / perspective on and off |
-| <kbd>L</kbd> | Lazy Stroke (Blender: Stabilize Stroke) |
+| <kbd>L</kbd> | Steady Stroke (Blender: Stabilize Stroke) |
 | <kbd>W</kbd> / <kbd>E</kbd> / <kbd>R</kbd> | Move / Scale / Rotate |
 | <kbd>Shift</kbd>+drag | Smooth (Blender already does this) |
 
@@ -136,7 +136,7 @@ and <kbd>Space</kbd> no longer plays the animation in Sculpt Mode.
 SculptForge's VDM brushes and Blender's use the same maps (see
 [Vector displacement brushes](sculpting.md#vector-displacement-brushes)):
 
-- **From Blender**: a map baked with Blender's *VDM Brush Baker* loads with **Brush > Vector Displacement > Load
+- **From Blender**: a map baked with Blender's *VDM Brush Baker* loads with **Sculpt > Brush > Vector Displacement > Load
   VDM...** as it is.
 - **To Blender**: **Export EXR...** writes the VDM brush's map. In Blender, in Sculpt Mode with a Draw brush:
   in the brush's **Texture** panel add a new image texture and open the EXR (set its Color Space to

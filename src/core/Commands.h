@@ -45,6 +45,7 @@ public:
     CommandRegistry(); // registers the built-in commands
 
     void add(Command cmd);
+    void remove(const std::string& name); // every command with this name (none: nothing happens)
     const Command* find(const std::string& name) const;
     const std::vector<Command>& all() const { return commands_; }
 

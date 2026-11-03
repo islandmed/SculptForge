@@ -65,6 +65,10 @@ mask stroke mirrors. A shape that covers none of the model clears the mask inste
 **Mask Strength** sets how much a selection masks or unmasks, and each selection is one undo step. A lasso that
 crosses itself leaves out the areas it encloses twice.
 
+Turn on **Front faces only** (under the shape buttons, shown for Mask Lasso and Mask Rectangle) to mask only what
+faces you: the far side of the model and folds turned away from you are left as they are. It follows the mirror
+image too when symmetry is on.
+
 The cursor turns into a small cross while <kbd>Ctrl</kbd> is held, since the brush size doesn't matter for a
 selection.
 

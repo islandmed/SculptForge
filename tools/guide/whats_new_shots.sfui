@@ -1,0 +1,90 @@
+# Feature pictures for What's New (docs/guide/whats-new.md's ```features blocks: images/wn-*.jpg, 600x340). Run from the
+# source folder:
+#   build/sculptforge --ui-test tools/guide/whats_new_shots.sfui --ui-out build/wn-shots
+#   python3 tools/guide/make_images.py build/wn-shots --whats-new
+# Crop boxes are in make_images.py (WHATS_NEW).
+
+env SF_WHATS_NEW_VERSION 0.10.7   # the cards below are 0.10.7's (Try it on card 3)
+
+# A new look: Forge Terminal with Tokyo Night and the SculptForge layout, the lion head.
+run ui_look look=forge scheme=tokyo_night layout=sculptforge
+run open path=assets/demo/lion-head.glb
+wait_idle 20
+wait 0.5
+shot wn-new-look
+
+# Native Wayland: the interface at 1:1, sharp (the same look).
+shot wn-wayland
+
+# Clearer memberships: the card in the look's colours.
+support_card first_run
+wait_idle
+wait 1.5
+shot wn-memberships
+key escape
+wait 0.4
+
+# Full alphas: Clay Slab (a custom brush) with the Square alpha at Focal Shift -100 stamps square-cornered slabs.
+run new_sphere subdivisions=6
+wait_idle 20
+run ui_look look=forge scheme=tokyo_night layout=zbrush   # (the palette bar has Help for the clicks below)
+click "Help##palette.help"
+click "What's New##help.whats_new"
+wait 0.5
+click "Try it##whats_new.try.2"
+wait 0.3
+run brush_set_alpha name=square
+key o
+key minus
+key 1
+key 0
+key 0
+key enter
+stroke 0.32 0.36 0.32 0.36
+stroke 0.50 0.36 0.50 0.36
+stroke 0.68 0.36 0.68 0.36
+stroke 0.32 0.62 0.32 0.62
+stroke 0.50 0.62 0.50 0.62
+stroke 0.68 0.62 0.68 0.62
+hover_window 0.95 0.5
+wait_idle 20
+shot wn-full-alpha
+
+# Benchmark your machine: Help > Benchmark's start window.
+click "Help##palette.help"
+click "Benchmark (proof mode)##help.benchmark"
+wait 0.5
+shot wn-benchmark
+click "Benchmark (proof mode)/Cancel"
+wait 0.3
+
+# What's New itself (0.10.8): the window over the lion.
+run open path=assets/demo/lion-head.glb
+wait_idle 20
+click "Help##palette.help"
+click "What's New##help.whats_new"
+wait 1
+shot wn-whats-new
+key escape
+wait 0.4
+
+# 0.10.9 Starter meshes: the Library's Starter meshes folder, then the human head opened with its levels.
+run new_starter_mesh name=human-head
+wait_idle 30
+key ,
+click "Library/Tool"
+double_click "Library/Starter meshes"
+wait_idle 60
+hover_window 0.9 0.6
+wait 0.5
+shot wn-starter-meshes
+key escape
+wait 0.4
+
+# 0.10.9 Brushes keep their settings: the Brush palette with Save Brush Settings and Reset Brush to Default.
+click "Clay##brush.clay"
+click "Brush##palette.brush"
+wait 0.5
+shot wn-brush-settings
+key escape
+# (images/wn-first-sculpt.jpg is cut from images/first-sculpt/12-render.jpg, the lesson's own Save Render.)

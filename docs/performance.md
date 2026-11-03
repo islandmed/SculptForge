@@ -12,6 +12,33 @@ sculptforge-cli --bench ...                     # the same without the GPU (CI, 
 Machine for all figures: Apple M1 Pro (8 performance + 2 efficiency cores, 32 GB unified memory, 30 GB usable
 under Asahi Linux), integrated GPU, Mesa 26.1 (OpenGL 4.6). How the benchmark works is described under v0.5 below.
 
+## 0.10.9: background dabs, Move once a frame (perf/bigbrush-p99)
+
+`--benchmark standard` placed every stroke in the frame loop (predictive strokes are off by default), and on the
+33M head one 240 px dab moves 3-11M vertices (the symmetric brush covers a large part of the face). Where one such
+frame went (`SF_FRAME_LOG=40 SF_STROKE_LOG=1 SF_SYNC_LOG=1`): the dab 70-220 ms (kernel 20-100, normals 40-100,
+BVH refit 10-30), then the vertex upload 40-110 ms (packing 30-75, cluster bounds 12-32), then the swap. Every step
+was already threaded and near memory bandwidth, so the work can't fit a frame; it has to leave the frame.
+
+From 2M vertices a sculpt stroke now uses the solver thread without the preview (`App::backgroundDabs`,
+`SF_BACKGROUND_DABS=0/1`): the same dabs in the same order, packed into the two-part upload there. A batch is about
+a frame of work (at least 10 ms), the frame waits up to 12.5 ms for it (so light dabs still show in the frame that
+placed them) and otherwise keeps drawing, and the next frame commits it. The same dabs through either path give the
+same mesh, bit for bit, positions and normals (`ui_stroke_background`; `--measure-stroke 3,120` and `3,240` with
+`SF_MEASURE_VERIFY=1` on a subdivided sphere). The benchmark scene itself isn't reproducible to that level: two
+frame-loop runs with every dab placed differ by up to 0.26, as much as one of each. Frame p99 / worst stall ms,
+before (quiet) -> after (provisional: load 3-4, the quiet run is still to do):
+
+| Phase | 15M | 33M |
+|---|---|---|
+| Clay large | 77 / 136 -> 31 / 34 | 139 / 154 -> 31 / 40 |
+| 240 px brush | 139 / 172 -> 31 / 36 | 306 / 325 -> 33 / 41 |
+| Pen lift (240 px) | 20 ms -> 0 | 162 ms -> 0 |
+
+On the sphere (`new_sphere subdivisions=9`) at 120 px (`--measure-stroke 3,120`, background dabs forced) the
+stroke places as many dabs (156 vs 141 in the frame loop) with about the same lag (62 vs 53 ms). Each 240 px dab at 33M still takes 100-200 ms, so the surface
+trails the pointer by about a dab while the view stays smooth.
+
 ## Next version: predictive strokes (feat/zero-latency)
 
 A stroke on a heavy mesh used to run in the frame loop: each frame placed a dab (45-50 ms at 21M with a 200 px

@@ -25,6 +25,11 @@ namespace sf {
 namespace {
 
 constexpr double kBatchSeconds = 0.033; // a batch's dabs: about this much work (the surface updates this often)
+// Background dabs (no preview to cover a batch): batches of about a frame's share of work, as the frame loop places.
+constexpr double kBackgroundBatchSeconds = 0.010;
+// Meshes from this many vertices place a stroke's dabs on the solver thread even without predictive strokes: one
+// 240 px dab there moves millions of vertices (100-300 ms at 33M triangles), more than a frame can hold.
+constexpr size_t kBackgroundDabVertices = 2'000'000;
 
 } // namespace
 
@@ -52,6 +57,11 @@ void App::StrokeSolver::start() {
 void App::StrokeSolver::wait() {
     std::unique_lock<std::mutex> lock(mutex_);
     idle_.wait(lock, [this] { return !busy_.load(std::memory_order_acquire); });
+}
+
+bool App::StrokeSolver::waitFor(double seconds) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    return idle_.wait_for(lock, std::chrono::duration<double>(seconds), [this] { return !busy_.load(std::memory_order_acquire); });
 }
 
 void App::StrokeSolver::loop() {
@@ -132,11 +142,21 @@ bool App::draftStrokes() const {
     return predictiveStrokes() && (env >= 0 ? env == 1 : uiPrefs_.draftStrokes || currentTierConfig().draftBrushMode);
 }
 
+bool App::backgroundDabs() const {
+    static const int env = [] {
+        const char* v = std::getenv("SF_BACKGROUND_DABS");
+        return v && *v ? (*v == '0' ? 0 : 1) : -1;
+    }();
+    // The same dabs in the same order as the frame loop places them, only on the solver thread: the frame keeps
+    // drawing what the GPU has while a big dab is worked out, and letting go doesn't wait for the dabs queued.
+    return env >= 0 ? env == 1 : doc_.mesh.vertexCount() >= kBackgroundDabVertices;
+}
+
 bool App::asyncStrokeAllowed() const {
     // Sculpt strokes of queued dabs only: Move, Snake Hook and the drag strokes work in strokeTo itself; painting,
     // masking and dynamic topology (which changes the layout the renderer packs for) stay in the frame loop.
     const bool recipe = strokeRecipe() != nullptr;
-    return interactiveStrokes_ && predictiveStrokes() && strokeSculpt_ && !strokePaint_ && !strokeMask_ &&
+    return interactiveStrokes_ && (predictiveStrokes() || backgroundDabs()) && strokeSculpt_ && !strokePaint_ && !strokeMask_ &&
            !doc_.sculptor.dyntopo.enabled && previewLod_ < 0 && !faceTakePlaying_ &&
            !doc_.mesh.micro && // (a micro level is sculpted and drawn by core/MicroSculpt and the MicroRenderer)
            (recipe || (strokeBrush_ != BrushType::Move && strokeBrush_ != BrushType::SnakeHook)) &&
@@ -241,8 +261,7 @@ void App::pumpStroke() {
         s.view.radiusProbe = nullptr;
         s.view.settings = dabSettings();
         s.uploadId = doc_.activeSubtoolInfo().id;
-        renderer_.bindStrokeUpload(s.uploadId, s.upload);
-    renderer_.bindStrokeUpload(s.uploadId, s.upload); // (the slot, found here: the thread doesn't walk the renderer's list)
+        renderer_.bindStrokeUpload(s.uploadId, s.upload); // (the slot, found here: the thread doesn't walk the renderer's list)
         s.prepare = &displayedMesh() == &doc_.mesh;
         s.start();
         return;
@@ -255,7 +274,10 @@ void App::pumpStroke() {
     // packing, per batch, stays at most about half the work), at least one dab; once the pen has lifted, every
     // dab left (the preview shows them all: only the end result is waited for), with the stroke's end work.
     StrokeSolver& s = *solver_;
-    const double target = std::max(kBatchSeconds, prepSeconds_);
+    // (Background dabs: about a frame of work, which the solver does while the frame draws: at least as many dabs
+    // a frame as the frame loop placed, however long the frame.)
+    const double target = std::max(predictiveStrokes() ? kBatchSeconds : std::max(kBackgroundBatchSeconds, frameSeconds_ * 0.8),
+                                   prepSeconds_);
     size_t n = dabSeconds_ > 0.0 ? size_t(std::clamp(target / dabSeconds_, 1.0, 64.0)) : 1;
     if (strokeFinishing_) n = 64;
     s.batch.clear();
@@ -271,6 +293,10 @@ void App::pumpStroke() {
     s.prepare = &displayedMesh() == &doc_.mesh; // (a previewed LOD shows instead: nothing to pack)
     renderer_.setDraftNormals(doc_.sculptor.draftActive() ? s.uploadId : 0);
     s.start();
+    // Background dabs: a batch is waited for here up to a frame's share of work, so a light one shows in this frame
+    // as in the frame loop's own path; a heavier one goes on while the frame draws, and the next frame commits it.
+    if (!predictiveStrokes() && dabSeconds_ > 0.0 && s.waitFor(kBackgroundBatchSeconds * 1.25) && s.done)
+        commitSolverBatch();
 }
 
 void App::finishStrokeNow() {
@@ -308,12 +334,16 @@ void App::finishStrokeNow() {
 App::DabSettings App::dabSettings() const {
     DabSettings st;
     st.radiusPx = radiusPx_;
-    st.strength = strength_;
+    st.worldRadius = worldSize_ && worldRadius_ > 0.0f ? worldRadius_ : 0.0f;
+    st.pressureCurve = strokeCurve_;
+    st.strength = precisionActive_ ? precisionIntensity_ : strength_; // Shift+Alt mid-stroke (Precision.cpp)
     st.smoothStrength = smoothStrength_;
     st.smoothKeepVolume = smoothKeepVolume_ != strokeAltSmooth_;
+    st.smoothGroupBorders = smoothGroupBorders_;
     st.focal = focalShift_;
     st.maskStrength = maskStrength_;
     st.sprayScatter = sprayScatter_;
+    st.alphaOptions = alphaOptions_;
     st.pressureSize = pressureSize_;
     st.pressureStrength = pressureStrength_;
     st.invert = strokeInvert_;
@@ -396,9 +426,10 @@ void App::buildGhost() {
     for (const PathDab& d : solver_->batch) pending.push_back({d.x, d.y, d.pressure, 1.0f});
     for (const PathDab& d : dabQueue_.items()) pending.push_back({d.x, d.y, d.pressure, 1.0f});
     // The head: from the last dab to where the pen will be when this frame shows (not for strokes that move the
-    // pointer's path: Lazy Mouse, a Shift line, jitter or spray), in part, as the dabs the pen is about to lay.
-    const float spacing = std::max(1.0f, radiusPx_ * (strokeRecipe() ? strokeRecipe()->spacing : 0.15f));
-    if (drag_ == Drag::Stroke && strokeType_ != StrokeType::LazyMouse && strokeType_ != StrokeType::Spray && !straight_.active &&
+    // pointer's path: Steady Stroke, the precision drag, a Shift line, jitter or spray), in part, as the dabs the pen is about to lay.
+    const float spacing = dabSpacingPx(radiusPx_, strokeRecipe() ? strokeRecipe()->spacing : 0.15f);
+    if (drag_ == Drag::Stroke && !steadyOn() && !precisionActive_ && precision_.caughtUp() &&
+        strokeType_ != StrokeType::Spray && !straight_.active &&
         !(strokeRecipe() && strokeRecipe()->jitter > 0.0f)) {
         const glm::vec2 head = predictedPointer();
         const glm::vec2 from = !pending.empty() ? glm::vec2(pending.back().x, pending.back().y) : lastDabScreen_;
@@ -432,7 +463,8 @@ void App::buildGhost() {
         camera_.screenRay(sd.x - c.x, sd.y - c.y, c.w, c.h, origin, dir);
         GhostDab d;
         if (!ghostSurface(origin, dir, d.center, n)) continue;
-        d.radius = radiusPx_ * (pressureSize_ ? std::max(sd.pressure, 0.05f) : 1.0f) * camera_.worldPerPixel(d.center, c.h);
+        d.radius = (worldSize_ && worldRadius_ > 0.0f ? worldRadius_ : radiusPx_ * camera_.worldPerPixel(d.center, c.h)) *
+                   (pressureSize_ ? std::max(sd.pressure, 0.05f) : 1.0f);
         d.normal = n;
         d.strength = std::clamp((strokeBrush_ == BrushType::Smooth ? smoothStrength_ : strength_), 0.0f, 1.0f) *
                      std::clamp(pressureStrength_ ? sd.pressure : 1.0f, 0.0f, 1.0f);

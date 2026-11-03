@@ -357,6 +357,7 @@ void microFetch() {
 uniform vec4 uViewport;  // the view's rectangle in window pixels
 uniform vec2 uProjScale; // projection x and y scale
 uniform vec3 uBaseColor;
+uniform vec3 uTintShift; // the material tint less 1 (0, the default, is no tint): the active colour, no vertex paint
 uniform int uPaint;      // 1: vertex colours replace the base colour
 uniform int uShowMask;   // 1: darken masked areas
 uniform int uGroups;     // 0: off, 1: per-triangle ids from uGroupIds, 2: everything is group 0, 3: per-triangle
@@ -473,8 +474,8 @@ void main() {
 #ifdef MICRO
     microFetch();
 #endif
-    vec3 albedo = uBaseColor;
-    vec3 tint = vec3(1.0); // multiplies a matcap: polypaint or polygroup colours
+    vec3 tint = vec3(1.0) + uTintShift; // multiplies a matcap: polypaint or polygroup colours, or the active colour
+    vec3 albedo = uBaseColor * tint;
 #ifdef PRIM
     if (uGroups == 3) albedo = tint = faceColor(texelFetch(uGroupIds, vPrimBase + gl_PrimitiveID).r);
     else if (uGroups == 1) albedo = tint = groupColor(texelFetch(uGroupIds, vPrimBase + gl_PrimitiveID).r);
@@ -878,6 +879,7 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     p.viewport = at("uViewport");
     p.projScale = at("uProjScale");
     p.baseColor = at("uBaseColor");
+    p.tintShift = at("uTintShift");
     p.paint = at("uPaint");
     p.showMask = at("uShowMask");
     p.groups = at("uGroups");
@@ -1341,6 +1343,7 @@ void Renderer::syncScene(const std::vector<SceneMesh>& scene) {
         it = slots_.erase(it);
     }
     drawList_.clear();
+    proxyPending_ = false;
     for (const SceneMesh& m : scene) {
         if (!m.visible || !m.mesh) continue; // hidden: keeps its dirty state until shown
         MeshSlot& ms = slot(m.id);
@@ -1689,23 +1692,38 @@ void Renderer::buildProxies(MeshSlot& s, const Mesh& mesh) {
         gl::BindVertexArray(0);
         s.proxyAllocated = true;
     }
-    std::vector<std::vector<uint16_t>> built(cullScratch_.size());
-    poolFor(cullScratch_.size(), [&](size_t i0, size_t i1) {
-        for (size_t i = i0; i < i1; ++i) {
-            const uint32_t c = cullScratch_[i];
-            ClusterBounds b = s.bounds[c];
-            if (!clusterProxy(mesh, s.order, c, s.order.clusterTriangles(c) / 4, built[i], b)) built[i].clear();
-            s.proxyBounds[c] = b;
-        }
-    }, 1, 2);
+    // A few milliseconds a frame: after a long stroke most of the front is stale, and building all of it in the first
+    // moving frame stalled the view (180-300 ms at 33M). Stale clusters draw in full detail until theirs is built.
+    constexpr double kProxyBudgetMs = 8.0;
+    constexpr size_t kProxyBatch = 1024; // clusters per parallel batch
+    const auto start = std::chrono::steady_clock::now();
+    std::vector<std::vector<uint16_t>> built;
     gl::BindVertexArray(s.proxyVao);
-    for (size_t i = 0; i < cullScratch_.size(); ++i) {
-        const uint32_t c = cullScratch_[i];
-        s.proxyCount[c] = uint32_t(built[i].size());
-        s.proxyStale[c] = 0;
-        if (!built[i].empty())
-            gl::BufferSubData(GL_ELEMENT_ARRAY_BUFFER, GLintptr(size_t(s.order.firstTriangle(c) / 4) * 3 * sizeof(uint16_t)),
-                              GLsizeiptr(built[i].size() * sizeof(uint16_t)), built[i].data());
+    for (size_t at = 0; at < cullScratch_.size();) {
+        const size_t n = std::min(kProxyBatch, cullScratch_.size() - at);
+        built.assign(n, {});
+        poolFor(n, [&](size_t i0, size_t i1) {
+            for (size_t i = i0; i < i1; ++i) {
+                const uint32_t c = cullScratch_[at + i];
+                ClusterBounds b = s.bounds[c];
+                if (!clusterProxy(mesh, s.order, c, s.order.clusterTriangles(c) / 4, built[i], b)) built[i].clear();
+                s.proxyBounds[c] = b;
+            }
+        }, 1, 2);
+        for (size_t i = 0; i < n; ++i) {
+            const uint32_t c = cullScratch_[at + i];
+            s.proxyCount[c] = uint32_t(built[i].size());
+            s.proxyStale[c] = 0;
+            if (!built[i].empty())
+                gl::BufferSubData(GL_ELEMENT_ARRAY_BUFFER, GLintptr(size_t(s.order.firstTriangle(c) / 4) * 3 * sizeof(uint16_t)),
+                                  GLsizeiptr(built[i].size() * sizeof(uint16_t)), built[i].data());
+        }
+        at += n;
+        if (at < cullScratch_.size() &&
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() > kProxyBudgetMs) {
+            proxyPending_ = true;
+            break;
+        }
     }
     gl::BindVertexArray(0);
 }
@@ -2094,9 +2112,21 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     const size_t ns = s.order.size();
     const bool ranged = !full && !dirtyRuns_.empty();
     const std::span<const uint32_t> order = s.order.fromGpu();
+    static const bool syncLog = std::getenv("SF_SYNC_LOG") != nullptr; // where a vertex upload's time went
+    auto lap = std::chrono::steady_clock::now();
+    const auto lapStart = lap;
+    double vertsMs = 0, boundsMs = 0, proxyMs = 0;
+    const auto lapMs = [](std::chrono::steady_clock::time_point& t) {
+        const auto now = std::chrono::steady_clock::now();
+        const double ms = std::chrono::duration<double, std::milli>(now - t).count();
+        t = now;
+        return ms;
+    };
     if (full || ranged) {
         uploadVertices(s, mesh, full);
+        if (syncLog) vertsMs = lapMs(lap);
         updateBounds(s, mesh, full, full); // (a full upload computed them while building)
+        if (syncLog) boundsMs = lapMs(lap);
     }
     if (full) {
         s.proxyAllocated = false; // sized for the old mesh
@@ -2128,7 +2158,9 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     if (wireframe && !s.linesValid && !s.outOfMemory) buildLines(s, mesh);
     // Small meshes draw in full while the view moves too (their proxy would save little).
     constexpr size_t kProxyMinTriangles = size_t(1) << 18;
+    if (syncLog) lapMs(lap);
     if (proxyUsed_ && !s.outOfMemory && s.drawnTriangles >= kProxyMinTriangles) buildProxies(s, mesh);
+    if (syncLog) proxyMs = lapMs(lap);
     syncTexture(s, mesh, pbr);
     syncNormalMap(s, mesh, normalMap);
 
@@ -2168,6 +2200,13 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     s.fresh = false;
     uploadPatches(s, mesh, wireframe); // (may ask for a full upload next time)
     mesh.clearDirty();
+    if (syncLog && (full || ranged || proxyMs > 1.0)) {
+        size_t sent = 0;
+        for (const auto& [b0, e0] : dirtyRuns_) sent += e0 - b0;
+        SDL_Log("sync: %s %zu slots in %zu runs, %.1f ms (vertices %.1f, bounds %.1f, proxy %.1f)", full ? "full" : "ranged",
+                sent, dirtyRuns_.size(), std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - lapStart).count(),
+                vertsMs, boundsMs, proxyMs);
+    }
 }
 
 // The painted texture (core/Texture.h): a full upload when it is new or replaced, then only the rectangle
@@ -2877,6 +2916,12 @@ void Renderer::drawClusters(const MeshSlot& s, const std::vector<uint32_t>& clus
 }
 
 // One mesh. Mask and polygroup colours are for the SubTool being edited; polypaint shows on all of them.
+// The material tint a mesh gets (RenderSettings::colorTintsMaterial), less 1: Lit Sphere shading, no vertex paint.
+static glm::vec3 materialTintShift(const RenderSettings& settings, bool hasColors) {
+    if (!settings.colorTintsMaterial || settings.pbr() || hasColors) return glm::vec3(0.0f);
+    return settings.materialTint - glm::vec3(1.0f);
+}
+
 void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings) {
     const MeshProgram* p = meshProgram(kMicro | (flat ? kFlat : 0) | (settings.pbr() && envTexture_ ? kPbr : 0));
     if (!p) return;
@@ -2888,6 +2933,7 @@ void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const Render
     const bool orthographic = frameProj_[3][3] == 1.0f;
     gl::Uniform2f(p->projScale, orthographic ? 1e20f : frameProj_[0][0], orthographic ? 1e20f : frameProj_[1][1]);
     gl::Uniform3fv(p->baseColor, 1, glm::value_ptr(settings.baseColor));
+    gl::Uniform3fv(p->tintShift, 1, glm::value_ptr(materialTintShift(settings, s.hasColors)));
     gl::Uniform1i(p->matcap, matcapTexture(settings.matcap) ? 1 : 0);
     const MatcapCavity cavity = matcapCavity(settings.matcap);
     gl::Uniform2f(p->matcapCavity, cavity.crease, cavity.ridge);
@@ -2942,6 +2988,7 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     const bool orthographic = frameProj_[3][3] == 1.0f;
     gl::Uniform2f(p->projScale, orthographic ? 1e20f : frameProj_[0][0], orthographic ? 1e20f : frameProj_[1][1]);
     gl::Uniform3fv(p->baseColor, 1, glm::value_ptr(settings.baseColor));
+    gl::Uniform3fv(p->tintShift, 1, glm::value_ptr(materialTintShift(settings, s.hasColors)));
     gl::Uniform1i(p->matcap, matcapTexture(settings.matcap) ? 1 : 0);
     const MatcapCavity cavity = matcapCavity(settings.matcap);
     gl::Uniform2f(p->matcapCavity, cavity.crease, cavity.ridge);

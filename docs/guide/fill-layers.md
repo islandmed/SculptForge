@@ -9,7 +9,7 @@ along it a moment later. **Material Recipes** are ready-made stacks of Fill laye
 ![Painted Edges on a sculpted sphere: the paint has chipped away along the creases](images/fill-painted-edges.jpg)
 
 Fill layers live in **Tool > Paint Layers** next to your paint layers, on a Part with a texture
-([Texture painting](texture-painting.md)). Turn on **Material > Viewport Shading > PBR** to see the metal, the
+([Texture painting](texture-painting.md)). Turn on **Render > Materials > Viewport Shading > PBR** to see the metal, the
 roughness and the bumps as they will look in a game engine ([Material painting](pbr-painting.md#the-pbr-viewport)).
 
 ## Lay a Material Recipe

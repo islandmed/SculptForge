@@ -1,8 +1,21 @@
-# Troubleshooting and FAQ
+# Troubleshooting: tablets, display, crashes and FAQ
 
 This chapter collects fixes for common problems: start-up and graphics errors, tablets, AI service messages,
 ComfyUI errors, the camera notch, first-launch warnings on macOS and Windows, where SculptForge keeps its
 settings, how to reset the interface, and how to report a bug.
+
+Quick answers:
+
+| Problem | Fix |
+|---|---|
+| No pen pressure on Windows | Switch **Windows Ink** in the tablet driver and bring the pen back ([Pen tablets](#pen-tablets)) |
+| The cursor jumps when the pen touches down | **Edit > Preferences > Tablet > Mouse mode (relative)** |
+| "Windows protected your PC" | **More info**, then **Run anyway** ([First launch warnings](#first-launch-warnings-on-macos-and-windows)) |
+| Text and buttons too small or too large | **Edit > Preferences > Interface > UI scale** ([details](#text-and-buttons-are-too-small-or-too-large)) |
+| Menus or shelves look wrong after an update | **Edit > Preferences > Config > Restore Standard UI** ([Reset the interface](#reset-the-interface)) |
+| Sculpting feels slow | [The viewport is slow](#the-viewport-is-slow) |
+| Lost work after a crash | [Recovering work after a crash](#recovering-work-after-a-crash) |
+| Want the ZBrush layout back | **Edit > Preferences > Interface > Look > Layout > ZBrush-style** |
 
 ## SculptForge doesn't start
 
@@ -40,16 +53,16 @@ documentation** opens links to it).
 
 ## The viewport is slow
 
-- Check the triangle count in the title strip (**Tris**). Millions of triangles on a laptop GPU are heavy;
+- Check the triangle count in the bar along the top of the window (**Tris**). Millions of triangles on a laptop GPU are heavy;
   **Tool > Geometry > Decimate** or a lower **Voxel Remesh** resolution brings it down. See
   [Subdivide, Remesh, Decimate and LODs](geometry.md).
 - Turn off **Wireframe** (<kbd>Shift</kbd>+<kbd>F</kbd>) on dense meshes.
 - Hide Parts you aren't working on, or **Solo** the active one.
 - A large Gaussian splat capture costs GPU time too: lower the count with **Clean floaters**, or untick
-  **Show** in the **Splats** palette while you sculpt.
+  **Show** in **Render > Gaussian Splats** while you sculpt.
 - On laptops with two GPUs, make sure SculptForge runs on the dedicated one (in the GPU maker's control panel
   or the operating system's graphics settings).
-- **Preferences > Performance**: lower **Antialiasing** (or turn it off), keep **Fast Navigation** on, and look
+- **Edit > Preferences > Performance**: lower **Antialiasing** (or turn it off), keep **Fast Navigation** on, and look
   at **Last stroke** to see whether brushes or the graphics card take the time. Step down a
   [subdivision level](subdivision-levels.md) for big changes. See [Performance and big meshes](performance.md).
 - A Part missing from the view with "Not enough GPU memory" in the status bar didn't fit on the graphics
@@ -60,24 +73,37 @@ documentation** opens links to it).
 SculptForge reads pen pressure through the operating system's standard pen input, so most Wacom, XP-Pen, Huion
 and similar tablets, and pen displays, work without settings.
 
-1. Open the **Draw** palette. Under **Tablet** it shows "Pen pressure: 0.42" once the pen has come near the
+1. Open **Sculpt > Draw & Tablet**. Under **Tablet** it shows "Pen pressure: 0.42" once the pen has come near the
    tablet, or "No pen detected".
 2. **Pressure > strength** (on by default) and **Pressure > size** choose what pressure controls. They are
    also on the top shelf.
 3. A custom brush can also set its own pressure response (**pressureCurve** in its recipe, see
    [Brush Lab and sharing brushes](brush-lab.md)).
 
+**Edit > Preferences > Input** and **Edit > Preferences > Tablet** show "Pressure: on" once the pen has pressed, or
+"Pressure: not detected". Without pressure the pen still draws, at full strength. A tablet plugged in while
+SculptForge runs works straight away; the status bar says "Tablet connected" (also through Wacom Bridge).
+
 If no pen is detected or pressure doesn't change:
 
-- Install or update the tablet maker's driver, then restart SculptForge.
-- **Windows:** most drivers have a **Windows Ink** option. If pressure doesn't reach SculptForge, try
-  switching it (on or off) in the tablet driver's settings for SculptForge or for all applications, then
-  restart SculptForge.
+- Install or update the tablet maker's driver.
+- **Windows:** SculptForge reads pressure through Windows Ink, and through the driver's Wintab when Windows Ink is
+  off (Wacom Tablet Properties > Mapping > **Use Windows Ink**). If pressure is still missing, switch that option
+  and bring the pen back to the tablet. See [Pen tablets on Windows](installing.md#pen-tablets-windows-ink-and-wintab).
 - **Linux:** check that the system sees the pen as a tablet (for example in your desktop's tablet settings).
 - If the cursor moves but strokes have no pressure, test in another application to see whether the driver
   reports pressure at all.
+- **The active Part changed by itself:** a Part becomes active with **Alt+click** on it (the keyboard's Alt, a
+  quick click), a triple-click with the mouse or a click in the Parts list; the status bar names it and how. A
+  tablet's ExpressKey set to Alt counts as the keyboard's Alt.
 - **The cursor jumps back when you put the pen down elsewhere:** the tablet driver is set to mouse (relative)
-  mode. Turn on **Preferences > Tablet > Mouse mode (relative)**.
+  mode. Turn on **Edit > Preferences > Tablet > Mouse mode (relative)**. It also makes the pen relative with the driver
+  in pen mode; the arrow is drawn at the brush while the pen is in range.
+- **The pen picks a brush, then stops clicking menus or the canvas until you use the mouse** (Huion, display
+  tablets, Wacom; 0.10.8 and earlier): update to 0.10.9 or later. If it still happens, tell us the tablet, its
+  driver version and whether Windows Ink is on.
+- **With two screens, the app slows down when the pointer is on the other screen:** fixed in 0.10.9; SculptForge
+  now rests only when its window loses focus.
 
 ## AI services
 
@@ -135,14 +161,17 @@ See [Image and text to 3D](generate-3d.md#comfyui-your-own-server) for setup.
 
 On MacBooks with a camera notch, SculptForge keeps the interface below the notch when it fills the screen. If
 the title strip or palette bar is still covered, or a plain band appears where you don't want one, change
-**Preferences > Interface > Camera notch**: **Automatic** (asks the system on macOS, recognises notched
+**Edit > Preferences > Interface > Camera notch**: **Automatic** (asks the system on macOS, recognises notched
 MacBook displays on Linux), **Always reserve**, or **Off**. <kbd>F11</kbd> switches between fullscreen and a
 window.
 
 ### Text and buttons are too small or too large
 
-**Preferences > Interface > UI scale** sets the size (Automatic, 100% to 200%). It takes effect the next time
-SculptForge starts, and only if you press **Store Config** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>).
+**Edit > Preferences > Interface > UI scale** sets the size (Automatic, 100% to 200%) and applies it at once. Press
+**Store Config** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) to keep it for the next start. **Automatic** uses
+the scale of the monitor the window is on: on Windows that is **Settings > Display > Scale**, per monitor, and the
+interface follows when you drag the window to another monitor. On Linux under X11 it comes from the desktop's
+font DPI (Xft.dpi); if Automatic looks wrong there, pick a size.
 
 ### My layout or shortcuts are gone after a restart
 
@@ -152,7 +181,7 @@ preferences. See [The interface](interface.md).
 
 ### Reset the interface
 
-- **Preferences > Config > Restore Standard UI** returns to the built-in layout and default shortcuts. Press
+- **Edit > Preferences > Config > Restore Standard UI** returns to the built-in layout and default shortcuts. Press
   **Store Config** afterwards to make it stick.
 - **Restore Custom UI** goes back to what the last Store Config saved.
 - To start completely fresh, quit SculptForge and delete `ui.json` (layout, shortcuts, interface preferences)
@@ -162,7 +191,7 @@ preferences. See [The interface](interface.md).
 
 Shortcuts don't fire while you type in a text field: click the canvas first. Check the key in **Help >
 Controls** (<kbd>F1</kbd>), which shows every shortcut as currently assigned; a key you reassigned shows in
-orange in **Preferences > Hotkeys**, where **Default shortcuts** undoes every change.
+orange in **Edit > Preferences > Hotkeys**, where **Default shortcuts** undoes every change.
 
 ## Where settings live
 
@@ -189,11 +218,11 @@ SculptForge keeps its settings in one folder per user:
 | `brush-gallery-cache/`, `brush-gallery.json` | Community brush gallery cache and its address |
 | `thumbs/` | Cached Library and picker thumbnails (safe to delete) |
 
-Your **library folder** (projects, tools, alphas, images, splats and QuickSaves shown in the Library) is
-separate: `Documents/SculptForge` by default, changeable in **Preferences > Library > Library folder**.
+Your **library folder** (projects, tools, alphas, images, splats and snapshots shown in the Library) is
+separate: `Documents/SculptForge` by default, changeable in **Edit > Preferences > Library > Library folder**.
 
 > **Tip:** To move settings to another computer, copy `ui.json`, `ai.json` and the `brushes` folder. For a
-> shared layout, use **Preferences > Config > Save UI...** and **Load UI...** instead.
+> shared layout, use **Edit > Preferences > Config > Save UI...** and **Load UI...** instead.
 
 ## The log file
 
@@ -214,7 +243,7 @@ no models and no keys, only command names and messages, which may include file n
 
 ## Recovering work after a crash
 
-SculptForge autosaves unsaved work every 5 minutes by default (**Preferences > Autosave**, 0 turns it off).
+SculptForge autosaves unsaved work every 5 minutes by default (**Edit > Preferences > Autosave**, 0 turns it off).
 After a crash, the next start asks "SculptForge did not close normally last time. Restore the autosaved
 work?". **Restore** opens it as unsaved work (save it under a name); **Discard** deletes it. See
 [Projects, autosave and snapshots](projects.md). The dialog also points to the crashed session's

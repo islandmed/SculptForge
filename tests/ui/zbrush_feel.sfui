@@ -90,11 +90,11 @@ expect_value brush_type == 0
 key 3
 expect_value brush_type == 0
 
-# --- L: LazyMouse on and off; V: swap the main and secondary colour ---
+# --- L: Steady Stroke (ZBrush: LazyMouse) on and off, with any stroke type; V: swap the main and secondary colour ---
 key l
-expect_value lazy_mouse == 1
+expect_value steady_stroke == 1
 key l
-expect_value lazy_mouse == 0
+expect_value steady_stroke == 0
 remember paint_r red0
 key v
 expect_value paint_r != $red0
@@ -130,17 +130,18 @@ hold ctrl
 stroke 0.2 0.55 0.8 0.55   # a little off-centre: on a centred band, blurring can leave the masked count unchanged
 hold none
 expect_value masked > 100
-remember masked painted
+# (Partly masked vertices: a blur always makes more of them, a sharpen fewer. The count above 0.5 can stay the same.)
+remember mask_soft painted
 hold ctrl
 drag_path 0.5 0.3 0.5 0.3
 hold none
-expect_value masked != $painted
-remember masked blurred
+expect_value mask_soft > $painted
+remember mask_soft blurred
 shot mask-blurred
 hold ctrl+alt
 drag_path 0.5 0.3 0.5 0.3
 hold none
-expect_value masked != $blurred
+expect_value mask_soft < $blurred
 shot mask-sharpened
 
 # --- Ctrl+W: the masked part becomes a polygroup and the mask is cleared ---

@@ -1,34 +1,73 @@
-# Help > What's New opens the guide's What's New chapter (it also opens by itself once after an update).
+# What's New: Help > What's New opens the newest version's feature cards (docs/guide/whats-new.md, its ```features
+# block); Esc closes it, Try it opens the feature, Full release notes opens the guide chapter, which shows the last
+# three versions in full and folds the older ones into groups.
+# The window is pinned to 0.10.7's five cards (SF_WHATS_NEW_VERSION), so this stays valid after each release; the guide
+# chapter below is pinned to 0.10.9 (SF_GUIDE_VERSION), so it checks 0.10.9's section before and after the release.
+env SF_WHATS_NEW_VERSION 0.10.7
+env SF_GUIDE_VERSION 0.10.9
 run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_sphere subdivisions=3
 click "Help##palette.help"
 click "What's New##help.whats_new"
+wait 0.5
+expect_value whats_new_open == 1
+expect_value whats_new_cards == 5
+expect_text "What's new in 0.10.7"
+expect_text "A new look"
+expect_text "Clearer memberships"
+expect_text "Full alphas, every brush"
+expect_text "Native Wayland"
+expect_text "Benchmark your machine"
+expect "Try it##whats_new.try.0"
+expect "Read more##whats_new.try.3"
+shot whats-new-popup
+
+# Esc closes it; nothing under it moved.
+key escape
+wait 0.3
+expect_value whats_new_open == 0
+
+# Tab to the third card, Enter tries it: the custom brush Clay Slab is selected (#75's full alphas).
+click "Help##palette.help"
+click "What's New##help.whats_new"
+wait 0.4
+key tab
+key tab
+key tab
+key enter
+wait 0.3
+expect_value whats_new_open == 0
+expect_value whats_new_tries == 1
+expect_value custom_brush_active == 1
+
+# Try it on the first card switches to the new look.
+click "Help##palette.help"
+click "What's New##help.whats_new"
+wait 0.4
+click "Try it##whats_new.try.0"
+wait 0.3
+expect_value whats_new_tries == 2
+expect_value whats_new_open == 0
+expect_value look == 1
+expect_value shell_layout == 1
+
+# The same window in Forge Terminal (the look's colours), then Full release notes: the guide chapter.
+run ui_look look=forge scheme=tokyo_night layout=zbrush   # Forge Terminal's colours, with the palette bar for the clicks
+click "Help##palette.help"
+click "What's New##help.whats_new"
+wait 0.5
+shot whats-new-popup-forge
+click "Full release notes##whats_new"
+wait 0.3
+expect_value whats_new_open == 0
 expect_value guide_open == 1
 expect_guide whats-new.md
+expect_text "Version 0.10.9"
+expect_text "Your first sculpt in ten minutes, starter meshes, brushes that keep their settings, and tablets that just work."
 expect_text "Version 0.10.8"
-expect_text "Tablets in mouse mode work again"
-expect_text "Version 0.10.7"
-expect_text "Version 0.10.6"
-expect_text "Version 0.10.5"
-expect_text "Version 0.10.4"
-expect_text "Version 0.10.3"
-expect_text "Version 0.10.2"
-expect_text "Version 0.9.6"
-expect_text "Extract"
-expect_text "Version 0.9.5"
-expect_text "Version 0.9.4"
-expect_text "Version 0.9.3"
-expect_text "Version 0.9.2"
-expect_text "Version 0.9.1"
-expect_text "Version 0.9.0"
-expect_text "Version 0.8.1"
-expect_text "Version 0.8"
-expect_text "Version 0.7"
-expect_text "Version 0.6"
-expect_text "Version 0.5"
-expect_text "Version 0.4.2"
-# The newest section is on screen.
-shot whats-new
+expect_value whats_new_contents == 6
+expect_value whats_new_expanded == 1
+shot whats-new-guide
 
 # The end of the chapter: a quiet line about supporting SculptForge; its button only asks for the website's page
 # (UI tests never start a browser).

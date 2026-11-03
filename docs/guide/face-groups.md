@@ -10,7 +10,7 @@ visibility gestures and the **Tool > Face Groups** and **Tool > Visibility** con
 ## Show face groups
 
 Click **Groups** in the right shelf to colour each face group of the active Part. The same toggle is
-**Show face groups** in **Tool > Face Groups** and **Show Face Groups** in the **Render** palette. The grouping
+**Show face groups** in **Tool > Face Groups** and **Show Face Groups** in the **View** menu. The grouping
 buttons turn the colours on for you, so you see the result straight away.
 
 The number next to **Show face groups** is how many face groups are visible right now.
