@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cut: line, lasso, rectangle and polyline - SculptForge User Guide</title>
+  <meta name="description" content="Cut cuts the active Part with a shape you draw on the screen. The shape is pushed straight into the view, so what you see inside it is what gets cut, front and back. Every cut is one undo step, and a closed Part stays closed (watertight), so you can keep sculpting, remeshing or 3D printing it.">
+  <meta name="theme-color" content="#111114">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" type="image/svg+xml" href="../img/favicon.svg?v=2">
+  <link rel="icon" type="image/png" href="../img/favicon-64.png?v=2">
+  <link rel="apple-touch-icon" href="../img/icon-256.png?v=2">
+  <link rel="canonical" href="https://sculptforge.app/guide/cut.html">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Cut: line, lasso, rectangle and polyline - SculptForge User Guide">
+  <meta property="og:description" content="Cut cuts the active Part with a shape you draw on the screen. The shape is pushed straight into the view, so what you see inside it is what gets cut, front and back. Every cut is one undo step, and a closed Part stays closed (watertight), so you can keep sculpting, remeshing or 3D printing it.">
+  <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=3">
+  <meta property="og:url" content="https://sculptforge.app/guide/cut.html">
+  <link rel="stylesheet" href="../style.css?v=19">
+  <script src="../motion.js?v=11" defer></script>
+  <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+  <script src="search-index.js?v=47" defer></script>
+</head>
+<body class="guide-page" data-prev="geometry.html" data-next="retopology.html">
+  <div class="scroll-progress" aria-hidden="true"></div>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="../index.html"><img src="../img/logo.svg?v=2" alt="" width="34" height="34"><span>SculptForge</span></a>
+      <nav aria-label="Main">
+        <a href="../index.html#features">Features</a>
+        <a href="../index.html#demos">Demos</a>
+        <a href="../brushes.html">Brushes</a>
+        <a href="index.html" aria-current="page">Guide</a>
+        <a class="nav-dl" href="../index.html#download">Download</a>
+        <a class="gh" href="https://discord.gg/gWrYkEmQhH">Discord</a>
+        <a class="gh" href="https://github.com/islandmed/SculptForge">GitHub</a>
+      </nav>
+    </div>
+  </header>
+  <div class="wrap guide-layout">
+    <div class="guide-side">
+      <button class="toc-toggle" type="button" aria-expanded="false" aria-controls="guide-toc">
+        <span>Contents</span><span class="toc-current">Cut: line, lasso, rectangle and polyline</span></button>
+      <div id="guide-toc" class="toc-panel">
+        <div class="guide-search" role="search">
+          <input type="search" id="guide-q" placeholder="Search the guide" aria-label="Search the guide" autocomplete="off">
+          <div class="search-results" id="guide-results" hidden></div>
+        </div>
+        <nav class="toc" aria-label="User guide"><a class="toc-home" href="index.html">Contents</a><p class="toc-group">Getting started</p><ul><li><a href="welcome.html">Welcome to SculptForge</a></li><li><a href="first-sculpt.html">Your first sculpt in 10 minutes</a></li><li><a href="whats-new.html">What&#x27;s new</a></li><li><a href="coming-from-zbrush.html">Coming from ZBrush</a></li><li><a href="installing.html">Install SculptForge on Windows, macOS and Linux</a></li><li><a href="interface.html">The interface</a></li><li><a href="navigation.html">Navigating the view</a></li></ul><p class="toc-group">Sculpting</p><ul><li><a href="sculpting.html">Sculpting and brushes</a></li><li><a href="brush-lab.html">Brush Lab and sharing brushes</a></li><li><a href="masking.html">Masking</a></li><li><a href="face-groups.html">Face Groups and visibility</a></li><li><a href="selection-sets.html">Selection sets and morph targets</a></li><li><a href="parts.html">Parts</a></li><li><a href="forge-spheres.html">Forge Spheres</a></li><li><a href="vertex-paint.html">Vertex Paint and materials</a></li><li><a href="texture-painting.html">Texture painting</a></li><li><a href="uv-editor.html">UV Editor</a></li><li><a href="pbr-painting.html">Material painting (PBR)</a></li><li><a href="fill-layers.html">Fill layers, Mesh Maps and Material Recipes</a></li><li><a href="layers.html">Sculpt layers and blend shapes</a></li><li><a href="facial-shapes.html">Facial shapes and live face</a></li><li><a href="subdivision-levels.html">Subdivision levels</a></li><li><a href="micro-levels.html">Micro levels: hundreds of millions of polygons</a></li><li><a href="dynamic-topology.html">Dynamic topology</a></li><li><a href="timeline.html">Sculpt Timeline and timelapse</a></li><li><a href="gizmo.html">Moving, rotating and posing (Gizmo)</a></li><li><a href="geometry.html">Subdivide, remesh, decimate and LODs</a></li><li><a href="cut.html" class="current" aria-current="page">Cut: line, lasso, rectangle and polyline</a><ul class="toc-sections"><li><a href="#pick-a-shape">Pick a shape</a></li><li><a href="#pick-a-mode">Pick a mode</a></li><li><a href="#what-the-cut-keeps">What the cut keeps</a></li><li><a href="#scripting">Scripting</a></li></ul></li><li><a href="retopology.html">Quad retopology and detail projection</a></li></ul><p class="toc-group">AI and capture</p><ul><li><a href="generate-3d.html">Image and text to 3D</a></li><li><a href="splats.html">Gaussian splats</a></li><li><a href="scan-to-splat.html">Scan an object into a splat</a></li><li><a href="scan-to-sculptable.html">From scan to sculptable mesh</a></li><li><a href="phone-capture.html">Phone capture and AR</a></li></ul><p class="toc-group">Files and pipelines</p><ul><li><a href="baking.html">Baking normal and displacement maps</a></li><li><a href="exporting.html">Exporting, Unreal and ZBrush</a></li><li><a href="export-presets.html">Export presets</a></li><li><a href="blender.html">Working with Blender</a></li><li><a href="maya.html">Working with Maya</a></li><li><a href="projects.html">Projects, autosave and snapshots</a></li><li><a href="scripting.html">Scripting and automation</a></li><li><a href="packs-and-macros.html">Packs and macros</a></li><li><a href="studios.html">SculptForge for studios</a></li></ul><p class="toc-group">Reference</p><ul><li><a href="shortcuts.html">Keyboard and mouse</a></li><li><a href="performance.html">Performance and big meshes</a></li><li><a href="troubleshooting.html">Troubleshooting: tablets, display, crashes and FAQ</a></li><li><a href="glossary.html">Glossary</a></li></ul></nav>
+      </div>
+    </div>
+    <main class="guide-main" id="top">
+      <article class="guide-article">
+<h1 id="cut-line-lasso-rectangle-and-polyline">Cut: line, lasso, rectangle and polyline</h1>
+<p><strong>Cut</strong> cuts the active Part with a shape you draw on the screen. The shape is pushed straight into the view, so what you see inside it is what gets cut, front and back. Every cut is one undo step, and a closed Part stays closed (watertight), so you can keep sculpting, remeshing or 3D printing it.</p>
+<h2 id="pick-a-shape">Pick a shape<a class="anchor" href="#pick-a-shape" aria-label="Link to this section">#</a></h2>
+<p>Hold <kbd>Ctrl</kbd>+<kbd>Shift</kbd> and click the brush tile on the shelf (or press <kbd>B</kbd>) to pick a Cut shape next to <strong>Select Rectangle</strong> and <strong>Select Lasso</strong>, or use the shape buttons at the top of <strong>Tool &gt; Cut</strong>:</p>
+<div class="table-wrap"><table><thead><tr><th>Shape</th><th>How to draw it</th></tr></thead><tbody><tr><td><strong>Cut Line</strong></td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+drag a straight line. The shaded side is cut; hold <kbd>Alt</kbd> as you let go to cut the other side.</td></tr><tr><td><strong>Cut Lasso</strong></td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+drag a free-hand outline. Its inside is cut. A lasso that crosses itself keeps its biggest loop.</td></tr><tr><td><strong>Cut Rectangle</strong></td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+drag a rectangle. Its inside is cut.</td></tr><tr><td><strong>Cut Polyline</strong></td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+click point after point. Click the first point again to cut the polygon; double-click or press <kbd>Enter</kbd> to cut along the open, bent line (the shaded side; <kbd>Alt</kbd> for the other); <kbd>Esc</kbd> drops it.</td></tr></tbody></table></div>
+<p>While a Cut shape is picked, <kbd>Ctrl</kbd>+<kbd>Shift</kbd> cuts instead of hiding; pick <strong>Select Rectangle</strong> or <strong>Select Lasso</strong> again to hide parts of the model.</p>
+<h2 id="pick-a-mode">Pick a mode<a class="anchor" href="#pick-a-mode" aria-label="Link to this section">#</a></h2>
+<p><strong>Tool &gt; Cut</strong> has three modes:</p>
+<div class="table-wrap"><table><thead><tr><th>Mode</th><th>What it does</th></tr></thead><tbody><tr><td><strong>Away</strong></td><td>Removes everything the shape covers, through the whole Part, and closes the cut with a flat cap. A line slices the Part in two and keeps one side; a lasso or rectangle drawn inside the outline cuts a hole right through.</td></tr><tr><td><strong>In</strong></td><td>Cuts a flat-bottomed pocket where the shape covers the Part. <strong>Depth</strong> sets how deep, measured from the nearest point under the shape.</td></tr><tr><td><strong>Add</strong></td><td>Adds the shape, extruded towards you by <strong>Depth</strong> and joined to the Part (a boolean union): panels, ridges, buttons, sockets.</td></tr></tbody></table></div>
+<p><strong>Depth</strong> is a share of the Part&#x27;s size (0.10 = a tenth of its largest side), so it means the same on a small or large model.</p>
+<h2 id="what-the-cut-keeps">What the cut keeps<a class="anchor" href="#what-the-cut-keeps" aria-label="Link to this section">#</a></h2>
+<ul>
+<li>
+The surface outside the cut is kept exactly, with its mask, vertex colours, UVs, face groups and sculpt layers; only the triangles the shape crosses are split.
+</li>
+<li>
+The cap (and the walls of a pocket or added shape) are a <strong>face group of their own</strong>, so you can select, mask or hide them in one click (<a href="face-groups.html">Face Groups</a>).
+</li>
+<li>
+The caps are flat with long triangles. To sculpt on them, give the Part even topology first: <strong>Tool &gt; Remesh</strong> or Dynamic topology (<a href="geometry.html">Subdivide, remesh, decimate and LODs</a>).
+</li>
+<li>
+Only the active Part is cut; the other <a href="parts.html">Parts</a> are untouched. Cut each Part on its own, or merge them first.
+</li>
+<li>
+With symmetry on (<strong>X</strong>, <strong>Y</strong>, <strong>Z</strong> or radial on the top shelf), the mirror image of the shape cuts too.
+</li>
+</ul>
+<p>An open Part (a plane, a scan with holes) is trimmed without a cap. <strong>Add</strong> needs a closed Part. Forge Spheres and Parts with a micro level must be made into a plain mesh first.</p>
+<aside class="callout callout-zbrush"><p><strong>ZBrush:</strong> this covers what the trim, clip and slice curve brushes and Live Boolean are used for, as one tool. SculptForge is not affiliated with Maxon or ZBrush.</p></aside>
+<h2 id="scripting">Scripting<a class="anchor" href="#scripting" aria-label="Link to this section">#</a></h2>
+<p>The <code>cut</code> command takes the shape (<code>line</code>, <code>lasso</code>, <code>rect</code>, <code>polyline</code>), its <code>points</code> in normalised screen coordinates, the <code>mode</code> (<code>away</code>, <code>in</code>, <code>add</code>), <code>depth</code>, <code>flip</code>, <code>closed</code> and an optional <code>view_proj</code> matrix; see <a href="scripting.html">Scripting</a>.</p>
+      </article>
+      <nav class="pager" aria-label="Previous and next chapter"><a class="prev" rel="prev" href="geometry.html"><span>Previous</span>Subdivide, remesh, decimate and LODs</a><a class="next" rel="next" href="retopology.html"><span>Next</span>Quad retopology and detail projection</a></nav>
+      <p class="guide-meta fine">Also in the app: <strong>Help &gt; User Guide</strong> (<kbd>Shift</kbd>+<kbd>F1</kbd>).
+        Found a mistake? <a href="https://github.com/islandmed/SculptForge/edit/main/docs/guide/cut.md">Edit this page on GitHub</a>.</p>
+    </main>
+    <aside class="on-page" aria-label="On this page"><p>On this page</p><ul><li><a href="#pick-a-shape">Pick a shape</a></li><li><a href="#pick-a-mode">Pick a mode</a></li><li><a href="#what-the-cut-keeps">What the cut keeps</a></li><li><a href="#scripting">Scripting</a></li></ul></aside>
+  </div>
+  <footer class="footer">
+    <div class="wrap footer-grid">
+      <div>
+        <a class="brand" href="../index.html"><img src="../img/logo.svg?v=2" alt="" width="28" height="28"><span>SculptForge</span></a>
+        <p class="fine">Copyright © 2026 The SculptForge contributors.<br>The SculptForge User Guide is part of
+          SculptForge, licensed under the <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
+      </div>
+      <div class="links">
+        <a href="index.html">User guide</a>
+        <a href="../supporters.html">Supporters</a>
+        <a href="https://github.com/islandmed/SculptForge">Source code</a>
+        <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
+        <a href="https://github.com/islandmed/SculptForge/issues">Report a problem</a>
+        <a href="https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md">AI services &amp; privacy</a>
+      </div>
+      <p class="fine trademarks">ZBrush, GoZ, MatCap and other ZBrush feature names are trademarks of Maxon Computer
+        GmbH. SculptForge is not affiliated with or endorsed by Maxon. All other trademarks belong to their owners.</p>
+    </div>
+  </footer>
+</body>
+</html>
