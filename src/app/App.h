@@ -1856,7 +1856,7 @@ private:
         int ran = -1;           // the slot run last (UI tests)
     } radial_;
     // ---- The stroke popup (StrokePopup.cpp, core/StrokePopup.h; Discord 11-02) ----
-    // One key (stroke.popup, G; N in the Blender style) or the left shelf's button opens a grid at the cursor: the
+    // One key (stroke.popup, G; Z in the Blender style) or the left shelf's button opens a grid at the cursor: the
     // stroke types and the modifiers Add / Sub, Smooth, Mask, Select. Hold the key, point, let go: picked. Tap it:
     // the grid stays open for a click (a stroke closes it, a modifier toggles and leaves it open). Esc cancels.
     // Smooth, Mask and Select latch: strokes act as if Shift, Ctrl or Ctrl+Shift were held until the same item is
@@ -1878,6 +1878,7 @@ private:
         bool held = false;     // its key holds it open; false: tapped open, stays until a click or Esc
         int key = 0;           // the held key (SDL_Keycode)
         int hover = -1;        // the item under the pointer
+        int start = -1;        // the item under the pointer when it opened (the current stroke, unless clamped)
         int picked = -1;       // the item picked last (UI tests)
     } strokePopup_;
     struct StrokeLatchState {

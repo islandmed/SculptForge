@@ -6,4 +6,4 @@
 - **Pen tablets (Windows first)**: hover the pen (tip up) while holding G, move onto an item, let go of G. Then tap G and tap an item with the pen tip. Does the tip tap ever sculpt the model under the grid? Tell us your tablet model and driver.
 - Click the grid button under the **Stroke** tile on the left shelf: does the grid open next to it?
 - At 150% / 200% Windows scaling, are the icons, labels and the key hints (Alt, Shift, Ctrl) sharp and not cut off? Send a screenshot.
-- Blender input style: is it **N** there (G stays the Move brush)?
+- Blender input style: is it **Z** there (G stays the Move brush)?

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // The stroke popup (Discord 11-02: "a popup for stroke type selection; the constant Ctrl+Shift / Alt combinations
-// interrupt the thought process"). One key (stroke.popup: G, N in the Blender style) or the left shelf's button
+// interrupt the thought process"). One key (stroke.popup: G, Z in the Blender style) or the left shelf's button
 // opens a plain grid at the cursor, the current stroke under the pointer: the stroke types, then Add / Sub and
 // the latched modifiers Smooth, Mask and Select. Hold the key, point, let go: picked (a pen hovering works the
 // same). Tap the key: the grid stays open; a click on a stroke picks it and closes, a click on a modifier toggles
@@ -106,6 +106,7 @@ void App::openStrokePopup(bool held, int key) {
     strokePopup_.held = held;
     strokePopup_.key = key;
     strokePopup_.hover = -1;
+    strokePopup_.start = g.itemAt({mouseX_ - at.x, mouseY_ - at.y});
 }
 
 void App::pickStrokePopupItem(int item, bool close) {
@@ -133,9 +134,10 @@ void App::strokePopupKeyUp(SDL_Keycode key) {
     const StrokePopupGeometry g = popupGeometry(uiScale_);
     const int item = g.itemAt({mouseX_ - strokePopup_.at.x, mouseY_ - strokePopup_.at.y});
     const bool tap = ImGui::GetTime() - strokePopup_.openedAt < kStrokePopupTapSeconds;
-    // It opens with the current stroke under the pointer: let go there quickly and it was a tap (stays open for a
-    // click); pointed at another item, or held a moment, and let go: that item.
-    if (item >= 0 && (!tap || item != int(strokeType_))) {
+    // Let go quickly over the item it opened under (the current stroke, or another one where the grid had to move
+    // to stay on the canvas) and it was a tap: it stays open for a click. Pointed at another item, or held a
+    // moment, and let go: that item.
+    if (item >= 0 && (!tap || item != strokePopup_.start)) {
         pickStrokePopupItem(item, true);
         return;
     }

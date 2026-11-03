@@ -134,6 +134,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Action | Keys | What it does |
 |---|---|---|
 | Steady Stroke | <kbd>L</kbd> | Steady Stroke on or off, with every stroke type (Dots, Drag Stamp, Slide Stamp, Spray): the brush trails the cursor on a string and only moves once the string is taut, for steady lines without hand shake. |
+| Stroke popup | <kbd>G</kbd> | A grid at the cursor with the stroke types and the modifiers (Add / Sub, Smooth, Mask, Select). Hold the key, point at one and let go; or tap the key and click. Smooth, Mask and Select stay on without holding Shift or Ctrl, until you pick them again or another brush. |
 
 ### Tool
 
@@ -141,6 +142,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 |---|---|---|
 | Clear Mask | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> | Unmask everything (also: Ctrl+drag on the background, away from the model). |
 | Divide | <kbd>Ctrl</kbd>+<kbd>D</kbd> | Add a subdivision level: four times the polygons, and the lower levels are kept, so you can step down to shape big forms and back up to the detail. Quads stay quads (Catmull-Clark). Smt off divides without smoothing. |
+| Duplicate Part | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> | Copy the active Part, with its layers and attributes, and make the copy active (also in the Parts list's right-click menu). |
 | Group Masked | <kbd>Ctrl</kbd>+<kbd>W</kbd> | Turn the masked part into a new face group and clear the mask (ZBrush Ctrl+W). With nothing masked, everything visible becomes one group. |
 | Higher Res | <kbd>D</kbd> | Step one subdivision level up (more polygons, for detail). Edits made below carry the detail along. |
 | Invert Mask | <kbd>Ctrl</kbd>+<kbd>I</kbd> | Mask what is unmasked and unmask what is masked (also: Ctrl+click the background). |

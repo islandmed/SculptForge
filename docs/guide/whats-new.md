@@ -35,7 +35,7 @@ image: images/wn-whats-new.jpg
 action: guide:whats-new.md
 ```
 
-- **Stroke popup**: press <kbd>G</kbd> (<kbd>N</kbd> in the Blender style) or the button under the **Stroke**
+- **Stroke popup**: press <kbd>G</kbd> (<kbd>Z</kbd> in the Blender style) or the button under the **Stroke**
   tile for a grid at the cursor: the stroke types plus **Add**, **Sub**, **Smooth**, **Mask** and **Select**. Hold
   the key, point and let go, or tap it and click. Smooth, Mask and Select stay on without holding
   <kbd>Shift</kbd> or <kbd>Ctrl</kbd>. See [Strokes](sculpting.md#the-stroke-popup).

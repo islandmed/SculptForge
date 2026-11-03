@@ -364,7 +364,7 @@ void App::applyInputStyle() {
         {"draw.paint", {"P", "P", ""}},
         {"ui.picker.material", {"M", "M", ""}},
         {"stroke.lazy", {"L", "L", "L / Shift+S"}},
-        {"stroke.popup", {"G", "G", "N"}}, // (Blender's G is its Move brush; J opens the Strokes radial menu)
+        {"stroke.popup", {"G", "G", "Z"}}, // (Blender's G is its Move brush; J opens the Strokes radial menu)
         {"mask.clear", {"Ctrl+Shift+A", "Ctrl+Shift+A", "Alt+M / Ctrl+Shift+A"}},
         {"geometry.lower_res", {"Shift+D", "Shift+D", "Alt+1 / Shift+D"}},
         {"geometry.higher_res", {"D", "D", "Alt+2 / D"}},

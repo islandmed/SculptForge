@@ -353,7 +353,7 @@ Notes:
 
 ### The stroke popup
 
-Press <kbd>G</kbd> (<kbd>N</kbd> in the Blender style) for a grid under the cursor, or click the grid button under
+Press <kbd>G</kbd> (<kbd>Z</kbd> in the Blender style) for a grid under the cursor, or click the grid button under
 the **Stroke** tile on the left shelf. The top row holds the stroke types, the bottom row the modifiers:
 
 | Modifier | What it does | Instead of holding |
