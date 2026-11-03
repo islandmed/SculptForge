@@ -1,4 +1,4 @@
-# feat/hover-pop (0.10.9): code complete, NOT built/tested/pushed
-Status: rebased on origin/main (0.10.8). Compile blockers fixed (two duplicated function headers in Ui.cpp). #86 fixed (Pickers.cpp AssetTileHoverGlow draws on the foreground list). CHANGELOG [Unreleased] + What's New "## Version 0.10.9" lines; TESTERS.md, REPLY.md (#86 tristratos, Discord ABHITAR) written.
-Blocked: the build (-j3, nice) was killed by Claude Code at ~60% because the machine ran critically low on memory; not restarted without Tony's go.
-Resume: `nice -n 19 ionice -c3 cmake --build build -j3`; `ctest --test-dir build -R "ui_(hover_pop|looks|shell_layout_1080|idle_redraw)"`; look at build/ui-shots/hover_pop/*.png (polish bar), copy before (main) / after to ~/Work/look-mockups/hover/; full ctest -j3 when `pgrep -f ctest` is empty; push; SendMessage "input" with the SHA.
+# feat/hover-pop (0.10.9): GREEN, pushed
+What: hover highlights in every look (eased accent fill + ring per look, keyboard focus ring), tile lift (shelves, pickers, Library, look cards), slider hover (brighter bar, knob, value tooltip), Preferences > Interface > Reduce motion; #86 enlarged picker thumbnail drawn on the foreground list. CHANGELOG [Unreleased], What's New 0.10.9, guide row; TESTERS.md, REPLY.md (#86, ABHITAR).
+Tests: full ctest -j3 100% (118, ui_stroke_resize disabled); ui_hover_pop/looks/shell_layout_1080/idle_redraw pass. Shots: ~/Work/look-mockups/hover/ (tiles.png, menus.png = crops across looks).
+Base: origin/main at 0.10.8 release (+ e38bc3c); main has moved since (0.10.9 merges): see merge notes in the coordinator message.
