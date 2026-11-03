@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Membership</title>
-  <meta name="description" content="SculptForge memberships from $5 a month: your name in the credits, a monthly pack and a vote on what gets built; Insider daily drops and preview builds; Studio custom builds for the whole company. Every release stays free for everyone.">
+  <meta name="description" content="SculptForge memberships from $5 a month: your name in the credits, a monthly pack and a vote on what we build next; Insider daily drops and preview builds; Studio custom builds for the whole company. Every release stays free for everyone.">
   <meta name="theme-color" content="#111114" media="(prefers-color-scheme: dark)">
   <meta name="theme-color" content="#f6f5f3" media="(prefers-color-scheme: light)">
   <meta name="color-scheme" content="dark light">
@@ -13,42 +13,44 @@
   <link rel="apple-touch-icon" href="img/icon-256.png?v=2">
   <meta property="og:type" content="website">
   <meta property="og:title" content="SculptForge Membership">
-  <meta property="og:description" content="Memberships from $5 a month: credits, a monthly pack, the feature vote, Insider daily drops and preview builds, and Studio custom builds.">
+  <meta property="og:description" content="Memberships from $5 a month: credits, a monthly pack, a vote on what we build next, Insider daily drops and preview builds, and Studio custom builds.">
   <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=3">
   <meta property="og:url" content="https://sculptforge.app/support.html">
   <link rel="canonical" href="https://sculptforge.app/support.html">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="style.css?v=19">
-  <link rel="preload" as="image" type="image/webp" fetchpriority="high" media="(min-width: 621px)"
-        imagesrcset="media/support-hero-1280.webp 1280w, media/support-hero-1920.webp 1920w" imagesizes="100vw">
   <style>
-    /* The first screen: a stage with a bronze sculpt rendered in SculptForge, and the memberships rising onto it.
-       The stage is always dark (it's a render); the rest of the page follows the system's light or dark setting. */
+    /* The first screen: a calm stage (words, a warm glow, a faint grid) with the memberships rising onto it.
+       It follows the system's light or dark setting like the rest of the page. */
     .support-page { --tier-bg: rgba(19, 19, 23, 0.88); --tier-border: rgba(255, 255, 255, 0.09); --tier-text: #a9a9b2;
                    --tier-title: #fff; --tier-shadow: 0 24px 60px rgba(0, 0, 0, 0.55); }
-    .stage { position: relative; isolation: isolate; overflow: hidden; background: #0c0c0f; color: #ececf1;
-             min-height: min(66vh, 640px); display: flex; align-items: flex-start; padding: 56px 0 190px; }
+    .stage { --grid: rgba(255, 255, 255, 0.035); position: relative; isolation: isolate; overflow: hidden; background: #0c0c0f; color: #ececf1;
+             min-height: min(66vh, 640px); display: flex; align-items: flex-start; padding: 56px 0 214px; }
     .stage-art { position: absolute; inset: -3%; z-index: -2; transform: translate3d(var(--px, 0px), var(--py, 0px), 0) scale(1.03);
                  transition: transform 0.6s cubic-bezier(.2, .7, .2, 1); animation: stage-in 1.6s cubic-bezier(.2, .7, .2, 1) both; }
-    .stage-art img { width: 100%; height: 100%; object-fit: cover; object-position: 72% 30%; }
+    .stage-art { background: radial-gradient(46% 62% at 50% 0%, rgba(242, 140, 60, 0.20), transparent 72%),
+                             radial-gradient(30% 40% at 12% 100%, rgba(255, 176, 106, 0.05), transparent 70%),
+                             radial-gradient(30% 40% at 88% 100%, rgba(255, 176, 106, 0.05), transparent 70%); }
     @keyframes stage-in { from { opacity: 0; scale: 1.05; } to { opacity: 1; scale: 1; } }
-    /* Darkening for the words on the left and the cards below. */
+    /* Fade into the page under the cards. */
     .stage::before { content: ""; position: absolute; inset: 0; z-index: -1;
-                     background: linear-gradient(90deg, rgba(12, 12, 15, 0.94) 0%, rgba(12, 12, 15, 0.72) 38%, rgba(12, 12, 15, 0) 66%),
-                                 linear-gradient(180deg, rgba(15, 15, 18, 0) 52%, #0f0f12 100%); }
-    /* A light passing over the sculpt now and then. */
-    .stage::after { content: ""; position: absolute; inset: -20% -40%; z-index: -1; pointer-events: none;
-                    background: linear-gradient(105deg, transparent 42%, rgba(255, 243, 226, 0.09) 50%, transparent 58%);
-                    transform: translateX(-60%); animation: sweep 7s cubic-bezier(.45, 0, .25, 1) 0.9s infinite; }
-    @keyframes sweep { 0% { transform: translateX(-60%); } 28%, 100% { transform: translateX(60%); } }
+                     background: linear-gradient(180deg, rgba(15, 15, 18, 0) 55%, var(--bg) 100%); }
+    /* A faint drafting grid, strongest under the glow. */
+    .stage::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+                    background: linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 56px 56px,
+                                linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 56px 56px;
+                    -webkit-mask-image: radial-gradient(62% 80% at 50% 0%, #000, transparent 78%);
+                    mask-image: radial-gradient(62% 80% at 50% 0%, #000, transparent 78%); }
     .stage .wrap { width: 100%; }
-    .stage-copy { max-width: 560px; animation: rise 0.8s cubic-bezier(.2, .7, .2, 1) both; }
+    .stage-copy { max-width: 780px; margin: 0 auto; text-align: center; animation: rise 0.8s cubic-bezier(.2, .7, .2, 1) both; }
     .stage .eyebrow { letter-spacing: 0.22em; font-size: 0.78rem; color: #ffb06a; }
-    .stage h1 { font-size: clamp(2.4rem, 5vw, 3.9rem); line-height: 1.05; margin: 0.35em 0 0.45em; color: #fff; }
+    .stage h1 { font-size: clamp(2.4rem, 5vw, 3.9rem); line-height: 1.05; margin: 0.35em 0 0.45em; color: #fff; text-wrap: balance; }
     .stage h1 .accent { display: block; }
-    .stage .lede { color: #cfcfd6; margin-bottom: 18px; }
-    .promise { display: flex; gap: 12px; align-items: flex-start; color: #f2e6da; font-size: 1.05rem; margin: 0; max-width: 34em; }
-    .promise::before { content: ""; flex: none; width: 9px; height: 9px; margin-top: 0.55em; border-radius: 50%; background: #ff9a45;
+    .stage .lede { color: #cfcfd6; margin: 0 auto 22px; max-width: 36em; }
+    .promise { display: inline-flex; gap: 12px; align-items: center; color: #f2e6da; font-size: 0.98rem; margin: 0; max-width: 40em;
+               padding: 10px 18px; border: 1px solid rgba(242, 140, 60, 0.32); border-radius: 14px; background: rgba(242, 140, 60, 0.07);
+               text-align: left; }
+    .promise::before { content: ""; flex: none; width: 9px; height: 9px; border-radius: 50%; background: #ff9a45;
                        box-shadow: 0 0 0 5px rgba(255, 154, 69, 0.18); }
     .stage .thanks { background: rgba(242, 140, 60, 0.12); border: 1px solid rgba(242, 140, 60, 0.4); border-radius: 12px;
                      padding: 12px 16px; color: #f2e6da; }
@@ -112,29 +114,26 @@
 
     @media (max-width: 900px) {
       .stage { min-height: 0; padding: 48px 0 150px; }
-      .stage::before { background: linear-gradient(90deg, rgba(12, 12, 15, 0.94) 0%, rgba(12, 12, 15, 0.62) 72%, rgba(12, 12, 15, 0.3) 100%),
-                                   linear-gradient(180deg, rgba(12, 12, 15, 0) 50%, rgba(12, 12, 15, 1) 100%); }
       .tiers-wrap { margin-top: -110px; }
       .tiers { grid-template-columns: 1fr; gap: 26px; max-width: 520px; margin: 0 auto; }
       .tier.featured { order: -1; margin: 0; }
     }
     @media (max-width: 620px) {
-      .stage { padding: 0 0 36px; }
+      .stage { padding: 40px 0 36px; }
       .tiers-wrap { margin-top: 0; padding-top: 22px; }
-      .stage-art { inset: 0; height: 108vw; }
-      .stage-art img { object-position: 50% 0; }
-      .stage-copy { padding-top: 78vw; } /* the lion first, the words under it */
-      .stage::before { background: linear-gradient(180deg, rgba(12, 12, 15, 0) 40vw, rgba(12, 12, 15, 0.85) 82vw, #0c0c0f 106vw); }
       .stage h1 { font-size: 2.3rem; }
+      .stage-copy { text-align: left; }
+      .stage .lede { display: block; font-size: 1rem; }
+      .promise { align-items: flex-start; }
+      .promise::before { margin-top: 0.5em; }
       .one-time { padding: 16px; }
       .one-time .btn { width: 100%; text-align: center; }
     }
     @media (prefers-reduced-motion: reduce) {
       .stage-art, .stage-copy, .tier, .one-time, .tier.featured::after { animation: none; }
-      .stage::after { display: none; }
       .stage-art, .tier, .tier .btn { transition: none; }
     }
-    /* Light: the stage stays a dark render; the cards and the page around them turn light. */
+    /* Light: the stage, the cards and the page around them turn light. */
     @media (prefers-color-scheme: light) {
       :root { color-scheme: light; }
       .support-page { --bg: #f6f5f3; --bg-alt: #efede9; --panel: #ffffff; --border: #e2dfda; --text: #1c1c21; --muted: #5d5d66;
@@ -147,7 +146,16 @@
       .support-page .nav nav a.nav-support:hover { color: #fff; background: #c8621f; }
       .support-page .nav-toggle span { background: var(--text); }
       .support-page a { color: #a84d14; }
-      .support-page .stage a { color: #ffb06a; }
+      .support-page .stage a { color: #a84d14; }
+      .stage { --grid: rgba(60, 40, 20, 0.06); background: #f6f5f3; color: var(--text); }
+      .stage-art { background: radial-gradient(46% 62% at 50% 0%, rgba(242, 140, 60, 0.20), transparent 72%); }
+      .stage .accent { color: #c8621f; text-shadow: none; }
+      .stage h1 { color: #16161a; }
+      .stage .eyebrow { color: #b8561a; }
+      .stage .lede { color: #4d4d56; }
+      .promise { color: #3d3229; background: #fff4ea; border-color: rgba(200, 98, 31, 0.3); }
+      .tier .badge.founding { background: #fff; color: #a84d14 !important; }
+      .stage .thanks { color: #3d3229; }
       .support-page code { background: #ebe8e3; }
       .tier .btn { background: #f4f2ef; border-color: #d8d4ce; }
       .tier .btn:hover { background: #ebe7e1; border-color: #bdb7ae; }
@@ -186,15 +194,7 @@
 
   <main id="top">
     <section class="stage" aria-labelledby="support-title">
-      <div class="stage-art" aria-hidden="true">
-        <picture>
-          <source type="image/webp" media="(max-width: 620px)" srcset="media/support-hero-mobile.webp">
-          <source media="(max-width: 620px)" srcset="media/support-hero-mobile.jpg">
-          <source type="image/webp" srcset="media/support-hero-1280.webp 1280w, media/support-hero-1920.webp 1920w" sizes="100vw">
-          <img src="media/support-hero-1920.jpg" srcset="media/support-hero-1280.jpg 1280w, media/support-hero-1920.jpg 1920w"
-               sizes="100vw" width="1920" height="1080" alt="" fetchpriority="high">
-        </picture>
-      </div>
+      <div class="stage-art" aria-hidden="true"></div>
       <div class="wrap">
         <div class="stage-copy">
           <p class="eyebrow">SculptForge Membership</p>
@@ -217,7 +217,7 @@
             <ul class="perks">
               <li>Your name in the <strong>credits</strong>, in the app and on the <a href="supporters.html">website</a></li>
               <li>The <strong>#members</strong> channel on Discord</li>
-              <li>A vote in the <strong>monthly feature vote</strong></li>
+              <li><strong>Vote on what we build next</strong> on Discord</li>
               <li>The <strong>monthly pack</strong> at month end</li>
             </ul>
             <p class="cta"><a class="btn" href="https://buy.stripe.com/aFacN5h1t6L8cP14ad4F201" rel="noopener">Join as a Supporter</a></p>
@@ -227,7 +227,7 @@
             <h2>Insider</h2><p class="price">$20<span>/ month</span></p>
             <ul class="perks">
               <li>Everything in Supporter</li>
-              <li><strong>Propose options</strong> for the vote</li>
+              <li><strong>Vote on what we build next</strong>, and propose the options</li>
               <li>A <strong>daily drop</strong>: a brush, alpha or VDM almost every day</li>
               <li><strong>Preview builds</strong> of the next release, about a week early</li>
               <li>The <strong>monthly dev Q&amp;A</strong></li>
@@ -239,6 +239,7 @@
             <h2>Studio</h2><p class="price"><span class="now" data-studio-price>$150</span><s data-founding>$300</s><span>/ month</span></p>
             <ul class="perks">
               <li><strong>Insider for every artist</strong> in your company, no seat count</li>
+              <li><strong>Vote on what we build next</strong>, for every artist</li>
               <li>A <strong>custom studio build</strong> with your presets, keymaps, packs, shelves and pipeline defaults</li>
               <li><strong>Custom content</strong>: brushes, alphas and VDMs from your own references, macros and presets</li>
               <li><strong>Guided development</strong>: your requests go first, with a monthly call or async review</li>
@@ -257,7 +258,7 @@
             <tbody>
               <tr><th scope="row">Name in the credits (app and website)</th><td>✓</td><td>✓</td><td>✓ (your logo too)</td></tr>
               <tr><th scope="row">#members on Discord</th><td>✓</td><td>✓</td><td>✓ and a private team channel</td></tr>
-              <tr><th scope="row">Vote in the monthly feature vote</th><td>✓</td><td>✓</td><td>✓</td></tr>
+              <tr><th scope="row">Vote on what we build next (#feature-vote)</th><td>✓</td><td>✓</td><td>✓ (every artist)</td></tr>
               <tr><th scope="row">Monthly pack at month end</th><td>✓</td><td>✓</td><td>✓</td></tr>
               <tr><th scope="row">Propose options for the vote</th><td></td><td>✓</td><td>✓</td></tr>
               <tr><th scope="row">Daily drop (brush, alpha or VDM)</th><td></td><td>✓</td><td>✓</td></tr>
@@ -275,6 +276,8 @@
             minimum.</p>
           <a class="btn" href="https://buy.stripe.com/4gM7sL8uXc5s4iv5eh4F200" rel="noopener">One-time Supporter</a>
         </div>
+        <p class="fine support-fine">Anyone can suggest a feature in #ideas on
+          <a href="https://discord.gg/gWrYkEmQhH" rel="noopener">Discord</a>; members' votes in #feature-vote pick what ships.</p>
         <p class="fine support-fine">Members get private channels on Discord:
           <a href="https://discord.gg/gWrYkEmQhH" rel="noopener">join the SculptForge community</a> and tell us your
           membership after checkout.</p>

@@ -604,7 +604,7 @@ bool App::backgroundBusy() const {
     return running(pendingBrush_) || running(pendingGenerator_) || running(pendingModels_) || running(pendingUnreal_) ||
            running(pendingComfyCheck_) || galleryBusy() || thumbs_.busy() || libraryScanner_.busy() || autoUv_ ||
            bakeBusy() || qremesh_ || voxelRemesh_ || updateJob_ || splatTrainBusy() || sculptableBusy() || phoneBusy() || uvEditorBusy() ||
-           supportCardLoading() || renderer_.environmentPending() || meshMapsBusy();
+           renderer_.environmentPending() || meshMapsBusy();
 }
 
 void App::redrawIn(double seconds) {
