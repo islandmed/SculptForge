@@ -53,6 +53,13 @@ action: guide:whats-new.md
   **Preferences > Input** shows whether pressure is detected, with a troubleshooting link. The view no longer jumps
   when the pen comes back into range, and the active Part changes only with **Alt+click** on the keyboard; the
   status bar names the new Part. See [Troubleshooting](troubleshooting.md#pen-tablets).
+- **The pen keeps working the panels**: with some tablets (Huion, pen displays, Wacom with Windows Ink on or off)
+  the pen picked one brush, then stopped clicking menus and the canvas until you used the mouse. SculptForge now
+  makes the pen's clicks itself (#95). See [Troubleshooting](troubleshooting.md#pen-tablets).
+- **Mouse mode is relative again**: with **Mouse mode** on (Preferences > Tablet) the pen moves the cursor by how
+  far it moves, whatever the driver's mode, and the arrow is drawn right at the brush (#72).
+- **Two screens**: SculptForge no longer slows down when the pointer is on your other screen; it rests only when
+  its window loses focus.
 - **Smaller (or larger) corner axes**: **Draw > Camera > Gizmo size** sets Small, Medium or Large
   ([Navigation](navigation.md)).
 - **View Figure**: turn it on beside **Axes** for a small head in the corner that turns with the view; click it to

@@ -129,11 +129,13 @@ private:
 // The name of an input device that is a pen tablet or pen display (Wacom, Huion, XP-Pen ...).
 bool looksLikeTablet(const std::string& name);
 
-// Where the pen puts the cursor. In pen mode that is where the pen reports it is. In mouse mode (the driver's
-// relative mode, TabletSettings::mouseMode) the pen moves the cursor by how far it moves, like a mouse: lifting
-// it away and putting it down elsewhere on the tablet leaves the cursor where it was. Windows Ink reports the
-// pen's place on the tablet even then, so following it made the cursor jump back (#54). The app passes every pen
-// position (the pen's own events and SDL's mouse events for the pen) through map().
+// Where the pen puts the cursor. In pen mode that is where the pen reports it is. In mouse mode
+// (TabletSettings::mouseMode) the pen moves the cursor by how far it moves, like a mouse: lifting it away and
+// putting it down elsewhere on the tablet leaves the cursor where it was. Tablet drivers report the pen's place on
+// the tablet (Windows Ink even with the driver in its own mouse mode), so following it made the cursor jump back
+// (#54), and following the system cursor made Mouse mode the same as Pen mode with the driver in pen mode (#72).
+// Only the pen's movement counts. The app passes every pen position (the pen's own events and its mouse events)
+// through map().
 class PenCursor {
 public:
     // A pen silent this long was lifted away (the driver may not say it left): the next position starts afresh.
@@ -142,32 +144,16 @@ public:
     bool mouseMode = false;
 
     // The pen came into range or left it: in mouse mode its next position moves the cursor from where it is.
-    void proximity() {
-        anchored_ = false;
-        systemStale_ = false;
-        staleCount_ = 0;
-    }
+    void proximity() { anchored_ = false; }
     // Something else (the mouse) moved the cursor to x, y.
     void cursorAt(float x, float y);
-    // Where the system cursor is (window pixels), read just before the next map(). In mouse mode the driver moves
-    // the system cursor itself, so that is the cursor: map() returns it for the brush and the panels alike (#72:
-    // a cursor of our own, moved by the pen's motion, drifted away from the system's after the pen was lifted and
-    // put down elsewhere, and clicks landed at the brush, not the arrow). Without one (a system that can't say),
-    // the pen's motion moves the cursor on from where it was.
-    void systemCursor(float x, float y);
     // A pen position (window pixels) at time nowNs -> the cursor's position, in place.
     void map(float& x, float& y, uint64_t nowNs);
 
 private:
     float offsetX_ = 0.0f, offsetY_ = 0.0f; // mouse mode: cursor = pen + offset
     float cursorX_ = 0.0f, cursorY_ = 0.0f;
-    float systemX_ = 0.0f, systemY_ = 0.0f;
-    bool haveCursor_ = false, anchored_ = false, haveSystem_ = false;
-    // A system cursor that stays put while the pen moves (seen on Windows tablets in 0.10.7: the brush froze) is
-    // not the cursor: the pen moves the cursor relatively until it comes back into range.
-    float lastPenX_ = 0.0f, lastPenY_ = 0.0f, lastSysX_ = 0.0f, lastSysY_ = 0.0f;
-    bool haveLast_ = false, systemStale_ = false;
-    int staleCount_ = 0;
+    bool haveCursor_ = false, anchored_ = false;
     uint64_t lastNs_ = 0;
 };
 

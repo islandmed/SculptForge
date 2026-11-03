@@ -633,9 +633,10 @@ also have a **Pressure curve** setting that makes them respond to a light or a f
 - the eraser end (default **Invert**, like holding <kbd>Alt</kbd>) and the side buttons (default:
   lower button right-click to rotate the view, upper button **Invert**, third button **Pan view**). A side button
   can open a [radial menu](#radial-menus) instead (Preferences > Input > Radial Menus).
-- **Mouse mode (relative)**, for a tablet whose driver is set to mouse mode: the pen moves the cursor by how far
-  it moves, and putting it down elsewhere on the tablet leaves the cursor where it was. The brush follows the
-  system cursor the driver moves, so brush, arrow and clicks always agree (#72).
+- **Mouse mode (relative)**: the pen moves the cursor by how far it moves, like a mouse, and putting it down
+  elsewhere on the tablet leaves the cursor where it was, with the driver in pen mode or in its own mouse mode.
+  While the pen is in range the arrow is drawn at the brush (the system's is hidden), so brush, arrow and clicks
+  always agree (#72).
 
 **Store Config** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) keeps these settings. Setup notes for Windows
 Ink, macOS and Linux are in

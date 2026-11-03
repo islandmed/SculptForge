@@ -170,6 +170,11 @@ private:
     bool penIn_ = false, penDown_ = false, penEraser_ = false;
     ImVec2 penAt_{960, 540}; // the simulated pen (mouse_ is SDL's shared cursor, which stray mouse events move too)
     SDL_PenInputFlags penState_ = 0;
+    // The pen's mouse events as SDL 3.2 makes them (true), or none: SDL after it dropped a touching pen (#95,
+    // sdl_pen_mouse / pen_lost). A Huion-style driver also sends mouse events of its own (pen_stream huion).
+    bool sdlPenMouse_ = true;
+    bool huionStream_ = false;
+    static constexpr SDL_MouseID kDriverMouse = 7; // the driver's own mouse device
     // `snapshot` saves the active mesh; moved* values compare against it. `remember` keeps values for $NAME.
     std::vector<glm::vec3> basePositions_, baseNormals_;
     std::map<std::string, double> remembered_;

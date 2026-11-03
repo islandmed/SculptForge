@@ -99,6 +99,8 @@ bool App::init(const AppOptions& options) {
     // UI tests run in a hidden window that never has focus; SDL drops joystick input without focus otherwise, and
     // the scripted SpaceMouse is a virtual joystick (UiTest.cpp).
     if (!options.uiTest.empty()) SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+    // The pen tip's mouse events come from the app, not SDL (App::penMouseEvents, #95).
+    SDL_SetHint(SDL_HINT_PEN_MOUSE_EVENTS, "0");
     if (!headless && options.demo.empty()) applyCachedThreadCount(); // the hardware profile's threads, before any brush work
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
@@ -696,8 +698,22 @@ void App::redrawIn(double seconds) {
     redrawAt_ = redrawAt_ > 0.0 ? std::min(redrawAt_, at) : at;
 }
 
+// With two screens the pointer often rests on the other one while the keyboard works here: no pointer events
+// then, so nothing kept the frames coming and the app looked as if in the background until the pointer came back
+// (Discord, Windows 11). Whether the app is in use follows the window's focus, never the pointer: while focused,
+// it keeps drawing for a while after any input (keys included) and while a key is held.
+bool App::focusKeepsDrawing(double now) const {
+    if (!windowFocused_) return false;
+    if (now - lastInputAt_ < kFocusedActiveSeconds) return true;
+    int n = 0;
+    const bool* keys = SDL_GetKeyboardState(&n);
+    for (int i = 0; keys && i < n; ++i)
+        if (keys[i]) return true;
+    return false;
+}
+
 bool App::wantsFrames(double now) const {
-    return now < activeUntil_ || drag_ != Drag::None || doc_.sculptor.strokeActive() ||
+    return now < activeUntil_ || focusKeepsDrawing(now) || drag_ != Drag::None || doc_.sculptor.strokeActive() ||
            !dabQueue_.empty() || // a stroke's dabs still waiting (drainStrokeDabs) are placed a few each frame
            strokeFinishing_ || solverBusy() || // the solver thread is placing a stroke's dabs (AsyncStroke.cpp)
            backgroundBusy() || playingLayer_ >= 0 || faceTakePlaying_ ||
@@ -1135,8 +1151,20 @@ int App::run() {
 // ---------------------------------------------------------------------------
 
 void App::handleEvent(const SDL_Event& event) {
-    if (dropPenMouseEvent(event)) return; // pen side buttons are mapped in Tablet.cpp, not left to SDL
-    if (strayMouseMotion(event)) return;  // neither the canvas nor the UI follows a driver's stray mouse events
+    if (dropPenMouseEvent(event)) return; // the pen's mouse events are made here, not by SDL (#95, Tablet.cpp)
+    penMouseEvents(event, true);          // a pen leaving lets go of the tip's button first
+    dispatchEvent(event);
+    penMouseEvents(event, false);         // the tip's mouse events, after the pen's own
+}
+
+void App::dispatchEvent(const SDL_Event& event) {
+    if (strayMouseMotion(event)) return; // neither the canvas nor the UI follows a driver's stray mouse events
+    if ((event.type >= SDL_EVENT_KEY_DOWN && event.type < SDL_EVENT_JOYSTICK_AXIS_MOTION &&
+         event.type != SDL_EVENT_KEYMAP_CHANGED && event.type != SDL_EVENT_KEYBOARD_ADDED &&
+         event.type != SDL_EVENT_KEYBOARD_REMOVED && event.type != SDL_EVENT_MOUSE_ADDED &&
+         event.type != SDL_EVENT_MOUSE_REMOVED) ||
+        (event.type >= SDL_EVENT_PEN_PROXIMITY_IN && event.type <= SDL_EVENT_PEN_AXIS))
+        lastInputAt_ = double(SDL_GetTicksNS()) * 1e-9; // (focusKeepsDrawing)
     wintabEvent(event); // Windows Ink off: the tablet driver's pressure for its mouse events (Tablet.cpp)
     SDL_Event e = event;
     mapPenPosition(e); // a tablet in mouse mode moves the cursor relatively (#54), for the canvas and the UI
@@ -1156,7 +1184,11 @@ void App::handleEvent(const SDL_Event& event) {
     case SDL_EVENT_JOYSTICK_BUTTON_DOWN:
         spaceMouseEvent(e); // a SpaceMouse (SpaceMouse.cpp)
         break;
+    case SDL_EVENT_WINDOW_FOCUS_GAINED:
+        windowFocused_ = true;
+        break;
     case SDL_EVENT_WINDOW_FOCUS_LOST:
+        windowFocused_ = false;
         if (radial_.hold != RadialHold::None) closeRadialMenu(); // its key or button's release won't come here
         spaceHeld_ = false; // Space let go in another window never reaches us
         break;
@@ -1263,7 +1295,11 @@ void App::updateMouseCursor() {
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
     const ImGuiMouseCursor ui = ImGui::GetMouseCursor();
-    cursorKind_ = viewportCursorWanted() ? kCursorCrosshair : ui == ImGuiMouseCursor_None || io.MouseDrawCursor ? kCursorHidden : int(ui);
+    // (Mouse mode with the pen: the system's would sit where the pen is on the tablet, not at the cursor.)
+    cursorKind_ = penSoftCursor()           ? kCursorHidden
+                  : viewportCursorWanted()  ? kCursorCrosshair
+                  : ui == ImGuiMouseCursor_None || io.MouseDrawCursor ? kCursorHidden
+                                                                      : int(ui);
     if (cursorKind_ == cursorShown_) return; // (the shape on screen already: nothing for the window system to do)
     const bool wasHidden = cursorShown_ == kCursorHidden || cursorShown_ == -2;
     cursorShown_ = cursorKind_;

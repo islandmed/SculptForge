@@ -31,72 +31,132 @@ constexpr const char* kButtonNames[kPenButtons] = {"Lower button", "Upper button
 
 } // namespace
 
-// SDL also turns pen side buttons into mouse clicks, but which button depends on the SDL version
-// (3.2.10: middle / right and only while touching; 3.2.12 and later: right / middle, also while hovering).
-// The mapping in Preferences > Tablet decides instead (see penButton).
+// The pen tip works the panels and the canvas as a left mouse button (SDL_PEN_MOUSEID). SDL 3.2 makes those mouse
+// events itself, but keeps one "a pen is touching" flag for all pens: on Windows, a pen SDL drops while it touches
+// (WM_POINTERCAPTURECHANGED, e.g. when a drag captures the mouse) leaves the flag set, and from then on no pen gets
+// a mouse event, while its own events still come. The pen sculpted once, then could neither pick a second brush nor
+// sculpt again (#95, Huion Kamvas, display tablets, Wacom with Windows Ink on or off). So SDL's pen mouse events are
+// off (SDL_HINT_PEN_MOUSE_EVENTS) and ignored should a system SDL send them anyway, its clicks for the side buttons
+// included (those depend on the SDL version; Preferences > Tablet maps the buttons, see penButton). penMouseEvents
+// makes the tip's events from the pen's own, in SDL's order, and lets go of the button whenever the pen goes.
 bool App::dropPenMouseEvent(const SDL_Event& e) const {
-    return (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN || e.type == SDL_EVENT_MOUSE_BUTTON_UP) &&
-           e.button.which == SDL_PEN_MOUSEID && e.button.button != SDL_BUTTON_LEFT;
+    if (penMouseSending_) return false;
+    switch (e.type) {
+    case SDL_EVENT_MOUSE_MOTION: return e.motion.which == SDL_PEN_MOUSEID;
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+    case SDL_EVENT_MOUSE_BUTTON_UP: return e.button.which == SDL_PEN_MOUSEID;
+    case SDL_EVENT_MOUSE_WHEEL: return e.wheel.which == SDL_PEN_MOUSEID;
+    default: return false;
+    }
 }
 
-// Windows Ink and some tablet drivers (Ugee on X11, #7) send mouse events of their own beside the pen's, often at an
-// old position (where the pen last touched). Following those made the brush ring flick between two places, the view
-// shake, and the UI see the cursor jump: a click landed somewhere else, a drag on the Move button threw the model
-// off the canvas (#13). So while the pen is in range (heard from in the last second) only the pen moves the cursor,
-// for the canvas and the UI alike.
+void App::sendPenMouse(SDL_EventType type, float x, float y, SDL_WindowID window) {
+    SDL_Event m{};
+    m.type = type;
+    if (type == SDL_EVENT_MOUSE_MOTION) {
+        m.motion.windowID = window;
+        m.motion.which = SDL_PEN_MOUSEID;
+        m.motion.state = penMouseDown_ ? SDL_BUTTON_LMASK : 0;
+        m.motion.x = x;
+        m.motion.y = y;
+        m.motion.xrel = x - penMouseX_;
+        m.motion.yrel = y - penMouseY_;
+    } else {
+        m.button.windowID = window;
+        m.button.which = SDL_PEN_MOUSEID;
+        m.button.button = SDL_BUTTON_LEFT;
+        m.button.down = type == SDL_EVENT_MOUSE_BUTTON_DOWN;
+        m.button.clicks = 1;
+        m.button.x = x;
+        m.button.y = y;
+    }
+    penMouseX_ = x;
+    penMouseY_ = y;
+    penMouseSending_ = true;
+    dispatchEvent(m);
+    penMouseSending_ = false;
+}
+
+// before: called ahead of the pen event (a pen leaving, or coming back without having left: let go first);
+// otherwise after it, as SDL orders them (the pen's touch, then the mouse's button).
+void App::penMouseEvents(const SDL_Event& e, bool before) {
+    if (before) {
+        if ((e.type == SDL_EVENT_PEN_PROXIMITY_OUT || e.type == SDL_EVENT_PEN_PROXIMITY_IN) && penMouseDown_) {
+            penMouseDown_ = false;
+            sendPenMouse(SDL_EVENT_MOUSE_BUTTON_UP, penMouseX_, penMouseY_, e.pproximity.windowID);
+        }
+        return;
+    }
+    switch (e.type) {
+    case SDL_EVENT_PEN_DOWN:
+        if (penMouseDown_) break; // another pen already touches
+        sendPenMouse(SDL_EVENT_MOUSE_MOTION, e.ptouch.x, e.ptouch.y, e.ptouch.windowID);
+        penMouseDown_ = true;
+        penMouseOwner_ = e.ptouch.which;
+        sendPenMouse(SDL_EVENT_MOUSE_BUTTON_DOWN, e.ptouch.x, e.ptouch.y, e.ptouch.windowID);
+        break;
+    case SDL_EVENT_PEN_UP:
+        if (!penMouseDown_ || e.ptouch.which != penMouseOwner_) break;
+        penMouseDown_ = false;
+        sendPenMouse(SDL_EVENT_MOUSE_BUTTON_UP, e.ptouch.x, e.ptouch.y, e.ptouch.windowID);
+        break;
+    case SDL_EVENT_PEN_MOTION:
+        if (penMouseDown_ && e.pmotion.which != penMouseOwner_) break;
+        sendPenMouse(SDL_EVENT_MOUSE_MOTION, e.pmotion.x, e.pmotion.y, e.pmotion.windowID);
+        if (!penMouseDown_) {
+            // A hovering pen presses nothing. Should the UI still hold a left button (a driver's press whose
+            // release never came), let go of it: the pen's next tap is a click again.
+            ImGuiIO& io = ImGui::GetIO();
+            if (io.MouseDown[ImGuiMouseButton_Left] && !(SDL_GetGlobalMouseState(nullptr, nullptr) & SDL_BUTTON_LMASK))
+                io.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+// Windows Ink and some tablet drivers (Ugee on X11, #7; Huion) send mouse events of their own beside the pen's, often
+// at an old position (where the pen last touched). Following those made the brush ring flick between two places,
+// the view shake, and the UI see the cursor jump: a click landed somewhere else, a drag on the Move button threw the
+// model off the canvas (#13). So while the pen is in range (heard from in the last second) only the pen moves the
+// cursor, for the canvas and the UI alike. The left button too: a driver's own press beside the pen's, whose
+// release may never come, left the panels holding a button, and the pen's next taps were not clicks (#95).
 bool App::strayMouseMotion(const SDL_Event& e) const {
-    if (e.type != SDL_EVENT_MOUSE_MOTION || e.motion.which == SDL_PEN_MOUSEID) return false;
+    const bool motion = e.type == SDL_EVENT_MOUSE_MOTION && e.motion.which != SDL_PEN_MOUSEID;
+    const bool left = (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN || e.type == SDL_EVENT_MOUSE_BUTTON_UP) &&
+                      e.button.which != SDL_PEN_MOUSEID && e.button.button == SDL_BUTTON_LEFT;
+    if (!motion && !left) return false;
     if (dragFromPen_ && drag_ != Drag::None) return true;
     return penInProximity_ && SDL_GetTicksNS() - lastPenNs_ < 1000000000ull;
 }
 
 // ImGui's SDL backend also reads the system cursor every frame while no button is held (the cursor minus the window
-// position, on Windows, macOS and X11). With a pen that cursor can be stale or elsewhere, so ImGui's mouse would
-// jump between it and the pen each frame: put it back on the pen.
+// position, on Windows, macOS and X11). With a pen that cursor can be stale or elsewhere (and in Mouse mode it is
+// somewhere else by design), so ImGui's mouse would jump between it and the pen each frame: put it back on the pen.
 void App::keepImGuiOnPen() {
-    if (!penInProximity_ || SDL_GetTicksNS() - lastPenNs_ >= 1000000000ull) return;
-    ImGui::GetIO().AddMousePosEvent(mouseX_, mouseY_);
+    ImGuiIO& io = ImGui::GetIO();
+    const bool soft = penSoftCursor();
+    io.MouseDrawCursor = soft && !viewportCursorWanted(); // over the view the brush ring is the cursor
+    if (!soft && (!penInProximity_ || SDL_GetTicksNS() - lastPenNs_ >= 1000000000ull)) return;
+    io.AddMousePosEvent(mouseX_, mouseY_);
 }
 
-// A tablet in mouse mode (Preferences > Tablet): the pen reports where it is on the tablet, but the cursor moves by
-// how far it moves, like a mouse. Every pen position, the pen's own events and SDL's mouse events for the pen, goes
-// through penCursor_ before anything reads it (#54: lifting the pen and putting it down elsewhere made the cursor
-// jump back). The mouse moving the cursor in between moves where the pen carries on from.
-//
-// #72: in mouse mode the driver moves the system cursor itself, so the system cursor is the one cursor, for the
-// brush circle and the panels alike; each pen position is replaced by it (the pen adds pressure and tilt). A
-// cursor of our own, moved by the pen's motion, drifted from the system's after the pen was lifted and put down
-// elsewhere, and clicks landed at the brush instead of the arrow.
-bool App::systemCursorInWindow(float& x, float& y) const {
-    if (demo_) { // UI tests: the system cursor a script set (os_cursor), or none
-        if (!testSystemCursor_) return false;
-        x = testSystemCursorX_;
-        y = testSystemCursorY_;
-        return true;
-    }
-    if (!window_) return false;
-    float gx = 0.0f, gy = 0.0f;
-    int wx = 0, wy = 0;
-    SDL_GetGlobalMouseState(&gx, &gy);
-    if (!SDL_GetWindowPosition(window_, &wx, &wy)) return false;
-    x = gx - float(wx);
-    y = gy - float(wy);
-    return std::isfinite(x) && std::isfinite(y);
-}
+// Mouse mode with the pen in range: the system arrow is wherever the driver puts it (where the pen is on the
+// tablet, with the driver in pen mode), not where the pen's relative movement took the cursor. It is hidden and
+// the panels draw their arrow at the cursor instead, so the arrow, the brush and the clicks agree (#72). (A pen
+// resting still in range sends nothing, so this lasts until it leaves or the mouse moves, not a second.)
+bool App::penSoftCursor() const { return uiPrefs_.tablet.mouseMode && penInProximity_; }
 
+// Mouse mode (Preferences > Tablet): the pen reports where it is on the tablet, but the cursor moves by how far it
+// moves, like a mouse: lifting it and putting it down elsewhere leaves the cursor where it was (#54). Every pen
+// position, the pen's own events and its mouse events, goes through penCursor_ before anything reads it, and
+// the mouse moving the cursor in between moves where the pen carries on from. Only the pen's movement counts, not
+// the system cursor: with the tablet driver in pen mode that is where the pen is, which made Mouse mode the same as
+// Pen mode (#72, 0.10.8); the arrow follows the cursor instead (penSoftCursor).
 void App::mapPenPosition(SDL_Event& e) {
     penCursor_.mouseMode = uiPrefs_.tablet.mouseMode;
     const Uint64 now = SDL_GetTicksNS();
-    if (penCursor_.mouseMode) {
-        float sx = 0.0f, sy = 0.0f;
-        const bool penPosition = e.type == SDL_EVENT_PEN_DOWN || e.type == SDL_EVENT_PEN_UP || e.type == SDL_EVENT_PEN_MOTION ||
-                                 e.type == SDL_EVENT_PEN_AXIS || e.type == SDL_EVENT_PEN_BUTTON_DOWN ||
-                                 e.type == SDL_EVENT_PEN_BUTTON_UP ||
-                                 ((e.type == SDL_EVENT_MOUSE_MOTION) && e.motion.which == SDL_PEN_MOUSEID) ||
-                                 ((e.type == SDL_EVENT_MOUSE_BUTTON_DOWN || e.type == SDL_EVENT_MOUSE_BUTTON_UP) &&
-                                  e.button.which == SDL_PEN_MOUSEID);
-        if (penPosition && systemCursorInWindow(sx, sy)) penCursor_.systemCursor(sx, sy);
-    }
     switch (e.type) {
     case SDL_EVENT_PEN_PROXIMITY_IN:
     case SDL_EVENT_PEN_PROXIMITY_OUT: penCursor_.proximity(); break;

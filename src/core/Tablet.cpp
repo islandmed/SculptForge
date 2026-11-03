@@ -164,41 +164,9 @@ void PenCursor::cursorAt(float x, float y) {
     anchored_ = false;
 }
 
-void PenCursor::systemCursor(float x, float y) {
-    if (!std::isfinite(x) || !std::isfinite(y)) return;
-    systemX_ = x;
-    systemY_ = y;
-    haveSystem_ = true;
-}
-
 void PenCursor::map(float& x, float& y, uint64_t nowNs) {
     if (!std::isfinite(x) || !std::isfinite(y)) return;
-    bool system = haveSystem_;
-    haveSystem_ = false; // (one reading per position)
-    if (mouseMode && system && !systemStale_) {
-        if (haveLast_) {
-            const bool penMoved = std::fabs(x - lastPenX_) + std::fabs(y - lastPenY_) > 2.0f;
-            const bool systemStill = std::fabs(systemX_ - lastSysX_) + std::fabs(systemY_ - lastSysY_) < 0.5f;
-            staleCount_ = penMoved && systemStill ? staleCount_ + 1 : (penMoved ? 0 : staleCount_);
-            if (staleCount_ >= 3) systemStale_ = true;
-        }
-        lastPenX_ = x;
-        lastPenY_ = y;
-        lastSysX_ = systemX_;
-        lastSysY_ = systemY_;
-        haveLast_ = true;
-    }
-    if (systemStale_) system = false;
-    if (mouseMode && system) {
-        // The system cursor is the one cursor; the pen only adds pressure and tilt. Should the system stop
-        // saying where it is, the pen carries on from here.
-        offsetX_ = systemX_ - x;
-        offsetY_ = systemY_ - y;
-        anchored_ = true;
-        lastNs_ = nowNs;
-        x = systemX_;
-        y = systemY_;
-    } else if (mouseMode) {
+    if (mouseMode) {
         // A pen that comes back (into range, or after a pause) moves the cursor on from where it is.
         if (!anchored_ || nowNs - lastNs_ > kLiftedNs) {
             offsetX_ = haveCursor_ ? cursorX_ - x : 0.0f;

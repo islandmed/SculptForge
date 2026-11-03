@@ -1,0 +1,101 @@
+# The pen stops clicking the UI (#95, Huion Kamvas Pro 24; display tablets; Wacom with Windows Ink on or off): the pen
+# sculpts, then can't pick a second brush or go back to the canvas. SDL 3.2 makes the pen's mouse events but keeps
+# one "a pen is touching" flag for every pen; on Windows a pen it drops while touching (WM_POINTERCAPTURECHANGED)
+# leaves the flag set, and no pen gets mouse events after that. The app now makes the pen's mouse events from the
+# pen's own and ignores SDL's. Each stream below: pen tap on a brush, lift, out of range and back, tap a second
+# brush, sculpt on the canvas; nothing is left holding the panels' left button.
+run new_sphere subdivisions=4
+key f
+
+# Windows Ink, as SDL reports it (the pen's events and SDL's mouse events for it).
+pen_stream ink
+pen_drag_item "Clay##brush.clay" 2 1 0.5 0.5
+expect_value brush_type == 1
+pen_out
+pen_enter 0.5 0.5
+pen_drag_item "Inflate##brush.inflate" 2 1 0.5 0.5
+expect_value brush_type == 4
+snapshot
+pen_stroke 0.3 0.45 0.7 0.55 0.4 0.8
+expect_value moved > 0
+expect_value pen_mouse_down == 0
+expect_value ui_left_down == 0
+key ctrl+z
+
+# The #95 sequence: SDL drops the pen while it touches a brush button (it leaves without lifting), comes back as a
+# new pen, and SDL sends no mouse events for any pen from then on. The pen still picks a second brush and sculpts.
+pen_drag_item "Clay##brush.clay" 2 1 0.5 0.5 lost
+expect_value brush_type == 1
+expect_value pen_mouse_down == 0
+pen_enter 0.5 0.5
+pen_hover 0.5 0.4
+expect_value ui_left_down == 0
+pen_drag_item "Standard##brush.standard" 2 1 0.5 0.5
+expect_value brush_type == 0
+pen_drag_item "Inflate##brush.inflate" 1 2 0.5 0.5
+expect_value brush_type == 4
+snapshot
+pen_stroke 0.3 0.45 0.7 0.55 0.4 0.8
+expect_value moved > 0
+expect_value stroking == 0
+key ctrl+z
+# The same drop in the middle of a stroke on the canvas: the stroke ends (one undo step), the pen carries on.
+snapshot
+pen_stroke 0.3 0.6 0.7 0.6 0.5 0.5 leave
+expect_value stroking == 0
+expect_value moved > 0
+key ctrl+z
+pen_drag_item "Clay##brush.clay" 2 1 0.5 0.5
+expect_value brush_type == 1
+pen_out
+
+# A Huion-style driver: beside the pen's events it sends mouse events of its own, a press at each touch whose
+# release never comes. The panels must not be left holding the button, so the next pen tap is a click again.
+sdl_pen_mouse on
+pen_stream huion
+pen_drag_item "Standard##brush.standard" 2 1 0.5 0.5
+expect_value brush_type == 0
+pen_out
+pen_enter 0.5 0.5
+pen_hover 0.5 0.45
+expect_value ui_left_down == 0
+pen_drag_item "Inflate##brush.inflate" 2 1 0.5 0.5
+expect_value brush_type == 4
+snapshot
+pen_stroke 0.3 0.45 0.7 0.55 0.4 0.8
+expect_value moved > 0
+expect_value ui_left_down == 0
+key ctrl+z
+# ... with SDL's pen mouse events stuck as well.
+pen_drag_item "Clay##brush.clay" 2 1 0.5 0.5 lost
+pen_enter 0.5 0.5
+pen_drag_item "Standard##brush.standard" 2 1 0.5 0.5
+expect_value brush_type == 0
+pen_out
+pen_stream ink
+
+# Windows Ink off (Wintab drivers): no pen events, the driver moves the mouse. Switching between it and the pen
+# works both ways.
+click "Clay##brush.clay"
+expect_value brush_type == 1
+snapshot
+stroke 0.3 0.45 0.7 0.55
+expect_value moved > 0
+key ctrl+z
+pen_enter 0.5 0.5
+pen_drag_item "Inflate##brush.inflate" 2 1 0.5 0.5
+expect_value brush_type == 4
+pen_out
+click "Standard##brush.standard"
+expect_value brush_type == 0
+
+# Two screens (Discord, Windows 11): the pointer on the other screen doesn't put the app in the background. While
+# the window has focus, using it keeps the frames coming, wherever the pointer is; losing focus lets it rest.
+window_focus 1
+mouse_leave
+key escape
+expect_value focus_frames == 1
+mouse_leave
+expect_value focus_frames == 1
+window_focus 0
+expect_value focus_frames == 0
