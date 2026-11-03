@@ -27,5 +27,6 @@ Anything after the front matter is for reviewers and is not copied anywhere.
 | `testers` | the #testers checklist (`assemble_notes.py X.Y.Z --testers`) | what to try, where, what "good" looks like |
 
 Every key may repeat. A value continues on the next lines indented by two spaces; each `testers` item starts with
-`  - `. Feature cards (title, line, image, Try it) stay hand-written in `docs/guide/whats-new.md`.
+`  - `. The version's tagline and feature cards (title, line, image, Try it) stay hand-written in the ```features block of
+`docs/guide/whats-new.md` (release.sh stops if the version has no tagline).
 `ctest -R release_notes` checks that every fragment parses.
