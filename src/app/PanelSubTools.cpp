@@ -435,7 +435,6 @@ void App::drawSubToolsContents() {
         confirm("Delete Part?", "Delete \"" + activeName + "\"? This can't be undone.", "Delete", "subtool_delete");
     ImGui::EndDisabled();
 
-    const float half2 = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) * 0.5f;
     const float arrowW = ImGui::GetFrameHeight();
     ImGui::BeginDisabled(active <= 0);
     if (ImGui::ArrowButton("##up", ImGuiDir_Up)) runCommand("subtool_move", {{"direction", std::string("up")}});
@@ -449,17 +448,27 @@ void App::drawSubToolsContents() {
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayNormal))
         ImGui::SetTooltip("%s", tr("Move down the list"));
     ImGui::SameLine();
+    // Solo and X-Ray side by side (#80), then Unhide all.
+    const float rest = ImGui::GetContentRegionAvail().x - 2.0f * (arrowW + style.ItemSpacing.x) - 2.0f * style.ItemSpacing.x;
+    const float soloW = std::floor(rest * 0.3f), xrayW = std::floor(rest * 0.32f);
     const bool solo = count > 1 && visibleCount == 1 && doc_.activeSubtoolInfo().visible;
     ImGui::BeginDisabled(count < 2);
     if (solo) ImGui::PushStyleColor(ImGuiCol_Button, style.Colors[ImGuiCol_ButtonActive]);
-    if (ImGui::Button(tr("Solo"), ImVec2(half2 - 2.0f * (arrowW + style.ItemSpacing.x), 0))) runCommand("subtool_solo");
+    if (ImGui::Button(tr("Solo"), ImVec2(soloW, 0))) runCommand("subtool_solo");
     if (solo) ImGui::PopStyleColor();
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
         ImGui::SetTooltip(solo ? "Show the other Parts again" : "Show only the active Part");
     ImGui::SameLine();
+    const bool xray = renderSettings_.xray;
+    if (xray) ImGui::PushStyleColor(ImGuiCol_Button, style.Colors[ImGuiCol_ButtonActive]);
+    if (ImGui::Button(tr("X-Ray"), ImVec2(xrayW, 0))) runCommand("xray");
+    if (xray) ImGui::PopStyleColor();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+        ImGui::SetTooltip("%s", xray ? tr("Draw the other Parts solid again") : tr("See through the other Parts to the active one"));
+    ImGui::SameLine();
     ImGui::BeginDisabled(visibleCount == count);
-    if (ImGui::Button(tr("Unhide all"), ImVec2(half2, 0))) runCommand("subtool_show_all");
+    if (ImGui::Button(tr("Unhide all"), ImVec2(-1, 0))) runCommand("subtool_show_all");
     ImGui::EndDisabled();
 
     const float half = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) * 0.5f;

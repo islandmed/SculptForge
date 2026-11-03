@@ -21,13 +21,14 @@ or **Select Lasso** again to hide parts of the model.
 
 ## Pick a mode
 
-**Tool > Cut** has three modes:
+**Tool > Cut** has four modes:
 
 | Mode | What it does |
 | --- | --- |
 | **Away** | Removes everything the shape covers, through the whole Part, and closes the cut with a flat cap. A line slices the Part in two and keeps one side; a lasso or rectangle drawn inside the outline cuts a hole right through. |
 | **In** | Cuts a flat-bottomed pocket where the shape covers the Part. **Depth** sets how deep, measured from the nearest point under the shape. |
 | **Add** | Adds the shape, extruded towards you by **Depth** and joined to the Part (a boolean union): panels, ridges, buttons, sockets. |
+| **Clip** | Removes nothing. A line presses its shaded side flat onto itself. A lasso, rectangle or closed polyline presses everything outside it onto its outline. Points keep their depth, so you get flat planes and clean silhouettes through the whole Part. The mask holds points back. |
 
 **Depth** is a share of the Part's size (0.10 = a tenth of its largest side), so it means the same on a small or
 large model.

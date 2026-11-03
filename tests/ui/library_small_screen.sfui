@@ -20,3 +20,23 @@ wait 0.2
 hover_window 0.79 0.4
 wait_idle 30
 shot right-shelf-outline
+
+# At 150% (a 720p laptop at Windows' 150% scaling, #80): the tabs fold into a drop-down instead of running under the
+# close button, and the Sculpt Timeline moves off the Library instead of covering its header, in both layouts.
+ui_scale 150
+wait 0.3
+key ,
+expect_value lightbox_open == 1
+wait_idle 30
+shot library-150
+click "Library/##lbclose"
+expect_value lightbox_open == 0
+run ui_look layout=zbrush
+ui_scale 150
+wait 0.3
+key ,
+expect_value lightbox_open == 1
+wait_idle 30
+shot library-zbrush-150
+click "Library/##lbclose"
+expect_value lightbox_open == 0

@@ -3,7 +3,7 @@
 //
 // Cut (#101, #91; core/Cut.h): the Cut shapes sit in the Ctrl+Shift brush picker next to Select Rectangle and
 // Select Lasso. Ctrl+Shift+drag a line, lasso or rectangle (Alt turns a line round); Cut Polyline places points
-// with Ctrl+Shift+click. Tool > Cut picks the mode (Away, In, Add) and the depth. Each cut is one "cut" command
+// with Ctrl+Shift+click. Tool > Cut picks the mode (Away, In, Add, Clip) and the depth. Each cut is one "cut" command
 // with the shape in normalised device coordinates and the current view, mirrored by the symmetry.
 #include "app/App.h"
 #include "app/I18n.h"
@@ -18,7 +18,7 @@ namespace {
 
 constexpr float kCloseRadiusPx = 9.0f; // a Polyline click this close to its first point closes it
 
-const char* modeName(int mode) { return mode == 1 ? "in" : mode == 2 ? "add" : "away"; }
+const char* modeName(int mode) { return mode == 1 ? "in" : mode == 2 ? "add" : mode == 3 ? "clip" : "away"; }
 
 // Which side of a -> b a line (or the first segment of an open polyline) cuts: the left in NDC (y up), which is the
 // left on the screen too; `flip` takes the right.
@@ -113,9 +113,12 @@ void App::drawCutOverlay() {
     const bool dragging = drag_ == Drag::Select && selectMoved_ && !selectPath_.empty() && isCutShape(selectShape_);
     if (!dragging && cutPolyline_.empty()) return;
     const bool alt = (inputMods() & SDL_KMOD_ALT) != 0;
-    // Orange: what the cut takes away (Away, In) or adds (Add).
-    const ImU32 line = cutMode_ == 2 ? IM_COL32(120, 220, 255, 235) : IM_COL32(255, 150, 70, 235);
-    const ImU32 fill = cutMode_ == 2 ? IM_COL32(120, 220, 255, 45) : IM_COL32(255, 150, 70, 45);
+    // Orange: what the cut takes away (Away, In); blue: what it adds (Add); green: what Clip presses flat (the
+    // shaded side of a line), or for a closed shape the outline it presses the outside onto.
+    const bool clip = cutMode_ == 3;
+    const ImU32 line = cutMode_ == 2 ? IM_COL32(120, 220, 255, 235) : clip ? IM_COL32(140, 230, 120, 235) : IM_COL32(255, 150, 70, 235);
+    const ImU32 fill = cutMode_ == 2 ? IM_COL32(120, 220, 255, 45) : clip ? IM_COL32(140, 230, 120, 40) : IM_COL32(255, 150, 70, 45);
+    const ImU32 closedFill = clip ? IM_COL32(0, 0, 0, 0) : fill; // (Clip keeps a closed shape's inside as it is)
     ImDrawList* dl = ImGui::GetForegroundDrawList();
     const CanvasRect c = canvasRect();
     dl->PushClipRect(ImVec2(c.x, c.y), ImVec2(c.x + c.w, c.y + c.h), true);
@@ -145,7 +148,7 @@ void App::drawCutOverlay() {
                              std::hypot(mouse.x - cutPolyline_.front().x, mouse.y - cutPolyline_.front().y) < kCloseRadiusPx * uiScale_;
         if (closing) {
             path.back() = cutPolyline_.front();
-            dl->AddConcavePolyFilled(path.data(), int(path.size()), fill);
+            dl->AddConcavePolyFilled(path.data(), int(path.size()), closedFill);
             dl->AddPolyline(path.data(), int(path.size()), line, ImDrawFlags_Closed, 2.0f);
         } else {
             openPath(path, alt);
@@ -157,12 +160,12 @@ void App::drawCutOverlay() {
     } else if (selectShape_ == SelectShape::CutRect) {
         const ImVec2 a = selectPath_.front();
         const ImVec2 p0(std::fmin(a.x, mouse.x), std::fmin(a.y, mouse.y)), p1(std::fmax(a.x, mouse.x), std::fmax(a.y, mouse.y));
-        dl->AddRectFilled(p0, p1, fill);
+        dl->AddRectFilled(p0, p1, closedFill);
         dl->AddRect(p0, p1, line, 0.0f, 0, 2.0f);
     } else {
         std::vector<ImVec2> path = selectPath_;
         path.push_back(mouse);
-        dl->AddConcavePolyFilled(path.data(), int(path.size()), fill);
+        dl->AddConcavePolyFilled(path.data(), int(path.size()), closedFill);
         dl->AddPolyline(path.data(), int(path.size()), line, ImDrawFlags_Closed, 2.0f);
     }
     dl->PopClipRect();
@@ -172,8 +175,8 @@ void App::drawCutSection() {
     ImGui::TextDisabled("%s", tr("Ctrl+Shift+drag a Cut shape"));
     ui::Segmented(*this, {"cut.line", "cut.lasso"}); // two rows: the names fit a narrow tray
     ui::Segmented(*this, {"cut.rect", "cut.polyline"});
-    ui::Segmented(*this, {"cut.away", "cut.in", "cut.add"});
-    if (cutMode_ != 0) {
+    ui::Segmented(*this, {"cut.away", "cut.in", "cut.add", "cut.clip"});
+    if (cutMode_ == 1 || cutMode_ == 2) {
         ImGui::SetNextItemWidth(-1);
         ui::SliderInside("##cutdepth", &cutDepth_, 0.01f, 1.0f, tr("Depth %.2f"));
         ui::HelpText("Depth", nullptr, tr("How deep Cut In goes, or how far Cut Add stands out, as a share of the Part's size."),

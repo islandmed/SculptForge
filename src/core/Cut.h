@@ -6,7 +6,10 @@
 // Modes, each an exact boolean between the Part and the shape extruded along the view:
 //   Away - removes everything the shape covers, through the whole Part, and closes the cut with a flat cap;
 //   In   - boolean difference with the shape pushed `depth` into the surface (a flat-bottomed pocket);
-//   Add  - boolean union with the shape extruded `depth` out of the surface (anchored halfway into the Part).
+//   Add  - boolean union with the shape extruded `depth` out of the surface (anchored halfway into the Part);
+//   Clip - nothing is removed (#102): the vertices on the shaded side of a Line or open Polyline, or outside a
+//          Lasso, Rectangle or closed Polyline, are pressed flat onto the shape's outline extruded along the view,
+//          keeping their depth (hard-surface planes, clean silhouettes). The mask holds vertices back.
 // The result is watertight when the Part is (open Parts are trimmed without a cap; Add needs a closed one).
 // The boolean runs in normalised device coordinates, where the extrusion is a straight prism: intersection
 // points are shared by the Part's triangles and the prism's faces, so no cracks; the Part's surface is kept
@@ -26,9 +29,9 @@ namespace sf {
 class CommandRegistry;
 
 enum class CutShape : uint8_t { Line, Lasso, Rect, Polyline };
-enum class CutMode : uint8_t { Away, In, Add };
+enum class CutMode : uint8_t { Away, In, Add, Clip };
 const char* cutShapeName(CutShape s); // "line", "lasso", "rect", "polyline"
-const char* cutModeName(CutMode m);   // "away", "in", "add"
+const char* cutModeName(CutMode m);   // "away", "in", "add", "clip"
 bool parseCutShape(const std::string& name, CutShape& out);
 bool parseCutMode(const std::string& name, CutMode& out);
 
@@ -44,6 +47,12 @@ bool cutRegion(CutShape shape, const std::vector<glm::vec2>& points, bool flip, 
 // the result would be empty, part of the mesh is behind the camera); `out` is the result otherwise.
 bool cutMesh(const Mesh& mesh, const glm::mat4& viewProj, const std::vector<glm::dvec2>& region, CutMode mode,
              float depth, Mesh& out, std::string& error);
+
+// Clip: moves the vertices of `mesh` that `region` (from cutRegion) covers (`open`: a Line or open Polyline) or
+// leaves out (a closed shape) onto `outline` (NDC; open: a polyline, closed: a polygon), along the screen at their
+// own depth in the view of `viewProj`. Masked vertices move less, hidden ones not at all. Returns how many moved.
+size_t clipMesh(Mesh& mesh, const glm::mat4& viewProj, const std::vector<glm::dvec2>& region,
+                const std::vector<glm::dvec2>& outline, bool open);
 
 // Every edge of `mesh` is shared by exactly two triangles, wound opposite ways (a closed, manifold surface).
 bool isWatertight(const Mesh& mesh);

@@ -18,6 +18,7 @@
 #include "core/HardwareProfile.h"
 #include "core/ImageTo3D.h"
 #include "core/Masking.h"
+#include "core/CloseHoles.h"
 #include "core/Cut.h"
 #include "core/Multires.h"
 #include "core/Micro.h"
@@ -807,6 +808,7 @@ CommandRegistry::CommandRegistry() {
 
     registerMaskingCommands(*this);
     registerCutCommands(*this); // cut (core/Cut.h)
+    registerCloseHolesCommands(*this); // close_holes (core/CloseHoles.h)
     registerPolygroupCommands(*this);
     registerSelectionSetCommands(*this); // selection_set_* (core/SelectionSets.h)
     registerSubToolCommands(*this);

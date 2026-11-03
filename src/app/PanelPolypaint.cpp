@@ -456,8 +456,9 @@ void App::drawPalette_Material() {
     ui::HelpText("Base colour", nullptr, "Colour of the Studio material (the clay colour).", "Material");
     drawShadingControls();
     drawViewportShadingControls();
+    drawLightControls(); // PanelView.cpp
     ImGui::Spacing();
-    ui::ActionButton(*this, "render.save_image", ImVec2(-1, 0), ui::Look::IconLabel);
+    drawSaveRenderControls();
 }
 
 // Material > Viewport Shading: Lit Sphere or PBR, and the PBR view's environment. Every change runs

@@ -91,6 +91,7 @@ struct UiPrefs {
     // Preferences > Performance (PanelPerformance.cpp).
     int antialiasing = 4;       // samples per pixel in the 3D view: 1 (off), 2, 4 or 8
     bool fastNavigation = true; // big scenes draw without antialiasing while the view moves
+    int viewResolution = 100;   // the 3D view's resolution, % of the window's (#80): 100, 75 or 50
     bool multithreading = true; // brushes, normals and BVH updates on every core (off: one thread)
     // Sculpt strokes solved on their own thread with a GPU preview of the dabs still to come, the cursor and the
     // stroke's head predicted a frame ahead (app/AsyncStroke.cpp). Off: the dabs are placed in the frame loop.

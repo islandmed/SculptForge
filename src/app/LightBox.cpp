@@ -601,8 +601,30 @@ void LightBox::drawHeader(App& app, float width) {
     }
     ImGui::SameLine(0, 14 * scale);
 
-    // Tabs: text buttons, the active one underlined in accent.
-    for (int i = 0; i < int(LibraryTab::Count); ++i) {
+    // Tabs: text buttons, the active one underlined in accent. When they don't fit beside the close button (a small
+    // screen at a big UI scale, #80), one drop-down lists them instead, so they never run under it.
+    float tabsW = 2.0f * (ImGui::GetFrameHeight() + 2.0f) + 10.0f * scale; // (Back / Forward)
+    for (int i = 0; i < int(LibraryTab::Count); ++i)
+        tabsW += ImGui::CalcTextSize(tr(libraryTabName(LibraryTab(i)))).x + 2.0f * style.FramePadding.x;
+    const float roomForTabs = origin.x + width - ImGui::GetCursorScreenPos().x - ImGui::GetFrameHeight() - 16.0f * scale;
+    if (tabsW > roomForTabs) {
+        float widest = 0.0f;
+        for (int i = 0; i < int(LibraryTab::Count); ++i)
+            widest = std::max(widest, ImGui::CalcTextSize(tr(libraryTabName(LibraryTab(i)))).x);
+        ImGui::SetNextItemWidth(widest + ImGui::GetFrameHeight() + 2.0f * style.FramePadding.x);
+        if (ImGui::BeginCombo("##lbtab", tr(libraryTabName(place_.tab)))) {
+            for (int i = 0; i < int(LibraryTab::Count); ++i) {
+                const auto tab = LibraryTab(i);
+                if (ImGui::Selectable(tr(libraryTabName(tab)), place_.tab == tab) && place_.tab != tab)
+                    navigate(app, {tab, ""});
+            }
+            ImGui::EndCombo();
+        }
+        ui::HelpText("Library tabs", nullptr, "What the Library shows: projects, models, brushes, alphas, materials, "
+                     "images, splats, snapshots, recent files and packs.", "Library");
+        ImGui::SameLine(0, 10 * scale);
+    }
+    for (int i = 0; i < int(LibraryTab::Count) && tabsW <= roomForTabs; ++i) {
         const auto tab = LibraryTab(i);
         const bool on = place_.tab == tab;
         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 0, 0, 0));
@@ -630,8 +652,8 @@ void LightBox::drawHeader(App& app, float width) {
         };
         ui::HelpText(libraryTabName(tab), nullptr, tips[i], "Library");
         ImGui::SameLine(0, 0);
+        if (i == int(LibraryTab::Count) - 1) ImGui::SameLine(0, 10 * scale);
     }
-    ImGui::SameLine(0, 10 * scale);
 
     // History.
     ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 0, 0, 0));
@@ -1115,9 +1137,10 @@ void App::initLightBox() {
         "Your project file is not changed. Find them in the Library's Snapshots tab.",
         [this] { quickSave(); });
     add("render.save_image", "Save Render", ICON_LC_CAMERA, "Material", "",
-        "Render the view (without the interface) at twice its size to a PNG in your library: Library > Image "
-        "lists it, and the status bar names the file.",
-        [this] { saveRender(); });
+        "Render the view (without the interface) to an image in your library: Library > Image lists it, and the "
+        "status bar names the file. Material sets its size (twice the view by default), shape (the view's, 1:1, "
+        "16:9, 9:16, 4:3) and format (PNG or JPG).",
+        [this] { runSaveRender(); });
 
     // ZBrush opens the LightBox at startup on the Project tab (never in tests, renders or recordings).
     if (uiPrefs_.lightboxAtStartup && interactive() && options_.uiTest.empty() && options_.openPath.empty() &&
@@ -1176,53 +1199,70 @@ void App::quickSave() {
     lastCommandOk_ = true;
 }
 
-void App::saveRender() {
-    if (library_.user.empty()) {
-        status_ = "Save Render needs a library folder (Preferences > Library)";
-        return;
-    }
-    const std::string folder = library_.user + "/Images";
+bool App::saveRender(const RenderRequest& request, std::string& message) {
+    std::string path = request.path;
+    const char* ext = request.jpg ? ".jpg" : ".png";
     std::error_code ec;
-    fs::create_directories(fsPath(folder), ec);
-    const std::time_t t = std::time(nullptr);
-    std::tm tm{};
+    if (path.empty()) {
+        if (library_.user.empty()) {
+            message = "Save Render needs a library folder (Preferences > Library)";
+            return false;
+        }
+        const std::string folder = library_.user + "/Images";
+        fs::create_directories(fsPath(folder), ec);
+        const std::time_t t = std::time(nullptr);
+        std::tm tm{};
 #if defined(_WIN32)
-    localtime_s(&tm, &t);
+        localtime_s(&tm, &t);
 #else
-    localtime_r(&t, &tm);
+        localtime_r(&t, &tm);
 #endif
-    char buf[64];
-    std::strftime(buf, sizeof buf, "Render %Y-%m-%d %H-%M-%S", &tm);
-    std::string path = folder + "/" + buf + ".png";
-    for (int serial = 1; fs::exists(fsPath(path), ec); ++serial)
-        path = folder + "/" + buf + " (" + std::to_string(serial) + ").png";
-    // The canvas's shape at twice its size (at most 4096 px wide): what you see, without the interface.
+        char buf[64];
+        std::strftime(buf, sizeof buf, "Render %Y-%m-%d %H-%M-%S", &tm);
+        path = folder + "/" + buf + ext;
+        for (int serial = 1; fs::exists(fsPath(path), ec); ++serial)
+            path = folder + "/" + buf + " (" + std::to_string(serial) + ")" + ext;
+    }
+    // The canvas's shape (or the one asked for), at twice the canvas's size (at most 4096 px) unless a size is
+    // given: what you see, without the interface. A narrower shape than the view's widens the field of view so
+    // the picture still shows everything the view does.
     const CanvasRect c = canvasRect();
-    const float aspect = c.h > 1.0f ? c.w / c.h : 1.0f;
+    const float viewAspect = c.h > 1.0f ? c.w / c.h : 1.0f;
+    const float aspect = request.aspect > 0.0f ? request.aspect : viewAspect;
+    const int longSide = request.size > 0 ? request.size : std::clamp(int(std::max(c.w, c.h) * 2.0f), 512, 4096);
     Image img;
-    img.width = std::clamp(int(c.w * 2.0f), 512, 4096);
-    img.height = std::max(1, int(float(img.width) / aspect));
+    if (aspect >= 1.0f) {
+        img.width = longSide;
+        img.height = std::max(1, int(std::lround(float(longSide) / aspect)));
+    } else {
+        img.height = longSide;
+        img.width = std::max(1, int(std::lround(float(longSide) * aspect)));
+    }
     Camera cam = camera_;
     cam.aspect = aspect;
+    if (aspect < viewAspect)
+        cam.fovY = 2.0f * std::atan(std::tan(camera_.fovY * 0.5f) * viewAspect / aspect);
     RenderSettings settings = renderSettings_;
     settings.dimInactive = false; // every Part at full brightness
     settings.showMask = false;
+    settings.resolutionScale = 1.0f;
     constexpr GLenum kFramebufferBinding = 0x8CA6, kViewport = 0x0BA2;
     GLint fbo = 0, viewport[4] = {};
     gl::GetIntegerv(kFramebufferBinding, &fbo);
     gl::GetIntegerv(kViewport, viewport);
     std::string err;
-    const bool ok = renderer_.renderToImage(cam, img.width, img.height, settings, img.rgba, err) && img.savePng(path, err);
+    bool ok = renderer_.renderToImage(cam, img.width, img.height, settings, img.rgba, err);
     gl::BindFramebuffer(GL_FRAMEBUFFER, GLuint(fbo));
     gl::Viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+    if (ok) ok = request.jpg ? img.saveJpg(path, 92, err) : img.savePng(path, err);
     if (!ok) {
-        status_ = "Save Render failed: " + err;
-        lastCommandOk_ = false;
-        return;
+        message = "Save Render failed: " + err;
+        return false;
     }
     libraryScanner_.invalidate();
-    status_ = "Saved " + utf8(fsPath(path).filename()) + " (Library > Image)";
-    lastCommandOk_ = true;
+    message = "Saved " + utf8(fsPath(path).filename()) + " (" + std::to_string(img.width) + " x " +
+              std::to_string(img.height) + (request.path.empty() ? ", Library > Image)" : ")");
+    return true;
 }
 
 } // namespace sf

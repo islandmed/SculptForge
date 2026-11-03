@@ -50,6 +50,7 @@ const char* cutModeName(CutMode m) {
     case CutMode::Away: return "away";
     case CutMode::In: return "in";
     case CutMode::Add: return "add";
+    case CutMode::Clip: return "clip";
     }
     return "away";
 }
@@ -68,7 +69,7 @@ bool parseCutShape(const std::string& name, CutShape& out) {
 }
 
 bool parseCutMode(const std::string& name, CutMode& out) {
-    for (CutMode m : {CutMode::Away, CutMode::In, CutMode::Add})
+    for (CutMode m : {CutMode::Away, CutMode::In, CutMode::Add, CutMode::Clip})
         if (name == cutModeName(m)) {
             out = m;
             return true;
@@ -940,6 +941,57 @@ bool cutRegion(CutShape shape, const std::vector<glm::vec2>& points, bool flip, 
     return true;
 }
 
+size_t clipMesh(Mesh& mesh, const glm::mat4& viewProj, const std::vector<glm::dvec2>& region,
+                const std::vector<glm::dvec2>& outline, bool open) {
+    const glm::dmat4 vp(viewProj), inv = glm::inverse(vp);
+    const size_t segments = open ? outline.size() - 1 : outline.size();
+    if (outline.size() < 2 || region.size() < 3) return 0;
+    auto inside = [&](dvec2 q) { // even-odd
+        bool in = false;
+        for (size_t i = 0, j = region.size() - 1; i < region.size(); j = i++) {
+            const dvec2 a = region[i], b = region[j];
+            if ((a.y > q.y) != (b.y > q.y) && q.x < (b.x - a.x) * (q.y - a.y) / (b.y - a.y) + a.x) in = !in;
+        }
+        return in;
+    };
+    auto nearest = [&](dvec2 q) {
+        dvec2 best = outline[0];
+        double bestD = 1e300;
+        for (size_t i = 0; i < segments; ++i) {
+            const dvec2 a = outline[i], b = outline[(i + 1) % outline.size()], ab = b - a;
+            const double len2 = glm::dot(ab, ab);
+            const double t = len2 > 0.0 ? std::clamp(glm::dot(q - a, ab) / len2, 0.0, 1.0) : 0.0;
+            const dvec2 p = a + ab * t;
+            const double d = glm::dot(q - p, q - p);
+            if (d < bestD) {
+                bestD = d;
+                best = p;
+            }
+        }
+        return best;
+    };
+    const bool layers = !mesh.layers.empty();
+    std::vector<uint32_t> moved;
+    for (uint32_t v = 0; v < mesh.vertexCount(); ++v) {
+        const float weight = 1.0f - mesh.maskAt(v);
+        if (weight <= 0.0f || (mesh.hasHidden() && mesh.vertexHidden(v))) continue;
+        const glm::dvec4 c = vp * glm::dvec4(dvec3(mesh.positions[v]), 1.0);
+        if (c.w <= 1e-12) continue; // behind the camera
+        const dvec3 ndc = dvec3(c) / c.w;
+        if (inside(dvec2(ndc)) != open) continue;
+        const dvec2 to = nearest(dvec2(ndc));
+        glm::dvec4 w = inv * glm::dvec4(to, ndc.z, 1.0);
+        const glm::vec3 target = glm::vec3(dvec3(w) / w.w);
+        const glm::vec3 d = (target - mesh.positions[v]) * weight;
+        if (glm::dot(d, d) <= 0.0f) continue;
+        mesh.positions[v] += d;
+        if (layers) mesh.base[v] += d;
+        moved.push_back(v);
+    }
+    if (!moved.empty()) mesh.recomputeAllNormals();
+    return moved.size();
+}
+
 bool cutMesh(const Mesh& mesh, const glm::mat4& viewProj, const std::vector<glm::dvec2>& region, CutMode mode,
              float depth, Mesh& out, std::string& error) {
     if (mesh.triangleCount() == 0) {
@@ -1243,13 +1295,14 @@ void registerCutCommands(CommandRegistry& registry) {
         {"cut",
          "Cut the active Part with a shape drawn on the screen (Line, Lasso, Rectangle or Polyline), extruded along "
          "the view. Modes: away (remove what the shape covers, through the whole Part, and close it with a flat cap), "
-         "in (cut a flat-bottomed pocket `depth` deep), add (add the shape extruded `depth` out of the surface). The "
-         "result stays watertight. Coordinates are normalised (-1..1, y up) in the given view; without a view the "
+         "in (cut a flat-bottomed pocket `depth` deep), add (add the shape extruded `depth` out of the surface), clip "
+         "(remove nothing: press what lies on the shaded side of a line, or outside a closed shape, flat onto the "
+         "shape's outline, like a clip brush). The result stays watertight. Coordinates are normalised (-1..1, y up) in the given view; without a view the "
          "shape is drawn on the Part seen from the front (+Z).",
          {{"shape", T::String, "line, lasso, rect or polyline. Default lasso.", false},
           {"points", T::String, "The shape's points \"x0 y0 x1 y1 ...\": two for a line (or a rect's corners), three or "
                                 "more for a lasso, two or more for a polyline.", true},
-          {"mode", T::String, "away, in or add. Default away.", false},
+          {"mode", T::String, "away, in, add or clip. Default away.", false},
           {"depth", T::Number, "In and add: how deep or tall, as a fraction of the Part's size (0.001-4). Default 0.1.", false},
           {"flip", T::Bool, "Line and open polyline: cut the right side instead of the left. Default false.", false},
           {"closed", T::Bool, "Polyline: a closed polygon (cuts its inside) instead of a bent line. Default false.", false},
@@ -1262,7 +1315,7 @@ void registerCutCommands(CommandRegistry& registry) {
              CutShape shape = CutShape::Lasso;
              CutMode mode = CutMode::Away;
              if (!parseCutShape(argString(a, "shape", "lasso"), shape)) return {false, "Cut: shape is line, lasso, rect or polyline"};
-             if (!parseCutMode(argString(a, "mode", "away"), mode)) return {false, "Cut: mode is away, in or add"};
+             if (!parseCutMode(argString(a, "mode", "away"), mode)) return {false, "Cut: mode is away, in, add or clip"};
              std::vector<glm::vec2> points;
              {
                  const std::string text = argString(a, "points");
@@ -1285,6 +1338,34 @@ void registerCutCommands(CommandRegistry& registry) {
              std::vector<glm::dvec2> region;
              if (!cutRegion(shape, points, argBool(a, "flip", false), argBool(a, "closed", false), region, error))
                  return {false, error};
+             if (mode == CutMode::Clip) {
+                 // The outline the vertices are pressed onto: a line or open polyline runs on far past its ends.
+                 const bool open = shape == CutShape::Line || (shape == CutShape::Polyline && !argBool(a, "closed", false));
+                 std::vector<glm::dvec2> outline;
+                 for (const glm::vec2& p : points)
+                     if (outline.empty() || glm::length(glm::dvec2(p) - outline.back()) > 1e-6) outline.push_back(glm::dvec2(p));
+                 if (shape == CutShape::Line && outline.size() > 2) outline = {outline.front(), outline.back()};
+                 if (shape == CutShape::Rect && outline.size() == 2) {
+                     const glm::dvec2 p = outline[0], q = outline[1];
+                     outline = {p, {q.x, p.y}, q, {p.x, q.y}};
+                 }
+                 if (open) {
+                     const glm::dvec2 d0 = glm::normalize(outline[1] - outline[0]);
+                     const glm::dvec2 d1 = glm::normalize(outline.back() - outline[outline.size() - 2]);
+                     outline.front() -= d0 * 1000.0;
+                     outline.back() += d1 * 1000.0;
+                 }
+                 Mesh m = doc.mesh;
+                 size_t moved = 0;
+                 for (const SymCopy& copy : copies) {
+                     glm::mat4 inv(glm::transpose(copy.m));
+                     inv[3] = glm::vec4(copy.pivot - glm::transpose(copy.m) * copy.pivot, 1.0f);
+                     moved += clipMesh(m, vp * inv, region, outline, open);
+                 }
+                 if (moved == 0) return {true, "Clip: the shape misses the Part"};
+                 doc.replaceMeshUndoable(std::move(m), "Clip");
+                 return {true, "Clip: " + std::to_string(moved) + " vertices pressed flat"};
+             }
              const float depth = float(argNumber(a, "depth", 0.1));
              // A mirror image of the shape that lands on the shape itself (a rectangle across the mirror plane) would
              // cut the same prism twice: skip it.

@@ -295,6 +295,14 @@ void App::storeProjectSettings() {
     render.set("backface_culling", renderSettings_.backfaceCulling);
     render.set("background", std::string(renderSettings_.gradientBackground ? "gradient" : "flat"));
     render.set("background_color", vec3Json(renderSettings_.backgroundColor));
+    {
+        Json light = Json::object(); // the Lit Sphere / studio light (#80)
+        light.set("yaw", double(renderSettings_.lightYaw));
+        light.set("pitch", double(renderSettings_.lightPitch));
+        light.set("intensity", double(renderSettings_.lightIntensity));
+        light.set("ambient", double(renderSettings_.lightAmbient));
+        render.set("light", light);
+    }
     render.set("matcap", renderSettings_.matcap < 0 ? std::string() : std::string(matcapName(renderSettings_.matcap)));
     // Viewport shading (Material > Viewport Shading): Lit Sphere or PBR with its environment.
     {
@@ -415,6 +423,19 @@ void App::applyProjectSettings() {
             v.pbrRoughness = num("roughness", defaults.pbrRoughness, 0.0f, 1.0f);
             v.pbrMetallic = num("metallic", defaults.pbrMetallic, 0.0f, 1.0f);
             v.pbrCavity = num("cavity", defaults.pbrCavity, 0.0f, 1.0f);
+        }
+        // The light (#80); projects from before it: the material's own.
+        {
+            RenderSettings& v = renderSettings_;
+            const RenderSettings defaults;
+            const Json& light = r["light"];
+            auto num = [&](const char* key, float def, float lo, float hi) {
+                return light.isObject() && light[key].isNumber() ? std::clamp(float(light[key].asNumber()), lo, hi) : def;
+            };
+            v.lightYaw = num("yaw", defaults.lightYaw, -180.0f, 180.0f);
+            v.lightPitch = num("pitch", defaults.lightPitch, -90.0f, 90.0f);
+            v.lightIntensity = num("intensity", defaults.lightIntensity, 0.0f, 3.0f);
+            v.lightAmbient = num("ambient", defaults.lightAmbient, 0.0f, 1.0f);
         }
         // The background (#21); projects from before it: the preferred one.
         renderSettings_.gradientBackground =

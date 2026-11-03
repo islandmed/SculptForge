@@ -296,3 +296,42 @@ TEST(mask_lasso_front_faces_only) {
     for (uint32_t v = 0; v < d.mesh.vertexCount(); ++v) back += d.mesh.normals[v].z < -0.5f && d.mesh.mask[v] > 0.5f;
     CHECK(back > 0);
 }
+
+TEST(cut_clip_presses_flat_without_removing) {
+    // #102: a line clips the shaded side flat onto the line; nothing is removed, the depth (z) is kept.
+    const Mesh sphere = makeIcosphere(4);
+    Document d = makeDoc(sphere);
+    CommandResult r = cut(d, "line", "0.5 -2 0.5 2", "clip", {{"flip", true}}); // the right side (x > 0.5)
+    CHECK(r.ok);
+    CHECK(r.message.find("Clip:") == 0);
+    CHECK(d.mesh.vertexCount() == sphere.vertexCount() && d.mesh.triangles == sphere.triangles);
+    float maxX = -1.0f;
+    for (size_t v = 0; v < sphere.vertexCount(); ++v) {
+        maxX = std::max(maxX, d.mesh.positions[v].x);
+        CHECK(std::abs(d.mesh.positions[v].z - sphere.positions[v].z) < 1e-4f);
+        if (sphere.positions[v].x < 0.49f) CHECK(d.mesh.positions[v] == sphere.positions[v]);
+    }
+    CHECK(maxX < 0.5f + 1e-3f && maxX > 0.5f - 1e-3f);
+    CHECK(isWatertight(d.mesh));
+    CHECK(registry().execute(d, "undo").ok);
+    CHECK(d.mesh.positions == sphere.positions);
+
+    // A rectangle presses everything outside it onto its outline.
+    r = cut(d, "rect", "-0.4 -0.3 0.4 0.3", "clip");
+    CHECK(r.ok);
+    for (const glm::vec3& p : d.mesh.positions) CHECK(std::abs(p.x) < 0.401f && std::abs(p.y) < 0.301f);
+    CHECK(registry().execute(d, "undo").ok);
+
+    // The mask holds vertices back; a fully masked Part doesn't move.
+    d.mesh.ensureMask(1.0f);
+    r = cut(d, "rect", "-0.4 -0.3 0.4 0.3", "clip");
+    CHECK(r.ok && r.message.find("misses") != std::string::npos);
+    CHECK(d.mesh.positions == sphere.positions);
+
+    // Symmetry X: a line on the right clips the left too.
+    Document s = makeDoc(sphere);
+    CHECK(cut(s, "line", "0.5 -2 0.5 2", "clip", {{"flip", true}, {"symmetry", std::string("x")}}).ok);
+    float minX = 1.0f;
+    for (const glm::vec3& p : s.mesh.positions) minX = std::min(minX, p.x);
+    CHECK(minX > -0.501f);
+}
