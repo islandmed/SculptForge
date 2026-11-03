@@ -101,7 +101,11 @@ public:
     bool mouseMode = false;
 
     // The pen came into range or left it: in mouse mode its next position moves the cursor from where it is.
-    void proximity() { anchored_ = false; }
+    void proximity() {
+        anchored_ = false;
+        systemStale_ = false;
+        staleCount_ = 0;
+    }
     // Something else (the mouse) moved the cursor to x, y.
     void cursorAt(float x, float y);
     // Where the system cursor is (window pixels), read just before the next map(). In mouse mode the driver moves
@@ -118,6 +122,11 @@ private:
     float cursorX_ = 0.0f, cursorY_ = 0.0f;
     float systemX_ = 0.0f, systemY_ = 0.0f;
     bool haveCursor_ = false, anchored_ = false, haveSystem_ = false;
+    // A system cursor that stays put while the pen moves (seen on Windows tablets in 0.10.7: the brush froze) is
+    // not the cursor: the pen moves the cursor relatively until it comes back into range.
+    float lastPenX_ = 0.0f, lastPenY_ = 0.0f, lastSysX_ = 0.0f, lastSysY_ = 0.0f;
+    bool haveLast_ = false, systemStale_ = false;
+    int staleCount_ = 0;
     uint64_t lastNs_ = 0;
 };
 

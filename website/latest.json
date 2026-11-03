@@ -1,12 +1,10 @@
 {
-  "version": "0.10.6",
+  "version": "0.10.8",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "PBR texturing phase 2: live mesh-map re-bake, fill layers and material recipes in the viewport",
-    "Smooth keeps quad topology after Quad Remesh; Keep Masked works on real voxel remeshes",
-    "Backface culling, a crosshair viewport cursor and a right-button pie option",
-    "Tablet mouse mode no longer drifts from the system cursor",
-    "Safer glTF/GLB import and a fix for an intermittent Fill layers crash"
+    "Tablets in Mouse mode follow the pen again on Windows (#72)",
+    "No jump when the pen comes back to the tablet: the brush carries on from where it was",
+    "A bug-fix release only: nothing else changes from 0.10.7"
   ]
 }

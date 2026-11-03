@@ -162,7 +162,7 @@ void App::loadPackMatcaps() {
             SDL_Log("Lit Spheres: %s (pack %s): %s", item.file.c_str(), item.packName.c_str(), err.c_str());
             continue;
         }
-        m.name = item.label(); // "Chrome (Supporter Pack)": never mistaken for (or replacing) another
+        m.name = item.label(); // "Chrome (Member pack)": never mistaken for (or replacing) another
         packs_.matcaps.push_back(addCustomMatcap(std::move(m)));
     }
 }
@@ -310,7 +310,7 @@ void App::drawPackReview() {
         if (fontBold_) ImGui::PopFont();
         if (m.channel == "insider") {
             ImGui::SameLine();
-            ImGui::TextColored(ImColor(kInsider), "%s", tr("Supporter Pack"));
+            ImGui::TextColored(ImColor(kInsider), "%s", tr("Member pack"));
         } else if (!m.channel.empty()) {
             ImGui::SameLine();
             ImGui::TextDisabled("[%s]", m.channel.c_str());
@@ -408,7 +408,7 @@ void App::drawPacksTab(float height) {
         ImGui::TextUnformatted((m.name + " " + m.version).c_str());
         if (m.channel == "insider") {
             ImGui::SameLine();
-            ImGui::TextColored(ImColor(kInsider), "%s", tr("Supporter Pack"));
+            ImGui::TextColored(ImColor(kInsider), "%s", tr("Member pack"));
         }
         std::array<int, kPackItemTypes> counts{};
         for (const PackItem& it : m.contents) ++counts[size_t(it.type)];
@@ -649,8 +649,8 @@ void App::drawNewPack() {
     ImGui::SetNextItemWidth(-110 * s);
     ImGui::InputTextMultiline("Description##newpack", packs_.description, sizeof packs_.description,
                               ImVec2(-110 * s, ImGui::GetTextLineHeight() * 3.0f));
-    ui::Checkbox("Supporter Pack (insider channel)##newpack", &packs_.insider);
-    ui::HelpText("Supporter Pack", nullptr, "Marks the pack as a Supporter Pack. Display only: anyone can install it.",
+    ui::Checkbox("Member pack (insider channel)##newpack", &packs_.insider);
+    ui::HelpText("Member pack", nullptr, "Marks the pack as the monthly pack or an Insider drop. Display only: anyone can install it.",
                  "Library > Packs > New Pack");
     ImGui::Separator();
     const float listH = ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * 2.6f;

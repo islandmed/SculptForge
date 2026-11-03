@@ -1313,7 +1313,7 @@ void registerPackCommands(CommandRegistry& registry) {
                    {"author", T::String, "Who made it.", true},
                    {"license", T::String, "License, e.g. CC-BY-4.0.", true},
                    {"description", T::String, "What it holds.", false},
-                   {"channel", T::String, "insider marks a Supporter Pack (display only).", false}},
+                   {"channel", T::String, "insider marks the monthly pack or an Insider drop (display only).", false}},
                   [reg](Document&, const Args& a) -> CommandResult {
                       PackManifest m;
                       m.id = argString(a, "id");

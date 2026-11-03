@@ -727,7 +727,7 @@ void App::drawUpdateBanner() {
         ImGui::SameLine();
         ImGui::TextDisabled(tr("(you have %s)"), SCULPTFORGE_VERSION);
         for (const auto& h : u.highlights) ImGui::BulletText("%s", h.c_str());
-        ImGui::TextDisabled("%s", kInsiderNote); // memberships (Support.h): honest about what's not running yet
+        ImGui::TextDisabled("%s", kFreeReleaseNote); // memberships (Support.h): releases stay free for everyone
         if (guide_.bodyFont()) ImGui::PopFont();
         ImGui::Spacing();
         bool close = false;

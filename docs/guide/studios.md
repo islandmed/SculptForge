@@ -143,6 +143,64 @@ SculptForge is free software under the GNU General Public License, version 3 or 
 - SculptForge has no telemetry and no servers of its own. AI features are optional and talk only to the
   service each artist chooses, or to your own ComfyUI server.
 
+## Studio membership
+
+SculptForge is free for any number of artists, and nothing in the app is ever paywalled. A Studio membership
+($300 a month; **Founding Studio:** the first 10 studios lock in $150 a month for as long as they stay
+subscribed) covers your whole company, with no seat count:
+
+- **Insider for every artist:** the monthly pack, daily drops (a brush, alpha or VDM almost every day), preview
+  builds of the next release about a week early, the feature vote and the monthly dev Q&A.
+- **A custom studio build** with your presets, keymaps, packs, shelves and pipeline defaults baked in.
+- **Custom content:** brushes, alphas, VDMs, macros and pipeline presets made for your team.
+- **Guided development:** your requests go to the front of the roadmap, with a monthly call or async review
+  with the developer.
+- **Priority triage:** reviewed within 2 business days (no fix-time guarantee).
+- A **private team channel** on Discord, and your **logo** on the website and in the README.
+
+Every release stays free for everyone; bug-fix and security releases go out to everyone the same day. Larger
+custom features are quoted separately. Join at [sculptforge.app/studios.html](https://sculptforge.app/studios.html#membership).
+
+## Studio onboarding
+
+After checkout, email hello@sculptforge.app from a studio address with the GitHub usernames that should get
+the private repository (as many artists as you like) and who should join the team channel.
+
+### Custom content
+
+Studios can ask for their own content, made to order:
+
+- **Brushes** tuned to your style.
+- **Alphas and VDMs** made from your own references or scans (only material you own).
+- **Macros** and one-click workflows.
+- **Pipeline presets:** export settings, naming, scale, axis, texture packing and ZBrush Bridge setup.
+- **Keymaps and layouts.**
+
+All of it is baked into your custom studio build. Up to 5 custom items a month (brushes, alphas, macros or
+presets); larger features are quoted separately. Your assets stay private to your studio and are never used
+for anything else.
+
+### Requesting a custom build
+
+Send, in one email or a message in your team channel:
+
+- **What to bake in:** your exported keymap and layout (**Preferences > Interface**), brush presets and packs
+  (`.sfbrush`, `.sfpack`), shelf setup, and the pipeline defaults you want (export format and preset, units
+  and scale, up axis, naming pattern, texture packing, ZBrush Bridge folder).
+- **References for custom content:** images or scans you own, with a line on what each item should do.
+- **Where it runs:** platforms and, for Linux, the distribution or VFX Reference Platform year.
+
+Files are treated as data only: scripts and executables you send are never run. Your build is published as a
+release in the private repository, built by the same pipeline and tests as public builds, with its source
+(it is GPL like every SculptForge build). Each new release brings an updated studio build.
+
+### Guided development
+
+Tell us what your team needs most, in the team channel or on the monthly call (or an async review, if a call
+doesn't suit your time zone). Studio requests go to the front of the roadmap: each month we agree what comes
+next, and you see it in preview builds about a week before the release. Requests that are bigger than a
+normal release's work are quoted separately before anything starts.
+
 ## Not yet
 
 Planned pipeline features, roughly in order: OpenColorIO viewport display, Alembic export, fuller USD

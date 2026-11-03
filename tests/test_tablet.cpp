@@ -202,6 +202,37 @@ TEST(pen_cursor_mouse_mode_follows_the_system_cursor) {
     CHECK(near(x, 50.0f) && near(y, 60.0f));
 }
 
+TEST(pen_cursor_mouse_mode_ignores_a_frozen_system_cursor) {
+    // 0.10.7 on Windows (#72 follow-up): the system cursor reading stayed put while the pen moved, so the brush
+    // froze. After a few such positions the pen moves the cursor relatively, on from where it was, with no jump.
+    sf::PenCursor c;
+    c.mouseMode = true;
+    float x = 100.0f, y = 100.0f;
+    c.systemCursor(400.0f, 300.0f);
+    c.map(x, y, 1000);
+    CHECK(near(x, 400.0f) && near(y, 300.0f));
+    float px = 100.0f;
+    for (int i = 1; i <= 6; ++i) {
+        px += 10.0f;
+        x = px;
+        y = 100.0f;
+        c.systemCursor(400.0f, 300.0f); // frozen
+        c.map(x, y, 1000 + uint64_t(i) * 1000000);
+    }
+    CHECK(x > 420.0f); // moving again, by the pen's motion
+    CHECK(near(y, 300.0f));
+    // A moving system cursor is still followed (the usual case).
+    sf::PenCursor d;
+    d.mouseMode = true;
+    for (int i = 0; i < 6; ++i) {
+        x = 100.0f + 10.0f * float(i);
+        y = 100.0f;
+        d.systemCursor(400.0f + 7.0f * float(i), 300.0f);
+        d.map(x, y, uint64_t(i + 1) * 1000000);
+        CHECK(near(x, 400.0f + 7.0f * float(i)));
+    }
+}
+
 TEST(tablet_settings_mouse_mode_round_trip) {
     TabletSettings t;
     CHECK(!t.mouseMode);

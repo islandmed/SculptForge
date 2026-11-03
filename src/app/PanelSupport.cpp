@@ -70,7 +70,7 @@ void App::drawSupportersSection() {
         }
         ImGui::EndChild();
     }
-    ImGui::TextWrapped("%s", kInsiderNote);
+    ImGui::TextWrapped("%s", kFreeReleaseNote);
     if (ImGui::Button("Support SculptForge##about")) openSupportPage();
 }
 
@@ -157,7 +157,7 @@ void App::drawSupportUi() {
             ImGui::Spacing();
             ImGui::Separator();
             ImGui::Spacing();
-            ImGui::TextWrapped("SculptForge is free. Memberships add credits, a monthly brush pack and a roadmap vote. %s", kInsiderNote);
+            ImGui::TextWrapped("SculptForge is free. Memberships add credits, a monthly pack, a feature vote and, for Insiders, daily drops and preview builds. %s", kFreeReleaseNote);
             if (ImGui::Button("Support SculptForge##welcome")) showSupportCard(SupportCardReason::Weekly); // the memberships
             ImGui::SameLine();
             if (ImGui::Button("Close##welcome")) showWelcome_ = false;

@@ -1,0 +1,151 @@
+name: Insider preview
+
+# Insider preview builds: the next release's packages, about a week early, as a prerelease in the private repository
+# islandmed/sculptforge-insiders (Insider and Studio members are invited to it), announced in #insiders on Discord.
+#
+#   Run workflow  with a version label (e.g. 0.10.8-preview.1) and an optional ref (default main).
+#   push          to a preview/* branch; the label is the project version plus "-preview.<run number>".
+#
+#   locate   a successful Packages run (packages.yml) for exactly this commit: its tested artifacts are promoted
+#            unchanged. Otherwise:
+#   build    the Packages workflow runs here for the commit (each package built and tested exactly as a release ships it).
+#   publish  checksums, then the prerelease in the private repository, then the Discord post.
+#
+# Secrets (both optional; without them the workflow skips quietly and builds nothing):
+#   INSIDERS_REPO_TOKEN        a fine-grained personal access token, resource owner islandmed, repository access
+#                              "Only select repositories: islandmed/sculptforge-insiders", repository permission
+#                              Contents: Read and write (Metadata: Read-only is added by GitHub). Nothing else: it
+#                              can't touch this repository or any other.
+#   DISCORD_INSIDERS_WEBHOOK   a webhook of the private #insiders channel (Channel settings > Integrations).
+# Only publish sees them. The public release stays free for everyone; this only shares builds earlier. Bug-fix and
+# security releases go out to everyone the same day through release.yml, never through here.
+
+on:
+  push:
+    branches: ['preview/*']
+  workflow_dispatch:
+    inputs:
+      label:
+        description: Version label, e.g. 0.10.8-preview.1
+        required: true
+        type: string
+      ref:
+        description: Branch, tag or commit to preview (default main)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: insider-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  locate:
+    name: Locate tested packages
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      enabled: ${{ steps.find.outputs.enabled }}
+      run-id: ${{ steps.find.outputs.run-id }}
+      sha: ${{ steps.find.outputs.sha }}
+      label: ${{ steps.find.outputs.label }}
+    steps:
+      - uses: actions/checkout@v7
+        with: { ref: '${{ inputs.ref || github.sha }}' }
+      - id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HAS_TOKEN: ${{ secrets.INSIDERS_REPO_TOKEN != '' }}
+          LABEL: ${{ inputs.label }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          if [ "$HAS_TOKEN" != true ]; then
+            echo "No INSIDERS_REPO_TOKEN secret: skipped"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+          sha=$(git rev-parse HEAD)
+          version=$(sed -n 's/^project(SculptForge VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
+          label=${LABEL:-$version-preview.$RUN_NUMBER}
+          label=${label#v}
+          if ! printf '%s' "$label" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
+            echo "::error::Version label '$label' should look like 0.10.8-preview.1"
+            exit 1
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "label=$label" >> "$GITHUB_OUTPUT"
+          # A successful Packages run for exactly this commit, from this repository's own workflow file.
+          run=$(gh api "repos/$REPO/actions/workflows/packages.yml/runs?head_sha=$sha&status=success&per_page=5" \
+                --jq '.workflow_runs[] | select(.head_sha == "'"$sha"'" and .path == ".github/workflows/packages.yml"
+                      and .head_repository.full_name == "'"$REPO"'") | .id' | head -1 || true)
+          if [ -n "$run" ]; then
+            echo "Promoting the tested packages of Packages run $run for $sha as v$label"
+            echo "run-id=$run" >> "$GITHUB_OUTPUT"
+          else
+            echo "No successful Packages run for $sha: building and testing the packages here"
+          fi
+
+  build:
+    name: Build
+    needs: locate
+    if: needs.locate.outputs.enabled == 'true' && needs.locate.outputs.run-id == ''
+    uses: ./.github/workflows/packages.yml
+    with:
+      ref: ${{ needs.locate.outputs.sha }}
+      tag: v${{ needs.locate.outputs.label }}
+
+  publish:
+    name: Publish to the Insiders repository
+    needs: [locate, build]
+    if: ${{ !cancelled() && needs.locate.outputs.enabled == 'true' && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read # the packages may be another run's artifacts
+    env:
+      TAG: v${{ needs.locate.outputs.label }}
+      SHA: ${{ needs.locate.outputs.sha }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+          pattern: '{linux,flatpak,vfx,macos,windows}*'
+          run-id: ${{ needs.locate.outputs.run-id || github.run_id }}
+          github-token: ${{ github.token }}
+      - name: Checksums
+        run: |
+          [ -n "$(ls -A dist)" ] || { echo "::error::No packages found"; exit 1; }
+          cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Prerelease in islandmed/sculptforge-insiders
+        env:
+          GH_TOKEN: ${{ secrets.INSIDERS_REPO_TOKEN }}
+          SOURCE: ${{ github.repository }}
+        run: |
+          cat > notes.md <<EOF
+          SculptForge ${TAG#v}, an Insider preview of the next release (commit ${SHA::7} of $SOURCE).
+          The same packages and tests as a public release. Please report problems in #insiders or on GitHub.
+
+          Every release stays free for everyone; bug-fix and security releases go out to everyone the same day.
+          EOF
+          repo=islandmed/sculptforge-insiders
+          gh release view "$TAG" --repo "$repo" >/dev/null 2>&1 ||
+            gh release create "$TAG" --repo "$repo" --prerelease --title "SculptForge ${TAG#v} (Insider preview)" \
+              --notes-file notes.md
+          gh release upload "$TAG" dist/* --repo "$repo" --clobber
+      - name: Post to #insiders
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_INSIDERS_WEBHOOK }}
+        run: |
+          if [ -z "$WEBHOOK" ]; then echo "No DISCORD_INSIDERS_WEBHOOK secret: skipped"; exit 0; fi
+          url="https://github.com/islandmed/sculptforge-insiders/releases/tag/$TAG"
+          jq -n --arg c "**SculptForge ${TAG#v} preview is up** for Insiders: $url" \
+            '{content: $c, allowed_mentions: {parse: []}}' |
+            curl -fsS -H 'Content-Type: application/json' -d @- "$WEBHOOK" >/dev/null
+          echo "Posted to #insiders"

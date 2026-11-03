@@ -24,12 +24,18 @@ inline constexpr const char* kDiscordUrl = "https://discord.gg/gWrYkEmQhH";
 // The same Stripe checkout links as website/support.html (tests/test_support.cpp checks they match).
 inline constexpr const char* kSupportUrlSupporter = "https://buy.stripe.com/aFacN5h1t6L8cP14ad4F201"; // $5 / month
 inline constexpr const char* kSupportUrlInsider = "https://buy.stripe.com/dRmdR94eH4D06qD9ux4F202";   // $20 / month
-inline constexpr const char* kSupportUrlStudio = "https://buy.stripe.com/3cI00j12v5H4g1dgWZ4F204";    // $150 / month (up to 10 artists)
+// Studio ($300 / month, the whole company). Founding Studio: the first 10 studios lock in $150 / month for as long as
+// they stay subscribed. When the 10 are taken, set kFoundingStudioOpen = false here and FOUNDING_STUDIO_OPEN = false in
+// website/studio-offer.js (the one switch on the site); nothing else changes.
+inline constexpr bool kFoundingStudioOpen = true;
+inline constexpr const char* kSupportUrlStudioFounding = "https://buy.stripe.com/3cI00j12v5H4g1dgWZ4F204"; // $150 / month, locked
+inline constexpr const char* kSupportUrlStudioRegular = "https://buy.stripe.com/9B66oH8uXd9w16j2254F205"; // $300 / month
+inline constexpr const char* kSupportUrlStudio = kFoundingStudioOpen ? kSupportUrlStudioFounding : kSupportUrlStudioRegular;
 inline constexpr const char* kSupportUrlOnce = "https://buy.stripe.com/4gM7sL8uXc5s4iv5eh4F200";      // one-time Supporter (pay what you want, $5 minimum)
-// What Insider members get; early access starts with 1.0. Worded the same in the app, on the membership page and in
-// What's New (tests/test_support.cpp checks the membership page).
-inline constexpr const char* kInsiderNote =
-    "Insiders will get each release about two weeks early, starting with SculptForge 1.0.";
+// The promise next to Insider preview builds. Worded the same in the app, on the membership page and in the guide
+// (tests/test_support.cpp checks the membership page).
+inline constexpr const char* kFreeReleaseNote =
+    "Every release stays free for everyone; bug-fix and security releases go out to everyone the same day.";
 
 inline constexpr size_t kSupporterNameMax = 40;   // characters (code points) per name; longer ones are cut
 inline constexpr size_t kSupportersMax = 2000;    // names kept

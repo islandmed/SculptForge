@@ -17,7 +17,7 @@
   <meta property="og:url" content="https://sculptforge.app/">
   <link rel="canonical" href="https://sculptforge.app/">
   <script type="application/ld+json">
-  {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "SculptForge", "url": "https://sculptforge.app/", "applicationCategory": "MultimediaApplication", "applicationSubCategory": "3D sculpting", "operatingSystem": "Windows 10, Windows 11, macOS, Linux", "softwareVersion": "0.10.6", "description": "Free, open-source digital sculpting: an alternative to ZBrush and Mudbox for VFX, animation and game studios.", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "downloadUrl": "https://github.com/islandmed/SculptForge/releases/latest", "image": "https://sculptforge.app/img/social-preview.png?v=3", "sameAs": ["https://github.com/islandmed/SculptForge"]}
+  {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "SculptForge", "url": "https://sculptforge.app/", "applicationCategory": "MultimediaApplication", "applicationSubCategory": "3D sculpting", "operatingSystem": "Windows 10, Windows 11, macOS, Linux", "softwareVersion": "0.10.8", "description": "Free, open-source digital sculpting: an alternative to ZBrush and Mudbox for VFX, animation and game studios.", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "downloadUrl": "https://github.com/islandmed/SculptForge/releases/latest", "image": "https://sculptforge.app/img/social-preview.png?v=3", "sameAs": ["https://github.com/islandmed/SculptForge"]}
   </script>
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="style.css?v=18">
@@ -101,10 +101,18 @@
     <section id="whats-new" class="section alt">
       <div class="wrap">
         <h2>What's new in 0.10</h2>
-        <p class="section-lede">New in 0.10.6: PBR texturing in the viewport with fill layers and material recipes, quad-safe Smooth, backface culling, a crosshair cursor and a tablet fix. New in 0.10.5: a UV Editor, selection sets with a Morph brush, radial and local symmetry, strokes that start off the model, the timeline at the top, and a fix for the viewport on some Windows PCs. New in 0.10.4: insert your own meshes, Keep Masked remeshing, pie menus, a Maya bridge, Spanish and twelve new alphas. New in 0.10.3: alternate smooth, better masking, Part thumbnails and fixes from your requests. New in 0.10.2: Quad Remesh 2, Kelvinlet brushes and Capture from view. New in 0.10: micro levels for hundreds of millions of polygons, material painting (PBR), the Sculpt Timeline and a built-in benchmark. New in 0.9.7: faster big brushes on dense meshes and a right-click QuickMenu. New in 0.9.6: Extract, Mirror And Weld and a Flatpak. New in 0.9.5: Forge Spheres, Blender keys, flat shading, your own MatCaps and SpaceMouse support. New in 0.9.4: Soft Clay grey exports and self-updating AppImages. New in 0.9.3: a cleaner look, made for reading your sculpt. Before that, maquette to performance: scan a clay maquette with your phone, sculpt on the scan,
+        <p class="section-lede">New in 0.10.8: Tablets fixed. New in 0.10.7: A new look, clearer memberships, native Wayland. New in 0.10.6: PBR texturing in the viewport with fill layers and material recipes, quad-safe Smooth, backface culling, a crosshair cursor and a tablet fix. New in 0.10.5: a UV Editor, selection sets with a Morph brush, radial and local symmetry, strokes that start off the model, the timeline at the top, and a fix for the viewport on some Windows PCs. New in 0.10.4: insert your own meshes, Keep Masked remeshing, pie menus, a Maya bridge, Spanish and twelve new alphas. New in 0.10.3: alternate smooth, better masking, Part thumbnails and fixes from your requests. New in 0.10.2: Quad Remesh 2, Kelvinlet brushes and Capture from view. New in 0.10: micro levels for hundreds of millions of polygons, material painting (PBR), the Sculpt Timeline and a built-in benchmark. New in 0.9.7: faster big brushes on dense meshes and a right-click QuickMenu. New in 0.9.6: Extract, Mirror And Weld and a Flatpak. New in 0.9.5: Forge Spheres, Blender keys, flat shading, your own MatCaps and SpaceMouse support. New in 0.9.4: Soft Clay grey exports and self-updating AppImages. New in 0.9.3: a cleaner look, made for reading your sculpt. Before that, maquette to performance: scan a clay maquette with your phone, sculpt on the scan,
           give the head its facial shapes and drive them with your own face. <a href="guide/whats-new.html">Everything that changed</a> ·
           <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">changelog</a></p>
         <div class="grid">
+          <article class="card">
+            <h3>Tablets fixed <small>new in 0.10.8</small></h3>
+            <p>Tablets in Mouse mode follow the pen again on Windows (#72). <a href="guide/whats-new.html">What's new</a></p>
+          </article>
+          <article class="card">
+            <h3>A new look, clearer memberships, native Wayland <small>new in 0.10.7</small></h3>
+            <p><strong>Forge Terminal</strong> is the new look for new installs: Tokyo Night colours and menus grouped by task, with the ZBrush-style layout one click away (updates keep your layout until you choose). Clearer <strong>memberships</strong> (a vote for Supporters; daily drops and preview builds for Insiders; Studio for your whole company), full alphas on <strong>custom brushes</strong> at Focal Shift -100 (#75), <strong>native Wayland</strong> on Linux and a built-in <strong>15M/33M benchmark</strong>. <a href="guide/whats-new.html">What's new</a></p>
+          </article>
           <article class="card">
             <h3>PBR texturing, quad-safe Smooth, backface culling <small>new in 0.10.6</small></h3>
             <p><strong>PBR texturing</strong> in the viewport: live Mesh Maps that re-bake as you sculpt,
@@ -581,7 +589,7 @@ rez-env sculptforge -- sculptforge troll.usda \
     <section id="download" class="section alt">
       <div class="wrap">
         <h2>Download</h2>
-        <p class="section-lede">Version 0.10.6. All builds come from the
+        <p class="section-lede">Version 0.10.8. All builds come from the
           <a href="https://github.com/islandmed/SculptForge/releases/latest">latest GitHub release</a>, with
           SHA-256 checksums. Free forever; <a href="support.html">memberships</a> add credits, a monthly brush pack and a roadmap vote.</p>
         <div class="downloads">
@@ -676,6 +684,7 @@ rez-env sculptforge -- sculptforge troll.usda \
         <a href="https://github.com/islandmed/SculptForge">Source code</a>
         <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
         <a href="support.html">Membership</a>
+        <a href="supporters.html">Supporters</a>
         <a href="https://github.com/islandmed/SculptForge/blob/main/THIRD_PARTY_NOTICES.md">Third-party notices</a>
         <a href="https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md">AI services &amp; privacy</a>
         <a href="https://github.com/islandmed/SculptForge/blob/main/SECURITY.md">Security</a>

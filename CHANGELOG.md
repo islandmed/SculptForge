@@ -6,6 +6,15 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.8] - 2026-11-02
+
+### Fixed
+- Tablet Mouse mode (Preferences > Tablet): on some Windows tablets the brush stopped following the pen in 0.10.7,
+  because the system cursor reading stayed put while the pen moved. A reading that doesn't move with the pen is now
+  ignored and the pen moves the brush relatively, from where it was, with no jump (#72).
+
+## [0.10.7] - 2026-11-01
+
 ### Changed
 - Large brushes on dense meshes no longer stall the view: from 2 million vertices a stroke's dabs are placed on the
   stroke thread (the same dabs, in the same order, as the frame loop places them; no preview), so a frame keeps
@@ -16,6 +25,18 @@ All notable changes to SculptForge are listed here. The format follows
   side with their perks checked off and one bold button each (Insider highlighted), and the members' Discord in the
   footer. It takes the current look's colours and opens in 150 ms. "Maybe later" now hides it for 30 days, updates
   included; the welcome's Support button and the ten-hour note open it too.
+- New memberships; nothing in the app is ever paywalled. **Supporter** ($5 / month): your name in the credits (in
+  the app and on the new [supporters page](https://sculptforge.app/supporters.html)), #members, a vote in the monthly
+  feature vote and the monthly pack. **Insider** ($20 / month): also proposing vote options, a daily drop (a brush,
+  alpha or VDM), preview builds of the next release about a week early and the monthly dev Q&A. "Every release
+  stays free for everyone; bug-fix and security releases go out to everyone the same day." **Studio** ($300 /
+  month) covers the whole company with no seat count: Insider for every artist, a custom studio build, up to 5
+  custom items a month, guided development, priority triage, a private team channel and the logo on the website
+  and README; **Founding Studio**: the first 10 studios lock in $150 / month for good. The card, Help > About, the
+  welcome, the website and the guide (with a new Studio onboarding section) say so; the monthly pack and Insider
+  drops show as **Member pack** in Library > Packs (was Supporter Pack).
+- Insider preview builds: a workflow publishes the tested packages of a commit as a prerelease in the private
+  Insiders repository and posts to #insiders (`.github/workflows/insider-preview.yml`).
 
 ### Fixed
 - Help > Benchmark (and `--benchmark`) checks the memory free now before each scene instead of trusting the

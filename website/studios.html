@@ -117,6 +117,10 @@
     .member .price span { color: var(--muted); font-size: 1rem; font-weight: 500; letter-spacing: 0; margin-left: 6px; }
     .member ul { margin: 0; padding-left: 1.1em; }
     .member li { margin: 6px 0; }
+    .member .price s { color: var(--muted); font-size: 1.3rem; font-weight: 500; letter-spacing: 0; margin-left: 12px; }
+    .member .price .now { color: inherit; font-size: inherit; font-weight: inherit; letter-spacing: inherit; margin: 0; }
+    .founding-badge { display: inline-block; margin: 0 0 12px; padding: 4px 13px; border-radius: 999px; font-size: 0.8rem;
+                      font-weight: 600; color: #ffb06a; border: 1.5px solid #f6994d; }
     .member .actions { display: grid; gap: 12px; }
     .member .actions .btn { display: block; text-align: center; padding: 14px 20px; }
     .member .actions p { margin: 0; color: var(--muted); font-size: 0.92rem; }
@@ -194,6 +198,7 @@
     }
   </style>
   <script src="motion.js?v=11" defer></script>
+  <script src="studio-offer.js?v=1" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </head>
 <body class="studio-page">
@@ -254,11 +259,11 @@
                 <div class="track" aria-hidden="true"><span class="fill them-hi" style="width: 24.7%"></span><span class="fill them" style="width: 14.6%"></span></div>
               </div>
               <div class="bar-row">
-                <div class="bar-label"><span>SculptForge + 1 Studio membership</span><b>$1,800</b></div>
+                <div class="bar-label"><span>SculptForge + Studio membership</span><b>$1,800</b></div>
                 <div class="track" aria-hidden="true"><span class="fill us" style="width: 10.6%"></span></div>
               </div>
             </div>
-            <p class="cost-note">One membership covers Insider access for all 5.</p>
+            <p class="cost-note">One membership covers the whole company.</p>
           </li>
           <li class="cost" style="--i: 1">
             <h2>10 artists <span>· per year</span></h2>
@@ -269,11 +274,11 @@
                 <div class="track" aria-hidden="true"><span class="fill them-hi" style="width: 49.4%"></span><span class="fill them" style="width: 29.1%"></span></div>
               </div>
               <div class="bar-row">
-                <div class="bar-label"><span>SculptForge + 1 Studio membership</span><b>$1,800</b></div>
+                <div class="bar-label"><span>SculptForge + Studio membership</span><b>$1,800</b></div>
                 <div class="track" aria-hidden="true"><span class="fill us" style="width: 10.6%"></span></div>
               </div>
             </div>
-            <p class="cost-note">One membership covers Insider access for all 10.</p>
+            <p class="cost-note">One membership covers the whole company.</p>
           </li>
           <li class="cost featured" style="--i: 2">
             <h2>20 artists <span>· per year</span></h2>
@@ -284,17 +289,17 @@
                 <div class="track" aria-hidden="true"><span class="fill them-hi" style="width: 98.7%"></span><span class="fill them" style="width: 58.2%"></span></div>
               </div>
               <div class="bar-row">
-                <div class="bar-label"><span>SculptForge + 2 Studio memberships</span><b>$3,600</b></div>
-                <div class="track" aria-hidden="true"><span class="fill us" style="width: 21.2%"></span></div>
+                <div class="bar-label"><span>SculptForge + Studio membership</span><b>$1,800</b></div>
+                <div class="track" aria-hidden="true"><span class="fill us" style="width: 10.6%"></span></div>
               </div>
             </div>
-            <p class="cost-note">Two memberships cover Insider access for all 20.</p>
+            <p class="cost-note">Still one membership: no seat count.</p>
           </li>
         </ul>
         <p class="legend" aria-hidden="true">
           <span><i class="k-them"></i>ZBrush, low end of the range*</span>
           <span><i class="k-them-hi"></i>up to the high end*</span>
-          <span><i class="k-us"></i>SculptForge with optional Studio memberships</span>
+          <span><i class="k-us"></i>SculptForge with the optional Studio membership</span>
         </p>
       </div>
     </section>
@@ -303,7 +308,8 @@
       <div class="wrap">
         <h2 id="table-title">What the software costs a year</h2>
         <p>The software is free for every artist, whether you have 5 or 500. A Studio membership is optional: it
-          funds development and gets your team early builds and priority on pipeline bugs.</p>
+          covers the whole company, funds development and gets your team preview builds, a custom studio build and
+          priority on pipeline bugs.</p>
         <div class="table-scroll" tabindex="0" role="region" aria-labelledby="table-title">
           <table class="costs-table" role="table">
             <caption>US dollars per year. ZBrush figures are approximate*.</caption>
@@ -316,9 +322,9 @@
               </tr>
             </thead>
             <tbody role="rowgroup">
-              <tr role="row"><th scope="row" role="rowheader">5 artists</th><td role="cell" data-label="ZBrush, Teams seats*">$2,475–$4,195</td><td role="cell" data-label="SculptForge software" class="us">$0</td><td role="cell" data-label="With Studio membership">$1,800 (1 membership)</td></tr>
-              <tr role="row"><th scope="row" role="rowheader">10 artists</th><td role="cell" data-label="ZBrush, Teams seats*">$4,950–$8,390</td><td role="cell" data-label="SculptForge software" class="us">$0</td><td role="cell" data-label="With Studio membership">$1,800 (1 membership)</td></tr>
-              <tr role="row"><th scope="row" role="rowheader">20 artists</th><td role="cell" data-label="ZBrush, Teams seats*">$9,900–$16,780</td><td role="cell" data-label="SculptForge software" class="us">$0</td><td role="cell" data-label="With Studio membership">$3,600 (2 memberships)</td></tr>
+              <tr role="row"><th scope="row" role="rowheader">5 artists</th><td role="cell" data-label="ZBrush, Teams seats*">$2,475–$4,195</td><td role="cell" data-label="SculptForge software" class="us">$0</td><td role="cell" data-label="With Studio membership">$1,800</td></tr>
+              <tr role="row"><th scope="row" role="rowheader">10 artists</th><td role="cell" data-label="ZBrush, Teams seats*">$4,950–$8,390</td><td role="cell" data-label="SculptForge software" class="us">$0</td><td role="cell" data-label="With Studio membership">$1,800</td></tr>
+              <tr role="row"><th scope="row" role="rowheader">20 artists</th><td role="cell" data-label="ZBrush, Teams seats*">$9,900–$16,780</td><td role="cell" data-label="SculptForge software" class="us">$0</td><td role="cell" data-label="With Studio membership">$1,800</td></tr>
             </tbody>
           </table>
         </div>
@@ -327,7 +333,8 @@
             $495 to $839 per seat); <a href="https://www.maxon.net/en/buy">Maxon's buy page</a> has current prices and
             quotes. An individual ZBrush subscription is about $480 a year, and floating seats cost extra. Prices vary by region, term and
             reseller.</p>
-          <p>A Studio membership is $150 a month ($1,800 a year, $15 per artist) and includes Insider access for up to 10 artists.
+          <p>A Studio membership is $300 a month for the whole company, with no seat count. Founding Studio: the first
+            10 studios lock in $150 a month ($1,800 a year, the figure above) for as long as they stay subscribed.
             SculptForge itself costs $0 with or without one.</p>
         </div>
       </div>
@@ -402,20 +409,30 @@
           <div>
             <p class="eyebrow">Studio membership</p>
             <h2 id="member-title">Put a little of the licence budget back into the tool</h2>
-            <p class="price">$150<span>/ month</span></p>
+            <p class="founding-badge" data-founding>Founding Studio: first 10 studios lock in $150/month for good</p>
+            <p class="price"><span class="now" data-studio-price>$150</span><s data-founding>$300</s><span>/ month</span></p>
             <ul>
-              <li>Your <strong>logo</strong> on sculptforge.app and in the project README</li>
-              <li><strong>Insider access for up to 10 artists</strong>: each release about two weeks early, starting
-                with SculptForge 1.0</li>
-              <li><strong>Priority triage</strong> of your pipeline bugs</li>
-              <li><strong>Monthly invoices</strong> for your accounts team</li>
+              <li><strong>Insider for every artist in your company</strong>, no seat count: daily drops, preview
+                builds about a week early, the feature vote and the dev Q&amp;A</li>
+              <li><strong>Custom studio build</strong>: your presets, keymaps, layouts, packs, shelves and pipeline
+                defaults baked in, delivered through the private repository</li>
+              <li><strong>Custom content</strong>: brushes tuned to your style, alphas and VDMs from your own
+                references or scans, macros and pipeline presets. Up to 5 custom items a month (brushes, alphas,
+                macros or presets); larger features are quoted separately.</li>
+              <li><strong>Guided development</strong>: your requests go to the front of the roadmap, with a monthly
+                call or async review with the developer</li>
+              <li><strong>Priority triage</strong>: reviewed within 2 business days (no fix-time guarantee)</li>
+              <li>A <strong>private team channel</strong>, and your <strong>logo</strong> on sculptforge.app and in
+                the project README</li>
             </ul>
           </div>
           <div class="actions">
-            <a class="btn btn-hot" href="https://buy.stripe.com/3cI00j12v5H4g1dgWZ4F204" rel="noopener">Become a Studio member</a>
+            <a class="btn btn-hot" data-studio-link href="https://buy.stripe.com/3cI00j12v5H4g1dgWZ4F204" rel="noopener">Become a Studio member</a>
             <a class="btn btn-ghost" href="mailto:hello@sculptforge.app?subject=SculptForge%20studio%20work">Email about custom work</a>
-            <p>Custom features and integration work are quoted separately: write to
-              <a href="mailto:hello@sculptforge.app">hello@sculptforge.app</a>. Payments go through Stripe; cancel
+            <p>Larger custom features are quoted separately: write to
+              <a href="mailto:hello@sculptforge.app">hello@sculptforge.app</a>. Your assets stay private to your
+              studio and are never used for anything else. <a href="guide/studios.html#studio-onboarding">Studio
+              onboarding</a> explains what to send. Payments go through Stripe; cancel
               anytime in the customer portal. Memberships are subscriptions to SculptForge benefits.
               <a href="support.html">All memberships</a>.</p>
           </div>
@@ -440,6 +457,7 @@
         <a href="benchmarks/">Benchmarks: 15M and 33M</a>
         <a href="press.html">Press kit</a>
         <a href="support.html">Membership</a>
+        <a href="supporters.html">Supporters</a>
         <a href="https://github.com/islandmed/SculptForge">Source code</a>
         <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
       </div>

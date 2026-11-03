@@ -205,7 +205,7 @@ struct Tier {
     const char* name;
     const char* price;
     const char* per;
-    const char* perks[3];
+    const char* perks[4];
     const char* cta;
     const char* id; // the button's ImGui label (UI tests click it)
     const char* url;
@@ -467,8 +467,8 @@ void App::drawSupportCard() {
     }
     y += 14.0f * k;
     paint.text(bodyFont, 16.5f, ImVec2(a.x + pad, y), tc(body, A),
-               "No ads, no accounts, no telemetry, and every feature stays free. A membership pays for development "
-               "time, test hardware and code signing.",
+               "No ads, no accounts, no telemetry, and nothing is ever paywalled: members pay for time and influence. "
+               "Every release stays free for everyone.",
                colW - pad);
 
     // Close (top right), always visible.
@@ -487,18 +487,19 @@ void App::drawSupportCard() {
         dl->AddLine(ImVec2(c.x - x, c.y + x), ImVec2(c.x + x, c.y - x), tc(ink, (hot ? 1.0f : 0.8f) * A), 1.6f * k);
     }
 
-    // The three memberships, with the perks worded as on website/support.html.
+    // The three memberships, with the perks worded as on website/support.html (the full list is there).
     static const Tier kTiers[3] = {
         {"Supporter", "$5", "/ month",
-         {"Your name in the credits", "In the app's Supporters list and on the website", "Optional, any name you choose"},
+         {"Your name in the credits, in the app and on the website", "The members' channel on Discord",
+          "A vote in the monthly feature vote", "The monthly pack at month end"},
          "Join as a Supporter", "Join as a Supporter##card.supporter", kSupportUrlSupporter},
         {"Insider", "$20", "/ month",
-         {"The monthly Supporter Pack of brushes, alphas and VDMs", "A monthly roadmap vote on what gets built next",
-          kInsiderNote},
+         {"Everything in Supporter, and you propose the vote's options", "A daily drop: a brush, alpha or VDM",
+          "Preview builds of the next release, about a week early", "The monthly dev Q&A"},
          "Become an Insider", "Become an Insider##card.insider", kSupportUrlInsider},
-        {"Studio", "$150", "/ month",
-         {"Insider benefits for up to 10 artists ($15 each)", "Priority bug triage and support for your pipeline",
-          "Your logo on the website and README, monthly invoices"},
+        {"Studio", kFoundingStudioOpen ? "$150" : "$300", "/ month",
+         {"Insider for every artist in your company", "Your own build: presets, keymaps, brushes and packs baked in",
+          "Up to 5 custom items a month; your requests go first", "Priority triage, a team channel, your logo"},
          "Studio membership", "Studio membership##card.studio", kSupportUrlStudio},
     };
     const float gap = 18.0f * k, footer = 62.0f * k, tierH = 318.0f * k;
@@ -546,12 +547,33 @@ void App::drawSupportCard() {
                          tc(theme::textOnAccent, appear), badge, 1.6f);
             ty += 4.0f * k;
         }
+        const bool founding = i == 2 && kFoundingStudioOpen; // the launch offer: a quieter outlined badge
+        if (founding) {
+            const char* badge = "FOUNDING STUDIO";
+            const float bw = paint.spaced(boldUi, 11.0f, ImVec2(0, 0), 0, badge, 1.6f, false) + 24.0f * k;
+            const ImVec2 b0(p0.x + (tierW - bw) * 0.5f, p0.y - 12.0f * k), b1(b0.x + bw, b0.y + 24.0f * k);
+            dl->AddRectFilled(b0, b1, tc(tierBg, appear), 12.0f * k);
+            dl->AddRect(b0, b1, tc(accent, appear), 12.0f * k, 0, 1.5f * k);
+            paint.spaced(boldUi, 11.0f, ImVec2(b0.x + 12.0f * k, b0.y + (24.0f * k - 11.0f * k) * 0.5f - 0.5f * k),
+                         tc(theme::accentHover, appear), badge, 1.6f);
+        }
         paint.text(headFont, 21.0f, ImVec2(ix, ty), tc(featured ? theme::accentHover : ink, appear), tier.name);
         ty += 32.0f * k;
         const ImVec2 ps = paint.text(titleFont, 44.0f, ImVec2(ix, ty), tc(ink, appear), tier.price);
         const ImVec2 pe = paint.measure(bodyFont, 16.5f, tier.per);
-        paint.text(bodyFont, 16.5f, ImVec2(ix + ps.x + 6.0f * k, ty + ps.y - pe.y - 7.0f * k), tc(dim, appear), tier.per);
-        ty += ps.y + 10.0f * k;
+        float px = ix + ps.x + 6.0f * k;
+        if (founding) { // the regular price, struck through
+            const ImVec2 at(px, ty + ps.y - pe.y - 7.0f * k);
+            const ImVec2 ws = paint.text(bodyFont, 16.5f, at, tc(dim, appear), "$300");
+            dl->AddLine(ImVec2(at.x - 1.0f * k, at.y + ws.y * 0.55f), ImVec2(at.x + ws.x + 1.0f * k, at.y + ws.y * 0.55f),
+                        tc(dim, appear), 1.5f * k);
+            px += ws.x + 6.0f * k;
+        }
+        paint.text(bodyFont, 16.5f, ImVec2(px, ty + ps.y - pe.y - 7.0f * k), tc(dim, appear), tier.per);
+        ty += ps.y + (founding ? 2.0f : 10.0f) * k;
+        if (founding)
+            ty += paint.text(boldUi, 12.5f, ImVec2(ix, ty), tc(theme::accentHover, appear),
+                             "First 10 studios lock in $150/month for good", iw).y + 6.0f * k;
         dl->AddLine(ImVec2(ix, ty), ImVec2(ix + iw, ty), tc(featured ? accent : line, (featured ? 0.35f : 0.12f) * appear), hair);
         ty += 14.0f * k;
         // The perks, each after a check mark.
@@ -562,11 +584,10 @@ void App::drawSupportCard() {
             const ImVec2 tick[3] = {ImVec2(cc.x - 3.6f * k, cc.y + 0.2f * k), ImVec2(cc.x - 1.0f * k, cc.y + 2.8f * k),
                                     ImVec2(cc.x + 3.8f * k, cc.y - 2.6f * k)};
             dl->AddPolyline(tick, 3, tc(theme::accentHover, appear), 0, 1.7f * k);
-            const bool promise = perk == kInsiderNote; // the early-access promise, a step brighter
-            ty += paint.text(promise ? boldUi : ImGui::GetFont(), 14.5f, ImVec2(ix + 26.0f * k, ty),
-                             tc(promise || featured ? ink : body, appear), perk, iw - 26.0f * k)
+            ty += paint.text(ImGui::GetFont(), 14.5f, ImVec2(ix + 26.0f * k, ty), tc(featured ? ink : body, appear), perk,
+                             iw - 26.0f * k)
                       .y +
-                  9.0f * k;
+                  7.0f * k;
         }
 
         // The one button, along the bottom.
