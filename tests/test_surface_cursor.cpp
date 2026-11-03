@@ -90,7 +90,7 @@ TEST(surface_cursor_steady_on_bumps) {
 }
 
 TEST(surface_cursor_cost_is_rays_not_mesh_passes) {
-    // A cursor update is 17 ray casts: on a 5M-triangle sphere it stays well under a millisecond (it walks the
+    // A cursor update is 33 ray casts: on a 5M-triangle sphere it stays well under a millisecond (it walks the
     // BVH, never the mesh). Generous bound so slow CI machines and debug builds pass.
     Mesh m = makeIcosphere(9, 1.0f);
     BVH bvh;

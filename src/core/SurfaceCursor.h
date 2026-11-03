@@ -6,7 +6,7 @@
 // made the ring wobble and break up on bumpy surfaces). The plane's normal is averaged over the brush's area, so
 // it turns smoothly with the form and ignores fine detail.
 //
-// Cost: under twenty BVH ray casts (each O(log n)) per cursor update, nothing that walks the whole mesh, so it stays
+// Cost: about thirty BVH ray casts (each O(log n)) per cursor update, nothing that walks the whole mesh, so it stays
 // cheap at tens of millions of triangles. The app only calls it on frames it draws anyway (pointer moved, stroke,
 // view change), so the idle view stays at 0 fps.
 #pragma once
@@ -24,10 +24,10 @@ namespace sf {
 // triangle's own normal on a coarse mesh); the triangle's normal if the mesh has no usable vertex normals.
 glm::vec3 interpolatedNormal(const Mesh& mesh, const RayHit& hit);
 
-// A steady normal for the cursor at `hit`: the shading normal there averaged with the normals at `samples` points
-// on each of two rings (half the brush radius and the full radius) pressed onto the surface: an area normal, so the
-// ring doesn't wobble from triangle to triangle as the pointer moves over fine detail. Points facing away from the
-// centre's normal (the far side of a thin part) are left out.
+// A steady normal for the cursor at `hit`: the plane fitted through `samples` surface points on each of two rings
+// (half the brush radius and the full radius) around it, fitted twice, so the ring follows the form under the brush
+// and doesn't wobble from bump to bump as the pointer moves over fine detail. The shading normal there when too
+// few points land (over a hole, at an edge).
 glm::vec3 surfaceCursorNormal(const Mesh& mesh, const BVH& bvh, const RayHit& hit, float radius, int samples = 8);
 
 // `count` points of the circle of `radius` about `center` in the plane through it with `normal` (a true circle:
