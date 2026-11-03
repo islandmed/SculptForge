@@ -35,26 +35,34 @@ StrokeLatch strokeModifierLatch(StrokeModifier m) {
     }
 }
 
+namespace {
+
+int sectionOf(int item) { return strokePopupIsStroke(item) ? 0 : strokePopupIsShape(item) ? 2 : 1; }
+int sectionCount(int section) { return section == 0 ? kStrokePopupStrokes : section == 1 ? kStrokePopupModifiers : kStrokePopupShapes; }
+int sectionFirst(int section) { return section == 0 ? 0 : section == 1 ? kStrokePopupStrokes : kStrokePopupStrokes + kStrokePopupModifiers; }
+
+} // namespace
+
 glm::vec2 StrokePopupGeometry::size() const {
     const int cols = columns > 0 ? columns : 1;
     const float w = 2.0f * pad + float(cols) * tile + float(cols - 1) * gap;
-    const int r = rows(kStrokePopupStrokes) + rows(kStrokePopupModifiers);
-    const float h = 2.0f * pad + 2.0f * header + float(r) * itemSize().y + float(r - 1) * gap + gap; // + the break
+    const int r = rows(kStrokePopupStrokes) + rows(kStrokePopupModifiers) + rows(kStrokePopupShapes);
+    const float h = 2.0f * pad + 3.0f * header + float(r) * itemSize().y + float(r - 1) * gap + 2.0f * gap; // + the breaks
     return {w, h};
 }
 
-float StrokePopupGeometry::sectionTop(bool modifiers) const {
-    if (!modifiers) return pad;
-    const int r = rows(kStrokePopupStrokes);
-    return pad + header + float(r) * (itemSize().y + gap) + gap;
+float StrokePopupGeometry::sectionTop(int section) const {
+    float y = pad;
+    for (int s = 0; s < section && s < 2; ++s) y += header + float(rows(sectionCount(s))) * (itemSize().y + gap) + gap;
+    return y;
 }
 
 glm::vec2 StrokePopupGeometry::itemMin(int item) const {
     if (columns <= 0 || item < 0 || item >= kStrokePopupItems) return {-1.0f, -1.0f};
-    const bool mod = !strokePopupIsStroke(item);
-    const int i = mod ? item - kStrokePopupStrokes : item;
+    const int section = sectionOf(item);
+    const int i = item - sectionFirst(section);
     const int col = i % columns, row = i / columns;
-    return {pad + float(col) * (tile + gap), sectionTop(mod) + header + float(row) * (itemSize().y + gap)};
+    return {pad + float(col) * (tile + gap), sectionTop(section) + header + float(row) * (itemSize().y + gap)};
 }
 
 int StrokePopupGeometry::itemAt(glm::vec2 p) const {

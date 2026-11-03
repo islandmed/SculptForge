@@ -223,6 +223,7 @@ void App::pollAutoUv() {
         status_ = "Auto UV: " + std::to_string(int(autoUv_->progress->load() * 100.0f)) + "%";
         return;
     }
+    if (jobWaitsForStroke()) return; // (the result lands when the stroke ends)
     const std::unique_ptr<AutoUvJob> job = std::move(autoUv_);
     const bool makeTexture = std::exchange(textureAfterAutoUv_, false);
     if (!job->done.get()) {
@@ -237,8 +238,7 @@ void App::pollAutoUv() {
         status_ = "Auto UV skipped: the mesh changed while it was being unwrapped";
         return;
     }
-    if (index != doc_.activeSubtool) doc_.selectSubtool(index);
-    if (doc_.sculptor.strokeActive()) endStroke();
+    const JobPart part(*this, index);
     Mesh m = doc_.mesh;
     // A painted texture and its layers move onto the new UVs, in the same undo step (core/TextureTransfer.h).
     const std::string note = setUvsKeepingTexture(m, std::move(job->result->uvs));

@@ -4,7 +4,8 @@
 // The stroke popup (Discord 11-02: "a popup for stroke type selection; the constant Ctrl+Shift / Alt combinations
 // interrupt the thought process"). One key (stroke.popup: G, Z in the Blender style) or the left shelf's button
 // opens a plain grid at the cursor, the current stroke under the pointer: the stroke types, then Add / Sub and
-// the latched modifiers Smooth, Mask and Select. Hold the key, point, let go: picked (a pen hovering works the
+// the latched modifiers Smooth, Mask and Select, then the mask and Cut shapes (they latch Mask or Select with that
+// shape: a plain drag masks or cuts with it, Discord 11-03). Hold the key, point, let go: picked (a pen hovering works the
 // same). Tap the key: the grid stays open; a click on a stroke picks it and closes, a click on a modifier toggles
 // it and leaves the grid open, a click beside it or Esc closes it. The click never reaches the model. The grid's
 // geometry and the latch rules are in core/StrokePopup.h.
@@ -40,6 +41,23 @@ constexpr ModifierLook kModifiers[] = {
      "Strokes draw the selection (hide) shape, as with Ctrl+Shift held, until you pick Select again or another brush."},
 };
 static_assert(std::size(kModifiers) == size_t(kStrokePopupModifiers));
+// The shapes (Discord 11-03): what they latch is in the corner, the shape under the icon.
+struct ShapeLook {
+    const char* label;
+    const char* glyph;
+    const char* kind; // "Mask" or "Cut"
+    const char* help;
+};
+constexpr ShapeLook kShapes[] = {
+    {"Pen", ICON_LC_PEN_TOOL, "Mask", "Strokes paint the mask (Ctrl erases it), no key held, until you pick it again or another brush."},
+    {"Lasso", ICON_LC_LASSO, "Mask", "A drag draws a lasso and masks inside it (Ctrl unmasks), no key held, until you pick it again."},
+    {"Rect", ICON_LC_SQUARE_DASHED, "Mask", "A drag draws a rectangle and masks inside it (Ctrl unmasks), no key held, until you pick it again."},
+    {"Line", ICON_LC_SLASH, "Cut", "A drag draws a Cut line (Alt: the other side), no key held, until you pick it again. Tool > Cut sets the mode."},
+    {"Lasso", ICON_LC_SCISSORS, "Cut", "A drag draws a Cut lasso, no key held, until you pick it again. Tool > Cut sets the mode."},
+    {"Rect", ICON_LC_SQUARE_DASHED, "Cut", "A drag draws a Cut rectangle, no key held, until you pick it again. Tool > Cut sets the mode."},
+    {"Polyline", ICON_LC_WAYPOINTS, "Cut", "Clicks place a Cut polyline's points (the first point closes it, Enter ends it), no key held."},
+};
+static_assert(std::size(kShapes) == size_t(kStrokePopupShapes));
 
 StrokePopupGeometry popupGeometry(float s) {
     StrokePopupGeometry g;
@@ -60,9 +78,10 @@ void App::registerStrokePopupActions() {
     a.label = "Stroke popup";
     a.icon = ICON_LC_LAYOUT_GRID;
     a.palette = "Stroke";
-    a.description = "A grid at the cursor with the stroke types and the modifiers (Add / Sub, Smooth, Mask, Select). "
-                    "Hold the key, point at one and let go; or tap the key and click. Smooth, Mask and Select stay on "
-                    "without holding Shift or Ctrl, until you pick them again or another brush.";
+    a.description = "A grid at the cursor with the stroke types, the modifiers (Add / Sub, Smooth, Mask, Select) and "
+                    "the mask and Cut shapes. Hold the key, point at one and let go; or tap the key and click. Smooth, "
+                    "Mask, Select and the shapes stay on without holding Shift or Ctrl, until you pick them again or "
+                    "another brush.";
     a.run = [this] { openStrokePopup(keyDown_ != SDLK_UNKNOWN, int(keyDown_)); };
     a.checked = [this] { return strokePopup_.open; };
     actions_.add(std::move(a)); // (its key depends on the input style: applyInputStyle in Input.cpp)
@@ -82,6 +101,24 @@ void App::setStrokeLatch(StrokeLatch latch) {
                   : std::string(strokeLatchName(latch)) + " on: strokes " +
                         (latch == StrokeLatch::Smooth ? "smooth" : latch == StrokeLatch::Mask ? "mask" : "select") +
                         " until you pick " + strokeLatchName(latch) + " again or another brush";
+}
+
+App::SelectShape App::selectShapeOf(StrokeShape shape) {
+    switch (shape) {
+    case StrokeShape::MaskPen: return SelectShape::Pen;
+    case StrokeShape::MaskLasso: return SelectShape::Lasso;
+    case StrokeShape::MaskRect: return SelectShape::Rect;
+    case StrokeShape::CutLine: return SelectShape::CutLine;
+    case StrokeShape::CutLasso: return SelectShape::CutLasso;
+    case StrokeShape::CutRect: return SelectShape::CutRect;
+    default: return SelectShape::CutPolyline;
+    }
+}
+
+bool App::strokeShapeOn(StrokeShape shape) const {
+    const StrokeLatch latch = strokeLatch();
+    if (latch != strokeShapeLatch(shape)) return false;
+    return (latch == StrokeLatch::Mask ? maskShape_ : hideShape_) == selectShapeOf(shape);
 }
 
 void App::openStrokePopup(bool held, int key) {
@@ -116,6 +153,20 @@ void App::pickStrokePopupItem(int item, bool close) {
         strokeType_ = StrokeType(item);
         status_ = std::string("Stroke: ") + strokeTypeName(strokeType_);
         closeStrokePopup();
+        return;
+    }
+    if (strokePopupIsShape(item)) { // the shape, latched: a plain drag masks or cuts with it (Discord 11-03)
+        const StrokeShape shape = strokePopupShape(item);
+        const bool off = strokeShapeOn(shape);
+        const StrokeLatch latch = strokeShapeLatch(shape);
+        (latch == StrokeLatch::Mask ? maskShape_ : hideShape_) = selectShapeOf(shape);
+        setStrokeLatch(off ? StrokeLatch::None : latch);
+        const ShapeLook& look = kShapes[int(shape)];
+        if (!off)
+            status_ = std::string(look.kind) + " " + look.label + " on: " +
+                      (latch == StrokeLatch::Mask ? "drags mask without Ctrl (Ctrl unmasks)" : "drags cut without Ctrl+Shift") +
+                      " until you pick it again or another brush";
+        if (close) closeStrokePopup();
         return;
     }
     const StrokeModifier m = strokePopupModifier(item);
@@ -189,13 +240,19 @@ void App::drawStrokePopup() {
     const float s = uiScale_;
     ImDrawList* fg = ImGui::GetForegroundDrawList();
     const StrokeLatch latch = strokeLatch();
+    // Another brush picked ends the latch for good: going back to the first brush doesn't bring it back.
+    if (latch == StrokeLatch::None) strokeLatch_.latch = StrokeLatch::None;
     if (!strokePopup_.open) {
         // A latched modifier shows beside the brush cursor: strokes do something other than sculpt.
         const ImGuiIO& io = ImGui::GetIO();
         if (latch != StrokeLatch::None && !io.WantCaptureMouse && canvasRect().contains(mouseX_, mouseY_) &&
             radial_.menu < 0 && !quickMenu_.open) {
             ImFont* font = fontSmall_ ? fontSmall_ : ImGui::GetFont();
-            const char* text = strokeLatchName(latch);
+            std::string label = strokeLatchName(latch); // with the shape it draws: "Mask Lasso", "Cut Line"
+            for (int i = 0; i < kStrokePopupShapes; ++i)
+                if (StrokeShape(i) != StrokeShape::MaskPen && strokeShapeOn(StrokeShape(i)))
+                    label = std::string(kShapes[i].kind) + " " + kShapes[i].label;
+            const char* text = label.c_str();
             const ImVec2 ts = font->CalcTextSizeA(font->FontSize, FLT_MAX, 0.0f, text);
             const ImVec2 a(mouseX_ + 14.0f * s, mouseY_ + 14.0f * s);
             const ImVec2 b(a.x + ts.x + 12.0f * s, a.y + ts.y + 6.0f * s);
@@ -221,25 +278,27 @@ void App::drawStrokePopup() {
 
     ImFont* small = fontSmall_ ? fontSmall_ : ImGui::GetFont();
     ImFont* tiny = fontTiny_ ? fontTiny_ : small;
-    auto header = [&](bool modifiers, const char* title, const char* note) {
-        const float y = o.y + g.sectionTop(modifiers);
+    auto header = [&](int section, const char* title, const char* note) {
+        const float y = o.y + g.sectionTop(section);
         const float ty = y + (g.header - small->FontSize) * 0.5f - 1.0f * s;
         fg->AddText(small, small->FontSize, ImVec2(o.x + g.pad, ty), theme::u32(theme::textDim), title);
         const ImVec2 ns = tiny->CalcTextSizeA(tiny->FontSize, FLT_MAX, 0.0f, note);
         fg->AddText(tiny, tiny->FontSize, ImVec2(o.x + size.x - g.pad - ns.x, y + (g.header - tiny->FontSize) * 0.5f - 1.0f * s),
                     theme::u32(theme::textDim), note);
     };
-    header(false, "Stroke", "Let go over one, or click  \xc2\xb7  Esc");
-    header(true, "Modifiers", "Smooth, Mask, Select stay on");
+    header(0, "Stroke", "Let go over one, or click  \xc2\xb7  Esc");
+    header(1, "Modifiers", "Smooth, Mask, Select stay on");
+    header(2, "Shapes", "Drag with no key held");
 
     const glm::vec2 is = g.itemSize();
     for (int item = 0; item < kStrokePopupItems; ++item) {
         const glm::vec2 m = g.itemMin(item);
         const ImVec2 a(o.x + m.x, o.y + m.y), b(a.x + is.x, a.y + is.y);
         const ImVec2 iconB(b.x, a.y + g.tile);
-        const bool stroke = strokePopupIsStroke(item);
-        const StrokeModifier mod = stroke ? StrokeModifier::Count : strokePopupModifier(item);
+        const bool stroke = strokePopupIsStroke(item), shape = strokePopupIsShape(item);
+        const StrokeModifier mod = stroke || shape ? StrokeModifier::Count : strokePopupModifier(item);
         const bool on = stroke ? strokeType_ == StrokeType(item)
+                        : shape ? strokeShapeOn(strokePopupShape(item))
                         : mod == StrokeModifier::Add ? !invertToggle_
                         : mod == StrokeModifier::Sub ? invertToggle_
                                                      : latch == strokeModifierLatch(mod);
@@ -248,19 +307,23 @@ void App::drawStrokePopup() {
         fg->AddRectFilled(a, b, theme::u32(hot ? theme::buttonHover : on ? theme::toggleOn : theme::tile), r);
         fg->AddRect(a, b, theme::u32(hot || on ? theme::accent : theme::tileBorder, hot ? 1.0f : on ? 0.8f : 1.0f), r, 0,
                     (hot ? 2.0f : 1.0f) * s);
-        const char* label = stroke ? strokeTypeName(StrokeType(item)) : kModifiers[int(mod)].label;
+        const char* label = stroke ? strokeTypeName(StrokeType(item))
+                            : shape ? kShapes[int(strokePopupShape(item))].label
+                                    : kModifiers[int(mod)].label;
         if (stroke) {
             drawStrokeIcon(fg, a, iconB, StrokeType(item));
         } else {
-            const ModifierLook& look = kModifiers[int(mod)];
+            const char* glyph = shape ? kShapes[int(strokePopupShape(item))].glyph : kModifiers[int(mod)].glyph;
+            // The keys a modifier stands for, or what a shape does (Mask, Cut), in the corner.
+            const char* corner = shape ? kShapes[int(strokePopupShape(item))].kind : kModifiers[int(mod)].keys;
             const float fs = g.tile * 0.42f;
-            const ImVec2 gs = ImGui::GetFont()->CalcTextSizeA(fs, FLT_MAX, 0.0f, look.glyph);
+            const ImVec2 gs = ImGui::GetFont()->CalcTextSizeA(fs, FLT_MAX, 0.0f, glyph);
             fg->AddText(ImGui::GetFont(), fs, ImVec2(a.x + (g.tile - gs.x) * 0.5f, a.y + (g.tile - gs.y) * 0.5f + 2.0f * s),
-                        theme::u32(on ? theme::accent : theme::text), look.glyph);
-            if (*look.keys) { // the keys it stands for, in the corner
-                const ImVec2 ks = tiny->CalcTextSizeA(tiny->FontSize, FLT_MAX, 0.0f, look.keys);
+                        theme::u32(on ? theme::accent : theme::text), glyph);
+            if (*corner) {
+                const ImVec2 ks = tiny->CalcTextSizeA(tiny->FontSize, FLT_MAX, 0.0f, corner);
                 fg->AddText(tiny, tiny->FontSize, ImVec2(b.x - ks.x - 4.0f * s, a.y + 3.0f * s), theme::u32(theme::textDim),
-                            look.keys);
+                            corner);
             }
         }
         const ImVec2 ls = small->CalcTextSizeA(small->FontSize, FLT_MAX, 0.0f, label);
@@ -269,7 +332,8 @@ void App::drawStrokePopup() {
     }
     // The hovered item's line of help under the panel (Ctrl-hover help doesn't reach a foreground drawing).
     if (strokePopup_.hover >= 0 && !strokePopupIsStroke(strokePopup_.hover)) {
-        const char* help = kModifiers[int(strokePopupModifier(strokePopup_.hover))].help;
+        const char* help = strokePopupIsShape(strokePopup_.hover) ? kShapes[int(strokePopupShape(strokePopup_.hover))].help
+                                                                 : kModifiers[int(strokePopupModifier(strokePopup_.hover))].help;
         const ImVec2 hs = small->CalcTextSizeA(small->FontSize, FLT_MAX, 0.0f, help);
         const ImVec2 a(o.x, o.y + size.y + 4.0f * s), b(o.x + hs.x + 14.0f * s, a.y + hs.y + 8.0f * s);
         fg->AddRectFilled(a, b, theme::u32(theme::panelBg, 0.95f), theme::rounding(4.0f * s));

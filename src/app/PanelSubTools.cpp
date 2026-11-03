@@ -146,6 +146,24 @@ void App::partSelected(const char* how) {
     status_ = "Active Part: " + doc_.activeSubtoolInfo().name + " (" + how + ")";
 }
 
+App::JobPart::JobPart(App& a, int index) : app(a) {
+    if (index < 0 || index == app.doc_.activeSubtool) return;
+    back = app.doc_.activeSubtoolInfo().id;
+    switched = true;
+    app.doc_.selectSubtool(index);
+}
+
+App::JobPart::~JobPart() {
+    if (!switched) return;
+    const std::string done = app.doc_.activeSubtoolInfo().name;
+    const int i = app.doc_.subtoolIndex(back);
+    if (i < 0 || i == app.doc_.activeSubtool) return;
+    app.doc_.selectSubtool(i);
+    app.status_ += " (on " + done + "; " + app.doc_.activeSubtoolInfo().name + " stays the active Part)";
+}
+
+bool App::jobWaitsForStroke() const { return drag_ == Drag::Stroke || doc_.sculptor.strokeActive() || !dabQueue_.empty(); }
+
 void App::updateSubtoolThumbnails() {
     // #43: what each SubTool looks like now; the schedule picks at most one to render this frame, from the GPU
     // buffers syncScene just brought up to date (never a CPU render, never a re-upload: cheap on 30M+ meshes).

@@ -602,6 +602,8 @@ private:
     // The Cut shapes share the Ctrl+Shift drag with SelectRect / SelectLasso (PanelCut.cpp).
     enum class SelectShape { Pen, Lasso, Rect, CutLine, CutLasso, CutRect, CutPolyline };
     static bool isCutShape(SelectShape s) { return s >= SelectShape::CutLine; }
+    static SelectShape selectShapeOf(StrokeShape shape); // the stroke popup's shapes (StrokePopup.cpp)
+    bool strokeShapeOn(StrokeShape shape) const;         // its latch is on with this shape
     enum class SelectTarget { Hide, Mask };
     void beginSelection(float x, float y, SelectTarget target, SelectShape shape);
     void selectionMove(float x, float y);
@@ -1244,6 +1246,20 @@ private:
     float subtoolClickX_ = 0.0f, subtoolClickY_ = 0.0f;
     Uint64 subtoolClickNs_ = 0; // when the Alt press on another Part began (a long pen press isn't a click)
     void partSelected(const char* how);
+    // A background job's result (Auto UV, Voxel Remesh, QRemesh, Unwrap) goes onto the Part it ran on, and the
+    // active Part stays the one the user is on (Discord: "the active Part switches by itself" when a job finished
+    // after picking another Part). JobPart makes the job's Part active for the result; its destructor goes back
+    // and the status bar says where the result went. Results wait while a stroke is on (jobWaitsForStroke).
+    struct JobPart {
+        JobPart(App& app, int index);
+        ~JobPart();
+        JobPart(const JobPart&) = delete;
+        JobPart& operator=(const JobPart&) = delete;
+        App& app;
+        uint32_t back = 0;
+        bool switched = false;
+    };
+    bool jobWaitsForStroke() const;
     Uint64 clickClockNs() const; // the status bar names the new active Part and how it was chosen
     uint32_t renamingSubtool_ = 0; // SubTool id being renamed inline (0: none)
     uint32_t listedActiveSubtool_ = 0; // the list scrolls to the active SubTool when it changes
@@ -2048,6 +2064,7 @@ private:
     void registerTimelineUiActions(); // view.timeline, timeline.timelapse, help.benchmark
     void startTimelapse(const std::string& path, int width, int height, float seconds, int fps);
     bool timelapseStep(double budgetSeconds); // renders frames for up to the budget; false when finished
+    bool timelapseBusy() const; // a timelapse is rendering (a few frames each app frame)
     int runTimelapseCli();                    // sculptforge FILE --timelapse out.mp4
     void startProofMode();                    // Help > Benchmark, sculptforge --benchmark
     bool proofSkippedScenes() const;          // the benchmark skipped a scene: too little free memory
