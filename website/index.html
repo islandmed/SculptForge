@@ -20,7 +20,7 @@
   {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "SculptForge", "url": "https://sculptforge.app/", "applicationCategory": "MultimediaApplication", "applicationSubCategory": "3D sculpting", "operatingSystem": "Windows 10, Windows 11, macOS, Linux", "softwareVersion": "0.10.8", "description": "Free, open-source digital sculpting: an alternative to ZBrush and Mudbox for VFX, animation and game studios.", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "downloadUrl": "https://github.com/islandmed/SculptForge/releases/latest", "image": "https://sculptforge.app/img/social-preview.png?v=3", "sameAs": ["https://github.com/islandmed/SculptForge"]}
   </script>
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="stylesheet" href="style.css?v=18">
+  <link rel="stylesheet" href="style.css?v=19">
   <script src="motion.js?v=11" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </head>
@@ -101,247 +101,19 @@
     <section id="whats-new" class="section alt">
       <div class="wrap">
         <h2>What's new in 0.10</h2>
-        <p class="section-lede">New in 0.10.8: Tablets fixed. New in 0.10.7: A new look, clearer memberships, native Wayland. New in 0.10.6: PBR texturing in the viewport with fill layers and material recipes, quad-safe Smooth, backface culling, a crosshair cursor and a tablet fix. New in 0.10.5: a UV Editor, selection sets with a Morph brush, radial and local symmetry, strokes that start off the model, the timeline at the top, and a fix for the viewport on some Windows PCs. New in 0.10.4: insert your own meshes, Keep Masked remeshing, pie menus, a Maya bridge, Spanish and twelve new alphas. New in 0.10.3: alternate smooth, better masking, Part thumbnails and fixes from your requests. New in 0.10.2: Quad Remesh 2, Kelvinlet brushes and Capture from view. New in 0.10: micro levels for hundreds of millions of polygons, material painting (PBR), the Sculpt Timeline and a built-in benchmark. New in 0.9.7: faster big brushes on dense meshes and a right-click QuickMenu. New in 0.9.6: Extract, Mirror And Weld and a Flatpak. New in 0.9.5: Forge Spheres, Blender keys, flat shading, your own MatCaps and SpaceMouse support. New in 0.9.4: Soft Clay grey exports and self-updating AppImages. New in 0.9.3: a cleaner look, made for reading your sculpt. Before that, maquette to performance: scan a clay maquette with your phone, sculpt on the scan,
-          give the head its facial shapes and drive them with your own face. <a href="guide/whats-new.html">Everything that changed</a> ·
-          <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">changelog</a></p>
-        <div class="grid">
-          <article class="card">
-            <h3>Tablets fixed <small>new in 0.10.8</small></h3>
-            <p>Tablets in Mouse mode follow the pen again on Windows (#72). <a href="guide/whats-new.html">What's new</a></p>
-          </article>
-          <article class="card">
-            <h3>A new look, clearer memberships, native Wayland <small>new in 0.10.7</small></h3>
-            <p><strong>Forge Terminal</strong> is the new look for new installs: Tokyo Night colours and menus grouped by task, with the ZBrush-style layout one click away (updates keep your layout until you choose). Clearer <strong>memberships</strong> (a vote for Supporters; daily drops and preview builds for Insiders; Studio for your whole company), full alphas on <strong>custom brushes</strong> at Focal Shift -100 (#75), <strong>native Wayland</strong> on Linux and a built-in <strong>15M/33M benchmark</strong>. <a href="guide/whats-new.html">What's new</a></p>
-          </article>
-          <article class="card">
-            <h3>PBR texturing, quad-safe Smooth, backface culling <small>new in 0.10.6</small></h3>
-            <p><strong>PBR texturing</strong> in the viewport: live Mesh Maps that re-bake as you sculpt,
-              <strong>Fill layers</strong> and <strong>Material Recipes</strong>. <strong>Smooth</strong> keeps quad
-              topology after Quad Remesh, <strong>Keep Masked</strong> works on real voxel remeshes, and there's
-              <strong>backface culling</strong>, a <strong>crosshair cursor</strong> and a right-button pie option.
-              Also fixed: tablet mouse mode drifting from the system cursor, safer glTF import and an intermittent
-              Fill layers crash. <a href="guide/whats-new.html">What's new</a></p>
-          </article>
-          <article class="card">
-            <h3>UV Editor, selection sets, radial symmetry <small>new in 0.10.5</small></h3>
-            <p>A full <strong>UV Editor</strong> (Alt+U): UDIM tiles, seams, six unwraps, packing, texel density and trim
-              sheets, with stretch shown live on the model and paint that follows new UVs. Store as many <strong>selection sets</strong> per Part as you like (mask, groups, visibility, vertex
-              paint, UVs and shape), restore them at any level and morph back toward them with the new
-              <strong>Morph</strong> brush. Sculpt with <strong>radial and local symmetry</strong>, start strokes
-              <strong>off the model</strong> (Shift+L), and find the timeline at the top. Also fixed: the viewport on
-              some Windows PCs. <a href="guide/whats-new.html">What's new</a></p>
-          </article>
-          <article class="card">
-            <h3>Your own meshes, Keep Masked, pie menus <small>new in 0.10.4</small></h3>
-            <p><strong>Insert your own mesh</strong> (a Part or an OBJ, PLY or GLB) by dragging on the model.
-              <strong>Keep Masked</strong> remeshes everything but the masked detail. Hold <strong>T</strong> or
-              <strong>Y</strong> for <strong>pie menus</strong>, swap meshes with <strong>Maya</strong> through a
-              folder, switch the interface to <strong>Spanish</strong>, and sculpt with twelve new alphas and six
-              VDM brushes. <a href="guide/whats-new.html">What's new</a></p>
-          </article>
-          <article class="card">
-            <h3>Alternate smooth, better masking <small>new in 0.10.3</small></h3>
-            <p>Let go of Shift mid-stroke to <strong>smooth without losing volume</strong>, as in ZBrush.
-              <strong>Ctrl+drag</strong> draws a mask rectangle, Lasso and Rectangle masks follow symmetry, pen
-              tablets in mouse mode stop jumping, and the axis gizmo snaps views. Plus Part thumbnails and Undo
-              / Redo on the shelf.
-              <a href="guide/whats-new.html">What's new</a></p>
-          </article>
-          <article class="card">
-            <h3>Quad Remesh 2, Kelvinlet brushes <small>new in 0.10.2</small></h3>
-            <p><strong>Quad Remesh 2</strong> is the new default quad remesher: two to fifty times fewer poles at the same
-              accuracy, edge loops that follow the forms and exact symmetry. <strong>Kelvinlet brushes</strong> move the
-              surface like elastic clay, and <strong>Capture from view</strong> turns any detail into an alpha or a vector
-              displacement brush. Also a security fix for video export file names: please update.
-              <a href="guide/whats-new.html">What's new</a></p>
-          </article>
-          <article class="card">
-            <h3>Hundreds of millions of polygons, material painting <small>new in 0.10</small></h3>
-            <p><strong>Micro levels</strong> sculpt about a billion triangles in under 2 GB of memory. Paint roughness,
-              metal, normal and height alongside colour and export maps for Unreal, Unity, glTF and Godot. Scrub back
-              through every stroke in the <strong>Sculpt Timeline</strong>, run <strong>Help &gt; Benchmark</strong> on your
-              own machine, and get Maya navigation, focal length and more primitives.
-              <a href="guide/whats-new.html">What's new</a></p>
-          </article>
-          <article class="card">
-            <h3>Faster big brushes, right-click Quick Menu <small>new in 0.9.7</small></h3>
-            <p>On a 21-million-triangle model a 200-pixel brush now takes a third less time per frame, trails the pen
-              by about half as far and no longer pauses when you lift it. A <strong>right click</strong> opens the Quick Menu
-              as in ZBrush, dynamic topology with symmetry remeshes both sides of a Quad Remeshed head, and the
-              orthographic view shades correctly. <a href="guide/whats-new.html">What's new</a></p>
-          </article>
-          <article class="card">
-            <h3>Extract, Mirror And Weld, a Flatpak <small>new in 0.9.6</small></h3>
-            <p>Mask part of a sculpt and <strong>Extract</strong> it as a shell for a helmet, a strap or armour;
-              <strong>Mirror And Weld</strong> makes one side match the other in a single watertight mesh. Divide no
-              longer crashes on models from Blender, fast strokes on dense meshes keep their curve, and Linux users can
-              install the Flatpak. <a href="guide/whats-new.html">What's new</a></p>
-          </article>
-          <article class="card">
-            <h3>Forge Spheres, Blender keys, Lit Spheres, SpaceMouse <small>new in 0.9.5</small></h3>
-            <p>Block out a body or creature from connected spheres, as in ZBrush, then <strong>Make Mesh</strong>
-              turns it into an all-quad Part to sculpt. Blender users get Blender's navigation and Sculpt Mode keys
-              (and can import their own keymap). Load your own lit spheres, switch to flat shading, steer the view with a
-              3Dconnexion SpaceMouse (experimental), and enjoy an app that sits at 0% GPU when idle. <a href="guide/forge-spheres.html">Forge Spheres</a> &middot;
-              <a href="guide/whats-new.html">What's new</a></p>
-          </article>
-          <article class="card">
-            <h3>Soft Clay everywhere, AppImages that update <small>new in 0.9.4</small></h3>
-            <p>FBX and USD exports without a material of their own, and splats made from an unpainted sculpt, use the
-              Soft Clay grey instead of the old peach. The Linux AppImages are now named
-              <code>SculptForge-0.9.4-x86_64.AppImage</code> (and <code>-aarch64</code>) and update themselves with
-              AppImageUpdate. <a href="guide/whats-new.html">What's new</a></p>
-          </article>
-          <article class="card">
-            <h3>A cleaner look <small>new in 0.9.3</small></h3>
-            <p>The new default material, Soft Clay, is matte with a clear light and shadow side, so every stroke reads
-              at a glance. Orange now marks only the tool you're using, and every brush has its own icon.
-              <a href="press.html">See the screenshots</a></p>
-          </article>
-          <article class="card">
-            <h3>Your shelf, your size <small>new in 0.9.3</small></h3>
-            <p>Bigger brush tiles on the bottom shelf. Right-click a brush and choose Tile size: Small, Medium or
-              Large. Plus File &gt; Export STL for 3D printing, and one-command install on a Mac:
-              <code>brew install --cask islandmed/tap/sculptforge</code>.
-              <a href="guide/interface.html#bottom-shelf">The bottom shelf</a></p>
-          </article>
-          <article class="card">
-            <h3>Your phone is the scanner <small>new in 0.9</small></h3>
-            <p>Scan the QR code in File &gt; Capture from phone, walk round an object for half a minute, and the
-              Gaussian splat trains on your own graphics card, sharpening in the viewport while you orbit. No app, no
-              account. <a href="guide/phone-capture.html">Phone capture</a> ·
-              <a href="guide/scan-to-splat.html">Scan to splat</a></p>
-          </article>
-          <article class="card">
-            <h3>Make sculptable <small>new in 0.9</small></h3>
-            <p>One click turns a scan into a watertight quad mesh with its colours, with edge loops round the eyes
-              and mouth when it's a head: a production asset, not a point cloud.
-              <a href="guide/scan-to-sculptable.html">From scan to sculptable</a></p>
-          </article>
-          <article class="card">
-            <h3>Facial shapes in one click <small>new in 0.9</small></h3>
-            <p>Generate the 52 ARKit blend shapes on any sculpted head, fitted to its proportions, then fix them by
-              sculpting. They export with their names to GLB, USD, FBX and Blender.
-              <a href="guide/facial-shapes.html">Facial shapes</a></p>
-          </article>
-          <article class="card">
-            <h3>Drive the face live, see it on your desk <small>new in 0.9</small></h3>
-            <p>Point your phone at your face and the character makes your expressions in real time; record takes
-              and bake them to animation. View in AR stands your sculpt on your real desk.
-              <a href="guide/phone-capture.html">How it works</a></p>
-          </article>
-          <article class="card">
-            <h3>Bring your ZTools over <small>new in 0.8.1</small></h3>
-            <p>A free plug-in for ZBrush converts a ZTool once, then SculptForge opens the .ZTL with every SubTool as a Part,
-              face groups, vertex paint, mask and UVs. Plus faster texture painting and ZBrush's Ctrl mask brushes.
-              <a href="guide/coming-from-zbrush.html#bring-your-ztools-over">How it works</a></p>
-          </article>
-          <article class="card">
-            <h3>Dynamic topology <small>new in 0.8</small></h3>
-            <p>Turn on Dynamic and the brush adds triangles where it needs detail and removes them where it doesn't,
-              like ZBrush's Sculptris Pro: pull a sphere into horns or fingers without stretching, with mirrored
-              triangles under symmetry. <a href="guide/dynamic-topology.html">How it works</a></p>
-          </article>
-          <article class="card">
-            <h3>Vector displacement brushes <small>new in 0.8</small></h3>
-            <p>One drag stamps a whole shape with overhangs: horns that lean, ears that curl, scales that overlap.
-              Make your own from a VDM plane, or use the EXRs Blender makes.
-              <a href="guide/sculpting.html#vector-displacement-brushes">VDM brushes</a></p>
-          </article>
-          <article class="card">
-            <h3>Quad Remesh Guides <small>new in 0.8</small></h3>
-            <p>Draw curves on the model and Quad Remesh's edge loops follow them, round the eyes and the mouth.
-              Sculpt layers now work on every subdivision level too.
-              <a href="guide/retopology.html">Retopology</a></p>
-          </article>
-          <article class="card">
-            <h3>ZBrush-style keys <small>new in 0.7</small></h3>
-            <p>With the ZBrush-style keymap, S, U, I and O open Draw Size, Intensity, RGB Intensity and Falloff under the cursor, Space
-              opens the Quick Menu, and B C B, B D S, B M V pick brushes.
-              <a href="guide/coming-from-zbrush.html">Coming from ZBrush</a></p>
-          </article>
-          <article class="card">
-            <h3>Works with Blender <small>new in 0.7</small></h3>
-            <p>A free add-on sends the selected objects to SculptForge in one click, and one click sends them back
-              into the same objects with transforms, UVs, colours, mask and face sets.
-              <a href="guide/blender.html">How it works</a></p>
-          </article>
-          <article class="card">
-            <h3>Familiar gestures <small>new in 0.7</small></h3>
-            <p>Ctrl+click blurs the mask and Ctrl+Alt+click sharpens it, Shift mid-stroke draws a straight line,
-              Falloff shapes the brush edge, and Smooth keeps its own strength. Each is a preference.</p>
-          </article>
-          <article class="card">
-            <h3>Half the memory <small>new in 0.6</small></h3>
-            <p>A 33 million triangle sculpt with all its subdivision levels fits in 3.4 GB instead of 5.6, and
-              Divide is limited only by your memory: past 100 million triangles on a 32 GB laptop.</p>
-          </article>
-          <article class="card">
-            <h3>A view twice as fast <small>new in 0.6</small></h3>
-            <p>Only what you can see is drawn. A 33 million triangle model turns at 109 fps with 4x antialiasing
-              and 270 fps with Fast Navigation, on a laptop's integrated graphics.</p>
-          </article>
-          <article class="card">
-            <h3>Quicker brushes on huge meshes <small>new in 0.6</small></h3>
-            <p>A medium dab on 33 million triangles takes about 7.5 ms, big brushes about 45 ms, and masking and
-              painting are about twice as fast. Opening a big project is twice as fast too.</p>
-          </article>
-          <article class="card">
-            <h3>Prints at the right size <small>new in 0.6</small></h3>
-            <p>STL export is in millimetres with Z up, as slicers expect, with a print height option. Downloaded
-              print models open upright and at their real size.</p>
-          </article>
-          <article class="card">
-            <h3>Update notifications <small>new in 0.6</small></h3>
-            <p>A small banner tells you when a new version is out, with what's in it. One small file once a day,
-              nothing about you is sent, and one switch turns it off.</p>
-          </article>
-          <article class="card">
-            <h3>Subdivision levels <small>new in 0.5</small></h3>
-            <p>Divide, then step down for big forms and back up for detail, like ZBrush's SDiv. Changes at a low
-              level carry up to the detail; Reconstruct Subdiv and Del Lower / Higher are there too.</p>
-          </article>
-          <article class="card">
-            <h3>Quad Remesh and Project All <small>new in 0.5</small></h3>
-            <p>Turn any sculpt into clean quads with edge loops that follow the forms, near a target count, then
-              project the sculpted detail and vertex paint back onto the divided quads.</p>
-          </article>
-          <article class="card">
-            <h3>Map baking <small>new in 0.5</small></h3>
-            <p>Bake normal, displacement, AO, cavity and colour maps from the high-poly to the low-poly with
-              MikkTSpace tangents, preview them in the viewport and send them to Unreal.</p>
-          </article>
-          <article class="card">
-            <h3>Gizmo <small>new in 0.5</small></h3>
-            <p>W, E and R move, scale and rotate a Part or just its unmasked part, with soft falloff for posing
-              limbs. <strong>All Parts</strong> moves every Part at once.</p>
-          </article>
-          <article class="card">
-            <h3>Texture painting on UVs <small>new in 0.4.2</small></h3>
-            <p>Paint into a 1K to 8K texture instead of the vertices, so colour detail no longer depends on the
-              mesh. Auto UV unwraps any sculpt, paint layers work on textures, and exports carry the texture.</p>
-          </article>
-          <article class="card">
-            <h3>Navigation styles</h3>
-            <p>Free rotation that rolls over the top, Shift to snap to front, side or top views, and Alt+drag then
-              release Alt to zoom, as ZBrush users expect, or Blender and Maya navigation. Prefer an upright turntable? It's one setting away.</p>
-          </article>
-          <article class="card">
-            <h3>Lasso and rectangle masking</h3>
-            <p>Mask Lasso and Mask Rectangle: Ctrl+drag a shape to mask what's inside, Ctrl+Alt to unmask. Select Lasso
-              isolates or hides any free-hand area with Ctrl+Shift.</p>
-          </article>
-          <article class="card">
-            <h3>Paint layers with blend modes</h3>
-            <p>Photoshop-style vertex paint layers: Multiply, Screen, Overlay, Soft Light and more, each with its own
-              opacity, lock and visibility.</p>
-          </article>
-          <article class="card">
-            <h3>Quads stay quads</h3>
-            <p>Models from ZBrush, OBJ, FBX or USD keep their quads in the wireframe and on export. Subdivide makes
-              quads, and voxel remesh gives an even quad grid.</p>
-          </article>
+        <!-- whats-new:start (tools/guide/build_site.py writes this from docs/guide/whats-new.md: edit that) -->
+        <p class="section-lede">New in 0.10.8: Tablets in mouse mode follow the pen again. <a href="guide/whats-new.html">Everything that changed</a> &middot; <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">changelog</a></p>
+        <div class="wn-home">
+          <article class="wn-home-card"><a href="guide/whats-new.html#version-0108"><div class="wn-pic wn-pic-mark"><img src="img/logo.svg?v=2" alt="" width="64" height="64"></div><div class="wn-card-body"><h3>Tablet mouse mode <small>new in 0.10.8</small></h3><p>Tablets in mouse mode follow the pen again.</p><ul><li>The brush follows the pen again on some Windows tablets (#72)</li></ul></div></a></article>
+          <article class="wn-home-card"><a href="guide/whats-new.html#version-0107"><div class="wn-pic"><img src="guide/images/wn-new-look.jpg" alt="" width="600" height="340" loading="lazy" decoding="async"></div><div class="wn-card-body"><h3>A new look, Memberships, Benchmark <small>new in 0.10.7</small></h3><p>A new look, clearer memberships, full alphas on every brush and a benchmark you can run.</p><ul><li>A new look</li><li>Clearer memberships</li><li>Full alphas, every brush</li><li>Native Wayland</li><li>Benchmark your machine</li></ul></div></a></article>
+          <article class="wn-home-card"><a href="guide/whats-new.html#version-0106"><div class="wn-pic"><img src="guide/images/pbr-viewport.jpg" alt="" width="600" height="340" loading="lazy" decoding="async"></div><div class="wn-card-body"><h3>PBR viewport, Fill layers, Packs and macros <small>new in 0.10.6</small></h3><p>See materials as a game engine does, wear that follows the sculpt, and packs you can share.</p><ul><li>PBR viewport</li><li>Fill layers</li><li>More maps to bake</li></ul></div></a></article>
         </div>
+        <div class="wn-home-groups">
+          <a class="wn-home-group" href="guide/whats-new.html#versions-0101-to-0105"><h3>0.10.1 to 0.10.5</h3><ul><li>UV Editor</li><li>Keep Masked remeshing</li><li>Alternate smooth</li><li>Quad Remesh 2</li><li>Micro levels</li><li>PBR painting</li></ul><span>All changes &rarr;</span></a>
+          <a class="wn-home-group" href="guide/whats-new.html#versions-09x"><h3>0.9.x</h3><ul><li>Faster big brushes</li><li>Extract</li><li>Mirror And Weld</li><li>Forge Spheres</li><li>Blender keys</li><li>Scan to sculptable</li></ul><span>All changes &rarr;</span></a>
+          <a class="wn-home-group" href="guide/whats-new.html#versions-08-and-earlier"><h3>0.8 and earlier</h3><ul><li>Dynamic topology</li><li>Vector displacement brushes</li><li>Blender bridge</li><li>Half the memory</li><li>Subdivision levels</li><li>Map baking</li></ul><span>All changes &rarr;</span></a>
+        </div>
+        <!-- whats-new:end -->
       </div>
     </section>
 

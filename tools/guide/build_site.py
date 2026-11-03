@@ -626,6 +626,60 @@ class WhatsNewPage(Page):
         return "\n".join(out)
 
 
+
+# The home page's release area (website/index.html #whats-new, between the whats-new markers): the newest versions
+# as cards with their first picture, then the older ones as groups of highlights, all linking into the guide chapter.
+HOME = ROOT / "website" / "index.html"
+HOME_START, HOME_END = "<!-- whats-new:start", "<!-- whats-new:end -->"
+CHANGELOG_URL = "https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md"
+
+
+def home_whats_new(page: "WhatsNewPage") -> str:
+    vs = page.versions[:page.detailed]
+    out = []
+    if vs:
+        lede = vs[0]["tagline"] or vs[0]["version"]
+        out.append(f'        <p class="section-lede">New in {html.escape(vs[0]["version"])}: {inline(lede, [])} '
+                   f'<a href="guide/whats-new.html">Everything that changed</a> &middot; <a href="{CHANGELOG_URL}">changelog</a></p>')
+    out.append('        <div class="wn-home">')
+    for v in vs:
+        titles = [split_highlight(h)[0] for h in v["highlights"] if split_highlight(h)[0]] or [c["title"] for c in v["cards"]]
+        pic = next((c["image"] for c in v["cards"] if c["image"]), "")
+        img = (f'<div class="wn-pic"><img src="guide/{html.escape(pic)}" alt="" width="600" height="340" loading="lazy" '
+               f'decoding="async"></div>') if pic else \
+            '<div class="wn-pic wn-pic-mark"><img src="img/logo.svg?v=2" alt="" width="64" height="64"></div>'
+        items = "".join(f"<li>{inline(c['title'], [])}</li>" for c in v["cards"]) or \
+            "".join(f"<li>{inline(r[:1].upper() + r[1:], [])}</li>" for _, r in map(split_highlight, v["highlights"]))
+        out.append(f'          <article class="wn-home-card"><a href="guide/whats-new.html#{v["anchor"]}">{img}'
+                   f'<div class="wn-card-body"><h3>{html.escape(", ".join(titles[:3]) or "Version " + v["version"])} '
+                   f'<small>new in {html.escape(v["version"])}</small></h3>'
+                   + (f'<p>{inline(v["tagline"], [])}</p>' if v["tagline"] else "")
+                   + f'<ul>{items}</ul></div></a></article>')
+    out.append("        </div>")
+    if page.groups:
+        out.append('        <div class="wn-home-groups">')
+        for g in page.groups:
+            items = "".join(f"<li>{inline(tt, [])}</li>" for tt, _ in map(split_highlight, g["highlights"]) if tt)
+            out.append(f'          <a class="wn-home-group" href="guide/whats-new.html#{g["anchor"]}"><h3>{html.escape(g["label"])}</h3>'
+                       f'<ul>{items}</ul><span>All changes &rarr;</span></a>')
+        out.append("        </div>")
+    return "\n".join(out)
+
+
+def write_home(page: "WhatsNewPage", check_only: bool) -> bool:
+    """Writes the release area into website/index.html; with CHECK_ONLY, True when it is already up to date."""
+    t = HOME.read_text(encoding="utf-8")
+    a = t.find(HOME_START)
+    b = t.find(HOME_END, a)
+    if a < 0 or b < 0:
+        sys.exit(f"{HOME}: no {HOME_START} ... {HOME_END} markers in #whats-new")
+    a = t.index("\n", a) + 1
+    new = t[:a] + home_whats_new(page) + "\n        " + t[b:]
+    if check_only:
+        return new == t
+    HOME.write_text(new, encoding="utf-8")
+    return True
+
 # ---------------------------------------------------------------------------
 # The book
 # ---------------------------------------------------------------------------
@@ -717,7 +771,7 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
   <meta property="og:description" content="{desc}">
   <meta property="og:image" content="{SITE}img/social-preview.png?v=3">
   <meta property="og:url" content="{url}">
-  <link rel="stylesheet" href="../style.css?v=18">
+  <link rel="stylesheet" href="../style.css?v=19">
   <script src="../motion.js?v=11" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   <script src="search-index.js?v={len(chapters)}" defer></script>
@@ -968,8 +1022,11 @@ def main() -> int:
               file=sys.stderr)
         return 1
     index, chapters = load_book()
+    wn = next((c for _, c in chapters if isinstance(c, WhatsNewPage)), None)
     if args.check:
         problems = check(index, chapters)
+        if wn and args.out.resolve() == (ROOT / "website" / "guide").resolve() and not write_home(wn, True):
+            problems.append("website/index.html: the What's New area is out of date with whats-new.md: run tools/guide/build_site.py")
         for p in problems:
             print(p, file=sys.stderr)
         if problems:
@@ -1000,6 +1057,8 @@ def main() -> int:
     # every guide page. Only for the real site, not --out folders.
     if out.resolve() == (ROOT / "website" / "guide").resolve():
         SUPPORTERS_PAGE.write_text(supporters_html(), encoding="utf-8")
+        if wn:
+            write_home(wn, False)
         urls = [SITE, SITE + "brushes.html", SITE + "mudbox-alternative.html",
                 SITE + "zbrush-alternative.html", SITE + "zbrush-linux.html", SITE + "press.html",
                 SITE + "studios.html", SITE + "support.html", SITE + "supporters.html"] + [f"{SITE}guide/{p.name[:-3]}.html" for p in pages]

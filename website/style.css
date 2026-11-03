@@ -578,6 +578,32 @@ kbd { display: inline-block; min-width: 1.5em; padding: 0.05em 0.45em; border: 1
 }
 @media (max-width: 380px) { .wn-cards { grid-template-columns: 1fr; } }
 
+/* The home page's release area (index.html #whats-new, written by build_site.py): the newest three versions as
+   cards, then the older ones as groups. */
+.wn-home { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 28px; }
+.wn-home-card > a { display: flex; flex-direction: column; height: 100%; overflow: hidden; color: inherit; border: 1px solid var(--border);
+                    border-radius: var(--radius); background: linear-gradient(180deg, #202027, var(--panel)); transition: border-color 0.2s, transform 0.2s; }
+.wn-home-card > a:hover { text-decoration: none; border-color: rgba(242, 140, 60, 0.6); transform: translateY(-3px); }
+.wn-home-card .wn-card-body { padding: 18px 20px 20px; }
+.wn-home-card h3 { margin: 0 0 0.4em; font-size: 1.12rem; line-height: 1.3; color: #fff; }
+.wn-home-card h3 small { display: block; margin-top: 6px; color: var(--accent-2); font-size: 0.72rem; font-weight: 600;
+                         letter-spacing: 0.08em; text-transform: uppercase; }
+.wn-home-card p { margin: 0 0 0.7em; color: var(--muted); font-size: 0.95rem; line-height: 1.5; }
+.wn-home-card ul { margin: 0; padding-left: 1.1em; color: #d6d6dd; font-size: 0.92rem; line-height: 1.55; }
+.wn-home-card li::marker { color: var(--accent); }
+.wn-home-card .wn-pic-mark { display: grid; place-items: center; background: radial-gradient(circle at 50% 45%, rgba(242, 140, 60, 0.18), #1b1b21 65%); }
+.wn-home-card .wn-pic-mark img { width: 64px; height: 64px; object-fit: contain; opacity: 0.9; }
+.wn-home-groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 18px; }
+.wn-home-group { display: flex; flex-direction: column; padding: 18px 20px; color: inherit; border: 1px solid var(--border);
+                 border-radius: var(--radius); background: var(--bg); transition: border-color 0.2s; }
+.wn-home-group:hover { text-decoration: none; border-color: rgba(242, 140, 60, 0.5); }
+.wn-home-group h3 { position: relative; margin: 0 0 0.6em; padding-top: 12px; font-size: 1rem; color: #fff; }
+.wn-home-group h3::before { content: ""; position: absolute; top: 0; left: 0; width: 32px; height: 3px; border-radius: 2px; background: var(--accent); }
+.wn-home-group ul { margin: 0 0 0.8em; padding-left: 1.1em; color: var(--muted); font-size: 0.9rem; line-height: 1.55; }
+.wn-home-group span { margin-top: auto; color: var(--accent-2); font-weight: 600; font-size: 0.88rem; }
+@media (max-width: 960px) { .wn-home, .wn-home-groups { grid-template-columns: 1fr 1fr; } .wn-home-card:first-child { grid-column: 1 / -1; } }
+@media (max-width: 620px) { .wn-home, .wn-home-groups { grid-template-columns: 1fr; } }
+
 /* Monitors narrower than 1280: no "On this page" column. */
 @media (max-width: 1279px) {
   .guide-layout { grid-template-columns: 240px minmax(0, 1fr); gap: 40px; }
