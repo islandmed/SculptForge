@@ -119,7 +119,7 @@ The library is a folder of `.sfbrush` files in the SculptForge settings folder:
 | macOS | `~/Library/Application Support/SculptForge/SculptForge/brushes` |
 | Windows | `%APPDATA%\SculptForge\SculptForge\brushes` |
 
-![The Custom brushes list in **Sculpt > Brush**, with its right-click menu](images/brush-library.jpg)
+![The Custom brushes list in Sculpt > Brush, with its right-click menu](images/brush-library.jpg)
 
 ### The Custom brushes list
 

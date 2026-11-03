@@ -173,7 +173,7 @@ right tray is open by default and holds the **Tool** palette; the left tray star
 - **Open or close a tray**: click its divider, the thin strip with a grip between the tray and the shelves.
   **Drag** the divider to make the tray wider or narrower (240 to 480 pixels).
 
-![**Sculpt > Stroke** kept in the right tray above the Tool palette](images/palette-tray.jpg)
+![The Stroke palette kept in the right tray, under the Tool panel](images/palette-tray.jpg)
 
 When a tray holds several palettes, **Edit > Preferences > Interface > Auto collapse left tray** (on by default) and
 **Auto collapse right tray** (off by default) collapse the other palettes when the one you open would not fit.
@@ -550,7 +550,7 @@ choice for the next session, and each project keeps the background it was saved 
 (along the top of the canvas, or at the bottom above the bottom shelf) and the **Library folder**.
 **Edit > Preferences > Autosave** sets how often a recovery copy is saved (see [Projects, autosave and snapshots](projects.md)).
 
-![**Edit > Preferences** with the Config and Interface sub-palettes](images/preferences.jpg)
+![Edit > Preferences with the Config and Interface sub-palettes](images/preferences.jpg)
 
 ### Fullscreen, hiding panels and the camera notch
 

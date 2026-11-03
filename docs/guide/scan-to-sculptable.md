@@ -27,7 +27,7 @@ No capture at hand? **Try a test head** in **Render > Gaussian Splats** (shown w
 one: a stylised head as 200,000 coloured splats with a few floaters and the hidden inside splats real captures
 have. `splat_test_capture kind=object` loads a mug with a thin handle instead.
 
-![The From scan section of **Render > Gaussian Splats**](images/make-sculptable-panel.jpg)
+![The From scan section of Render > Gaussian Splats](images/make-sculptable-panel.jpg)
 
 ## The options
 

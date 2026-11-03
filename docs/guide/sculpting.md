@@ -194,7 +194,7 @@ On a micro level (see [Micro levels](micro-levels.md)) Smooth is always the plai
 (after Quad Remesh, or an imported quad model) Smooth follows the quads' own edges, never their diagonals, so the
 quads keep their shape (#69).
 
-![**Sculpt > Draw & Tablet**](images/draw-palette.jpg)
+![Sculpt > Draw & Tablet](images/draw-palette.jpg)
 
 ## Sculpt, Paint, Add, Sub, Rgb and Front
 

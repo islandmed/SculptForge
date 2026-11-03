@@ -34,7 +34,7 @@ While the Paint brush is active:
 
 Press <kbd>P</kbd> again, or click **Sculpt** on the top shelf, to go back to sculpting.
 
-![Vertex Paint on a sculpt with the **Paint** menu open](images/polypaint.jpg)
+![Vertex Paint on a sculpt with the Paint menu open](images/polypaint.jpg)
 
 > **ZBrush:** **Paint** is ZBrush's Rgb on with Zadd off. **Sculpt** with **Rgb** on is Rgb with Zadd: the brush
 > sculpts and paints at once.
@@ -203,7 +203,7 @@ with the sphere filling it (a non-square image is cropped to its centre; big one
   only hidden until you restart, and the message says where its file is so you can delete it yourself.
   Built-in materials can't be removed.
 
-![A Lit Sphere loaded from an image (Gold) in **Render > Materials**](images/custom-matcaps.jpg)
+![A Lit Sphere loaded from an image (Gold) in Render > Materials](images/custom-matcaps.jpg)
 
 Your Lit Spheres appear in the material picker (<kbd>M</kbd>), **Render > Materials** and the Library, after the
 built-in ones. A project that uses one carries a copy of the image, so it opens with the same look on another

@@ -61,6 +61,9 @@ def convert(text: str) -> str:
             # Tables: leave the first cell (other apps' names in the glossary and the ZBrush chapter).
             first, rest = line[2:].split("|", 1)
             line = "| " + first + "|" + PHRASE.sub(phrase, PATH.sub(lambda m: MENUS[m.group(1)] + " > ", rest))
+        elif line.startswith("!["):
+            # Image captions name what the picture shows: a palette in a tray keeps its palette name.
+            line = PATH.sub(lambda m: MENUS[m.group(1)] + " > ", line)
         else:
             line = PHRASE.sub(phrase, PATH.sub(lambda m: MENUS[m.group(1)] + " > ", line))
         out.append(line)  # one pass each: a rewritten "Render > Materials" is not read again as "Render >"
