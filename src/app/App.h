@@ -582,10 +582,25 @@ private:
     bool polygroupMouseDown(float x, float y, SDL_Keymod mod); // true if it took the click
     void polygroupMouseUp();
     void drawPolygroupsSection();
+    // Cut (PanelCut.cpp, core/Cut.h): Ctrl+Shift with a Cut shape. Line, Lasso and Rectangle are dragged; Polyline
+    // is clicked point by point (click the first point to close it, double-click or Enter to end it open, Esc drops it).
+    void cutMouseUp();
+    bool cutPolylineMouseDown(float x, float y, SDL_Keymod mod); // true if it took the click
+    bool cutPolylineKey(SDL_Keycode key);                        // Enter / Esc while placing points
+    void finishCutPolyline(bool closed);
+    void runCut(const char* shape, const std::vector<ImVec2>& path, bool closed, bool flip);
+    void drawCutOverlay();
+    void drawCutSection();
+    bool maskFrontFacesOnly_ = false; // Mask Lasso / Rectangle: only vertices facing the viewer (#91.3)
+    int cutMode_ = 0;         // 0 Away, 1 In, 2 Add (core/Cut.h)
+    float cutDepth_ = 0.1f;   // In / Add: fraction of the Part's size
+    std::vector<ImVec2> cutPolyline_; // window pixels of the Polyline being placed
     // Screen selections (Selection.cpp): the rectangle or lasso dragged for
     // visibility (Ctrl+Shift, ZBrush SelectRect / SelectLasso) or for the mask
     // (Ctrl, MaskRect / MaskLasso). Pen is the mask's brush-stroke mode.
-    enum class SelectShape { Pen, Lasso, Rect };
+    // The Cut shapes share the Ctrl+Shift drag with SelectRect / SelectLasso (PanelCut.cpp).
+    enum class SelectShape { Pen, Lasso, Rect, CutLine, CutLasso, CutRect, CutPolyline };
+    static bool isCutShape(SelectShape s) { return s >= SelectShape::CutLine; }
     enum class SelectTarget { Hide, Mask };
     void beginSelection(float x, float y, SelectTarget target, SelectShape shape);
     void selectionMove(float x, float y);

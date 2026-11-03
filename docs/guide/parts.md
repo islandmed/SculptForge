@@ -35,7 +35,7 @@ and they catch up a moment after you stop changing a Part (not during a stroke).
 | Select a Part | Click its row, or <kbd>Alt</kbd>+click it in the viewport; triple-click another Part in the viewport to select it and frame it |
 | Rename it | Double-click the row (or right-click > **Rename**), type, press <kbd>Enter</kbd> |
 | Hide or show it | Click the eye at the end of the row |
-| Duplicate or delete it | Right-click the row > **Duplicate** or **Delete...** |
+| Duplicate or delete it | Right-click the row > **Duplicate** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>) or **Delete...** |
 | See its vertex and triangle counts | Point at the row for a moment |
 
 The list shows six rows and scrolls when there are more. Names are kept unique: renaming a Part to a name that
@@ -75,7 +75,8 @@ You can also add files as Parts from elsewhere:
 - In the [Library](interface.md) **Tool** tab, <kbd>Shift</kbd>+double-click a model, or right-click it
   and choose **Append as Part**.
 
-> **Tip:** **Duplicate** copies the active Part with its layers and attributes, names it `<name> copy` and puts it
+> **Tip:** **Duplicate** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>, also in the command palette as
+> **Duplicate Part**) copies the active Part with its layers and attributes, names it `<name> copy` and puts it
 > right under the original. Use it to keep a safe copy before a destructive step such as a remesh.
 
 ## Show, hide and solo

@@ -439,6 +439,24 @@ void App::registerShellActions() {
           "Ctrl+Shift+drag a rectangle to keep what's inside and hide the rest; add Alt to hide the inside.");
     shape("select.lasso", "Select Lasso", "Tool > Visibility", &hideShape_, SelectShape::Lasso,
           "Ctrl+Shift+drag a lasso to keep what's inside and hide the rest; add Alt to hide the inside.");
+    // Cut (PanelCut.cpp, core/Cut.h): the same Ctrl+Shift drag, cutting instead of hiding.
+    shape("cut.line", "Cut Line", "Tool > Cut", &hideShape_, SelectShape::CutLine,
+          "Ctrl+Shift+drag a line: the shaded side is cut (Alt: the other side). Away removes it through the whole "
+          "Part and closes the cut flat; In steps it down by Depth; Add raises it.");
+    shape("cut.lasso", "Cut Lasso", "Tool > Cut", &hideShape_, SelectShape::CutLasso,
+          "Ctrl+Shift+drag a lasso: Away cuts a hole through the Part, In a pocket Depth deep, Add raises the shape.");
+    shape("cut.rect", "Cut Rectangle", "Tool > Cut", &hideShape_, SelectShape::CutRect,
+          "Ctrl+Shift+drag a rectangle: Away cuts a hole through the Part, In a pocket Depth deep, Add a block.");
+    shape("cut.polyline", "Cut Polyline", "Tool > Cut", &hideShape_, SelectShape::CutPolyline,
+          "Ctrl+Shift+click points: click the first point to cut the polygon, double-click or Enter to cut along an "
+          "open bent line (Alt: the other side), Esc to drop it.");
+    auto cutMode = [this](std::string id, std::string label, int mode, std::string description) {
+        actions_.add({std::move(id), std::move(label), nullptr, std::move(description), "Tool > Cut", "", "",
+                      [this, mode] { cutMode_ = mode; }, [this, mode] { return cutMode_ == mode; }, nullptr});
+    };
+    cutMode("cut.away", "Away", 0, "Remove what the shape covers, through the whole Part, and close the cut with a flat cap.");
+    cutMode("cut.in", "In", 1, "Cut a flat-bottomed pocket Depth deep where the shape covers the Part.");
+    cutMode("cut.add", "Add", 2, "Add the shape, extruded Depth out of the surface, joined to the Part.");
     flag("draw.pressure_strength", "Pressure > Strength", nullptr, "Draw > Tablet", "", &pressureStrength_,
          "Pen pressure scales the brush strength.");
     flag("draw.pressure_size", "Pressure > Size", nullptr, "Draw > Tablet", "", &pressureSize_,

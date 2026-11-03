@@ -60,8 +60,9 @@ bool maskBorder(Mesh& mesh, int rings, bool polygroups, bool soft, float strengt
 // camera count as outside; the far side of the model is selected too.
 // `mirrors` (Sculptor::copies of the symmetry) also selects each vertex whose
 // mirror image or radial copy projects inside, as the brushes mirror (#51, #63); empty = none.
+// `frontFacesOnly` (#91.3): only vertices whose normal faces the viewer (for a mirror image, its mirrored normal).
 bool maskInShape(Mesh& mesh, const glm::mat4& viewProj, const ScreenPolygon& shape, float strength, bool unmask,
-                 const std::vector<SymCopy>& mirrors = {});
+                 const std::vector<SymCopy>& mirrors = {}, bool frontFacesOnly = false);
 // Whether any visible vertex (or, with `mirrors`, its mirror image) projects
 // inside `shape`: a selection that covers none of the model clears the mask
 // instead (ZBrush: Ctrl+drag on the background).

@@ -124,6 +124,13 @@ action: guide:whats-new.md
   groups and leaves the rest alone (#81). See [Smooth face group borders](sculpting.md#smooth-face-group-borders).
 - **Colour tints the material**: pick a colour and Parts with no vertex paint take it on in the Lit Sphere
   material. See [Vertex Paint and materials](vertex-paint.md#materials-lit-spheres).
+- **Cut**: one tool that cuts the active Part with a **Line**, **Lasso**, **Rectangle** or **Polyline**. **Away**
+  removes what the shape covers and closes the cut with a flat cap, **In** cuts a flat-bottomed pocket and **Add**
+  raises the shape out of the surface. The result stays watertight and follows the symmetry. Hold
+  <kbd>Ctrl</kbd>+<kbd>Shift</kbd> and pick a Cut shape, or open **Tool > Cut**. See [Cut](cut.md) (#101, #91).
+- **Mask: Front faces only**: Mask Lasso and Mask Rectangle can leave the far side alone
+  ([Masking](masking.md#mask-with-a-lasso-or-rectangle), #91).
+- **Duplicate Part** has a shortcut: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> ([Parts](parts.md)).
 
 ## Version 0.10.8
 

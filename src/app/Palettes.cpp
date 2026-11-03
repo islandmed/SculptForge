@@ -821,6 +821,10 @@ void App::drawPalette_Tool() {
         drawDeformationContents(); // Mirror (PanelExtract.cpp)
         Demo::popScope();
     }
+    if (subpalette("tool.cut", "Cut")) {
+        tray::Section section;
+        drawCutSection(); // PanelCut.cpp
+    }
     if (subpalette("tool.masking", "Masking")) {
         tray::Section section;
         drawMaskingSection();

@@ -68,6 +68,14 @@ All notable changes to SculptForge are listed here. The format follows
   surface and leaves the rest alone, for clean clothing edges (#81, thanks bossian0220).
 - Colour tints the material (Color palette, on by default): the current colour tints the Lit Sphere material of
   Parts with no vertex paint; grey leaves it as it is (thanks ThinkingPolygons).
+- Cut (#101, #91): one tool that cuts the active Part with a Line, Lasso, Rectangle or Polyline drawn on the screen,
+  in the Ctrl+Shift brush picker and in Tool > Cut. Away removes what the shape covers through the whole Part and
+  closes the cut with a flat cap (a face group of its own), In cuts a flat-bottomed pocket Depth deep, Add extrudes
+  the shape out of the surface (boolean union). An exact boolean in screen space: the uncut surface and its mask,
+  colours, UVs and layers are kept, and the result is watertight. Follows X/Y/Z and radial symmetry; one undo step.
+  Scriptable as the `cut` command.
+- Mask Lasso and Mask Rectangle: Front faces only (#91), also `front_faces_only` on mask_lasso / mask_rect.
+- Duplicate Part shortcut: Ctrl+Shift+D (also Duplicate Part in the command palette).
 
 ### Changed
 - What's New is a window now: after an update (and from **Help > What's New**) a centred card shows the version's main

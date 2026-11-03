@@ -395,6 +395,10 @@ void App::initActions() {
         "Write the micro level as a 32-bit EXR displacement map over the base UVs (next to the project).");
     add("geometry.micro_noise", "Micro Surface Noise", "Tool > Geometry", nullptr, [this] { runCommand("micro_noise"); }, nullptr,
         "micro_noise", nullptr, [this] { return hasMicro(doc_.mesh); });
+    add("subtool.duplicate", "Duplicate Part", "Tool > Parts", "Ctrl+Shift+D", [this] { runCommand("subtool_duplicate"); },
+        ICON_LC_COPY, "subtool_duplicate", nullptr, nullptr,
+        "Copy the active Part, with its layers and attributes, and make the copy active (also in the Parts list's "
+        "right-click menu).");
     // Tool > SubTool > Extract, Tool > Geometry > Modify Topology, Tool > Deformation (PanelExtract.cpp).
     add("subtool.extract", "Extract", "Tool > Parts", nullptr, [this] { runExtract(); }, nullptr, "extract", nullptr,
         [this] { return doc_.mesh.hasMask(); },

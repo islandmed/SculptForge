@@ -296,7 +296,7 @@ void App::drawSubToolsContents() {
                         focusRename_ = true;
                         std::snprintf(renameBuffer_, sizeof renameBuffer_, "%s", s.name.c_str());
                     }
-                    if (ImGui::MenuItem(tr("Duplicate"))) duplicateIndex = i;
+                    if (ImGui::MenuItem(tr("Duplicate"), actions_.shortcutText("subtool.duplicate").c_str())) duplicateIndex = i;
                     if (ImGui::MenuItem(tr("Delete..."), nullptr, false, count > 1)) deleteIndex = i;
                     ImGui::EndPopup();
                 }
@@ -428,6 +428,7 @@ void App::drawSubToolsContents() {
     }
     ImGui::SameLine();
     if (ImGui::Button(tr("Duplicate"), ImVec2(third, 0))) runCommand("subtool_duplicate");
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip(tr("Copy the active Part (%s)"), actions_.shortcutText("subtool.duplicate").c_str());
     ImGui::SameLine();
     ImGui::BeginDisabled(count < 2);
     if (ImGui::Button(tr("Delete..."), ImVec2(third, 0)))
