@@ -1,0 +1,21 @@
+# Generate 3D's defaults (0.10.9): Hunyuan3D 2.1 on Hugging Face (no token needed) and Quad Remesh for the result,
+# with Voxel remesh and Off as the other choices.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar
+drop ../../assets/demo/teddy-sketch.png
+wait_for "Generate 3D" 5
+expect_text Hunyuan3D 2.1 (Tencent) - free, no token
+expect_text About 32768 quads, then 1 subdivision level
+shot generate-defaults
+click "Generate 3D/Remesh"
+expect_text Off (raw mesh)
+click "Voxel remesh"
+wait 0.2
+expect_no_text About 32768 quads
+shot generate-voxel
+
+# The token the TRELLIS.2 fallback message points to: Preferences > AI.
+click "Preferences##palette.preferences"
+click "AI##preferences.ai"
+wait 0.2
+expect_text Hugging Face token
+shot preferences-ai
