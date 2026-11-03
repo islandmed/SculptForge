@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
     int ran = 0;
     for (std::size_t index = 0; index < registry().size(); ++index) {
         const auto& t = registry()[index];
-        if (!inShard(index, shard, shards)) continue;
+        if (!inShard(t.name, shard, shards)) continue;
         bool wanted = filters.empty();
         for (const char* f : filters) wanted = wanted || std::strstr(t.name, f) != nullptr;
         if (!wanted) continue;
