@@ -5,6 +5,12 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.10.9
+
+- **Focus Detail (experimental)**: sculpt a head of a billion micro triangles from one compressed file. Detail
+  loads where you look and where the brush is heading, and the rest shows a lighter version. Saving writes only
+  what you changed. Try it with `sculptforge --benchmark standard-1b` (Linux and macOS for now).
+
 ## Version 0.10.8
 
 - **Tablets in mouse mode work again**: on some Windows tablets with **Mouse mode** on (Preferences > Tablet) the
