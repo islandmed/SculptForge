@@ -132,19 +132,23 @@ Open the <strong>Draw</strong> palette. Under <strong>Tablet</strong> it shows &
 A custom brush can also set its own pressure response (<strong>pressureCurve</strong> in its recipe, see <a href="brush-lab.html">Brush Lab and sharing brushes</a>).
 </li>
 </ol>
+<p><strong>Preferences &gt; Input</strong> and <strong>Preferences &gt; Tablet</strong> show &quot;Pressure: on&quot; once the pen has pressed, or &quot;Pressure: not detected&quot;. Without pressure the pen still draws, at full strength. A tablet plugged in while SculptForge runs works straight away; the status bar says &quot;Tablet connected&quot; (also through Wacom Bridge).</p>
 <p>If no pen is detected or pressure doesn&#x27;t change:</p>
 <ul>
 <li>
-Install or update the tablet maker&#x27;s driver, then restart SculptForge.
+Install or update the tablet maker&#x27;s driver.
 </li>
 <li>
-<strong>Windows:</strong> most drivers have a <strong>Windows Ink</strong> option. If pressure doesn&#x27;t reach SculptForge, try switching it (on or off) in the tablet driver&#x27;s settings for SculptForge or for all applications, then restart SculptForge.
+<strong>Windows:</strong> SculptForge reads pressure through Windows Ink, and through the driver&#x27;s Wintab when Windows Ink is off (Wacom Tablet Properties &gt; Mapping &gt; <strong>Use Windows Ink</strong>). If pressure is still missing, switch that option and bring the pen back to the tablet.
 </li>
 <li>
 <strong>Linux:</strong> check that the system sees the pen as a tablet (for example in your desktop&#x27;s tablet settings).
 </li>
 <li>
 If the cursor moves but strokes have no pressure, test in another application to see whether the driver reports pressure at all.
+</li>
+<li>
+<strong>The active Part changed by itself:</strong> a Part becomes active with <strong>Alt+click</strong> on it (the keyboard&#x27;s Alt, a quick click), a triple-click with the mouse or a click in the Parts list; the status bar names it and how. A tablet&#x27;s ExpressKey set to Alt counts as the keyboard&#x27;s Alt.
 </li>
 <li>
 <strong>The cursor jumps back when you put the pen down elsewhere:</strong> the tablet driver is set to mouse (relative) mode. Turn on <strong>Preferences &gt; Tablet &gt; Mouse mode (relative)</strong>.

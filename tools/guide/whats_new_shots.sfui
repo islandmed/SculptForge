@@ -4,6 +4,8 @@
 #   python3 tools/guide/make_images.py build/wn-shots --whats-new
 # Crop boxes are in make_images.py (WHATS_NEW).
 
+env SF_WHATS_NEW_VERSION 0.10.7   # the cards below are 0.10.7's (Try it on card 3)
+
 # A new look: Forge Terminal with Tokyo Night and the SculptForge layout, the lion head.
 run ui_look look=forge scheme=tokyo_night layout=sculptforge
 run open path=assets/demo/lion-head.glb
@@ -63,3 +65,26 @@ click "Help##palette.help"
 click "What's New##help.whats_new"
 wait 1
 shot wn-whats-new
+key escape
+wait 0.4
+
+# 0.10.9 Starter meshes: the Library's Starter meshes folder, then the human head opened with its levels.
+run new_starter_mesh name=human-head
+wait_idle 30
+key ,
+click "Library/Tool"
+double_click "Library/Starter meshes"
+wait_idle 60
+hover_window 0.9 0.6
+wait 0.5
+shot wn-starter-meshes
+key escape
+wait 0.4
+
+# 0.10.9 Brushes keep their settings: the Brush palette with Save Brush Settings and Reset Brush to Default.
+click "Clay##brush.clay"
+click "Brush##palette.brush"
+wait 0.5
+shot wn-brush-settings
+key escape
+# (images/wn-first-sculpt.jpg is cut from images/first-sculpt/12-render.jpg, the lesson's own Save Render.)

@@ -303,7 +303,8 @@ void App::drawPalette_Brush() {
     // then every brush as thumbnails (Pickers.cpp, the same grid as the B picker).
     actionRow(*this, {"ui.brush_lab", "ui.brush_gallery"});
     actionRow(*this, {"brush.paste"});
-    actionRow(*this, {"brush.save_settings", "brush.reset_settings"}); // this brush's own settings (#78)
+    actionRow(*this, {"brush.save_settings"}); // this brush's own settings (#78); one per row so the labels fit
+    actionRow(*this, {"brush.reset_settings"});
     drawCustomBrushes();
     ImGui::Checkbox(tr("Front faces only"), &frontFacesOnly_);
     ui::HelpAction(*this, "draw.front_faces");
