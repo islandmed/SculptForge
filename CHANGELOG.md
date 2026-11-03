@@ -90,28 +90,12 @@ All notable changes to SculptForge are listed here. The format follows
   `remesh=quad|voxel|false` (`true` means quad) and `levels=0-2`. The status line says "remeshed to N quads".
 - The Hunyuan3D licence notice (the Tencent Hunyuan Community License doesn't cover use in the EU, UK or South
   Korea) is shown once, the first time a Hunyuan3D model runs, and stays in the Model picker's tooltip.
-- Hover highlights that pop, in every look: buttons, menu items, shelf buttons and palette headers ease into an
-  accent-tinted fill with a crisp accent border and a brighter label in about 100 ms (Forge Terminal: the accent
-  border; Phosphor: an inverse-video glow; Blueprint: a cyan line glow; Classic: a subtle warm highlight), and
-  pressed is a touch darker. Brush, alpha, material and look tiles (shelves, pickers, Library) lift slightly with a
-  soft shadow and an accent glow ring, without moving anything; the active tile keeps its orange outline. Sliders
-  brighten, grow a knob and show their exact value. The keyboard focus gets the same ring. New **Preferences >
-  Interface > Reduce motion**: colour changes only, no easing or lifting. Animations draw frames only while they run.
-- Hover highlights that pop, in every look: buttons, menu items, shelf buttons and palette headers ease into an
-  accent-tinted fill with a crisp accent border and a brighter label in about 100 ms (Forge Terminal: the accent
-  border; Phosphor: an inverse-video glow; Blueprint: a cyan line glow; Classic: a subtle warm highlight), and
-  pressed is a touch darker. Brush, alpha, material and look tiles (shelves, pickers, Library) lift slightly with a
-  soft shadow and an accent glow ring, without moving anything; the active tile keeps its orange outline. Sliders
-  brighten, grow a knob and show their exact value. The keyboard focus gets the same ring. New **Preferences >
-  Interface > Reduce motion**: colour changes only, no easing or lifting. Animations draw frames only while they run.
-- Hover highlights that pop, in every look: buttons, menu items, shelf buttons and palette headers ease into an
-  accent-tinted fill with a crisp accent border and a brighter label in about 100 ms (Forge Terminal: the accent
-  border; Phosphor: an inverse-video glow; Blueprint: a cyan line glow; Classic: a subtle warm highlight), and
-  pressed is a touch darker. Brush, alpha, material and look tiles (shelves, pickers, Library) lift slightly with a
-  soft shadow and an accent glow ring, without moving anything; the active tile keeps its orange outline. Sliders
-  brighten, grow a knob and show their exact value. The keyboard focus gets the same ring. New **Preferences >
-  Interface > Reduce motion**: colour changes only, no easing or lifting. The rings follow **Outlines** (Off: the fill and label only; Subtle, the default: one faint line; On: the
-  look's full flavour) and **Outline opacity**. Animations draw frames only while they run.
+- Hover in every look is calm and clear: buttons, menu items, shelf buttons and palette headers brighten a little in
+  about 100 ms (no accent tint), pressed is a touch darker, and brush, alpha, material and look tiles (shelves,
+  pickers, Library) lift slightly without moving anything; the active tile keeps its orange outline. Sliders
+  brighten, grow a knob and show their exact value. Hover and keyboard-focus rings follow **Outlines** (Off: none;
+  Subtle; On) and **Outline opacity**. New **Preferences > Interface > Reduce motion**: colour changes only, no easing
+  or lifting. Animations draw frames only while they run.
 - Large brushes on dense meshes no longer stall the view: from 2 million vertices a stroke's dabs are placed on the
   stroke thread (the same dabs, in the same order, as the frame loop places them; no preview), so a frame keeps
   drawing while a 240 px dab moves millions of vertices, and a light batch is still waited for within the frame.
@@ -136,8 +120,6 @@ All notable changes to SculptForge are listed here. The format follows
   view no longer jumps when the pen comes back into range elsewhere or leaves mid-drag. The active Part changes only
   with the keyboard's Alt and a quick click (not with a pen button set to Alt, a long pen press or quick pen taps),
   and the status bar says "Active Part: <name> (Alt+click)".
-- The enlarged brush or alpha thumbnail you point at in a picker is drawn over its neighbours again, not
-  under them (#86, thanks tristratos).
 - The enlarged brush or alpha thumbnail you point at in a picker is drawn over its neighbours again, not
   under them (#86, thanks tristratos).
 - The brush centre now sits exactly under the cursor at high zoom and on HiDPI screens: the brush's ray is worked
@@ -167,8 +149,6 @@ All notable changes to SculptForge are listed here. The format follows
   the MCP tool list, and stops every AI network call; the MCP server and the offline Relief / Inflate / Stamp stay.
   Saved at once. Studios: `SF_AI=off` (or `--no-ai`) turns it off and locks it. About and the website now say:
   "Your art is never uploaded or used for training. AI features run only when you use them and can be turned off."
-- The enlarged brush or alpha thumbnail you point at in a picker is drawn over its neighbours again, not
-  under them (#86, thanks tristratos).
 - Help > Benchmark (and `--benchmark`) checks the memory free now before each scene instead of trusting the
   computer's total: a scene that doesn't fit (15M needs about 2.2 GB free, 33M about 5 GB, plus a margin) is skipped
   with a clear message ("33M skipped: needs ~5 GB free, 1.3 GB available. Close other apps and run again") rather

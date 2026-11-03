@@ -79,13 +79,8 @@ action: guide:whats-new.md
   and the status line tells you. Your own model choice is kept. See [Image and text to 3D](generate-3d.md).
 - **Generated models arrive as clean quads**: Quad Remesh is now the default, with one subdivision level holding
   the detail, so you can sculpt and subdivide straight away. Voxel remesh and Off are still in **Remesh**.
-- **Hover highlights that pop**: buttons, menus and shelves light up in your look's accent as you point at them,
-  tiles lift a little, sliders show their exact value, and the keyboard focus gets the same ring. Prefer less
-  movement? Turn on **Preferences > Interface > Reduce motion** ([Interface](interface.md)).
-- **Picker thumbnails on top**: the enlarged thumbnail you point at in a picker is no longer hidden under its
-  neighbours (#86).
-- **Hover highlights that pop**: buttons, menus and shelves light up in your look's accent as you point at them,
-  tiles lift a little, sliders show their exact value, and the keyboard focus gets the same ring. Prefer less
+- **Calm, clear hover**: buttons, menus and shelves brighten a little as you point at them, tiles lift a little,
+  sliders show their exact value, and the keyboard focus gets a ring as strong as your **Outlines** setting. Prefer less
   movement? Turn on **Preferences > Interface > Reduce motion** ([Interface](interface.md)).
 - **Picker thumbnails on top**: the enlarged thumbnail you point at in a picker is no longer hidden under its
   neighbours (#86).
@@ -111,11 +106,6 @@ action: guide:whats-new.md
 - **Turn AI off**: **Preferences > AI > Enable AI features** (the welcome asks too). Off hides AI Brush and
   Generate 3D everywhere and SculptForge makes no AI network calls. Your art is never uploaded or used for training. AI features run only when you use them and can be turned off. Studios can set `SF_AI=off`.
   See [The interface](interface.md#turning-ai-off).
-- **Hover highlights that pop**: buttons, menus and shelves light up in your look's accent as you point at them,
-  tiles lift a little, sliders show their exact value, and the keyboard focus gets the same ring. Prefer less
-  movement? Turn on **Preferences > Interface > Reduce motion** ([Interface](interface.md)).
-- **Picker thumbnails on top**: the enlarged thumbnail you point at in a picker is no longer hidden under its
-  neighbours (#86).
 - **Big brushes stay smooth on dense meshes**: on models from about 4 million triangles a stroke's dabs are worked
   out beside the view, so a 240 px brush on 33 million triangles no longer freezes the view for a third of a
   second at a time (slowest frames about 35 ms instead of 300), and letting go of the pen is instant. The stroke
