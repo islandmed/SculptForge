@@ -413,7 +413,7 @@ TEST(bake_perf_4k_from_1m_triangles) {
     std::printf("  4K normal + displacement, 2x2 samples, from %zu triangles: %.2f s (BVH %.2f s), %zu island texels\n",
                 r.sourceTriangles, r.seconds, r.bvhSeconds, r.islandTexels);
     CHECK(r.sourceTriangles > 1000000);
-    CHECK(r.seconds < 60.0);
+    CHECK(r.seconds < timeLimit(60.0));
 }
 
 // Send to Unreal takes the baked normal map along: imported as T_<name>_N, set up as a normal map, green flipped
