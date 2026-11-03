@@ -13,6 +13,7 @@ import argparse
 import os
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
 
@@ -49,18 +50,22 @@ def main() -> int:
     ap.add_argument("--out", type=pathlib.Path, default=pathlib.Path("build/guide-features"))
     args = ap.parse_args()
     env = dict(os.environ, SDL_APP_ID=os.environ.get("SDL_APP_ID", "sculptforge-agent"))
+    scratch = lambda: set(ROOT.glob("sf_ui_*")) | set(ROOT.glob("ui-shots"))  # files some tests leave in the working folder
+    before = scratch()
     for name in TESTS:
         src = ROOT / "tests" / "ui" / f"{name}.sfui"
         tmp = src.with_name(f"_guide_{name}.sfui")  # beside the original, so its relative paths still resolve
         tmp.write_text(convert(src.read_text(encoding="utf-8")), encoding="utf-8")
         try:
-            r = subprocess.run([args.app, "--ui-test", str(tmp), "--ui-out", str(args.out / name)], env=env,
+            r = subprocess.run([args.app, "--ui-test", str(tmp), "--ui-out", str(args.out / name)], env=env, cwd=ROOT,
                                capture_output=True, text=True, timeout=900)
         finally:
             tmp.unlink()
         fails = [line for line in r.stdout.splitlines() if line.startswith("FAIL")]
         # A failed check late in a test still leaves the shots before it; make_images.py says if one is missing.
         print(f"{name}: {'ok' if r.returncode == 0 else fails[0] if fails else f'exit {r.returncode}'}")
+    for extra in scratch() - before:
+        shutil.rmtree(extra) if extra.is_dir() else extra.unlink()
     return 0
 
 
