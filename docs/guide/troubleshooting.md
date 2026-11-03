@@ -67,15 +67,22 @@ and similar tablets, and pen displays, work without settings.
 3. A custom brush can also set its own pressure response (**pressureCurve** in its recipe, see
    [Brush Lab and sharing brushes](brush-lab.md)).
 
+**Preferences > Input** and **Preferences > Tablet** show "Pressure: on" once the pen has pressed, or
+"Pressure: not detected". Without pressure the pen still draws, at full strength. A tablet plugged in while
+SculptForge runs works straight away; the status bar says "Tablet connected" (also through Wacom Bridge).
+
 If no pen is detected or pressure doesn't change:
 
-- Install or update the tablet maker's driver, then restart SculptForge.
-- **Windows:** most drivers have a **Windows Ink** option. If pressure doesn't reach SculptForge, try
-  switching it (on or off) in the tablet driver's settings for SculptForge or for all applications, then
-  restart SculptForge.
+- Install or update the tablet maker's driver.
+- **Windows:** SculptForge reads pressure through Windows Ink, and through the driver's Wintab when Windows Ink is
+  off (Wacom Tablet Properties > Mapping > **Use Windows Ink**). If pressure is still missing, switch that option
+  and bring the pen back to the tablet.
 - **Linux:** check that the system sees the pen as a tablet (for example in your desktop's tablet settings).
 - If the cursor moves but strokes have no pressure, test in another application to see whether the driver
   reports pressure at all.
+- **The active Part changed by itself:** a Part becomes active with **Alt+click** on it (the keyboard's Alt, a
+  quick click), a triple-click with the mouse or a click in the Parts list; the status bar names it and how. A
+  tablet's ExpressKey set to Alt counts as the keyboard's Alt.
 - **The cursor jumps back when you put the pen down elsewhere:** the tablet driver is set to mouse (relative)
   mode. Turn on **Preferences > Tablet > Mouse mode (relative)**.
 

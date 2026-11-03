@@ -27,6 +27,7 @@
 #include "core/Document.h"
 #include "core/Face.h"
 #include "core/MeshTransform.h"
+#include "app/Wintab.h"
 #include "core/PenPredictor.h"
 #include "core/AutoUv.h"
 #include "core/QRemesh.h"
@@ -1117,6 +1118,9 @@ private:
     int mouseClicks_ = 1; // SDL's click count of the press being handled (3 = a triple-click, #43)
     bool spaceHeld_ = false; // Space is down with Preferences > Input > Hold Space to move the camera on (#43)
     float subtoolClickX_ = 0.0f, subtoolClickY_ = 0.0f;
+    Uint64 subtoolClickNs_ = 0; // when the Alt press on another Part began (a long pen press isn't a click)
+    void partSelected(const char* how);
+    Uint64 clickClockNs() const; // the status bar names the new active Part and how it was chosen
     uint32_t renamingSubtool_ = 0; // SubTool id being renamed inline (0: none)
     uint32_t listedActiveSubtool_ = 0; // the list scrolls to the active SubTool when it changes
     // SubTool thumbnails (#43): rendered from each SubTool's GPU buffers while the SubTools panel shows, one per frame
@@ -1756,12 +1760,24 @@ private:
     void penLeft(); // out of proximity: ends what the pen was doing
     float strokePressure() const; // pressure after the global curve; 1 for the mouse
     SDL_Keymod inputMods() const; // the keyboard's modifiers plus those a pen button holds (Alt, Shift)
+    SDL_Keymod keyMods() const;   // the keyboard's alone (in the input style's terms)
     bool erasing() const;         // the pen's eraser end is drawing
     PenAction eraserAction() const { return uiPrefs_.tablet.eraser; }
     void firstDab(float x, float y); // the stroke's first dab, once the pen reports a real pressure
     void drawTabletSection();         // Preferences > Tablet
     void detectPenName();
+    void tabletDeviceEvent(const SDL_Event& e); // a tablet plugged in or out while running (TabletHotplug)
+    void tabletNote(TabletHotplug::Note note, const std::string& name);
+    const char* pressureStatus() const; // "Pressure: on" / "not detected" (Preferences > Input and > Tablet)
+    void drawPressureStatus();          // ... with the troubleshooting link
     PenPressureTracker penTracker_;
+    TabletHotplug tabletHotplug_;
+    void wintabEvent(const SDL_Event& e); // a mouse event while the tablet driver reports pressure through Wintab
+    WintabPressure wintab_;
+    bool wintabPen_ = false;  // the mouse is the pen of a driver without Windows Ink (pressure from Wintab)
+    bool wintabTip_ = false;
+    Uint64 wintabNs_ = 0;     // the last Wintab packet
+    bool penJump_ = false; // the pen just came into range: its first position doesn't move a drag (no jump)
     bool testSystemCursor_ = false; // UI tests: a system cursor set by the script (os_cursor), else none
     float testSystemCursorX_ = 0.0f, testSystemCursorY_ = 0.0f;
     PenCursor penCursor_; // where the pen puts the cursor (Preferences > Tablet > Mouse mode)

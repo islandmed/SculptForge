@@ -326,6 +326,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelTimeline.cpp
     src/app/ProofMode.cpp
     src/app/Tablet.cpp
+    src/app/Wintab.cpp
     src/app/SpaceMouse.cpp
     src/app/Input.cpp
     src/app/RadialMenu.cpp

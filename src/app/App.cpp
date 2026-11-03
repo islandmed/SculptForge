@@ -132,6 +132,7 @@ bool App::init(const AppOptions& options) {
         SDL_Log("SDL_CreateWindow failed: %s", SDL_GetError());
         return false;
     }
+    wintab_.open(window_); // Windows: pressure from a tablet driver without Windows Ink (Wintab.h)
     if (rememberWindow_) { // #35: where and how big it was last time
         if (saved.placed) SDL_SetWindowPosition(window_, saved.x, saved.y);
 #if defined(__APPLE__)
@@ -1135,6 +1136,7 @@ int App::run() {
 void App::handleEvent(const SDL_Event& event) {
     if (dropPenMouseEvent(event)) return; // pen side buttons are mapped in Tablet.cpp, not left to SDL
     if (strayMouseMotion(event)) return;  // neither the canvas nor the UI follows a driver's stray mouse events
+    wintabEvent(event); // Windows Ink off: the tablet driver's pressure for its mouse events (Tablet.cpp)
     SDL_Event e = event;
     mapPenPosition(e); // a tablet in mouse mode moves the cursor relatively (#54), for the canvas and the UI
     if (supportCardEvent(e)) return;  // the support card at launch takes clicks and keys while open
@@ -1168,6 +1170,10 @@ void App::handleEvent(const SDL_Event& event) {
     case SDL_EVENT_PEN_BUTTON_DOWN:
     case SDL_EVENT_PEN_BUTTON_UP:
         handlePenEvent(e);
+        break;
+    case SDL_EVENT_MOUSE_ADDED:
+    case SDL_EVENT_MOUSE_REMOVED:
+        tabletDeviceEvent(e); // a tablet plugged in or out (Tablet.cpp)
         break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
         lastInputPen_ = e.button.which == SDL_PEN_MOUSEID;
@@ -1350,19 +1356,24 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         if (captureMouseDown(x, y)) return;    // Capture from view: the drag draws the square (PanelKelvinlet.cpp)
         // A triple-click on another SubTool makes it the active one and frames it (#43). (Its first two clicks
         // don't sculpt it: brushes work on the active SubTool only.)
-        if (mouseClicks_ >= 3 && !(mod & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)) &&
+        // Not from a pen: quick taps of a stippling pen counted as a triple-click and switched the Part.
+        if (mouseClicks_ >= 3 && !lastInputPen_ && !wintabPen_ && !(mod & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)) &&
             insertType_.empty() && doc_.subtoolCount() > 1) {
             const int target = pickSubtool(x, y);
             if (target >= 0 && target != doc_.activeSubtool) {
                 runCommand("subtool_select", {{"index", double(target)}});
+                partSelected("triple-click");
                 frameActiveSubtool();
                 return;
             }
         }
         // Alt+click on another SubTool selects it (ZBrush); Alt+drag stays an inverted stroke or a pan.
         // Shift+Alt+click selects and frames it (ZBrush), the active one too.
-        const bool frameClick = (mod & SDL_KMOD_ALT) && (mod & SDL_KMOD_SHIFT) && !ctrlDown(mod);
-        if (!blenderStyle() && (mod & SDL_KMOD_ALT) && !ctrlDown(mod) && (frameClick || !(mod & SDL_KMOD_SHIFT)) &&
+        // Only the keyboard's Alt: a pen button set to Invert (Alt) is for subtracting, and a tap with it held
+        // switched the Part without the user knowing why.
+        const SDL_Keymod keys = keyMods();
+        const bool frameClick = (keys & SDL_KMOD_ALT) && (mod & SDL_KMOD_SHIFT) && !ctrlDown(mod);
+        if (!blenderStyle() && (keys & SDL_KMOD_ALT) && !ctrlDown(mod) && (frameClick || !(mod & SDL_KMOD_SHIFT)) &&
             (doc_.subtoolCount() > 1 || frameClick)) {
             const int target = pickSubtool(x, y);
             subtoolClickFrame_ = frameClick;
@@ -1371,6 +1382,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
                 subtoolClickTarget_ = target;
                 subtoolClickX_ = x;
                 subtoolClickY_ = y;
+                subtoolClickNs_ = clickClockNs();
                 return;
             }
         }
@@ -1453,6 +1465,10 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
         // X11, #7) each pen event's xrel jumped back from the stray position and the view shook instead of turning.
         dx = x - mouseX_;
         dy = y - mouseY_;
+        // The pen's first position after coming into range, or after the mouse moved the cursor, is a jump from
+        // wherever the cursor was, not a motion: it must not throw a drag (the view) across the screen.
+        if (penJump_ || !lastInputPen_) dx = dy = 0.0f;
+        penJump_ = false;
     }
     mouseX_ = x;
     mouseY_ = y;

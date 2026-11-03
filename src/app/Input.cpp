@@ -459,6 +459,7 @@ void App::drawInputSection() {
         if (ui::Checkbox("Emulate 3 Button Mouse##input.emulate_3_button", &emulate)) uiPrefs_.emulate3Button = emulate;
         ui::HelpAction(*this, "input.emulate_3_button");
     }
+    drawPressureStatus(); // the pen's pressure, with the troubleshooting link (Tablet.cpp)
     if (mayaStyle()) {
         int zoom = uiPrefs_.mayaZoomHorizontal ? 0 : 1;
         ImGui::TextDisabled("%s", tr("Zoom drag"));

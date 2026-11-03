@@ -40,6 +40,7 @@ public:
     void update(float dt);   // before the UI is built: plays the timeline
     void drawOverlay();      // inside the ImGui frame: captions and cursor
     bool finished() const { return step_ >= steps_.size(); }
+    float clock() const { return clock_; } // seconds of the script so far (its own time, not the wall clock)
     int frameStride() const { return stride_; } // >1 while fast-forwarding through waits
     // The recording's virtual camera: the part of the window the video shows (its centre and zoom, 1 = all of it),
     // eased between the targets set by zoomTo/zoomToItem. Captions and the fade stay the same size on screen.
@@ -164,7 +165,8 @@ private:
     std::string expandLibrary(std::string text) const; // $LIBRARY -> the LightBox library folder (UiTest.cpp)
     SDL_Keymod held_ = SDL_KMOD_NONE; // modifiers held by `hold` (Ctrl to mask, Ctrl+Shift to hide...)
     // Simulated pen (pen_* steps).
-    static constexpr SDL_PenID kTestPen = 1;
+    SDL_PenID testPen_ = 1;        // tablet_plug gives the next pen a new id, as SDL does
+    uint32_t testTabletMouse_ = 0; // the simulated tablet's mouse device (tablet_plug / tablet_unplug)
     bool penIn_ = false, penDown_ = false, penEraser_ = false;
     ImVec2 penAt_{960, 540}; // the simulated pen (mouse_ is SDL's shared cursor, which stray mouse events move too)
     SDL_PenInputFlags penState_ = 0;

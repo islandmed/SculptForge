@@ -13,6 +13,7 @@
 #include <array>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace sf {
 
@@ -71,22 +72,62 @@ void fromJson(const Json& j, TabletSettings& t);
 // previous stroke (or the 1.0 assumed before any sample) may still be high. The
 // first dab waits until a fresh, non-zero sample arrives; the app draws anyway at
 // the first motion for pens that have never reported pressure.
+//
+// A pen without a pressure axis (Windows Ink switched off in the Wacom driver, some old tablets) may still send
+// pressure 0 while touching: after kSilentMotions touching motions without any real pressure the pen counts as
+// pressure-less and draws at full pressure (noPressure) instead of never starting the stroke.
 class PenPressureTracker {
 public:
     static constexpr float kContact = 0.002f; // below this the tip is not really pressing
+    static constexpr int kSilentMotions = 8;  // touching motions without pressure before the pen counts as without
 
-    void touchDown() { sinceDown_ = false; }
-    void touchUp() { sinceDown_ = false; }
+    void touchDown() {
+        sinceDown_ = false;
+        down_ = true;
+    }
+    void touchUp() {
+        sinceDown_ = false;
+        down_ = false;
+    }
     void sample(float pressure);
+    void motion(); // the pen moved (counts touching motions that brought no pressure)
+    void reset() { *this = PenPressureTracker(); } // another pen or tablet: forget what this one did
     float raw() const { return raw_; }
+    float pressure() const { return noPressure() ? 1.0f : raw_; } // what brushes get, before the curve
     bool everSampled() const { return everSampled_; } // false: maybe a pen without pressure
-    bool readyForFirstDab() const { return sinceDown_ && raw_ > kContact; }
+    bool hasPressure() const { return pressed_; }     // the pen has reported a real pressure
+    bool noPressure() const { return !pressed_ && silentMotions_ >= kSilentMotions; }
+    bool readyForFirstDab() const { return (sinceDown_ && raw_ > kContact) || noPressure(); }
 
 private:
     float raw_ = 1.0f;
     bool sinceDown_ = false;
     bool everSampled_ = false;
+    bool down_ = false;
+    bool pressed_ = false;
+    int silentMotions_ = 0;
 };
+
+// Tablets plugged in or out while the app runs. SDL has no pen hot-plug events: a new pen is a new SDL_PenID at
+// its first proximity, and the tablet itself shows up as a mouse device (SDL_EVENT_MOUSE_ADDED / _REMOVED) with
+// the maker's name on Linux and usually on Windows. A mouse device added after launch with a generic name may be
+// the tablet too: if a new pen follows it, it was, and unplugging it says so.
+class TabletHotplug {
+public:
+    enum class Note { None, NewPen, Connected, Disconnected };
+
+    Note mouseAdded(uint32_t id, const std::string& name);
+    Note mouseRemoved(uint32_t id);
+    Note penIn(uint32_t penId);
+
+private:
+    std::vector<uint32_t> tabletMice_, pens_;
+    uint32_t candidate_ = 0;   // a generic mouse device added after launch (0: none)
+    bool announced_ = false;   // "Tablet connected" already said for the device just added
+};
+
+// The name of an input device that is a pen tablet or pen display (Wacom, Huion, XP-Pen ...).
+bool looksLikeTablet(const std::string& name);
 
 // Where the pen puts the cursor. In pen mode that is where the pen reports it is. In mouse mode (the driver's
 // relative mode, TabletSettings::mouseMode) the pen moves the cursor by how far it moves, like a mouse: lifting

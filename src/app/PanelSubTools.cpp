@@ -6,6 +6,7 @@
 // the ZBrush viewport gesture Alt+click to select a SubTool. Every action goes
 // through the subtool_* commands (core/SubTools.cpp).
 #include "app/App.h"
+#include "app/Demo.h"
 #include "app/Theme.h"
 #include "app/I18n.h"
 #include "core/Multires.h"
@@ -26,6 +27,7 @@ namespace sf {
 namespace {
 
 constexpr float kClickSlopPx = 4.0f; // movement that turns an Alt+click into a drag
+constexpr Uint64 kPartClickNs = 500000000ull; // a pen pressed longer than this isn't an Alt+click
 constexpr int kListRows = 6;         // the list scrolls beyond this many SubTools
 // The SubTool list's colours; should become theme tokens (Theme.h).
 // The recessed area behind the rows, a step below panelBg (the Classic look's #1c1c1f; other looks their shelf shade).
@@ -120,12 +122,28 @@ void App::subtoolClickMove(float x, float y) {
 }
 
 void App::subtoolClickRelease() {
-    if (subtoolClickTarget_ >= 0 && subtoolClickTarget_ < doc_.subtoolCount()) {
-        if (subtoolClickTarget_ != doc_.activeSubtool) runCommand("subtool_select", {{"index", double(subtoolClickTarget_)}});
+    // A pen pressed this long was held down to sculpt, not clicked (and Windows Ink's press-and-hold).
+    const bool held = (dragFromPen_ || wintabPen_) && clickClockNs() - subtoolClickNs_ > kPartClickNs;
+    if (!held && subtoolClickTarget_ >= 0 && subtoolClickTarget_ < doc_.subtoolCount()) {
+        if (subtoolClickTarget_ != doc_.activeSubtool) {
+            runCommand("subtool_select", {{"index", double(subtoolClickTarget_)}});
+            partSelected("Alt+click");
+        }
         if (subtoolClickFrame_) camera_.frame(doc_.mesh.bounds()); // Shift+Alt+click: frame it too
     }
     subtoolClickTarget_ = -1;
     subtoolClickFrame_ = false;
+}
+
+// Every Part switch from the viewport or the list says which Part and how (an unexpected switch had users
+// guessing which key they had hit).
+Uint64 App::clickClockNs() const {
+    return demo_ ? Uint64(double(demo_->clock()) * 1e9) : SDL_GetTicksNS(); // UI tests: the script's time
+}
+
+void App::partSelected(const char* how) {
+    if (!lastCommandOk_) return;
+    status_ = "Active Part: " + doc_.activeSubtoolInfo().name + " (" + how + ")";
 }
 
 void App::updateSubtoolThumbnails() {
@@ -337,6 +355,7 @@ void App::drawSubToolsContents() {
         runCommand("subtool_rename", {{"index", double(renameIndex)}, {"to", renameTo}});
     if (selectIndex >= 0) {
         runCommand("subtool_select", {{"index", double(selectIndex)}});
+        partSelected("Parts list");
     }
     if (toggleIndex >= 0) runCommand("subtool_visibility", {{"index", double(toggleIndex)}});
     if (duplicateIndex >= 0) runCommand("subtool_duplicate", {{"index", double(duplicateIndex)}});

@@ -123,8 +123,14 @@ void App::handlePenEvent(const SDL_Event& e) {
     lastPenNs_ = SDL_GetTicksNS();
     switch (e.type) {
     case SDL_EVENT_PEN_PROXIMITY_IN:
+        // A pen coming into range while a pen drag is still open: it left without saying so (some drivers never
+        // do). End that first, with the buttons it held, instead of carrying the drag on from somewhere else.
+        if (penInProximity_ || (dragFromPen_ && drag_ != Drag::None)) penLeft();
         penSeen_ = penInProximity_ = true;
+        penJump_ = true;
         penId_ = e.pproximity.which;
+        if (const TabletHotplug::Note note = tabletHotplug_.penIn(uint32_t(e.pproximity.which)); note != TabletHotplug::Note::None)
+            tabletNote(note, {});
         if (penName_.empty()) detectPenName();
         break;
     case SDL_EVENT_PEN_PROXIMITY_OUT:
@@ -147,6 +153,7 @@ void App::handlePenEvent(const SDL_Event& e) {
     case SDL_EVENT_PEN_MOTION:
         penSeen_ = penInProximity_ = true;
         penId_ = e.pmotion.which;
+        penTracker_.motion();
         break;
     case SDL_EVENT_PEN_AXIS:
         if (e.paxis.axis == SDL_PEN_AXIS_PRESSURE) {
@@ -217,24 +224,103 @@ void App::penLeft() {
     penNavButton_ = 0;
     firstDabPending_ = false;
     penTracker_.touchUp();
+    penJump_ = true;
     lastInputPen_ = false; // whatever moves the cursor next is a mouse until the pen says otherwise
 }
 
+// A tablet plugged in after launch works without a restart (SDL finds its pens as they come into range); this
+// forgets what the last one did (its name, pressure, held buttons) and says so in the status bar.
+void App::tabletDeviceEvent(const SDL_Event& e) {
+    if (e.type == SDL_EVENT_MOUSE_ADDED) {
+        wintab_.open(window_); // Windows: a tablet without Windows Ink plugged in after launch
+        const char* name = SDL_GetMouseNameForID(e.mdevice.which);
+        const std::string n = name ? name : "";
+        tabletNote(tabletHotplug_.mouseAdded(uint32_t(e.mdevice.which), n), n);
+    } else if (e.type == SDL_EVENT_MOUSE_REMOVED) {
+        tabletNote(tabletHotplug_.mouseRemoved(uint32_t(e.mdevice.which)), {});
+    }
+}
+
+void App::tabletNote(TabletHotplug::Note note, const std::string& name) {
+    if (note == TabletHotplug::Note::None) return;
+    if (note == TabletHotplug::Note::Disconnected) {
+        if (penInProximity_ || penButtons_ || (dragFromPen_ && drag_ != Drag::None)) penLeft(); // no Alt left held
+        penTracker_.reset();
+        wintabPen_ = wintabTip_ = false;
+        status_ = "Tablet disconnected";
+        return;
+    }
+    penTracker_.reset(); // a new pen: whether it has pressure is its own
+    penTiltSeen_ = false;
+    if (note == TabletHotplug::Note::NewPen) return;
+    if (!name.empty()) penName_ = name;
+    else detectPenName();
+    status_ = penName_.empty() ? std::string("Tablet connected") : "Tablet connected: " + penName_;
+}
+
+const char* App::pressureStatus() const {
+    if (!penSeen_) return "Pressure: no pen seen yet";
+    if (penTracker_.hasPressure()) return "Pressure: on";
+    if (penTracker_.noPressure() || penTracker_.everSampled()) return "Pressure: not detected";
+    return "Pressure: touch the tablet to check";
+}
+
+void App::drawPressureStatus() {
+    const bool ok = penSeen_ && penTracker_.hasPressure();
+    ImGui::TextColored(col(ok ? ui::color::accent : ui::color::textDim), "%s", pressureStatus());
+    ImGui::SameLine();
+    if (ImGui::SmallButton(ICON_LC_CIRCLE_HELP "  Troubleshooting##pressure_help")) guide_.open("troubleshooting.md#pen-tablets");
+#if defined(_WIN32)
+    ui::HelpText("Pressure", nullptr,
+                 "No pressure? In Wacom Tablet Properties > Mapping, switch \"Use Windows Ink\" (on for most tablets, "
+                 "off for some older drivers), then bring the pen back. Without pressure the pen draws at full "
+                 "strength.",
+                 "Preferences > Tablet");
+#else
+    ui::HelpText("Pressure", nullptr,
+                 "Whether the pen reports pressure. Without it the pen draws at full strength; check the tablet in "
+                 "your desktop's tablet settings.",
+                 "Preferences > Tablet");
+#endif
+}
+
+// Windows with "Use Windows Ink" off in the tablet driver: no SDL pen events, the driver moves the mouse, and the
+// pressure comes from Wintab. While Windows Ink speaks (SDL pen events in the last second) it is the one source.
+void App::wintabEvent(const SDL_Event& e) {
+    const bool mouse = (e.type == SDL_EVENT_MOUSE_MOTION && e.motion.which != SDL_PEN_MOUSEID) ||
+                       ((e.type == SDL_EVENT_MOUSE_BUTTON_DOWN || e.type == SDL_EVENT_MOUSE_BUTTON_UP) &&
+                        e.button.which != SDL_PEN_MOUSEID);
+    if (!mouse || !wintab_.isOpen()) return;
+    const Uint64 now = SDL_GetTicksNS();
+    if (penInProximity_ && now - lastPenNs_ < 1000000000ull) return; // Windows Ink is on: SDL's pen events count
+    WintabPressure::Sample s;
+    if (wintab_.poll(s)) {
+        wintabNs_ = now;
+        if (!wintabPen_) {
+            wintabPen_ = penSeen_ = true;
+            if (penName_.empty()) penName_ = "Tablet (Wintab)";
+        }
+        if (s.tip != wintabTip_) {
+            wintabTip_ = s.tip;
+            if (s.tip) penTracker_.touchDown();
+            else penTracker_.touchUp();
+        }
+        penTracker_.sample(s.pressure);
+        if (s.tip) penTracker_.motion();
+        penEraser_ = s.tip && s.eraser;
+    } else if (wintabPen_ && now - wintabNs_ > 250000000ull) {
+        wintabPen_ = wintabTip_ = penEraser_ = false; // the mouse itself: full pressure
+        penTracker_.touchUp();
+    }
+}
+
 float App::strokePressure() const {
-    if (!lastInputPen_) return 1.0f; // the mouse always presses fully
-    return uiPrefs_.tablet.curve.apply(penTracker_.raw());
+    if (!lastInputPen_ && !wintabPen_) return 1.0f; // the mouse always presses fully
+    return uiPrefs_.tablet.curve.apply(penTracker_.pressure()); // a pen without pressure: full
 }
 
 SDL_Keymod App::inputMods() const {
-    SDL_Keymod mods = SDL_GetModState();
-    if (blenderStyle()) mods = blenderMods(mods); // Blender's Ctrl inverts, its Mask brush masks (Input.cpp)
-    if (mayaStyle()) { // Maya: Ctrl inverts (as ZBrush's Alt), Ctrl+Alt masks (as ZBrush's Ctrl)
-        const bool ctrl = (mods & SDL_KMOD_CTRL) != 0, alt = (mods & SDL_KMOD_ALT) != 0, shift = (mods & SDL_KMOD_SHIFT) != 0;
-        // Ctrl+Alt+Shift erases the mask (#32): ZBrush's Ctrl+Alt, not Ctrl+Shift (visibility).
-        if (ctrl && alt && shift) mods = SDL_Keymod((mods & ~SDL_KMOD_SHIFT) | SDL_KMOD_LCTRL | SDL_KMOD_LALT);
-        else if (ctrl && alt) mods = SDL_Keymod((mods & ~SDL_KMOD_ALT) | SDL_KMOD_LCTRL);
-        else if (ctrl && !shift) mods = SDL_Keymod((mods & ~SDL_KMOD_CTRL) | SDL_KMOD_LALT);
-    }
+    SDL_Keymod mods = keyMods();
     for (int b = 1; b <= kPenButtons; ++b) {
         if (!(penButtons_ & (1u << b))) continue;
         const PenAction a = penButtonAction(b);
@@ -244,7 +330,20 @@ SDL_Keymod App::inputMods() const {
     return mods;
 }
 
-bool App::erasing() const { return lastInputPen_ && penEraser_; }
+SDL_Keymod App::keyMods() const {
+    SDL_Keymod mods = SDL_GetModState();
+    if (blenderStyle()) mods = blenderMods(mods); // Blender's Ctrl inverts, its Mask brush masks (Input.cpp)
+    if (mayaStyle()) { // Maya: Ctrl inverts (as ZBrush's Alt), Ctrl+Alt masks (as ZBrush's Ctrl)
+        const bool ctrl = (mods & SDL_KMOD_CTRL) != 0, alt = (mods & SDL_KMOD_ALT) != 0, shift = (mods & SDL_KMOD_SHIFT) != 0;
+        // Ctrl+Alt+Shift erases the mask (#32): ZBrush's Ctrl+Alt, not Ctrl+Shift (visibility).
+        if (ctrl && alt && shift) mods = SDL_Keymod((mods & ~SDL_KMOD_SHIFT) | SDL_KMOD_LCTRL | SDL_KMOD_LALT);
+        else if (ctrl && alt) mods = SDL_Keymod((mods & ~SDL_KMOD_ALT) | SDL_KMOD_LCTRL);
+        else if (ctrl && !shift) mods = SDL_Keymod((mods & ~SDL_KMOD_CTRL) | SDL_KMOD_LALT);
+    }
+    return mods;
+}
+
+bool App::erasing() const { return (lastInputPen_ || wintabPen_) && penEraser_; }
 
 void App::firstDab(float x, float y) {
     if (lastInputPen_ && !penTracker_.readyForFirstDab()) {
@@ -320,6 +419,8 @@ void App::drawTabletSection() {
         if (const char* driver = SDL_GetCurrentVideoDriver()) info += sep + std::string(driver);
         ImGui::TextColored(col(ui::color::textDim), "%s", info.c_str());
     }
+
+    drawPressureStatus();
 
     // --- Pen or mouse mode (#54) ---
     ImGui::Checkbox(tr("Mouse mode (relative)##tablet_mouse_mode"), &t.mouseMode);

@@ -20,6 +20,11 @@ chapter opens by itself the first time you start a new version; you can always f
   everywhere. Shift+F now sets the brush's Intensity, not Smooth's (#77).
 - **View > Lock camera** (<kbd>Shift</kbd>+<kbd>L</kbd>): drags that start beside the model sculpt instead of
   turning the view, and the status bar shows **CAMERA LOCKED** while it is on (#62).
+- **Tablets**: plug a tablet in while SculptForge runs and it just works ("Tablet connected" in the status bar),
+  also through Wacom Bridge. On Windows, pressure works with the Wacom driver's **Use Windows Ink** on or off.
+  **Preferences > Input** shows whether pressure is detected, with a troubleshooting link. The view no longer jumps
+  when the pen comes back into range, and the active Part changes only with **Alt+click** on the keyboard; the
+  status bar names the new Part. See [Troubleshooting](troubleshooting.md#pen-tablets).
 
 ## Version 0.10.8
 

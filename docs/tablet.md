@@ -49,9 +49,11 @@ inverts.
 
 ## Setup by system
 
-**Windows**: SculptForge uses Windows Ink. Wacom: Wacom Tablet Properties > Grip Pen > Mapping, keep **Use
-Windows Ink** checked (without it Windows sees only a mouse, without pressure). XP-Pen and Huion drivers have a
-"Windows Ink" option that must be on as well. Surface pens work as they are. If strokes start late or the
+**Windows**: SculptForge uses Windows Ink, and the driver's Wintab when Windows Ink is off (Wacom Tablet
+Properties > Grip Pen > Mapping > **Use Windows Ink**): then the driver moves the cursor and SculptForge reads only
+the pressure, tip and eraser from Wintab32.dll (loaded from System32). Windows Ink is preferred while it sends pen
+events. XP-Pen and Huion drivers have a "Windows Ink" option too. Wacom Bridge (a tablet on a remote desktop)
+works the same way. Surface pens work as they are. If strokes start late or the
 cursor shows a ripple, turn off "Press and hold for right-click" and the pen feedback in Windows Settings >
 Bluetooth & devices > Pen & Windows Ink.
 
@@ -63,6 +65,14 @@ On Wayland, GNOME (Settings > Wacom Tablet) and KDE Plasma (System Settings > Dr
 a screen and set the pen buttons; on X11 the xf86-input-wacom driver and `xsetwacom` do the same. To check
 that pressure arrives at all, run `libinput debug-events` and look for `TABLET_TOOL_AXIS` lines with a
 `pressure` value.
+
+## Hot-plugging
+
+A tablet plugged in while SculptForge runs works at once: SDL finds a new pen at its first proximity, and the
+tablet's mouse device (SDL_EVENT_MOUSE_ADDED / _REMOVED) says when it came and went; the status bar shows "Tablet
+connected" / "Tablet disconnected". Each new pen starts afresh (its name, whether it has pressure); unplugging
+releases the buttons it held, so no Alt stays down. On Windows the Wintab context is opened again when a device
+is added. The logic is `TabletHotplug` in `core/Tablet.h`.
 
 ## Troubleshooting
 
@@ -89,8 +99,9 @@ that pressure arrives at all, run `libinput debug-events` and look for `TABLET_T
 The settings and the curve are in `src/core/Tablet.h` (unit tests: `tests/test_tablet.cpp`); the pen event
 handling and the preferences panel in `src/app/Tablet.cpp`. UI tests drive a simulated pen with real SDL pen
 events plus the mouse events SDL synthesizes from them: `pen_stroke`, `pen_drag_item`, `pen_button`,
-`pen_hover`, `pen_enter`, `pen_drag`, `pen_pressure` and `pen_out` (documented in `src/app/UiTest.cpp`); `tests/ui/tablet.sfui`
+`pen_hover`, `pen_enter`, `pen_drag`, `pen_pressure`, `pen_out`, `pen_new`, `tablet_plug` and `tablet_unplug` (documented in `src/app/UiTest.cpp`); `tests/ui/tablet.sfui`
 covers pressure, the curve, Pressure > Size, the eraser, side buttons, leaving proximity, mouse mode and the panel, and
 `tests/ui/pen_navigation.sfui` view drags with the pen tip, with and without a driver's stray mouse events, and
 `tests/ui/pen_windows_ink.sfui` pen taps on menus, the Move button and the S slider with Windows Ink's stray
-mouse events.
+mouse events, and `tests/ui/tablet_hotplug.sfui` plugging in and out, a pen without pressure, the pen leaving and
+coming back mid-drag, side buttons, the eraser and Alt+click on a Part.

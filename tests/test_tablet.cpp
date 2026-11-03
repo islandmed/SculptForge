@@ -247,3 +247,62 @@ TEST(tablet_settings_mouse_mode_round_trip) {
     fromJson(j, d);
     CHECK(!d.mouseMode);
 }
+
+// A pen without a pressure axis (Windows Ink off) sends 0 while touching: after a few motions it draws at full
+// pressure instead of never starting the stroke; a pen with pressure never does.
+TEST(pen_pressure_tracker_no_pressure_axis) {
+    PenPressureTracker t;
+    t.touchDown();
+    t.sample(0.0f);
+    for (int i = 0; i + 1 < PenPressureTracker::kSilentMotions; ++i) t.motion();
+    CHECK(!t.readyForFirstDab());
+    CHECK(!t.noPressure());
+    t.motion();
+    CHECK(t.noPressure());
+    CHECK(t.readyForFirstDab());
+    CHECK(near(t.pressure(), 1.0f));
+    t.reset(); // another pen: its own
+    CHECK(!t.noPressure() && !t.hasPressure());
+
+    PenPressureTracker p;
+    p.touchDown();
+    p.sample(0.4f);
+    for (int i = 0; i < 3 * PenPressureTracker::kSilentMotions; ++i) p.motion();
+    p.touchUp();
+    p.touchDown();
+    p.sample(0.0f);
+    for (int i = 0; i < 3 * PenPressureTracker::kSilentMotions; ++i) p.motion();
+    CHECK(p.hasPressure());
+    CHECK(!p.noPressure()); // a light touch on a pen with pressure stays light
+    CHECK(near(p.pressure(), 0.0f));
+    PenPressureTracker hover;
+    for (int i = 0; i < 3 * PenPressureTracker::kSilentMotions; ++i) hover.motion();
+    CHECK(!hover.noPressure()); // hovering never counts
+}
+
+TEST(tablet_hotplug_notes) {
+    CHECK(looksLikeTablet("Wacom Intuos3 6x8 Pen"));
+    CHECK(looksLikeTablet("Intuos3 6x8"));
+    CHECK(looksLikeTablet("HUION Kamvas 13"));
+    CHECK(!looksLikeTablet("Logitech USB Optical Mouse"));
+    CHECK(!looksLikeTablet("HID-compliant mouse"));
+    CHECK(!looksLikeTablet("Openwheel")); // "pen" only as a word
+
+    using N = TabletHotplug::Note;
+    TabletHotplug h;
+    CHECK(h.penIn(7) == N::NewPen); // the tablet plugged in before launch: no note
+    CHECK(h.penIn(7) == N::None);
+    CHECK(h.mouseRemoved(3) == N::None); // a mouse, not the tablet
+
+    // Named tablet: connected at once, its pen needs no second note, unplugging says so.
+    CHECK(h.mouseAdded(10, "Wacom Intuos3 6x8 Pen") == N::Connected);
+    CHECK(h.penIn(7) == N::NewPen); // the same id after a replug is a new pen
+    CHECK(h.mouseRemoved(10) == N::Disconnected);
+
+    // Generic name (Windows): connected once its pen shows up; unplugging that device is the tablet leaving.
+    CHECK(h.mouseAdded(11, "HID-compliant mouse") == N::None);
+    CHECK(h.penIn(8) == N::Connected);
+    CHECK(h.penIn(9) == N::NewPen); // the eraser end, on systems where it is a pen of its own
+    CHECK(h.mouseRemoved(11) == N::Disconnected);
+    CHECK(h.mouseRemoved(11) == N::None);
+}
