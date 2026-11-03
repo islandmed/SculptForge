@@ -120,14 +120,16 @@ void App::penMouseEvents(const SDL_Event& e, bool before) {
 // at an old position (where the pen last touched). Following those made the brush ring flick between two places,
 // the view shake, and the UI see the cursor jump: a click landed somewhere else, a drag on the Move button threw the
 // model off the canvas (#13). So while the pen is in range (heard from in the last second) only the pen moves the
-// cursor, for the canvas and the UI alike. The left button too: a driver's own press beside the pen's, whose
-// release may never come, left the panels holding a button, and the pen's next taps were not clicks (#95).
+// cursor, for the canvas and the UI alike. The left button too while the pen touches (or just touched or lifted):
+// a driver's own press beside the pen's, whose release may never come, left the panels holding a button, and the
+// pen's next taps were not clicks (#95). A mouse click while the pen only hovers still counts.
 bool App::strayMouseMotion(const SDL_Event& e) const {
     const bool motion = e.type == SDL_EVENT_MOUSE_MOTION && e.motion.which != SDL_PEN_MOUSEID;
     const bool left = (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN || e.type == SDL_EVENT_MOUSE_BUTTON_UP) &&
                       e.button.which != SDL_PEN_MOUSEID && e.button.button == SDL_BUTTON_LEFT;
     if (!motion && !left) return false;
     if (dragFromPen_ && drag_ != Drag::None) return true;
+    if (left) return penInProximity_ && (penTouching_ || clickClockNs() - lastPenTouchNs_ < 100000000ull);
     return penInProximity_ && SDL_GetTicksNS() - lastPenNs_ < 1000000000ull;
 }
 
@@ -201,6 +203,7 @@ void App::handlePenEvent(const SDL_Event& e) {
         penId_ = e.ptouch.which;
         penEraser_ = e.ptouch.eraser;
         penTracker_.touchDown(); // SDL's left button down follows and starts the stroke
+        lastPenTouchNs_ = clickClockNs();
         break;
     case SDL_EVENT_PEN_UP:
         // End the stroke here rather than waiting for SDL's mouse button up: the pen may leave
@@ -209,6 +212,7 @@ void App::handlePenEvent(const SDL_Event& e) {
         if (drag_ != Drag::None && dragFromPen_ && !penNavButton_) onMouseUp();
         penTouching_ = penEraser_ = false;
         penTracker_.touchUp();
+        lastPenTouchNs_ = clickClockNs();
         break;
     case SDL_EVENT_PEN_MOTION:
         penSeen_ = penInProximity_ = true;

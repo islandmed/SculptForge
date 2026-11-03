@@ -174,8 +174,8 @@ expect_value cursor_x >= $mouse_x-0.5
 expect_value cursor_x <= $mouse_x+0.5
 # #72 (drag-d, driver in pen mode, 0.10.8: "no difference between default and mouse mode"): the pen reports its
 # place on the tablet, yet the cursor moves only by the pen's movement. The pen lifted and put down elsewhere: no
-# jump; it moves on from there, the panels see the pointer at the brush, and they draw the arrow there (the system
-# arrow, at the pen's place on the tablet, is hidden).
+# jump; it moves on from there, the panels see the pointer at the brush (ImGui floors it to whole pixels), and
+# they draw the arrow there (the system arrow, at the pen's place on the tablet, is hidden).
 pen_out
 pen_enter 0.3 0.6
 remember cursor_x a_x
@@ -190,9 +190,9 @@ expect_value cursor_x >= $b_x-0.5
 expect_value cursor_x <= $b_x+0.5
 expect_value cursor_y >= $b_y-0.5
 expect_value cursor_y <= $b_y+0.5
-expect_value ui_mouse_x >= $b_x-0.5
+expect_value ui_mouse_x >= $b_x-1
 expect_value ui_mouse_x <= $b_x+0.5
-expect_value ui_mouse_y >= $b_y-0.5
+expect_value ui_mouse_y >= $b_y-1
 expect_value ui_mouse_y <= $b_y+0.5
 pen_hover 0.8 0.15
 expect_value cursor_x < $b_x-5
