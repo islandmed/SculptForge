@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "ai/AiCommands.h"
 
+#include "ai/AiPolicy.h"
 #include "ai/BrushGalleryClient.h"
 #include "ai/ComfyUI.h"
 #include "ai/ImageTo3DService.h"
@@ -66,9 +67,9 @@ CommandResult importGenerated(Document& doc, const Args& a, const GeneratorResul
 
 } // namespace
 
-void registerAiCommands(CommandRegistry& registry, std::function<AiSettings()> settings) {
+void addAiFeatureCommands(CommandRegistry& registry, std::function<AiSettings()> settings) {
     using T = ParamSpec::Type;
-    registerBrushGalleryCommands(registry); // brush_gallery_search, brush_gallery_install (BrushGalleryClient.cpp)
+    removeAiFeatureCommands(registry); // never twice
     registry.add({"brush_ai",
                   "Design a brush from a description. Free by default (a hosted open model, no key); or "
                   "provider=anthropic (ANTHROPIC_API_KEY), or provider=openai-compatible endpoint=... model=... "
@@ -189,6 +190,16 @@ void registerAiCommands(CommandRegistry& registry, std::function<AiSettings()> s
                       if (!comfy::checkServer(url, info, err)) return {false, err};
                       return {true, info.summary() + " at " + url};
                   }});
+}
+
+void removeAiFeatureCommands(CommandRegistry& registry) {
+    for (const std::string& name : aiCommandNames()) registry.remove(name);
+}
+
+void registerAiCommands(CommandRegistry& registry, std::function<AiSettings()> settings) {
+    using T = ParamSpec::Type;
+    registerBrushGalleryCommands(registry); // brush_gallery_search, brush_gallery_install (BrushGalleryClient.cpp)
+    if (aiEnabled()) addAiFeatureCommands(registry, settings);
 
     registry.add({"unreal_editors", "List running Unreal Editors that SculptForge can send assets to (remote execution).",
                   {{"network", T::Bool, "Also look on other computers (Unreal needs Multicast TTL 1 and bind address 0.0.0.0).", false}},

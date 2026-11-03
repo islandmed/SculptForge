@@ -68,6 +68,20 @@ changes nothing. Either way, Preferences > Interface > Look changes it later.
 
 In scripts: `ui_look look=forge scheme=tokyo_night layout=sculptforge` (or `look=classic layout=zbrush`).
 
+## Turning AI off
+
+Your art is never uploaded or used for training. AI features run only when you use them and can be turned off.
+
+**Preferences > AI > Enable AI features** turns off everything AI: **AI Brush** (Brush Lab, where you describe a
+brush in words) and **Generate 3D** (image or text to a model) leave the shelves, menus and the command palette,
+their commands leave scripts, `sculptforge-cli` and the MCP tool list, and SculptForge makes no AI network calls.
+The offline image tools (**Relief**, **Inflate**, **Stamp**) and the MCP server stay. The first-run welcome asks
+the same question. The choice is saved at once; turn it back on the same way, or search the command palette for
+"Enable AI".
+
+Studios can turn it off for everyone with the environment variable `SF_AI=off` (or start with `--no-ai`); the
+setting is then locked. See [Studios](studios.md#environment-variables).
+
 ## The title strip
 
 From left to right:

@@ -79,6 +79,9 @@ action: guide:whats-new.md
   and the status line tells you. Your own model choice is kept. See [Image and text to 3D](generate-3d.md).
 - **Generated models arrive as clean quads**: Quad Remesh is now the default, with one subdivision level holding
   the detail, so you can sculpt and subdivide straight away. Voxel remesh and Off are still in **Remesh**.
+- **Turn AI off**: **Preferences > AI > Enable AI features** (the welcome asks too). Off hides AI Brush and
+  Generate 3D everywhere and SculptForge makes no AI network calls. Your art is never uploaded or used for training. AI features run only when you use them and can be turned off. Studios can set `SF_AI=off`.
+  See [The interface](interface.md#turning-ai-off).
 
 ## Version 0.10.8
 

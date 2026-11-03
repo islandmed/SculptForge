@@ -193,6 +193,8 @@ bool App::init(const AppOptions& options) {
     } else {
         io.IniFilename = nullptr;
     }
+    // Preferences > AI: tests, renders and videos start with AI on whatever this computer chose (SF_AI still wins).
+    ai::setAiEnabled(ai::aiFeaturesAllowed(headless || !options.demo.empty() || aiSettings_.enabled));
     ai::registerAiCommands(commands_, [this] { return aiSettings_; });
     registerPaintUiCommands();
     std::snprintf(falKey_, sizeof falKey_, "%s", aiSettings_.falKey.c_str());
@@ -2105,7 +2107,10 @@ void App::openPath(const std::string& path) {
     std::string ext = std::filesystem::path(std::u8string(path.begin(), path.end())).extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
     if (Image::isImagePath(path)) {
-        if (loadReferenceImage(path)) showImageTo3D_ = true;
+        if (loadReferenceImage(path)) {
+            if (ai::aiEnabled()) showImageTo3D_ = true;
+            else status_ = "Image loaded: Relief, Inflate or Stamp it from Mesh > Generate 3D";
+        }
     } else if (ext == ".sfbrush") {
         installBrushFile(path);
     } else if (ext == kPackExtension) { // a pack: the review screen first, nothing is installed yet
@@ -2360,6 +2365,8 @@ void App::drawUi() {
             ImGui::Text("SculptForge %s", SCULPTFORGE_VERSION);
             ImGui::TextWrapped("Free and open-source digital sculpting.");
             ImGui::Spacing();
+            ImGui::TextWrapped("%s", ai::kPrivacyLine); // also on the site (website/index.html) and in docs/ai-services.md
+            ImGui::Spacing();
             ImGui::TextWrapped("Copyright (C) 2026 The SculptForge contributors. This program is free software: you can "
                                "redistribute it and/or modify it under the terms of the GNU General Public License, "
                                "version 3 or later. It comes with ABSOLUTELY NO WARRANTY.");
@@ -2578,6 +2585,7 @@ void App::sendBrushRequest(const std::string& text) {
     scrollChat_ = true;
     busyTime_ = 0.0f;
 
+    if (!ai::aiEnabled()) return; // (the Brush Lab is closed then; requestBrush refuses too)
     // Detached worker with its own copies, so quitting never waits on the network.
     auto promise = std::make_shared<std::promise<BrushReply>>();
     pendingBrush_ = promise->get_future();

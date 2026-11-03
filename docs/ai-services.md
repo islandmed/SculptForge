@@ -4,6 +4,17 @@ Every AI feature in SculptForge is **optional and off until you use it**. Sculpt
 telemetry, no account and no servers of its own. When you use an AI feature, SculptForge talks
 **directly** to the service you picked; nothing goes anywhere else.
 
+**Your art is never uploaded or used for training. AI features run only when you use them and can be turned off.** Your sculpts stay on your computer; only what you hand an AI feature (a brush description,
+or the picture or text you give Generate 3D) goes to the service you picked.
+
+## Turning AI off
+
+**Preferences > AI > Enable AI features** (also asked in the first-run welcome). Off: Brush Lab and
+Generate 3D are hidden, their commands (`brush_ai`, `image_to_3d`, `text_to_3d`, `comfyui_check`)
+are not registered in the app, `sculptforge-cli`, Python or the MCP tool list, and no AI request is
+made. The setting is `"enabled"` in `ai.json`. `SF_AI=off` in the environment (or `--no-ai`) turns
+it off and locks it, for studios; `SF_AI=on` turns it on whatever was saved.
+
 ## What is sent where
 
 | Feature | Service (your choice) | What is sent | Key |

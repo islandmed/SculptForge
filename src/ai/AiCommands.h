@@ -13,7 +13,11 @@
 
 namespace sf::ai {
 
-// `settings` is called on every run so the latest saved settings are used.
+// `settings` is called on every run so the latest saved settings are used. The AI ones (ai/AiPolicy.h
+// aiCommandNames) only while aiEnabled(); the rest (community brushes, Unreal) always.
 void registerAiCommands(CommandRegistry& registry, std::function<AiSettings()> settings);
+// The AI switch at run time (Preferences > AI): adds or removes just the AI commands.
+void addAiFeatureCommands(CommandRegistry& registry, std::function<AiSettings()> settings);
+void removeAiFeatureCommands(CommandRegistry& registry);
 
 } // namespace sf::ai

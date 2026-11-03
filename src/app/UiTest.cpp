@@ -205,6 +205,7 @@
 //   expect_value spacemouse_connected (1 when the app opened it), spacemouse_moving (1 while it moves the view)
 //   expect_value look (0 Classic, 1 Forge Terminal, 2 Phosphor, 3 Blueprint), shell_layout (0 ZBrush-style, 1 SculptForge)
 #include "app/App.h"
+#include "ai/Http.h"
 
 #ifndef SDL_PEN_INPUT_IN_PROXIMITY
 #define SDL_PEN_INPUT_IN_PROXIMITY (1u << 31) // SDL 3.4's flag; older SDL 3 never sets it
@@ -618,6 +619,8 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "subtools") return double(doc.subtoolCount());
     if (name == "discord_requests") return double(app_.discordRequests_); // Join the community on Discord clicks
     if (name == "support_requests") return double(app_.supportPageRequests_); // Support SculptForge clicks
+    if (name == "ai_enabled") return ai::aiEnabled() ? 1.0 : 0.0; // Preferences > AI (PanelAi.cpp)
+    if (name == "http_requests") return double(ai::httpRequestCount()); // every request this process started
     if (name == "welcome_open") return app_.showWelcome_ ? 1.0 : 0.0;
     if (name == "new_look_card_open") return app_.newLookCard_ ? 1.0 : 0.0; // "SculptForge has a new look" (0.10.7)
     if (name == "support_card_open") return app_.supportCardOpen() ? 1.0 : 0.0; // the support card at launch

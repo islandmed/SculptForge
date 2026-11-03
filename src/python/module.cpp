@@ -12,6 +12,7 @@
 //   doc.mask, doc.colors, doc.polygroups           # optional attributes, None when absent
 //   doc.set_selection_set("Eyes", mask=m)          # push a selection set; doc.selection_set("Eyes") pulls it
 #include "ai/AiCommands.h"
+#include "ai/AiPolicy.h"
 #include "ai/SplatTrainer.h"
 #include "core/BrushLibrary.h"
 #include "core/Commands.h"
@@ -34,6 +35,7 @@ namespace {
 const CommandRegistry& registry() {
     static CommandRegistry r = [] {
         CommandRegistry reg;
+        ai::setAiEnabled(ai::aiFeaturesAllowed(ai::AiSettings::load(ai::defaultAiSettingsPath()).enabled)); // Preferences > AI, SF_AI
         ai::registerAiCommands(reg, [] { return ai::AiSettings::load(ai::defaultAiSettingsPath()); });
         ai::registerSplatTrainCommands(reg, [] { return ai::SplatTrainSettings::load(ai::defaultSplatTrainSettingsPath()); });
         return reg;

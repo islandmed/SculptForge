@@ -829,6 +829,11 @@ CommandRegistry::CommandRegistry() {
     registerProjectCommands(*this); // keep last (core/Project.cpp)
 }
 
+void CommandRegistry::remove(const std::string& name) {
+    commands_.erase(std::remove_if(commands_.begin(), commands_.end(), [&](const Command& c) { return c.name == name; }),
+                    commands_.end());
+}
+
 void CommandRegistry::add(Command cmd) {
     // The commands that follow the brushes' symmetry take radial and local symmetry too (#63).
     static const char* const kSymmetric[] = {"stroke", "vdm_stamp", "mask_rect", "mask_lasso", "hide_rect",

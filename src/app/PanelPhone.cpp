@@ -172,6 +172,10 @@ void App::handlePhoneCapture(const link::PhoneEvent& e) {
             status_ = "Photo received (" + where + ") but it can't be read: " + status_;
             return;
         }
+        if (!ai::aiEnabled()) { // Preferences > AI is off: the photo stays the reference image
+            status_ = "Photo received (" + where + "): Relief, Inflate or Stamp it from Mesh > Generate 3D";
+            return;
+        }
         showImageTo3D_ = true;
         textMode_ = false;
         if (phoneAutoGenerate_) {

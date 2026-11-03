@@ -76,6 +76,7 @@ rez-env sculptforge -- sculptforge
 
 | Variable | Effect |
 |---|---|
+| `SF_AI` | `off`: every AI feature off and locked (app, `sculptforge-cli`, MCP, Python); `on`: on whatever was saved. `--no-ai` does the same as `off` for one start |
 | `SCULPTFORGE_BRUSH_PATH` | Read-only studio brush folders (`:`-separated, `;` on Windows) |
 | `SCULPTFORGE_STUDIO_BRUSHES` | With the Rez package: appended to `SCULPTFORGE_BRUSH_PATH` |
 | `SCULPTFORGE_BRUSH_GALLERY` | Use another community brush gallery index (a URL or a folder), for example an in-house mirror |

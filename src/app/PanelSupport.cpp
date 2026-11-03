@@ -172,6 +172,25 @@ void App::drawSupportUi() {
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Bust, full body, hand, foot, ear, eye, stylised and creature heads, torso and "
                                   "bevelled primitives: Library > Tool > Starter meshes.");
+            // AI (Preferences > AI changes it later; saved at once).
+            ImGui::Spacing();
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted("AI features:");
+            for (const bool choice : {true, false}) {
+                ImGui::SameLine();
+                const bool on = ai::aiEnabled() == choice;
+                if (on) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+                ImGui::BeginDisabled(ai::aiPolicyLocked());
+                if (ImGui::Button(choice ? "On##welcome.ai" : "Off##welcome.ai")) setAiFeatures(choice);
+                ImGui::EndDisabled();
+                if (on) ImGui::PopStyleColor();
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                    ImGui::SetTooltip("%s", choice ? "AI Brush (describe a brush) and Generate 3D (image or text to a model)."
+                                                   : "Hides them; SculptForge makes no AI network calls.");
+            }
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+            ImGui::TextWrapped("%s", ai::kPrivacyLine);
+            ImGui::PopStyleColor();
             ImGui::Spacing();
             if (ImGui::Button("Open the User Guide##welcome")) {
                 guide_.open();

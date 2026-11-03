@@ -85,6 +85,12 @@ All notable changes to SculptForge are listed here. The format follows
   view no longer jumps when the pen comes back into range elsewhere or leaves mid-drag. The active Part changes only
   with the keyboard's Alt and a quick click (not with a pen button set to Alt, a long pen press or quick pen taps),
   and the status bar says "Active Part: <name> (Alt+click)".
+- Turn AI off: **Preferences > AI > Enable AI features** (also asked in the first-run welcome). Off hides AI Brush,
+  Generate 3D and their menu, shelf and command palette entries, removes the AI commands from scripts, the CLI and
+  the MCP tool list, and stops every AI network call; the MCP server and the offline Relief / Inflate / Stamp stay.
+  Saved at once. Studios: `SF_AI=off` (or `--no-ai`) turns it off and locks it. About and the website now say:
+  "Your art is never uploaded or used for training. AI features run only when you use them and can be turned off."
+
 ## [0.10.8] - 2026-11-02
 
 ### Fixed
