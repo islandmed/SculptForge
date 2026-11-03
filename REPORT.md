@@ -3,4 +3,5 @@
 - Every step sets the brush size with S + typed number (brushes keep their own size since #78; the old script flooded white/yellow because of it).
 - Images: tests/ui/first_sculpt.sfui -> `make_images.py --first-sculpt` -> docs/guide/images/first-sculpt/ (13 JPEGs) and images/wn-first-sculpt.jpg (600x340 card, from the 2x render). Every image reviewed at full size.
 - Text: index blurb, What's New 0.10.9 card line/highlight, help tooltip and welcome tooltip say owl; CHANGELOG [Unreleased] Changed. Guide rebuilt.
-- Tests: see the result line below.
+- Tests: first_sculpt.sfui passes locally and guide_site passes (build_site.py --check). No full ctest here: the merger runs it.
+- SHA: 7a707132 (lesson), on origin/main 430ab9c6.
