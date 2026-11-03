@@ -905,6 +905,7 @@ int App::run() {
                 continuousDabAt_ = nowS;
             }
         }
+        flushGrab(); // Move: the pointer's moves since the last frame, as one
         if (asyncStroke_) pumpStroke();
         else drainStrokeDabs(kStrokeBudgetSeconds);
         mark();
@@ -924,7 +925,6 @@ int App::run() {
             pollPhone();
             pollAutoUv();
             pollUvEditor();
-        pollUvEditor();
             pollBake();
             pollQRemesh();
             pollSplatTrain();
@@ -1057,7 +1057,7 @@ int App::run() {
                     int(drag_ != Drag::None), int(backgroundBusy()), int(perf_.framesStill < 10));
     }
     finishProject();
-    return 0;
+    return options_.benchmark && proofSkippedScenes() ? 2 : 0; // (--benchmark: a scene skipped for memory)
 }
 
 // The UI scale (Preferences > Interface > UI scale, #87). Automatic follows the window's display: on Windows
@@ -1839,6 +1839,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
         p.focal = focalShift_;
         p.connectedOnly = uiPrefs_.connectedOnly;
         p.viewFalloff = uiPrefs_.viewFalloff;
+        grabPending_ = false;
         doc_.sculptor.beginGrab(doc_.mesh, doc_.bvh, p, symmetry_);
         grabPlanePoint_ = grabLast_ = hit.position;
         beginAlongNormal(hit, p.radius);
@@ -1894,7 +1895,7 @@ void App::strokeTo(float x, float y) {
     const BrushRecipe* recipe = strokeRecipe();
     if (strokeBrush_ == BrushType::Move && !recipe && strokeSculpt_ && strokeAlongNormal_) {
         const glm::vec3 p = alongNormalTarget(x, y);
-        doc_.sculptor.grab(doc_.mesh, doc_.bvh, p - grabLast_);
+        queueGrab(p - grabLast_);
         grabLast_ = p;
         return;
     }
@@ -1906,7 +1907,7 @@ void App::strokeTo(float x, float y) {
         if (std::abs(denom) < 1e-6f) return;
         float t = glm::dot(grabPlanePoint_ - origin, n) / denom;
         glm::vec3 p = origin + dir * t;
-        doc_.sculptor.grab(doc_.mesh, doc_.bvh, p - grabLast_);
+        queueGrab(p - grabLast_);
         grabLast_ = p;
         return;
     }
@@ -1990,6 +1991,7 @@ void App::drainStrokeDabs(double budgetSeconds) {
     static const bool log = std::getenv("SF_STROKE_LOG") != nullptr; // per frame: dabs waiting, placed, ms
     const auto start = std::chrono::steady_clock::now();
     const size_t waiting = dabQueue_.size();
+    const SculptTimings before = doc_.sculptor.timings;
     size_t placed = 0;
     while (!dabQueue_.empty()) {
         const PathDab d = dabQueue_.pop();
@@ -2003,11 +2005,14 @@ void App::drainStrokeDabs(double budgetSeconds) {
             std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() >= budgetSeconds)
             break; // at least one dab per call, so a stroke always moves on
     }
-    if (log)
-        SDL_Log("stroke: %llu waiting, %llu placed in %.1f ms, %llu left", (unsigned long long)waiting,
-                (unsigned long long)placed,
+    if (log) {
+        const SculptTimings& t = doc_.sculptor.timings;
+        SDL_Log("stroke: %llu waiting, %llu placed in %.1f ms (kernel %.1f, normals %.1f, BVH %.1f, %llu vertices), %llu left",
+                (unsigned long long)waiting, (unsigned long long)placed,
                 std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count(),
-                (unsigned long long)dabQueue_.size());
+                t.kernelMs - before.kernelMs, t.normalsMs - before.normalsMs, t.bvhMs - before.bvhMs,
+                (unsigned long long)(t.vertices - before.vertices), (unsigned long long)dabQueue_.size());
+    }
 }
 
 void App::dabAt(float x, float y, float pressure) {
@@ -2119,7 +2124,25 @@ void App::dabAt(float x, float y, float pressure) {
     doc_.sculptor.dab(doc_.mesh, doc_.bvh, st.brush, p, st.symmetry);
 }
 
+void App::queueGrab(const glm::vec3& delta) {
+    // Move followed every pointer sample with a whole move of its region (positions, normals, BVH): at 240 samples
+    // a second on 33M triangles a frame did several, the next frame got more samples, and the view stalled for
+    // seconds. Each sample still moves the positions (the cheap part); the normals and the BVH, which depend only on
+    // where the vertices end up, follow once a frame (flushGrab): the same mesh, bit for bit. Scripts and
+    // recordings do both at once.
+    doc_.sculptor.grabMove(doc_.mesh, delta);
+    grabPending_ = true;
+    if (!interactiveStrokes_) flushGrab();
+}
+
+void App::flushGrab() {
+    if (!grabPending_) return;
+    grabPending_ = false;
+    doc_.sculptor.grabFinish(doc_.mesh, doc_.bvh);
+}
+
 void App::endStroke() {
+    flushGrab(); // (Move: the last samples' move)
     if (asyncStroke_) solverWait(); // (the dabs in flight; then the solver thread is idle)
     drainStrokeDabs(0.0); // the dabs still waiting belong to this stroke
     doc_.sculptor.flushDetailClone(doc_.mesh, doc_.bvh, symmetry_); // a Detail Clone click
@@ -2152,6 +2175,11 @@ void App::runCommand(const std::string& name, const Args& args) {
     if (name == "pack_install") {
         reviewPackFile(argString(args, "path"));
         lastCommandOk_ = packs_.review != nullptr;
+        return;
+    }
+    // A big mesh (Subdivide, Divide, micro, remesh) asks first when it wouldn't fit the memory free now.
+    if (!memoryAllows(name, args, [this, name, args] { runCommand(name, args); })) {
+        lastCommandOk_ = false;
         return;
     }
     if (doc_.sculptor.strokeActive()) endStroke();
@@ -2530,6 +2558,7 @@ void App::drawUi() {
     drawSupportUi(); // the first-run welcome, the one support reminder (PanelSupport.cpp)
     guide_.draw(*this);  // Help > User Guide
     drawPacksUi();       // pack review, New Pack, macro confirmation and editor (PanelPacks.cpp)
+    drawMemoryConfirm(); // "Not enough free memory" before a big mesh (MemoryConfirm.cpp)
     drawHelpConsoleUi(); // console, command palette, Controls (F1), Ctrl-hover help: last, on top
     drawWhatsNew();      // What's New after an update or from the Help menu (WhatsNewPopup.cpp)
     drawSupportCard();   // the support card at launch, over everything (PanelSupportCard.cpp)

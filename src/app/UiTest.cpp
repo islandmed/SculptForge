@@ -526,6 +526,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "radial_hover") return double(app_.radial_.hover);
     if (name == "radial_ran") return double(app_.radial_.ran); // the slot run last, -1: none yet
     if (name == "radial_menus") return double(app_.radialMenus_.size());
+    if (name == "memory_confirm_open") return app_.memoryConfirm_.open ? 1.0 : 0.0; // "Not enough free memory"
     if (const double v = app_.packsTestValue(name); !std::isnan(v)) return v; // packs_installed, macro_recording, ...
     if (name.rfind("radial_slots_", 0) == 0) { // radial_slots_N: menu N's items (1-based), -1: no such menu
         const size_t i = size_t(std::max(0, std::atoi(name.c_str() + 13) - 1));

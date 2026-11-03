@@ -1188,7 +1188,12 @@ void Sculptor::beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym)
 }
 
 void Sculptor::grab(Mesh& mesh, BVH& bvh, const glm::vec3& delta) {
-    if (micro_.active() && microMesh_ == &mesh) {
+    grabMove(mesh, delta);
+    grabFinish(mesh, bvh);
+}
+
+void Sculptor::grabMove(Mesh& mesh, const glm::vec3& delta) {
+    if (micro_.active() && microMesh_ == &mesh) { // (a micro level moves and stitches in one go)
         const double k0 = micro_.kernelMs, s0 = micro_.stitchMs;
         micro_.grab(mesh, delta);
         timings.kernelMs += micro_.kernelMs - k0;
@@ -1210,12 +1215,17 @@ void Sculptor::grab(Mesh& mesh, BVH& bvh, const glm::vec3& delta) {
         begin = end;
     }
     timings.kernelMs += lapMs(clock);
+    ++timings.dabs;
+    timings.vertices += grabAll_.size();
+}
+
+void Sculptor::grabFinish(Mesh& mesh, BVH& bvh) {
+    if (grabVerts_.empty() || (micro_.active() && microMesh_ == &mesh)) return;
+    auto clock = std::chrono::steady_clock::now();
     mesh.updateNormals(grabAll_);
     timings.normalsMs += lapMs(clock);
     bvh.refitLeaves(mesh, grabLeaves_);
     timings.bvhMs += lapMs(clock);
-    ++timings.dabs;
-    timings.vertices += grabAll_.size();
 }
 
 // Puts every vertex the current stroke moved back to its stroke-start position.

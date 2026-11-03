@@ -108,6 +108,17 @@ All notable changes to SculptForge are listed here. The format follows
   brighten, grow a knob and show their exact value. The keyboard focus gets the same ring. New **Preferences >
   Interface > Reduce motion**: colour changes only, no easing or lifting. The rings follow **Outlines** (Off: the fill and label only; Subtle, the default: one faint line; On: the
   look's full flavour) and **Outline opacity**. Animations draw frames only while they run.
+- Large brushes on dense meshes no longer stall the view: from 2 million vertices a stroke's dabs are placed on the
+  stroke thread (the same dabs, in the same order, as the frame loop places them; no preview), so a frame keeps
+  drawing while a 240 px dab moves millions of vertices, and a light batch is still waited for within the frame.
+  On the standard scene's 240 px brush the slowest frames drop from 139 ms (15M) and 306 ms (33M) to about 30 ms in
+  first runs, and lifting the pen no longer waits (162 ms at 33M). `SF_BACKGROUND_DABS=0` turns it off.
+- Move on dense meshes no longer stalls: it worked out its whole region's normals and bounds again for every pointer
+  sample (several times a frame with a 240 Hz pen, more the slower the frame got: seconds at 33M under load). The
+  positions still follow every sample; the normals and bounds now follow once a frame, and the mesh comes out the
+  same, bit for bit.
+- The first orbit after a long stroke no longer stalls (180-300 ms at 33M): the moving view's lighter stand-ins for
+  the changed areas are rebuilt a few milliseconds a frame, the rest drawn in full detail until then.
 
 ### Fixed
 - Blender style: Alt+left-drag on the model masks and Ctrl+Alt+left-drag unmasks, as Blender 5.1+'s default
@@ -154,6 +165,15 @@ All notable changes to SculptForge are listed here. The format follows
   "Your art is never uploaded or used for training. AI features run only when you use them and can be turned off."
 - The enlarged brush or alpha thumbnail you point at in a picker is drawn over its neighbours again, not
   under them (#86, thanks tristratos).
+- Help > Benchmark (and `--benchmark`) checks the memory free now before each scene instead of trusting the
+  computer's total: a scene that doesn't fit (15M needs about 2.2 GB free, 33M about 5 GB, plus a margin) is skipped
+  with a clear message ("33M skipped: needs ~5 GB free, 1.3 GB available. Close other apps and run again") rather
+  than running the system out of memory. The result lists skipped scenes; the command line exits with code 2.
+- Subdivide, Divide, Divide to a micro level and Voxel Remesh ask first ("Not enough free memory", Continue anyway or
+  Cancel) when the mesh they would build doesn't fit the memory free now.
+- Runs started by scripts and agents (`SDL_APP_ID=sculptforge-agent`, or `SF_ISOLATE=1`) use their own settings and
+  log folder for every mode (renders, `--bench`, `--calibrate` too), so they no longer write into your
+  sculptforge.log or move your session's log aside. Isolated runs remove their temporary folder when they pass.
 
 ## [0.10.8] - 2026-11-02
 

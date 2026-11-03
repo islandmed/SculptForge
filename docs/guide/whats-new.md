@@ -116,6 +116,15 @@ action: guide:whats-new.md
   movement? Turn on **Preferences > Interface > Reduce motion** ([Interface](interface.md)).
 - **Picker thumbnails on top**: the enlarged thumbnail you point at in a picker is no longer hidden under its
   neighbours (#86).
+- **Big brushes stay smooth on dense meshes**: on models from about 4 million triangles a stroke's dabs are worked
+  out beside the view, so a 240 px brush on 33 million triangles no longer freezes the view for a third of a
+  second at a time (slowest frames about 35 ms instead of 300), and letting go of the pen is instant. The stroke
+  itself comes out the same.
+- **Move keeps up on dense meshes**: Move no longer slows to a crawl on 33 million triangles with a fast pen, and the
+  first orbit after a long stroke no longer hitches.
+- **No more running out of memory**: **Help > Benchmark** skips a scene your computer hasn't got the free memory
+  for (and says how much to free), and Subdivide, Divide, Micro and Voxel Remesh ask first when the result
+  wouldn't fit in the memory free now.
 
 ## Version 0.10.8
 
