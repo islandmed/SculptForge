@@ -72,6 +72,13 @@ All notable changes to SculptForge are listed here. The format follows
   `remesh=quad|voxel|false` (`true` means quad) and `levels=0-2`. The status line says "remeshed to N quads".
 - The Hunyuan3D licence notice (the Tencent Hunyuan Community License doesn't cover use in the EU, UK or South
   Korea) is shown once, the first time a Hunyuan3D model runs, and stays in the Model picker's tooltip.
+- Hover highlights that pop, in every look: buttons, menu items, shelf buttons and palette headers ease into an
+  accent-tinted fill with a crisp accent border and a brighter label in about 100 ms (Forge Terminal: the accent
+  border; Phosphor: an inverse-video glow; Blueprint: a cyan line glow; Classic: a subtle warm highlight), and
+  pressed is a touch darker. Brush, alpha, material and look tiles (shelves, pickers, Library) lift slightly with a
+  soft shadow and an accent glow ring, without moving anything; the active tile keeps its orange outline. Sliders
+  brighten, grow a knob and show their exact value. The keyboard focus gets the same ring. New **Preferences >
+  Interface > Reduce motion**: colour changes only, no easing or lifting. Animations draw frames only while they run.
 
 ### Fixed
 - Blender style: Alt+left-drag on the model masks and Ctrl+Alt+left-drag unmasks, as Blender 5.1+'s default
@@ -85,6 +92,9 @@ All notable changes to SculptForge are listed here. The format follows
   view no longer jumps when the pen comes back into range elsewhere or leaves mid-drag. The active Part changes only
   with the keyboard's Alt and a quick click (not with a pen button set to Alt, a long pen press or quick pen taps),
   and the status bar says "Active Part: <name> (Alt+click)".
+- The enlarged brush or alpha thumbnail you point at in a picker is drawn over its neighbours again, not
+  under them (#86, thanks tristratos).
+
 ## [0.10.8] - 2026-11-02
 
 ### Fixed

@@ -30,14 +30,14 @@ struct Palette {
 };
 
 struct SchemeInfo {
-    const char* key;     // "tokyo_night"
+    const char* key;     // "neutral", "tokyo_night"
     const char* name;    // "Tokyo Night"
     const char* source;  // where the colours come from
     const char* license; // its licence (THIRD_PARTY_NOTICES.md)
     Palette palette;
 };
 
-// Forge Terminal's schemes, Tokyo Night first (the default).
+// Forge Terminal's schemes, Neutral first (the default since 0.10.9; Tokyo Night was before).
 const SchemeInfo* schemes(int& count);
 const SchemeInfo* findScheme(std::string_view key); // nullptr when unknown
 

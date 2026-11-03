@@ -411,6 +411,57 @@ bool SliderInside(const char* id, float* v, float lo, float hi, const char* form
     return changed;
 }
 
+namespace {
+ImGuiID g_dragScrollWindow = 0; // the panel a drag is scrolling (0: none)
+ImGuiMouseButton g_dragScrollButton = ImGuiMouseButton_Left;
+bool g_dragScrollMoved = false;
+int g_dragScrolls = 0;
+float g_dragScrollY = 0.0f;
+} // namespace
+
+void DragScrollPanels() {
+    ImGuiContext& g = *GImGui;
+    const ImGuiIO& io = g.IO;
+    if (g_dragScrollWindow) {
+        ImGuiWindow* w = ImGui::FindWindowByID(g_dragScrollWindow);
+        const ImGuiID id = w ? w->GetID("##dragscroll") : 0;
+        if (!w || !io.MouseDown[g_dragScrollButton] || (g.ActiveId != 0 && g.ActiveId != id)) {
+            if (w && g.ActiveId == id) ImGui::ClearActiveID();
+            if (g_dragScrollMoved) ++g_dragScrolls;
+            g_dragScrollWindow = 0;
+            return;
+        }
+        ImGui::KeepAliveID(id); // holds the press: nothing under the pointer reacts, the window doesn't move
+        if (io.MouseDelta.x != 0.0f || io.MouseDelta.y != 0.0f) {
+            if (w->ScrollMax.y > 0.0f) ImGui::SetScrollY(w, std::clamp(w->Scroll.y - io.MouseDelta.y, 0.0f, w->ScrollMax.y));
+            if (w->ScrollMax.x > 0.0f) ImGui::SetScrollX(w, std::clamp(w->Scroll.x - io.MouseDelta.x, 0.0f, w->ScrollMax.x));
+            g_dragScrollMoved = true;
+            g_dragScrollY = w->ScrollTarget.y < FLT_MAX ? w->ScrollTarget.y : w->Scroll.y;
+        }
+        return;
+    }
+    // A press this frame: left only on empty space (nothing hovered or pressed), middle anywhere on the panel. The
+    // nearest window that scrolls, from the one under the pointer out through its parents (a tray's sections are
+    // child windows).
+    for (const ImGuiMouseButton b : {ImGuiMouseButton_Left, ImGuiMouseButton_Middle}) {
+        if (!ImGui::IsMouseClicked(b) || !g.HoveredWindow) continue;
+        if (b == ImGuiMouseButton_Left && (g.HoveredId != 0 || g.ActiveId != 0)) continue;
+        if (b == ImGuiMouseButton_Middle && g.ActiveId != 0) continue;
+        ImGuiWindow* w = g.HoveredWindow;
+        while (w && !(w->ScrollMax.y > 0.0f || w->ScrollMax.x > 0.0f) && (w->Flags & ImGuiWindowFlags_ChildWindow)) w = w->ParentWindow;
+        if (!w || !(w->ScrollMax.y > 0.0f || w->ScrollMax.x > 0.0f)) continue;
+        if (w->ScrollbarY && io.MousePos.x >= w->InnerRect.Max.x) continue; // on its scroll bar: ImGui's own
+        g_dragScrollWindow = w->ID;
+        g_dragScrollButton = b;
+        g_dragScrollMoved = false;
+        ImGui::SetActiveID(w->GetID("##dragscroll"), w);
+        return;
+    }
+}
+
+int DragScrolls() { return g_dragScrolls; }
+float DragScrollY() { return g_dragScrollY; }
+
 void DrawHelp(App& app) {
     const UiPrefs& prefs = app.uiPrefs();
     g_popupInfo = prefs.popupInfo;

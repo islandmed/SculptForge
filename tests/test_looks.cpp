@@ -35,8 +35,8 @@ TEST(looks_keys_round_trip) {
 TEST(looks_schemes_complete_and_readable) {
     int count = 0;
     const looks::SchemeInfo* list = looks::schemes(count);
-    CHECK(count == 7);
-    CHECK(std::string(list[0].key) == "tokyo_night"); // the default comes first
+    CHECK(count == 8);
+    CHECK(std::string(list[0].key) == "neutral"); // the default comes first (0.10.9)
     std::set<std::string> keys;
     auto lum = [](unsigned c) { return 0.2126f * float((c >> 16) & 0xff) + 0.7152f * float((c >> 8) & 0xff) + 0.0722f * float(c & 0xff); };
     for (int i = 0; i < count; ++i) {

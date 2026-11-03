@@ -79,6 +79,11 @@ action: guide:whats-new.md
   and the status line tells you. Your own model choice is kept. See [Image and text to 3D](generate-3d.md).
 - **Generated models arrive as clean quads**: Quad Remesh is now the default, with one subdivision level holding
   the detail, so you can sculpt and subdivide straight away. Voxel remesh and Off are still in **Remesh**.
+- **Hover highlights that pop**: buttons, menus and shelves light up in your look's accent as you point at them,
+  tiles lift a little, sliders show their exact value, and the keyboard focus gets the same ring. Prefer less
+  movement? Turn on **Preferences > Interface > Reduce motion** ([Interface](interface.md)).
+- **Picker thumbnails on top**: the enlarged thumbnail you point at in a picker is no longer hidden under its
+  neighbours (#86).
 
 ## Version 0.10.8
 

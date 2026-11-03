@@ -5,6 +5,7 @@
 // the one optional reminder after ten hours of sculpting. Each only opens kSupportUrl in the browser (Support.h);
 // the app is the same for everyone, so nothing here checks, sends or stores anything else.
 #include "app/App.h"
+#include "app/Config.h"
 #include "app/LookSchemes.h"
 #include "app/Theme.h"
 
@@ -12,6 +13,7 @@
 #include <imgui.h>
 
 #include <algorithm>
+#include <cmath>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -80,15 +82,65 @@ void App::chooseNewLook(bool tryIt) {
     newLookCardDone_ = true;
     if (tryIt) {
         uiPrefs_.look.look = int(looks::LookId::ForgeTerminal);
-        uiPrefs_.look.scheme = "tokyo_night";
+        uiPrefs_.look.scheme = "neutral";
         uiPrefs_.look.matchOmarchy = false;
         setShellLayout(1);
         lookDirty_ = true;
-        status_ = "The new look: Forge Terminal, SculptForge layout (Preferences > Interface > Look changes it)";
+        status_ = "The new look: Neutral, SculptForge layout (Preferences > Interface > Look changes it)";
     } else {
         status_ = "Kept your layout (Preferences > Interface > Look has the new look)";
     }
     saveProjectPrefs();
+}
+
+// The first-run look picker (the welcome): Neutral (the default), Forge Terminal with Tokyo Night (0.10.7's
+// default), or the Classic look with the ZBrush-style layout. A click applies it at once and remembers it.
+void App::drawLookPicker() {
+    struct Choice {
+        const char* label;
+        const char* name;
+        int look;
+        const char* scheme;
+        int layout;
+        const char* help;
+    };
+    static const Choice kChoices[] = {
+        {"##welcome.look.neutral", "Neutral", int(looks::LookId::ForgeTerminal), "neutral", 1,
+         "Neutral grey panels, so your model's colours read true, with one orange accent. The SculptForge layout."},
+        {"##welcome.look.forge", "Forge Terminal", int(looks::LookId::ForgeTerminal), "tokyo_night", 1,
+         "Terminal-style tiles in the Tokyo Night colours (blue-grey). Preferences > Interface > Look has more schemes."},
+        {"##welcome.look.zbrush", "ZBrush-style layout", int(looks::LookId::Classic), "neutral", 0,
+         "The Classic grey look with the alphabetical palette bar and the two-row top shelf, for ZBrush users."},
+    };
+    const float s = uiScale_, spacing = ImGui::GetStyle().ItemSpacing.x;
+    const float w = std::floor((ImGui::GetContentRegionAvail().x - 2.0f * spacing) / 3.0f), h = 92.0f * s;
+    for (int i = 0; i < 3; ++i) {
+        const Choice& c = kChoices[i];
+        if (i) ImGui::SameLine();
+        const bool current = uiPrefs_.look.look == c.look && uiPrefs_.shellLayout == c.layout &&
+                             (c.look != int(looks::LookId::ForgeTerminal) || uiPrefs_.look.scheme == c.scheme);
+        const bool clicked = ImGui::InvisibleButton(c.label, ImVec2(w, h));
+        const bool hovered = ImGui::IsItemHovered();
+        const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        const looks::SchemeInfo* scheme = looks::findScheme(c.scheme);
+        const looks::Palette pal = c.look == int(looks::LookId::Classic) || !scheme ? config::classicPalette() : scheme->palette;
+        config::drawLookMiniature(dl, a, b, pal, c.name, c.look == int(looks::LookId::Classic) ? fontInterSmall_ : fontMonoSmall_, s,
+                                  c.layout);
+        if (hovered && !current) dl->AddRectFilled(a, b, theme::u32(theme::textHover, 0.05f)); // (a faint lift, no border)
+        if (current) dl->AddRect(a, b, theme::u32(theme::accent), 0.0f, 0, 2.0f * s);
+        ImGui::LogText("%s", c.name);
+        if (hovered) ImGui::SetTooltip("%s", c.help);
+        if (clicked && !current) {
+            uiPrefs_.look.look = c.look;
+            uiPrefs_.look.scheme = c.scheme;
+            uiPrefs_.look.matchOmarchy = false;
+            setShellLayout(c.layout);
+            lookDirty_ = true;
+            saveProjectPrefs(); // remembered for the next start, also without Store Config
+            status_ = std::string("Look: ") + c.name + " (Preferences > Interface > Look changes it)";
+        }
+    }
 }
 
 void App::drawSupportUi() {
@@ -97,7 +149,7 @@ void App::drawSupportUi() {
     if (showWelcome_) {
         // Not modal: the app works around it, and it doesn't come back once closed.
         ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + c.h * 0.3f), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-        ImGui::SetNextWindowSize(ImVec2(440.0f * s, 0.0f), ImGuiCond_Appearing);
+        ImGui::SetNextWindowSize(ImVec2(500.0f * s, 0.0f), ImGuiCond_Appearing);
         const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize;
         if (ImGui::Begin("Welcome to SculptForge", &showWelcome_, flags)) {
             // New to sculpting: the lesson first, big (docs/guide/first-sculpt.md).
@@ -112,50 +164,43 @@ void App::drawSupportUi() {
             ImGui::Spacing();
             ImGui::TextWrapped("Hold Ctrl over any control to see what it does. The User Guide (Shift+F1) explains every "
                                "tool, and Coming from ZBrush lists what is where.");
-            // The keys to start with (Preferences > Input changes them later; Store Config keeps them).
+            // The look (0.10.9, #U6): three cards, the first the default. Existing installs never see this window
+            // unless they open Help > Welcome, so nobody's look changes by itself.
+            ImGui::Spacing();
+            ImGui::TextUnformatted("Pick a look:");
+            drawLookPicker();
+            // Where you come from sets the keys and the layout together (Preferences > Input and > Interface > Look
+            // change them later; both are remembered without Store Config).
             ImGui::Spacing();
             ImGui::AlignTextToFramePadding();
             ImGui::TextUnformatted("Coming from:");
             struct Origin {
                 const char* label;
-                int style;
+                int style, layout;
                 const char* help;
             };
             static const Origin kOrigins[] = {
-                {"ZBrush##welcome.from", 0, "ZBrush-style keys and gestures."},
-                {"Blender##welcome.from", 2, "Blender's navigation and sculpt-mode keys."},
-                {"Maya##welcome.from", 3, "Maya's Alt+drag view controls."},
-                {"New to sculpting##welcome.from", 1, "SculptForge's own keys (the default)."},
+                {"ZBrush##welcome.from", 0, 0, "ZBrush-style keys and gestures, and the ZBrush-style layout."},
+                {"Blender##welcome.from", 2, 1, "Blender's navigation and sculpt-mode keys, the SculptForge layout."},
+                {"Maya##welcome.from", 3, 1, "Maya's Alt+drag view controls, the SculptForge layout."},
+                {"New to sculpting##welcome.from", 1, 1, "SculptForge's own keys and layout (the default)."},
             };
             for (const Origin& o : kOrigins) {
                 ImGui::SameLine();
-                const bool on = uiPrefs_.inputStyle == o.style;
+                const bool on = uiPrefs_.inputStyle == o.style && uiPrefs_.shellLayout == o.layout;
                 if (on) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
                 if (ImGui::Button(o.label)) {
                     setInputStyle(o.style);
                     startInputStyle_ = o.style; // kept for the next start, also without Store Config
+                    setShellLayout(o.layout);
+                    lookDirty_ = true;
                     saveProjectPrefs();
                     status_ = std::string("Keys: ") + (o.style == 0 ? "ZBrush-style" : o.style == 2 ? "Blender" : o.style == 3 ? "Maya" : "SculptForge") +
-                              " (Preferences > Input changes them)";
+                              (o.layout == 0 ? ", ZBrush-style layout" : ", SculptForge layout") + " (Preferences changes them)";
                 }
                 if (on) ImGui::PopStyleColor();
                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", o.help);
             }
-            // The layout (Preferences > Interface > Look): new installs start in the SculptForge layout.
-            ImGui::Spacing();
-            const bool zbrushLayout = uiPrefs_.shellLayout == 0;
-            ImGui::BeginDisabled(zbrushLayout);
-            if (ImGui::Button(zbrushLayout ? "Using the ZBrush-style layout##welcome.layout"
-                                           : "Coming from ZBrush? Use the ZBrush-style layout##welcome.layout")) {
-                setShellLayout(0);
-                lookDirty_ = true;
-                saveProjectPrefs(); // remembered for the next start, also without Store Config
-                status_ = "ZBrush-style layout (Preferences > Interface > Look switches back)";
-            }
-            ImGui::EndDisabled();
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-                ImGui::SetTooltip("The alphabetical palette bar and the two-row top shelf. Preferences > Interface > Look "
-                                  "switches back to the SculptForge layout.");
             // A base mesh to start from (core/StarterMeshes.h), instead of the sphere.
             ImGui::Spacing();
             if (ImGui::Button(ICON_LC_USER_ROUND "  Start from a head##welcome")) {
@@ -199,7 +244,7 @@ void App::drawSupportUi() {
                                        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoFocusOnAppearing;
         bool open = true;
         if (ImGui::Begin("SculptForge has a new look##newlook", &open, flags)) {
-            ImGui::TextWrapped("Forge Terminal with the Tokyo Night colours, and the SculptForge layout: menus by task, a "
+            ImGui::TextWrapped("Neutral grey panels with one orange accent, and the SculptForge layout: menus by task, a "
                                "status bar and a one-row tool shelf. Your layout stays as it is unless you try it.");
             ImGui::Spacing();
             if (ImGui::Button("Try it##newlook")) chooseNewLook(true);

@@ -1,0 +1,26 @@
+# #100 (small screens, pens): a palette that doesn't fit scrolls with a middle-drag anywhere on it, or a left-drag
+# on its empty space (text and gaps), as a finger scrolls a list. A drag that starts on a control still works the
+# control and never scrolls.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+run new_sphere subdivisions=3
+expect_value panel_drag_scrolls == 0
+click "Deformation##tool.deformation"                # long sub-palettes (Shift+click keeps more open): the tray overflows
+hold shift
+click "Parts##tool.subtool"
+click "Geometry##tool.geometry"
+hold none
+
+# Middle-drag up over the Tool palette in the right tray: it scrolls down.
+button_drag middle 0.9 0.8 0.9 0.5 0.3
+expect_value panel_drag_scrolls == 1
+expect_value panel_drag_scroll_y > 50
+shot middle-drag
+
+# Back down with a left-drag on empty space (beside the section titles): it scrolls back to the top.
+drag 0.975 0.3 0.975 0.9 0.3
+expect_value panel_drag_scrolls == 2
+expect_value panel_drag_scroll_y == 0
+
+# A left-drag that starts on a button presses the button, no scroll.
+drag_item "Append" 0 -200
+expect_value panel_drag_scrolls == 2

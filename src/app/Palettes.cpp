@@ -584,6 +584,14 @@ void App::drawPalette_Preferences() {
         tray::Section section;
         drawInputSection();
     }
+    if (subpalette("preferences.cursor", "Cursor")) {
+        tray::Section section;
+        drawCursorSection();
+    }
+    if (subpalette("preferences.hints", "Hints")) {
+        tray::Section section;
+        drawHintsSection();
+    }
     if (subpalette("preferences.hotkeys", "Hotkeys")) {
         tray::Section section;
         config::drawHotkeysSection(*this);

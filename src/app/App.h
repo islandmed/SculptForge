@@ -208,11 +208,13 @@ private:
     void pollBrushRequest();
     const BrushRecipe* activeRecipe() const;
     void drawBrushCursor();
-    // The brush ring lying on the surface under the pointer (#25, Preferences > Input > Cursor follows surface);
-    // false when the pointer is off the model (the flat screen ring is drawn instead).
-    bool drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col);
-    std::vector<SurfaceRingPoint> cursorRing_, cursorInner_; // scratch, kept to avoid allocating per frame
+    // The brush ring lying on the surface under the pointer (#25, Preferences > Cursor > Cursor follows surface);
+    // false when the pointer is off the model (the flat screen ring is drawn instead). `ring` false: only the
+    // centre and the symmetry copies' dots (Hide ring while stroking).
+    bool drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col, bool ring);
+    std::vector<glm::vec3> cursorRing_, cursorInner_; // scratch, kept to avoid allocating per frame
     bool surfaceCursorShown_ = false; // the last cursor drawn lay on the surface (UI tests: surface_cursor)
+    bool ringShown_ = true;           // the last cursor drawn had its ring (UI tests: cursor_ring)
     void updateTitle();
 
     int runRecording(); // also runs UI tests (options_.uiTest)
@@ -245,7 +247,7 @@ private:
     // The symmetry arguments of the commands that follow the brushes' symmetry (symmetry, radial, radial_axis,
     // local), added to `args`.
     Args withSymmetryArgs(Args args);
-    int symmetryCopiesDrawn_ = 0; // brush cursors the last drawSurfaceCursor drew (UI tests: cursor_copies)
+    int symmetryCopiesDrawn_ = 0; // the cursor and its symmetry dots the last drawSurfaceCursor drew (UI tests: cursor_copies)
     bool invertToggle_ = false;
     bool frontFacesOnly_ = false;
     bool pressureStrength_ = true;
@@ -1189,6 +1191,7 @@ public:
     // Preferences > Interface > Look: applies uiPrefs_.look (colours, style, fonts, the viewport background).
     void applyLook();
     void drawLookSection(); // Preferences > Interface > Look (Config.cpp)
+    void drawLookPicker();  // the first-run welcome's three look cards (PanelSupport.cpp)
     ImFont* smallFont() const { return fontSmall_; } // 12 px captions (shelf labels, tiles)
     ImFont* boldFont() const { return fontBold_; }   // SemiBold 15 (help titles)
 
@@ -1558,6 +1561,12 @@ private:
     bool drawHeldBrushGrid(HeldBrush held, bool strokes); // the picker's grid; true when one was picked
     void drawHeldBrushIcon(ImDrawList* dl, ImVec2 a, ImVec2 b, const char* icon, bool select); // shelf tiles (Shell.cpp)
     void drawInputSection(); // Preferences > Input
+    void drawCursorSection(); // Preferences > Cursor (Input.cpp)
+    // Viewport hints (U11, Config.cpp): a note over the 3D view with Don't show again, `top` its top edge in
+    // pixels; Preferences > Hints lists them. hintShown: not hidden by either.
+    bool hintShown(const char* id) const;
+    void drawViewportHint(const char* id, const char* text, ImU32 colour, float top);
+    void drawHintsSection();
     // Z Intensity (0-100 on screen): Smooth's own while Shift is held or Smooth is the brush, as in ZBrush.
     void drawZIntensitySlider(const char* id);
     void openQuickMenu();
@@ -1780,7 +1789,7 @@ private:
     bool systemCursorInWindow(float& x, float& y) const; // mouse mode (#72): the system cursor, window pixels
     void mapPenPosition(SDL_Event& e);                // mouse mode: the pen moves the cursor relatively (Tablet.cpp)
     // The system cursor (#73): ImGui's (resize handles, text fields, links) over the panels, a crosshair over the
-    // 3D view where a brush acts (Preferences > Interface > Viewport cursor). Called after each ImGui::Render.
+    // 3D view where a brush acts (Preferences > Cursor > Viewport cursor). Called after each ImGui::Render.
     void updateMouseCursor();
     bool viewportCursorWanted() const;
     bool frontRaycast(const glm::vec3& origin, const glm::vec3& dir, RayHit& hit) const; // as drawn (#68)
