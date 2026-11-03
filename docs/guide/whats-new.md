@@ -11,6 +11,9 @@ chapter opens by itself the first time you start a new version; you can always f
   out beside the view, so a 240 px brush on 33 million triangles no longer freezes the view for a third of a
   second at a time (slowest frames about 35 ms instead of 300), and letting go of the pen is instant. The stroke
   itself comes out the same.
+- **Tablets in mouse mode work again**: on some Windows tablets with **Mouse mode** on (Preferences > Tablet) the
+  brush stopped following the pen in 0.10.7. When the system can't say where its cursor is, the pen now moves the
+  brush by how far it moves, from where it was (#72).
 
 ## Version 0.10.7
 

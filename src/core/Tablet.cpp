@@ -121,8 +121,22 @@ void PenCursor::systemCursor(float x, float y) {
 
 void PenCursor::map(float& x, float& y, uint64_t nowNs) {
     if (!std::isfinite(x) || !std::isfinite(y)) return;
-    const bool system = haveSystem_;
+    bool system = haveSystem_;
     haveSystem_ = false; // (one reading per position)
+    if (mouseMode && system && !systemStale_) {
+        if (haveLast_) {
+            const bool penMoved = std::fabs(x - lastPenX_) + std::fabs(y - lastPenY_) > 2.0f;
+            const bool systemStill = std::fabs(systemX_ - lastSysX_) + std::fabs(systemY_ - lastSysY_) < 0.5f;
+            staleCount_ = penMoved && systemStill ? staleCount_ + 1 : (penMoved ? 0 : staleCount_);
+            if (staleCount_ >= 3) systemStale_ = true;
+        }
+        lastPenX_ = x;
+        lastPenY_ = y;
+        lastSysX_ = systemX_;
+        lastSysY_ = systemY_;
+        haveLast_ = true;
+    }
+    if (systemStale_) system = false;
     if (mouseMode && system) {
         // The system cursor is the one cursor; the pen only adds pressure and tilt. Should the system stop
         // saying where it is, the pen carries on from here.

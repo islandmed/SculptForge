@@ -1,11 +1,10 @@
 {
-  "version": "0.10.7",
+  "version": "0.10.8",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "A new look: Forge Terminal with Tokyo Night colours and menus grouped by task (the ZBrush-style layout is one click away)",
-    "Clearer memberships: a vote for Supporters; daily drops and preview builds for Insiders; Studio for your whole company",
-    "Custom and Community brushes use the full alpha at Focal Shift -100 (#75)",
-    "Native Wayland on Linux, and a built-in 15M/33M benchmark you can run yourself"
+    "Tablets in Mouse mode follow the pen again on Windows (#72)",
+    "No jump when the pen comes back to the tablet: the brush carries on from where it was",
+    "A bug-fix release only: nothing else changes from 0.10.7"
   ]
 }

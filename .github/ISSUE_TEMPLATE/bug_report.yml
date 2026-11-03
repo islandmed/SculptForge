@@ -35,10 +35,19 @@ body:
     validations:
       required: true
   - type: textarea
-    id: gpu
+    id: hardware
     attributes:
-      label: GPU and driver (for display or performance problems)
-      description: The first lines printed in the terminal show the OpenGL version and renderer.
+      label: Your hardware
+      description: >-
+        Helps us reproduce it. Your computer or CPU and RAM, the graphics card and driver version (the first lines
+        printed in the terminal show the OpenGL renderer), and for pen problems the tablet model, its driver version
+        and whether Windows Ink or Mouse mode is on.
+      placeholder: |
+        Computer / CPU / RAM: Ryzen 7 5800X, 32 GB
+        GPU and driver: RTX 3060, NVIDIA 565.90
+        Tablet (if any): Wacom Intuos Pro M, driver 6.4.8, Windows Ink on, Mouse mode off
+    validations:
+      required: true
   - type: textarea
     id: files
     attributes:
