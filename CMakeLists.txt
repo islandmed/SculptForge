@@ -660,6 +660,13 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME insider_drops COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/drops/drops.py selftest
                                         --cli ${SCULPTFORGE_CLI_RUNNER})
     set_tests_properties(insider_drops PROPERTIES TIMEOUT 300)
+    # Release notes from note fragments (tools/release/assemble_notes.py, changes/README.md): the assembler, and
+    # every fragment on this branch parses.
+    add_test(NAME release_notes COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/assemble_notes.py --self-test)
+    add_test(NAME release_notes_fragments COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/assemble_notes.py --check)
+    # The Actions cache pruner keeps the newest cache of each kind (tools/ci/prune_caches.py).
+    add_test(NAME ci_prune_caches COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/prune_caches.py --self-test)
+    add_test(NAME ci_slowest_tests COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/slowest_tests.py --self-test)
     add_test(NAME benchmark_submit COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/benchmark/submit.py selftest)
     # The upstream watch (tools/upstream-watch, .github/workflows/upstream-watch.yml) against recorded API responses.
     add_test(NAME upstream_watch COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/upstream/test_upstream_watch.py)

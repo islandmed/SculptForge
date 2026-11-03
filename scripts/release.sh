@@ -152,7 +152,8 @@ highlights_ok() {
 highlights_fix="write 3-5 one-line highlights (what users get) to a file and run again with HIGHLIGHTS=that-file"
 # The words people write for What's New: the guide section and the UI test that expects it.
 words_ok() {
-    grep -q "^## Version ${V//./\\.}\$" docs/guide/whats-new.md ||
+    python3 tools/release/assemble_notes.py --check >/dev/null || die "a note fragment in changes/ doesn't parse: $(python3 tools/release/assemble_notes.py --check 2>&1)" "fix it (changes/README.md has the format), commit, push main"
+    grep -q "^## Version ${V//./\\.}\$" docs/guide/whats-new.md || grep -qs '^whats_new:' changes/*.md ||
         die "docs/guide/whats-new.md has no '## Version $V'" "write that section at the top (Help > What's New shows it), commit, push main"
     grep -qF "expect_text \"Version $V\"" tests/ui/whats_new.sfui ||
         die "tests/ui/whats_new.sfui doesn't check Version $V" "update its first expect_text lines to the new section (the version and one line from it), commit, push main"
@@ -184,6 +185,11 @@ preflight() {
     # site (bump writes the home page's card from the features block)
     card_ok || features_ok || die "docs/guide/whats-new.md: Version $V has no \`\`\`features block with a tagline" "$card_fix"
     if ! feed_done; then
+        if [ -z "${HIGHLIGHTS:-}" ]; then # the version's highlight lines (What's New features block + note fragments)
+            HIGHLIGHTS=$(mktemp)
+            python3 tools/release/assemble_notes.py "$V" --highlights >"$HIGHLIGHTS"
+            highlights_ok || HIGHLIGHTS=
+        fi
         highlights_ok || die "HIGHLIGHTS must name a file with 3-5 highlight lines for the update feed (now: '${HIGHLIGHTS:-unset}')" "$highlights_fix"
     fi
     python3 -c 'import json, sys; json.load(open(sys.argv[1]))' website/latest.json 2>/dev/null || die "website/latest.json is not valid JSON" "fix it, commit"
@@ -214,6 +220,9 @@ step_bump() {
     on_main
     preflight bump
     local out
+    # Note fragments (changes/<branch>.md) into CHANGELOG [Unreleased] and What's New X.Y.Z; the fragments go.
+    out=$(python3 tools/release/assemble_notes.py "$V" --apply 2>&1) || die "$out" "fix that fragment in changes/, commit, push main"
+    grep -q 'written' <<<"$out" && echo "$out" | sed 's/^/   notes: /'
     out=$(python3 - "$V" "$TODAY" <<'PY'
 import re, sys
 v, today = sys.argv[1:]
@@ -281,7 +290,8 @@ PY
     [ -n "$out" ] && echo "$out" | sed 's/^/   set: /'
     python3 tools/guide/build_site.py >/dev/null # the guide, and the home page's What's New area for $V
     card_ok || die "website/index.html has no 'new in $V' card after build_site.py" "$card_fix"
-    git add CMakeLists.txt CITATION.cff packaging/rez/package.py packaging/linux/org.sculptforge.SculptForge.metainfo.xml CHANGELOG.md website/index.html
+    git add CMakeLists.txt CITATION.cff packaging/rez/package.py packaging/linux/org.sculptforge.SculptForge.metainfo.xml CHANGELOG.md website/index.html docs/guide/whats-new.md
+    git add -A changes
     git add -A website/guide
     if git diff --cached --quiet; then
         ok "every version file already says $V and the guide is built"
