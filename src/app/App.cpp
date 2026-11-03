@@ -2318,7 +2318,7 @@ void App::drawUi() {
     const bool ringOff = gizmoActive() || (guidesMode_ && !(inputMods() & SDL_KMOD_SHIFT)) || sculptableHot() || zsphereActive() ||
                          uvToolActive();
     if (((!ImGui::GetIO().WantCaptureMouse && canvasRect().contains(mouse.x, mouse.y)) || drag_ == Drag::Stroke) &&
-        !hideBrushCursor_ && radial_.menu < 0 && drag_ != Drag::Select && drag_ != Drag::Guide && // (no ring under a pie)
+        !hideBrushCursor_ && radial_.menu < 0 && !strokePopup_.open && drag_ != Drag::Select && drag_ != Drag::Guide && // (no ring under a pie or the stroke popup)
         (!ringOff || drag_ == Drag::Stroke || ctrlDown(inputMods())))
         drawBrushCursor();
     drawSelectionOverlay();

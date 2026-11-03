@@ -73,10 +73,11 @@ expect_value masked > 50
 expect_value moved == 0
 remember masked m
 # A drag beside the model turns the view (a held Ctrl would invert the mask there instead).
-remember camera_yaw yaw
-drag 0.8 0.25 0.85 0.3
+expect_value camera_aligned == 1
+view_drag 0.65 0.22 0.7 0.27
 expect_value masked == $m
-expect_value camera_yaw != $yaw
+expect_value camera_aligned == 0
+camera 0 0
 
 # Picked again: off. Add back on; a stroke sculpts again.
 key g

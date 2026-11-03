@@ -132,6 +132,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Action | Keys | What it does |
 |---|---|---|
 | Lazy Stroke | <kbd>L</kbd> | Lazy Stroke on or off: the brush trails the cursor on a string, for steady lines. |
+| Stroke popup | <kbd>G</kbd> | A grid at the cursor with the stroke types and the modifiers (Add / Sub, Smooth, Mask, Select). Hold the key, point at one and let go; or tap the key and click. Smooth, Mask and Select stay on without holding Shift or Ctrl, until you pick them again or another brush. |
 
 ### Tool
 
