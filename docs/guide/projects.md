@@ -52,6 +52,36 @@ original model file is left alone.
 
 When you open a project, its saved camera, material and brush settings come back too.
 
+## Start from a starter mesh
+
+Instead of a sphere, start from a base mesh with clean, even quads: **File > New from Starter Mesh** lists them,
+the Library's **Tool** tab has a **Starter meshes** folder with a thumbnail of each, and the welcome's
+**Start from a head** opens the human head straight away.
+
+| Starter mesh | What it is |
+|---|---|
+| Human Head | A neutral head and neck with loops round the eyes and mouth, for portraits |
+| Bust | Head, neck, shoulders and upper chest |
+| Full Body | A human figure in A-pose, 167 cm tall |
+| Hand, Foot, Ear | A left hand (raised, palm to the front), a left foot and ankle, a left ear |
+| Eye | An eyeball 24 mm across, with the cornea and rings of quads round the pupil |
+| Stylised Head | A cartoon head: big cranium and eyes, small nose and jaw |
+| Creature Head | A dragon or creature blockout: skull, jaw and two horns, each its own [Part](parts.md) |
+| Torso | A human torso from the neck to the upper thighs |
+| Rounded Box, Cylinder, Capsule, Ring | Hard-surface primitives with bevelled edges and quad caps |
+
+Every starter mesh is life size in centimetres, centred, standing on the ground and looking down +Z, and the
+symmetric ones are exactly symmetric, so [X symmetry](sculpting.md) works from the first stroke. The Hand, Foot,
+Ear, Head, Bust and Torso are cut from a body, so they have open edges where they were cut.
+
+A starter mesh opens with subdivision levels (two, or one for the Full Body): block out the big forms at
+**SDiv 1**, the base cage, and step up for the detail (see [Geometry](geometry.md)). It opens as a new, unsaved
+scene: **Save** asks for a name. Double-click a tile to open it; <kbd>Shift</kbd>+double-click appends its base
+cage as a Part, for example an Eye next to a head.
+
+The human meshes come from the MakeHuman base mesh, which MakeHuman released into the public domain (CC0); the
+others are made by SculptForge's own build script. You may use them for anything, including commercial work.
+
 ## The unsaved-changes prompt
 
 When the scene has unsaved changes, **New Sphere**, **New Plane**, **Open...**, **Open Recent**, dropping a model or
@@ -138,6 +168,7 @@ Double-click a tile to open it (you are asked about unsaved changes first). In t
 | `open_project path=work/dragon.sfproj` | Open a project (`open` also recognises `.sfproj`) |
 | `open path=scan.obj` | Open a model, splat capture or project |
 | `new_sphere subdivisions=6` / `new_plane resolution=128` | Start a new scene |
+| `new_starter_mesh name=human-head` | Start from a starter mesh (`levels=0` for the bare base cage) |
 
 Projects saved by `sculptforge-cli` or Python open in the app too. For the file layout, see
 [docs/project-format.md](https://github.com/islandmed/SculptForge/blob/main/docs/project-format.md).

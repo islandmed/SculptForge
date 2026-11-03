@@ -29,6 +29,11 @@ chapter opens by itself the first time you start a new version; you can always f
   ([Navigation](navigation.md)).
 - **View Figure**: turn it on beside **Axes** for a small head in the corner that turns with the view; click it to
   snap to the nearest side.
+- **Starter meshes**: start a sculpt from a human head with eye and mouth loops, a bust, a full body in A-pose, a
+  hand, a foot, an ear, an eye, a stylised head, a creature head, a torso, or a bevelled box, cylinder, capsule or
+  ring, all clean quads at life size with subdivision levels ready. **File > New from Starter Mesh**, the Library's
+  **Tool > Starter meshes**, or **Start from a head** in the welcome. See
+  [Projects](projects.md#start-from-a-starter-mesh).
 
 ## Version 0.10.8
 

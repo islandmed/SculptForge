@@ -1,0 +1,38 @@
+# Starter meshes (core/StarterMeshes.h): the Library's Tool tab has a "Starter meshes" folder with a thumbnail for
+# each; double-clicking one opens it as a new, unsaved scene with its subdivision levels, and File > New from
+# Starter Mesh opens the Library there.
+run new_plane resolution=8
+expect_value triangles == 128
+
+key ,
+expect_value lightbox_open == 1
+click "Library/Tool"
+expect "Library/Starter meshes"
+double_click "Library/Starter meshes"
+wait_idle 60
+expect "Library/Human Head"
+expect "Library/Bust"
+expect "Library/Full Body"
+expect_not "Library/Sphere"
+shot starter-meshes
+
+double_click "Library/Human Head"
+expect_status New Human Head
+expect_value subtools == 1
+expect_value vertices > 60000
+expect_value dirty == 0
+
+# Shift+double-click appends the base cage as a Part (an eye next to the head).
+hold shift
+double_click "Library/Eye"
+hold none
+expect_value subtools == 2
+
+# ".." goes back to the Tool tab's root.
+double_click "Library/.."
+expect "Library/Sphere"
+expect "Library/Starter meshes"
+
+# The command scripts and the File menu use.
+run new_starter_mesh name=creature-head levels=0
+expect_value subtools == 4

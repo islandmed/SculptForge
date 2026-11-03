@@ -16,6 +16,7 @@
 #include "app/Ui.h"
 #include "app/I18n.h"
 #include "core/Matcap.h"
+#include "core/StarterMeshes.h"
 
 #include <IconsLucide.h>
 
@@ -469,6 +470,18 @@ void App::drawPalette_Edit() {
 void App::drawPalette_File() {
     menuAction(*this, "file.new_sphere");
     menuAction(*this, "file.new_plane");
+    if (ImGui::BeginMenu("New from Starter Mesh")) {
+        for (const StarterMesh& m : starterMeshes()) {
+            if (ImGui::MenuItem((std::string(m.name) + "##starter." + m.id).c_str())) {
+                const std::string id = m.id;
+                confirmDiscard([this, id] { runCommand("new_starter_mesh", {{"name", id}}); });
+            }
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", m.description);
+        }
+        ImGui::Separator();
+        menuAction(*this, "file.new_starter");
+        ImGui::EndMenu();
+    }
     ImGui::Separator();
     menuAction(*this, "file.open");
     drawFileMenuProjectItems(); // Open Recent, Save, Save As, autosave

@@ -2039,8 +2039,8 @@ void App::runCommand(const std::string& name, const Args& args) {
     if (r.ok && name == "save_obj" && !doc_.mesh.layers.empty())
         status_ += " (OBJ stores the current blend; export GLB to keep layers as blend shapes)";
     if (!r.ok) SDL_Log("%s failed: %s", name.c_str(), r.message.c_str());
-    if (r.ok && (name == "new_sphere" || name == "new_plane" || name == "new_head" || name == "open_obj" || name == "open" ||
-                 name == "image_relief" || name == "image_inflate" || name == "splat_to_mesh" ||
+    if (r.ok && (name == "new_sphere" || name == "new_plane" || name == "new_head" || name == "new_starter_mesh" ||
+                 name == "open_obj" || name == "open" || name == "image_relief" || name == "image_inflate" || name == "splat_to_mesh" ||
                  (name == "splat_transform" && args.contains("fit"))))
         camera_.frame(sceneBounds());
     // A new SubTool lands beside the model: bring it into view only if it isn't already.

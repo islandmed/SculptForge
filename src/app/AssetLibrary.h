@@ -67,6 +67,7 @@ AssetKind fileKindForTab(LibraryTab tab, const std::string& path);
 struct LibraryRoots {
     std::string builtin; // bundled assets (contains demo/); may be empty
     std::string user;    // Documents/SculptForge (created on first use)
+    std::string starter; // the starter meshes, unpacked (core/StarterMeshes.h); may be empty
 };
 // The bundled assets folder: "assets" next to the executable or up to three levels above it.
 std::string findBuiltinAssets(const std::string& exeDir);
