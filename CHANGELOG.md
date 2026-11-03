@@ -6,6 +6,26 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Brush cursor (#88): the ring is a true circle in the surface's tangent plane (its normal averaged over the brush
+  area) instead of being pressed onto the mesh point by point, so it no longer wobbles or breaks up on bumpy
+  surfaces; symmetry and radial copies show as dots, not rings; the crosshair stays while the view turns, pans or
+  zooms. New Preferences > Cursor (Viewport cursor and Cursor follows surface moved there) with Hide ring while
+  stroking (off by default).
+- Looks: new installs default to the new Neutral scheme (pure grey, the orange accent only), and the first-run
+  welcome offers three look cards (Neutral, Forge Terminal, ZBrush-style layout); Coming from now sets the keys and
+  the layout together. The Classic look's greys, the viewport gradient and the default background are now exactly
+  neutral (they had a slight blue cast). Existing installs keep their look.
+- Forge Terminal, Phosphor and Blueprint: Preferences > Interface > Look > Outlines (Off / Subtle / On, default
+  Subtle) and Outline opacity (0-100%) (#98). The panel under the pointer no longer gets an accent border (at most a faint step, with Outlines On);
+  shelf thumbnails get a faint fill on hover instead of an accent outline.
+
+### Added
+- A Strokes radial menu on J: the five stroke types on one ring (single ring, like every radial menu), and a
+  stroke.type.* action for each.
+- Panels scroll with a left-drag on empty space or a middle-drag anywhere on them, for pens and small screens (#100).
+- Viewport hints have Don't show again; Preferences > Hints shows, hides or restores them all.
+
 ## [0.10.8] - 2026-11-02
 
 ### Fixed

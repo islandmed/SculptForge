@@ -1,5 +1,5 @@
-# Radial (pie) menus (#45). Two built in: Brushes on T and Masking on Y, keys no other action has in any input
-# style. Hold the key, flick toward an item, let go: it runs. Let go in the middle after a moment: nothing. Tap
+# Radial (pie) menus (#45). Three built in: Brushes on T, Masking on Y and Strokes on J (U13: the stroke types on
+# one ring, as 3D-Coat's stroke pop-up), keys no other action has in any input style. Hold the key, flick toward an item, let go: it runs. Let go in the middle after a moment: nothing. Tap
 # the key: the pie stays open; a click on an item runs it, a click in the middle or Esc closes it, and the click
 # never reaches the model. A pen or mouse button set on a menu does the same as its key. Preferences > Input >
 # Radial Menus: a new menu, an item picked with the palette's search, a key; import and export of one menu (only
@@ -7,11 +7,13 @@
 run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_sphere subdivisions=3
 camera 0 0
-expect_value radial_menus == 2
+expect_value radial_menus == 3
 expect_value radial_slots_1 == 8
 expect_value radial_slots_2 == 8
+expect_value radial_slots_3 == 5
 expect_shortcut radial.menu1 T
 expect_shortcut radial.menu2 Y
+expect_shortcut radial.menu3 J
 expect_value radial_ran == -1
 expect_value shortcut_conflicts == 0
 
@@ -30,6 +32,25 @@ key_up t
 expect_value radial_open == 0
 expect_value radial_ran == 2
 expect_value brush_type == 3
+
+# Hold J, flick right: the Strokes ring's second item (clockwise from the top), Drag Stamp; flick up: Dots.
+expect_value stroke_type == 0
+hover_window 0.5 0.5
+key_down j
+expect_value radial_menu == 2
+shot strokes_open
+hover_window 0.57 0.47 0.15
+expect_value radial_hover == 1
+shot strokes_flick
+key_up j
+expect_value radial_open == 0
+expect_value stroke_type == 1
+hover_window 0.5 0.5
+key_down j
+hover_window 0.5 0.4 0.1
+expect_value radial_hover == 0
+key_up j
+expect_value stroke_type == 0
 
 # Flick up: Standard.
 hover_window 0.5 0.5
@@ -114,48 +135,48 @@ expect_value radial_open == 1
 key escape
 pen_out
 
-# A new menu: its first item picked with the palette's search (Smooth), then a key (J).
+# A new menu: its first item picked with the palette's search (Smooth), then a key (N).
 click "Preferences##palette.preferences"
 click "###radial.add_menu"
-expect_value radial_menus == 3
+expect_value radial_menus == 4
 type "##radial.search" smooth
 click "###radial.pick.brush.smooth"
-expect_value radial_slots_3 == 1
+expect_value radial_slots_4 == 1
 click "###radial.key"
-key j
-expect_shortcut radial.menu3 J
+key n
+expect_shortcut radial.menu4 N
 expect_value shortcut_conflicts == 0
 key escape
 hover_window 0.5 0.5
-key_down j
-expect_value radial_menu == 2
+key_down n
+expect_value radial_menu == 3
 hover_window 0.5 0.4 0.1
-key_up j
+key_up n
 expect_value brush_type == 2
 
 # Import a menu file: unknown actions, a command that needs a path, a bad icon and a wrong type are left out; its
 # middle mouse button opens it (a right flick: Inflate of Smooth / Inflate / Pinch).
 radial_import data/radial/sculpting.json
-expect_value radial_menus == 4
-expect_value radial_slots_4 == 3
+expect_value radial_menus == 5
+expect_value radial_slots_5 == 3
 button_drag middle 0.5 0.5 0.57 0.5 0.3
 expect_value radial_open == 0
 expect_value radial_ran == 1
 expect_value brush_type == 4
 
 # Export it, clear it, import it back into the same (now empty) menu.
-radial_export 4 sculpting_out.json
+radial_export 5 sculpting_out.json
 click "Preferences##palette.preferences"
 click "Clear##radial.clear"
-expect_value radial_menus == 3
-radial_import sculpting_out.json
 expect_value radial_menus == 4
-expect_value radial_slots_4 == 3
+radial_import sculpting_out.json
+expect_value radial_menus == 5
+expect_value radial_slots_5 == 3
 key escape
 button_drag middle 0.5 0.5 0.5 0.4 0.3
 expect_value brush_type == 2
 
-# Every style keeps T, Y and J free of other actions.
+# Every style keeps T, Y, J (and the N set above) free of other actions.
 click "Preferences##palette.preferences"
 click "SculptForge##input.style_sculptforge"
 expect_value shortcut_conflicts == 0
@@ -167,9 +188,9 @@ click "ZBrush-style##input.style_zbrush"
 expect_value shortcut_conflicts == 0
 key escape
 
-# Restore default menus: Brushes and Masking again.
+# Restore default menus: Brushes, Masking and Strokes again.
 click "Preferences##palette.preferences"
 click "Restore default menus##radial.defaults"
-expect_value radial_menus == 2
+expect_value radial_menus == 3
 expect_value radial_slots_1 == 8
 key escape

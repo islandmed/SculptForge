@@ -55,39 +55,30 @@ glm::vec3 surfaceCursorNormal(const Mesh& mesh, const BVH& bvh, const RayHit& hi
     if (!(radius > 0.0f) || samples <= 0) return n0;
     glm::vec3 u, v;
     tangentBasis(n0, u, v);
-    const float r = radius * 0.5f;
     glm::vec3 sum = n0 * 2.0f; // the centre counts double: the cursor sits there
-    for (int i = 0; i < samples; ++i) {
-        const float a = 6.28318531f * float(i) / float(samples);
-        const glm::vec3 p = hit.position + (u * std::cos(a) + v * std::sin(a)) * r;
-        RayHit h;
-        if (!pressOnto(mesh, bvh, p, n0, r, h)) continue;
-        const glm::vec3 n = interpolatedNormal(mesh, h);
-        if (glm::dot(n, n0) > 0.0f) sum += n;
+    for (const float r : {radius * 0.5f, radius}) {
+        for (int i = 0; i < samples; ++i) {
+            const float a = 6.28318531f * (float(i) + (r < radius ? 0.0f : 0.5f)) / float(samples); // (staggered rings)
+            const glm::vec3 p = hit.position + (u * std::cos(a) + v * std::sin(a)) * r;
+            RayHit h;
+            if (!pressOnto(mesh, bvh, p, n0, r, h)) continue;
+            const glm::vec3 n = interpolatedNormal(mesh, h);
+            if (glm::dot(n, n0) > 0.0f) sum += n;
+        }
     }
     return safeNormalize(sum, n0);
 }
 
-void surfaceCursorRing(const Mesh& mesh, const BVH& bvh, const glm::vec3& center, const glm::vec3& normal, float radius,
-                       int count, std::vector<SurfaceRingPoint>& out) {
+void surfaceCursorCircle(const glm::vec3& center, const glm::vec3& normal, float radius, int count,
+                         std::vector<glm::vec3>& out) {
     out.clear();
     if (count <= 0 || !(radius > 0.0f)) return;
-    const glm::vec3 n = safeNormalize(normal, glm::vec3(0, 0, 1));
     glm::vec3 u, v;
-    tangentBasis(n, u, v);
+    tangentBasis(safeNormalize(normal, glm::vec3(0, 0, 1)), u, v);
     out.reserve(size_t(count));
     for (int i = 0; i < count; ++i) {
         const float a = 6.28318531f * float(i) / float(count);
-        SurfaceRingPoint p;
-        p.position = center + (u * std::cos(a) + v * std::sin(a)) * radius;
-        p.normal = n;
-        RayHit h;
-        if (pressOnto(mesh, bvh, p.position, n, radius, h)) {
-            p.position = h.position;
-            p.normal = interpolatedNormal(mesh, h);
-            p.onSurface = true;
-        }
-        out.push_back(p);
+        out.push_back(center + (u * std::cos(a) + v * std::sin(a)) * radius);
     }
 }
 

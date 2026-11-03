@@ -5,6 +5,23 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.10.9
+
+- **A calmer brush cursor**: the ring is a true circle lying in the plane of the surface, so bumps no longer bend
+  or break it; symmetry copies show as dots instead of extra rings; the crosshair stays while you turn the view; and
+  **Preferences > Cursor > Hide ring while stroking** leaves only a dot while you sculpt (off by default) (#88).
+- **Neutral grey by default**: new installs start in **Neutral** (grey panels, one orange accent), and the first
+  start offers three looks: Neutral, Forge Terminal and the ZBrush-style layout. **Classic** is now truly neutral
+  grey too. Your current look stays as it is. See [Looks and layouts](interface.md#looks-and-layouts).
+- **Calmer panels**: **Preferences > Interface > Look > Outlines** (Off, Subtle, On) and **Outline opacity** for
+  Forge Terminal, Phosphor and Blueprint (#98). Subtle is the default, and the panel under the pointer no longer lights up.
+- **Strokes ring on J**: hold <kbd>J</kbd>, flick toward Dots, Drag Stamp, Slide Stamp, Spray or Lazy Stroke, let
+  go. See [Radial menus](sculpting.md#radial-menus).
+- **Drag to scroll panels**: on small screens and with a pen, drag empty space in a panel (or middle-drag anywhere
+  on it) to scroll it (#100).
+- **Hints you can turn off**: every note over the 3D view has **Don't show again**, and **Preferences > Hints**
+  turns them on and off.
+
 ## Version 0.10.8
 
 - **Tablets in mouse mode work again**: on some Windows tablets with **Mouse mode** on (Preferences > Tablet) the

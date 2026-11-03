@@ -65,6 +65,13 @@ void DelayedTooltip(const char* text);
 bool CtrlHeld();
 bool AltHeld();
 
+// #100 (small screens, pens): a left-drag on a panel's empty space, or a middle-drag anywhere on it, scrolls it, as a
+// finger scrolls a list. Call once a frame, after every window (before ImGui ends the frame).
+void DragScrollPanels();
+// For UI tests: drags that scrolled a panel so far, and that panel's scroll after the last one (pixels).
+int DragScrolls();
+float DragScrollY();
+
 // Draws this frame's Ctrl-help box; call once, after every other window.
 void DrawHelp(App& app);
 // What the Ctrl-help box showed in the last frame ("" if none), for UI tests.
