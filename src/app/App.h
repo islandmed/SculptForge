@@ -1983,6 +1983,7 @@ private:
     PenCursor penCursor_; // where the pen puts the cursor (Preferences > Tablet > Mouse mode)
     bool penInProximity_ = false, penTouching_ = false, penEraser_ = false;
     Uint64 lastPenNs_ = 0; // when the last pen event arrived (see onMouseMove)
+    Uint64 lastPenTouchNs_ = 0; // when the pen tip last touched down or lifted (strayMouseMotion)
     uint32_t penButtons_ = 0; // bit N: pen button N is held
     int penNavButton_ = 0;    // the pen button driving a view drag (0: none)
     bool dragFromPen_ = false;
