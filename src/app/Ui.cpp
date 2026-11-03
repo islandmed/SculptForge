@@ -695,7 +695,7 @@ void DragScrollPanels() {
         }
         return;
     }
-    // A press this frame: left only on empty space (nothing hovered or pressed), middle anywhere on the panel. The
+    // A press this frame: left only on empty space (nothing hovered or pressed) of a fixed panel, middle anywhere. The
     // nearest window that scrolls, from the one under the pointer out through its parents (a tray's sections are
     // child windows).
     for (const ImGuiMouseButton b : {ImGuiMouseButton_Left, ImGuiMouseButton_Middle}) {
@@ -706,6 +706,11 @@ void DragScrollPanels() {
         while (w && !(w->ScrollMax.y > 0.0f || w->ScrollMax.x > 0.0f) && (w->Flags & ImGuiWindowFlags_ChildWindow)) w = w->ParentWindow;
         if (!w || !(w->ScrollMax.y > 0.0f || w->ScrollMax.x > 0.0f)) continue;
         if (w->ScrollbarY && io.MousePos.x >= w->InnerRect.Max.x) continue; // on its scroll bar: ImGui's own
+        // A left-drag on a floating window (or its title bar) moves the window, as ever: only the fixed panels
+        // (trays, palettes, shelves) scroll with it. The middle button never moves windows, so it scrolls any.
+        if (b == ImGuiMouseButton_Left && (!(w->RootWindow->Flags & ImGuiWindowFlags_NoMove) ||
+                                           w->RootWindow->TitleBarRect().Contains(io.MousePos)))
+            continue;
         g_dragScrollWindow = w->ID;
         g_dragScrollButton = b;
         g_dragScrollMoved = false;

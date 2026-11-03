@@ -53,20 +53,31 @@ glm::vec3 interpolatedNormal(const Mesh& mesh, const RayHit& hit) {
 glm::vec3 surfaceCursorNormal(const Mesh& mesh, const BVH& bvh, const RayHit& hit, float radius, int samples) {
     const glm::vec3 n0 = interpolatedNormal(mesh, hit);
     if (!(radius > 0.0f) || samples <= 0) return n0;
-    glm::vec3 u, v;
-    tangentBasis(n0, u, v);
-    glm::vec3 sum = n0 * 2.0f; // the centre counts double: the cursor sits there
-    for (const float r : {radius * 0.5f, radius}) {
-        for (int i = 0; i < samples; ++i) {
-            const float a = 6.28318531f * (float(i) + (r < radius ? 0.0f : 0.5f)) / float(samples); // (staggered rings)
-            const glm::vec3 p = hit.position + (u * std::cos(a) + v * std::sin(a)) * r;
-            RayHit h;
-            if (!pressOnto(mesh, bvh, p, n0, r, h)) continue;
-            const glm::vec3 n = interpolatedNormal(mesh, h);
-            if (glm::dot(n, n0) > 0.0f) sum += n;
+    // The plane through the surface points around the cursor (two rings, pressed onto the mesh along `axis`): the
+    // area vector of each ring's polygon about the centre (Newell). Its tilt comes from how high the points sit, so
+    // a bump tilts it by about its height over the brush radius, where averaging the points' normals would follow
+    // every steep little slope (#88).
+    auto fit = [&](const glm::vec3& axis) {
+        glm::vec3 u, v;
+        tangentBasis(axis, u, v);
+        glm::vec3 sum(0.0f);
+        glm::vec3 points[64];
+        for (const float r : {radius * 0.5f, radius}) {
+            int count = 0;
+            for (int i = 0; i < samples && count < 64; ++i) {
+                const float a = 6.28318531f * float(i) / float(samples);
+                RayHit h;
+                if (pressOnto(mesh, bvh, hit.position + (u * std::cos(a) + v * std::sin(a)) * r, axis, r, h))
+                    points[count++] = h.position - hit.position;
+            }
+            if (count < 3) continue; // (over a hole or off an edge: too little to fit)
+            for (int i = 0; i < count; ++i) sum += glm::cross(points[i], points[(i + 1) % count]);
         }
-    }
-    return safeNormalize(sum, n0);
+        return glm::dot(sum, axis) > 0.0f ? safeNormalize(sum, axis) : axis;
+    };
+    // Twice: the second fit samples the rings in the plane the first one found, square to the form.
+    const glm::vec3 n = fit(fit(n0));
+    return glm::dot(n, n0) > -0.2f ? n : n0;
 }
 
 void surfaceCursorCircle(const glm::vec3& center, const glm::vec3& normal, float radius, int count,
