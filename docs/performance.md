@@ -12,7 +12,7 @@ sculptforge-cli --bench ...                     # the same without the GPU (CI, 
 Machine for all figures: Apple M1 Pro (8 performance + 2 efficiency cores, 32 GB unified memory, 30 GB usable
 under Asahi Linux), integrated GPU, Mesa 26.1 (OpenGL 4.6). How the benchmark works is described under v0.5 below.
 
-## 0.10.8: background dabs (perf/bigbrush-p99)
+## 0.10.9: background dabs, Move once a frame (perf/bigbrush-p99)
 
 `--benchmark standard` placed every stroke in the frame loop (predictive strokes are off by default), and on the
 33M head one 240 px dab moves 3-11M vertices (the symmetric brush covers a large part of the face). Where one such

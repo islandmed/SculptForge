@@ -6,6 +6,30 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Large brushes on dense meshes no longer stall the view: from 2 million vertices a stroke's dabs are placed on the
+  stroke thread (the same dabs, in the same order, as the frame loop places them; no preview), so a frame keeps
+  drawing while a 240 px dab moves millions of vertices, and a light batch is still waited for within the frame.
+  On the standard scene's 240 px brush the slowest frames drop from 139 ms (15M) and 306 ms (33M) to about 30 ms in
+  first runs, and lifting the pen no longer waits (162 ms at 33M). `SF_BACKGROUND_DABS=0` turns it off.
+- Move on dense meshes no longer stalls: it worked out its whole region's normals and bounds again for every pointer
+  sample (several times a frame with a 240 Hz pen, more the slower the frame got: seconds at 33M under load). The
+  positions still follow every sample; the normals and bounds now follow once a frame, and the mesh comes out the
+  same, bit for bit.
+- The first orbit after a long stroke no longer stalls (180-300 ms at 33M): the moving view's lighter stand-ins for
+  the changed areas are rebuilt a few milliseconds a frame, the rest drawn in full detail until then.
+
+### Fixed
+- Help > Benchmark (and `--benchmark`) checks the memory free now before each scene instead of trusting the
+  computer's total: a scene that doesn't fit (15M needs about 2.2 GB free, 33M about 5 GB, plus a margin) is skipped
+  with a clear message ("33M skipped: needs ~5 GB free, 1.3 GB available. Close other apps and run again") rather
+  than running the system out of memory. The result lists skipped scenes; the command line exits with code 2.
+- Subdivide, Divide, Divide to a micro level and Voxel Remesh ask first ("Not enough free memory", Continue anyway or
+  Cancel) when the mesh they would build doesn't fit the memory free now.
+- Runs started by scripts and agents (`SDL_APP_ID=sculptforge-agent`, or `SF_ISOLATE=1`) use their own settings and
+  log folder for every mode (renders, `--bench`, `--calibrate` too), so they no longer write into your
+  sculptforge.log or move your session's log aside. Isolated runs remove their temporary folder when they pass.
+
 ## [0.10.8] - 2026-11-02
 
 ### Fixed
@@ -16,11 +40,6 @@ All notable changes to SculptForge are listed here. The format follows
 ## [0.10.7] - 2026-11-01
 
 ### Changed
-- Large brushes on dense meshes no longer stall the view: from 2 million vertices a stroke's dabs are placed on the
-  stroke thread (the same dabs, in the same order, as the frame loop places them; no preview), so a frame keeps
-  drawing while a 240 px dab moves millions of vertices, and a light batch is still waited for within the frame.
-  On the standard scene's 240 px brush the slowest frames drop from 139 ms (15M) and 306 ms (33M) to about 30 ms in
-  first runs, and lifting the pen no longer waits (162 ms at 33M). `SF_BACKGROUND_DABS=0` turns it off.
 - The membership card at launch is redesigned: the cube mark and the promise up top, the three memberships side by
   side with their perks checked off and one bold button each (Insider highlighted), and the members' Discord in the
   footer. It takes the current look's colours and opens in 150 ms. "Maybe later" now hides it for 30 days, updates
@@ -39,21 +58,6 @@ All notable changes to SculptForge are listed here. The format follows
   Insiders repository and posts to #insiders (`.github/workflows/insider-preview.yml`).
 
 ### Fixed
-- Help > Benchmark (and `--benchmark`) checks the memory free now before each scene instead of trusting the
-  computer's total: a scene that doesn't fit (15M needs about 2.2 GB free, 33M about 5 GB, plus a margin) is skipped
-  with a clear message ("33M skipped: needs ~5 GB free, 1.3 GB available. Close other apps and run again") rather
-  than running the system out of memory. The result lists skipped scenes; the command line exits with code 2.
-- Subdivide, Divide, Divide to a micro level and Voxel Remesh ask first ("Not enough free memory", Continue anyway or
-  Cancel) when the mesh they would build doesn't fit the memory free now.
-- Move on dense meshes no longer stalls: it worked out its whole region's normals and bounds again for every pointer
-  sample (several times a frame with a 240 Hz pen, more the slower the frame got: seconds at 33M under load). The
-  positions still follow every sample; the normals and bounds now follow once a frame, and the mesh comes out the
-  same, bit for bit.
-- The first orbit after a long stroke no longer stalls (180-300 ms at 33M): the moving view's lighter stand-ins for
-  the changed areas are rebuilt a few milliseconds a frame, the rest drawn in full detail until then.
-- Runs started by scripts and agents (`SDL_APP_ID=sculptforge-agent`, or `SF_ISOLATE=1`) use their own settings and
-  log folder for every mode (renders, `--bench`, `--calibrate` too), so they no longer write into your
-  sculptforge.log or move your session's log aside. Isolated runs remove their temporary folder when they pass.
 - Custom and Community brushes (Clay Slab and other presets) show the whole alpha at Focal Shift -100, as the
   built-in brushes do since #60: the stamp reaches its square's corners instead of being cut by the preset's round
   tip (#75, reported by rodrigomoretto). At the default Focal Shift presets look as before; saved presets are unchanged.
