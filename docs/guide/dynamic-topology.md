@@ -68,9 +68,10 @@ It is a preference (Store Config keeps it) and is saved with the project; from a
 ## Subdivision levels
 
 Dynamic topology works on meshes without [subdivision levels](subdivision-levels.md), as in ZBrush. On a Part
-with levels, **Dynamic** stays off and the status bar says why: go to the level you want to keep and use **Del
-Lower** and **Del Higher** in **Tool > Geometry** first. If you turn it on and then pick a Part that has
-levels, strokes sculpt it without remeshing.
+with levels, clicking **Dynamic** offers **Freeze Levels and Turn On Dynamic**: the level you see becomes one plain
+mesh and the other levels go (<kbd>Ctrl</kbd>+<kbd>Z</kbd> brings them back). To keep a different level, go to it
+first. If you turn Dynamic on and then pick a Part that has levels, strokes sculpt it without remeshing, and the
+Draw palette shows the same **Freeze Levels + Dynamic** button.
 
 A good workflow: block in with Dynamic, then [Quad Remesh](retopology.md) or [Voxel Remesh](geometry.md) for an even
 base, **Divide** for levels, and sculpt the fine detail on them.

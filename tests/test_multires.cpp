@@ -353,6 +353,39 @@ TEST(multires_delete_lower_and_higher) {
     CHECK(subdivLevelCount(d.mesh) == 3);
 }
 
+// A review hit "Dynamic topology needs a mesh without subdivision levels" on the divided default sphere: Freeze
+// Levels keeps the level shown as a plain mesh in one undo step, and dyntopo freeze_levels=true does it and turns
+// Dynamic on.
+TEST(multires_freeze_levels_for_dynamic) {
+    Document d = dividedCube(3);
+    CHECK(stroke(d, "0,0,2", "Standard", 0.3));
+    CHECK(run(d, "subdiv_level", {{"level", 2.0}}).ok);
+    const std::vector<glm::vec3> level2 = d.mesh.positions;
+    const size_t tris2 = d.mesh.triangleCount();
+    CHECK(!run(d, "dyntopo", {{"enabled", true}}).ok); // still blocked without the option
+    CHECK(!d.sculptor.dyntopo.enabled);
+    CHECK(run(d, "subdiv_freeze").ok);
+    CHECK(subdivLevelCount(d.mesh) == 0);
+    CHECK(d.mesh.triangleCount() == tris2);
+    CHECK(bitEqual(d.mesh.positions, level2));
+    CHECK(run(d, "undo").ok);
+    CHECK(subdivLevelText(d.mesh) == "SDiv 2/4");
+    CHECK(bitEqual(d.mesh.positions, level2));
+    // In one go, from the top level.
+    Document e = dividedCube(2);
+    const size_t top = e.mesh.triangleCount();
+    const CommandResult r = run(e, "dyntopo", {{"enabled", true}, {"freeze_levels", true}});
+    CHECK(r.ok);
+    CHECK(e.sculptor.dyntopo.enabled);
+    CHECK(subdivLevelCount(e.mesh) == 0);
+    CHECK(e.mesh.triangleCount() == top);
+    CHECK(run(e, "undo").ok);
+    CHECK(subdivLevelCount(e.mesh) == 3);
+    // Nothing to freeze on a plain mesh.
+    Document p = makeDoc(makeCube(3));
+    CHECK(!run(p, "subdiv_freeze").ok);
+}
+
 TEST(multires_reconstruct_finds_lower_levels) {
     // A Catmull-Clark subdivided cube, imported as a plain mesh.
     Document src = dividedCube(2, 2);

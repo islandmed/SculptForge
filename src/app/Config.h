@@ -77,6 +77,10 @@ struct UiPrefs {
     // Tool > Display > Backface culling (#68): skip the back faces of every Part (faster on dense meshes; see
     // through open meshes). Off by default; a preference, projects keep their own.
     bool backfaceCulling = false;
+    // Preferences > Interface > Mask darkness (and Tool > Masking): how dark masked areas show, 0-1
+    // (RenderSettings::maskDarkness).
+    float maskDarkness = 0.7f;
+    bool confirmSubdivide = true; // Subdivide (removes levels) asks first on a Part with levels (Don't ask again)
     TabletSettings tablet;      // Preferences > Tablet: pressure curve, eraser, pen buttons
     SpaceMouseSettings spaceMouse; // Preferences > Input > SpaceMouse
     // Preferences > Performance (PanelPerformance.cpp).

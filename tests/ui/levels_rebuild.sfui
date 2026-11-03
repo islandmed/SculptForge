@@ -39,10 +39,29 @@ expect_text "SDiv 2 / 3"
 shot levels-back
 
 # Subdivide (the flat one, without levels) from SDiv 2: four times its triangles.
-click "Geometry/Subdivide"
+click "Geometry/Subdivide (removes levels)"
+# It asks first on a Part with levels (Discord 11-02); Cancel keeps the levels.
+expect_text "This removes your 3 subdivision levels"
+shot subdivide-confirm
+click "Subdivide/Cancel"
+expect_value sdiv_levels == 3
+click "Geometry/Subdivide (removes levels)"
+click "Subdivide/Subdivide and Remove Levels"
 expect_value triangles == 27648
 expect_value sdiv_levels == 0
 expect_status "Subdivision levels removed: SDiv 2 of 3 kept as the new base"
+key ctrl+z
+expect_value sdiv_levels == 3
+expect_value sdiv == 2
+# Don't ask again: the next Subdivide goes straight through.
+click "Geometry/Subdivide (removes levels)"
+click "Subdivide/Don't ask again"
+click "Subdivide/Subdivide and Remove Levels"
+expect_value sdiv_levels == 0
+key ctrl+z
+click "Geometry/Subdivide (removes levels)"
+expect_value sdiv_levels == 0
+expect_no_text "This removes your"
 key ctrl+z
 expect_value sdiv_levels == 3
 expect_value sdiv == 2

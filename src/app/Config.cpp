@@ -107,6 +107,8 @@ Json toJson(const UiPrefs& p) {
     j.set("flatShading", p.flatShading);
     j.set("viewportCursor", double(p.viewportCursor));
     j.set("backfaceCulling", p.backfaceCulling);
+    j.set("maskDarkness", double(p.maskDarkness));
+    j.set("confirmSubdivide", p.confirmSubdivide);
     j.set("background", std::string(p.gradientBackground ? "gradient" : "flat"));
     Json bg = Json::array();
     for (int i = 0; i < 3; ++i) bg.push(double(p.backgroundColor[i]));
@@ -175,6 +177,8 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.flatShading = j["flatShading"].asBool(p.flatShading);
     p.viewportCursor = std::clamp(int(j["viewportCursor"].asNumber(p.viewportCursor)), 0, 1);
     p.backfaceCulling = j["backfaceCulling"].asBool(p.backfaceCulling);
+    p.maskDarkness = std::clamp(float(j["maskDarkness"].asNumber(p.maskDarkness)), 0.0f, 1.0f);
+    p.confirmSubdivide = j["confirmSubdivide"].asBool(p.confirmSubdivide);
     if (j["background"].isString()) p.gradientBackground = j["background"].asString() != "flat";
     if (const Json& bg = j["backgroundColor"]; bg.size() == 3)
         for (int i = 0; i < 3; ++i) p.backgroundColor[i] = std::clamp(float(bg[size_t(i)].asNumber(p.backgroundColor[i])), 0.0f, 1.0f);
@@ -331,11 +335,21 @@ void App::initActions() {
         [this] { return doc_.undo.canUndo(); });
     add("edit.redo", "Redo", "Edit", "Ctrl+Shift+Z / Ctrl+Y", [this] { runCommand("redo"); }, ICON_LC_REDO_2, "redo", nullptr,
         [this] { return doc_.undo.canRedo(); });
-    add("geometry.subdivide", "Subdivide", "Tool > Geometry", nullptr, [this] { runCommand("subdivide"); }, nullptr, "subdivide");
+    // Subdivide bakes: it keeps no levels, and on a Part with levels it removes them. Named and placed apart from
+    // Divide, and it asks first on a Part with levels (Discord 11-02: "I keep pressing the wrong one").
+    add("geometry.subdivide", "Subdivide (removes levels)", "Tool > Geometry", nullptr,
+        [this] {
+            if (doc_.mesh.multires && uiPrefs_.confirmSubdivide) openSubdivideConfirm_ = true;
+            else runCommand("subdivide");
+        },
+        nullptr, "subdivide", nullptr, nullptr,
+        "Destructive: four times the polygons as one plain mesh, with no lower levels to step back to. On a Part "
+        "with subdivision levels it removes them (it asks first; Ctrl+Z brings them back). To keep levels, use "
+        "Divide (keeps levels) instead.");
     // Subdivision levels (ZBrush Tool > Geometry; core/Multires.h).
-    add("geometry.divide", "Divide", "Tool > Geometry", "Ctrl+D", [this] { runCommand("subdiv_divide", {{"smooth", smt_}}); },
+    add("geometry.divide", "Divide (keeps levels)", "Tool > Geometry", "Ctrl+D", [this] { runCommand("subdiv_divide", {{"smooth", smt_}}); },
         ICON_LC_GRID_2X2, "subdiv_divide", nullptr, nullptr,
-        "Add a subdivision level: four times the polygons, and the lower levels are kept, so you can step down to "
+        "Non-destructive: add a subdivision level: four times the polygons, and the lower levels are kept, so you can step down to "
         "shape big forms and back up to the detail. Quads stay quads (Catmull-Clark). Smt off divides without smoothing.");
     add("geometry.smt", "Smt", "Tool > Geometry", nullptr, [this] { smt_ = !smt_; }, nullptr, nullptr,
         [this] { return smt_; }, nullptr,
@@ -347,9 +361,9 @@ void App::initActions() {
         ICON_LC_CHEVRON_UP, "subdiv_higher", nullptr,
         [this] { return subdivCurrentLevel(doc_.mesh) + 1 < subdivLevelCount(doc_.mesh); },
         "Step one subdivision level up (more polygons, for detail). Edits made below carry the detail along.");
-    add("geometry.del_lower", "Del Lower", "Tool > Geometry", nullptr, [this] { runCommand("subdiv_delete_lower"); }, nullptr,
+    add("geometry.del_lower", "Del Lower", "Tool > Geometry", nullptr, [this] { confirmLevelDelete("subdiv_delete_lower"); }, nullptr,
         "subdiv_delete_lower", nullptr, [this] { return subdivCurrentLevel(doc_.mesh) > 0; });
-    add("geometry.del_higher", "Del Higher", "Tool > Geometry", nullptr, [this] { runCommand("subdiv_delete_higher"); }, nullptr,
+    add("geometry.del_higher", "Del Higher", "Tool > Geometry", nullptr, [this] { confirmLevelDelete("subdiv_delete_higher"); }, nullptr,
         "subdiv_delete_higher", nullptr,
         [this] { return subdivCurrentLevel(doc_.mesh) + 1 < subdivLevelCount(doc_.mesh); });
     add("geometry.reconstruct", "Reconstruct Subdiv", "Tool > Geometry", nullptr, [this] { runCommand("subdiv_reconstruct"); },
@@ -805,6 +819,7 @@ bool App::readUiConfig(const std::string& path, std::string& err) {
     doc_.sculptor.dyntopo.smoothRemesh = uiPrefs_.dyntopoSmoothRemesh;
     renderSettings_.flatShading = uiPrefs_.flatShading;
     renderSettings_.backfaceCulling = uiPrefs_.backfaceCulling;
+    renderSettings_.maskDarkness = uiPrefs_.maskDarkness;
     renderSettings_.gradientBackground = uiPrefs_.gradientBackground;
     renderSettings_.backgroundColor = uiPrefs_.backgroundColor;
     return true;
@@ -1193,6 +1208,13 @@ void drawInterfaceSection(App& app) {
     ui::SliderInside("##tooltip_delay", &p.tooltipDelay, 0.0f, 2.0f, "Tooltip delay %.1f s");
     ui::HelpText("Tooltip delay", nullptr,
                  "How long to point at an icon-only button (or a clipped label) before its name appears.",
+                 "Preferences > Interface");
+    ImGui::SetNextItemWidth(-FLT_MIN);
+    if (ui::SliderInside("##mask_darkness", &p.maskDarkness, 0.0f, 1.0f, "Mask darkness %.2f"))
+        app.setMaskDarkness(p.maskDarkness);
+    ui::HelpText("Mask darkness", nullptr,
+                 "How dark masked areas show: 0 = not at all, 1 = nearly black. The default keeps the form readable "
+                 "under the mask.",
                  "Preferences > Interface");
     ImGui::Checkbox(tr("One sub-palette open"), &p.oneSubpalette);
     ui::HelpText("One sub-palette open", nullptr,

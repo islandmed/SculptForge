@@ -85,6 +85,25 @@ All notable changes to SculptForge are listed here. The format follows
   view no longer jumps when the pen comes back into range elsewhere or leaves mid-drag. The active Part changes only
   with the keyboard's Alt and a quick click (not with a pen button set to Alt, a long pen press or quick pen taps),
   and the status bar says "Active Part: <name> (Alt+click)".
+- Freeze Levels (`subdiv_freeze`, `dyntopo freeze_levels=true`): turning on Dynamic on a Part with subdivision levels
+  now offers to keep the level shown as one plain mesh and turn Dynamic on, one undo step, instead of a dead-end
+  message. The Draw palette shows the same button while Dynamic waits on levels.
+- View > Views: Front, Back, Left, Right, Top and Bottom buttons (Numpad 1 / 3 / 7, Ctrl for the opposite side, in
+  every input style), and named saved views: Save View (Ctrl+Alt+Numpad 0), click a name to go back, Numpad 0 for
+  the last one. Saved with the project.
+- Mask darkness (Preferences > Interface and Tool > Masking).
+
+### Changed
+- Masked areas show as a cool dark tint with a soft edge instead of near-black, so the form stays readable.
+- The wireframe fades edges shorter than a few pixels: a dense mesh shows a light veil, not a dark moire.
+- Options that are on (toggles) have an accent-tinted fill in every colour scheme, not just a lighter grey.
+- Quad Remesh guide curves draw smooth, with stroke smoothing while drawing and a dark outline for contrast.
+- Tool > Geometry (from Discord): **Divide (keeps levels)** and **Subdivide (removes levels)** are named for what
+  they do and sit apart: Micro in its own Micro Detail group, Subdivide under Change the Mesh (no levels). On a Part
+  with levels, Subdivide asks first ("This removes your N subdivision levels"), with Don't ask again; Del Lower and
+  Del Higher ask too (Ctrl+Z still brings the levels back).
+- Tool > Parts > Extract says to mask first when there's no mask, instead of only greying out its buttons.
+
 ## [0.10.8] - 2026-11-02
 
 ### Fixed

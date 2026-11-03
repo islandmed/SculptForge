@@ -144,8 +144,9 @@ void setTokens(const looks::Palette& p, looks::LookId id) {
     accentHover = mixc(ac, p.light ? rgb(0x000000) : rgb(0xffffff), 0.18f);
     toggleOff = mixc(mantle, s0, 0.6f);
     toggleOffHover = s0;
-    toggleOn = s1;
-    toggleOnHover = s2;
+    // On: a fill tinted with the accent, not just one surface step up (a review couldn't tell on from off).
+    toggleOn = mixc(s1, ac, p.light ? 0.28f : 0.32f);
+    toggleOnHover = mixc(s2, ac, p.light ? 0.34f : 0.38f);
     trough = mixc(mantle, s0, 0.7f);
     selection = mixc(s0, s1, 0.7f);
     selectionActive = s2;

@@ -368,6 +368,11 @@ constexpr Entry kSpanish[] = {
     // --- Geometry ---
     {"Divide", "Dividir"},
     {"Subdivide", "Subdividir"},
+    {"Subdivide (removes levels)", "Subdividir (quita los niveles)"},
+    {"Divide (keeps levels)", "Dividir (conserva los niveles)"},
+    {"Change the Mesh (no levels)", "Cambiar la malla (sin niveles)"},
+    {"Micro Detail", "Detalle micro"},
+    {"Subdivide and Remove Levels", "Subdividir y quitar los niveles"},
     {"Lower Res", "Res. menor"},
     {"Higher Res", "Res. mayor"},
     {"Del Lower", "Borrar inferiores"},

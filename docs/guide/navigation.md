@@ -177,6 +177,14 @@ every visible Part, plus the Gaussian splats when they are shown. SculptForge fr
 you open a file or start from a new primitive. Use it after panning far away, or when a model comes in at an
 unusual scale.
 
+## Saved views
+
+**View > Views** (the Render palette in the ZBrush-style layout) has a button for each axis view (Front, Back,
+Left, Right, Top, Bottom) and your own saved cameras. Type a name (or leave it empty for "View 1", "View 2" ...)
+and click **Save View** (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Numpad 0</kbd>); saving under a name that exists
+replaces it. Click a name to go back to that view, or press <kbd>Numpad 0</kbd> for the one used last; **x** forgets
+it. Saved views are kept in the project.
+
 ## Display toggles that help navigation
 
 These live on the right shelf and in the **Render** palette:
@@ -185,7 +193,7 @@ These live on the right shelf and in the **Render** palette:
   the surface, ZBrush's PolyFrame. Quads show as quads (see [Quads and triangles](geometry.md#quads-and-triangles)).
   Useful for judging mesh density before you subdivide or remesh.
 - **Groups**: colours each face group.
-- **Mask**: darkens masked areas.
+- **Mask**: tints masked areas dark (how dark: **Mask darkness** in Preferences > Interface).
 - **Paint**: shows vertex paint colours (off shows the plain material).
 - **Solo**: shows only the active Part, to get at parts hidden behind others.
 - **Show Mesh** (Render palette): hides the sculpt, for example to look at a splat capture on its own.
@@ -196,8 +204,7 @@ These live on the right shelf and in the **Render** palette:
 ## Not yet
 
 > **Not yet:** SculptForge has no rotation around the point under the cursor (the
-> camera always orbits its target, which Frame sets to the scene centre), no floor grid and no saved camera
-> views. Pan the target onto the area you're working on to orbit around it.
+> camera always orbits its target, which Frame sets to the scene centre), and no floor grid. Pan the target onto the area you're working on to orbit around it.
 
 ## See also
 

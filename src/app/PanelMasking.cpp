@@ -195,6 +195,11 @@ void App::drawMaskingSection() {
                                                              : "(Ctrl masks, Ctrl+Alt unmasks)"));
     ui::Segmented(*this, {"mask.pen", "mask.lasso", "mask.rect"});
     ImGui::SetNextItemWidth(-1);
+    if (float k = uiPrefs_.maskDarkness; ui::SliderInside("##maskdarkness", &k, 0.0f, 1.0f, "Mask Darkness %.2f"))
+        setMaskDarkness(k);
+    ui::HelpText("Mask Darkness", nullptr, "How dark masked areas show (also in Preferences > Interface).",
+                 "Tool > Masking");
+    ImGui::SetNextItemWidth(-1);
     ui::SliderInside("##maskstrength", &maskStrength_, 0.01f, 1.0f, "Mask Strength %.2f");
 
     const ImGuiStyle& style = ImGui::GetStyle();

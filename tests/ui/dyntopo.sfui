@@ -69,6 +69,8 @@ run subdiv_divide
 click "Dynamic##draw.dynamic"
 expect_value dynamic == 0
 expect_status "subdivision levels"
+expect_text "Freeze Levels and Turn On Dynamic"
+click "Dynamic/Cancel"
 run subdiv_delete_lower
 click "Dynamic##draw.dynamic"
 expect_value dynamic == 1

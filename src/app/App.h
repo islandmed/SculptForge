@@ -120,6 +120,7 @@ class App {
 
 public:
     App();
+    void setMaskDarkness(float k); // 0-1: the preference and the view (Preferences > Interface, Tool > Masking)
     ~App();
     bool init(const AppOptions& options);
     int run(); // returns the process exit code
@@ -175,6 +176,11 @@ private:
     void freezeLevelsAndDynamic();
     void drawDynamicOffer(); // the pop-up setDynamic opens instead of a dead-end message
     bool openDynamicOffer_ = false;
+    // Del Lower / Del Higher from the interface: a confirmation naming the levels that go (scripts run directly).
+    void confirmLevelDelete(const std::string& command);
+    std::string pendingLevelDelete_;
+    bool openLevelDelete_ = false;
+    bool openSubdivideConfirm_ = false; // Subdivide on a Part with levels: confirm first (Shell.cpp)
     void drawDetailSlider(const char* id);
 
     void runCommand(const std::string& name, const Args& args = {});
@@ -1530,6 +1536,17 @@ private:
     // every style. Import Blender keymap reads a keymap exported from Blender (BlenderKeymap.h).
     void registerViewActions();
     void viewAxis(float yawDegrees, float pitchDegrees); // Numpad 1 / 3 / 7: orthographic until turned
+    // Saved views (View > Views): named cameras, kept in the project (projectSettings "views").
+    struct SavedView {
+        std::string name;
+        Camera camera;
+    };
+    std::vector<SavedView> savedViews_;
+    int lastSavedView_ = -1; // Numpad 0 restores it
+    char savedViewName_[48] = "";
+    void saveView(const std::string& name = {}); // a free name ("View 3") when empty; the same name replaces
+    void restoreView(int index);
+    void drawViewsSection(); // Palettes.cpp, in View
     void viewOrbitStep(float yawDegrees, float pitchDegrees);
     void frameActiveSubtool();
     SDL_Keymod blenderMods(SDL_Keymod keyboard) const; // Ctrl -> Alt (invert), the mask brush -> Ctrl (mask)

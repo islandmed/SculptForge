@@ -5,6 +5,7 @@
 // (Tool > Deformation). The work is done by the extract / mirror_and_weld / mirror commands (core/ExtractMirror.h).
 #include "app/App.h"
 #include "app/Demo.h"
+#include "app/I18n.h"
 #include "app/Palettes.h"
 #include "app/Ui.h"
 
@@ -36,6 +37,12 @@ void App::drawExtractContents() {
     ImGui::SameLine();
     ui::ActionButton(*this, "subtool.extract_accept", ImVec2(-1, 0));
     ui::HelpAction(*this, "subtool.extract_accept");
+    // Extract works on the mask: say so instead of leaving greyed-out buttons (a review read them as unclickable).
+    if (!doc_.mesh.hasMask() && !doc_.extractPreviewCurrent()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+        ImGui::TextWrapped("%s", tr("Mask what to extract first (Ctrl+drag on the model)."));
+        ImGui::PopStyleColor();
+    }
 
     // The settings: changing one while the preview shows extracts again, so the preview follows.
     bool changed = false;

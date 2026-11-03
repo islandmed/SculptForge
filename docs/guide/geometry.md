@@ -42,7 +42,8 @@ glTF (`.glb`) and STL only hold triangles, so those exports always write triangl
 ## Subdivide
 
 For sculpting at several resolutions use **Divide** (<kbd>Ctrl</kbd>+<kbd>D</kbd>), which keeps the lower levels to
-step back to: see [Subdivision levels](subdivision-levels.md). **Subdivide** is the one-way version.
+step back to: see [Subdivision levels](subdivision-levels.md). **Subdivide (removes levels)** is the one-way
+version; on a Part with levels it asks before removing them.
 
 **Tool > Geometry > Subdivide** smooths the mesh with Loop subdivision. Each level
 multiplies the triangle count by four and rounds off the shape slightly, like ZBrush's Divide with Smt on.

@@ -275,6 +275,41 @@ void App::registerViewActions() {
     add("view.zoom_out", "Zoom out", "Numpad Minus", "Move the view back.", [this] { camera_.zoom(-1.0f); });
     add("view.frame_selected", "Frame Part", "Numpad .", "Fit the active Part in the view (Blender: View Selected).",
         [this] { frameActiveSubtool(); });
+    // Saved views (from a review: "custom cam views, like Blender"): named cameras, kept with the project.
+    add("view.save_view", "Save View", "Ctrl+Alt+Numpad 0",
+        "Remember this camera as a named view (View > Views; the name field names it). Saved with the project.",
+        [this] { saveView(savedViewName_); });
+    add("view.restore_view", "Restore View", "Numpad 0", "Go back to the view saved or restored last (View > Views).",
+        [this] { restoreView(lastSavedView_); });
+}
+
+void App::saveView(const std::string& requested) {
+    std::string name = requested;
+    if (name.empty())
+        for (int n = int(savedViews_.size()) + 1;; ++n) {
+            name = "View " + std::to_string(n);
+            if (std::none_of(savedViews_.begin(), savedViews_.end(), [&](const SavedView& v) { return v.name == name; })) break;
+        }
+    auto it = std::find_if(savedViews_.begin(), savedViews_.end(), [&](const SavedView& v) { return v.name == name; });
+    if (it == savedViews_.end()) it = savedViews_.insert(savedViews_.end(), SavedView{name, camera_});
+    else it->camera = camera_;
+    lastSavedView_ = int(it - savedViews_.begin());
+    savedViewName_[0] = 0;
+    doc_.modified = true; // (saved with the project)
+    status_ = "View saved: " + name + " (Numpad 0 goes back to it)";
+}
+
+void App::restoreView(int index) {
+    if (index < 0 || index >= int(savedViews_.size())) {
+        status_ = "No saved view yet: Save View (Ctrl+Alt+Numpad 0) remembers this one";
+        return;
+    }
+    const float aspect = camera_.aspect;
+    camera_ = savedViews_[size_t(index)].camera;
+    camera_.aspect = aspect;
+    autoOrtho_ = false;
+    lastSavedView_ = index;
+    status_ = "View: " + savedViews_[size_t(index)].name;
 }
 
 void App::setInputStyle(int style) {

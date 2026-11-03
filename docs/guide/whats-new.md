@@ -79,6 +79,18 @@ action: guide:whats-new.md
   and the status line tells you. Your own model choice is kept. See [Image and text to 3D](generate-3d.md).
 - **Generated models arrive as clean quads**: Quad Remesh is now the default, with one subdivision level holding
   the detail, so you can sculpt and subdivide straight away. Voxel remesh and Off are still in **Remesh**.
+- **Dynamic on a subdivided model**: turning on **Dynamic** on a Part with subdivision levels now offers **Freeze
+  Levels and Turn On Dynamic**: the level you see becomes one plain mesh (Ctrl+Z brings the levels back).
+- **Saved views**: **View > Views** has Front, Back, Left, Right, Top and Bottom (Numpad 1, 3, 7; Ctrl for the
+  other side) and **Save View** for your own named camera angles; Numpad 0 goes back to the last one. They are
+  saved with the project.
+- **A readable mask**: masked areas show a soft, dark tint instead of near-black, with **Mask darkness** in
+  Preferences > Interface and Tool > Masking. Dense wireframes no longer turn into a dark moire.
+- **Easier to see**: options that are on stand out in every colour scheme, and Quad Remesh guide curves draw
+  smooth with an outline.
+- **Safer levels**: in Tool > Geometry, **Divide (keeps levels)** and **Subdivide (removes levels)** no longer sit
+  together, Micro has its own group, and Subdivide, Del Lower and Del Higher ask before removing levels (with
+  **Don't ask again** for Subdivide).
 
 ## Version 0.10.8
 

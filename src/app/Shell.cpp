@@ -2212,7 +2212,81 @@ void App::freezeLevelsAndDynamic() {
     runCommand("dyntopo", {{"enabled", true}, {"freeze_levels", true}});
 }
 
+void App::setMaskDarkness(float k) { uiPrefs_.maskDarkness = renderSettings_.maskDarkness = std::clamp(k, 0.0f, 1.0f); }
+
+void App::confirmLevelDelete(const std::string& command) {
+    pendingLevelDelete_ = command;
+    openLevelDelete_ = true;
+}
+
 void App::drawDynamicOffer() {
+    // Del Lower / Del Higher: say which levels go before they do.
+    static constexpr const char* kDelete = "##level_delete";
+    if (openLevelDelete_) {
+        openLevelDelete_ = false;
+        ImGui::OpenPopup(kDelete);
+    }
+    if (ImGui::BeginPopup(kDelete)) {
+        Demo::pushScope("Delete Levels");
+        const int levels = subdivLevelCount(doc_.mesh), current = subdivCurrentLevel(doc_.mesh);
+        const bool lower = pendingLevelDelete_ == "subdiv_delete_lower";
+        const int gone = lower ? current : levels - 1 - current;
+        if (gone <= 0 || pendingLevelDelete_.empty()) {
+            ImGui::CloseCurrentPopup();
+        } else {
+            if (lower)
+                ImGui::Text(tr("Delete SDiv 1 to %d? SDiv %d becomes the base mesh."), current, current + 1);
+            else
+                ImGui::Text(tr("Delete SDiv %d to %d and the detail sculpted on them?"), current + 2, levels);
+            ImGui::TextDisabled("%s", tr("Ctrl+Z brings them back."));
+            ImGui::Spacing();
+            if (ImGui::Button(tr(lower ? "Delete Lower Levels" : "Delete Higher Levels"))) {
+                ImGui::CloseCurrentPopup();
+                runCommand(pendingLevelDelete_);
+                pendingLevelDelete_.clear();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(tr("Cancel##level_delete")) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+                ImGui::CloseCurrentPopup();
+                pendingLevelDelete_.clear();
+            }
+        }
+        Demo::popScope();
+        ImGui::EndPopup();
+    }
+
+    // Subdivide on a Part with levels removes them: ask (Don't ask again turns it off; Preferences keep it).
+    static constexpr const char* kSubdivide = "##subdivide_confirm";
+    if (openSubdivideConfirm_) {
+        openSubdivideConfirm_ = false;
+        ImGui::OpenPopup(kSubdivide);
+    }
+    if (ImGui::BeginPopup(kSubdivide)) {
+        Demo::pushScope("Subdivide");
+        if (!doc_.mesh.multires) {
+            ImGui::CloseCurrentPopup();
+        } else {
+            ImGui::Text(tr("This removes your %d subdivision levels. Undo brings them back."), subdivLevelCount(doc_.mesh));
+            ImGui::TextDisabled(tr("SDiv %d becomes one plain mesh, then it is subdivided. Divide (keeps levels) adds a "
+                                   "level instead."),
+                                subdivCurrentLevel(doc_.mesh) + 1);
+            bool ask = !uiPrefs_.confirmSubdivide;
+            if (ImGui::Checkbox(tr("Don't ask again##subdivide"), &ask)) uiPrefs_.confirmSubdivide = !ask;
+            ImGui::Spacing();
+            if (ImGui::Button(tr("Subdivide and Remove Levels"))) {
+                ImGui::CloseCurrentPopup();
+                runCommand("subdivide");
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(tr("Cancel##subdivide")) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+                uiPrefs_.confirmSubdivide = true; // (Cancel doesn't stop the asking)
+                ImGui::CloseCurrentPopup();
+            }
+        }
+        Demo::popScope();
+        ImGui::EndPopup();
+    }
+
     static constexpr const char* kPopup = "##dynamic_offer";
     if (openDynamicOffer_) {
         openDynamicOffer_ = false;
