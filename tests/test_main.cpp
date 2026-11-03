@@ -3,7 +3,7 @@
 //
 // Runs every TEST registered by the tests/test_*.cpp files (with arguments: only the tests whose names contain
 // one of them, e.g. `sculptforge_tests qremesh_guide`). `--shard K/N` runs only shard K (0-based) of N, so the
-// suite can run as N processes at once (CMake registers sculptforge_tests_0of8 ... for ctest -j); every test is
+// suite can run as N processes at once (CMake registers sculptforge_tests_0of16 ... for ctest -j); every test is
 // in exactly one shard (sf::test::inShard).
 #include "TestHarness.h"
 
