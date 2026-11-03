@@ -79,19 +79,6 @@ action: guide:whats-new.md
   and the status line tells you. Your own model choice is kept. See [Image and text to 3D](generate-3d.md).
 - **Generated models arrive as clean quads**: Quad Remesh is now the default, with one subdivision level holding
   the detail, so you can sculpt and subdivide straight away. Voxel remesh and Off are still in **Remesh**.
-
-## Version 0.10.8
-
-```features
-date: 2026-11-02
-tagline: Tablets in mouse mode follow the pen again.
-highlight: Tablet mouse mode: the brush follows the pen again on some Windows tablets (#72)
-```
-
-- **Tablets in mouse mode work again**: on some Windows tablets with **Mouse mode** on (Preferences > Tablet) the
-  brush stopped following the pen in 0.10.7. When the system can't say where its cursor is, the pen now moves the
-  brush by how far it moves, from where it was (#72).
-
 - **Precision work** for pores, wrinkles, jewellery and trims: **Steady Stroke** (<kbd>L</kbd>) with every stroke
   type and a catch-up on release; **World Size**, so the brush keeps its size in mm on the surface as you zoom;
   Draw Size down to 0.5 px with <kbd>Shift</kbd>+<kbd>[</kbd> / <kbd>]</kbd> for 1 px steps; hold
@@ -100,6 +87,12 @@ highlight: Tablet mouse mode: the brush follows the pen again on some Windows ta
   zoom. See [Precision work](sculpting.md#precision-work).
 
 ## Version 0.10.8
+
+```features
+date: 2026-11-02
+tagline: Tablets in mouse mode follow the pen again.
+highlight: Tablet mouse mode: the brush follows the pen again on some Windows tablets (#72)
+```
 
 - **Tablets in mouse mode work again**: on some Windows tablets with **Mouse mode** on (Preferences > Tablet) the
   brush stopped following the pen in 0.10.7. When the system can't say where its cursor is, the pen now moves the
