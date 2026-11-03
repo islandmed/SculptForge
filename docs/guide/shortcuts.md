@@ -106,8 +106,8 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Action | Keys | What it does |
 |---|---|---|
 | Load UI... | <kbd>Ctrl</kbd>+<kbd>L</kbd> | Load a layout file someone shared (or you saved with Save UI). |
-| Radial menu 1: Brushes | <kbd>T</kbd> | Hold the key, flick toward an item and let go to run it; or tap the key and click one. Edit it in Edit > Preferences > Input > Radial Menus. |
-| Radial menu 2: Masking | <kbd>Y</kbd> | Hold the key, flick toward an item and let go to run it; or tap the key and click one. Edit it in Edit > Preferences > Input > Radial Menus. |
+| Radial menu 1: Brushes | <kbd>T</kbd> | Hold the key, flick toward an item and let go to run it; or tap the key and click one. Edit it in Preferences > Input > Radial Menus. |
+| Radial menu 2: Masking | <kbd>Y</kbd> | Hold the key, flick toward an item and let go to run it; or tap the key and click one. Edit it in Preferences > Input > Radial Menus. |
 | Save UI... | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> | Save the layout, shortcuts and interface preferences to a file you can share. |
 | Shelves | <kbd>Tab</kbd> | Hide or show the shelves and trays around the canvas. |
 | Store Config | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> | Keep the current layout, shortcuts and interface preferences for future sessions. Like ZBrush, SculptForge never saves them on its own. |
@@ -181,7 +181,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 
 | Action | Keys | What it does |
 |---|---|---|
-| Lock camera | <kbd>Shift</kbd>+<kbd>L</kbd> | Lock the camera for left-drags: a drag that starts on the background sculpts once it reaches the model instead of turning the view (Edit > Preferences > Input > Start strokes off the model, #62). The status bar shows CAMERA LOCKED while it is on. Right-drag or Alt+drag still move the view. Shift+L turns it on and off. |
+| Lock camera | <kbd>Shift</kbd>+<kbd>L</kbd> | Lock the camera for left-drags: a drag that starts on the background sculpts once it reaches the model instead of turning the view (Preferences > Input > Start strokes off the model, #62). The status bar shows CAMERA LOCKED while it is on. Right-drag or Alt+drag still move the view. Shift+L turns it on and off. |
 
 <!-- END GENERATED: shortcuts -->
 

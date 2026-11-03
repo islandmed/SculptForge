@@ -55,8 +55,16 @@ BOLD_NAME = re.compile(r"\*\*(" + "|".join(MENUS) + r")\*\* palette\b")  # "the 
 
 def convert(text: str) -> str:
     out = []
-    zbrush_note = False
+    zbrush_note = generated = False
     for line in text.split("\n"):
+        # Tables generated from the app (update_shortcuts.py) quote its own help text; the app owns those words.
+        if line.startswith("<!-- BEGIN GENERATED"):
+            generated = True
+        elif line.startswith("<!-- END GENERATED"):
+            generated = False
+        if generated:
+            out.append(line)
+            continue
         # "> **ZBrush-style layout:** ..." notes name the palettes of that layout on purpose.
         zbrush_note = line.startswith("> **ZBrush-style layout") or (zbrush_note and line.startswith(">"))
         if zbrush_note:
