@@ -5,6 +5,13 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.10.10
+
+```features
+date: unreleased
+tagline: Close Holes, Clip and X-Ray, light you can turn, a faster view on slow machines, and more SpaceMouse devices.
+```
+
 ## Version 0.10.9
 
 ```features
