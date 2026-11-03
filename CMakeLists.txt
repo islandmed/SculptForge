@@ -58,6 +58,8 @@ add_library(sculptforge_core STATIC
   src/core/Pack.cpp
   src/core/Json.cpp
   src/core/BrushRecipe.cpp
+  src/core/BrushSettings.cpp
+  src/core/AlphaOptions.cpp
   src/core/BrushLibrary.cpp
   src/core/Image.cpp
   src/core/ImageTo3D.cpp
@@ -291,6 +293,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelSelectionSets.cpp
     src/app/Selection.cpp
     src/app/PanelBrushes.cpp
+    src/app/BrushSettingsUi.cpp
     src/app/PanelVdm.cpp
     src/app/PanelKelvinlet.cpp
     src/app/PanelFace.cpp

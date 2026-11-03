@@ -19,6 +19,7 @@
 #include "app/UserGuide.h"
 #include "ai/ComfyUI.h"
 #include "ai/ImageTo3DService.h"
+#include "core/BrushSettings.h"
 #include "core/Commands.h"
 #include "core/Image.h"
 #include "core/Macro.h"
@@ -289,6 +290,7 @@ private:
         bool pressureSize = false, pressureStrength = true, invert = false, frontFacesOnly = false;
         bool connectedOnly = false, viewFalloff = false; // the falloff options (Brush palette)
         bool mask = false, paint = false, sculpt = true, visible = true;
+        AlphaOptions alphaOptions; // Follow stroke direction, Angle, Angle jitter (#76; Tile is the alpha's own)
         BrushType brush = BrushType::Standard;
         StrokeType strokeType = StrokeType::Dots;
         Symmetry symmetry;
@@ -567,6 +569,13 @@ private:
     glm::vec3 dragAnchorHit_{0.0f};
     float dabRadiusScale_ = 1.0f, dabStrengthScale_ = 1.0f, dabAngle_ = 0.0f; // per-dab overrides
     bool alphaInvert_ = false;
+    // Alpha options (#76, core/AlphaOptions.h): the Alpha palette's Follow stroke direction, Angle, Angle jitter and
+    // Tile, kept per brush (#78). The rake and the jitter's seed start again with each stroke (dabAt).
+    AlphaOptions alphaOptions_;
+    AlphaRake alphaRake_;
+    uint32_t alphaSeed_ = 1;
+    float lastDabAngle_ = 0.0f; // radians (UI tests: last_dab_angle)
+    void drawAlphaOptions();
     std::mutex alphaMutex_;
     std::string pendingAlphaPath_; // set by the file dialog thread
     // Vector displacement brushes (PanelVdm.cpp, core/Vdm.h): the Brush palette's Vector Displacement section,
@@ -1532,6 +1541,28 @@ private:
     bool strokeAltSmooth_ = false;
     float rgbIntensity_ = 1.0f;   // paint strength (ZBrush RGB Intensity, 100 by default)
     float focalShift_ = 0.0f;     // -1..1 (ZBrush Focal Shift -100..100)
+    // Per-brush settings (#78, BrushSettingsUi.cpp, core/BrushSettings.h): each frame, a brush switch stores the
+    // brush left and brings back the picked brush's own Draw Size, Z Intensity, Falloff, RGB Intensity, stroke and
+    // alpha. Save Brush Settings writes them (<app data>/brush-settings.json) so they load at startup; Reset Brush
+    // to Default puts back the shipped values. Off in demo videos and benchmarks (their scripts set every value).
+public:
+    std::string currentBrushKey() const; // "builtin:Clay", "custom:Clay Slab"
+    BrushToolSettings liveBrushSettings() const;
+    void applyBrushSettings(const BrushToolSettings& s);
+    void saveBrushSettings();  // Brush > Save Brush Settings
+    void resetBrushSettings(); // Brush > Reset Brush to Default
+    void setShareBrushSize(bool on);
+    const BrushSettingsStore& brushSettingsStore() const { return brushSettings_; }
+
+private:
+    void initBrushSettings();
+    void syncBrushSettings(); // every frame, outside strokes
+    void syncAlphaTile();     // the brush's Tile onto the current alpha
+    void registerAlphaOptionsCommand(); // brush_alpha_options (#76)
+    std::string brushSettingsPath() const;
+    BrushSettingsStore brushSettings_;
+    std::string brushSettingsKey_; // the brush the live values belong to
+    bool brushSettingsOn_ = true;
     struct QuickMenu {
         bool open = false;
         ImVec2 at{0, 0};

@@ -76,13 +76,18 @@ void usage() {
         "  --crash-test KIND        Crash on purpose (segv, abort or throw) to test the crash note in the log");
 }
 
+// The folder isolateSettings made (removed when the run succeeds, kept with its log when it fails).
+std::filesystem::path g_isolatedDir;
+
 // UI tests must never read or change the user's real settings, recent files or
 // autosaves: point the per-user data directories at a fresh temporary folder.
 void isolateSettings() {
+    if (!g_isolatedDir.empty()) return;
     std::error_code ec;
     const auto dir = std::filesystem::temp_directory_path(ec) /
                      ("sculptforge-ui-test-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     std::filesystem::create_directories(dir, ec);
+    g_isolatedDir = dir;
     const std::string d = dir.string();
 #if defined(_WIN32)
     _putenv_s("APPDATA", d.c_str());
@@ -213,5 +218,9 @@ int main(int argc, char** argv) {
     int code = app.run();
     app.shutdown();
     sf::crashlog::stop();
+    if (code == 0 && !g_isolatedDir.empty()) { // UI tests ran thousands of times a day filled /tmp
+        std::error_code ec;
+        std::filesystem::remove_all(g_isolatedDir, ec);
+    }
     return code;
 }

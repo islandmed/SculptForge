@@ -314,6 +314,7 @@ App::DabSettings App::dabSettings() const {
     st.focal = focalShift_;
     st.maskStrength = maskStrength_;
     st.sprayScatter = sprayScatter_;
+    st.alphaOptions = alphaOptions_;
     st.pressureSize = pressureSize_;
     st.pressureStrength = pressureStrength_;
     st.invert = strokeInvert_;

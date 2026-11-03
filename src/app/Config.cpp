@@ -80,6 +80,7 @@ Json toJson(const UiPrefs& p) {
     j.set("emulateNumpad", p.emulateNumpad);
     j.set("rightClickQuickMenu", p.rightClickQuickMenu);
     j.set("spaceCamera", p.spaceCamera);
+    j.set("emulate3Button", p.emulate3Button);
     j.set("mayaZoomHorizontal", p.mayaZoomHorizontal);
     j.set("invertZoom", p.invertZoom);
     j.set("alongNormal", std::string(p.alongNormal == 1 ? "always" : p.alongNormal == 2 ? "never" : "invert_key"));
@@ -132,6 +133,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.emulateNumpad = j["emulateNumpad"].asBool(p.emulateNumpad);
     p.rightClickQuickMenu = j["rightClickQuickMenu"].asBool(p.rightClickQuickMenu);
     p.spaceCamera = j["spaceCamera"].asBool(p.spaceCamera);
+    p.emulate3Button = j["emulate3Button"].asBool(p.emulate3Button);
     p.mayaZoomHorizontal = j["mayaZoomHorizontal"].asBool(p.mayaZoomHorizontal);
     p.invertZoom = j["invertZoom"].asBool(p.invertZoom);
     if (j["alongNormal"].isString()) {
@@ -485,6 +487,20 @@ void App::initActions() {
         "SculptForge reads and writes only there, and only when you send or get.");
     add("brush.paste", "Paste brush", "Brush", "Ctrl+V", [this] { pasteBrush(); }, ICON_LC_CLIPBOARD_PASTE, nullptr, nullptr,
         nullptr, "Add the brush on the clipboard: a brush code someone shared, or the text of a .sfbrush file.");
+    // Per-brush settings (#78, BrushSettingsUi.cpp).
+    add("brush.save_settings", "Save Brush Settings", "Brush", nullptr, [this] { saveBrushSettings(); }, ICON_LC_SAVE,
+        nullptr, nullptr, nullptr,
+        "Every brush keeps its own Draw Size, Z Intensity, Falloff, RGB Intensity, stroke and alpha while you work. "
+        "This saves the current brush's, so it starts with them every time SculptForge opens.");
+    add("brush.reset_settings", "Reset Brush to Default", "Brush", nullptr, [this] { resetBrushSettings(); },
+        ICON_LC_ROTATE_CCW, nullptr, nullptr, nullptr,
+        "Put the current brush's Draw Size, Z Intensity, Falloff, RGB Intensity, stroke and alpha back to the values "
+        "SculptForge ships with, and forget what Save Brush Settings stored for it.");
+    add("brush.share_size", "Share size and intensity across brushes", "Preferences > Input", nullptr,
+        [this] { setShareBrushSize(!brushSettings_.shareSizeIntensity); }, nullptr, nullptr,
+        [this] { return brushSettings_.shareSizeIntensity; }, nullptr,
+        "On: Draw Size and Z Intensity stay as they are when you pick another brush (as before 0.10.8); Falloff, "
+        "RGB Intensity, the stroke and the alpha still follow each brush. Off (the default): every brush keeps its own.");
     add("brush.size_down", "Smaller brush", "Draw", "[", [this] { radiusPx_ = std::max(2.0f, radiusPx_ / 1.1f); }, nullptr,
         nullptr, nullptr, nullptr, "Make the brush 10% smaller (hold to repeat).");
     add("brush.size_up", "Larger brush", "Draw", "]", [this] { radiusPx_ = std::min(800.0f, radiusPx_ * 1.1f); }, nullptr,

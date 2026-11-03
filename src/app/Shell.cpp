@@ -1397,6 +1397,8 @@ void App::drawStatusBar(const ShellGeometry& g) {
         char fps[16];
         std::snprintf(fps, sizeof fps, "%3.0f", fpsShown_);
         mods.push_back({ICON_LC_ACTIVITY, "fps", fps});
+        // View > Lock camera (#62, Shift+L): left-drags on the background start strokes instead of turning the view.
+        if (uiPrefs_.airStrokes) mods.push_back({ICON_LC_LOCK, "camera", upper(tr("Camera locked")), true});
     }
     ImFont* labelFont = theme::look.id != 0 && fontMonoTiny_ ? fontMonoTiny_ : fontTiny_ ? fontTiny_ : monoSmall;
     auto moduleW = [&](const StatusModule& m) {
@@ -1412,6 +1414,7 @@ void App::drawStatusBar(const ShellGeometry& g) {
     const float sepW = style == Status::Terminal ? textW(monoSmall, " | ") : style == Status::TitleBlock ? 0.0f : 16.0f * s;
     // Drop the least important modules (from the file name inwards) until they fit beside the menus.
     std::vector<int> shown = {0, 1, 2, 3, 4};
+    if (mods.size() > 5) shown.insert(shown.begin() + 1, 5); // Camera locked, beside the mode (never dropped)
     auto total = [&] {
         float w = 0.0f;
         for (size_t k = 0; k < shown.size(); ++k) w += moduleW(mods[size_t(shown[k])]) + (k ? sepW : 0.0f);
@@ -1424,6 +1427,7 @@ void App::drawStatusBar(const ShellGeometry& g) {
     for (size_t k = 0; k < shown.size(); ++k) {
         const StatusModule& m = mods[size_t(shown[k])];
         const float w = moduleW(m);
+        ImGui::LogText("%s", m.value.c_str()); // (UI tests read the bar)
         if (k) {
             if (style == Status::Terminal) textAt(monoSmall, mx, theme::textDim, " | ");
             mx += sepW;

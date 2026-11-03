@@ -302,6 +302,7 @@ void App::drawPalette_Brush() {
     // then every brush as thumbnails (Pickers.cpp, the same grid as the B picker).
     actionRow(*this, {"ui.brush_lab", "ui.brush_gallery"});
     actionRow(*this, {"brush.paste"});
+    actionRow(*this, {"brush.save_settings", "brush.reset_settings"}); // this brush's own settings (#78)
     drawCustomBrushes();
     ImGui::Checkbox(tr("Front faces only"), &frontFacesOnly_);
     ui::HelpAction(*this, "draw.front_faces");
@@ -614,6 +615,9 @@ void App::drawPalette_Render() {
     ImGui::Checkbox(tr("Show Splats"), &renderSettings_.showSplats);
     ImGui::EndDisabled();
     ui::HelpAction(*this, "view.splats");
+    bool lockCamera = uiPrefs_.airStrokes; // #62: drags on the background start strokes (Shift+L)
+    if (ui::Checkbox("Lock camera##view.lock_camera", &lockCamera)) uiPrefs_.airStrokes = lockCamera;
+    ui::HelpAction(*this, "input.toggle_air_strokes");
     drawBackgroundControls("render");
     actionRow(*this, {"view.frame", "view.fullscreen"});
     actionRow(*this, {"ui.lightbox", "ui.console"}); // (the SculptForge layout's View menu: they left the shelf)

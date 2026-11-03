@@ -5,6 +5,22 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.10.9
+
+- **Each brush keeps its own settings**: Draw Size, Intensity, Falloff, RGB Intensity, stroke and alpha follow
+  the brush, custom and Community brushes included. **Brush > Save Brush Settings** keeps them for the next start,
+  **Reset Brush to Default** puts back the shipped values, and **Preferences > Input > Share size and intensity
+  across brushes** keeps the old way (#78). See [Sculpting](sculpting.md#each-brush-keeps-its-own-settings).
+- **Alpha options** (**Alpha** palette): **Follow stroke direction** turns the alpha along the stroke, smoothed as
+  Blender's Rake does; **Angle** and **Angle jitter** turn it by a fixed or a random amount; **Tile** repeats it
+  inside the brush. They work with custom and Community brushes too, and each brush keeps its own (#76). See
+  [Alpha options](sculpting.md#alpha-options).
+- **Blender style: Alt+drag masks** on the model and Ctrl+Alt+drag unmasks, as in Blender 5.1 and later; beside the
+  model Alt+drag still turns the view. **Preferences > Input > Emulate 3 Button Mouse** makes Alt+drag turn the view
+  everywhere. Shift+F now sets the brush's Intensity, not Smooth's (#77).
+- **View > Lock camera** (<kbd>Shift</kbd>+<kbd>L</kbd>): drags that start beside the model sculpt instead of
+  turning the view, and the status bar shows **CAMERA LOCKED** while it is on (#62).
+
 ## Version 0.10.8
 
 - **Tablets in mouse mode work again**: on some Windows tablets with **Mouse mode** on (Preferences > Tablet) the

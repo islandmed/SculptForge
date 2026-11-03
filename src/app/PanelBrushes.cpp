@@ -58,7 +58,7 @@ void App::drawAlphaSection() {
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (ImGui::GetContentRegionAvail().x - big) * 0.5f);
     const ImVec2 p0 = ImGui::GetCursorScreenPos();
     ImGui::Dummy(ImVec2(big, big));
-    if (ImTextureID tex = thumbs_.alpha(alpha))
+    if (ImTextureID tex = alpha.tiled() ? ImTextureID{} : thumbs_.alpha(alpha)) // (a tiled alpha: drawn as it stamps)
         ImGui::GetWindowDrawList()->AddImage(tex, p0, ImVec2(p0.x + big, p0.y + big));
     else
         preview(ImGui::GetWindowDrawList(), alpha, p0, big, 40);
@@ -66,8 +66,41 @@ void App::drawAlphaSection() {
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (ImGui::GetContentRegionAvail().x - nameSize.x) * 0.5f);
     ImGui::TextUnformatted(alpha.name.c_str());
 
+    drawAlphaOptions();
     // Built-in and library alphas, then Load image... and Invert loaded image (Pickers.cpp), as in the alpha picker.
     drawAlphaGrid(*this, GridMode::Palette);
+}
+
+// Alpha options (#76): how the alpha turns and repeats on each dab, kept per brush (#78).
+void App::drawAlphaOptions() {
+    AlphaOptions& o = alphaOptions_;
+    ui::Checkbox("Follow stroke direction##alpha.follow_stroke", &o.followStroke);
+    ui::HelpText("Follow stroke direction", nullptr,
+                 "The alpha turns with the stroke: its top points the way you are drawing, for scales, stitches and "
+                 "hair that line up along the stroke. Small wobbles are smoothed out (the direction is taken every "
+                 "20 pixels, as Blender's Rake does). Angle still adds its turn.",
+                 "Alpha");
+    ImGui::SetNextItemWidth(-1);
+    ui::SliderInside("##alpha_angle", &o.angle, -180.0f, 180.0f, "Angle %.0f");
+    ui::HelpText("Angle", nullptr, "Turn the alpha by a fixed angle in degrees (counter-clockwise); Ctrl+click to type.",
+                 "Alpha");
+    ImGui::SetNextItemWidth(-1);
+    ui::SliderInside("##alpha_angle_jitter", &o.jitter, 0.0f, 180.0f, "Angle jitter %.0f");
+    ui::HelpText("Angle jitter", nullptr,
+                 "Turn each dab by a random angle, up to this many degrees either way: breaks up repeats in skin, "
+                 "rock and noise alphas.",
+                 "Alpha");
+    const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
+    ImGui::SetNextItemWidth(half);
+    float tileX = float(o.tileX), tileY = float(o.tileY);
+    if (ui::SliderInside("##alpha_tile_x", &tileX, 1.0f, 8.0f, "Tile across %.0f")) o.tileX = int(std::lround(tileX));
+    ui::HelpText("Tile across", nullptr, "Repeat the alpha this many times across the brush (1 = once).", "Alpha");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(-1);
+    if (ui::SliderInside("##alpha_tile_y", &tileY, 1.0f, 8.0f, "Tile down %.0f")) o.tileY = int(std::lround(tileY));
+    ui::HelpText("Tile down", nullptr, "Repeat the alpha this many times down the brush (1 = once).", "Alpha");
+    syncAlphaTile();
+    ImGui::Dummy(ImVec2(0, 2.0f * uiScale_));
 }
 
 // SnakeHook: pull the region under the click along with the cursor, like Move,
