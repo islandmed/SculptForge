@@ -55,6 +55,7 @@ CROPS = {
     "user-guide": ("user-guide", (138, 108, 1180, 842), 1042),
     "extract": ("extract", (380, 140, 1000, 740), 620),
     "make-sculptable-panel": ("sculptable-panel", (1276, 500, 1600, 960), 324),
+    "qremesh": ("qremesh", (0, 0, 1600, 960), MAX_WIDTH),
 }
 
 # What's New feature pictures (tools/guide/whats_new_shots.sfui): name: (screenshot, crop with the 600:340 shape), saved

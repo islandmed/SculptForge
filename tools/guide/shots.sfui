@@ -395,3 +395,14 @@ shot mirror-weld-before
 run mirror_and_weld axis=x
 wait 0.2
 shot mirror-weld-after
+
+# Quad Remesh (retopology.md): the lion as quads, wireframe on, the Geometry sub-palette open.
+run open path=assets/demo/lion-head.glb
+wait_idle 20
+run qremesh target=5000 keep_original=true
+wait_idle 60
+click "Wire##view.polyf"
+click "Geometry##tool.geometry"
+wait 0.3
+shot qremesh
+click "Wire##view.polyf"
