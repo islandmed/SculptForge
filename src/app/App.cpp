@@ -1141,6 +1141,7 @@ void App::handleEvent(const SDL_Event& event) {
     SDL_Event e = event;
     mapPenPosition(e); // a tablet in mouse mode moves the cursor relatively (#54), for the canvas and the UI
     if (supportCardEvent(e)) return;  // the support card at launch takes clicks and keys while open
+    if (whatsNewEvent(e)) return;     // so does What's New (WhatsNewPopup.cpp)
     if (radialMouseEvent(e)) return;  // clicks on an open radial menu, and the buttons that open one (RadialMenu.cpp)
     ImGui_ImplSDL3_ProcessEvent(&e);
     const ImGuiIO& io = ImGui::GetIO();
@@ -2387,6 +2388,7 @@ void App::drawUi() {
     guide_.draw(*this);  // Help > User Guide
     drawPacksUi();       // pack review, New Pack, macro confirmation and editor (PanelPacks.cpp)
     drawHelpConsoleUi(); // console, command palette, Controls (F1), Ctrl-hover help: last, on top
+    drawWhatsNew();      // What's New after an update or from the Help menu (WhatsNewPopup.cpp)
     drawSupportCard();   // the support card at launch, over everything (PanelSupportCard.cpp)
 }
 

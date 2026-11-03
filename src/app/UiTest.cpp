@@ -67,6 +67,9 @@
 //                            custom_matcaps (MatCaps loaded from images), material_custom (1 when the view uses
 //                            one), matcap_files (images in the library's MatCaps folder),
 //                            support_requests (times Support SculptForge was clicked; never opens a browser in tests),
+//                            whats_new_open, whats_new_cards, whats_new_tries (What's New and its Try it clicks),
+//                            whats_new_contents / whats_new_expanded (its guide chapter: contents entries, open sections),
+//                            custom_brush_active (a custom brush is the active one),
 //                            welcome_open (the first-run welcome shown), new_look_card_open (the one-time
 //                            "SculptForge has a new look" card),
 //                            subtools (count), subtool_thumbnails (SubTool panel thumbnails rendered), active_subtool (index, 0 = top), visible_subtools,
@@ -618,6 +621,14 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "welcome_open") return app_.showWelcome_ ? 1.0 : 0.0;
     if (name == "new_look_card_open") return app_.newLookCard_ ? 1.0 : 0.0; // "SculptForge has a new look" (0.10.7)
     if (name == "support_card_open") return app_.supportCardOpen() ? 1.0 : 0.0; // the support card at launch
+    // What's New (WhatsNewPopup.cpp): open (1 while shown), its cards, Try it clicks; the guide chapter's contents
+    // entries (versions in full, then groups) and its open sections.
+    if (name == "whats_new_open") return app_.whatsNewOpen() ? 1.0 : 0.0;
+    if (name == "whats_new_cards") return app_.whatsNewVersion() ? double(app_.whatsNewVersion()->cards.size()) : 0.0;
+    if (name == "whats_new_tries") return double(app_.whatsNewTries_);
+    if (name == "whats_new_contents") return double(app_.guide_.whatsNewContents().size());
+    if (name == "whats_new_expanded") return double(app_.guide_.whatsNewExpanded());
+    if (name == "custom_brush_active") return app_.doc_.activeBrush >= 0 && !app_.paintMode_ ? 1.0 : 0.0;
     if (name == "supporter") return app_.supportCardPrefs_.supporter ? 1.0 : 0.0;
     if (name == "support_card_enabled") return app_.supportCardPrefs_.enabled ? 1.0 : 0.0;
     if (name == "subtool_thumbnails") { // SubTool panel thumbnails rendered (#43)

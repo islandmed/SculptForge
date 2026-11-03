@@ -348,6 +348,7 @@ bool UserGuide::ensureLoaded() {
     if (loaded_) return loadError_.empty();
     loaded_ = true;
     if (!book_.load(loadPage, nullptr, loadError_) && loadError_.empty()) loadError_ = "The user guide could not be loaded.";
+    prepareWhatsNew();
     return loadError_.empty();
 }
 
@@ -367,6 +368,19 @@ std::string UserGuide::chapterTitle(const std::string& file) {
     if (!ensureLoaded()) return {};
     const int i = book_.find(file);
     return i >= 0 ? book_.chapters()[size_t(i)].title : std::string();
+}
+
+const guide::Document* UserGuide::document(const std::string& file) {
+    if (!ensureLoaded()) return nullptr;
+    const int i = book_.find(file);
+    return i >= 0 ? &book_.chapters()[size_t(i)].doc : nullptr;
+}
+
+ImTextureID UserGuide::image(const std::string& path, ImVec2* size) {
+    const Texture* t = texture(path);
+    if (!t) return ImTextureID(0);
+    if (size) *size = ImVec2(float(t->width), float(t->height));
+    return ImTextureID(uintptr_t(t->tex));
 }
 
 const guide::Document& UserGuide::page() const {
@@ -663,11 +677,22 @@ void UserGuide::drawContents(App& app) {
         // The open chapter's sections.
         if (app.smallFont()) ImGui::PushFont(app.smallFont());
         ImGui::Indent(12.0f * s);
-        for (const auto& b : ch.doc.blocks) {
-            if (b.kind != BlockKind::Heading || b.level != 2) continue;
-            const std::string title = guide::plainText(b.spans);
-            if (ImGui::Selectable((title + "##guide.sec." + b.anchor).c_str(), false, 0, ImVec2(w - 12.0f * s, 0)))
-                navigate("#" + b.anchor);
+        if (ch.file == "whats-new.md") { // the versions in full, then the groups (core/WhatsNew.h)
+            for (int v = 0; v < whatsNew_.detailed; ++v) {
+                const auto& ver = whatsNew_.versions[size_t(v)];
+                if (ImGui::Selectable(("Version " + ver.version + "##guide.sec." + ver.anchor).c_str(), false, 0, ImVec2(w - 12.0f * s, 0)))
+                    navigate("#" + ver.anchor);
+            }
+            for (const auto& g : whatsNew_.groups)
+                if (ImGui::Selectable((g.label + "##guide.sec." + g.anchor).c_str(), false, 0, ImVec2(w - 12.0f * s, 0)))
+                    navigate("#" + g.anchor);
+        } else {
+            for (const auto& b : ch.doc.blocks) {
+                if (b.kind != BlockKind::Heading || b.level != 2) continue;
+                const std::string title = guide::plainText(b.spans);
+                if (ImGui::Selectable((title + "##guide.sec." + b.anchor).c_str(), false, 0, ImVec2(w - 12.0f * s, 0)))
+                    navigate("#" + b.anchor);
+            }
         }
         ImGui::Unindent(12.0f * s);
         if (app.smallFont()) ImGui::PopFont();
@@ -779,7 +804,7 @@ float UserGuide::drawBlock(App& app, const Block& b, int index, ImVec2 o, float 
     switch (b.kind) {
     case BlockKind::Heading: {
         FlowStyle hs = st;
-        hs.heading = b.level == 1 ? h1_ : b.level == 2 ? h2_ : h3_;
+        hs.heading = b.level == 1 ? h1_ : b.level == 2 ? h2_ : demoteHeadings_ ? bodyBold_ : h3_; // (What's New's groups)
         if (!hs.heading) hs.heading = st.bold;
         hs.color = kHeading;
         hs.lineHeight = std::round(hs.heading->FontSize * 1.3f);
@@ -965,6 +990,244 @@ float UserGuide::drawBlock(App& app, const Block& b, int index, ImVec2 o, float 
     return h;
 }
 
+float UserGuide::layoutBlocks(App& app, int first, int end, ImVec2 origin, float width, float y) {
+    const float s = app.uiScale_;
+    const guide::Document& doc = page();
+    const int page = place_.chapter;
+    for (int i = first; i < end; ++i) {
+        const Block& b = doc.blocks[size_t(i)];
+        blockY_[size_t(i)] = y;
+        if (b.kind == BlockKind::Heading) anchorY_[b.anchor] = y;
+        const ImVec2 at(origin.x, origin.y + y);
+        float h = blockH_[size_t(i)];
+        const bool visible = h < 0.0f || ImGui::IsRectVisible(at, ImVec2(at.x + width, at.y + h));
+        if (visible) h = drawBlock(app, b, i, at, width, true);
+        if (place_.chapter != page) return y; // a link was followed: the rest is the next page's
+        blockH_[size_t(i)] = h;
+        // Spacing after the block: list items sit close together, the last one of a list leaves a gap.
+        const bool listItem = b.kind == BlockKind::Bullet || b.kind == BlockKind::Numbered;
+        const bool nextList = i + 1 < end && (doc.blocks[size_t(i) + 1].kind == BlockKind::Bullet ||
+                                              doc.blocks[size_t(i) + 1].kind == BlockKind::Numbered);
+        float gap = 12.0f * s;
+        if (b.kind == BlockKind::Heading) gap = b.level == 3 ? 4.0f * s : 8.0f * s;
+        else if (listItem && nextList) gap = 3.0f * s;
+        else if (b.kind == BlockKind::Image || b.kind == BlockKind::Table || b.kind == BlockKind::Code) gap = 16.0f * s;
+        y += h + gap;
+    }
+    return y;
+}
+
+// ---------------------------------------------------------------------------
+// What's New (whats-new.md): the newest versions in full (a band, the feature cards, "All changes"), then the older
+// ones folded into groups with their highlights (core/WhatsNew.h; the website does the same in build_site.py).
+// ---------------------------------------------------------------------------
+
+void UserGuide::prepareWhatsNew() {
+    const int i = book_.find("whats-new.md");
+    if (i < 0) return;
+    whatsNew_ = whatsnew::build(book_.chapters()[size_t(i)].doc, SCULPTFORGE_VERSION);
+    expanded_.clear();
+    if (!whatsNew_.versions.empty()) expanded_[whatsNew_.versions[0].anchor] = true; // the newest one is open
+}
+
+std::vector<std::string> UserGuide::whatsNewContents() const {
+    std::vector<std::string> out;
+    for (int v = 0; v < whatsNew_.detailed; ++v) out.push_back("Version " + whatsNew_.versions[size_t(v)].version);
+    for (const auto& g : whatsNew_.groups) out.push_back(g.label);
+    return out;
+}
+
+int UserGuide::whatsNewExpanded() const {
+    return int(std::count_if(expanded_.begin(), expanded_.end(), [](const auto& e) { return e.second; }));
+}
+
+float UserGuide::drawWhatsNewBand(App& app, ImVec2 at, float width, const std::string& title, const std::string& right,
+                                  const std::string& line, bool large) {
+    const float s = app.uiScale_;
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    ImFont* head = (large ? h2_ : h3_) ? (large ? h2_ : h3_) : ImGui::GetFont();
+    ImFont* small = app.smallFont() ? app.smallFont() : ImGui::GetFont();
+    ImFont* regular = body_ ? body_ : ImGui::GetFont();
+    // A short accent rule, the title with the date on the right, and one line under it.
+    dl->AddRectFilled(at, ImVec2(at.x + 40.0f * s, at.y + 3.0f * s), theme::u32(theme::accent), 1.5f * s);
+    float y = at.y + 14.0f * s;
+    dl->AddText(head, head->FontSize, ImVec2(at.x, y), theme::u32(theme::textBright), title.c_str());
+    ImGui::LogText("%s\n", title.c_str());
+    if (!right.empty()) {
+        const float rw = small->CalcTextSizeA(small->FontSize, FLT_MAX, 0.0f, right.c_str()).x;
+        dl->AddText(small, small->FontSize, ImVec2(at.x + width - rw, y + head->FontSize - small->FontSize - 2.0f * s),
+                    theme::u32(theme::textDim), right.c_str());
+    }
+    y += std::round(head->FontSize * 1.3f);
+    if (!line.empty()) {
+        const float lw = std::min(width, 680.0f * s);
+        const ImVec2 ls = regular->CalcTextSizeA(regular->FontSize, FLT_MAX, lw, line.c_str());
+        dl->AddText(regular, regular->FontSize, ImVec2(at.x, y + 2.0f * s), theme::u32(theme::textDim), line.c_str(), nullptr, lw);
+        ImGui::LogText("%s\n", line.c_str());
+        y += ls.y + 4.0f * s;
+    }
+    return y - at.y;
+}
+
+float UserGuide::drawWhatsNewCards(App& app, const whatsnew::Version& v, ImVec2 at, float width) {
+    const float s = app.uiScale_;
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    ImFont* bold = bodyBold_ ? bodyBold_ : ImGui::GetFont();
+    ImFont* regular = app.fontCardBody_ ? app.fontCardBody_ : body_ ? body_ : ImGui::GetFont();
+    const float lineSize = std::round(15.0f * s);
+    const float gap = 14.0f * s, pad = 14.0f * s;
+    const int n = int(v.cards.size());
+    const int cols = std::clamp(int((width + gap) / (230.0f * s + gap)), 1, std::min(3, n));
+    const float cw = (width - gap * float(cols - 1)) / float(cols), ph = std::round(cw * 340.0f / 600.0f);
+    float y = 0.0f;
+    for (int row = 0; row * cols < n; ++row) {
+        float rowH = 0.0f;
+        for (int c = 0; c < cols && row * cols + c < n; ++c) { // the row's height: its tallest words
+            const auto& card = v.cards[size_t(row * cols + c)];
+            rowH = std::max(rowH, ph + pad + bold->CalcTextSizeA(bold->FontSize, FLT_MAX, cw - pad * 2.0f, card.title.c_str()).y +
+                                      4.0f * s + regular->CalcTextSizeA(lineSize, FLT_MAX, cw - pad * 2.0f, card.line.c_str()).y +
+                                      12.0f * s + ImGui::GetFrameHeight() + pad);
+        }
+        for (int c = 0; c < cols && row * cols + c < n; ++c) {
+            const int i = row * cols + c;
+            const auto& card = v.cards[size_t(i)];
+            const ImVec2 p0(at.x + float(c) * (cw + gap), at.y + y), p1(p0.x + cw, p0.y + rowH);
+            if (!ImGui::IsRectVisible(p0, p1)) continue;
+            const float r = 10.0f * s;
+            const bool hot = ImGui::IsMouseHoveringRect(p0, p1) && ImGui::IsWindowHovered();
+            dl->AddRectFilled(p0, p1, theme::u32(theme::header), r);
+            if (const Texture* tex = card.image.empty() ? nullptr : texture(card.image)) {
+                // Covers the top of the card (centred crop to 600 x 340).
+                const float ia = float(tex->width) / float(std::max(1, tex->height)), ba = cw / ph;
+                ImVec2 uv0(0, 0), uv1(1, 1);
+                if (ia > ba) uv0.x = 0.5f - ba / ia * 0.5f, uv1.x = 0.5f + ba / ia * 0.5f;
+                else uv0.y = 0.5f - ia / ba * 0.5f, uv1.y = 0.5f + ia / ba * 0.5f;
+                dl->AddImageRounded(ImTextureID(uintptr_t(tex->tex)), p0, ImVec2(p1.x, p0.y + ph), uv0, uv1, IM_COL32_WHITE, r,
+                                    ImDrawFlags_RoundCornersTop);
+            }
+            dl->AddRect(p0, p1, theme::u32(hot ? theme::accent : theme::text, hot ? 0.55f : 0.10f), r, 0, 1.0f);
+            float ty = p0.y + ph + pad;
+            const float tw = cw - pad * 2.0f;
+            dl->AddText(bold, bold->FontSize, ImVec2(p0.x + pad, ty), theme::u32(theme::textBright), card.title.c_str(), nullptr, tw);
+            ImGui::LogText("%s\n", card.title.c_str());
+            ty += bold->CalcTextSizeA(bold->FontSize, FLT_MAX, tw, card.title.c_str()).y + 4.0f * s;
+            dl->AddText(regular, lineSize, ImVec2(p0.x + pad, ty), theme::u32(theme::textDim), card.line.c_str(), nullptr, tw);
+            ImGui::LogText("%s\n", card.line.c_str());
+            const bool guideLink = card.action.rfind("guide:", 0) == 0;
+            ImGui::SetCursorScreenPos(ImVec2(p0.x + pad, p1.y - pad - ImGui::GetFrameHeight()));
+            const std::string label = std::string(guideLink ? "Read more " : "Try it ") + ICON_LC_ARROW_RIGHT + "##wn." + v.anchor + "." +
+                                      std::to_string(i);
+            if (ImGui::Button(label.c_str())) app.runWhatsNewAction(card.action);
+        }
+        y += rowH + gap;
+    }
+    return y - gap;
+}
+
+bool UserGuide::drawWhatsNewToggle(App& app, ImVec2 at, float width, const std::string& id, bool open, float& h) {
+    const float s = app.uiScale_;
+    ImFont* bold = bodyBold_ ? bodyBold_ : ImGui::GetFont();
+    h = bold->FontSize + 14.0f * s;
+    ImGui::SetCursorScreenPos(at);
+    const bool clicked = ImGui::InvisibleButton(("All changes##wn." + id).c_str(), ImVec2(width, h));
+    const bool hot = ImGui::IsItemHovered();
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    const ImU32 c = theme::u32(hot ? theme::accent : theme::text);
+    dl->AddLine(ImVec2(at.x, at.y), ImVec2(at.x + width, at.y), theme::u32(theme::sectionRule));
+    // A chevron (drawn: the reading font has no icons), right when folded, down when open.
+    const ImVec2 m(at.x + 6.0f * s, at.y + 7.0f * s + bold->FontSize * 0.5f);
+    const float r = 4.0f * s;
+    const ImVec2 pts[3] = {open ? ImVec2(m.x - r, m.y - r * 0.5f) : ImVec2(m.x - r * 0.5f, m.y - r),
+                           open ? ImVec2(m.x, m.y + r * 0.5f) : ImVec2(m.x + r * 0.5f, m.y),
+                           open ? ImVec2(m.x + r, m.y - r * 0.5f) : ImVec2(m.x - r * 0.5f, m.y + r)};
+    dl->AddPolyline(pts, 3, theme::u32(theme::accent), 0, 1.8f * s);
+    dl->AddText(bold, bold->FontSize, ImVec2(at.x + 20.0f * s, at.y + 7.0f * s), c, "All changes");
+    ImGui::LogText("All changes\n");
+    return clicked;
+}
+
+float UserGuide::drawWhatsNew(App& app, ImVec2 origin, float width) {
+    const float s = app.uiScale_;
+    const guide::Document& doc = page();
+    const whatsnew::Page& wn = whatsNew_;
+    const float prose = std::min(width, 680.0f * s); // about 70 characters a line
+    // Going to a heading or a search hit inside a folded section opens it.
+    int target = pendingBlock_ >= 0 ? pendingBlock_ : -1;
+    if (!pendingAnchor_.empty())
+        for (size_t i = 0; i < doc.blocks.size(); ++i)
+            if (doc.blocks[i].kind == BlockKind::Heading && doc.blocks[i].anchor == pendingAnchor_) target = int(i);
+    if (target >= 0) {
+        for (int v = 0; v < int(wn.versions.size()); ++v) {
+            const auto& ver = wn.versions[size_t(v)];
+            if (target < ver.first || target >= ver.end) continue;
+            if (v < wn.detailed) expanded_[ver.anchor] = true;
+            for (const auto& g : wn.groups)
+                if (std::find(g.versions.begin(), g.versions.end(), v) != g.versions.end()) expanded_[g.anchor] = true;
+        }
+    }
+
+    float y = layoutBlocks(app, 0, wn.introEnd, origin, prose, 0.0f) + 18.0f * s;
+    const int page = place_.chapter;
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    for (int vi = 0; vi < wn.detailed && place_.chapter == page; ++vi) {
+        const whatsnew::Version& v = wn.versions[size_t(vi)];
+        anchorY_[v.anchor] = y;
+        blockY_[size_t(v.heading)] = y;
+        const std::string date = v.date == "unreleased" ? std::string("Not released yet") : v.date;
+        y += drawWhatsNewBand(app, ImVec2(origin.x, origin.y + y), width, "Version " + v.version, date, v.tagline, true) + 16.0f * s;
+        if (!v.cards.empty()) y += drawWhatsNewCards(app, v, ImVec2(origin.x, origin.y + y), width) + 16.0f * s;
+        const bool open = expanded_[v.anchor];
+        float th = 0.0f;
+        if (drawWhatsNewToggle(app, ImVec2(origin.x, origin.y + y), width, v.anchor, open, th)) expanded_[v.anchor] = !open;
+        y += th;
+        if (open) y = layoutBlocks(app, v.first, v.end, origin, prose, y + 8.0f * s);
+        y += 40.0f * s;
+    }
+    if (!wn.groups.empty() && place_.chapter == page) {
+        ImFont* small = app.boldFont() ? app.boldFont() : ImGui::GetFont();
+        dl->AddText(small, small->FontSize, ImVec2(origin.x, origin.y + y), theme::u32(theme::textDim), "EARLIER VERSIONS");
+        y += small->FontSize + 18.0f * s;
+    }
+    for (const whatsnew::Group& g : wn.groups) {
+        if (place_.chapter != page) break;
+        anchorY_[g.anchor] = y;
+        y += drawWhatsNewBand(app, ImVec2(origin.x, origin.y + y), width, g.label, "", "", true) + 4.0f * s;
+        // The highlights, as a list ("Title: line" with the title in bold).
+        for (const std::string& h : g.highlights) {
+            const auto [title, rest] = whatsnew::splitHighlight(h);
+            Block b;
+            b.kind = BlockKind::Bullet;
+            if (!title.empty()) b.spans.push_back({title, true});
+            b.spans.push_back({title.empty() ? rest : ": " + rest});
+            y += drawBlock(app, b, -1, ImVec2(origin.x, origin.y + y), prose, true) + 3.0f * s;
+        }
+        y += 10.0f * s;
+        const bool open = expanded_[g.anchor];
+        float th = 0.0f;
+        if (drawWhatsNewToggle(app, ImVec2(origin.x, origin.y + y), width, g.anchor, open, th)) expanded_[g.anchor] = !open;
+        y += th;
+        if (open) {
+            for (int vi : g.versions) {
+                const whatsnew::Version& v = wn.versions[size_t(vi)];
+                y += 14.0f * s;
+                anchorY_[v.anchor] = y;
+                blockY_[size_t(v.heading)] = y;
+                ImFont* head = h3_ ? h3_ : ImGui::GetFont();
+                const std::string title = "Version " + v.version;
+                dl->AddText(head, head->FontSize, ImVec2(origin.x, origin.y + y), theme::u32(theme::accent), title.c_str());
+                ImGui::LogText("%s\n", title.c_str());
+                y += std::round(head->FontSize * 1.4f);
+                demoteHeadings_ = true; // its "###" sit under the version's title
+                y = layoutBlocks(app, v.first, v.end, origin, prose, y);
+                demoteHeadings_ = false;
+                if (place_.chapter != page) break;
+            }
+        }
+        y += 34.0f * s;
+    }
+    return y;
+}
+
 void UserGuide::drawPage(App& app) {
     const float s = app.uiScale_;
     ImGui::PushStyleColor(ImGuiCol_ChildBg, theme::panelBg);
@@ -986,27 +1249,9 @@ void UserGuide::drawPage(App& app) {
     anchorY_.clear();
     linkCounter_ = 0;
     const int page = place_.chapter;
-    float y = 0.0f;
-    for (size_t i = 0; i < n; ++i) {
-        const Block& b = doc.blocks[i];
-        blockY_[i] = y;
-        if (b.kind == BlockKind::Heading) anchorY_[b.anchor] = y;
-        const ImVec2 at(origin.x, origin.y + y);
-        float h = blockH_[i];
-        const bool visible = h < 0.0f || ImGui::IsRectVisible(at, ImVec2(at.x + width, at.y + h));
-        if (visible) h = drawBlock(app, b, int(i), at, width, true);
-        if (place_.chapter != page) break; // a link was followed: the rest is the next page's
-        blockH_[i] = h;
-        // Spacing after the block: list items sit close together, the last one of a list leaves a gap.
-        const bool listItem = b.kind == BlockKind::Bullet || b.kind == BlockKind::Numbered;
-        const bool nextList = i + 1 < n && (doc.blocks[i + 1].kind == BlockKind::Bullet || doc.blocks[i + 1].kind == BlockKind::Numbered);
-        float gap = 12.0f * s;
-        if (b.kind == BlockKind::Heading) gap = b.level == 3 ? 4.0f * s : 8.0f * s;
-        else if (listItem && nextList) gap = 3.0f * s;
-        else if (b.kind == BlockKind::Image || b.kind == BlockKind::Table || b.kind == BlockKind::Code) gap = 16.0f * s;
-        y += h + gap;
-    }
-    if (place_.chapter == page && currentFile() == "whats-new.md") {
+    const bool whatsNew = currentFile() == "whats-new.md";
+    float y = whatsNew ? drawWhatsNew(app, origin, width) : layoutBlocks(app, 0, int(n), origin, width, 0.0f);
+    if (place_.chapter == page && whatsNew) {
         // The end of What's New: a quiet line about supporting SculptForge (it only opens the website's page).
         const float y0 = origin.y + y + 8.0f * s;
         ImDrawList* dl = ImGui::GetWindowDrawList();

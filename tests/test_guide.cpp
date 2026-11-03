@@ -5,6 +5,7 @@
 #include "TestHarness.h"
 
 #include "core/Guide.h"
+#include "core/WhatsNew.h"
 
 #include <map>
 
@@ -188,4 +189,56 @@ TEST(guide_book_and_search) {
 
     Book broken;
     CHECK(!broken.load(loadBroken, nullptr, err) && err.find("glossary.md") != std::string::npos);
+}
+
+// What's New as data (core/WhatsNew.h): the ```features block, and the newest three versions in full with the older
+// ones folded into groups, so each release slides the window.
+TEST(guide_whats_new_features) {
+    whatsnew::Version v;
+    std::string err;
+    CHECK(whatsnew::parseFeatures("date: 2026-11-01\ntagline: Short.\nhighlight: Look: a new one\n# a comment\n"
+                                  "title: A new look\nline: One line.\nimage: images/a.jpg\naction: look:new\n"
+                                  "title: Benchmark\nline: Another.\naction: help.benchmark\nlink: performance.md\n",
+                                  v, err));
+    CHECK(v.date == "2026-11-01" && v.tagline == "Short." && v.highlights.size() == 1);
+    CHECK(v.cards.size() == 2 && v.cards[0].title == "A new look" && v.cards[0].image == "images/a.jpg");
+    CHECK(v.cards.size() == 2 && v.cards[1].action == "help.benchmark" && v.cards[1].link == "performance.md");
+    whatsnew::Version bad;
+    CHECK(!whatsnew::parseFeatures("line: before any title\n", bad, err) && err.find("title") != std::string::npos);
+    CHECK(!whatsnew::parseFeatures("colour: red\n", bad, err) && err.find("unknown key") != std::string::npos);
+    CHECK(!whatsnew::parseFeatures("title: No action\nline: x\n", bad, err));
+    CHECK(whatsnew::splitHighlight("Micro levels: a billion triangles") == std::make_pair(std::string("Micro levels"), std::string("a billion triangles")));
+    CHECK(whatsnew::compareVersions("0.9.7", "0.10.0") < 0 && whatsnew::compareVersions("0.8", "0.8.0") == 0);
+}
+
+TEST(guide_whats_new_groups) {
+    std::string md = "# What's new\n\nIntro.\n\n";
+    const char* versions[] = {"0.10.8", "0.10.7", "0.10.6", "0.10.5", "0.10.4", "0.10.1", "0.9.7", "0.9.0", "0.8", "0.5", "0.1"};
+    for (const char* ver : versions) {
+        md += std::string("## Version ") + ver + "\n\n```features\ndate: 2026-10-01\nhighlight: H" + ver + ": line\n";
+        if (std::string(ver) == "0.10.1") md += "highlight: Second: line\n";
+        if (std::string(ver) == "0.10.7") md += "title: Card\nline: One.\naction: look:new\n";
+        md += "```\n\n- A change in " + std::string(ver) + ".\n\n### Fixes\n\n- A fix.\n\n";
+    }
+    const guide::Document doc = parse(md);
+    // Built as 0.10.7: 0.10.8 is not released yet.
+    const whatsnew::Page p = whatsnew::build(doc, "0.10.7");
+    CHECK(p.problems.empty());
+    CHECK(p.versions.size() == 10 && p.versions[0].version == "0.10.7" && p.detailed == 3);
+    CHECK(p.versions[0].cards.size() == 1 && p.versions[0].anchor == "version-0107");
+    // The detail blocks leave the features block out and stop at the next version.
+    const auto& v0 = p.versions[0];
+    CHECK(doc.blocks[size_t(v0.first)].kind == BlockKind::Bullet && doc.blocks[size_t(v0.end)].kind == BlockKind::Heading);
+    CHECK(p.groups.size() == 3);
+    if (p.groups.size() == 3) {
+        CHECK(p.groups[0].label == "0.10.1 to 0.10.4" && p.groups[0].anchor == "versions-0101-to-0104");
+        CHECK(p.groups[1].label == "0.9.x" && p.groups[2].label == "0.8 and earlier");
+        CHECK(p.groups[2].versions.size() == 3);
+        // Bigger releases pick first, shown newest first: 0.10.4's one, then both of 0.10.1's.
+        CHECK(p.groups[0].highlights.size() == 3 && p.groups[0].highlights[0] == "H0.10.4: line");
+        CHECK(p.groups[0].summary == "H0.10.4, H0.10.1, Second");
+    }
+    // A release later the window slides: 0.10.5 folds into the 0.10 group.
+    const whatsnew::Page next = whatsnew::build(doc, "0.10.8");
+    CHECK(next.versions[0].version == "0.10.8" && !next.groups.empty() && next.groups[0].label == "0.10.1 to 0.10.5");
 }

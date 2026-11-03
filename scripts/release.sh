@@ -242,6 +242,12 @@ p = "packaging/linux/org.sculptforge.SculptForge.metainfo.xml"; t = load(p)
 if f'<release version="{v}"' not in t:
     new[p] = sub1(p, t, r"^([ \t]*)<releases>[ \t]*\n", rf'\g<0>\g<1>  <release version="{v}" date="{today}"/>\n')
 
+# What's New: the version's ```features block gets its release date (it says "date: unreleased" until then).
+p = "docs/guide/whats-new.md"; t = load(p)
+m = re.search(rf"^## Version {ev}\n\n```features\ndate: unreleased$", t, re.M)
+if m:
+    new[p] = t[:m.start()] + m.group(0).replace("date: unreleased", f"date: {today}") + t[m.end():]
+
 p = "CHANGELOG.md"; t = load(p)
 if not re.search(rf"^## \[{ev}\]", t, re.M):
     m = re.search(r"^## \[Unreleased\][^\n]*\n", t, re.M)

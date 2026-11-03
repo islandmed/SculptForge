@@ -8,6 +8,7 @@
 #pragma once
 
 #include "core/Guide.h"
+#include "core/WhatsNew.h"
 
 #include <imgui.h>
 
@@ -39,8 +40,16 @@ public:
     // Title of a chapter file ("masking.md" -> "Masking"), "" if unknown. Loads the guide on first use.
     std::string chapterTitle(const std::string& file);
 
+    // A chapter's parsed text (nullptr if there is none), and a guide image as a texture (null if missing; SIZE gets
+    // its pixels): What's New reads its cards with them. Both load the guide on first use.
+    const guide::Document* document(const std::string& file);
+    ImTextureID image(const std::string& path, ImVec2* size = nullptr);
+
     // UI tests.
     std::string currentFile() const; // "index.md" or the chapter's file
+    // What's New in the guide: the contents entries (versions in full, then the groups) and the sections open now.
+    std::vector<std::string> whatsNewContents() const;
+    int whatsNewExpanded() const;
     size_t searchHits() const { return hits_.size(); }
 
 private:
@@ -64,6 +73,14 @@ private:
     void drawPage(App& app);
     float drawBlock(App& app, const guide::Block& block, int index, ImVec2 origin, float width, bool draw);
     const Texture* texture(const std::string& path);
+    // What's New (whats-new.md, core/WhatsNew.h): the version bands, their cards and "All changes", then the groups.
+    float layoutBlocks(App& app, int first, int end, ImVec2 origin, float width, float y);
+    float drawWhatsNew(App& app, ImVec2 origin, float width);
+    float drawWhatsNewBand(App& app, ImVec2 at, float width, const std::string& title, const std::string& right,
+                           const std::string& line, bool draw);
+    float drawWhatsNewCards(App& app, const whatsnew::Version& v, ImVec2 at, float width);
+    bool drawWhatsNewToggle(App& app, ImVec2 at, float width, const std::string& id, bool open, float& h);
+    void prepareWhatsNew();
     std::string websiteUrl() const;
 
     bool open_ = false, loaded_ = false, focusSearch_ = false;
@@ -88,6 +105,9 @@ private:
     ImFont* h1_ = nullptr, *h2_ = nullptr, *h3_ = nullptr;
     ImFont* body_ = nullptr, *bodyBold_ = nullptr;
     int linkCounter_ = 0;
+    whatsnew::Page whatsNew_;               // whats-new.md as versions and groups (built when the guide loads)
+    std::map<std::string, bool> expanded_;  // What's New sections open (by anchor): the newest version at first
+    bool demoteHeadings_ = false;           // "###" drawn in the reading font (What's New's folded versions)
 };
 
 } // namespace sf
