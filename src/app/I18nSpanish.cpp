@@ -204,7 +204,7 @@ constexpr Entry kSpanish[] = {
     {"Pressure > Size", "Presión > Tamaño"},
     {"Pressure > Strength", "Presión > Fuerza"},
     {"Front faces only", "Solo caras frontales"},
-    {"Ctrl+Shift+drag with a Cut shape (Alt flips a line)", "Ctrl+Mayús+arrastrar con una forma de Corte (Alt cambia el lado de la línea)"},
+    {"Ctrl+Shift+drag a Cut shape", "Ctrl+Mayús+arrastrar una forma de Corte"},
     {"Depth %.2f", "Profundidad %.2f"},
     {"Copy the active Part (%s)", "Copiar la Parte activa (%s)"},
     {"Mask Lasso and Mask Rectangle mask only what faces you: the far side and folds turned away stay as they are.",

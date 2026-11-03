@@ -179,7 +179,12 @@ bool App::drawHeldBrushGrid(HeldBrush held, bool strokes) {
     const HeldBrushItem* current = heldBrushCurrent(held);
     bool picked = false;
     int column = 0;
+    bool cutRow = false;
     for (const HeldBrushItem& it : heldBrushItems(held)) {
+        if (isCutShape(it.shape) != cutRow) { // the Cut shapes get a row of their own under the selections
+            cutRow = true;
+            column = 0;
+        }
         if (column++ > 0) ImGui::SameLine(0.0f, 6.0f);
         const char* label = strokes ? it.stroke : it.brush;
         const std::string id = std::string(label) + "##held." + it.action;

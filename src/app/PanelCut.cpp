@@ -169,8 +169,9 @@ void App::drawCutOverlay() {
 }
 
 void App::drawCutSection() {
-    ImGui::TextDisabled("%s", tr("Ctrl+Shift+drag with a Cut shape (Alt flips a line)"));
-    ui::Segmented(*this, {"cut.line", "cut.lasso", "cut.rect", "cut.polyline"});
+    ImGui::TextDisabled("%s", tr("Ctrl+Shift+drag a Cut shape"));
+    ui::Segmented(*this, {"cut.line", "cut.lasso"}); // two rows: the names fit a narrow tray
+    ui::Segmented(*this, {"cut.rect", "cut.polyline"});
     ui::Segmented(*this, {"cut.away", "cut.in", "cut.add"});
     if (cutMode_ != 0) {
         ImGui::SetNextItemWidth(-1);

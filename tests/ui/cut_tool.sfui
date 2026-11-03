@@ -1,6 +1,12 @@
 # Cut (#101, #91): the Cut shapes in the Ctrl+Shift brush picker, Tool > Cut's modes, one undo step per cut; and
 # Duplicate Part's shortcut (Ctrl+Shift+D).
 run new_sphere subdivisions=5
+# Duplicate Part: Ctrl+Shift+D (then the copy goes again).
+expect_value subtools == 1
+key ctrl+shift+d
+expect_value subtools == 2
+run subtool_delete
+expect_value subtools == 1
 remember triangles full
 hold ctrl+shift
 click "##tile.brush"
@@ -18,6 +24,7 @@ hold ctrl+shift
 drag_path 0.38 0.36 0.62 0.6 keep
 wait 0.1
 shot cut-rect-dragging
+release
 hold none
 wait 0.2
 expect_value hidden == 0
@@ -56,7 +63,3 @@ click "Select Rectangle##held.select.rect"
 hold none
 expect_value hide_shape == 2
 
-# Duplicate Part: Ctrl+Shift+D.
-expect_value subtools == 1
-key ctrl+shift+d
-expect_value subtools == 2
