@@ -489,6 +489,9 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "look_outlines") return double(app_.uiPrefs_.look.outlines); // 0 off, 1 subtle, 2 on
     if (name == "look_neutral") return app_.uiPrefs_.look.scheme == "neutral" ? 1.0 : 0.0; // Forge Terminal's Neutral colours
     if (name == "look") return double(app_.uiPrefs_.look.look); // 0 Classic, 1 Forge Terminal, 2 Phosphor, 3 Blueprint
+    if (name == "hover_rings") return double(ui::HoverRingsShown()); // hover and focus rings drawn last frame
+    if (name == "hover_lifts") return double(ui::HoverLiftsShown()); // tiles lifted last frame
+    if (name == "reduce_motion") return app_.uiPrefs_.reduceMotion ? 1.0 : 0.0;
     if (name == "shell_layout") return double(app_.uiPrefs_.shellLayout); // 0 ZBrush-style, 1 SculptForge
     if (name == "air_strokes") return app_.uiPrefs_.airStrokes ? 1.0 : 0.0;
     if (name == "emulate_3_button") return app_.uiPrefs_.emulate3Button ? 1.0 : 0.0; // Blender style (#77)

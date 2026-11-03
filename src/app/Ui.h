@@ -43,6 +43,43 @@ void HelpAction(App& app, const char* actionId);
 // along the bottom (the accent only while dragging).
 bool SliderInside(const char* id, float* v, float lo, float hi, const char* format, ImGuiSliderFlags flags = 0);
 
+// Hover and keyboard focus (docs/ui-design.md §10): every labelled item gets the look's ring (an accent border,
+// Phosphor's glow, Blueprint's cyan line, Classic's warm edge) that eases in over ~100 ms; tiles lift instead.
+// Animations only keep the main loop drawing while they run (HoverAnimating); Reduce motion makes them instant
+// and turns the lift's scaling off.
+// Eased 0-1 for `id` heading to `on` (instant under Reduce motion). Items that were never on cost nothing.
+float HoverAmount(ImGuiID id, bool on);
+// The last item is hovered (or, last frame, was hovered: before the item is drawn) or has the keyboard focus.
+bool HoveredOrFocused(ImGuiID id);
+// The item `id` draws its own hover (tiles, the canvas): no ring for it this frame.
+void NoHoverRing(ImGuiID id);
+bool HoverAnimating();
+// For UI tests: the rings and lifted tiles drawn in the last frame.
+int HoverRingsShown();
+int HoverLiftsShown();
+bool ReduceMotion();
+// A tile that lifts on hover: begin after its InvisibleButton (draws the shadow), draw the tile, then end (scales
+// what was drawn by up to 1.05 about the centre and adds the glow ring). Draw-only: the layout never moves.
+struct TileLift {
+    ImDrawList* dl = nullptr;
+    int vtx = 0;
+    ImVec2 min, max;
+    float t = 0.0f;
+    bool clip = false;
+};
+TileLift BeginTileLift(ImVec2 min, ImVec2 max, float rounding = 4.0f);
+void EndTileLift(const TileLift& lift, float rounding = 4.0f);
+// Ends the lift when it goes out of scope (tiles drawn by several functions, or with early returns).
+struct TileLiftScope {
+    TileLift lift;
+    ~TileLiftScope() { EndTileLift(lift); }
+};
+// Draws this frame's hover and focus rings; call once, after every window and before DrawHelp.
+void DrawHover(App& app);
+// From the ImGui item hooks (Demo.cpp): where this frame's candidates for a ring are.
+void NoteItem(ImGuiContext* ctx, ImGuiID id, const ImVec2& min, const ImVec2& max);
+void NoteItemLabel(ImGuiID id);
+
 // Customize mode: shelves this payload ("SF_UIITEM") is dragged from and dropped on.
 enum Shelf { ShelfNone = -1, ShelfTop, ShelfLeft, ShelfRight, ShelfBottom };
 struct UiItemPayload {

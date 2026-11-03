@@ -488,6 +488,7 @@ Config keeps it.
 | **Popup Info (Ctrl+hover help)** | On | Ctrl-hover help boxes |
 | **Popup Info opacity** | 0.97 | How solid the help box is |
 | **Tooltip delay** | 0.5 s | How long to point at an icon-only button before its name appears |
+| **Reduce motion** | Off | Hover and focus highlights change colour only: no easing, and tiles don't lift |
 | **One sub-palette open** | On | Opening a sub-palette closes the others in that palette |
 | **Auto collapse left tray** / **right tray** | On / Off | Collapse other palettes in the tray when one wouldn't fit |
 | **Palettes strictly A-Z (ZBrush order)** | Off | Strict alphabetical palette bar instead of File and Edit first, Help last |

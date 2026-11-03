@@ -254,6 +254,7 @@ bool AssetTile(const char* id, ImTextureID texture, const char* glyph, const std
     const bool hovered = ImGui::IsItemHovered();
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const ImVec2 t0 = p, t1(p.x + thumbSize, p.y + thumbSize);
+    const ui::TileLift lift = ui::BeginTileLift(t0, t1); // the thumbnail lifts on hover; its label stays
     dl->AddRectFilled(t0, t1, hovered ? kTileHover() : kTileBg(), theme::rounding(4.0f));
     if (texture) {
         const float pad = 2.0f;
@@ -280,6 +281,7 @@ bool AssetTile(const char* id, ImTextureID texture, const char* glyph, const std
         dl->AddText(ImVec2(std::round((b0.x + b1.x - bs.x) * 0.5f), b0.y + 1.0f), lookColor(IM_COL32(20, 20, 22, 255), theme::textOnAccent), badge);
         ImGui::LogText(" [%s]", badge);
     }
+    ui::EndTileLift(lift);
     const std::string shown = elide(label, thumbSize);
     const ImVec2 ls = ImGui::CalcTextSize(shown.c_str());
     dl->AddText(ImVec2(std::round(p.x + (thumbSize - ls.x) * 0.5f), t1.y + 2.0f),
@@ -310,8 +312,9 @@ void AssetTileHoverGlow() {
     a.x = std::clamp(a.x, vp->Pos.x + 2.0f, vp->Pos.x + vp->Size.x - s - 2.0f);
     a.y = std::clamp(a.y, vp->Pos.y + 2.0f, vp->Pos.y + vp->Size.y - s - 2.0f);
     const ImVec2 b(a.x + s, a.y + s);
-    // In the window's own draw list, unclipped: over the neighbouring tiles but under tooltips.
-    ImDrawList* dl = ImGui::GetWindowDrawList();
+    // On the foreground list, drawn last: over the neighbouring tiles and every other window (#86: in the window's
+    // own list, tiles in later child windows covered it).
+    ImDrawList* dl = ImGui::GetForegroundDrawList();
     dl->PushClipRect(vp->Pos, ImVec2(vp->Pos.x + vp->Size.x, vp->Pos.y + vp->Size.y), false);
     struct PopClip {
         ImDrawList* dl;
