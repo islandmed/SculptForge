@@ -164,7 +164,7 @@ void App::drawSupportUi() {
         }
         ImGui::End();
     }
-    if (newLookCard_ && !showWelcome_ && !supportCardOpen()) {
+    if (newLookCard_ && !showWelcome_ && !supportCardOpen() && !whatsNew_ && !showWhatsNew_) {
         // Once, after updating from before 0.10.7 (PanelProject.cpp): the new default look, never forced.
         ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + c.h - 16.0f * s), ImGuiCond_Always, ImVec2(0.5f, 1.0f));
         ImGui::SetNextWindowSize(ImVec2(420.0f * s, 0.0f), ImGuiCond_Always);

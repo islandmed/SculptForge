@@ -6,13 +6,21 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- What's New is a window now: after an update (and from **Help > What's New**) a centred card shows the version's main
+  features, each with a picture, one line and a **Try it** button that opens it (switch the look, open the membership
+  card, select the brush, open the benchmark...), plus the full release notes, the Discord and Close. It takes the
+  look's colours, fades in, follows the UI scale and works from the keyboard (Esc, Tab, Enter). The guide chapter and
+  the website page show the last three versions in full (a band with the date, the feature cards, "All changes"
+  folded) and the older ones as short groups (0.10.1 to 0.10.5, 0.9.x, 0.8 and earlier); the contents list follows.
+  The data is a ```features block per version in docs/guide/whats-new.md, read by the app and build_site.py alike.
+
 ## [0.10.8] - 2026-11-02
 
 ### Fixed
 - Tablet Mouse mode (Preferences > Tablet): on some Windows tablets the brush stopped following the pen in 0.10.7,
   because the system cursor reading stayed put while the pen moved. A reading that doesn't move with the pen is now
   ignored and the pen moves the brush relatively, from where it was, with no jump (#72).
-
 ## [0.10.7] - 2026-11-01
 
 ### Changed

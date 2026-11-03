@@ -5,6 +5,7 @@
 
     build/sculptforge --ui-test tools/guide/shots.sfui --ui-out build/guide-shots
     python3 tools/guide/make_images.py build/guide-shots [--preview sheet.png]
+    python3 tools/guide/make_images.py build/wn-shots --whats-new   (What's New's 600x340 pictures)
 
 Each image is a crop of a 1600x960 screenshot (coordinates below), optionally labelled, scaled to at most
 MAX_WIDTH and saved as a JPEG of a few dozen KB in docs/guide/images. Needs Pillow.
@@ -55,6 +56,18 @@ CROPS = {
     "extract": ("extract", (380, 140, 1000, 740), 620),
     "make-sculptable-panel": ("sculptable-panel", (1276, 500, 1600, 960), 324),
 }
+
+# What's New feature pictures (tools/guide/whats_new_shots.sfui): name: (screenshot, crop with the 600:340 shape), saved
+# at exactly 600x340 (--whats-new).
+WHATS_NEW = {
+    "wn-new-look": ("wn-new-look", (0, 30, 1340, 789)),
+    "wn-wayland": ("wn-wayland", (0, 0, 600, 340)),
+    "wn-memberships": ("wn-memberships", (117, 90, 1483, 864)),
+    "wn-full-alpha": ("wn-full-alpha", (300, 290, 1020, 698)),
+    "wn-benchmark": ("wn-benchmark", (500, 190, 1100, 530)),
+    "wn-whats-new": ("wn-whats-new", (170, 120, 1430, 834)),
+}
+WN_SIZE = (600, 340)
 
 # The labelled overview: region name and box in window pixels.
 REGIONS = [
@@ -218,8 +231,20 @@ def main() -> int:
     ap.add_argument("shots", type=pathlib.Path, help="folder with the screenshots (--ui-out of shots.sfui)")
     ap.add_argument("--preview", type=pathlib.Path, help="also write a contact sheet of every image here")
     ap.add_argument("--only", action="append", help="make only this image (repeatable), e.g. --only qremesh-guides")
+    ap.add_argument("--whats-new", action="store_true", help="make only the What's New pictures (whats_new_shots.sfui)")
     args = ap.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
+    if args.whats_new:
+        for name, (shot, box) in WHATS_NEW.items():
+            src = args.shots / f"{shot}.png"
+            if not src.exists():
+                print(f"missing screenshot {src}", file=sys.stderr)
+                return 1
+            img = Image.open(src).convert("RGB").crop(box).resize(WN_SIZE, Image.LANCZOS)
+            path = OUT / f"{name}.jpg"
+            img.save(path, "JPEG", quality=90, optimize=True, progressive=True, subsampling=0)
+            print(f"{path.relative_to(ROOT)}  {path.stat().st_size // 1024} KB")
+        return 0
     composed = {"interface-overview": overview, "remesh": remesh, "subdivision-levels": subdivision,
                 "qremesh-guides": qremesh_guides, "dynamic-topology": dyntopo,
                 "make-sculptable": make_sculptable, "shading": shading, "mirror-weld": mirror_weld}

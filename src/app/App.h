@@ -37,6 +37,7 @@
 #include "core/Tablet.h"
 #include "core/UpdateCheck.h"
 #include "core/ViewCapture.h"
+#include "core/WhatsNew.h"
 #include "core/Texture.h"
 #include "io/ArExport.h"
 #include "link/PhoneLink.h"
@@ -401,6 +402,21 @@ private:
     void drawSupportCard();
     void drawSupportPrefs();                    // Preferences > Support
     bool welcomeAfterCard_ = false;             // the first-run welcome waits until the card closes
+    // What's New (WhatsNewPopup.cpp): the newest version's feature cards from docs/guide/whats-new.md, once after an
+    // update and from Help > What's New; each Try it runs the card's action (runWhatsNewAction).
+    struct WhatsNewPopup;
+    struct WhatsNewDelete { void operator()(WhatsNewPopup* p) const; };
+    std::unique_ptr<WhatsNewPopup, WhatsNewDelete> whatsNew_;
+    void showWhatsNew(); // the popup, or the guide's chapter when this version has no cards
+    void closeWhatsNew();
+    bool whatsNewOpen() const;
+    const whatsnew::Version* whatsNewVersion() const; // what the popup shows (UI tests), null when closed
+    bool whatsNewEvent(const SDL_Event& e);           // input while it's open goes to it
+    void drawWhatsNew();
+    // A card's action: look:new, card:membership, brush:NAME, guide:FILE[#ANCHOR] or an action id (help.benchmark).
+    bool runWhatsNewAction(const std::string& action);
+    int whatsNewTries_ = 0;          // UI tests: Try it clicks
+    std::string whatsNewLastAction_; // UI tests: the last card's action
 
     // Results from asynchronous native file dialogs (called off the main thread).
     struct PendingFile {
@@ -1071,7 +1087,7 @@ private:
     bool openUnsavedPopup_ = false;
     bool continueAfterSave_ = false; // run discardAction_ once the Save As dialog saved
     bool offerRestore_ = false;
-    bool showWhatsNew_ = false; // the first start after an update opens the guide's What's New chapter
+    bool showWhatsNew_ = false; // the first start after an update shows What's New (after the membership card)
     // Update check (PanelProject.cpp): website/latest.json at most once a day, on a worker thread; a banner when a
     // newer version is out. Off with Preferences > Updates, SF_NO_UPDATE_CHECK, or -DSCULPTFORGE_UPDATE_CHECK=OFF
     // (package managers); SF_UPDATE_FEED points it at another URL or a local file (UI tests).

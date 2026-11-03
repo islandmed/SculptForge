@@ -618,8 +618,8 @@ void App::drawProjectPopups() {
         ImGui::OpenPopup(kRestorePopup);
         offerRestore_ = false;
     }
-    if (showWhatsNew_) {
-        guide_.open("whats-new.md");
+    if (showWhatsNew_ && !supportCard_ && !showWelcome_) { // after the membership card, if it showed
+        showWhatsNew();
         showWhatsNew_ = false;
     }
     drawUpdateBanner();

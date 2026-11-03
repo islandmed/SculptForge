@@ -122,6 +122,7 @@ add_library(sculptforge_core STATIC
   src/core/Trash.cpp
   src/core/Project.cpp
   src/core/Guide.cpp
+  src/core/WhatsNew.cpp
   src/core/UpdateCheck.cpp
   src/core/Tablet.cpp
   src/core/RadialMenu.cpp
@@ -319,6 +320,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelSubTools.cpp
     src/app/PanelSupport.cpp
     src/app/PanelSupportCard.cpp
+    src/app/WhatsNewPopup.cpp
     src/app/PanelExtract.cpp
     src/app/PanelTimeline.cpp
     src/app/ProofMode.cpp

@@ -523,7 +523,7 @@ void App::initActions() {
         [this] { return guide_.isOpen(); }, nullptr,
         "The SculptForge user guide: every tool explained, with search. Hold Ctrl over a control and press F1 to open "
         "the chapter about it.");
-    add("help.whats_new", "What's New", "Help", nullptr, [this] { guide_.open("whats-new.md"); }, ICON_LC_SPARKLES, nullptr,
+    add("help.whats_new", "What's New", "Help", nullptr, [this] { showWhatsNew(); }, ICON_LC_SPARKLES, nullptr,
         nullptr, nullptr, "What changed in this version and the ones before it (opens once by itself after an update).");
     add("help.check_updates", "Check for updates", "Help", nullptr, [this] { startUpdateCheck(true); }, ICON_LC_REFRESH_CW,
         nullptr, nullptr, [this] { return !updateJob_; },
