@@ -184,7 +184,7 @@ for anything else.
 
 Send, in one email or a message in your team channel:
 
-- **What to bake in:** your exported keymap and layout (**Preferences > Interface**), brush presets and packs
+- **What to bake in:** your exported keymap and layout (**Edit > Preferences > Interface**), brush presets and packs
   (`.sfbrush`, `.sfpack`), shelf setup, and the pipeline defaults you want (export format and preset, units
   and scale, up axis, naming pattern, texture packing, ZBrush Bridge folder).
 - **References for custom content:** images or scans you own, with a line on what each item should do.

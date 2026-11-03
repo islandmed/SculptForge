@@ -141,21 +141,21 @@ SDL_VIDEO_DRIVER=x11 sculptforge
 
 Pen tablets work on both. On Wayland, pressure, tilt, the eraser end and side buttons come through the
 desktop's tablet protocol (tablet-v2), so the tablet must be set up in your desktop's settings rather than
-through X11 tools such as `xsetwacom`. If pressure doesn't respond, check **Preferences > Tablet** for the
+through X11 tools such as `xsetwacom`. If pressure doesn't respond, check **Edit > Preferences > Tablet** for the
 live pressure reading.
 
 ## What you see at start-up
 
 SculptForge opens a 1600 x 960 window with a sphere ready to sculpt and the **Library** open along the top of
 the canvas on its **Project** tab, so you can reopen recent work with a double-click. Press <kbd>,</kbd>
-(comma) to close it, or turn off **Preferences > Library > Show at startup**. The first start also creates
+(comma) to close it, or turn off **Edit > Preferences > Library > Show at startup**. The first start also creates
 your library folder (**Documents/SculptForge**, with Projects, Tools, Brushes, Alphas, MatCaps, Images, Splats
 and QuickSave (snapshots) sub-folders), which the Library shows as **User**.
 
 The first start also asks what you are **Coming from**: **ZBrush**, **Blender**, **Maya** or **New to sculpting**.
 Your answer picks the key style: **ZBrush** turns on the ZBrush-style keys, **Blender** and **Maya** their own
 styles, and **New to sculpting** keeps the SculptForge keys (the default). Change it any time in
-**Preferences > Input > Style** (see [Keyboard and mouse](shortcuts.md)); if you are updating from an earlier
+**Edit > Preferences > Input > Style** (see [Keyboard and mouse](shortcuts.md)); if you are updating from an earlier
 version, your saved style is kept and the question isn't asked.
 
 You can open a file directly from the command line, too: `sculptforge model.obj` (or a `.glb`, `.sfproj`,
@@ -169,7 +169,7 @@ The next chapter, [The interface](interface.md), explains what everything on scr
 SculptForge doesn't install updates by itself, but it tells you when there is one. Once a day at start-up it
 downloads a small file from its website that names the newest version; if yours is older, a banner at the top
 of the 3D view says what's new, with **What's new**, **Download**, **Later** and **Skip this version**. Nothing
-about you or your computer is sent. **Help > Check for updates** asks right away, and **Preferences > Updates**
+about you or your computer is sent. **Help > Check for updates** asks right away, and **Edit > Preferences > Updates**
 turns the daily check off. Builds from a package manager (such as the AUR package) leave updates to the package
 manager and don't check.
 

@@ -97,7 +97,7 @@ Dropping an image or a `.sfbrush` file never asks, because it doesn't replace th
 
 While the scene has unsaved changes, SculptForge writes a recovery copy every few minutes (every 5 minutes by
 default; it waits until you finish a stroke). Change the interval, or turn it off with 0, in
-**Preferences > Autosave** or with the **Autosave (min)** slider in the File palette (0 to 60 minutes).
+**Edit > Preferences > Autosave** or with the **Autosave (min)** slider in the File palette (0 to 60 minutes).
 
 The recovery copy is `autosave.sfproj` in the SculptForge settings folder (see
 [Troubleshooting](troubleshooting.md) for where that is on your system). It is deleted once your work is saved or
@@ -125,7 +125,7 @@ is safe to take before any risky step.
 - They appear in the Library **Snapshots** tab, newest first, labelled with their date and time. Double-click one
   to open it. The tab also has a **Save now** button.
 
-With the ZBrush-style keys (**Preferences > Input**) <kbd>9</kbd> takes a snapshot; otherwise it has no default
+With the ZBrush-style keys (**Edit > Preferences > Input**) <kbd>9</kbd> takes a snapshot; otherwise it has no default
 shortcut. To give it one, hold <kbd>Ctrl</kbd>+<kbd>Alt</kbd>, click the **Snapshot**
 button and press a key (see [The interface](interface.md)).
 
@@ -145,7 +145,7 @@ on first use with these sub-folders:
 | `Splats` | Splats | Gaussian splat captures |
 | `QuickSave` | Snapshots | Snapshots |
 
-Change it in **Preferences > Library > Library folder**, then Store Config (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>)
+Change it in **Edit > Preferences > Library > Library folder**, then Store Config (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>)
 to keep the setting.
 
 Press <kbd>,</kbd> (comma) to show the Library. The tabs that matter for projects:

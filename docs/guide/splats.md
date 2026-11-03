@@ -5,7 +5,7 @@ Postshot, Scaniverse and KIRI. SculptForge uses them three ways: as a reference 
 for a sculptable, animation-ready mesh with its colours, and as an output when you turn a sculpt into splats. This chapter covers all
 three.
 
-![A splat capture loaded next to the sculpt, with the Splats palette in the right tray](images/splats.jpg)
+![A splat capture loaded next to the sculpt, with **Render > Gaussian Splats** in the right tray](images/splats.jpg)
 
 To make a splat yourself from a phone video or photos, see [Scan an object into a splat](scan-to-splat.md).
 

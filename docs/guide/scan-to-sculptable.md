@@ -20,14 +20,14 @@ A progress bar and **Cancel** show while it works. When it's done:
 - a new Part named after the capture holds the sculptable mesh, and is active;
 - a hidden **"<name> Scan"** Part keeps the dense voxel surface it was made from (turn off **Keep scan** if you
   don't want it);
-- the splats are hidden, not deleted (**Show** in the Splats palette brings them back);
+- the splats are hidden, not deleted (**Show** in **Render > Gaussian Splats** brings them back);
 - an untouched starting sphere is hidden too.
 
-No capture at hand? **Try a test head** in the Splats palette (shown while no splats are loaded) loads a built-in
+No capture at hand? **Try a test head** in **Render > Gaussian Splats** (shown while no splats are loaded) loads a built-in
 one: a stylised head as 200,000 coloured splats with a few floaters and the hidden inside splats real captures
 have. `splat_test_capture kind=object` loads a mug with a thin handle instead.
 
-![The From scan section of the Splats palette](images/make-sculptable-panel.jpg)
+![The From scan section of **Render > Gaussian Splats**](images/make-sculptable-panel.jpg)
 
 ## The options
 

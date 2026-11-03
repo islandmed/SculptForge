@@ -7,7 +7,7 @@ of relearning. SculptForge has its own keymap and offers ZBrush-style, Blender a
 
 New installs start in SculptForge's own layout, with menus by task. For the alphabetical palette bar and the
 two-row top shelf you know, click **Coming from ZBrush? Use the ZBrush-style layout** in the welcome, or pick
-**Preferences > Interface > Look > Layout > ZBrush-style** (see [Looks and layouts](interface.md#looks-and-layouts)).
+**Edit > Preferences > Interface > Look > Layout > ZBrush-style** (see [Looks and layouts](interface.md#looks-and-layouts)).
 The palette paths in this guide (**Tool > Parts**) work in both: in the SculptForge layout the palettes are
 sections of the menus, and <kbd>F3</kbd> finds any of them.
 
@@ -19,21 +19,21 @@ Features use SculptForge's own names. The ideas are the ones you know; here is w
 |---|---|---|
 | SubTools | **Parts** | **Tool > Parts**; <kbd>Alt</kbd>+click one in the viewport. See [Parts](parts.md) |
 | ZSpheres | **Forge Spheres** | **Tool > Forge Spheres**. See [Forge Spheres](forge-spheres.md) |
-| Polypaint | **Vertex Paint** | The Paint brush (<kbd>P</kbd>), **Rgb**, the Color palette. See [Vertex Paint and materials](vertex-paint.md) |
+| Polypaint | **Vertex Paint** | The Paint brush (<kbd>P</kbd>), **Rgb**, the **Paint** menu. See [Vertex Paint and materials](vertex-paint.md) |
 | Polygroups | **Face Groups** | **Tool > Face Groups**. See [Face Groups and visibility](face-groups.md) |
 | LightBox | **Library** | <kbd>,</kbd> (comma). See [The interface](interface.md#the-library) |
 | GoZ | **Send to ZBrush** (GoZ-compatible) | **File > Send to ZBrush**. See [Exporting](exporting.md#exchange-models-with-zbrush-send-to-zbrush) |
-| MatCap | **Lit Sphere** | The Material palette, <kbd>M</kbd>. See [Materials](vertex-paint.md#materials-lit-spheres) |
+| MatCap | **Lit Sphere** | **Render > Materials**, <kbd>M</kbd>. See [Materials](vertex-paint.md#materials-lit-spheres) |
 | Zadd / Zsub | **Add** / **Sub** | Top shelf; <kbd>Alt</kbd> flips for one stroke |
 | Z Intensity | **Intensity** | Top shelf, <kbd>U</kbd> |
-| Focal Shift | **Falloff** | Draw palette, <kbd>O</kbd> |
+| Focal Shift | **Falloff** | **Sculpt > Draw & Tablet**, <kbd>O</kbd> |
 | DynaMesh | **Voxel Remesh** | **Tool > Remesh**. See [Geometry](geometry.md#voxel-remesh) |
 | ZRemesher, ZRemesher Guides | **Quad Remesh**, **Quad Remesh Guides** | **Tool > Geometry > Quad Remesh**. See [Quad retopology](retopology.md) |
 | ProjectAll, ZProject | **Project All**, **Project** | **Tool > Parts > Project**. See [Quad retopology](retopology.md#project-all) |
 | Sculptris Pro | **Dynamic Topology** | **Dynamic** on the top shelf. See [Dynamic topology](dynamic-topology.md) |
 | QuickSave | **Snapshot** | **File > Save Snapshot**, the Library's **Snapshots** tab. See [Projects](projects.md#snapshots) |
 | Transpose, Gizmo 3D, Transpose All | **Gizmo**, **All Parts** | <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd>. See [Gizmo](gizmo.md) |
-| LazyMouse | **Lazy Stroke** | Stroke palette, <kbd>L</kbd> |
+| LazyMouse | **Lazy Stroke** | **Sculpt > Stroke**, <kbd>L</kbd> |
 | PolyFrame (PolyF) | **Wireframe** (**Wire** on the shelf) | Right shelf, <kbd>Shift</kbd>+<kbd>F</kbd> |
 | QuickMenu | **Quick Menu** | <kbd>Space</kbd> or a right click |
 | DamStandard | **Sharp Crease** brush | <kbd>B</kbd> <kbd>D</kbd> <kbd>S</kbd>. See [Sculpting](sculpting.md) |
@@ -42,12 +42,12 @@ Features use SculptForge's own names. The ideas are the ones you know; here is w
 | KelvinSnake | **Elastic Tendril** brush | Brush picker (KelvinGrab, KelvinTwist and KelvinScale keep their names) |
 | Trim Dynamic | **Trim** brush | Brush picker |
 | hPolish | **Hard Polish** | Not built in yet; a [Brush Lab](brush-lab.md) recipe gets close |
-| DragRect, DragDot | **Drag Stamp**, **Slide Stamp** strokes | Stroke palette |
+| DragRect, DragDot | **Drag Stamp**, **Slide Stamp** strokes | **Sculpt > Stroke** |
 | MaskPen, MaskLasso, MaskRect | **Mask Pen**, **Mask Lasso**, **Mask Rectangle** | **Tool > Masking**. See [Masking](masking.md) |
 | SelectRect, SelectLasso | **Select Rectangle**, **Select Lasso** | **Tool > Visibility** |
 | FiberMesh, LightCap | Not yet | |
 | ZScript, ZPlugin | Script commands and the Python module | See [Scripting](scripting.md) |
-| Decimation Master, UV Master, Projection Master | **Decimate**, the **UV Editor** (and **Auto UV**), **Generate > Stamp** | See [Geometry](geometry.md#decimate), [UV Editor](uv-editor.md) and [Texture painting](texture-painting.md) |
+| Decimation Master, UV Master, Projection Master | **Decimate**, the **UV Editor** (and **Auto UV**), **Mesh > Generate 3D > Stamp** | See [Geometry](geometry.md#decimate), [UV Editor](uv-editor.md) and [Texture painting](texture-painting.md) |
 
 The command palette (<kbd>F3</kbd>) finds every feature by its ZBrush name too: type `SubTool`, `ZSphere`,
 `Polypaint` or `MatCap` and it shows the SculptForge command, as in "Forge Spheres (ZBrush users: ZSpheres)". The
@@ -60,7 +60,7 @@ affiliated with or endorsed by Maxon.
 
 New installs start with the **SculptForge** keys. The first time SculptForge starts it asks what you are
 **Coming from**: pick **ZBrush** and it turns on the ZBrush-style keys for you. To switch at any time, open
-**Preferences > Input** and choose **ZBrush-style** under **Style**, then press **Store Config**
+**Edit > Preferences > Input** and choose **ZBrush-style** under **Style**, then press **Store Config**
 (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) to keep it. If you used an earlier version, your saved choice is
 kept.
 
@@ -73,7 +73,7 @@ What the ZBrush-style keys change:
 | <kbd>Ctrl</kbd>+drag on the background with nothing masked | Draws a mask rectangle | Zooms |
 | Zoom drags (<kbd>Ctrl</kbd>+right-drag, <kbd>Alt</kbd> then release) | Up zooms out | Up zooms in |
 
-Everything else in this chapter works in both styles. **Preferences > Input > Rotation** chooses free rotation
+Everything else in this chapter works in both styles. **Edit > Preferences > Input > Rotation** chooses free rotation
 (as in ZBrush) or a turntable that keeps the model upright, as in Blender or Maya. Press **Store Config** to keep
 either. See [Keyboard and mouse](shortcuts.md#zbrush-style-keys) for the full list.
 
@@ -186,7 +186,7 @@ The SculptForge column is with the ZBrush-style keys on.
 | Search every command | | <kbd>F3</kbd> (ZBrush names work too) |
 
 Every shortcut is in [Keyboard and mouse](shortcuts.md), generated from the app itself, and can be changed with
-<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click or **Preferences > Hotkeys**.
+<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click or **Edit > Preferences > Hotkeys**.
 
 ## See also
 

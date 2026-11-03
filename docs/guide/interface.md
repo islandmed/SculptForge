@@ -27,7 +27,7 @@ palette bar stays, so every function is still one click away.
 
 ## Looks and layouts
 
-**Preferences > Interface > Look** sets how the interface looks and how it is laid out. Neither changes your
+**Edit > Preferences > Interface > Look** sets how the interface looks and how it is laid out. Neither changes your
 models, brushes or shortcuts.
 
 **Layout**:
@@ -64,7 +64,7 @@ ZBrush-style layout again right after. The look and layout are remembered for th
 
 **Updating from an older version** keeps the look and layout you had. A card, **SculptForge has a new look**,
 shows once: **Try it** switches to Forge Terminal with Tokyo Night and the SculptForge layout; **Keep my layout**
-changes nothing. Either way, Preferences > Interface > Look changes it later.
+changes nothing. Either way, Edit > Preferences > Interface > Look changes it later.
 
 In scripts: `ui_look look=forge scheme=tokyo_night layout=sculptforge` (or `look=classic layout=zbrush`).
 
@@ -92,7 +92,7 @@ From left to right:
 Every function in SculptForge lives in one of 16 palettes. Click a palette's name in the palette bar and it
 drops down under the name. Click another name to switch, or press <kbd>Esc</kbd> or click outside to close it.
 
-![The Stroke palette open as a drop-down from the palette bar](images/palette-dropdown.jpg)
+![**Sculpt > Stroke** open as a drop-down from the palette bar](images/palette-dropdown.jpg)
 
 The palette bar lists **File** and **Edit** first and **Help** last, where other desktop applications put
 them, and the rest in alphabetical order. If you prefer ZBrush's strict A to Z order, turn on **Preferences >
@@ -122,7 +122,7 @@ Interface > Palettes strictly A-Z (ZBrush order)**.
 Large palettes are divided into **sub-palettes**: headers you click to open or close. The Tool palette is the
 main example (Part, Layers, Geometry and so on). By default opening one sub-palette closes the others in
 the same palette, which keeps the palette short. **Shift**+click a header to open it without closing the
-others, or turn off **Preferences > Interface > One sub-palette open**.
+others, or turn off **Edit > Preferences > Interface > One sub-palette open**.
 
 > **ZBrush:** as in ZBrush, Parts (ZBrush's SubTool), Layers, Masking, Face Groups (Polygroups) and Visibility are sub-palettes of the Tool
 > palette rather than palettes of their own. SculptForge's Remesh sub-palette is where ZBrush's DynaMesh would be.
@@ -142,12 +142,12 @@ right tray is open by default and holds the **Tool** palette; the left tray star
 - **Open or close a tray**: click its divider, the thin strip with a grip between the tray and the shelves.
   **Drag** the divider to make the tray wider or narrower (240 to 480 pixels).
 
-![The Stroke palette kept in the right tray above the Tool palette](images/palette-tray.jpg)
+![**Sculpt > Stroke** kept in the right tray above the Tool palette](images/palette-tray.jpg)
 
-When a tray holds several palettes, **Preferences > Interface > Auto collapse left tray** (on by default) and
+When a tray holds several palettes, **Edit > Preferences > Interface > Auto collapse left tray** (on by default) and
 **Auto collapse right tray** (off by default) collapse the other palettes when the one you open would not fit.
 
-When you open a Gaussian splat capture, the Splats palette moves into the right tray by itself.
+When you open a Gaussian splat capture, **Render > Gaussian Splats** moves into the right tray by itself.
 
 > **Note:** on a window narrower than 1280 pixels (at 100% UI scale) the right tray folds away and palettes
 > open as drop-downs only. The left-shelf tiles get smaller and the bottom shelf scrolls sideways with the
@@ -227,7 +227,7 @@ The active brush has an orange outline.
   sparkle in the corner.
 - **Remove a brush**: right-click its tile and choose **Remove from shelf**.
 - **Bigger or smaller tiles**: right-click any brush on the shelf and choose **Tile size**: Small, Medium (the
-  default) or Large. The same setting is in **Preferences > Interface > Shelf tiles**. Small leaves the most
+  default) or Large. The same setting is in **Edit > Preferences > Interface > Shelf tiles**. Small leaves the most
   room for the model on a laptop screen.
 
 ## Pop-up pickers
@@ -318,7 +318,7 @@ Working with the strip:
 At the root of the Tool and Image tabs is a **Built-in** folder (the models and images that ship with
 SculptForge, such as the demo lion head), and the Project, Tool, Brush, Alpha, Image and Splats tabs have a
 **User** folder, your library folder (**Documents/SculptForge** by default). To use a different library folder,
-choose it in **Preferences > Library > Library folder**.
+choose it in **Edit > Preferences > Library > Library folder**.
 
 > **ZBrush:** the Library works like ZBrush's LightBox: comma toggles it, double-click loads, and Built-in and User
 > folders play the part of ZBrush's Maxon and User folders.
@@ -338,7 +338,7 @@ the command's usage line and each parameter with its type and description. This 
 console, `sculptforge-cli` and AI agents use.
 
 Without <kbd>Ctrl</kbd>, icon-only buttons and labels that don't fit show their name after a short delay
-(**Preferences > Interface > Tooltip delay**). Turn Ctrl-hover help off with **Preferences > Interface > Popup
+(**Edit > Preferences > Interface > Tooltip delay**). Turn Ctrl-hover help off with **Edit > Preferences > Interface > Popup
 Info (Ctrl+hover help)**, and make the box more or less see-through with **Popup Info opacity**.
 
 ### The Controls sheet
@@ -410,7 +410,7 @@ do what. As in ZBrush, **changes last until you quit** unless you store them wit
 
 ### Move, add and remove shelf items
 
-1. Open **Preferences > Config** and turn on **Enable Customize**. The shelves get a dashed orange outline and
+1. Open **Edit > Preferences > Config** and turn on **Enable Customize**. The shelves get a dashed orange outline and
    the status line reads "Customize: Ctrl+Alt+drag to move or remove items".
 2. Hold <kbd>Ctrl</kbd>+<kbd>Alt</kbd> and drag any button, slider or tile:
    - onto a shelf to put it there (an orange line shows where it will go), which is how you **add** buttons
@@ -426,7 +426,7 @@ Right-clicking a shelf item and choosing **Remove from shelf** works without Cus
 
 - Hold <kbd>Ctrl</kbd>+<kbd>Alt</kbd> and **click** any button (with Customize off), then press the key you
   want. <kbd>Esc</kbd> cancels and <kbd>Backspace</kbd> removes the button's shortcut.
-- Or open **Preferences > Hotkeys**, find the action (there's a filter), click its key button and press the
+- Or open **Edit > Preferences > Hotkeys**, find the action (there's a filter), click its key button and press the
   new key. Keys you changed show in orange. **Default shortcuts** undoes every change.
 - Or double-click a row in the Controls window (<kbd>F1</kbd>).
 
@@ -435,7 +435,7 @@ which action lost it.
 
 ### Store Config and friends
 
-All in **Preferences > Config**:
+All in **Edit > Preferences > Config**:
 
 | Item | What it does |
 |---|---|
@@ -454,7 +454,7 @@ tab) doesn't count as a layout change.
 
 ### Layout presets
 
-The **1**, **2** and **3** buttons in the title strip (also in **Preferences > Config**) switch between three
+The **1**, **2** and **3** buttons in the title strip (also in **Edit > Preferences > Config**) switch between three
 layouts:
 
 1. **Standard**: the Tool palette in the right tray and shelves around the canvas.
@@ -466,7 +466,7 @@ Config keeps it.
 
 ### Interface preferences
 
-**Preferences > Interface**:
+**Edit > Preferences > Interface**:
 
 | Setting | Default | What it does |
 |---|---|---|
@@ -490,7 +490,7 @@ Quad Remesh, Forge Spheres, Library, Lit Sphere, Clay Block, Add). The command p
 English name. Anything not translated yet (most Ctrl-help descriptions, this guide) shows in English. Scripts and
 `sculptforge-cli` commands are the same in every language.
 
-**Preferences > Input** sets the key **Style** (the first start sets it from your **Coming from** answer):
+**Edit > Preferences > Input** sets the key **Style** (the first start sets it from your **Coming from** answer):
 **SculptForge** (the default for new installs): <kbd>1</kbd> to <kbd>9</kbd> and <kbd>0</kbd> pick the first ten
 brushes, <kbd>I</kbd> opens Intensity like <kbd>U</kbd>, and <kbd>Ctrl</kbd>+drag on the background zooms when
 nothing is masked; **ZBrush-style**: ZBrush's keys, with the number keys free (<kbd>9</kbd> is Save Snapshot),
@@ -509,7 +509,7 @@ left-drag rotates, right- or middle-drag pans and <kbd>Ctrl</kbd>+drag zooms (se
 
 ### The background
 
-**Preferences > Display** (and the **Render** palette) sets the view's **Background**: **Gradient**, the
+**Edit > Preferences > Display** (and the **Render** palette) sets the view's **Background**: **Gradient**, the
 charcoal radial gradient (the default), or **Flat Colour**, one solid colour without the gradient. Click the
 **Background colour** swatch to pick the colour; picking one switches to Flat Colour. **Store Config** keeps the
 choice for the next session, and each project keeps the background it was saved with. From a script:
@@ -518,15 +518,15 @@ choice for the next session, and each project keeps the background it was saved 
 > **ZBrush:** like turning the gradient off in the Document palette (**Range** 0) and choosing the **Back**
 > colour.
 
-**Preferences > Library** has **Show at startup** (on by default), the number of **Rows**, **Placement**
+**Edit > Preferences > Library** has **Show at startup** (on by default), the number of **Rows**, **Placement**
 (along the top of the canvas, or at the bottom above the bottom shelf) and the **Library folder**.
-**Preferences > Autosave** sets how often a recovery copy is saved (see [Projects, autosave and snapshots](projects.md)).
+**Edit > Preferences > Autosave** sets how often a recovery copy is saved (see [Projects, autosave and snapshots](projects.md)).
 
-![The Preferences palette with the Config and Interface sub-palettes](images/preferences.jpg)
+![**Edit > Preferences** with the Config and Interface sub-palettes](images/preferences.jpg)
 
 ### Fullscreen, the palette bar and the camera notch
 
-- <kbd>F11</kbd> (or **Render > Fullscreen**) fills the screen with SculptForge; press it again to go back to
+- <kbd>F11</kbd> (or **View > Fullscreen**) fills the screen with SculptForge; press it again to go back to
   a window. `sculptforge --fullscreen` starts that way.
 - **Menus** in the title strip hides the palette bar; click it again to bring it back.
 - <kbd>Tab</kbd> hides the shelves and trays.

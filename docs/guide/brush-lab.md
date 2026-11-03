@@ -75,7 +75,7 @@ The name field at the top of the editor renames the brush when you press <kbd>En
 ## Choose an AI provider
 
 Brush Lab works out of the box with no account or key. Open the **AI provider** section of Brush Lab (also in
-**Generate > AI brush provider**) to choose another service.
+**Mesh > Generate 3D > AI brush provider**) to choose another service.
 
 | Provider | What you need | Notes |
 |---|---|---|
@@ -119,7 +119,7 @@ The library is a folder of `.sfbrush` files in the SculptForge settings folder:
 | macOS | `~/Library/Application Support/SculptForge/SculptForge/brushes` |
 | Windows | `%APPDATA%\SculptForge\SculptForge\brushes` |
 
-![The Custom brushes list in the Brush palette, with its right-click menu](images/brush-library.jpg)
+![The Custom brushes list in **Sculpt > Brush**, with its right-click menu](images/brush-library.jpg)
 
 ### The Custom brushes list
 
@@ -156,7 +156,7 @@ brushes.
 A brush code is the whole recipe in one line of text, starting with `sfbrush1:`. Paste it into a chat, an
 email, an issue or a forum post.
 
-- **Copy**: right-click a custom brush (in **Brush > Custom brushes** or the brush picker) and choose
+- **Copy**: right-click a custom brush (in **Sculpt > Brush > Custom brushes** or the brush picker) and choose
   **Copy brush code**.
 - **Paste**: copy a code, then press <kbd>Ctrl</kbd>+<kbd>V</kbd> over the viewport, click **Paste brush** in
   Brush Lab, or choose **Edit > Paste brush**. The brush is installed in your library and becomes active.

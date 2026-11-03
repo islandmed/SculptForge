@@ -9,7 +9,7 @@ SculptForge is a focused sculpting tool with the brushes, symmetry, masking and 
 already know, built around a ZBrush-style interface: shelves around a canvas, alphabetical palettes that hold
 every function, a Library of thumbnails and pop-up pickers. It runs natively on Windows, macOS and Linux,
 starts in a moment, works offline and costs nothing. ZBrush's keys and gestures are one choice away: answer
-**ZBrush** when the first start asks what you are coming from, or pick **ZBrush-style** in **Preferences > Input**.
+**ZBrush** when the first start asks what you are coming from, or pick **ZBrush-style** in **Edit > Preferences > Input**.
 See [Coming from ZBrush](coming-from-zbrush.md). There is no account, no subscription, no licence server
 and no telemetry.
 
@@ -22,7 +22,7 @@ a week early (every release stays free for everyone; bug-fix and security releas
 day): **Help > Support SculptForge...** opens [sculptforge.app/support.html](https://sculptforge.app/support.html) in your browser, where you can become a
 member. That is all it does: the app has no payment code, no account and no licence check. Supporters are thanked
 by name in **Help > About**. While SculptForge starts (the first time, after an update, and at most once a week
-otherwise) a card shows the memberships; **I'm already a supporter** hides it for good and **Preferences > Support**
+otherwise) a card shows the memberships; **I'm already a supporter** hides it for good and **Edit > Preferences > Support**
 turns it off. After about ten hours of sculpting, SculptForge also shows one small note about this along the bottom
 of the canvas, once, and never again after you close it.
 
@@ -77,7 +77,7 @@ palettes have the names you expect (Alpha, Brush, Stroke, Tool, Transform...), t
 Parts (ZBrush's SubTool), Masking and Face Groups (Polygroups) sub-palettes, <kbd>B</kbd> opens the brush pop-up with the same letter keys
 (B, S, T picks Standard), <kbd>,</kbd> opens the Library and <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>
 stores your interface, and <kbd>S</kbd> <kbd>U</kbd> <kbd>I</kbd> <kbd>O</kbd>, <kbd>Space</kbd>, <kbd>Ctrl</kbd>+<kbd>W</kbd>
-and the mask keys do what your hands expect with the ZBrush-style keys on (**Preferences > Input**).
+and the mask keys do what your hands expect with the ZBrush-style keys on (**Edit > Preferences > Input**).
 [Coming from ZBrush](coming-from-zbrush.md) lists SculptForge's names for ZBrush terms, what is the same,
 what differs and every shortcut side by side; the [Glossary](glossary.md) maps ZBrush terms to SculptForge ones.
 

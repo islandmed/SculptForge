@@ -11,7 +11,7 @@ for what is planned.
 
 | ZBrush | SculptForge |
 |---|---|
-| Alpha | **Alpha**: built-in round, square and noise, or any grayscale image. Left shelf, Alpha palette. See [Sculpting](sculpting.md) |
+| Alpha | **Alpha**: built-in round, square and noise, or any grayscale image. Left shelf, **Sculpt > Alpha**. See [Sculpting](sculpting.md) |
 | Auto Groups | **Tool > Face Groups > By pieces** (`polygroup_by_connectivity`) |
 | BPR render | Not yet as a renderer. Headless renders and turntables with `sculptforge --render` ([Scripting](scripting.md)) |
 | Brush pop-up (B) | **Brush picker**, <kbd>B</kbd>, then type letters (B S T = Standard) |
@@ -33,10 +33,10 @@ for what is planned.
 | Groups By Normals | **Tool > Face Groups > By normals** with an angle (`polygroup_auto_by_normals`) |
 | Bake, Multi Map Exporter (normal / displacement / AO maps) | **Tool > Bake** (`bake`): tangent and object-space normal, displacement, AO, cavity and colour maps from a high-poly Part onto a low-poly's UVs. See [Baking](baking.md) |
 | Layers (sculpt layers) | **Tool > Layers**: sculpt layers with weights, exported as blend shapes. See [Layers](layers.md) |
-| LazyMouse | **Lazy Stroke** stroke type (Stroke palette) |
+| LazyMouse | **Lazy Stroke** stroke type (**Sculpt > Stroke**) |
 | LightBox | **Library**, <kbd>,</kbd> (comma) |
 | Live Boolean | Not yet |
-| Local symmetry, radial symmetry | **Transform > Symmetry**: **R** (radial symmetry, Radial Count 2-64 around X, Y or Z, combined with the X / Y / Z mirrors) and **Local** (about the active Part's centre). See [Sculpting](sculpting.md#radial-symmetry) |
+| Local symmetry, radial symmetry | **Sculpt > Symmetry & Gizmo > Symmetry**: **R** (radial symmetry, Radial Count 2-64 around X, Y or Z, combined with the X / Y / Z mirrors) and **Local** (about the active Part's centre). See [Sculpting](sculpting.md#radial-symmetry) |
 | Mask by Cavity | **Tool > Masking > By cavity** (`mask_by_cavity`) |
 | Masking (Ctrl) | Hold <kbd>Ctrl</kbd> to paint the mask, <kbd>Ctrl</kbd>+<kbd>Alt</kbd> to erase. See [Masking](masking.md) |
 | MaskLasso, MaskRect | **Tool > Masking**: pick the shape, then <kbd>Ctrl</kbd>+drag (add <kbd>Alt</kbd> to unmask). See [Masking](masking.md) |
@@ -50,18 +50,18 @@ for what is planned.
 | Polypaint | **Vertex Paint**: Paint brush (<kbd>P</kbd>), Rgb, fills, cavity paint. See [Vertex Paint](vertex-paint.md) |
 | Polypaint layers | **Tool > Paint Layers**: Photoshop-style colour layers with blend modes. See [Paint layers](vertex-paint.md#paint-layers) |
 | Project All (ProjectAll) | **Tool > Parts > Project > Project All** (`project_all`), with Dist, Mean and PA Blur; respects the mask. See [Quad retopology](retopology.md#project-all) |
-| Projection Master | Not yet. **Generate > Stamp** projects an image onto the model from the view |
+| Projection Master | Not yet. **Mesh > Generate 3D > Stamp** projects an image onto the model from the view |
 | QuickSave | **File > Save Snapshot** (title strip **Snapshot**, <kbd>9</kbd> in the ZBrush-style keys); the last 10 are kept in the Library **Snapshots** tab. See [Projects](projects.md#snapshots) |
 | Rgb | **Rgb** on the top shelf (paint while sculpting) |
-| Rgb Intensity, Z Intensity, Focal Shift | Same keys: **RGB Intensity** (<kbd>I</kbd>), **Intensity** (<kbd>U</kbd>), **Falloff** (<kbd>O</kbd>) in the Draw palette and the Quick Menu |
+| Rgb Intensity, Z Intensity, Focal Shift | Same keys: **RGB Intensity** (<kbd>I</kbd>), **Intensity** (<kbd>U</kbd>), **Falloff** (<kbd>O</kbd>) in **Sculpt > Draw & Tablet** and the Quick Menu |
 | Sculptris Pro, dynamic topology | **Dynamic** on the top shelf, with **Detail** (`dyntopo`). See [Dynamic topology](dynamic-topology.md) |
 | Reconstruct Subdiv | **Tool > Geometry > Reconstruct Subdiv** (`subdiv_reconstruct`) |
 | SDiv, Lower Res / Higher Res (Shift+D / D) | **Tool > Geometry**: the **SDiv** slider, **Lower Res** <kbd>Shift</kbd>+<kbd>D</kbd>, **Higher Res** <kbd>D</kbd> (`subdiv_level`). See [Subdivision levels](subdivision-levels.md) |
 | SelectLasso, SelectRect | **Tool > Visibility**: pick the shape, then <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+drag (add <kbd>Alt</kbd> to hide). See [Face Groups](face-groups.md) |
 | Solo | **Solo** on the right shelf or in **Tool > Parts** |
 | Spotlight | Not yet |
-| Preferences > Performance, Preferences > Mem | **Preferences > Performance**: Antialiasing, Fast Navigation, Multithreading, the last stroke's cost and memory. See [Performance](performance.md) |
-| Store Config | **Store Config**, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> (**Preferences > Config**) |
+| Preferences > Performance, Preferences > Mem | **Edit > Preferences > Performance**: Antialiasing, Fast Navigation, Multithreading, the last stroke's cost and memory. See [Performance](performance.md) |
+| Store Config | **Store Config**, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> (**Edit > Preferences > Config**) |
 | Stroke (Dots, DragRect, DragDot, Spray) | **Stroke** types Dots, Drag Stamp, Slide Stamp, Spray, Lazy Stroke (<kbd>L</kbd> toggles Lazy Stroke) |
 | SubTool | **Part**: same idea, <kbd>Alt</kbd>+click to select. See [Parts](parts.md) |
 | Texture Map, New From Polypaint | **Tool > Texture Map**: **New Texture** (1K-8K) and paint straight into it, or **Vertex Paint > Texture**. See [Texture painting](texture-painting.md) |
@@ -69,7 +69,7 @@ for what is planned.
 | Transpose, Gizmo 3D (Move W, Scale E, Rotate R) | **Gizmo**: same keys, arrows, rings and boxes; masked parts stay, Falloff softens the joint. See [Gizmo](gizmo.md) |
 | Transpose All | **All Parts** in the Gizmo panel. See [Gizmo](gizmo.md#all-parts) |
 | UV Master (Unwrap), UV editing | The **UV Editor** (<kbd>Alt</kbd>+<kbd>U</kbd>): seams on the model, Least Stretch, Conformal, By Face Groups, Planar and Unfold unwraps, UDIM packing, texel density, trim sheets (`uv_unwrap`, `uv_pack`...). **Tool > Texture Map > Auto UV** (`uv_auto`) is the one-click unwrap. See [UV Editor](uv-editor.md) |
-| VDM brush, 3D alpha, Create VDM brush from the VDM plane | The **VDM** brush and **Brush > Vector Displacement**: built-in maps, **Load VDM...** (EXR), **New VDM Plane**, **Create VDM**, **Export EXR...**. See [Vector displacement brushes](sculpting.md#vector-displacement-brushes) |
+| VDM brush, 3D alpha, Create VDM brush from the VDM plane | The **VDM** brush and **Sculpt > Brush > Vector Displacement**: built-in maps, **Load VDM...** (EXR), **New VDM Plane**, **Create VDM**, **Export EXR...**. See [Vector displacement brushes](sculpting.md#vector-displacement-brushes) |
 | Zadd / Zsub | **Add** / **Sub** on the top shelf; <kbd>Alt</kbd> flips for one stroke |
 | ZPlugin | No in-app plugin system yet. Automate with the Python module, `sculptforge-cli` and MCP ([Scripting](scripting.md)) |
 | ZRemesher | **Tool > Geometry > Quad Remesh** (`qremesh`): Target Polygons, Half / Same / Double, Adaptive Size, Keep Groups, Use Vertex Paint, symmetry. No curve guides yet. See [Quad retopology](retopology.md) |
@@ -118,8 +118,8 @@ for what is planned.
 | UDIM tile | One unit square of UV space, numbered 1001 (u and v between 0 and 1), 1002 to its right, ten per row: a Part's islands can spread over several, each its own texture. See [UV Editor](uv-editor.md#packing-and-udim-tiles) |
 | Texel density | Texels of the texture per unit of surface length: equal density makes detail look the same size everywhere. See [UV Editor](uv-editor.md#texel-density) |
 | Trim sheet | A texture of horizontal strips that repeat left to right; islands are laid into a strip. See [UV Editor](uv-editor.md#trim-sheets) |
-| Antialiasing (AA) | Smoothing the 3D view's edges with several samples per pixel (Off, 2x, 4x, 8x in **Preferences > Performance**). See [Performance](performance.md) |
-| BVH | Bounding volume hierarchy: the structure SculptForge uses to find the surface under the cursor and the vertices under a brush. Its update time is shown per dab in **Preferences > Performance** |
+| Antialiasing (AA) | Smoothing the 3D view's edges with several samples per pixel (Off, 2x, 4x, 8x in **Edit > Preferences > Performance**). See [Performance](performance.md) |
+| BVH | Bounding volume hierarchy: the structure SculptForge uses to find the surface under the cursor and the vertices under a brush. Its update time is shown per dab in **Edit > Preferences > Performance** |
 | Dab | One step of a brush along a stroke. Its cost per dab decides whether a stroke keeps up with the display (under 16 ms at 60 Hz). See [Performance](performance.md) |
 | Fast Navigation | Drawing scenes of 10 million triangles or more without antialiasing while the view moves, so it keeps up. See [Performance](performance.md) |
 | Multithreading | Brushes, normal and BVH updates and saving spread over every processor core; same results either way. See [Performance](performance.md) |

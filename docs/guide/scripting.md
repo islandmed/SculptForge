@@ -35,7 +35,7 @@ Scripts stop at the first command that fails.
 
 ## The console
 
-Press the backtick key (left of <kbd>1</kbd>), or choose **Script > Console**, to open the console strip above
+Press the backtick key (left of <kbd>1</kbd>), or choose **File > Script > Console**, to open the console strip above
 the bottom shelf. Drag its top edge to resize it.
 
 ![The console showing commands run from the interface and typed by hand](images/console.jpg)

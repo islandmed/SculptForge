@@ -11,9 +11,9 @@ remeshing first.
 
 | Control | Where | What it does |
 |---|---|---|
-| **Dynamic** | Top shelf, Draw palette | Turns dynamic topology on or off (ZBrush's Sculptris Pro button) |
-| **Detail** | Top shelf (while Dynamic is on), Draw palette | How small the triangles get: 0 coarse, 100 fine (default 50) |
-| **Constant detail** | Draw palette | Off: the size follows the brush. On: one size for the whole mesh |
+| **Dynamic** | Top shelf, **Sculpt > Draw & Tablet** | Turns dynamic topology on or off (ZBrush's Sculptris Pro button) |
+| **Detail** | Top shelf (while Dynamic is on), **Sculpt > Draw & Tablet** | How small the triangles get: 0 coarse, 100 fine (default 50) |
+| **Constant detail** | **Sculpt > Draw & Tablet** | Off: the size follows the brush. On: one size for the whole mesh |
 
 Then sculpt as usual. Every brush works with it except **Move** (it drags the surface without remeshing), the
 mask and paint brushes, and the stamping strokes **Drag Stamp** and **Slide Stamp** (so VDM stamps don't remesh either). **Smooth** remeshes towards larger triangles, so smoothing
@@ -39,7 +39,7 @@ and fine ones around the eyes.
 ## Smooth remesh
 
 Smoothing (<kbd>Shift</kbd>) with Dynamic on also simplifies by default: it remeshes toward triangles twice the
-size, so the smoothed area gets coarser, as in Sculptris Pro. **Smooth remesh** under **Draw > Dynamic topology**
+size, so the smoothed area gets coarser, as in Sculptris Pro. **Smooth remesh** under **Sculpt > Draw & Tablet > Dynamic topology**
 sets how much (from the discussions):
 
 - **Smooth only** (0): Shift only smooths; the triangles stay as they are.

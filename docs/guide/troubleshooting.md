@@ -49,7 +49,7 @@ documentation** opens links to it).
   **Show** in the **Splats** palette while you sculpt.
 - On laptops with two GPUs, make sure SculptForge runs on the dedicated one (in the GPU maker's control panel
   or the operating system's graphics settings).
-- **Preferences > Performance**: lower **Antialiasing** (or turn it off), keep **Fast Navigation** on, and look
+- **Edit > Preferences > Performance**: lower **Antialiasing** (or turn it off), keep **Fast Navigation** on, and look
   at **Last stroke** to see whether brushes or the graphics card take the time. Step down a
   [subdivision level](subdivision-levels.md) for big changes. See [Performance and big meshes](performance.md).
 - A Part missing from the view with "Not enough GPU memory" in the status bar didn't fit on the graphics
@@ -67,7 +67,7 @@ and similar tablets, and pen displays, work without settings.
 3. A custom brush can also set its own pressure response (**pressureCurve** in its recipe, see
    [Brush Lab and sharing brushes](brush-lab.md)).
 
-**Preferences > Input** and **Preferences > Tablet** show "Pressure: on" once the pen has pressed, or
+**Edit > Preferences > Input** and **Edit > Preferences > Tablet** show "Pressure: on" once the pen has pressed, or
 "Pressure: not detected". Without pressure the pen still draws, at full strength. A tablet plugged in while
 SculptForge runs works straight away; the status bar says "Tablet connected" (also through Wacom Bridge).
 
@@ -84,7 +84,7 @@ If no pen is detected or pressure doesn't change:
   quick click), a triple-click with the mouse or a click in the Parts list; the status bar names it and how. A
   tablet's ExpressKey set to Alt counts as the keyboard's Alt.
 - **The cursor jumps back when you put the pen down elsewhere:** the tablet driver is set to mouse (relative)
-  mode. Turn on **Preferences > Tablet > Mouse mode (relative)**.
+  mode. Turn on **Edit > Preferences > Tablet > Mouse mode (relative)**.
 
 ## AI services
 
@@ -142,13 +142,13 @@ See [Image and text to 3D](generate-3d.md#comfyui-your-own-server) for setup.
 
 On MacBooks with a camera notch, SculptForge keeps the interface below the notch when it fills the screen. If
 the title strip or palette bar is still covered, or a plain band appears where you don't want one, change
-**Preferences > Interface > Camera notch**: **Automatic** (asks the system on macOS, recognises notched
+**Edit > Preferences > Interface > Camera notch**: **Automatic** (asks the system on macOS, recognises notched
 MacBook displays on Linux), **Always reserve**, or **Off**. <kbd>F11</kbd> switches between fullscreen and a
 window.
 
 ### Text and buttons are too small or too large
 
-**Preferences > Interface > UI scale** sets the size (Automatic, 100% to 200%). It takes effect the next time
+**Edit > Preferences > Interface > UI scale** sets the size (Automatic, 100% to 200%). It takes effect the next time
 SculptForge starts, and only if you press **Store Config** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>).
 
 ### My layout or shortcuts are gone after a restart
@@ -159,7 +159,7 @@ preferences. See [The interface](interface.md).
 
 ### Reset the interface
 
-- **Preferences > Config > Restore Standard UI** returns to the built-in layout and default shortcuts. Press
+- **Edit > Preferences > Config > Restore Standard UI** returns to the built-in layout and default shortcuts. Press
   **Store Config** afterwards to make it stick.
 - **Restore Custom UI** goes back to what the last Store Config saved.
 - To start completely fresh, quit SculptForge and delete `ui.json` (layout, shortcuts, interface preferences)
@@ -169,7 +169,7 @@ preferences. See [The interface](interface.md).
 
 Shortcuts don't fire while you type in a text field: click the canvas first. Check the key in **Help >
 Controls** (<kbd>F1</kbd>), which shows every shortcut as currently assigned; a key you reassigned shows in
-orange in **Preferences > Hotkeys**, where **Default shortcuts** undoes every change.
+orange in **Edit > Preferences > Hotkeys**, where **Default shortcuts** undoes every change.
 
 ## Where settings live
 
@@ -197,10 +197,10 @@ SculptForge keeps its settings in one folder per user:
 | `thumbs/` | Cached Library and picker thumbnails (safe to delete) |
 
 Your **library folder** (projects, tools, alphas, images, splats and QuickSaves shown in the Library) is
-separate: `Documents/SculptForge` by default, changeable in **Preferences > Library > Library folder**.
+separate: `Documents/SculptForge` by default, changeable in **Edit > Preferences > Library > Library folder**.
 
 > **Tip:** To move settings to another computer, copy `ui.json`, `ai.json` and the `brushes` folder. For a
-> shared layout, use **Preferences > Config > Save UI...** and **Load UI...** instead.
+> shared layout, use **Edit > Preferences > Config > Save UI...** and **Load UI...** instead.
 
 ## The log file
 
@@ -221,7 +221,7 @@ no models and no keys, only command names and messages, which may include file n
 
 ## Recovering work after a crash
 
-SculptForge autosaves unsaved work every 5 minutes by default (**Preferences > Autosave**, 0 turns it off).
+SculptForge autosaves unsaved work every 5 minutes by default (**Edit > Preferences > Autosave**, 0 turns it off).
 After a crash, the next start asks "SculptForge did not close normally last time. Restore the autosaved
 work?". **Restore** opens it as unsaved work (save it under a name); **Discard** deletes it. See
 [Projects, autosave and snapshots](projects.md). The dialog also points to the crashed session's

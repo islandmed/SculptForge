@@ -34,14 +34,14 @@ While the Paint brush is active:
 
 Press <kbd>P</kbd> again, or click **Sculpt** on the top shelf, to go back to sculpting.
 
-![Vertex Paint on a sculpt with the Color palette open](images/polypaint.jpg)
+![Vertex Paint on a sculpt with the **Paint** menu open](images/polypaint.jpg)
 
 > **ZBrush:** **Paint** is ZBrush's Rgb on with Zadd off. **Sculpt** with **Rgb** on is Rgb with Zadd: the brush
 > sculpts and paints at once.
 
 ## Paint while sculpting
 
-Turn on **Rgb** on the top shelf (or **RGB while sculpting** in the Color palette). Every sculpt brush then also
+Turn on **Rgb** on the top shelf (or **RGB while sculpting** in the **Paint** menu). Every sculpt brush then also
 paints the current colour along its stroke. The Smooth brush and <kbd>Shift</kbd>-smoothing never paint.
 
 ## Choose a colour
@@ -55,7 +55,7 @@ paints the current colour along its stroke. The Smooth brush and <kbd>Shift</kbd
 
 ## Fill, cavity paint and clear
 
-The Color palette has four buttons:
+The **Paint** menu has four buttons:
 
 | Button | What it does |
 |---|---|
@@ -90,7 +90,7 @@ Overlay layer, then change or hide it later without repainting the rest. Every P
   on an Overlay or Soft Light layer changes nothing, white on Multiply changes nothing, black on Screen changes
   nothing.
 - The Paint brush, **Rgb** while sculpting, **Fill**, **Fill masked** and **Cavity** all write into the
-  **active** layer (highlighted in the list; the Color palette shows "Painting on: ..."). They respect the mask and
+  **active** layer (highlighted in the list; the **Paint** menu shows "Painting on: ..."). They respect the mask and
   hidden faces on every layer.
 - With the Paint brush on a layer, <kbd>Alt</kbd> **erases** the layer's paint (on Base it paints back towards
   white, as before).
@@ -127,7 +127,7 @@ and opacity, a lock and an eye.
   lowest layer). **Flatten** bakes every visible layer into Base and removes the layers; hidden layers are
   discarded.
 - **Clear layer** makes the active layer transparent again (Base: white). **Fill layer** fills it with the current
-  colour, like **Fill** in the Color palette.
+  colour, like **Fill** in the **Paint** menu.
 
 Hold <kbd>Ctrl</kbd> over any control for its description. Every action is undoable with <kbd>Ctrl</kbd>+<kbd>Z</kbd>.
 
@@ -168,7 +168,7 @@ Materials change only how the model is shaded in the viewport. They aren't expor
 | Chrome | Mirror-like metal, good for checking surface flow |
 | White | Neutral off-white for judging forms |
 | Bronze | Polished bronze |
-| Studio | Softer clay shading with studio lighting (the default in earlier versions). Its colour is **Base colour** in the Material palette |
+| Studio | Softer clay shading with studio lighting (the default in earlier versions). Its colour is **Base colour** in **Render > Materials** |
 
 To choose one:
 
@@ -191,11 +191,11 @@ A Lit Sphere is a picture of a lit sphere (Sloan and others, 2001): the view col
 surface faces the same way. Any lit-sphere image made for ZBrush, Blender or Nomad works: a square PNG, JPG or EXR
 with the sphere filling it (a non-square image is cropped to its centre; big ones are scaled to 1024 pixels).
 
-- **Material > Load Lit Sphere...** picks an image. It joins the material list under its file name, the view uses
+- **Render > Materials > Load Lit Sphere...** picks an image. It joins the material list under its file name, the view uses
   it, and a copy goes into the **MatCaps** folder of your library (**Documents/SculptForge/MatCaps**, or the
-  folder set in **Preferences > Library**), so it is there next time.
+  folder set in **Edit > Preferences > Library**), so it is there next time.
 - Or put images into that **MatCaps** folder yourself: they show up the next time you open the material picker,
-  the Material palette or the Library's Material tab, no restart needed. Studios can share a read-only folder by
+  **Render > Materials** or the Library's Material tab, no restart needed. Studios can share a read-only folder by
   listing it in the `SCULPTFORGE_MATCAP_PATH` environment variable (separated by `:`, `;` on Windows); those load
   when SculptForge starts.
 - To remove one, right-click it in the material picker or palette and choose **Remove**. An image from your
@@ -203,9 +203,9 @@ with the sphere filling it (a non-square image is cropped to its centre; big one
   only hidden until you restart, and the message says where its file is so you can delete it yourself.
   Built-in materials can't be removed.
 
-![A Lit Sphere loaded from an image (Gold) in the Material palette](images/custom-matcaps.jpg)
+![A Lit Sphere loaded from an image (Gold) in **Render > Materials**](images/custom-matcaps.jpg)
 
-Your Lit Spheres appear in the material picker (<kbd>M</kbd>), the Material palette and the Library, after the
+Your Lit Spheres appear in the material picker (<kbd>M</kbd>), **Render > Materials** and the Library, after the
 built-in ones. A project that uses one carries a copy of the image, so it opens with the same look on another
 computer (or after you delete the file). Loading an image with the same name again replaces it. EXR images are
 read as linear light, so very bright highlights clip to white.
@@ -228,7 +228,7 @@ Shading works with every material, vertex paint, textures and the mask. Like the
 exports are unaffected. Projects save the scene's shading and each Part's own; projects from before open with
 your preferred shading. The scene's shading you choose is also the preference for the next session once you
 **Store Config** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>). Smooth and Flat have no default shortcut, so no
-ZBrush key changes meaning; assign one under **Preferences > Hotkeys** if you switch often.
+ZBrush key changes meaning; assign one under **Edit > Preferences > Hotkeys** if you switch often.
 
 > **Not yet:** loading your own Lit Sphere images, and physically based materials or BPR-style renders.
 

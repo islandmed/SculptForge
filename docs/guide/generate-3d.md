@@ -106,7 +106,7 @@ This runs each model author's own public demo on Hugging Face's shared ZeroGPU h
 
 If you never picked a model, SculptForge uses the default, so updates that change it reach you; a model you pick
 (and save) is kept. If you pick TRELLIS.2 without a token, Hunyuan3D 2.1 runs instead and the status line says
-"TRELLIS.2 needs a free Hugging Face token (Preferences > AI); used Hunyuan3D 2.1 instead."
+"TRELLIS.2 needs a free Hugging Face token (Edit > Preferences > AI); used Hunyuan3D 2.1 instead."
 
 The Hunyuan3D models' licence doesn't cover use in the European Union, the United Kingdom or South Korea. The
 first time a Hunyuan3D model runs, a notice says so, and it stays in the **Model** picker's tooltip. See
@@ -114,7 +114,7 @@ first time a Hunyuan3D model runs, a notice says so, and it stays in the **Model
 
 GPU time is rationed per person per day, there can be a queue at busy times, and a demo can be paused or
 changed by its owner. To raise the allowance, create a free token with read access at
-huggingface.co/settings/tokens and paste it into **HF token** or **Preferences > AI** (or set the `HF_TOKEN`
+huggingface.co/settings/tokens and paste it into **HF token** or **Edit > Preferences > AI** (or set the `HF_TOKEN`
 environment variable).
 When the allowance runs out you see "Hugging Face's free GPU time is used up for now"; add a token, wait for
 it to refill, or pick another model.
