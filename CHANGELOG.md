@@ -50,6 +50,10 @@ All notable changes to SculptForge are listed here. The format follows
   procedural tools and checked on a test sculpt (too faint, seams, torn surfaces and near-duplicates are left out),
   posted to Insiders as an .sfpack. Supporters get the month's drops as one Insider Pack at month end, and everyone
   gets that pack free three months later (`tools/drops/`, `.github/workflows/insider-drop.yml`).
+- Focus Detail (experimental, off by default): a billion-micro-triangle asset streamed from one compressed file.
+  Detail loads in under and ahead of the brush and wherever the camera would show it; everything else shows a
+  coarse version. Saving writes only the changed tiles. Try `sculptforge --benchmark standard-1b` or
+  `sculptforge --focus-detail FILE.sfdetail`; design and numbers in docs/design/focus-detail.md.
 
 ### Changed
 - What's New is a window now: after an update (and from **Help > What's New**) a centred card shows the version's main

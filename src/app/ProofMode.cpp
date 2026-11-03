@@ -14,6 +14,9 @@
 // its own thread), and a JSON result with the hardware and version is written at the end.
 #include "app/ProofMode.h"
 
+#include "core/FocusDetail.h"
+#include "core/Micro.h"
+
 #include "app/App.h"
 #include "app/ShellQuote.h"
 #include "app/Theme.h"
@@ -81,6 +84,19 @@ std::vector<ProofMeshSize> proofStandardScene(const std::string& name) {
     if (name == "standard-15m") return {s15};
     if (name == "standard-33m") return {s33};
     if (name == "standard") return {s15, s33};
+    if (name == "standard-1b") { // Focus Detail (prototype): ~1.02 billion micro triangles from a detail file
+        const ProofMeshSize s1b{1019, "1B Focus Detail", [](size_t) {
+                                    Mesh m;
+                                    std::string err;
+                                    const std::string path = focusStandard1bPath(err);
+                                    if (path.empty() || !FocusDetail::open(path, m, err)) { // (main checked the asset first)
+                                        std::fprintf(stderr, "standard-1b: %s\n", err.c_str());
+                                        return makeBenchHead(size_t(1) << 20);
+                                    }
+                                    return m;
+                                }, 5};
+        return {s1b};
+    }
     return {};
 }
 
@@ -782,7 +798,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         Mesh m = s.build ? s.build(tris) : makeBenchSphere(tris);
         SizeResult r;
         r.label = s.label;
-        r.triangles = m.triangleCount();
+        r.triangles = m.micro && m.micro->focus ? microTriangleCount(m) : m.triangleCount(); // (Focus Detail: its micro triangles)
         r.vertices = m.vertexCount();
         doc_.setMesh(std::move(m), "Benchmark");
         r.buildSeconds = nowSeconds() - t0;

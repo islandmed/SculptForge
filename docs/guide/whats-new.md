@@ -89,6 +89,9 @@ action: guide:whats-new.md
   movement? Turn on **Preferences > Interface > Reduce motion** ([Interface](interface.md)).
 - **Picker thumbnails on top**: the enlarged thumbnail you point at in a picker is no longer hidden under its
   neighbours (#86).
+- **Focus Detail (experimental)**: sculpt a head of a billion micro triangles from one compressed file. Detail
+  loads where you look and where the brush is heading, and the rest shows a lighter version. Saving writes only
+  what you changed. Try it with `sculptforge --benchmark standard-1b` (Linux and macOS for now).
 
 ## Version 0.10.8
 

@@ -96,6 +96,8 @@ add_library(sculptforge_core STATIC
   src/core/MicroSculpt.cpp
   src/core/MicroCommands.cpp
   src/core/MicroStore.cpp
+  src/core/FocusDetail.cpp
+  src/core/FocusBench.cpp
   src/core/MultiresCommands.cpp
   src/core/AutoUv.cpp
   src/core/TextureTransfer.cpp
@@ -197,6 +199,15 @@ else()
 endif()
 find_package(Threads REQUIRED)
 target_link_libraries(sculptforge_core PUBLIC glm::glm Threads::Threads)
+# zstd for Focus Detail tiles (core/FocusDetail.h), when the system has it; without it the tiles use our own codec.
+find_package(PkgConfig QUIET)
+if(PkgConfig_FOUND)
+  pkg_check_modules(SF_ZSTD QUIET IMPORTED_TARGET libzstd)
+endif()
+if(SF_ZSTD_FOUND)
+  target_link_libraries(sculptforge_core PRIVATE PkgConfig::SF_ZSTD)
+  target_compile_definitions(sculptforge_core PRIVATE SF_HAVE_ZSTD)
+endif()
 target_compile_definitions(sculptforge_core PUBLIC GLM_FORCE_XYZW_ONLY)
 target_compile_definitions(sculptforge_core PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}") # written into projects
 if(MSVC)
@@ -329,6 +340,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelGeometry.cpp
     src/app/Gizmo.cpp
     src/app/PanelBake.cpp
+    src/app/FocusDetailApp.cpp
     src/app/PanelRetopo.cpp
     src/app/PanelZSpheres.cpp
     src/app/PanelSplatTrain.cpp

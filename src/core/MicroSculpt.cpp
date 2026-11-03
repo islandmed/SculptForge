@@ -10,6 +10,7 @@
 //  5. stitches: copies of a point on a shared edge or corner are averaged (they differ only where a brush read
 //     neighbours, like Smooth), so the surface stays closed.
 #include "core/Micro.h"
+#include "core/FocusDetail.h"
 
 #include "core/BVH.h"
 #include "core/Sculpt.h"
@@ -131,6 +132,7 @@ void MicroStroke::begin(Mesh& m) {
 
 // Saves the grids of the triangles in `tris` that this stroke hasn't touched yet.
 void MicroStroke::touch(MicroMesh& mm, std::span<const uint32_t> tris) {
+    if (mm.focus) mm.focus->ensureFull(mm, tris, true); // (edits write full tiles only)
     const size_t S = mm.samples, before = tiles_.size();
     for (uint32_t t : tris)
         if (!tileOf_[t]) {

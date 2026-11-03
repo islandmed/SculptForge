@@ -97,7 +97,7 @@ struct AppOptions {
     // --benchmark: proof mode (ProofMode.cpp), then exit. Sizes in millions of triangles (empty: 5, 20, 33 and
     // 100 when memory allows); outputs default to the current folder.
     bool benchmark = false;
-    std::string benchmarkScene; // --benchmark standard-15m | standard-33m | standard: a standard scene (ProofMode.h)
+    std::string benchmarkScene; // --benchmark standard-15m | standard-33m | standard | standard-1b: a standard scene (ProofMode.h)
     std::string benchmarkSizes, benchmarkOut, benchmarkVideo;
     bool benchmarkNoVideo = false, benchmarkVsync = false;
     float benchmarkStrokeSeconds = 6.0f;
@@ -1531,6 +1531,13 @@ private:
     void viewAxis(float yawDegrees, float pitchDegrees); // Numpad 1 / 3 / 7: orthographic until turned
     void viewOrbitStep(float yawDegrees, float pitchDegrees);
     void frameActiveSubtool();
+    // Focus Detail (prototype, FocusDetailApp.cpp): open a .sfdetail file; once a frame, the camera and brush.
+    void openFocusDetail(const std::string& path);
+    void updateFocusDetail();
+    glm::vec3 focusBrushPos_{0.0f}, focusBrushVel_{0.0f};
+    float focusBrushRadius_ = 0.0f;
+    double focusBrushTime_ = 0.0;
+    bool focusBrushValid_ = false;
     SDL_Keymod blenderMods(SDL_Keymod keyboard) const; // Ctrl -> Alt (invert), the mask brush -> Ctrl (mask)
     bool maskBrushActive() const;
     void toggleMaskBrush();
