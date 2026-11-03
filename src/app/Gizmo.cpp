@@ -509,7 +509,7 @@ void App::gizmoDragTo(float x, float y) {
     if (h == H::None) return;
     glm::vec3 o, d;
     canvasRay(x, y, o, d);
-    const bool snap = (inputMods() & SDL_KMOD_SHIFT) != 0;
+    const bool snap = (inputMods(false) & SDL_KMOD_SHIFT) != 0;
     const glm::mat3& f = gizmo_.startFrame;
     const glm::vec3 c = gizmo_.startPivot;
     const int axis = axisOf(h);
@@ -732,7 +732,7 @@ void App::drawGizmo() {
     const ImVec2 mouse(mouseX_, mouseY_);
     const bool overCanvas = !ImGui::GetIO().WantCaptureMouse && canvasRect().contains(mouse.x, mouse.y);
     gizmo_.hover = drag_ == Drag::Gizmo ? gizmo_.handle
-                   : drag_ == Drag::None && overCanvas && !ctrlDown(inputMods()) ? gizmoHandleAt(mouse.x, mouse.y)
+                   : drag_ == Drag::None && overCanvas && !ctrlDown(inputMods(false)) ? gizmoHandleAt(mouse.x, mouse.y)
                                                                                  : H::None;
     ImDrawList* dl = ImGui::GetBackgroundDrawList(); // under the panels, over the model
     const CanvasRect cr = canvasRect();

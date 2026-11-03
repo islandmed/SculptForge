@@ -20,7 +20,8 @@ struct CanvasRect {
 };
 
 struct UiLayout {
-    int version = 3; // 2: the top shelf has Dynamic; 3: the right shelf has Undo / Redo (older stored layouts get them on load)
+    int version = 4; // 2: the top shelf has Dynamic; 3: the right shelf has Undo / Redo; 4: the left shelf has the stroke
+                     // popup (older stored layouts get them on load)
     bool shelvesVisible = true, paletteBarVisible = true, leftHanded = false;
     bool leftTrayOpen = false, rightTrayOpen = true;
     float leftTrayWidth = 300, rightTrayWidth = 300; // logical px

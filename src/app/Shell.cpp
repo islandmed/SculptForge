@@ -2335,24 +2335,12 @@ void App::drawBrushTile(const char* id, ImVec2 size) {
     ui::HelpText("Brush", "B", "The active brush. Click for the brush picker; the bottom shelf holds favourites.", "Left shelf");
 }
 
-void App::drawStrokeTile(const char* id, ImVec2 size) {
+void App::drawStrokeIcon(ImDrawList* dl, ImVec2 a, ImVec2 b, StrokeType type) {
     const float s = uiScale_;
-    if (const HeldBrushItem* held = heldBrushCurrent(heldBrush())) { // Ctrl / Ctrl+Shift: the mask's stroke
-        ImVec2 a, b;
-        const bool clicked = tileFrame(id, size, fontSmall_, held->stroke, s, a, b);
-        drawHeldBrushIcon(ImGui::GetWindowDrawList(), a, b, held->icon, heldBrush() == HeldBrush::Select);
-        if (clicked) openPicker(Picker::Stroke, ImVec2(ImGui::GetItemRectMax().x + 4.0f * s, ImGui::GetItemRectMin().y));
-        ui::HelpText("Stroke", nullptr, "Ctrl held: the mask's stroke, Dots (Mask Pen), Lasso or Rect (Ctrl+Shift: the "
-                     "selection's). Click with Ctrl held to choose.", "Left shelf");
-        return;
-    }
-    ImVec2 a, b;
-    const bool clicked = tileFrame(id, size, fontSmall_, strokeTypeName(strokeType_), s, a, b);
-    ImDrawList* dl = ImGui::GetWindowDrawList();
     const ImU32 col = IM_COL32(235, 235, 235, 230);
     const float w = b.x - a.x, h = b.y - a.y;
     auto at = [&](float u, float v) { return ImVec2(a.x + w * u, a.y + h * v); };
-    switch (strokeType_) {
+    switch (type) {
     case StrokeType::Dots: // ZBrush's dotted arc
         for (int i = 0; i < 7; ++i) {
             const float u = float(i) / 6.0f;
@@ -2395,6 +2383,22 @@ void App::drawStrokeTile(const char* id, ImVec2 size) {
     }
     default: break;
     }
+}
+
+void App::drawStrokeTile(const char* id, ImVec2 size) {
+    const float s = uiScale_;
+    if (const HeldBrushItem* held = heldBrushCurrent(heldBrush())) { // Ctrl / Ctrl+Shift: the mask's stroke
+        ImVec2 a, b;
+        const bool clicked = tileFrame(id, size, fontSmall_, held->stroke, s, a, b);
+        drawHeldBrushIcon(ImGui::GetWindowDrawList(), a, b, held->icon, heldBrush() == HeldBrush::Select);
+        if (clicked) openPicker(Picker::Stroke, ImVec2(ImGui::GetItemRectMax().x + 4.0f * s, ImGui::GetItemRectMin().y));
+        ui::HelpText("Stroke", nullptr, "Ctrl held: the mask's stroke, Dots (Mask Pen), Lasso or Rect (Ctrl+Shift: the "
+                     "selection's). Click with Ctrl held to choose.", "Left shelf");
+        return;
+    }
+    ImVec2 a, b;
+    const bool clicked = tileFrame(id, size, fontSmall_, strokeTypeName(strokeType_), s, a, b);
+    drawStrokeIcon(ImGui::GetWindowDrawList(), a, b, strokeType_);
     if (clicked) openPicker(Picker::Stroke, ImVec2(ImGui::GetItemRectMax().x + 4.0f * s, ImGui::GetItemRectMin().y));
     ui::HelpText("Stroke", nullptr, "How dabs follow the cursor: Dots, Drag Stamp, Slide Stamp, Spray or Lazy Stroke. Click to choose.",
                  "Left shelf");

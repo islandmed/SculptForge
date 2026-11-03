@@ -1138,6 +1138,7 @@ void App::handleEvent(const SDL_Event& event) {
     mapPenPosition(e); // a tablet in mouse mode moves the cursor relatively (#54), for the canvas and the UI
     if (supportCardEvent(e)) return;  // the support card at launch takes clicks and keys while open
     if (radialMouseEvent(e)) return;  // clicks on an open radial menu, and the buttons that open one (RadialMenu.cpp)
+    if (strokePopupMouseEvent(e)) return; // clicks on the open stroke popup (StrokePopup.cpp)
     ImGui_ImplSDL3_ProcessEvent(&e);
     const ImGuiIO& io = ImGui::GetIO();
 
@@ -1153,6 +1154,7 @@ void App::handleEvent(const SDL_Event& event) {
         break;
     case SDL_EVENT_WINDOW_FOCUS_LOST:
         if (radial_.hold != RadialHold::None) closeRadialMenu(); // its key or button's release won't come here
+        if (strokePopup_.held) closeStrokePopup();
         spaceHeld_ = false; // Space let go in another window never reaches us
         break;
     case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
@@ -1203,6 +1205,7 @@ void App::handleEvent(const SDL_Event& event) {
         if (e.key.key == SDLK_SPACE) spaceHeld_ = false;
         if (e.key.key == SDLK_SPACE) quickMenuKeyUp(); // a held Space closes the QuickMenu when let go
         radialKeyUp(e.key.key);                        // a radial menu's held key: run the slot pointed at
+        strokePopupKeyUp(e.key.key);                   // the stroke popup's held key: pick the item pointed at
         break;
     case SDL_EVENT_DROP_FILE:
         if (e.drop.data) openPathConfirmed(e.drop.data);
@@ -1300,6 +1303,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
     mouseX_ = x;
     mouseY_ = y;
     const SDL_Keymod mod = inputMods();
+    const SDL_Keymod nav = inputMods(false); // (navigation ignores the stroke popup's latched Smooth / Mask / Select)
     // A pen button is already driving the view: touching down with the tip keeps navigating.
     if (penNavButton_ && (drag_ == Drag::Orbit || drag_ == Drag::Pan)) return;
     dragFromPen_ = lastInputPen_;
@@ -1392,26 +1396,26 @@ void App::onMouseDown(float x, float y, Uint8 button) {
             // Blender: a drag beside the model navigates as the middle button would (Shift pans, Ctrl zooms).
             const SDL_Keymod keys = SDL_GetModState();
             drag_ = (keys & SDL_KMOD_SHIFT) ? Drag::Pan : ctrlDown(keys) ? Drag::Zoom : Drag::Orbit;
-        } else if (maskMod && !(mod & SDL_KMOD_ALT) && previewLod_ < 0) {
+        } else if (ctrlDown(nav) && !(nav & SDL_KMOD_SHIFT) && !(nav & SDL_KMOD_ALT) && previewLod_ < 0) {
             drag_ = Drag::MaskCanvas; // click inverts, drag draws a mask rectangle (PanelMasking.cpp)
             maskCanvasX_ = x;
             maskCanvasY_ = y;
             maskCanvasMoved_ = false;
         } else {
             // Dragging on empty space navigates (ZBrush style).
-            drag_ = (mod & SDL_KMOD_ALT) ? Drag::Pan : ctrlDown(mod) ? Drag::Zoom : Drag::Orbit;
+            drag_ = (nav & SDL_KMOD_ALT) ? Drag::Pan : ctrlDown(nav) ? Drag::Zoom : Drag::Orbit;
             panFromAlt_ = drag_ == Drag::Pan;
             // ZBrush: Shift+click, let go of Shift, then drag turns the view about its own axis (Z).
-            rollPending_ = drag_ == Drag::Orbit && (mod & SDL_KMOD_SHIFT);
+            rollPending_ = drag_ == Drag::Orbit && (nav & SDL_KMOD_SHIFT);
             rollStartX_ = x;
             rollStartY_ = y;
         }
     } else if (button == SDL_BUTTON_RIGHT) {
         // ZBrush's right-click navigation: rotate (Shift snaps), Alt pans (release Alt to zoom), Ctrl zooms.
-        drag_ = (mod & SDL_KMOD_ALT) ? Drag::Pan : ctrlDown(mod) ? Drag::Zoom : Drag::Orbit;
-        panFromAlt_ = (mod & SDL_KMOD_ALT) != 0;
+        drag_ = (nav & SDL_KMOD_ALT) ? Drag::Pan : ctrlDown(nav) ? Drag::Zoom : Drag::Orbit;
+        panFromAlt_ = (nav & SDL_KMOD_ALT) != 0;
     } else if (button == SDL_BUTTON_MIDDLE) {
-        drag_ = (mod & SDL_KMOD_CTRL) ? Drag::Zoom : Drag::Pan;
+        drag_ = (nav & SDL_KMOD_CTRL) ? Drag::Zoom : Drag::Pan;
     }
 }
 
@@ -1461,10 +1465,10 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
         dy = rightClick_.dy;
     }
     // ZBrush: start a pan with Alt, then let go of Alt while still dragging to zoom.
-    if (drag_ == Drag::Pan && panFromAlt_ && !(inputMods() & SDL_KMOD_ALT)) drag_ = Drag::Zoom;
+    if (drag_ == Drag::Pan && panFromAlt_ && !(inputMods(false) & SDL_KMOD_ALT)) drag_ = Drag::Zoom;
     // Shift+press on the background: letting go of Shift before the drag gets going rolls the view instead.
     if (rollPending_ && drag_ == Drag::Orbit) {
-        if (!(inputMods() & SDL_KMOD_SHIFT)) {
+        if (!(inputMods(false) & SDL_KMOD_SHIFT)) {
             drag_ = Drag::Roll;
             rollPending_ = false;
         } else if (std::hypot(x - rollStartX_, y - rollStartY_) > 6.0f) {
@@ -1514,7 +1518,7 @@ void App::orbitBy(float dx, float dy) {
     if (uiPrefs_.turntable || forceTurntable_) orbitRaw_.orbit(dx, dy);
     else orbitRaw_.orbitFree(dx, dy);
     // Holding Shift snaps to the nearest view along an axis; letting go continues from where the cursor took it.
-    if (inputMods() & SDL_KMOD_SHIFT) camera_.setOrientation(Camera::snapped(orbitRaw_.orientation()));
+    if (inputMods(false) & SDL_KMOD_SHIFT) camera_.setOrientation(Camera::snapped(orbitRaw_.orientation()));
     else camera_.setOrientation(orbitRaw_.orientation());
 }
 
@@ -1585,6 +1589,10 @@ void App::onMouseUp() {
 void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
     if (key == SDLK_ESCAPE && radial_.menu >= 0) {
         closeRadialMenu();
+        return;
+    }
+    if (key == SDLK_ESCAPE && strokePopup_.open) {
+        closeStrokePopup();
         return;
     }
     if (key == SDLK_ESCAPE && !insertType_.empty()) { // Append > Insert (#34) off
@@ -2271,6 +2279,7 @@ void App::drawUi() {
     drawLightBoxUi(); // thumbnails, the LightBox over the canvas, pickers, size / strength pop-ups
     drawQuickMenu();  // Space (Input.cpp)
     drawRadialMenu(); // radial menus (RadialMenu.cpp)
+    drawStrokePopup(); // the stroke popup and a latched modifier's label at the cursor (StrokePopup.cpp)
     drawSubToolPopups();
     if (showBrushLab_) drawBrushLab();
     drawBrushGallery();

@@ -30,6 +30,7 @@
 #include "core/AutoUv.h"
 #include "core/QRemesh.h"
 #include "core/RadialMenu.h"
+#include "core/StrokePopup.h"
 #include "core/Stroke.h"
 #include "core/StrokePath.h"
 #include "core/SurfaceCursor.h"
@@ -1195,6 +1196,7 @@ private:
     bool canvasNavButton(const char* id, const char* icon, const char* label, int mode); // right-shelf Move/Zoom/Rotate
     void drawBrushTile(const char* id, ImVec2 size);
     void drawStrokeTile(const char* id, ImVec2 size);
+    void drawStrokeIcon(ImDrawList* dl, ImVec2 a, ImVec2 b, StrokeType type); // the shelf tile's picture
     void drawAlphaTile(const char* id, ImVec2 size);
     void drawMaterialTile(const char* id, ImVec2 size);
     void drawColorWidget(float width);
@@ -1665,6 +1667,38 @@ private:
         int openedFrame = -1;
         int ran = -1;           // the slot run last (UI tests)
     } radial_;
+    // ---- The stroke popup (StrokePopup.cpp, core/StrokePopup.h; Discord 11-02) ----
+    // One key (stroke.popup, G; J in the Blender style) or the left shelf's button opens a grid at the cursor: the
+    // stroke types and the modifiers Add / Sub, Smooth, Mask, Select. Hold the key, point, let go: picked. Tap it:
+    // the grid stays open for a click (a stroke closes it, a modifier toggles and leaves it open). Esc cancels.
+    // Smooth, Mask and Select latch: strokes act as if Shift, Ctrl or Ctrl+Shift were held until the same item is
+    // picked again or another brush is picked.
+    void registerStrokePopupActions();
+    void openStrokePopup(bool held, int key);
+    void closeStrokePopup() { strokePopup_.open = false; }
+    void pickStrokePopupItem(int item, bool close);
+    bool strokePopupMouseEvent(const SDL_Event& e); // true: the popup used the event
+    void strokePopupKeyUp(SDL_Keycode key);
+    void drawStrokePopup();
+    bool strokePopupItemScreen(int item, ImVec2& out) const; // an item's centre, window pixels (UI tests)
+    StrokeLatch strokeLatch() const; // the latch in effect (None once another brush was picked)
+    void setStrokeLatch(StrokeLatch latch);
+    struct StrokePopupOpen {
+        bool open = false;
+        ImVec2 at{0, 0};       // the panel's top-left
+        double openedAt = 0.0; // seconds (a short press is a tap)
+        bool held = false;     // its key holds it open; false: tapped open, stays until a click or Esc
+        int key = 0;           // the held key (SDL_Keycode)
+        int hover = -1;        // the item under the pointer
+        int picked = -1;       // the item picked last (UI tests)
+    } strokePopup_;
+    struct StrokeLatchState {
+        StrokeLatch latch = StrokeLatch::None;
+        BrushType brush = BrushType::Standard; // the brush it was latched with: picking another ends it
+        int custom = -1;
+        bool paint = false;
+    } strokeLatch_;
+    uint32_t strokePopupSwallowUp_ = 0; // mouse buttons whose press the popup took: their release is its too
     SDL_Keycode keyDown_ = SDLK_UNKNOWN; // the key onKey is handling: a radial menu's key holds the pie open
     uint32_t radialSwallowUp_ = 0;       // mouse buttons whose press the pie took: their release is its too
     std::optional<Json> radialPending_;  // radial menus read from ui.json before the actions existed
@@ -1724,7 +1758,10 @@ private:
     void penButton(int button, bool down, float x, float y);
     void penLeft(); // out of proximity: ends what the pen was doing
     float strokePressure() const; // pressure after the global curve; 1 for the mouse
-    SDL_Keymod inputMods() const; // the keyboard's modifiers plus those a pen button holds (Alt, Shift)
+    // The keyboard's modifiers plus those a pen button holds (Alt, Shift) and, with latch, the stroke popup's
+    // latched modifier (Shift for Smooth, Ctrl for Mask, Ctrl+Shift for Select). Navigation reads it without the
+    // latch: a latched Mask still lets a drag beside the model turn the view.
+    SDL_Keymod inputMods(bool latch = true) const;
     bool erasing() const;         // the pen's eraser end is drawing
     PenAction eraserAction() const { return uiPrefs_.tablet.eraser; }
     void firstDab(float x, float y); // the stroke's first dab, once the pen reports a real pressure

@@ -5,6 +5,13 @@ chapter opens by itself the first time you start a new version; you can always f
 **Help > What's New**. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.10.9
+
+- **Stroke popup**: press <kbd>G</kbd> (<kbd>J</kbd> in the Blender style) or the button under the **Stroke**
+  tile for a grid at the cursor: the stroke types plus **Add**, **Sub**, **Smooth**, **Mask** and **Select**. Hold
+  the key, point and let go, or tap it and click. Smooth, Mask and Select stay on without holding
+  <kbd>Shift</kbd> or <kbd>Ctrl</kbd>. See [Strokes](sculpting.md#the-stroke-popup).
+
 ## Version 0.10.8
 
 - **Tablets in mouse mode work again**: on some Windows tablets with **Mouse mode** on (Preferences > Tablet) the

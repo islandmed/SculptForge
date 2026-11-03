@@ -225,7 +225,7 @@ float App::strokePressure() const {
     return uiPrefs_.tablet.curve.apply(penTracker_.raw());
 }
 
-SDL_Keymod App::inputMods() const {
+SDL_Keymod App::inputMods(bool latch) const {
     SDL_Keymod mods = SDL_GetModState();
     if (blenderStyle()) mods = blenderMods(mods); // Blender's Ctrl inverts, its Mask brush masks (Input.cpp)
     if (mayaStyle()) { // Maya: Ctrl inverts (as ZBrush's Alt), Ctrl+Alt masks (as ZBrush's Ctrl)
@@ -240,6 +240,11 @@ SDL_Keymod App::inputMods() const {
         const PenAction a = penButtonAction(b);
         if (a == PenAction::Invert) mods |= SDL_KMOD_LALT;
         else if (a == PenAction::Smooth) mods |= SDL_KMOD_LSHIFT;
+    }
+    if (latch) { // the stroke popup's Smooth / Mask / Select (StrokePopup.cpp)
+        const StrokeLatchKeys k = strokeLatchKeys(strokeLatch());
+        if (k.shift) mods |= SDL_KMOD_LSHIFT;
+        if (k.ctrl) mods |= SDL_KMOD_LCTRL;
     }
     return mods;
 }
