@@ -340,8 +340,6 @@ the **Stroke** tile on the left shelf. The top row holds the stroke types, the b
   to the brush cursor shows which one is on. Dragging beside the model still turns the view.
 - Change the key in **Preferences > Hotkeys** (*Stroke popup*), or hold <kbd>Ctrl</kbd>+<kbd>Alt</kbd> and click the shelf button, then press the new key.
 
-The stroke type you picked is saved with the project.
-
 > **ZBrush:** Drag Stamp, Slide Stamp, Spray and Lazy Stroke match ZBrush's DragRect, DragDot, Spray and LazyMouse. Freehand and Dots are the same thing here.
 > Roll and curve strokes are not available yet.
 

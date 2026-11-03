@@ -330,7 +330,6 @@ void App::storeProjectSettings() {
     brush.set("rgb_intensity", double(rgbIntensity_));
     brush.set("focal_shift", double(focalShift_));
     brush.set("invert", invertToggle_);
-    brush.set("stroke", strokeTypeName(strokeType_));
     brush.set("front_faces_only", frontFacesOnly_);
     brush.set("connected_only", uiPrefs_.connectedOnly);
     brush.set("view_falloff", uiPrefs_.viewFalloff);
@@ -455,9 +454,6 @@ void App::applyProjectSettings() {
         rgbIntensity_ = std::clamp(rgbIntensity_, 0.0f, 1.0f);
         focalShift_ = std::clamp(focalShift_, -1.0f, 1.0f);
         readBool(b, "invert", invertToggle_);
-        if (b["stroke"].isString())
-            for (int i = 0; i < int(StrokeType::Count); ++i)
-                if (b["stroke"].asString() == strokeTypeName(StrokeType(i))) strokeType_ = StrokeType(i);
         readBool(b, "smooth_keep_volume", smoothKeepVolume_);
         readBool(b, "front_faces_only", frontFacesOnly_);
         readBool(b, "connected_only", uiPrefs_.connectedOnly);

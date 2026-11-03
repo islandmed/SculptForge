@@ -11,7 +11,7 @@ All notable changes to SculptForge are listed here. The format follows
   tile for a grid at the cursor with the stroke types and the modifiers Add / Sub, Smooth, Mask and Select. Hold the
   key, point and let go (a hovering pen works too), or tap it and click. Smooth, Mask and Select stay on without
   holding Shift or Ctrl until you pick them again or another brush; a label at the cursor shows which. A plain grid,
-  not a ring. The stroke type is now saved with the project. (Suggested on Discord.)
+  not a ring. (Suggested on Discord.)
 
 ## [0.10.8] - 2026-11-02
 
