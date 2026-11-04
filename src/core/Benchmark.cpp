@@ -196,6 +196,41 @@ Mesh benchMesh(size_t triangles, bool head) {
 Mesh makeBenchSphere(size_t triangles) { return benchMesh(triangles, false); }
 Mesh makeBenchHead(size_t triangles) { return benchMesh(triangles, true); }
 
+Mesh makeCore200mMesh(size_t baseTriangles, int level) {
+    Mesh m = makeBenchHead(baseTriangles);
+    std::string err;
+    if (!microDivide(m, level, err, 0)) return m; // (in memory: phase 1 is the memory-only prototype)
+    microNoise(m, 0.004f, 40.0f, 1);  // forms the size of wrinkles
+    microNoise(m, 0.0008f, 400.0f, 2); // and pores
+    m.micro->clearDirty();
+    m.micro->markAllDirty();
+    return m;
+}
+
+std::string core200mScenePath(std::string& error, const std::function<void(const std::string&)>& log) {
+    namespace fs = std::filesystem;
+    const fs::path dir = MicroStore::swapFolder();
+    std::error_code ec;
+    fs::create_directories(dir, ec);
+    const fs::path path = dir / "core-200m-v1.sfproj";
+    if (fs::exists(path, ec)) return path.string(); // (renamed into place when whole)
+    if (log) log("Writing the core-200m scene (once): " + path.string());
+    Document doc;
+    doc.mesh = makeCore200mMesh();
+    if (!doc.mesh.micro) {
+        error = "core-200m: couldn't divide to micro level 5";
+        return {};
+    }
+    const fs::path tmp = fs::path(path.string() + ".tmp.sfproj");
+    if (!saveProject(tmp.string(), doc, error)) return {};
+    fs::rename(tmp, path, ec);
+    if (ec) {
+        error = "Can't write " + path.string();
+        return {};
+    }
+    return path.string();
+}
+
 namespace {
 
 using Clock = std::chrono::steady_clock;

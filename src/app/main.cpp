@@ -5,6 +5,7 @@
 #include "app/Calibration.h"
 #include "app/CrashLog.h"
 #include "ai/AiPolicy.h"
+#include "core/Benchmark.h"
 #include "core/FocusDetail.h"
 #include "core/Pack.h"
 
@@ -71,6 +72,7 @@ void usage() {
         "  --benchmark standard-15m The standard scene: a 15M triangle head, Clay S/M/L, Move, Smooth and a 240 px\n"
         "                           brush (standard-33m: 33M; standard: both). The numbers on sculptforge.app/benchmarks\n"
         "  --benchmark standard-1b  Experimental Focus Detail: a billion micro triangle head streamed from disk\n"
+        "  --benchmark core-200m    Research: a 200 million micro triangle head in memory (open and orbit)\n"
         "  --focus-detail FILE      Experimental: open a Focus Detail file (.sfdetail)\n"
         "  --benchmark-sizes 5,20   Proof mode mesh sizes in millions of triangles\n"
         "  --benchmark-out FILE     Where the JSON result goes (default: sculptforge-benchmark-<time>.json here)\n"
@@ -195,11 +197,12 @@ int main(int argc, char** argv) {
         else if (a == "--benchmark") {
             options.benchmark = true;
             // An optional scene name: sculptforge --benchmark standard-15m
-            if (i + 1 < argc && std::string(argv[i + 1]).rfind("standard", 0) == 0) {
+            if (i + 1 < argc && (std::string(argv[i + 1]).rfind("standard", 0) == 0 || std::string(argv[i + 1]) == "core-200m")) {
                 options.benchmarkScene = argv[++i];
                 if (options.benchmarkScene != "standard" && options.benchmarkScene != "standard-15m" &&
-                    options.benchmarkScene != "standard-33m" && options.benchmarkScene != "standard-1b") {
-                    std::fprintf(stderr, "Unknown benchmark scene %s (standard-15m, standard-33m, standard or standard-1b)\n", argv[i]);
+                    options.benchmarkScene != "standard-33m" && options.benchmarkScene != "standard-1b" &&
+                    options.benchmarkScene != "core-200m") {
+                    std::fprintf(stderr, "Unknown benchmark scene %s (standard-15m, standard-33m, standard, standard-1b or core-200m)\n", argv[i]);
                     return 1;
                 }
             }
@@ -236,6 +239,13 @@ int main(int argc, char** argv) {
         std::string error;
         if (sf::focusStandard1bPath(error, [](const std::string& s) { std::fprintf(stderr, "%s\n", s.c_str()); }).empty()) {
             std::fprintf(stderr, "standard-1b: %s\n", error.c_str());
+            return 1;
+        }
+    }
+    if (options.benchmarkScene == "core-200m") { // research: 200M micro triangles in memory, the project written once
+        std::string error;
+        if (sf::core200mScenePath(error, [](const std::string& s) { std::fprintf(stderr, "%s\n", s.c_str()); }).empty()) {
+            std::fprintf(stderr, "core-200m: %s\n", error.c_str());
             return 1;
         }
     }

@@ -81,6 +81,13 @@ Mesh makeBenchSphere(size_t triangles);
 // eye sockets, nose, cheekbones, jaw, ears, neck) of about `triangles` triangles, with subdivision levels. Made
 // from a formula, not a file, so every build and platform sculpts the same surface.
 Mesh makeBenchHead(size_t triangles);
+// The core-200m research scene (docs/design/core-200m.md, phase 1; --benchmark core-200m, off by default): the
+// bench head at micro level 5 with procedural detail, about 200 million micro triangles, held in memory. Written
+// once as a project in the swap folder (a few seconds) so the benchmark measures opening it; returns its path,
+// or "" with `error`.
+std::string core200mScenePath(std::string& error, const std::function<void(const std::string&)>& log = {});
+// The scene itself, built in memory (what core200mScenePath saves): `baseTriangles` base triangles at `level`.
+Mesh makeCore200mMesh(size_t baseTriangles = 195313, int level = 5);
 
 // Resident memory of this process in bytes (0 where unknown).
 size_t residentBytes();

@@ -570,3 +570,33 @@ TEST(micro_tier_config_and_page_table) {
         CHECK(ooc.mesh.micro->disp[7 * ooc.mesh.micro->samples] == 3); // trimmed pages come back from the file
     }
 }
+
+TEST(micro_core200m_scene_small) {
+    // The core-200m research scene (docs/design/core-200m.md), at a test's size: in memory, detailed, and it
+    // survives a project round trip unchanged.
+    Document doc;
+    doc.mesh = makeCore200mMesh(2000, 3);
+    CHECK(doc.mesh.micro);
+    if (!doc.mesh.micro) return;
+    const MicroMesh& mm = *doc.mesh.micro;
+    CHECK(mm.level == 3 && !mm.disp.mapped());
+    CHECK(microTriangleCount(doc.mesh) == size_t(mm.baseTriangles) * 64);
+    CHECK(mm.rangeMax > 0); // the noise is there
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    const std::string path = (fs::temp_directory_path(ec) / "sf-test-core200m.sfproj").string();
+    std::string err;
+    const bool saved = saveProject(path, doc, err);
+    CHECK(saved);
+    Document back;
+    const bool loaded = saved && loadProject(path, back, err);
+    CHECK(loaded);
+    fs::remove(path, ec);
+    if (!loaded) return;
+    CHECK(back.mesh.micro);
+    if (!back.mesh.micro) return;
+    CHECK(back.mesh.micro->baseTriangles == mm.baseTriangles && back.mesh.micro->level == 3);
+    bool same = true;
+    for (size_t i = 0; i < mm.disp.size() && same; ++i) same = back.mesh.micro->disp[i] == mm.disp[i];
+    CHECK(same);
+}

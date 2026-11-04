@@ -24,6 +24,7 @@
 #include "core/Benchmark.h"
 #include "core/MemoryGuard.h"
 #include "core/Primitives.h"
+#include "core/Project.h"
 #include "core/Timeline.h"
 
 #include "render/GL.h"
@@ -98,6 +99,19 @@ std::vector<ProofMeshSize> proofStandardScene(const std::string& name) {
                                     return m;
                                 }, 5};
         return {s1b};
+    }
+    if (name == "core-200m") { // research (docs/design/core-200m.md, phase 1): ~200M micro triangles in memory, opened from a project
+        const ProofMeshSize s200{200, "200M micro", [](size_t) {
+                                     std::string err;
+                                     const std::string path = core200mScenePath(err); // (main wrote it first)
+                                     Document d;
+                                     if (path.empty() || !loadProject(path, d, err)) {
+                                         std::fprintf(stderr, "core-200m: %s\n", err.c_str());
+                                         return makeBenchHead(size_t(1) << 20);
+                                     }
+                                     return std::move(d.mesh);
+                                 }, 8};
+        return {s200};
     }
     return {};
 }
@@ -373,6 +387,9 @@ struct SizeResult {
     std::string label;
     size_t triangles = 0, vertices = 0;
     double buildSeconds = 0;
+    double firstFrameSeconds = 0; // build start to the first frame showing the mesh
+    double shadedSeconds = 0;     // ... to the frame its micro level's shading was complete (0: no micro level)
+    size_t loadedRamBytes = 0;    // resident memory at that frame
     size_t ramBytes = 0, peakRamBytes = 0;
     size_t gpuBufferBytes = 0;   // the most the renderer's vertex and index buffers held (documentMemory().gpu)
     long long vramUsedKb = -1;   // the most the driver's free graphics memory dropped from before the build (-1: unknown)
@@ -394,6 +411,7 @@ struct ProofState {
     std::string jsonPath, videoPath;
     std::vector<ProofMeshSize> sizes;
     size_t sizeIndex = 0, phaseIndex = 0;
+    double buildStart = 0; // when the current size's build began
     std::vector<PhaseSpec> phases;
     std::vector<SizeResult> results;
     double stageStart = 0, lastFrame = 0, lastSample = 0;
@@ -496,7 +514,8 @@ void App::startProofMode() {
     };
     p->jsonPath = !options_.benchmarkOut.empty() ? options_.benchmarkOut : u8(dir / ("sculptforge-benchmark-" + stamp + ".json"));
     p->videoPath = !options_.benchmarkVideo.empty() ? options_.benchmarkVideo : u8(dir / ("sculptforge-benchmark-" + stamp + ".mp4"));
-    if (!p->scene.empty()) p->phases = standardPhases(p->strokeSeconds);
+    if (p->scene == "core-200m") p->phases = {{"orbit", 0.0f, 10.0}, {"orbit again", 0.0f, 10.0}}; // phase 1: loads and orbits
+    else if (!p->scene.empty()) p->phases = standardPhases(p->strokeSeconds);
     else p->phases = {{"stroke", 60.0f, p->strokeSeconds}, {"large brush stroke", 240.0f, p->strokeSeconds}, {"orbit", 0.0f, 3.0}};
     p->stage = p->cli ? ProofState::Stage::Announce : ProofState::Stage::Intro;
     p->radiusBefore = radiusPx_;
@@ -746,7 +765,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
     auto nextPhase = [&] {
         SizeResult& r = p.results.back();
         if (r.phases.back().seconds == 0) r.phases.back().seconds = now - p.stageStart; // (a stroke set it at its release)
-        r.gpuBufferBytes = std::max(r.gpuBufferBytes, documentMemory(doc_).gpu);
+        r.gpuBufferBytes = std::max({r.gpuBufferBytes, documentMemory(doc_).gpu, renderer_.gpuBytes()}); // (the estimate leaves micro levels out)
         if (r.vramFreeBeforeKb >= 0)
             if (const long long freeKb = driverFreeVramKb(); freeKb >= 0)
                 r.vramUsedKb = std::max(r.vramUsedKb, std::max(0LL, r.vramFreeBeforeKb - freeKb));
@@ -823,10 +842,11 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         Mesh m = s.build ? s.build(tris) : makeBenchSphere(tris);
         SizeResult r;
         r.label = s.label;
-        r.triangles = m.micro && m.micro->focus ? microTriangleCount(m) : m.triangleCount(); // (Focus Detail: its micro triangles)
+        r.triangles = m.micro ? microTriangleCount(m) : m.triangleCount(); // (a micro level: its micro triangles)
         r.vertices = m.vertexCount();
         doc_.setMesh(std::move(m), "Benchmark");
         r.buildSeconds = nowSeconds() - t0;
+        p.buildStart = t0;
         r.vramFreeBeforeKb = vramBefore;
         p.results.push_back(r);
         camera_.frame(sceneBounds());
@@ -841,9 +861,18 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         p.hudLine2 = "settling (the first upload to the GPU)";
         break;
     }
-    case Stage::Settle:
-        if (now - p.stageStart > 1.0 && !backgroundBusy()) beginPhase();
+    case Stage::Settle: {
+        // (called before the swap: this frame has drawn the new mesh)
+        SizeResult& r = p.results.back();
+        if (r.firstFrameSeconds == 0) r.firstFrameSeconds = now - p.buildStart;
+        const bool shading = renderer_.microPendingShading() > 0;
+        if (doc_.mesh.micro && !shading && r.shadedSeconds == 0) {
+            r.shadedSeconds = now - p.buildStart;
+            r.loadedRamBytes = residentBytes();
+        }
+        if (now - p.stageStart > 1.0 && !backgroundBusy() && !shading) beginPhase();
         break;
+    }
     case Stage::Phase: {
         const PhaseSpec& spec = p.phases[p.phaseIndex];
         PhaseResult& ph = p.results.back().phases.back();
@@ -985,6 +1014,11 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             run.set("triangles", double(r.triangles));
             run.set("vertices", double(r.vertices));
             run.set("build_seconds", std::round(r.buildSeconds * 100) / 100);
+            run.set("first_frame_seconds", std::round(r.firstFrameSeconds * 100) / 100);
+            if (r.shadedSeconds > 0) {
+                run.set("shaded_seconds", std::round(r.shadedSeconds * 100) / 100);
+                run.set("loaded_ram_mb", double(r.loadedRamBytes >> 20));
+            }
             run.set("ram_mb", double(r.ramBytes >> 20));
             run.set("peak_ram_mb", double(r.peakRamBytes >> 20));
             run.set("gpu_buffers_mb", double(r.gpuBufferBytes >> 20));
@@ -1038,6 +1072,10 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                 std::printf("  %s\n", r.skipped.c_str());
                 continue;
             }
+            std::printf("  %-5s %.1fM triangles: built / opened %.2f s, first frame %.2f s", r.label.c_str(), double(r.triangles) / 1e6,
+                        r.buildSeconds, r.firstFrameSeconds);
+            if (r.shadedSeconds > 0) std::printf(", fully shaded %.2f s (RAM then %zu MB)", r.shadedSeconds, r.loadedRamBytes >> 20);
+            std::printf("\n");
             std::printf("  %-5s peak RAM %zu MB, GPU buffers %zu MB%s, worst stall %.0f ms\n", r.label.c_str(), r.peakRamBytes >> 20,
                         r.gpuBufferBytes >> 20, r.vramUsedKb > 0 ? (", driver VRAM used " + std::to_string(r.vramUsedKb >> 10) + " MB").c_str() : "",
                         [&] { double w = 0; for (const PhaseResult& ph : r.phases) w = std::max(w, worstStallMs(ph.frameMs, ph.releaseMs)); return w; }());

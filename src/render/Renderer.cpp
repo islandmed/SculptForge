@@ -1080,6 +1080,13 @@ void Renderer::freeSlot(MeshSlot& s) {
     s = MeshSlot();
 }
 
+size_t Renderer::microPendingShading() const {
+    size_t total = 0;
+    for (const MeshSlot& s : slots_)
+        if (s.micro) total += s.micro->pendingShading();
+    return total;
+}
+
 size_t Renderer::gpuBytes() const {
     size_t total = 0;
     for (const MeshSlot& s : slots_) {
