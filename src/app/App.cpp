@@ -1873,11 +1873,12 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     }
 
     if (strokeBrush_ == BrushType::Move && !recipe && strokeSculpt_) {
-        const float pressure = pressureSize_ ? std::max(strokePressure(), 0.05f) : 1.0f;
+        // The grab region is fixed at the press, when a pen barely touches: Pressure > Size would shrink it to a
+        // few percent (#122), so Move grabs with the full brush size.
         DabParams p;
         p.center = hit.position;
         p.viewDir = camera_.forward();
-        p.radius = radiusPx_ * pressure * camera_.worldPerPixel(hit.position, canvasHeight());
+        p.radius = radiusPx_ * camera_.worldPerPixel(hit.position, canvasHeight());
         p.strength = strength_;
         p.focal = focalShift_;
         p.connectedOnly = uiPrefs_.connectedOnly;

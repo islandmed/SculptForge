@@ -52,9 +52,9 @@ bool App::kelvinStrokeBrush() const { return dragBrush(strokeBrush_) && !strokeR
 // ---------------------------------------------------------------------------
 
 void App::kelvinBegin(const RayHit& hit) {
-    const float pressure = pressureSize_ ? std::max(strokePressure(), 0.05f) : 1.0f;
+    // Full brush size, as Move: the press pressure of a pen is near zero, so Pressure > Size would shrink the grab (#122).
     kelvinCenter_ = hit.position;
-    kelvinRadius_ = radiusPx_ * pressure * camera_.worldPerPixel(hit.position, canvasHeight());
+    kelvinRadius_ = radiusPx_ * camera_.worldPerPixel(hit.position, canvasHeight());
     grabPlanePoint_ = grabLast_ = kelvinTarget_ = hit.position;
     kelvinPending_ = 0.0f;
     kelvinLastX_ = lastX_;
