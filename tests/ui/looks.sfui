@@ -26,7 +26,7 @@ expect_not "Tool##palette.tool"
 expect_not "Library##ui.lightbox"           # moved off the shelf (View > Display, F3)
 expect "Clay##brush.clay"
 expect "##drawsize"
-expect "SubTools/Append"                    # the Tool palette stays in the right tray
+expect "Parts/Append"                    # the Tool palette stays in the right tray
 shot forge
 
 # Every palette is a section of one menu.
@@ -189,7 +189,7 @@ click "##welcome.look.neutral"
 wait 0.2
 expect_value look_neutral == 1
 shot welcome-neutral
-click "ZBrush##welcome.from"
+click "Classic sculpting keys##welcome.from"
 wait 0.2
 expect_value shell_layout == 0
 expect "Tool##palette.tool"

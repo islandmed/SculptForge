@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "io/GozCommands.h"
 
+#include "io/BridgeProtocol.h"
+
 #include "core/SubTools.h"
 #include "io/GozIO.h"
 #include "io/StlIO.h"
@@ -88,9 +90,9 @@ void registerGozCommands(CommandRegistry& reg) {
     using T = ParamSpec::Type;
 
     reg.add({"goz_import",
-             "Open a GoZ-compatible file (.GoZ, as ZBrush writes), replacing the scene. Face Groups, UVs, mask and vertex paint are kept; "
+             "Open a Bridge file, replacing the scene. Face Groups, UVs, mask and vertex paint are kept; "
              "quads are split into triangle pairs (exported back as quads).",
-             {{"path", T::String, "Input .GoZ path (UTF-8).", true}},
+             {{"path", T::String, "Input Bridge file path (UTF-8).", true}},
              [](Document& doc, const Args& a) -> CommandResult {
                  const std::string path = argString(a, "path");
                  Mesh m;
@@ -101,17 +103,17 @@ void registerGozCommands(CommandRegistry& reg) {
                  doc.setMesh(std::move(m), name);
                  doc.path.clear();
                  doc.gozName = name;
-                 std::string msg = "Opened GoZ " + doc.gozName + " (" + meshSummary(doc.mesh) + ")";
+                 std::string msg = "Opened Bridge file " + doc.gozName + " (" + meshSummary(doc.mesh) + ")";
                  if (!err.empty()) msg += "; " + err;
                  return {true, msg};
              }});
 
     reg.add({"goz_export",
-             "Export the mesh as a GoZ-compatible file (.GoZ) with face groups, UVs, mask and vertex paint. With several "
-             "visible Parts, each is written next to `path` as <name>_<Part>.GoZ.",
-             {{"path", T::String, "Output .GoZ path (UTF-8).", true},
-              {"name", T::String, "Part name. Default: the name it came from ZBrush with, else the document name.", false},
-              {"quads", T::Bool, "Rebuild quads from triangle pairs made by the .GoZ import. Default true.", false}},
+             "Export the mesh as a Bridge file with face groups, UVs, mask and vertex paint. With several "
+             "visible Parts, each is written next to `path` as <name>_<Part> with the same extension.",
+             {{"path", T::String, "Output Bridge file path (UTF-8).", true},
+              {"name", T::String, "Part name. Default: the name it came through the Bridge with, else the document name.", false},
+              {"quads", T::Bool, "Rebuild quads from triangle pairs made by the Bridge file import. Default true.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  const std::string path = argString(a, "path");
                  GozWriteOptions o;
@@ -135,21 +137,21 @@ void registerGozCommands(CommandRegistry& reg) {
                      const std::string wanted = name;
                      for (int k = 2; std::find(used.begin(), used.end(), name) != used.end(); ++k) name = wanted + "_" + std::to_string(k);
                      used.push_back(name);
-                     const std::string file = fileStem(path) + "_" + name + ".GoZ";
+                     const std::string file = fileStem(path) + "_" + name + bridge::kExt;
                      const auto out = (base.parent_path() / std::u8string(file.begin(), file.end())).u8string();
                      if (!saveGoz(std::string(out.begin(), out.end()), *obj.mesh, name, err, o)) return {false, err};
                  }
-                 return {true, "Exported " + std::to_string(objects.size()) + " Parts as " + fileStem(path) + "_*.GoZ"};
+                 return {true, "Exported " + std::to_string(objects.size()) + " Parts as " + fileStem(path) + "_*" + bridge::kExt};
              }});
 
     reg.add({"goz_send",
-             "Send the visible Parts to ZBrush (Send to ZBrush, a GoZ-compatible exchange; Windows/macOS): writes each to the shared "
-             "GoZ folder, lists them in GoZ_ObjectList.txt and notifies or starts ZBrush. Sending meshes received "
-             "from ZBrush updates those Parts.",
-             {{"name", T::String, "Part name (single Part only). Default: the name it came from ZBrush with, else the document name.", false},
-              {"folder", T::String, "GoZ root folder (contains GoZBrush/ and GoZProjects/). Default: the public Pixologic folder.", false},
-              {"launch", T::Bool, "Notify or start ZBrush. Default true.", false},
-              {"zbrush", T::String, "ZBrush executable to start if GoZ's notifier is missing (optional).", false}},
+             "Send the visible Parts through the Bridge (Windows/macOS): writes each to the shared bridge folder, "
+             "lists them in its object list and notifies or starts the other application. Sending meshes received "
+             "through the Bridge updates those Parts.",
+             {{"name", T::String, "Part name (single Part only). Default: the name it came through the Bridge with, else the document name.", false},
+              {"folder", T::String, "Bridge folder. Default: the shared bridge folder of this system.", false},
+              {"launch", T::Bool, "Notify or start the other application. Default true.", false},
+              {"zbrush", T::String, "The other application's executable, started if its notifier is missing (optional).", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  GozSendOptions o;
                  o.root = argString(a, "folder");
@@ -174,15 +176,15 @@ void registerGozCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"goz_receive",
-             "Receive what ZBrush last sent with GoZ (the objects in GoZ_ObjectList.txt). Each object updates the "
+             "Receive what was last sent through the Bridge (the objects in its object list). Each object updates the "
              "Part it was sent from (an undoable step on that Part), or becomes a new Part; a single object "
-             "replaces a scene of one Part that didn't come from ZBrush.",
-             {{"folder", T::String, "GoZ root folder. Default: the public Pixologic folder.", false}},
+             "replaces a scene of one Part that didn't come through the Bridge.",
+             {{"folder", T::String, "Bridge folder. Default: the shared bridge folder of this system.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  std::vector<MeshObject> objects;
                  std::string msg;
                  if (!gozReceive(argString(a, "folder"), objects, msg)) return {false, msg};
-                 receiveObjects(doc, objects, "Receive from ZBrush", false);
+                 receiveObjects(doc, objects, "Receive via Bridge", false);
                  return {true, msg};
              }});
 

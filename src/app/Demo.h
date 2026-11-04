@@ -51,10 +51,11 @@ public:
     bool findItem(const std::string& label, ImVec2& center, bool* visible = nullptr, ImVec4* clip = nullptr) const;
     static void beginFrame(); // clears the item table (called before ImGui::NewFrame)
     // Items drawn between these are also found as "NAME/label" (palettes in the shell's trays and drop-downs,
-    // whose ImGui window is the tray, keep their panel names: "SubTools/Append").
+    // whose ImGui window is the tray, keep their panel names: "Parts/Append").
     static void pushScope(const char* name);
     static void popScope();
     static std::vector<std::string> similarItems(const std::string& label); // for test failure messages
+    static std::vector<std::string> offscreenItems(); // items drawn past the window's edge last frame ("window/label")
 
     // UI tests (UiTest.cpp). Steps that fail stop the run; failures() lists why.
     bool loadScript(const std::string& path, std::string& error);

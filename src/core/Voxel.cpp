@@ -5,61 +5,84 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <thread>
+
+#include "core/ThreadPool.h"
 
 namespace sf {
 
 namespace {
 
-// Running max (dilate) or min (erode) over a window of +-radius along one axis.
-void filterAxis(std::vector<uint8_t>& data, const glm::ivec3& dims, int axis, int radius, bool dilate) {
-    const glm::ivec3 step(1, dims.x, dims.x * dims.y);
-    const int n = dims[axis];
-    const int u = (axis + 1) % 3, v = (axis + 2) % 3;
-    std::vector<uint8_t> line(static_cast<size_t>(n)), out(static_cast<size_t>(n));
-    for (int b = 0; b < dims[v]; ++b)
-        for (int a = 0; a < dims[u]; ++a) {
-            const size_t start = size_t(a) * size_t(step[u]) + size_t(b) * size_t(step[v]);
-            for (int i = 0; i < n; ++i) line[size_t(i)] = data[start + size_t(i) * size_t(step[axis])];
-            for (int i = 0; i < n; ++i) {
-                uint8_t r = line[size_t(i)];
-                for (int k = std::max(0, i - radius); k <= std::min(n - 1, i + radius); ++k)
-                    r = dilate ? std::max(r, line[size_t(k)]) : std::min(r, line[size_t(k)]);
-                out[size_t(i)] = r;
-            }
-            for (int i = 0; i < n; ++i) data[start + size_t(i) * size_t(step[axis])] = out[size_t(i)];
-        }
-}
-
+// Running max (dilate) or min (erode) over a box of +-radius cells, one axis at a time (separable). Rows along x,
+// whole rows for y and whole slices for z, so every pass reads memory in order; the slices run in parallel.
 void morph(std::vector<uint8_t>& data, const glm::ivec3& dims, int radius, bool dilate) {
     if (radius <= 0) return;
-    for (int axis = 0; axis < 3; ++axis) filterAxis(data, dims, axis, radius, dilate);
+    const size_t X = size_t(dims.x), Y = size_t(dims.y), Z = size_t(dims.z), S = X * Y;
+    std::vector<uint8_t> tmp(data.size());
+    auto combine = [dilate](uint8_t* out, const uint8_t* in, size_t count) {
+        for (size_t i = 0; i < count; ++i) out[i] = dilate ? std::max(out[i], in[i]) : std::min(out[i], in[i]);
+    };
+    poolFor(Y * Z, [&](size_t b, size_t e) { // x: data -> tmp
+        for (size_t row = b; row < e; ++row) {
+            const uint8_t* in = &data[row * X];
+            uint8_t* out = &tmp[row * X];
+            for (int x = 0; x < dims.x; ++x) {
+                uint8_t r = in[x];
+                for (int k = std::max(0, x - radius); k <= std::min(dims.x - 1, x + radius); ++k)
+                    r = dilate ? std::max(r, in[k]) : std::min(r, in[k]);
+                out[x] = r;
+            }
+        }
+    }, 64);
+    poolFor(Z, [&](size_t b, size_t e) { // y: tmp -> data
+        for (size_t z = b; z < e; ++z)
+            for (int y = 0; y < dims.y; ++y) {
+                uint8_t* out = &data[z * S + size_t(y) * X];
+                std::copy_n(&tmp[z * S + size_t(y) * X], X, out);
+                for (int k = std::max(0, y - radius); k <= std::min(dims.y - 1, y + radius); ++k)
+                    if (k != y) combine(out, &tmp[z * S + size_t(k) * X], X);
+            }
+    }, 1);
+    poolFor(Z, [&](size_t b, size_t e) { // z: data -> tmp
+        for (size_t z = b; z < e; ++z) {
+            std::copy_n(&data[z * S], S, &tmp[z * S]);
+            for (int k = std::max(0, int(z) - radius); k <= std::min(dims.z - 1, int(z) + radius); ++k)
+                if (k != int(z)) combine(&tmp[z * S], &data[size_t(k) * S], S);
+        }
+    }, 1);
+    data.swap(tmp);
 }
 
-// Labels 6-connected regions where data[i] == value, starting from `seeds`.
+// Labels 6-connected regions where data[i] == value, starting from `seeds` (already marked in `reached`). Span fill:
+// each popped sample claims its whole x run, and only the first sample of each run beside it is pushed.
 void floodFill(const std::vector<uint8_t>& data, uint8_t value, const glm::ivec3& dims, std::vector<uint32_t>& stack,
                std::vector<uint8_t>& reached) {
-    const int64_t sx = 1, sy = dims.x, sz = int64_t(dims.x) * dims.y;
+    const size_t X = size_t(dims.x), S = X * size_t(dims.y);
+    auto open = [&](size_t j) { return !reached[j] && data[j] == value; };
     while (!stack.empty()) {
-        const uint32_t i = stack.back();
+        const size_t i = stack.back();
         stack.pop_back();
-        const int x = int(i % uint32_t(dims.x));
-        const int y = int((i / uint32_t(dims.x)) % uint32_t(dims.y));
-        const int z = int(i / uint32_t(sz));
-        auto visit = [&](bool inRange, int64_t offset) {
+        const size_t row = i - i % X; // the row's first sample
+        size_t lo = i, hi = i;
+        while (lo > row && open(lo - 1)) reached[--lo] = 1;
+        while (hi + 1 < row + X && open(hi + 1)) reached[++hi] = 1;
+        const size_t y = (i / X) % size_t(dims.y), z = i / S;
+        auto scan = [&](bool inRange, size_t offset, bool up) {
             if (!inRange) return;
-            const uint32_t j = uint32_t(int64_t(i) + offset);
-            if (!reached[j] && data[j] == value) {
-                reached[j] = 1;
-                stack.push_back(j);
+            bool inRun = false;
+            for (size_t k = lo; k <= hi; ++k) {
+                const size_t j = up ? k + offset : k - offset;
+                const bool o = open(j);
+                if (o && !inRun) {
+                    reached[j] = 1;
+                    stack.push_back(uint32_t(j));
+                }
+                inRun = o;
             }
         };
-        visit(x > 0, -sx);
-        visit(x + 1 < dims.x, sx);
-        visit(y > 0, -sy);
-        visit(y + 1 < dims.y, sy);
-        visit(z > 0, -sz);
-        visit(z + 1 < dims.z, sz);
+        scan(y > 0, X, false);
+        scan(y + 1 < size_t(dims.y), X, true);
+        scan(z > 0, S, false);
+        scan(z + 1 < size_t(dims.z), S, true);
     }
 }
 
@@ -128,7 +151,9 @@ std::vector<uint8_t> solidifyShell(const VoxelGrid& shell, float threshold, int 
     const glm::ivec3 dims = shell.dims;
     const size_t n = shell.size();
     std::vector<uint8_t> wall(n);
-    for (size_t i = 0; i < n; ++i) wall[i] = shell.values[i] > threshold ? 1 : 0;
+    poolFor(n, [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) wall[i] = shell.values[i] > threshold ? 1 : 0;
+    }, 1 << 16);
     morph(wall, dims, closeRadius, true);
 
     // Flood the empty space from the grid border; whatever it can't reach is inside.
@@ -147,7 +172,9 @@ std::vector<uint8_t> solidifyShell(const VoxelGrid& shell, float threshold, int 
     floodFill(wall, 0, dims, stack, outside);
 
     std::vector<uint8_t> solid(n);
-    for (size_t i = 0; i < n; ++i) solid[i] = outside[i] ? 0 : 1;
+    poolFor(n, [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) solid[i] = outside[i] ? 0 : 1;
+    }, 1 << 16);
     morph(solid, dims, closeRadius, false); // undo the gap-closing dilation
 
     if (!keepAllParts) {
@@ -197,82 +224,114 @@ Mesh meshFromSolid(const VoxelGrid& grid, const std::vector<uint8_t>& solid, int
 
 Mesh meshFromField(const VoxelGrid& grid, const std::vector<float>& f, float iso, int smoothIterations) {
     const glm::ivec3 dims = grid.dims;
-
-    // One vertex per cell that the surface passes through (surface nets).
     const glm::ivec3 cells = dims - 1;
-    std::vector<int32_t> cellVertex(size_t(cells.x) * size_t(cells.y) * size_t(cells.z), -1);
+    if (glm::any(glm::lessThan(cells, glm::ivec3(1)))) return {};
+    const size_t cellSlice = size_t(cells.x) * size_t(cells.y);
+    std::vector<int32_t> cellVertex(cellSlice * size_t(cells.z), -1);
     auto cellIndex = [&](int x, int y, int z) { return (size_t(z) * size_t(cells.y) + size_t(y)) * size_t(cells.x) + size_t(x); };
-    Mesh m;
-    for (int z = 0; z < cells.z; ++z)
-        for (int y = 0; y < cells.y; ++y)
-            for (int x = 0; x < cells.x; ++x) {
-                std::array<float, 8> c;
-                int inside = 0;
-                for (int k = 0; k < 8; ++k) {
-                    c[size_t(k)] = f[grid.index(x + (k & 1), y + ((k >> 1) & 1), z + ((k >> 2) & 1))];
-                    inside += c[size_t(k)] > iso;
-                }
-                if (inside == 0 || inside == 8) continue;
-                glm::vec3 sum(0.0f);
-                int crossings = 0;
-                for (int a = 0; a < 8; ++a)
-                    for (int bit = 1; bit < 8; bit <<= 1) {
-                        if (a & bit) continue;
-                        const int b = a | bit;
-                        const float fa = c[size_t(a)], fb = c[size_t(b)];
-                        if ((fa > iso) == (fb > iso)) continue;
-                        const float t = (iso - fa) / (fb - fa);
-                        const glm::vec3 pa(a & 1, (a >> 1) & 1, (a >> 2) & 1);
-                        const glm::vec3 pb(b & 1, (b >> 1) & 1, (b >> 2) & 1);
-                        sum += glm::mix(pa, pb, t);
-                        ++crossings;
-                    }
-                cellVertex[cellIndex(x, y, z)] = int32_t(m.positions.size());
-                m.positions.push_back(grid.position(x, y, z) + sum / float(crossings) * grid.cell);
-            }
 
-    // One quad per grid edge with a sign change, joining the four cells around it.
-    for (int z = 0; z < dims.z; ++z)
-        for (int y = 0; y < dims.y; ++y)
-            for (int x = 0; x < dims.x; ++x) {
-                const glm::ivec3 p(x, y, z);
-                const bool in0 = f[grid.index(x, y, z)] > iso;
-                for (int axis = 0; axis < 3; ++axis) {
-                    glm::ivec3 q = p;
-                    q[axis] += 1;
-                    if (q[axis] >= dims[axis]) continue;
-                    const bool in1 = f[grid.index(q.x, q.y, q.z)] > iso;
-                    if (in0 == in1) continue;
-                    const int u = (axis + 1) % 3, v = (axis + 2) % 3;
-                    if (p[u] < 1 || p[v] < 1 || p[u] > cells[u] - 1 || p[v] > cells[v] - 1 || p[axis] > cells[axis] - 1)
-                        continue;
-                    std::array<int32_t, 4> quad;
-                    const int du[4] = {-1, 0, 0, -1}, dv[4] = {-1, -1, 0, 0};
-                    bool ok = true;
-                    for (int k = 0; k < 4; ++k) {
-                        glm::ivec3 c = p;
-                        c[u] += du[k];
-                        c[v] += dv[k];
-                        quad[size_t(k)] = cellVertex[cellIndex(c.x, c.y, c.z)];
-                        ok &= quad[size_t(k)] >= 0;
+    // One vertex per cell that the surface passes through (surface nets). Slices run in parallel, each numbering its
+    // own vertices; the slices' counts then give the global numbers, in the same z, y, x order as a serial scan.
+    std::vector<std::vector<glm::vec3>> slicePositions(size_t(cells.z));
+    poolFor(size_t(cells.z), [&](size_t zb, size_t ze) {
+        for (int z = int(zb); z < int(ze); ++z) {
+            std::vector<glm::vec3>& out = slicePositions[size_t(z)];
+            for (int y = 0; y < cells.y; ++y)
+                for (int x = 0; x < cells.x; ++x) {
+                    std::array<float, 8> c;
+                    int inside = 0;
+                    for (int k = 0; k < 8; ++k) {
+                        c[size_t(k)] = f[grid.index(x + (k & 1), y + ((k >> 1) & 1), z + ((k >> 2) & 1))];
+                        inside += c[size_t(k)] > iso;
                     }
-                    if (!ok) continue;
-                    if (!in0) std::swap(quad[1], quad[3]); // outward normal must point to the outside sample
-                    const auto& P = m.positions;
-                    const bool diag02 = glm::distance(P[size_t(quad[0])], P[size_t(quad[2])]) <=
-                                        glm::distance(P[size_t(quad[1])], P[size_t(quad[3])]);
-                    const glm::uvec4 qq(quad[0], quad[1], quad[2], quad[3]);
-                    if (diag02) {
-                        m.triangles.push_back({qq.x, qq.y, qq.z});
-                        m.triangles.push_back({qq.x, qq.z, qq.w});
-                    } else {
-                        m.triangles.push_back({qq.x, qq.y, qq.w});
-                        m.triangles.push_back({qq.y, qq.z, qq.w});
-                    }
-                    // Surface nets makes quads: keep each one (Mesh::quadPartners), like ZBrush's DynaMesh.
-                    m.pairQuad(uint32_t(m.triangles.size() - 2), uint32_t(m.triangles.size() - 1));
+                    if (inside == 0 || inside == 8) continue;
+                    glm::vec3 sum(0.0f);
+                    int crossings = 0;
+                    for (int a = 0; a < 8; ++a)
+                        for (int bit = 1; bit < 8; bit <<= 1) {
+                            if (a & bit) continue;
+                            const int b = a | bit;
+                            const float fa = c[size_t(a)], fb = c[size_t(b)];
+                            if ((fa > iso) == (fb > iso)) continue;
+                            const float t = (iso - fa) / (fb - fa);
+                            const glm::vec3 pa(a & 1, (a >> 1) & 1, (a >> 2) & 1);
+                            const glm::vec3 pb(b & 1, (b >> 1) & 1, (b >> 2) & 1);
+                            sum += glm::mix(pa, pb, t);
+                            ++crossings;
+                        }
+                    cellVertex[cellIndex(x, y, z)] = int32_t(out.size());
+                    out.push_back(grid.position(x, y, z) + sum / float(crossings) * grid.cell);
                 }
-            }
+        }
+    }, 1);
+    std::vector<size_t> firstVertex(size_t(cells.z) + 1, 0);
+    for (size_t z = 0; z < size_t(cells.z); ++z) firstVertex[z + 1] = firstVertex[z] + slicePositions[z].size();
+    Mesh m;
+    m.positions.resize(firstVertex.back());
+    poolFor(size_t(cells.z), [&](size_t zb, size_t ze) {
+        for (size_t z = zb; z < ze; ++z) {
+            std::copy(slicePositions[z].begin(), slicePositions[z].end(), m.positions.begin() + ptrdiff_t(firstVertex[z]));
+            std::vector<glm::vec3>().swap(slicePositions[z]);
+            if (firstVertex[z] == 0) continue;
+            for (size_t i = z * cellSlice; i < (z + 1) * cellSlice; ++i)
+                if (cellVertex[i] >= 0) cellVertex[i] += int32_t(firstVertex[z]);
+        }
+    }, 1);
+
+    // One quad per grid edge with a sign change, joining the four cells around it; slices in parallel, joined in order.
+    std::vector<std::vector<glm::uvec3>> sliceTriangles(size_t(dims.z));
+    poolFor(size_t(dims.z), [&](size_t zb, size_t ze) {
+        for (int z = int(zb); z < int(ze); ++z) {
+            std::vector<glm::uvec3>& out = sliceTriangles[size_t(z)];
+            for (int y = 0; y < dims.y; ++y)
+                for (int x = 0; x < dims.x; ++x) {
+                    const glm::ivec3 p(x, y, z);
+                    const bool in0 = f[grid.index(x, y, z)] > iso;
+                    for (int axis = 0; axis < 3; ++axis) {
+                        glm::ivec3 q = p;
+                        q[axis] += 1;
+                        if (q[axis] >= dims[axis]) continue;
+                        const bool in1 = f[grid.index(q.x, q.y, q.z)] > iso;
+                        if (in0 == in1) continue;
+                        const int u = (axis + 1) % 3, v = (axis + 2) % 3;
+                        if (p[u] < 1 || p[v] < 1 || p[u] > cells[u] - 1 || p[v] > cells[v] - 1 || p[axis] > cells[axis] - 1)
+                            continue;
+                        std::array<int32_t, 4> quad;
+                        const int du[4] = {-1, 0, 0, -1}, dv[4] = {-1, -1, 0, 0};
+                        bool ok = true;
+                        for (int k = 0; k < 4; ++k) {
+                            glm::ivec3 c = p;
+                            c[u] += du[k];
+                            c[v] += dv[k];
+                            quad[size_t(k)] = cellVertex[cellIndex(c.x, c.y, c.z)];
+                            ok &= quad[size_t(k)] >= 0;
+                        }
+                        if (!ok) continue;
+                        if (!in0) std::swap(quad[1], quad[3]); // outward normal must point to the outside sample
+                        const auto& P = m.positions;
+                        const bool diag02 = glm::distance(P[size_t(quad[0])], P[size_t(quad[2])]) <=
+                                            glm::distance(P[size_t(quad[1])], P[size_t(quad[3])]);
+                        const glm::uvec4 qq(quad[0], quad[1], quad[2], quad[3]);
+                        if (diag02) {
+                            out.push_back({qq.x, qq.y, qq.z});
+                            out.push_back({qq.x, qq.z, qq.w});
+                        } else {
+                            out.push_back({qq.x, qq.y, qq.w});
+                            out.push_back({qq.y, qq.z, qq.w});
+                        }
+                    }
+                }
+        }
+    }, 1);
+    size_t triangleTotal = 0;
+    for (const auto& t : sliceTriangles) triangleTotal += t.size();
+    m.triangles.reserve(triangleTotal);
+    for (auto& t : sliceTriangles) {
+        m.triangles.insert(m.triangles.end(), t.begin(), t.end());
+        std::vector<glm::uvec3>().swap(t);
+    }
+    // Surface nets makes quads: keep each one (Mesh::quadPartners): an even all-quad surface.
+    for (uint32_t t = 0; t + 1 < m.triangles.size(); t += 2) m.pairQuad(t, t + 1);
     m.rebuildTopology();
     taubinSmooth(m, smoothIterations);
     m.recomputeAllNormals();
@@ -299,113 +358,182 @@ void rasterizeMeshShell(const Mesh& mesh, VoxelGrid& grid) {
 
 std::vector<float> insideDistanceField(const Mesh& mesh, const VoxelGrid& grid, const std::vector<uint8_t>& solid, float band) {
     // Exact distance (in cells) to the nearest triangle for every sample within `band` cells of the surface, found by
-    // visiting the samples around each triangle. z-slabs run on separate threads, so no two threads write a sample.
+    // visiting the samples around each triangle (a narrow band: nothing else is touched). Triangles are binned into
+    // z-slabs that run in parallel, each writing only its own samples and visiting its triangles in index order, so
+    // ties go to the same triangle as a serial pass.
     const glm::ivec3 dims = grid.dims;
     const size_t n = grid.size();
     std::vector<float> dist2(n, band * band);
     std::vector<int32_t> nearest(n, -1);
     const auto& P = mesh.positions;
     const float inv = 1.0f / grid.cell;
-    auto work = [&](int z0, int z1) {
-        for (uint32_t t = 0; t < mesh.triangleCount(); ++t) {
-            const glm::uvec3 tri = mesh.triangles[t];
-            const glm::vec3 a = (P[tri.x] - grid.origin) * inv, b = (P[tri.y] - grid.origin) * inv,
-                            c = (P[tri.z] - grid.origin) * inv;
-            const glm::ivec3 lo = glm::max(glm::ivec3(glm::floor(glm::min(a, glm::min(b, c)) - band)), glm::ivec3(0));
-            const glm::ivec3 hi = glm::min(glm::ivec3(glm::ceil(glm::max(a, glm::max(b, c)) + band)), dims - 1);
-            const int za = std::max(lo.z, z0), zb = std::min(hi.z, z1 - 1);
-            for (int z = za; z <= zb; ++z)
-                for (int y = lo.y; y <= hi.y; ++y)
-                    for (int x = lo.x; x <= hi.x; ++x) {
-                        const glm::vec3 p(x, y, z);
-                        const glm::vec3 d = p - closestOnTriangle(p, a, b, c);
-                        const float d2 = glm::dot(d, d);
-                        const size_t i = grid.index(x, y, z);
-                        if (d2 < dist2[i]) {
-                            dist2[i] = d2;
-                            nearest[i] = int32_t(t);
+    const uint32_t triangles = uint32_t(mesh.triangleCount());
+    auto local = [&](uint32_t t, glm::vec3& a, glm::vec3& b, glm::vec3& c, glm::ivec3& lo, glm::ivec3& hi) {
+        const glm::uvec3 tri = mesh.triangles[t];
+        a = (P[tri.x] - grid.origin) * inv, b = (P[tri.y] - grid.origin) * inv, c = (P[tri.z] - grid.origin) * inv;
+        lo = glm::max(glm::ivec3(glm::floor(glm::min(a, glm::min(b, c)) - band)), glm::ivec3(0));
+        hi = glm::min(glm::ivec3(glm::ceil(glm::max(a, glm::max(b, c)) + band)), dims - 1);
+    };
+    constexpr int kSlab = 4;
+    const size_t slabs = size_t((dims.z + kSlab - 1) / kSlab);
+    std::vector<glm::ivec2> slabRange(triangles);
+    poolFor(triangles, [&](size_t b0, size_t e0) {
+        for (size_t t = b0; t < e0; ++t) {
+            glm::vec3 a, b, c;
+            glm::ivec3 lo, hi;
+            local(uint32_t(t), a, b, c, lo, hi);
+            slabRange[t] = lo.z <= hi.z ? glm::ivec2(lo.z / kSlab, hi.z / kSlab) : glm::ivec2(1, 0); // (NaN: none)
+        }
+    }, 1 << 16);
+    std::vector<uint32_t> slabStart(slabs + 1, 0);
+    for (const glm::ivec2& r : slabRange)
+        for (int s = r.x; s <= r.y; ++s) ++slabStart[size_t(s) + 1];
+    for (size_t s = 0; s < slabs; ++s) slabStart[s + 1] += slabStart[s];
+    std::vector<uint32_t> slabTriangles(slabStart.back());
+    {
+        std::vector<uint32_t> cursor(slabStart.begin(), slabStart.end() - 1);
+        for (uint32_t t = 0; t < triangles; ++t)
+            for (int s = slabRange[t].x; s <= slabRange[t].y; ++s) slabTriangles[cursor[size_t(s)]++] = t;
+    }
+    std::vector<glm::ivec2>().swap(slabRange);
+    poolFor(slabs, [&](size_t sb, size_t se) {
+        for (size_t s = sb; s < se; ++s) {
+            const int z0 = int(s) * kSlab, z1 = std::min(dims.z, z0 + kSlab);
+            for (uint32_t k = slabStart[s]; k < slabStart[s + 1]; ++k) {
+                const uint32_t t = slabTriangles[k];
+                glm::vec3 a, b, c;
+                glm::ivec3 lo, hi;
+                local(t, a, b, c, lo, hi);
+                // Only samples within band of the triangle's bounding sphere can be within band of the triangle.
+                const glm::vec3 centre = (a + b + c) / 3.0f;
+                const float radius = std::sqrt(std::max({glm::dot(a - centre, a - centre), glm::dot(b - centre, b - centre),
+                                                         glm::dot(c - centre, c - centre)})) + 1e-3f;
+                const float reach = radius + band;
+                const float reach2 = reach * reach;
+                for (int z = std::max(lo.z, z0); z <= std::min(hi.z, z1 - 1); ++z) {
+                    const float dz = float(z) - centre.z, rz = reach2 - dz * dz;
+                    if (rz < 0.0f) continue;
+                    for (int y = lo.y; y <= hi.y; ++y) {
+                        const float dy = float(y) - centre.y, ry = rz - dy * dy;
+                        if (ry < 0.0f) continue;
+                        const float half = std::sqrt(ry);
+                        const int x0 = std::max(lo.x, int(std::ceil(centre.x - half)));
+                        const int x1 = std::min(hi.x, int(std::floor(centre.x + half)));
+                        for (int x = x0; x <= x1; ++x) {
+                            const glm::vec3 p(x, y, z);
+                            const size_t i = grid.index(x, y, z);
+                            // Skip when even the sphere's near side is no closer than the best so far (most samples
+                            // once a slab's first triangles are in: small triangles overlap many times).
+                            const float far = std::sqrt(dist2[i]) + radius;
+                            if (glm::dot(p - centre, p - centre) > far * far) continue;
+                            const glm::vec3 d = p - closestOnTriangle(p, a, b, c);
+                            const float d2 = glm::dot(d, d);
+                            if (d2 < dist2[i]) {
+                                dist2[i] = d2;
+                                nearest[i] = int32_t(t);
+                            }
                         }
                     }
+                }
+            }
         }
-    };
-    const int threads = int(std::clamp(std::thread::hardware_concurrency(), 1u, 16u));
-    const int slab = (dims.z + threads - 1) / threads;
-    std::vector<std::thread> pool;
-    for (int k = 1; k < threads; ++k)
-        if (k * slab < dims.z) pool.emplace_back(work, k * slab, std::min(dims.z, (k + 1) * slab));
-    work(0, std::min(dims.z, slab));
-    for (auto& th : pool) th.join();
+    }, 1);
+    std::vector<uint32_t>().swap(slabTriangles);
 
     // Sign: the flood fill is certain about the outside and about the deep inside; next to the surface the
     // nearest triangle's side decides, which keeps sub-voxel detail instead of voxel stair-steps.
-    std::vector<uint8_t> nearOutside(n, 0);
-    for (int z = 0; z < dims.z; ++z)
-        for (int y = 0; y < dims.y; ++y)
-            for (int x = 0; x < dims.x; ++x) {
-                if (solid[grid.index(x, y, z)]) continue;
-                for (int dz = -2; dz <= 2; ++dz)
-                    for (int dy = -2; dy <= 2; ++dy)
-                        for (int dx = -2; dx <= 2; ++dx) {
-                            const glm::ivec3 q(x + dx, y + dy, z + dz);
-                            if (glm::all(glm::greaterThanEqual(q, glm::ivec3(0))) && glm::all(glm::lessThan(q, dims)))
-                                nearOutside[grid.index(q.x, q.y, q.z)] = 1;
-                        }
-            }
+    std::vector<uint8_t> nearOutside(n);
+    poolFor(n, [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) nearOutside[i] = solid[i] ? 0 : 1;
+    }, 1 << 16);
+    morph(nearOutside, dims, 2, true); // within 2 samples (any axis) of an outside sample
     std::vector<uint8_t> inside(n);
-    for (int z = 0; z < dims.z; ++z)
-        for (int y = 0; y < dims.y; ++y)
-            for (int x = 0; x < dims.x; ++x) {
-                const size_t i = grid.index(x, y, z);
-                if (!solid[i]) inside[i] = 0;
-                else if (!nearOutside[i] || nearest[i] < 0) inside[i] = 1;
-                else {
-                    const glm::uvec3 tri = mesh.triangles[size_t(nearest[i])];
-                    const glm::vec3 nrm = glm::cross(P[tri.y] - P[tri.x], P[tri.z] - P[tri.x]);
-                    const glm::vec3 p = grid.position(x, y, z);
-                    const glm::vec3 onSurface = closestOnTriangle(p, P[tri.x], P[tri.y], P[tri.z]);
-                    // A surface buried inside another part (solid just outside it too) doesn't bound the solid.
-                    const float len = glm::length(nrm);
-                    const glm::ivec3 probe(glm::round((onSurface + nrm * (2.5f * grid.cell / std::max(len, 1e-20f)) -
-                                                       grid.origin) / grid.cell));
-                    const bool buried = len > 0.0f && glm::all(glm::greaterThanEqual(probe, glm::ivec3(0))) &&
-                                        glm::all(glm::lessThan(probe, dims)) && solid[grid.index(probe.x, probe.y, probe.z)];
-                    inside[i] = buried || glm::dot(p - onSurface, nrm) < 0.0f;
+    poolFor(size_t(dims.z), [&](size_t zb, size_t ze) {
+        for (int z = int(zb); z < int(ze); ++z)
+            for (int y = 0; y < dims.y; ++y)
+                for (int x = 0; x < dims.x; ++x) {
+                    const size_t i = grid.index(x, y, z);
+                    if (!solid[i]) inside[i] = 0;
+                    else if (!nearOutside[i] || nearest[i] < 0) inside[i] = 1;
+                    else {
+                        const glm::uvec3 tri = mesh.triangles[size_t(nearest[i])];
+                        const glm::vec3 nrm = glm::cross(P[tri.y] - P[tri.x], P[tri.z] - P[tri.x]);
+                        const glm::vec3 p = grid.position(x, y, z);
+                        const glm::vec3 onSurface = closestOnTriangle(p, P[tri.x], P[tri.y], P[tri.z]);
+                        // A surface buried inside another part (solid just outside it too) doesn't bound the solid.
+                        const float len = glm::length(nrm);
+                        const glm::ivec3 probe(glm::round((onSurface + nrm * (2.5f * grid.cell / std::max(len, 1e-20f)) -
+                                                           grid.origin) / grid.cell));
+                        const bool buried = len > 0.0f && glm::all(glm::greaterThanEqual(probe, glm::ivec3(0))) &&
+                                            glm::all(glm::lessThan(probe, dims)) && solid[grid.index(probe.x, probe.y, probe.z)];
+                        inside[i] = buried || glm::dot(p - onSurface, nrm) < 0.0f;
+                    }
                 }
-            }
+    }, 1);
+    std::vector<uint8_t>().swap(nearOutside);
     // Surfaces buried inside the solid (overlapping parts) make small "outside" pockets: anything outside that
-    // can't reach the real outside is inside, so merged parts stay one closed surface.
-    std::vector<uint8_t> reached(n, 0);
+    // can't reach the real outside is inside, so merged parts stay one closed surface. The flood starts from the
+    // outside samples that touch an outside-signed solid sample (the rest of the outside has nowhere to go).
+    std::vector<uint8_t> reached(n);
+    poolFor(n, [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) reached[i] = solid[i] ? 0 : 1;
+    }, 1 << 16);
+    const size_t X = size_t(dims.x), S = X * size_t(dims.y);
+    std::vector<std::vector<uint32_t>> sliceSeeds(size_t(dims.z));
+    poolFor(size_t(dims.z), [&](size_t zb, size_t ze) {
+        for (int z = int(zb); z < int(ze); ++z)
+            for (int y = 0; y < dims.y; ++y)
+                for (int x = 0; x < dims.x; ++x) {
+                    const size_t i = grid.index(x, y, z);
+                    if (solid[i]) continue;
+                    auto pocket = [&](bool inRange, size_t j) { return inRange && solid[j] && !inside[j]; };
+                    if (pocket(x > 0, i - 1) || pocket(x + 1 < dims.x, i + 1) || pocket(y > 0, i - X) ||
+                        pocket(y + 1 < dims.y, i + X) || pocket(z > 0, i - S) || pocket(z + 1 < dims.z, i + S))
+                        sliceSeeds[size_t(z)].push_back(uint32_t(i));
+                }
+    }, 1);
     std::vector<uint32_t> stack;
-    for (size_t i = 0; i < n; ++i)
-        if (!solid[i]) {
-            reached[i] = 1;
-            stack.push_back(uint32_t(i));
-        }
+    for (const auto& seeds : sliceSeeds) stack.insert(stack.end(), seeds.begin(), seeds.end());
     floodFill(inside, 0, dims, stack, reached);
     std::vector<float> f(n);
-    for (size_t i = 0; i < n; ++i) {
-        const float d = std::sqrt(dist2[i]);
-        f[i] = inside[i] || !reached[i] ? d : -d;
-    }
+    poolFor(n, [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) {
+            const float d = std::sqrt(dist2[i]);
+            f[i] = inside[i] || !reached[i] ? d : -d;
+        }
+    }, 1 << 16);
     return f;
 }
 
-Mesh voxelRemesh(const Mesh& mesh, int resolution, std::string* error) {
+Mesh voxelRemesh(const Mesh& mesh, int resolution, std::string* error, const std::function<bool(float)>& progress) {
     VoxelGrid grid;
     if (mesh.triangleCount() == 0 || !makeVoxelGrid(mesh.bounds(), resolution, 4, grid)) {
         if (error) *error = mesh.triangleCount() == 0 ? "The mesh is empty" : "Resolution too high for this mesh";
         return {};
     }
+    auto step = [&](float f) {
+        if (!progress || progress(f)) return true;
+        if (error) *error = "Voxel Remesh cancelled";
+        return false;
+    };
     rasterizeMeshShell(mesh, grid);
+    if (!step(0.1f)) return {};
     std::vector<uint8_t> solid = solidifyShell(grid, 0.5f, 1, true);
+    std::vector<float>().swap(grid.values);
+    if (!step(0.25f)) return {};
     // Mesh the signed distance to the original surface (positive inside), not the blocky occupancy: the result
     // lands on the original surface with no voxel terracing.
-    Mesh out = meshFromField(grid, insideDistanceField(mesh, grid, solid, 3.0f), 0.0f, 2);
+    const std::vector<float> field = insideDistanceField(mesh, grid, solid, 3.0f);
+    std::vector<uint8_t>().swap(solid);
+    if (!step(0.6f)) return {};
+    Mesh out = meshFromField(grid, field, 0.0f, 2);
     if (out.triangleCount() == 0 && error) *error = "Remesh produced no surface";
-    // Mask and polypaint follow the nearest original vertex; polygroups, hidden
+    if (!step(0.9f)) return {};
+    // Mask and vertex paint follow the nearest original vertex; face groups, hidden
     // flags and UVs don't survive a rebuild (everything becomes visible group 0).
     // The original's quads don't either: the new surface is all quads of its own.
     transferVertexAttributes(mesh, out);
+    step(1.0f);
     return out;
 }
 

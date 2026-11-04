@@ -87,7 +87,7 @@
   <p class="muted small">Counts are GitHub release downloads (checksum files left out), refreshed every hour; "today"
     is Pacific time. A download is not an install: someone who grabs two formats counts twice. Days are known from
     <span id="since"></span>; earlier downloads are in "All time" only.</p>
-  <p class="muted small">ZBrush, GoZ, MatCap, FiberMesh, LightCap and other ZBrush feature names are trademarks of Maxon Computer GmbH. SculptForge is not affiliated with or endorsed by Maxon.</p>
+  <p class="muted small">Product names are trademarks of their respective owners.</p>
 </main>
 <script>
 const DATA = "https://raw.githubusercontent.com/islandmed/SculptForge/download-stats/history.json";
@@ -99,7 +99,7 @@ const fmt = (n) => n.toLocaleString("en-US");
 
 function platform(file) {
   if (/bridge/i.test(file)) return "Blender add-on";
-  if (/ZToolExport/i.test(file)) return "ZBrush plug-in";
+  if (/Export\.txt$/i.test(file)) return "Bridge plug-in";
   if (/windows|\.exe$/i.test(file)) return "Windows";
   if (/darwin|macos|\.dmg$/i.test(file)) return "macOS";
   return "Linux";

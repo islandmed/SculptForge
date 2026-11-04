@@ -286,7 +286,7 @@ bool parseSetChannels(const std::string& text, uint32_t& out, std::string& error
         else if (w == "uvs" || w == "uv") out |= kSetUvs;
         else if (w == "morph" || w == "shape" || w == "positions") out |= kSetMorph;
         else {
-            error = "Unknown channel '" + w + "' (use mask, polygroups, paint, visibility, uvs, morph or all)";
+            error = "Unknown channel '" + w + "' (use mask, polygroups, paint, visibility, uvs, morph or all)"; // marks-pending
             return false;
         }
         return true;
@@ -988,7 +988,7 @@ CommandResult result(bool ok, std::string message) { return {ok, std::move(messa
 } // namespace
 
 void registerSelectionSetCommands(CommandRegistry& reg) {
-    const std::string channelHelp = "Comma-separated channels: mask, polygroups, paint (vertex paint), visibility (hidden "
+    const std::string channelHelp = "Comma-separated channels: mask, polygroups, paint (vertex paint), visibility (hidden " // marks-pending
                                     "faces), uvs, morph (the shape), or all";
     reg.add({"selection_set_store",
              "Store a named selection set on the active Part: a snapshot of the channels you choose. Storing again with "

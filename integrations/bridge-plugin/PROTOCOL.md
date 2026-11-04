@@ -1,4 +1,4 @@
-# ZBrush interoperability (Send to ZBrush, GoZ format) and STL
+# Bridge protocol notes (developers)
 
 SculptForge reads and writes ZBrush's **GoZ** bridge format and can send meshes to and receive them
 from a running ZBrush the way GoZ-enabled apps do. The format notes below come from reading
@@ -124,3 +124,5 @@ remembers the file time of SculptForge's own write, so a send is never received 
 `open` reads binary STL and ASCII STL. A file is binary when its size is exactly `84 + 50 × count`,
 otherwise it must start with `solid`. Coincident corners are welded with `weldImported`. `export_stl`
 writes binary STL with facet normals. Positions are kept as stored, with no axis or unit conversion.
+
+ZBrush is a trademark of Maxon. SculptForge is not affiliated with or endorsed by Maxon.

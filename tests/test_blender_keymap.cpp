@@ -54,9 +54,9 @@ TEST(blender_keymap_export_is_read_as_text) {
     CHECK(parseBlenderKeymap(readFile(SF_TEST_DATA_DIR "/blender_keymap_export.py"), k, err));
     CHECK(err.empty());
     CHECK(keysOf(k, "brush.standard") == "D");
-    CHECK(keysOf(k, "brush.claybuildup") == "Shift+Q"); // a 4.3+ brush asset
+    CHECK(keysOf(k, "brush.clayblock") == "Shift+Q"); // a 4.3+ brush asset
     CHECK(keysOf(k, "brush.crease") == "Shift+C");
-    CHECK(keysOf(k, "brush.snakehook").empty());        // switched off in Blender ("active": False)
+    CHECK(keysOf(k, "brush.tendril").empty());        // switched off in Blender ("active": False)
     CHECK(keysOf(k, "ui.size_popup") == "F");
     CHECK(keysOf(k, "ui.strength_popup") == "Shift+R");
     CHECK(keysOf(k, "mask.clear") == "Alt+M");

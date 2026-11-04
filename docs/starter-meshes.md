@@ -6,7 +6,7 @@ embedded in the program. They open with subdivision levels added (Divide), so th
 set; the budget is 15 MB, checked by `starter_meshes_set_and_budget`).
 
 **Licensing rule:** only meshes made by our own scripts, or CC0 / public-domain sources recorded here with URL,
-licence and date. Never ZBrush assets or output, nothing scraped.
+licence and date. Never another app's assets or output, nothing scraped.
 
 ## Sources
 

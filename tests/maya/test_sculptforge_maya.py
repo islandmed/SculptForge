@@ -251,7 +251,7 @@ def faces(obj_text):
 
 def test_format(sm, tmp):
     check(sm.safe_name("pCube1") == "pCube1" and sm.safe_name("Body Hi") == "Body_Hi", "safe names")
-    check(sm.safe_name("3D") == "_3D" and sm.safe_name("") == "SubTool", "safe names: digits, empty")
+    check(sm.safe_name("3D") == "_3D" and sm.safe_name("") == "Part", "safe names: digits, empty")
     check(sm.safe_name("Body Hi \u00fc") == "Body_Hi___", "safe names match SculptForge's (one '_' per byte)")
     check(len(sm.safe_name("x" * 1000)) == sm.MAX_NAME, "names are capped")
     for bad in ["", ".obj", "../x.obj", "a..b.obj", "/etc/x.obj", "C:\\x.obj", "c:x.obj", "a/b.obj", "x.mel",

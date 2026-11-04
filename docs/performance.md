@@ -608,7 +608,7 @@ of a dab with a dense mesh is the serial search for the triangles under the brus
 sculptforge --bench --bench-dyntopo --bench-sizes 0.25,1,4
 ```
 
-Spheres without subdivision levels (Sculptris Pro works on such meshes only), dynamic topology on with relative
+Spheres without subdivision levels (dynamic topology works on such meshes only), dynamic topology on with relative
 detail, strokes with X symmetry. Each row starts from the same sphere. "remesh" is the dynamic topology work of a
 dab (gathering the area, matching mirror images, splits, collapses, flips, relaxing, filling the freed slots,
 rings and normals of what changed, BVH edits); "GPU upload" sends the clusters whose triangles changed as patches
@@ -1575,7 +1575,7 @@ Shelf and Library thumbnails differ in the UI tests only because they arrive soo
 - Back faces are drawn (twice the work on huge meshes) on open meshes, with hidden polygons, when the eye is
   inside the mesh's bounds or the near plane cuts it: the cases where they can show. On a closed mesh, a lobe
   pushed through the surface so that it is inside out (winding below zero) would show a hole where its back
-  faces are culled; ZBrush culls back faces always.
+  faces are culled.
 - The proxy is coarse on a mesh with fine detail (detail under 2.5 edges disappears while moving), and the first
   move after opening or dividing a big mesh waits for it (126 ms at 33M, 408 ms at 104M).
 - 33M orbiting is 8.7 ms with antialiasing: what's left is 16M sub-pixel triangles a frame, which only a level

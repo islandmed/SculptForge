@@ -40,6 +40,8 @@ struct ItemTable {
     };
     std::vector<Seeded> frame;
     std::vector<std::string> scopes; // Demo::pushScope: panels drawn inside the shell's trays and drop-downs
+    // Items whose visible part runs past the window's edge this frame (#105): "window/label".
+    std::map<ImGuiID, std::string> offscreen;
 };
 ItemTable& items() {
     static ItemTable t;
@@ -53,6 +55,21 @@ void ImGuiTestEngineHook_ItemAdd(ImGuiContext* ctx, ImGuiID id, const ImRect& bb
     ImRect clip = bb;
     if (ctx && ctx->CurrentWindow) {
         clip = ctx->CurrentWindow->ClipRect;
+        // Out of reach: past the screen, or cut off by its window where that window can't scroll to it (#105).
+        const ImGuiWindow* win = ctx->CurrentWindow;
+        ImRect bounds = win->Rect();
+        bounds.ClipWith(ImRect(ImVec2(0, 0), ctx->IO.DisplaySize));
+        const bool wheel = !(win->Flags & ImGuiWindowFlags_NoScrollWithMouse);
+        const bool scrollX = win->ScrollMax.x > 0.0f && (win->ScrollbarX || wheel);
+        const bool scrollY = win->ScrollMax.y > 0.0f && (win->ScrollbarY || wheel);
+        constexpr float kSlack = 4.0f; // a spacer's padding over the edge hides nothing
+        const bool outX = bb.Min.x < bounds.Min.x - kSlack || bb.Max.x > bounds.Max.x + kSlack;
+        const bool outY = bb.Min.y < bounds.Min.y - kSlack || bb.Max.y > bounds.Max.y + kSlack;
+        const bool offScreen = bb.Min.x < -kSlack || bb.Min.y < -kSlack || bb.Max.x > ctx->IO.DisplaySize.x + kSlack ||
+                               bb.Max.y > ctx->IO.DisplaySize.y + kSlack;
+        if (bb.GetWidth() > 1.0f && bb.GetHeight() > 1.0f && ((outX && !scrollX) || (outY && !scrollY) || (offScreen && !scrollX && !scrollY)))
+            items().offscreen[id] = std::string(win->RootWindow->Name) + "/(unlabelled at " + std::to_string(int(bb.Min.x)) +
+                                    "," + std::to_string(int(bb.Min.y)) + ")";
         clip.ClipWith(ImRect(ImVec2(0, 0), ctx->IO.DisplaySize));
     }
     items().rects[id] = {bb, clip};
@@ -69,6 +86,7 @@ void ImGuiTestEngineHook_ItemInfo(ImGuiContext* ctx, ImGuiID id, const char* lab
     if (!label || it == items().rects.end()) return;
     std::string text(label);
     std::string window = ctx && ctx->CurrentWindow ? ctx->CurrentWindow->RootWindow->Name : "";
+    if (auto off = items().offscreen.find(id); off != items().offscreen.end()) off->second = window + "/" + text;
     if (const size_t hash = window.find("##"); hash != std::string::npos) window.resize(hash);
     auto add = [&](const std::string& key) {
         items().byLabel[key] = it->second;
@@ -116,6 +134,7 @@ glm::vec3 onSphere(float latDeg, float lonDeg, float r = 1.0f) {
 
 void Demo::beginFrame() {
     items().byLabel.clear();
+    items().offscreen.clear();
     items().frame.clear();
     items().scopes.clear();
 }
@@ -136,6 +155,12 @@ std::vector<std::string> Demo::similarItems(const std::string& label) {
     std::vector<std::string> out;
     for (const auto& [name, rect] : items().byLabel)
         if (lower(name).find(want) != std::string::npos && out.size() < 8) out.push_back(name);
+    return out;
+}
+
+std::vector<std::string> Demo::offscreenItems() {
+    std::vector<std::string> out;
+    for (const auto& [id, name] : items().offscreen) out.push_back(name);
     return out;
 }
 
@@ -566,7 +591,7 @@ void Demo::buildShowcase() {
         app_.camera_.distance *= 0.86f;
         mouse_ = ImVec2(-50.0f, -50.0f); // cursor off screen for the beauty shot
     });
-    caption("SculptForge", "The free, open-source alternative to ZBrush", 4.2f);
+    caption("SculptForge", "The free, open-source sculpting app", 4.2f);
     // Orbiting turns 0.008 rad per pixel: 240 px glides from profile to a three-quarter front view.
     orbit(240.0f, 0.0f, 4.5f);
     run([this] {
@@ -618,7 +643,7 @@ void Demo::buildSculpt() {
         app_.camera_.distance *= 0.78f;
         app_.showBrushLab_ = false;
     });
-    caption("Sculpt the way you already do", "ZBrush-style brushes, symmetry, tablet pressure", 4.5f);
+    caption("Sculpt the way you already do", "Familiar brushes, symmetry, tablet pressure", 4.5f);
     wait(1.0f);
     auto arc = [this](float lat0, float lon0, float lat1, float lon1) {
         return [this, lat0, lon0, lat1, lon1](float u) {

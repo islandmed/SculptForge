@@ -8,9 +8,6 @@ micro triangles take about 0.4 GB, sculpt in real time and draw at 60+ frames pe
 
 ![A sphere with 335 million micro triangles: surface noise, a Clay Block band, Crease and Sharp Crease lines (Micro 4, 420 MB)](images/micro-300m.jpg)
 
-> **ZBrush:** HD Geometry also goes past the subdivision levels, but you sculpt it one small region at a time.
-> A micro level is the whole model, all the time: every brush stroke, every view, every Part at once.
-
 ## Making a micro level
 
 1. Divide the Part to a comfortable highest level (0.3 to 2 million triangles is the sweet spot).

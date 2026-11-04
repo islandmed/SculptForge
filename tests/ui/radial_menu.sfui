@@ -184,7 +184,7 @@ click "Blender##input.style_blender"
 expect_value shortcut_conflicts == 0
 click "Maya##input.style_maya"
 expect_value shortcut_conflicts == 0
-click "ZBrush-style##input.style_zbrush"
+click "Classic sculpting keys##input.style_zbrush"
 expect_value shortcut_conflicts == 0
 key escape
 

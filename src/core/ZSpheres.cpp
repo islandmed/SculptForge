@@ -367,7 +367,7 @@ std::vector<ZSphere> zspheresFromJson(const Json& json) {
 
 namespace {
 
-constexpr const char* kNotZSphere = "The active Part is not a Forge Sphere Part (zsphere_new makes one)";
+constexpr const char* kNotZSphere = "The active Part is not a Forge Sphere Part (zsphere_new makes one)"; // marks-pending
 
 Symmetry symmetryArg(const Args& a) {
     Symmetry s{false, false, false};
@@ -399,9 +399,9 @@ void registerZSphereCommands(CommandRegistry& reg) {
                                   "Mirror the edit across these planes through the centre, e.g. \"x\". Default: none.",
                                   false};
     reg.add({"zsphere_new",
-             "Forge Spheres (ZBrush's ZSpheres): add a Forge Sphere Part holding one root sphere at the centre and make it "
-             "active. Grow limbs from it with zsphere_add (or the Forge Sphere tool), see the skin with zsphere_preview, "
-             "then zsphere_make_mesh turns it into a sculptable Part.",
+             "Forge Spheres: add a Forge Sphere Part holding one root sphere at the centre and make it "
+             "active. Grow limbs from it with zsphere_add (or the Forge Sphere tool), see the skin with zsphere_preview, " // marks-pending
+             "then zsphere_make_mesh turns it into a sculptable Part.", // marks-pending
              {{"name", T::String, "Part name (default \"Forge Sphere\").", false},
               {"radius", T::Number, "Root sphere radius (default 0.5).", false}},
              [](Document& doc, const Args& a) -> CommandResult {
@@ -438,7 +438,7 @@ void registerZSphereCommands(CommandRegistry& reg) {
                  if (!zsphereAdd(s, parent, c, r, symmetryArg(a), &added)) return {false, "radius must be above 0"};
                  return applyEdit(doc, std::move(s), "Forge Sphere add", "Added sphere " + std::to_string(added));
              }});
-    reg.add({"zsphere_set", "Move and/or resize a sphere of the active Forge Sphere Part (ZBrush's Move and Scale).",
+    reg.add({"zsphere_set", "Move and/or resize a sphere of the active Forge Sphere Part.",
              {{"index", T::Number, "Sphere index.", true},
               {"position", T::String, "New centre \"x,y,z\" (default: unchanged).", false},
               {"radius", T::Number, "New radius (default: unchanged).", false},
@@ -467,7 +467,7 @@ void registerZSphereCommands(CommandRegistry& reg) {
              }});
     reg.add({"zsphere_insert",
              "Insert a sphere halfway along the link from sphere `index` to its parent (a new joint, like clicking "
-             "a link in ZBrush's Draw mode).",
+             "a link in Draw mode).",
              {{"index", T::Number, "The child sphere whose link gets the new joint.", true}, symmetryParam},
              [](Document& doc, const Args& a) -> CommandResult {
                  auto s = doc.mesh.zspheres;
@@ -492,7 +492,7 @@ void registerZSphereCommands(CommandRegistry& reg) {
                                   "Sphere " + std::to_string(i) + " is the root now (index 0)");
              }});
     reg.add({"zsphere_preview",
-             "Show the skin over the active Forge Sphere Part's spheres instead of the spheres (ZBrush's Preview, A).",
+             "Show the skin over the active Forge Sphere Part's spheres instead of the spheres.",
              {{"on", T::Bool, "Default: toggle.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  if (doc.mesh.zspheres.empty()) return {false, kNotZSphere};
@@ -502,7 +502,7 @@ void registerZSphereCommands(CommandRegistry& reg) {
                  return {true, on ? "Skin preview on" : "Skin preview off"};
              }});
     reg.add({"zsphere_make_mesh",
-             "Make Mesh (ZBrush's Make Adaptive Skin): build the skin over the active Forge Sphere Part as a new, "
+             "Make Mesh: build the skin over the active Forge Sphere Part as a new, "
              "sculptable Part right below it, watertight quads with one face group per link. The Forge Sphere Part "
              "is hidden and kept so the proportions can still be changed and a new mesh made.",
              {{"resolution", T::Number, "Cells across the longest side (16-1024, default 128): higher is denser.", false},

@@ -1,0 +1,13 @@
+{
+  "version": "0.0.1",
+  "download": "https://islandmed.github.io/SculptForge/#download",
+  "highlights": ["Stable and old"],
+  "channels": {
+    "preview": {
+      "version": "99.0.0-beta.1",
+      "download": "https://github.com/islandmed/SculptForge/releases/tag/v99.0.0-beta.1",
+      "notes": "https://islandmed.github.io/SculptForge/guide/whats-new.html",
+      "highlights": ["Try the beta"]
+    }
+  }
+}

@@ -196,11 +196,11 @@ live pressure reading.
 SculptForge opens a 1600 x 960 window with a sphere ready to sculpt and the **Library** open along the top of
 the canvas on its **Project** tab, so you can reopen recent work with a double-click. Press <kbd>,</kbd>
 (comma) to close it, or turn off **Edit > Preferences > Library > Show at startup**. The first start also creates
-your library folder (**Documents/SculptForge**, with Projects, Tools, Brushes, Alphas, MatCaps, Images, Splats
+your library folder (**Documents/SculptForge**, with Projects, Tools, Brushes, Alphas, Lit Spheres, Images, Splats
 and QuickSave (snapshots) sub-folders), which the Library shows as **User**.
 
-The first start also asks what you are **Coming from**: **ZBrush**, **Blender**, **Maya** or **New to sculpting**.
-Your answer picks the key style: **ZBrush** turns on the ZBrush-style keys, **Blender** and **Maya** their own
+The first start also asks what you are **Coming from**: **Classic sculpting keys**, **Blender**, **Maya** or **New to sculpting**.
+Your answer picks the key style: **Classic sculpting keys** turns on the Classic sculpting keys, **Blender** and **Maya** their own
 styles, and **New to sculpting** keeps the SculptForge keys (the default). Change it any time in
 **Edit > Preferences > Input > Style** (see [Keyboard and mouse](shortcuts.md)); if you are updating from an earlier
 version, your saved style is kept and the question isn't asked.

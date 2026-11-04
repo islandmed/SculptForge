@@ -7,7 +7,7 @@ expect "Dynamic##draw.dynamic"
 expect_not "##dyntopo_detail"
 hold ctrl
 hover "Dynamic##draw.dynamic"
-expect_help "Sculptris Pro"
+expect_help "brushes add triangles"
 expect_help "subdivision levels"
 hold none
 
@@ -28,7 +28,7 @@ shot wireframe
 
 # Snake Hook pulls a horn out of the sphere, with new triangles all along it.
 remember triangles pulled
-click "Tendril##brush.snakehook"
+click "Tendril##brush.tendril"
 stroke 0.62 0.3 0.95 0.05
 expect_value triangles > $pulled
 shot snake_hook

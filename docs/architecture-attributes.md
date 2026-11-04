@@ -28,7 +28,7 @@ triangle count before `rebuildTopology()` if triangles follow). Read with `quadP
 requires both halves to share a face group: what Wire shows as a quad and what exporters write as one.
 - Display: `Renderer::uploadFaces` builds GL_LINES edges without the diagonals for meshes with quads.
 - Export: `exportFace(t, face)` gives 4 corners (in winding order; an `(a,b,c)+(a,c,d)` split gives `(a,b,c,d)`),
-  3, or 0 for the second half of a quad. OBJ, FBX, PLY, USD and GoZ use it; glTF and STL stay triangles.
+  3, or 0 for the second half of a quad. OBJ, FBX, PLY, USD and Bridge files use it; glTF and STL stay triangles.
 - Building a mesh from some triangles of another: `remapQuads(src, newIndex, dst)`; appending:
   `appendQuads(dst, firstTriangle, src)`.
 

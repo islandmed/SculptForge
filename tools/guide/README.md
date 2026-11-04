@@ -35,7 +35,7 @@ adjust them. Re-run cmake after adding or removing guide files so the app embeds
 
 The guide names the default **SculptForge layout**'s menus: **Edit > Preferences > Input**, **Sculpt > Stroke**,
 **Render > Materials**. **Tool > ...** paths stay, since the Tool palette is in the right tray in both layouts.
-`python3 tools/guide/menu_paths.py` rewrites ZBrush-style palette paths (**Preferences > Input**) in every
+`python3 tools/guide/menu_paths.py` rewrites classic palette paths (**Preferences > Input**) in every
 chapter; ctest `guide_menu_paths` fails while any are left.
 
 ## Feature panels

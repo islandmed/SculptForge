@@ -27,12 +27,12 @@ CROPS = {
     "palette-dropdown": ("palette-dropdown", (140, 0, 770, 295), 630),
     "palette-tray": ("palette-tray", (1280, 560, 1600, 960), 320),
     "draw-palette": ("draw-palette", (140, 0, 770, 600), 630),
-    "lightbox": ("lightbox", (90, 85, 1020, 230), 930),
+    "library": ("library", (90, 85, 1020, 230), 930),
     "brush-picker": ("brush-picker", (250, 82, 725, 414), 475),
     "stroke-picker": ("stroke-picker", (0, 190, 420, 450), 420),
     "alpha-picker": ("alpha-picker", (0, 295, 575, 668), 575),
     "material-picker": ("material-picker", (25, 320, 505, 545), 480),
-    "custom-matcaps": ("custom-matcaps", (436, 0, 980, 700), 544),
+    "custom-lit-spheres": ("custom-lit-spheres", (436, 0, 980, 700), 544),
     "ctrl-help": ("ctrl-help", (1060, 500, 1600, 740), 540),
     "command-palette": ("command-palette", (355, 100, 960, 500), 605),
     "console": ("console", (0, 698, 1275, 866), MAX_WIDTH),
@@ -46,11 +46,11 @@ CROPS = {
     "generate-3d": ("generate-3d", (882, 102, 1198, 830), 316),
     "export": ("export", (1280, 40, 1600, 780), 320),
     "masking": ("masking", (300, 46, 1600, 800), 960),
-    "polypaint": ("polypaint", (230, 20, 1100, 800), 870),
+    "vertex-paint": ("vertex-paint", (230, 20, 1100, 800), 870),
     "layers": ("layers", (1280, 40, 1600, 560), 320),
     "paint-layers": ("paint-layers", (300, 46, 1600, 800), 960),
-    "subtools": ("subtools", (380, 46, 1600, 900), 960),
-    "polygroups": ("polygroups", (300, 100, 1600, 860), 960),
+    "parts": ("parts", (380, 46, 1600, 900), 960),
+    "face-groups": ("face-groups", (300, 100, 1600, 860), 960),
     "splats": ("splats", (300, 90, 1280, 865), 980),
     "user-guide": ("user-guide", (138, 108, 1180, 842), 1042),
     "extract": ("extract", (380, 140, 1000, 740), 620),
@@ -290,6 +290,25 @@ def first_sculpt(shots: pathlib.Path) -> list:
     return made
 
 
+# The quick tour (quick-tour.md, src/app/QuickTour.cpp; tests/ui/quick_tour.sfui): name -> crop in the 1600x960
+# window, each the whole model with the panel "Show me" opened, at the slide's shape (1170x674).
+def _crop(x0, y0):
+    return (x0, y0, x0 + 1170, y0 + 674)
+
+
+QUICK_TOUR = {
+    "01-where": _crop(200, 40), "02-voxel": _crop(430, 140), "03-dynamic": _crop(250, 40), "04-quad": _crop(430, 140),
+    "05-levels": _crop(430, 140), "06-masking": _crop(430, 140), "07-cut": _crop(430, 140),
+    "08-library": _crop(90, 40), "09-bake": _crop(430, 140),
+}
+
+
+def quick_tour(shots: pathlib.Path) -> list:
+    (OUT / "quick-tour").mkdir(parents=True, exist_ok=True)
+    return [save(Image.open(shots / f"{name}.png").convert("RGB").crop(box), f"quick-tour/{name}", 1100)
+            for name, box in QUICK_TOUR.items()]
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("shots", type=pathlib.Path, help="folder with the screenshots (--ui-out of shots.sfui)")
@@ -298,11 +317,17 @@ def main() -> int:
     ap.add_argument("--only", action="append", help="make only this image (repeatable), e.g. --only qremesh-guides")
     ap.add_argument("--first-sculpt", action="store_true",
                     help="the shots are tests/ui/first_sculpt.sfui's: make images/first-sculpt/*.jpg")
+    ap.add_argument("--quick-tour", action="store_true",
+                    help="the shots are tests/ui/quick_tour.sfui's: make images/quick-tour/*.jpg")
     ap.add_argument("--whats-new", action="store_true", help="make only the What's New pictures (whats_new_shots.sfui)")
     args = ap.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
     if args.first_sculpt:
         for p in first_sculpt(args.shots):
+            print(f"{p.relative_to(ROOT)}  {p.stat().st_size // 1024} KB")
+        return 0
+    if args.quick_tour:
+        for p in quick_tour(args.shots):
             print(f"{p.relative_to(ROOT)}  {p.stat().st_size // 1024} KB")
         return 0
     if args.whats_new:

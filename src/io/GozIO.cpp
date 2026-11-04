@@ -3,8 +3,10 @@
 //
 // GoZ reader/writer and bridge. The format notes come from GoB, the GPL
 // Blender add-on (github.com/JoseConseco/GoB: gob_import.py, gob_export.py,
-// paths.py); docs/goz.md describes the layout.
+// paths.py); integrations/bridge-plugin/PROTOCOL.md describes the layout.
 #include "io/GozIO.h"
+
+#include "io/BridgeProtocol.h"
 
 #include "io/TextureExport.h"
 
@@ -49,9 +51,9 @@ constexpr uint32_t kTagNormalMap = 0xc351;
 constexpr uint32_t kTagDisplacementMap = 0xd6d9;
 constexpr uint32_t kNoIndex = 0xffffffffu;
 
-const char kHeader[] = "GoZb 1.0 ZBrush GoZ Binary";
+using bridge::kHeader;
 constexpr size_t kHeaderSize = 36; // the text, six '.' and the uint32 1 that tags the name record
-constexpr char kNamePrefix[] = "GoZMesh_";
+using bridge::kNamePrefix;
 
 // ZBrush is Y-down; SculptForge (like OpenGL/glTF) is Y-up. GoB maps GoZ
 // (x, y, z) to Blender (x, z, -y); in Y-up terms that is (x, -y, -z), a
@@ -160,16 +162,16 @@ bool parseGoz(std::span<const uint8_t> data, Mesh& out, std::string& error, GozI
     GozInfo local;
     GozInfo& gi = info ? *info : local;
     gi = GozInfo{};
-    if (data.size() < kHeaderSize + 4 || std::memcmp(data.data(), "GoZb", 4) != 0) {
-        error = "Not a GoZ file (missing \"GoZb\" header)";
+    if (data.size() < kHeaderSize + 4 || std::memcmp(data.data(), bridge::kMagic, 4) != 0) {
+        error = "Not a Bridge file (missing header)";
         return false;
     }
     Reader r(data);
     r.seek(kHeaderSize);
-    // Object name record: length (counted from the tag at offset 32), uint64 1, "GoZMesh_<name>".
+    // Object name record: length (counted from the tag at offset 32), uint64 1, kNamePrefix + name.
     uint32_t nameLen = 0;
     if (!r.u32(nameLen) || nameLen < 16 || nameLen - 8 > r.remaining()) {
-        error = "GoZ file has a truncated object name";
+        error = "Bridge file has a truncated object name";
         return false;
     }
     {
@@ -263,7 +265,7 @@ bool parseGoz(std::span<const uint8_t> data, Mesh& out, std::string& error, GozI
     }
 
     if (positions.empty() || faces.empty()) {
-        error = "GoZ file has no " + std::string(positions.empty() ? "vertices" : "faces");
+        error = "Bridge file has no " + std::string(positions.empty() ? "vertices" : "faces");
         return false;
     }
 
@@ -301,7 +303,7 @@ bool parseGoz(std::span<const uint8_t> data, Mesh& out, std::string& error, GozI
     }
     if (m.hasQuads()) m.quadPartners.resize(m.triangles.size(), Mesh::kNoQuad);
     if (m.triangles.empty()) {
-        error = "GoZ file has no valid faces";
+        error = "Bridge file has no valid faces";
         return false;
     }
     if (mask.size() == nv && std::any_of(mask.begin(), mask.end(), [](float v) { return v > 0.0f; }))
@@ -309,7 +311,7 @@ bool parseGoz(std::span<const uint8_t> data, Mesh& out, std::string& error, GozI
     if (colors.size() == nv) m.colors = std::move(colors);
     m.rebuildTopology();
     m.recomputeAllNormals();
-    if (skipped) error = std::to_string(skipped) + " GoZ faces with out-of-range indices were skipped";
+    if (skipped) error = std::to_string(skipped) + " Bridge file faces with out-of-range indices were skipped";
     out = std::move(m);
     return true;
 }
@@ -528,11 +530,11 @@ bool launchDetached(const std::string& target) {
 std::string findZBrush() {
     std::error_code ec;
 #ifdef _WIN32
-    const fs::path bases[] = {"C:\\Program Files", "C:\\Program Files\\Pixologic", "C:\\Program Files\\Maxon"};
-    const char* exe = "ZBrush.exe";
+    const auto& bases = bridge::kWinInstallDirs;
+    const char* exe = bridge::kWinExe;
 #else
-    const fs::path bases[] = {"/Applications"};
-    const char* exe = "ZBrush.app";
+    const char* const bases[] = {"/Applications"};
+    const char* exe = bridge::kMacApp;
 #endif
     std::vector<fs::path> found;
     for (const auto& base : bases) {
@@ -540,8 +542,8 @@ std::string findZBrush() {
         for (const auto& entry : fs::directory_iterator(base, ec)) {
             std::string n = pathUtf8(entry.path().filename());
             std::transform(n.begin(), n.end(), n.begin(), [](unsigned char c) { return char(std::tolower(c)); });
-            if (n.find("zbrush") == std::string::npos) continue;
-            if (n == "zbrush.app") found.push_back(entry.path());
+            if (n.find(bridge::kAppNameLower) == std::string::npos) continue;
+            if (n == bridge::kMacAppLower) found.push_back(entry.path());
             else if (fs::exists(entry.path() / exe, ec)) found.push_back(entry.path() / exe);
         }
     }
@@ -557,23 +559,23 @@ std::string gozDefaultRoot() {
 #ifdef _WIN32
     std::string pub = envUtf8(L"PUBLIC");
     if (pub.empty()) pub = "C:\\Users\\Public";
-    return pathUtf8(utf8Path(pub) / "Pixologic");
+    return pathUtf8(utf8Path(pub) / bridge::kVendorFolder);
 #elif defined(__APPLE__)
-    return "/Users/Shared/Pixologic";
+    return bridge::kMacRoot;
 #else
     return {};
 #endif
 }
 
 std::string gozUnavailableMessage() {
-    return "Send to ZBrush needs ZBrush, which runs only on Windows and macOS. Use Export / Import GoZ-compatible file "
-           "to move .GoZ files by hand, or set a bridge folder (e.g. a Wine prefix's Users/Public/Pixologic).";
+    return "The Bridge's default folder exists only on Windows and macOS. Use Export / Import Bridge file to move "
+           "files by hand, or set a custom bridge folder (for example inside a Wine prefix).";
 }
 
 void setGozApplicationPath(std::string executable) { g_appPath = std::move(executable); }
 
 std::string gozObjectListPath(const std::string& root) {
-    return root.empty() ? std::string() : pathUtf8(utf8Path(root) / "GoZBrush" / "GoZ_ObjectList.txt");
+    return root.empty() ? std::string() : pathUtf8(utf8Path(root) / bridge::kInboxFolder / bridge::kObjectList);
 }
 
 bool gozShellSafePath(const std::string& path) {
@@ -600,15 +602,15 @@ bool gozSend(const std::vector<MeshObjectRef>& objects, const GozSendOptions& o,
     std::error_code ec;
     if (o.launch) { // these paths reach the shell (launchDetached)
         if (!gozShellSafePath(root)) {
-            message = "The bridge folder path contains characters that are not allowed when launching ZBrush";
+            message = "The bridge folder path contains characters that are not allowed when launching the other application";
             return false;
         }
         if (!o.zbrushPath.empty()) {
             std::string file = pathUtf8(utf8Path(o.zbrushPath).filename());
             std::transform(file.begin(), file.end(), file.begin(), [](unsigned char c) { return char(std::tolower(c)); });
-            if (!gozShellSafePath(o.zbrushPath) || file.find("zbrush") == std::string::npos ||
+            if (!gozShellSafePath(o.zbrushPath) || file.find(bridge::kAppNameLower) == std::string::npos ||
                 !fs::exists(utf8Path(o.zbrushPath), ec)) {
-                message = "Not a ZBrush executable: " + o.zbrushPath;
+                message = "Not the other application's executable: " + o.zbrushPath;
                 return false;
             }
         }
@@ -623,9 +625,9 @@ bool gozSend(const std::vector<MeshObjectRef>& objects, const GozSendOptions& o,
             return false;
         }
     const fs::path rootPath = utf8Path(root);
-    const fs::path brush = rootPath / "GoZBrush";
-    const fs::path project = rootPath / "GoZProjects" / "Default";
-    const fs::path app = rootPath / "GoZApps" / "SculptForge";
+    const fs::path brush = rootPath / bridge::kInboxFolder;
+    const fs::path project = rootPath / bridge::kProjectsFolder / "Default";
+    const fs::path app = rootPath / bridge::kAppsFolder / "SculptForge";
     for (const auto& d : {brush, project, app}) fs::create_directories(d, ec);
     if (!fs::is_directory(project, ec)) {
         message = "Cannot create the bridge folder " + pathUtf8(project);
@@ -643,25 +645,21 @@ bool gozSend(const std::vector<MeshObjectRef>& objects, const GozSendOptions& o,
         // Object paths are written without the .GoZ extension, ZBrush appends it.
         const std::string base = genericUtf8(project / name);
         std::string err;
-        if (!saveGoz(pathUtf8(project / (name + ".GoZ")), *obj.mesh, name, err)) {
+        if (!saveGoz(pathUtf8(project / (name + bridge::kExt)), *obj.mesh, name, err)) {
             message = err;
             return false;
         }
         ok = ok && writeText(project / (name + ".ztn"), base);
         list += base + "\n";
     }
-    ok = ok && writeText(brush / "GoZ_ObjectList.txt", list) && writeText(brush / "GoZ_Application.txt", "SculptForge") &&
-              writeText(brush / "GoZ_ProjectPath.txt", genericUtf8(project) + "/");
+    ok = ok && writeText(brush / bridge::kObjectList, list) && writeText(brush / bridge::kApplicationFile, "SculptForge") &&
+              writeText(brush / bridge::kProjectPathFile, genericUtf8(project) + "/");
     // Register SculptForge in ZBrush's GoZ application list.
-    if (!fs::exists(app / "GoZ_Info.txt", ec))
-        ok = ok && writeText(app / "GoZ_Info.txt",
-                             "NAME\t\t\t=\t\"SculptForge\"\nGOZ_VERSION\t\t=\t1\nEXTENSION\t\t=\t\".GoZ\"\n"
-                             "TAMPLATE\t\t=\t\"GoZ Complete Binary.GoZ\"\n\nEXPORT_FLIP_Y\t\t\t=\tFALSE\n"
-                             "EXPORT_FLIP_Z\t\t\t=\tFALSE\nIMPORT_FLIP_Y\t\t\t=\tFALSE\nIMPORT_FLIP_Z\t\t\t=\tFALSE\n");
+    if (!fs::exists(app / bridge::kInfoFile, ec)) ok = ok && writeText(app / bridge::kInfoFile, bridge::kInfoText);
     if (!g_appPath.empty())
-        ok = ok && writeText(app / "GoZ_Config.txt", "PATH = \"" + genericUtf8(utf8Path(g_appPath)) + "\"");
+        ok = ok && writeText(app / bridge::kConfigFile, "PATH = \"" + genericUtf8(utf8Path(g_appPath)) + "\"");
     if (!ok) {
-        message = "Cannot write the GoZ bridge files in " + root;
+        message = "Cannot write the bridge files in " + root;
         return false;
     }
     message = "Sent " + names.front() + (names.size() > 1 ? " and " + std::to_string(names.size() - 1) + " more Parts" : "") +
@@ -672,22 +670,22 @@ bool gozSend(const std::vector<MeshObjectRef>& objects, const GozSendOptions& o,
     // Official GoZ plug-ins notify a running ZBrush with GoZBrushFromApp; GoB
     // starts ZBrush itself. Do the first, fall back to the second.
 #ifdef _WIN32
-    const fs::path notifier = brush / "GoZBrushFromApp.exe";
+    const fs::path notifier = brush / bridge::kNotifierWin;
 #else
-    const fs::path notifier = brush / "GoZBrushFromApp.app";
+    const fs::path notifier = brush / bridge::kNotifierMac;
 #endif
 #if defined(_WIN32) || defined(__APPLE__)
     if (fs::exists(notifier, ec)) {
         launchDetached(pathUtf8(notifier));
-        message += "; ZBrush notified";
+        message += "; the other application was notified";
         return true;
     }
     const std::string zbrush = o.zbrushPath.empty() ? findZBrush() : o.zbrushPath;
     if (!zbrush.empty() && launchDetached(zbrush)) {
-        message += "; started " + zbrush + " (use GoZ in ZBrush to import it)";
+        message += "; started " + zbrush + " (import from the bridge there)";
         return true;
     }
-    message += "; ZBrush was not found (install GoZ from ZBrush's Preferences > GoZ, then press GoZ in ZBrush)";
+    message += "; the other application was not found (set it up once: Help > User Guide > Exporting, Bridge)";
 #else
     (void)notifier;
     message += "; " + gozUnavailableMessage();
@@ -730,7 +728,7 @@ bool gozReceive(const std::string& rootIn, std::vector<MeshObject>& out, std::st
     }
     std::ifstream list(utf8Path(gozObjectListPath(root)), std::ios::binary);
     if (!list) {
-        message = "Nothing to receive: " + gozObjectListPath(root) + " does not exist (press GoZ in ZBrush first)";
+        message = "Nothing to receive: " + gozObjectListPath(root) + " does not exist (send from the other application first)";
         return false;
     }
     std::vector<MeshObject> loaded;
@@ -741,7 +739,7 @@ bool gozReceive(const std::string& rootIn, std::vector<MeshObject>& out, std::st
         std::string path = line;
         std::string lower = path;
         std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return char(std::tolower(c)); });
-        if (lower.size() < 4 || lower.compare(lower.size() - 4, 4, ".goz") != 0) path += ".GoZ";
+        if (lower.size() < 4 || lower.compare(lower.size() - 4, 4, bridge::kExtLower) != 0) path += bridge::kExt;
         Mesh m;
         GozInfo info;
         std::string err;
@@ -752,14 +750,14 @@ bool gozReceive(const std::string& rootIn, std::vector<MeshObject>& out, std::st
         loaded.push_back({info.name.empty() ? pathUtf8(utf8Path(path).stem()) : info.name, std::move(m)});
     }
     if (loaded.empty()) {
-        message = problems.empty() ? "Nothing to receive: GoZ_ObjectList.txt is empty" : problems;
+        message = problems.empty() ? "Nothing to receive: the bridge's object list is empty" : problems;
         return false;
     }
     size_t tris = 0;
     for (const auto& obj : loaded) tris += obj.mesh.triangleCount();
     message = "Received " + loaded.front().name;
     if (loaded.size() > 1) message += " and " + std::to_string(loaded.size() - 1) + " more Parts";
-    message += " from ZBrush (" + std::to_string(tris) + " triangles)";
+    message += " through the Bridge (" + std::to_string(tris) + " triangles)";
     if (!problems.empty()) message += "; skipped: " + problems;
     out = std::move(loaded);
     return true;
@@ -787,13 +785,14 @@ bool gozReceive(const std::string& root, Mesh& out, std::string& message, std::v
 std::string zbrushProprietaryMessage(const std::string& extension) {
     std::string ext = extension;
     std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::toupper(c)); });
-    if (ext == ".ZTL")
-        return ".ZTL is ZBrush's proprietary format and cannot be read directly. Convert it once in ZBrush with the "
-               "SculptForge ZTL Export plug-in (Help > User Guide > Coming from ZBrush), then open the .ztl again; "
-               "or send the model with GoZ (File > Send to ZBrush > Receive from ZBrush).";
-    return ext + " is ZBrush's proprietary format and cannot be read. In ZBrush, send the model with GoZ "
-                 "(File > Send to ZBrush > Receive from ZBrush) or export it as OBJ or FBX "
-                 "(Tool > Export / the FBX ExportImport plug-in) and open that instead.";
+    std::string lower = extension;
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+    if (lower == bridge::kLibraryExtLower)
+        return ext + " is another application's proprietary format and cannot be read directly. Convert it once with "
+                     "the Bridge export plug-in (Help > User Guide > Exporting, Bridge), then open it again; or send "
+                     "the model through the Bridge (File > Bridge > Receive).";
+    return ext + " is another application's proprietary format and cannot be read. Send the model through the "
+                 "Bridge (File > Bridge > Receive) or export it as OBJ or FBX there and open that instead.";
 }
 
 namespace {
@@ -820,7 +819,7 @@ std::vector<std::string> convertedZToolFiles(const std::string& path) {
     std::vector<fs::path> files;
     auto scan = [&](const fs::path& dir, const std::string& stem) {
         for (fs::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec)) {
-            if (lowerAscii(pathUtf8(it->path().extension())) != ".goz" || !it->is_regular_file(ec)) continue;
+            if (lowerAscii(pathUtf8(it->path().extension())) != bridge::kExtLower || !it->is_regular_file(ec)) continue;
             if (!stem.empty() && ztoolPrefixLength(pathUtf8(it->path().stem()), stem) == 0) continue;
             files.push_back(it->path());
         }
@@ -845,11 +844,11 @@ bool loadConvertedZTool(const std::string& path, std::vector<MeshObject>& out, s
     std::error_code ec;
     const std::vector<std::string> files = convertedZToolFiles(path);
     if (files.empty()) {
-        error = "No converted ZTool found for " + path + " (convert it in ZBrush with the SculptForge ZTL Export plug-in)";
+        error = "No converted files found for " + path + " (convert it once with the Bridge export plug-in)";
         return false;
     }
     const fs::path source = utf8Path(path);
-    const bool isZtl = lowerAscii(pathUtf8(source.extension())) == ".ztl";
+    const bool isZtl = lowerAscii(pathUtf8(source.extension())) == bridge::kLibraryExtLower;
     out.clear();
     fs::file_time_type newest{};
     for (const std::string& file : files) {
@@ -874,11 +873,11 @@ bool loadConvertedZTool(const std::string& path, std::vector<MeshObject>& out, s
         if (obj.mesh.triangleCount() > 0) out.push_back(std::move(obj));
     }
     if (out.empty()) {
-        error = "The converted ZTool for " + path + " has no polygons";
+        error = "The converted files for " + path + " has no polygons";
         return false;
     }
     if (note && isZtl && fs::last_write_time(source, ec) > newest && !ec)
-        *note = "the .ztl was saved after it was converted; convert it again in ZBrush to get the latest version";
+        *note = "the file was saved after it was converted; convert it again to get the latest version";
     return true;
 }
 

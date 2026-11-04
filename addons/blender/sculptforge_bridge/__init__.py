@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Send the selected meshes to SculptForge, sculpt them there, send them back: the objects update in
-# place (transform, materials and modifiers kept), the way GoZ / GoB work with ZBrush. Ideas and the
+# place (transform, materials and modifiers kept), the way Bridge files work between sculpting apps. Ideas and the
 # .GoZ conventions come from GoB (github.com/JoseConseco/GoB, GPL) by Daniel Grauer, JoseConseco and
 # contributors. The exchange itself (folder, manifest, .GoZ reading and writing) is in exchange.py.
 #
@@ -10,7 +10,7 @@
 # and quads (n-gons as triangle fans), the active UV map, the active colour attribute (vertex paint),
 # the sculpt mask (.sculpt_mask) and face sets (.sculpt_face_set, SculptForge's face groups).
 #
-# The preference "ZBrush-style keys in Sculpt Mode" adds ZBrush's keys to Blender's Sculpt Mode (zbrush_keys.py).
+# The preference "Classic sculpting keys in Sculpt Mode" adds the classic keys to Blender's Sculpt Mode (classic_keys.py).
 
 bl_info = {  # legacy add-on install (Blender 4.2+ reads blender_manifest.toml instead)
     "name": "SculptForge Bridge",
@@ -32,7 +32,7 @@ import bpy
 import numpy as np
 from bpy.props import BoolProperty, EnumProperty, StringProperty
 
-from . import exchange, zbrush_keys
+from . import exchange, classic_keys
 
 APPLIED_KEY = "sculptforge_applied_modifiers"
 MASK = ".sculpt_mask"
@@ -74,7 +74,7 @@ def _get(collection, prop, count, dtype, width=1):
 
 
 def mesh_topology(me, mirrored=False):
-    """(loops, face_polygon, faces) of the GoZ faces for `me` (exchange.polygon_corners)."""
+    """(loops, face_polygon, faces) of the Bridge file faces for `me` (exchange.polygon_corners)."""
     starts = _get(me.polygons, "loop_start", len(me.polygons), np.int32)
     totals = _get(me.polygons, "loop_total", len(me.polygons), np.int32)
     loop_vert = _get(me.loops, "vertex_index", len(me.loops), np.int32)
@@ -300,7 +300,7 @@ def _object_mode(context, objects):
 
 
 def _write_objects(context, objects, folder, prefix, apply):
-    """The objects' .GoZ files in `folder`; returns their manifest entries."""
+    """The objects' Bridge files in `folder`; returns their manifest entries."""
     depsgraph = context.evaluated_depsgraph_get() if apply else None
     entries = []
     for k, obj in enumerate(objects):
@@ -557,13 +557,13 @@ class SculptForgePreferences(bpy.types.AddonPreferences):
         name="Receive automatically",
         description="After a send, load what SculptForge sends back as soon as it arrives (checked once a second)",
         default=True)
-    zbrush_keys: BoolProperty(
-        name="ZBrush-style keys in Sculpt Mode",
+    classic_keys: BoolProperty(
+        name="Classic sculpting keys in Sculpt Mode",
         description="S / U / O for Draw Size / Z Intensity / Focal Shift, B for the brush list, Space for the quick "
                     "menu, Alt to dig in, Ctrl to mask, Ctrl+Shift to hide, D / Shift+D for SDiv... Turning it off "
                     "removes them again and Blender's own keys are back",
         default=False,
-        update=lambda self, context: _apply_zbrush_keys(self))
+        update=lambda self, context: _apply_classic_keys(self))
 
     def draw(self, context):
         layout = self.layout
@@ -574,16 +574,16 @@ class SculptForgePreferences(bpy.types.AddonPreferences):
         layout.label(text="Exchange folder: " + exchange_root(self))
         layout.prop(self, "modifiers")
         layout.prop(self, "auto_receive")
-        layout.prop(self, "zbrush_keys")
-        if self.zbrush_keys:
+        layout.prop(self, "classic_keys")
+        if self.classic_keys:
             box = layout.box()
             col = box.column(align=True)
-            for zkey, what, *_ in zbrush_keys.key_table():
+            for zkey, what, *_ in classic_keys.key_table():
                 if zkey:
                     col.label(text="%s: %s" % (zkey, what))
             col.separator()
             col.label(text="Not in Blender:", icon="INFO")
-            for zkey, why in zbrush_keys.MISSING:
+            for zkey, why in classic_keys.MISSING:
                 col.label(text="%s: %s" % (zkey, why))
 
 
@@ -604,25 +604,25 @@ def _import_menu(self, context):
 CLASSES = (SculptForgePreferences, SCULPTFORGE_OT_send, SCULPTFORGE_OT_receive, SCULPTFORGE_PT_panel)
 
 
-def _apply_zbrush_keys(p=None):
+def _apply_classic_keys(p=None):
     p = p or prefs()
-    if p is not None and p.zbrush_keys:
-        zbrush_keys.enable()
+    if p is not None and p.classic_keys:
+        classic_keys.enable()
     else:
-        zbrush_keys.disable()
+        classic_keys.disable()
 
 
-def _apply_zbrush_keys_later():
-    _apply_zbrush_keys()  # (the preferences are loaded by the time Blender runs timers)
+def _apply_classic_keys_later():
+    _apply_classic_keys()  # (the preferences are loaded by the time Blender runs timers)
     return None
 
 
 def register():
     for cls in CLASSES:
         bpy.utils.register_class(cls)
-    zbrush_keys.register()
-    _apply_zbrush_keys()
-    bpy.app.timers.register(_apply_zbrush_keys_later, first_interval=0.1)
+    classic_keys.register()
+    _apply_classic_keys()
+    bpy.app.timers.register(_apply_classic_keys_later, first_interval=0.1)
     bpy.types.VIEW3D_MT_object.append(_object_menu)
     bpy.types.TOPBAR_MT_file_export.append(_export_menu)
     bpy.types.TOPBAR_MT_file_import.append(_import_menu)
@@ -639,6 +639,6 @@ def unregister():
     bpy.types.TOPBAR_MT_file_import.remove(_import_menu)
     bpy.types.TOPBAR_MT_file_export.remove(_export_menu)
     bpy.types.VIEW3D_MT_object.remove(_object_menu)
-    zbrush_keys.unregister()  # (removes the ZBrush keys)
+    classic_keys.unregister()  # (removes the classic keys)
     for cls in reversed(CLASSES):
         bpy.utils.unregister_class(cls)

@@ -25,7 +25,7 @@ key comma
 click "Library/Tool"
 wait_idle 20
 wait 1
-shot lightbox
+shot library
 key comma
 key b
 wait_idle 20
@@ -140,7 +140,7 @@ run paint_fill color=bone
 run paint_from_cavity color=4a2c18 strength=0.9
 click "Paint##menu.paint"
 wait 0.2
-shot polypaint
+shot vertex-paint
 key escape
 run undo
 run undo
@@ -178,7 +178,7 @@ run subtool_append type=cube name=Crate size=0.3
 key f
 click "Tool/Parts"
 wait 0.3
-shot subtools
+shot parts
 
 # Face Groups on a cube.
 run new_cube
@@ -188,7 +188,7 @@ click "Tool/Face Groups"
 key f
 drag_item "Rotate##nav.rotate" -160 60
 wait 0.3
-shot polygroups
+shot face-groups
 click "Groups##view.polygroups"
 
 # Remesh: an uneven mesh, then voxel remeshed.
@@ -266,7 +266,7 @@ shot sdiv-6
 run new_sphere subdivisions=3
 click "Dynamic##draw.dynamic"
 run dyntopo detail=60
-click "Tendril##brush.snakehook"
+click "Tendril##brush.tendril"
 drag_path 0.76 0.32 0.85 0.25 0.95 0.17 1.05 0.08 1.12 0.0 S=1.5
 drag_path 0.5 0.2 0.5 0.05 0.5 -0.1 S=1.0
 click "Standard##brush.standard"
@@ -293,7 +293,7 @@ run stroke points="0.35,0.25,2 0.3,0.25,2" brush=Clay radius=0.2 strength=1 inve
 run stroke points="0.35,0.25,2 0.3,0.25,2" brush=Clay radius=0.2 strength=1 invert=true
 run stroke points="0,0.15,2 0,-0.15,2" brush=Standard radius=0.12 strength=1
 run stroke points="0,0.15,2 0,-0.15,2" brush=Standard radius=0.12 strength=1
-run stroke points="-0.3,-0.42,2 0,-0.46,2 0.3,-0.42,2" brush=DamStandard radius=0.08 strength=1
+run stroke points="-0.3,-0.42,2 0,-0.46,2 0.3,-0.42,2" brush=SharpCrease radius=0.08 strength=1
 run stroke points="-0.25,-0.36,2 0,-0.38,2 0.25,-0.36,2" brush=Standard radius=0.08 strength=0.6
 run stroke points="-0.25,-0.5,2 0,-0.53,2 0.25,-0.5,2" brush=Standard radius=0.08 strength=0.6
 run qremesh target=1500 symmetry=x keep_original=true
@@ -369,7 +369,7 @@ click "Render##menu.render"
 click "Materials##section.material"
 wait_idle 20
 wait 0.2
-shot custom-matcaps
+shot custom-lit-spheres
 key escape
 run set_material name="Soft Clay"
 

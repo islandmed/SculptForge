@@ -121,7 +121,7 @@ def main(argv):
             print(f"mesh_info: {state['triangles'] // 2} vertices, {state['triangles']} triangles, "
                   "bounds (-1, -1, -1) - (1, 1, 1)")
         elif cmd == "subtool_list":
-            print(f"subtool_list: 1 SubTool:\n0. {state['name']} ({state['triangles']} triangles, active)")
+            print(f"subtool_list: 1 Part:\n0. {state['name']} ({state['triangles']} triangles, active)")  # marks-pending
         else:
             fail(line, cmd, f"Unknown command '{cmd}'")
 

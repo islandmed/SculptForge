@@ -25,7 +25,7 @@ by hand, with more choices.
 2. If the Part has no UVs (the sub-palette says "No UVs"), click **Auto UV**. SculptForge cuts the model
    into UV islands and packs them into the texture square. It works in the background with a progress bar; on
    a few hundred thousand triangles it takes seconds, on millions it can take a minute or more. Models imported
-   with UVs (from ZBrush, Maya, Blender...) already have them: skip this step.
+   with UVs already have them: skip this step.
 3. Choose a size (**1K**, **2K**, **4K** or **8K**; 2K is the default) and click **New Texture**. The model now
    carries a white texture, and painting goes into it: **Texture** lights up next to **Vertex** on the top
    shelf.
@@ -100,7 +100,7 @@ texture after giving it UVs.
 - Projects (`.sfproj`) save the texture with all its layers, blend modes and settings.
 - Exporting the model writes the texture next to it as a PNG and references it, so other apps pick it up:
   OBJ writes a `.mtl` material with `map_Kd`; glTF/GLB embeds it as the base colour texture; USD binds a preview
-  material that reads it; FBX and GoZ-compatible export write the PNG beside the file. See [Exporting](exporting.md).
+  material that reads it; FBX and Bridge export write the PNG beside the file. See [Exporting](exporting.md).
 - **Delete Texture** removes it (undoable); painting goes back to the vertices.
 
 ## UVs and geometry
@@ -127,10 +127,6 @@ texture after giving it UVs.
 - Auto UV on dense meshes: the islands are kept to about 4,000 triangles each, so a million-triangle sculpt
   unwraps in a quarter of a minute or so and gets a few hundred islands.
 - UVs outside the 0-1 square (other UDIM tiles) aren't painted yet; the [UV Editor](uv-editor.md) lays them out.
-
-> **ZBrush:** ZBrush paints polypaint and converts it to a texture afterwards (**Texture Map > New From
-> Polypaint**). SculptForge can do both: paint the texture directly, or bake vertex paint with **Vertex Paint >
-> Texture**. **Auto UV** plays the part of UV Master's Unwrap.
 
 ## Scripting
 

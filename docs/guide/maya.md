@@ -2,7 +2,7 @@
 
 Keep Maya for the scene, rigging and animation, and sculpt in SculptForge: the **SculptForge shelf** for Maya
 sends the selected meshes to SculptForge, and **File > Maya > Send to Maya** sends them back, replacing each
-Maya object's mesh by name. It works like ZBrush's GoZ between ZBrush and other apps, on Linux, Windows and macOS.
+Maya object's mesh by name. It works through files in a shared folder, on Linux, Windows and macOS.
 
 The two apps exchange files through **one folder that you choose in both**, and nothing else: SculptForge opens
 no ports or connections for this, reads and writes only inside that folder, and never runs anything it finds

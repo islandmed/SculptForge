@@ -2,7 +2,7 @@
 
 The Gizmo moves, rotates and scales a whole Part, or only the part of it you haven't masked. Use it to
 place parts (an eye in its socket, a sword in a hand), to fix proportions, and to pose: mask the body, put the
-pivot at the shoulder and swing the arm. It works like ZBrush's Gizmo 3D, with the same keys.
+pivot at the shoulder and swing the arm. It works, with the same keys.
 
 ![The Gizmo's Move, Scale and Rotate modes; the handle under the cursor turns yellow](images/gizmo-modes.jpg)
 
@@ -96,7 +96,7 @@ step (rotate by 15 degrees, again, again).
 
 ## All Parts
 
-Turn on **All Parts** in the panel to move every visible Part together (ZBrush's Transpose All), for
+Turn on **All Parts** in the panel to move every visible Part together, for
 example to turn a whole character with its eyes, teeth and clothes. The pivot is the centre of all of them. Each
 Part gets its own undo step: undo goes back in the active Part, and selecting another Part undoes its
 part.

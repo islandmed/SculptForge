@@ -448,7 +448,7 @@ CommandResult runExtract(Document& doc, const Args& a) {
 
 void registerExtractMirrorCommands(CommandRegistry& reg) {
     reg.add({"extract",
-             "ZBrush Extract (Tool > SubTool): make a shell from the masked, visible part of the active Part and "
+             "(Tool > Part): make a shell from the masked, visible part of the active Part and "
              "show it as a preview below it; extract_accept (or accept=true) keeps it as a new Part in one undo "
              "step. Running it again replaces the preview.",
              {{"thickness", T::Number,
@@ -471,7 +471,7 @@ void registerExtractMirrorCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"mirror_and_weld",
-             "ZBrush Mirror And Weld (Tool > Geometry > Modify Topology): keep the half of the active Part on the "
+             "(Tool > Geometry > Modify Topology): keep the half of the active Part on the "
              "+ side of the plane through the origin, mirror it onto the other side and weld the seam into one "
              "watertight mesh. Face Groups, vertex paint, mask, UVs and sculpt layers are kept. One undo step.",
              {{"axis", T::String, "Axis whose plane to mirror across: x (default), y or z; several (xz) in turn.", false},
@@ -500,7 +500,7 @@ void registerExtractMirrorCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"mirror",
-             "ZBrush Mirror (Tool > Deformation): flip the active Part across a plane, by default the one through "
+             "(Tool > Deformation): flip the active Part across a plane, by default the one through "
              "the origin that symmetry and Mirror And Weld use. One undo step.",
              {{"axis", T::String, "Axis to flip along: x (default), y or z; several (xz) in turn.", false},
               {"pivot", T::String, "origin (default) or center (flip in place about the Part's centre).", false}},

@@ -5,9 +5,6 @@ inside the app, from script files, from the `sculptforge-cli` tool on a build fa
 agents through the Model Context Protocol (MCP). This chapter explains the script language, the console, both
 command-line programs, the Python module and MCP setup.
 
-> **ZBrush:** The console plays the role of ZBrush's ZScript window, and **Copy session as script** is a macro
-> recorder. The language is much simpler than ZScript: one command per statement, with named parameters.
-
 ## The script language
 
 A script is a list of statements. Each statement is a command name followed by `name=value` parameters:
@@ -85,7 +82,7 @@ the ones you will use most:
 |---|---|---|
 | Scene | `new_sphere` | `subdivisions` (0 to 8, default 6) |
 | Scene | `new_plane` | `resolution` (cells per side, default 128) |
-| Files | `open` | `path`: models, projects, splats, GoZ-compatible files |
+| Files | `open` | `path`: models, projects, splats, Bridge files |
 | Files | `save_project` | `path` (default: the current project) |
 | Files | `open_project` | `path` |
 | Geometry | `subdivide` | `levels` (1 to 4, default 1) |
@@ -222,8 +219,8 @@ sf.run_script(doc, "decimate ratio=0.25; export_lods path=/out/troll.glb levels=
 verts, tris = doc.vertices, doc.triangles            # NumPy (N, 3) float32 and (M, 3) uint32
 doc.set_mesh(verts * 1.1, tris)                      # bring in a mesh from your own tools (clears undo)
 
-print(doc.subtools)                                  # [{'name': ..., 'visible': ..., 'triangles': ...}]
-doc.active_subtool = "Helmet"                        # select by index or name
+print(doc.parts)                                  # [{'name': ..., 'visible': ..., 'triangles': ...}]
+doc.active_part = "Helmet"                        # select by index or name
 for name, weight in doc.layers:                      # sculpt layers (blend shapes)
     print(name, weight)
 

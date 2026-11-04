@@ -234,18 +234,8 @@ hold none
 expect_value camera_distance > $d1
 key f
 click "Preferences##palette.preferences"
-click "ZBrush-style##input.style_zbrush"
+click "Classic sculpting keys##input.style_zbrush"
 expect_value input_style == 0
 key 1
 expect_value brush_type == 2
 
-# The F3 search finds features by the names ZBrush users type, and says what SculptForge calls them.
-key f3
-type "##Command palette" zspheres
-expect_text "ZBrush users: ZSpheres"
-shot search-zbrush-name
-key escape
-key f3
-type "##Command palette" subtool append
-expect_text "ZBrush users: SubTool"
-key escape

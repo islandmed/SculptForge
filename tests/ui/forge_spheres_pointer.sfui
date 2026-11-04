@@ -7,11 +7,11 @@ run zsphere_new radius=1
 run subtool_visibility index=0 visible=false
 wait 0.3
 click "Forge Spheres##tool.zspheres"
-expect "ZSpheres/Drag places child"
+expect "Forge Spheres/Drag places child"
 hold ctrl
-hover "ZSpheres/Drag places child"
+hover "Forge Spheres/Drag places child"
 expect_help "moves the new sphere away"
-hover "ZSpheres/Delete Selected"
+hover "Forge Spheres/Delete Selected"
 expect_help "selected sphere"
 hold none
 
@@ -25,7 +25,7 @@ key ctrl+z
 expect_value zspheres == 1
 
 # On: the same drag pulls the new sphere out, at half the parent's size.
-click "ZSpheres/Drag places child"
+click "Forge Spheres/Drag places child"
 expect_value zsphere_place_child == 1
 view_drag 0.515 0.518 0.600 0.518
 expect_value zspheres == 3
@@ -36,7 +36,7 @@ expect_status "Forge Sphere add"
 expect_value zsphere_selected == 1
 shot placed
 key ctrl+z
-click "ZSpheres/Drag places child"
+click "Forge Spheres/Drag places child"
 expect_value zsphere_place_child == 0
 
 # Ctrl+drag places too, with the toggle off.
@@ -47,13 +47,13 @@ expect_value zspheres == 3
 expect_value zsphere_out1 > 1.4
 
 # Insert Between on the selected arm: a joint (and its mirror), selected.
-click "ZSpheres/Insert Between"
+click "Forge Spheres/Insert Between"
 expect_value zspheres == 5
 expect_status "Forge Sphere insert"
 expect_value zsphere_selected == 3
 
 # Delete Selected: the joint and the arm beyond it go (both sides); the root stays.
-click "ZSpheres/Delete Selected"
+click "Forge Spheres/Delete Selected"
 expect_value zspheres == 1
 expect_value zsphere_selected == -1
 key ctrl+z

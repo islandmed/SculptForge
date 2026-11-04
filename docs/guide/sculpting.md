@@ -22,9 +22,6 @@ works on the active Part, and only on parts that are visible and not masked. A s
 keeps sculpting when it slides past the edge of a form seen in profile, as long as the brush circle still covers
 the model: the brush holds on to the silhouette (#84).
 
-> **ZBrush:** the modifiers are the ones you know. <kbd>Alt</kbd> flips Add and Sub for one stroke,
-> <kbd>Shift</kbd> smooths with any brush, <kbd>Ctrl</kbd> paints a mask (see [Masking](masking.md)).
-
 ## Built-in brushes
 
 SculptForge has nineteen sculpting brushes plus the Paint brush. The first ten have number keys; all of them
@@ -62,10 +59,6 @@ Notes on particular brushes:
 - **Layer** sets its height from the brush size and **Intensity**. Pen pressure lowers the height when
   **Pressure > Strength** is on, so you can feather the edge of a layer.
 - **Trim** gives crisp planes on cylinders and edges. Use it with **Front** on when you work on thin shapes.
-
-> **ZBrush:** Sharp Crease (ZBrush's DamStandard), Clay Block (ClayBuildup), Tendril (SnakeHook), Trim (Trim
-> Dynamic), Layer and Nudge behave like their ZBrush counterparts. Brushes such as ZBrush's hPolish, ClayTubes, Slash or the IMM and curve brushes are not built in;
-> you can get close to several of them with a custom brush in [Brush Lab](brush-lab.md).
 
 ## Custom brushes that ship with SculptForge
 
@@ -106,7 +99,7 @@ the `Brushes` folder of your Library library that aren't loaded yet; picking one
 
 ![The brush picker after pressing B, with letter badges](images/brush-picker.jpg)
 
-The picker works the ZBrush way, by typing letters:
+The picker works, by typing letters:
 
 1. Press <kbd>B</kbd>.
 2. Type the first letter of the brush. Only brushes starting with that letter stay, and each shows a highlighted
@@ -124,10 +117,6 @@ Hover a tile for a large preview and the brush's description. Right-click a tile
 and on custom brushes also **Copy brush code**, **Rename...**, **Save as .sfbrush...**, **Delete...** and
 **Reveal in folder** (see [Brush Lab and sharing brushes](brush-lab.md)).
 
-> **ZBrush:** <kbd>B</kbd> then two letters is the same muscle memory. Holding <kbd>Ctrl</kbd> while picking
-> to choose a masking brush is not supported; mask strokes always use <kbd>Ctrl</kbd> with the current
-> settings.
-
 ## Draw Size, Intensity, RGB Intensity and Falloff
 
 These values control every brush. Draw Size and Intensity are on the top shelf;
@@ -143,11 +132,11 @@ all four are in **Sculpt > Draw & Tablet** and the [Quick Menu](#the-quick-menu)
 Because **Draw Size** is measured on screen, the brush covers less of the model as you zoom in, which is what
 you want for detail work.
 
-The brush cursor shows two rings, as in ZBrush: the outer one is the Draw Size, the inner one is Falloff
+The brush cursor shows two rings: the outer one is the Draw Size, the inner one is Falloff
 (where the brush works at half strength). Masking, painting, Move and Tendril follow Falloff too. Custom
 brushes made in Brush Lab and Clay Block's square tip keep their own tip shape at 0 and shift it like the others.
 
-With an [alpha](#alphas), Falloff works as in ZBrush: the alpha is multiplied by the round falloff. At -100
+With an [alpha](#alphas), Falloff works: the alpha is multiplied by the round falloff. At -100
 the whole alpha shows, hard to its edges (a Square alpha stamps the full square); at 0 the falloff softens it and
 rounds a square's corners; at +100 only a soft point in the middle is left.
 
@@ -179,7 +168,7 @@ yet in the session starts from the values you have now, so nothing jumps.
 
 ### Smooth's own Intensity
 
-Smooth keeps an Intensity of its own, as in ZBrush, so a gentle Standard stroke at 10 still smooths at full
+Smooth keeps an Intensity of its own, so a gentle Standard stroke at 10 still smooths at full
 speed. Hold <kbd>Shift</kbd> (or pick the Smooth brush) and the Intensity slider shows **Smooth Intensity**:
 change it there, or hold <kbd>Shift</kbd> and press <kbd>U</kbd>. It starts at 50.
 
@@ -189,7 +178,7 @@ The plain smooth evens out bumps by pulling each point towards its neighbours, s
 shrinks a little too: a cheek flattens, a sphere gets smaller. The other smooth keeps the volume: it removes the
 bumps but leaves the form where it is (a Taubin smooth, one step in and a slightly larger one back out).
 
-- **Alternate smooth**, as in ZBrush: start a stroke with <kbd>Shift</kbd> held, then let go of <kbd>Shift</kbd>
+- **Alternate smooth**: start a stroke with <kbd>Shift</kbd> held, then let go of <kbd>Shift</kbd>
   while still pressing. The rest of the stroke uses the other smooth, and the status line says which.
 - **Smooth keeps volume** in **Sculpt > Brush** makes the volume-keeping smooth the one <kbd>Shift</kbd> and
   the Smooth brush use; letting go of <kbd>Shift</kbd> mid-stroke then switches to the plain one. Saved with the
@@ -218,7 +207,7 @@ These toggles sit on the top shelf and in **Sculpt > Draw & Tablet**:
 |---|---|
 | **Sculpt** / **Paint** | **Sculpt** makes brushes change the shape. **Paint** (<kbd>P</kbd>) paints colour only. |
 | **Add** / **Sub** | **Add** makes brushes add (the default), **Sub** makes them subtract. <kbd>Alt</kbd> flips the current choice for one stroke. |
-| **Rgb** | Sculpt brushes also paint the current colour as they sculpt (ZBrush: Rgb with Zadd). |
+| **Rgb** | Sculpt brushes also paint the current colour as they sculpt. |
 | **Front** | Front faces only: brushes leave the far side of thin parts alone, such as the back of an ear or a cape. |
 
 **Sculpt > Brush** has the same Front and invert settings as the checkboxes **Front faces only** and
@@ -260,12 +249,12 @@ points right at you, drag up to pull it out. **Edit > Preferences > Input > Alon
 
 ## The Quick Menu
 
-Press <kbd>Space</kbd> for ZBrush's QuickMenu under the cursor: the Brush, Stroke, Alpha and Material tiles,
+Press <kbd>Space</kbd> for the Quick Menu under the cursor: the Brush, Stroke, Alpha and Material tiles,
 Draw Size, Falloff, Intensity and RGB Intensity, Add / Sub, Sculpt / Paint, Rgb and X symmetry. Hold
 <kbd>Space</kbd> and let go to close it again (it stays while the pointer is on it), or tap <kbd>Space</kbd> to
 keep it open until you click elsewhere or press <kbd>Esc</kbd>. Clicking a tile opens its picker.
 
-A right click on the canvas opens it too, as in ZBrush: press the right button and let go without moving, beside
+A right click on the canvas opens it too: press the right button and let go without moving, beside
 the model or on it, and the Quick Menu stays open at the cursor. A right drag still turns the view (and pans or
 zooms with <kbd>Alt</kbd> or <kbd>Ctrl</kbd>), and a pen button set to **Right click** (Edit > Preferences > Tablet)
 works the same way. Turn it off with **Edit > Preferences > Input > Right click opens the Quick Menu**.
@@ -315,7 +304,7 @@ open borders stay where they are, and each is one undo step:
 | **Polish** | Flattens fine noise and small bumps while flat areas and sharp edges stay sharp: a scan's grain, or the ripples a voxel remesh leaves on a hard-surface piece. |
 | **Relax** | Evens out the spacing of the vertices along the surface without changing its shape, for areas a big Move or Tendril stretched. |
 | **Smooth** | Smooths everything; with **Smooth keeps volume** it doesn't shrink the form. |
-| **Balloon** | Fills the form out toward a rounder volume, like blowing into it (ZBrush users: Inflate Balloon). A negative amount lets the air out. |
+| **Balloon** | Fills the form out toward a rounder volume, like blowing into it (experienced sculptors: Inflate Balloon). A negative amount lets the air out. |
 
 They are commands too: `deform_polish amount=60`, `deform_relax`, `deform_smooth amount=30 keep_volume=true`,
 `deform_balloon amount=-20` (add `masked=false` to ignore the mask). On a 10-million-vertex Part at amount 50,
@@ -379,9 +368,6 @@ Away, In, Add or Clip). The label next to the brush cursor names the shape. Pick
   adds the modifiers and shows every choice at once.
 - Change the key in **Edit > Preferences > Hotkeys** (*Stroke popup*), or hold <kbd>Ctrl</kbd>+<kbd>Alt</kbd> and click the shelf button, then press the new key.
 
-> **ZBrush:** Drag Stamp, Slide Stamp, Spray and Steady Stroke match ZBrush's DragRect, DragDot, Spray and LazyMouse. Freehand and Dots are the same thing here.
-> Roll and curve strokes are not available yet.
-
 ## Precision work
 
 Pores, wrinkles, jewellery and hard-surface trims need a brush that goes exactly where you mean, at exactly the
@@ -415,7 +401,7 @@ shows next to the cursor for a moment after it changes (all the time with World 
 <kbd>Shift</kbd>+<kbd>Alt</kbd>: the brush moves at a quarter of the pen's speed, drawn as a blue ring with a line
 back to the pen, and works at **Precision Intensity** (stroke picker, default 10). Let go and the brush glides back
 under the pen as you keep moving; it never jumps. Hold the keys after the stroke has started: at the press,
-<kbd>Shift</kbd>+<kbd>Alt</kbd> still selects and frames a Part (ZBrush and SculptForge styles), and in the Blender
+<kbd>Shift</kbd>+<kbd>Alt</kbd> still selects and frames a Part, and in the Blender
 style <kbd>Alt</kbd>+click still navigates. The same works in every input style.
 
 **A pressure curve for each brush.** Every brush keeps its own pen pressure curve, applied after the tablet's
@@ -434,7 +420,7 @@ with every tiny bump. A real step in the surface is followed at once.
 An alpha is a grayscale stamp that shapes the brush tip: white is full effect, black is none. It affects every
 brush, built-in or custom. Choose one from the **Alpha** tile on the left shelf (the alpha picker) or the
 **Sculpt > Alpha**, which also shows a large preview of the current alpha.
-[Falloff](#draw-size-intensity-rgb-intensity-and-falloff) fades it as in ZBrush: set it to -100 to
+[Falloff](#draw-size-intensity-rgb-intensity-and-falloff) fades it: set it to -100 to
 stamp the whole alpha (a crisp square, or a pattern out to its edges), 0 for a soft round fade, +100 for a soft
 point. Alphas work on [micro levels](micro-levels.md) too, with every stroke type including Drag Stamp.
 
@@ -488,13 +474,9 @@ They work with every brush, custom and Community brushes included, and each brus
 [Each brush keeps its own settings](#each-brush-keeps-its-own-settings)). From a script:
 `brush_alpha_options follow_stroke=true angle=30 angle_jitter=10 tile_x=2 tile_y=2`.
 
-> **ZBrush:** there is no alpha library browser with hundreds of alphas yet, and alpha options such as
-> MidValue or Rf (radial fade) are not available. Any grayscale image works, including alphas you already have as
-> PNG.
-
 ## Vector displacement brushes
 
-A vector displacement brush (ZBrush's VDM brushes, Blender's "VDM brushes") stamps a whole 3D shape in one
+A vector displacement brush stamps a whole 3D shape in one
 click: a horn, an ear, a cluster of scales, a nostril. An alpha can only push the surface up or down; a vector
 displacement map (VDM) moves every point of the stamp in any direction, so the shape can lean over, curl and
 overhang, as nothing made with a height ever can.
@@ -541,7 +523,7 @@ The top of the screen when you look at the plane from the top is the top of the 
 points to. The plane's UVs record where each point started, so what Create VDM captures is how far each point
 moved, sideways and up.
 
-### Load and export maps (Blender, ZBrush)
+### Load and export maps
 
 **Load VDM...** reads an OpenEXR (16- or 32-bit, any compression) or a `.sfvdm`; dropping an `.exr` on the window
 does the same. A loaded EXR is kept in your brush library as a `.sfvdm`, so it's there next time. **Export
@@ -562,19 +544,13 @@ with the EXR (Color Space: Non-Color) to a Draw brush, set the texture's **Mappi
 [Working with Blender](blender.md#vector-displacement-maps)). Blender's brush touches only the round area of the
 brush, so the corners of a map are cut off there; in SculptForge the whole square stamps.
 
-ZBrush keeps its VDMs inside brushes (as 3D alphas) and doesn't export them as EXR by itself; maps made with
-**Tool > Vector Displacement Map** or third-party exporters use axes set by ZBrush's *Vector Displacement Flip*
-options. If a map from ZBrush stamps lying on its side, load it again with **Swap Y/Z**; if it is mirrored or leans
+Maps made in other applications may use other axes. If a map stamps lying on its side, load it again with **Swap Y/Z**; if it is mirrored or leans
 the wrong way, with **Flip X** or **Flip Y** (**Flip Z** for a map that digs in where it should rise). **Scale**
 multiplies a map made in other units.
 
 From a script: `vdm_set name=horn` or `vdm_set path=ear.exr swap_yz=true`, `vdm_stamp point=0,0.5,0 radius=0.3
 angle=30`, `vdm_new_plane`, `vdm_capture name="My horn" exr=horn.exr`, `vdm_export path=horn.exr`, `vdm_list`,
 `vdm_delete name="My horn"`.
-
-> **ZBrush:** the VDM brush works like ZBrush's VDM brushes with DragRect or DragDot. Not available yet:
-> several VDMs in one brush (ZBrush's *Create Multiple Alpha Brush*), MidValue and the alpha options for 3D
-> alphas, and reading ZBrush's own brush files.
 
 ## Kelvinlet brushes
 
@@ -642,10 +618,6 @@ Any detail you have sculpted can become a brush in two seconds: **Capture from v
 The square is captured along your view, so look at the detail straight on. The capture takes about a tenth of a
 second for a small detail and a second or so for a large patch of a 20-million-triangle model.
 
-> **ZBrush:** this is "GrabDoc" for alphas, and more: ZBrush can only make a VDM from its special VDM plane,
-> here any detail on any model becomes one. The commands `capture_alpha` and `capture_vdm` do the same from a
-> script.
-
 ### Detail Clone
 
 **DetailClone** stamps the VDM brush's map (a captured one or any other) along your stroke, one copy every stamp
@@ -695,9 +667,6 @@ the symmetry settings, radial and local included. Scripts and `sculptforge-cli` 
 that take `symmetry` (`stroke`, `vdm_stamp`, `mask_rect`, `mask_lasso`, `hide_rect`, `hide_lasso`,
 `insert_primitive`, `insert_mesh`) also take `radial` (the count), `radial_axis` (`x`, `y` or `z`) and `local`
 (`true` for the Part's centre), for example `stroke points=... symmetry=x radial=8 radial_axis=y`.
-
-> **ZBrush:** **R** is ZBrush's (R) radial symmetry with Radial Count, and **Local** is its Local Symmetry (about
-> the Part's centre). Topological (poseable) symmetry is not available yet.
 
 ## Pen pressure and tablets
 
@@ -770,5 +739,5 @@ Points are projected onto the surface along `view` (default `0,0,-1`, the front 
 - [Masking](masking.md): protect areas from every brush
 - [Vertex Paint and materials](vertex-paint.md): Paint brush, Rgb and colour
 - [Sculpt layers and blend shapes](layers.md): sculpt into a layer you can dial in and out
-- [Dynamic topology](dynamic-topology.md): brushes that add triangles where they need them (Sculptris Pro)
+- [Dynamic topology](dynamic-topology.md): brushes that add triangles where they need them (dynamic topology)
 - [Keyboard and mouse reference](shortcuts.md)

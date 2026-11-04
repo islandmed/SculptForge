@@ -95,12 +95,12 @@ they want to sculpt fixes *on* a pose and send back a clean delta in the bind sp
 |---|---|---|
 | USD export | `.usda`/`.usdz` written without the SDK: one `Mesh` per Part under a root Xform, UVs as face-varying `primvars:st`, `displayColor`, UsdPreviewSurface (clay/painted/textured), sculpt layers as UsdSkel blend shapes on a joint-less Skeleton with a `SkelAnimation` (time-sampled face takes), Gaussian splats as `ParticleField3DGaussianSplat`. Checked with `usdchecker` 26.08. | `src/io/UsdIO.*` |
 | USD import | `.usda` and text-root `.usdz`: meshes, xform ops, Z-up, UVs, blend shapes, splats. **No `.usdc`, no references or payloads, no variants.** | `src/io/UsdIO.*` |
-| Other formats | FBX read (ufbx, any version) and write (7.4 binary, blend shapes, LOD groups); glTF/GLB (morph targets, `KHR_gaussian_splatting`, Khronos-validated); OBJ, PLY, STL (mm, Z-up), .GoZ | `src/io/` |
+| Other formats | FBX read (ufbx, any version) and write (7.4 binary, blend shapes, LOD groups); glTF/GLB (morph targets, `KHR_gaussian_splatting`, Khronos-validated); OBJ, PLY, STL (mm, Z-up), .Bridge files | `src/io/` |
 | VFX-RP builds | CY2026 (Rocky 8, glibc 2.28) and CY2027 (Rocky 9, glibc 2.34) tarballs, x86_64 and ARM64; CI checks glibc symbols; dependencies static (SDL3, ImGui, GLM, ufbx) | CI, `docs/studios.md` |
 | rez | `packaging/rez/package.py`: `PATH`, `PYTHONPATH`, `SCULPTFORGE_ROOT`, studio brush share | `packaging/rez/` |
 | Python | `import sculptforge`: `Document`, `run`, `run_script`, `commands()`, NumPy vertices and triangles, layers and deltas; releases the GIL | `src/python/module.cpp` |
 | CLI | `sculptforge-cli` runs every editor command headless; `sculptforge --render --turntable` renders offscreen; `--mcp` (stdio only) | `src/cli/` |
-| Bridges | Blender (folder + manifest, .GoZ; no sockets), Maya 2022+ (folder + manifest, OBJ; no sockets), Unreal 5 (Python remote execution, static or skeletal mesh with morph targets), ZBrush (GoZ-compatible, plug-in runs inside ZBrush) | `src/io/*Bridge*`, `src/link/UnrealLink.*` |
+| Bridges | Blender (folder + manifest, Bridge files; no sockets), Maya 2022+ (folder + manifest, OBJ; no sockets), Unreal 5 (Python remote execution, static or skeletal mesh with morph targets), Bridge | `src/io/*Bridge*`, `src/link/UnrealLink.*` |
 | Determinism | Seeded remesh, QRemesh, stroke jitter and scatter; deterministic deformers | `src/core/` |
 | Posing | Masked transforms with soft falloff at a joint ("mask the body, rotate the arm"). **No skeleton.** | `src/core/MeshTransform.h` |
 | Network | No telemetry, no account. **Automatic:** the daily update check, and the brush gallery index when its panel opens. **Remote by default when used:** the AI Brush assistant (Pollinations) and Generate 3D (Hugging Face). Listeners: Phone link (LAN, only while open), and a temporary Unreal call-back. Full audit in §7. | `src/ai/Http.cpp`, `src/link/Socket.cpp` |
@@ -435,7 +435,7 @@ Effort: about 0.75 w once AI tools ships (policy and choke points 0.4, UI/report
 These go out with the next release's lockstep, alongside the guide and site.
 
 **Files and code.**
-- File parsers (OBJ, FBX, glTF, PLY, USD/USDZ, images, .GoZ, brushes, packs) are tested against hostile and
+- File parsers (OBJ, FBX, glTF, PLY, USD/USDZ, images, .Bridge files, brushes, packs) are tested against hostile and
   malformed files, including fuzzer-found cases (`tests/test_malformed_files.cpp`). *(P1)* Continuous fuzzing in CI. Bridges exchange files through one folder, checked strictly (no paths outside it, no
   links, size limits), and nothing in the folder is ever executed.
 - No plug-ins from the network. Packs are reviewed and installed by the user, never by an AI agent. Studio
@@ -544,7 +544,7 @@ feature does. The structure is two pillars, then the integration grid, which alr
       </article>
     </div>
 
-    <!-- existing integration grid: Blender, Maya, ZBrush Bridge (GoZ-compatible), Unreal, formats,
+    <!-- existing integration grid: Blender, Maya, Bridge, Unreal, formats,
          Linux/Windows/macOS, Linux pipelines; add ⏳ Houdini Solaris, Flow Production Tracking / ftrack /
          Kitsu publish hooks, Alembic, MaterialX when they ship -->
 
@@ -554,7 +554,7 @@ feature does. The structure is two pillars, then the integration grid, which alr
 </section>
 ```
 
-Keep the existing no-affiliation footer on the page (it names ZBrush for compatibility).
+Keep the existing no-affiliation footer on the page.
 
 ---
 

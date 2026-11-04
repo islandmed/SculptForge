@@ -25,9 +25,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 SRC = ROOT / "docs" / "guide"
 SITE = "https://sculptforge.app/"
 # Chapters that were renamed: the old page stays as a small redirect so links from elsewhere keep working.
-REDIRECTS = {"subtools.html": "parts.html", "zspheres.html": "forge-spheres.html", "polypaint.html": "vertex-paint.html",
-             "polygroups.html": "face-groups.html"}
-CALLOUTS = {"tip": "Tip", "note": "Note", "zbrush": "ZBrush", "not-yet": "Not yet", "warning": "Warning",
+REDIRECTS: dict[str, str] = {}
+CALLOUTS = {"tip": "Tip", "note": "Note", "experienced": "Experienced sculptor?", "not-yet": "Not yet", "warning": "Warning",
             "important": "Important"}
 
 # ---------------------------------------------------------------------------
@@ -440,6 +439,12 @@ def project_version() -> str:
     return m.group(1) if m else ""
 
 
+def project_prerelease() -> str:
+    """CMakeLists.txt's SCULPTFORGE_PRERELEASE ("beta.1" while a beta of the project version is out, else "")."""
+    m = re.search(r'^set\(SCULPTFORGE_PRERELEASE "([^"]*)"\)', (ROOT / "CMakeLists.txt").read_text(encoding="utf-8"), re.M)
+    return m.group(1) if m else ""
+
+
 def parse_features(text: str) -> dict:
     """The features block: date, tagline, highlights, then cards (each starts with title:). Raises ValueError."""
     v = {"date": "", "tagline": "", "highlights": [], "cards": []}
@@ -667,7 +672,10 @@ def home_whats_new(page: "WhatsNewPage") -> str:
 
 
 def write_home(page: "WhatsNewPage", check_only: bool) -> bool:
-    """Writes the release area into website/index.html; with CHECK_ONLY, True when it is already up to date."""
+    """Writes the release area into website/index.html; with CHECK_ONLY, True when it is already up to date. A beta
+    leaves the home page alone: it keeps showing the stable release until that version ships."""
+    if project_prerelease():
+        return True
     t = HOME.read_text(encoding="utf-8")
     a = t.find(HOME_START)
     b = t.find(HOME_END, a)
@@ -769,7 +777,7 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
   <meta property="og:type" content="article">
   <meta property="og:title" content="{html.escape(title)}">
   <meta property="og:description" content="{desc}">
-  <meta property="og:image" content="{SITE}img/social-preview.png?v=3">
+  <meta property="og:image" content="{SITE}img/social-preview.png?v=4">
   <meta property="og:url" content="{url}">
   <link rel="stylesheet" href="../style.css?v=19">
   <script src="../motion.js?v=11" defer></script>
@@ -829,8 +837,7 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
         <a href="https://github.com/islandmed/SculptForge/issues">Report a problem</a>
         <a href="https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md">AI services &amp; privacy</a>
       </div>
-      <p class="fine trademarks">ZBrush, GoZ, MatCap and other ZBrush feature names are trademarks of Maxon Computer
-        GmbH. SculptForge is not affiliated with or endorsed by Maxon. All other trademarks belong to their owners.</p>
+      <p class="fine trademarks">SculptForge is an independent project. Product names are trademarks of their respective owners.</p>
     </div>
   </footer>
 </body>
@@ -1060,8 +1067,7 @@ def main() -> int:
         SUPPORTERS_PAGE.write_text(supporters_html(), encoding="utf-8")
         if wn:
             write_home(wn, False)
-        urls = [SITE, SITE + "brushes.html", SITE + "mudbox-alternative.html",
-                SITE + "zbrush-alternative.html", SITE + "zbrush-linux.html", SITE + "press.html",
+        urls = [SITE, SITE + "brushes.html", SITE + "press.html",
                 SITE + "studios.html", SITE + "support.html", SITE + "supporters.html"] + [f"{SITE}guide/{p.name[:-3]}.html" for p in pages]
         (ROOT / "website" / "sitemap.xml").write_text(
             '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'

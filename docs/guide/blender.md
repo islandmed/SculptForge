@@ -3,7 +3,7 @@
 Keep Blender for the scene, rigging, shading and animation, and sculpt in SculptForge: the **SculptForge Bridge**
 add-on sends the selected objects from Blender to SculptForge with one click, and one click in SculptForge sends
 them back. The objects update in place in Blender: their transform, materials and modifiers stay as they were.
-It works like ZBrush's GoZ between ZBrush and other apps, on Linux, Windows and macOS, with Blender 4.2 or newer.
+It works through files in a shared folder, on Linux, Windows and macOS, with Blender 4.2 or newer.
 
 ## Install the add-on
 
@@ -84,18 +84,18 @@ In SculptForge's **File > Blender**:
 
 The add-on's preferences add the path of SculptForge and the exchange folder (below).
 
-## ZBrush-style keys in Sculpt Mode
+## Classic sculpting keys in Sculpt Mode
 
-Sculpting in Blender too? Turn on **ZBrush-style keys in Sculpt Mode** in the add-on's preferences (**Edit >
-Preferences > Add-ons > SculptForge Bridge**) and Blender's Sculpt Mode answers to ZBrush's keys where Blender
+Sculpting in Blender too? Turn on **The Classic sculpting keys in Sculpt Mode** in the add-on's preferences (**Edit >
+Preferences > Add-ons > SculptForge Bridge**) and Blender's Sculpt Mode answers to the Classic sculpting keys where Blender
 has the same thing. Turning it off removes them again, and Blender's own keys are back; so does disabling the
 add-on. The preferences list every key while it's on.
 
-| ZBrush key | In Blender's Sculpt Mode |
+| Classic key | In Blender's Sculpt Mode |
 |---|---|
 | <kbd>S</kbd> / <kbd>U</kbd> / <kbd>O</kbd> | Draw Size / Intensity (Strength) / Falloff (Hardness), dragged at the cursor |
 | <kbd>Space</kbd> | Blender's Sculpt quick menu at the cursor (brush, size, strength) |
-| <kbd>B</kbd> | The brush list by ZBrush brush name (Standard, DamStandard, Clay, ClayBuildup, Move, SnakeHook...): type a few letters, <kbd>Enter</kbd> picks |
+| <kbd>B</kbd> | The brush list by name (Standard, Sharp Crease, Clay, Clay Block, Move, Tendril...): type a few letters, <kbd>Enter</kbd> picks |
 | <kbd>Alt</kbd>+drag | Sub: the brush digs in |
 | <kbd>Ctrl</kbd>+drag / <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+drag | Mask / unmask, drawn as a lasso |
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+drag / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+drag | Show only what's inside / hide what's inside |
@@ -108,11 +108,11 @@ add-on. The preferences list every key while it's on.
 | <kbd>W</kbd> / <kbd>E</kbd> / <kbd>R</kbd> | Move / Scale / Rotate |
 | <kbd>Shift</kbd>+drag | Smooth (Blender already does this) |
 
-ZBrush's brushes map to Blender's closest: Standard = Draw, DamStandard = Draw Sharp, ClayBuildup = Clay
-Strips, Move = Grab, Move Elastic = Elastic Grab, TrimDynamic = Trim (Scrape in Blender 4.2), Crease = Crease
+brushes map to Blender's closest: Standard = Draw, Sharp Crease = Draw Sharp, Clay Block = Clay
+Strips, Move = Grab, Move Elastic = Elastic Grab, Plane Trim = Trim (Scrape in Blender 4.2), Crease = Crease
 Sharp, MaskPen = Mask.
 
-What Blender has no key for, or can't do the ZBrush way:
+What Blender has no key for, or can't do:
 
 - <kbd>I</kbd> (RGB Intensity): Blender's sculpt brushes don't paint.
 - <kbd>Ctrl</kbd>+drag on the model doesn't paint the mask with a round brush: Blender can't switch to the Mask
@@ -147,7 +147,7 @@ SculptForge's VDM brushes and Blender's use the same maps (see
 
 The two programs share a folder in your user data: `~/.local/share/SculptForge/SculptForge/blender` on Linux,
 `%APPDATA%\SculptForge\SculptForge\blender` on Windows, `~/Library/Application Support/SculptForge/SculptForge/blender`
-on macOS. Each side writes its meshes there as `.GoZ` files (the format SculptForge also uses with ZBrush) with a
+on macOS. Each side writes its meshes there as `.GoZ` files with a
 small list of the objects, and checks the other side's list once a second. Nothing goes over the network.
 
 To use another folder, set it in the add-on's preferences and start SculptForge with the environment variable
@@ -163,7 +163,7 @@ SculptForge with `--blender` loads what Blender last sent.
   `SCULPTFORGE_BLENDER_EXCHANGE` set to it, and send.
 - **Linked duplicates** (objects sharing one mesh) all show the last one received.
 - **Shape keys**: the Basis and the keys named like SculptForge's layers are updated; other keys keep their shapes.
-- **Subdivision levels** don't go to Blender: it receives the level you're on (like ZBrush's GoZ).
+- **Subdivision levels** don't go to Blender: it receives the level you're on (like Bridge files).
 - **Sculpt layers** arrive as **shape keys** (Basis plus one key per layer, with its name and weight), so the 52
   [facial shapes](facial-shapes.md) keep their ARKit names. Shape keys don't come back from Blender, and textures
   stay in SculptForge.
@@ -174,6 +174,6 @@ SculptForge with `--blender` loads what Blender last sent.
 
 ## See also
 
-- [Exporting, Unreal and ZBrush](exporting.md): files, game engines and Send to ZBrush
+- [Exporting, Unreal and Bridge](exporting.md): files, game engines and Bridge
 - [Parts](parts.md): each Blender object is a Part
 - [Face Groups and visibility](face-groups.md): Blender's face sets

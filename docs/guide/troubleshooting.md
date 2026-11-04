@@ -15,7 +15,7 @@ Quick answers:
 | Menus or shelves look wrong after an update | **Edit > Preferences > Config > Restore Standard UI** ([Reset the interface](#reset-the-interface)) |
 | Sculpting feels slow | [The viewport is slow](#the-viewport-is-slow) |
 | Lost work after a crash | [Recovering work after a crash](#recovering-work-after-a-crash) |
-| Want the ZBrush layout back | **Edit > Preferences > Interface > Look > Layout > ZBrush-style** |
+| Want the Classic layout back | **Edit > Preferences > Interface > Look > Layout > Classic** |
 
 ## SculptForge doesn't start
 
@@ -175,7 +175,7 @@ font DPI (Xft.dpi); if Automatic looks wrong there, pick a size.
 
 ### My layout or shortcuts are gone after a restart
 
-Like ZBrush, SculptForge never saves the layout on its own. Press **Store Config**
+SculptForge never saves the layout on its own. Press **Store Config**
 (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) to keep the current layout, shortcuts and interface
 preferences. See [The interface](interface.md).
 
@@ -251,18 +251,16 @@ work?". **Restore** opens it as unsaved work (save it under a name); **Discard**
 
 ## Frequently asked questions
 
-**Can SculptForge open ZBrush files (.ZTL, .ZPR)?**
-Not directly: they are proprietary and undocumented. Convert ZTools once in ZBrush with the free
-**SculptForge ZTL Export** plug-in, then open the `.ZTL` in SculptForge (see
-[Coming from ZBrush](coming-from-zbrush.md#bring-your-ztools-over)). Or use Send to ZBrush, or export OBJ or FBX from ZBrush
-(see [Exporting, Send to Unreal and ZBrush](exporting.md#exchange-models-with-zbrush-send-to-zbrush)). `.ZPR` projects can't be
-converted; open their ZTools instead.
+**Can SculptForge open another sculpting app's own project files?**
+Not directly: those formats are proprietary and undocumented. Export OBJ or FBX from that app, use the
+[Bridge](exporting.md#exchange-models-through-the-bridge), or convert a whole library once with the free Bridge
+export plug-in (see the [Bridge setup page](https://github.com/islandmed/SculptForge/blob/main/integrations/bridge-plugin/README.md)).
 
-**Does it have subdivision levels, DynaMesh, ZRemesher or UVs?**
-Voxel remesh works like DynaMesh, **Quad Remesh** like ZRemesher (with **Project All** to bring the detail back; see
+**Does it have subdivision levels, voxel remesh, quad remesh or UVs?**
+Yes: **Voxel Remesh**, **Quad Remesh** (with **Project All** to bring the detail back; see
 [Quad retopology](retopology.md)), **Auto UV** unwraps any model, and Divide adds subdivision levels you can
 step up and down (see [Subdivision levels](subdivision-levels.md)). **Dynamic** on the top shelf is dynamic
-topology, like Sculptris Pro (see [Dynamic topology](dynamic-topology.md)).
+topology, like dynamic topology (see [Dynamic topology](dynamic-topology.md)).
 
 **Is it really free? Can I sell what I make?**
 Yes and yes. SculptForge is GPL-3.0-or-later free software; the licence covers the program, not your models.

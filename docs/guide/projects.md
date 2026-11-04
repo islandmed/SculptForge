@@ -21,17 +21,12 @@ Undo history isn't saved: an opened project starts with a clean history.
 Model formats such as OBJ, GLB or FBX can't hold all of this (masks, hidden faces, splats, brushes), so writing
 them is an export, not a save. See [Exporting](exporting.md).
 
-> **ZBrush:** A `.sfproj` is the equivalent of a ZBrush project (`.ZPR`), and saving a single Part scene is close
-> to saving a `.ZTL`. SculptForge can't read `.ZPR` files, and opens a `.ZTL` only after
-> the [ZTL Export plug-in](coming-from-zbrush.md#bring-your-ztools-over) converted it in ZBrush; otherwise bring
-> models over with [Send to ZBrush](exporting.md) or as OBJ, FBX or GLB.
-
 ## Save a project
 
 - **File > Save** (<kbd>Ctrl</kbd>+<kbd>S</kbd>) saves to the current project. The first time, it asks for a file
   name.
 - **File > Save As...** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>) saves under a new name.
-- In the ZBrush-style layout, clicking the document name in the title strip also saves.
+- In the Classic layout, clicking the document name in the title strip also saves.
 
 The bar along the top shows the file name with `*` after it while there are unsaved changes, and the window title
 starts with `*`. Any edit in any Part counts, as do splat edits and layer weight changes.
@@ -115,8 +110,8 @@ The autosave also appears first in the Library **Snapshots** tab while it exists
 
 ## Snapshots
 
-**File > Save Snapshot** (also the **Snapshot** button in the ZBrush-style layout's title strip) saves a timestamped copy of the whole
-scene (ZBrush users: QuickSave). Your project file, its name and its unsaved state are not changed, so a snapshot
+**File > Save Snapshot** (also the **Snapshot** button in the Classic layout's title strip) saves a timestamped copy of the whole
+scene (experienced sculptors: QuickSave). Your project file, its name and its unsaved state are not changed, so a snapshot
 is safe to take before any risky step.
 
 - Copies go to the `QuickSave` folder of your library (by default `Documents/SculptForge/QuickSave`), named like
@@ -125,7 +120,7 @@ is safe to take before any risky step.
 - They appear in the Library **Snapshots** tab, newest first, labelled with their date and time. Double-click one
   to open it. The tab also has a **Save now** button.
 
-With the ZBrush-style keys (**Edit > Preferences > Input**) <kbd>9</kbd> takes a snapshot; otherwise it has no default
+With the Classic sculpting keys (**Edit > Preferences > Input**) <kbd>9</kbd> takes a snapshot; otherwise it has no default
 shortcut. To give it one, hold <kbd>Ctrl</kbd>+<kbd>Alt</kbd>, click the **Snapshot**
 button and press a key (see [The interface](interface.md)).
 
@@ -158,7 +153,7 @@ Press <kbd>,</kbd> (comma) to show the Library. The tabs that matter for project
 Double-click a tile to open it (you are asked about unsaved changes first). In the **Tool** tab,
 <kbd>Shift</kbd>+double-click a model to append it as a Part instead.
 
-![The Library showing project thumbnails](images/lightbox.jpg)
+![The Library showing project thumbnails](images/library.jpg)
 
 ## Scripting
 

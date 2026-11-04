@@ -436,7 +436,7 @@ std::vector<BrushItem> PickerUi::brushItems(App& app, bool libraryFiles) {
     BrushItem guides;
     guides.kind = BrushItem::Kind::Guides;
     guides.name = "Quad Remesh Guides";
-    guides.description = "ZBrush's ZRemesher Guides: draw curves on the model for Quad Remesh's edge loops to follow (a curve "
+    guides.description = "quad remesh Guides: draw curves on the model for Quad Remesh's edge loops to follow (a curve "
                          "that ends where it started makes a loop). Alt+click a curve to delete it.";
     items.push_back(std::move(guides));
     for (int i = 0; i < int(app.doc_.brushes.size()); ++i) {
@@ -1132,7 +1132,7 @@ void drawPickers(App& app) {
                                 &app.radiusPx_, kMinDrawSizePx, kMaxDrawSizePx, 1.0f}
                       : which == PickerUi::Slider::ZIntensity
                           ? Def{s.sliderSmooth ? "Smooth Intensity" : "Intensity", "U",
-                                s.sliderSmooth ? "How strongly Smooth works (it keeps its own value, as in ZBrush: hold "
+                                s.sliderSmooth ? "How strongly Smooth works (it keeps its own value: hold "
                                                  "Shift and press U to set it). Type a number and press Enter."
                                                : "How strongly the brush changes the surface (1-100). Drag, or type a "
                                                  "number and press Enter.",
@@ -1386,7 +1386,7 @@ void App::drawColorWidget(float width) {
     swap |= ImGui::InvisibleButton("##secondary", ImVec2(secondW, swH));
     swatch(dl, pb, ImVec2(pb.x + secondW, pb.y + swH), ImVec4(second.x, second.y, second.z, 1.0f),
            rounding, s, ImGui::IsItemHovered());
-    ui::HelpText("Second colour", nullptr, "Click to swap it with the main colour (ZBrush Alternate).", "Left shelf");
+    ui::HelpText("Second colour", nullptr, "Click to swap it with the main colour.", "Left shelf");
     if (swap) std::swap(doc_.paintColor, secondaryColor_);
     ui::ActionButton(*this, "color.fill", ImVec2(width, 0), ui::Look::IconLabel);
     ImGui::PopStyleVar();

@@ -1302,7 +1302,7 @@ void registerPackCommands(CommandRegistry& registry) {
                       return {true, "Removed pack " + argString(a, "id")};
                   }});
     registry.add({"pack_create",
-                  "Make a pack (.sfpack) from a folder laid out like one: brushes/, alphas/, matcaps/, materials/, vdms/, "
+                  "Make a pack (.sfpack) from a folder laid out like one: brushes/, alphas/, matcaps/, materials/, vdms/, " // marks-pending
                   "keymaps/, piemenus/ and macros/ (each with its own file types), plus LICENSE.txt and preview.png if "
                   "there. Everything is checked exactly as an install would check it.",
                   {{"folder", T::String, "The folder holding the items.", true},

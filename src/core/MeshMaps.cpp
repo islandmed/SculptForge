@@ -604,7 +604,7 @@ void registerMeshMapCommands(CommandRegistry& reg) {
     using T = ParamSpec::Type;
     reg.add({"mesh_maps",
              "Mesh Maps of the active Part, on its texture's UVs at the texture's size, for Fill layers: ambient "
-             "occlusion, curvature, thickness, position, world normal and ID (polygroups). bake makes them, info "
+             "occlusion, curvature, thickness, position, world normal and ID (polygroups). bake makes them, info " // marks-pending
              "describes them, clear drops them, live=true re-bakes the changed tiles after sculpting (in the app). "
              "Derived data: not saved, not an undo step.",
              {{"action", T::String, "bake (default), info, clear, or live (with live=true/false).", false},

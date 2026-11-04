@@ -1,12 +1,8 @@
 # Forge Spheres
 
-Forge Spheres (ZBrush users: ZSpheres) block out an organic base mesh from connected spheres: start from one root sphere, grow a torso, a head,
+Forge Spheres (experienced sculptors: Forge Spheres) block out an organic base mesh from connected spheres: start from one root sphere, grow a torso, a head,
 limbs, fingers, a tail or branches from it, set the proportions, look at the skin over them, then turn it into a
 mesh you sculpt as usual. It is the quickest way to get the structure of a character or creature before any detail.
-
-> **ZBrush:** this works like ZBrush's ZSpheres with Adaptive Skin: Draw, Move and Scale on the spheres, Alt+click to delete,
-> **A** to preview the skin, and **Make Mesh** in place of Make Adaptive Skin. Rotate mode, ZSketch, the
-> Topology and Rigging uses of ZSpheres and the link-sphere (magnet) tricks are not there.
 
 ## Make a Forge Sphere Part
 

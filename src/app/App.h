@@ -416,6 +416,19 @@ private:
     bool newLookCard_ = false;
     bool newLookCardDone_ = false;
     void chooseNewLook(bool tryIt);
+    // Help > Quick tour (QuickTour.cpp): ten slides for sculptors who know another app, each with a "Show me".
+    // Offered once (project.json "quick_tour_done"); the welcome and the Help menu always open it.
+    void showQuickTour(int slide = 0);
+    void offerQuickTour(); // the Classic sculpting keys were picked: a note offers the tour, once
+    void closeQuickTour();
+    void quickTourShowMe(int slide);
+    void drawQuickTour();
+    static int quickTourSlides();
+    bool quickTourOpen_ = false, quickTourAside_ = false, quickTourOffer_ = false, quickTourDone_ = false;
+    int quickTourSlide_ = 0;
+    bool quickTourOffersInTests_ = false; // UI tests: the offer only after the script's quick_tour_offers
+    std::string flashSubpalette_; // a Tool sub-palette "Show me" opened: scrolled to and flashed (Palettes.cpp)
+    double flashSubpaletteStart_ = 0.0;
     double sculptSeconds_ = 0.0;        // cumulative time in strokes (project.json)
     bool supportReminderDone_ = false;  // the reminder was shown (or turned off) once: never again (project.json)
     bool supportReminderOpen_ = false;
@@ -821,7 +834,7 @@ private:
     bool paintRgb_ = false;   // also paint the colour while sculpting (ZBrush Rgb + Zadd)
     bool strokePaint_ = false, strokeSculpt_ = true;
     void registerPaintUiCommands();
-    std::string matcapFolder() const; // <library>/MatCaps, empty without a library
+    std::string matcapFolder() const; // <library>/Lit Spheres, empty without a library
     void loadMatcapLibrary();         // custom MatCaps from the studio folders and matcapFolder() (start-up)
     void loadMatcapDialog();          // Material > Load MatCap...
     void rescanMatcapFolder();        // loads new / changed images in matcapFolder(), drops deleted ones
@@ -1019,7 +1032,7 @@ private:
         uint32_t subtool = 0;
         size_t triangles = 0;
         int resolution = 200;
-        bool keepMasked = false;
+        bool keepMasked = false, keepTexture = true;
     };
     std::unique_ptr<VoxelRemeshJob> voxelRemesh_;
     void pollQRemesh();
@@ -1230,11 +1243,15 @@ private:
     };
     void startUpdateCheck(bool manual);
     void pollUpdateCheck();
+    static const char* appPrerelease();     // "beta.1" in a beta build, else ""
+    static std::string appFullVersion();    // "0.11.0-beta.1": what the update check compares
+    static std::string appVersionLabel();   // "0.11.0 Beta 1": title bar (betas only) and About
     void drawUpdateBanner();
     void drawUpdatesSection(); // Preferences > Updates
     bool checkUpdates_ = true;
     int64_t updateCheckedAt_ = 0;   // unix time of the last automatic check
     std::string updateSkipped_;     // "Skip this version"
+    UpdateChannel updateChannel_ = appPrerelease()[0] ? UpdateChannel::Preview : UpdateChannel::Stable; // a beta stays on betas
     std::shared_ptr<UpdateJob> updateJob_;
     std::optional<UpdateInfo> updateAvailable_; // shown as the banner until dismissed
     std::string updateStatus_;                  // the last check's result, for Preferences > Updates
@@ -1442,6 +1459,10 @@ private:
     uint64_t activeTrisKey_ = ~uint64_t(0); // the top shelf's ActiveTris, recounted when the scene changes
     size_t activeTris_ = 0;
     float bottomTileW_ = 58.0f; // bottom shelf tiles shrink (down to 44 px) before the shelf scrolls
+    // The top shelf when its row doesn't fit (#105: 1280 logical px at Windows' 200 %): the sliders leave room for the
+    // items after them (topShelfTailW_, measured last frame), then the icon buttons drop their labels.
+    bool topShelfCompact_ = false;
+    float topShelfFullW_ = 0.0f, topShelfTailW_ = 0.0f;
     int navDrag_ = -1;          // right-shelf drag button being dragged (0 move, 1 zoom, 2 rotate)
     ImVec2 navLast_{0, 0};      // the cursor at its last frame (the drag moves by the cursor's own steps)
     std::string statusShown_;   // for colouring fresh errors in the title strip
@@ -1521,7 +1542,12 @@ private:
     std::string uiConfigPath() const;
     // Window size, position, maximised and full screen, kept in window.json beside ui.json (#35). Not for tests,
     // renders, recordings or proof mode.
-    struct WindowState { int w = 1600, h = 960, x = 0, y = 0; bool placed = false, maximized = false, fullscreen = false; };
+    struct WindowState {
+        int w = 1600, h = 960, x = 0, y = 0;
+        float scale = 0.0f; // the UI scale Automatic picked when stored (0: before 0.10.11, taken as 100 %)
+        bool stored = false, placed = false, maximized = false, fullscreen = false;
+    };
+    void fitWindowToDisplay(const WindowState& saved); // #105: inside the screen, at its scale (ShellGeometry.h)
     static WindowState loadWindowState();
     void saveWindowState() const;
     bool rememberWindow_ = false;
@@ -1649,7 +1675,7 @@ private:
         float move[3] = {0, 0, 0}, rotate[3] = {0, 0, 0}, scale = 100.0f;
     } gizmo_;
     // ---- end Gizmo 3D ----
-    // ---- ZBrush feel (Input.cpp, docs/guide/coming-from-zbrush.md) ----
+    // ---- Classic sculpting keys (Input.cpp, docs/guide/quick-tour.md) ----
     // Preferences > Input (the ZBrush or SculptForge key style), the Space QuickMenu, the intensities and Focal
     // Shift (U / I / O), ZBrush's mask and polygroup keys, Shift-constrained straight strokes and the
     // Shift+click, release Shift, drag roll.

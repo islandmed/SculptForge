@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Voxel toolkit shared by the voxel remesher (DynaMesh-style: merge parts and
+// Voxel toolkit shared by the voxel remesher (merge parts and
 // even out topology), splat-to-mesh conversion and future boolean tools:
 // rasterise a surface "shell" into a grid, close small gaps, flood-fill the
 // outside to get a watertight solid, then extract a smooth surface with
@@ -11,6 +11,7 @@
 #include "core/Mesh.h"
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -55,9 +56,11 @@ void rasterizeMeshShell(const Mesh& mesh, VoxelGrid& grid);
 
 // Rebuilds the mesh as an even, watertight surface (`resolution` cells across
 // its longest side). Overlapping parts are merged. Sculpt layers are baked.
-// Mask and colours transfer from the nearest original vertex; polygroups,
+// Mask and colours transfer from the nearest original vertex; face groups,
 // hidden flags and UVs reset (all visible, group 0, no UVs); the original's
-// quads are dropped and the result is all quads of its own.
-Mesh voxelRemesh(const Mesh& mesh, int resolution, std::string* error = nullptr);
+// quads are dropped and the result is all quads of its own. `progress` (0..1) returning false cancels (empty result).
+// Parallel and narrow-band throughout: well under a second at the default resolution; run it off the UI thread.
+Mesh voxelRemesh(const Mesh& mesh, int resolution, std::string* error = nullptr,
+                 const std::function<bool(float)>& progress = {});
 
 } // namespace sf

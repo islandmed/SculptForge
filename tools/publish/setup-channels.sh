@@ -81,7 +81,7 @@ cask "sculptforge" do
   url "https://github.com/$REPO/releases/download/v#{version}/SculptForge-#{version}-darwin-universal.dmg",
       verified: "github.com/$REPO/"
   name "SculptForge"
-  desc "Free, open-source digital sculpting, an alternative to ZBrush"
+  desc "Free, open-source digital sculpting app"
   homepage "https://sculptforge.app/"
 
   livecheck do
@@ -149,14 +149,14 @@ PackageUrl: https://sculptforge.app/
 License: GPL-3.0-or-later
 LicenseUrl: https://github.com/$REPO/blob/main/LICENSE
 Copyright: Copyright (C) 2026 The SculptForge contributors
-ShortDescription: Free, open-source digital sculpting, an alternative to ZBrush and Mudbox.
-Description: SculptForge is a free, open-source digital sculpting app for artists and studios, with SubTools, layers, dynamic topology, remeshing, polypaint, baking and AI-assisted image-to-3D.
+ShortDescription: Free, open-source digital sculpting.
+Description: SculptForge is a free, open-source digital sculpting app for artists and studios, with Parts, layers, dynamic topology, remeshing, vertex paint, baking and AI-assisted image-to-3D.
 Moniker: sculptforge
 Tags:
 - 3d
 - sculpting
 - modeling
-- zbrush-alternative
+- digital-sculpting
 - open-source
 ReleaseNotesUrl: https://github.com/$REPO/releases/tag/$tag
 ManifestType: defaultLocale

@@ -242,3 +242,16 @@ TEST(guide_whats_new_groups) {
     const whatsnew::Page next = whatsnew::build(doc, "0.10.8");
     CHECK(next.versions[0].version == "0.10.8" && !next.groups.empty() && next.groups[0].label == "0.10.1 to 0.10.5");
 }
+
+TEST(guide_whats_new_in_a_beta) {
+    // A beta (0.11.0 Beta 1) is built as 0.11.0 (SCULPTFORGE_VERSION; the prerelease is a separate define) while its
+    // section still says "date: unreleased": Help > What's New shows that section, and the stable app doesn't.
+    const guide::Document doc = parse("# What's new\n\n## Version 0.11.0\n\n```features\ndate: unreleased\n"
+                                      "highlight: Beta: something new\n```\n\n- New.\n\n## Version 0.10.11\n\n"
+                                      "```features\ndate: 2026-11-04\nhighlight: Stable: a fix\n```\n\n- Fixed.\n");
+    const whatsnew::Page beta = whatsnew::build(doc, "0.11.0");
+    CHECK(beta.problems.empty() && !beta.versions.empty() && beta.versions[0].version == "0.11.0");
+    CHECK(!beta.versions.empty() && beta.versions[0].highlights.size() == 1);
+    const whatsnew::Page stable = whatsnew::build(doc, "0.10.11");
+    CHECK(!stable.versions.empty() && stable.versions[0].version == "0.10.11");
+}

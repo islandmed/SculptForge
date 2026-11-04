@@ -123,7 +123,7 @@ A `--set` variable replaces a whole value, so pass complete paths (with their ex
 | OBJ | Yes | Yes | Objects as Parts, groups as face groups, vertex colours, textures through `.mtl` |
 | PLY | Yes | Yes | Meshes with vertex colours, Gaussian splats |
 | STL | Yes (binary and ASCII) | Yes (binary) | |
-| Send to ZBrush (GoZ-compatible exchange) | Yes | Yes | Face Groups, mask, vertex paint, UVs |
+| Bridge | Yes | Yes | Face Groups, mask, vertex paint, UVs |
 | SculptForge project (`.sfproj`) | Yes | Yes | Everything; a documented ZIP of JSON and binary arrays |
 
 Binary `.usdc` files and USD references or payloads aren't read yet; convert with `usdcat in.usd -o out.usda`.
@@ -175,7 +175,7 @@ Studios can ask for their own content, made to order:
 - **Brushes** tuned to your style.
 - **Alphas and VDMs** made from your own references or scans (only material you own).
 - **Macros** and one-click workflows.
-- **Pipeline presets:** export settings, naming, scale, axis, texture packing and ZBrush Bridge setup.
+- **Pipeline presets:** export settings, naming, scale, axis, texture packing and Bridge setup.
 - **Keymaps and layouts.**
 
 All of it is baked into your custom studio build. Up to 5 custom items a month (brushes, alphas, macros or
@@ -187,8 +187,7 @@ for anything else.
 Send, in one email or a message in your team channel:
 
 - **What to bake in:** your exported keymap and layout (**Edit > Preferences > Interface**), brush presets and packs
-  (`.sfbrush`, `.sfpack`), shelf setup, and the pipeline defaults you want (export format and preset, units
-  and scale, up axis, naming pattern, texture packing, ZBrush Bridge folder).
+  (`.sfbrush`, `.sfpack`), shelf setup, and the pipeline defaults you want.
 - **References for custom content:** images or scans you own, with a line on what each item should do.
 - **Where it runs:** platforms and, for Linux, the distribution or VFX Reference Platform year.
 
@@ -212,7 +211,7 @@ requests are welcome as issues on the project's GitHub page.
 ## See also
 
 - [Scripting and automation](scripting.md)
-- [Exporting, Send to Unreal and ZBrush](exporting.md)
+- [Exporting, Unreal and Bridge](exporting.md)
 - [Brush Lab and sharing brushes](brush-lab.md)
 - [Image and text to 3D](generate-3d.md): running models on your own ComfyUI server
 - [Troubleshooting](troubleshooting.md)

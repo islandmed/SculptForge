@@ -3,6 +3,7 @@
 #include "app/ShellGeometry.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace sf {
 
@@ -11,6 +12,33 @@ using namespace shell;
 float trayWidth(float stored, float logicalWindowWidth) {
     if (stored == 300.0f && logicalWindowWidth >= kWideWidth) return 320.0f;
     return std::clamp(stored, kTrayMinW, kTrayMaxW);
+}
+
+WindowFit fitWindow(WindowRect win, bool stored, bool placed, float storedScale, const WindowRect& usable,
+                    const WindowBorders& b, float scale) {
+    WindowFit fit;
+    const float s = scale > 0.0f ? scale : 1.0f, was = storedScale > 0.0f ? storedScale : 1.0f;
+    const int availW = std::max(1, usable.w - b.left - b.right), availH = std::max(1, usable.h - b.top - b.bottom);
+    int wantW = win.w, wantH = win.h;
+    if (!stored) {
+        wantW = int(1600.0f * s + 0.5f);
+        wantH = int(960.0f * s + 0.5f);
+    } else if (std::abs(s - was) >= 0.01f) {
+        wantW = int(float(win.w) * s / was + 0.5f);
+        wantH = int(float(win.h) * s / was + 0.5f);
+    }
+    fit.maximize = wantW > availW || wantH > availH;
+    win.w = std::min(wantW, availW);
+    win.h = std::min(wantH, availH);
+    if (!placed) {
+        win.x = usable.x + b.left + (availW - win.w) / 2;
+        win.y = usable.y + b.top + (availH - win.h) / 2;
+    } else {
+        win.x = std::clamp(win.x, usable.x + b.left, usable.x + usable.w - b.right - win.w);
+        win.y = std::clamp(win.y, usable.y + b.top, usable.y + usable.h - b.bottom - win.h);
+    }
+    fit.rect = win;
+    return fit;
 }
 
 ShellMetrics sculptForgeMetrics(float gap) {
@@ -29,6 +57,7 @@ ShellGeometry computeShell(const UiLayout& l, float W, float H, float s, float t
         ShellMetrics inner = m;
         inner.gap = 0.0f;
         inner.grow = m.gap;
+        inner.windowW = W;
         UiLayout unmirrored = l; // mirrored at the end, dividers included
         unmirrored.leftHanded = false;
         ShellGeometry g = computeShell(unmirrored, W - 2.0f * half, H - 2.0f * half, s, topInset, inner);
@@ -63,7 +92,8 @@ ShellGeometry computeShell(const UiLayout& l, float W, float H, float s, float t
     }
     ShellGeometry g;
     g.scale = s;
-    const float logicalW = s > 0.0f ? W / s : W;
+    const float windowW = m.windowW > 0.0f ? m.windowW : W;
+    const float logicalW = s > 0.0f ? windowW / s : windowW;
     g.narrow = logicalW < kNarrowWidth;
     g.shelves = l.shelvesVisible;
 

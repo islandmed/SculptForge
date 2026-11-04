@@ -1,11 +1,11 @@
 # Face Groups and visibility
 
-Face Groups (ZBrush users: Polygroups) divide a Part's surface into named regions, shown as flat colours when you turn them on. You use
+Face Groups (experienced sculptors: Face groups) divide a Part's surface into named regions, shown as flat colours when you turn them on. You use
 them to hide and isolate parts of a model so you can reach what you want to sculpt, to build masks, and to
 split a model into Parts. This chapter covers creating face groups, the <kbd>Ctrl</kbd>+<kbd>Shift</kbd>
 visibility gestures and the **Tool > Face Groups** and **Tool > Visibility** controls.
 
-![Face Groups shown as colours, with the Face Groups sub-palette](images/polygroups.jpg)
+![Face Groups shown as colours, with the Face Groups sub-palette](images/face-groups.jpg)
 
 ## Show face groups
 
@@ -18,9 +18,9 @@ The number next to **Show face groups** is how many face groups are visible righ
 A mesh without face groups is one group. Face Groups come from:
 
 - the grouping buttons below;
-- OBJ files: each `g` group becomes a face group, as ZBrush writes them (SculptForge also writes face groups as
+- OBJ files: each `g` group becomes a face group (SculptForge also writes face groups as
   `g` groups when it exports OBJ);
-- `.GoZ` files from ZBrush and SculptForge projects, which keep face groups.
+- Bridge files and SculptForge projects, which keep face groups.
 
 ## Create face groups
 
@@ -37,11 +37,6 @@ groups. So you can isolate one part and regroup just that part.
 | **Clear groups** | Remove all face groups; the whole Part becomes one group again. | `polygroup_clear` |
 
 Each button is one undo step.
-
-> **ZBrush:** **By normals** is Auto Groups / Groups By Normals, **By pieces** is Auto Groups on a mesh with
-> separate parts, **From mask** is Group Masked, **Group by UVs** is UV Groups, and **Merge visible** is Group Visible.
-> <kbd>Ctrl</kbd>+<kbd>W</kbd> works as in ZBrush: the masked part becomes a new group and the mask is cleared
-> (with nothing masked, everything visible becomes one group).
 
 ### Group a region you painted
 
@@ -60,7 +55,7 @@ macOS):
 | Gesture | Effect |
 |---|---|
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd> + click a face group, everything shown | Isolate it: show only that group. |
-| <kbd>Ctrl</kbd>+<kbd>Shift</kbd> + click a face group, something hidden | Hide that group (as in ZBrush). |
+| <kbd>Ctrl</kbd>+<kbd>Shift</kbd> + click a face group, something hidden | Hide that group. |
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd> + click the isolated group again | Invert the visibility: show everything else instead. |
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd> + click a face group | Hide that group. |
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd> + click the background | Show everything. |
@@ -69,7 +64,7 @@ macOS):
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd> + drag | Hide what's inside the rectangle (or lasso). The shape is drawn red. |
 
 Whether a drag draws a rectangle or a lasso is set by **Select Rectangle** and **Select Lasso** at the top of
-**Tool > Visibility** (Select Rectangle by default), or, as in ZBrush, with <kbd>Ctrl</kbd>+<kbd>Shift</kbd> held: the
+**Tool > Visibility** (Select Rectangle by default), or, with <kbd>Ctrl</kbd>+<kbd>Shift</kbd> held: the
 left shelf then shows the selection brush, and clicking the brush tile (or pressing <kbd>B</kbd>) or the stroke tile
 picks **Select Rectangle** or **Select Lasso**. With **Select Lasso**, the drag traces a free-hand outline that
 closes back to where you started; drag around a part as if you were drawing round it with a pen. The drag can
@@ -84,11 +79,8 @@ With symmetry on (**X**, **Y**, **Z** on the top shelf), the mirror image of the
 the mask selections: keeping the left eye keeps the right one, and hiding one ear hides both
 (`hide_rect` / `hide_lasso symmetry=x`).
 
-SculptForge refuses a change that would hide everything, as ZBrush does. Every visibility change is one undo
+SculptForge refuses a change that would hide everything. Every visibility change is one undo
 step, so <kbd>Ctrl</kbd>+<kbd>Z</kbd> brings back what you just hid.
-
-> **ZBrush:** the gestures are the same as ZBrush's SelectRect and SelectLasso with polygroups. Grow and
-> Shrink visibility and hiding by clicking with the rectangle brush are not available yet.
 
 ### The Visibility sub-palette
 
@@ -130,7 +122,7 @@ Group the model, then click **Split groups** in **Tool > Parts**: each face grou
 
 - **Masking**: **By face group** in **Tool > Masking** masks one group (see [Masking](masking.md)).
 - **Brushes and vertex paint** skip hidden faces.
-- **Projects** save face groups and what's hidden; **Send to ZBrush** and **OBJ** carry face groups to and from ZBrush.
+- **Projects** save face groups and what's hidden; **Bridge** and **OBJ** carry face groups in and out.
 - Each Part has its own face groups and visibility. To show and hide whole Parts, use the eye icons and
   **Solo** in **Tool > Parts**.
 
@@ -149,10 +141,10 @@ When you isolate or hide a group in the viewport, the console (<kbd>`</kbd>) sho
 id, for example `isolate_polygroup group=3`, which you can reuse in scripts.
 
 ```sh
-sculptforge-cli -c 'open path=robot.obj; polygroup_by_connectivity; subtool_split_groups; save_project path=robot.sfproj'
+sculptforge-cli -c 'open path=robot.obj; face group_by_connectivity; part_split_groups; save_project path=robot.sfproj'
 ```
 
-> **Not yet:** a face group paint brush, Group Front, face groups from UV islands or PolyPaint, and
+> **Not yet:** a face group paint brush, Group Front, face groups from UV islands or Vertex Paint, and
 > face group-based crease edges are not available yet.
 
 ## See also

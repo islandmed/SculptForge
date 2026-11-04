@@ -376,7 +376,7 @@ void writeMaterial(Writer& w, const std::string& path, const std::string& name, 
     w.s += '\n';
     w.open("def Shader \"PreviewSurface\"");
     w.line("uniform token info:id = \"UsdPreviewSurface\"");
-    if (painted) w.line("color3f inputs:diffuseColor.connect = <" + path + "/Polypaint.outputs:result>");
+    if (painted) w.line("color3f inputs:diffuseColor.connect = <" + path + "/VertexPaint.outputs:result>");
     else w.line("color3f inputs:diffuseColor = (0.72, 0.68, 0.62)");
     w.line("float inputs:metallic = 0");
     w.line("float inputs:roughness = 0.65");
@@ -384,7 +384,7 @@ void writeMaterial(Writer& w, const std::string& path, const std::string& name, 
     w.close();
     if (painted) {
         w.s += '\n';
-        w.open("def Shader \"Polypaint\"");
+        w.open("def Shader \"VertexPaint\"");
         w.line("uniform token info:id = \"UsdPrimvarReader_float3\"");
         w.line("string inputs:varname = \"displayColor\"");
         w.line("float3 outputs:result");

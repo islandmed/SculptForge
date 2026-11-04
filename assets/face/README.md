@@ -10,7 +10,7 @@ src/core/Face.h) fits to a sculpt. It is embedded into the program at build time
 What changed from ICT's data: the 52 shapes carry Apple ARKit's names (ICT's `_L` / `_R` become `Left` / `Right`,
 the character's own sides), ICT's separate `browInnerUp_L/_R` and `cheekPuff_L/_R` are summed into ARKit's single
 `browInnerUp` and `cheekPuff`, `cheekRaiser_L/_R` and `PupilDilate_L/_R` (not ARKit shapes) are left out, and
-`tongueOut`, which ICT doesn't have, is a quarter of `jawOpen` (a tongue SubTool gets the tongue's motion).
+`tongueOut`, which ICT doesn't have, is a quarter of `jawOpen` (a tongue Part gets the tongue's motion).
 Offsets under 0.02 mm are dropped and the rest quantised to 16 bits; the teeth are kept only as the lower jaw's
 rigid motion per shape. ICT's 100 identity (PCA) shapes are not used. The separately licensed full ICT Face Model
 is not used either.

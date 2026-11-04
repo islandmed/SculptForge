@@ -450,7 +450,7 @@ void registerSubToolCommands(CommandRegistry& reg) {
              [](Document& doc, const Args& a) -> CommandResult {
                  const std::string blocked = dyntopoBlocker(doc.mesh);
                  if (!blocked.empty()) return {false, "Can't insert: " + blocked};
-                 if (a.contains("subtool") == a.contains("file")) return {false, "Give subtool= or file="};
+                 if (a.contains("subtool") == a.contains("file")) return {false, "Give subtool= or file="}; // marks-pending
                  Mesh source;
                  std::string label;
                  if (a.contains("subtool")) {
@@ -563,7 +563,7 @@ void registerSubToolCommands(CommandRegistry& reg) {
 
     reg.add({"subtool_merge_down",
              "Merge the active Part with the one below it into one mesh (not undoable). Each keeps its own "
-             "face groups, so subtool_split_groups can separate them again. Painted textures are kept in one new "
+             "face groups, so subtool_split_groups can separate them again. Painted textures are kept in one new " // marks-pending
              "texture on new Auto UVs.",
              {{"keep_texture", T::Bool, "Keep painted textures (Auto UV the result and copy them in). Default true.", false}},
              [](Document& doc, const Args& a) -> CommandResult {

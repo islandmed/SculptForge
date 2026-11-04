@@ -9,7 +9,7 @@ expect_value qremesh_guides == 0
 # Ctrl-hover help on the new controls.
 hold ctrl
 hover "QRemesh/Quad Remesh Guides"
-expect_help "ZRemesher Guides"
+expect_help "edge loops to follow"
 hover "QRemesh/Delete Last"
 expect_help "last Quad Remesh guide"
 hover "QRemesh/Clear"

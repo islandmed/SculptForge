@@ -10,7 +10,7 @@
 #   <root>/to_blender/manifest.json     + r<rev>_<k>.GoZ   written by SculptForge
 #   <root>/app.json    where SculptForge is installed (it writes this when it starts)
 #   <root>/alive.json  SculptForge's heartbeat (pid, time), rewritten every 2 s while it runs
-# Meshes travel as ZBrush .GoZ files, which SculptForge reads and writes already. The .GoZ layout and
+# Meshes travel as Bridge files, which SculptForge reads and writes already. The .GoZ layout and
 # the axis convention follow GoB (github.com/JoseConseco/GoB, GPL), the Blender GoZ add-on by Daniel
 # Grauer, JoseConseco and contributors: many thanks to them.
 
@@ -136,7 +136,7 @@ def next_file_prefix(folder):
 
 
 # --------------------------------------------------------------------------------------------------
-# Axes: Blender is Z-up, ZBrush (GoZ) Y-down. GoB maps GoZ (x, y, z) to Blender (x, z, -y).
+# Axes: Blender is Z-up, Bridge files Y-down. GoB maps GoZ (x, y, z) to Blender (x, z, -y).
 # SculptForge reads GoZ as Y-up (x, -y, -z), so Blender (x, y, z) arrives as (x, z, -y): metres both.
 # --------------------------------------------------------------------------------------------------
 
@@ -242,7 +242,7 @@ def corner_map(sent_faces, received_faces):
 
 
 # --------------------------------------------------------------------------------------------------
-# .GoZ files (docs/goz.md)
+# .GoZ files (integrations/bridge-plugin/PROTOCOL.md)
 # --------------------------------------------------------------------------------------------------
 
 TAG_MESH_NAME = 0x1389
@@ -252,11 +252,14 @@ TAG_UVS = 0x61A9
 TAG_MASK = 0x7532
 TAG_POLYPAINT = 0x88B9
 TAG_POLYGROUPS = 0x9C41
-HEADER = b"GoZb 1.0 ZBrush GoZ Binary" + b"." * 6
+try:
+    from .bridge_protocol import EXT, HEADER, MAGIC, NAME_PREFIX
+except ImportError:  # imported alone (tests/blender/test_exchange.py), not as the add-on package
+    from bridge_protocol import EXT, HEADER, MAGIC, NAME_PREFIX
 
 
 def goz_name(name):
-    """GoZ object names: ASCII letters, digits, '_' and '-' (GoB's escaping); the manifest keeps the real name."""
+    """Bridge file object names: ASCII letters, digits, '_' and '-' (GoB's escaping); the manifest keeps the real name."""
     out = ""
     for ch in name:
         if ch.isascii() and (ch.isalnum() or ch in "_-"):
@@ -281,7 +284,7 @@ def write_goz(path, name, positions, faces, uvs=None, colors=None, mask=None, gr
     name = goz_name(name).encode("ascii")
     pos = blender_to_goz(positions).astype("<f4")
     faces = np.ascontiguousarray(faces, dtype="<u4").reshape(-1, 4)
-    parts = [HEADER, struct.pack("<IIQ", 1, len(name) + 24, 1), b"GoZMesh_", name,
+    parts = [HEADER, struct.pack("<IIQ", 1, len(name) + 24, 1), NAME_PREFIX, name,
              struct.pack("<IIQI", TAG_MESH_NAME, 20, 1, 0),
              _section(TAG_VERTICES, pos.tobytes(), len(pos)),
              _section(TAG_FACES, faces.tobytes(), len(faces))]
@@ -308,7 +311,7 @@ def write_goz(path, name, positions, faces, uvs=None, colors=None, mask=None, gr
 
 
 class GozMesh:
-    """A .GoZ file read into Blender coordinates (see write_goz for the arrays)."""
+    """A Bridge file read into Blender coordinates (see write_goz for the arrays)."""
 
     def __init__(self):
         self.name = ""
@@ -323,8 +326,8 @@ class GozMesh:
 def read_goz(path):
     with open(path, "rb") as f:
         data = f.read()
-    if len(data) < 40 or data[:4] != b"GoZb":
-        raise ValueError("Not a GoZ file: %s" % path)
+    if len(data) < 40 or data[:4] != MAGIC:
+        raise ValueError("Not a Bridge file: %s" % path)
     out = GozMesh()
     (name_len,) = struct.unpack_from("<I", data, 36)
     if name_len >= 24 and 32 + name_len <= len(data):
@@ -362,11 +365,11 @@ def read_goz(path):
             out.groups = np.frombuffer(payload, dtype="<u2", count=records(2)).astype(np.int64)
     nv, nf = len(out.positions), len(out.faces)
     if nv == 0 or nf == 0:
-        raise ValueError("GoZ file has no %s: %s" % ("vertices" if nv == 0 else "faces", path))
+        raise ValueError("Bridge file has no %s: %s" % ("vertices" if nv == 0 else "faces", path))
     quad = out.faces[:, 3] != NO_INDEX
     corners = np.where(quad[:, None], out.faces, np.where(np.arange(4) < 3, out.faces, 0))
     if corners.max() >= nv:
-        raise ValueError("GoZ file has faces with bad vertex indices: %s" % path)
+        raise ValueError("Bridge file has faces with bad vertex indices: %s" % path)
     if out.uvs is not None and len(out.uvs) != nf:
         out.uvs = None
     if out.colors is not None and len(out.colors) != nv:

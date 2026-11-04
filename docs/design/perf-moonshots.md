@@ -190,17 +190,17 @@ Asahi drivers are conformant for OpenGL 4.6, OpenGL ES 3.2, OpenCL 3.0 and Vulka
 `VK_EXT_mesh_shader`, and `vulkaninfo` is not installed here; treat mesh shaders as unavailable. GPU-driven
 culling therefore means compute + multi-draw-indirect, which the driver has.
 
-## 3. How ZBrush does it (publicly documented approaches only)
+## 3. How the established desktop sculpting app does it (publicly documented approaches only)
 
-From Maxon's documentation and public material only (no binaries inspected):
-(a) **2.5D pixol canvas**: ZBrush has "a 2.5D canvas document", not a 3D scene; a pixol is a pixel with depth,
+From its vendor's public reference manual only (no binaries inspected):
+(a) **2.5D canvas**: the document is "a 2.5D canvas", not a 3D scene; each canvas pixel stores depth,
 orientation and material [13]. The heritage is a CPU renderer whose cost follows pixels.
 (b) **Subdivision levels**: the classic multires stack (ours: subdivision levels).
-(c) **HD Geometry**: DivideHD adds levels beyond the highest SDiv; Sculpt HD (the A hotkey) "selects an area of
-your model around the current mouse position for high-definition sculpting", circular or square [14]; only that
-region is at HD resolution while the rest stays at the regular top level.
-(d) **Per-mesh caps**: Preferences > Mem > MaxPolyPerMesh limits polygons per mesh (in millions), with a separate
-HD preview cap [15]; dense work is split into many objects, hidden ones costing little.
+(c) **Local high-resolution levels**: extra levels above the top subdivision level are sculpted only in a circular
+or square region around the cursor [14]; only that
+region is at the extra resolution while the rest stays at the regular top level.
+(d) **Per-mesh caps**: a memory preference limits polygons per mesh (in millions), with a separate
+cap for the local high-resolution preview [15]; dense work is split into many objects, hidden ones costing little.
 
 What it implies: their interactivity comes from bounding the *active* point count (cap per object, a local HD
 region) on a CPU renderer. Our equivalents must bound the same thing with our own design: micro levels (bounded
@@ -349,8 +349,6 @@ wireframe overlays draw on top of the canvas, not into it.
 10. Samsung Research, *Active Stylus Input Latency Compensation on Touch Screen Mobile Devices* (HCII 2020): https://research.samsung.com/research-papers/Active-Stylus-Input-Latency-Compensation-on-Touch-Screen-Mobile-Devices
 11. TurboTouch predictor (UIST 2018): https://github.com/LokiResearch/TurboTouchPredictor ; https://hal.archives-ouvertes.fr/hal-01893310
 12. A. Rosenzweig, Asahi GPU driver status (OpenGL 4.6, Vulkan 1.4, geometry/tessellation emulation): https://rosenzweig.io/blog/asahi-gpu-part-n.html ; Honeykrisp in Mesa 24.3: https://www.phoronix.com/news/Apple-Vulkan-Driver-Mesa-24.3
-13. Maxon ZBrush docs, *The Canvas Document* and *The Pixol*: https://help.maxon.net/zbr/en-us/Content/html/getting-started/basic-concepts/the-canvas-document/the-canvas-document.html ; https://help.maxon.net/zbr/en-us/Content/html/getting-started/basic-concepts/the-pixol/the-pixol.html
-14. Maxon ZBrush docs, *Geometry HD*: https://help.maxon.net/zbr/en-us/Content/html/reference-guide/tool/polymesh/geometry-hd/geometry-hd.html
-15. Maxon ZBrush docs, *Preferences > Mem*: https://help.maxon.net/zbr/en-us/Content/html/reference-guide/preferences/mem/mem.html
-
-ZBrush is a trademark of Maxon; SculptForge is not affiliated with or endorsed by Maxon.
+13. The vendor's public reference manual, chapters on the canvas document and its pixels.
+14. The same manual, the chapter on local high-resolution levels.
+15. The same manual, the memory preferences chapter.
