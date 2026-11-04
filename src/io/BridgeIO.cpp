@@ -680,9 +680,9 @@ bool bridgeSend(const std::vector<MeshObjectRef>& objects, const BridgeSendOptio
         message += "; the other application was notified";
         return true;
     }
-    const std::string app = o.appPath.empty() ? findOtherApp() : o.appPath;
-    if (!app.empty() && launchDetached(app)) {
-        message += "; started " + app + " (import from the bridge there)";
+    const std::string otherApp = o.appPath.empty() ? findOtherApp() : o.appPath;
+    if (!otherApp.empty() && launchDetached(otherApp)) {
+        message += "; started " + otherApp + " (import from the bridge there)";
         return true;
     }
     message += "; the other application was not found (set it up once: Help > User Guide > Exporting, Bridge)";
