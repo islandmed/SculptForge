@@ -6,9 +6,9 @@ run stroke brush=Crease points="-0.6,0.35,1 0,0.55,1 0.6,0.35,1" radius=0.07 str
 run stroke brush=Inflate points="-0.35,-0.3,1" radius=0.3 strength=1
 run stroke brush=Clay points="0.25,-0.5,1 0.55,-0.05,1" radius=0.1 strength=1
 run stroke brush=Crease invert=true points="-0.75,-0.1,1 -0.45,-0.65,1" radius=0.05 strength=1
-run uv_auto resolution=2048
+run uv_auto resolution=1024
 wait_value auto_uv_running == 0 120
-run texture_create size=2048
+run texture_create size=1024
 expect_value fill_layers == 0
 
 # A recipe from the Paint Layers panel: four Fill layers; Mesh Maps bake on a worker thread, then they evaluate.

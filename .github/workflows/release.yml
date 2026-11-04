@@ -53,7 +53,7 @@ jobs:
       tag: ${{ steps.find.outputs.tag }}
     steps:
       - uses: actions/checkout@v7
-        with: { ref: '${{ env.TAG }}' }
+        with: { ref: '${{ env.TAG }}', fetch-depth: 20 } # the commits before the bump, for the paperwork check
       - id: find
         env:
           GH_TOKEN: ${{ github.token }}
@@ -93,6 +93,15 @@ jobs:
           }
           ci=$(runs ci.yml || true)
           pkg=$(runs packages.yml || true)
+          if [ -z "$ci" ] && [ -n "$pkg" ]; then
+            # The bump commit adds only release paperwork (tools/release/paperwork_only.py: version lines, CHANGELOG,
+            # docs, site, fragments) to a main commit whose CI passed: that result stands (scripts/release.sh step ci).
+            for c in $(git rev-list --first-parent -n 8 "$sha~1"); do
+              python3 tools/release/paperwork_only.py "$c" "$sha" || break
+              ci=$(sha=$c; runs ci.yml || true)
+              [ -n "$ci" ] && { echo "CI run $ci on $c stands for $sha (only release paperwork since)"; break; }
+            done
+          fi
           if [ -n "$ci" ] && [ -n "$pkg" ]; then
             echo "Promoting the packages of Packages run $pkg (CI run $ci passed for $sha)"
             echo "run-id=$pkg" >> "$GITHUB_OUTPUT"

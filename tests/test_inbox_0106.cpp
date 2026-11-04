@@ -132,7 +132,7 @@ CommandResult lionKeepMasked(const std::function<bool(const glm::vec3&)>& masked
 
 } // namespace
 
-TEST(inbox0106_keep_masked_voxel_on_a_real_model) {
+TEST(nightly_inbox0106_keep_masked_voxel_on_a_real_model) {
     // Before the fix every one of these failed with "Couldn't cut the remeshed surface cleanly" (the plain voxel
     // remesh of the lion meets itself on 150-200 edges in the mane at any resolution).
     const std::function<bool(const glm::vec3&)> masks[] = {

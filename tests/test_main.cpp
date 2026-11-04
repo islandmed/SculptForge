@@ -4,7 +4,8 @@
 // Runs every TEST registered by the tests/test_*.cpp files (with arguments: only the tests whose names contain
 // one of them, e.g. `sculptforge_tests qremesh_guide`). `--shard K/N` runs only shard K (0-based) of N, so the
 // suite can run as N processes at once (CMake registers sculptforge_tests_0of16 ... for ctest -j); every test is
-// in exactly one shard (sf::test::inShard).
+// in exactly one shard (sf::test::inShard). Tests named nightly_* (benchmarks, stress, huge meshes) run only with
+// `--nightly` (ctest entry sculptforge_tests_nightly, label nightly: T3 of docs/testing-flow.md), never in a shard.
 #include "TestHarness.h"
 
 #include <chrono>
@@ -16,6 +17,7 @@
 int main(int argc, char** argv) {
     using namespace sf::test;
     int shard = 0, shards = 1;
+    bool nightly = false;
     std::vector<const char*> filters;
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "--shard") == 0 && i + 1 < argc) {
@@ -23,6 +25,8 @@ int main(int argc, char** argv) {
                 std::printf("--shard wants K/N with 0 <= K < N, got %s\n", argv[i]);
                 return 2;
             }
+        } else if (std::strcmp(argv[i], "--nightly") == 0) {
+            nightly = true;
         } else {
             filters.push_back(argv[i]);
         }
@@ -31,6 +35,7 @@ int main(int argc, char** argv) {
     for (std::size_t index = 0; index < registry().size(); ++index) {
         const auto& t = registry()[index];
         if (!inShard(t.name, shard, shards)) continue;
+        if ((std::strncmp(t.name, "nightly_", 8) == 0) != nightly) continue;
         bool wanted = filters.empty();
         for (const char* f : filters) wanted = wanted || std::strstr(t.name, f) != nullptr;
         if (!wanted) continue;

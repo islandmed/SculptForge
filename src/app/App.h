@@ -236,6 +236,7 @@ private:
 
     SDL_Window* window_ = nullptr;
     SDL_GLContext glContext_ = nullptr;
+    bool initialised_ = false; // init() got to the end (shutdown() takes down only what it made otherwise)
     bool running_ = true;
     std::string iniPath_;
 

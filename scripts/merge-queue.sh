@@ -9,6 +9,11 @@
 #   scripts/merge-queue.sh add <pr>...      queue pull requests (label "queue"); any session may do this
 #   scripts/merge-queue.sh list             the queue, oldest first, with each PR's check state
 #   scripts/merge-queue.sh run [--serial]   land the queue (the coordinator, in the background)
+#   scripts/merge-queue.sh staging [--with CMD] [REF]   the merger's batch (T2, docs/testing-flow.md): REF (default HEAD,
+#                                           main merged into it) goes to the branch `staging`, the full CI runs there
+#                                           while CMD runs here (e.g. '~/Work/.sf/pc.sh .', T1), and when both pass main
+#                                           fast-forwards to exactly that commit. CI's run on main then reuses the
+#                                           staging result (ci.yml, job Changes) instead of building it all again.
 #
 # run, batch mode (the default): main plus every queued PR merged in queue order on a branch queue/batch-<time>
 # (a PR that conflicts, or whose own checks are red, is dropped with a comment and the "queue-failed" label), the
@@ -132,7 +137,40 @@ run_batch() {
     done
 }
 
+land_staging() { # land_staging [--with CMD] [REF]
+    local with="" ref sha pid="" ci t0 local_rc=0
+    if [ "${1:-}" = --with ]; then with=$2; shift 2; fi
+    ref=${1:-HEAD}
+    sha=$(git rev-parse "$ref^{commit}") || die "no commit $ref"
+    git fetch -q origin main
+    git merge-base --is-ancestor origin/main "$sha" ||
+        die "$ref does not contain origin/main: merge origin/main into it first (main must fast-forward to the tested commit)"
+    [ "$sha" != "$(git rev-parse origin/main)" ] || { echo "main is already at ${sha:0:8}"; return 0; }
+    t0=$(date +%s)
+    say "staging ${sha:0:8} ($(git log -1 --format=%s "$sha" | cut -c1-60)) on main $(git rev-parse --short origin/main)"
+    git push -q --force origin "$sha:refs/heads/staging"
+    git fetch -q origin staging
+    if [ -n "$with" ]; then
+        bash -c "$with" > "/tmp/merge-queue-with-${sha:0:8}.log" 2>&1 &
+        pid=$!
+        echo "   alongside: $with (log /tmp/merge-queue-with-${sha:0:8}.log)"
+    fi
+    ci=$(wait_ci staging)
+    if [ -n "$pid" ]; then wait "$pid" || local_rc=$?; tail -5 "/tmp/merge-queue-with-${sha:0:8}.log" | sed 's/^/   /'; fi
+    echo "   CI on staging: $ci; local: $([ $local_rc = 0 ] && echo ok || echo "failed ($local_rc)"); $(( $(date +%s) - t0 )) s"
+    [ "$ci" = success ] && [ $local_rc = 0 ] || die "staging is red: main stays at $(git rev-parse --short origin/main); fix the batch and run again"
+    git fetch -q origin main
+    git merge-base --is-ancestor origin/main "$sha" ||
+        die "main moved while staging ran ($(git rev-parse --short origin/main)): merge it in and run again"
+    git push -q origin "$sha:refs/heads/main" # a fast-forward: exactly the tree CI passed
+    say "main is now ${sha:0:8}"
+}
+
 case ${1:-} in
+staging)
+    shift
+    land_staging "$@"
+    ;;
 add)
     shift
     [ $# -gt 0 ] || die "usage: scripts/merge-queue.sh add <pr>..."
@@ -152,7 +190,7 @@ run)
     if [ "${2:-}" = --serial ]; then run_serial; else run_batch; fi
     ;;
 *)
-    sed -n '5,18p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '5,23p' "$0" | sed 's/^# \{0,1\}//'
     exit 2
     ;;
 esac

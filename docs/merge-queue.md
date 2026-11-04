@@ -8,7 +8,7 @@ same job.)
 
 1. Branch from `origin/main`, one note fragment `changes/<branch>.md` instead of CHANGELOG / What's New edits
    ([changes/README.md](../changes/README.md)).
-2. Full ctest green locally (`~/Work/.sf/heavy.sh`), push the branch, `gh pr create --fill`.
+2. T0 green (`~/Work/.sf/t0.sh`, docs/testing-flow.md), push the branch, `gh pr create --fill`.
 3. The PR's CI runs the fast set (Linux x86_64 and ARM64, macOS, Windows over 4 runners; about 10 minutes). Add the
    label `full-ci` for the VFX Reference Platform and Blender add-on jobs too (build or packaging changes).
 4. `scripts/merge-queue.sh add <pr>`, write REPORT.md, tell the coordinator.
@@ -21,6 +21,11 @@ green moves main to exactly that commit; the PRs show as merged. A PR that confl
 comment and the `queue-failed` label; its author fixes the branch and queues it again. A red batch falls back to
 `--serial` (update each PR from main, wait for its checks, merge), which isolates the PR that broke it.
 `scripts/merge-queue.sh list` shows the queue.
+
+The merger's own batch (branches merged without pull requests, `~/Work/.sf/merge-batch.sh`) lands the same way with
+`scripts/merge-queue.sh staging --with ~/Work/.sf/t1.sh HEAD`. The batch goes to the branch `staging`, the full CI runs
+there while the PC runs the whole suite, and main fast-forwards when both pass. Either way, CI's run on main finds the
+full run of the same commit and reuses it rather than building everything a second time (docs/testing-flow.md).
 
 Cut, don't wait: what is green at cut time lands; the rest rides the next batch.
 

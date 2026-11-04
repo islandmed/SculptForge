@@ -15,9 +15,11 @@ on:
 permissions:
   contents: read
 
+# A newer push cancels a branch's run, but never main's: a commit's finished run on main is what the next commits reuse
+# (a release bump right after a merge reused nothing when the bump cancelled its parent's run, 0.10.10).
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 # Compiler cache (ccache). Every job compiles through ccache and starts from the newest cache of the same job; ccache
 # hashes the compiler and the preprocessed source with every flag, so a hit is the object file that compiler would
@@ -44,10 +46,16 @@ jobs:
   changes:
     name: Changes
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read # the staging run this commit may reuse
     outputs:
       code: ${{ steps.diff.outputs.code }}
       full: ${{ steps.diff.outputs.full }}
     steps:
+      - uses: actions/checkout@v7
+        if: github.event_name == 'push'
+        with: { fetch-depth: 20 } # the pushed range, for the paperwork check below
       - id: diff
         env:
           GH_TOKEN: ${{ github.token }}
@@ -77,6 +85,32 @@ jobs:
                   *) code=true ;;
                 esac
               done <<< "$files"
+            fi
+          fi
+          # T2 (docs/testing-flow.md): main only ever fast-forwards to a commit the merge queue tested on the branch
+          # staging (scripts/merge-queue.sh staging). When this exact commit already passed a full run of this workflow
+          # there (dispatched, full=true: its VFX Reference Platform jobs ran and passed), main's run reuses it.
+          if [ "$code" = true ] && [ "$EVENT" = push ] && [ "$GITHUB_REF" = refs/heads/main ]; then
+            for id in $(gh api "repos/$REPO/actions/workflows/ci.yml/runs?head_sha=$HEAD&event=workflow_dispatch&status=success&per_page=5" \
+                --jq '.workflow_runs[] | select(.head_sha == "'"$HEAD"'" and .path == ".github/workflows/ci.yml" and .head_repository.full_name == "'"$REPO"'") | .id'); do
+              vfx=$(gh api "repos/$REPO/actions/runs/$id/jobs?per_page=100" \
+                --jq '[.jobs[] | select((.name | startswith("VFX Reference Platform")) and .conclusion == "success")] | length')
+              if [ "${vfx:-0}" -ge 2 ]; then
+                echo "::notice::$HEAD passed the full CI on staging (run $id, https://github.com/$REPO/actions/runs/$id): reused, not rebuilt"
+                code=false
+                break
+              fi
+            done
+          fi
+          # A release bump (scripts/release.sh step bump: only version lines, notes, docs, site; checked line by line by
+          # tools/release/paperwork_only.py) on top of a main commit whose CI passed: that result stands for it.
+          if [ "$code" = true ] && [ "$EVENT" = push ] && [ "$GITHUB_REF" = refs/heads/main ] && [ -f tools/release/paperwork_only.py ] &&
+             python3 tools/release/paperwork_only.py "$BEFORE" "$HEAD"; then
+            id=$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?head_sha=$BEFORE&event=push&branch=main&status=success&per_page=5" \
+              --jq '[.workflow_runs[] | select(.head_sha == "'"$BEFORE"'" and .path == ".github/workflows/ci.yml")][0].id // empty')
+            if [ -n "$id" ]; then
+              echo "::notice::only release paperwork since $BEFORE, whose CI passed (run $id): reused"
+              code=false
             fi
           fi
           echo "code=$code" | tee -a "$GITHUB_OUTPUT"
@@ -114,6 +148,7 @@ jobs:
       CCACHE_BASEDIR: ${{ github.workspace }}
       CCACHE_MAXSIZE: 500M
       CCACHE_DEPEND: 'true' # include files from the compiler's own dependency list (-MD, /showIncludes): no extra preprocessor run
+      SF_TEST_BUDGET: 150 # seconds per test (tools/test/run.py); software OpenGL is several times slower than the PC's GPU
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -202,15 +237,17 @@ jobs:
           path: .ccache
           key: ccache-ci-${{ matrix.key }}.${{ github.sha }}
       # Every test in one parallel ctest run (UI tests too, where there is a display), so no core idles while the
-      # last tests of one group finish.
+      # last tests of one group finish. tools/test/run.py (docs/testing-flow.md): leaves out label nightly, reruns a
+      # failed test once (a pass on the rerun is reported as flaky and doesn't fail the job), and fails a test slower
+      # than SF_TEST_BUDGET seconds: 20 on the PC's GPU, scaled here for software OpenGL on 4-core runners.
       - name: Test (C++, Python API, UI tests with Xvfb + Mesa)
         if: runner.os == 'Linux'
         run: |
           xvfb-run -a -s "-screen 0 1920x1080x24" env LIBGL_ALWAYS_SOFTWARE=1 \
-            ctest --test-dir build -C Release --output-on-failure --output-junit ctest.xml --test-output-size-passed 262144 -j 4 -I '${{ matrix.shard }},,${{ matrix.shards }}'
+            python3 tools/test/run.py --build build --junit build/ctest.xml -- -C Release -j 4 -I '${{ matrix.shard }},,${{ matrix.shards }}'
       - name: Test (C++ and Python API; UI tests need a display)
         if: runner.os == 'macOS'
-        run: ctest --test-dir build -C Release --output-on-failure --output-junit ctest.xml --test-output-size-passed 262144 -LE ui -j 4 -I '${{ matrix.shard }},,${{ matrix.shards }}'
+        run: python3 tools/test/run.py --build build --junit build/ctest.xml -- -C Release -LE ui -j 4 -I '${{ matrix.shard }},,${{ matrix.shards }}'
       - name: Test (C++, Python API, UI tests with Mesa llvmpipe)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -223,7 +260,7 @@ jobs:
           }
           7z e mesa.7z x64/opengl32.dll x64/libgallium_wgl.dll -obuild/Release -y | Out-Null
           $env:GALLIUM_DRIVER = 'llvmpipe'
-          ctest --test-dir build -C Release --output-on-failure --output-junit ctest.xml --test-output-size-passed 262144 -j 4 -I '${{ matrix.shard }},,${{ matrix.shards }}'
+          python tools/test/run.py --build build --junit build/ctest.xml -- -C Release -j 4 -I '${{ matrix.shard }},,${{ matrix.shards }}'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Slowest tests (job summary; tells which test to split when a shard is the long pole)
         if: always()
@@ -348,7 +385,7 @@ jobs:
           path: .ccache
           key: ccache-ci-${{ matrix.cy }}.${{ github.sha }}
       - name: Test
-        run: ctest --test-dir build --output-on-failure -LE ui -j 4
+        run: ctest --test-dir build --output-on-failure -LE 'ui|nightly' -j 4
       - name: Check binary compatibility (glibc <= ${{ matrix.glibc }})
         run: |
           for f in build/sculptforge build/sculptforge-cli build/sculptforge*.so; do
