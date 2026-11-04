@@ -350,11 +350,14 @@ void MicroRenderer::release() {
     for (GLuint* t : {&gsPosTarget_, &gsShadeTarget_})
         if (*t) gl::DeleteTextures(1, t), *t = 0;
     gsPosRows_ = gsShadeRows_ = 0;
-    if (std::getenv("SF_GS_STATS") && (gsPasses || cpuShadePasses))
-        std::fprintf(stderr, "Micro shading: GPU %llu passes, %.2f ms CPU and %.2f ms GPU each (%llu timed), %.1f ns a point; CPU %llu syncs, %.2f ms each\n",
+    if (const char* stats = std::getenv("SF_GS_STATS"); stats && (gsPasses || cpuShadePasses))
+        if (FILE* f = std::string(stats) == "1" ? stderr : std::fopen(stats, "a")) {
+        std::fprintf(f, "Micro shading: GPU %llu passes, %.2f ms CPU and %.2f ms GPU each (%llu timed), %.1f ns a point; CPU %llu syncs, %.2f ms each\n",
                      (unsigned long long)gsPasses, gsPasses ? gsCpuMs / double(gsPasses) : 0.0,
                      gsQueried ? gsGpuMs / double(gsQueried) : 0.0, (unsigned long long)gsQueried, gsNsPerPoint_,
                      (unsigned long long)cpuShadePasses, cpuShadePasses ? cpuShadeMs / double(cpuShadePasses) : 0.0);
+            if (f != stderr) std::fclose(f);
+        }
     gsPosBytes_ = gsPosReadBytes_ = 0;
     if (gsQuery_ && gl::DeleteQueries) gl::DeleteQueries(1, &gsQuery_), gsQuery_ = 0;
     gsOutBytes_ = 0;

@@ -60,7 +60,7 @@ public:
     size_t gpuShadeBudget() const;
     double lastGpuShadeMs = 0.0;  // GPU time of the last pass (timer query, read a sync later), 0 if unknown
     uint64_t gpuShadedPoints = 0; // grid points the GPU shaded so far
-    // Totals for benchmarks (SF_GS_STATS=1 prints them on release): passes, CPU ms submitting them, GPU ms (queried
+    // Totals for benchmarks (SF_GS_STATS=1 prints them on release, SF_GS_STATS=FILE appends them to FILE): passes, CPU ms submitting them, GPU ms (queried
     // passes), and the CPU path's syncs and ms.
     uint64_t gsPasses = 0, gsQueried = 0, cpuShadePasses = 0;
     double gsCpuMs = 0.0, gsGpuMs = 0.0, cpuShadeMs = 0.0;
