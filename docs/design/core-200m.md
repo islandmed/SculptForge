@@ -309,7 +309,8 @@ transform of the touched patches, needed only for what is drawn or picked (defer
   for an idle PC (11-04) and may be up to ~2x pessimistic.
 - **In a real stroke (research/n2-stroke a433b6cb, `SF_MICRO_WAVELET=1`, off):** floor committed lag p50 at 216 px
   365 -> 31-36 ms, 108 px 28-32 -> 22 ms; Windows PC idle, floor 216 px 699-735 -> 157-178 ms (102-114 with shading
-  capped at ~10 ms a frame). Shading is now the cost; an ms shading budget comes first, then normals on the GPU
+  capped at ~10 ms a frame). On the slow-core bracket (d5738648) 216 px 3,084 -> 1,455 ms p50 (885 capped), 108 px
+  1,273 -> 546 (291 capped), dab 147 -> 17.5 ms: 2-3x on the gate, still far from target. Shading is now the cost; an ms shading budget comes first, then normals on the GPU
   (GL 3.3, no compute, the CPU path kept as a same-picture fallback).
 - **Next:** N2 inside MicroStroke behind a flag (coarse path for radii spanning > 64 samples), reconstruct-on-draw in the
   renderer's sync, then the same idea on the multires mesh path (betaboost's scale-adaptive dabs are its safe first step).
