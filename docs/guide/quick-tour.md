@@ -1,46 +1,121 @@
 # Quick tour for experienced sculptors
 
-If you have sculpted in another app, most habits carry over. This page shows where things are and how to set
-SculptForge up the way your hands expect.
+You know how to sculpt; you just need to know where SculptForge keeps things. Here are ten stops, each with a
+picture of the panel it talks about.
 
-## Keys and layout
-
-At the first start, pick **Classic sculpting keys** when SculptForge asks what you are coming from. It turns on the
-classic keys and gestures and the **Classic layout**: a title strip, the alphabetical palette bar and a two-row top
-shelf. Change either later in **Edit > Preferences > Input** and **Edit > Preferences > Interface > Look**.
-
-With the Classic sculpting keys you sculpt with a left drag, hold <kbd>Alt</kbd> to subtract and <kbd>Shift</kbd>
-to smooth, drag on the background to rotate, <kbd>Alt</kbd>+drag to pan, and hold <kbd>Ctrl</kbd> to mask.
-<kbd>S</kbd>, <kbd>U</kbd>, <kbd>I</kbd> and <kbd>O</kbd> put the Draw Size, Intensity, RGB Intensity and Falloff
-sliders under the cursor, <kbd>Space</kbd> opens the Quick Menu, <kbd>B</kbd> opens the brush pop-up with the same
-letter keys (B, S, T picks Standard), <kbd>,</kbd> opens the Library and <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>
-stores your interface. Every key is listed in [Keyboard and mouse](shortcuts.md#classic-sculpting-keys).
+The pictures are SculptForge in its default look and layout.
 
 ## Where things are
 
-| Looking for | In SculptForge |
+![The command search finding Quad Remesh by the word "retopo"](images/quick-tour/01-where.jpg)
+
+The menus along the top are sorted by task: **Sculpt** (brushes, strokes, alphas, symmetry), **Paint**, **Mesh**,
+**View** and **Render**. The right tray holds the **Tool** palette: Parts, Geometry, Remesh, Masking, Cut, Bake and
+more. The shelves around the view hold the brush, its size and strength, and the brush, stroke, alpha and material
+tiles. See [The interface](interface.md).
+
+Lost? Press <kbd>F3</kbd> and type what you are after in your own words. The search knows the usual sculpting
+words too, and says which one it matched:
+
+| Type | Finds |
 |---|---|
-| Separate meshes in one scene | **Parts**: **Tool > Parts** ([Parts](parts.md)) |
-| Blocking out from spheres | **Forge Spheres**: **Tool > Forge Spheres** ([Forge Spheres](forge-spheres.md)) |
-| Colour on the vertices | **Vertex Paint** ([Vertex paint and materials](vertex-paint.md)) |
-| Groups of faces to mask, hide and split by | **Face Groups** ([Face groups and visibility](face-groups.md)) |
-| Viewport materials from a lit-sphere image | **Lit Spheres** (**Material**) |
-| Your projects, brushes, alphas and materials | **Library** (<kbd>,</kbd>) |
-| An even, watertight remesh | **Tool > Remesh > Voxel Remesh** ([Geometry](geometry.md)) |
-| Automatic quad retopology | **Tool > Geometry > Quad Remesh** ([Retopology](retopology.md)) |
-| Sculpting that adds detail where the brush goes | **Dynamic topology** ([Dynamic topology](dynamic-topology.md)) |
-| Subdivision levels | **Tool > Geometry > Divide** ([Subdivision levels](subdivision-levels.md)) |
+| `remesh`, `voxel`, `block out` | **Voxel Remesh** |
+| `retopo`, `retopology`, `quads` | **Quad Remesh** |
+| `subdivide`, `multires`, `levels` | **Divide**, **Lower Res**, **Higher Res** |
+| `groups` | **Face Groups** |
+| `clip`, `trim`, `slice` | **Tool > Cut** |
+| `folders`, `objects` | **Tool > Parts** |
+| `insert`, `kitbash` | **Append** (a mesh as a new Part) |
+| `vertex color` | **Vertex Paint** |
+| `armature` | **Forge Spheres** |
 
-The command palette (<kbd>F3</kbd>) finds any feature by what it does: type "remesh", "groups" or "folders".
+## Voxel Remesh
 
-## Bringing your work over
+![Tool > Remesh open in the right tray](images/quick-tour/02-voxel.jpg)
 
-Export OBJ, FBX, glTF or USD from the other app and open it here: quads, UVs and groups come along. Or use the
-**Bridge** (**File > Bridge**) to send Parts back and forth with face groups, mask and vertex paint; see
-[Exporting, Unreal and Bridge](exporting.md#exchange-models-through-the-bridge).
+A fast remesh for blocking out. Pull shapes far out or merge pieces, then rebuild one even surface: open
+**Tool > Remesh** in the right tray, set **Resolution** and click **Voxel Remesh**. A higher resolution keeps more
+detail. The mask and vertex paint carry over, so you can keep going. See
+[Geometry](geometry.md#voxel-remesh).
+
+## Dynamic topology
+
+![Sculpt > Draw & Tablet with the Dynamic topology controls](images/quick-tour/03-dynamic.jpg)
+
+Dynamic topology adds detail where you sculpt. Turn on **Dynamic** on the top shelf and the brush adds triangles
+where it needs them and removes them where it doesn't; **Detail** sets how small they get. Pull horns, ears or
+fingers out of a ball without remeshing. **Wire** (<kbd>Shift</kbd>+<kbd>F</kbd>) shows the new triangles. See
+[Dynamic topology](dynamic-topology.md).
+
+## Quad Remesh
+
+![Tool > Remesh with Quad Remesh at its top](images/quick-tour/04-quad.jpg)
+
+Automatic quad retopology: **Tool > Remesh > Quad Remesh** rebuilds a sculpt as clean quads whose edge loops follow
+the forms. Set **Target Polygons** and leave **Keep Original** on. Divide the result, then **Project All**
+(**Tool > Parts**) brings the detail back. Draw **Quad Remesh Guides** to steer the loops. See
+[Quad retopology](retopology.md).
+
+## Levels, Parts and Face Groups
+
+![Tool > Geometry with the subdivision levels](images/quick-tour/05-levels.jpg)
+
+<kbd>Ctrl</kbd>+<kbd>D</kbd> divides and keeps the lower levels: <kbd>Shift</kbd>+<kbd>D</kbd> steps down,
+<kbd>D</kbd> steps up, and you can sculpt at any level (**Tool > Geometry**). A scene holds several
+[Parts](parts.md) (**Tool > Parts**); <kbd>Alt</kbd>+click one in the view to work on it.
+[Face Groups](face-groups.md) split a Part into coloured regions to hide, isolate or mask (**Tool > Face Groups**).
+See [Subdivision levels](subdivision-levels.md).
+
+## Masking
+
+![Tool > Masking with By cavity and By face group](images/quick-tour/06-masking.jpg)
+
+Hold <kbd>Ctrl</kbd> and paint to mask, <kbd>Ctrl</kbd>+<kbd>Alt</kbd> to unmask. **Tool > Masking** inverts,
+blurs and grows the mask, and builds one **By cavity**, **By face group** or along the border. Press <kbd>G</kbd>
+for the stroke popup: its **Shapes** row picks **Mask Pen**, **Mask Lasso** or **Mask Rect** for the next
+<kbd>Ctrl</kbd> stroke. See [Masking](masking.md).
+
+## Cut, Clip and Close Holes
+
+![Tool > Cut with its shapes and modes](images/quick-tour/07-cut.jpg)
+
+Pick a shape in **Tool > Cut** and draw it with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>: a line, lasso, rectangle or
+polyline goes straight through the whole Part, and a closed Part stays closed. Cut it away, cut in, add, or
+**Clip**: press everything outside the shape flat onto its outline. **Close Holes** (**Tool > Geometry**) caps every
+open boundary. See [Cut](cut.md) and [Close Holes](geometry.md#close-holes).
+
+## Brushes, alphas and the Library
+
+![The Library's Brush tab](images/quick-tour/08-library.jpg)
+
+<kbd>B</kbd> opens the brush picker; type the first letters of a name to pick one. The **Alpha** tile picks the
+stamp shape. The **Library** (<kbd>,</kbd>) holds starter meshes, brushes, alphas, Lit Spheres and snapshots. A
+pack (`.sfpack`) brings brushes, alphas and Lit Spheres in one file; **File > Install Pack** shows what is inside
+before anything is installed. See [Sculpting and brushes](sculpting.md) and [Packs and macros](packs-and-macros.md).
+
+## Baking and texturing
+
+![Tool > Bake with its maps](images/quick-tour/09-bake.jpg)
+
+**Tool > Bake** makes normal, displacement, ambient occlusion, cavity and colour maps from your sculpt onto a
+low-poly Part with UVs, in the background. <kbd>P</kbd> picks the Paint brush for vertex paint; **New Texture** on
+the top shelf paints into a texture instead (Auto UV runs first), with paint layers and material channels. See
+[Baking](baking.md), [Texture painting](texture-painting.md) and [Material painting](pbr-painting.md).
+
+## SculptForge stays free
+
+Everything in this tour is free, and stays free. If SculptForge helps your work, a membership keeps it moving:
+members vote on what we build next in #feature-vote on Discord, and Insiders get daily drops and preview builds.
+See [sculptforge.app/support.html](https://sculptforge.app/support.html).
+
+## Keys
+
+**Edit > Preferences > Input > Style** picks the keys: **SculptForge** (the default), **Classic sculpting keys**,
+Blender or Maya. See
+[Keyboard and mouse](shortcuts.md).
 
 ## See also
 
+- [Your first sculpt in 10 minutes](first-sculpt.md)
 - [The interface](interface.md)
-- [Keyboard and mouse](shortcuts.md)
 - [Glossary](glossary.md)

@@ -238,3 +238,4 @@ click "Classic sculpting keys##input.style_zbrush"
 expect_value input_style == 0
 key 1
 expect_value brush_type == 2
+
