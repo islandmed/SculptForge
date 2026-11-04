@@ -570,6 +570,10 @@ HardwareProfile Calibrator::profile(const ProfileOverrides& overrides, const Pro
 }
 
 void applyCachedThreadCount() {
+    if (simulatedFloorTier()) { // (4 cores; the renderer leaves out GL 4.4 buffer storage: Renderer::persistentUpload)
+        ThreadPool::setSharedThreadCount(4);
+        return;
+    }
     HardwareProfile cached;
     if (loadHardwareProfile(hardwareProfilePath(), cached) && cached.settings.threads > 0)
         ThreadPool::setSharedThreadCount(cached.settings.threads);

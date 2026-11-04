@@ -381,6 +381,7 @@ struct PhaseResult {
     size_t dabs = 0, samples = 0;
     std::vector<double> frameMs, lagMs, lagPx;
     std::vector<double> previewLagPx; // the predictive preview's head behind the pointer (the surface's without it)
+    std::vector<double> split[6]; // each frame by part (App::frameSplitMs_, the frame before: the swap comes after)
 };
 
 struct SizeResult {
@@ -885,7 +886,10 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             nextPhase();
             break;
         }
-        if (ph.frameMs.size() < 1000000 && now - p.stageStart > 0.0) ph.frameMs.push_back(frameMs);
+        if (ph.frameMs.size() < 1000000 && now - p.stageStart > 0.0) {
+            ph.frameMs.push_back(frameMs);
+            for (int k = 0; k < 6; ++k) ph.split[k].push_back(frameSplitMs_[k]);
+        }
         const double u = std::min(1.0, (now - p.stageStart) / spec.seconds);
         if (spec.radiusPx <= 0) { // orbit: the view turns, as a drag would
             camera_.yaw = float(6.2831853 * u);
@@ -1037,6 +1041,12 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                 j.set("frames", double(ph.frameMs.size()));
                 j.set("fps", ph.seconds > 0 ? std::round(double(ph.frameMs.size()) / ph.seconds * 10) / 10 : 0.0);
                 j.set("frame_ms", percentilesJson(percentiles(ph.frameMs)));
+                { // where the frames went (main thread; the solver thread's dabs run beside them, waits are in "sculpt")
+                    Json split = Json::object();
+                    const char* names[6] = {"events", "sculpt", "ui", "upload", "draw", "swap_wait"};
+                    for (int k = 0; k < 6; ++k) split.set(names[k], percentilesJson(percentiles(ph.split[k])));
+                    j.set("frame_split_ms", split);
+                }
                 if (ph.radiusPx > 0) {
                     if (!ph.lagMs.empty()) { // (Move drags the surface without dabs: no stroke to trail the pointer)
                         j.set("lag_ms", percentilesJson(percentiles(ph.lagMs)));

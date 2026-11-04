@@ -164,12 +164,26 @@ void App::applyHardwareProfile(const HardwareProfile& p, bool announce) {
     PerformanceSettings s = p.settings;
     s.targetFps = hw.tier.targetHz;
     s.uploadBudgetMBPerFrame = hw.tier.uploadBudgetMBPerFrame;
+    const bool floor = simulatedFloorTier();
+    if (floor) { // SF_HW_SIMULATE=floor: an integrated GPU's budgets (docs/design/perf-moonshots.md §0)
+        s.renderTriangleBudget = std::min<uint64_t>(s.renderTriangleBudget, 2'000'000);
+        s.motionProxyThreshold = std::min<uint64_t>(s.motionProxyThreshold, 3'000'000);
+        s.vramBudgetMB = std::min<uint64_t>(s.vramBudgetMB, 1536);
+        s.uploadBudgetMBPerFrame = std::min<uint64_t>(s.uploadBudgetMBPerFrame, 16);
+        s.threads = 4;
+        hw.tier.uploadBudgetMBPerFrame = s.uploadBudgetMBPerFrame;
+        hw.tier.residentCacheCapMB = std::min<uint64_t>(hw.tier.residentCacheCapMB, 1024);
+        hw.tier.zeroCopyUMA = false;
+        setCurrentTierConfig(hw.tier);
+        SDL_Log("Hardware profile: simulating the floor tier (SF_HW_SIMULATE=floor): budget 2M triangles, 4 threads");
+    }
     hw.profile.settings.targetFps = s.targetFps;
     setCurrentPerformanceSettings(s);
     GovernorConfig cfg;
     cfg.targetFps = s.targetFps;
     cfg.minBudget = std::max<uint64_t>(250'000, s.renderTriangleBudget / 8);
     cfg.maxBudget = std::min<uint64_t>(2'000'000'000, std::max<uint64_t>(s.renderTriangleBudget * 4, cfg.minBudget));
+    if (floor) cfg.maxBudget = s.renderTriangleBudget; // (the governor may lower the budget, never raise it)
     hw.governor.reset(cfg, s.renderTriangleBudget);
     hw.revision = performanceSettingsRevision();
     if (!announce) return;
