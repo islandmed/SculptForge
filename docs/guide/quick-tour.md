@@ -1,7 +1,9 @@
 # Quick tour for experienced sculptors
 
-You know how to sculpt; you just need to know where SculptForge keeps things. Here are ten stops, each with a
-picture of the panel it talks about.
+You know how to sculpt; you just need to know where SculptForge keeps things. This chapter is the same ten stops
+as the in-app tour: **Help > Quick tour**, or **Sculpted before? Take the quick tour** in the welcome. Each slide
+there has a **Show me** button that opens the panel it talks about and flashes it, while the tour waits in a small
+bar at the bottom of the view (**Back to the tour** brings it back).
 
 The pictures are SculptForge in its default look and layout.
 
@@ -106,12 +108,13 @@ the top shelf paints into a texture instead (Auto UV runs first), with paint lay
 
 Everything in this tour is free, and stays free. If SculptForge helps your work, a membership keeps it moving:
 members vote on what we build next in #feature-vote on Discord, and Insiders get daily drops and preview builds.
-See [sculptforge.app/support.html](https://sculptforge.app/support.html).
+See [sculptforge.app/support.html](https://sculptforge.app/support.html). **Maybe later** on the tour's last slide
+closes it, and it doesn't come back by itself.
 
 ## Keys
 
 **Edit > Preferences > Input > Style** picks the keys: **SculptForge** (the default), **Classic sculpting keys**,
-Blender or Maya. See
+Blender or Maya. Picking the Classic sculpting keys offers this tour once. See
 [Keyboard and mouse](shortcuts.md).
 
 ## See also

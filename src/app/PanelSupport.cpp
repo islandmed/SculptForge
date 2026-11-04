@@ -161,9 +161,15 @@ void App::drawSupportUi() {
             ImGui::PopStyleColor();
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Your first sculpt: a cute owl head from this sphere, step by step, in about ten minutes.");
+            // Sculpted before: the quick tour (QuickTour.cpp), where everything is in ten slides.
+            if (ImGui::Button(ICON_LC_COMPASS "  Sculpted before? Take the quick tour##welcome.tour", ImVec2(-1, 0)))
+                showQuickTour(0);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Ten short slides: remeshing, dynamic topology, retopology, levels, masking, cut, "
+                                  "brushes and baking, each with a Show me button.");
             ImGui::Spacing();
             ImGui::TextWrapped("Hold Ctrl over any control to see what it does. The User Guide (Shift+F1) explains every "
-                               "tool, and Quick tour for experienced sculptors lists what is where.");
+                               "tool, and the quick tour shows what is where.");
             // The look (0.10.9, #U6): three cards, the first the default. Existing installs never see this window
             // unless they open Help > Welcome, so nobody's look changes by itself.
             ImGui::Spacing();
@@ -255,6 +261,7 @@ void App::drawSupportUi() {
         }
         ImGui::End();
     }
+    drawQuickTour(); // QuickTour.cpp
     if (newLookCard_ && !showWelcome_ && !supportCardOpen() && !whatsNew_ && !showWhatsNew_) {
         // Once, after updating from before 0.10.7 (PanelProject.cpp): the new default look, never forced.
         ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + c.h - 16.0f * s), ImGuiCond_Always, ImVec2(0.5f, 1.0f));

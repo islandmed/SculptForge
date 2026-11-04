@@ -363,6 +363,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelProject.cpp
     src/app/PanelSubTools.cpp
     src/app/PanelSupport.cpp
+    src/app/QuickTour.cpp
     src/app/PanelAi.cpp
     src/app/PanelSupportCard.cpp
     src/app/WhatsNewPopup.cpp

@@ -405,6 +405,19 @@ private:
     bool newLookCard_ = false;
     bool newLookCardDone_ = false;
     void chooseNewLook(bool tryIt);
+    // Help > Quick tour (QuickTour.cpp): ten slides for sculptors who know another app, each with a "Show me".
+    // Offered once (project.json "quick_tour_done"); the welcome and the Help menu always open it.
+    void showQuickTour(int slide = 0);
+    void offerQuickTour(); // the Classic sculpting keys were picked: a note offers the tour, once
+    void closeQuickTour();
+    void quickTourShowMe(int slide);
+    void drawQuickTour();
+    static int quickTourSlides();
+    bool quickTourOpen_ = false, quickTourAside_ = false, quickTourOffer_ = false, quickTourDone_ = false;
+    int quickTourSlide_ = 0;
+    bool quickTourOffersInTests_ = false; // UI tests: the offer only after the script's quick_tour_offers
+    std::string flashSubpalette_; // a Tool sub-palette "Show me" opened: scrolled to and flashed (Palettes.cpp)
+    double flashSubpaletteStart_ = 0.0;
     double sculptSeconds_ = 0.0;        // cumulative time in strokes (project.json)
     bool supportReminderDone_ = false;  // the reminder was shown (or turned off) once: never again (project.json)
     bool supportReminderOpen_ = false;
@@ -1638,7 +1651,7 @@ private:
         float move[3] = {0, 0, 0}, rotate[3] = {0, 0, 0}, scale = 100.0f;
     } gizmo_;
     // ---- end Gizmo 3D ----
-    // ---- ZBrush feel (Input.cpp, docs/guide/coming-from-zbrush.md) ----
+    // ---- Classic sculpting keys (Input.cpp, docs/guide/quick-tour.md) ----
     // Preferences > Input (the ZBrush or SculptForge key style), the Space QuickMenu, the intensities and Focal
     // Shift (U / I / O), ZBrush's mask and polygroup keys, Shift-constrained straight strokes and the
     // Shift+click, release Shift, drag roll.
