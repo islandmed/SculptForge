@@ -92,7 +92,9 @@ the beta's tester reports. GL draw stays 0.1-0.8 ms p50 even at 50M; the real-GP
 5/20/50M (governor pinned) agree on strokes (240 px at 20M: 536 / 562 ms committed-surface lag p50) and differ only
 in orbit, where the floor's motion proxy from 3M makes 5-20M orbit cheaper (20M 1.1 vs 4.6 ms p50); the 50M orbit
 upload spike (27.5 ms p99) is in both. A 3060 can't simulate an iGPU's fill rate: the floor numbers here test the
-budgets, and a real iGPU run is still needed. It simulates the budgets, not the GPU's fill
+budgets, and a real iGPU run is still needed. (These JSONs have `ram_mb` 0: resident memory was read only on Linux until
+the cherry-picked fix from research/core-200m. On the same PC core-200m orbits 200M at p50 0.9 / p99 2.2 ms, GPU
+0.6 ms: the 200M p99 tail on Asahi was presentation on that desktop, not the engine.) It simulates the budgets, not the GPU's fill
 rate, so real iGPU runs by testers (Windows UHD 620 / Iris Xe first) confirm it.
 
 **Targets, floor profile** (laptop targets in brackets):
