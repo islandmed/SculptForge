@@ -54,9 +54,9 @@ expect_value material_custom == 1
 expect_value custom_matcaps == 2
 expect_status "sf_ui_custom_matcap"
 
-# Images added to the MatCaps folder while the app runs show up when a material list opens.
+# Images added to the Lit Spheres folder while the app runs show up when a material list opens.
 env XDG_DATA_HOME $LIBRARY/.trash-test
-copy data/Rose.png $LIBRARY/MatCaps/Pink.png
+copy data/Rose.png "$LIBRARY/Lit Spheres/Pink.png"
 expect_value custom_matcaps == 2
 click "Material##palette.material"
 wait_idle 20

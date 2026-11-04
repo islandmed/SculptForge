@@ -189,49 +189,50 @@ TEST(quicksave_files) {
 TEST(brush_popup_letter_keys) {
     // The built-in brushes in the pop-up's order, plus a custom one.
     const std::vector<std::string> names = {"Standard", "Clay",  "Smooth",      "Move",        "Inflate",   "Crease",
-                                            "Flatten",  "Pinch", "DamStandard", "ClayBuildup", "SnakeHook", "Trim",
-                                            "Layer",    "Nudge", "Paint",       "Clay Buildup"};
+                                            "Flatten",  "Pinch", "Sharp Crease", "Clay Block", "Tendril", "Trim",
+                                            "Layer",    "Nudge", "Paint",        "Clay Bulk"};
     auto keyOf = [&](const std::vector<std::pair<char, size_t>>& badges, const std::string& brush) {
         for (const auto& [c, i] : badges)
             if (names[i] == brush) return c;
         return '\0';
     };
-    // B, then S: Standard is T, Smooth M, SnakeHook H (ZBrush's B S T, B S M, B S H).
+    // B, then S: Standard is T, Smooth M, Tendril H (the classic B S T, B S M, B S H), Sharp Crease the next free letter.
     bool substring = true;
     auto kept = filterByTyped(names, "s", &substring);
     CHECK(!substring);
-    CHECK(kept.size() == 3);
+    CHECK(kept.size() == 4);
     auto badges = letterBadges(names, kept, "s");
     CHECK(keyOf(badges, "Standard") == 't');
     CHECK(keyOf(badges, "Smooth") == 'm');
-    CHECK(keyOf(badges, "SnakeHook") == 'h');
-    // C: Clay L, Crease R, ClayBuildup B (ZBrush's B C B), and the custom "Clay Buildup" the first free letter (A).
+    CHECK(keyOf(badges, "Tendril") == 'h');
+    CHECK(keyOf(badges, "Sharp Crease") == 'a');
+    // C: Clay L, Crease R, Clay Block B (the classic B C B), and the custom "Clay Bulk" the first free letter (A).
     kept = filterByTyped(names, "c");
     badges = letterBadges(names, kept, "c");
     CHECK(kept.size() == 4);
     CHECK(keyOf(badges, "Clay") == 'l');
     CHECK(keyOf(badges, "Crease") == 'r');
-    CHECK(keyOf(badges, "ClayBuildup") == 'b');
-    CHECK(keyOf(badges, "Clay Buildup") == 'a');
-    // ZBrush's keys for the brushes both apps have: B D S, B M V, B I N, B P I.
-    CHECK(keyOf(letterBadges(names, filterByTyped(names, "d"), "d"), "DamStandard") == 's');
+    CHECK(keyOf(badges, "Clay Block") == 'b');
+    CHECK(keyOf(badges, "Clay Bulk") == 'a');
+    // The classic keys: B D S, B M V, B I N, B P I.
+    CHECK(keyOf(letterBadges(names, filterByTyped(names, "d"), "d"), "Sharp Crease") == 's');
     CHECK(keyOf(letterBadges(names, filterByTyped(names, "m"), "m"), "Move") == 'v');
     CHECK(keyOf(letterBadges(names, filterByTyped(names, "i"), "i"), "Inflate") == 'n');
     CHECK(keyOf(letterBadges(names, filterByTyped(names, "p"), "p"), "Pinch") == 'i');
-    CHECK(keyOf(letterBadges(names, filterByTyped(names, "s"), "s"), "SnakeHook") == 'h');
+    CHECK(keyOf(letterBadges(names, filterByTyped(names, "s"), "s"), "Tendril") == 'h');
     // Every key is unique.
     for (size_t i = 0; i < badges.size(); ++i)
         for (size_t j = i + 1; j < badges.size(); ++j)
             CHECK(badges[i].first != badges[j].first);
-    // Nothing starts with "hook": fall back to names containing it, without keys.
-    kept = filterByTyped(names, "hook", &substring);
+    // Nothing starts with "dril": fall back to names containing it, without keys.
+    kept = filterByTyped(names, "dril", &substring);
     CHECK(substring);
-    CHECK(kept.size() == 1 && names[kept[0]] == "SnakeHook");
-    CHECK(letterBadges(names, kept, "hook").empty());
+    CHECK(kept.size() == 1 && names[kept[0]] == "Tendril");
+    CHECK(letterBadges(names, kept, "dril").empty());
     // Nothing typed: everything, no keys.
     CHECK(filterByTyped(names, "").size() == names.size());
     CHECK(letterBadges(names, filterByTyped(names, ""), "").empty());
-    CHECK(typedName("Clay Buildup!") == "claybuildup");
+    CHECK(typedName("Clay Block!") == "clayblock");
 }
 
 // #90: Library > Projects listed each project twice on Windows: the User folder is joined with "/", recent files are

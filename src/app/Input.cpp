@@ -83,7 +83,7 @@ void App::registerInputActions() {
         "inner ring of the brush cursor shows it.",
         [this] { PickerUi::sizePopup(*this, PickerUi::Slider::FocalShift); });
     add("ui.quickmenu", "Quick Menu", ICON_LC_LAYOUT_GRID, "Help", "Space",
-        "the Quick Menu under the cursor: brush, stroke, alpha, material, colour, Draw Size, Falloff and the "
+        "The Quick Menu under the cursor: brush, stroke, alpha, material, colour, Draw Size, Falloff and the "
         "intensities. Hold Space and let go to close it, or tap Space to keep it open.",
         [this] { openQuickMenu(); }, [this] { return quickMenu_.open; });
 

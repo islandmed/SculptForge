@@ -4,6 +4,7 @@ website/guide/search-index.js           skip     # built from docs/guide, which 
 src/**                                  strings
 tests/**                                skip     # test code and data: phase 2 (identifiers, comments, fixtures)
 addons/**                               strings
+integrations/comfyui/**                 strings  # calls subtool_list; command names follow phase 2
 tools/guide/**                          strings
 tools/looks/**                          strings
 tools/export_check/**                   strings

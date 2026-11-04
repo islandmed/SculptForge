@@ -135,7 +135,7 @@ expect_help "soft joint"
 hover "Gizmo/To Surface##gizmo.snap_pivot"
 expect_help "Alt+click"
 hover "Gizmo/All Parts##gizmo.all"
-expect_help "Transpose All"
+expect_help "every visible Part together"
 hover "Rotate##tool.rotate"
 expect_help "pose a limb"
 key ctrl+f1

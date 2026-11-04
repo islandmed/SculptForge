@@ -99,9 +99,9 @@ TEST(search_aliases_are_generic_words) {
     CHECK(has(searchAliasesIn("Show face groups"), "groups"));
     CHECK(searchAliasesIn("Partial redo").empty());       // whole words only
     CHECK(searchAliasesIn("Dynamic stroke spacing").empty()); // "Dynamic" only as the whole label
-    // Brushes: stored names stay (old projects, hotkeys and scripts), labels are SculptForge's.
+    // Brushes: SculptForge's stored names; the old ones still load (core/LegacyNames.h).
     BrushType t = BrushType::Standard;
-    CHECK(std::string(brushName(BrushType::DamStandard)) == "DamStandard");
+    CHECK(std::string(brushName(BrushType::DamStandard)) == "SharpCrease");
     CHECK(std::string(brushLabel(BrushType::DamStandard)) == "Sharp Crease");
     CHECK(brushFromName("DamStandard", t) && t == BrushType::DamStandard);
     CHECK(brushFromName("sharp crease", t) && t == BrushType::DamStandard);

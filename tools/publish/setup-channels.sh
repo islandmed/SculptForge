@@ -81,7 +81,7 @@ cask "sculptforge" do
   url "https://github.com/$REPO/releases/download/v#{version}/SculptForge-#{version}-darwin-universal.dmg",
       verified: "github.com/$REPO/"
   name "SculptForge"
-  desc "Free, open-source digital sculpting, a free, open-source sculpting app"
+  desc "Free, open-source digital sculpting app"
   homepage "https://sculptforge.app/"
 
   livecheck do

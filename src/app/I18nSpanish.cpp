@@ -543,7 +543,6 @@ constexpr Entry kSpanish[] = {
     {"Auto collapse left tray", "Plegar sola la bandeja izquierda"},
     {"Auto collapse right tray", "Plegar sola la bandeja derecha"},
     {"Palettes strictly A-Z", "Paletas estrictamente de la A a la Z"},
-    {"Palettes strictly A-Z", "Paletas de la A a la Z"},
     {"Left-handed layout", "Diseño para zurdos"},
     {"Shelf tiles", "Fichas del estante"},
     {"UI scale", "Escala de la interfaz"},

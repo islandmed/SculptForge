@@ -7,7 +7,7 @@ expect "Dynamic##draw.dynamic"
 expect_not "##dyntopo_detail"
 hold ctrl
 hover "Dynamic##draw.dynamic"
-expect_help "Sculptris Pro"
+expect_help "brushes add triangles"
 expect_help "subdivision levels"
 hold none
 
