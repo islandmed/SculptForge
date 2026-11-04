@@ -9,7 +9,7 @@ three versions in full, then the older ones in groups. Every detail is in the
 
 ```features
 date: unreleased
-tagline: A quick tour for experienced sculptors, a command search that knows plain sculpting words, and three experimental options for very dense meshes.
+tagline: Fast Big Brushes, sixty new brushes in six packs, a Masking panel, and a quick tour for experienced sculptors.
 ```
 
 ## Version 0.10.11
