@@ -33,7 +33,7 @@ Next lever: fewer TUs depending on core/Mesh.h (forward declarations, split head
 
 ## Tests
 Full ctest on the PC (pc.sh): all pass except `ui_micro_levels` (SEGFAULT). Main (058dba75, untouched worktree) fails
-it the same way on the PC (n2-stroke is looking at it). Its crash removes the D3D12 device, so 9 UI tests after it
+it the same way: a WSL D3D12 issue (passes on the native driver; test-flow labels it no_d3d12). Its crash removes the D3D12 device, so 9 UI tests after it
 failed in the first run. Rerun alone: all pass. `close_holes_big_hole_is_quick` (timing) missed its limit once under
 -j10 and passed on rerun. check_marks and note fragments: OK.
 
