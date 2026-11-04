@@ -45,6 +45,23 @@ render triangle budget 2M (1M while the view moves); motion proxy from 3M visibl
 may lower the budget, never raise it. View resolution 75% while the view moves, full
 when it stops (`SF_MOTION_RESOLUTION=25..100` sets it on any profile).
 
+**Limits of the simulation (11-04).** It sets the floor's budgets and thread count, not its per-core speed. On our
+dab code one M1 Pro performance core is about 1.6x a Ryzen 5600X core (216 px dab on 1 thread: 82 vs 134 ms; a GCC
+build on the same Ryzen is no faster, so it isn't the compiler; n2-stroke). A floor laptop core (8th-gen i5 class) is
+slower again, so roughly 2.5-3x an M1 Pro P-core. The simulated floor on this laptop's P-cores is therefore
+**optimistic for CPU-bound work**: dab cost, solver, normals, CPU shading. So CPU-bound results are reported as a
+bracket:
+- **floor (P-cores):** `SF_HW_SIMULATE=floor`, as is. The optimistic bound.
+- **floor (E-cores):** the same under `taskset -c 0,1`, the two efficiency cores (Linux `cpu_capacity` 485 vs 1024).
+  Each is ~0.47 of a P-core, near a floor core's speed. With two of them the process has ~1 P-core of compute
+  against a floor laptop's ~1.4-1.6, so this is the pessimistic bound.
+
+A CPU-bound claim counts on the floor only if it holds on the E-cores, or if it holds on the P-cores by a ~2.5x
+margin. GPU-side results (draw, fill, upload) are bounded by the budgets the simulation does set. The Windows PC
+can't stand in for a floor CPU either. Windows numbers taken while the PC ran other jobs read about 2x slow
+(n2-stroke found other sessions' WSL build jobs at 75-100% CPU during win.sh runs; win.sh now takes their lock), and
+the RTX 3060 runs in this doc (eb2f2aa) predate that fix: sanity checks only, possibly pessimistic.
+
 **Frame split.** `--benchmark` now writes `frame_split_ms` per phase (p50 / p95 / p99 of the main thread's
 events, sculpt, UI, upload = ghost + scene sync, draw = GL calls, swap_wait = UI draw + swap, where the frame
 waits for the GPU). It decides whether a native backend (D3D11/12, Metal) behind a thin render interface should
@@ -319,8 +336,31 @@ Fast Big Brushes takes the 240 px committed lag from 232-267 to 84-86 ms with th
 them on, so the two stack. With both, every stroke phase meets p99 < 33 ms on the floor and the visible stroke stays
 within 5 px p50. Committed lag beyond the spacing floor (target <= 16 ms) is still about 3x over at 240 px.
 
+**Pessimistic bound: the same on the efficiency cores** (`taskset -c 0,1`, §0; tree 6231d18 with Fast Big Brushes, 2 pairs
+interleaved, load < 2 at each start; `bench/floor/m1pro-6231d18-ecores-std15m-*.json`), toggles off -> on:
+
+| floor, E-cores, 15M | frame p99 | visible stroke p50 / p99 | committed lag p50 | pen up to done |
+|---|---|---|---|---|
+| Clay 25 px | 34-37 -> 20-22 ms | 14 / 179-216 -> **6 / 18-21 px** | 18-19 -> 32-33 ms | 0.17 -> 0.12 s |
+| Clay 60 px | 32-37 -> 25-29 ms | 18-39 / 565-826 -> **8 / 27-30 px** | 25-54 -> 39-55 ms | 0.7 -> 0.8 s |
+| Clay 120 px | 41-44 -> 28-31 ms | 715-722 / 1163-1274 -> **13 / 28-32 px** | 717-756 -> 594-644 ms | 1.8 -> 1.6 s |
+| Move | 69-72 -> 27-30 ms | (no dabs) | | |
+| Smooth | 39-45 -> 28 ms | 39-40 / 603-604 -> **8 / 29-31 px** | 45-47 -> 57-64 ms | 0.25 -> 0.28 s |
+| 240 px brush | 41-43 -> 33-34 ms | 1272-1745 / 3231-3521 -> **15-17 / 35-36 px** | 1294-1794 -> 1424-1496 ms | 3.0 -> 3.0 s |
+| orbit | 165-166 -> 164-166 ms (p50 8.6-8.9 either way) | | | |
+
+On slow cores, Background Preview and Live Move still do their job: the visible stroke stays within 6-17 px p50 of the pen,
+against 0.7-1.7 s behind with them off. Move's p99 frame halves. All stroke frames are p99 <= 31 ms except the
+240 px brush at 33-34 ms (target < 33: just misses). What fails on the pessimistic floor, with or without the
+toggles, is the CPU:
+- committed lag of big brushes: 0.6-1.5 s, and the stroke finishes up to **3 s after pen up** at 240 px;
+- a **~165 ms hitch at the start of every orbit**: about 3 frames, in the upload phase (the motion proxy's build and
+  upload on the main thread). On the P-cores it is 23-36 ms.
+These two are the floor's top problems: building the motion proxy ahead of the orbit and off the main thread, and
+CPU dab throughput (Fast Big Brushes, core-200m N2). They come before anything that needs a faster GPU.
+
 The laptop profile shows the same pattern (240 px: 208 -> 6 px p50, frame p99 33 -> 16 ms; Smooth p99 36 -> 12 ms).
-On the floor tier, with the toggles on, every stroke phase's p99 frame meets the < 33 ms target (off: 4 of 6 miss) and
+On the simulated floor tier (optimistic for CPU-bound work, §0), with the toggles on, every stroke phase's p99 frame meets the < 33 ms target (off: 4 of 6 miss) and
 the stroke you see stays within a few pixels of the pen. The cost: the committed surface on a small brush lands
 about 15-20 ms later (the frame no longer waits for the batch), while on big brushes and Smooth it lands as early or
 earlier. Orbit doesn't change (the toggles don't act there; the ranges overlap over 4 pairs). Its p99 still
