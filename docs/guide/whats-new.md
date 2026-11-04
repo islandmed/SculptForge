@@ -5,6 +5,13 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.10.11
+
+```features
+date: unreleased
+tagline: Voxel Remesh 3-4x faster, high-DPI laptops that fit the screen, the right tray in every look, and a Preview channel for betas.
+```
+
 ## Version 0.10.10
 
 ```features
