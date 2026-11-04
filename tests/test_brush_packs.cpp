@@ -131,7 +131,7 @@ TEST(brush_packs_every_brush_leaves_a_clean_mark) {
         }
     }
     std::printf("  60 pack brush strokes: %.0f ms in all, slowest %s %.0f ms\n", totalMs, slowest.c_str(), slowestMs);
-    CHECK(slowestMs < 400.0);
+    CHECK(slowestMs < timeLimit(400.0));
 }
 
 TEST(list_sort_orders) {
