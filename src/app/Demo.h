@@ -20,6 +20,7 @@
 
 #include <SDL3/SDL.h>
 
+#include <chrono>
 #include <functional>
 #include <map>
 #include <string>
@@ -73,6 +74,8 @@ public:
         lastShotW_ = w;
         lastShotH_ = h;
     }
+
+    void printProfile() const; // the slowest script lines (SF_UI_PROFILE=1), after the script ran
 
 private:
     using Step = std::function<bool(float t)>; // returns true when done; t = seconds since the step began
@@ -132,6 +135,11 @@ private:
     std::vector<Step> steps_;
     size_t step_ = 0;
     float stepTime_ = 0.0f;
+    // SF_UI_PROFILE=1 (docs/testing-flow.md): the real time each script line took, printed when the script ends.
+    std::vector<int> stepLines_;              // the script line each step came from
+    std::vector<std::string> scriptLines_;    // the script's lines, for the report
+    std::vector<double> lineSeconds_;         // real seconds spent on each line
+    std::chrono::steady_clock::time_point lastUpdate_{};
     int stride_ = 1;
     ImVec2 mouse_{960, 540};
     bool buttonDown_ = false;

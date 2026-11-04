@@ -404,6 +404,7 @@ int App::runUiTest(int w, int h, int fps) {
         if (!img.savePng(shot, err)) SDL_Log("%s", err.c_str());
         else SDL_Log("Screenshot %s", shot.c_str());
     }
+    demo_->printProfile();
     for (const auto& f : demo_->failures()) std::fprintf(stderr, "FAIL %s\n", f.c_str());
     if (demo_->failures().empty())
         std::printf("PASS %s (%d frames)\n", options_.uiTest.c_str(), frames);

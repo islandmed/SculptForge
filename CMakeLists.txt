@@ -729,6 +729,13 @@ if(SCULPTFORGE_BUILD_TESTS)
           "SCULPTFORGE_BRUSH=$<TARGET_FILE:sf_fake_splat_tools>;SCULPTFORGE_COLMAP=$<TARGET_FILE:sf_fake_splat_tools>;SCULPTFORGE_FFMPEG=$<TARGET_FILE:sf_fake_splat_tools>")
       endif()
     endforeach()
+    # Label no_d3d12: tests that the Windows PC's WSL GPU path (Mesa's OpenGL on D3D12, ~/Work/.sf/pc.sh) can't run and
+    # pc.sh leaves out. ui_micro_levels: its first micro-displacement frame makes D3D12 remove the device (a segfault,
+    # and every UI test running beside it loses its GL context); it passes on CI's llvmpipe and on the same PC's native
+    # NVIDIA driver (2026-11-03, v0.10.11, 128 frames), so it is the translation layer, not SculptForge.
+    if(TEST ui_micro_levels)
+      set_tests_properties(ui_micro_levels PROPERTIES LABELS "ui;no_d3d12")
+    endif()
     # The hardware profile panel with a real calibration (tests/ui/hardware_profile.sfui).
     if(TEST ui_hardware_profile)
       set_tests_properties(ui_hardware_profile PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1")

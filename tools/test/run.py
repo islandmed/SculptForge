@@ -144,6 +144,17 @@ def fingerprint(t, root, build, run_env):
     return h.hexdigest()
 
 
+def parallel_jobs(args):
+    """N of ctest's -jN / -j N / --parallel N (1 when absent)."""
+    for i, x in enumerate(args):
+        m = re.fullmatch(r"-j(\d+)", x)
+        if m:
+            return int(m.group(1))
+        if x in ("-j", "--parallel") and i + 1 < len(args) and args[i + 1].isdigit():
+            return int(args[i + 1])
+    return 1
+
+
 def run_env():
     return {k: v for k, v in os.environ.items() if k.startswith(ENV_PREFIXES) and k not in ENV_IGNORE}
 
@@ -212,6 +223,9 @@ def main(argv=None):
             args[le[-1] + 1] = f"({args[le[-1] + 1]})|nightly"
         else:
             args += ["-LE", "nightly"]
+    # A parallel run loads the machine like CI: timing checks (timeLimit, tests/TestHarness.h) get CI's slack.
+    if parallel_jobs(args) > 1:
+        os.environ.setdefault("SF_TIME_LIMIT_SCALE", "4")
     tests = load_tests(build, args)
     if tests is None:
         print(f"run.py: ctest can't list the tests in {build} (configured?)")
@@ -341,6 +355,7 @@ def self_test():
         open(junit, "w").write('<testsuite><testcase name="sculptforge_tests_0of2" time="9" status="run">'
                                '<system-out>[ RUN] x\n[ OK ] mesh_io (1200 ms)\n[FAIL] y (3 ms)\n</system-out></testcase></testsuite>')
         assert inner_times(junit) == {"mesh_io": 1.2}
+    assert parallel_jobs(["-j10"]) == 10 and parallel_jobs(["-C", "Release", "-j", "4"]) == 4 and parallel_jobs([]) == 1
     print("run.py self-test passed")
     return 0
 
