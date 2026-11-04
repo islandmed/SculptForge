@@ -14,6 +14,8 @@ ui_bake                                                             40  2048 AO 
 ui_quick_tour                                                       36  long tail of 1-2 s steps: re-measure with per-test threads (SF_THREADS)
 ui_bake_levels                                                      31  one 2048 bake (19 s): 1024
 ui_gizmo                                                            26  long tail of 2-3 s drags: re-measure with SF_THREADS
+ui_ctrl_brushes                                                     27  re-measure with SF_THREADS (24-27 s)
+ui_ui_scale                                                         35  ui scale steps 100-200 %: one size per step is enough (24-35 s)
 ui_pbr_viewport                                                     23  re-measure with SF_THREADS
 ui_stroke_background_preview                                        22  re-measure with SF_THREADS
 ui_face_shapes                                                      22  re-measure with SF_THREADS
