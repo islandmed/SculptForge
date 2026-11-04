@@ -30,7 +30,11 @@ import subprocess
 import sys
 import tempfile
 import time
-import xml.etree.ElementTree as ET
+try:
+    import xml.etree.ElementTree as ET
+    ET.fromstring("<a/>")
+except ImportError:  # some system Pythons (Rocky 8's 3.12) ship a pyexpat that doesn't load: plain ctest then
+    ET = None
 
 ENV_PREFIXES = ("SF_", "SCULPTFORGE_", "SDL_", "GALLIUM_", "LIBGL_", "MESA_", "__GLX_")
 ENV_IGNORE = {"SDL_APP_ID"}
@@ -195,6 +199,8 @@ GPU_LOST = re.compile(r"Could not find a valid EGL device|D3D12: Removing Device
 
 
 def outputs(junit):
+    if ET is None:
+        return {}
     try:
         root = ET.parse(junit).getroot()
     except (OSError, ET.ParseError):
@@ -207,6 +213,8 @@ INNER = re.compile(r"^\[ OK \] (\S+) \((\d+) ms\)$", re.M)
 
 def inner_times(junit):
     """The single TEST cases inside the sculptforge_tests shards: {case: seconds} (their "[ OK ] name (N ms)" lines)."""
+    if ET is None:
+        return {}
     try:
         root = ET.parse(junit).getroot()
     except (OSError, ET.ParseError):
@@ -221,6 +229,8 @@ def inner_times(junit):
 
 
 def results(junit):
+    if ET is None:
+        return {}
     try:
         root = ET.parse(junit).getroot()
     except (OSError, ET.ParseError):
@@ -251,6 +261,9 @@ def main(argv=None):
         return self_test()
     args = [x for x in a.ctest_args if x != "--"]
     build = os.path.abspath(a.build)
+    if ET is None:  # no JUnit to read: no cache, rerun or budget, just the tests
+        print("run.py: no XML parser in this Python: plain ctest")
+        return subprocess.run(["ctest", "--test-dir", build, "--output-on-failure", *args]).returncode
     root = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True).stdout.strip() or os.getcwd()
     if os.environ.get("CI"):
         a.cache = ""
@@ -381,6 +394,9 @@ deletes it; remove its lines once fixed.
 
 
 def self_test():
+    if ET is None:
+        print("run.py self-test: no XML parser in this Python (pyexpat): skipped")
+        return 0
     with tempfile.TemporaryDirectory() as d:
         src = os.path.join(d, "src")
         os.makedirs(os.path.join(src, "assets"))

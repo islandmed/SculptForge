@@ -232,7 +232,7 @@ def impacted(root, build, files, verbose=False, graph=None, tests=None, history=
                     continue
                 p = os.path.normpath(a if os.path.isabs(a) else os.path.join(t["cwd"] or build, a))
                 by_output[p].add(t["name"])
-                rel = os.path.relpath(p, root)
+                rel = os.path.relpath(p, root).replace(os.sep, "/")  # (git's spelling, also on Windows)
                 if not rel.startswith(".."):
                     by_file[rel].add(t["name"])
                     if os.path.isfile(p) and not rel.startswith("tests/ui/"):

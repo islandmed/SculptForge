@@ -38,6 +38,10 @@ The merger (`~/Work/.sf/merge-batch.sh`) merges the green branches, then calls
 - at the same time, `t1.sh` runs the whole suite on the PC;
 - when both are green, main fast-forwards to exactly that commit. When either is red, main doesn't move.
 
+The PC runs one job at a time, build and tests together. A build overlapping another job's tests drove the
+load to 65 on 12 threads and the compiler crashed. Each worktree fetches and builds its own dependencies
+(`/root/wt/<name>/fc`); ccache (`CCACHE_BASEDIR=/root/wt`) is shared, so another worktree's objects are cache hits.
+
 CI on main then doesn't build it all again. The `Changes` job sees that this exact commit passed a full run on
 staging, with both VFX jobs green, and passes as reused. The merger no longer runs a local full ctest.
 
@@ -46,7 +50,8 @@ staging, with both VFX jobs green, and passes as reused. The merger no longer ru
 `scripts/release.sh` step `ci` used to wait about 20 minutes for CI on the bump commit. That commit only adds
 paperwork to a commit CI had already passed. `tools/release/paperwork_only.py BASE HEAD` checks this file by file
 and line by line: the version lines, CHANGELOG, Markdown docs, the generated site, deleted fragments. Anything else
-fails safe. When the check passes, step `ci` and release.yml (job `locate`) take the earlier commit's CI result. The
+fails safe. When the check passes, step `ci` and release.yml (job `locate`) take the earlier commit's CI result.
+On main, a newer push never cancels a run that is still going (ci.yml `concurrency`), so that earlier result exists. The
 bump's own Packages run still has to pass, because the version is built into the app. Step `check` runs the bump's
 own tests (What's New, the guide, notes) on the bumped tree.
 
@@ -66,7 +71,19 @@ Every tier runs ctest through `tools/test/run.py --build build [-- ctest args]`:
   `flaky`, and a failure then never blocks a release. Its owner fixes it or deletes it.
 - **Budget**: a test slower than `--budget` seconds fails the run. For the `sculptforge_tests` shards, each TEST
   case counts on its own. The default is 20 s on the PC's GPU; CI sets `SF_TEST_BUDGET=150` for software OpenGL on
-  4-core runners. A slow test should wait on events rather than fixed frames, be split, or be labelled nightly.
+  4-core runners. `tests/slow_tests.txt` lists the tests over budget today, with their PC seconds and a plan for
+  each. A listed test may grow to 1.5× its seconds (scaled by budget ÷ 20 on CI), so the list can only shrink. A
+  slow test should wait on events rather than fixed frames, use a smaller mesh or texture, be split, or be labelled
+  nightly.
+- **Where the time goes**: `SF_UI_PROFILE=1` makes a UI test print its slowest script lines with real seconds
+  (`SF_PC_ENV=SF_UI_PROFILE=1 ~/Work/.sf/pc.sh . -R ui_bake`).
+- **Parallel runs** (`ctest -jN`, N > 1): timing checks get CI's slack (`SF_TIME_LIMIT_SCALE=4`, `timeLimit()` in
+  tests/TestHarness.h). With `--threads-per-test auto` (pc.sh), each test process gets its share of the cores
+  (`SF_THREADS`, core/ThreadPool.cpp), instead of ten pools each the size of the machine.
+- **GPU lost**: a failure whose output says the graphics device went away is the machine, not the code (exit 4).
+  pc.sh says so, and such a failure is never logged as a flake. Tests that the PC's WSL GPU path (Mesa on D3D12) can't
+  run carry the label `no_d3d12`, which pc.sh leaves out. ui_micro_levels makes D3D12 remove the device, yet passes on
+  CI and on the same PC's native driver.
 
 ## T3 nightly
 
