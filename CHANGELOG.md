@@ -6,21 +6,263 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
-### Added
-- Experimental, off by default (Preferences > Performance): **Live Move** draws a Move drag on the GPU from the grab's
-  start positions and applies the whole move once at pen lift (one grab, equal to the per-frame grabs to 1e-6;
-  falls back with masks, hidden faces, sculpt layers, micro levels, Connected Only or View falloff;
-  `SF_LIVE_MOVE=0/1`); **Background Preview** draws the predictive preview for background dabs and no longer waits
-  for a batch within the frame (the solver's dabs are unchanged; `SF_BG_GHOST=0/1`). `SF_PERSISTENT_UPLOAD=1`
-  (developers): stroke uploads pack into persistently mapped staging buffers and are copied on the GPU.
-  Research and measurements: docs/design/perf-moonshots.md.
+## [0.10.10] - 2026-11-03
 
 ### Changed
+- "Your first sculpt in 10 minutes" makes a cute owl head instead of the mushroom house: ear tufts pulled with
+  Move, face discs dug with Alt+Clay, a beak, Divide three times, inflated eyes and Clay brows, then brown, cream,
+  amber and orange Vertex Paint and a PBR render. Every step sets the brush's size (brushes keep their own since
+  0.10.9). New step pictures and What's New card, made from tests/ui/first_sculpt.sfui and a 2x Save Render.
+- Faster CI for branches and pull requests: the VFX Reference Platform and Blender add-on checks run on main, in the
+  merge queue and on request (label `full-ci`, or a dispatch with full=true); Windows tests run on 4 runners; CMake's
+  configure checks are cached; old compiler caches are pruned so main's stay warm (prune-caches.yml); docs-only
+  changes skip the build; every test job lists its slowest tests in the job summary.
+- Release notes come from one note fragment per branch, `changes/<branch>.md` (changes/README.md);
+  `scripts/release.sh` step bump assembles them into CHANGELOG.md and What's New, and the update feed's highlights
+  default to the version's highlight lines.
+- SpaceMouse recognition (#104): a device whose name says 3Dconnexion counts whatever its USB ids, and one with no
+  vendor id (as some systems report Bluetooth devices) counts when its name says SpaceMouse / SpaceNavigator; the
+  CadMouse and the keyboards never do.
+- 0.10.9 notes, added late (they were lost in that release's merges; the code shipped in 0.10.9): brush cursor (#88,
+  TheRedWaxPolice, with rodrigomoretto): the ring is a true circle in the surface's tangent plane, symmetry and radial
+  copies are dots, the crosshair stays while the view turns, pans or zooms, and Preferences > Cursor has Hide ring
+  while stroking (off by default). Panels scroll with a left-drag on empty space or a middle-drag (#100, ebarranco).
+  Neutral is the default look for new installs; Look > Outlines and Outline opacity (#98); the Strokes radial menu on
+  J; viewport hints with Don't show again (Preferences > Hints).
+- The membership page (sculptforge.app/support.html), the studios page and the in-app membership card drop the lion
+  picture for a calm header: type, a warm glow in the site's orange and a faint grid; on the site it follows light and
+  dark mode. The picture is no longer embedded in the app (about 115 KB smaller).
+- Every paid membership lists **Vote on what we build next**: members vote in #feature-vote on Discord, anyone can
+  suggest in #ideas, and members' votes pick what ships. Insiders also propose the options.
+
+### Added
+- **Stroke popup > Shapes** (Discord, Darth): Mask Pen, Mask Lasso, Mask Rect, Cut Line, Cut Lasso, Cut Rect and Cut
+  Polyline. Picking one latches Mask or Select with that shape, so a plain drag masks or cuts with it; with Mask
+  latched a held Ctrl unmasks. The cursor label names the shape (e.g. "Cut Line").
+- SpaceMouse (#104, reported by fenixpoints): Preferences > Input > SpaceMouse lists each joystick SDL reports (name,
+  USB ids, and why it was or wasn't taken: not a SpaceMouse, cannot open, fewer than six axes), warns when the
+  SpaceMouse is open but no axis has moved (another program such as 3DxWare holds it), and **Copy device report**
+  copies that list with the version, platform and SDL version. Skipped devices are also logged.
+- **Close Holes** (Tool > Geometry, `close_holes`, #103): caps every open boundary of the active Part (a hole, an open
+  bottom, the rim of an extracted shell) with new triangles sized like the ones around it. The patch is faired into
+  the curvature around the hole, so a sphere closes round, not flat. The rest of the Part is not changed, and the
+  patches get a face group of their own. `max_edges` closes only the small holes. Thanks to the reporter of #103.
+- **Clip** mode for Cut (Tool > Cut, `cut mode=clip`, #102): a line or open polyline presses its shaded side flat onto
+  itself, and a lasso, rectangle or closed polyline presses everything outside it onto its outline. Points keep their
+  depth and nothing is removed. The cut goes through the whole Part, follows symmetry, and the mask holds points back.
+  Thanks to the reporter of #102.
+- **X-Ray** (`xray`, #80, #91): a button next to Solo in Tool > Parts, and a View checkbox. The other Parts turn
+  see-through and only their nearest surface shows, so the active Part shows through them. When only the active Part
+  is shown, it is see-through itself.
+- **Light controls** (Render > Materials > Light, `light`, #80): drag on the pad to turn the light of the Lit Sphere
+  and the studio shading. Intensity and Ambient sliders sit beside it, and Reset goes back to the material's own
+  light. The light is saved in the project.
+- **View resolution** (View and Preferences > Performance, `view_resolution`, #80): 100%, 75% or 50%. The 3D view is
+  drawn smaller and scaled up, which helps slow or integrated GPUs. Save Render stays at full resolution.
+- **Save Render** sizes, shapes and JPG (Render > Materials, `save_render`, #80): twice the view (as before) or 1080,
+  1920, 2048 or 4096 pixels on the longer side. Shapes: the view's, 1:1, 16:9, 9:16 or 4:3 (a narrower shape widens
+  the field of view, so the picture still shows what the view shows). Output is PNG or JPG.
+
+### Fixed
+- The active Part no longer switches by itself (Discord, Oslen): a background job (Quad Remesh, Voxel Remesh with Keep
+  Texture, Auto UV, UV Editor Unwrap) that finished after another Part was picked made its own Part active again, and
+  cut short a stroke in progress. Its result now goes onto its own Part, waits for a stroke to end, and the status bar
+  says where it went.
+- A triple-click no longer switches the Part while a pen is in range: a Wacom side button set to Double Click (the
+  Intuos 3 default) followed by a tap counted as one (Discord, Oslen).
+- With two screens, an unfocused window kept drawing only what a background job asked for: a Sculpt Timeline timelapse
+  render and the hardware calibration stopped until the pointer came back (Discord, Tiagoffcruz). Full screen no
+  longer minimises when you click on another monitor.
+- A Smooth, Mask or Select latch from the stroke popup came back after picking another brush and then the first one
+  again.
+- The Library's close button works on small screens at a large UI scale (#80). When the tabs don't fit beside it, they
+  fold into a drop-down, and the Sculpt Timeline no longer covers the Library's header (720p at 150%, ZBrush layout).
+
+## [0.10.9] - 2026-11-02
+
+### Added
+- Alpha options in the Alpha palette (#76, requested by rodrigomoretto): **Follow stroke direction** turns the alpha
+  along the stroke with Blender's Rake smoothing (the direction is taken again every 20 pixels), **Angle** and **Angle
+  jitter** turn it by a fixed or a random amount per dab, and **Tile across / down** repeat it 1 to 8 times inside
+  the brush. They work with custom and Community brushes, are kept per brush, and the preview shows the tiling.
+  Scripts: `brush_alpha_options`.
+- **View > Lock camera** (Shift+L, the same switch as Preferences > Input > Start strokes off the model) and a
+  **CAMERA LOCKED** chip in the status bar while it is on (#62 follow-up).
+- Blender style: **Preferences > Input > Emulate 3 Button Mouse** (off by default): Alt+left-drag turns the view
+  everywhere, as before.
+- Each brush keeps its own settings (#78, requested by dCo3lh0 and on Discord): Draw Size, Z Intensity, Falloff, RGB
+  Intensity, the stroke (with Spray's scatter and Lazy Stroke's radius) and the alpha follow the brush, custom and
+  Community brushes included. Switching back brings back the values that brush had this session; a brush not used yet
+  starts from the current values. **Brush > Save Brush Settings** keeps them for every start (`brush-settings.json`
+  in the user data folder), **Brush > Reset Brush to Default** restores the shipped values, and **Preferences >
+  Input > Share size and intensity across brushes** (off by default) keeps Draw Size and Z Intensity shared as before.
+- **Gizmo size** (Draw > Camera): the corner axes come in Small, Medium (as before, the default) and Large, on top
+  of the UI scale; clicking an end still snaps to that side at every size. Saved in the preferences.
+- **View Figure** (Draw > Camera, beside Axes, off by default): a small shaded head in the canvas corner that turns
+  with the camera; click it to snap to the nearest side view. Requested on Discord.
+- Starter meshes (Discord #ideas): a human head with eye and mouth loops, a bust, a full body in A-pose, a hand, a
+  foot, an ear, an eye, a stylised head, a creature head blockout (skull, jaw and horns as Parts), a torso, and
+  bevelled rounded box, cylinder, capsule and ring primitives. All quads, centimetres, centred, standing on the
+  ground and symmetric where they should be; they open with subdivision levels over a small base cage (the whole
+  set adds 0.8 MB). **File > New from Starter Mesh**, a **Starter meshes** folder with thumbnails in Library > Tool,
+  **Start from a head** in the welcome, and `new_starter_mesh` for scripts. The human meshes are cut from the
+  MakeHuman base mesh (CC0); the rest are generated by `tools/starter/build_starter_meshes.py`
+  (docs/starter-meshes.md).
+- "Your first sculpt in 10 minutes" (docs/guide/first-sculpt.md): a twelve-step lesson for complete beginners that
+  turns the default sphere into a mushroom house: masked Move strokes for the walls and an overhanging cap, colour
+  filled through the mask, Divide twice, a door and framed windows carved with Crease and Clay, raised spots
+  painted with a hard-edged Paint brush, PBR shading and a saved render. The welcome has a big **Start the 10-minute
+  lesson** button, and **Help > Your first sculpt (10 min)** opens it. Its screenshots come from
+  tests/ui/first_sculpt.sfui, which ctest runs so the lesson keeps working. The website links it from the homepage
+  and the guide index.
+- **Render > Materials > Save Render**: the view without the interface at twice its size, saved as a PNG in the
+  library's Images folder (Library > Image).
+- Upstream watch for studios: a weekly check of OpenUSD, MaterialX, OpenColorIO, OpenEXR, OpenVDB, OpenSubdiv,
+  OpenTimelineIO, OpenAssetIO, the VFX Reference Platform, Blender, Unreal Engine, Godot, SDL3, Dear ImGui and Python
+  opens a tracking issue for each new release, plus a monthly "Upstream digest" (targets in `packaging/upstream.json`).
+- Insider daily drops: almost every day a new alpha, brush, VDM or Kelvinlet preset, made by SculptForge's own
+  procedural tools and checked on a test sculpt (too faint, seams, torn surfaces and near-duplicates are left out),
+  posted to Insiders as an .sfpack. Supporters get the month's drops as one Insider Pack at month end, and everyone
+  gets that pack free three months later (`tools/drops/`, `.github/workflows/insider-drop.yml`).
+- Focus Detail (experimental, off by default): a billion-micro-triangle asset streamed from one compressed file.
+  Detail loads in under and ahead of the brush and wherever the camera would show it; everything else shows a
+  coarse version. Saving writes only the changed tiles. Try `sculptforge --benchmark standard-1b` or
+  `sculptforge --focus-detail FILE.sfdetail`; design and numbers in docs/design/focus-detail.md.
+- Precision work (guide: Sculpting > Precision work). **Steady Stroke** (<kbd>L</kbd>) now works with every stroke
+  type (Dots, Drag Stamp, Slide Stamp, Spray), with **Catch up on release** (finish the line to the cursor) and the
+  string drawn to the lagging brush; the Lazy Stroke type is Dots with it on. **World Size** (Draw palette) keeps
+  Draw Size in model units, so the brush stays the same size on the surface as you zoom; every Draw Size slider
+  and the cursor show px and mm. Draw Size goes down to 0.5 px; <kbd>Shift</kbd>+<kbd>[</kbd> /
+  <kbd>Shift</kbd>+<kbd>]</kbd> step 1 px, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+right-drag scrubs the size finely,
+  and small brushes space their dabs closer so tiny strokes stay continuous. **Precision drag**: hold
+  <kbd>Shift</kbd>+<kbd>Alt</kbd> while drawing and the brush moves at a quarter of the pen's speed, at
+  **Precision Intensity**. **A pressure curve per brush**: 2 to 5 points with Soft, Linear, Firm and Fine detail
+  presets, in Brush Lab and Preferences > Tablet.
+- Smooth face group borders only (Brush palette): Smooth straightens the borders between face groups along the
+  surface and leaves the rest alone, for clean clothing edges (#81, thanks bossian0220).
+- Colour tints the material (Color palette, on by default): the current colour tints the Lit Sphere material of
+  Parts with no vertex paint; grey leaves it as it is (thanks ThinkingPolygons).
+- Cut (#101, #91): one tool that cuts the active Part with a Line, Lasso, Rectangle or Polyline drawn on the screen,
+  in the Ctrl+Shift brush picker and in Tool > Cut. Away removes what the shape covers through the whole Part and
+  closes the cut with a flat cap (a face group of its own), In cuts a flat-bottomed pocket Depth deep, Add extrudes
+  the shape out of the surface (boolean union). An exact boolean in screen space: the uncut surface and its mask,
+  colours, UVs and layers are kept, and the result is watertight. Follows X/Y/Z and radial symmetry; one undo step.
+  Scriptable as the `cut` command.
+- Mask Lasso and Mask Rectangle: Front faces only (#91), also `front_faces_only` on mask_lasso / mask_rect.
+- Duplicate Part shortcut: Ctrl+Shift+D (also Duplicate Part in the command palette).
+- Stroke popup: press G (Z in the Blender style; any key in Edit > Preferences > Hotkeys) or the new button under the Stroke
+  tile for a grid at the cursor with the stroke types and the modifiers Add / Sub, Smooth, Mask and Select. Hold the
+  key, point and let go (a hovering pen works too), or tap it and click. Smooth, Mask and Select stay on without
+  holding Shift or Ctrl until you pick them again or another brush; a label at the cursor shows which. A plain grid,
+  not a ring. (Suggested on Discord.)
+
+### Changed
+- What's New is a window now: after an update (and from **Help > What's New**) a centred card shows the version's main
+  features, each with a picture, one line and a **Try it** button that opens it (switch the look, open the membership
+  card, select the brush, open the benchmark...), plus the full release notes, the Discord and Close. It takes the
+  look's colours, fades in, follows the UI scale and works from the keyboard (Esc, Tab, Enter). The guide chapter and
+  the website page show the last three versions in full (a band with the date, the feature cards, "All changes"
+  folded) and the older ones as short groups (0.10.1 to 0.10.5, 0.9.x, 0.8 and earlier); the contents list follows.
+  The data is a ```features block per version in docs/guide/whats-new.md, read by the app and build_site.py alike.
+- Image and text to 3D work out of the box with no token: the free Hugging Face default is now **Hunyuan3D 2.1**,
+  for new installs and for everyone who never picked a model (an explicit choice is kept; a saved TRELLIS.2 is
+  kept when a token is saved too). TRELLIS.2 shows as "Best detail (needs token)".
+- TRELLIS.2 without a Hugging Face token no longer fails: Hunyuan3D 2.1 runs instead and the status line says
+  "TRELLIS.2 needs a free Hugging Face token (Preferences > AI); used Hunyuan3D 2.1 instead." The token can now be
+  set in the new **Preferences > AI** too.
+- Generated models get **Quad Remesh** by default instead of voxel remesh: clean quads (about resolution² / 2, 32768
+  at the default 256) with one subdivision level projected onto the model, ready to sculpt and subdivide. A voxel
+  pass cleans up holes and overlapping pieces first. It runs in the background with the progress bar (about 20 s
+  for a typical Hunyuan3D model). **Remesh** in Generate 3D also offers Voxel remesh and Off; the CLI takes
+  `remesh=quad|voxel|false` (`true` means quad) and `levels=0-2`. The status line says "remeshed to N quads".
+- The Hunyuan3D licence notice (the Tencent Hunyuan Community License doesn't cover use in the EU, UK or South
+  Korea) is shown once, the first time a Hunyuan3D model runs, and stays in the Model picker's tooltip.
+- Hover in every look is calm and clear: buttons, menu items, shelf buttons and palette headers brighten a little in
+  about 100 ms (no accent tint), pressed is a touch darker, and brush, alpha, material and look tiles (shelves,
+  pickers, Library) lift slightly without moving anything; the active tile keeps its orange outline. Sliders
+  brighten, grow a knob and show their exact value. Hover and keyboard-focus rings follow **Outlines** (Off: none;
+  Subtle; On) and **Outline opacity**. New **Preferences > Interface > Reduce motion**: colour changes only, no easing
+  or lifting. Animations draw frames only while they run.
 - Large brushes on dense meshes no longer stall the view: from 2 million vertices a stroke's dabs are placed on the
   stroke thread (the same dabs, in the same order, as the frame loop places them; no preview), so a frame keeps
   drawing while a 240 px dab moves millions of vertices, and a light batch is still waited for within the frame.
   On the standard scene's 240 px brush the slowest frames drop from 139 ms (15M) and 306 ms (33M) to about 30 ms in
   first runs, and lifting the pen no longer waits (162 ms at 33M). `SF_BACKGROUND_DABS=0` turns it off.
+- Move on dense meshes no longer stalls: it worked out its whole region's normals and bounds again for every pointer
+  sample (several times a frame with a 240 Hz pen, more the slower the frame got: seconds at 33M under load). The
+  positions still follow every sample; the normals and bounds now follow once a frame, and the mesh comes out the
+  same, bit for bit.
+- The first orbit after a long stroke no longer stalls (180-300 ms at 33M): the moving view's lighter stand-ins for
+  the changed areas are rebuilt a few milliseconds a frame, the rest drawn in full detail until then.
+
+### Fixed
+- Blender style: Alt+left-drag on the model masks and Ctrl+Alt+left-drag unmasks, as Blender 5.1+'s default
+  sculpt keymap does, instead of turning the view (#77, reported by TheRedWaxPolice). Beside the model Alt+drag still
+  turns the view, and Alt+Shift+drag pans anywhere. Shift+F (Strength) sets the brush's Intensity instead of Smooth's.
+- UI test runs remove their temporary settings folder when they pass (thousands of runs had filled `/tmp`).
+- Tablets (a Wacom Intuos 3 report): a tablet plugged in after launch works without a restart ("Tablet connected" /
+  "Tablet disconnected" in the status bar), also through Wacom Bridge; on Windows, pressure now also comes from the
+  Wacom driver with "Use Windows Ink" off (Wintab); a pen without pressure draws at full strength instead of not at
+  all, and Preferences > Input and > Tablet say "Pressure: on" or "not detected" with a troubleshooting link. The
+  view no longer jumps when the pen comes back into range elsewhere or leaves mid-drag. The active Part changes only
+  with the keyboard's Alt and a quick click (not with a pen button set to Alt, a long pen press or quick pen taps),
+  and the status bar says "Active Part: <name> (Alt+click)".
+- The enlarged brush or alpha thumbnail you point at in a picker is drawn over its neighbours again, not
+  under them (#86, thanks tristratos).
+- The brush centre now sits exactly under the cursor at high zoom and on HiDPI screens: the brush's ray is worked
+  out from the camera directly, and the view is drawn on whole pixels where the rays are cast (it could be up to
+  half a pixel off). The surface point under the brush is lightly filtered, so strokes on dense meshes no longer
+  wobble.
+- Preferences > Interface > UI scale applies at once: text, controls and panels resize live, no restart (#87).
+  Before, the choice waited for the next start and was lost unless Store Config saved it. Automatic now follows
+  the monitor the window is on: on Windows (per-monitor DPI v2, now declared in the app's manifest) dragging the
+  window between a 100 % and a 150 % monitor, or changing Settings > Display > Scale, rescales the UI right away.
+- The pen picks a brush, then stops clicking the panels and the canvas until the mouse is used (#95; Huion Kamvas,
+  display tablets, Wacom with Windows Ink on or off): SDL 3.2 keeps one "a pen is touching" flag for all pens, and
+  once Windows took a pen away while it touched (a drag capturing the mouse), it made no mouse events for any pen
+  again. SculptForge now makes the pen tip's mouse events from the pen's own and ignores SDL's, lets go of the
+  button whenever the pen leaves, and ignores the mouse presses some drivers (Huion) send beside the pen's, whose
+  release may never come. A replay test covers Windows Ink, a Huion-style pen + mouse stream, SDL's stuck state and
+  Wintab-style input.
+- Tablet Mouse mode (#72, 0.10.8): it followed the system cursor, which with the tablet driver in pen mode is where
+  the pen is, so it felt the same as Pen mode. Now only the pen's movement moves the cursor, with no jump when the
+  pen comes back elsewhere, and while the pen is in range the arrow is drawn at the brush (the system's, at the
+  pen's place on the tablet, is hidden), so arrow, brush and clicks agree.
+- With two screens, moving the pointer to the other screen made SculptForge draw as if it were in the background
+  until the pointer came back (Windows 11). It now keeps drawing after any input while its window has focus,
+  wherever the pointer is, and rests only when it loses focus.
+- Turn AI off: **Preferences > AI > Enable AI features** (also asked in the first-run welcome). Off hides AI Brush,
+  Generate 3D and their menu, shelf and command palette entries, removes the AI commands from scripts, the CLI and
+  the MCP tool list, and stops every AI network call; the MCP server and the offline Relief / Inflate / Stamp stay.
+  Saved at once. Studios: `SF_AI=off` (or `--no-ai`) turns it off and locks it. About and the website now say:
+  "Your art is never uploaded or used for training. AI features run only when you use them and can be turned off."
+- Help > Benchmark (and `--benchmark`) checks the memory free now before each scene instead of trusting the
+  computer's total: a scene that doesn't fit (15M needs about 2.2 GB free, 33M about 5 GB, plus a margin) is skipped
+  with a clear message ("33M skipped: needs ~5 GB free, 1.3 GB available. Close other apps and run again") rather
+  than running the system out of memory. The result lists skipped scenes; the command line exits with code 2.
+- Subdivide, Divide, Divide to a micro level and Voxel Remesh ask first ("Not enough free memory", Continue anyway or
+  Cancel) when the mesh they would build doesn't fit the memory free now.
+- Runs started by scripts and agents (`SDL_APP_ID=sculptforge-agent`, or `SF_ISOLATE=1`) use their own settings and
+  log folder for every mode (renders, `--bench`, `--calibrate` too), so they no longer write into your
+  sculptforge.log or move your session's log aside. Isolated runs remove their temporary folder when they pass.
+- Clay and Clay Block follow Intensity and pen pressure: below the default Intensity a dab no longer planes the
+  surface all the way to its plane, so light strokes and low Intensity build gently instead of looking the same as
+  full strength (#83, thanks NimeNayota). Custom clay brushes and micro levels too.
+- Alphas work on micro levels: Drag Stamp and every other stroke stamp the alpha instead of a round dab (#92,
+  thanks Devon0209).
+- Strokes keep sculpting across a silhouette: when the cursor slides just past the edge of a form seen in profile
+  and the brush still covers it, the dab lands on the edge instead of stopping (#84, thanks Bro-Code-99).
+- Brush shelf previews: Tendril and Elastic Tendril pull a long horn out past the ball (Tendril's preview re-aimed
+  every dab at the ball and dropped the dabs past its edge; scripted Tendril strokes now drag in the view plane as
+  the viewport does), and Layer and Nudge draw clean shapes instead of a pinched plateau and a torn ridge. Previews
+  are re-rendered once (thumbnail version 4). A new test sculpts every built-in brush's preview and checks its shape.
+- Library > Projects listed each project twice on Windows: recent files and the User folder spelled the same path
+  with different slashes (#90). Paths are now compared normalised, and without case on Windows.
+- The Library's close button stays on screen on small displays (1280x720), and Esc closes the Library (#80).
+- The right shelf's region outline is no longer drawn under its buttons, and the "x" buttons (Library, console,
+  window, palettes) are centred (#98).
+- macOS: a window closed in full screen reopens maximised instead of full screen, so the traffic lights and menu
+  bar stay reachable (#85, again after #41).
 
 ## [0.10.8] - 2026-11-02
 
@@ -28,7 +270,6 @@ All notable changes to SculptForge are listed here. The format follows
 - Tablet Mouse mode (Preferences > Tablet): on some Windows tablets the brush stopped following the pen in 0.10.7,
   because the system cursor reading stayed put while the pen moved. A reading that doesn't move with the pen is now
   ignored and the pen moves the brush relatively, from where it was, with no jump (#72).
-
 ## [0.10.7] - 2026-11-01
 
 ### Changed

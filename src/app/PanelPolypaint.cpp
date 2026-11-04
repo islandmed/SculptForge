@@ -429,6 +429,12 @@ void App::drawPalette_Color() {
     ImGui::EndDisabled();
     ui::HelpText("Clear", nullptr, "Remove all vertex paint from the Part, paint layers included (undoable).", "Color");
     ImGui::Checkbox(tr("Show vertex paint"), &renderSettings_.showPolypaint);
+    ImGui::Checkbox(tr("Colour tints the material"), &renderSettings_.colorTintsMaterial);
+    ui::HelpText("Colour tints the material", nullptr,
+                 "On a Part with no vertex paint, the colour above tints its Lit Sphere material, so you can try a "
+                 "skin, stone or metal tone without painting. Grey and black leave the material as it is. Vertex "
+                 "paint, once there, shows instead.",
+                 "Color");
     if (hasTexture(doc_.mesh)) {
         ImGui::SameLine();
         ImGui::Checkbox(tr("Texture##show"), &renderSettings_.showTexture);
@@ -450,6 +456,9 @@ void App::drawPalette_Material() {
     ui::HelpText("Base colour", nullptr, "Colour of the Studio material (the clay colour).", "Material");
     drawShadingControls();
     drawViewportShadingControls();
+    drawLightControls(); // PanelView.cpp
+    ImGui::Spacing();
+    drawSaveRenderControls();
 }
 
 // Material > Viewport Shading: Lit Sphere or PBR, and the PBR view's environment. Every change runs

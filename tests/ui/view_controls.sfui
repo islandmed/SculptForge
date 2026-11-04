@@ -1,0 +1,116 @@
+# View controls (#80, #91, #102, #103): X-Ray next to Solo, the view's resolution, the light, Save Render's size
+# and shape, Cut's Clip mode and Tool > Geometry > Close Holes.
+run new_sphere subdivisions=4
+run subtool_append type=cube name=Box
+run subtool_select index=0
+camera -30 -10
+key f
+wait_idle 30
+
+# X-Ray: the Parts panel's button beside Solo; the Box turns see-through, the sphere shows through it.
+expect_value xray == 0
+click "X-Ray"
+expect_value xray == 1
+wait 0.2
+shot xray-parts-panel
+run subtool_select index=1
+wait 0.2
+shot xray-box-active
+run subtool_select index=0
+# The lone Part is see-through itself.
+run subtool_solo
+wait 0.2
+shot xray-solo
+run subtool_solo
+click "X-Ray"
+expect_value xray == 0
+
+# View resolution: View > Display > 50% draws a quarter of the pixels; back to 100%.
+click "View##menu.view"
+click "50%##perf.res_50"
+expect_value view_resolution == 50
+wait 0.2
+shot view-resolution-50
+click "100%##perf.res_100"
+expect_value view_resolution == 100
+key escape
+
+# The light: Render > Materials > Light. Turned to the left and lower, brighter, with ambient; Reset puts it back.
+click "Render##menu.render"
+click "Materials##section.material"
+run light yaw=-60 pitch=-20 intensity=1.3 ambient=0.25
+expect_value light_yaw == -60
+expect_value light_ambient > 0.24
+wait 0.2
+shot light-panel
+key escape
+wait 0.2
+shot light-turned
+run set_material name=studio
+wait 0.2
+shot light-turned-studio
+click "Render##menu.render"
+click "Materials##section.material"
+click "Reset##light"
+expect_value light_yaw == 0
+expect_value light_intensity == 1
+
+# Save Render: 9:16 and JPG from the Material palette, then a script render at 1080 square.
+click "9:16##render.aspect_9x16"
+click "JPG##render.format_jpg"
+expect_value render_aspect == 3
+click "Material/Save Render##render.save_image"
+expect_status Saved Render
+expect_status Library > Image
+run save_render size=1080 aspect=1:1
+expect_status 1080 x 1080
+shot save-render-panel
+click "View##render.aspect_view"
+click "PNG##render.format_png"
+key escape
+
+# Clip (#102): Tool > Cut > Clip, a line across the sphere presses its right side flat; nothing is removed. (X turns
+# the symmetry off for it, and on again after.)
+run subtool_delete index=1
+camera 0 0
+key f
+remember triangles full
+key x
+click "Cut"
+click "Clip##cut.clip"
+click "Cut Line##cut.line"
+expect_value hide_shape == 3
+hold ctrl+shift
+drag_path 0.58 0.25 0.58 0.75 keep
+wait 0.1
+shot clip-line-dragging
+release
+hold none
+wait 0.2
+expect_value triangles == $full
+expect_value can_undo == 1
+expect_status Clip:
+camera -40 -10
+wait 0.2
+shot clip-line-done
+key ctrl+z
+key x
+click "Away##cut.away"
+
+# Close Holes (#103): a hole through the sphere (hide a square of it, delete the hidden part), closed again from
+# Tool > Geometry.
+camera 0 0
+run hide_rect x0=-0.25 y0=-0.25 x1=0.25 y1=0.25 inside=true
+run delete_hidden
+remember triangles open
+camera -35 -15
+wait 0.2
+shot close-holes-before
+click "Tool/Geometry"
+click "Close Holes##geometry.close_holes"
+expect_status Close Holes: closed 2 holes
+expect_value triangles > $open
+wait 0.2
+shot close-holes-after
+key ctrl+z
+expect_value triangles == $open

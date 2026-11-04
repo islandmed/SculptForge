@@ -3,10 +3,10 @@
 SculptForge is built to sculpt tens of millions of polygons. Brushes, normal updates and the picking structure
 run on every core of your processor, a stroke sends the graphics card only the part of the mesh it changed, and
 undo stores only the vertices a stroke touched, so it stays quick however big the model is. This chapter
-explains what to expect, the settings in **Preferences > Performance**, and how to get the most out of a big
+explains what to expect, the settings in **Edit > Preferences > Performance**, and how to get the most out of a big
 sculpt.
 
-![Preferences > Performance after a stroke: antialiasing, Fast Navigation, multithreading, what the stroke cost per dab, and memory](images/performance-panel.jpg)
+![Edit > Preferences > Performance after a stroke: antialiasing, Fast Navigation, multithreading, what the stroke cost per dab, and memory](images/performance-panel.jpg)
 
 ## What to expect
 
@@ -30,18 +30,20 @@ change to the graphics card is about a third.
 [Performance figures](https://github.com/islandmed/SculptForge/blob/main/docs/performance.md) has the full
 measurements, and how to run the same benchmark on your own machine.
 
-## Preferences > Performance
+## Edit > Preferences > Performance
 
 Open **Preferences** and click **Performance**.
 
 | Control | What it does |
 |---|---|
 | **Antialiasing** (Off, 2x, 4x, 8x) | How many samples per pixel the 3D view uses to smooth edges. 4x is the default. More samples look smoother and cost more on huge meshes. If the graphics card can't make room for them, the view quietly uses fewer and the panel says so |
+| **View resolution** (100%, 75%, 50%) | Draws the 3D view at a share of the window's resolution and scales it up: 75% draws about half the pixels and 50% a quarter. Try it on slow or integrated graphics and big screens. **Save Render** always renders at full resolution. Also in **View** |
 | **Fast Navigation** | While you rotate, pan or zoom a scene bigger than the hardware profile's motion proxy threshold (see below), draw it without antialiasing and draw big meshes as a lighter version with about a fifth of their triangles, so the view keeps up. The full mesh, smooth again, is back as soon as the view stops. On by default |
 | **Predictive Strokes** | The brush is worked out on its own thread while the view keeps drawing at full speed. The dabs it hasn't finished show at once as a preview on the surface, and the brush cursor and the stroke's head are drawn where the pen is about to be, so on a heavy mesh the surface moves under the pen straight away and lifting the pen never waits. The finished sculpt is exactly the same as with it off. On by default (painting, masking, dynamic topology, Move, Tendril and the drag strokes work as before) |
 | **Draft Strokes** | With Predictive Strokes: while you sculpt, the brush only moves the surface, the moved part is shaded from its facets, and the smooth shading, the cavities and the rest are worked out once when you lift the pen. Lighter on laptops and on battery. Inflate and the plane brushes use the surface's direction from the stroke's start, so the result can differ slightly from a full stroke. Off by default |
 | **Live Move** (experimental) | The Move brush's drag is drawn by the graphics card from where the surface started, so it follows the pen at the view's frame rate on any mesh size; the move is applied once, exactly, when you lift the pen. Not with masks, hidden parts, sculpt layers, micro levels, Connected Only or View falloff (Move works as before there). Off by default |
 | **Background Preview** (experimental) | On meshes of 2 million vertices or more a big brush is worked out on its own thread; with this on, the dabs still being worked out show as a preview under the pen. The finished sculpt is exactly the same either way. Off by default |
+| **Fast Upload** (experimental) | While you sculpt, the changed part of the mesh goes to the graphics card through memory both can see and the card copies it into place, instead of the driver copying it during the frame. The sculpt and the view are exactly the same either way. Needs OpenGL 4.4 buffer storage (otherwise it does nothing). Off by default |
 | **Multithreading** | Run brushes, normal and picking updates and project saving on every core (the number of threads is shown beside it). The results are exactly the same with it off; turn it off only to compare speeds or rule it out when something goes wrong |
 | **Last stroke** | What your last stroke cost per dab: **Brush** (finding and moving the vertices), **Normals** (shading), **BVH** (the structure that finds the surface under the cursor), and the **GPU upload** per frame |
 | **Memory** | What the scene holds: the meshes, the BVHs, the subdivision levels kept for stepping between them, the undo history (up to 1 GB; the oldest steps are dropped beyond that) and, roughly, the graphics card's buffers |
@@ -65,7 +67,7 @@ There are two main profiles and a safe mode:
 On a laptop running on battery, whatever its profile, SculptForge sends less data to the graphics card per
 frame and aims for 60 frames a second, and the status bar says so; plugged in again, it goes back.
 
-At the top of **Preferences > Performance**:
+At the top of **Edit > Preferences > Performance**:
 
 | Control | What it does |
 |---|---|
@@ -78,7 +80,7 @@ At the top of **Preferences > Performance**:
 
 From a shell, `sculptforge --calibrate` measures and prints the result as JSON.
 
-Like the other preferences, these last until you quit; **Preferences > Config > Store Config** keeps them. Every
+Like the other preferences, these last until you quit; **Edit > Preferences > Config > Store Config** keeps them. Every
 setting is also in the <kbd>F3</kbd> command palette (type "antialiasing", "fast navigation" or
 "multithreading").
 

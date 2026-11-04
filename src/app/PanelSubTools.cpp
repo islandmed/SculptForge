@@ -6,6 +6,7 @@
 // the ZBrush viewport gesture Alt+click to select a SubTool. Every action goes
 // through the subtool_* commands (core/SubTools.cpp).
 #include "app/App.h"
+#include "app/Demo.h"
 #include "app/Theme.h"
 #include "app/I18n.h"
 #include "core/Multires.h"
@@ -26,6 +27,7 @@ namespace sf {
 namespace {
 
 constexpr float kClickSlopPx = 4.0f; // movement that turns an Alt+click into a drag
+constexpr Uint64 kPartClickNs = 500000000ull; // a pen pressed longer than this isn't an Alt+click
 constexpr int kListRows = 6;         // the list scrolls beyond this many SubTools
 // The SubTool list's colours; should become theme tokens (Theme.h).
 // The recessed area behind the rows, a step below panelBg (the Classic look's #1c1c1f; other looks their shelf shade).
@@ -120,13 +122,47 @@ void App::subtoolClickMove(float x, float y) {
 }
 
 void App::subtoolClickRelease() {
-    if (subtoolClickTarget_ >= 0 && subtoolClickTarget_ < doc_.subtoolCount()) {
-        if (subtoolClickTarget_ != doc_.activeSubtool) runCommand("subtool_select", {{"index", double(subtoolClickTarget_)}});
+    // A pen pressed this long was held down to sculpt, not clicked (and Windows Ink's press-and-hold).
+    const bool held = (dragFromPen_ || wintabPen_) && clickClockNs() - subtoolClickNs_ > kPartClickNs;
+    if (!held && subtoolClickTarget_ >= 0 && subtoolClickTarget_ < doc_.subtoolCount()) {
+        if (subtoolClickTarget_ != doc_.activeSubtool) {
+            runCommand("subtool_select", {{"index", double(subtoolClickTarget_)}});
+            partSelected("Alt+click");
+        }
         if (subtoolClickFrame_) camera_.frame(doc_.mesh.bounds()); // Shift+Alt+click: frame it too
     }
     subtoolClickTarget_ = -1;
     subtoolClickFrame_ = false;
 }
+
+// Every Part switch from the viewport or the list says which Part and how (an unexpected switch had users
+// guessing which key they had hit).
+Uint64 App::clickClockNs() const {
+    return demo_ ? Uint64(double(demo_->clock()) * 1e9) : SDL_GetTicksNS(); // UI tests: the script's time
+}
+
+void App::partSelected(const char* how) {
+    if (!lastCommandOk_) return;
+    status_ = "Active Part: " + doc_.activeSubtoolInfo().name + " (" + how + ")";
+}
+
+App::JobPart::JobPart(App& a, int index) : app(a) {
+    if (index < 0 || index == app.doc_.activeSubtool) return;
+    back = app.doc_.activeSubtoolInfo().id;
+    switched = true;
+    app.doc_.selectSubtool(index);
+}
+
+App::JobPart::~JobPart() {
+    if (!switched) return;
+    const std::string done = app.doc_.activeSubtoolInfo().name;
+    const int i = app.doc_.subtoolIndex(back);
+    if (i < 0 || i == app.doc_.activeSubtool) return;
+    app.doc_.selectSubtool(i);
+    app.status_ += " (on " + done + "; " + app.doc_.activeSubtoolInfo().name + " stays the active Part)";
+}
+
+bool App::jobWaitsForStroke() const { return drag_ == Drag::Stroke || doc_.sculptor.strokeActive() || !dabQueue_.empty(); }
 
 void App::updateSubtoolThumbnails() {
     // #43: what each SubTool looks like now; the schedule picks at most one to render this frame, from the GPU
@@ -278,7 +314,7 @@ void App::drawSubToolsContents() {
                         focusRename_ = true;
                         std::snprintf(renameBuffer_, sizeof renameBuffer_, "%s", s.name.c_str());
                     }
-                    if (ImGui::MenuItem(tr("Duplicate"))) duplicateIndex = i;
+                    if (ImGui::MenuItem(tr("Duplicate"), actions_.shortcutText("subtool.duplicate").c_str())) duplicateIndex = i;
                     if (ImGui::MenuItem(tr("Delete..."), nullptr, false, count > 1)) deleteIndex = i;
                     ImGui::EndPopup();
                 }
@@ -337,6 +373,7 @@ void App::drawSubToolsContents() {
         runCommand("subtool_rename", {{"index", double(renameIndex)}, {"to", renameTo}});
     if (selectIndex >= 0) {
         runCommand("subtool_select", {{"index", double(selectIndex)}});
+        partSelected("Parts list");
     }
     if (toggleIndex >= 0) runCommand("subtool_visibility", {{"index", double(toggleIndex)}});
     if (duplicateIndex >= 0) runCommand("subtool_duplicate", {{"index", double(duplicateIndex)}});
@@ -409,13 +446,13 @@ void App::drawSubToolsContents() {
     }
     ImGui::SameLine();
     if (ImGui::Button(tr("Duplicate"), ImVec2(third, 0))) runCommand("subtool_duplicate");
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip(tr("Copy the active Part (%s)"), actions_.shortcutText("subtool.duplicate").c_str());
     ImGui::SameLine();
     ImGui::BeginDisabled(count < 2);
     if (ImGui::Button(tr("Delete..."), ImVec2(third, 0)))
         confirm("Delete Part?", "Delete \"" + activeName + "\"? This can't be undone.", "Delete", "subtool_delete");
     ImGui::EndDisabled();
 
-    const float half2 = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) * 0.5f;
     const float arrowW = ImGui::GetFrameHeight();
     ImGui::BeginDisabled(active <= 0);
     if (ImGui::ArrowButton("##up", ImGuiDir_Up)) runCommand("subtool_move", {{"direction", std::string("up")}});
@@ -429,17 +466,27 @@ void App::drawSubToolsContents() {
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayNormal))
         ImGui::SetTooltip("%s", tr("Move down the list"));
     ImGui::SameLine();
+    // Solo and X-Ray side by side (#80), then Unhide all.
+    const float rest = ImGui::GetContentRegionAvail().x - 2.0f * (arrowW + style.ItemSpacing.x) - 2.0f * style.ItemSpacing.x;
+    const float soloW = std::floor(rest * 0.3f), xrayW = std::floor(rest * 0.32f);
     const bool solo = count > 1 && visibleCount == 1 && doc_.activeSubtoolInfo().visible;
     ImGui::BeginDisabled(count < 2);
     if (solo) ImGui::PushStyleColor(ImGuiCol_Button, style.Colors[ImGuiCol_ButtonActive]);
-    if (ImGui::Button(tr("Solo"), ImVec2(half2 - 2.0f * (arrowW + style.ItemSpacing.x), 0))) runCommand("subtool_solo");
+    if (ImGui::Button(tr("Solo"), ImVec2(soloW, 0))) runCommand("subtool_solo");
     if (solo) ImGui::PopStyleColor();
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
         ImGui::SetTooltip(solo ? "Show the other Parts again" : "Show only the active Part");
     ImGui::SameLine();
+    const bool xray = renderSettings_.xray;
+    if (xray) ImGui::PushStyleColor(ImGuiCol_Button, style.Colors[ImGuiCol_ButtonActive]);
+    if (ImGui::Button(tr("X-Ray"), ImVec2(xrayW, 0))) runCommand("xray");
+    if (xray) ImGui::PopStyleColor();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+        ImGui::SetTooltip("%s", xray ? tr("Draw the other Parts solid again") : tr("See through the other Parts to the active one"));
+    ImGui::SameLine();
     ImGui::BeginDisabled(visibleCount == count);
-    if (ImGui::Button(tr("Unhide all"), ImVec2(half2, 0))) runCommand("subtool_show_all");
+    if (ImGui::Button(tr("Unhide all"), ImVec2(-1, 0))) runCommand("subtool_show_all");
     ImGui::EndDisabled();
 
     const float half = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) * 0.5f;

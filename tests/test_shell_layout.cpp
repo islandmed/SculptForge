@@ -8,6 +8,7 @@
 
 #include "app/ShellGeometry.h"
 
+#include <algorithm>
 #include <cmath>
 #include <string>
 #include <vector>
@@ -158,4 +159,35 @@ TEST(shell_right_shelf_undo_redo) {
     now.set("rightShelf", shelfJson({"view.frame"}));
     CHECK(fromJson(now, back, err));
     CHECK(back.rightShelf.size() == 1);
+}
+
+TEST(shell_left_shelf_stroke_popup) {
+    // The stroke popup's button sits under the Stroke tile; a layout stored before it (version < 4) gets it there.
+    const UiLayout l = standardLayout();
+    const auto tile = std::find(l.leftShelf.begin(), l.leftShelf.end(), "widget.tile.stroke");
+    CHECK(tile != l.leftShelf.end() && tile + 1 != l.leftShelf.end() && *(tile + 1) == "stroke.popup");
+    Json old = toJson(l);
+    old.set("version", 3.0);
+    old.set("leftShelf", shelfJson({"widget.tile.brush", "widget.tile.stroke", "widget.color"}));
+    UiLayout back;
+    std::string err;
+    CHECK(fromJson(old, back, err));
+    CHECK(back.leftShelf.size() == 4 && back.leftShelf[2] == "stroke.popup" && back.leftShelf[3] == "widget.color");
+    // A current layout the user took it out of stays without it.
+    Json now = toJson(l);
+    now.set("leftShelf", shelfJson({"widget.tile.stroke"}));
+    CHECK(fromJson(now, back, err));
+    CHECK(back.leftShelf.size() == 1);
+}
+
+// #85 (regression of #41): on macOS a window saved full screen comes back maximised, never straight into full screen
+// (its traffic lights couldn't be reached); elsewhere it comes back full screen.
+TEST(window_restore_fullscreen) {
+    CHECK(!restoresFullscreen(true, true));
+    CHECK(!restoresFullscreen(false, true));
+    CHECK(restoresFullscreen(true, false));
+    CHECK(!restoresFullscreen(false, false));
+#if defined(__APPLE__)
+    CHECK(!restoresFullscreen(true));
+#endif
 }

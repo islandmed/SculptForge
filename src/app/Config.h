@@ -8,12 +8,15 @@
 // Load UI (Ctrl+L) share a layout as a file.
 #pragma once
 
+#include "app/LookSchemes.h"
 #include "app/Theme.h"
 #include "core/Json.h"
 #include "core/SpaceMouse.h"
 #include "core/Tablet.h"
 
+#include <set>
 #include <string>
+#include <vector>
 
 namespace sf {
 
@@ -23,6 +26,7 @@ struct UiPrefs {
     bool popupInfo = true;      // Ctrl+hover shows an item's description (ZBrush "Popup Info")
     float helpOpacity = 0.97f;  // Ctrl-help box opacity (ZBrush "Quick Info Opacity")
     float tooltipDelay = 0.5f;  // plain hover tooltips on icon-only buttons and clipped labels
+    bool reduceMotion = false;  // hover highlights change colour only: no easing, no lifting tiles (Ui.h)
     bool oneSubpalette = true;  // opening a sub-palette closes the others (Shift+click opens more)
     bool autoCollapseLeft = true, autoCollapseRight = false; // trays collapse palettes that would overflow
     float uiScale = 0.0f;       // 0 = follow the display; otherwise applied at the next start
@@ -40,6 +44,9 @@ struct UiPrefs {
     bool emulateNumpad = false; // Blender style: the 1-9 and 0 keys above the letters act as the numpad (laptops)
     bool rightClickQuickMenu = true; // a right click on the canvas (no drag) opens the QuickMenu, as in ZBrush (#22)
     bool spaceCamera = false; // hold Space and drag to move the camera (#43; off: Space opens the QuickMenu)
+    // Blender style (#77): off, as Blender 5.1+'s default keymap, Alt+left-drag on the model masks (Ctrl+Alt unmasks)
+    // and turns the view only beside the model; on (Blender's Emulate 3 Button Mouse) it always turns the view.
+    bool emulate3Button = false;
     // Zoom drags (#32): the Maya style zooms with a sideways drag (right = in), as Maya's own dolly; false makes it
     // vertical as the other styles. invertZoom turns every zoom drag around.
     bool mayaZoomHorizontal = true;
@@ -55,7 +62,14 @@ struct UiPrefs {
     bool airStrokes = false;  // start strokes off the model (#62): a left-drag on the background sculpts once it
                               // reaches the surface instead of turning the view (off: it turns the view, ZBrush)
     bool showAxes = true;              // Draw > Camera > Axes: the X / Y / Z gizmo in the canvas corner (#31)
+    int axisGizmoSize = 1;             // Draw > Camera > Gizmo size: 0 Small, 1 Medium, 2 Large (axisGizmoScale)
+    bool showViewFigure = false;       // Draw > Camera > View Figure: a small shaded head that turns with the view
     bool cursorFollowsSurface = true; // the brush ring lies on the surface under the pointer, as in SculptGL (#25)
+    bool hideRingWhileStroking = false; // Preferences > Cursor (#88): only the centre dot while a stroke runs
+    // Preferences > Hints (U11): the notes SculptForge shows over the 3D view. Each has Don't show again, which
+    // adds its id here; showHints off hides them all.
+    bool showHints = true;
+    std::set<std::string> hiddenHints;
     // Preferences > Interface > Timeline position (#63): the Sculpt Timeline strip along the top of the viewport
     // (true, the default: clear of the brush shelf below it) or its bottom.
     bool timelineTop = true;
@@ -66,7 +80,7 @@ struct UiPrefs {
     theme::LookSettings look;
     int shellLayout = 1;
     bool lookSaved = false; // ui.json named the look or layout (not saved itself); one from before 0.10.7 didn't
-    // Preferences > Interface > Viewport cursor (#73): the system cursor over the 3D view, 0 = crosshair (the
+    // Preferences > Cursor > Viewport cursor (#73): the system cursor over the 3D view, 0 = crosshair (the
     // default, as most sculpting apps), 1 = the arrow. Panels, menus and popups always show their own.
     int viewportCursor = 0;
     // Tool > Display > Backface culling (#68): skip the back faces of every Part (faster on dense meshes; see
@@ -77,6 +91,7 @@ struct UiPrefs {
     // Preferences > Performance (PanelPerformance.cpp).
     int antialiasing = 4;       // samples per pixel in the 3D view: 1 (off), 2, 4 or 8
     bool fastNavigation = true; // big scenes draw without antialiasing while the view moves
+    int viewResolution = 100;   // the 3D view's resolution, % of the window's (#80): 100, 75 or 50
     bool multithreading = true; // brushes, normals and BVH updates on every core (off: one thread)
     // Sculpt strokes solved on their own thread with a GPU preview of the dabs still to come, the cursor and the
     // stroke's head predicted a frame ahead (app/AsyncStroke.cpp). Off: the dabs are placed in the frame loop.
@@ -87,16 +102,18 @@ struct UiPrefs {
     bool draftStrokes = false;
     // Experimental (docs/design/perf-moonshots.md), off by default. Live Move: the GPU draws a Move drag and the
     // move is applied once when the pen lifts (SF_LIVE_MOVE=0 / 1 overrides). Background Preview: heavy meshes'
-    // background dabs draw the predictive preview too (SF_BG_GHOST=0 / 1 overrides).
+    // background dabs draw the predictive preview too (SF_BG_GHOST=0 / 1 overrides). Fast Upload: stroke uploads
+    // go through persistently mapped staging buffers and a GPU copy (SF_PERSISTENT_UPLOAD=0 / 1 overrides).
     bool liveMove = false;
     bool backgroundPreview = false;
+    bool fastUpload = false;
     // Dynamic topology (Draw palette): false = the detail follows the brush size on screen (Sculptris Pro);
     // true = one detail size for the whole mesh.
     bool dyntopoConstantDetail = false;
     bool flatShading = false; // Material palette: the scene's shading at startup (false = Smooth, the default)
     // Preferences > Display: the view's background (#21), a gradient or a flat display (sRGB) colour.
     bool gradientBackground = true;
-    glm::vec3 backgroundColor{0.165f, 0.165f, 0.173f};
+    glm::vec3 backgroundColor{0.168f, 0.168f, 0.168f};
     // File > Maya (#42). Kept in <prefs>/maya.json, never in ui.json, so a shared UI layout can't point the bridge
     // at a folder: it is set only by the user's own pick (App::setMayaFolder).
     std::string mayaFolder;        // "" = the bridge is off
@@ -116,6 +133,13 @@ void drawConfigSection(App& app);    // Enable Customize, Store / Restore / Save
 void drawInterfaceSection(App& app); // UI scale, Popup Info, tooltips, sub-palettes, left-handed layout
 void drawHotkeysSection(App& app);   // every action's shortcut, click to reassign
 void drawLightBoxSection(App& app);  // show at startup, rows, placement, library folder
+// The Classic look's colours as a Palette (for its card; the look itself uses Theme.h's tokens).
+looks::Palette classicPalette();
+// A miniature of a look on its card, from a to b: its wallpaper, a bar with its accent, two tiles and `name` in its
+// text colour. `layout` 0 adds the ZBrush-style palette bar and two-row shelf, 1 the SculptForge menus and one-row
+// shelf (the first-run look picker); -1 neither (Preferences > Interface > Look).
+void drawLookMiniature(ImDrawList* dl, ImVec2 a, ImVec2 b, const looks::Palette& pal, const char* name, ImFont* font,
+                       float s, int layout = -1);
 } // namespace config
 
 } // namespace sf

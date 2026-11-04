@@ -35,7 +35,8 @@ From top to bottom:
   (delete) and a **weight** slider from 0 to 1.
 - A name field and **+ Add** at the bottom.
 
-The title strip shows the active layer (`Layer Smile`, or `Layer Base`).
+The Layers list highlights the active layer; in the ZBrush-style layout the title strip also shows it (`Layer Smile`,
+or `Layer Base`).
 
 ## Add a layer and sculpt into it
 

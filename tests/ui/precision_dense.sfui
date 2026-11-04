@@ -1,0 +1,112 @@
+# Precision at extreme zoom on a dense mesh (the benchmark sphere, divided like a real sculpt): a tiny brush's dabs
+# land exactly under the cursor (projected back to the screen, under 0.05 px, also on HiDPI where the window has 2
+# framebuffer pixels per point) and the pick filter steadies their depth. tests/perf/precision_33m.sfui is the same
+# on 33M triangles (run by hand: tools/precision_check.sh).
+run new_bench_sphere millions=4
+expect_value pixel_density >= 1
+remember pixel_density density
+camera 180 0
+look 0 0 -0.97
+camera_distance 0.06
+wait 0.2
+mouse_move 0.5 0.5
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+expect_value draw_size_exact == 0.5
+key shift+]
+expect_value draw_size_exact == 1
+# A 1 px brush across the back of the head.
+snapshot
+view_drag 0.45 0.5 0.55 0.52 1.0
+# (A 1 px brush here is 0.03 mm: smaller than this mesh's edges, so it places dabs but moves no vertex; what is
+# checked is where the dabs land.)
+expect_value dabs > 20
+remember dab_error_px err1
+expect_value dab_error_px < 0.05
+remember dab_jitter_raw jr
+remember dab_jitter jf
+expect_value dab_jitter <= $jr
+key ctrl+z
+# World Size at this zoom: a fraction of a millimetre.
+mouse_move 0.5 0.5
+wait 0.1
+remember world_radius_mm mm
+expect_value world_radius_mm < 0.5
+# 0.5 px, diagonally, with Steady Stroke.
+key shift+[
+expect_value draw_size_exact == 0.5
+key l
+view_drag 0.42 0.45 0.58 0.56 1.0
+expect_value dabs > 20
+remember dab_error_px err2
+expect_value dab_error_px < 0.05
+key l
+shot extreme_zoom

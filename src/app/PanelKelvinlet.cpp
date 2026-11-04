@@ -141,6 +141,7 @@ bool App::kelvinPump() {
     s.view.radiusProbe = nullptr;
     s.view.settings = dabSettings();
     s.uploadId = doc_.activeSubtoolInfo().id;
+    renderer_.setPersistentUpload(uiPrefs_.fastUpload);
     renderer_.bindStrokeUpload(s.uploadId, s.upload);
     s.prepare = &displayedMesh() == &doc_.mesh;
     renderer_.setDraftNormals(doc_.sculptor.draftActive() ? s.uploadId : 0);
@@ -300,7 +301,7 @@ void App::registerKelvinletActions() {
 bool App::captureMouseDown(float x, float y) {
     if (!capture_.armed) return false;
     capture_.anchor = capture_.current = glm::vec2(x, y);
-    capture_.circle = (inputMods() & SDL_KMOD_SHIFT) != 0;
+    capture_.circle = (inputMods(false) & SDL_KMOD_SHIFT) != 0;
     drag_ = Drag::Capture;
     return true;
 }

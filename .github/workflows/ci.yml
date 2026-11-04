@@ -4,7 +4,13 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:
+    inputs:
+      full:
+        description: Also the VFX Reference Platform and Blender add-on jobs (main always runs them)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -31,12 +37,16 @@ concurrency:
 
 jobs:
   # Pushes and pull requests that change only the website (not its phone page, website/link, which is built into the
-  # app) or release paperwork skip the build and test jobs; their required checks then pass as skipped.
+  # app), docs no build or test reads (docs/guide and docs/supporters.txt are built in), note fragments or release
+  # paperwork skip the build and test jobs; their required checks then pass as skipped.
+  # `full`: the slow platform checks (VFX Reference Platform containers, Blender add-on in Blender) run on main, in the
+  # merge queue's batch run (scripts/merge-queue.sh), on a dispatch with full=true and on a pull request labelled full-ci; other branch runs skip them.
   changes:
     name: Changes
     runs-on: ubuntu-24.04
     outputs:
       code: ${{ steps.diff.outputs.code }}
+      full: ${{ steps.diff.outputs.full }}
     steps:
       - id: diff
         env:
@@ -46,7 +56,9 @@ jobs:
           BEFORE: ${{ github.event.before }}
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          FULL: ${{ github.ref == 'refs/heads/main' || inputs.full == true || contains(github.event.pull_request.labels.*.name, 'full-ci') }}
         run: |
+          echo "full=$FULL" | tee -a "$GITHUB_OUTPUT"
           base=$BASE
           [ "$EVENT" = push ] && base=$BEFORE
           code=true
@@ -57,7 +69,10 @@ jobs:
               while IFS= read -r f; do
                 case "$f" in
                   website/link/*) code=true ;;
-                  website/*|.github/workflows/pages.yml|.github/workflows/download-stats.yml|packaging/arch/*|tools/publish/*|scripts/release.sh|docs/releasing.md) ;;
+                  website/*|.github/workflows/pages.yml|.github/workflows/download-stats.yml|packaging/arch/*|tools/publish/*|scripts/release.sh|scripts/merge-queue.sh) ;;
+                  docs/guide/*|docs/supporters.txt) code=true ;;
+                  docs/*.md|docs/design/*|changes/*|.github/ISSUE_TEMPLATE/*|.github/PULL_REQUEST_TEMPLATE.md) ;;
+                  CHANGELOG.md|README.md|ROADMAP.md|CONTRIBUTING.md|CODE_OF_CONDUCT.md|SECURITY.md|TESTERS.md|REPORT.md|BRIEF.md) ;;
                   '') ;;
                   *) code=true ;;
                 esac
@@ -81,9 +96,10 @@ jobs:
           - { name: Linux ARM64, key: linux-arm64, shard: 1, shards: 2, os: "${{ vars.SF_RUNNER_LINUX_ARM || 'ubuntu-24.04-arm' }}" }
           - { name: Linux ARM64, key: linux-arm64, shard: 2, shards: 2, os: "${{ vars.SF_RUNNER_LINUX_ARM || 'ubuntu-24.04-arm' }}" }
           - { name: macOS, key: macos, shard: 1, shards: 1, os: "${{ vars.SF_RUNNER_MAC || 'macos-15' }}" }
-          - { name: Windows, key: windows, shard: 1, shards: 3, os: "${{ vars.SF_RUNNER_WIN || 'windows-2022' }}" }
-          - { name: Windows, key: windows, shard: 2, shards: 3, os: "${{ vars.SF_RUNNER_WIN || 'windows-2022' }}" }
-          - { name: Windows, key: windows, shard: 3, shards: 3, os: "${{ vars.SF_RUNNER_WIN || 'windows-2022' }}" }
+          - { name: Windows, key: windows, shard: 1, shards: 4, os: "${{ vars.SF_RUNNER_WIN || 'windows-2022' }}" }
+          - { name: Windows, key: windows, shard: 2, shards: 4, os: "${{ vars.SF_RUNNER_WIN || 'windows-2022' }}" }
+          - { name: Windows, key: windows, shard: 3, shards: 4, os: "${{ vars.SF_RUNNER_WIN || 'windows-2022' }}" }
+          - { name: Windows, key: windows, shard: 4, shards: 4, os: "${{ vars.SF_RUNNER_WIN || 'windows-2022' }}" }
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_BASEDIR: ${{ github.workspace }}
@@ -92,6 +108,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
+        id: py
         with:
           python-version: '3.13'
       - name: Install Linux dependencies
@@ -132,6 +149,20 @@ jobs:
           restore-keys: ccache-ci-${{ matrix.key }}.
       - name: NumPy for the Python API test
         run: python -m pip install numpy
+      # The configured build folder (CMake's cache with every compiler and library check, the fetched dependency
+      # sources, the generated project), right after configure and before any compiling: a hit skips the minute or
+      # more of checks (93 s on Windows). Exact key only: the runner image (compiler), Python and every CMake file, so
+      # a changed CMakeLists.txt or option configures from scratch, as a fresh checkout would.
+      - name: Runner image (the compiler version, for the configure cache key)
+        id: image
+        shell: bash
+        run: echo "id=${ImageOS:-$RUNNER_OS}-${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+      - name: Configure cache (restore)
+        id: cmake-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: build
+          key: cmake-ci-${{ matrix.key }}~${{ steps.image.outputs.id }}-py${{ steps.py.outputs.python-version }}-${{ hashFiles('CMakeLists.txt', 'cmake/**', 'packaging/linux/install-build-deps.sh') }}
       - name: Configure
         if: runner.os != 'Windows'
         run: >
@@ -144,13 +175,19 @@ jobs:
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSCULPTFORGE_USE_SYSTEM_SDL=OFF
           -DCMAKE_VS_GLOBALS="CLToolExe=cl.exe;CLToolPath=${{ env.SF_CCACHE_CL }};TrackFileAccess=false;UseMultiToolTask=true;EnforceProcessCountAcrossBuilds=true"
           -DSCULPTFORGE_BUILD_PYTHON=ON -DPython_EXECUTABLE="${{ env.pythonLocation }}/python.exe"
+      - name: Configure cache (save; a miss, not from pull requests; one shard saves)
+        if: steps.cmake-cache.outputs.cache-hit != 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && matrix.shard == 1
+        uses: actions/cache/save@v5
+        with:
+          path: build
+          key: ${{ steps.cmake-cache.outputs.cache-primary-key }}
       - name: Build
         run: |
           ccache -z
           cmake --build build --config Release --parallel 4
           ccache -s -v
       - name: Compiler cache (save; not from pull requests; one shard saves)
-        if: github.event_name != 'pull_request' && matrix.shard == 1
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && matrix.shard == 1
         uses: actions/cache/save@v5
         with:
           path: .ccache
@@ -161,10 +198,10 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           xvfb-run -a -s "-screen 0 1920x1080x24" env LIBGL_ALWAYS_SOFTWARE=1 \
-            ctest --test-dir build -C Release --output-on-failure -j 4 -I '${{ matrix.shard }},,${{ matrix.shards }}'
+            ctest --test-dir build -C Release --output-on-failure --output-junit ctest.xml --test-output-size-passed 262144 -j 4 -I '${{ matrix.shard }},,${{ matrix.shards }}'
       - name: Test (C++ and Python API; UI tests need a display)
         if: runner.os == 'macOS'
-        run: ctest --test-dir build -C Release --output-on-failure -LE ui -j 4 -I '${{ matrix.shard }},,${{ matrix.shards }}'
+        run: ctest --test-dir build -C Release --output-on-failure --output-junit ctest.xml --test-output-size-passed 262144 -LE ui -j 4 -I '${{ matrix.shard }},,${{ matrix.shards }}'
       - name: Test (C++, Python API, UI tests with Mesa llvmpipe)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -177,8 +214,12 @@ jobs:
           }
           7z e mesa.7z x64/opengl32.dll x64/libgallium_wgl.dll -obuild/Release -y | Out-Null
           $env:GALLIUM_DRIVER = 'llvmpipe'
-          ctest --test-dir build -C Release --output-on-failure -j 4 -I '${{ matrix.shard }},,${{ matrix.shards }}'
+          ctest --test-dir build -C Release --output-on-failure --output-junit ctest.xml --test-output-size-passed 262144 -j 4 -I '${{ matrix.shard }},,${{ matrix.shards }}'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Slowest tests (job summary; tells which test to split when a shard is the long pole)
+        if: always()
+        run: python tools/ci/slowest_tests.py build/ctest.xml | tee -a "$GITHUB_STEP_SUMMARY"
+        shell: bash
       - name: UI test screenshots
         if: always() && runner.os != 'macOS'
         uses: actions/upload-artifact@v7
@@ -192,7 +233,7 @@ jobs:
   blender-addon:
     name: Blender add-on (bpy ${{ matrix.bpy }})
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && needs.changes.outputs.full == 'true'
     runs-on: ${{ vars.SF_RUNNER_LINUX || 'ubuntu-24.04' }}
     strategy:
       fail-fast: false
@@ -228,7 +269,7 @@ jobs:
           cmake --build build --target sculptforge-cli --parallel 4
           ccache -s -v
       - name: Compiler cache (save; not from pull requests)
-        if: github.event_name != 'pull_request'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         uses: actions/cache/save@v5
         with:
           path: .ccache
@@ -245,7 +286,7 @@ jobs:
   vfx-platform:
     name: VFX Reference Platform ${{ matrix.cy }} build (${{ matrix.image }})
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && needs.changes.outputs.full == 'true'
     runs-on: ${{ vars.SF_RUNNER_LINUX || 'ubuntu-24.04' }}
     container: ${{ matrix.image }}
     strategy:
@@ -292,7 +333,7 @@ jobs:
           cmake --build build --parallel 4
           ccache -s -v
       - name: Compiler cache (save; not from pull requests)
-        if: github.event_name != 'pull_request'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         uses: actions/cache/save@v5
         with:
           path: .ccache

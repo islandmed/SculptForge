@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "ai/AiCommands.h"
 
+#include "ai/AiPolicy.h"
 #include "ai/BrushGalleryClient.h"
 #include "ai/ComfyUI.h"
 #include "ai/ImageTo3DService.h"
 #include "core/EnginePresets.h"
+#include "core/GeneratedRemesh.h"
 #include "core/Texture.h"
 #include "core/Voxel.h"
 #include "link/UnrealLink.h"
@@ -24,11 +26,50 @@ std::optional<uint64_t> comfySeed(const Args& a) {
     return uint64_t(std::max(0.0, argNumber(a, "seed", 0.0)));
 }
 
+// remesh=quad (default) | voxel | false. true means quad, the default since 0.10.9.
+bool remeshArg(const Args& a, GeneratedRemesh& mode, std::string& error) {
+    mode = GeneratedRemesh::Quad;
+    const auto it = a.find("remesh");
+    if (it == a.end()) return true;
+    if (const auto* s = std::get_if<std::string>(&it->second)) {
+        if (generatedRemeshFromName(*s, mode)) return true;
+        error = "remesh must be quad, voxel or false";
+        return false;
+    }
+    mode = argBool(a, "remesh", true) ? GeneratedRemesh::Quad : GeneratedRemesh::Off;
+    return true;
+}
+
+// Opens the generated file into the document and makes it sculptable; the message ends "- ready to sculpt".
+CommandResult importGenerated(Document& doc, const Args& a, const GeneratorResult& r, GeneratedRemesh mode,
+                              const std::string& what) {
+    CommandResult opened = CommandRegistry().execute(doc, "open", {{"path", r.outputPath}});
+    std::error_code ec;
+    std::filesystem::remove(std::filesystem::path(std::u8string(r.outputPath.begin(), r.outputPath.end())), ec);
+    if (!opened.ok) return opened;
+    doc.path.clear();
+    GeneratedRemeshStats st;
+    if (mode != GeneratedRemesh::Off) {
+        std::string err;
+        Mesh m;
+        if (!remeshGenerated(doc.mesh, mode, std::clamp(int(argNumber(a, "resolution", 256)), 64, 512),
+                             int(argNumber(a, "levels", 1)), m, err, &st))
+            return {false, "Generated, but remeshing failed: " + err};
+        doc.setMesh(std::move(m));
+    } else {
+        st.rawTriangles = doc.mesh.triangleCount();
+    }
+    const std::string note = generatedRemeshNote(st, mode);
+    return {true, "Generated a 3D model" + what + " (" + std::to_string(st.rawTriangles) + " triangles" +
+                      (note.empty() ? std::string() : ", " + note) + ") - ready to sculpt" +
+                      (r.note.empty() ? std::string() : " " + r.note)};
+}
+
 } // namespace
 
-void registerAiCommands(CommandRegistry& registry, std::function<AiSettings()> settings) {
+void addAiFeatureCommands(CommandRegistry& registry, std::function<AiSettings()> settings) {
     using T = ParamSpec::Type;
-    registerBrushGalleryCommands(registry); // brush_gallery_search, brush_gallery_install (BrushGalleryClient.cpp)
+    removeAiFeatureCommands(registry); // never twice
     registry.add({"brush_ai",
                   "Design a brush from a description. Free by default (a hosted open model, no key); or "
                   "provider=anthropic (ANTHROPIC_API_KEY), or provider=openai-compatible endpoint=... model=... "
@@ -57,12 +98,17 @@ void registerAiCommands(CommandRegistry& registry, std::function<AiSettings()> s
                   "ComfyUI (service=comfyui workflow=FILE). Replaces the scene. A transparent background works best.",
                   {{"path", T::String, "Image file (png, jpg...).", true},
                    {"service", T::String, "'huggingface' (free, default), 'fal', 'meshy', 'comfyui' (your ComfyUI server), 'command' (your generator) or 'inflate' (offline blockout).", false},
-                   {"model", T::String, "huggingface: hunyuan3d-2.1, trellis-2, hunyuan3d-2-turbo, hunyuan3d-2, stable-fast-3d; fal: a model id such as fal-ai/trellis-2.", false},
+                   {"model", T::String, "huggingface: hunyuan3d-2.1 (default, no token), trellis-2 (needs HF_TOKEN, else hunyuan3d-2.1 runs), hunyuan3d-2-turbo, hunyuan3d-2, stable-fast-3d; fal: a model id such as fal-ai/trellis-2.", false},
                    {"workflow", T::String, "comfyui: API-format workflow file (default: your saved one, else the bundled one).", false},
                    {"url", T::String, "comfyui: server address. Default http://127.0.0.1:8188 or your saved one.", false},
                    {"seed", T::Number, "comfyui: seed for the workflow's sf_seed / seed inputs (default: random).", false},
-                   {"remesh", T::Bool, "Voxel-remesh the result into a clean watertight sculpting surface. Default true.", false},
-                   {"resolution", T::Number, "Remesh voxels across the model (64-512). Default 256.", false}},
+                   {"remesh", T::String, "'quad' (default): clean quads for sculpting and subdividing (a voxel cleanup "
+                                         "pass, Quad Remesh, then Divide with the detail projected back); 'voxel': an even "
+                                         "watertight triangle surface; 'false': the raw mesh.", false},
+                   {"resolution", T::Number, "Remesh detail (64-512): voxels across the model; quad picks about "
+                                             "resolution^2/2 quads (256: 32768). Default 256.", false},
+                   {"levels", T::Number, "quad: subdivision levels above the quad cage (0-2), projected onto the "
+                                         "model. Default 1.", false}},
                   [settings](Document& doc, const Args& a) -> CommandResult {
                       AiSettings s = settings();
                       if (a.contains("service")) s.generatorService = argString(a, "service");
@@ -77,27 +123,14 @@ void registerAiCommands(CommandRegistry& registry, std::function<AiSettings()> s
                                          std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
                       const auto stemU8 = stem.u8string();
                       const std::string out(stemU8.begin(), stemU8.end());
+                      GeneratedRemesh mode;
+                      std::string err;
+                      if (!remeshArg(a, mode, err)) return {false, err};
                       GeneratorResult r = s.generatorService == "comfyui"
                                               ? comfy::run(s, argString(a, "workflow"), argString(a, "path"), {}, out, nullptr, comfySeed(a))
                                               : generate3D(s, argString(a, "path"), out);
-                      if (!r.ok) return {false, r.error};
-                      CommandResult opened = CommandRegistry().execute(doc, "open", {{"path", r.outputPath}});
-                      std::error_code ec;
-                      std::filesystem::remove(std::filesystem::path(std::u8string(r.outputPath.begin(), r.outputPath.end())), ec);
-                      if (!opened.ok) return opened;
-                      doc.path.clear();
-                      const size_t raw = doc.mesh.triangleCount();
-                      if (argBool(a, "remesh", true)) {
-                          std::string err;
-                          Mesh m = voxelRemesh(doc.mesh, std::clamp(int(argNumber(a, "resolution", 256)), 64, 512), &err);
-                          if (m.triangleCount() == 0) return {false, "Generated, but remeshing failed: " + err};
-                          doc.setMesh(std::move(m));
-                      }
-                      return {true, "Generated a 3D model (" + std::to_string(raw) + " triangles" +
-                                        (raw != doc.mesh.triangleCount()
-                                             ? ", remeshed to " + std::to_string(doc.mesh.triangleCount())
-                                             : std::string()) +
-                                        ") - ready to sculpt"};
+                      if (!r.ok) return {false, r.error + (r.note.empty() ? std::string() : " " + r.note)};
+                      return importGenerated(doc, a, r, mode, "");
                   }});
 
     registry.add({"text_to_3d",
@@ -110,13 +143,20 @@ void registerAiCommands(CommandRegistry& registry, std::function<AiSettings()> s
                    {"workflow", T::String, "comfyui: API-format workflow file (default: your saved one, else the bundled one).", false},
                    {"url", T::String, "comfyui: server address. Default http://127.0.0.1:8188 or your saved one.", false},
                    {"seed", T::Number, "comfyui: seed for the workflow's sf_seed / seed inputs (default: random).", false},
-                   {"remesh", T::Bool, "Voxel-remesh the result into a clean watertight sculpting surface. Default true.", false},
-                   {"resolution", T::Number, "Remesh voxels across the model (64-512). Default 256.", false}},
+                   {"remesh", T::String, "'quad' (default): clean quads for sculpting and subdividing (a voxel cleanup "
+                                         "pass, Quad Remesh, then Divide with the detail projected back); 'voxel': an even "
+                                         "watertight triangle surface; 'false': the raw mesh.", false},
+                   {"resolution", T::Number, "Remesh detail (64-512): voxels across the model; quad picks about "
+                                             "resolution^2/2 quads (256: 32768). Default 256.", false},
+                   {"levels", T::Number, "quad: subdivision levels above the quad cage (0-2), projected onto the "
+                                         "model. Default 1.", false}},
                   [settings](Document& doc, const Args& a) -> CommandResult {
                       AiSettings s = settings();
                       if (a.contains("service")) s.generatorService = argString(a, "service");
                       if (a.contains("url")) s.comfyUrl = argString(a, "url");
-                      if (s.generatorService == "command" || s.generatorService == "inflate") s.generatorService = "huggingface";
+                      if (s.generatorService == "command" || s.generatorService == "inflate")
+                          return {false, "Text to 3D can't use '" + s.generatorService + "' (it works from an image); pass "
+                                         "service=huggingface, fal, meshy or comfyui"};
                       if (a.contains("model")) {
                           if (s.generatorService == "meshy") s.meshyModel = argString(a, "model");
                           else if (s.generatorService != "fal") s.hfModel = argString(a, "model");
@@ -126,6 +166,9 @@ void registerAiCommands(CommandRegistry& registry, std::function<AiSettings()> s
                                          std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
                       const auto stemU8 = stem.u8string();
                       const std::string out(stemU8.begin(), stemU8.end());
+                      GeneratedRemesh mode;
+                      std::string err;
+                      if (!remeshArg(a, mode, err)) return {false, err};
                       GeneratorResult r;
                       if (s.generatorService == "comfyui") {
                           if (argString(a, "prompt").find_first_not_of(" \t\r\n") == std::string::npos) return {false, "Describe the model you want"};
@@ -133,20 +176,8 @@ void registerAiCommands(CommandRegistry& registry, std::function<AiSettings()> s
                       } else {
                           r = generate3DFromText(s, argString(a, "prompt"), out);
                       }
-                      if (!r.ok) return {false, r.error};
-                      CommandResult opened = CommandRegistry().execute(doc, "open", {{"path", r.outputPath}});
-                      std::error_code ec;
-                      std::filesystem::remove(std::filesystem::path(std::u8string(r.outputPath.begin(), r.outputPath.end())), ec);
-                      if (!opened.ok) return opened;
-                      doc.path.clear();
-                      if (argBool(a, "remesh", true)) {
-                          std::string err;
-                          Mesh m = voxelRemesh(doc.mesh, std::clamp(int(argNumber(a, "resolution", 256)), 64, 512), &err);
-                          if (m.triangleCount() == 0) return {false, "Generated, but remeshing failed: " + err};
-                          doc.setMesh(std::move(m));
-                      }
-                      return {true, "Generated a 3D model from text (" + std::to_string(doc.mesh.triangleCount()) +
-                                        " triangles) - ready to sculpt"};
+                      if (!r.ok) return {false, r.error + (r.note.empty() ? std::string() : " " + r.note)};
+                      return importGenerated(doc, a, r, mode, " from text");
                   }});
 
     registry.add({"comfyui_check",
@@ -159,6 +190,16 @@ void registerAiCommands(CommandRegistry& registry, std::function<AiSettings()> s
                       if (!comfy::checkServer(url, info, err)) return {false, err};
                       return {true, info.summary() + " at " + url};
                   }});
+}
+
+void removeAiFeatureCommands(CommandRegistry& registry) {
+    for (const std::string& name : aiCommandNames()) registry.remove(name);
+}
+
+void registerAiCommands(CommandRegistry& registry, std::function<AiSettings()> settings) {
+    using T = ParamSpec::Type;
+    registerBrushGalleryCommands(registry); // brush_gallery_search, brush_gallery_install (BrushGalleryClient.cpp)
+    if (aiEnabled()) addAiFeatureCommands(registry, settings);
 
     registry.add({"unreal_editors", "List running Unreal Editors that SculptForge can send assets to (remote execution).",
                   {{"network", T::Bool, "Also look on other computers (Unreal needs Multicast TTL 1 and bind address 0.0.0.0).", false}},

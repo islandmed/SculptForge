@@ -46,6 +46,7 @@ snapshot
 stroke 0.86 0.5 0.98 0.38 0.6 hold
 wait 0.3
 expect_value moved == 0
+expect_value live_move_active == 1
 shot live_move_dragging
 release
 expect_value moved_sum > $plain*0.999
@@ -61,13 +62,19 @@ key ctrl+z
 key ctrl+z
 expect_value moved == 0
 
-# Background Preview: on and off again; Live Move off again.
+# Background Preview and Fast Upload: on and off again; Live Move off again.
 click "Preferences##palette.preferences"                # (Performance stays open from before)
 expect_value background_preview == 0
 click "Background Preview (Experimental)"
 expect_value background_preview == 1
 click "Background Preview (Experimental)"
 expect_value background_preview == 0
+expect_value fast_upload == 0
+click "Fast Upload (Experimental)"
+expect_value fast_upload == 1
+shot experimental_toggles
+click "Fast Upload (Experimental)"
+expect_value fast_upload == 0
 click "Live Move (Experimental)"
 expect_value live_move == 0
 click "Preferences##palette.preferences"

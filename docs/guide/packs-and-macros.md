@@ -29,9 +29,9 @@ example **Clay (Member pack)**.
 |---|---|
 | Brushes and VDMs | The brush lists, the Brush picker and **Library > Brush**, tagged with the pack's name. |
 | Alphas | The Alpha picker (a **Packs** section) and **Library > Alpha**, as **Name (Pack)**. |
-| Lit Spheres | **Material** and **Library > Material**, as **Name (Pack)**. |
+| Lit Spheres | **Render > Materials** and **Library > Material**, as **Name (Pack)**. |
 | Material Recipes | The **Material Recipe** list under **Tool > Paint Layers > Fill**, as **Name (Pack)**. |
-| Keymaps | **Library > Packs > Details > Apply keymap**, and **Preferences > Input > Pack keymaps**. |
+| Keymaps | **Library > Packs > Details > Apply keymap**, and **Edit > Preferences > Input > Pack keymaps**. |
 | Pie menus | **Library > Packs > Details > Add pie menu** (it becomes one of your radial menus). |
 | Macros | <kbd>F3</kbd>, the key editor and the pie menus, as **Name (Pack)**. |
 
@@ -100,9 +100,9 @@ values it needs. **Save** writes it to your macros folder; **Run** runs it.
 Every saved macro (yours and those of enabled packs) is an action:
 
 - <kbd>F3</kbd>: type its name and press <kbd>Enter</kbd>.
-- **Preferences > Hotkeys**: find it with the filter and give it a key, like any other action (see
+- **Edit > Preferences > Hotkeys**: find it with the filter and give it a key, like any other action (see
   [Assign shortcuts](interface.md#assign-shortcuts)).
-- **Preferences > Input > Radial Menus**: put it in a pie menu slot.
+- **Edit > Preferences > Input > Radial Menus**: put it in a pie menu slot.
 - **Library > Packs**: **Run** next to your macros, or in a pack's **Details**.
 
 The first time a macro runs, SculptForge shows its whole command list and asks. Click **Run** to go on; you are

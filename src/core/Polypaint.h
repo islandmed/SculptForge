@@ -10,6 +10,7 @@
 #include "core/Mesh.h"
 #include "core/Sculpt.h"
 
+#include <algorithm>
 #include <string>
 
 namespace sf {
@@ -22,6 +23,13 @@ class CommandRegistry;
 bool parseColor(const std::string& text, glm::vec3& linear);
 // "#rrggbb" (sRGB) for a linear colour.
 std::string colorToHex(const glm::vec3& linear);
+// The tint the active colour gives a Lit Sphere material on a mesh with no vertex paint (as ZBrush's main
+// colour): its hue and saturation at full brightness, so a grey (the default colour) or black leaves the material
+// as it is and a red turns it red while the material keeps its own light and shade.
+inline glm::vec3 materialTintFor(const glm::vec3& linear) {
+    const float m = std::max(linear.x, std::max(linear.y, linear.z));
+    return m > 1e-4f ? glm::clamp(linear / m, 0.0f, 1.0f) : glm::vec3(1.0f);
+}
 
 // One Paint brush dab inside a Sculptor stroke: blends `color` into the
 // vertices under the brush with the smoothstep falloff, strength x pressure,

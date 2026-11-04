@@ -232,6 +232,8 @@ void App::startTimelapse(const std::string& path, int width, int height, float s
     status_ = "Rendering the timelapse...";
 }
 
+bool App::timelapseBusy() const { return timelineUi_ && timelineUi_->job; }
+
 bool App::timelapseStep(double budgetSeconds) {
     if (!timelineUi_ || !timelineUi_->job) return false;
     TimelapseJob& j = *timelineUi_->job;
@@ -376,9 +378,16 @@ void App::drawTimelineUi() {
     // The strip: along the bottom of the canvas, or its top (Preferences > Interface > Timeline position, #63:
     // away from the brush shelf). At the top it sits below the top shelf (the canvas starts there) and what else
     // the canvas shows at its top (the axis gizmo, the update banner) moves down below it (timelineTopInset_).
-    const CanvasRect c = canvasRect();
+    CanvasRect c = canvasRect();
     const float sc = uiScale_;
     const bool top = uiPrefs_.timelineTop;
+    // The open Library takes the canvas's top (or bottom) edge: the strip moves off it, so it never covers the
+    // Library's tabs and close button (#80, a 720p screen at 150%).
+    if (lightbox_.open()) {
+        const float lib = std::min(LightBox::height(layout_.lightboxRows, sc), c.h);
+        if (!layout_.lightboxBottom) c.y += lib;
+        c.h -= lib;
+    }
     timelineTopInset_ = 0.0f;
     timelineStripY_ = -1.0f;
     if (c.w < 200 || c.h < 150 || hideUi_) return;
@@ -398,7 +407,7 @@ void App::drawTimelineUi() {
             }
             ui::HelpText("Sculpt Timeline", nullptr, "Open the history strip.", "Edit");
             timelineStripY_ = ImGui::GetWindowPos().y;
-            if (top) timelineTopInset_ = ImGui::GetWindowPos().y + ImGui::GetWindowSize().y - c.y;
+            if (top) timelineTopInset_ = ImGui::GetWindowPos().y + ImGui::GetWindowSize().y - canvasRect().y;
         }
         ImGui::End();
         return;
@@ -410,7 +419,7 @@ void App::drawTimelineUi() {
     const float stripY = top ? c.y + margin : c.y + c.h - margin - height;
     ImGui::SetNextWindowPos(ImVec2(c.x + margin, stripY), ImGuiCond_Always);
     timelineStripY_ = stripY;
-    if (top) timelineTopInset_ = margin + height;
+    if (top) timelineTopInset_ = stripY + height - canvasRect().y;
     ImGui::SetNextWindowSize(ImVec2(c.w - 2 * margin, height), ImGuiCond_Always);
     ImGui::SetNextWindowBgAlpha(0.88f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8 * sc, 5 * sc));

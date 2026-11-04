@@ -10,6 +10,7 @@
 #include "core/Symmetry.h"
 #include "core/Undo.h"
 
+#include <algorithm>
 #include <chrono>
 #include <functional>
 #include <memory>
@@ -72,6 +73,10 @@ struct DabParams {
     // Smooth: keep the volume (#40). A Taubin step, one shrink then one inflate, removes bumps as the plain
     // (Laplacian) smooth does without shrinking the form. Not on micro levels (they smooth plainly).
     bool keepVolume = false;
+    // Smooth: face group borders only (#81, clothing edges). Only vertices on a border between face groups move,
+    // each toward its two neighbours along the border and kept on the surface's tangent plane, so a jagged border
+    // straightens into a clean line while the rest stays put. Junctions of three or more groups hold still.
+    bool groupBorders = false;
     // Falloff options (#55, Blender's proportional editing): `connectedOnly` keeps the dab to the surface joined
     // to the point under the cursor (the other leg, the next finger stay put); `viewFalloff` measures the falloff
     // on screen, so the brush reaches through the model along the view as a cylinder.
@@ -134,6 +139,13 @@ glm::vec3 brushAreaNormal(const Mesh& mesh, const BVH& bvh, const glm::vec3& cen
 // the angle between them) of parallel to the ray, so the cursor can't say where along it.
 bool lineRayClosest(const glm::vec3& point, const glm::vec3& dir, const glm::vec3& origin, const glm::vec3& rayDir,
                     float& s, float minSine = 0.25f);
+// How far one Clay / Clay Block dab pulls the surface up to its plane (#83), from the dab's strength (Intensity x
+// pressure, 0..1): all the way from the default Intensity (50) up, less below it, so a light touch or a low
+// Intensity builds gently instead of planing the surface flat as a full-strength dab would.
+// Face group borders (#81): the neighbours of `v` across whose shared edge the face group changes, up to 3
+// (`out`); the return value is how many there are (a count of 3 means a junction).
+int groupBorderNeighbours(const Mesh& mesh, uint32_t v, uint32_t out[3]);
+inline float clayPull(float s) { return s >= 0.5f ? 1.0f : 2.0f * std::max(s, 0.0f); }
 // Smoothstep brush falloff: 1 at the centre, 0 at `radius`. `focal` is ZBrush's Focal Shift (-1..1): below 0
 // the full-strength centre widens (a harder, broader tip), above 0 it narrows to a softer point; 0 is the plain
 // smoothstep, unchanged.
@@ -175,7 +187,11 @@ public:
 
     // Move brush: capture the region once, then drag it by world deltas.
     void beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym);
-    void grab(Mesh& mesh, BVH& bvh, const glm::vec3& delta);
+    void grab(Mesh& mesh, BVH& bvh, const glm::vec3& delta); // grabMove, then grabFinish
+    // The two halves: the positions (each pointer sample), then the normals and the BVH of what moved (once a
+    // frame: they depend only on where the vertices ended up, so the mesh is the same, bit for bit).
+    void grabMove(Mesh& mesh, const glm::vec3& delta);
+    void grabFinish(Mesh& mesh, BVH& bvh);
 
     // Brushes that change mask or polypaint call these before writing
     // mesh.mask[v] / mesh.colors[v] (after ensureMask()/ensureColors()), so

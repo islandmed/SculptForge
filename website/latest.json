@@ -1,10 +1,12 @@
 {
-  "version": "0.10.8",
+  "version": "0.10.10",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Tablets in Mouse mode follow the pen again on Windows (#72)",
-    "No jump when the pen comes back to the tablet: the brush carries on from where it was",
-    "A bug-fix release only: nothing else changes from 0.10.7"
+    "Close Holes caps every open boundary of a Part; Clip presses one side of a line, lasso or rectangle flat",
+    "X-Ray shows the active Part through the others; turn the light around the model from Render > Materials",
+    "First Sculpt lesson rebuilt: a cute owl head in about 10 minutes with built-in tools",
+    "More SpaceMouse devices recognised, also over Bluetooth",
+    "Mask and Cut shapes in the stroke popup (G), no keys held"
   ]
 }

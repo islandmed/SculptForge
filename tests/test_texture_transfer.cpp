@@ -359,8 +359,8 @@ TEST(texture_transfer_speed_at_4k_on_a_million_triangles) {
     std::printf("  texture transfer at 4K: new UVs on %zu tris %.0f ms (2 planes); from the surface of %zu tris onto %zu tris "
                 "%.0f ms (%zu texels)\n",
                 m.triangleCount(), ms(t0, t1), m.triangleCount(), target.triangleCount(), ms(t2, t3), ss.texels);
-    CHECK(ms(t0, t1) < 5000.0);
-    CHECK(ms(t2, t3) < 20000.0);
+    CHECK(ms(t0, t1) < timeLimit(5000.0));
+    CHECK(ms(t2, t3) < timeLimit(20000.0));
 }
 
 // --- Material channels (core/TextureChannels.h) travel with the texture ---

@@ -18,3 +18,14 @@ expect_status Active Part: Cube
 expect_value camera_distance < $far
 expect_value edited_subtools == 0
 shot triple_click_frame
+
+# A pen in range (Discord, Wacom Intuos 3): its side button's Double Click (the driver's default) and a tap made a
+# triple-click that switched the Part. While a pen hovers, mouse triple-clicks don't switch; once it's gone they do.
+key f
+pen_hover 0.5 0.5
+click_subtool Sphere 0.5 0.5 3
+expect_value active_subtool == 1
+pen_out
+wait 1.1
+click_subtool Sphere 0.5 0.5 3
+expect_value active_subtool == 0

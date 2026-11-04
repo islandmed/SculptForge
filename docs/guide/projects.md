@@ -31,9 +31,9 @@ them is an export, not a save. See [Exporting](exporting.md).
 - **File > Save** (<kbd>Ctrl</kbd>+<kbd>S</kbd>) saves to the current project. The first time, it asks for a file
   name.
 - **File > Save As...** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>) saves under a new name.
-- Clicking the document name in the title strip also saves.
+- In the ZBrush-style layout, clicking the document name in the title strip also saves.
 
-The title strip shows the document name with `*` after it while there are unsaved changes, and the window title
+The bar along the top shows the file name with `*` after it while there are unsaved changes, and the window title
 starts with `*`. Any edit in any Part counts, as do splat edits and layer weight changes.
 
 If you opened a model file (an OBJ, say) rather than a project, **Save** asks where to save a new `.sfproj`; the
@@ -52,6 +52,36 @@ original model file is left alone.
 
 When you open a project, its saved camera, material and brush settings come back too.
 
+## Start from a starter mesh
+
+Instead of a sphere, start from a base mesh with clean, even quads: **File > New from Starter Mesh** lists them,
+the Library's **Tool** tab has a **Starter meshes** folder with a thumbnail of each, and the welcome's
+**Start from a head** opens the human head straight away.
+
+| Starter mesh | What it is |
+|---|---|
+| Human Head | A neutral head and neck with loops round the eyes and mouth, for portraits |
+| Bust | Head, neck, shoulders and upper chest |
+| Full Body | A human figure in A-pose, 167 cm tall |
+| Hand, Foot, Ear | A left hand (raised, palm to the front), a left foot and ankle, a left ear |
+| Eye | An eyeball 24 mm across, with the cornea and rings of quads round the pupil |
+| Stylised Head | A cartoon head: big cranium and eyes, small nose and jaw |
+| Creature Head | A dragon or creature blockout: skull, jaw and two horns, each its own [Part](parts.md) |
+| Torso | A human torso from the neck to the upper thighs |
+| Rounded Box, Cylinder, Capsule, Ring | Hard-surface primitives with bevelled edges and quad caps |
+
+Every starter mesh is life size in centimetres, centred, standing on the ground and looking down +Z, and the
+symmetric ones are exactly symmetric, so [X symmetry](sculpting.md) works from the first stroke. The Hand, Foot,
+Ear, Head, Bust and Torso are cut from a body, so they have open edges where they were cut.
+
+A starter mesh opens with subdivision levels (two, or one for the Full Body): block out the big forms at
+**SDiv 1**, the base cage, and step up for the detail (see [Geometry](geometry.md)). It opens as a new, unsaved
+scene: **Save** asks for a name. Double-click a tile to open it; <kbd>Shift</kbd>+double-click appends its base
+cage as a Part, for example an Eye next to a head.
+
+The human meshes come from the MakeHuman base mesh, which MakeHuman released into the public domain (CC0); the
+others are made by SculptForge's own build script. You may use them for anything, including commercial work.
+
 ## The unsaved-changes prompt
 
 When the scene has unsaved changes, **New Sphere**, **New Plane**, **Open...**, **Open Recent**, dropping a model or
@@ -67,7 +97,7 @@ Dropping an image or a `.sfbrush` file never asks, because it doesn't replace th
 
 While the scene has unsaved changes, SculptForge writes a recovery copy every few minutes (every 5 minutes by
 default; it waits until you finish a stroke). Change the interval, or turn it off with 0, in
-**Preferences > Autosave** or with the **Autosave (min)** slider in the File palette (0 to 60 minutes).
+**Edit > Preferences > Autosave** or with the **Autosave (min)** slider in the File palette (0 to 60 minutes).
 
 The recovery copy is `autosave.sfproj` in the SculptForge settings folder (see
 [Troubleshooting](troubleshooting.md) for where that is on your system). It is deleted once your work is saved or
@@ -85,7 +115,7 @@ The autosave also appears first in the Library **Snapshots** tab while it exists
 
 ## Snapshots
 
-**File > Save Snapshot** (also the **Snapshot** button in the title strip) saves a timestamped copy of the whole
+**File > Save Snapshot** (also the **Snapshot** button in the ZBrush-style layout's title strip) saves a timestamped copy of the whole
 scene (ZBrush users: QuickSave). Your project file, its name and its unsaved state are not changed, so a snapshot
 is safe to take before any risky step.
 
@@ -95,7 +125,7 @@ is safe to take before any risky step.
 - They appear in the Library **Snapshots** tab, newest first, labelled with their date and time. Double-click one
   to open it. The tab also has a **Save now** button.
 
-With the ZBrush-style keys (**Preferences > Input**) <kbd>9</kbd> takes a snapshot; otherwise it has no default
+With the ZBrush-style keys (**Edit > Preferences > Input**) <kbd>9</kbd> takes a snapshot; otherwise it has no default
 shortcut. To give it one, hold <kbd>Ctrl</kbd>+<kbd>Alt</kbd>, click the **Snapshot**
 button and press a key (see [The interface](interface.md)).
 
@@ -115,7 +145,7 @@ on first use with these sub-folders:
 | `Splats` | Splats | Gaussian splat captures |
 | `QuickSave` | Snapshots | Snapshots |
 
-Change it in **Preferences > Library > Library folder**, then Store Config (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>)
+Change it in **Edit > Preferences > Library > Library folder**, then Store Config (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>)
 to keep the setting.
 
 Press <kbd>,</kbd> (comma) to show the Library. The tabs that matter for projects:
@@ -138,6 +168,7 @@ Double-click a tile to open it (you are asked about unsaved changes first). In t
 | `open_project path=work/dragon.sfproj` | Open a project (`open` also recognises `.sfproj`) |
 | `open path=scan.obj` | Open a model, splat capture or project |
 | `new_sphere subdivisions=6` / `new_plane resolution=128` | Start a new scene |
+| `new_starter_mesh name=human-head` | Start from a starter mesh (`levels=0` for the bare base cage) |
 
 Projects saved by `sculptforge-cli` or Python open in the app too. For the file layout, see
 [docs/project-format.md](https://github.com/islandmed/SculptForge/blob/main/docs/project-format.md).

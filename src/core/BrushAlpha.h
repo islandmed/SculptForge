@@ -22,6 +22,13 @@ struct BrushAlpha {
     std::string name = "Round";
     int width = 0, height = 0;
     std::vector<float> values; // 0..1, row-major, row 0 at the top
+    // An image alpha's file and whether it was inverted (brush_set_alpha path=...), so a brush's settings can
+    // bring it back (core/BrushSettings.h). Empty for the built-ins.
+    std::string path;
+    bool inverted = false;
+    // Tile (#76, core/AlphaOptions.h): the alpha repeated tileX x tileY times inside the stamp (1 x 1: once).
+    int tileX = 1, tileY = 1;
+    bool tiled() const { return tileX > 1 || tileY > 1; }
 
     bool empty() const { return values.empty(); }
     // u, v in brush-local -1..1 (v points up); 0 outside the stamp.

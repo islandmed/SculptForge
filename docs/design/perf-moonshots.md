@@ -146,7 +146,8 @@ micro level (or compressed on disk), and the GPU draws each tile at its own leve
 
 ## 5. Prototypes (feature flags, off by default)
 
-All three are environment flags so they cost nothing when off. None changes what a stroke leaves on the mesh
+All three are Experimental toggles in Preferences > Performance (Live Move, Background Preview, Fast Upload), off
+by default, with environment overrides (`=0` / `=1`) for benchmarks; they cost nothing when off. None changes what a stroke leaves on the mesh
 except Live Move's commit (one grab with the summed move instead of one per frame; tested equal to 1e-6).
 
 1. **Background preview** (`SF_BG_GHOST=1`, idea 1): the ghost (already written for predictive strokes) also
@@ -158,18 +159,37 @@ except Live Move's commit (one grab with the summed move instead of one per fram
    Falls back to the old path with masks, hidden faces, sculpt layers, micro levels, connected-only or view
    falloff. Test `live_move_matches_the_grab`: the preview matches the grab to 1e-5, one grab matches the
    per-frame grabs to 1e-6 (X symmetry, focal shift).
-3. **Persistent upload** (`SF_PERSISTENT_UPLOAD=1`, idea 4): two persistently mapped, coherent staging buffers
+3. **Persistent upload** (Fast Upload, `SF_PERSISTENT_UPLOAD=1`, idea 4): two persistently mapped, coherent staging buffers
    (48 MB each, `glBufferStorage`); the solver thread packs straight into one, the GL thread issues
    `glCopyBufferSubData` for each range and a fence; a buffer is reused only after its fence. Batches larger than
    4M vertices pack into the old vector as before.
 
 ### Measurements
 
-MEASUREMENTS
+Correctness (all in ctest): `live_move_matches_the_grab` (preview vs grab 1e-5, one grab vs per-frame grabs
+1e-6); `ui_live_move` (the same drag with Live Move on and off moves the mesh by the same sum and maximum to 0.1%;
+mid-drag the mesh is untouched and the GPU draws the move: screenshot `live_move_dragging` matches the committed
+`live_move`; undo/redo); `ui_stroke_background_preview` and `ui_stroke_persistent_upload` (`SF_MEASURE_VERIFY=1`:
+the background path's mesh is bit-identical to the plain path's with the preview and the persistent upload on).
+
+Speed: **not measured yet.** The before/after runs need the shared machine at load < 2 (`--benchmark standard`,
+33M scene, toggles off vs each on vs all on, interleaved), and the load stayed between 7 and 20 through every
+session of this work. Expected from the design, to be checked by those runs: Live Move's frame cost no longer
+depends on the region moved (today Move at 33M is 18 fps); Background Preview takes the 12.5 ms batch wait out of
+the frame; Fast Upload moves the GL thread's 2-10 ms commit copy to a GPU copy. No public numbers until measured.
 
 ## 6. Recommendation
 
-RECOMMENDATION
+- **Ship now, Experimental, off by default (0.11.0-beta.1):** Live Move, Background Preview, Fast Upload. They are
+  tested equal to the plain path, so the beta risk is in drawing (driver differences), which is what the
+  #testers checklist asks about. Promote one to on-by-default only with the 33M numbers above and clean tester
+  reports on Windows, Linux and macOS.
+- **Build next:** Focus Detail's GPU side (per-tile resident levels in the MicroRenderer, idea 8): the data side's
+  measurements (promotion 0.05 ms a tile, GPU 3130 -> 597 MB at 1B) make it the biggest lever toward
+  billion-triangle assets. Then idea 6 made automatic (Divide past ~8M goes to a micro level).
+- **Later or not at all:** cluster LOD (5) only if orbit at 33M+ stays below target after Focus Detail; strokes as
+  data (3) belongs with the Sculpt Timeline; coarse-first (2) and learned prediction (7) don't pay once the
+  preview is on.
 
 ## References
 

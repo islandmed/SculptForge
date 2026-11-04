@@ -50,6 +50,10 @@ struct BenchOptions {
     // a base sphere at micro level `microLevel` (4: 256 micro triangles per base triangle).
     bool micro = false;
     int microLevel = 4;
+    // Focus Detail instead (--bench-focus, core/FocusDetail.h): the standard-1b asset (a billion micro triangles
+    // streamed from a detail file), or a head of `focusBase` base triangles at micro level `microLevel`.
+    bool focus = false;
+    size_t focusBase = 0;
     std::function<void(const std::string&)> log; // progress lines (optional)
     std::function<void(const std::string&)> partial; // the report so far, after each size (optional)
 };

@@ -9,7 +9,7 @@ The camera orbits around a target point. By default rotation is **free**, as in 
 model about the screen's own axes, so it follows the cursor and can roll right over the top. Hold
 <kbd>Shift</kbd> while rotating to snap to the nearest front, back, side, top or bottom view; let go of
 <kbd>Shift</kbd> and the drag carries on from where the cursor is. If you prefer the model to stay upright, as
-in Blender or Maya, set **Preferences > Interface > Rotation** to **Turntable**: sideways drags then turn the
+in Blender or Maya, set **Edit > Preferences > Interface > Rotation** to **Turntable**: sideways drags then turn the
 model around its vertical axis and up-down drags tilt it, stopping just short of looking straight down or up.
 
 Panning moves the target; zooming moves the camera closer to it or further away. The view is a perspective
@@ -17,10 +17,16 @@ view with a 35 degree field of view, or orthographic (<kbd>Numpad 5</kbd>): no f
 shrink with depth. The front, side and top views (<kbd>Numpad 1</kbd>, <kbd>3</kbd>, <kbd>7</kbd>) switch to
 orthographic until you rotate again, as in Blender.
 
-The X / Y / Z gizmo in the top left of the canvas (**Draw > Camera > Axes**) shows the world axes as the camera
+The X / Y / Z gizmo in the top left of the canvas (**Sculpt > Draw & Tablet > Camera > Axes**) shows the world axes as the camera
 sees them. Click an end to look from that side, as in Blender: **X** the right view, **Y** the top, **Z** the front,
 and the plain dot at the other end of each axis the left, bottom or back view. These are orthographic like the
 numpad views. The end under the pointer gets a ring.
+
+**Sculpt > Draw & Tablet > Camera > Gizmo size** makes the axes **Small**, **Medium** (the default) or **Large**; they grow with the
+UI scale too, and clicking an end works at every size. **View Figure** (beside **Axes**, off until you turn it on)
+adds a small shaded head in the corner that turns with the camera, so you can tell front from back at a glance.
+Click it to look from the nearest side: the front, back, left, right, top or bottom view, orthographic like the
+axes.
 
 Navigation starts only on the canvas. A drag that begins on a shelf, a tray or a palette never moves the
 camera.
@@ -31,10 +37,11 @@ camera.
 > navigation. As in ZBrush, dragging up (forward) zooms out and dragging down zooms in, and when you rotate or pan
 > the model follows the cursor. The right-shelf Move, Zoom and Rotate buttons work as in ZBrush.
 
-> **Blender:** with **Preferences > Input > Style** on **Blender**, middle-drag rotates, <kbd>Shift</kbd>+middle-drag
-> pans and <kbd>Ctrl</kbd>+middle-drag zooms. With a pen or a trackpad, <kbd>Alt</kbd>+left-drag does the same
-> (add <kbd>Shift</kbd> to pan, <kbd>Ctrl</kbd> to zoom), anywhere on the canvas, as Blender's Emulate 3 Button
-> Mouse. The numpad views, <kbd>Numpad .</kbd> and <kbd>Home</kbd> frame as in Blender. See
+> **Blender:** with **Edit > Preferences > Input > Style** on **Blender**, middle-drag rotates, <kbd>Shift</kbd>+middle-drag
+> pans and <kbd>Ctrl</kbd>+middle-drag zooms. With a pen or a trackpad, <kbd>Alt</kbd>+left-drag beside the model
+> does the same (add <kbd>Shift</kbd> to pan, anywhere; <kbd>Ctrl</kbd> to zoom); on the model it masks, as in
+> Blender 5.1 and later. Turn on **Edit > Preferences > Input > Emulate 3 Button Mouse** to make <kbd>Alt</kbd>+left-drag
+> turn the view everywhere, as that Blender preference does. The numpad views, <kbd>Numpad .</kbd> and <kbd>Home</kbd> frame as in Blender. See
 > [Blender keys](shortcuts.md#blender-keys).
 
 ## Mouse and pen
@@ -52,17 +59,18 @@ camera.
 | Turn in 15 degree steps | <kbd>Numpad 4</kbd> / <kbd>Numpad 6</kbd> (around), <kbd>Numpad 8</kbd> / <kbd>Numpad 2</kbd> (over); <kbd>Numpad 9</kbd>: the other side |
 | Frame the active Part | <kbd>Numpad .</kbd> |
 | Frame one Part | <kbd>Shift</kbd>+<kbd>Alt</kbd>+click it, or triple-click another Part (it becomes the active Part) |
-| Sculpt from the background | Turn on **Preferences > Input > Start strokes off the model**, or press <kbd>Shift</kbd>+<kbd>L</kbd> (**Toggle strokes off the model**): a left-drag that starts beside the model sculpts once it reaches the surface |
-| Move the camera with Space held | Turn on **Preferences > Input > Hold Space and drag to move the camera**, then hold <kbd>Space</kbd>: left-drag rotates, right- or middle-drag pans, <kbd>Ctrl</kbd>+drag zooms, anywhere on the canvas (on the model too) |
+| Sculpt from the background | Turn on **Edit > Preferences > Input > Start strokes off the model**, **View > Lock camera**, or press <kbd>Shift</kbd>+<kbd>L</kbd>: a left-drag that starts beside the model sculpts once it reaches the surface |
+| Move the camera with Space held | Turn on **Edit > Preferences > Input > Hold Space and drag to move the camera**, then hold <kbd>Space</kbd>: left-drag rotates, right- or middle-drag pans, <kbd>Ctrl</kbd>+drag zooms, anywhere on the canvas (on the model too) |
 
-Zoom drags: drag up to come closer, down to back away. With the ZBrush-style keys (**Preferences > Input**)
+Zoom drags: drag up to come closer, down to back away. With the ZBrush-style keys (**Edit > Preferences > Input**)
 they go the ZBrush way: drag up to zoom out, down to zoom in.
 
 **Hold Space and drag to move the camera** is off by default, because in ZBrush <kbd>Space</kbd> opens the
 Quick Menu. With it on, <kbd>Space</kbd> no longer opens the Quick Menu (a right click still does), and a space typed in
 a text field is never taken.
 
-**Start strokes off the model** is off by default. With it on (a label at the top of the canvas says so), a
+**Start strokes off the model** (also **View > Lock camera**) is off by default. With it on (a label at the top of
+the canvas says so, and in the SculptForge layout the status bar shows **CAMERA LOCKED**), a
 left-drag on the background no longer rotates: it waits, and the brush starts where the cursor first reaches the
 model, so strokes that begin at the silhouette never turn the view by accident. <kbd>Ctrl</kbd> (mask) and
 <kbd>Shift</kbd> (smooth) strokes start the same way, and a <kbd>Ctrl</kbd>+click on the background still inverts
@@ -97,7 +105,7 @@ on a laptop trackpad, or when the model fills the canvas and there is no backgro
 | **Zoom** | Zoom: drag up to come closer, down to move away |
 | **Rotate** | Orbit the view |
 
-The button stays orange while you drag. **Frame** is also in the **Render** and **Transform** palettes.
+The button stays orange while you drag. **Frame** is also in the **View** menu and **Sculpt > Symmetry & Gizmo**.
 
 ## SpaceMouse (experimental)
 
@@ -106,7 +114,7 @@ directly as a USB device, without 3Dconnexion's driver or SDK, so this is **expe
 with simulated input only, not yet with a real SpaceMouse. Tell us how it works with yours
 ([GitHub issue #6](https://github.com/islandmed/SculptForge/issues/6)).
 
-Plug it in and it works: **Preferences > Input** shows its name under **SpaceMouse (experimental)**, with live
+Plug it in and it works: **Edit > Preferences > Input** shows its name under **SpaceMouse (experimental)**, with live
 bars for its six axes. The model moves the way you move the cap, and turns about the same point the mouse
 orbits around (the camera's target: **Frame** sets it to the scene's centre, and panning moves it).
 
@@ -126,7 +134,7 @@ machine as on a fast one. It works in every input style (SculptForge, ZBrush-sty
 held: the stroke keeps going, sculpting wherever the pen points on the turned model. Many people stop moving the
 pen while they turn the view, and that works best, but you don't have to.
 
-**Preferences > Input > SpaceMouse:**
+**Edit > Preferences > Input > SpaceMouse:**
 
 - **Use SpaceMouse**: off ignores it completely, buttons too.
 - **Speed**: how fast the view moves for the same push.
@@ -157,10 +165,18 @@ Store Config (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) keeps these setting
   absolute axes, which is how joysticks work. If the kernel reports them as relative motion, as it does for some
   older models, the SpaceMouse doesn't show up at all. Reading it through spacenavd isn't supported yet.
 
+**If it shows up but the view doesn't move** (the live bars stay still when you push the cap), another program
+holds the device: quit 3DxWare (or spacenavd on Linux) as above, then unplug and plug the SpaceMouse back in.
+
+**To report a problem**, open **Edit > Preferences > Input > SpaceMouse** and click **Copy device report** (shown until the cap has moved the view): it puts
+every joystick SculptForge sees on the clipboard, with its USB ids and why it was or wasn't used. Paste it into
+your issue.
+
 SculptForge recognises 3Dconnexion devices by their USB ids: everything under 3Dconnexion's own vendor id
 (SpaceMouse Compact, Wireless, Pro, Enterprise, Module, the Universal Receiver) except the CadMouse and the
 keyboards, and the older models sold under Logitech's id (SpaceNavigator, SpacePilot, SpaceExplorer, SpaceMouse
-Pro, SpaceBall 5000).
+Pro, SpaceBall 5000). A device that names itself 3Dconnexion counts whatever its ids, as does one whose system
+reports no vendor id (seen over Bluetooth) when its name says SpaceMouse or SpaceNavigator.
 
 ## Framing
 
@@ -171,7 +187,7 @@ unusual scale.
 
 ## Display toggles that help navigation
 
-These live on the right shelf and in the **Render** palette:
+These live on the right shelf and in the **View** menu:
 
 - **Wire** (<kbd>Shift</kbd>+<kbd>F</kbd>): shows the polygons of the active Part over
   the surface, ZBrush's PolyFrame. Quads show as quads (see [Quads and triangles](geometry.md#quads-and-triangles)).
@@ -180,7 +196,7 @@ These live on the right shelf and in the **Render** palette:
 - **Mask**: darkens masked areas.
 - **Paint**: shows vertex paint colours (off shows the plain material).
 - **Solo**: shows only the active Part, to get at parts hidden behind others.
-- **Show Mesh** (Render palette): hides the sculpt, for example to look at a splat capture on its own.
+- **Show Mesh** (**View** menu): hides the sculpt, for example to look at a splat capture on its own.
 
 **Fullscreen** (<kbd>F11</kbd>) and hiding the shelves (<kbd>Tab</kbd>) give the canvas the most room. See
 [The interface](interface.md).

@@ -172,38 +172,37 @@ remember cursor_x mouse_x
 pen_enter 0.9 0.1
 expect_value cursor_x >= $mouse_x-0.5
 expect_value cursor_x <= $mouse_x+0.5
-# #72: the driver moves the system cursor itself, and that is the one cursor for the brush and the panels. The pen
-# lifted, the cursor moved elsewhere, the pen put down at another point: brush, panels and system cursor agree.
+# #72 (drag-d, driver in pen mode, 0.10.8: "no difference between default and mouse mode"): the pen reports its
+# place on the tablet, yet the cursor moves only by the pen's movement. The pen lifted and put down elsewhere: no
+# jump; it moves on from there, the panels see the pointer at the brush (ImGui floors it to whole pixels), and
+# they draw the arrow there (the system arrow, at the pen's place on the tablet, is hidden).
 pen_out
-os_cursor 0.3 0.6
-remember os_cursor_x os_x
-remember os_cursor_y os_y
-pen_enter 0.85 0.2
-expect_value cursor_x >= $os_x-1.5
-expect_value cursor_x <= $os_x+1.5
-expect_value cursor_y >= $os_y-1.5
-expect_value cursor_y <= $os_y+1.5
-expect_value ui_mouse_x >= $os_x-1.5
-expect_value ui_mouse_x <= $os_x+1.5
-os_cursor 0.4 0.55
-remember os_cursor_x os_x
-remember os_cursor_y os_y
-pen_hover 0.9 0.15
-expect_value cursor_x >= $os_x-1.5
-expect_value cursor_x <= $os_x+1.5
-expect_value ui_mouse_y >= $os_y-1.5
-expect_value ui_mouse_y <= $os_y+1.5
+pen_enter 0.3 0.6
+remember cursor_x a_x
+remember cursor_y a_y
+pen_hover 0.4 0.6
+expect_value cursor_x > $a_x+5
+remember cursor_x b_x
+remember cursor_y b_y
 pen_out
-mouse_move 0.65 0.35
-os_cursor 0.65 0.35
-remember os_cursor_x os_x
-remember os_cursor_y os_y
-pen_enter 0.1 0.9
-expect_value cursor_x >= $os_x-1.5
-expect_value cursor_x <= $os_x+1.5
-expect_value ui_mouse_x >= $os_x-1.5
-expect_value ui_mouse_x <= $os_x+1.5
-os_cursor off
+pen_enter 0.9 0.15
+expect_value cursor_x >= $b_x-0.5
+expect_value cursor_x <= $b_x+0.5
+expect_value cursor_y >= $b_y-0.5
+expect_value cursor_y <= $b_y+0.5
+expect_value ui_mouse_x >= $b_x-1
+expect_value ui_mouse_x <= $b_x+0.5
+expect_value ui_mouse_y >= $b_y-1
+expect_value ui_mouse_y <= $b_y+0.5
+pen_hover 0.8 0.15
+expect_value cursor_x < $b_x-5
+expect_value cursor_y >= $b_y-1.5
+expect_value cursor_y <= $b_y+1.5
+wait 0.1
+expect_value soft_cursor == 1
+pen_out
+wait 0.1
+expect_value soft_cursor == 0
 # Pen mode again: the cursor is where the pen is.
 pen_out
 click "Preferences##palette.preferences"

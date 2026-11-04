@@ -1,0 +1,65 @@
+# Preferences > AI > Enable AI features (F5): off, no AI entry point is left on the shelves, in the menus, the
+# command palette or scripts, and nothing AI connects; on brings them back. The welcome asks too.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+run new_sphere subdivisions=2
+expect_value ai_enabled == 1
+expect "AI Brush"
+click "Preferences##palette.preferences"
+click "AI##preferences.ai"
+expect_text "Your art is never uploaded or used for training"
+shot ai-prefs-on
+
+click "Enable AI features##prefs.ai"
+expect_value ai_enabled == 0
+expect_status "AI features off"
+expect_not "AI Brush"
+shot ai-prefs-off
+run_fails brush_ai prompt=sharp
+run_fails image_to_3d path=missing.png
+run_fails text_to_3d prompt=dragon
+run_fails comfyui_check
+expect_value http_requests == 0
+
+# The Generate palette keeps the offline tools only.
+click "Generate##palette.generate"
+expect_text "AI features are off"
+expect "Relief"
+expect_not "Generate 3D##ui.generate3d"
+shot ai-generate-off
+
+# The command palette finds the switch, not the AI tools.
+key f3
+type "##Command palette" "brush ai"
+expect_no_text "Design a brush"
+type "##Command palette" "image to 3d"
+expect_no_text "Reconstruct a full 3D model"
+type "##Command palette" "enable ai"
+expect_text "Preferences > AI"
+key esc
+
+# Back on: everything returns.
+click "Preferences##palette.preferences"         # its AI section is still open
+click "Enable AI features##prefs.ai"
+expect_value ai_enabled == 1
+expect "AI Brush"
+click "Preferences##palette.preferences"         # close the popup first
+click "AI Brush"
+expect "Brush Lab"
+click "AI Brush"
+
+# First run: the welcome asks.
+key f3
+type "##Command palette" "welcome"
+key enter
+expect_value welcome_open == 1
+expect "Off##welcome.ai"
+shot ai-welcome
+click "Off##welcome.ai"
+expect_value ai_enabled == 0
+click "On##welcome.ai"
+expect_value ai_enabled == 1
+run ai_features on=false
+expect_value ai_enabled == 0
+expect_not "AI Brush"
+run ai_features on=true
+expect "AI Brush"

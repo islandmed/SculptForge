@@ -14,7 +14,8 @@ hiding, reordering, merging and splitting Parts, and how they travel through fil
   Part, and switching Parts doesn't lose the history of the others.
 - Adding, deleting, reordering, merging and splitting Parts are **not undoable**, as in ZBrush. Merges and
   deletes ask for confirmation first.
-- The title strip shows the active Part and its place in the list, for example `Part Helmet (2/5)`.
+- The Parts list highlights the active Part. In the ZBrush-style layout the title strip also shows it and its place
+  in the list, for example `Part Helmet (2/5)`.
 
 > **ZBrush:** Parts work the way you expect: one active Part, the rest dimmed, Alt+click in the viewport to
 > switch. There is no folder grouping of Parts yet.
@@ -34,7 +35,7 @@ and they catch up a moment after you stop changing a Part (not during a stroke).
 | Select a Part | Click its row, or <kbd>Alt</kbd>+click it in the viewport; triple-click another Part in the viewport to select it and frame it |
 | Rename it | Double-click the row (or right-click > **Rename**), type, press <kbd>Enter</kbd> |
 | Hide or show it | Click the eye at the end of the row |
-| Duplicate or delete it | Right-click the row > **Duplicate** or **Delete...** |
+| Duplicate or delete it | Right-click the row > **Duplicate** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>) or **Delete...** |
 | See its vertex and triangle counts | Point at the row for a moment |
 
 The list shows six rows and scrolls when there are more. Names are kept unique: renaming a Part to a name that
@@ -74,7 +75,8 @@ You can also add files as Parts from elsewhere:
 - In the [Library](interface.md) **Tool** tab, <kbd>Shift</kbd>+double-click a model, or right-click it
   and choose **Append as Part**.
 
-> **Tip:** **Duplicate** copies the active Part with its layers and attributes, names it `<name> copy` and puts it
+> **Tip:** **Duplicate** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>, also in the command palette as
+> **Duplicate Part**) copies the active Part with its layers and attributes, names it `<name> copy` and puts it
 > right under the original. Use it to keep a safe copy before a destructive step such as a remesh.
 
 ## Show, hide and solo
@@ -82,6 +84,9 @@ You can also add files as Parts from elsewhere:
 - The eye on each row shows or hides that Part.
 - **Solo** shows only the active Part. Click it again to bring the others back. The **Solo** button on the right
   shelf does the same.
+- **X-Ray**, next to **Solo**, shows the active Part through the others: the other Parts turn see-through and only
+  their nearest surface shows. When only the active Part is shown, it is see-through itself. Click **X-Ray** again
+  to make them solid. **View > X-Ray** does the same.
 - **Unhide all** shows every Part.
 
 Hidden Parts aren't drawn, can't be selected with <kbd>Alt</kbd>+click, and are left out of exports.

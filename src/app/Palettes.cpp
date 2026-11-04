@@ -16,6 +16,7 @@
 #include "app/Ui.h"
 #include "app/I18n.h"
 #include "core/Matcap.h"
+#include "core/StarterMeshes.h"
 
 #include <IconsLucide.h>
 
@@ -302,6 +303,8 @@ void App::drawPalette_Brush() {
     // then every brush as thumbnails (Pickers.cpp, the same grid as the B picker).
     actionRow(*this, {"ui.brush_lab", "ui.brush_gallery"});
     actionRow(*this, {"brush.paste"});
+    actionRow(*this, {"brush.save_settings"}); // this brush's own settings (#78); one per row so the labels fit
+    actionRow(*this, {"brush.reset_settings"});
     drawCustomBrushes();
     ImGui::Checkbox(tr("Front faces only"), &frontFacesOnly_);
     ui::HelpAction(*this, "draw.front_faces");
@@ -318,6 +321,12 @@ void App::drawPalette_Brush() {
                  "The Smooth brush (and Shift) removes bumps without shrinking the form, instead of the plain smooth "
                  "that also flattens it. Either way, let go of Shift while still pressing a Shift-smooth stroke to "
                  "switch to the other smooth for the rest of the stroke (ZBrush's alternate smooth).",
+                 "Brush");
+    ImGui::Checkbox(tr("Smooth face group borders only##smooth_group_borders"), &smoothGroupBorders_);
+    ui::HelpText("Smooth face group borders only", nullptr,
+                 "The Smooth brush (and Shift) straightens the borders between face groups and leaves everything "
+                 "else alone: a jagged clothing edge, a cuff or a panel line becomes a clean line along the surface. "
+                 "Corners where three groups meet stay where they are.",
                  "Brush");
     if (BrushRecipe* recipe = doc_.activeBrush >= 0 && doc_.activeBrush < int(doc_.brushes.size())
                                   ? &doc_.brushes[size_t(doc_.activeBrush)]
@@ -345,8 +354,10 @@ void App::drawPalette_Brush() {
 void App::drawPalette_Draw() {
     const tray::Style style; // quiet check marks
     ImGui::SetNextItemWidth(-1);
-    ui::SliderInside("##drawsize", &radiusPx_, 2.0f, 800.0f, "Draw Size %.0f", ImGuiSliderFlags_Logarithmic);
-    ui::HelpText("Draw Size", "S", "Brush radius in screen pixels. [ and ] change it by 10%.", "Draw");
+    drawSizeSlider("##drawsize", "Draw",
+                   "Brush radius in screen pixels (0.5 to 800), and in mm on the surface under the cursor. [ and ] change "
+                   "it by 10%, Shift+[ and Shift+] by 1 px; Ctrl+Shift+right-drag scrubs it finely.");
+    ui::ActionButton(*this, "brush.world_size", ImVec2(-1, 0));
     ImGui::SetNextItemWidth(-1);
     drawZIntensitySlider("##strength");
     ImGui::SetNextItemWidth(-1);
@@ -429,6 +440,14 @@ void App::drawPalette_Draw() {
         }
         ui::Checkbox("Axes##draw.axes", &uiPrefs_.showAxes);
         ui::HelpText("Axes", nullptr, "Show the X / Y / Z directions in the corner of the canvas.", "Draw > Camera");
+        ImGui::SameLine();
+        ui::Checkbox("View Figure##draw.view_figure", &uiPrefs_.showViewFigure);
+        ui::HelpText("View Figure", nullptr,
+                     "Show a small shaded head in the corner of the canvas that turns with the view. Click it to look "
+                     "from the nearest side (front, back, left, right, top or bottom).",
+                     "Draw > Camera");
+        hint(*this, "Gizmo size");
+        segmented(*this, {"view.gizmo_small", "view.gizmo_medium", "view.gizmo_large"});
     }
     // Tablet: the same Pressure > Strength / Size toggles as the top shelf (not checkboxes), and the pen state as
     // a hint line.
@@ -460,6 +479,18 @@ void App::drawPalette_Edit() {
 void App::drawPalette_File() {
     menuAction(*this, "file.new_sphere");
     menuAction(*this, "file.new_plane");
+    if (ImGui::BeginMenu("New from Starter Mesh")) {
+        for (const StarterMesh& m : starterMeshes()) {
+            if (ImGui::MenuItem((std::string(m.name) + "##starter." + m.id).c_str())) {
+                const std::string id = m.id;
+                confirmDiscard([this, id] { runCommand("new_starter_mesh", {{"name", id}}); });
+            }
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", m.description);
+        }
+        ImGui::Separator();
+        menuAction(*this, "file.new_starter");
+        ImGui::EndMenu();
+    }
     ImGui::Separator();
     menuAction(*this, "file.open");
     drawFileMenuProjectItems(); // Open Recent, Save, Save As, autosave
@@ -485,9 +516,13 @@ void App::drawPalette_File() {
 
 void App::drawPalette_Generate() {
     const tray::Style style; // quiet check marks
-    actionRow(*this, {"ui.generate3d"});
-    hint(*this, "Image or text to a sculptable 3D model: Hugging Face (free), fal.ai, Meshy, your ComfyUI server, your own "
-         "command, or an offline blockout.");
+    if (ai::aiEnabled()) {
+        actionRow(*this, {"ui.generate3d"});
+        hint(*this, "Image or text to a sculptable 3D model: Hugging Face (free), fal.ai, Meshy, your ComfyUI server, your own "
+             "command, or an offline blockout.");
+    } else {
+        hint(*this, "AI features are off (Preferences > AI): Relief, Inflate and Stamp work offline.");
+    }
     tray::GroupLabel(*this, "From an image");
     if (ImGui::Button(refImage_.empty() ? "Choose image...##generate" : "Change image...##generate", ImVec2(-1, 0))) {
         static const SDL_DialogFileFilter filters[] = {{"Images", "png;jpg;jpeg;bmp;tga;psd;gif"}, {"All files", "*"}};
@@ -517,7 +552,7 @@ void App::drawPalette_Generate() {
     if (ImGui::Button(tr("Stamp"), ImVec2(third, 0))) projectImageFromView();
     ui::HelpText("Stamp", nullptr, "Projects the image onto the model from this view as surface detail.", "Generate");
     ImGui::EndDisabled();
-    if (subpalette("generate.ai", "AI brush provider")) {
+    if (ai::aiEnabled() && subpalette("generate.ai", "AI brush provider")) {
         tray::Section section;
         drawAiSettings();
     }
@@ -526,6 +561,7 @@ void App::drawPalette_Generate() {
 void App::drawPalette_Help() {
     menuAction(*this, "help.controls");
     menuAction(*this, "help.guide");
+    menuAction(*this, "help.first_sculpt");
     menuAction(*this, "help.whats_new");
     menuAction(*this, "help.check_updates");
     menuAction(*this, "ui.command_palette");
@@ -560,6 +596,14 @@ void App::drawPalette_Preferences() {
         tray::Section section;
         drawInputSection();
     }
+    if (subpalette("preferences.cursor", "Cursor")) {
+        tray::Section section;
+        drawCursorSection();
+    }
+    if (subpalette("preferences.hints", "Hints")) {
+        tray::Section section;
+        drawHintsSection();
+    }
     if (subpalette("preferences.hotkeys", "Hotkeys")) {
         tray::Section section;
         config::drawHotkeysSection(*this);
@@ -579,6 +623,14 @@ void App::drawPalette_Preferences() {
     if (subpalette("preferences.performance", "Performance")) {
         tray::Section section;
         drawPerformanceSection();
+    }
+    if (subpalette("preferences.ai", "AI")) {
+        tray::Section section;
+        drawAiPrefs(); // the switch (PanelAi.cpp)
+        if (ai::aiEnabled()) {
+            ImGui::Spacing();
+            drawAiPrefsSection(); // the Hugging Face token
+        }
     }
     if (subpalette("preferences.updates", "Updates")) {
         tray::Section section;
@@ -610,11 +662,19 @@ void App::drawPalette_Render() {
     ui::HelpAction(*this, "view.mask");
     ImGui::Checkbox(tr("Show Face Groups##render"), &renderSettings_.showPolygroups);
     ui::HelpAction(*this, "view.polygroups");
+    bool xray = renderSettings_.xray;
+    if (ui::Checkbox("X-Ray##render", &xray)) runCommand("xray", {{"on", xray}});
+    ui::HelpAction(*this, "view.xray");
     ImGui::BeginDisabled(doc_.splats.empty());
     ImGui::Checkbox(tr("Show Splats"), &renderSettings_.showSplats);
     ImGui::EndDisabled();
     ui::HelpAction(*this, "view.splats");
+    bool lockCamera = uiPrefs_.airStrokes; // #62: drags on the background start strokes (Shift+L)
+    if (ui::Checkbox("Lock camera##view.lock_camera", &lockCamera)) uiPrefs_.airStrokes = lockCamera;
+    ui::HelpAction(*this, "input.toggle_air_strokes");
     drawBackgroundControls("render");
+    ImGui::TextDisabled("%s", tr("View resolution"));
+    ui::Segmented(*this, {"perf.res_100", "perf.res_75", "perf.res_50"});
     actionRow(*this, {"view.frame", "view.fullscreen"});
     actionRow(*this, {"ui.lightbox", "ui.console"}); // (the SculptForge layout's View menu: they left the shelf)
 }
@@ -700,7 +760,7 @@ void App::drawPalette_Tool() {
         tray::Section section;
         Demo::pushScope("Geometry");
         drawGeometrySection();
-        actionRow(*this, {"geometry.subdivide"});
+        actionRow(*this, {"geometry.subdivide", "geometry.close_holes"});
         const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
         if (ImGui::Button(tr("Decimate"), ImVec2(half, 0))) {
             Args args{{"ratio", double(decimateRatio_)}};
@@ -765,6 +825,10 @@ void App::drawPalette_Tool() {
         Demo::pushScope("Deformation");
         drawDeformationContents(); // Mirror (PanelExtract.cpp)
         Demo::popScope();
+    }
+    if (subpalette("tool.cut", "Cut")) {
+        tray::Section section;
+        drawCutSection(); // PanelCut.cpp
     }
     if (subpalette("tool.masking", "Masking")) {
         tray::Section section;

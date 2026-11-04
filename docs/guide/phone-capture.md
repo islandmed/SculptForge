@@ -65,7 +65,7 @@ it into a Gaussian splat that sharpens in the viewport while it trains. See [Gau
 ## One photo to 3D
 
 Tap **One photo to 3D** and take a photo (or choose one). One object, the whole of it in the picture, on a plain
-background works best. SculptForge loads it into **Generate > Image to 3D** and starts generating with the service
+background works best. SculptForge loads it into **Mesh > Generate 3D > Image to 3D** and starts generating with the service
 chosen there (free Hugging Face models by default). Turn off **Generate from a photo at once** in the window to
 check the photo first and press **Generate** yourself. See [Image and text to 3D](generate-3d.md).
 

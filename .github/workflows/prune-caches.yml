@@ -1,0 +1,32 @@
+name: Prune caches
+
+# Keeps only the newest Actions cache of each kind per branch (tools/ci/prune_caches.py) after CI or Packages saved
+# new ones: the repository's 10 GB cache budget otherwise evicts main's compiler caches within two pushes, and branch
+# builds then start cold (8-13 min instead of about 1). Its own workflow because deleting caches needs actions: write,
+# which Packages cannot ask for when release.yml calls it.
+
+on:
+  workflow_run:
+    workflows: [CI, Packages]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: prune-caches
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    name: Prune caches
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: tools/ci
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/ci/prune_caches.py ccache-ci- cmake-ci- ccache-pkg-

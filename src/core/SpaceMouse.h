@@ -28,7 +28,8 @@ enum SpaceMouseAxis { kSmTx, kSmTy, kSmTz, kSmRx, kSmRy, kSmRz, kSmAxes };
 // vendor id 0x046D (SpaceNavigator, SpacePilot, SpaceExplorer...). SDL itself has no list of them (its
 // controller_list.h only knows gamepads), so this is ours, from the ids spacenavd and Linux's hid-ids.h use.
 // The CadMouse and the 3Dconnexion keyboards / numpads share the vendor id but are not SpaceMice.
-// `name` is the device's name: a Logitech-id device with an unknown product counts when it calls itself one.
+// `name` is the device's name: a Logitech-id or vendor-0 device with an unknown product counts when it calls itself
+// a SpaceMouse (SpaceNavigator...), any vendor when the name says 3Dconnexion (#104).
 bool isSpaceMouseDevice(uint16_t vendor, uint16_t product, const std::string& name = {});
 
 constexpr int kSpaceMouseButtonSlots = 8; // buttons whose action Preferences lists (an Enterprise has 31)

@@ -1,0 +1,98 @@
+# A Wacom Intuos 3 report (0.10.8): the tablet worked only if plugged in before launch, the camera sometimes went
+# wild, pressure was sometimes missing and the active Part changed by itself.
+run ui_look look=classic layout=zbrush
+run new_sphere subdivisions=4
+key f
+
+# Plugged in after launch with a generic device name (Windows, Wacom Bridge): connected once its pen comes into range,
+# and it sculpts with pressure.
+tablet_plug
+pen_hover 0.5 0.5
+expect_status Tablet connected
+snapshot
+pen_stroke 0.3 0.45 0.7 0.55 0.2 0.8
+expect_value pressure_status == 1
+expect_value moved > 0
+tablet_unplug
+expect_status Tablet disconnected
+expect_value stroking == 0
+
+# With the maker's name: said at once. A pen without a pressure axis (pressure 0 while touching, as with Windows
+# Ink off) still sculpts, at full pressure, and Preferences says pressure isn't detected.
+tablet_plug Wacom Intuos3 6x8 Pen
+expect_status Tablet connected: Wacom Intuos3 6x8 Pen
+snapshot
+pen_stroke 0.3 0.45 0.7 0.55 0 0
+expect_value pressure_status == 2
+expect_value moved > 0
+expect_value brush_pressure == 1
+
+# Wacom Bridge reconnecting (a new pen, no device event): pressure is read again for it.
+pen_new
+snapshot
+pen_stroke 0.3 0.6 0.7 0.6 0.3 0.9
+expect_value pressure_status == 1
+expect_value moved > 0
+
+# The camera: the lower side button (Right-click) drags the view; the pen leaving mid-drag ends it, and coming
+# back elsewhere doesn't move the view.
+camera 10 -10
+pen_hover 0.5 0.5
+pen_button 1 down
+pen_hover 0.6 0.5
+pen_out
+remember camera_yaw y1
+remember camera_pitch p1
+pen_enter 0.1 0.9
+pen_hover 0.2 0.8
+pen_button 1 up
+expect_value camera_yaw == $y1
+expect_value camera_pitch == $p1
+# A side button pressed and let go without moving: nothing moves.
+pen_button 1 down
+pen_button 1 up
+pen_button 2 down
+pen_button 2 up
+expect_value camera_yaw == $y1
+expect_value camera_pitch == $p1
+# The mouse moved the cursor meanwhile: the pen's first position is a jump, not a drag.
+mouse_move 0.9 0.1
+pen_enter 0.5 0.5
+expect_value camera_yaw == $y1
+# Flipping to the eraser end (a pen of its own on some systems): it sculpts, the view stays.
+pen_out
+pen_new
+snapshot
+pen_stroke 0.3 0.45 0.7 0.55 0.6 0.6 eraser
+expect_value moved > 0
+expect_value camera_yaw == $y1
+expect_value camera_pitch == $p1
+expect_value stroking == 0
+
+# The active Part: only the keyboard's Alt with a quick click switches it, and the status bar says so.
+run subtool_append type=cube name=Cube
+run subtool_select index=0
+key f
+# The upper pen button (Invert, as Alt) held while tapping another Part: no switch.
+pen_button 2 down
+click_subtool Cube 0.5 0.5 1 pen
+pen_button 2 up
+expect_value active_subtool == 0
+# Alt held on the keyboard and a long pen press: sculpting, not a click.
+hold alt
+click_subtool Cube 0.5 0.5 1 pen 0.8
+hold none
+expect_value active_subtool == 0
+# Alt + a pen tap: the Cube, named in the status bar with the shortcut.
+hold alt
+click_subtool Cube 0.5 0.5 1 pen
+hold none
+expect_value active_subtool == 1
+expect_status Active Part: Cube (Alt+click)
+# The mouse's Alt+click still works.
+run subtool_select index=0
+hold alt
+click_subtool Cube 0.5 0.5
+hold none
+expect_value active_subtool == 1
+expect_status (Alt+click)

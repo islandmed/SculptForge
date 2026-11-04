@@ -72,6 +72,8 @@ def validate(doc):
     runs = need(doc, "runs", "list", "root") or []
     if not runs:
         errs.append("runs: empty")
+    for k in doc.get("skipped") or []:  # a scene left out for lack of free memory: not a complete result
+        errs.append(f"skipped: {k.get('message', k.get('label', '?'))}")
     for i, run in enumerate(runs):
         w = f"runs[{i}]"
         need(run, "label", "str", w)

@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "ai/ImageTo3DService.h"
+#include "ai/AiPolicy.h"
 
 #include "ai/ComfyUI.h"
 #include "ai/GradioClient.h"
@@ -269,12 +270,8 @@ GeneratorResult runHuggingFace(const AiSettings& s, const std::string& imagePath
                                const std::string& outputStem, GenerationProgress* p) {
     GeneratorResult result;
     const bool text = !prompt.empty();
-    const auto& presets = text ? hfTextPresets() : hfPresets();
-    const HfPreset* preset = nullptr;
-    for (const auto& h : presets)
-        if (s.hfModel == h.id) preset = &h;
-    if (!preset) preset = &presets[0];
-
+    const HfPreset* preset = &resolveHfPreset(s, text, &result.note);
+    if (!result.note.empty()) status(p, result.note);
     status(p, "Connecting to " + std::string(preset->label) + "...");
     GradioClient client;
     if (!client.connect(preset->space, s.resolvedHfToken(), result.error)) return result;
@@ -374,8 +371,26 @@ bool hunyuanModel(std::string_view id) {
 }
 
 const char* kHunyuanLicenceNote =
-    "Hunyuan3D's licence (Tencent Hunyuan Community License) doesn't cover use in the European Union, the United "
-    "Kingdom or South Korea. There, pick TRELLIS.2 or another model.";
+    "Hunyuan3D models are under the Tencent Hunyuan Community License, which doesn't cover use in the EU, UK or "
+    "South Korea. There, choose TRELLIS.2 (free token) or another model.";
+
+const char* kTrellisNoTokenNote =
+    "TRELLIS.2 needs a free Hugging Face token (Preferences > AI); used Hunyuan3D 2.1 instead.";
+
+const HfPreset& resolveHfPreset(const AiSettings& s, bool text, std::string* note) {
+    const auto& presets = text ? hfTextPresets() : hfPresets();
+    auto find = [&](std::string_view id) -> const HfPreset* {
+        for (const auto& h : presets)
+            if (id == h.id) return &h;
+        return nullptr;
+    };
+    if (!text && s.hfModel == "trellis-2" && s.resolvedHfToken().empty()) {
+        if (note) *note = kTrellisNoTokenNote;
+        return *find("hunyuan3d-2.1");
+    }
+    const HfPreset* preset = find(s.hfModel);
+    return preset ? *preset : presets[0];
+}
 
 std::string base64Encode(const uint8_t* data, size_t size) {
     static const char* chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -428,11 +443,11 @@ const std::vector<HfPreset>& hfTextPresets() {
 
 const std::vector<HfPreset>& hfPresets() {
     static const std::vector<HfPreset> presets = {
-        // TRELLIS.2 first: the default, under the MIT licence.
-        {"trellis-2", "TRELLIS.2 (Microsoft, MIT) - free, best detail, needs an HF token", "https://microsoft-trellis-2.hf.space",
-         {{"start_session", {}}, {"preprocess_image", {"$IMG"}}, {"image_to_3d", {"$OUT1"}}, {"extract_glb", {}}}},
-        {"hunyuan3d-2.1", "Hunyuan3D 2.1 (Tencent) - free, detailed shape", "https://tencent-hunyuan3d-2-1.hf.space",
+        // Hunyuan3D 2.1 first: the default, works with no token. resolveHfPreset() falls back to it.
+        {"hunyuan3d-2.1", "Hunyuan3D 2.1 (Tencent) - free, no token", "https://tencent-hunyuan3d-2-1.hf.space",
          {{"shape_generation", {"$IMG"}}}},
+        {"trellis-2", "TRELLIS.2 (Microsoft, MIT) - Best detail (needs token)", "https://microsoft-trellis-2.hf.space",
+         {{"start_session", {}}, {"preprocess_image", {"$IMG"}}, {"image_to_3d", {"$OUT1"}}, {"extract_glb", {}}}},
         {"hunyuan3d-2-turbo", "Hunyuan3D 2 mini Turbo (Tencent) - free, fastest", "https://tencent-hunyuan3d-2mini-turbo.hf.space",
          {{"shape_generation", {"\"\"", "$IMG"}}}},
         {"hunyuan3d-2", "Hunyuan3D 2 (Tencent) - free", "https://tencent-hunyuan3d-2.hf.space",
@@ -511,6 +526,7 @@ std::string findModelUrl(const Json& result, std::string* extension) {
 
 GeneratorResult generate3D(const AiSettings& s, const std::string& imagePath, const std::string& outputStem,
                            GenerationProgress* progress) {
+    if (!aiEnabled()) return {false, {}, aiOffError()};
     if (s.generatorService == "meshy") return runMeshy(s, imagePath, outputStem, progress);
     if (s.generatorService == "command") {
         status(progress, "Running your generator...");
@@ -539,6 +555,7 @@ std::string falTextBody(const std::string& prompt) {
 
 GeneratorResult generate3DFromText(const AiSettings& s, const std::string& prompt, const std::string& outputStem,
                                    GenerationProgress* progress) {
+    if (!aiEnabled()) return {false, {}, aiOffError()};
     GeneratorResult result;
     if (prompt.find_first_not_of(" \t\r\n") == std::string::npos) {
         result.error = "Describe the model you want";

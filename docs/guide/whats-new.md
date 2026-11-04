@@ -1,30 +1,226 @@
 # What's new
 
-What changed in each version of SculptForge, newest first, with links to the chapters that explain it. This
-chapter opens by itself the first time you start a new version; you can always find it again under
-**Help > What's New**. Every detail is in the
+What changed in each version of SculptForge, newest first. The first time you start a new version, a window
+shows its main features, each with a **Try it** button; **Help > What's New** opens it again. Below are the last
+three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
+
+## Version 0.10.10
+
+```features
+date: 2026-11-03
+tagline: Close Holes, Clip and X-Ray, light you can turn, a faster view on slow machines, and more SpaceMouse devices.
+highlight: Mask and Cut shapes in the stroke popup, no keys held
+highlight: Close Holes, Clip and X-Ray
+```
+
+- **Shapes in the stroke popup**: press **G** and pick Mask Pen, Lasso or Rect, or Cut Line, Lasso, Rect or Polyline.
+  A plain drag then masks or cuts with that shape, no Ctrl or Ctrl+Shift held (with a mask shape on, Ctrl unmasks).
+  Pick it again to turn it off.
+- **Background jobs keep your Part**: a Quad Remesh, Voxel Remesh, Auto UV or Unwrap that finishes after you picked
+  another Part puts its result on its own Part; the Part you picked stays active.
+- **SpaceMouse detection** (#104): more 3Dconnexion devices are recognised (by name, also over Bluetooth), and **Edit
+  > Preferences > Input > SpaceMouse** lists every controller SculptForge sees, says when another program (3DxWare,
+  spacenavd) holds the device, and has **Copy device report** for bug reports.
+- **Also new since 0.10.9** (missing from its notes): the brush ring is a true circle lying on the surface, symmetry
+  copies show as dots, the crosshair stays while you turn the view, and **Preferences > Cursor > Hide ring while
+  stroking** leaves only the dot while you sculpt (#88); drag empty panel space, or middle-drag anywhere in a panel,
+  to scroll it with a pen (#100); Neutral is the default look for new installs; **Look > Outlines** (#98); the Strokes
+  ring on <kbd>J</kbd>.
+- **Close Holes**: **Tool > Geometry > Close Holes** caps every open boundary of a Part with a patch that follows the
+  curve of the surface around it.
+- **Clip**: **Tool > Cut > Clip** presses everything on one side of a line, or outside a lasso or rectangle, flat onto
+  the shape. Nothing is removed. Use it for hard-surface planes and clean silhouettes.
+- **X-Ray**: the **X-Ray** button next to **Solo** shows the active Part through the others. It is also in **View**.
+- **Light**: **Render > Materials > Light** turns the light around the model with a small pad, and sets its intensity
+  and ambient light.
+- **View resolution**: **View** or **Preferences > Performance** draws the 3D view at 75% or 50% for slow GPUs.
+- **Save Render** sizes (up to 4096 px), shapes (1:1, 16:9, 9:16, 4:3) and JPG.
+- **Membership card**: a cleaner look, with a calm warm light instead of the sculpt picture, and the perks now say it
+  plainly: members **vote on what we build next** (#feature-vote on Discord; anyone can suggest in #ideas).
 
 ## Version 0.10.9
 
+```features
+date: 2026-11-02
+tagline: Your first sculpt in ten minutes, starter meshes, brushes that keep their settings, and tablets that just work.
+highlight: Your first sculpt in 10 minutes: a beginner lesson from sphere to a rendered owl
+highlight: Starter meshes: heads, a body, hands and clean primitives, all quads with levels ready
+highlight: Each brush keeps its own size, intensity, stroke and alpha
+highlight: Tablets: plug in while running, pressure with or without Windows Ink, no camera jumps
+title: Your first sculpt
+line: A 12-step lesson that turns the default sphere into a painted, rendered owl head.
+image: images/wn-first-sculpt.jpg
+action: help.first_sculpt
+link: first-sculpt.md
+title: Starter meshes
+line: Start from a head, bust, body, hand or clean primitive, all quads at life size.
+image: images/wn-starter-meshes.jpg
+action: file.new_starter
+link: projects.md#start-from-a-starter-mesh
+title: Brushes keep their settings
+line: Size, intensity, falloff, stroke and alpha follow each brush; Save Brush Settings keeps them.
+image: images/wn-brush-settings.jpg
+action: brush:Clay
+link: sculpting.md#each-brush-keeps-its-own-settings
+title: What's New, redesigned
+line: The main features as cards with a Try it button; older versions fold into short groups.
+image: images/wn-whats-new.jpg
+action: guide:whats-new.md
+```
+
+- **Each brush keeps its own settings**: Draw Size, Intensity, Falloff, RGB Intensity, stroke and alpha follow
+  the brush, custom and Community brushes included. **Brush > Save Brush Settings** keeps them for the next start,
+  **Reset Brush to Default** puts back the shipped values, and **Preferences > Input > Share size and intensity
+  across brushes** keeps the old way (#78). See [Sculpting](sculpting.md#each-brush-keeps-its-own-settings).
+- **Alpha options** (**Alpha** palette): **Follow stroke direction** turns the alpha along the stroke, smoothed as
+  Blender's Rake does; **Angle** and **Angle jitter** turn it by a fixed or a random amount; **Tile** repeats it
+  inside the brush. They work with custom and Community brushes too, and each brush keeps its own (#76). See
+  [Alpha options](sculpting.md#alpha-options).
+- **Blender style: Alt+drag masks** on the model and Ctrl+Alt+drag unmasks, as in Blender 5.1 and later; beside the
+  model Alt+drag still turns the view. **Preferences > Input > Emulate 3 Button Mouse** makes Alt+drag turn the view
+  everywhere. Shift+F now sets the brush's Intensity, not Smooth's (#77).
+- **View > Lock camera** (<kbd>Shift</kbd>+<kbd>L</kbd>): drags that start beside the model sculpt instead of
+  turning the view, and the status bar shows **CAMERA LOCKED** while it is on (#62).
+- **Tablets**: plug a tablet in while SculptForge runs and it just works ("Tablet connected" in the status bar),
+  also through Wacom Bridge. On Windows, pressure works with the Wacom driver's **Use Windows Ink** on or off.
+  **Preferences > Input** shows whether pressure is detected, with a troubleshooting link. The view no longer jumps
+  when the pen comes back into range, and the active Part changes only with **Alt+click** on the keyboard; the
+  status bar names the new Part. See [Troubleshooting](troubleshooting.md#pen-tablets).
+- **Smaller (or larger) corner axes**: **Draw > Camera > Gizmo size** sets Small, Medium or Large
+  ([Navigation](navigation.md)).
+- **View Figure**: turn it on beside **Axes** for a small head in the corner that turns with the view; click it to
+  snap to the nearest side.
+- **Starter meshes**: start a sculpt from a human head with eye and mouth loops, a bust, a full body in A-pose, a
+  hand, a foot, an ear, an eye, a stylised head, a creature head, a torso, or a bevelled box, cylinder, capsule or
+  ring, all clean quads at life size with subdivision levels ready. **File > New from Starter Mesh**, the Library's
+  **Tool > Starter meshes**, or **Start from a head** in the welcome. See
+  [Projects](projects.md#start-from-a-starter-mesh).
+- **Your first sculpt in 10 minutes**: a step-by-step lesson for people who have never sculpted. Turn the
+  default sphere into a cute owl head with ear tufts, big amber eyes and a little beak, using Move, Clay,
+  Inflate and Smooth, Vertex Paint and PBR shading, and save a render to share. Start it from the
+  welcome's **Start the 10-minute lesson** button or **Help > Your first sculpt (10 min)**. See
+  [Your first sculpt](first-sculpt.md).
+- **Save Render** (**Render > Materials**): the view without the interface, at twice its size, as a PNG in your
+  Library (**Library > Image**).
+
+- **A new What's New**: after an update, a window shows the main features as cards with a picture, one line and a
+  **Try it** button that opens the feature (switch the look, select the brush, open the membership card...).
+  **Help > What's New** opens it again; <kbd>Esc</kbd> closes it. This chapter shows the last three versions in
+  full and folds the older ones into short groups, on the website too.
+- **Image to 3D with no setup**: the free default is now Hunyuan3D 2.1, which needs no token. TRELLIS.2 ("Best
+  detail") still needs a free Hugging Face token (**Preferences > AI**); without one, Hunyuan3D 2.1 runs instead
+  and the status line tells you. Your own model choice is kept. See [Image and text to 3D](generate-3d.md).
+- **Generated models arrive as clean quads**: Quad Remesh is now the default, with one subdivision level holding
+  the detail, so you can sculpt and subdivide straight away. Voxel remesh and Off are still in **Remesh**.
+- **Calm, clear hover**: buttons, menus and shelves brighten a little as you point at them, tiles lift a little,
+  sliders show their exact value, and the keyboard focus gets a ring as strong as your **Outlines** setting. Prefer less
+  movement? Turn on **Preferences > Interface > Reduce motion** ([Interface](interface.md)).
+- **Picker thumbnails on top**: the enlarged thumbnail you point at in a picker is no longer hidden under its
+  neighbours (#86).
+- **Focus Detail (experimental)**: sculpt a head of a billion micro triangles from one compressed file. Detail
+  loads where you look and where the brush is heading, and the rest shows a lighter version. Saving writes only
+  what you changed. Try it with `sculptforge --benchmark standard-1b` (Linux and macOS for now).
+- **Precision work** for pores, wrinkles, jewellery and trims: **Steady Stroke** (<kbd>L</kbd>) with every stroke
+  type and a catch-up on release; **World Size**, so the brush keeps its size in mm on the surface as you zoom;
+  Draw Size down to 0.5 px with <kbd>Shift</kbd>+<kbd>[</kbd> / <kbd>]</kbd> for 1 px steps; hold
+  <kbd>Shift</kbd>+<kbd>Alt</kbd> while drawing to move the brush at a quarter of the pen's speed; and a pressure
+  curve for each brush with a **Fine detail** preset. The brush centre now sits exactly under the cursor at any
+  zoom. See [Precision work](sculpting.md#precision-work).
+- **UI scale works live**: **Preferences > Interface > UI scale** (100% to 200%) resizes text and panels at once,
+  no restart. **Automatic** follows the monitor the window is on, so on Windows moving it between a 100% and a
+  150% monitor rescales it right away (#87). See [The interface](interface.md#interface-preferences).
+- **The pen keeps working the panels**: with some tablets (Huion, pen displays, Wacom with Windows Ink on or off)
+  the pen picked one brush, then stopped clicking menus and the canvas until you used the mouse. SculptForge now
+  makes the pen's clicks itself (#95). See [Troubleshooting](troubleshooting.md#pen-tablets).
+- **Mouse mode is relative again**: with **Mouse mode** on (Preferences > Tablet) the pen moves the cursor by how
+  far it moves, whatever the driver's mode, and the arrow is drawn right at the brush (#72).
+- **Two screens**: SculptForge no longer slows down when the pointer is on your other screen; it rests only when
+  its window loses focus.
+- **Turn AI off**: **Preferences > AI > Enable AI features** (the welcome asks too). Off hides AI Brush and
+  Generate 3D everywhere and SculptForge makes no AI network calls. Your art is never uploaded or used for training. AI features run only when you use them and can be turned off. Studios can set `SF_AI=off`.
+  See [The interface](interface.md#turning-ai-off).
 - **Big brushes stay smooth on dense meshes**: on models from about 4 million triangles a stroke's dabs are worked
   out beside the view, so a 240 px brush on 33 million triangles no longer freezes the view for a third of a
   second at a time (slowest frames about 35 ms instead of 300), and letting go of the pen is instant. The stroke
   itself comes out the same.
-- **Live Move (experimental)**: Preferences > Performance > Live Move. The graphics card draws the Move brush's
-  drag from where the surface started, so it keeps up with the pen on any mesh size, and the move is applied once,
-  exactly, when you lift the pen ([Performance](performance.md)).
-- **Background Preview (experimental)**: Preferences > Performance > Background Preview. On dense meshes the dabs a
-  big brush is still working out show as a preview under the pen, so the stroke no longer trails behind it. The
-  finished sculpt is the same either way.
+- **Move keeps up on dense meshes**: Move no longer slows to a crawl on 33 million triangles with a fast pen, and the
+  first orbit after a long stroke no longer hitches.
+- **No more running out of memory**: **Help > Benchmark** skips a scene your computer hasn't got the free memory
+  for (and says how much to free), and Subdivide, Divide, Micro and Voxel Remesh ask first when the result
+  wouldn't fit in the memory free now.
+- **Clay follows Intensity and pressure**: Clay and Clay Block build gently with a light pen or a low Intensity
+  instead of planing flat as at full strength (#83). See [Sculpting](sculpting.md#built-in-brushes).
+- **Alphas on micro levels**: Drag Stamp and every stroke stamp your alpha on a micro level too (#92).
+- **Brushes hold on at silhouettes**: a stroke sliding past the edge of a form in profile keeps sculpting while the
+  brush still covers it (#84).
+- **Smooth face group borders**: a Brush palette option that straightens jagged clothing edges between face
+  groups and leaves the rest alone (#81). See [Smooth face group borders](sculpting.md#smooth-face-group-borders).
+- **Colour tints the material**: pick a colour and Parts with no vertex paint take it on in the Lit Sphere
+  material. See [Vertex Paint and materials](vertex-paint.md#materials-lit-spheres).
+- **Cut**: one tool that cuts the active Part with a **Line**, **Lasso**, **Rectangle** or **Polyline**. **Away**
+  removes what the shape covers and closes the cut with a flat cap, **In** cuts a flat-bottomed pocket and **Add**
+  raises the shape out of the surface. The result stays watertight and follows the symmetry. Hold
+  <kbd>Ctrl</kbd>+<kbd>Shift</kbd> and pick a Cut shape, or open **Tool > Cut**. See [Cut](cut.md) (#101, #91).
+- **Mask: Front faces only**: Mask Lasso and Mask Rectangle can leave the far side alone
+  ([Masking](masking.md#mask-with-a-lasso-or-rectangle), #91).
+- **Duplicate Part** has a shortcut: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> ([Parts](parts.md)).
+- **Brush previews fixed**: the shelf shows Tendril and Elastic Tendril as long horns pulled out past the ball, as
+  they behave in the viewport, and Layer and Nudge with clean shapes; previews are rebuilt once after updating.
+- **Library**: projects no longer show twice on Windows (#90); the close button stays on small screens and
+  <kbd>Esc</kbd> closes the Library (#80).
+- **Cleaner outlines**: the right shelf's outline draws correctly and the **x** buttons are centred (#98).
+- **macOS**: a window closed in full screen reopens maximised, with the window buttons reachable (#85).
+- **Stroke popup**: press <kbd>G</kbd> (<kbd>Z</kbd> in the Blender style) or the button under the **Stroke**
+  tile for a grid at the cursor: the stroke types plus **Add**, **Sub**, **Smooth**, **Mask** and **Select**. Hold
+  the key, point and let go, or tap it and click. Smooth, Mask and Select stay on without holding
+  <kbd>Shift</kbd> or <kbd>Ctrl</kbd>. See [Strokes](sculpting.md#the-stroke-popup).
 
 ## Version 0.10.8
+
+```features
+date: 2026-11-02
+tagline: Tablets in mouse mode follow the pen again.
+highlight: Tablet mouse mode: the brush follows the pen again on some Windows tablets (#72)
+```
 
 - **Tablets in mouse mode work again**: on some Windows tablets with **Mouse mode** on (Preferences > Tablet) the
   brush stopped following the pen in 0.10.7. When the system can't say where its cursor is, the pen now moves the
   brush by how far it moves, from where it was (#72).
 
 ## Version 0.10.7
+
+```features
+date: 2026-11-01
+tagline: A new look, clearer memberships, full alphas on every brush and a benchmark you can run.
+highlight: A new look: Forge Terminal with menus by task, a status bar and a one-row tool shelf
+highlight: Memberships: Supporter, Insider and Studio, side by side on a clearer card
+highlight: Benchmark: a standard 15 or 33 million triangle scene that measures your machine
+title: A new look
+line: Forge Terminal with Tokyo Night and menus by task. Your layout stays until you try it.
+image: images/wn-new-look.jpg
+action: look:new
+link: interface.md#looks-and-layouts
+title: Clearer memberships
+line: Supporter, Insider and Studio side by side, in your look's colours.
+image: images/wn-memberships.jpg
+action: card:membership
+link: https://sculptforge.app/support.html
+title: Full alphas, every brush
+line: Custom and Community brushes show the whole alpha at Focal Shift -100 (#75).
+image: images/wn-full-alpha.jpg
+action: brush:Clay Slab
+link: sculpting.md
+title: Native Wayland
+line: Every Linux package opens without XWayland and stays sharp at fractional scales.
+image: images/wn-wayland.jpg
+action: guide:installing.md#wayland-and-x11
+title: Benchmark your machine
+line: Sculpt a standard 15 or 33 million triangle head and get frame times you can share.
+image: images/wn-benchmark.jpg
+action: help.benchmark
+link: performance.md#proof-mode-see-it-for-yourself
+```
 
 - **A clearer membership card**: the three memberships side by side with what each one gets you, in your look's
   colours. **Maybe later** now hides it for 30 days.
@@ -40,8 +236,34 @@ chapter opens by itself the first time you start a new version; you can always f
   **Keep my layout**. Coming from ZBrush? **Preferences > Interface > Look > ZBrush-style layout** (or the button in
   the welcome) brings back the palette bar and the two-row shelf. Six more colour schemes, Match my desktop theme,
   Phosphor, Blueprint and the Classic look are there too. See [The interface](interface.md#looks-and-layouts).
+- **Native Wayland on Linux**: every Linux package opens without XWayland, stays sharp at fractional scales and
+  reads pen pressure through tablet-v2. The RHEL and Rocky builds now include libdecor (title bars on GNOME
+  Wayland). See [Wayland and X11](installing.md#wayland-and-x11).
+- **Benchmark your machine** (**Help > Benchmark**, or `sculptforge --benchmark standard-15m`): a procedural 15 or
+  33 million triangle head sculpted with Clay at 25, 60 and 120 px, Move, Smooth and a 240 px brush, reporting frame
+  times (p50, p95, p99), stroke lag, the worst stall and memory. See [Performance](performance.md#proof-mode-see-it-for-yourself).
 
 ## Version 0.10.6
+
+```features
+date: 2026-11-01
+tagline: See materials as a game engine does, wear that follows the sculpt, and packs you can share.
+highlight: PBR viewport: the texture's material lit by an environment, as fast as Lit Sphere
+highlight: Fill layers: edge wear, dirt and gradients laid through a mask of effects
+highlight: Packs and macros: install brushes, alphas and macros after a review of what's inside
+title: PBR viewport
+line: See the texture's material lit by an environment, as a game engine shows it.
+image: images/pbr-viewport.jpg
+action: guide:pbr-painting.md#the-pbr-viewport
+title: Fill layers
+line: Edge wear, dirt and gradients laid over the whole Part through a mask of effects.
+image: images/fill-painted-edges.jpg
+action: guide:fill-layers.md
+title: More maps to bake
+line: Curvature, thickness, position and ID, and UDIM tiles as one set of files per tile.
+image: images/bake-mesh-maps.jpg
+action: guide:baking.md
+```
 
 - **PBR viewport** (**Material > Viewport Shading > PBR**): see the texture's material as a game engine shows it,
   lit by an environment: Studio, Photo Studio, Small Studio or Outdoor Sky, with exposure, rotation, the
@@ -103,6 +325,19 @@ chapter opens by itself the first time you start a new version; you can always f
 
 ## Version 0.10.5
 
+```features
+date: 2026-11-01
+tagline: Selection sets, a full UV Editor, radial symmetry and SculptForge's own names.
+highlight: UV Editor: seams, unwrapping, UDIM packing and live stretch on the model
+highlight: Selection sets: named snapshots of mask, groups, visibility and shape
+highlight: Radial symmetry: every stroke repeated 2 to 64 times around an axis
+title: UV Editor
+line: Draw seams, unwrap, pack across UDIM tiles and see stretch live on the model.
+image: images/uv-editor.jpg
+action: ui.uv_editor
+link: uv-editor.md
+```
+
 - **Selection sets** (**Tool > Selection Sets**): store as many named snapshots of a Part's mask, face groups,
   visibility, vertex paint, UVs and shape as you like, and restore them at any subdivision level, not only the one
   they were stored at. Combine two sets (union, intersect, subtract), restore one onto the current mask or
@@ -150,6 +385,13 @@ chapter opens by itself the first time you start a new version; you can always f
 
 ## Version 0.10.4
 
+```features
+date: 2026-11-01
+highlight: Keep Masked remeshing: the masked part keeps its triangles and detail exactly
+highlight: Radial menus: hold T or Y, flick and let go, or make your own
+highlight: Insert your own mesh: a copy of a Part or an .obj, .ply or .glb, placed by a drag
+```
+
 ### From your requests on GitHub
 
 - **Insert your own mesh** (#34): **Append > Insert on the model** now takes a copy of another Part or an
@@ -186,6 +428,11 @@ nothing about you is sent anywhere.
 
 ## Version 0.10.3
 
+```features
+date: 2026-11-01
+highlight: Alternate smooth: let go of Shift mid-stroke to smooth without shrinking the form
+```
+
 ### From your requests on GitHub
 
 - **Alternate smooth** (#40): start smoothing with Shift held, then let go of Shift while still pressing, and the
@@ -206,6 +453,13 @@ SculptForge stays free for everyone. **Help > Support SculptForge** opens the pa
 member. Every release stays free for everyone; bug-fix and security releases go out to everyone the same day.
 
 ## Version 0.10.2
+
+```features
+date: 2026-11-01
+highlight: Quad Remesh 2: two to fifty times fewer poles, loops that follow the forms
+highlight: Elastic brushes: KelvinGrab, KelvinTwist, KelvinScale and Elastic Tendril
+highlight: Capture from view: turn any detail into an alpha or a vector displacement brush
+```
 
 ### Quad Remesh 2
 
@@ -229,6 +483,14 @@ slider from rubber to firm clay; they're at their best below about 10 million tr
 - The local API added in 0.10.1 is removed; SculptForge doesn't listen for other programs.
 
 ## Version 0.10.1
+
+```features
+date: 2026-11-01
+highlight: Micro levels: about a billion sculptable triangles in under 2 GB of memory
+highlight: PBR painting: roughness, metallic, normal and height, exported for every engine
+highlight: Sculpt Timeline: scrub back through every stroke and branch from any point
+highlight: Maya navigation: Alt+left orbits, Alt+middle pans, Alt+right zooms
+```
 
 ### From your feedback on GitHub
 
@@ -277,6 +539,11 @@ a safe mode); on battery it saves power. See **Preferences > Performance**.
 
 ## Version 0.9.7
 
+```features
+date: 2026-10-31
+highlight: Faster big brushes: half the lag for a 200-pixel brush on 21 million triangles
+```
+
 ### Faster big brushes on dense meshes
 
 A large brush on a model of 20 million triangles or more keeps up much better: on a 21-million-triangle sphere
@@ -299,6 +566,13 @@ drag turns the view as before, and **Preferences > Input > Right click opens the
   triangles. See [Dynamic topology](dynamic-topology.md).
 
 ## Version 0.9.6
+
+```features
+date: 2026-10-31
+highlight: Extract: a masked area becomes a shell that fits the surface exactly
+highlight: Mirror And Weld: one side mirrored onto the other as one watertight mesh
+highlight: Flatpak: one sandboxed file for x86_64 and ARM64 Linux
+```
 
 ### Extract
 
@@ -342,6 +616,13 @@ SpaceMouse, and the Blender bridge finds it by itself. See
   [The log file](troubleshooting.md#the-log-file).
 
 ## Version 0.9.5
+
+```features
+date: 2026-10-31
+highlight: Forge Spheres: block out bodies and creatures from connected spheres
+highlight: Blender keys: Blender's navigation and Sculpt Mode keys
+highlight: SpaceMouse: turn, pan and zoom with a 3Dconnexion SpaceMouse (experimental)
+```
 
 ### Forge Spheres
 
@@ -391,6 +672,10 @@ computer. See [Your own Lit Spheres](vertex-paint.md#your-own-lit-spheres).
 
 ## Version 0.9.4
 
+```features
+date: 2026-10-29
+```
+
 ### Fixes and packaging
 
 Exports without a material of their own (FBX, USD) and splats made from an unpainted sculpt use the Soft Clay
@@ -399,6 +684,10 @@ grey instead of the old peach. Linux AppImages are now named `SculptForge-0.9.4-
 `brew install --cask islandmed/tap/sculptforge`.
 
 ## Version 0.9.3
+
+```features
+date: 2026-10-28
+```
 
 ### A cleaner look
 
@@ -418,6 +707,10 @@ Small, Medium or Large (also in **Preferences > Interface > Shelf tiles**).
 
 ## Version 0.9.2
 
+```features
+date: 2026-10-28
+```
+
 ### View in AR on Android
 
 On Android, **View in AR** used to just download a file. It now opens an AR page in **Chrome**: your sculpt comes
@@ -431,6 +724,10 @@ Face capture and AR now use the same network port as the capture page. On Linux 
 for both TCP and UDP from your home network.
 
 ## Version 0.9.1
+
+```features
+date: 2026-10-27
+```
 
 Fixes from the first day of 0.9.
 
@@ -449,6 +746,13 @@ This guide, including What's New, and the update banner now use larger text.
 **Cancel** now stops small bakes too.
 
 ## Version 0.9.0
+
+```features
+date: 2026-10-26
+highlight: Scan to sculptable: a phone scan becomes a clean, animatable quad mesh
+highlight: Facial shapes: the 52 ARKit blend shapes on any sculpted head, driven live by your face
+highlight: Phone capture: your phone as SculptForge's camera, with no app to install
+```
 
 Maquette to performance: scan an object or a clay maquette with your phone, turn the scan into a clean mesh you
 can sculpt and animate, give a head the 52 ARKit facial shapes, and drive them live with your own face.
@@ -489,6 +793,10 @@ character's facial shapes with your own face, live. No app to install. See [Phon
 
 ## Version 0.8.1
 
+```features
+date: 2026-10-25
+```
+
 Fixes from a ZBrush artist's testing, and a way to bring your ZTools over.
 
 ### More like ZBrush
@@ -514,6 +822,13 @@ SculptForge opens the `.ZTL` itself, every Part with its face groups, vertex pai
 [Coming from ZBrush](coming-from-zbrush.md#bring-your-ztools-over).
 
 ## Version 0.8
+
+```features
+date: 2026-10-25
+highlight: Dynamic topology: the brush adds triangles where it needs detail
+highlight: Vector displacement brushes: stamp whole shapes, overhangs and all
+highlight: Quad Remesh Guides: draw the edge loops you want
+```
 
 Dynamic topology, vector displacement brushes, Quad Remesh Guides, and sculpt layers on every subdivision level.
 
@@ -556,6 +871,11 @@ weight for every level. See [Layers and subdivision levels](layers.md#layers-and
 
 ## Version 0.7
 
+```features
+date: 2026-10-25
+highlight: Blender bridge: send models between Blender and SculptForge in one click
+```
+
 ZBrush's keys and gestures by default, and a bridge that sends models between Blender and SculptForge.
 
 ### Your ZBrush hands just work
@@ -591,6 +911,11 @@ modifiers; quads, UVs, colours, the mask and face sets (face groups) come across
 [Working with Blender](blender.md).
 
 ## Version 0.6
+
+```features
+date: 2026-10-24
+highlight: Half the memory: 100 million triangles and more on a 32 GB laptop
+```
 
 Performance: half the memory, a view that turns twice as fast, quicker brushes on huge meshes, and SculptForge
 now tells you when there's a new version.
@@ -650,6 +975,13 @@ sends nothing about you or your computer. Turn it off under **Preferences > Upda
 package manager.
 
 ## Version 0.5
+
+```features
+date: 2026-10-23
+highlight: Subdivision levels: big forms low, fine detail high, without losing anything
+highlight: Map baking: normal, displacement and AO maps for game engines and renderers
+highlight: Gizmo: move, scale, rotate and pose the unmasked part
+```
 
 The ZBrush workflow core: subdivision levels, quad retopology, map baking, the Gizmo, and speed at tens of
 millions of polygons.
@@ -763,6 +1095,10 @@ See [Performance and big meshes](performance.md).
 
 ## Version 0.4.2
 
+```features
+date: 2026-10-23
+```
+
 ### Texture painting on UV maps
 
 Paint into a texture instead of the vertices, so the colour detail comes from the texture (1K to 8K), not from
@@ -783,12 +1119,20 @@ See [Texture painting](texture-painting.md).
 
 ## Version 0.4.1
 
+```features
+date: 2026-10-23
+```
+
 A fix for graphics tablets: the brush ring no longer flickers between two places on the model (it looked like
 a second brush blinking, most often while masking or smoothing). Some tablet drivers, Windows Ink among them,
 send extra mouse movements beside the pen's; now, while the pen is in range, only the pen moves the brush. See
 [Pen tablets](troubleshooting.md#pen-tablets) if your pen still misbehaves.
 
 ## Version 0.4
+
+```features
+date: 2026-10-22
+```
 
 Version 0.4 is about making SculptForge feel like home to ZBrush artists. It was shaped by feedback from a
 working ZBrush modeler and by what sculptors say on the ZBrush and Mudbox forums.
@@ -846,6 +1190,10 @@ for Windows, macOS and Linux.
 
 ## Version 0.3
 
+```features
+date: 2026-10-22
+```
+
 - **Parts**: several separate meshes in one scene. Append, duplicate, split, merge, solo, and
   <kbd>Alt</kbd>+click to select. See [Parts](parts.md).
 - **A ZBrush-style interface**: shelves around the canvas, alphabetical palettes, the Library
@@ -859,6 +1207,10 @@ for Windows, macOS and Linux.
 
 ## Version 0.2
 
+```features
+date: 2026-10-21
+```
+
 - [Masking](masking.md), [face groups and visibility](face-groups.md), and
   [vertex paint with Lit Spheres](vertex-paint.md).
 - New brushes: Sharp Crease, Clay Block, Tendril, Trim, Layer and Nudge, with strokes and alphas.
@@ -866,6 +1218,10 @@ for Windows, macOS and Linux.
   [exchange with ZBrush (Send to ZBrush)](exporting.md).
 
 ## Version 0.1
+
+```features
+date: 2026-10-20
+```
 
 The first release: sculpting with symmetry and sculpt layers, voxel remesh and decimation, game-ready LOD
 chains and Send to Unreal, image and text to 3D with free AI models, Gaussian splats, OpenUSD, and scripting

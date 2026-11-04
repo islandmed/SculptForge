@@ -285,6 +285,7 @@ void App::storeProjectSettings() {
     render.set("wireframe", renderSettings_.wireframe);
     render.set("base_color", vec3Json(renderSettings_.baseColor));
     render.set("show_polypaint", renderSettings_.showPolypaint);
+    render.set("color_tints_material", renderSettings_.colorTintsMaterial);
     render.set("show_mask", renderSettings_.showMask);
     render.set("show_polygroups", renderSettings_.showPolygroups);
     render.set("show_mesh", renderSettings_.showMesh);
@@ -294,6 +295,14 @@ void App::storeProjectSettings() {
     render.set("backface_culling", renderSettings_.backfaceCulling);
     render.set("background", std::string(renderSettings_.gradientBackground ? "gradient" : "flat"));
     render.set("background_color", vec3Json(renderSettings_.backgroundColor));
+    {
+        Json light = Json::object(); // the Lit Sphere / studio light (#80)
+        light.set("yaw", double(renderSettings_.lightYaw));
+        light.set("pitch", double(renderSettings_.lightPitch));
+        light.set("intensity", double(renderSettings_.lightIntensity));
+        light.set("ambient", double(renderSettings_.lightAmbient));
+        render.set("light", light);
+    }
     render.set("matcap", renderSettings_.matcap < 0 ? std::string() : std::string(matcapName(renderSettings_.matcap)));
     // Viewport shading (Material > Viewport Shading): Lit Sphere or PBR with its environment.
     {
@@ -327,6 +336,7 @@ void App::storeProjectSettings() {
     brush.set("strength", double(strength_));
     brush.set("smooth_strength", double(smoothStrength_));
     brush.set("smooth_keep_volume", smoothKeepVolume_);
+    brush.set("smooth_group_borders", smoothGroupBorders_);
     brush.set("rgb_intensity", double(rgbIntensity_));
     brush.set("focal_shift", double(focalShift_));
     brush.set("invert", invertToggle_);
@@ -382,6 +392,7 @@ void App::applyProjectSettings() {
         readBool(r, "wireframe", renderSettings_.wireframe);
         readVec3(r["base_color"], renderSettings_.baseColor);
         readBool(r, "show_polypaint", renderSettings_.showPolypaint);
+        readBool(r, "color_tints_material", renderSettings_.colorTintsMaterial);
         readBool(r, "show_mask", renderSettings_.showMask);
         readBool(r, "show_polygroups", renderSettings_.showPolygroups);
         readBool(r, "show_mesh", renderSettings_.showMesh);
@@ -412,6 +423,19 @@ void App::applyProjectSettings() {
             v.pbrRoughness = num("roughness", defaults.pbrRoughness, 0.0f, 1.0f);
             v.pbrMetallic = num("metallic", defaults.pbrMetallic, 0.0f, 1.0f);
             v.pbrCavity = num("cavity", defaults.pbrCavity, 0.0f, 1.0f);
+        }
+        // The light (#80); projects from before it: the material's own.
+        {
+            RenderSettings& v = renderSettings_;
+            const RenderSettings defaults;
+            const Json& light = r["light"];
+            auto num = [&](const char* key, float def, float lo, float hi) {
+                return light.isObject() && light[key].isNumber() ? std::clamp(float(light[key].asNumber()), lo, hi) : def;
+            };
+            v.lightYaw = num("yaw", defaults.lightYaw, -180.0f, 180.0f);
+            v.lightPitch = num("pitch", defaults.lightPitch, -90.0f, 90.0f);
+            v.lightIntensity = num("intensity", defaults.lightIntensity, 0.0f, 3.0f);
+            v.lightAmbient = num("ambient", defaults.lightAmbient, 0.0f, 1.0f);
         }
         // The background (#21); projects from before it: the preferred one.
         renderSettings_.gradientBackground =
@@ -448,13 +472,14 @@ void App::applyProjectSettings() {
         readFloat(b, "smooth_strength", smoothStrength_);
         readFloat(b, "rgb_intensity", rgbIntensity_);
         readFloat(b, "focal_shift", focalShift_);
-        radiusPx_ = std::clamp(radiusPx_, 2.0f, 800.0f);
+        radiusPx_ = clampDrawSize(radiusPx_);
         strength_ = std::clamp(strength_, 0.0f, 1.0f);
         smoothStrength_ = std::clamp(smoothStrength_, 0.0f, 1.0f);
         rgbIntensity_ = std::clamp(rgbIntensity_, 0.0f, 1.0f);
         focalShift_ = std::clamp(focalShift_, -1.0f, 1.0f);
         readBool(b, "invert", invertToggle_);
         readBool(b, "smooth_keep_volume", smoothKeepVolume_);
+        readBool(b, "smooth_group_borders", smoothGroupBorders_);
         readBool(b, "front_faces_only", frontFacesOnly_);
         readBool(b, "connected_only", uiPrefs_.connectedOnly);
         readBool(b, "view_falloff", uiPrefs_.viewFalloff);
@@ -468,6 +493,7 @@ void App::applyProjectSettings() {
         doc_.sculptor.dyntopo.smoothRemesh = std::clamp(doc_.sculptor.dyntopo.smoothRemesh, 0.0f, 1.0f);
         if (const int vdm = b["vdm"].isString() ? findVdm(doc_, b["vdm"].asString()) : -1; vdm >= 0)
             doc_.brushVdm = doc_.vdms[size_t(vdm)];
+        brushSettingsKey_ = currentBrushKey(); // the project's values belong to its brush (#78), nothing to swap
     }
     if (const Json& sym = s["symmetry"]; sym.isObject()) {
         readBool(sym, "x", symmetry_.x);
@@ -618,8 +644,8 @@ void App::drawProjectPopups() {
         ImGui::OpenPopup(kRestorePopup);
         offerRestore_ = false;
     }
-    if (showWhatsNew_) {
-        guide_.open("whats-new.md");
+    if (showWhatsNew_ && !supportCard_ && !showWelcome_) { // after the membership card, if it showed
+        showWhatsNew();
         showWhatsNew_ = false;
     }
     drawUpdateBanner();

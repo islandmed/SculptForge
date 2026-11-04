@@ -1,204 +1,98 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The support card at launch: a full-window card over the app with a bronze sculpt render (rendered by SculptForge
-// itself, assets/branding/support-card.jpg), the cube mark and the promise, the three memberships with their perks and
+// The support card at launch: a full-window card over the app on a calm stage (a warm glow and a faint grid, drawn here,
+// no picture), the cube mark and the promise, the three memberships with their perks and
 // the one-time Supporter, in the current look's colours (Theme.h). When it may show is decided once while starting
 // (supportCardDue in Support.h): the first start, the first start of each new version, then at most once a week, and
 // not for 30 days after "Maybe later"; never mid-session, never for a supporter, never in tests, renders, demos or CI.
 // No countdowns, no guilt, nothing pre-selected; Close is always there. Every button only
-// opens one of the fixed links in Support.h in the browser. The picture is decoded on a worker thread the first time
-// the card shows, so starting is no slower; the card fades in over a plain backdrop and the picture follows.
+// opens one of the fixed links in Support.h in the browser.
 #include "app/App.h"
+#include "app/CardPaint.h"
 #include "app/Theme.h"
 #include "app/Ui.h"
-#include "render/GL.h"
 
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <imgui_impl_sdl3.h>
 
 #include <algorithm>
-#include <chrono>
 #include <cmath>
 #include <cstdlib>
-#include <future>
 
 namespace sf {
-
-namespace assets {
-extern const unsigned char supportCard[]; // assets/branding/support-card.jpg (CMakeLists.txt)
-extern const unsigned long long supportCard_size;
-} // namespace assets
 
 struct App::SupportCard {
     SupportCardReason reason = SupportCardReason::None;
     double openedAt = 0.0;          // seconds (ImGui clock)
-    std::future<Image> picture;     // decoded and graded on a worker thread
-    GLuint texture = 0;
-    float pictureAspect = 16.0f / 9.0f;
-    double pictureAt = -1.0;        // when the texture became ready (it fades in)
     ImVec2 parallax{0.0f, 0.0f};    // follows the pointer, eased
     float hover[3] = {0.0f, 0.0f, 0.0f}; // tier cards lifted under the pointer, eased
     bool closing = false;
     double closingAt = 0.0;
     bool supporterOnClose = false;
-
-    ~SupportCard() {
-        if (texture) gl::DeleteTextures(1, &texture);
-        if (picture.valid()) picture.wait();
-    }
 };
 
 void App::SupportCardDelete::operator()(SupportCard* c) const { delete c; }
+
+using namespace card;
 
 namespace {
 
 // ImGui's clock: real time in the app, the scripted time in UI tests (so their screenshots show the card settled).
 double nowSeconds() { return ImGui::GetTime(); }
 
-float clamp01(float x) { return std::clamp(x, 0.0f, 1.0f); }
-float easeOut(float x) { // cubic
-    x = 1.0f - clamp01(x);
-    return 1.0f - x * x * x;
-}
-float easeInOut(float x) {
-    x = clamp01(x);
-    return x * x * (3.0f - 2.0f * x);
-}
-float lerp(float a, float b, float t) { return a + (b - a) * t; }
-
-ImU32 col(unsigned hex, float alpha) {
-    return IM_COL32((hex >> 16) & 0xff, (hex >> 8) & 0xff, hex & 0xff, int(std::clamp(alpha, 0.0f, 1.0f) * 255.0f + 0.5f));
-}
-// A colour of the current look at an opacity.
-ImU32 tc(const ImVec4& c, float alpha) { return theme::u32(c, std::clamp(alpha, 0.0f, 1.0f)); }
-ImVec4 mix(const ImVec4& x, const ImVec4& y, float t) {
-    return ImVec4(lerp(x.x, y.x, t), lerp(x.y, y.y, t), lerp(x.z, y.z, t), lerp(x.w, y.w, t));
-}
-// The orange of the cube logo: the brand mark, the same in every look.
-constexpr unsigned kBrandOrange = 0xf0882e;
-
-// The picture with the shading for the text baked in (left half and the lower part, under the tier cards), towards the
-// look's background `ink`, so the card draws it as one rounded image.
-Image loadPicture(ImVec4 ink) {
-    Image img;
-    std::string error;
-    if (!Image::decode(assets::supportCard, size_t(assets::supportCard_size), img, error)) return {};
-    const int w = img.width, h = img.height;
-    for (int y = 0; y < h; ++y) {
-        const float v = (float(y) + 0.5f) / float(h);
-        const float bottom = 0.92f * easeInOut((v - 0.42f) / 0.5f);
-        for (int x = 0; x < w; ++x) {
-            const float u = (float(x) + 0.5f) / float(w);
-            const float left = 0.9f * std::pow(1.0f - easeInOut(u / 0.66f), 1.3f);
-            const float dark = 1.0f - (1.0f - left) * (1.0f - bottom);
-            uint8_t* p = &img.rgba[(size_t(y) * size_t(w) + size_t(x)) * 4];
-            const float kInk[3] = {ink.x * 255.0f, ink.y * 255.0f, ink.z * 255.0f};
-            for (int c = 0; c < 3; ++c) p[c] = uint8_t(lerp(float(p[c]), kInk[c], dark) + 0.5f);
-        }
-    }
-    return img;
-}
-
-GLuint uploadPicture(const Image& img) {
-    GLuint tex = 0;
-    gl::GenTextures(1, &tex);
-    gl::BindTexture(GL_TEXTURE_2D, tex);
-    gl::PixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    gl::TexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGBA8), img.width, img.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, img.rgba.data());
-    gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GLint(GL_LINEAR));
-    gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GLint(GL_LINEAR));
-    gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GLint(GL_CLAMP_TO_EDGE));
-    gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GLint(GL_CLAMP_TO_EDGE));
-    gl::BindTexture(GL_TEXTURE_2D, 0);
-    return tex;
-}
-
-// Text drawn straight to the draw list, also logged so UI tests can find it (expect_text).
-struct Painter {
-    ImDrawList* dl;
-    float k; // logical pixels to screen pixels (UI scale x fit x the opening zoom)
-
-    ImVec2 measure(ImFont* f, float px, const char* s, float wrap = 0.0f) const {
-        return f->CalcTextSizeA(px * k, FLT_MAX, wrap, s);
-    }
-    ImVec2 text(ImFont* f, float px, ImVec2 at, ImU32 c, const char* s, float wrap = 0.0f) const {
-        dl->AddText(f, px * k, at, c, s, nullptr, wrap);
-        ImGui::LogText("%s\n", s);
-        return measure(f, px, s, wrap);
-    }
-    // Small capitals with letter spacing (the eyebrow and the badge).
-    float spaced(ImFont* f, float px, ImVec2 at, ImU32 c, const char* s, float spacing, bool draw = true) const {
-        float x = at.x;
-        char one[2] = {0, 0};
-        for (const char* p = s; *p; ++p) {
-            one[0] = *p;
-            if (draw) dl->AddText(f, px * k, ImVec2(x, at.y), c, one);
-            x += f->CalcTextSizeA(px * k, FLT_MAX, 0.0f, one).x + spacing * k;
-        }
-        if (draw) ImGui::LogText("%s\n", s);
-        return x - at.x - spacing * k;
-    }
-};
-
-// A soft shadow / glow: rounded rectangles growing outwards, fading.
-void glow(ImDrawList* dl, ImVec2 a, ImVec2 b, float rounding, float spread, const ImVec4& c, float alpha, int layers = 10) {
-    for (int i = layers; i >= 1; --i) {
-        const float t = float(i) / float(layers), g = spread * t;
-        dl->AddRectFilled(ImVec2(a.x - g, a.y - g), ImVec2(b.x + g, b.y + g), tc(c, alpha * (1.0f - t) * (1.0f - t) * 0.5f),
-                          rounding + g);
-    }
-}
-void glow(ImDrawList* dl, ImVec2 a, ImVec2 b, float rounding, float spread, unsigned hex, float alpha, int layers = 10) {
-    glow(dl, a, b, rounding, spread, theme::rgb(hex), alpha, layers);
-}
-
-// The cube mark of the logo (assets/branding/sculptforge-icon.svg: Lucide's "box"), `size` wide at `at`.
-void cubeMark(ImDrawList* dl, ImVec2 at, float size, ImU32 c) {
-    const float u = size / 24.0f;
-    auto p = [&](float x, float y) { return ImVec2(at.x + x * u, at.y + y * u); };
-    const ImVec2 outline[6] = {p(12, 2), p(21, 7), p(21, 17), p(12, 22), p(3, 17), p(3, 7)};
-    const float w = 2.2f * u;
-    dl->AddPolyline(outline, 6, c, ImDrawFlags_Closed, w);
-    const ImVec2 top[3] = {p(3.3f, 7), p(12, 12), p(20.7f, 7)};
-    dl->AddPolyline(top, 3, c, 0, w);
-    dl->AddLine(p(12, 22), p(12, 12), c, w);
-}
-
-// A light sweeping across the picture: a soft diagonal band, faded towards the card's edges so it stays inside the
-// rounded corners.
-void lightSweep(ImDrawList* dl, ImVec2 a, ImVec2 b, float rounding, float x, float width, float alpha) {
+// The stage behind the words: a soft warm light from `center` (`rx` x `ry`, brightest in the middle) and a faint
+// drafting grid that fades out with it, kept inside the card's rounded corners. The same look as the membership page.
+void stageLight(ImDrawList* dl, ImVec2 a, ImVec2 b, float rounding, ImVec2 center, float rx, float ry, const ImVec4& tint,
+                float alpha, const ImVec4& gridInk, float gridAlpha, float cell, float hair) {
     if (alpha <= 0.002f) return;
-    const ImVec2 dir = ImVec2(0.34f, 1.0f); // leaning right going down
-    const float len = std::sqrt(dir.x * dir.x + dir.y * dir.y);
-    const ImVec2 d(dir.x / len, dir.y / len), n(d.y, -d.x);
-    const float h = (b.y - a.y) / d.y; // the band's length across the card
-    const ImVec2 top(x - d.x * h * 0.5f, a.y + (b.y - a.y) * 0.5f - h * 0.5f);
-    constexpr int kSteps = 28;
+    auto falloff = [&](ImVec2 p) {
+        const float dx = (p.x - center.x) / rx, dy = (p.y - center.y) / ry;
+        const float d = clamp01(1.0f - std::sqrt(dx * dx + dy * dy));
+        return d * d;
+    };
     auto edgeFade = [&](ImVec2 p) {
         const float e = std::min({p.x - a.x, b.x - p.x, p.y - a.y, b.y - p.y});
-        return clamp01((e - rounding * 0.4f) / (rounding * 2.0f));
+        return clamp01((e - rounding * 0.3f) / (rounding * 1.5f));
     };
-    const ImVec2 uv = ImGui::GetFontTexUvWhitePixel();
-    dl->PrimReserve(kSteps * 12, (kSteps + 1) * 3);
-    const ImDrawIdx base = ImDrawIdx(dl->_VtxCurrentIdx);
-    for (int i = 0; i <= kSteps; ++i) {
-        const float t = float(i) / float(kSteps);
-        const ImVec2 c(top.x + d.x * h * t, top.y + d.y * h * t);
-        const float fall = std::sin(t * 3.14159265f); // brightest in the middle of the card
-        const ImVec2 pts[3] = {ImVec2(c.x - n.x * width, c.y - n.y * width), c, ImVec2(c.x + n.x * width, c.y + n.y * width)};
-        for (int j = 0; j < 3; ++j) {
-            const float aj = j == 1 ? alpha * fall * edgeFade(pts[j]) : 0.0f;
-            dl->PrimWriteVtx(pts[j], uv, col(0xfff3e2, aj));
-        }
+    dl->PushClipRect(a, b, true);
+    { // the light: a fan of rings with the colour per vertex
+        constexpr int kSeg = 64, kRings = 8;
+        const ImVec2 uv = ImGui::GetFontTexUvWhitePixel();
+        auto ring = [&](int r) { return float(r) / float(kRings); };
+        dl->PrimReserve(kSeg * kRings * 6, kSeg * (kRings + 1));
+        const ImDrawIdx base = ImDrawIdx(dl->_VtxCurrentIdx);
+        for (int r = 0; r <= kRings; ++r)
+            for (int i = 0; i < kSeg; ++i) {
+                const float ang = float(i) / float(kSeg) * 6.28318531f, f = ring(r);
+                const ImVec2 p(center.x + std::cos(ang) * rx * f, center.y + std::sin(ang) * ry * f);
+                dl->PrimWriteVtx(p, uv, tc(tint, alpha * (1.0f - f) * (1.0f - f) * edgeFade(p)));
+            }
+        for (int r = 0; r < kRings; ++r)
+            for (int i = 0; i < kSeg; ++i) {
+                const int j = (i + 1) % kSeg;
+                const ImDrawIdx v0 = ImDrawIdx(base + r * kSeg + i), v1 = ImDrawIdx(base + r * kSeg + j);
+                const ImDrawIdx v2 = ImDrawIdx(v0 + kSeg), v3 = ImDrawIdx(v1 + kSeg);
+                dl->PrimWriteIdx(v0), dl->PrimWriteIdx(v1), dl->PrimWriteIdx(v3);
+                dl->PrimWriteIdx(v0), dl->PrimWriteIdx(v3), dl->PrimWriteIdx(v2);
+            }
     }
-    for (int i = 0; i < kSteps; ++i)
-        for (int j = 0; j < 2; ++j) {
-            const ImDrawIdx v0 = ImDrawIdx(base + i * 3 + j), v1 = ImDrawIdx(v0 + 1), v2 = ImDrawIdx(v0 + 3), v3 = ImDrawIdx(v0 + 4);
-            dl->PrimWriteIdx(v0), dl->PrimWriteIdx(v1), dl->PrimWriteIdx(v3);
-            dl->PrimWriteIdx(v0), dl->PrimWriteIdx(v3), dl->PrimWriteIdx(v2);
+    // The grid, in short pieces so each fades with the light.
+    const float step = cell * 0.5f;
+    for (float x = a.x + cell; x < b.x; x += cell)
+        for (float y = a.y; y < b.y; y += step) {
+            const ImVec2 p(x, y + step * 0.5f);
+            const float w = gridAlpha * alpha * falloff(p) * edgeFade(p);
+            if (w > 0.002f) dl->AddLine(ImVec2(x, y), ImVec2(x, std::min(y + step, b.y)), tc(gridInk, w), hair);
         }
+    for (float y = a.y + cell; y < b.y; y += cell)
+        for (float x = a.x; x < b.x; x += step) {
+            const ImVec2 p(x + step * 0.5f, y);
+            const float w = gridAlpha * alpha * falloff(p) * edgeFade(p);
+            if (w > 0.002f) dl->AddLine(ImVec2(x, y), ImVec2(std::min(x + step, b.x), y), tc(gridInk, w), hair);
+        }
+    dl->PopClipRect();
 }
 
 struct Tier {
@@ -221,7 +115,6 @@ bool App::supportCardTestMode() const {
 
 bool App::supportCardOpen() const { return supportCard_ && !supportCard_->closing; }
 
-bool App::supportCardLoading() const { return supportCard_ && !supportCard_->texture && supportCard_->picture.valid(); }
 
 void App::launchSupportCard(bool firstRun, int64_t now, bool testMode) {
     supportCardNow_ = now;
@@ -241,7 +134,6 @@ void App::showSupportCard(SupportCardReason reason) {
     supportCard_.reset(new SupportCard);
     supportCard_->reason = reason;
     supportCard_->openedAt = nowSeconds();
-    supportCard_->picture = std::async(std::launch::async, loadPicture, theme::shellBg);
     redrawIn(0.0);
 }
 
@@ -322,16 +214,6 @@ void App::drawSupportCard() {
     if (!ImGui::IsPopupOpen(kPopup)) ImGui::OpenPopup(kPopup);
     redrawIn(0.0); // animated while open (60 fps with vsync); nothing is drawn for it once closed
 
-    // The picture: decoded off the main thread, uploaded here once ready.
-    if (!card.texture && card.picture.valid() && card.picture.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-        const Image img = card.picture.get();
-        if (!img.empty()) {
-            card.texture = uploadPicture(img);
-            card.pictureAspect = img.aspect();
-            card.pictureAt = now;
-        }
-    }
-
     // The current look's colours (Theme.h), so the card fits Classic and every other look.
     const ImVec4 bg = theme::shellBg, tierBg = theme::panelBg, raised = theme::header, accent = theme::accent;
     const ImVec4 ink = theme::textBright, body = theme::text, dim = theme::textDim, line = theme::text;
@@ -373,7 +255,7 @@ void App::drawSupportCard() {
     glow(dl, ImVec2(a.x, a.y + 18.0f * k), ImVec2(b.x, b.y + 18.0f * k), radius, 40.0f * k, ImVec4(0, 0, 0, 1), 0.9f * A, 10);
     dl->AddRectFilled(a, b, tc(bg, A), radius);
 
-    // The picture: covers the card, a little larger so the pointer can move it (parallax), fading in once decoded.
+    // The stage: a warm light at the top right that drifts a little with the pointer, and a faint grid under it.
     const ImVec2 mouse = io.MousePos;
     ImVec2 target(0.0f, 0.0f);
     if (ImGui::IsMousePosValid(&mouse)) {
@@ -383,31 +265,9 @@ void App::drawSupportCard() {
     const float follow = 1.0f - std::exp(-dt * 4.0f);
     card.parallax.x = lerp(card.parallax.x, target.x, follow);
     card.parallax.y = lerp(card.parallax.y, target.y, follow);
-    if (card.texture) {
-        const float fade = easeOut(float(now - card.pictureAt) / 0.35f) * A;
-        const float cardAspect = size.x / size.y;
-        float uw = 1.0f, vh = 1.0f; // the part of the picture that covers the card
-        if (cardAspect > card.pictureAspect) vh = card.pictureAspect / cardAspect;
-        else uw = cardAspect / card.pictureAspect;
-        const float margin = 0.94f, drift = 0.025f; // 6 % to spare for the parallax; a slow drift as it opens
-        const float settle = 1.0f + drift * (1.0f - easeOut(float(now - card.pictureAt) / 2.4f));
-        uw *= margin / settle;
-        vh *= margin / settle;
-        const float cu = 0.5f - card.parallax.x * (1.0f - margin) * 0.45f + (1.0f - uw) * 0.06f; // a little right
-        const float cv = 0.5f - card.parallax.y * (1.0f - margin) * 0.45f - (1.0f - vh) * 0.2f;   // a little up
-        dl->AddImageRounded(ImTextureID(uintptr_t(card.texture)), a, b, ImVec2(cu - uw * 0.5f, cv - vh * 0.5f),
-                            ImVec2(cu + uw * 0.5f, cv + vh * 0.5f), col(0xffffff, fade), radius);
-    }
-    // A light passing over the sculpt now and then (every 7 s, the first soon after opening).
     {
-        const float period = 7.0f, run = 1.9f;
-        const float since = t - 0.5f;
-        const float phase = since >= 0.0f ? std::fmod(since, period) : -1.0f;
-        if (phase >= 0.0f && phase < run) {
-            const float u = easeInOut(phase / run);
-            lightSweep(dl, a, b, radius, lerp(a.x + size.x * 0.25f, b.x + size.x * 0.1f, u), 150.0f * k,
-                       0.10f * A * std::sin(u * 3.14159265f));
-        }
+        const ImVec2 c(a.x + size.x * 0.76f + card.parallax.x * 14.0f * k, a.y + size.y * 0.06f + card.parallax.y * 10.0f * k);
+        stageLight(dl, a, b, radius, c, size.x * 0.46f, size.y * 0.62f, accent, 0.22f * A, line, 0.20f, 48.0f * k, hair);
     }
     // A hairline edge, brighter along the top, and a thin accent line across the top.
     dl->AddRect(a, b, tc(line, 0.10f * A), radius, 0, hair);
@@ -431,8 +291,8 @@ void App::drawSupportCard() {
         ImGui::InvisibleButton("What's new##card.whatsnew", ImVec2(c1.x - c0.x, c1.y - c0.y));
         const bool hot = ImGui::IsItemHovered();
         if (ImGui::IsItemClicked()) {
-            guide_.open("whats-new.md");
             closeSupportCard(false);
+            showWhatsNew_ = true; // the cards, once the membership card has gone (PanelProject.cpp)
         }
         dl->AddRectFilled(c0, c1, tc(raised, (hot ? 1.0f : 0.8f) * A), 14.0f * k);
         dl->AddRect(c0, c1, tc(line, (hot ? 0.3f : 0.14f) * A), 14.0f * k, 0, hair);
@@ -443,13 +303,7 @@ void App::drawSupportCard() {
     {
         const float m = 48.0f * k;
         const ImVec2 m0(a.x + pad, y), m1(m0.x + m, m0.y + m);
-        glow(dl, m0, m1, 12.0f * k, 18.0f * k, kBrandOrange, 0.35f * A, 8);
-        const int v0 = dl->VtxBuffer.Size;
-        dl->AddRectFilled(m0, m1, col(0xffffff, A), 12.0f * k);
-        ImGui::ShadeVertsLinearColorGradientKeepAlpha(dl, v0, dl->VtxBuffer.Size, m0, ImVec2(m0.x, m1.y), col(0x23232a, 1.0f),
-                                                      col(0x0e0e11, 1.0f));
-        dl->AddRect(m0, m1, col(kBrandOrange, 0.45f * A), 12.0f * k, 0, hair);
-        cubeMark(dl, ImVec2(m0.x + m * 0.19f, m0.y + m * 0.19f), m * 0.62f, col(kBrandOrange, A));
+        cubeTile(dl, m0, m, k, A);
         const float ex = m1.x + 16.0f * k;
         paint.spaced(boldUi, 12.5f, ImVec2(ex, y + 6.0f * k), tc(accent, A), "SCULPTFORGE MEMBERSHIP", 2.2f);
         paint.text(bodyFont, 15.0f, ImVec2(ex, y + 25.0f * k), tc(dim, A), "Thank you for sculpting with SculptForge");
@@ -491,7 +345,7 @@ void App::drawSupportCard() {
     static const Tier kTiers[3] = {
         {"Supporter", "$5", "/ month",
          {"Your name in the credits, in the app and on the website", "The members' channel on Discord",
-          "A vote in the monthly feature vote", "The monthly pack at month end"},
+          "Vote on what we build next (#feature-vote)", "The monthly pack at month end"},
          "Join as a Supporter", "Join as a Supporter##card.supporter", kSupportUrlSupporter},
         {"Insider", "$20", "/ month",
          {"Everything in Supporter, and you propose the vote's options", "A daily drop: a brush, alpha or VDM",
@@ -521,7 +375,7 @@ void App::drawSupportCard() {
         } else {
             glow(dl, ImVec2(p0.x, p0.y + 8.0f * k), ImVec2(p1.x, p1.y + 8.0f * k), r, 18.0f * k, ImVec4(0, 0, 0, 1), 0.5f * appear, 6);
         }
-        { // glass over the picture; the featured card warmer towards the top
+        { // the tier card; the featured one warmer towards the top
             const int v0 = dl->VtxBuffer.Size;
             dl->AddRectFilled(p0, p1, col(0xffffff, 0.95f * appear), r);
             ImGui::ShadeVertsLinearColorGradientKeepAlpha(dl, v0, dl->VtxBuffer.Size, p0, ImVec2(p0.x, p1.y),

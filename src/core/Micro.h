@@ -49,6 +49,7 @@ namespace sf {
 
 class BVH;
 class CommandRegistry;
+class FocusDetail;
 struct Document;
 struct RayHit;
 enum class BrushType;
@@ -85,6 +86,9 @@ struct MicroMesh {
     // its GPU copy while the serial stays.
     uint64_t serial = 0;
     static uint64_t newSerial();
+    // Focus Detail (core/FocusDetail.h, prototype): set when the level streams from a detail file. Tiles outside
+    // the focus hold a coarse grid; brushes and undo make the tiles they change full first (ensureFull).
+    std::shared_ptr<FocusDetail> focus;
 
     size_t microTriangles() const { return size_t(baseTriangles) * n * n; }
     size_t microVertices() const; // unique grid points (shared edges and corners counted once)
@@ -238,14 +242,17 @@ private:
 // sharpen instead of pulling sideways; Move moves along the normal), 0 = not at all.
 int microBrushSupport(BrushType type);
 
+struct BrushAlpha;
 struct MicroUndo;
 class MicroStroke {
 public:
     void begin(Mesh& m);
     // One dab (one mirror) of a displacement brush, or the mask brush (`maskBrush`: raises the mask to 1, or
-    // lowers it with invert).
+    // lowers it with invert). `alpha` (null/empty = round) shapes a displacement dab as on a mesh, its top edge
+    // toward `alphaUp` (#92).
     void dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& center, const glm::vec3& viewDir, float radius,
-             float strength, bool invert, float focal, const glm::vec3& alphaUp, bool maskBrush, float maskStrength);
+             float strength, bool invert, float focal, const glm::vec3& alphaUp, bool maskBrush, float maskStrength,
+             const BrushAlpha* alpha = nullptr);
     // Move: captures the points within the dab (with each mirror's signs), then moves them along their normals.
     void beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, float radius, float focal, const glm::mat3& mirror);
     void grab(Mesh& m, const glm::vec3& delta);

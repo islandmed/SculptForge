@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "ai/GradioClient.h"
 
+#include "ai/AiPolicy.h"
+
 #include "ai/Http.h"
 
 #include <chrono>
@@ -46,6 +48,10 @@ std::vector<std::string> GradioClient::headers(bool json) const {
 }
 
 bool GradioClient::connect(const std::string& spaceUrl, const std::string& token, std::string& error) {
+    if (!aiEnabled()) {
+        error = aiOffError();
+        return false;
+    }
     root_ = spaceUrl;
     while (!root_.empty() && root_.back() == '/') root_.pop_back();
     token_ = token;

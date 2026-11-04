@@ -194,6 +194,8 @@ void App::startVoxelRemesh() {
     if (voxelRemesh_) return;
     Args args{{"resolution", double(voxelResolution_)}};
     if (voxelKeepMasked_) args["keep_masked"] = true;
+    if (!memoryAllows("remesh", args, [this] { startVoxelRemesh(); })) return;
+    memoryConfirmed_ = true; // (checked: the remesh command below doesn't ask again)
     if (!hasTexture(doc_.mesh) || !keepTexture_) {
         if (hasTexture(doc_.mesh)) args["keep_texture"] = false; // Keep Texture off
         runCommand("remesh", args);
@@ -252,6 +254,7 @@ void App::pollVoxelRemesh() {
         status_ = "Voxel Remesh (keeping the texture): " + std::to_string(int(voxelRemesh_->progress->load() * 100.0f)) + "%";
         return;
     }
+    if (jobWaitsForStroke()) return; // (the result lands when the stroke ends)
     const std::unique_ptr<VoxelRemeshJob> job = std::move(voxelRemesh_);
     if (!job->done.get()) {
         status_ = *job->error;
@@ -264,8 +267,7 @@ void App::pollVoxelRemesh() {
         status_ = "Voxel Remesh skipped: the Part changed while it was being remeshed";
         return;
     }
-    if (index != doc_.activeSubtool) doc_.selectSubtool(index);
-    if (doc_.sculptor.strokeActive()) endStroke();
+    const JobPart part(*this, index);
     doc_.replaceMeshUndoable(std::move(*job->result), "Remesh"); // as the remesh command
     CommandResult r{true, "Remeshed to " + std::to_string(doc_.mesh.triangleCount()) + " triangles" + *job->note};
     if (const std::string notice = doc_.takeNotice(); !notice.empty()) r.message += ". " + notice; // levels dropped
@@ -287,6 +289,7 @@ void App::pollQRemesh() {
         status_ = "Quad Remesh: " + std::to_string(int(qremesh_->progress->load() * 100.0f)) + "%";
         return;
     }
+    if (jobWaitsForStroke()) return; // (the result lands when the stroke ends)
     const std::unique_ptr<QRemeshJob> job = std::move(qremesh_);
     if (!job->done.get()) {
         status_ = *job->error;
@@ -300,8 +303,7 @@ void App::pollQRemesh() {
         status_ = "Quad Remesh skipped: the Part changed while it was being remeshed";
         return;
     }
-    if (index != doc_.activeSubtool) doc_.selectSubtool(index);
-    if (doc_.sculptor.strokeActive()) endStroke();
+    const JobPart part(*this, index);
     lastQRemeshStats_ = *job->stats;
     haveQRemeshStats_ = true;
     CommandResult r{true, applyQRemesh(doc_, std::move(*job->result), job->keepOriginal, *job->stats) + *job->textureNote};

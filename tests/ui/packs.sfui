@@ -57,8 +57,8 @@ click "Library/Apply keymap Demo Keys##km.demo-pack.Demo Keys"
 expect_shortcut mask.invert Ctrl+Shift+K
 expect_status Keymap Demo Keys: 1 keys
 click "Library/Add pie menu Demo Pie##pie.demo-pack.Demo Pie"
-expect_value radial_menus == 3
-expect_value radial_slots_3 == 2
+expect_value radial_menus == 4
+expect_value radial_slots_4 == 2
 
 # Off: its items leave the lists; on again: back.
 click "Library/##ondemo-pack"

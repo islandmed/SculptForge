@@ -1,0 +1,21 @@
+# Subdivide that wouldn't fit the memory free now asks first (core/MemoryGuard.h, app/MemoryConfirm.cpp): Cancel
+# leaves the mesh, Continue anyway subdivides. Free memory is mocked at 300 MB (two levels of this sphere need ~50 MB
+# plus a 512 MB margin).
+run new_sphere subdivisions=5
+expect_value triangles == 20480
+env SF_AVAILABLE_MEMORY_MB 300
+run_fails subdivide levels=2
+expect_value memory_confirm_open == 1
+expect_text "Subdivide needs"
+click "Cancel##memoryconfirm"
+expect_value memory_confirm_open == 0
+expect_value triangles == 20480
+run_fails subdivide levels=2
+click "Continue anyway##memoryconfirm"
+expect_value memory_confirm_open == 0
+expect_value triangles == 327680
+# With the memory there, no question.
+env SF_AVAILABLE_MEMORY_MB 0
+run undo
+run subdivide levels=2
+expect_value memory_confirm_open == 0

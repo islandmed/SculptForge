@@ -1,4 +1,4 @@
-# Installing SculptForge
+# Install SculptForge on Windows, macOS and Linux
 
 This chapter covers what SculptForge needs, which package to download for your system, what to expect the
 first time you open it, and how to build it from source.
@@ -98,6 +98,56 @@ set up. Only the runtime comes from Flathub: SculptForge itself is not published
 To build the Flatpak yourself from the source, install `flatpak` and `flatpak-builder` and run
 `packaging/flatpak/build.sh`; it writes `SculptForge-<version>-<arch>.flatpak`.
 
+## Windows
+
+Windows is where most SculptForge artists work. The notes below cover the first start, pen tablets and screen
+scaling.
+
+### SmartScreen
+
+The builds are not code-signed yet, so the first start may show "Windows protected your PC".
+
+1. Click **More info**.
+2. Click **Run anyway**.
+
+To confirm the file is the one we published, compare it with `SHA256SUMS.txt` on the release page.
+
+### Pen tablets: Windows Ink and Wintab
+
+SculptForge reads the pen through **Windows Ink**, the pen input built into Windows 10 and 11. When Windows Ink is
+off in the tablet driver, it takes the pressure from the driver's **Wintab** instead. Either way works; Windows Ink
+also gives the eraser end and tilt.
+
+- **Wacom**: Wacom Tablet Properties > **Mapping** > **Use Windows Ink**. You can set it for SculptForge only by
+  adding it as an application in Wacom Tablet Properties.
+- **Huion, XP-Pen, Gaomon, Ugee**: **Windows Ink** (sometimes "Windows Ink mode") in the driver's settings.
+- **Pen displays and Surface-type pens** use Windows Ink already.
+
+Check it in **Edit > Preferences > Tablet**: it shows "Pressure: on" once the pen has pressed, or "Pressure: not
+detected". A tablet plugged in while SculptForge runs works straight away. If pressure is missing, switch the
+driver's Windows Ink option and bring the pen back to the tablet.
+
+**Mouse mode.** Most drivers map the pen to the screen (pen mode): where the pen touches is where the cursor goes.
+If you set the driver to **Mouse** (relative) mode, the pen moves the cursor by how far it moves, like a mouse.
+Turn on **Edit > Preferences > Tablet > Mouse mode (relative)** to match it, or the cursor jumps when you put the
+pen down.
+
+Pen side buttons work as the driver sets them; a button set to **Right click** opens the
+[Quick Menu](sculpting.md#the-quick-menu). More in [Troubleshooting: pen tablets](troubleshooting.md#pen-tablets).
+
+### Screen scaling (DPI)
+
+SculptForge follows the **Scale** in Windows' **Settings > System > Display**, so text and buttons have the
+same size as in other apps at 125%, 150% or 200%. To make the interface larger or smaller than that, choose a
+size in **Edit > Preferences > Interface > UI scale** (**Automatic** follows Windows).
+
+### Where files go
+
+- Settings, brushes and the log: `%APPDATA%\SculptForge\SculptForge` (**Help > Open log folder** opens it).
+- Your library (projects, snapshots, alphas, Lit Spheres): `Documents\SculptForge`.
+
+See [Where settings live](troubleshooting.md#where-settings-live) for every file.
+
 ## Opening SculptForge for the first time
 
 The builds are not code-signed yet, so your operating system may warn you the first time.
@@ -115,10 +165,7 @@ Privacy & Security** and click **Open Anyway** next to the message about SculptF
 
 ### Windows: SmartScreen
 
-Windows may show "Windows protected your PC".
-
-1. Click **More info**.
-2. Click **Run anyway**.
+Windows may show "Windows protected your PC". See [Windows](#windows) below.
 
 ### Linux
 
@@ -141,21 +188,21 @@ SDL_VIDEO_DRIVER=x11 sculptforge
 
 Pen tablets work on both. On Wayland, pressure, tilt, the eraser end and side buttons come through the
 desktop's tablet protocol (tablet-v2), so the tablet must be set up in your desktop's settings rather than
-through X11 tools such as `xsetwacom`. If pressure doesn't respond, check **Preferences > Tablet** for the
+through X11 tools such as `xsetwacom`. If pressure doesn't respond, check **Edit > Preferences > Tablet** for the
 live pressure reading.
 
 ## What you see at start-up
 
 SculptForge opens a 1600 x 960 window with a sphere ready to sculpt and the **Library** open along the top of
 the canvas on its **Project** tab, so you can reopen recent work with a double-click. Press <kbd>,</kbd>
-(comma) to close it, or turn off **Preferences > Library > Show at startup**. The first start also creates
+(comma) to close it, or turn off **Edit > Preferences > Library > Show at startup**. The first start also creates
 your library folder (**Documents/SculptForge**, with Projects, Tools, Brushes, Alphas, MatCaps, Images, Splats
 and QuickSave (snapshots) sub-folders), which the Library shows as **User**.
 
 The first start also asks what you are **Coming from**: **ZBrush**, **Blender**, **Maya** or **New to sculpting**.
 Your answer picks the key style: **ZBrush** turns on the ZBrush-style keys, **Blender** and **Maya** their own
 styles, and **New to sculpting** keeps the SculptForge keys (the default). Change it any time in
-**Preferences > Input > Style** (see [Keyboard and mouse](shortcuts.md)); if you are updating from an earlier
+**Edit > Preferences > Input > Style** (see [Keyboard and mouse](shortcuts.md)); if you are updating from an earlier
 version, your saved style is kept and the question isn't asked.
 
 You can open a file directly from the command line, too: `sculptforge model.obj` (or a `.glb`, `.sfproj`,
@@ -169,7 +216,7 @@ The next chapter, [The interface](interface.md), explains what everything on scr
 SculptForge doesn't install updates by itself, but it tells you when there is one. Once a day at start-up it
 downloads a small file from its website that names the newest version; if yours is older, a banner at the top
 of the 3D view says what's new, with **What's new**, **Download**, **Later** and **Skip this version**. Nothing
-about you or your computer is sent. **Help > Check for updates** asks right away, and **Preferences > Updates**
+about you or your computer is sent. **Help > Check for updates** asks right away, and **Edit > Preferences > Updates**
 turns the daily check off. Builds from a package manager (such as the AUR package) leave updates to the package
 manager and don't check.
 

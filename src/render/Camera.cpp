@@ -21,8 +21,10 @@ glm::vec3 Camera::position() const { return target + orientation() * glm::vec3(0
 glm::vec3 Camera::forward() const { return orientation() * glm::vec3(0, 0, -1); }
 
 glm::mat4 Camera::view() const {
-    glm::mat4 world = glm::translate(glm::mat4(1.0f), position()) * glm::mat4_cast(orientation());
-    return glm::inverse(world);
+    // The inverse of translate(position) * rotate(orientation), written out (no general 4x4 inverse and its
+    // rounding: at extreme zoom the view and the brush's rays, screenRay, agree to a fraction of a pixel).
+    const glm::quat q = glm::normalize(orientation());
+    return glm::translate(glm::mat4_cast(glm::conjugate(q)), -position());
 }
 
 glm::mat4 Camera::projection() const {
@@ -89,13 +91,20 @@ void Camera::frame(const AABB& box) {
 }
 
 void Camera::screenRay(float x, float y, float width, float height, glm::vec3& origin, glm::vec3& dir) const {
-    float nx = 2.0f * x / width - 1.0f;
-    float ny = 1.0f - 2.0f * y / height;
-    glm::mat4 inv = glm::inverse(projection() * view());
-    glm::vec4 a = inv * glm::vec4(nx, ny, -1.0f, 1.0f);
-    glm::vec4 b = inv * glm::vec4(nx, ny, 1.0f, 1.0f);
-    origin = glm::vec3(a) / a.w;
-    dir = glm::normalize(glm::vec3(b) / b.w - origin);
+    // From the camera's own axes rather than by inverting projection * view: the same ray, without the matrix
+    // inverse's rounding, so the brush lands under the cursor to a fraction of a pixel at any zoom.
+    const float nx = 2.0f * x / std::max(width, 1e-6f) - 1.0f;
+    const float ny = 1.0f - 2.0f * y / std::max(height, 1e-6f);
+    const float t = std::tan(fovY * 0.5f);
+    const glm::quat q = orientation();
+    if (!ortho) {
+        origin = position() + q * (glm::vec3(nx * t * aspect, ny * t, -1.0f) * nearPlane()); // on the near plane
+        dir = glm::normalize(q * glm::vec3(nx * t * aspect, ny * t, -1.0f));
+        return;
+    }
+    const float h = distance * t; // projection(): the depth range starts behind the eye
+    origin = position() + q * glm::vec3(nx * h * aspect, ny * h, farPlane());
+    dir = forward();
 }
 
 float Camera::worldPerPixel(const glm::vec3& point, float viewportHeight) const {

@@ -9,21 +9,24 @@
 
 TEST(test_shards_cover_every_test_once) {
     using sf::test::inShard;
-    const std::size_t count = sf::test::registry().size();
-    CHECK(count > 100); // the whole suite is registered
-    for (int shards = 1; shards <= 9; ++shards) {
-        std::vector<int> runs(count + 17, 0); // a few more than registered: the rule must not depend on the count
-        for (int k = 0; k < shards; ++k)
-            for (std::size_t i = 0; i < runs.size(); ++i)
-                if (inShard(i, k, shards)) ++runs[i];
+    const auto& tests = sf::test::registry();
+    CHECK(tests.size() > 100); // the whole suite is registered
+    for (int shards = 1; shards <= 17; ++shards) {
         bool once = true;
-        for (int r : runs) once = once && r == 1;
+        for (const auto& t : tests) {
+            int runs = 0;
+            for (int k = 0; k < shards; ++k) runs += inShard(t.name, k, shards) ? 1 : 0;
+            once = once && runs == 1;
+        }
         CHECK(once);
     }
-    // Shards stay balanced: with 4 shards none gets more than a quarter (rounded up) of the tests.
-    for (int k = 0; k < 4; ++k) {
-        std::size_t n = 0;
-        for (std::size_t i = 0; i < count; ++i) n += inShard(i, k, 4) ? 1 : 0;
-        CHECK(n <= (count + 3) / 4);
+    // Shards stay balanced by count: with 16 shards (CMakeLists.txt) none gets more than twice its share, and with
+    // CI's 2 and 4 machines (every other / every fourth shard) none more than 1.3 times.
+    for (int shards : {2, 4, 16}) {
+        std::vector<std::size_t> n(std::size_t(shards), 0);
+        for (const auto& t : tests)
+            for (int k = 0; k < shards; ++k) n[std::size_t(k)] += inShard(t.name, k, shards) ? 1 : 0;
+        const double share = double(tests.size()) / shards;
+        for (std::size_t c : n) CHECK(double(c) <= share * (shards == 16 ? 2.0 : 1.3));
     }
 }

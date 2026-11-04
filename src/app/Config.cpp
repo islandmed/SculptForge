@@ -46,6 +46,8 @@ void lookToJson(const UiPrefs& p, Json& j) {
     look.set("matchOmarchy", p.look.matchOmarchy);
     look.set("phosphor", std::string(p.look.amber ? "amber" : "green"));
     look.set("effects", p.look.effects);
+    look.set("outlines", std::string(p.look.outlines == 0 ? "off" : p.look.outlines == 2 ? "on" : "subtle"));
+    look.set("outlineOpacity", double(p.look.outlineOpacity));
     j.set("look", std::move(look));
     j.set("layout", std::string(p.shellLayout == 1 ? "sculptforge" : "zbrush"));
 }
@@ -58,6 +60,11 @@ bool lookFromJson(const Json& j, UiPrefs& p) {
         p.look.matchOmarchy = look["matchOmarchy"].asBool(p.look.matchOmarchy);
         if (look["phosphor"].isString()) p.look.amber = look["phosphor"].asString() == "amber";
         p.look.effects = look["effects"].asBool(p.look.effects);
+        if (look["outlines"].isString()) {
+            const std::string o = look["outlines"].asString();
+            p.look.outlines = o == "off" ? 0 : o == "on" ? 2 : 1;
+        }
+        p.look.outlineOpacity = std::clamp(float(look["outlineOpacity"].asNumber(p.look.outlineOpacity)), 0.0f, 1.0f);
     }
     if (j["layout"].isString()) p.shellLayout = j["layout"].asString() == "sculptforge" ? 1 : 0;
     return j["look"].isObject() || j["layout"].isString();
@@ -68,6 +75,7 @@ Json toJson(const UiPrefs& p) {
     j.set("popupInfo", p.popupInfo);
     j.set("helpOpacity", double(p.helpOpacity));
     j.set("tooltipDelay", double(p.tooltipDelay));
+    j.set("reduceMotion", p.reduceMotion);
     j.set("oneSubpalette", p.oneSubpalette);
     j.set("autoCollapseLeft", p.autoCollapseLeft);
     j.set("autoCollapseRight", p.autoCollapseRight);
@@ -80,6 +88,7 @@ Json toJson(const UiPrefs& p) {
     j.set("emulateNumpad", p.emulateNumpad);
     j.set("rightClickQuickMenu", p.rightClickQuickMenu);
     j.set("spaceCamera", p.spaceCamera);
+    j.set("emulate3Button", p.emulate3Button);
     j.set("mayaZoomHorizontal", p.mayaZoomHorizontal);
     j.set("invertZoom", p.invertZoom);
     j.set("alongNormal", std::string(p.alongNormal == 1 ? "always" : p.alongNormal == 2 ? "never" : "invert_key"));
@@ -88,8 +97,11 @@ Json toJson(const UiPrefs& p) {
     j.set("dyntopoSmoothRemesh", double(p.dyntopoSmoothRemesh));
     j.set("airStrokes", p.airStrokes);
     j.set("cursorFollowsSurface", p.cursorFollowsSurface);
+    j.set("hideRingWhileStroking", p.hideRingWhileStroking);
     j.set("timelinePosition", std::string(p.timelineTop ? "top" : "bottom"));
     j.set("showAxes", p.showAxes);
+    j.set("axisGizmoSize", std::string(p.axisGizmoSize == 0 ? "small" : p.axisGizmoSize == 2 ? "large" : "medium"));
+    j.set("showViewFigure", p.showViewFigure);
     j.set("alphabeticalPalettes", p.alphabeticalPalettes);
     lookToJson(p, j);
     j.set("language", p.language);
@@ -97,11 +109,13 @@ Json toJson(const UiPrefs& p) {
     j.set("spaceMouse", toJson(p.spaceMouse));
     j.set("antialiasing", double(p.antialiasing));
     j.set("fastNavigation", p.fastNavigation);
+    j.set("viewResolution", double(p.viewResolution));
     j.set("multithreading", p.multithreading);
     j.set("predictiveStrokes", p.predictiveStrokes);
     j.set("draftStrokes", p.draftStrokes);
     j.set("liveMove", p.liveMove);
     j.set("backgroundPreview", p.backgroundPreview);
+    j.set("fastUpload", p.fastUpload);
     j.set("dyntopoConstantDetail", p.dyntopoConstantDetail);
     j.set("flatShading", p.flatShading);
     j.set("viewportCursor", double(p.viewportCursor));
@@ -110,6 +124,10 @@ Json toJson(const UiPrefs& p) {
     Json bg = Json::array();
     for (int i = 0; i < 3; ++i) bg.push(double(p.backgroundColor[i]));
     j.set("backgroundColor", std::move(bg));
+    j.set("showHints", p.showHints);
+    Json hints = Json::array();
+    for (const std::string& h : p.hiddenHints) hints.push(h);
+    j.set("hiddenHints", std::move(hints));
     return j;
 }
 
@@ -118,6 +136,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.popupInfo = j["popupInfo"].asBool(p.popupInfo);
     p.helpOpacity = std::clamp(float(j["helpOpacity"].asNumber(p.helpOpacity)), 0.3f, 1.0f);
     p.tooltipDelay = std::clamp(float(j["tooltipDelay"].asNumber(p.tooltipDelay)), 0.0f, 3.0f);
+    p.reduceMotion = j["reduceMotion"].asBool(p.reduceMotion);
     p.oneSubpalette = j["oneSubpalette"].asBool(p.oneSubpalette);
     p.autoCollapseLeft = j["autoCollapseLeft"].asBool(p.autoCollapseLeft);
     p.autoCollapseRight = j["autoCollapseRight"].asBool(p.autoCollapseRight);
@@ -134,6 +153,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.emulateNumpad = j["emulateNumpad"].asBool(p.emulateNumpad);
     p.rightClickQuickMenu = j["rightClickQuickMenu"].asBool(p.rightClickQuickMenu);
     p.spaceCamera = j["spaceCamera"].asBool(p.spaceCamera);
+    p.emulate3Button = j["emulate3Button"].asBool(p.emulate3Button);
     p.mayaZoomHorizontal = j["mayaZoomHorizontal"].asBool(p.mayaZoomHorizontal);
     p.invertZoom = j["invertZoom"].asBool(p.invertZoom);
     if (j["alongNormal"].isString()) {
@@ -145,8 +165,14 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.dyntopoSmoothRemesh = std::clamp(float(j["dyntopoSmoothRemesh"].asNumber(p.dyntopoSmoothRemesh)), 0.0f, 1.0f);
     p.airStrokes = j["airStrokes"].asBool(p.airStrokes);
     p.cursorFollowsSurface = j["cursorFollowsSurface"].asBool(p.cursorFollowsSurface);
+    p.hideRingWhileStroking = j["hideRingWhileStroking"].asBool(p.hideRingWhileStroking);
     if (j["timelinePosition"].isString()) p.timelineTop = j["timelinePosition"].asString() != "bottom";
     p.showAxes = j["showAxes"].asBool(p.showAxes);
+    if (j["axisGizmoSize"].isString()) {
+        const std::string size = j["axisGizmoSize"].asString();
+        p.axisGizmoSize = size == "small" ? 0 : size == "large" ? 2 : 1;
+    }
+    p.showViewFigure = j["showViewFigure"].asBool(p.showViewFigure);
     p.alphabeticalPalettes = j["alphabeticalPalettes"].asBool(p.alphabeticalPalettes);
     // A ui.json from before 0.10.7 names neither: it was stored with the Classic look and the ZBrush-style layout,
     // and keeps them (the new-look card offers the new default once, PanelSupport.cpp).
@@ -161,16 +187,27 @@ void fromJson(const Json& j, UiPrefs& p) {
     const int aa = int(j["antialiasing"].asNumber(p.antialiasing));
     p.antialiasing = aa >= 8 ? 8 : aa >= 4 ? 4 : aa >= 2 ? 2 : 1;
     p.fastNavigation = j["fastNavigation"].asBool(p.fastNavigation);
+    {
+        const int r = int(j["viewResolution"].asNumber(p.viewResolution));
+        p.viewResolution = r <= 50 ? 50 : r <= 75 ? 75 : 100;
+    }
     p.multithreading = j["multithreading"].asBool(p.multithreading);
     p.predictiveStrokes = j["predictiveStrokes"].asBool(p.predictiveStrokes);
     p.draftStrokes = j["draftStrokes"].asBool(p.draftStrokes);
     p.liveMove = j["liveMove"].asBool(p.liveMove);
     p.backgroundPreview = j["backgroundPreview"].asBool(p.backgroundPreview);
+    p.fastUpload = j["fastUpload"].asBool(p.fastUpload);
     p.dyntopoConstantDetail = j["dyntopoConstantDetail"].asBool(p.dyntopoConstantDetail);
     p.flatShading = j["flatShading"].asBool(p.flatShading);
     p.viewportCursor = std::clamp(int(j["viewportCursor"].asNumber(p.viewportCursor)), 0, 1);
     p.backfaceCulling = j["backfaceCulling"].asBool(p.backfaceCulling);
     if (j["background"].isString()) p.gradientBackground = j["background"].asString() != "flat";
+    p.showHints = j["showHints"].asBool(p.showHints);
+    if (const Json& hints = j["hiddenHints"]; hints.size() > 0) {
+        p.hiddenHints.clear();
+        for (size_t i = 0; i < hints.size() && i < 64; ++i)
+            if (hints[i].isString() && hints[i].asString().size() < 64) p.hiddenHints.insert(hints[i].asString());
+    }
     if (const Json& bg = j["backgroundColor"]; bg.size() == 3)
         for (int i = 0; i < 3; ++i) p.backgroundColor[i] = std::clamp(float(bg[size_t(i)].asNumber(p.backgroundColor[i])), 0.0f, 1.0f);
 }
@@ -327,6 +364,11 @@ void App::initActions() {
     add("edit.redo", "Redo", "Edit", "Ctrl+Shift+Z / Ctrl+Y", [this] { runCommand("redo"); }, ICON_LC_REDO_2, "redo", nullptr,
         [this] { return doc_.undo.canRedo(); });
     add("geometry.subdivide", "Subdivide", "Tool > Geometry", nullptr, [this] { runCommand("subdivide"); }, nullptr, "subdivide");
+    add("geometry.close_holes", "Close Holes", "Tool > Geometry", nullptr, [this] { runCommand("close_holes"); },
+        ICON_LC_CIRCLE_DOT, "close_holes", nullptr, nullptr,
+        "Cap every open boundary of the active Part (a hole, an open bottom, the rim of an extracted shell) with a "
+        "new patch sized like the polygons around it, so remeshing and sculpting see a closed surface. The rest of "
+        "the Part stays as it is; the patches get a face group of their own (#103).");
     // Subdivision levels (ZBrush Tool > Geometry; core/Multires.h).
     add("geometry.divide", "Divide", "Tool > Geometry", "Ctrl+D", [this] { runCommand("subdiv_divide", {{"smooth", smt_}}); },
         ICON_LC_GRID_2X2, "subdiv_divide", nullptr, nullptr,
@@ -369,6 +411,10 @@ void App::initActions() {
         "Write the micro level as a 32-bit EXR displacement map over the base UVs (next to the project).");
     add("geometry.micro_noise", "Micro Surface Noise", "Tool > Geometry", nullptr, [this] { runCommand("micro_noise"); }, nullptr,
         "micro_noise", nullptr, [this] { return hasMicro(doc_.mesh); });
+    add("subtool.duplicate", "Duplicate Part", "Tool > Parts", "Ctrl+Shift+D", [this] { runCommand("subtool_duplicate"); },
+        ICON_LC_COPY, "subtool_duplicate", nullptr, nullptr,
+        "Copy the active Part, with its layers and attributes, and make the copy active (also in the Parts list's "
+        "right-click menu).");
     // Tool > SubTool > Extract, Tool > Geometry > Modify Topology, Tool > Deformation (PanelExtract.cpp).
     add("subtool.extract", "Extract", "Tool > Parts", nullptr, [this] { runExtract(); }, nullptr, "extract", nullptr,
         [this] { return doc_.mesh.hasMask(); },
@@ -445,6 +491,10 @@ void App::initActions() {
         ICON_LC_FILE_PLUS, "new_sphere");
     add("file.new_plane", "New Plane", "File", nullptr, [this] { confirmDiscard([this] { runCommand("new_plane"); }); }, nullptr,
         "new_plane");
+    add("file.new_starter", "New from Starter Mesh...", "File", nullptr, [this] { showStarterMeshes(); }, nullptr, nullptr,
+        nullptr, nullptr,
+        "Start from a base mesh: human head, bust, full body, hand, foot, ear, eye, stylised and creature heads, "
+        "torso, or a bevelled box, cylinder, capsule or ring (Library > Tool > Starter meshes).");
     add("file.open", "Open...", "File", "Ctrl+O", [this] { confirmDiscard([this] { openFileDialog(); }); }, ICON_LC_FOLDER_OPEN,
         nullptr, nullptr, nullptr, "Open a project (.sfproj), a model (.obj, .glb, .fbx, .stl, .ply, .usd ...) or splats.");
     add("file.save", "Save", "File", "Ctrl+S", [this] { saveProjectAs(false); }, ICON_LC_SAVE, nullptr, nullptr, nullptr,
@@ -489,10 +539,24 @@ void App::initActions() {
         "SculptForge reads and writes only there, and only when you send or get.");
     add("brush.paste", "Paste brush", "Brush", "Ctrl+V", [this] { pasteBrush(); }, ICON_LC_CLIPBOARD_PASTE, nullptr, nullptr,
         nullptr, "Add the brush on the clipboard: a brush code someone shared, or the text of a .sfbrush file.");
-    add("brush.size_down", "Smaller brush", "Draw", "[", [this] { radiusPx_ = std::max(2.0f, radiusPx_ / 1.1f); }, nullptr,
-        nullptr, nullptr, nullptr, "Make the brush 10% smaller (hold to repeat).");
-    add("brush.size_up", "Larger brush", "Draw", "]", [this] { radiusPx_ = std::min(800.0f, radiusPx_ * 1.1f); }, nullptr,
-        nullptr, nullptr, nullptr, "Make the brush 10% larger (hold to repeat).");
+    // Per-brush settings (#78, BrushSettingsUi.cpp).
+    add("brush.save_settings", "Save Brush Settings", "Brush", nullptr, [this] { saveBrushSettings(); }, ICON_LC_SAVE,
+        nullptr, nullptr, nullptr,
+        "Every brush keeps its own Draw Size, Z Intensity, Falloff, RGB Intensity, stroke and alpha while you work. "
+        "This saves the current brush's, so it starts with them every time SculptForge opens.");
+    add("brush.reset_settings", "Reset Brush to Default", "Brush", nullptr, [this] { resetBrushSettings(); },
+        ICON_LC_ROTATE_CCW, nullptr, nullptr, nullptr,
+        "Put the current brush's Draw Size, Z Intensity, Falloff, RGB Intensity, stroke and alpha back to the values "
+        "SculptForge ships with, and forget what Save Brush Settings stored for it.");
+    add("brush.share_size", "Share size and intensity across brushes", "Preferences > Input", nullptr,
+        [this] { setShareBrushSize(!brushSettings_.shareSizeIntensity); }, nullptr, nullptr,
+        [this] { return brushSettings_.shareSizeIntensity; }, nullptr,
+        "On: Draw Size and Z Intensity stay as they are when you pick another brush (as before 0.10.8); Falloff, "
+        "RGB Intensity, the stroke and the alpha still follow each brush. Off (the default): every brush keeps its own.");
+    add("brush.size_down", "Smaller brush", "Draw", "[", [this] { radiusPx_ = drawSizeStep(radiusPx_, -1, false); }, nullptr,
+        nullptr, nullptr, nullptr, "Make the brush 10% smaller (hold to repeat; Shift+[ steps one pixel).");
+    add("brush.size_up", "Larger brush", "Draw", "]", [this] { radiusPx_ = drawSizeStep(radiusPx_, 1, false); }, nullptr,
+        nullptr, nullptr, nullptr, "Make the brush 10% larger (hold to repeat; Shift+] steps one pixel).");
     add("transform.symmetry_x", "Symmetry X", "Transform", "X", [this] { symmetry_.x = !symmetry_.x; }, ICON_LC_FLIP_HORIZONTAL_2,
         nullptr, [this] { return symmetry_.x; }, nullptr, "Mirror strokes across the X axis (left / right).");
     add("view.wireframe", "Wireframe", "Render", "Shift+F", [this] { renderSettings_.wireframe = !renderSettings_.wireframe; },
@@ -527,7 +591,11 @@ void App::initActions() {
         [this] { return guide_.isOpen(); }, nullptr,
         "The SculptForge user guide: every tool explained, with search. Hold Ctrl over a control and press F1 to open "
         "the chapter about it.");
-    add("help.whats_new", "What's New", "Help", nullptr, [this] { guide_.open("whats-new.md"); }, ICON_LC_SPARKLES, nullptr,
+    add("help.first_sculpt", "Your first sculpt (10 min)", "Help", nullptr, [this] { guide_.open("first-sculpt.md"); },
+        ICON_LC_GRADUATION_CAP, nullptr, nullptr, nullptr,
+        "A step-by-step lesson for complete beginners: a cute owl head from the default sphere, painted and "
+        "rendered, in about ten minutes.");
+    add("help.whats_new", "What's New", "Help", nullptr, [this] { showWhatsNew(); }, ICON_LC_SPARKLES, nullptr,
         nullptr, nullptr, "What changed in this version and the ones before it (opens once by itself after an update).");
     add("help.check_updates", "Check for updates", "Help", nullptr, [this] { startUpdateCheck(true); }, ICON_LC_REFRESH_CW,
         nullptr, nullptr, [this] { return !updateJob_; },
@@ -538,7 +606,7 @@ void App::initActions() {
     add("help.support", "Support SculptForge...", "Help", nullptr, [this] { openSupportPage(); }, ICON_LC_HEART, nullptr,
         nullptr, nullptr,
         "SculptForge is free and stays free. Memberships add your name to the credits, a monthly brush and "
-        "alpha pack and a roadmap vote: opens sculptforge.app/support.html in your browser. Nothing in the app changes either way.");
+        "alpha pack and a vote on what we build next: opens sculptforge.app/support.html in your browser. Nothing in the app changes either way.");
     add("help.discord", "Join the Discord...", "Help", nullptr, [this] { openDiscordPage(); }, ICON_LC_MESSAGE_CIRCLE,
         nullptr, nullptr, nullptr,
         "The official SculptForge community on Discord: questions, tips and work in progress. Opens the invite in "
@@ -766,6 +834,7 @@ bool App::readUiConfig(const std::string& path, std::string& err) {
     if (!fromJson(j["layout"], layout, err, prefs.shellLayout)) return false;
     uiPrefs_ = std::move(prefs);
     lookDirty_ = true;
+    requestUiScale(); // its UI scale
     const bool customize = layout_.customize;
     layout_ = std::move(layout);
     layout_.customize = customize;
@@ -857,6 +926,76 @@ std::string App::layoutKey() const {
     l.lightboxTab.clear();
     l.customize = false;
     return toJson(l).dump();
+}
+
+// ---------------------------------------------------------------------------
+// Viewport hints (U11): every note shown over the 3D view goes through here, with its Don't show again
+// ---------------------------------------------------------------------------
+
+namespace {
+struct HintInfo {
+    const char* id;
+    const char* name; // as Preferences > Hints lists it
+};
+constexpr HintInfo kHints[] = {
+    {"air_strokes", "Strokes start off the model"},
+    {"lod_preview", "Previewing an LOD"},
+    {"face_landmarks", "Face landmark steps"},
+};
+} // namespace
+
+bool App::hintShown(const char* id) const {
+    return uiPrefs_.showHints && !uiPrefs_.hiddenHints.count(id);
+}
+
+void App::drawViewportHint(const char* id, const char* text, ImU32 colour, float top) {
+    if (!hintShown(id)) return;
+    const CanvasRect c = canvasRect();
+    const float s = uiScale_;
+    ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, top), ImGuiCond_Always, ImVec2(0.5f, 0.0f));
+    ImGui::SetNextWindowBgAlpha(0.72f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f * s, 4.0f * s));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, theme::rounding(4.0f * s));
+    const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
+                                   ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
+    const std::string window = std::string("##hint.") + id;
+    if (ImGui::Begin(window.c_str(), nullptr, flags)) {
+        ImGui::AlignTextToFramePadding();
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(colour));
+        ImGui::TextUnformatted(text);
+        ImGui::PopStyleColor();
+        ImGui::SameLine(0.0f, 12.0f * s);
+        const std::string button = std::string(tr("Don't show again")) + "##hint." + id;
+        if (ImGui::SmallButton(button.c_str())) {
+            uiPrefs_.hiddenHints.insert(id);
+            status_ = "Hint hidden (Preferences > Hints shows it again; Store Config keeps it)";
+        }
+    }
+    ImGui::End();
+    ImGui::PopStyleVar(3);
+}
+
+void App::drawHintsSection() {
+    ui::Checkbox("Show hints in the viewport##hints.show", &uiPrefs_.showHints);
+    ui::HelpText("Show hints in the viewport", nullptr,
+                 "The short notes SculptForge shows over the 3D view (a mode that is on, the next step of a tool). Off "
+                 "hides them all; each also has its own Don't show again. Store Config keeps it.",
+                 "Preferences > Hints");
+    ImGui::BeginDisabled(!uiPrefs_.showHints);
+    for (const HintInfo& h : kHints) {
+        bool on = !uiPrefs_.hiddenHints.count(h.id);
+        const std::string label = std::string(tr(h.name)) + "##hints." + h.id;
+        if (ui::Checkbox(label.c_str(), &on)) {
+            if (on) uiPrefs_.hiddenHints.erase(h.id);
+            else uiPrefs_.hiddenHints.insert(h.id);
+        }
+    }
+    ImGui::EndDisabled();
+    if (ImGui::Button(tr("Show all hints again##hints.reset"), ImVec2(-FLT_MIN, 0))) {
+        uiPrefs_.showHints = true;
+        uiPrefs_.hiddenHints.clear();
+    }
 }
 
 void App::watchLayoutChanges() {
@@ -1005,6 +1144,8 @@ void App::drawHelpConsoleUi() {
         ImGui::PopStyleVar(3);
     }
     watchLayoutChanges();
+    ui::DragScrollPanels(); // #100: pen and middle drags scroll panels (after every window)
+    ui::DrawHover(*this); // the hover and keyboard-focus rings, over every window
     ui::DrawHelp(*this); // last: on top of everything
 }
 
@@ -1138,19 +1279,6 @@ void drawInterfaceSection(App& app) {
                      "Clay Block...) stay as they are. Store Config keeps it for the next start.",
                      "Preferences > Interface");
     }
-    // Viewport cursor (#73).
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted(tr("Viewport cursor"));
-    const char* const kCursors[] = {"Crosshair##viewport_cursor", "Arrow##viewport_cursor"};
-    for (int i = 0; i < 2; ++i) {
-        ImGui::SameLine();
-        if (ImGui::RadioButton(tr(kCursors[i]), p.viewportCursor == i)) p.viewportCursor = i;
-        ui::HelpText("Viewport cursor", nullptr,
-                     "The pointer over the 3D view: a crosshair (the default, as in most sculpting apps) or the arrow. "
-                     "Panels, menus and popups always show the arrow (or their own resize and text cursors). Store "
-                     "Config keeps it.",
-                     "Preferences > Interface");
-    }
     ImGui::Checkbox(tr("Popup Info (Ctrl+hover help)"), &p.popupInfo);
     ui::HelpText("Popup Info", nullptr,
                  "Hold Ctrl and point at any control to see what it does and its shortcut. Ctrl+Alt shows a command's "
@@ -1166,6 +1294,10 @@ void drawInterfaceSection(App& app) {
     ui::SliderInside("##tooltip_delay", &p.tooltipDelay, 0.0f, 2.0f, "Tooltip delay %.1f s");
     ui::HelpText("Tooltip delay", nullptr,
                  "How long to point at an icon-only button (or a clipped label) before its name appears.",
+                 "Preferences > Interface");
+    ImGui::Checkbox(tr("Reduce motion"), &p.reduceMotion);
+    ui::HelpText("Reduce motion", nullptr,
+                 "Hover and focus highlights change colour only: no easing, and tiles don't lift or grow.",
                  "Preferences > Interface");
     ImGui::Checkbox(tr("One sub-palette open"), &p.oneSubpalette);
     ui::HelpText("One sub-palette open", nullptr,
@@ -1208,12 +1340,15 @@ void drawInterfaceSection(App& app) {
     ImGui::SetNextItemWidth(-FLT_MIN);
     if (ImGui::BeginCombo("##ui_scale", (std::string(tr("UI scale:")) + " " + tr(kScales[current])).c_str())) {
         for (int i = 0; i < 6; ++i)
-            if (ImGui::Selectable(tr(kScales[i]), i == current)) p.uiScale = kScaleValues[i];
+            if (ImGui::Selectable(tr(kScales[i]), i == current)) {
+                p.uiScale = kScaleValues[i];
+                app.requestUiScale(); // live, from the next frame (#87)
+            }
         ImGui::EndCombo();
     }
     ui::HelpText("UI scale", nullptr,
-                 "Size of text and controls. Automatic follows the display. Takes effect the next time SculptForge starts "
-                 "(Store Config to keep it).",
+                 "Size of text and controls, applied at once. Automatic follows the display the window is on (Windows: "
+                 "Settings > Display > Scale, per monitor). Store Config keeps it for the next start.",
                  "Preferences > Interface");
     static const char* kRotation[] = {"Free (ZBrush)", "Turntable"};
     ImGui::SetNextItemWidth(-FLT_MIN);
@@ -1325,6 +1460,48 @@ void drawLightBoxSection(App& app) {
 
 } // namespace config
 
+namespace config {
+
+looks::Palette classicPalette() {
+    return {0x121212, 0x1c1c1c, 0x232323, 0x2c2c2c, 0x393939, 0x505050, 0x8d8d8d, 0xb6b6b6, 0xd8d8d8, 0xf2f2f2, 0xf0882e,
+            0xf0882e, 0xe5604a, 0x9ece6a, 0xe0af68, false};
+}
+
+void drawLookMiniature(ImDrawList* dl, ImVec2 a, ImVec2 b, const looks::Palette& pal, const char* name, ImFont* font,
+                       float s, int layout) {
+    auto col = [](unsigned hex) { return theme::u32(theme::rgb(hex)); };
+    dl->AddRectFilled(a, b, col(pal.crust));
+    const float g = 3.0f * s;
+    float top = a.y + g;
+    if (layout == 0) { // the palette bar: a row of short words
+        for (float x = a.x + g + 2.0f * s; x < b.x - g - 14.0f * s; x += 13.0f * s)
+            dl->AddRectFilled(ImVec2(x, top + 2.0f * s), ImVec2(x + 9.0f * s, top + 4.0f * s), col(pal.overlay));
+        top += 7.0f * s;
+    }
+    // The bar (the status bar with its menus, or the top shelf), its accent marking the current tool.
+    const float barH = (layout == 0 ? 14.0f : 8.0f) * s;
+    dl->AddRectFilled(ImVec2(a.x + g, top), ImVec2(b.x - g, top + barH), col(pal.mantle));
+    dl->AddRectFilled(ImVec2(a.x + g + 2.0f * s, top + 2.0f * s), ImVec2(a.x + g + 16.0f * s, top + 6.0f * s), col(pal.accent));
+    if (layout >= 0) // the shelf's tiles: one row, or two in the ZBrush-style layout
+        for (int row = 0; row < (layout == 0 ? 2 : 1); ++row)
+            for (float x = a.x + g + 22.0f * s; x < b.x - g - 8.0f * s; x += 9.0f * s)
+                dl->AddRectFilled(ImVec2(x, top + 2.0f * s + float(row) * 6.0f * s), ImVec2(x + 6.0f * s, top + 6.0f * s + float(row) * 6.0f * s),
+                                  col(pal.surface1));
+    top += barH + g;
+    dl->AddRectFilled(ImVec2(a.x + g, top), ImVec2(b.x - g - 30.0f * s, b.y - g), col(pal.base));
+    dl->AddRectFilled(ImVec2(b.x - g - 26.0f * s, top), ImVec2(b.x - g, b.y - g), col(pal.base));
+    dl->AddRectFilled(ImVec2(b.x - g - 22.0f * s, b.y - g - 8.0f * s), ImVec2(b.x - g - 4.0f * s, b.y - g - 4.0f * s), col(pal.accent2));
+    if (layout >= 0) { // a sphere in the view, so the colours read around a model
+        const ImVec2 c((a.x + b.x - 30.0f * s) * 0.5f, (top + b.y) * 0.5f);
+        const float r = std::min(b.x - a.x, b.y - top) * 0.2f;
+        dl->AddCircleFilled(c, r, col(0x8a8a8e));
+        dl->AddCircleFilled(ImVec2(c.x - r * 0.3f, c.y - r * 0.3f), r * 0.55f, col(0xb0b0b4));
+    }
+    if (!font) font = ImGui::GetFont();
+    dl->AddText(font, font->FontSize, ImVec2(a.x + g + 6.0f * s, b.y - g - font->FontSize - 3.0f * s), col(pal.text), name);
+}
+
+} // namespace config
 
 // Preferences > Interface > Look: four looks as swatch cards, the look's own options, and the layout.
 void App::drawLookSection() {
@@ -1346,28 +1523,18 @@ void App::drawLookSection() {
         } else if (id == looks::LookId::Blueprint) {
             pal = looks::blueprintPalette();
         } else {
-            pal = {0x111113, 0x1b1b1d, 0x222225, 0x2b2b2f, 0x37373c, 0x4e4e55, 0x8c8c90, 0xb4b4b9, 0xd8d8d8, 0xf2f2f2, 0xf0882e,
-                   0xf0882e, 0xe5604a, 0x9ece6a, 0xe0af68, false};
+            pal = config::classicPalette();
         }
         const std::string label = std::string(looks::lookName(id)) + "##look." + looks::lookKey(id);
         const bool clicked = ImGui::InvisibleButton(label.c_str(), ImVec2(cardW, cardH));
         const bool hovered = ImGui::IsItemHovered(), current = l.look == i;
         const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
         ImDrawList* dl = ImGui::GetWindowDrawList();
-        auto col = [](unsigned hex) { return theme::u32(theme::rgb(hex)); };
-        // A miniature of the look: its wallpaper, a bar with its accent, two tiles, its name in its text colour.
-        dl->AddRectFilled(a, b, col(pal.crust));
-        const float g = 3.0f * s;
-        dl->AddRectFilled(ImVec2(a.x + g, a.y + g), ImVec2(b.x - g, a.y + g + 8.0f * s), col(pal.mantle));
-        dl->AddRectFilled(ImVec2(a.x + g + 2.0f * s, a.y + g + 2.0f * s), ImVec2(a.x + g + 16.0f * s, a.y + g + 6.0f * s), col(pal.accent));
-        dl->AddRectFilled(ImVec2(a.x + g, a.y + 2.0f * g + 8.0f * s), ImVec2(b.x - g - 30.0f * s, b.y - g), col(pal.base));
-        dl->AddRectFilled(ImVec2(b.x - g - 26.0f * s, a.y + 2.0f * g + 8.0f * s), ImVec2(b.x - g, b.y - g), col(pal.base));
-        dl->AddRectFilled(ImVec2(b.x - g - 22.0f * s, b.y - g - 8.0f * s), ImVec2(b.x - g - 4.0f * s, b.y - g - 4.0f * s), col(pal.accent2));
-        ImFont* f = i == int(looks::LookId::Classic) ? fontInterSmall_ : fontMonoSmall_;
-        if (!f) f = ImGui::GetFont();
-        dl->AddText(f, f->FontSize, ImVec2(a.x + g + 6.0f * s, b.y - g - f->FontSize - 3.0f * s), col(pal.text), looks::lookName(id));
+        const ui::TileLift lift = ui::BeginTileLift(a, b, 0.0f);
+        config::drawLookMiniature(dl, a, b, pal, looks::lookName(id), i == int(looks::LookId::Classic) ? fontInterSmall_ : fontMonoSmall_, s);
         dl->AddRect(a, b, theme::u32(current ? theme::accent : hovered ? theme::textDim : theme::tileBorder), 0.0f, 0,
                     current ? 2.0f * s : 1.0f * s);
+        ui::EndTileLift(lift, 0.0f);
         ImGui::LogText("%s", looks::lookName(id));
         ui::HelpText(looks::lookName(id), nullptr,
                      i == 0   ? "The original dark grey look with the orange accent."
@@ -1431,6 +1598,35 @@ void App::drawLookSection() {
         if (ui::Checkbox("Scanlines & glow##look.effects", &l.effects)) lookDirty_ = true;
         ui::HelpText("Scanlines & glow", nullptr,
                      "Faint scanlines and a glow around the focused panel, on the interface only (never on the 3D view). Off by default.",
+                     "Preferences > Interface > Look");
+    }
+    if (l.look != int(looks::LookId::Classic)) { // the tiled looks' panel borders (Classic has none to speak of)
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(tr("Outlines"));
+        const char* const kOutlines[] = {"Off##look.outlines", "Subtle##look.outlines", "On##look.outlines"};
+        for (int i = 0; i < 3; ++i) {
+            ImGui::SameLine();
+            if (ImGui::RadioButton(tr(kOutlines[i]), l.outlines == i)) {
+                l.outlines = i;
+                lookDirty_ = true;
+            }
+            ui::HelpText("Outlines", nullptr,
+                         "The borders around the panels in Forge Terminal, Phosphor and Blueprint. Subtle (the default): "
+                         "faint, and nothing lights up under the pointer. Off: no borders, the gaps alone separate the "
+                         "panels. On: clear borders, the panel under the pointer a faint step lighter.",
+                         "Preferences > Interface > Look");
+        }
+        ImGui::BeginDisabled(l.outlines == 0);
+        float opacity = l.outlineOpacity * 100.0f;
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        if (ui::SliderInside("##look.outline_opacity", &opacity, 0.0f, 100.0f, "Outline opacity %.0f%%")) {
+            l.outlineOpacity = std::clamp(opacity / 100.0f, 0.0f, 1.0f);
+            lookDirty_ = true;
+        }
+        ImGui::EndDisabled();
+        ui::HelpText("Outline opacity", nullptr,
+                     "How strong the panel borders are (0-100%), on top of Outlines: 100% draws them as Subtle or On "
+                     "does, lower fades them into the panels (#98). Ctrl+click to type.",
                      "Preferences > Interface > Look");
     }
     ImGui::AlignTextToFramePadding();

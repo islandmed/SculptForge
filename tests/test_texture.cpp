@@ -534,7 +534,7 @@ TEST(texture_dab_is_interactive_at_4k_on_a_million_triangles) {
     std::printf("  texture dab at 4K / %zu tris: begin %.1f ms, %.2f ms per dab (%zu texels)\n", m.triangleCount(), beginMs,
                 dabMs, texels / 20);
     CHECK(texels > 0);
-    CHECK(dabMs < 30.0); // interactive: several dabs per frame
+    CHECK(dabMs < timeLimit(30.0)); // interactive: several dabs per frame
 }
 
 TEST(texture_stroke_benchmark) {

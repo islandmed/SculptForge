@@ -272,7 +272,8 @@ void App::pumpStroke() {
         s.view.radiusProbe = nullptr;
         s.view.settings = dabSettings();
         s.uploadId = doc_.activeSubtoolInfo().id;
-        renderer_.bindStrokeUpload(s.uploadId, s.upload); // (the slot, found here: the thread doesn't walk the renderer's list)
+        renderer_.setPersistentUpload(uiPrefs_.fastUpload);
+    renderer_.bindStrokeUpload(s.uploadId, s.upload); // (the slot, found here: the thread doesn't walk the renderer's list)
         s.prepare = &displayedMesh() == &doc_.mesh;
         s.start();
         return;
@@ -300,6 +301,7 @@ void App::pumpStroke() {
     s.view.radiusProbe = strokeProbe_ ? &s.radiusProbe : nullptr;
     s.view.settings = dabSettings();
     s.uploadId = doc_.activeSubtoolInfo().id;
+    renderer_.setPersistentUpload(uiPrefs_.fastUpload);
     renderer_.bindStrokeUpload(s.uploadId, s.upload); // (the slot, found here: the thread doesn't walk the renderer's list)
     s.prepare = &displayedMesh() == &doc_.mesh; // (a previewed LOD shows instead: nothing to pack)
     renderer_.setDraftNormals(doc_.sculptor.draftActive() ? s.uploadId : 0);
@@ -362,12 +364,16 @@ void App::finishStrokeNow() {
 App::DabSettings App::dabSettings() const {
     DabSettings st;
     st.radiusPx = radiusPx_;
-    st.strength = strength_;
+    st.worldRadius = worldSize_ && worldRadius_ > 0.0f ? worldRadius_ : 0.0f;
+    st.pressureCurve = strokeCurve_;
+    st.strength = precisionActive_ ? precisionIntensity_ : strength_; // Shift+Alt mid-stroke (Precision.cpp)
     st.smoothStrength = smoothStrength_;
     st.smoothKeepVolume = smoothKeepVolume_ != strokeAltSmooth_;
+    st.smoothGroupBorders = smoothGroupBorders_;
     st.focal = focalShift_;
     st.maskStrength = maskStrength_;
     st.sprayScatter = sprayScatter_;
+    st.alphaOptions = alphaOptions_;
     st.pressureSize = pressureSize_;
     st.pressureStrength = pressureStrength_;
     st.invert = strokeInvert_;
@@ -469,9 +475,10 @@ void App::buildGhost() {
     for (const PathDab& d : solver_->batch) pending.push_back({d.x, d.y, d.pressure, 1.0f});
     for (const PathDab& d : dabQueue_.items()) pending.push_back({d.x, d.y, d.pressure, 1.0f});
     // The head: from the last dab to where the pen will be when this frame shows (not for strokes that move the
-    // pointer's path: Lazy Mouse, a Shift line, jitter or spray), in part, as the dabs the pen is about to lay.
-    const float spacing = std::max(1.0f, radiusPx_ * (strokeRecipe() ? strokeRecipe()->spacing : 0.15f));
-    if (drag_ == Drag::Stroke && strokeType_ != StrokeType::LazyMouse && strokeType_ != StrokeType::Spray && !straight_.active &&
+    // pointer's path: Steady Stroke, the precision drag, a Shift line, jitter or spray), in part, as the dabs the pen is about to lay.
+    const float spacing = dabSpacingPx(radiusPx_, strokeRecipe() ? strokeRecipe()->spacing : 0.15f);
+    if (drag_ == Drag::Stroke && !steadyOn() && !precisionActive_ && precision_.caughtUp() &&
+        strokeType_ != StrokeType::Spray && !straight_.active &&
         !(strokeRecipe() && strokeRecipe()->jitter > 0.0f)) {
         const glm::vec2 head = predictedPointer();
         const glm::vec2 from = !pending.empty() ? glm::vec2(pending.back().x, pending.back().y) : lastDabScreen_;
@@ -505,7 +512,8 @@ void App::buildGhost() {
         camera_.screenRay(sd.x - c.x, sd.y - c.y, c.w, c.h, origin, dir);
         GhostDab d;
         if (!ghostSurface(origin, dir, d.center, n)) continue;
-        d.radius = radiusPx_ * (pressureSize_ ? std::max(sd.pressure, 0.05f) : 1.0f) * camera_.worldPerPixel(d.center, c.h);
+        d.radius = (worldSize_ && worldRadius_ > 0.0f ? worldRadius_ : radiusPx_ * camera_.worldPerPixel(d.center, c.h)) *
+                   (pressureSize_ ? std::max(sd.pressure, 0.05f) : 1.0f);
         d.normal = n;
         d.strength = std::clamp((strokeBrush_ == BrushType::Smooth ? smoothStrength_ : strength_), 0.0f, 1.0f) *
                      std::clamp(pressureStrength_ ? sd.pressure : 1.0f, 0.0f, 1.0f);

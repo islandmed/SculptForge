@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include "ai/AiPolicy.h"
 #include "ai/BrushAssistant.h"
 #include "app/Actions.h"
 #include "app/AssetLibrary.h"
@@ -19,17 +20,22 @@
 #include "app/UserGuide.h"
 #include "ai/ComfyUI.h"
 #include "ai/ImageTo3DService.h"
+#include "core/BrushSettings.h"
 #include "core/Commands.h"
 #include "core/Image.h"
 #include "core/Macro.h"
 #include "core/Pack.h"
 #include "core/Document.h"
 #include "core/Face.h"
+#include "core/GeneratedRemesh.h"
 #include "core/MeshTransform.h"
+#include "app/Wintab.h"
 #include "core/PenPredictor.h"
 #include "core/AutoUv.h"
 #include "core/QRemesh.h"
 #include "core/RadialMenu.h"
+#include "core/Precision.h"
+#include "core/StrokePopup.h"
 #include "core/Stroke.h"
 #include "core/StrokePath.h"
 #include "core/SurfaceCursor.h"
@@ -37,6 +43,7 @@
 #include "core/Tablet.h"
 #include "core/UpdateCheck.h"
 #include "core/ViewCapture.h"
+#include "core/WhatsNew.h"
 #include "core/Texture.h"
 #include "io/ArExport.h"
 #include "link/PhoneLink.h"
@@ -93,7 +100,7 @@ struct AppOptions {
     // --benchmark: proof mode (ProofMode.cpp), then exit. Sizes in millions of triangles (empty: 5, 20, 33 and
     // 100 when memory allows); outputs default to the current folder.
     bool benchmark = false;
-    std::string benchmarkScene; // --benchmark standard-15m | standard-33m | standard: a standard scene (ProofMode.h)
+    std::string benchmarkScene; // --benchmark standard-15m | standard-33m | standard | standard-1b: a standard scene (ProofMode.h)
     std::string benchmarkSizes, benchmarkOut, benchmarkVideo;
     bool benchmarkNoVideo = false, benchmarkVsync = false;
     float benchmarkStrokeSeconds = 6.0f;
@@ -127,6 +134,7 @@ public:
     UiLayout& layout() { return layout_; }
     ThumbnailCache& thumbnails() { return thumbs_; }
     void shutdown();
+    void requestUiScale(); // Preferences > Interface > UI scale changed: rebuilt live before the next frame (#87)
 
     enum class FileAction { OpenObj, SaveObj, ExportGlb, ExportLods, SaveBrush, LoadBrush, OpenImage, ExportUsd, SaveSplats, ExportUnreal, SaveProject, AppendSubtool, ComfyWorkflow, LoadMatcap, InsertMesh, Count };
     struct DialogRequest {
@@ -138,9 +146,10 @@ public:
 
 private:
     enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, SubToolClick, Select, Gizmo, Guide, Sculptable, ZSphere, Insert, Capture,
-                      AirStroke, UvTool }; // AirStroke: a stroke begun off the model, waiting to reach it (#62)
+                      AirStroke, UvTool, SizeScrub }; // AirStroke: a stroke begun off the model, waiting to reach it (#62)
 
-    void handleEvent(const SDL_Event& e);
+    void handleEvent(const SDL_Event& e); // the pen's mouse events first (penMouseEvents), then dispatchEvent
+    void dispatchEvent(const SDL_Event& e);
     void onMouseDown(float x, float y, Uint8 button);
     void onMouseMove(float x, float y, float dx, float dy, bool fromPen);
     void onMouseUp();
@@ -192,6 +201,8 @@ private:
     bool loadReferenceImage(const std::string& path);
     void projectImageFromView();
     void startGenerator();
+    void showHunyuanNoticeOnce(); // the licence notice, once ever (saved in ai.json)
+    void drawAiPrefsSection();    // Preferences > AI: the Hugging Face token
     void pollGenerator();
     int renderHeadless();
     void openPath(const std::string& path);
@@ -202,17 +213,24 @@ private:
     void pollBrushRequest();
     const BrushRecipe* activeRecipe() const;
     void drawBrushCursor();
-    // The brush ring lying on the surface under the pointer (#25, Preferences > Input > Cursor follows surface);
-    // false when the pointer is off the model (the flat screen ring is drawn instead).
-    bool drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col);
-    std::vector<SurfaceRingPoint> cursorRing_, cursorInner_; // scratch, kept to avoid allocating per frame
+    // The brush ring lying on the surface under the pointer (#25, Preferences > Cursor > Cursor follows surface);
+    // false when the pointer is off the model (the flat screen ring is drawn instead). `ring` false: only the
+    // centre and the symmetry copies' dots (Hide ring while stroking).
+    bool drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col, bool ring);
+    std::vector<glm::vec3> cursorRing_, cursorInner_; // scratch, kept to avoid allocating per frame
     bool surfaceCursorShown_ = false; // the last cursor drawn lay on the surface (UI tests: surface_cursor)
+    bool ringShown_ = true;           // the last cursor drawn had its ring (UI tests: cursor_ring)
     void updateTitle();
 
     int runRecording(); // also runs UI tests (options_.uiTest)
     int runUiTest(int width, int height, int fps);
     std::unique_ptr<Demo> demo_;
     float uiScale_ = 1.0f; // UI layout scale (fonts are rasterised at this scale)
+    bool uiScaleDirty_ = false;          // the UI scale may have changed: applyUiScale before the next frame
+    float displayScaleOverride_ = 0.0f;  // UI tests (display_scale): the display's content scale, 0 = the real one
+    float targetUiScale() const;         // what uiScale_ should be now (Preferences, the display; Config.cpp)
+    void applyUiScale();                 // rebuild fonts and style live when it changed (between frames)
+    void buildUiFonts(float scale);
     ImFont* fontCaption_ = nullptr;
     ImFont* fontCaptionSub_ = nullptr;
 
@@ -239,7 +257,7 @@ private:
     // The symmetry arguments of the commands that follow the brushes' symmetry (symmetry, radial, radial_axis,
     // local), added to `args`.
     Args withSymmetryArgs(Args args);
-    int symmetryCopiesDrawn_ = 0; // brush cursors the last drawSurfaceCursor drew (UI tests: cursor_copies)
+    int symmetryCopiesDrawn_ = 0; // the cursor and its symmetry dots the last drawSurfaceCursor drew (UI tests: cursor_copies)
     bool invertToggle_ = false;
     bool frontFacesOnly_ = false;
     bool pressureStrength_ = true;
@@ -285,10 +303,14 @@ private:
     struct DabSettings {
         float radiusPx = 60.0f, strength = 0.5f, smoothStrength = 0.5f, focal = 0.0f, maskStrength = 1.0f;
         float sprayScatter = 1.0f;
+        float worldRadius = 0.0f; // World Size: the brush radius in model units (0: Draw Size in pixels)
+        PressurePoints pressureCurve; // the brush's own (after the tablet's global curve)
         bool smoothKeepVolume = false; // Smooth keeps the volume (smoothKeepVolume_, or the alternate smooth)
+        bool smoothGroupBorders = false; // Smooth moves face group borders only (smoothGroupBorders_, #81)
         bool pressureSize = false, pressureStrength = true, invert = false, frontFacesOnly = false;
         bool connectedOnly = false, viewFalloff = false; // the falloff options (Brush palette)
         bool mask = false, paint = false, sculpt = true, visible = true;
+        AlphaOptions alphaOptions; // Follow stroke direction, Angle, Angle jitter (#76; Tile is the alpha's own)
         BrushType brush = BrushType::Standard;
         StrokeType strokeType = StrokeType::Dots;
         Symmetry symmetry;
@@ -359,6 +381,9 @@ private:
     } liveMove_;
     bool liveMoveEnabled() const;      // the Live Move preference (and SF_LIVE_MOVE)
     void commitLiveMove();
+    bool grabPending_ = false; // Move: positions moved, normals and BVH not yet (queueGrab / flushGrab, once a frame)
+    void queueGrab(const glm::vec3& delta);
+    void flushGrab();
     // Along the normal (from the discussions): Move, Tendril, Elastic Tendril and KelvinGrab strokes that began with
     // the invert key held (Preferences > Input > Along the normal) slide along the average normal under the brush
     // at the press instead of the view plane. alongNormalTarget: where the cursor puts the grabbed point.
@@ -408,11 +433,25 @@ private:
     void showSupportCard(SupportCardReason reason); // (also Preferences > Support > Show it now)
     void closeSupportCard(bool supporter);
     bool supportCardOpen() const;
-    bool supportCardLoading() const; // its picture still decoding (backgroundBusy)
     bool supportCardEvent(const SDL_Event& e); // input while it's open goes to it, not the canvas or shortcuts
     void drawSupportCard();
     void drawSupportPrefs();                    // Preferences > Support
     bool welcomeAfterCard_ = false;             // the first-run welcome waits until the card closes
+    // What's New (WhatsNewPopup.cpp): the newest version's feature cards from docs/guide/whats-new.md, once after an
+    // update and from Help > What's New; each Try it runs the card's action (runWhatsNewAction).
+    struct WhatsNewPopup;
+    struct WhatsNewDelete { void operator()(WhatsNewPopup* p) const; };
+    std::unique_ptr<WhatsNewPopup, WhatsNewDelete> whatsNew_;
+    void showWhatsNew(); // the popup, or the guide's chapter when this version has no cards
+    void closeWhatsNew();
+    bool whatsNewOpen() const;
+    const whatsnew::Version* whatsNewVersion() const; // what the popup shows (UI tests), null when closed
+    bool whatsNewEvent(const SDL_Event& e);           // input while it's open goes to it
+    void drawWhatsNew();
+    // A card's action: look:new, card:membership, brush:NAME, guide:FILE[#ANCHOR] or an action id (help.benchmark).
+    bool runWhatsNewAction(const std::string& action);
+    int whatsNewTries_ = 0;          // UI tests: Try it clicks
+    std::string whatsNewLastAction_; // UI tests: the last card's action
 
     // Results from asynchronous native file dialogs (called off the main thread).
     struct PendingFile {
@@ -421,6 +460,11 @@ private:
     };
     DialogRequest dialogRequests_[int(FileAction::Count)];
 
+    // Preferences > AI (PanelAi.cpp, ai/AiPolicy.h): Enable AI features. Off removes the AI commands, the Brush Lab
+    // and Generate 3D entries and closes their windows; saved in ai.json at once (not in tests). SF_AI / --no-ai lock it.
+    void setAiFeatures(bool on);
+    void registerAiActions(); // ui.brush_lab, ui.generate3d: only while AI is on
+    void drawAiPrefs();       // the Preferences > AI section and the first-run question
     // Brush Lab (AI brush designer)
     bool showBrushLab_ = false; // floating; opened from the top shelf's AI Brush or the Brush palette
     bool hideUi_ = false;
@@ -479,7 +523,7 @@ private:
     bool comfyWorkflowsScanned_ = false;
     bool comfyPickingText_ = false;
     std::string comfyWorkflowError_;
-    bool remeshGenerated_ = true;
+    int generatedRemesh_ = int(GeneratedRemesh::Quad); // Generate 3D's Remesh: Quad (default), Voxel, Off
     int voxelResolution_ = 200;
     bool voxelKeepMasked_ = false; // Voxel Remesh's Keep Masked (#43)
     static constexpr const char* kKeepMaskedHelp =
@@ -488,7 +532,15 @@ private:
         "If the mask's edge is too ragged to join up, the status line says so and nothing changes.";
     bool keepTexture_ = true; // Keep Texture: remeshes carry a painted texture over (core/TextureTransfer.h)
     int remeshResolution_ = 256;
-    std::future<ai::GeneratorResult> pendingGenerator_;
+    // A generated model, made sculptable on the worker thread (Quad Remesh takes seconds).
+    struct GeneratedModel {
+        ai::GeneratorResult result;
+        std::shared_ptr<Mesh> remeshed; // null: Remesh off, or it failed (remeshError)
+        GeneratedRemeshStats stats;
+        std::string remeshError;
+    };
+    std::future<GeneratedModel> pendingGenerator_;
+    bool openHunyuanNotice_ = false;
     std::shared_ptr<ai::GenerationProgress> generatorProgress_;
     float generatorTime_ = 0.0f;
 
@@ -541,10 +593,27 @@ private:
     bool polygroupMouseDown(float x, float y, SDL_Keymod mod); // true if it took the click
     void polygroupMouseUp();
     void drawPolygroupsSection();
+    // Cut (PanelCut.cpp, core/Cut.h): Ctrl+Shift with a Cut shape. Line, Lasso and Rectangle are dragged; Polyline
+    // is clicked point by point (click the first point to close it, double-click or Enter to end it open, Esc drops it).
+    void cutMouseUp();
+    bool cutPolylineMouseDown(float x, float y, SDL_Keymod mod); // true if it took the click
+    bool cutPolylineKey(SDL_Keycode key);                        // Enter / Esc while placing points
+    void finishCutPolyline(bool closed);
+    void runCut(const char* shape, const std::vector<ImVec2>& path, bool closed, bool flip);
+    void drawCutOverlay();
+    void drawCutSection();
+    bool maskFrontFacesOnly_ = false; // Mask Lasso / Rectangle: only vertices facing the viewer (#91.3)
+    int cutMode_ = 0;         // 0 Away, 1 In, 2 Add, 3 Clip (core/Cut.h)
+    float cutDepth_ = 0.1f;   // In / Add: fraction of the Part's size
+    std::vector<ImVec2> cutPolyline_; // window pixels of the Polyline being placed
     // Screen selections (Selection.cpp): the rectangle or lasso dragged for
     // visibility (Ctrl+Shift, ZBrush SelectRect / SelectLasso) or for the mask
     // (Ctrl, MaskRect / MaskLasso). Pen is the mask's brush-stroke mode.
-    enum class SelectShape { Pen, Lasso, Rect };
+    // The Cut shapes share the Ctrl+Shift drag with SelectRect / SelectLasso (PanelCut.cpp).
+    enum class SelectShape { Pen, Lasso, Rect, CutLine, CutLasso, CutRect, CutPolyline };
+    static bool isCutShape(SelectShape s) { return s >= SelectShape::CutLine; }
+    static SelectShape selectShapeOf(StrokeShape shape); // the stroke popup's shapes (StrokePopup.cpp)
+    bool strokeShapeOn(StrokeShape shape) const;         // its latch is on with this shape
     enum class SelectTarget { Hide, Mask };
     void beginSelection(float x, float y, SelectTarget target, SelectShape shape);
     void selectionMove(float x, float y);
@@ -573,12 +642,77 @@ private:
     bool strokeContinuous_ = false; // Stroke > Continuous (#31): keep dabbing while the pointer rests
     double strokeMovedAt_ = 0.0, continuousDabAt_ = 0.0;
     LazyMouse lazyMouse_;
+    // Precision work (Precision.cpp, core/Precision.h). Steady Stroke (L) puts every stroke type's brush on
+    // lazyMouse_'s string, not only the Lazy Stroke type; Catch up finishes the line to the pointer on release.
+    bool steadyStroke_ = false;
+    bool steadyCatchUp_ = true;
+    bool steadyOn() const { return steadyStroke_ || strokeType_ == StrokeType::LazyMouse; }
+    glm::vec2 steadyCursor_{0.0f}; // where the pointer is (the string's far end) during a steady stroke
+    void steadyCatchUp(); // on release: the brush point runs on to the pointer
+    // World Size: Draw Size kept in model units, so the brush stays the same size on the surface as you zoom.
+    bool worldSize_ = false;
+    float worldRadius_ = 0.0f;   // model units (shown in mm)
+    float worldSyncedPx_ = 0.0f; // radiusPx_ as worldSize sync last set it (a different value: the user set it)
+    float cursorWorldPerPx_ = 0.0f; // at the surface under the pointer (0: not seen yet)
+    void syncWorldSize();           // every frame, outside strokes
+    std::string drawSizeLabel() const; // "Draw Size %.1f px  0.42 mm" (an ImGui slider format)
+    std::string drawSizeStatus() const; // "Draw Size 3.5 px (0.42 mm)"
+    void drawPrecisionCursor(ImDrawList* dl, ImVec2 cursor, float radius, ImU32 col);
+    void drawPrecisionOptions(); // the Stroke picker: Steady Stroke, its radius and catch-up, Precision Intensity
+    glm::vec3 cursorSurface_{0.0f}; // the surface point last under the cursor (World Size measures there)
+    bool haveCursorSurface_ = false;
+    float sizeReadoutPx_ = 0.0f;   // the size readout by the brush shows for a moment after a change
+    double sizeReadoutUntil_ = 0.0;
+    void drawSizeSlider(const char* id, const char* helpPath, const char* help);
+    // Shift+Alt held mid-stroke: the brush moves at a quarter of the pen's speed and dabs at Precision Intensity.
+    PrecisionDrag precision_;
+    bool precisionActive_ = false;
+    float precisionIntensity_ = 0.1f;
+    bool precisionHeld() const;
+    // Ctrl+Shift+right-drag: scrubs the Draw Size finely (Drag::SizeScrub).
+    float sizeScrubStart_ = 0.0f, sizeScrubDx_ = 0.0f;
+    // The surface pick under each dab, filtered along its ray so dense meshes don't wobble the stroke.
+    PickSmoother pickSmoother_;
+    struct DabAccuracy { // this stroke's dabs (UI tests): how far they land from the cursor, how much they wobble
+        float maxErrorPx = 0.0f;
+        double jitterRaw = 0.0, jitterFiltered = 0.0; // mean |second difference| of the depth, in brush radii
+        int count = 0;
+        float raw[2] = {0, 0}, filtered[2] = {0, 0};
+        void add(float t, float f, float radius) {
+            if (count >= 2 && radius > 0.0f) {
+                jitterRaw += std::abs(t - 2.0f * raw[1] + raw[0]) / radius;
+                jitterFiltered += std::abs(f - 2.0f * filtered[1] + filtered[0]) / radius;
+            }
+            raw[0] = raw[1], raw[1] = t, filtered[0] = filtered[1], filtered[1] = f;
+            ++count;
+        }
+    } dabAccuracy_;
+    // Each brush's own pressure curve (Brush Lab, Preferences > Tablet), keyed as per-brush settings are (#78:
+    // "builtin:<brush>", "custom:<recipe>"); <app data>/brush-curves.json keeps them.
+    std::map<std::string, PressurePoints> brushCurves_;
+    std::string pressureCurveKey() const;
+    std::string pressureCurveKey(BrushType type, const BrushRecipe* recipe) const;
+    std::string brushCurvesPath() const; // empty in tests and recordings
+    PressurePoints strokeCurve_;  // the curve of the brush this stroke draws with
+    PressurePoints& brushCurve(); // the current brush's (linear until edited)
+    const PressurePoints* activeBrushCurve() const;
+    void brushCurvesChanged();
+    void loadBrushCurves();
+    void drawPressureCurveEditor(const char* id, float width);
+    int curveDragPoint_ = -1;
     Spray spray_;
     float sprayScatter_ = 1.0f;          // jitter radius as a fraction of brush size
     glm::vec2 dragAnchor_{0.0f};         // DragRect: where the click landed (window pixels)
     glm::vec3 dragAnchorHit_{0.0f};
     float dabRadiusScale_ = 1.0f, dabStrengthScale_ = 1.0f, dabAngle_ = 0.0f; // per-dab overrides
     bool alphaInvert_ = false;
+    // Alpha options (#76, core/AlphaOptions.h): the Alpha palette's Follow stroke direction, Angle, Angle jitter and
+    // Tile, kept per brush (#78). The rake and the jitter's seed start again with each stroke (dabAt).
+    AlphaOptions alphaOptions_;
+    AlphaRake alphaRake_;
+    uint32_t alphaSeed_ = 1;
+    float lastDabAngle_ = 0.0f; // radians (UI tests: last_dab_angle)
+    void drawAlphaOptions();
     std::mutex alphaMutex_;
     std::string pendingAlphaPath_; // set by the file dialog thread
     // Vector displacement brushes (PanelVdm.cpp, core/Vdm.h): the Brush palette's Vector Displacement section,
@@ -1083,7 +1217,7 @@ private:
     bool openUnsavedPopup_ = false;
     bool continueAfterSave_ = false; // run discardAction_ once the Save As dialog saved
     bool offerRestore_ = false;
-    bool showWhatsNew_ = false; // the first start after an update opens the guide's What's New chapter
+    bool showWhatsNew_ = false; // the first start after an update shows What's New (after the membership card)
     // Update check (PanelProject.cpp): website/latest.json at most once a day, on a worker thread; a banner when a
     // newer version is out. Off with Preferences > Updates, SF_NO_UPDATE_CHECK, or -DSCULPTFORGE_UPDATE_CHECK=OFF
     // (package managers); SF_UPDATE_FEED points it at another URL or a local file (UI tests).
@@ -1120,6 +1254,23 @@ private:
     int mouseClicks_ = 1; // SDL's click count of the press being handled (3 = a triple-click, #43)
     bool spaceHeld_ = false; // Space is down with Preferences > Input > Hold Space to move the camera on (#43)
     float subtoolClickX_ = 0.0f, subtoolClickY_ = 0.0f;
+    Uint64 subtoolClickNs_ = 0; // when the Alt press on another Part began (a long pen press isn't a click)
+    void partSelected(const char* how);
+    // A background job's result (Auto UV, Voxel Remesh, QRemesh, Unwrap) goes onto the Part it ran on, and the
+    // active Part stays the one the user is on (Discord: "the active Part switches by itself" when a job finished
+    // after picking another Part). JobPart makes the job's Part active for the result; its destructor goes back
+    // and the status bar says where the result went. Results wait while a stroke is on (jobWaitsForStroke).
+    struct JobPart {
+        JobPart(App& app, int index);
+        ~JobPart();
+        JobPart(const JobPart&) = delete;
+        JobPart& operator=(const JobPart&) = delete;
+        App& app;
+        uint32_t back = 0;
+        bool switched = false;
+    };
+    bool jobWaitsForStroke() const;
+    Uint64 clickClockNs() const; // the status bar names the new active Part and how it was chosen
     uint32_t renamingSubtool_ = 0; // SubTool id being renamed inline (0: none)
     uint32_t listedActiveSubtool_ = 0; // the list scrolls to the active SubTool when it changes
     // SubTool thumbnails (#43): rendered from each SubTool's GPU buffers while the SubTools panel shows, one per frame
@@ -1161,6 +1312,7 @@ public:
     // Preferences > Interface > Look: applies uiPrefs_.look (colours, style, fonts, the viewport background).
     void applyLook();
     void drawLookSection(); // Preferences > Interface > Look (Config.cpp)
+    void drawLookPicker();  // the first-run welcome's three look cards (PanelSupport.cpp)
     ImFont* smallFont() const { return fontSmall_; } // 12 px captions (shelf labels, tiles)
     ImFont* boldFont() const { return fontBold_; }   // SemiBold 15 (help titles)
 
@@ -1207,6 +1359,7 @@ private:
     bool canvasNavButton(const char* id, const char* icon, const char* label, int mode); // right-shelf Move/Zoom/Rotate
     void drawBrushTile(const char* id, ImVec2 size);
     void drawStrokeTile(const char* id, ImVec2 size);
+    void drawStrokeIcon(ImDrawList* dl, ImVec2 a, ImVec2 b, StrokeType type); // the shelf tile's picture
     void drawAlphaTile(const char* id, ImVec2 size);
     void drawMaterialTile(const char* id, ImVec2 size);
     void drawColorWidget(float width);
@@ -1307,10 +1460,28 @@ private:
     friend void drawMaterialGrid(App&, GridMode);
     friend void drawStrokeGrid(App&, GridMode);
     void initLightBox();   // end of init(): library folders, thumbnail cache, actions, project thumbnails
+    void showStarterMeshes(); // the Library at Tool > Starter meshes (File > New from Starter Mesh, the welcome)
     void drawLightBoxUi(); // every frame from drawUi: thumbnails, the LightBox, pickers, size / strength pop-ups
     // The LightBox / picker shortcuts (, B M S) until the action registry dispatches keys.
     bool lightBoxKey(SDL_Keycode key, SDL_Keymod mod);
     void quickSave();                  // file.quicksave: a timestamped project in <library>/QuickSave
+    // Save Render (render.save_image, save_render): the view without the interface, by default as a PNG in
+    // <library>/Images at twice the view's size. `size` is the longer side (0 = twice the view, at most 4096),
+    // `aspect` width / height (0 = the view's); a different shape shows at least what the view shows.
+    struct RenderRequest {
+        int size = 0;
+        float aspect = 0.0f;
+        bool jpg = false;
+        std::string path; // "" = a new file in <library>/Images
+    };
+    bool saveRender(const RenderRequest& request, std::string& message);
+    void runSaveRender(); // with Material's size, shape and format (PanelView.cpp)
+    int renderAspect_ = 0, renderSize_ = 0; // Material > Save Render: indices into PanelView.cpp's lists
+    bool renderJpg_ = false;
+    // View controls (PanelView.cpp): X-Ray, the view's resolution, the light, Save Render's options.
+    void registerViewUiCommands();
+    void drawLightControls();
+    void drawSaveRenderControls();
     LibraryRoots library_;
     FolderScanner libraryScanner_;
     // ---- end LightBox (B) ----
@@ -1354,10 +1525,13 @@ private:
     static WindowState loadWindowState();
     void saveWindowState() const;
     bool rememberWindow_ = false;
-    bool fullscreenAfterFirstFrame_ = false; // macOS: the saved full screen, entered once the window is on screen (#41)
     void drawAxisGizmo();
     std::array<AxisGizmoEnd, 6> axisGizmoLayout() const; // the gizmo's ends on screen now (AxisGizmo.h)
     bool axisGizmoMouseDown(float x, float y);          // a click on an end: that side view (#43)
+    float axisGizmoUnit() const;                        // UI scale times Draw > Camera > Gizmo size
+    glm::vec2 viewFigureCentre() const;                 // Draw > Camera > View Figure: where it sits, how big
+    float viewFigureRadius() const;
+    void drawViewFigure();
     // Insert on the model (#34): the primitive chosen in Append > Insert; a drag on the surface places it.
     // "mesh" inserts your own mesh instead: insertMeshKey_ is "subtool" (a SubTool's name) or "file" (a path
     // chosen in the file dialog), insertMeshValue_ the name or path (insert_mesh).
@@ -1494,6 +1668,13 @@ private:
     void viewAxis(float yawDegrees, float pitchDegrees); // Numpad 1 / 3 / 7: orthographic until turned
     void viewOrbitStep(float yawDegrees, float pitchDegrees);
     void frameActiveSubtool();
+    // Focus Detail (prototype, FocusDetailApp.cpp): open a .sfdetail file; once a frame, the camera and brush.
+    void openFocusDetail(const std::string& path);
+    void updateFocusDetail();
+    glm::vec3 focusBrushPos_{0.0f}, focusBrushVel_{0.0f};
+    float focusBrushRadius_ = 0.0f;
+    double focusBrushTime_ = 0.0;
+    bool focusBrushValid_ = false;
     SDL_Keymod blenderMods(SDL_Keymod keyboard) const; // Ctrl -> Alt (invert), the mask brush -> Ctrl (mask)
     bool maskBrushActive() const;
     void toggleMaskBrush();
@@ -1524,6 +1705,12 @@ private:
     bool drawHeldBrushGrid(HeldBrush held, bool strokes); // the picker's grid; true when one was picked
     void drawHeldBrushIcon(ImDrawList* dl, ImVec2 a, ImVec2 b, const char* icon, bool select); // shelf tiles (Shell.cpp)
     void drawInputSection(); // Preferences > Input
+    void drawCursorSection(); // Preferences > Cursor (Input.cpp)
+    // Viewport hints (U11, Config.cpp): a note over the 3D view with Don't show again, `top` its top edge in
+    // pixels; Preferences > Hints lists them. hintShown: not hidden by either.
+    bool hintShown(const char* id) const;
+    void drawViewportHint(const char* id, const char* text, ImU32 colour, float top);
+    void drawHintsSection();
     // Z Intensity (0-100 on screen): Smooth's own while Shift is held or Smooth is the brush, as in ZBrush.
     void drawZIntensitySlider(const char* id);
     void openQuickMenu();
@@ -1539,11 +1726,34 @@ private:
     glm::vec2 constrainStroke(float x, float y);
     float smoothStrength_ = 0.5f; // Smooth's own Z Intensity (Shift+stroke, or the Smooth brush)
     bool smoothKeepVolume_ = false; // Brush > Smooth keeps volume: a Taubin smooth instead of the plain one (#40)
+    bool smoothGroupBorders_ = false; // Brush > Smooth face group borders only: straightens the borders (#81)
     // ZBrush's alternate smooth (#40): a stroke begun with Shift held that lets go of Shift while still pressing
     // smooths the other way (keeping the volume, or plainly when Smooth keeps volume) for the rest of the stroke.
     bool strokeAltSmooth_ = false;
     float rgbIntensity_ = 1.0f;   // paint strength (ZBrush RGB Intensity, 100 by default)
     float focalShift_ = 0.0f;     // -1..1 (ZBrush Focal Shift -100..100)
+    // Per-brush settings (#78, BrushSettingsUi.cpp, core/BrushSettings.h): each frame, a brush switch stores the
+    // brush left and brings back the picked brush's own Draw Size, Z Intensity, Falloff, RGB Intensity, stroke and
+    // alpha. Save Brush Settings writes them (<app data>/brush-settings.json) so they load at startup; Reset Brush
+    // to Default puts back the shipped values. Off in demo videos and benchmarks (their scripts set every value).
+public:
+    std::string currentBrushKey() const; // "builtin:Clay", "custom:Clay Slab"
+    BrushToolSettings liveBrushSettings() const;
+    void applyBrushSettings(const BrushToolSettings& s);
+    void saveBrushSettings();  // Brush > Save Brush Settings
+    void resetBrushSettings(); // Brush > Reset Brush to Default
+    void setShareBrushSize(bool on);
+    const BrushSettingsStore& brushSettingsStore() const { return brushSettings_; }
+
+private:
+    void initBrushSettings();
+    void syncBrushSettings(); // every frame, outside strokes
+    void syncAlphaTile();     // the brush's Tile onto the current alpha
+    void registerAlphaOptionsCommand(); // brush_alpha_options (#76)
+    std::string brushSettingsPath() const;
+    BrushSettingsStore brushSettings_;
+    std::string brushSettingsKey_; // the brush the live values belong to
+    bool brushSettingsOn_ = true;
     struct QuickMenu {
         bool open = false;
         ImVec2 at{0, 0};
@@ -1575,6 +1785,16 @@ private:
     void drawPackReview();
     void drawNewPack();
     void drawMacroConfirm();
+    // Free memory before a big mesh (core/MemoryGuard.h): a command that would need more than is free asks first.
+    // Returns true to go on now; false: the dialog is open and `proceed` runs on Continue.
+    bool memoryAllows(const std::string& command, const Args& args, std::function<void()> proceed);
+    void drawMemoryConfirm();
+    struct MemoryConfirm {
+        bool open = false;
+        std::string what, message;
+        std::function<void()> proceed;
+    } memoryConfirm_;
+    bool memoryConfirmed_ = false; // the next memoryAllows passes (Continue was pressed)
     void drawMacroEditor();
     void drawPackKeymapRows();  // Preferences > Input: the enabled packs' keymaps
     void pollPackDialogs();
@@ -1677,6 +1897,39 @@ private:
         int openedFrame = -1;
         int ran = -1;           // the slot run last (UI tests)
     } radial_;
+    // ---- The stroke popup (StrokePopup.cpp, core/StrokePopup.h; Discord 11-02) ----
+    // One key (stroke.popup, G; Z in the Blender style) or the left shelf's button opens a grid at the cursor: the
+    // stroke types and the modifiers Add / Sub, Smooth, Mask, Select. Hold the key, point, let go: picked. Tap it:
+    // the grid stays open for a click (a stroke closes it, a modifier toggles and leaves it open). Esc cancels.
+    // Smooth, Mask and Select latch: strokes act as if Shift, Ctrl or Ctrl+Shift were held until the same item is
+    // picked again or another brush is picked.
+    void registerStrokePopupActions();
+    void openStrokePopup(bool held, int key);
+    void closeStrokePopup() { strokePopup_.open = false; }
+    void pickStrokePopupItem(int item, bool close);
+    bool strokePopupMouseEvent(const SDL_Event& e); // true: the popup used the event
+    void strokePopupKeyUp(SDL_Keycode key);
+    void drawStrokePopup();
+    bool strokePopupItemScreen(int item, ImVec2& out) const; // an item's centre, window pixels (UI tests)
+    StrokeLatch strokeLatch() const; // the latch in effect (None once another brush was picked)
+    void setStrokeLatch(StrokeLatch latch);
+    struct StrokePopupOpen {
+        bool open = false;
+        ImVec2 at{0, 0};       // the panel's top-left
+        double openedAt = 0.0; // seconds (a short press is a tap)
+        bool held = false;     // its key holds it open; false: tapped open, stays until a click or Esc
+        int key = 0;           // the held key (SDL_Keycode)
+        int hover = -1;        // the item under the pointer
+        int start = -1;        // the item under the pointer when it opened (the current stroke, unless clamped)
+        int picked = -1;       // the item picked last (UI tests)
+    } strokePopup_;
+    struct StrokeLatchState {
+        StrokeLatch latch = StrokeLatch::None;
+        BrushType brush = BrushType::Standard; // the brush it was latched with: picking another ends it
+        int custom = -1;
+        bool paint = false;
+    } strokeLatch_;
+    uint32_t strokePopupSwallowUp_ = 0; // mouse buttons whose press the popup took: their release is its too
     SDL_Keycode keyDown_ = SDLK_UNKNOWN; // the key onKey is handling: a radial menu's key holds the pie open
     uint32_t radialSwallowUp_ = 0;       // mouse buttons whose press the pie took: their release is its too
     std::optional<Json> radialPending_;  // radial menus read from ui.json before the actions existed
@@ -1709,6 +1962,10 @@ private:
     // ---- end ZBrush feel ----
     // ---- Redraw on demand (App.cpp run()) ----
     bool wantsFrames(double now) const; // something animates or runs: keep drawing
+    bool focusKeepsDrawing(double now) const; // the window has focus and was just used (not: the pointer is over it)
+    static constexpr double kFocusedActiveSeconds = 2.0;
+    bool windowFocused_ = false; // keyboard focus (SDL_EVENT_WINDOW_FOCUS_GAINED / _LOST)
+    double lastInputAt_ = -1e9;  // seconds (SDL clock) of the last key, mouse or pen event
     uint64_t frameKey() const;          // changes when a poller changed what the window shows
     double activeUntil_ = 0.0;          // seconds: keep drawing until then (after input: hover, tooltips)
     double redrawAt_ = 0.0;             // seconds (SDL clock): draw one frame then, asleep or not (0: none)
@@ -1716,15 +1973,18 @@ public:
     void redrawIn(double seconds);      // something on screen changes by itself later (an error colour fading)
 private:
     // ---- Tablet (Tablet.cpp, core/Tablet.h, docs/tablet.md) ----
-    // SDL turns pen tip contact into left mouse button events (SDL_PEN_MOUSEID); the pen's own events
-    // add pressure, tilt, the eraser end and the side buttons, which are mapped in Preferences > Tablet.
-    bool dropPenMouseEvent(const SDL_Event& e) const; // SDL's version-dependent clicks for pen buttons
-    bool strayMouseMotion(const SDL_Event& e) const;  // a driver's mouse motion beside the pen's (Tablet.cpp)
+    // The pen tip is a left mouse button (SDL_PEN_MOUSEID) for the canvas and the UI. The app makes those mouse
+    // events from the pen's own (penMouseEvents), not SDL (#95); the pen's events add pressure, tilt, the eraser
+    // end and the side buttons, which are mapped in Preferences > Tablet.
+    bool dropPenMouseEvent(const SDL_Event& e) const; // SDL's own mouse events for the pen (Tablet.cpp)
+    void penMouseEvents(const SDL_Event& pen, bool before); // the pen tip's mouse events, made from the pen's
+    void sendPenMouse(SDL_EventType type, float x, float y, SDL_WindowID window);
+    bool strayMouseMotion(const SDL_Event& e) const;  // a driver's mouse events beside the pen's (Tablet.cpp)
     void keepImGuiOnPen();                            // after ImGui_ImplSDL3_NewFrame (Tablet.cpp)
-    bool systemCursorInWindow(float& x, float& y) const; // mouse mode (#72): the system cursor, window pixels
+    bool penSoftCursor() const; // mouse mode with the pen: the arrow is drawn at the brush (Tablet.cpp)
     void mapPenPosition(SDL_Event& e);                // mouse mode: the pen moves the cursor relatively (Tablet.cpp)
     // The system cursor (#73): ImGui's (resize handles, text fields, links) over the panels, a crosshair over the
-    // 3D view where a brush acts (Preferences > Interface > Viewport cursor). Called after each ImGui::Render.
+    // 3D view where a brush acts (Preferences > Cursor > Viewport cursor). Called after each ImGui::Render.
     void updateMouseCursor();
     bool viewportCursorWanted() const;
     bool frontRaycast(const glm::vec3& origin, const glm::vec3& dir, RayHit& hit) const; // as drawn (#68)
@@ -1736,18 +1996,36 @@ private:
     void penButton(int button, bool down, float x, float y);
     void penLeft(); // out of proximity: ends what the pen was doing
     float strokePressure() const; // pressure after the global curve; 1 for the mouse
-    SDL_Keymod inputMods() const; // the keyboard's modifiers plus those a pen button holds (Alt, Shift)
+    // The keyboard's modifiers plus those a pen button holds (Alt, Shift) and, with latch, the stroke popup's
+    // latched modifier (Shift for Smooth, Ctrl for Mask, Ctrl+Shift for Select). Navigation reads it without the
+    // latch: a latched Mask still lets a drag beside the model turn the view.
+    SDL_Keymod inputMods(bool latch = true) const;
+    SDL_Keymod keyMods() const;   // the keyboard's alone (in the input style's terms)
     bool erasing() const;         // the pen's eraser end is drawing
     PenAction eraserAction() const { return uiPrefs_.tablet.eraser; }
     void firstDab(float x, float y); // the stroke's first dab, once the pen reports a real pressure
     void drawTabletSection();         // Preferences > Tablet
     void detectPenName();
+    void tabletDeviceEvent(const SDL_Event& e); // a tablet plugged in or out while running (TabletHotplug)
+    void tabletNote(TabletHotplug::Note note, const std::string& name);
+    const char* pressureStatus() const; // "Pressure: on" / "not detected" (Preferences > Input and > Tablet)
+    void drawPressureStatus();          // ... with the troubleshooting link
     PenPressureTracker penTracker_;
-    bool testSystemCursor_ = false; // UI tests: a system cursor set by the script (os_cursor), else none
-    float testSystemCursorX_ = 0.0f, testSystemCursorY_ = 0.0f;
+    TabletHotplug tabletHotplug_;
+    void wintabEvent(const SDL_Event& e); // a mouse event while the tablet driver reports pressure through Wintab
+    WintabPressure wintab_;
+    bool wintabPen_ = false;  // the mouse is the pen of a driver without Windows Ink (pressure from Wintab)
+    bool wintabTip_ = false;
+    Uint64 wintabNs_ = 0;     // the last Wintab packet
+    bool penJump_ = false; // the pen just came into range: its first position doesn't move a drag (no jump)
+    bool penMouseSending_ = false;  // dispatching a mouse event made from the pen (not SDL's)
+    bool penMouseDown_ = false;     // the pen tip's left button is down (as made by penMouseEvents)
+    SDL_PenID penMouseOwner_ = 0;   // the pen holding it
+    float penMouseX_ = 0.0f, penMouseY_ = 0.0f; // the pen's last position (window pixels, before mouse mode)
     PenCursor penCursor_; // where the pen puts the cursor (Preferences > Tablet > Mouse mode)
     bool penInProximity_ = false, penTouching_ = false, penEraser_ = false;
     Uint64 lastPenNs_ = 0; // when the last pen event arrived (see onMouseMove)
+    Uint64 lastPenTouchNs_ = 0; // when the pen tip last touched down or lifted (strayMouseMotion)
     uint32_t penButtons_ = 0; // bit N: pen button N is held
     int penNavButton_ = 0;    // the pen button driving a view drag (0: none)
     bool dragFromPen_ = false;
@@ -1780,6 +2058,10 @@ private:
     std::array<float, kSmAxes> spaceMouseAxes_{}; // the last values read, -1 .. 1 (Preferences shows them)
     bool spaceMouseMoving_ = false;
     int spaceMouseLastButton_ = -1; // for Preferences: "Button N pressed"
+    bool spaceMouseReported_ = false; // an axis has moved since the device was opened (else 3DxWare may hold it, #104)
+    // Every joystick SDL listed at the last scan and why it was or wasn't taken, for Preferences and the device
+    // report a user can paste into an issue (#104).
+    std::vector<std::string> joysticksSeen_;
     // ---- end SpaceMouse ----
     // ---- Sculpt Timeline (PanelTimeline.cpp, core/Timeline.h) and proof mode (ProofMode.cpp) ----
     // The history strip along the bottom of the canvas, the timelapse export, and Help > Benchmark: a scripted
@@ -1792,8 +2074,10 @@ private:
     void registerTimelineUiActions(); // view.timeline, timeline.timelapse, help.benchmark
     void startTimelapse(const std::string& path, int width, int height, float seconds, int fps);
     bool timelapseStep(double budgetSeconds); // renders frames for up to the budget; false when finished
+    bool timelapseBusy() const; // a timelapse is rendering (a few frames each app frame)
     int runTimelapseCli();                    // sculptforge FILE --timelapse out.mp4
     void startProofMode();                    // Help > Benchmark, sculptforge --benchmark
+    bool proofSkippedScenes() const;          // the benchmark skipped a scene: too little free memory
     void proofBeforeSwap(int fbW, int fbH);   // the interactive loop, after drawing a frame, before showing it
     void drawProofUi();
     // ---- end Sculpt Timeline ----

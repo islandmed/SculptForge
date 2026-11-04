@@ -35,7 +35,7 @@ Scripts stop at the first command that fails.
 
 ## The console
 
-Press the backtick key (left of <kbd>1</kbd>), or choose **Script > Console**, to open the console strip above
+Press the backtick key (left of <kbd>1</kbd>), or choose **File > Script > Console**, to open the console strip above
 the bottom shelf. Drag its top edge to resize it.
 
 ![The console showing commands run from the interface and typed by hand](images/console.jpg)
@@ -52,7 +52,7 @@ the bottom shelf. Drag its top edge to resize it.
 - `help` (or `?`) lists every command; `help remesh` explains one command and its parameters.
 - `clear` empties the log.
 
-The console buttons (also in the **Script** palette):
+The console buttons (also in **File > Script**):
 
 | Button | What it does |
 |---|---|
@@ -65,7 +65,7 @@ The console buttons (also in the **Script** palette):
 
 ## The command palette
 
-Press <kbd>F3</kbd> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>, or click **Search** in the title strip)
+Press <kbd>F3</kbd> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>, or click **Search** at the top right of the window)
 to search every command, brush and setting by name. <kbd>Enter</kbd> runs the highlighted entry;
 <kbd>Shift</kbd>+<kbd>Enter</kbd> opens it in the console so you can add parameters first. Commands that need
 parameters always open in the console. With an empty search, the palette lists what you used recently. See

@@ -1,0 +1,98 @@
+# Preferences > Interface > UI scale applies at once, no restart (#87): text and panels grow by the chosen factor.
+# Then Automatic follows the display, as on Windows with per-monitor DPI when the window moves to a monitor at
+# another scale: SDL's display-scale event rebuilds the UI. CMake runs it at 1600x900 (ui_ui_scale_dpi) and at the
+# default size; a preference is absolute, so the numbers are the same in both.
+run new_sphere subdivisions=3
+
+ui_scale 100
+expect_value ui_scale == 100
+expect_value font_height >= 14
+expect_value font_height <= 16
+expect_value panel_width >= 51
+expect_value panel_width <= 53
+remember title_height t100
+remember frame_height f100
+shot scale_100
+
+ui_scale 125
+expect_value ui_scale == 125
+expect_value font_height >= 17.75
+expect_value font_height <= 19.75
+expect_value panel_width >= 64
+expect_value panel_width <= 66
+expect_value title_height >= $t100*1.24
+expect_value title_height <= $t100*1.26
+expect_value frame_height > $f100
+shot scale_125
+
+ui_scale 150
+expect_value ui_scale == 150
+expect_value font_height >= 21.5
+expect_value font_height <= 23.5
+expect_value panel_width >= 77
+expect_value panel_width <= 79
+shot scale_150
+
+ui_scale 175
+expect_value ui_scale == 175
+expect_value font_height >= 25.25
+expect_value font_height <= 27.25
+expect_value panel_width >= 90
+expect_value panel_width <= 92
+expect_value frame_height >= $f100*1.5
+shot scale_175
+
+ui_scale 200
+expect_value ui_scale == 200
+expect_value font_height >= 29
+expect_value font_height <= 31
+expect_value panel_width >= 103
+expect_value panel_width <= 105
+expect_value title_height >= $t100*1.99
+expect_value title_height <= $t100*2.01
+shot scale_200
+
+# Back to 100 %: everything returns to its size (the style is rebuilt from scratch, not scaled twice).
+ui_scale 100
+expect_value font_height >= 14
+expect_value font_height <= 16
+expect_value panel_width >= 51
+expect_value panel_width <= 53
+expect_value frame_height == $f100
+expect_value style_window_min == 32
+
+# Automatic follows the display: 150 % (a Windows laptop), then the window moves to a 100 % monitor, then 175 %.
+ui_scale auto
+display_scale 150
+expect_value ui_scale == 150
+expect_value font_height >= 21.5
+expect_value font_height <= 23.5
+expect_value panel_width >= 77
+expect_value panel_width <= 79
+shot display_150
+display_scale 100
+expect_value ui_scale == 100
+expect_value font_height >= 14
+expect_value font_height <= 16
+display_scale 175
+expect_value ui_scale == 175
+expect_value font_height >= 25.25
+expect_value font_height <= 27.25
+
+# A chosen scale wins over the display's.
+ui_scale 125
+display_scale 200
+expect_value ui_scale == 125
+expect_value font_height >= 17.75
+expect_value font_height <= 19.75
+
+# Another look keeps the scale; the rebuilt fonts serve every window: the User Guide opens and draws at 125 %.
+run ui_look look=classic layout=zbrush
+expect_value ui_scale == 125
+expect_value font_height >= 17.75
+expect_value font_height <= 19.75
+click "Help##palette.help"
+click "User Guide##help.guide"
+expect_value guide_open == 1
+shot guide_125
+key escape

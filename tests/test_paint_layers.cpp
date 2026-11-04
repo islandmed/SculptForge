@@ -399,5 +399,5 @@ TEST(paint_layers_dab_cost_on_big_mesh) {
     std::printf("    paint layers: %zu vertices, full composite %.1f ms, dab %.2f ms (%zu vertices per dab)\n", m.vertexCount(),
                 fullMs, dabMs, touched / 20);
     CHECK(touched > 0);
-    CHECK(dabMs < 25.0); // generous for debug builds; a whole-mesh composite per dab would be far slower
+    CHECK(dabMs < timeLimit(25.0)); // generous for debug builds; a whole-mesh composite per dab would be far slower
 }

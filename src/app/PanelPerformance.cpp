@@ -118,6 +118,15 @@ void App::registerPerformanceUiActions() {
         "Experimental. On meshes of 2 million vertices or more, big brushes are worked out on their own thread; "
         "with this on, the dabs still being worked out are shown as a preview on the surface (as Predictive "
         "Strokes does), so the stroke stays under the pen. The finished sculpt is exactly the same either way.");
+    add("perf.fast_upload", "Fast Upload (Experimental)",
+        [this] {
+            uiPrefs_.fastUpload = !uiPrefs_.fastUpload;
+            status_ = uiPrefs_.fastUpload ? "Fast upload on" : "Fast upload off";
+        },
+        [this] { return uiPrefs_.fastUpload; },
+        "Experimental. While you sculpt, the changed part of the mesh goes to the graphics card through memory both "
+        "can see, and the card copies it into place itself, instead of the driver copying it during the frame. The "
+        "sculpt and the view are exactly the same either way; needs a driver with buffer storage (OpenGL 4.4).");
     add("perf.draft_strokes", "Draft Strokes",
         [this] {
             uiPrefs_.draftStrokes = !uiPrefs_.draftStrokes;
@@ -177,6 +186,12 @@ void App::drawPerformanceSection() {
     ui::HelpText("Antialiasing", nullptr,
                  "Samples per pixel in the 3D view: more smooths edges, fewer is faster on huge meshes.", kPath);
     ui::Segmented(*this, {"perf.aa_1", "perf.aa_2", "perf.aa_4", "perf.aa_8"});
+    ImGui::TextUnformatted(tr("View resolution"));
+    ui::HelpText("View resolution", nullptr,
+                 "Draw the 3D view at a share of the window's resolution and scale it up: 75% draws about half the "
+                 "pixels, 50% a quarter. For slow or integrated GPUs and big screens; Save Render stays sharp (#80).",
+                 kPath);
+    ui::Segmented(*this, {"perf.res_100", "perf.res_75", "perf.res_50"});
     bool fast = uiPrefs_.fastNavigation;
     if (ImGui::Checkbox(tr("Fast Navigation"), &fast)) actions_.find("perf.fast_navigation")->run();
     ui::HelpAction(*this, "perf.fast_navigation");
@@ -196,6 +211,9 @@ void App::drawPerformanceSection() {
     bool bgPreview = uiPrefs_.backgroundPreview;
     if (ImGui::Checkbox(tr("Background Preview (Experimental)"), &bgPreview)) actions_.find("perf.background_preview")->run();
     ui::HelpAction(*this, "perf.background_preview");
+    bool fastUpload = uiPrefs_.fastUpload;
+    if (ImGui::Checkbox(tr("Fast Upload (Experimental)"), &fastUpload)) actions_.find("perf.fast_upload")->run();
+    ui::HelpAction(*this, "perf.fast_upload");
 
     // --- Threads ---
     bool threads = !ThreadPool::shared().serial();

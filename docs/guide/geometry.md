@@ -57,7 +57,7 @@ multiplies the triangle count by four and rounds off the shape slightly, like ZB
 > levels back). Voxel Remesh, Decimate and Quad Remesh do the same. To add triangles only where you sculpt, use
 > [Dynamic topology](dynamic-topology.md).
 
-> **Tip:** The title strip shows the vertex and triangle counts of the whole scene. A few million triangles sculpt
+> **Tip:** The bar along the top shows the triangle count of the whole scene. A few million triangles sculpt
 > smoothly on a recent GPU; go up a level only when you need finer detail.
 
 ## Voxel remesh
@@ -108,6 +108,15 @@ clean quads whose edge loops follow the forms, close to a target polygon count, 
 vertex paint density and symmetry. **Project All** (**Tool > Parts > Project**) brings the sculpted detail back onto
 the new topology after you divide it. Both have their own chapter: [Quad retopology and detail
 projection](retopology.md).
+
+## Close Holes
+
+**Tool > Geometry > Close Holes** caps every open boundary of the active Part, such as a hole, an open bottom or the
+rim of an extracted shell. The new patch's triangles are sized like the ones around the hole, and the patch follows
+the curve of the surface around it, so a hole in a sphere closes round, not flat. The rest of the Part is not changed.
+The patches get a [face group](face-groups.md) of their own, so you can mask or hide them in one click. Close Holes
+makes an open scan or an extracted part watertight without a remesh. <kbd>Ctrl</kbd>+<kbd>Z</kbd> brings the holes
+back.
 
 ## Decimate
 
@@ -189,7 +198,7 @@ Subdivide, remesh, Quad Remesh, decimate, Mirror And Weld, Mirror and delete hid
 active Part. They can use a lot of memory on dense meshes, and undo keeps a full copy of the previous mesh for
 each of them. Before a big change on a heavy sculpt:
 
-- **Snapshot** (**File > Save Snapshot**, title strip) keeps a timestamped copy of the scene without touching your project file; see
+- **Snapshot** (**File > Save Snapshot**) keeps a timestamped copy of the scene without touching your project file; see
   [Projects](projects.md#snapshots).
 - **Duplicate** the Part to keep the old version side by side.
 
@@ -201,6 +210,7 @@ each of them. Before a big change on a heavy sculpt:
 | `remesh` | `resolution` 32-512 voxels across the longest side (default 200); `keep_texture` (default true) |
 | `decimate` | `ratio` 0.01-1 of the triangles to keep (default 0.5), or `triangles` for an exact target |
 | `qremesh` | `target` quads (default 5000), `adaptive`, `keep_groups`, `detect_edges`, `use_polypaint`, `symmetry`, `keep_original`, `keep_texture`; see [Quad retopology](retopology.md#scripting) |
+| `close_holes` | `max_edges` closes only holes with at most that many boundary edges (default 0: all); `refine` (default true; false: as few triangles as possible); `new_group` (default true) |
 | `mirror_and_weld` | `axis` x, y, z or several, e.g. `xz` (default x); `side` positive (default) or negative |
 | `mirror` | `axis` (default x); `pivot` origin (default) or center |
 | `export_lods` | `path` (base name), `levels` 1-8 including LOD0 (default 4), `ratio` 0.1-0.9 (default 0.5) |

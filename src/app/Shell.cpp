@@ -41,26 +41,29 @@ constexpr ImGuiWindowFlags kShellFlags = ImGuiWindowFlags_NoDecoration | ImGuiWi
 
 const char* const kShelfWindows[kShelfCount] = {"##TopShelf", "##LeftShelf", "##RightShelf", "##BottomShelf"};
 
-CanvasRect g_focus; // the tile under the pointer this frame (tiled looks draw its border in the accent)
+CanvasRect g_focus; // the tile under the pointer this frame (Outlines on: its border a faint step lighter)
 
 bool sameRect(const CanvasRect& a, const CanvasRect& b) {
     return a.w > 0.0f && a.h > 0.0f && std::abs(a.x - b.x) < 0.5f && std::abs(a.y - b.y) < 0.5f && std::abs(a.w - b.w) < 0.5f &&
            std::abs(a.h - b.h) < 0.5f;
 }
 
-// A tiled look's frame around one region: a thin border (the accent on the focused tile), Blueprint's corner marks.
+// A tiled look's frame around one region: a thin border, Blueprint's corner marks.
 void tileFrame(ImDrawList* dl, const CanvasRect& r, bool focused) {
-    if (!theme::look.tiled || r.w <= 0.0f || r.h <= 0.0f) return;
+    // Outlines (Preferences > Interface > Look): off draws nothing; only on marks the tile under the pointer, and
+    // only with a faint step (applyLook's focusBorder), never a thicker or accent border.
+    if (!theme::look.tiled || theme::look.outlines == 0 || r.w <= 0.0f || r.h <= 0.0f) return;
+    focused = focused && theme::look.outlines == 2;
     const ImFontAtlas* atlas = ImGui::GetIO().Fonts;
     const float s = atlas && !atlas->Fonts.empty() ? atlas->Fonts[0]->FontSize / 15.0f : 1.0f; // the UI scale
-    const float t = std::max(1.0f, std::floor(s + 0.25f)) * (focused ? 2.0f : 1.0f); // 2 px on the focused tile
+    const float t = std::max(1.0f, std::floor(s + 0.25f));
     const ImVec2 a(r.x, r.y), b(r.x + r.w, r.y + r.h);
     dl->PushClipRect(a, b, false);
     dl->AddRect(ImVec2(a.x + t * 0.5f, a.y + t * 0.5f), ImVec2(b.x - t * 0.5f, b.y - t * 0.5f),
                 theme::u32(focused ? theme::focusBorder : theme::tileBorder), 0.0f, 0, t);
     if (theme::look.headers == theme::LookStyle::Headers::Grid) { // registration marks at the corners
         const float k = std::min(9.0f, std::min(r.w, r.h) * 0.3f);
-        const ImU32 c = theme::u32(theme::accent, focused ? 1.0f : 0.75f);
+        const ImU32 c = theme::u32(theme::accent, theme::look.outlines == 2 ? 0.75f : 0.35f);
         const float w = 2.0f * t;
         for (int i = 0; i < 4; ++i) {
             const float x = i & 1 ? b.x - w * 0.5f : a.x + w * 0.5f, y = i & 2 ? b.y - w * 0.5f : a.y + w * 0.5f;
@@ -72,8 +75,10 @@ void tileFrame(ImDrawList* dl, const CanvasRect& r, bool focused) {
     dl->PopClipRect();
 }
 
+// `frame` false: the caller draws the tile's frame itself, after the contents (shelves, #98).
 bool beginShellWindow(const char* name, const CanvasRect& r, const ImVec4& bg, ImVec2 padding,
-                      ImGuiWindowFlags extra = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse) {
+                      ImGuiWindowFlags extra = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse,
+                      bool frame = true) {
     ImGui::SetNextWindowPos(ImVec2(r.x, r.y));
     ImGui::SetNextWindowSize(ImVec2(r.w, r.h));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, padding);
@@ -84,7 +89,7 @@ bool beginShellWindow(const char* name, const CanvasRect& r, const ImVec4& bg, I
     const bool open = ImGui::Begin(name, nullptr, kShellFlags | extra);
     ImGui::PopStyleColor();
     ImGui::PopStyleVar(4);
-    if (open) tileFrame(ImGui::GetWindowDrawList(), r, sameRect(r, g_focus));
+    if (open && frame) tileFrame(ImGui::GetWindowDrawList(), r, sameRect(r, g_focus));
     return open;
 }
 
@@ -216,11 +221,9 @@ void drawBrushIcon(ImDrawList* dl, ImVec2 c, float r, int type) {
 }
 
 // Glyph centred in a box, in `font` (or the current one).
+// (A lone icon is centred by its ink: ui::CentredGlyph.)
 void centredText(ImDrawList* dl, ImFont* font, ImVec2 a, ImVec2 b, ImU32 col, const char* text) {
-    if (!font) font = ImGui::GetFont();
-    const float size = font->FontSize;
-    const ImVec2 ts = font->CalcTextSizeA(size, FLT_MAX, 0.0f, text);
-    dl->AddText(font, size, ImVec2(std::floor((a.x + b.x - ts.x) * 0.5f), std::floor((a.y + b.y - ts.y) * 0.5f)), col, text);
+    ui::CentredGlyph(dl, font ? font : ImGui::GetFont(), a, b, col, text);
 }
 
 // Text clipped to `width` with an ellipsis.
@@ -279,8 +282,12 @@ bool drawShelfTile(App& app, const Action& a, ImVec2 size) {
         // Right-shelf toggles are options (Mask, Paint, PolyF): on is a raised grey with an accent bar down the
         // side that faces the canvas, off is quiet; only a mode action gets the accent fill.
         const bool mode = ui::IsModeAction(a.id);
+        // Off: the fill eases into the accent-tinted hover (ui::DrawHover adds the look's ring).
+        const float h = disabled ? 0.0f : ui::HoverAmount(ImGui::GetItemID(), hovered || ui::HoveredOrFocused(ImGui::GetItemID()));
+        const ImVec4 rest = theme::frame, hot = theme::buttonHover;
+        const ImVec4 eased(rest.x + (hot.x - rest.x) * h, rest.y + (hot.y - rest.y) * h, rest.z + (hot.z - rest.z) * h, 1.0f);
         const ImVec4 bg = on ? (mode ? (hovered ? theme::accentHover : theme::accent) : hovered ? theme::toggleOnHover : theme::toggleOn)
-                             : held ? theme::buttonPressed : hovered ? theme::buttonHover : theme::frame;
+                             : held ? theme::buttonPressed : eased;
         dl->AddRectFilled(p0, p1, theme::u32(bg, alpha), theme::rounding(4.0f * s));
         if (on && !mode) ui::DrawOnMark(dl, p0, p1, true);
         // Two text levels only: actions and hovered items in text, options that are off in textOff (readable, so
@@ -294,6 +301,8 @@ bool drawShelfTile(App& app, const Action& a, ImVec2 size) {
     // Tile: a square picture (brush thumbnail or icon) with the name under it.
     const float pic = std::min(size.x, size.y - capH);
     const ImVec2 q0(p0.x + (size.x - pic) * 0.5f, p0.y), q1(q0.x + pic, q0.y + pic);
+    ui::TileLiftScope lift; // the tile lifts on hover; the layout stays
+    lift.lift = ui::BeginTileLift(p0, p1);
     dl->AddRectFilled(p0, p1, theme::u32(hovered ? theme::buttonHover : theme::tile, hovered ? 0.55f : 0.0f), theme::rounding(4.0f * s));
     ImTextureID tex = type >= 0 ? app.thumbnails().brush(type) : ImTextureID(0);
     if (a.id == "draw.paint") { // the Paint brush's own preview (Pickers.cpp)
@@ -430,6 +439,30 @@ void App::registerShellActions() {
           "Ctrl+Shift+drag a rectangle to keep what's inside and hide the rest; add Alt to hide the inside.");
     shape("select.lasso", "Select Lasso", "Tool > Visibility", &hideShape_, SelectShape::Lasso,
           "Ctrl+Shift+drag a lasso to keep what's inside and hide the rest; add Alt to hide the inside.");
+    // Cut (PanelCut.cpp, core/Cut.h): the same Ctrl+Shift drag, cutting instead of hiding.
+    shape("cut.line", "Cut Line", "Tool > Cut", &hideShape_, SelectShape::CutLine,
+          "Ctrl+Shift+drag a line: the shaded side is cut (Alt: the other side). Away removes it through the whole "
+          "Part and closes the cut flat; In steps it down by Depth; Add raises it; Clip presses it flat onto the line.");
+    shape("cut.lasso", "Cut Lasso", "Tool > Cut", &hideShape_, SelectShape::CutLasso,
+          "Ctrl+Shift+drag a lasso: Away cuts a hole through the Part, In a pocket Depth deep, Add raises the shape, "
+          "Clip presses what lies outside it onto its outline.");
+    shape("cut.rect", "Cut Rectangle", "Tool > Cut", &hideShape_, SelectShape::CutRect,
+          "Ctrl+Shift+drag a rectangle: Away cuts a hole through the Part, In a pocket Depth deep, Add a block, Clip "
+          "presses what lies outside it onto its edges.");
+    shape("cut.polyline", "Cut Polyline", "Tool > Cut", &hideShape_, SelectShape::CutPolyline,
+          "Ctrl+Shift+click points: click the first point to cut the polygon, double-click or Enter to cut along an "
+          "open bent line (Alt: the other side), Esc to drop it.");
+    auto cutMode = [this](std::string id, std::string label, int mode, std::string description) {
+        actions_.add({std::move(id), std::move(label), nullptr, std::move(description), "Tool > Cut", "", "",
+                      [this, mode] { cutMode_ = mode; }, [this, mode] { return cutMode_ == mode; }, nullptr});
+    };
+    cutMode("cut.away", "Away", 0, "Remove what the shape covers, through the whole Part, and close the cut with a flat cap.");
+    cutMode("cut.in", "In", 1, "Cut a flat-bottomed pocket Depth deep where the shape covers the Part.");
+    cutMode("cut.add", "Add", 2, "Add the shape, extruded Depth out of the surface, joined to the Part.");
+    cutMode("cut.clip", "Clip", 3,
+            "Remove nothing: press the shaded side of a line, or everything outside a lasso or rectangle, flat onto "
+            "the shape's outline, through the whole Part (#102). Hard-surface planes and clean silhouettes; the mask "
+            "holds parts back.");
     flag("draw.pressure_strength", "Pressure > Strength", nullptr, "Draw > Tablet", "", &pressureStrength_,
          "Pen pressure scales the brush strength.");
     flag("draw.pressure_size", "Pressure > Size", nullptr, "Draw > Tablet", "", &pressureSize_,
@@ -452,10 +485,7 @@ void App::registerShellActions() {
         a.checked = [this, axis] { return symmetry_.radialAxis == axis; };
         actions_.add(std::move(a));
     }
-    flag("ui.brush_lab", "AI Brush", ICON_LC_SPARKLES, "Brush", "", &showBrushLab_,
-         "Brush Lab: describe a brush in words and AI builds it; tweak the recipe with sliders.");
-    flag("ui.generate3d", "Generate 3D", ICON_LC_WAND_SPARKLES, "Generate", "", &showImageTo3D_,
-         "Turn an image or a description into a sculptable model (Hugging Face, fal.ai, Meshy, ComfyUI or offline).");
+    registerAiActions(); // AI Brush, Generate 3D: only while AI is on (PanelAi.cpp)
     flag("ui.brush_gallery", "Community brushes", ICON_LC_GLOBE, "Brush", "", &showBrushGallery_,
          "Browse, search and install brushes other sculptors shared.");
 
@@ -641,11 +671,13 @@ void App::registerShellActions() {
                    "Interface look and layout (Preferences > Interface > Look). Only changes how the interface looks.",
                    {{"look", ParamSpec::Type::String, "classic, forge, phosphor or blueprint (default: unchanged).", false},
                     {"scheme", ParamSpec::Type::String,
-                     "Forge Terminal's colours: tokyo_night, catppuccin_mocha, gruvbox_dark, nord, rose_pine, kanagawa or everforest.",
+                     "Forge Terminal's colours: neutral, tokyo_night, catppuccin_mocha, gruvbox_dark, nord, rose_pine, kanagawa or everforest.",
                      false},
                     {"match_omarchy", ParamSpec::Type::Bool, "Forge Terminal: match the desktop theme (the current Omarchy theme's colours, Linux).", false},
                     {"phosphor", ParamSpec::Type::String, "Phosphor's colour: green or amber.", false},
                     {"effects", ParamSpec::Type::Bool, "Phosphor's scanlines and glow (on the interface only).", false},
+                    {"outlines", ParamSpec::Type::String, "The tiled looks' panel borders: off, subtle (the default) or on.", false},
+                    {"outline_opacity", ParamSpec::Type::Number, "How strong those borders are, 0-100 (default 100).", false},
                     {"layout", ParamSpec::Type::String, "sculptforge or zbrush (default: the look's, else unchanged).", false},
                     {"card", ParamSpec::Type::Bool, "Show the one-time \"SculptForge has a new look\" card (for tests).", false}},
                    [this](Document&, const Args& a) -> CommandResult {
@@ -666,6 +698,13 @@ void App::registerShellActions() {
                        if (a.contains("match_omarchy")) l.matchOmarchy = argBool(a, "match_omarchy", false);
                        if (a.contains("phosphor")) l.amber = argString(a, "phosphor") == "amber";
                        if (a.contains("effects")) l.effects = argBool(a, "effects", false);
+                       if (a.contains("outlines")) {
+                           const std::string o = argString(a, "outlines");
+                           if (o != "off" && o != "subtle" && o != "on") return {false, "outlines must be off, subtle or on"};
+                           l.outlines = o == "off" ? 0 : o == "on" ? 2 : 1;
+                       }
+                       if (a.contains("outline_opacity"))
+                           l.outlineOpacity = std::clamp(float(argNumber(a, "outline_opacity", 100.0)) / 100.0f, 0.0f, 1.0f);
                        if (a.contains("layout")) {
                            const std::string k = argString(a, "layout");
                            if (k != "sculptforge" && k != "zbrush") return {false, "layout must be sculptforge or zbrush"};
@@ -744,7 +783,17 @@ CanvasRect App::canvasRect() const {
     int w = 0, h = 0;
     SDL_GetWindowSize(window_, &w, &h);
     if (hideUi_) return {0.0f, 0.0f, float(std::max(w, 1)), float(std::max(h, 1))};
-    return computeShell(layout_, float(w), float(h), uiScale_, topInset(), shellMetrics()).canvas;
+    CanvasRect c = computeShell(layout_, float(w), float(h), uiScale_, topInset(), shellMetrics()).canvas;
+    // On whole framebuffer pixels, as canvasViewport draws it: with a fractional rect (HiDPI, UI scales) the view
+    // was drawn up to half a pixel from where the rays for the brush were cast.
+    int pw = 0, ph = 0;
+    if (w > 0 && h > 0 && SDL_GetWindowSizeInPixels(window_, &pw, &ph) && pw > 0 && ph > 0) {
+        const float sx = float(pw) / float(w), sy = float(ph) / float(h);
+        const float x0 = std::round(c.x * sx) / sx, x1 = std::round((c.x + c.w) * sx) / sx;
+        const float y0 = std::round(c.y * sy) / sy, y1 = std::round((c.y + c.h) * sy) / sy;
+        c = {x0, y0, std::max(x1 - x0, 1.0f / sx), std::max(y1 - y0, 1.0f / sy)};
+    }
+    return c;
 }
 
 void App::canvasRay(float x, float y, glm::vec3& origin, glm::vec3& dir) const {
@@ -1043,9 +1092,8 @@ void App::drawTitleStrip(const ShellGeometry& g) {
             dl->AddRectFilled(p, ImVec2(p.x + windowButtonW, p.y + buttonH),
                               theme::u32(close ? theme::danger : theme::frameHover), theme::rounding(3.0f * s));
         const char* glyph = close ? ICON_LC_X : ICON_LC_MINUS;
-        const ImVec2 gs = ImGui::CalcTextSize(glyph);
-        dl->AddText(ImVec2(p.x + (windowButtonW - gs.x) * 0.5f, p.y + (buttonH - ImGui::GetFontSize()) * 0.5f),
-                    theme::u32(hovered && close ? theme::text : theme::textDim), glyph);
+        ui::CentredGlyph(dl, nullptr, p, ImVec2(p.x + windowButtonW, p.y + buttonH),
+                         theme::u32(hovered && close ? theme::text : theme::textDim), glyph);
         if (close) {
             if (clicked) requestQuit();
             ui::HelpAction(*this, "file.quit");
@@ -1227,7 +1275,7 @@ void App::drawLookChrome() {
             }
         }
     }
-    if (theme::look.glow && g_focus.w > 0.0f) { // a soft phosphor bloom around the focused tile, in the gap
+    if (theme::look.glow && theme::look.outlines == 2 && g_focus.w > 0.0f) { // a soft phosphor bloom around the focused tile, in the gap
         for (int k = 1; k <= 4; ++k) {
             const float d = float(k) * s;
             bg->AddRect(ImVec2(g_focus.x - d, g_focus.y - d), ImVec2(g_focus.x + g_focus.w + d, g_focus.y + g_focus.h + d),
@@ -1397,6 +1445,8 @@ void App::drawStatusBar(const ShellGeometry& g) {
         char fps[16];
         std::snprintf(fps, sizeof fps, "%3.0f", fpsShown_);
         mods.push_back({ICON_LC_ACTIVITY, "fps", fps});
+        // View > Lock camera (#62, Shift+L): left-drags on the background start strokes instead of turning the view.
+        if (uiPrefs_.airStrokes) mods.push_back({ICON_LC_LOCK, "camera", upper(tr("Camera locked")), true});
     }
     ImFont* labelFont = theme::look.id != 0 && fontMonoTiny_ ? fontMonoTiny_ : fontTiny_ ? fontTiny_ : monoSmall;
     auto moduleW = [&](const StatusModule& m) {
@@ -1412,6 +1462,7 @@ void App::drawStatusBar(const ShellGeometry& g) {
     const float sepW = style == Status::Terminal ? textW(monoSmall, " | ") : style == Status::TitleBlock ? 0.0f : 16.0f * s;
     // Drop the least important modules (from the file name inwards) until they fit beside the menus.
     std::vector<int> shown = {0, 1, 2, 3, 4};
+    if (mods.size() > 5) shown.insert(shown.begin() + 1, 5); // Camera locked, beside the mode (never dropped)
     auto total = [&] {
         float w = 0.0f;
         for (size_t k = 0; k < shown.size(); ++k) w += moduleW(mods[size_t(shown[k])]) + (k ? sepW : 0.0f);
@@ -1424,6 +1475,7 @@ void App::drawStatusBar(const ShellGeometry& g) {
     for (size_t k = 0; k < shown.size(); ++k) {
         const StatusModule& m = mods[size_t(shown[k])];
         const float w = moduleW(m);
+        ImGui::LogText("%s", m.value.c_str()); // (UI tests read the bar)
         if (k) {
             if (style == Status::Terminal) textAt(monoSmall, mx, theme::textDim, " | ");
             mx += sepW;
@@ -1864,7 +1916,8 @@ void App::drawShelf(int shelf, const CanvasRect& r) {
                        : shelf == kShelfBottom ? ImVec2(6.0f * s, 3.0f * s)
                        : shelf == kShelfLeft   ? ImVec2(6.0f * s, 6.0f * s)
                                                : ImVec2(4.0f * s, 6.0f * s);
-    if (!beginShellWindow(kShelfWindows[shelf], r, theme::shellBg, pad)) {
+    if (!beginShellWindow(kShelfWindows[shelf], r, theme::shellBg, pad,
+                          ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse, false)) {
         ImGui::End();
         return;
     }
@@ -1958,6 +2011,9 @@ void App::drawShelf(int shelf, const CanvasRect& r) {
             ImGui::EndDragDropTarget();
         }
     }
+    // The frame last, over the shelf's buttons: drawn first, the right shelf's tall buttons covered its sides and
+    // the accent outline showed in pieces (#98).
+    tileFrame(dl, r, sameRect(r, g_focus));
     ImGui::End();
 }
 
@@ -2000,8 +2056,10 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         ImGui::SetNextItemWidth(vertical ? 180.0f * s
                                          : std::clamp(item == "widget.draw_size" ? avail * 0.5f : avail, 120.0f * s, 180.0f * s));
         if (item == "widget.draw_size") {
-            ui::SliderInside("##drawsize", &radiusPx_, 2.0f, 800.0f, "Draw Size %.0f", ImGuiSliderFlags_Logarithmic);
-            ui::HelpText("Draw Size", "S", "Brush radius in screen pixels. [ and ] change it by 10%; Ctrl+click to type.", "Draw");
+            drawSizeSlider("##drawsize", "Draw",
+                           "Brush radius in screen pixels (0.5 to 800), and in mm on the surface under the cursor. [ and ] "
+                           "change it by 10%, Shift+[ and Shift+] by 1 px, Ctrl+Shift+right-drag scrubs it finely; "
+                           "Ctrl+click to type.");
         } else {
             drawZIntensitySlider("##strength");
         }
@@ -2272,7 +2330,9 @@ bool App::canvasNavButton(const char* id, const char* icon, const char* englishL
 namespace {
 
 // Tile frame: the picture square and the caption under it. Returns true when clicked.
-bool tileFrame(const char* id, ImVec2 size, ImFont* font, const std::string& caption, float s, ImVec2& pic0, ImVec2& pic1) {
+// A left-shelf tile; it lifts on hover (`lift` ends when the caller has drawn the picture).
+bool tileFrame(const char* id, ImVec2 size, ui::TileLift& lift, ImFont* font, const std::string& caption, float s, ImVec2& pic0,
+               ImVec2& pic1) {
     const bool clicked = ImGui::InvisibleButton(id, size);
     const bool hovered = ImGui::IsItemHovered();
     const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
@@ -2281,9 +2341,12 @@ bool tileFrame(const char* id, ImVec2 size, ImFont* font, const std::string& cap
     pic0 = a;
     pic1 = ImVec2(b.x, b.y - capH);
     dl->AddRectFilled(pic0, pic1, theme::u32(theme::tile), theme::rounding(4.0f * s));
-    if (hovered) dl->AddRect(pic0, pic1, theme::u32(theme::accent, 0.8f), theme::rounding(4.0f * s), 0, 1.5f * s);
+    if (hovered) dl->AddRectFilled(pic0, pic1, theme::u32(theme::buttonHover, 0.45f), theme::rounding(4.0f * s)); // (a faint fill, no border)
     centredText(dl, font, ImVec2(a.x, b.y - capH), b, theme::u32(hovered ? theme::text : theme::textDim),
                 elide(font ? font : ImGui::GetFont(), caption, size.x).c_str());
+    lift = ui::BeginTileLift(pic0, pic1); // the picture lifts, the caption stays
+    dl->AddRectFilled(pic0, pic1, theme::u32(theme::tile), theme::rounding(4.0f * s));
+    if (hovered) dl->AddRectFilled(pic0, pic1, theme::u32(theme::buttonHover, 0.45f), theme::rounding(4.0f * s)); // (a faint fill)
     ImGui::LogText("%s", caption.c_str());
     return clicked;
 }
@@ -2301,7 +2364,8 @@ void App::drawBrushTile(const char* id, ImVec2 size) {
     // ZBrush: Ctrl held shows the mask brush, Ctrl+Shift the selection brush; a click picks among those.
     if (const HeldBrushItem* held = heldBrushCurrent(heldBrush())) {
         ImVec2 a, b;
-        const bool clicked = tileFrame(id, size, fontSmall_, held->brush, s, a, b);
+        ui::TileLiftScope lift;
+        const bool clicked = tileFrame(id, size, lift.lift, fontSmall_, held->brush, s, a, b);
         drawHeldBrushIcon(ImGui::GetWindowDrawList(), a, b, held->icon, heldBrush() == HeldBrush::Select);
         if (clicked) openPicker(Picker::Brush, ImVec2(ImGui::GetItemRectMax().x + 4.0f * s, ImGui::GetItemRectMin().y));
         ui::HelpText("Brush", "B", "Ctrl held: the mask brush (Ctrl+Shift: the selection brush). Click, or press B with Ctrl "
@@ -2311,7 +2375,8 @@ void App::drawBrushTile(const char* id, ImVec2 size) {
     const BrushRecipe* recipe = activeRecipe();
     const std::string name = guidesMode_ ? "Quad Remesh Guides" : paintMode_ ? "Paint" : recipe ? recipe->name : brushLabel(brush_);
     ImVec2 a, b;
-    const bool clicked = tileFrame(id, size, fontSmall_, name, s, a, b);
+    ui::TileLiftScope lift;
+    const bool clicked = tileFrame(id, size, lift.lift, fontSmall_, name, s, a, b);
     ImDrawList* dl = ImGui::GetWindowDrawList();
     ImTextureID tex = paintMode_ || guidesMode_ ? ImTextureID(0) : recipe ? thumbs_.recipe(*recipe) : thumbs_.brush(int(brush_));
     const ImVec2 c((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
@@ -2335,24 +2400,12 @@ void App::drawBrushTile(const char* id, ImVec2 size) {
     ui::HelpText("Brush", "B", "The active brush. Click for the brush picker; the bottom shelf holds favourites.", "Left shelf");
 }
 
-void App::drawStrokeTile(const char* id, ImVec2 size) {
+void App::drawStrokeIcon(ImDrawList* dl, ImVec2 a, ImVec2 b, StrokeType type) {
     const float s = uiScale_;
-    if (const HeldBrushItem* held = heldBrushCurrent(heldBrush())) { // Ctrl / Ctrl+Shift: the mask's stroke
-        ImVec2 a, b;
-        const bool clicked = tileFrame(id, size, fontSmall_, held->stroke, s, a, b);
-        drawHeldBrushIcon(ImGui::GetWindowDrawList(), a, b, held->icon, heldBrush() == HeldBrush::Select);
-        if (clicked) openPicker(Picker::Stroke, ImVec2(ImGui::GetItemRectMax().x + 4.0f * s, ImGui::GetItemRectMin().y));
-        ui::HelpText("Stroke", nullptr, "Ctrl held: the mask's stroke, Dots (Mask Pen), Lasso or Rect (Ctrl+Shift: the "
-                     "selection's). Click with Ctrl held to choose.", "Left shelf");
-        return;
-    }
-    ImVec2 a, b;
-    const bool clicked = tileFrame(id, size, fontSmall_, strokeTypeName(strokeType_), s, a, b);
-    ImDrawList* dl = ImGui::GetWindowDrawList();
     const ImU32 col = IM_COL32(235, 235, 235, 230);
     const float w = b.x - a.x, h = b.y - a.y;
     auto at = [&](float u, float v) { return ImVec2(a.x + w * u, a.y + h * v); };
-    switch (strokeType_) {
+    switch (type) {
     case StrokeType::Dots: // ZBrush's dotted arc
         for (int i = 0; i < 7; ++i) {
             const float u = float(i) / 6.0f;
@@ -2395,6 +2448,24 @@ void App::drawStrokeTile(const char* id, ImVec2 size) {
     }
     default: break;
     }
+}
+
+void App::drawStrokeTile(const char* id, ImVec2 size) {
+    const float s = uiScale_;
+    if (const HeldBrushItem* held = heldBrushCurrent(heldBrush())) { // Ctrl / Ctrl+Shift: the mask's stroke
+        ImVec2 a, b;
+        ui::TileLiftScope lift;
+        const bool clicked = tileFrame(id, size, lift.lift, fontSmall_, held->stroke, s, a, b);
+        drawHeldBrushIcon(ImGui::GetWindowDrawList(), a, b, held->icon, heldBrush() == HeldBrush::Select);
+        if (clicked) openPicker(Picker::Stroke, ImVec2(ImGui::GetItemRectMax().x + 4.0f * s, ImGui::GetItemRectMin().y));
+        ui::HelpText("Stroke", nullptr, "Ctrl held: the mask's stroke, Dots (Mask Pen), Lasso or Rect (Ctrl+Shift: the "
+                     "selection's). Click with Ctrl held to choose.", "Left shelf");
+        return;
+    }
+    ImVec2 a, b;
+    ui::TileLiftScope lift;
+    const bool clicked = tileFrame(id, size, lift.lift, fontSmall_, strokeTypeName(strokeType_), s, a, b);
+    drawStrokeIcon(ImGui::GetWindowDrawList(), a, b, strokeType_);
     if (clicked) openPicker(Picker::Stroke, ImVec2(ImGui::GetItemRectMax().x + 4.0f * s, ImGui::GetItemRectMin().y));
     ui::HelpText("Stroke", nullptr, "How dabs follow the cursor: Dots, Drag Stamp, Slide Stamp, Spray or Lazy Stroke. Click to choose.",
                  "Left shelf");
@@ -2404,7 +2475,8 @@ void App::drawAlphaTile(const char* id, ImVec2 size) {
     const float s = uiScale_;
     ImVec2 a, b;
     if (vdmBrushActive() && doc_.brushVdm) { // the VDM brush's 3D alpha (ZBrush shows VDMs in the alpha slot)
-        const bool clicked = tileFrame(id, size, fontSmall_, doc_.brushVdm->name, s, a, b);
+        ui::TileLiftScope lift;
+        const bool clicked = tileFrame(id, size, lift.lift, fontSmall_, doc_.brushVdm->name, s, a, b);
         if (ImTextureID tex = thumbs_.vdm(doc_.brushVdm))
             ImGui::GetWindowDrawList()->AddImageRounded(tex, ImVec2(a.x + 2 * s, a.y + 2 * s), ImVec2(b.x - 2 * s, b.y - 2 * s),
                                                         ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, theme::rounding(4.0f * s));
@@ -2412,7 +2484,8 @@ void App::drawAlphaTile(const char* id, ImVec2 size) {
         ui::HelpText("VDM", nullptr, "The VDM brush's vector displacement map. Click to pick another.", "Left shelf");
         return;
     }
-    const bool clicked = tileFrame(id, size, fontSmall_, doc_.brushAlpha.name, s, a, b);
+    ui::TileLiftScope lift;
+    const bool clicked = tileFrame(id, size, lift.lift, fontSmall_, doc_.brushAlpha.name, s, a, b);
     ImDrawList* dl = ImGui::GetWindowDrawList();
     ImTextureID tex = thumbs_.alpha(doc_.brushAlpha);
     if (tex) {
@@ -2439,7 +2512,8 @@ void App::drawMaterialTile(const char* id, ImVec2 size) {
     const float s = uiScale_;
     const int m = renderSettings_.matcap;
     ImVec2 a, b;
-    const bool clicked = tileFrame(id, size, fontSmall_, m < 0 ? std::string("Studio") : std::string(matcapName(m)), s, a, b);
+    ui::TileLiftScope lift;
+    const bool clicked = tileFrame(id, size, lift.lift, fontSmall_, m < 0 ? std::string("Studio") : std::string(matcapName(m)), s, a, b);
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const ImVec2 c((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
     const float r = (b.x - a.x) * 0.4f;

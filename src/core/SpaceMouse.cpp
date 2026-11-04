@@ -49,10 +49,17 @@ std::string lower(std::string s) {
 
 bool isSpaceMouseDevice(uint16_t vendor, uint16_t product, const std::string& name) {
     if (vendor == kVendor3Dconnexion) return std::find(std::begin(kNot6Dof), std::end(kNot6Dof), product) == std::end(kNot6Dof);
-    if (vendor == kVendorLogitech) {
-        if (std::find(std::begin(kLogitechSpaceMice), std::end(kLogitechSpaceMice), product) != std::end(kLogitechSpaceMice))
-            return true;
-        const std::string n = lower(name);
+    if (vendor == kVendorLogitech &&
+        std::find(std::begin(kLogitechSpaceMice), std::end(kLogitechSpaceMice), product) != std::end(kLogitechSpaceMice))
+        return true;
+    // By name (#104): a Logitech-id model missing above; a device whose vendor id the system could not read (0,
+    // seen over Bluetooth); any other id when the name says 3Dconnexion (a driver's virtual device). Never the
+    // CadMouse or the keyboards.
+    const std::string n = lower(name);
+    for (const char* word : {"cadmouse", "keyboard", "numpad"})
+        if (n.find(word) != std::string::npos) return false;
+    if (n.find("3dconnexion") != std::string::npos) return true;
+    if (vendor == kVendorLogitech || vendor == 0) {
         for (const char* word : {"spacemouse", "space mouse", "spacenavigator", "space navigator", "spacepilot",
                                  "spaceexplorer", "spaceball", "spacetraveler"})
             if (n.find(word) != std::string::npos) return true;

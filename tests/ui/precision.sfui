@@ -1,0 +1,312 @@
+# Precision work (Precision.cpp, core/Precision.h): Steady Stroke with every stroke type (L) and its catch-up on
+# release, World Size across zoom levels, the fine size keys (Shift+[ / Shift+]) and Ctrl+Shift+right-drag, sizes
+# down to 0.5 px, the precision drag (Shift+Alt mid-stroke) in every input style, and a pressure curve per brush.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+run new_sphere subdivisions=5
+input_style sculptforge
+
+# --- Steady Stroke: L turns it on for every stroke type; the brush trails the pointer on its string. ---
+expect_value steady_stroke == 0
+key l
+expect_value steady_stroke == 1
+expect_status Steady Stroke on
+expect_value steady_catch_up == 1
+
+# Dots: mid-stroke the brush is a string's length (40 px) behind; on release it catches up to the pointer.
+snapshot
+drag_path 0.25 0.5 0.45 0.5 0.6 0.5 keep
+expect_value stroking == 1
+expect_value steady_lag > 35
+expect_value steady_lag < 41
+release
+expect_value moved > 0
+expect_value steady_lag < 1
+key ctrl+z
+
+# Spray, Drag Stamp and Slide Stamp: the same string.
+click "Stroke##palette.stroke"
+click "Spray##stroke"
+key escape
+expect_value stroke_type == 3
+drag_path 0.25 0.5 0.45 0.5 0.6 0.5 keep
+expect_value steady_lag > 35
+release
+key ctrl+z
+click "Stroke##palette.stroke"
+click "Drag Stamp##stroke"
+key escape
+expect_value stroke_type == 1
+drag_path 0.3 0.5 0.5 0.5 0.65 0.5 keep
+expect_value steady_lag > 35
+release
+key ctrl+z
+click "Stroke##palette.stroke"
+click "Slide Stamp##stroke"
+key escape
+expect_value stroke_type == 2
+drag_path 0.3 0.5 0.5 0.5 0.65 0.5 keep
+expect_value steady_lag > 35
+release
+key ctrl+z
+
+# Catch up off: the line ends a string's length behind the pointer.
+click "Stroke##palette.stroke"
+click "Dots##stroke"
+click "Catch up on release##steady_catch_up"
+key escape
+expect_value steady_catch_up == 0
+drag_path 0.25 0.5 0.45 0.5 0.6 0.5 keep
+release
+expect_value steady_lag > 35
+key ctrl+z
+key l
+expect_value steady_stroke == 0
+expect_status Steady Stroke off
+
+# The Lazy Stroke type is Dots on the string: L turns it off.
+click "Stroke##palette.stroke"
+click "Lazy Stroke##stroke"
+key escape
+expect_value steady_stroke == 1
+key l
+expect_value steady_stroke == 0
+expect_value stroke_type == 0
+
+# --- Fine size keys: Shift+[ / Shift+] step one pixel, [ / ] 10%; down to 0.5 px. ---
+mouse_move 0.5 0.5
+remember draw_size_exact s0
+key shift+]
+expect_value draw_size_exact == $s0+1
+key shift+[
+key shift+[
+expect_value draw_size_exact == $s0-1
+key ]
+expect_value draw_size_exact > $s0
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+expect_value draw_size_exact == 0.5
+key shift+]
+expect_value draw_size_exact == 1
+key shift+]
+key shift+]
+expect_value draw_size_exact == 2
+key shift+]
+expect_value draw_size_exact == 3
+expect_text px
+
+# A 1 px brush still draws one continuous line (dabs at half its radius).
+snapshot
+stroke 0.3 0.5 0.7 0.5
+expect_value moved > 0
+key ctrl+z
+
+# Ctrl+Shift+right-drag scrubs the size finely: 100 px to the right is about 1.5x.
+key shift+]
+key shift+]
+key shift+]
+key shift+]
+key shift+]
+key shift+]
+key shift+]
+expect_value draw_size_exact == 10
+hold ctrl+shift
+button_drag right 0.5 0.5 0.5521 0.5
+hold none
+expect_value draw_size_exact > 13
+expect_value draw_size_exact < 17
+expect_status Draw Size
+hold ctrl+shift
+button_drag right 0.5 0.5 0.4479 0.5
+hold none
+expect_value draw_size_exact > 9.5
+expect_value draw_size_exact < 10.5
+remember camera_distance d0
+expect_value camera_distance == $d0
+
+# --- World Size: the brush keeps its size on the surface (mm) as you zoom. ---
+key shift+]
+key shift+]
+key shift+]
+key shift+]
+key shift+]
+key shift+]
+key shift+]
+key shift+]
+key shift+]
+key shift+]
+mouse_move 0.5 0.5
+wait 0.1
+remember draw_size_exact px0
+expect_value world_radius_mm > 0
+click "Draw##palette.draw"
+click "World Size##brush.world_size"
+expect_value world_size == 1
+click "Draw##palette.draw"
+mouse_move 0.5 0.5
+wait 0.1
+remember world_radius_mm mm0
+zoom 2
+mouse_move 0.5 0.5
+wait 0.2
+expect_value world_radius_mm == $mm0
+expect_value draw_size_exact > $px0*1.7
+expect_value draw_size_exact < $px0*3     # (the surface is nearer than the pivot: a bit more than 2x)
+zoom 1.5
+mouse_move 0.5 0.5
+wait 0.2
+expect_value world_radius_mm == $mm0
+expect_value draw_size_exact > $px0*4
+zoom 0.33333333
+mouse_move 0.5 0.5
+wait 0.2
+expect_value world_radius_mm == $mm0
+expect_value draw_size_exact > $px0*0.9
+expect_value draw_size_exact < $px0*1.1
+expect_text mm
+# A stroke with World Size on sculpts at that size.
+snapshot
+stroke 0.3 0.5 0.7 0.5
+expect_value moved > 0
+key ctrl+z
+# Off: pixels again, the size no longer follows the zoom.
+click "Draw##palette.draw"
+click "World Size##brush.world_size"
+expect_value world_size == 0
+click "Draw##palette.draw"
+remember draw_size_exact px1
+zoom 2
+mouse_move 0.5 0.5
+wait 0.2
+expect_value draw_size_exact == $px1
+zoom 0.5
+
+# --- Precision drag: Shift+Alt held mid-stroke moves the brush at a quarter of the pen's speed. ---
+input_style sculptforge
+drag_path 0.25 0.5 0.35 0.5 keep
+expect_value precision_active == 0
+expect_value precision_lag < 1
+hold shift+alt
+drag_path 0.35 0.5 0.6 0.5 keep
+expect_value precision_active == 1
+expect_value precision_lag > 40
+expect_value stroking == 1
+hold none
+drag_path 0.6 0.5 0.7 0.5 0.8 0.5 0.9 0.5 keep
+expect_value precision_active == 0
+release
+key ctrl+z
+input_style zbrush
+drag_path 0.25 0.5 0.35 0.5 keep
+hold shift+alt
+drag_path 0.35 0.5 0.6 0.5 keep
+expect_value precision_active == 1
+expect_value precision_lag > 40
+hold none
+release
+key ctrl+z
+input_style blender
+drag_path 0.25 0.5 0.35 0.5 keep
+hold shift+alt
+drag_path 0.35 0.5 0.6 0.5 keep
+expect_value precision_active == 1
+expect_value precision_lag > 40
+hold none
+release
+key ctrl+z
+input_style maya
+drag_path 0.25 0.5 0.35 0.5 keep
+hold shift+alt
+drag_path 0.35 0.5 0.6 0.5 keep
+expect_value precision_active == 1
+expect_value precision_lag > 40
+hold none
+release
+key ctrl+z
+input_style sculptforge
+
+# --- A pressure curve per brush (Preferences > Tablet; Brush Lab shows the same). ---
+expect_value brush_curves == 0
+expect_value brush_curve_half == 50
+click "Preferences##palette.preferences"
+click "Tablet##preferences.tablet"
+wait 0.3
+shot prefs-brush-curve
+click "Fine detail##brushcurve"
+expect_value brush_curve_points == 4
+expect_value brush_curve_half < 20
+expect_status Pressure curve for
+click "Preferences##palette.preferences"
+# Another brush keeps its own (linear) curve; coming back brings Fine detail back.
+click "Clay##brush.clay"
+expect_value brush_curve_half == 50
+expect_value brush_curves == 1
+click "Standard##brush.standard"
+expect_value brush_curve_half < 20

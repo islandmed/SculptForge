@@ -4,6 +4,8 @@
 #include "app/Bench.h"
 #include "app/Calibration.h"
 #include "app/CrashLog.h"
+#include "ai/AiPolicy.h"
+#include "core/FocusDetail.h"
 #include "core/Pack.h"
 
 #include <SDL3/SDL_main.h>
@@ -45,6 +47,7 @@ void usage() {
         "  --ui-test FILE.sfui      Run a UI test script headless and exit (0 = pass); settings are isolated\n"
         "  --ui-out DIR             Where UI tests save screenshots\n"
         "  --fullscreen             Start filling the screen (F11 toggles)\n"
+        "  --no-ai                  Start with every AI feature off and locked (as SF_AI=off)\n"
         "  --no-packs               Safe mode: start without any installed pack (Library > Packs)\n"
         "  --blender                Load what the Blender add-on sent (it starts SculptForge this way)\n"
         "  --bench                  Run the performance benchmark (with GPU upload and orbit timings) and exit\n"
@@ -67,6 +70,8 @@ void usage() {
         "                           JSON result and an MP4 of the run and exits (docs/benchmark.md)\n"
         "  --benchmark standard-15m The standard scene: a 15M triangle head, Clay S/M/L, Move, Smooth and a 240 px\n"
         "                           brush (standard-33m: 33M; standard: both). The numbers on sculptforge.app/benchmarks\n"
+        "  --benchmark standard-1b  Experimental Focus Detail: a billion micro triangle head streamed from disk\n"
+        "  --focus-detail FILE      Experimental: open a Focus Detail file (.sfdetail)\n"
         "  --benchmark-sizes 5,20   Proof mode mesh sizes in millions of triangles\n"
         "  --benchmark-out FILE     Where the JSON result goes (default: sculptforge-benchmark-<time>.json here)\n"
         "  --benchmark-video FILE   Where the MP4 goes; --benchmark-no-video records none\n"
@@ -85,8 +90,8 @@ void isolateSettings() {
     std::error_code ec;
     const auto dir = std::filesystem::temp_directory_path(ec) /
                      ("sculptforge-ui-test-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
-    g_isolatedDir = dir;
     std::filesystem::create_directories(dir, ec);
+    g_isolatedDir = dir;
     const std::string d = dir.string();
 #if defined(_WIN32)
     _putenv_s("APPDATA", d.c_str());
@@ -105,6 +110,28 @@ void isolateSettings() {
         unsetenv(key);
 #endif
     }
+}
+
+// Runs by an agent or a script (SDL_APP_ID=sculptforge-agent, as ~/Work/CLAUDE.md asks for agent windows, or a
+// Claude Code shell) never touch the user's settings, log or hardware profile: a benchmark or render started there
+// wrote into the user's sculptforge.log and pushed the session's log to sculptforge-previous.log.
+// SF_ISOLATE=1 isolates any run, SF_ISOLATE=0 none of the automatic ones.
+bool automatedRun() {
+    const char* force = std::getenv("SF_ISOLATE");
+    if (force && *force) return *force != '0';
+    const char* appId = std::getenv("SDL_APP_ID");
+    const char* claude = std::getenv("CLAUDECODE");
+    return (appId && std::string(appId) == "sculptforge-agent") || (claude && *claude);
+}
+
+int finishIsolated(int code) {
+    // The isolated folder (settings, the log, autosaves: a benchmark's 33M mesh is over a gigabyte) goes with a run
+    // that passed; a failed one keeps it, log included, to look at.
+    if (code == 0 && !g_isolatedDir.empty()) {
+        std::error_code ec;
+        std::filesystem::remove_all(g_isolatedDir, ec);
+    }
+    return code;
 }
 
 } // namespace
@@ -150,6 +177,7 @@ int main(int argc, char** argv) {
         else if (a == "--supersample") options.supersample = std::clamp(std::atoi(next().c_str()), 1, 4);
         else if (a == "--ui-test") options.uiTest = next();
         else if (a == "--fullscreen") options.fullscreen = true;
+        else if (a == "--no-ai") sf::ai::setAiForcedOff(true); // as SF_AI=off (ai/AiPolicy.h)
         else if (a == "--no-packs") sf::setPacksSafeMode(true); // safe mode: no installed pack is loaded
         else if (a == "--blender") options.blender = true;
         else if (a == "--ui-out") options.uiOutDir = next();
@@ -170,12 +198,13 @@ int main(int argc, char** argv) {
             if (i + 1 < argc && std::string(argv[i + 1]).rfind("standard", 0) == 0) {
                 options.benchmarkScene = argv[++i];
                 if (options.benchmarkScene != "standard" && options.benchmarkScene != "standard-15m" &&
-                    options.benchmarkScene != "standard-33m") {
-                    std::fprintf(stderr, "Unknown benchmark scene %s (standard-15m, standard-33m or standard)\n", argv[i]);
+                    options.benchmarkScene != "standard-33m" && options.benchmarkScene != "standard-1b") {
+                    std::fprintf(stderr, "Unknown benchmark scene %s (standard-15m, standard-33m, standard or standard-1b)\n", argv[i]);
                     return 1;
                 }
             }
         }
+        else if (a == "--focus-detail") options.openPath = next(); // a .sfdetail file (prototype)
         else if (a == "--benchmark-sizes") options.benchmarkSizes = next();
         else if (a == "--benchmark-out") options.benchmarkOut = next();
         else if (a == "--benchmark-video") options.benchmarkVideo = next();
@@ -192,11 +221,23 @@ int main(int argc, char** argv) {
             return 1;
         }
     }
-    if (bench.run) return sf::runAppBenchmark(bench);
-    if (calibrate) return sf::runCalibrateCommandLine(calibrateQuick, calibrateSave);
+    if (automatedRun()) isolateSettings();
+    if (bench.run) return finishIsolated(sf::runAppBenchmark(bench));
+    if (calibrate) return finishIsolated(sf::runCalibrateCommandLine(calibrateQuick, calibrateSave));
     if (!options.uiTest.empty()) {
         if (!sizeGiven) options.width = 1600, options.height = 960;
         isolateSettings();
+    }
+    if (options.benchmarkScene == "standard-1b") { // the asset first (written once, a few seconds), before any window
+#if defined(_WIN32)
+        std::fprintf(stderr, "standard-1b (experimental Focus Detail) needs Linux or macOS for now\n");
+        return 1;
+#endif
+        std::string error;
+        if (sf::focusStandard1bPath(error, [](const std::string& s) { std::fprintf(stderr, "%s\n", s.c_str()); }).empty()) {
+            std::fprintf(stderr, "standard-1b: %s\n", error.c_str());
+            return 1;
+        }
     }
     if (options.benchmark && !sizeGiven) options.width = 1920, options.height = 1080;
     if (options.benchmark || !options.timelapsePath.empty()) isolateSettings(); // the user's settings and files untouched
@@ -217,11 +258,5 @@ int main(int argc, char** argv) {
     int code = app.run();
     app.shutdown();
     sf::crashlog::stop();
-    // The isolated folder (settings, the log, autosaves: a benchmark's 33M mesh is over a gigabyte) goes with a run
-    // that passed; a failed one keeps it, log included, to look at.
-    if (code == 0 && !g_isolatedDir.empty()) {
-        std::error_code ec;
-        std::filesystem::remove_all(g_isolatedDir, ec);
-    }
-    return code;
+    return finishIsolated(code);
 }

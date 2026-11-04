@@ -1,0 +1,79 @@
+# Hover highlights (0.10.8): in every look the hovered button or menu gets the look's ring, a tile lifts and draws
+# its own glow instead; Outlines (Off / Subtle, the default / On) sets how loud the ring is, and Preferences > Interface >
+# Reduce motion keeps the highlight (colour only).
+run new_sphere subdivisions=3
+expect_value reduce_motion == 0
+
+run ui_look look=forge scheme=tokyo_night
+wait 0.2
+hover "Clay##brush.clay"
+wait 0.3
+expect_value hover_lifts == 1
+expect_value hover_rings == 0               # the tile's glow, not a second ring
+shot forge_tile
+hover "File##menu.file"
+wait 0.3
+expect_value hover_rings == 1
+expect_value hover_lifts == 0
+shot forge_menu                             # Outlines Subtle (the default): one faint line
+run ui_look look=forge outlines=on
+wait 0.2
+hover "Edit##menu.edit"
+wait 0.3
+expect_value hover_rings == 1
+shot forge_menu_outlines_on
+run ui_look look=forge outlines=off
+wait 0.2
+hover "File##menu.file"
+wait 0.3
+expect_value hover_rings == 1               # the fill and label only, no line
+shot forge_menu_outlines_off
+run ui_look look=forge outlines=subtle
+
+run ui_look look=phosphor
+wait 0.2
+hover "Clay##brush.clay"
+wait 0.3
+expect_value hover_lifts == 1
+shot phosphor_tile
+hover "File##menu.file"
+wait 0.3
+expect_value hover_rings == 1
+shot phosphor_menu
+
+run ui_look look=blueprint
+wait 0.2
+hover "Clay##brush.clay"
+wait 0.3
+expect_value hover_lifts == 1
+shot blueprint_tile
+hover "File##menu.file"
+wait 0.3
+expect_value hover_rings == 1
+shot blueprint_menu
+
+run ui_look look=classic
+wait 0.2
+hover "Clay##brush.clay"
+wait 0.3
+expect_value hover_lifts == 1
+shot classic_tile
+hover "File##menu.file"
+wait 0.3
+expect_value hover_rings == 1
+shot classic_menu
+
+# Reduce motion: the ring and the tile's glow stay, only the motion goes.
+click "Edit##menu.edit"
+click "Preferences##section.preferences"
+click "Interface##preferences.interface"
+click "Reduce motion"
+expect_value reduce_motion == 1
+key escape
+hover "Clay##brush.clay"
+wait 0.2
+expect_value hover_lifts == 1
+shot classic_tile_reduce_motion
+hover "File##menu.file"
+wait 0.2
+expect_value hover_rings == 1
