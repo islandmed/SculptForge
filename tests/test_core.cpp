@@ -812,6 +812,14 @@ TEST(voxel_remesh) {
     CHECK(reg.execute(d, "remesh", {{"resolution", 48.0}}).ok);
     CHECK(reg.execute(d, "undo").ok && d.mesh.triangleCount() == 1280);
     CHECK(!voxelRemesh(Mesh(), 64, &err).triangleCount() && !err.empty());
+
+    // Progress rises to 1; returning false cancels with an empty result (the app's background job).
+    std::vector<float> steps;
+    CHECK(voxelRemesh(sphere, 48, &err, [&](float f) { steps.push_back(f); return true; }).triangleCount() > 0);
+    CHECK(steps.size() >= 3 && std::is_sorted(steps.begin(), steps.end()) && steps.back() == 1.0f);
+    err.clear();
+    CHECK(voxelRemesh(sphere, 48, &err, [](float) { return false; }).triangleCount() == 0);
+    CHECK(err.find("cancelled") != std::string::npos);
 }
 
 TEST(splats_mesh_conversions) {

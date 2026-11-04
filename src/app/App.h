@@ -1008,7 +1008,7 @@ private:
         uint32_t subtool = 0;
         size_t triangles = 0;
         int resolution = 200;
-        bool keepMasked = false;
+        bool keepMasked = false, keepTexture = true;
     };
     std::unique_ptr<VoxelRemeshJob> voxelRemesh_;
     void pollQRemesh();
