@@ -92,8 +92,7 @@ proxy before the orbit starts.
 With the toggles on the stroke you see stays under the pen (the preview's head, `preview_lag_px`) and small-brush
 frame p99 halves; the committed mesh finishes as before (its lag is the same or up to ~20% later: the solver does
 the same work, and the frame no longer waits for it). This is Background Preview's case for on-by-default after
-the beta's tester reports, and only if the floor A/B (§5) shows the same: a 3060 result alone does not count
-(item 6). GL draw stays 0.1-0.8 ms p50 even at 50M; the real-GPU and simulated-floor runs at
+the beta's tester reports; the floor A/B (§5) shows the same, which is what counts (item 6). GL draw stays 0.1-0.8 ms p50 even at 50M; the real-GPU and simulated-floor runs at
 5/20/50M (governor pinned) agree on strokes (240 px at 20M: 536 / 562 ms committed-surface lag p50) and differ only
 in orbit, where the floor's motion proxy from 3M makes 5-20M orbit cheaper (20M 1.1 vs 4.6 ms p50); the 50M orbit
 upload spike (27.5 ms p99) is in both. A 3060 can't simulate an iGPU's fill rate: the floor numbers here test the
@@ -281,11 +280,29 @@ mid-drag the mesh is untouched and the GPU draws the move: screenshot `live_move
 `live_move`; undo/redo); `ui_stroke_background_preview` and `ui_stroke_persistent_upload` (`SF_MEASURE_VERIFY=1`:
 the background path's mesh is bit-identical to the plain path's with the preview and the persistent upload on).
 
-Speed: **not measured yet.** The before/after runs need the shared machine at load < 2 (`--benchmark standard`,
-33M scene, toggles off vs each on vs all on, interleaved), and the load stayed between 7 and 20 through every
-session of this work. Expected from the design, to be checked by those runs: Live Move's frame cost no longer
-depends on the region moved (today Move at 33M is 18 fps); Background Preview takes the 12.5 ms batch wait out of
-the frame; Fast Upload moves the GL thread's 2-10 ms commit copy to a GPU copy. No public numbers until measured.
+Speed, **floor tier first** (§0 item 6). Run on 11-04 on this laptop (M1 Pro, Asahi), local release build of 522aea3,
+standard-15m, `SF_GOVERNOR=0`, all three toggles off vs on. Floor (`SF_HW_SIMULATE=floor`, so Fast Upload is off
+and only Live Move and Background Preview act): 4 pairs, interleaved, order reversed for the second two. Laptop: 1 pair. Every run started at load < 2.
+`bench/floor/m1pro-522aea3-std15m-*.json`. Ranges are across runs; "lag" is when the committed surface reaches the pointer.
+
+| floor, 15M | frame p50 / p99, off -> on | visible stroke behind the pointer p50 / p99, off -> on | committed lag p50, off -> on |
+|---|---|---|---|
+| Clay 25 px | 7.9-12.5 / 26-36 -> 6.1-10.3 / 21-33 ms | 8-14 / 79-152 px -> **3-5 / 14-30 px** | 14-19 -> 27-39 ms |
+| Clay 60 px | 12.4-20.6 / 28-38 -> 6.7-10.1 / 16-26 ms | 18-55 / 95-137 px -> **3-5 / 12-27 px** | 24-78 -> 28-43 ms |
+| Clay 120 px | 16.3-24.4 / 32-34 -> 8.7-9.2 / 15-20 ms | 91-112 / 149-176 px -> **5 / 12-14 px** | 123-137 -> 106-146 ms |
+| Move | 16.8-21.8 / 36-42 -> 6.5-12.5 / 17-32 ms | (no dabs) | |
+| Smooth | 18.0-23.3 / 30-44 -> 6.7-8.0 / 14-15 ms | 60-71 / 107-124 px -> **3-4 / 11-13 px** | 71-85 -> 37-65 ms |
+| 240 px brush | 10.4-11.1 / 31-33 -> 10.2-10.6 / 16-29 ms | 189-212 / 302-356 px -> **6 / 17-31 px** | 232-267 -> 206-327 ms |
+| orbit | 8.6-8.9 / 23-33 -> 7.4-9.0 / 22-36 ms | | |
+
+The laptop profile shows the same pattern (240 px: 208 -> 6 px p50, frame p99 33 -> 16 ms; Smooth p99 36 -> 12 ms).
+On the floor tier, with the toggles on, every stroke phase's p99 frame meets the < 33 ms target (off: 4 of 6 miss) and
+the stroke you see stays within a few pixels of the pen. The cost: the committed surface on a small brush lands
+about 15-20 ms later (the frame no longer waits for the batch), while on big brushes and Smooth it lands as early or
+earlier. Orbit doesn't change (the toggles don't act there; the ranges overlap over 4 pairs). Its p99 still
+touches 33-36 ms in some runs either way: that is the orbit-start scene-sync spike (§0), not the toggles. The
+RTX 3060 runs (§0) agree, as a sanity check. Not yet met on the floor tier: committed stroke latency (< 16 ms target; 14-327 ms
+here), which is the canvas track's job (§7) and CPU dab throughput (core-200m N2).
 
 ## 6. Recommendation
 
