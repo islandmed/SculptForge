@@ -20,4 +20,4 @@ testers:
   - Any OS, with it on, integrated graphics first: lifting the pen after a long big-brush stroke may finish a little
     later (the exact shading lands then); say if it feels like a hitch.
 ---
-Off by default for 0.11.0-beta.1: faster on laptops and integrated graphics, not yet on every desktop (perf/beta-boost REPORT.md).
+Off by default for 0.11.0-beta.1 while we tune it (perf/beta-boost REPORT.md).
