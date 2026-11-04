@@ -47,6 +47,15 @@ public:
     size_t pendingShading() const { return pendingCount_; }
     // Grid points of shading recomputed per sync at most (0 = no limit).
     size_t shadeBudget = size_t(3) << 20;
+    // Research (SF_MICRO_GPU_SHADE=1, off by default): the shading grid computed on the GPU (a transform-feedback pass,
+    // GL 3.0 core: no compute, no readback) instead of by MicroShader, with gpuShadeBudget points a sync. Falls back to
+    // the CPU when it can't run (no transform feedback, more than four chunks, a mask, a failed pass).
+    bool gpuShade = gpuShadeDefault();
+    size_t gpuShadeBudget = size_t(2) << 20;
+    static bool gpuShadeDefault();
+    double lastGpuShadeMs = 0.0;  // GPU time of the last pass (timer query, read a sync later), 0 if unknown
+    uint64_t gpuShadedPoints = 0; // grid points the GPU shaded so far
+    bool gpuShadeFailed() const { return gsFailed_; }
     // The last draw: the level used by each visible cluster (-1 = culled), and the target it settled on.
     float lastTargetPx = 0.0f;
 
@@ -57,6 +66,9 @@ private:
     void ensurePatches(int level);
     void uploadDispTiles(const Mesh& mesh, std::vector<uint32_t>& slots, bool all);
     void shadePending(const Mesh& mesh, bool all);
+    void buildGpuShade(const Mesh& mesh);
+    // The shading of `tris` (and only those) on the GPU; false when it can't (the caller shades on the CPU).
+    bool shadeOnGpu(const Mesh& mesh, std::vector<uint32_t>& tris);
 
     uint64_t serial_ = 0;
     uint32_t baseTriangles_ = 0, baseVertices_ = 0;
@@ -88,7 +100,18 @@ private:
     size_t bytes_ = 0;
     MicroShader shader_;
     std::vector<uint64_t> pending_; // per base triangle: shading out of date
-    double shadeNsPerPoint_ = 0.0;  // what shading a grid point (and sending it) took lately (TierConfig::strokeShadeMs)
+    double shadeNsPerPoint_ = 0.0;
+    GLuint gsProgram_ = 0;  // GPU shading: the pass, its tables, the list of slots, the output, a timer query
+    bool gsFailed_ = false;
+    GLuint gsNbrData_ = 0, gsNbrTex_ = 0, gsRingOffData_ = 0, gsRingOffTex_ = 0, gsRingData_ = 0, gsRingTex_ = 0;
+    GLuint gsIJData_ = 0, gsIJTex_ = 0, gsListData_ = 0, gsListTex_ = 0, gsOut_ = 0, gsQuery_ = 0;
+    GLuint gsPosProgram_ = 0, gsPos_ = 0, gsPosTex_ = 0, gsRowData_ = 0, gsRowTex_ = 0, gsList1Data_ = 0, gsList1Tex_ = 0;
+    size_t gsOutBytes_ = 0, gsPosBytes_ = 0, gsPosReadBytes_ = 0;
+    GLuint gsPosRead_ = 0;
+    std::vector<int32_t> gsRow_;
+    bool gsQueryPending_ = false;
+    std::vector<uint32_t> gsStamp_, gsVStamp_;
+    uint32_t gsEpoch_ = 0;  // what shading a grid point (and sending it) took lately (TierConfig::strokeShadeMs)
     size_t pendingCount_ = 0;
     std::vector<uint32_t> scratch_, written_, stageIndex_;
     std::vector<uint8_t> staging_;

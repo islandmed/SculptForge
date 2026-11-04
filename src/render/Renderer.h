@@ -237,6 +237,9 @@ public:
     size_t gpuBytes() const;
     // Triangles the last draw() sent to the GPU (after culling), for the benchmark.
     size_t lastDrawnTriangles() const { return lastDrawn_; }
+    // Micro levels' GPU shading (MicroRenderer::gpuShade): 1 when it is off, or on and shaded on the GPU without
+    // falling back; 0 when it is on but the CPU shaded (tests/ui/micro_gpu_shade.sfui).
+    bool microGpuShadeOk() const;
     // The last syncScene left motion proxies to build (a few milliseconds of them a frame; the rest draw in full).
     bool proxiesPending() const { return proxyPending_; }
 

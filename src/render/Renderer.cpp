@@ -1060,6 +1060,17 @@ Renderer::MeshSlot& Renderer::slot(uint32_t id) {
     return s;
 }
 
+bool Renderer::microGpuShadeOk() const {
+    if (!MicroRenderer::gpuShadeDefault()) return true;
+    bool any = false;
+    for (const MeshSlot& s : slots_)
+        if (s.micro) {
+            if (s.micro->gpuShadeFailed() || !s.micro->gpuShadedPoints) return false;
+            any = true;
+        }
+    return any;
+}
+
 void Renderer::freeSlot(MeshSlot& s) {
     for (GLuint* b : {&s.vertexBuffer, &s.indexBuffer, &s.lineBuffer, &s.proxyBuffer, &s.colorBuffer, &s.maskBuffer, &s.groupData,
                       &s.primData, &s.uvData})

@@ -719,6 +719,20 @@ if(SCULPTFORGE_BUILD_TESTS)
     if(TEST ui_hardware_profile)
       set_tests_properties(ui_hardware_profile PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1")
     endif()
+    # Micro GPU shading gives the CPU's picture: the same script with each, then the shots compared (no readback in the app).
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+    if(Python3_Interpreter_FOUND)
+      foreach(mode 0 1)
+        add_test(NAME ui_micro_gpu_shade_${mode} COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/micro_gpu_shade.sfui
+                 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/micro_gpu_shade_${mode})
+        set_tests_properties(ui_micro_gpu_shade_${mode} PROPERTIES LABELS ui TIMEOUT 300 ENVIRONMENT "SF_MICRO_GPU_SHADE=${mode}"
+                             FIXTURES_SETUP micro_gpu_shade_shots)
+      endforeach()
+      add_test(NAME ui_micro_gpu_shade_parity COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/test/png_diff.py
+               ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/micro_gpu_shade_0/micro-gpu-shade.png
+               ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/micro_gpu_shade_1/micro-gpu-shade.png --crop 120 170 1210 860) # (the 3D view only: the brush shelf's thumbnails render on their own time)
+      set_tests_properties(ui_micro_gpu_shade_parity PROPERTIES LABELS ui TIMEOUT 120 FIXTURES_REQUIRED micro_gpu_shade_shots)
+    endif()
     # The shell layout again on a 1920x1080 window (docs/ui-design.md §2.3).
     add_test(NAME ui_shell_layout_1080 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/shell_layout.sfui
              --size 1920x1080 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/shell_layout_1080)

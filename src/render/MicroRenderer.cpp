@@ -11,6 +11,8 @@
 #include <chrono>
 #include <bit>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 namespace sf {
@@ -123,6 +125,156 @@ void main() {
 }
 )";
 
+// GPU shading (MicroRenderer::gpuShade): MicroShader's grid in two transform-feedback passes. Pass 1 evaluates every
+// grid point of the listed slots once (the surface as kMicroVS / MicroTriangle do, its height in w); pass 2 sums for each
+// point of the slots to shade what core/Micro.cpp's GridWork sums, from those positions: per base triangle the
+// area-weighted face normals of its micro triangles at the point and the neighbours' heights along its upward triangles
+// (a "partial"), its own partial plus the edge neighbour's for an edge point, every triangle's around the vertex for a
+// corner, then the same normalisation and packing as encodeShade.
+const char* kShadePosVS = R"(#version 330 core
+uniform usamplerBuffer uTris;   // per slot: (corner vertices, -), (clusters across the edges, -)
+uniform samplerBuffer uBase;    // per base vertex: position, normal
+uniform isamplerBuffer uDisp0;  // the chunks' displacement grids (up to four)
+uniform isamplerBuffer uDisp1;
+uniform isamplerBuffer uDisp2;
+uniform isamplerBuffer uDisp3;
+uniform usamplerBuffer uIJ;     // per grid point index: i | j << 16
+uniform isamplerBuffer uList;   // the slots, in output order
+uniform int uN, uSamples, uChunkSlots;
+uniform float uStep;
+out vec4 vPos;
+void main() {
+    int li = gl_VertexID / uSamples, idx = gl_VertexID - li * uSamples;
+    int slot = texelFetch(uList, li).r;
+    uint ijp = texelFetch(uIJ, idx).r;
+    int I = int(ijp & 0xFFFFu), J = int(ijp >> 16);
+    uvec4 tv = texelFetch(uTris, slot * 2);
+    uint v[3] = uint[3](tv.x, tv.y, tv.z);
+    int ord[3] = int[3](0, 1, 2);
+    if (v[ord[0]] > v[ord[1]]) { int t = ord[0]; ord[0] = ord[1]; ord[1] = t; }
+    if (v[ord[1]] > v[ord[2]]) { int t = ord[1]; ord[1] = ord[2]; ord[2] = t; }
+    if (v[ord[0]] > v[ord[1]]) { int t = ord[0]; ord[0] = ord[1]; ord[1] = t; }
+    vec3 P[3], Nn[3];
+    for (int k = 0; k < 3; ++k) {
+        int vi = int(v[ord[k]]);
+        P[k] = texelFetch(uBase, vi * 2).xyz;
+        Nn[k] = texelFetch(uBase, vi * 2 + 1).xyz;
+    }
+    float inv = 1.0 / float(uN);
+    float wc[3] = float[3](float(uN - I - J) * inv, float(I) * inv, float(J) * inv);
+    float w0 = wc[ord[0]], w1 = wc[ord[1]], w2 = wc[ord[2]];
+    vec3 f = P[0] * w0;
+    f += P[1] * w1;
+    f += P[2] * w2;
+    vec3 nn = Nn[0] * w0;
+    nn += Nn[1] * w1;
+    nn += Nn[2] * w2;
+    vec3 pull = Nn[0] * (w0 * dot(f - P[0], Nn[0]));
+    pull += Nn[1] * (w1 * dot(f - P[1], Nn[1]));
+    pull += Nn[2] * (w2 * dot(f - P[2], Nn[2]));
+    vec3 s = f - pull * 0.75;
+    float len = length(nn);
+    vec3 n = len > 1e-20 ? nn / len : vec3(0.0, 0.0, 1.0);
+    int c = slot / uChunkSlots;
+    int at = (slot - c * uChunkSlots) * uSamples + idx;
+    int d = c == 0 ? texelFetch(uDisp0, at).r : c == 1 ? texelFetch(uDisp1, at).r : c == 2 ? texelFetch(uDisp2, at).r : texelFetch(uDisp3, at).r;
+    vPos = vec4(s + n * (float(d) * uStep), float(d));
+}
+)";
+
+const char* kShadeVS = R"(#version 330 core
+uniform usamplerBuffer uTris;    // per slot: (corner vertices, -), (clusters across the edges, -)
+uniform samplerBuffer uBase;     // per base vertex: position, normal
+uniform samplerBuffer uPos;      // pass 1's points: position, height
+uniform isamplerBuffer uRow;     // per slot: its first point in uPos / uSamples, or -1
+uniform isamplerBuffer uNbr;     // per slot and edge: neighbour slot << 3 | its edge << 1 | reversed, or -1
+uniform isamplerBuffer uRingOff; // per base vertex: its first entry in uRing (and one more)
+uniform isamplerBuffer uRing;    // slot << 2 | which corner the vertex is
+uniform usamplerBuffer uIJ;      // per grid point index: i | j << 16
+uniform isamplerBuffer uList;    // the slots to shade, in output order
+uniform int uN, uSamples;
+uniform float uStep;
+flat out uint vShade;
+int base = 0;
+int sampleIndex(int i, int j) { return j * (uN + 1) - (j * (j - 1)) / 2 + i; }
+vec4 at(int i, int j) { return texelFetch(uPos, base + sampleIndex(i, j)); }
+vec3 gN;
+float gD, gC;
+// This base triangle's micro triangles at grid point (i, j): face normals and (upward triangles) neighbour heights.
+void partial(int slot, int i, int j) {
+    base = texelFetch(uRow, slot).r * uSamples;
+    int n = uN;
+    vec3 p = at(i, j).xyz;
+    if (i + j < n) {
+        vec4 b = at(i + 1, j), c = at(i, j + 1);
+        gN += cross(b.xyz - p, c.xyz - p); gD += b.w + c.w; gC += 2.0;
+    }
+    if (i > 0) {
+        vec4 a = at(i - 1, j), c = at(i - 1, j + 1);
+        gN += cross(p - a.xyz, c.xyz - a.xyz); gD += a.w + c.w; gC += 2.0;
+        if (i + j < n) gN += cross(at(i, j + 1).xyz - p, c.xyz - p);
+        if (j > 0) { vec3 b = at(i, j - 1).xyz; gN += cross(p - b, a.xyz - b); }
+    }
+    if (j > 0) {
+        vec4 a = at(i, j - 1), b = at(i + 1, j - 1);
+        gN += cross(b.xyz - a.xyz, p - a.xyz); gD += a.w + b.w; gC += 2.0;
+        if (i + j < n) gN += cross(at(i + 1, j).xyz - b.xyz, p - b.xyz);
+    }
+}
+ivec2 edgePoint(int e, int k, int m) {
+    if (e == 0) return ivec2(k, 0);
+    if (e == 1) return ivec2(m - k, k);
+    return ivec2(0, m - k);
+}
+uint q8(float v) { return uint(clamp(floor((v * 0.5 + 0.5) * 255.0 + 0.5), 0.0, 255.0)); }
+void main() {
+    int li = gl_VertexID / uSamples, idx = gl_VertexID - li * uSamples;
+    int slot = texelFetch(uList, li).r;
+    uint ijp = texelFetch(uIJ, idx).r;
+    int i = int(ijp & 0xFFFFu), j = int(ijp >> 16), n = uN;
+    uvec4 tv = texelFetch(uTris, slot * 2);
+    vec3 a = texelFetch(uBase, int(tv.x) * 2).xyz, b = texelFetch(uBase, int(tv.y) * 2).xyz, c = texelFetch(uBase, int(tv.z) * 2).xyz;
+    float h = max((distance(a, b) + distance(b, c) + distance(c, a)) / (3.0 * float(n)), 1e-20);
+    gN = vec3(0.0); gD = 0.0; gC = 0.0;
+    int corner = i == 0 && j == 0 ? 0 : i == n && j == 0 ? 1 : i == 0 && j == n ? 2 : -1;
+    if (corner >= 0) {
+        int v = int(corner == 0 ? tv.x : corner == 1 ? tv.y : tv.z);
+        int e1 = texelFetch(uRingOff, v + 1).r;
+        for (int e = texelFetch(uRingOff, v).r; e < e1; ++e) {
+            int en = texelFetch(uRing, e).r, cu = en & 3;
+            partial(en >> 2, cu == 1 ? n : 0, cu == 2 ? n : 0);
+        }
+    } else {
+        partial(slot, i, j);
+        int ed = j == 0 ? 0 : i + j == n ? 1 : i == 0 ? 2 : -1;
+        if (ed >= 0) {
+            int k = ed == 0 ? i : ed == 1 ? j : n - j;
+            int nb = texelFetch(uNbr, slot * 3 + ed).r;
+            if (nb >= 0) {
+                ivec2 q = edgePoint((nb >> 1) & 3, (nb & 1) != 0 ? n - k : k, n);
+                partial(nb >> 3, q.x, q.y);
+            }
+        }
+    }
+    base = texelFetch(uRow, slot).r * uSamples;
+    float len = length(gN);
+    vec3 nn = len > 0.0 ? gN / len : vec3(0.0, 0.0, 1.0);
+    float curv = gC > 0.0 ? (gD / gC - at(i, j).w) * uStep / h : 0.0;
+    float l1 = abs(nn.x) + abs(nn.y) + abs(nn.z);
+    vec2 e = vec2(0.0);
+    if (l1 > 0.0) {
+        vec3 o = nn / l1;
+        e = o.xy;
+        if (o.z < 0.0) e = vec2((1.0 - abs(o.y)) * (o.x >= 0.0 ? 1.0 : -1.0), (1.0 - abs(o.x)) * (o.y >= 0.0 ? 1.0 : -1.0));
+    }
+    float cc = clamp(curv, -1.0, 1.0);
+    float t = (cc >= 0.0 ? 1.0 : -1.0) * sqrt(abs(cc)) * 127.0;
+    float r = t >= 0.0 ? floor(t + 0.5) : -floor(-t + 0.5);
+    uint cq = uint(clamp(r + 128.0, 1.0, 255.0));
+    vShade = q8(e.x) | q8(e.y) << 8 | cq << 16; // (mask 0: a level with a mask is shaded on the CPU)
+}
+)";
+
 uint32_t spread10(uint32_t x) {
     x &= 0x3FF;
     x = (x | (x << 16)) & 0x030000FF;
@@ -157,6 +309,16 @@ void MicroRenderer::release() {
     }
     patches_.clear();
     if (emptyVao_) gl::DeleteVertexArrays(1, &emptyVao_), emptyVao_ = 0;
+    for (GLuint* b : {&gsNbrData_, &gsRingOffData_, &gsRingData_, &gsIJData_, &gsListData_, &gsOut_, &gsPos_, &gsPosRead_, &gsRowData_, &gsList1Data_})
+        if (*b) gl::DeleteBuffers(1, b), *b = 0;
+    for (GLuint* t : {&gsNbrTex_, &gsRingOffTex_, &gsRingTex_, &gsIJTex_, &gsListTex_, &gsPosTex_, &gsRowTex_, &gsList1Tex_})
+        if (*t) gl::DeleteTextures(1, t), *t = 0;
+    if (gsProgram_) gl::DeleteProgram(gsProgram_), gsProgram_ = 0;
+    if (gsPosProgram_) gl::DeleteProgram(gsPosProgram_), gsPosProgram_ = 0;
+    gsPosBytes_ = gsPosReadBytes_ = 0;
+    if (gsQuery_ && gl::DeleteQueries) gl::DeleteQueries(1, &gsQuery_), gsQuery_ = 0;
+    gsOutBytes_ = 0;
+    gsQueryPending_ = false;
     serial_ = 0;
     bytes_ = 0;
 }
@@ -281,6 +443,280 @@ void MicroRenderer::buildLayout(const Mesh& mesh) {
     pending_.assign((size_t(nt) + 63) / 64, 0);
     pendingCount_ = 0;
     ensurePatches(mm.level);
+    if (gpuShade) buildGpuShade(mesh);
+}
+
+bool MicroRenderer::gpuShadeDefault() {
+    static const bool on = [] {
+        const char* e = std::getenv("SF_MICRO_GPU_SHADE");
+        return e && e[0] == '1';
+    }();
+    return on;
+}
+
+// The GPU shading's static tables for this layout: per slot its edge neighbours, per base vertex the slots around it,
+// per grid index its (i, j).
+void MicroRenderer::buildGpuShade(const Mesh& mesh) {
+    const MicroMesh& mm = *mesh.micro;
+    const uint32_t nt = mm.baseTriangles, n = mm.n;
+    std::vector<int32_t> nbr(size_t(nt) * 3, -1);
+    poolFor(nt, [&](size_t b, size_t e) {
+        for (size_t s = b; s < e; ++s) {
+            const uint32_t t = order_[s];
+            for (int ed = 0; ed < 3; ++ed) {
+                const uint32_t nb = mm.edgeNeighbor[size_t(t) * 3 + size_t(ed)];
+                if (nb == MicroMesh::kNone) continue;
+                const uint32_t u = nb >> 2, f = nb & 3;
+                const bool reversed = mesh.triangles[u][int(f)] != mesh.triangles[t][ed];
+                nbr[s * 3 + size_t(ed)] = int32_t(slotOf_[u] << 3 | f << 1 | (reversed ? 1u : 0u));
+            }
+        }
+    }, 1 << 14);
+    std::vector<int32_t> off(mesh.vertexCount() + 1, 0), ring;
+    ring.reserve(size_t(nt) * 3);
+    for (uint32_t v = 0; v < mesh.vertexCount(); ++v) {
+        off[v] = int32_t(ring.size());
+        for (uint32_t u : mesh.vertexTriangles(v)) {
+            const glm::uvec3 ut = mesh.triangles[u];
+            const uint32_t corner = ut.x == v ? 0 : ut.y == v ? 1 : 2;
+            ring.push_back(int32_t(slotOf_[u] << 2 | corner));
+        }
+    }
+    off[mesh.vertexCount()] = int32_t(ring.size());
+    std::vector<uint32_t> ij;
+    ij.reserve(mm.samples);
+    for (uint32_t j = 0; j <= n; ++j)
+        for (uint32_t i = 0; i + j <= n; ++i) ij.push_back(i | j << 16);
+    auto tex = [&](GLuint& buffer, GLuint& t, GLenum format, const void* data, size_t bytes) {
+        if (!buffer) gl::GenBuffers(1, &buffer);
+        if (!t) gl::GenTextures(1, &t);
+        gl::BindBuffer(GL_TEXTURE_BUFFER, buffer);
+        gl::BufferData(GL_TEXTURE_BUFFER, GLsizeiptr(std::max<size_t>(bytes, 4)), data, GL_STATIC_DRAW);
+        gl::BindTexture(GL_TEXTURE_BUFFER, t);
+        gl::TexBuffer(GL_TEXTURE_BUFFER, format, buffer);
+        bytes_ += bytes;
+    };
+    tex(gsNbrData_, gsNbrTex_, GL_R32I, nbr.data(), nbr.size() * 4);
+    tex(gsRingOffData_, gsRingOffTex_, GL_R32I, off.data(), off.size() * 4);
+    tex(gsRingData_, gsRingTex_, GL_R32I, ring.data(), ring.size() * 4);
+    tex(gsIJData_, gsIJTex_, GL_R32UI, ij.data(), ij.size() * 4);
+    gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
+    gl::BindTexture(GL_TEXTURE_BUFFER, 0);
+}
+
+namespace {
+
+// A transform-feedback program of one vertex shader capturing `varying`; 0 (with the log on stderr) if it fails.
+GLuint feedbackProgram(const char* source, const char* varying) {
+    const GLuint vs = gl::CreateShader(GL_VERTEX_SHADER);
+    gl::ShaderSource(vs, 1, &source, nullptr);
+    gl::CompileShader(vs);
+    GLint ok = 0;
+    gl::GetShaderiv(vs, GL_COMPILE_STATUS, &ok);
+    GLuint p = 0;
+    if (ok) {
+        p = gl::CreateProgram();
+        gl::AttachShader(p, vs);
+        const GLchar* varyings[] = {varying};
+        gl::TransformFeedbackVaryings(p, 1, varyings, GL_INTERLEAVED_ATTRIBS);
+        gl::LinkProgram(p);
+        gl::GetProgramiv(p, GL_LINK_STATUS, &ok);
+    }
+    if (!ok) {
+        char log[2048] = {0};
+        gl::GetShaderInfoLog(vs, sizeof log, nullptr, log);
+        std::fprintf(stderr, "Micro GPU shading unavailable (the CPU shades): %s\n", log);
+        if (p) gl::DeleteProgram(p), p = 0;
+    }
+    gl::DeleteShader(vs);
+    return p;
+}
+
+// A buffer of at least `bytes` (grown by doubling; `have` its size), as a texture buffer of `format` when `tex`.
+void ensureBuffer(GLuint& buffer, GLuint* tex, GLenum format, size_t bytes, size_t& have) {
+    if (bytes <= have && buffer) return;
+    if (!buffer) gl::GenBuffers(1, &buffer);
+    have = std::max(bytes, have * 2);
+    gl::BindBuffer(GL_TEXTURE_BUFFER, buffer);
+    gl::BufferData(GL_TEXTURE_BUFFER, GLsizeiptr(have), nullptr, GL_STREAM_DRAW);
+    if (tex) {
+        if (!*tex) gl::GenTextures(1, tex);
+        gl::BindTexture(GL_TEXTURE_BUFFER, *tex);
+        gl::TexBuffer(GL_TEXTURE_BUFFER, format, buffer);
+    }
+    gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
+}
+
+void uploadInts(GLuint& buffer, GLuint& tex, const std::vector<int32_t>& v) {
+    if (!buffer) gl::GenBuffers(1, &buffer), gl::GenTextures(1, &tex);
+    gl::BindBuffer(GL_TEXTURE_BUFFER, buffer);
+    gl::BufferData(GL_TEXTURE_BUFFER, GLsizeiptr(std::max<size_t>(v.size(), 1) * 4), v.empty() ? nullptr : v.data(), GL_STREAM_DRAW);
+    gl::BindTexture(GL_TEXTURE_BUFFER, tex);
+    gl::TexBuffer(GL_TEXTURE_BUFFER, GL_R32I, buffer);
+    gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
+}
+
+// Binds `count` texture buffers to units 0.. and their samplers in `program`; `saved` gets what was bound there.
+void bindUnits(GLuint program, const GLuint* texs, const char* const* names, int count, GLint* saved) {
+    for (int k = 0; k < count; ++k) {
+        gl::ActiveTexture(GL_TEXTURE0 + GLenum(k));
+        gl::GetIntegerv(GL_TEXTURE_BINDING_BUFFER, &saved[k]);
+        gl::BindTexture(GL_TEXTURE_BUFFER, texs[k]);
+        gl::Uniform1i(gl::GetUniformLocation(program, names[k]), k);
+    }
+}
+
+void restoreUnits(const GLint* saved, int count) {
+    for (int k = count - 1; k >= 0; --k) {
+        gl::ActiveTexture(GL_TEXTURE0 + GLenum(k));
+        gl::BindTexture(GL_TEXTURE_BUFFER, GLuint(saved[k]));
+    }
+}
+
+// One transform-feedback draw of `points` points into `out`.
+void feedback(GLuint vao, GLuint out, size_t points) {
+    gl::Enable(GL_RASTERIZER_DISCARD);
+    gl::BindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, out);
+    gl::BeginTransformFeedback(GL_POINTS);
+    gl::BindVertexArray(vao);
+    gl::DrawArrays(GL_POINTS, 0, GLsizei(points));
+    gl::EndTransformFeedback();
+    gl::BindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, 0);
+    gl::Disable(GL_RASTERIZER_DISCARD);
+    gl::BindVertexArray(0);
+}
+
+} // namespace
+
+bool MicroRenderer::shadeOnGpu(const Mesh& mesh, std::vector<uint32_t>& tris) {
+    if (gsFailed_ || tris.empty()) return false;
+    if (!gl::TransformFeedbackVaryings || !gl::BeginTransformFeedback || !gl::EndTransformFeedback || !gl::BindBufferBase ||
+        chunks_.size() > 4) {
+        gsFailed_ = true;
+        return false;
+    }
+    if (!gsProgram_) gsProgram_ = feedbackProgram(kShadeVS, "vShade");
+    if (!gsPosProgram_ && gsProgram_) gsPosProgram_ = feedbackProgram(kShadePosVS, "vPos");
+    if (!gsProgram_ || !gsPosProgram_) {
+        gsFailed_ = true;
+        return false;
+    }
+    if (!gsNbrTex_) buildGpuShade(mesh);
+    const MicroMesh& mm = *mesh.micro;
+    const size_t S = samples_;
+    // Pass 1's slots: these and every triangle sharing a vertex with one (their edges and corners are summed in).
+    if (gsStamp_.size() != mm.baseTriangles) gsStamp_.assign(mm.baseTriangles, 0), gsEpoch_ = 0;
+    if (gsVStamp_.size() != mesh.vertexCount()) gsVStamp_.assign(mesh.vertexCount(), 0), gsEpoch_ = 0;
+    if (++gsEpoch_ == 0) {
+        std::fill(gsStamp_.begin(), gsStamp_.end(), 0);
+        std::fill(gsVStamp_.begin(), gsVStamp_.end(), 0);
+        gsEpoch_ = 1;
+    }
+    std::vector<uint32_t> outer;
+    for (uint32_t t : tris)
+        if (gsStamp_[t] != gsEpoch_) gsStamp_[t] = gsEpoch_, outer.push_back(t);
+    const size_t inner = outer.size();
+    for (size_t k = 0; k < inner; ++k) {
+        const glm::uvec3 tr = mesh.triangles[outer[k]];
+        for (int c = 0; c < 3; ++c) {
+            if (gsVStamp_[tr[c]] == gsEpoch_) continue;
+            gsVStamp_[tr[c]] = gsEpoch_;
+            for (uint32_t u : mesh.vertexTriangles(tr[c]))
+                if (gsStamp_[u] != gsEpoch_) gsStamp_[u] = gsEpoch_, outer.push_back(u);
+        }
+    }
+    // In slot order, so pass 2's patches land in runs of consecutive slots.
+    std::sort(tris.begin(), tris.end(), [&](uint32_t a, uint32_t b) { return slotOf_[a] < slotOf_[b]; });
+    std::vector<int32_t> list1(outer.size()), list2(tris.size());
+    if (gsRow_.size() != mm.baseTriangles) gsRow_.assign(mm.baseTriangles, -1);
+    for (size_t k = 0; k < outer.size(); ++k) list1[k] = int32_t(slotOf_[outer[k]]), gsRow_[slotOf_[outer[k]]] = int32_t(k);
+    for (size_t k = 0; k < tris.size(); ++k) list2[k] = int32_t(slotOf_[tris[k]]);
+    for (int i = 0; i < 16 && gl::GetError() != GL_NO_ERROR; ++i) {
+    }
+    uploadInts(gsList1Data_, gsList1Tex_, list1);
+    uploadInts(gsListData_, gsListTex_, list2);
+    uploadInts(gsRowData_, gsRowTex_, gsRow_);
+    for (uint32_t t : outer) gsRow_[slotOf_[t]] = -1; // (all -1 again for the next pass)
+    const size_t points1 = list1.size() * S, points2 = list2.size() * S;
+    ensureBuffer(gsPos_, nullptr, 0, points1 * 16, gsPosBytes_);
+    ensureBuffer(gsOut_, nullptr, 0, points2 * 4, gsOutBytes_);
+    if (!emptyVao_) gl::GenVertexArrays(1, &emptyVao_);
+    // The last pass's GPU time, if it's ready (never waited for).
+    if (gsQueryPending_ && gl::GetQueryObjectui64v) {
+        GLuint64 ready = 0;
+        gl::GetQueryObjectui64v(gsQuery_, GL_QUERY_RESULT_AVAILABLE, &ready);
+        if (ready) {
+            GLuint64 ns = 0;
+            gl::GetQueryObjectui64v(gsQuery_, GL_QUERY_RESULT, &ns);
+            lastGpuShadeMs = double(ns) * 1e-6;
+            gsQueryPending_ = false;
+        }
+    }
+    const bool timed = gl::GenQueries && gl::BeginQuery && gl::EndQuery && !gsQueryPending_;
+    if (timed && !gsQuery_) gl::GenQueries(1, &gsQuery_);
+    if (timed) gl::BeginQuery(GL_TIME_ELAPSED, gsQuery_);
+    auto chunkDisp = [&](size_t c) { return chunks_[std::min(c, chunks_.size() - 1)].dispTex; };
+    GLint saved[9];
+    { // Pass 1: the points.
+        const GLuint texs[8] = {triTex_, baseTex_, chunkDisp(0), chunkDisp(1), chunkDisp(2), chunkDisp(3), gsIJTex_, gsList1Tex_};
+        static const char* names[8] = {"uTris", "uBase", "uDisp0", "uDisp1", "uDisp2", "uDisp3", "uIJ", "uList"};
+        gl::UseProgram(gsPosProgram_);
+        bindUnits(gsPosProgram_, texs, names, 8, saved);
+        gl::Uniform1i(gl::GetUniformLocation(gsPosProgram_, "uN"), GLint(n_));
+        gl::Uniform1i(gl::GetUniformLocation(gsPosProgram_, "uSamples"), GLint(S));
+        gl::Uniform1i(gl::GetUniformLocation(gsPosProgram_, "uChunkSlots"), GLint(chunkSlots_));
+        gl::Uniform1f(gl::GetUniformLocation(gsPosProgram_, "uStep"), mm.step);
+        feedback(emptyVao_, gsPos_, points1);
+        // Pass 2 reads them through a copy on the GPU: read straight from the feedback buffer as a texture buffer,
+        // Mesa on the M1 gave the previous contents (no CPU wait or readback either way).
+        ensureBuffer(gsPosRead_, &gsPosTex_, GL_RGBA32F, points1 * 16, gsPosReadBytes_);
+        gl::BindBuffer(GL_COPY_READ_BUFFER, gsPos_);
+        gl::BindBuffer(GL_COPY_WRITE_BUFFER, gsPosRead_);
+        gl::CopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, GLsizeiptr(points1 * 16));
+        gl::BindBuffer(GL_COPY_READ_BUFFER, 0);
+        gl::BindBuffer(GL_COPY_WRITE_BUFFER, 0);
+        restoreUnits(saved, 8);
+    }
+    { // Pass 2: the shading of the slots asked for.
+        const GLuint texs[9] = {triTex_, baseTex_, gsPosTex_, gsRowTex_, gsNbrTex_, gsRingOffTex_, gsRingTex_, gsIJTex_, gsListTex_};
+        static const char* names[9] = {"uTris", "uBase", "uPos", "uRow", "uNbr", "uRingOff", "uRing", "uIJ", "uList"};
+        gl::UseProgram(gsProgram_);
+        bindUnits(gsProgram_, texs, names, 9, saved);
+        gl::Uniform1i(gl::GetUniformLocation(gsProgram_, "uN"), GLint(n_));
+        gl::Uniform1i(gl::GetUniformLocation(gsProgram_, "uSamples"), GLint(S));
+        gl::Uniform1f(gl::GetUniformLocation(gsProgram_, "uStep"), mm.step);
+        feedback(emptyVao_, gsOut_, points2);
+        restoreUnits(saved, 9);
+    }
+    if (timed) gl::EndQuery(GL_TIME_ELAPSED), gsQueryPending_ = true;
+    gl::UseProgram(0);
+    // Into the shading grids, on the GPU: one copy per run of consecutive slots in one chunk.
+    gl::BindBuffer(GL_COPY_READ_BUFFER, gsOut_);
+    for (size_t i = 0; i < list2.size();) {
+        const uint32_t s0 = uint32_t(list2[i]), chunk = s0 / chunkSlots_;
+        size_t j = i + 1;
+        while (j < list2.size() && uint32_t(list2[j]) == uint32_t(list2[j - 1]) + 1 && uint32_t(list2[j]) / chunkSlots_ == chunk) ++j;
+        gl::BindBuffer(GL_COPY_WRITE_BUFFER, chunks_[chunk].shade);
+        gl::CopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, GLintptr(i * S * 4),
+                              GLintptr(size_t(s0 - chunks_[chunk].firstSlot) * S * 4), GLsizeiptr((j - i) * S * 4));
+        i = j;
+    }
+    gl::BindBuffer(GL_COPY_READ_BUFFER, 0);
+    gl::BindBuffer(GL_COPY_WRITE_BUFFER, 0);
+    gl::ActiveTexture(GL_TEXTURE0);
+    bool failed = false;
+    for (int i = 0; i < 16; ++i) {
+        const GLenum e = gl::GetError();
+        if (e == GL_NO_ERROR) break;
+        failed = true;
+    }
+    if (failed) {
+        std::fprintf(stderr, "Micro GPU shading failed (GL error): the CPU shades from now on\n");
+        gsFailed_ = true;
+        return false;
+    }
+    gpuShadedPoints += points2;
+    return true;
 }
 
 void MicroRenderer::uploadBase(const Mesh& mesh) {
@@ -389,6 +825,20 @@ void MicroRenderer::uploadDispTiles(const Mesh& mesh, std::vector<uint32_t>& slo
 void MicroRenderer::shadePending(const Mesh& mesh, bool all) {
     const MicroMesh& mm = *mesh.micro;
     const size_t S = mm.samples;
+    if (all && gpuShade && !mm.hasMask()) { // everything on the GPU, a batch of slots at a time
+        const size_t batch = std::max<size_t>(1, gpuShadeBudget / S);
+        std::vector<uint32_t> tris;
+        bool ok = true;
+        for (size_t first = 0; ok && first < order_.size(); first += batch) {
+            tris.assign(order_.begin() + std::ptrdiff_t(first), order_.begin() + std::ptrdiff_t(std::min(order_.size(), first + batch)));
+            ok = shadeOnGpu(mesh, tris);
+        }
+        if (ok) {
+            std::fill(pending_.begin(), pending_.end(), 0);
+            pendingCount_ = 0;
+            return;
+        }
+    }
     if (all) {
         std::vector<uint32_t*> mapped(chunks_.size(), nullptr);
         for (size_t i = 0; i < chunks_.size(); ++i) {
@@ -427,6 +877,35 @@ void MicroRenderer::shadePending(const Mesh& mesh, bool all) {
     seeds.erase(std::unique(seeds.begin(), seeds.end()), seeds.end());
     if (seeds.size() > limit) seeds.resize(limit);
     if (seeds.empty()) return;
+    if (gpuShade && !mm.hasMask()) { // what MicroShader would write: the seeds and every triangle sharing a vertex
+        if (gsStamp_.size() != mm.baseTriangles) gsStamp_.assign(mm.baseTriangles, 0), gsEpoch_ = 0;
+        if (gsVStamp_.size() != mesh.vertexCount()) gsVStamp_.assign(mesh.vertexCount(), 0), gsEpoch_ = 0;
+        if (++gsEpoch_ == 0) {
+            std::fill(gsStamp_.begin(), gsStamp_.end(), 0);
+            std::fill(gsVStamp_.begin(), gsVStamp_.end(), 0);
+            gsEpoch_ = 1;
+        }
+        std::vector<uint32_t> ring;
+        for (uint32_t t : seeds) {
+            if (gsStamp_[t] != gsEpoch_) gsStamp_[t] = gsEpoch_, ring.push_back(t);
+            const glm::uvec3 tr = mesh.triangles[t];
+            for (int k = 0; k < 3; ++k) {
+                if (gsVStamp_[tr[k]] == gsEpoch_) continue;
+                gsVStamp_[tr[k]] = gsEpoch_;
+                for (uint32_t u : mesh.vertexTriangles(tr[k]))
+                    if (gsStamp_[u] != gsEpoch_) gsStamp_[u] = gsEpoch_, ring.push_back(u);
+            }
+        }
+        if (shadeOnGpu(mesh, ring)) {
+            written_.swap(ring);
+            for (uint32_t t : written_) {
+                uint64_t& w = pending_[t >> 6];
+                const uint64_t bit = uint64_t(1) << (t & 63);
+                if (w & bit) w &= ~bit, --pendingCount_;
+            }
+            return;
+        }
+    }
     const auto started = std::chrono::steady_clock::now();
     std::vector<uint32_t> sorted;
     if (stageIndex_.size() != mm.baseTriangles) stageIndex_.assign(mm.baseTriangles, 0);
@@ -550,6 +1029,7 @@ bool MicroRenderer::sync(Mesh& mesh) {
             // While a stroke runs, also no more than strokeShadeMs of it (at least one patch and its ring), so a
             // slower CPU doesn't spend the frame the dabs need on shading; the rest follows as before.
             if (mm.stroking) shadeBudget = strokeShadeBudget(shadeBudget, tier.strokeShadeMs, shadeNsPerPoint_, size_t(mm.samples) * 3);
+            if (gpuShade && !gsFailed_ && !mm.hasMask()) shadeBudget = gpuShadeBudget; // (the GPU's budget, not the CPU's)
             if (pendingCount_) shadePending(mesh, false);
         }
     }
