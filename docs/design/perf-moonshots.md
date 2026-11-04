@@ -38,8 +38,8 @@ this; an experiment that misses it stays off for that tier or doesn't ship.
 profile is applied, so it is the same code a real floor machine runs): Laptop tier; 4 worker threads;
 render triangle budget 2M (1M while the view moves); motion proxy from 3M visible triangles; upload budget
 16 MB a frame; no GL 4.4 buffer storage (Fast Upload falls back); resident caches capped at 1 GB; the governor
-may lower the budget, never raise it. Still to add: view resolution 75% while the view moves (only a fixed view
-resolution exists today).
+may lower the budget, never raise it. View resolution 75% while the view moves, full
+when it stops (`SF_MOTION_RESOLUTION=25..100` sets it on any profile).
 
 **Frame split.** `--benchmark` now writes `frame_split_ms` per phase (p50 / p95 / p99 of the main thread's
 events, sculpt, UI, upload = ghost + scene sync, draw = GL calls, swap_wait = UI draw + swap, where the frame

@@ -2071,6 +2071,9 @@ private:
     // The last drawn frame's time by part (run()'s marks): events, dabs, UI, ghost + scene sync (the upload), draw,
     // UI draw + swap (where the frame waits for the GPU).
     double frameSplitMs_[6] = {};
+    // The view's resolution while it moves (experimental, docs/design/perf-moonshots.md §0): 0.75 on the simulated
+    // floor tier (SF_HW_SIMULATE=floor), else 1; SF_MOTION_RESOLUTION=25..100 (percent) overrides.
+    static float motionResolution();
     void drawTimelineUi();            // once a frame from drawUi: keeps the timeline attached and draws the strip
     float timelineTopInset_ = 0.0f;   // how far down the canvas the strip (or its tab) reaches at the top; 0 at the bottom
     float timelineStripY_ = -1.0f;    // the strip's (or tab's) top edge in window pixels this frame (-1: not shown)
