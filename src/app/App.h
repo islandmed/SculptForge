@@ -125,6 +125,7 @@ public:
     App();
     ~App();
     bool init(const AppOptions& options);
+    const std::string& startError() const { return startError_; } // why init failed, for the message box (#109)
     int run(); // returns the process exit code
     // Redraw on demand (#14): the interactive loop sleeps in SDL_WaitEventTimeout until an event, a background
     // job or an animation needs a new frame. UI tests and recordings (runRecording) draw every frame as before.
@@ -510,6 +511,7 @@ private:
     bool scrollChat_ = false;
     // Image to 3D
     AppOptions options_;
+    std::string startError_;
     bool showImageTo3D_ = false;
     bool textMode_ = false;
     char textPrompt_[512] = "";

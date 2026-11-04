@@ -251,6 +251,18 @@ int main(int argc, char** argv) {
     if (!crashTest.empty()) crashOnPurpose(crashTest);
     sf::App app;
     if (!app.init(options)) {
+        // A double-clicked app that can't start says why (#109: on a laptop it just vanished, not even in the
+        // Task Manager). Tests, renders and benchmarks keep failing quietly with their log.
+        const bool interactive = options.renderPath.empty() && options.recordPath.empty() && options.uiTest.empty() &&
+                                 options.timelapsePath.empty() && !options.benchmark && options.demo.empty() &&
+                                 !automatedRun();
+        if (interactive) {
+            std::string text = "SculptForge could not start.\n\n" +
+                               (app.startError().empty() ? std::string("See the log for details.") : app.startError()) +
+                               "\n\nUpdating the graphics driver (from the PC or GPU maker) usually fixes this.";
+            if (!sf::crashlog::path().empty()) text += "\n\nLog: " + sf::crashlog::path();
+            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "SculptForge", text.c_str(), nullptr);
+        }
         app.shutdown();
         sf::crashlog::stop();
         return 1;

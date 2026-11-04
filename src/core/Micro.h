@@ -252,7 +252,8 @@ public:
     // toward `alphaUp` (#92).
     void dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& center, const glm::vec3& viewDir, float radius,
              float strength, bool invert, float focal, const glm::vec3& alphaUp, bool maskBrush, float maskStrength,
-             const BrushAlpha* alpha = nullptr);
+             const BrushAlpha* alpha = nullptr, const std::function<float(const glm::vec3&)>& texture = {});
+    // (texture: a brush recipe's surface pattern, 0..1 at a surface point, times the tip; #120)
     // Move: captures the points within the dab (with each mirror's signs), then moves them along their normals.
     void beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, float radius, float focal, const glm::mat3& mirror);
     void grab(Mesh& m, const glm::vec3& delta);

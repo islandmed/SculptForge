@@ -478,6 +478,13 @@ elseif(WIN32)
 else()
   set(SF_DOC_DIR ${CMAKE_INSTALL_DOCDIR})
 endif()
+# Windows: the Visual C++ runtime (msvcp140, vcruntime140, vcruntime140_1) goes next to the exe, so the portable zip
+# and the installer start on a PC without the Visual C++ Redistributable (#109: nothing happened at all).
+if(MSVC)
+  set(CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION ${CMAKE_INSTALL_BINDIR})
+  set(CMAKE_INSTALL_UCRT_LIBRARIES OFF) # the Universal CRT is part of Windows 10 and 11
+  include(InstallRequiredSystemLibraries)
+endif()
 install(FILES LICENSE THIRD_PARTY_NOTICES.md README.md CHANGELOG.md DESTINATION ${SF_DOC_DIR})
 install(FILES docs/ai-services.md docs/unreal.md docs/generators.md docs/comfyui.md DESTINATION ${SF_DOC_DIR}/docs)
 # Bundled ComfyUI workflows, where the Generate 3D window looks for them (see src/ai/ComfyUI.cpp).

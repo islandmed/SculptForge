@@ -108,6 +108,7 @@ bool App::init(const AppOptions& options) {
     SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "0");
     if (!headless && options.demo.empty()) applyCachedThreadCount(); // the hardware profile's threads, before any brush work
     if (!SDL_Init(SDL_INIT_VIDEO)) {
+        startError_ = std::string("The window system did not start: ") + SDL_GetError();
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return false;
     }
@@ -137,6 +138,7 @@ bool App::init(const AppOptions& options) {
     const int winW = sized ? options.width : saved.w, winH = sized ? options.height : saved.h;
     window_ = SDL_CreateWindow("SculptForge", winW, winH, flags);
     if (!window_) {
+        startError_ = std::string("The OpenGL 3.3 window could not be made: ") + SDL_GetError();
         SDL_Log("SDL_CreateWindow failed: %s", SDL_GetError());
         return false;
     }
@@ -164,6 +166,7 @@ bool App::init(const AppOptions& options) {
     }
     glContext_ = SDL_GL_CreateContext(window_);
     if (!glContext_) {
+        startError_ = std::string("OpenGL 3.3 is not available: ") + SDL_GetError();
         SDL_Log("OpenGL 3.3 context creation failed: %s", SDL_GetError());
         return false;
     }
@@ -171,6 +174,7 @@ bool App::init(const AppOptions& options) {
     SDL_GL_SetSwapInterval(1);
 
     if (const char* missing = gl::load([](const char* n) { return reinterpret_cast<gl::GenericProc>(SDL_GL_GetProcAddress(n)); })) {
+        startError_ = std::string("The graphics driver lacks the OpenGL function ") + missing + ".";
         SDL_Log("Missing OpenGL function: %s", missing);
         return false;
     }
@@ -179,6 +183,7 @@ bool App::init(const AppOptions& options) {
 
     std::string err;
     if (!renderer_.init(err)) {
+        startError_ = err;
         SDL_Log("%s", err.c_str());
         return false;
     }

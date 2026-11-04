@@ -1163,8 +1163,29 @@ void Sculptor::updateDabNormals(Mesh& mesh, const BVH& bvh) {
 
 void Sculptor::dabRecipe(Mesh& mesh, BVH& bvh, const BrushRecipe& recipe, const DabParams& p, Symmetry sym) {
     if (!active_) return;
-    if (mesh.micro && microMatches(mesh)) { // recipes aren't grid brushes: a micro level gets the Standard dab
-        dab(mesh, bvh, BrushType::Standard, p, sym);
+    if (microReady(mesh)) {
+        // A micro level: the grid takes a Standard dab with the recipe's depth (its sign carves or builds) and its
+        // surface pattern (Dragon Scales, Skin Pores..., #120: they sculpted plain blobs there). Planes, pinch and
+        // drag aren't grid brushes.
+        const float patternFreq = 1.0f / std::max(p.radius * recipe.patternScale, 1e-6f);
+        std::function<float(const glm::vec3&)> texture;
+        if (recipe.pattern != BrushRecipe::Pattern::None && recipe.patternAmount > 0.0f)
+            texture = [&recipe, patternFreq](const glm::vec3& x) {
+                return glm::mix(1.0f, samplePattern(recipe.pattern, x * patternFreq), recipe.patternAmount);
+            };
+        const bool invert = p.invert != (recipe.depth < 0.0f);
+        // (Standard's 0.08 r layer per full dab against the recipe's 0.12 r * depth)
+        const float strength = p.strength * std::min(1.0f, std::abs(recipe.depth) * 1.5f);
+        const float pressure = std::pow(std::clamp(p.pressure, 0.0f, 1.0f), recipe.pressureCurve);
+        const double k0 = micro_.findMs + micro_.kernelMs, s0 = micro_.stitchMs;
+        const uint64_t pts = micro_.points;
+        for (const SymCopy& m : copies(sym))
+            micro_.dab(mesh, bvh, BrushType::Standard, m.point(p.center), m.dir(p.viewDir), p.radius, strength * pressure,
+                       invert, p.focal, m.dir(p.alphaUp), false, 0.0f, p.alpha, texture);
+        timings.kernelMs += micro_.findMs + micro_.kernelMs - k0;
+        timings.normalsMs += micro_.stitchMs - s0;
+        timings.vertices += micro_.points - pts;
+        ++timings.dabs;
         return;
     }
     const bool useAlpha = p.alpha && !p.alpha->empty(); // (an alpha reaches its square's corners, #75)

@@ -268,7 +268,7 @@ void MicroStroke::stitch(const Mesh& m, MicroMesh& mm, std::span<const uint32_t>
 
 void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& center, const glm::vec3& viewDir, float radius,
                       float strength, bool invert, float focal, const glm::vec3& alphaUp, bool maskBrush, float maskStrength,
-                      const BrushAlpha* alpha) {
+                      const BrushAlpha* alpha, const std::function<float(const glm::vec3&)>& texture) {
     if (!active_ || !m.micro || radius <= 0.0f) return;
     if (!maskBrush && microBrushSupport(type) == 0) return;
     auto clock = std::chrono::steady_clock::now();
@@ -413,6 +413,7 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
                         const float edge = std::clamp((1.0f - cheb) / 0.35f, 0.0f, 1.0f);
                         f = edge * edge * (3.0f - 2.0f * edge) * corner;
                     }
+                    if (texture) f *= texture(p);
                     if (mk && stride == 1) f *= 1.0f - float(mk[idx]) / 255.0f; // (coarse: the fine points' mask, below)
                     if (f <= 0.0f) continue;
                     const float facing = std::max(glm::dot(nn, areaNormal), 0.3f); // moving along nn reaches a plane this much slower

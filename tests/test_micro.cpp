@@ -6,6 +6,7 @@
 #include "TestHarness.h"
 
 #include "core/Benchmark.h"
+#include "core/BrushRecipe.h"
 #include "core/Commands.h"
 #include "core/Micro.h"
 #include "core/Multires.h"
@@ -145,6 +146,41 @@ TEST(micro_standard_brush_raises_and_undoes) {
     CHECK(doc.mesh.micro->disp == before);
     CHECK(doc.undo.redo(doc.mesh, doc.bvh));
     CHECK(doc.mesh.micro->disp == after);
+}
+
+// #120: a recipe brush on a micro level keeps its surface pattern (Dragon Scales was a plain Standard blob) and its
+// depth's sign (Wrinkle carves).
+TEST(micro_recipe_brushes_keep_pattern_and_depth) {
+    auto recipe = [](const char* name) {
+        for (const BrushRecipe& r : builtinBrushRecipes())
+            if (r.name == name) return r;
+        CHECK(false);
+        return BrushRecipe{};
+    };
+    const BrushRecipe scales = recipe("Dragon Scales"), wrinkle = recipe("Wrinkle");
+    Symmetry sym;
+    auto sculpt = [&](const BrushRecipe* r) {
+        Document doc = microDoc(4);
+        CHECK(doc.sculptor.beginStroke(doc.mesh, "Recipe"));
+        for (int i = 0; i < 6; ++i) {
+            if (r) doc.sculptor.dabRecipe(doc.mesh, doc.bvh, *r, dabAt(glm::vec3(0, 0, 1), 0.3f), sym);
+            else doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::Standard, dabAt(glm::vec3(0, 0, 1), 0.3f), sym);
+        }
+        doc.undo.push(doc.sculptor.endStroke());
+        CHECK(watertight(doc.mesh));
+        return doc;
+    };
+    const float h0 = frontHeight(microDoc(4));
+    const Document plain = sculpt(nullptr), scaled = sculpt(&scales), carved = sculpt(&wrinkle);
+    CHECK(frontHeight(scaled) > h0 + 0.001f);
+    CHECK(frontHeight(carved) < h0 - 0.001f);
+    // The pattern: the scales' displacement differs from Standard's smooth bump over many grid points.
+    const auto& a = plain.mesh.micro->disp;
+    const auto& b = scaled.mesh.micro->disp;
+    CHECK(a.size() == b.size());
+    size_t differ = 0;
+    for (size_t i = 0; i < a.size(); ++i) differ += std::abs(int(a[i]) - int(b[i])) > 2;
+    CHECK(differ > 1000);
 }
 
 TEST(micro_brushes_each_change_the_surface_and_stay_closed) {

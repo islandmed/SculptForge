@@ -723,7 +723,8 @@ void App::registerShellActions() {
     for (int i = 0; i < count; ++i) {
         const std::string id = list[i].id;
         add({"ui.palette." + id, list[i].name, list[i].icon,
-             std::string("Open the ") + list[i].name + " palette (click its tray icon to keep it in a tray).", "Palettes", "",
+             std::string("Open the ") + list[i].name + " palette (click its tray icon to keep it in a tray).", "Palettes",
+             id == "preferences" ? "Ctrl+," : "", // (Cmd+, on macOS, where apps keep their settings, #111)
              "",
              [this, id] {
                  if (std::count(layout_.leftTray.begin(), layout_.leftTray.end(), id) +

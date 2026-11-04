@@ -103,6 +103,12 @@ generated from SculptForge's action registry, the same source as the Controls wi
 |---|---|---|
 | Material picker | <kbd>M</kbd> | Pop up the materials under the cursor. Hover one to preview it on the model; click to keep it. |
 
+### Palettes
+
+| Action | Keys | What it does |
+|---|---|---|
+| Preferences | <kbd>Ctrl</kbd>+<kbd>,</kbd> | Open the Preferences palette (click its tray icon to keep it in a tray). |
+
 ### Preferences
 
 | Action | Keys | What it does |
