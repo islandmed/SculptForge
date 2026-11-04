@@ -84,7 +84,8 @@ Mesh makeBenchHead(size_t triangles);
 
 // Resident memory of this process in bytes (0 where unknown).
 size_t residentBytes();
-// The most resident memory since the last reset (Linux: VmHWM; 0 where unknown); the reset returns residentBytes().
+// The most resident memory since the last reset (Linux: VmHWM; Windows / macOS: sampled by residentBytes() after a
+// reset, the system's peak before one; 0 where unknown); the reset returns residentBytes().
 size_t peakResidentBytes();
 size_t resetPeakResidentBytes();
 
