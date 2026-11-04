@@ -107,8 +107,16 @@ rate, so real iGPU runs by testers (Windows UHD 620 / Iris Xe first) confirm it.
 |---|---|---|---|
 | p99 frame, orbit | < 16 ms [< 8] | < 33 ms [< 11] | < 33 ms, proxy [< 16] |
 | p99 frame, 240 px stroke | < 33 ms [< 16] | < 33 ms [< 33] | < 50 ms [< 33] |
-| stroke latency (pen to visible surface), p99 | < 16 ms | < 16 ms (canvas track, §7) | < 33 ms |
+| pen to visible stroke (the preview's head), p99 | < 16 ms | < 16 ms (canvas track, §7) | < 33 ms |
+| committed surface: solver + frame beyond the spacing floor, p50 | < 16 ms | < 16 ms | < 33 ms |
 | RSS after load + 20 strokes | < 1 GB | < 2.5 GB | < 5 GB (needs item 4) |
+
+Two stroke latencies, reported side by side (agreed with core-200m and beta-boost, 11-04). **Pen to visible** is
+how far the stroke you see trails the pen. That is the preview's job (Background Preview: 3-6 px p50 on the floor,
+§5). **Committed** is when the real surface reaches the pointer. It has a floor that no solver can beat: dabs are
+placed every 0.15 x radius of path, so a dab is on average half a spacing old when it is placed (240 px at
+973 px/s: a dab every ~37 ms of path, ~18 ms average age). Its target is
+solver + frame <= 16 ms beyond that floor, so at 240 px about 35 ms p50 raw. Every report gives the raw lag and the lag minus the spacing floor.
 
 **The three prototypes against the floor:**
 
@@ -294,6 +302,22 @@ and only Live Move and Background Preview act): 4 pairs, interleaved, order reve
 | Smooth | 18.0-23.3 / 30-44 -> 6.7-8.0 / 14-15 ms | 60-71 / 107-124 px -> **3-4 / 11-13 px** | 71-85 -> 37-65 ms |
 | 240 px brush | 10.4-11.1 / 31-33 -> 10.2-10.6 / 16-29 ms | 189-212 / 302-356 px -> **6 / 17-31 px** | 232-267 -> 206-327 ms |
 | orbit | 8.6-8.9 / 23-33 -> 7.4-9.0 / 22-36 ms | | |
+
+**With Fast Big Brushes** (perf/beta-boost, on by default on main since 9b81767e; merged tree 2dd3fa0, floor, 2 pairs
+interleaved, load < 2 at each start; `bench/floor/m1pro-2dd3fa0-fastbig-std15m-*.json`), the three toggles off -> on:
+
+| floor, 15M | frame p99 | visible stroke p50 / p99 | committed lag p50, raw (minus the ~18 ms spacing floor at 240 px) |
+|---|---|---|---|
+| Clay 25 px | 31-34 -> 21-26 ms | 14 / 151-165 -> **3-5 / 24-26 px** | 18 -> 29-32 ms |
+| Clay 60 px | 35-41 -> 21-24 ms | 17-18 / 114-122 -> **5 / 18 px** | 22 -> 31-32 ms |
+| Clay 120 px | 32-33 -> 15-16 ms | 54-56 / 103-114 -> **4-5 / 13-23 px** | 65-66 -> 45-46 ms |
+| Move | 35-36 -> 31 ms | (no dabs) | |
+| Smooth | 35-45 -> 13-14 ms | 69-73 / 121-124 -> **4 / 12-13 px** | 80-83 -> 59-62 ms |
+| 240 px brush | 32-33 -> 17-21 ms | 68-70 / 165 -> **5 / 16-18 px** | 84-86 -> 66-76 ms (48-58 ms beyond the floor) |
+
+Fast Big Brushes takes the 240 px committed lag from 232-267 to 84-86 ms with the toggles off, and to 66-76 ms with
+them on, so the two stack. With both, every stroke phase meets p99 < 33 ms on the floor and the visible stroke stays
+within 5 px p50. Committed lag beyond the spacing floor (target <= 16 ms) is still about 3x over at 240 px.
 
 The laptop profile shows the same pattern (240 px: 208 -> 6 px p50, frame p99 33 -> 16 ms; Smooth p99 36 -> 12 ms).
 On the floor tier, with the toggles on, every stroke phase's p99 frame meets the < 33 ms target (off: 4 of 6 miss) and
