@@ -38,6 +38,12 @@ expect_value quick_tour_slide == 1
 expect_value quick_tour_done == 1
 expect_text Where things are
 shot tour-01
+# An open slide costs nothing at rest: no focus, no pointer, no frames.
+window_focus 0
+mouse_leave
+wait 2
+expect_value wants_frames == 0
+window_focus 1
 
 # 1. Show me opens the search; the tour waits at the bottom.
 click "Show me##quicktour"
@@ -66,6 +72,11 @@ expect_text Resolution
 mouse_leave
 wait 0.2
 shot 02-voxel
+# The flash has ended: the app rests with the tour waiting at the bottom.
+window_focus 0
+wait 2
+expect_value wants_frames == 0
+window_focus 1
 key escape
 click "Next##quicktour.aside"
 
