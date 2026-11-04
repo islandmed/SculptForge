@@ -196,6 +196,77 @@ will need under and ahead of the cursor: Focus Detail promotion, N2 reconstructi
 and undo-tile allocations, shading. The first dab then finds everything warm (the beta measured a 965 ms first-dab stall
 on Windows at 15M; perf/beta-boost removes its cause, N5 keeps such costs off the stroke in general).
 
+## 7c. Novel track results (N1, N2)
+
+Three setups: this laptop (M1 Pro, Asahi GL 4.6, load < 2), the floor profile on it (`SF_HW_SIMULATE=floor`: 4 solver
+threads; the GPU pass isn't budgeted), and the Windows PC (RTX 3060, Ryzen 5600X, 12 threads; floor = 4).
+
+### N1, optimistic screen-space strokes (`sculptforge --bench-optimistic`)
+
+A 240 px Standard stroke of 30 dabs on the bench head, 1920x1080 canvas. The stroke is placed from the canvas alone
+(centres and area normals from depth). Pass = one GPU pass per dab over its rectangle: inverse warp (for each pixel the
+canvas point whose displaced position lands there, by fixed-point iteration) + the Lit Sphere ratio re-shade at the bent
+normal. Mesh = the same dabs by the real Standard brush on the CPU plus the upload: the latency the canvas hides.
+Pop = the per-pixel difference between the optimistic image and the solved mesh at the same dabs (0-255 levels), against
+showing nothing until the mesh catches up.
+
+| | mesh | pass per dab, median / max | mesh: brush + upload | interior pop, mean / p99 (> 8 levels) | same, doing nothing | outline pixels: pop vs nothing (mean) |
+|---|---|---|---|---|---|---|
+| laptop | 4.9M | 4.7 / 9.7 ms | 332 ms | 4.4 / 21 (15.0%) | 17.7 / 74 (60.0%) | 8.8K: 41 vs 98 |
+| laptop | 15.1M | 4.4 / 8.0 ms | 916 ms | 4.4 / 20 (15.0%) | 17.5 / 72 (59.8%) | 8.8K: 41 vs 98 |
+| laptop | 33.2M | 4.8 / 10.6 ms | 2,450 ms | 4.3 / 19 (15.2%) | 17.1 / 68 (59.4%) | 8.5K: 40 vs 99 |
+| floor | 4.9M / 15.1M / 33.2M | 4.5 / 4.2 / 4.5 ms | 595 / 1,665 / 3,667 ms | 4.4 / 21-19 | 17.7-17.1 / 74-68 | as laptop |
+| Windows | 4.9M / 15.1M / 33.2M | 3.1 / 3.0 / 6.7 ms | 1,156 / 4,282 / 5,057 ms | 4.4 / 21-19 | 17.7-17.1 / 74-68 | 41 vs 98 |
+| Windows floor | 4.9M / 15.1M / 33.2M | 1.3 / 2.2 / 1.4 ms | 1,238 / 3,948 / 8,247 ms | 4.4 / 21-19 | 17.7-17.1 / 74-68 | 41 vs 98 |
+
+- **The pass doesn't depend on the mesh:** 4.2-4.8 ms per dab on the laptop from 5M to 33M while the real brush takes
+  0.33 s to 2.45 s for the stroke (0.6-3.7 s on the floor, 1.2-8.2 s on the Windows PC). The surface under the pen
+  changes the frame the pen moves, at any mesh size.
+- **The pop is a quarter of doing nothing:** interior mean 4.4 against 17.7 levels, p99 19-21 against 68-74; the
+  outline (where the stroke grows the silhouette) 40 against 98. Identical on every machine (the same maths).
+![N1 at 33M: before, optimistic (under 5 ms), truth (the solved mesh, 2.45 s later), pop map](core-200m-n1.jpg)
+
+- **Looked at** (screenshots before / optimistic / truth / pop map at 5M and 33M): smooth, the features in the right
+  places; the visible residuals are a slightly stair-stepped outline where the surface grows over the background, and
+  shading differences where the solver's per-dab area normals drift from the canvas's estimate.
+- **Not yet < 1 ms.** The prototype re-evaluates every dab of the stroke in every pass (30 here). Live, only the dabs
+  the solver hasn't committed are evaluated (its backlog, a few to a dozen), and accumulating into the canvas (displaced
+  depth and normal written back) makes it one dab per pass; both are the next step. Timing is CPU-side around
+  `glFinish` (an upper bound; the Windows spread 1.3-6.7 ms is that).
+- **Next:** wire it into the live frame (the canvas cache of perf-moonshots §7 A as its storage), the backlog-only
+  evaluation, then Clay / Inflate / Flatten kernels (Flatten reads the canvas plane), then pen prediction (N4) on top.
+
+### N2, wavelet displacement (`sculptforge --bench-wavelet`)
+
+A Micro 7 head (314.6M micro triangles, 19,200 patches), one Standard dab of growing radius. Today = the adaptive micro
+brush (kernel on a stride, written to every fine point, stitched, undo tiles saved). Wavelet = the kernel added to the
+lattice where the radius spans >= 64 samples; the finer coefficients (the detail) untouched; reconstruct = the inverse
+transform of the touched patches, needed only for what is drawn or picked (deferred). Error = against the exact brush
+(every fine point evaluated), as a share of its largest change.
+
+| radius (~px) | patches | values written: today / wavelet | today: dab (laptop / floor / Win / Win floor) | wavelet: dab (same) | reconstruct (laptop / Win) | wavelet error, mean / max | today's error |
+|---|---|---|---|---|---|---|---|
+| 27 | 50 | 0.19M / 21K | 1.3 / 1.0 / 4.8 / 4.3 ms | 0.9 / 0.7 / 1.4 / 5.0 ms | 0.2 / 0.6 ms | 0.02% / 0.6% | 0.00% / 0.6% |
+| 54 | 106 | 0.51M / 22K | 2.7 / 1.9 / 6.3 / 8.2 ms | 0.4 / 0.6 / 1.6 / 1.1 ms | 0.4 / 1.1 ms | 0.04% / 0.8% | 0.01% / 0.3% |
+| 108 | 301 | 1.69M / 25K | 5.3 / 5.8 / 15.7 / 16.3 ms | 0.3 / 0.4 / 2.8 / 0.9 ms | 1.1 / 5.2 ms | 0.18% / 2.2% | 0.01% / 0.4% |
+| 216 | 1,301 | 8.24M / 40K | 17.0 / 25.6 / 71.7 / 89.4 ms | 0.5 / 0.6 / 12.5 / 1.9 ms | 4.6 / 13.3 ms | 0.04% / 0.5% | 0.01% / 0.4% |
+
+- **Cost falls as the brush grows:** a 216 px dab writes 40K values instead of 8.2M; 0.5 ms against 17 ms on the laptop
+  (35x), 1.9 ms against 89 ms on the Windows floor (47x). The detail rides along without being touched.
+- **Same result within half a percent** of the stroke height at 216 px (max 2.2% at 108 px, where the lattice is
+  coarsest relative to the radius's curvature); today's adaptive brush is within 0.4%.
+- **One anomaly:** on Windows with 12 threads the 216 px wavelet dab took 12.5 ms against 1.9 ms on 4 (and 0.5 ms on the
+  laptop's 10): the thread pool's wake-up cost for 325 tiny jobs on Windows, to fix with bigger blocks before claiming it.
+- **What it costs elsewhere:** the reconstruction (4.6 ms laptop, 13 ms Windows at 216 px) moves off the stroke: lazily,
+  visible patches first, and later on the GPU (each level is one pass over its new points). Undo of a coarse edit is the
+  touched lattice coefficients only (tens of KB). Not measured yet: shading of the reconstructed patches, and a whole
+  stroke (30 dabs) end to end.
+- **Next:** N2 inside MicroStroke behind a flag (coarse path for radii spanning > 64 samples), reconstruct-on-draw in the
+  renderer's sync, then the same idea on the multires mesh path (betaboost's scale-adaptive dabs are its safe first step).
+
+N3-N5 are designed (§7b), not built: N3 builds on N2's coefficients as its cache; N4 and N5 attach to N1 and the
+renderer.
+
 ## 8. Phase 1 results
 
 Run: `sculptforge --benchmark core-200m --benchmark-no-video` (Release). The scene: the bench head at 196,608 base
