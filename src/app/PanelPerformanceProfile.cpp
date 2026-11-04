@@ -16,6 +16,7 @@
 #include "app/Ui.h"
 
 #include "core/FrameGovernor.h"
+#include "render/MicroRenderer.h"
 #include "core/HardwareProfile.h"
 #include "core/ThreadPool.h"
 #include "core/TierConfig.h"
@@ -233,6 +234,11 @@ void App::hardwareProfileFrameBegin() {
     }
     hw.frameStartMs = nowMs();
     if (!hw.calibrator) hw.timer.begin();
+    // The micro GPU shading times its own passes: the frame's query steps aside meanwhile (render/MicroRenderer.h).
+    if (!MicroRenderer::pauseFrameTimer) {
+        MicroRenderer::pauseFrameTimer = [&hw] { return hw.calibrator ? true : hw.timer.pause(); };
+        MicroRenderer::resumeFrameTimer = [&hw] { if (!hw.calibrator) hw.timer.resume(); };
+    }
 }
 
 void App::hardwareProfileFrameEnd() {
