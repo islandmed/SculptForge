@@ -80,7 +80,7 @@ void clayAndForm(PackBuilder b) {
 }
 
 void hardSurface(PackBuilder b) {
-    b("Panel Line", "Cuts a clean, narrow groove for panel gaps and seams.", [](BrushRecipe& r) {
+    b("Panel Groove", "Cuts a clean, narrow groove for panel gaps and seams.", [](BrushRecipe& r) {
         r.depth = -0.4f; r.pinch = 0.25f; r.hardness = 0.4f; r.tipSharpness = 0.3f; r.spacing = 0.08f;
         r.frontFacesOnly = true;
     });

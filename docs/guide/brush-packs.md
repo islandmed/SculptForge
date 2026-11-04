@@ -50,7 +50,7 @@ Crisp planes, panel lines, bevels, rivets and bolts for props, armour and machin
 
 | Brush | What it does | Alpha |
 |---|---|---|
-| **Panel Line** | Cuts a clean, narrow groove for panel gaps and seams. |  |
+| **Panel Groove** | Cuts a clean, narrow groove for panel gaps and seams. |  |
 | **Flat Plane** | Presses a perfectly flat face with a hard edge, for machined surfaces. | Square |
 | **Bevel Scrape** | Scrapes high points into a bevel along an edge, for chamfers. |  |
 | **Raised Plate** | Builds a flat, square-edged plate on the surface, for armour and hull panels. | Square |
