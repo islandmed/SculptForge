@@ -801,9 +801,9 @@ void App::drawUpdatesSection() {
                  "Preferences > Updates");
     ImGui::TextUnformatted(tr("Update channel"));
     int channel = updateChannel_ == UpdateChannel::Preview ? 1 : 0;
-    bool changed = ImGui::RadioButton(tr("Stable"), &channel, 0);
+    bool changed = ImGui::RadioButton((std::string(tr("Stable")) + "##prefs.update_stable").c_str(), &channel, 0);
     ImGui::SameLine();
-    changed |= ImGui::RadioButton(tr("Preview (betas)"), &channel, 1);
+    changed |= ImGui::RadioButton((std::string(tr("Preview (betas)")) + "##prefs.update_preview").c_str(), &channel, 1);
     ui::HelpText("Update channel", nullptr,
                  "Stable offers only finished releases. Preview also offers the betas: the next version a couple of "
                  "weeks before it ships, for trying it out and reporting what goes wrong (Discord #bug-reports). When "
