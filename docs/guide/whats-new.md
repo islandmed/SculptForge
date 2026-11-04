@@ -10,7 +10,32 @@ three versions in full, then the older ones in groups. Every detail is in the
 ```features
 date: unreleased
 tagline: Sixty new brushes in six packs, a Masking panel, a quick tour for experienced sculptors, and experimental options for very dense meshes.
+highlight: Sixty new brushes in six built-in packs
+highlight: Mask by peaks, colour and facing in a new Masking panel
+highlight: A quick tour for experienced sculptors
+highlight: Experimental: Live Move and Background Preview for very dense meshes
 ```
+
+- **Fast Big Brushes (Experimental)**: a new way to place big brushes on dense meshes, off by default. Try it on a
+  heavy model with a big Clay or Standard brush and tell us how it feels: **Preferences > Performance > Fast Big
+  Brushes (Experimental)**.
+- **Brush packs**: sixty new built-in brushes in six packs (Clay & Form, Hard Surface, Organic & Skin, Cloth & Folds,
+  Damage & Wear, Ornament), each with its own alpha and a one-line description; see [Brush packs](brush-packs.md).
+- **A-Z everywhere**: brushes, alphas, materials and the Library list A-Z; **Sort** switches to the most recently used
+  first or (brushes, alphas) by pack. Alphas get a filter field.
+- **Masking panel**: **Tool > Masking** is one panel of buttons with pictures: the Shapes, **Mask by** (cavity, peaks,
+  face group, colour, facing, border) and **Adjust** (grow, shrink, sharpen, blur, invert, clear, all).
+- **Quick tour**: **Help > Quick tour** (or **Sculpted before? Take the quick tour** in the welcome) shows in ten
+  short slides where remeshing, dynamic topology, quad retopology, levels, masking, cut, brushes and baking are, each
+  with a **Show me** button that opens the panel. The guide has it too: Quick tour for experienced sculptors.
+- **Live Move (experimental)**: **Preferences > Performance > Live Move**. The graphics card draws the Move brush's
+  drag from where the surface started, so it keeps up with the pen on any mesh size, and the move is applied once,
+  exactly, when you lift the pen ([Performance](performance.md)).
+- **Background Preview (experimental)**: **Preferences > Performance > Background Preview**. On dense meshes, the dabs
+  a big brush is still working out show as a preview under the pen, so the stroke no longer trails behind it. The
+  finished sculpt is the same either way.
+- **Fast Upload (experimental)**: **Preferences > Performance > Fast Upload**. Sculpted changes reach the graphics
+  card through shared memory and a copy on the card, instead of a copy by the driver during the frame.
 
 ## Version 0.10.11
 

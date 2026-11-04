@@ -6,6 +6,57 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- **Fast Big Brushes (Experimental)** (Preferences > Performance, off by default): a dab that reaches more than
+  150,000 vertices takes its plane from an even sample of them and turns the shading along with the move it makes
+  (from the brush's own slope, no neighbour walks), and the dabs waiting for a frame go through the vertices together
+  in one pass, so the normals, the picking structure and the GPU copy are updated once a frame instead of once a dab.
+  Every vertex still moves by the brush itself; the exact shading follows behind the brush and when the pen lifts.
+  Standard, Clay, Flatten, Crease, Pinch and Sharp Crease; Trim takes the sampled plane and shading but not the fused
+  pass. Small brushes, Smooth, Layer, Inflate, Nudge, Clay Block, alphas and masked areas are placed dab by dab as
+  before. The result matches the dab-by-dab stroke to within about 2% of how far it moved the surface
+  (tests/test_beta_boost.cpp).
+- **Brush packs**: 60 built-in brushes in six packs (Clay & Form, Hard Surface, Organic & Skin, Cloth & Folds, Damage
+  & Wear, Ornament), made from SculptForge's own recipe engine and procedural alphas. A pack brush picked the first
+  time brings its alpha (and turns it along the stroke where that helps). Guide chapter [Brush
+  packs](docs/guide/brush-packs.md).
+- Six new procedural alphas: **Cobblestone**, **Leather Grain**, **Hex Plates**, **Knit**, **Bolt** and **Chips** (21
+  built-in alphas in all).
+- **Sort** menu on the brush grid and list, the Alpha palette, the Material picker and the Library: A-Z (the default),
+  Recent, and Pack (brushes, alphas). Saved in the preferences. The Alpha palette gets a filter field.
+- **Mask by peaks**, **Mask by colour** and **Mask by facing** (`mask_by_peaks`, `mask_by_color`, `mask_by_facing`),
+  and `brush_use name=...` to pick a library or pack brush from scripts and macros.
+- Brush recipes (.sfbrush, brush codes) may name a built-in `alpha` and `alphaFollow`; older files are unchanged.
+- **Quick tour** (Help > Quick tour, the welcome, and once when the Classic sculpting keys are picked): ten slides
+  with pictures of SculptForge; **Show me** opens and flashes the panel while the tour waits in a bar at the bottom.
+  The last slide is about memberships; **Maybe later** closes it for good. Guide chapter **Quick tour for experienced
+  sculptors** (replaces the old comparison chapter).
+- Experimental toggles in Preferences > Performance, all off by default. **Live Move**: the GPU draws a Move drag from
+  the grab's start positions and the whole move is applied once at pen lift (one grab, equal to the per-frame grabs to
+  1e-6). It falls back to the normal Move with masks, hidden faces, sculpt layers, micro levels, Connected Only or
+  View falloff (`SF_LIVE_MOVE=0/1`). **Background Preview**: the predictive preview is drawn for background dabs
+  (meshes of 2M+ vertices), and the frame no longer waits for a batch; the solver's dabs are unchanged
+  (`SF_BG_GHOST=0/1`). **Fast Upload**: stroke uploads are packed into persistently mapped staging buffers
+  (GL_ARB_buffer_storage) and copied on the GPU (`SF_PERSISTENT_UPLOAD=0/1`). The research behind them, including a
+  design for focus detail on billion-polygon assets, is in docs/design/perf-moonshots.md.
+
+### Changed
+- **Tool > Masking** is one panel of buttons with pictures and a hint each: Shapes, Mask by and Adjust, with their
+  options under **Mask by options**.
+- Brushes, alphas, materials and Library files list A-Z by default (alphas and materials were in a fixed order;
+  Library projects were newest first, which is still one click away under **Sort: Recent**).
+- The command search (F3) finds features by plain sculpting words: remesh, voxel, retopo, quads, multires, groups,
+  clip, trim, slice, folders, insert, kitbash, vertex color ("Quad Remesh (also: retopo)").
+- Scripts, commands and file names use SculptForge's own names throughout (`part_*`, `forgesphere_*`, `bridge_*`,
+  `facegroup_*`, `load_litsphere`, `library_open`, `layout=classic`, `input_style classic`, the `--facegroups` flag,
+  the `SCULPTFORGE_LITSPHERE_PATH` variable). Scripts, macros, keymaps, radial menus, packs, projects and preferences
+  from older versions still load: their old names are read once and mapped to the new ones. The old command-line flag
+  and environment variable names are no longer read.
+
+### Removed
+- The library export plug-in for another sculpting app and opening its library files through it. A folder of numbered
+  Bridge files still opens as one scene.
+
 ## [0.10.11] - 2026-11-03
 
 ### Added
