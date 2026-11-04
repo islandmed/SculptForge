@@ -17,6 +17,12 @@ const char* powerSourceName(PowerSource power) {
     return "unknown";
 }
 
+size_t strokeShadeBudget(size_t points, double ms, double nsPerPoint, size_t minPoints) {
+    if (!(ms > 0.0) || !(nsPerPoint > 0.0)) return points;
+    const size_t timed = std::max(size_t(ms * 1e6 / nsPerPoint), minPoints);
+    return points ? std::min(points, timed) : timed;
+}
+
 int targetHzForDisplay(int hz) {
     if (hz >= 143) return 144;
     if (hz >= 119) return 120;
@@ -71,6 +77,7 @@ Json tierConfigJson(const TierConfig& c) {
     j.set("resident_cache_cap_mb", double(c.residentCacheCapMB));
     j.set("active_triangle_budget", double(c.activeTriangleBudget));
     j.set("shade_budget_points", double(c.shadeBudgetPoints));
+    j.set("stroke_shade_ms", c.strokeShadeMs);
     j.set("out_of_core_points", double(c.outOfCorePoints));
     j.set("upload_budget_mb_per_frame", double(c.uploadBudgetMBPerFrame));
     j.set("draft_brush_mode", c.draftBrushMode);

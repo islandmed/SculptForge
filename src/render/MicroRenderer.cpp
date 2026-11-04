@@ -8,6 +8,7 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <bit>
 #include <cmath>
 #include <cstring>
@@ -426,6 +427,7 @@ void MicroRenderer::shadePending(const Mesh& mesh, bool all) {
     seeds.erase(std::unique(seeds.begin(), seeds.end()), seeds.end());
     if (seeds.size() > limit) seeds.resize(limit);
     if (seeds.empty()) return;
+    const auto started = std::chrono::steady_clock::now();
     std::vector<uint32_t> sorted;
     if (stageIndex_.size() != mm.baseTriangles) stageIndex_.assign(mm.baseTriangles, 0);
     shader_.shade(mesh, seeds, false, written_, [&](uint32_t t) -> uint32_t* {
@@ -447,6 +449,11 @@ void MicroRenderer::shadePending(const Mesh& mesh, bool all) {
         i = j;
     }
     gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
+    if (!written_.empty()) { // the cost per point, smoothed (a stroke's shading budget in time follows it)
+        const double ns = std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - started).count() /
+                          double(written_.size() * S);
+        shadeNsPerPoint_ = shadeNsPerPoint_ > 0.0 ? shadeNsPerPoint_ * 0.7 + ns * 0.3 : ns;
+    }
     for (uint32_t t : written_) {
         uint64_t& w = pending_[t >> 6];
         const uint64_t bit = uint64_t(1) << (t & 63);
@@ -540,6 +547,9 @@ bool MicroRenderer::sync(Mesh& mesh) {
             // stroke runs (the rest follows when it ends).
             const TierConfig tier = currentTierConfig();
             shadeBudget = size_t(tier.shadeBudgetPoints) / (mm.stroking && tier.draftBrushMode ? 4 : 1);
+            // While a stroke runs, also no more than strokeShadeMs of it (at least one patch and its ring), so a
+            // slower CPU doesn't spend the frame the dabs need on shading; the rest follows as before.
+            if (mm.stroking) shadeBudget = strokeShadeBudget(shadeBudget, tier.strokeShadeMs, shadeNsPerPoint_, size_t(mm.samples) * 3);
             if (pendingCount_) shadePending(mesh, false);
         }
     }
