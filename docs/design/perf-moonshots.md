@@ -33,6 +33,10 @@ this; an experiment that misses it stays off for that tier or doesn't ship.
    octahedral normals, implicit adjacency), and micro levels (1.25 bytes per triangle) above ~8M.
 5. **Benchmarks.** Every number is reported twice: this laptop and the **iGPU-simulated floor profile** (below),
    with p99 frame time and stroke latency at 5, 20 and 50M triangles. A beta must not regress the floor tier.
+6. **The floor decides; a big GPU never does (Tony, 11-03).** Performance must never be gated by an expensive GPU:
+   that is the value proposition. Every perf claim and every beta gate is judged on the floor tier first (the
+   simulated profile and this laptop), and only then on the RTX 3060, as a sanity check. The 3060 PC is for test
+   speed and Windows driver checks, not the target. A result that meets its target only on the 3060 has not met it.
 
 **The iGPU-simulated profile** (`SF_HW_SIMULATE=floor`, core/HardwareProfile.h; applied where the hardware
 profile is applied, so it is the same code a real floor machine runs): Laptop tier; 4 worker threads;
@@ -72,7 +76,7 @@ in every run). It stays env-only (`SF_MOTION_RESOLUTION`) until it helps somewhe
 the per-pixel cost dominates (core-200m §8), is the case to test. The 20-50M orbit fix is building the motion
 proxy before the orbit starts.
 
-**Windows, real GPU** (RTX 3060, Ryzen 5600X, Win 11, GL 3.3 NVIDIA 616.56; this branch's CI package eb2f2aa;
+**Windows, real GPU: sanity check, not the target** (RTX 3060, Ryzen 5600X, Win 11, GL 3.3 NVIDIA 616.56; this branch's CI package eb2f2aa;
 `bench/windows/rtx3060-eb2f2aa-*.json`). standard-15m, the three toggles off (3 runs) vs on (2 runs), interleaved:
 
 | 15M | frame p99 off / on | visible stroke behind the pointer p50 / p99, off / on |
@@ -88,7 +92,8 @@ proxy before the orbit starts.
 With the toggles on the stroke you see stays under the pen (the preview's head, `preview_lag_px`) and small-brush
 frame p99 halves; the committed mesh finishes as before (its lag is the same or up to ~20% later: the solver does
 the same work, and the frame no longer waits for it). This is Background Preview's case for on-by-default after
-the beta's tester reports. GL draw stays 0.1-0.8 ms p50 even at 50M; the real-GPU and simulated-floor runs at
+the beta's tester reports, and only if the floor A/B (§5) shows the same: a 3060 result alone does not count
+(item 6). GL draw stays 0.1-0.8 ms p50 even at 50M; the real-GPU and simulated-floor runs at
 5/20/50M (governor pinned) agree on strokes (240 px at 20M: 536 / 562 ms committed-surface lag p50) and differ only
 in orbit, where the floor's motion proxy from 3M makes 5-20M orbit cheaper (20M 1.1 vs 4.6 ms p50); the 50M orbit
 upload spike (27.5 ms p99) is in both. A 3060 can't simulate an iGPU's fill rate: the floor numbers here test the
@@ -286,8 +291,8 @@ the frame; Fast Upload moves the GL thread's 2-10 ms commit copy to a GPU copy. 
 
 - **Ship now, Experimental, off by default (0.11.0-beta.1):** Live Move, Background Preview, Fast Upload. They are
   tested equal to the plain path, so the beta risk is in drawing (driver differences), which is what the
-  #testers checklist asks about. Promote one to on-by-default only with the 33M numbers above and clean tester
-  reports on Windows, Linux and macOS.
+  #testers checklist asks about. Promote one to on-by-default only when the floor profile (§0, item 6) shows the gain, with clean tester reports
+  on Windows (iGPU laptops first), Linux and macOS; the RTX 3060 numbers are a sanity check, not the case.
 - **Build next:** Focus Detail's GPU side (per-tile resident levels in the MicroRenderer, idea 8): the data side's
   measurements (promotion 0.05 ms a tile, GPU 3130 -> 597 MB at 1B) make it the biggest lever toward
   billion-triangle assets. Then idea 6 made automatic (Divide past ~8M goes to a micro level).
