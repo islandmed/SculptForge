@@ -2707,7 +2707,7 @@ void Renderer::endCapture(std::vector<uint8_t>& rgba) {
 
 void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, const RenderSettings& settings,
                     const Viewport& viewport) {
-    // SF_FRAME_LOG=ms (App.cpp): a draw slower than that says where its time went.
+    // SF_FRAME_LOG=ms (App.cpp): a draw slower than that says where its time went (lit spheres, environment, Parts).
     static const double drawLogMs = std::getenv("SF_FRAME_LOG") ? std::atof(std::getenv("SF_FRAME_LOG")) : -1.0;
     const auto drawStart = std::chrono::steady_clock::now();
     double drawMarks[4] = {};
@@ -2722,7 +2722,7 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
             if (limit < 0.0) return;
             const double total = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
             if (total > limit)
-                SDL_Log("draw %.1f ms: matcaps %.1f, environment %.1f, Parts %.1f, the rest %.1f", total, marks[0],
+                SDL_Log("draw %.1f ms: lit spheres %.1f, environment %.1f, Parts %.1f, the rest %.1f", total, marks[0],
                         marks[1] - marks[0], marks[2] - marks[1], total - marks[2]);
         }
     } drawLog{drawLogMs, drawMarks, drawStart};

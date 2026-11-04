@@ -8,7 +8,7 @@ added: **Fast Big Brushes** (Preferences > Performance, on by default): a dab th
   own slope, no neighbour walks), and the dabs waiting for a frame go through the vertices together in one pass, so
   the normals, the picking structure and the GPU copy are updated once a frame instead of once a dab. Every vertex
   still moves by the brush itself; the exact shading follows when the pen rests and when it lifts. Standard, Clay,
-  Flatten, Crease, Pinch and Dam Standard; Trim takes the sampled plane and shading but not the fused pass. Small
+  Flatten, Crease, Pinch and Sharp Crease; Trim takes the sampled plane and shading but not the fused pass. Small
   brushes, Smooth, Layer, Inflate, Nudge, Clay Block, alphas and masked areas are placed dab by dab as before.
   The result matches the dab-by-dab stroke to within about 2% of how far it moved the surface
   (tests/test_beta_boost.cpp).

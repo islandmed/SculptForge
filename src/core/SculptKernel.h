@@ -15,7 +15,7 @@
 
 namespace sf {
 
-// Standard, Clay, Flatten, Crease, Pinch, Dam Standard and Trim: the offset of a point from its place alone.
+// Standard, Clay, Flatten, Crease, Pinch, Sharp Crease and Trim: the offset of a point from its place alone.
 // Fused batches take all but Trim (its crisp cut shows where a centre moved by a hair).
 inline bool isPlaneKernelBrush(BrushType t) {
     return t == BrushType::Standard || t == BrushType::Clay || t == BrushType::Flatten || t == BrushType::Crease ||
