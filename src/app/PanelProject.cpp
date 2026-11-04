@@ -106,6 +106,8 @@ void App::initProject() {
         checkUpdates_ = prefs["check_updates"].asBool(checkUpdates_);
         updateCheckedAt_ = int64_t(prefs["update_checked_at"].asNumber(0));
         if (prefs["update_skipped"].isString()) updateSkipped_ = prefs["update_skipped"].asString();
+        if (prefs["update_channel"].isString())
+            updateChannel_ = prefs["update_channel"].asString() == "preview" ? UpdateChannel::Preview : UpdateChannel::Stable;
         sculptSeconds_ = addSculptTime(prefs["sculpt_seconds"].asNumber(0.0), 0.0);
         supportReminderDone_ = prefs["support_reminder_done"].asBool(false);
         supportCardPrefs_.enabled = prefs["support_card"].asBool(true);
@@ -176,6 +178,7 @@ void App::saveProjectPrefs() {
     prefs.set("check_updates", checkUpdates_);
     prefs.set("update_checked_at", double(updateCheckedAt_));
     if (!updateSkipped_.empty()) prefs.set("update_skipped", updateSkipped_);
+    prefs.set("update_channel", std::string(updateChannel_ == UpdateChannel::Preview ? "preview" : "stable"));
     prefs.set("sculpt_seconds", std::floor(sculptSeconds_)); // for the one support reminder (Support.h); stays here
     prefs.set("support_reminder_done", supportReminderDone_);
     prefs.set("support_card", supportCardPrefs_.enabled); // the support card at launch (Support.h)
@@ -682,6 +685,16 @@ void App::drawProjectPopups() {
 
 // --- Update check ---
 
+#ifndef SCULPTFORGE_PRERELEASE
+#define SCULPTFORGE_PRERELEASE ""
+#endif
+
+const char* App::appPrerelease() { return SCULPTFORGE_PRERELEASE; }
+std::string App::appFullVersion() {
+    return std::string(SCULPTFORGE_VERSION) + (*SCULPTFORGE_PRERELEASE ? std::string("-") + SCULPTFORGE_PRERELEASE : "");
+}
+std::string App::appVersionLabel() { return versionLabel(SCULPTFORGE_VERSION, SCULPTFORGE_PRERELEASE); }
+
 void App::startUpdateCheck(bool manual) {
     if (updateJob_) return; // one at a time
     auto job = std::make_shared<UpdateJob>();
@@ -694,7 +707,8 @@ void App::startUpdateCheck(bool manual) {
     const char* feed = std::getenv("SF_UPDATE_FEED");
     std::string source = feed && *feed ? feed : kUpdateFeedUrl;
     // Detached: a slow network never holds up quitting (the job is shared, so it outlives the app if it must).
-    std::thread([job, source] {
+    const UpdateChannel channel = updateChannel_;
+    std::thread([job, source, channel] {
         std::string body;
         if (source.rfind("https://", 0) == 0 || source.rfind("http://", 0) == 0) {
             ai::HttpResponse r = ai::httpRequest("GET", source, {"Accept: application/json"}, {}, 15);
@@ -707,7 +721,7 @@ void App::startUpdateCheck(bool manual) {
             if (f) body.assign(std::istreambuf_iterator<char>(f), {});
             else job->error = "can't read " + source;
         }
-        if (job->error.empty()) job->ok = parseUpdateFeed(body, job->info, job->error);
+        if (job->error.empty()) job->ok = parseUpdateFeed(body, job->info, job->error, channel);
         job->done = true;
     }).detach();
 }
@@ -722,8 +736,8 @@ void App::pollUpdateCheck() {
         return;
     }
     const UpdateInfo& u = job->info;
-    if (compareVersions(u.version, SCULPTFORGE_VERSION) <= 0) {
-        updateStatus_ = "SculptForge " SCULPTFORGE_VERSION " is the newest version";
+    if (compareVersions(u.version, appFullVersion()) <= 0) {
+        updateStatus_ = "SculptForge " + appVersionLabel() + " is the newest version";
         if (job->manual) status_ = updateStatus_;
         return;
     }
@@ -751,7 +765,7 @@ void App::drawUpdateBanner() {
         if (guide_.bodyBoldFont()) ImGui::PopFont();
         if (ImFont* body = guide_.bodyFont()) ImGui::PushFont(body);
         ImGui::SameLine();
-        ImGui::TextDisabled(tr("(you have %s)"), SCULPTFORGE_VERSION);
+        ImGui::TextDisabled(tr("(you have %s)"), appVersionLabel().c_str());
         for (const auto& h : u.highlights) ImGui::BulletText("%s", h.c_str());
         ImGui::TextDisabled("%s", kFreeReleaseNote); // memberships (Support.h): releases stay free for everyone
         if (guide_.bodyFont()) ImGui::PopFont();
@@ -785,6 +799,21 @@ void App::drawUpdatesSection() {
                  "Once a day at startup, download a small file from the SculptForge website that names the newest "
                  "version, and show a banner when there is a newer one. Nothing about you or your computer is sent.",
                  "Preferences > Updates");
+    ImGui::TextUnformatted(tr("Update channel"));
+    int channel = updateChannel_ == UpdateChannel::Preview ? 1 : 0;
+    bool changed = ImGui::RadioButton(tr("Stable"), &channel, 0);
+    ImGui::SameLine();
+    changed |= ImGui::RadioButton(tr("Preview (betas)"), &channel, 1);
+    ui::HelpText("Update channel", nullptr,
+                 "Stable offers only finished releases. Preview also offers the betas: the next version a couple of "
+                 "weeks before it ships, for trying it out and reporting what goes wrong (Discord #bug-reports). When "
+                 "the stable release passes the beta, Preview offers that.",
+                 "Preferences > Updates");
+    if (changed) {
+        updateChannel_ = channel ? UpdateChannel::Preview : UpdateChannel::Stable;
+        updateSkipped_.clear();
+        saveProjectPrefs();
+    }
 #else
     ImGui::TextWrapped("%s", tr("This build gets its updates from your package manager."));
 #endif

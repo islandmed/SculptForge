@@ -7,6 +7,8 @@
 #   HIGHLIGHTS=notes.txt scripts/release.sh X.Y.Z --yes   every step, in order (the normal way: one command)
 #   scripts/release.sh X.Y.Z --from site                  resume at a step (after fixing what stopped it)
 #   scripts/release.sh X.Y.Z --only replies              one step
+#   HIGHLIGHTS=f scripts/release.sh X.Y.Z-beta.N --yes  a beta (also -rc.N): a GitHub pre-release for testers, offered
+#                     only to apps on the Preview update channel (see "Betas" below and docs/releasing.md)
 #   HIGHLIGHTS=file   the update feed's 3-5 highlight lines, one per line (default: the version's highlight: lines in
 #                     What's New and the note fragments, tools/release/assemble_notes.py X.Y.Z --highlights)
 #   (the home page's What's New area is written by tools/guide/build_site.py from docs/guide/whats-new.md: the
@@ -18,6 +20,11 @@
 # Each step looks at the live state first and skips what is already done, so running it again is always safe.
 # When something is wrong it stops and prints the fix; fix it, then run again with --from <that step>.
 # It never posts issue replies: it writes drafts for a person to read and post.
+# Betas: steps bump check ci tag release preview status. bump sets CMakeLists.txt to X.Y.Z with
+# SCULPTFORGE_PRERELEASE "beta.N" (the app says "X.Y.Z Beta N"; CHANGELOG, CITATION, metainfo and the home page stay
+# at the stable release); preview writes channels.preview in website/latest.json (the stable top level is untouched);
+# the Discord announcement workflow posts the beta once the feed names it. No site, AUR, Homebrew, Omarchy, winget or
+# issue replies. The stable release later is plain scripts/release.sh X.Y.Z, which clears the prerelease.
 # Needs: gh logged in as islandmed (gh auth status), git, curl, python3, sha256sum (or shasum); run it from a clean
 # checkout of main. Pushes to main and the tag are made here, so only the release coordinator runs it, after
 # Tony's "ship it" for this version.
@@ -49,7 +56,10 @@ confirm() {
 }
 
 V=${1:-}
-[[ "$V" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "usage: scripts/release.sh X.Y.Z [--from STEP | --only STEP]"; exit 2; }
+[[ "$V" =~ ^([0-9]+\.[0-9]+\.[0-9]+)(-((beta|rc)\.[0-9]+))?$ ]] ||
+    { echo "usage: scripts/release.sh X.Y.Z[-beta.N|-rc.N] [--from STEP | --only STEP] [--yes]"; exit 2; }
+BASE=${BASH_REMATCH[1]} PRE=${BASH_REMATCH[3]} # 0.11.0-beta.1: BASE 0.11.0, PRE beta.1; a stable release: PRE ""
+[ -z "$PRE" ] || STEPS=(bump check ci tag release preview status)
 shift
 FROM=bump ONLY=
 while [ $# -gt 0 ]; do
@@ -140,9 +150,12 @@ gh_file() { gh api "repos/$1/contents/$2${3:+?ref=$3}" -q .content 2>/dev/null |
 # The home page's "new in X.Y.Z" card and "New in X.Y.Z:" lede in #whats-new, written by build_site.py (step bump) from
 # the version's ```features block in whats-new.md, which needs a date and a tagline.
 card_ok() { grep -qF "<small>new in $V</small>" website/index.html && grep -qF "class=\"section-lede\">New in $V:" website/index.html; }
-features_ok() { awk -v v="## Version $V" '$0==v{f=1;next} f&&/^## /{exit} f' docs/guide/whats-new.md | grep -q '^tagline: .'; }
+features_ok() { awk -v v="## Version $BASE" '$0==v{f=1;next} f&&/^## /{exit} f' docs/guide/whats-new.md | grep -q '^tagline: .'; }
 card_fix="give '## Version $V' in docs/guide/whats-new.md a \`\`\`features block (date: unreleased, tagline: ..., highlight: ..., cards), commit, push main, run again"
-feed_done() { grep -qF "\"version\": \"$V\"" website/latest.json; }
+feed_done() { grep -qF "\"version\": \"$V\"" website/latest.json; } # (a beta's is in channels.preview)
+# A beta's entry in the update feed: channels.preview (old apps and the Stable channel read only the top level).
+preview_done() { python3 -c 'import json, sys; sys.exit(json.load(open("website/latest.json")).get("channels", {}).get("preview", {}).get("version") != sys.argv[1])' "$V" 2>/dev/null; }
+prerelease_is() { grep -qx "set(SCULPTFORGE_PRERELEASE \"$1\")" CMakeLists.txt; }
 # HIGHLIGHTS names a file of 3-5 non-empty lines.
 highlights_ok() {
     local n
@@ -154,10 +167,10 @@ highlights_fix="write 3-5 one-line highlights (what users get) to a file and run
 # The words people write for What's New: the guide section and the UI test that expects it.
 words_ok() {
     python3 tools/release/assemble_notes.py --check >/dev/null || die "a note fragment in changes/ doesn't parse: $(python3 tools/release/assemble_notes.py --check 2>&1)" "fix it (changes/README.md has the format), commit, push main"
-    grep -q "^## Version ${V//./\\.}\$" docs/guide/whats-new.md || grep -qs '^whats_new:' changes/*.md ||
-        die "docs/guide/whats-new.md has no '## Version $V'" "write that section at the top (Help > What's New shows it), commit, push main"
-    grep -qF "expect_text \"Version $V\"" tests/ui/whats_new.sfui ||
-        die "tests/ui/whats_new.sfui doesn't check Version $V" "update its first expect_text lines to the new section (the version and one line from it), commit, push main"
+    grep -q "^## Version ${BASE//./\\.}\$" docs/guide/whats-new.md || grep -qs '^whats_new:' changes/*.md ||
+        die "docs/guide/whats-new.md has no '## Version $BASE'" "write that section at the top (Help > What's New shows it), commit, push main"
+    grep -qF "expect_text \"Version $BASE\"" tests/ui/whats_new.sfui ||
+        die "tests/ui/whats_new.sfui doesn't check Version $BASE" "update its first expect_text lines to the new section (the version and one line from it), commit, push main"
 }
 # UI scale / DPI (#87): the Windows manifest still asks for per-monitor DPI v2, and the "dpi" UI tests (100-200 %, a
 # display-scale event) pass on main's build. BUILD_DIR (default build) is the coordinator's tree, already built for
@@ -183,12 +196,27 @@ preflight() {
     auth=$(gh auth status 2>&1 || true)
     grep -q "account $AUTHOR_NAME" <<<"$auth" || die "gh is not logged in as $AUTHOR_NAME" "gh auth login (or gh auth switch -u $AUTHOR_NAME)"
     words_ok
+    grep -q '^set(SCULPTFORGE_PRERELEASE "[a-z0-9.]*")$' CMakeLists.txt ||
+        die "CMakeLists.txt lost its set(SCULPTFORGE_PRERELEASE \"\") line that step bump sets" "restore it under project() (git log -p CMakeLists.txt), commit"
+    python3 -c 'import json, sys; json.load(open(sys.argv[1]))' website/latest.json 2>/dev/null || die "website/latest.json is not valid JSON" "fix it, commit"
+    if [ -n "$PRE" ]; then # a beta: the update feed's channels.preview, nothing else of the site, no packages
+        if ! preview_done; then
+            if [ -z "${HIGHLIGHTS:-}" ]; then
+                HIGHLIGHTS=$(mktemp)
+                python3 tools/release/assemble_notes.py "$BASE" --highlights >"$HIGHLIGHTS"
+                highlights_ok || HIGHLIGHTS=
+            fi
+            highlights_ok || die "HIGHLIGHTS must name a file with 3-5 highlight lines for the beta's feed entry (now: '${HIGHLIGHTS:-unset}')" "$highlights_fix"
+        fi
+        ok "What's New $BASE and the highlights are ready for the beta (a beta has no site, package or reply steps)"
+        return
+    fi
     # site (bump writes the home page's card from the features block)
     card_ok || features_ok || die "docs/guide/whats-new.md: Version $V has no \`\`\`features block with a tagline" "$card_fix"
     if ! feed_done; then
         if [ -z "${HIGHLIGHTS:-}" ]; then # the version's highlight lines (What's New features block + note fragments)
             HIGHLIGHTS=$(mktemp)
-            python3 tools/release/assemble_notes.py "$V" --highlights >"$HIGHLIGHTS"
+            python3 tools/release/assemble_notes.py "$BASE" --highlights >"$HIGHLIGHTS"
             highlights_ok || HIGHLIGHTS=
         fi
         highlights_ok || die "HIGHLIGHTS must name a file with 3-5 highlight lines for the update feed (now: '${HIGHLIGHTS:-unset}')" "$highlights_fix"
@@ -221,12 +249,16 @@ step_bump() {
     on_main
     preflight bump
     local out
+    # A beta's #testers checklist comes from the fragments, so it is written before they go (step status names it).
+    if [ -n "$PRE" ] && ls changes/*.md 2>/dev/null | grep -v '/README.md$' >/dev/null; then
+        python3 tools/release/assemble_notes.py "$BASE" --testers >"release-testers-$V.md"
+    fi
     # Note fragments (changes/<branch>.md) into CHANGELOG [Unreleased] and What's New X.Y.Z; the fragments go.
-    out=$(python3 tools/release/assemble_notes.py "$V" --apply 2>&1) || die "$out" "fix that fragment in changes/, commit, push main"
+    out=$(python3 tools/release/assemble_notes.py "$BASE" --apply 2>&1) || die "$out" "fix that fragment in changes/, commit, push main"
     grep -q 'written' <<<"$out" && echo "$out" | sed 's/^/   notes: /'
-    out=$(python3 - "$V" "$TODAY" <<'PY'
+    out=$(python3 - "$BASE" "$TODAY" "$PRE" <<'PY'
 import re, sys
-v, today = sys.argv[1:]
+v, today, pre = sys.argv[1:]
 ev = re.escape(v)
 new = {}
 
@@ -245,7 +277,14 @@ def sub1(p, t, pat, rep):
 
 p = "CMakeLists.txt"; t = load(p)
 if not re.search(rf"^project\(SculptForge VERSION {ev}\b(?!\.)", t, re.M):
-    new[p] = sub1(p, t, r"^(project\(SculptForge VERSION )[0-9]+(?:\.[0-9]+)*", rf"\g<1>{v}")
+    t = new[p] = sub1(p, t, r"^(project\(SculptForge VERSION )[0-9]+(?:\.[0-9]+)*", rf"\g<1>{v}")
+if f'set(SCULPTFORGE_PRERELEASE "{pre}")' not in t:  # a beta sets it, the stable release clears it
+    new[p] = sub1(p, t, r'^set\(SCULPTFORGE_PRERELEASE "[^"]*"\)$', f'set(SCULPTFORGE_PRERELEASE "{pre}")')
+if pre:  # a beta: CITATION, metainfo, CHANGELOG, What's New's date and the home page wait for the stable release
+    for p, t in new.items():
+        open(p, "w", encoding="utf-8").write(t)
+        print(p)
+    sys.exit(0)
 
 p = "CITATION.cff"; t = load(p)
 if not re.search(rf"^version: {ev}$", t, re.M):
@@ -289,8 +328,8 @@ for p, t in new.items():  # written only after every check passed, so a failure 
 PY
 ) || die "$out" "fix that file by hand (CHANGELOG entries and What's New are written by people), commit, push main"
     [ -n "$out" ] && echo "$out" | sed 's/^/   set: /'
-    python3 tools/guide/build_site.py >/dev/null # the guide, and the home page's What's New area for $V
-    card_ok || die "website/index.html has no 'new in $V' card after build_site.py" "$card_fix"
+    python3 tools/guide/build_site.py >/dev/null # the guide, and the home page's What's New area for $V (not a beta's)
+    [ -n "$PRE" ] || card_ok || die "website/index.html has no 'new in $V' card after build_site.py" "$card_fix"
     git add CMakeLists.txt CITATION.cff packaging/rez/package.py packaging/linux/org.sculptforge.SculptForge.metainfo.xml CHANGELOG.md website/index.html docs/guide/whats-new.md
     git add -A changes
     git add -A website/guide
@@ -298,7 +337,11 @@ PY
         ok "every version file already says $V and the guide is built"
         return
     fi
-    commit -m "Release $V: version files, CHANGELOG section, guide"
+    if [ -n "$PRE" ]; then
+        commit -m "Beta $V: CMake version $BASE $PRE, notes, guide"
+    else
+        commit -m "Release $V: version files, CHANGELOG section, guide"
+    fi
     push_main
     ok "version files at $V, guide rebuilt, pushed main $(git rev-parse --short HEAD)"
 }
@@ -307,6 +350,19 @@ step_check() {
     on_main
     preflight
     local bump="run step bump: scripts/release.sh $V --only bump (it sets every version file)"
+    grep -q "^project(SculptForge VERSION ${BASE//./\\.}[ )]" CMakeLists.txt || die "CMakeLists.txt is not at $BASE" "$bump"
+    prerelease_is "$PRE" || die "CMakeLists.txt's SCULPTFORGE_PRERELEASE is not \"$PRE\"" "$bump"
+    if [ -n "$PRE" ]; then
+        python3 tools/guide/build_site.py >/dev/null
+        [ -z "$(git status --porcelain -- website/guide website/index.html)" ] ||
+            die "website/guide is not rebuilt from docs/guide, or the home page changed (a beta leaves it alone)" "$bump"
+        if git rev-parse -q --verify "refs/tags/$T" >/dev/null && [ "$(git rev-list -n1 "$T")" != "$(git rev-parse HEAD)" ]; then
+            die "$T already tags $(git rev-list -n1 "$T"), not main's $(git rev-parse --short HEAD)" "if that is the beta, continue: scripts/release.sh $V --from release; if not, use the next number ($BASE-${PRE%.*}.$((${PRE##*.} + 1)))"
+        fi
+        ok "CMakeLists.txt says $BASE $PRE and the guide is built at $(git rev-parse --short HEAD)"
+        dpi_ok
+        return
+    fi
     grep -q "^project(SculptForge VERSION ${V//./\\.}[ )]" CMakeLists.txt || die "CMakeLists.txt is not at $V" "$bump"
     grep -q "^## \[${V//./\\.}\]" CHANGELOG.md || die "CHANGELOG.md has no '## [$V] - date' section" "$bump"
     grep -qF "<release version=\"$V\"" packaging/linux/org.sculptforge.SculptForge.metainfo.xml || die "metainfo has no <release version=\"$V\">" "$bump"
@@ -339,7 +395,7 @@ step_tag() {
     if gh api "repos/$REPO/git/ref/tags/$T" >/dev/null 2>&1; then ok "$T is already pushed"; return; fi
     local sha
     sha=$(git rev-parse HEAD)
-    confirm "Tag $T at $(git log -1 --format='%h %s' "$sha") and push it? This publishes SculptForge $V." ||
+    confirm "Tag $T at $(git log -1 --format='%h %s' "$sha") and push it? This publishes SculptForge $V${PRE:+ as a GitHub pre-release for testers}." ||
         die "not confirmed" "run again and answer y (or YES=1) once Tony has said ship it for $V"
     git rev-parse -q --verify "refs/tags/$T" >/dev/null || git tag "$T" "$sha"
     gitp push -q origin "$T" || die "pushing $T failed" "git push origin $T (check gh auth status)"
@@ -388,6 +444,14 @@ if not 3 <= len(lines) <= 5:
 with open("website/latest.json", encoding="utf-8") as f:
     feed = json.load(f)
 feed["version"], feed["highlights"] = v, lines
+def key(s):  # 0.11.0-beta.1 < 0.11.0, as src/core/UpdateCheck.cpp orders them
+    n, _, pre = s.partition("-")
+    return [int(x) for x in n.split(".")], (0, pre) if pre else (1, "")
+pv = feed.get("channels", {}).get("preview", {}).get("version", "")
+if pv and key(pv) <= key(v):  # stable passed the beta: Preview is offered stable (the app checks this too)
+    del feed["channels"]["preview"]
+    if not feed["channels"]:
+        del feed["channels"]
 with open("website/latest.json", "w", encoding="utf-8") as f:
     json.dump(feed, f, indent=2, ensure_ascii=False)
     f.write("\n")
@@ -506,7 +570,54 @@ step_replies() {
     ok "drafts for $(echo "$issues" | wc -w) issues in $out: read them, then post with gh issue comment / close"
 }
 
+step_preview() {
+    release_ready
+    on_main
+    if preview_done; then
+        ok "website/latest.json's channels.preview already says $V"
+    else
+        if [ -z "${HIGHLIGHTS:-}" ]; then # (a run that started here) What's New's highlight lines for the version
+            HIGHLIGHTS=$work/highlights
+            python3 tools/release/assemble_notes.py "$BASE" --highlights >"$HIGHLIGHTS"
+        fi
+        highlights_ok || die "the feed's preview entry needs this beta's highlights" "$highlights_fix --from preview"
+        python3 - "$V" "$HIGHLIGHTS" "https://github.com/$REPO/releases/tag/$T" <<'PY'
+import json, sys
+v, notes, url = sys.argv[1:]
+lines = [l.strip() for l in open(notes, encoding="utf-8") if l.strip()]
+if not 3 <= len(lines) <= 5:
+    sys.exit(f"{notes}: want 3-5 highlight lines, found {len(lines)}")
+with open("website/latest.json", encoding="utf-8") as f:
+    feed = json.load(f)
+feed.setdefault("channels", {})["preview"] = {
+    "version": v, "download": url, "notes": "https://sculptforge.app/guide/whats-new.html", "highlights": lines}
+with open("website/latest.json", "w", encoding="utf-8") as f:
+    json.dump(feed, f, indent=2, ensure_ascii=False)
+    f.write("\n")
+PY
+        git add website/latest.json
+        commit -m "Update feed: $V on the Preview channel"
+        push_main
+        ok "pushed channels.preview (the stable top level is unchanged)"
+    fi
+    wait_live https://sculptforge.app/latest.json "\"version\": \"$V\"" 600 ||
+        die "sculptforge.app still serves the old feed after 10 minutes" "check the Website workflow: gh run list -R $REPO -w pages.yml -L 3; re-run it if it failed"
+    ok "sculptforge.app/latest.json offers $V on the Preview channel"
+}
+
 step_status() {
+    if [ -n "$PRE" ]; then
+        echo "   Beta:     https://github.com/$REPO/releases/tag/$T (a pre-release: releases/latest stays on stable)"
+        echo "   Discord:  the Discord announcement workflow posts it in #announcements with how to send feedback"
+        echo "             (gh run list -R $REPO -w discord-announce.yml -L 1)"
+        if [ -f "release-testers-$V.md" ]; then
+            echo "   Testers:  $PWD/release-testers-$V.md (read it, then post it in #testers)"
+        else
+            echo "   Testers:  no checklist (the note fragments had no testers: lines)"
+        fi
+        echo "   Stable:   when testers are happy: HIGHLIGHTS=f scripts/release.sh $BASE --yes (clears the prerelease)"
+        return
+    fi
     local winget
     winget=$(gh pr view 464465 -R microsoft/winget-pkgs --json state -q .state 2>/dev/null || echo unknown)
     echo "   winget-pkgs#464465: $winget (update it once it merges; waits on the CLA)"

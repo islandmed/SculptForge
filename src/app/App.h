@@ -1219,11 +1219,15 @@ private:
     };
     void startUpdateCheck(bool manual);
     void pollUpdateCheck();
+    static const char* appPrerelease();     // "beta.1" in a beta build, else ""
+    static std::string appFullVersion();    // "0.11.0-beta.1": what the update check compares
+    static std::string appVersionLabel();   // "0.11.0 Beta 1": title bar (betas only) and About
     void drawUpdateBanner();
     void drawUpdatesSection(); // Preferences > Updates
     bool checkUpdates_ = true;
     int64_t updateCheckedAt_ = 0;   // unix time of the last automatic check
     std::string updateSkipped_;     // "Skip this version"
+    UpdateChannel updateChannel_ = appPrerelease()[0] ? UpdateChannel::Preview : UpdateChannel::Stable; // a beta stays on betas
     std::shared_ptr<UpdateJob> updateJob_;
     std::optional<UpdateInfo> updateAvailable_; // shown as the banner until dismissed
     std::string updateStatus_;                  // the last check's result, for Preferences > Updates

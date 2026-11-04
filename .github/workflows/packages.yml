@@ -65,7 +65,8 @@ jobs:
       - uses: actions/checkout@v7
         with: { ref: '${{ env.REF }}' }
       - name: Tag (the release's, or v<project version>)
-        run: echo "TAG=${{ inputs.tag }}" | sed "s/^TAG=$/TAG=v$(sed -n 's/^project(SculptForge VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)/" >> "$GITHUB_ENV"
+        # (a beta's tag names its packages without the prerelease: v0.11.0-beta.1 makes SculptForge-0.11.0-*)
+        run: echo "TAG=${{ inputs.tag }}" | sed "s/^TAG=$/TAG=v$(sed -n 's/^project(SculptForge VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)/; s/^\(TAG=v[0-9.]*\)-.*/\1/" >> "$GITHUB_ENV"
       - run: |
           sudo ./packaging/linux/install-build-deps.sh
           sudo apt-get install -y --no-install-recommends ccache xvfb libgl1-mesa-dri
@@ -168,7 +169,8 @@ jobs:
       - uses: actions/checkout@v7
         with: { ref: '${{ env.REF }}' }
       - name: Tag (the release's, or v<project version>)
-        run: echo "TAG=${{ inputs.tag }}" | sed "s/^TAG=$/TAG=v$(sed -n 's/^project(SculptForge VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)/" >> "$GITHUB_ENV"
+        # (a beta's tag names its packages without the prerelease: v0.11.0-beta.1 makes SculptForge-0.11.0-*)
+        run: echo "TAG=${{ inputs.tag }}" | sed "s/^TAG=$/TAG=v$(sed -n 's/^project(SculptForge VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)/; s/^\(TAG=v[0-9.]*\)-.*/\1/" >> "$GITHUB_ENV"
       - run: ./packaging/linux/install-build-deps.sh
       - name: ccache (the static release binary, pinned by hash)
         run: |
