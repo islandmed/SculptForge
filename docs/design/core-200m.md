@@ -349,6 +349,9 @@ each (off, on, off, on); floor = `SF_HW_SIMULATE=floor SF_GOVERNOR=0` (4 threads
   (both measured: no change worth a fix). With stroke-time shading held to ~10 ms a frame (256K points) 216 px falls
   to 102-114 ms and 108 px to 25 ms. The M1's floor simulation is optimistic for CPU-bound work. Runs that shared the
   PC with WSL builds were ~2x slower (win.sh now holds pc.sh's lock).
+- **On the E-cores (the floor's pessimistic bound, perf-moonshots §0):** 216 px committed lag 3,084 -> 1,455 ms p50
+  (with stroke shading capped: 2,551 -> 885 ms), 108 px 1,273 -> 546 ms (749 -> 291), per dab 147 -> 17.5 ms at
+  216 px. A clear win (2.1-2.9x) but far from the targets: shading (41-61 ms a frame uncapped) and the dab remain.
 - **Pen-up shading catch-up:** taking the patches the brush has left first (`SF_BENCH_SHADE_ORDER=fifo`) cuts it only
   234 -> 198 ms at 216 px: the exact shading of the stroke's ~2,700 patches is ~234 ms of the floor's 4 cores, with no
   CPU left during the stroke. Under 50 ms needs the normals on the GPU (normals from the displacement in the
