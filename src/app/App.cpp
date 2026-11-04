@@ -256,10 +256,17 @@ bool App::init(const AppOptions& options) {
                       ai::defaultGeneratorCommand(std::string(base) + cliName).c_str());
     }
     initHardwareProfile(); // the cached hardware profile, or calibration over the first frames (PanelPerformanceProfile.cpp)
+    initialised_ = true;
     return true;
 }
 
 void App::shutdown() {
+    if (!initialised_) { // init stopped early (no window or no OpenGL): nothing but SDL to take down
+        if (glContext_) SDL_GL_DestroyContext(glContext_);
+        if (window_) SDL_DestroyWindow(window_);
+        SDL_Quit();
+        return;
+    }
     saveWindowState();
     if (doc_.sculptor.strokeActive()) endStroke();
     solver_.reset(); // (its thread uses the renderer)
