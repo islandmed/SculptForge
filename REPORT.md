@@ -1,6 +1,7 @@
 # feat/link-speed: edit one file -> rebuilt binaries
 
-Branch feat/link-speed, code commit 142f7e82 (on 058dba75). Details and tables: docs/build-speed.md.
+Branch feat/link-speed-rebased, on origin/main 4b0d34a5 (after fix/ip-purge-2; ip_rename.py finds nothing left).
+feat/link-speed on GitHub is the pre-rebase copy (79f77aa8/9601bff1): delete it. Details and tables: docs/build-speed.md.
 
 ## What
 - `cmake/BuildSpeed.cmake` (included before the dependencies):
@@ -36,6 +37,8 @@ Full ctest on the PC (pc.sh): all pass except `ui_micro_levels` (SEGFAULT). Main
 it the same way: a WSL D3D12 issue (passes on the native driver; test-flow labels it no_d3d12). Its crash removes the D3D12 device, so 9 UI tests after it
 failed in the first run. Rerun alone: all pass. `close_holes_big_hole_is_quick` (timing) missed its limit once under
 -j10 and passed on rerun. check_marks and note fragments: OK.
+After the rebase: full PC ctest again, same two only (ui_micro_levels WSL; close_holes timing 3.1 s under load,
+its shard passes alone in 15 s).
 
 ## Notes for the merger
 - CMakeLists edits are in the targets (core/ai/phone PCH, new libs, app + tests sources); test-flow edits the tests
