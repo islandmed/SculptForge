@@ -359,6 +359,21 @@ toggles, is the CPU:
 These two are the floor's top problems: building the motion proxy ahead of the orbit and off the main thread, and
 CPU dab throughput (Fast Big Brushes, core-200m N2). They come before anything that needs a faster GPU.
 
+**Fixed: the orbit-start hitch** (11-04). `SF_FRAME_LOG` + `SF_SYNC_LOG` on the E-cores showed three frames of 157-160 ms,
+all in `Renderer::buildProxies`. Its 8 ms budget was checked only after each fixed batch of 1024 clusters, and on two slow
+cores one batch took the whole 157 ms. Now each batch is sized from the measured cost per cluster to fit what is left
+of the frame's budget (16-1024 clusters). Still frames after a stroke also rebuild the stale proxies at 4 ms a frame
+(`Renderer::setProxyPrebuild`, only for meshes already orbited, never while sculpting), so the next orbit usually
+starts with them ready. Floor, standard-15m, orbit p50 / p95 / p99 / max (`bench/floor/m1pro-proxyfix-*`):
+
+| | before | after |
+|---|---|---|
+| E-cores | 8.6-8.7 / 16 / **165-166** / 170-174 ms | 8.2-9.1 / 21 / **26-31** / 50-64 ms |
+| P-cores | 9.0 / 12-14 / 26-27 / 36-42 ms | 8.8-9.1 / 14-15 / 21-31 / 42-53 ms |
+
+On the E-cores the floor's orbit now meets p99 < 33 ms. p95 rises a little because the build is spread over more
+frames. On the P-cores nothing changes beyond noise. One frame per orbit still reaches 50-64 ms; that's the next one to find.
+
 The laptop profile shows the same pattern (240 px: 208 -> 6 px p50, frame p99 33 -> 16 ms; Smooth p99 36 -> 12 ms).
 On the simulated floor tier (optimistic for CPU-bound work, §0), with the toggles on, every stroke phase's p99 frame meets the < 33 ms target (off: 4 of 6 miss) and
 the stroke you see stays within a few pixels of the pen. The cost: the committed surface on a small brush lands

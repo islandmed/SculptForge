@@ -1714,13 +1714,23 @@ void Renderer::buildProxies(MeshSlot& s, const Mesh& mesh) {
     }
     // A few milliseconds a frame: after a long stroke most of the front is stale, and building all of it in the first
     // moving frame stalled the view (180-300 ms at 33M). Stale clusters draw in full detail until theirs is built.
-    constexpr double kProxyBudgetMs = 8.0;
-    constexpr size_t kProxyBatch = 1024; // clusters per parallel batch
+    // Batches are sized from the measured cost per cluster: a fixed 1024 took 157 ms a frame on two slow cores.
+    // Still frames (proxyPrebuild_) get less, as nothing waits for them.
+    const double budgetMs = proxyUsed_ ? 8.0 : 4.0;
+    constexpr size_t kProxyBatchMin = 16, kProxyBatchMax = 1024; // clusters per parallel batch
     const auto start = std::chrono::steady_clock::now();
+    auto elapsedMs = [&] { return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count(); };
     std::vector<std::vector<uint16_t>> built;
     gl::BindVertexArray(s.proxyVao);
     for (size_t at = 0; at < cullScratch_.size();) {
-        const size_t n = std::min(kProxyBatch, cullScratch_.size() - at);
+        const double left = budgetMs - elapsedMs();
+        if (at > 0 && left <= 0.0) {
+            proxyPending_ = true;
+            break;
+        }
+        const size_t fit = proxyMsPerCluster_ > 0.0 ? size_t(std::max(left, 0.0) / proxyMsPerCluster_) : 64;
+        const size_t n = std::min(std::clamp(fit, kProxyBatchMin, kProxyBatchMax), cullScratch_.size() - at);
+        const double batchStart = elapsedMs();
         built.assign(n, {});
         poolFor(n, [&](size_t i0, size_t i1) {
             for (size_t i = i0; i < i1; ++i) {
@@ -1739,11 +1749,8 @@ void Renderer::buildProxies(MeshSlot& s, const Mesh& mesh) {
                                   GLsizeiptr(built[i].size() * sizeof(uint16_t)), built[i].data());
         }
         at += n;
-        if (at < cullScratch_.size() &&
-            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() > kProxyBudgetMs) {
-            proxyPending_ = true;
-            break;
-        }
+        const double perCluster = (elapsedMs() - batchStart) / double(n);
+        proxyMsPerCluster_ = proxyMsPerCluster_ > 0.0 ? 0.7 * proxyMsPerCluster_ + 0.3 * perCluster : perCluster;
     }
     gl::BindVertexArray(0);
 }
@@ -2179,7 +2186,8 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     // Small meshes draw in full while the view moves too (their proxy would save little).
     constexpr size_t kProxyMinTriangles = size_t(1) << 18;
     if (syncLog) lapMs(lap);
-    if (proxyUsed_ && !s.outOfMemory && s.drawnTriangles >= kProxyMinTriangles) buildProxies(s, mesh);
+    if ((proxyUsed_ || (proxyPrebuild_ && s.proxyAllocated)) && !s.outOfMemory && s.drawnTriangles >= kProxyMinTriangles)
+        buildProxies(s, mesh);
     if (syncLog) proxyMs = lapMs(lap);
     syncTexture(s, mesh, pbr);
     syncNormalMap(s, mesh, normalMap);

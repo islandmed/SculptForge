@@ -239,6 +239,9 @@ public:
     size_t lastDrawnTriangles() const { return lastDrawn_; }
     // The last syncScene left motion proxies to build (a few milliseconds of them a frame; the rest draw in full).
     bool proxiesPending() const { return proxyPending_; }
+    // Build stale motion proxies on still frames too (after a stroke, so the next orbit starts with them), at a
+    // smaller budget; only for meshes whose proxies were drawn before. The app turns it on when nothing sculpts.
+    void setProxyPrebuild(bool on) { proxyPrebuild_ = on; }
 
     // Texture of matcap `index` (sRGB RGBA8, rows bottom-up) for UI previews; 0 if none (or a custom one not
     // uploaded yet: the next syncScene or draw does).
@@ -391,6 +394,8 @@ private:
     void buildProxies(MeshSlot& s, const Mesh& mesh);
     bool proxyUsed_ = false; // the last draw() drew motion proxies: sync keeps them current
     bool proxyPending_ = false; // (proxiesPending)
+    bool proxyPrebuild_ = false; // (setProxyPrebuild)
+    double proxyMsPerCluster_ = 0.0; // measured, so a frame's batches fit its budget on slow cores too
     // The ghost (setGhost), drawn on the slot ghostId_.
     GhostStroke ghost_;
     uint32_t ghostId_ = 0;

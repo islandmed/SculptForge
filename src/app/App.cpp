@@ -637,7 +637,8 @@ bool App::wantsFrames(double now) const {
            backgroundBusy() || playingLayer_ >= 0 || faceTakePlaying_ ||
            timelapseBusy() || hardwareCalibrating() || // both render a step per frame: they stop when the frames do
            spaceMouseMoving() || // a held SpaceMouse cap sends no events, but the view keeps moving (SpaceMouse.cpp)
-           perf_.framesStill < 10; // the view just moved: Fast Navigation's full-quality frame comes after it stops
+           perf_.framesStill < 10 || // the view just moved: Fast Navigation's full-quality frame comes after it stops
+           (perf_.proxyPrebuild && renderer_.proxiesPending()); // motion proxies left to build, a few ms a frame
 }
 
 uint64_t App::frameKey() const {
@@ -979,6 +980,11 @@ int App::run() {
         // thread owns the mesh
         if (!solverBusy()) prewarmTexturePaint();
         const auto syncStart = std::chrono::steady_clock::now();
+        // Still and not sculpting: bring the motion proxies a stroke made stale up to date, so the next orbit starts
+        // with them (on slow cores building them as the orbit starts hitched it).
+        perf_.proxyPrebuild = uiPrefs_.fastNavigation && !perf_.movingNow && !doc_.sculptor.strokeActive() &&
+                              dabQueue_.empty() && !strokeFinishing_ && !solverBusy();
+        renderer_.setProxyPrebuild(perf_.proxyPrebuild);
         syncScene();
         mark();
         notePerformanceFrame(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - syncStart).count());

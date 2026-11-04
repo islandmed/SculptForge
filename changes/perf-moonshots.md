@@ -16,7 +16,15 @@ added: Experimental toggles in Preferences > Performance, all off by default. **
   unchanged (`SF_BG_GHOST=0/1`). **Fast Upload**: stroke uploads are packed into persistently mapped staging
   buffers (GL_ARB_buffer_storage) and copied on the GPU (`SF_PERSISTENT_UPLOAD=0/1`). The research behind them,
   including a design for focus detail on billion-polygon assets, is in docs/design/perf-moonshots.md.
+fixed: Orbiting a dense model right after sculpting no longer hitches on slower processors. The lighter copy that is
+  drawn while the view moves was rebuilt in batches that a slow CPU took about 160 ms to finish, so the first frames of
+  the orbit froze. Batches are now sized to fit a few milliseconds a frame. After a stroke the copy is also brought up
+  to date while the view is still, so the next orbit starts with it ready (15M triangles, simulated integrated-graphics
+  profile on slow cores: worst orbit frame 166 -> 24 ms).
 testers:
+  - Windows laptops with integrated graphics first, any OS: open a model of 10M+ triangles (or Help > Benchmark's
+    head), sculpt a long stroke, then orbit straight away. Good: the view turns smoothly from the first frame (no
+    freeze at the start of the orbit), and the model sharpens to full detail when you stop.
   - Any OS, Live Move: Preferences > Performance > Live Move (Experimental) on. Open Help > Benchmark's dense
     head, or any model over 10M triangles. Drag the Move brush big and fast. Good: the bulge follows the pen
     smoothly with no stutter, and when you lift the pen the shape stays exactly where the preview left it (no jump
