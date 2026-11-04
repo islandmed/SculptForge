@@ -51,6 +51,7 @@
 #include "io/UsdIO.h"
 
 #include <algorithm>
+#include <cctype>
 #include <filesystem>
 #include <glm/gtc/matrix_transform.hpp>
 #include <sstream>
@@ -597,8 +598,26 @@ CommandRegistry::CommandRegistry() {
              std::string out;
              for (size_t i = 0; i < doc.brushes.size(); ++i)
                  out += (i ? "\n" : "") + std::to_string(i) + ": " + doc.brushes[i].name + " [" +
-                        brushSourceName(doc.brushes[i].origin.source) + "] - " + doc.brushes[i].description;
+                        brushSourceName(doc.brushes[i].origin.source) +
+                        (doc.brushes[i].origin.pack.empty() ? "" : ", " + doc.brushes[i].origin.pack) + "] - " +
+                        doc.brushes[i].description;
              return {true, out};
+         }});
+
+    add({"brush_use", "Make a custom brush (a built-in pack brush, one from the library or a pack) the active brush.",
+         {{"name", T::String, "Brush name, as brush_list shows it (case doesn't matter).", true}},
+         [](Document& doc, const Args& a) -> CommandResult {
+             auto low = [](std::string t) {
+                 for (char& c : t) c = char(std::tolower(static_cast<unsigned char>(c)));
+                 return t;
+             };
+             const std::string want = low(argString(a, "name"));
+             for (size_t i = 0; i < doc.brushes.size(); ++i)
+                 if (low(doc.brushes[i].name) == want) {
+                     doc.activeBrush = int(i);
+                     return {true, "Brush: " + doc.brushes[i].name};
+                 }
+             return {false, "No such brush: " + argString(a, "name") + " (brush_list shows them)"};
          }});
 
     add({"brush_save", "Save a custom brush as a shareable .sfbrush file.",

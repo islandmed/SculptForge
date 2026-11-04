@@ -479,3 +479,58 @@ TEST(mask_border_polygroup_borders) {
     // Without polygroups the closed sphere still has no border to mask.
     CHECK(registry().execute(d, "mask_border").message.find("No open edges") != std::string::npos);
 }
+
+TEST(mask_by_peaks_finds_ridges) {
+    // The same banded sphere as above: the band's upper and lower rims (where the surface steps in) are ridges.
+    Mesh m = makeIcosphere(5);
+    for (glm::vec3& p : m.positions)
+        if (std::abs(p.y) < 0.3f) p *= 0.85f;
+    m.recomputeAllNormals();
+    Document d = makeDoc(std::move(m));
+    CHECK(registry().execute(d, "mask_by_peaks", {{"strength", 1.0}, {"threshold", 0.02}}).ok);
+    bool capsFree = true, ridgeMasked = false, valleyFree = true;
+    for (uint32_t v = 0; v < d.mesh.vertexCount(); ++v) {
+        const float y = std::abs(d.mesh.positions[v].y);
+        const float r = glm::length(d.mesh.positions[v]);
+        if (y > 0.6f) capsFree &= d.mesh.mask[v] < 0.25f; // a smooth ball is barely convex
+        if (r > 0.95f && y > 0.28f && y < 0.36f) ridgeMasked |= d.mesh.mask[v] > 0.5f;
+        if (r < 0.9f && y < 0.15f) valleyFree &= d.mesh.mask[v] < 0.5f; // the middle of the band
+    }
+    CHECK(capsFree);
+    CHECK(ridgeMasked);
+    CHECK(valleyFree);
+    CHECK(registry().execute(d, "undo").ok);
+    CHECK(countMasked(d.mesh, 0.0f) == 0);
+}
+
+TEST(mask_by_color_and_facing) {
+    Document d = makeDoc(makeIcosphere(4));
+    Mesh& m = d.mesh;
+    // Unpainted meshes are white: white masks everything, red nothing.
+    CHECK(registry().execute(d, "mask_by_color", {{"r", 1.0}, {"g", 1.0}, {"b", 1.0}}).ok);
+    CHECK(countMasked(m) == m.vertexCount());
+    CHECK(registry().execute(d, "mask_by_color", {{"r", 1.0}, {"g", 0.0}, {"b", 0.0}}).ok);
+    CHECK(countMasked(m, 0.0f) == 0);
+    // Paint the top red: By colour masks just it, and add keeps what was masked.
+    m.ensureColors(glm::vec3(1.0f));
+    for (uint32_t v = 0; v < m.vertexCount(); ++v)
+        if (m.positions[v].y > 0.5f) m.colors[v] = glm::vec3(0.9f, 0.05f, 0.05f);
+    CHECK(registry().execute(d, "mask_by_color", {{"r", 1.0}, {"g", 0.0}, {"b", 0.0}, {"tolerance", 0.2}}).ok);
+    bool exact = true;
+    for (uint32_t v = 0; v < m.vertexCount(); ++v) exact &= (m.mask[v] > 0.99f) == (m.positions[v].y > 0.5f);
+    CHECK(exact);
+
+    // By facing: +z within 45 degrees is the front cap only; add grows it with the top.
+    CHECK(registry().execute(d, "mask_by_facing", {{"x", 0.0}, {"y", 0.0}, {"z", 1.0}, {"angle", 45.0}}).ok);
+    bool front = true;
+    for (uint32_t v = 0; v < m.vertexCount(); ++v) {
+        const glm::vec3 n = glm::normalize(m.positions[v]);
+        if (n.z > 0.88f) front &= m.mask[v] > 0.99f; // within 30 degrees: fully masked
+        if (n.z < 0.7f) front &= m.mask[v] == 0.0f;  // beyond 45 degrees: free
+    }
+    CHECK(front);
+    const size_t frontCount = countMasked(m, 0.0f);
+    CHECK(registry().execute(d, "mask_by_facing", {{"x", 0.0}, {"y", 2.0}, {"z", 0.0}, {"angle", 45.0}, {"add", true}}).ok);
+    CHECK(countMasked(m, 0.0f) > frontCount);
+    CHECK(!registry().execute(d, "mask_by_facing", {{"x", 0.0}, {"y", 0.0}}).ok); // z is required
+}

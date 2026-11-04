@@ -227,7 +227,7 @@ StrokeStats runStroke(Document& doc, const BenchBrush& b, int dabs, const BenchG
     const std::vector<BrushRecipe> recipes = builtinBrushRecipes();
     const BrushRecipe* recipe = nullptr;
     for (const auto& r : recipes)
-        if (r.pattern != BrushRecipe::Pattern::None) recipe = &r;
+        if (r.pattern != BrushRecipe::Pattern::None && r.origin.pack.empty()) recipe = &r; // (the classic seven)
     if (!recipe && !recipes.empty()) recipe = &recipes.front();
     if (b.kind == Kind::Paint) m.ensureColors();
     sc.beginStroke(m, b.name);

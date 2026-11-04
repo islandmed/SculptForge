@@ -10,6 +10,8 @@
 #include "app/AssetLibrary.h"
 #include "app/Ui.h"
 #include "core/BrushLibrary.h"
+#include "core/BrushPacks.h"
+#include "core/ListSort.h"
 #include "core/Matcap.h"
 
 #include <IconsLucide.h>
@@ -18,6 +20,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <functional>
 #include <array>
 #include <cctype>
 #include <cmath>
@@ -109,7 +112,25 @@ struct State {
     // Recently used brushes (ids, newest first).
     std::vector<std::string> recent;
     std::string lastActive;
+    // The same for alphas (names) and materials (matcap indices as text), for the lists' Recent order.
+    std::vector<std::string> recentAlphas, recentMaterials;
+    std::string lastAlpha, lastMaterial;
 };
+
+void touchRecent(std::vector<std::string>& list, std::string& last, const std::string& id) {
+    if (id == last) return;
+    if (!last.empty()) {
+        list.erase(std::remove(list.begin(), list.end(), id), list.end());
+        list.insert(list.begin(), id);
+        if (list.size() > 12) list.resize(12);
+    }
+    last = id;
+}
+int recentRank(const std::vector<std::string>& list, const std::string& id) {
+    const auto it = std::find(list.begin(), list.end(), id);
+    return it == list.end() ? -1 : int(it - list.begin());
+}
+
 State& st() {
     static State s;
     return s;
@@ -300,6 +321,43 @@ bool AssetTile(const char* id, ImTextureID texture, const char* glyph, const std
     return clicked;
 }
 
+float SortMenuWidth() { // the widest Sort button and the gap before it
+    const ImGuiStyle& st = ImGui::GetStyle();
+    return ImGui::CalcTextSize("Sort: Recent").x + st.FramePadding.x * 2.0f + st.ItemSpacing.x + 2.0f;
+}
+
+int brushRecentRank(const std::string& id) { return recentRank(st().recent, id); }
+
+int builtinBrushPackRank(const std::string& pack) {
+    const auto& packs = builtinBrushPacks();
+    const auto it = std::find(packs.begin(), packs.end(), pack);
+    return it == packs.end() ? -1 : int(it - packs.begin());
+}
+
+bool SortMenu(const char* id, std::string& pref, bool packs) {
+    const ListSort cur = listSortFromId(pref);
+    char label[64];
+    std::snprintf(label, sizeof label, "Sort: %s##%s", listSortLabel(cur), id);
+    if (ImGui::SmallButton(label)) ImGui::OpenPopup(id);
+    ui::HelpText("Sort", nullptr,
+                 packs ? "The order of this list: A-Z (the default), the most recently used first, or grouped by pack."
+                       : "The order of this list: A-Z (the default) or the most recently changed first.",
+                 nullptr);
+    bool changed = false;
+    if (ImGui::BeginPopup(id)) {
+        for (int i = 0; i < int(ListSort::Count); ++i) {
+            const ListSort m = ListSort(i);
+            if (m == ListSort::Pack && !packs) continue;
+            if (ImGui::MenuItem((std::string(listSortLabel(m)) + "##" + id).c_str(), nullptr, m == cur) && m != cur) {
+                pref = listSortId(m);
+                changed = true;
+            }
+        }
+        ImGui::EndPopup();
+    }
+    return changed;
+}
+
 void AssetTileHoverGlow() {
     Glow& g = glow();
     if (g.frame != ImGui::GetFrameCount() || !g.tex || ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId)) return;
@@ -447,6 +505,7 @@ std::vector<BrushItem> PickerUi::brushItems(App& app, bool libraryFiles) {
         b.name = r.name;
         b.path = r.origin.path;
         b.description = r.description;
+        b.pack = r.origin.pack;
         switch (r.origin.source) {
         case BrushSource::Studio:
             b.tag = "studio";
@@ -562,16 +621,28 @@ void drawBrushGrid(App& app, GridMode mode) {
 
     static char paletteFilter[64] = "";
     if (!popup) {
-        ImGui::SetNextItemWidth(-1);
+        ImGui::SetNextItemWidth(-SortMenuWidth());
         ImGui::InputTextWithHint("##brushfilter", ICON_LC_SEARCH "  Filter brushes", paletteFilter,
                                  sizeof paletteFilter);
+        ImGui::SameLine();
+        SortMenu("brushsort", app.uiPrefs_.brushSort);
     }
     const std::string typed = popup ? s.typed : typedName(paletteFilter);
     std::vector<std::string> names;
     for (const auto& it : items)
         names.push_back(it.name);
     bool substring = false;
-    const std::vector<size_t> shown = filterByTyped(names, typed, &substring);
+    std::vector<size_t> shown = filterByTyped(names, typed, &substring);
+    // The chosen order (A-Z by default): the letter badges and Enter follow it.
+    const ListSort sort = listSortFromId(app.uiPrefs_.brushSort);
+    {
+        std::vector<ListSortKey> keys;
+        for (size_t i : shown)
+            keys.push_back({items[i].name, items[i].pack, recentRank(s.recent, items[i].id()), builtinBrushPackRank(items[i].pack)});
+        std::vector<size_t> sorted;
+        for (size_t k : listSortOrder(keys, sort)) sorted.push_back(shown[k]);
+        shown = std::move(sorted);
+    }
     const auto badges = popup ? letterBadges(names, shown, typed) : std::vector<std::pair<char, size_t>>{};
 
     // Letter keys (pop-up only; the palette has a filter field instead).
@@ -602,6 +673,8 @@ void drawBrushGrid(App& app, GridMode mode) {
         // What was typed, or how to type.
         if (typed.empty()) {
             ImGui::TextDisabled("Type a letter to narrow the brushes, then press its orange key");
+            ImGui::SameLine();
+            SortMenu("brushsortpop", app.uiPrefs_.brushSort);
         } else {
             std::string shownTyped = typed;
             for (auto& c : shownTyped)
@@ -729,18 +802,31 @@ void drawBrushGrid(App& app, GridMode mode) {
                     break;
                 }
     }
+    // Sections: the built-in brushes, your own and other custom brushes, then the brush packs (one section per
+    // pack when sorted by pack), then library files not loaded yet.
     struct Section {
-        const char* title;
-        bool (*match)(const BrushItem&);
+        std::string title;
+        std::function<bool(const BrushItem&)> match;
     };
-    const Section sections[] = {
+    std::vector<Section> sections = {
         {"Built-in",
          [](const BrushItem& b) {
              return b.kind == BrushItem::Kind::Type || b.kind == BrushItem::Kind::Paint || b.kind == BrushItem::Kind::Guides;
          }},
-        {"Custom", [](const BrushItem& b) { return b.kind == BrushItem::Kind::Recipe; }},
-        {"Library", [](const BrushItem& b) { return b.kind == BrushItem::Kind::File; }},
+        {"Custom", [](const BrushItem& b) { return b.kind == BrushItem::Kind::Recipe && b.pack.empty(); }},
     };
+    if (sort == ListSort::Pack) {
+        std::vector<std::string> packs;
+        for (size_t i : shown)
+            if (items[i].kind == BrushItem::Kind::Recipe && !items[i].pack.empty() &&
+                std::find(packs.begin(), packs.end(), items[i].pack) == packs.end())
+                packs.push_back(items[i].pack);
+        for (const std::string& p : packs)
+            sections.push_back({p, [p](const BrushItem& b) { return b.kind == BrushItem::Kind::Recipe && b.pack == p; }});
+    } else {
+        sections.push_back({"Brush packs", [](const BrushItem& b) { return b.kind == BrushItem::Kind::Recipe && !b.pack.empty(); }});
+    }
+    sections.push_back({"Library", [](const BrushItem& b) { return b.kind == BrushItem::Kind::File; }});
     if (popup) {
         // The grid scrolls inside the pop-up when there are many custom brushes.
         const float rowH = tile + ImGui::GetFontSize() + 4.0f + ImGui::GetStyle().ItemSpacing.y;
@@ -754,10 +840,12 @@ void drawBrushGrid(App& app, GridMode mode) {
         for (size_t i : shown)
             if (sec.match(items[i])) in.push_back(i);
         if (in.empty()) continue;
-        sectionHeader(sec.title);
+        sectionHeader(sec.title.c_str());
+        if (const std::string help = builtinBrushPackHelp(sec.title); !help.empty())
+            ui::HelpText(sec.title.c_str(), nullptr, help.c_str(), "Brush packs");
         int column = 0;
         for (size_t i : in)
-            drawItem(i, column, sec.title);
+            drawItem(i, column, sec.title.c_str());
     }
     if (shown.empty()) ImGui::TextDisabled("No brush matches \"%s\"", typed.c_str());
     if (popup) ImGui::EndChild();
@@ -839,63 +927,103 @@ void drawAlphaGrid(App& app, GridMode mode) {
         drawVdmGrid(app, mode);
         ImGui::Dummy(ImVec2(0, 4));
     }
+    State& s = st();
     const float tile = 64.0f * app.uiScale_;
-    const int columns = columnsFor(tile, mode);
     const BrushAlpha& current = app.doc_.brushAlpha;
-    sectionHeader("Built-in");
-    int column = 0;
+    static char filter[64] = "";
+    ImGui::SetNextItemWidth(mode == GridMode::Popup ? 200.0f * app.uiScale_ : -SortMenuWidth());
+    ImGui::InputTextWithHint("##alphafilter", ICON_LC_SEARCH "  Filter alphas", filter, sizeof filter);
+    ImGui::SameLine();
+    SortMenu("alphasort", app.uiPrefs_.alphaSort);
+    const int columns = columnsFor(tile, mode);
+
+    // Every alpha in one list: the built-ins, the loaded image, the library's Alphas folder and the packs'.
+    struct Entry {
+        enum class Kind { Builtin, Current, File, Pack } kind;
+        std::string name, help, path, pack, group;
+        int builtin = -1;
+    };
+    std::vector<Entry> entries;
     for (int i = 0; i < int(BrushAlpha::builtins().size()); ++i) {
-        tileGrid(column, columns);
         const std::string& name = builtinAlpha(i).name;
-        const std::string help = BrushAlpha::builtinHelp(name);
-        const bool on = lower(current.name) == lower(name) || (i == 0 && current.empty());
-        const ImTextureID tex = app.thumbs_.alpha(builtinAlpha(i));
-        if (AssetTile((name + "##alpha").c_str(), tex, ICON_LC_CIRCLE_DASHED, name.c_str(), tile, on))
-            app.runCommand("brush_set_alpha", {{"name", name}});
-        quickInfo(tex, ICON_LC_CIRCLE_DASHED, name.c_str(), help.c_str());
-        ui::HelpText(name.c_str(), nullptr, help.c_str(), "Alpha");
+        entries.push_back({Entry::Kind::Builtin, name, BrushAlpha::builtinHelp(name), "", "", "Built-in", i});
     }
-    // The loaded image alpha, then images in the library's Alphas folder.
-    const bool custom = !current.empty() && lower(current.name) != "square" && lower(current.name) != "noise";
-    std::vector<AssetEntry> files;
+    const bool custom = !current.empty() && !current.path.empty();
+    if (custom)
+        entries.push_back({Entry::Kind::Current, current.name, "The loaded image alpha (white = full effect).",
+                           current.path, "", "Images"});
     if (!app.library_.user.empty()) {
         const std::string dir = app.library_.user + "/Alphas";
         if (const auto* list = app.libraryScanner_.get(dir, "alpha", [](const std::string& p) {
                 return isImageFile(p) ? AssetKind::AlphaFile : AssetKind::Folder;
             }))
             for (const auto& e : *list)
-                if (e.kind == AssetKind::AlphaFile) files.push_back(e);
+                if (e.kind == AssetKind::AlphaFile && !(custom && lower(e.name) == lower(current.name)))
+                    entries.push_back({Entry::Kind::File, e.name, "Image in your library's Alphas folder.", e.path, "",
+                                       "Images"});
     }
-    if (custom || !files.empty()) {
-        sectionHeader("Images");
-        column = 0;
-        if (custom) {
-            tileGrid(column, columns);
-            const ImTextureID tex = app.thumbs_.alpha(current);
-            AssetTile((current.name + "##alphacur").c_str(), tex, ICON_LC_CIRCLE_DASHED, current.name, tile, true);
-            quickInfo(tex, ICON_LC_CIRCLE_DASHED, current.name, "The loaded image alpha (white = full effect).");
+    for (const PackContentItem& it : app.packAlphas()) // tagged with the pack's name
+        entries.push_back({Entry::Kind::Pack, it.label(), "From the pack " + it.packName + ".", it.file, it.packName,
+                           it.packName});
+
+    const std::string f = lower(filter);
+    std::vector<ListSortKey> keys;
+    std::vector<size_t> kept;
+    for (size_t i = 0; i < entries.size(); ++i) {
+        if (!f.empty() && lower(entries[i].name).find(f) == std::string::npos) continue;
+        kept.push_back(i);
+        // Round is "no alpha": it stays first in every order (the pack order puts it with the built-ins).
+        const Entry& e = entries[i];
+        ListSortKey k{e.name, e.kind == Entry::Kind::Builtin ? std::string() : "\x01" + e.group,
+                      recentRank(s.recentAlphas, lower(e.name))};
+        if (e.builtin == 0) k.name = std::string(1, '\0');
+        keys.push_back(std::move(k));
+    }
+    const ListSort sort = listSortFromId(app.uiPrefs_.alphaSort);
+    std::vector<size_t> order;
+    for (size_t k : listSortOrder(keys, sort)) order.push_back(kept[k]);
+    if (sort == ListSort::Recent) { // Round first, then the recent ones
+        const auto round = std::find_if(order.begin(), order.end(), [&](size_t i) { return entries[i].builtin == 0; });
+        if (round != order.end()) std::rotate(order.begin(), round, round + 1);
+    }
+
+    int column = 0;
+    std::string group = "\x02";
+    if (sort != ListSort::Pack) sectionHeader("Alphas");
+    for (size_t i : order) {
+        const Entry& e = entries[i];
+        if (sort == ListSort::Pack && e.group != group) {
+            group = e.group;
+            sectionHeader(group.c_str());
+            column = 0;
         }
-        for (const auto& e : files) {
-            if (custom && lower(e.name) == lower(current.name)) continue;
-            tileGrid(column, columns);
-            const ImTextureID tex = app.thumbs_.file(e.path);
-            if (AssetTile((e.name + "##alphafile").c_str(), tex, ICON_LC_IMAGE, e.name, tile, false))
+        tileGrid(column, columns);
+        bool on = false;
+        ImTextureID tex = ImTextureID(0);
+        const char* glyph = ICON_LC_IMAGE;
+        switch (e.kind) {
+        case Entry::Kind::Builtin:
+            on = (current.path.empty() && lower(current.name) == lower(e.name)) || (e.builtin == 0 && current.empty());
+            tex = app.thumbs_.alpha(builtinAlpha(e.builtin));
+            glyph = ICON_LC_CIRCLE_DASHED;
+            break;
+        case Entry::Kind::Current:
+            on = true;
+            tex = app.thumbs_.alpha(current);
+            glyph = ICON_LC_CIRCLE_DASHED;
+            break;
+        default: tex = app.thumbs_.file(e.path); break;
+        }
+        const std::string id = e.name + "##alpha" + std::to_string(int(e.kind)) + e.path;
+        if (AssetTile(id.c_str(), tex, glyph, e.name, tile, on)) {
+            if (e.kind == Entry::Kind::Builtin) app.runCommand("brush_set_alpha", {{"name", e.name}});
+            else if (e.kind != Entry::Kind::Current)
                 app.runCommand("brush_set_alpha", {{"path", e.path}, {"invert", app.alphaInvert_}});
-            quickInfo(tex, ICON_LC_IMAGE, e.name, "Image in your library's Alphas folder.", e.path);
         }
+        quickInfo(tex, glyph, e.name, e.help, e.path);
+        ui::HelpText(e.name.c_str(), nullptr, e.help.c_str(), "Alpha");
     }
-    if (!app.packAlphas().empty()) { // alphas from installed packs, tagged with the pack's name
-        sectionHeader("Packs");
-        column = 0;
-        for (const PackContentItem& it : app.packAlphas()) {
-            tileGrid(column, columns);
-            const std::string label = it.label();
-            const ImTextureID tex = app.thumbs_.file(it.file);
-            if (AssetTile((label + "##alphapack" + it.file).c_str(), tex, ICON_LC_IMAGE, label, tile, false))
-                app.runCommand("brush_set_alpha", {{"path", it.file}, {"invert", app.alphaInvert_}});
-            quickInfo(tex, ICON_LC_IMAGE, label, ("From the pack " + it.packName + ".").c_str(), it.file);
-        }
-    }
+    if (order.empty()) ImGui::TextDisabled("No alpha matches \"%s\"", filter);
     ImGui::Dummy(ImVec2(0, 2));
     if (ImGui::Button(ICON_LC_FOLDER_OPEN "  Load image...", ImVec2(mode == GridMode::Popup ? 0.0f : -1.0f, 0)))
         SDL_ShowOpenFileDialog(App::onAlphaChosen, &app, app.window_, kAlphaFilters, 2, nullptr, false);
@@ -916,9 +1044,17 @@ void drawMaterialGrid(App& app, GridMode mode) {
     int hovered = -2;
     const int active = s.previewing ? s.savedMatcap : app.renderSettings_.matcap;
     app.materialListShown(); // just opened: pick up images added to the MatCaps folder meanwhile
+    SortMenu("materialsort", app.uiPrefs_.materialSort, false);
+    std::vector<int> list; // the Lit Spheres and Studio (-1), in the chosen order (A-Z by default)
+    std::vector<ListSortKey> keys;
     for (int k = 0; k <= matcapCount(); ++k) {
-        const int i = k < matcapCount() ? matcapInListOrder(k) : -1; // the MatCaps (the default first), then Studio
+        const int i = k < matcapCount() ? matcapInListOrder(k) : -1;
         if (i >= 0 && !isMatcapListed(i)) continue; // removed
+        list.push_back(i);
+        keys.push_back({i < 0 ? "Studio" : matcapName(i), "", recentRank(s.recentMaterials, std::to_string(i))});
+    }
+    for (size_t o : listSortOrder(keys, listSortFromId(app.uiPrefs_.materialSort))) {
+        const int i = list[o];
         tileGrid(column, columns);
         const char* name = i < 0 ? "Studio" : matcapName(i);
         const ImTextureID tex = app.thumbs_.material(i);
@@ -1047,6 +1183,9 @@ void drawPickers(App& app) {
             s.lastActive = id;
         }
     }
+
+    touchRecent(s.recentAlphas, s.lastAlpha, lower(app.doc_.brushAlpha.empty() ? std::string("round") : app.doc_.brushAlpha.name));
+    if (!s.previewing) touchRecent(s.recentMaterials, s.lastMaterial, std::to_string(app.renderSettings_.matcap));
 
     if (s.open) {
         // Pickers own the keyboard while open (letters choose brushes; Esc closes).

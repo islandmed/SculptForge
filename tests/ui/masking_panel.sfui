@@ -1,0 +1,61 @@
+# Content pass: Tool > Masking is one panel of buttons with pictures: the Shapes (pen, lasso, rectangle) with a hint
+# each, Mask by (cavity, peaks, face group, colour, facing, border) and Adjust (grow, shrink, sharpen, blur,
+# invert, clear, all), each running its mask_* command with one undo step.
+run new_sphere subdivisions=5
+camera 0 0
+key f
+click "Masking"
+expect "Mask Pen##mask.pen"
+expect "Mask Lasso##mask.lasso"
+expect "Mask Rectangle##mask.rect"
+expect "By cavity##mask"
+expect "By peaks##mask"
+expect "By face group##mask"
+expect "By colour##mask"
+expect "By facing##mask"
+expect "By border##mask"
+expect "Grow##mask"
+expect "Shrink##mask"
+expect "Sharpen##mask"
+expect "Blur##mask"
+expect "Invert##mask"
+expect "Clear##mask"
+expect "All##mask"
+hold ctrl
+hover "Mask Lasso##mask.lasso"
+expect_help free shape
+hover "By facing##mask"
+expect_help faces the camera
+hold none
+wait_idle 30
+shot masking_panel
+
+# Shapes pick the Ctrl+drag shape.
+click "Mask Lasso##mask.lasso"
+expect "Front faces only##mask"
+click "Mask Pen##mask.pen"
+expect_not "Front faces only##mask"
+
+# By facing (the camera looks at the front): the front of the ball, not the back.
+click "By facing##mask"
+expect_value masked > 2000
+expect_value masked < 7000
+click "Invert##mask"
+expect_value masked > 3000
+click "Clear##mask"
+expect_value masked == 0
+click "All##mask"
+expect_value masked > 10000
+shot masking_panel_adjust
+click "Shrink##mask"
+click "Clear##mask"
+
+# A smooth ball has no sharp ridges; unpainted clay is white, so By colour with white masks all of it.
+click "By peaks##mask"
+expect_value masked == 0
+run set_color r=1 g=1 b=1
+click "By colour##mask"
+expect_value masked == 10242
+click "Clear##mask"
+expect_value masked == 0
+expect_value can_undo == 1

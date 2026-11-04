@@ -7,6 +7,7 @@
 #pragma once
 
 #include "core/BVH.h"
+#include "core/Commands.h"
 #include "core/Mesh.h"
 #include "core/Sculpt.h"
 
@@ -21,6 +22,9 @@ class CommandRegistry;
 // 0..255) or a basic name ("red", "skin", ...). The text is a display (sRGB)
 // colour; `linear` receives the linear value Mesh::colors stores.
 bool parseColor(const std::string& text, glm::vec3& linear);
+// A command's colour: "color" (any parseColor form) or numeric "r"/"g"/"b" (sRGB 0..1). False with `error` empty
+// when no colour was given.
+bool colorArg(const Args& a, glm::vec3& linear, std::string& error);
 // "#rrggbb" (sRGB) for a linear colour.
 std::string colorToHex(const glm::vec3& linear);
 // The tint the active colour gives a Lit Sphere material on a mesh with no vertex paint (as ZBrush's main

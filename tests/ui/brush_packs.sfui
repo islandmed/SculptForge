@@ -1,0 +1,73 @@
+# Content pass: the brush lists are A-Z by default with a Sort menu (A-Z, Recent, Pack), the six built-in brush
+# packs load, and a pack brush picked the first time brings its own alpha (Rivet Row: Rivets, turned along the
+# stroke; Soft Clay: none).
+run ui_look look=classic layout=zbrush
+run new_sphere subdivisions=6
+key f
+expect_value builtin_pack_brushes == 60
+expect_value brush_sort == 0
+expect_value alpha_index == 0
+
+# A pack brush brings its alpha the first time; a stroke with it sculpts.
+run brush_use name="rivet row"
+wait 0.2
+expect_value alpha_index == 6
+expect_value alpha_follow == 1
+snapshot
+stroke 0.3 0.5 0.7 0.5
+expect_value moved > 50
+run brush_use name="Soft Clay"
+wait 0.2
+expect_value alpha_index == 0
+expect_value alpha_follow == 0
+# Back to Rivet Row: it keeps what it had this session.
+run brush_use name="Rivet Row"
+wait 0.2
+expect_value alpha_index == 6
+run_fails brush_use name="No Such Brush"
+
+click "Brush##palette.brush"
+expect "Sort: A-Z##brushsort"
+expect_text Brush packs
+hold ctrl
+hover "Sort: A-Z##brushsort"
+expect_help most recently used
+hold none
+click "Sort: A-Z##brushsort"
+click "Pack##brushsort"
+expect_value brush_sort == 2
+expect "Sort: Pack##brushsort"
+expect_text Clay & Form
+expect_text Hard Surface
+expect_text Organic & Skin
+expect_text Cloth & Folds
+expect_text Damage & Wear
+expect_text Ornament
+wait_idle 180
+shot brush_palette_packs
+
+# Alphas: A-Z with Round (no alpha) first, a filter, and the same Sort menu.
+click "Brush##palette.brush"
+click "Alpha##palette.alpha"
+expect "Sort: A-Z##alphasort"
+type "##alphafilter" bo
+expect "Bolt##alpha0"
+expect_not "Cracks##alpha0"
+key backspace
+key backspace
+expect "Cracks##alpha0"
+wait_idle 60
+shot alpha_palette_az
+click "Sort: A-Z##alphasort"
+click "Pack##alphasort"
+expect_value alpha_sort == 2
+click "Alpha##palette.alpha"
+
+# Materials sort A-Z or by recent use.
+click "Material##palette.material"
+expect "Sort: A-Z##materialsort"
+click "Sort: A-Z##materialsort"
+expect "Recent##materialsort"
+expect_not "Pack##materialsort"
+click "Recent##materialsort"
+expect_value material_sort == 1

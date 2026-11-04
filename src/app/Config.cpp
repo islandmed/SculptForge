@@ -15,6 +15,7 @@
 #include "app/Ui.h"
 #include "app/I18n.h"
 #include "core/Bake.h"
+#include "core/ListSort.h"
 #include "core/Micro.h"
 #include "core/Multires.h"
 #include "core/Script.h"
@@ -88,6 +89,10 @@ Json toJson(const UiPrefs& p) {
     j.set("inputStyle", std::string(p.inputStyle == 3 ? "maya" : p.inputStyle == 2 ? "blender" : p.inputStyle == 1 ? "sculptforge" : "zbrush"));
     j.set("emulateNumpad", p.emulateNumpad);
     j.set("rightClickQuickMenu", p.rightClickQuickMenu);
+    j.set("brushSort", p.brushSort);
+    j.set("alphaSort", p.alphaSort);
+    j.set("materialSort", p.materialSort);
+    j.set("librarySort", p.librarySort);
     j.set("spaceCamera", p.spaceCamera);
     j.set("emulate3Button", p.emulate3Button);
     j.set("mayaZoomHorizontal", p.mayaZoomHorizontal);
@@ -150,6 +155,9 @@ void fromJson(const Json& j, UiPrefs& p) {
     }
     p.emulateNumpad = j["emulateNumpad"].asBool(p.emulateNumpad);
     p.rightClickQuickMenu = j["rightClickQuickMenu"].asBool(p.rightClickQuickMenu);
+    for (auto [key, v] : {std::pair{"brushSort", &p.brushSort}, std::pair{"alphaSort", &p.alphaSort},
+                          std::pair{"materialSort", &p.materialSort}, std::pair{"librarySort", &p.librarySort}})
+        if (j[key].isString()) *v = listSortId(listSortFromId(j[key].asString()));
     p.spaceCamera = j["spaceCamera"].asBool(p.spaceCamera);
     p.emulate3Button = j["emulate3Button"].asBool(p.emulate3Button);
     p.mayaZoomHorizontal = j["mayaZoomHorizontal"].asBool(p.mayaZoomHorizontal);

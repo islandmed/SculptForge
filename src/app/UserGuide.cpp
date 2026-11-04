@@ -445,6 +445,7 @@ std::string UserGuide::chapterFor(const std::string& palette, const std::string&
     if (starts("Tool > Geometry > Quad Remesh") || starts("Tool > Geometry > QRemesh") || starts("Tool > Parts > Project") ||
         starts("Tool > Part > Project"))
         return "retopology.md";
+    if (starts("Brush packs")) return "brush-packs.md";
     if (starts("Tool > Parts") || starts("Tool > Part")) return "parts.md";
     if (starts("Tool > Forge Spheres") || starts("Tool > Forge Spheres")) return "forge-spheres.md";
     if (starts("Tool > Layers")) return "layers.md";

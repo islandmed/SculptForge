@@ -276,6 +276,85 @@ const Generated kGenerated[] = {
              return (1.0f - smooth01(std::hypot(u - cx, v - cy) / (cell * 0.32f))) * squareEdge(u, v);
          });
      }},
+    {"Cobblestone", "Rounded stones packed together with grooves between, for paths, walls and rough ground.",
+     [] {
+         return generate("Cobblestone", [](float u, float v) {
+             float f1, f2;
+             uint32_t id = 0;
+             worley(u * 3.2f + 40.0f, v * 3.2f + 40.0f, 91, f1, f2, &id);
+             const float edge = smooth01((f2 - f1) / 0.32f); // 0 in the grooves, 1 inside a stone
+             const float dome = std::sqrt(std::max(0.0f, edge)) * (0.8f + 0.2f * float(id & 0xffu) / 255.0f);
+             const float rough = fbm(u * 10.0f + 3.0f, v * 10.0f, 93) * 0.15f;
+             return std::clamp(dome * 0.85f + rough * edge, 0.0f, 1.0f) * squareEdge(u, v);
+         });
+     }},
+    {"Leather Grain", "Fine irregular creases between small pebbled bumps, for leather, hide and elephant skin.",
+     [] {
+         return generate("Leather Grain", [](float u, float v) {
+             float f1, f2;
+             worley(u * 11.0f + 7.0f, v * 11.0f + 7.0f, 95, f1, f2);
+             const float pebble = smooth01((f2 - f1) / 0.22f);
+             float g1, g2;
+             worley(u * 4.0f + 13.0f, v * 4.0f + 13.0f, 97, g1, g2);
+             const float crease = smooth01((g2 - g1) / 0.06f); // a sparse web of deeper creases
+             return std::clamp(pebble * 0.7f * crease + 0.15f * fbm(u * 20.0f, v * 20.0f, 99), 0.0f, 1.0f) *
+                    squareEdge(u, v);
+         });
+     }},
+    {"Hex Plates", "A honeycomb of flat hexagonal plates with bevelled gaps, for armour, sci-fi panels and shells.",
+     [] {
+         return generate("Hex Plates", [](float u, float v) {
+             const float scale = 3.0f; // plates across
+             float x = (u + 1.0f) * scale, y = (v + 1.0f) * scale;
+             // Nearest centre on a hex lattice (two offset rectangular grids).
+             const float w = 1.0f, h = 1.7320508f;
+             auto near = [&](float ox, float oy) {
+                 const float cx = (std::floor((x - ox) / w) + 0.5f) * w + ox;
+                 const float cy = (std::floor((y - oy) / h) + 0.5f) * h + oy;
+                 return glm::vec2(x - cx, y - cy);
+             };
+             glm::vec2 a = near(0.0f, 0.0f), b = near(0.5f, h * 0.5f);
+             const glm::vec2 d = glm::dot(a, a) < glm::dot(b, b) ? a : b;
+             // Hexagon distance (flat sides left and right).
+             const glm::vec2 q = glm::abs(d);
+             const float hex = std::max(q.x, q.x * 0.5f + q.y * 0.8660254f);
+             return smooth01((0.5f - hex) / 0.09f) * squareEdge(u, v);
+         });
+     }},
+    {"Knit", "Rows of interlocking V-shaped loops, for knitted wool and chunky fabric.",
+     [] {
+         return generate("Knit", [](float u, float v) {
+             const float cols = 5.0f, rows = 7.0f;
+             const float x = (u + 1.0f) * cols * 0.5f, y = (v + 1.0f) * rows * 0.5f;
+             const float fx = x - std::floor(x) - 0.5f, fy = y - std::floor(y);
+             // Each stitch is two leaning loops meeting at the bottom like a V.
+             const float lx = std::abs(fx) - 0.25f - 0.15f * (fy - 0.5f);
+             const float loop = std::sqrt(std::max(0.0f, 1.0f - (lx * lx) / 0.04f - (fy - 0.5f) * (fy - 0.5f) / 0.36f));
+             return loop * squareEdge(u, v);
+         });
+     }},
+    {"Bolt", "One hexagonal bolt head on a round washer, for machines and hard-surface props (stamp it).",
+     [] {
+         return generate("Bolt", [](float u, float v) {
+             const float r = std::hypot(u, v);
+             const float washer = 0.45f * (1.0f - smooth01((r - 0.82f) / 0.06f));
+             const glm::vec2 q = glm::abs(glm::vec2(u, v));
+             const float hex = std::max(q.x * 0.8660254f + q.y * 0.5f, q.y);
+             const float head = (1.0f - smooth01((hex - 0.55f) / 0.04f)) * (0.85f + 0.15f * (1.0f - r));
+             return std::max(washer, head);
+         });
+     }},
+    {"Chips", "Broken, angular chips knocked out of an edge, for worn stone, wood and painted metal.",
+     [] {
+         return generate("Chips", [](float u, float v) {
+             float f1, f2;
+             uint32_t id = 0;
+             worley(u * 4.5f + 60.0f, v * 4.5f + 60.0f, 101, f1, f2, &id);
+             if ((id & 3u) == 0u) return 0.0f; // a quarter of the cells stay whole
+             const float facet = 1.0f - smooth01(f1 / (0.35f + 0.2f * float((id >> 2) & 0xffu) / 255.0f));
+             return std::clamp(facet * 1.6f, 0.0f, 1.0f) * roundEdge(u, v);
+         });
+     }},
 };
 
 } // namespace

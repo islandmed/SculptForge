@@ -43,6 +43,8 @@ A `.sfbrush` file is a JSON object:
 | `pressureCurve` | 0.3 … 3 | Tablet response |
 | `frontFacesOnly` | `true` / `false` | Protects the far side of thin parts |
 | `cavityMask` | -1 … 1 | Only cavities (positive) or only ridges (negative) |
+| `alpha` (optional) | a built-in alpha's name, e.g. `"Rivets"` | The alpha the brush starts with the first time it is picked (written only when set; an unknown name is dropped) |
+| `alphaFollow` (optional) | `true` / `false` | That alpha turns along the stroke (written only when true) |
 
 Missing keys take neutral defaults, out-of-range values are clamped, and unknown keys are ignored when loading
 (the gallery is stricter, see below). `sculptforge-cli --list` shows the same parameters under `brush_create`.
