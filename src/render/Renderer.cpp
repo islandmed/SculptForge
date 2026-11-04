@@ -2719,7 +2719,7 @@ void Renderer::endCapture(std::vector<uint8_t>& rgba) {
 
 void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, const RenderSettings& settings,
                     const Viewport& viewport) {
-    // SF_FRAME_LOG=ms (App.cpp): a draw slower than that says where its time went.
+    // SF_FRAME_LOG=ms (App.cpp): a draw slower than that says where its time went (lit spheres, environment, Parts).
     static const double drawLogMs = std::getenv("SF_FRAME_LOG") ? std::atof(std::getenv("SF_FRAME_LOG")) : -1.0;
     const auto drawStart = std::chrono::steady_clock::now();
     double drawMarks[4] = {};
