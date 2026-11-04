@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// ZBrush-style masking. Mask strokes are Sculptor::dabMask (see Sculpt.h);
+// classic masking. Mask strokes are Sculptor::dabMask (see Sculpt.h);
 // the whole-mesh operations below edit Mesh::mask in place. They never touch
 // fully hidden vertices (except clear, which frees the mask), mark the
 // changed vertices dirty for the renderer and return false when nothing
@@ -40,21 +40,21 @@ float vertexConcavity(const Mesh& mesh, uint32_t v);
 // Masks concave areas: vertices whose concavity exceeds `threshold` get up to
 // `strength` (0-1), with a soft ramp above the threshold. Replaces the mask.
 bool maskByCavity(Mesh& mesh, float strength, float threshold);
-// Masks every vertex touching a visible triangle of polygroup `group`.
+// Masks every vertex touching a visible triangle of face group `group`.
 // With `add` the existing mask is kept, otherwise it is replaced.
-bool maskByPolygroup(Mesh& mesh, uint32_t group, bool add);
+bool maskByFaceGroup(Mesh& mesh, uint32_t group, bool add);
 
-// Vertices on an open edge (an edge of only one triangle) and, with `polygroups`, where the visible triangles
-// around a vertex have more than one polygroup: 1 for those, 0 elsewhere.
-std::vector<uint8_t> borderVertices(const Mesh& mesh, bool polygroups);
-// Mask from the mesh border (#61; Blender: Mask from mesh boundary, ZBrush: Mask by polygroup border): the
+// Vertices on an open edge (an edge of only one triangle) and, with `face groups`, where the visible triangles
+// around a vertex have more than one face group: 1 for those, 0 elsewhere.
+std::vector<uint8_t> borderVertices(const Mesh& mesh, bool facegroups);
+// Mask from the mesh border (#61; Blender: Mask from mesh boundary, Mask by face group border): the
 // border vertices and `rings - 1` edge rings inside them (rings 1-20) get `strength` (0-1) of mask, fading
-// towards the innermost ring with `soft`. `polygroups` also masks polygroup borders. With `add` the mask
+// towards the innermost ring with `soft`. `face groups` also masks face group borders. With `add` the mask
 // grows (each vertex keeps the larger value), otherwise it is replaced. `found` gets the number of border
 // vertices: 0 on a closed mesh (nothing to mask).
-bool maskBorder(Mesh& mesh, int rings, bool polygroups, bool soft, float strength, bool add, size_t* found = nullptr);
+bool maskBorder(Mesh& mesh, int rings, bool facegroups, bool soft, float strength, bool add, size_t* found = nullptr);
 
-// Mask selections (ZBrush MaskLasso / MaskRect): visible vertices that
+// Mask selections (MaskLasso / MaskRect): visible vertices that
 // project inside `shape` (NDC under `viewProj`, see ScreenSelect.h) gain
 // `strength` (0-1) of mask, or lose it with `unmask`. Vertices behind the
 // camera count as outside; the far side of the model is selected too.
@@ -65,7 +65,7 @@ bool maskInShape(Mesh& mesh, const glm::mat4& viewProj, const ScreenPolygon& sha
                  const std::vector<SymCopy>& mirrors = {}, bool frontFacesOnly = false);
 // Whether any visible vertex (or, with `mirrors`, its mirror image) projects
 // inside `shape`: a selection that covers none of the model clears the mask
-// instead (ZBrush: Ctrl+drag on the background).
+// instead (Ctrl+drag on the background).
 bool shapeCoversMesh(const Mesh& mesh, const glm::mat4& viewProj, const ScreenPolygon& shape,
                      const std::vector<SymCopy>& mirrors = {});
 
@@ -79,7 +79,7 @@ bool symmetryCopiesArg(const Args& a, const Mesh& mesh, std::vector<SymCopy>& co
 std::vector<ParamSpec> radialSymmetryParams();
 
 // Registers mask_clear, mask_all, mask_invert, mask_blur, mask_sharpen,
-// mask_grow, mask_shrink, mask_by_cavity, mask_by_polygroup, mask_border,
+// mask_grow, mask_shrink, mask_by_cavity, mask_by_face group, mask_border,
 // mask_rect and mask_lasso.
 void registerMaskingCommands(CommandRegistry& registry);
 

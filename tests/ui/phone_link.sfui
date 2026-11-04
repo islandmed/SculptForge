@@ -2,7 +2,7 @@
 # window and its QR code, a scan, a photo and a splat .ply uploaded into the Captures inbox (each upload loses a
 # chunk and resumes), View in AR (the model exported for the phone, then again after a stroke), and the live face
 # feed with a recorded take. Port 0: any free port, so tests can run side by side.
-run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 env SCULPTFORGE_LINK_PORT 0
 run new_sphere subdivisions=4
 
@@ -51,10 +51,10 @@ expect_status "Only 2 usable photos"
 phone_upload ply data/phone/scan_splat.ply
 wait 0.3
 expect_value splats == 400
-expect_value subtools == 1
+expect_value parts == 1
 
 # View in AR: the phone asks, the model is exported for it (USDZ and GLB), and a stroke re-exports it.
-phone_request POST /api/ar 200 {"scope":"subtool","size":20}
+phone_request POST /api/ar 200 {"scope":"part","size":20}
 wait 0.1
 wait_idle 120
 expect_value phone_ar_version == 1

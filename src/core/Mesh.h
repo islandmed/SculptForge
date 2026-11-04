@@ -80,9 +80,9 @@ struct SculptLayer {
 // a feature needs them, so plain meshes pay nothing. When present their size
 // always matches the vertex / triangle / corner count; rebuildTopology()
 // drops any that don't.
-// One sphere of a ZSphere armature (core/ZSpheres.h): the root is index 0 with parent -1; every other sphere
+// One sphere of a Forge Sphere armature (core/Forge Spheres.h): the root is index 0 with parent -1; every other sphere
 // grows from `parent`.
-struct ZSphere {
+struct ForgeSphere {
     glm::vec3 center{0.0f};
     float radius = 1.0f;
     int parent = -1;
@@ -94,11 +94,11 @@ public:
     std::vector<glm::vec3> normals;
     std::vector<glm::uvec3> triangles;
 
-    // Per vertex: mask (0 = free, 1 = fully masked) and polypaint (linear RGB, 0..1).
+    // Per vertex: mask (0 = free, 1 = fully masked) and vertex paint (linear RGB, 0..1).
     std::vector<float> mask;
     std::vector<glm::vec3> colors;
-    // Per triangle: polygroup id (empty = everything in group 0) and hidden flag (empty = all visible).
-    std::vector<uint32_t> polygroups;
+    // Per triangle: face group id (empty = everything in group 0) and hidden flag (empty = all visible).
+    std::vector<uint32_t> facegroups;
     std::vector<uint8_t> hidden;
     // Per triangle corner (3 per triangle, in triangle order): texture coordinates.
     std::vector<glm::vec2> uvs;
@@ -114,7 +114,7 @@ public:
 
     bool hasMask() const { return !mask.empty(); }
     bool hasColors() const { return !colors.empty(); }
-    bool hasPolygroups() const { return !polygroups.empty(); }
+    bool hasFaceGroups() const { return !facegroups.empty(); }
     bool hasHidden() const { return !hidden.empty(); }
     bool hasUvs() const { return !uvs.empty(); }
     bool hasUvFlags() const { return !uvFlags.empty(); }
@@ -124,14 +124,14 @@ public:
     glm::vec3 colorAt(uint32_t v, const glm::vec3& fallback = glm::vec3(1.0f)) const {
         return colors.empty() ? fallback : colors[v];
     }
-    uint32_t polygroupAt(uint32_t t) const { return polygroups.empty() ? 0u : polygroups[t]; }
+    uint32_t facegroupAt(uint32_t t) const { return facegroups.empty() ? 0u : facegroups[t]; }
     bool triangleHidden(uint32_t t) const { return !hidden.empty() && hidden[t] != 0; }
     // The triangle `t` is shown and exported as one quad with, or kNoQuad: a stored pair whose halves share a
-    // polygroup (a pair split between groups shows and exports as two triangles).
+    // face group (a pair split between groups shows and exports as two triangles).
     uint32_t quadPartnerAt(uint32_t t) const {
         if (quadPartners.empty()) return kNoQuad;
         const uint32_t u = quadPartners[t];
-        return u < quadPartners.size() && polygroupAt(t) == polygroupAt(u) ? u : kNoQuad;
+        return u < quadPartners.size() && facegroupAt(t) == facegroupAt(u) ? u : kNoQuad;
     }
     // Which edge of `t` (t[e] -> t[(e + 1) % 3]) is the diagonal it shares with triangle `u` (wound the other
     // way in `u`, whose third corner is not on `t`), or -1 when they don't form a quad.
@@ -148,7 +148,7 @@ public:
     // Allocate an attribute (no-op if present); returns it for convenience.
     std::vector<float>& ensureMask(float fill = 0.0f);
     std::vector<glm::vec3>& ensureColors(const glm::vec3& fill = glm::vec3(1.0f));
-    std::vector<uint32_t>& ensurePolygroups(uint32_t fill = 0);
+    std::vector<uint32_t>& ensureFaceGroups(uint32_t fill = 0);
     std::vector<uint8_t>& ensureHidden();
     std::vector<uint32_t>& ensureQuadPartners();
     // Records triangles `t` and `u` as one quad (growing quadPartners to the triangle count, so it can be called
@@ -157,7 +157,7 @@ public:
     // Free an attribute again once it holds only its default (e.g. after "clear mask" / "show all").
     void clearMask() { std::vector<float>().swap(mask); }
     void clearColors() { std::vector<glm::vec3>().swap(colors); }
-    void clearPolygroups() { std::vector<uint32_t>().swap(polygroups); }
+    void clearFaceGroups() { std::vector<uint32_t>().swap(facegroups); }
     void clearHidden() { std::vector<uint8_t>().swap(hidden); }
     void clearQuads() { std::vector<uint32_t>().swap(quadPartners); }
     // Drops attributes whose size no longer matches the mesh and unpairs invalid quad pairs (called by
@@ -183,7 +183,7 @@ public:
 
     // Paint layers (core/PaintLayer.h). While any exist, `paintBase` holds the
     // Base layer and `colors` the composited stack; `activePaintLayer` is the
-    // layer painting writes into (-1 = Base). Empty = plain polypaint in `colors`.
+    // layer painting writes into (-1 = Base). Empty = plain vertex paint in `colors`.
     std::vector<glm::vec3> paintBase;
     std::vector<PaintLayer> paintLayers;
     int activePaintLayer = -1;
@@ -204,12 +204,12 @@ public:
     // triangle or vertex count changes.
     std::shared_ptr<MicroMesh> micro;
 
-    // ZSpheres (core/ZSpheres.h): not empty = a ZSphere SubTool, whose triangles are made from this armature (the
-    // spheres and their links, or the skin while `zspherePreview`). Copies, undo steps and projects carry it.
-    std::vector<ZSphere> zspheres;
-    bool zspherePreview = false;
+    // Forge Spheres (core/Forge Spheres.h): not empty = a Forge Sphere Part, whose triangles are made from this armature (the
+    // spheres and their links, or the skin while `Forge SpherePreview`). Copies, undo steps and projects carry it.
+    std::vector<ForgeSphere> forgespheres;
+    bool forgespherePreview = false;
 
-    // Selection Sets (core/SelectionSets.h): named snapshots of the mask, polygroups, vertex paint, hidden faces, UVs
+    // Selection Sets (core/SelectionSets.h): named snapshots of the mask, face groups, vertex paint, hidden faces, UVs
     // and shape, immutable and shared by copies of the mesh (undo steps swap the whole list). They belong to the
     // Part, not to one subdivision level: stepping levels keeps them. Null = none.
     std::shared_ptr<const SelectionSetList> selectionSets;
@@ -280,7 +280,7 @@ public:
     // GPU synchronisation state: [dirtyBegin, dirtyEnd) bounds what needs re-uploading,
     // topologyDirty means everything (including indices) does.
     // Vertex attributes (mask, colours) share the vertex range; facesDirty
-    // means per-triangle state (hidden, polygroups) needs re-uploading.
+    // means per-triangle state (hidden, face groups) needs re-uploading.
     // Within the range each changed vertex has a bit in dirtyBits, and each block of kDirtyBlock vertices with
     // any a mark in dirtyBlocks, so uploads find a dab's vertices without scanning the mesh (core/UploadOrder.h).
     uint32_t dirtyBegin = std::numeric_limits<uint32_t>::max();

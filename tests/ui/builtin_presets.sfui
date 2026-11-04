@@ -1,15 +1,15 @@
 # #43: twelve more built-in alphas and six more VDM brushes, made in code at first use, with thumbnails in the
-# LightBox (Alpha and Brush tabs) and in the Alpha picker; a double-click uses one.
+# Library (Alpha and Brush tabs) and in the Alpha picker; a double-click uses one.
 run new_sphere subdivisions=5
 key ,
-expect_value lightbox_open == 1
+expect_value library_open == 1
 click "Library/Alpha"
 expect "Library/Round"
 expect "Library/Pores"
 expect "Library/Cracks"
 expect "Library/Fabric Weave"
 wait_idle 60
-shot lightbox_alphas
+shot library_alphas
 # The rest are further along the strip; the filter finds them.
 type "Library/##lbfilter" hair
 expect "Library/Hair Strands"
@@ -23,7 +23,7 @@ expect "Library/Bark"
 type "Library/##lbfilter" grid
 expect "Library/Dot Grid"
 wait_idle 60
-shot lightbox_alphas_filtered
+shot library_alphas_filtered
 type "Library/##lbfilter" crack
 double_click "Library/Cracks"
 expect_status Alpha 'Cracks'
@@ -40,7 +40,7 @@ expect "Library/Rock Ledge"
 type "Library/##lbfilter" line
 expect "Library/Wrinkle Line"
 wait_idle 60
-shot lightbox_vdms
+shot library_vdms
 type "Library/##lbfilter" fold
 expect "Library/Skin Fold"
 type "Library/##lbfilter" rivet
@@ -48,4 +48,4 @@ double_click "Library/Rivet"
 expect_status VDM 'Rivet'
 expect_value brush_type == 14
 key ,
-expect_value lightbox_open == 0
+expect_value library_open == 0

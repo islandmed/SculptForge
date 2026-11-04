@@ -34,7 +34,7 @@ void zipVertexArrays(Mesh& m, TopologyVertexValues& v, F&& f) {
 template <class F>
 void zipTriangleArrays(Mesh& m, TopologyTriangleValues& t, F&& f) {
     f(m.triangles, t.triangles);
-    f(m.polygroups, t.polygroups);
+    f(m.facegroups, t.facegroups);
     f(m.quadPartners, t.quadPartners);
     f(m.hidden, t.hidden);
 }
@@ -58,7 +58,7 @@ void forVertexArrays(Mesh& m, F&& f) {
 template <class F>
 void forTriangleArrays(Mesh& m, F&& f) {
     f(m.triangles);
-    f(m.polygroups);
+    f(m.facegroups);
     f(m.quadPartners);
     f(m.hidden);
 }
@@ -123,7 +123,7 @@ size_t TopologyVertexValues::bytes() const {
 }
 
 size_t TopologyTriangleValues::bytes() const {
-    return bytesOf(triangles) + bytesOf(polygroups) + bytesOf(quadPartners) + bytesOf(hidden);
+    return bytesOf(triangles) + bytesOf(facegroups) + bytesOf(quadPartners) + bytesOf(hidden);
 }
 
 size_t TopologyUndo::bytes() const {
@@ -275,7 +275,7 @@ uint32_t DynamicTopology::newTriangle(const glm::uvec3& tri, uint32_t like) {
     }
     recordTriangle(t);
     m.triangles[t] = tri;
-    if (!m.polygroups.empty()) m.polygroups[t] = m.polygroups[like];
+    if (!m.facegroups.empty()) m.facegroups[t] = m.facegroups[like];
     if (!m.hidden.empty()) m.hidden[t] = m.hidden[like];
     if (!m.quadPartners.empty()) m.quadPartners[t] = Mesh::kNoQuad;
     for (int c = 0; c < 3; ++c) {
@@ -539,12 +539,12 @@ bool DynamicTopology::planeVertex(uint32_t v) const {
     return false;
 }
 
-// Boundary, polygroup border, non-manifold, or lying in a symmetry plane.
+// Boundary, face group border, non-manifold, or lying in a symmetry plane.
 bool DynamicTopology::featureEdge(uint32_t a, uint32_t b) const {
     uint32_t tris[4];
     const int n = edgeTriangles(a, b, tris);
     if (n != 2) return true;
-    if (mesh_->polygroupAt(tris[0]) != mesh_->polygroupAt(tris[1])) return true;
+    if (mesh_->facegroupAt(tris[0]) != mesh_->facegroupAt(tris[1])) return true;
     for (size_t k = 0; k < mirrorMaps_.size(); ++k)
         if (mirrorOf(k, a) == a && mirrorOf(k, b) == b) return true;
     return false;

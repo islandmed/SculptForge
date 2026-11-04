@@ -6,7 +6,7 @@
 // Look / Vision Pro, Omniverse, Houdini Solaris, Blender, Maya, Unreal):
 //  - the sculpt as a UsdGeomMesh with a UsdPreviewSurface clay material, UVs
 //    as a face-varying primvars:st
-//  - a SubTool's texture (core/Texture.h) as a PNG (inside a .usdz, else beside
+//  - a Part's texture (core/Texture.h) as a PNG (inside a .usdz, else beside
 //    the file) read by a UsdUVTexture in the mesh's own UsdPreviewSurface
 //  - sculpt layers as UsdSkel blend shapes, current weights on a SkelAnimation
 //  - Gaussian splats as a UsdVol ParticleField3DGaussianSplat prim (OpenUSD 26.03+)
@@ -29,7 +29,7 @@ namespace sf {
 // Either pointer may be null (or empty) but not both. Format by extension.
 bool saveUsd(const std::string& path, const Mesh* mesh, const SplatCloud* splats, const std::string& name,
              std::string& error);
-// One Mesh prim per object (SubTool) under the root Xform `name`, each with its
+// One Mesh prim per object (Part) under the root Xform `name`, each with its
 // own blend shapes: a single object is the prim "Sculpt" as above, several are
 // named after the objects (made valid and unique). `animation` (optional, e.g.
 // a baked face take) adds time samples to each SkelAnimation's

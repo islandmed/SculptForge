@@ -10,11 +10,11 @@
 #include "app/CommandPalette.h"
 #include "app/Config.h"
 #include "app/Console.h"
-#include "app/LightBox.h"
+#include "app/LibraryBrowser.h"
 #include "app/Pickers.h"
 #include "app/ShellGeometry.h"
 #include "app/Support.h"
-#include "app/SubtoolThumbnails.h"
+#include "app/PartThumbnails.h"
 #include "app/Thumbnails.h"
 #include "app/UiLayout.h"
 #include "app/UserGuide.h"
@@ -80,7 +80,7 @@ struct AppOptions {
     float zoom = 1.0f; // headless: camera this many times closer than the framed view
     int turntable = 0; // headless: render N frames around the model (<path>_000.png ...)
     bool wireframe = false;
-    bool polygroups = false; // headless: colour each polygroup
+    bool facegroups = false; // headless: colour each face group
     bool hideMesh = false; // headless: show only the splats
     std::string demo;       // scripted demo to play (see Demo.h)
     std::string recordPath; // record the session to this .mp4 (needs ffmpeg) and exit
@@ -114,8 +114,8 @@ void wakeMainLoop();
 
 class App {
     friend class Demo;
-    // ZBrush-style shell modules (see ui-spec): they read and drive the app's state directly.
-    friend class LightBox;
+    // classic shell modules (see ui-spec): they read and drive the app's state directly.
+    friend class LibraryBrowser;
     friend class ThumbnailCache;
     friend void openPicker(Picker, ImVec2);
     friend void drawPickers(App&);
@@ -136,7 +136,7 @@ public:
     void shutdown();
     void requestUiScale(); // Preferences > Interface > UI scale changed: rebuilt live before the next frame (#87)
 
-    enum class FileAction { OpenObj, SaveObj, ExportGlb, ExportLods, SaveBrush, LoadBrush, OpenImage, ExportUsd, SaveSplats, ExportUnreal, SaveProject, AppendSubtool, ComfyWorkflow, LoadMatcap, InsertMesh, Count };
+    enum class FileAction { OpenObj, SaveObj, ExportGlb, ExportLods, SaveBrush, LoadBrush, OpenImage, ExportUsd, SaveSplats, ExportUnreal, SaveProject, AppendPart, ComfyWorkflow, LoadLitSphere, InsertMesh, Count };
     struct DialogRequest {
         App* app;
         FileAction action;
@@ -145,7 +145,7 @@ public:
     void queueFile(FileAction action, std::string path);
 
 private:
-    enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, SubToolClick, Select, Gizmo, Guide, Sculptable, ZSphere, Insert, Capture,
+    enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, PartClick, Select, Gizmo, Guide, Sculptable, ForgeSphere, Insert, Capture,
                       AirStroke, UvTool, SizeScrub }; // AirStroke: a stroke begun off the model, waiting to reach it (#62)
 
     void handleEvent(const SDL_Event& e); // the pen's mouse events first (penMouseEvents), then dispatchEvent
@@ -158,7 +158,7 @@ private:
     void rollBy(float x, float y, float dx, float dy); // Shift+click, release Shift, drag: turn about the view axis
     void onKey(SDL_Keycode key, SDL_Keymod mod);
 
-    bool pick(float x, float y, RayHit& hit) const; // the active SubTool (what brushes work on)
+    bool pick(float x, float y, RayHit& hit) const; // the active Part (what brushes work on)
     BrushType activeBrush() const;
     void beginStroke(float x, float y, const RayHit& hit);
     // Preferences > Input > Start strokes off the model (#62): a left press on the background waits as
@@ -173,7 +173,7 @@ private:
     void strokeTo(float x, float y);
     void dabAt(float x, float y, float pressure = -1.0f); // pressure < 0: strokePressure()
     void endStroke();
-    // Dynamic topology (ZBrush's Sculptris Pro, core/Dyntopo.h): turns it on or off (not on a mesh with
+    // Dynamic topology (dynamic topology, core/Dyntopo.h): turns it on or off (not on a mesh with
     // subdivision levels), saying so in the status bar; the Detail slider.
     void setDynamic(bool on);
     void drawDetailSlider(const char* id);
@@ -190,7 +190,7 @@ private:
     void generateLods();
     void clearLods();
     Mesh& displayedMesh();
-    void syncScene(); // uploads every SubTool (the active one as displayedMesh()) and the splats to the renderer
+    void syncScene(); // uploads every Part (the active one as displayedMesh()) and the splats to the renderer
 
     void drawUi();
     void drawBrushLab();
@@ -268,7 +268,7 @@ private:
     // Rotation drags: the unsnapped view, so Shift (snap to an axis) can be pressed and released mid-drag.
     Camera orbitRaw_;
     bool orbitStarted_ = false;
-    bool panFromAlt_ = false;       // a pan started with Alt: releasing Alt mid-drag zooms (ZBrush)
+    bool panFromAlt_ = false;       // a pan started with Alt: releasing Alt mid-drag zooms
     bool forceTurntable_ = false;   // demos orbit like a turntable whatever the preference
     float mouseX_ = 0.0f, mouseY_ = 0.0f;
     float lastX_ = 0.0f, lastY_ = 0.0f;
@@ -409,10 +409,10 @@ private:
     bool showWelcome_ = false;          // the first start (no project.json yet), or Help > Welcome
     // project.json "input_style": the key style an install started with (the welcome's "Coming from" choice, or
     // SculptForge for a new install), used while ui.json (Store Config) names none; -1: an install from before it,
-    // which keeps the ZBrush-style keys it had.
+    // which keeps the Classic sculpting keys it had.
     int startInputStyle_ = -1;
     // "SculptForge has a new look" (0.10.7, PanelSupport.cpp): once, for an install from before it that kept the
-    // Classic look or the ZBrush-style layout. Done once either button or its close box is used.
+    // Classic look or the Classic layout. Done once either button or its close box is used.
     bool newLookCard_ = false;
     bool newLookCardDone_ = false;
     void chooseNewLook(bool tryIt);
@@ -598,14 +598,14 @@ private:
     float cavityThreshold_ = 0.02f;
     int maskGroup_ = 0;
     int maskBorderRings_ = 2;        // Tool > Masking > By border: width in edge rings (#61)
-    bool maskBorderGroups_ = false;  // ... polygroup borders too
+    bool maskBorderGroups_ = false;  // ... face group borders too
     bool maskBorderSoft_ = false;    // ... fading inwards
     float maskCanvasX_ = 0.0f, maskCanvasY_ = 0.0f;
     bool maskCanvasMoved_ = false;
-    // Polygroups & visibility (PanelPolygroups.cpp): Ctrl+Shift click/drag.
-    bool polygroupMouseDown(float x, float y, SDL_Keymod mod); // true if it took the click
-    void polygroupMouseUp();
-    void drawPolygroupsSection();
+    // Face groups & visibility (PanelFace groups.cpp): Ctrl+Shift click/drag.
+    bool facegroupMouseDown(float x, float y, SDL_Keymod mod); // true if it took the click
+    void facegroupMouseUp();
+    void drawFaceGroupsSection();
     // Cut (PanelCut.cpp, core/Cut.h): Ctrl+Shift with a Cut shape. Line, Lasso and Rectangle are dragged; Polyline
     // is clicked point by point (click the first point to close it, double-click or Enter to end it open, Esc drops it).
     void cutMouseUp();
@@ -620,7 +620,7 @@ private:
     float cutDepth_ = 0.1f;   // In / Add: fraction of the Part's size
     std::vector<ImVec2> cutPolyline_; // window pixels of the Polyline being placed
     // Screen selections (Selection.cpp): the rectangle or lasso dragged for
-    // visibility (Ctrl+Shift, ZBrush SelectRect / SelectLasso) or for the mask
+    // visibility (Ctrl+Shift, classic SelectRect / SelectLasso) or for the mask
     // (Ctrl, MaskRect / MaskLasso). Pen is the mask's brush-stroke mode.
     // The Cut shapes share the Ctrl+Shift drag with SelectRect / SelectLasso (PanelCut.cpp).
     enum class SelectShape { Pen, Lasso, Rect, CutLine, CutLasso, CutRect, CutPolyline };
@@ -642,8 +642,8 @@ private:
     // Window pixels: the start, then the lasso's points (a rectangle's other corner is the cursor).
     std::vector<ImVec2> selectPath_;
     bool selectMoved_ = false; // left the click slop: a drag, not a click
-    float polygroupAngle_ = 30.0f;
-    // visiblePolygroupCount is O(triangles): recomputed only when the key below changes.
+    float facegroupAngle_ = 30.0f;
+    // visibleFace groupCount is O(triangles): recomputed only when the key below changes.
     size_t visibleGroups_ = 0;
     std::array<uint64_t, 6> visibleGroupsKey_{};
     // Stroke types, alphas and the extra brushes (PanelBrushes.cpp).
@@ -729,7 +729,7 @@ private:
     std::mutex alphaMutex_;
     std::string pendingAlphaPath_; // set by the file dialog thread
     // Vector displacement brushes (PanelVdm.cpp, core/Vdm.h): the Brush palette's Vector Displacement section,
-    // its file dialogs and actions, DragDot, and the DragRect stroke the VDM brush brings along (as ZBrush's do).
+    // its file dialogs and actions, DragDot, and the DragRect stroke the VDM brush brings along (as the classic do).
     void dragDotTo(float x, float y);
     bool vdmBrushActive() const { return brush_ == BrushType::Vdm && doc_.activeBrush < 0 && !paintMode_; }
     void drawVdmSection();
@@ -750,7 +750,7 @@ private:
     bool facePlacing_ = false;
     int facePlaceIndex_ = 0;
     int faceSymmetry_ = 0; // 0 Auto, 1 On, 2 Off
-    bool faceSubtools_ = true;
+    bool faceParts_ = true;
     float facePresetAmount_ = 1.0f;
     MorphAnimation faceTake_;
     std::string faceTakePath_;
@@ -829,33 +829,33 @@ private:
     std::string brushPopupError_; // why the last rename failed
     int listedBrush_ = -1;        // active brush when the list was last drawn (to scroll to a new one)
     std::string pendingRename_;    // new name typed in the recipe editor, applied after the panel is drawn
-    // Polypaint and MatCap materials (PanelPolypaint.cpp)
-    bool paintMode_ = false;  // Paint brush: colour only, no sculpting (ZBrush Rgb on, Zadd off)
-    bool paintRgb_ = false;   // also paint the colour while sculpting (ZBrush Rgb + Zadd)
+    // Vertex paint and Lit Sphere materials (PanelVertex paint.cpp)
+    bool paintMode_ = false;  // Paint brush: colour only, no sculpting (Rgb on, Raise off)
+    bool paintRgb_ = false;   // also paint the colour while sculpting (Rgb + Raise)
     bool strokePaint_ = false, strokeSculpt_ = true;
     void registerPaintUiCommands();
-    std::string matcapFolder() const; // <library>/Lit Spheres, empty without a library
-    void loadMatcapLibrary();         // custom MatCaps from the studio folders and matcapFolder() (start-up)
-    void loadMatcapDialog();          // Material > Load MatCap...
-    void rescanMatcapFolder();        // loads new / changed images in matcapFolder(), drops deleted ones
+    std::string litsphereFolder() const; // <library>/Lit Spheres, empty without a library
+    void loadLitSphereLibrary();         // custom Lit Spheres from the studio folders and lit sphereFolder() (start-up)
+    void loadLitSphereDialog();          // Material > Load Lit Sphere...
+    void rescanLitSphereFolder();        // loads new / changed images in lit sphereFolder(), drops deleted ones
     void materialListShown();         // a material list is on screen: rescans when it has just opened
-    std::map<std::string, std::pair<uintmax_t, int64_t>> matcapFolderSeen_; // path -> size, time at the last scan
-    std::set<std::string> hiddenMatcapFiles_; // removed MatCaps whose file couldn't go to the trash
+    std::map<std::string, std::pair<uintmax_t, int64_t>> litsphereFolderSeen_; // path -> size, time at the last scan
+    std::set<std::string> hiddenLitSphereFiles_; // removed Lit Spheres whose file couldn't go to the trash
     int materialListFrame_ = -10;
     void setFlatShading(bool flat); // the scene's shading, and the preference for the next session
     // The view's background (#21): gradient or a flat display colour; also the preference for the next session.
     void setBackground(bool gradient, const glm::vec3& color);
     void drawBackgroundControls(const char* idSuffix); // Preferences > Display and the Render palette
-    void drawShadingControls();     // Material palette and Tool > Display: Smooth | Flat, and the SubTool's own
+    void drawShadingControls();     // Material palette and Tool > Display: Smooth | Flat, and the Part's own
     void drawViewportShadingControls(); // Material palette: Lit Sphere | PBR and the environment
     void paintAt(const DabParams& p);
     void pickColorUnderCursor();
-    // First paint stroke on a mesh without polypaint: undo swaps this paint stack (no colours) back in, so the
+    // First paint stroke on a mesh without vertex paint: undo swaps this paint stack (no colours) back in, so the
     // attribute goes away again.
     std::unique_ptr<PaintStackUndo> paintSnapshot_;
     void beginPaintStroke();
     void finishPaintStroke(UndoRecord& record);
-    TexturePainter texturePainter_; // strokes into the SubTool's texture (core/Texture.h)
+    TexturePainter texturePainter_; // strokes into the Part's texture (core/Texture.h)
     // Texture Map sub-palette (PanelTexture.cpp): texture painting on UVs, Auto UV, the UV view.
     void drawTextureMapContents();
     void registerTextureUiActions();
@@ -872,7 +872,7 @@ private:
     bool uvToolMouseDown(float x, float y, SDL_Keymod mod);
     void uvToolDragTo(float x, float y);
     void uvToolRelease();
-    const MeshOverlay* uvEditorOverlay(uint32_t subtool); // what syncScene hands the renderer for the model
+    const MeshOverlay* uvEditorOverlay(uint32_t part); // what syncScene hands the renderer for the model
     bool uvEditorBusy() const;
     // UI test values: uv_editor_open, uv_islands, uv_seams, uv_selected, uv_select_mode, uv_pins, uv_tiles,
     // uv_stretch_x1000, uv_flipped_x1000, uv_density, uv_max_u, uv_unwrapping, uv_unwraps, uv_tool,
@@ -889,7 +889,7 @@ private:
         std::shared_ptr<std::atomic<bool>> cancel;
         std::shared_ptr<AutoUvResult> result;
         std::shared_ptr<std::string> error;
-        uint32_t subtool = 0;            // SubTool id it unwraps
+        uint32_t part = 0;            // Part id it unwraps
         size_t triangles = 0;            // the mesh must still have this many triangles when it finishes
     };
     std::unique_ptr<AutoUvJob> autoUv_;
@@ -927,18 +927,18 @@ private:
     glm::vec3 prewarmCenter_{1e30f};
     float prewarmRadius_ = 0.0f;
     // Bake sub-palette (PanelBake.cpp): normal / displacement / AO / cavity / colour maps from a high-poly onto
-    // the active SubTool's UVs (core/Bake.h), on a worker thread, and the baked normal map shown on the model.
+    // the active Part's UVs (core/Bake.h), on a worker thread, and the baked normal map shown on the model.
     void drawBakeContents();
     void registerBakeUiActions();
     void startBake();
     void pollBake();
-    // The normal map to preview on SubTool `id` (null when none, it is turned off, or the mesh changed).
+    // The normal map to preview on Part `id` (null when none, it is turned off, or the mesh changed).
     const NormalMapView* bakeNormalMap(uint32_t id, const Mesh& mesh);
     bool bakeBusy() const;
-    // The last bake's normal map PNG when its SubTool is shown and still fits it (Send to Unreal takes it along).
+    // The last bake's normal map PNG when its Part is shown and still fits it (Send to Unreal takes it along).
     std::string bakedNormalMapFile(bool& directX);
     // UI test values: bake_running, baked_maps (maps in the last bake), bake_size, bake_files, normal_map_preview
-    // (1 when the active SubTool shows a baked normal map); NaN for other names.
+    // (1 when the active Part shows a baked normal map); NaN for other names.
     double bakeTestValue(const std::string& name);
     std::shared_ptr<struct BakeUiState> bake_;
     // Splats > Train from capture (PanelSplatTrain.cpp, ai/SplatTrainer.h): Brush trains a splat from a phone
@@ -953,7 +953,7 @@ private:
     double splatTrainTestValue(const std::string& name);
     std::shared_ptr<struct SplatTrainUi> splatTrain_;
     std::string lastExportFolder_; // where the last export went: the default folder for baked maps
-    // Cached UV wireframe of the active SubTool for the UV view: segments in 0..1 UV space.
+    // Cached UV wireframe of the active Part for the UV view: segments in 0..1 UV space.
     std::vector<glm::vec2> uvLines_;
     uint64_t uvLinesKey_ = 0;
     // Preferences > Performance (PanelPerformance.cpp): antialiasing and fast navigation, multithreading, what the
@@ -994,7 +994,7 @@ private:
     void applyHardwareProfile(const struct HardwareProfile& profile, bool announce);
     void finishCalibration();
     std::shared_ptr<struct HwProfileUi> hwProfile_;
-    // Splats > Make sculptable (PanelSculptable.cpp, core/Sculptable.h): splat capture -> sculptable SubTool on a
+    // Splats > Make sculptable (PanelSculptable.cpp, core/Sculptable.h): splat capture -> sculptable Part on a
     // worker thread; the crop box and the face landmark review in the viewport.
     void registerSculptableUiActions();
     void drawSculptableSection();
@@ -1013,13 +1013,13 @@ private:
     bool sculptableLandmarkScreen(int i, ImVec2& out) const; // UI tests: where landmark i is drawn
     double sculptableTestValue(const std::string& name);     // NaN for names it doesn't know
     std::shared_ptr<struct SculptableUiState> sculptable_;
-    // Geometry > QRemesh (quad retopology on a worker thread) and SubTool > Project (ProjectAll); PanelRetopo.cpp.
+    // Geometry > QRemesh (quad retopology on a worker thread) and Part > Project (ProjectAll); PanelRetopo.cpp.
     void registerRetopoUiActions();
     void drawQRemeshContents();
     void drawProjectContents();
     void startQRemesh();
     void drawKeepTextureCheckbox(const char* id, const char* path); // Keep Texture under Remesh and QRemesh (PanelTexture.cpp)
-    // Voxel Remesh of a painted SubTool with Keep Texture: the remesh, Auto UV and texture transfer run on a
+    // Voxel Remesh of a painted Part with Keep Texture: the remesh, Auto UV and texture transfer run on a
     // worker thread (PanelRetopo.cpp); otherwise Voxel Remesh is the plain remesh command.
     void startVoxelRemesh();
     void pollVoxelRemesh();
@@ -1029,7 +1029,7 @@ private:
         std::shared_ptr<std::atomic<bool>> cancel;
         std::shared_ptr<Mesh> result;
         std::shared_ptr<std::string> error, note;
-        uint32_t subtool = 0;
+        uint32_t part = 0;
         size_t triangles = 0;
         int resolution = 200;
         bool keepMasked = false, keepTexture = true;
@@ -1043,7 +1043,7 @@ private:
         std::shared_ptr<Mesh> result;
         std::shared_ptr<QRemeshStats> stats;
         std::shared_ptr<std::string> error;
-        uint32_t subtool = 0;  // SubTool id it remeshes
+        uint32_t part = 0;  // Part id it remeshes
         size_t triangles = 0;  // the mesh must still have this many triangles when it finishes
         bool keepOriginal = false;
         Args args;             // the equivalent qremesh command, for the console
@@ -1054,15 +1054,15 @@ private:
         int method = 0; // 0 = QRemesh 2 (QRemeshMethod::V2), 1 = Legacy
         int target = 5000;
         float adaptive = 0.5f;
-        bool keepGroups = false, detectEdges = true, usePolypaint = false, symmetry = true, keepOriginal = false;
+        bool keepGroups = false, detectEdges = true, useVertexPaint = false, symmetry = true, keepOriginal = false;
         bool keepMasked = false; // Keep Masked (#43): the masked area stays as it is (core/KeepMasked.h)
         float projectDist = 0.02f;
         int projectBlur = 0;
-        bool projectMean = false, projectGeometry = true, projectPolypaint = true;
+        bool projectMean = false, projectGeometry = true, projectVertexPaint = true;
     } retopo_;
-    // The last QRemesh's quality report (shown under the QRemesh controls while that SubTool is active).
+    // The last QRemesh's quality report (shown under the QRemesh controls while that Part is active).
     QRemeshStats lastQRemeshStats_;
-    uint64_t lastQRemeshSubtool_ = 0;
+    uint64_t lastQRemeshPart_ = 0;
     bool haveQRemeshStats_ = false;
     void drawQRemeshReport();
     // QRemesh Guides (PanelRetopo.cpp, core/QRemeshGuides.h): the "QRemesh Guides" brush draws curves on the
@@ -1087,44 +1087,44 @@ private:
     // Which guide points face the camera (drawn solid; the others faint), cached per view and guide set.
     std::vector<std::vector<uint8_t>> guideVisible_;
     uint64_t guideVisibleKey_ = 0;
-    // ZSpheres (PanelZSpheres.cpp, core/ZSpheres.h): while a ZSphere SubTool is active, clicks on it draw, move,
+    // Forge Spheres (PanelForge Spheres.cpp, core/Forge Spheres.h): while a Forge Sphere Part is active, clicks on it draw, move,
     // scale or delete spheres instead of sculpting; each drag is one undo step.
-    enum class ZSphereMode { Draw, Move, Scale };
-    void registerZSphereUiActions();
-    void drawZSpheresContents();                          // Tool > ZSpheres
-    bool zsphereMouseDown(float x, float y, SDL_Keymod mod); // true if it took the click
-    void zsphereDragTo(float x, float y);
-    void zsphereRelease();
-    void drawZSphereOverlay();                            // the hovered sphere's outline
-    bool zsphereActive() const { return !doc_.mesh.zspheres.empty(); }
-    int zsphereAt(float x, float y, bool* link = nullptr) const; // sphere (or link's child) under the cursor, or -1
+    enum class ForgeSphereMode { Draw, Move, Scale };
+    void registerForgeSphereUiActions();
+    void drawForgeSpheresContents();                          // Tool > Forge Spheres
+    bool forgesphereMouseDown(float x, float y, SDL_Keymod mod); // true if it took the click
+    void forgesphereDragTo(float x, float y);
+    void forgesphereRelease();
+    void drawForgeSphereOverlay();                            // the hovered sphere's outline
+    bool forgesphereActive() const { return !doc_.mesh.forgespheres.empty(); }
+    int forgesphereAt(float x, float y, bool* link = nullptr) const; // sphere (or link's child) under the cursor, or -1
     float worldPerPixel(const glm::vec3& at) const;       // world size of one canvas pixel at `at`'s depth
-    ZSphereMode zsphereMode_ = ZSphereMode::Draw;
-    bool zspherePlaceChild_ = false; // Draw: the drag moves the new sphere away from its parent (Ctrl does it too)
-    int zsphereSelected_ = -1;      // the sphere last clicked or added (Delete Selected, the menu); -1 none
+    ForgeSphereMode forgesphereMode_ = ForgeSphereMode::Draw;
+    bool forgespherePlaceChild_ = false; // Draw: the drag moves the new sphere away from its parent (Ctrl does it too)
+    int forgesphereSelected_ = -1;      // the sphere last clicked or added (Delete Selected, the menu); -1 none
     // The right-click menu on a sphere: armed by a right press on one, opened if it was a click.
-    struct ZSphereMenu {
+    struct ForgeSphereMenu {
         bool armed = false, open = false;
         int sphere = -1;
         bool link = false;
         float x = 0.0f, y = 0.0f;
     } zsMenu_;
-    bool zsphereRightDown(float x, float y); // a right press on a sphere arms the menu
+    bool forgesphereRightDown(float x, float y); // a right press on a sphere arms the menu
     float deformAmount_[4] = {50.0f, 50.0f, 50.0f, 50.0f}; // Tool > Deformation: Polish, Relax, Smooth, Balloon
     bool deformKeepVolume_ = false;
     float zoomDragAmount(float dx, float dy) const; // Drag::Zoom's step (App.cpp)
-    void drawZSphereMenu();
+    void drawForgeSphereMenu();
     bool zsMenuShown_ = false; // the menu was drawn this frame (UI tests)
     // Delete, Insert (a joint on the link to its parent) or Set as root on sphere `i`, symmetric, one undo step.
-    enum class ZSphereEdit { Delete, Insert, SetRoot };
-    void zsphereEdit(ZSphereEdit edit, int i);
-    int zsphereSelection() const; // zsphereSelected_ when it is still a sphere, else -1
-    int zsphereResolution_ = 128;                         // Make Mesh resolution
-    struct ZSphereDrag {
-        ZSphereMode op = ZSphereMode::Draw; // what this drag does (a Draw click on a link then moves the new joint)
+    enum class ForgeSphereEdit { Delete, Insert, SetRoot };
+    void forgesphereEdit(ForgeSphereEdit edit, int i);
+    int forgesphereSelection() const; // Forge SphereSelected_ when it is still a sphere, else -1
+    int forgesphereResolution_ = 128;                         // Make Mesh resolution
+    struct ForgeSphereDrag {
+        ForgeSphereMode op = ForgeSphereMode::Draw; // what this drag does (a Draw click on a link then moves the new joint)
         int sphere = -1;               // the sphere being drawn, moved or scaled
-        std::vector<ZSphere> start;    // the armature when the drag began
-        Mesh before;                   // the SubTool's mesh then (the undo step's old state)
+        std::vector<ForgeSphere> start;    // the armature when the drag began
+        Mesh before;                   // the Part's mesh then (the undo step's old state)
         glm::vec3 grab{0.0f};          // Move: the centre's offset from the grab plane's hit
         float x = 0.0f, y = 0.0f;      // where the press was
         bool changed = false;
@@ -1133,23 +1133,23 @@ private:
         const char* label = "";
     } zsDrag_;
     const BrushRecipe* strokeRecipe() const; // recipe the current stroke sculpts with (none for Smooth / paint only)
-    // ZBrush GoZ bridge and GoZ/STL files (PanelGoz.cpp).
-    void drawGozMenu();
-    void pollGoz();
-    void runGozCommand(const std::string& name, const Args& args = {});
-    static void SDLCALL onGozFileChosen(void* userdata, const char* const* files, int filter);
-    enum class GozFile { Import, Export, ExportStl, Count };
-    struct GozDialog {
+    // Bridge bridge and Bridge/STL files (PanelBridge.cpp).
+    void drawBridgeMenu();
+    void pollBridge();
+    void runBridgeCommand(const std::string& name, const Args& args = {});
+    static void SDLCALL onBridgeFileChosen(void* userdata, const char* const* files, int filter);
+    enum class BridgeFile { Import, Export, ExportStl, Count };
+    struct BridgeDialog {
         App* app;
-        GozFile kind;
+        BridgeFile kind;
     };
-    GozDialog gozDialogs_[int(GozFile::Count)];
-    std::vector<std::pair<GozFile, std::string>> gozPendingFiles_; // guarded by pendingMutex_
-    char gozFolder_[512] = "";   // custom GoZ root (empty = the platform default)
-    bool gozAutoReceive_ = false; // import whenever ZBrush rewrites GoZ_ObjectList.txt
-    long long gozListTime_ = 0;   // last seen modification time of the object list
-    Uint64 gozLastPollNs_ = 0;
-    bool gozInitialised_ = false;
+    BridgeDialog bridgeDialogs_[int(BridgeFile::Count)];
+    std::vector<std::pair<BridgeFile, std::string>> bridgePendingFiles_; // guarded by pendingMutex_
+    char bridgeFolder_[512] = "";   // custom Bridge root (empty = the platform default)
+    bool bridgeAutoReceive_ = false; // import whenever the other application rewrites the object list
+    long long bridgeListTime_ = 0;   // last seen modification time of the object list
+    Uint64 bridgeLastPollNs_ = 0;
+    bool bridgeInitialised_ = false;
     // Blender bridge (PanelBlender.cpp, io/BlenderBridge.h): the add-on's exchange folder, polled once a second.
     void drawBlenderMenu();
     void pollBlender();
@@ -1260,18 +1260,18 @@ private:
     uint64_t autosaveRevision_ = ~uint64_t(0);
     bool autosaveWritten_ = false;
     std::string windowTitle_;
-    // SubTools (PanelSubTools.cpp): the panel, and Alt+click in the viewport to select one.
-    void drawSubToolPopups();
-    // Index of the nearest visible SubTool under the cursor (-1: none); builds stale BVHs on the way.
-    int pickSubtool(float x, float y, RayHit* hit = nullptr);
-    void subtoolClickMove(float x, float y); // Alt press on another SubTool: dragging turns it into a stroke
-    void subtoolClickRelease();              // ... and releasing without dragging selects it
-    int subtoolClickTarget_ = -1;
-    bool subtoolClickFrame_ = false; // Shift+Alt+click: frame the SubTool as well
+    // Parts (PanelParts.cpp): the panel, and Alt+click in the viewport to select one.
+    void drawPartPopups();
+    // Index of the nearest visible Part under the cursor (-1: none); builds stale BVHs on the way.
+    int pickPart(float x, float y, RayHit* hit = nullptr);
+    void partClickMove(float x, float y); // Alt press on another Part: dragging turns it into a stroke
+    void partClickRelease();              // ... and releasing without dragging selects it
+    int partClickTarget_ = -1;
+    bool partClickFrame_ = false; // Shift+Alt+click: frame the Part as well
     int mouseClicks_ = 1; // SDL's click count of the press being handled (3 = a triple-click, #43)
     bool spaceHeld_ = false; // Space is down with Preferences > Input > Hold Space to move the camera on (#43)
-    float subtoolClickX_ = 0.0f, subtoolClickY_ = 0.0f;
-    Uint64 subtoolClickNs_ = 0; // when the Alt press on another Part began (a long pen press isn't a click)
+    float partClickX_ = 0.0f, partClickY_ = 0.0f;
+    Uint64 partClickNs_ = 0; // when the Alt press on another Part began (a long pen press isn't a click)
     void partSelected(const char* how);
     // A background job's result (Auto UV, Voxel Remesh, QRemesh, Unwrap) goes onto the Part it ran on, and the
     // active Part stays the one the user is on (Discord: "the active Part switches by itself" when a job finished
@@ -1288,24 +1288,24 @@ private:
     };
     bool jobWaitsForStroke() const;
     Uint64 clickClockNs() const; // the status bar names the new active Part and how it was chosen
-    uint32_t renamingSubtool_ = 0; // SubTool id being renamed inline (0: none)
-    uint32_t listedActiveSubtool_ = 0; // the list scrolls to the active SubTool when it changes
-    // SubTool thumbnails (#43): rendered from each SubTool's GPU buffers while the SubTools panel shows, one per frame
-    // at most, a change once it has settled (SubtoolThumbnails.h); GL textures by SubTool id.
-    SubtoolThumbnailSchedule subtoolThumbSchedule_;
-    std::unordered_map<uint32_t, unsigned> subtoolThumbs_;
-    bool subtoolPanelShown_ = false; // drawn this frame
-    void updateSubtoolThumbnails();  // after syncScene, GL current
-    void clearSubtoolThumbnails();
+    uint32_t renamingPart_ = 0; // Part id being renamed inline (0: none)
+    uint32_t listedActivePart_ = 0; // the list scrolls to the active Part when it changes
+    // Part thumbnails (#43): rendered from each Part's GPU buffers while the Parts panel shows, one per frame
+    // at most, a change once it has settled (PartThumbnails.h); GL textures by Part id.
+    PartThumbnailSchedule partThumbSchedule_;
+    std::unordered_map<uint32_t, unsigned> partThumbs_;
+    bool partPanelShown_ = false; // drawn this frame
+    void updatePartThumbnails();  // after syncScene, GL current
+    void clearPartThumbnails();
     bool focusRename_ = false;
     char renameBuffer_[128] = "";
-    // Not-undoable SubTool commands wait for a confirmation popup.
-    struct SubToolConfirm {
+    // Not-undoable Part commands wait for a confirmation popup.
+    struct PartConfirm {
         std::string title, message, button, command;
     };
-    SubToolConfirm subtoolConfirm_;
-    bool openSubtoolConfirm_ = false;
-    // Split by polygroups needs more than one group; counted only when the active mesh changes.
+    PartConfirm partConfirm_;
+    bool openPartConfirm_ = false;
+    // Split by face groups needs more than one group; counted only when the active mesh changes.
     uint64_t splitGroupsKey_ = ~uint64_t(0);
     bool splitGroupsPossible_ = false;
     // Community brushes window (PanelBrushGallery.cpp): browse, search and install shared brushes.
@@ -1413,7 +1413,7 @@ private:
     // Tool > Selection Sets (PanelSelectionSets.cpp).
     void drawSelectionSetsSection();
     char setNameBuffer_[64] = "Set 1";
-    uint32_t setChannels_ = 1 | 2 | 8; // kSetMask | kSetPolygroups | kSetVisibility (core/SelectionSets.h)
+    uint32_t setChannels_ = 1 | 2 | 8; // kSetMask | kSetFace groups | kSetVisibility (core/SelectionSets.h)
     std::string selectedSet_, combineWith_;
     int setMode_ = 0; // Replace, Union, Intersect, Subtract
     float morphAmount_ = 1.0f;
@@ -1424,15 +1424,15 @@ private:
     float sdivSlider_ = 1.0f;   // the SDiv slider while dragged (1-based)
     float microSlider_ = 4.0f;  // Tool > Geometry > Micro: the micro level the next Divide to micro makes
     bool sdivHeld_ = false;
-    void drawSubToolsContents();
-    // PanelExtract.cpp: Tool > SubTool > Extract, Tool > Geometry > Modify Topology (Mirror And Weld) and
-    // Tool > Deformation (Mirror), as in ZBrush.
+    void drawPartsContents();
+    // PanelExtract.cpp: Tool > Part > Extract, Tool > Geometry > Modify Topology (Mirror And Weld) and
+    // Tool > Deformation (Mirror).
     void drawExtractContents();
     void drawModifyTopologyContents();
     void drawDeformationContents();
     void runExtract(); // Extract with the palette's settings (a preview; Accept keeps it)
     static std::string axesText(const bool axes[3]); // "x", "xz", "" (the axis argument of mirror commands)
-    float extractThick_ = 0.015f;          // Thick: fraction of the SubTool's size
+    float extractThick_ = 0.015f;          // Thick: fraction of the Part's size
     int extractSmooth_ = 5;                // E Smt
     bool extractDouble_ = false;           // Double
     bool extractTCorne_ = false;           // TCorne
@@ -1473,18 +1473,18 @@ private:
     } shelfDrag_;
     // ---- end Shell (A) ----
 
-    // ---- LightBox (B): LightBox, thumbnails, pickers ----
-    LightBox lightbox_;
+    // ---- Library (B): Library, thumbnails, pickers ----
+    LibraryBrowser libraryBrowser_;
     ThumbnailCache thumbs_;
     friend struct PickerUi;
     friend void drawAlphaGrid(App&, GridMode);
     friend void drawMaterialGrid(App&, GridMode);
     friend void drawStrokeGrid(App&, GridMode);
-    void initLightBox();   // end of init(): library folders, thumbnail cache, actions, project thumbnails
+    void initLibraryBrowser();   // end of init(): library folders, thumbnail cache, actions, project thumbnails
     void showStarterMeshes(); // the Library at Tool > Starter meshes (File > New from Starter Mesh, the welcome)
-    void drawLightBoxUi(); // every frame from drawUi: thumbnails, the LightBox, pickers, size / strength pop-ups
-    // The LightBox / picker shortcuts (, B M S) until the action registry dispatches keys.
-    bool lightBoxKey(SDL_Keycode key, SDL_Keymod mod);
+    void drawLibraryBrowserUi(); // every frame from drawUi: thumbnails, the Library, pickers, size / strength pop-ups
+    // The Library / picker shortcuts (, B M S) until the action registry dispatches keys.
+    bool libraryKey(SDL_Keycode key, SDL_Keymod mod);
     void quickSave();                  // file.quicksave: a timestamped project in <library>/QuickSave
     // Save Render (render.save_image, save_render): the view without the interface, by default as a PNG in
     // <library>/Images at twice the view's size. `size` is the longer side (0 = twice the view, at most 4096),
@@ -1505,7 +1505,7 @@ private:
     void drawSaveRenderControls();
     LibraryRoots library_;
     FolderScanner libraryScanner_;
-    // ---- end LightBox (B) ----
+    // ---- end Library (B) ----
 
     // ---- Help/Console/Config (C): actions, help, command palette, console, config ----
 public:
@@ -1531,7 +1531,7 @@ private:
     friend class Console;
     friend class CommandPalette;
     friend void config::drawHotkeysSection(App&);
-    friend void config::drawLightBoxSection(App&);
+    friend void config::drawLibraryBrowserSection(App&);
     void initUiConfig(bool deterministic); // reads ui.json before fonts are built (UI scale)
     void initActions();                    // the default actions and shortcuts, then every command as cmd.*
     void addHelpFonts(float scale);
@@ -1559,7 +1559,7 @@ private:
     float viewFigureRadius() const;
     void drawViewFigure();
     // Insert on the model (#34): the primitive chosen in Append > Insert; a drag on the surface places it.
-    // "mesh" inserts your own mesh instead: insertMeshKey_ is "subtool" (a SubTool's name) or "file" (a path
+    // "mesh" inserts your own mesh instead: insertMeshKey_ is "part" (a Part's name) or "file" (a path
     // chosen in the file dialog), insertMeshValue_ the name or path (insert_mesh).
     std::string insertType_;
     std::string insertMeshKey_, insertMeshValue_;
@@ -1622,14 +1622,14 @@ private:
     void drawGizmoContents(bool compact); // Transform palette > Gizmo 3D and the floating panel
     void updateGizmoPivot();   // follows the moving part's centre until the pivot is placed
     void resetGizmoPivot();
-    void snapGizmoPivot(const RayHit& hit, int subtool);
+    void snapGizmoPivot(const RayHit& hit, int part);
     void applyGizmoNumbers();  // the panel's Move / Rotate / Scale fields, as a transform command
     glm::mat3 gizmoFrame() const;
     float gizmoWorldSize() const; // world length of an axis arrow (constant on screen)
     bool gizmoProject(const glm::vec3& p, ImVec2& out) const; // false behind the camera
     GizmoHandle gizmoHandleAt(float x, float y) const;
     bool gizmoHandleScreen(GizmoHandle h, ImVec2& out) const; // a point to grab handle h (UI tests)
-    std::vector<int> gizmoTargets() const; // SubTools a drag transforms (the active one, or All)
+    std::vector<int> gizmoTargets() const; // Parts a drag transforms (the active one, or All)
     void gizmoAfterUndo(bool redo);        // the gizmo goes back (or forward) with its own steps
     void rememberGizmoStep(const glm::vec3& before, const glm::mat3& frameBefore, bool surfaceBefore);
     struct GizmoState {
@@ -1657,14 +1657,14 @@ private:
         glm::vec3 surfaceNormal{0, 1, 0};     // at the last snap (Surface orientation)
         bool pendingSnap = false;             // Alt+press on the model: a click (no drag) puts the pivot there
         RayHit snapHit;
-        int snapSubtool = -1;
+        int snapPart = -1;
         MeshTransform current;
-        std::vector<int> subtools;
+        std::vector<int> parts;
         std::vector<TransformSession> sessions;
         std::string readout;        // shown beside the gizmo while dragging ("Rotate 45")
-        // Where the gizmo was before and after each of its undo steps (active SubTool, by undo depth).
+        // Where the gizmo was before and after each of its undo steps (active Part, by undo depth).
         struct Step {
-            uint32_t subtool = 0;
+            uint32_t part = 0;
             size_t depth = 0; // UndoStack::undoCount() right after the step
             glm::vec3 before{0.0f}, after{0.0f};
             glm::mat3 frameBefore{1.0f}, frameAfter{1.0f};
@@ -1676,12 +1676,12 @@ private:
     } gizmo_;
     // ---- end Gizmo 3D ----
     // ---- Classic sculpting keys (Input.cpp, docs/guide/quick-tour.md) ----
-    // Preferences > Input (the ZBrush or SculptForge key style), the Space QuickMenu, the intensities and Focal
-    // Shift (U / I / O), ZBrush's mask and polygroup keys, Shift-constrained straight strokes and the
+    // Preferences > Input (the classic or SculptForge key style), the Space QuickMenu, the intensities and Focal
+    // Shift (U / I / O), the classic mask and face group keys, Shift-constrained straight strokes and the
     // Shift+click, release Shift, drag roll.
     void registerInputActions();
     void applyInputStyle(); // the style's default shortcuts (1-0 brushes or 9 QuickSave; I = RGB or Z Intensity)
-    bool zbrushStyle() const { return uiPrefs_.inputStyle == 0; }
+    bool classicStyle() const { return uiPrefs_.inputStyle == 0; }
     bool blenderStyle() const { return uiPrefs_.inputStyle == 2; }
     bool mayaStyle() const { return uiPrefs_.inputStyle == 3; } // #32: Alt+left/middle/right orbit/pan/zoom
     bool mayaNavigationDown(Uint8 button);
@@ -1693,7 +1693,7 @@ private:
     void registerViewActions();
     void viewAxis(float yawDegrees, float pitchDegrees); // Numpad 1 / 3 / 7: orthographic until turned
     void viewOrbitStep(float yawDegrees, float pitchDegrees);
-    void frameActiveSubtool();
+    void frameActivePart();
     // Focus Detail (prototype, FocusDetailApp.cpp): open a .sfdetail file; once a frame, the camera and brush.
     void openFocusDetail(const std::string& path);
     void updateFocusDetail();
@@ -1715,7 +1715,7 @@ private:
         bool paint = false;
     } maskBrush_;
     bool autoOrtho_ = false; // an axis view switched to orthographic; orbiting goes back to perspective (Blender)
-    // ZBrush: while Ctrl is held the brush is the mask brush, with Ctrl+Shift the selection (hide) brush. The shelf
+    // while Ctrl is held the brush is the mask brush, with Ctrl+Shift the selection (hide) brush. The shelf
     // tiles show it, and the Brush / Stroke pickers opened then pick among those brushes (PanelMasking.cpp).
     enum class HeldBrush { None, Mask, Select };
     HeldBrush heldBrush() const;
@@ -1737,12 +1737,12 @@ private:
     bool hintShown(const char* id) const;
     void drawViewportHint(const char* id, const char* text, ImU32 colour, float top);
     void drawHintsSection();
-    // Z Intensity (0-100 on screen): Smooth's own while Shift is held or Smooth is the brush, as in ZBrush.
+    // Z Intensity (0-100 on screen): Smooth's own while Shift is held or Smooth is the brush.
     void drawZIntensitySlider(const char* id);
     void openQuickMenu();
     void quickMenuKeyUp();   // Space released: a hold closes the menu, a tap leaves it open
     // A right click on the canvas (pressed and let go without moving past kRightClickSlop) opens the QuickMenu
-    // there, as in ZBrush (#22); a right drag navigates as before. Preferences > Input > Right click opens the
+    // there (#22); a right drag navigates as before. Preferences > Input > Right click opens the
     // QuickMenu (uiPrefs_.rightClickQuickMenu).
     void rightClickRelease();
     void drawQuickMenu();
@@ -1753,11 +1753,11 @@ private:
     float smoothStrength_ = 0.5f; // Smooth's own Z Intensity (Shift+stroke, or the Smooth brush)
     bool smoothKeepVolume_ = false; // Brush > Smooth keeps volume: a Taubin smooth instead of the plain one (#40)
     bool smoothGroupBorders_ = false; // Brush > Smooth face group borders only: straightens the borders (#81)
-    // ZBrush's alternate smooth (#40): a stroke begun with Shift held that lets go of Shift while still pressing
+    // the classic alternate smooth (#40): a stroke begun with Shift held that lets go of Shift while still pressing
     // smooths the other way (keeping the volume, or plainly when Smooth keeps volume) for the rest of the stroke.
     bool strokeAltSmooth_ = false;
-    float rgbIntensity_ = 1.0f;   // paint strength (ZBrush RGB Intensity, 100 by default)
-    float focalShift_ = 0.0f;     // -1..1 (ZBrush Focal Shift -100..100)
+    float rgbIntensity_ = 1.0f;   // paint strength (RGB Intensity, 100 by default)
+    float focalShift_ = 0.0f;     // -1..1 (Focal Shift -100..100)
     // Per-brush settings (#78, BrushSettingsUi.cpp, core/BrushSettings.h): each frame, a brush switch stores the
     // brush left and brings back the picked brush's own Draw Size, Z Intensity, Falloff, RGB Intensity, stroke and
     // alpha. Save Brush Settings writes them (<app data>/brush-settings.json) so they load at startup; Reset Brush
@@ -1795,7 +1795,7 @@ private:
     // editor (plain text, checked as you type), and one action per macro ("macro.<pack or user>.<name>") for F3, keys
     // and pie menus. A macro shows its whole command list and asks before it first runs (again after it changed).
 public:
-    void drawPacksTab(float height);                // Library > Packs (LightBox.cpp)
+    void drawPacksTab(float height);                // Library > Packs (Library.cpp)
     double packsTestValue(const std::string& name) const; // NaN: not a pack value (UiTest.cpp)
     void packDialogAnswered(std::string path);      // thread-safe: a pack or macro file dialog's answer
     void reviewPackFile(const std::string& path);   // File > Install Pack, a dropped .sfpack: the review screen
@@ -1806,7 +1806,7 @@ private:
     void registerPackActions();
     void refreshPacks();        // after an install, removal or switch: brushes, VDMs, Lit Spheres, recipes, macros
     void refreshMacroActions(); // one action per macro
-    void loadPackMatcaps();
+    void loadPackLitSpheres();
     void drawPacksUi();         // the review screen, New Pack, the macro confirmation and the macro editor
     void drawPackReview();
     void drawNewPack();
@@ -1844,7 +1844,7 @@ private:
     struct PacksUi {
         std::vector<InstalledPack> installed;
         std::vector<PackContentItem> alphas, materials, keymaps, pieMenus;
-        std::vector<int> matcaps; // Lit Sphere indices the packs added (removed again on a refresh)
+        std::vector<int> litspheres; // Lit Sphere indices the packs added (removed again on a refresh)
         std::unique_ptr<PackReview> review;
         std::string reviewError, reviewPath;
         bool reviewOpen = false;
@@ -1985,7 +1985,7 @@ private:
     glm::vec2 lastDabScreen_{0.0f}; // window pixels of the last dab (UI tests: last_dab_x / last_dab_y)
     bool maskClickPending_ = false; // Ctrl+press on the model: a click blurs (Alt: sharpens), a drag paints
     float maskClickX_ = 0.0f, maskClickY_ = 0.0f;
-    // ---- end ZBrush feel ----
+    // ---- end classic feel ----
     // ---- Redraw on demand (App.cpp run()) ----
     bool wantsFrames(double now) const; // something animates or runs: keep drawing
     bool focusKeepsDrawing(double now) const; // the window has focus and was just used (not: the pointer is over it)

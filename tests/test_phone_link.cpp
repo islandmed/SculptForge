@@ -680,7 +680,7 @@ TEST(ar_link_uploads_the_model_encrypted_to_the_relay) {
     PhoneLink link;
     CHECK(link.start(o, err));
     std::string url;
-    CHECK(link.createFaceLink(url, err, true, "subtool", 20.0f));
+    CHECK(link.createFaceLink(url, err, true, "part", 20.0f));
     const std::string fragment = url.substr(url.find('#') + 1);
     const std::string blobUrl = percentDecode(queryParameter(fragment, "b"));
     CHECK(blobUrl.rfind("http://127.0.0.1:" + std::to_string(relay.port()) + "/blob/sculptforge-", 0) == 0);
@@ -806,7 +806,7 @@ TEST(qr_code_encodes_the_pairing_url) {
 
 TEST(ar_export_writes_valid_glb_and_usdz) {
     Mesh sphere = makeIcosphere(5); // 20,480 triangles
-    // Polypaint: red top, blue bottom.
+    // Vertex paint: red top, blue bottom.
     sphere.ensureColors();
     for (size_t v = 0; v < sphere.vertexCount(); ++v)
         sphere.colors[v] = sphere.positions[v].y > 0 ? glm::vec3(0.9f, 0.05f, 0.05f) : glm::vec3(0.05f, 0.05f, 0.9f);

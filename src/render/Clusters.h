@@ -47,7 +47,7 @@ float unpackCurvature(const PackedVertex& v);
 // since coarse meshes interpolate it across big triangles.
 constexpr float kCurvatureRange = 1.0f;
 
-// Polypaint colours in 8 bits per channel, gamma 2.2 encoded so dark colours keep their steps (the shader
+// Vertex paint colours in 8 bits per channel, gamma 2.2 encoded so dark colours keep their steps (the shader
 // decodes with pow 2.2). A table lookup, it is called for every vertex of an upload.
 uint32_t packColor(const glm::vec3& linear);
 inline uint8_t packMask(float m) { return uint8_t(std::clamp(m, 0.0f, 1.0f) * 255.0f + 0.5f); }

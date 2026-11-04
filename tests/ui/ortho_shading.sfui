@@ -1,4 +1,4 @@
-# The orthographic view (Numpad 5) shades like the perspective one (#24): the matcap and the lights looked inside
+# The orthographic view (Numpad 5) shades like the perspective one (#24): the lit sphere and the lights looked inside
 # out, because each pixel's view ray was worked out as in a perspective view. The same sphere, both ways: the
 # brightness matches where 0.9.6 was furthest off (up to 38 levels; now within 1).
 run new_sphere subdivisions=4

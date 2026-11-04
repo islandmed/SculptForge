@@ -12,9 +12,9 @@
 namespace sf {
 
 Document::Document() {
-    subtools.emplace_back();
-    subtools.back().id = 1;
-    subtools.back().name = "Sculpt";
+    parts.emplace_back();
+    parts.back().id = 1;
+    parts.back().name = "Sculpt";
 }
 
 void Document::setMesh(Mesh m, std::string name, BVH* built) {
@@ -25,21 +25,21 @@ void Document::setMesh(Mesh m, std::string name, BVH* built) {
     undo.clear();
     activeLayer = -1;
     bvhDirty = false;
-    gozName.clear();
+    bridgeName.clear();
     qremeshGuides.clear();
-    subtools.clear();
-    subtools.emplace_back();
-    subtools.back().id = nextSubtoolId_++;
-    subtools.back().name = name.empty() ? "Sculpt" : std::move(name);
-    activeSubtool = 0;
+    parts.clear();
+    parts.emplace_back();
+    parts.back().id = nextPartId_++;
+    parts.back().name = name.empty() ? "Sculpt" : std::move(name);
+    activePart = 0;
     extractPreview = {};
     markClean();
 }
 
 bool Document::dirty() const {
     if (modified || undo.revision() != cleanRevision_ || splatsVersion != cleanSplatsVersion_) return true;
-    for (int i = 0; i < subtoolCount(); ++i)
-        if (i != activeSubtool && subtools[size_t(i)].undo.revision() != subtools[size_t(i)].cleanRevision) return true;
+    for (int i = 0; i < partCount(); ++i)
+        if (i != activePart && parts[size_t(i)].undo.revision() != parts[size_t(i)].cleanRevision) return true;
     return false;
 }
 
@@ -47,46 +47,46 @@ void Document::markClean() {
     modified = false;
     cleanRevision_ = undo.revision();
     cleanSplatsVersion_ = splatsVersion;
-    for (int i = 0; i < subtoolCount(); ++i)
-        if (i != activeSubtool) subtools[size_t(i)].cleanRevision = subtools[size_t(i)].undo.revision();
+    for (int i = 0; i < partCount(); ++i)
+        if (i != activePart) parts[size_t(i)].cleanRevision = parts[size_t(i)].undo.revision();
 }
 
-void Document::selectSubtool(int i) {
-    if (i < 0 || i >= subtoolCount() || i == activeSubtool) return;
+void Document::selectPart(int i) {
+    if (i < 0 || i >= partCount() || i == activePart) return;
     uvSelection.clear();
-    // Check the active SubTool back in, then check `i` out. Swapping keeps each
+    // Check the active Part back in, then check `i` out. Swapping keeps each
     // mesh's GPU dirty state, so the renderer doesn't re-upload anything.
-    auto swapIn = [this](SubTool& s) {
+    auto swapIn = [this](Part& s) {
         std::swap(mesh, s.mesh);
         std::swap(bvh, s.bvh);
         std::swap(undo, s.undo);
         std::swap(activeLayer, s.activeLayer);
-        std::swap(gozName, s.gozName);
+        std::swap(bridgeName, s.bridgeName);
         std::swap(qremeshGuides, s.qremeshGuides);
         std::swap(bvhDirty, s.bvhDirty);
         std::swap(cleanRevision_, s.cleanRevision);
     };
-    swapIn(subtools[size_t(activeSubtool)]);
-    subdivReleaseCache(subtools[size_t(activeSubtool)].mesh); // only the active SubTool keeps cached levels
-    activeSubtool = i;
-    swapIn(subtools[size_t(i)]);
+    swapIn(parts[size_t(activePart)]);
+    subdivReleaseCache(parts[size_t(activePart)].mesh); // only the active Part keeps cached levels
+    activePart = i;
+    swapIn(parts[size_t(i)]);
     if (bvh.nodeCount() == 0 && mesh.triangleCount()) bvhDirty = true; // built on first use
     syncBvh();
 }
 
-int Document::addSubtool(Mesh m, std::string name, bool select, int at, BVH* built) {
-    SubTool s;
-    s.id = nextSubtoolId_++;
-    s.name = uniqueSubtoolName(name.empty() ? "Part" : name);
+int Document::addPart(Mesh m, std::string name, bool select, int at, BVH* built) {
+    Part s;
+    s.id = nextPartId_++;
+    s.name = uniquePartName(name.empty() ? "Part" : name);
     s.mesh = std::move(m);
     s.mesh.topologyDirty = true;
     if (built) s.bvh = std::move(*built);
     else s.bvh.build(s.mesh);
-    const int index = at < 0 || at > subtoolCount() ? subtoolCount() : at;
-    subtools.insert(subtools.begin() + index, std::move(s));
-    if (index <= activeSubtool) ++activeSubtool;
+    const int index = at < 0 || at > partCount() ? partCount() : at;
+    parts.insert(parts.begin() + index, std::move(s));
+    if (index <= activePart) ++activePart;
     modified = true;
-    if (select) selectSubtool(index);
+    if (select) selectPart(index);
     return index;
 }
 
@@ -101,82 +101,82 @@ void Document::replaceActiveMesh(Mesh m) {
     modified = true;
 }
 
-bool Document::removeSubtool(int i) {
-    if (subtoolCount() <= 1 || i < 0 || i >= subtoolCount()) return false;
-    if (i == activeSubtool) selectSubtool(i + 1 < subtoolCount() ? i + 1 : i - 1);
-    subtools.erase(subtools.begin() + i);
-    if (activeSubtool > i) --activeSubtool;
+bool Document::removePart(int i) {
+    if (partCount() <= 1 || i < 0 || i >= partCount()) return false;
+    if (i == activePart) selectPart(i + 1 < partCount() ? i + 1 : i - 1);
+    parts.erase(parts.begin() + i);
+    if (activePart > i) --activePart;
     modified = true;
     return true;
 }
 
-void Document::moveSubtool(int i, int direction) {
+void Document::movePart(int i, int direction) {
     const int j = i + (direction < 0 ? -1 : 1);
-    if (i < 0 || j < 0 || i >= subtoolCount() || j >= subtoolCount()) return;
-    std::swap(subtools[size_t(i)], subtools[size_t(j)]);
-    if (activeSubtool == i) activeSubtool = j;
-    else if (activeSubtool == j) activeSubtool = i;
+    if (i < 0 || j < 0 || i >= partCount() || j >= partCount()) return;
+    std::swap(parts[size_t(i)], parts[size_t(j)]);
+    if (activePart == i) activePart = j;
+    else if (activePart == j) activePart = i;
     modified = true;
 }
 
-int Document::subtoolIndex(uint32_t id) const {
-    for (int i = 0; i < subtoolCount(); ++i)
-        if (subtools[size_t(i)].id == id) return i;
+int Document::partIndex(uint32_t id) const {
+    for (int i = 0; i < partCount(); ++i)
+        if (parts[size_t(i)].id == id) return i;
     return -1;
 }
 
-bool Document::applySubtoolStep(SubtoolStep& step) {
+bool Document::applyPartStep(PartStep& step) {
     if (step.stashed) { // redo: put it back where it was
-        const int at = std::clamp(step.at, 0, subtoolCount());
-        subtools.insert(subtools.begin() + at, std::move(*step.stashed));
+        const int at = std::clamp(step.at, 0, partCount());
+        parts.insert(parts.begin() + at, std::move(*step.stashed));
         step.stashed.reset();
-        if (at <= activeSubtool) ++activeSubtool;
-        subtools[size_t(at)].mesh.topologyDirty = true;
+        if (at <= activePart) ++activePart;
+        parts[size_t(at)].mesh.topologyDirty = true;
         modified = true;
         return true;
     }
-    const int i = subtoolIndex(step.id);
-    if (i < 0 || i == activeSubtool || subtoolCount() <= 1) return false;
+    const int i = partIndex(step.id);
+    if (i < 0 || i == activePart || partCount() <= 1) return false;
     step.at = i;
-    step.stashed = std::make_unique<SubTool>(std::move(subtools[size_t(i)]));
-    subtools.erase(subtools.begin() + i);
-    if (activeSubtool > i) --activeSubtool;
+    step.stashed = std::make_unique<Part>(std::move(parts[size_t(i)]));
+    parts.erase(parts.begin() + i);
+    if (activePart > i) --activePart;
     modified = true;
     return true;
 }
 
 bool Document::extractPreviewCurrent() const {
     if (!extractPreview.id) return false;
-    const int i = subtoolIndex(extractPreview.id);
-    return i >= 0 && i != activeSubtool && activeSubtoolInfo().id == extractPreview.source &&
+    const int i = partIndex(extractPreview.id);
+    return i >= 0 && i != activePart && activePartInfo().id == extractPreview.source &&
            undo.revision() == extractPreview.revision;
 }
 
 void Document::dropExtractPreview(bool staleOnly) {
     if (!extractPreview.id || (staleOnly && extractPreviewCurrent())) return;
-    const int i = subtoolIndex(extractPreview.id);
+    const int i = partIndex(extractPreview.id);
     extractPreview = {};
-    if (i >= 0) removeSubtool(i);
+    if (i >= 0) removePart(i);
 }
 
-int Document::findSubtool(const std::string& name) const {
-    for (int i = 0; i < subtoolCount(); ++i)
-        if (subtools[size_t(i)].name == name) return i;
+int Document::findPart(const std::string& name) const {
+    for (int i = 0; i < partCount(); ++i)
+        if (parts[size_t(i)].name == name) return i;
     return -1;
 }
 
-std::string Document::uniqueSubtoolName(const std::string& wanted) const {
-    if (findSubtool(wanted) < 0) return wanted;
+std::string Document::uniquePartName(const std::string& wanted) const {
+    if (findPart(wanted) < 0) return wanted;
     for (int n = 2;; ++n) {
         std::string candidate = wanted + " " + std::to_string(n);
-        if (findSubtool(candidate) < 0) return candidate;
+        if (findPart(candidate) < 0) return candidate;
     }
 }
 
 AABB Document::visibleBounds() const {
     AABB b;
-    for (int i = 0; i < subtoolCount(); ++i)
-        if (subtools[size_t(i)].visible && subtoolMesh(i).vertexCount()) b.expand(subtoolMesh(i).bounds());
+    for (int i = 0; i < partCount(); ++i)
+        if (parts[size_t(i)].visible && partMesh(i).vertexCount()) b.expand(partMesh(i).bounds());
     return b;
 }
 

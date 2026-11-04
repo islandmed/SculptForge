@@ -63,7 +63,7 @@ expect_value texture_mean_r > $both_r
 key ctrl+z
 expect_value texture_mean_r == $both_r
 
-# The Vertex / Texture toggle sends the brush back to the vertices (polypaint).
+# The Vertex / Texture toggle sends the brush back to the vertices (vertex paint).
 click "Paint Layers/Vertex"
 expect_value paint_texture == 0
 stroke 0.2 0.3 0.8 0.3
@@ -94,10 +94,10 @@ expect_value texture_layers == 1
 expect_value texture_mean_r == $both_r
 shot reopened
 
-# Flatten bakes the layer into Base; Texture > Polypaint copies it to the vertices.
+# Flatten bakes the layer into Base; Texture > Vertex paint copies it to the vertices.
 click "Paint Layers##tool.paint_layers"
 click "Paint Layers/Flatten"
 expect_value texture_layers == 0
 expect_value texture_mean_r == $both_r
-run polypaint_from_texture
+run vertexpaint_from_texture
 expect_value colored == 1

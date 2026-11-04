@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Sculpt layers on subdivision levels, as ZBrush's 3D Layers: a layer recorded at the top level survives stepping
+// Sculpt layers on subdivision levels 3D Layers: a layer recorded at the top level survives stepping
 // down and up, Divide, Reconstruct Subdiv, Del Lower / Del Higher, saving and loading, and stays togglable and
 // blendable at every level; layers added or sculpted at a low level show at the top; undo across levels; blend
 // shapes export from the current level.

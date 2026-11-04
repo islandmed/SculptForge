@@ -1,6 +1,6 @@
 # The Maya input style (#32): Alt+left orbits, Alt+middle pans, Alt+right zooms (on the model too, without
-# sculpting); Ctrl inverts a stroke, Ctrl+Alt masks; back to the ZBrush style.
-run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+# sculpting); Ctrl inverts a stroke, Ctrl+Alt masks; back to the classic.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=4
 click "Preferences##palette.preferences"
 click "Input##preferences.input"
@@ -86,5 +86,5 @@ expect_value masked < $m0
 expect_value hidden == $h0
 
 click "Preferences##palette.preferences"
-click "Classic sculpting keys##input.style_zbrush"
+click "Classic sculpting keys##input.style_classic"
 expect_value input_style == 0

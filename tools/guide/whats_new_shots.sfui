@@ -27,7 +27,7 @@ wait 0.4
 # Full alphas: Clay Slab (a custom brush) with the Square alpha at Focal Shift -100 stamps square-cornered slabs.
 run new_sphere subdivisions=6
 wait_idle 20
-run ui_look look=forge scheme=tokyo_night layout=zbrush   # (the palette bar has Help for the clicks below)
+run ui_look look=forge scheme=tokyo_night layout=classic   # (the palette bar has Help for the clicks below)
 click "Help##palette.help"
 click "What's New##help.whats_new"
 wait 0.5

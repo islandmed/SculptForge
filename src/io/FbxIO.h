@@ -6,7 +6,7 @@
 // Engine imports most completely:
 //  - the sculpt as a polygon mesh (quads where Mesh::quadPartners keeps them,
 //    else triangles) with per-corner normals and UVs, smoothing and a material slot
-//  - a SubTool's texture (core/Texture.h, taken from LOD0) as a PNG beside the
+//  - a Part's texture (core/Texture.h, taken from LOD0) as a PNG beside the
 //    file, read by the object's own material (Texture/Video on DiffuseColor)
 //  - sculpt layers as blend shapes (Unreal: morph targets on a skeletal mesh)
 //  - a LOD chain as an FBX LOD group (Unreal: LOD0..N of one static mesh)
@@ -34,7 +34,7 @@ struct FbxExportOptions {
 bool saveFbx(const std::string& path, const std::string& name, const std::vector<const Mesh*>& lods,
              const FbxExportOptions& options, std::string& error);
 
-// One object (SubTool) of a multi-object export: its LOD chain (lods[0] = full resolution).
+// One object (Part) of a multi-object export: its LOD chain (lods[0] = full resolution).
 struct FbxObject {
     std::string name;
     std::vector<const Mesh*> lods;

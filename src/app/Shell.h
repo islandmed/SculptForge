@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Pieces of the ZBrush-style shell shared between Shell.cpp, Palettes.cpp and
+// Pieces of the classic shell shared between Shell.cpp, Palettes.cpp and
 // the ui:: widgets: the palette table, shelf ids and the button looks.
 #pragma once
 

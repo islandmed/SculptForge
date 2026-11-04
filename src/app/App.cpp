@@ -22,7 +22,7 @@
 #include <imgui_internal.h>
 #include "ai/Generator3D.h"
 #include "core/Micro.h"
-#include "core/Polypaint.h"
+#include "core/VertexPaint.h"
 #include "core/EnginePresets.h"
 #include "link/UnrealLink.h"
 #include "core/BrushLibrary.h"
@@ -73,7 +73,7 @@ namespace {
 const SDL_DialogFileFilter kObjFilters[] = {{"Wavefront OBJ", "obj"}, {"All files", "*"}};
 const SDL_DialogFileFilter kGlbFilters[] = {{"glTF binary", "glb"}, {"All files", "*"}};
 const SDL_DialogFileFilter kBrushFilters[] = {{"SculptForge brush", "sfbrush"}, {"All files", "*"}};
-const SDL_DialogFileFilter kModelFilters[] = {{"Projects, models and splats", "sfproj;obj;fbx;glb;gltf;ply;stl;" SF_BRIDGE_DIALOG_EXTS ";splat;usda;usd;usdz"}, {"All files", "*"}};
+const SDL_DialogFileFilter kModelFilters[] = {{"Projects, models and splats", "sfproj;obj;fbx;glb;gltf;ply;stl;" SF_BRIDGE_MESH_EXTS ";splat;usda;usd;usdz"}, {"All files", "*"}};
 const SDL_DialogFileFilter kFbxFilters[] = {{"FBX", "fbx"}, {"All files", "*"}};
 const SDL_DialogFileFilter kUsdFilters[] = {{"USDZ package", "usdz"}, {"USD text", "usda"}};
 const SDL_DialogFileFilter kSplatFilters[] = {{"Gaussian splats (PLY)", "ply"}, {"glTF splats", "glb"}, {"OpenUSD", "usda;usdz"}};
@@ -226,7 +226,7 @@ bool App::init(const AppOptions& options) {
     initBrushSettings(); // each brush's own size, intensity, stroke and alpha (#78)
     loadBrushCurves(); // each brush's own pressure curve (Precision.cpp)
     initPhoneActions(); // File > Capture from phone (PanelPhone.cpp)
-    initLightBox();
+    initLibraryBrowser();
     runCommand("new_sphere");
     if (!options.openPath.empty()) openPath(options.openPath);
     if (!options.script.empty()) {
@@ -271,7 +271,7 @@ void App::shutdown() {
     if (refTexture_) gl::DeleteTextures(1, &refTexture_);
     gallery_.reset(); // its preview textures need the GL context
     thumbs_.clear();
-    clearSubtoolThumbnails();
+    clearPartThumbnails();
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
@@ -294,9 +294,9 @@ int App::renderHeadless() {
     renderSettings_.wireframe = renderSettings_.wireframe || options_.wireframe; // syncScene builds its edges
     RenderSettings settings = renderSettings_;
     settings.wireframe = options_.wireframe;
-    settings.showPolygroups = settings.showPolygroups || options_.polygroups;
+    settings.showFaceGroups = settings.showFaceGroups || options_.facegroups;
     settings.showMesh = !options_.hideMesh;
-    settings.dimInactive = false; // a beauty shot: every SubTool at full brightness
+    settings.dimInactive = false; // a beauty shot: every Part at full brightness
     syncScene();
     const std::filesystem::path out(std::u8string(options_.renderPath.begin(), options_.renderPath.end()));
     for (int f = 0; f < frames; ++f) {
@@ -643,7 +643,7 @@ bool App::wantsFrames(double now) const {
 uint64_t App::frameKey() const {
     uint64_t h = std::hash<std::string>{}(status_) ^ (std::hash<std::string>{}(updateStatus_) << 1);
     for (const uint64_t v : {uint64_t(doc_.undo.revision()), uint64_t(doc_.splatsVersion), uint64_t(doc_.modified),
-                             uint64_t(doc_.subtoolCount()), uint64_t(int64_t(doc_.activeSubtool))})
+                             uint64_t(doc_.partCount()), uint64_t(int64_t(doc_.activePart))})
         h = h * 1099511628211ull ^ v;
     return h;
 }
@@ -670,7 +670,7 @@ int App::run() {
         if ((frameLogMs >= 0.0 || proof_) && phases < 10) phase[phases++] = double(SDL_GetTicksNS()) * 1e-6;
     };
     auto seconds = [] { return double(SDL_GetTicksNS()) * 1e-9; };
-    // --measure-idle: let start-up settle (first frames, the LightBox's thumbnails), then count.
+    // --measure-idle: let start-up settle (first frames, the Library's thumbnails), then count.
     constexpr double kMeasureSettle = 3.0;
     const double started = seconds();
     uint64_t framesDrawn = 0, wakeUps = 0, framesAtMeasure = 0, wakesAtMeasure = 0;
@@ -925,7 +925,7 @@ int App::run() {
             pollBrushRequest();
             pollGenerator();
             pollUnreal();
-            pollGoz();
+            pollBridge();
             pollBlender();
             pollMaya();
             pollPhone();
@@ -1326,7 +1326,7 @@ void App::dispatchEvent(const SDL_Event& event) {
 }
 
 bool App::pick(float x, float y, RayHit& hit) const {
-    if (!doc_.activeSubtoolInfo().visible) return false; // you can't sculpt what you can't see
+    if (!doc_.activePartInfo().visible) return false; // you can't sculpt what you can't see
     glm::vec3 origin, dir;
     canvasRay(x, y, origin, dir);
     return frontRaycast(origin, dir, hit);
@@ -1408,7 +1408,7 @@ void App::updateMouseCursor() {
 }
 
 BrushType App::activeBrush() const {
-    // ZBrush convention: holding Shift temporarily switches to Smooth.
+    // classic convention: holding Shift temporarily switches to Smooth.
     // The pen's eraser end can be set to smooth too (Preferences > Tablet).
     const bool smooth = (inputMods() & SDL_KMOD_SHIFT) || (erasing() && eraserAction() == PenAction::Smooth);
     return smooth ? BrushType::Smooth : brush_;
@@ -1439,9 +1439,9 @@ void App::onMouseDown(float x, float y, Uint8 button) {
     rightClick_.dx = rightClick_.dy = 0.0f;
     zsMenu_.armed = false;
     // A right click on a Forge Sphere opens its menu (#8): Delete, Insert Between, Set as Root.
-    if (button == SDL_BUTTON_RIGHT && zsphereActive() && !doc_.mesh.zspherePreview &&
+    if (button == SDL_BUTTON_RIGHT && forgesphereActive() && !doc_.mesh.forgespherePreview &&
         !(SDL_GetModState() & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)))
-        zsphereRightDown(x, y);
+        forgesphereRightDown(x, y);
     if (spaceHeld_) { // Preferences > Input > Hold Space and drag to move the camera (#43)
         switch (spaceCameraMove(button, ctrlDown(SDL_GetModState()))) {
         case SpaceCameraMove::Orbit: drag_ = Drag::Orbit; break;
@@ -1466,8 +1466,8 @@ void App::onMouseDown(float x, float y, Uint8 button) {
     if (mayaStyle() && mayaNavigationDown(button)) return;       // Alt+left / middle / right: orbit / pan / zoom
     if (button == SDL_BUTTON_LEFT) {
         if (axisGizmoMouseDown(x, y)) return;   // the axis gizmo's ends snap to a side view (#43)
-        if (zsphereMouseDown(x, y, mod)) return; // a ZSphere SubTool takes clicks on it (PanelZSpheres.cpp)
-        if (polygroupMouseDown(x, y, mod)) return;
+        if (forgesphereMouseDown(x, y, mod)) return; // a Forge Sphere Part takes clicks on it (PanelForge Spheres.cpp)
+        if (facegroupMouseDown(x, y, mod)) return;
         if (maskSelectMouseDown(x, y, mod)) return;
         if (gizmoMouseDown(x, y, mod)) return; // Gizmo 3D handles, pivot clicks (Gizmo.cpp)
         if (uvToolMouseDown(x, y, mod)) return; // the UV Editor's Seam / Select in 3D tool (PanelUvEditor.cpp)
@@ -1475,37 +1475,37 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         if (faceMouseDown(x, y, mod)) return;  // placing facial landmarks (PanelFace.cpp)
         if (sculptableMouseDown(x, y)) return; // Make sculptable: landmarks, crop box (PanelSculptable.cpp)
         if (captureMouseDown(x, y)) return;    // Capture from view: the drag draws the square (PanelKelvinlet.cpp)
-        // A triple-click on another SubTool makes it the active one and frames it (#43). (Its first two clicks
-        // don't sculpt it: brushes work on the active SubTool only.)
+        // A triple-click on another Part makes it the active one and frames it (#43). (Its first two clicks
+        // don't sculpt it: brushes work on the active Part only.)
         // Not from a pen: quick taps of a stippling pen counted as a triple-click and switched the Part. Nor while
         // a pen hovers: a Wacom side button set to Double Click (the Intuos 3 default) and a tap made one (Discord).
         const bool penNear = penInProximity_ && SDL_GetTicksNS() - lastPenNs_ < 1000000000ull;
         if (mouseClicks_ >= 3 && !lastInputPen_ && !wintabPen_ && !penNear && !(mod & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)) &&
-            insertType_.empty() && doc_.subtoolCount() > 1) {
-            const int target = pickSubtool(x, y);
-            if (target >= 0 && target != doc_.activeSubtool) {
-                runCommand("subtool_select", {{"index", double(target)}});
+            insertType_.empty() && doc_.partCount() > 1) {
+            const int target = pickPart(x, y);
+            if (target >= 0 && target != doc_.activePart) {
+                runCommand("part_select", {{"index", double(target)}});
                 partSelected("triple-click");
-                frameActiveSubtool();
+                frameActivePart();
                 return;
             }
         }
-        // Alt+click on another SubTool selects it (ZBrush); Alt+drag stays an inverted stroke or a pan.
-        // Shift+Alt+click selects and frames it (ZBrush), the active one too.
+        // Alt+click on another Part selects it; Alt+drag stays an inverted stroke or a pan.
+        // Shift+Alt+click selects and frames it, the active one too.
         // Only the keyboard's Alt: a pen button set to Invert (Alt) is for subtracting, and a tap with it held
         // switched the Part without the user knowing why.
         const SDL_Keymod keys = keyMods();
         const bool frameClick = (keys & SDL_KMOD_ALT) && (mod & SDL_KMOD_SHIFT) && !ctrlDown(mod);
         if (!blenderStyle() && (keys & SDL_KMOD_ALT) && !ctrlDown(mod) && (frameClick || !(mod & SDL_KMOD_SHIFT)) &&
-            (doc_.subtoolCount() > 1 || frameClick)) {
-            const int target = pickSubtool(x, y);
-            subtoolClickFrame_ = frameClick;
-            if (target >= 0 && (target != doc_.activeSubtool || frameClick)) {
-                drag_ = Drag::SubToolClick;
-                subtoolClickTarget_ = target;
-                subtoolClickX_ = x;
-                subtoolClickY_ = y;
-                subtoolClickNs_ = clickClockNs();
+            (doc_.partCount() > 1 || frameClick)) {
+            const int target = pickPart(x, y);
+            partClickFrame_ = frameClick;
+            if (target >= 0 && (target != doc_.activePart || frameClick)) {
+                drag_ = Drag::PartClick;
+                partClickTarget_ = target;
+                partClickX_ = x;
+                partClickY_ = y;
+                partClickNs_ = clickClockNs();
                 return;
             }
         }
@@ -1534,16 +1534,16 @@ void App::onMouseDown(float x, float y, Uint8 button) {
             maskCanvasY_ = y;
             maskCanvasMoved_ = false;
         } else {
-            // Dragging on empty space navigates (ZBrush style).
+            // Dragging on empty space navigates.
             drag_ = (nav & SDL_KMOD_ALT) ? Drag::Pan : ctrlDown(nav) ? Drag::Zoom : Drag::Orbit;
             panFromAlt_ = drag_ == Drag::Pan;
-            // ZBrush: Shift+click, let go of Shift, then drag turns the view about its own axis (Z).
+            // Shift+click, let go of Shift, then drag turns the view about its own axis (Z).
             rollPending_ = drag_ == Drag::Orbit && (nav & SDL_KMOD_SHIFT);
             rollStartX_ = x;
             rollStartY_ = y;
         }
     } else if (button == SDL_BUTTON_RIGHT) {
-        // ZBrush's right-click navigation: rotate (Shift snaps), Alt pans (release Alt to zoom), Ctrl zooms.
+        // the classic right-click navigation: rotate (Shift snaps), Alt pans (release Alt to zoom), Ctrl zooms.
         drag_ = (nav & SDL_KMOD_ALT) ? Drag::Pan : ctrlDown(nav) ? Drag::Zoom : Drag::Orbit;
         panFromAlt_ = (nav & SDL_KMOD_ALT) != 0;
     } else if (button == SDL_BUTTON_MIDDLE) {
@@ -1606,7 +1606,7 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
         dx = rightClick_.dx;
         dy = rightClick_.dy;
     }
-    // ZBrush: start a pan with Alt, then let go of Alt while still dragging to zoom.
+    // start a pan with Alt, then let go of Alt while still dragging to zoom.
     if (drag_ == Drag::Pan && panFromAlt_ && !(inputMods(false) & SDL_KMOD_ALT)) drag_ = Drag::Zoom;
     // Shift+press on the background: letting go of Shift before the drag gets going rolls the view instead.
     if (rollPending_ && drag_ == Drag::Orbit) {
@@ -1626,14 +1626,14 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     case Drag::Pan: camera_.pan(dx, dy, canvasHeight()); break;
     case Drag::Zoom: camera_.zoom(zoomDragAmount(dx, dy)); break;
     case Drag::MaskCanvas: maskCanvasMove(x, y); break;
-    case Drag::SubToolClick: subtoolClickMove(x, y); break;
+    case Drag::PartClick: partClickMove(x, y); break;
     case Drag::Select: selectionMove(x, y); break;
     case Drag::Gizmo: gizmoDragTo(x, y); break;
     case Drag::Guide: guideDragTo(x, y); break;
     case Drag::UvTool: uvToolDragTo(x, y); break;
     case Drag::Sculptable: sculptableMouseMove(x, y); break;
     case Drag::Capture: captureMouseMove(x, y); break;
-    case Drag::ZSphere: zsphereDragTo(x, y); break;
+    case Drag::ForgeSphere: forgesphereDragTo(x, y); break;
     case Drag::AirStroke: airStrokeTo(x, y); break;
     case Drag::SizeScrub:
         sizeScrubDx_ += dx;
@@ -1643,11 +1643,11 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     }
 }
 
-// How far a zoom drag zooms in (negative: out). ZBrush: dragging up (forward) zooms out; the SculptForge and
+// How far a zoom drag zooms in (negative: out). dragging up (forward) zooms out; the SculptForge and
 // Blender styles zoom in. Maya (#32): a drag to the right zooms in, as Maya's own dolly (Preferences > Input >
 // Zoom drag can make it vertical). Invert zoom turns either around.
 float App::zoomDragAmount(float dx, float dy) const {
-    float a = mayaStyle() && uiPrefs_.mayaZoomHorizontal ? dx : zbrushStyle() ? dy : -dy;
+    float a = mayaStyle() && uiPrefs_.mayaZoomHorizontal ? dx : classicStyle() ? dy : -dy;
     if (uiPrefs_.invertZoom) a = -a;
     return a * 0.05f;
 }
@@ -1703,7 +1703,7 @@ void App::onMouseUp() {
                   // the drag's direction on screen turns it about the normal
                   {"twist", insertPx_ > 4.0f ? double(glm::degrees(std::atan2(mouseY_ - insertY_, mouseX_ - insertX_))) : 0.0}};
         args = withSymmetryArgs(std::move(args));
-        if (insertType_ == "mesh") { // your own mesh: a SubTool's copy or a file (insert_mesh)
+        if (insertType_ == "mesh") { // your own mesh: a Part's copy or a file (insert_mesh)
             args[insertMeshKey_] = insertMeshValue_;
             runCommand("insert_mesh", args);
         } else {
@@ -1721,12 +1721,12 @@ void App::onMouseUp() {
         // (even with nothing left to place: the stroke's end work runs on the solver thread, pumpStroke)
     } else if (drag_ == Drag::Stroke) endStroke();
     if (drag_ == Drag::MaskCanvas) maskCanvasRelease();
-    if (drag_ == Drag::SubToolClick) subtoolClickRelease();
+    if (drag_ == Drag::PartClick) partClickRelease();
     if (drag_ == Drag::Guide) guideRelease();
     if (drag_ == Drag::UvTool) uvToolRelease();
     if (drag_ == Drag::Sculptable) sculptableMouseUp();
     if (drag_ == Drag::Capture) captureMouseUp();
-    if (drag_ == Drag::ZSphere) zsphereRelease();
+    if (drag_ == Drag::ForgeSphere) forgesphereRelease();
     if (drag_ == Drag::AirStroke) airStrokeRelease();
     gizmoRelease();
     drag_ = Drag::None;
@@ -1756,7 +1756,7 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
         status_ = "Capture cancelled";
         return;
     }
-    if (lightBoxKey(key, mod)) return;        // , LightBox, B / M pickers, S / I pop-ups (LightBox.cpp)
+    if (libraryKey(key, mod)) return;        // , Library, B / M pickers, S / I pop-ups (Library.cpp)
     // Blender's Emulate Numpad: the number row works as the numpad, unless the key itself has an action.
     if (blenderStyle() && uiPrefs_.emulateNumpad && key >= SDLK_0 && key <= SDLK_9 &&
         !actions_.actionForChord(chordFromEvent(key, mod)))
@@ -1818,7 +1818,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     steadyCursor_ = glm::vec2(x, y);
     pickSmoother_.reset();
     strokeInvert_ = invertToggle_ != (((inputMods() & SDL_KMOD_ALT) != 0) || (erasing() && eraserAction() == PenAction::Invert));
-    // Shift still smooths geometry while the Paint brush is active (ZBrush behaviour).
+    // Shift still smooths geometry while the Paint brush is active.
     strokePaint_ = strokeBrush_ != BrushType::Smooth && (paintMode_ || paintRgb_);
     strokeSculpt_ = !(strokePaint_ && paintMode_);
     const BrushRecipe* recipe = strokeRecipe();
@@ -1917,7 +1917,7 @@ void App::strokeTo(float x, float y) {
         pointerLatestAt_ = double(SDL_GetTicksNS()) * 1e-9;
         penPredictor_.add(pointerLatest_, pointerLatestAt_);
     }
-    // ZBrush's alternate smooth (#40): Shift let go while the stroke it began goes on.
+    // the classic alternate smooth (#40): Shift let go while the stroke it began goes on.
     if (strokeBrush_ == BrushType::Smooth && straight_.shiftAtStart && !strokeAltSmooth_ && !strokeMask_ &&
         !(inputMods() & SDL_KMOD_SHIFT)) {
         strokeAltSmooth_ = true;
@@ -1977,7 +1977,7 @@ void App::strokeTo(float x, float y) {
         dragDotTo(x, y);
         return;
     }
-    { // Shift pressed after the stroke began: a straight line (ZBrush)
+    { // Shift pressed after the stroke began: a straight line
         const glm::vec2 c = constrainStroke(x, y);
         x = c.x;
         y = c.y;
@@ -2131,7 +2131,7 @@ void App::dabAt(float x, float y, float pressure) {
     p.center = hit.position;
     p.viewDir = cam.forward();
     p.radius = baseRadius * (st.pressureSize ? std::max(pressure, 0.05f) : 1.0f) * dabRadiusScale_;
-    // Smooth keeps its own Z Intensity (ZBrush), whether picked or held with Shift.
+    // Smooth keeps its own Z Intensity, whether picked or held with Shift.
     p.strength = (st.brush == BrushType::Smooth ? st.smoothStrength : st.strength) * dabStrengthScale_;
     p.keepVolume = st.brush == BrushType::Smooth && st.smoothKeepVolume;
     p.groupBorders = st.brush == BrushType::Smooth && st.smoothGroupBorders;
@@ -2240,14 +2240,14 @@ void App::runCommand(const std::string& name, const Args& args) {
     if (r.ok && name != "export_glb" && name != "export_lods" && name != "export_usd" && name != "export_fbx" &&
         name != "export_unreal" && name.rfind("unreal_", 0) != 0 && name != "save_obj" && name != "save_project" &&
         name != "mesh_info" && name.rfind("brush_", 0) != 0 && name.rfind("splat_", 0) != 0 && name != "mesh_to_splats" &&
-        name != "set_color" && name != "set_material" && name != "load_matcap" && name != "set_shading" && name != "subtool_shading" &&
+        name != "set_color" && name != "set_material" && name != "load_litsphere" && name != "set_shading" && name != "part_shading" &&
         name != "viewport_shading" &&
         name != "export_ply" && name != "face_weights" &&
         name != "face_preset" && name.rfind("face_take", 0) != 0 && name != "face_landmarks_detect") {
         clearLods();
         playingLayer_ = -1;
     }
-    if (r.ok && name == "splat_to_mesh") renderSettings_.showSplats = false; // the new SubTool shows; the splats stay
+    if (r.ok && name == "splat_to_mesh") renderSettings_.showSplats = false; // the new Part shows; the splats stay
     if (r.ok && name == "save_obj" && !doc_.mesh.layers.empty())
         status_ += " (OBJ stores the current blend; export GLB to keep layers as blend shapes)";
     if (!r.ok) SDL_Log("%s failed: %s", name.c_str(), r.message.c_str());
@@ -2255,8 +2255,8 @@ void App::runCommand(const std::string& name, const Args& args) {
                  name == "open_obj" || name == "open" || name == "image_relief" || name == "image_inflate" || name == "splat_to_mesh" ||
                  (name == "splat_transform" && args.contains("fit"))))
         camera_.frame(sceneBounds());
-    // A new SubTool lands beside the model: bring it into view only if it isn't already.
-    if (r.ok && (name == "subtool_append" || name == "subtool_duplicate") && !onScreen(doc_.mesh.bounds()))
+    // A new Part lands beside the model: bring it into view only if it isn't already.
+    if (r.ok && (name == "part_append" || name == "part_duplicate") && !onScreen(doc_.mesh.bounds()))
         camera_.frame(sceneBounds());
     afterCommand(name, args, r);
     afterVdmCommand(name, r); // the VDM brush after vdm_set / vdm_capture, the top view after vdm_new_plane
@@ -2283,7 +2283,7 @@ void SDLCALL onFileChosen(void* userdata, const char* const* files, int) {
 
 void App::queueFile(FileAction action, std::string path) {
     if (action != FileAction::OpenObj && action != FileAction::LoadBrush && action != FileAction::OpenImage &&
-        action != FileAction::AppendSubtool && action != FileAction::ComfyWorkflow && action != FileAction::InsertMesh &&
+        action != FileAction::AppendPart && action != FileAction::ComfyWorkflow && action != FileAction::InsertMesh &&
         !path.empty() &&
         std::filesystem::path(std::u8string(path.begin(), path.end())).extension().empty())
         path += action == FileAction::SaveObj      ? ".obj"
@@ -2299,10 +2299,10 @@ void App::queueFile(FileAction action, std::string path) {
     pendingFiles_.push_back({action, std::move(path)});
 }
 
-void App::loadMatcapDialog() {
-    static const SDL_DialogFileFilter kMatcapFilters[] = {{"Lit Sphere images", "png;jpg;jpeg;exr"}, {"All files", "*"}};
-    const std::string folder = matcapFolder();
-    SDL_ShowOpenFileDialog(onFileChosen, &dialogRequests_[int(FileAction::LoadMatcap)], window_, kMatcapFilters, 2,
+void App::loadLitSphereDialog() {
+    static const SDL_DialogFileFilter kLitSphereFilters[] = {{"Lit Sphere images", "png;jpg;jpeg;exr"}, {"All files", "*"}};
+    const std::string folder = litsphereFolder();
+    SDL_ShowOpenFileDialog(onFileChosen, &dialogRequests_[int(FileAction::LoadLitSphere)], window_, kLitSphereFilters, 2,
                            folder.empty() ? nullptr : folder.c_str(), false);
 }
 
@@ -2367,7 +2367,7 @@ bool App::onScreen(const AABB& box) const {
 }
 
 AABB App::sceneBounds() const {
-    AABB b = doc_.visibleBounds(); // every SubTool that's shown
+    AABB b = doc_.visibleBounds(); // every Part that's shown
     if (!b.valid()) b = doc_.mesh.bounds();
     if (!doc_.splats.empty() && renderSettings_.showSplats) b.expand(doc_.splats.bounds(0.9f));
     return b;
@@ -2410,12 +2410,12 @@ void App::processPendingFiles() {
             break;
         }
         case FileAction::SaveProject: saveProjectTo(f.path); break;
-        case FileAction::AppendSubtool:
-            runCommand("subtool_append", {{"path", f.path}});
+        case FileAction::AppendPart:
+            runCommand("part_append", {{"path", f.path}});
             if (lastCommandOk_) camera_.frame(sceneBounds()); // a model can be any size, anywhere
             break;
         case FileAction::ComfyWorkflow: setComfyWorkflow(f.path, comfyPickingText_); break;
-        case FileAction::LoadMatcap: runCommand("load_matcap", {{"path", f.path}}); break;
+        case FileAction::LoadLitSphere: runCommand("load_litsphere", {{"path", f.path}}); break;
         case FileAction::InsertMesh: // Append > Insert on the model > From file (#34): the next drag inserts it
             insertType_ = "mesh";
             insertMeshKey_ = "file";
@@ -2442,15 +2442,15 @@ void App::syncScene() {
     updateMeshMaps();
     if (paintsTexture(doc_.mesh) && doc_.mesh.texture->fillRevision != doc_.mesh.texture->revision)
         updateFillLayers(doc_.mesh, mutableTexture(doc_.mesh));
-    // The active SubTool's slot shows the LOD being previewed instead of the sculpt.
+    // The active Part's slot shows the LOD being previewed instead of the sculpt.
     Mesh& shown = displayedMesh();
     if (&shown != lastDisplayed_) shown.topologyDirty = true;
     lastDisplayed_ = &shown;
     std::vector<SceneMesh> scene;
-    scene.reserve(doc_.subtools.size());
-    for (int i = 0; i < doc_.subtoolCount(); ++i) {
-        SubTool& s = doc_.subtools[size_t(i)];
-        const bool active = i == doc_.activeSubtool;
+    scene.reserve(doc_.parts.size());
+    for (int i = 0; i < doc_.partCount(); ++i) {
+        Part& s = doc_.parts[size_t(i)];
+        const bool active = i == doc_.activePart;
         Mesh* mesh = active ? &shown : &s.mesh;
         // Solo channel view (channel_view): the texture's shown texels follow before the renderer uploads them.
         if (mesh->texture) syncChannelView(*mesh->texture, doc_.channelView);
@@ -2461,8 +2461,8 @@ void App::syncScene() {
     }
     renderer_.syncScene(scene);
     renderer_.syncSplats(doc_.splats, doc_.splatsVersion);
-    if (subtoolPanelShown_) updateSubtoolThumbnails(); // from the buffers just synced (PanelSubTools.cpp)
-    subtoolPanelShown_ = false;
+    if (partPanelShown_) updatePartThumbnails(); // from the buffers just synced (PanelParts.cpp)
+    partPanelShown_ = false;
 }
 
 void App::setLayerWeight(int index, float weight) {
@@ -2514,17 +2514,17 @@ void App::updateTitle() {
 // ---------------------------------------------------------------------------
 
 void App::drawUi() {
-    // An Extract preview goes once its source changes or another SubTool is picked (strokes aren't commands).
+    // An Extract preview goes once its source changes or another Part is picked (strokes aren't commands).
     if (doc_.extractPreview.id && !doc_.sculptor.strokeActive()) doc_.dropExtractPreview(true);
     drawProjectPopups();
     if (hideUi_) return; // demos: clean beauty shots
-    // Draw order (ui-spec §12): shells, LightBox, floating windows, then pop-ups and help.
+    // Draw order (ui-spec §12): shells, Library, floating windows, then pop-ups and help.
     drawShell();
-    drawLightBoxUi(); // thumbnails, the LightBox over the canvas, pickers, size / strength pop-ups
+    drawLibraryBrowserUi(); // thumbnails, the Library over the canvas, pickers, size / strength pop-ups
     drawQuickMenu();  // Space (Input.cpp)
     drawRadialMenu(); // radial menus (RadialMenu.cpp)
     drawStrokePopup(); // the stroke popup and a latched modifier's label at the cursor (StrokePopup.cpp)
-    drawSubToolPopups();
+    drawPartPopups();
     if (showBrushLab_) drawBrushLab();
     drawBrushGallery();
     if (showImageTo3D_) drawImageTo3D();
@@ -2546,8 +2546,8 @@ void App::drawUi() {
     drawGizmo(); // Gizmo 3D handles and panel (Gizmo.cpp)
     drawQRemeshGuides(); // QRemesh Guides curves (PanelRetopo.cpp)
     drawUvEditorOverlay(); // UV seams on the model, the Seam tool's cursor (PanelUvEditor.cpp)
-    drawZSphereOverlay(); // the sphere under the cursor (PanelZSpheres.cpp)
-    drawZSphereMenu();    // a right click on a sphere
+    drawForgeSphereOverlay(); // the sphere under the cursor (PanelForge Spheres.cpp)
+    drawForgeSphereMenu();    // a right click on a sphere
     drawFaceOverlay();   // facial landmarks (PanelFace.cpp)
     drawSplatTrainOverlay(); // splat training progress (PanelSplatTrain.cpp)
     drawSculptableOverlay(); // Make sculptable: crop box, face landmarks (PanelSculptable.cpp)
@@ -2561,7 +2561,7 @@ void App::drawUi() {
                                                   theme::u32(theme::accent), 48, 2.0f * uiScale_);
     }
     // In Gizmo mode (and with the QRemesh Guides brush) the brush ring shows only while Ctrl masks or Shift smooths.
-    const bool ringOff = gizmoActive() || (guidesMode_ && !(inputMods() & SDL_KMOD_SHIFT)) || sculptableHot() || zsphereActive() ||
+    const bool ringOff = gizmoActive() || (guidesMode_ && !(inputMods() & SDL_KMOD_SHIFT)) || sculptableHot() || forgesphereActive() ||
                          uvToolActive();
     if (((!ImGui::GetIO().WantCaptureMouse && canvasRect().contains(mouse.x, mouse.y)) || drag_ == Drag::Stroke) &&
         !hideBrushCursor_ && radial_.menu < 0 && !strokePopup_.open && drag_ != Drag::Select && drag_ != Drag::Guide && // (no ring under a pie or the stroke popup)
@@ -3586,7 +3586,7 @@ void App::drawPalette_Splats() {
 }
 
 bool App::drawSurfaceCursor(ImDrawList* dl, float radiusPx, ImU32 col, bool ring) {
-    // Only what brushes work on: the active, visible SubTool with an up-to-date BVH (a stale one, after a
+    // Only what brushes work on: the active, visible Part with an up-to-date BVH (a stale one, after a
     // whole-mesh change, is rebuilt at the next press; until then the flat ring shows), not an LOD preview.
     if (previewLod_ >= 0 || doc_.bvhDirty) return false;
     // Not while the solver thread is moving this mesh (predictive strokes): reading it then races the dabs.
@@ -3796,7 +3796,7 @@ void App::drawBrushCursor() {
     if (!surfaceCursorShown_) {
         if (ring) {
             dl->AddCircle(c, r, col, 64, 1.5f);
-            // The inner ring is Focal Shift, as in ZBrush: where the falloff drops to half.
+            // The inner ring is Focal Shift: where the falloff drops to half.
             dl->AddCircle(c, r * focalRingFraction(focalShift_), IM_COL32(255, 255, 255, 90), 48, 1.0f);
         } else {
             dl->AddCircleFilled(c, 2.0f * uiScale_, col);

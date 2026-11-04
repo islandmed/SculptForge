@@ -3,7 +3,7 @@
 //
 // Read-only spatial queries on a fixed surface, safe to call from many threads at once (core/BVH.h is the
 // sculpting BVH: refittable, but its queries share scratch buffers). Used by QRemesh (snapping the new
-// quads onto the sculpt) and ProjectAll (shooting rays at the source SubTools), plus the deviation
+// quads onto the sculpt) and ProjectAll (shooting rays at the source Parts), plus the deviation
 // (Hausdorff) measure the tests and the status line report.
 #pragma once
 
@@ -62,7 +62,7 @@ private:
     FlatBVH bvh_;
 };
 
-// Closest points on a set of line segments (mesh boundaries, polygroup borders).
+// Closest points on a set of line segments (mesh boundaries, face group borders).
 class SegmentBVH {
 public:
     void build(std::vector<glm::vec3> a, std::vector<glm::vec3> b);

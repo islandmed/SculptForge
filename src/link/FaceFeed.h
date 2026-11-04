@@ -6,7 +6,7 @@
 //   {"type":"face","t":<ms>,"weights":{"jawOpen":0.31,...},"head":[qx,qy,qz,qw]}
 // with the blend shape names of Apple ARKit (which MediaPipe's blendshape categories use too; MediaPipe has no
 // tongueOut and adds "_neutral", which is ignored). The desktop hands the weights to the `face_weights` command
-// (facial shapes on the active SubTool) and can record a take: one such message per line (JSON Lines).
+// (facial shapes on the active Part) and can record a take: one such message per line (JSON Lines).
 #pragma once
 
 #include <array>

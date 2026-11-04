@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Tool > Geometry: subdivision levels, as in ZBrush (Lower Res / Higher Res, SDiv, Del Lower / Del Higher,
+// Tool > Geometry: subdivision levels (Lower Res / Higher Res, SDiv, Del Lower / Del Higher,
 // Reconstruct Subdiv, Divide with Smt). The levels themselves live in core/Multires.
 #include "app/App.h"
 #include "app/Ui.h"
@@ -49,7 +49,7 @@ void App::drawGeometrySection() {
     ui::ActionButton(*this, "geometry.del_higher", ImVec2(half, 0));
     ui::ActionButton(*this, "geometry.reconstruct", ImVec2(-1, 0));
 
-    // Divide with its Smt toggle beside it, as in ZBrush.
+    // Divide with its Smt toggle beside it.
     const float smtW = ImGui::CalcTextSize("Smt").x + 2.0f * style.FramePadding.x + 6.0f * uiScale_;
     ui::ActionButton(*this, "geometry.divide", ImVec2(ImGui::GetContentRegionAvail().x - smtW - style.ItemSpacing.x, 0),
                      ui::Look::IconLabel);

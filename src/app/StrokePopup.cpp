@@ -29,7 +29,7 @@ constexpr double kStrokePopupTapSeconds = 0.25; // let go sooner without pointin
 struct ModifierLook {
     const char* label;
     const char* glyph;
-    const char* keys; // what it saves holding (the ZBrush keys; the latches stand for them in every style)
+    const char* keys; // what it saves holding (the Classic sculpting keys; the latches stand for them in every style)
     const char* help;
 };
 constexpr ModifierLook kModifiers[] = {

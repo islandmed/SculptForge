@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// ZBrush's Extract (Tool > SubTool), Mirror And Weld (Tool > Geometry > Modify Topology) and Mirror
+// the classic Extract (Tool > Part), Mirror And Weld (Tool > Geometry > Modify Topology) and Mirror
 // (Tool > Deformation). The work is done by the extract / mirror_and_weld / mirror commands (core/ExtractMirror.h).
 #include "app/App.h"
 #include "app/Demo.h"
@@ -31,11 +31,11 @@ void App::drawExtractContents() {
     Demo::pushScope("Extract");
     tray::GroupLabel(*this, "Extract");
     const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
-    ui::ActionButton(*this, "subtool.extract", ImVec2(half, 0));
-    ui::HelpAction(*this, "subtool.extract");
+    ui::ActionButton(*this, "part.extract", ImVec2(half, 0));
+    ui::HelpAction(*this, "part.extract");
     ImGui::SameLine();
-    ui::ActionButton(*this, "subtool.extract_accept", ImVec2(-1, 0));
-    ui::HelpAction(*this, "subtool.extract_accept");
+    ui::ActionButton(*this, "part.extract_accept", ImVec2(-1, 0));
+    ui::HelpAction(*this, "part.extract_accept");
 
     // The settings: changing one while the preview shows extracts again, so the preview follows.
     bool changed = false;
@@ -53,10 +53,10 @@ void App::drawExtractContents() {
                  "Thickness of the shell, as a fraction of the Part's size (0.015 is 1.5%). Negative grows it "
                  "inward; 0 makes a single-sided surface.",
                  "Tool > Parts > Extract");
-    ui::ActionButton(*this, "subtool.extract_double", ImVec2(half, 0));
-    ui::HelpAction(*this, "subtool.extract_double");
+    ui::ActionButton(*this, "part.extract_double", ImVec2(half, 0));
+    ui::HelpAction(*this, "part.extract_double");
     ImGui::SameLine();
-    ui::Segmented(*this, {"subtool.extract_tcorne", "subtool.extract_tborder"}, -1.0f);
+    ui::Segmented(*this, {"part.extract_tcorne", "part.extract_tborder"}, -1.0f);
     if (changed && doc_.extractPreviewCurrent()) runExtract();
     Demo::popScope();
 }

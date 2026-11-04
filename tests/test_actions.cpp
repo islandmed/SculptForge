@@ -45,7 +45,7 @@ TEST(action_registry_keys_and_overrides) {
     --wire;
     CHECK(!reg.handleKey(SDLK_LCTRL, SDL_KMOD_LCTRL));
 
-    // ZBrush-style assignment: taking Ctrl+Y from Redo leaves Redo its other chord.
+    // classic assignment: taking Ctrl+Y from Redo leaves Redo its other chord.
     CHECK(reg.assignShortcut("view.wireframe", "Ctrl+Y") == "Redo");
     CHECK(reg.shortcutText("view.wireframe") == "Ctrl+Y");
     CHECK(reg.shortcutText("edit.redo") == "Ctrl+Shift+Z");
@@ -101,11 +101,11 @@ TEST(search_aliases_are_generic_words) {
     CHECK(searchAliasesIn("Dynamic stroke spacing").empty()); // "Dynamic" only as the whole label
     // Brushes: SculptForge's stored names; the old ones still load (core/LegacyNames.h).
     BrushType t = BrushType::Standard;
-    CHECK(std::string(brushName(BrushType::DamStandard)) == "SharpCrease");
-    CHECK(std::string(brushLabel(BrushType::DamStandard)) == "Sharp Crease");
-    CHECK(brushFromName("DamStandard", t) && t == BrushType::DamStandard);
-    CHECK(brushFromName("sharp crease", t) && t == BrushType::DamStandard);
-    CHECK(brushFromName("Clay Block", t) && t == BrushType::ClayBuildup);
+    CHECK(std::string(brushName(BrushType::SharpCrease)) == "SharpCrease");
+    CHECK(std::string(brushLabel(BrushType::SharpCrease)) == "Sharp Crease");
+    CHECK(brushFromName("SharpCrease", t) && t == BrushType::SharpCrease);
+    CHECK(brushFromName("sharp crease", t) && t == BrushType::SharpCrease);
+    CHECK(brushFromName("Clay Block", t) && t == BrushType::ClayBlock);
     CHECK(brushFromName("snakehook", t) && t == BrushType::SnakeHook);
     CHECK(!brushFromName("frobnicate", t));
 }

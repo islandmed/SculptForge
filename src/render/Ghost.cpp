@@ -8,8 +8,8 @@
 namespace sf {
 
 GhostKind ghostKindForBrush(int brushType) {
-    // core/Sculpt.h BrushType order: Standard, Clay, Smooth, Move, Inflate, Crease, Flatten, Pinch, DamStandard,
-    // ClayBuildup, SnakeHook, Trim, Layer, Nudge, Vdm.
+    // core/Sculpt.h BrushType order: Standard, Clay, Smooth, Move, Inflate, Crease, Flatten, Pinch, Sharp Crease,
+    // Clay Block, SnakeHook, Trim, Layer, Nudge, Vdm.
     switch (brushType) {
     case 0: return GhostKind::Standard;
     case 1: return GhostKind::Clay;
@@ -17,8 +17,8 @@ GhostKind ghostKindForBrush(int brushType) {
     case 5: return GhostKind::Crease;
     case 6: return GhostKind::Flatten;
     case 7: return GhostKind::Pinch;
-    case 8: return GhostKind::DamStandard;
-    case 9: return GhostKind::ClayBuildup;
+    case 8: return GhostKind::SharpCrease;
+    case 9: return GhostKind::ClayBlock;
     case 11: return GhostKind::Trim;
     default: return GhostKind::None;
     }
@@ -60,7 +60,7 @@ glm::vec3 ghostMove(const GhostStroke& g, glm::vec3 x, const glm::vec3& n) {
             if (sign * h < 0.0f) x -= an * (h * f);
             break;
         }
-        case GhostKind::ClayBuildup: {
+        case GhostKind::ClayBlock: {
             // (round: the square tip's corners need the brush's screen frame)
             const float e = std::clamp((1.0f - dist / r) / 0.35f, 0.0f, 1.0f);
             const float w = e * e * (3.0f - 2.0f * e) * d.weight;
@@ -77,7 +77,7 @@ glm::vec3 ghostMove(const GhostStroke& g, glm::vec3 x, const glm::vec3& n) {
             x += an * (-sign * s * r * 0.05f * f * f) + onPlane(d.center - x, an) * (0.25f * s * f);
             break;
         case GhostKind::Pinch: x += onPlane(d.center - x, an) * (sign * 0.2f * s * f); break;
-        case GhostKind::DamStandard:
+        case GhostKind::SharpCrease:
             x += an * (-sign * s * r * 0.08f * f * f * f * f) + onPlane(d.center - x, an) * (0.3f * s * f);
             break;
         case GhostKind::Trim: {

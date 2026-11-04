@@ -1,6 +1,6 @@
 # Preferences > AI > Enable AI features (F5): off, no AI entry point is left on the shelves, in the menus, the
 # command palette or scripts, and nothing AI connects; on brings them back. The welcome asks too.
-run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=2
 expect_value ai_enabled == 1
 expect "AI Brush"

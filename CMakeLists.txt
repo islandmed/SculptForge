@@ -48,10 +48,10 @@ add_library(sculptforge_core STATIC
   src/core/Primitives.cpp
   src/core/Document.cpp
   src/core/Commands.cpp
-  src/core/Polygroups.cpp
+  src/core/FaceGroups.cpp
   src/core/SelectionSets.cpp
   src/core/ScreenSelect.cpp
-  src/core/SubTools.cpp
+  src/core/Parts.cpp
   src/core/ExtractMirror.cpp
   src/core/MeshTransform.cpp
   src/core/Deform.cpp
@@ -81,7 +81,7 @@ add_library(sculptforge_core STATIC
   src/core/PathStroke.cpp
   src/core/Sha256.cpp
   src/core/BrushGallery.cpp
-  src/core/Polypaint.cpp
+  src/core/VertexPaint.cpp
   src/core/PaintLayer.cpp
   src/core/Texture.cpp
   src/core/TextureCommands.cpp
@@ -117,7 +117,7 @@ add_library(sculptforge_core STATIC
   src/core/QRemesh2Field.cpp
   src/core/QRemesh2Param.cpp
   src/core/QuadQuality.cpp
-  src/core/ZSpheres.cpp
+  src/core/ForgeSpheres.cpp
   src/core/Projection.cpp
   src/core/RetopoCommands.cpp
   third_party/xatlas/xatlas.cpp
@@ -130,7 +130,7 @@ add_library(sculptforge_core STATIC
   src/core/KeepMasked.cpp
   src/core/ViewCapture.cpp
   third_party/tinyexr/tinyexr_impl.cpp
-  src/core/Matcap.cpp
+  src/core/LitSphere.cpp
   src/core/Trash.cpp
   src/core/Project.cpp
   src/core/Guide.cpp
@@ -147,8 +147,8 @@ add_library(sculptforge_core STATIC
   src/io/PlyIO.cpp
   src/io/UsdIO.cpp
   src/io/Zip.cpp
-  src/io/GozIO.cpp
-  src/io/GozCommands.cpp
+  src/io/BridgeIO.cpp
+  src/io/BridgeCommands.cpp
   src/io/BlenderBridge.cpp
   src/io/BlenderCommands.cpp
   src/io/MayaBridge.cpp
@@ -323,7 +323,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/CommandPalette.cpp
     src/app/Console.cpp
     src/app/Config.cpp
-    src/app/LightBox.cpp
+    src/app/LibraryBrowser.cpp
     src/app/BrushPreview.cpp
     src/app/Thumbnails.cpp
     src/app/Pickers.cpp
@@ -332,7 +332,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelMasking.cpp
     src/app/PanelCut.cpp
     src/app/PanelView.cpp
-    src/app/PanelPolygroups.cpp
+    src/app/PanelFaceGroups.cpp
     src/app/PanelSelectionSets.cpp
     src/app/Selection.cpp
     src/app/PanelBrushes.cpp
@@ -342,7 +342,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelFace.cpp
     src/app/PanelBrushLibrary.cpp
     src/app/PanelBrushGallery.cpp
-    src/app/PanelPolypaint.cpp
+    src/app/PanelVertexPaint.cpp
     src/app/PanelPacks.cpp
     src/app/MemoryConfirm.cpp
     src/app/PanelPaintLayers.cpp
@@ -355,16 +355,16 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelBake.cpp
     src/app/FocusDetailApp.cpp
     src/app/PanelRetopo.cpp
-    src/app/PanelZSpheres.cpp
+    src/app/PanelForgeSpheres.cpp
     src/app/PanelSplatTrain.cpp
     src/app/PanelSculptable.cpp
     src/app/PanelPerformance.cpp
-    src/app/PanelGoz.cpp
+    src/app/PanelBridge.cpp
     src/app/PanelBlender.cpp
     src/app/PanelMaya.cpp
     src/app/PanelPhone.cpp
     src/app/PanelProject.cpp
-    src/app/PanelSubTools.cpp
+    src/app/PanelParts.cpp
     src/app/PanelSupport.cpp
     src/app/QuickTour.cpp
     src/app/PanelAi.cpp

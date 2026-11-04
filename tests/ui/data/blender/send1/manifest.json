@@ -7,7 +7,7 @@
   "objects": [
     {
       "name": "Box",
-      "file": "r1_000.GoZ",
+      "file": "r1_000.Bridge",
       "matrix_world": [
         [
           0.9396926207859084,
@@ -37,7 +37,7 @@
     },
     {
       "name": "Rock",
-      "file": "r1_001.GoZ",
+      "file": "r1_001.Bridge",
       "matrix_world": [
         [
           1.0,

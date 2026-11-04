@@ -271,7 +271,7 @@ void App::pumpStroke() {
         s.view.probe = nullptr;
         s.view.radiusProbe = nullptr;
         s.view.settings = dabSettings();
-        s.uploadId = doc_.activeSubtoolInfo().id;
+        s.uploadId = doc_.activePartInfo().id;
         renderer_.setPersistentUpload(uiPrefs_.fastUpload);
     renderer_.bindStrokeUpload(s.uploadId, s.upload); // (the slot, found here: the thread doesn't walk the renderer's list)
         s.prepare = &displayedMesh() == &doc_.mesh;
@@ -300,7 +300,7 @@ void App::pumpStroke() {
     s.view.probe = strokeProbe_ ? &s.probe : nullptr;
     s.view.radiusProbe = strokeProbe_ ? &s.radiusProbe : nullptr;
     s.view.settings = dabSettings();
-    s.uploadId = doc_.activeSubtoolInfo().id;
+    s.uploadId = doc_.activePartInfo().id;
     renderer_.setPersistentUpload(uiPrefs_.fastUpload);
     renderer_.bindStrokeUpload(s.uploadId, s.upload); // (the slot, found here: the thread doesn't walk the renderer's list)
     s.prepare = &displayedMesh() == &doc_.mesh; // (a previewed LOD shows instead: nothing to pack)
@@ -333,7 +333,7 @@ void App::finishStrokeNow() {
     if (solver_) solver_->finalize = false;
     doc_.sculptor.flushDraft(doc_.mesh, doc_.bvh); // (a draft stroke ended here rather than on the solver thread)
     renderer_.setDraftNormals(0);
-    if (asyncStroke_) renderer_.refineStrokeBounds(doc_.activeSubtoolInfo().id, displayedMesh()); // (the quick ones)
+    if (asyncStroke_) renderer_.refineStrokeBounds(doc_.activePartInfo().id, displayedMesh()); // (the quick ones)
     strokeFinishing_ = false;
     asyncStroke_ = false;
     renderer_.setGhost(0, GhostStroke());
@@ -383,7 +383,7 @@ App::DabSettings App::dabSettings() const {
     st.mask = strokeMask_;
     st.paint = strokePaint_;
     st.sculpt = strokeSculpt_;
-    st.visible = doc_.activeSubtoolInfo().visible;
+    st.visible = doc_.activePartInfo().visible;
     st.brush = strokeBrush_;
     st.strokeType = strokeType_;
     st.symmetry = symmetry_;
@@ -434,7 +434,7 @@ bool App::ghostSurface(const glm::vec3& origin, const glm::vec3& dir, glm::vec3&
 
 void App::buildGhost() {
     ghostHeadValid_ = false;
-    const uint32_t id = doc_.activeSubtoolInfo().id;
+    const uint32_t id = doc_.activePartInfo().id;
     if (liveMove_.active) { // Live Move: one "dab" per mirror, the whole move so far
         GhostStroke g;
         g.kind = GhostKind::Move;

@@ -1,7 +1,7 @@
 # Community brushes: browse a gallery (the seed content in tools/brush-gallery/repo, read from disk the way a
 # studio mirror would be), search it, filter by tag, install a brush and see it in the library; then a
 # gallery that can't be reached shows a clear error instead of an empty window.
-run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 env SCULPTFORGE_BRUSH_GALLERY $SCRIPT_DIR/../../tools/brush-gallery/repo
 expect_value brushes == 7
 click "Brush##palette.brush"

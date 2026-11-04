@@ -133,15 +133,15 @@ texture after giving it UVs.
 | Command | What it does |
 |---|---|
 | `uv_auto` | Unwrap the active Part (xatlas); `resolution=4096` packs the islands for that texture size. A painted texture moves onto the new UVs (`keep_texture=false` leaves it as it was) |
-| `texture_create size=2048` | Give the Part a texture (1024, 2048, 4096, 8192 or `1k`...`8k`) and paint into it; `from_polypaint=true` starts from the vertex paint |
+| `texture_create size=2048` | Give the Part a texture (1024, 2048, 4096, 8192 or `1k`...`8k`) and paint into it; `from_vertexpaint=true` starts from the vertex paint |
 | `paint_target target=texture` | Where painting goes: `vertex` or `texture` |
-| `texture_from_polypaint` | Bake the vertex paint into the active texture layer |
-| `polypaint_from_texture` | Copy the texture into the vertex paint |
+| `texture_from_vertexpaint` | Bake the vertex paint into the active texture layer |
+| `vertexpaint_from_texture` | Copy the texture into the vertex paint |
 | `texture_export path=skin.png` | Save the texture as a PNG |
 | `texture_import path=skin.png` | Load an image as the texture |
 | `texture_delete` | Remove the texture |
 
-`remesh`, `qremesh`, `subtool_merge_down` and `subtool_merge_visible` keep a texture unless you add
+`remesh`, `qremesh`, `part_merge_down` and `part_merge_visible` keep a texture unless you add
 `keep_texture=false`.
 
 `paint_fill`, `paint_from_cavity`, `paint_clear` and every `paint_layer_*` command work on the texture while

@@ -3,31 +3,31 @@
 # the low-poly. After baking, the source is hidden so the shots show the high-poly (left) next to the low-poly
 # wearing its baked normal map (right).
 run new_sphere subdivisions=5
-run subtool_rename to=High
-run subtool_append type=sphere size=1 name=Source
+run part_rename to=High
+run part_append type=sphere size=1 name=Source
 run subdivide levels=2
-run subtool_select name=High
+run part_select name=High
 run subdivide levels=2
-# The same strokes on both spheres (the source sits 2.2 units to the right); strokes go to the active SubTool.
+# The same strokes on both spheres (the source sits 2.2 units to the right); strokes go to the active Part.
 run stroke brush=Crease points="-0.6,0.35,1 0,0.55,1 0.6,0.35,1" radius=0.07 strength=1
 run stroke brush=Inflate points="-0.35,-0.3,1" radius=0.3 strength=1
 run stroke brush=Clay points="0.25,-0.5,1 0.55,-0.05,1" radius=0.1 strength=1
 run stroke brush=Crease invert=true points="-0.75,-0.1,1 -0.45,-0.65,1" radius=0.05 strength=1
 run stroke brush=Standard points="-0.2,0.05,1 0.2,0.1,1" radius=0.06 strength=1 invert=true
-run subtool_select name=Source
+run part_select name=Source
 run stroke brush=Crease points="1.6,0.35,1 2.2,0.55,1 2.8,0.35,1" radius=0.07 strength=1
 run stroke brush=Inflate points="1.85,-0.3,1" radius=0.3 strength=1
 run stroke brush=Clay points="2.45,-0.5,1 2.75,-0.05,1" radius=0.1 strength=1
 run stroke brush=Crease invert=true points="1.45,-0.1,1 1.75,-0.65,1" radius=0.05 strength=1
 run stroke brush=Standard points="2.0,0.05,1 2.4,0.1,1" radius=0.06 strength=1 invert=true
 # The low-poly: a decimated copy of the source with automatic UVs.
-run subtool_duplicate
-run subtool_rename to=Low
+run part_duplicate
+run part_rename to=Low
 run decimate triangles=2000
 run uv_auto resolution=2048
 expect_value uvs == 1
 expect_value triangles <= 2000
-expect_value subtools == 3
+expect_value parts == 3
 key f
 
 # The Bake sub-palette, with the source picked and three maps ticked.
@@ -56,8 +56,8 @@ expect_text "Displacement: mid-grey = 0"
 expect_no_text "found no surface"
 
 # Hide the source: the high-poly (left) next to the baked low-poly (right).
-run subtool_visibility name=Source visible=false
-expect_value visible_subtools == 2
+run part_visibility name=Source visible=false
+expect_value visible_parts == 2
 expect_value normal_map_preview == 1
 shot high-and-baked-low
 # From an angle: the silhouette stays low-poly, the shading carries the sculpted detail.

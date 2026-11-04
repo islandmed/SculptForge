@@ -50,7 +50,7 @@ bool computeProjection(const Mesh& target, const std::vector<const Mesh*>& sourc
     }
 
     const float reach = std::max(opt.distance, 1e-6f) * glm::length(target.bounds().extent());
-    const bool doColors = colors && opt.polypaint && anyColor;
+    const bool doColors = colors && opt.vertexpaint && anyColor;
     positions = target.positions;
     if (doColors) *colors = target.hasColors() ? target.colors : std::vector<glm::vec3>(nv, glm::vec3(1.0f));
     std::vector<float> moved(nv, 0.0f); // weight each vertex was projected with (0 = untouched)
@@ -139,17 +139,17 @@ bool computeProjection(const Mesh& target, const std::vector<const Mesh*>& sourc
 
 bool projectAll(Document& doc, const ProjectOptions& opt, std::string& message, int source, ProjectStats* statsOut) {
     std::vector<const Mesh*> sources;
-    for (int i = 0; i < doc.subtoolCount(); ++i) {
-        if (i == doc.activeSubtool) continue;
-        if (source >= 0 ? i != source : !doc.subtools[size_t(i)].visible) continue;
-        if (doc.subtoolMesh(i).triangleCount() > 0) sources.push_back(&doc.subtoolMesh(i));
+    for (int i = 0; i < doc.partCount(); ++i) {
+        if (i == doc.activePart) continue;
+        if (source >= 0 ? i != source : !doc.parts[size_t(i)].visible) continue;
+        if (doc.partMesh(i).triangleCount() > 0) sources.push_back(&doc.partMesh(i));
     }
     if (sources.empty()) {
         message = source >= 0 ? "Project All: that Part can't be projected from"
                               : "Project All needs another visible Part to project from (the source)";
         return false;
     }
-    if (!opt.geometry && !opt.polypaint) {
+    if (!opt.geometry && !opt.vertexpaint) {
         message = "Project All: nothing to project (turn on Geometry or Vertex Paint)";
         return false;
     }
@@ -160,16 +160,16 @@ bool projectAll(Document& doc, const ProjectOptions& opt, std::string& message, 
         message = "Project All: the active sculpt layer's weight is 0";
         return false;
     }
-    if (opt.polypaint && !m.paintLayers.empty() && !paintLayerEditable(m, m.activePaintLayer)) {
+    if (opt.vertexpaint && !m.paintLayers.empty() && !paintLayerEditable(m, m.activePaintLayer)) {
         message = "Project All: the active paint layer is locked or hidden";
         return false;
     }
     std::vector<glm::vec3> positions, colors;
     ProjectStats st;
-    if (!computeProjection(m, sources, opt, positions, opt.polypaint ? &colors : nullptr, st, message)) return false;
+    if (!computeProjection(m, sources, opt, positions, opt.vertexpaint ? &colors : nullptr, st, message)) return false;
 
     // One undo step: the shape (active sculpt layer) and the colours (active paint layer), or a snapshot when
-    // the SubTool had no polypaint yet, so undo takes the attribute away again.
+    // the Part had no vertex paint yet, so undo takes the attribute away again.
     UndoRecord r;
     if (st.colors && !m.hasColors()) {
         r.mesh = std::make_unique<Mesh>(m);

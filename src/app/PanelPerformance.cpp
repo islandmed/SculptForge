@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Preferences > Performance (ZBrush: Preferences > Performance and Mem): how the 3D view draws (Antialiasing,
+// Preferences > Performance (Preferences > Performance and Mem): how the 3D view draws (Antialiasing,
 // Fast Navigation), Multithreading, what the last stroke cost per dab, and the memory the scene holds. The
 // numbers come from the same instruments as the benchmark (core/Benchmark.h, docs/performance.md).
 #include "app/App.h"
@@ -155,8 +155,8 @@ int App::viewSamples() {
     }
     const bool moving = drag_ == Drag::Orbit || drag_ == Drag::Pan || drag_ == Drag::Zoom || perf_.framesStill < 8;
     size_t triangles = 0;
-    for (int i = 0; i < doc_.subtoolCount(); ++i)
-        if (doc_.subtools[size_t(i)].visible) triangles += doc_.subtoolMesh(i).triangleCount();
+    for (int i = 0; i < doc_.partCount(); ++i)
+        if (doc_.parts[size_t(i)].visible) triangles += doc_.partMesh(i).triangleCount();
     perf_.movingNow = moving;
     perf_.sceneTriangles = triangles;
     perf_.proxyNow = uiPrefs_.fastNavigation && moving && triangles >= fastNavigationTriangles(hardwareProfileGoverns());
@@ -170,9 +170,9 @@ void App::notePerformanceFrame(double syncMs) {
         perf_.strokeSyncMs += syncMs;
         ++perf_.strokeFrames;
     }
-    // A SubTool too big for the GPU's memory isn't drawn: say so once.
+    // A Part too big for the GPU's memory isn't drawn: say so once.
     bool oom = false;
-    for (const SubTool& s : doc_.subtools) oom = oom || (s.visible && renderer_.outOfMemory(s.id));
+    for (const Part& s : doc_.parts) oom = oom || (s.visible && renderer_.outOfMemory(s.id));
     if (oom && !perf_.gpuOutOfMemory)
         status_ = "Not enough GPU memory to show every Part: hide some, or step down a subdivision level "
                   "(Preferences > Performance)";

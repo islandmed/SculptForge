@@ -1,9 +1,9 @@
 # #43: Preferences > Input > Hold Space and drag to move the camera (off by default: Space opens the QuickMenu).
-run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=4
 key f
 
-# Off: Space opens the QuickMenu, as in ZBrush.
+# Off: Space opens the QuickMenu.
 expect_value space_camera == 0
 key space
 expect_value quickmenu_open == 1

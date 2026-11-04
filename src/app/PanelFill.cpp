@@ -18,7 +18,7 @@
 #include "core/LayerStack.h"
 #include "core/MaterialRecipe.h"
 #include "core/MeshMaps.h"
-#include "core/Polypaint.h"
+#include "core/VertexPaint.h"
 #include "core/Texture.h"
 
 #include <IconsLucide.h>
@@ -57,7 +57,7 @@ void App::updateMeshMaps() {
     using Clock = std::chrono::steady_clock;
     const auto now = [] { return std::chrono::duration<double>(Clock::now().time_since_epoch()).count(); };
     Mesh& m = doc_.mesh;
-    const uint32_t part = doc_.activeSubtoolInfo().id;
+    const uint32_t part = doc_.activePartInfo().id;
     // A finished job: its maps go in when the Part still has the same texture layout.
     if (meshMapJob_) {
         if (!meshMapJob_->done) return;

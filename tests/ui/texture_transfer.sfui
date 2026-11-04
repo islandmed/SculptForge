@@ -36,7 +36,7 @@ expect_value texture_painted == $painted
 key ctrl+shift+z
 expect_value texture_layers == 1
 
-# Voxel Remesh with Keep Texture (shown because the SubTool has a texture), in the background.
+# Voxel Remesh with Keep Texture (shown because the Part has a texture), in the background.
 click "Remesh##tool.remesh"
 expect "Keep Texture##remesh"
 hold ctrl

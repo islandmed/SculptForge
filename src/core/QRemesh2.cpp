@@ -9,9 +9,9 @@
 // them (eight on a sphere-like shape, a handful more per feature) and edge loops run unbroken along the form.
 //
 //  1. Proxy surface (QRemesh2Proxy.cpp): the piece decimated and remeshed to about three triangle edges per quad
-//     edge, feature lines kept. Sizes: the target count, Adaptive Size (curvature) and polypaint density set a
+//     edge, feature lines kept. Sizes: the target count, Adaptive Size (curvature) and vertex paint density set a
 //     wanted quad size per vertex; the proxy is refined where quads will be small.
-//  2. Features as hard constraints: open edges (and the symmetry cut), polygroup borders (Keep Groups), hard edges
+//  2. Features as hard constraints: open edges (and the symmetry cut), face group borders (Keep Groups), hard edges
 //     (Detect Edges, chains shorter than a quad dropped), QRemesh Guides snapped onto the proxy as edge chains.
 //  3. Cross field (QRemesh2Field.cpp) following smoothed principal curvature directions and the features.
 //  4. Integer-grid map (QRemesh2Param.cpp): its integer lattice lines are the edge loops, feature lines and guides
@@ -1325,7 +1325,7 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
     mark("curvature");
     if (!step(0.35f)) return false;
 
-    // Sizes: Adaptive Size (curvature) and polypaint, relative; then normalised to the target.
+    // Sizes: Adaptive Size (curvature) and vertex paint, relative; then normalised to the target.
     const bool adaptive = opt.adaptive > 0.01f || !piece.color.empty();
     std::vector<float> rel(proxy.P.size(), 1.0f);
     auto vertexAverage = [&](const std::vector<float>& perTri) {
@@ -1360,7 +1360,7 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
                 relPaint[v] = std::pow(2.0f, blue - red);
             }
         }
-        // The size the cross field turns with (QRemesh2Field.cpp): the polypaint density, which asks for real changes
+        // The size the cross field turns with (QRemesh2Field.cpp): the vertex paint density, which asks for real changes
         // of density (pole pairs where it changes). Adaptive Size only stretches the map (a noisy sculpt's curvature
         // would otherwise ask for many pole pairs).
         if (!piece.color.empty()) proxy.fieldSize = relPaint;

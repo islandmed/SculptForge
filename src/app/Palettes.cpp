@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // The palettes of the palette bar (docs/ui-design.md §3.2), listed
-// alphabetically like ZBrush's. Each body is one function, drawn the same way
-// in a drop-down and in a tray. ZBrush's Tool palette holds the SubTool,
-// Layers, Geometry, Remesh, Masking, Polygroups, Visibility, Export and
+// alphabetically. Each body is one function, drawn the same way
+// in a drop-down and in a tray. the classic Tool palette holds the Part,
+// Layers, Geometry, Remesh, Masking, Face groups, Visibility, Export and
 // Display sub-palettes.
 #include "app/App.h"
 
@@ -15,7 +15,7 @@
 #include "app/Theme.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
-#include "core/Matcap.h"
+#include "core/LitSphere.h"
 #include "core/StarterMeshes.h"
 
 #include <IconsLucide.h>
@@ -380,11 +380,11 @@ void App::drawPalette_Draw() {
                  "The brush falloff: below 0 a broad, hard tip, above 0 a soft point. The brush cursor's inner ring shows "
                  "where the brush works at half strength.",
                  "Draw");
-    // The same looks as the top shelf: Sculpt | Paint is a mode (the accent), Zadd | Zsub a choice (raised grey),
+    // The same looks as the top shelf: Sculpt | Paint is a mode (the accent), Raise | Lower a choice (raised grey),
     // the rest options (dark chips, an underline when on). Sliders stay neutral, so the accent marks one thing.
     ImGui::Dummy(ImVec2(0, 2.0f * uiScale_));
     segmented(*this, {"draw.sculpt", "draw.paint"});
-    segmented(*this, {"draw.zadd", "draw.zsub"});
+    segmented(*this, {"draw.raise", "draw.lower"});
     drawOptionRow(*this, {"draw.rgb", "draw.front_faces"});
     tray::GroupLabel(*this, "Dynamic topology");
     drawOptionRow(*this, {"draw.dynamic"});
@@ -515,7 +515,7 @@ void App::drawPalette_File() {
     menuAction(*this, "file.save_splats");
     menuAction(*this, "pack.install"); // a review screen first (PanelPacks.cpp)
     ImGui::Separator();
-    drawGozMenu();
+    drawBridgeMenu();
     drawBlenderMenu(); // the Blender bridge (PanelBlender.cpp)
     drawMayaMenu(); // the Maya bridge (PanelMaya.cpp)
     menuAction(*this, "file.capture_phone"); // the phone link (PanelPhone.cpp)
@@ -588,7 +588,7 @@ void App::drawPalette_Help() {
 
 void App::drawPalette_Preferences() {
     const tray::Style style; // quiet check marks
-    // The sub-palettes come from Config.cpp (Store / Restore UI, interface preferences, hotkeys, LightBox).
+    // The sub-palettes come from Config.cpp (Store / Restore UI, interface preferences, hotkeys, Library).
     if (subpalette("preferences.config", "Config")) {
         tray::Section section;
         config::drawConfigSection(*this);
@@ -622,9 +622,9 @@ void App::drawPalette_Preferences() {
         tray::Section section;
         drawBackgroundControls("prefs");
     }
-    if (subpalette("preferences.lightbox", "Library")) {
+    if (subpalette("preferences.library", "Library")) {
         tray::Section section;
-        config::drawLightBoxSection(*this);
+        config::drawLibraryBrowserSection(*this);
     }
     if (subpalette("preferences.tablet", "Tablet")) {
         tray::Section section;
@@ -666,12 +666,12 @@ void App::drawPalette_Render() {
     ui::HelpAction(*this, "view.wireframe");
     ImGui::Checkbox(tr("Show Mesh"), &renderSettings_.showMesh);
     ui::HelpAction(*this, "view.mesh");
-    ImGui::Checkbox(tr("Show Vertex Paint"), &renderSettings_.showPolypaint);
-    ui::HelpAction(*this, "view.polypaint");
+    ImGui::Checkbox(tr("Show Vertex Paint"), &renderSettings_.showVertexPaint);
+    ui::HelpAction(*this, "view.vertexpaint");
     ImGui::Checkbox(tr("Show Mask"), &renderSettings_.showMask);
     ui::HelpAction(*this, "view.mask");
-    ImGui::Checkbox(tr("Show Face Groups##render"), &renderSettings_.showPolygroups);
-    ui::HelpAction(*this, "view.polygroups");
+    ImGui::Checkbox(tr("Show Face Groups##render"), &renderSettings_.showFaceGroups);
+    ui::HelpAction(*this, "view.facegroups");
     bool xray = renderSettings_.xray;
     if (ui::Checkbox("X-Ray##render", &xray)) runCommand("xray", {{"on", xray}});
     ui::HelpAction(*this, "view.xray");
@@ -686,7 +686,7 @@ void App::drawPalette_Render() {
     ImGui::TextDisabled("%s", tr("View resolution"));
     ui::Segmented(*this, {"perf.res_100", "perf.res_75", "perf.res_50"});
     actionRow(*this, {"view.frame", "view.fullscreen"});
-    actionRow(*this, {"ui.lightbox", "ui.console"}); // (the SculptForge layout's View menu: they left the shelf)
+    actionRow(*this, {"ui.library", "ui.console"}); // (the SculptForge layout's View menu: they left the shelf)
 }
 
 void App::drawPalette_Script() {
@@ -707,9 +707,9 @@ void App::drawPalette_Stroke() {
 void App::drawPalette_Tool() {
     const tray::Style style; // quiet check marks
     const float s = uiScale_;
-    // Header: the active SubTool and its size, then Open / Save / Import.
+    // Header: the active Part and its size, then Open / Save / Import.
     {
-        const SubTool& st = doc_.activeSubtoolInfo();
+        const Part& st = doc_.activePartInfo();
         if (fontBold_) ImGui::PushFont(fontBold_);
         ImGui::TextUnformatted(st.name.c_str());
         if (fontBold_) ImGui::PopFont();
@@ -720,20 +720,20 @@ void App::drawPalette_Tool() {
         actionRow(*this, {"file.open", "file.save", "file.import"});
         ImGui::Dummy(ImVec2(0, 2.0f * s));
     }
-    if (subpalette("tool.subtool", "Parts")) {
+    if (subpalette("tool.part", "Parts")) {
         tray::Section section;
         Demo::pushScope("Parts");
-        drawSubToolsContents();
+        drawPartsContents();
         Demo::popScope();
         drawExtractContents(); // PanelExtract.cpp
         Demo::pushScope("Project");
         drawProjectContents(); // ProjectAll (PanelRetopo.cpp)
         Demo::popScope();
     }
-    if (subpalette("tool.zspheres", "Forge Spheres")) {
+    if (subpalette("tool.forgespheres", "Forge Spheres")) {
         tray::Section section;
         Demo::pushScope("Forge Spheres");
-        drawZSpheresContents(); // PanelZSpheres.cpp
+        drawForgeSpheresContents(); // PanelForge Spheres.cpp
         Demo::popScope();
     }
     if (subpalette("tool.layers", "Layers")) {
@@ -826,7 +826,7 @@ void App::drawPalette_Tool() {
             ui::HelpText("Keep Masked", nullptr, kKeepMaskedHelp, "Tool > Remesh");
             if (hasTexture(doc_.mesh)) {
                 ImGui::SameLine();
-                drawKeepTextureCheckbox("Keep Texture##remesh", "Tool > Remesh"); // only for a painted SubTool
+                drawKeepTextureCheckbox("Keep Texture##remesh", "Tool > Remesh"); // only for a painted Part
             }
         }
     }
@@ -844,9 +844,9 @@ void App::drawPalette_Tool() {
         tray::Section section;
         drawMaskingSection();
     }
-    if (subpalette("tool.polygroups", "Face Groups")) {
+    if (subpalette("tool.facegroups", "Face Groups")) {
         tray::Section section;
-        drawPolygroupsSection();
+        drawFaceGroupsSection();
     }
     if (subpalette("tool.visibility", "Visibility")) {
         tray::Section section;
@@ -870,8 +870,8 @@ void App::drawPalette_Tool() {
         ImGui::Checkbox(tr("Mask##display"), &renderSettings_.showMask);
         ui::HelpAction(*this, "view.mask");
         ImGui::SameLine();
-        ImGui::Checkbox(tr("Groups##display"), &renderSettings_.showPolygroups);
-        ui::HelpAction(*this, "view.polygroups");
+        ImGui::Checkbox(tr("Groups##display"), &renderSettings_.showFaceGroups);
+        ui::HelpAction(*this, "view.facegroups");
         if (ImGui::Checkbox(tr("Backface culling##display"), &renderSettings_.backfaceCulling))
             uiPrefs_.backfaceCulling = renderSettings_.backfaceCulling; // the default for the next session
         ui::HelpText("Backface culling", nullptr,
@@ -906,7 +906,7 @@ void App::drawPalette_Transform() {
     ImGui::TextDisabled("%s", tr("Symmetry"));
     segmented(*this, {"transform.symmetry_x", "transform.symmetry_y", "transform.symmetry_z"});
     drawRadialSymmetryControls();
-    actionRow(*this, {"view.frame", "subtool.solo"});
+    actionRow(*this, {"view.frame", "part.solo"});
     actionRow(*this, {"view.polyf"});
 }
 

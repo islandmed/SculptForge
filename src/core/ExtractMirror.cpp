@@ -68,7 +68,7 @@ bool parseAxes(const std::string& text, std::vector<int>& axes) {
 
 Mesh extractShell(const Mesh& mesh, const ExtractOptions& o, std::string& error) {
     const size_t nv = mesh.vertexCount(), nt = mesh.triangleCount();
-    if (!mesh.zspheres.empty()) {
+    if (!mesh.forgespheres.empty()) {
         error = "Extract works on meshes; make the Forge Spheres a mesh first";
         return {};
     }
@@ -148,11 +148,11 @@ Mesh extractShell(const Mesh& mesh, const ExtractOptions& o, std::string& error)
             for (uint32_t v : kept) out.colors.push_back(mesh.colors[v]);
     }
     out.triangles = tris;
-    out.polygroups.assign(tris.size(), 1u);
+    out.facegroups.assign(tris.size(), 1u);
     if (!single) {
         // The inner surface faces the other way; the rim joins the two along the patch's edge, one quad per edge.
         for (const glm::uvec3& c : tris) out.triangles.push_back(glm::uvec3(c.x + np, c.z + np, c.y + np));
-        out.polygroups.resize(out.triangles.size(), 2u);
+        out.facegroups.resize(out.triangles.size(), 2u);
         // TCorne: where the edge turns sharply (over 50 degrees) the rim keeps triangles; TBorder: all along it.
         std::vector<uint8_t> corner(o.triangleCorners && !o.triangleBorder ? np : 0, 0);
         if (!corner.empty()) {
@@ -175,8 +175,8 @@ Mesh extractShell(const Mesh& mesh, const ExtractOptions& o, std::string& error)
             const uint32_t first = uint32_t(out.triangles.size());
             out.triangles.push_back(glm::uvec3(v, u, u + np));
             out.triangles.push_back(glm::uvec3(v, u + np, v + np));
-            out.polygroups.push_back(3u);
-            out.polygroups.push_back(3u);
+            out.facegroups.push_back(3u);
+            out.facegroups.push_back(3u);
             if (!o.triangleBorder && (corner.empty() || (!corner[u] && !corner[v]))) out.pairQuad(first, first + 1);
         }
     }
@@ -351,7 +351,7 @@ Mesh mirrorAndWeld(const Mesh& mesh, int axis, bool keepPositive, std::string& e
     std::vector<uint32_t> mirrored(half.size(), kNone);
     auto addTriangle = [&](const glm::uvec3& v, uint32_t source, const std::array<glm::vec2, 3>& uv) {
         out.triangles.push_back(v);
-        if (mesh.hasPolygroups()) out.polygroups.push_back(mesh.polygroups[source]);
+        if (mesh.hasFaceGroups()) out.facegroups.push_back(mesh.facegroups[source]);
         if (mesh.hasHidden()) out.hidden.push_back(mesh.hidden[source]);
         if (uvs) out.uvs.insert(out.uvs.end(), uv.begin(), uv.end());
     };
@@ -384,7 +384,7 @@ Mesh mirrorFlip(const Mesh& mesh, int axis, float pivot) {
     for (auto& p : out.base) p[axis] = 2.0f * pivot - p[axis];
     for (auto& l : out.layers)
         for (auto& v : l.delta) v[axis] = -v[axis];
-    for (auto& z : out.zspheres) z.center[axis] = 2.0f * pivot - z.center[axis];
+    for (auto& z : out.forgespheres) z.center[axis] = 2.0f * pivot - z.center[axis];
     for (auto& t : out.triangles) std::swap(t.y, t.z);
     for (size_t t = 0; t * 3 + 2 < out.uvs.size(); ++t) std::swap(out.uvs[3 * t + 1], out.uvs[3 * t + 2]);
     out.rebuildTopology();
@@ -403,16 +403,16 @@ CommandResult acceptPreview(Document& doc) {
         doc.dropExtractPreview();
         return {false, "Nothing to accept: press Extract first"};
     }
-    const int i = doc.subtoolIndex(doc.extractPreview.id);
+    const int i = doc.partIndex(doc.extractPreview.id);
     UndoRecord r;
     r.label = "Extract";
-    r.subtool = std::make_shared<SubtoolStep>();
-    r.subtool->id = doc.extractPreview.id;
-    r.subtool->at = i;
+    r.part = std::make_shared<PartStep>();
+    r.part->id = doc.extractPreview.id;
+    r.part->at = i;
     doc.undo.push(std::move(r));
     doc.extractPreview = {};
     doc.modified = true;
-    return {true, "Extracted " + doc.subtools[size_t(i)].name + " (" + triangles(doc.subtoolMesh(i).triangleCount()) + ")"};
+    return {true, "Extracted " + doc.parts[size_t(i)].name + " (" + triangles(doc.partMesh(i).triangleCount()) + ")"};
 }
 
 CommandResult runExtract(Document& doc, const Args& a) {
@@ -431,14 +431,14 @@ CommandResult runExtract(Document& doc, const Args& a) {
     const size_t tris = shell.triangleCount();
     doc.dropExtractPreview(true);
     if (doc.extractPreview.id) { // Extract again (other settings): the preview is replaced
-        SubTool& s = doc.subtools[size_t(doc.subtoolIndex(doc.extractPreview.id))];
+        Part& s = doc.parts[size_t(doc.partIndex(doc.extractPreview.id))];
         s.mesh = std::move(shell);
         s.mesh.topologyDirty = true;
         s.bvh.build(s.mesh);
         s.bvhDirty = false;
     } else {
-        const int i = doc.addSubtool(std::move(shell), "Extract", false, doc.activeSubtool + 1);
-        doc.extractPreview = {doc.subtools[size_t(i)].id, doc.activeSubtoolInfo().id, doc.undo.revision()};
+        const int i = doc.addPart(std::move(shell), "Extract", false, doc.activePart + 1);
+        doc.extractPreview = {doc.parts[size_t(i)].id, doc.activePartInfo().id, doc.undo.revision()};
     }
     if (argBool(a, "accept", false)) return acceptPreview(doc);
     return {true, "Extract preview (" + triangles(tris) + "): Accept keeps it as a new Part"};
@@ -483,7 +483,7 @@ void registerExtractMirrorCommands(CommandRegistry& reg) {
                  const bool positive = side == "positive" || side == "+" || side == "pos";
                  if (!positive && side != "negative" && side != "-" && side != "neg")
                      return {false, "Bad side '" + side + "' (positive or negative)"};
-                 if (!doc.mesh.zspheres.empty()) return {false, "Mirror And Weld works on meshes; make the Forge Spheres a mesh first"};
+                 if (!doc.mesh.forgespheres.empty()) return {false, "Mirror And Weld works on meshes; make the Forge Spheres a mesh first"};
                  if (doc.mesh.triangleCount() == 0) return {false, "The Part is empty"};
                  const size_t before = doc.mesh.triangleCount();
                  Mesh m = doc.mesh;

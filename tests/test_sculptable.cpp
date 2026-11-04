@@ -310,9 +310,9 @@ TEST(sculptable_command_head) {
     const CommandResult r = reg.execute(d, "splat_to_mesh", {{"detail", 128.0}, {"target", 2500.0}});
     std::printf("  %s\n", r.message.c_str());
     CHECK(r.ok);
-    CHECK(d.subtoolCount() == 3); // the starting sphere (hidden), the scan (hidden), the result
-    CHECK(d.activeSubtool == 2 && d.activeSubtoolInfo().name == "Test Head");
-    CHECK(!d.subtools[0].visible && !d.subtools[1].visible && d.subtools[1].name == "Test Head Scan");
+    CHECK(d.partCount() == 3); // the starting sphere (hidden), the scan (hidden), the result
+    CHECK(d.activePart == 2 && d.activePartInfo().name == "Test Head");
+    CHECK(!d.parts[0].visible && !d.parts[1].visible && d.parts[1].name == "Test Head Scan");
     const TopologyReport t = topologyReport(d.mesh);
     CHECK(t.manifold() && t.boundaryEdges == 0 && t.quadFraction() > 0.97f);
     CHECK(t.faces > 1500 && t.faces < 4000);
@@ -338,7 +338,7 @@ TEST(sculptable_stages_and_landmarks) {
     CHECK(reg.execute(d, "splat_test_capture", {{"count", 100000.0}}).ok);
     const CommandResult scan = reg.execute(d, "splat_to_mesh", {{"detail", 112.0}, {"stage", std::string("scan")}, {"target", 2500.0}});
     CHECK(scan.ok && scan.message.find("landmarks {") != std::string::npos);
-    CHECK(d.activeSubtoolInfo().name == "Test Head Scan" && d.mesh.hasColors() && !d.qremeshGuides.empty());
+    CHECK(d.activePartInfo().name == "Test Head Scan" && d.mesh.hasColors() && !d.qremeshGuides.empty());
     // Nudge: face_guides with landmarks moved, then finish.
     const std::string json = scan.message.substr(scan.message.find('{'));
     FaceLandmarks lm;
@@ -352,8 +352,8 @@ TEST(sculptable_stages_and_landmarks) {
     CHECK(guides >= 4);
     const CommandResult fin = reg.execute(d, "splat_to_mesh", {{"stage", std::string("finish")}, {"target", 2500.0}});
     CHECK(fin.ok);
-    CHECK(d.activeSubtoolInfo().name == "Test Head" && d.qremeshGuides.size() == guides);
-    CHECK(!d.subtools[size_t(d.findSubtool("Test Head Scan"))].visible);
+    CHECK(d.activePartInfo().name == "Test Head" && d.qremeshGuides.size() == guides);
+    CHECK(!d.parts[size_t(d.findPart("Test Head Scan"))].visible);
     CHECK(topologyReport(d.mesh).quadFraction() > 0.97f && d.mesh.hasColors());
     // Bad arguments.
     CHECK(!reg.execute(d, "splat_to_mesh", {{"preset", std::string("huge")}}).ok);
@@ -386,7 +386,7 @@ TEST(sculptable_texture_and_levels) {
     std::printf("  handle samples %zu, orange %zu\n", handle, orange);
     CHECK(handle > 10 && orange * 10 >= handle * 8);
     // The top level follows the scan: no vertex further than 2 voxels from it.
-    const Mesh& scan = d.subtoolMesh(d.findSubtool("Test Mug Scan"));
+    const Mesh& scan = d.partMesh(d.findPart("Test Mug Scan"));
     BVH bvh;
     bvh.build(scan);
     std::vector<uint32_t> found;

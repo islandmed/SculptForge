@@ -6,7 +6,7 @@
     python3 tools/guide/feature_shots.py --app build/sculptforge --out build/guide-features
     python3 tools/guide/make_images.py build/guide-shots --features build/guide-features
 
-Tests written for the Classic look and the ZBrush-style palette bar run from a converted copy: the look line becomes
+Tests written for the Classic look and the Classic-style palette bar run from a converted copy: the look line becomes
 the default look and each palette click opens its task menu and section instead. Shots land in <out>/<test>/.
 """
 import argparse

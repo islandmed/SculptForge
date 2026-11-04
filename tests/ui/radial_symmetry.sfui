@@ -1,7 +1,7 @@
 # Radial and local symmetry (#63): the R toggle on the top shelf and in Transform > Symmetry, Radial Count and the
 # axis, every copy's brush cursor, strokes that land on every copy, mask rectangles that follow them, projects
 # that keep the settings, and Local about the Part's own centre.
-run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=5
 key f
 expect_value symmetry_radial == 0

@@ -3,7 +3,7 @@
 //
 // Vector displacement brushes (core/Vdm.h) in the app: Brush > Vector Displacement (the maps, loading EXRs,
 // the VDM plane and Create VDM, Export EXR), their F3 actions, the DragDot stroke, and the DragRect stroke the
-// VDM brush brings along while it is the brush (ZBrush's VDM brushes come set to DragRect).
+// VDM brush brings along while it is the brush (VDM brushes come set to DragRect).
 #include "app/App.h"
 #include "app/Ui.h"
 

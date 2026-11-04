@@ -119,10 +119,10 @@ Open **Tool > Masking** (the Tool palette is in the right tray by default). Ever
 | **passes** | How many times Blur, Sharpen, Grow and Shrink run (1 to 20 here, default 1). | `iterations=` |
 | **By cavity** | Mask concave areas (creases, folds, pores), replacing the current mask. | `mask_by_cavity` |
 | **threshold** | How concave a spot must be for **By cavity** (-0.2 to 0.5, default 0.02). 0 masks anything concave; higher values keep only deep creases. | `threshold=` |
-| **By face group** | Mask one face group, replacing the current mask. The number field next to it is the face group id. | `mask_by_polygroup` |
+| **By face group** | Mask one face group, replacing the current mask. The number field next to it is the face group id. | `mask_by_facegroup` |
 | **By border** | Mask the open edges of the mesh (edges with only one face) and the rings of edges inside them, replacing the current mask, so sculpting keeps the border in place. Uses **Mask Strength**. A closed mesh has no open edges, and the status bar says so. | `mask_border` |
 | **Rings** | How wide **By border** masks, in rings of edges from the border (1 to 20, default 2; 1 masks the border vertices only). | `rings=` |
-| **Face Group borders** | **By border** also masks where face groups meet. | `polygroups=true` |
+| **Face Group borders** | **By border** also masks where face groups meet. | `facegroups=true` |
 | **Soft** | **By border** fades the mask from the border towards the innermost ring. | `soft=true` |
 
 Mask operations only change visible parts of the model; hidden parts keep their mask. **Clear** is the
@@ -191,8 +191,8 @@ you can mask an area and fill the rest with a colour. See [Vertex Paint and mate
 | `mask_clear`, `mask_all`, `mask_invert` | |
 | `mask_blur`, `mask_sharpen`, `mask_grow`, `mask_shrink` | `iterations` (1-100, default 1) |
 | `mask_by_cavity` | `strength` (0-1, default 1), `threshold` (-1 to 1, default 0.02) |
-| `mask_by_polygroup` | `group` (required), `add=true` to add to the current mask instead of replacing it |
-| `mask_border` | `rings` (1-20, default 1), `polygroups=true` to also mask face group borders, `soft=true` to fade inwards, `strength` (0-1, default 1), `add=true` to add to the current mask |
+| `mask_by_facegroup` | `group` (required), `add=true` to add to the current mask instead of replacing it |
+| `mask_border` | `rings` (1-20, default 1), `facegroups=true` to also mask face group borders, `soft=true` to fade inwards, `strength` (0-1, default 1), `add=true` to add to the current mask |
 | `mask_rect` | `x0 y0 x1 y1` (-1 to 1, y up), `unmask`, `strength` (0-1, default 1), optional `view_proj` matrix; without a view the rectangle spans the mesh seen from the front |
 | `mask_lasso` | `points` (required): the outline as `"x0 y0 x1 y1 ..."`, at least 3 points in the same -1 to 1 space; `unmask`, `strength`, `view_proj` as for `mask_rect` |
 

@@ -55,7 +55,7 @@ public:
         return n.count > 0 ? std::span<const uint32_t>(triIndices_.data() + n.first, n.count) : std::span<const uint32_t>();
     }
     void refitLeaves(const Mesh& mesh, std::span<const uint32_t> leaves);
-    // Recomputes every box (same tree) after most of the mesh moved, e.g. a whole SubTool transformed.
+    // Recomputes every box (same tree) after most of the mesh moved, e.g. a whole Part transformed.
     void refitAll(const Mesh& mesh);
 
     // Dynamic topology (core/Dyntopo.h): a few triangles at a time added, removed or renumbered without a

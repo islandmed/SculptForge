@@ -6,6 +6,7 @@
 #include "core/BrushRecipe.h"
 #include "core/Commands.h"
 #include "core/Image.h"
+#include "core/LegacyNames.h"
 #include "core/Macro.h"
 #include "core/MaterialRecipe.h"
 #include "core/RadialMenu.h"
@@ -139,7 +140,7 @@ const char* packItemTypeId(PackItemType t) {
     switch (t) {
     case PackItemType::Brush: return "brush";
     case PackItemType::Alpha: return "alpha";
-    case PackItemType::Matcap: return "matcap";
+    case PackItemType::LitSphere: return "litsphere";
     case PackItemType::Material: return "material";
     case PackItemType::Vdm: return "vdm";
     case PackItemType::Keymap: return "keymap";
@@ -154,7 +155,7 @@ const char* packItemFolder(PackItemType t) {
     switch (t) {
     case PackItemType::Brush: return "brushes";
     case PackItemType::Alpha: return "alphas";
-    case PackItemType::Matcap: return "matcaps";
+    case PackItemType::LitSphere: return "litspheres";
     case PackItemType::Material: return "materials";
     case PackItemType::Vdm: return "vdms";
     case PackItemType::Keymap: return "keymaps";
@@ -170,7 +171,7 @@ const char* packItemLabel(PackItemType t, int count) {
     switch (t) {
     case PackItemType::Brush: return one ? "brush" : "brushes";
     case PackItemType::Alpha: return one ? "alpha" : "alphas";
-    case PackItemType::Matcap: return one ? "Lit Sphere" : "Lit Spheres";
+    case PackItemType::LitSphere: return one ? "Lit Sphere" : "Lit Spheres";
     case PackItemType::Material: return one ? "Material Recipe" : "Material Recipes";
     case PackItemType::Vdm: return one ? "VDM" : "VDMs";
     case PackItemType::Keymap: return one ? "keymap" : "keymaps";
@@ -195,7 +196,7 @@ bool packItemExtensionOk(PackItemType t, const std::string& fileName) {
     switch (t) {
     case PackItemType::Brush: return ext == ".sfbrush";
     case PackItemType::Alpha:
-    case PackItemType::Matcap: return ext == ".png" || ext == ".jpg" || ext == ".jpeg";
+    case PackItemType::LitSphere: return ext == ".png" || ext == ".jpg" || ext == ".jpeg";
     case PackItemType::Material: return ext == kMaterialRecipeExtension;
     case PackItemType::Vdm: return ext == ".sfvdm";
     case PackItemType::Keymap:
@@ -322,7 +323,8 @@ bool parsePackManifest(const std::string& textIn, PackManifest& out, std::string
             return false;
         }
         PackItem item;
-        if (!packItemTypeFromId(it["type"].asString(), item.type)) {
+        // legacy::modernize: a pack made for an older version names some types and folders the old way.
+        if (!packItemTypeFromId(legacy::modernize(it["type"].asString()), item.type)) {
             error = where + " has an unknown type \"" + radialCleanText(it["type"].asString(), 40) + "\"";
             return false;
         }
@@ -333,8 +335,10 @@ bool parsePackManifest(const std::string& textIn, PackManifest& out, std::string
             return false;
         }
         const std::string folder = std::string(packItemFolder(item.type)) + "/";
-        if (item.path.compare(0, folder.size(), folder) != 0 || item.path.find('/', folder.size()) != std::string::npos ||
-            item.path.size() == folder.size()) {
+        if (const std::string inFolder = legacy::modernize(item.path.substr(0, item.path.find('/') + 1)) +
+                                         item.path.substr(item.path.find('/') + 1);
+            inFolder.compare(0, folder.size(), folder) != 0 || item.path.find('/', item.path.find('/') + 1) != std::string::npos ||
+            inFolder.size() == folder.size()) {
             error = where + ": a " + packItemTypeId(item.type) + " must be directly in " + folder;
             return false;
         }
@@ -709,7 +713,7 @@ bool checkPackFile(PackItemType type, const PackFile& f, const CommandRegistry* 
         return true;
     }
     case PackItemType::Alpha:
-    case PackItemType::Matcap: return imageOk(f.data, 4096, error, f.name);
+    case PackItemType::LitSphere: return imageOk(f.data, 4096, error, f.name);
     case PackItemType::Material: {
         if (f.data.size() > 256 * 1024) {
             error = "\"" + shown + "\" is too big for a Material Recipe";
@@ -1302,7 +1306,7 @@ void registerPackCommands(CommandRegistry& registry) {
                       return {true, "Removed pack " + argString(a, "id")};
                   }});
     registry.add({"pack_create",
-                  "Make a pack (.sfpack) from a folder laid out like one: brushes/, alphas/, matcaps/, materials/, vdms/, " // marks-pending
+                  "Make a pack (.sfpack) from a folder laid out like one: brushes/, alphas/, litspheres/, materials/, vdms/, "
                   "keymaps/, piemenus/ and macros/ (each with its own file types), plus LICENSE.txt and preview.png if "
                   "there. Everything is checked exactly as an install would check it.",
                   {{"folder", T::String, "The folder holding the items.", true},

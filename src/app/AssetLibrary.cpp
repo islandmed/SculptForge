@@ -3,6 +3,7 @@
 #include "app/AssetLibrary.h"
 
 #include "core/LegacyNames.h"
+#include "io/BridgeProtocol.h"
 
 #include <algorithm>
 #include <cctype>
@@ -91,7 +92,7 @@ const char* libraryTabFolder(LibraryTab tab) {
     case LibraryTab::Alpha:
         return "Alphas";
     case LibraryTab::Material:
-        return "Lit Spheres"; // custom lit-sphere images, loaded at start-up (core/Matcap.h)
+        return "Lit Spheres"; // custom lit-sphere images, loaded at start-up (core/Lit Sphere.h)
     case LibraryTab::Image:
         return "Images";
     case LibraryTab::Splats:
@@ -104,7 +105,7 @@ const char* libraryTabFolder(LibraryTab tab) {
 }
 
 bool isMeshFile(const std::string& path) {
-    return anyOf(lowerExt(path), {".obj", ".glb", ".gltf", ".fbx", ".stl", ".ply", ".usda", ".usdz", ".usd", ".goz"});
+    return anyOf(lowerExt(path), {".obj", ".glb", ".gltf", ".fbx", ".stl", ".ply", ".usda", ".usdz", ".usd", bridgefile::kExtLower});
 }
 bool isSplatFile(const std::string& path) { return anyOf(lowerExt(path), {".ply", ".splat"}); }
 bool isImageFile(const std::string& path) {
@@ -188,11 +189,16 @@ bool ensureUserLibrary(const std::string& root, std::string& error) {
         return false;
     }
     std::error_code ec;
-    for (const legacy::Rename& r : legacy::kLibraryFolders) { // a library from an older version: move the folder over
-        const fs::path from = fsPath(root) / std::string(r.old), to = fsPath(root) / std::string(r.now);
-        if (fs::is_directory(from, ec) && !fs::exists(to, ec)) fs::rename(from, to, ec);
-        ec.clear();
+    // A library from an older version: move its Lit Spheres folder over.
+    for (fs::directory_iterator it(fsPath(root), ec), end; !ec && it != end; it.increment(ec)) {
+        const std::string name = utf8(it->path().filename());
+        if (legacy::modernize(name) != "LitSpheres" || !it->is_directory(ec)) continue;
+        const fs::path to = fsPath(root) / "Lit Spheres";
+        std::error_code mv;
+        if (!fs::exists(to, mv)) fs::rename(it->path(), to, mv);
+        break;
     }
+    ec.clear();
     for (int i = 0; i < int(LibraryTab::Count); ++i) {
         const char* sub = libraryTabFolder(LibraryTab(i));
         if (!*sub) continue;

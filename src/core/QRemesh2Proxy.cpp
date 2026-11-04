@@ -8,9 +8,9 @@
 //     density stays even), collapsed vertices settling at the middle of the edge and back onto the sculpt.
 //  2. Isotropic remeshing (after Botsch & Kobbelt, "A remeshing approach to multiresolution modeling", 2004):
 //     split long edges, collapse short ones, flip edges towards valence 6, smooth tangentially and project onto
-//     the sculpt, towards a per-vertex target length (smaller where Adaptive Size or polypaint want small quads).
+//     the sculpt, towards a per-vertex target length (smaller where Adaptive Size or vertex paint want small quads).
 //
-// Feature lines (open edges, polygroup borders with Keep Groups, hard edges with Detect Edges) are kept: their
+// Feature lines (open edges, face group borders with Keep Groups, hard edges with Detect Edges) are kept: their
 // vertices only collapse along the line, slide along it when smoothed and project onto the source's line; where
 // lines meet or turn sharply the vertex is pinned.
 #include "core/QRemesh2.h"

@@ -35,7 +35,7 @@ void parallelJobs(size_t n, const std::function<void(size_t)>& fn);
 // --- Proxy surface ----------------------------------------------------------------------------------------------
 
 // The triangle mesh the field and the map are solved on: about three triangle edges per quad edge, even triangles,
-// feature lines (open edges, polygroup borders, hard edges) kept as edge chains on their exact place.
+// feature lines (open edges, face group borders, hard edges) kept as edge chains on their exact place.
 struct Proxy {
     std::vector<vec3> P;
     std::vector<glm::uvec3> T;
@@ -46,7 +46,7 @@ struct Proxy {
     std::vector<uint8_t> guide;    // per corner: ... because a QRemesh Guide runs along it (empty: none)
     std::vector<float> size;       // per vertex: wanted quad edge length
     std::vector<float> fieldSize;  // per vertex: the (relative) size the cross field turns with; empty = none
-    std::vector<vec3> color;       // per vertex polypaint (usePolypaint only)
+    std::vector<vec3> color;       // per vertex vertex paint (useVertex paint only)
     std::vector<vec3> fixedDir;    // per triangle: direction the field is fixed to (a guide's tangent), 0 = from its edges
 
     size_t triangles() const { return T.size(); }

@@ -190,7 +190,7 @@ void App::generateFaceShapesUi() {
     Args args;
     if (faceLandmarks_.count() >= 3) args["landmarks"] = faceLandmarks_.toJson().dump();
     args["symmetry"] = std::string(faceSymmetry_ == 1 ? "on" : faceSymmetry_ == 2 ? "off" : "auto");
-    args["subtools"] = faceSubtools_;
+    args["parts"] = faceParts_;
     facePlacing_ = false;
     runCommand("face_shapes_generate", args);
 }
@@ -290,7 +290,7 @@ void App::drawFaceContents() {
                  "Auto: Left and Right shapes are made exact mirror images when the sculpt is symmetric about X = 0. "
                  "On: always (asymmetric spots take the average). Off: each side as fitted.",
                  kFacePath);
-    ImGui::Checkbox("Parts too##face", &faceSubtools_);
+    ImGui::Checkbox("Parts too##face", &faceParts_);
     ui::HelpText("Parts too", nullptr,
                  "Eyes (Parts named Eye...) turn for the eyeLook shapes, Teeth / Tongue follow the jaw below the "
                  "bite (and tongueOut), and other Parts on the face (brows, lashes, a beard) follow the skin.",

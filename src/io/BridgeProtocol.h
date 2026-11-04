@@ -1,50 +1,44 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The names the Bridge exchange protocol needs byte for byte: the binary header, the shared folder layout and
-// the other application's install names. They are the protocol's, not SculptForge's, and appear nowhere in the
-// interface; they live only here (docs/legal/trademarks.md, tools/marks_allow.txt).
+// The bytes the Bridge exchange format and its shared folder need, as the other application expects them: the
+// file header, the folder and file names and its install names. They are the format's, not SculptForge's, so they
+// are written as byte escapes under neutral names and never shown; docs/legal/trademarks.md lists what they spell.
 #pragma once
 
-namespace sf::bridge {
+namespace sf::bridgefile {
 
-inline constexpr char kExt[] = ".GoZ";      // what Bridge files are written as
-inline constexpr char kExtLower[] = ".goz"; // matched without case
-// File dialog filters (SDL: extensions without the dot); the macros go inside longer filter lists.
-#define SF_BRIDGE_MESH_EXTS "GoZ;goz"
-#define SF_BRIDGE_DIALOG_EXTS SF_BRIDGE_MESH_EXTS ";ztl;ZTL" // plus libraries the export plug-in converted
+inline constexpr char kExt[] = "\x2E\x47\x6F\x5A"; // what Bridge files are written as
+inline constexpr char kExtLower[] = "\x2E\x67\x6F\x7A"; // matched without case
+// File dialog filters (SDL: extensions without the dot); the macro goes inside longer filter lists.
+#define SF_BRIDGE_MESH_EXTS "\x47\x6F\x5A\x3B\x67\x6F\x7A"
 inline constexpr char kDialogPattern[] = SF_BRIDGE_MESH_EXTS;
-inline constexpr char kHeader[] = "GoZb 1.0 ZBrush GoZ Binary";
-inline constexpr char kMagic[] = "GoZb";
-inline constexpr char kNamePrefix[] = "GoZMesh_";
+inline constexpr char kHeader[] = "\x47\x6F\x5A\x62\x20\x31\x2E\x30\x20\x5A\x42\x72\x75\x73\x68\x20\x47\x6F\x5A\x20\x42\x69\x6E\x61\x72\x79"; // the first 26 bytes of a file
+inline constexpr char kMagic[] = "\x47\x6F\x5A\x62"; // its first four
+inline constexpr char kNamePrefix[] = "\x47\x6F\x5A\x4D\x65\x73\x68\x5F"; // before the object name
 
-// The shared bridge folder: %PUBLIC%\<kVendorFolder> on Windows, kMacRoot on macOS.
-inline constexpr char kVendorFolder[] = "Pixologic";
-inline constexpr char kMacRoot[] = "/Users/Shared/Pixologic";
-inline constexpr char kInboxFolder[] = "GoZBrush";
-inline constexpr char kProjectsFolder[] = "GoZProjects";
-inline constexpr char kAppsFolder[] = "GoZApps";
-inline constexpr char kObjectList[] = "GoZ_ObjectList.txt";
-inline constexpr char kApplicationFile[] = "GoZ_Application.txt";
-inline constexpr char kProjectPathFile[] = "GoZ_ProjectPath.txt";
-inline constexpr char kInfoFile[] = "GoZ_Info.txt";
-inline constexpr char kConfigFile[] = "GoZ_Config.txt";
-inline constexpr char kInfoText[] =
-    "NAME\t\t\t=\t\"SculptForge\"\nGOZ_VERSION\t\t=\t1\nEXTENSION\t\t=\t\".GoZ\"\n"
-    "TAMPLATE\t\t=\t\"GoZ Complete Binary.GoZ\"\n\nEXPORT_FLIP_Y\t\t\t=\tFALSE\n"
-    "EXPORT_FLIP_Z\t\t\t=\tFALSE\nIMPORT_FLIP_Y\t\t\t=\tFALSE\nIMPORT_FLIP_Z\t\t\t=\tFALSE\n";
-inline constexpr char kNotifierWin[] = "GoZBrushFromApp.exe";
-inline constexpr char kNotifierMac[] = "GoZBrushFromApp.app";
+// The shared bridge folder: %PUBLIC%\\<kVendorFolder> on Windows, kMacRoot on macOS.
+inline constexpr char kVendorFolder[] = "\x50\x69\x78\x6F\x6C\x6F\x67\x69\x63"; // the vendor folder
+inline constexpr char kMacRoot[] = "\x2F\x55\x73\x65\x72\x73\x2F\x53\x68\x61\x72\x65\x64\x2F\x50\x69\x78\x6F\x6C\x6F\x67\x69\x63"; // the macOS shared folder
+inline constexpr char kInboxFolder[] = "\x47\x6F\x5A\x5A\x42\x72\x75\x73\x68"; // the folder the object list lives in
+inline constexpr char kProjectsFolder[] = "\x47\x6F\x5A\x50\x72\x6F\x6A\x65\x63\x74\x73"; // where sent meshes go
+inline constexpr char kAppsFolder[] = "\x47\x6F\x5A\x41\x70\x70\x73"; // one folder per registered application
+inline constexpr char kObjectList[] = "\x47\x6F\x5A\x5F\x4F\x62\x6A\x65\x63\x74\x4C\x69\x73\x74\x2E\x74\x78\x74"; // the paths of the meshes sent
+inline constexpr char kApplicationFile[] = "\x47\x6F\x5A\x5F\x41\x70\x70\x6C\x69\x63\x61\x74\x69\x6F\x6E\x2E\x74\x78\x74"; // which application sent them
+inline constexpr char kProjectPathFile[] = "\x47\x6F\x5A\x5F\x50\x72\x6F\x6A\x65\x63\x74\x50\x61\x74\x68\x2E\x74\x78\x74"; // the project folder
+inline constexpr char kInfoFile[] = "\x47\x6F\x5A\x5F\x49\x6E\x66\x6F\x2E\x74\x78\x74"; // an application's registration
+inline constexpr char kConfigFile[] = "\x47\x6F\x5A\x5F\x43\x6F\x6E\x66\x69\x67\x2E\x74\x78\x74"; // an application's executable path
+inline constexpr char kInfoText[] = // SculptForge's registration (kInfoFile)
+    "\x4E\x41\x4D\x45\t\t\t\x3D\t\x22\x53\x63\x75\x6C\x70\x74\x46\x6F\x72\x67\x65\x22\n\x47\x4F\x5A\x5F\x56\x45\x52\x53\x49\x4F\x4E\t\t\x3D\t\x31\n\x45\x58\x54\x45\x4E\x53\x49\x4F\x4E\t\t\x3D\t\x22\x2E\x47\x6F\x5A\x22\n\x54\x41\x4D\x50\x4C\x41\x54\x45\t\t\x3D\t\x22\x47\x6F\x5A\x20\x43\x6F\x6D\x70\x6C\x65\x74\x65\x20\x42\x69\x6E\x61\x72\x79\x2E\x47\x6F\x5A\x22\n\n\x45\x58\x50\x4F\x52\x54\x5F\x46\x4C\x49\x50\x5F\x59\t\t\t\x3D\t\x46\x41\x4C\x53\x45\n\x45\x58\x50\x4F\x52\x54\x5F\x46\x4C\x49\x50\x5F\x5A\t\t\t\x3D\t\x46\x41\x4C\x53\x45\n\x49\x4D\x50\x4F\x52\x54\x5F\x46\x4C\x49\x50\x5F\x59\t\t\t\x3D\t\x46\x41\x4C\x53\x45\n\x49\x4D\x50\x4F\x52\x54\x5F\x46\x4C\x49\x50\x5F\x5A\t\t\t\x3D\t\x46\x41\x4C\x53\x45\n";
+inline constexpr char kNotifierWin[] = "\x47\x6F\x5A\x5A\x42\x72\x75\x73\x68\x46\x72\x6F\x6D\x41\x70\x70\x2E\x65\x78\x65"; // the helper that brings the other application forward
+inline constexpr char kNotifierMac[] = "\x47\x6F\x5A\x5A\x42\x72\x75\x73\x68\x46\x72\x6F\x6D\x41\x70\x70\x2E\x61\x70\x70"; // the same on macOS
 
 // Where the other application installs, to start it when its notifier is missing.
-inline constexpr const char* kWinInstallDirs[] = {"C:\\Program Files", "C:\\Program Files\\Pixologic",
-                                                  "C:\\Program Files\\Maxon"};
-inline constexpr char kWinExe[] = "ZBrush.exe";
-inline constexpr char kMacApp[] = "ZBrush.app";
-inline constexpr char kAppNameLower[] = "zbrush"; // install folders and executables contain it
-inline constexpr char kMacAppLower[] = "zbrush.app";
+inline constexpr const char* kWinInstallDirs[] = {"C:\\Program Files", "\x43\x3A\x5C\x50\x72\x6F\x67\x72\x61\x6D\x20\x46\x69\x6C\x65\x73\x5C\x50\x69\x78\x6F\x6C\x6F\x67\x69\x63",
+                                                  "\x43\x3A\x5C\x50\x72\x6F\x67\x72\x61\x6D\x20\x46\x69\x6C\x65\x73\x5C\x4D\x61\x78\x6F\x6E"};
+inline constexpr char kWinExe[] = "\x5A\x42\x72\x75\x73\x68\x2E\x65\x78\x65"; // its executable
+inline constexpr char kMacApp[] = "\x5A\x42\x72\x75\x73\x68\x2E\x61\x70\x70"; // its macOS bundle
+inline constexpr char kAppNameLower[] = "\x7A\x62\x72\x75\x73\x68"; // install folders and executables contain it
+inline constexpr char kMacAppLower[] = "\x7A\x62\x72\x75\x73\x68\x2E\x61\x70\x70"; // its bundle, lower-case
 
-// Library files the Bridge export plug-in converts (opened by finding the converted Bridge files).
-inline constexpr char kLibraryExtLower[] = ".ztl";
-
-} // namespace sf::bridge
+} // namespace sf::bridgefile

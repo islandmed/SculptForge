@@ -1,10 +1,10 @@
 # The v0.5 features together, as a game artist chains them: sculpt a high-poly, QRemesh a copy, divide it and
 # project the detail back (ProjectAll), Auto UV the base, bake a normal map from the high-poly, and pose the
 # retopologised mesh with the gizmo at a low subdivision level.
-run new_sphere subdivisions=6 ; subtool_rename to=High
+run new_sphere subdivisions=6 ; part_rename to=High
 run stroke brush=Clay points="-0.5,0.2,2 0.5,0.25,2" radius=0.2 strength=1
 run stroke brush=Crease points="-0.55,-0.35,2 0.55,-0.4,2" radius=0.12 strength=1
-run subtool_duplicate ; subtool_rename to=Low
+run part_duplicate ; part_rename to=Low
 
 # Retopology: a light, mostly-quad mesh.
 run qremesh target=1500
@@ -17,10 +17,10 @@ expect_value quad_percent > 80
 run subdiv_divide ; subdiv_divide
 expect_value sdiv == 3
 expect_value sdiv_levels == 3
-run subtool_visibility name=High visible=true
+run part_visibility name=High visible=true
 run project_all distance=0.1
 wait_idle 120
-run subtool_visibility name=High visible=false
+run part_visibility name=High visible=false
 shot projected
 
 # Pose at the base level: the detail rides along when stepping back up.

@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The ZBrush-style shell's layout math (docs/ui-design.md §2): where the canvas,
+// The classic shell's layout math (docs/ui-design.md §2): where the canvas,
 // shelves and trays go for the standard layout, hidden shelves, narrow and
 // wide windows, and the left-handed mirror; plus the layout JSON round trip.
 #include "TestHarness.h"

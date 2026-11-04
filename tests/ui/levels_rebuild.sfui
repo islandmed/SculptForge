@@ -1,10 +1,10 @@
 # Subdivision levels and the tools that rebuild the mesh (Decimate, Subdivide, Remesh, QRemesh, Delete Hidden,
-# merging and splitting SubTools): they work on the current level, the status line says the levels were removed
-# and which one became the base, and Ctrl+Z brings every level back. Selecting another SubTool and coming back
+# merging and splitting Parts): they work on the current level, the status line says the levels were removed
+# and which one became the base, and Ctrl+Z brings every level back. Selecting another Part and coming back
 # still steps between the levels.
 run new_sphere subdivisions=1
-run subtool_append type=cube name=Box
-run subtool_delete index=0
+run part_append type=cube name=Box
+run part_delete index=0
 orbit 140 -70
 key f
 click "Geometry##tool.geometry"
@@ -47,10 +47,10 @@ key ctrl+z
 expect_value sdiv_levels == 3
 expect_value sdiv == 2
 
-# Another SubTool and back: the levels step as before (the cached levels of the SubTool left are freed).
-run subtool_append type=sphere name=Eye
+# Another Part and back: the levels step as before (the cached levels of the Part left are freed).
+run part_append type=sphere name=Eye
 expect_value sdiv_levels == 0
-run subtool_select name=Box
+run part_select name=Box
 expect_value sdiv == 2
 key d
 expect_value sdiv == 3

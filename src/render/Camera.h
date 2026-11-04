@@ -10,7 +10,7 @@
 namespace sf {
 
 // Orbit camera around a target. Turntable orbiting keeps the world upright (yaw / pitch); free orbiting
-// (ZBrush) turns about the screen's axes and can roll over the top, which shows up as roll.
+// turns about the screen's axes and can roll over the top, which shows up as roll.
 class Camera {
 public:
     glm::vec3 target{0.0f};
@@ -29,9 +29,9 @@ public:
     glm::mat4 projection() const;
 
     void orbit(float dxPixels, float dyPixels);     // turntable
-    void orbitFree(float dxPixels, float dyPixels); // trackball about the screen axes (ZBrush)
+    void orbitFree(float dxPixels, float dyPixels); // trackball about the screen axes
     void setOrientation(const glm::quat& q);        // as yaw / pitch / roll
-    // The nearest of the 24 views looking along a world axis with another world axis up (ZBrush's
+    // The nearest of the 24 views looking along a world axis with another world axis up (the classic
     // Shift while rotating).
     static glm::quat snapped(const glm::quat& q);
     void pan(float dxPixels, float dyPixels, float viewportHeight);

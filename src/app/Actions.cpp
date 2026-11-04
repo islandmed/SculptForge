@@ -27,14 +27,12 @@ std::string trim(std::string_view s) {
     return std::string(s.substr(a, b - a));
 }
 
-// "subtool_append" -> "Part append": the command's words, with the interface's names for what they name.
+// "part_append" -> "Part append": the command's words, with the interface's names for what they name.
 std::string humanize(const std::string& name) {
     static const std::pair<std::string_view, std::string_view> kWords[] = {
-        {"subtool", "part"},           {"subtools", "parts"},       {"zsphere", "forge sphere"},
-        {"zspheres", "forge spheres"}, {"polygroup", "face group"}, {"polygroups", "face groups"},
-        {"polypaint", "vertex paint"}, {"qremesh", "quad remesh"},  {"matcap", "lit sphere"},
-        {"matcaps", "lit spheres"},    {"lightbox", "library"},     {"goz", "zbrush"},
-        {"quicksave", "snapshot"}};
+        {"forgesphere", "forge sphere"}, {"forgespheres", "forge spheres"}, {"facegroup", "face group"},
+        {"facegroups", "face groups"},   {"vertexpaint", "vertex paint"},   {"qremesh", "quad remesh"},
+        {"litsphere", "lit sphere"},     {"litspheres", "lit spheres"},     {"quicksave", "snapshot"}};
     std::string out;
     size_t start = 0;
     while (start <= name.size()) {
@@ -222,7 +220,7 @@ void ActionRegistry::removePrefix(std::string_view prefix) {
 const Action* ActionRegistry::find(std::string_view id) const {
     for (const auto& a : actions_)
         if (a.id == id) return &a;
-    if (const std::string_view now = legacy::renamed(legacy::kActionIds, id); !now.empty()) return find(now);
+    if (legacy::isOld(id)) return find(legacy::modernize(id)); // an id an older version saved
     return nullptr;
 }
 
@@ -337,8 +335,7 @@ void ActionRegistry::overridesFromJson(const Json& j) {
     if (!j.isObject()) return;
     for (const auto& [id, chord] : j.members())
         if (chord.isString()) {
-            const std::string_view now = legacy::renamed(legacy::kActionIds, id);
-            overrides_.emplace_back(now.empty() ? id : std::string(now), chord.asString());
+            overrides_.emplace_back(legacy::modernize(id), chord.asString());
         }
 }
 

@@ -4,7 +4,7 @@
 // Commands for texture painting (core/Texture.h) and automatic UVs (core/AutoUv.h), plus the texture side
 // of the paint_layer_* commands.
 #include "core/AutoUv.h"
-#include "core/Polypaint.h"
+#include "core/VertexPaint.h"
 #include "core/Texture.h"
 #include "core/TextureTransfer.h"
 #include "core/Undo.h"
@@ -49,7 +49,7 @@ std::string blendList() {
 
 std::string layerName(const PaintTexture& t, int i) { return i < 0 ? std::string("Base") : t.layers[size_t(i)].name; }
 
-// The layer named by "layer" or "index" (as the polypaint commands), the active one by default; -2 + error if none.
+// The layer named by "layer" or "index" (as the vertex paint commands), the active one by default; -2 + error if none.
 int layerArg(const PaintTexture& t, const Args& a, std::string& error) {
     if (a.contains("layer")) {
         const std::string name = argString(a, "layer");
@@ -228,7 +228,7 @@ void registerTextureCommands(CommandRegistry& reg) {
              "comes from the texture, not the mesh). The Paint brush, fills and paint layers then work on the texture. "
              "Needs UVs (uv_auto makes them). Replaces an existing texture (undoable).",
              {{"size", T::String, "1024, 2048 (default), 4096 or 8192 (or 1k, 2k, 4k, 8k).", false},
-              {"from_polypaint", T::Bool, "Start from the Part's vertex paint instead of white. Default false.", false}},
+              {"from_vertexpaint", T::Bool, "Start from the Part's vertex paint instead of white. Default false.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  Mesh& m = doc.mesh;
                  if (m.triangleCount() == 0) return {false, "There is no mesh to paint"};
@@ -240,7 +240,7 @@ void registerTextureCommands(CommandRegistry& reg) {
                  UndoRecord r = captureTexture(m, "New Texture");
                  m.texture = makeTexture(size, size);
                  m.paintToTexture = true;
-                 if (argBool(a, "from_polypaint", false) && m.hasColors()) polypaintToTexture(m);
+                 if (argBool(a, "from_vertexpaint", false) && m.hasColors()) vertexpaintToTexture(m);
                  m.facesDirty = true;
                  finishTextureUndo(r, m);
                  doc.undo.push(std::move(r));
@@ -266,7 +266,7 @@ void registerTextureCommands(CommandRegistry& reg) {
              {{"target", T::String, "vertex or texture.", true}},
              [](Document& doc, const Args& a) -> CommandResult {
                  const std::string t = argString(a, "target");
-                 if (t == "vertex" || t == "vertices" || t == "polypaint") {
+                 if (t == "vertex" || t == "vertices" || t == "vertexpaint") {
                      doc.mesh.paintToTexture = false;
                      return {true, "Painting goes into the vertices (vertex paint)"};
                  }
@@ -277,7 +277,7 @@ void registerTextureCommands(CommandRegistry& reg) {
                  return {true, "Painting goes into the " + sizeLabel(*doc.mesh.texture) + " texture"};
              }});
 
-    reg.add({"texture_from_polypaint",
+    reg.add({"texture_from_vertexpaint",
              "Bake the Part's vertex paint (vertex colours, all paint layers composited) into the active texture layer "
              "(undoable). Creates a 2K texture when there is none.",
              {{"size", T::String, "Size for a new texture: 1024, 2048, 4096 or 8192. Default 2048.", false}},
@@ -293,13 +293,13 @@ void registerTextureCommands(CommandRegistry& reg) {
                      m.facesDirty = true;
                  }
                  m.paintToTexture = true;
-                 polypaintToTexture(m);
+                 vertexpaintToTexture(m);
                  finishTextureUndo(r, m);
                  doc.undo.push(std::move(r));
                  return {true, "Vertex Paint baked into the " + sizeLabel(*m.texture) + " texture"};
              }});
 
-    reg.add({"polypaint_from_texture",
+    reg.add({"vertexpaint_from_texture",
              "Set the vertex paint (the active paint layer) of every vertex to the texture's colour under it (undoable). "
              "Detail finer than the mesh is lost; vertices on UV seams average their sides.",
              {},
@@ -315,7 +315,7 @@ void registerTextureCommands(CommandRegistry& reg) {
                      r.label = "Texture to Vertex Paint";
                      r.mesh = std::make_unique<Mesh>(m);
                  }
-                 textureToPolypaint(m);
+                 textureToVertexPaint(m);
                  doc.undo.push(std::move(r));
                  doc.modified = true;
                  return {true, "Texture copied into the vertex paint of " + std::to_string(m.vertexCount()) + " vertices"};

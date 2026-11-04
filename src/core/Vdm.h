@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Vector displacement maps (ZBrush VDM brushes, Blender's "VDM brushes"): a square grid of 3D offsets in the
+// Vector displacement maps (VDM brushes, Blender's "VDM brushes"): a square grid of 3D offsets in the
 // brush's tangent frame. One dab of the VDM brush (BrushType::Vdm) moves every vertex under the stamp by its
 // texel's vector, so a single click can press a horn, an ear curl or a nostril with overhangs, which a height
 // (grayscale alpha) can't.
@@ -88,7 +88,7 @@ VectorDisplacement makeWrinkleVdm(int size = 256);
 VectorDisplacement makeCrackVdm(int size = 256);
 VectorDisplacement makeRockLedgeVdm(int size = 256);
 
-// --- Create VDM from a plane (ZBrush: Brush > Create > from the VDM plane; Blender: VDM Brush Baker) ---
+// --- Create VDM from a plane (Brush > Create > from the VDM plane; Blender: VDM Brush Baker) ---
 
 // A flat 2 x 2 grid in the XZ plane facing +Y (the top view), `cells` quads a side, with UVs (they record
 // where each vertex started, so its offset can be captured after sculpting) and the outer ring masked.

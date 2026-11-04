@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Make sculptable (Splats palette): one click from a Gaussian-splat capture to a clean, sculptable,
-// animation-ready SubTool with the capture's colours.
+// animation-ready Part with the capture's colours.
 //
 //  1. Surface. Every Gaussian adds its opacity-weighted density to a voxel grid (in parallel, in z slabs, so
 //     the sum is the same with any number of threads). Cells over the density threshold are the shell; gaps
@@ -16,7 +16,7 @@
 //     found on a depth + colour image of the scan seen from the front, and turned into QRemesh Guides: rings
 //     round the eyes and the mouth, the nasolabial lines, mirrored across the face so the loops are symmetric.
 //     The user can review and nudge the landmarks before remeshing (the app's Review guides step).
-//  3. Colour. Every vertex (polypaint) or texel (Auto UV + a texture) takes the colour of the splats on the
+//  3. Colour. Every vertex (vertex paint) or texel (Auto UV + a texture) takes the colour of the splats on the
 //     surface around it, weighted by opacity and distance, with splats behind the surface faded out.
 //     Optionally the quad mesh is divided into subdivision levels and the scan's detail projected onto the top
 //     level (as ProjectAll), so the user sculpts with levels.
@@ -98,7 +98,7 @@ private:
     std::vector<uint32_t> cellStart_;    // CSR: splats of cell c are [cellStart_[c], cellStart_[c + 1])
 };
 
-// Sets the polypaint of every vertex from the splats. Vertices with no splat near take their neighbours' colour;
+// Sets the vertex paint of every vertex from the splats. Vertices with no splat near take their neighbours' colour;
 // returns how many there were.
 size_t colorFromSplats(Mesh& mesh, const SplatColorSampler& sampler);
 // Bakes the splat colour into a size x size texture on the mesh's UVs (it must have UVs); painting then goes
@@ -128,7 +128,7 @@ struct FaceLandmarks {
     const glm::vec3& point(int i) const;
 };
 
-// Looks for a face on the mesh seen from `frame.front` (depth relief and, with polypaint, darkness of the
+// Looks for a face on the mesh seen from `frame.front` (depth relief and, with vertex paint, darkness of the
 // eyes and mouth). False with `why` set when nothing face-like is found.
 bool detectFaceLandmarks(const Mesh& mesh, const FaceFrame& frame, FaceLandmarks& out, std::string& why);
 // Makes the landmarks mirror images of each other across the face's middle (the plane through the nose tip
@@ -151,7 +151,7 @@ int sculptablePresetQuads(SculptablePreset preset);
 const char* sculptablePresetName(SculptablePreset preset); // game, film, sculpt
 bool parseSculptablePreset(const std::string& text, SculptablePreset& out);
 
-enum class SculptableColor { None, Polypaint, Texture };
+enum class SculptableColor { None, VertexPaint, Texture };
 
 struct SculptableOptions {
     SplatSurfaceOptions surface;
@@ -160,14 +160,14 @@ struct SculptableOptions {
     bool symmetry = true;       // QRemesh mirrors across the world axis nearest the face's right (auto plane)
     bool faceGuides = true;     // look for a face and add guides (when no guides are given)
     FaceFrame frame;
-    SculptableColor color = SculptableColor::Polypaint;
+    SculptableColor color = SculptableColor::VertexPaint;
     int textureSize = 2048;
     int levels = 0;             // subdivision levels on top of the quad mesh, the scan's detail projected onto them
     uint32_t seed = 1;
 };
 
 struct SculptableResult {
-    Mesh scan;                  // the watertight voxel surface, with the splat colours as polypaint
+    Mesh scan;                  // the watertight voxel surface, with the splat colours as vertex paint
     Mesh mesh;                  // the sculptable result (quads, levels, colour)
     FaceLandmarks landmarks;    // when a face was found (or given)
     std::vector<QRemeshGuide> guides;
@@ -179,7 +179,7 @@ struct SculptableResult {
     std::string report() const; // one status line
 };
 
-// Stage 1: the scan (surface + polypaint) and, with options.faceGuides, the landmarks and guides.
+// Stage 1: the scan (surface + vertex paint) and, with options.faceGuides, the landmarks and guides.
 bool makeSculptableScan(const SplatCloud& cloud, const SculptableOptions& options, SculptableResult& result,
                         std::string& error, const SculptableProgress& progress = {});
 // Stage 2: QRemesh `result.scan` along `result.guides`, then levels and colour, into `result.mesh`.
@@ -189,7 +189,7 @@ bool finishSculptable(const SplatCloud& cloud, const SculptableOptions& options,
 // --- Test subjects (no downloads) ---------------------------------------------------------------------------
 
 // A stylised head facing +Z (Y up), about 1.6 wide: nose, eye sockets with painted eyes, brows, lips, chin and
-// hair, as a coloured mesh (polypaint). `landmarks` (optional): where its face landmarks were designed.
+// hair, as a coloured mesh (vertex paint). `landmarks` (optional): where its face landmarks were designed.
 Mesh makeTestHead(int subdivisions = 6, FaceLandmarks* landmarks = nullptr);
 // A mug-like object with a thin handle (no cavity), coloured.
 Mesh makeTestObject(int resolution = 160);
@@ -201,18 +201,18 @@ struct TestCaptureOptions {
     bool openBottom = false; // no splats on the lowest 15% (a subject standing on a table)
     uint32_t seed = 7;
 };
-// The mesh as a capture-like splat cloud: flat surfels in its polypaint colours (display sRGB), plus the
+// The mesh as a capture-like splat cloud: flat surfels in its vertex paint colours (display sRGB), plus the
 // options' imperfections.
 SplatCloud makeTestCapture(const Mesh& mesh, const TestCaptureOptions& options);
 
-// Adds the result to the scene as SubTools named after the capture: "<name> Scan" (hidden; the source to
+// Adds the result to the scene as Parts named after the capture: "<name> Scan" (hidden; the source to
 // ProjectAll from again) when `keepScan`, then "<name>" made active. An untouched starting sphere is hidden.
 // Returns the status message.
 std::string applySculptable(Document& doc, SculptableResult& result, bool keepScan);
 // Stage 1 into the scene: the scan as "<name> Scan", made active, with the face guides. Returns the status message
 // (with the landmarks as JSON when a face was found).
 std::string applySculptableScan(Document& doc, SculptableResult& result);
-// Stage 2 into the scene: the result next to the active scan SubTool `scanIndex` (hidden, or removed without
+// Stage 2 into the scene: the result next to the active scan Part `scanIndex` (hidden, or removed without
 // `keepScan`), named like it without " Scan", made active. Returns the status message.
 std::string applySculptableFinish(Document& doc, SculptableResult& result, int scanIndex, bool keepScan);
 

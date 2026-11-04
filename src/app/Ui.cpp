@@ -150,10 +150,10 @@ bool IsModeAction(std::string_view id) {
 }
 
 bool IsChoiceAction(std::string_view id) {
-    return id == "draw.zadd" || id == "draw.zsub" || id == "material.smooth" || id == "material.flat" ||
+    return id == "draw.raise" || id == "draw.lower" || id == "material.smooth" || id == "material.flat" ||
            id == "view.background_gradient" || id == "view.background_flat" || id == "view.shading_lit_sphere" ||
            id == "view.shading_pbr" ||
-           id.substr(0, 16) == "subtool.shading_" || id.substr(0, 8) == "uv.mode_";
+           id.rfind("part.shading_", 0) == 0 || id.substr(0, 8) == "uv.mode_";
 }
 
 void CentredGlyph(ImDrawList* dl, ImFont* font, ImVec2 a, ImVec2 b, ImU32 col, const char* glyph) {
@@ -516,7 +516,7 @@ bool ActionButton(App& app, const char* actionId, ImVec2 size, Look look) {
     if (look == Look::Icon && size.x <= 0.0f) size = ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight());
     if (look == Look::Tile && size.x <= 0.0f) size = ImVec2(44.0f * s, 40.0f * s);
 
-    // On: the accent fill for the current mode, a raised grey for the chosen side of a choice (Zadd | Zsub), a
+    // On: the accent fill for the current mode, a raised grey for the chosen side of a choice (Raise | Lower), a
     // raised grey with an accent underline for an option.
     const bool mode = IsModeAction(id), choice = IsChoiceAction(id);
     const std::string itemLabel = label + "##" + id;
@@ -614,7 +614,7 @@ bool ActionButton(App& app, const char* actionId, ImVec2 size, Look look) {
     }
     if (!clicked) return false;
     if (CtrlHeld() && AltHeld()) {
-        // Ctrl+Alt+click: customize mode drags instead; otherwise it assigns a shortcut (ZBrush).
+        // Ctrl+Alt+click: customize mode drags instead; otherwise it assigns a shortcut.
         if (!customize) app.beginShortcutCapture(id);
         return false;
     }
@@ -640,7 +640,7 @@ bool SliderInside(const char* id, float* v, float lo, float hi, const char* form
     ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
     ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(1, 1, 1, 0.04f));
     ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(1, 1, 1, 0.06f));
-    // No grab over the label: the position shows as the fill and a thin accent bar along the bottom (ZBrush).
+    // No grab over the label: the position shows as the fill and a thin accent bar along the bottom.
     ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0, 0, 0, 0));
     ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0, 0, 0, 0));
     const bool changed = ImGui::SliderFloat(id, v, lo, hi, format ? tr(format) : format, flags);

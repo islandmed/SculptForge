@@ -208,7 +208,7 @@ TEST(qremesh2_hard_edges_and_groups) {
     CommandRegistry reg;
     Document doc;
     doc.setMesh(makeCube(24));
-    CHECK(reg.execute(doc, "polygroup_auto_by_normals", {{"angle", 40.0}}).ok);
+    CHECK(reg.execute(doc, "facegroup_auto_by_normals", {{"angle", 40.0}}).ok);
     QRemeshOptions o;
     o.targetQuads = 1200;
     o.keepGroups = true;
@@ -217,8 +217,8 @@ TEST(qremesh2_hard_edges_and_groups) {
     std::string err;
     QRemeshStats st;
     CHECK(qremesh(doc.mesh, o, out, err, {}, &st));
-    CHECK(out.hasPolygroups());
-    for (size_t t = 0; t + 1 < out.triangleCount(); t += 2) CHECK(out.polygroups[t] == out.polygroups[t + 1]);
+    CHECK(out.hasFaceGroups());
+    for (size_t t = 0; t + 1 < out.triangleCount(); t += 2) CHECK(out.facegroups[t] == out.facegroups[t + 1]);
     CHECK(st.quality.poles == 8); // a cube: one valence-3 pole per corner
 }
 
@@ -233,7 +233,7 @@ TEST(qremesh2_command_method_and_report) {
     CHECK(reg.execute(doc, "undo", {}).ok);
     r = reg.execute(doc, "qremesh", {{"target", 800.0}, {"method", std::string("legacy")}});
     CHECK(r.ok && r.message.find("legacy method") != std::string::npos);
-    CHECK(!reg.execute(doc, "qremesh", {{"method", std::string("zremesher")}}).ok);
+    CHECK(!reg.execute(doc, "qremesh", {{"method", std::string("unknown")}}).ok);
     r = reg.execute(doc, "qremesh", {{"target", 500.0}, {"quality", false}});
     CHECK(r.ok && r.message.find("Quality") == std::string::npos);
 }
@@ -256,7 +256,7 @@ TEST(qremesh2_benchmark) {
     }
     {
         Document doc;
-        if (reg.execute(doc, "new_head", {}).ok) models.push_back({"head", doc.subtoolMesh(0), 0});
+        if (reg.execute(doc, "new_head", {}).ok) models.push_back({"head", doc.partMesh(0), 0});
     }
     models.push_back({"creature", creature(), 0});
     models.push_back({"hardsurface", hardSurface(), -1});

@@ -4,8 +4,8 @@
 #   python3 tests/blender/test_exchange.py [--cli path/to/sculptforge-cli]
 #
 # With --cli, meshes written the way the add-on writes them go through SculptForge (blender_receive, then
-# blender_send) and must come back identical: positions, faces and their winding, UVs, polypaint, mask and
-# polygroups, for objects with a rotation, a scale, a negative scale (mirrored) and n-gons. CMake runs this
+# blender_send) and must come back identical: positions, faces and their winding, UVs, vertex paint, mask and
+# face groups, for objects with a rotation, a scale, a negative scale (mirrored) and n-gons. CMake runs this
 # when it finds Python 3 with numpy (ctest -R blender_exchange).
 import argparse
 import os
@@ -93,9 +93,9 @@ def object_arrays(mesh, mirrored, seed):
     loop_uv = rng.random((len(loop_vert), 2)).astype(np.float32).astype(np.float64)
     colors = rng.integers(0, 256, (len(co), 3)) / 255.0
     mask = rng.integers(0, 65536, len(co)) / 65535.0
-    polygroups = rng.integers(0, 5, len(starts))
+    facegroups = rng.integers(0, 5, len(starts))
     return {"positions": co, "faces": faces, "uvs": loop_uv[np.maximum(loops, 0)], "colors": colors,
-            "mask": mask, "groups": polygroups[face_poly]}, loops
+            "mask": mask, "groups": facegroups[face_poly]}, loops
 
 
 # ---------------------------------------------------------------------------- unit tests
@@ -130,35 +130,35 @@ def test_canonical_and_reverse():
           "corner_map finds each corner's vertex")
 
 
-def test_goz_round_trip(tmp):
+def test_bridge_round_trip(tmp):
     arrays, _ = object_arrays(grid_with_ngon(), False, 1)
-    path = os.path.join(tmp, "t.GoZ")
-    exchange.write_goz(path, "Grid Ünïcode.001", **arrays)
-    g = exchange.read_goz(path)
-    check(g.name == "Grid_n_code_001", "GoZ name escaped like GoB (got %r)" % g.name)
-    check(np.allclose(g.positions, arrays["positions"], atol=1e-6), "GoZ positions")
-    check(np.array_equal(g.faces, arrays["faces"]), "GoZ faces")
+    path = os.path.join(tmp, "t.Bridge")
+    exchange.write_bridge(path, "Grid Ünïcode.001", **arrays)
+    g = exchange.read_bridge(path)
+    check(g.name == "Grid_n_code_001", "Bridge name escaped like GoB (got %r)" % g.name)
+    check(np.allclose(g.positions, arrays["positions"], atol=1e-6), "Bridge positions")
+    check(np.array_equal(g.faces, arrays["faces"]), "Bridge faces")
     tri = arrays["faces"][:, 3] == N
-    check(np.allclose(g.uvs[~tri], arrays["uvs"][~tri]) and np.allclose(g.uvs[tri, :3], arrays["uvs"][tri, :3]), "GoZ UVs")
-    check(np.allclose(g.colors, arrays["colors"]), "GoZ polypaint")
-    check(np.allclose(g.mask, arrays["mask"], atol=1e-9), "GoZ mask")
-    check(np.array_equal(g.groups, arrays["groups"]), "GoZ polygroups")
+    check(np.allclose(g.uvs[~tri], arrays["uvs"][~tri]) and np.allclose(g.uvs[tri, :3], arrays["uvs"][tri, :3]), "Bridge UVs")
+    check(np.allclose(g.colors, arrays["colors"]), "Bridge vertexpaint")
+    check(np.allclose(g.mask, arrays["mask"], atol=1e-9), "Bridge mask")
+    check(np.array_equal(g.groups, arrays["groups"]), "Bridge facegroups")
     with open(path, "rb") as f:
         head = f.read(64)
-    check(head.startswith(exchange.HEADER), "GoZ header as GoB writes it")
+    check(head.startswith(exchange.HEADER), "Bridge header as GoB writes it")
 
 
 def test_manifest(tmp):
     folder = os.path.join(tmp, "m")
     check(exchange.revision(folder) == -1, "no manifest yet")
-    r1 = exchange.write_manifest(folder, [{"name": "A", "file": "r1_000.GoZ"}])
-    open(os.path.join(folder, "r1_000.GoZ"), "wb").close()
+    r1 = exchange.write_manifest(folder, [{"name": "A", "file": "r1_000.Bridge"}])
+    open(os.path.join(folder, "r1_000.Bridge"), "wb").close()
     check(exchange.next_file_prefix(folder) == "r2_", "next prefix")
-    open(os.path.join(folder, "r2_000.GoZ"), "wb").close()
-    r2 = exchange.write_manifest(folder, [{"name": "A", "file": "r2_000.GoZ"}])
+    open(os.path.join(folder, "r2_000.Bridge"), "wb").close()
+    r2 = exchange.write_manifest(folder, [{"name": "A", "file": "r2_000.Bridge"}])
     check((r1, r2) == (1, 2), "revisions count up")
-    check(not os.path.exists(os.path.join(folder, "r1_000.GoZ")), "old files removed")
-    check(os.path.exists(os.path.join(folder, "r2_000.GoZ")), "current files kept")
+    check(not os.path.exists(os.path.join(folder, "r1_000.Bridge")), "old files removed")
+    check(os.path.exists(os.path.join(folder, "r2_000.Bridge")), "current files kept")
     with open(exchange.manifest_path(folder), "w") as f:
         f.write('{"format": "sculptforge-bridge", "objects": [{"name": "x", "file": "../evil"}]}')
     try:
@@ -187,8 +187,8 @@ def test_round_trip_through_sculptforge(tmp, cli):
     for k, (name, mesh, m) in enumerate(objects):
         mirrored = np.linalg.det(m[:3, :3]) < 0
         arrays, _ = object_arrays(mesh, mirrored, k + 10)
-        file = "r1_%03d.GoZ" % k
-        exchange.write_goz(os.path.join(out, file), name, **arrays)
+        file = "r1_%03d.Bridge" % k
+        exchange.write_bridge(os.path.join(out, file), name, **arrays)
         entries.append({"name": name, "file": file, "matrix_world": m.tolist()})
         sent[name] = (mesh, m, arrays)
     exchange.write_manifest(out, entries, "test")
@@ -207,7 +207,7 @@ def test_round_trip_through_sculptforge(tmp, cli):
         if name not in sent:
             continue
         mesh, m, arrays = sent[name]
-        g = exchange.read_goz(os.path.join(exchange.inbox(root), entry["file"]))
+        g = exchange.read_bridge(os.path.join(exchange.inbox(root), entry["file"]))
         # What the add-on does on receive (update_object): into object space, and the faces compared with the
         # ones it sent (reversed for a mirrored object).
         local = exchange.transform_points(np.linalg.inv(m), g.positions)
@@ -240,9 +240,9 @@ def test_round_trip_through_sculptforge(tmp, cli):
         loop_uv_back = np.zeros_like(loop_uv_sent)
         loop_uv_back[loops[loops >= 0]] = back[loops >= 0]
         check(np.allclose(loop_uv_back, loop_uv_sent, atol=1e-6), "%s: UVs" % name)
-        check(g.colors is not None and np.allclose(g.colors, arrays["colors"]), "%s: polypaint" % name)
+        check(g.colors is not None and np.allclose(g.colors, arrays["colors"]), "%s: vertexpaint" % name)
         check(g.mask is not None and np.allclose(g.mask, arrays["mask"], atol=1e-9), "%s: mask" % name)
-        check(g.groups is not None and np.array_equal(g.groups, arrays["groups"]), "%s: polygroups" % name)
+        check(g.groups is not None and np.array_equal(g.groups, arrays["groups"]), "%s: facegroups" % name)
 
     # A second send from SculptForge: the next revision, the previous files gone.
     r = subprocess.run([cli, "-c", 'blender_receive folder="%s"; blender_send folder="%s"' % (root, root)],
@@ -253,7 +253,7 @@ def test_round_trip_through_sculptforge(tmp, cli):
 
 
 def test_shapes_through_sculptforge(tmp, cli):
-    """Sculpt layers (here the 52 ARKit facial shapes) travel as a shapes file beside the .GoZ, which holds the base
+    """Sculpt layers (here the 52 ARKit facial shapes) travel as a shapes file beside the Bridge, which holds the base
     shape: read_shapes gives the names in order and offsets in Blender's axes (jawOpen drops the chin: -Z)."""
     root = os.path.join(tmp, "shapes")
     r = subprocess.run([cli, "-c", 'new_head; face_shapes_generate; blender_send folder="%s"' % root],
@@ -267,9 +267,9 @@ def test_shapes_through_sculptforge(tmp, cli):
     check(len(head) == 1 and head[0].get("shapes"), "the Head object names its shapes file")
     if not head or not head[0].get("shapes"):
         return
-    g = exchange.read_goz(os.path.join(folder, head[0]["file"]))
+    g = exchange.read_bridge(os.path.join(folder, head[0]["file"]))
     nv, shapes = exchange.read_shapes(os.path.join(folder, head[0]["shapes"]))
-    check(nv == len(g.positions), "shapes file vertex count matches the .GoZ")
+    check(nv == len(g.positions), "shapes file vertex count matches the .Bridge")
     names = [s[0] for s in shapes]
     check(len(names) == 52 and names[0] == "browDownLeft" and names[-1] == "tongueOut" and "jawOpen" in names,
           "the 52 ARKit names, in order")
@@ -277,7 +277,7 @@ def test_shapes_through_sculptforge(tmp, cli):
     check(len(jaw[2]) > 100 and jaw[3][:, 2].min() < -0.01, "jawOpen moves the chin down (Blender -Z)")
     check(all(s[1] == 0.0 for s in shapes), "weights are sent (all 0 after generating)")
     eyes = [o for o in manifest["objects"] if o["name"] == "Eyes"]
-    check(len(eyes) == 1 and eyes[0].get("shapes"), "the Eyes SubTool has its eyeLook shapes too")
+    check(len(eyes) == 1 and eyes[0].get("shapes"), "the Eyes Part has its eyeLook shapes too")
 
 
 def main():
@@ -287,7 +287,7 @@ def main():
     with tempfile.TemporaryDirectory() as tmp:
         test_polygon_corners()
         test_canonical_and_reverse()
-        test_goz_round_trip(tmp)
+        test_bridge_round_trip(tmp)
         test_manifest(tmp)
         if args.cli:
             test_round_trip_through_sculptforge(tmp, args.cli)

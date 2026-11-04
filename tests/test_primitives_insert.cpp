@@ -102,37 +102,37 @@ TEST(insert_primitive_mirrors_with_symmetry) {
 namespace {
 size_t groupTriangles(const Mesh& m, uint32_t g) {
     size_t n = 0;
-    for (uint32_t t = 0; t < m.triangleCount(); ++t) n += m.polygroupAt(t) == g;
+    for (uint32_t t = 0; t < m.triangleCount(); ++t) n += m.facegroupAt(t) == g;
     return n;
 }
 uint32_t topGroup(const Mesh& m) {
     uint32_t g = 0;
-    for (uint32_t x : m.polygroups) g = std::max(g, x);
+    for (uint32_t x : m.facegroups) g = std::max(g, x);
     return g;
 }
 } // namespace
 
-TEST(insert_mesh_from_subtool) {
+TEST(insert_mesh_from_part) {
     Document doc;
     CommandRegistry reg;
     CHECK(reg.execute(doc, "new_sphere", {{"subdivisions", 3.0}}).ok);
-    // A tall, off-centre box SubTool to insert: it's centred and scaled so its largest side is `size`.
-    CHECK(reg.execute(doc, "subtool_append", {{"type", std::string("cube")}, {"name", std::string("Stud")}}).ok);
+    // A tall, off-centre box Part to insert: it's centred and scaled so its largest side is `size`.
+    CHECK(reg.execute(doc, "part_append", {{"type", std::string("cube")}, {"name", std::string("Stud")}}).ok);
     for (auto& p : doc.mesh.positions) p = glm::vec3(p.x, p.y * 4.0f, p.z) + glm::vec3(5.0f, 3.0f, 0.0f);
     const size_t studTris = doc.mesh.triangleCount();
-    CHECK(reg.execute(doc, "subtool_select", {{"index", 0.0}}).ok);
+    CHECK(reg.execute(doc, "part_select", {{"index", 0.0}}).ok);
     const size_t before = doc.mesh.triangleCount();
-    CommandResult r = reg.execute(doc, "insert_mesh", {{"subtool", std::string("Stud")}, {"x", 1.0}, {"y", 0.0}, {"z", 0.0},
+    CommandResult r = reg.execute(doc, "insert_mesh", {{"part", std::string("Stud")}, {"x", 1.0}, {"y", 0.0}, {"z", 0.0},
                                                         {"nx", 1.0}, {"ny", 0.0}, {"nz", 0.0}, {"size", 0.4}});
     CHECK(r.ok);
     CHECK(doc.mesh.triangleCount() == before + studTris);
-    CHECK(doc.subtoolCount() == 2); // the source SubTool stays
+    CHECK(doc.partCount() == 2); // the source Part stays
     // Its long (Y) axis lies along the normal (+X): it reaches 0.2 out from the surface point, 0.05 to the sides.
     const uint32_t g = topGroup(doc.mesh);
     CHECK(groupTriangles(doc.mesh, g) == studTris);
     AABB box;
     for (uint32_t t = 0; t < doc.mesh.triangleCount(); ++t)
-        if (doc.mesh.polygroupAt(t) == g)
+        if (doc.mesh.facegroupAt(t) == g)
             for (int k = 0; k < 3; ++k) box.expand(doc.mesh.positions[doc.mesh.triangles[t][k]]);
     CHECK(std::abs(box.max.x - 1.2f) < 0.01f);
     CHECK(std::abs(box.min.x - 0.8f) < 0.01f);
@@ -140,17 +140,17 @@ TEST(insert_mesh_from_subtool) {
     CHECK(reg.execute(doc, "undo", {}).ok);
     CHECK(doc.mesh.triangleCount() == before);
     // Symmetry makes a mirrored copy, as with the primitives.
-    CHECK(reg.execute(doc, "insert_mesh", {{"subtool", std::string("Stud")}, {"symmetry", std::string("x")}, {"x", 1.0},
+    CHECK(reg.execute(doc, "insert_mesh", {{"part", std::string("Stud")}, {"symmetry", std::string("x")}, {"x", 1.0},
                                            {"y", 0.0}, {"z", 0.0}, {"nx", 1.0}, {"ny", 0.0}, {"nz", 0.0}, {"size", 0.4}}).ok);
     CHECK(doc.mesh.triangleCount() == before + 2 * studTris);
     float minX = 0.0f;
     for (const auto& p : doc.mesh.positions) minX = std::min(minX, p.x);
     CHECK(minX < -1.1f);
-    // Errors: nothing named, both named, an unknown SubTool.
+    // Errors: nothing named, both named, an unknown Part.
     CHECK(!reg.execute(doc, "insert_mesh", {{"x", 0.0}, {"y", 0.0}, {"z", 0.0}}).ok);
-    CHECK(!reg.execute(doc, "insert_mesh", {{"subtool", std::string("Stud")}, {"file", std::string("a.obj")}, {"x", 0.0},
+    CHECK(!reg.execute(doc, "insert_mesh", {{"part", std::string("Stud")}, {"file", std::string("a.obj")}, {"x", 0.0},
                                             {"y", 0.0}, {"z", 0.0}}).ok);
-    CHECK(!reg.execute(doc, "insert_mesh", {{"subtool", std::string("Nope")}, {"x", 0.0}, {"y", 0.0}, {"z", 0.0}}).ok);
+    CHECK(!reg.execute(doc, "insert_mesh", {{"part", std::string("Nope")}, {"x", 0.0}, {"y", 0.0}, {"z", 0.0}}).ok);
 }
 
 TEST(insert_mesh_from_file) {

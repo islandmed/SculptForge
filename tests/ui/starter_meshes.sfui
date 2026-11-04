@@ -5,7 +5,7 @@ run new_plane resolution=8
 expect_value triangles == 128
 
 key ,
-expect_value lightbox_open == 1
+expect_value library_open == 1
 click "Library/Tool"
 expect "Library/Starter meshes"
 double_click "Library/Starter meshes"
@@ -18,7 +18,7 @@ shot starter-meshes
 
 double_click "Library/Human Head"
 expect_status New Human Head
-expect_value subtools == 1
+expect_value parts == 1
 expect_value vertices > 60000
 expect_value dirty == 0
 
@@ -26,7 +26,7 @@ expect_value dirty == 0
 hold shift
 double_click "Library/Eye"
 hold none
-expect_value subtools == 2
+expect_value parts == 2
 
 # ".." goes back to the Tool tab's root.
 double_click "Library/.."
@@ -35,4 +35,4 @@ expect "Library/Starter meshes"
 
 # The command scripts and the File menu use.
 run new_starter_mesh name=creature-head levels=0
-expect_value subtools == 4
+expect_value parts == 4

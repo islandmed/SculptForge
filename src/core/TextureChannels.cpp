@@ -4,7 +4,7 @@
 
 #include "core/Document.h"
 #include "core/Mesh.h"
-#include "core/Polypaint.h"
+#include "core/VertexPaint.h"
 #include "core/Texture.h"
 #include "core/ThreadPool.h"
 #include "core/Undo.h"

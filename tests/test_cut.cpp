@@ -90,7 +90,7 @@ TEST(cut_line_away_halves_sphere) {
     const double v1 = volume(d.mesh);
     CHECK(v1 > 0.4 * v0 && v1 < 0.5 * v0); // a bit under half: the line is right of centre
     // The cap is a face group of its own.
-    CHECK(d.mesh.hasPolygroups());
+    CHECK(d.mesh.hasFaceGroups());
     // Flip keeps the other half.
     Document e = makeDoc(makeIcosphere(4));
     CHECK(cut(e, "line", "0.013 -2 0.013 2", "away", {{"flip", true}}).ok);
@@ -206,9 +206,9 @@ TEST(cut_perspective_view_and_symmetry) {
 
 TEST(cut_two_part_scene_cuts_active_part_only) {
     Document d = makeDoc(makeIcosphere(4));
-    CHECK(registry().execute(d, "subtool_append", {{"type", std::string("sphere")}}).ok);
-    CHECK(d.subtools.size() == 2 && d.activeSubtool == 1);
-    const Mesh other = d.subtoolMesh(0);
+    CHECK(registry().execute(d, "part_append", {{"type", std::string("sphere")}}).ok);
+    CHECK(d.parts.size() == 2 && d.activePart == 1);
+    const Mesh other = d.partMesh(0);
     const double v0 = volume(d.mesh);
     const AABB b = d.mesh.bounds();
     // The default view frames the active Part: a line through its middle.
@@ -217,15 +217,15 @@ TEST(cut_two_part_scene_cuts_active_part_only) {
     CHECK(volume(d.mesh) < 0.6 * v0);
     for (const glm::vec3& p : d.mesh.positions) CHECK(p.x > b.center().x - 0.01f * b.extent().x);
     // The other Part is untouched.
-    CHECK(d.subtoolMesh(0).triangleCount() == other.triangleCount());
-    CHECK(d.subtoolMesh(0).positions == other.positions);
+    CHECK(d.partMesh(0).triangleCount() == other.triangleCount());
+    CHECK(d.partMesh(0).positions == other.positions);
     // Undo and redo.
     CHECK(registry().execute(d, "undo").ok);
     CHECK(std::abs(volume(d.mesh) - v0) < 1e-6);
     CHECK(registry().execute(d, "redo").ok);
     CHECK(volume(d.mesh) < 0.6 * v0);
     // Every mode on the other Part too.
-    CHECK(registry().execute(d, "subtool_select", {{"index", 0.0}}).ok);
+    CHECK(registry().execute(d, "part_select", {{"index", 0.0}}).ok);
     for (const char* mode : {"away", "in", "add"}) {
         const size_t before = d.undo.undoCount();
         CHECK(cut(d, "rect", "-0.31 -0.29 0.33 0.27", mode, {{"depth", 0.15}}).ok);

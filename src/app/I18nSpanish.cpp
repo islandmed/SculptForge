@@ -4,11 +4,11 @@
 // The Spanish interface (#44), written by hand for SculptForge. The English text
 // is the key (I18n.h); a label without an entry stays in English.
 //
-// Conventions, as Spanish-speaking ZBrush artists use them:
+// Conventions, as Spanish-speaking experienced sculptors use them:
 //   - Names of tools, brushes and products stay in English: Quad Remesh, Forge Spheres, Lit Sphere, Clay Block and every
 //     other brush, Smt, Rgb, Project All, Lazy Stroke, Mask Pen, VDM. Generic words are translated: Pieza (Part),
 //     Biblioteca (Library), Pintura de vértices (Vertex Paint), Grupos de caras (Face Groups).
-//   - Palettes and actions read as ZBrush's own Spanish: Pincel, Trazo, Herramienta, Dibujar, Tamaño de dibujo,
+//   - Palettes and actions read own Spanish: Pincel, Trazo, Herramienta, Dibujar, Tamaño de dibujo,
 //     Intensidad, Atenuación, Dividir, Enmascarado.
 //   - Short and imperative, "tú" (Elige, Guarda), sentence case like the English.
 //   - printf conversions (%d, %.1f, %s, %%) stay in the same order: tests check every entry.

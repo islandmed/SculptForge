@@ -76,7 +76,7 @@
 <strong>Right click</strong> a sphere (a click, not a drag: a right drag still turns the view) for a menu with <strong>Delete Sphere</strong>, <strong>Insert Between</strong> and <strong>Set as Root</strong>.
 </li>
 </ul>
-<p>Each is one undo step, and Symmetry mirrors Delete and Insert. From a script: <code>zsphere_set_root index=3</code>.</p>
+<p>Each is one undo step, and Symmetry mirrors Delete and Insert. From a script: <code>forgesphere_set_root index=3</code>.</p>
 <h2 id="preview-the-skin">Preview the skin<a class="anchor" href="#preview-the-skin" aria-label="Link to this section">#</a></h2>
 <p><strong>Preview</strong> (<kbd>A</kbd>) shows the skin over the spheres instead of the spheres themselves, so you can judge the volumes. The skin is a smooth union of the spheres and the cones between them, with the joints filled out a little. Turn Preview off to edit the spheres again; while it is on, clicks on the model do nothing.</p>
 <h2 id="make-mesh">Make Mesh<a class="anchor" href="#make-mesh" aria-label="Link to this section">#</a></h2>
@@ -95,11 +95,11 @@ Each link gets its own <a href="face-groups.html">face group</a>, so you can iso
 <p>The Forge Sphere Part is hidden and kept. To change the proportions later, show and select it, edit the spheres and Make Mesh again. The armature is saved with the project.</p>
 <aside class="callout callout-tip"><p><strong>Tip:</strong> for clean edge flow, run <a href="retopology.html">Quad Remesh</a> on the new mesh, then Divide and sculpt.</p></aside>
 <h2 id="scripting">Scripting<a class="anchor" href="#scripting" aria-label="Link to this section">#</a></h2>
-<p>The same operations are commands (see <a href="scripting.html">Scripting</a>): <code>zsphere_new</code>, <code>zsphere_list</code>, <code>zsphere_add</code>, <code>zsphere_set</code>, <code>zsphere_delete</code>, <code>zsphere_insert</code>, <code>zsphere_preview</code> and <code>zsphere_make_mesh</code>. For example, a simple figure:</p>
-<div class="code-block"><pre class="code"><code>zsphere_new radius=0.5
-zsphere_add parent=0 position=0,0.8,0 radius=0.3
-zsphere_add parent=0 position=0.9,0.1,0 radius=0.2 symmetry=x
-zsphere_make_mesh resolution=160</code></pre><button class="copy" type="button" aria-label="Copy">Copy</button></div>
+<p>The same operations are commands (see <a href="scripting.html">Scripting</a>): <code>forgesphere_new</code>, <code>forgesphere_list</code>, <code>forgesphere_add</code>, <code>forgesphere_set</code>, <code>forgesphere_delete</code>, <code>forgesphere_insert</code>, <code>forgesphere_preview</code> and <code>forgesphere_make_mesh</code>. For example, a simple figure:</p>
+<div class="code-block"><pre class="code"><code>forgesphere_new radius=0.5
+forgesphere_add parent=0 position=0,0.8,0 radius=0.3
+forgesphere_add parent=0 position=0.9,0.1,0 radius=0.2 symmetry=x
+forgesphere_make_mesh resolution=160</code></pre><button class="copy" type="button" aria-label="Copy">Copy</button></div>
       </article>
       <nav class="pager" aria-label="Previous and next chapter"><a class="prev" rel="prev" href="parts.html"><span>Previous</span>Parts</a><a class="next" rel="next" href="vertex-paint.html"><span>Next</span>Vertex Paint and materials</a></nav>
       <p class="guide-meta fine">Also in the app: <strong>Help &gt; User Guide</strong> (<kbd>Shift</kbd>+<kbd>F1</kbd>).

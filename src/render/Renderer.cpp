@@ -3,7 +3,7 @@
 #include "render/Renderer.h"
 #include "render/MicroRenderer.h"
 
-#include "core/Matcap.h"
+#include "core/LitSphere.h"
 #include "core/Tangents.h"
 #include "core/Texture.h"
 #include "core/TextureChannels.h"
@@ -30,7 +30,7 @@ namespace {
 
 // Mesh vertices are PackedVertex (render/Clusters.h): the position on the slot's grid (21 bits per axis in two
 // words), an octahedral normal and the (companded) curvature in a third. Decoded here exactly as Clusters.cpp does.
-// Compiled per feature set: PAINT (polypaint colour and mask attributes), PRIM (per-triangle data: the first
+// Compiled per feature set: PAINT (vertex paint colour and mask attributes), PRIM (per-triangle data: the first
 // drawn triangle of the vertex's cluster, from a per-block table indexed by gl_VertexID, or uPrimBase when the
 // clusters are drawn one by one), TEXTURED and NORMALMAP (with a geometry shader, below), and FLAT (flat
 // shading: the view-space position goes along, so the fragment shader takes each triangle's own normal from it).
@@ -38,7 +38,7 @@ const char* kMeshVS = R"(
 layout(location = 0) in uvec2 aPos;
 layout(location = 1) in uint aNormal;
 #ifdef PAINT
-layout(location = 2) in vec4 aColor; // polypaint, gamma 2.2 encoded (constant white when the mesh has none)
+layout(location = 2) in vec4 aColor; // vertex paint, gamma 2.2 encoded (constant white when the mesh has none)
 layout(location = 3) in float aMask; // constant 0 when the mesh has no mask
 out vec4 vPaint;                     // linear colour, mask
 #endif
@@ -118,7 +118,7 @@ vec3 ghostMove(vec3 x, vec3 n, int first, int end, inout vec3 g, inout float lap
             x += (kind == 1 ? an : n) * (a * f);
             g += radial * (k * a * F.y);
             lap += k * a * radialLap;
-        } else if (kind == 3 || kind == 4) { // Clay, Clay Buildup: everything below a plane pulled up to it
+        } else if (kind == 3 || kind == 4) { // Clay, Clay Block: everything below a plane pulled up to it
             float h = dot(x - (ac + an * (sgn * r * (kind == 3 ? 0.05 : 0.08) * s)), an);
             if (sgn * h < 0.0) {
                 vec3 W = F; // the pull's profile and its derivatives
@@ -143,7 +143,7 @@ vec3 ghostMove(vec3 x, vec3 n, int first, int end, inout vec3 g, inout float lap
             lap += cn * a * (2.0 * (F.y * F.y + f * F.z) + 2.0 * f * F.y * inv);
         } else if (kind == 7) { // Pinch: sideways only
             x += onPlane(c - x, an) * (sgn * 0.2 * s * f);
-        } else if (kind == 8) { // Dam Standard: f^4, the sides pinched in
+        } else if (kind == 8) { // Sharp Crease: f^4, the sides pinched in
             float a = -sgn * s * r * 0.08;
             float f3 = f * f * f;
             x += an * (a * f3 * f) + onPlane(c - x, an) * (0.3 * s * f);
@@ -372,10 +372,10 @@ uniform int uGroups;     // 0: off, 1: per-triangle ids from uGroupIds, 2: every
 uniform usamplerBuffer uGroupIds;
 uniform int uChecker;        // 1: a checker on the UVs (TEXTURED), tinted per UDIM tile
 uniform float uCheckerScale; // checker squares per UV unit
-uniform int uMatcap;          // 1: shade with the matcap texture instead of the studio lights
-uniform sampler2D uMatcapTex; // sRGB-encoded lit sphere (core/Matcap.h)
-uniform vec2 uMatcapCavity;   // crease darkening, ridge lift (sf::matcapCavity)
-uniform int uDim;             // 1: an inactive SubTool, shown a little darker and greyer
+uniform int uLitSphere;          // 1: shade with the lit sphere texture instead of the studio lights
+uniform sampler2D uLitSphereTex; // sRGB-encoded lit sphere (core/Lit Sphere.h)
+uniform vec2 uLitSphereCavity;   // crease darkening, ridge lift (sf::lit sphereCavity)
+uniform int uDim;             // 1: an inactive Part, shown a little darker and greyer
 uniform mat3 uLightRot;       // turns the light (Lit Sphere and studio) in view space (RenderSettings::lightYaw / Pitch)
 uniform vec2 uLightLevels;    // light intensity, ambient
 uniform float uAlpha;         // X-Ray: the see-through Parts' opacity (1 = opaque)
@@ -386,7 +386,7 @@ vec4 finish(vec3 c) {
     if (uDim == 1) c = mix(c, vec3(dot(c, vec3(0.2126, 0.7152, 0.0722))), 0.25) * 0.72;
     return vec4(pow(c, vec3(1.0 / 2.2)), uAlpha);
 }
-// Keep in sync with sf::polygroupColor.
+// Keep in sync with sf::face groupColor.
 vec3 groupColor(uint id) {
     uint h = id * 0x9E3779B1u;
     h ^= h >> 15;
@@ -484,7 +484,7 @@ void main() {
 #ifdef MICRO
     microFetch();
 #endif
-    vec3 tint = vec3(1.0) + uTintShift; // multiplies a matcap: polypaint or polygroup colours, or the active colour
+    vec3 tint = vec3(1.0) + uTintShift; // multiplies a lit sphere: vertex paint or face group colours, or the active colour
     vec3 albedo = uBaseColor * tint;
 #ifdef PRIM
     if (uGroups == 3) albedo = tint = faceColor(texelFetch(uGroupIds, vPrimBase + gl_PrimitiveID).r);
@@ -545,18 +545,18 @@ void main() {
         return;
     }
 #endif
-    if (uMatcap == 1) {
+    if (uLitSphere == 1) {
         // View-aligned basis so the material stays put towards the edges of a perspective view.
         vec3 bx = normalize(vec3(v.z, 0.0, -v.x));
         vec3 by = cross(v, bx);
         vec3 ln = transpose(uLightRot) * n; // the normal turned against the light: the material's light turns
         vec2 uv = vec2(dot(bx, ln), dot(by, ln)) * 0.495 + 0.5;
-        vec3 mc = pow(texture(uMatcapTex, uv).rgb, vec3(2.2)) * uLightLevels.x + uLightLevels.y * 0.6;
+        vec3 mc = pow(texture(uLitSphereTex, uv).rgb, vec3(2.2)) * uLightLevels.x + uLightLevels.y * 0.6;
         // Starts above the curvature of a smooth sphere's own facets, so only real creases darken and a broad
         // stroke doesn't pool into a smear.
         float mcrease = smoothstep(0.03, 0.18, curvature);
         float mridge = smoothstep(0.03, 0.2, -curvature);
-        vec3 c = mc * tint * (1.0 - uMatcapCavity.x * mcrease) * (1.0 + uMatcapCavity.y * mridge);
+        vec3 c = mc * tint * (1.0 - uLitSphereCavity.x * mcrease) * (1.0 + uLitSphereCavity.y * mridge);
         if (uShowMask == 1) c *= 1.0 - 0.75 * clamp(V_MASK, 0.0, 1.0);
         fragColor = finish(c);
         return;
@@ -748,7 +748,7 @@ void main() {
 )";
 
 constexpr GLenum kTexture7 = 0x84C7; // GL_TEXTURE7 (the cluster table)
-constexpr GLenum kTexture2 = 0x84C2; // GL_TEXTURE2 (matcap)
+constexpr GLenum kTexture2 = 0x84C2; // GL_TEXTURE2 (lit sphere)
 constexpr GLenum kTexture5 = 0x84C5; // kTexture5 (baked normal map)
 constexpr GLenum kTexture6 = 0x84C6; // kTexture6 (its tangents)
 constexpr GLenum kRgb = 0x1907, kRgb8 = 0x8051; // GL_RGB, GL_RGB8
@@ -811,7 +811,7 @@ GLuint link(const char* vs, const char* fs, std::string& error, const char* fsPr
 
 } // namespace
 
-glm::vec3 polygroupColor(uint32_t id) {
+glm::vec3 facegroupColor(uint32_t id) {
     uint32_t h = id * 0x9E3779B1u;
     h ^= h >> 15;
     h *= 0x85EBCA77u;
@@ -850,15 +850,15 @@ bool Renderer::init(std::string& error) {
 
     gl::GenVertexArrays(1, &emptyVao_);
 
-    // Built-in matcaps, generated once (256 KB each); custom ones upload in syncMatcaps.
-    matcapTextures_.assign(size_t(builtinMatcapCount()), 0);
-    matcapHashes_.assign(size_t(builtinMatcapCount()), 0);
-    gl::GenTextures(GLsizei(matcapTextures_.size()), matcapTextures_.data());
-    for (int i = 0; i < builtinMatcapCount(); ++i) {
+    // Built-in lit spheres, generated once (256 KB each); custom ones upload in syncLit Spheres.
+    litsphereTextures_.assign(size_t(builtinLitSphereCount()), 0);
+    litsphereHashes_.assign(size_t(builtinLitSphereCount()), 0);
+    gl::GenTextures(GLsizei(litsphereTextures_.size()), litsphereTextures_.data());
+    for (int i = 0; i < builtinLitSphereCount(); ++i) {
         constexpr int kSize = 256;
-        uploadMatcap(matcapTextures_[size_t(i)], kSize, generateMatcap(i, kSize));
+        uploadLitSphere(litsphereTextures_[size_t(i)], kSize, generateLitSphere(i, kSize));
     }
-    syncMatcaps();
+    syncLitSpheres();
     // SF_NO_VERTEXID_BASE=1 takes the other path, to check it on drivers that don't need it.
     vertexIdHasBase_ = checkVertexIdBase() && !std::getenv("SF_NO_VERTEXID_BASE");
     return true;
@@ -895,8 +895,8 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     p.paint = at("uPaint");
     p.showMask = at("uShowMask");
     p.groups = at("uGroups");
-    p.matcap = at("uMatcap");
-    p.matcapCavity = at("uMatcapCavity");
+    p.litsphere = at("uLitSphere");
+    p.litsphereCavity = at("uLitSphereCavity");
     p.dim = at("uDim");
     p.lightRot = at("uLightRot");
     p.lightLevels = at("uLightLevels");
@@ -925,10 +925,10 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     p.pbrCavity = at("uPbrCavity");
     p.viewToEnv = at("uViewToEnv");
     p.sh = at("uSH");
-    // Texture units: groups 1, matcap 2, UVs 3, painted texture 4, normal map 5, tangents 6, cluster table 7.
+    // Texture units: groups 1, lit sphere 2, UVs 3, painted texture 4, normal map 5, tangents 6, cluster table 7.
     gl::UseProgram(p.id);
     gl::Uniform1i(at("uGroupIds"), 1);
-    gl::Uniform1i(at("uMatcapTex"), 2);
+    gl::Uniform1i(at("uLitSphereTex"), 2);
     gl::Uniform1i(at("uUvs"), 3);
     gl::Uniform1i(at("uPaintTex"), 4);
     gl::Uniform1i(at("uNormalTex"), 5);
@@ -944,7 +944,7 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
 
 // Draws one point with index 2 and base vertex 1000 into a 1x1 integer target and reads back the gl_VertexID
 // the shader saw: 1002 as the spec says, or 2 on drivers that leave the base out (then the per-triangle data of
-// polygroups and textures is drawn cluster by cluster with the base as a uniform).
+// face groups and textures is drawn cluster by cluster with the base as a uniform).
 bool Renderer::checkVertexIdBase() {
     std::string error;
     const GLuint prog = link(kVertexIdVS, kVertexIdFS, error);
@@ -984,7 +984,7 @@ bool Renderer::checkVertexIdBase() {
     return id == 1002;
 }
 
-void Renderer::uploadMatcap(GLuint texture, int size, const std::vector<uint8_t>& pixels) {
+void Renderer::uploadLitSphere(GLuint texture, int size, const std::vector<uint8_t>& pixels) {
     gl::PixelStorei(GL_UNPACK_ALIGNMENT, 1);
     gl::BindTexture(GL_TEXTURE_2D, texture);
     gl::TexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGBA8), size, size, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
@@ -995,26 +995,26 @@ void Renderer::uploadMatcap(GLuint texture, int size, const std::vector<uint8_t>
     gl::BindTexture(GL_TEXTURE_2D, 0);
 }
 
-// Custom MatCaps (core/Matcap.h) added or changed since the last call: a texture each, at their own size.
-void Renderer::syncMatcaps() {
-    if (matcapTextures_.empty() || matcapRevision_ == matcapRevision()) return;
-    matcapRevision_ = matcapRevision();
-    for (int i = builtinMatcapCount(); i < matcapCount(); ++i) {
-        const CustomMatcap* c = customMatcap(i);
-        if (size_t(i) >= matcapTextures_.size()) {
+// Custom Lit Spheres (core/Lit Sphere.h) added or changed since the last call: a texture each, at their own size.
+void Renderer::syncLitSpheres() {
+    if (litsphereTextures_.empty() || litsphereRevision_ == litsphereRevision()) return;
+    litsphereRevision_ = litsphereRevision();
+    for (int i = builtinLitSphereCount(); i < litsphereCount(); ++i) {
+        const CustomLitSphere* c = customLitSphere(i);
+        if (size_t(i) >= litsphereTextures_.size()) {
             GLuint t = 0;
             gl::GenTextures(1, &t);
-            matcapTextures_.push_back(t);
-            matcapHashes_.push_back(0);
+            litsphereTextures_.push_back(t);
+            litsphereHashes_.push_back(0);
         }
-        if (matcapHashes_[size_t(i)] == c->hash) continue;
-        uploadMatcap(matcapTextures_[size_t(i)], c->size, c->rgba);
-        matcapHashes_[size_t(i)] = c->hash;
+        if (litsphereHashes_[size_t(i)] == c->hash) continue;
+        uploadLitSphere(litsphereTextures_[size_t(i)], c->size, c->rgba);
+        litsphereHashes_[size_t(i)] = c->hash;
     }
 }
 
-GLuint Renderer::matcapTexture(int index) const {
-    return index >= 0 && index < int(matcapTextures_.size()) ? matcapTextures_[size_t(index)] : 0;
+GLuint Renderer::litsphereTexture(int index) const {
+    return index >= 0 && index < int(litsphereTextures_.size()) ? litsphereTextures_[size_t(index)] : 0;
 }
 
 Renderer::MeshSlot& Renderer::slot(uint32_t id) {
@@ -1109,10 +1109,10 @@ void Renderer::shutdown() {
     }
     slots_.clear();
     drawList_.clear();
-    if (!matcapTextures_.empty()) gl::DeleteTextures(GLsizei(matcapTextures_.size()), matcapTextures_.data());
-    matcapTextures_.clear();
-    matcapHashes_.clear();
-    matcapRevision_ = 0;
+    if (!litsphereTextures_.empty()) gl::DeleteTextures(GLsizei(litsphereTextures_.size()), litsphereTextures_.data());
+    litsphereTextures_.clear();
+    litsphereHashes_.clear();
+    litsphereRevision_ = 0;
     for (GLuint* t : {&envTexture_, &brdfTexture_})
         if (*t) gl::DeleteTextures(1, t);
     envIndex_ = envFailedIndex_ = -1;
@@ -1350,9 +1350,9 @@ bool Renderer::outOfMemory(uint32_t id) const {
 }
 
 void Renderer::syncScene(const std::vector<SceneMesh>& scene) {
-    syncMatcaps();
+    syncLitSpheres();
     if (envJob_ && envJob_->done) ensureEnvironment(envJob_->index); // (a new environment is ready: upload it)
-    // Free the slots of SubTools that are gone (deleted, merged, a new scene).
+    // Free the slots of Parts that are gone (deleted, merged, a new scene).
     for (auto it = slots_.begin(); it != slots_.end();) {
         const bool live = std::any_of(scene.begin(), scene.end(), [&](const SceneMesh& m) { return m.id == it->id; });
         if (live) {
@@ -1522,14 +1522,14 @@ void Renderer::uploadIndices(MeshSlot& s, const Mesh& mesh) {
     gl::BindVertexArray(0);
 }
 
-// The index buffer (unless `indicesDone`), the first drawn triangle of each cluster, and the polygroup id and
+// The index buffer (unless `indicesDone`), the first drawn triangle of each cluster, and the face group id and
 // UVs of every drawn triangle in draw order (looked up by that plus gl_PrimitiveID). The wireframe's edges and
 // motion proxies are rebuilt on next need.
 void Renderer::uploadFaces(MeshSlot& s, const Mesh& mesh, bool wantUvs, bool indicesDone) {
     const size_t nt = mesh.triangleCount();
     const bool hidden = mesh.hidden.size() == nt && nt > 0;
     const bool overlay = s.overlay && s.overlay->colors.size() == nt && nt > 0;
-    const bool groups = (mesh.polygroups.size() == nt || overlay) && nt > 0;
+    const bool groups = (mesh.facegroups.size() == nt || overlay) && nt > 0;
     const auto clusters = s.order.clusters();
     const size_t nc = clusters.size();
     s.primBase.assign(nc, 0);
@@ -1577,7 +1577,7 @@ void Renderer::uploadFaces(MeshSlot& s, const Mesh& mesh, bool wantUvs, bool ind
     visibleGroups_.resize(groups ? drawn : 0);
     if (groups)
         poolFor(drawn, [&](size_t b, size_t e) {
-            for (size_t i = b; i < e; ++i) visibleGroups_[i] = overlay ? s.overlay->colors[drawnTris[i]] : mesh.polygroups[drawnTris[i]];
+            for (size_t i = b; i < e; ++i) visibleGroups_[i] = overlay ? s.overlay->colors[drawnTris[i]] : mesh.facegroups[drawnTris[i]];
         }, 1 << 16);
     s.hasGroups = groups && !visibleGroups_.empty() && visibleGroups_.size() <= size_t(std::max(maxTexels, 0));
     s.overlayColors = overlay && s.hasGroups;
@@ -1821,7 +1821,7 @@ bool Renderer::preparePatches(MeshSlot& s, const Mesh& mesh, bool wireframe) {
     if (wireframe && !s.patchLinesOn)
         for (MeshSlot::Patch& p : s.patches) p.stale = true; // (their edges weren't built)
     const bool hidden = mesh.hidden.size() == nt && nt > 0;
-    const bool groups = mesh.polygroups.size() == nt && nt > 0;
+    const bool groups = mesh.facegroups.size() == nt && nt > 0;
     for (MeshSlot::Patch& p : s.patches) {
         if (!p.stale) continue;
         if (++patchStampValue_ == 0) {
@@ -1843,7 +1843,7 @@ bool Renderer::preparePatches(MeshSlot& s, const Mesh& mesh, bool wireframe) {
                 }
                 p.local.push_back(uint16_t(std::min<uint32_t>(patchLocal_[v], 0xFFFF)));
             }
-            if (groups) p.groups.push_back(mesh.polygroups[t]);
+            if (groups) p.groups.push_back(mesh.facegroups[t]);
         };
         if (p.key < kTailPatch) {
             for (uint32_t i = 0; i < s.order.clusterTriangles(p.key); ++i) add(s.order.triangle(p.key, i));
@@ -2043,15 +2043,15 @@ void Renderer::uploadPatches(MeshSlot& s, const Mesh& mesh, bool wireframe) {
     s.drawnTriangles = drawn;
 }
 
-void Renderer::drawPatches(const MeshSlot& s, GLenum mode, Part part, GLint primBaseLocation) {
+void Renderer::drawPatches(const MeshSlot& s, GLenum mode, DrawPart part, GLint primBaseLocation) {
     for (const MeshSlot::Patch& p : s.patches) {
-        const uint32_t count = part == Part::Lines ? p.lines : p.indices;
+        const uint32_t count = part == DrawPart::Lines ? p.lines : p.indices;
         if (count == 0 || !insideFrustum(frameCull_, p.bounds)) continue;
         if (primBaseLocation >= 0) gl::Uniform1i(primBaseLocation, GLint(p.part * kPatchTriangles));
-        const size_t first = part == Part::Lines ? size_t(p.part) * kPatchLineIndices : size_t(p.part) * kPatchTriangles * 3;
+        const size_t first = part == DrawPart::Lines ? size_t(p.part) * kPatchLineIndices : size_t(p.part) * kPatchTriangles * 3;
         gl::DrawElementsBaseVertex(mode, GLsizei(count), GL_UNSIGNED_SHORT, reinterpret_cast<const void*>(first * sizeof(uint16_t)),
                                    GLint(p.part * kPatchVertices));
-        if (part != Part::Lines) lastDrawn_ += count / 3;
+        if (part != DrawPart::Lines) lastDrawn_ += count / 3;
     }
     if (primBaseLocation >= 0) gl::Uniform1i(primBaseLocation, -1);
 }
@@ -2719,7 +2719,7 @@ void Renderer::endCapture(std::vector<uint8_t>& rgba) {
 
 void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, const RenderSettings& settings,
                     const Viewport& viewport) {
-    syncMatcaps();
+    syncLitSpheres();
     forceBackfaces_ = settings.backfaceCulling && !thumbnailPass_; // (#68; thumbnails show the whole Part)
     // Known state before the clears: a scissor box, colour mask or depth mask left over from another pass (UI,
     // overlays, calibration) makes glClear partial. Some drivers (NVIDIA on Windows, #29) then show old frames
@@ -2813,7 +2813,7 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
     };
 
     gl::ActiveTexture(kTexture2);
-    gl::BindTexture(GL_TEXTURE_2D, matcapTexture(settings.matcap));
+    gl::BindTexture(GL_TEXTURE_2D, litsphereTexture(settings.litsphere));
     gl::ActiveTexture(GL_TEXTURE0);
     gl::Enable(GL_POLYGON_OFFSET_FILL);
     gl::PolygonOffset(1.0f, 1.0f);
@@ -2875,7 +2875,7 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
     }
     gl::ActiveTexture(GL_TEXTURE0);
 
-    if (settings.wireframe) { // the active SubTool only
+    if (settings.wireframe) { // the active Part only
         gl::UseProgram(wireProgram_);
         gl::UniformMatrix4fv(gl::GetUniformLocation(wireProgram_, "uView"), 1, GL_FALSE, glm::value_ptr(view));
         gl::UniformMatrix4fv(gl::GetUniformLocation(wireProgram_, "uProj"), 1, GL_FALSE, glm::value_ptr(proj));
@@ -2893,18 +2893,18 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
                 gl::Uniform1f(gl::GetUniformLocation(wireProgram_, "uAlpha"), lines ? 0.5775f : 0.35f);
                 if (!lines) gl::PolygonMode(GL_FRONT_AND_BACK, GL_LINE);
                 gl::BindVertexArray(lines ? s->patchLineVao : s->patchVao);
-                drawPatches(*s, lines ? GL_LINES : GL_TRIANGLES, lines ? Part::Lines : Part::Triangles, -1);
+                drawPatches(*s, lines ? GL_LINES : GL_TRIANGLES, lines ? DrawPart::Lines : DrawPart::Triangles, -1);
                 if (!lines) gl::PolygonMode(GL_FRONT_AND_BACK, GL_FILL);
             }
             if (s->linesValid) {
                 gl::Uniform1f(gl::GetUniformLocation(wireProgram_, "uAlpha"), 0.5775f); // 1 - (1 - 0.35)^2
                 gl::BindVertexArray(s->lineVao);
-                drawClusters(*s, drawClusters_, GL_LINES, Part::Lines, -1);
+                drawClusters(*s, drawClusters_, GL_LINES, DrawPart::Lines, -1);
             } else { // edges not built (a mesh not synced for the wireframe): outline the triangles
                 gl::Uniform1f(gl::GetUniformLocation(wireProgram_, "uAlpha"), 0.35f);
                 gl::PolygonMode(GL_FRONT_AND_BACK, GL_LINE);
                 gl::BindVertexArray(s->vao);
-                drawClusters(*s, drawClusters_, GL_TRIANGLES, Part::Triangles, -1);
+                drawClusters(*s, drawClusters_, GL_TRIANGLES, DrawPart::Triangles, -1);
                 gl::PolygonMode(GL_FRONT_AND_BACK, GL_FILL);
             }
         }
@@ -2978,7 +2978,7 @@ void Renderer::cull(const MeshSlot& s, const CullView& frame, bool proxy) {
 // Draws `clusters` of `s` (the VAO for `part` bound): their triangles, the wireframe's edges, or their motion
 // proxies. One multi-draw, or with per-triangle data on a driver whose gl_VertexID lacks the base vertex, one
 // draw per cluster with its first drawn triangle in `primBaseLocation`.
-void Renderer::drawClusters(const MeshSlot& s, const std::vector<uint32_t>& clusters, GLenum mode, Part part, GLint primBaseLocation) {
+void Renderer::drawClusters(const MeshSlot& s, const std::vector<uint32_t>& clusters, GLenum mode, DrawPart part, GLint primBaseLocation) {
     drawCounts_.clear();
     drawOffsets_.clear();
     drawBases_.clear();
@@ -2988,15 +2988,15 @@ void Renderer::drawClusters(const MeshSlot& s, const std::vector<uint32_t>& clus
         GLsizei count = 0;
         size_t first = 0;
         switch (part) {
-        case Part::Triangles:
+        case DrawPart::Triangles:
             count = s.drawCount[c];
             first = size_t(s.order.firstTriangle(c)) * 3;
             break;
-        case Part::Lines:
+        case DrawPart::Lines:
             count = GLsizei(s.lineCount[c]);
             first = s.lineFirst[c];
             break;
-        case Part::Proxy:
+        case DrawPart::Proxy:
             count = GLsizei(s.proxyCount[c]);
             first = size_t(s.order.firstTriangle(c) / 4) * 3;
             break;
@@ -3007,7 +3007,7 @@ void Renderer::drawClusters(const MeshSlot& s, const std::vector<uint32_t>& clus
         indices += size_t(count);
     }
     if (drawCounts_.empty()) return;
-    if (part != Part::Lines) lastDrawn_ += indices / 3;
+    if (part != DrawPart::Lines) lastDrawn_ += indices / 3;
     if (primBaseLocation >= 0 && !vertexIdHasBase_) {
         for (size_t i = 0; i < clusters.size(); ++i) {
             if (drawCounts_[i] == 0) continue;
@@ -3021,7 +3021,7 @@ void Renderer::drawClusters(const MeshSlot& s, const std::vector<uint32_t>& clus
                                     drawBases_.data());
 }
 
-// One mesh. Mask and polygroup colours are for the SubTool being edited; polypaint shows on all of them.
+// One mesh. Mask and face group colours are for the Part being edited; vertex paint shows on all of them.
 // The material tint a mesh gets (RenderSettings::colorTintsMaterial), less 1: Lit Sphere shading, no vertex paint.
 static glm::vec3 materialTintShift(const RenderSettings& settings, bool hasColors) {
     if (!settings.colorTintsMaterial || settings.pbr() || hasColors) return glm::vec3(0.0f);
@@ -3040,12 +3040,12 @@ void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const Render
     gl::Uniform2f(p->projScale, orthographic ? 1e20f : frameProj_[0][0], orthographic ? 1e20f : frameProj_[1][1]);
     gl::Uniform3fv(p->baseColor, 1, glm::value_ptr(settings.baseColor));
     gl::Uniform3fv(p->tintShift, 1, glm::value_ptr(materialTintShift(settings, s.hasColors)));
-    gl::Uniform1i(p->matcap, matcapTexture(settings.matcap) ? 1 : 0);
-    const MatcapCavity cavity = matcapCavity(settings.matcap);
-    gl::Uniform2f(p->matcapCavity, cavity.crease, cavity.ridge);
+    gl::Uniform1i(p->litsphere, litsphereTexture(settings.litsphere) ? 1 : 0);
+    const LitSphereCavity cavity = litsphereCavity(settings.litsphere);
+    gl::Uniform2f(p->litsphereCavity, cavity.crease, cavity.ridge);
     gl::Uniform1i(p->paint, 0);
     gl::Uniform1i(p->showMask, active && settings.showMask ? 1 : 0);
-    gl::Uniform1i(p->groups, active && settings.showPolygroups ? 2 : 0);
+    gl::Uniform1i(p->groups, active && settings.showFaceGroups ? 2 : 0);
     gl::Uniform1i(p->dim, !active && settings.dimInactive ? 1 : 0);
     setLightUniforms(*p, settings);
     gl::Uniform1i(p->twoSided, 1);
@@ -3054,7 +3054,7 @@ void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const Render
     const size_t full = settings.renderTriangleBudget ? settings.renderTriangleBudget : size_t(currentTierConfig().activeTriangleBudget);
     const size_t budget = moving ? full / 2 : full;
     const float target = settings.microTargetPx * (moving ? 2.0f : 1.0f);
-    // (the budget is shared by the micro SubTools on screen: each gets it whole; one is the usual case)
+    // (the budget is shared by the micro Parts on screen: each gets it whole; one is the usual case)
     const_cast<MeshSlot&>(s).microDrawn = s.micro->draw(p->id, frameCull_, frameProj_, frameViewport_, budget, target);
     lastDrawn_ += s.microDrawn;
 }
@@ -3083,15 +3083,15 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     }
     // The UV Editor's checker on the model.
     const bool checker = active && s.hasUvs && s.overlay && s.overlay->checker;
-    // A painted texture shows through the textured program (polypaint still multiplies it).
-    const bool textured = s.hasUvs && ((s.paintTexture && settings.showPolypaint && settings.showTexture) || checker);
+    // A painted texture shows through the textured program (vertex paint still multiplies it).
+    const bool textured = s.hasUvs && ((s.paintTexture && settings.showVertexPaint && settings.showTexture) || checker);
     const bool pbr = settings.pbr() && envTexture_;
     // A baked normal map preview bends the shading normal (core/Bake.h), and in the PBR view the texture's
     // Normal / Height channels do (syncTexture's material normal, with tangents from syncNormalMap).
     const GLuint normalTex = s.normalTexture ? s.normalTexture : (pbr && textured ? s.matNormalTexture : 0);
     const bool normalMapped = s.hasUvs && normalTex && s.hasTangents;
     const int groups = active && s.overlayColors                 ? 3
-                       : active && settings.showPolygroups && !s.overlayColors ? (s.hasGroups ? 1 : 2)
+                       : active && settings.showFaceGroups && !s.overlayColors ? (s.hasGroups ? 1 : 2)
                                                                                : 0;
     // (Not through the textured program's geometry shader: those meshes are sculpted without the preview.)
     const bool ghost = active && s.id == ghostId_ && !ghost_.empty() && !settings.motionProxy && !textured && !normalMapped;
@@ -3108,14 +3108,14 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     gl::Uniform4fv(p->viewport, 1, glm::value_ptr(frameViewport_));
     // The shader turns a pixel into its view ray as (-ndc / scale, 1): right for perspective. An orthographic
     // view (Numpad 5) looks straight along the axis at every pixel, which an unbounded scale gives (its own
-    // scale tilted the ray at the edges until the matcap and the lights came from the other side, #24).
+    // scale tilted the ray at the edges until the lit sphere and the lights came from the other side, #24).
     const bool orthographic = frameProj_[3][3] == 1.0f;
     gl::Uniform2f(p->projScale, orthographic ? 1e20f : frameProj_[0][0], orthographic ? 1e20f : frameProj_[1][1]);
     gl::Uniform3fv(p->baseColor, 1, glm::value_ptr(settings.baseColor));
     gl::Uniform3fv(p->tintShift, 1, glm::value_ptr(materialTintShift(settings, s.hasColors)));
-    gl::Uniform1i(p->matcap, matcapTexture(settings.matcap) ? 1 : 0);
-    const MatcapCavity cavity = matcapCavity(settings.matcap);
-    gl::Uniform2f(p->matcapCavity, cavity.crease, cavity.ridge);
+    gl::Uniform1i(p->litsphere, litsphereTexture(settings.litsphere) ? 1 : 0);
+    const LitSphereCavity cavity = litsphereCavity(settings.litsphere);
+    gl::Uniform2f(p->litsphereCavity, cavity.crease, cavity.ridge);
     if (textured || normalMapped) {
         gl::ActiveTexture(GL_TEXTURE3);
         gl::BindTexture(GL_TEXTURE_BUFFER, s.uvTexture);
@@ -3136,7 +3136,7 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     gl::ActiveTexture(GL_TEXTURE1);
     gl::BindTexture(GL_TEXTURE_BUFFER, s.hasGroups ? s.groupTexture : 0);
     gl::ActiveTexture(GL_TEXTURE0);
-    gl::Uniform1i(p->paint, settings.showPolypaint && s.hasColors ? 1 : 0);
+    gl::Uniform1i(p->paint, settings.showVertexPaint && s.hasColors ? 1 : 0);
     gl::Uniform1i(p->showMask, active && settings.showMask && s.hasMask ? 1 : 0);
     gl::Uniform1i(p->groups, groups);
     gl::Uniform1i(p->dim, !active && settings.dimInactive ? 1 : 0);
@@ -3179,13 +3179,13 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
         }
         drawClusters_.resize(kept);
     }
-    drawClusters(s, drawClusters_, GL_TRIANGLES, Part::Triangles, perTriangle ? p->primBase : -1);
+    drawClusters(s, drawClusters_, GL_TRIANGLES, DrawPart::Triangles, perTriangle ? p->primBase : -1);
     for (int k = 1; k < 4; ++k) {
         if (extraClusters_[k].empty()) continue;
         if (const MeshProgram* pg = meshProgram(features | ((k & 1) ? kGhost : 0) | ((k & 2) ? kFlat : 0))) {
             bind(pg);
             if (k & 1) setGhostUniforms(*pg);
-            drawClusters(s, extraClusters_[k], GL_TRIANGLES, Part::Triangles, -1);
+            drawClusters(s, extraClusters_[k], GL_TRIANGLES, DrawPart::Triangles, -1);
             bind(p);
         }
     }
@@ -3198,7 +3198,7 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
             gl::BindTexture(GL_TEXTURE_BUFFER, s.hasGroups ? s.patchGroupTexture : 0);
             gl::ActiveTexture(GL_TEXTURE0);
         }
-        drawPatches(s, GL_TRIANGLES, Part::Triangles, perTriangle ? p->primBase : -1);
+        drawPatches(s, GL_TRIANGLES, DrawPart::Triangles, perTriangle ? p->primBase : -1);
         gl::BindVertexArray(s.vao);
     }
     if (!proxyClusters_.empty()) {
@@ -3206,7 +3206,7 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
         if (!s.hasColors) gl::VertexAttrib4f(2, 1.0f, 1.0f, 1.0f, 1.0f);
         if (!s.hasMask) gl::VertexAttrib1f(3, 0.0f);
         gl::Uniform1i(p->twoSided, 0);
-        drawClusters(s, proxyClusters_, GL_TRIANGLES, Part::Proxy, -1);
+        drawClusters(s, proxyClusters_, GL_TRIANGLES, DrawPart::Proxy, -1);
     }
     gl::Disable(GL_CULL_FACE);
     if (xrayCull_) gl::CullFace(GL_BACK);
@@ -3589,7 +3589,7 @@ void Renderer::refineStrokeBounds(uint32_t id, const Mesh& mesh) {
 }
 
 // ---------------------------------------------------------------------------
-// Thumbnails (LightBox / pickers)
+// Thumbnails (Library / pickers)
 // ---------------------------------------------------------------------------
 
 bool Renderer::renderMeshThumbnail(Mesh& mesh, const Camera& camera, int size, const RenderSettings& settings,
@@ -3599,7 +3599,7 @@ bool Renderer::renderMeshThumbnail(Mesh& mesh, const Camera& camera, int size, c
     gl::GetIntegerv(kFramebufferBinding, &fbo);
     gl::GetIntegerv(kViewport, viewport);
 
-    // A scratch slot outside the SubTool id range; the scene's draw list is put back afterwards.
+    // A scratch slot outside the Part id range; the scene's draw list is put back afterwards.
     constexpr uint32_t kThumbnailSlot = 0xFFFFFFF0u;
     mesh.topologyDirty = true;
     sync(slot(kThumbnailSlot), mesh);
@@ -3622,7 +3622,7 @@ bool Renderer::renderMeshThumbnail(Mesh& mesh, const Camera& camera, int size, c
     return ok;
 }
 
-bool Renderer::renderSubtoolThumbnail(uint32_t id, float yaw, float pitch, int size, const RenderSettings& settings,
+bool Renderer::renderPartThumbnail(uint32_t id, float yaw, float pitch, int size, const RenderSettings& settings,
                                       std::vector<uint8_t>& rgba, std::string& error) {
     const MeshSlot* s = nullptr;
     for (const MeshSlot& slot : slots_)
@@ -3640,7 +3640,7 @@ bool Renderer::renderSubtoolThumbnail(uint32_t id, float yaw, float pitch, int s
     camera.frame(s->box);
     camera.distance *= 0.6f; // (frame leaves room around the model for the view; a thumbnail fills its tile)
     RenderSettings thumb = settings;
-    thumb.showMask = thumb.showPolygroups = thumb.wireframe = false;
+    thumb.showMask = thumb.showFaceGroups = thumb.wireframe = false;
     thumb.dimInactive = false;
     constexpr size_t kProxyTriangles = size_t(1) << 20; // a big mesh: its lighter proxy, where current, is plenty at this size
     thumb.motionProxy = s->drawnTriangles >= kProxyTriangles;

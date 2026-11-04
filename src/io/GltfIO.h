@@ -15,10 +15,10 @@ namespace sf {
 // mesh; each sculpt layer becomes a morph target with its current weight as
 // the default, and target names stored in mesh.extras.targetNames (the
 // convention read by Blender, Unity, Unreal, Godot and three.js). UVs become
-// TEXCOORD_0 (vertices split along UV seams), and a SubTool's texture
+// TEXCOORD_0 (vertices split along UV seams), and a Part's texture
 // (core/Texture.h) is embedded as a PNG: the primitive's baseColorTexture.
 bool saveGlb(const std::string& path, const Mesh& mesh, const std::string& name, std::string& error);
-// One node and mesh per object (SubTool), each with its own morph targets;
+// One node and mesh per object (Part), each with its own morph targets;
 // with several, the scene is called `sceneName`. `animation` (optional, e.g. a
 // baked face take) becomes a glTF animation on the morph target weights of
 // every object with layers of those names (other targets keyed at 0).

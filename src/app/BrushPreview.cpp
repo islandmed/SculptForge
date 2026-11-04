@@ -16,13 +16,13 @@ namespace sf {
 std::unique_ptr<Mesh> sceneMesh(Document& doc) {
     auto out = std::make_unique<Mesh>();
     bool colors = false;
-    for (int i = 0; i < doc.subtoolCount(); ++i)
-        colors |= doc.subtools[size_t(i)].visible &&
-                  doc.subtoolMesh(i).colors.size() == doc.subtoolMesh(i).positions.size() &&
-                  !doc.subtoolMesh(i).colors.empty();
-    for (int i = 0; i < doc.subtoolCount(); ++i) {
-        if (!doc.subtools[size_t(i)].visible) continue;
-        const Mesh& m = doc.subtoolMesh(i);
+    for (int i = 0; i < doc.partCount(); ++i)
+        colors |= doc.parts[size_t(i)].visible &&
+                  doc.partMesh(i).colors.size() == doc.partMesh(i).positions.size() &&
+                  !doc.partMesh(i).colors.empty();
+    for (int i = 0; i < doc.partCount(); ++i) {
+        if (!doc.parts[size_t(i)].visible) continue;
+        const Mesh& m = doc.partMesh(i);
         const uint32_t base = uint32_t(out->positions.size());
         out->positions.insert(out->positions.end(), m.positions.begin(), m.positions.end());
         if (colors) {
@@ -82,7 +82,7 @@ void stroke(Document& d, const BrushRecipe* recipe, BrushType type, std::vector<
 // on the shared ball (see kBallRadius).
 std::unique_ptr<Mesh> sculptBrushPreview(const BrushRecipe* recipe, int type) {
     if (type == kPaintBrush) {
-        // Polypaint: a coloured S on the ball; white elsewhere, so the material shows as on the others.
+        // Vertex paint: a coloured S on the ball; white elsewhere, so the material shows as on the others.
         Mesh m = makeIcosphere(kBallDetail, kBallRadius);
         m.ensureColors(glm::vec3(1.0f));
         for (uint32_t v = 0; v < m.vertexCount(); ++v) {
@@ -114,13 +114,13 @@ std::unique_ptr<Mesh> sculptBrushPreview(const BrushRecipe* recipe, int type) {
             stroke(d, nullptr, bt, line({dx - 0.28f, -0.42f, 2.0f}, {dx + 0.12f, 0.42f, 2.0f}), 0.15f, 1.0f, false);
         }
         break;
-    case BrushType::ClayBuildup: // a hash of square, flat-topped bars, built up in two directions
+    case BrushType::ClayBlock: // a hash of square, flat-topped bars, built up in two directions
         for (float o : {-0.2f, 0.2f}) {
             stroke(d, nullptr, bt, line({-0.5f, o, 2.0f}, {0.5f, o, 2.0f}), 0.13f, 0.1f, false);
             stroke(d, nullptr, bt, line({o, -0.5f, 2.0f}, {o, 0.5f, 2.0f}), 0.13f, 0.1f, false);
         }
         break;
-    case BrushType::DamStandard: // one deep, sharp diagonal cut
+    case BrushType::SharpCrease: // one deep, sharp diagonal cut
         stroke(d, nullptr, bt, line({-0.55f, 0.45f, 2.0f}, {0.55f, -0.45f, 2.0f}), 0.2f, 1.0f, false);
         stroke(d, nullptr, bt, line({-0.55f, 0.45f, 2.0f}, {0.55f, -0.45f, 2.0f}), 0.2f, 1.0f, false);
         break;

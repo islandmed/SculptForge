@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// UV Editor (core/Uv.h): UV topology, the unwrap solvers (LSCM, least stretch, polygroups, planar, unfold), cut
+// UV Editor (core/Uv.h): UV topology, the unwrap solvers (LSCM, least stretch, face groups, planar, unfold), cut
 // graphs for closed pieces, packing into one tile and across UDIM tiles, texel density, trim sheets, seams,
 // weld / split / straighten, the uv_* commands with undo, painted textures following the UVs, and the cost on
 // a million triangles.
@@ -55,7 +55,7 @@ size_t flippedTriangles(const Mesh& m) {
     return size_t(std::count(s.begin(), s.end(), -1.0f));
 }
 
-// A cube whose six sides are polygroups 1-6 (makeCube's), without UVs.
+// A cube whose six sides are face groups 1-6 (makeCube's), without UVs.
 Mesh cube(int res = 6) {
     Mesh m = makeCube(res);
     m.uvs.clear();
@@ -180,9 +180,9 @@ TEST(uv_unwrap_closed_sphere_gets_cut_automatically) {
     CHECK(uvStretchStats(doc.mesh).mean < 0.3f);
 }
 
-TEST(uv_unwrap_by_polygroups_gives_one_flat_island_per_side) {
+TEST(uv_unwrap_by_facegroups_gives_one_flat_island_per_side) {
     Document doc = makeDoc(cube());
-    const CommandResult r = run(doc, "uv_unwrap", {{"method", std::string("polygroups")}});
+    const CommandResult r = run(doc, "uv_unwrap", {{"method", std::string("facegroups")}});
     CHECK(r.ok);
     const UvTopology topo = buildUvTopology(doc.mesh);
     CHECK(topo.islandCount == 6);
@@ -199,7 +199,7 @@ TEST(uv_unwrap_by_polygroups_gives_one_flat_island_per_side) {
 TEST(uv_unwrap_planar_and_conformal_methods) {
     for (const char* method : {"planar", "conformal", "auto"}) {
         Document doc = makeDoc(cube(4));
-        uvSeamsFromPolygroups(doc.mesh, cornerTwins(doc.mesh));
+        uvSeamsFromFaceGroups(doc.mesh, cornerTwins(doc.mesh));
         const CommandResult r = run(doc, "uv_unwrap", {{"method", std::string(method)}});
         CHECK(r.ok);
         CHECK(doc.mesh.hasUvs());
@@ -211,7 +211,7 @@ TEST(uv_unwrap_planar_and_conformal_methods) {
 
 TEST(uv_unfold_keeps_pins_and_layout) {
     Document doc = makeDoc(cube(4));
-    CHECK(run(doc, "uv_unwrap", {{"method", std::string("polygroups")}}).ok);
+    CHECK(run(doc, "uv_unwrap", {{"method", std::string("facegroups")}}).ok);
     const std::vector<glm::vec2> before = doc.mesh.uvs;
     // Pin one corner after nudging it; Unfold keeps it there.
     const UvTopology topo = buildUvTopology(doc.mesh);
@@ -231,7 +231,7 @@ TEST(uv_unfold_keeps_pins_and_layout) {
 
 TEST(uv_pack_one_tile_and_udim_tiles) {
     Document doc = makeDoc(cube());
-    CHECK(run(doc, "uv_unwrap", {{"method", std::string("polygroups")}}).ok);
+    CHECK(run(doc, "uv_unwrap", {{"method", std::string("facegroups")}}).ok);
     // Across four UDIM tiles: six equal squares fit best four to a tile, so two tiles (1001, 1002) hold them
     // at twice the size one tile would give.
     CommandResult r = run(doc, "uv_pack", {{"tiles", 4.0}, {"margin", 16.0}});
@@ -275,7 +275,7 @@ TEST(uv_pack_rectangles) {
 
 TEST(uv_texel_density_set_and_match) {
     Document doc = makeDoc(cube());
-    CHECK(run(doc, "uv_unwrap", {{"method", std::string("polygroups")}}).ok);
+    CHECK(run(doc, "uv_unwrap", {{"method", std::string("facegroups")}}).ok);
     // Make the islands differ, then match them.
     UvTopology topo = buildUvTopology(doc.mesh);
     std::vector<uint8_t> one(topo.islandCount, 0);
@@ -325,15 +325,15 @@ TEST(uv_trim_sheet_strips) {
     CHECK(!parseTrimStrips("banana", strips, err));
 
     Document doc = makeDoc(cube());
-    CHECK(run(doc, "uv_unwrap", {{"method", std::string("polygroups")}}).ok);
-    CHECK(run(doc, "uv_select", {{"op", std::string("polygroup")}, {"group", 1.0}, {"mode", std::string("island")}}).ok);
+    CHECK(run(doc, "uv_unwrap", {{"method", std::string("facegroups")}}).ok);
+    CHECK(run(doc, "uv_select", {{"op", std::string("facegroup")}, {"group", 1.0}, {"mode", std::string("island")}}).ok);
     CommandResult r = run(doc, "uv_trim", {{"strip", 2.0}, {"strips", std::string("4")}, {"fit_width", true}});
     CHECK(r.ok);
     // The selected island sits in strip 2 (v 0.5 - 0.75) across u 0-1.
     const UvTopology topo = buildUvTopology(doc.mesh);
     glm::vec2 lo(1e30f), hi(-1e30f);
     for (uint32_t t = 0; t < doc.mesh.triangleCount(); ++t) {
-        if (doc.mesh.polygroupAt(t) != 1) continue;
+        if (doc.mesh.facegroupAt(t) != 1) continue;
         for (uint32_t j = 0; j < 3; ++j) lo = glm::min(lo, doc.mesh.uvs[t * 3 + j]), hi = glm::max(hi, doc.mesh.uvs[t * 3 + j]);
     }
     CHECK(lo.y >= 0.5f - 1e-4f && hi.y <= 0.75f + 1e-4f);
@@ -341,9 +341,9 @@ TEST(uv_trim_sheet_strips) {
     CHECK(hi.y - lo.y > 0.2f); // filled the strip's height (less the margin)
 }
 
-TEST(uv_seams_path_polygroups_and_angle) {
+TEST(uv_seams_path_facegroups_and_angle) {
     Document doc = makeDoc(cube(4));
-    CommandResult r = run(doc, "uv_seam", {{"op", std::string("polygroups")}});
+    CommandResult r = run(doc, "uv_seam", {{"op", std::string("facegroups")}});
     CHECK(r.ok);
     CHECK(uvSeamCount(doc.mesh) == 12 * 4); // 12 cube edges, 4 segments each
     CHECK(run(doc, "uv_seam", {{"op", std::string("clear_all")}}).ok);
@@ -368,7 +368,7 @@ TEST(uv_seams_path_polygroups_and_angle) {
 
 TEST(uv_weld_split_straighten) {
     Document doc = makeDoc(cube(4));
-    CHECK(run(doc, "uv_unwrap", {{"method", std::string("polygroups")}}).ok);
+    CHECK(run(doc, "uv_unwrap", {{"method", std::string("facegroups")}}).ok);
     // Split one side's faces into two islands by its half.
     UvTopology topo = buildUvTopology(doc.mesh);
     const size_t before = topo.islandCount;
@@ -376,7 +376,7 @@ TEST(uv_weld_split_straighten) {
     for (uint32_t t = 0; t < faces.size(); ++t) {
         const glm::uvec3 tri = doc.mesh.triangles[t];
         const glm::vec3 c = (doc.mesh.positions[tri.x] + doc.mesh.positions[tri.y] + doc.mesh.positions[tri.z]) / 3.0f;
-        faces[t] = doc.mesh.polygroupAt(t) == 1 && c.x + c.y + c.z > 0.0f;
+        faces[t] = doc.mesh.facegroupAt(t) == 1 && c.x + c.y + c.z > 0.0f;
     }
     doc.uvSelection.mode = UvSelectMode::Face;
     doc.uvSelection.faces = faces;
@@ -401,7 +401,7 @@ TEST(uv_weld_split_straighten) {
 
 TEST(uv_commands_undo_redo_exactly) {
     Document doc = makeDoc(cube());
-    CHECK(run(doc, "uv_unwrap", {{"method", std::string("polygroups")}}).ok);
+    CHECK(run(doc, "uv_unwrap", {{"method", std::string("facegroups")}}).ok);
     const std::vector<glm::vec2> a = doc.mesh.uvs;
     CHECK(run(doc, "uv_transform", {{"rotate", 30.0}, {"scale", 0.5}, {"move_u", 0.1}}).ok);
     const std::vector<glm::vec2> b = doc.mesh.uvs;
@@ -423,7 +423,7 @@ TEST(uv_commands_undo_redo_exactly) {
 
 TEST(uv_selection_modes_convert) {
     Document doc = makeDoc(cube(4));
-    CHECK(run(doc, "uv_unwrap", {{"method", std::string("polygroups")}}).ok);
+    CHECK(run(doc, "uv_unwrap", {{"method", std::string("facegroups")}}).ok);
     CHECK(run(doc, "uv_select", {{"op", std::string("face")}, {"face", 0.0}, {"mode", std::string("face")}}).ok);
     CHECK(doc.uvSelection.count() == 1);
     CHECK(run(doc, "uv_select", {{"op", std::string("mode")}, {"mode", std::string("island")}}).ok);
@@ -442,13 +442,13 @@ TEST(uv_painted_texture_follows_the_new_layout) {
     // Paint each side of the cube its own colour, then repack: the model looks the same (keep_texture), but
     // with keep_texture=false the colours slide.
     Document doc = makeDoc(cube(4));
-    CHECK(run(doc, "uv_unwrap", {{"method", std::string("polygroups")}}).ok);
+    CHECK(run(doc, "uv_unwrap", {{"method", std::string("facegroups")}}).ok);
     CHECK(run(doc, "texture_create", {{"size", std::string("1024")}}).ok);
     Mesh& m = doc.mesh;
     PaintTexture& tex = *m.texture;
     bakeTexels(m, tex, [&](uint32_t t, float, float, float, int x, int y) {
         uint8_t* px = &tex.pixels[(size_t(y) * size_t(tex.width) + size_t(x)) * 4];
-        const uint32_t g = m.polygroupAt(t);
+        const uint32_t g = m.facegroupAt(t);
         px[0] = uint8_t(g * 40), px[1] = uint8_t(255 - g * 30), px[2] = uint8_t(g * 20), px[3] = 255;
     }, true);
     tex.markAllDirty();
@@ -477,7 +477,7 @@ TEST(uv_painted_texture_follows_the_new_layout) {
 
 TEST(uv_project_round_trip_keeps_seams_and_pins) {
     Document doc = makeDoc(cube(4));
-    CHECK(run(doc, "uv_seam", {{"op", std::string("polygroups")}}).ok);
+    CHECK(run(doc, "uv_seam", {{"op", std::string("facegroups")}}).ok);
     CHECK(run(doc, "uv_unwrap", {{"method", std::string("conformal")}}).ok);
     std::vector<uint32_t> corners = {0, 1, 2};
     uvSetPins(doc.mesh, corners, true);
@@ -493,17 +493,17 @@ TEST(uv_project_round_trip_keeps_seams_and_pins) {
 
 TEST(uv_editor_million_triangles_stay_interactive) {
     // An 8-level icosphere: 1.3M triangles. Topology, measures, a transform and a pack are each well under the
-    // time a frame or a click can take; a full unwrap by polygroups (in the background in the app) takes seconds.
+    // time a frame or a click can take; a full unwrap by face groups (in the background in the app) takes seconds.
     Mesh m = makeIcosphere(8);
-    // Eight polygroups by octant, as seams.
-    m.ensurePolygroups();
+    // Eight face groups by octant, as seams.
+    m.ensureFaceGroups();
     for (uint32_t t = 0; t < m.triangleCount(); ++t) {
         const glm::vec3 c = m.positions[m.triangles[t].x];
-        m.polygroups[t] = (c.x > 0) + 2 * (c.y > 0) + 4 * (c.z > 0);
+        m.facegroups[t] = (c.x > 0) + 2 * (c.y > 0) + 4 * (c.z > 0);
     }
     std::printf("  %zu triangles\n", m.triangleCount());
     UvUnwrapOptions o;
-    o.method = UvUnwrapMethod::Polygroups;
+    o.method = UvUnwrapMethod::FaceGroups;
     o.iterations = 4;
     UvUnwrapResult r;
     std::string err;

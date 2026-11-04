@@ -1,16 +1,16 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Texture transfer (core/TextureTransfer.h): Auto UV on a painted SubTool moves the paint (and its layers)
-// onto the new UVs as one undo step; voxel remesh, QRemesh and merging SubTools keep the texture; the cost at
+// Texture transfer (core/TextureTransfer.h): Auto UV on a painted Part moves the paint (and its layers)
+// onto the new UVs as one undo step; voxel remesh, QRemesh and merging Parts keep the texture; the cost at
 // 4K on a million triangles.
 #include "TestHarness.h"
 
 #include "core/AutoUv.h"
 #include "core/Commands.h"
-#include "core/Polypaint.h"
+#include "core/VertexPaint.h"
 #include "core/Primitives.h"
-#include "core/SubTools.h"
+#include "core/Parts.h"
 #include "core/Texture.h"
 #include "core/TextureTransfer.h"
 
@@ -250,13 +250,13 @@ TEST(texture_transfer_merge_keeps_both_textures) {
     }
     Mesh plain = makeIcosphere(2, 0.3f); // a part without texture comes out white
     for (auto& p : plain.positions) p += glm::vec3(-2.0f, 0.0f, 0.0f);
-    doc.addSubtool(second, "Second", false);
-    doc.addSubtool(plain, "Plain", false);
+    doc.addPart(second, "Second", false);
+    doc.addPart(plain, "Plain", false);
     CommandRegistry reg;
-    const CommandResult r = reg.execute(doc, "subtool_merge_visible", {});
+    const CommandResult r = reg.execute(doc, "part_merge_visible", {});
     CHECK(r.ok);
     CHECK(r.message.find("textures kept") != std::string::npos);
-    CHECK(doc.subtoolCount() == 1);
+    CHECK(doc.partCount() == 1);
     CHECK(hasTexture(doc.mesh));
     CHECK(doc.mesh.texture->width == 2048);
     // Points on the two painted spheres follow the pattern; the plain one is white.
@@ -463,8 +463,8 @@ TEST(texture_transfer_carries_material_channels) {
         second.uvs = uv.uvs;
         second.texture = makeTexture(1024, 1024);
         second.paintToTexture = true;
-        doc.addSubtool(second, "Second", false);
-        CHECK(reg.execute(doc, "subtool_merge_visible", {}).ok);
+        doc.addPart(second, "Second", false);
+        CHECK(reg.execute(doc, "part_merge_visible", {}).ok);
         CHECK(channelEnabled(*doc.mesh.texture, Channel::Roughness));
         std::vector<float> first, other;
         for (const auto& s : randomPoints(doc.mesh, 3000, 5)) {

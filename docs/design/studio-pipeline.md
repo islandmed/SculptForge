@@ -95,7 +95,7 @@ they want to sculpt fixes *on* a pose and send back a clean delta in the bind sp
 |---|---|---|
 | USD export | `.usda`/`.usdz` written without the SDK: one `Mesh` per Part under a root Xform, UVs as face-varying `primvars:st`, `displayColor`, UsdPreviewSurface (clay/painted/textured), sculpt layers as UsdSkel blend shapes on a joint-less Skeleton with a `SkelAnimation` (time-sampled face takes), Gaussian splats as `ParticleField3DGaussianSplat`. Checked with `usdchecker` 26.08. | `src/io/UsdIO.*` |
 | USD import | `.usda` and text-root `.usdz`: meshes, xform ops, Z-up, UVs, blend shapes, splats. **No `.usdc`, no references or payloads, no variants.** | `src/io/UsdIO.*` |
-| Other formats | FBX read (ufbx, any version) and write (7.4 binary, blend shapes, LOD groups); glTF/GLB (morph targets, `KHR_gaussian_splatting`, Khronos-validated); OBJ, PLY, STL (mm, Z-up), .Bridge files | `src/io/` |
+| Other formats | FBX read (ufbx, any version) and write (7.4 binary, blend shapes, LOD groups); glTF/GLB (morph targets, `KHR_gaussian_splatting`, Khronos-validated); OBJ, PLY, STL (mm, Z-up), Bridge files | `src/io/` |
 | VFX-RP builds | CY2026 (Rocky 8, glibc 2.28) and CY2027 (Rocky 9, glibc 2.34) tarballs, x86_64 and ARM64; CI checks glibc symbols; dependencies static (SDL3, ImGui, GLM, ufbx) | CI, `docs/studios.md` |
 | rez | `packaging/rez/package.py`: `PATH`, `PYTHONPATH`, `SCULPTFORGE_ROOT`, studio brush share | `packaging/rez/` |
 | Python | `import sculptforge`: `Document`, `run`, `run_script`, `commands()`, NumPy vertices and triangles, layers and deltas; releases the GIL | `src/python/module.cpp` |
@@ -435,7 +435,7 @@ Effort: about 0.75 w once AI tools ships (policy and choke points 0.4, UI/report
 These go out with the next release's lockstep, alongside the guide and site.
 
 **Files and code.**
-- File parsers (OBJ, FBX, glTF, PLY, USD/USDZ, images, .Bridge files, brushes, packs) are tested against hostile and
+- File parsers (OBJ, FBX, glTF, PLY, USD/USDZ, images, Bridge files, brushes, packs) are tested against hostile and
   malformed files, including fuzzer-found cases (`tests/test_malformed_files.cpp`). *(P1)* Continuous fuzzing in CI. Bridges exchange files through one folder, checked strictly (no paths outside it, no
   links, size limits), and nothing in the folder is ever executed.
 - No plug-ins from the network. Packs are reviewed and installed by the user, never by an AI agent. Studio

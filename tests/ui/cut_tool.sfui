@@ -2,11 +2,11 @@
 # Duplicate Part's shortcut (Ctrl+Shift+D).
 run new_sphere subdivisions=5
 # Duplicate Part: Ctrl+Shift+D (then the copy goes again).
-expect_value subtools == 1
+expect_value parts == 1
 key ctrl+shift+d
-expect_value subtools == 2
-run subtool_delete
-expect_value subtools == 1
+expect_value parts == 2
+run part_delete
+expect_value parts == 1
 remember triangles full
 hold ctrl+shift
 click "##tile.brush"

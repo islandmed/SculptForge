@@ -140,7 +140,7 @@ bool App::kelvinPump() {
     s.view.probe = nullptr;
     s.view.radiusProbe = nullptr;
     s.view.settings = dabSettings();
-    s.uploadId = doc_.activeSubtoolInfo().id;
+    s.uploadId = doc_.activePartInfo().id;
     renderer_.setPersistentUpload(uiPrefs_.fastUpload);
     renderer_.bindStrokeUpload(s.uploadId, s.upload);
     s.prepare = &displayedMesh() == &doc_.mesh;
@@ -521,7 +521,7 @@ void App::drawCaptureWindow() {
     ui::HelpText("Detail Clone", nullptr, "Paint copies of the captured detail along your strokes, each turned to follow the stroke.", help);
     ImGui::SameLine();
     if (ImGui::Button("Save to Library##capture", ImVec2(w2, 0))) {
-        // The VDM into the brush library, the alpha into the LightBox's Alphas folder.
+        // The VDM into the brush library, the alpha into the Library's Alphas folder.
         Args a = args();
         a["save"] = true;
         runCommand("capture_vdm", a);

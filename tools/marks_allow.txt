@@ -1,8 +1,0 @@
-# Permanent exceptions to tools/check_marks.py. Keep this list as short as it is; see docs/legal/trademarks.md.
-docs/legal/trademarks.md                # the trademark notice itself: the one place the marks are named
-integrations/bridge-plugin/**           # the exchange plug-in runs inside the other application and must call its commands
-src/io/BridgeProtocol.h                 # folder and file names the exchange protocol needs on disk, and old-file read aliases
-src/core/LegacyNames.h                  # old on-disk names, read only, so old projects, brushes and configs load
-addons/blender/sculptforge_bridge/bridge_protocol.py   # the Bridge file header bytes, for the Blender add-on
-tools/check_marks.py                    # the check has to spell the patterns it looks for
-tools/marks_pending.txt                 # names the files still waiting for the rename

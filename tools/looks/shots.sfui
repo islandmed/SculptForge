@@ -6,13 +6,13 @@
 run open path=assets/demo/lion-head.glb
 wait_idle 20
 
-run ui_look look=classic layout=zbrush
+run ui_look look=classic layout=classic
 run open path=assets/demo/lion-head.glb
 wait_idle 20
 click "Clay##brush.clay"
 hover_model 0.52 0.42
 wait 0.3
-shot classic-zbrush-layout
+shot classic-classic-layout
 
 run ui_look look=forge scheme=tokyo_night
 run open path=assets/demo/lion-head.glb

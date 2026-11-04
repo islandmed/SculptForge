@@ -75,4 +75,4 @@ a=np.array([list(map(float,l.split()[1:])) for l in out.stdout.strip().split('\n
 tex=[l.split('filename=')[1].split()[0] for l in out.stderr.split('\n') if 'tex filename=' in l]
 compare('FBX',a[:,:3],a[:,3:5],Image.open(tex[0] if os.path.isabs(tex[0]) else os.path.join(D,tex[0])),True)
 print('Expect ~90% or more per format: the rest are corners on UV seams and checker borders, where a vertex\'s one '
-      'polypaint colour cannot match every corner. A flipped convention gives under 1%.')
+      'vertexpaint colour cannot match every corner. A flipped convention gives under 1%.')

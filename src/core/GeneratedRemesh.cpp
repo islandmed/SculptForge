@@ -64,7 +64,7 @@ bool remeshGenerated(const Mesh& raw, GeneratedRemesh mode, int resolution, int 
                 std::vector<glm::vec3> positions;
                 ProjectStats ps;
                 ProjectOptions po;
-                po.polypaint = false;
+                po.vertexpaint = false;
                 if (!computeProjection(quads, {&voxel}, po, positions, nullptr, ps, error)) return false;
                 quads.layerTarget(-1) = positions;
                 quads.recomputeAllNormals();

@@ -11,7 +11,7 @@
 #include "core/Deform.h"
 #include "core/Primitives.h"
 #include "core/Sculpt.h"
-#include "core/ZSpheres.h"
+#include "core/ForgeSpheres.h"
 
 #include <algorithm>
 #include <chrono>
@@ -436,22 +436,22 @@ TEST(deform_large_mesh_timing) {
 
 // --- Forge Spheres: Set as root --------------------------------------------------------------------------
 
-TEST(zspheres_set_root) {
+TEST(forgespheres_set_root) {
     // Root 0, an arm 1 from it, a hand 2 from the arm, a head 3 from the root.
-    std::vector<ZSphere> s{{vec3(0.0f), 0.5f, -1}, {vec3(1, 0, 0), 0.3f, 0}, {vec3(2, 0, 0), 0.2f, 1}, {vec3(0, 1, 0), 0.3f, 0}};
-    const std::vector<ZSphere> before = s;
-    CHECK(!zsphereSetRoot(s, 0) && !zsphereSetRoot(s, 9));
-    CHECK(zsphereSetRoot(s, 2));
-    CHECK(zspheresValidate(s).empty());
+    std::vector<ForgeSphere> s{{vec3(0.0f), 0.5f, -1}, {vec3(1, 0, 0), 0.3f, 0}, {vec3(2, 0, 0), 0.2f, 1}, {vec3(0, 1, 0), 0.3f, 0}};
+    const std::vector<ForgeSphere> before = s;
+    CHECK(!forgesphereSetRoot(s, 0) && !forgesphereSetRoot(s, 9));
+    CHECK(forgesphereSetRoot(s, 2));
+    CHECK(forgespheresValidate(s).empty());
     // The hand is the root now (index 0), the old root took its index (2).
     CHECK(s[0].center == before[2].center && s[0].parent == -1);
     CHECK(s[2].center == before[0].center && s[2].parent == 1); // the old root hangs from the arm
     CHECK(s[1].parent == 0);                                    // the arm from the hand
     CHECK(s[3].parent == 2);                                    // the head still from the old root
     // Same spheres, same links (as unordered pairs of centres).
-    auto links = [](const std::vector<ZSphere>& z) {
+    auto links = [](const std::vector<ForgeSphere>& z) {
         std::vector<std::pair<float, float>> out;
-        for (const ZSphere& a : z)
+        for (const ForgeSphere& a : z)
             if (a.parent >= 0) {
                 const float p = a.center.x + 10.0f * a.center.y, q = z[size_t(a.parent)].center.x + 10.0f * z[size_t(a.parent)].center.y;
                 out.push_back({std::min(p, q), std::max(p, q)});
@@ -463,11 +463,11 @@ TEST(zspheres_set_root) {
     // The command, with undo.
     Document doc;
     CommandRegistry reg;
-    CHECK(reg.execute(doc, "zsphere_new", {{"radius", 0.5}}).ok);
-    CHECK(reg.execute(doc, "zsphere_add", {{"parent", 0.0}, {"position", std::string("1,0,0")}, {"radius", 0.25}}).ok);
-    CHECK(!reg.execute(doc, "zsphere_set_root", {{"index", 0.0}}).ok);
-    CHECK(reg.execute(doc, "zsphere_set_root", {{"index", 1.0}}).ok);
-    CHECK(doc.mesh.zspheres[0].center.x == 1.0f && doc.mesh.zspheres[1].parent == 0);
+    CHECK(reg.execute(doc, "forgesphere_new", {{"radius", 0.5}}).ok);
+    CHECK(reg.execute(doc, "forgesphere_add", {{"parent", 0.0}, {"position", std::string("1,0,0")}, {"radius", 0.25}}).ok);
+    CHECK(!reg.execute(doc, "forgesphere_set_root", {{"index", 0.0}}).ok);
+    CHECK(reg.execute(doc, "forgesphere_set_root", {{"index", 1.0}}).ok);
+    CHECK(doc.mesh.forgespheres[0].center.x == 1.0f && doc.mesh.forgespheres[1].parent == 0);
     CHECK(doc.undo.undo(doc.mesh, doc.bvh));
-    CHECK(doc.mesh.zspheres[0].center.x == 0.0f);
+    CHECK(doc.mesh.forgespheres[0].center.x == 0.0f);
 }

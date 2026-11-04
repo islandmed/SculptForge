@@ -36,8 +36,8 @@ std::string symmetryAxes(const Symmetry& s) { return std::string(s.x ? "x" : "")
 void App::refreshSymmetryPivot() {
     if (!symmetry_.local) return;
     if (doc_.sculptor.strokeActive() || solverBusy()) return; // (the centre holds still during a stroke)
-    const uint64_t key = doc_.undo.revision() * 0x9E3779B97F4A7C15ull ^ (uint64_t(doc_.activeSubtool) << 40) ^
-                         uint64_t(doc_.mesh.vertexCount()) ^ (uint64_t(doc_.subtools.size()) << 56);
+    const uint64_t key = doc_.undo.revision() * 0x9E3779B97F4A7C15ull ^ (uint64_t(doc_.activePart) << 40) ^
+                         uint64_t(doc_.mesh.vertexCount()) ^ (uint64_t(doc_.parts.size()) << 56);
     if (key == symmetryPivotKey_) return;
     symmetryPivotKey_ = key;
     symmetry_.pivot = symmetryPivot(doc_.mesh);
@@ -78,7 +78,7 @@ void App::beginMaskStroke(float x, float y) {
     precisionActive_ = false;
     pickSmoother_.reset();
     strokeCurve_ = PressurePoints(); // (mask strokes: the tablet's curve only)
-    // ZBrush: a Ctrl+click on the model blurs the mask (Ctrl+Alt+click sharpens it); only a drag paints. The
+    // a Ctrl+click on the model blurs the mask (Ctrl+Alt+click sharpens it); only a drag paints. The
     // pen's eraser end set to Erase mask paints straight away.
     maskClickPending_ = ctrlDown(inputMods()) && !blenderStyle(); // (Blender's Mask brush dabs on a click)
     maskClickX_ = x;
@@ -93,7 +93,7 @@ void App::maskClickRelease() {
     if (anyMasked(doc_.mesh)) runCommand(sharpen ? "mask_sharpen" : "mask_blur");
 }
 
-// ZBrush convention: Ctrl+drag on the background with MaskPen draws a mask rectangle (#48) that masks what it
+// classic convention: Ctrl+drag on the background with MaskPen draws a mask rectangle (#48) that masks what it
 // covers, and clears the mask when it covers none of the model. With nothing masked the SculptForge input style
 // zooms instead, as it did before masking existed.
 void App::maskCanvasMove(float x, float y) {
@@ -125,7 +125,7 @@ void App::maskSelectMouseUp() {
     const bool alt = (inputMods() & SDL_KMOD_ALT) != 0;
     if (!selectMoved_) {
         // A click on the background inverts the mask, as with MaskPen; on the model it blurs the mask (Alt:
-        // sharpens it), as with MaskPen and as in ZBrush whichever mask brush is picked (#51).
+        // sharpens it), as with MaskPen and whichever mask brush is picked (#51).
         doc_.syncBvh();
         RayHit hit;
         if (!pick(selectPath_.front().x, selectPath_.front().y, hit)) {
@@ -136,7 +136,7 @@ void App::maskSelectMouseUp() {
         return;
     }
     // Mask the inside, or unmask it with Alt (Mask Strength sets how much), mirrored by the symmetry like a mask
-    // stroke (#51). A shape that covers none of the model clears the mask instead (ZBrush).
+    // stroke (#51). A shape that covers none of the model clears the mask instead.
     runSelection("mask_rect", "mask_lasso",
                  withSymmetryArgs({{"unmask", alt}, {"strength", double(maskStrength_)}, {"clear_outside", !alt},
                                    {"front_faces_only", maskFrontFacesOnly_}}));
@@ -248,7 +248,7 @@ void App::drawMaskingSection() {
     ImGui::SetNextItemWidth(-1);
     ui::SliderInside("##cavitythreshold", &cavityThreshold_, -0.2f, 0.5f, "Threshold %.2f");
     if (ImGui::Button(tr("By face group"), ImVec2(half, 0)))
-        runCommand("mask_by_polygroup", {{"group", double(maskGroup_)}});
+        runCommand("mask_by_facegroup", {{"group", double(maskGroup_)}});
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Mask one face group (replaces the mask)"));
     ImGui::SameLine();
     // The group id as a drag field the size of the button beside it (Ctrl+click or double-click types a number),
@@ -257,10 +257,10 @@ void App::drawMaskingSection() {
     if (ImGui::DragInt("##maskgroup", &maskGroup_, 0.1f, 0, 1 << 30, tr("Group %d"), ImGuiSliderFlags_AlwaysClamp))
         maskGroup_ = std::max(0, maskGroup_);
 
-    // Mask from the mesh border (#61): open edges, optionally polygroup borders, a few rings wide.
+    // Mask from the mesh border (#61): open edges, optionally face group borders, a few rings wide.
     if (ImGui::Button("By border##mask", ImVec2(half, 0)))
         runCommand("mask_border", {{"rings", double(maskBorderRings_)},
-                                   {"polygroups", maskBorderGroups_},
+                                   {"facegroups", maskBorderGroups_},
                                    {"soft", maskBorderSoft_},
                                    {"strength", double(maskStrength_)}});
     ui::HelpText("By border", nullptr,

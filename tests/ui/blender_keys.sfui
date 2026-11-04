@@ -1,12 +1,12 @@
 # The Blender input style (#12): Preferences > Input > Blender, middle-drag navigation and Alt+left-drag for pens,
 # the numpad views (orthographic until turned), Blender's sculpt-mode brush letters, F / Shift+F, Ctrl to invert,
 # M for the Mask brush, H / Shift+H / Alt+H, Alt+1 / Alt+2, Emulate Numpad, the Controls window, a keymap
-# exported from Blender, and back to the ZBrush style with its keys intact.
-run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+# exported from Blender, and back to the classic with its keys intact.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=4
-# New installs start with the SculptForge keys; this script is about the ZBrush-style ones.
+# New installs start with the SculptForge keys; this script is about the classic ones.
 expect_value input_style == 1
-input_style zbrush
+input_style classic
 expect_value input_style == 0
 expect_value shortcut_conflicts == 0
 # The numpad views work in every style.
@@ -208,7 +208,7 @@ key m
 key s
 expect_value mask_brush == 0
 
-# --- H hides the polygroup under the cursor, Shift+H shows only it, Alt+H shows everything ---
+# --- H hides the face group under the cursor, Shift+H shows only it, Alt+H shows everything ---
 key v
 key m
 stroke 0.0 0.3 1.0 0.3
@@ -264,7 +264,7 @@ click "Mouse & pen"
 expect_text Middle drag
 shot controls-blender
 # The style row in Controls switches too.
-click "Classic sculpting keys##input.style_zbrush"
+click "Classic sculpting keys##input.style_classic"
 expect_value input_style == 0
 expect_text Alt + click it
 key f1
@@ -285,14 +285,14 @@ expect_value brush_type == 0
 key shift+q
 expect_value brush_type == 9
 
-# --- Back to ZBrush: its keys and gestures are as they were (the imported keys stay until Restore Standard UI) ---
+# --- Back to its keys and gestures are as they were (the imported keys stay until Restore Standard UI) ---
 click "Preferences##palette.preferences"
 click "Config##preferences.config"
 click "Restore Standard UI##config.restore_standard"
 expect_value shortcut_conflicts == 0
 expect_shortcut brush.standard V
 key f1
-click "Classic sculpting keys##input.style_zbrush"
+click "Classic sculpting keys##input.style_classic"
 key f1
 expect_value input_style == 0
 expect_value shortcut_conflicts == 0

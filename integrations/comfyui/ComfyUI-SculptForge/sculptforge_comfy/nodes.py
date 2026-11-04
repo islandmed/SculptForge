@@ -355,7 +355,7 @@ class SculptForgeMeshInfo:
         return {"required": {"mesh": (MESH_IN,)}, "hidden": {"unique_id": "UNIQUE_ID"}}
 
     def info(self, mesh, unique_id=None):
-        stdout = cli.run("open path=$IN; mesh_info; subtool_list", {"IN": _source(mesh)})  # marks-pending
+        stdout = cli.run("open path=$IN; mesh_info; part_list", {"IN": _source(mesh)})
         lines = [l.split(": ", 1)[-1] if re.match(r"^\w+: ", l) else l for l in stdout.strip().splitlines()[1:]]
         text = "\n".join(lines)
         paths.show_text(text, unique_id)

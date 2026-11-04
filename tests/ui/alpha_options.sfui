@@ -1,7 +1,7 @@
 # #76: alpha options in the Alpha palette. Follow stroke direction turns the alpha along the stroke (Blender's Rake
 # smoothing), Angle adds a fixed turn, Tile repeats the alpha in the dab; all kept per brush (#78), and custom
 # (recipe) brushes turn their alpha the same way.
-run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=4
 key f
 click "Standard##brush.standard"

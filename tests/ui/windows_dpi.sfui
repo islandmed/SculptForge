@@ -10,12 +10,12 @@ expect_value right_tray_shown == 1
 expect_value offscreen_items == 0
 shot sculptforge-1280
 key ,
-expect_value lightbox_open == 1
+expect_value library_open == 1
 wait_idle 30
 expect_value offscreen_items == 0
 shot library-1280
 key escape
-expect_value lightbox_open == 0
+expect_value library_open == 0
 
 run ui_look look=phosphor
 wait_idle 30
@@ -27,7 +27,7 @@ expect_value right_tray_shown == 1
 expect_value offscreen_items == 0
 shot blueprint-1280
 
-run ui_look look=classic layout=zbrush
+run ui_look look=classic layout=classic
 wait_idle 30
 expect_value right_tray_shown == 1
 expect_value offscreen_items == 0

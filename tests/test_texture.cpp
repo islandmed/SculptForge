@@ -10,7 +10,7 @@
 #include "core/AutoUv.h"
 #include "core/BrushAlpha.h"
 #include "core/Commands.h"
-#include "core/Polypaint.h"
+#include "core/VertexPaint.h"
 #include "core/Primitives.h"
 #include "core/Project.h"
 #include "core/Texture.h"
@@ -287,7 +287,7 @@ TEST(texture_layers_composite_merge_and_round_trip) {
     CommandRegistry reg;
     CHECK(reg.execute(doc, "paint_fill", {{"color", std::string("#808080")}, {"area", std::string("all")}}).ok);
     CHECK(reg.execute(doc, "paint_layer_add", {{"blend", std::string("multiply")}, {"name", std::string("Dirt")}}).ok);
-    CHECK(doc.mesh.paintLayers.empty()); // the texture's stack, not polypaint's
+    CHECK(doc.mesh.paintLayers.empty()); // the texture's stack, not vertex paint's
     CHECK(doc.mesh.texture->layers.size() == 1 && doc.mesh.texture->activeLayer == 0);
     TexturePainter painter;
     CHECK(painter.begin(doc.mesh));
@@ -418,7 +418,7 @@ TEST(texture_copies_are_independent) {
     Mesh a = texturedPlane(8, 64);
     a.rebuildTopology();
     a.recomputeAllNormals();
-    Mesh b = a; // e.g. a duplicated SubTool or an undo snapshot: shares the texture until one changes it
+    Mesh b = a; // e.g. a duplicated Part or an undo snapshot: shares the texture until one changes it
     CHECK(a.texture == b.texture);
     BVH bvh;
     bvh.build(a);
@@ -446,19 +446,19 @@ TEST(texture_commands) {
     CHECK(doc.undo.undo(doc.mesh, doc.bvh));
     CHECK(doc.mesh.texture->width == 1024);
 
-    // Fills paint the texture (the vertices stay unpainted), Texture > Polypaint copies it over.
+    // Fills paint the texture (the vertices stay unpainted), Texture > Vertex paint copies it over.
     CHECK(reg.execute(doc, "paint_fill", {{"color", std::string("#ff0000")}}).ok);
     CHECK(!doc.mesh.hasColors());
     CHECK(paintedTexels(*doc.mesh.texture) > 100000);
-    CHECK(reg.execute(doc, "polypaint_from_texture").ok);
+    CHECK(reg.execute(doc, "vertexpaint_from_texture").ok);
     CHECK(doc.mesh.hasColors());
     CHECK(glm::all(glm::lessThan(glm::abs(doc.mesh.colors[0] - glm::vec3(1, 0, 0)), glm::vec3(0.02f))));
 
-    // Polypaint > Texture bakes vertex colours (green) back.
+    // Vertex paint > Texture bakes vertex colours (green) back.
     CHECK(reg.execute(doc, "paint_target", {{"target", std::string("vertex")}}).ok);
     CHECK(!paintsTexture(doc.mesh));
     CHECK(reg.execute(doc, "paint_fill", {{"color", std::string("#00ff00")}}).ok);
-    CHECK(reg.execute(doc, "texture_from_polypaint").ok);
+    CHECK(reg.execute(doc, "texture_from_vertexpaint").ok);
     CHECK(paintsTexture(doc.mesh));
     const glm::vec3 c = sampleTexture(*doc.mesh.texture, doc.mesh.uvs[0]);
     CHECK(c.y > 0.9f && c.x < 0.05f);
@@ -613,7 +613,7 @@ TEST(texture_dab_is_deterministic_with_threads) {
 }
 
 TEST(texture_dab_sharpness_does_not_depend_on_mesh_density) {
-    // The ZBrush tester's "resolution depends on the geometry density": a hard square alpha on a 2-triangle
+    // The classic tester's "resolution depends on the geometry density": a hard square alpha on a 2-triangle
     // plane must give the same texels as on a 64x64 plane, with an edge as sharp as the texture allows.
     BrushAlpha square; // fully opaque up to the square's edge: the hardest possible stamp
     square.width = square.height = 4;

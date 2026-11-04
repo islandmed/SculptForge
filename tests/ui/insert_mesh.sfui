@@ -1,13 +1,13 @@
-# #34: Append > Insert on the model with your own mesh: a copy of another SubTool, or a model file.
+# #34: Append > Insert on the model with your own mesh: a copy of another Part, or a model file.
 run new_sphere subdivisions=4
 key f
 click "Parts/Append"
 click "Cube"
-expect_value subtools == 2
-run subtool_select index=0
+expect_value parts == 2
+run part_select index=0
 key f
 
-# A copy of the Cube SubTool, dragged onto the sphere (X symmetry is on: a mirrored copy too), one undo step.
+# A copy of the Cube Part, dragged onto the sphere (X symmetry is on: a mirrored copy too), one undo step.
 remember triangles base
 click "Parts/Append"
 hover "Insert on the model"
@@ -17,8 +17,8 @@ expect_status Insert a copy of Cube
 stroke 0.8 0.45 0.86 0.45
 expect_status 2 Cubes (mirrored)
 expect_value triangles > $base
-expect_value subtools == 2
-shot insert_subtool_copy
+expect_value parts == 2
+shot insert_part_copy
 key ctrl+z
 expect_value triangles == $base
 

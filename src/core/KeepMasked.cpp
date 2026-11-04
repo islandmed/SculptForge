@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/KeepMasked.h"
 
-#include "core/Polygroups.h"
+#include "core/FaceGroups.h"
 #include "core/QRemesh.h"
-#include "core/SubTools.h"
+#include "core/Parts.h"
 
 #include <algorithm>
 #include <string>
@@ -134,7 +134,7 @@ Mesh keptPiece(const Mesh& source, const std::vector<uint8_t>& keep, std::vector
         for (uint32_t v : sourceVertex) k.colors.push_back(source.colors[v]);
     for (uint32_t t = 0; t < nt; ++t) {
         if (!keep[t]) continue;
-        if (source.polygroups.size() == nt) k.polygroups.push_back(source.polygroups[t]);
+        if (source.facegroups.size() == nt) k.facegroups.push_back(source.facegroups[t]);
         if (source.hidden.size() == nt) k.hidden.push_back(source.hidden[t]);
         if (source.uvs.size() == nt * 3)
             for (int c = 0; c < 3; ++c) k.uvs.push_back(source.uvs[size_t(t) * 3 + size_t(c)]);
@@ -341,7 +341,7 @@ bool stitchOnce(const Mesh& source, const std::vector<uint8_t>& keep, const Mesh
     Mesh merged = mergeMeshes({&kept, &rest});
     const uint32_t offset = uint32_t(kept.vertexCount());
     const size_t keptTris = kept.triangleCount();
-    const uint32_t bridgeGroup = merged.polygroups.size() > keptTris ? merged.polygroups[keptTris] : 0u;
+    const uint32_t bridgeGroup = merged.facegroups.size() > keptTris ? merged.facegroups[keptTris] : 0u;
     std::vector<glm::uvec3> bridge;
     for (size_t l = 0; l < keptLoops.size(); ++l) {
         const auto& P = keptLoops[l];
@@ -377,7 +377,7 @@ bool stitchOnce(const Mesh& source, const std::vector<uint8_t>& keep, const Mesh
     }
     for (const glm::uvec3& t : bridge) {
         merged.triangles.push_back(t);
-        if (!merged.polygroups.empty()) merged.polygroups.push_back(bridgeGroup);
+        if (!merged.facegroups.empty()) merged.facegroups.push_back(bridgeGroup);
         if (!merged.hidden.empty()) merged.hidden.push_back(0);
         if (!merged.uvs.empty()) merged.uvs.insert(merged.uvs.end(), 3, glm::vec2(0.0f));
         if (!merged.quadPartners.empty()) merged.quadPartners.push_back(Mesh::kNoQuad);

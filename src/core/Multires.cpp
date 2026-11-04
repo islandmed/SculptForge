@@ -63,7 +63,7 @@ void assignLevelArrays(Mesh& out, const Mesh& m) {
     out.positions = m.positions;
     out.mask = m.mask;
     out.colors = m.colors;
-    out.polygroups = m.polygroups;
+    out.facegroups = m.facegroups;
     out.hidden = m.hidden;
     out.uvs = m.uvs;
     out.quadPartners = m.quadPartners;
@@ -1290,7 +1290,7 @@ void spreadShape(MultiresStack& s, int c, const Mesh& w, const Mesh& r) {
 bool levelsDiffer(const Mesh& w, const Mesh& r) {
     if (!sameArray(w.positions, r.positions) || !sameArray(w.base, r.base) || !sameLayerSet(w, r) ||
         !sameLayerWeights(w, r) || !sameArray(w.mask, r.mask) || !sameArray(w.colors, r.colors) ||
-        !sameArray(w.polygroups, r.polygroups) || !sameArray(w.hidden, r.hidden) || !sameArray(w.uvs, r.uvs) ||
+        !sameArray(w.facegroups, r.facegroups) || !sameArray(w.hidden, r.hidden) || !sameArray(w.uvs, r.uvs) ||
         !samePaintSet(w, r) || !samePaintProperties(w, r) || !sameArray(w.paintBase, r.paintBase))
         return true;
     for (size_t i = 0; i < w.layers.size(); ++i)
@@ -1330,7 +1330,7 @@ std::shared_ptr<Mesh> divideData(const SubdivTopology& tp, const Mesh& coarse) {
     }
     if (coarse.hasMask()) prolongVertices(tp, coarse.mask, fine->mask, 0.0f, nullptr, f);
     if (coarse.hasColors()) prolongVertices(tp, coarse.colors, fine->colors, glm::vec3(1.0f), nullptr, f);
-    if (coarse.hasPolygroups()) prolongFaces(tp, coarse.polygroups, fine->polygroups, 0u, nullptr, f);
+    if (coarse.hasFaceGroups()) prolongFaces(tp, coarse.facegroups, fine->facegroups, 0u, nullptr, f);
     if (coarse.hasHidden()) prolongFaces(tp, coarse.hidden, fine->hidden, uint8_t(0), nullptr, f);
     if (coarse.hasUvs()) prolongUvs(tp, coarse.uvs, fine->uvs, nullptr, f);
     if (!coarse.paintLayers.empty()) {
@@ -1398,7 +1398,7 @@ size_t subdivBytes(const Mesh& mesh) {
         const Mesh& m = *l.data;
         total += m.positions.size() * sizeof(glm::vec3) * (1 + (m.base.empty() ? 0 : 1 + m.layers.size())) +
                  m.triangles.size() * sizeof(glm::uvec3) + m.mask.size() * 4 + m.colors.size() * 12 +
-                 m.polygroups.size() * 4 + m.hidden.size() + m.uvs.size() * 8 + m.quadPartners.size() * 4 +
+                 m.facegroups.size() * 4 + m.hidden.size() + m.uvs.size() * 8 + m.quadPartners.size() * 4 +
                  m.paintBase.size() * 12;
         for (const PaintLayer& p : m.paintLayers) total += p.color.size() * 12 + p.alpha.size() * 4;
         if (l.topo) total += l.topo->bytes();
@@ -1416,7 +1416,7 @@ size_t subdivCacheBytes(const Mesh& mesh) {
         const Mesh& m = e.mesh;
         // Positions, normals and the vertex adjacency; triangles, face normals, quads and the BVH (estimated).
         total += m.vertexCount() * 80 + m.triangleCount() * 48 + m.base.size() * 12 + m.mask.size() * 4 +
-                 m.colors.size() * 12 + m.polygroups.size() * 4 + m.hidden.size() + m.uvs.size() * 8 +
+                 m.colors.size() * 12 + m.facegroups.size() * 4 + m.hidden.size() + m.uvs.size() * 8 +
                  m.paintBase.size() * 12;
         for (const SculptLayer& l : m.layers) total += l.delta.size() * 12;
         for (const PaintLayer& p : m.paintLayers) total += p.color.size() * 12 + p.alpha.size() * 4;
@@ -1436,9 +1436,9 @@ std::string subdivDroppedNote(const Mesh& mesh, const std::string& name) {
            " kept as the new base";
 }
 
-void noteSubtoolLevelsDropped(Document& doc, int index) {
-    if (index < 0 || index >= doc.subtoolCount()) return;
-    const std::string note = subdivDroppedNote(doc.subtoolMesh(index), doc.subtools[size_t(index)].name);
+void notePartLevelsDropped(Document& doc, int index) {
+    if (index < 0 || index >= doc.partCount()) return;
+    const std::string note = subdivDroppedNote(doc.partMesh(index), doc.parts[size_t(index)].name);
     if (!note.empty()) doc.notice += (doc.notice.empty() ? "" : "; ") + note;
 }
 
@@ -1516,7 +1516,7 @@ bool subdivCommit(Mesh& w) {
         for (int j = 0; j < n; ++j)
             if (j != c && hasPaintLayers(*s.levels[size_t(j)].data)) compositePaintAll(mutableData(s.levels[size_t(j)]));
     }
-    spreadFaceArray(s, c, w.polygroups, r->polygroups, 0u, [](Mesh& m) -> std::vector<uint32_t>& { return m.polygroups; });
+    spreadFaceArray(s, c, w.facegroups, r->facegroups, 0u, [](Mesh& m) -> std::vector<uint32_t>& { return m.facegroups; });
     spreadFaceArray(s, c, w.hidden, r->hidden, uint8_t(0), [](Mesh& m) -> std::vector<uint8_t>& { return m.hidden; });
     spreadUvs(s, c, w, *r);
 
@@ -2149,7 +2149,7 @@ bool subdivReconstruct(Mesh& mesh, std::string& error, BVH* bvh) {
         return false;
     }
 
-    // Coarse shape: the fine level's corner vertices, as ZBrush does (fitting the cage so its subdivision passes
+    // Coarse shape: the fine level's corner vertices (fitting the cage so its subdivision passes
     // through them overshoots badly on sharp shapes, and compounds over several levels); the detail of the fine
     // level keeps it exactly as it was.
     const std::vector<glm::vec3>& fineBase = baseChannel(mesh);
@@ -2158,7 +2158,7 @@ bool subdivReconstruct(Mesh& mesh, std::string& error, BVH* bvh) {
     std::vector<uint8_t> f;
     if (mesh.hasMask()) restrictVertices(*tp, mesh.mask, coarse.mask, 0.0f, nullptr, f);
     if (mesh.hasColors()) restrictVertices(*tp, mesh.colors, coarse.colors, glm::vec3(1.0f), nullptr, f);
-    if (mesh.hasPolygroups()) restrictFaces(*tp, mesh.polygroups, coarse.polygroups, coarse.triangleCount(), 0u, nullptr, f);
+    if (mesh.hasFaceGroups()) restrictFaces(*tp, mesh.facegroups, coarse.facegroups, coarse.triangleCount(), 0u, nullptr, f);
     if (mesh.hasHidden()) restrictFaces(*tp, mesh.hidden, coarse.hidden, coarse.triangleCount(), uint8_t(0), nullptr, f);
     if (mesh.hasUvs()) restrictUvs(*tp, coarse.triangles, mesh.uvs, coarse.uvs, nullptr, f);
     if (!rec.pairing.empty()) coarse.quadPartners = rec.pairing;
@@ -2247,7 +2247,7 @@ void applySubdivUndo(SubdivUndo& r, Mesh& mesh, BVH& bvh) {
 
 namespace {
 
-// Runs a level operation on the active SubTool as one undo step that swaps the level stack back.
+// Runs a level operation on the active Part as one undo step that swaps the level stack back.
 // `plainLevel`: for operations that can start without levels, the level of the new stack that holds the mesh
 // as it was (it is the undo's `plain` mesh, shared rather than copied).
 template <class Op>

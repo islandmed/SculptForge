@@ -764,7 +764,7 @@ struct FaceImage {
     float u0 = 0, v0 = 0;     // face coordinates of pixel (0, 0)'s centre
     float front = 0;          // where the rays start (along front)
     std::vector<float> depth; // along front; NaN = no hit
-    std::vector<float> lum;   // luminance of the polypaint (1 without)
+    std::vector<float> lum;   // luminance of the vertex paint (1 without)
     std::vector<vec3> hit;
     bool valid(int x, int y) const { return x >= 0 && y >= 0 && x < w && y < h && !std::isnan(depth[size_t(y * w + x)]); }
     float d(int x, int y) const { return depth[size_t(y * w + x)]; }
@@ -899,7 +899,7 @@ bool detectFaceLandmarks(const Mesh& mesh, const FaceFrame& frameIn, FaceLandmar
     auto idx = [&](int x, int y) { return size_t(y * W + x); };
 
     // Protrusion: depth above its blurred surroundings (the nose, brow, lips and chin stand out; eye sockets and
-    // the mouth line dip). Darkness from the polypaint helps with eyes and the mouth.
+    // the mouth line dip). Darkness from the vertex paint helps with eyes and the mouth.
     const int R = std::max(3, int(std::lround(0.06f * float(std::max(W, H)))));
     const std::vector<float> smooth = blurValid(img, img.depth, R);
     std::vector<float> P(img.depth.size(), std::nanf(""));
@@ -1383,7 +1383,7 @@ bool finishSculptable(const SplatCloud& cloud, const SculptableOptions& o, Sculp
     }
     if (o.levels > 0) {
         ProjectOptions po;
-        po.polypaint = false;
+        po.vertexpaint = false;
         po.distance = 0.03f;
         std::vector<vec3> positions;
         ProjectStats ps;
@@ -1414,8 +1414,8 @@ namespace {
 
 // An untouched starting sphere makes way for the scan (hidden, not deleted).
 void hideStartingSphere(Document& doc) {
-    if (doc.subtoolCount() == 1 && !doc.undo.canUndo() && doc.mesh.layers.empty() && !doc.mesh.hasColors())
-        doc.activeSubtoolInfo().visible = false;
+    if (doc.partCount() == 1 && !doc.undo.canUndo() && doc.mesh.layers.empty() && !doc.mesh.hasColors())
+        doc.activePartInfo().visible = false;
 }
 
 std::string captureName(const Document& doc) { return doc.splats.name.empty() ? std::string("Scan") : doc.splats.name; }
@@ -1426,12 +1426,12 @@ std::string applySculptable(Document& doc, SculptableResult& res, bool keepScan)
     const std::string base = captureName(doc);
     hideStartingSphere(doc);
     if (keepScan) {
-        const int s = doc.addSubtool(std::move(res.scan), doc.uniqueSubtoolName(base + " Scan"), false);
-        doc.subtools[size_t(s)].visible = false;
-        doc.subtools[size_t(s)].qremeshGuides = res.guides;
+        const int s = doc.addPart(std::move(res.scan), doc.uniquePartName(base + " Scan"), false);
+        doc.parts[size_t(s)].visible = false;
+        doc.parts[size_t(s)].qremeshGuides = res.guides;
     }
     const std::string report = res.report();
-    doc.addSubtool(std::move(res.mesh), doc.uniqueSubtoolName(base), true);
+    doc.addPart(std::move(res.mesh), doc.uniquePartName(base), true);
     doc.qremeshGuides = res.guides;
     doc.modified = true;
     return report;
@@ -1440,7 +1440,7 @@ std::string applySculptable(Document& doc, SculptableResult& res, bool keepScan)
 std::string applySculptableScan(Document& doc, SculptableResult& res) {
     hideStartingSphere(doc);
     const size_t splats = res.surface.used;
-    doc.addSubtool(std::move(res.scan), doc.uniqueSubtoolName(captureName(doc) + " Scan"), true);
+    doc.addPart(std::move(res.scan), doc.uniquePartName(captureName(doc) + " Scan"), true);
     doc.qremeshGuides = res.guides;
     doc.modified = true;
     char buf[160];
@@ -1457,9 +1457,9 @@ std::string applySculptableScan(Document& doc, SculptableResult& res) {
 }
 
 std::string applySculptableFinish(Document& doc, SculptableResult& res, int scanIndex, bool keepScan) {
-    if (scanIndex < 0 || scanIndex >= doc.subtoolCount()) scanIndex = doc.activeSubtool;
+    if (scanIndex < 0 || scanIndex >= doc.partCount()) scanIndex = doc.activePart;
     // "Head Scan" -> "Head", "Head Scan 2" -> "Head 2"; another name gets " Quads".
-    const std::string name = doc.subtools[size_t(scanIndex)].name;
+    const std::string name = doc.parts[size_t(scanIndex)].name;
     std::string base = name + " Quads";
     if (const size_t at = name.rfind(" Scan"); at != std::string::npos && at > 0) {
         const std::string rest = name.substr(at + 5);
@@ -1468,13 +1468,13 @@ std::string applySculptableFinish(Document& doc, SculptableResult& res, int scan
     }
     const size_t faces = res.mesh.triangleCount() - res.mesh.quadCount();
     const int levels = subdivLevelCount(res.mesh);
-    const uint32_t scanId = doc.subtools[size_t(scanIndex)].id;
-    doc.addSubtool(std::move(res.mesh), doc.uniqueSubtoolName(base), true, scanIndex + 1);
+    const uint32_t scanId = doc.parts[size_t(scanIndex)].id;
+    doc.addPart(std::move(res.mesh), doc.uniquePartName(base), true, scanIndex + 1);
     doc.qremeshGuides = res.guides;
-    for (int i = 0; i < doc.subtoolCount(); ++i) {
-        if (doc.subtools[size_t(i)].id != scanId) continue;
-        if (keepScan) doc.subtools[size_t(i)].visible = false;
-        else doc.removeSubtool(i);
+    for (int i = 0; i < doc.partCount(); ++i) {
+        if (doc.parts[size_t(i)].id != scanId) continue;
+        if (keepScan) doc.parts[size_t(i)].visible = false;
+        else doc.removePart(i);
         break;
     }
     doc.modified = true;
@@ -1762,8 +1762,8 @@ bool sculptableOptionsFromArgs(const Args& a, SculptableOptions& o, std::string&
         error = "front and up must not be parallel";
         return false;
     }
-    const std::string color = argString(a, "color", "polypaint");
-    if (color == "polypaint") o.color = SculptableColor::Polypaint;
+    const std::string color = argString(a, "color", "vertexpaint");
+    if (color == "vertexpaint") o.color = SculptableColor::VertexPaint;
     else if (color == "texture") o.color = SculptableColor::Texture;
     else if (color == "none") o.color = SculptableColor::None;
     else {
@@ -1828,7 +1828,7 @@ void registerSculptableCommands(CommandRegistry& reg) {
                      res.surface.cell = std::max({b.extent().x, b.extent().y, b.extent().z}) / float(std::max(o.surface.resolution, 32));
                      if (doc.splats.empty() && o.color != SculptableColor::None) o.color = SculptableColor::None;
                      if (!finishSculptable(doc.splats, o, res, err)) return {false, err};
-                     return {true, applySculptableFinish(doc, res, doc.activeSubtool, argBool(a, "keep_scan", true))};
+                     return {true, applySculptableFinish(doc, res, doc.activePart, argBool(a, "keep_scan", true))};
                  }
                  if (doc.splats.empty()) return {false, "No splats loaded"};
                  if (!makeSculptableScan(doc.splats, o, res, err)) return {false, err};

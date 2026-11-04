@@ -1,19 +1,19 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Texture painting on UV maps: an RGBA texture per SubTool (Mesh::texture), so
+// Texture painting on UV maps: an RGBA texture per Part (Mesh::texture), so
 // the colour resolution comes from the texture instead of the mesh density.
 //
 // Storage is 8-bit sRGB (what PNGs hold); painting blends in linear like
-// polypaint does. Rows are bottom-up (row 0 is v = 0, as OpenGL samples it);
+// vertex paint does. Rows are bottom-up (row 0 is v = 0, as OpenGL samples it);
 // PNG export and import flip. A texture has the same Photoshop-style layer
-// stack as polypaint (core/PaintLayer.h): without layers `pixels` is the paint;
+// stack as vertex paint (core/PaintLayer.h): without layers `pixels` is the paint;
 // with layers `base` holds the Base layer, every TextureLayer its own colour
 // with coverage in alpha, and `pixels` the composite (recomputed for the
 // changed rectangle only).
 //
 // A dab rasterises, in UV space, only the triangles near the brush (BVH), gets
-// each texel's 3D position from its barycentrics and applies polypaint's rules
+// each texel's 3D position from its barycentrics and applies vertex paint's rules
 // (falloff, alpha stamp, strength x pressure, mask, hidden faces, symmetry,
 // and front faces only). Texels just outside the UV islands (kTextureGutter
 // texels) take the colour of the nearest island texel, so seams don't show.
@@ -21,7 +21,7 @@
 // tiles they changed (TextureStackUndo); tiles of one colour cost one RGBA value.
 //
 // Mesh::texture is shared between copies of a mesh (undo snapshots, duplicated
-// SubTools): edits go through mutableTexture(), which copies it first when
+// Parts): edits go through mutableTexture(), which copies it first when
 // anyone else holds it, and stack edits replace it (TextureStackUndo).
 #pragma once
 
@@ -198,7 +198,7 @@ glm::vec3 sampleTextureAt(const Mesh& mesh, uint32_t triangle, const glm::vec3& 
 // --- Painting (brush) ---
 // One stroke of the Paint brush into the texture. begin() picks the target layer; dab() paints texels;
 // end() moves the undo tiles into the stroke's record. Within a stroke each texel keeps its coverage
-// (repeated dabs build up as polypaint does) and is computed from its colour before the stroke, so 8-bit
+// (repeated dabs build up as vertex paint does) and is computed from its colour before the stroke, so 8-bit
 // storage never stalls on small strengths.
 class TexturePainter {
 public:
@@ -290,16 +290,16 @@ void bakeTexels(const Mesh& mesh, PaintTexture& tex, const BakeFn& fn, bool skip
 // Blends `color` into the target layer of every texel with the weight interpolated from `vertexWeight`
 // (per vertex 0..1). Returns the number of texels changed.
 size_t textureFill(Mesh& mesh, const glm::vec3& color, const std::vector<float>& vertexWeight);
-// Bakes the polypaint (Mesh::colors, composited) into the active texture layer (opaque).
-void polypaintToTexture(Mesh& mesh);
-// Sets the polypaint (active paint layer) of every vertex to the texture's colour at its UVs (seams average).
-void textureToPolypaint(Mesh& mesh);
+// Bakes the vertex paint (Mesh::colors, composited) into the active texture layer (opaque).
+void vertexpaintToTexture(Mesh& mesh);
+// Sets the vertex paint (active paint layer) of every vertex to the texture's colour at its UVs (seams average).
+void textureToVertexPaint(Mesh& mesh);
 // The composite as a top-down image (for PNG export), or one layer (-1 = Base).
 Image textureImage(const PaintTexture& tex);
 // Replaces the Base (or the only) layer with `image` resized to the texture (nearest), as sRGB.
 bool loadTextureImage(PaintTexture& tex, const Image& image, std::string& error);
 
-// --- Texture layer stack (as the polypaint paint_layer_* functions) ---
+// --- Texture layer stack (as the vertex paint paint_layer_* functions) ---
 int addTextureLayer(PaintTexture& tex, std::string name, int above = -2);
 int duplicateTextureLayer(PaintTexture& tex, int layer);
 bool removeTextureLayer(PaintTexture& tex, int layer);
@@ -318,9 +318,9 @@ UndoRecord captureTexture(Mesh& mesh, std::string label);
 // Shrinks a captureTexture record to what the edit changed (the tiles that differ, settings), before pushing it.
 void finishTextureUndo(UndoRecord& record, const Mesh& mesh);
 
-// texture_create, texture_delete, texture_import, texture_export, texture_from_polypaint,
-// polypaint_from_texture, paint_target, uv_auto (see core/AutoUv.h).
+// texture_create, texture_delete, texture_import, texture_export, texture_from_vertex paint,
+// vertex paint_from_texture, paint_target, uv_auto (see core/AutoUv.h).
 void registerTextureCommands(CommandRegistry& registry);
-// paint_layer_<verb> on the texture's layers (PaintLayer.cpp hands over when the SubTool paints into its texture).
+// paint_layer_<verb> on the texture's layers (PaintLayer.cpp hands over when the Part paints into its texture).
 CommandResult textureLayerCommand(Document& doc, const std::string& verb, const Args& args);
 } // namespace sf

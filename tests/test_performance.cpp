@@ -498,7 +498,7 @@ TEST(stroke_records_each_vertex_once_per_stroke) {
 }
 
 TEST(first_paint_undo_is_cheap_and_exact) {
-    // The app's first polypaint stroke on an unpainted mesh: the undo step holds the paint stack without
+    // The app's first vertex paint stroke on an unpainted mesh: the undo step holds the paint stack without
     // colours (not a copy of the mesh), and undo removes the attribute again.
     Document d = sphereDoc(5);
     CHECK(!d.mesh.hasColors());
