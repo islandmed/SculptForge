@@ -83,22 +83,25 @@ TEST(action_registry_commands) {
 }
 #endif
 
-#include "app/ZBrushNames.h"
+#include <algorithm>
+#include "app/SearchAliases.h"
 #include "core/Sculpt.h"
 
-TEST(zbrush_names_find_renamed_features) {
+TEST(search_aliases_are_generic_words) {
     using namespace sf;
-    CHECK(zbrushNamesIn("Forge Spheres") == "ZSpheres");
-    CHECK(zbrushNamesIn("Append", "Tool > Parts") == "SubTool");
-    CHECK(zbrushNamesIn("Partial redo").empty()); // whole words only
-    CHECK(zbrushNamesIn("Add") == "Zadd");
-    CHECK(zbrushNamesIn("Add a folder").empty()); // "Add" only as the whole label
-    CHECK(zbrushNamesIn("Load Lit Sphere...") == "MatCap");
-    CHECK(zbrushNamesIn("Quad Remesh") == "ZRemesher");
-    CHECK(zbrushNamesIn("Quad Remesh", {}, true) == "ZRemesher, QRemesh");
-    // Brushes: stored names stay (old projects, hotkeys and scripts), labels are SculptForge's.
+    auto has = [](const std::vector<std::string>& v, const char* w) { return std::find(v.begin(), v.end(), w) != v.end(); };
+    CHECK(has(searchAliasesIn("Quad Remesh"), "retopo"));
+    CHECK(has(searchAliasesIn("Voxel Remesh"), "block out"));
+    CHECK(has(searchAliasesIn("Append", "Tool > Parts"), "kitbash"));
+    CHECK(has(searchAliasesIn("Duplicate", "Tool > Parts"), "folders"));
+    CHECK(has(searchAliasesIn("Clip", "Tool > Cut"), "trim"));
+    CHECK(has(searchAliasesIn("Divide"), "multires"));
+    CHECK(has(searchAliasesIn("Show face groups"), "groups"));
+    CHECK(searchAliasesIn("Partial redo").empty());       // whole words only
+    CHECK(searchAliasesIn("Dynamic stroke spacing").empty()); // "Dynamic" only as the whole label
+    // Brushes: SculptForge's stored names; the old ones still load (core/LegacyNames.h).
     BrushType t = BrushType::Standard;
-    CHECK(std::string(brushName(BrushType::DamStandard)) == "DamStandard");
+    CHECK(std::string(brushName(BrushType::DamStandard)) == "SharpCrease");
     CHECK(std::string(brushLabel(BrushType::DamStandard)) == "Sharp Crease");
     CHECK(brushFromName("DamStandard", t) && t == BrushType::DamStandard);
     CHECK(brushFromName("sharp crease", t) && t == BrushType::DamStandard);

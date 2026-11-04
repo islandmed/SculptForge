@@ -1,15 +1,13 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// GoZ: ZBrush's bridge format (.GoZ binary meshes plus a shared "GoZ folder"
-// with an object list). The binary layout follows the open-source
-// Blender add-on GoB (github.com/JoseConseco/GoB, GPL); see docs/goz.md.
+// Bridge files: binary meshes plus a shared bridge folder with an object list (io/BridgeProtocol.h holds the
+// protocol's names). The binary layout follows the open-source Blender add-on GoB (github.com/JoseConseco/GoB,
+// GPL); see integrations/bridge-plugin/PROTOCOL.md.
 //
-// .GoZ carries positions, tri/quad faces, per-face-corner UVs, polygroups,
-// mask and polypaint. Quads are triangulated on import as (a,b,c) + (a,c,d)
-// and kept paired (Mesh::quadPartners); export writes the pairs back as quads
-// (meshes without kept quads pair consecutive (a,b,c),(a,c,d) triangles).
-// ZBrush's own .ZTL/.ZPR files are proprietary and cannot be read.
+// A Bridge file carries positions, tri/quad faces, per-face-corner UVs, face groups, mask and vertex paint. Quads
+// are triangulated on import as (a,b,c) + (a,c,d) and kept paired (Mesh::quadPartners); export writes the pairs
+// back as quads (meshes without kept quads pair consecutive (a,b,c),(a,c,d) triangles).
 #pragma once
 
 #include "core/Mesh.h"
@@ -24,7 +22,7 @@ namespace sf {
 
 // Extra GoZ information that has no place in Mesh.
 struct GozInfo {
-    std::string name;            // object (SubTool) name without the "GoZMesh_" prefix
+    std::string name;            // object (SubTool) name without the bridge::kNamePrefix prefix
     int subdivisionLevel = 0;    // as recorded by ZBrush (informational)
     std::string diffuseMap, displacementMap, normalMap; // texture paths, if any
     size_t quads = 0, triangles = 0; // GoZ faces read

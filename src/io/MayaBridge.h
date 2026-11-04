@@ -49,7 +49,7 @@ std::string mayaOutbox(const std::string& folder); // <folder>/sculptforge_to_ma
 std::string mayaManifestPath(const std::string& box); // <box>/manifest.json
 
 // A name Maya accepts as is: letters, digits and '_' (anything else becomes '_'), not starting with a digit,
-// at most kMayaMaxNameBytes; "" becomes "SubTool".
+// at most kMayaMaxNameBytes; "" becomes "Part".
 std::string mayaSafeName(const std::string& name);
 // A file name a manifest may list: 1..kMayaMaxFileNameBytes of [A-Za-z0-9_.-], not starting with '.', no "..",
 // ending in ".obj".

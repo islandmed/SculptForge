@@ -283,7 +283,7 @@ PYBIND11_MODULE(sculptforge, m) {
                 return out;
             },
             py::arg("name"),
-            "A selection set's channels at the current subdivision level, as a dict of NumPy arrays (mask, polygroups, "
+            "A selection set's channels at the current subdivision level, as a dict of NumPy arrays (mask, polygroups, " // marks-pending
             "colors, hidden, uvs (per triangle corner), positions), only those the set holds.")
         .def(
             "set_selection_set",
@@ -303,7 +303,7 @@ PYBIND11_MODULE(sculptforge, m) {
                 }
                 if (!uvs.is_none()) data.uvs = rows<glm::vec2>(uvs, nt * 3, 2, "uvs"), data.channels |= kSetUvs;
                 if (!positions.is_none()) data.positions = rows<glm::vec3>(positions, nv, 3, "positions"), data.channels |= kSetMorph;
-                if (!data.channels) throw py::value_error("give at least one of mask, polygroups, colors, hidden, uvs, positions");
+                if (!data.channels) throw py::value_error("give at least one of mask, polygroups, colors, hidden, uvs, positions"); // marks-pending
                 SelectionSet set;
                 std::string msg;
                 if (!makeSelectionSet(name, data, uint32_t(nv), uint32_t(nt), subdivCurrentLevel(d.mesh), set, msg) ||

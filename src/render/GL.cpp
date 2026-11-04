@@ -6,6 +6,7 @@ namespace gl {
 
 #define SF_GL_DEFINE(ret, name, ...) PFN_##name name = nullptr;
 SF_GL_FUNCTIONS(SF_GL_DEFINE)
+SF_GL_OPTIONAL(SF_GL_DEFINE)
 #undef SF_GL_DEFINE
 
 const char* load(ProcLoader loader) {
@@ -14,6 +15,9 @@ const char* load(ProcLoader loader) {
     if (!name) return "gl" #name;
     SF_GL_FUNCTIONS(SF_GL_LOAD)
 #undef SF_GL_LOAD
+#define SF_GL_LOAD_OPTIONAL(ret, name, ...) name = reinterpret_cast<PFN_##name>(loader("gl" #name));
+    SF_GL_OPTIONAL(SF_GL_LOAD_OPTIONAL)
+#undef SF_GL_LOAD_OPTIONAL
     return nullptr;
 }
 

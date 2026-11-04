@@ -366,7 +366,7 @@ void registerPaintCommands(CommandRegistry& registry) {
                   }});
 
     registry.add({"paint_from_cavity",
-                  "Darken (or tint) the creases and cavities of the sculpt with vertex paint, like ZBrush's cavity "
+                  "Darken (or tint) the creases and cavities of the sculpt with vertex paint"
                   "masking plus fill (undoable, respects the mask).",
                   {{"color", T::String, std::string(kColorHelp) + " Default: a dark brown.", false},
                    {"strength", T::Number, "0-1. Default 0.7.", false},

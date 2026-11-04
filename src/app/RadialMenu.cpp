@@ -68,8 +68,8 @@ const char* const kDefaultKeys[] = {"T", "Y", "J"}; // free in every input style
 std::vector<RadialMenu> App::defaultRadialMenus() {
     RadialMenu brushes;
     brushes.name = "Brushes";
-    for (const char* id : {"brush.standard", "brush.claybuildup", "brush.move", "brush.damstandard", "brush.inflate",
-                           "brush.pinch", "brush.flatten", "brush.snakehook"})
+    for (const char* id : {"brush.standard", "brush.clayblock", "brush.move", "brush.sharpcrease", "brush.inflate",
+                           "brush.pinch", "brush.flatten", "brush.tendril"})
         brushes.slots.push_back({id, "", ""});
     RadialMenu masking;
     masking.name = "Masking";

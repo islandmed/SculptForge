@@ -15,7 +15,7 @@ expect_value quads == 0
 # Ctrl-hover help on the new controls.
 hold ctrl
 hover "QRemesh/Quad Remesh"
-expect_help "ZRemesher"
+expect_help "all-quad topology"
 hover "QRemesh/Keep Groups"
 expect_help "face group borders"
 hover "QRemesh/Double"

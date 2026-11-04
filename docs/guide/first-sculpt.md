@@ -9,7 +9,7 @@ steps.
 
 The lesson uses the default look: the **SculptForge layout**, with the menus **File, Edit, Sculpt, Paint, Mesh,
 View, Render, Help** along the top, a tool shelf under them, the brushes along the bottom and the **Tool** panel
-on the right. If you switched to the **ZBrush-style layout**, the **ZBrush-style layout** notes say where things
+on the right. If you switched to the **Classic layout**, the **Classic layout** notes say where things
 are there. Every step can be undone with <kbd>Ctrl</kbd>+<kbd>Z</kbd>, so experiment freely.
 
 Each brush remembers its own size. To set it, hold the cursor over the canvas, press <kbd>S</kbd>, type the number
@@ -112,8 +112,6 @@ it smaller and bigger.
 
 ![The owl filled brown](images/first-sculpt/08-fill.jpg)
 
-> **ZBrush-style layout:** the colour controls are in the **Color** palette on the palette bar.
-
 ## 9. Paint the face
 
 **Goal:** soft cream face discs.
@@ -168,8 +166,6 @@ it smaller and bigger.
 5. Press <kbd>Ctrl</kbd>+<kbd>S</kbd> to save the project.
 
 ![Render > Materials with PBR shading and Save Render](images/first-sculpt/12-material.jpg)
-
-> **ZBrush-style layout:** **PBR** and **Save Render** are in the **Material** palette.
 
 Well done: that's a sculpt, painted and rendered.
 

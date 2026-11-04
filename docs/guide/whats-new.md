@@ -5,6 +5,37 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.11.0
+
+```features
+date: unreleased
+tagline: A quick tour for experienced sculptors, a command search that knows plain sculpting words, and three experimental options for very dense meshes.
+```
+
+## Version 0.10.11
+
+```features
+date: 2026-11-03
+tagline: Voxel Remesh 3-4x faster, high-DPI laptops that fit the screen, the right tray in every look, and a Preview channel for betas.
+highlight: Voxel Remesh 3-4x faster, never freezes the app
+highlight: Classic sculpting keys and the Bridge: SculptForge's own names throughout
+```
+
+- **Update channel**: **Preferences > Updates > Update channel** picks **Stable** (finished releases, the default) or
+  **Preview (betas)**, which also offers the betas of the next version, a couple of weeks before it ships. A beta says
+  so in the title bar and About ("0.11.0 Beta 1"). Problems in a beta go to the Discord's #bug-reports.
+- **High-DPI laptops**: on a Windows laptop at 150-200 % scaling the window opens inside the screen at a size the
+  interface fits, and nothing runs past its edges.
+- **Right tray in every look**: Forge Terminal, Phosphor and Blueprint open the right tray on 1280 px screens, as
+  Classic does.
+- **QuickMenu**: square thumbnails and the look's own colours.
+- **Faster Voxel Remesh**: **Tool > Remesh > Voxel Remesh** is about 3-4 times faster (a 500,000-triangle sculpt at
+  the default resolution in about a third of a second) and runs in the background with a progress bar and Cancel, so
+  the app never freezes while it works.
+- **Our own names, everywhere**: the keymap is now **Classic sculpting keys** with the **Classic layout**, the
+  exchange menu is **File > Bridge** (Send, Receive, Import / Export Bridge file), and the brushes are stored as Sharp
+  Crease, Clay Block and Tendril. Older projects, brush files, hotkeys, shelves and radial menus load as before.
+
 ## Version 0.10.10
 
 ```features
@@ -233,7 +264,7 @@ link: performance.md#proof-mode-see-it-for-yourself
 - **A new look**: new installs start in **Forge Terminal** with the Tokyo Night colours and the **SculptForge
   layout**: menus by task (File, Edit, Sculpt, Paint, Mesh, View, Render, Help) holding every palette, a status
   bar and a one-row tool shelf. If you are updating, nothing changes until you say so: a card offers **Try it** or
-  **Keep my layout**. Coming from ZBrush? **Preferences > Interface > Look > ZBrush-style layout** (or the button in
+  **Keep my layout**. Experienced sculptor? **Preferences > Interface > Look > Classic layout** (or the button in
   the welcome) brings back the palette bar and the two-row shelf. Six more colour schemes, Match my desktop theme,
   Phosphor, Blueprint and the Classic look are there too. See [The interface](interface.md#looks-and-layouts).
 - **Native Wayland on Linux**: every Linux package opens without XWayland, stays sharp at fractional scales and
@@ -363,11 +394,9 @@ link: uv-editor.md
   NVIDIA and high-resolution screens) the model never appeared and the cursor left trails. The view now reaches the
   window on every format, and falls back to drawing directly if a driver still refuses.
 - **Features use SculptForge's own names** (Parts, Forge Spheres, Vertex Paint, Face Groups, Library, Lit Spheres,
-  Quad Remesh, Send to ZBrush, Snapshot...); searching for ZBrush terms still finds them, and MatCaps are now Lit
-  Spheres. The table is in [Coming from ZBrush](coming-from-zbrush.md#zbrush-terms-in-sculptforge).
-- **New installs start with the SculptForge keys**, and the first start asks what you are coming from (ZBrush,
-  Blender, Maya or new to sculpting) to pick the key style. Your saved style is kept; ZBrush's keys are
-  **ZBrush-style** in **Preferences > Input**. See [Keyboard and mouse](shortcuts.md#zbrush-style-keys).
+  Quad Remesh, Bridge, Snapshot...); the command palette finds them by what they do. See [Quick tour for experienced sculptors](quick-tour.md).
+- **New installs start with the SculptForge keys**, and the first start asks what you are coming from to pick the key style. Your saved style is kept; the Classic sculpting keys are
+  **Classic** in **Preferences > Input**. See [Keyboard and mouse](shortcuts.md#classic-sculpting-keys).
 
 ### From your requests on GitHub
 
@@ -553,7 +582,7 @@ are placed. See [Performance](performance.md).
 
 ### Right click for the Quick Menu
 
-A right click on the canvas opens the Quick Menu under the cursor, as in ZBrush (Space still does too). A right
+A right click on the canvas opens the Quick Menu under the cursor (Space still does too). A right
 drag turns the view as before, and **Preferences > Input > Right click opens the Quick Menu** turns it off. See
 [The Quick Menu](sculpting.md#the-quick-menu).
 
@@ -626,7 +655,7 @@ highlight: SpaceMouse: turn, pan and zoom with a 3Dconnexion SpaceMouse (experim
 
 ### Forge Spheres
 
-Block out a body, creature or plant from connected spheres, the ZBrush way: **Tool > Forge Spheres > New Forge Sphere**,
+Block out a body, creature or plant from connected spheres: **Tool > Forge Spheres > New Forge Sphere**,
 drag on a sphere to grow a limb, Move and Scale it into proportion, Alt+click to delete, with Symmetry mirroring
 every edit. **Preview** (<kbd>A</kbd>) shows the skin, and **Make Mesh** turns it into a sculptable, all-quad
 Part with a face group per limb, keeping the Forge Spheres to change later. See [Forge Spheres](forge-spheres.md).
@@ -655,7 +684,7 @@ rotation, a dominant-axis mode, inverts any axis, and maps the buttons. It reads
 ### Your own Lit Spheres
 
 **Material > Load Lit Sphere...** turns any image (PNG, JPG or EXR) into a material, and images you put in
-**Documents/SculptForge/MatCaps** show up in the material list, even while SculptForge is running. Right-click one
+**Documents/SculptForge/Lit Spheres** show up in the material list, even while SculptForge is running. Right-click one
 and choose **Remove** to send it to the trash. Projects carry the Lit Sphere they use, so they look the same on any
 computer. See [Your own Lit Spheres](vertex-paint.md#your-own-lit-spheres).
 
@@ -797,11 +826,11 @@ character's facial shapes with your own face, live. No app to install. See [Phon
 date: 2026-10-25
 ```
 
-Fixes from a ZBrush artist's testing, and a way to bring your ZTools over.
+Fixes from a professional sculptor's testing, and a way to bring a library over.
 
-### More like ZBrush
+### More classic
 
-- **ZBrush zoom direction.** With the ZBrush input style, dragging up zooms out on every zoom drag, as in ZBrush.
+- **Classic zoom direction.** With the Classic input style, dragging up zooms out on every zoom drag.
   See [Navigation](navigation.md).
 - **Ctrl and Ctrl+Shift brushes.** Hold <kbd>Ctrl</kbd> and the left shelf shows the mask brush; with
   <kbd>Ctrl</kbd> held the Brush and Stroke pickers pick Mask Pen, Mask Lasso or Mask Rectangle. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>
@@ -815,11 +844,11 @@ palette: click it and SculptForge unwraps the model if it has no UVs (Auto UV, i
 texture, so the next stroke paints texels. Big brushes on 4K textures paint four to five times faster. See
 [Texture painting](texture-painting.md).
 
-### Bring your ZTools over
+### Bring a library over
 
-ZBrush's `.ZTL` files are proprietary, but a free plug-in for ZBrush now converts them once, and then
-SculptForge opens the `.ZTL` itself, every Part with its face groups, vertex paint, mask and UVs. See
-[Coming from ZBrush](coming-from-zbrush.md#bring-your-ztools-over).
+Another app's library files are proprietary, but a free export plug-in now converts them once, and then
+SculptForge opens the library file itself, every Part with its face groups, vertex paint, mask and UVs. See
+the [Bridge setup page](https://github.com/islandmed/SculptForge/blob/main/integrations/bridge-plugin/README.md).
 
 ## Version 0.8
 
@@ -832,7 +861,7 @@ highlight: Quad Remesh Guides: draw the edge loops you want
 
 Dynamic topology, vector displacement brushes, Quad Remesh Guides, and sculpt layers on every subdivision level.
 
-### Dynamic topology (Sculptris Pro)
+### Dynamic topology
 
 Turn on **Dynamic** on the top shelf and the brush adds triangles where it needs detail and removes them where
 it doesn't: pull a sphere into horns or fingers without stretching, block in from a ball without remeshing.
@@ -848,16 +877,16 @@ Ear Curl, Scales, Nostril); make your own by sculpting on a **VDM Plane** and cl
 EXRs Blender's VDM Brush Baker makes (and export yours for Blender). The new **Slide Stamp** stroke slides a stamp
 into place. See [Vector displacement brushes](sculpting.md#vector-displacement-brushes).
 
-### ZBrush keys in Blender's Sculpt Mode
+### Classic sculpting keys in Blender's Sculpt Mode
 
-The Blender add-on has a new preference, **ZBrush-style keys in Sculpt Mode**: S, U and O for Draw Size,
-Strength and Falloff, B for the brushes by their ZBrush names, Space for the quick menu, Alt to dig in,
+The Blender add-on has a new preference, **The Classic sculpting keys in Sculpt Mode**: S, U and O for Draw Size,
+Strength and Falloff, B for the brushes by name, Space for the quick menu, Alt to dig in,
 Ctrl to mask, Ctrl+Shift to hide, D and Shift+D for subdivision levels, and more. See
-[Working with Blender](blender.md#zbrush-style-keys-in-sculpt-mode).
+[Working with Blender](blender.md#classic-sculpting-keys-in-sculpt-mode).
 
 ### Draw the edge loops you want
 
-**Quad Remesh Guides** work like ZBrush's ZRemesher Guides brush: draw curves on the sculpt, around the eyes, the mouth or a
+**Quad Remesh Guides** work: draw curves on the sculpt, around the eyes, the mouth or a
 joint, and Quad Remesh puts an edge loop on each one and turns the flow around it to follow. A curve that ends where
 it started becomes a loop that closes cleanly, symmetry mirrors what you draw, and **Curves Strength** sets how far
 around a curve the flow follows it. Guides are kept with each Part and saved in the project. See
@@ -865,7 +894,7 @@ around a curve the flow follows it. Guides are kept with each Part and saved in 
 
 ### Sculpt layers on every subdivision level
 
-Sculpt layers now have a guide section on how they work with subdivision levels, like ZBrush's 3D Layers: record
+Sculpt layers now have a guide section on how they work with subdivision levels: record
 a layer at the top, step down and up, divide, reconstruct or delete levels, save, and it's still there, with one
 weight for every level. See [Layers and subdivision levels](layers.md#layers-and-subdivision-levels).
 
@@ -876,27 +905,27 @@ date: 2026-10-25
 highlight: Blender bridge: send models between Blender and SculptForge in one click
 ```
 
-ZBrush's keys and gestures by default, and a bridge that sends models between Blender and SculptForge.
+The Classic sculpting keys and gestures by default, and a bridge that sends models between Blender and SculptForge.
 
-### Your ZBrush hands just work
+### Your hands just work
 
-SculptForge now follows ZBrush's keys and gestures by default. A ZBrush sculptor tried an earlier version and
-put it down because it didn't feel like ZBrush; this release goes through every habit of the first hour.
-[Coming from ZBrush](coming-from-zbrush.md) lists what's the same, what's different and every shortcut side by
+SculptForge now follows the Classic sculpting keys and gestures by default. A professional sculptor tried an earlier version and
+put it down because it didn't feel; this release goes through every habit of the first hour.
+[Quick tour for experienced sculptors](quick-tour.md) lists what's the same, what's different and every shortcut side by
 side.
 
 - **S, U, I, O** open Draw Size, Intensity, RGB Intensity and Falloff under the cursor, and
   <kbd>Space</kbd> opens the Quick Menu with all of them plus the brush, stroke, alpha and material.
 - **Falloff** shapes the brush falloff, shown as the cursor's inner ring. **RGB Intensity** gives painting a
   strength of its own, and **Smooth keeps its own Intensity**, so a gentle brush still smooths properly.
-- **ZBrush's brush letters**: B C B Clay Block, B D S Sharp Crease, B M V Move, B I N Inflate...
+- **brush letters**: B C B Clay Block, B D S Sharp Crease, B M V Move, B I N Inflate...
 - **Masking**: <kbd>Ctrl</kbd>+click the model blurs the mask, <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click sharpens it;
   <kbd>Ctrl</kbd>+<kbd>A</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd>, <kbd>Ctrl</kbd>+<kbd>I</kbd>,
-  <kbd>Ctrl</kbd>+<kbd>H</kbd> and <kbd>Ctrl</kbd>+<kbd>W</kbd> (group masked) work as in ZBrush.
+  <kbd>Ctrl</kbd>+<kbd>H</kbd> and <kbd>Ctrl</kbd>+<kbd>W</kbd> (group masked) work.
 - **Strokes and the view**: <kbd>Shift</kbd> pressed mid-stroke draws a straight line; <kbd>Shift</kbd>+click,
   let go and drag rolls the view; <kbd>Shift</kbd>+<kbd>Alt</kbd>+click frames a Part; <kbd>L</kbd> toggles
   Lazy Stroke and <kbd>V</kbd> swaps colours.
-- **Visibility**: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+click on a partly hidden mesh hides the group, as in ZBrush.
+- **Visibility**: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+click on a partly hidden mesh hides the group.
 - **Prefer the old keys?** **Preferences > Input > Style > SculptForge** brings back the number keys for brushes,
   <kbd>I</kbd> for Intensity and the <kbd>Ctrl</kbd>+drag zoom.
 
@@ -983,12 +1012,12 @@ highlight: Map baking: normal, displacement and AO maps for game engines and ren
 highlight: Gizmo: move, scale, rotate and pose the unmasked part
 ```
 
-The ZBrush workflow core: subdivision levels, quad retopology, map baking, the Gizmo, and speed at tens of
+The sculpting workflow core: subdivision levels, quad retopology, map baking, the Gizmo, and speed at tens of
 millions of polygons.
 
 ### Subdivision levels
 
-Sculpt one model at several resolutions, as with ZBrush's SDiv: big forms low, fine detail high, and back down
+Sculpt one model at several resolutions: big forms low, fine detail high, and back down
 without losing anything.
 
 - **Divide** (<kbd>Ctrl</kbd>+<kbd>D</kbd>) adds a level and keeps the ones below. Quads stay quads
@@ -1007,7 +1036,7 @@ See [Subdivision levels](subdivision-levels.md).
 
 ### Gizmo: move, scale, rotate and pose
 
-ZBrush's Gizmo 3D, with the same keys: <kbd>W</kbd> Move, <kbd>E</kbd> Scale, <kbd>R</kbd> Rotate, <kbd>Q</kbd>
+Gizmo 3D, with the same keys: <kbd>W</kbd> Move, <kbd>E</kbd> Scale, <kbd>R</kbd> Rotate, <kbd>Q</kbd>
 back to Draw (also on the top shelf and in the **Transform** palette).
 
 - **Handles over the model.** Arrows, plane squares and a free-move centre; axis rings and a view ring; axis
@@ -1020,7 +1049,7 @@ back to Draw (also on the top shelf and in the **Transform** palette).
   layers move with the surface, and the `transform` command for scripts.
 - Fast on big models: a drag frame on 1.3 million triangles takes about 10 ms.
 
-<kbd>W</kbd> no longer toggles the wireframe: use <kbd>Shift</kbd>+<kbd>F</kbd> (as in ZBrush) or **Wire** on the
+<kbd>W</kbd> no longer toggles the wireframe: use <kbd>Shift</kbd>+<kbd>F</kbd> or **Wire** on the
 right shelf. See [Moving, rotating and posing](gizmo.md).
 
 ### Normal, displacement and AO map baking
@@ -1034,7 +1063,7 @@ Bake the detail of a high-poly sculpt into maps on a low-poly's UVs, for game en
   do; pick the OpenGL or DirectX green convention.
 - **Check it on the model.** The low-poly shows its baked normal map in the viewport as soon as the bake ends,
   next to the high-poly.
-- **ZBrush-style controls**: source Part, 1K-8K, anti-aliasing, automatic or manual front and rear ray
+- **The Classic sculpting keys**: source Part, 1K-8K, anti-aliasing, automatic or manual front and rear ray
   distances, padding around UV islands. Bakes run in the background on every core, with progress and Cancel.
 - **Send to Unreal** brings the normal map along, set up as a normal map. The `bake` command does it all from
   scripts.
@@ -1043,9 +1072,9 @@ See [Baking normal and displacement maps](baking.md).
 
 ### Quad retopology and detail projection
 
-- **Quad Remesh** (**Tool > Geometry**, like ZRemesher) rebuilds a sculpt as clean quads whose edge loops follow
+- **Quad Remesh** (**Tool > Geometry**, like quad remesh) rebuilds a sculpt as clean quads whose edge loops follow
   the forms, near a **Target Polygons** count, in the background. **Keep Groups**, **Adaptive Size**,
-  **Use Vertex Paint**, **Symmetry** and **Half / Same / Double** work as in ZBrush.
+  **Use Vertex Paint**, **Symmetry** and **Half / Same / Double** work.
 - **Project All** (**Tool > Parts > Project**) puts the sculpted detail and vertex paint back onto the divided
   quads, with **Dist**, **Mean** and **PA Blur**, and respects the mask.
 
@@ -1113,7 +1142,7 @@ the mesh: sharp decals, pores and freckles on a light game mesh.
 - **The same paint layers.** **Tool > Paint Layers** works on the texture's layers: blend modes, opacity,
   merge, flatten, all undoable.
 - **Convert both ways**, **Show UVs**, **Import / Export Texture** (PNG). Projects save textures and their
-  layers, and model exports write the texture next to the model (OBJ `.mtl`, glTF, USD, FBX, GoZ-compatible files).
+  layers, and model exports write the texture next to the model (OBJ `.mtl`, glTF, USD, FBX, Bridge files).
 
 See [Texture painting](texture-painting.md).
 
@@ -1134,17 +1163,17 @@ send extra mouse movements beside the pen's; now, while the pen is in range, onl
 date: 2026-10-22
 ```
 
-Version 0.4 is about making SculptForge feel like home to ZBrush artists. It was shaped by feedback from a
-working ZBrush modeler and by what sculptors say on the ZBrush and Mudbox forums.
+Version 0.4 is about making SculptForge feel like home to experienced sculptors. It was shaped by feedback from a
+working professional modeler and by what sculptors say on sculpting forums.
 
-### Navigation that works like ZBrush
+### Classic navigation
 
 - **Free rotation.** Dragging turns the model the way the cursor moves and can roll it right over the top,
-  as in ZBrush. If you prefer the model to stay upright, set **Preferences > Interface > Rotation** to
+ . If you prefer the model to stay upright, set **Preferences > Interface > Rotation** to
   **Turntable**.
 - **Snap to a view.** Hold <kbd>Shift</kbd> while rotating to snap to the nearest front, back, side, top or
   bottom view.
-- **ZBrush zoom.** <kbd>Alt</kbd>+drag on the background pans; let go of <kbd>Alt</kbd> while still dragging
+- **Classic zoom.** <kbd>Alt</kbd>+drag on the background pans; let go of <kbd>Alt</kbd> while still dragging
   and the rest of the drag zooms. With the right mouse button, <kbd>Alt</kbd> pans and <kbd>Ctrl</kbd> zooms.
 
 See [Navigating the view](navigation.md).
@@ -1169,17 +1198,16 @@ material picker (<kbd>M</kbd>), and projects keep the material they were saved w
 
 ### Quads stay quads
 
-Models you bring in from ZBrush (Send to ZBrush) or as OBJ, FBX, PLY or USD keep their quads: **Wire** shows them as
+Models you bring in from the other app (Bridge) or as OBJ, FBX, PLY or USD keep their quads: **Wire** shows them as
 quads, and exporting writes them back as quads. Subdivide turns each quad into four, voxel remesh now gives
-an even grid of quads (like DynaMesh), and new cubes and planes are made of quads. See
+an even grid of quads (like voxel remesh), and new cubes and planes are made of quads. See
 [Quads and triangles](geometry.md#quads-and-triangles).
 
 ### Paint layers
 
 Vertex Paint now has layers, like Photoshop: each Part can have a stack of colour layers with their own
 opacity, visibility, lock and blend mode (Multiply, Screen, Overlay, Soft Light, Add and more). Painting on a
-layer never destroys what's underneath, and you can merge, flatten, duplicate and reorder layers. ZBrush has
-never had this. Find it in **Tool > Paint Layers**, and see [Paint layers](vertex-paint.md#paint-layers).
+layer never destroys what's underneath, and you can merge, flatten, duplicate and reorder layers. Find it in **Tool > Paint Layers**, and see [Paint layers](vertex-paint.md#paint-layers).
 
 ![The Paint Layers sub-palette with three layers and their blend modes](images/paint-layers.jpg)
 
@@ -1196,7 +1224,7 @@ date: 2026-10-22
 
 - **Parts**: several separate meshes in one scene. Append, duplicate, split, merge, solo, and
   <kbd>Alt</kbd>+click to select. See [Parts](parts.md).
-- **A ZBrush-style interface**: shelves around the canvas, alphabetical palettes, the Library
+- **A classic interface**: shelves around the canvas, alphabetical palettes, the Library
   (<kbd>,</kbd>), the brush, stroke, alpha and material pickers, hold-<kbd>Ctrl</kbd> help on every control
   and a command palette (<kbd>F3</kbd>). See [The interface](interface.md).
 - **Graphics tablets**: pen pressure, the eraser end and pen buttons. See [Sculpting and brushes](sculpting.md).
@@ -1215,7 +1243,7 @@ date: 2026-10-21
   [vertex paint with Lit Spheres](vertex-paint.md).
 - New brushes: Sharp Crease, Clay Block, Tendril, Trim, Layer and Nudge, with strokes and alphas.
 - [Project files](projects.md) with autosave, recent files and snapshots, and
-  [exchange with ZBrush (Send to ZBrush)](exporting.md).
+  [exchange with the other app (Bridge)](exporting.md).
 
 ## Version 0.1
 

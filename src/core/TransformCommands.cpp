@@ -134,7 +134,7 @@ void registerTransformCommands(CommandRegistry& reg) {
                "Mirror a masked transform across these planes through the origin, e.g. x: the unmasked part on the "
                "other side of the plane takes the mirrored transform (both arms pose together).",
                false},
-              {"all", T::Bool, "Transform every visible Part (ZBrush Transpose All). Default false.", false}},
+              {"all", T::Bool, "Transform every visible Part. Default false.", false}},
              runTransform});
 }
 

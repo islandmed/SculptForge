@@ -13,7 +13,7 @@ weighting, playing and exporting layers.
 - Layers belong to a [Part](parts.md): each Part has its own list of layers.
 - A weight of 0 turns a layer off, 1 shows it as sculpted. Scripts can also set negative weights or weights
   above 1 to exaggerate a shape.
-- Layers work on every [subdivision level](subdivision-levels.md), like ZBrush's 3D Layers: see
+- Layers work on every [subdivision level](subdivision-levels.md): see
   [Layers and subdivision levels](#layers-and-subdivision-levels).
 - Layers survive [subdividing](geometry.md#subdivide), [decimating](geometry.md#decimate) and
   [LOD chains](geometry.md#lod-chains). A [voxel remesh](geometry.md#voxel-remesh) bakes them into the surface
@@ -35,7 +35,7 @@ From top to bottom:
   (delete) and a **weight** slider from 0 to 1.
 - A name field and **+ Add** at the bottom.
 
-The Layers list highlights the active layer; in the ZBrush-style layout the title strip also shows it (`Layer Smile`,
+The Layers list highlights the active layer; in the Classic layout the title strip also shows it (`Layer Smile`,
 or `Layer Base`).
 
 ## Add a layer and sculpt into it
@@ -65,7 +65,7 @@ Deleting a layer is undoable.
 
 ## Layers and subdivision levels
 
-With [subdivision levels](subdivision-levels.md) a layer works the way ZBrush's 3D Layers do: record it at the
+With [subdivision levels](subdivision-levels.md) a layer works the way 3D Layers do: record it at the
 top level for the fine detail of an expression, and it stays with the Part whatever level you work on.
 
 - **Each layer has its own detail on every level.** Step down with **Lower Res** (<kbd>Shift</kbd>+<kbd>D</kbd>)
@@ -104,10 +104,6 @@ into the surface.
 
 Importing works the other way: glTF morph targets and FBX or USD blend shapes open as sculpt layers. See
 [Exporting](exporting.md).
-
-> **ZBrush:** Layers here are close to ZBrush's 3D Layers with the slider used as a morph, and they follow
-> subdivision levels the same way. Selecting a layer is its REC; a weight of 0 is its eye. There are no layer
-> folders and no per-layer mask yet.
 
 ## Scripting
 

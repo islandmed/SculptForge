@@ -28,7 +28,7 @@ struct ArExportResult {
     std::string glb, usdz; // file contents
     size_t triangles = 0;
     bool colored = false;  // polypaint or a texture was baked
-    std::string summary;   // "62,410 triangles, polypaint, 20 cm"
+    std::string summary;   // "62,410 triangles, vertex paint, 20 cm"
 };
 
 // `meshes`: the parts to show (null entries are skipped); hidden triangles are left out.

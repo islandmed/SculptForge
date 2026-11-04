@@ -275,6 +275,15 @@ bool App::subpalette(const char* id, const char* englishTitle) {
                  "Interface).",
                  "Tool");
     }
+    if (flashSubpalette_ == id) { // the quick tour's "Show me" (QuickTour.cpp): scrolled into view and flashed
+        const double t = ImGui::GetTime() - flashSubpaletteStart_;
+        if (t < 0.1) ImGui::SetScrollHereY(0.1f);
+        if (t < 1.5)
+            dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), theme::u32(theme::accent, float(0.5 * (1.0 - t / 1.5))),
+                              theme::rounding(2.0f * s));
+        else
+            flashSubpalette_.clear();
+    }
     if (clicked) {
         if (isOpen) {
             open.erase(std::remove(open.begin(), open.end(), id), open.end());
@@ -310,7 +319,7 @@ void App::drawPalette_Brush() {
     ui::HelpAction(*this, "draw.front_faces");
     ImGui::SameLine();
     ImGui::Checkbox(tr("Invert (Alt)"), &invertToggle_);
-    ui::HelpText("Invert", "Alt", "Brushes subtract instead of add (ZBrush Zsub). Holding Alt flips it for one stroke.", "Brush");
+    ui::HelpText("Invert", "Alt", "Brushes subtract instead of add. Holding Alt flips it for one stroke.", "Brush");
     ui::Checkbox("Connected only##draw.connected_only", &uiPrefs_.connectedOnly);
     ui::HelpAction(*this, "draw.connected_only");
     ImGui::SameLine();
@@ -320,7 +329,7 @@ void App::drawPalette_Brush() {
     ui::HelpText("Smooth keeps volume", nullptr,
                  "The Smooth brush (and Shift) removes bumps without shrinking the form, instead of the plain smooth "
                  "that also flattens it. Either way, let go of Shift while still pressing a Shift-smooth stroke to "
-                 "switch to the other smooth for the rest of the stroke (ZBrush's alternate smooth).",
+                 "switch to the other smooth for the rest of the stroke.",
                  "Brush");
     ImGui::Checkbox(tr("Smooth face group borders only##smooth_group_borders"), &smoothGroupBorders_);
     ui::HelpText("Smooth face group borders only", nullptr,
@@ -562,6 +571,7 @@ void App::drawPalette_Help() {
     menuAction(*this, "help.controls");
     menuAction(*this, "help.guide");
     menuAction(*this, "help.first_sculpt");
+    menuAction(*this, "help.quick_tour");
     menuAction(*this, "help.whats_new");
     menuAction(*this, "help.check_updates");
     menuAction(*this, "ui.command_palette");
@@ -712,7 +722,7 @@ void App::drawPalette_Tool() {
     }
     if (subpalette("tool.subtool", "Parts")) {
         tray::Section section;
-        Demo::pushScope("SubTools");
+        Demo::pushScope("Parts");
         drawSubToolsContents();
         Demo::popScope();
         drawExtractContents(); // PanelExtract.cpp
@@ -722,7 +732,7 @@ void App::drawPalette_Tool() {
     }
     if (subpalette("tool.zspheres", "Forge Spheres")) {
         tray::Section section;
-        Demo::pushScope("ZSpheres");
+        Demo::pushScope("Forge Spheres");
         drawZSpheresContents(); // PanelZSpheres.cpp
         Demo::popScope();
     }
@@ -793,10 +803,10 @@ void App::drawPalette_Tool() {
         ImGui::PopID();
         tray::GroupLabel(*this, "Voxel Remesh");
         const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
-        if (voxelRemesh_) { // remeshing a painted SubTool in the background (PanelRetopo.cpp)
+        if (voxelRemesh_) { // remeshing in the background (PanelRetopo.cpp)
             ImGui::ProgressBar(voxelRemesh_->progress->load(), ImVec2(half, 0), "Remeshing...");
             ui::HelpText("Voxel Remesh", nullptr,
-                         "Remeshing and keeping the texture in the background (Auto UV of the new surface, then the "
+                         "Remeshing in the background (with a painted texture: Auto UV of the new surface, then the "
                          "texture projected onto it). The result replaces the Part when it's done.",
                          "Tool > Remesh");
         } else {

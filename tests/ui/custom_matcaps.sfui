@@ -17,7 +17,7 @@ click "Material##palette.material"
 expect "Material/Load Lit Sphere..."
 key escape
 run load_matcap path=$SCRIPT_DIR/data/Gold.png
-expect_status "Material: Gold (kept in the MatCaps folder)"
+expect_status "Material: Gold (kept in the Lit Spheres folder)"
 expect_value material_custom == 1
 expect_value custom_matcaps == 2
 expect_value matcap_files == 1
@@ -54,9 +54,9 @@ expect_value material_custom == 1
 expect_value custom_matcaps == 2
 expect_status "sf_ui_custom_matcap"
 
-# Images added to the MatCaps folder while the app runs show up when a material list opens.
+# Images added to the Lit Spheres folder while the app runs show up when a material list opens.
 env XDG_DATA_HOME $LIBRARY/.trash-test
-copy data/Rose.png $LIBRARY/MatCaps/Pink.png
+copy data/Rose.png "$LIBRARY/Lit Spheres/Pink.png"
 expect_value custom_matcaps == 2
 click "Material##palette.material"
 wait_idle 20

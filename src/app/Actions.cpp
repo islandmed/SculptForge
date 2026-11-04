@@ -3,6 +3,7 @@
 #include "app/Actions.h"
 
 #include "core/Commands.h"
+#include "core/LegacyNames.h"
 
 #include <algorithm>
 #include <cctype>
@@ -221,6 +222,7 @@ void ActionRegistry::removePrefix(std::string_view prefix) {
 const Action* ActionRegistry::find(std::string_view id) const {
     for (const auto& a : actions_)
         if (a.id == id) return &a;
+    if (const std::string_view now = legacy::renamed(legacy::kActionIds, id); !now.empty()) return find(now);
     return nullptr;
 }
 
@@ -334,7 +336,10 @@ void ActionRegistry::overridesFromJson(const Json& j) {
     ++revision_;
     if (!j.isObject()) return;
     for (const auto& [id, chord] : j.members())
-        if (chord.isString()) overrides_.emplace_back(id, chord.asString());
+        if (chord.isString()) {
+            const std::string_view now = legacy::renamed(legacy::kActionIds, id);
+            overrides_.emplace_back(now.empty() ? id : std::string(now), chord.asString());
+        }
 }
 
 void ActionRegistry::touch(std::string_view id) {

@@ -11,6 +11,7 @@
 #include "render/Clusters.h"
 #include "render/GL.h"
 #include "render/Ghost.h"
+#include "render/ScreenStroke.h"
 
 #include <cstdint>
 #include <functional>
@@ -178,6 +179,11 @@ public:
     // --- Strokes on heavy meshes (app/AsyncStroke.cpp) ---
     // The predictive stroke preview (render/Ghost.h) drawn on SubTool `id`; an empty stroke turns it off.
     void setGhost(uint32_t id, const GhostStroke& ghost);
+    // Research (render/ScreenStroke.h, SF_SCREEN_STROKE=1): the same pending dabs applied to the drawn view instead
+    // of the geometry (Lit Sphere views through drawView only); an empty stroke turns it off.
+    void setScreenStroke(const GhostStroke& stroke) { screenStroke_ = stroke; }
+    // The last drawView applied the screen stroke.
+    bool screenStrokeDrawn() const { return screenStrokeDrawn_; }
     // A sculpt stroke's vertex upload made in two halves: prepareStrokeUpload packs what the mesh marked dirty
     // (positions and normals only) and the culling bounds of the clusters that moved, on any thread and without
     // GL, while the GL thread keeps drawing from what it has; commitStrokeUpload sends it on the GL thread.
@@ -203,7 +209,16 @@ public:
         bool exact = false;                            // refineStrokeBoundsInto: exact bounds to set
         std::vector<uint32_t> exactClusters;
         std::vector<ClusterBounds> exactBounds;
-        size_t bytes() const { return data.size() * sizeof(PackedVertex); }
+        size_t bytes() const { return packed * sizeof(PackedVertex); }
+        size_t packed = 0; // vertices packed (in data, or the staging buffer)
+        // Persistent upload (SF_PERSISTENT_UPLOAD=1, a research prototype): bindStrokeUpload lends a persistently
+        // mapped staging buffer; prepare packs straight into it when the batch fits (`staged`), and commit has
+        // the GPU copy the ranges into the vertex buffer (no glBufferSubData of the packed data on the GL thread).
+        PackedVertex* stagingPtr = nullptr;
+        size_t stagingCap = 0; // vertices
+        int stagingIndex = -1;
+        bool staged = false;
+        PackedVertex* dst() { return staged ? stagingPtr : data.data(); }
     };
     // `curvature` (optional, by vertex): the cavity term of every vertex the mesh marked dirty, already worked
     // out (Sculptor::strokeCurvature).
@@ -211,6 +226,7 @@ public:
     // GL thread, before handing `up` to another thread: finds SubTool id's slot (slots come and go on the GL
     // thread, e.g. thumbnails; the other thread uses this one, which stays put in the list).
     void bindStrokeUpload(uint32_t id, StrokeUpload& up);
+    void setPersistentUpload(bool on) { persistentUpload_ = on; } // Fast Upload (Preferences > Performance, experimental)
     void commitStrokeUpload(StrokeUpload& up);
     // The stroke uploads gave the clusters they moved quick culling bounds (around their vertices' boxes, which
     // packing finds anyway, without the normal cone, so they are never culled as facing away); at the stroke's
@@ -270,6 +286,15 @@ private:
     GLuint viewFbo_ = 0, viewResolveFbo_ = 0, viewRb_[3] = {};
     int viewW_ = 0, viewH_ = 0, viewSamples_ = 0, viewFailed_ = 0;
     bool directView_ = false;
+    struct Staging { // the persistent upload's buffers (StrokeUpload::stagingPtr), used in turn
+        GLuint buffer = 0;
+        void* ptr = nullptr;
+        size_t cap = 0; // vertices
+        GLsync fence = nullptr;
+    } persist_[2];
+    int stagingNext_ = 0;
+    bool persistentUpload_ = false; // setPersistentUpload
+    bool persistentUpload() const;  // the preference, SF_PERSISTENT_UPLOAD=0 / 1 overrides; needs GL_ARB_buffer_storage
     int captureW_ = 0, captureH_ = 0;
     GLuint emptyVao_ = 0;
     bool thumbnailPass_ = false; // draw(): transparent background, no gradient (renderMeshThumbnail)
@@ -379,6 +404,9 @@ private:
     uint32_t ghostId_ = 0;
     struct MeshProgram;
     void setGhostUniforms(const MeshProgram& p);
+    GhostStroke screenStroke_;
+    ScreenStroke screenPass_;
+    bool screenStrokeDrawn_ = false;
     void syncNormalMap(MeshSlot& s, const Mesh& mesh, const NormalMapView* normalMap);
     // `indicesDone`: the index buffer and drawCount are already written (a full upload writes them while
     // building the layout).

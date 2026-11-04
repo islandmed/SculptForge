@@ -48,9 +48,6 @@ large model.
 An open Part (a plane, a scan with holes) is trimmed without a cap. **Add** needs a closed Part. Forge Spheres
 and Parts with a micro level must be made into a plain mesh first.
 
-> **ZBrush:** this covers what the trim, clip and slice curve brushes and Live Boolean are used for, as one tool.
-> SculptForge is not affiliated with Maxon or ZBrush.
-
 ## Scripting
 
 The `cut` command takes the shape (`line`, `lasso`, `rect`, `polyline`), its `points` in normalised screen

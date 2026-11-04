@@ -49,10 +49,10 @@ inline bool isKelvinletBrush(BrushType t) {
            t == BrushType::KelvinSnake || t == BrushType::DetailClone;
 }
 
-// The brush's stored name: the key projects, brush files, hotkeys ("brush.damstandard") and scripts (stroke
-// brush=DamStandard) use. Never changes, so old files and scripts keep working.
+// The brush's stored name: the key projects, brush files, hotkeys ("brush.sharpcrease") and scripts (stroke
+// brush=SharpCrease) use. brushFromName also reads the names older versions wrote (core/LegacyNames.h).
 const char* brushName(BrushType type);
-// The name the interface shows ("Sharp Crease" for DamStandard); brushes named after ZBrush's coinages have their own.
+// The name the interface shows ("Sharp Crease" for SharpCrease).
 const char* brushLabel(BrushType type);
 // The brush a name means: its stored name or its label (any case, spaces ignored). False when none.
 bool brushFromName(std::string_view name, BrushType& out);

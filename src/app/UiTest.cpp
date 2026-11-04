@@ -84,7 +84,7 @@
 //                            user library), library_files (.sfbrush files in it; UI tests get an empty
 //                            one in --ui-out/brush-library), ui_config (1 once Store Config wrote ui.json),
 //                            console_open, command_palette_open, customize, shelves_visible,
-//                            right_tray_open, left_tray_open, lightbox_open, guide_open, guide_hits (search results), shelves (1 shown), left_tray / right_tray (palettes in
+//                            right_tray_open, left_tray_open, right_tray_shown (drawn), shell_narrow, offscreen_items (past the window edge), lightbox_open, guide_open, guide_hits (search results), shelves (1 shown), left_tray / right_tray (palettes in
 //                            the tray, -1 when closed); OP is == != < <= > >=; N may be $NAME, $NAME*K,
 //                            $NAME+K or $NAME-K (see remember)
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
@@ -236,7 +236,7 @@
 //   spacemouse_unplug        unplug it
 //   expect_value spacemouse_connected (1 when the app opened it), spacemouse_moving (1 while it moves the view)
 //   ui_scale PERCENT | auto  Preferences > Interface > UI scale (applied live, #87); display_scale PERCENT: the display's
-//                            content scale changes, with SDL's event (Windows DPI, another monitor)
+//                            content scale changes, with SDL's event (Windows DPI, another monitor); logical_width W: the display scale that makes the window W logical px wide (#105)
 //   expect_value ui_scale (percent built now), font_height (default font, px), frame_height, panel_width (right
 //                            shelf, px), title_height
 //   expect_value look (0 Classic, 1 Forge Terminal, 2 Phosphor, 3 Blueprint), shell_layout (0 ZBrush-style, 1 SculptForge)
@@ -436,6 +436,10 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "view_samples") return double(app_.perf_.samplesWanted);
     if (name == "multithreading") return ThreadPool::shared().serial() ? 0.0 : 1.0;
     if (name == "predictive_strokes") return app_.predictiveStrokes() ? 1.0 : 0.0;
+    if (name == "live_move") return app_.liveMoveEnabled() ? 1.0 : 0.0;
+    if (name == "background_preview") return app_.uiPrefs_.backgroundPreview ? 1.0 : 0.0;
+    if (name == "fast_upload") return app_.uiPrefs_.fastUpload ? 1.0 : 0.0;
+    if (name == "live_move_active") return app_.liveMove_.active ? 1.0 : 0.0; // (a Move drag drawn by the GPU)
     if (name == "last_stroke_dabs") return double(app_.perf_.lastStroke.dabs);
     if (name == "texture_size") return hasTexture(m) ? double(m.texture->width) : 0.0;
     if (name == "paint_texture") return paintsTexture(m) ? 1.0 : 0.0;
@@ -689,6 +693,13 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "shelves_visible") return app_.layout_.shelvesVisible ? 1.0 : 0.0;
     if (name == "right_tray_open") return app_.layout_.rightTrayOpen ? 1.0 : 0.0;
     if (name == "left_tray_open") return app_.layout_.leftTrayOpen ? 1.0 : 0.0;
+    if (name == "right_tray_shown") return app_.shell_.rightTray.w > 0.0f ? 1.0 : 0.0; // drawn, not just set open (#107)
+    if (name == "shell_narrow") return app_.shell_.narrow ? 1.0 : 0.0;
+    if (name == "offscreen_items") { // items drawn past the window's edge last frame (#105); names them in the log
+        const std::vector<std::string> off = Demo::offscreenItems();
+        for (const std::string& o : off) std::fprintf(stderr, "offscreen: %s\n", o.c_str());
+        return double(off.size());
+    }
     if (name == "lightbox_open") return app_.lightbox_.open() ? 1.0 : 0.0;
     if (name == "guide_open") return app_.guide_.isOpen() ? 1.0 : 0.0;
     if (name == "guide_hits") return double(app_.guide_.searchHits());
@@ -699,6 +710,13 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "ai_enabled") return ai::aiEnabled() ? 1.0 : 0.0; // Preferences > AI (PanelAi.cpp)
     if (name == "http_requests") return double(ai::httpRequestCount()); // every request this process started
     if (name == "welcome_open") return app_.showWelcome_ ? 1.0 : 0.0;
+    // Help > Quick tour (QuickTour.cpp): open, the slide (1-based), waiting aside after Show me, the one offer.
+    if (name == "quick_tour_open") return app_.quickTourOpen_ ? 1.0 : 0.0;
+    if (name == "quick_tour_slide") return double(app_.quickTourSlide_ + 1);
+    if (name == "quick_tour_aside") return app_.quickTourAside_ ? 1.0 : 0.0;
+    if (name == "quick_tour_offer") return app_.quickTourOffer_ ? 1.0 : 0.0;
+    if (name == "quick_tour_done") return app_.quickTourDone_ ? 1.0 : 0.0;
+    if (name == "dropdown_open") return app_.dropdown_.empty() ? 0.0 : 1.0;
     if (name == "new_look_card_open") return app_.newLookCard_ ? 1.0 : 0.0; // "SculptForge has a new look" (0.10.7)
     if (name == "support_card_open") return app_.supportCardOpen() ? 1.0 : 0.0; // the support card at launch
     // What's New (WhatsNewPopup.cpp): open (1 while shown), its cards, Try it clicks; the guide chapter's contents
@@ -1078,13 +1096,15 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         });
     } else if (verb == "stroke") {
         if (!need(4)) return false;
+        // stroke u0 v0 u1 v1 [seconds] [hold]: hold keeps the button down at the end (the release verb lets go)
         const float u0 = num(1, 0), v0 = num(2, 0), u1 = num(3, 0), v1 = num(4, 0), seconds = num(5, 0.6f);
+        const bool hold = w.size() > 6 && w[6] == "hold";
         auto ends = std::make_shared<std::pair<ImVec2, ImVec2>>();
         run([this, ends, u0, v0, u1, v1] { *ends = {onModel(u0, v0), onModel(u1, v1)}; });
         stroke([ends](float u) {
             return ImVec2(ends->first.x + (ends->second.x - ends->first.x) * u,
                           ends->first.y + (ends->second.y - ends->first.y) * u);
-        }, seconds);
+        }, seconds, false, hold);
         run([this] { SDL_SetModState(held_); });
         wait(0.1f);
     } else if (verb == "view_drag") {
@@ -1688,13 +1708,32 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             app_.handleEvent(e);
         });
         wait(0.2f);
+    } else if (verb == "logical_width") {
+        // logical_width 1280: the display reports the scale that makes the window this many logical px wide, as a
+        // Windows laptop at 150-200 % does (#105: 2560x1600 at 200 % is 1280x800)
+        if (!need(1)) return false;
+        run([this, v = num(1, 1280)] {
+            int pw = 0, ph = 0; // window units, as the shell lays out (the pixel density is covered by the framebuffer)
+            SDL_GetWindowSize(app_.window_, &pw, &ph);
+            app_.displayScaleOverride_ = float(pw) / std::max(1.0f, v);
+            SDL_Event e{};
+            e.type = SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED;
+            e.window.windowID = SDL_GetWindowID(app_.window_);
+            app_.handleEvent(e);
+        });
+        wait(0.2f);
+    } else if (verb == "classic_keys") { // the Classic sculpting keys (style 0), as Preferences > Input sets them
+        run([this] { app_.setInputStyle(0); });
+    } else if (verb == "quick_tour_offers") {
+        // quick_tour_offers: UI tests leave out the quick tour's one offer (it would sit over their clicks)
+        run([this] { app_.quickTourOffersInTests_ = true; });
     } else if (verb == "input_style") {
         // input_style zbrush|sculptforge|blender|maya: as Preferences > Input sets it (scripts written for one style)
         if (!need(1)) return false;
         const std::string n = w[1];
         const int style = n == "zbrush" ? 0 : n == "sculptforge" ? 1 : n == "blender" ? 2 : n == "maya" ? 3 : -1;
         if (style < 0) {
-            fail(line, "input_style takes zbrush, sculptforge, blender or maya");
+            fail(line, "input_style takes zbrush, sculptforge, blender or maya"); // marks-pending
             return false;
         }
         run([this, style] { app_.setInputStyle(style); });

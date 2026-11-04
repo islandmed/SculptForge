@@ -174,7 +174,7 @@ void App::registerGizmoActions() {
         "Part moves whatever the mask.");
     add("gizmo.all", "All Parts", ICON_LC_LAYERS, kPath, "", [this] { gizmo_.all = !gizmo_.all; },
         [this] { return gizmo_.all; },
-        "Transform every visible Part together (ZBrush Transpose All). Each Part gets its own undo step.");
+        "Transform every visible Part together. Each Part gets its own undo step.");
 }
 
 void App::setGizmoMode(GizmoMode mode) {

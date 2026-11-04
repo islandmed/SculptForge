@@ -2,7 +2,7 @@
 
 This guide explains every part of SculptForge, the free, open-source sculpting app for VFX, animation and games:
 how the interface is organised, how to sculpt, mask, paint (on vertices or textures) and manage Parts, how to generate models with AI,
-and how to get your work into a game engine, a film pipeline, Blender or ZBrush. It is updated with every
+and how to get your work into a game engine, a film pipeline, Blender or another sculpting app. It is updated with every
 release; [What's new](whats-new.md) lists what changed.
 
 Read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<kbd>F1</kbd>) or on the
@@ -18,7 +18,7 @@ Read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<kbd>F1</
 | Start from a head or body | [Starter meshes](projects.md#start-from-a-starter-mesh): base meshes with clean quads, **File > New from Starter Mesh** |
 | Find your way around | [The interface](interface.md): the menus **File, Edit, Sculpt, Paint, Mesh, View, Render, Help**, the shelves and the Tool panel; [Navigating the view](navigation.md) |
 | Learn the brushes | [Sculpting and brushes](sculpting.md) |
-| Switch from ZBrush | [Coming from ZBrush](coming-from-zbrush.md) (the ZBrush-style layout and keys) and the [Glossary](glossary.md) |
+| Switch from another sculpting app | [Quick tour for experienced sculptors](quick-tour.md) (the Classic layout and keys) and the [Glossary](glossary.md) |
 | Switch from Blender | [Blender keys](shortcuts.md#blender-keys), and [Working with Blender](blender.md) for the bridge add-on |
 | Fix a problem | [Troubleshooting](troubleshooting.md) |
 
@@ -29,7 +29,7 @@ Read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<kbd>F1</
 1. [Welcome to SculptForge](welcome.md)
 2. [Your first sculpt in 10 minutes](first-sculpt.md)
 3. [What's new](whats-new.md)
-4. [Coming from ZBrush](coming-from-zbrush.md)
+4. [Quick tour for experienced sculptors](quick-tour.md)
 5. [Install SculptForge on Windows, macOS and Linux](installing.md)
 6. [The interface](interface.md)
 7. [Navigating the view](navigation.md)
@@ -70,7 +70,7 @@ Read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<kbd>F1</
 ## Files and pipelines
 
 33. [Baking normal and displacement maps](baking.md)
-34. [Exporting, Unreal and ZBrush](exporting.md)
+34. [Exporting, Unreal and Bridge](exporting.md)
 35. [Export presets](export-presets.md)
 36. [Working with Blender](blender.md)
 37. [Working with Maya](maya.md)

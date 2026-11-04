@@ -114,7 +114,7 @@ Plain text in the command language of `sculptforge-cli` (`docs/guide/scripting.m
 comments, optional `# name:` and `# description:` header lines. At most 64 KB and 500 commands.
 
 - Only SculptForge's own commands, and not those that reach the network or another program (AI services, the
-  brush gallery, Unreal, Blender, Maya and ZBrush exchange, splat training), install, list or remove packs, or run
+  brush gallery, Unreal, Blender, Maya and Bridge exchange, splat training), install, list or remove packs, or run
   macros. Parameters naming URLs, endpoints, services or programs are refused.
 - File values (`path=`, `folder=`, `file=`, `out=`, `exr=` ...) are either a path relative to the project folder,
   without `..`, `~`, `$`, `%`, drive letters or a leading slash (resolved, symbolic links followed, and checked to

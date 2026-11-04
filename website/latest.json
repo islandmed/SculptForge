@@ -1,12 +1,11 @@
 {
-  "version": "0.10.10",
+  "version": "0.10.11",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Close Holes caps every open boundary of a Part; Clip presses one side of a line, lasso or rectangle flat",
-    "X-Ray shows the active Part through the others; turn the light around the model from Render > Materials",
-    "First Sculpt lesson rebuilt: a cute owl head in about 10 minutes with built-in tools",
-    "More SpaceMouse devices recognised, also over Bluetooth",
-    "Mask and Cut shapes in the stroke popup (G), no keys held"
+    "Voxel Remesh 3-4x faster, always in the background so the app never freezes",
+    "High-DPI Windows laptops (150-200% scaling): the window opens inside the screen",
+    "The right tray opens in every look on 1280 px screens; QuickMenu gets square thumbnails",
+    "New update channel: Preferences > Updates picks Stable or Preview (betas)"
   ]
 }

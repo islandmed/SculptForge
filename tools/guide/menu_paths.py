@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SculptForge - open source digital sculpting
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Rewrite ZBrush-style palette paths in the guide to the SculptForge layout's task menus.
+"""Rewrite Classic-layout palette paths in the guide to the SculptForge layout's task menus.
 
 "Preferences > Input" becomes "Edit > Preferences > Input", "Material > Load Lit Sphere..." becomes
 "Render > Materials > Load Lit Sphere...", and so on (src/app/Palettes.cpp, taskMenus). Tool paths stay: the Tool
@@ -65,8 +65,8 @@ def convert(text: str) -> str:
         if generated:
             out.append(line)
             continue
-        # "> **ZBrush-style layout:** ..." notes name the palettes of that layout on purpose.
-        zbrush_note = line.startswith("> **ZBrush-style layout") or (zbrush_note and line.startswith(">"))
+        # "> **Classic layout:** ..." notes name the palettes of that layout on purpose.
+        zbrush_note = line.startswith("> **Classic layout") or (zbrush_note and line.startswith(">"))
         if zbrush_note:
             out.append(line)
             continue
@@ -104,7 +104,7 @@ def main() -> int:
         else:
             md.write_text(new, encoding="latin-1")
     if args.check and stale:
-        print(f"{stale} line(s) use ZBrush-style palette paths; run tools/guide/menu_paths.py", file=sys.stderr)
+        print(f"{stale} line(s) use Classic-layout palette paths; run tools/guide/menu_paths.py", file=sys.stderr)
         return 1
     return 0
 

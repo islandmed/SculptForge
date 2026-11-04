@@ -191,3 +191,42 @@ TEST(window_restore_fullscreen) {
     CHECK(!restoresFullscreen(true));
 #endif
 }
+
+// #107: a tiled look's gaps don't make a 1280 px window narrow; the right tray opens as it does in Classic.
+TEST(shell_tiled_look_not_narrow_at_1280) {
+    const UiLayout l = standardLayout(1);
+    const ShellGeometry classic = computeShell(l, 1280, 720, 1.0f, 0.0f, sculptForgeMetrics(0.0f));
+    const ShellGeometry tiled = computeShell(l, 1280, 720, 1.0f, 0.0f, sculptForgeMetrics(6.0f));
+    CHECK(!classic.narrow && !tiled.narrow);
+    CHECK(classic.rightTray.w > 0.0f && tiled.rightTray.w > 0.0f);
+    CHECK(tiled.rightTray.x + tiled.rightTray.w <= 1280.0f);
+    CHECK(computeShell(l, 1200, 720, 1.0f, 0.0f, sculptForgeMetrics(6.0f)).narrow); // below 1280: narrow, as before
+}
+
+// #105: windows go inside the display's usable area, at its scale.
+TEST(window_fits_display) {
+    // A Legion 5 Pro: 2560x1600, the taskbar 96 px at 200 %, a 62 px title bar.
+    const WindowRect usable{0, 0, 2560, 1504};
+    const WindowBorders frame{62, 0, 0, 0};
+    // The 1600x960 stored by 0.10.10 (no scale): 3200x1920 at 200 %, which doesn't fit: maximised, inside.
+    WindowFit f = fitWindow({100, 100, 1600, 960}, true, true, 0.0f, usable, frame, 2.0f);
+    CHECK(f.maximize);
+    CHECK(f.rect.x >= 0 && f.rect.y >= 62 && f.rect.x + f.rect.w <= 2560 && f.rect.y + f.rect.h <= 1504);
+    // At 150 %: 2400x1440 just fits under the title bar, moved up 36 px to clear the taskbar.
+    f = fitWindow({100, 100, 1600, 960}, true, true, 0.0f, usable, frame, 1.5f);
+    CHECK(!f.maximize && f.rect.w == 2400 && f.rect.h == 1440 && f.rect.x == 100 && f.rect.y == 64);
+    // Stored at 150 % and opened at 150 %: as it was.
+    f = fitWindow({200, 150, 1800, 1100}, true, true, 1.5f, usable, frame, 1.5f);
+    CHECK(!f.maximize && f.rect.x == 200 && f.rect.y == 150 && f.rect.w == 1800 && f.rect.h == 1100);
+    // A first start at 125 %: 2000x1200, centred.
+    f = fitWindow({0, 0, 1600, 960}, false, false, 0.0f, usable, frame, 1.25f);
+    CHECK(!f.maximize && f.rect.w == 2000 && f.rect.h == 1200 && f.rect.x == 280 && f.rect.y == 62 + (1442 - 1200) / 2);
+    // Half off the screen to the left and above (a monitor that went, a moved taskbar): pulled back in.
+    f = fitWindow({-300, -40, 1600, 960}, true, true, 1.0f, usable, frame, 1.0f);
+    CHECK(!f.maximize && f.rect.x == 0 && f.rect.y == 62);
+    f = fitWindow({2000, 1000, 1600, 960}, true, true, 1.0f, usable, frame, 1.0f);
+    CHECK(f.rect.x == 960 && f.rect.y == 1504 - 960);
+    // A second monitor left of the main one.
+    f = fitWindow({-1900, 50, 1600, 960}, true, true, 1.0f, {-1920, 0, 1920, 1040}, {30, 0, 0, 0}, 1.0f);
+    CHECK(f.rect.x == -1900 && f.rect.y == 50);
+}

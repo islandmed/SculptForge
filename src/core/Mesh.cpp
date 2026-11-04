@@ -832,17 +832,19 @@ size_t Mesh::memoryBytes() const {
 
 static void laplacianStep(Mesh& m, float lambda, std::vector<glm::vec3>& next) {
     next.resize(m.vertexCount());
-    for (uint32_t v = 0; v < m.vertexCount(); ++v) {
-        auto ring = m.neighbors(v);
-        if (ring.empty()) {
-            next[v] = m.positions[v];
-            continue;
+    poolFor(m.vertexCount(), [&](size_t b, size_t e) {
+        for (uint32_t v = uint32_t(b); v < uint32_t(e); ++v) {
+            auto ring = m.neighbors(v);
+            if (ring.empty()) {
+                next[v] = m.positions[v];
+                continue;
+            }
+            glm::vec3 avg(0.0f);
+            for (uint32_t n : ring) avg += m.positions[n];
+            avg /= float(ring.size());
+            next[v] = glm::mix(m.positions[v], avg, lambda);
         }
-        glm::vec3 avg(0.0f);
-        for (uint32_t n : ring) avg += m.positions[n];
-        avg /= float(ring.size());
-        next[v] = glm::mix(m.positions[v], avg, lambda);
-    }
+    }, 1 << 14);
     m.positions.swap(next);
 }
 
@@ -987,35 +989,38 @@ void transferVertexAttributes(const Mesh& src, Mesh& dst) {
 
     if (wantMask) dst.mask.assign(dst.positions.size(), 0.0f);
     if (wantColors) dst.colors.assign(dst.positions.size(), glm::vec3(1.0f));
-    for (size_t i = 0; i < dst.positions.size(); ++i) {
-        const glm::vec3 p = dst.positions[i];
-        const glm::ivec3 c = cellOf(p);
-        const glm::vec3 outside = glm::max(glm::max(box.min - p, p - box.max), glm::vec3(0.0f));
-        const int maxRing = gridCells + int(std::ceil(glm::length(outside) / cell));
-        float best = std::numeric_limits<float>::max();
-        uint32_t bestV = 0;
-        // Search shells of growing Chebyshev radius; stop once nothing closer can remain.
-        for (int r = 0; r <= maxRing; ++r) {
-            for (int dz = -r; dz <= r; ++dz)
-                for (int dy = -r; dy <= r; ++dy)
-                    for (int dx = -r; dx <= r; ++dx) {
-                        if (std::max({std::abs(dx), std::abs(dy), std::abs(dz)}) != r) continue;
-                        auto it = grid.find(key(c + glm::ivec3(dx, dy, dz)));
-                        if (it == grid.end()) continue;
-                        for (uint32_t v : it->second) {
-                            const glm::vec3 d = src.positions[v] - p;
-                            const float d2 = glm::dot(d, d);
-                            if (d2 < best) {
-                                best = d2;
-                                bestV = v;
+    // Each new vertex searches on its own: blocks in parallel.
+    poolFor(dst.positions.size(), [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) {
+            const glm::vec3 p = dst.positions[i];
+            const glm::ivec3 c = cellOf(p);
+            const glm::vec3 outside = glm::max(glm::max(box.min - p, p - box.max), glm::vec3(0.0f));
+            const int maxRing = gridCells + int(std::ceil(glm::length(outside) / cell));
+            float best = std::numeric_limits<float>::max();
+            uint32_t bestV = 0;
+            // Search shells of growing Chebyshev radius; stop once nothing closer can remain.
+            for (int r = 0; r <= maxRing; ++r) {
+                for (int dz = -r; dz <= r; ++dz)
+                    for (int dy = -r; dy <= r; ++dy)
+                        for (int dx = -r; dx <= r; ++dx) {
+                            if (std::max({std::abs(dx), std::abs(dy), std::abs(dz)}) != r) continue;
+                            auto it = grid.find(key(c + glm::ivec3(dx, dy, dz)));
+                            if (it == grid.end()) continue;
+                            for (uint32_t v : it->second) {
+                                const glm::vec3 d = src.positions[v] - p;
+                                const float d2 = glm::dot(d, d);
+                                if (d2 < best) {
+                                    best = d2;
+                                    bestV = v;
+                                }
                             }
                         }
-                    }
-            if (best < std::numeric_limits<float>::max() && std::sqrt(best) <= float(r) * cell) break;
+                if (best < std::numeric_limits<float>::max() && std::sqrt(best) <= float(r) * cell) break;
+            }
+            if (wantMask) dst.mask[i] = src.mask[bestV];
+            if (wantColors) dst.colors[i] = src.colors[bestV];
         }
-        if (wantMask) dst.mask[i] = src.mask[bestV];
-        if (wantColors) dst.colors[i] = src.colors[bestV];
-    }
+    }, 1 << 13);
     dst.markAllDirty();
 }
 

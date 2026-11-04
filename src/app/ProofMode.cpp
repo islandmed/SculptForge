@@ -384,6 +384,7 @@ struct PhaseResult {
     std::vector<double> previewLagPx; // the predictive preview's head behind the pointer (the surface's without it)
     std::vector<double> drawn;    // triangles each frame drew (Renderer::lastDrawnTriangles)
     std::vector<double> gpuMs;    // GPU time of the phase's frames (GL_TIME_ELAPSED; empty without timer queries)
+    size_t screenStrokeFrames = 0; // frames the view showed pending dabs on the screen (render/ScreenStroke.h)
     std::vector<double> split[6]; // each frame by part (App::frameSplitMs_, the frame before: the swap comes after)
 };
 
@@ -894,6 +895,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             ph.frameMs.push_back(frameMs);
             for (int k = 0; k < 6; ++k) ph.split[k].push_back(frameSplitMs_[k]);
             ph.drawn.push_back(double(renderer_.lastDrawnTriangles()));
+            ph.screenStrokeFrames += renderer_.screenStrokeDrawn() ? 1 : 0;
             ph.gpuMs.insert(ph.gpuMs.end(), proofGpuMs_.begin(), proofGpuMs_.end());
             proofGpuMs_.clear();
         }
@@ -1059,6 +1061,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                         j.set("gpu_frames", double(ph.gpuMs.size()));
                     }
                     j.set("render_triangle_budget", double(renderTriangleBudget()));
+                    if (ph.screenStrokeFrames) j.set("screen_stroke_frames", double(ph.screenStrokeFrames));
                 }
                 if (ph.radiusPx > 0) {
                     if (!ph.lagMs.empty()) { // (Move drags the surface without dabs: no stroke to trail the pointer)

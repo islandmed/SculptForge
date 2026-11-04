@@ -6,7 +6,7 @@
 #include "app/App.h"
 #include "app/I18n.h"
 #include "app/Ui.h"
-#include "app/ZBrushNames.h"
+#include "app/SearchAliases.h"
 
 #include <IconsLucide.h>
 #include <imgui_internal.h>
@@ -74,14 +74,17 @@ int fuzzy(const std::string& hay, const std::string& word, bool allowScattered =
 
 } // namespace
 
-std::string CommandPalette::zbrushHint(const Action& a, const std::string& query) {
-    const std::string names = zbrushNamesIn(a.label, a.palette);
-    if (names.empty()) return {};
-    const std::string zbrush = lower(names), label = lower(a.label);
-    for (const auto& w : words(query))
-        if (w.size() >= 2 && fuzzy(zbrush, w, false) > 0 && fuzzy(label, w, false) == 0)
-            return "(ZBrush users: " + names + ")";
-    return {};
+std::string CommandPalette::aliasHint(const Action& a, const std::string& query) {
+    const std::vector<std::string> other = searchAliasesIn(a.label, a.palette);
+    if (other.empty()) return {};
+    const std::string label = lower(a.label);
+    std::string hit;
+    for (const auto& w : words(query)) {
+        if (w.size() < 2 || fuzzy(label, w, false) > 0) continue;
+        for (const auto& o : other)
+            if (fuzzy(lower(o), w, false) > 0 && hit.find(o) == std::string::npos) hit += (hit.empty() ? "" : ", ") + o;
+    }
+    return hit.empty() ? std::string() : "(also: " + hit + ")";
 }
 
 int CommandPalette::score(const Action& a, const std::string& query) {
@@ -90,10 +93,11 @@ int CommandPalette::score(const Action& a, const std::string& query) {
     const std::string label = lower(a.label), palette = lower(a.palette), id = lower(a.id), command = lower(a.command),
                       description = lower(a.description);
     const std::string shown = lower(trAction(a.id, a.label)); // the label in the interface language finds it too (#44)
-    const std::string zbrush = lower(zbrushNamesIn(a.label, a.palette, true)); // and the ZBrush (or earlier) name
+    std::string other; // and the other words for it (SearchAliases.h)
+    for (const auto& o : searchAliasesIn(a.label, a.palette)) other += lower(o) + " ";
     int total = 0;
     for (const auto& w : ws) {
-        const int s = 3 * std::max({fuzzy(label, w), shown == label ? 0 : fuzzy(shown, w), fuzzy(zbrush, w, false)}) +
+        const int s = 3 * std::max({fuzzy(label, w), shown == label ? 0 : fuzzy(shown, w), fuzzy(other, w, false)}) +
                       2 * fuzzy(palette, w, false) + 2 * std::max(fuzzy(id, w), fuzzy(command, w)) +
                       fuzzy(description, w, false);
         if (s == 0) return 0; // every word must match somewhere
@@ -269,8 +273,8 @@ void CommandPalette::draw(App& app, const CanvasRect& area) {
                     const char* shownLabel = trAction(a.id, a.label);
                     rows->AddText(ImVec2(x, ty), fg, shownLabel);
                     x += ImGui::CalcTextSize(shownLabel).x + 10.0f * s;
-                    // Found by its ZBrush name: "Forge Spheres (ZBrush users: ZSpheres)".
-                    if (const std::string hint = zbrushHint(a, query_); !hint.empty()) {
+                    // Found by another word for it: "Quad Remesh (also: retopo)".
+                    if (const std::string hint = aliasHint(a, query_); !hint.empty()) {
                         rows->AddText(ImVec2(x - 4.0f * s, ty), ui::color::accent, hint.c_str());
                         if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogText("\n%s %s", shownLabel, hint.c_str());
                         x += ImGui::CalcTextSize(hint.c_str()).x + 6.0f * s;

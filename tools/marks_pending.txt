@@ -1,0 +1,15 @@
+# Files not fully renamed yet (tools/check_marks.py). This list only shrinks; empty it, don't add to it.
+# Phase 2 of fix/ip-audit renames code identifiers, comments, command names and on-disk keys (with read aliases).
+website/guide/search-index.js           skip     # built from docs/guide, which is checked; command names follow phase 2
+src/**                                  strings
+tests/**                                skip     # test code and data: phase 2 (identifiers, comments, fixtures)
+addons/**                               strings
+integrations/comfyui/**                 strings  # calls subtool_list; command names follow phase 2
+tools/guide/**                          strings
+tools/looks/**                          strings
+tools/export_check/**                   strings
+CMakeLists.txt                          strings
+docs/project-format.md                  skip     # documents on-disk keys; renamed with read aliases in phase 2
+docs/**                                 prose
+website/guide/**                        prose
+CHANGELOG.md                            prose

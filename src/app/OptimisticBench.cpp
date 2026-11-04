@@ -318,6 +318,7 @@ int runOptimisticBench(const OptimisticBenchOptions& o) {
           "interior pop: optimistic vs truth (mean / p99 levels, > 8) | interior, doing nothing vs truth | pixels | "
           "outline (coverage changed): pixels, pop vs doing nothing (mean) |\n"
        << "|---|---:|---:|---:|---:|---:|---:|---:|\n";
+    std::string ghostRows;
     for (double sizeM : o.sizesMillions) {
         if (code) break;
         Document doc;
@@ -423,6 +424,37 @@ int runOptimisticBench(const OptimisticBenchOptions& o) {
         const double allMs = msSince(all0);
         gl::UseProgram(0);
         const std::vector<uint8_t> optimistic = readColor(out);
+        // The geometry preview (render/Ghost.h, Background Preview): the same dabs moved in the vertex shader. Its
+        // cost is the frame with it less the frame without (median of 5 each).
+        GhostStroke ghost;
+        ghost.kind = GhostKind::Standard;
+        for (const Dab& d : dabs) {
+            GhostDab g;
+            g.center = glm::vec3(invView * glm::vec4(d.cView, 1.0f));
+            g.normal = glm::normalize(glm::vec3(invView * glm::vec4(d.nView, 0.0f)));
+            g.areaCenter = g.center;
+            g.radius = d.radius;
+            g.strength = 0.5f;
+            ghost.dabs.push_back(g);
+        }
+        auto frameMs = [&](int repeats) {
+            std::vector<double> t;
+            for (int k = 0; k < repeats; ++k) {
+                gl::BindFramebuffer(GL_FRAMEBUFFER, canvas.fbo);
+                gl::Viewport(0, 0, kW, kH);
+                gl::Finish();
+                const auto t0 = Clock::now();
+                renderer.draw(cam, kW, kH, rs);
+                gl::Finish();
+                t.push_back(msSince(t0));
+            }
+            return median(t);
+        };
+        const double plainMs = frameMs(5);
+        renderer.setGhost(1, ghost);
+        const double ghostFrameMs = frameMs(5);
+        const std::vector<uint8_t> ghostImage = readColor(canvas);
+        renderer.setGhost(1, GhostStroke());
         // Truth: the same dabs by the Standard brush on the mesh (world space), then drawn.
         Sculptor& sc = doc.sculptor;
         Symmetry sym;
@@ -459,12 +491,17 @@ int runOptimisticBench(const OptimisticBenchOptions& o) {
         }
         const Diff pop = diff(optimistic, truth, before, &interior), none = diff(before, truth, before, &interior);
         const Diff popEdge = diff(optimistic, truth, before, &outline), noneEdge = diff(before, truth, before, &outline);
+        const Diff ghostPop = diff(ghostImage, truth, before, &interior), ghostEdge = diff(ghostImage, truth, before, &outline);
         char row[512];
         std::snprintf(row, sizeof row, "| %.1fM | %.2f / %.2f ms | %.1f ms | %.0f ms | %.1f / %.0f, %.1f%% | %.1f / %.0f, %.1f%% | %zu | %zu: %.1f vs %.1f |\n",
                       double(m.triangleCount()) / 1e6, median(passMs), *std::max_element(passMs.begin(), passMs.end()), allMs,
                       solveMs, pop.mean, pop.p99, pop.over8 * 100, none.mean, none.p99, none.over8 * 100, none.pixels, popEdge.pixels, popEdge.mean, noneEdge.mean);
         md << row;
         std::fprintf(stderr, "%s", row);
+        char grow[256];
+        std::snprintf(grow, sizeof grow, "| %.1fM | %.2f ms (frame %.2f vs %.2f) | %.1f / %.0f, %.1f%% | %.1f |\n", double(m.triangleCount()) / 1e6,
+                      ghostFrameMs - plainMs, ghostFrameMs, plainMs, ghostPop.mean, ghostPop.p99, ghostPop.over8 * 100, ghostEdge.mean);
+        ghostRows += grow;
         if (!o.shotsDir.empty()) {
             std::error_code ec;
             std::filesystem::create_directories(o.shotsDir, ec);
@@ -481,11 +518,15 @@ int runOptimisticBench(const OptimisticBenchOptions& o) {
                 heat[i + 1] = heat[i + 2] = v;
             }
             savePng(heat, o.shotsDir + "/n1-" + tag + "-pop.png");
+            savePng(ghostImage, o.shotsDir + "/n1-" + tag + "-ghost.png");
         }
         canvas.release();
         out.release();
         renderer.syncScene({});
     }
+    md << "\nThe geometry preview (Background Preview's ghost) on the same 30 dabs:\n\n| Mesh | extra cost on a frame "
+          "(frame with / without) | interior pop vs truth (mean / p99, > 8) | outline pop (mean) |\n|---|---:|---:|---:|\n"
+       << ghostRows;
     md << "\nPass: one GPU pass over the dab's rectangle evaluating every dab so far (its cost is the brush's pixels, not "
           "the mesh). Mesh: the Standard brush on the CPU plus the upload, i.e. what the optimistic canvas hides. Pop: "
           "per-pixel max channel difference over the pixels the stroke changed in either image.\n";

@@ -5,6 +5,8 @@
 # - A release: "SculptForge vX.Y.Z is out", the release's feed highlights, the download link and the release URL.
 #   The Release workflow publishes with GITHUB_TOKEN, and GitHub sends no `release` event for that, so its
 #   successful run (workflow_run) triggers the post; `release: published` covers a release published by hand.
+# - A beta (a vX.Y.Z-beta.N or -rc.N pre-release): "SculptForge X.Y.Z Beta N is out for testing", the highlights of
+#   the feed's channels.preview (release.sh step "preview"), the release link and how to send feedback (#bug-reports).
 #   release.sh step "site" writes the highlights to website/latest.json on main after the release is out, so the
 #   job waits (up to FEED_WAIT_MINUTES) for the feed to name this version, then posts without highlights if it never does.
 # - Run workflow: posts .github/announcements/<file> (at most 2000 characters), with an optional embed image: a
@@ -108,10 +110,11 @@ jobs:
                   if not started or not new:
                       print("This Release run published no new release; nothing to post."); sys.exit(0)
                   tag, url, pre = new[0]["tag_name"], new[0]["html_url"], new[0]["prerelease"]
-              m = re.fullmatch(r"v(\d+\.\d+\.\d+)", tag)
-              if pre or not m:
-                  print(f"{tag} is a prerelease or not vX.Y.Z; nothing to post."); sys.exit(0)
-              version, highlights = m[1], []
+              m = re.fullmatch(r"v(\d+\.\d+\.\d+)(?:-(beta|rc)\.(\d+))?", tag)
+              if not m or pre != bool(m[2]):
+                  print(f"{tag} is not vX.Y.Z, or a pre-release that is not vX.Y.Z-beta.N/-rc.N; nothing to post."); sys.exit(0)
+              version, highlights = tag[1:], []
+              label = f"{m[1]} {'Beta' if m[2] == 'beta' else 'RC'} {m[3]}" if pre else f"v{version}"
               deadline = time.time() + 60 * float(env("FEED_WAIT_MINUTES", "45"))
               while True:
                   subprocess.run(["git", "fetch", "-q", "--depth=1", "origin", env("BRANCH", "main")], check=True)
@@ -121,6 +124,8 @@ jobs:
                       feed = json.loads(shown.stdout)
                   except ValueError:
                       feed = {}
+                  if pre:  # a beta's highlights are in the Preview channel's entry
+                      feed = (feed.get("channels") or {}).get("preview") or {} if isinstance(feed, dict) else {}
                   if feed.get("version") == version:
                       highlights = [h.strip() for h in feed.get("highlights", []) if isinstance(h, str) and h.strip()][:6]
                       break
@@ -128,10 +133,23 @@ jobs:
                       print(f"::warning::website/latest.json never said {version}; posting without highlights"); break
                   time.sleep(60)
               while True:
-                  lines = [f"**SculptForge v{version} is out**"] + [f"• {h}" for h in highlights]
+                  if pre:
+                      lines = [f"**SculptForge {label} is out for testing**",
+                               "A beta of the next release: please try it on your own work before it goes stable."]
+                  else:
+                      lines = [f"**SculptForge {label} is out**"]
+                  lines += [f"• {h}" for h in highlights]
                   if not highlights:
                       lines.append(f"What's new: {SITE}/guide/whats-new.html")
-                  text = "\n".join(lines + [f"Download: {SITE}", f"Release notes: {url}"])
+                  if pre:
+                      tail = [f"Download the beta (Windows, macOS, Linux): {url}",
+                              "Feedback: post in #bug-reports with your OS, the version (Help > About) and your "
+                              "hardware (graphics card, tablet), plus what you did and what you saw. What works well "
+                              "is welcome too.",
+                              "Want the next betas offered in the app? Preferences > Updates > Update channel: Preview."]
+                  else:
+                      tail = [f"Download: {SITE}", f"Release notes: {url}"]
+                  text = "\n".join(lines + tail)
                   if len(text) <= 2000 or not highlights:
                       break
                   highlights.pop()

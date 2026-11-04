@@ -5,6 +5,7 @@
 // the Preferences > Config / Interface / Hotkeys / LightBox sections, the F1
 // Controls sheet (generated from the action registry) and ZBrush-style
 // shortcut assignment.
+#include "app/UiScale.h"
 #include "app/Config.h"
 
 #include "app/App.h"
@@ -113,6 +114,9 @@ Json toJson(const UiPrefs& p) {
     j.set("multithreading", p.multithreading);
     j.set("predictiveStrokes", p.predictiveStrokes);
     j.set("draftStrokes", p.draftStrokes);
+    j.set("liveMove", p.liveMove);
+    j.set("backgroundPreview", p.backgroundPreview);
+    j.set("fastUpload", p.fastUpload);
     j.set("dyntopoConstantDetail", p.dyntopoConstantDetail);
     j.set("flatShading", p.flatShading);
     j.set("viewportCursor", double(p.viewportCursor));
@@ -191,6 +195,9 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.multithreading = j["multithreading"].asBool(p.multithreading);
     p.predictiveStrokes = j["predictiveStrokes"].asBool(p.predictiveStrokes);
     p.draftStrokes = j["draftStrokes"].asBool(p.draftStrokes);
+    p.liveMove = j["liveMove"].asBool(p.liveMove);
+    p.backgroundPreview = j["backgroundPreview"].asBool(p.backgroundPreview);
+    p.fastUpload = j["fastUpload"].asBool(p.fastUpload);
     p.dyntopoConstantDetail = j["dyntopoConstantDetail"].asBool(p.dyntopoConstantDetail);
     p.flatShading = j["flatShading"].asBool(p.flatShading);
     p.viewportCursor = std::clamp(int(j["viewportCursor"].asNumber(p.viewportCursor)), 0, 1);
@@ -469,7 +476,7 @@ void App::initActions() {
             "(stretched areas after big moves). The mask holds what it covers; one undo step.",
             "Smooth the whole Part by the amount beside it (Smooth keeps volume: without shrinking it). The mask "
             "holds what it covers; one undo step.",
-            "Fill the whole Part out toward a rounder volume, like a balloon (ZBrush's Inflate Balloon); a negative "
+            "Fill the whole Part out toward a rounder volume, like a balloon; a negative "
             "amount lets the air out. The mask holds what it covers; one undo step."};
         for (int k = 0; k < 4; ++k)
             add(kIds[k], kLabels[k], "Tool > Deformation", nullptr,
@@ -555,7 +562,7 @@ void App::initActions() {
         nullptr, [this] { return symmetry_.x; }, nullptr, "Mirror strokes across the X axis (left / right).");
     add("view.wireframe", "Wireframe", "Render", "Shift+F", [this] { renderSettings_.wireframe = !renderSettings_.wireframe; },
         ICON_LC_GRID_3X3, nullptr, [this] { return renderSettings_.wireframe; }, nullptr,
-        "Show the mesh's polygons (quads and triangles) over the surface (ZBrush PolyFrame).");
+        "Show the mesh's polygons (quads and triangles) over the surface.");
     add("view.frame", "Frame model", "Transform", "F", [this] { camera_.frame(sceneBounds()); }, ICON_LC_SCAN, nullptr, nullptr,
         nullptr, "Fit the whole model in the view.");
     add("color.pick", "Pick colour", "Color", "C", [this] { pickColorUnderCursor(); }, ICON_LC_PIPETTE, nullptr, nullptr, nullptr,
@@ -589,6 +596,9 @@ void App::initActions() {
         ICON_LC_GRADUATION_CAP, nullptr, nullptr, nullptr,
         "A step-by-step lesson for complete beginners: a cute owl head from the default sphere, painted and "
         "rendered, in about ten minutes.");
+    add("help.quick_tour", "Quick tour", "Help", nullptr, [this] { showQuickTour(0); }, ICON_LC_COMPASS, nullptr, nullptr,
+        nullptr, "Ten short slides for sculptors who know another app: where remeshing, dynamic topology, retopology, "
+                 "levels, masking, cut, brushes and baking are, each with a Show me button.");
     add("help.whats_new", "What's New", "Help", nullptr, [this] { showWhatsNew(); }, ICON_LC_SPARKLES, nullptr,
         nullptr, nullptr, "What changed in this version and the ones before it (opens once by itself after an update).");
     add("help.check_updates", "Check for updates", "Help", nullptr, [this] { startUpdateCheck(true); }, ICON_LC_REFRESH_CW,
@@ -652,7 +662,7 @@ void App::initActions() {
     // --- Config (ZBrush: Preferences > Config) ---
     add("config.store", "Store Config", "Preferences > Config", "Ctrl+Shift+I", [this] { storeConfig(); }, ICON_LC_SAVE, nullptr,
         nullptr, nullptr,
-        "Keep the current layout, shortcuts and interface preferences for future sessions. Like ZBrush, SculptForge never "
+        "Keep the current layout, shortcuts and interface preferences for future sessions. SculptForge never "
         "saves them on its own.");
     add("config.restore_standard", "Restore Standard UI", "Preferences > Config", nullptr, [this] { restoreStandardUi(); },
         ICON_LC_ROTATE_CCW, nullptr, nullptr, nullptr,
@@ -739,6 +749,8 @@ App::WindowState App::loadWindowState() {
     Json j;
     std::string err;
     if (!Json::parse(std::string(std::istreambuf_iterator<char>(f), {}), j, err)) return st;
+    st.stored = true;
+    st.scale = std::clamp(float(j["scale"].asNumber(0.0)), 0.0f, 4.0f);
     st.w = std::clamp(int(j["w"].asNumber(st.w)), 640, 16384);
     st.h = std::clamp(int(j["h"].asNumber(st.h)), 400, 16384);
     st.maximized = j["maximized"].asBool(false);
@@ -774,10 +786,12 @@ void App::saveWindowState() const {
         SDL_GetWindowSize(window_, &st.w, &st.h);
         SDL_GetWindowPosition(window_, &st.x, &st.y);
         st.placed = true;
+        st.scale = automaticUiScale(SDL_GetWindowDisplayScale(window_), SDL_GetWindowPixelDensity(window_));
     }
     Json j;
     j.set("w", double(st.w));
     j.set("h", double(st.h));
+    if (st.scale > 0.0f) j.set("scale", double(st.scale));
     if (st.placed) {
         j.set("x", double(st.x));
         j.set("y", double(st.y));
@@ -1281,7 +1295,7 @@ void drawInterfaceSection(App& app) {
     ImGui::BeginDisabled(!p.popupInfo);
     ImGui::SetNextItemWidth(-FLT_MIN);
     ui::SliderInside("##help_opacity", &p.helpOpacity, 0.3f, 1.0f, "Popup Info opacity %.2f");
-    ui::HelpText("Popup Info opacity", nullptr, "How solid the Ctrl-help box is (ZBrush: Quick Info Opacity).",
+    ui::HelpText("Popup Info opacity", nullptr, "How solid the Ctrl-help box is.",
                  "Preferences > Interface");
     ImGui::EndDisabled();
     ImGui::SetNextItemWidth(-FLT_MIN);
@@ -1303,10 +1317,9 @@ void drawInterfaceSection(App& app) {
     ImGui::Checkbox(tr("Auto collapse right tray"), &p.autoCollapseRight);
     ui::HelpText("Auto collapse right tray", nullptr,
                  "Opening a palette in the right tray collapses the others when they would not fit.", "Preferences > Interface");
-    ImGui::Checkbox(tr("Palettes strictly A-Z (ZBrush order)"), &p.alphabeticalPalettes);
+    ImGui::Checkbox(tr("Palettes strictly A-Z"), &p.alphabeticalPalettes);
     ui::HelpText("Palettes strictly A-Z", nullptr,
-                 "Off: File and Edit come first in the palette bar and Help last, the rest A to Z. On: every palette A to Z, as in "
-                 "ZBrush.",
+                 "Off: File and Edit come first in the palette bar and Help last, the rest A to Z. On: every palette A to Z.",
                  "Preferences > Interface");
     ImGui::Checkbox(tr("Left-handed layout"), &app.layout().leftHanded);
     ui::HelpText("Left-handed layout", nullptr, "Mirror the shelves and trays: tools on the left, navigation on the right.",
@@ -1344,7 +1357,7 @@ void drawInterfaceSection(App& app) {
                  "Size of text and controls, applied at once. Automatic follows the display the window is on (Windows: "
                  "Settings > Display > Scale, per monitor). Store Config keeps it for the next start.",
                  "Preferences > Interface");
-    static const char* kRotation[] = {"Free (ZBrush)", "Turntable"};
+    static const char* kRotation[] = {"Free", "Turntable"};
     ImGui::SetNextItemWidth(-FLT_MIN);
     if (ImGui::BeginCombo("##rotation", (std::string(tr("Rotation:")) + " " + tr(kRotation[p.turntable ? 1 : 0])).c_str())) {
         for (int i = 0; i < 2; ++i)
@@ -1352,7 +1365,7 @@ void drawInterfaceSection(App& app) {
         ImGui::EndCombo();
     }
     ui::HelpText("Rotation", nullptr,
-                 "Free: dragging turns the model about the screen's axes and can roll it over the top, as in ZBrush; press "
+                 "Free: dragging turns the model about the screen's axes and can roll it over the top; press "
                  "Shift while rotating to snap to the nearest front, side, top or bottom view. Turntable: the model stays "
                  "upright and turns about its vertical axis, as in Blender or Maya.",
                  "Preferences > Interface");
@@ -1422,7 +1435,7 @@ void drawLightBoxSection(App& app) {
     UiPrefs& p = app.uiPrefs();
     UiLayout& l = app.layout();
     ImGui::Checkbox(tr("Show at startup"), &p.lightboxAtStartup);
-    ui::HelpText("Show Library at startup", nullptr, "Open Library on the Project tab when SculptForge starts (as ZBrush does).",
+    ui::HelpText("Show Library at startup", nullptr, "Open Library on the Project tab when SculptForge starts.",
                  "Preferences > Library");
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted(tr("Rows"));
@@ -1635,11 +1648,11 @@ void App::drawLookSection() {
                  "Every palette is a section of one menu, and F3 finds them all.",
                  "Preferences > Interface > Look");
     ImGui::SameLine();
-    if (ImGui::RadioButton(tr("ZBrush-style##layout.zbrush"), uiPrefs_.shellLayout == 0)) {
+    if (ImGui::RadioButton(tr("Classic##layout.zbrush"), uiPrefs_.shellLayout == 0)) {
         setShellLayout(0);
         lookDirty_ = true;
     }
-    ui::HelpText("ZBrush-style layout", nullptr, "The alphabetical palette bar and the two-row top shelf.",
+    ui::HelpText("Classic layout", nullptr, "The alphabetical palette bar and the two-row top shelf.",
                  "Preferences > Interface > Look");
     tray::GroupLabel(*this, "Interface");
 }

@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.24)
-project(SculptForge VERSION 0.10.10 LANGUAGES C CXX)
+project(SculptForge VERSION 0.10.11 LANGUAGES C CXX)
+# "beta.1" while this is a beta of that version (title bar and About: "0.11.0 Beta 1"), "" for a stable release.
+# scripts/release.sh sets it; release.yml checks the tag against both (v0.11.0-beta.1).
+set(SCULPTFORGE_PRERELEASE "")
 include(GNUInstallDirs)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -365,6 +368,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelProject.cpp
     src/app/PanelSubTools.cpp
     src/app/PanelSupport.cpp
+    src/app/QuickTour.cpp
     src/app/PanelAi.cpp
     src/app/PanelSupportCard.cpp
     src/app/WhatsNewPopup.cpp
@@ -381,6 +385,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/render/Camera.cpp
     src/render/Clusters.cpp
     src/render/Ghost.cpp
+    src/render/ScreenStroke.cpp
     src/render/Renderer.cpp
     src/render/UvView.cpp
     src/render/MicroRenderer.cpp
@@ -388,6 +393,7 @@ if(SCULPTFORGE_BUILD_APP)
   target_link_libraries(sculptforge PRIVATE sculptforge_core sculptforge_ai sculptforge_phone imgui SDL3::SDL3)
   target_include_directories(sculptforge PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/lucide)
   target_compile_definitions(sculptforge PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}"
+                                                 SCULPTFORGE_PRERELEASE="${SCULPTFORGE_PRERELEASE}"
                                                  SF_UPDATE_CHECK=$<BOOL:${SCULPTFORGE_UPDATE_CHECK}>)
   # The commit a build came from, for proof mode's results (src/app/ProofMode.cpp); taken when CMake configures.
   find_package(Git QUIET)
@@ -665,8 +671,16 @@ if(SCULPTFORGE_BUILD_TESTS)
     set_tests_properties(insider_drops PROPERTIES TIMEOUT 300)
     # Release notes from note fragments (tools/release/assemble_notes.py, changes/README.md): the assembler, and
     # every fragment on this branch parses.
+    add_test(NAME marks COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks.py
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}) # docs/legal/trademarks.md
+    add_test(NAME marks_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks.py --self-test)
     add_test(NAME release_notes COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/assemble_notes.py --self-test)
     add_test(NAME release_notes_fragments COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/assemble_notes.py --check)
+    # scripts/release.sh's beta (X.Y.Z-beta.N) and its promotion to stable, in a sandbox with stand-ins for gh and curl.
+    if(UNIX AND NOT APPLE AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
+      add_test(NAME release_script_beta COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_beta_test.sh)
+      set_tests_properties(release_script_beta PROPERTIES TIMEOUT 300)
+    endif()
     # The Actions cache pruner keeps the newest cache of each kind (tools/ci/prune_caches.py).
     add_test(NAME ci_prune_caches COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/prune_caches.py --self-test)
     add_test(NAME ci_slowest_tests COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/slowest_tests.py --self-test)
@@ -732,6 +746,15 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME ui_library_small_screen_720 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/library_small_screen.sfui
              --size 1280x720 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/library_small_screen_720)
     set_tests_properties(ui_library_small_screen_720 PROPERTIES LABELS ui TIMEOUT 300)
+    # #107: every look's right tray on a 1280x720 screen; #105: a Windows laptop at 150-200 % (2560x1600 at 200 % is
+    # 1280x800 logical px), nothing past the window's edges.
+    add_test(NAME ui_right_tray_looks_720 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/right_tray_looks.sfui
+             --size 1280x720 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/right_tray_looks_720)
+    add_test(NAME ui_windows_dpi_2560 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/windows_dpi.sfui
+             --size 2560x1600 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/windows_dpi_2560)
+    add_test(NAME ui_windows_dpi_2160 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/windows_dpi.sfui
+             --size 2160x1350 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/windows_dpi_2160)
+    set_tests_properties(ui_right_tray_looks_720 ui_windows_dpi_2560 ui_windows_dpi_2160 PROPERTIES LABELS "ui;dpi" TIMEOUT 300)
     add_test(NAME ui_user_guide_1080 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/user_guide.sfui
              --size 1920x1080 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/user_guide_1080)
     set_tests_properties(ui_user_guide_1080 PROPERTIES LABELS ui TIMEOUT 300)
@@ -753,6 +776,15 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME ui_stroke_background COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
     set_tests_properties(ui_stroke_background PROPERTIES LABELS ui TIMEOUT 60
                          ENVIRONMENT "SF_NO_UPDATE_CHECK=1;SF_MEASURE_VERIFY=1;SF_BACKGROUND_DABS=1")
+    # The same with Background Preview (experimental): the preview never changes the mesh and the frame no longer waits
+    # for a batch; the stroke still replays bit for bit.
+    add_test(NAME ui_stroke_background_preview COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
+    set_tests_properties(ui_stroke_background_preview PROPERTIES LABELS ui TIMEOUT 60
+                         ENVIRONMENT "SF_NO_UPDATE_CHECK=1;SF_MEASURE_VERIFY=1;SF_BACKGROUND_DABS=1;SF_BG_GHOST=1")
+    # And with the persistent upload (experimental, SF_PERSISTENT_UPLOAD): staging buffers instead of glBufferSubData.
+    add_test(NAME ui_stroke_persistent_upload COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
+    set_tests_properties(ui_stroke_persistent_upload PROPERTIES LABELS ui TIMEOUT 60
+                         ENVIRONMENT "SF_NO_UPDATE_CHECK=1;SF_MEASURE_VERIFY=1;SF_BACKGROUND_DABS=1;SF_BG_GHOST=1;SF_PERSISTENT_UPLOAD=1")
     # Predictive strokes with the brush size changing every frame mid-stroke: each batch of dabs keeps the size it
     # was handed (no data race with the solver thread), replaying the stroke without the thread gives the same
     # mesh, bit for bit, and its undo the mesh it started from.

@@ -1,6 +1,6 @@
 # Vertex Paint and materials
 
-Vertex Paint (ZBrush users: Polypaint) stores a colour on every vertex of the mesh, so you can paint a sculpt
+Vertex Paint (experienced sculptors: Vertex Paint) stores a colour on every vertex of the mesh, so you can paint a sculpt
 without UVs or textures. This chapter covers the Paint brush, painting while you sculpt, fills and cavity paint, picking colours,
 paint layers with blend modes, and the Lit Sphere materials that change how the model is shaded in the viewport.
 
@@ -13,7 +13,7 @@ paint layers with blend modes, and the Lit Sphere materials that change how the 
   [hidden faces](face-groups.md).
 - Symmetry works for painting as it does for sculpting.
 - Vertex Paint is per Part and is saved in projects. It is exported as vertex colours to PLY, glTF/GLB, OBJ, USD
-  (`displayColor`) and GoZ-compatible files. FBX export doesn't include it.
+  (`displayColor`) and Bridge files. FBX export doesn't include it.
 - A mesh starts without vertex paint. The first paint stroke or fill adds it (white everywhere you haven't painted).
 
 > **Texture painting:** to paint finer than the mesh, give the Part a texture and paint into it instead; the
@@ -29,15 +29,12 @@ paint layers with blend modes, and the Lit Sphere materials that change how the 
 While the Paint brush is active:
 
 - <kbd>Alt</kbd> paints back towards white.
-- <kbd>Shift</kbd> still smooths the shape, as in ZBrush.
+- <kbd>Shift</kbd> still smooths the shape.
 - The surface isn't changed.
 
 Press <kbd>P</kbd> again, or click **Sculpt** on the top shelf, to go back to sculpting.
 
-![Vertex Paint on a sculpt with the Paint menu open](images/polypaint.jpg)
-
-> **ZBrush:** **Paint** is ZBrush's Rgb on with Zadd off. **Sculpt** with **Rgb** on is Rgb with Zadd: the brush
-> sculpts and paints at once.
+![Vertex Paint on a sculpt with the Paint menu open](images/vertex-paint.jpg)
 
 ## Paint while sculpting
 
@@ -47,7 +44,7 @@ paints the current colour along its stroke. The Smooth brush and <kbd>Shift</kbd
 ## Choose a colour
 
 - The **left shelf** has a colour picker (a square plus a hue strip), two swatches and a **Fill** button. Clicking
-  the second swatch swaps it with the main colour, like ZBrush's Alternate.
+  the second swatch swaps it with the main colour.
 - The **Paint** menu has a larger hue wheel with a hex value, ten preset swatches (white, near black, red,
   orange, yellow, green, blue, purple, skin and brown) and the fill buttons.
 - Press <kbd>C</kbd> with the cursor over the model to pick the colour under it (the mesh needs vertex paint for this,
@@ -145,14 +142,11 @@ way round, so a stroke with **Rgb** on can sculpt into the "Smile" layer and pai
 
 - Paint layers are saved in projects (`.sfproj`) with their names, blend modes, opacity, visibility, lock and the
   active layer. Older versions of SculptForge open these projects with the paint flattened.
-- Exports (OBJ, PLY, glTF/GLB, USD, GoZ-compatible) write the composited colours, exactly what the viewport shows.
+- Exports (OBJ, PLY, glTF/GLB, USD, Bridge) write the composited colours, exactly what the viewport shows.
 - [Duplicating](parts.md) a Part copies its layers, and [Split](parts.md#split-a-part) keeps them on each piece.
   [Subdividing](geometry.md#subdivide) and [decimating](geometry.md#decimate) keep them too.
 - [Merging](parts.md#merge-parts) Parts, a [voxel remesh](geometry.md#voxel-remesh) and other rebuilds keep the look but
   flatten the layers into Base.
-
-> **ZBrush and Mudbox:** ZBrush's polypaint layers only have opacity. Here every layer also has a blend mode, its
-> own coverage and a lock, like the paint layers in Mudbox and Photoshop.
 
 ## Materials (Lit Spheres)
 
@@ -183,7 +177,7 @@ Vertex Paint multiplies the material, and cavity shading stays on with every mat
 material is saved with the project: projects saved with Studio open with Studio.
 
 **Colour tints the material** (in the **Paint** menu, on by default): on a Part with no vertex paint yet, the
-current colour tints its Lit Sphere material, as in ZBrush, so you can try a skin, stone or bronze tone without
+current colour tints its Lit Sphere material, so you can try a skin, stone or bronze tone without
 painting anything. The colour's hue and saturation tint it; grey (the starting colour) and black leave the material
 as it is, and the material keeps its own light and shade. Once a Part has vertex paint, the paint shows instead.
 PBR shading uses the material channels and is not tinted. Saved with the project.
@@ -194,22 +188,22 @@ PBR shading uses the material channels and is not tinted. Saved with the project
 ### Your own Lit Spheres
 
 A Lit Sphere is a picture of a lit sphere (Sloan and others, 2001): the view colours each point of the model with the sphere's colour where its
-surface faces the same way. Any lit-sphere image made for ZBrush, Blender or Nomad works: a square PNG, JPG or EXR
+surface faces the same way. Any lit-sphere image works: a square PNG, JPG or EXR
 with the sphere filling it (a non-square image is cropped to its centre; big ones are scaled to 1024 pixels).
 
 - **Render > Materials > Load Lit Sphere...** picks an image. It joins the material list under its file name, the view uses
-  it, and a copy goes into the **MatCaps** folder of your library (**Documents/SculptForge/MatCaps**, or the
+  it, and a copy goes into the **Lit Spheres** folder of your library (**Documents/SculptForge/Lit Spheres**, or the
   folder set in **Edit > Preferences > Library**), so it is there next time.
-- Or put images into that **MatCaps** folder yourself: they show up the next time you open the material picker,
+- Or put images into that **Lit Spheres** folder yourself: they show up the next time you open the material picker,
   **Render > Materials** or the Library's Material tab, no restart needed. Studios can share a read-only folder by
   listing it in the `SCULPTFORGE_MATCAP_PATH` environment variable (separated by `:`, `;` on Windows); those load
   when SculptForge starts.
 - To remove one, right-click it in the material picker or palette and choose **Remove**. An image from your
-  MatCaps folder goes to the trash (the Recycle Bin on Windows), so you can still get it back. On macOS it is
+  Lit Spheres folder goes to the trash (the Recycle Bin on Windows), so you can still get it back. On macOS it is
   only hidden until you restart, and the message says where its file is so you can delete it yourself.
   Built-in materials can't be removed.
 
-![A Lit Sphere loaded from an image (Gold) in Render > Materials](images/custom-matcaps.jpg)
+![A Lit Sphere loaded from an image (Gold) in Render > Materials](images/custom-lit-spheres.jpg)
 
 Your Lit Spheres appear in the material picker (<kbd>M</kbd>), **Render > Materials** and the Library, after the
 built-in ones. A project that uses one carries a copy of the image, so it opens with the same look on another
@@ -234,7 +228,7 @@ Shading works with every material, vertex paint, textures and the mask. Like the
 exports are unaffected. Projects save the scene's shading and each Part's own; projects from before open with
 your preferred shading. The scene's shading you choose is also the preference for the next session once you
 **Store Config** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>). Smooth and Flat have no default shortcut, so no
-ZBrush key changes meaning; assign one under **Edit > Preferences > Hotkeys** if you switch often.
+classic key changes meaning; assign one under **Edit > Preferences > Hotkeys** if you switch often.
 
 > **Not yet:** loading your own Lit Sphere images, and physically based materials or BPR-style renders.
 
@@ -254,8 +248,8 @@ ZBrush key changes meaning; assign one under **Edit > Preferences > Hotkeys** if
 | `paint_layer_merge` / `paint_layer_flatten` | Merge down / bake every visible layer into Base |
 | `paint_layer_list` | List the layers, top first (`*` marks the active one) |
 | `set_material name=Chrome` | Viewport material: a Lit Sphere name (`Soft Clay` is the default, your own Lit Spheres included) or `studio` (desktop app only) |
-| `load_matcap path=gold.png` | Load a Lit Sphere image and use it; `keep=false` doesn't copy it into the MatCaps folder (desktop app only) |
-| `remove_matcap name=Gold` | Remove one of your Lit Spheres; its image in the MatCaps folder goes to the trash (desktop app only) |
+| `load_matcap path=gold.png` | Load a Lit Sphere image and use it; `keep=false` doesn't copy it into the Lit Spheres folder (desktop app only) |
+| `remove_matcap name=Gold` | Remove one of your Lit Spheres; its image in the Lit Spheres folder goes to the trash (desktop app only) |
 | `set_background mode=flat color=60,70,80` | The view's background: `gradient` (the default) or `flat` with a colour (`#rrggbb`, `r,g,b` or a name); see [The background](interface.md#the-background) (desktop app only) |
 | `set_shading mode=flat` | The scene's shading: `smooth` (the default) or `flat` (desktop app only) |
 | `subtool_shading mode=smooth name=Eyes` | A Part's own shading: `default` (follow the scene), `smooth` or `flat`; `index` or `name` picks the Part (default: the active one) |

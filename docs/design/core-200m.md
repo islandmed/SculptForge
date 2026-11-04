@@ -236,6 +236,38 @@ showing nothing until the mesh catches up.
 - **Next:** wire it into the live frame (the canvas cache of perf-moonshots §7 A as its storage), the backlog-only
   evaluation, then Clay / Inflate / Flatten kernels (Flatten reads the canvas plane), then pen prediction (N4) on top.
 
+### N1 live, against Background Preview (floor first)
+
+N1 runs in the app behind `SF_SCREEN_STROKE=1` (render/ScreenStroke, off by default): the dabs Background Preview would
+move in the vertex shader (the solver's backlog plus the predicted head) are applied to the resolved view instead, for
+Standard and Clay in Lit Sphere views; anything else keeps the geometry preview. Measured with proof mode on
+standard-15m, **floor profile, budget pinned** (`SF_HW_SIMULATE=floor SF_GOVERNOR=0`), this laptop, Background Preview
+on (`SF_BG_GHOST=1`) with and without N1, interleaved x2 (load 1.7-1.9; the first ghost run 3.7). N1 drew in 72-100% of
+the Clay frames (`screen_stroke_frames`); Smooth and Move keep the geometry path in both.
+
+| phase | | frame p50 / p99 | GPU p50 / p99 | preview_lag_px p50 / p99 | lag_ms p50 / p99 (committed) |
+|---|---|---|---|---|---|
+| Clay small (25 px) | ghost | 5.8-6.9 / 14.6-16.0 ms | 4.8-6.0 / 10-11 | 2-3 / 11 | 22-29 / 79-88 |
+| | N1 | 8.6-9.6 / 23-26 ms | 6.8-7.4 / 14-15 | 4-5 / 18-23 | 29-30 / 93-99 |
+| Clay large (120 px) | ghost | 9.0-9.3 / 16-22 ms | 7.3 / 13-16 | 4-5 / 13-14 | 145-171 / 228-264 |
+| | N1 | 10.2-10.3 / 16.5-16.6 ms | 8.0-8.2 / 13 | 5 / 18 | 115 / 174-177 |
+| 240 px | ghost | 10.3-13.5 / 19-48 ms | 8.8-11.0 / 14-32 | 6-7 / 20-62 | 339-472 / 532-921 |
+| | N1 | 17.8-17.9 / 25.5-27.9 ms | 15.6-15.7 / 23 | 12 / 29-30 | 238-243 / 370-383 |
+
+Offline on the same 30 dabs (`--bench-optimistic`, floor, load 3.7, indicative): the ghost adds 2.4 ms to a frame at 5M and
+7.0 ms at 15M (it grows with the mesh), N1's pass ~4.8 ms flat; reconcile pop inside the surface N1 4.4 / 21 vs the ghost
+5.5 / 29 (mean / p99 levels), at the outline N1 41 vs the ghost 12.8 (the ghost moves real geometry, so the silhouette is
+right).
+
+**Decision: N1 does not replace the geometry preview.** At 15M on the floor it costs more GPU per frame (15.6 vs 8.8-11 ms
+p50 at 240 px), trails the pointer by a few more pixels (12 vs 6-7 px p50) and is worse at the outline; it is a little
+better inside the surface and its frame p99 at 240 px is steadier. The crossover in cost is around 15-20M (the ghost grows
+with the mesh, N1 doesn't), so N1's place is the meshes the geometry preview can't draw at all: micro levels (no preview
+path today: their strokes run synchronously in the frame loop) and 30M+ meshes. That needs a pending-dab list for micro
+strokes first; until then N1 stays a research toggle and Background Preview remains the one toggle users see. The
+committed lag difference at 240 px (238-243 vs 339-472 ms) is not attributed to N1 yet (the first ghost run was at load
+3.7, and N1 changes no solver work): to repeat at load < 2 before reading anything into it.
+
 ### N2, wavelet displacement (`sculptforge --bench-wavelet`)
 
 A Micro 7 head (314.6M micro triangles, 19,200 patches), one Standard dab of growing radius. Today = the adaptive micro

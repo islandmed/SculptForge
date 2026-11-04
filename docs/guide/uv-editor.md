@@ -171,7 +171,7 @@ commands work on the whole Part.
 | `uv_info` | Islands, seams, pins, texel density, the UDIM tiles in use and the mean stretch |
 
 ```
-uv_seam op=polygroups
+uv_seam op=face groups
 uv_unwrap method=isometric
 uv_pack tiles=2 margin=8
 uv_density op=match
@@ -185,7 +185,7 @@ uv_info
 - Packing works on islands' outlines when there are enough of them and the mesh isn't huge; otherwise on their boxes
   (a little less tight).
 
-> **Coming from ZBrush?** The UV Editor does what ZBrush 2027's UV editing and UV Master do: seams on the model,
+> **Experienced sculptor?** The UV Editor covers UV editing and auto UV: seams on the model,
 > several unwraps, UDIM packing, texel density and trim sheets, plus live stretch and density on the model while you
 > edit and paint that stays put when the UVs change.
 

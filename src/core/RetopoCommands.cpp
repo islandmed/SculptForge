@@ -84,7 +84,7 @@ std::string applyQRemesh(Document& doc, Mesh result, bool keepOriginal, const QR
 
 void registerRetopoCommands(CommandRegistry& reg) {
     reg.add({"qremesh",
-             "Quad Remesh (like ZBrush's ZRemesher): automatic quad retopology of the active Part. Builds clean, "
+             "Quad Remesh: automatic quad retopology of the active Part. Builds clean, "
              "all-quad topology with edge loops that follow the form, close to the target polygon count. Sculpt "
              "layers are baked; mask and vertex paint carry over. Undoable. Use project_all afterwards (from a kept "
              "original) to bring fine detail back onto a divided copy.",

@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/UiLayout.h"
 
+#include "core/LegacyNames.h"
+
 #include <algorithm>
 
 namespace sf {
@@ -18,7 +20,10 @@ void readStrings(const Json& j, std::vector<std::string>& out) {
     if (!j.isArray()) return;
     out.clear();
     for (size_t i = 0; i < j.size(); ++i)
-        if (j[i].isString() && !j[i].asString().empty()) out.push_back(j[i].asString());
+        if (j[i].isString() && !j[i].asString().empty()) {
+            const std::string_view now = legacy::renamed(legacy::kActionIds, j[i].asString());
+            out.push_back(now.empty() ? j[i].asString() : std::string(now));
+        }
 }
 
 } // namespace
@@ -41,9 +46,9 @@ UiLayout standardLayout() {
                     "view.frame", "widget.nav.move", "widget.nav.zoom", "widget.nav.rotate", "sep",
                     "view.polyf", "view.polygroups", "view.mask",       "view.polypaint",    "sep",
                     "subtool.solo", "view.splats"};
-    l.bottomShelf = {"brush.standard", "brush.clay",    "brush.claybuildup", "brush.damstandard", "brush.move",
+    l.bottomShelf = {"brush.standard", "brush.clay",    "brush.clayblock", "brush.sharpcrease", "brush.move",
                      "brush.smooth",   "brush.inflate", "brush.pinch",       "brush.flatten",     "brush.crease",
-                     "brush.trim",     "brush.snakehook", "brush.layer",     "brush.nudge",       "brush.kelvingrab",
+                     "brush.trim",     "brush.tendril", "brush.layer",     "brush.nudge",       "brush.kelvingrab",
                      "brush.detailclone", "brush.paint",
                      "widget.add_brush"};
     return l;

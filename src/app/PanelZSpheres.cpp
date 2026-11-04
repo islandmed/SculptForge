@@ -97,13 +97,13 @@ void App::registerZSphereUiActions() {
         "zsphere_set_root");
     add("zsphere.preview", "Preview", [this] { runCommand("zsphere_preview"); }, active,
         [this] { return doc_.mesh.zspherePreview; },
-        "Show the skin Make Mesh would build instead of the spheres (ZBrush's Preview). Turn it off to edit the "
+        "Show the skin Make Mesh would build instead of the spheres. Turn it off to edit the "
         "spheres again.",
         "zsphere_preview", "A");
     add("zsphere.make_mesh", "Make Mesh",
         [this] { runCommand("zsphere_make_mesh", {{"resolution", double(zsphereResolution_)}}); }, active, nullptr,
         "Build the skin as a new, sculptable Part right below (watertight quads, one face group per link), like "
-        "ZBrush's Make Adaptive Skin. The Forge Sphere Part is hidden and kept: show it to change the proportions and "
+        "Make Adaptive Skin. The Forge Sphere Part is hidden and kept: show it to change the proportions and "
         "make a new mesh.",
         "zsphere_make_mesh");
 }

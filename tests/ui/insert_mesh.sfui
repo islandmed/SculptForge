@@ -1,7 +1,7 @@
 # #34: Append > Insert on the model with your own mesh: a copy of another SubTool, or a model file.
 run new_sphere subdivisions=4
 key f
-click "SubTools/Append"
+click "Parts/Append"
 click "Cube"
 expect_value subtools == 2
 run subtool_select index=0
@@ -9,7 +9,7 @@ key f
 
 # A copy of the Cube SubTool, dragged onto the sphere (X symmetry is on: a mirrored copy too), one undo step.
 remember triangles base
-click "SubTools/Append"
+click "Parts/Append"
 hover "Insert on the model"
 hover "Active Part's copy..."
 click "Cube##insertcopy1"

@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/App.h"
+#include "io/BridgeProtocol.h"
 #include "core/LayerStack.h"
 #include "app/ShellQuote.h"
 #include "app/SpaceCamera.h"
@@ -72,7 +73,7 @@ namespace {
 const SDL_DialogFileFilter kObjFilters[] = {{"Wavefront OBJ", "obj"}, {"All files", "*"}};
 const SDL_DialogFileFilter kGlbFilters[] = {{"glTF binary", "glb"}, {"All files", "*"}};
 const SDL_DialogFileFilter kBrushFilters[] = {{"SculptForge brush", "sfbrush"}, {"All files", "*"}};
-const SDL_DialogFileFilter kModelFilters[] = {{"Projects, models and splats", "sfproj;obj;fbx;glb;gltf;ply;stl;GoZ;goz;ztl;ZTL;splat;usda;usd;usdz"}, {"All files", "*"}};
+const SDL_DialogFileFilter kModelFilters[] = {{"Projects, models and splats", "sfproj;obj;fbx;glb;gltf;ply;stl;" SF_BRIDGE_DIALOG_EXTS ";splat;usda;usd;usdz"}, {"All files", "*"}};
 const SDL_DialogFileFilter kFbxFilters[] = {{"FBX", "fbx"}, {"All files", "*"}};
 const SDL_DialogFileFilter kUsdFilters[] = {{"USDZ package", "usdz"}, {"USD text", "usda"}};
 const SDL_DialogFileFilter kSplatFilters[] = {{"Gaussian splats (PLY)", "ply"}, {"glTF splats", "glb"}, {"OpenUSD", "usda;usdz"}};
@@ -84,7 +85,7 @@ const char* kExamplePrompts[] = {
     "Overlapping dragon scales",
     "Weathered, chipped stone edges",
     "Dry cracked mud",
-    "Soft clay buildup like a thumb smear",
+    "Soft clay built up like a thumb smear",
 };
 
 bool ctrlDown(SDL_Keymod mod) { return (mod & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) != 0; }
@@ -142,8 +143,8 @@ bool App::init(const AppOptions& options) {
     wintab_.open(window_); // Windows: pressure from a tablet driver without Windows Ink (Wintab.h)
     // Focused from the start when the window system says so: the FOCUS_GAINED event can come before the loop runs.
     windowFocused_ = (SDL_GetWindowFlags(window_) & SDL_WINDOW_INPUT_FOCUS) != 0;
-    if (rememberWindow_) { // #35: where and how big it was last time
-        if (saved.placed) SDL_SetWindowPosition(window_, saved.x, saved.y);
+    if (rememberWindow_) { // #35: where and how big it was last time, inside the screen (#105)
+        fitWindowToDisplay(saved);
         if (restoresFullscreen(saved.fullscreen)) SDL_SetWindowFullscreen(window_, true);
         // #41, #85: on macOS full screen is a Space of its own; entered at start-up (before the first frame, or right
         // after it) the menu bar and traffic lights couldn't be revealed. A window that was full screen comes back
@@ -375,6 +376,7 @@ int App::runUiTest(int w, int h, int fps) {
         ImGui::LogFinish();
         ImGui::Render();
         updateMouseCursor();
+        buildGhost(); // (the stroke preview, as run() draws it)
 
         prewarmTexturePaint(); // dense textured meshes: ready the area under the hovering Paint brush (PanelPbr.cpp)
         const auto syncStart = std::chrono::steady_clock::now();
@@ -544,6 +546,7 @@ int App::runRecording() {
         demo_->drawOverlay();
         ImGui::Render();
         updateMouseCursor();
+        buildGhost(); // (the stroke preview, as run() draws it)
 
         syncScene();
         ++frames;
@@ -1063,6 +1066,24 @@ int App::run() {
     }
     finishProject();
     return options_.benchmark && proofSkippedScenes() ? 2 : 0; // (--benchmark: a scene skipped for memory)
+}
+
+// #105: the window on its display's usable area at the display's scale. A Windows laptop at 150-200 % opened the
+// 1600x960 window stored at 100 % (or by older versions) 800-1067 logical px wide, the shelves past its right edge.
+void App::fitWindowToDisplay(const WindowState& saved) {
+    const SDL_Point corner{saved.x + 100, saved.y + 10}; // (loadWindowState: a display shows this much of it)
+    const SDL_DisplayID display = saved.placed ? SDL_GetDisplayForPoint(&corner) : SDL_GetDisplayForWindow(window_);
+    SDL_Rect usable;
+    if (!display || !SDL_GetDisplayUsableBounds(display, &usable)) return;
+    const float scale = automaticUiScale(SDL_GetDisplayContentScale(display), SDL_GetWindowPixelDensity(window_));
+    WindowBorders b;
+    if (!SDL_GetWindowBordersSize(window_, &b.top, &b.left, &b.bottom, &b.right) || b.top <= 0)
+        b = {int(32.0f * scale), 0, 0, 0}; // not shown yet (X11): about a title bar
+    const WindowFit fit = fitWindow({saved.x, saved.y, saved.w, saved.h}, saved.stored, saved.placed, saved.scale,
+                                    {usable.x, usable.y, usable.w, usable.h}, b, scale);
+    SDL_SetWindowSize(window_, fit.rect.w, fit.rect.h);
+    SDL_SetWindowPosition(window_, fit.rect.x, fit.rect.y);
+    if (fit.maximize && !saved.fullscreen) SDL_MaximizeWindow(window_);
 }
 
 // The UI scale (Preferences > Interface > UI scale, #87). Automatic follows the window's display: on Windows
@@ -1857,6 +1878,11 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
         p.viewFalloff = uiPrefs_.viewFalloff;
         grabPending_ = false;
         doc_.sculptor.beginGrab(doc_.mesh, doc_.bvh, p, symmetry_);
+        liveMove_ = {};
+        if (liveMoveEnabled() && !p.connectedOnly && !p.viewFalloff && !doc_.mesh.micro && !doc_.mesh.hasMask() &&
+            !doc_.mesh.hasHidden() && doc_.mesh.layers.empty() && !doc_.sculptor.dyntopo.enabled &&
+            &displayedMesh() == &doc_.mesh)
+            liveMove_ = {true, p.center, glm::vec3(0.0f), p.radius, std::clamp(p.strength * 2.0f, 0.0f, 1.0f)};
         grabPlanePoint_ = grabLast_ = hit.position;
         beginAlongNormal(hit, p.radius);
         return;
@@ -1911,7 +1937,8 @@ void App::strokeTo(float x, float y) {
     const BrushRecipe* recipe = strokeRecipe();
     if (strokeBrush_ == BrushType::Move && !recipe && strokeSculpt_ && strokeAlongNormal_) {
         const glm::vec3 p = alongNormalTarget(x, y);
-        queueGrab(p - grabLast_);
+        if (liveMove_.active) liveMove_.delta += p - grabLast_;
+        else queueGrab(p - grabLast_);
         grabLast_ = p;
         return;
     }
@@ -1923,7 +1950,8 @@ void App::strokeTo(float x, float y) {
         if (std::abs(denom) < 1e-6f) return;
         float t = glm::dot(grabPlanePoint_ - origin, n) / denom;
         glm::vec3 p = origin + dir * t;
-        queueGrab(p - grabLast_);
+        if (liveMove_.active) liveMove_.delta += p - grabLast_;
+        else queueGrab(p - grabLast_);
         grabLast_ = p;
         return;
     }
@@ -2475,6 +2503,7 @@ void App::updateTitle() {
                            ? std::string("Untitled")
                            : std::filesystem::path(std::u8string(doc_.path.begin(), doc_.path.end())).filename().string();
     std::string title = (doc_.dirty() ? "* " : "") + name + " - SculptForge";
+    if (*appPrerelease()) title += " " + appVersionLabel(); // "- SculptForge 0.11.0 Beta 1": a beta says so
     if (title == windowTitle_) return; // called every frame
     windowTitle_ = title;
     SDL_SetWindowTitle(window_, title.c_str());
@@ -2546,7 +2575,7 @@ void App::drawUi() {
         ImGui::SetNextWindowSize(ImVec2(460 * uiScale_, 0), ImGuiCond_Always);
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         if (ImGui::Begin("About SculptForge", &showAbout_, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse)) {
-            ImGui::Text("SculptForge %s", SCULPTFORGE_VERSION);
+            ImGui::Text("SculptForge %s", appVersionLabel().c_str());
             ImGui::TextWrapped("Free and open-source digital sculpting.");
             ImGui::Spacing();
             ImGui::TextWrapped("%s", ai::kPrivacyLine); // also on the site (website/index.html) and in docs/ai-services.md
@@ -2600,7 +2629,7 @@ void App::drawLayersContents() {
         if (ImGui::RadioButton(layer.name.c_str(), doc_.activeLayer == i))
             runCommand("layer_set_active", {{"index", double(i)}});
         ui::HelpText(layer.name.c_str(), nullptr,
-                     "Select to sculpt into this layer (ZBrush's REC). With subdivision levels, record at any level: a "
+                     "Select to sculpt into this layer. With subdivision levels, record at any level: a "
                      "layer keeps its own detail on every level and follows Lower Res / Higher Res and Divide.",
                      kLayersPath);
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 52 * scale);
@@ -2622,7 +2651,7 @@ void App::drawLayersContents() {
             setLayerWeight(i, w);
         }
         ui::HelpText("Weight", nullptr,
-                     "How strongly the layer shows: 0 = off (ZBrush's eye), 1 = as sculpted. One weight for every "
+                     "How strongly the layer shows: 0 = off, 1 = as sculpted. One weight for every "
                      "subdivision level.",
                      kLayersPath);
         ImGui::PopID();
@@ -3777,3 +3806,4 @@ void App::drawBrushCursor() {
 }
 
 } // namespace sf
+

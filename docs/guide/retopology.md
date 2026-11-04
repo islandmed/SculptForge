@@ -1,8 +1,8 @@
 # Quad retopology and detail projection
 
-**Quad Remesh** rebuilds a sculpt as clean, all-quad topology whose edge loops follow the forms, like ZBrush's
-ZRemesher. **Project All** then moves a mesh onto the surface of other Parts, so the detail of the original
-sculpt comes back onto the new topology, like ZBrush's Project All. Together they turn a dense, messy sculpt
+**Quad Remesh** rebuilds a sculpt as clean, all-quad topology whose edge loops follow the forms.
+**Project All** then moves a mesh onto the surface of other Parts, so the detail of the original
+sculpt comes back onto the new topology. Together they turn a dense, messy sculpt
 (a voxel remesh, a scan, an AI-generated model) into a light quad mesh you can divide, sculpt on, unwrap and
 animate.
 
@@ -39,7 +39,7 @@ Both steps are single undo steps (<kbd>Ctrl</kbd>+<kbd>Z</kbd>).
 | **Detect Edges** | Hard edges get an edge loop, so boxes and bevels stay crisp (on by default). Quad Remesh 2 takes faces meeting at more than about 60 degrees along a line at least a few quads long (a scan's or a sculpt's deep creases are left to the flow); the legacy method any edge over 50 degrees |
 | **Use Vertex Paint** | Paint where you want density: red areas get up to four times the quads, blue areas down to a quarter, white areas are unchanged |
 | **Symmetry** | Remesh one half and mirror it, welded on the seam, for exactly symmetric topology (on by default). It mirrors on the axis chosen in **Sculpt > Symmetry & Gizmo** (X if none), across the model's own middle plane: the world's centre plane when the model is symmetric about it, otherwise the plane through the model's middle, so a model moved away from the centre works too. A model that isn't mirror-symmetric is remeshed whole instead, and the status line says "Symmetry off: the model isn't mirror-symmetric"; one that is nearly symmetric (a bump on one side) gets mirrored topology that follows each side's own surface |
-| **Keep Original** | Keep the Part as it was, hidden, below the new one, ready for Project All. Off: the Part is replaced, as in ZBrush (undo brings it back) |
+| **Keep Original** | Keep the Part as it was, hidden, below the new one, ready for Project All. Off: the Part is replaced (undo brings it back) |
 | **Keep Masked** | Masked areas keep their triangles exactly, as a fixed piece: only the unmasked part is remeshed (the target counts its quads), and it's joined to the masked part along the mask's edge with a strip of triangles, so the model stays closed. If the mask's edge can't be joined up, the status line says so and nothing changes (off by default; `qremesh keep_masked=true`) |
 | **Keep Texture** | Shown when the Part has a painted texture (on by default): Auto UV the result and project the texture onto it. Off: the texture is dropped |
 | **Quad Remesh Guides** | Picks the guides brush: draw curves on the model for the edge loops to follow. See [Quad Remesh Guides](#quad-remesh-guides) |
@@ -49,7 +49,7 @@ Both steps are single undo steps (<kbd>Ctrl</kbd>+<kbd>Z</kbd>).
 
 What happens to your data:
 
-- The result is all quads (stored as pairs of triangles, so **Wire** draws quads and OBJ, FBX, PLY, USD and GoZ-compatible
+- The result is all quads (stored as pairs of triangles, so **Wire** draws quads and OBJ, FBX, PLY, USD and Bridge
   export them as quads), closed wherever the sculpt is closed. Open edges of the sculpt stay open, along the
   same outline.
 - Sculpt layers are baked into the surface: the result has no layers.
@@ -135,14 +135,10 @@ The legacy method (**Method > Legacy**, `method=legacy`) is the Instant Meshes s
 SculptForge 0.9 (Jakob, Tarini, Panozzo and Sorkine-Hornung, 2015): faster on small models but with many more
 poles, and its result is extracted at twice the spacing and split, which shows as paired loops.
 
-> **ZBrush:** Quad Remesh Guides work like ZBrush's ZRemesher Guides brush, and Curves Strength like its slider of that name.
-> Keep Groups, Use Vertex Paint, Adaptive Size, Half / Same / Double and symmetry work as you know them. There is no
-> Freeze Border / Freeze Groups yet, and the mask doesn't steer Quad Remesh: use vertex paint for density.
-
 ## Quad Remesh Guides
 
 Draw curves on the sculpt and Quad Remesh puts an edge loop along each one, and turns the flow around it to follow,
-like ZBrush's ZRemesher Guides brush. With Quad Remesh 2 an open curve is an exact edge loop: the grid line lies on it.
+like quad remesh Guides brush. With Quad Remesh 2 an open curve is an exact edge loop: the grid line lies on it.
 Closed loops (round an eye) and loops across the symmetry plane are, for now, done by the legacy method for that
 piece (the status line says so). Use them where the topology has to work for animation: rings around the
 eyes and the mouth, loops around the shoulders, elbows and knees, a line down the middle of a muscle.
@@ -229,7 +225,7 @@ straight along the normal, it takes the closest point within **Dist**.
 | `project_all` | `distance` (0.001-1, default 0.02), `mean`, `blur` (0-20), `geometry` (default true), `polypaint` (default true), `source` (one Part's name instead of all visible ones) |
 
 ```sh
-sculptforge-cli -c 'open path=scan.glb; qremesh target=8000 adaptive=0.3 keep_original=true; subdivide levels=2; subtool_visibility index=1 visible=true; project_all distance=0.02; export_fbx path=retopo.fbx'
+sculptforge-cli -c 'open path=scan.glb; qremesh target=8000 adaptive=0.3 keep_original=true; subdivide levels=2; part_visibility index=1 visible=true; project_all distance=0.02; export_fbx path=retopo.fbx'
 ```
 
 ```sh

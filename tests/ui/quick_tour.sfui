@@ -1,0 +1,192 @@
+# Help > Quick tour (src/app/QuickTour.cpp, docs/guide/quick-tour.md): ten slides, each "Show me" opens its panel.
+# The slides' and the guide's pictures come from this run, in the default look and the SculptForge layout:
+#   build/sculptforge --ui-test tests/ui/quick_tour.sfui --ui-out build/quick-tour
+#   python3 tools/guide/make_images.py --quick-tour build/quick-tour
+expect_value look == 1
+expect_value shell_layout == 1
+run new_starter_mesh name=human-head
+camera -25 -6
+key f
+wait_idle 30
+
+# Picking the Classic sculpting keys offers the tour once, with a note along the bottom; No thanks is for good.
+expect_value quick_tour_done == 0
+quick_tour_offers
+classic_keys
+expect_value quick_tour_offer == 1
+shot offer
+click "No thanks##quicktour.offer"
+expect_value quick_tour_offer == 0
+expect_value quick_tour_done == 1
+input_style sculptforge
+classic_keys
+expect_value quick_tour_offer == 0
+input_style sculptforge
+
+# The ways in: the welcome's button and Help > Quick tour.
+key f3
+type "##Command palette" "welcome"
+key enter
+expect_value welcome_open == 1
+hover_window 0.99 0.99
+wait 0.2
+shot welcome
+click "Sculpted before? Take the quick tour##welcome.tour"
+expect_value welcome_open == 0
+expect_value quick_tour_open == 1
+expect_value quick_tour_slide == 1
+expect_value quick_tour_done == 1
+expect_text Where things are
+shot tour-01
+# An open slide costs nothing at rest: no focus, no pointer, no frames.
+window_focus 0
+mouse_leave
+wait 2
+expect_value wants_frames == 0
+window_focus 1
+
+# 1. Show me opens the search; the tour waits at the bottom.
+click "Show me##quicktour"
+expect_value quick_tour_aside == 1
+expect_value command_palette_open == 1
+type "##Command palette" "retopo"
+expect_text "also: retopo"
+wait 0.3
+mouse_leave
+wait 0.2
+shot 01-where
+key escape
+click "Back to the tour##quicktour"
+expect_value quick_tour_aside == 0
+
+# 2. Voxel Remesh: Tool > Remesh opens and flashes.
+click "Next##quicktour"
+expect_value quick_tour_slide == 2
+expect_text Voxel Remesh
+shot tour-02
+click "Show me##quicktour"
+expect_value quick_tour_aside == 1
+expect_value right_tray_open == 1
+wait 1.6
+expect_text Resolution
+mouse_leave
+wait 0.2
+shot 02-voxel
+# The flash has ended: the app rests with the tour waiting at the bottom.
+window_focus 0
+wait 2
+expect_value wants_frames == 0
+window_focus 1
+key escape
+click "Next##quicktour.aside"
+
+# 3. Dynamic topology: Sculpt > Draw & Tablet.
+expect_value quick_tour_slide == 3
+shot tour-03
+click "Show me##quicktour"
+expect_value dropdown_open == 1
+wait 0.3
+expect_text Detail
+mouse_leave
+wait 0.2
+shot 03-dynamic
+key escape
+click "Next##quicktour.aside"
+
+# 4. Quad Remesh: Tool > Remesh again, Quad Remesh at its top.
+expect_value quick_tour_slide == 4
+shot tour-04
+click "Show me##quicktour"
+wait 1.6
+expect_text Target Polygons
+mouse_leave
+wait 0.2
+shot 04-quad
+key escape
+click "Next##quicktour.aside"
+
+# 5. Levels, Parts and Face Groups: Tool > Geometry.
+expect_value quick_tour_slide == 5
+shot tour-05
+click "Show me##quicktour"
+wait 1.6
+expect_text Divide
+mouse_leave
+wait 0.2
+shot 05-levels
+key escape
+click "Next##quicktour.aside"
+
+# 6. Masking: Tool > Masking.
+expect_value quick_tour_slide == 6
+shot tour-06
+click "Show me##quicktour"
+wait 1.6
+expect_text By cavity
+mouse_leave
+wait 0.2
+shot 06-masking
+key escape
+click "Next##quicktour.aside"
+
+# 7. Cut: Tool > Cut.
+expect_value quick_tour_slide == 7
+shot tour-07
+click "Show me##quicktour"
+wait 1.6
+expect_text Clip
+mouse_leave
+wait 0.2
+shot 07-cut
+key escape
+click "Next##quicktour.aside"
+
+# 8. Brushes, alphas and the Library: the Library opens.
+expect_value quick_tour_slide == 8
+shot tour-08
+click "Show me##quicktour"
+click "Library/Brush"
+wait 0.5
+mouse_leave
+wait 0.2
+shot 08-library
+key comma
+expect_not "Library/Brush"
+click "Next##quicktour.aside"
+
+# 9. Baking and texturing: Tool > Bake.
+expect_value quick_tour_slide == 9
+shot tour-09
+click "Show me##quicktour"
+wait 1.6
+expect_text Bake
+mouse_leave
+wait 0.2
+shot 09-bake
+key escape
+click "Next##quicktour.aside"
+
+# 10. Last: memberships, friendly. See memberships opens the page (the status bar in tests); Maybe later closes.
+expect_value quick_tour_slide == 10
+expect_text SculptForge stays free
+expect_text feature-vote
+expect_no_text "Show me"
+shot tour-10
+remember support_requests s0
+click "See memberships##quicktour"
+expect_value support_requests == $s0+1
+click "Maybe later##quicktour"
+expect_value quick_tour_open == 0
+
+# Help > Quick tour always opens it; Back and the close box work.
+click "Help##menu.help"
+click "Quick tour##help.quick_tour"
+expect_value quick_tour_open == 1
+expect_value quick_tour_slide == 1
+click "Next##quicktour"
+click "Back##quicktour"
+expect_value quick_tour_slide == 1
+click "Show me##quicktour"
+key escape
+click "Close##quicktour.aside"
+expect_value quick_tour_open == 0

@@ -37,6 +37,14 @@ glm::vec3 onPlane(const glm::vec3& v, const glm::vec3& n) { return v - n * glm::
 // Keep in step with kMeshVS's ghostMove (Renderer.cpp) and the kernels in Sculptor::dabSingle.
 glm::vec3 ghostMove(const GhostStroke& g, glm::vec3 x, const glm::vec3& n) {
     const float sign = g.invert ? -1.0f : 1.0f;
+    if (g.kind == GhostKind::Move) { // Sculptor::grab: every mirror's weight from the grab's start position
+        const glm::vec3 start = x;
+        for (const GhostDab& d : g.dabs) {
+            const float dist = glm::length(start - d.center);
+            if (dist < d.radius) x += d.normal * (ghostFalloff(dist, d.radius, g.focal) * d.strength);
+        }
+        return x;
+    }
     for (const GhostDab& d : g.dabs) {
         const glm::vec3 o = x - d.center;
         const float dist = glm::length(o);
@@ -77,6 +85,7 @@ glm::vec3 ghostMove(const GhostStroke& g, glm::vec3 x, const glm::vec3& n) {
             if (sign * h > 0.0f) x -= an * (h * std::min(1.0f, std::sqrt(f) * (0.5f + s)));
             break;
         }
+        case GhostKind::Move: break; // (below: measured from the start position, not the moved one)
         case GhostKind::None: break;
         }
     }

@@ -133,12 +133,12 @@ std::string fileThumbnailKey(const std::string& kind, const std::string& absPath
 // <cacheDir>/<key>.png
 std::string thumbnailCachePath(const std::string& cacheDir, const std::string& key);
 
-// --- Brush pop-up letters (ZBrush: B, then S, then T picks Standard) ---
+// --- Brush pop-up letters (B, then S, then T picks Standard) ---
 
-// Lower-case letters and digits only ("Clay Buildup" -> "claybuildup"): what a name is typed as.
+// Lower-case letters and digits only ("Clay Block" -> "clayblock"): what a name is typed as.
 std::string typedName(const std::string& name);
-// The name ZBrush users type for a brush SculptForge names its own way ("sharpcrease" -> "damstandard"), else "".
-std::string typedZBrushAlias(const std::string& typed);
+// The two classic pop-up letters for a brush whose name doesn't start with them ("sharpcrease" -> "ds"), else "".
+std::string typedClassicKeys(const std::string& typed);
 // Indices of `names` the typed letters keep: names starting with `typed`, or (when none does) names
 // containing it (`substring` says which). Empty `typed` keeps all.
 std::vector<size_t> filterByTyped(const std::vector<std::string>& names, const std::string& typed,

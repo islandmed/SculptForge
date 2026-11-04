@@ -86,6 +86,42 @@ tagging.
 Scripting rule: under `set -o pipefail`, never end a pipe with `grep -q` or `head` (they close the pipe early and the
 writer fails); capture to a variable or file first, or let grep read everything (`grep ... >/dev/null`).
 
+## Betas (the Preview channel)
+
+A beta is the next release, published early for testers (docs/design/release-train.md §1). The first one is 0.11.0
+Beta 1, cut after stable 0.10.11 ships.
+
+```sh
+HIGHLIGHTS=highlights.txt scripts/release.sh 0.11.0-beta.1 --yes   # a beta (also 0.11.0-rc.1)
+HIGHLIGHTS=highlights.txt scripts/release.sh 0.11.0 --yes          # later: the stable release, on main as it is then
+```
+
+Steps for a beta: `bump check ci tag release preview status`.
+
+- **bump** writes the note fragments into CHANGELOG `[Unreleased]` and What's New `0.11.0` (date stays `unreleased`), and
+  saves their testers bullets to `release-testers-0.11.0-beta.1.md` first. It sets CMakeLists.txt to
+  `VERSION 0.11.0` and `set(SCULPTFORGE_PRERELEASE "beta.1")`. The app reads "0.11.0 Beta 1" in the title bar and
+  About; packages are named `SculptForge-0.11.0-*`. CITATION, rez, metainfo, the CHANGELOG section and the home page
+  stay at the stable release (`build_site.py` leaves the home page alone while a prerelease is set).
+- **check** checks CMakeLists.txt (version and prerelease), the guide and the DPI tests. A beta skips the
+  site/AUR/Homebrew/Omarchy checks.
+- **tag / release**: `v0.11.0-beta.1`. release.yml checks that the tag equals the version plus the prerelease. It
+  publishes a GitHub **pre-release**, never marked latest, so `releases/latest/download/...` and the site stay on
+  stable. The notes are CHANGELOG `[Unreleased]` with a line on how to send feedback.
+- **preview** writes `channels.preview` (version, the release's link, the highlights) into website/latest.json. The
+  stable top level is unchanged, so old apps and the Stable channel see nothing new. Apps whose
+  Preferences > Updates > Update channel is **Preview** are offered the beta (a beta build starts on Preview).
+- **Discord**: discord-announce.yml posts "SculptForge 0.11.0 Beta 1 is out for testing" in #announcements once the
+  feed names it. The post has the highlights, the download link and how to send feedback (#bug-reports, with OS,
+  version and hardware).
+- **status** prints the release link, the testers checklist (post it in #testers) and the promote command.
+- No site, AUR, Homebrew, Omarchy, winget or issue replies for a beta.
+
+**Promoting** is the normal stable release of `0.11.0`. Its bump clears `SCULPTFORGE_PRERELEASE`, so it is a new commit
+after the beta's. Step `site` removes the `channels.preview` entry the stable release has caught up with. In the
+app, Preview never offers anything older than stable. The beta's tag doesn't get in the way: stable releases take
+the guide from the newest tag without a `-` (pages.yml). A second beta is `0.11.0-beta.2`.
+
 ## When a step fails
 
 The script stops with a line starting `fix:` and the command to resume (`--from <step>`). Fix that one thing, then

@@ -352,7 +352,7 @@ void registerPolygroupCommands(CommandRegistry& reg) {
     reg.add(
         {"polygroup_auto_by_normals",
          "Split the visible surface into face groups wherever it turns more than an angle (each flat side of a "
-         "box becomes a group), like ZBrush Auto Groups / Groups By Normals.",
+         "box becomes a group).",
          {{"angle", T::Number, "Largest normal deviation inside one group, in degrees (1-180). Default 30.", false}},
          [](Document& doc, const Args& a) -> CommandResult {
              const float angle = float(std::clamp(argNumber(a, "angle", 30.0), 1.0, 180.0));
@@ -361,7 +361,7 @@ void registerPolygroupCommands(CommandRegistry& reg) {
          }});
 
     reg.add({"polygroup_by_connectivity",
-             "Give every disconnected piece of the visible mesh its own face group (like ZBrush Auto Groups).",
+             "Give every disconnected piece of the visible mesh its own face group.",
              {},
              [](Document& doc, const Args&) -> CommandResult {
                  commitPolygroups(doc, groupsByConnectivity(doc.mesh), "Groups by Connectivity");
@@ -369,7 +369,7 @@ void registerPolygroupCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"polygroup_uv",
-             "Give every UV island of the visible mesh its own face group (ZBrush Polygroups > UV Groups).", {},
+             "Give every UV island of the visible mesh its own face group.", {},
              [](Document& doc, const Args&) -> CommandResult {
                  if (!doc.mesh.hasUvs()) return {false, "This mesh has no UVs: unwrap it first (Tool > UV Map)"};
                  commitPolygroups(doc, groupsByUvs(doc.mesh), "Group by UVs");
@@ -377,7 +377,7 @@ void registerPolygroupCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"polygroup_from_mask",
-             "Move the masked (visible) part of the mesh into a new face group, like ZBrush Group Masked.", {},
+             "Move the masked (visible) part of the mesh into a new face group.", {},
              [](Document& doc, const Args&) -> CommandResult {
                  size_t n = 0;
                  std::vector<uint32_t> groups = groupsFromMask(doc.mesh, &n);
@@ -393,14 +393,14 @@ void registerPolygroupCommands(CommandRegistry& reg) {
                  return {true, "Face Groups cleared"};
              }});
 
-    reg.add({"polygroup_merge_visible", "Merge everything visible into a single face group (ZBrush Group Visible).", {},
+    reg.add({"polygroup_merge_visible", "Merge everything visible into a single face group.", {},
              [](Document& doc, const Args&) -> CommandResult {
                  commitPolygroups(doc, groupsMergeVisible(doc.mesh), "Group Visible");
                  return {true, groupSummary(doc.mesh)};
              }});
 
     // --- Visibility ---
-    reg.add({"hide_polygroup", "Hide one face group (ZBrush Ctrl+Shift+Alt+click).",
+    reg.add({"hide_polygroup", "Hide one face group.",
              {{"group", T::Number, "Face Group id.", true}},
              [](Document& doc, const Args& a) -> CommandResult {
                  const uint32_t group = uint32_t(std::max(0.0, argNumber(a, "group", 0)));
@@ -411,7 +411,7 @@ void registerPolygroupCommands(CommandRegistry& reg) {
                  return {true, visibleSummary(doc.mesh)};
              }});
 
-    reg.add({"isolate_polygroup", "Show only one face group and hide the rest (ZBrush Ctrl+Shift+click).",
+    reg.add({"isolate_polygroup", "Show only one face group and hide the rest.",
              {{"group", T::Number, "Face Group id.", true}},
              [](Document& doc, const Args& a) -> CommandResult {
                  const uint32_t group = uint32_t(std::max(0.0, argNumber(a, "group", 0)));
@@ -440,14 +440,14 @@ void registerPolygroupCommands(CommandRegistry& reg) {
                                   "too, as the brushes mirror (#51; default none).",
                                   false};
     reg.add({"hide_rect",
-             "Rectangle selection (ZBrush Ctrl+Shift+drag): keep the visible triangles inside a screen rectangle and "
+             "Rectangle selection: keep the visible triangles inside a screen rectangle and "
              "hide the rest, or hide the inside instead. Coordinates are normalised (-1..1, y up) in the given view; "
              "without a view the rectangle spans the mesh seen from the front (+Z).",
              {{"x0", T::Number, "Rectangle left (-1..1). Default -1.", false},
               {"y0", T::Number, "Rectangle bottom (-1..1). Default -1.", false},
               {"x1", T::Number, "Rectangle right (-1..1). Default 1.", false},
               {"y1", T::Number, "Rectangle top (-1..1). Default 1.", false},
-              {"inside", T::Bool, "Hide the inside instead of the outside (ZBrush: Alt held).", false},
+              {"inside", T::Bool, "Hide the inside instead of the outside.", false},
               {"view_proj", T::String, "Optional 16 numbers: column-major view-projection matrix.", false},
               symmetryParam},
              [](Document& doc, const Args& a) -> CommandResult {
@@ -467,11 +467,11 @@ void registerPolygroupCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"hide_lasso",
-             "Lasso selection (ZBrush SelectLasso, Ctrl+Shift+drag): keep the visible triangles inside a screen "
+             "Lasso selection: keep the visible triangles inside a screen "
              "polygon and hide the rest, or hide the inside instead. Points are normalised (-1..1, y up) in the given "
              "view; without a view they span the mesh seen from the front (+Z).",
              {{"points", T::String, "The lasso: at least 3 points as \"x0 y0 x1 y1 ...\" (-1..1, y up).", true},
-              {"inside", T::Bool, "Hide the inside instead of the outside (ZBrush: Alt held).", false},
+              {"inside", T::Bool, "Hide the inside instead of the outside.", false},
               {"view_proj", T::String, "Optional 16 numbers: column-major view-projection matrix.", false},
               symmetryParam},
              [](Document& doc, const Args& a) -> CommandResult {

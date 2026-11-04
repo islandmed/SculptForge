@@ -2,13 +2,15 @@ name: Release
 
 # A v* tag publishes a GitHub release (docs/releasing.md has the whole process; scripts/release.sh drives it).
 #
-#   locate   the tagged commit must carry the version the tag names (CMakeLists.txt). If CI and the Packages
+#   locate   the tagged commit must carry the version the tag names (CMakeLists.txt's version, plus its
+#            SCULPTFORGE_PRERELEASE for a beta: v0.11.0-beta.1 tags 0.11.0 with "beta.1"). If CI and the Packages
 #            workflow (packages.yml) both succeeded on a push to main for exactly this commit, the release uses those
 #            packages: built and tested once, promoted unchanged. Otherwise:
 #   build    the Packages workflow runs here, from the tag (compiler cache restored from main, never saved).
 #   smoke    every package installed or unpacked on a fresh runner: the app opens a model and sculpts
 #            (tests/ui/release_smoke.sfui), sculptforge-cli opens, sculpts, saves and reopens (tests/release_smoke.py).
-#   publish  only after every smoke test passed: checksums, notes from CHANGELOG.md, the GitHub release.
+#   publish  only after every smoke test passed: checksums, notes from CHANGELOG.md, the GitHub release. A tag with
+#            a '-' (a beta) is published as a pre-release, never marked latest, with CHANGELOG's [Unreleased] notes.
 #
 # Only publish holds a token that can write (contents: write); every other job reads. Build and smoke jobs take their
 # runner from the SF_RUNNER_* repository variables (standard GitHub runners when unset); locate and publish always run
@@ -62,12 +64,14 @@ jobs:
           sha=$(git rev-parse HEAD)
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
           version=$(sed -n 's/^project(SculptForge VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
+          pre=$(sed -n 's/^set(SCULPTFORGE_PRERELEASE "\([^"]*\)")$/\1/p' CMakeLists.txt)
+          version=$version${pre:+-$pre} # a beta: 0.11.0-beta.1
           if [ "$DRY_RUN" = true ] && ! git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
             # A dry run of a branch or commit: its packages are named for the version it carries.
             echo "Dry run of $TAG ($sha), packages named v$version"
             echo "tag=v$version" >> "$GITHUB_OUTPUT"
           elif [ "v$version" != "$TAG" ]; then
-            echo "::error::$TAG tags a commit whose CMakeLists.txt says $version. Fix: delete the tag, bump the version (or tag v$version), tag again."
+            echo "::error::$TAG tags a commit whose CMakeLists.txt says $version (version and SCULPTFORGE_PRERELEASE). Fix: delete the tag, bump the version (scripts/release.sh, or tag v$version), tag again."
             exit 1
           else
             echo "tag=$TAG" >> "$GITHUB_OUTPUT"
@@ -227,6 +231,7 @@ jobs:
         run: |
           cd dist
           V=${TAG#v}
+          V=${V%%-*} # a beta's packages carry its version without the prerelease (the app shows it)
           cp "SculptForge-$V-windows-x86_64.exe" SculptForge-windows-x86_64-setup.exe
           cp "SculptForge-$V-windows-x86_64.zip" SculptForge-windows-x86_64-portable.zip
           cp "SculptForge-$V-darwin-universal.dmg" SculptForge-macos.dmg
@@ -240,21 +245,35 @@ jobs:
           cp "SculptForge-$V-aarch64.flatpak" SculptForge-linux-arm64.flatpak
       - name: Blender add-on (extension and legacy zips, plus a version-less copy for the website's link)
         run: |
-          python3 addons/blender/build_addon.py --check --version "${TAG#v}" --out dist
-          cp "dist/sculptforge_bridge-${TAG#v}.zip" dist/sculptforge_bridge.zip
+          V=${TAG#v}
+          V=${V%%-*}
+          python3 addons/blender/build_addon.py --check --version "$V" --out dist
+          cp "dist/sculptforge_bridge-$V.zip" dist/sculptforge_bridge.zip
       - name: Maya shelf script (Python source and its README; nothing to build)
         run: python3 -m zipfile -c dist/sculptforge_maya.zip integrations/maya/sculptforge_maya.py integrations/maya/README.md
-      - name: ZBrush ZTL Export plug-in (ZScript source; ZBrush compiles it)
-        run: cp integrations/zbrush/SculptForgeZToolExport.txt dist/
+      - name: Bridge export plug-in
+        run: cp integrations/bridge-plugin/SculptForgeBridgeExport.txt dist/
       - name: Checksums
         run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
       - name: Release notes from CHANGELOG
         run: |
-          awk "/^## \[${TAG#v}\]/{flag=1;next} /^## \[/{flag=0} flag" CHANGELOG.md > notes.md
+          section=${TAG#v}
+          if [[ "$TAG" == *-* ]]; then # a beta: what has changed since the stable release
+            section=Unreleased
+            printf '%s\n\n' "**Beta for testers.** Please report problems in the Discord's #bug-reports (or a GitHub issue) with your OS, this version (Help > About) and your graphics card. Preferences > Updates > Update channel: Preview offers the next betas." > notes.md
+          fi
+          awk -v h="## [$section]" 'index($0, h) == 1 {flag=1;next} /^## \[/{flag=0} flag' CHANGELOG.md >> notes.md
           cat packaging/release-notes-footer.md >> notes.md
       - name: Create or update the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "SculptForge ${TAG#v}" --notes-file notes.md
+          if [[ "$TAG" == *-* ]]; then # v0.11.0-beta.1: "SculptForge 0.11.0 Beta 1", a pre-release, not latest
+            pre=${TAG#*-}
+            title="SculptForge ${TAG%%-*} $(sed -E 's/^rc/RC/; s/^./\U&/; s/\./ /g' <<<"$pre")"
+            gh release view "$TAG" >/dev/null 2>&1 ||
+              gh release create "$TAG" --title "${title/SculptForge v/SculptForge }" --notes-file notes.md --prerelease --latest=false
+          else
+            gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "SculptForge ${TAG#v}" --notes-file notes.md
+          fi
           gh release upload "$TAG" dist/* --clobber
