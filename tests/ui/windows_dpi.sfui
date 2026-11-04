@@ -1,0 +1,48 @@
+# A Windows laptop at 150-200 % display scaling (#105: a Legion 5 Pro, 2560x1600 at 200 % is 1280x800 logical px):
+# nothing is drawn past the window's edges, in both layouts and every look, with the Library open or closed; and a
+# tiled look's right tray opens on a 1280 px wide window as in Classic (#107). CMake also runs it at 2560x1600 and
+# 2160x1350 (ui_windows_dpi_*).
+run new_sphere subdivisions=3
+logical_width 1280
+wait_idle 30
+expect_value shell_narrow == 0
+expect_value right_tray_shown == 1
+expect_value offscreen_items == 0
+shot sculptforge-1280
+key ,
+expect_value lightbox_open == 1
+wait_idle 30
+expect_value offscreen_items == 0
+shot library-1280
+key escape
+expect_value lightbox_open == 0
+
+run ui_look look=phosphor
+wait_idle 30
+expect_value right_tray_shown == 1
+expect_value offscreen_items == 0
+run ui_look look=blueprint
+wait_idle 30
+expect_value right_tray_shown == 1
+expect_value offscreen_items == 0
+shot blueprint-1280
+
+run ui_look look=classic layout=zbrush
+wait_idle 30
+expect_value right_tray_shown == 1
+expect_value offscreen_items == 0
+shot classic-1280
+key ,
+wait_idle 30
+expect_value offscreen_items == 0
+key escape
+
+logical_width 1440
+wait_idle 30
+expect_value offscreen_items == 0
+shot classic-1440
+run ui_look look=forge layout=sculptforge
+wait_idle 30
+expect_value right_tray_shown == 1
+expect_value offscreen_items == 0
+shot sculptforge-1440

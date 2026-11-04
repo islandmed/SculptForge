@@ -1431,6 +1431,10 @@ private:
     uint64_t activeTrisKey_ = ~uint64_t(0); // the top shelf's ActiveTris, recounted when the scene changes
     size_t activeTris_ = 0;
     float bottomTileW_ = 58.0f; // bottom shelf tiles shrink (down to 44 px) before the shelf scrolls
+    // The top shelf when its row doesn't fit (#105: 1280 logical px at Windows' 200 %): the sliders leave room for the
+    // items after them (topShelfTailW_, measured last frame), then the icon buttons drop their labels.
+    bool topShelfCompact_ = false;
+    float topShelfFullW_ = 0.0f, topShelfTailW_ = 0.0f;
     int navDrag_ = -1;          // right-shelf drag button being dragged (0 move, 1 zoom, 2 rotate)
     ImVec2 navLast_{0, 0};      // the cursor at its last frame (the drag moves by the cursor's own steps)
     std::string statusShown_;   // for colouring fresh errors in the title strip
@@ -1510,7 +1514,12 @@ private:
     std::string uiConfigPath() const;
     // Window size, position, maximised and full screen, kept in window.json beside ui.json (#35). Not for tests,
     // renders, recordings or proof mode.
-    struct WindowState { int w = 1600, h = 960, x = 0, y = 0; bool placed = false, maximized = false, fullscreen = false; };
+    struct WindowState {
+        int w = 1600, h = 960, x = 0, y = 0;
+        float scale = 0.0f; // the UI scale Automatic picked when stored (0: before 0.10.11, taken as 100 %)
+        bool stored = false, placed = false, maximized = false, fullscreen = false;
+    };
+    void fitWindowToDisplay(const WindowState& saved); // #105: inside the screen, at its scale (ShellGeometry.h)
     static WindowState loadWindowState();
     void saveWindowState() const;
     bool rememberWindow_ = false;

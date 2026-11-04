@@ -5,6 +5,7 @@
 // the Preferences > Config / Interface / Hotkeys / LightBox sections, the F1
 // Controls sheet (generated from the action registry) and ZBrush-style
 // shortcut assignment.
+#include "app/UiScale.h"
 #include "app/Config.h"
 
 #include "app/App.h"
@@ -739,6 +740,8 @@ App::WindowState App::loadWindowState() {
     Json j;
     std::string err;
     if (!Json::parse(std::string(std::istreambuf_iterator<char>(f), {}), j, err)) return st;
+    st.stored = true;
+    st.scale = std::clamp(float(j["scale"].asNumber(0.0)), 0.0f, 4.0f);
     st.w = std::clamp(int(j["w"].asNumber(st.w)), 640, 16384);
     st.h = std::clamp(int(j["h"].asNumber(st.h)), 400, 16384);
     st.maximized = j["maximized"].asBool(false);
@@ -774,10 +777,12 @@ void App::saveWindowState() const {
         SDL_GetWindowSize(window_, &st.w, &st.h);
         SDL_GetWindowPosition(window_, &st.x, &st.y);
         st.placed = true;
+        st.scale = automaticUiScale(SDL_GetWindowDisplayScale(window_), SDL_GetWindowPixelDensity(window_));
     }
     Json j;
     j.set("w", double(st.w));
     j.set("h", double(st.h));
+    if (st.scale > 0.0f) j.set("scale", double(st.scale));
     if (st.placed) {
         j.set("x", double(st.x));
         j.set("y", double(st.y));

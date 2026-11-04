@@ -712,27 +712,29 @@ void App::drawQuickMenu() {
     }
     const float s = uiScale_;
     const float tile = 56.0f * s;
-    const float width = 4 * tile + 3 * ImGui::GetStyle().ItemSpacing.x + 150.0f * s;
+    // As on the left shelf: a square picture with its caption under it (a square tile squashed the thumbnails).
+    const ImVec2 tileSize(tile, tile + (fontSmall_ ? fontSmall_->FontSize : 12.0f) + 4.0f * s);
+    const float width = 4 * tile + 3 * ImGui::GetStyle().ItemSpacing.x + 188.0f * s;
     ImGui::SetNextWindowPos(ImVec2(quickMenu_.at.x - width * 0.5f, quickMenu_.at.y - tile * 0.5f), ImGuiCond_Appearing);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 6.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(37, 37, 40, 245));
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, theme::u32(theme::panelBg, 0.96f)); // the look's own grey, no blue tint
     bool close = false;
     if (ImGui::Begin("Quick Menu##quickmenu", nullptr,
                      ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
                          ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing)) {
         ImGui::BeginGroup();
-        drawBrushTile("##qm_brush", ImVec2(tile, tile));
+        drawBrushTile("##qm_brush", tileSize);
         ImGui::SameLine();
-        drawStrokeTile("##qm_stroke", ImVec2(tile, tile));
+        drawStrokeTile("##qm_stroke", tileSize);
         ImGui::SameLine();
-        drawAlphaTile("##qm_alpha", ImVec2(tile, tile));
+        drawAlphaTile("##qm_alpha", tileSize);
         ImGui::SameLine();
-        drawMaterialTile("##qm_material", ImVec2(tile, tile));
+        drawMaterialTile("##qm_material", tileSize);
         ImGui::EndGroup();
-        ImGui::SameLine();
+        ImGui::SameLine(0.0f, 8.0f * s);
         ImGui::BeginGroup();
-        const float sw = 150.0f * s;
+        const float sw = 180.0f * s; // "Draw Size 60 px  289 mm" whole
         ImGui::SetNextItemWidth(sw);
         drawSizeSlider("##qm_drawsize", "Quick Menu", "Brush radius in screen pixels (0.5 to 800), and in mm on the surface.");
         float focal = focalShift_ * 100.0f;

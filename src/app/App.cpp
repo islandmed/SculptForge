@@ -142,8 +142,8 @@ bool App::init(const AppOptions& options) {
     wintab_.open(window_); // Windows: pressure from a tablet driver without Windows Ink (Wintab.h)
     // Focused from the start when the window system says so: the FOCUS_GAINED event can come before the loop runs.
     windowFocused_ = (SDL_GetWindowFlags(window_) & SDL_WINDOW_INPUT_FOCUS) != 0;
-    if (rememberWindow_) { // #35: where and how big it was last time
-        if (saved.placed) SDL_SetWindowPosition(window_, saved.x, saved.y);
+    if (rememberWindow_) { // #35: where and how big it was last time, inside the screen (#105)
+        fitWindowToDisplay(saved);
         if (restoresFullscreen(saved.fullscreen)) SDL_SetWindowFullscreen(window_, true);
         // #41, #85: on macOS full screen is a Space of its own; entered at start-up (before the first frame, or right
         // after it) the menu bar and traffic lights couldn't be revealed. A window that was full screen comes back
@@ -1059,6 +1059,24 @@ int App::run() {
     }
     finishProject();
     return options_.benchmark && proofSkippedScenes() ? 2 : 0; // (--benchmark: a scene skipped for memory)
+}
+
+// #105: the window on its display's usable area at the display's scale. A Windows laptop at 150-200 % opened the
+// 1600x960 window stored at 100 % (or by older versions) 800-1067 logical px wide, the shelves past its right edge.
+void App::fitWindowToDisplay(const WindowState& saved) {
+    const SDL_Point corner{saved.x + 100, saved.y + 10}; // (loadWindowState: a display shows this much of it)
+    const SDL_DisplayID display = saved.placed ? SDL_GetDisplayForPoint(&corner) : SDL_GetDisplayForWindow(window_);
+    SDL_Rect usable;
+    if (!display || !SDL_GetDisplayUsableBounds(display, &usable)) return;
+    const float scale = automaticUiScale(SDL_GetDisplayContentScale(display), SDL_GetWindowPixelDensity(window_));
+    WindowBorders b;
+    if (!SDL_GetWindowBordersSize(window_, &b.top, &b.left, &b.bottom, &b.right) || b.top <= 0)
+        b = {int(32.0f * scale), 0, 0, 0}; // not shown yet (X11): about a title bar
+    const WindowFit fit = fitWindow({saved.x, saved.y, saved.w, saved.h}, saved.stored, saved.placed, saved.scale,
+                                    {usable.x, usable.y, usable.w, usable.h}, b, scale);
+    SDL_SetWindowSize(window_, fit.rect.w, fit.rect.h);
+    SDL_SetWindowPosition(window_, fit.rect.x, fit.rect.y);
+    if (fit.maximize && !saved.fullscreen) SDL_MaximizeWindow(window_);
 }
 
 // The UI scale (Preferences > Interface > UI scale, #87). Automatic follows the window's display: on Windows

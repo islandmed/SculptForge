@@ -1,0 +1,26 @@
+# #107: on a 1280x720 screen (CMake: ui_right_tray_looks_720, at 100 %) the right tray of every look opens and
+# closes from its divider, as in Classic, and starts open.
+run new_sphere subdivisions=3
+display_scale 100
+wait_idle 30
+run ui_look look=forge
+wait_idle 30
+expect_value right_tray_open == 1
+expect_value right_tray_shown == 1
+shot forge-open
+click "##rightdivider"
+expect_value right_tray_open == 0
+expect_value right_tray_shown == 0
+click "##rightdivider"
+expect_value right_tray_open == 1
+expect_value right_tray_shown == 1
+run ui_look look=phosphor
+wait_idle 30
+expect_value right_tray_shown == 1
+run ui_look look=blueprint
+wait_idle 30
+expect_value right_tray_shown == 1
+shot blueprint-open
+run ui_look look=classic
+wait_idle 30
+expect_value right_tray_shown == 1

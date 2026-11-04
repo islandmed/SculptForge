@@ -55,6 +55,7 @@ public:
     static void pushScope(const char* name);
     static void popScope();
     static std::vector<std::string> similarItems(const std::string& label); // for test failure messages
+    static std::vector<std::string> offscreenItems(); // items drawn past the window's edge last frame ("window/label")
 
     // UI tests (UiTest.cpp). Steps that fail stop the run; failures() lists why.
     bool loadScript(const std::string& path, std::string& error);

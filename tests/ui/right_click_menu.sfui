@@ -70,3 +70,17 @@ button_drag right 0.12 0.3 0.12 0.3 0.1
 expect_value quickmenu_open == 0
 button_drag right 0.12 0.3 0.12 0.5
 expect_value camera_pitch != $p0
+
+# The QuickMenu in the default look (Forge Terminal, Neutral): square, uncropped thumbnails, the look's own grey
+# behind them (Discord: squashed thumbnails, a blue tint).
+click "Preferences##palette.preferences"
+click "Right click opens the Quick Menu##input.right_click_menu"
+expect_value right_click_menu == 1
+key escape
+run ui_look look=forge scheme=neutral
+wait_idle 30
+button_drag right 0.3 0.3 0.3 0.3 0.1
+expect_value quickmenu_open == 1
+wait_idle 30
+shot quickmenu-neutral
+key escape
