@@ -40,6 +40,16 @@ float vertexConcavity(const Mesh& mesh, uint32_t v);
 // Masks concave areas: vertices whose concavity exceeds `threshold` get up to
 // `strength` (0-1), with a soft ramp above the threshold. Replaces the mask.
 bool maskByCavity(Mesh& mesh, float strength, float threshold);
+// Masks convex areas (ridges, peaks, edges): the mirror of maskByCavity, for vertices whose concavity is below
+// -threshold. Replaces the mask.
+bool maskByPeaks(Mesh& mesh, float strength, float threshold);
+// Masks vertices whose vertex paint is within `tolerance` (0-1, distance in RGB / sqrt 3) of `color`, with a soft
+// ramp over the last fifth. A mesh without vertex paint is all white. With `add` the mask grows, else it is replaced.
+bool maskByColor(Mesh& mesh, const glm::vec3& color, float tolerance, float strength, bool add);
+// Masks vertices whose normal points within `angleDeg` (1-180) of `direction` (any length), with a soft ramp
+// over the last 15 degrees, e.g. the view direction reversed to mask what faces the camera, or +Y for what faces
+// up. With `add` the mask grows, else it is replaced.
+bool maskByFacing(Mesh& mesh, const glm::vec3& direction, float angleDeg, float strength, bool add);
 // Masks every vertex touching a visible triangle of polygroup `group`.
 // With `add` the existing mask is kept, otherwise it is replaced.
 bool maskByPolygroup(Mesh& mesh, uint32_t group, bool add);
@@ -79,7 +89,7 @@ bool symmetryCopiesArg(const Args& a, const Mesh& mesh, std::vector<SymCopy>& co
 std::vector<ParamSpec> radialSymmetryParams();
 
 // Registers mask_clear, mask_all, mask_invert, mask_blur, mask_sharpen,
-// mask_grow, mask_shrink, mask_by_cavity, mask_by_polygroup, mask_border,
+// mask_grow, mask_shrink, mask_by_cavity, mask_by_peaks, mask_by_color, mask_by_facing, mask_by_polygroup, mask_border,
 // mask_rect and mask_lasso.
 void registerMaskingCommands(CommandRegistry& registry);
 

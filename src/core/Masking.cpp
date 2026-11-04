@@ -3,6 +3,7 @@
 #include "core/Masking.h"
 
 #include "core/Commands.h"
+#include "core/Polypaint.h"
 #include "core/ScreenSelect.h"
 #include "core/Sculpt.h"
 #include "core/ThreadPool.h"
@@ -196,6 +197,46 @@ bool maskByCavity(Mesh& mesh, float strength, float threshold) {
     constexpr float kRamp = 0.15f; // concavity above the threshold at which the mask is full
     return maskPass(mesh, [&](const std::vector<float>&, uint32_t v) {
         return strength * smoothstep01(threshold, threshold + kRamp, cav[v]);
+    });
+}
+
+bool maskByPeaks(Mesh& mesh, float strength, float threshold) {
+    const uint32_t n = static_cast<uint32_t>(mesh.vertexCount());
+    if (n == 0) return false;
+    strength = std::clamp(strength, 0.0f, 1.0f);
+    std::vector<float> raw(n), cav(n);
+    for (uint32_t v = 0; v < n; ++v) raw[v] = vertexConcavity(mesh, v);
+    for (uint32_t v = 0; v < n; ++v) cav[v] = 0.5f * raw[v] + 0.5f * neighbourAverage(mesh, raw, v);
+    constexpr float kRamp = 0.15f; // (as maskByCavity)
+    return maskPass(mesh, [&](const std::vector<float>&, uint32_t v) {
+        return strength * smoothstep01(threshold, threshold + kRamp, -cav[v]);
+    });
+}
+
+bool maskByColor(Mesh& mesh, const glm::vec3& color, float tolerance, float strength, bool add) {
+    if (mesh.vertexCount() == 0) return false;
+    tolerance = std::clamp(tolerance, 0.001f, 1.0f);
+    strength = std::clamp(strength, 0.0f, 1.0f);
+    const glm::vec3 c = glm::clamp(color, glm::vec3(0.0f), glm::vec3(1.0f));
+    return maskPass(mesh, [&](const std::vector<float>& m, uint32_t v) {
+        const float d = glm::distance(mesh.colorAt(v, glm::vec3(1.0f)), c) / 1.7320508f;
+        const float w = strength * (1.0f - smoothstep01(tolerance * 0.8f, tolerance, d));
+        return add ? std::max(m[v], w) : w;
+    });
+}
+
+bool maskByFacing(Mesh& mesh, const glm::vec3& direction, float angleDeg, float strength, bool add) {
+    if (mesh.vertexCount() == 0 || mesh.normals.size() != mesh.vertexCount()) return false;
+    const float len = glm::length(direction);
+    if (!(len > 1e-9f)) return false;
+    const glm::vec3 dir = direction / len;
+    angleDeg = std::clamp(angleDeg, 1.0f, 180.0f);
+    strength = std::clamp(strength, 0.0f, 1.0f);
+    const float full = std::max(0.0f, angleDeg - 15.0f); // fully masked inside this angle
+    return maskPass(mesh, [&](const std::vector<float>& m, uint32_t v) {
+        const float a = std::acos(std::clamp(glm::dot(mesh.normals[v], dir), -1.0f, 1.0f)) * 57.29578f;
+        const float w = strength * (1.0f - smoothstep01(full, angleDeg, a));
+        return add ? std::max(m[v], w) : w;
     });
 }
 
@@ -416,6 +457,48 @@ void registerMaskingCommands(CommandRegistry& registry) {
         [](Mesh& m, const Args& a) {
             return maskByCavity(m, float(argNumber(a, "strength", 1.0)),
                                 std::clamp(float(argNumber(a, "threshold", 0.02)), -1.0f, 1.0f));
+        });
+    add("mask_by_peaks", "Mask by Peaks",
+        "Mask convex areas (ridges, peaks, sharp edges), replacing the current mask - e.g. to work only in the "
+        "valleys, or to protect edges.",
+        {{"strength", T::Number, "Mask value on the sharpest peaks (0-1). Default 1.", false},
+         {"threshold", T::Number,
+          "Convexity above which vertices get masked (-1 to 1; 0 = anything convex, higher = only sharp ridges). "
+          "Default 0.02.",
+          false}},
+        [](Mesh& m, const Args& a) {
+            return maskByPeaks(m, float(argNumber(a, "strength", 1.0)),
+                               std::clamp(float(argNumber(a, "threshold", 0.02)), -1.0f, 1.0f));
+        });
+    add("mask_by_color", "Mask by Colour",
+        "Mask the vertices whose vertex paint is close to a colour (unpainted meshes are white).",
+        {{"color", T::String, "The colour by name or #rrggbb (or give r, g, b).", false},
+         {"r", T::Number, "Red 0-1 (sRGB), instead of color.", false},
+         {"g", T::Number, "Green 0-1 (sRGB).", false},
+         {"b", T::Number, "Blue 0-1 (sRGB).", false},
+         {"tolerance", T::Number, "How different a colour may be and still count (0-1). Default 0.15.", false},
+         {"strength", T::Number, "Mask value (0-1). Default 1.", false},
+         {"add", T::Bool, "Add to the current mask instead of replacing it. Default false.", false}},
+        [](Mesh& m, const Args& a) {
+            glm::vec3 c(1.0f);
+            std::string err;
+            if (!colorArg(a, c, err)) return false;
+            return maskByColor(m, c, float(argNumber(a, "tolerance", 0.15)), float(argNumber(a, "strength", 1.0)),
+                               argBool(a, "add", false));
+        });
+    add("mask_by_facing", "Mask by Facing",
+        "Mask the vertices whose surface faces a direction (within an angle): e.g. 0 0 1 masks what faces the front "
+        "view, 0 1 0 what faces up.",
+        {{"x", T::Number, "Direction x.", true},
+         {"y", T::Number, "Direction y.", true},
+         {"z", T::Number, "Direction z.", true},
+         {"angle", T::Number, "Largest angle from the direction, in degrees (1-180). Default 60.", false},
+         {"strength", T::Number, "Mask value (0-1). Default 1.", false},
+         {"add", T::Bool, "Add to the current mask instead of replacing it. Default false.", false}},
+        [](Mesh& m, const Args& a) {
+            const glm::vec3 d(float(argNumber(a, "x", 0)), float(argNumber(a, "y", 0)), float(argNumber(a, "z", 1)));
+            return maskByFacing(m, d, float(argNumber(a, "angle", 60)), float(argNumber(a, "strength", 1.0)),
+                                argBool(a, "add", false));
         });
     add("mask_by_polygroup", "Mask by Face Group",
         "Mask the vertices of one face group (meshes without face groups are all group 0).",

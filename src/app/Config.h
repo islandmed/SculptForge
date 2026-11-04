@@ -42,6 +42,8 @@ struct UiPrefs {
     bool inputStyleSaved = false; // ui.json named the style (not saved itself): an install from before 0.10.4
                                   // without it had the ZBrush-style keys and keeps them (PanelProject.cpp)
     bool emulateNumpad = false; // Blender style: the 1-9 and 0 keys above the letters act as the numpad (laptops)
+    // The order of the asset lists (core/ListSort.h ids "az", "recent", "pack"): brushes, alphas, materials, Library.
+    std::string brushSort = "az", alphaSort = "az", materialSort = "az", librarySort = "az";
     bool rightClickQuickMenu = true; // a right click on the canvas (no drag) opens the QuickMenu, as in ZBrush (#22)
     bool spaceCamera = false; // hold Space and drag to move the camera (#43; off: Space opens the QuickMenu)
     // Blender style (#77): off, as Blender 5.1+'s default keymap, Alt+left-drag on the model masks (Ctrl+Alt unmasks)
@@ -107,6 +109,11 @@ struct UiPrefs {
     bool liveMove = false;
     bool backgroundPreview = false;
     bool fastUpload = false;
+    // Fast big brushes (Sculptor::adaptiveDabs, core/SculptBatch.cpp): a big brush's dabs take their plane from a
+    // sample of the region, carry the normals along with the move (the exact ones follow), and the dabs waiting
+    // for a frame go through the vertices together. The result matches the dab-by-dab stroke to within about 2% of
+    // how far it moved the surface (tests/test_beta_boost.cpp). On by default.
+    bool fastBigBrushes = true;
     // Dynamic topology (Draw palette): false = the detail follows the brush size on screen (Sculptris Pro);
     // true = one detail size for the whole mesh.
     bool dyntopoConstantDetail = false;

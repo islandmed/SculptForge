@@ -43,6 +43,7 @@ struct BrushItem {
     std::string path; // .sfbrush (File)
     std::string description;
     std::string tag;        // "gallery", "studio", "unsaved"... (Recipe)
+    std::string pack;       // the brush pack it belongs to (a built-in or installed pack's recipe), or ""
     std::string id() const; // stable across frames: "type:Clay", "recipe:Dragon Scales", "file:<path>"
 };
 
@@ -59,6 +60,16 @@ struct PickerUi {
     // The open slider's knob (its current value) in window coordinates, as last drawn; false when none is open.
     static bool sliderKnob(ImVec2& knob);
 };
+
+// The sort menu of an asset list: a small "A-Z v" button that opens A-Z, Recent and (with `packs`) Pack. `pref`
+// holds the core/ListSort.h id and is saved with the preferences. Returns true when the order changed.
+bool SortMenu(const char* id, std::string& pref, bool packs = true);
+float SortMenuWidth(); // room to leave for it beside a filter field
+
+// Where a brush (BrushItem::id) is in the recently used list (0 = last used), -1 when not in it; the place of a
+// built-in brush pack in the packs' order, -1 for other packs.
+int brushRecentRank(const std::string& id);
+int builtinBrushPackRank(const std::string& pack);
 
 // Action id of a brush for the shelves ("brush.clay", "brush.paint", "brush.recipe.<name>").
 std::string brushActionId(const BrushItem& item);

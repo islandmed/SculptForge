@@ -41,6 +41,7 @@ add_library(sculptforge_core STATIC
   src/core/TierConfig.cpp
   src/core/MemoryGuard.cpp
   src/core/Sculpt.cpp
+  src/core/SculptBatch.cpp
   src/core/Dyntopo.cpp
   src/core/DyntopoCommands.cpp
   src/core/Undo.cpp
@@ -62,6 +63,7 @@ add_library(sculptforge_core STATIC
   src/core/Pack.cpp
   src/core/Json.cpp
   src/core/BrushRecipe.cpp
+  src/core/BrushPacks.cpp
   src/core/BrushSettings.cpp
   src/core/AlphaOptions.cpp
   src/core/BrushLibrary.cpp

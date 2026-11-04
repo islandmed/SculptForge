@@ -1828,6 +1828,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     }
     haveLastDab_ = false;
     doc_.sculptor.draftStrokes = draftStrokes() && asyncStrokeAllowed(); // (AsyncStroke.cpp)
+    doc_.sculptor.adaptiveDabs = fastBigBrushes();
     if (!doc_.sculptor.beginStroke(doc_.mesh,
                                    !strokeSculpt_ ? std::string("Paint") : recipe ? recipe->name : brushLabel(strokeBrush_),
                                    strokeSculpt_ ? doc_.activeLayer : -1)) {
@@ -2037,17 +2038,27 @@ void App::drainStrokeDabs(double budgetSeconds) {
     const size_t waiting = dabQueue_.size();
     const SculptTimings before = doc_.sculptor.timings;
     size_t placed = 0;
+    doc_.sculptor.beginBatch(); // (a big brush's dabs wait and go through the vertices together: core/SculptBatch.cpp)
     while (!dabQueue_.empty()) {
         const PathDab d = dabQueue_.pop();
         const auto dabStart = std::chrono::steady_clock::now();
         dabAt(d.x, d.y, d.pressure);
         ++placed;
+        if (doc_.sculptor.batchWaiting() > 0) continue; // (its cost shows when the batch is placed, below)
         // what a dab costs on this mesh with this brush (the backlog limit in strokeTo)
         const double cost = std::chrono::duration<double>(std::chrono::steady_clock::now() - dabStart).count();
         dabSeconds_ = dabSeconds_ > 0.0 ? dabSeconds_ * 0.8 + cost * 0.2 : cost;
         if (budgetSeconds > 0.0 &&
             std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() >= budgetSeconds)
             break; // at least one dab per call, so a stroke always moves on
+    }
+    if (const size_t fused = doc_.sculptor.batchWaiting(); fused > 0) {
+        const auto batchStart = std::chrono::steady_clock::now();
+        doc_.sculptor.endBatch(doc_.mesh, doc_.bvh);
+        const double cost = std::chrono::duration<double>(std::chrono::steady_clock::now() - batchStart).count() / double(fused);
+        dabSeconds_ = dabSeconds_ > 0.0 ? dabSeconds_ * 0.8 + cost * 0.2 : cost;
+    } else {
+        doc_.sculptor.endBatch(doc_.mesh, doc_.bvh);
     }
     if (log) {
         const SculptTimings& t = doc_.sculptor.timings;
@@ -2130,6 +2141,8 @@ void App::dabAt(float x, float y, float pressure) {
     DabParams p;
     p.center = hit.position;
     p.viewDir = cam.forward();
+    p.pickDir = cam.ortho ? cam.forward() : hit.position - cam.position();
+    p.pickNormal = glm::length(hit.normal) > 0.0f ? glm::normalize(hit.normal) : glm::vec3(0.0f);
     p.radius = baseRadius * (st.pressureSize ? std::max(pressure, 0.05f) : 1.0f) * dabRadiusScale_;
     // Smooth keeps its own Z Intensity (ZBrush), whether picked or held with Shift.
     p.strength = (st.brush == BrushType::Smooth ? st.smoothStrength : st.strength) * dabStrengthScale_;

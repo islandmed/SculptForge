@@ -276,6 +276,7 @@ private:
     // frame in the interactive loop, so a stroke on a huge mesh keeps its curve (core/StrokePath.h).
     StrokePath strokePath_;
     DabQueue dabQueue_;
+    double lastDabsQueued_ = 0.0; // when pumpStroke last handed the solver dabs (catch-up waits for a pause)
     std::vector<PathDab> strokeScratch_;
     std::vector<glm::vec2>* strokeProbe_ = nullptr; // --measure-stroke: where each dab went (screen)
     std::vector<float>* strokeRadiusProbe_ = nullptr; // ... and its brush radius (px)
@@ -335,6 +336,7 @@ private:
     bool strokeFinishing_ = false;     // released: the solver places the last dabs, the UI carries on
     bool predictiveStrokes() const;    // the preference (and its environment override)
     bool previewStrokes() const;       // the stroke's dabs draw the predictive preview (predictive, or SF_BG_GHOST)
+    bool fastBigBrushes() const;       // Preferences > Performance > Fast Big Brushes (SF_ADAPTIVE_DABS=0 / 1 overrides it)
     bool draftStrokes() const;         // Draft Strokes (SF_DRAFT_STROKE=0 / 1 overrides)
     bool backgroundDabs() const;       // a heavy mesh's dabs on the solver thread without the preview (SF_BACKGROUND_DABS)
     bool asyncStrokeAllowed() const;   // the stroke beginning now may use the solver thread
@@ -586,6 +588,7 @@ private:
     // Ctrl+click on the background inverts it, Ctrl+drag there clears it.
     // With MaskLasso / MaskRect, Ctrl+drag draws the shape instead.
     void drawMaskingSection();
+    bool maskButton(const char* id, const char* hint, int art, float width, bool selected = false);
     void beginMaskStroke(float x, float y);
     void maskCanvasMove(float x, float y);
     void maskCanvasRelease();
@@ -597,6 +600,9 @@ private:
     int maskIterations_ = 1;
     float cavityThreshold_ = 0.02f;
     int maskGroup_ = 0;
+    float maskColorTolerance_ = 0.15f; // Tool > Masking > By colour
+    int maskFacingDir_ = 0;            // By facing: 0 the camera, 1 up, 2 down
+    float maskFacingAngle_ = 60.0f;
     int maskBorderRings_ = 2;        // Tool > Masking > By border: width in edge rings (#61)
     bool maskBorderGroups_ = false;  // ... polygroup borders too
     bool maskBorderSoft_ = false;    // ... fading inwards
@@ -1774,6 +1780,7 @@ public:
 private:
     void initBrushSettings();
     void syncBrushSettings(); // every frame, outside strokes
+    void recipeAlpha(BrushToolSettings& s) const; // the active recipe's own alpha (brush packs) into `s`
     void syncAlphaTile();     // the brush's Tile onto the current alpha
     void registerAlphaOptionsCommand(); // brush_alpha_options (#76)
     std::string brushSettingsPath() const;

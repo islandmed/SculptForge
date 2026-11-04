@@ -32,6 +32,10 @@ public:
     // `axis` (a brush whose falloff is measured on screen reaches through the model along the view).
     void queryVerticesCylinder(const Mesh& mesh, const glm::vec3& point, const glm::vec3& axis, float radius,
                                std::vector<uint32_t>& out) const;
+    // queryVertices for a capsule: every vertex within `radius` of the segment a..b (a fused batch of dabs along
+    // a stroke, core/SculptBatch.cpp).
+    void queryVerticesCapsule(const Mesh& mesh, const glm::vec3& a, const glm::vec3& b, float radius,
+                              std::vector<uint32_t>& out) const;
     // Appends every triangle whose bounds touch the sphere (cleared first; hidden ones included).
     void queryTriangles(const Mesh& mesh, const glm::vec3& center, float radius, std::vector<uint32_t>& out) const;
     // Calls fn(triangles of the leaf) for every leaf whose box touches the sphere (hidden triangles included);

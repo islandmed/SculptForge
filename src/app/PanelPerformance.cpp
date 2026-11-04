@@ -138,6 +138,17 @@ void App::registerPerformanceUiActions() {
         "Lighter on laptops and on battery: the hardware profile turns it on there by itself (its Draft brushes "
         "setting); this turns it on everywhere. Brushes that follow the surface's direction (Inflate, the plane "
         "brushes) use its direction from the stroke's start, so the result can differ slightly from a full stroke.");
+    add("perf.fast_big_brushes", "Fast Big Brushes",
+        [this] {
+            uiPrefs_.fastBigBrushes = !uiPrefs_.fastBigBrushes;
+            status_ = uiPrefs_.fastBigBrushes ? "Fast big brushes on" : "Fast big brushes off";
+        },
+        [this] { return uiPrefs_.fastBigBrushes; },
+        "Big brushes on dense meshes keep up with the pen: a dab that reaches more than 150,000 vertices finds its "
+        "plane from a sample of them and turns the shading along with the move it makes, and the dabs waiting for a "
+        "frame are placed together in one pass. Every vertex still moves by the brush itself; the exact shading "
+        "follows behind the brush and when you lift the pen. Small brushes, Smooth, Layer, Inflate, Nudge, Clay "
+        "Block, alphas and masked areas are placed dab by dab as before. Off: every dab one by one.");
     registerPerformanceProfileUiActions(); // Re-calibrate, the frame governor (PanelPerformanceProfile.cpp)
 }
 
@@ -205,6 +216,9 @@ void App::drawPerformanceSection() {
     bool draft = uiPrefs_.draftStrokes;
     if (ImGui::Checkbox(tr("Draft Strokes"), &draft)) actions_.find("perf.draft_strokes")->run();
     ui::HelpAction(*this, "perf.draft_strokes");
+    bool fastBig = uiPrefs_.fastBigBrushes;
+    if (ImGui::Checkbox(tr("Fast Big Brushes"), &fastBig)) actions_.find("perf.fast_big_brushes")->run();
+    ui::HelpAction(*this, "perf.fast_big_brushes");
     bool liveMove = uiPrefs_.liveMove;
     if (ImGui::Checkbox(tr("Live Move (Experimental)"), &liveMove)) actions_.find("perf.live_move")->run();
     ui::HelpAction(*this, "perf.live_move");
