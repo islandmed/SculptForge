@@ -49,6 +49,9 @@ All enforced by tests (`test_brush_packs.cpp`, `test_brushes.cpp`, `test_masking
   Cut tear and faint textures fixed).
 
 ## Notes for the merger
+- Fix 11-03 (merge0109): pack brush 'Panel Line' renamed 'Panel Groove' (it hid the community gallery's Panel Line
+  Install button); brush_gallery.sfui counts 7/8 -> 67/68; new unit test brush_packs_names_clear_of_the_gallery keeps
+  pack names off the gallery seed index. ui_brush_gallery and ui_brush_packs pass.
 - Merges cleanly onto origin/main (17 commits ahead at push time).
 - Library projects are now A-Z by default (were newest first); **Sort: Recent** gives the old order.
 - Projects save all brushes incl. the 60 pack recipes in the manifest (~25 KB more JSON); unchanged ones load back as

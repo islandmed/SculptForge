@@ -7,6 +7,7 @@
 
 #include "app/BrushPreview.h"
 #include "core/BrushAlpha.h"
+#include "core/BrushGallery.h"
 #include "core/BrushPacks.h"
 #include "core/BrushRecipe.h"
 #include "core/ListSort.h"
@@ -16,6 +17,8 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <fstream>
+#include <iterator>
 #include <map>
 #include <set>
 
@@ -153,4 +156,21 @@ TEST(list_sort_orders) {
     CHECK(names(ListSort::Pack) == "Wrinkle;Clay 2;Clay 10;bolt Head;Mine;");
     CHECK(listSortFromId(listSortId(ListSort::Pack)) == ListSort::Pack);
     CHECK(listSortFromId("nonsense") == ListSort::AZ);
+}
+
+// A built-in pack brush must not share a name with a community gallery brush: the gallery would show it as
+// installed and offer no Install (brush_gallery.sfui).
+TEST(brush_packs_names_clear_of_the_gallery) {
+    std::ifstream f(std::string(SF_TEST_DATA_DIR) + "/../../tools/brush-gallery/repo/index.json", std::ios::binary);
+    CHECK(f.good());
+    const std::string text((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    GalleryIndex index;
+    std::string error;
+    CHECK(parseGalleryIndex(text, index, error));
+    CHECK(index.brushes.size() >= 20);
+    for (const BrushRecipe& r : builtinPackRecipes())
+        for (const GalleryBrush& g : index.brushes) {
+            if (r.name == g.name) std::printf("  pack brush %s is also a gallery brush\n", r.name.c_str());
+            CHECK(r.name != g.name);
+        }
 }
