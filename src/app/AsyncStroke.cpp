@@ -82,9 +82,17 @@ void App::StrokeSolver::loop() {
             app.doc_.sculptor.flushDraft(app.doc_.mesh, app.doc_.bvh);
             spent += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
         }
+        app.doc_.sculptor.beginBatch(); // (a big brush's dabs go through the vertices together: core/SculptBatch.cpp)
         for (const PathDab& d : batch) {
             const auto t0 = std::chrono::steady_clock::now();
             app.dabAt(d.x, d.y, d.pressure);
+            spent += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+        }
+        {
+            const auto t0 = std::chrono::steady_clock::now();
+            app.doc_.sculptor.endBatch(app.doc_.mesh, app.doc_.bvh);
+            // Nothing more waiting: the exact normals behind the brush catch up (a frame's share of them).
+            if (catchUp && !finalize) app.doc_.sculptor.catchUpNormals(app.doc_.mesh, app.doc_.bvh, catchUpLeaves);
             spent += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
         }
         app.dabView_ = nullptr;
@@ -130,6 +138,14 @@ bool App::predictiveStrokes() const {
         return v && *v ? (*v == '0' ? 0 : 1) : -1;
     }();
     return env >= 0 ? env == 1 : uiPrefs_.predictiveStrokes;
+}
+
+bool App::fastBigBrushes() const {
+    static const int env = [] {
+        const char* v = std::getenv("SF_ADAPTIVE_DABS");
+        return v && *v ? (*v == '0' ? 0 : 1) : -1;
+    }();
+    return env >= 0 ? env == 1 : uiPrefs_.fastBigBrushes;
 }
 
 bool App::draftStrokes() const {
@@ -255,6 +271,7 @@ void App::pumpStroke() {
         StrokeSolver& s = *solver_;
         s.batch.clear();
         s.finalize = true;
+        s.catchUp = false;
         s.view.camera = camera_;
         s.view.canvas = canvasRect();
         s.view.probe = nullptr;
@@ -267,7 +284,26 @@ void App::pumpStroke() {
         return;
     }
     if (dabQueue_.empty()) {
-        if (strokeFinishing_) finishStrokeNow(); // released, and every dab is on the GPU
+        if (strokeFinishing_) {
+            finishStrokeNow(); // released, and every dab is on the GPU
+            return;
+        }
+        // The pen rests (no dabs for a tenth of a second): the exact normals behind the brush (Fast Big Brushes)
+        // catch up meanwhile. (Not while dabs keep coming: a catch-up batch would hold the next one back.)
+        if (!doc_.sculptor.normalsPending() || double(SDL_GetTicksNS()) * 1e-9 - lastDabsQueued_ < 0.1) return;
+        StrokeSolver& s = *solver_;
+        s.batch.clear();
+        s.finalize = false;
+        s.catchUp = true;
+        s.view.camera = camera_;
+        s.view.canvas = canvasRect();
+        s.view.probe = nullptr;
+        s.view.radiusProbe = nullptr;
+        s.view.settings = dabSettings();
+        s.uploadId = doc_.activeSubtoolInfo().id;
+        renderer_.bindStrokeUpload(s.uploadId, s.upload);
+        s.prepare = &displayedMesh() == &doc_.mesh;
+        s.start();
         return;
     }
     // The next batch, oldest first: about kBatchSeconds of work, or as much as packing its upload costs (so the
@@ -279,10 +315,13 @@ void App::pumpStroke() {
     const double target = std::max(predictiveStrokes() ? kBatchSeconds : std::max(kBackgroundBatchSeconds, frameSeconds_ * 0.8),
                                    prepSeconds_);
     size_t n = dabSeconds_ > 0.0 ? size_t(std::clamp(target / dabSeconds_, 1.0, 64.0)) : 1;
-    if (strokeFinishing_) n = 64;
+    // A big brush's batch goes through the vertices together (Fast Big Brushes): every dab waiting, at once.
+    if (strokeFinishing_ || doc_.sculptor.fusesBatches()) n = 64;
     s.batch.clear();
     while (!dabQueue_.empty() && s.batch.size() < n) s.batch.push_back(dabQueue_.pop());
     s.finalize = strokeFinishing_ && dabQueue_.empty();
+    s.catchUp = false; // (dabs are coming: the exact normals wait for a pause or the release)
+    lastDabsQueued_ = double(SDL_GetTicksNS()) * 1e-9;
     s.view.camera = camera_;
     s.view.canvas = canvasRect();
     s.view.probe = strokeProbe_ ? &s.probe : nullptr;

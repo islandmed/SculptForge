@@ -409,6 +409,36 @@ struct CylinderShape {
 
 } // namespace
 
+// A capsule: the points within sqrt(r2) of the segment a..a + ab.
+struct CapsuleShape {
+    glm::vec3 a, ab;
+    float r, r2, len2;
+    float dist2(const glm::vec3& p) const {
+        const glm::vec3 d = p - a;
+        const float t = len2 > 0.0f ? std::clamp(glm::dot(d, ab) / len2, 0.0f, 1.0f) : 0.0f;
+        const glm::vec3 off = d - ab * t;
+        return glm::dot(off, off);
+    }
+    bool touches(const AABB& b) const { // conservative: the box's bounding sphere against the capsule
+        const glm::vec3 mid = (b.min + b.max) * 0.5f;
+        const float reach = r + glm::length(b.max - mid);
+        return dist2(mid) <= reach * reach;
+    }
+    bool containsBox(const AABB& b) const {
+        for (int k = 0; k < 8; ++k) {
+            const glm::vec3 p((k & 1) ? b.max.x : b.min.x, (k & 2) ? b.max.y : b.min.y, (k & 4) ? b.max.z : b.min.z);
+            if (dist2(p) > r2) return false;
+        }
+        return true;
+    }
+    bool contains(const glm::vec3& p) const { return dist2(p) <= r2; }
+};
+
+void BVH::queryVerticesCapsule(const Mesh& mesh, const glm::vec3& a, const glm::vec3& b, float radius,
+                               std::vector<uint32_t>& out) const {
+    queryVerticesIn(mesh, CapsuleShape{a, b - a, radius, radius * radius, glm::dot(b - a, b - a)}, out);
+}
+
 void BVH::queryVertices(const Mesh& mesh, const glm::vec3& center, float radius, std::vector<uint32_t>& out) const {
     queryVerticesIn(mesh, SphereShape{center, radius * radius}, out);
 }

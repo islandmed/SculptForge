@@ -276,6 +276,7 @@ private:
     // frame in the interactive loop, so a stroke on a huge mesh keeps its curve (core/StrokePath.h).
     StrokePath strokePath_;
     DabQueue dabQueue_;
+    double lastDabsQueued_ = 0.0; // when pumpStroke last handed the solver dabs (catch-up waits for a pause)
     std::vector<PathDab> strokeScratch_;
     std::vector<glm::vec2>* strokeProbe_ = nullptr; // --measure-stroke: where each dab went (screen)
     std::vector<float>* strokeRadiusProbe_ = nullptr; // ... and its brush radius (px)
@@ -334,6 +335,7 @@ private:
     bool asyncStroke_ = false;         // this stroke's dabs go to the solver thread
     bool strokeFinishing_ = false;     // released: the solver places the last dabs, the UI carries on
     bool predictiveStrokes() const;    // the preference (and its environment override)
+    bool fastBigBrushes() const;       // Preferences > Performance > Fast Big Brushes (SF_ADAPTIVE_DABS=0 / 1 overrides it)
     bool draftStrokes() const;         // Draft Strokes (SF_DRAFT_STROKE=0 / 1 overrides)
     bool backgroundDabs() const;       // a heavy mesh's dabs on the solver thread without the preview (SF_BACKGROUND_DABS)
     bool asyncStrokeAllowed() const;   // the stroke beginning now may use the solver thread
