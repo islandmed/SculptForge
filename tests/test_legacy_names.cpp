@@ -88,4 +88,8 @@ TEST(legacy_names_read_old_files_and_scripts) {
     Document doc;
     CHECK(reg.execute(doc, old.at("part") + "_list", {}).ok);
     CHECK(!reg.execute(doc, "no_such_" + old.at("part"), {}).ok);
+    // A path with an old word in it (a user's folder) is never rewritten, and a failure keeps its own message.
+    const std::string path = "/no/such/" + capitalised(old.at("classic")) + "/model.obj";
+    const CommandResult missing = reg.execute(doc, "open", {{"path", path}});
+    CHECK(!missing.ok && missing.message.find(capitalised(old.at("classic"))) != std::string::npos);
 }

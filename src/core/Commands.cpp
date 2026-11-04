@@ -871,21 +871,25 @@ const Command* CommandRegistry::find(const std::string& name) const {
 }
 
 namespace {
-// Args from an older version's script: parameter names, and string values when the command refused them as they
-// were (so a user's own text is never changed when the command accepts it).
+// A value an older version's script may have used as a name (layout=..., mode=..., id=...): letters, digits, '_'
+// and '-' only, so paths and a user's own text are never rewritten.
+bool oldNameValue(const ArgValue& v) {
+    const std::string* s = std::get_if<std::string>(&v);
+    if (!s || s->empty() || s->size() > 64) return false;
+    for (unsigned char c : *s)
+        if (!std::isalnum(c) && c != '_' && c != '-') return false;
+    return legacy::isOld(*s);
+}
+// Args from an older version's script: parameter names, and (values) old name values.
 Args modernizedArgs(const Args& args, bool values) {
     Args out;
-    for (const auto& [k, v] : args) {
-        ArgValue nv = v;
-        if (values)
-            if (const std::string* s = std::get_if<std::string>(&v); s && legacy::isOld(*s)) nv = legacy::modernize(*s);
-        out[legacy::modernize(k)] = std::move(nv);
-    }
+    for (const auto& [k, v] : args)
+        out[legacy::modernize(k)] = values && oldNameValue(v) ? ArgValue(legacy::modernize(std::get<std::string>(v))) : v;
     return out;
 }
 bool anyOldValue(const Args& args) {
     for (const auto& [k, v] : args)
-        if (const std::string* s = std::get_if<std::string>(&v); s && legacy::isOld(*s)) return true;
+        if (oldNameValue(v)) return true;
     return false;
 }
 } // namespace
@@ -905,7 +909,8 @@ CommandResult CommandRegistry::execute(Document& doc, const std::string& name, c
     if (doc.extractPreview.id && name.rfind("extract", 0) != 0)
         doc.dropExtractPreview(!(name.rfind("save", 0) == 0 || name.rfind("export", 0) == 0));
     CommandResult r = cmd->run(doc, args);
-    if (!r.ok && anyOldValue(args)) r = cmd->run(doc, modernizedArgs(args, true)); // a value an older version used
+    if (!r.ok && anyOldValue(args)) // a name value an older version used: try today's; keep the first answer if it fails too
+        if (CommandResult again = cmd->run(doc, modernizedArgs(args, true)); again.ok) r = std::move(again);
     if (const std::string notice = doc.takeNotice(); !notice.empty() && r.ok) r.message += ". " + notice;
     return r;
 }
