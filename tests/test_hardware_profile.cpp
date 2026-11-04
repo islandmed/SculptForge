@@ -678,6 +678,17 @@ TEST(governor_target_120) {
     CHECK(std::abs(g60.targetMs() - 1000.0 / 120.0) < 1e-9);
 }
 
+TEST(hw_stroke_shade_budget) {
+    // A micro stroke's shading per frame: the points budget, held to TierConfig::strokeShadeMs at the measured cost.
+    CHECK(TierConfig().strokeShadeMs == 10.0);
+    CHECK(strokeShadeBudget(1u << 20, 10.0, 0.0, 300) == (1u << 20));      // cost not measured yet: the points
+    CHECK(strokeShadeBudget(1u << 20, 0.0, 20.0, 300) == (1u << 20));      // off
+    CHECK(strokeShadeBudget(1u << 20, 10.0, 20.0, 300) == 500000);         // 10 ms at 20 ns a point
+    CHECK(strokeShadeBudget(1u << 20, 10.0, 2.0, 300) == (1u << 20));      // fast enough: the points still cap it
+    CHECK(strokeShadeBudget(0, 10.0, 20.0, 300) == 500000);                // no points limit
+    CHECK(strokeShadeBudget(1u << 20, 10.0, 1e9, 300) == 300);             // at least one patch and its ring
+}
+
 TEST(hw_tier_config) {
     // Laptop / Budget: 2M active triangles, continuous brushes on mains, a quarter of the RAM for caches.
     const HardwareProfile laptop = mapProfile(machine("Intel", "Mesa Intel(R) Xe Graphics (TGL GT2)", 0, 16384, 8), measured(400.0, 4.0));
