@@ -590,6 +590,9 @@ void App::initActions() {
         ICON_LC_GRADUATION_CAP, nullptr, nullptr, nullptr,
         "A step-by-step lesson for complete beginners: a cute owl head from the default sphere, painted and "
         "rendered, in about ten minutes.");
+    add("help.quick_tour", "Quick tour", "Help", nullptr, [this] { showQuickTour(0); }, ICON_LC_COMPASS, nullptr, nullptr,
+        nullptr, "Ten short slides for sculptors who know another app: where remeshing, dynamic topology, retopology, "
+                 "levels, masking, cut, brushes and baking are, each with a Show me button.");
     add("help.whats_new", "What's New", "Help", nullptr, [this] { showWhatsNew(); }, ICON_LC_SPARKLES, nullptr,
         nullptr, nullptr, "What changed in this version and the ones before it (opens once by itself after an update).");
     add("help.check_updates", "Check for updates", "Help", nullptr, [this] { startUpdateCheck(true); }, ICON_LC_REFRESH_CW,

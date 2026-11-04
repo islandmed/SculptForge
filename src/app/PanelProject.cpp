@@ -119,6 +119,7 @@ void App::initProject() {
         // remembers neither and keeps the Classic look with the ZBrush-style layout; the new-look card offers the
         // new default once (PanelSupport.cpp).
         newLookCardDone_ = prefs["new_look_card_done"].asBool(false);
+        quickTourDone_ = prefs["quick_tour_done"].asBool(false);
         if (!uiPrefs_.lookSaved && !uiConfigDeterministic_) {
             UiPrefs saved = uiPrefs_;
             if (!lookFromJson(prefs["ui_look"], saved)) {
@@ -192,6 +193,7 @@ void App::saveProjectPrefs() {
         prefs.set("ui_look", std::move(look));
     }
     prefs.set("new_look_card_done", newLookCardDone_);
+    prefs.set("quick_tour_done", quickTourDone_);
     std::ofstream(fsPath(prefDir_ + "project.json"), std::ios::binary | std::ios::trunc) << prefs.dump(true);
 }
 

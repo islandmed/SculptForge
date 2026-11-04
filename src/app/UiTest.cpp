@@ -706,6 +706,13 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "ai_enabled") return ai::aiEnabled() ? 1.0 : 0.0; // Preferences > AI (PanelAi.cpp)
     if (name == "http_requests") return double(ai::httpRequestCount()); // every request this process started
     if (name == "welcome_open") return app_.showWelcome_ ? 1.0 : 0.0;
+    // Help > Quick tour (QuickTour.cpp): open, the slide (1-based), waiting aside after Show me, the one offer.
+    if (name == "quick_tour_open") return app_.quickTourOpen_ ? 1.0 : 0.0;
+    if (name == "quick_tour_slide") return double(app_.quickTourSlide_ + 1);
+    if (name == "quick_tour_aside") return app_.quickTourAside_ ? 1.0 : 0.0;
+    if (name == "quick_tour_offer") return app_.quickTourOffer_ ? 1.0 : 0.0;
+    if (name == "quick_tour_done") return app_.quickTourDone_ ? 1.0 : 0.0;
+    if (name == "dropdown_open") return app_.dropdown_.empty() ? 0.0 : 1.0;
     if (name == "new_look_card_open") return app_.newLookCard_ ? 1.0 : 0.0; // "SculptForge has a new look" (0.10.7)
     if (name == "support_card_open") return app_.supportCardOpen() ? 1.0 : 0.0; // the support card at launch
     // What's New (WhatsNewPopup.cpp): open (1 while shown), its cards, Try it clicks; the guide chapter's contents
@@ -1709,6 +1716,11 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             app_.handleEvent(e);
         });
         wait(0.2f);
+    } else if (verb == "classic_keys") { // the Classic sculpting keys (style 0), as Preferences > Input sets them
+        run([this] { app_.setInputStyle(0); });
+    } else if (verb == "quick_tour_offers") {
+        // quick_tour_offers: UI tests leave out the quick tour's one offer (it would sit over their clicks)
+        run([this] { app_.quickTourOffersInTests_ = true; });
     } else if (verb == "input_style") {
         // input_style zbrush|sculptforge|blender|maya: as Preferences > Input sets it (scripts written for one style)
         if (!need(1)) return false;

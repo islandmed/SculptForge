@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The ZBrush feel (docs/guide/coming-from-zbrush.md): ZBrush's keys that SculptForge lacked (U Z Intensity, I RGB
+// The Classic sculpting keys (docs/guide/quick-tour.md): the keys SculptForge lacked (U Intensity, I RGB
 // Intensity, O Focal Shift, Space QuickMenu, L LazyMouse, V switch colour, Ctrl+A / Ctrl+Shift+A / Ctrl+I /
 // Ctrl+H for the mask, Ctrl+W group masked), Preferences > Input with the ZBrush and SculptForge key styles,
 // the QuickMenu itself and Shift-constrained straight strokes. The mouse gestures live with the rest of the
@@ -341,6 +341,7 @@ void App::setInputStyle(int style) {
     if (blenderStyle()) uiPrefs_.turntable = true; // Blender orbits as a turntable; Preferences > Input changes it
     maskBrush_.on = false;
     applyInputStyle();
+    if (uiPrefs_.inputStyle == 0) offerQuickTour(); // the Classic sculpting keys: the quick tour, once (QuickTour.cpp)
 }
 
 void App::applyInputStyle() {

@@ -290,6 +290,25 @@ def first_sculpt(shots: pathlib.Path) -> list:
     return made
 
 
+# The quick tour (quick-tour.md, src/app/QuickTour.cpp; tests/ui/quick_tour.sfui): name -> crop in the 1600x960
+# window, each the whole model with the panel "Show me" opened, at the slide's shape (1170x674).
+def _crop(x0, y0):
+    return (x0, y0, x0 + 1170, y0 + 674)
+
+
+QUICK_TOUR = {
+    "01-where": _crop(200, 40), "02-voxel": _crop(430, 140), "03-dynamic": _crop(250, 40), "04-quad": _crop(430, 140),
+    "05-levels": _crop(430, 140), "06-masking": _crop(430, 140), "07-cut": _crop(430, 140),
+    "08-library": _crop(90, 40), "09-bake": _crop(430, 140),
+}
+
+
+def quick_tour(shots: pathlib.Path) -> list:
+    (OUT / "quick-tour").mkdir(parents=True, exist_ok=True)
+    return [save(Image.open(shots / f"{name}.png").convert("RGB").crop(box), f"quick-tour/{name}", 1100)
+            for name, box in QUICK_TOUR.items()]
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("shots", type=pathlib.Path, help="folder with the screenshots (--ui-out of shots.sfui)")
@@ -298,11 +317,17 @@ def main() -> int:
     ap.add_argument("--only", action="append", help="make only this image (repeatable), e.g. --only qremesh-guides")
     ap.add_argument("--first-sculpt", action="store_true",
                     help="the shots are tests/ui/first_sculpt.sfui's: make images/first-sculpt/*.jpg")
+    ap.add_argument("--quick-tour", action="store_true",
+                    help="the shots are tests/ui/quick_tour.sfui's: make images/quick-tour/*.jpg")
     ap.add_argument("--whats-new", action="store_true", help="make only the What's New pictures (whats_new_shots.sfui)")
     args = ap.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
     if args.first_sculpt:
         for p in first_sculpt(args.shots):
+            print(f"{p.relative_to(ROOT)}  {p.stat().st_size // 1024} KB")
+        return 0
+    if args.quick_tour:
+        for p in quick_tour(args.shots):
             print(f"{p.relative_to(ROOT)}  {p.stat().st_size // 1024} KB")
         return 0
     if args.whats_new:

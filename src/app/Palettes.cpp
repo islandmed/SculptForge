@@ -275,6 +275,15 @@ bool App::subpalette(const char* id, const char* englishTitle) {
                  "Interface).",
                  "Tool");
     }
+    if (flashSubpalette_ == id) { // the quick tour's "Show me" (QuickTour.cpp): scrolled into view and flashed
+        const double t = ImGui::GetTime() - flashSubpaletteStart_;
+        if (t < 0.1) ImGui::SetScrollHereY(0.1f);
+        if (t < 1.5)
+            dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), theme::u32(theme::accent, float(0.5 * (1.0 - t / 1.5))),
+                              theme::rounding(2.0f * s));
+        else
+            flashSubpalette_.clear();
+    }
     if (clicked) {
         if (isOpen) {
             open.erase(std::remove(open.begin(), open.end(), id), open.end());
@@ -562,6 +571,7 @@ void App::drawPalette_Help() {
     menuAction(*this, "help.controls");
     menuAction(*this, "help.guide");
     menuAction(*this, "help.first_sculpt");
+    menuAction(*this, "help.quick_tour");
     menuAction(*this, "help.whats_new");
     menuAction(*this, "help.check_updates");
     menuAction(*this, "ui.command_palette");
