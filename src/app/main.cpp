@@ -210,12 +210,13 @@ int main(int argc, char** argv) {
         else if (a == "--benchmark") {
             options.benchmark = true;
             // An optional scene name: sculptforge --benchmark standard-15m
-            if (i + 1 < argc && (std::string(argv[i + 1]).rfind("standard", 0) == 0 || std::string(argv[i + 1]) == "core-200m")) {
+            if (i + 1 < argc && (std::string(argv[i + 1]).rfind("standard", 0) == 0 || std::string(argv[i + 1]) == "core-200m" ||
+                              std::string(argv[i + 1]) == "micro-head")) {
                 options.benchmarkScene = argv[++i];
                 if (options.benchmarkScene != "standard" && options.benchmarkScene != "standard-15m" &&
                     options.benchmarkScene != "standard-33m" && options.benchmarkScene != "standard-1b" &&
-                    options.benchmarkScene != "core-200m") {
-                    std::fprintf(stderr, "Unknown benchmark scene %s (standard-15m, standard-33m, standard, standard-1b or core-200m)\n", argv[i]);
+                    options.benchmarkScene != "core-200m" && options.benchmarkScene != "micro-head") {
+                    std::fprintf(stderr, "Unknown benchmark scene %s (standard-15m, standard-33m, standard, standard-1b, core-200m or micro-head)\n", argv[i]);
                     return 1;
                 }
             }
