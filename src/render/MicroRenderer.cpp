@@ -14,6 +14,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 
 namespace sf {
 
@@ -21,6 +22,7 @@ namespace {
 
 constexpr GLenum kUnitTris = 0x84C8, kUnitBase = 0x84C9, kUnitDisp = 0x84CA, kUnitLevels = 0x84CB, kUnitShade = 0x84CC;
 constexpr uint32_t kChunkTexels = 1u << 26;
+constexpr int kTargetW = 2048; // the GPU shading's fragment-shader targets: points a row
 constexpr uint32_t kNoCluster = 0xFFFFFFFFu;
 
 // Evaluates the micro surface exactly as MicroTriangle::evalWeights (corners in ascending vertex order), so
@@ -131,7 +133,7 @@ void main() {
 // area-weighted face normals of its micro triangles at the point and the neighbours' heights along its upward triangles
 // (a "partial"), its own partial plus the edge neighbour's for an edge point, every triangle's around the vertex for a
 // corner, then the same normalisation and packing as encodeShade.
-const char* kShadePosVS = R"(#version 330 core
+const char* kShadePosBody = R"(
 uniform usamplerBuffer uTris;   // per slot: (corner vertices, -), (clusters across the edges, -)
 uniform samplerBuffer uBase;    // per base vertex: position, normal
 uniform isamplerBuffer uDisp0;  // the chunks' displacement grids (up to four)
@@ -142,9 +144,8 @@ uniform usamplerBuffer uIJ;     // per grid point index: i | j << 16
 uniform isamplerBuffer uList;   // the slots, in output order
 uniform int uN, uSamples, uChunkSlots;
 uniform float uStep;
-out vec4 vPos;
-void main() {
-    int li = gl_VertexID / uSamples, idx = gl_VertexID - li * uSamples;
+vec4 shadePos(int gid) {
+    int li = gid / uSamples, idx = gid - li * uSamples;
     int slot = texelFetch(uList, li).r;
     uint ijp = texelFetch(uIJ, idx).r;
     int I = int(ijp & 0xFFFFu), J = int(ijp >> 16);
@@ -178,14 +179,21 @@ void main() {
     int c = slot / uChunkSlots;
     int at = (slot - c * uChunkSlots) * uSamples + idx;
     int d = c == 0 ? texelFetch(uDisp0, at).r : c == 1 ? texelFetch(uDisp1, at).r : c == 2 ? texelFetch(uDisp2, at).r : texelFetch(uDisp3, at).r;
-    vPos = vec4(s + n * (float(d) * uStep), float(d));
+    return vec4(s + n * (float(d) * uStep), float(d));
 }
 )";
 
-const char* kShadeVS = R"(#version 330 core
+const char* kShadeBody = R"(
 uniform usamplerBuffer uTris;    // per slot: (corner vertices, -), (clusters across the edges, -)
 uniform samplerBuffer uBase;     // per base vertex: position, normal
+#ifdef PASS_TEXTURE
+uniform sampler2D uPos;          // pass 1's points: position, height (uW a row)
+uniform int uW;
+vec4 posFetch(int k) { return texelFetch(uPos, ivec2(k % uW, k / uW), 0); }
+#else
 uniform samplerBuffer uPos;      // pass 1's points: position, height
+vec4 posFetch(int k) { return texelFetch(uPos, k); }
+#endif
 uniform isamplerBuffer uRow;     // per slot: its first point in uPos / uSamples, or -1
 uniform isamplerBuffer uNbr;     // per slot and edge: neighbour slot << 3 | its edge << 1 | reversed, or -1
 uniform isamplerBuffer uRingOff; // per base vertex: its first entry in uRing (and one more)
@@ -194,10 +202,9 @@ uniform usamplerBuffer uIJ;      // per grid point index: i | j << 16
 uniform isamplerBuffer uList;    // the slots to shade, in output order
 uniform int uN, uSamples;
 uniform float uStep;
-flat out uint vShade;
 int base = 0;
 int sampleIndex(int i, int j) { return j * (uN + 1) - (j * (j - 1)) / 2 + i; }
-vec4 at(int i, int j) { return texelFetch(uPos, base + sampleIndex(i, j)); }
+vec4 at(int i, int j) { return posFetch(base + sampleIndex(i, j)); }
 vec3 gN;
 float gD, gC;
 // This base triangle's micro triangles at grid point (i, j): face normals and (upward triangles) neighbour heights.
@@ -227,8 +234,8 @@ ivec2 edgePoint(int e, int k, int m) {
     return ivec2(0, m - k);
 }
 uint q8(float v) { return uint(clamp(floor((v * 0.5 + 0.5) * 255.0 + 0.5), 0.0, 255.0)); }
-void main() {
-    int li = gl_VertexID / uSamples, idx = gl_VertexID - li * uSamples;
+uint shadeAt(int gid) {
+    int li = gid / uSamples, idx = gid - li * uSamples;
     int slot = texelFetch(uList, li).r;
     uint ijp = texelFetch(uIJ, idx).r;
     int i = int(ijp & 0xFFFFu), j = int(ijp >> 16), n = uN;
@@ -271,7 +278,31 @@ void main() {
     float t = (cc >= 0.0 ? 1.0 : -1.0) * sqrt(abs(cc)) * 127.0;
     float r = t >= 0.0 ? floor(t + 0.5) : -floor(-t + 0.5);
     uint cq = uint(clamp(r + 128.0, 1.0, 255.0));
-    vShade = q8(e.x) | q8(e.y) << 8 | cq << 16; // (mask 0: a level with a mask is shaded on the CPU)
+    return q8(e.x) | q8(e.y) << 8 | cq << 16; // (mask 0: a level with a mask is shaded on the CPU)
+}
+)";
+
+// The passes' mains: transform feedback (a point per grid point), or a fragment per grid point of a uW-wide target
+// (fragment (x, y) = point y * uW + x; the rest of the last row discarded).
+const char* kFeedbackPosMain = "out vec4 vPos;\nvoid main() { vPos = shadePos(gl_VertexID); }\n";
+const char* kFeedbackShadeMain = "flat out uint vShade;\nvoid main() { vShade = shadeAt(gl_VertexID); }\n";
+const char* kTargetVS = R"(#version 330 core
+void main() { gl_Position = vec4(gl_VertexID == 1 ? 3.0 : -1.0, gl_VertexID == 2 ? 3.0 : -1.0, 0.0, 1.0); }
+)";
+const char* kTargetPosMain = R"(uniform int uTargetW, uCount;
+out vec4 oPos;
+void main() {
+    int gid = int(gl_FragCoord.y) * uTargetW + int(gl_FragCoord.x);
+    if (gid >= uCount) discard;
+    oPos = shadePos(gid);
+}
+)";
+const char* kTargetShadeMain = R"(uniform int uTargetW, uCount;
+out uint oShade;
+void main() {
+    int gid = int(gl_FragCoord.y) * uTargetW + int(gl_FragCoord.x);
+    if (gid >= uCount) discard;
+    oShade = shadeAt(gid);
 }
 )";
 
@@ -315,6 +346,15 @@ void MicroRenderer::release() {
         if (*t) gl::DeleteTextures(1, t), *t = 0;
     if (gsProgram_) gl::DeleteProgram(gsProgram_), gsProgram_ = 0;
     if (gsPosProgram_) gl::DeleteProgram(gsPosProgram_), gsPosProgram_ = 0;
+    if (gsFbo_) gl::DeleteFramebuffers(1, &gsFbo_), gsFbo_ = 0;
+    for (GLuint* t : {&gsPosTarget_, &gsShadeTarget_})
+        if (*t) gl::DeleteTextures(1, t), *t = 0;
+    gsPosRows_ = gsShadeRows_ = 0;
+    if (std::getenv("SF_GS_STATS") && (gsPasses || cpuShadePasses))
+        std::fprintf(stderr, "Micro shading: GPU %llu passes, %.2f ms CPU and %.2f ms GPU each (%llu timed), %.1f ns a point; CPU %llu syncs, %.2f ms each\n",
+                     (unsigned long long)gsPasses, gsPasses ? gsCpuMs / double(gsPasses) : 0.0,
+                     gsQueried ? gsGpuMs / double(gsQueried) : 0.0, (unsigned long long)gsQueried, gsNsPerPoint_,
+                     (unsigned long long)cpuShadePasses, cpuShadePasses ? cpuShadeMs / double(cpuShadePasses) : 0.0);
     gsPosBytes_ = gsPosReadBytes_ = 0;
     if (gsQuery_ && gl::DeleteQueries) gl::DeleteQueries(1, &gsQuery_), gsQuery_ = 0;
     gsOutBytes_ = 0;
@@ -446,12 +486,19 @@ void MicroRenderer::buildLayout(const Mesh& mesh) {
     if (gpuShade) buildGpuShade(mesh);
 }
 
-bool MicroRenderer::gpuShadeDefault() {
-    static const bool on = [] {
+MicroRenderer::GpuShade MicroRenderer::gpuShadeModeDefault() {
+    static const GpuShade mode = [] {
         const char* e = std::getenv("SF_MICRO_GPU_SHADE");
-        return e && e[0] == '1';
+        const std::string v = e ? e : "";
+        return v == "1" || v == "fs" ? GpuShade::Target : v == "tf" ? GpuShade::Feedback : GpuShade::Off;
     }();
-    return on;
+    return mode;
+}
+
+size_t MicroRenderer::gpuShadeBudget() const {
+    const size_t least = size_t(samples_) * 3, most = size_t(8) << 20;
+    if (!(gsNsPerPoint_ > 0.0)) return size_t(2) << 20; // (not measured yet)
+    return std::clamp(size_t(gpuShadeTargetMs * 1e6 / gsNsPerPoint_), least, most);
 }
 
 // The GPU shading's static tables for this layout: per slot its edge neighbours, per base vertex the slots around it,
@@ -532,6 +579,48 @@ GLuint feedbackProgram(const char* source, const char* varying) {
     return p;
 }
 
+// A program of kTargetVS (one triangle over the target) and fragment shader `source`; 0 (log on stderr) if it fails.
+GLuint targetProgram(const char* source) {
+    GLuint sh[2] = {gl::CreateShader(GL_VERTEX_SHADER), gl::CreateShader(GL_FRAGMENT_SHADER)};
+    const char* src[2] = {kTargetVS, source};
+    GLint ok = 1;
+    for (int k = 0; k < 2 && ok; ++k) {
+        gl::ShaderSource(sh[k], 1, &src[k], nullptr);
+        gl::CompileShader(sh[k]);
+        gl::GetShaderiv(sh[k], GL_COMPILE_STATUS, &ok);
+        if (!ok) {
+            char log[2048] = {0};
+            gl::GetShaderInfoLog(sh[k], sizeof log, nullptr, log);
+            std::fprintf(stderr, "Micro GPU shading unavailable (the CPU shades): %s\n", log);
+        }
+    }
+    GLuint p = 0;
+    if (ok) {
+        p = gl::CreateProgram();
+        gl::AttachShader(p, sh[0]);
+        gl::AttachShader(p, sh[1]);
+        gl::LinkProgram(p);
+        gl::GetProgramiv(p, GL_LINK_STATUS, &ok);
+        if (!ok) gl::DeleteProgram(p), p = 0;
+    }
+    gl::DeleteShader(sh[0]);
+    gl::DeleteShader(sh[1]);
+    return p;
+}
+
+// A W x rows target texture of `format` (rows grown as needed), attached to the bound framebuffer.
+void ensureTarget(GLuint& tex, int& rows, int want, GLint internal, GLenum format, GLenum type) {
+    if (!tex) gl::GenTextures(1, &tex);
+    gl::BindTexture(GL_TEXTURE_2D, tex);
+    if (want > rows) {
+        rows = std::max(want, rows + rows / 2);
+        gl::TexImage2D(GL_TEXTURE_2D, 0, internal, kTargetW, rows, 0, format, type, nullptr);
+        gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); // (texelFetch: complete without mipmaps)
+        gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    }
+    gl::FramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
+}
+
 // A buffer of at least `bytes` (grown by doubling; `have` its size), as a texture buffer of `format` when `tex`.
 void ensureBuffer(GLuint& buffer, GLuint* tex, GLenum format, size_t bytes, size_t& have) {
     if (bytes <= have && buffer) return;
@@ -590,13 +679,23 @@ void feedback(GLuint vao, GLuint out, size_t points) {
 
 bool MicroRenderer::shadeOnGpu(const Mesh& mesh, std::vector<uint32_t>& tris) {
     if (gsFailed_ || tris.empty()) return false;
-    if (!gl::TransformFeedbackVaryings || !gl::BeginTransformFeedback || !gl::EndTransformFeedback || !gl::BindBufferBase ||
+    const bool target = gpuShadeMode == GpuShade::Target;
+    if ((!target && (!gl::TransformFeedbackVaryings || !gl::BeginTransformFeedback || !gl::EndTransformFeedback || !gl::BindBufferBase)) ||
         chunks_.size() > 4) {
         gsFailed_ = true;
         return false;
     }
-    if (!gsProgram_) gsProgram_ = feedbackProgram(kShadeVS, "vShade");
-    if (!gsPosProgram_ && gsProgram_) gsPosProgram_ = feedbackProgram(kShadePosVS, "vPos");
+    const auto started = std::chrono::steady_clock::now();
+    if (!gsProgram_) {
+        const std::string head = "#version 330 core\n";
+        if (target) {
+            gsPosProgram_ = targetProgram((head + kShadePosBody + kTargetPosMain).c_str());
+            if (gsPosProgram_) gsProgram_ = targetProgram((head + "#define PASS_TEXTURE\n" + kShadeBody + kTargetShadeMain).c_str());
+        } else {
+            gsPosProgram_ = feedbackProgram((head + kShadePosBody + kFeedbackPosMain).c_str(), "vPos");
+            if (gsPosProgram_) gsProgram_ = feedbackProgram((head + kShadeBody + kFeedbackShadeMain).c_str(), "vShade");
+        }
+    }
     if (!gsProgram_ || !gsPosProgram_) {
         gsFailed_ = true;
         return false;
@@ -638,8 +737,6 @@ bool MicroRenderer::shadeOnGpu(const Mesh& mesh, std::vector<uint32_t>& tris) {
     uploadInts(gsRowData_, gsRowTex_, gsRow_);
     for (uint32_t t : outer) gsRow_[slotOf_[t]] = -1; // (all -1 again for the next pass)
     const size_t points1 = list1.size() * S, points2 = list2.size() * S;
-    ensureBuffer(gsPos_, nullptr, 0, points1 * 16, gsPosBytes_);
-    ensureBuffer(gsOut_, nullptr, 0, points2 * 4, gsOutBytes_);
     if (!emptyVao_) gl::GenVertexArrays(1, &emptyVao_);
     // The last pass's GPU time, if it's ready (never waited for).
     if (gsQueryPending_ && gl::GetQueryObjectui64v) {
@@ -650,25 +747,101 @@ bool MicroRenderer::shadeOnGpu(const Mesh& mesh, std::vector<uint32_t>& tris) {
             gl::GetQueryObjectui64v(gsQuery_, GL_QUERY_RESULT, &ns);
             lastGpuShadeMs = double(ns) * 1e-6;
             gsQueryPending_ = false;
+            gsGpuMs += lastGpuShadeMs, ++gsQueried;
+            if (gsQueryPoints_) { // the GPU's cost per shaded point, smoothed: the next syncs' budget follows it
+                const double per = double(ns) / double(gsQueryPoints_);
+                gsNsPerPoint_ = gsNsPerPoint_ > 0.0 ? gsNsPerPoint_ * 0.7 + per * 0.3 : per;
+            }
         }
     }
     const bool timed = gl::GenQueries && gl::BeginQuery && gl::EndQuery && !gsQueryPending_;
     if (timed && !gsQuery_) gl::GenQueries(1, &gsQuery_);
     if (timed) gl::BeginQuery(GL_TIME_ELAPSED, gsQuery_);
     auto chunkDisp = [&](size_t c) { return chunks_[std::min(c, chunks_.size() - 1)].dispTex; };
+    auto uniforms = [&](GLuint prog) {
+        gl::Uniform1i(gl::GetUniformLocation(prog, "uN"), GLint(n_));
+        gl::Uniform1i(gl::GetUniformLocation(prog, "uSamples"), GLint(S));
+        gl::Uniform1i(gl::GetUniformLocation(prog, "uChunkSlots"), GLint(chunkSlots_));
+        gl::Uniform1f(gl::GetUniformLocation(prog, "uStep"), mm.step);
+    };
+    const GLuint texs1[8] = {triTex_, baseTex_, chunkDisp(0), chunkDisp(1), chunkDisp(2), chunkDisp(3), gsIJTex_, gsList1Tex_};
+    static const char* names1[8] = {"uTris", "uBase", "uDisp0", "uDisp1", "uDisp2", "uDisp3", "uIJ", "uList"};
+    static const char* names2[9] = {"uTris", "uBase", "uPos", "uRow", "uNbr", "uRingOff", "uRing", "uIJ", "uList"};
     GLint saved[9];
-    { // Pass 1: the points.
-        const GLuint texs[8] = {triTex_, baseTex_, chunkDisp(0), chunkDisp(1), chunkDisp(2), chunkDisp(3), gsIJTex_, gsList1Tex_};
-        static const char* names[8] = {"uTris", "uBase", "uDisp0", "uDisp1", "uDisp2", "uDisp3", "uIJ", "uList"};
+    if (target) {
+        // Fragment shaders: pass 1 into an RGBA32F target, pass 2 into an R32UI one, a fragment per point; then the
+        // shading into gsOut_ through a pixel-pack copy (on the GPU, no CPU readback). The caller's framebuffer,
+        // viewport and state are put back after.
+        static GLint maxSize = 0;
+        if (!maxSize) gl::GetIntegerv(GL_MAX_TEXTURE_SIZE, &maxSize);
+        const int rows1 = int((points1 + kTargetW - 1) / kTargetW), rows2 = int((points2 + kTargetW - 1) / kTargetW);
+        if (rows1 > maxSize) return false; // (a smaller budget next time; the CPU shades this one)
+        GLint fbo = 0, viewport[4], mask[4], blend = 0, depth = 0, scissor = 0, cull = 0, tex2d = 0;
+        gl::GetIntegerv(GL_FRAMEBUFFER_BINDING, &fbo);
+        gl::GetIntegerv(GL_VIEWPORT, viewport);
+        gl::GetIntegerv(GL_COLOR_WRITEMASK, mask);
+        gl::GetIntegerv(GL_BLEND, &blend);
+        gl::GetIntegerv(GL_DEPTH_TEST, &depth);
+        gl::GetIntegerv(GL_SCISSOR_TEST, &scissor);
+        gl::GetIntegerv(GL_CULL_FACE, &cull);
+        gl::Disable(GL_BLEND);
+        gl::Disable(GL_DEPTH_TEST);
+        gl::Disable(GL_SCISSOR_TEST);
+        gl::Disable(GL_CULL_FACE);
+        gl::ColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+        if (!gsFbo_) gl::GenFramebuffers(1, &gsFbo_);
+        gl::BindFramebuffer(GL_FRAMEBUFFER, gsFbo_);
+        gl::BindVertexArray(emptyVao_);
+        // Pass 1: the points.
+        ensureTarget(gsPosTarget_, gsPosRows_, rows1, GL_RGBA32F, GL_RGBA, GL_FLOAT);
+        gl::Viewport(0, 0, kTargetW, rows1);
         gl::UseProgram(gsPosProgram_);
-        bindUnits(gsPosProgram_, texs, names, 8, saved);
-        gl::Uniform1i(gl::GetUniformLocation(gsPosProgram_, "uN"), GLint(n_));
-        gl::Uniform1i(gl::GetUniformLocation(gsPosProgram_, "uSamples"), GLint(S));
-        gl::Uniform1i(gl::GetUniformLocation(gsPosProgram_, "uChunkSlots"), GLint(chunkSlots_));
-        gl::Uniform1f(gl::GetUniformLocation(gsPosProgram_, "uStep"), mm.step);
+        bindUnits(gsPosProgram_, texs1, names1, 8, saved);
+        uniforms(gsPosProgram_);
+        gl::Uniform1i(gl::GetUniformLocation(gsPosProgram_, "uTargetW"), kTargetW);
+        gl::Uniform1i(gl::GetUniformLocation(gsPosProgram_, "uCount"), GLint(points1));
+        gl::DrawArrays(GL_TRIANGLES, 0, 3);
+        restoreUnits(saved, 8);
+        // Pass 2: the shading of the slots asked for (pass 1's target read on unit 9 as a 2D texture).
+        ensureTarget(gsShadeTarget_, gsShadeRows_, rows2, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT);
+        gl::Viewport(0, 0, kTargetW, rows2);
+        gl::UseProgram(gsProgram_);
+        const GLuint texs2[9] = {triTex_, baseTex_, 0, gsRowTex_, gsNbrTex_, gsRingOffTex_, gsRingTex_, gsIJTex_, gsListTex_};
+        bindUnits(gsProgram_, texs2, names2, 9, saved);
+        gl::ActiveTexture(GL_TEXTURE0 + 9);
+        gl::GetIntegerv(GL_TEXTURE_BINDING_2D, &tex2d);
+        gl::BindTexture(GL_TEXTURE_2D, gsPosTarget_);
+        gl::Uniform1i(gl::GetUniformLocation(gsProgram_, "uPos"), 9);
+        uniforms(gsProgram_);
+        gl::Uniform1i(gl::GetUniformLocation(gsProgram_, "uW"), kTargetW);
+        gl::Uniform1i(gl::GetUniformLocation(gsProgram_, "uTargetW"), kTargetW);
+        gl::Uniform1i(gl::GetUniformLocation(gsProgram_, "uCount"), GLint(points2));
+        gl::DrawArrays(GL_TRIANGLES, 0, 3);
+        gl::BindTexture(GL_TEXTURE_2D, GLuint(tex2d));
+        restoreUnits(saved, 9);
+        // Into gsOut_ (rows of kTargetW points: the points in order).
+        ensureBuffer(gsOut_, nullptr, 0, size_t(rows2) * kTargetW * 4, gsOutBytes_);
+        gl::BindBuffer(GL_PIXEL_PACK_BUFFER, gsOut_);
+        gl::PixelStorei(GL_PACK_ALIGNMENT, 4);
+        gl::ReadPixels(0, 0, kTargetW, rows2, GL_RED_INTEGER, GL_UNSIGNED_INT, nullptr);
+        gl::BindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+        gl::BindVertexArray(0);
+        gl::BindFramebuffer(GL_FRAMEBUFFER, GLuint(fbo));
+        gl::Viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+        gl::ColorMask(GLboolean(mask[0]), GLboolean(mask[1]), GLboolean(mask[2]), GLboolean(mask[3]));
+        if (blend) gl::Enable(GL_BLEND);
+        if (depth) gl::Enable(GL_DEPTH_TEST);
+        if (scissor) gl::Enable(GL_SCISSOR_TEST);
+        if (cull) gl::Enable(GL_CULL_FACE);
+    } else {
+        // Transform feedback: pass 1 into gsPos_, read by pass 2 through a GPU copy (reading the feedback buffer
+        // straight as a texture buffer, Mesa on the M1 gave the previous contents), pass 2 into gsOut_.
+        ensureBuffer(gsPos_, nullptr, 0, points1 * 16, gsPosBytes_);
+        ensureBuffer(gsOut_, nullptr, 0, points2 * 4, gsOutBytes_);
+        gl::UseProgram(gsPosProgram_);
+        bindUnits(gsPosProgram_, texs1, names1, 8, saved);
+        uniforms(gsPosProgram_);
         feedback(emptyVao_, gsPos_, points1);
-        // Pass 2 reads them through a copy on the GPU: read straight from the feedback buffer as a texture buffer,
-        // Mesa on the M1 gave the previous contents (no CPU wait or readback either way).
         ensureBuffer(gsPosRead_, &gsPosTex_, GL_RGBA32F, points1 * 16, gsPosReadBytes_);
         gl::BindBuffer(GL_COPY_READ_BUFFER, gsPos_);
         gl::BindBuffer(GL_COPY_WRITE_BUFFER, gsPosRead_);
@@ -676,19 +849,14 @@ bool MicroRenderer::shadeOnGpu(const Mesh& mesh, std::vector<uint32_t>& tris) {
         gl::BindBuffer(GL_COPY_READ_BUFFER, 0);
         gl::BindBuffer(GL_COPY_WRITE_BUFFER, 0);
         restoreUnits(saved, 8);
-    }
-    { // Pass 2: the shading of the slots asked for.
-        const GLuint texs[9] = {triTex_, baseTex_, gsPosTex_, gsRowTex_, gsNbrTex_, gsRingOffTex_, gsRingTex_, gsIJTex_, gsListTex_};
-        static const char* names[9] = {"uTris", "uBase", "uPos", "uRow", "uNbr", "uRingOff", "uRing", "uIJ", "uList"};
+        const GLuint texs2[9] = {triTex_, baseTex_, gsPosTex_, gsRowTex_, gsNbrTex_, gsRingOffTex_, gsRingTex_, gsIJTex_, gsListTex_};
         gl::UseProgram(gsProgram_);
-        bindUnits(gsProgram_, texs, names, 9, saved);
-        gl::Uniform1i(gl::GetUniformLocation(gsProgram_, "uN"), GLint(n_));
-        gl::Uniform1i(gl::GetUniformLocation(gsProgram_, "uSamples"), GLint(S));
-        gl::Uniform1f(gl::GetUniformLocation(gsProgram_, "uStep"), mm.step);
+        bindUnits(gsProgram_, texs2, names2, 9, saved);
+        uniforms(gsProgram_);
         feedback(emptyVao_, gsOut_, points2);
         restoreUnits(saved, 9);
     }
-    if (timed) gl::EndQuery(GL_TIME_ELAPSED), gsQueryPending_ = true;
+    if (timed) gl::EndQuery(GL_TIME_ELAPSED), gsQueryPending_ = true, gsQueryPoints_ = points1 + points2;
     gl::UseProgram(0);
     // Into the shading grids, on the GPU: one copy per run of consecutive slots in one chunk.
     gl::BindBuffer(GL_COPY_READ_BUFFER, gsOut_);
@@ -716,6 +884,8 @@ bool MicroRenderer::shadeOnGpu(const Mesh& mesh, std::vector<uint32_t>& tris) {
         return false;
     }
     gpuShadedPoints += points2;
+    ++gsPasses;
+    gsCpuMs += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
     return true;
 }
 
@@ -826,7 +996,7 @@ void MicroRenderer::shadePending(const Mesh& mesh, bool all) {
     const MicroMesh& mm = *mesh.micro;
     const size_t S = mm.samples;
     if (all && gpuShade && !mm.hasMask()) { // everything on the GPU, a batch of slots at a time
-        const size_t batch = std::max<size_t>(1, gpuShadeBudget / S);
+        const size_t batch = std::max<size_t>(1, gpuShadeBudget() / S);
         std::vector<uint32_t> tris;
         bool ok = true;
         for (size_t first = 0; ok && first < order_.size(); first += batch) {
@@ -932,6 +1102,8 @@ void MicroRenderer::shadePending(const Mesh& mesh, bool all) {
         const double ns = std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - started).count() /
                           double(written_.size() * S);
         shadeNsPerPoint_ = shadeNsPerPoint_ > 0.0 ? shadeNsPerPoint_ * 0.7 + ns * 0.3 : ns;
+        cpuShadeMs += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+        ++cpuShadePasses;
     }
     for (uint32_t t : written_) {
         uint64_t& w = pending_[t >> 6];
@@ -1029,7 +1201,7 @@ bool MicroRenderer::sync(Mesh& mesh) {
             // While a stroke runs, also no more than strokeShadeMs of it (at least one patch and its ring), so a
             // slower CPU doesn't spend the frame the dabs need on shading; the rest follows as before.
             if (mm.stroking) shadeBudget = strokeShadeBudget(shadeBudget, tier.strokeShadeMs, shadeNsPerPoint_, size_t(mm.samples) * 3);
-            if (gpuShade && !gsFailed_ && !mm.hasMask()) shadeBudget = gpuShadeBudget; // (the GPU's budget, not the CPU's)
+            if (gpuShade && !gsFailed_ && !mm.hasMask()) shadeBudget = gpuShadeBudget(); // (the GPU's budget, not the CPU's)
             if (pendingCount_) shadePending(mesh, false);
         }
     }
