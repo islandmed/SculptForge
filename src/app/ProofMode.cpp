@@ -14,6 +14,8 @@
 // its own thread), and a JSON result with the hardware and version is written at the end.
 #include "app/ProofMode.h"
 
+#include "core/Precision.h"
+
 #include "core/FocusDetail.h"
 #include "core/Micro.h"
 
@@ -1087,6 +1089,15 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                     if (!ph.lagMs.empty()) { // (Move drags the surface without dabs: no stroke to trail the pointer)
                         j.set("lag_ms", percentilesJson(percentiles(ph.lagMs)));
                         j.set("lag_px", percentilesJson(percentiles(ph.lagPx)));
+                        // The spacing floor: a dab is placed every dabSpacingPx of path, so the newest one's pointer
+                        // sample is on average half that interval old before anything is solved or drawn (at the
+                        // phase's pointer speed). lag_adjusted_ms = lag_ms less it: what solving and drawing add.
+                        const double speed = ph.seconds > 0 ? ph.pathPx / ph.seconds : 0.0;
+                        const double floorMs = speed > 0 ? 0.5 * double(dabSpacingPx(float(ph.radiusPx), 0.15f)) / speed * 1000.0 : 0.0;
+                        std::vector<double> adjusted(ph.lagMs);
+                        for (double& a : adjusted) a = std::max(0.0, a - floorMs);
+                        j.set("spacing_floor_ms", std::round(floorMs * 10) / 10);
+                        j.set("lag_adjusted_ms", percentilesJson(percentiles(adjusted)));
                     }
                     j.set("dabs", double(ph.dabs));
                     j.set("pointer_samples", double(ph.samples));
