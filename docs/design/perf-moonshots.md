@@ -45,7 +45,21 @@ resolution exists today).
 events, sculpt, UI, upload = ghost + scene sync, draw = GL calls, swap_wait = UI draw + swap, where the frame
 waits for the GPU). It decides whether a native backend (D3D11/12, Metal) behind a thin render interface should
 move earlier: only if draw + swap_wait dominate on the floor profile at 20M while sculpt and upload are within
-budget. Run: `--benchmark --benchmark-sizes 5,20,50`, with and without `SF_HW_SIMULATE=floor`. It simulates the budgets, not the GPU's fill
+budget. Run: `--benchmark --benchmark-sizes 5,20,50`, with and without `SF_HW_SIMULATE=floor`.
+
+**First measurement** (11-03, M1 Pro, one run each at load < 2 at start; p99 frame / stroke latency p50):
+
+| 20M | laptop | floor (simulated) |
+|---|---|---|
+| 60 px stroke | 30.0 ms / 89 ms | 36.2 ms / 58 ms |
+| 240 px stroke | 30.2 ms / 414 ms | 30.6 ms / 311 ms |
+| orbit | 25.4 ms | 21.8 ms |
+| GL draw p99 (any phase) | <= 4.7 ms | <= 6.1 ms |
+
+The floor misses its stroke targets by far (latency 58-311 ms against < 16), while orbit at 20M meets < 33 ms. The
+GL calls are a few ms, so the time goes to CPU stroke throughput and scene-sync spikes (the motion proxy's build at
+the start of an orbit), not the driver: a native backend would not fix these. At 50M on the floor, orbit p99 is
+44 ms with draw at 32 ms p99, the one place the draw side shows. It simulates the budgets, not the GPU's fill
 rate, so real iGPU runs by testers (Windows UHD 620 / Iris Xe first) confirm it.
 
 **Targets, floor profile** (laptop targets in brackets):
