@@ -51,6 +51,9 @@ jobs:
       code: ${{ steps.diff.outputs.code }}
       full: ${{ steps.diff.outputs.full }}
     steps:
+      - uses: actions/checkout@v7
+        if: github.event_name == 'push'
+        with: { fetch-depth: 20 } # the pushed range, for the paperwork check below
       - id: diff
         env:
           GH_TOKEN: ${{ github.token }}
@@ -96,6 +99,17 @@ jobs:
                 break
               fi
             done
+          fi
+          # A release bump (scripts/release.sh step bump: only version lines, notes, docs, site; checked line by line by
+          # tools/release/paperwork_only.py) on top of a main commit whose CI passed: that result stands for it.
+          if [ "$code" = true ] && [ "$EVENT" = push ] && [ "$GITHUB_REF" = refs/heads/main ] && [ -f tools/release/paperwork_only.py ] &&
+             python3 tools/release/paperwork_only.py "$BEFORE" "$HEAD"; then
+            id=$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?head_sha=$BEFORE&event=push&branch=main&status=success&per_page=5" \
+              --jq '[.workflow_runs[] | select(.head_sha == "'"$BEFORE"'" and .path == ".github/workflows/ci.yml")][0].id // empty')
+            if [ -n "$id" ]; then
+              echo "::notice::only release paperwork since $BEFORE, whose CI passed (run $id): reused"
+              code=false
+            fi
           fi
           echo "code=$code" | tee -a "$GITHUB_OUTPUT"
 

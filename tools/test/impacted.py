@@ -87,7 +87,7 @@ class Graph:
         self.users = defaultdict(set)  # input path (absolute) -> outputs built from it
         ninja = os.path.join(build, "build.ninja")
         if not os.path.exists(ninja):
-            self.ok = False
+            self.ok = self.load_make(build)
             return
         self.ok = True
         text = open(ninja, encoding="utf-8", errors="replace").read().replace("$\n", " ")
@@ -110,6 +110,42 @@ class Graph:
                 obj = self.abs(line.split(":")[0])
             elif line.strip() and obj:
                 self.users[self.abs(line.strip())].add(obj)
+
+    def load_make(self, build):
+        """The Makefile generator's graph: CMakeFiles/<target>.dir/link.txt (what links what) and the compiler's
+        .o.d dependency files (which headers each object includes). False when there is no build at all."""
+        found = False
+        for d, dirs, files in os.walk(build):
+            dirs[:] = [x for x in dirs if x not in ("_deps", "Testing", "ui-shots", "test-tmp")]
+            if not d.endswith(".dir") or os.path.basename(os.path.dirname(d)) != "CMakeFiles":
+                continue
+            base = os.path.dirname(os.path.dirname(d))  # where the target's outputs and commands live
+            try:
+                words = open(os.path.join(d, "link.txt"), encoding="utf-8", errors="replace").read().split()
+            except OSError:
+                words = []
+            out = None
+            if "-o" in words and words.index("-o") + 1 < len(words):
+                out = words[words.index("-o") + 1]
+            elif len(words) > 2 and words[0].endswith("ar") and words[1] in ("qc", "cr", "rcs", "qcs"):
+                out = words[2]
+            for root, _, fs in os.walk(d):
+                for f in fs:
+                    path = os.path.join(root, f)
+                    if f.endswith(".o.d"):
+                        found = True
+                        text = open(path, encoding="utf-8", errors="replace").read().replace("\\\n", " ")
+                        head, _, deps = text.partition(": ")
+                        obj = os.path.normpath(os.path.join(base, head.strip()))
+                        for dep in deps.split():
+                            self.users[os.path.normpath(os.path.join(base, dep))].add(obj)
+                    elif f.endswith(".o") and out:
+                        self.users[os.path.normpath(path)].add(os.path.normpath(os.path.join(base, out)))
+            if out:
+                for w in words:
+                    if w.endswith((".a", ".so", ".lib")) and not os.path.isabs(w):
+                        self.users[os.path.normpath(os.path.join(base, w))].add(os.path.normpath(os.path.join(base, out)))
+        return found
 
     @staticmethod
     def split(s):

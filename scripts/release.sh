@@ -140,9 +140,13 @@ ci_reused() {
     local sha=$1 c id
     for c in $(git rev-list --first-parent -n 8 "$sha~1" 2>/dev/null); do
         python3 tools/release/paperwork_only.py "$c" "$sha" >/dev/null 2>&1 || return 1
-        id=$(gh run list -R "$REPO" -w ci.yml -c "$c" -e push -b main -L 1 --json databaseId,conclusion \
-            -q '.[] | select(.conclusion == "success") | .databaseId' 2>/dev/null)
-        [ -n "$id" ] && { echo "${c:0:8} $id"; return 0; }
+        id=$(gh run list -R "$REPO" -w ci.yml -c "$c" -e push -b main -L 1 --json databaseId -q '.[0].databaseId' 2>/dev/null)
+        [ -n "$id" ] || continue
+        if [ "$(gh run view "$id" -R "$REPO" --json status -q .status)" != completed ]; then
+            echo "   waiting for ci.yml run $id on ${c:0:8} (the commit before the bump) ..." >&2
+            gh run watch "$id" -R "$REPO" --exit-status >/dev/null 2>&1 || true
+        fi
+        [ "$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion)" = success ] && { echo "${c:0:8} $id"; return 0; }
     done
     return 1
 }
