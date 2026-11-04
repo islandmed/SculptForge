@@ -383,6 +383,7 @@ struct PhaseResult {
     std::vector<double> frameMs, lagMs, lagPx;
     std::vector<double> previewLagPx; // the predictive preview's head behind the pointer (the surface's without it)
     std::vector<double> drawn;    // triangles each frame drew (Renderer::lastDrawnTriangles)
+    std::vector<double> gpuMs;    // GPU time of the phase's frames (GL_TIME_ELAPSED; empty without timer queries)
     std::vector<double> split[6]; // each frame by part (App::frameSplitMs_, the frame before: the swap comes after)
 };
 
@@ -739,6 +740,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         r.phases.back().radiusPx = spec.radiusPx;
         if (spec.radiusPx > 0) r.phases.back().brush = proofBrushName(spec.brush);
         p.stageStart = p.lastFrame = nowSeconds(); // (not counting what the last phase's release cost)
+        proofGpuMs_.clear(); // (frames from before the phase)
         p.samples.clear();
         p.dabs.clear();
         p.sent = 1;
@@ -892,6 +894,8 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             ph.frameMs.push_back(frameMs);
             for (int k = 0; k < 6; ++k) ph.split[k].push_back(frameSplitMs_[k]);
             ph.drawn.push_back(double(renderer_.lastDrawnTriangles()));
+            ph.gpuMs.insert(ph.gpuMs.end(), proofGpuMs_.begin(), proofGpuMs_.end());
+            proofGpuMs_.clear();
         }
         const double u = std::min(1.0, (now - p.stageStart) / spec.seconds);
         if (spec.radiusPx <= 0) { // orbit: the view turns, as a drag would
@@ -1050,6 +1054,10 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                     for (int k = 0; k < 6; ++k) split.set(names[k], percentilesJson(percentiles(ph.split[k])));
                     j.set("frame_split_ms", split);
                     j.set("triangles_drawn", percentilesJson(percentiles(ph.drawn)));
+                    if (!ph.gpuMs.empty()) { // (the GPU's own work, no compositor; fewer than "frames": results that came too late)
+                        j.set("gpu_ms", percentilesJson(percentiles(ph.gpuMs)));
+                        j.set("gpu_frames", double(ph.gpuMs.size()));
+                    }
                     j.set("render_triangle_budget", double(renderTriangleBudget()));
                 }
                 if (ph.radiusPx > 0) {

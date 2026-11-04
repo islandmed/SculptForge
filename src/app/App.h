@@ -2060,6 +2060,8 @@ private:
     // The last drawn frame's time by part (run()'s marks): events, dabs, UI, ghost + scene sync (the upload), draw,
     // UI draw + swap (where the frame waits for the GPU).
     double frameSplitMs_[6] = {};
+    // GPU time of frames (GL_TIME_ELAPSED, a few frames late) since Help > Benchmark last took them.
+    std::vector<double> proofGpuMs_;
     // The view's resolution while it moves (experimental, docs/design/perf-moonshots.md §0): 0.75 on the simulated
     // floor tier (SF_HW_SIMULATE=floor), else 1; SF_MOTION_RESOLUTION=25..100 (percent) overrides.
     static float motionResolution();
