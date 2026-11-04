@@ -119,10 +119,15 @@ def fingerprint(t, root, build, run_env):
     h = hashlib.sha256()
     h.update(json.dumps([t["name"], t["command"], sorted(t["env"]), sorted(run_env.items())]).encode())
     is_app = False
-    for arg in t["command"]:
+    cmd = t["command"]
+    for i, arg in enumerate(cmd):
+        if i and cmd[i - 1] in ("--ui-out", "--out", "-o"):
+            continue  # where the test writes (screenshots): an output, not an input
         for a in re.split(r"[=;]", arg):
             if a and (os.path.isabs(a) or "/" in a):
                 p = os.path.normpath(a if os.path.isabs(a) else os.path.join(t["cwd"], a))
+                if os.path.isdir(p) and not os.path.relpath(p, build).startswith(".."):
+                    continue  # a folder in the build tree is one the tests write (crash-log-test, test-tmp)
                 if os.path.exists(p):
                     h.update(f"{p}\0{sha_path(p)}\n".encode())
                     is_app |= os.path.basename(p) in ("sculptforge", "sculptforge.exe")
@@ -346,12 +351,15 @@ def main(argv=None):
     for n in tolerated:
         print(f"failed but labelled flaky (does not block): {n}")
     known = load_slow_list(os.path.join(root, a.slow_list) if not os.path.isabs(a.slow_list) else a.slow_list)
-    listed = [(d, n) for d, n in slow if n in known and d <= 1.5 * known[n]]
+    # The list's seconds are the PC's, where the budget is 20 s; a machine with a bigger budget (CI's software
+    # OpenGL: 150 s) scales them the same way.
+    scale = max(1.0, a.budget / 20.0)
+    listed = [(d, n) for d, n in slow if n in known and d <= 1.5 * known[n] * scale]
     slow = [(d, n) for d, n in slow if (d, n) not in listed]
     for d, n in listed:
         print(f"known slow: {n} {d:.1f} s (tests/slow_tests.txt: {known[n]:g} s; make it fast, then delete its line)")
     for d, n in slow:
-        why = f"1.5x its {known[n]:g} s in tests/slow_tests.txt" if n in known else f"the {a.budget:g} s budget"
+        why = f"1.5x its {known[n] * scale:g} s in tests/slow_tests.txt" if n in known else f"the {a.budget:g} s budget"
         print(f"over budget: {n} {d:.1f} s, over {why} (wait on events, use a smaller mesh, split it, or label it nightly)")
     for n in real:
         print(f"FAILED: {n}")
@@ -382,9 +390,13 @@ def self_test():
         open(script, "w").write("x")
         app = os.path.join(d, "sculptforge")
         open(app, "w").write("bin")
-        t = {"name": "ui_s", "command": [app, "--ui-test", script], "labels": ["ui"], "env": [], "cwd": d}
+        shots = os.path.join(d, "ui-shots", "s")
+        os.makedirs(shots)
+        t = {"name": "ui_s", "command": [app, "--ui-test", script, "--ui-out", shots], "labels": ["ui"], "env": [], "cwd": d}
         f1 = fingerprint(t, src, d, {})
-        assert f1 == fingerprint(t, src, d, {})
+        open(os.path.join(shots, "shot.png"), "w").write("new")
+        forget()
+        assert f1 == fingerprint(t, src, d, {}), "screenshots the test wrote are not inputs"
         open(script, "w").write("y")
         forget()
         f2 = fingerprint(t, src, d, {})

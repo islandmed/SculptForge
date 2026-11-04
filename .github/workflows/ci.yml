@@ -15,9 +15,11 @@ on:
 permissions:
   contents: read
 
+# A newer push cancels a branch's run, but never main's: a commit's finished run on main is what the next commits reuse
+# (a release bump right after a merge reused nothing when the bump cancelled its parent's run, 0.10.10).
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 # Compiler cache (ccache). Every job compiles through ccache and starts from the newest cache of the same job; ccache
 # hashes the compiler and the preprocessed source with every flag, so a hit is the object file that compiler would
