@@ -16,6 +16,14 @@ grids, multiresolution offsets, quantization, page tables, copy-on-write); no co
 
 The rule behind every piece: **cost follows the pixels on screen and the brush footprint, never the total count.**
 
+**Two latencies, two jobs** (agreed 11-04 with perf-moonshots and beta-boost). *Pen to visible surface* < 16 ms is the
+preview's job (the geometry preview, or N1 where it can't draw): on the floor it already holds the visible stroke 3-6 px
+behind the pen. *Committed stroke* latency (proof mode's lag_ms) has a floor the solver can't beat: a dab lands every
+0.15 x radius of path, so at 240 px and the benchmark's 973 px/s the newest dab's pointer sample is on average ~18 ms old
+before any work (120 px ~9 ms, 25 px ~2 ms). Its target is solver + frame <= 16 ms beyond that spacing floor (240 px:
+~35 ms p50); reports give raw lag_ms and the floor-adjusted figure side by side. No partial "head" dab is committed at
+the pointer: it would change what the stroke leaves on the mesh.
+
 ## 0. What we already have (mapped before designing)
 
 | Piece | Where | State | What it gives 200M | Gap |
