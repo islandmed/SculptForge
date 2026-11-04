@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/ThreadPool.h"
 
+#include <chrono>
+#include <cstdlib>
+
 namespace sf {
 
 namespace {
@@ -58,6 +61,16 @@ void ThreadPool::workerLoop() {
         // doesn't wait for the thread to wake up.
         lock.unlock();
         for (int i = 0; i < 1000 && generation_.load(std::memory_order_relaxed) == seen; ++i) std::this_thread::yield();
+        // Research (n2-stroke, Windows A/B): SF_POOL_SPIN_US=N spins N microseconds more before sleeping.
+        static const int spinUs = [] {
+            const char* e = std::getenv("SF_POOL_SPIN_US");
+            return e ? std::atoi(e) : 0;
+        }();
+        if (spinUs > 0) {
+            const auto until = std::chrono::steady_clock::now() + std::chrono::microseconds(spinUs);
+            while (generation_.load(std::memory_order_relaxed) == seen && std::chrono::steady_clock::now() < until) {
+            }
+        }
         lock.lock();
         wake_.wait(lock, [&] { return stop_ || generation_ != seen; });
         if (stop_) return;

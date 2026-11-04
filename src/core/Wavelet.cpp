@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Wavelet.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 #include "core/BVH.h"
 #include "core/Benchmark.h"
 #include "core/HardwareProfile.h"
@@ -210,6 +214,24 @@ int runWaveletStrokeBench(const std::string& outPath) {
     using Clock = std::chrono::steady_clock;
     auto ms = [](Clock::time_point a, Clock::time_point b) { return std::chrono::duration<double, std::milli>(b - a).count(); };
     if (simulatedFloorTier()) ThreadPool::setSharedThreadCount(4); // SF_HW_SIMULATE=floor: 4 cores
+    // Windows A/B (research): SF_BENCH_THREADS=N threads (1: no pool, the codegen alone); SF_BENCH_TIMER1=1 asks
+    // Windows for a 1 ms timer (timeBeginPeriod, winmm) so the frame loop's sleeps don't round up to a 15.6 ms tick.
+    if (const char* e = std::getenv("SF_BENCH_THREADS")) ThreadPool::setSharedThreadCount(std::atoi(e));
+    bool timer1 = false;
+#ifdef _WIN32
+    if (const char* e = std::getenv("SF_BENCH_TIMER1"); e && e[0] == '1')
+        if (HMODULE winmm = LoadLibraryA("winmm.dll"))
+            if (auto begin = reinterpret_cast<unsigned(WINAPI*)(unsigned)>(GetProcAddress(winmm, "timeBeginPeriod"))) timer1 = begin(1) == 0;
+#endif
+    // How much a requested 1 ms sleep really takes (the timer's granularity), median of 20.
+    std::vector<double> naps;
+    for (int i = 0; i < 20; ++i) {
+        const auto a = Clock::now();
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        naps.push_back(ms(a, Clock::now()));
+    }
+    std::sort(naps.begin(), naps.end());
+    const char* spin = std::getenv("SF_POOL_SPIN_US");
     std::fprintf(stderr, "core-200m N2 stroke: building a Micro 7 head...\n");
     Mesh m = makeCore200mMesh(20000, 7);
     if (!m.micro) return 1;
@@ -255,7 +277,9 @@ int runWaveletStrokeBench(const std::string& outPath) {
     std::ostringstream md;
     md << "## Wavelet strokes (N2 in MicroStroke): " << double(mm.microTriangles()) / 1e6 << "M micro triangles, Micro " << mm.level
        << ", " << ThreadPool::shared().threads() << " threads, shading budget " << budget << " points a frame ("
-       << limit << " patches + ring" << (tier.draftBrushMode ? ", draft" : "") << ")\n\n"
+       << limit << " patches + ring" << (tier.draftBrushMode ? ", draft" : "") << "); environment: SF_HW_SIMULATE="
+       << (simulatedFloorTier() ? "floor" : "-") << ", 1 ms timer " << (timer1 ? "on" : "off") << ", SF_POOL_SPIN_US="
+       << (spin ? spin : "-") << ", a 1 ms sleep takes " << naps[10] << " ms\n\n"
        << "Standard, strength 0.5, " << kDabs << " dabs 0.1 radius apart across the face; the pen delivers a dab every "
        << kPenMs << " ms; a frame places the dabs that have arrived (pick + dab, at least one, until 10 ms), rebuilds the "
           "changed patches (wavelet), shades up to the renderer's budget of what changed (MicroShader, MicroRenderer::sync's queue: the rest waits) and "
