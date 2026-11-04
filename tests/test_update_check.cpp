@@ -37,44 +37,44 @@ TEST(update_feed_parses) {
 }
 
 TEST(update_versions_order_prereleases) {
-    CHECK(compareVersions("0.11.0-beta.1", "0.11.0") < 0);
-    CHECK(compareVersions("0.11.0", "0.11.0-beta.1") > 0);
-    CHECK(compareVersions("0.11.0-beta.1", "0.10.11") > 0);
-    CHECK(compareVersions("0.11.0-beta.1", "0.11.0-beta.2") < 0);
-    CHECK(compareVersions("0.11.0-beta.2", "0.11.0-beta.10") < 0); // numbers numerically
-    CHECK(compareVersions("0.11.0-beta.2", "0.11.0-rc.1") < 0);
-    CHECK(compareVersions("0.11.0-beta", "0.11.0-beta.1") < 0);
-    CHECK(compareVersions("v0.11.0-beta.1", "0.11.0-beta.1") == 0);
-    CHECK(versionLabel("0.11.0", "beta.1") == "0.11.0 Beta 1");
-    CHECK(versionLabel("0.11.0", "rc.2") == "0.11.0 RC 2");
-    CHECK(versionLabel("0.10.11", "") == "0.10.11");
+    CHECK(compareVersions("9.0.0-beta.1", "9.0.0") < 0);
+    CHECK(compareVersions("9.0.0", "9.0.0-beta.1") > 0);
+    CHECK(compareVersions("9.0.0-beta.1", "8.10.11") > 0);
+    CHECK(compareVersions("9.0.0-beta.1", "9.0.0-beta.2") < 0);
+    CHECK(compareVersions("9.0.0-beta.2", "9.0.0-beta.10") < 0); // numbers numerically
+    CHECK(compareVersions("9.0.0-beta.2", "9.0.0-rc.1") < 0);
+    CHECK(compareVersions("9.0.0-beta", "9.0.0-beta.1") < 0);
+    CHECK(compareVersions("v9.0.0-beta.1", "9.0.0-beta.1") == 0);
+    CHECK(versionLabel("9.0.0", "beta.1") == "9.0.0 Beta 1");
+    CHECK(versionLabel("9.0.0", "rc.2") == "9.0.0 RC 2");
+    CHECK(versionLabel("8.10.11", "") == "8.10.11");
 }
 
-// latest.json while 0.11.0 Beta 1 is out: old apps and Stable read the top level, Preview the channel's entry.
-static const char* kPreviewFeed = R"({"version":"0.10.11","download":"https://sculptforge.app/#download",
+// latest.json while 9.0.0 Beta 1 is out: old apps and Stable read the top level, Preview the channel's entry.
+static const char* kPreviewFeed = R"({"version":"8.10.11","download":"https://sculptforge.app/#download",
     "highlights":["Stable one"],
-    "channels":{"preview":{"version":"0.11.0-beta.1","download":"https://github.com/islandmed/SculptForge/releases/tag/v0.11.0-beta.1",
+    "channels":{"preview":{"version":"9.0.0-beta.1","download":"https://github.com/islandmed/SculptForge/releases/tag/v9.0.0-beta.1",
                            "notes":"https://sculptforge.app/guide/whats-new.html","highlights":["Beta one","Beta two"]}}})";
 
 TEST(update_feed_preview_channel) {
     UpdateInfo u;
     std::string err;
-    CHECK(parseUpdateFeed(kPreviewFeed, u, err) && u.version == "0.10.11" && u.highlights.size() == 1); // Stable
+    CHECK(parseUpdateFeed(kPreviewFeed, u, err) && u.version == "8.10.11" && u.highlights.size() == 1); // Stable
     CHECK(parseUpdateFeed(kPreviewFeed, u, err, UpdateChannel::Preview));
-    CHECK(u.version == "0.11.0-beta.1" && u.highlights.size() == 2 && u.highlights[0] == "Beta one");
-    CHECK(u.downloadUrl.find("/releases/tag/v0.11.0-beta.1") != std::string::npos);
+    CHECK(u.version == "9.0.0-beta.1" && u.highlights.size() == 2 && u.highlights[0] == "Beta one");
+    CHECK(u.downloadUrl.find("/releases/tag/v9.0.0-beta.1") != std::string::npos);
     // Once stable passes the beta, Preview is offered stable.
     std::string promoted = kPreviewFeed;
-    promoted.replace(promoted.find("0.10.11"), 7, "0.11.0");
-    CHECK(parseUpdateFeed(promoted, u, err, UpdateChannel::Preview) && u.version == "0.11.0");
+    promoted.replace(promoted.find("8.10.11"), 7, "9.0.0");
+    CHECK(parseUpdateFeed(promoted, u, err, UpdateChannel::Preview) && u.version == "9.0.0");
     // A broken or missing preview entry falls back to stable; it never breaks the check.
-    CHECK(parseUpdateFeed(R"({"version":"0.10.11","download":"https://example.org/dl",
-                              "channels":{"preview":{"version":"0.11.0-beta.1","download":"http://example.org"}}})",
-                          u, err, UpdateChannel::Preview) && u.version == "0.10.11");
-    CHECK(parseUpdateFeed(R"({"version":"0.10.11","download":"https://example.org/dl","channels":[]})", u, err,
-                          UpdateChannel::Preview) && u.version == "0.10.11");
-    CHECK(parseUpdateFeed(R"({"version":"0.10.11","download":"https://example.org/dl"})", u, err,
-                          UpdateChannel::Preview) && u.version == "0.10.11");
+    CHECK(parseUpdateFeed(R"({"version":"8.10.11","download":"https://example.org/dl",
+                              "channels":{"preview":{"version":"9.0.0-beta.1","download":"http://example.org"}}})",
+                          u, err, UpdateChannel::Preview) && u.version == "8.10.11");
+    CHECK(parseUpdateFeed(R"({"version":"8.10.11","download":"https://example.org/dl","channels":[]})", u, err,
+                          UpdateChannel::Preview) && u.version == "8.10.11");
+    CHECK(parseUpdateFeed(R"({"version":"8.10.11","download":"https://example.org/dl"})", u, err,
+                          UpdateChannel::Preview) && u.version == "8.10.11");
 }
 
 TEST(update_feed_rejects_bad_feeds) {
