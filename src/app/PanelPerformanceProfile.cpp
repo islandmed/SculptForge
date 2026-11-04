@@ -270,7 +270,11 @@ void App::hardwareProfileFrameEnd() {
     } else {
         changed = hw.governor.addFrame(sample);
     }
-    if (changed && hw.profile.overrides.governor && !hw.profile.overrides.motionProxyThreshold)
+    static const bool pinned = [] { // SF_GOVERNOR=0: the budgets stay as the profile set them (benchmark A/Bs)
+        const char* v = std::getenv("SF_GOVERNOR");
+        return v && *v == '0';
+    }();
+    if (changed && !pinned && hw.profile.overrides.governor && !hw.profile.overrides.motionProxyThreshold)
         setGovernedBudgets(hw.governor.budget(), hw.governor.proxyThreshold());
     // The display (the window moved to a 120 Hz screen) or the power source (unplugged) may change: every few
     // seconds, look; a change re-applies the profile with the new tier configuration.

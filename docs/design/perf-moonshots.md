@@ -45,7 +45,10 @@ when it stops (`SF_MOTION_RESOLUTION=25..100` sets it on any profile).
 events, sculpt, UI, upload = ghost + scene sync, draw = GL calls, swap_wait = UI draw + swap, where the frame
 waits for the GPU). It decides whether a native backend (D3D11/12, Metal) behind a thin render interface should
 move earlier: only if draw + swap_wait dominate on the floor profile at 20M while sculpt and upload are within
-budget. Run: `--benchmark --benchmark-sizes 5,20,50`, with and without `SF_HW_SIMULATE=floor`.
+budget. Run: `--benchmark --benchmark-sizes 5,20,50`, with and without `SF_HW_SIMULATE=floor`. For A/Bs add
+`SF_GOVERNOR=0`: otherwise the frame governor may lower the budget in some runs and not others (core-200m saw
+0.3M vs 1.44M triangles drawn for the same setting), which swamps the effect being measured. The motion-resolution
+A/B below ran with the governor on, so treat it as indicative.
 
 **First measurement** (11-03, M1 Pro, one run each at load < 2 at start; p99 frame / stroke latency p50):
 
