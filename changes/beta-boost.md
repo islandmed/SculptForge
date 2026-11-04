@@ -1,7 +1,7 @@
 ---
 whats_new: **Fast Big Brushes**: big brushes on dense meshes keep up with the pen. A 240 px Clay stroke on a 15 million
-  triangle head trails the pen by a third to a quarter of what it did (most on modest hardware), and every dab is
-  placed. On by default: **Preferences > Performance > Fast Big Brushes**.
+  triangle head trails the pen by a quarter of what it did on integrated graphics (a third on faster machines), and
+  every dab is placed. On by default: **Preferences > Performance > Fast Big Brushes**.
 highlight: Big brushes keep up on dense meshes
 added: **Fast Big Brushes** (Preferences > Performance, on by default): a dab that reaches more than 150,000 vertices
   takes its plane from an even sample of them and turns the shading along with the move it makes (from the brush's
@@ -19,5 +19,7 @@ testers:
     same; the shading under the brush should be smooth while you drag and after you lift the pen.
   - Any OS: X symmetry on, a big brush back and forth across the middle of the face: no seam or step at the mirror line.
   - macOS / Linux: undo and redo a big stroke: the surface and its shading come back exactly.
+  - Any OS, integrated graphics first: after a long big-brush stroke without pausing, lifting the pen finishes about
+    70-110 ms later than before (the exact shading lands then); it should not feel like a hitch.
 ---
 Numbers before/after (laptop, floor profile, Windows PC): REPORT.md on perf/beta-boost.
