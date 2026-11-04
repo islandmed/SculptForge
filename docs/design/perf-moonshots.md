@@ -10,6 +10,61 @@ Starting point (Tony's clean 33M run, M1 Pro, Asahi, Mesa GL 4.6, unified memory
 p99s to about 30 ms; what it leaves is the surface trailing the pen (each 240 px dab at 33M still costs
 100-200 ms of CPU) and Move, which never used the solver path.
 
+## 0. Hard requirement: the floor tier (Tony, 11-03)
+
+Weak GPUs must get great performance too, not only big cards. Every idea, prototype and default below is held to
+this; an experiment that misses it stays off for that tier or doesn't ship.
+
+1. **Floor hardware.** Integrated GPUs: Intel UHD 620 / Iris Xe, AMD Vega / 680M iGPU, Apple M1 base. OpenGL 3.3,
+   8 GB RAM, about 1-2 GB of shared video memory, 4 cores. Windows first (the biggest install base; real-hardware
+   checks by testers).
+2. **Costs bounded by screen pixels and brush footprint, never total polygon count.** The cluster-LOD pixel budget
+   and the draw budget come from the hardware profile (calibration: `renderTriangleBudget()`,
+   `motionProxyThreshold()`, `TierConfig::uploadBudgetMBPerFrame`). Under load they degrade gracefully: fewer drawn
+   triangles, a lower view resolution while the view moves, full quality on release. They never stutter: a budget
+   is cut before a frame is late, not after.
+3. **GPU work is optional.** Sculpting, normals, picking and undo stay on the CPU, multithreaded; the GPU only draws
+   a budgeted set. No feature may require compute shaders, SSBOs, mesh shaders or big VRAM; anything newer than
+   GL 3.3 is an optional fast path with a GL 3.3 fallback that produces the same picture. A CPU raster path for
+   sub-pixel clusters (and for the canvas, §7 E) is part of the plan.
+4. **Memory.** Compact per-vertex storage so 20M+ triangles fit in 8 GB with headroom. Today the scene is about
+   90 bytes per triangle (docs/performance.md): 20M = 1.8 GB plus undo, which fits; 50M = 4.5 GB, which does not
+   leave headroom on 8 GB. Target: 60 bytes per triangle at the top level (quantized positions in the cluster grid,
+   octahedral normals, implicit adjacency), and micro levels (1.25 bytes per triangle) above ~8M.
+5. **Benchmarks.** Every number is reported twice: this laptop and the **iGPU-simulated floor profile** (below),
+   with p99 frame time and stroke latency at 5, 20 and 50M triangles. A beta must not regress the floor tier.
+
+**The iGPU-simulated profile** (`SF_HW_SIMULATE=floor`, core/HardwareProfile.h; applied where the hardware
+profile is applied, so it is the same code a real floor machine runs): Laptop tier; 4 worker threads;
+render triangle budget 2M (1M while the view moves); motion proxy from 3M visible triangles; upload budget
+16 MB a frame; no GL 4.4 buffer storage (Fast Upload falls back); resident caches capped at 1 GB; the governor
+may lower the budget, never raise it. Still to add: view resolution 75% while the view moves (only a fixed view
+resolution exists today).
+
+**Frame split.** `--benchmark` now writes `frame_split_ms` per phase (p50 / p95 / p99 of the main thread's
+events, sculpt, UI, upload = ghost + scene sync, draw = GL calls, swap_wait = UI draw + swap, where the frame
+waits for the GPU). It decides whether a native backend (D3D11/12, Metal) behind a thin render interface should
+move earlier: only if draw + swap_wait dominate on the floor profile at 20M while sculpt and upload are within
+budget. Run: `--benchmark --benchmark-sizes 5,20,50`, with and without `SF_HW_SIMULATE=floor`. It simulates the budgets, not the GPU's fill
+rate, so real iGPU runs by testers (Windows UHD 620 / Iris Xe first) confirm it.
+
+**Targets, floor profile** (laptop targets in brackets):
+
+| | 5M | 20M | 50M |
+|---|---|---|---|
+| p99 frame, orbit | < 16 ms [< 8] | < 33 ms [< 11] | < 33 ms, proxy [< 16] |
+| p99 frame, 240 px stroke | < 33 ms [< 16] | < 33 ms [< 33] | < 50 ms [< 33] |
+| stroke latency (pen to visible surface), p99 | < 16 ms | < 16 ms (canvas track, §7) | < 33 ms |
+| RSS after load + 20 strokes | < 1 GB | < 2.5 GB | < 5 GB (needs item 4) |
+
+**The three prototypes against the floor:**
+
+| Prototype | GL needed | Floor tier |
+|---|---|---|
+| Live Move | GL 3.3 (vertex shader, uniform arrays) | works; takes per-frame grab and upload work off the CPU, so it helps most here. The commit at pen lift is one grab on the CPU (cost is the brush footprint) |
+| Background Preview | GL 3.3 | works; draws only the clusters the dabs reach |
+| Fast Upload | GL 4.4 buffer storage (optional) | an optional fast path: without the extension (GL 3.3 contexts, macOS GL 4.1) it is off and uploads go the old way, same picture; on Windows iGPUs (GL 4.6 drivers) it needs the floor-profile numbers before it may default on |
+
 ## 1. What SculptForge already does (so the ideas below are measured against the right thing)
 
 | Piece | Where | State |
@@ -190,6 +245,41 @@ the frame; Fast Upload moves the GL thread's 2-10 ms commit copy to a GPU copy. 
 - **Later or not at all:** cluster LOD (5) only if orbit at 33M+ stays below target after Focus Detail; strokes as
   data (3) belongs with the Sculpt Timeline; coarse-first (2) and learned prediction (7) don't pay once the
   preview is on.
+
+## 7. Canvas track (the cached screen; Tony, 11-03)
+
+Generic techniques, designed here from first principles (clean room: no decompiling, no copied code or docs). Goal:
+a dab costs about the brush's pixels, whatever the mesh size, so the floor tier sculpts 20M like a small mesh.
+
+- **A. Cached screen canvas.** Keep a G-buffer between frames: depth, normal (octahedral, 2x16 bit), material and
+  colour per pixel. When nothing moves, nothing is redrawn (the canvas is composited as one quad). While sculpting,
+  only the clusters overlapping the brush's dirty screen rectangle (the dab's screen bound, grown by the move) are
+  re-rasterized into the canvas, scissored to that rectangle, and only that rectangle is re-shaded. The rectangle
+  comes from the dab list we already have (the solver's dabs and the ghost's bounds); the clusters come from the
+  existing cluster bounds. Cost per dab: brush pixels plus the clusters under them. Correctness: the depth test
+  inside the scissor against the cached depth outside it; clusters straddling the edge are drawn whole and clipped.
+- **B. Deferred Lit Sphere shading.** Shade the canvas per pixel from its cached normals with the Lit Sphere lookup
+  (one texture fetch, no lights, no shadows) in the interactive path; the full material (PBR, cavity, shadows) is
+  applied when the view is still. Re-shading a rectangle is then a texture pass, not a geometry pass.
+- **C. Motion.** While orbiting or zooming: draw a lower level or budget (the motion proxy, micro levels' coarse
+  level), or reproject the cached canvas for the first frames of a move; full detail returns on release. Input is
+  never stalled: the frame takes what the budget allows, never waits for geometry.
+- **D. Compact data, levels as offsets.** Multires levels stored as offsets from the level below (the micro levels'
+  16-bit heights already are), so a large brush works at a coarse level and the detail rides along; with §0 item 4
+  this is how 50M fits the floor.
+- **E. CPU rasterizer for the canvas.** A tiled, multithreaded CPU rasterizer (binning by 64x64 tiles, SIMD edge
+  functions, one thread per tile) that writes the same G-buffer, so a GL 3.3 iGPU only composites one textured
+  quad. Also the path for sub-pixel clusters (§0 item 3). Compare CPU vs GPU fill per machine on the floor profile;
+  calibration measures both and the hardware profile picks one (`TierConfig`, a new `canvasRaster` field).
+
+**Targets (floor profile, 20M):** stroke latency < 16 ms, p99 frame < 33 ms; idle frames ~0 ms of GPU (composite
+only). Measured as in §0 (5/20/50M, laptop and floor).
+
+**Order of experiments**, each behind a flag, off by default, with numbers before it ships: (1) A + B on the GPU
+(the canvas, dirty rectangles, Lit Sphere re-shade); (2) C reprojection of the canvas; (3) E the CPU rasterizer
+writing the same canvas, and the per-machine pick; (4) D with Focus Detail's per-tile levels. Risks: the canvas
+must match a full redraw (a screenshot test compares them pixel for pixel at rest); transparency, X-Ray and
+wireframe overlays draw on top of the canvas, not into it.
 
 ## References
 

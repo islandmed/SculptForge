@@ -3492,7 +3492,11 @@ bool Renderer::persistentUpload() const {
         const char* v = std::getenv("SF_PERSISTENT_UPLOAD");
         return v && *v ? (*v == '0' ? 0 : 1) : -1;
     }();
-    return (env >= 0 ? env == 1 : persistentUpload_) && gl::BufferStorage != nullptr;
+    static const bool floor = [] { // SF_HW_SIMULATE=floor (core/HardwareProfile.h): GL 3.3, no buffer storage
+        const char* v = std::getenv("SF_HW_SIMULATE");
+        return v && std::string(v) == "floor";
+    }();
+    return (env >= 0 ? env == 1 : persistentUpload_) && gl::BufferStorage != nullptr && !floor;
 }
 
 void Renderer::bindStrokeUpload(uint32_t id, StrokeUpload& up) {
