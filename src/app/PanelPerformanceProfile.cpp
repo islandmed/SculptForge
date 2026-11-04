@@ -99,6 +99,14 @@ int displayRefreshHz(SDL_Window* window) {
 
 } // namespace
 
+float App::motionResolution() {
+    static const float scale = [] {
+        if (const char* v = std::getenv("SF_MOTION_RESOLUTION"); v && *v) return std::clamp(float(std::atof(v)) / 100.0f, 0.25f, 1.0f);
+        return simulatedFloorTier() ? 0.75f : 1.0f;
+    }();
+    return scale;
+}
+
 bool App::hardwareProfileGoverns() const { return hwProfile_ && hwProfile_->active; }
 
 void App::initHardwareProfile() {

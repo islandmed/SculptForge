@@ -983,6 +983,8 @@ int App::run() {
         renderSettings_.motionProxy = perf_.proxyNow; // big meshes draw their lighter proxy while the view moves
         renderSettings_.materialTint = materialTintFor(doc_.paintColor); // (Color > Colour tints the material)
         renderSettings_.resolutionScale = float(uiPrefs_.viewResolution) / 100.0f; // (#80; only the window's view)
+        if (perf_.movingNow) // while the view moves, the floor tier draws fewer pixels; full resolution when it stops
+            renderSettings_.resolutionScale = std::min(renderSettings_.resolutionScale, motionResolution());
         perf_.samplesUsed = renderer_.drawView(camera_, fbW, fbH, renderSettings_, canvasViewport(fbW, fbH), samples);
         if (snapshotEnv && *snapshotEnv && (sm.moving || sm.releasing)) {
             // Three points of the stroke, and the end (the frame the last dab reached the screen).
