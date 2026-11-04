@@ -199,9 +199,8 @@ application's own exchange plug-in does, on Windows and macOS. The commands are 
 | **Export Bridge file...** | Writes a Bridge file. With several visible Parts, one file per Part next to the path |
 | **Export STL...** | Writes a binary STL of the visible Parts |
 
-The default bridge folder and the one-time setup are on the
-[Bridge setup page](https://github.com/islandmed/SculptForge/blob/main/integrations/bridge-plugin/README.md). On
-Linux the Bridge needs a custom folder; Bridge files still import and export.
+On Windows and macOS the Bridge finds the shared exchange folder by itself; nothing to install. On Linux it needs a
+custom folder; Bridge files still import and export.
 
 ### A round trip
 
@@ -217,7 +216,7 @@ format has no hidden-face flag, so hidden faces are sent like any others.
 > **Note:** the Bridge is tested with files, not yet against every version of a live application. If a send does
 > not arrive, export a Bridge file and import it by hand, and please report it (**Help > Report a problem**).
 
-From scripts: `goz_export path=`, `goz_import path=`, `goz_send`, `goz_receive` and `export_stl path=` (see
+From scripts: `bridge_export path=`, `bridge_import path=`, `bridge_send`, `bridge_receive` and `export_stl path=` (see
 [3D printing](#3d-printing) for its options).
 
 ## Blender

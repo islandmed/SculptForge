@@ -54,18 +54,18 @@ size_t vecBytes(const std::vector<glm::vec3>& v) { return v.capacity() * sizeof(
 // The tree
 
 Timeline::Kind Timeline::classify(const UndoRecord& r) {
-    if (r.subdiv || r.mesh || r.topology || r.subtool) return Kind::Topology;
+    if (r.subdiv || r.mesh || r.topology || r.part) return Kind::Topology;
     if (!r.positions.empty()) return Kind::Stroke;
     if (!r.mask.empty()) return Kind::Mask;
     if (!r.colors.empty() || r.paint || r.texture || r.textureTiles) return Kind::Paint;
-    if (!r.hidden.empty() || !r.polygroups.empty()) return Kind::Visibility;
+    if (!r.hidden.empty() || !r.facegroups.empty()) return Kind::Visibility;
     return Kind::Other;
 }
 
 bool Timeline::fastShape(const UndoRecord& r) {
     return !r.positions.empty() && r.layer == -1 && r.layerOffsets.empty() && r.mask.empty() && r.colors.empty() &&
-           r.paintAlpha.empty() && !r.paint && r.hidden.empty() && r.polygroups.empty() && !r.textureTiles &&
-           !r.texture && !r.mesh && !r.subdiv && !r.topology && !r.subtool && !r.uv;
+           r.paintAlpha.empty() && !r.paint && r.hidden.empty() && r.facegroups.empty() && !r.textureTiles &&
+           !r.texture && !r.mesh && !r.subdiv && !r.topology && !r.part && !r.uv;
 }
 
 void Timeline::reset() {
@@ -89,7 +89,7 @@ uint32_t Timeline::newNode(uint32_t parent, const UndoRecord* r) {
         n.label = r->label.empty() ? "Edit" : r->label;
         n.kind = classify(*r);
         n.touched = uint32_t(std::max({r->positions.indices.size(), r->mask.indices.size(), r->colors.indices.size(),
-                                       r->hidden.indices.size(), r->polygroups.indices.size()}));
+                                       r->hidden.indices.size(), r->facegroups.indices.size()}));
     }
     if (parent != kNone) {
         nodes_[parent].children.push_back(id);
@@ -424,7 +424,7 @@ void Timeline::walkTo(Document& doc, size_t index) {
         } else {
             flushBatch(doc);
             if (!s.undo(mesh, doc.bvh)) break;
-            if (UndoRecord* u = s.lastRedo(); u && u->subtool) doc.applySubtoolStep(*u->subtool);
+            if (UndoRecord* u = s.lastRedo(); u && u->part) doc.applyPartStep(*u->part);
             ++lastSeek_.walked;
         }
     }
@@ -443,7 +443,7 @@ void Timeline::walkTo(Document& doc, size_t index) {
         } else {
             flushBatch(doc);
             if (!s.redo(mesh, doc.bvh)) break;
-            if (UndoRecord* u = s.lastUndo(); u && u->subtool) doc.applySubtoolStep(*u->subtool);
+            if (UndoRecord* u = s.lastUndo(); u && u->part) doc.applyPartStep(*u->part);
             ++lastSeek_.walked;
         }
     }
@@ -610,7 +610,7 @@ bool Timeline::canRetune(uint32_t id, std::string* why) const {
         todo.pop_back();
         const UndoRecord* r = recordOf(x);
         if (!r) continue;
-        if (r->mesh || r->topology || r->subdiv || r->subtool || !r->layerOffsets.empty() || (!r->positions.empty() && r->layer != -1))
+        if (r->mesh || r->topology || r->subdiv || r->part || !r->layerOffsets.empty() || (!r->positions.empty() && r->layer != -1))
             return no("A later step (\"" + nodes_[x].label + "\") changes the mesh as a whole; re-tuning would undo it");
         for (uint32_t c : nodes_[x].children) todo.push_back(c);
     }
@@ -758,7 +758,7 @@ struct Reader {
 };
 
 bool savable(const UndoRecord& r) {
-    return !r.mesh && !r.subdiv && !r.topology && !r.subtool && !r.texture && !r.textureTiles && !r.paint && !r.uv &&
+    return !r.mesh && !r.subdiv && !r.topology && !r.part && !r.texture && !r.textureTiles && !r.paint && !r.uv &&
            r.layerOffsets.empty() && r.layer == -1 && r.paintLayer == -1 && r.paintAlpha.empty();
 }
 
@@ -863,7 +863,7 @@ bool Timeline::save(std::vector<uint8_t>& out, const Mesh& mesh, std::string* er
         writeChannel(w, r.mask);
         writeChannel(w, r.colors);
         writeChannel(w, r.hidden);
-        writeChannel(w, r.polygroups);
+        writeChannel(w, r.facegroups);
         w.pod(uint8_t(n.fast));
         if (n.fast) w.vec(n.other);
         w.vec(n.retuneDelta);
@@ -907,12 +907,12 @@ bool Timeline::load(Document& doc, const std::vector<uint8_t>& in, std::string* 
         auto r = std::make_unique<UndoRecord>();
         r->label = n.label;
         bool good = readChannel(rd, r->positions) && readChannel(rd, r->mask) && readChannel(rd, r->colors) &&
-                    readChannel(rd, r->hidden) && readChannel(rd, r->polygroups);
+                    readChannel(rd, r->hidden) && readChannel(rd, r->facegroups);
         n.fast = rd.pod<uint8_t>() != 0;
         if (n.fast) rd.vec(n.other);
         rd.vec(n.retuneDelta);
         good = good && rd.ok && channelInRange(r->positions, verts) && channelInRange(r->mask, verts) &&
-               channelInRange(r->colors, verts) && channelInRange(r->hidden, tris) && channelInRange(r->polygroups, tris) &&
+               channelInRange(r->colors, verts) && channelInRange(r->hidden, tris) && channelInRange(r->facegroups, tris) &&
                (!n.fast || n.other.size() == r->positions.indices.size()) &&
                (n.retuneDelta.empty() || n.retuneDelta.size() == r->positions.indices.size());
         if (!good || r->empty()) return fail("The history file is damaged");
@@ -950,14 +950,14 @@ bool saveHistorySidecar(Document& doc, const std::string& projectPath, std::stri
     std::vector<uint8_t> blob;
     std::vector<uint8_t> body;
     Writer wb{body};
-    for (int i = 0; i < doc.subtoolCount(); ++i) {
-        UndoStack& stack = i == doc.activeSubtool ? doc.undo : doc.subtools[size_t(i)].undo;
+    for (int i = 0; i < doc.partCount(); ++i) {
+        UndoStack& stack = i == doc.activePart ? doc.undo : doc.parts[size_t(i)].undo;
         Timeline* t = Timeline::of(stack);
         if (!t) continue;
         t->bindStack(stack);
-        if (!t->save(blob, doc.subtoolMesh(i))) continue;
+        if (!t->save(blob, doc.partMesh(i))) continue;
         wb.pod(uint32_t(i));
-        wb.str(doc.subtools[size_t(i)].name);
+        wb.str(doc.parts[size_t(i)].name);
         wb.vec(blob);
         ++saved;
     }
@@ -1003,19 +1003,19 @@ int loadHistorySidecar(Document& doc, const std::string& projectPath, std::strin
     }
     const uint32_t count = rd.pod<uint32_t>();
     int loaded = 0;
-    const int active = doc.activeSubtool;
+    const int active = doc.activePart;
     for (uint32_t k = 0; k < count && rd.ok; ++k) {
         const uint32_t index = rd.pod<uint32_t>();
         const std::string name = rd.str();
         std::vector<uint8_t> blob;
         rd.vec(blob);
-        if (!rd.ok || int(index) >= doc.subtoolCount() || doc.subtools[index].name != name) continue;
-        doc.selectSubtool(int(index));
+        if (!rd.ok || int(index) >= doc.partCount() || doc.parts[index].name != name) continue;
+        doc.selectPart(int(index));
         std::string e;
         if (Timeline::load(doc, blob, &e)) ++loaded;
         else if (error) *error = e;
     }
-    doc.selectSubtool(active);
+    doc.selectPart(active);
     return loaded;
 }
 

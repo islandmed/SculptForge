@@ -90,8 +90,8 @@ public:
     void disable() { enabled_ = false; }               // the macro ran undo / redo itself: leave its steps alone
 
 private:
-    uint32_t subtoolId_ = 0;
-    int subtools_ = 0;
+    uint32_t partId_ = 0;
+    int parts_ = 0;
     size_t undoCount_ = 0;
     uint64_t revision_ = 0;
     bool enabled_ = true;

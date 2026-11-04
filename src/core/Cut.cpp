@@ -1229,11 +1229,11 @@ bool cutMesh(const Mesh& mesh, const glm::mat4& viewProj, const std::vector<glm:
         m.triangles.resize(ntOut);
         uint32_t capGroup = 0;
         if (c.prismTriangles > 0) {
-            for (uint32_t gid : mesh.polygroups) capGroup = std::max(capGroup, gid);
+            for (uint32_t gid : mesh.facegroups) capGroup = std::max(capGroup, gid);
             capGroup += 1;
-            m.ensurePolygroups(0);
-        } else if (mesh.hasPolygroups()) {
-            m.polygroups.resize(ntOut);
+            m.ensureFaceGroups(0);
+        } else if (mesh.hasFaceGroups()) {
+            m.facegroups.resize(ntOut);
         }
         if (mesh.hasHidden()) m.hidden.assign(ntOut, 0);
         if (mesh.hasUvs()) m.uvs.assign(ntOut * 3, glm::vec2(0.0f));
@@ -1244,11 +1244,11 @@ bool cutMesh(const Mesh& mesh, const glm::mat4& viewProj, const std::vector<glm:
             m.triangles[t] = glm::uvec3(remap[tr[0]], remap[tr[1]], remap[tr[2]]);
             const int64_t parent = c.outParent[t];
             if (parent < 0) {
-                if (!m.polygroups.empty()) m.polygroups[t] = capGroup;
+                if (!m.facegroups.empty()) m.facegroups[t] = capGroup;
                 continue;
             }
             const uint32_t pt = uint32_t(parent);
-            if (!m.polygroups.empty()) m.polygroups[t] = mesh.polygroupAt(pt);
+            if (!m.facegroups.empty()) m.facegroups[t] = mesh.facegroupAt(pt);
             if (mesh.hasHidden()) m.hidden[t] = mesh.hidden[pt];
             if (!c.splitParent[pt]) {
                 newIndex[pt] = uint32_t(t);
@@ -1310,7 +1310,7 @@ void registerCutCommands(CommandRegistry& registry) {
           {"symmetry", T::String, "Mirror axes, e.g. \"x\": the mirror image of the shape cuts too (default none).", false}},
          [](Document& doc, const Args& a) -> CommandResult {
              if (doc.mesh.triangleCount() == 0) return {false, "The Part is empty"};
-             if (!doc.mesh.zspheres.empty()) return {false, "Cut: make Forge Spheres into a mesh first"};
+             if (!doc.mesh.forgespheres.empty()) return {false, "Cut: make Forge Spheres into a mesh first"};
              if (doc.mesh.micro) return {false, "Cut: apply or remove the micro level first"};
              CutShape shape = CutShape::Lasso;
              CutMode mode = CutMode::Away;

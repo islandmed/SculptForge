@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Default actions and shortcuts, Store Config / Restore / Save / Load UI,
-// the Preferences > Config / Interface / Hotkeys / LightBox sections, the F1
-// Controls sheet (generated from the action registry) and ZBrush-style
+// the Preferences > Config / Interface / Hotkeys / Library sections, the F1
+// Controls sheet (generated from the action registry) and classic
 // shortcut assignment.
 #include "app/UiScale.h"
 #include "app/Config.h"
@@ -14,7 +14,9 @@
 #include "app/Palettes.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
+#include "core/LegacyNames.h"
 #include "core/Bake.h"
+#include "core/ListSort.h"
 #include "core/Micro.h"
 #include "core/Multires.h"
 #include "core/Script.h"
@@ -50,7 +52,7 @@ void lookToJson(const UiPrefs& p, Json& j) {
     look.set("outlines", std::string(p.look.outlines == 0 ? "off" : p.look.outlines == 2 ? "on" : "subtle"));
     look.set("outlineOpacity", double(p.look.outlineOpacity));
     j.set("look", std::move(look));
-    j.set("layout", std::string(p.shellLayout == 1 ? "sculptforge" : "zbrush"));
+    j.set("layout", std::string(p.shellLayout == 1 ? "sculptforge" : "classic"));
 }
 
 bool lookFromJson(const Json& j, UiPrefs& p) {
@@ -81,13 +83,17 @@ Json toJson(const UiPrefs& p) {
     j.set("autoCollapseLeft", p.autoCollapseLeft);
     j.set("autoCollapseRight", p.autoCollapseRight);
     j.set("uiScale", double(p.uiScale));
-    j.set("lightboxAtStartup", p.lightboxAtStartup);
+    j.set("libraryAtStartup", p.libraryAtStartup);
     j.set("libraryFolder", p.libraryFolder);
     j.set("cameraNotch", double(p.cameraNotch));
     j.set("turntable", p.turntable);
-    j.set("inputStyle", std::string(p.inputStyle == 3 ? "maya" : p.inputStyle == 2 ? "blender" : p.inputStyle == 1 ? "sculptforge" : "zbrush"));
+    j.set("inputStyle", std::string(p.inputStyle == 3 ? "maya" : p.inputStyle == 2 ? "blender" : p.inputStyle == 1 ? "sculptforge" : "classic"));
     j.set("emulateNumpad", p.emulateNumpad);
     j.set("rightClickQuickMenu", p.rightClickQuickMenu);
+    j.set("brushSort", p.brushSort);
+    j.set("alphaSort", p.alphaSort);
+    j.set("materialSort", p.materialSort);
+    j.set("librarySort", p.librarySort);
     j.set("spaceCamera", p.spaceCamera);
     j.set("emulate3Button", p.emulate3Button);
     j.set("mayaZoomHorizontal", p.mayaZoomHorizontal);
@@ -117,6 +123,7 @@ Json toJson(const UiPrefs& p) {
     j.set("liveMove", p.liveMove);
     j.set("backgroundPreview", p.backgroundPreview);
     j.set("fastUpload", p.fastUpload);
+    j.set("fastBigBrushes", p.fastBigBrushes);
     j.set("dyntopoConstantDetail", p.dyntopoConstantDetail);
     j.set("flatShading", p.flatShading);
     j.set("viewportCursor", double(p.viewportCursor));
@@ -142,7 +149,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.autoCollapseLeft = j["autoCollapseLeft"].asBool(p.autoCollapseLeft);
     p.autoCollapseRight = j["autoCollapseRight"].asBool(p.autoCollapseRight);
     p.uiScale = std::clamp(float(j["uiScale"].asNumber(p.uiScale)), 0.0f, 3.0f);
-    p.lightboxAtStartup = j["lightboxAtStartup"].asBool(p.lightboxAtStartup);
+    p.libraryAtStartup = j["libraryAtStartup"].asBool(p.libraryAtStartup);
     if (j["libraryFolder"].isString()) p.libraryFolder = j["libraryFolder"].asString();
     p.cameraNotch = std::clamp(int(j["cameraNotch"].asNumber(p.cameraNotch)), 0, 2);
     p.turntable = j["turntable"].asBool(p.turntable);
@@ -153,6 +160,9 @@ void fromJson(const Json& j, UiPrefs& p) {
     }
     p.emulateNumpad = j["emulateNumpad"].asBool(p.emulateNumpad);
     p.rightClickQuickMenu = j["rightClickQuickMenu"].asBool(p.rightClickQuickMenu);
+    for (auto [key, v] : {std::pair{"brushSort", &p.brushSort}, std::pair{"alphaSort", &p.alphaSort},
+                          std::pair{"materialSort", &p.materialSort}, std::pair{"librarySort", &p.librarySort}})
+        if (j[key].isString()) *v = listSortId(listSortFromId(j[key].asString()));
     p.spaceCamera = j["spaceCamera"].asBool(p.spaceCamera);
     p.emulate3Button = j["emulate3Button"].asBool(p.emulate3Button);
     p.mayaZoomHorizontal = j["mayaZoomHorizontal"].asBool(p.mayaZoomHorizontal);
@@ -175,7 +185,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     }
     p.showViewFigure = j["showViewFigure"].asBool(p.showViewFigure);
     p.alphabeticalPalettes = j["alphabeticalPalettes"].asBool(p.alphabeticalPalettes);
-    // A ui.json from before 0.10.7 names neither: it was stored with the Classic look and the ZBrush-style layout,
+    // A ui.json from before 0.10.7 names neither: it was stored with the Classic look and the Classic layout,
     // and keeps them (the new-look card offers the new default once, PanelSupport.cpp).
     p.lookSaved = lookFromJson(j, p);
     if (!p.lookSaved) {
@@ -198,6 +208,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.liveMove = j["liveMove"].asBool(p.liveMove);
     p.backgroundPreview = j["backgroundPreview"].asBool(p.backgroundPreview);
     p.fastUpload = j["fastUpload"].asBool(p.fastUpload);
+    p.fastBigBrushes = j["fastBigBrushes"].asBool(p.fastBigBrushes);
     p.dyntopoConstantDetail = j["dyntopoConstantDetail"].asBool(p.dyntopoConstantDetail);
     p.flatShading = j["flatShading"].asBool(p.flatShading);
     p.viewportCursor = std::clamp(int(j["viewportCursor"].asNumber(p.viewportCursor)), 0, 1);
@@ -370,7 +381,7 @@ void App::initActions() {
         "Cap every open boundary of the active Part (a hole, an open bottom, the rim of an extracted shell) with a "
         "new patch sized like the polygons around it, so remeshing and sculpting see a closed surface. The rest of "
         "the Part stays as it is; the patches get a face group of their own (#103).");
-    // Subdivision levels (ZBrush Tool > Geometry; core/Multires.h).
+    // Subdivision levels (Tool > Geometry; core/Multires.h).
     add("geometry.divide", "Divide", "Tool > Geometry", "Ctrl+D", [this] { runCommand("subdiv_divide", {{"smooth", smt_}}); },
         ICON_LC_GRID_2X2, "subdiv_divide", nullptr, nullptr,
         "Add a subdivision level: four times the polygons, and the lower levels are kept, so you can step down to "
@@ -412,33 +423,33 @@ void App::initActions() {
         "Write the micro level as a 32-bit EXR displacement map over the base UVs (next to the project).");
     add("geometry.micro_noise", "Micro Surface Noise", "Tool > Geometry", nullptr, [this] { runCommand("micro_noise"); }, nullptr,
         "micro_noise", nullptr, [this] { return hasMicro(doc_.mesh); });
-    add("subtool.duplicate", "Duplicate Part", "Tool > Parts", "Ctrl+Shift+D", [this] { runCommand("subtool_duplicate"); },
-        ICON_LC_COPY, "subtool_duplicate", nullptr, nullptr,
+    add("part.duplicate", "Duplicate Part", "Tool > Parts", "Ctrl+Shift+D", [this] { runCommand("part_duplicate"); },
+        ICON_LC_COPY, "part_duplicate", nullptr, nullptr,
         "Copy the active Part, with its layers and attributes, and make the copy active (also in the Parts list's "
         "right-click menu).");
-    // Tool > SubTool > Extract, Tool > Geometry > Modify Topology, Tool > Deformation (PanelExtract.cpp).
-    add("subtool.extract", "Extract", "Tool > Parts", nullptr, [this] { runExtract(); }, nullptr, "extract", nullptr,
+    // Tool > Part > Extract, Tool > Geometry > Modify Topology, Tool > Deformation (PanelExtract.cpp).
+    add("part.extract", "Extract", "Tool > Parts", nullptr, [this] { runExtract(); }, nullptr, "extract", nullptr,
         [this] { return doc_.mesh.hasMask(); },
         "Make a shell from the masked part of the Part (a helmet, a strap, clothing), shown as a preview below it. "
         "Change Thick, E Smt or Double and it updates; Accept keeps it as a new Part.");
-    add("subtool.extract_accept", "Accept", "Tool > Parts", nullptr, [this] { runCommand("extract_accept"); }, nullptr,
+    add("part.extract_accept", "Accept", "Tool > Parts", nullptr, [this] { runCommand("extract_accept"); }, nullptr,
         "extract_accept", nullptr, [this] { return doc_.extractPreviewCurrent(); },
         "Keep the Extract preview as a new Part below this one. Ctrl+Z takes it away again.");
-    add("subtool.extract_double", "Double", "Tool > Parts", nullptr,
+    add("part.extract_double", "Double", "Tool > Parts", nullptr,
         [this] {
             extractDouble_ = !extractDouble_;
             if (doc_.extractPreviewCurrent()) runExtract();
         },
         nullptr, nullptr, [this] { return extractDouble_; }, nullptr,
         "Grow the extracted shell both inward and outward from the surface, instead of outward only.");
-    add("subtool.extract_tcorne", "TCorne", "Tool > Parts", nullptr,
+    add("part.extract_tcorne", "TCorne", "Tool > Parts", nullptr,
         [this] {
             extractTCorne_ = !extractTCorne_;
             if (doc_.extractPreviewCurrent()) runExtract();
         },
         nullptr, nullptr, [this] { return extractTCorne_; }, nullptr,
         "Triangle corners: where the extracted edge turns sharply, the rim is made of triangles instead of quads.");
-    add("subtool.extract_tborder", "TBorder", "Tool > Parts", nullptr,
+    add("part.extract_tborder", "TBorder", "Tool > Parts", nullptr,
         [this] {
             extractTBorder_ = !extractTBorder_;
             if (doc_.extractPreviewCurrent()) runExtract();
@@ -507,7 +518,7 @@ void App::initActions() {
         "Export the model as glTF binary, with sculpt layers as blend shapes (morph targets).");
     add("file.export_stl", "Export STL...", "File > Export", nullptr, [this] {
             static const SDL_DialogFileFilter filters[] = {{"STL", "stl"}, {"All files", "*"}};
-            SDL_ShowSaveFileDialog(onGozFileChosen, &gozDialogs_[int(GozFile::ExportStl)], window_, filters, 2, nullptr);
+            SDL_ShowSaveFileDialog(onBridgeFileChosen, &bridgeDialogs_[int(BridgeFile::ExportStl)], window_, filters, 2, nullptr);
         },
         nullptr, nullptr, nullptr, nullptr, "Save the visible Parts as one binary STL, for 3D printing.");
     add("file.send_unreal", "Send to Unreal", "File > Export", "Ctrl+U", [this] { sendToUnreal(); }, ICON_LC_SEND, nullptr,
@@ -659,7 +670,7 @@ void App::initActions() {
     add("script.clear_console", "Clear console", "Script", nullptr, [this] { console_.clear(); }, ICON_LC_TRASH_2, nullptr, nullptr,
         nullptr, "Empty the console log (the session script is kept).");
 
-    // --- Config (ZBrush: Preferences > Config) ---
+    // --- Config (Preferences > Config) ---
     add("config.store", "Store Config", "Preferences > Config", "Ctrl+Shift+I", [this] { storeConfig(); }, ICON_LC_SAVE, nullptr,
         nullptr, nullptr,
         "Keep the current layout, shortcuts and interface preferences for future sessions. SculptForge never "
@@ -690,15 +701,15 @@ void App::initActions() {
     registerGizmoActions();     // Q W E R: Draw, and the Gizmo 3D's Move, Scale, Rotate (Gizmo.cpp)
     registerBakeUiActions();    // Tool > Bake (PanelBake.cpp)
     registerUvEditorActions();  // UV Editor (PanelUvEditor.cpp)
-    registerRetopoUiActions(); // Geometry > QRemesh, SubTool > ProjectAll (PanelRetopo.cpp)
-    registerZSphereUiActions(); // Tool > ZSpheres (PanelZSpheres.cpp)
+    registerRetopoUiActions(); // Geometry > QRemesh, Part > ProjectAll (PanelRetopo.cpp)
+    registerForgeSphereUiActions(); // Tool > Forge Spheres (PanelForge Spheres.cpp)
     registerSplatTrainUi();    // Splats > Train from capture (PanelSplatTrain.cpp)
     registerSculptableUiActions(); // Splats > Make sculptable (PanelSculptable.cpp)
     registerVdmActions();      // Brush > Vector Displacement (PanelVdm.cpp)
     registerKelvinletActions(); // Brush > Kelvinlet & Capture: Capture from view (PanelKelvinlet.cpp)
     registerFaceUiActions();   // Tool > Facial Shapes, face_take_play / face_take_stop (PanelFace.cpp)
     registerPerformanceUiActions(); // Preferences > Performance (PanelPerformance.cpp)
-    registerInputActions();     // ZBrush keys: U I O, Space, L, V, Ctrl+A / I / H / W..., the input style (Input.cpp)
+    registerInputActions();     // the Classic sculpting keys: U I O, Space, L, V, Ctrl+A / I / H / W..., the input style (Input.cpp)
     registerTimelineUiActions(); // Sculpt Timeline, timelapse, Help > Benchmark (PanelTimeline.cpp)
 
     // Every command, so the command palette finds anything scriptable.
@@ -831,6 +842,7 @@ bool App::readUiConfig(const std::string& path, std::string& err) {
         err = path + ": " + err;
         return false;
     }
+    j = legacy::modernizeKeys(j); // keys an older version wrote
     if (!j.isObject() || !j["layout"].isObject()) {
         err = path + " is not a SculptForge UI configuration";
         return false;
@@ -930,8 +942,8 @@ std::string App::layoutKey() const {
     UiLayout l = layout_; // what a session changes on its own doesn't count as a layout edit
     l.consoleOpen = false;
     l.consoleHeight = 0;
-    l.lightboxOpen = false;
-    l.lightboxTab.clear();
+    l.libraryOpen = false;
+    l.libraryTab.clear();
     l.customize = false;
     return toJson(l).dump();
 }
@@ -1009,7 +1021,7 @@ void App::drawHintsSection() {
 void App::watchLayoutChanges() {
     if (layoutHintShown_ || uiConfigDeterministic_ || ++layoutCheckFrame_ % 20 != 0) return;
     if (layoutKey() == layoutBaseline_) return;
-    layoutHintShown_ = true; // once per session (ZBrush never saves the layout by itself)
+    layoutHintShown_ = true; // once per session (never saves the layout by itself)
     status_ = "Layout changed - Ctrl+Shift+I to keep it";
 }
 
@@ -1110,7 +1122,7 @@ void App::drawHelpConsoleUi() {
             } else if (kind == kLibraryFolder) {
                 uiPrefs_.libraryFolder = path;
                 std::string libErr;
-                if (ensureUserLibrary(path, libErr)) { // the LightBox's User folder, from now on
+                if (ensureUserLibrary(path, libErr)) { // the Library's User folder, from now on
                     library_.user = path;
                     libraryScanner_.invalidate();
                     status_ = "Library folder: " + path + " (Store Config keeps it)";
@@ -1183,7 +1195,7 @@ void App::drawControlsWindow() {
     if (ImGui::BeginTabBar("##controls_tabs")) {
         if (ImGui::BeginTabItem(tr("Keyboard"))) {
             ImGui::BeginChild("##controls_keys", ImVec2(0, -ImGui::GetTextLineHeightWithSpacing() * 1.6f));
-            // Grouped by palette, alphabetically (as ZBrush lists its palettes).
+            // Grouped by palette, alphabetically (as classic lists its palettes).
             std::map<std::string, std::vector<const Action*>> groups;
             for (const auto& a : actions_.all()) {
                 const std::string chord = actions_.shortcutText(a.id);
@@ -1431,29 +1443,29 @@ void drawHotkeysSection(App& app) {
     ui::HelpText("Default shortcuts", nullptr, "Undo every shortcut change.", "Preferences > Hotkeys");
 }
 
-void drawLightBoxSection(App& app) {
+void drawLibraryBrowserSection(App& app) {
     UiPrefs& p = app.uiPrefs();
     UiLayout& l = app.layout();
-    ImGui::Checkbox(tr("Show at startup"), &p.lightboxAtStartup);
+    ImGui::Checkbox(tr("Show at startup"), &p.libraryAtStartup);
     ui::HelpText("Show Library at startup", nullptr, "Open Library on the Project tab when SculptForge starts.",
                  "Preferences > Library");
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted(tr("Rows"));
     for (int r = 1; r <= 4; ++r) {
         ImGui::SameLine();
-        const bool on = l.lightboxRows == r;
+        const bool on = l.libraryRows == r;
         if (on) ImGui::PushStyleColor(ImGuiCol_Button, col(ui::color::accent));
-        if (ImGui::Button((std::to_string(r) + "##lbrows").c_str(), ImVec2(ImGui::GetFrameHeight() * 1.3f, 0))) l.lightboxRows = r;
+        if (ImGui::Button((std::to_string(r) + "##lbrows").c_str(), ImVec2(ImGui::GetFrameHeight() * 1.3f, 0))) l.libraryRows = r;
         if (on) ImGui::PopStyleColor();
         ui::HelpText("Library rows", nullptr, "How many rows of thumbnails the Library strip shows.", "Preferences > Library");
     }
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted(tr("Placement"));
     ImGui::SameLine();
-    if (ImGui::RadioButton(tr("Top"), !l.lightboxBottom)) l.lightboxBottom = false;
+    if (ImGui::RadioButton(tr("Top"), !l.libraryBottom)) l.libraryBottom = false;
     ui::HelpText("Library at the top", nullptr, "Library opens along the top edge of the canvas.", "Preferences > Library");
     ImGui::SameLine();
-    if (ImGui::RadioButton(tr("Bottom"), l.lightboxBottom)) l.lightboxBottom = true;
+    if (ImGui::RadioButton(tr("Bottom"), l.libraryBottom)) l.libraryBottom = true;
     ui::HelpText("Library at the bottom", nullptr, "Library opens above the bottom shelf.", "Preferences > Library");
     ImGui::TextColored(col(ui::color::textDim), "Library folder");
     const std::string shown = p.libraryFolder.empty() ? std::string("Documents/SculptForge (default)") : p.libraryFolder;
@@ -1489,7 +1501,7 @@ void drawLookMiniature(ImDrawList* dl, ImVec2 a, ImVec2 b, const looks::Palette&
     const float barH = (layout == 0 ? 14.0f : 8.0f) * s;
     dl->AddRectFilled(ImVec2(a.x + g, top), ImVec2(b.x - g, top + barH), col(pal.mantle));
     dl->AddRectFilled(ImVec2(a.x + g + 2.0f * s, top + 2.0f * s), ImVec2(a.x + g + 16.0f * s, top + 6.0f * s), col(pal.accent));
-    if (layout >= 0) // the shelf's tiles: one row, or two in the ZBrush-style layout
+    if (layout >= 0) // the shelf's tiles: one row, or two in the Classic layout
         for (int row = 0; row < (layout == 0 ? 2 : 1); ++row)
             for (float x = a.x + g + 22.0f * s; x < b.x - g - 8.0f * s; x += 9.0f * s)
                 dl->AddRectFilled(ImVec2(x, top + 2.0f * s + float(row) * 6.0f * s), ImVec2(x + 6.0f * s, top + 6.0f * s + float(row) * 6.0f * s),
@@ -1648,7 +1660,7 @@ void App::drawLookSection() {
                  "Every palette is a section of one menu, and F3 finds them all.",
                  "Preferences > Interface > Look");
     ImGui::SameLine();
-    if (ImGui::RadioButton(tr("Classic##layout.zbrush"), uiPrefs_.shellLayout == 0)) {
+    if (ImGui::RadioButton(tr("Classic##layout.classic"), uiPrefs_.shellLayout == 0)) {
         setShellLayout(0);
         lookDirty_ = true;
     }

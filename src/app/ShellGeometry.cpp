@@ -137,7 +137,7 @@ ShellGeometry computeShell(const UiLayout& l, float W, float H, float s, float t
     g.rightShelf = {right - rightW, y0, rightW, y1 - y0};
     g.canvas = {left + leftW, y0, std::max(1.0f, span - leftW - rightW), std::max(1.0f, y1 - y0)};
 
-    if (l.leftHanded) { // Nomad's mirrored layout: everything swaps sides
+    if (l.leftHanded) { // the mirrored layout: everything swaps sides
         for (CanvasRect* r : {&g.topShelf, &g.leftShelf, &g.rightShelf, &g.bottomShelf, &g.console, &g.leftDivider,
                               &g.rightDivider, &g.leftTray, &g.rightTray, &g.canvas})
             r->x = W - r->x - r->w;

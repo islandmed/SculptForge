@@ -1,4 +1,4 @@
-# Dynamic topology (ZBrush's Sculptris Pro): the top shelf's Dynamic toggle and its Detail slider, strokes that
+# Dynamic topology (dynamic topology): the top shelf's Dynamic toggle and its Detail slider, strokes that
 # add triangles where they go (mirrored with X symmetry), the wireframe of the remeshed area, Undo / Redo, the
 # dyntopo command, and the refusal on a mesh with subdivision levels.
 run new_sphere subdivisions=3

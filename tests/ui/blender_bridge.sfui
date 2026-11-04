@@ -1,15 +1,15 @@
 # The Blender bridge (File > Blender): what the add-on sends loads by itself (checked every frame in UI tests,
-# once a second in the app), Send to Blender writes the SubTools back, and a second send from Blender updates
-# the SubTool it came from (undoable) and adds the new object. The sends are staged from tests/ui/data/blender
+# once a second in the app), Send to Blender writes the Parts back, and a second send from Blender updates
+# the Part it came from (undoable) and adds the new object. The sends are staged from tests/ui/data/blender
 # into an exchange folder in the working directory (the build folder under ctest).
-run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=3
 env SCULPTFORGE_BLENDER_EXCHANGE sf_ui_blender
 copy data/blender/send1 sf_ui_blender/to_sculptforge
 wait 0.2
 expect_status "Received 2 objects from Blender"
-expect_value subtools == 2
-expect_value active_subtool == 0
+expect_value parts == 2
+expect_value active_part == 0
 expect_text Box
 expect_text Rock
 expect_value colored > 0
@@ -36,7 +36,7 @@ expect_status "Sent 2 objects to Blender"
 copy data/blender/send2 sf_ui_blender/to_sculptforge
 wait 0.2
 expect_status "Received 2 objects from Blender"
-expect_value subtools == 3
+expect_value parts == 3
 expect_text Pebble
 expect_value can_undo == 1
 shot updated

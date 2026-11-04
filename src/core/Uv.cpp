@@ -572,10 +572,10 @@ void uvSetSeams(Mesh& m, const std::vector<uint32_t>& twin, const std::vector<ui
     m.facesDirty = true;
 }
 
-size_t uvSeamsFromPolygroups(Mesh& m, const std::vector<uint32_t>& twin) {
+size_t uvSeamsFromFaceGroups(Mesh& m, const std::vector<uint32_t>& twin) {
     std::vector<uint32_t> cut;
     for (uint32_t c = 0; c < twin.size(); ++c)
-        if (twin[c] != kNoCorner && twin[c] > c && m.polygroupAt(c / 3) != m.polygroupAt(twin[c] / 3)) cut.push_back(c);
+        if (twin[c] != kNoCorner && twin[c] > c && m.facegroupAt(c / 3) != m.facegroupAt(twin[c] / 3)) cut.push_back(c);
     uvSetSeams(m, twin, cut, true);
     return cut.size();
 }

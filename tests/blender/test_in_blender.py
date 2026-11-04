@@ -7,7 +7,7 @@
 # Sends a small scene to SculptForge (sculptforge-cli stands in for the app: blender_receive, then
 # blender_send), receives it back and checks that the objects are unchanged: positions, n-gons,
 # transforms, materials, modifiers, UVs, colours, mask and face sets. Then a topology change (subdivide)
-# and a new SubTool come back as a rebuilt mesh and a new object. The classic keys preference adds and
+# and a new Part come back as a rebuilt mesh and a new object. The classic keys preference adds and
 # removes its keymap items, each bound to a real operator with valid settings. Vector displacement maps that
 # SculptForge exports read in Blender with the same orientation, and Blender's EXRs load in SculptForge.
 # CMake runs it when `blender` is found.
@@ -256,9 +256,9 @@ def main():
         if "mask" in a:
             check("mask" in b and np.allclose(a["mask"], b["mask"], atol=1e-4), n + ": mask")
 
-    # Subdivide the box in SculptForge and add a SubTool: the box is rebuilt (transform, material and modifier
-    # kept), the new SubTool becomes a new object.
-    sculptforge(["blender_receive", "subtool_select name=Box", "subdivide", "subtool_append type=cube name=Extra",
+    # Subdivide the box in SculptForge and add a Part: the box is rebuilt (transform, material and modifier
+    # kept), the new Part becomes a new object.
+    sculptforge(["blender_receive", "part_select name=Box", "subdivide", "part_append type=cube name=Extra",
                  "blender_send"])
     check(bpy.ops.sculptforge.receive() == {"FINISHED"}, "Receive the changed scene: " + bridge.state.message)
     box = bpy.data.objects["Box"]
@@ -266,7 +266,7 @@ def main():
     check(np.allclose(np.array(box.matrix_world), before["Box"]["matrix"]), "Box: transform kept")
     check([m.name for m in box.data.materials] == ["Clay"] and box.modifiers.get("Bevel") is not None,
           "Box: material and modifier kept")
-    check("Extra" in bpy.data.objects, "the new SubTool is a new object")
+    check("Extra" in bpy.data.objects, "the new Part is a new object")
 
     # Sending and receiving work from Sculpt, Edit and Vertex Paint Mode (Edit Mode keeps UVs in its edit mesh):
     # the add-on switches to Object Mode for the transfer and back.

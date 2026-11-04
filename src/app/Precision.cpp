@@ -21,7 +21,7 @@
 namespace sf {
 
 // Shift+Alt, the keyboard's own (not a style's mapping): free mid-stroke in every input style. At the press it
-// stays what it was (ZBrush: select and frame a Part; Blender: Alt+left navigates), so it is held once drawing.
+// stays what it was (select and frame a Part; Blender: Alt+left navigates), so it is held once drawing.
 bool App::precisionHeld() const {
     const SDL_Keymod keys = SDL_GetModState();
     return (keys & SDL_KMOD_SHIFT) && (keys & SDL_KMOD_ALT) && !(keys & (SDL_KMOD_CTRL | SDL_KMOD_GUI));

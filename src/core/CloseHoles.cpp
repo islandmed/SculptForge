@@ -456,12 +456,12 @@ bool closeHoles(Mesh& mesh, const CloseHolesOptions& options, CloseHolesStats& s
     if (mesh.hasColors()) mesh.colors.insert(mesh.colors.end(), loopColor.begin(), loopColor.end());
     if (!before.paintLayers.empty()) copyPaintLayers(before, mesh, kept);
     mesh.triangles.insert(mesh.triangles.end(), newTris.begin(), newTris.end());
-    if (options.newGroup || mesh.hasPolygroups()) {
+    if (options.newGroup || mesh.hasFaceGroups()) {
         uint32_t group = 0;
-        for (uint32_t g : mesh.polygroups) group = std::max(group, g);
-        const bool had = mesh.hasPolygroups();
-        mesh.polygroups.resize(nt0, 0u);
-        mesh.polygroups.resize(nt, options.newGroup ? (had ? group + 1 : 1u) : 0u);
+        for (uint32_t g : mesh.facegroups) group = std::max(group, g);
+        const bool had = mesh.hasFaceGroups();
+        mesh.facegroups.resize(nt0, 0u);
+        mesh.facegroups.resize(nt, options.newGroup ? (had ? group + 1 : 1u) : 0u);
     }
     if (mesh.hasHidden()) mesh.hidden.resize(nt, 0);
     if (mesh.hasUvs()) mesh.uvs.resize(nt * 3, glm::vec2(0.0f));
@@ -486,7 +486,7 @@ void registerCloseHolesCommands(CommandRegistry& registry) {
           {"new_group", T::Bool, "Give the patches a new face group (default true).", false}},
          [](Document& doc, const Args& a) -> CommandResult {
              if (doc.mesh.triangleCount() == 0) return {false, "The Part is empty"};
-             if (!doc.mesh.zspheres.empty()) return {false, "Close Holes: make Forge Spheres into a mesh first"};
+             if (!doc.mesh.forgespheres.empty()) return {false, "Close Holes: make Forge Spheres into a mesh first"};
              if (doc.mesh.micro) return {false, "Close Holes: apply or remove the micro level first"};
              CloseHolesOptions o;
              o.maxEdges = size_t(std::max(0.0, argNumber(a, "max_edges", 0.0)));

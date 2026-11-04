@@ -13,7 +13,7 @@
 #include "core/Multires.h"
 #include "core/Primitives.h"
 #include "core/QRemesh.h"
-#include "core/SubTools.h"
+#include "core/Parts.h"
 
 #include <glm/glm.hpp>
 

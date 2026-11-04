@@ -1,7 +1,7 @@
 # Live Move (Preferences > Performance, experimental): the graphics card draws a Move drag and the move is applied
 # once when the pen lifts. The same drag leaves the same surface as plain Move (one grab with the whole move is the
 # sum of the per-frame grabs) and undo puts it back.
-run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=5
 camera 0 0
 click "Move##brush.move"

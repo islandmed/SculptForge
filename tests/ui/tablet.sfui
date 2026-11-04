@@ -1,7 +1,7 @@
 # Graphics tablet with a simulated pen (real SDL3 pen events plus the mouse events SDL synthesizes from them):
 # pressure, the global pressure curve, Pressure > Size, the eraser end, side buttons, leaving proximity
 # mid-stroke, and Preferences > Tablet.
-run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 wait 0.2
 run new_sphere subdivisions=5
 snapshot

@@ -205,9 +205,28 @@ constexpr GLbitfield GL_COLOR_BUFFER_BIT = 0x4000;
     X(void, MultiDrawElementsBaseVertex, GLenum, const GLsizei*, GLenum, const void* const*, GLsizei, const GLint*)
 
 // Optional (GL 4.4 / GL_ARB_buffer_storage; macOS stops at 4.1): null when missing.
-#define SF_GL_OPTIONAL(X) X(void, BufferStorage, GLenum, GLsizeiptr, const void*, GLbitfield)
+// Also optional, though core since GL 3.3: timer queries (MicroRenderer's GPU shading budget; without them it keeps
+// its first budget).
+#define SF_GL_OPTIONAL(X)                                                                    \
+    X(void, BufferStorage, GLenum, GLsizeiptr, const void*, GLbitfield)                      \
+    X(void, GenQueries, GLsizei, GLuint*)                                                    \
+    X(void, DeleteQueries, GLsizei, const GLuint*)                                           \
+    X(void, BeginQuery, GLenum, GLuint)                                                      \
+    X(void, EndQuery, GLenum)                                                                \
+    X(void, GetQueryObjectui64v, GLuint, GLenum, GLuint64*)
 
 constexpr GLenum GL_COPY_READ_BUFFER = 0x8F36;
+constexpr GLenum GL_R32I = 0x8235;
+constexpr GLenum GL_TIME_ELAPSED = 0x88BF;
+constexpr GLenum GL_TEXTURE_BINDING_BUFFER = 0x8C2C;
+constexpr GLenum GL_PIXEL_PACK_BUFFER = 0x88EB;
+constexpr GLenum GL_VIEWPORT = 0x0BA2;
+constexpr GLenum GL_FRAMEBUFFER_BINDING = 0x8CA6;
+constexpr GLenum GL_COLOR_WRITEMASK = 0x0C23;
+constexpr GLenum GL_MAX_TEXTURE_SIZE = 0x0D33;
+constexpr GLenum GL_TEXTURE_BINDING_2D = 0x8069;
+constexpr GLenum GL_QUERY_RESULT = 0x8866;
+constexpr GLenum GL_QUERY_RESULT_AVAILABLE = 0x8867;
 constexpr GLenum GL_COPY_WRITE_BUFFER = 0x8F37;
 constexpr GLenum GL_SYNC_GPU_COMMANDS_COMPLETE = 0x9117;
 constexpr GLbitfield GL_SYNC_FLUSH_COMMANDS_BIT = 0x00000001;

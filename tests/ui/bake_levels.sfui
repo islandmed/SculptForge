@@ -4,7 +4,7 @@
 run new_sphere subdivisions=3
 run uv_auto resolution=1024
 expect_value uvs == 1
-run polygroup_uv
+run facegroup_uv
 run subdiv_divide
 run subdiv_divide
 expect_value sdiv_levels == 3

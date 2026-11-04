@@ -6,6 +6,7 @@
 #include "app/Theme.h"
 #include "app/Ui.h"
 #include "core/Image.h"
+#include "core/LegacyNames.h"
 #include "render/GL.h"
 
 #include <IconsLucide.h>
@@ -417,10 +418,10 @@ void UserGuide::navigate(const std::string& target, bool record) {
     std::string file = t.file;
     if (const size_t slash = file.rfind('/'); slash != std::string::npos) file = file.substr(slash + 1);
     // Chapters renamed to SculptForge's own names: old links still find them.
-    static const std::pair<const char*, const char*> kRenamed[] = {{"subtools.md", "parts.md"},
-                                                                   {"zspheres.md", "forge-spheres.md"},
-                                                                   {"polypaint.md", "vertex-paint.md"},
-                                                                   {"polygroups.md", "face-groups.md"}};
+    file = legacy::modernize(file);
+    static const std::pair<const char*, const char*> kRenamed[] = {{"forgespheres.md", "forge-spheres.md"},
+                                                                   {"vertexpaint.md", "vertex-paint.md"},
+                                                                   {"facegroups.md", "face-groups.md"}};
     for (const auto& [from, to] : kRenamed)
         if (file == from) file = to;
     if (file == "index.md") {
@@ -441,10 +442,11 @@ std::string UserGuide::websiteUrl() const {
 std::string UserGuide::chapterFor(const std::string& palette, const std::string& actionId) {
     auto starts = [&](const char* p) { return palette.rfind(p, 0) == 0; };
     auto idStarts = [&](const char* p) { return actionId.rfind(p, 0) == 0; };
-    // Palette paths by SculptForge's names, and the older ZBrush-style ones (stored layouts, scripts).
+    // Palette paths by SculptForge's names, and the older classic ones (stored layouts, scripts).
     if (starts("Tool > Geometry > Quad Remesh") || starts("Tool > Geometry > QRemesh") || starts("Tool > Parts > Project") ||
         starts("Tool > Part > Project"))
         return "retopology.md";
+    if (starts("Brush packs")) return "brush-packs.md";
     if (starts("Tool > Parts") || starts("Tool > Part")) return "parts.md";
     if (starts("Tool > Forge Spheres") || starts("Tool > Forge Spheres")) return "forge-spheres.md";
     if (starts("Tool > Layers")) return "layers.md";

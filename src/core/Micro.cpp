@@ -323,7 +323,7 @@ bool microDivide(Mesh& m, int level, std::string& error, int outOfCore) {
         error = "Go to the highest subdivision level first: the micro level goes on top of it";
         return false;
     }
-    if (!m.zspheres.empty()) {
+    if (!m.forgespheres.empty()) {
         error = "Forge Sphere Parts can't have a micro level (make an adaptive skin first)";
         return false;
     }
@@ -986,9 +986,9 @@ bool microBakeMesh(const Mesh& m, int level, Mesh& out, std::string& error, size
     out = Mesh();
     out.positions.resize(verts);
     out.triangles.resize(tris);
-    const bool uvs = m.hasUvs(), groups = m.hasPolygroups(), hidden = m.hasHidden(), masked = mm.hasMask();
+    const bool uvs = m.hasUvs(), groups = m.hasFaceGroups(), hidden = m.hasHidden(), masked = mm.hasMask();
     if (uvs) out.uvs.resize(tris * 3);
-    if (groups) out.polygroups.resize(tris);
+    if (groups) out.facegroups.resize(tris);
     if (hidden) out.hidden.resize(tris);
     if (masked) out.mask.assign(verts, 0.0f);
     // The vertex of grid point (a, b) (bake level) of triangle t.
@@ -1055,7 +1055,7 @@ bool microBakeMesh(const Mesh& m, int level, Mesh& out, std::string& error, size
                     }
                 }
             for (size_t k = first; k < o; ++k) {
-                if (groups) out.polygroups[k] = m.polygroups[t];
+                if (groups) out.facegroups[k] = m.facegroups[t];
                 if (hidden) out.hidden[k] = m.hidden[t];
             }
         }

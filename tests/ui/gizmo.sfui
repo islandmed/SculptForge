@@ -1,7 +1,7 @@
 # Gizmo 3D (W Move, E Scale, R Rotate, Q Draw): each mode's handles, axis-locked moves, Shift snapping, Alt+drag
 # moving only the gizmo, scaling, posing a capsule arm at the elbow (mask, pivot, soft falloff), undo / redo,
-# numeric entry, All SubTools.
-run new_sphere subdivisions=5 ; transform scale=3,0.7,0.7 pivot=origin ; subtool_rename to=Arm
+# numeric entry, All Parts.
+run new_sphere subdivisions=5 ; transform scale=3,0.7,0.7 pivot=origin ; part_rename to=Arm
 key f
 orbit -70 -45
 expect_value size_x > 5.9
@@ -96,7 +96,7 @@ expect_value masked > 1000
 wait 0.1
 expect_value pivot_x > 1
 hold alt
-click_subtool Arm 0.5 0.5
+click_part Arm 0.5 0.5
 hold none
 expect_value pivot_x < 0.8
 expect_value pivot_x > -0.8
@@ -156,14 +156,14 @@ shot numeric
 key ctrl+z
 click "Gizmo/Clear"
 
-# All SubTools moves every visible SubTool together, with an undo step in each.
-run subtool_append type=sphere name=Ball
+# All Parts moves every visible Part together, with an undo step in each.
+run part_append type=sphere name=Ball
 key f
 key w
 click "All Parts##gizmo.all"
 gizmo_drag move_view 50 40
-expect_value edited_subtools == 2
-shot all-subtools
+expect_value edited_parts == 2
+shot all-parts
 click "All Parts##gizmo.all"
 
 # Q (or W again) goes back to Draw: the gizmo and its panel go away and brushes sculpt again.

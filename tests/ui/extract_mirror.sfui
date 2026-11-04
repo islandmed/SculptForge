@@ -1,5 +1,5 @@
-# Extract (Tool > SubTool > Extract: preview, then Accept), Mirror And Weld (Tool > Geometry > Modify Topology)
-# and Mirror (Tool > Deformation), as in ZBrush; askNK's 0.9.5 review wishlist.
+# Extract (Tool > Part > Extract: preview, then Accept), Mirror And Weld (Tool > Geometry > Modify Topology)
+# and Mirror (Tool > Deformation); askNK's 0.9.5 review wishlist.
 
 # --- Extract: a cap from the masked top of a sphere.
 run new_sphere subdivisions=4
@@ -11,45 +11,45 @@ camera 25 25
 key f
 click "Extract/Extract"
 expect_status "Extract preview"
-expect_value subtools == 2
-expect_value active_subtool == 0
+expect_value parts == 2
+expect_value active_part == 0
 expect_value extract_preview == 1
 shot extract-preview
 
 # The settings follow the preview: Double grows it both ways (still one preview).
 click "Extract/Double"
-expect_value subtools == 2
+expect_value parts == 2
 expect_value extract_preview == 1
 shot extract-palette
 
-# Accept keeps it as a SubTool below the source; the source stays active.
+# Accept keeps it as a Part below the source; the source stays active.
 click "Extract/Accept"
 expect_status "Extracted Extract"
 expect_value extract_preview == 0
-expect_value subtools == 2
+expect_value parts == 2
 expect_value can_undo == 1
 run mask_clear
 shot extract-accepted
 
-# The shell is closed: outer, inner and rim polygroups.
-run subtool_select index=1
+# The shell is closed: outer, inner and rim face groups.
+run part_select index=1
 expect_value open_edges == 0
 expect_value groups == 3
-run subtool_select index=0
+run part_select index=0
 
-# Ctrl+Z takes the extracted SubTool away again (after the mask_clear), redo brings it back.
+# Ctrl+Z takes the extracted Part away again (after the mask_clear), redo brings it back.
 key ctrl+z
 key ctrl+z
-expect_value subtools == 1
+expect_value parts == 1
 key ctrl+shift+z
-expect_value subtools == 2
+expect_value parts == 2
 
 # A preview that isn't accepted goes when the source changes.
 click "Extract/Extract"
-expect_value subtools == 3
+expect_value parts == 3
 run mask_invert
 wait_idle 5
-expect_value subtools == 2
+expect_value parts == 2
 expect_value extract_preview == 0
 
 # --- Mirror And Weld: an off-centre sphere comes back symmetric and closed.

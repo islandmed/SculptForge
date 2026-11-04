@@ -1,5 +1,5 @@
-# Paint layers: a Photoshop-style stack of polypaint layers in Tool > Paint Layers. Base is the
-# polypaint; layers paint non-destructively with their own blend mode, opacity and visibility.
+# Paint layers: a Photoshop-style stack of vertex paint layers in Tool > Paint Layers. Base is the
+# vertex paint; layers paint non-destructively with their own blend mode, opacity and visibility.
 run new_sphere subdivisions=5
 click "Paint Layers##tool.paint_layers"
 expect "Paint Layers/Base"

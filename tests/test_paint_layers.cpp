@@ -9,8 +9,8 @@
 #include "core/Commands.h"
 #include "core/Decimate.h"
 #include "core/PaintLayer.h"
-#include "core/Polygroups.h"
-#include "core/Polypaint.h"
+#include "core/FaceGroups.h"
+#include "core/VertexPaint.h"
 #include "core/Primitives.h"
 #include "core/Project.h"
 #include "io/PlyIO.h"
@@ -100,7 +100,7 @@ TEST(paint_layers_compositing) {
     Mesh m = makeIcosphere(2);
     m.ensureColors(lin(0.8f, 0.4f, 0.2f));
     const std::vector<glm::vec3> before = m.colors;
-    // One layer added and removed again: the polypaint is exactly what it was.
+    // One layer added and removed again: the vertex paint is exactly what it was.
     CHECK(addPaintLayer(m, "Temp") == 0 && hasPaintLayers(m) && m.paintBase == before);
     CHECK(m.colors == before); // a fresh layer is transparent
     CHECK(removePaintLayer(m, 0) && !hasPaintLayers(m) && m.paintBase.empty());
@@ -268,7 +268,7 @@ TEST(paint_layers_commands_and_undo) {
     CHECK(same && near(linearToSrgb(m.paintBase[0]), kRed, 3e-3f));
     CHECK(reg.execute(doc, "undo").ok && sameStack(m, three));
 
-    // Flatten: plain polypaint that looks the same; undo brings the layers back.
+    // Flatten: plain vertex paint that looks the same; undo brings the layers back.
     CHECK(reg.execute(doc, "paint_layer_flatten").ok && m.paintLayers.empty() && m.paintBase.empty());
     CHECK(m.colors == look);
     CHECK(reg.execute(doc, "undo").ok && sameStack(m, three));
@@ -299,19 +299,19 @@ TEST(paint_layers_project_round_trip) {
     CHECK(reg.execute(doc, "paint_fill", {{"color", std::string("#00ff00")}}).ok);
     CHECK(reg.execute(doc, "paint_layer_set", {{"visible", false}, {"locked", true}}).ok);
     CHECK(reg.execute(doc, "paint_layer_select", {{"index", 0.0}}).ok);
-    // A second SubTool without paint layers.
-    doc.addSubtool(makeIcosphere(1), "Plain", false);
+    // A second Part without paint layers.
+    doc.addPart(makeIcosphere(1), "Plain", false);
 
     const std::string path = tempPath("sf_paint_layers.sfproj");
     std::string err;
     CHECK(saveProject(path, doc, err));
     Document back;
     CHECK(loadProject(path, back, err));
-    CHECK(back.subtoolCount() == 2);
+    CHECK(back.partCount() == 2);
     CHECK(sameStack(back.mesh, doc.mesh));
     CHECK(back.mesh.paintLayers[0].blend == BlendMode::Overlay && back.mesh.paintLayers[0].opacity == 0.75f);
     CHECK(!back.mesh.paintLayers[1].visible && back.mesh.paintLayers[1].locked && back.mesh.activePaintLayer == 0);
-    CHECK(back.subtools[1].mesh.paintLayers.empty());
+    CHECK(back.parts[1].mesh.paintLayers.empty());
     // Undo after loading has no history, but painting works on the loaded stack.
     CHECK(reg.execute(back, "paint_fill", {{"color", std::string("#ffffff")}}).ok);
     CHECK(reg.execute(back, "undo").ok && sameStack(back.mesh, doc.mesh));
@@ -319,8 +319,8 @@ TEST(paint_layers_project_round_trip) {
 
     // Exports carry the composited colours (what the viewport shows).
     const std::string ply = tempPath("sf_paint_layers.ply");
-    CHECK(reg.execute(doc, "subtool_select", {{"index", 0.0}}).ok);
-    CHECK(reg.execute(doc, "subtool_visibility", {{"index", 1.0}}).ok); // hide "Plain"
+    CHECK(reg.execute(doc, "part_select", {{"index", 0.0}}).ok);
+    CHECK(reg.execute(doc, "part_visibility", {{"index", 1.0}}).ok); // hide "Plain"
     CHECK(reg.execute(doc, "export_ply", {{"path", ply}}).ok);
     Mesh loaded;
     SplatCloud splats;
@@ -369,10 +369,10 @@ TEST(paint_layers_topology_changes) {
     grown.rebuildTopology();
     CHECK(grown.paintLayers.empty() && grown.paintBase.empty() && grown.hasColors() && grown.activePaintLayer == -1);
 
-    // Duplicating a SubTool copies its layers.
+    // Duplicating a Part copies its layers.
     Document doc = makeDoc(m);
     CommandRegistry reg;
-    CHECK(reg.execute(doc, "subtool_duplicate").ok && doc.mesh.paintLayers.size() == 1 && doc.mesh.paintLayers[0].name == "Spots");
+    CHECK(reg.execute(doc, "part_duplicate").ok && doc.mesh.paintLayers.size() == 1 && doc.mesh.paintLayers[0].name == "Spots");
 }
 
 TEST(paint_layers_dab_cost_on_big_mesh) {

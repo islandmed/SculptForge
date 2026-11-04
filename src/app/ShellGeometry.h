@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Where every region of the ZBrush-style shell goes for a window size: title
+// Where every region of the classic shell goes for a window size: title
 // strip, palette bar, the four shelves around the canvas, the console, the tray
 // dividers and trays. Pure arithmetic (no ImGui), so it can be unit tested and
 // used by input handling before a frame is drawn. See docs/ui-design.md §2.
@@ -73,7 +73,7 @@ constexpr BottomShelfSize bottomShelfSize(int tiles) {
 // windows 1920 logical px wide or more.
 float trayWidth(float stored, float logicalWindowWidth);
 
-// The sizes that differ between the ZBrush-style layout (the defaults: shell:: above) and the SculptForge layout,
+// The sizes that differ between the Classic layout (the defaults: shell:: above) and the SculptForge layout,
 // and the gap of a tiled look (Preferences > Interface > Look), logical px.
 struct ShellMetrics {
     float titleH = shell::kTitleH, paletteBarH = shell::kPaletteBarH, topShelfH = shell::kTopShelfH;

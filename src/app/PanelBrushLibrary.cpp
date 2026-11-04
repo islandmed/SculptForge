@@ -7,7 +7,9 @@
 // clipboard, and saving Brush Lab edits to the user library automatically.
 #include "app/App.h"
 
+#include "app/Pickers.h"
 #include "core/BrushLibrary.h"
+#include "core/ListSort.h"
 
 #include <imgui.h>
 
@@ -40,7 +42,7 @@ const char* brushTag(const BrushRecipe& b) {
     case BrushSource::Project: return "project";
     case BrushSource::Session: return "unsaved";
     case BrushSource::User: return b.origin.overrides != BrushSource::Session ? "yours" : nullptr;
-    case BrushSource::Builtin: return nullptr;
+    case BrushSource::Builtin: return b.origin.pack.empty() ? nullptr : b.origin.pack.c_str(); // a built-in pack
     }
     return nullptr;
 }
@@ -75,7 +77,8 @@ std::string fileUrl(const std::string& path) {
 // Where a brush comes from, in words (list tooltips, picker Quick Info).
 std::string brushOriginText(const BrushRecipe& b) {
     switch (b.origin.source) {
-    case BrushSource::Builtin: return "Built-in brush";
+    case BrushSource::Builtin:
+        return b.origin.pack.empty() ? std::string("Built-in brush") : "Built-in brush pack " + b.origin.pack + " (Brush > Sort > Pack)";
     case BrushSource::User:
         return b.origin.overrides != BrushSource::Session
                    ? std::string("Your version - replaces the ") + brushSourceName(b.origin.overrides) +
@@ -212,7 +215,11 @@ void App::drawCustomBrushes() {
     int actionIndex = -1;
     if (ImGui::BeginListBox("##custom", ImVec2(-1, ImGui::GetTextLineHeightWithSpacing() * 5.5f))) {
         const ImGuiStyle& style = ImGui::GetStyle();
-        for (int i = 0; i < int(doc_.brushes.size()); ++i) {
+        std::vector<ListSortKey> keys; // in the brush lists' order (A-Z by default)
+        for (const BrushRecipe& b : doc_.brushes)
+            keys.push_back({b.name, b.origin.pack, brushRecentRank("recipe:" + b.name), builtinBrushPackRank(b.origin.pack)});
+        for (const size_t at : listSortOrder(keys, listSortFromId(uiPrefs_.brushSort))) {
+            const int i = int(at);
             const BrushRecipe& b = doc_.brushes[size_t(i)];
             const char* tag = brushTag(b);
             const float tagWidth = tag ? ImGui::CalcTextSize(tag).x + style.ItemSpacing.x : 0.0f;

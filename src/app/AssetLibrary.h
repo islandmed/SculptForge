@@ -1,8 +1,8 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The asset library behind the LightBox: the built-in and user folders, what
-// each LightBox tab lists, folder scanning on a worker thread, QuickSave files
+// The asset library behind the Library: the built-in and user folders, what
+// each Library tab lists, folder scanning on a worker thread, QuickSave files
 // and the thumbnail cache keys. No GL or ImGui here, so the unit tests link it.
 #pragma once
 
@@ -21,14 +21,14 @@ enum class AssetKind {
     Folder,    // a directory (double-click enters it)
     Up,        // the ".." tile at the start of a sub-folder
     Project,   // .sfproj
-    Mesh,      // .obj .glb .gltf .fbx .stl .ply .usda .usdz .GoZ
+    Mesh,      // .obj .glb .gltf .fbx .stl .ply .usda .usdz Bridge
     Primitive, // built-in Sphere / Cube / Plane (index = Primitive)
     BrushType, // built-in brush (index = BrushType, kPaintBrush = the Paint brush)
     Recipe,    // custom brush in the document (index into doc.brushes)
     BrushFile, // .sfbrush not loaded yet
     Alpha,     // built-in alpha (name)
     AlphaFile, // image used as an alpha
-    Material,  // matcap (index; -1 = Studio)
+    Material,  // lit sphere (index; -1 = Studio)
     Image,     // reference image
     Splat,     // Gaussian splat capture (.ply .splat, splat .glb)
     Vdm,       // vector displacement map in the brush library (name; Capture from view saves these)
@@ -47,10 +47,10 @@ struct AssetEntry {
     int64_t mtime = 0; // seconds since the epoch (files)
 };
 
-// The LightBox tabs, in the order they are shown.
+// The Library tabs, in the order they are shown.
 enum class LibraryTab { Project, Tool, Brush, Alpha, Material, Image, Splats, QuickSave, Recent, Packs, Count };
 const char* libraryTabName(LibraryTab tab);       // "Project"
-const char* libraryTabId(LibraryTab tab);         // "project" (UiLayout::lightboxTab)
+const char* libraryTabId(LibraryTab tab);         // "project" (UiLayout::LibraryTab)
 LibraryTab libraryTabFromId(std::string_view id); // unknown -> Project
 // User-library sub-folder a tab browses ("Projects", "Tools", ...); "" for tabs without one.
 const char* libraryTabFolder(LibraryTab tab);
@@ -96,7 +96,7 @@ int64_t modifiedTime(const std::string& path);
 // Lists folders on a worker thread. get() never blocks: it returns the last finished listing (or
 // nullptr before the first one) and starts a scan when there is none or the folder changed. Call
 // poll() once per frame; it collects finished scans and re-checks each folder's time stamp every
-// `recheckSeconds` (a cheap stat, as ZBrush's LightBox refreshes while open).
+// `recheckSeconds` (a cheap stat Library refreshes while open).
 class FolderScanner {
 public:
     using Accept = std::function<AssetKind(const std::string&)>;
@@ -124,7 +124,7 @@ private:
 
 // --- Thumbnail cache keys (spec: fnv1a64(kind|absPath|size|mtime|version)) ---
 
-constexpr int kThumbnailVersion = 4; // bump when thumbnails are rendered differently
+constexpr int kThumbnailVersion = 5; // bump when thumbnails are rendered differently
 uint64_t fnv1a64(std::string_view data, uint64_t seed = 0xcbf29ce484222325ull);
 std::string hex64(uint64_t v); // 16 lower-case hex digits
 // Key of a file's thumbnail: changes when the file is rewritten (size or time) or the renderer changes.
@@ -143,7 +143,7 @@ std::string typedClassicKeys(const std::string& typed);
 // containing it (`substring` says which). Empty `typed` keeps all.
 std::vector<size_t> filterByTyped(const std::vector<std::string>& names, const std::string& typed,
                                   bool* substring = nullptr);
-// The key badge of each kept name: ZBrush's own second letter for the brushes it shares with SculptForge
+// The key badge of each kept name: the Classic sculpting keys' second letter for the brushes it shares with SculptForge
 // (B C B Clay Block, B D S Sharp Crease, B M V Move ...), otherwise the first letter after `typed` in the name
 // that no earlier name took. Returns (letter, index into names) pairs; substring matches get none.
 std::vector<std::pair<char, size_t>> letterBadges(const std::vector<std::string>& names,

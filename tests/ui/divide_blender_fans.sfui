@@ -7,8 +7,8 @@ env SCULPTFORGE_BLENDER_EXCHANGE sf_ui_blender_divide
 copy data/blender/divide sf_ui_blender_divide/to_sculptforge
 wait 0.2
 expect_status "Received 2 objects from Blender"
-expect_value subtools == 2
-expect_value active_subtool == 0
+expect_value parts == 2
+expect_value active_part == 0
 remember triangles t0
 
 # The cylinder: three levels, each drawn (the crash was in the viewport's shading after Divide).
@@ -35,8 +35,8 @@ key d
 expect_value sdiv == 4
 
 # The UV sphere.
-run subtool_select index=1
-expect_value active_subtool == 1
+run part_select index=1
+expect_value active_part == 1
 key ctrl+d
 wait 0.2
 key ctrl+d

@@ -97,8 +97,8 @@ Mesh makeCube(int resolution, float size) {
                 raw.triangles.push_back({a, c, b}); // (v x u) = outward normal on every side
                 raw.triangles.push_back({b, c, d});
                 raw.pairQuad(uint32_t(raw.triangles.size() - 2), uint32_t(raw.triangles.size() - 1));
-                raw.polygroups.push_back(uint32_t(f + 1));
-                raw.polygroups.push_back(uint32_t(f + 1));
+                raw.facegroups.push_back(uint32_t(f + 1));
+                raw.facegroups.push_back(uint32_t(f + 1));
             }
     }
     return weldImported(raw);
@@ -115,7 +115,7 @@ void faceOutwards(Mesh& m) {
 }
 
 // A surface of revolution about Y from a profile of (radius, height) points, bottom to top. A radius of 0 is a
-// pole (a triangle fan); everything else is rings of quads. group[k] is the polygroup between points k and k+1.
+// pole (a triangle fan); everything else is rings of quads. group[k] is the face group between points k and k+1.
 Mesh revolve(const std::vector<glm::vec2>& profile, const std::vector<uint32_t>& group, int segments) {
     Mesh raw;
     const int n = std::max(segments, 3);
@@ -143,9 +143,9 @@ Mesh revolve(const std::vector<glm::vec2>& profile, const std::vector<uint32_t>&
                 raw.triangles.push_back({a, c, b});
                 raw.triangles.push_back({b, c, d});
                 raw.pairQuad(uint32_t(raw.triangles.size() - 2), uint32_t(raw.triangles.size() - 1));
-                raw.polygroups.push_back(group[k]);
+                raw.facegroups.push_back(group[k]);
             }
-            raw.polygroups.push_back(group[k]);
+            raw.facegroups.push_back(group[k]);
         }
     }
     faceOutwards(raw);
@@ -218,8 +218,8 @@ Mesh makeTorus(int segments, float size) {
             raw.triangles.push_back({a, c, b});
             raw.triangles.push_back({b, c, d});
             raw.pairQuad(uint32_t(raw.triangles.size() - 2), uint32_t(raw.triangles.size() - 1));
-            raw.polygroups.push_back(1);
-            raw.polygroups.push_back(1);
+            raw.facegroups.push_back(1);
+            raw.facegroups.push_back(1);
         }
     faceOutwards(raw);
     return weldImported(raw);
@@ -305,7 +305,7 @@ Mesh loopSubdivide(const Mesh& src) {
         for (const auto& l : src.layers) out.layers.push_back({l.name, subdivideAttribute(l.delta), l.weight});
     }
 
-    // Mask and polypaint are interpolated linearly (old vertices keep their
+    // Mask and vertex paint are interpolated linearly (old vertices keep their
     // value, edge vertices take the average) so painted borders stay crisp.
     auto interpolateLinear = [&](const auto& A) {
         std::remove_cvref_t<decltype(A)> result(next);
@@ -323,7 +323,7 @@ Mesh loopSubdivide(const Mesh& src) {
     }
 
     const size_t nt = src.triangles.size();
-    const bool groups = src.polygroups.size() == nt, hidden = src.hidden.size() == nt, uvs = src.uvs.size() == nt * 3;
+    const bool groups = src.facegroups.size() == nt, hidden = src.hidden.size() == nt, uvs = src.uvs.size() == nt * 3;
     out.triangles.reserve(nt * 4);
     for (size_t ti = 0; ti < nt; ++ti) {
         const auto& t = src.triangles[ti];
@@ -335,7 +335,7 @@ Mesh loopSubdivide(const Mesh& src) {
         out.triangles.push_back({t.z, ca, bc});
         out.triangles.push_back({ab, bc, ca});
         // Children inherit their parent's group and visibility.
-        if (groups) out.polygroups.insert(out.polygroups.end(), 4, src.polygroups[ti]);
+        if (groups) out.facegroups.insert(out.facegroups.end(), 4, src.facegroups[ti]);
         if (hidden) out.hidden.insert(out.hidden.end(), 4, src.hidden[ti]);
         if (uvs) {
             const glm::vec2 ua = src.uvs[ti * 3], ub = src.uvs[ti * 3 + 1], uc = src.uvs[ti * 3 + 2];

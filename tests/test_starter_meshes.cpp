@@ -45,7 +45,7 @@ TEST(starter_meshes_set_and_budget) {
         CHECK(m.levels >= 1 && m.levels <= 3);
     }
     CHECK(findStarterMesh("head") == findStarterMesh("human-head"));
-    CHECK(findStarterMesh("zsphere") == nullptr);
+    CHECK(findStarterMesh("forgesphere") == nullptr);
     CHECK(total < size_t(15) * 1000 * 1000); // the brief's budget; the set is about 1 MB
     std::printf("  starter meshes: %zu bytes compressed\n", total);
 }
@@ -53,15 +53,15 @@ TEST(starter_meshes_set_and_budget) {
 TEST(starter_meshes_topology_symmetry_and_placement) {
     for (const StarterMesh& m : starterMeshes()) {
         Document d = load(m, 0);
-        CHECK(!d.subtools.empty());
+        CHECK(!d.parts.empty());
         AABB box;
         // Mirror check: every vertex of every Part has a partner at (-x, y, z) within 0.01 mm.
         std::set<std::tuple<long, long, long>> points;
         auto key = [](glm::vec3 p) {
             return std::make_tuple(std::lround(p.x * 1000.0f), std::lround(p.y * 1000.0f), std::lround(p.z * 1000.0f));
         };
-        for (int i = 0; i < int(d.subtools.size()); ++i) {
-            const Mesh& mesh = d.subtoolMesh(i);
+        for (int i = 0; i < int(d.parts.size()); ++i) {
+            const Mesh& mesh = d.partMesh(i);
             CHECK(mesh.vertexCount() > 100);
             // All quads: every triangle is paired.
             CHECK(mesh.quadPartners.size() == mesh.triangleCount());
@@ -89,8 +89,8 @@ TEST(starter_meshes_topology_symmetry_and_placement) {
         }
         if (m.symmetric) {
             size_t missing = 0;
-            for (int i = 0; i < int(d.subtools.size()); ++i)
-                for (const glm::vec3& p : d.subtoolMesh(i).positions) {
+            for (int i = 0; i < int(d.parts.size()); ++i)
+                for (const glm::vec3& p : d.partMesh(i).positions) {
                     const auto [x, y, z] = key(glm::vec3(-p.x, p.y, p.z));
                     bool found = false;
                     for (long dx = -1; dx <= 1 && !found; ++dx)
@@ -122,14 +122,14 @@ TEST(starter_meshes_open_with_levels) {
     CHECK(subdivCurrentLevel(d.mesh) == 2);
     CHECK(d.mesh.vertexCount() > 60000);
     CHECK(d.path.empty());
-    CHECK(d.subtools.size() == 1 && d.subtools[0].name == "Human Head");
+    CHECK(d.parts.size() == 1 && d.parts[0].name == "Human Head");
     // Multi-Part: every Part gets its levels.
     r = registry.execute(d, "new_starter_mesh", {{"name", std::string("Creature Head")}, {"levels", 1.0}});
     CHECK(r.ok);
-    CHECK(d.subtools.size() == 4);
-    for (int i = 0; i < int(d.subtools.size()); ++i) CHECK(subdivLevelCount(d.subtoolMesh(i)) == 2);
+    CHECK(d.parts.size() == 4);
+    for (int i = 0; i < int(d.parts.size()); ++i) CHECK(subdivLevelCount(d.partMesh(i)) == 2);
     CHECK(!registry.execute(d, "new_starter_mesh", {{"name", std::string("no-such-mesh")}}).ok);
-    CHECK(d.subtools.size() == 4); // a failure leaves the scene alone
+    CHECK(d.parts.size() == 4); // a failure leaves the scene alone
 }
 
 TEST(starter_meshes_unpack_to_folder) {

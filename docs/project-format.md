@@ -6,33 +6,33 @@ read by `loadProject` (src/core/Project.cpp). Commands: `save_project path=...`,
 
 ## Layout (version 5)
 - `manifest.json`: always first. `format` = `"SculptForge project"`, `version` (integer, currently 5),
-  `app_version`, then `subtools` (one entry per Part, in list order), `active_subtool` (index),
+  `app_version`, then `parts` (one entry per Part, in list order), `active_part` (index),
   `brushes` (recipe JSON), `active_brush` (name), optional `splats`, and app-owned keys (`camera`,
   `render`, `brush`, `symmetry`, `gizmo`). `gizmo` (added in 0.5 without a version bump; older readers
   ignore it) holds the Gizmo's `pivot`, `pivot_placed`, `orient_surface`, `axis_x` / `axis_y` (its
-  surface axes), `use_mask`, `all_subtools` and `falloff`.
-- Each `subtools[i]` holds `name`, `visible` (bool), `mesh`, `layers`, `active_layer` (sculpt layer
-  strokes go into, -1 = base) and, for a mesh that came from ZBrush, `goz_name` (the GoZ object name
-  that `goz_send` / `goz_receive` match on). Optional `shading` (`"smooth"` or `"flat"`; missing or unknown =
+  surface axes), `use_mask`, `all_parts` and `falloff`.
+- Each `parts[i]` holds `name`, `visible` (bool), `mesh`, `layers`, `active_layer` (sculpt layer
+  strokes go into, -1 = base) and, for a mesh that came , `bridge_name` (the Bridge object name
+  that `bridge_send` / `bridge_receive` match on). Optional `shading` (`"smooth"` or `"flat"`; missing or unknown =
   follow the scene) is the Part's own viewport shading, and the app's `render.flat_shading` (bool) the scene's;
   both were added after 0.9.4 without a version bump (older readers ignore them).
 - Optional top-level `attachments` (added in 0.9.5 without a version bump; older readers ignore it): files the app
   keeps in the project, each `{"name", "data"}` with `data` a `u8` blob under `attachments/<name>`. Names use
   letters, digits, space, `. _ -` and `/` (no `..`); a missing or unreadable attachment is left out on loading. The
-  app stores the custom Lit Sphere the view uses as `matcaps/<name>.png` and names it in `render.matcap_file`
-  (`render.matcap` keeps its name).
+  app stores the custom Lit Sphere the view uses as `litspheres/<name>.png` and names it in `render.litsphere_file`
+  (`render.litsphere` keeps its name).
 - Blobs are little-endian arrays. The manifest describes each one as
   `{"file", "type": "f32"|"u32"|"u8", "components", "count"}`; readers check all four. Part `i`'s
-  blobs live under `subtools/<i>/` (the file name comes from the descriptor, so readers don't rely
+  blobs live under `parts/<i>/` (the file name comes from the descriptor, so readers don't rely
   on it).
 
-| Manifest key (in `subtools[i]`) | File | Layout |
+| Manifest key (in `parts[i]`) | File | Layout |
 |--------------|------|--------|
 | `mesh.positions` | parts/i/mesh/positions.bin | f32 x3 per vertex (current blend) |
 | `mesh.triangles` | parts/i/mesh/triangles.bin | u32 x3 per triangle |
 | `mesh.base` | parts/i/mesh/base.bin | f32 x3 per vertex (only with layers) |
 | `mesh.mask` / `colors` | parts/i/mesh/mask.bin, colors.bin | f32 x1 / x3 per vertex (linear RGB) |
-| `mesh.polygroups` / `hidden` | parts/i/mesh/face groups.bin, hidden.bin | u32 / u8 per triangle |
+| `mesh.facegroups` / `hidden` | parts/i/mesh/face groups.bin, hidden.bin | u32 / u8 per triangle |
 | `mesh.uvs` | parts/i/mesh/uvs.bin | f32 x2 per triangle corner |
 | `mesh.quad_partners` | parts/i/mesh/quad_partners.bin | u32 per triangle: the triangle it forms a quad with, 0xFFFFFFFF = none. Readers drop pairs that aren't mutual or don't share an edge. Added without a version bump: older readers ignore it and load triangles |
 | `layers[k].delta` | parts/i/layers/<k>.bin | f32 x3 per vertex, plus `name`, `weight` |
@@ -48,14 +48,14 @@ read by `loadProject` (src/core/Project.cpp). Commands: `save_project path=...`,
 Optional attributes are simply absent when the mesh doesn't have them.
 
 ### Selection sets
-`subtools[i].selection_sets` (only for SubTools with sets; src/core/SelectionSets.h; added after 0.10.4 without a
+`parts[i].selection_sets` (only for Parts with sets; src/core/SelectionSets.h; added after 0.10.4 without a
 format version bump, older readers ignore it) holds `version` (1), `morph_target` (the set the Morph brush uses, if
 any) and `sets`: per set its `name`, `channels`, `level`, `vertex_count`, `triangle_count` (for people and tools;
-readers rely on the data) and `data`, a `u8` blob under `subtools/i/sets/<k>.bin`. The blob is self-contained,
-little-endian: `SFSS`, the set format version (1), the channel bits (1 mask, 2 polygroups, 4 vertex paint,
+readers rely on the data) and `data`, a `u8` blob under `parts/i/sets/<k>.bin`. The blob is self-contained,
+little-endian: `SFSS`, the set format version (1), the channel bits (1 mask, 2 face groups, 4 vertex paint,
 8 visibility, 16 UVs, 32 shape), the vertex and triangle counts and level it was stored at, the name (u32 length +
 UTF-8), then one section per channel (u32 channel bit, u64 byte length, payload): runs (u64 count, then u32 start,
-u32 length each) of masked vertices plus a u32 "all ones" flag and otherwise f32 values; run-length polygroups (u32
+u32 length each) of masked vertices plus a u32 "all ones" flag and otherwise f32 values; run-length face groups (u32
 id, u32 length); runs of non-white vertices plus f32 x3 colours; runs of hidden triangles; f32 x2 UVs per triangle
 corner; f32 x3 positions. Readers skip sections they don't know and leave out (with a notice) any set they can't
 read; a set whose format version is newer than theirs is left out the same way. `.sfsets` files
@@ -63,7 +63,7 @@ read; a set whose format version is newer than theirs is left out the same way. 
 `version` 1, `morph_target`, `sets` as above with `data` naming the entry) and the same blobs under `sets/`.
 
 ### Paint layers
-`subtools[i].paint_layers` (only written when the Part has paint layers; src/core/PaintLayer.h) holds
+`parts[i].paint_layers` (only written when the Part has paint layers; src/core/PaintLayer.h) holds
 `active` (the layer painting writes into, -1 = Base), `base` and `layers` (bottom to top). `blend` is one of
 `normal`, `multiply`, `screen`, `overlay`, `soft_light`, `add`, `subtract`, `darken`, `lighten`, `difference`
 (unknown modes load as `normal`). `mesh.colors` still holds the composited stack, so readers that don't know
@@ -71,7 +71,7 @@ read; a set whose format version is newer than theirs is left out the same way. 
 version bump.
 
 ### Texture (version 3)
-`subtools[i].texture` (only for Parts with a painted texture; src/core/Texture.h) holds `width`, `height`,
+`parts[i].texture` (only for Parts with a painted texture; src/core/Texture.h) holds `width`, `height`,
 `paint_to_texture` (painting goes into the texture rather than the vertices), `active` (texture layer
 painting writes into, -1 = Base), `base` and `layers` (bottom to top, the same fields and blend modes as
 paint layers). Each image is a PNG of exactly `width` x `height`; a texture whose images are missing or the
@@ -80,9 +80,9 @@ Version 3 was introduced for this key (SculptForge 0.5): earlier versions refuse
 silently dropping the paint. Version 1 and 2 files load unchanged.
 
 ### Subdivision levels (version 4)
-`subtools[i].subdiv` (only for Parts with levels; src/core/Multires.h) holds `current` (the level the
+`parts[i].subdiv` (only for Parts with levels; src/core/Multires.h) holds `current` (the level the
 Part's own `mesh` is) and `levels` (base first). Each level has `mesh` / `layers` / `paint_layers` as above
-under `subtools/i/subdiv/<k>/` (or `same_as_mesh: true` for the current level when it equals the Part's
+under `parts/i/subdiv/<k>/` (or `same_as_mesh: true` for the current level when it equals the Part's
 mesh), `stale` (positions to be re-evaluated from the level below), `detail` (f32 x3 per vertex: displacement
 in the local frame of the subdivided level below), `layer_detail` (one per sculpt layer: the layer's offsets
 minus the subdivided offsets of the level below, in the same local frames as `detail`; version 4 stored them in
@@ -95,13 +95,13 @@ local-frame `layer_detail`) was introduced so a sculpt layer's detail turns with
 version 4 readers would misread it, so they refuse version 5 files.
 
 Loading replaces the scene: every Part comes back with its name, visibility, attributes, layers,
-active layer and GoZ name, the saved active Part is selected, every Part starts with an empty
+active layer and Bridge name, the saved active Part is selected, every Part starts with an empty
 undo history and the document is clean. A file is refused (and the open scene left alone) when the
-Parts list is missing or empty, or any Part's mesh is broken; an out-of-range `active_subtool`
+Parts list is missing or empty, or any Part's mesh is broken; an out-of-range `active_part`
 selects the first one.
 
 ## Version 1
-Version 1 files (SculptForge 0.2 and earlier) have one mesh at the top level instead of `subtools`:
+Version 1 files (SculptForge 0.2 and earlier) have one mesh at the top level instead of `parts`:
 `mesh` and `layers` as above (blobs under `mesh/` and `layers/`) and `active_layer`. They still load,
 as a single Part called "Sculpt". Saving always writes the current version (5).
 

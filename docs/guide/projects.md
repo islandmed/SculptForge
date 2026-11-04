@@ -135,7 +135,7 @@ on first use with these sub-folders:
 | `Tools` | Tool | Models to open or append as Parts |
 | `Brushes` | Brush | `.sfbrush` files |
 | `Alphas` | Alpha | Grayscale images for brush alphas |
-| `MatCaps` | Material | Lit Sphere images, loaded as materials at start-up |
+| `LitSpheres` | Material | Lit Sphere images, loaded as materials at start-up |
 | `Images` | Image | Sketches and concept art for Generate 3D |
 | `Splats` | Splats | Gaussian splat captures |
 | `QuickSave` | Snapshots | Snapshots |

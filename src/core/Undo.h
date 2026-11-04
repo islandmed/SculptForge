@@ -123,9 +123,9 @@ struct SelectionSetsUndo {
     size_t bytes() const; // what only this step keeps alive
 };
 
-// Adding or removing a whole SubTool (Extract's Accept; core/Document.h). Applied by the undo / redo commands,
+// Adding or removing a whole Part (Extract's Accept; core/Document.h). Applied by the undo / redo commands,
 // which see the whole scene: the record itself leaves the mesh alone.
-struct SubtoolStep;
+struct PartStep;
 
 // "The active paint layer" for UndoRecord::captureColors.
 inline constexpr int kActivePaintLayer = -2;
@@ -135,15 +135,15 @@ inline constexpr int kActivePaintLayer = -2;
 //  - positions: the stroke's target array (positions, layer base or a layer's
 //    offsets; see Mesh::layerTarget), selected by `layer`; layerOffsets: every
 //    layer's offsets too (transforms). Each lists a vertex at most once.
-//  - mask / colors: per-vertex mask and polypaint. `colors` holds the paint
+//  - mask / colors: per-vertex mask and vertex paint. `colors` holds the paint
 //    target of `paintLayer` (Mesh::colors without paint layers, else Base for
 //    -1 or that layer's colours, with its coverage in `paintAlpha`)
 //  - paint: the whole paint-layer stack (layer add / delete / merge / settings)
-//  - hidden / polygroups: per-triangle visibility and group ids
+//  - hidden / face groups: per-triangle visibility and group ids
 //  - textureTiles / texture: texture-paint tiles of one layer, or the whole texture
 //  - subdiv: a subdivision level step or level edit (core/Multires.h), applied on its own
 //  - topology: the slots a dynamic-topology stroke changed (core/Dyntopo.h), applied before the channels
-//  - subtool: a SubTool added to the scene (Extract), taken out on undo and put back on redo
+//  - part: a Part added to the scene (Extract), taken out on undo and put back on redo
 //  - micro: the grid tiles a stroke on a micro level changed, or a whole micro level (core/Micro.h)
 //  - uvs: per triangle corner texture coordinates (restoring a selection set's UVs)
 //  - sets: the Selection Sets list (core/SelectionSets.h)
@@ -162,13 +162,13 @@ struct UndoRecord {
     UndoChannel<float> paintAlpha;
     std::unique_ptr<PaintStackUndo> paint;
     UndoChannel<uint8_t> hidden;
-    UndoChannel<uint32_t> polygroups;
+    UndoChannel<uint32_t> facegroups;
     std::unique_ptr<TextureTileUndo> textureTiles;
     std::unique_ptr<TextureStackUndo> texture;
     std::unique_ptr<Mesh> mesh;
     std::unique_ptr<SubdivUndo> subdiv;
     std::unique_ptr<TopologyUndo> topology;
-    std::shared_ptr<SubtoolStep> subtool; // (shared: SubtoolStep is defined in core/Document.h)
+    std::shared_ptr<PartStep> part; // (shared: PartStep is defined in core/Document.h)
     std::unique_ptr<UvUndo> uv;           // UVs, seams and pins (UV Editor, core/Uv.h)
     std::unique_ptr<MicroUndo> micro;     // micro-displacement tiles of a stroke, or a micro level added / removed (core/Micro.h)
     UndoChannel<glm::vec2> uvs;           // per corner (index = triangle * 3 + corner)
@@ -176,7 +176,7 @@ struct UndoRecord {
 
     bool empty() const {
         return positions.empty() && mask.empty() && colors.empty() && paintAlpha.empty() && hidden.empty() &&
-               polygroups.empty() && !mesh && !paint && !textureTiles && !texture && !subdiv && !topology && !subtool && !micro &&
+               facegroups.empty() && !mesh && !paint && !textureTiles && !texture && !subdiv && !topology && !part && !micro &&
                uvs.empty() && !sets && !uv;
     }
     size_t approxBytes() const;
@@ -188,11 +188,11 @@ struct UndoRecord {
     static UndoRecord captureColors(const Mesh& mesh, std::string label, std::span<const uint32_t> verts = {},
                                     int paintLayer = kActivePaintLayer);
     static UndoRecord captureHidden(const Mesh& mesh, std::string label, std::span<const uint32_t> tris = {});
-    static UndoRecord capturePolygroups(const Mesh& mesh, std::string label, std::span<const uint32_t> tris = {});
+    static UndoRecord captureFaceGroups(const Mesh& mesh, std::string label, std::span<const uint32_t> tris = {});
 };
 
 // Watches an UndoStack: the Sculpt Timeline (core/Timeline.h) keeps its history tree in step with it. Held by the
-// stack (UndoStack::listener), so it moves with it (each SubTool's history has its own).
+// stack (UndoStack::listener), so it moves with it (each Part's history has its own).
 struct UndoListener {
     virtual ~UndoListener() = default;
     // A step was pushed (it is the stack's last undo step); `discardedRedo` holds the redo steps the push is about

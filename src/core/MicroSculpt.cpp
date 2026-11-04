@@ -30,7 +30,7 @@ int microBrushSupport(BrushType type) {
     switch (type) {
     case BrushType::Standard:
     case BrushType::Clay:
-    case BrushType::ClayBuildup:
+    case BrushType::ClayBlock:
     case BrushType::Smooth:
     case BrushType::Inflate:
     case BrushType::Flatten:
@@ -38,7 +38,7 @@ int microBrushSupport(BrushType type) {
     case BrushType::Layer: return 2;
     case BrushType::Pinch:
     case BrushType::Crease:
-    case BrushType::DamStandard:
+    case BrushType::SharpCrease:
     case BrushType::Move: return 1;
     default: return 0;
     }
@@ -550,9 +550,9 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
     const float r = radius, r2 = r * r;
     const float s = std::clamp(strength, 0.0f, 1.0f);
     const float sign = invert ? -1.0f : 1.0f;
-    // An alpha reaches its square's corners, the square ClayBuildup tip a little past the circle (as Sculpt.cpp).
+    // An alpha reaches its square's corners, the square Clay Block tip a little past the circle (as Sculpt.cpp).
     const bool useAlpha = alpha && !alpha->empty() && !maskBrush;
-    const float reach = useAlpha ? kAlphaReach : type == BrushType::ClayBuildup && !maskBrush ? 1.3f : 1.0f;
+    const float reach = useAlpha ? kAlphaReach : type == BrushType::ClayBlock && !maskBrush ? 1.3f : 1.0f;
 
     // The displacement range this dab may need: widened first (it costs precision) when what a dab adds could
     // pass it; a dab that still clips (planes far off) widens it for the next one.
@@ -639,7 +639,7 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
     const glm::vec3 right = glm::cross(up, areaNormal);
     const float layerHeight = r * 0.08f * s;
     const bool readsNeighbours = type == BrushType::Smooth || type == BrushType::Pinch || type == BrushType::Crease ||
-                                 type == BrushType::DamStandard;
+                                 type == BrushType::SharpCrease;
 
     // 3. The kernel, in parallel over the triangles (each writes only its own grid). Scale-adaptive: the brush is
     // evaluated on the grid points `stride` apart, about kBrushSamples across its radius, and the points in between
@@ -690,7 +690,7 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
                     }
                     float f = useAlpha ? alpha->stamp(glm::dot(o, right) / r, glm::dot(o, up) / r, focal)
                                        : brushFalloff(std::sqrt(dist2), r, focal);
-                    if (type == BrushType::ClayBuildup && !useAlpha) { // square tip, rounded corners (as Sculpt.cpp)
+                    if (type == BrushType::ClayBlock && !useAlpha) { // square tip, rounded corners (as Sculpt.cpp)
                         const float cheb = std::max(std::abs(glm::dot(o, right)), std::abs(glm::dot(o, up))) / r;
                         const float corner = std::clamp((1.3f - std::sqrt(dist2) / r) / 0.3f, 0.0f, 1.0f);
                         const float edge = std::clamp((1.0f - cheb) / 0.35f, 0.0f, 1.0f);
@@ -738,7 +738,7 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
                         if (sign * h < 0.0f) delta = -h * f * clayPull(s) / facing;
                         break;
                     }
-                    case BrushType::ClayBuildup: {
+                    case BrushType::ClayBlock: {
                         const glm::vec3 pp = areaCenter + areaNormal * (sign * r * 0.08f * s);
                         const float h = glm::dot(p - pp, areaNormal);
                         if (sign * h < 0.0f) delta = -h * f * clayPull(s) / facing;
@@ -761,7 +761,7 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
                     case BrushType::Crease:
                         delta = -sign * s * r * 0.05f * f * f + sharpen(0.5f * s * f);
                         break;
-                    case BrushType::DamStandard:
+                    case BrushType::SharpCrease:
                         delta = -sign * s * r * 0.08f * f * f * f * f + sharpen(0.7f * s * f);
                         break;
                     default: break;

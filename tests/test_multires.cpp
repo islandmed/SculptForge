@@ -3,7 +3,7 @@
 //
 // Multiresolution subdivision levels (core/Multires.h): Divide keeps quads, detail survives stepping up and
 // down bit-for-bit, low-level edits carry the high-level detail along, high-level edits show up below, mask /
-// polygroups / UVs / paint / sculpt layers follow the levels, undo steps across levels, Del Lower / Del
+// face groups / UVs / paint / sculpt layers follow the levels, undo steps across levels, Del Lower / Del
 // Higher / Reconstruct, projects keep every level, and exports can write the base.
 #include "TestHarness.h"
 
@@ -11,7 +11,7 @@
 #include "core/Multires.h"
 #include "core/Primitives.h"
 #include "core/Project.h"
-#include "core/SubTools.h"
+#include "core/Parts.h"
 #include "io/ObjIO.h"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -245,7 +245,7 @@ TEST(multires_undo_steps_across_levels) {
 
 TEST(multires_attributes_follow_levels) {
     Document d = dividedCube(2);
-    // Mask painted at the top shows at the corners of the base; polygroups set low are inherited up.
+    // Mask painted at the top shows at the corners of the base; face groups set low are inherited up.
     run(d, "mask_all");
     d.mesh.ensureMask();
     for (uint32_t v = 0; v < d.mesh.vertexCount(); ++v) d.mesh.mask[v] = d.mesh.positions[v].x > 0 ? 1.0f : 0.0f;
@@ -254,19 +254,19 @@ TEST(multires_attributes_follow_levels) {
     CHECK(d.mesh.hasMask());
     const Mesh base = subdivLevelMesh(d.mesh, 0);
     for (uint32_t v = 0; v < d.mesh.vertexCount(); ++v) CHECK(d.mesh.mask[v] == (base.positions[v].x > 0 ? 1.0f : 0.0f));
-    d.mesh.ensurePolygroups();
-    for (auto& g : d.mesh.polygroups) g = 7;
-    d.mesh.polygroups[0] = 9;
-    d.mesh.polygroups[1] = 9; // one quad
+    d.mesh.ensureFaceGroups();
+    for (auto& g : d.mesh.facegroups) g = 7;
+    d.mesh.facegroups[0] = 9;
+    d.mesh.facegroups[1] = 9; // one quad
     CHECK(run(d, "subdiv_level", {{"level", 3.0}}).ok);
     CHECK(d.mesh.mask == topMask); // untouched mask detail kept
     size_t nine = 0;
-    for (uint32_t g : d.mesh.polygroups) nine += g == 9;
+    for (uint32_t g : d.mesh.facegroups) nine += g == 9;
     CHECK(nine == 2 * 16); // the quad's 16 grandchildren
-    for (uint32_t g : d.mesh.polygroups) CHECK(g == 7 || g == 9);
+    for (uint32_t g : d.mesh.facegroups) CHECK(g == 7 || g == 9);
     // Hidden faces at the top hide their parents below.
     d.mesh.ensureHidden();
-    for (uint32_t t = 0; t < d.mesh.triangleCount(); ++t) d.mesh.hidden[t] = d.mesh.polygroups[t] == 9;
+    for (uint32_t t = 0; t < d.mesh.triangleCount(); ++t) d.mesh.hidden[t] = d.mesh.facegroups[t] == 9;
     CHECK(run(d, "subdiv_level", {{"level", 1.0}}).ok);
     CHECK(d.mesh.hasHidden() && d.mesh.hidden[0] && d.mesh.hidden[1] && !d.mesh.hidden[2]);
     // Clearing the mask clears it everywhere.
@@ -296,7 +296,7 @@ TEST(multires_attributes_follow_levels) {
     CHECK(run(u, "subdiv_level", {{"level", 1.0}}).ok);
     CHECK(run(u, "subdiv_level", {{"level", 2.0}}).ok);
     CHECK(u.mesh.uvs == uvs);
-    // Polypaint painted low is interpolated up; paint at the top survives a low-level paint elsewhere.
+    // Vertex paint painted low is interpolated up; paint at the top survives a low-level paint elsewhere.
     Document c = dividedCube(2);
     c.mesh.ensureColors();
     c.mesh.colors[0] = glm::vec3(1, 0, 0);
@@ -399,7 +399,7 @@ TEST(multires_project_round_trip_keeps_every_level) {
     CHECK(stroke(d, "0,0,2", "Standard", 0.3));
     CHECK(run(d, "subdiv_level", {{"level", 2.0}}).ok);
     CHECK(stroke(d, "0.4,0.4,2", "Inflate", 0.4, 1.0)); // pending, not folded in yet
-    d.mesh.ensurePolygroups()[3] = 5;
+    d.mesh.ensureFaceGroups()[3] = 5;
     std::vector<std::vector<glm::vec3>> levels;
     for (int i = 0; i < 4; ++i) levels.push_back(subdivLevelMesh(d.mesh, i).positions);
     const std::string path = tempPath("sf_multires.sfproj");
@@ -409,37 +409,37 @@ TEST(multires_project_round_trip_keeps_every_level) {
     CHECK(loadProject(path, e, err));
     CHECK(subdivLevelText(e.mesh) == "SDiv 2/4");
     CHECK(bitEqual(e.mesh.positions, levels[1]));
-    CHECK(e.mesh.polygroupAt(3) == 5);
+    CHECK(e.mesh.facegroupAt(3) == 5);
     for (int i : {0, 3, 2, 1}) {
         CHECK(run(e, "subdiv_level", {{"level", double(i + 1)}}).ok);
         CHECK(maxDistance(e.mesh.positions, levels[size_t(i)]) < 1e-6f);
     }
-    // Saved through the command too (which folds pending edits in first), and a second SubTool keeps its own levels.
-    e.addSubtool(makeIcosphere(1), "Eye", true);
+    // Saved through the command too (which folds pending edits in first), and a second Part keeps its own levels.
+    e.addPart(makeIcosphere(1), "Eye", true);
     run(e, "subdiv_divide");
     CHECK(run(e, "save_project", {{"path", path}}).ok);
     Document f;
     CHECK(loadProject(path, f, err));
-    CHECK(f.subtoolCount() == 2);
+    CHECK(f.partCount() == 2);
     CHECK(subdivLevelText(f.mesh) == "SDiv 2/2");
-    f.selectSubtool(0);
+    f.selectPart(0);
     CHECK(subdivLevelText(f.mesh) == "SDiv 2/4");
     CHECK(run(f, "subdiv_level", {{"level", 4.0}}).ok);
     CHECK(maxDistance(f.mesh.positions, levels[3]) < 1e-6f);
     std::filesystem::remove(path);
 }
 
-TEST(multires_subtools_exports_and_info) {
+TEST(multires_parts_exports_and_info) {
     Document d = dividedCube(2);
-    d.addSubtool(makeIcosphere(1), "Eye", true);
+    d.addPart(makeIcosphere(1), "Eye", true);
     CHECK(subdivLevelCount(d.mesh) == 0);
-    d.selectSubtool(0);
+    d.selectPart(0);
     CHECK(subdivLevelText(d.mesh) == "SDiv 3/3");
-    CHECK(run(d, "subtool_list").message.find("SDiv 3/3") != std::string::npos);
+    CHECK(run(d, "part_list").message.find("SDiv 3/3") != std::string::npos);
     CHECK(run(d, "subdiv_info").message.find("SDiv 1: 108 triangles") != std::string::npos);
     // Exports write the current level; subdiv_export the base.
     const std::string cur = tempPath("sf_multires_cur.obj"), base = tempPath("sf_multires_base.obj");
-    d.subtools[1].visible = false;
+    d.parts[1].visible = false;
     CHECK(run(d, "save_obj", {{"path", cur}}).ok);
     CHECK(run(d, "subdiv_export", {{"path", base}}).ok);
     CHECK(countObjFaces(cur, 4) == 54 * 16);

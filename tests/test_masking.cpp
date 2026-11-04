@@ -132,7 +132,7 @@ TEST(painted_mask_protects_from_brushes) {
 TEST(mask_commands_registered) {
     const std::string schema = registry().toolSchemaJson();
     for (const char* name : {"mask_clear", "mask_all", "mask_invert", "mask_blur", "mask_sharpen", "mask_grow",
-                             "mask_shrink", "mask_by_cavity", "mask_by_polygroup", "mask_border", "mask_rect", "mask_lasso"}) {
+                             "mask_shrink", "mask_by_cavity", "mask_by_facegroup", "mask_border", "mask_rect", "mask_lasso"}) {
         CHECK(registry().find(name) != nullptr);
         CHECK(schema.find(std::string("\"") + name + "\"") != std::string::npos);
     }
@@ -238,15 +238,15 @@ TEST(mask_by_cavity_finds_creases) {
     CHECK(countMasked(d.mesh, 0.0f) > 0);
 }
 
-TEST(mask_by_polygroup) {
+TEST(mask_by_facegroup) {
     Document d = makeDoc(makeIcosphere(3));
     Mesh& m = d.mesh;
-    m.ensurePolygroups();
+    m.ensureFaceGroups();
     for (uint32_t t = 0; t < m.triangleCount(); ++t) {
         const auto& tri = m.triangles[t];
-        m.polygroups[t] = (m.positions[tri.x].z + m.positions[tri.y].z + m.positions[tri.z].z) > 0.0f ? 2u : 0u;
+        m.facegroups[t] = (m.positions[tri.x].z + m.positions[tri.y].z + m.positions[tri.z].z) > 0.0f ? 2u : 0u;
     }
-    CHECK(registry().execute(d, "mask_by_polygroup", {{"group", 2.0}}).ok);
+    CHECK(registry().execute(d, "mask_by_facegroup", {{"group", 2.0}}).ok);
     bool ok = true;
     for (uint32_t v = 0; v < m.vertexCount(); ++v) {
         if (m.positions[v].z > 0.2f) ok &= m.mask[v] == 1.0f;
@@ -254,14 +254,14 @@ TEST(mask_by_polygroup) {
     }
     CHECK(ok);
     // Replace vs add.
-    CHECK(registry().execute(d, "mask_by_polygroup", {{"group", 0.0}}).ok);
+    CHECK(registry().execute(d, "mask_by_facegroup", {{"group", 0.0}}).ok);
     bool replaced = true;
     for (uint32_t v = 0; v < m.vertexCount(); ++v)
         if (m.positions[v].z > 0.2f) replaced &= m.mask[v] == 0.0f;
     CHECK(replaced);
-    CHECK(registry().execute(d, "mask_by_polygroup", {{"group", 2.0}, {"add", true}}).ok);
+    CHECK(registry().execute(d, "mask_by_facegroup", {{"group", 2.0}, {"add", true}}).ok);
     CHECK(countMasked(m) == m.vertexCount());
-    CHECK(!registry().execute(d, "mask_by_polygroup", {}).ok); // group is required
+    CHECK(!registry().execute(d, "mask_by_facegroup", {}).ok); // group is required
     CHECK(registry().execute(d, "undo").ok);
     CHECK(registry().execute(d, "undo").ok);
     CHECK(registry().execute(d, "undo").ok);
@@ -374,7 +374,7 @@ TEST(mask_rect_and_lasso_symmetry_and_clear_outside) {
     CHECK(wrong == 0 && countMasked(y.mesh) > 0);
     CHECK(!registry().execute(y, "mask_rect", {{"symmetry", std::string("xw")}}).ok);
 
-    // clear_outside (#48, ZBrush's Ctrl+drag on the background): a shape that covers none of the model clears the
+    // clear_outside (#48, the classic Ctrl+drag on the background): a shape that covers none of the model clears the
     // mask, as one undo step; one that covers some masks as usual; without it a miss changes nothing.
     const size_t before = countMasked(m);
     CHECK(registry().execute(d, "mask_rect", {{"x0", 5.0}, {"y0", 5.0}, {"x1", 6.0}, {"y1", 6.0}}).ok);
@@ -453,29 +453,84 @@ TEST(mask_border_closed_mesh_masks_nothing) {
     CHECK(r.message.find("No open edges: the mesh is closed") != std::string::npos);
     CHECK(countMasked(d.mesh, 0.0f) == 0);
     CHECK(!d.undo.canUndo());
-    // Nor are there polygroup borders on a mesh of one polygroup.
-    r = registry().execute(d, "mask_border", {{"polygroups", true}});
+    // Nor are there face group borders on a mesh of one face group.
+    r = registry().execute(d, "mask_border", {{"facegroups", true}});
     CHECK(r.message.find("No open edges") != std::string::npos);
     CHECK(!d.undo.canUndo());
 }
 
-TEST(mask_border_polygroup_borders) {
+TEST(mask_border_facegroup_borders) {
     Document d = makeDoc(makeIcosphere(3));
     Mesh& m = d.mesh;
-    m.polygroups.assign(m.triangleCount(), 0);
+    m.facegroups.assign(m.triangleCount(), 0);
     for (uint32_t t = 0; t < m.triangleCount(); ++t) {
         const glm::uvec3 tri = m.triangles[t];
-        m.polygroups[t] = m.positions[tri.x].y + m.positions[tri.y].y + m.positions[tri.z].y > 0.0f ? 1u : 0u;
+        m.facegroups[t] = m.positions[tri.x].y + m.positions[tri.y].y + m.positions[tri.z].y > 0.0f ? 1u : 0u;
     }
-    CHECK(registry().execute(d, "mask_border", {{"polygroups", true}}).ok);
+    CHECK(registry().execute(d, "mask_border", {{"facegroups", true}}).ok);
     const size_t seam = countMasked(m);
     CHECK(seam > 0 && seam < m.vertexCount() / 4);
     bool nearEquator = true;
     for (uint32_t v = 0; v < m.vertexCount(); ++v)
         if (m.mask[v] > 0.5f) nearEquator &= std::abs(m.positions[v].y) < 0.25f;
     CHECK(nearEquator);
-    CHECK(registry().execute(d, "mask_border", {{"polygroups", true}, {"rings", 3.0}}).ok);
+    CHECK(registry().execute(d, "mask_border", {{"facegroups", true}, {"rings", 3.0}}).ok);
     CHECK(countMasked(m) > seam);
-    // Without polygroups the closed sphere still has no border to mask.
+    // Without face groups the closed sphere still has no border to mask.
     CHECK(registry().execute(d, "mask_border").message.find("No open edges") != std::string::npos);
+}
+
+TEST(mask_by_peaks_finds_ridges) {
+    // The same banded sphere as above: the band's upper and lower rims (where the surface steps in) are ridges.
+    Mesh m = makeIcosphere(5);
+    for (glm::vec3& p : m.positions)
+        if (std::abs(p.y) < 0.3f) p *= 0.85f;
+    m.recomputeAllNormals();
+    Document d = makeDoc(std::move(m));
+    CHECK(registry().execute(d, "mask_by_peaks", {{"strength", 1.0}, {"threshold", 0.02}}).ok);
+    bool capsFree = true, ridgeMasked = false, valleyFree = true;
+    for (uint32_t v = 0; v < d.mesh.vertexCount(); ++v) {
+        const float y = std::abs(d.mesh.positions[v].y);
+        const float r = glm::length(d.mesh.positions[v]);
+        if (y > 0.6f) capsFree &= d.mesh.mask[v] < 0.25f; // a smooth ball is barely convex
+        if (r > 0.95f && y > 0.28f && y < 0.36f) ridgeMasked |= d.mesh.mask[v] > 0.5f;
+        if (r < 0.9f && y < 0.15f) valleyFree &= d.mesh.mask[v] < 0.5f; // the middle of the band
+    }
+    CHECK(capsFree);
+    CHECK(ridgeMasked);
+    CHECK(valleyFree);
+    CHECK(registry().execute(d, "undo").ok);
+    CHECK(countMasked(d.mesh, 0.0f) == 0);
+}
+
+TEST(mask_by_color_and_facing) {
+    Document d = makeDoc(makeIcosphere(4));
+    Mesh& m = d.mesh;
+    // Unpainted meshes are white: white masks everything, red nothing.
+    CHECK(registry().execute(d, "mask_by_color", {{"r", 1.0}, {"g", 1.0}, {"b", 1.0}}).ok);
+    CHECK(countMasked(m) == m.vertexCount());
+    CHECK(registry().execute(d, "mask_by_color", {{"r", 1.0}, {"g", 0.0}, {"b", 0.0}}).ok);
+    CHECK(countMasked(m, 0.0f) == 0);
+    // Paint the top red: By colour masks just it, and add keeps what was masked.
+    m.ensureColors(glm::vec3(1.0f));
+    for (uint32_t v = 0; v < m.vertexCount(); ++v)
+        if (m.positions[v].y > 0.5f) m.colors[v] = glm::vec3(0.9f, 0.05f, 0.05f);
+    CHECK(registry().execute(d, "mask_by_color", {{"r", 1.0}, {"g", 0.0}, {"b", 0.0}, {"tolerance", 0.2}}).ok);
+    bool exact = true;
+    for (uint32_t v = 0; v < m.vertexCount(); ++v) exact &= (m.mask[v] > 0.99f) == (m.positions[v].y > 0.5f);
+    CHECK(exact);
+
+    // By facing: +z within 45 degrees is the front cap only; add grows it with the top.
+    CHECK(registry().execute(d, "mask_by_facing", {{"x", 0.0}, {"y", 0.0}, {"z", 1.0}, {"angle", 45.0}}).ok);
+    bool front = true;
+    for (uint32_t v = 0; v < m.vertexCount(); ++v) {
+        const glm::vec3 n = glm::normalize(m.positions[v]);
+        if (n.z > 0.88f) front &= m.mask[v] > 0.99f; // within 30 degrees: fully masked
+        if (n.z < 0.7f) front &= m.mask[v] == 0.0f;  // beyond 45 degrees: free
+    }
+    CHECK(front);
+    const size_t frontCount = countMasked(m, 0.0f);
+    CHECK(registry().execute(d, "mask_by_facing", {{"x", 0.0}, {"y", 2.0}, {"z", 0.0}, {"angle", 45.0}, {"add", true}}).ok);
+    CHECK(countMasked(m, 0.0f) > frontCount);
+    CHECK(!registry().execute(d, "mask_by_facing", {{"x", 0.0}, {"y", 0.0}}).ok); // z is required
 }

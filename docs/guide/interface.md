@@ -83,7 +83,7 @@ Classic layout again right after. The look and layout are remembered for the nex
 shows once: **Try it** switches to Forge Terminal with the Neutral colours and the SculptForge layout; **Keep my layout**
 changes nothing. Either way, Edit > Preferences > Interface > Look changes it later.
 
-In scripts: `ui_look look=forge scheme=neutral outlines=subtle layout=sculptforge` (or `look=classic layout=zbrush`).
+In scripts: `ui_look look=forge scheme=neutral outlines=subtle layout=sculptforge` (or `look=classic layout=classic`).
 
 ## Turning AI off
 

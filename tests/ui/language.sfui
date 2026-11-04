@@ -1,7 +1,7 @@
 # The interface language (#44), Preferences > Interface > Language: Español translates the palette bar, the
-# palettes, the shelves and the Ctrl-help; brush and tool names (SubTool, QRemesh, Clay Buildup) stay as they are.
+# palettes, the shelves and the Ctrl-help; brush and tool names (Part, QRemesh, Clay Block) stay as they are.
 # The "##" ids don't change, so every button works the same in either language, and English comes back unchanged.
-run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=2
 click "Preferences##palette.preferences"
 click "Interface##preferences.interface"
@@ -26,7 +26,7 @@ expect_text "Tamaño de dibujo"
 expect_text "Intensidad"
 expect "Clay Block##brush.clayblock"
 expect "Move##brush.move"
-expect "Piezas##tool.subtool"
+expect "Piezas##tool.part"
 
 # Tool > Geometry: the translated Divide divides.
 click "Geometría##tool.geometry"

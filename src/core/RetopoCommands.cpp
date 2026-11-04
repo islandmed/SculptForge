@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// qremesh and project_all: the scriptable side of Geometry > QRemesh and SubTool > Project (core/QRemesh.h,
+// qremesh and project_all: the scriptable side of Geometry > QRemesh and Part > Project (core/QRemesh.h,
 // core/Projection.h). The app runs QRemesh on a worker thread and applies the result with applyQRemesh.
 #include "core/Commands.h"
 #include "core/KeepMasked.h"
@@ -45,11 +45,11 @@ std::string qualitySummary(const QuadQuality& q) {
 std::string applyQRemesh(Document& doc, Mesh result, bool keepOriginal, const QRemeshStats& st) {
     const size_t before = doc.mesh.triangleCount();
     if (keepOriginal) {
-        const SubTool& active = doc.activeSubtoolInfo();
-        const int at = doc.activeSubtool + 1;
-        doc.addSubtool(doc.mesh, active.name + " Original", false, at);
-        doc.subtools[size_t(at)].visible = false;
-        doc.subtools[size_t(at)].qremeshGuides = doc.qremeshGuides; // to remesh it again with them
+        const Part& active = doc.activePartInfo();
+        const int at = doc.activePart + 1;
+        doc.addPart(doc.mesh, active.name + " Original", false, at);
+        doc.parts[size_t(at)].visible = false;
+        doc.parts[size_t(at)].qremeshGuides = doc.qremeshGuides; // to remesh it again with them
     }
     doc.replaceMeshUndoable(std::move(result), "Quad Remesh");
     const size_t faces = st.quads + st.triangles;
@@ -99,7 +99,7 @@ void registerRetopoCommands(CommandRegistry& reg) {
               {"keep_groups", T::Bool, "Keep Groups: edge loops follow the face group borders and the groups are kept.", false},
               {"detect_edges", T::Bool, "Detect Edges: hard edges get an edge loop (v2: faces meeting at more than about "
                                         "60 degrees along a line a few quads long; legacy: over 50 degrees). Default true.", false},
-              {"use_polypaint", T::Bool, "Use the vertex paint as a density guide: red areas get up to 4x the quads, blue "
+              {"use_vertexpaint", T::Bool, "Use the vertex paint as a density guide: red areas get up to 4x the quads, blue "
                                          "areas down to a quarter.", false},
               {"symmetry", T::String, "Mirror the topology across x, y or z. The mirror plane is found from the model (the "
                                       "world's centre plane, or the model's own middle when it sits off-centre); a model "
@@ -136,7 +136,7 @@ void registerRetopoCommands(CommandRegistry& reg) {
                  o.adaptive = float(std::clamp(argNumber(a, "adaptive", 0.5), 0.0, 1.0));
                  o.keepGroups = argBool(a, "keep_groups", false);
                  o.detectEdges = argBool(a, "detect_edges", true);
-                 o.usePolypaint = argBool(a, "use_polypaint", false);
+                 o.useVertexPaint = argBool(a, "use_vertexpaint", false);
                  o.symmetryAxis = symmetryAxisArg(argString(a, "symmetry"));
                  if (a.contains("symmetry_center")) {
                      o.symmetryAuto = false;
@@ -169,7 +169,7 @@ void registerRetopoCommands(CommandRegistry& reg) {
               {"mean", T::Bool, "Mean: with surface on both sides, settle halfway between them. Default false.", false},
               {"blur", T::Number, "PA Blur: smoothing passes over the projected offsets (0-20). Default 0.", false},
               {"geometry", T::Bool, "Project the shape. Default true.", false},
-              {"polypaint", T::Bool, "Project the vertex paint (when a source has any). Default true.", false},
+              {"vertexpaint", T::Bool, "Project the vertex paint (when a source has any). Default true.", false},
               {"source", T::String, "Project only from the Part with this name (default: all visible ones).", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  ProjectOptions o;
@@ -177,12 +177,12 @@ void registerRetopoCommands(CommandRegistry& reg) {
                  o.mean = argBool(a, "mean", false);
                  o.blur = int(std::clamp(argNumber(a, "blur", 0), 0.0, 20.0));
                  o.geometry = argBool(a, "geometry", true);
-                 o.polypaint = argBool(a, "polypaint", true);
+                 o.vertexpaint = argBool(a, "vertexpaint", true);
                  int source = -1;
                  if (a.contains("source")) {
-                     source = doc.findSubtool(argString(a, "source"));
+                     source = doc.findPart(argString(a, "source"));
                      if (source < 0) return {false, "No Part called '" + argString(a, "source") + "'"};
-                     if (source == doc.activeSubtool) return {false, "Project All can't project a Part onto itself"};
+                     if (source == doc.activePart) return {false, "Project All can't project a Part onto itself"};
                  }
                  std::string msg;
                  const bool ok = projectAll(doc, o, msg, source);

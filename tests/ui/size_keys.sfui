@@ -1,4 +1,4 @@
-# S and U change Draw Size and Z Intensity at the cursor in the default (SculptForge) and ZBrush input styles,
+# S and U change Draw Size and Z Intensity at the cursor in the default (SculptForge) and classic input styles,
 # also after a click on a panel (askNK's review: "the shortcut keys for brush size and intensity" seemed not to work).
 run new_sphere subdivisions=4
 
@@ -21,7 +21,7 @@ release
 expect_value size_popup_open == 0
 expect_value z_intensity < $z0
 
-input_style zbrush
+input_style classic
 mouse_move 0.4 0.6
 remember draw_size s1
 key s

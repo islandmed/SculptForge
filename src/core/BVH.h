@@ -32,6 +32,10 @@ public:
     // `axis` (a brush whose falloff is measured on screen reaches through the model along the view).
     void queryVerticesCylinder(const Mesh& mesh, const glm::vec3& point, const glm::vec3& axis, float radius,
                                std::vector<uint32_t>& out) const;
+    // queryVertices for a capsule: every vertex within `radius` of the segment a..b (a fused batch of dabs along
+    // a stroke, core/SculptBatch.cpp).
+    void queryVerticesCapsule(const Mesh& mesh, const glm::vec3& a, const glm::vec3& b, float radius,
+                              std::vector<uint32_t>& out) const;
     // Appends every triangle whose bounds touch the sphere (cleared first; hidden ones included).
     void queryTriangles(const Mesh& mesh, const glm::vec3& center, float radius, std::vector<uint32_t>& out) const;
     // Calls fn(triangles of the leaf) for every leaf whose box touches the sphere (hidden triangles included);
@@ -55,7 +59,7 @@ public:
         return n.count > 0 ? std::span<const uint32_t>(triIndices_.data() + n.first, n.count) : std::span<const uint32_t>();
     }
     void refitLeaves(const Mesh& mesh, std::span<const uint32_t> leaves);
-    // Recomputes every box (same tree) after most of the mesh moved, e.g. a whole SubTool transformed.
+    // Recomputes every box (same tree) after most of the mesh moved, e.g. a whole Part transformed.
     void refitAll(const Mesh& mesh);
 
     // Dynamic topology (core/Dyntopo.h): a few triangles at a time added, removed or renumbered without a

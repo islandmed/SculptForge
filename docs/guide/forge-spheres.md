@@ -49,7 +49,7 @@ Everything also works with the pointer alone, without a key held (#8):
 - **Right click** a sphere (a click, not a drag: a right drag still turns the view) for a menu with **Delete
   Sphere**, **Insert Between** and **Set as Root**.
 
-Each is one undo step, and Symmetry mirrors Delete and Insert. From a script: `zsphere_set_root index=3`.
+Each is one undo step, and Symmetry mirrors Delete and Insert. From a script: `forgesphere_set_root index=3`.
 
 ## Preview the skin
 
@@ -74,13 +74,13 @@ Make Mesh again. The armature is saved with the project.
 
 ## Scripting
 
-The same operations are commands (see [Scripting](scripting.md)): `zsphere_new`, `zsphere_list`, `zsphere_add`,
-`zsphere_set`, `zsphere_delete`, `zsphere_insert`, `zsphere_preview` and `zsphere_make_mesh`. For example, a
+The same operations are commands (see [Scripting](scripting.md)): `forgesphere_new`, `forgesphere_list`, `forgesphere_add`,
+`forgesphere_set`, `forgesphere_delete`, `forgesphere_insert`, `forgesphere_preview` and `forgesphere_make_mesh`. For example, a
 simple figure:
 
 ```
-zsphere_new radius=0.5
-zsphere_add parent=0 position=0,0.8,0 radius=0.3
-zsphere_add parent=0 position=0.9,0.1,0 radius=0.2 symmetry=x
-zsphere_make_mesh resolution=160
+forgesphere_new radius=0.5
+forgesphere_add parent=0 position=0,0.8,0 radius=0.3
+forgesphere_add parent=0 position=0.9,0.1,0 radius=0.2 symmetry=x
+forgesphere_make_mesh resolution=160
 ```

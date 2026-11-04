@@ -1,14 +1,14 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Texture transfer: keeps a SubTool's painted texture (core/Texture.h) when its UVs or its surface are rebuilt.
+// Texture transfer: keeps a Part's painted texture (core/Texture.h) when its UVs or its surface are rebuilt.
 //
-// - New UVs on the same triangles (Auto UV on a textured SubTool): every texel of the new layout is the same
+// - New UVs on the same triangles (Auto UV on a textured Part): every texel of the new layout is the same
 //   surface point as before (same triangle, same barycentrics), so it reads the old texture at the old UVs.
 //   Every layer is transferred, with its settings; the result is exact up to resampling (bilinear).
 // - A new surface (voxel remesh, QRemesh): the result gets Auto UVs, and every texel takes the colour of the
 //   closest point of the old surface. Every layer is transferred too.
-// - Merged SubTools: the merged mesh keeps each part's triangles in order, so each texel reads its part's
+// - Merged Parts: the merged mesh keeps each part's triangles in order, so each texel reads its part's
 //   texture exactly (layers are flattened, as the parts' stacks differ).
 //
 // Texels are filled triangle by triangle on all threads; then the texels around each UV island are padded

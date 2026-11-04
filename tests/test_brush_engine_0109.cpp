@@ -8,7 +8,7 @@
 #include "core/Benchmark.h"
 #include "core/BrushAlpha.h"
 #include "core/Micro.h"
-#include "core/Polypaint.h"
+#include "core/VertexPaint.h"
 #include "core/Primitives.h"
 #include "core/Sculpt.h"
 #include "core/Stroke.h"
@@ -53,7 +53,7 @@ float microFront(const Document& doc, float x, float y) {
 } // namespace
 
 TEST(clay_follows_intensity_and_pressure) {
-    for (BrushType type : {BrushType::Clay, BrushType::ClayBuildup}) {
+    for (BrushType type : {BrushType::Clay, BrushType::ClayBlock}) {
         const float i10 = clayStrokeHeight(type, 0.1f, 1.0f), i50 = clayStrokeHeight(type, 0.5f, 1.0f),
                     i100 = clayStrokeHeight(type, 1.0f, 1.0f);
         CHECK(i10 > 0.0f);
@@ -153,7 +153,7 @@ TEST(smooth_straightens_face_group_borders_only) {
     Document d = makeDoc(makePlane(64, 2.0f));
     Mesh& m = d.mesh;
     // A staircase border: group 1 above z = 0 or z = 0.0625, alternating every eighth of a unit along X.
-    std::vector<uint32_t>& groups = m.ensurePolygroups();
+    std::vector<uint32_t>& groups = m.ensureFaceGroups();
     for (uint32_t t = 0; t < m.triangleCount(); ++t) {
         const glm::uvec3 tr = m.triangles[t];
         const glm::vec3 c = (m.positions[tr.x] + m.positions[tr.y] + m.positions[tr.z]) / 3.0f;

@@ -198,7 +198,7 @@ size_t deformActivePart(Document& doc, DeformOp op, const DeformOptions& o, std:
         error = name + ": the active Part is empty";
         return 0;
     }
-    if (!mesh.zspheres.empty()) {
+    if (!mesh.forgespheres.empty()) {
         error = name + ": the active Part is a Forge Sphere Part (Make Mesh first)";
         return 0;
     }

@@ -129,7 +129,7 @@ on the same computer; for one on another computer, import the PNG by hand. See
 
 | Command | What it does |
 |---|---|
-| `bake` | Bake onto the active Part and write the maps. Options: `source=all`, a Part name, `subdivision` or `micro`, `maps=normal,object_normal,displacement,ao,cavity,color,curvature,thickness,position,id` (or `all`), `udim=true`, `thickness_rays=24`, `thickness_distance=0.1`, `curvature_radius=0.02`, `id=polygroups` or `parts`, `size=2048` (512 to 8192, or `1k`...`8k`), `out=folder`, `name=prefix`, `front=0.02` and `rear=0.02` (fractions of the model's size, or `auto`), `samples=2`, `padding=8`, `ao_rays=48`, `ao_distance=0.05`, `green=opengl` or `directx`, `displacement_scale=` (world units at white), `exr=true` |
+| `bake` | Bake onto the active Part and write the maps. Options: `source=all`, a Part name, `subdivision` or `micro`, `maps=normal,object_normal,displacement,ao,cavity,color,curvature,thickness,position,id` (or `all`), `udim=true`, `thickness_rays=24`, `thickness_distance=0.1`, `curvature_radius=0.02`, `id=facegroups` or `parts`, `size=2048` (512 to 8192, or `1k`...`8k`), `out=folder`, `name=prefix`, `front=0.02` and `rear=0.02` (fractions of the model's size, or `auto`), `samples=2`, `padding=8`, `ao_rays=48`, `ao_distance=0.05`, `green=opengl` or `directx`, `displacement_scale=` (world units at white), `exr=true` |
 
 For example, from the console or `sculptforge-cli`:
 

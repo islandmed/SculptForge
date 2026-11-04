@@ -47,6 +47,23 @@ public:
     size_t pendingShading() const { return pendingCount_; }
     // Grid points of shading recomputed per sync at most (0 = no limit).
     size_t shadeBudget = size_t(3) << 20;
+    // Research (off by default, SF_MICRO_GPU_SHADE=1): the shading grid computed on the GPU instead of by MicroShader,
+    // in two passes of fragment shaders into float / integer targets; GL 3.3, no compute, no readback. A sync shades what fits gpuShadeTargetMs of GPU time at the measured cost (2M points
+    // until measured). Falls back to the CPU when it can't run (more than four chunks, a mask, a failed pass).
+    enum class GpuShade { Off, On };
+    static GpuShade gpuShadeModeDefault();
+    static bool gpuShadeDefault() { return gpuShadeModeDefault() != GpuShade::Off; }
+    GpuShade gpuShadeMode = gpuShadeModeDefault();
+    bool gpuShade = gpuShadeDefault();
+    double gpuShadeTargetMs = 4.0;
+    size_t gpuShadeBudget() const;
+    double lastGpuShadeMs = 0.0;  // GPU time of the last pass (timer query, read a sync later), 0 if unknown
+    uint64_t gpuShadedPoints = 0; // grid points the GPU shaded so far
+    // Totals for benchmarks (SF_GS_STATS=1 prints them on release, SF_GS_STATS=FILE appends them to FILE): passes, CPU ms submitting them, GPU ms (queried
+    // passes), and the CPU path's syncs and ms.
+    uint64_t gsPasses = 0, gsQueried = 0, cpuShadePasses = 0;
+    double gsCpuMs = 0.0, gsGpuMs = 0.0, cpuShadeMs = 0.0;
+    bool gpuShadeFailed() const { return gsFailed_; }
     // The last draw: the level used by each visible cluster (-1 = culled), and the target it settled on.
     float lastTargetPx = 0.0f;
 
@@ -57,6 +74,9 @@ private:
     void ensurePatches(int level);
     void uploadDispTiles(const Mesh& mesh, std::vector<uint32_t>& slots, bool all);
     void shadePending(const Mesh& mesh, bool all);
+    void buildGpuShade(const Mesh& mesh);
+    // The shading of `tris` (and only those) on the GPU; false when it can't (the caller shades on the CPU).
+    bool shadeOnGpu(const Mesh& mesh, std::vector<uint32_t>& tris);
 
     uint64_t serial_ = 0;
     uint32_t baseTriangles_ = 0, baseVertices_ = 0;
@@ -88,6 +108,21 @@ private:
     size_t bytes_ = 0;
     MicroShader shader_;
     std::vector<uint64_t> pending_; // per base triangle: shading out of date
+    double shadeNsPerPoint_ = 0.0;
+    GLuint gsProgram_ = 0;  // GPU shading: the pass, its tables, the list of slots, the output, a timer query
+    bool gsFailed_ = false;
+    GLuint gsNbrData_ = 0, gsNbrTex_ = 0, gsRingOffData_ = 0, gsRingOffTex_ = 0, gsRingData_ = 0, gsRingTex_ = 0;
+    GLuint gsIJData_ = 0, gsIJTex_ = 0, gsListData_ = 0, gsListTex_ = 0, gsOut_ = 0, gsQuery_ = 0;
+    GLuint gsPosProgram_ = 0, gsRowData_ = 0, gsRowTex_ = 0, gsList1Data_ = 0, gsList1Tex_ = 0;
+    GLuint gsFbo_ = 0, gsPosTarget_ = 0, gsShadeTarget_ = 0; // the fragment-shader passes' targets (uW x rows)
+    int gsPosRows_ = 0, gsShadeRows_ = 0;
+    size_t gsQueryPoints_ = 0;   // points of the pass the pending query times
+    double gsNsPerPoint_ = 0.0;  // its GPU cost, smoothed
+    size_t gsOutBytes_ = 0;
+    std::vector<int32_t> gsRow_;
+    bool gsQueryPending_ = false;
+    std::vector<uint32_t> gsStamp_, gsVStamp_;
+    uint32_t gsEpoch_ = 0;  // what shading a grid point (and sending it) took lately (TierConfig::strokeShadeMs)
     size_t pendingCount_ = 0;
     std::vector<uint32_t> scratch_, written_, stageIndex_;
     std::vector<uint8_t> staging_;

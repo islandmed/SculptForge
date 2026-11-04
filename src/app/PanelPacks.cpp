@@ -9,7 +9,7 @@
 #include "app/I18n.h"
 #include "app/Ui.h"
 #include "core/BrushLibrary.h"
-#include "core/Matcap.h"
+#include "core/LitSphere.h"
 #include "core/MaterialRecipe.h"
 #include "core/Project.h"
 #include "core/Texture.h"
@@ -111,7 +111,7 @@ void App::registerPackActions() {
         [this] { openNewPack(); });
     add("pack.library", "Packs", ICON_LC_PACKAGE, "Library",
         "Library > Packs: the installed packs. Switch one off or remove it, apply its keymap, add its pie menus.",
-        [this] { lightbox_.show(LibraryTab::Packs); });
+        [this] { libraryBrowser_.show(LibraryTab::Packs); });
     add("macro.record", "Record Macro", ICON_LC_CIRCLE_DOT, "Library > Packs",
         "Start recording: the commands you run (menus, buttons, the console) are kept as a macro until you press it "
         "again. Files inside the project folder are kept as relative paths, any other file is asked for when the "
@@ -126,7 +126,7 @@ void App::registerPackActions() {
     packs_.materials = enabledPackItems(PackItemType::Material);
     packs_.keymaps = enabledPackItems(PackItemType::Keymap);
     packs_.pieMenus = enabledPackItems(PackItemType::PieMenu);
-    loadPackMatcaps();
+    loadPackLitSpheres();
     refreshMacroActions();
 }
 
@@ -152,18 +152,18 @@ void App::refreshMacroActions() {
     }
 }
 
-void App::loadPackMatcaps() {
-    for (int i : packs_.matcaps) removeCustomMatcap(i);
-    packs_.matcaps.clear();
-    for (const PackContentItem& item : enabledPackItems(PackItemType::Matcap)) {
-        CustomMatcap m;
+void App::loadPackLitSpheres() {
+    for (int i : packs_.litspheres) removeCustomLitSphere(i);
+    packs_.litspheres.clear();
+    for (const PackContentItem& item : enabledPackItems(PackItemType::LitSphere)) {
+        CustomLitSphere m;
         std::string err;
-        if (!readMatcapImage(item.file, m, err)) {
+        if (!readLitSphereImage(item.file, m, err)) {
             SDL_Log("Lit Spheres: %s (pack %s): %s", item.file.c_str(), item.packName.c_str(), err.c_str());
             continue;
         }
         m.name = item.label(); // "Chrome (Member pack)": never mistaken for (or replacing) another
-        packs_.matcaps.push_back(addCustomMatcap(std::move(m)));
+        packs_.litspheres.push_back(addCustomLitSphere(std::move(m)));
     }
 }
 
@@ -176,7 +176,7 @@ void App::refreshPacks() {
     packs_.materials = enabledPackItems(PackItemType::Material);
     packs_.keymaps = enabledPackItems(PackItemType::Keymap);
     packs_.pieMenus = enabledPackItems(PackItemType::PieMenu);
-    loadPackMatcaps();
+    loadPackLitSpheres();
     refreshMacroActions();
 }
 
@@ -345,7 +345,7 @@ void App::drawPackReview() {
                 refreshPacks();
                 status_ = "Installed " + m.name + " " + m.version + ": " + packCountsText(r->counts) +
                           (packsSafeMode() ? " (packs are off this session: --no-packs)" : "");
-                lightbox_.show(LibraryTab::Packs);
+                libraryBrowser_.show(LibraryTab::Packs);
                 close = true;
             } else {
                 status_ = "Could not install " + m.name + ": " + err;
@@ -558,9 +558,9 @@ void App::openNewPack() {
     if (!library_.user.empty())
         for (const std::string& f : filesIn(library_.user + "/Alphas", images))
             add(PackItemType::Alpha, utf8(fsPath(f).stem()), f);
-    for (const std::string& f : filesIn(matcapFolder(), images)) add(PackItemType::Matcap, utf8(fsPath(f).stem()), f);
+    for (const std::string& f : filesIn(litsphereFolder(), images)) add(PackItemType::LitSphere, utf8(fsPath(f).stem()), f);
     if (hasTexture(doc_.mesh)) {
-        const std::string name = doc_.activeSubtoolInfo().name + " Material";
+        const std::string name = doc_.activePartInfo().name + " Material";
         const std::string text = materialRecipeText(*doc_.mesh.texture, name);
         MaterialRecipe probe;
         std::string err;
@@ -904,7 +904,7 @@ double App::packsTestValue(const std::string& name) const {
     }
     if (name == "pack_alphas") return double(packs_.alphas.size());
     if (name == "pack_materials") return double(packs_.materials.size());
-    if (name == "pack_matcaps") return double(packs_.matcaps.size());
+    if (name == "pack_litspheres") return double(packs_.litspheres.size());
     if (name == "pack_keymaps") return double(packs_.keymaps.size());
     if (name == "pack_brushes")
         return double(std::count_if(doc_.brushes.begin(), doc_.brushes.end(),

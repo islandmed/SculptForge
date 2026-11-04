@@ -111,7 +111,7 @@ All JSON; `X-SF-Token` header (or `?k=`) on everything but `/` and `/api/pair`.
 | `GET /api/file/<id>` | `{"received","size"}` |
 | `POST /api/capture/<id>/finish` | moves it to `Captures/<yyyy-mm-dd_hhmmss>-<kind>/`, writes `capture.json`, runs the command; 409 lists incomplete files |
 | `POST /api/capture/<id>/cancel` | drops it |
-| `POST /api/ar {"scope":"subtool|scene","size":cm}` | asks for an AR model |
+| `POST /api/ar {"scope":"part|scene","size":cm}` | asks for an AR model |
 | `GET /ar/model.usdz`, `GET /ar/model.glb` | the newest model (503 while preparing) |
 | `POST /api/face` | face messages (one per line), for `/face` on localhost and tests |
 | `GET /api/face-link` | creates a WebRTC offer, -> `{"url"}` of the face page |
@@ -119,7 +119,7 @@ All JSON; `X-SF-Token` header (or `?k=`) on everything but `/` and `/api/pair`.
 
 The phone retries network failures with backoff (2 s doubling to 30 s, 12 tries) and resumes from what the desktop
 has. Captures then run, by kind: `splat_train source=<video or folder>` (owned by the splat feature), the Image to 3D
-window (generating at once, a window option), and `open` (splat `.ply`/`.splat`) or `subtool_append` (mesh `.ply`).
+window (generating at once, a window option), and `open` (splat `.ply`/`.splat`) or `part_append` (mesh `.ply`).
 A missing command is reported in the status bar.
 
 ## Face feed

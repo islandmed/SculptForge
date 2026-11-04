@@ -2,15 +2,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // The Blender bridge: SculptForge and the SculptForge add-on for Blender
-// (addons/blender) exchange meshes through a per-user folder, the way GoZ apps
-// do with ZBrush. Meshes travel as .GoZ files (io/GozIO.h: quads, UVs,
-// polypaint, mask, polygroups); a small JSON manifest per direction lists the
+// (addons/blender) exchange meshes through a per-user folder, the way Bridge apps
+// do . Meshes travel as Bridge files (io/BridgeIO.h: quads, UVs,
+// vertex paint, mask, face groups); a small JSON manifest per direction lists the
 // objects, their Blender names and transforms, and a revision number so each
 // side sees what is new. No sockets: each side polls the other's manifest.
 // docs/blender.md describes the folder and the manifest.
 //
-//   <root>/to_sculptforge/manifest.json + r<rev>_<k>.GoZ   written by Blender
-//   <root>/to_blender/manifest.json     + r<rev>_<k>.GoZ   written by SculptForge
+//   <root>/to_sculptforge/manifest.json + r<rev>_<k>.<ext>   written by Blender
+//   <root>/to_blender/manifest.json     + r<rev>_<k>.<ext>   written by SculptForge
 //   <root>/app.json    where SculptForge is installed (the add-on starts it)
 //   <root>/alive.json  SculptForge's heartbeat, so the add-on knows it is running
 #pragma once
@@ -27,11 +27,11 @@ namespace sf {
 
 // One object in a manifest.
 struct BridgeObject {
-    std::string name;            // the Blender object name (UTF-8, exact): the SubTool's gozName
-    std::string file;            // .GoZ file name inside the manifest's folder
+    std::string name;            // the Blender object name (UTF-8, exact): the Part's bridgeName
+    std::string file;            // Bridge file name inside the manifest's folder
     bool hasMatrix = false;      // the mesh is in object space and `matrix` places it in the scene
     glm::dmat4 matrix{1.0};      // Blender's matrix_world (Z-up, metres; glm column-major)
-    std::string shapes;          // optional: blend shapes file (writeBridgeShapes) beside the .GoZ
+    std::string shapes;          // optional: blend shapes file (writeBridgeShapes) beside the Bridge
 };
 
 struct BridgeManifest {
@@ -65,7 +65,7 @@ glm::dvec3 blenderToSculptForge(const glm::dvec3& p);
 glm::dvec3 sculptForgeToBlender(const glm::dvec3& p);
 glm::dmat4 blenderMatrixToSculptForge(const glm::dmat4& m);
 
-// Blend shapes (sculpt layers) for the add-on's shape keys, sent beside an object's .GoZ (which then holds the base
+// Blend shapes (sculpt layers) for the add-on's shape keys, sent beside an object's Bridge (which then holds the base
 // shape, every layer at zero). Little endian: "SFSHAPES", u32 version 1, u32 vertex count, u32 shape count, then per
 // shape u32 name length, the name (UTF-8), f32 weight, u32 count N, u32[N] vertex indices, f32[3N] offsets in
 // Blender's axes (Z up, metres, world space).
@@ -78,7 +78,7 @@ struct BridgeShape {
 bool writeBridgeShapes(const std::string& path, const Mesh& mesh, std::string& error);
 bool readBridgeShapes(const std::string& path, uint32_t& vertexCount, std::vector<BridgeShape>& out, std::string& error);
 
-// Loads what Blender sent (<root>/to_sculptforge): every object's .GoZ, moved by its matrix into place, named
+// Loads what Blender sent (<root>/to_sculptforge): every object's Bridge, moved by its matrix into place, named
 // after its Blender object. `manifest` receives the manifest (for its revision).
 bool blenderReceive(const std::string& root, std::vector<MeshObject>& out, BridgeManifest* manifest,
                     std::string& message);

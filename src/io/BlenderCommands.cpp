@@ -3,7 +3,7 @@
 #include "io/BlenderCommands.h"
 
 #include "io/BlenderBridge.h"
-#include "io/GozCommands.h"
+#include "io/BridgeCommands.h"
 
 namespace sf {
 
@@ -18,12 +18,12 @@ void registerBlenderCommands(CommandRegistry& reg) {
              [](Document& doc, const Args& a) -> CommandResult {
                  const std::string root = argString(a, "folder", blenderExchangeRoot());
                  std::vector<int> indices;
-                 const auto objects = gozObjects(doc, indices);
+                 const auto objects = bridgeObjects(doc, indices);
                  std::vector<std::string> sent;
                  std::string msg;
                  if (!blenderSend(objects, root, msg, &sent)) return {false, msg};
-                 // Blender's next send of these objects updates the same SubTools.
-                 for (size_t k = 0; k < sent.size() && k < indices.size(); ++k) subtoolGozName(doc, indices[k]) = sent[k];
+                 // Blender's next send of these objects updates the same Parts.
+                 for (size_t k = 0; k < sent.size() && k < indices.size(); ++k) partBridgeName(doc, indices[k]) = sent[k];
                  return {true, msg};
              }});
 

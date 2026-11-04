@@ -5,7 +5,7 @@
 #   FBX       ufbx (third_party/ufbx) in strict mode: textures, materials, UVs
 #   all       the texture is sampled the right way up: a checker texture is sampled through each format's UVs
 #             (OBJ/USD/FBX: v up, glTF: v down) and compared with SculptForge's own sampling (a PLY of the
-#             polypaint made from the same texture).
+#             vertex paint made from the same texture).
 # Usage: tools/export_check/run.sh BUILD_DIR [WORK_DIR]   (needs node/npm, cc, and uv or python3 -m venv)
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -36,9 +36,9 @@ for y in range(1024):
         px[x, y] = (int(r * 255), int(g * 255), int(b * 255))
 im.save(sys.argv[1])
 PY
-"$cli" -q -c "new_sphere subdivisions=4; uv_auto; texture_import path=$out/checker.png; polypaint_from_texture; \
+"$cli" -q -c "new_sphere subdivisions=4; uv_auto; texture_import path=$out/checker.png; vertexpaint_from_texture; \
 export_ply path=$out/truth.ply; save_obj path=$out/s.obj; export_glb path=$out/s.glb; export_usd path=$out/s.usda; \
-export_fbx path=$out/s.fbx; layer_add name=Bulge; subtool_append primitive=sphere; uv_auto; texture_create size=1024; \
+export_fbx path=$out/s.fbx; layer_add name=Bulge; part_append primitive=sphere; uv_auto; texture_create size=1024; \
 export_glb path=$out/scene.glb; export_usd path=$out/scene.usdz; export_fbx path=$out/scene.fbx lods=2"
 
 echo "== glTF validator";  for f in "$out"/s.glb "$out"/scene.glb; do NODE_PATH="$work/tools/node_modules" node "$here/validate_gltf.js" "$f" | head -6; done

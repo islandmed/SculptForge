@@ -201,7 +201,7 @@ each of them. Before a big change on a heavy sculpt:
 | `subdivide` | `levels` 1-4 (default 1) |
 | `remesh` | `resolution` 32-512 voxels across the longest side (default 200); `keep_texture` (default true) |
 | `decimate` | `ratio` 0.01-1 of the triangles to keep (default 0.5), or `triangles` for an exact target |
-| `qremesh` | `target` quads (default 5000), `adaptive`, `keep_groups`, `detect_edges`, `use_polypaint`, `symmetry`, `keep_original`, `keep_texture`; see [Quad retopology](retopology.md#scripting) |
+| `qremesh` | `target` quads (default 5000), `adaptive`, `keep_groups`, `detect_edges`, `use_vertexpaint`, `symmetry`, `keep_original`, `keep_texture`; see [Quad retopology](retopology.md#scripting) |
 | `close_holes` | `max_edges` closes only holes with at most that many boundary edges (default 0: all); `refine` (default true; false: as few triangles as possible); `new_group` (default true) |
 | `mirror_and_weld` | `axis` x, y, z or several, e.g. `xz` (default x); `side` positive (default) or negative |
 | `mirror` | `axis` (default x); `pivot` origin (default) or center |

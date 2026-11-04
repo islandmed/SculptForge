@@ -20,19 +20,19 @@ enum class Look { Label, Icon, IconLabel, Tile };
 
 // Runs the action on click; toggles draw with the accent when checked(); shows Ctrl-hover help;
 // is a Ctrl+Alt drag source in customize mode. Ctrl+Alt+click (outside customize mode) assigns
-// a shortcut, as in ZBrush. Returns true when the action ran.
+// a shortcut. Returns true when the action ran.
 bool ActionButton(App& app, const char* actionId, ImVec2 size = {}, Look look = Look::Label);
 // How a toggle that is on looks (docs/ui-design.md §10). A mode action picks the current tool or mode of its
 // group (Draw/Move/Scale/Rotate, Sculpt/Paint, a brush, MaskPen/MaskLasso...) and gets the accent fill; every
-// other toggle is an option (Zadd, X, Pressure > Strength, Mask, Menus) and gets a raised grey with an accent
+// other toggle is an option (Raise, X, Pressure > Strength, Mask, Menus) and gets a raised grey with an accent
 // underline, so the accent marks one thing per group.
 bool IsModeAction(std::string_view actionId);
-// One side of a secondary either/or pair (Zadd | Zsub): always drawn as segments, the chosen one a raised grey with a
+// One side of a secondary either/or pair (Raise | Lower): always drawn as segments, the chosen one a raised grey with a
 // bright label and no underline, so it reads as a selector rather than as two on/off options.
 bool IsChoiceAction(std::string_view actionId);
 // The 2 px accent mark of an option that is on: along the bottom of the rect, or down its left side.
 void DrawOnMark(ImDrawList* drawList, ImVec2 min, ImVec2 max, bool side = false);
-// Adjacent toggle buttons that read as one control (Zadd | Zsub, X | Y | Z); width -1 fills the line.
+// Adjacent toggle buttons that read as one control (Raise | Lower, X | Y | Z); width -1 fills the line.
 void Segmented(App& app, std::initializer_list<const char*> actionIds, float width = -1.0f);
 // ImGui::Checkbox with an outline round the box while it is unchecked, so an off box doesn't vanish on panelBg.
 bool Checkbox(const char* label, bool* v);
@@ -44,7 +44,7 @@ void CentredGlyph(ImDrawList* drawList, ImFont* font, ImVec2 a, ImVec2 b, ImU32 
 // Ctrl-hover help for the last item.
 void HelpText(const char* title, const char* shortcut, const char* description, const char* path = nullptr);
 void HelpAction(App& app, const char* actionId);
-// ZBrush-style slider with its label drawn inside the frame ("Draw Size 60"), a quiet fill and a thin neutral bar
+// classic slider with its label drawn inside the frame ("Draw Size 60"), a quiet fill and a thin neutral bar
 // along the bottom (the accent only while dragging).
 bool SliderInside(const char* id, float* v, float lo, float hi, const char* format, ImGuiSliderFlags flags = 0);
 

@@ -107,7 +107,7 @@ TEST(micro_divide_counts_and_memory) {
     CHECK(worstMicro < worstFlat * 0.5f);
     CHECK(watertight(doc.mesh));
     std::string err;
-    CHECK(!microDivide(doc.mesh, 2, err)); // one micro level per SubTool
+    CHECK(!microDivide(doc.mesh, 2, err)); // one micro level per Part
 }
 
 TEST(micro_divide_needs_top_level) {
@@ -153,9 +153,9 @@ TEST(micro_brushes_each_change_the_surface_and_stay_closed) {
         BrushType type;
         bool invert;
     };
-    for (const Case c : {Case{BrushType::Clay, false}, Case{BrushType::ClayBuildup, false}, Case{BrushType::Inflate, false},
+    for (const Case c : {Case{BrushType::Clay, false}, Case{BrushType::ClayBlock, false}, Case{BrushType::Inflate, false},
                          Case{BrushType::Flatten, false}, Case{BrushType::Crease, false}, Case{BrushType::Pinch, false},
-                         Case{BrushType::DamStandard, false}, Case{BrushType::Layer, false}, Case{BrushType::Trim, false},
+                         Case{BrushType::SharpCrease, false}, Case{BrushType::Layer, false}, Case{BrushType::Trim, false},
                          Case{BrushType::Standard, true}}) {
         Document doc = microDoc(3);
         microNoise(doc.mesh, 0.01f, 12.0f); // something to flatten, trim and pinch
@@ -422,7 +422,7 @@ TEST(micro_commands) {
     CHECK(reg.execute(doc, "micro_noise", {{"amplitude", 0.002}}).ok);
     CHECK(reg.execute(doc, "micro_info").message.find("Micro level") != std::string::npos);
     CHECK(reg.execute(doc, "micro_bake", {{"level", 1.0}}).ok);
-    CHECK(doc.subtoolCount() == 2);
+    CHECK(doc.partCount() == 2);
     CHECK(reg.execute(doc, "micro_delete").ok);
     CHECK(doc.mesh.micro == nullptr);
     CHECK(reg.execute(doc, "undo").ok);

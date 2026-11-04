@@ -2,17 +2,17 @@
 # screen and clickable, and Esc closes the Library.
 run new_sphere subdivisions=3
 key ,
-expect_value lightbox_open == 1
+expect_value library_open == 1
 click "Library/Brush"
 wait_idle 60
 shot library-brush
 click "Library/##lbclose"
-expect_value lightbox_open == 0
+expect_value library_open == 0
 
 key ,
-expect_value lightbox_open == 1
+expect_value library_open == 1
 key escape
-expect_value lightbox_open == 0
+expect_value library_open == 0
 
 # The right shelf's outline is drawn over its buttons, not under them (#98).
 run ui_look look=forge
@@ -26,17 +26,17 @@ shot right-shelf-outline
 ui_scale 150
 wait 0.3
 key ,
-expect_value lightbox_open == 1
+expect_value library_open == 1
 wait_idle 30
 shot library-150
 click "Library/##lbclose"
-expect_value lightbox_open == 0
-run ui_look layout=zbrush
+expect_value library_open == 0
+run ui_look layout=classic
 ui_scale 150
 wait 0.3
 key ,
-expect_value lightbox_open == 1
+expect_value library_open == 1
 wait_idle 30
-shot library-zbrush-150
+shot library-classic-150
 click "Library/##lbclose"
-expect_value lightbox_open == 0
+expect_value library_open == 0

@@ -9,7 +9,7 @@ three versions in full, then the older ones in groups. Every detail is in the
 
 ```features
 date: unreleased
-tagline: A quick tour for experienced sculptors, a command search that knows plain sculpting words, and three experimental options for very dense meshes.
+tagline: Fast Big Brushes, sixty new brushes in six packs, a Masking panel, and a quick tour for experienced sculptors.
 ```
 
 ## Version 0.10.11
@@ -846,9 +846,8 @@ texture, so the next stroke paints texels. Big brushes on 4K textures paint four
 
 ### Bring a library over
 
-Another app's library files are proprietary, but a free export plug-in now converts them once, and then
-SculptForge opens the library file itself, every Part with its face groups, vertex paint, mask and UVs. See
-the [Bridge setup page](https://github.com/islandmed/SculptForge/blob/main/integrations/bridge-plugin/README.md).
+A folder of numbered Bridge files opens as one scene, every Part with its face groups, vertex paint, mask and
+UVs.
 
 ## Version 0.8
 

@@ -4,7 +4,7 @@
 // Dynamic topology (core/Dyntopo.h): strokes remesh the surface under the brush and leave a valid mesh
 // (manifold, no degenerate or flipped triangles, Euler characteristic kept, adjacency and BVH matching a fresh
 // build) after every dab; symmetry makes mirrored topology; undo and redo restore exactly; attributes are
-// carried; boundaries, polygroup borders, masks and subdivision levels are respected.
+// carried; boundaries, face group borders, masks and subdivision levels are respected.
 #include "TestHarness.h"
 
 #include "core/Commands.h"
@@ -417,12 +417,12 @@ TEST(dyntopo_carries_attributes_and_drops_uvs) {
     Document d = sphereDoc(2);
     Mesh& m = d.mesh;
     m.ensureColors();
-    m.ensurePolygroups();
+    m.ensureFaceGroups();
     m.uvs.assign(m.triangleCount() * 3, glm::vec2(0.5f));
     for (uint32_t v = 0; v < m.vertexCount(); ++v) m.colors[v] = glm::vec3(m.positions[v].x * 0.5f + 0.5f, 0.2f, 0.1f);
     for (uint32_t t = 0; t < m.triangleCount(); ++t) {
         const glm::uvec3 tri = m.triangles[t];
-        m.polygroups[t] = (m.positions[tri.x] + m.positions[tri.y] + m.positions[tri.z]).y > 0.0f ? 7u : 3u;
+        m.facegroups[t] = (m.positions[tri.x] + m.positions[tri.y] + m.positions[tri.z]).y > 0.0f ? 7u : 3u;
     }
     d.activeLayer = m.addLayer("Detail");
     m.rebuildTopology();
@@ -432,7 +432,7 @@ TEST(dyntopo_carries_attributes_and_drops_uvs) {
         std::set<uint32_t> out;
         for (uint32_t v = 0; v < mesh.vertexCount(); ++v) {
             std::set<uint32_t> groups;
-            for (uint32_t t : mesh.vertexTriangles(v)) groups.insert(mesh.polygroups[t]);
+            for (uint32_t t : mesh.vertexTriangles(v)) groups.insert(mesh.facegroups[t]);
             if (groups.size() > 1) out.insert(v);
         }
         return out;
@@ -442,7 +442,7 @@ TEST(dyntopo_carries_attributes_and_drops_uvs) {
         for (uint32_t t = 0; t < mesh.triangleCount(); ++t)
             for (int c = 0; c < 3; ++c) {
                 const uint32_t a = mesh.triangles[t][c], b = mesh.triangles[t][(c + 1) % 3];
-                groups[{std::min(a, b), std::max(a, b)}].insert(mesh.polygroups[t]);
+                groups[{std::min(a, b), std::max(a, b)}].insert(mesh.facegroups[t]);
             }
         float len = 0.0f;
         for (const auto& [e, g] : groups)
@@ -452,7 +452,7 @@ TEST(dyntopo_carries_attributes_and_drops_uvs) {
     auto groupArea = [](const Mesh& mesh, uint32_t group) {
         float area = 0.0f;
         for (uint32_t t = 0; t < mesh.triangleCount(); ++t) {
-            if (mesh.polygroups[t] != group) continue;
+            if (mesh.facegroups[t] != group) continue;
             const glm::uvec3 tri = mesh.triangles[t];
             area += 0.5f * glm::length(glm::cross(mesh.base[tri.y] - mesh.base[tri.x], mesh.base[tri.z] - mesh.base[tri.x]));
         }
@@ -467,7 +467,7 @@ TEST(dyntopo_carries_attributes_and_drops_uvs) {
     CHECK(invalid(m, true).empty());
     CHECK(m.uvs.empty());
     CHECK(m.colors.size() == m.vertexCount());
-    CHECK(m.polygroups.size() == m.triangleCount());
+    CHECK(m.facegroups.size() == m.triangleCount());
     CHECK(m.layers[0].delta.size() == m.vertexCount() && m.base.size() == m.vertexCount());
     // Interpolated colours: red follows x everywhere.
     bool colorsOk = true;
@@ -614,7 +614,7 @@ TEST(dyntopo_smooth_remesh_setting) {
 }
 
 // Long randomized sessions (set SF_STRESS=1, or another number for other seeds; skipped otherwise, it takes a while): every brush, detail, radius,
-// symmetry and invert, with a partial mask, polygroups, hidden triangles, a sculpt layer and polypaint, random
+// symmetry and invert, with a partial mask, face groups, hidden triangles, a sculpt layer and vertex paint, random
 // undo / redo between strokes; the mesh stays valid after every stroke and undoing everything gives the start back.
 TEST(dyntopo_stress_random_sessions) {
     if (!std::getenv("SF_STRESS")) return;
@@ -623,7 +623,7 @@ TEST(dyntopo_stress_random_sessions) {
         Document d = makeDoc(open ? makePlane(60, 2.0f) : makeIcosphere(4 + session, 1.0f));
         Mesh& m = d.mesh;
         m.ensureColors();
-        m.ensurePolygroups();
+        m.ensureFaceGroups();
         m.ensureMask();
         m.ensureHidden();
         for (uint32_t v = 0; v < m.vertexCount(); ++v) {
@@ -632,7 +632,7 @@ TEST(dyntopo_stress_random_sessions) {
         }
         for (uint32_t t = 0; t < m.triangleCount(); ++t) {
             const glm::vec3 c = m.positions[m.triangles[t].x];
-            m.polygroups[t] = c.y > 0.3f ? 2u : 1u;
+            m.facegroups[t] = c.y > 0.3f ? 2u : 1u;
             m.hidden[t] = c.x > 0.8f && c.y < -0.4f;
         }
         d.activeLayer = session == 1 ? m.addLayer("L") : -1;
@@ -652,7 +652,7 @@ TEST(dyntopo_stress_random_sessions) {
         };
         const BrushType types[] = {BrushType::Standard, BrushType::SnakeHook, BrushType::Smooth, BrushType::Clay,
                                    BrushType::Pinch,    BrushType::Inflate,   BrushType::Crease, BrushType::Flatten,
-                                   BrushType::DamStandard, BrushType::ClayBuildup, BrushType::Layer, BrushType::Nudge,
+                                   BrushType::SharpCrease, BrushType::ClayBlock, BrushType::Layer, BrushType::Nudge,
                                    BrushType::Trim};
         std::string why;
         int strokes = 0, undos = 0;
@@ -715,7 +715,7 @@ TEST(dyntopo_stress_random_sessions) {
             if (why.empty()) why = invalid(m, !open);
             if (why.empty() && !bvhMatches(m, d.bvh)) why = "BVH";
             if (why.empty() && (m.colors.size() != m.vertexCount() || m.mask.size() != m.vertexCount() ||
-                                m.polygroups.size() != m.triangleCount() || m.hidden.size() != m.triangleCount()))
+                                m.facegroups.size() != m.triangleCount() || m.hidden.size() != m.triangleCount()))
                 why = "attribute sizes";
             if (why.empty() && !m.layers.empty())
                 for (uint32_t v = 0; v < m.vertexCount() && why.empty(); ++v)
@@ -728,6 +728,6 @@ TEST(dyntopo_stress_random_sessions) {
         while (d.undo.canUndo()) d.undo.undo(m, d.bvh);
         CHECK(m.triangles == start.triangles);
         CHECK(m.positions == start.positions);
-        CHECK(m.colors == start.colors && m.mask == start.mask && m.polygroups == start.polygroups && m.hidden == start.hidden);
+        CHECK(m.colors == start.colors && m.mask == start.mask && m.facegroups == start.facegroups && m.hidden == start.hidden);
     }
 }

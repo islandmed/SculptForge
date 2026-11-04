@@ -4,7 +4,7 @@
 // Commands for material texture painting (core/TextureChannels.h): texture_channels, paint_material,
 // channel_view and texture_layer_channel.
 #include "core/Document.h"
-#include "core/Polypaint.h"
+#include "core/VertexPaint.h"
 #include "core/Texture.h"
 #include "core/TextureChannels.h"
 #include "core/Undo.h"
@@ -253,8 +253,8 @@ void registerTextureChannelCommands(CommandRegistry& reg) {
                                             " channel (texture_channels enable=" + channelFormat(c).id + ")"};
                  }
                  doc.channelView = c;
-                 for (int i = 0; i < doc.subtoolCount(); ++i)
-                     if (const Mesh& m = doc.subtoolMesh(i); m.texture) syncChannelView(*m.texture, c);
+                 for (int i = 0; i < doc.partCount(); ++i)
+                     if (const Mesh& m = doc.partMesh(i); m.texture) syncChannelView(*m.texture, c);
                  return {true, c == Channel::BaseColor ? std::string("Showing the textures as they are")
                                                        : std::string("Showing the ") + channelFormat(c).label + " channel"};
              }});

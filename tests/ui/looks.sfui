@@ -1,5 +1,5 @@
 # The interface looks and the SculptForge layout (Preferences > Interface > Look): the task menus hold every palette
-# as a section, the ZBrush-style layout stays one setting away, and switching looks keeps everything working.
+# as a section, the Classic layout stays one setting away, and switching looks keeps everything working.
 run new_sphere subdivisions=3
 expect_value look == 1                      # the default: Forge Terminal, Neutral colours (0.10.9), SculptForge layout
 expect_value look_neutral == 1
@@ -9,9 +9,9 @@ shot neutral-default
 expect "Sculpt##menu.sculpt"
 expect_not "Tool##palette.tool"
 
-# Classic with the ZBrush-style layout, then Forge Terminal brings the SculptForge layout back: the menus in the
+# Classic with the Classic layout, then Forge Terminal brings the SculptForge layout back: the menus in the
 # status bar, no palette bar, a one-row shelf.
-run ui_look look=classic layout=zbrush
+run ui_look look=classic layout=classic
 wait 0.2
 expect_value look == 0
 expect_value shell_layout == 0
@@ -23,7 +23,7 @@ expect_value shell_layout == 1
 expect_value style_window_min < 33           # switching looks doesn't scale the style again (2400x1350 gizmo overlap)
 expect "Sculpt##menu.sculpt"
 expect_not "Tool##palette.tool"
-expect_not "Library##ui.lightbox"           # moved off the shelf (View > Display, F3)
+expect_not "Library##ui.library"           # moved off the shelf (View > Display, F3)
 expect "Clay##brush.clay"
 expect "##drawsize"
 expect "Parts/Append"                    # the Tool palette stays in the right tray
@@ -132,17 +132,17 @@ wait 0.2
 expect_value look == 3
 key escape
 
-# The ZBrush-style layout is one setting away and works with any look.
-run ui_look layout=zbrush
+# The Classic layout is one setting away and works with any look.
+run ui_look layout=classic
 wait 0.2
 expect_value shell_layout == 0
 expect "Tool##palette.tool"
-expect "Library##ui.lightbox"
+expect "Library##ui.library"
 expect_not "Sculpt##menu.sculpt"
 click "Stroke##palette.stroke"
 expect "Stroke/##totray"
 key escape
-shot blueprint-zbrush-layout
+shot blueprint-classic-layout
 run ui_look look=classic
 wait 0.2
 expect_value look == 0
@@ -168,14 +168,14 @@ expect_value look == 1
 expect_value shell_layout == 1
 expect "Sculpt##menu.sculpt"
 
-# The welcome's look picker: three cards (Neutral, Forge Terminal, ZBrush-style layout), and Coming from sets the
+# The welcome's look picker: three cards (Neutral, Forge Terminal, Classic layout), and Coming from sets the
 # keys and the layout together.
 key f3
 type "##Command palette" "welcome"
 key enter
 expect_value welcome_open == 1
 shot welcome-look-picker
-click "##welcome.look.zbrush"
+click "##welcome.look.classic"
 wait 0.2
 expect_value look == 0
 expect_value shell_layout == 0

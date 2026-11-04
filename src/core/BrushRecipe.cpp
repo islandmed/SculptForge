@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/BrushRecipe.h"
 
+#include "core/BrushAlpha.h"
+#include "core/BrushPacks.h"
+
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
@@ -141,6 +144,8 @@ Json BrushRecipe::toJson() const {
     j.set("description", r.description);
     if (connectedOnly) j.set("connectedOnly", true);
     if (viewFalloff) j.set("viewFalloff", true);
+    if (!alpha.empty()) j.set("alpha", alpha);
+    if (alphaFollow) j.set("alphaFollow", true);
     for (const auto& p : recipeParams()) {
         switch (p.kind) {
         case K::Float: j.set(p.key, std::round(double(*floatField(r, p.key)) * 1000.0) / 1000.0); break;
@@ -161,6 +166,11 @@ void BrushRecipe::applyJson(const Json& j) {
     if (j["description"].isString()) description = j["description"].asString();
     if (j["connectedOnly"].isBool()) connectedOnly = j["connectedOnly"].asBool();
     if (j["viewFalloff"].isBool()) viewFalloff = j["viewFalloff"].asBool();
+    if (j["alphaFollow"].isBool()) alphaFollow = j["alphaFollow"].asBool();
+    if (j["alpha"].isString()) {
+        BrushAlpha a;
+        alpha = BrushAlpha::builtin(j["alpha"].asString(), a) && !a.empty() ? a.name : std::string();
+    }
     for (const auto& p : recipeParams()) {
         const Json& v = j[p.key];
         if (v.isNull()) continue;
@@ -346,6 +356,7 @@ std::vector<BrushRecipe> builtinBrushRecipes() {
         r.hardness = 0.4f;
         add(r);
     }
+    for (BrushRecipe& r : builtinPackRecipes()) add(std::move(r));
     return out;
 }
 

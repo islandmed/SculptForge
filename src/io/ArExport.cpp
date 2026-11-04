@@ -29,9 +29,9 @@ constexpr size_t kClusterAbove = 3'000'000; // triangles: cluster vertices first
 constexpr int kPadding = 4;                 // texels around each UV island
 
 // One part's source of colour for a merged triangle.
-struct Part {
+struct PartColour {
     const PaintTexture* texture = nullptr; // sampled at the carried corner UVs
-    bool colors = false;                   // polypaint (per vertex, linear)
+    bool colors = false;                   // vertex paint (per vertex, linear)
 };
 
 glm::vec3 sampleBaked(const PaintTexture& tex, glm::vec2 uv) {
@@ -109,7 +109,7 @@ std::vector<uint8_t> bake(const std::vector<glm::uvec3>& triangles, const std::v
     return rgba;
 }
 
-// A copy with only what AR needs: current positions, visible triangles, polypaint, and the texture's corner UVs.
+// A copy with only what AR needs: current positions, visible triangles, vertex paint, and the texture's corner UVs.
 Mesh leanCopy(const Mesh& src, bool keepUvs) {
     Mesh m;
     m.positions = src.positions;
@@ -221,13 +221,13 @@ bool exportArModel(const std::vector<const Mesh*>& meshes, const ArExportOptions
 
     // Reduce each part to its share of the budget, keeping colour sources.
     std::vector<Mesh> reducedParts;
-    std::vector<Part> partInfo;
+    std::vector<PartColour> partInfo;
     bool anyColor = false;
     for (const Mesh* src : parts) {
         const bool textured = hasTexture(*src);
         const size_t share = std::max<size_t>(64, size_t(double(budget) * double(src->triangleCount()) / double(total)));
         Mesh lean = leanCopy(*src, textured);
-        Part info;
+        PartColour info;
         if (lean.triangleCount() > kClusterAbove) {
             lean = cluster(lean, textured ? src->texture.get() : nullptr,
                            std::min<size_t>(lean.triangleCount() / 2, std::max<size_t>(share * 4, 500'000)));
@@ -241,16 +241,16 @@ bool exportArModel(const std::vector<const Mesh*>& meshes, const ArExportOptions
         partInfo.push_back(info);
         reducedParts.push_back(std::move(reduced));
     }
-    // One mesh: per triangle its part, per corner the part's texture UV, per vertex polypaint (white elsewhere).
+    // One mesh: per triangle its part, per corner the part's texture UV, per vertex vertex paint (white elsewhere).
     Mesh merged;
     std::vector<uint32_t> triPart;
     std::vector<glm::vec2> sourceUvs;
-    const bool anyPolypaint = std::any_of(partInfo.begin(), partInfo.end(), [](const Part& p) { return p.colors; });
+    const bool anyVertexPaint = std::any_of(partInfo.begin(), partInfo.end(), [](const PartColour& p) { return p.colors; });
     for (size_t i = 0; i < reducedParts.size(); ++i) {
         const Mesh& reduced = reducedParts[i];
         const uint32_t base = uint32_t(merged.positions.size());
         merged.positions.insert(merged.positions.end(), reduced.positions.begin(), reduced.positions.end());
-        if (anyPolypaint) {
+        if (anyVertexPaint) {
             if (partInfo[i].colors) merged.colors.insert(merged.colors.end(), reduced.colors.begin(), reduced.colors.end());
             else merged.colors.resize(merged.positions.size(), glm::vec3(1.0f));
         }
@@ -276,7 +276,7 @@ bool exportArModel(const std::vector<const Mesh*>& meshes, const ArExportOptions
     const glm::vec3 offset(-box.center().x, -box.min.y, -box.center().z);
     for (auto& p : merged.positions) p = (p + offset) * scale;
 
-    // Colour: new UVs for the merged mesh and one texture baked from each part's polypaint or texture.
+    // Colour: new UVs for the merged mesh and one texture baked from each part's vertex paint or texture.
     if (anyColor) {
         AutoUvResult atlas;
         std::string uvError;
@@ -285,7 +285,7 @@ bool exportArModel(const std::vector<const Mesh*>& meshes, const ArExportOptions
             return false;
         }
         std::vector<uint8_t> rgba = bake(merged.triangles, atlas.uvs, options.textureSize, [&](size_t t, glm::vec3 w) {
-            const Part& part = partInfo[triPart[t]];
+            const PartColour& part = partInfo[triPart[t]];
             if (part.texture)
                 return sampleBaked(*part.texture, sourceUvs[t * 3] * w.x + sourceUvs[t * 3 + 1] * w.y + sourceUvs[t * 3 + 2] * w.z);
             if (part.colors) {

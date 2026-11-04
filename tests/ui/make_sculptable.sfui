@@ -1,4 +1,4 @@
-# Make sculptable (Splats palette): the built-in test head capture -> one click -> a quad SubTool with face loops and
+# Make sculptable (Splats palette): the built-in test head capture -> one click -> a quad Part with face loops and
 # the capture's colours next to the hidden scan; then the review: the face landmarks as dots, one dragged (its mirror
 # follows and the loops are rebuilt), Finish. The crop box toggles; F3 finds the action.
 run splat_test_capture kind=head count=150000
@@ -36,8 +36,8 @@ click "Make sculptable/Make sculptable"
 wait_idle 120
 expect_status "Made sculptable"
 expect_status "face guides: 6 loops"
-expect_value subtools == 3
-expect_value visible_subtools == 1
+expect_value parts == 3
+expect_value visible_parts == 1
 expect_value show_splats == 0
 expect_value quad_percent >= 97
 expect_value colored > 0
@@ -77,8 +77,8 @@ expect_status "Made sculptable"
 expect_status "along"
 expect_value sculptable_review == 0
 expect_value quad_percent >= 97
-expect_value subtools == 5
-expect_value visible_subtools == 2
+expect_value parts == 5
+expect_value visible_parts == 2
 camera 0 0
 click "Wire##view.polyf"
 shot film-polyf

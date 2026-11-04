@@ -3,7 +3,7 @@
 //
 // QRemesh (quad retopology) and ProjectAll (detail projection): the result is a closed 2-manifold made of
 // quads, near the target count and the sculpt's surface (Hausdorff distance); Keep Groups, symmetry, open
-// surfaces, polypaint density, mask / colour transfer, cancel; projecting detail back onto a divided retopo
+// surfaces, vertex paint density, mask / colour transfer, cancel; projecting detail back onto a divided retopo
 // brings the error down and respects the mask; both commands are one undo step.
 // SF_RETOPO_BENCH=1 also times both on a 1M+ triangle sculpt.
 #include "TestHarness.h"
@@ -97,7 +97,7 @@ TEST(qremesh_keep_groups_follows_borders) {
     CommandRegistry reg;
     Document doc;
     doc.setMesh(makeCube(24));
-    CHECK(reg.execute(doc, "polygroup_auto_by_normals", {{"angle", 40.0}}).ok);
+    CHECK(reg.execute(doc, "facegroup_auto_by_normals", {{"angle", 40.0}}).ok);
     QRemeshOptions o;
     o.targetQuads = 1500;
     o.keepGroups = true;
@@ -107,10 +107,10 @@ TEST(qremesh_keep_groups_follows_borders) {
     CHECK(qremesh(doc.mesh, o, out, err));
     checkQuadMesh(out, true, "cube, Keep Groups");
     // Six groups, each quad entirely in one (halves agree), and the cube's sharp edges kept.
-    CHECK(out.hasPolygroups());
-    std::set<uint32_t> groups(out.polygroups.begin(), out.polygroups.end());
+    CHECK(out.hasFaceGroups());
+    std::set<uint32_t> groups(out.facegroups.begin(), out.facegroups.end());
     CHECK(groups.size() == 6);
-    for (size_t t = 0; t + 1 < out.triangleCount(); t += 2) CHECK(out.polygroups[t] == out.polygroups[t + 1]);
+    for (size_t t = 0; t + 1 < out.triangleCount(); t += 2) CHECK(out.facegroups[t] == out.facegroups[t + 1]);
     const SurfaceDeviation d = measureDeviation(out, doc.mesh);
     std::printf("  cube with Keep Groups: Hausdorff %.3f%% of the size\n", 100.0f * d.max / diagonal(doc.mesh));
     CHECK(d.max < 0.005f * diagonal(doc.mesh));
@@ -168,7 +168,7 @@ TEST(qremesh_open_surface_keeps_its_outline) {
     CHECK(glm::length(a.max - b.max) < 0.01f * diagonal(doc.mesh));
 }
 
-TEST(qremesh_transfers_mask_and_polypaint) {
+TEST(qremesh_transfers_mask_and_vertexpaint) {
     CommandRegistry reg;
     Document doc;
     reg.execute(doc, "new_sphere", {{"subdivisions", 5.0}});
@@ -194,7 +194,7 @@ TEST(qremesh_transfers_mask_and_polypaint) {
     CHECK(wrong == 0);
 }
 
-TEST(qremesh_polypaint_density) {
+TEST(qremesh_vertexpaint_density) {
     CommandRegistry reg;
     Document doc;
     reg.execute(doc, "new_sphere", {{"subdivisions", 5.0}});
@@ -204,11 +204,11 @@ TEST(qremesh_polypaint_density) {
     QRemeshOptions o;
     o.targetQuads = 2000;
     o.adaptive = 0.0f;
-    o.usePolypaint = true;
+    o.useVertexPaint = true;
     Mesh out;
     std::string err;
     CHECK(qremesh(m, o, out, err));
-    checkQuadMesh(out, true, "sphere, polypaint density");
+    checkQuadMesh(out, true, "sphere, vertexpaint density");
     size_t top = 0, bottom = 0;
     for (size_t t = 0; t < out.triangleCount(); t += 2) {
         const glm::uvec3 tri = out.triangles[t];
@@ -261,11 +261,11 @@ TEST(qremesh_command_keeps_original_and_undoes) {
     const CommandResult r = reg.execute(doc, "qremesh", {{"target", 1200.0}, {"keep_original", true}, {"adaptive", 0.3}});
     CHECK(r.ok);
     CHECK(r.message.find("quads") != std::string::npos);
-    CHECK(doc.subtoolCount() == 2);
-    CHECK(doc.activeSubtool == 0);
-    CHECK(!doc.subtools[1].visible);
-    CHECK(doc.subtools[1].name == doc.subtools[0].name + " Original");
-    CHECK(doc.subtoolMesh(1).triangleCount() == before);
+    CHECK(doc.partCount() == 2);
+    CHECK(doc.activePart == 0);
+    CHECK(!doc.parts[1].visible);
+    CHECK(doc.parts[1].name == doc.parts[0].name + " Original");
+    CHECK(doc.partMesh(1).triangleCount() == before);
     CHECK(doc.mesh.quadCount() * 2 == doc.mesh.triangleCount());
     CHECK(doc.undo.canUndo());
     CHECK(doc.undo.undo(doc.mesh, doc.bvh));
@@ -277,14 +277,14 @@ TEST(qremesh_command_keeps_original_and_undoes) {
 TEST(project_all_brings_detail_back) {
     CommandRegistry reg;
     Document doc = sculptedSphere(6);
-    doc.subtools[0].name = "Sculpt";
-    // Paint the source so polypaint comes across too.
+    doc.parts[0].name = "Sculpt";
+    // Paint the source so vertex paint comes across too.
     doc.mesh.ensureColors();
     for (uint32_t v = 0; v < doc.mesh.vertexCount(); ++v)
         doc.mesh.colors[v] = doc.mesh.positions[v].y > 0.0f ? glm::vec3(0.8f, 0.1f, 0.1f) : glm::vec3(0.1f, 0.2f, 0.8f);
     const Mesh source = doc.mesh;
     // Retopo a copy, divide it twice, then project from the original.
-    doc.addSubtool(doc.mesh, "Retopo");
+    doc.addPart(doc.mesh, "Retopo");
     CHECK(reg.execute(doc, "qremesh", {{"target", 2000.0}}).ok);
     CHECK(reg.execute(doc, "subdivide", {{"levels", 2.0}}).ok);
     const Mesh divided = doc.mesh;
@@ -316,14 +316,14 @@ TEST(project_all_brings_detail_back) {
 TEST(project_all_respects_mask_and_options) {
     CommandRegistry reg;
     Document doc = sculptedSphere(5);
-    doc.addSubtool(doc.mesh, "Retopo");
+    doc.addPart(doc.mesh, "Retopo");
     CHECK(reg.execute(doc, "qremesh", {{"target", 1500.0}}).ok);
     CHECK(reg.execute(doc, "subdivide", {}).ok);
     const Mesh divided = doc.mesh;
     // Mask the top half: it must not move.
     doc.mesh.ensureMask();
     for (uint32_t v = 0; v < doc.mesh.vertexCount(); ++v) doc.mesh.mask[v] = doc.mesh.positions[v].y > 0.0f ? 1.0f : 0.0f;
-    CHECK(reg.execute(doc, "project_all", {{"polypaint", false}}).ok);
+    CHECK(reg.execute(doc, "project_all", {{"vertexpaint", false}}).ok);
     size_t movedMasked = 0, movedFree = 0;
     for (uint32_t v = 0; v < doc.mesh.vertexCount(); ++v) {
         const bool moved = doc.mesh.positions[v] != divided.positions[v];
@@ -339,11 +339,11 @@ TEST(project_all_respects_mask_and_options) {
     std::string err;
     ProjectOptions o;
     o.geometry = false;
-    std::vector<const Mesh*> sources{&doc.subtoolMesh(0)};
+    std::vector<const Mesh*> sources{&doc.partMesh(0)};
     CHECK(computeProjection(divided, sources, o, positions, nullptr, st, err));
     CHECK(positions == divided.positions);
     // Nothing visible to project from.
-    doc.subtools[0].visible = false;
+    doc.parts[0].visible = false;
     CHECK(!reg.execute(doc, "project_all", {}).ok);
 }
 
@@ -365,7 +365,7 @@ TEST(retopo_bench_1m_triangles) {
                     100.0f * t.quadFraction(), int(t.manifold()), st.seconds);
     }
     // ProjectAll onto a 1.3M-triangle target from the 1.3M-triangle sculpt.
-    doc.addSubtool(doc.mesh, "Retopo");
+    doc.addPart(doc.mesh, "Retopo");
     CHECK(reg.execute(doc, "qremesh", {{"target", 5000.0}}).ok);
     CHECK(reg.execute(doc, "subdivide", {{"levels", 4.0}}).ok);
     const auto t0 = std::chrono::steady_clock::now();

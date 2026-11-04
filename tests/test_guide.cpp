@@ -57,7 +57,7 @@ TEST(guide_slugs) {
     CHECK(slugify("Mask by cavity") == "mask-by-cavity");
     CHECK(slugify("Subdivide, remesh & decimate") == "subdivide-remesh--decimate"); // GitHub keeps both dashes
     CHECK(slugify("Send to Unreal (Ctrl+U)") == "send-to-unreal-ctrlu");
-    CHECK(slugify("GoZ / ZBrush") == "goz--zbrush");
+    CHECK(slugify("Bridge / Classic") == "bridge--classic");
     CHECK(slugify("Image & text to 3D") == "image--text-to-3d");
 }
 
@@ -148,7 +148,7 @@ const std::map<std::string, std::string>& sampleBook() {
         {"welcome.md", "# Welcome to SculptForge\n\nSculpt things. Masking is covered later.\n"},
         {"masking.md", "# Masking\n\nProtect areas from brushes.\n\n## Mask by cavity\n\nMasks the crevices of the "
                        "model, so you can paint dirt into them. Cavity masking needs detail.\n"},
-        {"glossary.md", "# Glossary\n\n| ZBrush | SculptForge |\n|---|---|\n| DynaMesh | Voxel remesh |\n"},
+        {"glossary.md", "# Glossary\n\n| Word | SculptForge |\n|---|---|\n| Blockout | Voxel remesh |\n"},
     };
     return files;
 }
@@ -183,7 +183,7 @@ TEST(guide_book_and_search) {
     // Every word must appear; tables are searchable.
     CHECK(book.search("dirt crevices").size() == 1);
     CHECK(book.search("dirt glossary").empty());
-    CHECK(book.search("dynamesh").size() == 1);
+    CHECK(book.search("blockout").size() == 1);
     CHECK(book.search("   ").empty());
     CHECK(book.search("masking").size() >= 3); // titles and text in two chapters
 

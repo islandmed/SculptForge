@@ -196,7 +196,7 @@ with the sphere filling it (a non-square image is cropped to its centre; big one
   folder set in **Edit > Preferences > Library**), so it is there next time.
 - Or put images into that **Lit Spheres** folder yourself: they show up the next time you open the material picker,
   **Render > Materials** or the Library's Material tab, no restart needed. Studios can share a read-only folder by
-  listing it in the `SCULPTFORGE_MATCAP_PATH` environment variable (separated by `:`, `;` on Windows); those load
+  listing it in the `SCULPTFORGE_LITSPHERE_PATH` environment variable (separated by `:`, `;` on Windows); those load
   when SculptForge starts.
 - To remove one, right-click it in the material picker or palette and choose **Remove**. An image from your
   Lit Spheres folder goes to the trash (the Recycle Bin on Windows), so you can still get it back. On macOS it is
@@ -248,11 +248,11 @@ classic key changes meaning; assign one under **Edit > Preferences > Hotkeys** i
 | `paint_layer_merge` / `paint_layer_flatten` | Merge down / bake every visible layer into Base |
 | `paint_layer_list` | List the layers, top first (`*` marks the active one) |
 | `set_material name=Chrome` | Viewport material: a Lit Sphere name (`Soft Clay` is the default, your own Lit Spheres included) or `studio` (desktop app only) |
-| `load_matcap path=gold.png` | Load a Lit Sphere image and use it; `keep=false` doesn't copy it into the Lit Spheres folder (desktop app only) |
-| `remove_matcap name=Gold` | Remove one of your Lit Spheres; its image in the Lit Spheres folder goes to the trash (desktop app only) |
+| `load_litsphere path=gold.png` | Load a Lit Sphere image and use it; `keep=false` doesn't copy it into the Lit Spheres folder (desktop app only) |
+| `remove_litsphere name=Gold` | Remove one of your Lit Spheres; its image in the Lit Spheres folder goes to the trash (desktop app only) |
 | `set_background mode=flat color=60,70,80` | The view's background: `gradient` (the default) or `flat` with a colour (`#rrggbb`, `r,g,b` or a name); see [The background](interface.md#the-background) (desktop app only) |
 | `set_shading mode=flat` | The scene's shading: `smooth` (the default) or `flat` (desktop app only) |
-| `subtool_shading mode=smooth name=Eyes` | A Part's own shading: `default` (follow the scene), `smooth` or `flat`; `index` or `name` picks the Part (default: the active one) |
+| `part_shading mode=smooth name=Eyes` | A Part's own shading: `default` (follow the scene), `smooth` or `flat`; `index` or `name` picks the Part (default: the active one) |
 
 ```text
 set_color color="#d9b38c"; paint_fill; paint_from_cavity strength=0.5

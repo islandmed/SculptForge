@@ -288,18 +288,18 @@ TEST(timeline_follows_the_undo_budget_and_clear) {
     d.setMesh(makeIcosphere(3)); // a new scene clears the history
     CHECK(Timeline::of(d.undo) == t.get());
     CHECK(t->path().size() == 1);
-    // SubTools: each history keeps its own timeline.
+    // Parts: each history keeps its own timeline.
     stroke(d, {0, 0, 1}, {0, 0.3f, 1});
     t->sync(d);
-    d.addSubtool(makeIcosphere(3), "Other");
+    d.addPart(makeIcosphere(3), "Other");
     CHECK(Timeline::of(d.undo) == nullptr);
     auto t2 = Timeline::attach(d);
     stroke(d, {0, 0, 1}, {0, 0.3f, 1});
     stroke(d, {0, 1, 0}, {0, 1, 0.3f});
-    d.selectSubtool(0);
+    d.selectPart(0);
     CHECK(Timeline::of(d.undo) == t.get());
     CHECK(t->path().size() == 2);
-    d.selectSubtool(1);
+    d.selectPart(1);
     CHECK(Timeline::of(d.undo) == t2.get());
     CHECK(t2->path().size() == 3);
     CHECK(t2->seek(d, 0));

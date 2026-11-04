@@ -100,9 +100,23 @@ void App::syncBrushSettings() {
     if (!brushSettingsOn_) return;
     const std::string key = currentBrushKey();
     if (key == brushSettingsKey_) return;
-    applyBrushSettings(brushSettings_.switchBrush(brushSettingsKey_, key, liveBrushSettings()));
+    const bool firstUse = !brushSettings_.known(key);
+    BrushToolSettings next = brushSettings_.switchBrush(brushSettingsKey_, key, liveBrushSettings());
+    if (firstUse) recipeAlpha(next); // a brush-pack brush starts with its own alpha (or none), not the last brush's
+    applyBrushSettings(next);
     brushSettingsKey_ = key;
     syncAlphaTile();
+}
+
+void App::recipeAlpha(BrushToolSettings& s) const {
+    if (doc_.activeBrush < 0 || doc_.activeBrush >= int(doc_.brushes.size())) return;
+    const BrushRecipe& r = doc_.brushes[size_t(doc_.activeBrush)];
+    if (r.alpha.empty() && r.origin.pack.empty()) return;
+    s.alphaName = r.alpha.empty() ? std::string("Round") : r.alpha;
+    s.alphaPath.clear();
+    s.alphaInvert = false;
+    s.alphaOptions.followStroke = r.alphaFollow;
+    s.alphaOptions.tileX = s.alphaOptions.tileY = 1;
 }
 
 void App::syncAlphaTile() { // Tile lives on the alpha (a new alpha starts at 1 x 1): the brush's option wins
@@ -149,7 +163,9 @@ void App::saveBrushSettings() {
 void App::resetBrushSettings() {
     syncBrushSettings();
     const bool wasSaved = brushSettings_.hasSaved(brushSettingsKey_);
-    applyBrushSettings(brushSettings_.reset(brushSettingsKey_));
+    BrushToolSettings shipped = brushSettings_.reset(brushSettingsKey_);
+    recipeAlpha(shipped); // (a pack brush's own alpha is part of its defaults)
+    applyBrushSettings(shipped);
     std::string err;
     if (wasSaved && brushSettingsOn_ && !brushSettingsPath().empty() && !brushSettings_.save(brushSettingsPath(), err))
         status_ = err;

@@ -8,7 +8,7 @@
 
 #include "core/Commands.h"
 #include "core/Masking.h"
-#include "core/Polypaint.h"
+#include "core/VertexPaint.h"
 #include "core/Primitives.h"
 
 #include <algorithm>

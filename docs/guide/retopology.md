@@ -219,10 +219,10 @@ straight along the normal, it takes the closest point within **Dist**.
 
 | Command | Options |
 |---|---|
-| `qremesh` | `method` (`v2`, the default, or `legacy`), `quality` (report poles, corner angles and the distance to the sculpt, default true), `target` (16 to 2,000,000, default 5000), `adaptive` (0-1, default 0.5), `keep_groups`, `detect_edges` (default true), `use_polypaint`, `symmetry` (`x`, `y` or `z`; off by default in scripts; the mirror plane is found from the model), `symmetry_center` (use this plane instead, e.g. `0` for the world's centre), `keep_original`, `smooth` (relaxation passes, default 6), `seed` (legacy method only; Quad Remesh 2 has no random start), `keep_texture` (default true), `guides` (follow the Part's Quad Remesh Guides, default true), `curves_strength` (0-100, default 50) |
+| `qremesh` | `method` (`v2`, the default, or `legacy`), `quality` (report poles, corner angles and the distance to the sculpt, default true), `target` (16 to 2,000,000, default 5000), `adaptive` (0-1, default 0.5), `keep_groups`, `detect_edges` (default true), `use_vertexpaint`, `symmetry` (`x`, `y` or `z`; off by default in scripts; the mirror plane is found from the model), `symmetry_center` (use this plane instead, e.g. `0` for the world's centre), `keep_original`, `smooth` (relaxation passes, default 6), `seed` (legacy method only; Quad Remesh 2 has no random start), `keep_texture` (default true), `guides` (follow the Part's Quad Remesh Guides, default true), `curves_strength` (0-100, default 50) |
 | `qremesh_guide` | `points` (the curve, `"x,y,z x,y,z ..."`), `view` (project the points onto the surface along this direction, as a stroke from the camera; default: each point to the closest surface point), `symmetry` (`x`, `xz`...; mirror the curve) |
 | `qremesh_guide_delete_last`, `qremesh_guides_clear`, `qremesh_guides_info` | Delete the last curve, delete all, list them |
-| `project_all` | `distance` (0.001-1, default 0.02), `mean`, `blur` (0-20), `geometry` (default true), `polypaint` (default true), `source` (one Part's name instead of all visible ones) |
+| `project_all` | `distance` (0.001-1, default 0.02), `mean`, `blur` (0-20), `geometry` (default true), `vertexpaint` (default true), `source` (one Part's name instead of all visible ones) |
 
 ```sh
 sculptforge-cli -c 'open path=scan.glb; qremesh target=8000 adaptive=0.3 keep_original=true; subdivide levels=2; part_visibility index=1 visible=true; project_all distance=0.02; export_fbx path=retopo.fbx'

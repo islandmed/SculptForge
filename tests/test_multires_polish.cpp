@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Subdivision levels, polish: tools that rebuild the mesh say they drop the levels and undo brings them back,
-// sculpt-layer detail turns with the low level, and inactive SubTools don't keep cached levels.
+// sculpt-layer detail turns with the low level, and inactive Parts don't keep cached levels.
 #include "TestHarness.h"
 
 #include "core/Commands.h"
@@ -69,12 +69,12 @@ double msSince(std::chrono::steady_clock::time_point t0) {
 
 } // namespace
 
-// Timing of selecting SubTools and stepping levels on a 1.77M-triangle top level (SF_LEVELS_BENCH=1).
+// Timing of selecting Parts and stepping levels on a 1.77M-triangle top level (SF_LEVELS_BENCH=1).
 TEST(multires_bench_select_and_step) {
     if (!std::getenv("SF_LEVELS_BENCH")) return;
     Document d = makeDoc(makeCube(3));
     for (int i = 0; i < 7; ++i) run(d, "subdiv_divide");
-    d.addSubtool(makeIcosphere(3), "Eye", false);
+    d.addPart(makeIcosphere(3), "Eye", false);
     std::printf("  top level: %zu triangles\n", d.mesh.triangleCount());
     // Fill the level cache: down and back up.
     run(d, "subdiv_lower");
@@ -84,10 +84,10 @@ TEST(multires_bench_select_and_step) {
                 double(subdivBytes(d.mesh)) / 1e6);
     for (int round = 0; round < 3; ++round) {
         auto t0 = std::chrono::steady_clock::now();
-        d.selectSubtool(1);
+        d.selectPart(1);
         const double away = msSince(t0);
         t0 = std::chrono::steady_clock::now();
-        d.selectSubtool(0);
+        d.selectPart(0);
         const double back = msSince(t0);
         t0 = std::chrono::steady_clock::now();
         run(d, "subdiv_lower");
@@ -190,29 +190,29 @@ TEST(multires_rebuilding_tools_drop_levels_and_undo_restores_them) {
     CHECK(!contains(run(p, "decimate", {{"ratio", 0.5}}).message, "Subdivision"));
 }
 
-// Merging and splitting SubTools (not undoable) use each SubTool's current level and say so.
+// Merging and splitting Parts (not undoable) use each Part's current level and say so.
 TEST(multires_merge_and_split_say_levels_are_removed) {
     Document d = levelledCube();
-    d.subtools[0].name = "Body";
+    d.parts[0].name = "Body";
     const size_t current = d.mesh.triangleCount();
-    d.addSubtool(makeIcosphere(1), "Eye", false);
-    CommandResult r = run(d, "subtool_merge_down");
+    d.addPart(makeIcosphere(1), "Eye", false);
+    CommandResult r = run(d, "part_merge_down");
     CHECK(r.ok);
     CHECK(contains(r.message, "Subdivision levels removed: Body SDiv 2 of 3 kept as the new base"));
     CHECK(d.mesh.triangleCount() == current + makeIcosphere(1).triangleCount());
     CHECK(subdivLevelCount(d.mesh) == 0);
     // Split: pieces of the current level.
     Document t = levelledCube();
-    for (uint32_t i = 0; i < t.mesh.triangleCount(); ++i) t.mesh.ensurePolygroups()[i] = i < 100 ? 1 : 2;
-    r = run(t, "subtool_split_groups");
+    for (uint32_t i = 0; i < t.mesh.triangleCount(); ++i) t.mesh.ensureFaceGroups()[i] = i < 100 ? 1 : 2;
+    r = run(t, "part_split_groups");
     CHECK(r.ok);
     CHECK(contains(r.message, "Subdivision levels removed: Sculpt SDiv 2 of 3 kept as the new base"));
-    CHECK(t.mesh.triangleCount() == 100 || t.subtoolMesh(0).triangleCount() == 100);
-    // Merge visible: both SubTools with levels are named.
+    CHECK(t.mesh.triangleCount() == 100 || t.partMesh(0).triangleCount() == 100);
+    // Merge visible: both Parts with levels are named.
     Document m = levelledCube();
-    m.addSubtool(makeCube(2), "Box", true);
+    m.addPart(makeCube(2), "Box", true);
     run(m, "subdiv_divide");
-    r = run(m, "subtool_merge_visible");
+    r = run(m, "part_merge_visible");
     CHECK(r.ok);
     CHECK(contains(r.message, "Sculpt SDiv 2 of 3"));
     CHECK(contains(r.message, "Box SDiv 2 of 2"));
@@ -318,9 +318,9 @@ TEST(multires_format4_layer_detail_is_converted) {
     std::filesystem::remove(path);
 }
 
-// Only the active SubTool keeps cached levels: leaving a SubTool frees its cache, and stepping levels after
+// Only the active Part keeps cached levels: leaving a Part frees its cache, and stepping levels after
 // coming back still works (the level is rebuilt once).
-TEST(multires_inactive_subtools_free_their_level_cache) {
+TEST(multires_inactive_parts_free_their_level_cache) {
     Document d = makeDoc(makeCube(4));
     for (int i = 0; i < 3; ++i) run(d, "subdiv_divide");
     stroke(d, "0,0,2");
@@ -331,10 +331,10 @@ TEST(multires_inactive_subtools_free_their_level_cache) {
     std::printf("  cache %zu bytes, stack %zu bytes\n", cached, stackBytes);
     CHECK(cached > d.mesh.triangleCount() * 12); // at least the level left
     const std::vector<glm::vec3> top = d.mesh.positions;
-    d.addSubtool(makeIcosphere(1), "Eye", true); // selects the new SubTool
-    CHECK(subdivCacheBytes(d.subtoolMesh(0)) == 0);
-    CHECK(subdivBytes(d.subtoolMesh(0)) == stackBytes); // the levels themselves are kept
-    d.selectSubtool(0);
+    d.addPart(makeIcosphere(1), "Eye", true); // selects the new Part
+    CHECK(subdivCacheBytes(d.partMesh(0)) == 0);
+    CHECK(subdivBytes(d.partMesh(0)) == stackBytes); // the levels themselves are kept
+    d.selectPart(0);
     CHECK(subdivLevelText(d.mesh) == "SDiv 4/4");
     CHECK(bitEqual(d.mesh.positions, top));
     CHECK(run(d, "subdiv_lower").ok);

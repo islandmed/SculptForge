@@ -55,6 +55,8 @@ public:
     BrushToolSettings reset(const std::string& key);
     static BrushToolSettings shipped(const std::string& key); // the Vector Displacement brush stamps with DragRect
     bool hasSaved(const std::string& key) const { return saved_.count(key) != 0; }
+    // Used this session or saved: switchBrush brings its own values back (otherwise it takes the current ones).
+    bool known(const std::string& key) const { return session_.count(key) != 0 || saved_.count(key) != 0; }
     size_t savedCount() const { return saved_.size(); }
 
     Json toJson() const; // the saved settings and shareSizeIntensity (the session's values are not written)

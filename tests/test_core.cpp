@@ -1128,8 +1128,8 @@ TEST(splat_commands) {
     CHECK(reg.execute(d, "splat_transform", {{"rotate_x", 180.0}, {"fit", true}}).ok);
     CHECK(reg.execute(d, "splat_clean", {{"min_opacity", 0.5}}).ok);
     CHECK(reg.execute(d, "splat_to_mesh", {{"resolution", 48.0}}).ok && isClosedManifold(d.mesh));
-    // Make sculptable adds SubTools (the hidden scan, the result) and leaves the sculpt as it was.
-    CHECK(d.subtoolCount() == 3 && d.subtoolMesh(0).triangleCount() == 1280);
+    // Make sculptable adds Parts (the hidden scan, the result) and leaves the sculpt as it was.
+    CHECK(d.partCount() == 3 && d.partMesh(0).triangleCount() == 1280);
     for (const char* ext : {".ply", ".splat", ".glb", ".usda", ".usdz"}) {
         const std::string path = tempPath((std::string("sculptforge_cmd_splats") + ext).c_str());
         CHECK(reg.execute(d, "splat_save", {{"path", path}}).ok);

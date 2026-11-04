@@ -1,13 +1,13 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Map baking: the detail of a high-poly sculpt (one or more SubTools) captured as images on the UVs of a
-// low-poly SubTool, for game engines and renderers. Maps: tangent-space normal (MikkTSpace, core/Tangents.h,
+// Map baking: the detail of a high-poly sculpt (one or more Parts) captured as images on the UVs of a
+// low-poly Part, for game engines and renderers. Maps: tangent-space normal (MikkTSpace, core/Tangents.h,
 // so Blender, Unreal, Unity and Godot show it right), object-space (= world) normal, displacement, ambient
-// occlusion, cavity, colour (polypaint or the source's painted texture), and the Mesh Maps texturing reads:
+// occlusion, cavity, colour (vertex paint or the source's painted texture), and the Mesh Maps texturing reads:
 // curvature (convex edges bright, concave dark, from the surface's mean curvature at a set radius), thickness
 // (how far rays travel inside the surface), position (in the bounding box, 16-bit) and ID (a flat colour per
-// polygroup or per Part).
+// face group or per Part).
 //
 // Sources: other Parts (the classic high-to-low bake), or the active Part's own top subdivision level baked onto
 // its lowest level, or its micro level onto its base (bakeLevelSources). UVs outside 0..1 bake as UDIM tiles,
@@ -62,8 +62,8 @@ struct BakeSettings {
     int thicknessRays = 24;                // per texel
     float thicknessDistance = 0.1f;        // rays longer than this count as thick, x bounding-box diagonal
     float curvatureRadius = 0.02f;         // a bend of this radius (x diagonal) is fully bright / dark
-    enum class IdSource : uint8_t { Polygroups, Parts };
-    IdSource idSource = IdSource::Polygroups;
+    enum class IdSource : uint8_t { FaceGroups, Parts };
+    IdSource idSource = IdSource::FaceGroups;
 };
 
 struct BakeResult {
@@ -93,7 +93,7 @@ struct BakeResult {
 using BakeProgress = std::function<bool(float)>;
 
 // Bakes `sources` (meshes, hidden triangles skipped) onto the UVs of `low`. Needs UVs on `low`, valid normals
-// on every mesh. Colour comes from each source's texture when it has one, else its polypaint.
+// on every mesh. Colour comes from each source's texture when it has one, else its vertex paint.
 bool bakeMaps(const Mesh& low, const std::vector<const Mesh*>& sources, const BakeSettings& settings, BakeResult& result,
               std::string& error, const BakeProgress& progress = {});
 
@@ -127,9 +127,9 @@ bool saveBakeMaps(const BakeResult& result, const std::string& folder, const std
 // One line for people: what was baked, the ranges, the displacement scale and the time.
 std::string bakeSummary(const BakeResult& result);
 
-// The SubTools a "source" argument names for baking onto the active SubTool: "all" (or empty) = every visible
-// SubTool but the active one, "visible" likewise, otherwise a SubTool name. False + error when none qualify.
-bool bakeSourceSubtools(const Document& doc, const std::string& source, std::vector<int>& indices, std::string& error);
+// The Parts a "source" argument names for baking onto the active Part: "all" (or empty) = every visible
+// Part but the active one, "visible" likewise, otherwise a Part name. False + error when none qualify.
+bool bakeSourceParts(const Document& doc, const std::string& source, std::vector<int>& indices, std::string& error);
 // Where maps go when no folder is given: the project's folder, else the current folder.
 std::string defaultBakeFolder(const Document& doc);
 

@@ -1,5 +1,5 @@
-# Core loop on the real UI: sculpt, undo/redo, masking, polygroups, visibility.
-run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+# Core loop on the real UI: sculpt, undo/redo, masking, face groups, visibility.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=5
 expect_value can_undo == 0
 click "Clay##brush.clay"
@@ -23,15 +23,15 @@ expect_value masked > 1000
 click "Clear##mask"
 expect_value masked == 0
 
-# Polygroups by normals on a cube-ish shape, then hide one with Ctrl+Shift+click.
+# Face groups by normals on a cube-ish shape, then hide one with Ctrl+Shift+click.
 run new_sphere subdivisions=1
 click "Face Groups"
 click "By normals"
 expect_value groups > 1
-expect_value show_polygroups == 1    # grouping turns the colours on
-shot polygroups
+expect_value show_facegroups == 1    # grouping turns the colours on
+shot facegroups
 click "Show face groups"
-expect_value show_polygroups == 0
+expect_value show_facegroups == 0
 click "Visibility"
 click "Show all"
 expect_value hidden == 0

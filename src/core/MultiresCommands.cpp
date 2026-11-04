@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// subdiv_* commands: ZBrush's Tool > Geometry subdivision levels for scripts, the console and the AI assistant.
+// subdiv_* commands: the classic Tool > Geometry subdivision levels for scripts, the console and the AI assistant.
 #include "core/Commands.h"
 #include "core/Multires.h"
 
@@ -31,7 +31,7 @@ std::string exportCommandFor(const std::string& ext) {
     if (ext == ".fbx") return "export_fbx";
     if (ext == ".ply") return "export_ply";
     if (ext == ".stl") return "export_stl";
-    if (ext == ".goz") return "goz_export";
+    if (ext == ".bridge") return "bridge_export";
     return {};
 }
 
@@ -129,15 +129,15 @@ void registerSubdivCommands(CommandRegistry& reg) {
                  const std::string command = exportCommandFor(lowerExtension(path));
                  if (command.empty()) return {false, "Unknown export format: " + path};
                  const int level = std::max(1, int(argNumber(a, "level", 1))) - 1;
-                 // A scratch scene with each visible SubTool at that level, written by the normal exporter.
+                 // A scratch scene with each visible Part at that level, written by the normal exporter.
                  Document scratch;
                  bool first = true;
-                 for (int i = 0; i < doc.subtoolCount(); ++i) {
-                     if (!doc.subtools[size_t(i)].visible && doc.subtoolCount() > 1) continue;
-                     const Mesh& m = doc.subtoolMesh(i);
+                 for (int i = 0; i < doc.partCount(); ++i) {
+                     if (!doc.parts[size_t(i)].visible && doc.partCount() > 1) continue;
+                     const Mesh& m = doc.partMesh(i);
                      Mesh lm = subdivLevelMesh(m, std::min(level, std::max(subdivLevelCount(m) - 1, 0)));
-                     if (first) scratch.setMesh(std::move(lm), doc.subtools[size_t(i)].name);
-                     else scratch.addSubtool(std::move(lm), doc.subtools[size_t(i)].name, false);
+                     if (first) scratch.setMesh(std::move(lm), doc.parts[size_t(i)].name);
+                     else scratch.addPart(std::move(lm), doc.parts[size_t(i)].name, false);
                      first = false;
                  }
                  if (first) return {false, "Nothing visible to export"};

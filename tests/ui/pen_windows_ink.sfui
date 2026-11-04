@@ -2,7 +2,7 @@
 # of their own beside the pen's, at an old position. The UI must follow only the pen, like the canvas does: pen taps
 # on menus and buttons work (with the small jitter of a real tap), dragging the Move button pans by the pen's own
 # movement, the S slider can be dragged with the pen, and Alt+pen drag pans as far as without the stray events.
-run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=4
 snapshot
 

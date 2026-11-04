@@ -18,6 +18,6 @@ TEST(space_camera_buttons) {
 
 TEST(space_camera_key) {
     CHECK(spaceCameraKeyDown(true, false));
-    CHECK(!spaceCameraKeyDown(false, false)); // off by default (ZBrush's Space opens the QuickMenu)
+    CHECK(!spaceCameraKeyDown(false, false)); // off by default (Space opens the QuickMenu)
     CHECK(!spaceCameraKeyDown(true, true));   // typing a space in a text field
 }

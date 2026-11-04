@@ -165,15 +165,15 @@ TEST(malformed_material_channels_in_a_project_fail_cleanly) {
     CHECK(Json::parse(std::string(entries[0].data.begin(), entries[0].data.end()), manifest, err));
     // Json is read-only through [], so edits copy the path down and set it back.
     auto editPbr = [&](const std::function<void(Json&)>& edit) {
-        Json subtools = manifest["subtools"];
-        Json st = subtools[0], tex = st["texture"], pbr = tex["pbr"];
+        Json parts = manifest["parts"];
+        Json st = parts[0], tex = st["texture"], pbr = tex["pbr"];
         edit(pbr);
         tex.set("pbr", std::move(pbr));
         st.set("texture", std::move(tex));
         Json list = Json::array();
         list.push(std::move(st));
-        for (size_t i = 1; i < subtools.size(); ++i) list.push(subtools[i]);
-        manifest.set("subtools", std::move(list));
+        for (size_t i = 1; i < parts.size(); ++i) list.push(parts[i]);
+        manifest.set("parts", std::move(list));
     };
     editPbr([](Json& pbr) {
         Json channels = pbr["channels"];

@@ -45,11 +45,11 @@ void paintState(Mesh& m, float cut = 0.0f, bool soft = false) {
     m.ensureMask();
     for (size_t v = 0; v < m.vertexCount(); ++v) m.mask[v] = m.positions[v].y > cut ? (soft ? 0.5f : 1.0f) : 0.0f;
     m.ensureHidden();
-    m.ensurePolygroups();
+    m.ensureFaceGroups();
     for (size_t t = 0; t < m.triangleCount(); ++t) {
         const glm::vec3 c = (m.positions[m.triangles[t].x] + m.positions[m.triangles[t].y] + m.positions[m.triangles[t].z]) / 3.0f;
         m.hidden[t] = c.x < 0.0f;
-        m.polygroups[t] = c.z > 0.0f ? 7u : 3u;
+        m.facegroups[t] = c.z > 0.0f ? 7u : 3u;
     }
     m.ensureColors();
     for (size_t v = 0; v < m.vertexCount(); ++v)
@@ -75,10 +75,10 @@ TEST(selection_sets_store_restore_undo) {
     Document d = makeDoc(makeIcosphere(4));
     paintState(d.mesh);
     const Mesh before = d.mesh;
-    CHECK(run(d, "selection_set_store", {{"name", "Head"}, {"channels", "mask,polygroups,paint,visibility"}}).ok);
+    CHECK(run(d, "selection_set_store", {{"name", "Head"}, {"channels", "mask,facegroups,paint,visibility"}}).ok);
     CHECK(setCount(d.mesh) == 1);
     const SelectionSet* s = setNamed(d.mesh, "Head");
-    CHECK(s && s->has(kSetMask) && s->has(kSetPaint) && s->has(kSetVisibility) && s->has(kSetPolygroups) && !s->has(kSetMorph));
+    CHECK(s && s->has(kSetMask) && s->has(kSetPaint) && s->has(kSetVisibility) && s->has(kSetFaceGroups) && !s->has(kSetMorph));
     // Compact: a binary mask on half a sphere is a few runs and no values; groups are run-length coded.
     CHECK(s && s->maskValues.empty() && s->maskRuns.size() < s->vertexCount / 4);
     CHECK(s && s->groupRuns.size() < s->triangleCount / 2);
@@ -87,12 +87,12 @@ TEST(selection_sets_store_restore_undo) {
     // Change everything, then restore: back exactly; one undo step brings the changes back.
     d.mesh.clearMask();
     d.mesh.clearHidden();
-    d.mesh.clearPolygroups();
+    d.mesh.clearFaceGroups();
     d.mesh.clearColors();
     CHECK(run(d, "selection_set_restore", {{"name", "Head"}}).ok);
     CHECK(d.mesh.mask == before.mask);
     CHECK(d.mesh.hidden == before.hidden);
-    CHECK(d.mesh.polygroups == before.polygroups);
+    CHECK(d.mesh.facegroups == before.facegroups);
     CHECK(d.mesh.colors == before.colors);
     CHECK(run(d, "undo").ok);
     CHECK(!d.mesh.hasMask() || std::all_of(d.mesh.mask.begin(), d.mesh.mask.end(), [](float v) { return v == 0.0f; }));
@@ -161,7 +161,7 @@ TEST(selection_sets_pack_roundtrip_and_damage) {
     decodeSelectionSet(s, kSetAllChannels, a);
     decodeSelectionSet(back, kSetAllChannels, b);
     CHECK(back.name == "All" && back.channels == s.channels);
-    CHECK(a.mask == b.mask && a.polygroups == b.polygroups && a.colors == b.colors && a.hidden == b.hidden);
+    CHECK(a.mask == b.mask && a.facegroups == b.facegroups && a.colors == b.colors && a.hidden == b.hidden);
     CHECK(a.uvs == b.uvs && a.positions == b.positions);
     CHECK(a.mask == m.mask && a.hidden == m.hidden && a.positions == m.positions);
     // Every truncation is refused, never read past the end.
@@ -236,7 +236,7 @@ TEST(selection_sets_across_levels) {
     m.ensureMask();
     for (size_t v = 0; v < m.vertexCount(); ++v) m.mask[v] = m.positions[v].y > 0.2f ? 1.0f : 0.0f;
     m.markAllDirty();
-    CHECK(run(d, "selection_set_store", {{"name", "Top mask"}, {"channels", "mask,polygroups,visibility"}}).ok);
+    CHECK(run(d, "selection_set_store", {{"name", "Top mask"}, {"channels", "mask,facegroups,visibility"}}).ok);
     CHECK(run(d, "subdiv_level", {{"level", 1.0}}).ok);
     const std::vector<float> reference = d.mesh.mask; // what the levels made of it
     CHECK(!reference.empty());
@@ -353,23 +353,23 @@ TEST(selection_sets_project_roundtrip) {
     CHECK(run(d, "selection_set_morph_target", {{"name", "Everything"}}).ok);
     const Mesh saved = d.mesh;
     // A second Part with its own set.
-    d.addSubtool(makeCube(2), "Box");
+    d.addPart(makeCube(2), "Box");
     CHECK(run(d, "selection_set_from_visible", {{"name", "Box visible"}}).ok);
     const std::string path = tempPath("sf_selection_sets.sfproj");
     std::string err;
     CHECK(saveProject(path, d, err));
     Document back;
     CHECK(loadProject(path, back, err));
-    CHECK(back.subtoolCount() == 2);
-    back.selectSubtool(0);
+    CHECK(back.partCount() == 2);
+    back.selectPart(0);
     CHECK(setCount(back.mesh) == 2);
     CHECK(back.mesh.selectionSets && back.mesh.selectionSets->morphTarget == "Everything");
     SelectionSetData a, b;
     decodeSelectionSet(*setNamed(saved, "Everything"), kSetAllChannels, a);
     decodeSelectionSet(*setNamed(back.mesh, "Everything"), kSetAllChannels, b);
-    CHECK(a.mask == b.mask && a.colors == b.colors && a.hidden == b.hidden && a.polygroups == b.polygroups &&
+    CHECK(a.mask == b.mask && a.colors == b.colors && a.hidden == b.hidden && a.facegroups == b.facegroups &&
           a.positions == b.positions && a.uvs == b.uvs);
-    back.selectSubtool(1);
+    back.selectPart(1);
     CHECK(setNamed(back.mesh, "Box visible"));
     // Undo isn't carried by projects: the loaded list is simply there.
     CHECK(!back.undo.canUndo());
@@ -398,7 +398,7 @@ TEST(selection_sets_file_export_import) {
     Document d = makeDoc(makeIcosphere(3));
     paintState(d.mesh);
     CHECK(run(d, "selection_set_store", {{"name", "A"}, {"channels", "mask,visibility"}}).ok);
-    CHECK(run(d, "selection_set_store", {{"name", "B"}, {"channels", "polygroups"}}).ok);
+    CHECK(run(d, "selection_set_store", {{"name", "B"}, {"channels", "facegroups"}}).ok);
     const std::string path = tempPath("sf_sets.sfsets");
     CHECK(run(d, "selection_sets_export", {{"path", path}}).ok);
     Document other = makeDoc(makeIcosphere(3));
@@ -422,7 +422,7 @@ TEST(selection_sets_file_export_import) {
 TEST(selection_sets_usd_roundtrip) {
     Document d = makeDoc(makeIcosphere(3));
     paintState(d.mesh, 0.0f, true);
-    CHECK(run(d, "selection_set_store", {{"name", "Front half"}, {"channels", "mask,polygroups,visibility,paint"}}).ok);
+    CHECK(run(d, "selection_set_store", {{"name", "Front half"}, {"channels", "mask,facegroups,visibility,paint"}}).ok);
     const Mesh expected = d.mesh;
     const std::string path = tempPath("sf_sets.usda");
     std::string err;
@@ -432,12 +432,12 @@ TEST(selection_sets_usd_roundtrip) {
     CHECK(loadUsd(path, back, splats, err));
     CHECK(back.vertexCount() == expected.vertexCount() && back.triangleCount() == expected.triangleCount());
     const SelectionSet* s = setNamed(back, "Front half");
-    CHECK(s && s->has(kSetMask) && s->has(kSetVisibility) && s->has(kSetPolygroups) && s->has(kSetPaint));
+    CHECK(s && s->has(kSetMask) && s->has(kSetVisibility) && s->has(kSetFaceGroups) && s->has(kSetPaint));
     if (s) {
         SelectionSetData a;
         decodeSelectionSet(*s, kSetAllChannels, a);
         CHECK(a.hidden == expected.hidden);
-        CHECK(a.polygroups == expected.polygroups);
+        CHECK(a.facegroups == expected.facegroups);
         float diff = 0.0f;
         for (size_t v = 0; v < a.mask.size() && v < expected.mask.size(); ++v) diff = std::max(diff, std::abs(a.mask[v] - expected.mask[v]));
         CHECK(a.mask.size() == expected.mask.size() && diff < 1e-5f);

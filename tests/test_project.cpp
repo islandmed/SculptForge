@@ -26,10 +26,10 @@ Document makeRichDoc() {
         m.mask[v] = float(v % 7) / 6.0f;
         m.colors[v] = glm::vec3(float(v % 3) * 0.5f, 0.25f, 1.0f / float(v + 1));
     }
-    m.ensurePolygroups();
+    m.ensureFaceGroups();
     m.ensureHidden();
     for (uint32_t t = 0; t < m.triangleCount(); ++t) {
-        m.polygroups[t] = t % 5 + 100000u;
+        m.facegroups[t] = t % 5 + 100000u;
         m.hidden[t] = t % 11 == 0 ? 1 : 0;
     }
     m.uvs.resize(m.triangleCount() * 3);
@@ -92,19 +92,19 @@ bool editManifest(const std::string& path, const std::function<void(Json&)>& edi
     return writeStoredZip(path, entries, 1, err);
 }
 
-// Applies `edit` to the "mesh" object of the first SubTool in a manifest.
+// Applies `edit` to the "mesh" object of the first Part in a manifest.
 void editFirstMesh(Json& j, const std::function<void(Json&)>& edit) {
-    Json subtools = Json::array();
-    for (size_t i = 0; i < j["subtools"].size(); ++i) {
-        Json st = j["subtools"][i];
+    Json parts = Json::array();
+    for (size_t i = 0; i < j["parts"].size(); ++i) {
+        Json st = j["parts"][i];
         if (i == 0) {
             Json mesh = st["mesh"];
             edit(mesh);
             st.set("mesh", std::move(mesh));
         }
-        subtools.push(std::move(st));
+        parts.push(std::move(st));
     }
-    j.set("subtools", std::move(subtools));
+    j.set("parts", std::move(parts));
 }
 
 } // namespace
@@ -125,7 +125,7 @@ TEST(project_round_trip_every_attribute) {
     CHECK(b.base == a.base);
     CHECK(b.mask == a.mask);
     CHECK(b.colors == a.colors);
-    CHECK(b.polygroups == a.polygroups);
+    CHECK(b.facegroups == a.facegroups);
     CHECK(b.hidden == a.hidden);
     CHECK(b.uvs == a.uvs);
     CHECK(b.layers.size() == 2);
@@ -166,7 +166,7 @@ TEST(project_plain_mesh_keeps_attributes_empty) {
     Document back;
     CHECK(loadProject(path, back, err));
     CHECK(back.mesh.positions == doc.mesh.positions);
-    CHECK(!back.mesh.hasMask() && !back.mesh.hasColors() && !back.mesh.hasPolygroups() && !back.mesh.hasHidden() &&
+    CHECK(!back.mesh.hasMask() && !back.mesh.hasColors() && !back.mesh.hasFaceGroups() && !back.mesh.hasHidden() &&
           !back.mesh.hasUvs());
     CHECK(back.mesh.layers.empty() && back.mesh.base.empty() && back.splats.empty());
     std::filesystem::remove(path);
@@ -195,27 +195,27 @@ TEST(project_commands_and_open) {
     std::filesystem::remove(path);
 }
 
-TEST(project_subtool_shading) {
-    // Smooth / Flat per SubTool (#11): an optional key, so files without it (and older readers) are unaffected.
+TEST(project_part_shading) {
+    // Smooth / Flat per Part (#11): an optional key, so files without it (and older readers) are unaffected.
     CommandRegistry reg;
     Document doc = makeDoc(makeIcosphere(1));
-    CHECK(reg.execute(doc, "subtool_append", {{"type", std::string("cube")}}).ok);
-    CHECK(doc.activeSubtoolInfo().shading == Shading::Default);
-    CHECK(reg.execute(doc, "subtool_shading", {{"mode", std::string("flat")}}).ok);
-    CHECK(reg.execute(doc, "subtool_shading", {{"mode", std::string("Smooth")}, {"index", 0.0}}).ok);
-    CHECK(!reg.execute(doc, "subtool_shading", {{"mode", std::string("faceted")}}).ok);
-    CHECK(doc.subtools[0].shading == Shading::Smooth && doc.subtools[1].shading == Shading::Flat);
-    CHECK(reg.execute(doc, "subtool_duplicate").ok); // the copy keeps it
-    CHECK(doc.subtoolCount() == 3 && doc.activeSubtoolInfo().shading == Shading::Flat);
+    CHECK(reg.execute(doc, "part_append", {{"type", std::string("cube")}}).ok);
+    CHECK(doc.activePartInfo().shading == Shading::Default);
+    CHECK(reg.execute(doc, "part_shading", {{"mode", std::string("flat")}}).ok);
+    CHECK(reg.execute(doc, "part_shading", {{"mode", std::string("Smooth")}, {"index", 0.0}}).ok);
+    CHECK(!reg.execute(doc, "part_shading", {{"mode", std::string("faceted")}}).ok);
+    CHECK(doc.parts[0].shading == Shading::Smooth && doc.parts[1].shading == Shading::Flat);
+    CHECK(reg.execute(doc, "part_duplicate").ok); // the copy keeps it
+    CHECK(doc.partCount() == 3 && doc.activePartInfo().shading == Shading::Flat);
 
     const std::string path = tempPath("sf_project_shading.sfproj");
     std::string err;
     CHECK(saveProject(path, doc, err));
     Document back;
     CHECK(loadProject(path, back, err));
-    CHECK(back.subtoolCount() == 3);
-    CHECK(back.subtools[0].shading == Shading::Smooth && back.subtools[1].shading == Shading::Flat &&
-          back.subtools[2].shading == Shading::Flat);
+    CHECK(back.partCount() == 3);
+    CHECK(back.parts[0].shading == Shading::Smooth && back.parts[1].shading == Shading::Flat &&
+          back.parts[2].shading == Shading::Flat);
 
     // Unknown values load as Default rather than failing the file.
     Shading s = Shading::Flat;
@@ -225,10 +225,10 @@ TEST(project_subtool_shading) {
 }
 
 TEST(project_attachments) {
-    // Document::projectFiles (an embedded custom MatCap): saved under attachments/ and loaded back byte for byte;
+    // Document::projectFiles (an embedded custom Lit Sphere): saved under attachments/ and loaded back byte for byte;
     // names that could escape the folder are not written.
     Document doc = makeDoc(makeIcosphere(1));
-    doc.projectFiles["matcaps/Green Gold.png"] = {1, 2, 3, 250};
+    doc.projectFiles["litspheres/Green Gold.png"] = {1, 2, 3, 250};
     doc.projectFiles["../evil.png"] = {9};
     doc.projectFiles["empty.bin"] = {};
     const std::string path = tempPath("sf_project_attachments.sfproj");
@@ -238,7 +238,7 @@ TEST(project_attachments) {
     back.projectFiles["stale"] = {7};
     CHECK(loadProject(path, back, err));
     CHECK(back.projectFiles.size() == 2);
-    CHECK(back.projectFiles["matcaps/Green Gold.png"] == std::vector<uint8_t>({1, 2, 3, 250}));
+    CHECK(back.projectFiles["litspheres/Green Gold.png"] == std::vector<uint8_t>({1, 2, 3, 250}));
     CHECK(back.projectFiles.count("empty.bin") == 1 && back.projectFiles.count("../evil.png") == 0);
     CHECK(!back.projectSettings.has("attachments")); // a core key, not an app setting
     std::filesystem::remove(path);
@@ -402,7 +402,7 @@ TEST(project_texture_without_material_channels_writes_format_6) {
     Json manifest;
     CHECK(Json::parse(readManifest(path), manifest, err));
     CHECK(manifest["version"].asNumber() == 6);
-    CHECK(!manifest["subtools"][0]["texture"].has("pbr"));
+    CHECK(!manifest["parts"][0]["texture"].has("pbr"));
     // A format 6 texture project loads with no material channels.
     Document back;
     CHECK(loadProject(path, back, err));
@@ -436,7 +436,7 @@ TEST(project_material_channels_round_trip_as_format_7) {
     Json manifest;
     CHECK(Json::parse(readManifest(path), manifest, err));
     CHECK(manifest["version"].asNumber() == 7);
-    CHECK(manifest["subtools"][0]["texture"]["pbr"]["channels"].size() == 5);
+    CHECK(manifest["parts"][0]["texture"]["pbr"]["channels"].size() == 5);
     Document back;
     CHECK(loadProject(path, back, err));
     const PaintTexture& b = *back.mesh.texture;

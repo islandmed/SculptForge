@@ -320,11 +320,11 @@ void TransformSession::cancel(Mesh& mesh, BVH& bvh) {
     *this = TransformSession();
 }
 
-size_t transformSubtool(Document& doc, int index, const MeshTransform& t, bool useMask, float falloff, Symmetry mirror,
+size_t transformPart(Document& doc, int index, const MeshTransform& t, bool useMask, float falloff, Symmetry mirror,
                         const std::string& label) {
-    if (index < 0 || index >= doc.subtoolCount()) return 0;
-    const bool active = index == doc.activeSubtool;
-    SubTool& info = doc.subtools[size_t(index)];
+    if (index < 0 || index >= doc.partCount()) return 0;
+    const bool active = index == doc.activePart;
+    Part& info = doc.parts[size_t(index)];
     Mesh& mesh = active ? doc.mesh : info.mesh;
     BVH& bvh = active ? doc.bvh : info.bvh;
     UndoStack& undo = active ? doc.undo : info.undo;
