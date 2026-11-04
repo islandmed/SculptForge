@@ -10,6 +10,7 @@
 #include "core/BrushAlpha.h"
 #include "core/Sculpt.h"
 #include "core/SculptKernel.h"
+#include "core/ThreadPool.h"
 
 #include <chrono>
 #include <algorithm>
@@ -253,6 +254,7 @@ TEST(adaptive_dabs_normals_during_the_stroke) {
 TEST(adaptive_dabs_timing) {
     const char* env = std::getenv("SF_BOOST_TRIS");
     if (!env) return; // (a measurement, not a check: SF_BOOST_TRIS=15000000)
+    if (const char* t = std::getenv("SF_BOOST_THREADS")) ThreadPool::setSharedThreadCount(std::atoi(t)); // (before first use)
     const Mesh head = makeBenchHead(size_t(std::strtod(env, nullptr)));
     const float radius = std::getenv("SF_BOOST_RADIUS") ? float(std::strtod(std::getenv("SF_BOOST_RADIUS"), nullptr)) : 0.7f;
     const int batch = std::getenv("SF_BOOST_BATCH") ? std::atoi(std::getenv("SF_BOOST_BATCH")) : 4;

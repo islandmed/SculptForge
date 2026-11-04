@@ -325,22 +325,25 @@ void Sculptor::flushBatch(Mesh& mesh, BVH& bvh) {
             for (size_t i = b; i < e; ++i) {
                 const uint32_t v = g.verts[i];
                 const glm::vec3 x0 = pos[v];
-                glm::vec3 x = x0, nv = normals[v];
+                glm::vec3 x = x0, t1, t2;
                 bool reached = false;
                 for (const PlaneKernel* k : ks) {
-                    if (!k->reaches(x)) continue;
-                    if (!reached && curvatureStamp_[v] != stamp) { // (the cavity term from before the stroke moved it)
-                        curvatureStamp_[v] = stamp;
-                        curvature_[v] = mesh.curvatureAt(v);
+                    if (!reached) { // (the first dab that reaches it: its cavity term from before, its tangents)
+                        const glm::vec3 o = x - k->center;
+                        if (glm::dot(o, o) >= k->r * k->r) continue;
+                        if (curvatureStamp_[v] != stamp) {
+                            curvatureStamp_[v] = stamp;
+                            curvature_[v] = mesh.curvatureAt(v);
+                        }
+                        PlaneKernel::tangents(normals[v], t1, t2);
+                        reached = true;
                     }
-                    reached = true;
                     glm::vec3 d;
-                    nv = k->offsetAndNormal(x, nv, kexp, d);
-                    x += d;
+                    if (k->offsetAndCarry(x, kexp, d, t1, t2)) x += d;
                 }
                 scratch_[i] = x - x0;
                 givenInfluence_[i] = reached ? 1.0f : 0.0f;
-                if (reached) normals[v] = nv;
+                if (reached) normals[v] = PlaneKernel::carriedNormal(t1, t2, normals[v]);
             }
         }, 2048);
         displaceAll(mesh, g.verts, scratch_, false, givenInfluence_.data());
@@ -350,10 +353,30 @@ void Sculptor::flushBatch(Mesh& mesh, BVH& bvh) {
         timings.vertices += n;
         addLazyLeaves(bvh, g.leaves);
         lastLazyLeaves_.insert(lastLazyLeaves_.end(), g.leaves.begin(), g.leaves.end());
-        mesh.markDirtyAround(n, 4096, [&](size_t b, size_t e, IndexBits& set) {
-            for (size_t i = b; i < e; ++i)
-                if (givenInfluence_[i] > 0.0f) set.insertLocal(g.verts[i]);
-        });
+        // The GPU's dirty marks of what moved, in parallel straight into the mesh's bits: the list is increasing,
+        // so each stretch of it starts and ends at a dirty block's edge and no two threads share a word.
+        size_t first = 0, last = n;
+        while (first < n && givenInfluence_[first] <= 0.0f) ++first;
+        while (last > first && givenInfluence_[last - 1] <= 0.0f) --last;
+        if (first < last) {
+            const std::vector<uint32_t>& vs = g.verts;
+            mesh.growDirtyBlocks((size_t(vs[last - 1]) >> Mesh::kDirtyBlockShift) + 1);
+            mesh.dirtyBegin = std::min(mesh.dirtyBegin, vs[first]);
+            mesh.dirtyEnd = std::max(mesh.dirtyEnd, vs[last - 1] + 1);
+            const auto block = [&](size_t i) { return vs[i] >> Mesh::kDirtyBlockShift; };
+            poolFor(n, [&](size_t b, size_t e) {
+                size_t i = b, end = e;
+                if (b > 0)
+                    while (i < n && block(i) == block(b - 1)) ++i; // (the stretch before has that block)
+                while (end < n && block(end) == block(end - 1)) ++end;
+                for (; i < end; ++i)
+                    if (givenInfluence_[i] > 0.0f) {
+                        const uint32_t v = vs[i];
+                        mesh.dirtyBlocks[v >> Mesh::kDirtyBlockShift] = 1;
+                        mesh.dirtyBits[v >> 6] |= uint64_t(1) << (v & 63);
+                    }
+            }, 16384);
+        }
         timings.normalsMs += lapMs(clock);
     }
     lazyMesh_ = &mesh;

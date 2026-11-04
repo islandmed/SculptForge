@@ -90,24 +90,27 @@ struct PlaneKernel {
     // Inside the dab's reach (the falloff is 0 beyond it).
     bool reaches(const glm::vec3& x) const { return brushDistance(x, center, viewDir, viewFalloff) <= r; }
 
-    // The offset at x (into d) and the normal n of the surface there after the move: the tangents carried by the
-    // offset's derivative, t + J t (J worked out from the formulas above: one falloff slope, no extra offsets),
-    // so n' is the moved surface's normal to first order (exact where the brush's slope is constant). Not with
-    // viewFalloff (carriedNormal's finite differences then). `k` = exp2(2 focal), the falloff's exponent.
-    glm::vec3 offsetAndNormal(const glm::vec3& x, const glm::vec3& n, float k, glm::vec3& d) const {
+    // The offset at x (into d), and the surface's tangents t1, t2 there carried by the move: t + J t, J the
+    // offset's derivative (worked out from the formulas above: one falloff slope, no extra offsets). Carried
+    // through several dabs in turn, the moved surface's normal is cross(t1, t2) at the end (to first order in each
+    // dab's slope, exact where it is constant). Not with viewFalloff. `k` = exp2(2 focal), the falloff's exponent.
+    // False (d = 0, tangents as they were) outside the dab.
+    bool offsetAndCarry(const glm::vec3& x, float k, glm::vec3& d, glm::vec3& t1, glm::vec3& t2) const {
         const glm::vec3 o = x - center;
-        const float dist = glm::length(o);
-        const float t = std::clamp(1.0f - dist / r, 0.0f, 1.0f);
+        const float dist2 = glm::dot(o, o);
+        if (dist2 >= r * r) {
+            d = glm::vec3(0.0f);
+            return false;
+        }
+        const float dist = std::sqrt(dist2);
+        const float t = 1.0f - dist / r;
         const float g = focal != 0.0f ? std::pow(t, k) : t;
         const float f = g * g * (3.0f - 2.0f * g);
         d = offsetWith(x, f);
-        if (t <= 0.0f) return n; // (outside: no move)
         // df/d(dist) = df/dg dg/dt dt/d(dist).
         const float dg = focal != 0.0f ? (t > 0.0f ? k * g / t : 0.0f) : 1.0f;
-        const float slope = dist > 1e-12f && t < 1.0f ? -6.0f * g * (1.0f - g) * dg / r : 0.0f;
+        const float slope = dist > 1e-12f ? -6.0f * g * (1.0f - g) * dg / r : 0.0f;
         const glm::vec3 grad = dist > 1e-12f ? o * (slope / dist) : glm::vec3(0.0f); // the falloff's gradient
-        const glm::vec3 t1 = glm::normalize(std::abs(n.x) < 0.9f ? glm::cross(n, glm::vec3(1, 0, 0)) : glm::cross(n, glm::vec3(0, 1, 0)));
-        const glm::vec3 t2 = glm::cross(n, t1);
         const auto carry = [&](const glm::vec3& tv) -> glm::vec3 { // J tv
             const float gf = glm::dot(grad, tv);
             const glm::vec3 tflat = tv - areaNormal * glm::dot(areaNormal, tv);
@@ -151,9 +154,27 @@ struct PlaneKernel {
                 return glm::vec3(0.0f);
             }
         };
-        const glm::vec3 m = glm::cross(t1 + carry(t1), t2 + carry(t2));
+        t1 += carry(t1);
+        t2 += carry(t2);
+        return true;
+    }
+    // A tangent pair for the normal n (cross(t1, t2) = n), to carry through offsetAndCarry.
+    static void tangents(const glm::vec3& n, glm::vec3& t1, glm::vec3& t2) {
+        t1 = glm::normalize(std::abs(n.x) < 0.9f ? glm::cross(n, glm::vec3(1, 0, 0)) : glm::cross(n, glm::vec3(0, 1, 0)));
+        t2 = glm::cross(n, t1);
+    }
+    // The normal the carried tangents give, or n where they folded over (or collapsed).
+    static glm::vec3 carriedNormal(const glm::vec3& t1, const glm::vec3& t2, const glm::vec3& n) {
+        const glm::vec3 m = glm::cross(t1, t2);
         const float len = glm::length(m);
         return len > 1e-20f && glm::dot(m, n) > 0.0f ? m / len : n;
+    }
+    // One dab: the offset at x and the normal n after it (offsetAndCarry with fresh tangents).
+    glm::vec3 offsetAndNormal(const glm::vec3& x, const glm::vec3& n, float k, glm::vec3& d) const {
+        glm::vec3 t1, t2;
+        tangents(n, t1, t2);
+        if (!offsetAndCarry(x, k, d, t1, t2)) return n;
+        return carriedNormal(t1, t2, n);
     }
 };
 
