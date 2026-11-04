@@ -301,6 +301,16 @@ transform of the touched patches, needed only for what is drawn or picked (defer
   visible patches first, and later on the GPU (each level is one pass over its new points). Undo of a coarse edit is the
   touched lattice coefficients only (tens of KB). Not measured yet: shading of the reconstructed patches, and a whole
   stroke (30 dabs) end to end.
+- **CPU-honest floor bracket (perf-moonshots §0, 11-04):** the floor profile on the M1's two efficiency cores
+  (`taskset -c 0,1`, ~0.47 of a fast core each) is the pessimistic bound; four fast cores (`taskset -c 4-7`) the
+  optimistic one. 216 px dab: today 147 / 29 ms, wavelet 3.5 / 0.6 ms, reconstruct 34 / 6 ms (108 px: today 29 / 6.2,
+  wavelet 3.8 / 0.4). The wavelet dab holds on the slow cores (42x at 216 px); the reconstruction is what a slow CPU
+  pays, which is why it has to move off the stroke and onto the GPU. Windows columns above ran before win.sh waited
+  for an idle PC (11-04) and may be up to ~2x pessimistic.
+- **In a real stroke (research/n2-stroke a433b6cb, `SF_MICRO_WAVELET=1`, off):** floor committed lag p50 at 216 px
+  365 -> 31-36 ms, 108 px 28-32 -> 22 ms; Windows PC idle, floor 216 px 699-735 -> 157-178 ms (102-114 with shading
+  capped at ~10 ms a frame). Shading is now the cost; an ms shading budget comes first, then normals on the GPU
+  (GL 3.3, no compute, the CPU path kept as a same-picture fallback).
 - **Next:** N2 inside MicroStroke behind a flag (coarse path for radii spanning > 64 samples), reconstruct-on-draw in the
   renderer's sync, then the same idea on the multires mesh path (betaboost's scale-adaptive dabs are its safe first step).
 
