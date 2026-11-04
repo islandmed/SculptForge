@@ -256,7 +256,7 @@ public:
     // for the GPU. flushDraft works out every normal and cavity term the stroke touched, once (the app calls
     // it before endStroke). Not with dynamic topology.
     bool draftStrokes = false;
-    // Scale-adaptive dabs (Preferences > Performance > Fast big brushes, on by default): a dab whose region holds
+    // Scale-adaptive dabs (Preferences > Performance > Fast Big Brushes (Experimental), off by default): a dab whose region holds
     // more than kAdaptiveMinVertices vertices takes its area plane from an even sample of about kAreaSamples of
     // them (an average, so the sample gives it to within a fraction of a percent) and updates the normals of
     // what it moved from the derivative of its own displacement (the brush's offset at two points a hair away
@@ -265,7 +265,7 @@ public:
     // lazily: behind the brush as the stroke goes on (catchUpNormals) and the rest when it ends (flushDraft, or
     // endStroke). Brushes whose offset depends on more than the vertex's place (Smooth, Layer, Morph) and the
     // remesher always take the exact path, and so do regions below the threshold (small brushes are unchanged).
-    bool adaptiveDabs = true;
+    bool adaptiveDabs = false;
     static constexpr size_t kAdaptiveMinVertices = 150'000;
     static constexpr size_t kAreaSamples = 65'536;
     // Whether adaptive dabs moved leaves whose exact normals are still to come, and catching up with up to
