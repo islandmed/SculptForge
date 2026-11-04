@@ -4,8 +4,10 @@
 #include "app/Bench.h"
 #include "app/Calibration.h"
 #include "app/CrashLog.h"
+#include "app/OptimisticBench.h"
 #include "ai/AiPolicy.h"
 #include "core/Benchmark.h"
+#include "core/Wavelet.h"
 #include "core/FocusDetail.h"
 #include "core/Pack.h"
 
@@ -154,11 +156,18 @@ int main(int argc, char** argv) {
     std::string logDir, crashTest;
     bool sizeGiven = false;
     sf::BenchCommandLine bench;
+    bool optimistic = false; // --bench-optimistic (research, docs/design/core-200m.md N1)
+    sf::OptimisticBenchOptions optimisticOptions;
     bool calibrate = false, calibrateQuick = false, calibrateSave = true;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
         auto next = [&]() -> std::string { return i + 1 < argc ? argv[++i] : std::string(); };
         if (sf::parseBenchArg(argc, argv, i, bench)) continue;
+        if (sf::parseOptimisticBenchArg(argc, argv, i, optimistic, optimisticOptions)) continue;
+        if (std::string(argv[i]) == "--bench-wavelet") { // research (docs/design/core-200m.md N2), CPU only
+            const std::string out = i + 1 < argc && argv[i + 1][0] != '-' ? argv[++i] : std::string();
+            return sf::runWaveletBench(out);
+        }
         if (a == "--calibrate") calibrate = true;
         else if (a == "--calibrate-quick") calibrate = calibrateQuick = true;
         else if (a == "--calibrate-no-save") calibrateSave = false;
@@ -226,6 +235,7 @@ int main(int argc, char** argv) {
     }
     if (automatedRun()) isolateSettings();
     if (bench.run) return finishIsolated(sf::runAppBenchmark(bench));
+    if (optimistic) return finishIsolated(sf::runOptimisticBench(optimisticOptions));
     if (calibrate) return finishIsolated(sf::runCalibrateCommandLine(calibrateQuick, calibrateSave));
     if (!options.uiTest.empty()) {
         if (!sizeGiven) options.width = 1600, options.height = 960;

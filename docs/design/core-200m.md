@@ -152,6 +152,50 @@ Every number twice: this laptop and the floor profile (`SF_HW_SIMULATE=floor`), 
 
 Nothing here merges into a release without the floor-tier numbers.
 
+## 7b. The novel track (Tony, 11-03: beyond the known playbook)
+
+Sections 1-6 are the known playbook done well (multiresolution offsets, cluster LOD to a pixel budget, a cached
+screen, scale-adaptive dabs). The novel track changes *what a stroke is*, not only how fast it runs. Each item is a
+prototype with numbers before anything ships; measured on this laptop, the floor profile and the Windows PC.
+
+**N1. Optimistic screen-space strokes.** The screen is the first thing a dab changes, the mesh the last. Each dab is
+applied at once to the cached screen (depth, normal, colour) by one GPU pass over the dab's screen rectangle: the
+surface point from depth, the brush's displacement along the dab normal, the bent normal from the kernel's gradient,
+the colour re-shaded by the ratio of the Lit Sphere lookups at the bent and the original normal (so cavity, material
+and paint stay). Cost: the brush's pixels, under 1 ms, whatever the mesh size. The true mesh is solved on the solver
+thread a few frames later and replaces the optimistic pixels; the swap is pop-free where the estimate holds (open
+surface, no silhouette change), and the residual is measured (the "pop": the per-pixel difference between the
+optimistic image and the solved mesh at the same dabs). Stroke latency stops depending on mesh size. Differs from the
+geometry preview we have (render/Ghost.h): that moves the mesh's vertices in the vertex shader, so its cost follows the
+clusters under the brush; N1 never touches geometry. Limits: silhouettes (the outline doesn't move until reconcile),
+brushes that read the surface (Smooth, Flatten: approximated from the canvas's depth), occluded surface (not on screen,
+nothing to show, nothing lost: the solver is exact).
+
+**N2. Wavelet (multi-scale) displacement.** Store each patch's heights as interpolating-wavelet coefficients (integer
+lifting on the triangle grid: a point new at level k stores its height minus the floor-average of its two parents on the
+coarser edge), losslessly invertible. A dab whose radius spans 64-256 samples at level l adds its kernel to the level-l
+coefficients only: a 300 px brush writes thousands of values instead of millions, so **cost falls as the brush grows**,
+and the fine coefficients (the detail) ride along unchanged. Reconstruction (the inverse transform) runs lazily for what
+is drawn or picked, and can move to the GPU (each level is one pass over its new points). The result is identical, bit
+for bit, to adding the coarse kernel and linearly interpolating it to the fine points (tested), which is what today's
+stride-sampled micro brushes approximate at full write cost.
+
+**N3. Procedural stroke layers (research).** A stroke stored as an operation (path, brush, parameters, the base it was
+applied to) instead of its result; detail is evaluated at any resolution on demand, so it isn't bounded by memory, and a
+stroke can be edited after the fact (strength, path, falloff). Hard parts: brushes that read the surface (order
+dependence: replay is sequential), determinism across versions, the cost of evaluating many layers (cache per patch per
+level; N2's coefficients are the cache). Prototype after N1 and N2: a layer stack of Standard / Clay strokes evaluated
+into N2 coefficients per patch on demand.
+
+**N4. Pen prediction for the last frames.** The alpha-beta-gamma predictor (core/PenPredictor.h, from the zero-latency
+work) extrapolates the pen ~25 ms; with N1 the predicted dabs are drawn optimistically too (weight < 1, as the preview
+does), hiding the last frame or two of display latency. Literature: no gain predicting past ~33 ms.
+
+**N5. Idle-time pre-refinement around the cursor.** When the pen hovers, spend idle frames preparing what the next dab
+will need under and ahead of the cursor: Focus Detail promotion, N2 reconstruction of the patches under the cursor, BVH
+and undo-tile allocations, shading. The first dab then finds everything warm (the beta measured a 965 ms first-dab stall
+on Windows at 15M; perf/beta-boost removes its cause, N5 keeps such costs off the stroke in general).
+
 ## 8. Phase 1 results
 
 Run: `sculptforge --benchmark core-200m --benchmark-no-video` (Release). The scene: the bench head at 196,608 base
@@ -259,6 +303,25 @@ every frame had a result: gpu_frames = frames). Orbit, ms:
 driver blocking the draw calls on this shared Asahi desktop. That is this machine's stack, not the engine; the
 Windows PC (RTX 3060) run below shows the same scene on a desktop GPU and driver.
 
+
+### Windows PC (RTX 3060, NVIDIA 616.56, Ryzen 5600X, 32 GB; 1920x1080; CI Windows build of this branch)
+
+Six runs interleaved real GPU / floor 100 % / floor 75 %, governor pinned (`SF_GOVERNOR=0`); every run's log checked
+for the profile it ran with. Orbit, ms:
+
+| | drawn | frame p50 / p99 / max | GPU p50 / p99 | swap wait p99 | open / first frame |
+|---|---|---|---|---|---|
+| real GPU (x2) | 0.62M | 0.8-0.9 / 2.1-2.3 / 3-8 | 0.6 / 1.7-2.1 | 0.4-1.2 | 0.29-0.30 / 1.32-1.34 s |
+| floor 100 % (x2) | 0.62M | 0.8-0.9 / 2.2-2.3 / 3-10 | 0.6 / 1.7-2.0 | 0.3-1.1 | 0.28-0.35 / 1.36-1.41 s |
+| floor 75 % (x2) | 0.36M | 0.9 / 2.2 / 3-11 | 0.5 / 1.5-1.8 | 0.8-0.9 | 0.30-0.38 / 1.33-1.44 s |
+
+- **200M orbits at ~1,100 fps, p99 2.2 ms**, 15x under the 33 ms target, on the floor budgets too. The 29-43 ms tail of
+  the M1 laptop is its presentation stack (above), not the engine.
+- First frame 1.3-1.4 s (the first full shading of 110M grid points on 6 cores) against 0.7 s on the M1's 10; within
+  the < 5 s target, and phase 2 (shading on demand) removes it.
+- The floor profile on a 3060 tests the budgets, not an iGPU's fill rate; real iGPU runs by testers still decide.
+- RAM was not measured on Windows: `residentBytes()` read only Linux's /proc, so every Windows and macOS benchmark
+  reported 0 MB. Fixed on this branch (working set / Mach task info); remeasured below once the CI build is in.
 
 What the floor simulation does not show: a real iGPU's fill rate (it doesn't slow the GPU) and 4-core open time
 (the open stayed 0.7 s; whether the first shading runs on the capped pool is not verified). Real UHD 620 / Iris Xe

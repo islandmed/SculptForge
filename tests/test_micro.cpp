@@ -12,6 +12,7 @@
 #include "core/Primitives.h"
 #include "core/Project.h"
 #include "core/TierConfig.h"
+#include "core/Wavelet.h"
 #include "io/Zip.h"
 
 #include <chrono>
@@ -599,4 +600,29 @@ TEST(micro_core200m_scene_small) {
     bool same = true;
     for (size_t i = 0; i < mm.disp.size() && same; ++i) same = back.mesh.micro->disp[i] == mm.disp[i];
     CHECK(same);
+}
+
+TEST(wavelet_round_trip_and_coarse_edit) {
+    // N2 (docs/design/core-200m.md): the integer lifting transform is exactly invertible, whatever the values, and a
+    // coarse edit leaves the fine detail alone: the result is the old surface plus the coarse change interpolated.
+    const uint32_t n = 32, S = (n + 1) * (n + 2) / 2;
+    std::vector<int16_t> g(S), orig;
+    uint32_t seed = 12345;
+    for (int16_t& v : g) seed = seed * 1664525u + 1013904223u, v = int16_t(seed >> 16);
+    orig = g;
+    waveletForward(g.data(), n);
+    CHECK(g != orig);
+    waveletInverse(g.data(), n);
+    CHECK(g == orig);
+    // A smooth surface with fine detail, then a constant raise on the spacing-8 lattice.
+    for (uint32_t j = 0; j <= n; ++j)
+        for (uint32_t i = 0; i + j <= n; ++i)
+            g[MicroMesh::index(i, j, n)] = int16_t(100 * i + 37 * j + ((i * 7 + j * 13) % 5) * 20);
+    orig = g;
+    waveletForward(g.data(), n);
+    waveletAddCoarse(g.data(), n, 8, [](uint32_t, uint32_t, int) { return 500; });
+    waveletInverse(g.data(), n);
+    int worst = 0;
+    for (uint32_t k = 0; k < S; ++k) worst = std::max(worst, std::abs(int(g[k]) - int(orig[k]) - 500));
+    CHECK(worst <= 3); // (floor averages round at most once per finer level: 3 levels below spacing 8)
 }
