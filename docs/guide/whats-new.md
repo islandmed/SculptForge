@@ -9,7 +9,7 @@ three versions in full, then the older ones in groups. Every detail is in the
 
 ```features
 date: unreleased
-tagline: Fast Big Brushes, sixty new brushes in six packs, a Masking panel, and a quick tour for experienced sculptors.
+tagline: Sixty new brushes in six packs, a Masking panel, a quick tour for experienced sculptors, and experimental options for very dense meshes.
 ```
 
 ## Version 0.10.11
