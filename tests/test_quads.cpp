@@ -2,20 +2,21 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Quads: imported quads stay paired (Mesh::quadPartners) through sculpting,
-// undo, sculpt layers, SubTools, projects and subdivision, are written back as
-// quads (OBJ, FBX, PLY, USD, GoZ), and topology rebuilds (remesh, decimate,
+// undo, sculpt layers, Parts, projects and subdivision, are written back as
+// quads (OBJ, FBX, PLY, USD, Bridge), and topology rebuilds (remesh, decimate,
 // deleting part of a quad, edits that break a pair) never leave a stale pair.
 #include "TestHarness.h"
 
 #include "core/Commands.h"
 #include "core/Decimate.h"
-#include "core/Polygroups.h"
+#include "core/FaceGroups.h"
 #include "core/Primitives.h"
 #include "core/Project.h"
-#include "core/SubTools.h"
+#include "core/Parts.h"
 #include "core/Voxel.h"
 #include "io/FbxIO.h"
-#include "io/GozIO.h"
+#include "io/BridgeIO.h"
+#include "io/BridgeProtocol.h"
 #include "io/ObjIO.h"
 #include "io/PlyIO.h"
 #include "io/UsdIO.h"
@@ -57,7 +58,7 @@ std::map<int, size_t> objFaceSizes(const std::string& text) {
     return sizes;
 }
 
-// A closed cube of n x n quads per side (welded, wound outwards), as ZBrush or Blender would write it.
+// A closed cube of n x n quads per side (welded, wound outwards) or Blender would write it.
 std::string quadCubeObj(int n) {
     std::map<std::tuple<int, int, int>, int> index;
     std::string verts, faces;
@@ -234,7 +235,7 @@ TEST(quads_subdivision_makes_quads_and_keeps_triangles) {
 
 TEST(quads_topology_rebuilds_drop_or_remake_pairs) {
     const Mesh cube = loadQuadCube(6);
-    // Voxel remesh: none of the old pairs survive; the new surface is quads of its own (like DynaMesh).
+    // Voxel remesh: none of the old pairs survive; the new surface is quads of its own (like voxel remesh).
     const Mesh r = voxelRemesh(cube, 32);
     CHECK(r.triangleCount() > 0 && pairsValid(r));
     CHECK(r.quadCount() * 2 == r.triangleCount());
@@ -252,11 +253,11 @@ TEST(quads_topology_rebuilds_drop_or_remake_pairs) {
     CHECK(kept.triangleCount() == cube.triangleCount() - 3);
     CHECK(pairsValid(kept) && kept.quadCount() == cube.quadCount() - 2);
 
-    // Splitting by polygroups and merging SubTools keep pairs (with shifted triangle ids).
+    // Splitting by face groups and merging Parts keep pairs (with shifted triangle ids).
     Mesh grouped = cube;
-    grouped.ensurePolygroups();
-    for (uint32_t t = 0; t < grouped.triangleCount(); ++t) grouped.polygroups[t] = t < grouped.triangleCount() / 2 ? 1 : 2;
-    const auto parts = splitByPolygroups(grouped);
+    grouped.ensureFaceGroups();
+    for (uint32_t t = 0; t < grouped.triangleCount(); ++t) grouped.facegroups[t] = t < grouped.triangleCount() / 2 ? 1 : 2;
+    const auto parts = splitByFaceGroups(grouped);
     CHECK(parts.size() == 2);
     size_t quads = 0;
     for (const auto& part : parts) {
@@ -270,11 +271,11 @@ TEST(quads_topology_rebuilds_drop_or_remake_pairs) {
     CHECK(merged.quadPartnerAt(0) == Mesh::kNoQuad);
 }
 
-TEST(quads_split_between_polygroups_show_and_export_as_triangles) {
+TEST(quads_split_between_facegroups_show_and_export_as_triangles) {
     Mesh m = loadQuadCube(1);
-    m.ensurePolygroups(1);
+    m.ensureFaceGroups(1);
     const uint32_t partner = m.quadPartnerAt(0);
-    m.polygroups[partner] = 2;
+    m.facegroups[partner] = 2;
     CHECK(m.quadPartnerAt(0) == Mesh::kNoQuad && m.quadCount() == 5);
     std::string err;
     const std::string path = tempPath("sf_quads_groups.obj");
@@ -285,17 +286,17 @@ TEST(quads_split_between_polygroups_show_and_export_as_triangles) {
 
 TEST(quads_project_round_trip) {
     Document doc = makeDoc(loadQuadCube(3));
-    doc.addSubtool(makeIcosphere(1), "Ball", false);
+    doc.addPart(makeIcosphere(1), "Ball", false);
     const std::string path = tempPath("sf_quads.sfproj");
     std::string err;
     CHECK(saveProject(path, doc, err));
     Document back;
     CHECK(loadProject(path, back, err));
     CHECK(back.mesh.quadPartners == doc.mesh.quadPartners && back.mesh.quadCount() == 54);
-    CHECK(!back.subtoolMesh(1).hasQuads());
+    CHECK(!back.partMesh(1).hasQuads());
 }
 
-TEST(quads_round_trip_through_fbx_ply_usd_goz) {
+TEST(quads_round_trip_through_fbx_ply_usd_bridge) {
     const Mesh cube = loadQuadCube(3);
     const size_t quads = cube.quadCount();
     std::string err;
@@ -321,11 +322,11 @@ TEST(quads_round_trip_through_fbx_ply_usd_goz) {
     CHECK(loadUsd(usd, u, splats, err));
     CHECK(u.quadCount() == quads);
 
-    const std::string goz = tempPath("sf_quads.GoZ");
-    CHECK(saveGoz(goz, cube, "Cube", err));
+    const std::string bridge = tempPath((std::string("sf_quads") + bridgefile::kExt).c_str());
+    CHECK(saveBridge(bridge, cube, "Cube", err));
     Mesh g;
-    GozInfo info;
-    CHECK(loadGoz(goz, g, err, &info));
+    BridgeInfo info;
+    CHECK(loadBridge(bridge, g, err, &info));
     CHECK(info.quads == quads && info.triangles == 0);
     CHECK(g.quadCount() == quads && g.triangles == cube.triangles);
 }

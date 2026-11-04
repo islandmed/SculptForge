@@ -153,7 +153,7 @@ Stroke types (Drag Stamp, Spray...): each Blender brush sets its stroke method i
 </li>
 </ul>
 <h2 id="how-it-works">How it works<a class="anchor" href="#how-it-works" aria-label="Link to this section">#</a></h2>
-<p>The two programs share a folder in your user data: <code>~/.local/share/SculptForge/SculptForge/blender</code> on Linux, <code>%APPDATA%\SculptForge\SculptForge\blender</code> on Windows, <code>~/Library/Application Support/SculptForge/SculptForge/blender</code> on macOS. Each side writes its meshes there as <code>.GoZ</code> files with a small list of the objects, and checks the other side&#x27;s list once a second. Nothing goes over the network.</p>
+<p>The two programs share a folder in your user data: <code>~/.local/share/SculptForge/SculptForge/blender</code> on Linux, <code>%APPDATA%\SculptForge\SculptForge\blender</code> on Windows, <code>~/Library/Application Support/SculptForge/SculptForge/blender</code> on macOS. Each side writes its meshes there as Bridge files with a small list of the objects, and checks the other side&#x27;s list once a second. Nothing goes over the network.</p>
 <p>To use another folder, set it in the add-on&#x27;s preferences and start SculptForge with the environment variable <code>SCULPTFORGE_BLENDER_EXCHANGE</code> set to the same folder.</p>
 <p>From scripts and the MCP server: <code>blender_send</code> and <code>blender_receive</code> (both take <code>folder=</code>). Starting SculptForge with <code>--blender</code> loads what Blender last sent.</p>
 <h2 id="limits-and-troubleshooting">Limits and troubleshooting<a class="anchor" href="#limits-and-troubleshooting" aria-label="Link to this section">#</a></h2>

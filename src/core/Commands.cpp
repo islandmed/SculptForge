@@ -24,14 +24,14 @@
 #include "core/Micro.h"
 #include "core/MeshTransform.h"
 #include "core/PathStroke.h"
-#include "core/Polygroups.h"
+#include "core/FaceGroups.h"
 #include "core/SelectionSets.h"
-#include "core/SubTools.h"
-#include "core/Polypaint.h"
+#include "core/Parts.h"
+#include "core/VertexPaint.h"
 #include "core/Primitives.h"
 #include "core/Project.h"
 #include "core/QRemesh.h"
-#include "core/ZSpheres.h"
+#include "core/ForgeSpheres.h"
 #include "core/Deform.h"
 #include "core/Sculptable.h"
 #include "core/Splats.h"
@@ -39,11 +39,13 @@
 #include "core/TextureTransfer.h"
 #include "core/Timeline.h"
 #include "core/Voxel.h"
+#include "core/LegacyNames.h"
+#include "io/BridgeProtocol.h"
 #include "io/FbxIO.h"
 #include "io/GltfIO.h"
 #include "io/BlenderCommands.h"
-#include "io/GozCommands.h"
-#include "io/GozIO.h"
+#include "io/BridgeCommands.h"
+#include "io/BridgeIO.h"
 #include "io/MayaCommands.h"
 #include "io/ObjIO.h"
 #include "io/PlyIO.h"
@@ -181,20 +183,15 @@ CommandRegistry::CommandRegistry() {
              Mesh m;
              SplatCloud splats;
              std::string err;
-             GozInfo goz;
+             BridgeInfo bridge;
              bool ok;
-             std::string ztoolNote;
              if (ext == ".glb" || ext == ".gltf") ok = loadGltf(path, objects, err, &splats);
              else if (ext == ".usda" || ext == ".usd" || ext == ".usdz") ok = loadUsd(path, objects, splats, err);
              else if (ext == ".splat") ok = loadDotSplat(path, splats, err);
              else if (ext == ".fbx") ok = loadFbx(path, objects, err);
-             else if (ext == ".goz") ok = loadGoz(path, m, err, &goz);
+             else if (ext == bridgefile::kExtLower) ok = loadBridge(path, m, err, &bridge);
              else if (ext == ".stl") ok = loadStl(path, m, err);
-             else if (ext == ".ztl" || ext == ".sculptforge") {
-                 // A ZTool converted in ZBrush by the SculptForge ZTL Export plug-in (GoZ files beside it).
-                 if (convertedZToolFiles(path).empty()) return {false, zbrushProprietaryMessage(".ztl")};
-                 ok = loadConvertedZTool(path, objects, err, &ztoolNote);
-             } else if (ext == ".zpr" || ext == ".zbr") return {false, zbrushProprietaryMessage(ext)};
+             else if (ext == ".sculptforge") ok = loadBridgeFolder(path, objects, err); // numbered Bridge files
              else if (ext == ".ply") {
                  PlyContent content;
                  ok = loadPly(path, m, splats, content, err);
@@ -212,12 +209,11 @@ CommandRegistry::CommandRegistry() {
                      layers = std::max(layers, o.mesh.layers.size());
                  }
                  const size_t count = objects.size();
-                 setSceneObjects(doc, std::move(objects), ext == ".goz" && !goz.name.empty() ? goz.name : fileStem(path));
+                 setSceneObjects(doc, std::move(objects), ext == bridgefile::kExtLower && !bridge.name.empty() ? bridge.name : fileStem(path));
                  doc.path = ext == ".obj" ? path : std::string(); // other formats are exported explicitly
-                 if (ext == ".goz") doc.gozName = goz.name;
+                 if (ext == bridgefile::kExtLower) doc.bridgeName = bridge.name;
                  msg += " (" + (count > 1 ? std::to_string(count) + " Parts, " : std::string()) + std::to_string(tris) +
                         " triangles" + (quads == 0 ? "" : ", " + std::to_string(quads) + " quads") + (layers == 0 ? "" : ", " + std::to_string(layers) + " layers") + ")";
-                 if (!ztoolNote.empty()) msg += "; " + ztoolNote;
              }
              if (!splats.empty()) {
                  doc.splats = std::move(splats);
@@ -340,7 +336,7 @@ CommandRegistry::CommandRegistry() {
              if (path.empty()) return {false, "No path given"};
              if (isProjectPath(path)) return {false, "Use save_project for .sfproj files"};
              std::string err;
-             const auto objects = visibleSubtoolObjects(doc);
+             const auto objects = visiblePartObjects(doc);
              if (objects.empty()) return {false, "Nothing visible to export"};
              if (!saveObj(path, objects, err)) return {false, err};
              return {true, "Saved " + path + objectCountText(objects)};
@@ -432,7 +428,7 @@ CommandRegistry::CommandRegistry() {
          [](Document& doc, const Args& a) -> CommandResult {
              std::string path = argString(a, "path");
              std::string err;
-             const auto objects = visibleSubtoolObjects(doc);
+             const auto objects = visiblePartObjects(doc);
              if (objects.empty()) return {false, "Nothing visible to export"};
              MorphAnimation take;
              const bool animated = bakedFaceAnimation(doc, take);
@@ -453,7 +449,7 @@ CommandRegistry::CommandRegistry() {
              std::string path = argString(a, "path");
              std::string err;
              const SplatCloud* splats = argBool(a, "splats", true) && !doc.splats.empty() ? &doc.splats : nullptr;
-             const auto objects = visibleSubtoolObjects(doc);
+             const auto objects = visiblePartObjects(doc);
              MorphAnimation take;
              const bool animated = bakedFaceAnimation(doc, take);
              if (!saveUsd(path, objects, splats, doc.assetName(), err, animated ? &take : nullptr)) return {false, err};
@@ -472,9 +468,9 @@ CommandRegistry::CommandRegistry() {
           {"scale", T::Number, "Multiply positions (FBX units are centimetres). Default 100 (1 unit = 1 m).", false}},
          [](Document& doc, const Args& a) -> CommandResult {
              const int levels = std::clamp(int(argNumber(a, "lods", 1)), 1, 8);
-             const auto objects = visibleSubtoolObjects(doc);
+             const auto objects = visiblePartObjects(doc);
              if (objects.empty()) return {false, "Nothing visible to export"};
-             // One model per visible SubTool; with lods > 1 each gets its own LOD group (see FbxIO.h).
+             // One model per visible Part; with lods > 1 each gets its own LOD group (see FbxIO.h).
              std::vector<std::vector<Mesh>> lods(objects.size());
              std::vector<FbxObject> fbxObjects;
              for (size_t i = 0; i < objects.size(); ++i) {
@@ -514,7 +510,7 @@ CommandRegistry::CommandRegistry() {
              std::string err;
              if (!exportForUnreal(doc, o, r, err)) return {false, err};
              size_t morphs = 0;
-             for (const auto& obj : visibleSubtoolObjects(doc)) morphs += obj.mesh->layers.size();
+             for (const auto& obj : visiblePartObjects(doc)) morphs += obj.mesh->layers.size();
              return {true, "Exported " + r.path + " (" + (r.skeletal ? "skeletal mesh, " + std::to_string(morphs) + " morph targets"
                                                                      : "static mesh, " + std::to_string(r.lodCount) + " LODs") + ")"};
          }});
@@ -530,13 +526,13 @@ CommandRegistry::CommandRegistry() {
              std::filesystem::path base(std::u8string(pathArg.begin(), pathArg.end()));
              int levels = std::clamp(int(argNumber(a, "levels", 4)), 1, 8);
              float ratio = float(std::clamp(argNumber(a, "ratio", 0.5), 0.1, 0.9));
-             const auto objects = visibleSubtoolObjects(doc);
+             const auto objects = visiblePartObjects(doc);
              if (objects.empty()) return {false, "Nothing visible to export"};
-             // Every visible SubTool is decimated on its own; LOD n of each goes into <name>_LOD<n>.glb.
+             // Every visible Part is decimated on its own; LOD n of each goes into <name>_LOD<n>.glb.
              std::vector<std::vector<Mesh>> lods;
              for (const auto& o : objects) {
                  lods.push_back(generateLods(*o.mesh, levels, ratio));
-                 // Decimation keeps the UVs, so every level can carry the SubTool's texture.
+                 // Decimation keeps the UVs, so every level can carry the Part's texture.
                  for (auto& l : lods.back()) l.texture = o.mesh->texture;
              }
              auto stemU8 = base.stem().u8string();
@@ -651,7 +647,7 @@ CommandRegistry::CommandRegistry() {
     registerCaptureCommands(*this); // capture_alpha, capture_vdm: alpha / VDM from the viewport (ViewCapture.cpp)
     registerRetopoCommands(*this); // qremesh, project_all (RetopoCommands.cpp)
     registerQRemeshGuideCommands(*this); // qremesh_guide, ... (QRemeshGuides.cpp)
-    registerZSphereCommands(*this);      // zsphere_new, ... (ZSpheres.cpp)
+    registerForgeSphereCommands(*this);      // Forge Sphere_new, ... (Forge Spheres.cpp)
     registerDeformCommands(*this);       // deform_polish, deform_relax, deform_smooth, deform_balloon (Deform.cpp)
 
     add({"stroke",
@@ -779,8 +775,8 @@ CommandRegistry::CommandRegistry() {
          {{"count", T::Number, "Number of splats (1000-5000000). Default 250000.", false},
           {"shading", T::Bool, "Bake soft lighting and cavity darkening into the colour. Default true.", false}},
          [](Document& doc, const Args& a) -> CommandResult {
-             Mesh merged; // no copy for a single SubTool
-             const Mesh& visible = doc.subtoolCount() == 1 ? doc.mesh : (merged = mergedVisibleMesh(doc));
+             Mesh merged; // no copy for a single Part
+             const Mesh& visible = doc.partCount() == 1 ? doc.mesh : (merged = mergedVisibleMesh(doc));
              if (visible.triangleCount() == 0) return {false, "The mesh is empty"};
              MeshToSplatsOptions o;
              o.count = size_t(std::clamp(argNumber(a, "count", 250000), 1000.0, 5000000.0));
@@ -801,7 +797,7 @@ CommandRegistry::CommandRegistry() {
     add({"undo", "Undo the last action.", {},
          [](Document& doc, const Args&) -> CommandResult {
              if (!doc.undo.undo(doc.mesh, doc.bvh)) return {false, "Nothing to undo"};
-             if (UndoRecord* r = doc.undo.lastRedo(); r && r->subtool) doc.applySubtoolStep(*r->subtool);
+             if (UndoRecord* r = doc.undo.lastRedo(); r && r->part) doc.applyPartStep(*r->part);
              doc.modified = true;
              return {true, "Undone"};
          }});
@@ -809,7 +805,7 @@ CommandRegistry::CommandRegistry() {
     add({"redo", "Redo the last undone action.", {},
          [](Document& doc, const Args&) -> CommandResult {
              if (!doc.undo.redo(doc.mesh, doc.bvh)) return {false, "Nothing to redo"};
-             if (UndoRecord* r = doc.undo.lastUndo(); r && r->subtool) doc.applySubtoolStep(*r->subtool);
+             if (UndoRecord* r = doc.undo.lastUndo(); r && r->part) doc.applyPartStep(*r->part);
              doc.modified = true;
              return {true, "Redone"};
          }});
@@ -828,9 +824,9 @@ CommandRegistry::CommandRegistry() {
     registerMaskingCommands(*this);
     registerCutCommands(*this); // cut (core/Cut.h)
     registerCloseHolesCommands(*this); // close_holes (core/CloseHoles.h)
-    registerPolygroupCommands(*this);
+    registerFaceGroupCommands(*this);
     registerSelectionSetCommands(*this); // selection_set_* (core/SelectionSets.h)
-    registerSubToolCommands(*this);
+    registerPartCommands(*this);
     registerSubdivCommands(*this); // subdiv_* (core/MultiresCommands.cpp)
     registerMicroCommands(*this);  // micro_* (core/MicroCommands.cpp)
     registerDyntopoCommands(*this); // dyntopo (core/DyntopoCommands.cpp)
@@ -840,8 +836,8 @@ CommandRegistry::CommandRegistry() {
     registerPerformanceCommands(*this); // perf_info, set_multithreading (core/Benchmark.cpp)
     registerHardwareProfileCommands(*this); // performance_profile, calibrate, set_performance_override (core/HardwareProfile.cpp)
     registerTimelineCommands(*this); // timeline_info / seek / select / retune / save / load (core/Timeline.h)
-    registerPaintCommands(*this); // core/Polypaint.cpp
-    registerGozCommands(*this); // goz_import/export/send/receive, export_stl (io/GozCommands.cpp)
+    registerPaintCommands(*this); // core/Vertex paint.cpp
+    registerBridgeCommands(*this); // bridge_import/export/send/receive, export_stl (io/BridgeCommands.cpp)
     registerBlenderCommands(*this); // blender_send/receive (io/BlenderCommands.cpp)
     registerMayaCommands(*this); // maya_send/receive (io/MayaCommands.cpp)
     registerBakeCommands(*this); // bake (core/Bake.cpp)
@@ -870,20 +866,46 @@ void CommandRegistry::add(Command cmd) {
 const Command* CommandRegistry::find(const std::string& name) const {
     for (const auto& c : commands_)
         if (c.name == name) return &c;
+    if (legacy::isOld(name)) return find(legacy::modernize(name)); // a script or macro from an older version
     return nullptr;
 }
 
-CommandResult CommandRegistry::execute(Document& doc, const std::string& name, const Args& args) const {
+namespace {
+// Args from an older version's script: parameter names, and string values when the command refused them as they
+// were (so a user's own text is never changed when the command accepts it).
+Args modernizedArgs(const Args& args, bool values) {
+    Args out;
+    for (const auto& [k, v] : args) {
+        ArgValue nv = v;
+        if (values)
+            if (const std::string* s = std::get_if<std::string>(&v); s && legacy::isOld(*s)) nv = legacy::modernize(*s);
+        out[legacy::modernize(k)] = std::move(nv);
+    }
+    return out;
+}
+bool anyOldValue(const Args& args) {
+    for (const auto& [k, v] : args)
+        if (const std::string* s = std::get_if<std::string>(&v); s && legacy::isOld(*s)) return true;
+    return false;
+}
+} // namespace
+
+CommandResult CommandRegistry::execute(Document& doc, const std::string& name, const Args& givenArgs) const {
     const Command* cmd = find(name);
     if (!cmd) return {false, "Unknown command: " + name};
+    bool oldKeys = false;
+    for (const auto& [k, v] : givenArgs) oldKeys = oldKeys || legacy::isOld(k);
+    const Args renamedKeys = oldKeys ? modernizedArgs(givenArgs, false) : Args{};
+    const Args& args = oldKeys ? renamedKeys : givenArgs;
     for (const auto& p : cmd->params)
         if (p.required && !args.contains(p.name)) return {false, "Missing required argument: " + p.name};
     doc.notice.clear();
-    // Extract's preview lasts until Accept or until anything else changes the scene (as in ZBrush); saving or
+    // Extract's preview lasts until Accept or until anything else changes the scene; saving or
     // exporting never writes it.
     if (doc.extractPreview.id && name.rfind("extract", 0) != 0)
         doc.dropExtractPreview(!(name.rfind("save", 0) == 0 || name.rfind("export", 0) == 0));
     CommandResult r = cmd->run(doc, args);
+    if (!r.ok && anyOldValue(args)) r = cmd->run(doc, modernizedArgs(args, true)); // a value an older version used
     if (const std::string notice = doc.takeNotice(); !notice.empty() && r.ok) r.message += ". " + notice;
     return r;
 }

@@ -60,8 +60,8 @@ Click **Append** and choose:
   To insert your own mesh, choose **Active Part's copy...** and pick another Part (it stays as it is), or
   **From file...** and pick an `.obj`, `.ply` or `.glb` file; then drag as with the shapes. The mesh is centred,
   scaled so its largest side matches the drag, and stood on the surface along its own up (+Y) axis. Esc stops
-  inserting. (Command: `insert_mesh subtool=<name>` or `insert_mesh file=<path>`.)
-- **From file...**: a model (`.obj`, `.fbx`, `.glb`, `.gltf`, `.ply`, `.stl`, `.GoZ`, `.usda`, `.usd`, `.usdz`) or
+  inserting. (Command: `insert_mesh part=<name>` or `insert_mesh file=<path>`.)
+- **From file...**: a model (`.obj`, `.fbx`, `.glb`, `.gltf`, `.ply`, `.stl`, Bridge files, `.usda`, `.usd`, `.usdz`) or
   a project (`.sfproj`). A file with several objects adds one Part per object.
 
 The new Part becomes the active one.
@@ -176,17 +176,17 @@ used.
 
 | Command | What it does |
 |---|---|
-| `subtool_list` | List the Parts |
-| `subtool_select index=1` | Make a Part active |
-| `subtool_append type=cube` | Add a primitive (`sphere`, `cube`, `plane`); `path=` adds a file; `size=` (0.05-2, default 0.35) |
-| `subtool_duplicate` | Copy a Part |
-| `subtool_delete name=Helmet` | Delete a Part |
-| `subtool_rename to=Body` | Rename a Part |
-| `subtool_visibility visible=false` | Show or hide (toggles when `visible` is left out) |
-| `subtool_solo` / `subtool_show_all` | Solo the active Part / show every Part |
-| `subtool_move direction=up` | Move a Part up or down the list |
-| `subtool_merge_down` / `subtool_merge_visible` | Merge |
-| `subtool_split_groups` / `subtool_split_parts` | Split |
+| `part_list` | List the Parts |
+| `part_select index=1` | Make a Part active |
+| `part_append type=cube` | Add a primitive (`sphere`, `cube`, `plane`); `path=` adds a file; `size=` (0.05-2, default 0.35) |
+| `part_duplicate` | Copy a Part |
+| `part_delete name=Helmet` | Delete a Part |
+| `part_rename to=Body` | Rename a Part |
+| `part_visibility visible=false` | Show or hide (toggles when `visible` is left out) |
+| `part_solo` / `part_show_all` | Solo the active Part / show every Part |
+| `part_move direction=up` | Move a Part up or down the list |
+| `part_merge_down` / `part_merge_visible` | Merge |
+| `part_split_groups` / `part_split_parts` | Split |
 | `extract thickness=0.02 smooth=5 double=false` | Preview an Extract shell from the mask; `tcorne` / `tborder` for a triangle rim; `accept=true` keeps it at once |
 | `extract_accept` / `extract_cancel` | Keep or remove the Extract preview |
 

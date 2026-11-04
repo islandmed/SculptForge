@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Pop-up pickers (ZBrush's brush, stroke, alpha and material pop-ups), the
+// Pop-up pickers (brush, stroke, alpha and material pop-ups), the
 // Draw Size / Strength sliders at the cursor, and the thumbnail tile.
 #include "app/Theme.h"
 #include "app/Pickers.h"
@@ -12,7 +12,7 @@
 #include "core/BrushLibrary.h"
 #include "core/BrushPacks.h"
 #include "core/ListSort.h"
-#include "core/Matcap.h"
+#include "core/LitSphere.h"
 
 #include <IconsLucide.h>
 
@@ -93,12 +93,12 @@ struct State {
     int openedFrame = -1, closedFrame = -1;
     int keysFrom = 0; // frame from which typed keys count (not the key that opened it)
     bool addToShelf = false;
-    // Opened with Ctrl (mask brushes) or Ctrl+Shift (selection brushes) held, as in ZBrush: App::HeldBrush.
+    // Opened with Ctrl (mask brushes) or Ctrl+Shift (selection brushes) held: App::HeldBrush.
     int held = 0;
     std::string typed; // brush picker: letters typed so far
     // Material hover preview: the material to go back to.
     bool previewing = false;
-    int savedMatcap = -1;
+    int savedLitSphere = -1;
     // Draw Size / Z Intensity / RGB Intensity / Focal Shift at the cursor.
     int slider = -1; // PickerUi::Slider, -1 = closed
     bool sliderSmooth = false; // Z Intensity of the Smooth brush (Shift was held)
@@ -112,7 +112,7 @@ struct State {
     // Recently used brushes (ids, newest first).
     std::vector<std::string> recent;
     std::string lastActive;
-    // The same for alphas (names) and materials (matcap indices as text), for the lists' Recent order.
+    // The same for alphas (names) and materials (lit sphere indices as text), for the lists' Recent order.
     std::vector<std::string> recentAlphas, recentMaterials;
     std::string lastAlpha, lastMaterial;
 };
@@ -163,7 +163,7 @@ void sectionHeader(const char* text) {
     ImGui::PopStyleColor();
 }
 
-// Hover "Quick Info": a large thumbnail and the description, as ZBrush shows for palette items.
+// Hover "Quick Info": a large thumbnail and the description shows for palette items.
 void quickInfo(ImTextureID tex, const char* glyph, const std::string& title, const std::string& text,
                const std::string& footer = {}) {
     if (!ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort | ImGuiHoveredFlags_NoSharedDelay) ||
@@ -362,7 +362,7 @@ void AssetTileHoverGlow() {
     Glow& g = glow();
     if (g.frame != ImGui::GetFrameCount() || !g.tex || ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId)) return;
     if (ImGui::IsMouseDragging(ImGuiMouseButton_Left)) return;
-    // ZBrush's thumbnail glow: the hovered thumbnail pops out at 1.5x.
+    // the classic thumbnail glow: the hovered thumbnail pops out at 1.5x.
     const float s = g.rect.GetWidth() * 1.5f;
     const ImVec2 c = g.rect.GetCenter();
     const ImGuiViewport* vp = ImGui::GetMainViewport();
@@ -440,9 +440,9 @@ const char* brushTypeDescription(int type) {
         return "Presses the surface onto a plane, levelling hills and valleys.";
     case BrushType::Pinch:
         return "Pulls the surface toward the stroke, sharpening edges and creases.";
-    case BrushType::DamStandard:
+    case BrushType::SharpCrease:
         return "A sharp V-shaped crease with the sides pinched in, for wrinkles and folds.";
-    case BrushType::ClayBuildup:
+    case BrushType::ClayBlock:
         return "Square, flat-topped clay strokes that stack up quickly, for bold blocking.";
     case BrushType::SnakeHook:
         return "Pulls the surface out along the stroke into horns, tentacles and spikes.";
@@ -528,7 +528,7 @@ std::vector<BrushItem> PickerUi::brushItems(App& app, bool libraryFiles) {
         items.push_back(std::move(b));
     }
     if (libraryFiles && !app.library_.user.empty()) {
-        // .sfbrush files in the LightBox library that aren't loaded yet.
+        // .sfbrush files in the Library library that aren't loaded yet.
         const std::string dir = app.library_.user + "/Brushes";
         if (const auto* files = app.libraryScanner_.get(dir, "brush", [](const std::string& p) {
                 return isBrushFile(p) ? AssetKind::BrushFile : AssetKind::Folder;
@@ -1042,65 +1042,65 @@ void drawMaterialGrid(App& app, GridMode mode) {
     const int columns = columnsFor(tile, mode);
     int column = 0;
     int hovered = -2;
-    const int active = s.previewing ? s.savedMatcap : app.renderSettings_.matcap;
-    app.materialListShown(); // just opened: pick up images added to the MatCaps folder meanwhile
+    const int active = s.previewing ? s.savedLitSphere : app.renderSettings_.litsphere;
+    app.materialListShown(); // just opened: pick up images added to the Lit Spheres folder meanwhile
     SortMenu("materialsort", app.uiPrefs_.materialSort, false);
     std::vector<int> list; // the Lit Spheres and Studio (-1), in the chosen order (A-Z by default)
     std::vector<ListSortKey> keys;
-    for (int k = 0; k <= matcapCount(); ++k) {
-        const int i = k < matcapCount() ? matcapInListOrder(k) : -1;
-        if (i >= 0 && !isMatcapListed(i)) continue; // removed
+    for (int k = 0; k <= litsphereCount(); ++k) {
+        const int i = k < litsphereCount() ? litsphereInListOrder(k) : -1;
+        if (i >= 0 && !isLitSphereListed(i)) continue; // removed
         list.push_back(i);
-        keys.push_back({i < 0 ? "Studio" : matcapName(i), "", recentRank(s.recentMaterials, std::to_string(i))});
+        keys.push_back({i < 0 ? "Studio" : litsphereName(i), "", recentRank(s.recentMaterials, std::to_string(i))});
     }
     for (size_t o : listSortOrder(keys, listSortFromId(app.uiPrefs_.materialSort))) {
         const int i = list[o];
         tileGrid(column, columns);
-        const char* name = i < 0 ? "Studio" : matcapName(i);
+        const char* name = i < 0 ? "Studio" : litsphereName(i);
         const ImTextureID tex = app.thumbs_.material(i);
         if (AssetTile((std::string(name) + "##mat").c_str(), tex, ICON_LC_SUN, name, tile, active == i)) {
             s.previewing = false;
-            app.renderSettings_.matcap = s.savedMatcap = i; // runCommand below echoes it for scripts
+            app.renderSettings_.litsphere = s.savedLitSphere = i; // runCommand below echoes it for scripts
             app.runCommand("set_material", {{"name", std::string(i < 0 ? "studio" : name)}});
             if (popup) closePicker();
         }
         if (ImGui::IsItemHovered()) hovered = i;
         ui::HelpText(name, nullptr,
                      i < 0                ? "Soft studio lighting with cavity shading, in the Base colour."
-                     : i == defaultMatcap() ? "The default: a matte warm clay with a clear key light and a soft "
+                     : i == defaultLitSphere() ? "The default: a matte warm clay with a clear key light and a soft "
                                               "rim, so strokes read without glare."
                      : i == 0 ? "Made for sculpting: a strong key light, crisp highlights and deep cavities so "
                                 "every stroke reads."
-                     : isCustomMatcap(i) ? "Your own Lit Sphere. Right-click to remove it."
+                     : isCustomLitSphere(i) ? "Your own Lit Sphere. Right-click to remove it."
                               : "Lit Sphere material: the whole lit look in one image.",
                      "Material");
-        if (isCustomMatcap(i) && ImGui::BeginPopupContextItem()) {
+        if (isCustomLitSphere(i) && ImGui::BeginPopupContextItem()) {
             ImGui::TextDisabled("%s", name);
-            if (const CustomMatcap* c = customMatcap(i); c && !c->path.empty()) { // the file name; the folder is long
+            if (const CustomLitSphere* c = customLitSphere(i); c && !c->path.empty()) { // the file name; the folder is long
                 const std::u8string file = std::filesystem::path(std::u8string(c->path.begin(), c->path.end())).filename().u8string();
                 ImGui::TextDisabled("%s", reinterpret_cast<const char*>(file.c_str()));
             }
             ImGui::Separator();
-            if (ImGui::MenuItem("Remove##matcap")) {
+            if (ImGui::MenuItem("Remove##litsphere")) {
                 if (popup && s.previewing) { // put the real material back before it can go
-                    app.renderSettings_.matcap = s.savedMatcap;
+                    app.renderSettings_.litsphere = s.savedLitSphere;
                     s.previewing = false;
                 }
-                app.runCommand("remove_matcap", {{"name", std::string(name)}});
+                app.runCommand("remove_litsphere", {{"name", std::string(name)}});
             }
             ImGui::EndPopup();
         }
     }
-    // ZBrush's "Preview Material On Mesh": hovering a material shows it on the model until the pointer leaves.
+    // the classic "Preview Material On Mesh": hovering a material shows it on the model until the pointer leaves.
     if (popup && st().open) {
         if (hovered >= -1) {
             if (!s.previewing) {
                 s.previewing = true;
-                s.savedMatcap = app.renderSettings_.matcap;
+                s.savedLitSphere = app.renderSettings_.litsphere;
             }
-            app.renderSettings_.matcap = hovered;
+            app.renderSettings_.litsphere = hovered;
         } else if (s.previewing) {
-            app.renderSettings_.matcap = s.savedMatcap;
+            app.renderSettings_.litsphere = s.savedLitSphere;
             s.previewing = false;
         }
     }
@@ -1144,7 +1144,7 @@ bool pickerOpen() { return st().open || st().slider >= 0; }
 void PickerUi::sizePopup(App& app, Slider which) {
     State& s = st();
     s.slider = int(which);
-    // Smooth's own Intensity when Smooth is the brush or (ZBrush) Shift is held. Not Shift in the Blender style:
+    // Smooth's own Intensity when Smooth is the brush or Shift is held. Not Shift in the Blender style:
     // there Shift+F is the brush's Strength, as in Blender, and Shift has no smoothing meaning for a key.
     s.sliderSmooth = app.blenderStyle() ? app.brush_ == BrushType::Smooth : app.activeBrush() == BrushType::Smooth;
     // The brush cursor's own position (SDL's window coordinates, the brush ring's centre) rather than ImGui's
@@ -1185,7 +1185,7 @@ void drawPickers(App& app) {
     }
 
     touchRecent(s.recentAlphas, s.lastAlpha, lower(app.doc_.brushAlpha.empty() ? std::string("round") : app.doc_.brushAlpha.name));
-    if (!s.previewing) touchRecent(s.recentMaterials, s.lastMaterial, std::to_string(app.renderSettings_.matcap));
+    if (!s.previewing) touchRecent(s.recentMaterials, s.lastMaterial, std::to_string(app.renderSettings_.litsphere));
 
     if (s.open) {
         // Pickers own the keyboard while open (letters choose brushes; Esc closes).
@@ -1247,7 +1247,7 @@ void drawPickers(App& app) {
         }
     }
     if (!s.open && s.previewing) { // closed without picking: put the material back
-        app.renderSettings_.matcap = s.savedMatcap;
+        app.renderSettings_.litsphere = s.savedLitSphere;
         s.previewing = false;
     }
 
@@ -1255,7 +1255,7 @@ void drawPickers(App& app) {
     if (s.slider >= 0) {
         ImGui::SetNextFrameWantCaptureKeyboard(true);
         const auto which = PickerUi::Slider(s.slider);
-        // The value as shown: Draw Size in pixels, the intensities 0-100 and Focal Shift -100..100, as in ZBrush.
+        // The value as shown: Draw Size in pixels, the intensities 0-100 and Focal Shift -100..100.
         struct Def {
             const char* name;
             const char* key;
@@ -1286,7 +1286,7 @@ void drawPickers(App& app) {
                                 "inner ring of the cursor shows it.",
                                 &app.focalShift_, -1.0f, 1.0f, 100.0f};
         const float w = 200.0f * app.uiScale_;
-        // As in ZBrush the knob (the current value) opens right under the cursor, so pressing there drags it. The
+        // As  the knob (the current value) opens right under the cursor, so pressing there drags it. The
         // first frame (hidden while the window sizes itself) measures where the knob is; the window then stays put.
         if (!s.sliderPlaced) s.sliderPos = ImVec2(s.sliderAt.x - w * 0.5f, s.sliderAt.y - ImGui::GetFrameHeight() * 0.5f);
         ImGui::SetNextWindowPos(s.sliderPos, ImGuiCond_Always);
@@ -1314,7 +1314,7 @@ void drawPickers(App& app) {
                 if (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter)) {
                     if (!s.sliderTyped.empty()) {
                         float v = std::strtof(s.sliderTyped.c_str(), nullptr);
-                        // Intensities: 0-100 as in ZBrush (a fraction up to 1 still works).
+                        // Intensities: 0-100 (a fraction up to 1 still works).
                         if (which == PickerUi::Slider::ZIntensity || which == PickerUi::Slider::RgbIntensity)
                             v = v > 1.0f ? v / 100.0f : v;
                         else if (which == PickerUi::Slider::FocalShift)
@@ -1361,7 +1361,7 @@ void drawPickers(App& app) {
             if (dragging)
                 s.sliderWasActive = true;
             else if (s.sliderWasActive)
-                close = true; // closes on release, as in ZBrush
+                close = true; // closes on release, as 
             // A click elsewhere closes it. (The press that grabs the knob is not one: ImGui reports the window as not
             // hovered while its own slider is active, and that used to close the slider as soon as it was dragged, #9.)
             const bool clicked =
@@ -1510,7 +1510,7 @@ void App::drawColorWidget(float width) {
     ImGui::EndGroup();
     ui::HelpText("Colour", "C", "The vertex paint colour (C over the model picks one).", "Left shelf");
 
-    // Two swatches, like ZBrush's main and secondary colour: clicking either swaps them ("Alternate"). Equal halves of
+    // Two swatches main and secondary colour: clicking either swaps them ("Alternate"). Equal halves of
     // the column, main on the left, the same gap as between the square and the strip.
     const float swH = kSwatchH * s;
     const float mainW = std::floor((width - gap) * 0.5f), secondW = width - gap - mainW;

@@ -19,7 +19,7 @@ namespace sf {
 // Fused batches take all but Trim (its crisp cut shows where a centre moved by a hair).
 inline bool isPlaneKernelBrush(BrushType t) {
     return t == BrushType::Standard || t == BrushType::Clay || t == BrushType::Flatten || t == BrushType::Crease ||
-           t == BrushType::Pinch || t == BrushType::DamStandard || t == BrushType::Trim;
+           t == BrushType::Pinch || t == BrushType::SharpCrease || t == BrushType::Trim;
 }
 
 struct PlaneKernel {
@@ -60,7 +60,7 @@ struct PlaneKernel {
         case BrushType::Pinch:
             d = flat(center - x, areaNormal) * (sign * 0.2f * s * f);
             break;
-        case BrushType::DamStandard: {
+        case BrushType::SharpCrease: {
             // Narrow, deep V-groove (a ridge when inverted); the sides are always
             // pinched in toward the stroke line, so the crease stays sharp.
             const float core = f * f * f * f;
@@ -71,7 +71,7 @@ struct PlaneKernel {
             break;
         }
         case BrushType::Trim: {
-            // Trim Dynamic: a plane just below the area cuts off whatever sticks out
+            // Trim: a plane just below the area cuts off whatever sticks out
             // above it (fills up to it when inverted). sqrt falloff for a crisp edge.
             const glm::vec3 planePoint = areaCenter - areaNormal * (sign * r * 0.02f * s);
             const float h = glm::dot(x - planePoint, areaNormal);
@@ -135,7 +135,7 @@ struct PlaneKernel {
                 const glm::vec3 q = flat(center - x, areaNormal);
                 return (q * gf - tflat * f) * (sign * 0.2f * s);
             }
-            case BrushType::DamStandard: {
+            case BrushType::SharpCrease: {
                 glm::vec3 q = flat(center - x, areaNormal);
                 q -= strokeDir * glm::dot(q, strokeDir);
                 const glm::vec3 dq = -(tflat - strokeDir * glm::dot(tflat, strokeDir));

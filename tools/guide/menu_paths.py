@@ -36,7 +36,7 @@ MENUS = {
 SKIP = {"whats-new.md"}
 
 # "Preferences > X" anywhere (bold, tables, plain text), but not when already behind a menu ("Edit > Preferences"),
-# the new Render menu, Blender's own "Preferences > Add-ons", or ZBrush's "Preferences > Mem".
+# the new Render menu, Blender's own "Preferences > Add-ons", or the classic "Preferences > Mem".
 NAMES = "|".join(n + "(?! > (?:Materials|Gaussian Splats))" if n == "Render" else n for n in MENUS)  # new Render menu
 PATH = re.compile(r"(?<!> )\b(" + NAMES + r") > (?=[A-Z0-9+])(?!Add-ons|Mem\b)")
 # "the Color palette", "**Brush palette**": the menu (and section) that holds it.
@@ -55,7 +55,7 @@ BOLD_NAME = re.compile(r"\*\*(" + "|".join(MENUS) + r")\*\* palette\b")  # "the 
 
 def convert(text: str) -> str:
     out = []
-    zbrush_note = generated = False
+    classic_note = generated = False
     for line in text.split("\n"):
         # Tables generated from the app (update_shortcuts.py) quote its own help text; the app owns those words.
         if line.startswith("<!-- BEGIN GENERATED"):
@@ -66,13 +66,13 @@ def convert(text: str) -> str:
             out.append(line)
             continue
         # "> **Classic layout:** ..." notes name the palettes of that layout on purpose.
-        zbrush_note = line.startswith("> **Classic layout") or (zbrush_note and line.startswith(">"))
-        if zbrush_note:
+        classic_note = line.startswith("> **Classic layout") or (classic_note and line.startswith(">"))
+        if classic_note:
             out.append(line)
             continue
         line = BOLD_NAME.sub(r"\1 palette", line)
         if line.startswith("| ") and line.count("|") > 2:
-            # Tables: leave the first cell (other apps' names in the glossary and the ZBrush chapter).
+            # Tables: leave the first cell (other apps' names in the glossary and the classic chapter).
             first, rest = line[2:].split("|", 1)
             line = "| " + first + "|" + PHRASE.sub(phrase, PATH.sub(lambda m: MENUS[m.group(1)] + " > ", rest))
         elif line.startswith("!["):

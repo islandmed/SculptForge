@@ -18,7 +18,7 @@ Blender exchange add-on by Daniel Grauer, JoseConseco and contributors; no GoB c
 
 - **No sockets**: nothing to configure, nothing listening, works in sandboxes that allow files, and a crash on one
   side leaves the other unaffected. Polling is a `stat` of one file a second.
-- **Bridge files** (integrations/bridge-plugin/PROTOCOL.md) already carry everything both sides keep per mesh: positions, triangles and quads,
+- **Bridge files** (docs/bridge-format.md) already carry everything both sides keep per mesh: positions, triangles and quads,
   per-corner UVs, per-vertex vertex paint and mask, per-face face groups. SculptForge reads and writes it, and it is
   simple to write from Python with numpy. A second mesh format was not needed.
 
@@ -31,8 +31,8 @@ override it in its preferences).
 
 | Path | Written by | Contents |
 |---|---|---|
-| `to_sculptforge/manifest.json` + `r<rev>_<k>.GoZ` | the add-on | what Blender sent |
-| `to_blender/manifest.json` + `r<rev>_<k>.GoZ` | SculptForge | what SculptForge sent |
+| `to_sculptforge/manifest.json` + `r<rev>_<k>.<ext>` | the add-on | what Blender sent |
+| `to_blender/manifest.json` + `r<rev>_<k>.<ext>` | SculptForge | what SculptForge sent |
 | `app.json` | SculptForge, at start | `{"path": executable, "version": ...}`: the AppImage (`$APPIMAGE`), the `.app` bundle, or the binary |
 | `alive.json` | SculptForge, every 2 s once `to_sculptforge/` exists | `{"pid": ..., "time": unix seconds}`; removed on exit |
 
@@ -52,7 +52,7 @@ Windows).
   "sender_version": "4.2.3",
   "time": 1761300000.5,
   "objects": [
-    {"name": "Suzanne.001", "file": "r12_000.GoZ",
+    {"name": "Suzanne.001", "file": "r12_000.<ext>",
      "matrix_world": [[1, 0, 0, 0.5], [0, 1, 0, 0], [0, 0, 1, 2], [0, 0, 0, 1]]}
   ]
 }
@@ -62,7 +62,7 @@ Windows).
   it loaded last (not "greater": a deleted folder restarts at 1). It reads the revision once a
   second rather than trusting file times (Windows copies keep them; FAT and network drives store them coarsely).
 - `name` is the exact Blender object name (UTF-8); the Bridge file's own name is GoB's ASCII escape of it. In SculptForge
-  it is the Part's `gozName` (shared with the Bridge; saved in projects), so the next send updates the same object.
+  it is the Part's `bridgeName` (shared with the Bridge; saved in projects), so the next send updates the same object.
 - `file` must be a plain file name in the same folder (`..`, `/`, `\` and `:` are refused).
 - `matrix_world` (Blender -> SculptForge only): the object's matrix, rows as Blender prints them, Z-up. The Bridge file
   holds the mesh in object space. SculptForge places it with `A * M * A^-1` where `A` maps Blender

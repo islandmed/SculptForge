@@ -1754,7 +1754,7 @@ size_t textureFill(Mesh& m, const glm::vec3& color, const std::vector<float>& vw
     return changed;
 }
 
-void polypaintToTexture(Mesh& m) {
+void vertexpaintToTexture(Mesh& m) {
     if (!hasTexture(m)) return;
     PaintTexture& tex = mutableTexture(m);
     const int layer = tex.layers.empty() ? -1 : tex.activeLayer;
@@ -1769,7 +1769,7 @@ void polypaintToTexture(Mesh& m) {
     compositeTextureAll(tex);
 }
 
-void textureToPolypaint(Mesh& m) {
+void textureToVertexPaint(Mesh& m) {
     if (!hasTexture(m)) return;
     const size_t nv = m.vertexCount();
     std::vector<glm::vec3> sum(nv, glm::vec3(0.0f));

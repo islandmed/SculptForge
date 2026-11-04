@@ -2,9 +2,9 @@
 # slider step between them, detail sculpted at the top survives sculpting big forms at a low level, and undo
 # steps back through strokes and level changes. A cube divided four times becomes a rounded box of quads.
 run new_sphere subdivisions=1
-run subtool_append type=cube name=Box
-run subtool_delete index=0
-expect_value subtools == 1
+run part_append type=cube name=Box
+run part_delete index=0
+expect_value parts == 1
 expect_value triangles == 27648
 orbit 140 -70
 key f
@@ -122,10 +122,10 @@ expect_value sdiv == 1
 expect_value triangles == 108
 shot base-level
 
-# The SubTool list shows the level.
-click "Parts##tool.subtool"
+# The Part list shows the level.
+click "Parts##tool.part"
 expect_text "SDiv 1/5"
-shot subtool-list
+shot part-list
 
 # Del Lower at level 2 makes it the new base; Del Higher drops the top.
 click "Geometry##tool.geometry"

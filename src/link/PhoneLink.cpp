@@ -1102,7 +1102,7 @@ bool PhoneLink::createFaceLink(std::string& faceUrl, std::string& error, bool ar
     if (ar) {
         char size[32];
         std::snprintf(size, sizeof size, "%g", double(arSizeCm));
-        faceUrl += std::string("&m=ar&s=") + (arScope == "scene" ? "scene" : "subtool") + "&z=" + size;
+        faceUrl += std::string("&m=ar&s=") + (arScope == "scene" ? "scene" : "part") + "&z=" + size;
         std::lock_guard lock(mutex_);
         arBlobUrl_ = blobUrl;
         arBlobKey_ = key;
@@ -1138,7 +1138,7 @@ HttpResponse PhoneLink::faceLink(const HttpRequest& request) {
     const bool ar = request.param("mode") == "ar";
     float size = 20.0f;
     try { size = std::clamp(std::stof(request.param("size", "20")), 2.0f, 200.0f); } catch (...) {}
-    if (!createFaceLink(url, error, ar, request.param("scope", "subtool"), size)) return jsonError(webrtcAvailable() ? 500 : 501, error);
+    if (!createFaceLink(url, error, ar, request.param("scope", "part"), size)) return jsonError(webrtcAvailable() ? 500 : 501, error);
     Json j = Json::object();
     j.set("url", url);
     return jsonOk(j);

@@ -2,16 +2,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Texture Map sub-palette (Tool palette): texture painting on UVs (core/Texture.h). Auto UV unwraps the
-// SubTool on a worker thread (core/AutoUv.h, xatlas); New gives it a 1K-8K texture, after which the Paint
+// Part on a worker thread (core/AutoUv.h, xatlas); New gives it a 1K-8K texture, after which the Paint
 // brush, Rgb sculpting, fills and the Paint Layers palette work on the texture (the Vertex / Texture toggle
-// switches back). Polypaint <-> Texture convert, Import / Export load and save PNGs, Show UVs draws the
+// switches back). Vertex paint <-> Texture convert, Import / Export load and save PNGs, Show UVs draws the
 // texture with the UV layout over it. Everything but Auto UV and the file dialogs goes through commands,
 // so it is undoable and scriptable.
 #include "app/App.h"
 #include "app/Demo.h"
 #include "app/Ui.h"
 
-#include "core/Polypaint.h"
+#include "core/VertexPaint.h"
 #include "core/TextureTransfer.h"
 
 #include <IconsLucide.h>
@@ -115,7 +115,7 @@ void App::registerTextureUiActions() {
         [this] { return paintsTexture(doc_.mesh); }, textured,
         "Paint into the Part's texture: the colour resolution comes from the texture, not the mesh. The Paint "
         "brush, Rgb sculpting, fills and Paint Layers all work on it.");
-    // Shown on the top shelf and in the Color palette while painting a SubTool that has no texture yet.
+    // Shown on the top shelf and in the Color palette while painting a Part that has no texture yet.
     add("draw.new_texture", "New Texture", "Draw", [this] { startNewTexture(); }, nullptr,
         [this] { return !autoUv_ && doc_.mesh.triangleCount() > 0; },
         "Start texture painting: give the Part a texture (the size chosen in Tool > Texture Map, 2K by default) "
@@ -138,14 +138,14 @@ void App::registerTextureUiActions() {
         "texture_create");
     add("texture.show_uvs", "Show UVs", kPath, [this] { showUvView_ = !showUvView_; }, [this] { return showUvView_; },
         [this] { return doc_.mesh.hasUvs(); }, "Show the texture with the UV layout drawn over it, below these buttons.");
-    add("texture.from_polypaint", "Vertex Paint > Texture", kPath, [this] { runCommand("texture_from_polypaint"); }, nullptr,
+    add("texture.from_vertexpaint", "Vertex Paint > Texture", kPath, [this] { runCommand("texture_from_vertexpaint"); }, nullptr,
         [this] { return doc_.mesh.hasUvs() && doc_.mesh.hasColors(); },
         "Bake the vertex paint (all paint layers) into the active texture layer. Makes a 2K texture if there is none.",
-        "texture_from_polypaint");
-    add("texture.to_polypaint", "Texture > Vertex Paint", kPath, [this] { runCommand("polypaint_from_texture"); }, nullptr,
+        "texture_from_vertexpaint");
+    add("texture.to_vertexpaint", "Texture > Vertex Paint", kPath, [this] { runCommand("vertexpaint_from_texture"); }, nullptr,
         textured,
         "Copy the texture into the vertex paint of every vertex (detail finer than the mesh is lost).",
-        "polypaint_from_texture");
+        "vertexpaint_from_texture");
     add("texture.export", "Export Texture...", kPath,
         [this] { SDL_ShowSaveFileDialog(onTextureFile, &g_dialogs[kExportTexture], window_, kPngFilter, 1, nullptr); },
         nullptr, textured, "Save the texture (every visible layer composited) as a PNG image.", "texture_export");
@@ -191,7 +191,7 @@ void App::startAutoUv() {
     job->cancel = std::make_shared<std::atomic<bool>>(false);
     job->result = std::make_shared<AutoUvResult>();
     job->error = std::make_shared<std::string>();
-    job->subtool = doc_.activeSubtoolInfo().id;
+    job->part = doc_.activePartInfo().id;
     job->triangles = doc_.mesh.triangleCount();
     const int res = doc_.mesh.texture ? std::max(doc_.mesh.texture->width, doc_.mesh.texture->height)
                                       : kSizes[std::clamp(textureSizeChoice_, 0, 3)];
@@ -230,11 +230,11 @@ void App::pollAutoUv() {
         status_ = *job->error;
         return;
     }
-    // The SubTool it unwrapped may be inactive now, or changed topology meanwhile.
+    // The Part it unwrapped may be inactive now, or changed topology meanwhile.
     int index = -1;
-    for (int i = 0; i < doc_.subtoolCount(); ++i)
-        if (doc_.subtools[size_t(i)].id == job->subtool) index = i;
-    if (index < 0 || doc_.subtoolMesh(index).triangleCount() != job->triangles) {
+    for (int i = 0; i < doc_.partCount(); ++i)
+        if (doc_.parts[size_t(i)].id == job->part) index = i;
+    if (index < 0 || doc_.partMesh(index).triangleCount() != job->triangles) {
         status_ = "Auto UV skipped: the mesh changed while it was being unwrapped";
         return;
     }
@@ -293,9 +293,9 @@ void App::drawTextureMapContents() {
         ImGui::SameLine();
         ui::Segmented(*this, {"draw.paint_vertex", "draw.paint_texture"});
     }
-    ui::ActionButton(*this, "texture.from_polypaint", ImVec2(half, 0));
+    ui::ActionButton(*this, "texture.from_vertexpaint", ImVec2(half, 0));
     ImGui::SameLine();
-    ui::ActionButton(*this, "texture.to_polypaint", ImVec2(-1, 0));
+    ui::ActionButton(*this, "texture.to_vertexpaint", ImVec2(-1, 0));
     ui::ActionButton(*this, "texture.import", ImVec2(half, 0));
     ImGui::SameLine();
     ui::ActionButton(*this, "texture.export", ImVec2(-1, 0));
@@ -311,10 +311,10 @@ void App::drawTextureMapContents() {
         const float side = ImGui::GetContentRegionAvail().x;
         const ImVec2 p = ImGui::GetCursorScreenPos();
         ImDrawList* dl = ImGui::GetWindowDrawList();
-        const GLuint tex = hasTexture(m) ? renderer_.paintTexture(doc_.activeSubtoolInfo().id) : 0;
+        const GLuint tex = hasTexture(m) ? renderer_.paintTexture(doc_.activePartInfo().id) : 0;
         if (tex) dl->AddImage(ImTextureID(uintptr_t(tex)), p, ImVec2(p.x + side, p.y + side), ImVec2(0, 1), ImVec2(1, 0));
         else dl->AddRectFilled(p, ImVec2(p.x + side, p.y + side), IM_COL32(40, 40, 46, 255));
-        const uint64_t key = (uint64_t(doc_.activeSubtoolInfo().id) << 40) ^ uint64_t(uintptr_t(m.uvs.data())) ^ m.uvs.size();
+        const uint64_t key = (uint64_t(doc_.activePartInfo().id) << 40) ^ uint64_t(uintptr_t(m.uvs.data())) ^ m.uvs.size();
         if (key != uvLinesKey_) {
             uvLines_ = uvLayoutLines(m);
             uvLinesKey_ = key;

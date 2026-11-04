@@ -43,11 +43,11 @@ Mesh faceTemplateHeadMesh(Mesh* eyes) {
             ++i;
         }
     }
-    // Polygroups: skin, mouth, eye sockets.
-    m.ensurePolygroups();
+    // Face groups: skin, mouth, eye sockets.
+    m.ensureFaceGroups();
     for (uint32_t i = 0; i < m.triangles.size(); ++i) {
         const uint32_t v = std::min({m.triangles[i].x, m.triangles[i].y, m.triangles[i].z});
-        m.polygroups[i] = v < t.skinEnd ? 0u : v < t.mouthEnd ? 1u : 2u;
+        m.facegroups[i] = v < t.skinEnd ? 0u : v < t.mouthEnd ? 1u : 2u;
     }
     m.rebuildTopology();
     m.recomputeAllNormals();
@@ -85,7 +85,7 @@ void registerFaceCommands(CommandRegistry& registry) {
                       Mesh eyes;
                       Mesh head = faceTemplateHeadMesh(&eyes);
                       doc.setMesh(std::move(head), "Head");
-                      doc.addSubtool(std::move(eyes), "Eyes", false);
+                      doc.addPart(std::move(eyes), "Eyes", false);
                       doc.path.clear();
                       return {true, "New head (" + std::to_string(doc.mesh.vertexCount()) + " vertices) with Eyes"};
                   }});
@@ -103,7 +103,7 @@ void registerFaceCommands(CommandRegistry& registry) {
                     false},
                    {"symmetry", T::String,
                     "auto (default: mirror Left / Right when the sculpt is symmetric about X = 0), on or off.", false},
-                   {"subtools", T::Bool, "Also give the shapes to eyes, teeth, tongue and Parts on the face (default true).",
+                   {"parts", T::Bool, "Also give the shapes to eyes, teeth, tongue and Parts on the face (default true).",
                     false},
                    {"level", T::Number,
                     "Subdivision level (1-based, as SDiv) to make the shapes on; default: the lowest with at least 20,000 "
@@ -120,15 +120,15 @@ void registerFaceCommands(CommandRegistry& registry) {
                       }
                       const std::string sym = argString(a, "symmetry", "auto");
                       o.symmetry = sym == "on" || sym == "true" || sym == "1" ? 1 : sym == "off" || sym == "false" || sym == "0" ? 0 : -1;
-                      o.subtools = argBool(a, "subtools", true);
+                      o.parts = argBool(a, "parts", true);
                       if (a.count("level")) o.level = int(argNumber(a, "level", 1.0)) - 1;
                       FaceShapesReport r;
                       if (!generateFaceShapes(doc, o, r, error)) return {false, error};
-                      std::string msg = "Generated 52 facial shapes on " + doc.activeSubtoolInfo().name;
+                      std::string msg = "Generated 52 facial shapes on " + doc.activePartInfo().name;
                       if (subdivLevelCount(doc.mesh)) msg += " (made at SDiv " + std::to_string(r.level + 1) + ")";
                       msg += ": fit error " + percent(headShare(r.fit)) + " of the head, " + percent(r.fit.coverage) +
                              " of the template's face on the sculpt" + (r.symmetric ? ", Left/Right mirrored" : "");
-                      for (const auto& s : r.subtools) msg += "; " + s;
+                      for (const auto& s : r.parts) msg += "; " + s;
                       return {true, msg};
                   }});
 

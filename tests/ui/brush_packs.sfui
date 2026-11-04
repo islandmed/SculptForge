@@ -1,7 +1,7 @@
 # Content pass: the brush lists are A-Z by default with a Sort menu (A-Z, Recent, Pack), the six built-in brush
 # packs load, and a pack brush picked the first time brings its own alpha (Rivet Row: Rivets, turned along the
 # stroke; Soft Clay: none).
-run ui_look look=classic layout=zbrush
+run ui_look look=classic layout=classic
 run new_sphere subdivisions=6
 key f
 expect_value builtin_pack_brushes == 60

@@ -15,7 +15,7 @@ Open **Tool > Selection Sets**.
    | Channel | What it keeps | Command name |
    |---|---|---|
    | **Mask** | The mask, soft edges included. | `mask` |
-   | **Groups** | The face groups. | `polygroups` |
+   | **Groups** | The face groups. | `facegroups` |
    | **Visibility** | Which faces are shown and which are hidden. | `visibility` |
    | **Vertex Paint** | The vertex colours. | `paint` |
    | **UVs** | The UV layout (only when the Part has UVs). | `uvs` |
@@ -117,7 +117,7 @@ Every button is a command, so scripts, `sculptforge-cli`, the MCP server and the
 
 | Command | What it does |
 |---|---|
-| `selection_set_store name=Head channels=mask,visibility` | Store (or replace) a set. `channels` takes `mask`, `polygroups`, `paint`, `visibility`, `uvs`, `morph` or `all`. |
+| `selection_set_store name=Head channels=mask,visibility` | Store (or replace) a set. `channels` takes `mask`, `facegroups`, `paint`, `visibility`, `uvs`, `morph` or `all`. |
 | `selection_set_restore name=Head mode=union` | Restore; `channels=` restores some of them (add `morph` to restore the shape). |
 | `selection_set_rename name=Head to=Face` | Rename. |
 | `selection_set_delete name=Head` | Delete. |

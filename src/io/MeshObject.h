@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Named meshes for model files that hold several objects (OBJ `o` blocks,
-// glTF nodes, FBX models, USD Mesh prims, GoZ object lists). Each object
-// becomes one SubTool on import, and each visible SubTool one object on export.
+// glTF nodes, FBX models, USD Mesh prims, Bridge object lists). Each object
+// becomes one Part on import, and each visible Part one object on export.
 #pragma once
 
 #include "core/Mesh.h"

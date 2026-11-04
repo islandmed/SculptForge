@@ -101,7 +101,7 @@ void parallelRange(size_t n, Fn fn) {
     for (auto& th : pool) th.join();
 }
 
-// Creates the stack: Base = today's polypaint (white when unpainted).
+// Creates the stack: Base = today's vertex paint (white when unpainted).
 void ensureStack(Mesh& m) {
     if (!m.paintLayers.empty()) return;
     m.ensureColors();
@@ -109,7 +109,7 @@ void ensureStack(Mesh& m) {
     m.activePaintLayer = -1;
 }
 
-// Back to plain polypaint once the last layer is gone (colors already holds Base).
+// Back to plain vertex paint once the last layer is gone (colors already holds Base).
 void dropStackIfEmpty(Mesh& m) {
     if (!m.paintLayers.empty()) return;
     if (m.paintBase.size() == m.colors.size()) m.colors = m.paintBase;

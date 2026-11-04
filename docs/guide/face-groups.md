@@ -29,12 +29,12 @@ groups. So you can isolate one part and regroup just that part.
 
 | Control | What it does | Command |
 |---|---|---|
-| **By normals** | A new group wherever the surface turns more than the angle next to it (1 to 90 degrees, default 30). Each flat side of a box becomes its own group. | `polygroup_auto_by_normals` |
-| **By pieces** | One group per disconnected piece, such as separate eyes or buttons in one mesh. | `polygroup_by_connectivity` |
-| **From mask** | Masked triangles move into a new group. | `polygroup_from_mask` |
-| **Group by UVs** | One group per UV island: triangles that touch without a UV seam between them share a group. Needs UVs (**Tool > Texture Map > Auto UV** or an imported model's). | `polygroup_uv` |
-| **Merge visible** | Everything visible becomes one group. | `polygroup_merge_visible` |
-| **Clear groups** | Remove all face groups; the whole Part becomes one group again. | `polygroup_clear` |
+| **By normals** | A new group wherever the surface turns more than the angle next to it (1 to 90 degrees, default 30). Each flat side of a box becomes its own group. | `facegroup_auto_by_normals` |
+| **By pieces** | One group per disconnected piece, such as separate eyes or buttons in one mesh. | `facegroup_by_connectivity` |
+| **From mask** | Masked triangles move into a new group. | `facegroup_from_mask` |
+| **Group by UVs** | One group per UV island: triangles that touch without a UV seam between them share a group. Needs UVs (**Tool > Texture Map > Auto UV** or an imported model's). | `facegroup_uv` |
+| **Merge visible** | Everything visible becomes one group. | `facegroup_merge_visible` |
+| **Clear groups** | Remove all face groups; the whole Part becomes one group again. | `facegroup_clear` |
 
 Each button is one undo step.
 
@@ -130,15 +130,15 @@ Group the model, then click **Split groups** in **Tool > Parts**: each face grou
 
 | Command | Options |
 |---|---|
-| `polygroup_auto_by_normals` | `angle` (1-180 degrees, default 30) |
-| `polygroup_by_connectivity`, `polygroup_uv`, `polygroup_from_mask`, `polygroup_merge_visible`, `polygroup_clear` | |
-| `isolate_polygroup`, `hide_polygroup` | `group` (required): the face group id |
+| `facegroup_auto_by_normals` | `angle` (1-180 degrees, default 30) |
+| `facegroup_by_connectivity`, `facegroup_uv`, `facegroup_from_mask`, `facegroup_merge_visible`, `facegroup_clear` | |
+| `isolate_facegroup`, `hide_facegroup` | `group` (required): the face group id |
 | `show_all`, `invert_visibility`, `delete_hidden` | |
 | `hide_rect` | `x0 y0 x1 y1` (-1 to 1, y up), `inside`, optional `view_proj` matrix; without a view the rectangle spans the mesh seen from the front |
 | `hide_lasso` | `points` (required): the outline as `"x0 y0 x1 y1 ..."`, at least 3 points in the same -1 to 1 space; `inside`, `view_proj` as for `hide_rect` |
 
 When you isolate or hide a group in the viewport, the console (<kbd>`</kbd>) shows the command with the group's
-id, for example `isolate_polygroup group=3`, which you can reuse in scripts.
+id, for example `isolate_facegroup group=3`, which you can reuse in scripts.
 
 ```sh
 sculptforge-cli -c 'open path=robot.obj; face group_by_connectivity; part_split_groups; save_project path=robot.sfproj'

@@ -1,6 +1,6 @@
 # A Wacom Intuos 3 report (0.10.8): the tablet worked only if plugged in before launch, the camera sometimes went
 # wild, pressure was sometimes missing and the active Part changed by itself.
-run ui_look look=classic layout=zbrush
+run ui_look look=classic layout=classic
 run new_sphere subdivisions=4
 key f
 
@@ -70,29 +70,29 @@ expect_value camera_pitch == $p1
 expect_value stroking == 0
 
 # The active Part: only the keyboard's Alt with a quick click switches it, and the status bar says so.
-run subtool_append type=cube name=Cube
-run subtool_select index=0
+run part_append type=cube name=Cube
+run part_select index=0
 key f
 # The upper pen button (Invert, as Alt) held while tapping another Part: no switch.
 pen_button 2 down
-click_subtool Cube 0.5 0.5 1 pen
+click_part Cube 0.5 0.5 1 pen
 pen_button 2 up
-expect_value active_subtool == 0
+expect_value active_part == 0
 # Alt held on the keyboard and a long pen press: sculpting, not a click.
 hold alt
-click_subtool Cube 0.5 0.5 1 pen 0.8
+click_part Cube 0.5 0.5 1 pen 0.8
 hold none
-expect_value active_subtool == 0
+expect_value active_part == 0
 # Alt + a pen tap: the Cube, named in the status bar with the shortcut.
 hold alt
-click_subtool Cube 0.5 0.5 1 pen
+click_part Cube 0.5 0.5 1 pen
 hold none
-expect_value active_subtool == 1
+expect_value active_part == 1
 expect_status Active Part: Cube (Alt+click)
 # The mouse's Alt+click still works.
-run subtool_select index=0
+run part_select index=0
 hold alt
-click_subtool Cube 0.5 0.5
+click_part Cube 0.5 0.5
 hold none
-expect_value active_subtool == 1
+expect_value active_part == 1
 expect_status (Alt+click)

@@ -17,7 +17,7 @@
 // `checkpointEvery` fast steps it keeps a full copy of the positions (a checkpoint, within `checkpointBudget`):
 // a long jump writes the nearest checkpoint at or before the target and replays at most a few steps forward,
 // instead of walking every step in between, so seeking costs about the same wherever the target is. Other steps
-// (dynamic topology, remeshes, masks, paint, SubTool changes) are walked with the undo stack's own undo / redo.
+// (dynamic topology, remeshes, masks, paint, Part changes) are walked with the undo stack's own undo / redo.
 //
 // Re-tune: a past stroke's strength can be changed (its delta scaled) without redoing the strokes after it. The
 // change is added to the current shape and to every later step's stored positions where they overlap the
@@ -27,7 +27,7 @@
 // re-tuning it impossible (it reports why).
 //
 // The history can be saved beside a project as <name>.sfhist (saveHistory / loadHistory): sculpt strokes, masks,
-// polypaint, visibility and polygroup steps; the tree, labels, times and strengths. Steps that can't be saved
+// vertex paint, visibility and face group steps; the tree, labels, times and strengths. Steps that can't be saved
 // (topology changes, textures, layers) cut the saved history at the newest such step before the cursor.
 #pragma once
 
@@ -76,7 +76,7 @@ public:
     static std::shared_ptr<Timeline> attach(Document& doc);
     // The timeline watching `stack`, if any.
     static Timeline* of(UndoStack& stack);
-    void bindStack(UndoStack& stack) { stack_ = &stack; } // after the stack moved (SubTools); Document calls do it
+    void bindStack(UndoStack& stack) { stack_ = &stack; } // after the stack moved (Parts); Document calls do it
 
     // --- the tree
     const Node& node(uint32_t id) const { return nodes_[id]; }
@@ -174,11 +174,11 @@ private:
 
 // The sidecar file beside a project: "<dir>/<name>.sfhist" for "<dir>/<name>.sfp" (any extension).
 std::string historySidecarPath(const std::string& projectPath);
-// Writes every SubTool's history (those with a timeline) to the sidecar of `projectPath`; removes a stale one when
+// Writes every Part's history (those with a timeline) to the sidecar of `projectPath`; removes a stale one when
 // there's nothing to save. Returns false with `error` on a write failure.
 bool saveHistorySidecar(Document& doc, const std::string& projectPath, std::string* error = nullptr);
-// Reads the sidecar of `projectPath`, if there is one, into the SubTools whose meshes it matches (attaching
-// timelines). Returns how many SubTools got their history back.
+// Reads the sidecar of `projectPath`, if there is one, into the Parts whose meshes it matches (attaching
+// timelines). Returns how many Parts got their history back.
 int loadHistorySidecar(Document& doc, const std::string& projectPath, std::string* error = nullptr);
 
 class CommandRegistry;

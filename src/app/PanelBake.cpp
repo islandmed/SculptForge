@@ -1,8 +1,8 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Bake sub-palette (Tool palette): bakes maps from a high-poly source (one SubTool, or every visible one but
-// the active) onto the active SubTool's UVs (core/Bake.h): tangent-space normal, object-space normal,
+// Bake sub-palette (Tool palette): bakes maps from a high-poly source (one Part, or every visible one but
+// the active) onto the active Part's UVs (core/Bake.h): tangent-space normal, object-space normal,
 // displacement, AO, cavity and colour, at 1K-8K with ray distances, anti-aliasing and padding. The bake runs
 // on a worker thread on copies of the meshes, with progress and Cancel, and writes PNGs (and a float EXR for
 // displacement) into the output folder. The tangent-space normal map then shows on the low-poly in the viewport
@@ -79,7 +79,7 @@ bool sliderInt(const char* id, int* v, int lo, int hi, const char* format) {
 struct BakeUiState {
     BakeSettings settings;
     int sizeChoice = 1;          // 2K
-    uint32_t source = 0;         // SubTool id to bake from; 0 = every visible SubTool but the active one
+    uint32_t source = 0;         // Part id to bake from; 0 = every visible Part but the active one
     int levelSource = 0;         // 1: the active Part's top subdivision level onto its lowest, 2: its micro level
     char folder[1024] = "";      // empty = beside the last export / the project / <library>/Bakes
     bool exr = true;
@@ -93,7 +93,7 @@ struct BakeUiState {
         std::shared_ptr<BakeResult> result;
         std::shared_ptr<std::string> error;
         std::shared_ptr<std::vector<std::string>> files;
-        uint32_t subtool = 0;
+        uint32_t part = 0;
         size_t triangles = 0;
         std::string folder;
         bool preview = true; // the bake is of the active Part as it is (no other level, no UDIM tiles)
@@ -101,9 +101,9 @@ struct BakeUiState {
     };
     std::unique_ptr<Job> job;
 
-    // The last bake, shown on its SubTool while the mesh keeps its triangles and UVs.
+    // The last bake, shown on its Part while the mesh keeps its triangles and UVs.
     std::shared_ptr<const BakeResult> result;
-    uint32_t subtool = 0;
+    uint32_t part = 0;
     size_t triangles = 0;
     uint64_t uvKey = 0;
     const void* uvData = nullptr; // the UV array last checked against uvKey
@@ -115,7 +115,7 @@ struct BakeUiState {
     void show(uint32_t id, const Mesh& mesh, std::shared_ptr<const BakeResult> r, std::vector<std::string> written,
               std::string where) {
         result = std::move(r);
-        subtool = id;
+        part = id;
         triangles = mesh.triangleCount();
         uvKey = uvHash(mesh);
         uvData = mesh.uvs.data();
@@ -150,10 +150,10 @@ void SDLCALL onBakeFolder(void*, const char* const* files, int) {
 } // namespace
 
 const NormalMapView* App::bakeNormalMap(uint32_t id, const Mesh& mesh) {
-    if (!bake_ || !bake_->preview || !bake_->result || bake_->subtool != id || !bake_->view.serial) return nullptr;
+    if (!bake_ || !bake_->preview || !bake_->result || bake_->part != id || !bake_->view.serial) return nullptr;
     BakeUiState& b = *bake_;
     if (mesh.triangleCount() != b.triangles || mesh.uvs.size() != b.result->tangents.size()) return nullptr;
-    if (mesh.uvs.data() != b.uvData) { // the UV array moved (undo, a SubTool switch): same UVs?
+    if (mesh.uvs.data() != b.uvData) { // the UV array moved (undo, a Part switch): same UVs?
         if (uvHash(mesh) != b.uvKey) return nullptr;
         b.uvData = mesh.uvs.data();
     }
@@ -164,10 +164,10 @@ bool App::bakeBusy() const { return bake_ && bake_->job; }
 
 std::string App::bakedNormalMapFile(bool& directX) {
     if (!bake_ || !bake_->result || !bake_->view.serial) return {};
-    for (int i = 0; i < doc_.subtoolCount(); ++i) {
-        const SubTool& st = doc_.subtools[size_t(i)];
-        if (st.id != bake_->subtool || !st.visible) continue;
-        const Mesh& m = doc_.subtoolMesh(i);
+    for (int i = 0; i < doc_.partCount(); ++i) {
+        const Part& st = doc_.parts[size_t(i)];
+        if (st.id != bake_->part || !st.visible) continue;
+        const Mesh& m = doc_.partMesh(i);
         if (m.triangleCount() != bake_->triangles || uvHash(m) != bake_->uvKey) return {};
         for (const std::string& f : bake_->files) {
             const std::string suffix = "_normal.png";
@@ -191,7 +191,7 @@ double App::bakeTestValue(const std::string& name) {
     }
     if (name == "bake_size") return b && b->result ? double(b->result->width) : 0.0;
     if (name == "bake_files") return b ? double(b->files.size()) : 0.0;
-    if (name == "normal_map_preview") return bakeNormalMap(doc_.activeSubtoolInfo().id, displayedMesh()) ? 1.0 : 0.0;
+    if (name == "normal_map_preview") return bakeNormalMap(doc_.activePartInfo().id, displayedMesh()) ? 1.0 : 0.0;
     return std::numeric_limits<double>::quiet_NaN();
 }
 
@@ -213,7 +213,7 @@ void App::registerBakeUiActions() {
         actions_.add(std::move(a));
     };
     add("bake.run", "Bake", [this] { startBake(); }, nullptr,
-        [this] { return !bake_->job && doc_.mesh.hasUvs() && (doc_.subtoolCount() > 1 || bake_->levelSource); },
+        [this] { return !bake_->job && doc_.mesh.hasUvs() && (doc_.partCount() > 1 || bake_->levelSource); },
         "Bake the chosen maps from the source Part(s), or this Part's own top subdivision or micro level, onto its "
         "UVs, in the background. Maps are saved as PNGs (displacement also as a 32-bit EXR, position as a 16-bit PNG) "
         "in the output folder, one set per UDIM tile when the UVs use them, and the normal map shows on the model.",
@@ -239,7 +239,7 @@ void App::registerBakeUiActions() {
     // A bake run as a command (console, scripts, UI tests) shows its normal map too.
     setBakeListener([this](const Document& doc, std::shared_ptr<const BakeResult> r, const std::vector<std::string>& files) {
         const std::string folder = files.empty() ? std::string() : utf8(std::filesystem::path(std::u8string(files[0].begin(), files[0].end())).parent_path());
-        bake_->show(doc.activeSubtoolInfo().id, doc.mesh, std::move(r), files, folder);
+        bake_->show(doc.activePartInfo().id, doc.mesh, std::move(r), files, folder);
     });
 }
 
@@ -264,9 +264,9 @@ void App::startBake() {
             return;
         }
         std::string source = "all";
-        for (int i = 0; i < doc_.subtoolCount(); ++i)
-            if (b.source && doc_.subtools[size_t(i)].id == b.source) source = doc_.subtools[size_t(i)].name;
-        if (!bakeSourceSubtools(doc_, source, idx, err)) {
+        for (int i = 0; i < doc_.partCount(); ++i)
+            if (b.source && doc_.parts[size_t(i)].id == b.source) source = doc_.parts[size_t(i)].name;
+        if (!bakeSourceParts(doc_, source, idx, err)) {
             status_ = err;
             return;
         }
@@ -294,19 +294,19 @@ void App::startBake() {
     job->result = std::make_shared<BakeResult>();
     job->error = std::make_shared<std::string>();
     job->files = std::make_shared<std::vector<std::string>>();
-    job->subtool = doc_.activeSubtoolInfo().id;
+    job->part = doc_.activePartInfo().id;
     job->triangles = doc_.mesh.triangleCount();
     job->folder = folder;
     // The worker bakes copies, so sculpting can go on meanwhile.
     if (!b.levelSource) {
         *low = doc_.mesh;
-        for (int i : idx) sources->push_back(doc_.subtoolMesh(i));
+        for (int i : idx) sources->push_back(doc_.partMesh(i));
     }
     job->preview = !b.levelSource && udimTiles(*low).empty();
     job->tiles = std::make_shared<int>(0);
     std::promise<bool> promise;
     job->done = promise.get_future();
-    std::thread([promise = std::move(promise), low, sources, st, folder, name = safeName(doc_.activeSubtoolInfo().name),
+    std::thread([promise = std::move(promise), low, sources, st, folder, name = safeName(doc_.activePartInfo().name),
                  exr = b.exr, progress = job->progress, cancel = job->cancel, result = job->result, error = job->error,
                  files = job->files, tiles = job->tiles]() mutable {
         std::vector<const Mesh*> src;
@@ -355,10 +355,10 @@ void App::pollBake() {
         return;
     }
     int index = -1;
-    for (int i = 0; i < doc_.subtoolCount(); ++i)
-        if (doc_.subtools[size_t(i)].id == job->subtool) index = i;
-    if (job->preview && index >= 0 && doc_.subtoolMesh(index).triangleCount() == job->triangles)
-        b.show(job->subtool, doc_.subtoolMesh(index), job->result, *job->files, job->folder);
+    for (int i = 0; i < doc_.partCount(); ++i)
+        if (doc_.parts[size_t(i)].id == job->part) index = i;
+    if (job->preview && index >= 0 && doc_.partMesh(index).triangleCount() == job->triangles)
+        b.show(job->part, doc_.partMesh(index), job->result, *job->files, job->folder);
     else
         b.files = *job->files, b.writtenFolder = job->folder;
     status_ = bakeSummary(*job->result) + (*job->tiles ? " (" + std::to_string(*job->tiles) + " UDIM tiles)" : std::string()) +
@@ -376,7 +376,7 @@ void App::drawBakeContents() {
     if (!m.hasUvs()) {
         ImGui::TextDisabled("No UVs: Tool > Texture Map > Auto UV");
     } else {
-        ImGui::TextDisabled("Onto %s (%zu tris, UVs)", doc_.activeSubtoolInfo().name.c_str(), m.triangleCount());
+        ImGui::TextDisabled("Onto %s (%zu tris, UVs)", doc_.activePartInfo().name.c_str(), m.triangleCount());
     }
     ui::HelpText("Low-poly", nullptr,
                  "Maps are baked onto the active Part's UVs: make the low-poly active (it needs UVs from import or "
@@ -386,9 +386,9 @@ void App::drawBakeContents() {
     // Source.
     std::string current = "All visible Parts";
     bool found = false;
-    for (int i = 0; i < doc_.subtoolCount(); ++i)
-        if (b.source && doc_.subtools[size_t(i)].id == b.source && i != doc_.activeSubtool) {
-            current = doc_.subtools[size_t(i)].name;
+    for (int i = 0; i < doc_.partCount(); ++i)
+        if (b.source && doc_.parts[size_t(i)].id == b.source && i != doc_.activePart) {
+            current = doc_.parts[size_t(i)].name;
             found = true;
         }
     if (!found) b.source = 0;
@@ -405,9 +405,9 @@ void App::drawBakeContents() {
         if (hasLevels && ImGui::Selectable("Own top subdivision level##level", b.levelSource == 1)) b.levelSource = 1, b.source = 0;
         if (hasMicroLevel && ImGui::Selectable("Own micro level##micro", b.levelSource == 2)) b.levelSource = 2, b.source = 0;
         if (ImGui::Selectable("All visible Parts", b.source == 0 && !b.levelSource)) b.source = 0, b.levelSource = 0;
-        for (int i = 0; i < doc_.subtoolCount(); ++i) {
-            if (i == doc_.activeSubtool) continue;
-            const SubTool& st = doc_.subtools[size_t(i)];
+        for (int i = 0; i < doc_.partCount(); ++i) {
+            if (i == doc_.activePart) continue;
+            const Part& st = doc_.parts[size_t(i)];
             ImGui::PushID(int(st.id));
             if (ImGui::Selectable(st.name.c_str(), b.source == st.id && !b.levelSource)) b.source = st.id, b.levelSource = 0;
             ImGui::PopID();

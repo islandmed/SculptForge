@@ -1,0 +1,84 @@
+# Forge Spheres (Forge Spheres, Tool > Forge Spheres): a Forge Sphere Part with one root, Draw grows an arm from it with X
+# symmetry (the mirror arm follows), Move pulls it out, Scale grows it and undo takes that back, a click on the link
+# adds a joint (both sides), Alt+click deletes a limb, Preview (A) shows the skin, and Make Mesh builds a sculptable
+# Part below with the Forge Spheres hidden and kept. Dragging the background still navigates.
+run forgesphere_new radius=1
+run part_visibility index=0 visible=false
+wait 0.3
+click "Forge Spheres##tool.forgespheres"
+expect "Forge Spheres/Draw"
+expect_value forgespheres == 1
+expect_text "1 sphere"
+
+# Ctrl-hover help.
+hold ctrl
+hover "Forge Spheres/Draw"
+expect_help "grow a new sphere"
+hover "Forge Spheres/Preview"
+expect_help "skin"
+hover "Forge Spheres/Make Mesh"
+expect_help "Adaptive Skin"
+hold none
+
+# Draw: drag near the root's right edge grows an arm there; symmetry adds its twin on the left.
+view_drag 0.515 0.518 0.545 0.518
+expect_value forgespheres == 3
+expect_value forgesphere_x1 > 0.5
+expect_value forgesphere_x2 < -0.5
+expect_status "Forge Sphere add"
+shot forgespheres-draw
+
+# Move: pull the arm out to the right; the twin goes left.
+click "Forge Spheres/Move"
+remember forgesphere_x1 x
+view_drag 0.530 0.518 0.600 0.518
+expect_value forgesphere_x1 > $x
+expect_value forgesphere_x2 < -1.0
+
+# Scale: drag up on the arm to grow it; undo puts it back.
+click "Forge Spheres/Scale"
+remember forgesphere_r1 r
+view_drag 0.600 0.518 0.600 0.45
+expect_value forgesphere_r1 > $r
+key ctrl+z
+expect_value forgesphere_r1 == $r
+key ctrl+shift+z
+expect_value forgesphere_r1 > $r
+key ctrl+z
+
+# Draw on the link between the root and the arm: a joint halfway, mirrored.
+click "Forge Spheres/Draw"
+remember forgesphere_x1 armx
+view_drag 0.543 0.518 0.543 0.518 0.05
+expect_value forgespheres == 5
+expect_status "Forge Sphere insert"
+shot forgespheres-joint
+
+# Preview: the skin replaces the spheres; clicks on it do nothing.
+key a
+expect_value forgesphere_preview == 1
+expect_value forgespheres == 5
+shot forgespheres-preview
+view_drag 0.412 0.518 0.412 0.518 0.05
+expect_status "Preview is on"
+expect_value forgespheres == 5
+key a
+expect_value forgesphere_preview == 0
+
+# Make Mesh: a new Part below, active and sculptable; the Forge Spheres hidden and kept.
+click "Forge Spheres/Make Mesh"
+expect_value parts == 3
+expect_value active_part == 2
+expect_value forgespheres == 0
+expect_status "from the Forge Spheres"
+shot forgespheres-mesh
+remember triangles before
+snapshot
+stroke 0.38 0.45 0.44 0.55
+expect_value moved > 0
+expect_value triangles == $before
+
+# The background still navigates.
+remember camera_yaw yaw
+view_drag 0.2 0.8 0.3 0.8
+expect_value camera_yaw != $yaw

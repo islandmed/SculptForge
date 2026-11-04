@@ -45,7 +45,7 @@ Plug in Claude, fal.ai or Meshy, or run models entirely on your own machine.
 Pick **Classic sculpting keys** at the first start and your hands know the way: familiar brushes, symmetry, Alt and
 Shift modifiers, masking and face groups with Ctrl and Ctrl+Shift, Parts, subdivision levels, dynamic topology, quad
 remeshing and a Gizmo. Bring models over as OBJ, FBX, glTF or USD, or through the Bridge (face groups, mask and vertex
-paint come along); see the [Bridge setup page](integrations/bridge-plugin/README.md).
+paint come along).
 
 > **Status: early release (v0.8).** The core sculpting, pipeline and AI features work and are tested on every
 > commit. Version 0.8 adds dynamic topology (brushes add triangles where they need them),
@@ -134,8 +134,8 @@ paint come along); see the [Bridge setup page](integrations/bridge-plugin/README
 
 **Bridge**
 - Bridge files in and out with face groups, mask, vertex paint and UVs, and **File > Bridge** (Send / Receive) on
-  Windows and macOS: every visible Part goes over as its own object. See the
-  [Bridge setup page](integrations/bridge-plugin/README.md).
+  Windows and macOS: every visible Part goes over as its own object. See
+  [Exporting](docs/guide/exporting.md#exchange-models-through-the-bridge).
 
 **Gaussian splats**
 - Open phone captures (Polycam, Luma, Postshot, Scaniverse and others) as a sculpting reference, convert them

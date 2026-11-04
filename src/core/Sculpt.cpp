@@ -29,8 +29,8 @@ const char* brushName(BrushType type) {
     case BrushType::Crease: return "Crease";
     case BrushType::Flatten: return "Flatten";
     case BrushType::Pinch: return "Pinch";
-    case BrushType::DamStandard: return "SharpCrease";
-    case BrushType::ClayBuildup: return "ClayBlock";
+    case BrushType::SharpCrease: return "SharpCrease";
+    case BrushType::ClayBlock: return "ClayBlock";
     case BrushType::SnakeHook: return "Tendril";
     case BrushType::Trim: return "Trim";
     case BrushType::Layer: return "Layer";
@@ -48,8 +48,8 @@ const char* brushName(BrushType type) {
 
 const char* brushLabel(BrushType type) {
     switch (type) {
-    case BrushType::DamStandard: return "Sharp Crease";
-    case BrushType::ClayBuildup: return "Clay Block";
+    case BrushType::SharpCrease: return "Sharp Crease";
+    case BrushType::ClayBlock: return "Clay Block";
     case BrushType::SnakeHook: return "Tendril";
     case BrushType::KelvinSnake: return "Elastic Tendril";
     default: return brushName(type);
@@ -65,7 +65,9 @@ bool brushFromName(std::string_view name, BrushType& out) {
     };
     std::string want = squash(name);
     if (want.empty()) return false;
-    if (const std::string_view now = legacy::renamed(legacy::kBrushNames, want); !now.empty()) want = squash(now);
+    want = legacy::modernize(want);
+    for (const legacy::Rename& r : legacy::kBrushNames)
+        if (r.old == want) want = squash(r.now);
     for (int i = 0; i < int(BrushType::Count); ++i)
         if (squash(brushName(BrushType(i))) == want || squash(brushLabel(BrushType(i))) == want) {
             out = BrushType(i);
@@ -738,7 +740,7 @@ UndoRecord Sculptor::endStroke() {
 }
 
 int groupBorderNeighbours(const Mesh& mesh, uint32_t v, uint32_t out[3]) {
-    if (!mesh.hasPolygroups()) return 0;
+    if (!mesh.hasFaceGroups()) return 0;
     int count = 0;
     const auto tris = mesh.vertexTriangles(v);
     for (uint32_t t : tris) {
@@ -750,12 +752,12 @@ int groupBorderNeighbours(const Mesh& mesh, uint32_t v, uint32_t out[3]) {
             for (int i = 0; i < count && !seen; ++i) seen = out[i] == n;
             if (seen) continue;
             // The edge v-n: a border when the triangles sharing it don't all have one group.
-            const uint32_t g = mesh.polygroupAt(t);
+            const uint32_t g = mesh.facegroupAt(t);
             bool border = false;
             for (uint32_t u : tris) {
                 if (u == t) continue;
                 const glm::uvec3 o = mesh.triangles[u];
-                if ((o.x == n || o.y == n || o.z == n) && mesh.polygroupAt(u) != g) border = true;
+                if ((o.x == n || o.y == n || o.z == n) && mesh.facegroupAt(u) != g) border = true;
             }
             if (!border) continue;
             out[count++] = n;
@@ -796,7 +798,7 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
     if (!pending_.empty()) flushBatch(mesh, bvh);
     if (type != BrushType::Move && type != BrushType::Morph) { // (Morph needs the vertices the target has)
         const bool useAlpha = p.alpha && !p.alpha->empty(); // (the reach dabSingle gives the brush)
-        const float reach = useAlpha ? kAlphaReach : type == BrushType::ClayBuildup ? 1.3f : 1.0f;
+        const float reach = useAlpha ? kAlphaReach : type == BrushType::ClayBlock ? 1.3f : 1.0f;
         const float scale = type == BrushType::Smooth ? dyntopoSmoothScale(dyntopo) : 1.0f;
         if (scale > 0.0f) remeshDab(mesh, bvh, p, sym, scale, reach);
         else lastRemesh_ = false; // (Smooth only: no repair pass either)
@@ -816,9 +818,9 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
 
 void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p) {
     auto clock = std::chrono::steady_clock::now();
-    // Alphas and the square ClayBuildup tip reach into the corners of their square.
+    // Alphas and the square Clay Block tip reach into the corners of their square.
     const bool useAlpha = p.alpha && !p.alpha->empty();
-    const float reach = useAlpha ? kAlphaReach : type == BrushType::ClayBuildup ? 1.3f : 1.0f;
+    const float reach = useAlpha ? kAlphaReach : type == BrushType::ClayBlock ? 1.3f : 1.0f;
     brushRegion(mesh, bvh, p.center, p.viewDir, p.radius * reach, p.connectedOnly, p.viewFalloff, verts_, connected_);
     if (verts_.empty()) return;
 
@@ -835,7 +837,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
                    type != BrushType::Smooth && type != BrushType::Layer && type != BrushType::Morph &&
                    // (an alpha's fine pattern or Clay Block's square tip, which turn with the area normal, and the brushes that move along each vertex's own normal amplify a
                    // hair's difference in the normals the next dabs read)
-                   type != BrushType::Nudge && type != BrushType::Inflate && type != BrushType::ClayBuildup && !useAlpha &&
+                   type != BrushType::Nudge && type != BrushType::Inflate && type != BrushType::ClayBlock && !useAlpha &&
                    mesh.normals.size() == mesh.vertexCount();
     if (adaptiveDab_ && (mesh.mask.size() == mesh.vertexCount() || mesh.hasHidden())) {
         // A mask's edge is a step the adaptive normals don't see (they follow the brush, not the mask): regions
@@ -914,7 +916,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
 
         switch (type) {
         case BrushType::Standard: case BrushType::Flatten: case BrushType::Clay: case BrushType::Crease:
-        case BrushType::Pinch: case BrushType::DamStandard: case BrushType::Trim:
+        case BrushType::Pinch: case BrushType::SharpCrease: case BrushType::Trim:
             d = plane.offsetWith(x, f); // (core/SculptKernel.h)
             break;
         case BrushType::Inflate:
@@ -948,7 +950,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
             d = (avg - x) * std::min(1.0f, s * f);
             break;
         }
-        case BrushType::ClayBuildup: {
+        case BrushType::ClayBlock: {
             // Square tip (rounded corners) with a flat top: a raised plane that
             // everything below is pulled up to, so strokes build up in slabs.
             float w = f;
@@ -1411,7 +1413,7 @@ void Sculptor::restoreStroke(Mesh& mesh, BVH& bvh) {
         return;
     }
     topologyHeld_ = true; // (positions come back, topology wouldn't)
-    // Polypaint laid down by the stroke so far (Paint brush / RGB while sculpting).
+    // Vertex paint laid down by the stroke so far (Paint brush / RGB while sculpting).
     if (!record_.colors.empty() && mesh.hasColors()) {
         const auto& ci = record_.colors.indices;
         const int layer = record_.paintLayer;

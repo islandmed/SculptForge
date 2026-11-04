@@ -27,10 +27,10 @@ struct VectorDisplacement;
 
 enum class BrushType {
     Standard, Clay, Smooth, Move, Inflate, Crease, Flatten, Pinch,
-    DamStandard, // sharp V-crease with the sides pinched toward the stroke
-    ClayBuildup, // square-ish, flat-topped clay
+    SharpCrease, // sharp V-crease with the sides pinched toward the stroke
+    ClayBlock, // square-ish, flat-topped clay
     SnakeHook,   // pulls the region along the stroke (strokeDelta), tapering
-    Trim,        // Trim Dynamic: a plane cuts away everything above it
+    Trim,        // Plane Trim: a plane cuts away everything above it
     Layer,       // raises to one fixed height per stroke (overlaps never stack)
     Nudge,       // slides the surface sideways along the stroke
     Vdm,         // vector displacement: stamps DabParams::vdm (a horn, an ear...) with overhangs (core/Vdm.h)
@@ -66,10 +66,10 @@ struct DabParams {
     float pressure = 1.0f;              // tablet pressure, 0..1
     bool invert = false;
     bool frontFacesOnly = false;
-    glm::vec3 strokeDelta{0.0f}; // world-space movement since the previous dab (recipe, SnakeHook, Nudge, DamStandard)
+    glm::vec3 strokeDelta{0.0f}; // world-space movement since the previous dab (recipe, SnakeHook, Nudge, Sharp Crease)
     const BrushAlpha* alpha = nullptr;   // stamp shaping the falloff (null/empty = round)
     glm::vec3 alphaUp{0.0f, 1.0f, 0.0f}; // world direction of the alpha's top edge (screen up, or rotated)
-    float focal = 0.0f;                  // ZBrush Focal Shift, -1..1 (brushFalloff; alphaFalloff with an alpha)
+    float focal = 0.0f;                  // classic Focal Shift, -1..1 (brushFalloff; alphaFalloff with an alpha)
     const VectorDisplacement* vdm = nullptr; // the Vdm brush's map (null = the built-in Horn); top edge = alphaUp
     // Smooth: keep the volume (#40). A Taubin step, one shrink then one inflate, removes bumps as the plain
     // (Laplacian) smooth does without shrinking the form. Not on micro levels (they smooth plainly).
@@ -153,7 +153,7 @@ bool lineRayClosest(const glm::vec3& point, const glm::vec3& dir, const glm::vec
 // (`out`); the return value is how many there are (a count of 3 means a junction).
 int groupBorderNeighbours(const Mesh& mesh, uint32_t v, uint32_t out[3]);
 inline float clayPull(float s) { return s >= 0.5f ? 1.0f : 2.0f * std::max(s, 0.0f); }
-// Smoothstep brush falloff: 1 at the centre, 0 at `radius`. `focal` is ZBrush's Focal Shift (-1..1): below 0
+// Smoothstep brush falloff: 1 at the centre, 0 at `radius`. `focal` is the classic Focal Shift (-1..1): below 0
 // the full-strength centre widens (a harder, broader tip), above 0 it narrows to a softer point; 0 is the plain
 // smoothstep, unchanged.
 float brushFalloff(float dist, float radius, float focal = 0.0f);
@@ -161,7 +161,7 @@ float brushFalloff(float dist, float radius, float focal = 0.0f);
 float focalRingFraction(float focal);
 // An alpha's stamp covers the square around the brush circle: its corners are radius x sqrt 2 out.
 constexpr float kAlphaReach = 1.4143f;
-// Focal Shift on an alpha brush (#60), as in ZBrush: the alpha is multiplied by this round falloff, which reaches
+// Focal Shift on an alpha brush (#60): the alpha is multiplied by this round falloff, which reaches
 // the stamp's corners (radius x kAlphaReach). -1 is 1 everywhere (the alpha shows hard to its edges), 0 the
 // smoothstep (soft, rounding a square alpha's corners), +1 a narrow soft point (the alpha mostly gone).
 float alphaFalloff(float dist, float radius, float focal);
@@ -200,7 +200,7 @@ public:
     void grabMove(Mesh& mesh, const glm::vec3& delta);
     void grabFinish(Mesh& mesh, BVH& bvh);
 
-    // Brushes that change mask or polypaint call these before writing
+    // Brushes that change mask or vertex paint call these before writing
     // mesh.mask[v] / mesh.colors[v] (after ensureMask()/ensureColors()), so
     // the stroke's undo step restores them. Each vertex is recorded once per stroke.
     void recordMask(const Mesh& mesh, uint32_t v);
@@ -223,7 +223,7 @@ public:
     DabFrame lastFrame;
 
     // Dynamic topology (core/Dyntopo.h): while enabled, dab() and dabRecipe() remesh the surface under the
-    // brush first (Smooth towards twice the edge length, so it simplifies, as in ZBrush). Not the Move brush.
+    // brush first (Smooth towards twice the edge length, so it simplifies). Not the Move brush.
     DyntopoSettings dyntopo;
     DynamicTopology& dynamicTopology() { return dynTopo_; }
     // No remeshing for the rest of this stroke: strokes that undo and re-stamp while dragging (DragRect,

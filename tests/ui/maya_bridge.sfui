@@ -1,9 +1,9 @@
 # The Maya bridge (File > Maya, #42): off until an exchange folder is chosen (here: what the native folder
-# dialog would answer), then Get from Maya loads what the shelf script sent, Send to Maya writes the SubTools
-# back, and with Get automatically on a second send from Maya replaces the SubTool by name (undoable) and adds
+# dialog would answer), then Get from Maya loads what the shelf script sent, Send to Maya writes the Parts
+# back, and with Get automatically on a second send from Maya replaces the Part by name (undoable) and adds
 # the new object. The sends are staged from tests/ui/data/maya into a folder in the working directory (the build
 # folder under ctest).
-run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=3
 copy data/maya/send1 sf_ui_maya/maya_to_sculptforge
 
@@ -27,13 +27,13 @@ hold none
 choose_file maya_folder sf_ui_maya
 wait 0.2
 expect_status "Maya exchange folder:"
-expect_value subtools == 1
+expect_value parts == 1
 hover "Maya"
 wait 0.2
 expect_text Folder:
 click "Get from Maya##file.receive_maya"
 expect_status "Received 1 object from Maya"
-expect_value subtools == 1
+expect_value parts == 1
 expect_text pCube1
 expect_value quads > 0
 shot received
@@ -46,12 +46,12 @@ click "Get automatically##maya"
 copy data/maya/send2 sf_ui_maya/maya_to_sculptforge
 wait 0.3
 expect_status "Received 2 objects from Maya"
-expect_value subtools == 2
+expect_value parts == 2
 expect_text pCube2
 expect_value can_undo == 1
 shot updated
 
-# Send to Maya: both SubTools, under their Maya names.
+# Send to Maya: both Parts, under their Maya names.
 click "File##palette.file"
 hover "Maya"
 wait 0.2

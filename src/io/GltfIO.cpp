@@ -200,7 +200,7 @@ bool saveGlb(const std::string& path, const std::vector<MeshObjectRef>& objects,
         int posAcc = addVec3(uvs ? split(baseMesh.positions) : baseMesh.positions, true);
         int nrmAcc = addVec3(uvs ? split(baseMesh.normals) : baseMesh.normals, false);
         const bool colors = mesh.hasColors() && mesh.colors.size() == mesh.vertexCount();
-        int colorAcc = colors ? addVec3(uvs ? split(mesh.colors) : mesh.colors, false) : -1; // polypaint as COLOR_0 (linear)
+        int colorAcc = colors ? addVec3(uvs ? split(mesh.colors) : mesh.colors, false) : -1; // vertex paint as COLOR_0 (linear)
         int uvAcc = uvs ? addVec2(texcoords) : -1;
 
         const std::vector<glm::uvec3>& tris = uvs ? triangles : mesh.triangles;

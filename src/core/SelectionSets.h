@@ -1,21 +1,21 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Selection Sets (Tool > Selection Sets): any number of named snapshots of a Part's mask, polygroups, vertex
+// Selection Sets (Tool > Selection Sets): any number of named snapshots of a Part's mask, face groups, vertex
 // paint, visibility (hidden faces), UVs and shape (the morph target), each holding the channels it was stored
 // with. A set is stored at the subdivision level the Part is at and restores at any level of the same stack: its
 // values travel through the levels as the stack passes attributes on (core/Multires.h, subdivMapVertices ...),
 // and the shape travels as an offset from the level's own shape, so the detail of the levels in between stays.
 //
 // Sets are compact: masks, vertex paint and visibility keep only runs of the elements that differ from the
-// default (unmasked, white, shown), polygroups are run-length coded, UVs and shapes are kept as they are. A set is
+// default (unmasked, white, shown), face groups are run-length coded, UVs and shapes are kept as they are. A set is
 // immutable once made and shared (std::shared_ptr) by every copy of the mesh, so undo steps cost a pointer.
 //
-// Beyond ZBrush: sets combine (union, intersect, subtract) into new sets or onto the current mask and visibility,
+// Beyond sets combine (union, intersect, subtract) into new sets or onto the current mask and visibility,
 // a quick set takes the visible faces, the Morph brush and Morph to Set pull the surface toward any set's shape
 // (at any level), and every operation is a command, so Python (`sculptforge`), sculptforge-cli, MCP and the AI
 // assistant push and pull sets too. Sets travel with projects (.sfproj), as their own `.sfsets` files, and in
-// USD exports (GeomSubsets for visibility and polygroups, primvars for the rest; read back on import).
+// USD exports (GeomSubsets for visibility and face groups, primvars for the rest; read back on import).
 #pragma once
 
 #include "core/Mesh.h"
@@ -36,14 +36,14 @@ class Json;
 // What a set holds (bits).
 enum SetChannel : uint32_t {
     kSetMask = 1,
-    kSetPolygroups = 2,
+    kSetFaceGroups = 2,
     kSetPaint = 4,       // vertex paint (Mesh::colors)
     kSetVisibility = 8,  // hidden faces
     kSetUvs = 16,
     kSetMorph = 32,      // the shape (vertex positions): the Morph brush's target
     kSetAllChannels = 63,
 };
-// "mask,polygroups,paint,visibility,uvs,morph" (any order, also "all", "groups", "colors", "hidden", "shape").
+// "mask,face groups,paint,visibility,uvs,morph" (any order, also "all", "groups", "colors", "hidden", "shape").
 bool parseSetChannels(const std::string& text, uint32_t& out, std::string& error);
 std::string setChannelNames(uint32_t channels); // "mask, visibility"
 
@@ -67,7 +67,7 @@ struct SelectionSet {
     // Mask: runs of masked vertices and their values in run order (no values: every one is exactly 1).
     std::vector<SetRun> maskRuns;
     std::vector<float> maskValues;
-    // Polygroups: runs of triangles with one id (start = the id, length = how many).
+    // Face groups: runs of triangles with one id (start = the id, length = how many).
     std::vector<SetRun> groupRuns;
     // Vertex paint: runs of vertices that aren't white, and their colours (linear RGB).
     std::vector<SetRun> paintRuns;
@@ -92,7 +92,7 @@ struct SelectionSetList {
 struct SelectionSetData {
     uint32_t channels = 0;
     std::vector<float> mask;
-    std::vector<uint32_t> polygroups;
+    std::vector<uint32_t> facegroups;
     std::vector<glm::vec3> colors;
     std::vector<uint8_t> hidden;
     std::vector<glm::vec2> uvs;

@@ -1,11 +1,11 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Gizmo 3D (ZBrush's Move W / Scale E / Rotate R, Q back to Draw): a gizmo at the pivot with axis arrows, plane
+// Gizmo 3D (Move W / Scale E / Rotate R, Q back to Draw): a gizmo at the pivot with axis arrows, plane
 // squares and a free-move centre (Move), rings and a view ring (Rotate), axis boxes and a uniform centre (Scale).
-// Dragging a handle transforms the active SubTool, or only its unmasked part (posing), through a
+// Dragging a handle transforms the active Part, or only its unmasked part (posing), through a
 // TransformSession (core/MeshTransform.h): every frame recomputes from the drag's start, so nothing drifts, and
-// the release makes one undo step per SubTool. Shift snaps (15 degrees, the grid, 10%), Alt+drag moves the pivot
+// the release makes one undo step per Part. Shift snaps (15 degrees, the grid, 10%), Alt+drag moves the pivot
 // or turns the axes only, Alt+click on the model puts the pivot there. The Gizmo 3D panel adds numeric entry.
 #include "app/App.h"
 #include "app/Ui.h"
@@ -198,24 +198,24 @@ void App::setGizmoMode(GizmoMode mode) {
 
 std::vector<int> App::gizmoTargets() const {
     std::vector<int> out;
-    for (int i = 0; i < doc_.subtoolCount(); ++i) {
-        const bool visible = doc_.subtools[size_t(i)].visible;
-        if (i == doc_.activeSubtool ? visible : gizmo_.all && visible) out.push_back(i);
+    for (int i = 0; i < doc_.partCount(); ++i) {
+        const bool visible = doc_.parts[size_t(i)].visible;
+        if (i == doc_.activePart ? visible : gizmo_.all && visible) out.push_back(i);
     }
     return out;
 }
 
 void App::updateGizmoPivot() {
-    // Recomputed only when the scene changes: a new undo step, another SubTool, the options.
-    uint64_t key = uint64_t(doc_.activeSubtoolInfo().id) * 1000003u ^ doc_.undo.revision() * 7919u ^
+    // Recomputed only when the scene changes: a new undo step, another Part, the options.
+    uint64_t key = uint64_t(doc_.activePartInfo().id) * 1000003u ^ doc_.undo.revision() * 7919u ^
                    doc_.mesh.vertexCount() * 31u ^ (gizmo_.all ? 2u : 0u) ^ (gizmo_.useMask ? 4u : 0u) ^
-                   uint64_t(doc_.subtoolCount()) << 48;
+                   uint64_t(doc_.partCount()) << 48;
     if (gizmo_.all)
-        for (const SubTool& s : doc_.subtools) key = key * 1099511628211ull ^ s.undo.revision() ^ (s.visible ? 1u : 0u);
+        for (const Part& s : doc_.parts) key = key * 1099511628211ull ^ s.undo.revision() ^ (s.visible ? 1u : 0u);
     if (key == gizmo_.centreKey) return;
     gizmo_.centreKey = key;
-    // A new mask (or another SubTool) means a new part to move: follow its centre again.
-    uint64_t maskKey = doc_.activeSubtoolInfo().id;
+    // A new mask (or another Part) means a new part to move: follow its centre again.
+    uint64_t maskKey = doc_.activePartInfo().id;
     const auto& mask = doc_.mesh.mask;
     double sum = 0.0;
     for (size_t v = 0; v < mask.size(); v += 1 + mask.size() / 65536) sum += double(mask[v]) * double(v % 97 + 1);
@@ -227,7 +227,7 @@ void App::updateGizmoPivot() {
     if (gizmo_.pivotPlaced) return;
     AABB box;
     for (int i : gizmoTargets()) {
-        const Mesh& m = doc_.subtoolMesh(i);
+        const Mesh& m = doc_.partMesh(i);
         if (m.vertexCount() == 0) continue;
         box.expand(transformBounds(m, transformWeights(m, gizmo_.useMask, 0.0f)));
     }
@@ -243,7 +243,7 @@ void App::resetGizmoPivot() {
     status_ = "Pivot at the centre, world axes";
 }
 
-void App::snapGizmoPivot(const RayHit& hit, int subtool) {
+void App::snapGizmoPivot(const RayHit& hit, int part) {
     gizmo_.pivot = hit.position;
     gizmo_.pivotPlaced = true;
     gizmo_.snapNext = false;
@@ -251,7 +251,7 @@ void App::snapGizmoPivot(const RayHit& hit, int subtool) {
     // The triangle's normal faces either way: turn it toward the viewer.
     if (glm::dot(gizmo_.surfaceNormal, camera_.forward()) > 0.0f) gizmo_.surfaceNormal = -gizmo_.surfaceNormal;
     if (gizmo_.orientSurface) gizmo_.frame = frameFromNormal(gizmo_.surfaceNormal);
-    status_ = "Pivot on " + doc_.subtools[size_t(subtool)].name + " at " + vecText(hit.position);
+    status_ = "Pivot on " + doc_.parts[size_t(part)].name + " at " + vecText(hit.position);
 }
 
 glm::mat3 App::gizmoFrame() const {
@@ -400,23 +400,23 @@ bool App::gizmoHandleScreen(GizmoHandle h, ImVec2& out) const {
 // ---------------------------------------------------------------------------
 
 bool App::gizmoMouseDown(float x, float y, SDL_Keymod mod) {
-    if (!gizmoActive() || ctrlDown(mod)) return false; // Ctrl still masks, as in ZBrush
+    if (!gizmoActive() || ctrlDown(mod)) return false; // Ctrl still masks, as 
     if (previewLod_ >= 0) clearLods();
     updateGizmoPivot();
     const bool alt = (mod & SDL_KMOD_ALT) != 0;
     const GizmoHandle h = gizmoHandleAt(x, y);
     if (h == H::None) {
         RayHit hit;
-        const int st = pickSubtool(x, y, &hit);
+        const int st = pickPart(x, y, &hit);
         if (st >= 0 && gizmo_.snapNext) {
             snapGizmoPivot(hit, st);
             return true;
         }
-        if (alt && st >= 0 && st != doc_.activeSubtool) return false; // Alt+click selects another SubTool
+        if (alt && st >= 0 && st != doc_.activePart) return false; // Alt+click selects another Part
         if (alt && st >= 0) { // a click puts the pivot here, a drag pans
             gizmo_.pendingSnap = true;
             gizmo_.snapHit = hit;
-            gizmo_.snapSubtool = st;
+            gizmo_.snapPart = st;
             gizmo_.startMouse = ImVec2(x, y);
         }
         // Off the handles the mouse navigates, wherever it is.
@@ -475,20 +475,20 @@ bool App::gizmoMouseDown(float x, float y, SDL_Keymod mod) {
         }
     }
 
-    gizmo_.subtools.clear();
+    gizmo_.parts.clear();
     gizmo_.sessions.clear();
     if (!gizmo_.pivotOnly) {
         for (int i : gizmoTargets()) {
-            Mesh& m = doc_.subtoolMesh(i);
-            SubTool& s = doc_.subtools[size_t(i)];
-            if (i != doc_.activeSubtool && s.bvhDirty) {
+            Mesh& m = doc_.partMesh(i);
+            Part& s = doc_.parts[size_t(i)];
+            if (i != doc_.activePart && s.bvhDirty) {
                 s.bvh.build(s.mesh);
                 s.bvhDirty = false;
             }
             TransformSession session;
             if (!session.begin(m, transformWeights(m, gizmo_.useMask, gizmo_.falloff), symmetry_, gizmo_.pivot))
                 continue;
-            gizmo_.subtools.push_back(i);
+            gizmo_.parts.push_back(i);
             gizmo_.sessions.push_back(std::move(session));
         }
         if (gizmo_.sessions.empty()) {
@@ -514,8 +514,8 @@ void App::gizmoDragTo(float x, float y) {
     const glm::vec3 c = gizmo_.startPivot;
     const int axis = axisOf(h);
     float size = 0.0f;
-    for (int i : gizmo_.subtools.empty() ? gizmoTargets() : gizmo_.subtools)
-        size = std::max(size, glm::length(doc_.subtoolMesh(i).bounds().extent()));
+    for (int i : gizmo_.parts.empty() ? gizmoTargets() : gizmo_.parts)
+        size = std::max(size, glm::length(doc_.partMesh(i).bounds().extent()));
     const float grid = gridStep(size);
     MeshTransform t;
     t.pivot = c;
@@ -593,14 +593,14 @@ void App::gizmoDragTo(float x, float y) {
         return;
     }
     gizmo_.current = t;
-    for (size_t i = 0; i < gizmo_.sessions.size(); ++i) gizmo_.sessions[i].apply(doc_.subtoolMesh(gizmo_.subtools[i]), t);
+    for (size_t i = 0; i < gizmo_.sessions.size(); ++i) gizmo_.sessions[i].apply(doc_.partMesh(gizmo_.parts[i]), t);
 }
 
 void App::gizmoRelease() {
     if (gizmo_.pendingSnap) {
         gizmo_.pendingSnap = false;
-        if (dist2(gizmo_.startMouse, ImVec2(mouseX_, mouseY_)) < 16.0f && gizmo_.snapSubtool == doc_.activeSubtool)
-            snapGizmoPivot(gizmo_.snapHit, gizmo_.snapSubtool);
+        if (dist2(gizmo_.startMouse, ImVec2(mouseX_, mouseY_)) < 16.0f && gizmo_.snapPart == doc_.activePart)
+            snapGizmoPivot(gizmo_.snapHit, gizmo_.snapPart);
     }
     if (drag_ != Drag::Gizmo) return;
     const GizmoHandle h = gizmo_.handle;
@@ -611,9 +611,9 @@ void App::gizmoRelease() {
     const char* label = isRotate(h) ? "Gizmo Rotate" : isScale(h) ? "Gizmo Scale" : "Gizmo Move";
     size_t moved = 0;
     for (size_t i = 0; i < gizmo_.sessions.size(); ++i) {
-        const int st = gizmo_.subtools[i];
-        const bool active = st == doc_.activeSubtool;
-        SubTool& s = doc_.subtools[size_t(st)];
+        const int st = gizmo_.parts[i];
+        const bool active = st == doc_.activePart;
+        Part& s = doc_.parts[size_t(st)];
         const size_t n = gizmo_.sessions[i].movingVertices();
         UndoRecord r = gizmo_.sessions[i].finish(active ? doc_.mesh : s.mesh, active ? doc_.bvh : s.bvh, label);
         if (r.empty()) continue;
@@ -621,7 +621,7 @@ void App::gizmoRelease() {
         moved += n;
     }
     gizmo_.sessions.clear();
-    gizmo_.subtools.clear();
+    gizmo_.parts.clear();
     if (moved == 0) return;
     // The gizmo moves and turns with what it moved.
     const MeshTransform& t = gizmo_.current;
@@ -656,7 +656,7 @@ void App::gizmoRelease() {
 
 void App::rememberGizmoStep(const glm::vec3& before, const glm::mat3& frameBefore, bool surfaceBefore) {
     GizmoState::Step st;
-    st.subtool = doc_.activeSubtoolInfo().id;
+    st.part = doc_.activePartInfo().id;
     st.depth = doc_.undo.undoCount();
     st.before = before;
     st.after = gizmo_.pivot;
@@ -670,12 +670,12 @@ void App::rememberGizmoStep(const glm::vec3& before, const glm::mat3& frameBefor
 }
 
 void App::gizmoAfterUndo(bool redo) {
-    const uint32_t id = doc_.activeSubtoolInfo().id;
+    const uint32_t id = doc_.activePartInfo().id;
     const size_t depth = doc_.undo.undoCount();
     auto& from = redo ? gizmo_.redoSteps : gizmo_.undoSteps;
     auto& to = redo ? gizmo_.undoSteps : gizmo_.redoSteps;
     // Undo took the stack from st.depth to st.depth - 1; redo brought it back to st.depth.
-    if (from.empty() || from.back().subtool != id || from.back().depth != (redo ? depth : depth + 1)) return;
+    if (from.empty() || from.back().part != id || from.back().depth != (redo ? depth : depth + 1)) return;
     const GizmoState::Step st = from.back();
     from.pop_back();
     to.push_back(st);
@@ -728,7 +728,7 @@ void App::drawGizmo() {
     if (!gizmoActive()) return;
     if (drag_ != Drag::Gizmo) updateGizmoPivot();
     drawGizmoPanel();
-    if (!doc_.activeSubtoolInfo().visible) return;
+    if (!doc_.activePartInfo().visible) return;
     const ImVec2 mouse(mouseX_, mouseY_);
     const bool overCanvas = !ImGui::GetIO().WantCaptureMouse && canvasRect().contains(mouse.x, mouse.y);
     gizmo_.hover = drag_ == Drag::Gizmo ? gizmo_.handle

@@ -138,8 +138,8 @@ void registerMicroCommands(CommandRegistry& reg) {
                      doc.replaceMeshUndoable(std::move(baked), "Bake micro");
                      return {true, "Baked the micro level into this Part: " + tris + " triangles"};
                  }
-                 const std::string name = doc.uniqueSubtoolName(doc.activeSubtoolInfo().name + " baked");
-                 doc.addSubtool(std::move(baked), name, false, doc.activeSubtool + 1);
+                 const std::string name = doc.uniquePartName(doc.activePartInfo().name + " baked");
+                 doc.addPart(std::move(baked), name, false, doc.activePart + 1);
                  return {true, "Baked the micro level into Part \"" + name + "\": " + tris + " triangles"};
              }});
 

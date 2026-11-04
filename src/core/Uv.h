@@ -129,8 +129,8 @@ glm::vec2 uvCenter(const std::vector<glm::vec2>& uvs, const std::vector<uint32_t
 
 // Marks (`on`) or clears the seam on the edges starting at `corners`, on both sides of each edge.
 void uvSetSeams(Mesh& mesh, const std::vector<uint32_t>& twin, const std::vector<uint32_t>& corners, bool on);
-// Seam presets: every polygroup border, every current island border, edges sharper than `degrees`.
-size_t uvSeamsFromPolygroups(Mesh& mesh, const std::vector<uint32_t>& twin);
+// Seam presets: every face group border, every current island border, edges sharper than `degrees`.
+size_t uvSeamsFromFaceGroups(Mesh& mesh, const std::vector<uint32_t>& twin);
 size_t uvSeamsFromIslands(Mesh& mesh, const UvTopology& topo);
 size_t uvSeamsFromAngle(Mesh& mesh, const std::vector<uint32_t>& twin, float degrees);
 size_t uvSeamCount(const Mesh& mesh); // marked edges (each counted once)
@@ -209,18 +209,18 @@ enum class UvUnwrapMethod {
     Auto,       // xatlas: finds its own seams (core/AutoUv.h)
     Conformal,  // LSCM: angle-preserving, cut along the marked seams
     Isometric,  // LSCM then as-rigid-as-possible: keeps lengths too (least stretch), along the marked seams
-    Polygroups, // Isometric, cut along the polygroup borders as well as the marked seams
+    FaceGroups, // Isometric, cut along the face group borders as well as the marked seams
     Planar,     // each piece projected along its mean normal
     Unfold,     // the current islands flattened again in place (Isometric, honouring pins)
 };
-const char* uvUnwrapMethodId(UvUnwrapMethod m); // auto, conformal, isometric, polygroups, planar, unfold
+const char* uvUnwrapMethodId(UvUnwrapMethod m); // auto, conformal, isometric, face groups, planar, unfold
 const char* uvUnwrapMethodLabel(UvUnwrapMethod m);
 bool parseUvUnwrapMethod(const std::string& id, UvUnwrapMethod& m);
 
 struct UvUnwrapOptions {
     UvUnwrapMethod method = UvUnwrapMethod::Isometric;
     int resolution = 2048;
-    int iterations = 10;          // as-rigid-as-possible steps (Isometric, Polygroups, Unfold)
+    int iterations = 10;          // as-rigid-as-possible steps (Isometric, Face groups, Unfold)
     bool pack = true;             // pack the new islands (UvPackOptions below); off for Unfold (fitted in place)
     UvPackOptions packing;
     const std::vector<uint8_t>* faces = nullptr; // only these triangles (null: all); the rest keep their UVs and

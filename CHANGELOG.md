@@ -24,8 +24,7 @@ All notable changes to SculptForge are listed here. The format follows
   **Classic layout** (Preferences, first-start welcome), **File > Bridge** (Send, Receive, Import / Export Bridge
   file), Lit Spheres, Parts, Face groups, Vertex Paint, Library. Brushes are stored as SharpCrease, ClayBlock and
   Tendril (old names in projects, brush files, scripts and configs still load); the library's lit-sphere folder is now
-  `Documents/SculptForge/Lit Spheres` (an existing folder moves over once). The export plug-in is
-  `SculptForgeBridgeExport.txt`, with its setup on the Bridge setup page. A new check (`tools/check_marks.py`, ctest
+  `Documents/SculptForge/Lit Spheres` (an existing folder moves over once). A new check (`tools/check_marks.py`, ctest
   `marks`) keeps third-party product names out of what we publish.
 
 ### Fixed
@@ -411,7 +410,7 @@ All notable changes to SculptForge are listed here. The format follows
 - Forge Spheres with the pointer only (#8): **Drag places child** (or <kbd>Ctrl</kbd>+drag) moves a new sphere away
   from its parent in one Draw drag; the sphere last clicked or added is selected (outlined in orange) for **Delete
   Selected**, **Insert Between** and **Set as Root**, and a right click on a sphere opens a menu with the same.
-  Set as Root keeps the armature's shape and links (`zsphere_set_root index=3`).
+  Set as Root keeps the armature's shape and links (`forgesphere_set_root index=3`).
 - Maya input style (#32): <kbd>Alt</kbd>+right drag zooms with a sideways drag (right zooms in), as Maya's own
   dolly; **Preferences > Input > Zoom drag** switches it back to up and down, and **Invert zoom** turns zoom drags
   around in every style.
@@ -575,7 +574,7 @@ All notable changes to SculptForge are listed here. The format follows
   **Rings** (1-20) of edges inside them, so sculpting doesn't move the border (Blender: Mask from mesh
   boundary). **Face group borders** also masks where face groups meet, **Soft**
   fades the mask inwards; one undo step. A closed mesh masks nothing and the status bar says it has no open edges
-  (`mask_border rings=2 polygroups=true soft=true`).
+  (`mask_border rings=2 facegroups=true soft=true`).
 - The support card at launch: a full-window card over a bronze sculpt rendered in SculptForge, with the Supporter
   ($5 / month), Insider ($20 / month, "Insiders will get each release about two weeks early, starting with
   SculptForge 1.0.") and Studio ($150 / month for up to 10 artists) memberships and a one-time gift, each opening its Stripe checkout in
@@ -595,7 +594,7 @@ All notable changes to SculptForge are listed here. The format follows
 - Insert your own mesh (#34): **Append > Insert on the model > Active Part's copy...** (another Part) or
   **From file...** (`.obj`, `.ply`, `.glb`), dragged onto the surface like the shapes: centred, sized by the drag,
   its up axis along the normal, turned by the drag and mirrored by symmetry, one undo step
-  (`insert_mesh subtool=<name>|file=<path>`).
+  (`insert_mesh part=<name>|file=<path>`).
 - **Keep Masked** for Voxel Remesh, Decimate and QRemesh (#43, off by default): masked areas keep their
   triangles exactly; the rest is rebuilt and, for the remeshers, joined to them along the mask's edge with a
   strip of triangles so the model stays closed (`keep_masked=true` on `remesh`, `decimate`, `qremesh`).
@@ -1018,7 +1017,7 @@ longer keeps the graphics card busy, and fixes for pens on Windows and Linux, th
 Thank you for the reports.
 
 ### Added
-- Forge Spheres (Tool > Forge Spheres, #8): block out a base mesh from connected spheres. Draw grows a sphere from another (the drag sets its size) or adds a joint on a link, Move and Scale set the proportions, Alt+click deletes, Symmetry mirrors every edit, Preview (A) shows the skin, and Make Mesh builds it as a new watertight quad Part with a face group per link, keeping the Forge Spheres hidden to edit again. Undoable, saved in projects, and scriptable (`zsphere_new`, `zsphere_add`, `zsphere_set, zsphere_delete, zsphere_insert, zsphere_preview, zsphere_make_mesh, zsphere_list`).
+- Forge Spheres (Tool > Forge Spheres, #8): block out a base mesh from connected spheres. Draw grows a sphere from another (the drag sets its size) or adds a joint on a link, Move and Scale set the proportions, Alt+click deletes, Symmetry mirrors every edit, Preview (A) shows the skin, and Make Mesh builds it as a new watertight quad Part with a face group per link, keeping the Forge Spheres hidden to edit again. Undoable, saved in projects, and scriptable (`forgesphere_new`, `forgesphere_add`, `forgesphere_set, forgesphere_delete, forgesphere_insert, forgesphere_preview, forgesphere_make_mesh, forgesphere_list`).
 - A Blender input style (#12): **Preferences > Input > Style > Blender**, also at the top of the Controls window.
   Middle-drag orbits, Shift+middle pans, Ctrl+middle zooms, and Alt+left-drag does the same for pens and
   trackpads (Emulate 3 Button Mouse); Ctrl inverts a stroke, Shift smooths; F / Shift+F set the radius and
@@ -1037,17 +1036,17 @@ Thank you for the reports.
 - Custom Lit Spheres (#15): **Material > Load Lit Sphere...** loads a lit-sphere image (PNG, JPG or EXR; non-square images
   are cropped to the centre, large ones scaled to 1024) as a material and copies it into the new **Lit Spheres** folder
   of the library (Documents/SculptForge/Lit Spheres); images in that folder load at start-up and, when added later,
-  the next time a material list opens (a cheap size and time check), and folders listed in `SCULPTFORGE_MATCAP_PATH`
+  the next time a material list opens (a cheap size and time check), and folders listed in `SCULPTFORGE_LITSPHERE_PATH`
   load at start-up. They show in the material picker, palette and Library. Right-click > **Remove** takes one out
   of the lists and moves its image to the trash (freedesktop trash on Linux, Recycle Bin on Windows; on macOS it
   is hidden for the session and the message says where the file is). A project
   using one embeds it as a PNG (an `attachments` entry; no format change), so it opens with the same look anywhere.
-  Scripts: `load_matcap path=...`, `remove_matcap name=...`, `set_material name=<your MatCap>`.
+  Scripts: `load_litsphere path=...`, `remove_litsphere name=...`, `set_material name=<your LitSphere>`.
 - Smooth / Flat shading (#11): **Material** palette (and **Tool > Display**) > **Shading** switches the whole
   scene to flat, faceted shading, where every polygon shows its own face; **This Part** keeps one Part smooth
   or flat whatever the scene says. Both are saved in projects (no format change; older files open with your
   preferred shading) and the scene's choice is a preference (Store Config). Smooth stays the default. Scripts:
-  `set_shading mode=flat`, `subtool_shading mode=smooth name=Eyes`.
+  `set_shading mode=flat`, `part_shading mode=smooth name=Eyes`.
 - 3Dconnexion SpaceMouse navigation (#6, experimental): the cap's six axes pan, zoom and turn the view about the
   orbit pivot, continuously and at the same speed whatever the frame rate, in every input style and while a pen
   stroke is held. Read through SDL's joystick API (no 3Dconnexion SDK), hot-plug aware, recognised by USB id
@@ -1239,7 +1238,7 @@ Fixes from a professional sculptor's testing, and a way to bring a library over.
   Ctrl+Shift does the same for SelectRect and SelectLasso. Tool > Masking and Tool >
   Visibility keep their buttons.
 - Face groups > **Group by UVs**: one face group per UV island of the visible mesh, undoable;
-  `polygroup_uv` command for the console, CLI, MCP and Python.
+  `facegroup_uv` command for the console, CLI, MCP and Python.
 
 ### Texture painting
 - **New Texture** on the top shelf and in the Color palette whenever the Paint brush (or Rgb) is on and the
@@ -1254,12 +1253,8 @@ Fixes from a professional sculptor's testing, and a way to bring a library over.
   the Vertex target, or vertex paint shown multiplied over the texture.
 
 ### Bring a library over
-- **Bridge export plug-in** (`integrations/bridge-plugin`, script, GPL-3.0-or-later, attached to
-  releases): **Convert** / **Save for SculptForge** writes every Part of a library file at
-  its highest subdivision level as `<name>.sf<NNN>_<SubTool>.GoZ` next to the `.ZTL`.
-- Opening a `.ZTL` (File > Open, drag and drop, `open`) opens that conversion as Parts in order, with names,
-  face groups, vertex paint, mask and UVs, and warns when the `.ZTL` is newer than the conversion; without one the
-  message points to the plug-in. A folder of numbered `.GoZ` files (`<name>.sculptforge`) opens the same way.
+- A folder of numbered Bridge files (`<name>.sculptforge`) opens as Parts in order, with names, face groups,
+  vertex paint, mask and UVs.
 
 ## [0.8.0] - 2026-10-25
 
@@ -1397,7 +1392,7 @@ docs/guide/quick-tour.md.
   **Send to SculptForge** (the 3D View's SculptForge tab, the Object menu or File > Export), sculpt, then
   **File > Blender > Send to Blender** in SculptForge. The objects update in place in Blender, keeping their
   transform, materials and modifiers; new Parts become new objects. Works on Linux, Windows and macOS.
-  - The two sides share a per-user folder (`<user data>/SculptForge/SculptForge/blender`) and exchange `.GoZ` files
+  - The two sides share a per-user folder (`<user data>/SculptForge/SculptForge/blender`) and exchange Bridge files
     plus a JSON manifest per direction (object names, `matrix_world`, a revision); each side checks the other's
     manifest once a second. No network. SculptForge records where it is installed and writes a heartbeat there, so
     the add-on starts it (`--blender`) only when it isn't running.
@@ -1560,7 +1555,7 @@ adjacency that saves the memory).
   tangents), with a Preview Normal Map toggle.
 - Send to Unreal imports the baked normal map too (`T_<Name>_N`, normal-map compression, green flipped for
   OpenGL maps) when the editor runs on the same computer.
-- Maps are written as `<SubTool>_normal.png`, `_ao.png`, `_displacement.png` / `.exr` and so on, beside the
+- Maps are written as `<Part>_normal.png`, `_ao.png`, `_displacement.png` / `.exr` and so on, beside the
   last export by default.
 
 ### Quad retopology and detail projection
@@ -1616,7 +1611,7 @@ adjacency that saves the memory).
 - Keep Texture (Tool > Remesh, Tool > Geometry > QRemesh; `keep_texture` on `remesh` and `qremesh`, default on):
   the rebuilt surface gets Auto UVs and the texture, all layers, is projected onto it from the old surface, in the
   same undo step. Voxel Remesh of a painted Part runs in the background with progress and Cancel. Merging
-  Parts (`subtool_merge_down`, `subtool_merge_visible`) keeps their textures in one texture on new Auto UVs.
+  Parts (`part_merge_down`, `part_merge_visible`) keeps their textures in one texture on new Auto UVs.
 - Decimate no longer scrambles a texture at UV seams (seam vertices stay in place).
 - Auto UV no longer crashes or folds UVs on dense smooth meshes (e.g. the default 82k-triangle sphere): fixed in
   third_party/xatlas. UV islands are capped at about 4000 triangles, so a 1.3M-triangle sculpt unwraps in about
@@ -1643,7 +1638,7 @@ adjacency that saves the memory).
   and MTL's `map_Kd` split names at spaces). Textured exports were validated with other tools: Khronos glTF
   validator (no errors or warnings), OpenUSD's validators (no issues), ufbx strict mode, and a texture
   orientation check per format; `tools/export_check/run.sh` repeats it.
-- UI tests: `wait_idle` waits for several idle frames in a row, which fixes the flaky `ui_lightbox` under a
+- UI tests: `wait_idle` waits for several idle frames in a row, which fixes the flaky `ui_library` under a
   loaded parallel ctest.
 
 ### Changed
@@ -1669,7 +1664,7 @@ adjacency that saves the memory).
   the changed rectangle of the texture.
 - Auto UV (Tool > Texture Map, `uv_auto`): automatic UV unwrapping with xatlas (MIT, vendored in
   third_party/xatlas), running in the background with progress. Show UVs draws the texture with the UV layout.
-- Vertex Paint > Texture and Texture > Vertex Paint (`texture_from_polypaint`, `polypaint_from_texture`), Import and
+- Vertex Paint > Texture and Texture > Vertex Paint (`texture_from_vertexpaint`, `vertexpaint_from_texture`), Import and
   Export Texture (PNG; `texture_import`, `texture_export`), Delete Texture (`texture_delete`).
 - Projects save textures and their layers (project format 3; version 1 and 2 projects still open, and older
   SculptForge versions refuse format 3 files instead of dropping the paint).
@@ -1793,7 +1788,7 @@ Shaped by feedback from a working professional modeler and a survey of sculpting
   history. Only the active one is sculpted; the others are drawn slightly dimmed.
 - Parts panel: select, rename (double-click), show/hide, Solo, Unhide all, reorder, Append (sphere, cube,
   plane or a model file), Duplicate, Delete, Merge down, Merge visible, Split by face groups, Split into parts.
-  Alt+click a Part in the viewport to select it. New `subtool_*` commands for scripts, Python and MCP agents.
+  Alt+click a Part in the viewport to select it. New `part_*` commands for scripts, Python and MCP agents.
 - Files: projects save every Part (format version 2; version 1 projects still open). OBJ (`o` objects), glTF,
   FBX (an LOD group per Part), USD and Bridge files export each visible Part as its own object, and multi-object
   files open as Parts. PLY, STL and splat conversion use the visible Parts merged.
@@ -1850,14 +1845,14 @@ Shaped by feedback from a working professional modeler and a survey of sculpting
 - Hold Ctrl while stroking to paint the mask, Ctrl+Alt to erase it. Ctrl+click the background inverts it and
   Ctrl+drag there clears it. Every brush and vertex paint leave masked areas alone.
 - Commands `mask_clear`, `mask_all`, `mask_invert`, `mask_blur`, `mask_sharpen`, `mask_grow`, `mask_shrink`,
-  `mask_by_cavity` and `mask_by_polygroup`, plus a Masking section in the Tools panel.
+  `mask_by_cavity` and `mask_by_facegroup`, plus a Masking section in the Tools panel.
 
 ### Face groups and visibility
-- `polygroup_auto_by_normals`, `polygroup_by_connectivity`, `polygroup_from_mask`, `polygroup_clear`,
-  `polygroup_merge_visible`.
+- `facegroup_auto_by_normals`, `facegroup_by_connectivity`, `facegroup_from_mask`, `facegroup_clear`,
+  `facegroup_merge_visible`.
 - classic visibility: Ctrl+Shift+click isolates a face group (click again to invert), Ctrl+Shift+Alt+click
   hides it, Ctrl+Shift+click on the background shows everything, Ctrl+Shift+drag hides outside a rectangle (Alt:
-  inside). Commands `hide_polygroup`, `isolate_polygroup`, `show_all`, `invert_visibility`, `hide_rect` and
+  inside). Commands `hide_facegroup`, `isolate_facegroup`, `show_all`, `invert_visibility`, `hide_rect` and
   `delete_hidden`. Brushes, vertex paint and mask operations skip hidden faces.
 
 ### Vertex Paint and materials
@@ -1874,11 +1869,10 @@ Shaped by feedback from a working professional modeler and a survey of sculpting
   and autosave with an offer to restore after a crash.
 
 ### Interchange
-- Bridge: `.GoZ` import and export with face groups, mask, vertex paint and UVs (quads are kept), and the Bridge files
-  bridge (`goz_send`, `goz_receive`, File > Bridge) on Windows and macOS. The format follows the open-source
-  GoB add-on. See [integrations/bridge-plugin/PROTOCOL.md](integrations/bridge-plugin/PROTOCOL.md).
-- STL import (binary and ASCII) and binary STL export. Opening a `.ZTL`/`.ZPR` file now explains that the format is
-  proprietary and suggests Bridge files or OBJ/FBX.
+- Bridge: Bridge file import and export with face groups, mask, vertex paint and UVs (quads are kept), and the
+  shared-folder exchange (`bridge_send`, `bridge_receive`, File > Bridge) on Windows and macOS. The format follows
+  the open-source GoB add-on. See [docs/bridge-format.md](docs/bridge-format.md).
+- STL import (binary and ASCII) and binary STL export.
 
 ### Security and robustness
 - File loaders were fuzzed with libFuzzer, AddressSanitizer and UndefinedBehaviorSanitizer (about 8 million

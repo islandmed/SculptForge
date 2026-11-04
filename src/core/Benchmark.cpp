@@ -8,7 +8,7 @@
 #include "core/Micro.h"
 #include "core/FocusDetail.h"
 #include "core/Multires.h"
-#include "core/Polypaint.h"
+#include "core/VertexPaint.h"
 #include "core/Primitives.h"
 #include "core/Project.h"
 #include "core/Texture.h"
@@ -70,11 +70,11 @@ size_t peakResidentBytes() {
 
 MemoryUse documentMemory(const Document& doc) {
     MemoryUse u;
-    std::vector<const PaintTexture*> seen; // textures shared between SubTools count once
-    for (int i = 0; i < doc.subtoolCount(); ++i) {
-        const bool active = i == doc.activeSubtool;
-        const SubTool& st = doc.subtools[size_t(i)];
-        const Mesh& m = doc.subtoolMesh(i);
+    std::vector<const PaintTexture*> seen; // textures shared between Parts count once
+    for (int i = 0; i < doc.partCount(); ++i) {
+        const bool active = i == doc.activePart;
+        const Part& st = doc.parts[size_t(i)];
+        const Mesh& m = doc.partMesh(i);
         u.mesh += m.memoryBytes();
         if (m.texture && std::find(seen.begin(), seen.end(), m.texture.get()) == seen.end()) {
             seen.push_back(m.texture.get());
@@ -86,9 +86,9 @@ MemoryUse documentMemory(const Document& doc) {
         u.triangles += m.triangleCount();
         u.vertices += m.vertexCount();
         if (st.visible) // the renderer's cluster layout (core/UploadOrder.h): packed vertices (12 bytes, + colour 4,
-                        // mask 1), about a tenth more for the copies on cluster seams; 16-bit indices and polygroups
+                        // mask 1), about a tenth more for the copies on cluster seams; 16-bit indices and face groups
             u.gpu += m.vertexCount() * (12 + (m.hasColors() ? 4 : 0) + (m.hasMask() ? 1 : 0)) * 11 / 10 +
-                     m.triangleCount() * (6 + (m.hasPolygroups() ? 2 : 0));
+                     m.triangleCount() * (6 + (m.hasFaceGroups() ? 2 : 0));
     }
     // Material channel tiles from the atomic count (every texture, copies and undo steps): no tile walk here, so
     // the readout is safe whatever else is painting.
@@ -373,7 +373,7 @@ int runBenchCommandLine(BenchCommandLine cl, const std::string& heading, const B
 namespace {
 
 // Dynamic topology (core/Dyntopo.h): strokes that remesh as they go, on spheres without subdivision levels
-// (Sculptris Pro works on such meshes only). Each row starts from the same sphere.
+// (dynamic topology works on such meshes only). Each row starts from the same sphere.
 std::string runDyntopoBenchmark(const BenchOptions& o, const BenchGpu* gpu) {
     auto log = [&](const std::string& s) {
         if (o.log) o.log(s);
@@ -391,7 +391,7 @@ std::string runDyntopoBenchmark(const BenchOptions& o, const BenchGpu* gpu) {
         {{"Standard, Detail 50%", Kind::Brush, BrushType::Standard}, 0.5f},
         {{"Standard, Detail 100%", Kind::Brush, BrushType::Standard}, 1.0f},
         {{"Tendril, Detail 50%", Kind::Brush, BrushType::SnakeHook}, 0.5f},
-        {{"Clay Block, Detail 75%", Kind::Brush, BrushType::ClayBuildup}, 0.75f},
+        {{"Clay Block, Detail 75%", Kind::Brush, BrushType::ClayBlock}, 0.75f},
         {{"Smooth (simplifies), Detail 50%", Kind::Brush, BrushType::Smooth}, 0.5f},
         {{"Standard (large, r 0.4), Detail 50%", Kind::Brush, BrushType::Standard, 0.4f}, 0.5f},
     };
@@ -456,7 +456,7 @@ std::string runMicroBenchmark(const BenchOptions& o, const BenchGpu* gpu) {
         {"Standard (large, r 0.4)", Kind::Brush, BrushType::Standard, 0.4f},
         {"Standard (300 px, r 0.56)", Kind::Brush, BrushType::Standard, 0.56f},
         {"Clay", Kind::Brush, BrushType::Clay},
-        {"Clay Block", Kind::Brush, BrushType::ClayBuildup},
+        {"Clay Block", Kind::Brush, BrushType::ClayBlock},
         {"Smooth", Kind::Brush, BrushType::Smooth},
         {"Smooth (large, r 0.4)", Kind::Brush, BrushType::Smooth, 0.4f},
         {"Inflate", Kind::Brush, BrushType::Inflate},
@@ -683,11 +683,11 @@ std::string runBenchmark(const BenchOptions& o, const BenchGpu* gpu) {
         {"Standard", Kind::Brush, BrushType::Standard},
         {"Standard (large, r 0.4)", Kind::Brush, BrushType::Standard, 0.4f},
         {"Clay", Kind::Brush, BrushType::Clay},
-        {"Clay Block", Kind::Brush, BrushType::ClayBuildup},
+        {"Clay Block", Kind::Brush, BrushType::ClayBlock},
         {"Smooth", Kind::Brush, BrushType::Smooth},
         {"Smooth (large, r 0.4)", Kind::Brush, BrushType::Smooth, 0.4f},
         {"Inflate", Kind::Brush, BrushType::Inflate},
-        {"Sharp Crease", Kind::Brush, BrushType::DamStandard},
+        {"Sharp Crease", Kind::Brush, BrushType::SharpCrease},
         {"Layer", Kind::Brush, BrushType::Layer},
         {"Move", Kind::Move, BrushType::Move},
         {"Move (large, r 0.4)", Kind::Move, BrushType::Move, 0.4f},

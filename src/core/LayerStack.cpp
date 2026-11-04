@@ -6,7 +6,7 @@
 #include "core/Document.h"
 #include "core/Json.h"
 #include "core/MeshMaps.h"
-#include "core/Polypaint.h"
+#include "core/VertexPaint.h"
 #include "core/Texture.h"
 #include "core/ThreadPool.h"
 #include "core/Undo.h"

@@ -250,7 +250,7 @@ Mesh decimate(const Mesh& src, size_t targetTriangles, bool keepMasked) {
         }
         out.triangles.push_back(t);
         // Surviving faces keep their group, visibility and (updated) corner UVs.
-        if (src.polygroups.size() == nt) out.polygroups.push_back(src.polygroups[f]);
+        if (src.facegroups.size() == nt) out.facegroups.push_back(src.facegroups[f]);
         if (src.hidden.size() == nt) out.hidden.push_back(src.hidden[f]);
         if (!FUV.empty()) out.uvs.insert(out.uvs.end(), FUV.begin() + std::ptrdiff_t(f) * 3, FUV.begin() + std::ptrdiff_t(f) * 3 + 3);
     }

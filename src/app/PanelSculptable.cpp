@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Splats > Make sculptable (core/Sculptable.h): one click from a Gaussian-splat capture to a clean, sculptable
-// SubTool with the capture's colours. The options (Detail, polygon preset, Face loops, colour, crop box) sit in
+// Part with the capture's colours. The options (Detail, polygon preset, Face loops, colour, crop box) sit in
 // the Splats palette; the work runs on a worker thread with a progress bar and Cancel.
 //
 // With Review on, it stops after the scan: the face landmarks show as dots on the model with the guide loops
@@ -64,7 +64,7 @@ struct SculptableUiState {
     int preset = 0; // kPresets
     bool faceLoops = true;
     bool review = false;
-    int color = 0; // 0 polypaint, 1 texture
+    int color = 0; // 0 vertex paint, 1 texture
     bool keepScan = true;
     bool crop = false;
     AABB box;
@@ -87,7 +87,7 @@ struct SculptableUiState {
     };
     std::unique_ptr<Job> job;
 
-    // Review: the scan SubTool, its landmarks and the frame they were found in.
+    // Review: the scan Part, its landmarks and the frame they were found in.
     bool reviewing = false;
     uint32_t scanId = 0;
     FaceLandmarks landmarks;
@@ -203,16 +203,16 @@ void App::startSculptable(int stage) {
     job->result = std::make_shared<SculptableResult>();
     job->error = std::make_shared<std::string>();
     if (stage == 2) {
-        // Remesh the scan SubTool under review (its guides as they are now).
+        // Remesh the scan Part under review (its guides as they are now).
         int index = -1;
-        for (int i = 0; i < doc_.subtoolCount(); ++i)
-            if (doc_.subtools[size_t(i)].id == s.scanId) index = i;
+        for (int i = 0; i < doc_.partCount(); ++i)
+            if (doc_.parts[size_t(i)].id == s.scanId) index = i;
         if (index < 0) {
             status_ = "The scan Part is gone; Make sculptable again";
             s.reviewing = false;
             return;
         }
-        if (index != doc_.activeSubtool) doc_.selectSubtool(index);
+        if (index != doc_.activePart) doc_.selectPart(index);
         job->result->scan = doc_.mesh;
         job->result->guides = doc_.qremeshGuides;
         job->result->landmarks = s.landmarks;
@@ -277,16 +277,16 @@ void App::pollSculptable() {
         s.landmarks = res.landmarks;
         r.message = applySculptableScan(doc_, res);
         s.reviewing = true;
-        s.scanId = doc_.activeSubtoolInfo().id;
+        s.scanId = doc_.activePartInfo().id;
         if (!s.landmarks.valid && s.faceLoops) {
             s.placing = 0;
             r.message += ". Place the landmarks by hand: click " + std::string(kLandmarkPrompts[0]);
         }
     } else {
         int index = -1;
-        for (int i = 0; i < doc_.subtoolCount(); ++i)
-            if (doc_.subtools[size_t(i)].id == job->scanId) index = i;
-        if (index < 0 || doc_.subtoolMesh(index).triangleCount() != job->scanTriangles) {
+        for (int i = 0; i < doc_.partCount(); ++i)
+            if (doc_.parts[size_t(i)].id == job->scanId) index = i;
+        if (index < 0 || doc_.partMesh(index).triangleCount() != job->scanTriangles) {
             status_ = "Make sculptable skipped: the scan Part changed meanwhile";
             return;
         }
@@ -464,7 +464,7 @@ bool App::sculptableLandmarkScreen(int i, ImVec2& out) const {
 }
 
 bool App::sculptableReviewActive() const {
-    return sculptable_ && sculptable_->reviewing && doc_.activeSubtoolInfo().id == sculptable_->scanId;
+    return sculptable_ && sculptable_->reviewing && doc_.activePartInfo().id == sculptable_->scanId;
 }
 
 bool App::sculptableHot() const {

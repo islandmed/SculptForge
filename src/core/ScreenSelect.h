@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Screen-space selection shapes shared by the lasso and rectangle tools
-// (ZBrush MaskLasso / MaskRect and SelectRect / SelectLasso). Shapes live in
+// (MaskLasso / MaskRect and SelectRect / SelectLasso). Shapes live in
 // normalised device coordinates (-1..1, y up) under a view-projection
 // matrix; the commands take that matrix as 16 numbers ("view_proj") and the
 // lasso as "x0 y0 x1 y1 ..." ("points").
@@ -19,7 +19,7 @@
 namespace sf {
 
 // A closed polygon with a fast inside test (even-odd rule, so a lasso that
-// crosses itself leaves the doubly-enclosed parts out, as ZBrush does).
+// crosses itself leaves the doubly-enclosed parts out).
 // Edges are bucketed into horizontal bands, so testing a vertex only walks
 // the few edges near its height even for a long lasso.
 class ScreenPolygon {

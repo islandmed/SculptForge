@@ -23,7 +23,7 @@
 //   view_drag X0 Y0 X1 Y1 [S]  left-drag in the viewport at window fractions, gliding there first like stroke (same
 //                            point twice = a click)
 //   drag X0 Y0 X1 Y1 [S] [release]  left-drag in window fractions (rectangle hide, sliders...); release:
-//                            let go of the held modifiers halfway (ZBrush's Alt-drag, release Alt to zoom)
+//                            let go of the held modifiers halfway (Alt-drag, release Alt to zoom)
 //   drag_item LABEL DX DY [S] left-drag from the item by DX DY pixels (scrubbing, dragging a tile out)
 //   drag_path U0 V0 U1 V1 ... [keep] [S=seconds]   left-drag through the points (fractions of the model's
 //                            on-screen bounds; outside 0..1 is the background) with the held modifiers: a lasso,
@@ -50,10 +50,10 @@
 //   run COMMANDS             sculptforge-cli commands, e.g. run new_sphere subdivisions=4 ($SCRIPT_DIR: the script's folder)
 //   drop FILE                as if FILE were dropped onto the window (relative to the script's folder)
 //   env NAME VALUE           set an environment variable; $SCRIPT_DIR is the script's folder
-//   input_style STYLE        zbrush, sculptforge (the default), blender or maya, as Preferences > Input sets it
+//   input_style STYLE        classic, sculptforge (the default), blender or maya, as Preferences > Input sets it
 //   copy SRC DST             copy a file or folder (SRC relative to the script's folder, DST to the working
 //                            directory), e.g. to stage what another program would write (the Blender bridge);
-//                            $LIBRARY in DST (and in env values) is the test's LightBox library folder
+//                            $LIBRARY in DST (and in env values) is the test's Library library folder
 //   wait SECONDS / wait_idle [TIMEOUT] (AI requests, thumbnails, update checks and other background jobs) / wait_for LABEL [TIMEOUT]
 //   wait_value NAME OP N [TIMEOUT]  wait (real time, default 30 s) until expect_value NAME OP N would pass
 //   expect LABEL / expect_not LABEL
@@ -62,29 +62,29 @@
 //   expect_help TEXT         the Ctrl-hover help box shown this frame contains TEXT (hold ctrl, then hover)
 //   clipboard TEXT           put TEXT on the clipboard (to test pasting, e.g. a brush code)
 //   expect_clipboard TEXT    the clipboard contains TEXT (after a copy)
-//   click_subtool NAME [U V [N]] left-click SubTool NAME in the viewport (with the held modifiers, e.g.
+//   click_part NAME [U V [N]] left-click Part NAME in the viewport (with the held modifiers, e.g.
 //                            hold alt to select it); U V: fractions of its on-screen bounds; N clicks in a row
 //                            (3 = a triple-click)
 //   expect_value NAME OP N   triangles, vertices, layers, brushes, masked, hidden, groups, colored,
-//                            can_undo, dirty, splats, show_polygroups, show_mask, show_mesh, wireframe,
+//                            can_undo, dirty, splats, show_face groups, show_mask, show_mesh, wireframe,
 //                            flat_shading (the scene's: 1 Flat), gradient_background (1 Gradient, 0 Flat Colour),
-//                            background_r / background_g / background_b (the flat colour, 0-255), subtool_shading (0 Scene, 1 Smooth, 2 Flat),
-//                            custom_matcaps (MatCaps loaded from images), material_custom (1 when the view uses
-//                            one), matcap_files (images in the library's MatCaps folder),
+//                            background_r / background_g / background_b (the flat colour, 0-255), part_shading (0 Scene, 1 Smooth, 2 Flat),
+//                            custom_lit spheres (Lit Spheres loaded from images), material_custom (1 when the view uses
+//                            one), lit sphere_files (images in the library's Lit Spheres folder),
 //                            support_requests (times Support SculptForge was clicked; never opens a browser in tests),
 //                            whats_new_open, whats_new_cards, whats_new_tries (What's New and its Try it clicks),
 //                            whats_new_contents / whats_new_expanded (its guide chapter: contents entries, open sections),
 //                            custom_brush_active (a custom brush is the active one),
 //                            welcome_open (the first-run welcome shown), new_look_card_open (the one-time
 //                            "SculptForge has a new look" card),
-//                            subtools (count), subtool_thumbnails (SubTool panel thumbnails rendered), active_subtool (index, 0 = top), visible_subtools,
+//                            parts (count), part_thumbnails (Part panel thumbnails rendered), active_part (index, 0 = top), visible_parts,
 //                            extract_preview (1 while an Extract preview waits for Accept), open_edges (edges of
-//                            the active SubTool with one triangle: 0 = watertight),
-//                            edited_subtools (SubTools with undo history), user_brushes (brushes in the
+//                            the active Part with one triangle: 0 = watertight),
+//                            edited_parts (Parts with undo history), user_brushes (brushes in the
 //                            user library), library_files (.sfbrush files in it; UI tests get an empty
 //                            one in --ui-out/brush-library), ui_config (1 once Store Config wrote ui.json),
 //                            console_open, command_palette_open, customize, shelves_visible,
-//                            right_tray_open, left_tray_open, right_tray_shown (drawn), shell_narrow, offscreen_items (past the window edge), lightbox_open, guide_open, guide_hits (search results), shelves (1 shown), left_tray / right_tray (palettes in
+//                            right_tray_open, left_tray_open, right_tray_shown (drawn), shell_narrow, offscreen_items (past the window edge), Library_open, guide_open, guide_hits (search results), shelves (1 shown), left_tray / right_tray (palettes in
 //                            the tray, -1 when closed); OP is == != < <= > >=; N may be $NAME, $NAME*K,
 //                            $NAME+K or $NAME-K (see remember)
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
@@ -117,8 +117,8 @@
 //                            axis), camera_distance, camera_pan (target offset);
 //                            N may be $NAME or $NAME*K for a value kept by `remember`
 //                            paint_layers (paint layers above Base), active_paint_layer (-1 = Base),
-//                            paint_mean_r / paint_mean_g / paint_mean_b (mean displayed polypaint, sRGB 0-255)
-//                            uvs (1 when the SubTool has UVs), texture_size (0 = no texture), paint_texture (1 when
+//                            paint_mean_r / paint_mean_g / paint_mean_b (mean displayed vertex paint, sRGB 0-255)
+//                            uvs (1 when the Part has UVs), texture_size (0 = no texture), paint_texture (1 when
 //                            painting goes into the texture), texture_layers, active_texture_layer,
 //                            texture_painted (texels of the texture composite that aren't white),
 //                            texture_mean_r / texture_mean_g / texture_mean_b (mean composite, sRGB 0-255),
@@ -128,9 +128,9 @@
 //                            roughness differs from the default), shown_mean_r (mean red the viewport is sent),
 //                            layer_channel_<id> (1 when the active texture layer has channel <id> on, e.g. roughness)
 //                            auto_uv_running, qremesh_running (QRemesh working in the background),
-//                            qremesh_guides (guide curves on the active SubTool), qremesh_guide_loops (closed ones),
+//                            qremesh_guides (guide curves on the active Part), qremesh_guide_loops (closed ones),
 //                            guides_mode (1 while the QRemesh Guides brush is picked),
-//                            quads (quad pairs in the active SubTool), quad_percent (quads among its polygons)
+//                            quads (quad pairs in the active Part), quad_percent (quads among its polygons)
 //                            mask_shape (0 MaskPen, 1 MaskLasso, 2 MaskRect), hide_shape (1 SelectLasso, 2 SelectRect)
 //                            sdiv (the current subdivision level, 1 = base; 0 without levels), sdiv_levels (0 = none)
 //                            antialiasing (Preferences > Performance: 1, 2, 4, 8), view_samples (what the interactive
@@ -154,7 +154,7 @@
 //                            pressure curve: its points, its value at half pressure x100), brush_curves (brushes with
 //                            their own curve), dab_error_px (the last stroke's dab furthest from its cursor
 //                            position, projected back), dab_jitter / dab_jitter_raw (its depth wobble with / without
-//                            the pick filter, x1000 radii), dabs, pixel_density (2 on a HiDPI screen), input_style (0 ZBrush, 1 SculptForge, 2 Blender), turntable,
+//                            the pick filter, x1000 radii), dabs, pixel_density (2 on a HiDPI screen), input_style (0 classic, 1 SculptForge, 2 Blender), turntable,
 //                            camera_ortho, mask_brush (Blender's Mask brush on), shortcut_conflicts (keys two actions
 //                            claim), brush_type (BrushType
 //                            index, -1 for a custom brush or Paint), last_dab_x / last_dab_y (window pixels), paint_r
@@ -162,7 +162,7 @@
 //                            0 = none, in gizmo_drag's order from 1), gizmo_falloff, pivot_x / pivot_y / pivot_z,
 //                            center_x / center_y / center_z and size_x / size_y / size_z (active mesh bounds)
 //                            bake_running, baked_maps (maps in the last bake), bake_size, bake_files (files it wrote),
-//                            normal_map_preview (1 when the active SubTool shows its baked normal map)
+//                            normal_map_preview (1 when the active Part shows its baked normal map)
 //                            splat_training (1 while a splat trains), splat_previews (checkpoints shown), splat_train_step,
 //                            splat_train_stage (4 done, 5 failed, 6 cancelled), splat_train_psnr, splat_train_prompt
 //                            sculptable_running, sculptable_review, sculptable_landmarks (8 when placed),
@@ -173,7 +173,7 @@
 //                            phone_take_frames, phone_ar_version (AR models published), phone_ar_busy
 //                            brush_sort / alpha_sort / material_sort / library_sort (0 A-Z, 1 Recent, 2 Pack),
 //                            builtin_pack_brushes (built-in brush-pack brushes loaded), alpha_index (0 Round, -1 an image)
-//   (mesh values are the active SubTool's)
+//   (mesh values are the active Part's)
 //   snapshot                 remember the active mesh's vertices (for the moved* values)
 //   remember VALUE NAME      keep VALUE's current value as $NAME
 //   run_fails COMMAND ...    run a command that must be refused (bad arguments)
@@ -189,7 +189,7 @@
 //                            script), in 64 KB chunks with one lost chunk resumed, then finish the capture
 //   phone_face NAME=W ... [frames=N]   N face messages (default 5) with these ARKit weights
 //   phone_request METHOD PATH STATUS [BODY]   any request with the session token; fails unless the answer has
-//                            STATUS (e.g. phone_request POST /api/ar 200 {"scope":"subtool","size":20})
+//                            STATUS (e.g. phone_request POST /api/ar 200 {"scope":"part","size":20})
 //                            (tools/guide/update_shortcuts.py puts it into docs/guide/shortcuts.md)
 //
 // Simulated graphics tablet: real SDL3 pen events, each followed by the mouse event SDL 3.2 synthesizes
@@ -214,7 +214,7 @@
 //                            a new id
 //   tablet_unplug            ... and unplugged
 //   pen_new                  the next pen has a new id, without a device event (Wacom Bridge, eraser on Wayland)
-//   click_subtool NAME U V 1 pen [S]   tap the Part with the pen tip instead (held S seconds)
+//   click_part NAME U V 1 pen [S]   tap the Part with the pen tip instead (held S seconds)
 //   sdl_pen_mouse on|stuck   SDL's mouse events for the pen: on (SDL 3.2's), stuck (none, as after SDL dropped a
 //                            touching pen on Windows, #95; the app makes its own)
 //   pen_lost                 SDL drops the pen while it touches (WM_POINTERCAPTURECHANGED): it leaves proximity
@@ -241,7 +241,7 @@
 //                            content scale changes, with SDL's event (Windows DPI, another monitor); logical_width W: the display scale that makes the window W logical px wide (#105)
 //   expect_value ui_scale (percent built now), font_height (default font, px), frame_height, panel_width (right
 //                            shelf, px), title_height
-//   expect_value look (0 Classic, 1 Forge Terminal, 2 Phosphor, 3 Blueprint), shell_layout (0 ZBrush-style, 1 SculptForge)
+//   expect_value look (0 Classic, 1 Forge Terminal, 2 Phosphor, 3 Blueprint), shell_layout (0 classic, 1 SculptForge)
 #include "app/App.h"
 #include "ai/Http.h"
 
@@ -253,7 +253,7 @@
 
 #include "core/BrushLibrary.h"
 #include "core/ListSort.h"
-#include "core/Matcap.h"
+#include "core/LitSphere.h"
 #include "core/Multires.h"
 #include "core/Script.h"
 #include "core/SelectionSets.h"
@@ -465,18 +465,18 @@ double Demo::query(const std::string& name, bool& known) const {
         return double(n);
     }
     if (name == "guides_mode") return app_.guidesMode_ ? 1.0 : 0.0;
-    if (name == "zspheres") return double(m.zspheres.size());
-    if (name == "zsphere_preview") return m.zspherePreview ? 1.0 : 0.0;
-    if (name == "zsphere_selected") return double(app_.zsphereSelection());
-    if (name == "zsphere_menu") return app_.zsMenuShown_ ? 1.0 : 0.0;
-    if (name == "zsphere_place_child") return app_.zspherePlaceChild_ ? 1.0 : 0.0;
-    if (name.rfind("zsphere_out", 0) == 0) { // zsphere_out2: how far sphere 2 is from its parent, in the parent's radii
-        const size_t i = size_t(std::atoi(name.c_str() + 11));
-        if (i == 0 || i >= m.zspheres.size()) return -1.0;
-        const ZSphere& p = m.zspheres[size_t(m.zspheres[i].parent)];
-        return double(glm::distance(m.zspheres[i].center, p.center) / p.radius);
+    if (name == "forgespheres") return double(m.forgespheres.size());
+    if (name == "forgesphere_preview") return m.forgespherePreview ? 1.0 : 0.0;
+    if (name == "forgesphere_selected") return double(app_.forgesphereSelection());
+    if (name == "forgesphere_menu") return app_.zsMenuShown_ ? 1.0 : 0.0;
+    if (name == "forgesphere_place_child") return app_.forgespherePlaceChild_ ? 1.0 : 0.0;
+    if (name.rfind("forgesphere_out", 0) == 0) { // forgesphere_out2: how far sphere 2 is from its parent, in the parent's radii
+        const size_t i = size_t(std::atoi(name.c_str() + 15));
+        if (i == 0 || i >= m.forgespheres.size()) return -1.0;
+        const ForgeSphere& p = m.forgespheres[size_t(m.forgespheres[i].parent)];
+        return double(glm::distance(m.forgespheres[i].center, p.center) / p.radius);
     }
-    if (name == "zsphere_root_x") return m.zspheres.empty() ? 0.0 : double(m.zspheres[0].center.x);
+    if (name == "forgesphere_root_x") return m.forgespheres.empty() ? 0.0 : double(m.forgespheres[0].center.x);
     if (name == "connected_only") return app_.uiPrefs_.connectedOnly ? 1.0 : 0.0;
     if (name == "view_falloff") return app_.uiPrefs_.viewFalloff ? 1.0 : 0.0;
     if (name == "smooth_remesh") return std::round(app_.doc_.sculptor.dyntopo.smoothRemesh * 100.0f);
@@ -484,10 +484,10 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "maya_zoom_horizontal") return app_.uiPrefs_.mayaZoomHorizontal ? 1.0 : 0.0;
     if (name == "along_normal") return double(app_.uiPrefs_.alongNormal);
     if (name == "stroke_along_normal") return app_.strokeAlongNormal_ ? 1.0 : 0.0;
-    if (name.rfind("zsphere_x", 0) == 0 || name.rfind("zsphere_r", 0) == 0) { // zsphere_x2, zsphere_r2: sphere 2's x / radius
-        const size_t i = size_t(std::atoi(name.c_str() + 9));
-        if (i >= m.zspheres.size()) return -1.0;
-        return name[8] == 'x' ? double(m.zspheres[i].center.x) : double(m.zspheres[i].radius);
+    if (name.rfind("forgesphere_x", 0) == 0 || name.rfind("forgesphere_r", 0) == 0) { // forgesphere_x2, forgesphere_r2: sphere 2's x / radius
+        const size_t i = size_t(std::atoi(name.c_str() + 13));
+        if (i >= m.forgespheres.size()) return -1.0;
+        return name[12] == 'x' ? double(m.forgespheres[i].center.x) : double(m.forgespheres[i].radius);
     }
     if (name == "quads") return double(m.quadCount());
     if (name == "quad_percent")
@@ -504,7 +504,7 @@ double Demo::query(const std::string& name, bool& known) const {
         const int k = name.back() == 'r' ? 0 : name.back() == 'g' ? 1 : 2;
         return sum[k] / double(px.size() / 4);
     }
-    // ZBrush feel (Input.cpp): the intensities and Focal Shift as shown (0-100, -100..100).
+    // classic feel (Input.cpp): the intensities and Focal Shift as shown (0-100, -100..100).
     if (name == "z_intensity") return std::round(app_.strength_ * 100.0f);
     if (name == "smooth_keep_volume") return app_.smoothKeepVolume_ ? 1.0 : 0.0;
     if (name == "smooth_group_borders") return app_.smoothGroupBorders_ ? 1.0 : 0.0;
@@ -550,7 +550,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "hover_rings") return double(ui::HoverRingsShown()); // hover and focus rings drawn last frame
     if (name == "hover_lifts") return double(ui::HoverLiftsShown()); // tiles lifted last frame
     if (name == "reduce_motion") return app_.uiPrefs_.reduceMotion ? 1.0 : 0.0;
-    if (name == "shell_layout") return double(app_.uiPrefs_.shellLayout); // 0 ZBrush-style, 1 SculptForge
+    if (name == "shell_layout") return double(app_.uiPrefs_.shellLayout); // 0 classic, 1 SculptForge
     if (name == "air_strokes") return app_.uiPrefs_.airStrokes ? 1.0 : 0.0;
     if (name == "emulate_3_button") return app_.uiPrefs_.emulate3Button ? 1.0 : 0.0; // Blender style (#77)
     if (name == "space_held") return app_.spaceHeld_ ? 1.0 : 0.0;
@@ -675,30 +675,30 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "can_undo") return app_.doc_.undo.canUndo() ? 1.0 : 0.0;
     if (name == "dirty") return app_.doc_.dirty() ? 1.0 : 0.0;
     if (name == "splats") return double(app_.doc_.splats.size());
-    if (name == "show_polygroups") return app_.renderSettings_.showPolygroups ? 1.0 : 0.0;
+    if (name == "show_facegroups") return app_.renderSettings_.showFaceGroups ? 1.0 : 0.0;
     if (name == "show_mask") return app_.renderSettings_.showMask ? 1.0 : 0.0;
     if (name == "show_mesh") return app_.renderSettings_.showMesh ? 1.0 : 0.0;
     if (name == "wireframe") return app_.renderSettings_.wireframe ? 1.0 : 0.0;
-    if (name == "custom_matcaps") {
+    if (name == "custom_litspheres") {
         int n = 0;
-        for (int i = builtinMatcapCount(); i < matcapCount(); ++i) n += isMatcapListed(i) ? 1 : 0;
+        for (int i = builtinLitSphereCount(); i < litsphereCount(); ++i) n += isLitSphereListed(i) ? 1 : 0;
         return double(n);
     }
-    if (name == "material_custom") return isCustomMatcap(app_.renderSettings_.matcap) ? 1.0 : 0.0;
-    if (name == "matcap_files") {
+    if (name == "material_custom") return isCustomLitSphere(app_.renderSettings_.litsphere) ? 1.0 : 0.0;
+    if (name == "litsphere_files") {
         int n = 0;
         std::error_code ec;
-        const std::string dir = app_.matcapFolder();
+        const std::string dir = app_.litsphereFolder();
         for (std::filesystem::directory_iterator it(std::filesystem::path(std::u8string(dir.begin(), dir.end())), ec), end;
              !dir.empty() && !ec && it != end; it.increment(ec))
-            n += isMatcapFile(it->path().string()) ? 1 : 0;
+            n += isLitSphereFile(it->path().string()) ? 1 : 0;
         return double(n);
     }
     if (name == "flat_shading") return app_.renderSettings_.flatShading ? 1.0 : 0.0;
     if (name == "gradient_background") return app_.renderSettings_.gradientBackground ? 1.0 : 0.0;
     if (name == "background_r" || name == "background_g" || name == "background_b") // 0-255, display values
         return std::round(app_.renderSettings_.backgroundColor[name.back() == 'r' ? 0 : name.back() == 'g' ? 1 : 2] * 255.0f);
-    if (name == "subtool_shading") return double(int(app_.doc_.activeSubtoolInfo().shading));
+    if (name == "part_shading") return double(int(app_.doc_.activePartInfo().shading));
     if (name == "shelves") return app_.layout_.shelvesVisible ? 1.0 : 0.0;
     if (name == "left_tray") return app_.layout_.leftTrayOpen ? double(app_.layout_.leftTray.size()) : -1.0;
     if (name == "right_tray") return app_.layout_.rightTrayOpen ? double(app_.layout_.rightTray.size()) : -1.0;
@@ -720,11 +720,11 @@ double Demo::query(const std::string& name, bool& known) const {
         for (const std::string& o : off) std::fprintf(stderr, "offscreen: %s\n", o.c_str());
         return double(off.size());
     }
-    if (name == "lightbox_open") return app_.lightbox_.open() ? 1.0 : 0.0;
+    if (name == "library_open") return app_.libraryBrowser_.open() ? 1.0 : 0.0;
     if (name == "guide_open") return app_.guide_.isOpen() ? 1.0 : 0.0;
     if (name == "guide_hits") return double(app_.guide_.searchHits());
     const Document& doc = app_.doc_;
-    if (name == "subtools") return double(doc.subtoolCount());
+    if (name == "parts") return double(doc.partCount());
     if (name == "discord_requests") return double(app_.discordRequests_); // Join the community on Discord clicks
     if (name == "support_requests") return double(app_.supportPageRequests_); // Support SculptForge clicks
     if (name == "ai_enabled") return ai::aiEnabled() ? 1.0 : 0.0; // Preferences > AI (PanelAi.cpp)
@@ -749,12 +749,12 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "custom_brush_active") return app_.doc_.activeBrush >= 0 && !app_.paintMode_ ? 1.0 : 0.0;
     if (name == "supporter") return app_.supportCardPrefs_.supporter ? 1.0 : 0.0;
     if (name == "support_card_enabled") return app_.supportCardPrefs_.enabled ? 1.0 : 0.0;
-    if (name == "subtool_thumbnails") { // SubTool panel thumbnails rendered (#43)
+    if (name == "part_thumbnails") { // Part panel thumbnails rendered (#43)
         double n = 0.0;
-        for (const auto& [id, tex] : app_.subtoolThumbs_) n += tex ? 1.0 : 0.0;
+        for (const auto& [id, tex] : app_.partThumbs_) n += tex ? 1.0 : 0.0;
         return n;
     }
-    if (name == "active_subtool") return double(doc.activeSubtool);
+    if (name == "active_part") return double(doc.activePart);
     if (name == "extract_preview") return doc.extractPreviewCurrent() ? 1.0 : 0.0;
     if (name == "open_edges") {
         std::map<std::pair<uint32_t, uint32_t>, int> edges;
@@ -762,12 +762,12 @@ double Demo::query(const std::string& name, bool& known) const {
             for (int k = 0; k < 3; ++k) ++edges[{std::min(t[k], t[(k + 1) % 3]), std::max(t[k], t[(k + 1) % 3])}];
         return double(std::count_if(edges.begin(), edges.end(), [](const auto& e) { return e.second == 1; }));
     }
-    if (name == "visible_subtools")
-        return double(std::count_if(doc.subtools.begin(), doc.subtools.end(), [](const SubTool& s) { return s.visible; }));
-    if (name == "edited_subtools") { // SubTools with undo history (the active one's lives in doc.undo)
+    if (name == "visible_parts")
+        return double(std::count_if(doc.parts.begin(), doc.parts.end(), [](const Part& s) { return s.visible; }));
+    if (name == "edited_parts") { // Parts with undo history (the active one's lives in doc.undo)
         int n = 0;
-        for (int i = 0; i < doc.subtoolCount(); ++i)
-            n += (i == doc.activeSubtool ? doc.undo.canUndo() : doc.subtools[size_t(i)].undo.canUndo()) ? 1 : 0;
+        for (int i = 0; i < doc.partCount(); ++i)
+            n += (i == doc.activePart ? doc.undo.canUndo() : doc.parts[size_t(i)].undo.canUndo()) ? 1 : 0;
         return double(n);
     }
     if (name == "user_brushes")
@@ -905,7 +905,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "camera_distance") return app_.camera_.distance;
     if (name == "camera_pan") return glm::length(app_.camera_.target);
     if (name == "groups") {
-        std::set<uint32_t> ids(m.polygroups.begin(), m.polygroups.end());
+        std::set<uint32_t> ids(m.facegroups.begin(), m.facegroups.end());
         return double(std::max<size_t>(ids.size(), m.triangleCount() ? 1 : 0));
     }
     known = false;
@@ -1168,21 +1168,21 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         stroke([at](float) { return *at; }, 0.2f);
         run([this] { SDL_SetModState(held_); });
         wait(0.1f);
-    } else if (verb == "click_subtool") {
+    } else if (verb == "click_part") {
         if (!need(1)) return false;
         const std::string name = w[1];
         const float u = num(2, 0.5f), v = num(3, 0.5f);
-        const int times = std::clamp(int(num(4, 1.0f)), 1, 3); // click_subtool NAME U V 3: a triple-click
+        const int times = std::clamp(int(num(4, 1.0f)), 1, 3); // click_part NAME U V 3: a triple-click
         const bool pen = w.back() == "pen" || (w.size() > 5 && w[5] == "pen"); // taps with the pen tip instead
         const float hold = pen && w.size() > 6 ? num(6, 0.0f) : 0.0f;        // ... held this long
         steps_.push_back([this, line, name, u, v, times, pen, hold](float t) {
-            const int index = app_.doc_.findSubtool(name);
+            const int index = app_.doc_.findPart(name);
             if (index < 0) {
                 fail(line, "no Part named \"" + name + "\"");
                 return true;
             }
-            // The point of its on-screen bounds nearest (U, V) where it's the front SubTool and no panel covers it.
-            const AABB b = app_.doc_.subtoolMesh(index).bounds();
+            // The point of its on-screen bounds nearest (U, V) where it's the front Part and no panel covers it.
+            const AABB b = app_.doc_.partMesh(index).bounds();
             ImVec2 lo(1e9f, 1e9f), hi(-1e9f, -1e9f);
             for (int i = 0; i < 8; ++i) {
                 const ImVec2 p = project(glm::vec3((i & 1) ? b.max.x : b.min.x, (i & 2) ? b.max.y : b.min.y,
@@ -1204,7 +1204,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
                 for (int gx = 0; gx <= kGrid; ++gx) {
                     const ImVec2 q(lo.x + (hi.x - lo.x) * float(gx) / kGrid, lo.y + (hi.y - lo.y) * float(gy) / kGrid);
                     const float d = (q.x - want.x) * (q.x - want.x) + (q.y - want.y) * (q.y - want.y);
-                    if (d >= best || covered(q) || app_.pickSubtool(q.x, q.y) != index) continue;
+                    if (d >= best || covered(q) || app_.pickPart(q.x, q.y) != index) continue;
                     p = q;
                     best = d;
                     found = true;
@@ -1553,7 +1553,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (!need(2)) return false;
         App::FileAction action;
         if (w[1] == "insert") action = App::FileAction::InsertMesh;
-        else if (w[1] == "append") action = App::FileAction::AppendSubtool;
+        else if (w[1] == "append") action = App::FileAction::AppendPart;
         else {
             error = "'choose_file' takes insert or append";
             return false;
@@ -1748,12 +1748,12 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         // quick_tour_offers: UI tests leave out the quick tour's one offer (it would sit over their clicks)
         run([this] { app_.quickTourOffersInTests_ = true; });
     } else if (verb == "input_style") {
-        // input_style zbrush|sculptforge|blender|maya: as Preferences > Input sets it (scripts written for one style)
+        // input_style classic|sculptforge|blender|maya: as Preferences > Input sets it (scripts written for one style)
         if (!need(1)) return false;
         const std::string n = w[1];
-        const int style = n == "zbrush" ? 0 : n == "sculptforge" ? 1 : n == "blender" ? 2 : n == "maya" ? 3 : -1;
+        const int style = n == "classic" ? 0 : n == "sculptforge" ? 1 : n == "blender" ? 2 : n == "maya" ? 3 : -1;
         if (style < 0) {
-            fail(line, "input_style takes zbrush, sculptforge, blender or maya"); // marks-pending
+            fail(line, "input_style takes classic, sculptforge, blender or maya");
             return false;
         }
         run([this, style] { app_.setInputStyle(style); });
@@ -1832,8 +1832,8 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     } else if (verb == "wait_idle") {
         const float timeout = num(1, 120.0f);
         // Idle for several frames in a row: work is often only requested by the frame after an input (a
-        // double-clicked LightBox folder is listed when the strip next draws), and a single idle frame in
-        // between let the test run on before it started (ui_lightbox failed that way under a loaded ctest -j).
+        // double-clicked Library folder is listed when the strip next draws), and a single idle frame in
+        // between let the test run on before it started (ui_Library failed that way under a loaded ctest -j).
         auto idleFrames = std::make_shared<int>(0);
         steps_.push_back([this, line, timeout, idleFrames](float t) {
             const bool idle = !app_.backgroundBusy(); // (the same list keeps the app's loop drawing, #14)

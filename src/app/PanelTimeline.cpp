@@ -325,7 +325,7 @@ void App::drawTimelineUi() {
         Timeline::historyDocument = &doc_;
     }
     if (proof_) drawProofUi();
-    // Keep a timeline on the active SubTool's history (each SubTool's travels with its undo stack).
+    // Keep a timeline on the active Part's history (each Part's travels with its undo stack).
     Timeline* t = Timeline::of(doc_.undo);
     if (!t && s.record) t = Timeline::attach(doc_).get();
     if (!t) return;
@@ -383,9 +383,9 @@ void App::drawTimelineUi() {
     const bool top = uiPrefs_.timelineTop;
     // The open Library takes the canvas's top (or bottom) edge: the strip moves off it, so it never covers the
     // Library's tabs and close button (#80, a 720p screen at 150%).
-    if (lightbox_.open()) {
-        const float lib = std::min(LightBox::height(layout_.lightboxRows, sc), c.h);
-        if (!layout_.lightboxBottom) c.y += lib;
+    if (libraryBrowser_.open()) {
+        const float lib = std::min(LibraryBrowser::height(layout_.libraryRows, sc), c.h);
+        if (!layout_.libraryBottom) c.y += lib;
         c.h -= lib;
     }
     timelineTopInset_ = 0.0f;

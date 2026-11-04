@@ -21,21 +21,20 @@ void readStrings(const Json& j, std::vector<std::string>& out) {
     out.clear();
     for (size_t i = 0; i < j.size(); ++i)
         if (j[i].isString() && !j[i].asString().empty()) {
-            const std::string_view now = legacy::renamed(legacy::kActionIds, j[i].asString());
-            out.push_back(now.empty() ? j[i].asString() : std::string(now));
+            out.push_back(legacy::modernize(j[i].asString()));
         }
 }
 
 } // namespace
 
 UiLayout standardLayout() {
-    // docs/ui-design.md §3: what a ZBrush user expects to find around the canvas.
+    // docs/ui-design.md §3: what a classic user expects to find around the canvas.
     UiLayout l;
     l.rightTray = {"tool"};
-    l.openSubpalettes = {"tool.subtool"};
-    l.topShelf = {"ui.lightbox",       "sep",           "tool.draw",            "tool.move",           "tool.scale",
+    l.openSubpalettes = {"tool.part"};
+    l.topShelf = {"ui.library",       "sep",           "tool.draw",            "tool.move",           "tool.scale",
                   "tool.rotate",       "sep",           "draw.sculpt",          "draw.paint",          "sep",
-                  "draw.zadd",         "draw.zsub",     "draw.rgb",             "draw.paint_vertex",   "draw.paint_texture",   "draw.new_texture",     "sep",                 "widget.draw_size",
+                  "draw.raise",         "draw.lower",     "draw.rgb",             "draw.paint_vertex",   "draw.paint_texture",   "draw.new_texture",     "sep",                 "widget.draw_size",
                   "widget.strength",   "row",           "ui.brush_lab",         "draw.front_faces",    "sep",
                   "draw.dynamic",      "widget.dyntopo_detail", "sep",
                   "transform.symmetry_x",   "transform.symmetry_y", "transform.symmetry_z",    "transform.symmetry_radial", "sep",                 "draw.pressure_strength",
@@ -44,8 +43,8 @@ UiLayout standardLayout() {
                    "widget.color"};
     l.rightShelf = {"edit.undo",  "edit.redo",       "sep",
                     "view.frame", "widget.nav.move", "widget.nav.zoom", "widget.nav.rotate", "sep",
-                    "view.polyf", "view.polygroups", "view.mask",       "view.polypaint",    "sep",
-                    "subtool.solo", "view.splats"};
+                    "view.polyf", "view.facegroups", "view.mask",       "view.vertexpaint",    "sep",
+                    "part.solo", "view.splats"};
     l.bottomShelf = {"brush.standard", "brush.clay",    "brush.clayblock", "brush.sharpcrease", "brush.move",
                      "brush.smooth",   "brush.inflate", "brush.pinch",       "brush.flatten",     "brush.crease",
                      "brush.trim",     "brush.tendril", "brush.layer",     "brush.nudge",       "brush.kelvingrab",
@@ -62,14 +61,14 @@ UiLayout standardLayout(int shellLayout) {
     // the menus (Sculpt > Draw) and the status bar.
     l.topShelf = {"draw.sculpt",          "draw.paint",           "sep",
                   "tool.draw",            "tool.move",            "tool.scale",           "tool.rotate",       "sep",
-                  "draw.zadd",            "draw.zsub",            "draw.rgb",             "draw.paint_vertex", "draw.paint_texture",
+                  "draw.raise",            "draw.lower",            "draw.rgb",             "draw.paint_vertex", "draw.paint_texture",
                   "draw.new_texture",     "sep",                  "widget.draw_size",     "widget.strength",   "sep",
                   "draw.dynamic",         "widget.dyntopo_detail", "sep",
                   "transform.symmetry_x", "transform.symmetry_y", "transform.symmetry_z", "transform.symmetry_radial"};
     l.rightShelf = {"edit.undo",  "edit.redo",       "sep",
                     "view.frame", "widget.nav.move", "widget.nav.zoom", "widget.nav.rotate", "sep",
-                    "view.polyf", "view.polygroups", "view.mask",       "view.polypaint",    "sep",
-                    "subtool.solo", "view.splats"};
+                    "view.polyf", "view.facegroups", "view.mask",       "view.vertexpaint",    "sep",
+                    "part.solo", "view.splats"};
     return l;
 }
 
@@ -92,10 +91,10 @@ Json toJson(const UiLayout& l) {
     j.set("bottomShelf", stringArray(l.bottomShelf));
     j.set("consoleOpen", l.consoleOpen);
     j.set("consoleHeight", double(l.consoleHeight));
-    j.set("lightboxOpen", l.lightboxOpen);
-    j.set("lightboxRows", double(l.lightboxRows));
-    j.set("lightboxTab", l.lightboxTab);
-    j.set("lightboxBottom", l.lightboxBottom);
+    j.set("libraryOpen", l.libraryOpen);
+    j.set("libraryRows", double(l.libraryRows));
+    j.set("libraryTab", l.libraryTab);
+    j.set("libraryBottom", l.libraryBottom);
     j.set("shelfTiles", double(l.shelfTiles));
     return j;
 }
@@ -141,10 +140,10 @@ bool fromJson(const Json& j, UiLayout& l, std::string& error, int shellLayout) {
     readStrings(j["bottomShelf"], out.bottomShelf);
     flag("consoleOpen", out.consoleOpen);
     number("consoleHeight", out.consoleHeight);
-    flag("lightboxOpen", out.lightboxOpen);
-    out.lightboxRows = int(j["lightboxRows"].asNumber(out.lightboxRows));
-    if (j["lightboxTab"].isString()) out.lightboxTab = j["lightboxTab"].asString();
-    flag("lightboxBottom", out.lightboxBottom);
+    flag("libraryOpen", out.libraryOpen);
+    out.libraryRows = int(j["libraryRows"].asNumber(out.libraryRows));
+    if (j["libraryTab"].isString()) out.libraryTab = j["libraryTab"].asString();
+    flag("libraryBottom", out.libraryBottom);
     out.shelfTiles = std::clamp(int(j["shelfTiles"].asNumber(out.shelfTiles)), 0, 2);
     l = std::move(out);
     return true;

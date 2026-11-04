@@ -866,9 +866,9 @@ void registerVdmCommands(CommandRegistry& registry) {
                   {{"resolution", T::Number, "Quads per side (16-1024). Default 256; divide it for finer detail.", false}},
                   [](Document& doc, const Args& a) -> CommandResult {
                       const int res = std::clamp(int(argNumber(a, "resolution", 256)), 16, 1024);
-                      for (auto& s : doc.subtools) s.visible = false;
-                      doc.addSubtool(makeVdmPlane(res), doc.uniqueSubtoolName("VDM Plane"));
-                      doc.activeSubtoolInfo().visible = true;
+                      for (auto& s : doc.parts) s.visible = false;
+                      doc.addPart(makeVdmPlane(res), doc.uniquePartName("VDM Plane"));
+                      doc.activePartInfo().visible = true;
                       doc.modified = true;
                       return {true, "VDM plane (" + std::to_string(res) + " x " + std::to_string(res) +
                                         "): sculpt it from the top, then Create VDM"};

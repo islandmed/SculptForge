@@ -79,8 +79,8 @@ TEST(close_holes_two_holes_in_a_sphere) {
     const double around = meanEdge(open, 0), patch = meanEdge(d.mesh, t0);
     CHECK(patch > 0.6 * around && patch < 1.5 * around);
     // Each patch is its own new face group.
-    CHECK(d.mesh.hasPolygroups());
-    CHECK(d.mesh.polygroupAt(0) == 0 && d.mesh.polygroupAt(uint32_t(d.mesh.triangleCount() - 1)) == 1);
+    CHECK(d.mesh.hasFaceGroups());
+    CHECK(d.mesh.facegroupAt(0) == 0 && d.mesh.facegroupAt(uint32_t(d.mesh.triangleCount() - 1)) == 1);
     // Undo brings the holes back; a second Close Holes finds none.
     CHECK(registry().execute(d, "undo").ok);
     CHECK(d.mesh.triangleCount() == t0);
@@ -127,7 +127,7 @@ TEST(close_holes_size_filter_and_attributes) {
     const size_t small = std::min(loops[0].size(), loops[1].size());
     open.ensureMask(0.5f);
     open.ensureColors(glm::vec3(0.2f, 0.4f, 0.6f));
-    open.ensurePolygroups(7);
+    open.ensureFaceGroups(7);
     open.uvs.assign(open.triangleCount() * 3, glm::vec2(0.25f));
     Document d = makeDoc(open);
     const CommandResult r = registry().execute(d, "close_holes", {{"max_edges", double(small)}});
@@ -136,8 +136,8 @@ TEST(close_holes_size_filter_and_attributes) {
     CHECK(boundaryLoops(d.mesh).size() == 1);
     const Mesh& m = d.mesh;
     CHECK(m.mask.size() == m.vertexCount() && m.colors.size() == m.vertexCount());
-    CHECK(m.polygroups.size() == m.triangleCount() && m.uvs.size() == m.triangleCount() * 3);
-    CHECK(m.polygroupAt(uint32_t(m.triangleCount() - 1)) == 8);
+    CHECK(m.facegroups.size() == m.triangleCount() && m.uvs.size() == m.triangleCount() * 3);
+    CHECK(m.facegroupAt(uint32_t(m.triangleCount() - 1)) == 8);
     CHECK(m.mask.back() == 0.0f);
     CHECK(glm::length(m.colors.back() - glm::vec3(0.2f, 0.4f, 0.6f)) < 1e-4f);
     // Forge Spheres and empty Parts are refused.

@@ -1,7 +1,7 @@
 # Radial menus on mouse buttons (#74): a plain press of the button opens the pie; with a modifier held the button
 # keeps its navigation (Alt+middle pans). A menu on the right button opens on a plain right-drag, while Alt+right
-# still zooms in the Maya style and Shift+right still turns the view in the ZBrush style.
-run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+# still zooms in the Maya style and Shift+right still turns the view in the classic.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=4
 
 # The middle button (sculpting.json): a plain press opens the pie, a right flick runs Inflate.
@@ -31,7 +31,7 @@ expect_value brush_type == 7
 expect_value camera_yaw >= $yaw0-0.0001
 expect_value camera_yaw <= $yaw0+0.0001
 
-# ZBrush style: Shift+right-drag still turns the view (the way to orbit while the right button opens the pie).
+# classic: Shift+right-drag still turns the view (the way to orbit while the right button opens the pie).
 hold shift
 button_drag right 0.5 0.5 0.62 0.5 0.3
 hold none
@@ -55,7 +55,7 @@ button_drag right 0.5 0.5 0.57 0.5 0.3
 expect_value radial_open == 0
 expect_value brush_type == 4
 
-# Back to the ZBrush style for later tests.
+# Back to the classic for later tests.
 click "Preferences##palette.preferences"
-click "Classic sculpting keys##input.style_zbrush"
+click "Classic sculpting keys##input.style_classic"
 key escape

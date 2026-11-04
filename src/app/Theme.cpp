@@ -13,7 +13,7 @@ namespace sf::theme {
 void applyStyle() {
     ImGui::StyleColorsDark();
     ImGuiStyle& s = ImGui::GetStyle();
-    s.WindowRounding = 0.0f; // shells; floating windows keep square corners too, like ZBrush
+    s.WindowRounding = 0.0f; // shells; floating windows keep square corners too, 
     s.ChildRounding = 0.0f;
     s.PopupRounding = 6.0f;
     s.FrameRounding = 3.0f;

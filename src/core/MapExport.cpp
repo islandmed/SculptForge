@@ -485,8 +485,8 @@ void registerMapExportCommands(CommandRegistry& reg) {
                  std::string err;
                  if (!findExportPreset(argString(a, "preset", "gltf"), preset, err)) return {false, err};
                  std::string name = argString(a, "name");
-                 if (name.empty() && doc.activeSubtool >= 0 && doc.activeSubtool < doc.subtoolCount())
-                     name = doc.subtools[size_t(doc.activeSubtool)].name;
+                 if (name.empty() && doc.activePart >= 0 && doc.activePart < doc.partCount())
+                     name = doc.parts[size_t(doc.activePart)].name;
                  if (name.empty()) name = "Sculpt";
                  std::vector<ExportedMap> written;
                  if (!exportMaps(*doc.mesh.texture, preset, folder, name, written, err)) return {false, err};

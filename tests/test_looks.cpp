@@ -140,14 +140,14 @@ TEST(looks_tiled_geometry_left_handed) {
 
 TEST(looks_standard_layouts) {
     const UiLayout zb = standardLayout(0), sf = standardLayout(1);
-    CHECK(zb.topShelf == standardLayout().topShelf); // the ZBrush-style layout is the old standard one
+    CHECK(zb.topShelf == standardLayout().topShelf); // the Classic layout is the old standard one
     CHECK(sf.topShelf != zb.topShelf);
     for (const std::string& id : sf.topShelf) CHECK(id != "row"); // one row
     CHECK(sf.bottomShelf == zb.bottomShelf);
 }
 
 TEST(looks_stored_layout_without_shelves) {
-    // A SculptForge-layout ui.json that stored no shelves gets the SculptForge layout's shelves, not the ZBrush-style ones.
+    // A SculptForge-layout ui.json that stored no shelves gets the SculptForge layout's shelves, not the classic ones.
     Json j = Json::object();
     j.set("version", 3.0);
     j.set("rightTrayOpen", false);
@@ -158,6 +158,6 @@ TEST(looks_stored_layout_without_shelves) {
     CHECK(!sf.rightTrayOpen);
     CHECK(fromJson(j, zb, err, 0));
     CHECK(zb.topShelf == standardLayout(0).topShelf);
-    CHECK(fromJson(j, zb, err)); // the ZBrush-style layout's when the layout isn't named
+    CHECK(fromJson(j, zb, err)); // the Classic layout's when the layout isn't named
     CHECK(zb.topShelf == standardLayout(0).topShelf);
 }

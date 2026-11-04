@@ -87,7 +87,7 @@ expect_value font_height >= 17.75
 expect_value font_height <= 19.75
 
 # Another look keeps the scale; the rebuilt fonts serve every window: the User Guide opens and draws at 125 %.
-run ui_look look=classic layout=zbrush
+run ui_look look=classic layout=classic
 expect_value ui_scale == 125
 expect_value font_height >= 17.75
 expect_value font_height <= 19.75

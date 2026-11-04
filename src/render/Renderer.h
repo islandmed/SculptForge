@@ -3,7 +3,7 @@
 #pragma once
 
 #include "core/EnvironmentMath.h"
-#include "core/Matcap.h"
+#include "core/LitSphere.h"
 #include "core/Mesh.h"
 #include "core/Splats.h"
 #include "core/UploadOrder.h"
@@ -26,21 +26,21 @@ class MicroRenderer;
 struct RenderSettings {
     bool wireframe = false;
     glm::vec3 baseColor{0.62f, 0.58f, 0.53f}; // Studio's colour: a warm clay grey, like the default Soft Clay
-    bool showPolypaint = true;   // vertex colours replace baseColor when the mesh has them
-    // The active colour tints the Lit Sphere material on meshes with no vertex paint (Color palette, as ZBrush's
+    bool showVertexPaint = true;   // vertex colours replace baseColor when the mesh has them
+    // The active colour tints the Lit Sphere material on meshes with no vertex paint (Color palette, as the classic
     // main colour does): materialTint multiplies the material there, white leaves it as it is (materialTintFor).
     bool colorTintsMaterial = true;
     glm::vec3 materialTint{1.0f};
-    bool showTexture = true;     // with showPolypaint: a SubTool's painted texture (core/Texture.h) multiplies in
-    bool showMask = true;        // masked areas render darker (ZBrush style)
-    bool showPolygroups = false; // colour each polygroup (see polygroupColor)
-    int matcap = defaultMatcap(); // built-in MatCap material (core/Matcap.h), Soft Clay; -1 = studio clay lighting
+    bool showTexture = true;     // with showVertex paint: a Part's painted texture (core/Texture.h) multiplies in
+    bool showMask = true;        // masked areas render darker
+    bool showFaceGroups = false; // colour each face group (see face groupColor)
+    int litsphere = defaultLitSphere(); // built-in Lit Sphere material (core/Lit Sphere.h), Soft Clay; -1 = studio clay lighting
     bool showMesh = true;
     bool showSplats = true;
     float splatOpacity = 1.0f; // global fade for using a capture as reference
-    bool dimInactive = true;   // SubTools other than the active one render slightly darker (ZBrush style)
+    bool dimInactive = true;   // Parts other than the active one render slightly darker
     bool motionProxy = false;  // the view is moving (Fast Navigation): draw big meshes' lighter proxy (render/Clusters.h)
-    bool flatShading = false;  // the scene's shading (Material palette): faceted; SubTools can override (core/Document.h)
+    bool flatShading = false;  // the scene's shading (Material palette): faceted; Parts can override (core/Document.h)
     // Backface culling (#68, Tool > Display): back faces are never drawn, on any mesh (closed or not, from any
     // view). Off: they are skipped only where they can't show (a closed mesh seen from outside, Renderer::cull).
     bool backfaceCulling = false;
@@ -55,7 +55,7 @@ struct RenderSettings {
     // of detail drops to fit; a hardware profile may set it), and the micro edge length to aim for on screen.
     size_t renderTriangleBudget = 0; // 0 = TierConfig::activeTriangleBudget (core/TierConfig.h)
     float microTargetPx = 2.0f;
-    // Viewport shading: Lit Sphere (the matcap or studio lights above) or PBR, which shades the material channels
+    // Viewport shading: Lit Sphere (the lit sphere or studio lights above) or PBR, which shades the material channels
     // (core/TextureChannels.h) with image-based lighting from an environment (core/EnvironmentMath.h): GGX
     // specular through a prefiltered environment and a BRDF table, diffuse from its SH9, exposure and a tone map.
     // Meshes without a PBR texture use pbrRoughness / pbrMetallic with their colour.
@@ -106,11 +106,11 @@ struct MeshOverlay {
     float checkerScale = 8.0f;    // checker squares per UV unit
 };
 
-// One mesh of the scene for Renderer::syncScene: a SubTool, keyed by its stable id.
+// One mesh of the scene for Renderer::syncScene: a Part, keyed by its stable id.
 struct SceneMesh {
     uint32_t id = 0;
     Mesh* mesh = nullptr;
-    bool active = false; // gets mask darkening, polygroup colours and wireframe; never dimmed
+    bool active = false; // gets mask darkening, face group colours and wireframe; never dimmed
     bool visible = true; // hidden meshes keep their GPU slot but aren't drawn (or uploaded)
     const NormalMapView* normalMap = nullptr; // shade with this normal map (needs the mesh's UVs)
     bool wireframe = false; // keep the wireframe's edges on the GPU (built on first need; draw() falls back to
@@ -127,17 +127,17 @@ struct RenderViewport {
     glm::vec3 surround{0.118f, 0.118f, 0.125f};
 };
 
-// Display colour of a polygroup id (linear RGB): a stable hash spread over
+// Display colour of a face group id (linear RGB): a stable hash spread over
 // pleasant hues. The mesh shader uses the same formula.
-glm::vec3 polygroupColor(uint32_t id);
+glm::vec3 facegroupColor(uint32_t id);
 
-// Draws every visible SubTool, each from its own GPU buffers (a slot keyed by
-// SubTool id), in clusters (core/UploadOrder.h) culled on the CPU every frame
+// Draws every visible Part, each from its own GPU buffers (a slot keyed by
+// Part id), in clusters (core/UploadOrder.h) culled on the CPU every frame
 // (render/Clusters.h) and drawn with one multi-draw. Mesh drawing honours the optional Mesh attributes: colours
-// (polypaint), mask (darkening), polygroups (group colours) and hidden
+// (vertex paint), mask (darkening), face groups (group colours) and hidden
 // triangles (not drawn). Mark changed vertices dirty for colour/mask edits and
-// set Mesh::facesDirty after changing `hidden` or `polygroups`. Only what a
-// mesh marks dirty is uploaded, so inactive SubTools upload once.
+// set Mesh::facesDirty after changing `hidden` or `face groups`. Only what a
+// mesh marks dirty is uploaded, so inactive Parts upload once.
 class Renderer {
 public:
     bool init(std::string& error);
@@ -146,7 +146,7 @@ public:
     // mesh marked dirty and clears its dirty state (a new slot uploads
     // everything), and frees the slots of ids no longer listed.
     void syncScene(const std::vector<SceneMesh>& scene);
-    // True when SubTool `id` didn't fit in GPU memory at its last full upload (it isn't drawn until it does).
+    // True when Part `id` didn't fit in GPU memory at its last full upload (it isn't drawn until it does).
     bool outOfMemory(uint32_t id) const;
     // Re-uploads the splats when `version` differs from the last upload.
     void syncSplats(const SplatCloud& splats, uint64_t version);
@@ -168,15 +168,15 @@ public:
     // PBR view: an environment's lighting is being built (the view shows the previous one meanwhile). `wake` is
     // called from the worker thread when it is ready (the app redraws then).
     bool environmentPending() const;
-    // The PBR planes SubTool `id` has on the GPU (pbrViewPlanes bits: 1 ORM, 2 normal, 4 emissive), for tests.
+    // The PBR planes Part `id` has on the GPU (pbrViewPlanes bits: 1 ORM, 2 normal, 4 emissive), for tests.
     uint32_t pbrPlanes(uint32_t id) const;
     void setEnvironmentWake(std::function<void()> wake) { envWake_ = std::move(wake); }
 
-    // GL texture of the painted texture of SubTool `id` as last synced (0 if none), for UI previews (rows bottom-up).
+    // GL texture of the painted texture of Part `id` as last synced (0 if none), for UI previews (rows bottom-up).
     GLuint paintTexture(uint32_t id) const;
 
     // --- Strokes on heavy meshes (app/AsyncStroke.cpp) ---
-    // The predictive stroke preview (render/Ghost.h) drawn on SubTool `id`; an empty stroke turns it off.
+    // The predictive stroke preview (render/Ghost.h) drawn on Part `id`; an empty stroke turns it off.
     void setGhost(uint32_t id, const GhostStroke& ghost);
     // A sculpt stroke's vertex upload made in two halves: prepareStrokeUpload packs what the mesh marked dirty
     // (positions and normals only) and the culling bounds of the clusters that moved, on any thread and without
@@ -217,7 +217,7 @@ public:
     // `curvature` (optional, by vertex): the cavity term of every vertex the mesh marked dirty, already worked
     // out (Sculptor::strokeCurvature).
     bool prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out, const float* curvature = nullptr);
-    // GL thread, before handing `up` to another thread: finds SubTool id's slot (slots come and go on the GL
+    // GL thread, before handing `up` to another thread: finds Part id's slot (slots come and go on the GL
     // thread, e.g. thumbnails; the other thread uses this one, which stays put in the list).
     void bindStrokeUpload(uint32_t id, StrokeUpload& up);
     void setPersistentUpload(bool on) { persistentUpload_ = on; } // Fast Upload (Preferences > Performance, experimental)
@@ -226,7 +226,7 @@ public:
     // packing finds anyway, without the normal cone, so they are never culled as facing away); at the stroke's
     // end this works out the exact ones (GL thread, the mesh no longer changing).
     void refineStrokeBounds(uint32_t id, const Mesh& mesh);
-    // A draft stroke on SubTool `id` (0: none): the clusters its uploads moved draw with per-pixel face normals
+    // A draft stroke on Part `id` (0: none): the clusters its uploads moved draw with per-pixel face normals
     // (theirs are stale) until refineStrokeBounds.
     void setDraftNormals(uint32_t id);
     // refineStrokeBounds on the solver thread at a stroke's end, after prepareStrokeUpload: the exact bounds go
@@ -240,21 +240,21 @@ public:
     // The last syncScene left motion proxies to build (a few milliseconds of them a frame; the rest draw in full).
     bool proxiesPending() const { return proxyPending_; }
 
-    // Texture of matcap `index` (sRGB RGBA8, rows bottom-up) for UI previews; 0 if none (or a custom one not
+    // Texture of lit sphere `index` (sRGB RGBA8, rows bottom-up) for UI previews; 0 if none (or a custom one not
     // uploaded yet: the next syncScene or draw does).
-    GLuint matcapTexture(int index) const;
+    GLuint litsphereTexture(int index) const;
 
-    // --- Thumbnails (LightBox / pickers) ---
+    // --- Thumbnails (Library / pickers) ---
     // Renders `mesh` alone (not the synced scene, which is left as it was) into a `size` x `size`
     // top-down RGBA8 image with a transparent background. Keeps the caller's framebuffer and viewport.
     bool renderMeshThumbnail(Mesh& mesh, const Camera& camera, int size, const RenderSettings& settings,
                              std::vector<uint8_t>& rgba, std::string& error);
-    // SubTool thumbnails (#43): SubTool `id` alone as last synced, from the GPU buffers it already has (nothing
+    // Part thumbnails (#43): Part `id` alone as last synced, from the GPU buffers it already has (nothing
     // uploaded, so it stays cheap on 30M+ meshes: those draw their motion proxy where built), framed from the
     // angle `yaw`, `pitch` (degrees) into a `size` x `size` top-down RGBA8 image with a transparent background.
-    // False when the SubTool has no drawn slot (hidden, not synced yet, out of GPU memory). Keeps the caller's
+    // False when the Part has no drawn slot (hidden, not synced yet, out of GPU memory). Keeps the caller's
     // framebuffer and viewport.
-    bool renderSubtoolThumbnail(uint32_t id, float yaw, float pitch, int size, const RenderSettings& settings,
+    bool renderPartThumbnail(uint32_t id, float yaw, float pitch, int size, const RenderSettings& settings,
                                 std::vector<uint8_t>& rgba, std::string& error);
 
 private:
@@ -290,7 +290,7 @@ private:
     int captureW_ = 0, captureH_ = 0;
     GLuint emptyVao_ = 0;
     bool thumbnailPass_ = false; // draw(): transparent background, no gradient (renderMeshThumbnail)
-    // The GPU copy of one mesh (one SubTool), in the cluster layout of `order`.
+    // The GPU copy of one mesh (one Part), in the cluster layout of `order`.
     struct MeshSlot {
         uint32_t id = 0;
         GLuint vao = 0, lineVao = 0;
@@ -298,7 +298,7 @@ private:
         GLuint indexBuffer = 0;  // 16-bit, relative to each cluster's first vertex; kClusterTriangles * 3 per cluster
         GLuint lineBuffer = 0;   // wireframe edges, 16-bit like the triangles, each edge once
         GLuint colorBuffer = 0, maskBuffer = 0; // RGBA8 (gamma encoded), R8
-        GLuint groupData = 0, groupTexture = 0; // polygroup id per drawn triangle (texture buffer, R16UI or R32UI)
+        GLuint groupData = 0, groupTexture = 0; // face group id per drawn triangle (texture buffer, R16UI or R32UI)
         GLuint primData = 0, primTexture = 0;   // per GPU block: the first drawn triangle of its cluster (R32UI)
         GLuint uvData = 0, uvTexture = 0; // per drawn triangle corner UVs (texture buffer), meshes with a texture
         GLuint paintTexture = 0;          // the painted texture (sRGB, mipmapped)
@@ -320,7 +320,7 @@ private:
         bool hasColors = false, hasMask = false, hasGroups = false, hasUvs = false;
         const MeshOverlay* overlay = nullptr; // this frame's (SceneMesh::overlay)
         uint64_t overlaySerial = 0;           // the one uploaded
-        bool overlayColors = false;           // the per-triangle data holds overlay colours, not polygroups
+        bool overlayColors = false;           // the per-triangle data holds overlay colours, not face groups
         bool fresh = true; // nothing uploaded yet
         bool regrid = false; // a stroke's vertex left the position grid (prepareStrokeUpload): the next sync re-sends everything
         bool outOfMemory = false; // the last full upload ran out of GPU memory: not drawn
@@ -362,7 +362,7 @@ private:
             uint32_t indices = 0, lines = 0; // drawn
             std::vector<uint32_t> verts;     // the mesh vertex of each local index
             std::vector<uint16_t> local;     // triangles (local indices), while stale
-            std::vector<uint32_t> groups;    // their polygroups, while stale
+            std::vector<uint32_t> groups;    // their face groups, while stale
             ClusterBounds bounds;
             bool stale = true;    // triangles changed: rebuild and upload everything
             bool uploaded = false;
@@ -436,9 +436,9 @@ private:
     // where it is built (proxyClusters_).
     void cull(const MeshSlot& s, const CullView& view, bool proxy = false);
     void drawSlot(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings);
-    enum class Part { Triangles, Lines, Proxy };
-    void drawPatches(const MeshSlot& s, GLenum mode, Part part, GLint primBaseLocation);
-    void drawClusters(const MeshSlot& s, const std::vector<uint32_t>& clusters, GLenum mode, Part part, GLint primBaseLocation);
+    enum class DrawPart { Triangles, Lines, Proxy };
+    void drawPatches(const MeshSlot& s, GLenum mode, DrawPart part, GLint primBaseLocation);
+    void drawClusters(const MeshSlot& s, const std::vector<uint32_t>& clusters, GLenum mode, DrawPart part, GLint primBaseLocation);
     std::vector<uint32_t> proxyClusters_;
     std::vector<GLsizei> drawCounts_;
     std::vector<const void*> drawOffsets_;
@@ -458,7 +458,7 @@ private:
     struct MeshProgram {
         GLuint id = 0;
         GLint view = -1, proj = -1, gridOrigin = -1, gridStep = -1, viewport = -1, projScale = -1, baseColor = -1, paint = -1,
-              showMask = -1, groups = -1, matcap = -1, matcapCavity = -1, dim = -1, primBase = -1, hasPaint = -1,
+              showMask = -1, groups = -1, litsphere = -1, litsphereCavity = -1, dim = -1, primBase = -1, hasPaint = -1,
               normalFlipY = -1, twoSided = -1, checker = -1, checkerScale = -1, tintShift = -1, lightRot = -1,
               lightLevels = -1, alpha = -1;
         GLint hasOrm = -1, hasEmissive = -1, hasMatNormal = -1, envLevels = -1, exposure = -1, toneMap = -1, material = -1,
@@ -483,11 +483,11 @@ private:
     std::vector<DrawItem> drawList_;      // visible meshes, in scene order
     std::vector<uint32_t> visibleGroups_; // scratch for uploadFaces
     std::vector<glm::vec2> visibleUvs_;   // scratch for uploadFaces
-    std::vector<GLuint> matcapTextures_; // one per matcap (core/Matcap.h): the built-ins, then custom ones
-    std::vector<uint64_t> matcapHashes_; // the custom matcap pixels each texture holds
-    uint64_t matcapRevision_ = 0;
-    void syncMatcaps(); // uploads custom matcaps added or changed since the last call (syncScene and draw call it)
-    static void uploadMatcap(GLuint texture, int size, const std::vector<uint8_t>& pixels);
+    std::vector<GLuint> litsphereTextures_; // one per lit sphere (core/Lit Sphere.h): the built-ins, then custom ones
+    std::vector<uint64_t> litsphereHashes_; // the custom lit sphere pixels each texture holds
+    uint64_t litsphereRevision_ = 0;
+    void syncLitSpheres(); // uploads custom lit spheres added or changed since the last call (syncScene and draw call it)
+    static void uploadLitSphere(GLuint texture, int size, const std::vector<uint8_t>& pixels);
 };
 
 } // namespace sf

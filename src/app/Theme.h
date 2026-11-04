@@ -33,7 +33,7 @@ inline ImVec4 toggleOff = rgb(0x2b2b2b);
 inline ImVec4 toggleOffHover = rgb(0x383838);
 inline ImVec4 toggleOn = rgb(0x4e4e4e);
 inline ImVec4 toggleOnHover = rgb(0x5a5a5a);
-// The unselected segments of a mode or choice group (Draw | Move | Scale | Rotate, Zadd | Zsub): a step above the
+// The unselected segments of a mode or choice group (Draw | Move | Scale | Rotate, Raise | Lower): a step above the
 // shelf, so the group reads as one control.
 inline ImVec4 trough = rgb(0x2e2e2e);
 inline ImVec4 selection = rgb(0x3c3c3c);  // selected list rows: a lighter neutral row, with a 2 px accent bar on the left

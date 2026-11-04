@@ -88,13 +88,13 @@ size_t residentBytes();
 size_t peakResidentBytes();
 size_t resetPeakResidentBytes();
 
-// What the scene holds in memory, summed over SubTools (Preferences > Performance, perf_info).
+// What the scene holds in memory, summed over Parts (Preferences > Performance, perf_info).
 struct MemoryUse {
     size_t mesh = 0;   // meshes with topology (Mesh::memoryBytes)
     size_t bvh = 0;    // acceleration structures
     size_t levels = 0; // subdivision level stacks (subdivBytes)
     size_t undo = 0;   // undo history (UndoStack::undoBytes)
-    size_t gpu = 0;    // vertex and index buffers the renderer keeps for the visible SubTools (an estimate)
+    size_t gpu = 0;    // vertex and index buffers the renderer keeps for the visible Parts (an estimate)
     size_t textures = 0; // painted textures (core/Texture.h): colour, layers, material channels (each texture once)
     size_t channels = 0; // of `textures`, every material channel tile alive (copies and undo steps too; TileImage::liveBytes)
     size_t paintCaches = 0; // texture painting caches of dense meshes (UV tile bins, texel maps), shared per UV layout

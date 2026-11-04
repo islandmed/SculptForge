@@ -43,7 +43,7 @@ namespace {
 constexpr const char* kPath = "UV Editor";
 constexpr int kSizes[] = {1024, 2048, 4096, 8192};
 constexpr const char* kSizeLabels[] = {"1K", "2K", "4K", "8K"};
-constexpr UvUnwrapMethod kMethods[] = {UvUnwrapMethod::Isometric, UvUnwrapMethod::Conformal, UvUnwrapMethod::Polygroups,
+constexpr UvUnwrapMethod kMethods[] = {UvUnwrapMethod::Isometric, UvUnwrapMethod::Conformal, UvUnwrapMethod::FaceGroups,
                                        UvUnwrapMethod::Planar,    UvUnwrapMethod::Unfold,    UvUnwrapMethod::Auto};
 constexpr const char* kColorLabels[] = {"Islands", "Stretch", "Density", "Plain"};
 constexpr const char* kImageLabels[] = {"No Image", "Checker", "Texture"};
@@ -104,7 +104,7 @@ struct UvEditorState {
     bool keepTexture = true; // paint stays on the model
     int sizeChoice = 1;      // texture size for density and margins without a texture
     // Caches of the active mesh's UVs, rebuilt when they change.
-    uint32_t subtool = ~0u;
+    uint32_t part = ~0u;
     uint64_t revision = ~uint64_t(0);
     const void* uvData = nullptr;
     size_t uvCount = 0, flagCount = 0;
@@ -166,7 +166,7 @@ struct UvEditorState {
         std::shared_ptr<std::atomic<bool>> cancel;
         std::shared_ptr<UvUnwrapResult> result;
         std::shared_ptr<std::string> error;
-        uint32_t subtool = 0;
+        uint32_t part = 0;
         size_t triangles = 0;
         UvUnwrapMethod method = UvUnwrapMethod::Isometric;
         bool keepTexture = true;
@@ -190,9 +190,9 @@ struct UvEditorUi {
 
     void refresh() {
         const Mesh& m = mesh();
-        const uint32_t id = app.doc_.activeSubtoolInfo().id;
+        const uint32_t id = app.doc_.activePartInfo().id;
         if (s.drag != UvEditorState::Drag::None) return; // (the drag keeps its own caches up to date)
-        if (id != s.subtool || app.doc_.undo.revision() != s.revision || m.uvs.data() != s.uvData || m.uvs.size() != s.uvCount ||
+        if (id != s.part || app.doc_.undo.revision() != s.revision || m.uvs.data() != s.uvData || m.uvs.size() != s.uvCount ||
             m.uvFlags.size() != s.flagCount)
             s.dirty = true;
         if (!s.dirty && !s.colorsDirty) return;
@@ -203,7 +203,7 @@ struct UvEditorUi {
 
     void rebuildTopology() {
         Mesh& m = mesh();
-        s.subtool = app.doc_.activeSubtoolInfo().id;
+        s.part = app.doc_.activePartInfo().id;
         s.revision = app.doc_.undo.revision();
         s.uvData = m.uvs.data();
         s.uvCount = m.uvs.size();
@@ -630,7 +630,7 @@ struct UvEditorUi {
         job->cancel = std::make_shared<std::atomic<bool>>(false);
         job->result = std::make_shared<UvUnwrapResult>();
         job->error = std::make_shared<std::string>();
-        job->subtool = app.doc_.activeSubtoolInfo().id;
+        job->part = app.doc_.activePartInfo().id;
         job->triangles = m.triangleCount();
         job->method = method;
         job->keepTexture = s.keepTexture;
@@ -639,7 +639,7 @@ struct UvEditorUi {
         copy->triangles = m.triangles;
         copy->uvs = m.uvs;
         copy->uvFlags = m.uvFlags;
-        copy->polygroups = m.polygroups;
+        copy->facegroups = m.facegroups;
         auto faces = std::make_shared<std::vector<uint8_t>>();
         const UvSelection& sel = app.doc_.uvSelection;
         if (sel.valid(m) && !sel.empty() && m.hasUvs()) {
@@ -689,9 +689,9 @@ struct UvEditorUi {
             return;
         }
         int index = -1;
-        for (int i = 0; i < app.doc_.subtoolCount(); ++i)
-            if (app.doc_.subtools[size_t(i)].id == job->subtool) index = i;
-        if (index < 0 || app.doc_.subtoolMesh(index).triangleCount() != job->triangles) {
+        for (int i = 0; i < app.doc_.partCount(); ++i)
+            if (app.doc_.parts[size_t(i)].id == job->part) index = i;
+        if (index < 0 || app.doc_.partMesh(index).triangleCount() != job->triangles) {
             app.status_ = "Unwrap skipped: the mesh changed while it was being unwrapped";
             return;
         }
@@ -708,7 +708,7 @@ struct UvEditorUi {
 
     const std::vector<uint32_t>& twins() {
         const Mesh& m = mesh();
-        const uint64_t key = (uint64_t(uintptr_t(m.triangles.data())) << 8) ^ m.triangles.size() ^ (uint64_t(app.doc_.activeSubtoolInfo().id) << 48);
+        const uint64_t key = (uint64_t(uintptr_t(m.triangles.data())) << 8) ^ m.triangles.size() ^ (uint64_t(app.doc_.activePartInfo().id) << 48);
         if (key != s.twinKey || s.twin.size() != m.triangleCount() * 3) {
             s.twin = cornerTwins(m);
             s.twinKey = key;
@@ -842,7 +842,7 @@ void App::registerUvEditorActions() {
         selected, "Mark the selected edges (or the border of the selected faces) as seams: Unwrap cuts there.", "uv_seam");
     add("uv.seam_clear", "Clear Seam", nullptr, "", [runUv] { runUv("uv_seam", {{"op", std::string("clear")}}); }, nullptr,
         selected, "Clear the seams on the selected edges (or the border of the selected faces).", "uv_seam");
-    add("uv.seam_polygroups", "Face Groups", nullptr, "", [runUv] { runUv("uv_seam", {{"op", std::string("polygroups")}}); },
+    add("uv.seam_facegroups", "Face Groups", nullptr, "", [runUv] { runUv("uv_seam", {{"op", std::string("facegroups")}}); },
         nullptr, nullptr, "Mark every face group border as a seam.", "uv_seam");
     add("uv.seam_islands", "Island Borders", nullptr, "", [runUv] { runUv("uv_seam", {{"op", std::string("islands")}}); }, nullptr,
         uvs, "Mark every current UV island border as a seam (keeps an imported layout's cuts for Unwrap).", "uv_seam");
@@ -938,9 +938,9 @@ void App::uvEditorChanged() {
     if (uvEditor_) uvEditor_->dirty = true;
 }
 
-const MeshOverlay* App::uvEditorOverlay(uint32_t subtool) {
-    if (!showUvEditor_ || !uvEditor_ || subtool != doc_.activeSubtoolInfo().id) return nullptr;
-    if (!uvEditor_->hasUvs || uvEditor_->subtool != subtool) return nullptr;
+const MeshOverlay* App::uvEditorOverlay(uint32_t part) {
+    if (!showUvEditor_ || !uvEditor_ || part != doc_.activePartInfo().id) return nullptr;
+    if (!uvEditor_->hasUvs || uvEditor_->part != part) return nullptr;
     return &uvEditor_->overlay;
 }
 
@@ -1110,7 +1110,7 @@ void App::drawUvEditor() {
     v.min = s.center - half;
     v.max = s.center + half;
     v.imageMode = s.image;
-    v.image = s.image == 2 && hasTexture(m) ? renderer_.paintTexture(doc_.activeSubtoolInfo().id) : 0;
+    v.image = s.image == 2 && hasTexture(m) ? renderer_.paintTexture(doc_.activePartInfo().id) : 0;
     v.imageOpacity = s.image == 2 ? 1.0f : s.imageOpacity;
     v.checkerScale = s.checkerScale;
     v.tiles = s.tiles;
@@ -1245,7 +1245,7 @@ void App::drawUvEditor() {
                      "By Face Groups: also cuts along the face group borders. Planar: each piece projected flat. Unfold Islands: "
                      "the current islands flattened again where they are, keeping pins. Auto Seams: finds its own seams.",
                      kPath);
-        if (kMethods[std::clamp(s.method, 0, 5)] == UvUnwrapMethod::Isometric || kMethods[s.method] == UvUnwrapMethod::Polygroups ||
+        if (kMethods[std::clamp(s.method, 0, 5)] == UvUnwrapMethod::Isometric || kMethods[s.method] == UvUnwrapMethod::FaceGroups ||
             kMethods[s.method] == UvUnwrapMethod::Unfold) {
             float it = float(s.iterations);
             ImGui::SetNextItemWidth(w);
@@ -1269,7 +1269,7 @@ void App::drawUvEditor() {
         ui::ActionButton(*this, "uv.seam_mark", ImVec2(halfW, 0));
         ImGui::SameLine();
         ui::ActionButton(*this, "uv.seam_clear", ImVec2(-1, 0));
-        ui::ActionButton(*this, "uv.seam_polygroups", ImVec2(halfW, 0));
+        ui::ActionButton(*this, "uv.seam_facegroups", ImVec2(halfW, 0));
         ImGui::SameLine();
         ui::ActionButton(*this, "uv.seam_islands", ImVec2(-1, 0));
         ImGui::SetNextItemWidth(halfW);
@@ -1500,7 +1500,7 @@ void App::uvToolRelease() {
 }
 
 void App::drawUvEditorOverlay() {
-    if (!showUvEditor_ || !uvEditor_ || !doc_.activeSubtoolInfo().visible) return;
+    if (!showUvEditor_ || !uvEditor_ || !doc_.activePartInfo().visible) return;
     UvEditorState& s = *uvEditor_;
     const Mesh& m = doc_.mesh;
     const size_t nc = m.triangleCount() * 3;
@@ -1569,7 +1569,7 @@ double App::uvEditorTestValue(const std::string& name) {
     if (name == "uv_frame_ms") return uvEditor_ ? uvEditor_->frameMs : 0.0;
     if (name == "uv_tool") return uvEditor_ ? double(uvEditor_->tool) : 0.0;
     if (name == "uv_view_triangles") return uvEditor_ ? double(uvEditor_->gpu.triangles()) : 0.0;
-    if (name == "uv_overlay") return uvEditorOverlay(doc_.activeSubtoolInfo().id) && !uvEditor_->overlay.colors.empty() ? 1.0 : 0.0;
+    if (name == "uv_overlay") return uvEditorOverlay(doc_.activePartInfo().id) && !uvEditor_->overlay.colors.empty() ? 1.0 : 0.0;
     if (name == "uv_pins") {
         double n = 0;
         for (uint8_t f : m.uvFlags) n += (f & kUvPin) != 0;

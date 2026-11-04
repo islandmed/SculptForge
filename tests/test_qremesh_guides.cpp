@@ -1,9 +1,9 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// QRemesh Guides (ZBrush's ZRemesher Guides): a curve drawn round an "eye" on a sphere gets a closed edge loop
+// QRemesh Guides (QRemesh Guides): a curve drawn round an "eye" on a sphere gets a closed edge loop
 // along it, and the edges near the curve line up with its tangent much better than without the guide; drawing
-// (snapping, closing, mirroring), Delete Last / Clear, commands, SubTool swaps and project round trips.
+// (snapping, closing, mirroring), Delete Last / Clear, commands, Part swaps and project round trips.
 #include "TestHarness.h"
 
 #include "core/Commands.h"
@@ -173,18 +173,18 @@ GuideFit measureFit(const Mesh& m, glm::vec3 c, float angle) {
 }
 
 // SF_GUIDE_DEBUG=dir: saves `m` as dir/name.obj with the faces just outside each circle that have an edge on it
-// in polygroup 1 (a clean band when the loop is clean), for renders with --polygroups --wireframe.
+// in face group 1 (a clean band when the loop is clean), for renders with --face groups --wireframe.
 void debugDump(const char* name, const Mesh& m, std::vector<glm::vec3> eyes, float angle) {
     const char* dir = std::getenv("SF_GUIDE_DEBUG");
     if (!dir) return;
     Mesh copy = m;
-    copy.ensurePolygroups();
+    copy.ensureFaceGroups();
     const float edge = std::sqrt(4.0f * kPi / float(std::max<size_t>(m.quadCount(), 1)));
     for (uint32_t t = 0; t < copy.triangleCount(); ++t) {
         glm::uvec4 f;
         const uint32_t u = copy.quadPartnerAt(t);
         const int n = copy.exportFace(u == Mesh::kNoQuad ? t : std::min(t, u), f);
-        copy.polygroups[t] = 0;
+        copy.facegroups[t] = 0;
         for (const glm::vec3& eye : eyes) {
             const glm::vec3 c = glm::normalize(eye);
             int on = 0;
@@ -196,7 +196,7 @@ void debugDump(const char* name, const Mesh& m, std::vector<glm::vec3> eyes, flo
                 on += std::abs(std::acos(std::clamp(glm::dot(p, c), -1.0f, 1.0f)) - angle) < 0.2f * edge;
             }
             const bool outside = std::acos(std::clamp(glm::dot(glm::normalize(centre), c), -1.0f, 1.0f)) > angle;
-            if (on >= 2 && outside) copy.polygroups[t] = 1;
+            if (on >= 2 && outside) copy.facegroups[t] = 1;
         }
     }
     std::string err;
@@ -410,30 +410,30 @@ TEST(qremesh_guide_drawing_and_commands) {
     CHECK(!reg.execute(doc, "qremesh_guides_clear").ok);
 }
 
-TEST(qremesh_guide_command_subtools_and_projects) {
+TEST(qremesh_guide_command_parts_and_projects) {
     CommandRegistry reg;
     Document doc;
     reg.execute(doc, "new_sphere", {{"subdivisions", 5.0}});
     CHECK(reg.execute(doc, "qremesh_guide", {{"points", std::string("0.2,0,2 0.4,0.2,2 0.6,0,2 0.4,-0.2,2 0.2,0,2")},
                                              {"view", std::string("0,0,-1")}}).ok);
     const std::vector<QRemeshGuide> drawn = doc.qremeshGuides;
-    // Per SubTool: a new SubTool has none, going back brings them back.
-    CHECK(reg.execute(doc, "subtool_append", {{"type", std::string("cube")}}).ok);
-    CHECK(doc.subtoolCount() == 2 && doc.activeSubtool == 1);
+    // Per Part: a new Part has none, going back brings them back.
+    CHECK(reg.execute(doc, "part_append", {{"type", std::string("cube")}}).ok);
+    CHECK(doc.partCount() == 2 && doc.activePart == 1);
     CHECK(doc.qremeshGuides.empty());
-    doc.selectSubtool(0);
+    doc.selectPart(0);
     CHECK(doc.qremeshGuides.size() == drawn.size() && doc.qremeshGuides[0].points == drawn[0].points);
 
-    // Projects keep them, per SubTool, exactly.
+    // Projects keep them, per Part, exactly.
     const std::string path = (std::filesystem::temp_directory_path() / "sf_test_guides.sfproj").string();
     std::string err;
-    doc.selectSubtool(1);
-    CHECK(saveProject(path, doc, err)); // the guided SubTool inactive while saving
+    doc.selectPart(1);
+    CHECK(saveProject(path, doc, err)); // the guided Part inactive while saving
     Document loaded;
     CHECK(loadProject(path, loaded, err));
     std::filesystem::remove(path);
-    CHECK(loaded.activeSubtool == 1 && loaded.qremeshGuides.empty());
-    loaded.selectSubtool(0);
+    CHECK(loaded.activePart == 1 && loaded.qremeshGuides.empty());
+    loaded.selectPart(0);
     CHECK(loaded.qremeshGuides.size() == 1);
     CHECK(loaded.qremeshGuides[0].closed == drawn[0].closed && loaded.qremeshGuides[0].stroke == drawn[0].stroke);
     CHECK(loaded.qremeshGuides[0].points.size() == drawn[0].points.size());
@@ -448,13 +448,13 @@ TEST(qremesh_guide_command_subtools_and_projects) {
     CHECK(parsed.size() == 1 && parsed[0].closed && parsed[0].points.size() == 3);
 
     // The qremesh command follows them, keeps them for the original, and can ignore them.
-    doc.selectSubtool(0);
+    doc.selectPart(0);
     CommandResult r = reg.execute(doc, "qremesh", {{"target", 1500.0}, {"keep_original", true}});
     CHECK(r.ok);
     std::printf("  %s\n", r.message.c_str());
     CHECK(r.message.find("followed 1 guide") != std::string::npos);
     CHECK(doc.qremeshGuides.size() == 1);
-    CHECK(doc.subtools[size_t(doc.activeSubtool + 1)].qremeshGuides.size() == 1);
+    CHECK(doc.parts[size_t(doc.activePart + 1)].qremeshGuides.size() == 1);
     r = reg.execute(doc, "qremesh", {{"target", 1500.0}, {"guides", false}});
     CHECK(r.ok && r.message.find("guide") == std::string::npos);
     // Guides left behind by a move are ignored, with a note.

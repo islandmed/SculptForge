@@ -21,7 +21,7 @@ namespace sf {
 class CommandRegistry;
 
 struct Action {
-    std::string id;          // "geometry.subdivide", "ui.lightbox", "brush.clay", "view.wireframe"
+    std::string id;          // "geometry.subdivide", "ui.Library", "brush.clay", "view.wireframe"
     std::string label;       // "Subdivide"
     const char* icon = nullptr; // ICON_LC_* or nullptr
     std::string description; // Ctrl-hover help; defaults to the command's description
@@ -58,7 +58,7 @@ public:
     bool handleKey(SDL_Keycode key, SDL_Keymod mods);
     std::string shortcutText(std::string_view id) const; // effective chord after user overrides
     void setShortcut(std::string_view id, std::string chord); // user override ("" clears)
-    // Changes an action's default chord (Preferences > Input switches between the ZBrush and SculptForge
+    // Changes an action's default chord (Preferences > Input switches between the classic and SculptForge
     // defaults); user overrides still win.
     void setDefaultShortcut(std::string_view id, std::string chord);
     Json overridesToJson() const;
@@ -67,7 +67,7 @@ public:
     const std::vector<std::string>& recent() const { return recent_; }
     void setRecent(std::vector<std::string> ids) { recent_ = std::move(ids); }
 
-    // Like setShortcut, but takes CHORD away from any other action that has it (ZBrush reassigns
+    // Like setShortcut, but takes CHORD away from any other action that has it (reassigns
     // on conflict). Returns the label of the action that lost it, or "".
     // keepOthers: add CHORD to the action's chords instead of replacing them (an imported keymap's second key).
     std::string assignShortcut(std::string_view id, const std::string& chord, bool keepOthers = false);

@@ -33,8 +33,7 @@ constexpr ButtonName kButtons[int(RadialButton::Count)] = {
 // An id from a file: a string of sensible length the vocabulary knows, or "".
 std::string knownId(const Json& j, const std::function<bool(std::string_view)>& known) {
     if (!j.isString()) return {};
-    std::string s = j.asString();
-    if (const std::string_view now = legacy::renamed(legacy::kActionIds, s); !now.empty()) s = now;
+    std::string s = legacy::modernize(j.asString());
     if (s.empty() || s.size() > kRadialIdMax || !known || !known(s)) return {};
     return s;
 }

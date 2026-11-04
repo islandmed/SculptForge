@@ -39,7 +39,7 @@ struct PressureCurve {
 // What the eraser end or a side button does.
 enum class PenAction {
     None,
-    Invert,     // like holding Alt: brushes subtract (ZBrush Zsub), Alt+drag on the background pans
+    Invert,     // like holding Alt: brushes subtract (Lower), Alt+drag on the background pans
     Smooth,     // like holding Shift: the Smooth brush
     RotateView, // hold the button and move the pen to orbit
     PanView,    // hold the button and move the pen to pan

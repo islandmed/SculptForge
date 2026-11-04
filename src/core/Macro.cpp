@@ -43,7 +43,7 @@ const std::set<std::string>& deniedCommands() {
     static const std::set<std::string> kDenied = {
         "brush_ai",       "brush_gallery_install", "brush_gallery_search", "comfyui_check",  "image_to_3d",
         "text_to_3d",     "splat_train",           "splat_train_cancel",   "blender_send",   "blender_receive",
-        "maya_send",      "maya_receive",          "goz_send",             "goz_receive",    "unreal_send",
+        "maya_send",      "maya_receive",          "bridge_send",             "bridge_receive",    "unreal_send",
         "unreal_editors", "blender_keymap_import", "macro_run",            "macro_list",     "macro_check",
         "pack_install",   "pack_remove",           "pack_enable",          "pack_disable",   "pack_list",
         "pack_create",    "calibrate"};
@@ -51,7 +51,7 @@ const std::set<std::string>& deniedCommands() {
 }
 // Parameters a macro may never set (network addresses, programs to start).
 bool deniedParam(const std::string& p) {
-    return p == "url" || p == "endpoint" || p == "gallery" || p == "zbrush" || p == "workflow" || p == "launch" ||
+    return p == "url" || p == "endpoint" || p == "gallery" || p == "classic" || p == "workflow" || p == "launch" ||
            p == "provider" || p == "service";
 }
 
@@ -295,11 +295,11 @@ std::string macroFileName(const std::string& name) {
 // ---------------------------------------------------------------------------
 
 MacroUndoGroup::MacroUndoGroup(const Document& doc)
-    : subtoolId_(doc.activeSubtoolInfo().id), subtools_(doc.subtoolCount()), undoCount_(doc.undo.undoCount()),
+    : partId_(doc.activePartInfo().id), parts_(doc.partCount()), undoCount_(doc.undo.undoCount()),
       revision_(doc.undo.revision()) {}
 
 bool MacroUndoGroup::end(Document& doc, const std::string& label) {
-    if (!enabled_ || doc.subtoolCount() != subtools_ || doc.activeSubtoolInfo().id != subtoolId_) return false;
+    if (!enabled_ || doc.partCount() != parts_ || doc.activePartInfo().id != partId_) return false;
     const size_t now = doc.undo.undoCount();
     if (now < undoCount_ + 2) return false; // nothing to fold
     const size_t k = now - undoCount_;
@@ -307,7 +307,7 @@ bool MacroUndoGroup::end(Document& doc, const std::string& label) {
     if (doc.mesh.multires || doc.mesh.micro) return false;
     for (size_t i = 0; i < k; ++i) {
         const UndoRecord* r = doc.undo.undoStep(i);
-        if (!r || r->subtool || r->subdiv || r->micro || r->texture || r->textureTiles) return false;
+        if (!r || r->part || r->subdiv || r->micro || r->texture || r->textureTiles) return false;
     }
     Mesh after = doc.mesh;
     for (size_t i = 0; i < k; ++i)

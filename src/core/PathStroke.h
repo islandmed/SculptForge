@@ -3,7 +3,7 @@
 //
 // Headless strokes: applies a brush along a path of world-space points, the
 // way a cursor drag does in the viewport. Each dab lands where a ray along the
-// view direction through the path point meets the active SubTool, so a path
+// view direction through the path point meets the active Part, so a path
 // drawn in the camera's plane behaves like a screen-space stroke. Used by the
 // `stroke` command (scripts, AI agents, brush preview renders) and tests.
 #pragma once
@@ -37,7 +37,7 @@ bool parseVec3(const std::string& text, glm::vec3& out);
 // Samples the path at even `step` distance (curved through the points when `curve` is set).
 std::vector<glm::vec3> samplePath(const std::vector<glm::vec3>& points, bool curve, float step);
 
-// Strokes the active SubTool with `recipe` (when not null) or the built-in brush `type`,
+// Strokes the active Part with `recipe` (when not null) or the built-in brush `type`,
 // as one undoable step. Returns the number of dabs that hit the surface, or -1 on error.
 int strokePath(Document& doc, const BrushRecipe* recipe, BrushType type, const PathStroke& stroke, std::string& error);
 

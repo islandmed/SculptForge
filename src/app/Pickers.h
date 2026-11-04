@@ -1,9 +1,9 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// ZBrush-style pop-up pickers: brush grid (B; type letters to choose), stroke,
+// classic pop-up pickers: brush grid (B; type letters to choose), stroke,
 // alpha and material (M) grids, and the Draw Size / Strength sliders at the
-// cursor (S / I). Also the thumbnail tile every grid and the LightBox draw.
+// cursor (S / I). Also the thumbnail tile every grid and the Library draw.
 #pragma once
 
 #include <imgui.h>
@@ -35,7 +35,7 @@ void drawStrokeGrid(App& app, GridMode mode);
 // brush the brush. The Alpha picker shows them first while the VDM brush is the brush.
 void drawVdmGrid(App& app, GridMode mode);
 
-// One brush of the picker, the LightBox Brush tab and the shelves.
+// One brush of the picker, the Library Brush tab and the shelves.
 struct BrushItem {
     enum class Kind { Type, Paint, Recipe, File, Guides } kind = Kind::Type; // Guides: QRemesh Guides (PanelRetopo.cpp)
     int index = -1;   // BrushType (Type) or doc.brushes index (Recipe)
@@ -47,13 +47,13 @@ struct BrushItem {
     std::string id() const; // stable across frames: "type:Clay", "recipe:Dragon Scales", "file:<path>"
 };
 
-// Shared by the pickers, the LightBox and (through ui ids) the shelves; they read App internals.
+// Shared by the pickers, the Library and (through ui ids) the shelves; they read App internals.
 struct PickerUi {
     static std::vector<BrushItem> brushItems(App& app, bool libraryFiles);
     static bool isActive(const App& app, const BrushItem& item);
     static void select(App& app, const BrushItem& item);
     static ImTextureID thumbnail(App& app, const BrushItem& item);
-    // Opens a slider under the mouse (ZBrush S / U / I / O): Draw Size, Z Intensity (Smooth's own while Shift is
+    // Opens a slider under the mouse (S / U / I / O): Draw Size, Z Intensity (Smooth's own while Shift is
     // held or Smooth is the brush), RGB Intensity or Focal Shift.
     enum class Slider { DrawSize, ZIntensity, RgbIntensity, FocalShift };
     static void sizePopup(App& app, Slider which);

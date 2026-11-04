@@ -186,8 +186,8 @@ bool loadStarterMesh(const StarterMesh& mesh, Document& doc, int levels, std::st
         std::string name;
     };
     std::vector<Part> parts;
-    for (int i = 0; i < int(loaded.subtools.size()); ++i) {
-        Part p{std::move(loaded.subtoolMesh(i)), loaded.subtools[size_t(i)].name};
+    for (int i = 0; i < int(loaded.parts.size()); ++i) {
+        Part p{std::move(loaded.partMesh(i)), loaded.parts[size_t(i)].name};
         for (int l = 0; l < levels; ++l)
             if (!subdivDivide(p.mesh, true, error)) return false;
         parts.push_back(std::move(p));
@@ -198,8 +198,8 @@ bool loadStarterMesh(const StarterMesh& mesh, Document& doc, int levels, std::st
     }
     if (parts.size() == 1) parts[0].name = mesh.name; // a one-object OBJ named its Part after the file
     doc.setMesh(std::move(parts[0].mesh), parts[0].name);
-    for (size_t i = 1; i < parts.size(); ++i) doc.addSubtool(std::move(parts[i].mesh), parts[i].name, false);
-    doc.selectSubtool(0);
+    for (size_t i = 1; i < parts.size(); ++i) doc.addPart(std::move(parts[i].mesh), parts[i].name, false);
+    doc.selectPart(0);
     doc.path.clear();
     return true;
 }
@@ -221,7 +221,7 @@ void registerStarterMeshCommands(CommandRegistry& registry) {
                       std::string error;
                       if (!loadStarterMesh(*m, doc, int(argNumber(a, "levels", -1)), error)) return {false, error};
                       size_t vertices = 0;
-                      for (int i = 0; i < int(doc.subtools.size()); ++i) vertices += doc.subtoolMesh(i).vertexCount();
+                      for (int i = 0; i < int(doc.parts.size()); ++i) vertices += doc.partMesh(i).vertexCount();
                       const std::string levels = subdivLevelText(doc.mesh);
                       return {true, std::string("New ") + m->name + " (" + std::to_string(vertices) + " vertices" +
                                         (levels.empty() ? std::string() : ", " + levels) + ")"};

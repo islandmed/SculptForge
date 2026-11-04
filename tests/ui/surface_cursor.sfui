@@ -2,7 +2,7 @@
 # surface there (#88: not bent over each bump), at the brush's real size; off the model it is the flat screen ring.
 # Symmetry copies show as dots, not rings (#88). Preferences > Cursor: Cursor follows surface (on by default) and
 # Hide ring while stroking (off by default), kept by Store Config.
-run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_head
 camera 35 10
 key f

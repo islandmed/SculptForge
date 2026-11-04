@@ -30,8 +30,8 @@ shot offcentre-symmetry-polyf
 click "Wire##view.polyf"
 
 # A small separate piece beside it: not symmetric any more, so no mirroring; both pieces come out as quads.
-run subtool_append type=sphere size=0.12
-run subtool_merge_visible
+run part_append type=sphere size=0.12
+run part_merge_visible
 remember triangles merged_tris
 click "QRemesh/Quad Remesh"
 wait_idle 120

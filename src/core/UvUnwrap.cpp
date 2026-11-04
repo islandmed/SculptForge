@@ -43,7 +43,7 @@ const char* uvUnwrapMethodId(UvUnwrapMethod m) {
     case UvUnwrapMethod::Auto: return "auto";
     case UvUnwrapMethod::Conformal: return "conformal";
     case UvUnwrapMethod::Isometric: return "isometric";
-    case UvUnwrapMethod::Polygroups: return "polygroups";
+    case UvUnwrapMethod::FaceGroups: return "facegroups";
     case UvUnwrapMethod::Planar: return "planar";
     case UvUnwrapMethod::Unfold: return "unfold";
     }
@@ -55,7 +55,7 @@ const char* uvUnwrapMethodLabel(UvUnwrapMethod m) {
     case UvUnwrapMethod::Auto: return "Auto Seams";
     case UvUnwrapMethod::Conformal: return "Conformal (LSCM)";
     case UvUnwrapMethod::Isometric: return "Least Stretch";
-    case UvUnwrapMethod::Polygroups: return "By Face Groups";
+    case UvUnwrapMethod::FaceGroups: return "By Face Groups";
     case UvUnwrapMethod::Planar: return "Planar";
     case UvUnwrapMethod::Unfold: return "Unfold Islands";
     }
@@ -64,7 +64,7 @@ const char* uvUnwrapMethodLabel(UvUnwrapMethod m) {
 
 bool parseUvUnwrapMethod(const std::string& id, UvUnwrapMethod& m) {
     for (UvUnwrapMethod x : {UvUnwrapMethod::Auto, UvUnwrapMethod::Conformal, UvUnwrapMethod::Isometric,
-                             UvUnwrapMethod::Polygroups, UvUnwrapMethod::Planar, UvUnwrapMethod::Unfold})
+                             UvUnwrapMethod::FaceGroups, UvUnwrapMethod::Planar, UvUnwrapMethod::Unfold})
         if (id == uvUnwrapMethodId(x)) {
             m = x;
             return true;
@@ -72,7 +72,7 @@ bool parseUvUnwrapMethod(const std::string& id, UvUnwrapMethod& m) {
     if (id == "lscm" || id == "angle") return m = UvUnwrapMethod::Conformal, true;
     if (id == "arap" || id == "stretch" || id == "least_stretch") return m = UvUnwrapMethod::Isometric, true;
     if (id == "xatlas") return m = UvUnwrapMethod::Auto, true;
-    if (id == "face_groups" || id == "groups") return m = UvUnwrapMethod::Polygroups, true;
+    if (id == "face_groups" || id == "groups") return m = UvUnwrapMethod::FaceGroups, true;
     return false;
 }
 
@@ -741,7 +741,7 @@ bool uvUnwrap(const Mesh& m, const UvUnwrapOptions& o, UvUnwrapResult& result, s
         bool x = d == kNoCorner;
         if (!x && flags) x = (m.uvFlags[c] | m.uvFlags[d]) & kUvSeam;
         if (!x && useIslands) x = topo.border[c];
-        if (!x && o.method == UvUnwrapMethod::Polygroups) x = m.polygroupAt(c / 3) != m.polygroupAt(d / 3);
+        if (!x && o.method == UvUnwrapMethod::FaceGroups) x = m.facegroupAt(c / 3) != m.facegroupAt(d / 3);
         cut[c] = x;
     }
     // 2. Pieces, with extra cuts until every piece is a disk.

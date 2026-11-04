@@ -39,7 +39,7 @@ struct PackLimits {
     size_t nameBytes = 160;               // one file name, with its folder
 };
 
-enum class PackItemType { Brush, Alpha, Matcap, Material, Vdm, Keymap, PieMenu, Macro, Count };
+enum class PackItemType { Brush, Alpha, LitSphere, Material, Vdm, Keymap, PieMenu, Macro, Count };
 constexpr int kPackItemTypes = int(PackItemType::Count);
 const char* packItemTypeId(PackItemType t);              // "brush" (pack.json)
 const char* packItemFolder(PackItemType t);              // "brushes" (the folder inside the pack)

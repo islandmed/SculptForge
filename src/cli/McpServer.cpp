@@ -95,7 +95,7 @@ std::string handleMcpMessage(const CommandRegistry& registry, Document& doc, con
                    "SculptForge is a digital sculpting tool. One scene is kept for the whole session: start with "
                    "new_sphere, open (models, Gaussian-splat captures, USD) or image_to_3d, shape it with "
                    "subdivide/remesh/layers/decimate, then export_glb, export_usd, export_lods or splat_save. "
-                   "A scene can hold several Parts (separate meshes, see subtool_list): edits apply to the active " // marks-pending
+                   "A scene can hold several Parts (separate meshes, see part_list): edits apply to the active "
                    "one, exports write every visible one. "
                    "Use mesh_info and splat_info to check results. File paths are on the user's machine.");
         return reply(id, result).dump();

@@ -3,7 +3,7 @@
 #include "core/Masking.h"
 
 #include "core/Commands.h"
-#include "core/Polypaint.h"
+#include "core/VertexPaint.h"
 #include "core/ScreenSelect.h"
 #include "core/Sculpt.h"
 #include "core/ThreadPool.h"
@@ -240,13 +240,13 @@ bool maskByFacing(Mesh& mesh, const glm::vec3& direction, float angleDeg, float 
     });
 }
 
-bool maskByPolygroup(Mesh& mesh, uint32_t group, bool add) {
+bool maskByFaceGroup(Mesh& mesh, uint32_t group, bool add) {
     const uint32_t n = static_cast<uint32_t>(mesh.vertexCount());
     if (n == 0) return false;
     std::vector<uint8_t> inGroup(n, 0);
     bool found = false;
     for (uint32_t t = 0; t < mesh.triangleCount(); ++t) {
-        if (mesh.polygroupAt(t) != group || mesh.triangleHidden(t)) continue;
+        if (mesh.facegroupAt(t) != group || mesh.triangleHidden(t)) continue;
         const glm::uvec3& tri = mesh.triangles[t];
         inGroup[tri.x] = inGroup[tri.y] = inGroup[tri.z] = 1;
         found = true;
@@ -257,7 +257,7 @@ bool maskByPolygroup(Mesh& mesh, uint32_t group, bool add) {
     });
 }
 
-std::vector<uint8_t> borderVertices(const Mesh& mesh, bool polygroups) {
+std::vector<uint8_t> borderVertices(const Mesh& mesh, bool facegroups) {
     const uint32_t n = static_cast<uint32_t>(mesh.vertexCount());
     std::vector<uint8_t> border(n, 0);
     poolFor(n, [&](size_t b, size_t e) {
@@ -271,8 +271,8 @@ std::vector<uint8_t> borderVertices(const Mesh& mesh, bool polygroups) {
                 const glm::uvec3& tri = mesh.triangles[t];
                 for (int k = 0; k < 3; ++k)
                     if (tri[k] != v) corners.push_back(tri[k]);
-                if (!polygroups || mesh.triangleHidden(t)) continue;
-                const uint32_t g = mesh.polygroupAt(t);
+                if (!facegroups || mesh.triangleHidden(t)) continue;
+                const uint32_t g = mesh.facegroupAt(t);
                 if (seenGroup && g != group) mixed = true;
                 group = g;
                 seenGroup = true;
@@ -293,14 +293,14 @@ std::vector<uint8_t> borderVertices(const Mesh& mesh, bool polygroups) {
     return border;
 }
 
-bool maskBorder(Mesh& mesh, int rings, bool polygroups, bool soft, float strength, bool add, size_t* found) {
+bool maskBorder(Mesh& mesh, int rings, bool facegroups, bool soft, float strength, bool add, size_t* found) {
     const uint32_t n = static_cast<uint32_t>(mesh.vertexCount());
     if (found) *found = 0;
     if (n == 0) return false;
     rings = std::clamp(rings, 1, 20);
     strength = std::clamp(strength, 0.0f, 1.0f);
     // Ring index of each vertex from the border (0 = on it), out to rings - 1; -1 beyond.
-    const std::vector<uint8_t> border = borderVertices(mesh, polygroups);
+    const std::vector<uint8_t> border = borderVertices(mesh, facegroups);
     std::vector<int8_t> ring(n, -1);
     std::vector<uint32_t> frontier, next;
     for (uint32_t v = 0; v < n; ++v)
@@ -500,12 +500,12 @@ void registerMaskingCommands(CommandRegistry& registry) {
             return maskByFacing(m, d, float(argNumber(a, "angle", 60)), float(argNumber(a, "strength", 1.0)),
                                 argBool(a, "add", false));
         });
-    add("mask_by_polygroup", "Mask by Face Group",
+    add("mask_by_facegroup", "Mask by Face Group",
         "Mask the vertices of one face group (meshes without face groups are all group 0).",
         {{"group", T::Number, "Face Group id.", true},
          {"add", T::Bool, "Add to the current mask instead of replacing it. Default false.", false}},
         [](Mesh& m, const Args& a) {
-            return maskByPolygroup(m, uint32_t(std::max(0.0, argNumber(a, "group", 0))), argBool(a, "add", false));
+            return maskByFaceGroup(m, uint32_t(std::max(0.0, argNumber(a, "group", 0))), argBool(a, "add", false));
         });
 
     registry.add(
@@ -516,7 +516,7 @@ void registerMaskingCommands(CommandRegistry& registry) {
          {{"rings", T::Number, "Width of the mask in edge rings from the border (1-20; 1 = the border vertices only). "
                                "Default 1.",
            false},
-          {"polygroups", T::Bool, "Also mask face group borders. Default false.",
+          {"facegroups", T::Bool, "Also mask face group borders. Default false.",
            false},
           {"soft", T::Bool, "Fade the mask from the border towards the innermost ring. Default false.", false},
           {"strength", T::Number, "Mask value on the border (0-1). Default 1.", false},
@@ -524,14 +524,14 @@ void registerMaskingCommands(CommandRegistry& registry) {
          [](Document& doc, const Args& a) -> CommandResult {
              if (doc.mesh.vertexCount() == 0) return {false, "The mesh is empty"};
              const std::string label = "Mask Border";
-             const bool polygroups = argBool(a, "polygroups", false);
+             const bool facegroups = argBool(a, "facegroups", false);
              UndoRecord record = UndoRecord::captureMask(doc.mesh, label);
              size_t found = 0;
              const bool changed =
-                 maskBorder(doc.mesh, int(argNumber(a, "rings", 1)), polygroups, argBool(a, "soft", false),
+                 maskBorder(doc.mesh, int(argNumber(a, "rings", 1)), facegroups, argBool(a, "soft", false),
                             float(argNumber(a, "strength", 1.0)), argBool(a, "add", false), &found);
              if (found == 0)
-                 return {true, polygroups ? "No open edges or face group borders: the mesh is closed and one face group"
+                 return {true, facegroups ? "No open edges or face group borders: the mesh is closed and one face group"
                                           : "No open edges: the mesh is closed"};
              if (!changed) return {true, label + ": mask unchanged"};
              doc.undo.push(std::move(record));

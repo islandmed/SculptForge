@@ -136,7 +136,7 @@ TEST(adaptive_dabs_fused_batches_match_exact_strokes) {
     // Batches of 2-6 dabs placed in one pass (Sculptor::beginBatch), each picked on the surface as its batch began.
     const Mesh head = makeBenchHead(3'000'000);
     for (BrushType type : {BrushType::Clay, BrushType::Standard, BrushType::Flatten, BrushType::Pinch, BrushType::Crease,
-                           BrushType::DamStandard})
+                           BrushType::SharpCrease})
         for (int batch : {2, 6}) {
             std::vector<glm::vec3> centres;
             static const bool replay = std::getenv("SF_BOOST_REPLAY") != nullptr;
@@ -159,7 +159,7 @@ TEST(adaptive_dabs_fused_batches_match_exact_strokes) {
 TEST(adaptive_dabs_analytic_normals_match_finite_differences) {
     // PlaneKernel::offsetAndNormal against the moved surface's normal from offsets a hair apart, on a bumpy patch.
     for (BrushType type : {BrushType::Standard, BrushType::Clay, BrushType::Flatten, BrushType::Crease, BrushType::Pinch,
-                           BrushType::DamStandard, BrushType::Trim})
+                           BrushType::SharpCrease, BrushType::Trim})
         for (float focal : {0.0f, -0.6f, 0.5f})
             for (bool invert : {false, true}) {
                 PlaneKernel k;
@@ -207,7 +207,7 @@ TEST(adaptive_dabs_leave_small_brushes_alone) {
     // Small brushes, and the brushes that always take the exact path, come out bit for bit as before.
     const Mesh head = makeBenchHead(1'500'000);
     for (const auto& [type, radius, alpha] : {std::tuple{BrushType::Clay, 0.08f, false}, std::tuple{BrushType::Smooth, 0.8f, false},
-                                              std::tuple{BrushType::Nudge, 0.8f, false}, std::tuple{BrushType::Inflate, 0.8f, false}, std::tuple{BrushType::ClayBuildup, 0.8f, false}, std::tuple{BrushType::Standard, 0.8f, true}}) {
+                                              std::tuple{BrushType::Nudge, 0.8f, false}, std::tuple{BrushType::Inflate, 0.8f, false}, std::tuple{BrushType::ClayBlock, 0.8f, false}, std::tuple{BrushType::Standard, 0.8f, true}}) {
         const StrokeResult exact = strokeOn(head, type, radius, false, 8, alpha), fast = strokeOn(head, type, radius, true, 8, alpha);
         CHECK(exact.mesh.positions == fast.mesh.positions);
         CHECK(exact.mesh.normals == fast.mesh.normals);

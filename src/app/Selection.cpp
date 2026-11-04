@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Screen selections: the rectangle and lasso drags shared by visibility
-// (Ctrl+Shift, see PanelPolygroups.cpp) and masking (Ctrl with MaskLasso or
+// (Ctrl+Shift, see PanelFace groups.cpp) and masking (Ctrl with MaskLasso or
 // MaskRect, see PanelMasking.cpp). This file tracks and draws the shape; the
 // panels decide what a click or a finished drag does. The selection itself
 // runs as hide_rect / hide_lasso / mask_rect / mask_lasso commands with the
@@ -76,7 +76,7 @@ void App::selectionMouseUp() {
     if (isCutShape(selectShape_))
         cutMouseUp(); // PanelCut.cpp
     else if (selectTarget_ == SelectTarget::Hide)
-        polygroupMouseUp();
+        facegroupMouseUp();
     else
         maskSelectMouseUp();
     selectPath_.clear();

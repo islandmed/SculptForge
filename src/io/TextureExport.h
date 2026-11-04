@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Shared by the exporters that carry UVs and textures (OBJ, FBX, USD, glTF,
-// GoZ): faces with their per-corner UVs, and the texture of a SubTool
+// Bridge): faces with their per-corner UVs, and the texture of a Part
 // (core/Texture.h) as a PNG written beside the model file or embedded in it.
 //
 // External PNGs are named after the model file: "<stem>_color.png" for a

@@ -1,8 +1,8 @@
-# A right click on the canvas opens the QuickMenu under the cursor, as in ZBrush (#22): pressed and let go
+# A right click on the canvas opens the QuickMenu under the cursor (#22): pressed and let go
 # without moving more than a few pixels, beside the model or on it, and the view doesn't move. A right drag still
 # turns the view and opens nothing. A pen button set to Right click (the lower one, by default) does the same.
 # Preferences > Input > Right click opens the QuickMenu turns it off.
-run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=3
 camera 0 0
 remember camera_yaw y0

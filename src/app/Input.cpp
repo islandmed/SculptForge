@@ -3,7 +3,7 @@
 //
 // The Classic sculpting keys (docs/guide/quick-tour.md): the keys SculptForge lacked (U Intensity, I RGB
 // Intensity, O Focal Shift, Space QuickMenu, L LazyMouse, V switch colour, Ctrl+A / Ctrl+Shift+A / Ctrl+I /
-// Ctrl+H for the mask, Ctrl+W group masked), Preferences > Input with the ZBrush and SculptForge key styles,
+// Ctrl+H for the mask, Ctrl+W group masked), Preferences > Input with the classic and SculptForge key styles,
 // the QuickMenu itself and Shift-constrained straight strokes. The mouse gestures live with the rest of the
 // input in App.cpp (roll, Ctrl+click blur / sharpen in PanelMasking.cpp).
 //
@@ -17,7 +17,7 @@
 #include "app/Theme.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
-#include "core/Polygroups.h"
+#include "core/FaceGroups.h"
 
 #include <IconsLucide.h>
 
@@ -70,7 +70,7 @@ void App::registerInputActions() {
         actions_.add(std::move(a));
     };
 
-    // The sliders at the cursor (S is Draw Size, in LightBox.cpp).
+    // The sliders at the cursor (S is Draw Size, in Library.cpp).
     add("ui.strength_popup", "Intensity at cursor", ICON_LC_CIRCLE_DOT, "Draw", "U",
         "A Intensity slider under the cursor: drag it, or type a number (1-100) and press Enter. Hold Shift (or "
         "pick Smooth) to set Smooth's own Intensity.",
@@ -151,7 +151,7 @@ void App::registerInputActions() {
     add("color.switch", "Switch Color", ICON_LC_ARROW_LEFT_RIGHT, "Color", "V",
         "Swap the main and the secondary colour.", [this] { std::swap(doc_.paintColor, secondaryColor_); });
 
-    // Masking (ZBrush Tool > Masking keys).
+    // Masking (Tool > Masking keys).
     add("mask.all", "Mask All", ICON_LC_SQUARE, "Tool > Masking", "Ctrl+A", "Mask the whole visible Part.",
         [this] { runCommand("mask_all"); });
     add("mask.clear", "Clear Mask", ICON_LC_ERASER, "Tool > Masking", "Ctrl+Shift+A",
@@ -160,21 +160,21 @@ void App::registerInputActions() {
         "Mask what is unmasked and unmask what is masked (also: Ctrl+click the background).",
         [this] { runCommand("mask_invert"); });
     actions_.setDefaultShortcut("view.mask", "Ctrl+H"); // View Mask
-    add("polygroup.group_masked", "Group Masked", ICON_LC_SHAPES, "Tool > Face Groups", "Ctrl+W",
+    add("facegroup.group_masked", "Group Masked", ICON_LC_SHAPES, "Tool > Face Groups", "Ctrl+W",
         "Turn the masked part into a new face group and clear the mask. With nothing masked, "
         "everything visible becomes one group.",
         [this] { groupMasked(); });
-    add("polygroup.uv_groups", "Group by UVs", ICON_LC_GRID_2X2, "Tool > Face Groups", "",
+    add("facegroup.uv_groups", "Group by UVs", ICON_LC_GRID_2X2, "Tool > Face Groups", "",
         "One face group per UV island: triangles that touch without a UV seam share a group. "
         "Only the visible part is regrouped. Needs UVs (Tool > Texture Map > Auto UV makes some).",
         [this] {
-            runCommand("polygroup_uv");
-            if (lastCommandOk_) renderSettings_.showPolygroups = true;
+            runCommand("facegroup_uv");
+            if (lastCommandOk_) renderSettings_.showFaceGroups = true;
         });
     actions_.setDefaultShortcut("config.save", "Ctrl+Shift+Alt+I");
 
     // Preferences > Input: the key style.
-    add("input.style_zbrush", "Classic sculpting keys", nullptr, "Preferences > Input", "",
+    add("input.style_classic", "Classic sculpting keys", nullptr, "Preferences > Input", "",
         "The classic sculpting keys and gestures: I is RGB Intensity, 9 saves a snapshot, the number keys don't pick brushes, and "
         "Ctrl+drag on the background only clears the mask.",
         [this] { setInputStyle(0); }, [this] { return uiPrefs_.inputStyle == 0; });
@@ -333,7 +333,7 @@ void App::registerViewActions() {
     add("view.zoom_in", "Zoom in", "Numpad Plus", "Move the view closer.", [this] { camera_.zoom(1.0f); });
     add("view.zoom_out", "Zoom out", "Numpad Minus", "Move the view back.", [this] { camera_.zoom(-1.0f); });
     add("view.frame_selected", "Frame Part", "Numpad .", "Fit the active Part in the view (Blender: View Selected).",
-        [this] { frameActiveSubtool(); });
+        [this] { frameActivePart(); });
 }
 
 void App::setInputStyle(int style) {
@@ -345,9 +345,9 @@ void App::setInputStyle(int style) {
 }
 
 void App::applyInputStyle() {
-    const int style = std::clamp(uiPrefs_.inputStyle, 0, 3) == 3 ? 0 : std::clamp(uiPrefs_.inputStyle, 0, 2); // Maya keeps ZBrush keys
+    const int style = std::clamp(uiPrefs_.inputStyle, 0, 3) == 3 ? 0 : std::clamp(uiPrefs_.inputStyle, 0, 2); // Maya keeps the Classic sculpting keys
     const bool sf = style == 1;
-    // One row per action whose key depends on the style: ZBrush, SculptForge, Blender (Blender 4.2 - 5.x defaults).
+    // One row per action whose key depends on the style: classic, SculptForge, Blender (Blender 4.2 - 5.x defaults).
     struct Keys {
         const char* id;
         const char* keys[3];
@@ -379,7 +379,7 @@ void App::applyInputStyle() {
     static const std::pair<BrushType, const char*> kBlenderBrushes[] = {
         {BrushType::Standard, "V"}, {BrushType::Smooth, "S"},        {BrushType::Pinch, "P"},
         {BrushType::Inflate, "I"},  {BrushType::Move, "G"},          {BrushType::Flatten, "Shift+T"},
-        {BrushType::ClayBuildup, "C"}, {BrushType::Crease, "Shift+C"}, {BrushType::SnakeHook, "K"},
+        {BrushType::ClayBlock, "C"}, {BrushType::Crease, "Shift+C"}, {BrushType::SnakeHook, "K"},
     };
     for (int i = 0; i < int(BrushType::Count); ++i) {
         std::string key = sf && i < 10 ? (i < 9 ? std::to_string(i + 1) : "0") : "";
@@ -414,21 +414,21 @@ void App::viewOrbitStep(float yawDegrees, float pitchDegrees) {
     }
 }
 
-void App::frameActiveSubtool() {
+void App::frameActivePart() {
     const AABB b = doc_.mesh.bounds();
     if (b.valid()) camera_.frame(b);
     else camera_.frame(sceneBounds());
 }
 
 SDL_Keymod App::blenderMods(SDL_Keymod keyboard) const {
-    // What the sculpting code reads: Alt inverts, Ctrl masks, Shift smooths (the ZBrush meanings). Blender inverts
+    // What the sculpting code reads: Alt inverts, Ctrl masks, Shift smooths (the classic meanings). Blender inverts
     // with Ctrl and masks with the Mask brush, or (5.1+, #77) with Alt held: Alt+drag masks, Ctrl+Alt+drag unmasks.
     // With Emulate 3 Button Mouse, Alt is the emulated middle button and means nothing here.
     SDL_Keymod out = keyboard & SDL_KMOD_SHIFT;
     const bool ctrl = (keyboard & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) != 0;
     if ((keyboard & SDL_KMOD_ALT) && !uiPrefs_.emulate3Button) {
-        out = SDL_KMOD_LCTRL; // the mask brush, as ZBrush's Ctrl (not with Shift: that would hide)
-        if (ctrl) out = SDL_Keymod(out | SDL_KMOD_LALT); // ... unmasking, as ZBrush's Ctrl+Alt
+        out = SDL_KMOD_LCTRL; // the mask brush Ctrl (not with Shift: that would hide)
+        if (ctrl) out = SDL_Keymod(out | SDL_KMOD_LALT); // ... unmasking Ctrl+Alt
     } else if (maskBrushActive()) {
         if (!(keyboard & SDL_KMOD_SHIFT)) out |= SDL_KMOD_LCTRL; // Shift still smooths the surface
         if (ctrl) out |= SDL_KMOD_LALT;                          // Ctrl unmasks
@@ -461,10 +461,10 @@ void App::hideGroupUnderCursor(bool isolate) {
         if (isolate && doc_.mesh.hasHidden()) runCommand("show_all");
         return;
     }
-    const uint32_t group = doc_.mesh.polygroupAt(hit.triangle);
-    if (!isolate) runCommand("hide_polygroup", {{"group", double(group)}});
-    else if (polygroupIsolated(doc_.mesh, group)) runCommand("show_all");
-    else runCommand("isolate_polygroup", {{"group", double(group)}});
+    const uint32_t group = doc_.mesh.facegroupAt(hit.triangle);
+    if (!isolate) runCommand("hide_facegroup", {{"group", double(group)}});
+    else if (facegroupIsolated(doc_.mesh, group)) runCommand("show_all");
+    else runCommand("isolate_facegroup", {{"group", double(group)}});
 }
 
 bool App::importBlenderKeymap(const std::string& path) {
@@ -504,7 +504,7 @@ bool App::importBlenderKeymap(const std::string& path) {
 }
 
 void App::drawInputStyleRow(float width) {
-    ui::Segmented(*this, {"input.style_zbrush", "input.style_sculptforge", "input.style_blender", "input.style_maya"}, width);
+    ui::Segmented(*this, {"input.style_classic", "input.style_sculptforge", "input.style_blender", "input.style_maya"}, width);
 }
 
 void App::drawInputSection() {
@@ -623,16 +623,16 @@ void App::drawZIntensitySlider(const char* id) {
 
 void App::groupMasked() {
     if (anyMasked(doc_.mesh)) {
-        runCommand("polygroup_from_mask");
+        runCommand("facegroup_from_mask");
         if (lastCommandOk_) {
             const std::string message = status_;
             runCommand("mask_clear");
             status_ = message;
         }
     } else {
-        runCommand("polygroup_merge_visible");
+        runCommand("facegroup_merge_visible");
     }
-    if (lastCommandOk_) renderSettings_.showPolygroups = true; // like the panel's buttons: show the result
+    if (lastCommandOk_) renderSettings_.showFaceGroups = true; // like the panel's buttons: show the result
 }
 
 // ---------------------------------------------------------------------------
@@ -678,7 +678,7 @@ void App::openQuickMenu() {
 void App::rightClickRelease() {
     const bool click = rightClick_.pending;
     rightClick_.pending = false;
-    if (zsMenu_.armed) { // on a Forge Sphere: its menu instead (PanelZSpheres.cpp)
+    if (zsMenu_.armed) { // on a Forge Sphere: its menu instead (PanelForge Spheres.cpp)
         zsMenu_.armed = false;
         zsMenu_.open = click;
         return;
@@ -697,7 +697,7 @@ void App::quickMenuKeyUp() {
     if (!quickMenu_.keyHeld) return;
     quickMenu_.keyHeld = false;
     if (!quickMenu_.open) return;
-    // Held: let go to close, as in ZBrush, unless the pointer is on the menu (then it stays until it leaves).
+    // Held: let go to close, unless the pointer is on the menu (then it stays until it leaves).
     const bool tap = ImGui::GetTime() - quickMenu_.openedAt < kQuickMenuTapSeconds;
     ImGuiWindow* w = ImGui::FindWindowByName("Quick Menu##quickmenu");
     const bool over = w && ImGui::IsMouseHoveringRect(w->Pos, ImVec2(w->Pos.x + w->Size.x, w->Pos.y + w->Size.y), false);
@@ -754,7 +754,7 @@ void App::drawQuickMenu() {
         if (ui::SliderInside("##qm_rgb", &rgb, 1.0f, 100.0f, "RGB Intensity %.0f")) rgbIntensity_ = rgb / 100.0f;
         ui::HelpText("RGB Intensity", "I", "How strongly painting colours the surface.", "Quick Menu");
         ImGui::EndGroup();
-        ui::Segmented(*this, {"draw.zadd", "draw.zsub"}, 2 * tile + ImGui::GetStyle().ItemSpacing.x);
+        ui::Segmented(*this, {"draw.raise", "draw.lower"}, 2 * tile + ImGui::GetStyle().ItemSpacing.x);
         ImGui::SameLine();
         ui::Segmented(*this, {"draw.sculpt", "draw.paint"}, 2 * tile + ImGui::GetStyle().ItemSpacing.x);
         ImGui::SameLine();

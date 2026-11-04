@@ -1,8 +1,8 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The layout of the ZBrush-style shell (shelves, trays, LightBox, console): the
-// shared contract between the shell, LightBox and config code, and what Store
+// The layout of the classic shell (shelves, trays, Library, console): the
+// shared contract between the shell, Library and config code, and what Store
 // Config writes to ui.json.
 #pragma once
 
@@ -26,21 +26,21 @@ struct UiLayout {
     bool leftTrayOpen = false, rightTrayOpen = true;
     float leftTrayWidth = 300, rightTrayWidth = 300; // logical px
     std::vector<std::string> leftTray, rightTray;     // palette ids, top to bottom
-    std::vector<std::string> openSubpalettes;         // "tool.subtool", ...
+    std::vector<std::string> openSubpalettes;         // "tool.part", ...
     // Item ids: action ids, "widget.*", "sep", "row" (top shelf line break).
     std::vector<std::string> topShelf, leftShelf, rightShelf, bottomShelf;
     bool consoleOpen = false;
     float consoleHeight = 160;
-    bool lightboxOpen = false;
-    int lightboxRows = 1;
-    std::string lightboxTab = "project";
-    bool lightboxBottom = false;
+    bool libraryOpen = false;
+    int libraryRows = 1;
+    std::string libraryTab = "project";
+    bool libraryBottom = false;
     int shelfTiles = 1; // bottom shelf brush tiles: 0 small, 1 medium, 2 large (shell::bottomShelfSize)
     bool customize = false; // runtime only, never stored
 };
 
 UiLayout standardLayout(); // the built-in default
-UiLayout standardLayout(int shellLayout); // 0 the ZBrush-style layout (the same), 1 the SculptForge layout
+UiLayout standardLayout(int shellLayout); // 0 the Classic layout (the same), 1 the SculptForge layout
 Json toJson(const UiLayout& layout);
 // Unknown ids are dropped, not fatal; false only for unreadable JSON. What the file leaves out (a shelf it never
 // stored) comes from standardLayout(shellLayout): the SculptForge layout's shelves for a SculptForge-layout file.

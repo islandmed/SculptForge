@@ -31,7 +31,7 @@ bool loadDotSplat(const std::string& path, SplatCloud& splats, std::string& erro
 bool saveDotSplat(const std::string& path, const SplatCloud& splats, std::string& error);
 
 // Writes a mesh (binary little-endian: positions, normals and, when the mesh
-// has polypaint, uchar red/green/blue in sRGB; quads where Mesh::quadPartners
+// has vertex paint, uchar red/green/blue in sRGB; quads where Mesh::quadPartners
 // keeps them, else triangles) that loadPly reads back.
 bool savePlyMesh(const std::string& path, const Mesh& mesh, std::string& error);
 

@@ -160,10 +160,10 @@ commands work on the whole Part.
 
 | Command | What it does |
 | --- | --- |
-| `uv_unwrap` | Unwrap: `method=isometric` (Least Stretch), `conformal`, `polygroups` (By Face Groups), `planar`, `unfold` or `auto`; `iterations=`, `selected=`, `tiles=`, `margin=`, `rotate=`, `density=`, `pack=false` (fit in place), `keep_texture=` |
+| `uv_unwrap` | Unwrap: `method=isometric` (Least Stretch), `conformal`, `facegroups` (By Face Groups), `planar`, `unfold` or `auto`; `iterations=`, `selected=`, `tiles=`, `margin=`, `rotate=`, `density=`, `pack=false` (fit in place), `keep_texture=` |
 | `uv_pack` | Pack: `margin=` (texels), `tiles=` (UDIM tiles), `first_tile=`, `rotate=`, `equal_density=`, `density=` (texels per unit, as many tiles as needed), `resolution=`, `keep_texture=` |
-| `uv_seam` | Seams: `op=mark` / `clear` (the selection), `path from= to=` (shortest edge path between two vertices; `clear=true`), `polygroups`, `islands`, `angle angle=60`, `clear_all` |
-| `uv_select` | `op=all`, `none`, `invert`, `island face=`, `face face=`, `polygroup group=`, `rect u0= v0= u1= v1=`, `seams`, `mode`; `mode=vertex/edge/face/island`, `add=true` |
+| `uv_seam` | Seams: `op=mark` / `clear` (the selection), `path from= to=` (shortest edge path between two vertices; `clear=true`), `facegroups`, `islands`, `angle angle=60`, `clear_all` |
+| `uv_select` | `op=all`, `none`, `invert`, `island face=`, `face face=`, `facegroup group=`, `rect u0= v0= u1= v1=`, `seams`, `mode`; `mode=vertex/edge/face/island`, `add=true` |
 | `uv_transform` | `move_u=`, `move_v=`, `rotate=` (degrees), `scale=`, `scale_u=`, `scale_v=` about the selection's centre |
 | `uv_edit` | `op=pin`, `unpin`, `clear_pins`, `weld`, `split`, `straighten`, `flip_u`, `flip_v` |
 | `uv_density` | `op=set value=`, `op=match` (`match=mean` or `first`), `op=info`; `resolution=` |

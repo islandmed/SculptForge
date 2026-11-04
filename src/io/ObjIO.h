@@ -12,12 +12,12 @@ namespace sf {
 
 // Paths are UTF-8. Polygons are fan-triangulated; quads are kept paired
 // (Mesh::quadPartners) and written back as quads. `vt` UVs are read into
-// Mesh::uvs and written back (normals are ignored); a SubTool with a texture
+// Mesh::uvs and written back (normals are ignored); a Part with a texture
 // (core/Texture.h) is written with <stem>.mtl and a PNG beside the file
 // (`map_Kd`, see io/TextureExport.h).
 // "v x y z r g b" vertex colours are read into Mesh::colors and written back.
-// `g` groups become polygroups (when an object uses two or more), as ZBrush
-// writes them; `o` starts a new object, as Blender and ZBrush write SubTools.
+// `g` groups become face groups (when an object uses two or more), as classic
+// writes them; `o` starts a new object, as Blender and classic write Parts.
 
 // Reads every object into one mesh.
 bool loadObj(const std::string& path, Mesh& out, std::string& error);
@@ -27,7 +27,7 @@ bool loadObj(const std::string& path, std::vector<MeshObject>& out, std::string&
 
 bool saveObj(const std::string& path, const Mesh& mesh, std::string& error);
 // Several objects are written as `o name` blocks; a single one as a plain mesh.
-// Polygroups (two or more) are written as `g` groups.
+// Face groups (two or more) are written as `g` groups.
 bool saveObj(const std::string& path, const std::vector<MeshObjectRef>& objects, std::string& error);
 
 } // namespace sf

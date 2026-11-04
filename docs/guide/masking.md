@@ -125,7 +125,7 @@ shape or **Mask by** button masks (0.01 to 1).
 |---|---|---|
 | **By cavity** | Concave areas: creases, folds, pores. | `mask_by_cavity` |
 | **By peaks** | Convex areas: ridges, peaks and sharp edges (the opposite of By cavity). | `mask_by_peaks` |
-| **By face group** | One face group (the number under **Mask by options**). | `mask_by_polygroup` |
+| **By face group** | One face group (the number under **Mask by options**). | `mask_by_facegroup` |
 | **By colour** | Vertex paint close to the main colour (the left shelf's swatch); unpainted clay counts as white. | `mask_by_color` |
 | **By facing** | Surface that faces the camera (or up, or down) within an angle: the front of a face, the top of a rock. | `mask_by_facing` |
 | **By border** | The open edges of the mesh and the rings of edges inside them, so sculpting keeps the border in place. A closed mesh has no open edges, and the status bar says so. | `mask_border` |
@@ -149,7 +149,7 @@ shape or **Mask by** button masks (0.01 to 1).
 | **Colour tolerance** | How different a colour may be and still count for By colour (0.01 to 1, default 0.15). | `tolerance=` |
 | **Faces the camera / up / down** and **Angle** | The direction By facing compares with, and how far the surface may turn from it (default 60 degrees). | `x= y= z= angle=` |
 | **Border rings** | How wide By border masks, in rings of edges (1 to 20, default 2). | `rings=` |
-| **Face Group borders** | By border also masks where face groups meet. | `polygroups=true` |
+| **Face Group borders** | By border also masks where face groups meet. | `facegroups=true` |
 | **Soft** | By border fades the mask from the border towards the innermost ring. | `soft=true` |
 
 Mask operations only change visible parts of the model; hidden parts keep their mask. **Clear** is the
@@ -218,8 +218,8 @@ you can mask an area and fill the rest with a colour. See [Vertex Paint and mate
 | `mask_clear`, `mask_all`, `mask_invert` | |
 | `mask_blur`, `mask_sharpen`, `mask_grow`, `mask_shrink` | `iterations` (1-100, default 1) |
 | `mask_by_cavity` | `strength` (0-1, default 1), `threshold` (-1 to 1, default 0.02) |
-| `mask_by_polygroup` | `group` (required), `add=true` to add to the current mask instead of replacing it |
-| `mask_border` | `rings` (1-20, default 1), `polygroups=true` to also mask face group borders, `soft=true` to fade inwards, `strength` (0-1, default 1), `add=true` to add to the current mask |
+| `mask_by_facegroup` | `group` (required), `add=true` to add to the current mask instead of replacing it |
+| `mask_border` | `rings` (1-20, default 1), `facegroups=true` to also mask face group borders, `soft=true` to fade inwards, `strength` (0-1, default 1), `add=true` to add to the current mask |
 | `mask_rect` | `x0 y0 x1 y1` (-1 to 1, y up), `unmask`, `strength` (0-1, default 1), optional `view_proj` matrix; without a view the rectangle spans the mesh seen from the front |
 | `mask_lasso` | `points` (required): the outline as `"x0 y0 x1 y1 ..."`, at least 3 points in the same -1 to 1 space; `unmask`, `strength`, `view_proj` as for `mask_rect` |
 

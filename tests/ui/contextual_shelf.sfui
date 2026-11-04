@@ -1,5 +1,5 @@
 # Contextual shelf buttons (docs/ui-design.md, "Contextual controls"): the top shelf's Vertex / Texture paint
-# target only shows when the SubTool has a texture to paint into, instead of sitting there greyed out.
+# target only shows when the Part has a texture to paint into, instead of sitting there greyed out.
 run new_sphere subdivisions=3
 expect_value texture_size == 0
 expect "Rgb##draw.rgb"
