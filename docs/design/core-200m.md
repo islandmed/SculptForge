@@ -244,9 +244,21 @@ per run, ms:
   (a new store per frame, GL 3.3) in a 3 + 3 interleaved A/B (floor, 75 %, load 1.29-1.99): p99 29.7-43.7 ms before
   against 24.7-37.9 ms after, draw p99 11.9-20.8 against 11.1-14.9 ms: a small shift inside the noise, not the cause,
   so it was not kept.
-- **Next:** GPU timer queries per frame (`GL_TIME_ELAPSED`, core in GL 3.3) to split the tail into GPU execution vs
-  waiting on the compositor / the other GPU users of this shared machine, with the governor pinned. Until then the
-  orbit p99 on the floor stays "not met" (12-44 ms across 36 floor orbits today).
+### GPU time vs frame time (governor pinned: `SF_GOVERNOR=0`, perf-moonshots eb2f2aac)
+
+Six floor runs interleaved 100 / 75 %, load 1.39-1.94; GPU time is the frame's own GL work (`GL_TIME_ELAPSED`,
+every frame had a result: gpu_frames = frames). Orbit, ms:
+
+| Moving resolution | drawn | frame p50 / p99 / max | GPU p50 / p99 / max | swap wait p99 | draw issue p99 |
+|---|---|---|---|---|---|
+| 100 % | 1.22M (fixed) | 10.7-13.1 / 30.8-37.9 / 49-83 | 7.2-8.2 / 12.6-15.7 / 32-44 | 15-28 | 11-17 |
+| 75 % | 1.44M (fixed) | 11.8-12.3 / 28.9-43.0 / 55-68 | 7.7-7.9 / 12.7-18.1 / 16-51 | 16-27 | 11-17 |
+
+**The tail is not our GPU work.** Our frames cost the GPU 8 ms (p50) and 13-18 ms (p99); the frame p99 is 29-43 ms.
+15-25 ms of the tail is outside our GL commands: presentation (the swap through the desktop compositor) and the
+driver blocking the draw calls on this shared Asahi desktop. That is this machine's stack, not the engine; the
+Windows PC (RTX 3060) run below shows the same scene on a desktop GPU and driver.
+
 
 What the floor simulation does not show: a real iGPU's fill rate (it doesn't slow the GPU) and 4-core open time
 (the open stayed 0.7 s; whether the first shading runs on the capped pool is not verified). Real UHD 620 / Iris Xe
