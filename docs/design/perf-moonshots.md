@@ -70,7 +70,29 @@ the start of an orbit), not the driver: a native backend would not fix these. At
 extra pass costs about 1 ms, and the worst frames are scene sync at the start of an orbit (upload p99 15-20 ms
 in every run). It stays env-only (`SF_MOTION_RESOLUTION`) until it helps somewhere: the 200M micro scene, where
 the per-pixel cost dominates (core-200m §8), is the case to test. The 20-50M orbit fix is building the motion
-proxy before the orbit starts. It simulates the budgets, not the GPU's fill
+proxy before the orbit starts.
+
+**Windows, real GPU** (RTX 3060, Ryzen 5600X, Win 11, GL 3.3 NVIDIA 616.56; this branch's CI package eb2f2aa;
+`bench/windows/rtx3060-eb2f2aa-*.json`). standard-15m, the three toggles off (3 runs) vs on (2 runs), interleaved:
+
+| 15M | frame p99 off / on | visible stroke behind the pointer p50 / p99, off / on |
+|---|---|---|
+| Clay 25 px | 15-16 / 7 ms | 5 / 65-79 px vs **0 / 4-5 px** |
+| Clay 60 px | 18-22 / 9-10 ms | 9 / 104-125 px vs **0 / 6 px** |
+| Clay 120 px | 22-32 / 23-30 ms | 144-160 / 250-323 px vs **0 / 15-18 px** |
+| Smooth | 19-21 / 9-10 ms | 10-11 / 111-141 px vs **0 / 6 px** |
+| 240 px brush | 31-39 / 35 ms | 389-496 / 639-824 px vs **0 / 27-28 px** |
+| Move | 5-8 / 5 ms (p50 4.4-4.8 / 3.6-3.7) | (no dabs) |
+| orbit | 4.4-4.6 / 4.5-5.7 ms | |
+
+With the toggles on the stroke you see stays under the pen (the preview's head, `preview_lag_px`) and small-brush
+frame p99 halves; the committed mesh finishes as before (its lag is the same or up to ~20% later: the solver does
+the same work, and the frame no longer waits for it). This is Background Preview's case for on-by-default after
+the beta's tester reports. GL draw stays 0.1-0.8 ms p50 even at 50M; the real-GPU and simulated-floor runs at
+5/20/50M (governor pinned) agree on strokes (240 px at 20M: 536 / 562 ms committed-surface lag p50) and differ only
+in orbit, where the floor's motion proxy from 3M makes 5-20M orbit cheaper (20M 1.1 vs 4.6 ms p50); the 50M orbit
+upload spike (27.5 ms p99) is in both. A 3060 can't simulate an iGPU's fill rate: the floor numbers here test the
+budgets, and a real iGPU run is still needed. It simulates the budgets, not the GPU's fill
 rate, so real iGPU runs by testers (Windows UHD 620 / Iris Xe first) confirm it.
 
 **Targets, floor profile** (laptop targets in brackets):
