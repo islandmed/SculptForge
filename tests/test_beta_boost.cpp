@@ -32,7 +32,7 @@ struct StrokeResult {
 
 // A stroke of `dabs` dabs across the face of `head` (0.15 radius apart, as the app spaces them), X symmetry.
 StrokeResult strokeOn(const Mesh& head, BrushType type, float radius, bool adaptive, int dabs = 16, bool alpha = false,
-                      bool mask = false, float strength = 0.3f, int batch = 0) {
+                      bool mask = false, float strength = 0.3f, int batch = 0, bool catchUp = false) {
     Document d = makeDoc(head);
     if (mask) { // a hard-edged mask over part of the stroke (such regions take the exact path)
         d.mesh.ensureMask();
@@ -52,6 +52,7 @@ StrokeResult strokeOn(const Mesh& head, BrushType type, float radius, bool adapt
     for (int i = 0; i < dabs; ++i) {
         if (batch > 0 && i % batch == 0) { // (the solver's batches: picked on the surface as each began)
             d.sculptor.endBatch(d.mesh, d.bvh);
+            if (catchUp) d.sculptor.catchUpBehind(d.mesh, d.bvh, 0.35); // (as the solver does after each batch)
             d.sculptor.beginBatch();
         }
         DabParams p;
@@ -201,6 +202,19 @@ TEST(adaptive_dabs_analytic_normals_match_finite_differences) {
                                 invert ? " inverted" : "", double(worst));
                 CHECK(worst < 1.0f); // (Trim: its min(1, ...) bends the slope)
             }
+}
+
+TEST(adaptive_dabs_catch_up_behind_ends_exact) {
+    // Catching up the exact normals behind the brush after each batch ends where flushing them all at the end does.
+    const Mesh head = makeBenchHead(3'000'000);
+    const StrokeResult once = strokeOn(head, BrushType::Clay, 0.8f, true, 18, false, false, 0.3f, 3, false);
+    const StrokeResult spread = strokeOn(head, BrushType::Clay, 0.8f, true, 18, false, false, 0.3f, 3, true);
+    // (The caught-up normals feed the later dabs' planes, which then move the surface by a hair differently.)
+    const Difference d = compare(head, once.mesh, spread.mesh);
+    std::printf("  spread catch-up vs one flush: within %.2g (%.3f%% of the move), normals mean %.4f deg; pen-up flush %.0f vs %.0f ms\n",
+                double(d.position), 100.0 * double(d.position / std::max(d.moved, 1e-9f)), d.meanDeg, spread.flushMs, once.flushMs);
+    CHECK(d.position <= 0.005f * d.moved);
+    CHECK(d.meanDeg < 0.05);
 }
 
 TEST(adaptive_dabs_leave_small_brushes_alone) {

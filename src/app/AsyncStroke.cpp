@@ -98,6 +98,9 @@ void App::StrokeSolver::loop() {
             app.doc_.sculptor.endBatch(app.doc_.mesh, app.doc_.bvh);
             // Nothing more waiting: the exact normals behind the brush catch up (a frame's share of them).
             if (catchUp && !finalize) app.doc_.sculptor.catchUpNormals(app.doc_.mesh, app.doc_.bvh, catchUpLeaves);
+            // A share of the exact normals the brush has left behind, every batch: lifting the pen then waits for
+            // the last stretch only (they cost a tenth of what the dab-by-dab normals did over the stroke).
+            else if (!finalize) app.doc_.sculptor.catchUpBehind(app.doc_.mesh, app.doc_.bvh, 0.35);
             spent += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
         }
         app.dabView_ = nullptr;
