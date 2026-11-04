@@ -10,6 +10,8 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
+# CI containers check the repository out as another user ("dubious ownership"); HOME changes below, so not --global.
+export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0='*'
 S=$(mktemp -d)
 trap 'rm -rf "$S"' EXIT
 fail() { echo "FAIL: $*" >&2; exit 1; }
@@ -44,6 +46,8 @@ echo '# expect_text "Version 0.11.0"' >> tests/ui/whats_new.sfui # words_ok want
 git add -A . && git commit -q -m "sandbox"
 git init -q --bare "$S/origin.git"
 git remote set-url origin "$S/origin.git"
+# One root commit with the whole tree: CI's shallow checkout can't be pushed to a fresh bare repository.
+git reset -q --soft "$(git commit-tree "HEAD^{tree}" -m sandbox)"
 git push -q origin main
 
 # Stand-ins: gh answers the few questions the tested steps ask; curl serves the sandbox's own site.

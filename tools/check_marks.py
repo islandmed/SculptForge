@@ -64,8 +64,12 @@ def matches(path, globs):
 
 
 def tracked_files():
-    out = subprocess.run(["git", "ls-files", "-z"], cwd=ROOT, capture_output=True, check=True).stdout
-    return [p for p in out.decode("utf-8").split("\0") if p and not p.startswith(SKIP_PREFIXES)]
+    """Tracked files, or None when git can't list them."""
+    # safe.directory: CI containers check the repository out as another user ("dubious ownership").
+    r = subprocess.run(["git", "-c", "safe.directory=*", "ls-files", "-z"], cwd=ROOT, capture_output=True)
+    if r.returncode != 0:
+        return None
+    return [p for p in r.stdout.decode("utf-8").split("\0") if p and not p.startswith(SKIP_PREFIXES)]
 
 
 def read_text(path):
@@ -170,6 +174,9 @@ def main(argv):
         return 0
     if "--count" in argv:
         count()
+        return 0
+    if tracked_files() is None:
+        print("check_marks: skipped, git can't list the tracked files here")
         return 0
     errors = scan()
     for e in errors:

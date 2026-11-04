@@ -252,7 +252,10 @@ TAG_UVS = 0x61A9
 TAG_MASK = 0x7532
 TAG_POLYPAINT = 0x88B9
 TAG_POLYGROUPS = 0x9C41
-from .bridge_protocol import EXT, HEADER, MAGIC, NAME_PREFIX
+try:
+    from .bridge_protocol import EXT, HEADER, MAGIC, NAME_PREFIX
+except ImportError:  # imported alone (tests/blender/test_exchange.py), not as the add-on package
+    from bridge_protocol import EXT, HEADER, MAGIC, NAME_PREFIX
 
 
 def goz_name(name):
