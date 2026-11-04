@@ -144,7 +144,7 @@ Every number twice: this laptop and the floor profile (`SF_HW_SIMULATE=floor`), 
 | Phase | What | Checkpoint (measurable) |
 |---|---|---|
 | **1** (this branch) | Memory-only 200M prototype on today's micro levels: `--benchmark core-200m` (off by default; writes the scene once, then opens it and orbits) | RSS, open time (project open, first frame, fully shaded), orbit p50 / p99, GPU MB: measured below |
-| 2 | Pixel-bounded GPU: per-patch resident levels (coarse grids + full where needed), shading on demand, visible first; lower view resolution while moving (phase 1's p99 is per-pixel GPU cost, §8) | GPU < 150 MB at 200M; open to fully shaded < 2 s; orbit p99 < 33 ms on the floor profile; picture equal to today's at rest (screenshot test) |
+| 2 | Pixel-bounded GPU: per-patch resident levels (coarse grids + full where needed), shading on demand, visible first; lower view resolution while moving (helps the median, §8); find the p99 tail with GPU timer queries | GPU < 150 MB at 200M; open to fully shaded < 2 s; orbit p99 < 33 ms on the floor profile; picture equal to today's at rest (screenshot test) |
 | 3 | Multiresolution offsets + dabs at the 64-256-sample level + lazy push-up + background catch-up | 300 px dab < 8 ms CPU on the laptop, < 16 ms floor; stroke latency < 16 ms; p99 frame while sculpting < 33 ms floor; same result as the fine-level brush within quantization (test) |
 | 4 | Focus Detail for 200M: compressed patches, visible-first open, project integration, sparse pool | open < 5 s floor (first frame < 1 s); file < 300 MB; RSS with colour < 1.2 GB |
 | 5 | COW undo on coarse edits; atomic dirty/stale bits; per-frame job graph | undo < 100 KB a typical stroke; 4-thread speed-up > 3x on dab kernels; no lock on the stroke path (TSan clean) |
@@ -214,15 +214,39 @@ Orbit frame split (main thread, ms p50 / p99; sculpt and upload are 0.0 / <= 0.1
 | laptop, 6 orbits | 0.0 / 0.1-1.8 | 0.5-1.0 / 1.7-3.3 | 1.2-2.2 / 6.3-14.6 | 6.0-8.7 / 13.7-28.8 |
 | floor, 6 orbits | 0.0 / 0.1-1.2 | 0.6-1.0 / 1.8-3.3 | 1.0-1.7 / 6.0-12.1 | 5.5-7.5 / 14.3-25.4 |
 
-**Cause of the p99 miss: the GPU, per pixel, not per triangle and not the CPU.** 70-80% of a frame and nearly all
-of its tail is the swap wait (the GPU finishing the frame); sculpt, upload and UI are negligible. The floor profile
-draws a quarter of the triangles (0.3M against 1.2M) yet its swap wait drops only from ~8.7 to ~6.5 ms p50 and its
-p99 barely moves, so the cost follows the pixels: a 3408x2136 framebuffer (7.3M pixels) where every fragment
-interpolates the full-resolution shading grid from a texture buffer. The tail (one frame in 50-100 at 2-4x the
-median) on top of that is GPU-side and varies run to run (18-41 ms), consistent with sharing the GPU with the
-desktop at load ~2; the draw-issue p99 (6-15 ms) is the driver stalling on the same GPU work. What fixes it is
-exactly the floor plan's pixel-side items: a lower view resolution while moving (perf-moonshots §0: 75%, not yet in
-the simulation) and the canvas cache (§7); fewer triangles alone does not.
+**Where the time goes:** 70-80% of an orbit frame is the swap wait (the GPU finishing the frame); sculpt, upload
+and UI are negligible. The floor draws a quarter of the triangles (0.3M against 1.2M) yet its swap wait drops only
+from ~8.7 to ~6.5 ms p50, so the *median* follows the pixels (3408x2136 = 7.3M, each sampling the full-resolution
+shading grid), not the triangles. The tail is a different matter (next section).
+
+### View resolution while moving (perf-moonshots a45b06bd, `SF_MOTION_RESOLUTION`), floor profile
+
+Nine floor runs interleaved 100 / 75 (the floor default) / 50 %, each at 1-minute load < 2 (1.60-1.97). Orbit, two
+per run, ms:
+
+| Moving resolution | frame p50 | frame p99 | p99 < 33 ms | worst frame | swap wait p50 / p99 | draw issue p50 / p99 | drawn p50 |
+|---|---|---|---|---|---|---|---|
+| 100 % | 7.9-11.8 | 15.3-31.7 | 6 of 6 | 27-73 | 6.3-8.2 / 13.2-21.0 | 0.4-2.1 / 3.7-10.7 | 0.3-1.2M |
+| 75 % (default) | 9.8-12.8 | 26.7-37.5 | 4 of 6 | 48-67 | 6.9-8.4 / 14.1-24.9 | 1.6-3.2 / 10.4-15.0 | 0.7-1.4M |
+| 50 % | 5.2-9.3 | 12.3-33.9 | 5 of 6 | 23-68 | 4.4-6.0 / 11.1-22.7 | 0.3-1.6 / 2.2-15.4 | 0.6M |
+
+- **Resolution moves the median, not the tail.** 50 % takes ~25 % off the swap wait p50 (6.6 → 5.3 ms), as a
+  per-pixel cost should; the p99 and the worst frames (50-70 ms in every setting) don't follow it. **Resolution
+  alone does not get 200M reliably under 33 ms p99**; between settings the spread from run to run is larger than the
+  effect.
+- **A confound: the governor.** Triangles drawn differ between runs of the same setting (0.3M or 1.2M at 100 %) because
+  the frame governor lowers the budget during some runs; 75 % happened to run at the larger budget (1.44M), which
+  explains part of why it looks worse than 100 %. Floor A/Bs need the governor pinned (a fixed budget) to compare.
+- **The tail follows draw-issue stalls.** In every orbit the frame p99 tracks the draw p99 (the main thread inside the
+  driver): orbits with draw p99 <= 4.5 ms have frame p99 12-18 ms; those with 10-15 ms have 23-38 ms.
+- **Tested and ruled out: the per-frame level upload.** The micro renderer rewrites its small per-cluster level buffer
+  (a `GL_STATIC_DRAW` texture buffer) every frame with `glBufferSubData`, a classic implicit-sync pattern. Orphaning it
+  (a new store per frame, GL 3.3) in a 3 + 3 interleaved A/B (floor, 75 %, load 1.29-1.99): p99 29.7-43.7 ms before
+  against 24.7-37.9 ms after, draw p99 11.9-20.8 against 11.1-14.9 ms: a small shift inside the noise, not the cause,
+  so it was not kept.
+- **Next:** GPU timer queries per frame (`GL_TIME_ELAPSED`, core in GL 3.3) to split the tail into GPU execution vs
+  waiting on the compositor / the other GPU users of this shared machine, with the governor pinned. Until then the
+  orbit p99 on the floor stays "not met" (12-44 ms across 36 floor orbits today).
 
 What the floor simulation does not show: a real iGPU's fill rate (it doesn't slow the GPU) and 4-core open time
 (the open stayed 0.7 s; whether the first shading runs on the capped pool is not verified). Real UHD 620 / Iris Xe
