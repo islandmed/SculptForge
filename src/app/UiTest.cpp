@@ -1715,7 +1715,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         const std::string n = w[1];
         const int style = n == "zbrush" ? 0 : n == "sculptforge" ? 1 : n == "blender" ? 2 : n == "maya" ? 3 : -1;
         if (style < 0) {
-            fail(line, "input_style takes zbrush, sculptforge, blender or maya");
+            fail(line, "input_style takes zbrush, sculptforge, blender or maya"); // marks-pending
             return false;
         }
         run([this, style] { app_.setInputStyle(style); });

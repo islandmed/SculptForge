@@ -250,8 +250,8 @@ jobs:
           cp "dist/sculptforge_bridge-$V.zip" dist/sculptforge_bridge.zip
       - name: Maya shelf script (Python source and its README; nothing to build)
         run: python3 -m zipfile -c dist/sculptforge_maya.zip integrations/maya/sculptforge_maya.py integrations/maya/README.md
-      - name: ZBrush ZTL Export plug-in (ZScript source; ZBrush compiles it)
-        run: cp integrations/zbrush/SculptForgeZToolExport.txt dist/
+      - name: Bridge export plug-in
+        run: cp integrations/bridge-plugin/SculptForgeBridgeExport.txt dist/
       - name: Checksums
         run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
       - name: Release notes from CHANGELOG

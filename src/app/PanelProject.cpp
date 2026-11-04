@@ -68,7 +68,7 @@ void readBool(const Json& j, const char* key, bool& v) { v = j[key].asBool(v); }
 std::string matcapAttachmentName(const std::string& name) {
     std::string safe;
     for (unsigned char c : name) safe += std::isalnum(c) || c == ' ' || c == '_' || c == '-' || c >= 0x80 ? char(c) : '_';
-    return "matcaps/" + (safe.empty() ? std::string("MatCap") : safe) + ".png";
+    return "matcaps/" + (safe.empty() ? std::string("LitSphere") : safe) + ".png";
 }
 
 void SDLCALL onProjectChosen(void* userdata, const char* const* files, int) {

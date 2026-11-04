@@ -1,19 +1,19 @@
 # SubTools survive files: build a scene in the UI, save a project, reopen it, and round-trip GLB / OBJ.
 # Files are written to the working directory (the build folder under ctest).
 run new_sphere subdivisions=4
-click "SubTools/Append"
+click "Parts/Append"
 click "Cube"
-click "SubTools/Append"
+click "Parts/Append"
 click "Sphere"
 expect_value subtools == 3
-double_click "SubTools/Sphere 2"
+double_click "Parts/Sphere 2"
 type "##rename" Eye
 key enter
 expect_text Eye
-click "SubTools/Cube"
+click "Parts/Cube"
 stroke 0.4 0.4 0.6 0.6
 expect_value edited_subtools == 1
-click "SubTools/##eye Eye"
+click "Parts/##eye Eye"
 expect_value visible_subtools == 2
 shot before-save
 

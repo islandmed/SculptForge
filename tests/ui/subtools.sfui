@@ -1,18 +1,18 @@
 # SubTools: the panel, Alt+click in the viewport, sculpting and undo per SubTool,
 # visibility, rename, duplicate, delete, merge and split.
 run new_sphere subdivisions=4 ; subtool_rename to=Body
-expect "SubTools/Append"
+expect "Parts/Append"
 expect_value subtools == 1
-expect "SubTools/Body"
+expect "Parts/Body"
 shot one-subtool
 
 # Append from the panel's menu: each new SubTool becomes the active one.
-click "SubTools/Append"
+click "Parts/Append"
 click "Sphere"
 expect_status Appended Part Sphere
 expect_value subtools == 2
 expect_value active_subtool == 1
-click "SubTools/Append"
+click "Parts/Append"
 click "Cube"
 expect_value subtools == 3
 expect_value active_subtool == 2
@@ -20,10 +20,10 @@ key f
 shot appended
 
 # Click rows to select.
-click "SubTools/Body"
+click "Parts/Body"
 expect_value active_subtool == 0
 expect_status Active Part: Body
-click "SubTools/Sphere"
+click "Parts/Sphere"
 expect_value active_subtool == 1
 
 # Alt+click in the viewport selects another SubTool without sculpting anything.
@@ -66,11 +66,11 @@ hold none
 expect_value active_subtool == 0
 expect_value edited_subtools == 1
 shot sculpted
-click "SubTools/Cube"
+click "Parts/Cube"
 expect_value can_undo == 0
 key ctrl+z
 expect_value edited_subtools == 1
-click "SubTools/Body"
+click "Parts/Body"
 expect_value can_undo == 1
 key ctrl+z
 key ctrl+z
@@ -80,78 +80,78 @@ key ctrl+shift+z
 expect_value edited_subtools == 1
 
 # Eye toggles, Solo and Unhide all.
-click "SubTools/##eye Sphere"
+click "Parts/##eye Sphere"
 expect_value visible_subtools == 2
 expect_status Sphere hidden
 shot hidden
-click "SubTools/Solo"
+click "Parts/Solo"
 expect_value visible_subtools == 1
 expect_status Solo: Body
 shot solo
-click "SubTools/Solo"
+click "Parts/Solo"
 expect_value visible_subtools == 3
-click "SubTools/##eye Cube"
+click "Parts/##eye Cube"
 expect_value visible_subtools == 2
-click "SubTools/Unhide all"
+click "Parts/Unhide all"
 expect_value visible_subtools == 3
 
 # Rename: double-click the row and type.
-double_click "SubTools/Cube"
-type "SubTools/##rename" Helmet
+double_click "Parts/Cube"
+type "Parts/##rename" Helmet
 key enter
 expect_status Renamed to Helmet
-expect "SubTools/Helmet"
-expect_not "SubTools/Cube"
+expect "Parts/Helmet"
+expect_not "Parts/Cube"
 
 # Duplicate, then delete through the confirmation (Cancel first).
-click "SubTools/Helmet"
-click "SubTools/Duplicate"
+click "Parts/Helmet"
+click "Parts/Duplicate"
 expect_value subtools == 4
 expect_value active_subtool == 3
-expect "SubTools/Helmet copy"
-click "SubTools/Delete..."
+expect "Parts/Helmet copy"
+click "Parts/Delete..."
 expect_text This can't be undone
 shot confirm-delete
 click "Delete Part?/Cancel"
 expect_value subtools == 4
-click "SubTools/Delete..."
+click "Parts/Delete..."
 click "Delete Part?/Delete"
 expect_value subtools == 3
 expect_status Deleted Part Helmet copy
-expect_not "SubTools/Helmet copy"
+expect_not "Parts/Helmet copy"
 
 # Move the active SubTool up and down the list.
-click "SubTools/Sphere"
-click "SubTools/##up"
+click "Parts/Sphere"
+click "Parts/##up"
 expect_value active_subtool == 0
-click "SubTools/##down"
+click "Parts/##down"
 expect_value active_subtool == 1
 
 # Merge down keeps polygroups apart, so Split groups separates the pieces again.
-click "SubTools/Body"
-click "SubTools/Merge down..."
+click "Parts/Body"
+click "Parts/Merge down..."
 click "Merge Down?/Merge"
 expect_value subtools == 2
 expect_status Merged Sphere into Body
 expect_value can_undo == 0
-click "SubTools/Split groups"
+click "Parts/Split groups"
 expect_value subtools == 3
 expect_status Split into 2 Parts
 shot split-groups
-click "SubTools/Merge visible..."
+click "Parts/Merge visible..."
 click "Merge Visible?/Merge"
 expect_value subtools == 1
-expect "SubTools/Merged"
-click "SubTools/Split parts"
+expect "Parts/Merged"
+click "Parts/Split parts"
 expect_value subtools == 3
 expect_status Split into 3 Parts
 shot split-parts
 
 # The Tool palette's SubTool sub-palette closes and opens.
 click "Parts##tool.subtool"
-expect_not "SubTools/Append"
+expect_not "Parts/Append"
 click "Parts##tool.subtool"
-expect "SubTools/Append"
+expect "Parts/Append"
 
 # Wireframe, polygroup colours and the LOD preview are for the active SubTool only.
 key shift+f
@@ -172,5 +172,5 @@ run subtool_append ; subtool_append ; subtool_append ; subtool_append
 expect_value subtools == 7
 expect_value active_subtool == 6
 shot many
-click "SubTools/Merged 1"
+click "Parts/Merged 1"
 expect_value active_subtool == 0

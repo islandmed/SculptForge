@@ -244,11 +244,11 @@ TEST(goz_commands_and_open) {
     std::filesystem::remove(path);
 
     r = reg.execute(doc, "open", {{"path", "model.zpr"}});
-    CHECK(!r.ok && r.message.find("proprietary") != std::string::npos && r.message.find("GoZ") != std::string::npos &&
+    CHECK(!r.ok && r.message.find("proprietary") != std::string::npos && r.message.find("Bridge") != std::string::npos &&
           r.message.find("OBJ") != std::string::npos);
     // A .ztl without a conversion beside it points to the ZBrush plug-in.
     r = reg.execute(doc, "open", {{"path", "model.ZTL"}});
-    CHECK(!r.ok && r.message.find("proprietary") != std::string::npos && r.message.find("ZTL Export") != std::string::npos);
+    CHECK(!r.ok && r.message.find("proprietary") != std::string::npos && r.message.find("export plug-in") != std::string::npos);
 }
 
 // The SculptForge ZTL Export plug-in writes <name>.sf<NNN>_<SubTool>.GoZ next to <name>.ztl; opening the .ztl
@@ -292,7 +292,7 @@ TEST(goz_converted_ztool_opens_as_subtools) {
     // Without a conversion, a .ztl explains the plug-in; an empty folder is an error, not an empty scene.
     Document doc;
     CommandResult r = reg.execute(doc, "open", {{"path", (base / "Missing.ztl").string()}});
-    CHECK(!r.ok && r.message.find("ZTL Export") != std::string::npos);
+    CHECK(!r.ok && r.message.find("export plug-in") != std::string::npos);
     fs::create_directories(base / "Empty.sculptforge");
     CHECK(!reg.execute(doc, "open", {{"path", (base / "Empty.sculptforge").string()}}).ok);
     fs::remove_all(base);

@@ -22,8 +22,8 @@ All of them work on the **active Part** and, except the LOD preview, are undoabl
 ## Quads and triangles
 
 SculptForge sculpts on triangles, but it remembers which pairs of triangles were one quad. A model you open
-from ZBrush (Send to ZBrush), Blender or Maya (OBJ, FBX, PLY, USD) keeps its quads: **Wire** draws them as quads, without
-the diagonal, and OBJ, FBX, PLY, USD and GoZ-compatible exports write them back as quads, corner for corner. Polygons with
+from the Bridge, Blender or Maya (OBJ, FBX, PLY, USD) keeps its quads: **Wire** draws them as quads, without
+the diagonal, and OBJ, FBX, PLY, USD and Bridge exports write them back as quads, corner for corner. Polygons with
 more than four sides are split into triangles. The new **Plane** and **Cube** are made of quads, and so is the
 result of a voxel remesh.
 
@@ -36,16 +36,13 @@ turns every quad into four quads. Two things turn quads into triangles:
 
 glTF (`.glb`) and STL only hold triangles, so those exports always write triangles.
 
-> **ZBrush:** Besides keeping the quads you bring in, SculptForge can make new ones from any mesh: **Quad Remesh**
-> (like ZRemesher) builds quads with flowing edge loops. See [Quad retopology](retopology.md).
-
 ## Subdivide
 
 For sculpting at several resolutions use **Divide** (<kbd>Ctrl</kbd>+<kbd>D</kbd>), which keeps the lower levels to
 step back to: see [Subdivision levels](subdivision-levels.md). **Subdivide** is the one-way version.
 
 **Tool > Geometry > Subdivide** smooths the mesh with Loop subdivision. Each level
-multiplies the triangle count by four and rounds off the shape slightly, like ZBrush's Divide with Smt on.
+multiplies the triangle count by four and rounds off the shape slightly.
 
 - Sculpt layers are subdivided with the mesh, so blend shapes keep working.
 - Mask, vertex paint and UVs are interpolated; face groups and hidden faces carry over.
@@ -62,7 +59,7 @@ multiplies the triangle count by four and rounds off the shape slightly, like ZB
 
 ## Voxel remesh
 
-**Tool > Remesh > Voxel Remesh** rebuilds the active Part as an even, watertight surface, like ZBrush's DynaMesh.
+**Tool > Remesh > Voxel Remesh** rebuilds the active Part as an even, watertight surface.
 Use it to:
 
 - fuse overlapping pieces into one surface (append a sphere, overlap it, merge, remesh);
@@ -97,13 +94,9 @@ What happens to your data:
 To remesh several Parts into one, first combine them with **Merge visible...** or **Merge down...** in
 [Parts](parts.md#merge-parts).
 
-> **ZBrush:** There is no Project option, Groups-aware remesh or Blur slider yet. Like ZBrush's DynaMesh, the remesh
-> produces an even grid of quads, not flowing edge loops. For quads with edge loops that follow the forms, use
-> [Quad Remesh](retopology.md) (like ZRemesher), and Project All to get the detail back.
-
 ## Quad Remesh
 
-**Tool > Geometry > Quad Remesh** is automatic quad retopology, like ZBrush's ZRemesher: it rebuilds the Part as
+**Tool > Geometry > Quad Remesh** is automatic quad retopology: it rebuilds the Part as
 clean quads whose edge loops follow the forms, close to a target polygon count, with Keep Groups, Adaptive Size,
 vertex paint density and symmetry. **Project All** (**Tool > Parts > Project**) brings the sculpted detail back onto
 the new topology after you divide it. Both have their own chapter: [Quad retopology and detail
@@ -120,8 +113,7 @@ back.
 
 ## Decimate
 
-**Tool > Geometry > Decimate** reduces the triangle count while keeping the shape, using quadric edge collapse (the
-same family of algorithm as ZBrush's Decimation Master). The **Keep** slider next to the button sets the fraction
+**Tool > Geometry > Decimate** reduces the triangle count while keeping the shape, using quadric edge collapse. The **Keep** slider next to the button sets the fraction
 of triangles to keep (0.05 to 0.95, default 0.50).
 
 Decimation keeps open borders in place, and because it only removes vertices, every remaining vertex keeps its

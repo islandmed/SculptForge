@@ -246,7 +246,7 @@ void registerDeformCommands(CommandRegistry& reg) {
         {"deform_smooth", DeformOp::Smooth,
          "Smooth the whole active Part (Laplacian; keep_volume=true for Taubin smoothing, which doesn't shrink it)."},
         {"deform_balloon", DeformOp::Balloon,
-         "Balloon (ZBrush users: Inflate Balloon): fill the active Part out toward a rounder volume; a negative "
+         "Balloon: fill the active Part out toward a rounder volume; a negative "
          "amount lets the air out."},
     };
     for (const Spec& sp : kSpecs) {

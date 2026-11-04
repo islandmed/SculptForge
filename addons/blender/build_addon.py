@@ -23,7 +23,7 @@ import zipfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 SOURCE = os.path.join(HERE, "sculptforge_bridge")
 LICENSE = os.path.join(HERE, "..", "..", "LICENSE")
-FILES = ["__init__.py", "exchange.py", "zbrush_keys.py"]
+FILES = ["__init__.py", "bridge_protocol.py", "exchange.py", "classic_keys.py"]
 EPOCH = (2026, 1, 1, 0, 0, 0)  # fixed timestamps: the same sources give the same zip
 
 

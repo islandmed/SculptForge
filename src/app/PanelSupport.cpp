@@ -109,8 +109,8 @@ void App::drawLookPicker() {
          "Neutral grey panels, so your model's colours read true, with one orange accent. The SculptForge layout."},
         {"##welcome.look.forge", "Forge Terminal", int(looks::LookId::ForgeTerminal), "tokyo_night", 1,
          "Terminal-style tiles in the Tokyo Night colours (blue-grey). Preferences > Interface > Look has more schemes."},
-        {"##welcome.look.zbrush", "ZBrush-style layout", int(looks::LookId::Classic), "neutral", 0,
-         "The Classic grey look with the alphabetical palette bar and the two-row top shelf, for ZBrush users."},
+        {"##welcome.look.zbrush", "Classic layout", int(looks::LookId::Classic), "neutral", 0,
+         "The Classic grey look with the alphabetical palette bar and the two-row top shelf, for experienced sculptors."},
     };
     const float s = uiScale_, spacing = ImGui::GetStyle().ItemSpacing.x;
     const float w = std::floor((ImGui::GetContentRegionAvail().x - 2.0f * spacing) / 3.0f), h = 92.0f * s;
@@ -163,7 +163,7 @@ void App::drawSupportUi() {
                 ImGui::SetTooltip("Your first sculpt: a cute owl head from this sphere, step by step, in about ten minutes.");
             ImGui::Spacing();
             ImGui::TextWrapped("Hold Ctrl over any control to see what it does. The User Guide (Shift+F1) explains every "
-                               "tool, and Coming from ZBrush lists what is where.");
+                               "tool, and Quick tour for experienced sculptors lists what is where.");
             // The look (0.10.9, #U6): three cards, the first the default. Existing installs never see this window
             // unless they open Help > Welcome, so nobody's look changes by itself.
             ImGui::Spacing();
@@ -180,7 +180,7 @@ void App::drawSupportUi() {
                 const char* help;
             };
             static const Origin kOrigins[] = {
-                {"ZBrush##welcome.from", 0, 0, "ZBrush-style keys and gestures, and the ZBrush-style layout."},
+                {"Classic sculpting keys##welcome.from", 0, 0, "The classic sculpting keys and gestures, and the Classic layout."},
                 {"Blender##welcome.from", 2, 1, "Blender's navigation and sculpt-mode keys, the SculptForge layout."},
                 {"Maya##welcome.from", 3, 1, "Maya's Alt+drag view controls, the SculptForge layout."},
                 {"New to sculpting##welcome.from", 1, 1, "SculptForge's own keys and layout (the default)."},
@@ -195,8 +195,8 @@ void App::drawSupportUi() {
                     setShellLayout(o.layout);
                     lookDirty_ = true;
                     saveProjectPrefs();
-                    status_ = std::string("Keys: ") + (o.style == 0 ? "ZBrush-style" : o.style == 2 ? "Blender" : o.style == 3 ? "Maya" : "SculptForge") +
-                              (o.layout == 0 ? ", ZBrush-style layout" : ", SculptForge layout") + " (Preferences changes them)";
+                    status_ = std::string("Keys: ") + (o.style == 0 ? "Classic sculpting keys" : o.style == 2 ? "Blender" : o.style == 3 ? "Maya" : "SculptForge") +
+                              (o.layout == 0 ? ", Classic layout" : ", SculptForge layout") + " (Preferences changes them)";
                 }
                 if (on) ImGui::PopStyleColor();
                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", o.help);

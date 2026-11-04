@@ -129,13 +129,13 @@ std::string uvInfoText(const Mesh& m, int resolution) {
 void registerUvCommands(CommandRegistry& reg) {
     reg.add({"uv_unwrap",
              "Unwrap the active Part's UVs (UV Editor > Unwrap). Methods: isometric (least stretch: angles and lengths, "
-             "along the marked seams; the default), conformal (LSCM: angles, along the seams), polygroups (cut along "
+             "along the marked seams; the default), conformal (LSCM: angles, along the seams), polygroups (cut along " // marks-pending
              "the face group borders and the seams), planar (each piece projected flat), unfold (flatten the current "
              "islands again in place, keeping pinned corners), auto (finds its own seams, xatlas). Pieces that are "
              "closed or looped get extra cuts. The result is packed into the 0-1 tile, or across UDIM tiles. With a UV "
              "selection only the selected faces are unwrapped (fitted where they were). A painted texture moves onto "
              "the new UVs (keep_texture). One undo step.",
-             {{"method", T::String, "isometric (default), conformal, polygroups, planar, unfold or auto", false},
+             {{"method", T::String, "isometric (default), conformal, polygroups, planar, unfold or auto", false}, // marks-pending
               {"selected", T::Bool, "Only the UV Editor's selected faces (default true when something is selected)", false},
               {"iterations", T::Number, "Least-stretch refinement steps (default 10; 0 = conformal)", false},
               {"resolution", T::Number, "Texture size the margin is measured in (default: the texture's, or 2048)", false},
@@ -150,7 +150,7 @@ void registerUvCommands(CommandRegistry& reg) {
                  if (m.triangleCount() == 0) return {false, "There is no mesh to unwrap"};
                  UvUnwrapOptions o;
                  if (a.contains("method") && !parseUvUnwrapMethod(argString(a, "method"), o.method))
-                     return {false, "method must be isometric, conformal, polygroups, planar, unfold or auto"};
+                     return {false, "method must be isometric, conformal, polygroups, planar, unfold or auto"}; // marks-pending
                  o.resolution = resolutionArg(doc, a);
                  o.iterations = std::clamp(int(argNumber(a, "iterations", 10)), 0, 100);
                  o.packing = packOptions(doc, a);
@@ -211,9 +211,9 @@ void registerUvCommands(CommandRegistry& reg) {
     reg.add({"uv_seam",
              "Mark or clear UV seams on the active Part (seams are where Unwrap cuts). op: mark / clear (the UV "
              "Editor's selected edges, or the border of its selected faces), path (mark the shortest edge path from "
-             "vertex `from` to vertex `to`; clear=true clears it), polygroups (every face group border), islands (every "
+             "vertex `from` to vertex `to`; clear=true clears it), polygroups (every face group border), islands (every " // marks-pending
              "current UV island border), angle (edges sharper than `angle` degrees), clear_all. One undo step.",
-             {{"op", T::String, "mark, clear, path, polygroups, islands, angle or clear_all", true},
+             {{"op", T::String, "mark, clear, path, polygroups, islands, angle or clear_all", true}, // marks-pending
               {"from", T::Number, "path: the vertex to start at", false},
               {"to", T::Number, "path: the vertex to end at", false},
               {"clear", T::Bool, "path: clear the seams along it instead of marking them", false},
@@ -256,7 +256,7 @@ void registerUvCommands(CommandRegistry& reg) {
                  } else if (op == "clear_all") {
                      uvClearSeams(m);
                  } else {
-                     return {false, "op must be mark, clear, path, polygroups, islands, angle or clear_all"};
+                     return {false, "op must be mark, clear, path, polygroups, islands, angle or clear_all"}; // marks-pending
                  }
                  edit.commit();
                  const size_t after = uvSeamCount(m);
@@ -266,13 +266,13 @@ void registerUvCommands(CommandRegistry& reg) {
 
     reg.add({"uv_select",
              "Set the UV Editor's selection on the active Part (what the other uv_* commands work on). op: all, none, "
-             "invert, island (the island of triangle `face`), face (triangle `face`), polygroup (every face of face group "
+             "invert, island (the island of triangle `face`), face (triangle `face`), polygroup (every face of face group " // marks-pending
              "`group`), rect (faces touching u0 v0 u1 v1), seams (the marked seam edges), mode (just switch to `mode`). "
              "`mode` (vertex, edge, face, island) converts the selection; `add` adds to it instead of replacing it.",
-             {{"op", T::String, "all, none, invert, island, face, polygroup, rect, seams or mode", true},
+             {{"op", T::String, "all, none, invert, island, face, polygroup, rect, seams or mode", true}, // marks-pending
               {"mode", T::String, "vertex, edge, face or island", false},
               {"face", T::Number, "island / face: a triangle index", false},
-              {"group", T::Number, "polygroup: the face group id", false},
+              {"group", T::Number, "polygroup: the face group id", false}, // marks-pending
               {"u0", T::Number, "rect: lower u", false},
               {"v0", T::Number, "rect: lower v", false},
               {"u1", T::Number, "rect: upper u", false},
@@ -347,7 +347,7 @@ void registerUvCommands(CommandRegistry& reg) {
                      if (m.uvFlags.size() == nt * 3)
                          for (uint32_t c = 0; c < nt * 3; ++c) sel.corners[c] = (m.uvFlags[c] & kUvSeam) != 0;
                  } else if (op != "mode") {
-                     return {false, "op must be all, none, invert, island, face, polygroup, rect, seams or mode"};
+                     return {false, "op must be all, none, invert, island, face, polygroup, rect, seams or mode"}; // marks-pending
                  }
                  if (sel.mode == UvSelectMode::Island) uvConvertSelection(m, topo, sel, UvSelectMode::Island);
                  const size_t n = sel.count();

@@ -70,7 +70,7 @@ void App::registerVdmActions() {
         "vdm_set");
     add("vdm.new_plane", "New VDM Plane", ICON_LC_GRID_3X3,
         [this] { runCommand("vdm_new_plane", {{"resolution", double(vdmPlaneRes_)}}); }, nullptr,
-        "Add a flat VDM plane to sculpt a new brush on (ZBrush's VDM plane template): seen from the top, its border "
+        "Add a flat VDM plane to sculpt a new brush on: seen from the top, its border "
         "masked so it stays put; the other Parts are hidden. Sculpt anything (overhangs welcome), then Create VDM.",
         "vdm_new_plane");
     add("vdm.create", "Create VDM", ICON_LC_STAMP,
@@ -79,8 +79,7 @@ void App::registerVdmActions() {
         },
         [this] { return doc_.mesh.hasUvs(); },
         "Turn the sculpted VDM plane into a vector displacement brush: how far every point moved from the flat grid "
-        "becomes the map, saved in your brush library and picked as the VDM brush's map (ZBrush: Create brush from "
-        "the VDM plane). Needs the VDM plane (its UVs record where each point started).",
+        "becomes the map, saved in your brush library and picked as the VDM brush's map Needs the VDM plane (its UVs record where each point started).",
         "vdm_capture");
     add("vdm.export", "Export EXR...", ICON_LC_DOWNLOAD,
         [this] { SDL_ShowSaveFileDialog(onVdmExportChosen, this, window_, kExrFilters, 1, nullptr); },
@@ -185,7 +184,7 @@ void App::drawVdmSection() {
     ImGui::Checkbox("Swap Y/Z##vdm", &vdmImport_.swapYZ);
     ui::HelpText("Swap Y/Z", nullptr,
                  "For maps that store the surface normal in G instead of B (Y-up apps). Blender's maps and ours need "
-                 "nothing; ZBrush maps depend on its Vector Displacement Flip options, so try this if a stamp comes "
+                 "nothing; maps from other apps depend on how they were exported, so try this if a stamp comes "
                  "out lying on its side.",
                  "Brush > Vector Displacement");
     ImGui::SameLine();

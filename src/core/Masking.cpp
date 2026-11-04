@@ -433,7 +433,7 @@ void registerMaskingCommands(CommandRegistry& registry) {
          {{"rings", T::Number, "Width of the mask in edge rings from the border (1-20; 1 = the border vertices only). "
                                "Default 1.",
            false},
-          {"polygroups", T::Bool, "Also mask face group borders (ZBrush: Mask by polygroup border). Default false.",
+          {"polygroups", T::Bool, "Also mask face group borders. Default false.",
            false},
           {"soft", T::Bool, "Fade the mask from the border towards the innermost ring. Default false.", false},
           {"strength", T::Number, "Mask value on the border (0-1). Default 1.", false},
@@ -457,7 +457,7 @@ void registerMaskingCommands(CommandRegistry& registry) {
          }});
 
     // MaskRect / MaskLasso. Bad arguments are errors, unlike the "mask unchanged" of a selection that misses.
-    const ParamSpec unmask{"unmask", T::Bool, "Unmask the inside instead (ZBrush: Alt held). Default false.", false};
+    const ParamSpec unmask{"unmask", T::Bool, "Unmask the inside instead. Default false.", false};
     const ParamSpec strength{"strength", T::Number, "How much to mask or unmask (0-1). Default 1.", false};
     const ParamSpec viewProj{"view_proj", T::String, "Optional 16 numbers: column-major view-projection matrix.",
                              false};
@@ -466,7 +466,7 @@ void registerMaskingCommands(CommandRegistry& registry) {
                              "brushes mirror (default none).",
                              false};
     const ParamSpec clearOutside{"clear_outside", T::Bool,
-                                 "When the shape covers none of the model, clear the mask instead (ZBrush: Ctrl+drag on "
+                                 "When the shape covers none of the model, clear the mask instead (like Ctrl+drag on "
                                  "the background). Default false.",
                                  false};
     const ParamSpec frontFaces{"front_faces_only", T::Bool,
@@ -506,7 +506,7 @@ void registerMaskingCommands(CommandRegistry& registry) {
     };
     selection(
         "mask_rect",
-        "Rectangle mask selection (ZBrush MaskRect, Ctrl+drag): mask the visible vertices inside a screen rectangle, "
+        "Rectangle mask selection: mask the visible vertices inside a screen rectangle, "
         "or unmask them. Coordinates are normalised (-1..1, y up) in the given view; without a view the rectangle "
         "spans the mesh seen from the front (+Z).",
         {{"x0", T::Number, "Rectangle left (-1..1). Default -1.", false},
@@ -527,7 +527,7 @@ void registerMaskingCommands(CommandRegistry& registry) {
         });
     selection(
         "mask_lasso",
-        "Lasso mask selection (ZBrush MaskLasso, Ctrl+drag): mask the visible vertices inside a screen polygon, or "
+        "Lasso mask selection: mask the visible vertices inside a screen polygon, or "
         "unmask them. Points are normalised (-1..1, y up) in the given view; without a view they span the mesh "
         "seen from the front (+Z).",
         {{"points", T::String, "The lasso: at least 3 points as \"x0 y0 x1 y1 ...\" (-1..1, y up).", true},

@@ -586,7 +586,7 @@ void LightBox::drawHeader(App& app, float width) {
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const ImVec2 origin = ImGui::GetCursorScreenPos();
 
-    // Title (an item, so tests and help find "LightBox").
+    // Title (an item, so tests and help find "Library").
     {
         const char* title = ICON_LC_IMAGES "  Library";
         const ImVec2 ts = ImGui::CalcTextSize(title);
@@ -1002,7 +1002,7 @@ void LightBox::drawPreferences(App& app) {
     UiLayout& layout = app.layout_;
     ImGui::Checkbox(tr("Show at startup##lightbox"), &showAtStartup);
     ui::HelpText("Show at startup", nullptr,
-                 "Open the Library on the Project tab when SculptForge starts (as ZBrush does).",
+                 "Open the Library on the Project tab when SculptForge starts.",
                  "Preferences > Library");
     ImGui::SetNextItemWidth(-1);
     ImGui::SliderInt("##lbrowspref", &layout.lightboxRows, 1, 4, "Rows %d");

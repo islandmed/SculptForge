@@ -483,8 +483,8 @@ kbd { display: inline-block; min-width: 1.5em; padding: 0.05em 0.45em; border: 1
 .callout p { margin: 0; }
 .callout-tip { border-left-color: #62c07e; } .callout-tip strong:first-child { color: #7fd497; }
 .callout-note { border-left-color: #6fa8e6; } .callout-note strong:first-child { color: #8dbcf0; }
-.callout-zbrush { border-left-color: var(--accent); background: linear-gradient(90deg, rgba(242, 140, 60, 0.07), #1b1b21 40%); }
-.callout-zbrush strong:first-child { color: var(--accent-2); }
+.callout-experienced { border-left-color: var(--accent); background: linear-gradient(90deg, rgba(242, 140, 60, 0.07), #1b1b21 40%); }
+.callout-experienced strong:first-child { color: var(--accent-2); }
 .callout-not-yet { border-left-color: #a990dc; } .callout-not-yet strong:first-child { color: #c1aef0; }
 .callout-warning, .callout-important { border-left-color: #e5604a; } .callout-warning strong:first-child { color: #f08a78; }
 .code-block { position: relative; margin: 0 0 1.3em; }

@@ -39,7 +39,7 @@ std::string exportCommandFor(const std::string& ext) {
 
 void registerSubdivCommands(CommandRegistry& reg) {
     reg.add({"subdiv_divide",
-             "Divide (ZBrush Tool > Geometry > Divide, Ctrl+D): add a subdivision level above the highest one and step "
+             "Divide: add a subdivision level above the highest one and step "
              "to it. Quads stay quads (Catmull-Clark); triangle meshes use Loop subdivision. Lower levels are kept, so "
              "you can step down to sculpt big forms and back up to the detail. Each level has 4x the polygons.",
              {{"smooth", T::Bool, "Smt: smooth the new level (default true); false divides flat, keeping hard edges.", false}},
@@ -50,7 +50,7 @@ void registerSubdivCommands(CommandRegistry& reg) {
              }});
 
     reg.add({"subdiv_level",
-             "Step to a subdivision level (ZBrush's SDiv slider). Detail sculpted at higher levels is kept when you "
+             "Step to a subdivision level. Detail sculpted at higher levels is kept when you "
              "edit a lower one, and edits at a high level show up (softened) at the lower ones.",
              {{"level", T::Number, "Level to step to: 1 = the base cage, up to the number of levels.", true}},
              [](Document& doc, const Args& a) -> CommandResult {
@@ -119,8 +119,8 @@ void registerSubdivCommands(CommandRegistry& reg) {
 
     reg.add({"subdiv_export",
              "Export the visible Parts at a subdivision level other than the current one, e.g. the base cage for "
-             "another app (exports and GoZ otherwise write the current level). Parts without levels are written "
-             "as they are. The format follows the extension (.obj, .glb, .usd, .fbx, .ply, .stl, .goz).",
+             "another app (exports and Bridge files otherwise write the current level). Parts without levels are written "
+             "as they are. The format follows the extension (.obj, .glb, .usd, .fbx, .ply, .stl or a Bridge file).",
              {{"path", T::String, "File to write.", true},
               {"level", T::Number, "Level to export: 1 = the base cage (default); higher than a Part has = its highest.", false}},
              [](Document& doc, const Args& a) -> CommandResult {

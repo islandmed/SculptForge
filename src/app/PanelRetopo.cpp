@@ -61,7 +61,7 @@ void App::registerRetopoUiActions() {
     };
     add("geometry.qremesh", "Quad Remesh", kQRemeshPath, [this] { startQRemesh(); },
         [this] { return !qremesh_ && doc_.mesh.triangleCount() > 0; },
-        "Automatic quad retopology, like ZBrush's ZRemesher: rebuilds the Part as clean, all-quad topology whose "
+        "Automatic quad retopology: rebuilds the Part as clean, all-quad topology whose "
         "edge loops follow the forms, close to Target Polygons. Runs in the background (Cancel stops it); undoable. "
         "Then divide it and use Part > Project > Project All to bring the detail back.",
         "qremesh");
@@ -73,7 +73,7 @@ void App::registerRetopoUiActions() {
         a.palette = kQRemeshPath;
         a.run = [this] { setGuidesMode(!guidesMode_); };
         a.checked = [this] { return guidesMode_; };
-        a.description = "The Quad Remesh Guides brush (ZBrush's ZRemesher Guides): drag on the model to draw a curve for "
+        a.description = "The Quad Remesh Guides brush: drag on the model to draw a curve for "
                         "Quad Remesh's edge loops to follow, around an eye, the mouth or a joint. A curve that ends where "
                         "it started becomes a loop. Symmetry mirrors it; Alt+click a curve to delete it. Pick any "
                         "brush to sculpt again.";
@@ -405,7 +405,7 @@ void App::drawQRemeshContents() {
     ImGui::Checkbox(tr("Keep Original"), &retopo_.keepOriginal);
     ui::HelpText("Keep Original", nullptr,
                  "Keep the Part as it was, hidden, right below the new one (\"<name> Original\"), ready to "
-                 "Project All its detail back. Off: replace it, as ZBrush does (undo brings it back).",
+                 "Project All its detail back. Off: replace it (undo brings it back).",
                  kQRemeshPath);
     ImGui::SameLine();
     ImGui::SetCursorPosX(x0 + half + style.ItemSpacing.x); // the right column, inside the section indent
@@ -462,7 +462,7 @@ void App::drawQRemeshGuideControls() {
     ui::SliderInside("##qcurves", &curvesStrength_, 0.0f, 100.0f, "Curves Strength %.0f");
     ui::HelpText("Curves Strength", nullptr,
                  "How far around each guide curve the edge flow follows it: 0 = only the edge loop on the curve, 100 = "
-                 "about six quads to each side (ZBrush's Curves Strength). The loop on the curve is always made.",
+                 "about six quads to each side. The loop on the curve is always made.",
                  kQRemeshPath);
 }
 

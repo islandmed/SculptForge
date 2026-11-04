@@ -12,6 +12,8 @@
 #include <limits>
 #include <unordered_map>
 
+#include "core/LegacyNames.h"
+
 namespace sf {
 
 const char* brushName(BrushType type) {
@@ -24,9 +26,9 @@ const char* brushName(BrushType type) {
     case BrushType::Crease: return "Crease";
     case BrushType::Flatten: return "Flatten";
     case BrushType::Pinch: return "Pinch";
-    case BrushType::DamStandard: return "DamStandard";
-    case BrushType::ClayBuildup: return "ClayBuildup";
-    case BrushType::SnakeHook: return "SnakeHook";
+    case BrushType::DamStandard: return "SharpCrease";
+    case BrushType::ClayBuildup: return "ClayBlock";
+    case BrushType::SnakeHook: return "Tendril";
     case BrushType::Trim: return "Trim";
     case BrushType::Layer: return "Layer";
     case BrushType::Nudge: return "Nudge";
@@ -58,8 +60,9 @@ bool brushFromName(std::string_view name, BrushType& out) {
             if (c != ' ' && c != '_' && c != '-') r += char(std::tolower(c));
         return r;
     };
-    const std::string want = squash(name);
+    std::string want = squash(name);
     if (want.empty()) return false;
+    if (const std::string_view now = legacy::renamed(legacy::kBrushNames, want); !now.empty()) want = squash(now);
     for (int i = 0; i < int(BrushType::Count); ++i)
         if (squash(brushName(BrushType(i))) == want || squash(brushLabel(BrushType(i))) == want) {
             out = BrushType(i);

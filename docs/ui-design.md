@@ -13,7 +13,7 @@ Sculptors should find their way around within a minute:
 - **Ctrl+hover** on any control shows its description and shortcut;
 - **Customize**: Preferences > Config > Enable Customize, Ctrl+Alt+drag to move or remove items, **Store Config (Ctrl+Shift+I)**, **Restore Standard UI**.
 
-Not goals: free-floating or OS-level detachable panels, tabbed docking, a full keymap editor, a 2.5D canvas or pixols. These need ImGui's docking branch or aren't worth the cost (see §12).
+Not goals: free-floating or OS-level detachable panels, tabbed docking, a full keymap editor, a 2.5D canvas. These need ImGui's docking branch or aren't worth the cost (see §12).
 
 The current UI (screenshot, 1600x960) is a menu bar (File/Edit/Mesh/View/Help) plus floating windows over a full-window viewport: Tools (250 px, left), Parts, Layers / Blend Shapes, Game Ready, Brush Lab (open by default, covers the model), and optionally Vertex Paint & Materials, Generate 3D, Gaussian Splats. All of the features stay. Only where they live changes.
 
@@ -46,14 +46,14 @@ All sizes are logical px at `uiScale_ = 1` and get multiplied by `uiScale_`. She
 ```
 x:0 8      96                                                              1240   1292 1300                1600
   +-------------------------------------------------------------------------------------------------------------+ y0
-  |SF SculptForge  head.sfproj*  | Verts 5.1k  Tris 10.2k  SubTool Sphere  Layer Base   status msg... [QS][1][2][3][Menus][? Search F3]|
+  |SF SculptForge  head.sfproj*  | Verts 5.1k  Tris 10.2k  Part Sphere  Layer Base   status msg... [QS][1][2][3][Menus][? Search F3]|
   +-------------------------------------------------------------------------------------------------------------+ y24
   |Alpha Brush Color Draw Edit File Generate Help Material Preferences Render Script Splats Stroke Tool Transform |
   +--+-------------------------------------------------------------------------------------+-+-------------------+ y46
-  |  |[LightBox] [Sculpt|Paint] [Zadd|Zsub] [Rgb] [Draw Size 60 ====] [Strength 0.50 ====] | | Tool          [x] |
+  |  |[Library] [Sculpt|Paint] [Add|Sub] [Rgb] [Draw Size 60 ====] [Strength 0.50 ====] | | Tool          [x] |
   |  |[AI Brush] [Front] [ X | Y | Z sym ]  [Pressure>Str] [Pressure>Size]   5.1k / 10.2k   | | Sphere 5.1k  (o)  |
   +--+------+--------------------------------------------------------------------+---------+ | [Open][Save][Imp] |
-  |d | +--+ |                                                                    | [Frame] |d| > SubTool  (open) |
+  |d | +--+ |                                                                    | [Frame] |d| > Part  (open) |
   |i | |Br| |                                                                    | [Move ] |i|   Sphere      eye |
   |v | +--+ |                                                                    | [Zoom ] |v|   Helmet      eye |
   |  |Clay  |                                                                    | [Rotat] | |   [Append][Dup]...|
@@ -61,7 +61,7 @@ x:0 8      96                                                              1240 
   |  | |St| |                          CANVAS                                    | [Floor] | | > Geometry        |
   |  | +--+ |                     (3D view, gradient bg)                         | [PolyF] | | > Remesh          |
   |  |Dots  |                        1144 x 790                                  | [Grps ] | | > Masking         |
-  |  | +--+ |                                                                    | [Mask ] | | > Polygroups      |
+  |  | +--+ |                                                                    | [Mask ] | | > Face groups      |
   |  | |Al| |                                                                    | [Paint] | | > Visibility      |
   |  | +--+ |                                                                    | [Solo ] | | > Export          |
   |  |Round |                                                                    | [Splat] | | > Display         |
@@ -133,7 +133,7 @@ Every palette's body is one function `void drawPalette_<Id>()`, and the same fun
 | **Color** | Vertex Paint colour picker and swatches; Fill object (`cmd:paint_fill`); Clear (`cmd:paint_clear`); From cavity (`cmd:paint_from_cavity`); Pick under cursor (C). (`PanelPolypaint.cpp` minus the material part) |
 | **Draw** | Draw Size, Strength (Intensity), Add/Sub, Rgb (`paintRgb_`), Paint mode, Tablet: Pressure > strength, Pressure > size, pen readout |
 | **Edit** | Undo <label>, Redo <label> (`cmd:undo`, `cmd:redo`) |
-| **File** | New Sphere, New Plane, Open..., Open Recent >, Save, Save As..., Autosave interval; Import/Export: Export OBJ, GLB (blend shapes), LOD chain, USD/USDZ, FBX for Unreal, Send to Unreal, Save Splats...; Send to ZBrush >; Quit. (Today's File menu, `drawFileMenuProjectItems`, `drawGozMenu`) |
+| **File** | New Sphere, New Plane, Open..., Open Recent >, Save, Save As..., Autosave interval; Import/Export: Export OBJ, GLB (blend shapes), LOD chain, USD/USDZ, FBX for Unreal, Send to Unreal, Save Splats...; Bridge >; Quit. (Today's File menu, `drawFileMenuProjectItems`, `drawGozMenu`) |
 | **Generate** | Generate 3D (image/text -> 3D, ComfyUI) opens the existing Generate 3D window; Image Relief / Inflate / Project (`cmd:image_relief`, `image_inflate`, `image_project`); AI provider settings (`drawAiSettings`) |
 | **Help** | Controls (shortcut sheet generated from the Action registry), User Guide (Shift+F1), What's New (also opened once after each update), Command palette (F3), Website & documentation, Report a problem, About SculptForge |
 | **Material** | Studio + Lit Sphere thumbnail grid (`cmd:set_material`); base colour (today's "Material" ColorEdit in Tools) |
@@ -142,7 +142,7 @@ Every palette's body is one function `void drawPalette_<Id>()`, and the same fun
 | **Script** | Show console (`` ` ``), Run script file..., Copy session as script, Clear console |
 | **Splats** | `drawSplatSection` body (info, clean, transform, to mesh, save, clear) |
 | **Stroke** | Stroke type (Dots, Drag Stamp, Spray, Lazy Stroke) and its settings (spray scatter, lazy radius) |
-| **Tool** | The model palette. Header: active Part name + tri count, `[Open] [Save] [Import]`. Sub-palettes (collapsing headers, one open at a time, Shift+click for more): **Part** (Parts panel body), **Layers** (Layers / Blend Shapes body), **Geometry** (Lower Res / Higher Res, SDiv slider, Del Lower / Del Higher, Reconstruct Subdiv, Divide Ctrl+D + Smt, Subdivide, Decimate, `cmd:decimate`), **Remesh** (Voxel remesh + resolution, the "DynaMesh" analogue), **Masking** (`drawMaskingSection`), **Face Groups** (`drawPolygroupsSection`), **Visibility** (Show all, Invert visibility, Delete hidden), **Export** (Game Ready panel body: LODs, Unreal, GLB/LOD chain), **Display** (wireframe, show mask/groups, material colour) |
+| **Tool** | The model palette. Header: active Part name + tri count, `[Open] [Save] [Import]`. Sub-palettes (collapsing headers, one open at a time, Shift+click for more): **Part** (Parts panel body), **Layers** (Layers / Blend Shapes body), **Geometry** (Lower Res / Higher Res, SDiv slider, Del Lower / Del Higher, Reconstruct Subdiv, Divide Ctrl+D + Smt, Subdivide, Decimate, `cmd:decimate`), **Remesh** (Voxel remesh + resolution, the "voxel remesh" analogue), **Masking** (`drawMaskingSection`), **Face Groups** (`drawPolygroupsSection`), **Visibility** (Show all, Invert visibility, Delete hidden), **Export** (Game Ready panel body: LODs, Unreal, GLB/LOD chain), **Display** (wireframe, show mask/groups, material colour) |
 | **Transform** | Draw / Move / Scale / Rotate (Q W E R, Gizmo: pivot, World / Surface axes, Mask, All Parts, Falloff, numeric entry; `cmd:transform`), Symmetry X / Y / Z (X), Frame (F), Solo (`cmd:subtool_solo`), Wireframe |
 
 Part / Layer / Masking / Face Groups are **Tool** sub-palettes, not top-level palettes. The Mesh and View menus disappear, and their items move to Tool > Geometry/Remesh and Render. Palettes are sorted by name at registration, so a new palette lands in alphabetical order automatically.
@@ -344,7 +344,7 @@ One registry drives shelves, palettes, help, the command palette, keys and custo
 ```cpp
 // src/app/Actions.h
 struct Action {
-    std::string id;           // "geometry.subdivide", "ui.lightbox", "brush.clay", "view.wireframe"
+    std::string id;           // "geometry.subdivide", "ui.library", "brush.clay", "view.wireframe"
     std::string label;        // "Subdivide"
     const char* icon = nullptr;   // ICON_LC_* or nullptr
     std::string description;  // shown in Ctrl help; defaults to Command::description
@@ -412,10 +412,10 @@ struct UiLayout {
     bool leftTrayOpen = false, rightTrayOpen = true;
     float leftTrayWidth = 300, rightTrayWidth = 300;          // logical px
     std::vector<std::string> leftTray, rightTray;              // palette ids, top to bottom
-    std::vector<std::string> openSubpalettes;                  // "tool.subtool", ...
+    std::vector<std::string> openSubpalettes;                  // "tool.part", ...
     std::vector<std::string> topShelf, leftShelf, rightShelf, bottomShelf; // item ids: action ids, "widget.*", "sep", "row" (top shelf line break)
     bool consoleOpen = false; float consoleHeight = 160;
-    bool lightboxOpen = false; int lightboxRows = 1; std::string lightboxTab = "project"; bool lightboxBottom = false;
+    bool libraryOpen = false; int libraryRows = 1; std::string libraryTab = "project"; bool libraryBottom = false;
     bool customize = false;                                    // runtime only, never stored
 };
 UiLayout standardLayout();                // the built-in default described in §3
@@ -499,7 +499,7 @@ Every look also tints the 3D view's gradient (`RenderSettings::gradientCentre` /
 user picked is left alone.
 
 **Layouts.** Picking one of the three looks switches to the **SculptForge layout**; the old one stays as the
-**ZBrush-style layout** (Preferences > Interface > Look > Layout, `ui_look layout=zbrush`), and works with any look.
+**Classic layout** (Preferences > Interface > Look > Layout, `ui_look layout=zbrush`), and works with any look.
 
 - Status bar (h 30): the cube and name, the task menus **File · Edit · Sculpt · Paint · Mesh · View · Render · Help**,
   the status message, then modules (mode, brush, file, triangles, fps), the presets 1 2 3 as workspaces, search (F3),
@@ -517,7 +517,7 @@ user picked is left alone.
   contents keep their size; the dividers become the gaps beside the trays.
 
 Scripts and tests: `ui_look look=forge|phosphor|blueprint|classic scheme=nord phosphor=amber effects=true
-layout=sculptforge|zbrush`; `expect_value look`, `shell_layout`; tests/ui/looks.sfui; screenshots for choosing:
+layout=sculptforge|classic`; `expect_value look`, `shell_layout`; tests/ui/looks.sfui; screenshots for choosing:
 tools/looks/shots.sfui.
 
 ---

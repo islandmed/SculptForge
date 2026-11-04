@@ -179,7 +179,7 @@ std::vector<QRemeshGuide> qremeshGuidesFromJson(const Json& json) {
 void registerQRemeshGuideCommands(CommandRegistry& reg) {
     using T = ParamSpec::Type;
     reg.add({"qremesh_guide",
-             "Quad Remesh Guides (ZBrush's ZRemesher Guides brush): draw a curve on the active Part for Quad Remesh to "
+             "Quad Remesh Guides: draw a curve on the active Part for Quad Remesh to "
              "follow; an edge loop runs along it and the edge flow around it turns with it. A curve that ends where it "
              "started becomes a loop (around an eye or the mouth). The guides are kept with the Part and saved in "
              "projects.",

@@ -6,6 +6,7 @@
 // canvas, the left and right trays with their dividers, customize-mode drag
 // and drop, layout presets, and the actions behind all of it.
 #include "app/App.h"
+#include "io/BridgeProtocol.h"
 
 #include "app/Demo.h"
 #include "app/Shell.h"
@@ -359,7 +360,7 @@ void App::registerShellActions() {
         "Cuts a sharp crease; Alt raises a ridge.",
         "Presses the surface toward a plane.",
         "Pulls the surface toward the stroke to tighten edges.",
-        "A sharp V-shaped crease with the sides pinched in (ZBrush DamStandard).",
+        "A sharp V-shaped crease with the sides pinched in.",
         "Square, flat-topped clay strokes for blocking in forms.",
         "Pulls the surface out into horns and tendrils.",
         "Trim: shaves away everything above a plane.",
@@ -396,16 +397,16 @@ void App::registerShellActions() {
         add(std::move(a));
     }
     add({"draw.sculpt", "Sculpt", nullptr,
-         "Brushes change the shape (ZBrush Zadd/Zsub). Turn on Rgb to paint colour at the same time.", "Draw", "", "",
+         "Brushes change the shape. Turn on Rgb to paint colour at the same time.", "Draw", "", "",
          [this] { paintMode_ = false; }, [this] { return !paintMode_; }, nullptr});
     add({"draw.paint", "Paint", ICON_LC_PAINTBRUSH,
-         "Paint colour without sculpting (ZBrush Rgb on, Zadd off). Alt paints back to white, Shift still smooths.",
+         "Paint colour without sculpting. Alt paints back to white, Shift still smooths.",
          "Draw", "P", "", [this] { paintMode_ = !paintMode_; }, [this] { return paintMode_; }, nullptr});
     add({"draw.zadd", "Add", nullptr, "Brushes add to the surface. Hold Alt to subtract for one stroke.", "Draw", "", "",
          [this] { invertToggle_ = false; }, [this] { return !invertToggle_; }, nullptr});
     add({"draw.zsub", "Sub", nullptr, "Brushes subtract from the surface. Hold Alt to add for one stroke.", "Draw", "", "",
          [this] { invertToggle_ = true; }, [this] { return invertToggle_; }, nullptr});
-    flag("draw.rgb", "Rgb", nullptr, "Draw", "", &paintRgb_, "Sculpt brushes also paint the colour (ZBrush Rgb with Zadd).");
+    flag("draw.rgb", "Rgb", nullptr, "Draw", "", &paintRgb_, "Sculpt brushes also paint the colour.");
     flag("draw.front_faces", "Front", nullptr, "Brush", "", &frontFacesOnly_,
          "Front faces only: brushes leave the far side of thin parts alone.");
     flag("draw.connected_only", "Connected only", nullptr, "Brush", "", &uiPrefs_.connectedOnly,
@@ -417,7 +418,7 @@ void App::registerShellActions() {
          "and out the back, as a cylinder along the view (Blender's Projected from View). Turn on Connected only too "
          "to keep it to one piece.");
     add({"draw.dynamic", "Dynamic", nullptr,
-         "Dynamic topology (ZBrush's Sculptris Pro): brushes add triangles where they need detail and remove them "
+         "Dynamic topology: brushes add triangles where they need detail and remove them "
          "where they don't, so you can pull out horns or fingers without stretching. Detail sets how small the "
          "triangles get; zoom in or shrink the brush for finer ones. Needs a mesh without subdivision levels; quads "
          "under the brush become triangles and UVs are dropped (Undo brings them back).",
@@ -530,7 +531,7 @@ void App::registerShellActions() {
          [this] { return !renderSettings_.flatShading; }, nullptr});
     add({"material.flat", "Flat", nullptr,
          "Flat shading: every polygon shows its own face, so the mesh's structure and each stroke's effect on it read "
-         "clearly (as in ZBrush). Parts set to Smooth or Flat keep their own. A preference: Store Config keeps it.",
+         "clearly. Parts set to Smooth or Flat keep their own. A preference: Store Config keeps it.",
          "Material", "", "", [this] { runCommand("set_shading", {{"mode", std::string("flat")}}); },
          [this] { return renderSettings_.flatShading; }, nullptr});
     // The view's background (#21; Preferences > Display, Render palette).
@@ -582,7 +583,7 @@ void App::registerShellActions() {
     add({"file.import", "Import", ICON_LC_IMPORT, "Add a model file as a new Part.", "Tool", "", "",
          [this] {
              static const SDL_DialogFileFilter filters[] = {
-                 {"Models", "obj;fbx;glb;gltf;ply;stl;GoZ;goz;usda;usd;usdz"}, {"All files", "*"}};
+                 {"Models", "obj;fbx;glb;gltf;ply;stl;" SF_BRIDGE_MESH_EXTS ";usda;usd;usdz"}, {"All files", "*"}};
              SDL_ShowOpenFileDialog(
                  [](void* user, const char* const* files, int) {
                      if (files && files[0]) static_cast<App*>(user)->queueFile(FileAction::AppendSubtool, files[0]);
@@ -664,8 +665,8 @@ void App::registerShellActions() {
          "Menus by task (File, Edit, Sculpt, Paint, Mesh, View, Render, Help), a status bar and a one-row tool shelf.",
          "Preferences > Interface > Look", "", "", [this] { setShellLayout(1); lookDirty_ = true; },
          [this] { return uiPrefs_.shellLayout == 1; }, nullptr});
-    add({"ui.layout.zbrush", "ZBrush-style layout", ICON_LC_LAYOUT_TEMPLATE,
-         "The alphabetical palette bar and the two-row top shelf, as ZBrush users expect.", "Preferences > Interface > Look", "",
+    add({"ui.layout.zbrush", "Classic layout", ICON_LC_LAYOUT_TEMPLATE,
+         "The alphabetical palette bar and the two-row top shelf, as experienced sculptors expect.", "Preferences > Interface > Look", "",
          "", [this] { setShellLayout(0); lookDirty_ = true; }, [this] { return uiPrefs_.shellLayout == 0; }, nullptr});
     commands_.add({"ui_look",
                    "Interface look and layout (Preferences > Interface > Look). Only changes how the interface looks.",
@@ -678,7 +679,7 @@ void App::registerShellActions() {
                     {"effects", ParamSpec::Type::Bool, "Phosphor's scanlines and glow (on the interface only).", false},
                     {"outlines", ParamSpec::Type::String, "The tiled looks' panel borders: off, subtle (the default) or on.", false},
                     {"outline_opacity", ParamSpec::Type::Number, "How strong those borders are, 0-100 (default 100).", false},
-                    {"layout", ParamSpec::Type::String, "sculptforge or zbrush (default: the look's, else unchanged).", false},
+                    {"layout", ParamSpec::Type::String, "sculptforge or classic (default: the look's, else unchanged).", false},
                     {"card", ParamSpec::Type::Bool, "Show the one-time \"SculptForge has a new look\" card (for tests).", false}},
                    [this](Document&, const Args& a) -> CommandResult {
                        theme::LookSettings& l = uiPrefs_.look;
@@ -707,14 +708,14 @@ void App::registerShellActions() {
                            l.outlineOpacity = std::clamp(float(argNumber(a, "outline_opacity", 100.0)) / 100.0f, 0.0f, 1.0f);
                        if (a.contains("layout")) {
                            const std::string k = argString(a, "layout");
-                           if (k != "sculptforge" && k != "zbrush") return {false, "layout must be sculptforge or zbrush"};
+                           if (k != "sculptforge" && k != "classic" && k != "zbrush") return {false, "layout must be sculptforge or classic"};
                            layoutKind = k == "sculptforge" ? 1 : 0;
                        }
                        setShellLayout(layoutKind);
                        lookDirty_ = true;
                        if (a.contains("card")) newLookCard_ = argBool(a, "card", false);
                        return {true, std::string("Look: ") + looks::lookName(looks::LookId(l.look)) +
-                                         (layoutKind == 1 ? ", SculptForge layout" : ", ZBrush-style layout")};
+                                         (layoutKind == 1 ? ", SculptForge layout" : ", Classic layout")};
                    }});
 
     int count = 0;
@@ -1374,7 +1375,7 @@ void App::drawStatusBar(const ShellGeometry& g) {
         const ImVec4 col = open ? (style == Status::Terminal ? theme::textOnAccent : theme::textBright) : theme::text;
         textAt(menuFont, a.x + 8.0f * s, col, shown);
         ImGui::LogText("%s", tr(m.name));
-        ui::HelpText(m.name, nullptr, "Open this menu. Its sections are the palettes of the ZBrush-style layout.", "Menus");
+        ui::HelpText(m.name, nullptr, "Open this menu. Its sections are the palettes of the Classic layout.", "Menus");
         // Click to open or close; while one is open, pointing at another menu switches to it, as in a menu bar.
         const bool switchTo = openMenu >= 0 && !open && hovered;
         if (pressed || switchTo) {

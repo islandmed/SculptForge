@@ -22,7 +22,7 @@ struct PaletteDef {
     const char* id;    // "tool", also the UiLayout tray entry
     const char* name;  // "Tool", shown in the palette bar (sorted by it)
     const char* icon;  // ICON_LC_*
-    const char* scope; // extra name UI tests find its items under ("SubTools/Append"), or nullptr
+    const char* scope; // extra name UI tests find its items under ("Parts/Append"), or nullptr
     void (App::*draw)();
 };
 const PaletteDef* palettes(int& count); // alphabetical

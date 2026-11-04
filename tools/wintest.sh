@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 #   tools/wintest.sh                 build build-win<arch>, run every test
-#   tools/wintest.sh -R ui_subtools  extra arguments go to ctest
+#   tools/wintest.sh -R ui_mask_lasso  extra arguments go to ctest
 #   tools/wintest.sh --x64           build for x64 (on an ARM machine: build only, for tools/winvm/winvm.sh)
 #
 # The Windows architecture follows the host: ARM64 on an ARM machine (Wine runs ARM64 Windows programs

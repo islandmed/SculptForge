@@ -264,7 +264,7 @@ click "Mouse & pen"
 expect_text Middle drag
 shot controls-blender
 # The style row in Controls switches too.
-click "ZBrush-style##input.style_zbrush"
+click "Classic sculpting keys##input.style_zbrush"
 expect_value input_style == 0
 expect_text Alt + click it
 key f1
@@ -275,7 +275,7 @@ expect_status Blender keymap: 13 keys
 expect_value input_style == 2
 expect_shortcut brush.standard D
 expect_shortcut geometry.higher_res Alt+2
-expect_shortcut brush.claybuildup Shift+Q
+expect_shortcut brush.clayblock Shift+Q
 expect_shortcut ui.strength_popup Shift+R
 expect_shortcut view.ortho \
 expect_shortcut view.front Numpad 1
@@ -292,7 +292,7 @@ click "Restore Standard UI##config.restore_standard"
 expect_value shortcut_conflicts == 0
 expect_shortcut brush.standard V
 key f1
-click "ZBrush-style##input.style_zbrush"
+click "Classic sculpting keys##input.style_zbrush"
 key f1
 expect_value input_style == 0
 expect_value shortcut_conflicts == 0

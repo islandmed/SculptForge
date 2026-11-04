@@ -63,7 +63,7 @@ expect_value masked == 0
 
 # Insert on the model with X symmetry (on by default): a mirrored copy, one undo step.
 remember triangles base
-click "SubTools/Append"
+click "Parts/Append"
 hover "Insert on the model"
 click "Cone##insert"
 stroke 0.8 0.45 0.86 0.45
@@ -75,7 +75,7 @@ expect_value triangles == $base
 key escape
 
 # SubTool thumbnails: each row shows its SubTool, rendered from the GPU mesh.
-click "SubTools/Append"
+click "Parts/Append"
 click "Cube"
 expect_value subtools == 2
 wait_value subtool_thumbnails == 2 10

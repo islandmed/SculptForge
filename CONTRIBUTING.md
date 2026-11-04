@@ -80,7 +80,7 @@ artifact. CI compiles through ccache (see the comment at the top of `.github/wor
 
 `tools/wintest.sh` cross-compiles SculptForge for Windows with llvm-mingw (downloaded once into
 `~/.cache/sculptforge`) and runs every test, UI tests included, under Wine. It catches Windows API, path and
-file-sharing problems before a push; extra arguments go to `ctest` (`tools/wintest.sh -R ui_subtools`). On an
+file-sharing problems before a push; extra arguments go to `ctest` (`tools/wintest.sh -R ui_mask_lasso`). On an
 ARM machine it builds for Windows on ARM, which Wine runs natively.
 
 ## Demo videos

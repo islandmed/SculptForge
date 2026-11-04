@@ -1,7 +1,7 @@
-# SculptForge bridge for Blender: ZBrush-style keys in Sculpt Mode
+# SculptForge bridge for Blender: Classic sculpting keys in Sculpt Mode
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# The add-on preference "ZBrush-style keys in Sculpt Mode" adds these to Blender's add-on keymap (they take
+# The add-on preference "Classic sculpting keys in Sculpt Mode" adds these to Blender's add-on keymap (they take
 # priority over Blender's own Sculpt keys while it is on, and are removed again when it is turned off or the
 # add-on is disabled). Only keys with a real Blender equivalent are mapped; MISSING lists the rest, for the
 # preferences and docs/guide/blender.md.
@@ -13,22 +13,22 @@
 import bpy
 from bpy.props import IntProperty, StringProperty
 
-# (ZBrush name, ZBrush's B-letters, Blender 4.3+ Essentials brush, Blender 4.2 sculpt_tool, Blender 4.2 tool id)
+# (SculptForge name, the classic B-letters, Blender 4.3+ Essentials brush, Blender 4.2 sculpt_tool, Blender 4.2 tool id)
 BRUSHES = [
     ("Standard", "ST", "Draw", "DRAW", "builtin_brush.Draw"),
-    ("DamStandard", "DS", "Draw Sharp", "DRAW_SHARP", "builtin_brush.Draw Sharp"),
+    ("Sharp Crease", "DS", "Draw Sharp", "DRAW_SHARP", "builtin_brush.Draw Sharp"),
     ("Clay", "CL", "Clay", "CLAY", "builtin_brush.Clay"),
-    ("ClayBuildup", "CB", "Clay Strips", "CLAY_STRIPS", "builtin_brush.Clay Strips"),
+    ("Clay Block", "CB", "Clay Strips", "CLAY_STRIPS", "builtin_brush.Clay Strips"),
     ("Inflate", "IN", "Inflate/Deflate", "INFLATE", "builtin_brush.Inflate"),
     ("Layer", "LY", "Layer", "LAYER", "builtin_brush.Layer"),
     ("Crease", "CR", "Crease Sharp", "CREASE", "builtin_brush.Crease"),
     ("Smooth", "SM", "Smooth", "SMOOTH", "builtin_brush.Smooth"),
     ("Flatten", "FL", "Flatten/Contrast", "FLATTEN", "builtin_brush.Flatten"),
-    ("TrimDynamic", "TD", "Trim", "SCRAPE", "builtin_brush.Scrape"),
+    ("Plane Trim", "TD", "Trim", "SCRAPE", "builtin_brush.Scrape"),
     ("Pinch", "PI", "Pinch/Magnify", "PINCH", "builtin_brush.Pinch"),
     ("Move", "MV", "Grab", "GRAB", "builtin_brush.Grab"),
     ("Move Elastic", "", "Elastic Grab", "ELASTIC_DEFORM", "builtin_brush.Elastic Deform"),
-    ("SnakeHook", "SH", "Snake Hook", "SNAKE_HOOK", "builtin_brush.Snake Hook"),
+    ("Tendril", "SH", "Snake Hook", "SNAKE_HOOK", "builtin_brush.Snake Hook"),
     ("Nudge", "NU", "Nudge", "NUDGE", "builtin_brush.Nudge"),
     ("MaskPen", "", "Mask", "MASK", "builtin_brush.Mask"),
 ]
@@ -40,7 +40,7 @@ def brush_assets():
     """Blender 4.3+ picks brushes as assets (bpy.ops.brush.asset_activate); 4.2 as tools."""
     return bpy.app.version >= (4, 3, 0)
 
-# ZBrush keys Blender has nothing for (or that can't be bound the same way), shown in the preferences.
+# Classic keys Blender has nothing for (or that can't be bound the same way), shown in the preferences.
 MISSING = [
     ("I", "RGB Intensity: Blender's sculpt brushes don't paint"),
     ("Ctrl+drag on the model", "painting the mask with any brush held: Blender can't swap to the Mask brush "
@@ -51,7 +51,7 @@ MISSING = [
     ("Ctrl+Shift+click the background", "show everything: use Alt+H"),
     ("B, then two letters", "Blender menus take one key at a time: B opens the brush list; type the letters "
                             "(or any part of the name) to filter it, Enter picks"),
-    ("Alt+click a SubTool", "Blender's objects aren't SubTools: Alt+Q switches the object being sculpted"),
+    ("Alt+click a Part", "Blender's objects aren't Parts: Alt+Q switches the object being sculpted"),
     ("Strokes (DragRect, Spray...)", "Blender's stroke methods live in each brush's Stroke panel"),
 ]
 
@@ -81,18 +81,18 @@ def _brush_entry(name):
     return next((b for b in BRUSHES if b[0] == name), None)
 
 
-class SCULPTFORGE_OT_zbrush_brush(bpy.types.Operator):
-    bl_idname = "sculptforge.zbrush_brush"
-    bl_label = "ZBrush Brush"
-    bl_description = "Sculpt with the Blender brush closest to this ZBrush brush"
+class SCULPTFORGE_OT_classic_brush(bpy.types.Operator):
+    bl_idname = "sculptforge.classic_brush"
+    bl_label = "Classic Brush"
+    bl_description = "Sculpt with the Blender brush closest to this SculptForge brush"
     bl_options = {"REGISTER"}
 
-    brush: StringProperty(name="Brush", description="ZBrush brush name")
+    brush: StringProperty(name="Brush", description="SculptForge brush name")
 
     def execute(self, context):
         entry = _brush_entry(self.brush)
         if entry is None:
-            self.report({"ERROR"}, "No ZBrush brush called %s" % self.brush)
+            self.report({"ERROR"}, "No brush called %s" % self.brush)
             return {"CANCELLED"}
         name, _, asset, sculpt_tool, tool_id = entry
         if brush_assets():
@@ -115,10 +115,10 @@ class SCULPTFORGE_OT_zbrush_brush(bpy.types.Operator):
         return {"FINISHED"}
 
 
-class SCULPTFORGE_OT_zbrush_sdiv(bpy.types.Operator):
-    bl_idname = "sculptforge.zbrush_sdiv"
-    bl_label = "ZBrush SDiv"
-    bl_description = "Sculpt one Multires level higher or lower (ZBrush D / Shift+D); never adds a level"
+class SCULPTFORGE_OT_classic_sdiv(bpy.types.Operator):
+    bl_idname = "sculptforge.classic_sdiv"
+    bl_label = "Classic SDiv"
+    bl_description = "Sculpt one Multires level higher or lower (D / Shift+D); never adds a level"
     bl_options = {"REGISTER", "UNDO"}
 
     step: IntProperty(name="Step", default=1, min=-1, max=1)
@@ -131,15 +131,15 @@ class SCULPTFORGE_OT_zbrush_sdiv(bpy.types.Operator):
         multires = next(m for m in context.active_object.modifiers if m.type == "MULTIRES")
         level = max(0, min(multires.total_levels, multires.sculpt_levels + self.step))
         multires.sculpt_levels = level
-        multires.levels = level  # the viewport shows the level being sculpted, as ZBrush does
+        multires.levels = level  # the viewport shows the level being sculpted
         self.report({"INFO"}, "SDiv %d of %d" % (level, multires.total_levels))
         return {"FINISHED"}
 
 
-class SCULPTFORGE_OT_zbrush_divide(bpy.types.Operator):
-    bl_idname = "sculptforge.zbrush_divide"
-    bl_label = "ZBrush Divide"
-    bl_description = "Add a subdivision level to the Multires modifier (adding one if needed) and sculpt on it (ZBrush Ctrl+D)"
+class SCULPTFORGE_OT_classic_divide(bpy.types.Operator):
+    bl_idname = "sculptforge.classic_divide"
+    bl_label = "Classic Divide"
+    bl_description = "Add a subdivision level to the Multires modifier (adding one if needed) and sculpt on it (Ctrl+D)"
     bl_options = {"REGISTER", "UNDO"}
 
     @classmethod
@@ -159,10 +159,10 @@ class SCULPTFORGE_OT_zbrush_divide(bpy.types.Operator):
         return {"FINISHED"}
 
 
-class SCULPTFORGE_OT_zbrush_group(bpy.types.Operator):
-    bl_idname = "sculptforge.zbrush_group"
-    bl_label = "ZBrush Group"
-    bl_description = "Make the masked part a face set and clear the mask; with nothing masked, the visible part (ZBrush Ctrl+W)"
+class SCULPTFORGE_OT_classic_group(bpy.types.Operator):
+    bl_idname = "sculptforge.classic_group"
+    bl_label = "Classic Group"
+    bl_description = "Make the masked part a face set and clear the mask; with nothing masked, the visible part (Ctrl+W)"
     bl_options = {"REGISTER", "UNDO"}
 
     @classmethod
@@ -184,20 +184,20 @@ class SCULPTFORGE_OT_zbrush_group(bpy.types.Operator):
         return {"FINISHED"}
 
 
-class SCULPTFORGE_MT_zbrush_brushes(bpy.types.Menu):
-    bl_idname = "SCULPTFORGE_MT_zbrush_brushes"
-    bl_label = "ZBrush Brushes"
-    bl_options = {"SEARCH_ON_KEY_PRESS"}  # typing filters, as ZBrush's B pop-up does
+class SCULPTFORGE_MT_classic_brushes(bpy.types.Menu):
+    bl_idname = "SCULPTFORGE_MT_classic_brushes"
+    bl_label = "Classic Brushes"
+    bl_options = {"SEARCH_ON_KEY_PRESS"}  # typing filters, as the classic B pop-up does
 
     def draw(self, context):
         layout = self.layout
         for name, keys, asset, _, _ in BRUSHES:
             label = "%s  (B %s)" % (name, " ".join(keys)) if keys else name
-            layout.operator(SCULPTFORGE_OT_zbrush_brush.bl_idname, text=label).brush = name
+            layout.operator(SCULPTFORGE_OT_classic_brush.bl_idname, text=label).brush = name
 
 
 def key_table():
-    """(ZBrush key, what it does, Blender operator, key, ctrl, shift, alt, value, properties)."""
+    """(Classic key, what it does, Blender operator, key, ctrl, shift, alt, value, properties)."""
     toggle = "wm.context_toggle"
     lasso = "paint.mask_lasso_gesture"
     return [
@@ -209,8 +209,8 @@ def key_table():
         ("Space", "the quick menu at the cursor (Blender's Sculpt context menu)", "wm.call_panel", "SPACE", False,
          False, False, "PRESS", {"name": "VIEW3D_PT_sculpt_context_menu"}),
         ("B", "the brush pop-up: type to narrow, Enter picks", "wm.call_menu", "B", False, False, False, "PRESS",
-         {"name": SCULPTFORGE_MT_zbrush_brushes.bl_idname}),
-        ("Alt+drag", "Zsub (the brush digs in)", "sculpt.brush_stroke", "LEFTMOUSE", False, False, True, "PRESS",
+         {"name": SCULPTFORGE_MT_classic_brushes.bl_idname}),
+        ("Alt+drag", "Sub (the brush digs in)", "sculpt.brush_stroke", "LEFTMOUSE", False, False, True, "PRESS",
          {"mode": "INVERT"}),
         ("Ctrl+drag", "mask (a lasso)", lasso, "LEFTMOUSE", True, False, False, "PRESS", {"mode": "VALUE", "value": 1.0}),
         ("Ctrl+Alt+drag", "unmask (a lasso)", lasso, "LEFTMOUSE", True, False, True, "PRESS", {"mode": "VALUE", "value": 0.0}),
@@ -225,11 +225,11 @@ def key_table():
         ("P", "Perspective on / off", "view3d.view_persportho", "P", False, False, False, "PRESS", {}),
         ("L", "LazyMouse (Blender: Stabilize Stroke)", toggle, "L", False, False, False, "PRESS",
          {"data_path": "tool_settings.sculpt.brush.use_smooth_stroke"}),
-        ("Ctrl+D", "Divide (adds a Multires level)", SCULPTFORGE_OT_zbrush_divide.bl_idname, "D", True, False, False,
+        ("Ctrl+D", "Divide (adds a Multires level)", SCULPTFORGE_OT_classic_divide.bl_idname, "D", True, False, False,
          "PRESS", {}),
-        ("D", "SDiv up", SCULPTFORGE_OT_zbrush_sdiv.bl_idname, "D", False, False, False, "PRESS", {"step": 1}),
-        ("Shift+D", "SDiv down", SCULPTFORGE_OT_zbrush_sdiv.bl_idname, "D", False, True, False, "PRESS", {"step": -1}),
-        ("Ctrl+W", "Group Masked and clear the mask, or Group Visible (face sets)", SCULPTFORGE_OT_zbrush_group.bl_idname,
+        ("D", "SDiv up", SCULPTFORGE_OT_classic_sdiv.bl_idname, "D", False, False, False, "PRESS", {"step": 1}),
+        ("Shift+D", "SDiv down", SCULPTFORGE_OT_classic_sdiv.bl_idname, "D", False, True, False, "PRESS", {"step": -1}),
+        ("Ctrl+W", "Group Masked and clear the mask, or Group Visible (face sets)", SCULPTFORGE_OT_classic_group.bl_idname,
          "W", True, False, False, "PRESS", {}),
         ("W / E / R", "Move / Scale / Rotate", "wm.tool_set_by_id", "W", False, False, False, "PRESS",
          {"name": "builtin.move"}),
@@ -286,8 +286,8 @@ def disable():
             pass
 
 
-CLASSES = (SCULPTFORGE_OT_zbrush_brush, SCULPTFORGE_OT_zbrush_sdiv, SCULPTFORGE_OT_zbrush_divide,
-           SCULPTFORGE_OT_zbrush_group, SCULPTFORGE_MT_zbrush_brushes)
+CLASSES = (SCULPTFORGE_OT_classic_brush, SCULPTFORGE_OT_classic_sdiv, SCULPTFORGE_OT_classic_divide,
+           SCULPTFORGE_OT_classic_group, SCULPTFORGE_MT_classic_brushes)
 
 
 def register():

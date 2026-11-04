@@ -145,7 +145,7 @@ def test_goz_round_trip(tmp):
     check(np.array_equal(g.groups, arrays["groups"]), "GoZ polygroups")
     with open(path, "rb") as f:
         head = f.read(64)
-    check(head.startswith(b"GoZb 1.0 ZBrush GoZ Binary......"), "GoZ header as GoB writes it")
+    check(head.startswith(b"GoZb 1.0 classic GoZ Binary......"), "GoZ header as GoB writes it")
 
 
 def test_manifest(tmp):

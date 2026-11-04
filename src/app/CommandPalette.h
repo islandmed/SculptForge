@@ -24,8 +24,8 @@ public:
 
     // Ranks actions for QUERY (best first); exposed for tests.
     static int score(const Action& action, const std::string& query);
-    // "(ZBrush users: ZSpheres)" when `query` found the action by the ZBrush name of a renamed feature, else "".
-    static std::string zbrushHint(const Action& action, const std::string& query);
+    // "(also: retopo)" when `query` found the action by another word for it (SearchAliases.h), else "".
+    static std::string aliasHint(const Action& action, const std::string& query);
     // The palette's search: indices into ActionRegistry::all() of the actions matching QUERY, best first, at most
     // LIMIT, only those ACCEPT takes (null: all). Radial menus pick their items with it.
     static std::vector<size_t> find(const App& app, const std::string& query, size_t limit,

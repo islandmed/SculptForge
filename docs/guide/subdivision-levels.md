@@ -1,6 +1,6 @@
 # Subdivision levels
 
-Subdivision levels let you sculpt one model at several resolutions, as with ZBrush's **SDiv**: block in the big
+Subdivision levels let you sculpt one model at several resolutions: block in the big
 forms on a light version of the mesh, add pores and wrinkles on a dense one, and go back down to change the
 silhouette without losing the detail. Every Part has its own levels.
 
@@ -30,7 +30,7 @@ can step back down at any time.
 - **Quads stay quads.** A mesh with quads is divided with Catmull-Clark subdivision: each quad becomes four
   quads, and a triangle among them becomes three quads. A mesh of triangles only (a sphere from **New Sphere**,
   a scan) is divided with Loop subdivision: each triangle becomes four.
-- **Smt** (next to Divide) smooths the new level, rounding off the shape the way ZBrush does. Turn it off to
+- **Smt** (next to Divide) smooths the new level, rounding off the shape. Turn it off to
   divide flat: the new level keeps the hard edges and flat faces of the one below, for hard-surface pieces.
 - Divide always adds the level on top. If you are at a lower level it steps to the highest first.
 - Mask, vertex paint, paint layers and UVs are interpolated onto the new level; face groups and hidden faces carry
@@ -86,10 +86,9 @@ one dense mesh. **Reconstruct Subdiv** finds the mesh it was subdivided from and
 keeping the dense mesh exactly as it was. Press it again for more levels.
 
 - It works at the lowest level (SDiv 1).
-- The mesh must be a regular subdivision: all quads from Catmull-Clark subdivision (Blender's Subdivision
-  Surface, Maya's Smooth, ZBrush's Divide), or all triangles from Loop subdivision. Otherwise it says so and
+- The mesh must be a regular subdivision: all quads from Catmull-Clark subdivision, or all triangles from Loop subdivision. Otherwise it says so and
   leaves the mesh alone.
-- The vertices of the new lower level sit on the dense mesh's corner vertices, as in ZBrush.
+- The vertices of the new lower level sit on the dense mesh's corner vertices.
 
 > **Tip:** The **Cube** from **Tool > Parts > Append** is a regular quad grid, so Reconstruct Subdiv takes it
 > down to a 3 x 3 cube in four steps.
@@ -103,14 +102,14 @@ keeping the dense mesh exactly as it was. Press it again for more levels.
 - **Projects** (`.sfproj`) save every level of every Part and open at the level you saved at. They use
   project format 5 (sculpt-layer detail relative to the surface), so older SculptForge versions ask you to update
   before opening them. Projects saved with format 4 open as before and are converted as they load.
-- **Exports and Send to ZBrush** write the current level. To write another one, step to it first, or use the
+- **Exports and Bridge** write the current level. To write another one, step to it first, or use the
   `subdiv_export` command (`subdiv_export path=base.obj level=1` writes the base cage of every visible Part,
   in any export format). LODs and **Send to Unreal** start from the current level too.
 - **Tools that rebuild the mesh** (Voxel Remesh, Decimate, Quad Remesh, Subdivide, Delete hidden, merging and
   splitting Parts) work on the level you are on, including what you just sculpted there, and make a new mesh
   without levels: that level becomes the new base. The status line says so, e.g. *Subdivision levels removed:
   SDiv 3 of 5 kept as the new base (undo restores them)*. <kbd>Ctrl</kbd>+<kbd>Z</kbd> brings every level back,
-  at the level you were on. Merging and splitting Parts can't be undone (as in ZBrush), so step to the level
+  at the level you were on. Merging and splitting Parts can't be undone, so step to the level
   you want to keep first, or save before.
 
 > **Note:** **Subdivide** (in **Tool > Geometry**, below Divide) is still there: it replaces the mesh with a
@@ -147,9 +146,6 @@ SculptForge keeps the two levels you visited last ready to show, so going back a
 high level (the usual rhythm) is instant. Only the active Part keeps them: selecting another Part frees
 that memory (50-170 MB for a Part with 1.8 million triangles at the top), and the first level change after
 you come back takes a moment longer (about 0.1 s at that size) while the level is prepared again.
-
-> **ZBrush:** Divide, Smt, Lower Res, Higher Res, SDiv, Del Lower, Del Higher and Reconstruct Subdiv work as in
-> ZBrush. Not yet: Freeze SubDivision Levels, Cage, Rstr, Suv (UV smoothing on divide) and creased edges.
 
 ## Past the highest level
 

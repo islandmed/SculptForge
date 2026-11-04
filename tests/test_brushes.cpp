@@ -55,9 +55,9 @@ glm::vec3 moved(const Document& d, const std::vector<glm::vec3>& before, uint32_
 } // namespace
 
 TEST(brush_names_cover_new_types) {
-    CHECK(std::string(brushName(BrushType::DamStandard)) == "DamStandard");
-    CHECK(std::string(brushName(BrushType::ClayBuildup)) == "ClayBuildup");
-    CHECK(std::string(brushName(BrushType::SnakeHook)) == "SnakeHook");
+    CHECK(std::string(brushName(BrushType::DamStandard)) == "SharpCrease");
+    CHECK(std::string(brushName(BrushType::ClayBuildup)) == "ClayBlock");
+    CHECK(std::string(brushName(BrushType::SnakeHook)) == "Tendril");
     CHECK(std::string(brushName(BrushType::Trim)) == "Trim");
     CHECK(std::string(brushName(BrushType::Layer)) == "Layer");
     CHECK(std::string(brushName(BrushType::Nudge)) == "Nudge");

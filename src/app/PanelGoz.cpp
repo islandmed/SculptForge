@@ -4,6 +4,7 @@
 // File > Send to ZBrush: send/receive through the GoZ-compatible bridge, GoZ and STL files.
 #include "app/App.h"
 
+#include "io/BridgeProtocol.h"
 #include "io/GozIO.h"
 
 #include <filesystem>
@@ -12,7 +13,7 @@ namespace sf {
 
 namespace {
 
-const SDL_DialogFileFilter kGozFilters[] = {{"GoZ-compatible files", "GoZ;goz"}, {"All files", "*"}};
+const SDL_DialogFileFilter kGozFilters[] = {{"Bridge files", bridge::kDialogPattern}, {"All files", "*"}};
 
 long long fileTime(const std::string& path) {
     if (path.empty()) return 0;
@@ -30,7 +31,7 @@ void SDLCALL App::onGozFileChosen(void* userdata, const char* const* files, int)
     std::string path = files[0];
     if (req->kind != GozFile::Import &&
         std::filesystem::path(std::u8string(path.begin(), path.end())).extension().empty())
-        path += req->kind == GozFile::ExportStl ? ".stl" : ".GoZ";
+        path += req->kind == GozFile::ExportStl ? ".stl" : bridge::kExt;
     std::lock_guard lock(req->app->pendingMutex_);
     req->app->gozPendingFiles_.push_back({req->kind, std::move(path)});
 }
@@ -48,7 +49,7 @@ void App::runGozCommand(const std::string& name, const Args& args) {
 
 void App::drawGozMenu() {
     if (!gozInitialised_) pollGoz(); // sets up the dialogs
-    if (!ImGui::BeginMenu("Send to ZBrush")) return;
+    if (!ImGui::BeginMenu("Bridge")) return;
     const std::string root = gozFolder_[0] ? std::string(gozFolder_) : gozDefaultRoot();
     const bool bridge = !root.empty();
     if (ImGui::MenuItem("Send")) {
@@ -56,18 +57,18 @@ void App::drawGozMenu() {
         if (bridge) gozAutoReceive_ = true; // a round trip comes back the same way
     }
     if (!bridge && ImGui::IsItemHovered()) ImGui::SetTooltip("%s", gozUnavailableMessage().c_str());
-    if (ImGui::MenuItem("Receive from ZBrush")) runGozCommand("goz_receive");
+    if (ImGui::MenuItem("Receive")) runGozCommand("goz_receive");
     if (!bridge && ImGui::IsItemHovered()) ImGui::SetTooltip("%s", gozUnavailableMessage().c_str());
     if (ImGui::MenuItem("Receive automatically", nullptr, &gozAutoReceive_, bridge) && gozAutoReceive_)
         gozListTime_ = fileTime(gozObjectListPath(root));
     if (bridge) ImGui::TextDisabled("Bridge folder: %s", root.c_str());
-    else ImGui::TextDisabled("ZBrush runs on Windows and macOS only;\nGoZ-compatible files still import and export.");
+    else ImGui::TextDisabled("No default bridge folder on this system;\nBridge files still import and export.");
     ImGui::SetNextItemWidth(260.0f * uiScale_);
     ImGui::InputTextWithHint("##gozfolder", "Custom bridge folder (optional)", gozFolder_, sizeof(gozFolder_));
     ImGui::Separator();
-    if (ImGui::MenuItem("Import GoZ-compatible file..."))
+    if (ImGui::MenuItem("Import Bridge file..."))
         SDL_ShowOpenFileDialog(onGozFileChosen, &gozDialogs_[int(GozFile::Import)], window_, kGozFilters, 2, nullptr, false);
-    if (ImGui::MenuItem("Export GoZ-compatible file..."))
+    if (ImGui::MenuItem("Export Bridge file..."))
         SDL_ShowSaveFileDialog(onGozFileChosen, &gozDialogs_[int(GozFile::Export)], window_, kGozFilters, 2, nullptr);
     ImGui::EndMenu();
 }

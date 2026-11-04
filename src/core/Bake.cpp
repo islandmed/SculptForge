@@ -1062,7 +1062,7 @@ void registerBakeCommands(CommandRegistry& reg) {
     reg.add({"bake",
              "Bake maps from a high-poly source onto the active Part's UVs (the low-poly): tangent-space normal "
              "(MikkTSpace), object-space (world) normal, displacement (16-bit PNG + 32-bit EXR), ambient occlusion, cavity, "
-             "colour, curvature, thickness, position (16-bit) and ID (polygroups or Parts). Rays go along the low-poly's "
+             "colour, curvature, thickness, position (16-bit) and ID (face groups or Parts). Rays go along the low-poly's "
              "smooth normals from 'front' in front of it to 'rear' behind it. The source can be other Parts, or the "
              "active Part's own top subdivision level (baked onto its lowest level) or micro level (onto its base). "
              "UVs outside 0..1 bake as UDIM tiles. Writes <name>_<map>.png (<name>_<map>.1001.png per UDIM tile) into "
@@ -1086,7 +1086,7 @@ void registerBakeCommands(CommandRegistry& reg) {
               {"thickness_rays", T::Number, "Thickness rays per texel. Default 24.", false},
               {"thickness_distance", T::Number, "Rays longer than this (a fraction of the size) count as thick. Default 0.1.", false},
               {"curvature_radius", T::Number, "A bend of this radius (a fraction of the size) is fully bright or dark. Default 0.02.", false},
-              {"id", T::String, "What the ID map colours: polygroups (default) or parts.", false},
+              {"id", T::String, "What the ID map colours: polygroups (default) or parts.", false}, // marks-pending
               {"udim", T::Bool, "Bake UVs outside 0..1 as UDIM tiles (default true; false bakes the 0..1 square only).", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  BakeSettings st;
@@ -1134,7 +1134,7 @@ void registerBakeCommands(CommandRegistry& reg) {
                  st.thicknessDistance = float(argNumber(a, "thickness_distance", st.thicknessDistance));
                  st.curvatureRadius = float(argNumber(a, "curvature_radius", st.curvatureRadius));
                  const std::string id = argString(a, "id", "polygroups");
-                 if (id != "polygroups" && id != "parts") return {false, "id must be polygroups or parts"};
+                 if (id != "polygroups" && id != "parts") return {false, "id must be polygroups or parts"}; // marks-pending
                  st.idSource = id == "parts" ? BakeSettings::IdSource::Parts : BakeSettings::IdSource::Polygroups;
 
                  // The meshes: other Parts onto the active one, or the active Part's own levels.

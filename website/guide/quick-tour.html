@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quick tour for experienced sculptors - SculptForge User Guide</title>
+  <meta name="description" content="You know how to sculpt; you just need to know where SculptForge keeps things. Here are ten stops, each with a picture of the panel it talks about.">
+  <meta name="theme-color" content="#111114">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" type="image/svg+xml" href="../img/favicon.svg?v=2">
+  <link rel="icon" type="image/png" href="../img/favicon-64.png?v=2">
+  <link rel="apple-touch-icon" href="../img/icon-256.png?v=2">
+  <link rel="canonical" href="https://sculptforge.app/guide/quick-tour.html">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Quick tour for experienced sculptors - SculptForge User Guide">
+  <meta property="og:description" content="You know how to sculpt; you just need to know where SculptForge keeps things. Here are ten stops, each with a picture of the panel it talks about.">
+  <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=4">
+  <meta property="og:url" content="https://sculptforge.app/guide/quick-tour.html">
+  <link rel="stylesheet" href="../style.css?v=19">
+  <script src="../motion.js?v=11" defer></script>
+  <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+  <script src="search-index.js?v=47" defer></script>
+</head>
+<body class="guide-page" data-prev="whats-new.html" data-next="installing.html">
+  <div class="scroll-progress" aria-hidden="true"></div>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="../index.html"><img src="../img/logo.svg?v=2" alt="" width="34" height="34"><span>SculptForge</span></a>
+      <nav aria-label="Main">
+        <a href="../index.html#features">Features</a>
+        <a href="../index.html#demos">Demos</a>
+        <a href="../brushes.html">Brushes</a>
+        <a href="index.html" aria-current="page">Guide</a>
+        <a class="nav-dl" href="../index.html#download">Download</a>
+        <a class="gh" href="https://discord.gg/gWrYkEmQhH">Discord</a>
+        <a class="gh" href="https://github.com/islandmed/SculptForge">GitHub</a>
+      </nav>
+    </div>
+  </header>
+  <div class="wrap guide-layout">
+    <div class="guide-side">
+      <button class="toc-toggle" type="button" aria-expanded="false" aria-controls="guide-toc">
+        <span>Contents</span><span class="toc-current">Quick tour for experienced sculptors</span></button>
+      <div id="guide-toc" class="toc-panel">
+        <div class="guide-search" role="search">
+          <input type="search" id="guide-q" placeholder="Search the guide" aria-label="Search the guide" autocomplete="off">
+          <div class="search-results" id="guide-results" hidden></div>
+        </div>
+        <nav class="toc" aria-label="User guide"><a class="toc-home" href="index.html">Contents</a><p class="toc-group">Getting started</p><ul><li><a href="welcome.html">Welcome to SculptForge</a></li><li><a href="first-sculpt.html">Your first sculpt in 10 minutes</a></li><li><a href="whats-new.html">What&#x27;s new</a></li><li><a href="quick-tour.html" class="current" aria-current="page">Quick tour for experienced sculptors</a><ul class="toc-sections"><li><a href="#where-things-are">Where things are</a></li><li><a href="#voxel-remesh">Voxel Remesh</a></li><li><a href="#dynamic-topology">Dynamic topology</a></li><li><a href="#quad-remesh">Quad Remesh</a></li><li><a href="#levels-parts-and-face-groups">Levels, Parts and Face Groups</a></li><li><a href="#masking">Masking</a></li><li><a href="#cut-clip-and-close-holes">Cut, Clip and Close Holes</a></li><li><a href="#brushes-alphas-and-the-library">Brushes, alphas and the Library</a></li><li><a href="#baking-and-texturing">Baking and texturing</a></li><li><a href="#sculptforge-stays-free">SculptForge stays free</a></li><li><a href="#keys">Keys</a></li><li><a href="#see-also">See also</a></li></ul></li><li><a href="installing.html">Install SculptForge on Windows, macOS and Linux</a></li><li><a href="interface.html">The interface</a></li><li><a href="navigation.html">Navigating the view</a></li></ul><p class="toc-group">Sculpting</p><ul><li><a href="sculpting.html">Sculpting and brushes</a></li><li><a href="brush-lab.html">Brush Lab and sharing brushes</a></li><li><a href="masking.html">Masking</a></li><li><a href="face-groups.html">Face Groups and visibility</a></li><li><a href="selection-sets.html">Selection sets and morph targets</a></li><li><a href="parts.html">Parts</a></li><li><a href="forge-spheres.html">Forge Spheres</a></li><li><a href="vertex-paint.html">Vertex Paint and materials</a></li><li><a href="texture-painting.html">Texture painting</a></li><li><a href="uv-editor.html">UV Editor</a></li><li><a href="pbr-painting.html">Material painting (PBR)</a></li><li><a href="fill-layers.html">Fill layers, Mesh Maps and Material Recipes</a></li><li><a href="layers.html">Sculpt layers and blend shapes</a></li><li><a href="facial-shapes.html">Facial shapes and live face</a></li><li><a href="subdivision-levels.html">Subdivision levels</a></li><li><a href="micro-levels.html">Micro levels: hundreds of millions of polygons</a></li><li><a href="dynamic-topology.html">Dynamic topology</a></li><li><a href="timeline.html">Sculpt Timeline and timelapse</a></li><li><a href="gizmo.html">Moving, rotating and posing (Gizmo)</a></li><li><a href="geometry.html">Subdivide, remesh, decimate and LODs</a></li><li><a href="cut.html">Cut: line, lasso, rectangle and polyline</a></li><li><a href="retopology.html">Quad retopology and detail projection</a></li></ul><p class="toc-group">AI and capture</p><ul><li><a href="generate-3d.html">Image and text to 3D</a></li><li><a href="splats.html">Gaussian splats</a></li><li><a href="scan-to-splat.html">Scan an object into a splat</a></li><li><a href="scan-to-sculptable.html">From scan to sculptable mesh</a></li><li><a href="phone-capture.html">Phone capture and AR</a></li></ul><p class="toc-group">Files and pipelines</p><ul><li><a href="baking.html">Baking normal and displacement maps</a></li><li><a href="exporting.html">Exporting, Unreal and Bridge</a></li><li><a href="export-presets.html">Export presets</a></li><li><a href="blender.html">Working with Blender</a></li><li><a href="maya.html">Working with Maya</a></li><li><a href="projects.html">Projects, autosave and snapshots</a></li><li><a href="scripting.html">Scripting and automation</a></li><li><a href="packs-and-macros.html">Packs and macros</a></li><li><a href="studios.html">SculptForge for studios</a></li></ul><p class="toc-group">Reference</p><ul><li><a href="shortcuts.html">Keyboard and mouse</a></li><li><a href="performance.html">Performance and big meshes</a></li><li><a href="troubleshooting.html">Troubleshooting: tablets, display, crashes and FAQ</a></li><li><a href="glossary.html">Glossary</a></li></ul></nav>
+      </div>
+    </div>
+    <main class="guide-main" id="top">
+      <article class="guide-article">
+<h1 id="quick-tour-for-experienced-sculptors">Quick tour for experienced sculptors</h1>
+<p>You know how to sculpt; you just need to know where SculptForge keeps things. Here are ten stops, each with a picture of the panel it talks about.</p>
+<p>The pictures are SculptForge in its default look and layout.</p>
+<h2 id="where-things-are">Where things are<a class="anchor" href="#where-things-are" aria-label="Link to this section">#</a></h2>
+<figure class="shot"><a href="images/quick-tour/01-where.jpg" class="zoom"><img src="images/quick-tour/01-where.jpg" alt="The command search finding Quad Remesh by the word &quot;retopo&quot;" width="1100" height="634" loading="lazy" decoding="async"></a><figcaption>The command search finding Quad Remesh by the word &quot;retopo&quot;</figcaption></figure>
+<p>The menus along the top are sorted by task: <strong>Sculpt</strong> (brushes, strokes, alphas, symmetry), <strong>Paint</strong>, <strong>Mesh</strong>, <strong>View</strong> and <strong>Render</strong>. The right tray holds the <strong>Tool</strong> palette: Parts, Geometry, Remesh, Masking, Cut, Bake and more. The shelves around the view hold the brush, its size and strength, and the brush, stroke, alpha and material tiles. See <a href="interface.html">The interface</a>.</p>
+<p>Lost? Press <kbd>F3</kbd> and type what you are after in your own words. The search knows the usual sculpting words too, and says which one it matched:</p>
+<div class="table-wrap"><table><thead><tr><th>Type</th><th>Finds</th></tr></thead><tbody><tr><td><code>remesh</code>, <code>voxel</code>, <code>block out</code></td><td><strong>Voxel Remesh</strong></td></tr><tr><td><code>retopo</code>, <code>retopology</code>, <code>quads</code></td><td><strong>Quad Remesh</strong></td></tr><tr><td><code>subdivide</code>, <code>multires</code>, <code>levels</code></td><td><strong>Divide</strong>, <strong>Lower Res</strong>, <strong>Higher Res</strong></td></tr><tr><td><code>groups</code></td><td><strong>Face Groups</strong></td></tr><tr><td><code>clip</code>, <code>trim</code>, <code>slice</code></td><td><strong>Tool &gt; Cut</strong></td></tr><tr><td><code>folders</code>, <code>objects</code></td><td><strong>Tool &gt; Parts</strong></td></tr><tr><td><code>insert</code>, <code>kitbash</code></td><td><strong>Append</strong> (a mesh as a new Part)</td></tr><tr><td><code>vertex color</code></td><td><strong>Vertex Paint</strong></td></tr><tr><td><code>armature</code></td><td><strong>Forge Spheres</strong></td></tr></tbody></table></div>
+<h2 id="voxel-remesh">Voxel Remesh<a class="anchor" href="#voxel-remesh" aria-label="Link to this section">#</a></h2>
+<figure class="shot"><a href="images/quick-tour/02-voxel.jpg" class="zoom"><img src="images/quick-tour/02-voxel.jpg" alt="Tool &gt; Remesh open in the right tray" width="1100" height="634" loading="lazy" decoding="async"></a><figcaption>Tool &gt; Remesh open in the right tray</figcaption></figure>
+<p>A fast remesh for blocking out. Pull shapes far out or merge pieces, then rebuild one even surface: open <strong>Tool &gt; Remesh</strong> in the right tray, set <strong>Resolution</strong> and click <strong>Voxel Remesh</strong>. A higher resolution keeps more detail. The mask and vertex paint carry over, so you can keep going. See <a href="geometry.html#voxel-remesh">Geometry</a>.</p>
+<h2 id="dynamic-topology">Dynamic topology<a class="anchor" href="#dynamic-topology" aria-label="Link to this section">#</a></h2>
+<figure class="shot"><a href="images/quick-tour/03-dynamic.jpg" class="zoom"><img src="images/quick-tour/03-dynamic.jpg" alt="Sculpt &gt; Draw &amp; Tablet with the Dynamic topology controls" width="1100" height="634" loading="lazy" decoding="async"></a><figcaption>Sculpt &gt; Draw &amp; Tablet with the Dynamic topology controls</figcaption></figure>
+<p>Dynamic topology adds detail where you sculpt. Turn on <strong>Dynamic</strong> on the top shelf and the brush adds triangles where it needs them and removes them where it doesn&#x27;t; <strong>Detail</strong> sets how small they get. Pull horns, ears or fingers out of a ball without remeshing. <strong>Wire</strong> (<kbd>Shift</kbd>+<kbd>F</kbd>) shows the new triangles. See <a href="dynamic-topology.html">Dynamic topology</a>.</p>
+<h2 id="quad-remesh">Quad Remesh<a class="anchor" href="#quad-remesh" aria-label="Link to this section">#</a></h2>
+<figure class="shot"><a href="images/quick-tour/04-quad.jpg" class="zoom"><img src="images/quick-tour/04-quad.jpg" alt="Tool &gt; Remesh with Quad Remesh at its top" width="1100" height="634" loading="lazy" decoding="async"></a><figcaption>Tool &gt; Remesh with Quad Remesh at its top</figcaption></figure>
+<p>Automatic quad retopology: <strong>Tool &gt; Remesh &gt; Quad Remesh</strong> rebuilds a sculpt as clean quads whose edge loops follow the forms. Set <strong>Target Polygons</strong> and leave <strong>Keep Original</strong> on. Divide the result, then <strong>Project All</strong> (<strong>Tool &gt; Parts</strong>) brings the detail back. Draw <strong>Quad Remesh Guides</strong> to steer the loops. See <a href="retopology.html">Quad retopology</a>.</p>
+<h2 id="levels-parts-and-face-groups">Levels, Parts and Face Groups<a class="anchor" href="#levels-parts-and-face-groups" aria-label="Link to this section">#</a></h2>
+<figure class="shot"><a href="images/quick-tour/05-levels.jpg" class="zoom"><img src="images/quick-tour/05-levels.jpg" alt="Tool &gt; Geometry with the subdivision levels" width="1100" height="634" loading="lazy" decoding="async"></a><figcaption>Tool &gt; Geometry with the subdivision levels</figcaption></figure>
+<p><kbd>Ctrl</kbd>+<kbd>D</kbd> divides and keeps the lower levels: <kbd>Shift</kbd>+<kbd>D</kbd> steps down, <kbd>D</kbd> steps up, and you can sculpt at any level (<strong>Tool &gt; Geometry</strong>). A scene holds several <a href="parts.html">Parts</a> (<strong>Tool &gt; Parts</strong>); <kbd>Alt</kbd>+click one in the view to work on it. <a href="face-groups.html">Face Groups</a> split a Part into coloured regions to hide, isolate or mask (<strong>Tool &gt; Face Groups</strong>). See <a href="subdivision-levels.html">Subdivision levels</a>.</p>
+<h2 id="masking">Masking<a class="anchor" href="#masking" aria-label="Link to this section">#</a></h2>
+<figure class="shot"><a href="images/quick-tour/06-masking.jpg" class="zoom"><img src="images/quick-tour/06-masking.jpg" alt="Tool &gt; Masking with By cavity and By face group" width="1100" height="634" loading="lazy" decoding="async"></a><figcaption>Tool &gt; Masking with By cavity and By face group</figcaption></figure>
+<p>Hold <kbd>Ctrl</kbd> and paint to mask, <kbd>Ctrl</kbd>+<kbd>Alt</kbd> to unmask. <strong>Tool &gt; Masking</strong> inverts, blurs and grows the mask, and builds one <strong>By cavity</strong>, <strong>By face group</strong> or along the border. Press <kbd>G</kbd> for the stroke popup: its <strong>Shapes</strong> row picks <strong>Mask Pen</strong>, <strong>Mask Lasso</strong> or <strong>Mask Rect</strong> for the next <kbd>Ctrl</kbd> stroke. See <a href="masking.html">Masking</a>.</p>
+<h2 id="cut-clip-and-close-holes">Cut, Clip and Close Holes<a class="anchor" href="#cut-clip-and-close-holes" aria-label="Link to this section">#</a></h2>
+<figure class="shot"><a href="images/quick-tour/07-cut.jpg" class="zoom"><img src="images/quick-tour/07-cut.jpg" alt="Tool &gt; Cut with its shapes and modes" width="1100" height="634" loading="lazy" decoding="async"></a><figcaption>Tool &gt; Cut with its shapes and modes</figcaption></figure>
+<p>Pick a shape in <strong>Tool &gt; Cut</strong> and draw it with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>: a line, lasso, rectangle or polyline goes straight through the whole Part, and a closed Part stays closed. Cut it away, cut in, add, or <strong>Clip</strong>: press everything outside the shape flat onto its outline. <strong>Close Holes</strong> (<strong>Tool &gt; Geometry</strong>) caps every open boundary. See <a href="cut.html">Cut</a> and <a href="geometry.html#close-holes">Close Holes</a>.</p>
+<h2 id="brushes-alphas-and-the-library">Brushes, alphas and the Library<a class="anchor" href="#brushes-alphas-and-the-library" aria-label="Link to this section">#</a></h2>
+<figure class="shot"><a href="images/quick-tour/08-library.jpg" class="zoom"><img src="images/quick-tour/08-library.jpg" alt="The Library&#x27;s Brush tab" width="1100" height="634" loading="lazy" decoding="async"></a><figcaption>The Library&#x27;s Brush tab</figcaption></figure>
+<p><kbd>B</kbd> opens the brush picker; type the first letters of a name to pick one. The <strong>Alpha</strong> tile picks the stamp shape. The <strong>Library</strong> (<kbd>,</kbd>) holds starter meshes, brushes, alphas, Lit Spheres and snapshots. A pack (<code>.sfpack</code>) brings brushes, alphas and Lit Spheres in one file; <strong>File &gt; Install Pack</strong> shows what is inside before anything is installed. See <a href="sculpting.html">Sculpting and brushes</a> and <a href="packs-and-macros.html">Packs and macros</a>.</p>
+<h2 id="baking-and-texturing">Baking and texturing<a class="anchor" href="#baking-and-texturing" aria-label="Link to this section">#</a></h2>
+<figure class="shot"><a href="images/quick-tour/09-bake.jpg" class="zoom"><img src="images/quick-tour/09-bake.jpg" alt="Tool &gt; Bake with its maps" width="1100" height="634" loading="lazy" decoding="async"></a><figcaption>Tool &gt; Bake with its maps</figcaption></figure>
+<p><strong>Tool &gt; Bake</strong> makes normal, displacement, ambient occlusion, cavity and colour maps from your sculpt onto a low-poly Part with UVs, in the background. <kbd>P</kbd> picks the Paint brush for vertex paint; <strong>New Texture</strong> on the top shelf paints into a texture instead (Auto UV runs first), with paint layers and material channels. See <a href="baking.html">Baking</a>, <a href="texture-painting.html">Texture painting</a> and <a href="pbr-painting.html">Material painting</a>.</p>
+<h2 id="sculptforge-stays-free">SculptForge stays free<a class="anchor" href="#sculptforge-stays-free" aria-label="Link to this section">#</a></h2>
+<p>Everything in this tour is free, and stays free. If SculptForge helps your work, a membership keeps it moving: members vote on what we build next in #feature-vote on Discord, and Insiders get daily drops and preview builds. See <a href="https://sculptforge.app/support.html" rel="noopener">sculptforge.app/support.html</a>.</p>
+<h2 id="keys">Keys<a class="anchor" href="#keys" aria-label="Link to this section">#</a></h2>
+<p><strong>Edit &gt; Preferences &gt; Input &gt; Style</strong> picks the keys: <strong>SculptForge</strong> (the default), <strong>Classic sculpting keys</strong>, Blender or Maya. See <a href="shortcuts.html">Keyboard and mouse</a>.</p>
+<h2 id="see-also">See also<a class="anchor" href="#see-also" aria-label="Link to this section">#</a></h2>
+<ul>
+<li>
+<a href="first-sculpt.html">Your first sculpt in 10 minutes</a>
+</li>
+<li>
+<a href="interface.html">The interface</a>
+</li>
+<li>
+<a href="glossary.html">Glossary</a>
+</li>
+</ul>
+      </article>
+      <nav class="pager" aria-label="Previous and next chapter"><a class="prev" rel="prev" href="whats-new.html"><span>Previous</span>What&#x27;s new</a><a class="next" rel="next" href="installing.html"><span>Next</span>Install SculptForge on Windows, macOS and Linux</a></nav>
+      <p class="guide-meta fine">Also in the app: <strong>Help &gt; User Guide</strong> (<kbd>Shift</kbd>+<kbd>F1</kbd>).
+        Found a mistake? <a href="https://github.com/islandmed/SculptForge/edit/main/docs/guide/quick-tour.md">Edit this page on GitHub</a>.</p>
+    </main>
+    <aside class="on-page" aria-label="On this page"><p>On this page</p><ul><li><a href="#where-things-are">Where things are</a></li><li><a href="#voxel-remesh">Voxel Remesh</a></li><li><a href="#dynamic-topology">Dynamic topology</a></li><li><a href="#quad-remesh">Quad Remesh</a></li><li><a href="#levels-parts-and-face-groups">Levels, Parts and Face Groups</a></li><li><a href="#masking">Masking</a></li><li><a href="#cut-clip-and-close-holes">Cut, Clip and Close Holes</a></li><li><a href="#brushes-alphas-and-the-library">Brushes, alphas and the Library</a></li><li><a href="#baking-and-texturing">Baking and texturing</a></li><li><a href="#sculptforge-stays-free">SculptForge stays free</a></li><li><a href="#keys">Keys</a></li><li><a href="#see-also">See also</a></li></ul></aside>
+  </div>
+  <footer class="footer">
+    <div class="wrap footer-grid">
+      <div>
+        <a class="brand" href="../index.html"><img src="../img/logo.svg?v=2" alt="" width="28" height="28"><span>SculptForge</span></a>
+        <p class="fine">Copyright © 2026 The SculptForge contributors.<br>The SculptForge User Guide is part of
+          SculptForge, licensed under the <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
+      </div>
+      <div class="links">
+        <a href="index.html">User guide</a>
+        <a href="../supporters.html">Supporters</a>
+        <a href="https://github.com/islandmed/SculptForge">Source code</a>
+        <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
+        <a href="https://github.com/islandmed/SculptForge/issues">Report a problem</a>
+        <a href="https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md">AI services &amp; privacy</a>
+      </div>
+      <p class="fine trademarks">SculptForge is an independent project. Product names are trademarks of their respective owners.</p>
+    </div>
+  </footer>
+</body>
+</html>

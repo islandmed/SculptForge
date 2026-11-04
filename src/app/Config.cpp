@@ -470,7 +470,7 @@ void App::initActions() {
             "(stretched areas after big moves). The mask holds what it covers; one undo step.",
             "Smooth the whole Part by the amount beside it (Smooth keeps volume: without shrinking it). The mask "
             "holds what it covers; one undo step.",
-            "Fill the whole Part out toward a rounder volume, like a balloon (ZBrush's Inflate Balloon); a negative "
+            "Fill the whole Part out toward a rounder volume, like a balloon; a negative "
             "amount lets the air out. The mask holds what it covers; one undo step."};
         for (int k = 0; k < 4; ++k)
             add(kIds[k], kLabels[k], "Tool > Deformation", nullptr,
@@ -556,7 +556,7 @@ void App::initActions() {
         nullptr, [this] { return symmetry_.x; }, nullptr, "Mirror strokes across the X axis (left / right).");
     add("view.wireframe", "Wireframe", "Render", "Shift+F", [this] { renderSettings_.wireframe = !renderSettings_.wireframe; },
         ICON_LC_GRID_3X3, nullptr, [this] { return renderSettings_.wireframe; }, nullptr,
-        "Show the mesh's polygons (quads and triangles) over the surface (ZBrush PolyFrame).");
+        "Show the mesh's polygons (quads and triangles) over the surface.");
     add("view.frame", "Frame model", "Transform", "F", [this] { camera_.frame(sceneBounds()); }, ICON_LC_SCAN, nullptr, nullptr,
         nullptr, "Fit the whole model in the view.");
     add("color.pick", "Pick colour", "Color", "C", [this] { pickColorUnderCursor(); }, ICON_LC_PIPETTE, nullptr, nullptr, nullptr,
@@ -653,7 +653,7 @@ void App::initActions() {
     // --- Config (ZBrush: Preferences > Config) ---
     add("config.store", "Store Config", "Preferences > Config", "Ctrl+Shift+I", [this] { storeConfig(); }, ICON_LC_SAVE, nullptr,
         nullptr, nullptr,
-        "Keep the current layout, shortcuts and interface preferences for future sessions. Like ZBrush, SculptForge never "
+        "Keep the current layout, shortcuts and interface preferences for future sessions. SculptForge never "
         "saves them on its own.");
     add("config.restore_standard", "Restore Standard UI", "Preferences > Config", nullptr, [this] { restoreStandardUi(); },
         ICON_LC_ROTATE_CCW, nullptr, nullptr, nullptr,
@@ -1286,7 +1286,7 @@ void drawInterfaceSection(App& app) {
     ImGui::BeginDisabled(!p.popupInfo);
     ImGui::SetNextItemWidth(-FLT_MIN);
     ui::SliderInside("##help_opacity", &p.helpOpacity, 0.3f, 1.0f, "Popup Info opacity %.2f");
-    ui::HelpText("Popup Info opacity", nullptr, "How solid the Ctrl-help box is (ZBrush: Quick Info Opacity).",
+    ui::HelpText("Popup Info opacity", nullptr, "How solid the Ctrl-help box is.",
                  "Preferences > Interface");
     ImGui::EndDisabled();
     ImGui::SetNextItemWidth(-FLT_MIN);
@@ -1308,10 +1308,9 @@ void drawInterfaceSection(App& app) {
     ImGui::Checkbox(tr("Auto collapse right tray"), &p.autoCollapseRight);
     ui::HelpText("Auto collapse right tray", nullptr,
                  "Opening a palette in the right tray collapses the others when they would not fit.", "Preferences > Interface");
-    ImGui::Checkbox(tr("Palettes strictly A-Z (ZBrush order)"), &p.alphabeticalPalettes);
+    ImGui::Checkbox(tr("Palettes strictly A-Z"), &p.alphabeticalPalettes);
     ui::HelpText("Palettes strictly A-Z", nullptr,
-                 "Off: File and Edit come first in the palette bar and Help last, the rest A to Z. On: every palette A to Z, as in "
-                 "ZBrush.",
+                 "Off: File and Edit come first in the palette bar and Help last, the rest A to Z. On: every palette A to Z.",
                  "Preferences > Interface");
     ImGui::Checkbox(tr("Left-handed layout"), &app.layout().leftHanded);
     ui::HelpText("Left-handed layout", nullptr, "Mirror the shelves and trays: tools on the left, navigation on the right.",
@@ -1349,7 +1348,7 @@ void drawInterfaceSection(App& app) {
                  "Size of text and controls, applied at once. Automatic follows the display the window is on (Windows: "
                  "Settings > Display > Scale, per monitor). Store Config keeps it for the next start.",
                  "Preferences > Interface");
-    static const char* kRotation[] = {"Free (ZBrush)", "Turntable"};
+    static const char* kRotation[] = {"Free", "Turntable"};
     ImGui::SetNextItemWidth(-FLT_MIN);
     if (ImGui::BeginCombo("##rotation", (std::string(tr("Rotation:")) + " " + tr(kRotation[p.turntable ? 1 : 0])).c_str())) {
         for (int i = 0; i < 2; ++i)
@@ -1357,7 +1356,7 @@ void drawInterfaceSection(App& app) {
         ImGui::EndCombo();
     }
     ui::HelpText("Rotation", nullptr,
-                 "Free: dragging turns the model about the screen's axes and can roll it over the top, as in ZBrush; press "
+                 "Free: dragging turns the model about the screen's axes and can roll it over the top; press "
                  "Shift while rotating to snap to the nearest front, side, top or bottom view. Turntable: the model stays "
                  "upright and turns about its vertical axis, as in Blender or Maya.",
                  "Preferences > Interface");
@@ -1427,7 +1426,7 @@ void drawLightBoxSection(App& app) {
     UiPrefs& p = app.uiPrefs();
     UiLayout& l = app.layout();
     ImGui::Checkbox(tr("Show at startup"), &p.lightboxAtStartup);
-    ui::HelpText("Show Library at startup", nullptr, "Open Library on the Project tab when SculptForge starts (as ZBrush does).",
+    ui::HelpText("Show Library at startup", nullptr, "Open Library on the Project tab when SculptForge starts.",
                  "Preferences > Library");
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted(tr("Rows"));
@@ -1640,11 +1639,11 @@ void App::drawLookSection() {
                  "Every palette is a section of one menu, and F3 finds them all.",
                  "Preferences > Interface > Look");
     ImGui::SameLine();
-    if (ImGui::RadioButton(tr("ZBrush-style##layout.zbrush"), uiPrefs_.shellLayout == 0)) {
+    if (ImGui::RadioButton(tr("Classic##layout.zbrush"), uiPrefs_.shellLayout == 0)) {
         setShellLayout(0);
         lookDirty_ = true;
     }
-    ui::HelpText("ZBrush-style layout", nullptr, "The alphabetical palette bar and the two-row top shelf.",
+    ui::HelpText("Classic layout", nullptr, "The alphabetical palette bar and the two-row top shelf.",
                  "Preferences > Interface > Look");
     tray::GroupLabel(*this, "Interface");
 }
