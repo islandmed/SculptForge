@@ -65,7 +65,8 @@ jobs:
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
           version=$(sed -n 's/^project(SculptForge VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
           pre=$(sed -n 's/^set(SCULPTFORGE_PRERELEASE "\([^"]*\)")$/\1/p' CMakeLists.txt)
-          version=$version${pre:+-$pre} # a beta: 0.11.0-beta.1          if [ "$DRY_RUN" = true ] && ! git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+          version=$version${pre:+-$pre} # a beta: 0.11.0-beta.1
+          if [ "$DRY_RUN" = true ] && ! git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
             # A dry run of a branch or commit: its packages are named for the version it carries.
             echo "Dry run of $TAG ($sha), packages named v$version"
             echo "tag=v$version" >> "$GITHUB_OUTPUT"
