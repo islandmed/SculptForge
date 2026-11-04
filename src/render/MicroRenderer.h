@@ -25,6 +25,7 @@
 #include "render/GL.h"
 
 #include <cstdint>
+#include <functional>
 #include <vector>
 
 namespace sf {
@@ -53,6 +54,10 @@ public:
     enum class GpuShade { Off, On };
     static GpuShade gpuShadeModeDefault();
     static bool gpuShadeDefault() { return gpuShadeModeDefault() != GpuShade::Off; }
+    // The app's frame timer (app/Calibration.h GpuFrameTimer): stepped aside while a pass times itself with
+    // GL_TIME_ELAPSED (one can't open inside another); pause() false = don't time this pass.
+    static inline std::function<bool()> pauseFrameTimer;
+    static inline std::function<void()> resumeFrameTimer;
     GpuShade gpuShadeMode = gpuShadeModeDefault();
     bool gpuShade = gpuShadeDefault();
     double gpuShadeTargetMs = 4.0;
@@ -112,7 +117,7 @@ private:
     GLuint gsProgram_ = 0;  // GPU shading: the pass, its tables, the list of slots, the output, a timer query
     bool gsFailed_ = false;
     GLuint gsNbrData_ = 0, gsNbrTex_ = 0, gsRingOffData_ = 0, gsRingOffTex_ = 0, gsRingData_ = 0, gsRingTex_ = 0;
-    GLuint gsIJData_ = 0, gsIJTex_ = 0, gsListData_ = 0, gsListTex_ = 0, gsOut_ = 0, gsQuery_[2] = {0, 0};
+    GLuint gsIJData_ = 0, gsIJTex_ = 0, gsListData_ = 0, gsListTex_ = 0, gsOut_ = 0, gsQuery_ = 0;
     GLuint gsPosProgram_ = 0, gsRowData_ = 0, gsRowTex_ = 0, gsList1Data_ = 0, gsList1Tex_ = 0;
     GLuint gsFbo_ = 0, gsPosTarget_ = 0, gsShadeTarget_ = 0; // the fragment-shader passes' targets (uW x rows)
     int gsPosRows_ = 0, gsShadeRows_ = 0;

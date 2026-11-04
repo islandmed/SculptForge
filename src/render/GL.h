@@ -213,13 +213,11 @@ constexpr GLbitfield GL_COLOR_BUFFER_BIT = 0x4000;
     X(void, DeleteQueries, GLsizei, const GLuint*)                                           \
     X(void, BeginQuery, GLenum, GLuint)                                                      \
     X(void, EndQuery, GLenum)                                                                \
-    X(void, GetQueryObjectui64v, GLuint, GLenum, GLuint64*)                                  \
-    X(void, QueryCounter, GLuint, GLenum)
+    X(void, GetQueryObjectui64v, GLuint, GLenum, GLuint64*)
 
 constexpr GLenum GL_COPY_READ_BUFFER = 0x8F36;
 constexpr GLenum GL_R32I = 0x8235;
 constexpr GLenum GL_TIME_ELAPSED = 0x88BF;
-constexpr GLenum GL_TIMESTAMP = 0x8E28;
 constexpr GLenum GL_TEXTURE_BINDING_BUFFER = 0x8C2C;
 constexpr GLenum GL_PIXEL_PACK_BUFFER = 0x88EB;
 constexpr GLenum GL_VIEWPORT = 0x0BA2;

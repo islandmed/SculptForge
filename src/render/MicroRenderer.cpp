@@ -351,7 +351,7 @@ void MicroRenderer::release() {
                      (unsigned long long)cpuShadePasses, cpuShadePasses ? cpuShadeMs / double(cpuShadePasses) : 0.0);
             if (f != stderr) std::fclose(f);
         }
-    if (gsQuery_[0] && gl::DeleteQueries) gl::DeleteQueries(2, gsQuery_), gsQuery_[0] = gsQuery_[1] = 0;
+    if (gsQuery_ && gl::DeleteQueries) gl::DeleteQueries(1, &gsQuery_), gsQuery_ = 0;
     gsOutBytes_ = 0;
     gsQueryPending_ = false;
     serial_ = 0;
@@ -688,27 +688,29 @@ bool MicroRenderer::shadeOnGpu(const Mesh& mesh, std::vector<uint32_t>& tris) {
     const size_t points1 = list1.size() * S, points2 = list2.size() * S;
     if (!emptyVao_) gl::GenVertexArrays(1, &emptyVao_);
     // The last pass's GPU time, if it's ready (never waited for).
-    // (Timestamps, not GL_TIME_ELAPSED: the frame governor may have its own elapsed-time query open around this.)
+    // The last pass's GPU time, if it's ready (never waited for).
     if (gsQueryPending_ && gl::GetQueryObjectui64v) {
         GLuint64 ready = 0;
-        gl::GetQueryObjectui64v(gsQuery_[1], GL_QUERY_RESULT_AVAILABLE, &ready);
+        gl::GetQueryObjectui64v(gsQuery_, GL_QUERY_RESULT_AVAILABLE, &ready);
         if (ready) {
-            GLuint64 t0 = 0, t1 = 0;
-            gl::GetQueryObjectui64v(gsQuery_[0], GL_QUERY_RESULT, &t0);
-            gl::GetQueryObjectui64v(gsQuery_[1], GL_QUERY_RESULT, &t1);
-            const double ns = double(t1 > t0 ? t1 - t0 : 0);
-            lastGpuShadeMs = ns * 1e-6;
+            GLuint64 ns = 0;
+            gl::GetQueryObjectui64v(gsQuery_, GL_QUERY_RESULT, &ns);
+            lastGpuShadeMs = double(ns) * 1e-6;
             gsQueryPending_ = false;
             gsGpuMs += lastGpuShadeMs, ++gsQueried;
             if (gsQueryPoints_) { // the GPU's cost per shaded point, smoothed: the next syncs' budget follows it
-                const double per = ns / double(gsQueryPoints_);
+                const double per = double(ns) / double(gsQueryPoints_);
                 gsNsPerPoint_ = gsNsPerPoint_ > 0.0 ? gsNsPerPoint_ * 0.7 + per * 0.3 : per;
             }
         }
     }
-    const bool timed = gl::GenQueries && gl::QueryCounter && gl::GetQueryObjectui64v && !gsQueryPending_;
-    if (timed && !gsQuery_[0]) gl::GenQueries(2, gsQuery_);
-    if (timed) gl::QueryCounter(gsQuery_[0], GL_TIMESTAMP);
+    // Timed with GL_TIME_ELAPSED (timestamps on the M1 missed ~90% of the work), with the frame timer's query
+    // stepped aside meanwhile.
+    bool timed = gl::GenQueries && gl::BeginQuery && gl::EndQuery && !gsQueryPending_;
+    const bool paused = timed && pauseFrameTimer && pauseFrameTimer();
+    if (timed && pauseFrameTimer && !paused) timed = false;
+    if (timed && !gsQuery_) gl::GenQueries(1, &gsQuery_);
+    if (timed) gl::BeginQuery(GL_TIME_ELAPSED, gsQuery_);
     auto chunkDisp = [&](size_t c) { return chunks_[std::min(c, chunks_.size() - 1)].dispTex; };
     auto uniforms = [&](GLuint prog) {
         gl::Uniform1i(gl::GetUniformLocation(prog, "uN"), GLint(n_));
@@ -786,7 +788,8 @@ bool MicroRenderer::shadeOnGpu(const Mesh& mesh, std::vector<uint32_t>& tris) {
         if (scissor) gl::Enable(GL_SCISSOR_TEST);
         if (cull) gl::Enable(GL_CULL_FACE);
     }
-    if (timed) gl::QueryCounter(gsQuery_[1], GL_TIMESTAMP), gsQueryPending_ = true, gsQueryPoints_ = points1 + points2;
+    if (timed) gl::EndQuery(GL_TIME_ELAPSED), gsQueryPending_ = true, gsQueryPoints_ = points1 + points2;
+    if (paused && resumeFrameTimer) resumeFrameTimer();
     gl::UseProgram(0);
     // Into the shading grids, on the GPU: one copy per run of consecutive slots in one chunk.
     gl::BindBuffer(GL_COPY_READ_BUFFER, gsOut_);
