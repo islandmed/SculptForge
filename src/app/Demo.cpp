@@ -3,6 +3,7 @@
 #include "app/Demo.h"
 
 #include "app/App.h"
+#include "app/UiServe.h"
 #include "app/Ui.h"
 
 #include <imgui_internal.h>
@@ -131,6 +132,8 @@ glm::vec3 onSphere(float latDeg, float lonDeg, float r = 1.0f) {
 }
 
 } // namespace
+
+void resetDemoGlobals() { items() = {}; }
 
 void Demo::beginFrame() {
     items().byLabel.clear();

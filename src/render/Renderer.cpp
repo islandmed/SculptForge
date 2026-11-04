@@ -20,6 +20,7 @@
 #include <bit>
 #include <chrono>
 #include <thread>
+#include <unordered_map>
 #include <cstdlib>
 #include <limits>
 #include <vector>
@@ -774,8 +775,33 @@ GLuint compile(GLenum type, const char* src, std::string& error, const char* pre
     return s;
 }
 
+// Renderer::keepPrograms: every program linked, by its sources, kept for the next Renderer in the same GL context.
+bool g_keepPrograms = false;
+std::unordered_map<std::string, GLuint> g_keptPrograms;
+int g_keptVertexIdBase = -1; // checkVertexIdBase's answer (-1: not asked yet)
+std::vector<GLuint> g_keptLitSpheres; // the built-in lit spheres' textures
+
+GLuint linkNew(const char* vs, const char* fs, std::string& error, const char* fsPrefix, const char* gs);
+
 // `fsPrefix` goes before the fragment source (the #version line and defines); `gs` is an optional geometry shader.
 GLuint link(const char* vs, const char* fs, std::string& error, const char* fsPrefix = nullptr, const char* gs = nullptr) {
+    if (!g_keepPrograms) return linkNew(vs, fs, error, fsPrefix, gs);
+    std::string key = std::string(vs) + '\x1f' + (fsPrefix ? fsPrefix : "") + '\x1f' + fs + '\x1f' + (gs ? gs : "");
+    if (const auto it = g_keptPrograms.find(key); it != g_keptPrograms.end()) return it->second;
+    const GLuint p = linkNew(vs, fs, error, fsPrefix, gs);
+    if (p) g_keptPrograms.emplace(std::move(key), p);
+    return p;
+}
+
+void deleteProgram(GLuint p) {
+    if (!p) return;
+    if (g_keepPrograms)
+        for (const auto& [key, kept] : g_keptPrograms)
+            if (kept == p) return;
+    gl::DeleteProgram(p);
+}
+
+GLuint linkNew(const char* vs, const char* fs, std::string& error, const char* fsPrefix, const char* gs) {
     GLuint v = compile(GL_VERTEX_SHADER, vs, error);
     if (!v) return 0;
     GLuint f = compile(GL_FRAGMENT_SHADER, fs, error, fsPrefix);
@@ -824,6 +850,17 @@ glm::vec3 facegroupColor(uint32_t id) {
     return val * glm::mix(glm::vec3(1.0f), rgb, sat);
 }
 
+void Renderer::keepPrograms(bool keep) {
+    g_keepPrograms = keep;
+    if (!keep) {
+        for (const auto& [key, p] : g_keptPrograms) gl::DeleteProgram(p);
+        g_keptPrograms.clear();
+        g_keptVertexIdBase = -1;
+        if (!g_keptLitSpheres.empty()) gl::DeleteTextures(GLsizei(g_keptLitSpheres.size()), g_keptLitSpheres.data());
+        g_keptLitSpheres.clear();
+    }
+}
+
 bool Renderer::init(std::string& error) {
     for (int f : {0, kPaint}) // the common ones up front, so a broken driver fails here rather than mid-session
         if (!meshProgram(f)) {
@@ -850,17 +887,25 @@ bool Renderer::init(std::string& error) {
 
     gl::GenVertexArrays(1, &emptyVao_);
 
-    // Built-in lit spheres, generated once (256 KB each); custom ones upload in syncLit Spheres.
-    litsphereTextures_.assign(size_t(builtinLitSphereCount()), 0);
-    litsphereHashes_.assign(size_t(builtinLitSphereCount()), 0);
-    gl::GenTextures(GLsizei(litsphereTextures_.size()), litsphereTextures_.data());
-    for (int i = 0; i < builtinLitSphereCount(); ++i) {
-        constexpr int kSize = 256;
-        uploadLitSphere(litsphereTextures_[size_t(i)], kSize, generateLitSphere(i, kSize));
+    // Built-in lit spheres, generated once (256 KB each, together on the thread pool) and uploaded (with keepPrograms,
+    // kept for the next Renderer: an upload is slow on some drivers, WSL's d3d12); custom ones upload in syncLitSpheres.
+    if (g_keepPrograms && !g_keptLitSpheres.empty()) litsphereTextures_ = g_keptLitSpheres;
+    else {
+        constexpr int kLitSphereSize = 256;
+        std::vector<std::vector<uint8_t>> pixels(static_cast<size_t>(builtinLitSphereCount()));
+        poolFor(pixels.size(), [&](size_t b, size_t e) {
+            for (size_t i = b; i < e; ++i) pixels[i] = generateLitSphere(int(i), kLitSphereSize);
+        }, 1, 2);
+        litsphereTextures_.assign(pixels.size(), 0);
+        gl::GenTextures(GLsizei(litsphereTextures_.size()), litsphereTextures_.data());
+        for (size_t i = 0; i < pixels.size(); ++i) uploadLitSphere(litsphereTextures_[i], kLitSphereSize, pixels[i]);
+        if (g_keepPrograms) g_keptLitSpheres = litsphereTextures_;
     }
+    litsphereHashes_.assign(size_t(builtinLitSphereCount()), 0);
     syncLitSpheres();
     // SF_NO_VERTEXID_BASE=1 takes the other path, to check it on drivers that don't need it.
-    vertexIdHasBase_ = checkVertexIdBase() && !std::getenv("SF_NO_VERTEXID_BASE");
+    if (g_keptVertexIdBase < 0 || !g_keepPrograms) g_keptVertexIdBase = checkVertexIdBase() ? 1 : 0;
+    vertexIdHasBase_ = g_keptVertexIdBase == 1 && !std::getenv("SF_NO_VERTEXID_BASE");
     return true;
 }
 
@@ -978,7 +1023,7 @@ bool Renderer::checkVertexIdBase() {
     gl::BindFramebuffer(GL_FRAMEBUFFER, 0);
     gl::DeleteFramebuffers(1, &fbo);
     gl::DeleteRenderbuffers(1, &rb);
-    gl::DeleteProgram(prog);
+    deleteProgram(prog);
     for (int i = 0; i < 16 && gl::GetError() != GL_NO_ERROR; ++i) {
     }
     return id == 1002;
@@ -1109,23 +1154,24 @@ void Renderer::shutdown() {
     }
     slots_.clear();
     drawList_.clear();
-    if (!litsphereTextures_.empty()) gl::DeleteTextures(GLsizei(litsphereTextures_.size()), litsphereTextures_.data());
+    for (GLuint& t : litsphereTextures_) // (not the kept built-ins: keepPrograms)
+        if (std::find(g_keptLitSpheres.begin(), g_keptLitSpheres.end(), t) == g_keptLitSpheres.end()) gl::DeleteTextures(1, &t);
     litsphereTextures_.clear();
     litsphereHashes_.clear();
     litsphereRevision_ = 0;
     for (GLuint* t : {&envTexture_, &brdfTexture_})
         if (*t) gl::DeleteTextures(1, t);
     envIndex_ = envFailedIndex_ = -1;
-    if (envBgProgram_) gl::DeleteProgram(envBgProgram_);
+    deleteProgram(envBgProgram_);
     envBgProgram_ = 0;
     gl::DeleteVertexArrays(1, &emptyVao_);
     for (MeshProgram& p : programs_) {
-        if (p.id) gl::DeleteProgram(p.id);
+        deleteProgram(p.id);
         p = MeshProgram();
     }
-    gl::DeleteProgram(wireProgram_);
-    gl::DeleteProgram(bgProgram_);
-    gl::DeleteProgram(splatProgram_);
+    deleteProgram(wireProgram_);
+    deleteProgram(bgProgram_);
+    deleteProgram(splatProgram_);
     gl::DeleteBuffers(1, &splatData_);
     gl::DeleteBuffers(1, &splatOrder_);
     gl::DeleteTextures(1, &splatTexture_);

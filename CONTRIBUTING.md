@@ -71,7 +71,15 @@ ctest --test-dir build -L ui                                                  # 
 The step reference is at the top of `src/app/UiTest.cpp`. Tests run headless on simulated time, so most
 take under a second. They use a throwaway settings folder and never touch your own. A failing step stops
 the script and saves `FAIL-line-N.png`, and clicking a missing item lists similarly named items. Clicks
-scroll panels as needed, and clicking an item a person couldn't reach (off screen) fails. CI runs the UI
+scroll panels as needed, and clicking an item a person couldn't reach (off screen) fails.
+
+Under ctest (Linux, macOS) the scripts run warm: the `ui_warm` fixture starts a few `sculptforge --ui-serve`
+servers that make their window and OpenGL context once and then run one script after another, each in a fresh
+app with fresh settings (`tools/test/warm_ui.py`; `src/app/UiServe.h` lists what is reset between scripts). Output
+and exit codes are those of a cold run; a server that crashes reruns its script cold. `SF_UI_COLD=1 ctest ...` runs
+every script in its own process, as does a `# cold` line in a script that changes something the reset can't put
+back. `tools/test/warm_ui.py suite --build build --repeat 3 --shuffle` runs the suite outside ctest and
+`warm_ui.py compare` lists verdicts and screenshots that differ between two such runs. CI runs the UI
 tests on Linux under Xvfb and on Windows with Mesa's software OpenGL, and uploads the screenshots as an
 artifact. CI compiles through ccache (see the comment at the top of `.github/workflows/ci.yml`). Releases: see
 [docs/releasing.md](docs/releasing.md).

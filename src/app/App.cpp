@@ -16,6 +16,7 @@
 #include "app/Shell.h"
 #include "app/Theme.h"
 #include "app/Ui.h"
+#include "app/UiServe.h"
 
 #include <IconsLucide.h>
 
@@ -92,11 +93,26 @@ bool ctrlDown(SDL_Keymod mod) { return (mod & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) !=
 
 } // namespace
 
+namespace {
+// SF_STARTUP_TIMES=1: how long each start-up step took (stderr), to keep start-up and UI tests quick.
+struct StartupTimer {
+    bool on = std::getenv("SF_STARTUP_TIMES") != nullptr;
+    std::chrono::steady_clock::time_point last = std::chrono::steady_clock::now();
+    void step(const char* what) {
+        if (!on) return;
+        const auto now = std::chrono::steady_clock::now();
+        std::fprintf(stderr, "startup %-22s %7.1f ms\n", what, std::chrono::duration<double, std::milli>(now - last).count());
+        last = now;
+    }
+};
+} // namespace
+
 App::App() = default;
 App::~App() = default;
 
 bool App::init(const AppOptions& options) {
     options_ = options;
+    StartupTimer timer;
     const bool recording = !options.recordPath.empty() || !options.uiTest.empty();
     const bool headless = !options.renderPath.empty() || recording || !options.timelapsePath.empty();
     // UI tests run in a hidden window that never has focus; SDL drops joystick input without focus otherwise, and
@@ -107,7 +123,8 @@ bool App::init(const AppOptions& options) {
     // Full screen on one monitor stays up when the pointer clicks on another (Windows multi-monitor, Discord).
     SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "0");
     if (!headless && options.demo.empty()) applyCachedThreadCount(); // the hardware profile's threads, before any brush work
-    if (!SDL_Init(SDL_INIT_VIDEO)) {
+    if (sharedWindow_) syncSdlEnvironment(); // (what SDL_Init would have read)
+    else if (!SDL_Init(SDL_INIT_VIDEO)) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return false;
     }
@@ -117,16 +134,7 @@ bool App::init(const AppOptions& options) {
         else SDL_Log("SDL joystick init failed (no SpaceMouse): %s", SDL_GetError());
     }
 
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-    // No multisampling in the window: the 3D view antialiases in its own target (Renderer::drawView), so it can
-    // draw with fewer samples while a huge scene moves (Preferences > Performance).
-    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 0);
-    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 0);
+    glWindowAttributes();
 
     const SDL_WindowFlags flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY |
                                   (headless ? SDL_WINDOW_HIDDEN : 0) |
@@ -135,7 +143,12 @@ bool App::init(const AppOptions& options) {
     rememberWindow_ = !sized && !headless && options.demo.empty() && !options.fullscreen;
     const WindowState saved = rememberWindow_ ? loadWindowState() : WindowState{};
     const int winW = sized ? options.width : saved.w, winH = sized ? options.height : saved.h;
-    window_ = SDL_CreateWindow("SculptForge", winW, winH, flags);
+    if (sharedWindow_) { // --ui-serve: the server's window, at this script's size
+        window_ = sharedWindow_;
+        SDL_SetWindowSize(window_, winW, winH);
+        SDL_SyncWindow(window_);
+    } else
+        window_ = SDL_CreateWindow("SculptForge", winW, winH, flags);
     if (!window_) {
         SDL_Log("SDL_CreateWindow failed: %s", SDL_GetError());
         return false;
@@ -162,15 +175,17 @@ bool App::init(const AppOptions& options) {
             }
         }
     }
-    glContext_ = SDL_GL_CreateContext(window_);
+    glContext_ = sharedContext_ ? sharedContext_ : SDL_GL_CreateContext(window_);
     if (!glContext_) {
         SDL_Log("OpenGL 3.3 context creation failed: %s", SDL_GetError());
         return false;
     }
     SDL_GL_MakeCurrent(window_, glContext_);
     SDL_GL_SetSwapInterval(1);
+    timer.step("window, GL context");
 
-    if (const char* missing = gl::load([](const char* n) { return reinterpret_cast<gl::GenericProc>(SDL_GL_GetProcAddress(n)); })) {
+    if (const char* missing = sharedContext_ ? nullptr // (loaded by the server)
+                              : gl::load([](const char* n) { return reinterpret_cast<gl::GenericProc>(SDL_GL_GetProcAddress(n)); })) {
         SDL_Log("Missing OpenGL function: %s", missing);
         return false;
     }
@@ -182,6 +197,7 @@ bool App::init(const AppOptions& options) {
         SDL_Log("%s", err.c_str());
         return false;
     }
+    timer.step("renderer");
     renderer_.setEnvironmentWake([] { wakeMainLoop(); }); // (PBR view: a new environment's lighting is ready)
     // Fill layers ask for Mesh Maps: the app bakes them on a worker thread (PanelFill.cpp, updateMeshMaps).
     setMeshMapRequester([this](Document&) { meshMapsWanted_ = true; });
@@ -211,6 +227,7 @@ bool App::init(const AppOptions& options) {
     initUiConfig(headless || !options.demo.empty()); // ui.json (layout, shortcuts, UI scale); never for tests and videos
     uiScale_ = targetUiScale(); // the style follows in applyLook below
     buildUiFonts(uiScale_);
+    timer.step("ImGui, settings, fonts");
     if (recording) {
         ImGui::GetCurrentContext()->TestEngineHookItems = true; // lets the demo find buttons by label
         io.IniFilename = nullptr;                               // fixed, reproducible layout
@@ -221,13 +238,16 @@ bool App::init(const AppOptions& options) {
 
     for (int i = 0; i < int(FileAction::Count); ++i) dialogRequests_[i] = {this, FileAction(i)};
     initBrushLibrary(); // before a project can bring its own brushes
+    timer.step("look, brush library");
     initProject(); // before opening anything, so it lands in the recent files
     initActions(); // the default shortcuts and every command, for keys, help and the command palette
     initBrushSettings(); // each brush's own size, intensity, stroke and alpha (#78)
     loadBrushCurves(); // each brush's own pressure curve (Precision.cpp)
     initPhoneActions(); // File > Capture from phone (PanelPhone.cpp)
     initLibraryBrowser();
+    timer.step("project, actions, library");
     runCommand("new_sphere");
+    timer.step("new sphere");
     if (!options.openPath.empty()) openPath(options.openPath);
     if (!options.script.empty()) {
         std::vector<ScriptStatement> statements;
@@ -256,6 +276,7 @@ bool App::init(const AppOptions& options) {
                       ai::defaultGeneratorCommand(std::string(base) + cliName).c_str());
     }
     initHardwareProfile(); // the cached hardware profile, or calibration over the first frames (PanelPerformanceProfile.cpp)
+    timer.step("hardware profile");
     return true;
 }
 
@@ -280,9 +301,31 @@ void App::shutdown() {
         c = nullptr;
     }
     renderer_.shutdown();
+    if (sharedWindow_) { // --ui-serve: the window, its context and SDL stay for the next script
+        wintab_.close();
+        return;
+    }
     if (glContext_) SDL_GL_DestroyContext(glContext_);
     if (window_) SDL_DestroyWindow(window_);
     SDL_Quit();
+}
+
+void App::glWindowAttributes() {
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+    // No multisampling in the window: the 3D view antialiases in its own target (Renderer::drawView), so it can
+    // draw with fewer samples while a huge scene moves (Preferences > Performance).
+    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 0);
+    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 0);
+}
+
+void App::shareWindow(SDL_Window* window, SDL_GLContext context) {
+    sharedWindow_ = window;
+    sharedContext_ = context;
 }
 
 int App::renderHeadless() {
@@ -332,7 +375,21 @@ int App::runUiTest(int w, int h, int fps) {
     const float dt = 1.0f / float(fps);
     int frames = 0;
     bool finalFrame = false;
+    std::vector<std::future<void>> shotWrites;
+    const bool timed = std::getenv("SF_STARTUP_TIMES") != nullptr; // the first frames' times (StartupTimer)
+    double frameMs[4] = {}; // input and polls, ImGui backends' new frame, the UI, the scene
+    auto lap = [last = std::chrono::steady_clock::now()](double& into) mutable {
+        const auto now = std::chrono::steady_clock::now();
+        into += std::chrono::duration<double, std::milli>(now - last).count();
+        last = now;
+    };
     while (frames < fps * 60 * 30) {
+        if (timed && (frames == 1 || frames == 5 || frames == 20)) {
+            std::fprintf(stderr, "frames to %2d: polls %.1f, new frame %.1f, UI %.1f, scene %.1f ms\n", frames, frameMs[0],
+                         frameMs[1], frameMs[2], frameMs[3]);
+            frameMs[0] = frameMs[1] = frameMs[2] = frameMs[3] = 0.0;
+        }
+        lap(frameMs[3]);
         SDL_Event e;
         while (SDL_PollEvent(&e)) // the script provides all input (its SpaceMouse is a virtual joystick)
             if (e.type >= SDL_EVENT_JOYSTICK_AXIS_MOTION && e.type < SDL_EVENT_GAMEPAD_AXIS_MOTION) spaceMouseEvent(e);
@@ -361,8 +418,10 @@ int App::runUiTest(int w, int h, int fps) {
         hardwareProfileFrameBegin(); // (only with SF_HW_PROFILE_IN_TESTS=1: tests use fixed settings)
         Demo::beginFrame();
         if (uiScaleDirty_) applyUiScale(); // (Preferences, a display-scale change: #87)
+        lap(frameMs[0]);
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
+        lap(frameMs[1]);
         keepImGuiOnPen();
         ImGuiIO& io = ImGui::GetIO();
         io.DisplaySize = ImVec2(float(w), float(h));
@@ -375,6 +434,7 @@ int App::runUiTest(int w, int h, int fps) {
         if (ImGuiContext* g = ImGui::GetCurrentContext()) demo_->setFrameText(g->LogBuffer.c_str());
         ImGui::LogFinish();
         ImGui::Render();
+        lap(frameMs[2]);
         updateMouseCursor();
         buildGhost(); // (the stroke preview, as run() draws it)
 
@@ -401,9 +461,18 @@ int App::runUiTest(int w, int h, int fps) {
         img.rgba = rgba;
         for (size_t i = 3; i < img.rgba.size(); i += 4) img.rgba[i] = 255;
         demo_->setLastShot(img.rgba, w, h);
-        if (!img.savePng(shot, err)) SDL_Log("%s", err.c_str());
-        else SDL_Log("Screenshot %s", shot.c_str());
+        // The PNG compresses on another thread while the script goes on (encoding was a fifth of the UI tests' time).
+        if (shotWrites.size() >= 4) {
+            shotWrites.front().get();
+            shotWrites.erase(shotWrites.begin());
+        }
+        shotWrites.push_back(std::async(std::launch::async, [img = std::move(img), shot] {
+            std::string error;
+            if (!img.savePng(shot, error)) SDL_Log("%s", error.c_str());
+        }));
+        SDL_Log("Screenshot %s", shot.c_str());
     }
+    for (auto& write : shotWrites) write.get(); // every screenshot on disk before the verdict
     for (const auto& f : demo_->failures()) std::fprintf(stderr, "FAIL %s\n", f.c_str());
     if (demo_->failures().empty())
         std::printf("PASS %s (%d frames)\n", options_.uiTest.c_str(), frames);

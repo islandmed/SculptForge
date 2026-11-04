@@ -134,6 +134,10 @@ public:
     UiLayout& layout() { return layout_; }
     ThumbnailCache& thumbnails() { return thumbs_; }
     void shutdown();
+    // The warm UI test server (sculptforge --ui-serve, UiServe.cpp): every App it makes draws in this one hidden
+    // window and GL context, made once, instead of its own; shutdown() leaves them (and SDL) for the next script.
+    static void shareWindow(SDL_Window* window, SDL_GLContext context);
+    static void glWindowAttributes(); // OpenGL 3.3 core, before a window is made
     void requestUiScale(); // Preferences > Interface > UI scale changed: rebuilt live before the next frame (#87)
 
     enum class FileAction { OpenObj, SaveObj, ExportGlb, ExportLods, SaveBrush, LoadBrush, OpenImage, ExportUsd, SaveSplats, ExportUnreal, SaveProject, AppendPart, ComfyWorkflow, LoadLitSphere, InsertMesh, Count };
@@ -236,6 +240,8 @@ private:
 
     SDL_Window* window_ = nullptr;
     SDL_GLContext glContext_ = nullptr;
+    static inline SDL_Window* sharedWindow_ = nullptr; // shareWindow
+    static inline SDL_GLContext sharedContext_ = nullptr;
     bool running_ = true;
     std::string iniPath_;
 

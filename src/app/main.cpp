@@ -4,6 +4,7 @@
 #include "app/Bench.h"
 #include "app/Calibration.h"
 #include "app/CrashLog.h"
+#include "app/UiServe.h"
 #include "ai/AiPolicy.h"
 #include "core/FocusDetail.h"
 #include "core/Pack.h"
@@ -15,6 +16,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
+#include <memory>
 #include <stdexcept>
 #include <string>
 
@@ -46,6 +48,7 @@ void usage() {
         "  --supersample N          Render recordings N times larger and downsample (sharper, allows zoom-ins)\n"
         "  --ui-test FILE.sfui      Run a UI test script headless and exit (0 = pass); settings are isolated\n"
         "  --ui-out DIR             Where UI tests save screenshots\n"
+        "  --ui-serve [--threads N] Warm UI test server: one window, then one test per stdin line (tools/test/warm_ui.py)\n"
         "  --fullscreen             Start filling the screen (F11 toggles)\n"
         "  --no-ai                  Start with every AI feature off and locked (as SF_AI=off)\n"
         "  --no-packs               Safe mode: start without any installed pack (Library > Packs)\n"
@@ -147,7 +150,8 @@ int finishIsolated(int code) {
     std::abort();
 }
 
-int main(int argc, char** argv) {
+// One run of the app: the whole of main, also each script of the warm UI test server (--ui-serve, UiServe.cpp).
+static int runMain(int argc, char** argv) {
     sf::AppOptions options;
     std::string logDir, crashTest;
     bool sizeGiven = false;
@@ -221,6 +225,7 @@ int main(int argc, char** argv) {
             return 1;
         }
     }
+    g_isolatedDir.clear(); // (the warm server's last script's folder)
     if (automatedRun()) isolateSettings();
     if (bench.run) return finishIsolated(sf::runAppBenchmark(bench));
     if (calibrate) return finishIsolated(sf::runCalibrateCommandLine(calibrateQuick, calibrateSave));
@@ -249,14 +254,25 @@ int main(int argc, char** argv) {
     }
     sf::crashlog::start(logDir); // after isolateSettings: a UI test logs into its own folder
     if (!crashTest.empty()) crashOnPurpose(crashTest);
-    sf::App app;
-    if (!app.init(options)) {
-        app.shutdown();
+    auto app = std::make_unique<sf::App>();
+    if (!app->init(options)) {
+        app->shutdown();
         sf::crashlog::stop();
         return 1;
     }
-    int code = app.run();
-    app.shutdown();
+    const auto runStart = std::chrono::steady_clock::now();
+    int code = app->run();
+    const auto runEnd = std::chrono::steady_clock::now();
+    app->shutdown();
+    app.reset();
+    if (std::getenv("SF_STARTUP_TIMES"))
+        std::fprintf(stderr, "run %.1f ms, shutdown %.1f ms\n", std::chrono::duration<double, std::milli>(runEnd - runStart).count(),
+                     std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - runEnd).count());
     sf::crashlog::stop();
     return finishIsolated(code);
+}
+
+int main(int argc, char** argv) {
+    if (argc >= 2 && std::string(argv[1]) == "--ui-serve") return sf::runUiServer(argc - 1, argv + 1, runMain);
+    return runMain(argc, argv);
 }

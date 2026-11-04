@@ -9,6 +9,7 @@
 #include "app/Config.h"
 
 #include "app/App.h"
+#include "app/UiServe.h"
 #include "app/CrashLog.h"
 #include "app/LookSchemes.h"
 #include "app/Palettes.h"
@@ -1169,6 +1170,16 @@ void App::drawHelpConsoleUi() {
     ui::DrawHelp(*this); // last: on top of everything
 }
 
+namespace {
+char g_controlsFilter[96] = ""; // the Controls window's filter field
+char g_hotkeysFilter[64] = "";  // Preferences > Hotkeys' filter field
+} // namespace
+
+void resetConfigGlobals() {
+    g_controlsFilter[0] = g_hotkeysFilter[0] = 0;
+    for (auto& r : g_requests) r = {};
+}
+
 void App::drawControlsWindow() {
     const float s = uiScale_;
     ImGui::SetNextWindowSize(ImVec2(560.0f * s, 640.0f * s), ImGuiCond_FirstUseEver);
@@ -1183,7 +1194,7 @@ void App::drawControlsWindow() {
     drawInputStyleRow(ImGui::GetContentRegionAvail().x * 0.6f);
     ImGui::SameLine();
     ui::ActionButton(*this, "input.import_blender", ImVec2(-FLT_MIN, 0), ui::Look::IconLabel);
-    static char filter[96] = "";
+    char (&filter)[96] = g_controlsFilter;
     ImGui::SetNextItemWidth(-FLT_MIN);
     ImGui::InputTextWithHint("##controls_filter", ICON_LC_SEARCH "  Filter shortcuts and gestures", filter, sizeof filter);
     const std::string f = lower(filter);
@@ -1395,7 +1406,7 @@ void drawInterfaceSection(App& app) {
 }
 
 void drawHotkeysSection(App& app) {
-    static char filter[64] = "";
+    char (&filter)[64] = g_hotkeysFilter;
     ImGui::SetNextItemWidth(-FLT_MIN);
     ImGui::InputTextWithHint("##hotkeys_filter", tr(ICON_LC_SEARCH "  Filter"), filter, sizeof filter);
     const std::string f = lower(filter);
