@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.24)
 project(SculptForge VERSION 0.10.10 LANGUAGES C CXX)
+# "beta.1" while this is a beta of that version (title bar and About: "0.11.0 Beta 1"), "" for a stable release.
+# scripts/release.sh sets it; release.yml checks the tag against both (v0.11.0-beta.1).
+set(SCULPTFORGE_PRERELEASE "")
 include(GNUInstallDirs)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -386,6 +389,7 @@ if(SCULPTFORGE_BUILD_APP)
   target_link_libraries(sculptforge PRIVATE sculptforge_core sculptforge_ai sculptforge_phone imgui SDL3::SDL3)
   target_include_directories(sculptforge PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/lucide)
   target_compile_definitions(sculptforge PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}"
+                                                 SCULPTFORGE_PRERELEASE="${SCULPTFORGE_PRERELEASE}"
                                                  SF_UPDATE_CHECK=$<BOOL:${SCULPTFORGE_UPDATE_CHECK}>)
   # The commit a build came from, for proof mode's results (src/app/ProofMode.cpp); taken when CMake configures.
   find_package(Git QUIET)
@@ -665,6 +669,11 @@ if(SCULPTFORGE_BUILD_TESTS)
     # every fragment on this branch parses.
     add_test(NAME release_notes COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/assemble_notes.py --self-test)
     add_test(NAME release_notes_fragments COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/assemble_notes.py --check)
+    # scripts/release.sh's beta (X.Y.Z-beta.N) and its promotion to stable, in a sandbox with stand-ins for gh and curl.
+    if(UNIX AND NOT APPLE AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
+      add_test(NAME release_script_beta COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_beta_test.sh)
+      set_tests_properties(release_script_beta PROPERTIES TIMEOUT 300)
+    endif()
     # The Actions cache pruner keeps the newest cache of each kind (tools/ci/prune_caches.py).
     add_test(NAME ci_prune_caches COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/prune_caches.py --self-test)
     add_test(NAME ci_slowest_tests COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/slowest_tests.py --self-test)

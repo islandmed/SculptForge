@@ -440,6 +440,12 @@ def project_version() -> str:
     return m.group(1) if m else ""
 
 
+def project_prerelease() -> str:
+    """CMakeLists.txt's SCULPTFORGE_PRERELEASE ("beta.1" while a beta of the project version is out, else "")."""
+    m = re.search(r'^set\(SCULPTFORGE_PRERELEASE "([^"]*)"\)', (ROOT / "CMakeLists.txt").read_text(encoding="utf-8"), re.M)
+    return m.group(1) if m else ""
+
+
 def parse_features(text: str) -> dict:
     """The features block: date, tagline, highlights, then cards (each starts with title:). Raises ValueError."""
     v = {"date": "", "tagline": "", "highlights": [], "cards": []}
@@ -667,7 +673,10 @@ def home_whats_new(page: "WhatsNewPage") -> str:
 
 
 def write_home(page: "WhatsNewPage", check_only: bool) -> bool:
-    """Writes the release area into website/index.html; with CHECK_ONLY, True when it is already up to date."""
+    """Writes the release area into website/index.html; with CHECK_ONLY, True when it is already up to date. A beta
+    leaves the home page alone: it keeps showing the stable release until that version ships."""
+    if project_prerelease():
+        return True
     t = HOME.read_text(encoding="utf-8")
     a = t.find(HOME_START)
     b = t.find(HOME_END, a)

@@ -2489,6 +2489,7 @@ void App::updateTitle() {
                            ? std::string("Untitled")
                            : std::filesystem::path(std::u8string(doc_.path.begin(), doc_.path.end())).filename().string();
     std::string title = (doc_.dirty() ? "* " : "") + name + " - SculptForge";
+    if (*appPrerelease()) title += " " + appVersionLabel(); // "- SculptForge 0.11.0 Beta 1": a beta says so
     if (title == windowTitle_) return; // called every frame
     windowTitle_ = title;
     SDL_SetWindowTitle(window_, title.c_str());
@@ -2560,7 +2561,7 @@ void App::drawUi() {
         ImGui::SetNextWindowSize(ImVec2(460 * uiScale_, 0), ImGuiCond_Always);
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         if (ImGui::Begin("About SculptForge", &showAbout_, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse)) {
-            ImGui::Text("SculptForge %s", SCULPTFORGE_VERSION);
+            ImGui::Text("SculptForge %s", appVersionLabel().c_str());
             ImGui::TextWrapped("Free and open-source digital sculpting.");
             ImGui::Spacing();
             ImGui::TextWrapped("%s", ai::kPrivacyLine); // also on the site (website/index.html) and in docs/ai-services.md
