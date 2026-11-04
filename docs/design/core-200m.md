@@ -144,7 +144,7 @@ Every number twice: this laptop and the floor profile (`SF_HW_SIMULATE=floor`), 
 | Phase | What | Checkpoint (measurable) |
 |---|---|---|
 | **1** (this branch) | Memory-only 200M prototype on today's micro levels: `--benchmark core-200m` (off by default; writes the scene once, then opens it and orbits) | RSS, open time (project open, first frame, fully shaded), orbit p50 / p99, GPU MB: measured below |
-| 2 | Pixel-bounded GPU: per-patch resident levels (coarse grids + full where needed), shading on demand, visible first | GPU < 150 MB at 200M; open to fully shaded < 2 s; orbit p99 < 33 ms on the floor profile; picture equal to today's at rest (screenshot test) |
+| 2 | Pixel-bounded GPU: per-patch resident levels (coarse grids + full where needed), shading on demand, visible first; lower view resolution while moving (phase 1's p99 is per-pixel GPU cost, §8) | GPU < 150 MB at 200M; open to fully shaded < 2 s; orbit p99 < 33 ms on the floor profile; picture equal to today's at rest (screenshot test) |
 | 3 | Multiresolution offsets + dabs at the 64-256-sample level + lazy push-up + background catch-up | 300 px dab < 8 ms CPU on the laptop, < 16 ms floor; stroke latency < 16 ms; p99 frame while sculpting < 33 ms floor; same result as the fine-level brush within quantization (test) |
 | 4 | Focus Detail for 200M: compressed patches, visible-first open, project integration, sparse pool | open < 5 s floor (first frame < 1 s); file < 300 MB; RSS with colour < 1.2 GB |
 | 5 | COW undo on coarse edits; atomic dirty/stale bits; per-frame job graph | undo < 100 KB a typical stroke; 4-thread speed-up > 3x on dab kernels; no lock on the stroke path (TSan clean) |
@@ -185,9 +185,48 @@ Reading it:
   the per-cluster LOD doing its job (the draw follows the budget, not the 200M); the tail is not yet explained
   (candidates: the motion-proxy switch at the start of a move, shared-machine noise at load ~2, the 7.3M-pixel
   framebuffer). To profile in phase 2 before claiming "smooth".
-- **Floor profile: not measured yet.** `SF_HW_SIMULATE=floor` is not in research/perf-moonshots yet; the same
-  command reruns there once it lands. Expect the open to be ~2x slower (4 workers) and GPU memory the problem: 640 MB
-  of buffers against the 1-2 GB of shared video memory of a floor iGPU fits but leaves little; phase 2 is the fix.
+- **Floor profile:** see the next section.
+
+### Floor profile (`SF_HW_SIMULATE=floor`, research/perf-moonshots 94c9136f cherry-picked)
+
+Before the run: the micro renderer did **not** read the governed `renderTriangleBudget()`. It took
+`RenderSettings::renderTriangleBudget` (never set) or else `TierConfig::activeTriangleBudget`, which is 2M on the
+Laptop tier, so a floor run would have drawn exactly what the laptop draws. Fixed on this branch: the micro budget is
+now `min(tier budget, governed budget)`, so the governor and the floor profile can lower it and nothing ever raises
+it (the laptop's draw is unchanged). `residentCacheCapMB` (1 GB on the floor) is read only by the out-of-core trim;
+this in-memory scene never reaches it (RSS 0.58 GB), so it has no effect here.
+
+Six runs interleaved laptop / floor, each started at 1-minute load < 2 (1.49-1.96):
+
+| | laptop (3 runs) | floor (3 runs) |
+|---|---|---|
+| Open project / to fully shaded first frame | 0.16-0.19 / 0.69-0.72 s | 0.16-0.17 / 0.68-0.75 s |
+| RSS when shown / GPU buffers | 567-583 / 640 MB | 579-582 / 640 MB |
+| Governed budget at the end / triangles drawn while orbiting (p50) | 1-2M / 1.22M | 1M / 0.30-0.62M |
+| Orbit p50 | 8.1-12.6 ms | 7.1-10.9 ms |
+| Orbit p99 | 21.3-41.4 ms | 18.1-38.5 ms |
+| Worst frame | 55-71 ms | 50-68 ms |
+
+Orbit frame split (main thread, ms p50 / p99; sculpt and upload are 0.0 / <= 0.1 everywhere):
+
+| | events | UI | draw (issue) | swap wait (GPU) |
+|---|---|---|---|---|
+| laptop, 6 orbits | 0.0 / 0.1-1.8 | 0.5-1.0 / 1.7-3.3 | 1.2-2.2 / 6.3-14.6 | 6.0-8.7 / 13.7-28.8 |
+| floor, 6 orbits | 0.0 / 0.1-1.2 | 0.6-1.0 / 1.8-3.3 | 1.0-1.7 / 6.0-12.1 | 5.5-7.5 / 14.3-25.4 |
+
+**Cause of the p99 miss: the GPU, per pixel, not per triangle and not the CPU.** 70-80% of a frame and nearly all
+of its tail is the swap wait (the GPU finishing the frame); sculpt, upload and UI are negligible. The floor profile
+draws a quarter of the triangles (0.3M against 1.2M) yet its swap wait drops only from ~8.7 to ~6.5 ms p50 and its
+p99 barely moves, so the cost follows the pixels: a 3408x2136 framebuffer (7.3M pixels) where every fragment
+interpolates the full-resolution shading grid from a texture buffer. The tail (one frame in 50-100 at 2-4x the
+median) on top of that is GPU-side and varies run to run (18-41 ms), consistent with sharing the GPU with the
+desktop at load ~2; the draw-issue p99 (6-15 ms) is the driver stalling on the same GPU work. What fixes it is
+exactly the floor plan's pixel-side items: a lower view resolution while moving (perf-moonshots §0: 75%, not yet in
+the simulation) and the canvas cache (§7); fewer triangles alone does not.
+
+What the floor simulation does not show: a real iGPU's fill rate (it doesn't slow the GPU) and 4-core open time
+(the open stayed 0.7 s; whether the first shading runs on the capped pool is not verified). Real UHD 620 / Iris Xe
+runs by testers are what confirm it.
 
 Reproduce: `sculptforge --benchmark core-200m --benchmark-no-video` (the first run writes
 `~/.cache/sculptforge/core-200m-v1.sfproj`, about 3 s). Test: `micro_core200m_scene_small` (scene build, in memory,

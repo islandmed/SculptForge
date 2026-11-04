@@ -8,6 +8,7 @@
 #include "core/Texture.h"
 #include "core/TextureChannels.h"
 #include "core/ThreadPool.h"
+#include "core/HardwareProfile.h"
 #include "core/TierConfig.h"
 #include "core/UploadOrder.h"
 
@@ -3046,7 +3047,9 @@ void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const Render
     gl::Uniform1i(p->twoSided, 1);
     // Moving (Fast Navigation): a coarser target and half the budget, so orbiting stays smooth.
     const bool moving = settings.motionProxy;
-    const size_t full = settings.renderTriangleBudget ? settings.renderTriangleBudget : size_t(currentTierConfig().activeTriangleBudget);
+    // The tier's budget, lowered by the governed one (core/HardwareProfile.h: the frame governor, SF_HW_SIMULATE=floor).
+    size_t full = settings.renderTriangleBudget ? settings.renderTriangleBudget : size_t(currentTierConfig().activeTriangleBudget);
+    if (const uint64_t governed = renderTriangleBudget(); governed > 0) full = std::min(full, size_t(governed));
     const size_t budget = moving ? full / 2 : full;
     const float target = settings.microTargetPx * (moving ? 2.0f : 1.0f);
     // (the budget is shared by the micro SubTools on screen: each gets it whole; one is the usual case)

@@ -22,6 +22,7 @@
 #include "app/Theme.h"
 
 #include "core/Benchmark.h"
+#include "core/HardwareProfile.h"
 #include "core/MemoryGuard.h"
 #include "core/Primitives.h"
 #include "core/Project.h"
@@ -381,6 +382,7 @@ struct PhaseResult {
     size_t dabs = 0, samples = 0;
     std::vector<double> frameMs, lagMs, lagPx;
     std::vector<double> previewLagPx; // the predictive preview's head behind the pointer (the surface's without it)
+    std::vector<double> drawn;    // triangles each frame drew (Renderer::lastDrawnTriangles)
     std::vector<double> split[6]; // each frame by part (App::frameSplitMs_, the frame before: the swap comes after)
 };
 
@@ -889,6 +891,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         if (ph.frameMs.size() < 1000000 && now - p.stageStart > 0.0) {
             ph.frameMs.push_back(frameMs);
             for (int k = 0; k < 6; ++k) ph.split[k].push_back(frameSplitMs_[k]);
+            ph.drawn.push_back(double(renderer_.lastDrawnTriangles()));
         }
         const double u = std::min(1.0, (now - p.stageStart) / spec.seconds);
         if (spec.radiusPx <= 0) { // orbit: the view turns, as a drag would
@@ -1046,6 +1049,8 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                     const char* names[6] = {"events", "sculpt", "ui", "upload", "draw", "swap_wait"};
                     for (int k = 0; k < 6; ++k) split.set(names[k], percentilesJson(percentiles(ph.split[k])));
                     j.set("frame_split_ms", split);
+                    j.set("triangles_drawn", percentilesJson(percentiles(ph.drawn)));
+                    j.set("render_triangle_budget", double(renderTriangleBudget()));
                 }
                 if (ph.radiusPx > 0) {
                     if (!ph.lagMs.empty()) { // (Move drags the surface without dabs: no stroke to trail the pointer)
