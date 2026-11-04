@@ -59,7 +59,15 @@ budget. Run: `--benchmark --benchmark-sizes 5,20,50`, with and without `SF_HW_SI
 The floor misses its stroke targets by far (latency 58-311 ms against < 16), while orbit at 20M meets < 33 ms. The
 GL calls are a few ms, so the time goes to CPU stroke throughput and scene-sync spikes (the motion proxy's build at
 the start of an orbit), not the driver: a native backend would not fix these. At 50M on the floor, orbit p99 is
-44 ms with draw at 32 ms p99, the one place the draw side shows. It simulates the budgets, not the GPU's fill
+44 ms with draw at 32 ms p99, the one place the draw side shows.
+
+**Motion resolution, measured** (floor, 75% vs 100% while moving, interleaved twice, load < 2 at each start):
+20M orbit p50 9.0-9.2 vs 7.6-8.0 ms, p99 21.5-25.9 vs 23.7-24.1 ms; 50M p50 14.5-15.1 vs 9.0-14.0 ms, p99
+35.8-51.9 vs 33.0-40.0 ms. No gain at 20-50M: there the motion proxy keeps the pixel cost low, the scaled path's
+extra pass costs about 1 ms, and the worst frames are scene sync at the start of an orbit (upload p99 15-20 ms
+in every run). It stays env-only (`SF_MOTION_RESOLUTION`) until it helps somewhere: the 200M micro scene, where
+the per-pixel cost dominates (core-200m §8), is the case to test. The 20-50M orbit fix is building the motion
+proxy before the orbit starts. It simulates the budgets, not the GPU's fill
 rate, so real iGPU runs by testers (Windows UHD 620 / Iris Xe first) confirm it.
 
 **Targets, floor profile** (laptop targets in brackets):
