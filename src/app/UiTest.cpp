@@ -84,7 +84,7 @@
 //                            user library), library_files (.sfbrush files in it; UI tests get an empty
 //                            one in --ui-out/brush-library), ui_config (1 once Store Config wrote ui.json),
 //                            console_open, command_palette_open, customize, shelves_visible,
-//                            right_tray_open, left_tray_open, lightbox_open, guide_open, guide_hits (search results), shelves (1 shown), left_tray / right_tray (palettes in
+//                            right_tray_open, left_tray_open, right_tray_shown (drawn), shell_narrow, offscreen_items (past the window edge), lightbox_open, guide_open, guide_hits (search results), shelves (1 shown), left_tray / right_tray (palettes in
 //                            the tray, -1 when closed); OP is == != < <= > >=; N may be $NAME, $NAME*K,
 //                            $NAME+K or $NAME-K (see remember)
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
@@ -236,7 +236,7 @@
 //   spacemouse_unplug        unplug it
 //   expect_value spacemouse_connected (1 when the app opened it), spacemouse_moving (1 while it moves the view)
 //   ui_scale PERCENT | auto  Preferences > Interface > UI scale (applied live, #87); display_scale PERCENT: the display's
-//                            content scale changes, with SDL's event (Windows DPI, another monitor)
+//                            content scale changes, with SDL's event (Windows DPI, another monitor); logical_width W: the display scale that makes the window W logical px wide (#105)
 //   expect_value ui_scale (percent built now), font_height (default font, px), frame_height, panel_width (right
 //                            shelf, px), title_height
 //   expect_value look (0 Classic, 1 Forge Terminal, 2 Phosphor, 3 Blueprint), shell_layout (0 ZBrush-style, 1 SculptForge)
@@ -689,6 +689,13 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "shelves_visible") return app_.layout_.shelvesVisible ? 1.0 : 0.0;
     if (name == "right_tray_open") return app_.layout_.rightTrayOpen ? 1.0 : 0.0;
     if (name == "left_tray_open") return app_.layout_.leftTrayOpen ? 1.0 : 0.0;
+    if (name == "right_tray_shown") return app_.shell_.rightTray.w > 0.0f ? 1.0 : 0.0; // drawn, not just set open (#107)
+    if (name == "shell_narrow") return app_.shell_.narrow ? 1.0 : 0.0;
+    if (name == "offscreen_items") { // items drawn past the window's edge last frame (#105); names them in the log
+        const std::vector<std::string> off = Demo::offscreenItems();
+        for (const std::string& o : off) std::fprintf(stderr, "offscreen: %s\n", o.c_str());
+        return double(off.size());
+    }
     if (name == "lightbox_open") return app_.lightbox_.open() ? 1.0 : 0.0;
     if (name == "guide_open") return app_.guide_.isOpen() ? 1.0 : 0.0;
     if (name == "guide_hits") return double(app_.guide_.searchHits());
@@ -1682,6 +1689,20 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (!need(1)) return false;
         run([this, v = num(1, 100) / 100.0f] {
             app_.displayScaleOverride_ = v;
+            SDL_Event e{};
+            e.type = SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED;
+            e.window.windowID = SDL_GetWindowID(app_.window_);
+            app_.handleEvent(e);
+        });
+        wait(0.2f);
+    } else if (verb == "logical_width") {
+        // logical_width 1280: the display reports the scale that makes the window this many logical px wide, as a
+        // Windows laptop at 150-200 % does (#105: 2560x1600 at 200 % is 1280x800)
+        if (!need(1)) return false;
+        run([this, v = num(1, 1280)] {
+            int pw = 0, ph = 0; // window units, as the shell lays out (the pixel density is covered by the framebuffer)
+            SDL_GetWindowSize(app_.window_, &pw, &ph);
+            app_.displayScaleOverride_ = float(pw) / std::max(1.0f, v);
             SDL_Event e{};
             e.type = SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED;
             e.window.windowID = SDL_GetWindowID(app_.window_);

@@ -606,7 +606,12 @@ void LightBox::drawHeader(App& app, float width) {
     float tabsW = 2.0f * (ImGui::GetFrameHeight() + 2.0f) + 10.0f * scale; // (Back / Forward)
     for (int i = 0; i < int(LibraryTab::Count); ++i)
         tabsW += ImGui::CalcTextSize(tr(libraryTabName(LibraryTab(i)))).x + 2.0f * style.FramePadding.x;
-    const float roomForTabs = origin.x + width - ImGui::GetCursorScreenPos().x - ImGui::GetFrameHeight() - 16.0f * scale;
+    // (and beside the right-hand group at its most compact: a short filter, the rows, icon-only buttons; #105)
+    const float iconW = ImGui::CalcTextSize(ICON_LC_FOLDER_PLUS).x + 2.0f * style.FramePadding.x;
+    const float compactGroupW = 70.0f * scale + 4 * (ImGui::GetFrameHeight() + 2.0f) + 3.0f * iconW + 4 * 8.0f * scale +
+                                (place_.tab == LibraryTab::QuickSave ? iconW + 8.0f * scale : 0.0f);
+    const float roomForTabs = origin.x + width - ImGui::GetCursorScreenPos().x - ImGui::GetFrameHeight() - 16.0f * scale -
+                              compactGroupW - 16.0f * scale;
     if (tabsW > roomForTabs) {
         float widest = 0.0f;
         for (int i = 0; i < int(LibraryTab::Count); ++i)

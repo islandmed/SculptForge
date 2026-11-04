@@ -1470,6 +1470,9 @@ void App::drawStatusBar(const ShellGeometry& g) {
     };
     for (int drop : {2, 4, 1})
         if (total() > right - menusEnd - 120.0f * s) shown.erase(std::remove(shown.begin(), shown.end(), drop), shown.end());
+    // A narrow window (#105: 800 logical px at Windows' 200 %): never over the menus; the triangles go, then the mode.
+    for (int drop : {3, 5, 0})
+        if (total() > right - menusEnd) shown.erase(std::remove(shown.begin(), shown.end(), drop), shown.end());
     float mx = right - total();
     const float modulesX = mx;
     for (size_t k = 0; k < shown.size(); ++k) {
@@ -1959,6 +1962,26 @@ void App::drawShelf(int shelf, const CanvasRect& r) {
         indices.push_back(i);
     }
     ImGui::PopStyleVar();
+    if (shelf == kShelfTop && !rects.empty()) {
+        // What follows the Intensity slider on its line, and whether the row fits (with the sliders at their least).
+        float tail = 0.0f, right = rects[0].Max.x;
+        for (size_t k = 0; k < rects.size(); ++k) {
+            right = std::max(right, rects[k].Max.x);
+            if (list[size_t(indices[k])] == "widget.strength") {
+                tail = 0.0f;
+                for (size_t j = k + 1; j < rects.size() && std::abs(rects[j].Min.y - rects[k].Min.y) < 1.0f; ++j)
+                    tail = rects[j].Max.x - rects[k].Max.x;
+            }
+        }
+        topShelfTailW_ = tail;
+        const float needed = right - r.x + pad.x;
+        if (!topShelfCompact_ && needed > r.w + 1.0f) {
+            topShelfCompact_ = true;
+            topShelfFullW_ = needed / s; // logical px: the UI scale may change before the shelf widens
+        } else if (topShelfCompact_ && r.w / s >= topShelfFullW_) {
+            topShelfCompact_ = false;
+        }
+    }
 
     ImGuiWindow* window = ImGui::GetCurrentWindow();
     ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -2052,7 +2075,7 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
     } else if (item == "widget.draw_size" || item == "widget.strength") {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f * s, (rowH - ImGui::GetFontSize()) * 0.5f));
         // 180 px each, narrower when the row is full (e.g. with the contextual Vertex / Texture buttons at 1600 px).
-        const float avail = ImGui::GetContentRegionAvail().x - (item == "widget.draw_size" ? 4.0f * s : 0.0f);
+        const float avail = ImGui::GetContentRegionAvail().x - (item == "widget.draw_size" ? 4.0f * s : 0.0f) - topShelfTailW_;
         ImGui::SetNextItemWidth(vertical ? 180.0f * s
                                          : std::clamp(item == "widget.draw_size" ? avail * 0.5f : avail, 120.0f * s, 180.0f * s));
         if (item == "widget.draw_size") {
@@ -2178,8 +2201,10 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
                                                                                    : "One of your custom brushes.",
                      "Bottom shelf");
     } else if (const Action* a = actions_.find(item == "brush.paint" ? std::string("draw.paint") : item)) {
-        const ui::Look look = shelf != kShelfTop ? ui::Look::Tile : a->icon ? ui::Look::IconLabel : ui::Look::Label;
-        const ImVec2 size = shelf == kShelfTop      ? ImVec2(0.0f, rowH)
+        const ui::Look look = shelf != kShelfTop ? ui::Look::Tile
+                              : a->icon          ? (topShelfCompact_ ? ui::Look::Icon : ui::Look::IconLabel)
+                                                 : ui::Look::Label;
+        const ImVec2 size = shelf == kShelfTop      ? ImVec2(look == ui::Look::Icon ? rowH : 0.0f, rowH)
                             : shelf == kShelfRight  ? ImVec2(44.0f * s, 40.0f * s)
                             : shelf == kShelfBottom ? ImVec2(bottomTileW_, shell::bottomShelfSize(layout_.shelfTiles).tileH * s)
                                                     : ImVec2(winW - 2.0f * padX, 60.0f * s);
@@ -2329,6 +2354,14 @@ bool App::canvasNavButton(const char* id, const char* icon, const char* englishL
 
 namespace {
 
+// The largest square centred in a tile's picture area, inset by `pad`: thumbnails are square renders, never stretched.
+void squareIn(ImVec2& a, ImVec2& b, float pad) {
+    const float side = std::max(1.0f, std::min(b.x - a.x, b.y - a.y) - 2.0f * pad);
+    const ImVec2 c((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
+    a = ImVec2(std::floor(c.x - side * 0.5f), std::floor(c.y - side * 0.5f));
+    b = ImVec2(a.x + side, a.y + side);
+}
+
 // Tile frame: the picture square and the caption under it. Returns true when clicked.
 // A left-shelf tile; it lifts on hover (`lift` ends when the caller has drawn the picture).
 bool tileFrame(const char* id, ImVec2 size, ui::TileLift& lift, ImFont* font, const std::string& caption, float s, ImVec2& pic0,
@@ -2382,8 +2415,9 @@ void App::drawBrushTile(const char* id, ImVec2 size) {
     const ImVec2 c((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
     const float r = (b.x - a.x) * 0.36f;
     if (tex) {
-        dl->AddImageRounded(tex, ImVec2(a.x + 2 * s, a.y + 2 * s), ImVec2(b.x - 2 * s, b.y - 2 * s), ImVec2(0, 0), ImVec2(1, 1),
-                            IM_COL32_WHITE, theme::rounding(4.0f * s));
+        ImVec2 p0 = a, p1 = b;
+        squareIn(p0, p1, 2.0f * s);
+        dl->AddImageRounded(tex, p0, p1, ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, theme::rounding(4.0f * s));
     } else if (guidesMode_) { // QRemesh Guides (PanelRetopo.cpp)
         dl->AddCircleFilled(c, r, theme::u32(theme::tile), 32);
         centredText(dl, fontIcons_, a, b, IM_COL32(255, 196, 64, 255), ICON_LC_SPLINE);
@@ -2477,9 +2511,12 @@ void App::drawAlphaTile(const char* id, ImVec2 size) {
     if (vdmBrushActive() && doc_.brushVdm) { // the VDM brush's 3D alpha (ZBrush shows VDMs in the alpha slot)
         ui::TileLiftScope lift;
         const bool clicked = tileFrame(id, size, lift.lift, fontSmall_, doc_.brushVdm->name, s, a, b);
-        if (ImTextureID tex = thumbs_.vdm(doc_.brushVdm))
-            ImGui::GetWindowDrawList()->AddImageRounded(tex, ImVec2(a.x + 2 * s, a.y + 2 * s), ImVec2(b.x - 2 * s, b.y - 2 * s),
-                                                        ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, theme::rounding(4.0f * s));
+        if (ImTextureID tex = thumbs_.vdm(doc_.brushVdm)) {
+            ImVec2 p0 = a, p1 = b;
+            squareIn(p0, p1, 2.0f * s);
+            ImGui::GetWindowDrawList()->AddImageRounded(tex, p0, p1, ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE,
+                                                        theme::rounding(4.0f * s));
+        }
         if (clicked) openPicker(Picker::Alpha, ImVec2(ImGui::GetItemRectMax().x + 4.0f * s, ImGui::GetItemRectMin().y));
         ui::HelpText("VDM", nullptr, "The VDM brush's vector displacement map. Click to pick another.", "Left shelf");
         return;
@@ -2489,10 +2526,12 @@ void App::drawAlphaTile(const char* id, ImVec2 size) {
     ImDrawList* dl = ImGui::GetWindowDrawList();
     ImTextureID tex = thumbs_.alpha(doc_.brushAlpha);
     if (tex) {
-        dl->AddImageRounded(tex, ImVec2(a.x + 2 * s, a.y + 2 * s), ImVec2(b.x - 2 * s, b.y - 2 * s), ImVec2(0, 0), ImVec2(1, 1),
-                            IM_COL32_WHITE, theme::rounding(4.0f * s));
+        ImVec2 p0 = a, p1 = b;
+        squareIn(p0, p1, 2.0f * s);
+        dl->AddImageRounded(tex, p0, p1, ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, theme::rounding(4.0f * s));
     } else {
         constexpr int kCells = 26;
+        squareIn(a, b, 0.0f);
         const float inset = 6.0f * s, cell = (b.x - a.x - 2.0f * inset) / kCells;
         dl->AddRectFilled(ImVec2(a.x + inset, a.y + inset), ImVec2(b.x - inset, b.y - inset), IM_COL32(0, 0, 0, 255), theme::rounding(3.0f * s));
         for (int y = 0; y < kCells; ++y)
@@ -2518,7 +2557,9 @@ void App::drawMaterialTile(const char* id, ImVec2 size) {
     const ImVec2 c((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
     const float r = (b.x - a.x) * 0.4f;
     if (ImTextureID thumb = thumbs_.material(m)) { // a rendered sphere on a transparent background
-        dl->AddImage(thumb, ImVec2(a.x + 2 * s, a.y + 2 * s), ImVec2(b.x - 2 * s, b.y - 2 * s));
+        ImVec2 p0 = a, p1 = b;
+        squareIn(p0, p1, 2.0f * s);
+        dl->AddImage(thumb, p0, p1);
     } else if (const GLuint t = m >= 0 ? renderer_.matcapTexture(m) : 0) {
         // Until then the raw matcap (a sphere picture already; stored bottom-up).
         dl->AddImageRounded(ImTextureID(uintptr_t(t)), ImVec2(c.x - r, c.y - r), ImVec2(c.x + r, c.y + r), ImVec2(0, 1),

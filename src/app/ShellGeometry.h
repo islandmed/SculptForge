@@ -21,6 +21,25 @@ constexpr bool kMacWindows = false;
 #endif
 constexpr bool restoresFullscreen(bool savedFullscreen, bool mac = kMacWindows) { return savedFullscreen && !mac; }
 
+// Where a new or restored window goes (#105), in the window system's units: inside the display's usable area with
+// its frame (`borders`: the title bar on top), title bar on screen. `scale` is the UI scale Automatic picks there.
+// A window never stored opens 1600x960 logical px, centred, maximised when that doesn't fit; a
+// stored one keeps its logical size: stored at another scale (`storedScale`; files before 0.10.11 have none: 100 %),
+// it grows or shrinks with it (a 1600x960 window at Windows' 200 % was 800 logical px wide and the shelves ran off
+// its right edge), maximised when that doesn't fit.
+struct WindowRect {
+    int x = 0, y = 0, w = 0, h = 0;
+};
+struct WindowBorders {
+    int top = 0, left = 0, bottom = 0, right = 0;
+};
+struct WindowFit {
+    WindowRect rect;
+    bool maximize = false;
+};
+WindowFit fitWindow(WindowRect window, bool stored, bool placed, float storedScale, const WindowRect& usable,
+                    const WindowBorders& borders, float scale);
+
 struct ShellGeometry {
     CanvasRect notchBand;               // h 0 unless the top of the window is unsafe (camera notch)
     CanvasRect title, paletteBar;
@@ -63,6 +82,8 @@ struct ShellMetrics {
                       // (bars and shelves grow by the gap first, so what's inside keeps its size); the dividers
                       // become the gaps beside the trays
     float grow = 0.0f; // (internal) added to the bars' and shelves' sizes
+    float windowW = 0.0f; // (internal) the whole window's width when laying out inside the gaps: narrow and the
+                          // tray width follow the window, not the gap-inset span (#107)
 };
 ShellMetrics sculptForgeMetrics(float gap); // the SculptForge layout: menus in the status bar, a one-row tool shelf
 

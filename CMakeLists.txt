@@ -730,6 +730,15 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME ui_library_small_screen_720 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/library_small_screen.sfui
              --size 1280x720 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/library_small_screen_720)
     set_tests_properties(ui_library_small_screen_720 PROPERTIES LABELS ui TIMEOUT 300)
+    # #107: every look's right tray on a 1280x720 screen; #105: a Windows laptop at 150-200 % (2560x1600 at 200 % is
+    # 1280x800 logical px), nothing past the window's edges.
+    add_test(NAME ui_right_tray_looks_720 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/right_tray_looks.sfui
+             --size 1280x720 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/right_tray_looks_720)
+    add_test(NAME ui_windows_dpi_2560 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/windows_dpi.sfui
+             --size 2560x1600 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/windows_dpi_2560)
+    add_test(NAME ui_windows_dpi_2160 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/windows_dpi.sfui
+             --size 2160x1350 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/windows_dpi_2160)
+    set_tests_properties(ui_right_tray_looks_720 ui_windows_dpi_2560 ui_windows_dpi_2160 PROPERTIES LABELS "ui;dpi" TIMEOUT 300)
     add_test(NAME ui_user_guide_1080 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/user_guide.sfui
              --size 1920x1080 --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/user_guide_1080)
     set_tests_properties(ui_user_guide_1080 PROPERTIES LABELS ui TIMEOUT 300)
