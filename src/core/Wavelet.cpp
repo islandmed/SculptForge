@@ -8,6 +8,7 @@
 #include "core/Micro.h"
 #include "core/Sculpt.h"
 #include "core/ThreadPool.h"
+#include "core/TierConfig.h"
 
 #include <algorithm>
 #include <atomic>
@@ -15,6 +16,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <sstream>
 #include <thread>
@@ -239,18 +241,29 @@ int runWaveletStrokeBench(const std::string& outPath) {
     };
     shader.shade(m, {}, true, written, scratch); // (the first full pass, as the renderer's)
     mm.clearDirty();
+    // The renderer's shading budget while a stroke runs (MicroRenderer::sync: seeds whose ring triples them). The CLI
+    // has no hardware profile, so the app's on a Laptop-tier machine (TierConfig: 1M points, draft brushes off; the
+    // floor simulation keeps it), or SF_BENCH_SHADE_BUDGET points.
+    TierConfig tier = currentTierConfig();
+    tier.shadeBudgetPoints = 1u << 20;
+    tier.draftBrushMode = false;
+    if (const char* e = std::getenv("SF_BENCH_SHADE_BUDGET")) tier.shadeBudgetPoints = std::strtoull(e, nullptr, 10);
+    const size_t budget = size_t(tier.shadeBudgetPoints) / (tier.draftBrushMode ? 4 : 1);
+    const size_t limit = std::max<size_t>(1, budget / (size_t(mm.samples) * 3));
     constexpr int kDabs = 30;
     constexpr double kPenMs = 1000.0 / 120.0, kFrameMs = 1000.0 / 60.0, kBudgetMs = 10.0;
     std::ostringstream md;
     md << "## Wavelet strokes (N2 in MicroStroke): " << double(mm.microTriangles()) / 1e6 << "M micro triangles, Micro " << mm.level
-       << ", " << ThreadPool::shared().threads() << " threads\n\n"
+       << ", " << ThreadPool::shared().threads() << " threads, shading budget " << budget << " points a frame ("
+       << limit << " patches + ring" << (tier.draftBrushMode ? ", draft" : "") << ")\n\n"
        << "Standard, strength 0.5, " << kDabs << " dabs 0.1 radius apart across the face; the pen delivers a dab every "
        << kPenMs << " ms; a frame places the dabs that have arrived (pick + dab, at least one, until 10 ms), rebuilds the "
-          "changed patches (wavelet), shades what changed (MicroShader, the renderer's CPU part) and waits for the next "
-          "60 Hz tick. Lag = a dab's arrival to the end of the frame that shows it. Error against the exact brush (every "
+          "changed patches (wavelet), shades up to the renderer's budget of what changed (MicroShader, MicroRenderer::sync's queue: the rest waits) and "
+          "waits for the next 60 Hz tick. Lag (committed) = a dab's arrival to the end of the frame whose heights hold it; "
+          "pending = patches whose shading still lags at release, catch-up = shading them all then. Error against the exact brush (every "
           "fine point) as a share of the stroke's height. Runs interleaved: off, on, off, on.\n\n"
        << "| Radius | brush | lattice | dabs / frame | dab (pick + dab) | rebuild / frame | shading / frame | stroke end | stroke total | "
-          "lag p50 / max | error mean / max |\n|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n";
+          "lag p50 / p99 | pending, catch-up | error mean / max |\n|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n";
     for (float frac : {0.025f, 0.05f, 0.1f, 0.2f}) {
         const float r = frac * height;
         // The path: picks on the untouched surface (every run then places the same dabs; each still picks for real).
@@ -279,6 +292,9 @@ int runWaveletStrokeBench(const std::string& outPath) {
             st.wavelet = on;
             st.begin(m);
             std::vector<double> lags;
+            std::vector<uint8_t> pending(mm.baseTriangles, 0);
+            std::vector<uint32_t> seeds;
+            size_t pendingCount = 0;
             double dabMs = 0, rebuildMs = 0, shadeMs = 0;
             int frames = 0;
             size_t next = 0;
@@ -303,14 +319,26 @@ int runWaveletStrokeBench(const std::string& outPath) {
                 st.flush(m);
                 rebuildMs += st.flushMs - f0;
                 const auto s0 = Clock::now();
+                // As MicroRenderer::sync: this frame's changed patches join the pending ones; the shading budget's
+                // worth of them (this frame's first) is shaded with its ring, the rest waits.
                 dirty.clear();
                 for (size_t w = 0; w < mm.dirtyBits.size(); ++w)
                     for (uint64_t bits = mm.dirtyBits[w]; bits; bits &= bits - 1) dirty.push_back(uint32_t(w * 64 + size_t(std::countr_zero(bits))));
-                shader.shade(m, dirty, mm.allDirty, written, scratch);
                 mm.clearDirty();
+                for (uint32_t t : dirty)
+                    if (!pending[t]) pending[t] = 1, ++pendingCount;
+                seeds.assign(dirty.begin(), dirty.end());
+                for (size_t t = 0; t < pending.size() && seeds.size() < limit; ++t)
+                    if (pending[t]) seeds.push_back(uint32_t(t));
+                std::sort(seeds.begin(), seeds.end());
+                seeds.erase(std::unique(seeds.begin(), seeds.end()), seeds.end());
+                if (seeds.size() > limit) seeds.resize(limit);
+                if (!seeds.empty()) shader.shade(m, seeds, false, written, scratch);
+                for (uint32_t t : written)
+                    if (pending[t]) pending[t] = 0, --pendingCount;
                 shadeMs += ms(s0, Clock::now());
                 const double shown = ms(t0, Clock::now());
-                for (double a : arrivals) lags.push_back(shown - a);
+                for (double a : arrivals) lags.push_back(shown - a); // (committed: its heights are in this frame)
                 ++frames;
                 const auto tick = frame + std::chrono::microseconds(int64_t(kFrameMs * 1000.0));
                 if (Clock::now() < tick && next < centers.size()) std::this_thread::sleep_until(tick);
@@ -318,6 +346,15 @@ int runWaveletStrokeBench(const std::string& outPath) {
             const auto e0 = Clock::now();
             st.end(m);
             const double endMs = ms(e0, Clock::now()), totalMs = ms(t0, Clock::now());
+            // Release: the shading still pending, all at once (what the picture waits for after the pen lifts).
+            const size_t pendingAtEnd = pendingCount;
+            const auto c0 = Clock::now();
+            seeds.clear();
+            for (size_t t = 0; t < pending.size(); ++t)
+                if (pending[t]) seeds.push_back(uint32_t(t));
+            if (!seeds.empty()) shader.shade(m, seeds, false, written, scratch);
+            mm.clearDirty();
+            const double catchUpMs = ms(c0, Clock::now());
             std::sort(lags.begin(), lags.end());
             double sum = 0, worst = 0, h = 0;
             size_t count = 0;
@@ -330,11 +367,11 @@ int runWaveletStrokeBench(const std::string& outPath) {
             }
             const double scale = 100.0 / std::max(h, 1.0);
             char row[512];
-            std::snprintf(row, sizeof row, "| %.0f px | %s | %u (%llu wavelet dabs) | %.1f | %.2f ms | %.2f ms | %.2f ms | %.1f ms | %.0f ms | %.0f / %.0f ms | %.3f%% / %.2f%% |\n",
+            std::snprintf(row, sizeof row, "| %.0f px | %s | %u (%llu wavelet dabs) | %.1f | %.2f ms | %.2f ms | %.2f ms | %.1f ms | %.0f ms | %.0f / %.0f ms | %zu, %.0f ms | %.3f%% / %.2f%% |\n",
                           double(frac * 1080.0f), on ? "wavelet" : "today", st.lastStride, (unsigned long long)st.waveletDabs, double(centers.size()) / double(std::max(frames, 1)),
                           dabMs / double(std::max<size_t>(centers.size(), 1)), rebuildMs / double(std::max(frames, 1)),
                           shadeMs / double(std::max(frames, 1)), endMs, totalMs, lags.empty() ? 0.0 : lags[lags.size() / 2],
-                          lags.empty() ? 0.0 : lags.back(), sum / double(std::max<size_t>(count, 1)) * scale, worst * scale);
+                          lags.empty() ? 0.0 : lags[std::min(lags.size() - 1, size_t(double(lags.size()) * 0.99))], pendingAtEnd, catchUpMs, sum / double(std::max<size_t>(count, 1)) * scale, worst * scale);
             md << row;
             std::fprintf(stderr, "%s", row);
         }

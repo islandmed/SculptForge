@@ -311,33 +311,38 @@ first change, so undo / redo stay bit-exact (tests: micro_wavelet_stroke_matches
 
 A 30-dab Standard stroke (strength 0.5, dabs 0.1 radius apart) on the Micro 7 head (314.6M micro triangles) through a
 frame loop: the pen delivers a dab every 8.3 ms (120 Hz), a frame places what has arrived (pick + dab) for up to 10 ms
-(the app's budget), rebuilds (wavelet), shades what changed (MicroShader, the renderer's CPU part), and waits for the
-next 60 Hz tick. Lag = a dab's arrival to the end of the frame that shows it. Two interleaved runs each (off, on, off,
-on); floor = `SF_HW_SIMULATE=floor SF_GOVERNOR=0` (4 threads), load 1.6-2.0 at the start of each pass.
+(the app's budget), rebuilds (wavelet), then shades as MicroRenderer::sync does: this frame's changed patches join a
+queue and the renderer's budget of them is shaded (1M points a frame, the Laptop tier's: 41 patches and their ring),
+then it waits for the next 60 Hz tick. Lag (committed) = a dab's arrival to the end of the frame whose heights hold it;
+pending / catch-up = the patches whose shading still trails at release, and shading them all then. Two interleaved runs
+each (off, on, off, on); floor = `SF_HW_SIMULATE=floor SF_GOVERNOR=0` (4 threads), load 1.7-1.8 at the start of each pass.
 
-| radius | lattice | | dab (pick + dab) | rebuild / frame | shading / frame | stroke total | lag p50 / max | error vs exact, mean / max |
-|---|---|---|---|---|---|---|---|---|
-| 27 px | 2 (today's path) | floor, off / on | 1.6-1.8 / 2.0-2.1 ms | - | 7-9 ms | 261-263 / 255-263 ms | 18-19 / 19-21 ms | 0.027% / 0.99% |
-| 54 px | 4 | floor, off | 2.4-2.5 ms | - | 11.3-11.5 ms | 265-273 ms | 22 / 35-39 ms | 0.013% / 0.45% |
-| | | floor, on | 1.6-2.3 ms | 0.3-0.4 ms | 9.7-10.0 ms | 268-274 ms | 19-20 / 24-31 ms | 0.026% / 0.45% |
-| 108 px | 8 | floor, off | 5.4-5.5 ms | - | 28.3-28.5 ms | 544-574 ms | 157-199 / 289-319 ms | 0.019% / 0.48% |
-| | | floor, on | 2.6-2.9 ms | 1.5 ms | 25.6-27.3 ms | 307-330 ms | 51-70 / 77-93 ms | 0.024% / 0.50% |
-| 216 px | 16 | floor, off | 21.7-22.1 ms | - | 89.4-89.7 ms | 3,375-3,397 ms | 1,624-1,627 / 3,090-3,112 ms | 0.014% / 0.60% |
-| | | floor, on | 3.7-4.3 ms | 5.3-5.5 ms | 89.6-94.2 ms | 1,051-1,216 ms | 416-501 / 768-931 ms | 0.017% / 0.59% |
-| 108 px | 8 | laptop, off / on | 3.5-3.7 / 1.9-2.1 ms | - / 0.6 ms | 13.7-14.8 / 12.0 ms | 285-286 / 276-281 ms | 29-33 / 22 ms | as floor |
-| 216 px | 16 | laptop, off / on | 12.2-12.3 / 3.1 ms | - / 2.7-2.8 ms | 45.8-46.0 / 45.9-46.2 ms | 1,649 / 570 ms | 713-737 / 160-174 ms | as floor |
+| radius | lattice | | dab (pick + dab) | rebuild / frame | shading / frame | stroke total | committed lag p50 / p99 | shading pending, catch-up | error vs exact, mean / max |
+|---|---|---|---|---|---|---|---|---|---|
+| 27 px | 2 (today's path) | floor | 1.6-3.2 ms | - | 7.6-10.4 ms | 257-273 ms | 18-32 / 22-81 ms (same path, noise) | 0 | 0.027% / 0.99% |
+| 54 px | 4 | floor, off | 2.0-2.2 ms | - | 9.5-10.4 ms | 257-266 ms | 20-21 / 23-31 ms | 12-16, 7 ms | 0.013% / 0.45% |
+| | | floor, on | 1.7-1.8 ms | 0.3 ms | 10.5-11.3 ms | 258-260 ms | 21-22 / 31-33 ms | 3, 4 ms | 0.026% / 0.45% |
+| 108 px | 8 | floor, off | 4.7-4.8 ms | - | 9.7-9.9 ms | 282-285 ms | 28-32 / 46-51 ms | 269, 35 ms | 0.019% / 0.48% |
+| | | floor, on | 1.8 ms | 1.0 ms | 10.0 ms | 278 ms | 22 / 27 ms | 222, 34 ms | 0.024% / 0.50% |
+| 216 px | 16 | floor, off | 21.6 ms | - | 10.0 ms | 990-992 ms | 365 / 705-706 ms | 2,818, 240 ms | 0.014% / 0.60% |
+| | | floor, on | 3.7-3.8 ms | 5.0-5.3 ms | 10.3-10.6 ms | 316-322 ms | 31-36 / 46-55 ms | 2,700-2,748, 234 ms | 0.017% / 0.59% |
+| 108 px | 8 | laptop, off / on | 3.5-3.9 / 2.4 ms | - / 0.7 ms | 6.9-8.7 / 10.4-11.5 ms | 268-274 / 271-273 ms | 19-27 / 30-55 vs 20-26 / 38-43 ms | 272 / 219-227, 18-20 ms | as floor |
+| 216 px | 16 | laptop, off / on | 12.2 / 3.2-3.5 ms | - / 2.7-2.9 ms | 6.6-6.7 / 7.6-9.0 ms | 581-586 / 294-300 ms | 163-166 / 301-305 vs 25-28 / 47-50 ms | 2,832-2,853 / 2,736-2,758, 111-120 ms | as floor |
 
-- **It wins on the floor from 54 px up, with the same output.** At 216 px a dab costs 3.7-4.3 ms instead of 22 ms, the
-  stroke is done in 1.1-1.2 s instead of 3.4 s and the median lag falls from 1.6 s to 0.42-0.50 s (laptop: 0.71 s to
-  0.17 s). At 108 px the lag falls 3x (157-199 to 51-70 ms). Against the exact brush the wavelet stroke is within 0.6%
-  of the stroke's height at the worst point (today's adaptive brush: the same, 0.45-0.99%).
+- **It wins on the floor from 108 px up, with the same output.** At 216 px a dab costs 3.7-3.8 ms instead of 21.6 ms and
+  the committed lag falls from 365 / 705 ms (p50 / p99) to 31-36 / 46-55 ms; at 108 px from 28-32 / 46-51 to 22 / 27 ms.
+  The stroke is done 50-70 ms after the pen's last dab instead of 750 ms. At 54 px it is even (the pen and the 60 Hz frame
+  set the lag: ~20 ms is this loop's floor, a dab waits for the next frame). Against the exact brush the wavelet stroke is
+  within 0.6% of the stroke's height at the worst point (today's adaptive brush: 0.45-0.99%).
 - **The lattice must be >= 4x coarser.** At spacing 2 (27 px here) a first run of the wavelet path cost more than
   today's brush (dab 3.1-3.6 vs 1.9-2.5 ms on the floor, lag p50 23-27 vs 18-21 ms: the rebuild and the coefficients'
   bookkeeping cost what the lattice saves), so such dabs take today's path (`kWaveletMinSpacing`).
-- **Shading is now the wall.** At 216 px the renderer's CPU shading of the changed patches and their neighbours takes
-  ~90 ms a frame on the floor (46 ms on the laptop) in both modes: the brush is no longer what limits a big stroke. Next:
-  shade the rebuilt patches at the lattice resolution while the stroke runs (full shading at the end, or on the GPU),
-  which is the same idea one stage further down the pipeline.
+- **Shading is now what trails.** The renderer shades a budget a frame (~10 ms here in both modes), so at 216 px the
+  shading of ~2,700 changed patches still trails at release (234-240 ms to catch up on the floor, 111-120 on the laptop):
+  the surface's shape is committed within ~35 ms but its normals follow later. Shading everything each frame instead
+  costs ~90 ms a frame on the floor at 216 px (measured first: it put the lag at 0.4-0.5 s). Next: during a stroke,
+  shade the changed patches at the edited lattice's resolution (the fine detail's shading carried), exact catch-up at
+  rest and release.
 - **Windows PC:** see REPORT.md (CI Windows build of research/n2-stroke; a sanity check only, not the target).
 
 N3-N5 are designed (§7b), not built: N3 builds on N2's coefficients as its cache; N4 and N5 attach to N1 and the
