@@ -1,4 +1,4 @@
-# SubTools: the panel, Alt+click in the viewport, sculpting and undo per SubTool,
+# Parts: the panel, Alt+click in the viewport, sculpting and undo per Part,
 # visibility, rename, duplicate, delete, merge and split.
 run new_sphere subdivisions=4 ; subtool_rename to=Body
 expect "Parts/Append"
@@ -6,7 +6,7 @@ expect_value subtools == 1
 expect "Parts/Body"
 shot one-subtool
 
-# Append from the panel's menu: each new SubTool becomes the active one.
+# Append from the panel's menu: each new Part becomes the active one.
 click "Parts/Append"
 click "Sphere"
 expect_status Appended Part Sphere
@@ -26,7 +26,7 @@ expect_status Active Part: Body
 click "Parts/Sphere"
 expect_value active_subtool == 1
 
-# Alt+click in the viewport selects another SubTool without sculpting anything.
+# Alt+click in the viewport selects another Part without sculpting anything.
 hold alt
 click_subtool Cube
 hold none
@@ -39,7 +39,7 @@ expect_value active_subtool == 0
 expect_value edited_subtools == 0
 shot alt-click
 
-# Shift+Alt+click selects a SubTool and frames it (ZBrush): the camera moves in on the Cube.
+# Shift+Alt+click selects a Part and frames it (Classic keys): the camera moves in on the Cube.
 remember camera_distance far
 hold shift+alt
 click_subtool Cube
@@ -54,12 +54,12 @@ click_subtool Body
 hold none
 expect_value active_subtool == 0
 
-# A stroke changes only the active SubTool; undo history is per SubTool.
+# A stroke changes only the active Part; undo history is per Part.
 click "Clay##brush.clay"
 stroke 0.3 0.4 0.6 0.6
 expect_value can_undo == 1
 expect_value edited_subtools == 1
-# Alt+drag on the active SubTool is still an inverted stroke, not a selection.
+# Alt+drag on the active Part is still an inverted stroke, not a selection.
 hold alt
 stroke 0.4 0.3 0.5 0.7
 hold none
@@ -120,14 +120,14 @@ expect_value subtools == 3
 expect_status Deleted Part Helmet copy
 expect_not "Parts/Helmet copy"
 
-# Move the active SubTool up and down the list.
+# Move the active Part up and down the list.
 click "Parts/Sphere"
 click "Parts/##up"
 expect_value active_subtool == 0
 click "Parts/##down"
 expect_value active_subtool == 1
 
-# Merge down keeps polygroups apart, so Split groups separates the pieces again.
+# Merge down keeps face groups apart, so Split groups separates the pieces again.
 click "Parts/Body"
 click "Parts/Merge down..."
 click "Merge Down?/Merge"
@@ -147,13 +147,13 @@ expect_value subtools == 3
 expect_status Split into 3 Parts
 shot split-parts
 
-# The Tool palette's SubTool sub-palette closes and opens.
+# The Tool palette's Part sub-palette closes and opens.
 click "Parts##tool.subtool"
 expect_not "Parts/Append"
 click "Parts##tool.subtool"
 expect "Parts/Append"
 
-# Wireframe, polygroup colours and the LOD preview are for the active SubTool only.
+# Wireframe, face group colours and the LOD preview are for the active Part only.
 key shift+f
 expect_value wireframe == 1
 click "Face Groups"
@@ -167,7 +167,7 @@ shot lod-preview
 click "Game Ready/Sculpt"
 click "Parts##tool.subtool"
 
-# Past six SubTools the list scrolls; clicks scroll it like a person would.
+# Past six Parts the list scrolls; clicks scroll it like a person would.
 run subtool_append ; subtool_append ; subtool_append ; subtool_append
 expect_value subtools == 7
 expect_value active_subtool == 6

@@ -1,15 +1,15 @@
-# The ZBrush-style keys (docs/guide/coming-from-zbrush.md): U / I / O at the cursor, Smooth's own Z Intensity, ZBrush's brush
+# The Classic keys (the guide): U / I / O at the cursor, Smooth's own Z Intensity, the classic brush
 # letters, L, V, Space QuickMenu, the mask keys (Ctrl+A, Ctrl+Shift+A, Ctrl+I, Ctrl+H), Ctrl+click to blur and
 # Ctrl+Alt+click to sharpen the mask, Ctrl+W, Ctrl+Shift+click on a partly hidden mesh, Shift-constrained
-# straight strokes, Shift+click / release Shift / drag to roll, and the ZBrush / SculptForge input styles.
-run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+# straight strokes, Shift+click / release Shift / drag to roll, and the Classic / SculptForge input styles.
+run ui_look look=classic layout=zbrush        # written for the Classic look and the Classic palette bar and shelves
 run new_sphere subdivisions=5
-# New installs start with the SculptForge keys; this script is about the ZBrush-style ones.
+# New installs start with the SculptForge keys; this script is about the Classic ones.
 expect_value input_style == 1
 input_style zbrush
 expect_value input_style == 0
 
-# --- U / I / O: Z Intensity, RGB Intensity and Focal Shift at the cursor (typed in ZBrush's 0-100) ---
+# --- U / I / O: Z Intensity, RGB Intensity and Focal Shift at the cursor (typed as 0-100) ---
 mouse_move 0.5 0.5
 key u
 expect_text Intensity 50
@@ -64,7 +64,7 @@ expect_help "soft point"
 hold none
 shot draw-palette
 
-# --- ZBrush's brush letters: B C B ClayBuildup, B D S DamStandard, B M V Move, B I N Inflate, B S T Standard ---
+# --- the classic brush letters: B C B ClayBuildup, B D S DamStandard, B M V Move, B I N Inflate, B S T Standard ---
 key b
 key c
 shot picker-c
@@ -86,11 +86,11 @@ key b
 key s
 key t
 expect_value brush_type == 0
-# In the ZBrush style the number keys don't pick brushes.
+# In the Classic style the number keys don't pick brushes.
 key 3
 expect_value brush_type == 0
 
-# --- L: Steady Stroke (ZBrush: LazyMouse) on and off, with any stroke type; V: swap the main and secondary colour ---
+# --- L: Steady Stroke on and off, with any stroke type; V: swap the main and secondary colour ---
 key l
 expect_value steady_stroke == 1
 key l
@@ -144,7 +144,7 @@ hold none
 expect_value mask_soft < $blurred
 shot mask-sharpened
 
-# --- Ctrl+W: the masked part becomes a polygroup and the mask is cleared ---
+# --- Ctrl+W: the masked part becomes a face group and the mask is cleared ---
 remember groups g0
 key ctrl+w
 expect_value groups > $g0
@@ -152,7 +152,7 @@ expect_value masked == 0
 expect_value show_polygroups == 1
 shot group-masked
 
-# ZBrush style: Ctrl+drag on the background with nothing masked does nothing (SculptForge's zoom is a preference).
+# Classic style: Ctrl+drag on the background with nothing masked does nothing (SculptForge's zoom is a preference).
 remember camera_distance d0
 hold ctrl
 drag 0.12 0.3 0.12 0.7

@@ -1,16 +1,16 @@
-# Custom MatCaps (#15): Material > Load MatCap... (the dialog's command), the library's MatCaps folder, and
-# projects that carry their custom MatCap. Files are written to the working directory (the build folder).
-run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+# Custom Lit Spheres (#15): Material > Load Lit Sphere... (the dialog's command), the library's Lit Spheres folder, and
+# projects that carry their custom Lit Sphere. Files are written to the working directory (the build folder).
+run ui_look look=classic layout=zbrush        # written for the Classic look and the Classic palette bar and shelves
 expect_value custom_matcaps == 0
 
-# A project saved with a MatCap this machine doesn't have (Rose, embedded): it opens with it.
+# A project saved with a Lit Sphere this machine doesn't have (Rose, embedded): it opens with it.
 run open path=$SCRIPT_DIR/data/rose_matcap.sfproj
 expect_value material_custom == 1
 expect_value custom_matcaps == 1
 camera 20 10
 shot rose-from-project
 
-# Load an image: it becomes the material, joins the palette's list and is copied into the MatCaps folder.
+# Load an image: it becomes the material, joins the palette's list and is copied into the Lit Spheres folder.
 run new_sphere subdivisions=4
 expect_value matcap_files == 0
 click "Material##palette.material"
@@ -40,7 +40,7 @@ run load_matcap path=$SCRIPT_DIR/data/Gold.png
 expect_value custom_matcaps == 2
 expect_value matcap_files == 1
 
-# Scripts pick custom MatCaps by name (files that aren't images fail: test_polypaint matcap_custom_images).
+# Scripts pick custom Lit Spheres by name (files that aren't images fail: test_polypaint matcap_custom_images).
 run set_material name=rose
 expect_status "Material: Rose"
 
@@ -64,7 +64,7 @@ expect "Material/Pink"
 expect_value custom_matcaps == 3
 expect_value matcap_files == 2
 
-# Right-click > Remove: out of the lists, and a MatCaps-folder image goes to the trash (Linux: the one under
+# Right-click > Remove: out of the lists, and a Lit Spheres-folder image goes to the trash (Linux: the one under
 # XDG_DATA_HOME above, inside the test library; Windows: the Recycle Bin). The view was using Gold, so it goes
 # back to the default.
 right_click "Material/Gold"

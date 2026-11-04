@@ -1,7 +1,7 @@
-# ZSpheres (ZBrush's ZSpheres, Tool > ZSpheres): a ZSphere SubTool with one root, Draw grows an arm from it with X
+# Forge Spheres (Tool > Forge Spheres): a Forge Sphere Part with one root, Draw grows an arm from it with X
 # symmetry (the mirror arm follows), Move pulls it out, Scale grows it and undo takes that back, a click on the link
 # adds a joint (both sides), Alt+click deletes a limb, Preview (A) shows the skin, and Make Mesh builds a sculptable
-# SubTool below with the ZSpheres hidden and kept. Dragging the background still navigates.
+# Part below with the Forge Spheres hidden and kept. Dragging the background still navigates.
 run zsphere_new radius=1
 run subtool_visibility index=0 visible=false
 wait 0.3
@@ -65,7 +65,7 @@ expect_value zspheres == 5
 key a
 expect_value zsphere_preview == 0
 
-# Make Mesh: a new SubTool below, active and sculptable; the ZSpheres hidden and kept.
+# Make Mesh: a new Part below, active and sculptable; the Forge Spheres hidden and kept.
 click "Forge Spheres/Make Mesh"
 expect_value subtools == 3
 expect_value active_subtool == 2

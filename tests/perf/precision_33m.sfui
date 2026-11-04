@@ -1,4 +1,4 @@
-# Precision at extreme zoom on 33M triangles (by hand, not in ctest: tools/precision_check.sh). See
+# Precision at extreme zoom on 33M triangles (nightly: ctest -L nightly, or by hand: tools/precision_check.sh). See
 # tests/ui/precision_dense.sfui.
 run new_bench_sphere millions=33
 expect_value pixel_density >= 1

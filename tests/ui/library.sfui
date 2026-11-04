@@ -1,9 +1,9 @@
-# LightBox (comma key): tabs, history, loading models, appending SubTools, materials,
-# brushes, QuickSave; then the ZBrush-style pickers: the brush pop-up (B, type letters,
+# Library (comma key): tabs, history, loading models, appending Parts, materials,
+# brushes, QuickSave; then the Classic pickers: the brush pop-up (B, type letters,
 # press the orange key), the material pop-up (M) and Draw Size / Z Intensity at the cursor (S / U).
 run new_plane resolution=8
 expect_value triangles == 128
-expect_value lightbox_open == 0   # (the window; "LightBox" is also the top-shelf button)
+expect_value lightbox_open == 0   # (the window; "Library" is also the top-shelf button)
 
 key ,
 expect_value lightbox_open == 1
@@ -18,7 +18,7 @@ shot lightbox-tool
 click "Library/###Fixes & suggestions"
 expect_status Submit a request for a fix or a suggestion
 
-# Double-click a model to open it (replaces the scene), Shift+double-click to append it as a SubTool.
+# Double-click a model to open it (replaces the scene), Shift+double-click to append it as a Part.
 double_click "Library/Sphere"
 expect_value triangles > 128
 expect_value subtools == 1
