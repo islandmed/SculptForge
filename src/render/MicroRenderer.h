@@ -112,7 +112,7 @@ private:
     GLuint gsProgram_ = 0;  // GPU shading: the pass, its tables, the list of slots, the output, a timer query
     bool gsFailed_ = false;
     GLuint gsNbrData_ = 0, gsNbrTex_ = 0, gsRingOffData_ = 0, gsRingOffTex_ = 0, gsRingData_ = 0, gsRingTex_ = 0;
-    GLuint gsIJData_ = 0, gsIJTex_ = 0, gsListData_ = 0, gsListTex_ = 0, gsOut_ = 0, gsQuery_ = 0;
+    GLuint gsIJData_ = 0, gsIJTex_ = 0, gsListData_ = 0, gsListTex_ = 0, gsOut_ = 0, gsQuery_[2] = {0, 0};
     GLuint gsPosProgram_ = 0, gsRowData_ = 0, gsRowTex_ = 0, gsList1Data_ = 0, gsList1Tex_ = 0;
     GLuint gsFbo_ = 0, gsPosTarget_ = 0, gsShadeTarget_ = 0; // the fragment-shader passes' targets (uW x rows)
     int gsPosRows_ = 0, gsShadeRows_ = 0;
