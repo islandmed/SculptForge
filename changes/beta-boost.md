@@ -1,7 +1,7 @@
 ---
 whats_new: **Fast Big Brushes**: big brushes on dense meshes keep up with the pen. A 240 px Clay stroke on a 15 million
-  triangle head trails the pen by about a quarter of what it did, and every dab is placed. On by default:
-  **Preferences > Performance > Fast Big Brushes**.
+  triangle head trails the pen by a third to a quarter of what it did (most on modest hardware), and every dab is
+  placed. On by default: **Preferences > Performance > Fast Big Brushes**.
 highlight: Big brushes keep up on dense meshes
 added: **Fast Big Brushes** (Preferences > Performance, on by default): a dab that reaches more than 150,000 vertices
   takes its plane from an even sample of them and turns the shading along with the move it makes (from the brush's
