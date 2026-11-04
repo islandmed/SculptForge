@@ -16,7 +16,8 @@ class CommandRegistry;
 // alpha is the plain round smoothstep falloff, so brushes behave exactly as
 // without one. Built-ins: Round (empty), Square, Noise and twelve patterns made
 // in code (Pores, Cracks, Scales, Rivets, Stitches, Fabric Weave, Bark, Rock
-// Strata, Wrinkles, Skin Folds, Hair Strands, Dot Grid; #43); anything else comes
+// Strata, Wrinkles, Skin Folds, Hair Strands, Dot Grid; #43; Cobblestone, Leather
+// Grain, Hex Plates, Knit, Bolt, Chips for the brush packs); anything else comes
 // from an image's luminance (transparent pixels count as black).
 struct BrushAlpha {
     std::string name = "Round";

@@ -3,6 +3,7 @@
 #include "app/BrushPreview.h"
 
 #include "app/AssetLibrary.h"
+#include "core/BrushAlpha.h"
 #include "core/Document.h"
 #include "core/PathStroke.h"
 #include "core/Primitives.h"
@@ -100,7 +101,10 @@ std::unique_ptr<Mesh> sculptBrushPreview(const BrushRecipe* recipe, int type) {
     d.setMesh(makeIcosphere(kBallDetail, kBallRadius));
     const float r = 0.17f;
     if (recipe) {
-        stroke(d, recipe, BrushType::Standard, frontCurve(), r, 0.9f);
+        if (!recipe->alpha.empty()) BrushAlpha::builtin(recipe->alpha, d.brushAlpha); // (as its first pick has)
+        // A textured brush (alpha or pattern) strokes wider, so its texture reads at thumbnail size.
+        const bool textured = !recipe->alpha.empty() || recipe->pattern != BrushRecipe::Pattern::None;
+        stroke(d, recipe, BrushType::Standard, frontCurve(), textured ? 0.26f : r, 0.9f);
         return sceneMesh(d);
     }
     // Each brush gets a mark of its own shape that shows what it does, so the shelf tells them apart at a glance

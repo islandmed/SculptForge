@@ -586,6 +586,7 @@ private:
     // Ctrl+click on the background inverts it, Ctrl+drag there clears it.
     // With MaskLasso / MaskRect, Ctrl+drag draws the shape instead.
     void drawMaskingSection();
+    bool maskButton(const char* id, const char* hint, int art, float width, bool selected = false);
     void beginMaskStroke(float x, float y);
     void maskCanvasMove(float x, float y);
     void maskCanvasRelease();
@@ -597,6 +598,9 @@ private:
     int maskIterations_ = 1;
     float cavityThreshold_ = 0.02f;
     int maskGroup_ = 0;
+    float maskColorTolerance_ = 0.15f; // Tool > Masking > By colour
+    int maskFacingDir_ = 0;            // By facing: 0 the camera, 1 up, 2 down
+    float maskFacingAngle_ = 60.0f;
     int maskBorderRings_ = 2;        // Tool > Masking > By border: width in edge rings (#61)
     bool maskBorderGroups_ = false;  // ... polygroup borders too
     bool maskBorderSoft_ = false;    // ... fading inwards
@@ -1774,6 +1778,7 @@ public:
 private:
     void initBrushSettings();
     void syncBrushSettings(); // every frame, outside strokes
+    void recipeAlpha(BrushToolSettings& s) const; // the active recipe's own alpha (brush packs) into `s`
     void syncAlphaTile();     // the brush's Tile onto the current alpha
     void registerAlphaOptionsCommand(); // brush_alpha_options (#76)
     std::string brushSettingsPath() const;

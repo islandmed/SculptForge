@@ -171,6 +171,8 @@
 //                            phone_running (1 while the phone link listens), phone_uploads (uploads under way),
 //                            phone_captures (captures received), phone_face_frames, phone_face_fps, phone_recording,
 //                            phone_take_frames, phone_ar_version (AR models published), phone_ar_busy
+//                            brush_sort / alpha_sort / material_sort / library_sort (0 A-Z, 1 Recent, 2 Pack),
+//                            builtin_pack_brushes (built-in brush-pack brushes loaded), alpha_index (0 Round, -1 an image)
 //   (mesh values are the active SubTool's)
 //   snapshot                 remember the active mesh's vertices (for the moved* values)
 //   remember VALUE NAME      keep VALUE's current value as $NAME
@@ -250,6 +252,7 @@
 #include "app/Ui.h"
 
 #include "core/BrushLibrary.h"
+#include "core/ListSort.h"
 #include "core/Matcap.h"
 #include "core/Multires.h"
 #include "core/Script.h"
@@ -514,6 +517,23 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "share_brush_size") return app_.brushSettingsStore().shareSizeIntensity ? 1.0 : 0.0;
     if (name == "alpha_follow") return app_.alphaOptions_.followStroke ? 1.0 : 0.0; // alpha options (#76)
     if (name == "alpha_angle") return std::round(app_.alphaOptions_.angle);
+    if (name == "brush_sort") return double(int(listSortFromId(app_.uiPrefs_.brushSort))); // 0 A-Z, 1 Recent, 2 Pack
+    if (name == "alpha_sort") return double(int(listSortFromId(app_.uiPrefs_.alphaSort)));
+    if (name == "material_sort") return double(int(listSortFromId(app_.uiPrefs_.materialSort)));
+    if (name == "library_sort") return double(int(listSortFromId(app_.uiPrefs_.librarySort)));
+    if (name == "builtin_pack_brushes") // built-in brush-pack brushes loaded
+        return double(std::count_if(app_.doc_.brushes.begin(), app_.doc_.brushes.end(), [](const BrushRecipe& r) {
+            return r.origin.source == BrushSource::Builtin && !r.origin.pack.empty();
+        }));
+    if (name == "alpha_index") { // the alpha's place among the built-ins (0 = Round), -1 for an image
+        const BrushAlpha& a = app_.doc_.brushAlpha;
+        if (a.empty()) return 0.0;
+        if (!a.path.empty()) return -1.0;
+        const auto& all = BrushAlpha::builtins();
+        for (size_t i = 0; i < all.size(); ++i)
+            if (all[i].name == a.name) return double(i);
+        return -1.0;
+    }
     if (name == "alpha_tile_x") return double(app_.doc_.brushAlpha.tileX);
     if (name == "alpha_tile_y") return double(app_.doc_.brushAlpha.tileY);
     if (name == "last_dab_angle") { // degrees, -180..180: the alpha's turn on the last dab

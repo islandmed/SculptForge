@@ -7,6 +7,7 @@
 #include "app/Pickers.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
+#include "core/ListSort.h"
 #include "core/Matcap.h"
 #include "core/Primitives.h"
 #include "core/Project.h"
@@ -361,6 +362,18 @@ std::vector<AssetEntry> LightBox::entries(App& app) {
                 place_.folder, libraryTabId(tab), [tab](const std::string& p) { return fileKindForTab(tab, p); },
                 tab == LibraryTab::QuickSave || tab == LibraryTab::Project))
             out.insert(out.end(), list->begin(), list->end());
+        // Files in the chosen order (A-Z by default, or the newest first; folders stay first, A-Z). QuickSaves are
+        // always newest first: their names are their times.
+        if (tab != LibraryTab::QuickSave && place_.folder != app.library_.starter) {
+            const bool recent = listSortFromId(app.uiPrefs_.librarySort) == ListSort::Recent;
+            const auto files = std::stable_partition(out.begin(), out.end(), [](const AssetEntry& e) {
+                return e.kind == AssetKind::Up || e.kind == AssetKind::Folder;
+            });
+            std::stable_sort(files, out.end(), [recent](const AssetEntry& a, const AssetEntry& b) {
+                if (recent && a.mtime != b.mtime) return a.mtime > b.mtime;
+                return naturalLess(a.name, b.name);
+            });
+        }
     }
     if (filter_[0]) {
         const std::string f = lower(filter_);
@@ -707,7 +720,8 @@ void LightBox::drawHeader(App& app, float width) {
                               buttonW(ICON_LC_SMARTPHONE) + 8.0f * scale;
         const float feedbackW =
             buttonW(compactFeedback ? ICON_LC_MESSAGE_SQUARE_PLUS : ICON_LC_MESSAGE_SQUARE_PLUS "  Fixes & suggestions");
-        return saveW + filterW + rowsW + folderW + feedbackW + 4 * 8.0f * scale;
+        const float sortW = buttonW("Sort: Recent") + 8.0f * scale;
+        return saveW + filterW + sortW + rowsW + folderW + feedbackW + 4 * 8.0f * scale;
     };
     // The close button is pinned to the right edge (#80: on a 720p screen the group ran past it and hid it); the
     // rest gets what is left between the tabs and it, clipped if even the compact group doesn't fit.
@@ -728,6 +742,8 @@ void LightBox::drawHeader(App& app, float width) {
     ImGui::SetNextItemWidth(filterW);
     ImGui::InputTextWithHint("##lbfilter", tr(ICON_LC_SEARCH "  Filter"), filter_, sizeof filter_);
     ui::HelpText("Filter", nullptr, "Show only the items whose names contain this text.", "Library");
+    ImGui::SameLine(0, 8 * scale);
+    SortMenu("lbsort", app.uiPrefs_.librarySort, false);
     ImGui::SameLine(0, 8 * scale);
     for (int r = 1; r <= 4; ++r) {
         const bool on = app.layout_.lightboxRows == r;

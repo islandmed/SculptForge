@@ -74,6 +74,11 @@ struct BrushRecipe {
     bool viewFalloff = false;
     float cavityMask = 0.0f; // -1..1: >0 only affects cavities, <0 only ridges/peaks
 
+    // The built-in alpha (core/BrushAlpha.h) the brush starts with the first time it is picked; empty = whatever
+    // alpha is on. Written to the JSON only when set. An unknown name is dropped.
+    std::string alpha;
+    bool alphaFollow = false; // the alpha turns along the stroke (Alpha > Follow stroke direction) on that first pick
+
     // Library bookkeeping, not part of the recipe: never written by toJson().
     BrushOrigin origin;
 
@@ -107,6 +112,7 @@ const std::vector<RecipeParam>& recipeParams();
 // additionalProperties, ranges given in descriptions).
 Json recipeJsonSchema();
 
+// The built-ins: the seven classic recipes, then the brush packs (core/BrushPacks.h; origin.pack names the pack).
 std::vector<BrushRecipe> builtinBrushRecipes();
 
 } // namespace sf

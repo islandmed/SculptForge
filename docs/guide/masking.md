@@ -2,8 +2,8 @@
 
 A mask protects part of the model from change. Masked areas are drawn darker, and every brush, the Paint
 brush and colour fills leave them alone. This chapter covers painting masks with <kbd>Ctrl</kbd>, masking
-with a lasso or rectangle, the background gestures, and the **Tool > Masking** controls for inverting, blurring, growing and building masks
-from cavities, face groups or the mesh border.
+with a lasso or rectangle, the background gestures, and the **Tool > Masking** panel for inverting, blurring, growing and building masks
+from cavities, peaks, face groups, vertex paint, the direction the surface faces or the mesh border.
 
 ![A mask painted on the lion's mane, with the Masking sub-palette](images/masking.jpg)
 
@@ -100,30 +100,57 @@ A drag starts after the cursor moves a few pixels, so a slightly shaky click sti
 or **Mask Rectangle**, a <kbd>Ctrl</kbd> + drag on the background draws that shape; to clear the mask, draw it away
 from the model, or use **Clear**.
 
-## The Masking sub-palette
+## The Masking panel
 
-Open **Tool > Masking** (the Tool palette is in the right tray by default). Every button is one undo step.
+Open **Tool > Masking** (the Tool palette is in the right tray by default). It has three rows of buttons, each
+with a picture of what it does (the masked part dark, as in the viewport); hold <kbd>Ctrl</kbd> over a button for
+its hint. Every button is one undo step.
 
-| Control | What it does | Command |
+![Tool > Masking: Shapes, Mask by and Adjust](images/masking-panel.jpg)
+
+**Shapes**: what <kbd>Ctrl</kbd> + drag does.
+
+| Button | What it does | Command |
 |---|---|---|
-| **Show mask** | Darken masked areas in the viewport. | |
-| **Mask Pen** / **Mask Lasso** / **Mask Rectangle** | What <kbd>Ctrl</kbd> + drag does: paint with the brush, or mask inside a lasso or rectangle. | `mask_lasso` / `mask_rect` |
-| **Mask Strength** | How much each mask stroke or selection masks (0.01 to 1), and the mask value **By cavity** gives the deepest cavities. | |
-| **Clear** | Unmask everything. | `mask_clear` |
+| **Mask Pen** | Paint the mask with the brush; <kbd>Ctrl</kbd>+<kbd>Alt</kbd> erases. | |
+| **Mask Lasso** | Mask what is inside a free shape you draw. | `mask_lasso` |
+| **Mask Rectangle** | Mask what is inside a rectangle. | `mask_rect` |
+
+**Front faces only** (lasso and rectangle) masks only what faces you. **Mask Strength** is how much each stroke,
+shape or **Mask by** button masks (0.01 to 1).
+
+**Mask by**: build a whole mask at once. Each one replaces the current mask.
+
+| Button | What it masks | Command |
+|---|---|---|
+| **By cavity** | Concave areas: creases, folds, pores. | `mask_by_cavity` |
+| **By peaks** | Convex areas: ridges, peaks and sharp edges (the opposite of By cavity). | `mask_by_peaks` |
+| **By face group** | One face group (the number under **Mask by options**). | `mask_by_polygroup` |
+| **By colour** | Vertex paint close to the main colour (the left shelf's swatch); unpainted clay counts as white. | `mask_by_color` |
+| **By facing** | Surface that faces the camera (or up, or down) within an angle: the front of a face, the top of a rock. | `mask_by_facing` |
+| **By border** | The open edges of the mesh and the rings of edges inside them, so sculpting keeps the border in place. A closed mesh has no open edges, and the status bar says so. | `mask_border` |
+
+**Adjust**: change the mask there is.
+
+| Button | What it does | Command |
+|---|---|---|
+| **Grow** / **Shrink** | Expand or contract the masked region by one ring of edges per pass. | `mask_grow` / `mask_shrink` |
+| **Sharpen** / **Blur** | Tighten or soften the mask's edges. | `mask_sharpen` / `mask_blur` |
 | **Invert** | Masked becomes free and free becomes masked. | `mask_invert` |
+| **Clear** | Unmask everything. | `mask_clear` |
 | **All** | Mask every visible vertex. | `mask_all` |
-| **Blur** | Soften the mask edges by averaging with neighbouring vertices. | `mask_blur` |
-| **Sharpen** | Tighten soft edges, pushing values toward fully masked or free. | `mask_sharpen` |
-| **Grow** | Expand the masked region by one ring of edges per pass. | `mask_grow` |
-| **Shrink** | Contract the masked region by one ring of edges per pass. | `mask_shrink` |
-| **passes** | How many times Blur, Sharpen, Grow and Shrink run (1 to 20 here, default 1). | `iterations=` |
-| **By cavity** | Mask concave areas (creases, folds, pores), replacing the current mask. | `mask_by_cavity` |
-| **threshold** | How concave a spot must be for **By cavity** (-0.2 to 0.5, default 0.02). 0 masks anything concave; higher values keep only deep creases. | `threshold=` |
-| **By face group** | Mask one face group, replacing the current mask. The number field next to it is the face group id. | `mask_by_polygroup` |
-| **By border** | Mask the open edges of the mesh (edges with only one face) and the rings of edges inside them, replacing the current mask, so sculpting keeps the border in place. Uses **Mask Strength**. A closed mesh has no open edges, and the status bar says so. | `mask_border` |
-| **Rings** | How wide **By border** masks, in rings of edges from the border (1 to 20, default 2; 1 masks the border vertices only). | `rings=` |
-| **Face Group borders** | **By border** also masks where face groups meet. | `polygroups=true` |
-| **Soft** | **By border** fades the mask from the border towards the innermost ring. | `soft=true` |
+
+**Passes** sets how many times Grow, Shrink, Sharpen and Blur run (1 to 20). **Mask by options** holds the rest:
+
+| Option | For | |
+|---|---|---|
+| **Cavity / peaks threshold** | How deep a crease (By cavity) or sharp a ridge (By peaks) must be (-0.2 to 0.5, default 0.02). 0 takes anything; higher keeps only the strongest. | `threshold=` |
+| **Face group** | The face group id By face group masks. | `group=` |
+| **Colour tolerance** | How different a colour may be and still count for By colour (0.01 to 1, default 0.15). | `tolerance=` |
+| **Faces the camera / up / down** and **Angle** | The direction By facing compares with, and how far the surface may turn from it (default 60 degrees). | `x= y= z= angle=` |
+| **Border rings** | How wide By border masks, in rings of edges (1 to 20, default 2). | `rings=` |
+| **Face Group borders** | By border also masks where face groups meet. | `polygroups=true` |
+| **Soft** | By border fades the mask from the border towards the innermost ring. | `soft=true` |
 
 Mask operations only change visible parts of the model; hidden parts keep their mask. **Clear** is the
 exception and frees everything.
@@ -155,7 +182,7 @@ The quickest way works without knowing the group's number:
 
 **By face group** masks a group by its id. The viewport doesn't show ids, but the console does: isolate the
 group, then open the console (<kbd>`</kbd>) and read the `isolate_face group group=N` line. Enter that number in
-the field next to **By face group** and click it.
+**Mask by options > Face group** and click **By face group**.
 
 ### Sculpt without breaking the border
 

@@ -233,8 +233,6 @@ glm::vec3 sampleColor(const Mesh& mesh, uint32_t triangle, const glm::vec3& poin
     return mesh.colorAt(t.x) * (1.0f - wb - wc) + mesh.colorAt(t.y) * wb + mesh.colorAt(t.z) * wc;
 }
 
-namespace {
-
 // A colour from "color" (any parseColor form) or numeric "r"/"g"/"b" (sRGB 0..1).
 // Returns false with `error` empty when no colour was given.
 bool colorArg(const Args& a, glm::vec3& linear, std::string& error) {
@@ -252,6 +250,8 @@ bool colorArg(const Args& a, glm::vec3& linear, std::string& error) {
     }
     return false;
 }
+
+namespace {
 
 // Undo step for a whole-mesh colour edit, pushed before the edit: the old
 // colours, or a mesh snapshot when there is no polypaint yet, so undo removes
