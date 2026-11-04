@@ -118,6 +118,14 @@ const char* tierName(ProfileTier tier) {
     return "Laptop";
 }
 
+bool simulatedFloorTier() {
+    static const bool on = [] {
+        const char* v = std::getenv("SF_HW_SIMULATE");
+        return v && std::string(v) == "floor";
+    }();
+    return on;
+}
+
 bool tierFromName(const std::string& name, ProfileTier& out) {
     const std::string n = lower(name);
     for (ProfileTier t : {ProfileTier::Software, ProfileTier::Laptop, ProfileTier::Workstation})

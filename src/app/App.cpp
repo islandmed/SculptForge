@@ -665,7 +665,7 @@ int App::run() {
     double phase[10] = {};
     int phases = 0;
     const auto mark = [&] {
-        if (frameLogMs >= 0.0 && phases < 10) phase[phases++] = double(SDL_GetTicksNS()) * 1e-6;
+        if ((frameLogMs >= 0.0 || proof_) && phases < 10) phase[phases++] = double(SDL_GetTicksNS()) * 1e-6;
     };
     auto seconds = [] { return double(SDL_GetTicksNS()) * 1e-9; };
     // --measure-idle: let start-up settle (first frames, the LightBox's thumbnails), then count.
@@ -1013,7 +1013,9 @@ int App::run() {
         if (proof_) proofBeforeSwap(fbW, fbH); // Help > Benchmark: timing, video capture, the scripted pointer
         SDL_GL_SwapWindow(window_);
         mark();
-        if (phases == 7 && phase[6] - phase[0] > frameLogMs)
+        if (phases == 7) // (Help > Benchmark splits each phase's frames by these)
+            for (int k = 0; k < 6; ++k) frameSplitMs_[k] = phase[k + 1] - phase[k];
+        if (phases == 7 && frameLogMs >= 0.0 && phase[6] - phase[0] > frameLogMs)
             SDL_Log("frame %.1f ms: events %.1f, dabs %.1f, UI %.1f, ghost + sync %.1f, draw %.1f, UI draw + swap %.1f",
                     phase[6] - phase[0], phase[1] - phase[0], phase[2] - phase[1], phase[3] - phase[2], phase[4] - phase[3],
                     phase[5] - phase[4], phase[6] - phase[5]);

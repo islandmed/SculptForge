@@ -2072,6 +2072,9 @@ private:
     // stroke through the input handlers on 5M..100M+ meshes with a live HUD, an MP4 and a JSON result.
     std::shared_ptr<struct TimelineUiState> timelineUi_;
     std::shared_ptr<struct ProofState> proof_;
+    // The last drawn frame's time by part (run()'s marks): events, dabs, UI, ghost + scene sync (the upload), draw,
+    // UI draw + swap (where the frame waits for the GPU).
+    double frameSplitMs_[6] = {};
     void drawTimelineUi();            // once a frame from drawUi: keeps the timeline attached and draws the strip
     float timelineTopInset_ = 0.0f;   // how far down the canvas the strip (or its tab) reaches at the top; 0 at the bottom
     float timelineStripY_ = -1.0f;    // the strip's (or tab's) top edge in window pixels this frame (-1: not shown)
