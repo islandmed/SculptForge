@@ -210,3 +210,54 @@ TEST(pen_predictor_tracks_a_circle_better_than_holding_still) {
     }
     CHECK(predicted / n < held / n * 0.25);
 }
+
+TEST(live_move_matches_the_grab) {
+    // Live Move (SF_LIVE_MOVE, research prototype): the preview of a whole Move drag (GhostKind::Move, from the
+    // grab's start positions) is where the grab puts every vertex, and one grab with the whole move lands where a
+    // grab per frame does (up to float rounding), with X symmetry.
+    Mesh sphere = makeIcosphere(6);
+    DabParams p;
+    p.center = glm::normalize(glm::vec3(0.3f, 0.2f, 1.0f));
+    p.radius = 0.45f;
+    p.strength = 0.4f;
+    p.focal = 0.3f;
+    p.viewDir = -p.center;
+    const Symmetry sym{true, false, false};
+    const std::vector<glm::vec3> steps = {{0.01f, 0.02f, 0.0f}, {0.03f, -0.01f, 0.02f}, {0.02f, 0.02f, 0.01f}};
+    glm::vec3 total(0.0f);
+    for (const glm::vec3& s : steps) total += s;
+
+    Document framed = makeDoc(sphere), once = makeDoc(sphere);
+    const std::vector<glm::vec3> before = framed.mesh.positions, normals = framed.mesh.normals;
+    framed.sculptor.beginStroke(framed.mesh, "test");
+    framed.sculptor.beginGrab(framed.mesh, framed.bvh, p, sym);
+    for (const glm::vec3& s : steps) framed.sculptor.grab(framed.mesh, framed.bvh, s);
+    framed.sculptor.endStroke();
+    once.sculptor.beginStroke(once.mesh, "test");
+    once.sculptor.beginGrab(once.mesh, once.bvh, p, sym);
+    once.sculptor.grab(once.mesh, once.bvh, total);
+    once.sculptor.endStroke();
+
+    GhostStroke g;
+    g.kind = GhostKind::Move;
+    g.focal = p.focal;
+    const std::vector<SymCopy> copies = Sculptor::copies(sym);
+    for (uint32_t m = 0; m < copies.size(); ++m) {
+        GhostDab d;
+        d.center = copies[m].point(p.center);
+        d.radius = p.radius;
+        d.normal = copies[m].m * total;
+        d.strength = std::clamp(p.strength * 2.0f, 0.0f, 1.0f);
+        d.mirror = m;
+        g.dabs.push_back(d);
+    }
+    float moved = 0.0f, single = 0.0f, ghost = 0.0f;
+    for (size_t v = 0; v < before.size(); ++v) {
+        moved = std::max(moved, glm::distance(before[v], framed.mesh.positions[v]));
+        single = std::max(single, glm::distance(once.mesh.positions[v], framed.mesh.positions[v]));
+        ghost = std::max(ghost, glm::distance(ghostMove(g, before[v], normals[v]), framed.mesh.positions[v]));
+    }
+    CHECK(moved > 0.02f);
+    CHECK(single < 1e-6f);
+    CHECK(ghost < 1e-5f);
+}

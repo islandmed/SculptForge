@@ -99,6 +99,34 @@ void App::registerPerformanceUiActions() {
         "the dabs still being worked out as a preview on the surface, with the cursor and the stroke's head drawn "
         "where the pen is about to be. On a heavy mesh the surface moves under the pen at once and lifting the pen "
         "is instant. The finished sculpt is exactly the same either way.");
+    add("perf.live_move", "Live Move (Experimental)",
+        [this] {
+            uiPrefs_.liveMove = !uiPrefs_.liveMove;
+            status_ = uiPrefs_.liveMove ? "Live Move on" : "Live Move off";
+        },
+        [this] { return uiPrefs_.liveMove; },
+        "Experimental. The Move brush's drag is drawn by the graphics card from where the surface started, so it "
+        "follows the pen at the view's frame rate whatever the mesh size; the move itself is applied once, exactly, "
+        "when you lift the pen. Not with masks, hidden parts, sculpt layers, micro levels, Connected Only or View "
+        "falloff (Move works as before there).");
+    add("perf.background_preview", "Background Preview (Experimental)",
+        [this] {
+            uiPrefs_.backgroundPreview = !uiPrefs_.backgroundPreview;
+            status_ = uiPrefs_.backgroundPreview ? "Background preview on" : "Background preview off";
+        },
+        [this] { return uiPrefs_.backgroundPreview; },
+        "Experimental. On meshes of 2 million vertices or more, big brushes are worked out on their own thread; "
+        "with this on, the dabs still being worked out are shown as a preview on the surface (as Predictive "
+        "Strokes does), so the stroke stays under the pen. The finished sculpt is exactly the same either way.");
+    add("perf.fast_upload", "Fast Upload (Experimental)",
+        [this] {
+            uiPrefs_.fastUpload = !uiPrefs_.fastUpload;
+            status_ = uiPrefs_.fastUpload ? "Fast upload on" : "Fast upload off";
+        },
+        [this] { return uiPrefs_.fastUpload; },
+        "Experimental. While you sculpt, the changed part of the mesh goes to the graphics card through memory both "
+        "can see, and the card copies it into place itself, instead of the driver copying it during the frame. The "
+        "sculpt and the view are exactly the same either way; needs a driver with buffer storage (OpenGL 4.4).");
     add("perf.draft_strokes", "Draft Strokes",
         [this] {
             uiPrefs_.draftStrokes = !uiPrefs_.draftStrokes;
@@ -177,6 +205,15 @@ void App::drawPerformanceSection() {
     bool draft = uiPrefs_.draftStrokes;
     if (ImGui::Checkbox(tr("Draft Strokes"), &draft)) actions_.find("perf.draft_strokes")->run();
     ui::HelpAction(*this, "perf.draft_strokes");
+    bool liveMove = uiPrefs_.liveMove;
+    if (ImGui::Checkbox(tr("Live Move (Experimental)"), &liveMove)) actions_.find("perf.live_move")->run();
+    ui::HelpAction(*this, "perf.live_move");
+    bool bgPreview = uiPrefs_.backgroundPreview;
+    if (ImGui::Checkbox(tr("Background Preview (Experimental)"), &bgPreview)) actions_.find("perf.background_preview")->run();
+    ui::HelpAction(*this, "perf.background_preview");
+    bool fastUpload = uiPrefs_.fastUpload;
+    if (ImGui::Checkbox(tr("Fast Upload (Experimental)"), &fastUpload)) actions_.find("perf.fast_upload")->run();
+    ui::HelpAction(*this, "perf.fast_upload");
 
     // --- Threads ---
     bool threads = !ThreadPool::shared().serial();

@@ -376,6 +376,7 @@ int App::runUiTest(int w, int h, int fps) {
         ImGui::LogFinish();
         ImGui::Render();
         updateMouseCursor();
+        buildGhost(); // (the stroke preview, as run() draws it)
 
         prewarmTexturePaint(); // dense textured meshes: ready the area under the hovering Paint brush (PanelPbr.cpp)
         const auto syncStart = std::chrono::steady_clock::now();
@@ -545,6 +546,7 @@ int App::runRecording() {
         demo_->drawOverlay();
         ImGui::Render();
         updateMouseCursor();
+        buildGhost(); // (the stroke preview, as run() draws it)
 
         syncScene();
         ++frames;
@@ -665,7 +667,7 @@ int App::run() {
     double phase[10] = {};
     int phases = 0;
     const auto mark = [&] {
-        if (frameLogMs >= 0.0 && phases < 10) phase[phases++] = double(SDL_GetTicksNS()) * 1e-6;
+        if ((frameLogMs >= 0.0 || proof_) && phases < 10) phase[phases++] = double(SDL_GetTicksNS()) * 1e-6;
     };
     auto seconds = [] { return double(SDL_GetTicksNS()) * 1e-9; };
     // --measure-idle: let start-up settle (first frames, the LightBox's thumbnails), then count.
@@ -984,6 +986,8 @@ int App::run() {
         renderSettings_.motionProxy = perf_.proxyNow; // big meshes draw their lighter proxy while the view moves
         renderSettings_.materialTint = materialTintFor(doc_.paintColor); // (Color > Colour tints the material)
         renderSettings_.resolutionScale = float(uiPrefs_.viewResolution) / 100.0f; // (#80; only the window's view)
+        if (perf_.movingNow) // while the view moves, the floor tier draws fewer pixels; full resolution when it stops
+            renderSettings_.resolutionScale = std::min(renderSettings_.resolutionScale, motionResolution());
         perf_.samplesUsed = renderer_.drawView(camera_, fbW, fbH, renderSettings_, canvasViewport(fbW, fbH), samples);
         if (snapshotEnv && *snapshotEnv && (sm.moving || sm.releasing)) {
             // Three points of the stroke, and the end (the frame the last dab reached the screen).
@@ -1013,7 +1017,9 @@ int App::run() {
         if (proof_) proofBeforeSwap(fbW, fbH); // Help > Benchmark: timing, video capture, the scripted pointer
         SDL_GL_SwapWindow(window_);
         mark();
-        if (phases == 7 && phase[6] - phase[0] > frameLogMs)
+        if (phases == 7) // (Help > Benchmark splits each phase's frames by these)
+            for (int k = 0; k < 6; ++k) frameSplitMs_[k] = phase[k + 1] - phase[k];
+        if (phases == 7 && frameLogMs >= 0.0 && phase[6] - phase[0] > frameLogMs)
             SDL_Log("frame %.1f ms: events %.1f, dabs %.1f, UI %.1f, ghost + sync %.1f, draw %.1f, UI draw + swap %.1f",
                     phase[6] - phase[0], phase[1] - phase[0], phase[2] - phase[1], phase[3] - phase[2], phase[4] - phase[3],
                     phase[5] - phase[4], phase[6] - phase[5]);
@@ -1872,6 +1878,11 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
         p.viewFalloff = uiPrefs_.viewFalloff;
         grabPending_ = false;
         doc_.sculptor.beginGrab(doc_.mesh, doc_.bvh, p, symmetry_);
+        liveMove_ = {};
+        if (liveMoveEnabled() && !p.connectedOnly && !p.viewFalloff && !doc_.mesh.micro && !doc_.mesh.hasMask() &&
+            !doc_.mesh.hasHidden() && doc_.mesh.layers.empty() && !doc_.sculptor.dyntopo.enabled &&
+            &displayedMesh() == &doc_.mesh)
+            liveMove_ = {true, p.center, glm::vec3(0.0f), p.radius, std::clamp(p.strength * 2.0f, 0.0f, 1.0f)};
         grabPlanePoint_ = grabLast_ = hit.position;
         beginAlongNormal(hit, p.radius);
         return;
@@ -1926,7 +1937,8 @@ void App::strokeTo(float x, float y) {
     const BrushRecipe* recipe = strokeRecipe();
     if (strokeBrush_ == BrushType::Move && !recipe && strokeSculpt_ && strokeAlongNormal_) {
         const glm::vec3 p = alongNormalTarget(x, y);
-        queueGrab(p - grabLast_);
+        if (liveMove_.active) liveMove_.delta += p - grabLast_;
+        else queueGrab(p - grabLast_);
         grabLast_ = p;
         return;
     }
@@ -1938,7 +1950,8 @@ void App::strokeTo(float x, float y) {
         if (std::abs(denom) < 1e-6f) return;
         float t = glm::dot(grabPlanePoint_ - origin, n) / denom;
         glm::vec3 p = origin + dir * t;
-        queueGrab(p - grabLast_);
+        if (liveMove_.active) liveMove_.delta += p - grabLast_;
+        else queueGrab(p - grabLast_);
         grabLast_ = p;
         return;
     }
@@ -3793,3 +3806,4 @@ void App::drawBrushCursor() {
 }
 
 } // namespace sf
+

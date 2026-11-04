@@ -41,6 +41,9 @@ enum class ProfileTier { Software, Laptop, Workstation };
 const char* tierName(ProfileTier tier); // "Software", "Laptop", "Workstation"
 // Also accepts "llvmpipe" / "safe" (Software), "budget" (Laptop) and "monster" (Workstation), in any case.
 bool tierFromName(const std::string& name, ProfileTier& out);
+// SF_HW_SIMULATE=floor: run with the floor tier's budgets (docs/design/perf-moonshots.md §0: an integrated GPU,
+// GL 3.3, 4 cores) on a faster machine, to measure what such a computer gets. Budgets only, not the GPU's speed.
+bool simulatedFloorTier();
 
 // What the computer is. GPU fields stay empty / 0 where no OpenGL context was probed (sculptforge-cli).
 struct HardwareInfo {

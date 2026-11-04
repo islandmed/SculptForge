@@ -83,7 +83,7 @@ private:
     void moveTo(float x, float y, float seconds);
     void moveToItem(const std::string& label, float seconds = 0.6f);
     void click(const std::string& label);  // move to the item and click it
-    void stroke(std::function<ImVec2(float u)> path, float seconds, bool invert = false);
+    void stroke(std::function<ImVec2(float u)> path, float seconds, bool invert = false, bool hold = false); // hold: the button stays down
     void orbit(float dx, float dy, float seconds); // right-drag on the background
     void type(char* buffer, size_t size, const std::string& text, float seconds);
     void run(std::function<void()> action);

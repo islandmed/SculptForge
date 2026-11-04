@@ -398,7 +398,7 @@ void Demo::click(const std::string& label) {
     wait(0.25f);
 }
 
-void Demo::stroke(std::function<ImVec2(float u)> path, float seconds, bool invert) {
+void Demo::stroke(std::function<ImVec2(float u)> path, float seconds, bool invert, bool hold) {
     // Glide to the start, press, follow the path, release.
     auto started = std::make_shared<bool>(false);
     auto from = std::make_shared<ImVec2>();
@@ -409,7 +409,7 @@ void Demo::stroke(std::function<ImVec2(float u)> path, float seconds, bool inver
         mouseMotion(from->x + (p.x - from->x) * u, from->y + (p.y - from->y) * u);
         return t >= 0.35f;
     });
-    steps_.push_back([this, path, seconds, invert, started](float t) {
+    steps_.push_back([this, path, seconds, invert, hold, started](float t) {
         if (!*started) {
             app_.invertToggle_ = invert;
             mouseButton(true, SDL_BUTTON_LEFT);
@@ -418,7 +418,7 @@ void Demo::stroke(std::function<ImVec2(float u)> path, float seconds, bool inver
         const ImVec2 p = path(std::min(t / seconds, 1.0f));
         mouseMotion(p.x, p.y);
         if (t >= seconds) {
-            mouseButton(false, SDL_BUTTON_LEFT);
+            if (!hold) mouseButton(false, SDL_BUTTON_LEFT); // (held: a later release lets go)
             app_.invertToggle_ = false;
             *started = false;
             return true;

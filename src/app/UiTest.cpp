@@ -436,6 +436,10 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "view_samples") return double(app_.perf_.samplesWanted);
     if (name == "multithreading") return ThreadPool::shared().serial() ? 0.0 : 1.0;
     if (name == "predictive_strokes") return app_.predictiveStrokes() ? 1.0 : 0.0;
+    if (name == "live_move") return app_.liveMoveEnabled() ? 1.0 : 0.0;
+    if (name == "background_preview") return app_.uiPrefs_.backgroundPreview ? 1.0 : 0.0;
+    if (name == "fast_upload") return app_.uiPrefs_.fastUpload ? 1.0 : 0.0;
+    if (name == "live_move_active") return app_.liveMove_.active ? 1.0 : 0.0; // (a Move drag drawn by the GPU)
     if (name == "last_stroke_dabs") return double(app_.perf_.lastStroke.dabs);
     if (name == "texture_size") return hasTexture(m) ? double(m.texture->width) : 0.0;
     if (name == "paint_texture") return paintsTexture(m) ? 1.0 : 0.0;
@@ -1092,13 +1096,15 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         });
     } else if (verb == "stroke") {
         if (!need(4)) return false;
+        // stroke u0 v0 u1 v1 [seconds] [hold]: hold keeps the button down at the end (the release verb lets go)
         const float u0 = num(1, 0), v0 = num(2, 0), u1 = num(3, 0), v1 = num(4, 0), seconds = num(5, 0.6f);
+        const bool hold = w.size() > 6 && w[6] == "hold";
         auto ends = std::make_shared<std::pair<ImVec2, ImVec2>>();
         run([this, ends, u0, v0, u1, v1] { *ends = {onModel(u0, v0), onModel(u1, v1)}; });
         stroke([ends](float u) {
             return ImVec2(ends->first.x + (ends->second.x - ends->first.x) * u,
                           ends->first.y + (ends->second.y - ends->first.y) * u);
-        }, seconds);
+        }, seconds, false, hold);
         run([this] { SDL_SetModState(held_); });
         wait(0.1f);
     } else if (verb == "view_drag") {

@@ -334,6 +334,7 @@ private:
     bool asyncStroke_ = false;         // this stroke's dabs go to the solver thread
     bool strokeFinishing_ = false;     // released: the solver places the last dabs, the UI carries on
     bool predictiveStrokes() const;    // the preference (and its environment override)
+    bool previewStrokes() const;       // the stroke's dabs draw the predictive preview (predictive, or SF_BG_GHOST)
     bool draftStrokes() const;         // Draft Strokes (SF_DRAFT_STROKE=0 / 1 overrides)
     bool backgroundDabs() const;       // a heavy mesh's dabs on the solver thread without the preview (SF_BACKGROUND_DABS)
     bool asyncStrokeAllowed() const;   // the stroke beginning now may use the solver thread
@@ -370,6 +371,16 @@ private:
     BrushType strokeBrush_ = BrushType::Standard;
     bool strokeInvert_ = false;
     glm::vec3 grabPlanePoint_{0.0f}, grabLast_{0.0f};
+    // Live Move (Preferences > Performance, experimental; docs/design/perf-moonshots.md): a Move drag on a plain mesh
+    // isn't applied frame by frame; the GPU draws it (render/Ghost.h, GhostKind::Move) from the grab's start, and
+    // the whole move is applied once when the stroke ends (finishStrokeNow): one grab instead of one a frame.
+    struct LiveMove {
+        bool active = false;
+        glm::vec3 center{0.0f}, delta{0.0f};
+        float radius = 0.0f, scale = 0.0f;
+    } liveMove_;
+    bool liveMoveEnabled() const;      // the Live Move preference (and SF_LIVE_MOVE)
+    void commitLiveMove();
     bool grabPending_ = false; // Move: positions moved, normals and BVH not yet (queueGrab / flushGrab, once a frame)
     void queueGrab(const glm::vec3& delta);
     void flushGrab();
@@ -2083,6 +2094,12 @@ private:
     // stroke through the input handlers on 5M..100M+ meshes with a live HUD, an MP4 and a JSON result.
     std::shared_ptr<struct TimelineUiState> timelineUi_;
     std::shared_ptr<struct ProofState> proof_;
+    // The last drawn frame's time by part (run()'s marks): events, dabs, UI, ghost + scene sync (the upload), draw,
+    // UI draw + swap (where the frame waits for the GPU).
+    double frameSplitMs_[6] = {};
+    // The view's resolution while it moves (experimental, docs/design/perf-moonshots.md §0): 0.75 on the simulated
+    // floor tier (SF_HW_SIMULATE=floor), else 1; SF_MOTION_RESOLUTION=25..100 (percent) overrides.
+    static float motionResolution();
     void drawTimelineUi();            // once a frame from drawUi: keeps the timeline attached and draws the strip
     float timelineTopInset_ = 0.0f;   // how far down the canvas the strip (or its tab) reaches at the top; 0 at the bottom
     float timelineStripY_ = -1.0f;    // the strip's (or tab's) top edge in window pixels this frame (-1: not shown)
