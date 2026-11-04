@@ -232,6 +232,10 @@ int runWaveletStrokeBench(const std::string& outPath) {
     }
     std::sort(naps.begin(), naps.end());
     const char* spin = std::getenv("SF_POOL_SPIN_US");
+    // SF_BENCH_SHADE_ORDER=fifo: the shading queue takes the patches the brush has left first (oldest first), then
+    // this frame's; default: this frame's first (MicroRenderer::shadePending today).
+    const char* order = std::getenv("SF_BENCH_SHADE_ORDER");
+    const bool fifoOrder = order && std::string(order) == "fifo";
     std::fprintf(stderr, "core-200m N2 stroke: building a Micro 7 head...\n");
     Mesh m = makeCore200mMesh(20000, 7);
     if (!m.micro) return 1;
@@ -279,7 +283,7 @@ int runWaveletStrokeBench(const std::string& outPath) {
        << ", " << ThreadPool::shared().threads() << " threads, shading budget " << budget << " points a frame ("
        << limit << " patches + ring" << (tier.draftBrushMode ? ", draft" : "") << "); environment: SF_HW_SIMULATE="
        << (simulatedFloorTier() ? "floor" : "-") << ", 1 ms timer " << (timer1 ? "on" : "off") << ", SF_POOL_SPIN_US="
-       << (spin ? spin : "-") << ", a 1 ms sleep takes " << naps[10] << " ms\n\n"
+       << (spin ? spin : "-") << ", shading order " << (fifoOrder ? "fifo" : "newest") << ", a 1 ms sleep takes " << naps[10] << " ms\n\n"
        << "Standard, strength 0.5, " << kDabs << " dabs 0.1 radius apart across the face; the pen delivers a dab every "
        << kPenMs << " ms; a frame places the dabs that have arrived (pick + dab, at least one, until 10 ms), rebuilds the "
           "changed patches (wavelet), shades up to the renderer's budget of what changed (MicroShader, MicroRenderer::sync's queue: the rest waits) and "
@@ -317,6 +321,7 @@ int runWaveletStrokeBench(const std::string& outPath) {
             st.begin(m);
             std::vector<double> lags;
             std::vector<uint8_t> pending(mm.baseTriangles, 0);
+            std::vector<uint32_t> lastDirty(mm.baseTriangles, 0), fifo;
             std::vector<uint32_t> seeds;
             size_t pendingCount = 0;
             double dabMs = 0, rebuildMs = 0, shadeMs = 0;
@@ -349,11 +354,26 @@ int runWaveletStrokeBench(const std::string& outPath) {
                 for (size_t w = 0; w < mm.dirtyBits.size(); ++w)
                     for (uint64_t bits = mm.dirtyBits[w]; bits; bits &= bits - 1) dirty.push_back(uint32_t(w * 64 + size_t(std::countr_zero(bits))));
                 mm.clearDirty();
-                for (uint32_t t : dirty)
-                    if (!pending[t]) pending[t] = 1, ++pendingCount;
-                seeds.assign(dirty.begin(), dirty.end());
-                for (size_t t = 0; t < pending.size() && seeds.size() < limit; ++t)
-                    if (pending[t]) seeds.push_back(uint32_t(t));
+                for (uint32_t t : dirty) {
+                    if (!pending[t]) pending[t] = 1, ++pendingCount, fifo.push_back(t);
+                    lastDirty[t] = uint32_t(frames + 1);
+                }
+                seeds.clear();
+                if (fifoOrder) { // the patches the brush has left first, oldest first; then this frame's
+                    size_t keep = 0;
+                    for (size_t k = 0; k < fifo.size(); ++k) {
+                        const uint32_t t = fifo[k];
+                        if (!pending[t]) continue; // (shaded meanwhile)
+                        if (seeds.size() < limit && lastDirty[t] != uint32_t(frames + 1)) seeds.push_back(t);
+                        else fifo[keep++] = t;
+                    }
+                    fifo.resize(keep);
+                    for (size_t k = 0; k < dirty.size() && seeds.size() < limit; ++k) seeds.push_back(dirty[k]);
+                } else {
+                    seeds.assign(dirty.begin(), dirty.end());
+                    for (size_t t = 0; t < pending.size() && seeds.size() < limit; ++t)
+                        if (pending[t]) seeds.push_back(uint32_t(t));
+                }
                 std::sort(seeds.begin(), seeds.end());
                 seeds.erase(std::unique(seeds.begin(), seeds.end()), seeds.end());
                 if (seeds.size() > limit) seeds.resize(limit);

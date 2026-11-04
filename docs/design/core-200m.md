@@ -343,7 +343,16 @@ each (off, on, off, on); floor = `SF_HW_SIMULATE=floor SF_GOVERNOR=0` (4 threads
   costs ~90 ms a frame on the floor at 216 px (measured first: it put the lag at 0.4-0.5 s). Next: during a stroke,
   shade the changed patches at the edited lattice's resolution (the fine detail's shading carried), exact catch-up at
   rest and release.
-- **Windows PC:** see REPORT.md (CI Windows build of research/n2-stroke; a sanity check only, not the target).
+- **Windows PC (Ryzen 5600X, floor = 4 threads, PC idle):** 216 px committed lag 699-735 -> 157-178 ms p50, 108 px
+  147-161 -> 35-50 ms; per dab and rebuild are 1.5-1.8x the laptop floor's, which is the CPU (1 thread: 134 vs 82 ms
+  for today's 216 px dab; the GCC build in WSL on the same PC is no faster), not the pool or the 15.6 ms timer tick
+  (both measured: no change worth a fix). With stroke-time shading held to ~10 ms a frame (256K points) 216 px falls
+  to 102-114 ms and 108 px to 25 ms. The M1's floor simulation is optimistic for CPU-bound work. Runs that shared the
+  PC with WSL builds were ~2x slower (win.sh now holds pc.sh's lock).
+- **Pen-up shading catch-up:** taking the patches the brush has left first (`SF_BENCH_SHADE_ORDER=fifo`) cuts it only
+  234 -> 198 ms at 216 px: the exact shading of the stroke's ~2,700 patches is ~234 ms of the floor's 4 cores, with no
+  CPU left during the stroke. Under 50 ms needs the normals on the GPU (normals from the displacement in the
+  MicroRenderer's fragment shader), not CPU shading at the lattice's resolution.
 
 N3-N5 are designed (§7b), not built: N3 builds on N2's coefficients as its cache; N4 and N5 attach to N1 and the
 renderer.
