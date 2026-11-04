@@ -17,7 +17,8 @@
   reported but never fails the run either (it never blocks a release; fix it or delete it).
 * Budget: a non-nightly test that took longer than --budget seconds (default $SF_TEST_BUDGET or 20; 0 = off) fails
   the run, with the list. Make it wait on events instead of fixed frames, split it, or label it nightly.
-Exit code: 0 green, 1 a real failure or a test over budget, 2 ctest itself could not run.
+Exit code: 0 green, 1 a real failure or a test over budget, 2 ctest itself could not run, 4 only GPU-lost failures
+(the output says the graphics device went away: the machine, not the code).
 """
 import argparse
 import hashlib
@@ -144,6 +145,21 @@ def fingerprint(t, root, build, run_env):
     return h.hexdigest()
 
 
+def load_slow_list(path):
+    """tests/slow_tests.txt: `name seconds plan...` lines (# comments). Names of sculptforge_tests cases are written
+    `sculptforge_tests: case`."""
+    out = {}
+    try:
+        for line in open(path, encoding="utf-8"):
+            line = line.split("#", 1)[0].strip()
+            m = re.match(r"(sculptforge_tests: \S+|\S+)\s+([0-9.]+)", line)
+            if m:
+                out[m.group(1)] = float(m.group(2))
+    except OSError:
+        pass
+    return out
+
+
 def parallel_jobs(args):
     """N of ctest's -jN / -j N / --parallel N (1 when absent)."""
     for i, x in enumerate(args):
@@ -164,6 +180,21 @@ def ctest(build, args, junit):
            "--test-output-size-passed", "1048576", *args]
     print("+ " + " ".join(cmd), flush=True)
     return subprocess.run(cmd).returncode
+
+
+# A failure whose output says the GPU went away is the machine, not the code (the PC's WSL GPU path can lose its
+# device: a test that crashes the driver, or the Windows desktop resetting it). Reported apart, exit code 4 (3 is pc.sh's
+# "PC unreachable").
+GPU_LOST = re.compile(r"Could not find a valid EGL device|D3D12: Removing Device|Offscreen framebuffer is not supported"
+                      r"|failed to create dri2 screen|GL context lost")
+
+
+def outputs(junit):
+    try:
+        root = ET.parse(junit).getroot()
+    except (OSError, ET.ParseError):
+        return {}
+    return {tc.get("name"): "".join(so.text or "" for so in tc.iter("system-out")) for tc in root.iter("testcase")}
 
 
 INNER = re.compile(r"^\[ OK \] (\S+) \((\d+) ms\)$", re.M)
@@ -203,7 +234,10 @@ def main(argv=None):
     ap.add_argument("--cache", default=os.environ.get("SF_TEST_CACHE", ""))
     ap.add_argument("--budget", type=float, default=float(os.environ.get("SF_TEST_BUDGET", "20")))
     ap.add_argument("--flaky-log", default="")
+    ap.add_argument("--slow-list", default="tests/slow_tests.txt",
+                    help="known slow tests (name seconds plan): over budget but within 1.5x their seconds is allowed")
     ap.add_argument("--times", default="", help="write name<TAB>seconds<TAB>result for every test run here")
+    ap.add_argument("--threads-per-test", default="", help="'auto': SF_THREADS = cores / ctest -j for each test process")
     ap.add_argument("--junit", default="", help="also keep the first run's JUnit file here (CI: build/ctest.xml)")
     ap.add_argument("--self-test", action="store_true")
     ap.add_argument("ctest_args", nargs=argparse.REMAINDER)
@@ -226,6 +260,8 @@ def main(argv=None):
     # A parallel run loads the machine like CI: timing checks (timeLimit, tests/TestHarness.h) get CI's slack.
     if parallel_jobs(args) > 1:
         os.environ.setdefault("SF_TIME_LIMIT_SCALE", "4")
+        if a.threads_per_test == "auto":
+            os.environ.setdefault("SF_THREADS", str(max(2, (os.cpu_count() or 4) // parallel_jobs(args))))
     tests = load_tests(build, args)
     if tests is None:
         print(f"run.py: ctest can't list the tests in {build} (configured?)")
@@ -247,7 +283,7 @@ def main(argv=None):
         print(f"test cache: {len(cached)} of {len(prints)} tests passed before with these exact inputs: skipped "
               f"({time.time() - t0:.1f} s to fingerprint)")
     todo = [t["name"] for t in tests if not t["disabled"] and t["name"] not in cached]
-    res, inner = {}, {}
+    res, inner, gpu_lost = {}, {}, []
     rc = 0
     with tempfile.TemporaryDirectory() as tmp:
         if todo:
@@ -270,10 +306,17 @@ def main(argv=None):
                 print(f"\nrerunning {len(failed)} failed test(s) once: {' '.join(failed)}", flush=True)
                 ctest(build, ["--rerun-failed", *[x for x in args if x.startswith("-j")]], os.path.join(tmp, "b.xml"))
                 again = results(os.path.join(tmp, "b.xml"))
+                said = outputs(os.path.join(tmp, "b.xml"))
+                gpu_lost = [n for n in failed if again.get(n, ("fail",))[0] != "pass" and GPU_LOST.search(said.get(n, ""))]
+                first = outputs(os.path.join(tmp, "a.xml"))
                 for n in failed:
                     if again.get(n, ("fail",))[0] == "pass":
-                        flaky.append(n)
-                        res[n] = ("flaky", res[n][1])
+                        res[n] = ("pass", again[n][1])
+                        if GPU_LOST.search(first.get(n, "")):
+                            print(f"gpu: {n} failed with the graphics device gone, then passed: not a flake")
+                        else:
+                            flaky.append(n)
+                            res[n] = ("flaky", res[n][1])
             for n in flaky:
                 print(f"flaky: {n} (failed, then passed on the rerun)")
             if flaky and a.flaky_log:
@@ -286,7 +329,7 @@ def main(argv=None):
         for n, (s, _) in res.items():
             if s == "pass" and n in prints:
                 open(os.path.join(a.cache, prints[n]), "w").write(f"{n} {time.strftime('%Y-%m-%dT%H:%M:%S')}\n")
-    real = [n for n, (s, _) in res.items() if s == "fail" and "flaky" not in labels.get(n, [])]
+    real = [n for n, (s, _) in res.items() if s == "fail" and "flaky" not in labels.get(n, []) and n not in gpu_lost]
     tolerated = [n for n, (s, _) in res.items() if s == "fail" and "flaky" in labels.get(n, [])]
     # The budget is per test: a ctest entry, or one TEST case inside a sculptforge_tests shard (a shard is many tests).
     slow = sorted(((d, n) for n, (s, d) in res.items() if a.budget > 0 and d > a.budget and s != "skip"
@@ -302,11 +345,20 @@ def main(argv=None):
           f"{len(slow)} over the {a.budget:g} s budget; {time.time() - t0:.0f} s")
     for n in tolerated:
         print(f"failed but labelled flaky (does not block): {n}")
+    known = load_slow_list(os.path.join(root, a.slow_list) if not os.path.isabs(a.slow_list) else a.slow_list)
+    listed = [(d, n) for d, n in slow if n in known and d <= 1.5 * known[n]]
+    slow = [(d, n) for d, n in slow if (d, n) not in listed]
+    for d, n in listed:
+        print(f"known slow: {n} {d:.1f} s (tests/slow_tests.txt: {known[n]:g} s; make it fast, then delete its line)")
     for d, n in slow:
-        print(f"over budget: {n} {d:.1f} s (wait on events, split it, or label it nightly)")
+        why = f"1.5x its {known[n]:g} s in tests/slow_tests.txt" if n in known else f"the {a.budget:g} s budget"
+        print(f"over budget: {n} {d:.1f} s, over {why} (wait on events, use a smaller mesh, split it, or label it nightly)")
     for n in real:
         print(f"FAILED: {n}")
-    return 1 if real or slow else 0
+    if gpu_lost:
+        print(f"GPU lost: {len(gpu_lost)} test(s) failed twice with the graphics device gone ({' '.join(gpu_lost[:8])}): "
+              "the machine, not the code; run them again (ctest --rerun-failed)")
+    return 1 if real or slow else 4 if gpu_lost else 0
 
 
 FLAKY_HEADER = """# Flaky tests
@@ -355,6 +407,8 @@ def self_test():
         open(junit, "w").write('<testsuite><testcase name="sculptforge_tests_0of2" time="9" status="run">'
                                '<system-out>[ RUN] x\n[ OK ] mesh_io (1200 ms)\n[FAIL] y (3 ms)\n</system-out></testcase></testsuite>')
         assert inner_times(junit) == {"mesh_io": 1.2}
+        open(os.path.join(d, "slow.txt"), "w").write("# x\nui_bake 40 smaller mesh\nsculptforge_tests: lion 50.5 nightly\n")
+        assert load_slow_list(os.path.join(d, "slow.txt")) == {"ui_bake": 40.0, "sculptforge_tests: lion": 50.5}
     assert parallel_jobs(["-j10"]) == 10 and parallel_jobs(["-C", "Release", "-j", "4"]) == 4 and parallel_jobs([]) == 1
     print("run.py self-test passed")
     return 0

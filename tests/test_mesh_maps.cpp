@@ -202,7 +202,7 @@ TEST(mesh_maps_live_update_matches_a_full_bake) {
     CHECK(differ == 0);
 }
 
-TEST(mesh_maps_live_update_is_faster_than_a_full_bake) {
+TEST(nightly_mesh_maps_live_update_is_faster_than_a_full_bake) {
     // A denser Part: a 2K map of a 130k-triangle sphere, then a small local change.
     Mesh m = makeIcosphere(6, 1.0f);
     sphereUvs(m);

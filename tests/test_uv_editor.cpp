@@ -491,7 +491,7 @@ TEST(uv_project_round_trip_keeps_seams_and_pins) {
     std::filesystem::remove(path);
 }
 
-TEST(uv_editor_million_triangles_stay_interactive) {
+TEST(nightly_uv_editor_million_triangles_stay_interactive) {
     // An 8-level icosphere: 1.3M triangles. Topology, measures, a transform and a pack are each well under the
     // time a frame or a click can take; a full unwrap by polygroups (in the background in the app) takes seconds.
     Mesh m = makeIcosphere(8);
@@ -538,7 +538,7 @@ TEST(uv_editor_million_triangles_stay_interactive) {
     CHECK(flippedTriangles(m) < m.triangleCount() / 1000);
 }
 
-TEST(uv_unwrap_lion_head_by_sharp_edges) {
+TEST(nightly_uv_unwrap_lion_head_by_sharp_edges) {
     // A real sculpt with holes and thin strands: the islands don't fold, overlap or leave the tile.
     Document doc;
     std::string lion = __FILE__;
