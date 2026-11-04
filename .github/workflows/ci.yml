@@ -124,7 +124,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo ./packaging/linux/install-build-deps.sh
-          sudo apt-get install -y --no-install-recommends ccache xvfb libgl1-mesa-dri
+          sudo apt-get install -y --no-install-recommends ccache xvfb libgl1-mesa-dri mold # mold: faster links (docs/build-speed.md)
       - name: ccache (macOS; the release binary, pinned by hash)
         if: runner.os == 'macOS'
         run: |

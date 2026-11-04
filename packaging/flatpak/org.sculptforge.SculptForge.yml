@@ -42,6 +42,7 @@ modules:
       - -DSCULPTFORGE_USE_SYSTEM_SDL=OFF # SDL 3.2.30, the version every other package ships (pen and tablet fixes)
       - -DSCULPTFORGE_BUILD_TESTS=OFF # the tests run in CI and in the release jobs, outside the sandbox
       - -DSCULPTFORGE_BUILD_PYTHON=OFF
+      - -DSCULPTFORGE_MOLD=OFF # the shipped binary keeps the system linker (docs/build-speed.md)
       - -DFETCHCONTENT_FULLY_DISCONNECTED=ON
       - -DFETCHCONTENT_SOURCE_DIR_GLM=/run/build/sculptforge/_deps-src/glm
       - -DFETCHCONTENT_SOURCE_DIR_SDL3=/run/build/sculptforge/_deps-src/SDL3
