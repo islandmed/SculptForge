@@ -205,14 +205,10 @@ constexpr GLbitfield GL_COLOR_BUFFER_BIT = 0x4000;
     X(void, MultiDrawElementsBaseVertex, GLenum, const GLsizei*, GLenum, const void* const*, GLsizei, const GLint*)
 
 // Optional (GL 4.4 / GL_ARB_buffer_storage; macOS stops at 4.1): null when missing.
-// Also optional, though core since GL 3.0 / 3.3: transform feedback and timer queries (MicroRenderer's GPU shading;
-// without them the CPU shades, as before).
+// Also optional, though core since GL 3.3: timer queries (MicroRenderer's GPU shading budget; without them it keeps
+// its first budget).
 #define SF_GL_OPTIONAL(X)                                                                    \
     X(void, BufferStorage, GLenum, GLsizeiptr, const void*, GLbitfield)                      \
-    X(void, TransformFeedbackVaryings, GLuint, GLsizei, const GLchar* const*, GLenum)        \
-    X(void, BeginTransformFeedback, GLenum)                                                  \
-    X(void, EndTransformFeedback)                                                            \
-    X(void, BindBufferBase, GLenum, GLuint, GLuint)                                          \
     X(void, GenQueries, GLsizei, GLuint*)                                                    \
     X(void, DeleteQueries, GLsizei, const GLuint*)                                           \
     X(void, BeginQuery, GLenum, GLuint)                                                      \
@@ -220,9 +216,6 @@ constexpr GLbitfield GL_COLOR_BUFFER_BIT = 0x4000;
     X(void, GetQueryObjectui64v, GLuint, GLenum, GLuint64*)
 
 constexpr GLenum GL_COPY_READ_BUFFER = 0x8F36;
-constexpr GLenum GL_TRANSFORM_FEEDBACK_BUFFER = 0x8C8E;
-constexpr GLenum GL_RASTERIZER_DISCARD = 0x8C89;
-constexpr GLenum GL_INTERLEAVED_ATTRIBS = 0x8C8C;
 constexpr GLenum GL_R32I = 0x8235;
 constexpr GLenum GL_TIME_ELAPSED = 0x88BF;
 constexpr GLenum GL_TEXTURE_BINDING_BUFFER = 0x8C2C;

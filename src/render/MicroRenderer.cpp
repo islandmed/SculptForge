@@ -127,7 +127,7 @@ void main() {
 }
 )";
 
-// GPU shading (MicroRenderer::gpuShade): MicroShader's grid in two transform-feedback passes. Pass 1 evaluates every
+// GPU shading (MicroRenderer::gpuShade): MicroShader's grid in two fragment-shader passes. Pass 1 evaluates every
 // grid point of the listed slots once (the surface as kMicroVS / MicroTriangle do, its height in w); pass 2 sums for each
 // point of the slots to shade what core/Micro.cpp's GridWork sums, from those positions: per base triangle the
 // area-weighted face normals of its micro triangles at the point and the neighbours' heights along its upward triangles
@@ -186,14 +186,9 @@ vec4 shadePos(int gid) {
 const char* kShadeBody = R"(
 uniform usamplerBuffer uTris;    // per slot: (corner vertices, -), (clusters across the edges, -)
 uniform samplerBuffer uBase;     // per base vertex: position, normal
-#ifdef PASS_TEXTURE
 uniform sampler2D uPos;          // pass 1's points: position, height (uW a row)
 uniform int uW;
 vec4 posFetch(int k) { return texelFetch(uPos, ivec2(k % uW, k / uW), 0); }
-#else
-uniform samplerBuffer uPos;      // pass 1's points: position, height
-vec4 posFetch(int k) { return texelFetch(uPos, k); }
-#endif
 uniform isamplerBuffer uRow;     // per slot: its first point in uPos / uSamples, or -1
 uniform isamplerBuffer uNbr;     // per slot and edge: neighbour slot << 3 | its edge << 1 | reversed, or -1
 uniform isamplerBuffer uRingOff; // per base vertex: its first entry in uRing (and one more)
@@ -282,10 +277,8 @@ uint shadeAt(int gid) {
 }
 )";
 
-// The passes' mains: transform feedback (a point per grid point), or a fragment per grid point of a uW-wide target
-// (fragment (x, y) = point y * uW + x; the rest of the last row discarded).
-const char* kFeedbackPosMain = "out vec4 vPos;\nvoid main() { vPos = shadePos(gl_VertexID); }\n";
-const char* kFeedbackShadeMain = "flat out uint vShade;\nvoid main() { vShade = shadeAt(gl_VertexID); }\n";
+// The passes' mains: a fragment per grid point of a uW-wide target (fragment (x, y) = point y * uW + x; the rest of
+// the last row discarded).
 const char* kTargetVS = R"(#version 330 core
 void main() { gl_Position = vec4(gl_VertexID == 1 ? 3.0 : -1.0, gl_VertexID == 2 ? 3.0 : -1.0, 0.0, 1.0); }
 )";
@@ -340,9 +333,9 @@ void MicroRenderer::release() {
     }
     patches_.clear();
     if (emptyVao_) gl::DeleteVertexArrays(1, &emptyVao_), emptyVao_ = 0;
-    for (GLuint* b : {&gsNbrData_, &gsRingOffData_, &gsRingData_, &gsIJData_, &gsListData_, &gsOut_, &gsPos_, &gsPosRead_, &gsRowData_, &gsList1Data_})
+    for (GLuint* b : {&gsNbrData_, &gsRingOffData_, &gsRingData_, &gsIJData_, &gsListData_, &gsOut_, &gsRowData_, &gsList1Data_})
         if (*b) gl::DeleteBuffers(1, b), *b = 0;
-    for (GLuint* t : {&gsNbrTex_, &gsRingOffTex_, &gsRingTex_, &gsIJTex_, &gsListTex_, &gsPosTex_, &gsRowTex_, &gsList1Tex_})
+    for (GLuint* t : {&gsNbrTex_, &gsRingOffTex_, &gsRingTex_, &gsIJTex_, &gsListTex_, &gsRowTex_, &gsList1Tex_})
         if (*t) gl::DeleteTextures(1, t), *t = 0;
     if (gsProgram_) gl::DeleteProgram(gsProgram_), gsProgram_ = 0;
     if (gsPosProgram_) gl::DeleteProgram(gsPosProgram_), gsPosProgram_ = 0;
@@ -358,7 +351,6 @@ void MicroRenderer::release() {
                      (unsigned long long)cpuShadePasses, cpuShadePasses ? cpuShadeMs / double(cpuShadePasses) : 0.0);
             if (f != stderr) std::fclose(f);
         }
-    gsPosBytes_ = gsPosReadBytes_ = 0;
     if (gsQuery_ && gl::DeleteQueries) gl::DeleteQueries(1, &gsQuery_), gsQuery_ = 0;
     gsOutBytes_ = 0;
     gsQueryPending_ = false;
@@ -493,7 +485,7 @@ MicroRenderer::GpuShade MicroRenderer::gpuShadeModeDefault() {
     static const GpuShade mode = [] {
         const char* e = std::getenv("SF_MICRO_GPU_SHADE");
         const std::string v = e ? e : "";
-        return v == "1" || v == "fs" ? GpuShade::Target : v == "tf" ? GpuShade::Feedback : GpuShade::Off;
+        return v == "1" ? GpuShade::On : GpuShade::Off;
     }();
     return mode;
 }
@@ -555,32 +547,6 @@ void MicroRenderer::buildGpuShade(const Mesh& mesh) {
 }
 
 namespace {
-
-// A transform-feedback program of one vertex shader capturing `varying`; 0 (with the log on stderr) if it fails.
-GLuint feedbackProgram(const char* source, const char* varying) {
-    const GLuint vs = gl::CreateShader(GL_VERTEX_SHADER);
-    gl::ShaderSource(vs, 1, &source, nullptr);
-    gl::CompileShader(vs);
-    GLint ok = 0;
-    gl::GetShaderiv(vs, GL_COMPILE_STATUS, &ok);
-    GLuint p = 0;
-    if (ok) {
-        p = gl::CreateProgram();
-        gl::AttachShader(p, vs);
-        const GLchar* varyings[] = {varying};
-        gl::TransformFeedbackVaryings(p, 1, varyings, GL_INTERLEAVED_ATTRIBS);
-        gl::LinkProgram(p);
-        gl::GetProgramiv(p, GL_LINK_STATUS, &ok);
-    }
-    if (!ok) {
-        char log[2048] = {0};
-        gl::GetShaderInfoLog(vs, sizeof log, nullptr, log);
-        std::fprintf(stderr, "Micro GPU shading unavailable (the CPU shades): %s\n", log);
-        if (p) gl::DeleteProgram(p), p = 0;
-    }
-    gl::DeleteShader(vs);
-    return p;
-}
 
 // A program of kTargetVS (one triangle over the target) and fragment shader `source`; 0 (log on stderr) if it fails.
 GLuint targetProgram(const char* source) {
@@ -665,39 +631,19 @@ void restoreUnits(const GLint* saved, int count) {
     }
 }
 
-// One transform-feedback draw of `points` points into `out`.
-void feedback(GLuint vao, GLuint out, size_t points) {
-    gl::Enable(GL_RASTERIZER_DISCARD);
-    gl::BindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, out);
-    gl::BeginTransformFeedback(GL_POINTS);
-    gl::BindVertexArray(vao);
-    gl::DrawArrays(GL_POINTS, 0, GLsizei(points));
-    gl::EndTransformFeedback();
-    gl::BindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, 0);
-    gl::Disable(GL_RASTERIZER_DISCARD);
-    gl::BindVertexArray(0);
-}
-
 } // namespace
 
 bool MicroRenderer::shadeOnGpu(const Mesh& mesh, std::vector<uint32_t>& tris) {
     if (gsFailed_ || tris.empty()) return false;
-    const bool target = gpuShadeMode == GpuShade::Target;
-    if ((!target && (!gl::TransformFeedbackVaryings || !gl::BeginTransformFeedback || !gl::EndTransformFeedback || !gl::BindBufferBase)) ||
-        chunks_.size() > 4) {
+    if (chunks_.size() > 4) {
         gsFailed_ = true;
         return false;
     }
     const auto started = std::chrono::steady_clock::now();
     if (!gsProgram_) {
         const std::string head = "#version 330 core\n";
-        if (target) {
-            gsPosProgram_ = targetProgram((head + kShadePosBody + kTargetPosMain).c_str());
-            if (gsPosProgram_) gsProgram_ = targetProgram((head + "#define PASS_TEXTURE\n" + kShadeBody + kTargetShadeMain).c_str());
-        } else {
-            gsPosProgram_ = feedbackProgram((head + kShadePosBody + kFeedbackPosMain).c_str(), "vPos");
-            if (gsPosProgram_) gsProgram_ = feedbackProgram((head + kShadeBody + kFeedbackShadeMain).c_str(), "vShade");
-        }
+        gsPosProgram_ = targetProgram((head + kShadePosBody + kTargetPosMain).c_str());
+        if (gsPosProgram_) gsProgram_ = targetProgram((head + kShadeBody + kTargetShadeMain).c_str());
     }
     if (!gsProgram_ || !gsPosProgram_) {
         gsFailed_ = true;
@@ -771,7 +717,7 @@ bool MicroRenderer::shadeOnGpu(const Mesh& mesh, std::vector<uint32_t>& tris) {
     static const char* names1[8] = {"uTris", "uBase", "uDisp0", "uDisp1", "uDisp2", "uDisp3", "uIJ", "uList"};
     static const char* names2[9] = {"uTris", "uBase", "uPos", "uRow", "uNbr", "uRingOff", "uRing", "uIJ", "uList"};
     GLint saved[9];
-    if (target) {
+    {
         // Fragment shaders: pass 1 into an RGBA32F target, pass 2 into an R32UI one, a fragment per point; then the
         // shading into gsOut_ through a pixel-pack copy (on the GPU, no CPU readback). The caller's framebuffer,
         // viewport and state are put back after.
@@ -836,28 +782,6 @@ bool MicroRenderer::shadeOnGpu(const Mesh& mesh, std::vector<uint32_t>& tris) {
         if (depth) gl::Enable(GL_DEPTH_TEST);
         if (scissor) gl::Enable(GL_SCISSOR_TEST);
         if (cull) gl::Enable(GL_CULL_FACE);
-    } else {
-        // Transform feedback: pass 1 into gsPos_, read by pass 2 through a GPU copy (reading the feedback buffer
-        // straight as a texture buffer, Mesa on the M1 gave the previous contents), pass 2 into gsOut_.
-        ensureBuffer(gsPos_, nullptr, 0, points1 * 16, gsPosBytes_);
-        ensureBuffer(gsOut_, nullptr, 0, points2 * 4, gsOutBytes_);
-        gl::UseProgram(gsPosProgram_);
-        bindUnits(gsPosProgram_, texs1, names1, 8, saved);
-        uniforms(gsPosProgram_);
-        feedback(emptyVao_, gsPos_, points1);
-        ensureBuffer(gsPosRead_, &gsPosTex_, GL_RGBA32F, points1 * 16, gsPosReadBytes_);
-        gl::BindBuffer(GL_COPY_READ_BUFFER, gsPos_);
-        gl::BindBuffer(GL_COPY_WRITE_BUFFER, gsPosRead_);
-        gl::CopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, GLsizeiptr(points1 * 16));
-        gl::BindBuffer(GL_COPY_READ_BUFFER, 0);
-        gl::BindBuffer(GL_COPY_WRITE_BUFFER, 0);
-        restoreUnits(saved, 8);
-        const GLuint texs2[9] = {triTex_, baseTex_, gsPosTex_, gsRowTex_, gsNbrTex_, gsRingOffTex_, gsRingTex_, gsIJTex_, gsListTex_};
-        gl::UseProgram(gsProgram_);
-        bindUnits(gsProgram_, texs2, names2, 9, saved);
-        uniforms(gsProgram_);
-        feedback(emptyVao_, gsOut_, points2);
-        restoreUnits(saved, 9);
     }
     if (timed) gl::EndQuery(GL_TIME_ELAPSED), gsQueryPending_ = true, gsQueryPoints_ = points1 + points2;
     gl::UseProgram(0);
