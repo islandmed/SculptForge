@@ -7,5 +7,19 @@
     "High-DPI Windows laptops (150-200% scaling): the window opens inside the screen",
     "The right tray opens in every look on 1280 px screens; QuickMenu gets square thumbnails",
     "New update channel: Preferences > Updates picks Stable or Preview (betas)"
-  ]
+  ],
+  "channels": {
+    "preview": {
+      "version": "0.11.0-beta.1",
+      "download": "https://github.com/islandmed/SculptForge/releases/tag/v0.11.0-beta.1",
+      "notes": "https://sculptforge.app/guide/whats-new.html",
+      "highlights": [
+        "Fast Big Brushes (Experimental): a new experimental path for big brushes on dense meshes; turn it on in Preferences > Performance and tell us how it feels.",
+        "Sixty new brushes in six built-in packs, and A-Z sorting everywhere",
+        "A Masking panel: mask by cavity, peaks, colour, facing and more",
+        "Quick tour for experienced sculptors (Help > Quick tour): ten slides with Show me, the last one about memberships",
+        "Experimental, off by default: Live Move, Background Preview and Fast Upload (Preferences > Performance)"
+      ]
+    }
+  }
 }
