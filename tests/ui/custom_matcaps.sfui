@@ -17,7 +17,7 @@ click "Material##palette.material"
 expect "Material/Load Lit Sphere..."
 key escape
 run load_matcap path=$SCRIPT_DIR/data/Gold.png
-expect_status "Material: Gold (kept in the MatCaps folder)"
+expect_status "Material: Gold (kept in the Lit Spheres folder)"
 expect_value material_custom == 1
 expect_value custom_matcaps == 2
 expect_value matcap_files == 1

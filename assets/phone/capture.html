@@ -202,7 +202,7 @@ footer { text-align:center; color:#6f6f78; font-size:12px; padding:22px 18px 30p
     <p class="muted">Point your phone at a desk or the floor; the sculpt stands on it at real size.</p>
     <div class="panel">
       <div class="small muted">Show</div>
-      <div class="seg" id="arScope"><button data-v="subtool" class="on">Active SubTool</button><button data-v="scene">Whole scene</button></div>
+      <div class="seg" id="arScope"><button data-v="part" class="on">Active Part</button><button data-v="scene">Whole scene</button></div>
       <div class="small muted">Size on the desk</div>
       <div class="seg" id="arSize"><button data-v="10">10 cm</button><button data-v="20" class="on">20 cm</button><button data-v="40">40 cm</button><button data-v="100">1 m</button></div>
       <button class="primary" id="arPrepare">Get the model</button>
@@ -471,7 +471,7 @@ $("plyFile").onchange = (e) => {
 };
 
 // --- AR ---
-let arScope = "subtool", arSize = 20, arWanted = 0, arShown = 0;
+let arScope = "part", arSize = 20, arWanted = 0, arShown = 0;
 function segment(id, set) {
   for (const b of $(id).querySelectorAll("button")) b.onclick = () => {
     for (const o of $(id).querySelectorAll("button")) o.classList.toggle("on", o === b);

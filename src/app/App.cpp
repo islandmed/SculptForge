@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/App.h"
+#include "io/BridgeProtocol.h"
 #include "core/LayerStack.h"
 #include "app/ShellQuote.h"
 #include "app/SpaceCamera.h"
@@ -72,7 +73,7 @@ namespace {
 const SDL_DialogFileFilter kObjFilters[] = {{"Wavefront OBJ", "obj"}, {"All files", "*"}};
 const SDL_DialogFileFilter kGlbFilters[] = {{"glTF binary", "glb"}, {"All files", "*"}};
 const SDL_DialogFileFilter kBrushFilters[] = {{"SculptForge brush", "sfbrush"}, {"All files", "*"}};
-const SDL_DialogFileFilter kModelFilters[] = {{"Projects, models and splats", "sfproj;obj;fbx;glb;gltf;ply;stl;GoZ;goz;ztl;ZTL;splat;usda;usd;usdz"}, {"All files", "*"}};
+const SDL_DialogFileFilter kModelFilters[] = {{"Projects, models and splats", "sfproj;obj;fbx;glb;gltf;ply;stl;" SF_BRIDGE_DIALOG_EXTS ";splat;usda;usd;usdz"}, {"All files", "*"}};
 const SDL_DialogFileFilter kFbxFilters[] = {{"FBX", "fbx"}, {"All files", "*"}};
 const SDL_DialogFileFilter kUsdFilters[] = {{"USDZ package", "usdz"}, {"USD text", "usda"}};
 const SDL_DialogFileFilter kSplatFilters[] = {{"Gaussian splats (PLY)", "ply"}, {"glTF splats", "glb"}, {"OpenUSD", "usda;usdz"}};
@@ -84,7 +85,7 @@ const char* kExamplePrompts[] = {
     "Overlapping dragon scales",
     "Weathered, chipped stone edges",
     "Dry cracked mud",
-    "Soft clay buildup like a thumb smear",
+    "Soft clay built up like a thumb smear",
 };
 
 bool ctrlDown(SDL_Keymod mod) { return (mod & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) != 0; }
@@ -2596,7 +2597,7 @@ void App::drawLayersContents() {
         if (ImGui::RadioButton(layer.name.c_str(), doc_.activeLayer == i))
             runCommand("layer_set_active", {{"index", double(i)}});
         ui::HelpText(layer.name.c_str(), nullptr,
-                     "Select to sculpt into this layer (ZBrush's REC). With subdivision levels, record at any level: a "
+                     "Select to sculpt into this layer. With subdivision levels, record at any level: a "
                      "layer keeps its own detail on every level and follows Lower Res / Higher Res and Divide.",
                      kLayersPath);
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 52 * scale);
@@ -2618,7 +2619,7 @@ void App::drawLayersContents() {
             setLayerWeight(i, w);
         }
         ui::HelpText("Weight", nullptr,
-                     "How strongly the layer shows: 0 = off (ZBrush's eye), 1 = as sculpted. One weight for every "
+                     "How strongly the layer shows: 0 = off, 1 = as sculpted. One weight for every "
                      "subdivision level.",
                      kLayersPath);
         ImGui::PopID();

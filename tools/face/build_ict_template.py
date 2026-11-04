@@ -13,8 +13,8 @@ for each of the 52 Apple ARKit blend shapes the offsets of those vertices, spars
 names are ARKit's with _L / _R for Left / Right (the character's own left, +X); its separate browInnerUp_L/_R and
 cheekPuff_L/_R are summed into ARKit's single browInnerUp and cheekPuff, cheekRaiser_L/_R and PupilDilate_L/_R are
 not ARKit shapes and are left out, and ICT has no tongueOut: the file's tongueOut opens the jaw a little (the
-tongue itself is a SubTool's job, see core/Face.cpp). The teeth aren't kept, only how the lower teeth move in each
-shape (a rigid transform fitted to ICT's lower teeth), which drives teeth SubTools. Units: centimetres, Y up, the
+tongue itself is a Part's job, see core/Face.cpp). The teeth aren't kept, only how the lower teeth move in each
+shape (a rigid transform fitted to ICT's lower teeth), which drives teeth Parts. Units: centimetres, Y up, the
 face looking down +Z.
 
 File layout (little endian):

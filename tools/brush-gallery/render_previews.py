@@ -5,7 +5,7 @@
 
 Each preview is the same shot, so a gallery reads as one set: a sculpting
 sphere with three S-curve strokes of the brush, rendered headless by
-`sculptforge --render` with the Clay MatCap from the front.
+`sculptforge --render` with the Clay Lit Sphere from the front.
 
     python3 render_previews.py repo/brushes --out repo/previews
     python3 render_previews.py my_brush.sfbrush --out .          # one brush
@@ -122,7 +122,7 @@ def main():
     p.add_argument("--app", help="path to the sculptforge executable")
     p.add_argument("--size", default="512x384", help="image size WxH (default 512x384)")
     p.add_argument("--subject", choices=["sphere", "plane"], default="sphere", help="what to sculpt on")
-    p.add_argument("--material", default="Clay", help="MatCap (Clay, Red Wax, Skin, White, Bronze, Chrome)")
+    p.add_argument("--material", default="Clay", help="Lit Sphere (Clay, Red Wax, Skin, White, Bronze, Chrome)")
     p.add_argument("--radius", type=float, default=0.12, help="brush radius in world units (sphere radius 1)")
     p.add_argument("--no-shrink", action="store_true", help="keep the full-colour PNGs even if Pillow is installed")
     p.add_argument("--changed", action="store_true", help="skip brushes whose preview is newer than the brush")

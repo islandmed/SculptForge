@@ -6,6 +6,7 @@
 // the ZBrush viewport gesture Alt+click to select a SubTool. Every action goes
 // through the subtool_* commands (core/SubTools.cpp).
 #include "app/App.h"
+#include "io/BridgeProtocol.h"
 #include "app/Demo.h"
 #include "app/Theme.h"
 #include "app/I18n.h"
@@ -38,7 +39,7 @@ constexpr ImVec4 kRowPressed = theme::rgb(0xffffff, 0.14f);
 constexpr ImVec4 kThumbWell = theme::rgb(0x000000, 0.22f); // behind a SubTool thumbnail (#43)
 
 const SDL_DialogFileFilter kAppendFilters[] = {
-    {"Models and projects", "obj;fbx;glb;gltf;ply;stl;GoZ;goz;usda;usd;usdz;sfproj"}, {"All files", "*"}};
+    {"Models and projects", "obj;fbx;glb;gltf;ply;stl;" SF_BRIDGE_MESH_EXTS ";usda;usd;usdz;sfproj"}, {"All files", "*"}};
 const SDL_DialogFileFilter kInsertFilters[] = {{"Meshes (OBJ, PLY, GLB)", "obj;ply;glb;gltf"}, {"All files", "*"}};
 
 void SDLCALL onAppendChosen(void* userdata, const char* const* files, int) {

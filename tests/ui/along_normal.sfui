@@ -28,7 +28,7 @@ key ctrl+z
 expect_value moved == 0
 
 # Tendril with Alt pulls straight out too.
-click "Tendril##brush.snakehook"
+click "Tendril##brush.tendril"
 hold alt
 stroke 0.86 0.5 0.98 0.38
 hold none

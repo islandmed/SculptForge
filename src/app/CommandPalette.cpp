@@ -74,14 +74,8 @@ int fuzzy(const std::string& hay, const std::string& word, bool allowScattered =
 
 } // namespace
 
-std::string CommandPalette::zbrushHint(const Action& a, const std::string& query) {
-    const std::string names = zbrushNamesIn(a.label, a.palette);
-    if (names.empty()) return {};
-    const std::string zbrush = lower(names), label = lower(a.label);
-    for (const auto& w : words(query))
-        if (w.size() >= 2 && fuzzy(zbrush, w, false) > 0 && fuzzy(label, w, false) == 0)
-            return "(ZBrush users: " + names + ")";
-    return {};
+std::string CommandPalette::zbrushHint(const Action&, const std::string&) {
+    return {}; // the palette finds a feature by its other names (score) without naming them
 }
 
 int CommandPalette::score(const Action& a, const std::string& query) {
@@ -269,7 +263,6 @@ void CommandPalette::draw(App& app, const CanvasRect& area) {
                     const char* shownLabel = trAction(a.id, a.label);
                     rows->AddText(ImVec2(x, ty), fg, shownLabel);
                     x += ImGui::CalcTextSize(shownLabel).x + 10.0f * s;
-                    // Found by its ZBrush name: "Forge Spheres (ZBrush users: ZSpheres)".
                     if (const std::string hint = zbrushHint(a, query_); !hint.empty()) {
                         rows->AddText(ImVec2(x - 4.0f * s, ty), ui::color::accent, hint.c_str());
                         if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogText("\n%s %s", shownLabel, hint.c_str());

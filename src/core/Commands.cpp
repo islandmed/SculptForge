@@ -95,7 +95,7 @@ std::string fileStem(const std::string& path) {
     return std::string(stem.begin(), stem.end());
 }
 
-// " (3 SubTools)" for a multi-object export, else nothing.
+// " (3 Parts)" for a multi-object export, else nothing.
 std::string objectCountText(const std::vector<MeshObjectRef>& objects) {
     return objects.size() > 1 ? " (" + std::to_string(objects.size()) + " Parts)" : std::string();
 }
@@ -166,7 +166,7 @@ CommandRegistry::CommandRegistry() {
          }});
 
     add({"open",
-         "Open a file: models (.obj, .fbx, .glb, .gltf, .ply, .stl, .usda, .usdz, ZBrush .GoZ) replace the scene; Gaussian splats "
+         "Open a file: models replace the scene; Gaussian splats "
          "(.ply/.splat captures, KHR_gaussian_splatting .glb, USD ParticleField) load as a reference next to the sculpt. "
          "glTF morph targets and FBX/USD blend shapes become sculpt layers. Files with several objects (OBJ `o`, "
          "glTF nodes, FBX models, USD meshes) open as one Part each. SculptForge projects (.sfproj) "

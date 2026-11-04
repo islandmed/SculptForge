@@ -118,8 +118,7 @@ def _output_ui(saved):
 
 
 class SculptForgeLoadMesh:
-    DESCRIPTION = ("Load a model file (OBJ, FBX, GLB/glTF, PLY, STL, USD/USDZ, ZBrush .GoZ files or a SculptForge "
-                   ".sfproj) for the SculptForge nodes. Relative paths are looked up in ComfyUI's input folder.")
+    DESCRIPTION = ("Load a model file for the SculptForge nodes. Relative paths are looked up in ComfyUI's input folder.")
     CATEGORY = CATEGORY
     RETURN_TYPES = (SF_MESH,)
     RETURN_NAMES = ("mesh",)
@@ -204,7 +203,7 @@ class SculptForgeImageRelief:
 
 
 class SculptForgeVoxelRemesh:
-    DESCRIPTION = ("Voxel remesh (similar to ZBrush's DynaMesh): rebuild the mesh as an even, watertight sculpting surface, "
+    DESCRIPTION = ("Voxel remesh: rebuild the mesh as an even, watertight sculpting surface, "
                    "merging overlapping parts and fixing broken scans or AI-generated models.")
     CATEGORY = CATEGORY
     RETURN_TYPES = (SF_MESH,)
@@ -355,7 +354,7 @@ class SculptForgeMeshInfo:
         return {"required": {"mesh": (MESH_IN,)}, "hidden": {"unique_id": "UNIQUE_ID"}}
 
     def info(self, mesh, unique_id=None):
-        stdout = cli.run("open path=$IN; mesh_info; subtool_list", {"IN": _source(mesh)})
+        stdout = cli.run("open path=$IN; mesh_info; part_list", {"IN": _source(mesh)})
         lines = [l.split(": ", 1)[-1] if re.match(r"^\w+: ", l) else l for l in stdout.strip().splitlines()[1:]]
         text = "\n".join(lines)
         paths.show_text(text, unique_id)

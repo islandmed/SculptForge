@@ -24,7 +24,7 @@ expect "Dibujar##tool.draw"
 expect "Mover##tool.move"
 expect_text "Tamaño de dibujo"
 expect_text "Intensidad"
-expect "Clay Block##brush.claybuildup"
+expect "Clay Block##brush.clayblock"
 expect "Move##brush.move"
 expect "Piezas##tool.subtool"
 

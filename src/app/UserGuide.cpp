@@ -306,7 +306,7 @@ struct CalloutLook {
 };
 constexpr CalloutLook kCallouts[] = {
     {"Tip", IM_COL32(0x62, 0xc0, 0x7e, 0xff)},     {"Note", IM_COL32(0x6f, 0xa8, 0xe6, 0xff)},
-    {"ZBrush", IM_COL32(0xf0, 0x88, 0x2e, 0xff)},  {"Not yet", IM_COL32(0xa9, 0x90, 0xdc, 0xff)},
+    {"Experienced sculptor?", IM_COL32(0xf0, 0x88, 0x2e, 0xff)},  {"Not yet", IM_COL32(0xa9, 0x90, 0xdc, 0xff)},
     {"Warning", IM_COL32(0xe5, 0x60, 0x4a, 0xff)}, {"Important", IM_COL32(0xe5, 0x60, 0x4a, 0xff)},
 };
 
@@ -443,15 +443,15 @@ std::string UserGuide::chapterFor(const std::string& palette, const std::string&
     auto idStarts = [&](const char* p) { return actionId.rfind(p, 0) == 0; };
     // Palette paths by SculptForge's names, and the older ZBrush-style ones (stored layouts, scripts).
     if (starts("Tool > Geometry > Quad Remesh") || starts("Tool > Geometry > QRemesh") || starts("Tool > Parts > Project") ||
-        starts("Tool > SubTool > Project"))
+        starts("Tool > Part > Project"))
         return "retopology.md";
-    if (starts("Tool > Parts") || starts("Tool > SubTool")) return "parts.md";
-    if (starts("Tool > Forge Spheres") || starts("Tool > ZSpheres")) return "forge-spheres.md";
+    if (starts("Tool > Parts") || starts("Tool > Part")) return "parts.md";
+    if (starts("Tool > Forge Spheres") || starts("Tool > Forge Spheres")) return "forge-spheres.md";
     if (starts("Tool > Layers")) return "layers.md";
     if (starts("Tool > Facial Shapes")) return "facial-shapes.md";
     if (starts("Tool > Geometry") || starts("Tool > Remesh")) return "geometry.md";
     if (starts("Tool > Masking")) return "masking.md";
-    if (starts("Tool > Face Groups") || starts("Tool > Polygroups") || starts("Tool > Visibility")) return "face-groups.md";
+    if (starts("Tool > Face Groups") || starts("Tool > Face groups") || starts("Tool > Visibility")) return "face-groups.md";
     if (starts("Tool > Selection Sets")) return "selection-sets.md";
     if (starts("Tool > Export")) return "exporting.md";
     if (starts("Tool > Display")) return "interface.md";
@@ -465,7 +465,7 @@ std::string UserGuide::chapterFor(const std::string& palette, const std::string&
     if (starts("File > Maya")) return "maya.md";
     if (starts("File > Capture from phone") || actionId == "file.capture_phone") return "phone-capture.md";
     if (starts("File > Export") || idStarts("file.export") || actionId == "file.send_unreal" || actionId == "file.save_splats" ||
-        starts("File > Send to ZBrush") || starts("File > GoZ"))
+        starts("File > Bridge") || starts("File > Bridge files"))
         return "exporting.md";
     if (starts("File")) return "projects.md";
     if (starts("Generate")) return "generate-3d.md";
@@ -478,7 +478,7 @@ std::string UserGuide::chapterFor(const std::string& palette, const std::string&
         return "gizmo.md";
     if (starts("Transform")) return idStarts("transform.symmetry") ? "sculpting.md" : "navigation.md";
     if (starts("Render") || starts("Edit") || starts("Help") || starts("Palettes") || starts("Preferences") ||
-        starts("Library") || starts("LightBox"))
+        starts("Library"))
         return "interface.md";
     return {};
 }

@@ -3,7 +3,7 @@
 """SculptForge bridge for Maya (SculptForge issue #42).
 
 Sends the selected meshes from Maya to SculptForge and gets them back, through ONE exchange folder that you
-pick in both apps (the way GoZ works between ZBrush and other apps). Nothing else is shared: no ports, sockets
+pick in both apps. Nothing else is shared: no ports, sockets
 or servers, and neither side runs anything it finds in the folder. Meshes travel as OBJ (quads and UVs, world
 space, Maya's own units, one object per file); a small JSON manifest per direction lists the objects:
 
@@ -45,7 +45,7 @@ def safe_name(name):
     s = _NAME_BAD.sub("_", (name or "").encode("utf-8", "replace").decode("ascii", "replace").replace("�", "_"))
     s = s[:MAX_NAME]
     if not s:
-        return "SubTool"
+        return "Part"
     if s[0].isdigit():
         s = ("_" + s)[:MAX_NAME]
     return s

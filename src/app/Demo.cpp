@@ -566,7 +566,7 @@ void Demo::buildShowcase() {
         app_.camera_.distance *= 0.86f;
         mouse_ = ImVec2(-50.0f, -50.0f); // cursor off screen for the beauty shot
     });
-    caption("SculptForge", "The free, open-source alternative to ZBrush", 4.2f);
+    caption("SculptForge", "The free, open-source sculpting app", 4.2f);
     // Orbiting turns 0.008 rad per pixel: 240 px glides from profile to a three-quarter front view.
     orbit(240.0f, 0.0f, 4.5f);
     run([this] {
@@ -618,7 +618,7 @@ void Demo::buildSculpt() {
         app_.camera_.distance *= 0.78f;
         app_.showBrushLab_ = false;
     });
-    caption("Sculpt the way you already do", "ZBrush-style brushes, symmetry, tablet pressure", 4.5f);
+    caption("Sculpt the way you already do", "Familiar brushes, symmetry, tablet pressure", 4.5f);
     wait(1.0f);
     auto arc = [this](float lat0, float lon0, float lat1, float lon1) {
         return [this, lat0, lon0, lat1, lon1](float u) {

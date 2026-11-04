@@ -4,6 +4,7 @@
 // Polypaint & Materials panel: the Paint brush (ZBrush Rgb / Zadd), colour
 // picker and swatches, fills, and the viewport MatCap material picker.
 #include "app/App.h"
+#include "app/AssetLibrary.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
 
@@ -39,7 +40,7 @@ std::string u8string(const std::filesystem::path& p) {
 
 } // namespace
 
-std::string App::matcapFolder() const { return library_.user.empty() ? std::string() : library_.user + "/MatCaps"; }
+std::string App::matcapFolder() const { return library_.user.empty() ? std::string() : library_.user + "/" + libraryTabFolder(LibraryTab::Material); }
 
 // Custom MatCaps (#15): the studio folders (SCULPTFORGE_MATCAP_PATH), then the library's MatCaps folder.
 void App::loadMatcapLibrary() {
@@ -89,7 +90,7 @@ void App::registerPaintUiCommands() {
     // A view setting, so it lives with the app (scripts: --script "set_material name=Chrome").
     commands_.add({"set_material",
                    "Viewport material: a built-in Lit Sphere (Sculpt, the default, is made for reading strokes), one of "
-                   "your own (load_matcap) or studio (soft clay lighting in the Base colour). Vertex Paint multiplies "
+                   "your own (loaded with Load Lit Sphere) or studio (soft clay lighting in the Base colour). Vertex Paint multiplies "
                    "the lit sphere; cavity shading stays on.",
                    {{"name", ParamSpec::Type::String, "A Lit Sphere's name (Soft Clay, Sculpt, Red Wax, Clay, Skin, Chrome, "
                                                       "White, Bronze or a custom one) or studio.", true}},
@@ -107,10 +108,10 @@ void App::registerPaintUiCommands() {
     commands_.add({"load_matcap",
                    "Load a Lit Sphere: a lit-sphere image (PNG, JPG or EXR; a non-square image is cropped to its centre) "
                    "becomes a viewport material named after the file, and the view uses it. It is copied into the "
-                   "library's MatCaps folder (Documents/SculptForge/MatCaps), so it is there next time; projects "
+                   "library's Lit Spheres folder (Documents/SculptForge/Lit Spheres), so it is there next time; projects "
                    "that use it carry a copy.",
                    {{"path", ParamSpec::Type::String, "The image file.", true},
-                    {"keep", ParamSpec::Type::Bool, "Copy it into the library's MatCaps folder (default true).", false}},
+                    {"keep", ParamSpec::Type::Bool, "Copy it into the library's Lit Spheres folder (default true).", false}},
                    [this](Document&, const Args& a) -> CommandResult {
                        CustomMatcap m;
                        std::string err;
@@ -130,7 +131,7 @@ void App::registerPaintUiCommands() {
                            } else {
                                const std::u8string s = to.u8string();
                                m.path.assign(s.begin(), s.end());
-                               kept = " (kept in the MatCaps folder)";
+                               kept = " (kept in the Lit Spheres folder)";
                            }
                        }
                        hiddenMatcapFiles_.erase(m.path);
@@ -139,7 +140,7 @@ void App::registerPaintUiCommands() {
                        return {true, std::string("Material: ") + matcapName(index) + kept};
                    }});
     commands_.add({"remove_matcap",
-                   "Remove one of your Lit Spheres from the material lists. One from the library's MatCaps folder goes to "
+                   "Remove one of your Lit Spheres from the material lists. One from the library's Lit Spheres folder goes to "
                    "the trash (the Recycle Bin on Windows); where that isn't possible (macOS for now) it is hidden "
                    "for this session and its file stays put. Built-in Lit Spheres can't be removed.",
                    {{"name", ParamSpec::Type::String, "The Lit Sphere's name.", true}},
@@ -242,7 +243,7 @@ void App::registerPaintUiCommands() {
                    }});
     // The scene's shading; SubTools can override it (subtool_shading). Also the preference for new sessions.
     commands_.add({"set_shading",
-                   "Viewport shading for every Part that doesn't set its own (subtool_shading): smooth (the "
+                   "Viewport shading for every Part that doesn't set its own (subtool_shading): smooth (the " // marks-pending
                    "default) or flat, where each polygon shows its own face, so the mesh's structure reads.",
                    {{"mode", ParamSpec::Type::String, "smooth or flat.", true}},
                    [this](Document&, const Args& a) -> CommandResult {
@@ -318,7 +319,7 @@ void App::beginPaintStroke() {
 void App::finishPaintStroke(UndoRecord& record) {
     if (texturePainter_.active()) texturePainter_.end(record);
     if (!paintSnapshot_) return;
-    // The colours the stroke recorded are the white it started from; restoring "no polypaint" replaces them.
+    // The colours the stroke recorded are the white it started from; restoring "no vertex paint" replaces them.
     record.colors = {};
     record.paintAlpha = {};
     record.paint = std::move(paintSnapshot_);
@@ -363,7 +364,7 @@ void App::drawPalette_Color() {
     if (painting) ImGui::PopStyleColor();
     ui::HelpAction(*this, "draw.paint");
     ImGui::Checkbox(tr("RGB while sculpting"), &paintRgb_);
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Sculpt brushes also paint the colour (ZBrush Rgb with Zadd)"));
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Sculpt brushes also paint the colour"));
 
     // The picker edits display (sRGB) values; the mesh stores linear colour.
     glm::vec3 srgb = linearToSrgb(doc_.paintColor);
@@ -449,7 +450,7 @@ void App::drawPalette_Material() {
     if (ImGui::Button(tr("Load Lit Sphere..."), ImVec2(-1, 0))) loadMatcapDialog();
     ui::HelpText("Load Lit Sphere", nullptr,
                  "Use a Lit Sphere image of your own: a lit sphere filling a square PNG, JPG or EXR. It joins the list "
-                 "and is kept in Documents/SculptForge/MatCaps; images you put in that folder show up when a material list "
+                 "and is kept in Documents/SculptForge/Lit Spheres; images you put in that folder show up when a material list "
                  "opens. Right-click one of your Lit Spheres to remove it.",
                  "Material");
     ImGui::ColorEdit3(tr("Base colour"), &renderSettings_.baseColor.x, ImGuiColorEditFlags_NoInputs);
@@ -514,7 +515,7 @@ void App::drawViewportShadingControls() {
     if (v.environmentBackground)
         slider("##Blur", "blur", &v.backgroundBlur, 0.0f, 1.0f, tr("Blur %.2f"), "How soft the environment behind the model is.");
     slider("##Roughness", "roughness", &v.pbrRoughness, 0.0f, 1.0f, tr("Roughness %.2f"),
-           "Roughness of Parts without a material texture (their colour comes from polypaint or the base colour).");
+           "Roughness of Parts without a material texture (their colour comes from vertex paint or the base colour).");
     slider("##Metallic", "metallic", &v.pbrMetallic, 0.0f, 1.0f, tr("Metallic %.2f"),
            "Metallic of Parts without a material texture.");
     slider("##Cavity", "cavity", &v.pbrCavity, 0.0f, 1.0f, tr("Cavity %.2f"),

@@ -91,7 +91,7 @@ float OpenEXR holds the real distances in world units, with no scale to set.
 | **Size** | 1K, 2K (default), 4K or 8K square |
 | **AA** | Anti-aliasing: 1 to 4 means 1, 4, 9 or 16 rays per texel, averaged. 2 (the default) gives clean edges |
 | **Auto distance** | Measure how far the high-poly lies in front of and behind the low-poly, and cast rays just that far. After a bake, **Front** and **Rear** show what it measured |
-| **Front** / **Rear** | With Auto off: how far in front of the low-poly rays start, and how far behind it they look, as a percentage of the model's size (its bounding-box diagonal). ZBrush and Substance call these the max frontal and rear distances |
+| **Front** / **Rear** | With Auto off: how far in front of the low-poly rays start, and how far behind it they look, as a percentage of the model's size (its bounding-box diagonal). Other bakers call these the max frontal and rear distances |
 | **Padding** | Texels around each UV island filled with the island's edge colours, so seams don't show once an engine mipmaps the map. 8 suits 2K; use 16 for 4K and 8K |
 | **OpenGL / DirectX** | The normal map's green channel convention (see above) |
 | **AO rays**, **AO reach** | Ambient occlusion quality, and how far away geometry still darkens a point (a percentage of the model's size) |
@@ -123,7 +123,7 @@ When the last bake made a normal map, its low-poly Part is shown and still fits 
 (**Tool > Export**) imports the map too, as `T_<Name>_N` next to the mesh, set up as a normal map (linear, normal
 map compression), with Unreal's **Flip Green Channel** set for an OpenGL map. This works with an Unreal Editor
 on the same computer; for one on another computer, import the PNG by hand. See
-[Exporting, Unreal and ZBrush](exporting.md#send-to-unreal).
+[Exporting, Unreal and Bridge](exporting.md#send-to-unreal).
 
 ## Commands
 
@@ -134,7 +134,7 @@ on the same computer; for one on another computer, import the PNG by hand. See
 For example, from the console or `sculptforge-cli`:
 
 ```
-subtool_select name=Body_low; bake source=Body maps=normal,ao,displacement size=4096 out=maps
+part_select name=Body_low; bake source=Body maps=normal,ao,displacement size=4096 out=maps
 ```
 
 The command runs in the foreground (scripts wait for it); the **Bake** button runs the same bake in the

@@ -17,4 +17,4 @@ body:
     id: other
     attributes:
       label: How do other tools handle it?
-      description: ZBrush, Blender, Nomad, Mudbox... Screenshots and links welcome.
+      description: Another app or tool that does it well? Screenshots and links welcome.

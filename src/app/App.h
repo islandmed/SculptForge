@@ -810,7 +810,7 @@ private:
     bool paintRgb_ = false;   // also paint the colour while sculpting (ZBrush Rgb + Zadd)
     bool strokePaint_ = false, strokeSculpt_ = true;
     void registerPaintUiCommands();
-    std::string matcapFolder() const; // <library>/MatCaps, empty without a library
+    std::string matcapFolder() const; // <library>/Lit Spheres, empty without a library
     void loadMatcapLibrary();         // custom MatCaps from the studio folders and matcapFolder() (start-up)
     void loadMatcapDialog();          // Material > Load MatCap...
     void rescanMatcapFolder();        // loads new / changed images in matcapFolder(), drops deleted ones

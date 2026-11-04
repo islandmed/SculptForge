@@ -663,6 +663,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     set_tests_properties(insider_drops PROPERTIES TIMEOUT 300)
     # Release notes from note fragments (tools/release/assemble_notes.py, changes/README.md): the assembler, and
     # every fragment on this branch parses.
+    add_test(NAME marks COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks.py
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}) # docs/legal/trademarks.md
+    add_test(NAME marks_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks.py --self-test)
     add_test(NAME release_notes COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/assemble_notes.py --self-test)
     add_test(NAME release_notes_fragments COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/assemble_notes.py --check)
     # The Actions cache pruner keeps the newest cache of each kind (tools/ci/prune_caches.py).

@@ -21,7 +21,7 @@ std::string dyntopoSummary(const DyntopoSettings& s) {
 void registerDyntopoCommands(CommandRegistry& registry) {
     using T = ParamSpec::Type;
     registry.add({"dyntopo",
-                  "Dynamic topology (ZBrush's Sculptris Pro): while on, brush strokes add triangles where they need "
+                  "Dynamic topology: while on, brush strokes add triangles where they need "
                   "detail and remove them where they don't, so shapes can be pulled out without stretching. Needs a "
                   "mesh without subdivision levels; quads under the brush become triangles and UVs are dropped (undo "
                   "brings them back). Without arguments, reports the settings.",

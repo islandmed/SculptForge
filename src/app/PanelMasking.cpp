@@ -273,7 +273,7 @@ void App::drawMaskingSection() {
     tray::SliderInt("##maskborderrings", &maskBorderRings_, 1, 20, "Rings %d");
     ui::Checkbox("Face Group borders##maskborder", &maskBorderGroups_);
     ui::HelpText("Face Group borders", nullptr,
-                 "By border also masks where face groups meet (ZBrush: Mask by polygroup border).", "Tool > Masking");
+                 "By border also masks where face groups meet.", "Tool > Masking");
     ImGui::SameLine();
     ui::Checkbox("Soft##maskborder", &maskBorderSoft_);
     ui::HelpText("Soft", nullptr, "By border fades the mask from the border towards the innermost ring.",

@@ -25,9 +25,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 SRC = ROOT / "docs" / "guide"
 SITE = "https://sculptforge.app/"
 # Chapters that were renamed: the old page stays as a small redirect so links from elsewhere keep working.
-REDIRECTS = {"subtools.html": "parts.html", "zspheres.html": "forge-spheres.html", "polypaint.html": "vertex-paint.html",
-             "polygroups.html": "face-groups.html"}
-CALLOUTS = {"tip": "Tip", "note": "Note", "zbrush": "ZBrush", "not-yet": "Not yet", "warning": "Warning",
+REDIRECTS: dict[str, str] = {}
+CALLOUTS = {"tip": "Tip", "note": "Note", "experienced": "Experienced sculptor?", "not-yet": "Not yet", "warning": "Warning",
             "important": "Important"}
 
 # ---------------------------------------------------------------------------
@@ -769,7 +768,7 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
   <meta property="og:type" content="article">
   <meta property="og:title" content="{html.escape(title)}">
   <meta property="og:description" content="{desc}">
-  <meta property="og:image" content="{SITE}img/social-preview.png?v=3">
+  <meta property="og:image" content="{SITE}img/social-preview.png?v=4">
   <meta property="og:url" content="{url}">
   <link rel="stylesheet" href="../style.css?v=19">
   <script src="../motion.js?v=11" defer></script>
@@ -829,8 +828,7 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
         <a href="https://github.com/islandmed/SculptForge/issues">Report a problem</a>
         <a href="https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md">AI services &amp; privacy</a>
       </div>
-      <p class="fine trademarks">ZBrush, GoZ, MatCap and other ZBrush feature names are trademarks of Maxon Computer
-        GmbH. SculptForge is not affiliated with or endorsed by Maxon. All other trademarks belong to their owners.</p>
+      <p class="fine trademarks">SculptForge is an independent project. Product names are trademarks of their respective owners.</p>
     </div>
   </footer>
 </body>
@@ -1060,8 +1058,7 @@ def main() -> int:
         SUPPORTERS_PAGE.write_text(supporters_html(), encoding="utf-8")
         if wn:
             write_home(wn, False)
-        urls = [SITE, SITE + "brushes.html", SITE + "mudbox-alternative.html",
-                SITE + "zbrush-alternative.html", SITE + "zbrush-linux.html", SITE + "press.html",
+        urls = [SITE, SITE + "brushes.html", SITE + "press.html",
                 SITE + "studios.html", SITE + "support.html", SITE + "supporters.html"] + [f"{SITE}guide/{p.name[:-3]}.html" for p in pages]
         (ROOT / "website" / "sitemap.xml").write_text(
             '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'

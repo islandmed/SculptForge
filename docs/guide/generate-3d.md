@@ -17,9 +17,6 @@ tools: relief, inflate and stamp.
 Nothing leaves your computer until you choose a hosted service and press **Generate 3D model**. For exactly
 what is sent where, see [AI services and privacy](#privacy-and-model-licences) below.
 
-> **ZBrush:** ZBrush has no built-in image-to-3D. The closest workflow is blocking out a base mesh by hand
-> with DynaMesh or Forge Spheres; here you get a starting shape in seconds and refine it with the usual brushes.
-
 ## Open the Generate 3D window
 
 Any of these opens it:

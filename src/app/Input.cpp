@@ -43,7 +43,7 @@ bool anyMasked(const Mesh& mesh) {
     return std::any_of(mesh.mask.begin(), mesh.mask.end(), [](float m) { return m > 0.0f; });
 }
 
-// The brush's action id, as the shell registers it ("brush.claybuildup").
+// The brush's action id, as the shell registers it ("brush.clayblock").
 std::string brushId(BrushType t) {
     std::string id = "brush.";
     for (const char* c = brushName(t); *c; ++c)
@@ -83,7 +83,7 @@ void App::registerInputActions() {
         "inner ring of the brush cursor shows it.",
         [this] { PickerUi::sizePopup(*this, PickerUi::Slider::FocalShift); });
     add("ui.quickmenu", "Quick Menu", ICON_LC_LAYOUT_GRID, "Help", "Space",
-        "ZBrush's QuickMenu under the cursor: brush, stroke, alpha, material, colour, Draw Size, Falloff and the "
+        "the Quick Menu under the cursor: brush, stroke, alpha, material, colour, Draw Size, Falloff and the "
         "intensities. Hold Space and let go to close it, or tap Space to keep it open.",
         [this] { openQuickMenu(); }, [this] { return quickMenu_.open; });
 
@@ -161,11 +161,11 @@ void App::registerInputActions() {
         [this] { runCommand("mask_invert"); });
     actions_.setDefaultShortcut("view.mask", "Ctrl+H"); // View Mask
     add("polygroup.group_masked", "Group Masked", ICON_LC_SHAPES, "Tool > Face Groups", "Ctrl+W",
-        "Turn the masked part into a new face group and clear the mask (ZBrush Ctrl+W). With nothing masked, "
+        "Turn the masked part into a new face group and clear the mask. With nothing masked, "
         "everything visible becomes one group.",
         [this] { groupMasked(); });
     add("polygroup.uv_groups", "Group by UVs", ICON_LC_GRID_2X2, "Tool > Face Groups", "",
-        "One face group per UV island (ZBrush UV Groups): triangles that touch without a UV seam share a group. "
+        "One face group per UV island: triangles that touch without a UV seam share a group. "
         "Only the visible part is regrouped. Needs UVs (Tool > Texture Map > Auto UV makes some).",
         [this] {
             runCommand("polygroup_uv");
@@ -174,8 +174,8 @@ void App::registerInputActions() {
     actions_.setDefaultShortcut("config.save", "Ctrl+Shift+Alt+I");
 
     // Preferences > Input: the key style.
-    add("input.style_zbrush", "ZBrush-style", nullptr, "Preferences > Input", "",
-        "Keys and gestures as in ZBrush, for hands that know it: I is RGB Intensity, 9 saves a snapshot, the number keys don't pick brushes, and "
+    add("input.style_zbrush", "Classic sculpting keys", nullptr, "Preferences > Input", "",
+        "The classic sculpting keys and gestures: I is RGB Intensity, 9 saves a snapshot, the number keys don't pick brushes, and "
         "Ctrl+drag on the background only clears the mask.",
         [this] { setInputStyle(0); }, [this] { return uiPrefs_.inputStyle == 0; });
     add("input.style_sculptforge", "SculptForge", nullptr, "Preferences > Input", "",
@@ -190,7 +190,7 @@ void App::registerInputActions() {
     add("input.style_maya", "Maya", nullptr, "Preferences > Input", "",
         "Maya's view controls: Alt+left-drag orbits, Alt+middle-drag pans, Alt+right-drag zooms, anywhere on the "
         "canvas. Ctrl inverts a stroke, Ctrl+Alt masks (Ctrl+Alt+drag on the background clears the mask), Shift "
-        "smooths, Ctrl+Shift hides and shows. ZBrush's keys stay for everything else.",
+        "smooths, Ctrl+Shift hides and shows. The Classic sculpting keys stay for everything else.",
         [this] { setInputStyle(3); }, [this] { return uiPrefs_.inputStyle == 3; });
     add("input.emulate_numpad", "Emulate Numpad", nullptr, "Preferences > Input", "",
         "Blender style: the number keys above the letters work as the numpad (1 front, 3 right, 7 top, 5 "
@@ -198,13 +198,13 @@ void App::registerInputActions() {
         [this] { uiPrefs_.emulateNumpad = !uiPrefs_.emulateNumpad; }, [this] { return uiPrefs_.emulateNumpad; },
         [this] { return blenderStyle(); });
     add("input.right_click_menu", "Right click opens the Quick Menu", nullptr, "Preferences > Input", "",
-        "A right click on the canvas, without dragging, opens the Quick Menu under the cursor, as in ZBrush (Space "
+        "A right click on the canvas, without dragging, opens the Quick Menu under the cursor (Space "
         "does too). A right drag still turns, pans or zooms the view. A pen button set to Right click works the same.",
         [this] { uiPrefs_.rightClickQuickMenu = !uiPrefs_.rightClickQuickMenu; },
         [this] { return uiPrefs_.rightClickQuickMenu; });
     add("input.space_camera", "Hold Space and drag to move the camera", nullptr, "Preferences > Input", "",
         "While Space is held, a drag on the canvas moves the camera: left-drag turns it, right- or middle-drag pans, "
-        "and with Ctrl held too a drag zooms (#43). Off by default: in ZBrush, Space opens the Quick Menu (with this "
+        "and with Ctrl held too a drag zooms (#43). Off by default: with the Classic sculpting keys, Space opens the Quick Menu (with this "
         "on, a right click still does). Typing a space in a text field is never taken.",
         [this] { uiPrefs_.spaceCamera = !uiPrefs_.spaceCamera; }, [this] { return uiPrefs_.spaceCamera; });
     add("input.emulate_3_button", "Emulate 3 Button Mouse", nullptr, "Preferences > Input", "",
@@ -569,10 +569,10 @@ void App::drawInputSection() {
     ImGui::SameLine();
     int rotation = uiPrefs_.turntable ? 1 : 0;
     ImGui::SetNextItemWidth(-1);
-    const std::string rotations = std::string(tr("Free (ZBrush)")) + '\0' + tr("Turntable") + '\0';
+    const std::string rotations = std::string(tr("Free")) + '\0' + tr("Turntable") + '\0';
     if (ImGui::Combo("##rotation_input", &rotation, rotations.c_str())) uiPrefs_.turntable = rotation == 1;
     ui::HelpText("Rotation", nullptr,
-                 "Free: the model turns about the screen's axes and can roll over the top, as in ZBrush. Turntable: it "
+                 "Free: the model turns about the screen's axes and can roll over the top. Turntable: it "
                  "stays upright, as in Blender or Maya.",
                  "Preferences > Input");
     drawRadialMenusSection(); // RadialMenu.cpp
@@ -609,7 +609,7 @@ void App::drawZIntensitySlider(const char* id) {
     if (ui::SliderInside(id, &shown, 1.0f, 100.0f, smooth ? "Smooth Intensity %.0f" : "Intensity %.0f"))
         value = std::clamp(shown / 100.0f, 0.01f, 1.0f);
     ui::HelpText(smooth ? "Smooth Intensity" : "Intensity", "U",
-                 smooth ? "How strongly Smooth works. Smooth keeps its own value, as in ZBrush: hold Shift to see and "
+                 smooth ? "How strongly Smooth works. Smooth keeps its own value: hold Shift to see and "
                           "set it. Ctrl+click to type."
                         : "How strongly each dab changes the surface (1-100). Holding Shift shows Smooth's own value. "
                           "Ctrl+click to type.",

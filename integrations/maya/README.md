@@ -1,6 +1,6 @@
 # SculptForge bridge for Maya
 
-Send the selected meshes from Maya to SculptForge and get them back, the way GoZ works between ZBrush and
+Send the selected meshes from Maya to SculptForge and get them back, the way the Bridge works between SculptForge and
 other apps. One Python file (`sculptforge_maya.py`), plain `maya.cmds`, no other modules. Tested against a
 mocked `maya.cmds` (`tests/maya/test_sculptforge_maya.py`); it uses only commands Maya has had for many
 versions (Maya 2022 or newer, Python 3), but it has not been run inside a real Maya yet: please report what

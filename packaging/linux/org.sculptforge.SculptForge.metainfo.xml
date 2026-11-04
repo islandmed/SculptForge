@@ -9,13 +9,12 @@
     <name>The SculptForge contributors</name>
   </developer>
   <description>
-    <p>SculptForge is a free and open-source alternative to ZBrush: a digital sculpting application with familiar brushes,
+    <p>SculptForge is a free, open-source digital sculpting application with familiar brushes,
     symmetry, sculpt layers, voxel remeshing and one-click LOD chains.</p>
     <p>It exports game-ready FBX, glTF and OpenUSD files, can send assets straight into the Unreal Editor,
     works with Gaussian splats, and includes free AI tools (or bring your own): describe a brush in words,
     or turn an image or a description into a sculptable 3D model.</p>
-    <p>ZBrush, GoZ, MatCap, FiberMesh, LightCap and other ZBrush feature names are trademarks of Maxon Computer GmbH. SculptForge is not affiliated with
-    or endorsed by Maxon.</p>
+    <p>Product names are trademarks of their respective owners.</p>
   </description>
   <launchable type="desktop-id">org.sculptforge.SculptForge.desktop</launchable>
   <url type="homepage">https://sculptforge.app/</url>

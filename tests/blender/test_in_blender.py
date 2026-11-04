@@ -7,7 +7,7 @@
 # Sends a small scene to SculptForge (sculptforge-cli stands in for the app: blender_receive, then
 # blender_send), receives it back and checks that the objects are unchanged: positions, n-gons,
 # transforms, materials, modifiers, UVs, colours, mask and face sets. Then a topology change (subdivide)
-# and a new SubTool come back as a rebuilt mesh and a new object. The ZBrush-style keys preference adds and
+# and a new SubTool come back as a rebuilt mesh and a new object. The classic keys preference adds and
 # removes its keymap items, each bound to a real operator with valid settings. Vector displacement maps that
 # SculptForge exports read in Blender with the same orientation, and Blender's EXRs load in SculptForge.
 # CMake runs it when `blender` is found.
@@ -110,32 +110,32 @@ def addon_sculpt_items():
     return list(km.keymap_items) if km else []
 
 
-def test_zbrush_keys():
-    keys = bridge.zbrush_keys
+def test_classic_keys():
+    keys = bridge.classic_keys
     p = bridge.prefs()
     before = len(addon_sculpt_items())
-    check(not p.zbrush_keys and not keys.enabled(), "ZBrush keys: off by default")
-    p.zbrush_keys = True
+    check(not p.classic_keys and not keys.enabled(), "Classic keys: off by default")
+    p.classic_keys = True
     table = keys.key_table()
     items = addon_sculpt_items()
-    check(len(items) == before + len(table), "ZBrush keys: one keymap item per key (%d)" % len(table))
+    check(len(items) == before + len(table), "Classic keys: one keymap item per key (%d)" % len(table))
     for zkey, what, idname, key, ctrl, shift, alt, value, props in table:
         kmi = next((i for i in items if i.idname == idname and i.type == key and i.ctrl == ctrl and i.shift == shift
                     and i.alt == alt), None)
-        check(kmi is not None and kmi.active, "ZBrush keys: %s -> %s" % (zkey or key, idname))
+        check(kmi is not None and kmi.active, "Classic keys: %s -> %s" % (zkey or key, idname))
         mod, fn = idname.split(".")
         try:  # (hasattr is always true on bpy.ops: the operator is looked up when called)
             getattr(getattr(bpy.ops, mod), fn).get_rna_type()
             exists = True
         except (AttributeError, KeyError, RuntimeError):
             exists = False
-        check(exists, "ZBrush keys: operator %s exists" % idname)
+        check(exists, "Classic keys: operator %s exists" % idname)
         for name, v in props.items():
             got = getattr(kmi.properties, name) if kmi else None
             same = got == v or (isinstance(v, str) and isinstance(got, str) and got.upper() == v.upper()) or \
                 (isinstance(v, float) and abs(got - v) < 1e-6)
-            check(same, "ZBrush keys: %s %s = %r" % (idname, name, v))
-    check(not keys.skipped, "ZBrush keys: none skipped %s" % keys.skipped)
+            check(same, "Classic keys: %s %s = %r" % (idname, name, v))
+    check(not keys.skipped, "Classic keys: none skipped %s" % keys.skipped)
     # Every data path the keys use resolves in Sculpt Mode (they changed between Blender 4.2 and 5).
     for obj in list(bpy.data.objects):
         bpy.data.objects.remove(obj)
@@ -151,37 +151,37 @@ def test_zbrush_keys():
                     ok = True
                 except ValueError:
                     ok = False
-                check(ok, "ZBrush keys: %s resolves (%s)" % (path, zkey or key))
-    check(bpy.types.Menu.bl_rna_get_subclass_py(keys.SCULPTFORGE_MT_zbrush_brushes.bl_idname) is not None,
-          "ZBrush keys: the brush menu is registered")
+                check(ok, "Classic keys: %s resolves (%s)" % (path, zkey or key))
+    check(bpy.types.Menu.bl_rna_get_subclass_py(keys.SCULPTFORGE_MT_classic_brushes.bl_idname) is not None,
+          "Classic keys: the brush menu is registered")
     # The brush menu's picks.
     for name, _, asset, sculpt_tool, _ in keys.BRUSHES:
-        r = bpy.ops.sculptforge.zbrush_brush(brush=name)
+        r = bpy.ops.sculptforge.classic_brush(brush=name)
         brush = bpy.context.tool_settings.sculpt.brush
         got = brush.name if keys.brush_assets() else brush.sculpt_tool
         check(r == {"FINISHED"} and got == (asset if keys.brush_assets() else sculpt_tool),
-              "ZBrush brush %s -> Blender %s (%s)" % (name, asset, got))
+              "classic brush %s -> Blender %s (%s)" % (name, asset, got))
     # Ctrl+D divides (a Multires level); D / Shift+D step between levels without adding any.
-    check(bpy.ops.sculptforge.zbrush_divide() == {"FINISHED"}, "Ctrl+D: Divide")
-    bpy.ops.sculptforge.zbrush_divide()
+    check(bpy.ops.sculptforge.classic_divide() == {"FINISHED"}, "Ctrl+D: Divide")
+    bpy.ops.sculptforge.classic_divide()
     multires = next((m for m in bpy.context.active_object.modifiers if m.type == "MULTIRES"), None)
     check(multires is not None and multires.total_levels == 2, "Ctrl+D in Sculpt Mode adds Multires levels")
     if multires is not None:
-        bpy.ops.sculptforge.zbrush_sdiv(step=-1)
-        bpy.ops.sculptforge.zbrush_sdiv(step=-1)
-        bpy.ops.sculptforge.zbrush_sdiv(step=-1)
+        bpy.ops.sculptforge.classic_sdiv(step=-1)
+        bpy.ops.sculptforge.classic_sdiv(step=-1)
+        bpy.ops.sculptforge.classic_sdiv(step=-1)
         check(multires.sculpt_levels == 0 and multires.total_levels == 2, "Shift+D steps down to SDiv 0")
-        bpy.ops.sculptforge.zbrush_sdiv(step=1)
-        bpy.ops.sculptforge.zbrush_sdiv(step=1)
-        bpy.ops.sculptforge.zbrush_sdiv(step=1)
+        bpy.ops.sculptforge.classic_sdiv(step=1)
+        bpy.ops.sculptforge.classic_sdiv(step=1)
+        bpy.ops.sculptforge.classic_sdiv(step=1)
         check(multires.sculpt_levels == 2 and multires.total_levels == 2, "D steps up to the top, adds nothing")
-    # Ctrl+W (sculptforge.zbrush_group) runs sculpt operators that need a viewport (mask_flood_fill crashes
+    # Ctrl+W (sculptforge.classic_group) runs sculpt operators that need a viewport (mask_flood_fill crashes
     # headless Blender): only its poll is checked here.
-    check(bpy.ops.sculptforge.zbrush_group.poll(), "Ctrl+W: Group is available in Sculpt Mode")
+    check(bpy.ops.sculptforge.classic_group.poll(), "Ctrl+W: Group is available in Sculpt Mode")
     bpy.ops.object.mode_set(mode="OBJECT")
-    p.zbrush_keys = False
-    check(len(addon_sculpt_items()) == before and not keys.enabled(), "ZBrush keys: turning it off removes them")
-    p.zbrush_keys = True  # (the add-on's unregister removes them too: checked after disabling it)
+    p.classic_keys = False
+    check(len(addon_sculpt_items()) == before and not keys.enabled(), "Classic keys: turning it off removes them")
+    p.classic_keys = True  # (the add-on's unregister removes them too: checked after disabling it)
 
 
 def read_sfvdm(path):
@@ -311,11 +311,11 @@ def main():
     check(eyes is not None and eyes.data.shape_keys is not None and "eyeLookUpLeft" in eyes.data.shape_keys.key_blocks,
           "Eyes: eyeLook shape keys")
 
-    test_zbrush_keys()
+    test_classic_keys()
     test_vdm_exr()
 
     addon_utils.disable("sculptforge_bridge")
-    check(not bridge.zbrush_keys.enabled(), "disabling the add-on removes the ZBrush keys")
+    check(not bridge.classic_keys.enabled(), "disabling the add-on removes the Classic keys")
     print("%d failure(s)" % len(failures))
     sys.exit(1 if failures else 0)
 

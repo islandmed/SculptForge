@@ -386,7 +386,7 @@ std::vector<std::string> loadMatcapFolders(const std::vector<std::string>& dirs)
 }
 
 std::vector<std::string> studioMatcapDirs() {
-    const char* v = std::getenv("SCULPTFORGE_MATCAP_PATH");
+    const char* v = std::getenv("SCULPTFORGE_MATCAP_PATH"); // marks-pending
     return splitSearchPath(v ? v : "");
 }
 

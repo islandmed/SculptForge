@@ -3,7 +3,7 @@
 # at 1920x1080 (ui_shell_layout_1080).
 run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_sphere subdivisions=4
-expect "SubTools/Append"            # right tray: the Tool palette with its SubTool sub-palette open
+expect "Parts/Append"            # right tray: the Tool palette with its SubTool sub-palette open
 expect_value right_tray == 1
 expect_value left_tray == -1
 expect "Clay##brush.clay"           # bottom shelf: quick brushes
@@ -29,20 +29,20 @@ click "Groups##view.polygroups"
 key tab
 expect_value shelves == 0
 expect_not "Clay##brush.clay"
-expect_not "SubTools/Append"
+expect_not "Parts/Append"
 expect "Tool##palette.tool"
 shot no-shelves
 key tab
 expect "Clay##brush.clay"
-expect "SubTools/Append"
+expect "Parts/Append"
 
 # The divider opens and closes the right tray.
 click "##rightdivider"
-expect_not "SubTools/Append"
+expect_not "Parts/Append"
 expect_value right_tray == -1
 shot tray-closed
 click "##rightdivider"
-expect "SubTools/Append"
+expect "Parts/Append"
 
 # A palette opens as a drop-down from the bar; its icon puts it in the tray, and back.
 click "Stroke##palette.stroke"
@@ -57,7 +57,7 @@ expect_not "Draw/Add"
 click "Stroke##palette.stroke"
 click "Stroke/##totray"
 expect "Stroke/Drag Stamp"
-expect "SubTools/Append"
+expect "Parts/Append"
 expect_value right_tray == 2
 shot palette-in-tray
 click "Stroke/##totray"
@@ -76,11 +76,11 @@ shot left-tray
 # Tool sub-palettes: one open at a time.
 click "Tool/Geometry"
 expect "Subdivide"
-expect_not "SubTools/Append"
+expect_not "Parts/Append"
 click "Subdivide"
 expect_value triangles == 20480
 click "Tool/Parts"
-expect "SubTools/Append"
+expect "Parts/Append"
 
 # Bottom shelf: remove a brush with its menu, add it back with [+].
 right_click "Clay##brush.clay"
@@ -105,7 +105,7 @@ click "Medium"
 click "2##ui.preset.2"
 expect_value left_tray == -1
 expect_value right_tray == -1
-expect_not "SubTools/Append"
+expect_not "Parts/Append"
 expect_not "Alpha/Load image..."
 shot preset-sculpt
 click "3##ui.preset.3"
@@ -115,7 +115,7 @@ expect "Stroke/Drag Stamp"
 expect "Material/Studio"
 shot preset-wide
 click "1##ui.preset.1"
-expect "SubTools/Append"
+expect "Parts/Append"
 expect_not "Stroke/Drag Stamp"
 
 # Window controls: minimise and close sit at the far right of the title strip.

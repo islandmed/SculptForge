@@ -310,7 +310,7 @@ void App::drawPalette_Brush() {
     ui::HelpAction(*this, "draw.front_faces");
     ImGui::SameLine();
     ImGui::Checkbox(tr("Invert (Alt)"), &invertToggle_);
-    ui::HelpText("Invert", "Alt", "Brushes subtract instead of add (ZBrush Zsub). Holding Alt flips it for one stroke.", "Brush");
+    ui::HelpText("Invert", "Alt", "Brushes subtract instead of add. Holding Alt flips it for one stroke.", "Brush");
     ui::Checkbox("Connected only##draw.connected_only", &uiPrefs_.connectedOnly);
     ui::HelpAction(*this, "draw.connected_only");
     ImGui::SameLine();
@@ -320,7 +320,7 @@ void App::drawPalette_Brush() {
     ui::HelpText("Smooth keeps volume", nullptr,
                  "The Smooth brush (and Shift) removes bumps without shrinking the form, instead of the plain smooth "
                  "that also flattens it. Either way, let go of Shift while still pressing a Shift-smooth stroke to "
-                 "switch to the other smooth for the rest of the stroke (ZBrush's alternate smooth).",
+                 "switch to the other smooth for the rest of the stroke.",
                  "Brush");
     ImGui::Checkbox(tr("Smooth face group borders only##smooth_group_borders"), &smoothGroupBorders_);
     ui::HelpText("Smooth face group borders only", nullptr,
@@ -712,7 +712,7 @@ void App::drawPalette_Tool() {
     }
     if (subpalette("tool.subtool", "Parts")) {
         tray::Section section;
-        Demo::pushScope("SubTools");
+        Demo::pushScope("Parts");
         drawSubToolsContents();
         Demo::popScope();
         drawExtractContents(); // PanelExtract.cpp
@@ -722,7 +722,7 @@ void App::drawPalette_Tool() {
     }
     if (subpalette("tool.zspheres", "Forge Spheres")) {
         tray::Section section;
-        Demo::pushScope("ZSpheres");
+        Demo::pushScope("Forge Spheres");
         drawZSpheresContents(); // PanelZSpheres.cpp
         Demo::popScope();
     }

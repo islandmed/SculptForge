@@ -136,13 +136,13 @@ std::string brushAction(std::string tool) {
     for (auto& c : tool)
         if (c == ' ') c = '_';
     static const std::pair<const char*, const char*> kBrushes[] = {
-        {"DRAW", "brush.standard"},       {"DRAW_SHARP", "brush.damstandard"}, {"CLAY", "brush.clay"},
-        {"CLAY_STRIPS", "brush.claybuildup"}, {"LAYER", "brush.layer"},      {"INFLATE", "brush.inflate"},
+        {"DRAW", "brush.standard"},       {"DRAW_SHARP", "brush.sharpcrease"}, {"CLAY", "brush.clay"},
+        {"CLAY_STRIPS", "brush.clayblock"}, {"LAYER", "brush.layer"},      {"INFLATE", "brush.inflate"},
         {"INFLATE/DEFLATE", "brush.inflate"}, {"CREASE", "brush.crease"},    {"CREASE_POLISH", "brush.crease"},
         {"CREASE_SHARP", "brush.crease"}, {"SMOOTH", "brush.smooth"},        {"FLATTEN", "brush.flatten"},
         {"FLATTEN/CONTRAST", "brush.flatten"}, {"SCRAPE", "brush.flatten"},  {"SCRAPE/FILL", "brush.flatten"},
         {"PINCH", "brush.pinch"},         {"PINCH/MAGNIFY", "brush.pinch"},  {"GRAB", "brush.move"},
-        {"SNAKE_HOOK", "brush.snakehook"}, {"NUDGE", "brush.nudge"},         {"MASK", "mask.brush"},
+        {"SNAKE_HOOK", "brush.tendril"}, {"NUDGE", "brush.nudge"},         {"MASK", "mask.brush"},
     };
     for (const auto& [name, id] : kBrushes)
         if (tool == name) return id;

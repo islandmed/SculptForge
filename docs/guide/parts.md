@@ -1,6 +1,6 @@
 # Parts
 
-A scene in SculptForge can hold several separate meshes, called Parts (ZBrush users: SubTools): a body, eyes, teeth,
+A scene in SculptForge can hold several separate meshes, called Parts (experienced sculptors: Parts): a body, eyes, teeth,
 a helmet and a sword can each live in their own Part. This chapter covers the Parts list, selecting, adding,
 hiding, reordering, merging and splitting Parts, and how they travel through files.
 
@@ -12,19 +12,16 @@ hiding, reordering, merging and splitting Parts, and how they travel through fil
   [sculpt layers](layers.md).
 - Each Part has its own undo history. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes the last change in the active
   Part, and switching Parts doesn't lose the history of the others.
-- Adding, deleting, reordering, merging and splitting Parts are **not undoable**, as in ZBrush. Merges and
+- Adding, deleting, reordering, merging and splitting Parts are **not undoable**. Merges and
   deletes ask for confirmation first.
-- The Parts list highlights the active Part. In the ZBrush-style layout the title strip also shows it and its place
+- The Parts list highlights the active Part. In the Classic layout the title strip also shows it and its place
   in the list, for example `Part Helmet (2/5)`.
-
-> **ZBrush:** Parts work the way you expect: one active Part, the rest dimmed, Alt+click in the viewport to
-> switch. There is no folder grouping of Parts yet.
 
 ## The Parts list
 
 The list is in **Tool > Parts**, which is open in the right tray by default.
 
-![The Parts sub-palette with several Parts, the active one highlighted](images/subtools.jpg)
+![The Parts sub-palette with several Parts, the active one highlighted](images/parts.jpg)
 
 Each row shows a small picture of the Part, its name, its triangle count and an eye. The pictures are drawn from
 the model the viewport already has on the graphics card, so they cost almost nothing even on very dense Parts,
@@ -129,7 +126,7 @@ Both replace the active Part with the pieces. Because a merge keeps each origina
 ## Extract a shell
 
 **Extract**, in **Tool > Parts**, makes a new Part from the masked part of the active one: a helmet from the
-top of a head, a strap, a sleeve, a piece of armour that fits the surface exactly. It works as in ZBrush:
+top of a head, a strap, a sleeve, a piece of armour that fits the surface exactly. It works:
 
 1. Mask the part (hold <kbd>Ctrl</kbd> and paint, or use **Mask Rectangle** / **Mask Lasso**; see [Masking](masking.md)).
 2. Click **Extract**. The shell appears as a preview, a Part just below the active one.
@@ -151,8 +148,6 @@ Accept is one undo step: <kbd>Ctrl</kbd>+<kbd>Z</kbd> on the source Part takes t
 and redo brings it back. A preview you don't accept goes away as soon as you change the source Part or pick
 another one, and it is never saved.
 
-> **ZBrush:** the same Extract, E Smt, Thick, Double, TCorne, TBorder and Accept.
-
 ## Delete a Part
 
 Click **Delete...** (or right-click a row > **Delete...**) and confirm. The last Part can't be deleted, and a
@@ -167,7 +162,7 @@ delete can't be undone.
 | glTF / GLB | One node and mesh per visible Part, both ways |
 | FBX | One model per visible Part (with LODs, an LOD group each), both ways |
 | USD | One Mesh prim per visible Part, both ways |
-| Send to ZBrush (GoZ-compatible exchange) | Each visible Part is sent to ZBrush as its own SubTool |
+| Bridge | Each visible Part is sent as its own object |
 | PLY, STL, splat conversion | The visible Parts are merged into one mesh |
 
 Opening a multi-object file replaces the scene with one Part per object. See [Exporting](exporting.md) for the
@@ -196,7 +191,7 @@ used.
 | `extract_accept` / `extract_cancel` | Keep or remove the Extract preview |
 
 ```text
-subtool_append type=sphere name=EyeL size=0.12; subtool_duplicate; subtool_rename to=EyeR
+part_append type=sphere name=EyeL size=0.12; part_duplicate; part_rename to=EyeR
 ```
 
 ## See also

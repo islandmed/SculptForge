@@ -52,7 +52,7 @@ whether a problem comes from a pack. `sculptforge-cli --no-packs` does the same 
 ## Make a pack
 
 **Library > Packs > New Pack...** lists what you made yourself: brushes in your library, images in your
-Library's Alphas and MatCaps folders, the active Part's Fill layers as a Material Recipe, your VDMs, your pie
+Library's Alphas and Lit Spheres folders, the active Part's Fill layers as a Material Recipe, your VDMs, your pie
 menus, your changed shortcuts (as a keymap) and your macros. Tick what goes in, fill in the name, author, license
 and description, and click **Save Pack...**. The file is checked exactly as an install would check it before it
 is written.
@@ -113,7 +113,7 @@ not asked again for that macro unless its text changes. A macro's edits on one P
 
 A macro only runs SculptForge's own commands, in order. It can't run programs or scripts, and it can't:
 
-- reach the network (AI services, the brush gallery, Unreal, the phone link) or send to Blender, Maya or ZBrush;
+- reach the network (AI services, the brush gallery, Unreal, the phone link) or send to Blender, Maya or the Bridge;
 - install, remove or switch packs, or run another macro;
 - name a file outside the project folder. File values are either a path inside the folder of the saved project
   (`exports/clean.glb`) or `?`, which opens a file dialog when the macro runs. Absolute paths, `..`, `~` and drive
