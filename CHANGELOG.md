@@ -6,6 +6,41 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.11] - 2026-11-03
+
+### Added
+- **Update channel** (Preferences > Updates): Stable or Preview. Preview is also offered the betas, which the update
+  feed lists under `channels.preview`. It is never offered anything older than the stable release. Betas are GitHub
+  pre-releases (`vX.Y.Z-beta.N`). They show "X.Y.Z Beta N" in the title bar and About.
+
+### Changed
+- Version comparison in the update check: a prerelease sorts before its version (0.11.0-beta.1 < 0.11.0), and betas
+  compare by number.
+- **Voxel Remesh** is 3-4 times faster with the same result (Discord, ThinkingPolygons and GABO): every stage runs on
+  all cores, the distance to the old surface is only computed in a narrow band around it, and the flood fills work a
+  run at a time. A 500,000-triangle sculpt at the default resolution 200 takes about 0.3 s instead of 1.1 s; 2 million
+  triangles about 0.6 s instead of 2 s; resolution 400 about 1.1 s instead of 6 s (10-core laptop).
+- SculptForge now uses only its own names in the app, guide, website and listings: **Classic sculpting keys** and the
+  **Classic layout** (Preferences, first-start welcome), **File > Bridge** (Send, Receive, Import / Export Bridge
+  file), Lit Spheres, Parts, Face groups, Vertex Paint, Library. Brushes are stored as SharpCrease, ClayBlock and
+  Tendril (old names in projects, brush files, scripts and configs still load); the library's lit-sphere folder is now
+  `Documents/SculptForge/Lit Spheres` (an existing folder moves over once). The export plug-in is
+  `SculptForgeBridgeExport.txt`, with its setup on the Bridge setup page. A new check (`tools/check_marks.py`, ctest
+  `marks`) keeps third-party product names out of what we publish.
+
+### Fixed
+- Windows at 150-200 % display scaling (#105, a 2560x1600 laptop): the window opened at its 100 % size, 800-1067
+  logical px wide, and the shelves and status bar ran past its right edge. The window now opens inside the screen's
+  usable area at the display's scale (maximised when that doesn't fit), its title bar on screen, and keeps its logical
+  size when the scale changes; the status bar drops its readouts before they reach the menus.
+- The right tray stayed closed and wouldn't open on screens under 1920 px with Forge Terminal, Phosphor or Blueprint
+  (#107, thanks ebarranco): the tiled looks' gaps made a 1280 px window count as too narrow for a tray.
+- The QuickMenu (right click) squashed its brush, alpha and material thumbnails and had a blue tint in the Neutral
+  look (thanks ThinkingPolygons): the thumbnails are square and uncropped, the background the look's grey.
+- Voxel Remesh no longer freezes the app: it always runs in the background with a progress bar and Cancel (before,
+  only when keeping a painted texture). Smoothing a remeshed surface and carrying mask and colour over also run in
+  parallel.
+
 ## [0.10.10] - 2026-11-03
 
 ### Changed

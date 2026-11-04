@@ -8,9 +8,26 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.10.11
 
 ```features
-date: unreleased
+date: 2026-11-03
 tagline: Voxel Remesh 3-4x faster, high-DPI laptops that fit the screen, the right tray in every look, and a Preview channel for betas.
+highlight: Voxel Remesh 3-4x faster, never freezes the app
+highlight: Classic sculpting keys and the Bridge: SculptForge's own names throughout
 ```
+
+- **Update channel**: **Preferences > Updates > Update channel** picks **Stable** (finished releases, the default) or
+  **Preview (betas)**, which also offers the betas of the next version, a couple of weeks before it ships. A beta says
+  so in the title bar and About ("0.11.0 Beta 1"). Problems in a beta go to the Discord's #bug-reports.
+- **High-DPI laptops**: on a Windows laptop at 150-200 % scaling the window opens inside the screen at a size the
+  interface fits, and nothing runs past its edges.
+- **Right tray in every look**: Forge Terminal, Phosphor and Blueprint open the right tray on 1280 px screens, as
+  Classic does.
+- **QuickMenu**: square thumbnails and the look's own colours.
+- **Faster Voxel Remesh**: **Tool > Remesh > Voxel Remesh** is about 3-4 times faster (a 500,000-triangle sculpt at
+  the default resolution in about a third of a second) and runs in the background with a progress bar and Cancel, so
+  the app never freezes while it works.
+- **Our own names, everywhere**: the keymap is now **Classic sculpting keys** with the **Classic layout**, the
+  exchange menu is **File > Bridge** (Send, Receive, Import / Export Bridge file), and the brushes are stored as Sharp
+  Crease, Clay Block and Tendril. Older projects, brush files, hotkeys, shelves and radial menus load as before.
 
 ## Version 0.10.10
 
