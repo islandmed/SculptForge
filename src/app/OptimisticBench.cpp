@@ -47,7 +47,7 @@ void main() {
 }
 )";
 const char* kFS = R"(#version 330 core
-uniform sampler2D uColor, uDepth, uMatcapTex;
+uniform sampler2D uColor, uDepth, uLitSphereTex;
 uniform mat4 uInvProj, uProj;
 uniform vec2 uProjScale, uSize;
 uniform int uCount;
@@ -65,7 +65,7 @@ vec3 lit(vec3 n, vec3 v) {
     vec3 bx = normalize(vec3(v.z, 0.0, -v.x));
     vec3 by = cross(v, bx);
     vec2 uv = vec2(dot(bx, n), dot(by, n)) * 0.495 + 0.5;
-    return pow(texture(uMatcapTex, uv).rgb, vec3(2.2));
+    return pow(texture(uLitSphereTex, uv).rgb, vec3(2.2));
 }
 // The displacement of the surface point P by every dab (the Standard kernel along each area normal), and the
 // tangential gradient that bends a normal n.
@@ -384,7 +384,7 @@ int runOptimisticBench(const OptimisticBenchOptions& o) {
         gl::BindVertexArray(vao);
         gl::Uniform1i(gl::GetUniformLocation(prog, "uColor"), 0);
         gl::Uniform1i(gl::GetUniformLocation(prog, "uDepth"), 1);
-        gl::Uniform1i(gl::GetUniformLocation(prog, "uMatcapTex"), 2);
+        gl::Uniform1i(gl::GetUniformLocation(prog, "uLitSphereTex"), 2);
         gl::UniformMatrix4fv(gl::GetUniformLocation(prog, "uInvProj"), 1, GL_FALSE, glm::value_ptr(invProj));
         gl::UniformMatrix4fv(gl::GetUniformLocation(prog, "uProj"), 1, GL_FALSE, glm::value_ptr(proj));
         gl::Uniform2f(gl::GetUniformLocation(prog, "uProjScale"), proj[0][0], proj[1][1]);
@@ -392,7 +392,7 @@ int runOptimisticBench(const OptimisticBenchOptions& o) {
         gl::ActiveTexture(GL_TEXTURE0 + 1);
         gl::BindTexture(GL_TEXTURE_2D, canvas.depth);
         gl::ActiveTexture(GL_TEXTURE0 + 2);
-        gl::BindTexture(GL_TEXTURE_2D, renderer.matcapTexture(rs.matcap));
+        gl::BindTexture(GL_TEXTURE_2D, renderer.litsphereTexture(rs.litsphere));
         gl::ActiveTexture(GL_TEXTURE0);
         gl::BindTexture(GL_TEXTURE_2D, canvas.color); // (each pass re-shades its rectangle from the drawn canvas, all dabs so far)
         gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GLint(GL_LINEAR));

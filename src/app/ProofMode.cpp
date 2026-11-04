@@ -101,6 +101,10 @@ std::vector<ProofMeshSize> proofStandardScene(const std::string& name) {
                                 }, 5};
         return {s1b};
     }
+    if (name == "micro-head") { // research (core-200m N2 + micro GPU shading): the Micro 7 head, 314.6M micro triangles, built here
+        const ProofMeshSize sm{315, "315M micro", [](size_t) { return makeCore200mMesh(20000, 7); }, 8};
+        return {sm};
+    }
     if (name == "core-200m") { // research (docs/design/core-200m.md, phase 1): ~200M micro triangles in memory, opened from a project
         const ProofMeshSize s200{200, "200M micro", [](size_t) {
                                      std::string err;
@@ -520,6 +524,9 @@ void App::startProofMode() {
     p->jsonPath = !options_.benchmarkOut.empty() ? options_.benchmarkOut : u8(dir / ("sculptforge-benchmark-" + stamp + ".json"));
     p->videoPath = !options_.benchmarkVideo.empty() ? options_.benchmarkVideo : u8(dir / ("sculptforge-benchmark-" + stamp + ".mp4"));
     if (p->scene == "core-200m") p->phases = {{"orbit", 0.0f, 10.0}, {"orbit again", 0.0f, 10.0}}; // phase 1: loads and orbits
+    else if (p->scene == "micro-head") // the strokes N2 and the GPU shading are measured on (Standard, as --bench-wavelet-stroke)
+        p->phases = {{"standard 108 px", 108.0f, p->strokeSeconds, BrushType::Standard, 0.5f},
+                     {"standard 216 px", 216.0f, p->strokeSeconds, BrushType::Standard, 0.5f}};
     else if (!p->scene.empty()) p->phases = standardPhases(p->strokeSeconds);
     else p->phases = {{"stroke", 60.0f, p->strokeSeconds}, {"large brush stroke", 240.0f, p->strokeSeconds}, {"orbit", 0.0f, 3.0}};
     p->stage = p->cli ? ProofState::Stage::Announce : ProofState::Stage::Intro;
