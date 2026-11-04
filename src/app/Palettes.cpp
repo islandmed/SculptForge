@@ -793,10 +793,10 @@ void App::drawPalette_Tool() {
         ImGui::PopID();
         tray::GroupLabel(*this, "Voxel Remesh");
         const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
-        if (voxelRemesh_) { // remeshing a painted SubTool in the background (PanelRetopo.cpp)
+        if (voxelRemesh_) { // remeshing in the background (PanelRetopo.cpp)
             ImGui::ProgressBar(voxelRemesh_->progress->load(), ImVec2(half, 0), "Remeshing...");
             ui::HelpText("Voxel Remesh", nullptr,
-                         "Remeshing and keeping the texture in the background (Auto UV of the new surface, then the "
+                         "Remeshing in the background (with a painted texture: Auto UV of the new surface, then the "
                          "texture projected onto it). The result replaces the Part when it's done.",
                          "Tool > Remesh");
         } else {

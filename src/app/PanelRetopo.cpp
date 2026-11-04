@@ -195,13 +195,8 @@ void App::startVoxelRemesh() {
     Args args{{"resolution", double(voxelResolution_)}};
     if (voxelKeepMasked_) args["keep_masked"] = true;
     if (!memoryAllows("remesh", args, [this] { startVoxelRemesh(); })) return;
-    memoryConfirmed_ = true; // (checked: the remesh command below doesn't ask again)
-    if (!hasTexture(doc_.mesh) || !keepTexture_) {
-        if (hasTexture(doc_.mesh)) args["keep_texture"] = false; // Keep Texture off
-        runCommand("remesh", args);
-        return;
-    }
-    // Keeping a texture adds Auto UV of the result, which takes seconds to minutes: run it all in the background.
+    // Always in the background with progress, so the UI never freezes (keeping a texture adds Auto UV of the
+    // result, seconds to minutes); the result lands as the remesh command's would (pollVoxelRemesh).
     if (doc_.sculptor.strokeActive()) endStroke();
     auto job = std::make_unique<VoxelRemeshJob>();
     job->progress = std::make_shared<std::atomic<float>>(0.0f);
@@ -219,25 +214,33 @@ void App::startVoxelRemesh() {
         return;
     }
     job->keepMasked = !keep.empty();
+    job->keepTexture = keepTexture_;
+    const bool texture = hasTexture(doc_.mesh) && keepTexture_;
     std::promise<bool> promise;
     job->done = promise.get_future();
     std::thread([promise = std::move(promise), source = std::make_shared<Mesh>(doc_.mesh), res = job->resolution,
                  progress = job->progress, cancel = job->cancel, result = job->result, error = job->error,
-                 note = job->note, keep = std::move(keep)]() mutable {
+                 note = job->note, keep = std::move(keep), texture, keepTexture = keepTexture_]() mutable {
         progress->store(0.02f);
-        *result = voxelRemesh(*source, res, error.get());
+        const float remeshShare = texture ? 0.13f : 0.9f; // the rest: Keep Masked, then the texture's Auto UV
+        *result = voxelRemesh(*source, res, error.get(), [&](float f) {
+            progress->store(0.02f + remeshShare * f);
+            return !cancel->load();
+        });
         bool ok = result->triangleCount() > 0;
         if (ok && !keep.empty()) { // Keep Masked: the masked part goes back in, joined to the new surface
             Mesh stitched;
-            ok = stitchKeptTriangles(*source, keep, *result, stitched, *error);
+            std::string keepNote;
+            ok = stitchKeptTriangles(*source, keep, *result, stitched, *error, &keepNote);
             if (ok) *result = std::move(stitched);
             else *error = "Remesh (Keep Masked): " + *error;
+            if (ok && !keepNote.empty()) *note = "; Keep masked: " + keepNote;
         }
-        progress->store(0.15f);
-        if (ok) *note = carryTextureNote(*source, *result, true, [&](float f) {
+        progress->store(texture ? 0.15f : 0.98f);
+        if (ok) *note = carryTextureNote(*source, *result, keepTexture, [&](float f) {
             progress->store(0.15f + 0.85f * f);
             return !cancel->load();
-        });
+        }) + *note;
         if (ok && cancel->load()) {
             ok = false;
             *error = "Voxel Remesh cancelled";
@@ -245,13 +248,13 @@ void App::startVoxelRemesh() {
         promise.set_value(ok);
     }).detach();
     voxelRemesh_ = std::move(job);
-    status_ = "Voxel Remesh: remeshing and keeping the texture...";
+    status_ = texture ? "Voxel Remesh: remeshing and keeping the texture..." : "Voxel Remesh: remeshing...";
 }
 
 void App::pollVoxelRemesh() {
     if (!voxelRemesh_) return;
     if (voxelRemesh_->done.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
-        status_ = "Voxel Remesh (keeping the texture): " + std::to_string(int(voxelRemesh_->progress->load() * 100.0f)) + "%";
+        status_ = "Voxel Remesh: " + std::to_string(int(voxelRemesh_->progress->load() * 100.0f)) + "%";
         return;
     }
     if (jobWaitsForStroke()) return; // (the result lands when the stroke ends)
@@ -279,6 +282,7 @@ void App::pollVoxelRemesh() {
     updateTitle();
     Args echo{{"resolution", double(job->resolution)}};
     if (job->keepMasked) echo["keep_masked"] = true;
+    if (!job->keepTexture && job->note->find("texture") != std::string::npos) echo["keep_texture"] = false;
     consoleEcho("remesh", echo, r);
 }
 
