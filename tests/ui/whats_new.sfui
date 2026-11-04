@@ -2,9 +2,9 @@
 # block); Esc closes it, Try it opens the feature, Full release notes opens the guide chapter, which shows the last
 # three versions in full and folds the older ones into groups.
 # The window is pinned to 0.10.7's five cards (SF_WHATS_NEW_VERSION), so this stays valid after each release; the guide
-# chapter below is pinned to 0.10.11 (SF_GUIDE_VERSION), so it checks 0.10.11's section before and after the release.
+# chapter below is pinned to 0.11.0 (SF_GUIDE_VERSION), so it checks 0.11.0's section before and after the release.
 env SF_WHATS_NEW_VERSION 0.10.7
-env SF_GUIDE_VERSION 0.10.11
+env SF_GUIDE_VERSION 0.11.0
 run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
 run new_sphere subdivisions=3
 click "Help##palette.help"
@@ -62,12 +62,12 @@ wait 0.3
 expect_value whats_new_open == 0
 expect_value guide_open == 1
 expect_guide whats-new.md
+expect_text "Version 0.11.0"
+expect_text "A quick tour for experienced sculptors, a command search that knows plain sculpting words, and three experimental options for very dense meshes."
 expect_text "Version 0.10.11"
 expect_text "Voxel Remesh 3-4x faster, high-DPI laptops that fit the screen, the right tray in every look, and a Preview channel for betas."
 expect_text "Version 0.10.10"
 expect_text "Close Holes, Clip and X-Ray, light you can turn, a faster view on slow machines, and more SpaceMouse devices."
-expect_text "Version 0.10.9"
-expect_text "Your first sculpt in ten minutes, starter meshes, brushes that keep their settings, and tablets that just work."
 expect_value whats_new_contents == 6
 expect_value whats_new_expanded == 1
 shot whats-new-guide

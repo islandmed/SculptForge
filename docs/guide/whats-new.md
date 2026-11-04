@@ -5,6 +5,13 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.11.0
+
+```features
+date: unreleased
+tagline: A quick tour for experienced sculptors, a command search that knows plain sculpting words, and three experimental options for very dense meshes.
+```
+
 ## Version 0.10.11
 
 ```features
