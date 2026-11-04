@@ -83,5 +83,7 @@ Tests: T1 on the PC green at 74d8e424 (143 run, 28 cached, 0 failed; the 2 tests
 in a222de07). Full CI on the branch with full=true is green: run 41807683356, 20.9 min, every platform plus the VFX
 Reference Platform and Blender jobs. run.py ran on every runner: no flakes, nothing over the 150 s CI budget.
 Self-tests test_impact, test_run and release_paperwork pass; release_script_beta passes.
+Rebased T1 on the PC (87f59321): 171 run, 0 real failures. 6 tests failed with the GPU gone and passed on the rerun; the 3
+that failed twice passed alone. main's new adaptive_dabs_* cases (80/41/21 s) are listed in slow_tests.txt for their owner.
 Rebased as **feat/test-flow-2** on origin/main d614f533 (after fix/ip-purge-2; feat/test-flow is superseded).
 ~/Work/.sf scripts are already live. Merge after 0.11.0-beta.1 is cut (coordinator), as a batch of its own.
