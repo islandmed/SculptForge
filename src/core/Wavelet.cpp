@@ -11,11 +11,13 @@
 
 #include <algorithm>
 #include <atomic>
+#include <bit>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <fstream>
 #include <sstream>
+#include <thread>
 #include <vector>
 
 namespace sf {
@@ -50,15 +52,27 @@ void waveletInverse(int16_t* grid, uint32_t n) {
     for (uint32_t s = n >> 1; s >= 1; s >>= 1) stage(grid, n, s, false);
 }
 
+void waveletToLattice(int16_t* coeffs, uint32_t n, uint32_t s) {
+    for (uint32_t t = n >> 1; t >= s && t >= 1; t >>= 1) stage(coeffs, n, t, false);
+}
+
+void waveletFromLattice(int16_t* grid, uint32_t n, uint32_t s) {
+    for (uint32_t t = s; t < n; t <<= 1) stage(grid, n, t, true);
+}
+
+void waveletHeightsToLattice(int16_t* heights, uint32_t n, uint32_t s) {
+    for (uint32_t t = 1; t < s && t < n; t <<= 1) stage(heights, n, t, true);
+}
+
 void waveletAddCoarse(int16_t* coeffs, uint32_t n, uint32_t s, const std::function<int(uint32_t, uint32_t, int)>& delta) {
     s = std::clamp<uint32_t>(s, 1, n);
-    for (uint32_t t = n >> 1; t >= s && t >= 1; t >>= 1) stage(coeffs, n, t, false); // the lattice's heights
+    waveletToLattice(coeffs, n, s); // the lattice's heights
     for (uint32_t j = 0; j <= n; j += s)
         for (uint32_t i = 0; i + j <= n; i += s) {
             int16_t& v = coeffs[MicroMesh::index(i, j, n)];
             v = int16_t(std::clamp(int(v) + delta(i, j, int(v)), -32767, 32767));
         }
-    for (uint32_t t = s; t < n; t <<= 1) stage(coeffs, n, t, true); // back to coefficients; finer ones untouched
+    waveletFromLattice(coeffs, n, s); // back to coefficients; finer ones untouched
 }
 
 int runWaveletBench(const std::string& outPath) {
@@ -185,6 +199,148 @@ int runWaveletBench(const std::string& outPath) {
     std::copy(original.begin(), original.end(), mm.disp.begin());
     md << "\nValues written today: grid points the brush visited (MicroStroke::points). The wavelet dab's cost follows "
           "the lattice points, so it falls (relative to today) as the brush grows.\n";
+    if (outPath.empty()) std::printf("%s", md.str().c_str());
+    else std::ofstream(outPath) << md.str();
+    return 0;
+}
+
+int runWaveletStrokeBench(const std::string& outPath) {
+    using Clock = std::chrono::steady_clock;
+    auto ms = [](Clock::time_point a, Clock::time_point b) { return std::chrono::duration<double, std::milli>(b - a).count(); };
+    if (simulatedFloorTier()) ThreadPool::setSharedThreadCount(4); // SF_HW_SIMULATE=floor: 4 cores
+    std::fprintf(stderr, "core-200m N2 stroke: building a Micro 7 head...\n");
+    Mesh m = makeCore200mMesh(20000, 7);
+    if (!m.micro) return 1;
+    BVH bvh;
+    bvh.build(m);
+    MicroMesh& mm = mutableMicro(m);
+    mm.ensureTopology(m);
+    const AABB box = m.bounds();
+    const float height = box.max.y - box.min.y;
+    // Room for the largest stroke up front, so no run rescales the heights (every run in one unit).
+    mm.widen(float(mm.rangeMax) * mm.step + 0.2f * height * 0.06f * 0.5f * 12.0f);
+    const std::vector<int16_t> original(mm.disp.begin(), mm.disp.end());
+    const std::vector<uint16_t> originalRange = mm.triRange;
+    const uint16_t originalRangeMax = mm.rangeMax;
+    const float step0 = mm.step;
+    auto reset = [&] {
+        std::copy(original.begin(), original.end(), mm.disp.begin());
+        mm.triRange = originalRange;
+        mm.rangeMax = originalRangeMax;
+        mm.clearDirty();
+    };
+    const glm::vec3 c = (box.min + box.max) * 0.5f;
+    MicroShader shader;
+    std::vector<uint32_t> written, dirty;
+    auto scratch = [&](uint32_t) -> uint32_t* {
+        thread_local std::vector<uint32_t> tile;
+        tile.resize(mm.samples);
+        return tile.data();
+    };
+    shader.shade(m, {}, true, written, scratch); // (the first full pass, as the renderer's)
+    mm.clearDirty();
+    constexpr int kDabs = 30;
+    constexpr double kPenMs = 1000.0 / 120.0, kFrameMs = 1000.0 / 60.0, kBudgetMs = 10.0;
+    std::ostringstream md;
+    md << "## Wavelet strokes (N2 in MicroStroke): " << double(mm.microTriangles()) / 1e6 << "M micro triangles, Micro " << mm.level
+       << ", " << ThreadPool::shared().threads() << " threads\n\n"
+       << "Standard, strength 0.5, " << kDabs << " dabs 0.1 radius apart across the face; the pen delivers a dab every "
+       << kPenMs << " ms; a frame places the dabs that have arrived (pick + dab, at least one, until 10 ms), rebuilds the "
+          "changed patches (wavelet), shades what changed (MicroShader, the renderer's CPU part) and waits for the next "
+          "60 Hz tick. Lag = a dab's arrival to the end of the frame that shows it. Error against the exact brush (every "
+          "fine point) as a share of the stroke's height. Runs interleaved: off, on, off, on.\n\n"
+       << "| Radius | brush | lattice | dabs / frame | dab (pick + dab) | rebuild / frame | shading / frame | stroke end | stroke total | "
+          "lag p50 / max | error mean / max |\n|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n";
+    for (float frac : {0.025f, 0.05f, 0.1f, 0.2f}) {
+        const float r = frac * height;
+        // The path: picks on the untouched surface (every run then places the same dabs; each still picks for real).
+        std::vector<glm::vec3> centers, origins;
+        for (int i = 0; i < kDabs; ++i) {
+            const glm::vec3 o(c.x - 1.5f * r + 0.1f * r * float(i), c.y + 0.05f * height + 0.1f * r * std::sin(float(i) * 0.3f), box.max.z + height);
+            RayHit hit;
+            if (surfaceRaycast(m, bvh, o, glm::vec3(0, 0, -1), hit)) centers.push_back(hit.position), origins.push_back(o);
+        }
+        auto stroke = [&](MicroStroke& st) {
+            st.begin(m);
+            for (const glm::vec3& p : centers)
+                st.dab(m, bvh, BrushType::Standard, p, glm::vec3(0, 0, -1), r, 0.5f, false, 0.0f, glm::vec3(0, 1, 0), false, 0.0f);
+            st.end(m);
+        };
+        reset();
+        MicroStroke exactStroke;
+        exactStroke.adaptive = false;
+        exactStroke.wavelet = false;
+        stroke(exactStroke);
+        const std::vector<int16_t> exact(mm.disp.begin(), mm.disp.end());
+        for (int run = 0; run < 4; ++run) {
+            const bool on = run & 1;
+            reset();
+            MicroStroke st;
+            st.wavelet = on;
+            st.begin(m);
+            std::vector<double> lags;
+            double dabMs = 0, rebuildMs = 0, shadeMs = 0;
+            int frames = 0;
+            size_t next = 0;
+            const auto t0 = Clock::now();
+            while (next < centers.size()) {
+                const auto frame = Clock::now();
+                std::vector<double> arrivals;
+                while (next < centers.size()) {
+                    const double arrival = double(next) * kPenMs;
+                    if (arrival > ms(t0, Clock::now()) && !arrivals.empty()) break;
+                    if (arrival > ms(t0, Clock::now())) std::this_thread::sleep_until(t0 + std::chrono::microseconds(int64_t(arrival * 1000.0)));
+                    const auto d0 = Clock::now();
+                    RayHit hit;
+                    surfaceRaycast(m, bvh, origins[next], glm::vec3(0, 0, -1), hit); // (the pick, as the app's; reads the heights)
+                    st.dab(m, bvh, BrushType::Standard, centers[next], glm::vec3(0, 0, -1), r, 0.5f, false, 0.0f, glm::vec3(0, 1, 0), false, 0.0f);
+                    dabMs += ms(d0, Clock::now());
+                    arrivals.push_back(arrival);
+                    ++next;
+                    if (ms(frame, Clock::now()) >= kBudgetMs) break;
+                }
+                const double f0 = st.flushMs;
+                st.flush(m);
+                rebuildMs += st.flushMs - f0;
+                const auto s0 = Clock::now();
+                dirty.clear();
+                for (size_t w = 0; w < mm.dirtyBits.size(); ++w)
+                    for (uint64_t bits = mm.dirtyBits[w]; bits; bits &= bits - 1) dirty.push_back(uint32_t(w * 64 + size_t(std::countr_zero(bits))));
+                shader.shade(m, dirty, mm.allDirty, written, scratch);
+                mm.clearDirty();
+                shadeMs += ms(s0, Clock::now());
+                const double shown = ms(t0, Clock::now());
+                for (double a : arrivals) lags.push_back(shown - a);
+                ++frames;
+                const auto tick = frame + std::chrono::microseconds(int64_t(kFrameMs * 1000.0));
+                if (Clock::now() < tick && next < centers.size()) std::this_thread::sleep_until(tick);
+            }
+            const auto e0 = Clock::now();
+            st.end(m);
+            const double endMs = ms(e0, Clock::now()), totalMs = ms(t0, Clock::now());
+            std::sort(lags.begin(), lags.end());
+            double sum = 0, worst = 0, h = 0;
+            size_t count = 0;
+            for (size_t k = 0; k < exact.size(); ++k) {
+                const double dc = std::abs(int(exact[k]) - int(original[k]));
+                h = std::max(h, dc);
+                const double dw = std::abs(int(mm.disp[k]) - int(exact[k]));
+                if (dc == 0 && dw == 0) continue;
+                sum += dw, worst = std::max(worst, dw), ++count;
+            }
+            const double scale = 100.0 / std::max(h, 1.0);
+            char row[512];
+            std::snprintf(row, sizeof row, "| %.0f px | %s | %u (%llu wavelet dabs) | %.1f | %.2f ms | %.2f ms | %.2f ms | %.1f ms | %.0f ms | %.0f / %.0f ms | %.3f%% / %.2f%% |\n",
+                          double(frac * 1080.0f), on ? "wavelet" : "today", st.lastStride, (unsigned long long)st.waveletDabs, double(centers.size()) / double(std::max(frames, 1)),
+                          dabMs / double(std::max<size_t>(centers.size(), 1)), rebuildMs / double(std::max(frames, 1)),
+                          shadeMs / double(std::max(frames, 1)), endMs, totalMs, lags.empty() ? 0.0 : lags[lags.size() / 2],
+                          lags.empty() ? 0.0 : lags.back(), sum / double(std::max<size_t>(count, 1)) * scale, worst * scale);
+            md << row;
+            std::fprintf(stderr, "%s", row);
+        }
+    }
+    reset();
+    if (mm.step != step0) md << "\n(The heights were rescaled during a run: the error column is not comparable.)\n";
     if (outPath.empty()) std::printf("%s", md.str().c_str());
     else std::ofstream(outPath) << md.str();
     return 0;

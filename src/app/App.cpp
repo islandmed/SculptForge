@@ -2049,6 +2049,7 @@ void App::drainStrokeDabs(double budgetSeconds) {
             std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() >= budgetSeconds)
             break; // at least one dab per call, so a stroke always moves on
     }
+    doc_.sculptor.flushMicro(doc_.mesh); // (a wavelet stroke's patches: their heights once for this frame)
     if (log) {
         const SculptTimings& t = doc_.sculptor.timings;
         SDL_Log("stroke: %llu waiting, %llu placed in %.1f ms (kernel %.1f, normals %.1f, BVH %.1f, %llu vertices), %llu left",

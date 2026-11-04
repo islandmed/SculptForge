@@ -20,6 +20,12 @@ namespace sf {
 // In place, heights -> coefficients (finest spacing first) and back (coarsest first). n = 2^L, (n+1)(n+2)/2 values.
 void waveletForward(int16_t* grid, uint32_t n);
 void waveletInverse(int16_t* grid, uint32_t n);
+// Lattice form, in between: the points of the spacing-`s` lattice hold their heights, the finer points their
+// coefficients. From coefficients (the coarser stages undone) and back, or from heights (the finer stages done); each
+// costs the points it changes: (n/s+1)(n/s+2)/2 for the first two.
+void waveletToLattice(int16_t* coeffs, uint32_t n, uint32_t s);
+void waveletFromLattice(int16_t* grid, uint32_t n, uint32_t s);
+void waveletHeightsToLattice(int16_t* heights, uint32_t n, uint32_t s);
 // Coefficients of one patch: adds delta(i, j, height) (in units of the height step; i, j on the spacing-`s` lattice,
 // `height` the point's current height) to the lattice points, touching only that lattice's coefficients
 // ((n/s+1)(n/s+2)/2 points).
@@ -28,5 +34,10 @@ void waveletAddCoarse(int16_t* coeffs, uint32_t n, uint32_t s, const std::functi
 // sculptforge --bench-wavelet / sculptforge-cli --bench-wavelet: a micro head (Micro 7), a Standard dab of growing
 // radius on today's adaptive micro brush against the coarse wavelet edit; Markdown to `outPath` (or stdout).
 int runWaveletBench(const std::string& outPath);
+// sculptforge --bench-wavelet-stroke: the same head, a 30-dab Standard stroke at 27 / 54 / 108 / 216 px through a
+// frame loop (pen at 120 Hz, dabs placed within 10 ms a frame, then the frame's rebuild and shading, 60 Hz), today's
+// brush against MicroStroke::wavelet, interleaved: per-dab cost, per-frame rebuild and shading, stroke total, lag,
+// and both against the exact brush.
+int runWaveletStrokeBench(const std::string& outPath);
 
 } // namespace sf

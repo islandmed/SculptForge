@@ -296,6 +296,50 @@ transform of the touched patches, needed only for what is drawn or picked (defer
 - **Next:** N2 inside MicroStroke behind a flag (coarse path for radii spanning > 64 samples), reconstruct-on-draw in the
   renderer's sync, then the same idea on the multires mesh path (betaboost's scale-adaptive dabs are its safe first step).
 
+### N2 in a real stroke (`MicroStroke::wavelet`, `SF_MICRO_WAVELET=1`, `sculptforge --bench-wavelet-stroke`)
+
+N2 runs inside MicroStroke behind a flag (off by default). A Standard, Inflate or Clay dab whose radius spans >= 64
+points of a lattice at least 4x coarser than the grid keeps the patches it changes as coefficients in a side buffer for
+the rest of the stroke (the heights in `disp` stay as they were) and adds its kernel to that lattice only (the plane and
+area normal as the brush computes them, on the lattice). Each changed patch's heights are rebuilt from its coefficients
+once a frame (`Sculptor::flushMicro`, after the frame's dabs), or earlier for the few patches the brush's pick reads
+(`MicroMesh::lazy`, from microRaycast), any other brush (Smooth, Flatten, Pinch, Move, mask: their patches rebuilt and
+taken off coefficients first), a rescale, undo or the stroke's end. Shared edges stay bit-identical without stitching
+(an edge's lifting reads only that edge, symmetric in its two parents, and both sides add the same kernel values); a
+mask or a hidden neighbour under the dab sends it to today's path; undo tiles are saved from the heights before the
+first change, so undo / redo stay bit-exact (tests: micro_wavelet_stroke_matches_exact, micro_wavelet_stroke_reads_and_masks).
+
+A 30-dab Standard stroke (strength 0.5, dabs 0.1 radius apart) on the Micro 7 head (314.6M micro triangles) through a
+frame loop: the pen delivers a dab every 8.3 ms (120 Hz), a frame places what has arrived (pick + dab) for up to 10 ms
+(the app's budget), rebuilds (wavelet), shades what changed (MicroShader, the renderer's CPU part), and waits for the
+next 60 Hz tick. Lag = a dab's arrival to the end of the frame that shows it. Two interleaved runs each (off, on, off,
+on); floor = `SF_HW_SIMULATE=floor SF_GOVERNOR=0` (4 threads), load 1.6-2.0 at the start of each pass.
+
+| radius | lattice | | dab (pick + dab) | rebuild / frame | shading / frame | stroke total | lag p50 / max | error vs exact, mean / max |
+|---|---|---|---|---|---|---|---|---|
+| 27 px | 2 (today's path) | floor, off / on | 1.6-1.8 / 2.0-2.1 ms | - | 7-9 ms | 261-263 / 255-263 ms | 18-19 / 19-21 ms | 0.027% / 0.99% |
+| 54 px | 4 | floor, off | 2.4-2.5 ms | - | 11.3-11.5 ms | 265-273 ms | 22 / 35-39 ms | 0.013% / 0.45% |
+| | | floor, on | 1.6-2.3 ms | 0.3-0.4 ms | 9.7-10.0 ms | 268-274 ms | 19-20 / 24-31 ms | 0.026% / 0.45% |
+| 108 px | 8 | floor, off | 5.4-5.5 ms | - | 28.3-28.5 ms | 544-574 ms | 157-199 / 289-319 ms | 0.019% / 0.48% |
+| | | floor, on | 2.6-2.9 ms | 1.5 ms | 25.6-27.3 ms | 307-330 ms | 51-70 / 77-93 ms | 0.024% / 0.50% |
+| 216 px | 16 | floor, off | 21.7-22.1 ms | - | 89.4-89.7 ms | 3,375-3,397 ms | 1,624-1,627 / 3,090-3,112 ms | 0.014% / 0.60% |
+| | | floor, on | 3.7-4.3 ms | 5.3-5.5 ms | 89.6-94.2 ms | 1,051-1,216 ms | 416-501 / 768-931 ms | 0.017% / 0.59% |
+| 108 px | 8 | laptop, off / on | 3.5-3.7 / 1.9-2.1 ms | - / 0.6 ms | 13.7-14.8 / 12.0 ms | 285-286 / 276-281 ms | 29-33 / 22 ms | as floor |
+| 216 px | 16 | laptop, off / on | 12.2-12.3 / 3.1 ms | - / 2.7-2.8 ms | 45.8-46.0 / 45.9-46.2 ms | 1,649 / 570 ms | 713-737 / 160-174 ms | as floor |
+
+- **It wins on the floor from 54 px up, with the same output.** At 216 px a dab costs 3.7-4.3 ms instead of 22 ms, the
+  stroke is done in 1.1-1.2 s instead of 3.4 s and the median lag falls from 1.6 s to 0.42-0.50 s (laptop: 0.71 s to
+  0.17 s). At 108 px the lag falls 3x (157-199 to 51-70 ms). Against the exact brush the wavelet stroke is within 0.6%
+  of the stroke's height at the worst point (today's adaptive brush: the same, 0.45-0.99%).
+- **The lattice must be >= 4x coarser.** At spacing 2 (27 px here) a first run of the wavelet path cost more than
+  today's brush (dab 3.1-3.6 vs 1.9-2.5 ms on the floor, lag p50 23-27 vs 18-21 ms: the rebuild and the coefficients'
+  bookkeeping cost what the lattice saves), so such dabs take today's path (`kWaveletMinSpacing`).
+- **Shading is now the wall.** At 216 px the renderer's CPU shading of the changed patches and their neighbours takes
+  ~90 ms a frame on the floor (46 ms on the laptop) in both modes: the brush is no longer what limits a big stroke. Next:
+  shade the rebuilt patches at the lattice resolution while the stroke runs (full shading at the end, or on the GPU),
+  which is the same idea one stage further down the pipeline.
+- **Windows PC:** see REPORT.md (CI Windows build of research/n2-stroke; a sanity check only, not the target).
+
 N3-N5 are designed (§7b), not built: N3 builds on N2's coefficients as its cache; N4 and N5 attach to N1 and the
 renderer.
 

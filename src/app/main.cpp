@@ -168,6 +168,10 @@ int main(int argc, char** argv) {
             const std::string out = i + 1 < argc && argv[i + 1][0] != '-' ? argv[++i] : std::string();
             return sf::runWaveletBench(out);
         }
+        if (std::string(argv[i]) == "--bench-wavelet-stroke") { // research (N2 in MicroStroke), CPU only
+            const std::string out = i + 1 < argc && argv[i + 1][0] != '-' ? argv[++i] : std::string();
+            return sf::runWaveletStrokeBench(out);
+        }
         if (a == "--calibrate") calibrate = true;
         else if (a == "--calibrate-quick") calibrate = calibrateQuick = true;
         else if (a == "--calibrate-no-save") calibrateSave = false;

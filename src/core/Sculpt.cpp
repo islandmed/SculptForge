@@ -409,6 +409,13 @@ bool Sculptor::microReady(Mesh& mesh) {
     return true;
 }
 
+void Sculptor::flushMicro(Mesh& mesh) {
+    if (!micro_.active() || microMesh_ != &mesh) return;
+    const double f0 = micro_.flushMs;
+    micro_.flush(mesh);
+    timings.normalsMs += micro_.flushMs - f0;
+}
+
 void Sculptor::remeshDab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym, float scale, float reach) {
     if (!dyntopo.enabled || topologyHeld_) return;
     auto clock = std::chrono::steady_clock::now();

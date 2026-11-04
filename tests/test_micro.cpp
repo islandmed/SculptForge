@@ -626,3 +626,104 @@ TEST(wavelet_round_trip_and_coarse_edit) {
     for (uint32_t k = 0; k < S; ++k) worst = std::max(worst, std::abs(int(g[k]) - int(orig[k]) - 500));
     CHECK(worst <= 3); // (floor averages round at most once per finer level: 3 levels below spacing 8)
 }
+
+namespace {
+
+// A stroke of `dabs` dabs across the sphere's front, the heights rebuilt (as a frame would) every third dab.
+void waveletTestStroke(Document& d, BrushType type, float r, int dabs) {
+    Symmetry sym;
+    d.sculptor.beginStroke(d.mesh, "Stroke");
+    for (int i = 0; i < dabs; ++i) {
+        const float x = -0.3f + 0.6f * float(i) / float(std::max(dabs - 1, 1));
+        d.sculptor.dab(d.mesh, d.bvh, type, dabAt(glm::vec3(x, 0.1f, std::sqrt(1.0f - x * x - 0.01f)), r), sym);
+        if (i % 3 == 2) d.sculptor.flushMicro(d.mesh);
+    }
+    d.undo.push(d.sculptor.endStroke());
+}
+
+} // namespace
+
+TEST(micro_wavelet_stroke_matches_exact) {
+    // N2 in MicroStroke: Standard, Clay and Inflate strokes on the wavelet lattice land within 1% of the stroke's
+    // height of the exact brush (every fine point evaluated), as today's adaptive brush does; undo and redo are
+    // bit-exact and the surface stays closed.
+    for (BrushType type : {BrushType::Standard, BrushType::Clay, BrushType::Inflate}) {
+        Document exact = microDoc(5), today = microDoc(5), wave = microDoc(5);
+        exact.sculptor.microStroke().adaptive = false;
+        exact.sculptor.microStroke().wavelet = today.sculptor.microStroke().wavelet = false;
+        wave.sculptor.microStroke().wavelet = true;
+        const std::vector<int16_t> before = wave.mesh.micro->disp;
+        for (Document* d : {&exact, &today, &wave}) waveletTestStroke(*d, type, 0.4f, 12);
+        CHECK(wave.sculptor.microStroke().waveletDabs >= 12);
+        CHECK(wave.sculptor.microStroke().lastStride >= MicroStroke::kWaveletMinSpacing);
+        CHECK(today.sculptor.microStroke().waveletDabs == 0);
+        const MicroMesh &e = *exact.mesh.micro, &t = *today.mesh.micro, &w = *wave.mesh.micro;
+        CHECK(e.step == w.step && e.step == t.step);
+        int height = 0, errW = 0, errT = 0;
+        double sumW = 0, sumT = 0;
+        size_t changed = 0;
+        for (size_t k = 0; k < e.disp.size(); ++k) {
+            const int de = int(e.disp[k]), dc = std::abs(de - int(before[k]));
+            height = std::max(height, dc);
+            if (!dc && w.disp[k] == before[k]) continue;
+            ++changed;
+            errW = std::max(errW, std::abs(int(w.disp[k]) - de)), sumW += std::abs(int(w.disp[k]) - de);
+            errT = std::max(errT, std::abs(int(t.disp[k]) - de)), sumT += std::abs(int(t.disp[k]) - de);
+        }
+        std::printf("  wavelet stroke %d: height %d units, wavelet max %.2f%% mean %.3f%%, today max %.2f%% mean %.3f%%\n", int(type),
+                    height, 100.0 * errW / height, 100.0 * sumW / double(changed) / height, 100.0 * errT / height,
+                    100.0 * sumT / double(changed) / height);
+        CHECK(height > 100);
+        CHECK(errW <= height / 100);
+        CHECK(errT <= height / 100);
+        CHECK(watertight(wave.mesh));
+        const std::vector<int16_t> after = w.disp;
+        CHECK(wave.undo.undo(wave.mesh, wave.bvh));
+        CHECK(wave.mesh.micro->disp == before);
+        CHECK(wave.undo.redo(wave.mesh, wave.bvh));
+        CHECK(wave.mesh.micro->disp == after);
+    }
+}
+
+TEST(micro_wavelet_stroke_reads_and_masks) {
+    Document doc = microDoc(5);
+    MicroStroke& ms = doc.sculptor.microStroke();
+    ms.wavelet = true;
+    Symmetry sym;
+    sym.x = false;
+    // The pick sees a dab the frame hasn't rebuilt yet (MicroMesh::lazy), and the surface is closed meanwhile.
+    const float h0 = frontHeight(doc);
+    doc.sculptor.beginStroke(doc.mesh, "Standard");
+    doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::Standard, dabAt(glm::vec3(0, 0, 1), 0.4f), sym);
+    CHECK(ms.waveletDabs == 1);
+    CHECK(frontHeight(doc) > h0 + 0.005f);
+    doc.sculptor.flushMicro(doc.mesh);
+    CHECK(watertight(doc.mesh));
+    // A Smooth dab in the same stroke works on the rebuilt heights.
+    doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::Smooth, dabAt(glm::vec3(0, 0, 1), 0.2f), sym);
+    doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::Standard, dabAt(glm::vec3(0.1f, 0, 0.995f), 0.4f), sym);
+    doc.undo.push(doc.sculptor.endStroke());
+    CHECK(ms.waveletDabs == 2);
+    CHECK(watertight(doc.mesh));
+    // Mask a spot, then stroke over it: the masked points don't move.
+    doc.sculptor.beginStroke(doc.mesh, "Mask");
+    for (int i = 0; i < 4; ++i) doc.sculptor.dabMask(doc.mesh, doc.bvh, dabAt(glm::vec3(0, 0, 1), 0.15f, 1.0f), sym);
+    doc.undo.push(doc.sculptor.endStroke());
+    const std::vector<int16_t> masked = doc.mesh.micro->disp;
+    const uint64_t w0 = ms.waveletDabs;
+    doc.sculptor.beginStroke(doc.mesh, "Standard");
+    for (int i = 0; i < 6; ++i)
+        doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::Standard, dabAt(glm::vec3(-0.25f + 0.1f * float(i), 0, 0.97f), 0.4f), sym);
+    doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::Standard, dabAt(glm::vec3(0, 0, -1), 0.4f), sym); // (no mask there)
+    doc.undo.push(doc.sculptor.endStroke());
+    CHECK(ms.waveletDabs == w0 + 1);
+    const MicroMesh& mm = *doc.mesh.micro;
+    size_t full = 0;
+    for (size_t k = 0; k < mm.disp.size(); ++k)
+        if (mm.mask[k] == 255) {
+            ++full;
+            CHECK(mm.disp[k] == masked[k]);
+        }
+    CHECK(full > 100);
+    CHECK(watertight(doc.mesh));
+}
