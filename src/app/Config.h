@@ -109,6 +109,11 @@ struct UiPrefs {
     bool liveMove = false;
     bool backgroundPreview = false;
     bool fastUpload = false;
+    // Fast big brushes (Sculptor::adaptiveDabs, core/SculptBatch.cpp): a big brush's dabs take their plane from a
+    // sample of the region, carry the normals along with the move (the exact ones follow), and the dabs waiting
+    // for a frame go through the vertices together. The result matches the dab-by-dab stroke to within about 2% of
+    // how far it moved the surface (tests/test_beta_boost.cpp). On by default.
+    bool fastBigBrushes = true;
     // Dynamic topology (Draw palette): false = the detail follows the brush size on screen (Sculptris Pro);
     // true = one detail size for the whole mesh.
     bool dyntopoConstantDetail = false;

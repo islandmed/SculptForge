@@ -41,6 +41,7 @@ add_library(sculptforge_core STATIC
   src/core/TierConfig.cpp
   src/core/MemoryGuard.cpp
   src/core/Sculpt.cpp
+  src/core/SculptBatch.cpp
   src/core/Dyntopo.cpp
   src/core/DyntopoCommands.cpp
   src/core/Undo.cpp

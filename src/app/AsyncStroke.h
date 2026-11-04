@@ -37,6 +37,8 @@ struct App::StrokeSolver {
     uint32_t uploadId = 0;        // the active SubTool's renderer slot
     bool prepare = true;          // pack the upload on the thread
     bool finalize = false;        // before the batch: Sculptor::flushDraft (a draft stroke's end)
+    bool catchUp = false;         // after the batch (no dabs were waiting): Sculptor::catchUpNormals, this many leaves
+    size_t catchUpLeaves = 16384; // (about 150,000 vertices: a few ms)
     // Kelvinlet strokes (PanelKelvinlet.cpp): after the batch's dabs, these moves (taken on the main thread, by
     // value) and, when kelvinFar, one group of the deferred far field.
     std::vector<KelvinletStep> kelvinSteps;

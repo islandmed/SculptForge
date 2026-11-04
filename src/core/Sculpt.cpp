@@ -1,14 +1,17 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Sculpt.h"
+#include "core/SculptKernel.h"
 
 #include "core/AtomicRef.h"
 #include "core/BrushAlpha.h"
 #include "core/ThreadPool.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cctype>
 #include <cmath>
+#include <iterator>
 #include <limits>
 #include <unordered_map>
 
@@ -392,6 +395,10 @@ bool Sculptor::beginStroke(const Mesh& mesh, std::string label, int layer) {
     draft_ = draftStrokes && !dyntopo.enabled;
     draftStrokes = false; // (asked for per stroke)
     draftLeaves_.clear();
+    dropLazy(); // (a stroke that never ended)
+    pending_.clear();
+    lastRegion_ = 0;
+    lastRegionRadius_ = 0.0f;
     strokeDiagonal_ = 0.0f;
     lastRemesh_ = false;
     topologyHeld_ = false;
@@ -591,7 +598,8 @@ void Sculptor::moveVertices(Mesh& mesh, BVH& bvh, std::span<const uint32_t> vert
     else bvh.refit(mesh, verts);
 }
 
-void Sculptor::displaceAll(Mesh& mesh, std::span<const uint32_t> verts, std::span<const glm::vec3> d, bool influence) {
+void Sculptor::displaceAll(Mesh& mesh, std::span<const uint32_t> verts, std::span<const glm::vec3> d, bool influence,
+                           const float* given) {
     const size_t n = verts.size();
     if (dynTopo_.active()) // the remesher's record keeps them (see touch); their bits then keep them out of ours
         for (uint32_t v : verts)
@@ -603,7 +611,7 @@ void Sculptor::displaceAll(Mesh& mesh, std::span<const uint32_t> verts, std::spa
     poolFor(n, [&](size_t b, size_t e) {
         uint32_t count = 0;
         for (size_t i = b; i < e; ++i) {
-            const float k = influence ? vertexInfluence(mesh, verts[i]) : 1.0f;
+            const float k = given ? given[i] : influence ? vertexInfluence(mesh, verts[i]) : 1.0f;
             influence_[i] = k;
             firstTouch_[i] = k > 0.0f && markBit(touched_, verts[i]);
             count += firstTouch_[i];
@@ -635,7 +643,61 @@ void Sculptor::displaceAll(Mesh& mesh, std::span<const uint32_t> verts, std::spa
     }, kBlock);
 }
 
+void Sculptor::flushLazy(Mesh& mesh, const BVH& bvh, std::span<const uint32_t> leaves) {
+    if (leaves.empty()) return;
+    const std::vector<uint32_t> keep = std::move(dabLeaves_);
+    dabLeaves_.assign(leaves.begin(), leaves.end());
+    const bool draft = draft_;
+    draft_ = false; // (updateDabNormals in full)
+    updateDabNormals(mesh, bvh);
+    draft_ = draft;
+    dabLeaves_ = keep;
+}
+
+void Sculptor::dropLazy() {
+    if (lazyCount_ > 0) {
+        std::vector<uint32_t> drop;
+        lazyLeaves_.take(drop);
+        lazyCount_ = 0;
+    }
+    lastLazyLeaves_.clear();
+}
+
+void Sculptor::addLazyLeaves(const BVH& bvh, std::span<const uint32_t> leaves) {
+    if (leaves.empty()) return;
+    if (lazyLeaves_.capacity() < bvh.nodeCount()) {
+        std::vector<uint32_t> keep;
+        if (lazyCount_ > 0) lazyLeaves_.take(keep);
+        lazyLeaves_.resize(bvh.nodeCount());
+        for (uint32_t l : keep) lazyLeaves_.insertLocal(l);
+    }
+    lazyLeaves_.insertParallel(leaves.size(), 16384, [&](size_t b, size_t e, IndexBits& set) {
+        for (size_t i = b; i < e; ++i) set.insertLocal(leaves[i]);
+    });
+    lazyCount_ += leaves.size();
+}
+
+void Sculptor::catchUpNormals(Mesh& mesh, const BVH& bvh, size_t maxLeaves) {
+    if (lazyCount_ == 0 || &mesh != lazyMesh_) return;
+    std::vector<uint32_t> leaves;
+    lazyLeaves_.take(leaves);
+    lazyCount_ = 0;
+    if (leaves.size() > maxLeaves) { // the rest stay pending
+        for (size_t i = maxLeaves; i < leaves.size(); ++i) lazyLeaves_.insertLocal(leaves[i]);
+        lazyCount_ = leaves.size() - maxLeaves;
+        leaves.resize(maxLeaves);
+    }
+    flushLazy(mesh, bvh, leaves);
+}
+
 void Sculptor::flushDraft(Mesh& mesh, const BVH& bvh) {
+    if (lazyCount_ > 0 && &mesh == lazyMesh_) {
+        std::vector<uint32_t> leaves;
+        lazyLeaves_.take(leaves);
+        lazyCount_ = 0;
+        lastLazyLeaves_.clear();
+        flushLazy(mesh, bvh, leaves);
+    }
     if (!draft_ || draftLeaves_.empty()) return;
     std::sort(draftLeaves_.begin(), draftLeaves_.end());
     draftLeaves_.erase(std::unique(draftLeaves_.begin(), draftLeaves_.end()), draftLeaves_.end());
@@ -647,6 +709,13 @@ void Sculptor::flushDraft(Mesh& mesh, const BVH& bvh) {
 }
 
 UndoRecord Sculptor::endStroke() {
+    if (!pending_.empty() && pendingMesh_ && pendingBvh_) flushBatch(*pendingMesh_, *pendingBvh_); // (callers that didn't)
+    pending_.clear();
+    batching_ = false;
+    if (lazyCount_ > 0 && lazyMesh_ && lazyBvh_) flushDraft(*lazyMesh_, *lazyBvh_); // (callers that didn't)
+    dropLazy();
+    lazyMesh_ = nullptr;
+    lazyBvh_ = nullptr;
     if (dynTopo_.active()) {
         Mesh& mesh = *dynTopo_.strokeMesh();
         std::unique_ptr<TopologyUndo> topo = dynTopo_.finish(mesh, *dynTopo_.strokeBvh());
@@ -716,6 +785,15 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
         ++timings.dabs;
         return;
     }
+    lastFusable_ = adaptiveDabs && isPlaneKernelBrush(type) && type != BrushType::Trim && !(p.alpha && !p.alpha->empty()) &&
+                   !p.frontFacesOnly && !p.connectedOnly && !p.viewFalloff && !dyntopo.enabled;
+    if (batching_ && batchable(mesh, type, p, sym)) { // a fused batch's (SculptBatch.cpp)
+        pending_.push_back({type, p, sym});
+        pendingMesh_ = &mesh;
+        pendingBvh_ = &bvh;
+        return;
+    }
+    if (!pending_.empty()) flushBatch(mesh, bvh);
     if (type != BrushType::Move && type != BrushType::Morph) { // (Morph needs the vertices the target has)
         const bool useAlpha = p.alpha && !p.alpha->empty(); // (the reach dabSingle gives the brush)
         const float reach = useAlpha ? kAlphaReach : type == BrushType::ClayBuildup ? 1.3f : 1.0f;
@@ -725,13 +803,14 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
     }
     dabVerts_.clear();
     dabLeaves_.clear();
+    lastLazyLeaves_.clear();
     for (const SymCopy& m : copies(sym)) {
         frameWanted_ = m.identity(); // (the unmirrored pass records lastFrame)
         const DabParams mp = m.identity() ? p : transformed(p, m);
         if (type == BrushType::Vdm) dabVdmSingle(mesh, bvh, mp, m.handedness());
         else dabSingle(mesh, bvh, type, mp);
     }
-    updateDabNormals(mesh, bvh);
+    if (!dabVerts_.empty() || !dabLeaves_.empty() || lastLazyLeaves_.empty()) updateDabNormals(mesh, bvh);
     if (type != BrushType::Move) repairDab(mesh, bvh);
 }
 
@@ -751,9 +830,28 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
         if (verts_.empty()) return;
     }
 
+    // Scale-adaptive dabs (Sculpt.h, adaptiveDabs): a big region's plane from an even sample of its vertices.
+    adaptiveDab_ = adaptiveDabs && !dynTopo_.active() && !draft_ && verts_.size() >= kAdaptiveMinVertices &&
+                   type != BrushType::Smooth && type != BrushType::Layer && type != BrushType::Morph &&
+                   // (an alpha's fine pattern or Clay Block's square tip, which turn with the area normal, and the brushes that move along each vertex's own normal amplify a
+                   // hair's difference in the normals the next dabs read)
+                   type != BrushType::Nudge && type != BrushType::Inflate && type != BrushType::ClayBuildup && !useAlpha &&
+                   mesh.normals.size() == mesh.vertexCount();
+    if (adaptiveDab_ && (mesh.mask.size() == mesh.vertexCount() || mesh.hasHidden())) {
+        // A mask's edge is a step the adaptive normals don't see (they follow the brush, not the mask): regions
+        // with any of it take the exact path.
+        std::atomic<bool> masked{false};
+        poolFor(verts_.size(), [&](size_t b, size_t e) {
+            for (size_t i = b; i < e && !masked.load(std::memory_order_relaxed); ++i)
+                if (vertexInfluence(mesh, verts_[i]) < 1.0f) masked.store(true, std::memory_order_relaxed);
+        }, 65536);
+        adaptiveDab_ = !masked.load();
+    }
+    const size_t stride = adaptiveDab_ ? std::max<size_t>(1, verts_.size() / kAreaSamples) : 1;
+
     // Weighted area normal and centre of the brush region.
-    const AreaSums sums = areaSums(verts_.size(), [&](size_t i, AreaSums& acc) {
-        const uint32_t v = verts_[i];
+    const AreaSums sums = areaSums((verts_.size() + stride - 1) / stride, [&](size_t i, AreaSums& acc) {
+        const uint32_t v = verts_[i * stride];
         float w = brushFalloff(brushDistance(p, pos[v]), p.radius, p.focal);
         acc.normal += nrm[v] * w;
         acc.center += pos[v] * w;
@@ -768,6 +866,8 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     if (frameWanted_) {
         lastFrame = {p.center, areaNormal, areaCenter, true};
         frameWanted_ = false;
+        lastRegion_ = verts_.size();
+        lastRegionRadius_ = p.radius;
     }
 
     const float s = std::clamp(p.strength, 0.0f, 1.0f) * std::clamp(p.pressure, 0.0f, 1.0f);
@@ -788,20 +888,34 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     const std::vector<glm::vec3>* morph = type == BrushType::Morph ? morphTarget(mesh) : nullptr;
     if (type == BrushType::Morph && !morph) return;
 
+    PlaneKernel plane;
+    plane.type = type;
+    plane.center = p.center;
+    plane.viewDir = p.viewDir;
+    plane.areaNormal = areaNormal;
+    plane.areaCenter = areaCenter;
+    plane.strokeDir = strokeDir;
+    plane.r = r;
+    plane.s = s;
+    plane.sign = sign;
+    plane.focal = p.focal;
+    plane.invert = p.invert;
+    plane.viewFalloff = p.viewFalloff;
+
     scratch_.resize(verts_.size());
-    // Each vertex's offset depends only on the positions before the dab (and, for Layer, on its own state).
-    poolFor(verts_.size(), [&](size_t begin, size_t end) {
-    for (size_t i = begin; i < end; ++i) {
-        const uint32_t v = verts_[i];
-        const glm::vec3& x = pos[v];
+    // Each vertex's offset depends only on the positions before the dab (and, for Layer, on its own state). The
+    // offset of the i-th vertex v if it were at x (x = pos[v] for the dab itself; the adaptive normals ask for
+    // points next to it, which only the brushes that read nothing but the place, and v's own normal, are asked).
+    const auto offset = [&](size_t i, uint32_t v, const glm::vec3& x) -> glm::vec3 {
         const glm::vec3 o = x - p.center;
         const float f = useAlpha ? p.alpha->stamp(glm::dot(o, right) / r, glm::dot(o, up) / r, p.focal)
                                  : brushFalloff(brushDistance(p, x), r, p.focal);
         glm::vec3 d(0.0f);
 
         switch (type) {
-        case BrushType::Standard:
-            d = areaNormal * (sign * s * r * 0.06f * f);
+        case BrushType::Standard: case BrushType::Flatten: case BrushType::Clay: case BrushType::Crease:
+        case BrushType::Pinch: case BrushType::DamStandard: case BrushType::Trim:
+            d = plane.offsetWith(x, f); // (core/SculptKernel.h)
             break;
         case BrushType::Inflate:
             d = nrm[v] * (sign * s * r * 0.05f * f);
@@ -834,38 +948,6 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
             d = (avg - x) * std::min(1.0f, s * f);
             break;
         }
-        case BrushType::Flatten: {
-            float h = glm::dot(x - areaCenter, areaNormal);
-            d = -areaNormal * (h * s * f * (p.invert ? -0.5f : 1.0f));
-            break;
-        }
-        case BrushType::Clay: {
-            // Raise a plane slightly above the surface and pull everything below up to it.
-            glm::vec3 planePoint = areaCenter + areaNormal * (sign * r * 0.05f * s);
-            float h = glm::dot(x - planePoint, areaNormal);
-            if (sign * h < 0.0f) d = -areaNormal * (h * f * clayPull(s));
-            break;
-        }
-        case BrushType::Crease: {
-            // Carves a sharp valley by default (raises a ridge when inverted).
-            float sharp = f * f;
-            d = areaNormal * (-sign * s * r * 0.05f * sharp);
-            d += projectOnPlane(p.center - x, areaNormal) * (0.25f * s * f);
-            break;
-        }
-        case BrushType::Pinch:
-            d = projectOnPlane(p.center - x, areaNormal) * (sign * 0.2f * s * f);
-            break;
-        case BrushType::DamStandard: {
-            // Narrow, deep V-groove (a ridge when inverted); the sides are always
-            // pinched in toward the stroke line, so the crease stays sharp.
-            const float core = f * f * f * f;
-            d = areaNormal * (-sign * s * r * 0.08f * core);
-            glm::vec3 pull = projectOnPlane(p.center - x, areaNormal);
-            pull -= strokeDir * glm::dot(pull, strokeDir);
-            d += pull * (0.3f * s * f);
-            break;
-        }
         case BrushType::ClayBuildup: {
             // Square tip (rounded corners) with a flat top: a raised plane that
             // everything below is pulled up to, so strokes build up in slabs.
@@ -896,14 +978,6 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
             d += side * (0.1f * s * f * std::min(1.0f, strokeLen / (0.1f * r)));
             break;
         }
-        case BrushType::Trim: {
-            // Trim Dynamic: a plane just below the area cuts off whatever sticks out
-            // above it (fills up to it when inverted). sqrt falloff for a crisp edge.
-            glm::vec3 planePoint = areaCenter - areaNormal * (sign * r * 0.02f * s);
-            float h = glm::dot(x - planePoint, areaNormal);
-            if (sign * h > 0.0f) d = -areaNormal * (h * std::min(1.0f, std::sqrt(f) * (0.5f + s)));
-            break;
-        }
         case BrushType::Layer: {
             // Each vertex rises to the stroke's height x falloff once; later dabs
             // only add what is missing, so overlaps within a stroke never stack.
@@ -930,9 +1004,57 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
         default:
             break;
         }
-        scratch_[i] = d;
+        return d;
+    };
+    if (!adaptiveDab_) {
+        poolFor(verts_.size(), [&](size_t begin, size_t end) {
+            for (size_t i = begin; i < end; ++i) scratch_[i] = offset(i, verts_[i], pos[verts_[i]]);
+        });
+    } else {
+        // The new normal from the displaced tangents: t + (offset(x + h t) - offset(x)) / h along two directions
+        // on the surface (first order in the brush's slope, exact for a plane); the cavity term each vertex had
+        // before the stroke moved it is kept for the GPU until the exact one catches up.
+        if (curvature_.size() != mesh.vertexCount() || curvatureMesh_ != &mesh) {
+            curvature_.assign(mesh.vertexCount(), 0.0f);
+            curvatureFilled_ = false;
+            curvatureMesh_ = &mesh;
+        }
+        if (curvatureStamp_.size() != mesh.vertexCount()) curvatureStamp_.assign(mesh.vertexCount(), 0);
+        const uint32_t stamp = uint32_t(strokeId_);
+        const float h = r * 1e-3f;
+        // The plane brushes carry the normals by their offset's derivative (core/SculptKernel.h); the others by
+        // finite differences.
+        const bool analytic = isPlaneKernelBrush(type) && !p.viewFalloff;
+        const float kexp = std::exp2(2.0f * std::clamp(p.focal, -1.0f, 1.0f));
+        std::vector<glm::vec3>& normals = mesh.normals;
+        poolFor(verts_.size(), [&](size_t begin, size_t end) {
+            for (size_t i = begin; i < end; ++i) {
+                const uint32_t v = verts_[i];
+                const glm::vec3 x = pos[v];
+                if (curvatureStamp_[v] != stamp) {
+                    curvatureStamp_[v] = stamp;
+                    curvature_[v] = mesh.curvatureAt(v);
+                }
+                const glm::vec3 n = normals[v];
+                if (analytic) { // (no mask here: such regions take the exact path)
+                    normals[v] = plane.offsetAndNormal(x, n, kexp, scratch_[i]);
+                    continue;
+                }
+                const glm::vec3 d = offset(i, v, x);
+                scratch_[i] = d;
+                const float k = vertexInfluence(mesh, v);
+                if (k <= 0.0f) continue;
+                const glm::vec3 t1 = glm::normalize(std::abs(n.x) < 0.9f ? glm::cross(n, glm::vec3(1, 0, 0))
+                                                                         : glm::cross(n, glm::vec3(0, 1, 0)));
+                const glm::vec3 t2 = glm::cross(n, t1);
+                const glm::vec3 a = t1 + (offset(i, v, x + t1 * h) - d) * (k / h);
+                const glm::vec3 b = t2 + (offset(i, v, x + t2 * h) - d) * (k / h);
+                const glm::vec3 m = glm::cross(a, b);
+                const float len = glm::length(m);
+                if (len > 1e-20f && glm::dot(m, n) > 0.0f) normals[v] = m / len;
+            }
+        });
     }
-    });
 
     displaceAll(mesh, verts_, scratch_);
     finishDab(mesh, bvh, clock);
@@ -970,8 +1092,20 @@ void Sculptor::finishDab(Mesh& mesh, BVH& bvh, std::chrono::steady_clock::time_p
     timings.bvhMs += lapMs(clock);
     ++timings.dabs;
     timings.vertices += verts_.size();
-    dabVerts_.insert(dabVerts_.end(), verts_.begin(), verts_.end()); // a vertex twice is fine: updateNormals dedups
     const auto leaves = bvh.queriedLeaves(); // (the query that found verts_)
+    if (adaptiveDab_) { // the normals are done; the exact ones later (catchUpNormals, flushDraft), the GPU's now
+        adaptiveDab_ = false;
+        lazyMesh_ = &mesh;
+        lazyBvh_ = &bvh;
+        addLazyLeaves(bvh, leaves);
+        lastLazyLeaves_.insert(lastLazyLeaves_.end(), leaves.begin(), leaves.end());
+        mesh.markDirtyAround(verts_.size(), 4096, [&](size_t b, size_t e, IndexBits& set) {
+            for (size_t i = b; i < e; ++i) set.insertLocal(verts_[i]);
+        });
+        timings.normalsMs += lapMs(clock);
+        return;
+    }
+    dabVerts_.insert(dabVerts_.end(), verts_.begin(), verts_.end()); // a vertex twice is fine: updateNormals dedups
     dabLeaves_.insert(dabLeaves_.end(), leaves.begin(), leaves.end());
 }
 
@@ -1040,6 +1174,7 @@ void Sculptor::dabRecipe(Mesh& mesh, BVH& bvh, const BrushRecipe& recipe, const 
     base.viewFalloff = p.viewFalloff || recipe.viewFalloff;
     dabVerts_.clear();
     dabLeaves_.clear();
+    lastLazyLeaves_.clear();
     for (const SymCopy& m : copies(sym)) {
         frameWanted_ = m.identity(); // (the unmirrored pass records lastFrame)
         const DabParams mp = m.identity() ? base : transformed(base, m);
@@ -1122,6 +1257,8 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
     if (frameWanted_) {
         lastFrame = {p.center, areaNormal, areaCenter, true};
         frameWanted_ = false;
+        lastRegion_ = verts_.size();
+        lastRegionRadius_ = p.radius;
     }
 
     glm::vec3 strokeDir = p.strokeDelta;

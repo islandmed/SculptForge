@@ -2719,7 +2719,27 @@ void Renderer::endCapture(std::vector<uint8_t>& rgba) {
 
 void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, const RenderSettings& settings,
                     const Viewport& viewport) {
+    // SF_FRAME_LOG=ms (App.cpp): a draw slower than that says where its time went.
+    static const double drawLogMs = std::getenv("SF_FRAME_LOG") ? std::atof(std::getenv("SF_FRAME_LOG")) : -1.0;
+    const auto drawStart = std::chrono::steady_clock::now();
+    double drawMarks[4] = {};
+    const auto drawMark = [&](int i) {
+        if (drawLogMs >= 0.0) drawMarks[i] = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - drawStart).count();
+    };
+    struct DrawLog {
+        const double& limit;
+        const double* marks;
+        std::chrono::steady_clock::time_point start;
+        ~DrawLog() {
+            if (limit < 0.0) return;
+            const double total = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+            if (total > limit)
+                SDL_Log("draw %.1f ms: lit spheres %.1f, environment %.1f, Parts %.1f, the rest %.1f", total, marks[0],
+                        marks[1] - marks[0], marks[2] - marks[1], total - marks[2]);
+        }
+    } drawLog{drawLogMs, drawMarks, drawStart};
     syncMatcaps();
+    drawMark(0);
     forceBackfaces_ = settings.backfaceCulling && !thumbnailPass_; // (#68; thumbnails show the whole Part)
     // Known state before the clears: a scissor box, colour mask or depth mask left over from another pass (UI,
     // overlays, calibration) makes glClear partial. Some drivers (NVIDIA on Windows, #29) then show old frames
@@ -2754,6 +2774,7 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
     // PBR view: the environment's lighting (built when it first shows), and the rotation from view space into it.
     // (Thumbnails use whatever environment the view has: their settings must not start another build.)
     const bool pbr = settings.pbr() && (thumbnailPass_ ? envTexture_ != 0 : ensureEnvironment(settings.environment));
+    drawMark(1);
     if (pbr) {
         const float yaw = glm::radians(settings.environmentRotation);
         const glm::mat3 spin(glm::vec3(std::cos(yaw), 0.0f, -std::sin(yaw)), glm::vec3(0.0f, 1.0f, 0.0f),
@@ -2827,6 +2848,7 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
     for (const DrawItem& item : drawList_)
         if (const MeshSlot* s = findSlot(item.id); s && s->drawnTriangles > 0 && !seeThrough(item))
             drawSlot(*s, item.active, item.flat, settings);
+    drawMark(2);
     if (xray) {
         gl::Enable(GL_BLEND);
         gl::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);

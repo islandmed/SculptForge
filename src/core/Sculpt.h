@@ -5,6 +5,7 @@
 #include "core/BVH.h"
 #include "core/BrushRecipe.h"
 #include "core/Dyntopo.h"
+#include "core/IndexBits.h"
 #include "core/Kelvinlet.h"
 #include "core/Mesh.h"
 #include "core/Symmetry.h"
@@ -82,6 +83,10 @@ struct DabParams {
     // on screen, so the brush reaches through the model along the view as a cylinder.
     bool connectedOnly = false;
     bool viewFalloff = false;
+    // The direction of the ray that picked `center` (zero: viewDir), so a fused batch (Sculptor::beginBatch) can
+    // find where that ray meets the surface the batch's earlier dabs left.
+    glm::vec3 pickDir{0.0f};
+    glm::vec3 pickNormal{0.0f}; // the surface's normal there (zero: unknown)
 };
 
 // Local symmetry's centre for a Part: the middle of its bounding box (in parallel).
@@ -93,6 +98,8 @@ inline DabParams transformed(const DabParams& p, const SymCopy& c) {
     o.viewDir = c.dir(p.viewDir);
     o.strokeDelta = c.dir(p.strokeDelta);
     o.alphaUp = c.dir(p.alphaUp);
+    o.pickDir = c.dir(p.pickDir);
+    o.pickNormal = c.dir(p.pickNormal);
     return o;
 }
 
@@ -249,6 +256,34 @@ public:
     // for the GPU. flushDraft works out every normal and cavity term the stroke touched, once (the app calls
     // it before endStroke). Not with dynamic topology.
     bool draftStrokes = false;
+    // Scale-adaptive dabs (Preferences > Performance > Fast big brushes, on by default): a dab whose region holds
+    // more than kAdaptiveMinVertices vertices takes its area plane from an even sample of about kAreaSamples of
+    // them (an average, so the sample gives it to within a fraction of a percent) and updates the normals of
+    // what it moved from the derivative of its own displacement (the brush's offset at two points a hair away
+    // along the surface: no neighbour rings are read), so the cost per vertex is the brush itself, the move and
+    // its undo entry. Every vertex still moves by the exact brush. The exact normals and cavity terms follow
+    // lazily: behind the brush as the stroke goes on (catchUpNormals) and the rest when it ends (flushDraft, or
+    // endStroke). Brushes whose offset depends on more than the vertex's place (Smooth, Layer, Morph) and the
+    // remesher always take the exact path, and so do regions below the threshold (small brushes are unchanged).
+    bool adaptiveDabs = true;
+    static constexpr size_t kAdaptiveMinVertices = 150'000;
+    static constexpr size_t kAreaSamples = 65'536;
+    // Whether adaptive dabs moved leaves whose exact normals are still to come, and catching up with up to
+    // `maxLeaves` of them (in leaf order). The app calls it when no dabs are waiting (the pen rests or slows).
+    bool normalsPending() const { return lazyCount_ > 0; }
+    void catchUpNormals(Mesh& mesh, const BVH& bvh, size_t maxLeaves);
+    // The last dab was big enough for a fused batch (the app then hands the solver every dab waiting at once).
+    bool fusesBatches() const { return adaptiveDabs && lastFusable_ && lastRegion_ >= kAdaptiveMinVertices; }
+    // Fused batches (SculptBatch.cpp): between beginBatch and endBatch, the dabs of a big brush (adaptive, one of
+    // the plane brushes core/SculptKernel.h lists, no alpha, mask or falloff options) wait and are then placed
+    // in one pass over the vertices they reach: each vertex goes through the dabs in order, moved by exactly
+    // the offset each gives where it is by then, so it ends where the dab-by-dab stroke leaves it. Each dab's
+    // area plane comes from an even sample of the region, moved along dab by dab; each dab's centre, picked on
+    // the surface as the batch began, is moved along by the dabs before it. The normals, the BVH and the GPU's
+    // copy follow once a batch instead of once a dab. Any other dab places the waiting ones first.
+    void beginBatch() { batching_ = true; }
+    void endBatch(Mesh& mesh, BVH& bvh);
+    size_t batchWaiting() const { return pending_.size(); }
     bool draftActive() const { return draft_; }
     bool draftPending() const { return draft_ && !draftLeaves_.empty(); }
     void flushDraft(Mesh& mesh, const BVH& bvh);
@@ -310,7 +345,8 @@ private:
     void touch(Mesh& mesh, uint32_t v);
     // The one place brushes move vertices: scales `d` by vertexInfluence().
     void displace(Mesh& mesh, uint32_t v, const glm::vec3& d);
-    void displaceAll(Mesh& mesh, std::span<const uint32_t> verts, std::span<const glm::vec3> d, bool influence = true);
+    void displaceAll(Mesh& mesh, std::span<const uint32_t> verts, std::span<const glm::vec3> d, bool influence = true,
+                     const float* given = nullptr); // given: each vertex's influence (0 = not moved)
 
     // Dynamic topology: remeshes before a dab, and keeps the stroke's per-vertex state in step with it.
     void remeshDab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym, float scale, float reach);
@@ -347,6 +383,36 @@ private:
     const Mesh* curvatureMesh_ = nullptr;    // the mesh curvature_ is for
     bool draft_ = false;                     // this stroke is a draft
     std::vector<uint32_t> draftLeaves_;      // the BVH leaves its dabs touched (flushDraft)
+    // Adaptive dabs: the leaves they moved (exact normals to come), the mesh and BVH they are of (endStroke
+    // flushes them when the app didn't), the leaves of the last dab,
+    // and per vertex the stroke whose cavity term curvature_ holds (taken once, before the stroke moved it).
+    IndexBits lazyLeaves_;       // (a set: a leaf many dabs moved is listed once)
+    size_t lazyCount_ = 0;       // leaves added since the set was last emptied (0: none pending)
+    std::vector<uint32_t> lastLazyLeaves_;
+    void addLazyLeaves(const BVH& bvh, std::span<const uint32_t> leaves);
+    void dropLazy(); // (empties the set without the normals)
+    Mesh* lazyMesh_ = nullptr;
+    const BVH* lazyBvh_ = nullptr;
+    std::vector<uint32_t> curvatureStamp_;
+    bool adaptiveDab_ = false; // the dab dabSingle is placing takes the adaptive path
+    // Fused batches: the dabs waiting, and the last unmirrored region's size and radius (whether the next dab
+    // is big enough to wait), and the place a batch's vertices are kept while it is applied.
+    struct PendingDab {
+        BrushType type;
+        DabParams p;
+        Symmetry sym;
+    };
+    bool batching_ = false;
+    std::vector<PendingDab> pending_;
+    Mesh* pendingMesh_ = nullptr;
+    BVH* pendingBvh_ = nullptr;
+    size_t lastRegion_ = 0;
+    bool lastFusable_ = false; // the last dab's brush and options are a fused batch's (batchable, but for its size)
+    float lastRegionRadius_ = 0.0f;
+    bool batchable(const Mesh& mesh, BrushType type, const DabParams& p, const Symmetry& sym) const;
+    void flushBatch(Mesh& mesh, BVH& bvh);
+    std::vector<float> givenInfluence_;
+    void flushLazy(Mesh& mesh, const BVH& bvh, std::span<const uint32_t> leaves);
     std::vector<glm::vec3> scratch_;
     // Smooth with keepVolume: each brush vertex's shrunk position, and (vertex, index) sorted to look it up.
     void taubinShrink(const Mesh& mesh);
