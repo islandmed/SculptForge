@@ -4,7 +4,7 @@
 # runs sculpt the same surface.
 run new_sphere subdivisions=5
 orbit 30 -15
-run micro_divide level=5
+run micro_divide level=4
 run micro_noise amplitude=0.003 scale=40
 key b
 key s
