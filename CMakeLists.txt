@@ -25,6 +25,7 @@ endif()
 # Position-independent code so the core libraries can also go into the Python module.
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+include(cmake/BuildSpeed.cmake)
 include(cmake/Dependencies.cmake)
 
 # --- Core library: geometry, sculpting, undo, commands, file IO (no GPU/UI) ---
@@ -227,6 +228,9 @@ else()
   # packages build at -O2; face_weights' fast path is tested to match a full evaluation exactly).
   target_compile_options(sculptforge_core PRIVATE -Wall -Wextra -Wno-unused-parameter -ffp-contract=off)
 endif()
+sculptforge_pch(sculptforge_core)
+set_source_files_properties(third_party/xatlas/xatlas.cpp third_party/tinyexr/tinyexr_impl.cpp ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedRecipes.cpp
+                            PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 
 # --- Bring-your-own-AI (brush assistant). HTTPS via WinHTTP or libcurl. ---
 add_library(sculptforge_ai STATIC src/ai/Http.cpp src/ai/AiPolicy.cpp src/ai/BrushAssistant.cpp src/ai/Generator3D.cpp
@@ -252,6 +256,7 @@ if(MSVC)
 else()
   target_compile_options(sculptforge_ai PRIVATE -Wall -Wextra -Wno-unused-parameter)
 endif()
+sculptforge_pch(sculptforge_ai)
 
 # --- Phone link (src/link/PhoneLink.h, docs/phone-link.md): the capture page server, AR export, live face feed ---
 option(SCULPTFORGE_WEBRTC "Live face feed over WebRTC (fetches libdatachannel and Mbed TLS; OFF: capture and AR only)" ON)
@@ -277,11 +282,42 @@ else()
   target_compile_options(sculptforge_phone PRIVATE -Wall -Wextra -Wno-unused-parameter)
   set_source_files_properties(third_party/qrcodegen/qrcodegen.cpp PROPERTIES COMPILE_OPTIONS "-w")
 endif()
+sculptforge_pch(sculptforge_phone)
+set_source_files_properties(third_party/qrcodegen/qrcodegen.cpp ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedPhone.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 
 # --- Headless command-line tool (pipelines, build farms, AI agents) ---
-add_executable(sculptforge-cli src/cli/main.cpp src/cli/McpServer.cpp)
+# The MCP server (src/cli/McpServer.cpp) is a library of its own: the tool and the tests link it, nobody compiles it twice.
+add_library(sculptforge_mcp STATIC src/cli/McpServer.cpp)
+target_compile_definitions(sculptforge_mcp PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}")
+target_link_libraries(sculptforge_mcp PUBLIC sculptforge_core sculptforge_ai)
+add_executable(sculptforge-cli src/cli/main.cpp)
 target_compile_definitions(sculptforge-cli PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}")
-target_link_libraries(sculptforge-cli PRIVATE sculptforge_core sculptforge_ai)
+target_link_libraries(sculptforge-cli PRIVATE sculptforge_core sculptforge_ai sculptforge_mcp)
+
+# App code the tests also run (layout, looks, translations, Library, brush previews, camera, clusters): one static
+# library both link, so an edit to one of these files compiles once, not once per program.
+if(SCULPTFORGE_BUILD_APP OR SCULPTFORGE_BUILD_TESTS)
+  add_library(sculptforge_appshared STATIC src/app/AssetLibrary.cpp src/app/BrushPreview.cpp src/app/UiLayout.cpp
+    src/app/ShellGeometry.cpp src/app/LookSchemes.cpp src/app/I18n.cpp src/app/I18nSpanish.cpp src/render/Camera.cpp
+    src/render/Clusters.cpp src/render/Ghost.cpp)
+  target_link_libraries(sculptforge_appshared PUBLIC sculptforge_core)
+  if(MSVC)
+    target_compile_options(sculptforge_appshared PRIVATE /W4 /utf-8 /permissive-)
+  else()
+    target_compile_options(sculptforge_appshared PRIVATE -Wall -Wextra -Wno-unused-parameter)
+  endif()
+  sculptforge_pch(sculptforge_appshared)
+endif()
+# The action registry (key chords, shortcut overrides; needs SDL's key names): the app and its tests.
+if(SCULPTFORGE_BUILD_APP)
+  add_library(sculptforge_actions STATIC src/app/Actions.cpp src/app/BlenderKeymap.cpp)
+  target_link_libraries(sculptforge_actions PUBLIC sculptforge_core SDL3::SDL3)
+  if(MSVC)
+    target_compile_options(sculptforge_actions PRIVATE /W4 /utf-8 /permissive-)
+  else()
+    target_compile_options(sculptforge_actions PRIVATE -Wall -Wextra -Wno-unused-parameter)
+  endif()
+endif()
 
 # --- Desktop application ---
 if(SCULPTFORGE_BUILD_APP)
@@ -309,26 +345,17 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/AsyncStroke.cpp
     src/app/Demo.cpp
     src/app/UiTest.cpp
-    src/app/Actions.cpp
-    src/app/BlenderKeymap.cpp
     src/app/Ui.cpp
-    src/app/UiLayout.cpp
     src/app/Shell.cpp
-    src/app/ShellGeometry.cpp
     src/app/Palettes.cpp
     src/app/Theme.cpp
-    src/app/LookSchemes.cpp
-    src/app/I18n.cpp
-    src/app/I18nSpanish.cpp
     src/app/CommandPalette.cpp
     src/app/Console.cpp
     src/app/Config.cpp
     src/app/LightBox.cpp
-    src/app/BrushPreview.cpp
     src/app/Thumbnails.cpp
     src/app/Pickers.cpp
     src/app/UserGuide.cpp
-    src/app/AssetLibrary.cpp
     src/app/PanelMasking.cpp
     src/app/PanelCut.cpp
     src/app/PanelView.cpp
@@ -380,14 +407,12 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/RadialMenu.cpp
     src/app/StrokePopup.cpp
     src/render/GL.cpp
-    src/render/Camera.cpp
-    src/render/Clusters.cpp
-    src/render/Ghost.cpp
     src/render/Renderer.cpp
     src/render/UvView.cpp
     src/render/MicroRenderer.cpp
   )
-  target_link_libraries(sculptforge PRIVATE sculptforge_core sculptforge_ai sculptforge_phone imgui SDL3::SDL3)
+  target_link_libraries(sculptforge PRIVATE sculptforge_core sculptforge_ai sculptforge_phone sculptforge_appshared
+                                            sculptforge_actions imgui SDL3::SDL3)
   target_include_directories(sculptforge PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/lucide)
   target_compile_definitions(sculptforge PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}"
                                                  SCULPTFORGE_PRERELEASE="${SCULPTFORGE_PRERELEASE}"
@@ -406,6 +431,9 @@ if(SCULPTFORGE_BUILD_APP)
   else()
     target_compile_options(sculptforge PRIVATE -Wall -Wextra -Wno-unused-parameter)
   endif()
+  sculptforge_pch(sculptforge <imgui.h>)
+  set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedFonts.cpp ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedGuide.cpp
+                              PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
   if(WIN32)
     set_target_properties(sculptforge PROPERTIES WIN32_EXECUTABLE $<CONFIG:Release,MinSizeRel>)
     set(ICON_PATH "${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge.ico")
@@ -578,15 +606,13 @@ endif()
 if(SCULPTFORGE_BUILD_TESTS)
   # tests/test_main.cpp plus every tests/test_*.cpp (add a file to add tests; see tests/TestHarness.h).
   file(GLOB SCULPTFORGE_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_*.cpp)
-  add_executable(sculptforge_tests ${SCULPTFORGE_TEST_SOURCES} src/cli/McpServer.cpp src/app/AssetLibrary.cpp src/app/BrushPreview.cpp
-                                   src/app/UiLayout.cpp src/app/ShellGeometry.cpp src/app/LookSchemes.cpp src/app/I18n.cpp src/app/I18nSpanish.cpp src/render/Camera.cpp
-                                   src/render/Clusters.cpp src/render/Ghost.cpp)
+  add_executable(sculptforge_tests ${SCULPTFORGE_TEST_SOURCES})
   target_include_directories(sculptforge_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
   target_compile_definitions(sculptforge_tests PRIVATE SF_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
-  target_link_libraries(sculptforge_tests PRIVATE sculptforge_core sculptforge_ai sculptforge_phone)
+  target_link_libraries(sculptforge_tests PRIVATE sculptforge_core sculptforge_ai sculptforge_phone sculptforge_mcp sculptforge_appshared)
+  sculptforge_pch(sculptforge_tests)
   if(SCULPTFORGE_BUILD_APP) # the action registry (key chords, shortcut overrides) needs SDL's key names
-    target_sources(sculptforge_tests PRIVATE src/app/Actions.cpp src/app/BlenderKeymap.cpp)
-    target_link_libraries(sculptforge_tests PRIVATE SDL3::SDL3)
+    target_link_libraries(sculptforge_tests PRIVATE sculptforge_actions)
     target_compile_definitions(sculptforge_tests PRIVATE SF_TEST_ACTIONS)
   endif()
   if(MSVC)

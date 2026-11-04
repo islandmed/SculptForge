@@ -8,7 +8,7 @@ if [ -n "$python" ]; then
   python_args=(-DSCULPTFORGE_BUILD_PYTHON=ON "-DPython_EXECUTABLE=$python" -DSCULPTFORGE_PYTHON_INSTALL_DIR=python)
 fi
 cmake -S "$source_dir" -B . -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$REZ_BUILD_INSTALL_PATH" \
-  -DCMAKE_INSTALL_BINDIR=bin -DCMAKE_INSTALL_LIBDIR=lib "${python_args[@]}"
+  -DCMAKE_INSTALL_BINDIR=bin -DCMAKE_INSTALL_LIBDIR=lib -DSCULPTFORGE_MOLD=OFF "${python_args[@]}"
 cmake --build . --parallel "${REZ_BUILD_THREAD_COUNT:-4}"
 ctest --output-on-failure
 if [ "${1:-}" = "install" ]; then
