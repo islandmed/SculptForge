@@ -754,6 +754,57 @@ TEST(micro_base_stroke_is_the_plain_brush) {
     }
 }
 
+TEST(micro_base_release_dabs_fuse) {
+    // The dabs still waiting when the pen lifts (Sculptor::microBaseFuse, App::endStroke) go through the plain
+    // path, fused: they move the base exactly as the plain brush moves the same mesh, and a stroke whose first dabs
+    // took the base kernel and whose last ones were fused is still one undo step, bit-exact both ways.
+    Symmetry sym;
+    sym.x = false;
+    auto dabs = [&](Document& d, int from, int to) {
+        for (int i = from; i < to; ++i) {
+            const float x = -0.2f + 0.04f * float(i);
+            d.sculptor.dab(d.mesh, d.bvh, BrushType::Clay, dabAt(glm::vec3(x, 0.05f, std::sqrt(1.0f - x * x - 0.0025f)), 0.3f, 0.4f), sym);
+        }
+    };
+    {
+        Document plain = makeDoc(makeBenchSphere(200000)), base = microDoc(2, 200000);
+        microNoise(base.mesh, 0.002f, 60.0f, 7);
+        const std::vector<int16_t> heights = base.mesh.micro->disp;
+        base.sculptor.microBaseFuse = true;
+        for (Document* d : {&plain, &base}) {
+            d->sculptor.beginStroke(d->mesh, "Clay");
+            d->sculptor.beginBatch();
+            dabs(*d, 0, 10);
+            d->sculptor.endBatch(d->mesh, d->bvh);
+            d->undo.push(d->sculptor.endStroke());
+        }
+        CHECK(base.mesh.positions == plain.mesh.positions);
+        CHECK(base.mesh.micro->disp == heights);
+        CHECK(base.sculptor.microStroke().points == 0);
+        CHECK(watertight(base.mesh));
+    }
+    {
+        Document doc = microDoc(2, 200000);
+        const std::vector<glm::vec3> positions = doc.mesh.positions;
+        const std::vector<int16_t> heights = doc.mesh.micro->disp;
+        doc.sculptor.beginStroke(doc.mesh, "Clay");
+        dabs(doc, 0, 5);
+        doc.sculptor.microBaseFuse = true;
+        doc.sculptor.beginBatch();
+        dabs(doc, 5, 10);
+        doc.sculptor.endBatch(doc.mesh, doc.bvh);
+        doc.sculptor.microBaseFuse = false;
+        doc.undo.push(doc.sculptor.endStroke());
+        const std::vector<glm::vec3> after = doc.mesh.positions;
+        CHECK(after != positions);
+        CHECK(doc.undo.undo(doc.mesh, doc.bvh));
+        CHECK(doc.mesh.positions == positions && doc.mesh.micro->disp == heights);
+        CHECK(doc.undo.redo(doc.mesh, doc.bvh));
+        CHECK(doc.mesh.positions == after);
+        CHECK(watertight(doc.mesh));
+    }
+}
+
 TEST(micro_base_stroke_symmetry_hidden_mask) {
     // Symmetry: both sides move alike. Hidden faces: their vertices stay. A micro mask: the grid brush (it masks
     // per grid point), not the base.
