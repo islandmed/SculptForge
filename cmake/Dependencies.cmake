@@ -1,12 +1,10 @@
 # Third-party dependencies. Everything is fetched at configure time so a fresh
 # checkout builds the same way on Linux, macOS and Windows.
-include(FetchContent)
+include(${CMAKE_CURRENT_LIST_DIR}/Fetch.cmake) # include(FetchContent), the pins, sf_fetch_declare
 set(FETCHCONTENT_QUIET ON)
 
 # glm (header-only maths)
-FetchContent_Declare(glm
-  URL https://github.com/g-truc/glm/archive/refs/tags/1.0.1.tar.gz
-  DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+sf_fetch_declare(glm DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
 set(GLM_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLM_BUILD_INSTALL OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(glm)
@@ -23,9 +21,7 @@ if(SDL3_FOUND)
   message(STATUS "Using system SDL3 ${SDL3_VERSION}")
 else()
   message(STATUS "Fetching SDL3")
-  FetchContent_Declare(SDL3
-    URL https://github.com/libsdl-org/SDL/releases/download/release-3.2.30/SDL3-3.2.30.tar.gz
-    DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+  sf_fetch_declare(SDL3 DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
   # Static: release packages then need no separate SDL library (zlib licence allows this).
   set(SDL_SHARED OFF CACHE BOOL "" FORCE)
   set(SDL_STATIC ON CACHE BOOL "" FORCE)
@@ -35,9 +31,7 @@ else()
 endif()
 
 # Dear ImGui (UI) with the SDL3 + OpenGL3 backends
-FetchContent_Declare(imgui
-  URL https://github.com/ocornut/imgui/archive/refs/tags/v1.91.9.tar.gz
-  DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+sf_fetch_declare(imgui DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
 FetchContent_MakeAvailable(imgui)
 
 add_library(imgui STATIC

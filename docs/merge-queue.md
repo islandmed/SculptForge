@@ -22,6 +22,12 @@ comment and the `queue-failed` label; its author fixes the branch and queues it 
 `--serial` (update each PR from main, wait for its checks, merge), which isolates the PR that broke it.
 `scripts/merge-queue.sh list` shows the queue.
 
+Every landing (batch, serial, staging) first runs `tools/ci/no_revert.py` on its merges: a merge or squash that
+throws a side's change away whole (the result keeps the other side's file or the old one, though that side's commit
+still applies to it) is refused with the files listed, as 0.11.1's quick-remesh merge nearly reverted main's newer
+fix. Redo it keeping both sides; a deliberate revert lands with `SF_ALLOW_REVERT=<its commit>`.
+`scripts/merge-queue.sh no-revert BASE..TIP` checks a range by hand.
+
 The merger's own batch (branches merged without pull requests, `~/Work/.sf/merge-batch.sh`) lands the same way with
 `scripts/merge-queue.sh staging --with ~/Work/.sf/t1.sh HEAD`. The batch goes to the branch `staging`, the full CI runs
 there while the PC runs the whole suite, and main fast-forwards when both pass. Either way, CI's run on main finds the

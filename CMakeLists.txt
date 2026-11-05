@@ -623,9 +623,7 @@ include(CPack)
 # --- Python module ---
 if(SCULPTFORGE_BUILD_PYTHON)
   find_package(Python 3.9 REQUIRED COMPONENTS Interpreter Development.Module)
-  FetchContent_Declare(pybind11
-    URL https://github.com/pybind/pybind11/archive/refs/tags/v3.0.4.tar.gz
-    DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+  sf_fetch_declare(pybind11 DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
   FetchContent_MakeAvailable(pybind11)
   pybind11_add_module(sculptforge_python MODULE src/python/module.cpp)
   set_target_properties(sculptforge_python PROPERTIES OUTPUT_NAME sculptforge)
@@ -763,6 +761,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME release_workflows COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_workflows.py)
     add_test(NAME release_workflows_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_workflows.py --self-test)
     add_test(NAME release_paperwork COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/paperwork_only.py --self-test)
+    # Step bump pins tests/ui/whats_new.sfui to the newest What's New sections (tools/release/pin_whats_new_test.py).
+    add_test(NAME release_pin_whats_new COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/pin_whats_new_test.py --self-test)
+    # scripts/merge-queue.sh refuses a merge or squash that throws away the other side's change (tools/ci/no_revert.py).
+    add_test(NAME ci_no_revert COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/no_revert.py --self-test)
     # scripts/release.sh's beta (X.Y.Z-beta.N) and its promotion to stable, in a sandbox with stand-ins for gh and curl.
     if(UNIX AND NOT APPLE AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
       add_test(NAME release_script_beta COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_beta_test.sh)

@@ -9,6 +9,10 @@
 #   scripts/merge-queue.sh add <pr>...      queue pull requests (label "queue"); any session may do this
 #   scripts/merge-queue.sh list             the queue, oldest first, with each PR's check state
 #   scripts/merge-queue.sh run [--serial]   land the queue (the coordinator, in the background)
+#   scripts/merge-queue.sh no-revert BASE..TIP | --merge C | --squash RESULT BRANCH
+#                                           the check every landing runs (tools/ci/no_revert.py): no merge or squash
+#                                           may throw away a side's change whole (0.11.1's quick-remesh near-revert);
+#                                           a deliberate revert lands with SF_ALLOW_REVERT=<its commit>
 #   scripts/merge-queue.sh staging [--with CMD] [REF]   the merger's batch (T2, docs/testing-flow.md): REF (default HEAD,
 #                                           main merged into it) goes to the branch `staging`, the full CI runs there
 #                                           while CMD runs here (e.g. '~/Work/.sf/pc.sh .', T1), and when both pass main
@@ -83,6 +87,12 @@ run_serial() {
             drop "$pr" "Its checks failed on top of main."
             continue
         fi
+        git fetch -q origin main "pull/$pr/head"
+        if ! out=$(python3 tools/ci/no_revert.py origin/main..FETCH_HEAD); then
+            echo "$out" | sed 's/^/   /'
+            drop "$pr" "A merge in it throws away changes from main (tools/ci/no_revert.py): $(echo "$out" | head -3 | tr '\n' ' ')"
+            continue
+        fi
         gh pr merge "$pr" -R "$REPO" --merge --delete-branch >/dev/null
         echo "   merged #$pr"
     done
@@ -107,7 +117,13 @@ run_batch() {
         head=$(gh pr view "$pr" -R "$REPO" --json headRefName -q .headRefName)
         git fetch -q origin "$head"
         if git -C "$wt" merge -q --no-ff --no-edit -m "Merge $head (#$pr)" FETCH_HEAD >/dev/null 2>&1; then
-            merged+=("$pr")
+            if out=$(cd "$wt" && python3 tools/ci/no_revert.py "$base..HEAD"); then
+                merged+=("$pr")
+            else
+                git -C "$wt" reset -q --hard HEAD~1
+                echo "$out" | sed 's/^/   /'
+                drop "$pr" "It throws away changes from main (tools/ci/no_revert.py): $(echo "$out" | head -3 | tr '\n' ' ')"
+            fi
         else
             git -C "$wt" merge --abort
             drop "$pr" "It conflicts with main or with a PR ahead of it in the queue."
@@ -149,6 +165,8 @@ land_staging() { # land_staging [--with CMD] [REF]
     git merge-base --is-ancestor origin/main "$sha" ||
         die "$ref does not contain origin/main: merge origin/main into it first (main must fast-forward to the tested commit)"
     [ "$sha" != "$(git rev-parse origin/main)" ] || { echo "main is already at ${sha:0:8}"; return 0; }
+    python3 tools/ci/no_revert.py "origin/main..$sha" ||
+        die "a merge in the batch throws away changes from the other side (above): redo it keeping both, or SF_ALLOW_REVERT=<commit> for a deliberate revert"
     t0=$(date +%s)
     say "staging ${sha:0:8} ($(git log -1 --format=%s "$sha" | cut -c1-60)) on main $(git rev-parse --short origin/main)"
     git push -q --force origin "$sha:refs/heads/staging"
@@ -173,6 +191,10 @@ land_staging() { # land_staging [--with CMD] [REF]
 }
 
 case ${1:-} in
+no-revert)
+    shift
+    python3 tools/ci/no_revert.py "$@"
+    ;;
 staging)
     shift
     land_staging "$@"
@@ -196,7 +218,7 @@ run)
     if [ "${2:-}" = --serial ]; then run_serial; else run_batch; fi
     ;;
 *)
-    sed -n '5,23p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '5,27p' "$0" | sed 's/^# \{0,1\}//'
     exit 2
     ;;
 esac
