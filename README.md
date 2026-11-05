@@ -316,7 +316,9 @@ SculptForge is free, and nothing in the app is ever paywalled.
 feature vote, Member Requests (ask for a brush, alpha or material each month), #members on Discord and your name in
 the [credits](https://sculptforge.app/supporters.html); the first 100 members are Founding Members, price locked for
 good. **[Studio](https://sculptforge.app/studios.html#membership)**
-($150 / month): up to 10 artists with everything in Member, priority support and a private channel. Every release
+($300 / month for up to 10 artists, +$25 per extra artist; Founding Studio $150 for the first 10 studios): your
+studio's own isolated build with your assets built in, a pinned version with security fixes, an offline signed
+installer, support and a private channel. Every release
 stays free for everyone; bug-fix and security releases go out to everyone the same day.
 
 <!-- Studio members' logos go here. -->

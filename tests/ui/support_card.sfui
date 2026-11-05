@@ -20,10 +20,11 @@ expect_text Every release stays free for everyone.
 expect_text RECOMMENDED
 expect_text Member
 expect_text $5
-expect_text $150
+expect_text $300
 expect_text Betas and early builds of the next version
-expect_text Up to 10 artists, each with everything in Member
-expect_text invoiced monthly
+expect_text Up to 10 artists (+$25 / month each after), each with everything in Member
+expect_text Isolated: a private release channel, no outside connections
+expect_text Founding Studio: $150, first 10 studios
 expect_text or $48 a year
 expect "Member, $48 a year##card.member_yearly"
 shot first_run
@@ -59,7 +60,7 @@ click "Show the memberships"
 wait 0.8
 click "Studio membership##card.studio"
 expect_value support_requests == 3
-expect_status https://buy.stripe.com/3cI00j12v5H4g1dgWZ4F204
+expect_status https://sculptforge.app/studios.html#membership
 wait 0.4
 
 # Not now and Esc close it.

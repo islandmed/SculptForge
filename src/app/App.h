@@ -44,6 +44,7 @@
 #include "core/TouchGesture.h"
 #include "core/Tablet.h"
 #include "core/SelfUpdate.h"
+#include "core/StudioProfile.h"
 #include "core/UpdateCheck.h"
 #include "core/ViewCapture.h"
 #include "core/WhatsNew.h"

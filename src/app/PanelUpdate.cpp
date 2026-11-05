@@ -109,6 +109,8 @@ const update::Install& App::updateInstall() {
     if (updateInstallKnown_ && options_.uiTest.empty()) return updateInstall_; // (UI tests switch installs)
     updateInstallKnown_ = true;
     updateInstall_ = update::detectInstall(update::currentInstallProbe());
+    // Studio mode: no one-click update (it downloads only public releases); the studio's IT installs its own builds.
+    if (studioMode().active) updateInstall_ = update::Install{};
     // UI tests only: how the banner looks on other installs (nothing is downloaded in a UI test).
     const char* kind = options_.uiTest.empty() ? nullptr : std::getenv("SF_UPDATE_TEST_INSTALL");
     if (kind) {

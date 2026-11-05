@@ -7,6 +7,7 @@
 // connect (supportCardTestMode).
 #include "app/App.h"
 #include "app/Ui.h"
+#include "core/NetworkPolicy.h"
 
 #include <imgui.h>
 
@@ -17,7 +18,8 @@ namespace sf {
 
 void App::DiscordClientDelete::operator()(discord::Client* c) const { delete c; }
 
-bool App::discordPresenceAvailable() const { return discord::appIdConfigured(discord::kDiscordAppId); }
+// Never in studio mode (core/NetworkPolicy.h): no Discord presence in a studio build.
+bool App::discordPresenceAvailable() const { return net::localIpcAllowed() && discord::appIdConfigured(discord::kDiscordAppId); }
 
 void App::updateDiscordPresence() {
     if (!discordPresenceAvailable() || supportCardTestMode()) return;

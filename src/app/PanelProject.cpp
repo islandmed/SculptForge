@@ -715,25 +715,36 @@ void App::startUpdateCheck(bool manual) {
         updateCheckedAt_ = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
         saveProjectPrefs();
     }
-    const char* feed = std::getenv("SF_UPDATE_FEED");
-    std::string source = feed && *feed ? feed : kUpdateFeedUrl;
+    // Studio mode: only the studio's own channel, then its mirror (core/StudioProfile.h); else the public feed.
+    std::string fallback;
+    const std::string source = updateFeedSource(studioMode(), std::getenv("SF_UPDATE_FEED"), fallback);
+    if (source.empty()) { // a studio without a channel: nothing to ask
+        job->error = "this studio build has no update channel";
+        job->done = true;
+        return;
+    }
     // Detached: a slow network never holds up quitting (the job is shared, so it outlives the app if it must).
     const UpdateChannel channel = updateChannel_;
-    // Member builds only when signed in, and never in UI tests (the network).
-    const std::shared_ptr<MemberAuth> member = memberBuilds_ && options_.uiTest.empty() ? memberAuth_ : nullptr;
-    std::thread([job, source, channel, member] {
+    // Member builds only when signed in, never in UI tests (the network) and never in studio mode (its own channel).
+    const std::shared_ptr<MemberAuth> member =
+        memberBuilds_ && options_.uiTest.empty() && !studioMode().active ? memberAuth_ : nullptr;
+    std::thread([job, source, fallback, channel, member] {
         std::string body;
-        if (source.rfind("https://", 0) == 0 || source.rfind("http://", 0) == 0) {
-            ai::HttpResponse r = ai::httpRequest("GET", source, {"Accept: application/json"}, {}, 15);
-            if (r.status != 200 && source == kUpdateFeedUrl)
-                r = ai::httpRequest("GET", kUpdateFeedMirrorUrl, {"Accept: application/json"}, {}, 15);
-            if (r.status == 200) body = r.body;
-            else job->error = r.status ? "the server answered " + std::to_string(r.status) : (r.error.empty() ? "no connection" : r.error);
-        } else {
-            std::ifstream f(fsPath(source), std::ios::binary);
-            if (f) body.assign(std::istreambuf_iterator<char>(f), {});
-            else job->error = "can't read " + source;
-        }
+        // A URL or a local file (a studio's mirror on a share; UI tests).
+        auto fetch = [&](const std::string& from) {
+            job->error.clear();
+            if (from.rfind("https://", 0) == 0 || from.rfind("http://", 0) == 0) {
+                ai::HttpResponse r = ai::httpRequest("GET", from, {"Accept: application/json"}, {}, 15);
+                if (r.status == 200) body = r.body;
+                else job->error = r.status ? "the server answered " + std::to_string(r.status) : (r.error.empty() ? "no connection" : r.error);
+            } else {
+                std::ifstream f(fsPath(from), std::ios::binary);
+                if (f) body.assign(std::istreambuf_iterator<char>(f), {});
+                else job->error = "can't read " + from;
+            }
+            return job->error.empty();
+        };
+        if (!fetch(source) && !fallback.empty()) fetch(fallback);
         if (job->error.empty()) job->ok = parseUpdateFeed(body, job->info, job->error, channel);
         if (member) checkMemberBuilds(*member, *job); // (PanelUpdate.cpp)
         job->done = true;

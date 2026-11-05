@@ -12,9 +12,11 @@
 #include "core/Commands.h"
 #include "core/Pack.h"
 #include "core/Script.h"
+#include "core/StudioProfile.h"
 
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <map>
@@ -36,6 +38,8 @@ void usage() {
         "  -q, --quiet                Only print errors\n"
         "      --no-ai                Leave the AI commands out (as SF_AI=off; Preferences > AI turns them off for good)\n"
         "      --no-packs             Safe mode: leave every installed pack out (pack_install still works)\n"
+        "      --studio FILE          Studio mode with this studio profile (studio.json; docs/studios.md)\n"
+        "      --offline              Studio mode without a profile: no outside connection at all\n"
         "      --bench                Run the performance benchmark (CPU side; the app's --bench adds the GPU)\n"
         "      --bench-sizes 4,16,32  Benchmark sizes in millions of triangles\n"
         "      --bench-dabs N         Dabs per benchmark stroke (default 40)\n"
@@ -60,8 +64,21 @@ int main(int argc, char** argv) {
     sf::CommandRegistry registry;
     // AI commands use the same settings file as the app (keys can also come from the environment), and only
     // while AI is on there (Preferences > AI), SF_AI allows it and --no-ai isn't given (ai/AiPolicy.h).
-    for (int i = 1; i < argc; ++i)
-        if (std::string(argv[i]) == "--no-ai") sf::ai::setAiForcedOff(true);
+    std::string studioProfile;
+    bool offline = false;
+    for (int i = 1; i < argc; ++i) {
+        const std::string a = argv[i];
+        if (a == "--no-ai") sf::ai::setAiForcedOff(true);
+        else if (a == "--studio" && i + 1 < argc) studioProfile = argv[i + 1];
+        else if (a == "--offline") offline = true;
+    }
+    { // studio mode (core/StudioProfile.h) before anything can reach the network
+        std::error_code ec;
+        const std::string exeDir = std::filesystem::absolute(argv[0], ec).parent_path().generic_string();
+        const sf::StudioStart& studio = sf::startStudioMode(exeDir, studioProfile, offline);
+        sf::ai::setStudioAiAllowed(studio.profile.ai);
+        for (const std::string& m : studio.messages) std::fprintf(stderr, "%s\n", m.c_str());
+    }
     sf::ai::setAiEnabled(sf::ai::aiFeaturesAllowed(sf::ai::AiSettings::load(sf::ai::defaultAiSettingsPath()).enabled));
     sf::ai::registerAiCommands(registry, [] { return sf::ai::AiSettings::load(sf::ai::defaultAiSettingsPath()); });
     // splat_train: trains in the foreground with the app's tool settings (ai/SplatTrainer.h).
@@ -121,6 +138,9 @@ int main(int argc, char** argv) {
             // read before the commands were registered
         } else if (a == "--no-packs") {
             sf::setPacksSafeMode(true);
+        } else if (a == "--studio") {
+            ++i; // read before the commands were registered
+        } else if (a == "--offline") {
         } else if (a == "-q" || a == "--quiet") {
             quiet = true;
         } else if (a == "-h" || a == "--help") {
