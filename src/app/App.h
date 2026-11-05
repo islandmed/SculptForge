@@ -301,6 +301,7 @@ private:
     // frame in the interactive loop, so a stroke on a huge mesh keeps its curve (core/StrokePath.h).
     StrokePath strokePath_;
     DabQueue dabQueue_;
+    double fusedDabs_ = 64.0; // how many dabs a fused batch takes (AsyncStroke.cpp: sized to kFusedBatchSeconds)
     double lastDabsQueued_ = 0.0; // when pumpStroke last handed the solver dabs (catch-up waits for a pause)
     std::vector<PathDab> strokeScratch_;
     std::vector<glm::vec2>* strokeProbe_ = nullptr; // --measure-stroke: where each dab went (screen)

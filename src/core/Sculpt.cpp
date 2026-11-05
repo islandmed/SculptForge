@@ -765,46 +765,70 @@ void Sculptor::flushLazy(Mesh& mesh, const BVH& bvh, std::span<const uint32_t> l
 }
 
 void Sculptor::dropLazy() {
-    if (lazyCount_ > 0) {
-        std::vector<uint32_t> drop;
-        lazyLeaves_.take(drop);
-        lazyCount_ = 0;
-    }
+    for (size_t i = lazyHead_; i < lazyLeaves_.size(); ++i) lazyFlag_[lazyLeaves_[i]] = 0;
+    for (uint32_t l : lastLazyLeaves_)
+        if (l < lazyFlag_.size()) lazyFlag_[l] = 0;
+    lazyLeaves_.clear();
+    lazyHead_ = 0;
+    lazyCount_ = 0;
     lastLazyLeaves_.clear();
 }
 
 void Sculptor::addLazyLeaves(const BVH& bvh, std::span<const uint32_t> leaves) {
-    if (leaves.empty()) return;
-    if (lazyLeaves_.capacity() < bvh.nodeCount()) {
-        std::vector<uint32_t> keep;
-        if (lazyCount_ > 0) lazyLeaves_.take(keep);
-        lazyLeaves_.resize(bvh.nodeCount());
-        for (uint32_t l : keep) lazyLeaves_.insertLocal(l);
+    if (lazyFlag_.size() < bvh.nodeCount()) lazyFlag_.resize(bvh.nodeCount(), 0);
+    for (uint32_t l : leaves) {
+        if (lazyFlag_[l] == 0) {
+            lazyLeaves_.push_back(l);
+            ++lazyCount_;
+        }
+        lazyFlag_[l] = 2; // (moved by the batch being placed: catchUpBehind leaves it for now)
     }
-    lazyLeaves_.insertParallel(leaves.size(), 16384, [&](size_t b, size_t e, IndexBits& set) {
-        for (size_t i = b; i < e; ++i) set.insertLocal(leaves[i]);
-    });
-    lazyCount_ += leaves.size();
+}
+
+// Takes up to `maxLeaves` pending leaves, oldest first, skipping (and keeping, at the back) those flagged 2 when
+// `skipLast`.
+static std::vector<uint32_t> takeLazy(std::vector<uint32_t>& list, size_t& head, std::vector<uint8_t>& flag, size_t& count,
+                                      size_t maxLeaves, bool skipLast) {
+    std::vector<uint32_t> out, kept;
+    const size_t end = list.size();
+    for (size_t i = head; i < end && out.size() < maxLeaves; ++i, ++head) {
+        const uint32_t l = list[i];
+        if (skipLast && flag[l] == 2) {
+            kept.push_back(l);
+            continue;
+        }
+        flag[l] = 0;
+        out.push_back(l);
+        --count;
+    }
+    list.insert(list.end(), kept.begin(), kept.end());
+    if (head > 4096 && head * 2 > list.size()) { // (drop the taken front now and then)
+        list.erase(list.begin(), list.begin() + std::ptrdiff_t(head));
+        head = 0;
+    }
+    return out;
 }
 
 void Sculptor::catchUpNormals(Mesh& mesh, const BVH& bvh, size_t maxLeaves) {
     if (lazyCount_ == 0 || &mesh != lazyMesh_) return;
-    std::vector<uint32_t> leaves;
-    lazyLeaves_.take(leaves);
-    lazyCount_ = 0;
-    if (leaves.size() > maxLeaves) { // the rest stay pending
-        for (size_t i = maxLeaves; i < leaves.size(); ++i) lazyLeaves_.insertLocal(leaves[i]);
-        lazyCount_ = leaves.size() - maxLeaves;
-        leaves.resize(maxLeaves);
-    }
+    const std::vector<uint32_t> leaves = takeLazy(lazyLeaves_, lazyHead_, lazyFlag_, lazyCount_, maxLeaves, false);
     flushLazy(mesh, bvh, leaves);
+}
+
+void Sculptor::catchUpBehind(Mesh& mesh, const BVH& bvh, double share) {
+    if (lazyCount_ == 0 || &mesh != lazyMesh_) return;
+    const size_t budget = size_t(double(lastLazyLeaves_.size()) * share);
+    if (budget > 0) {
+        const std::vector<uint32_t> leaves = takeLazy(lazyLeaves_, lazyHead_, lazyFlag_, lazyCount_, budget, true);
+        flushLazy(mesh, bvh, leaves);
+    }
+    for (uint32_t l : lastLazyLeaves_) // (the next batch's own are what count as recent then)
+        if (l < lazyFlag_.size() && lazyFlag_[l] == 2) lazyFlag_[l] = 1;
 }
 
 void Sculptor::flushDraft(Mesh& mesh, const BVH& bvh) {
     if (lazyCount_ > 0 && &mesh == lazyMesh_) {
-        std::vector<uint32_t> leaves;
-        lazyLeaves_.take(leaves);
-        lazyCount_ = 0;
+        const std::vector<uint32_t> leaves = takeLazy(lazyLeaves_, lazyHead_, lazyFlag_, lazyCount_, SIZE_MAX, false);
         lastLazyLeaves_.clear();
         flushLazy(mesh, bvh, leaves);
     }
@@ -919,7 +943,7 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
     }
     dabVerts_.clear();
     dabLeaves_.clear();
-    lastLazyLeaves_.clear();
+    if (!batching_) lastLazyLeaves_.clear(); // (a batch's: catchUpBehind clears them after it)
     for (const SymCopy& m : copies(sym)) {
         frameWanted_ = m.identity(); // (the unmirrored pass records lastFrame)
         const DabParams mp = m.identity() ? p : transformed(p, m);
@@ -1149,7 +1173,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
                 const glm::vec3 x = pos[v];
                 if (curvatureStamp_[v] != stamp) {
                     curvatureStamp_[v] = stamp;
-                    curvature_[v] = mesh.curvatureAt(v);
+                    curvature_[v] = kKeepCurvature; // (the GPU keeps its cavity term: no ring walk here)
                 }
                 const glm::vec3 n = normals[v];
                 if (analytic) { // (no mask here: such regions take the exact path)

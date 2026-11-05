@@ -223,7 +223,7 @@ void Sculptor::flushBatch(Mesh& mesh, BVH& bvh) {
             g.sampleNrm[i] = normals[g.sample[i]];
         }
     }
-    constexpr size_t kBlock = 4096;
+    constexpr size_t kBlock = 32768; // (few jobs: waking a 12-thread pool costs more than these do)
     std::vector<Frame> parts;
     for (size_t j = 0; j < passes.size(); ++j) {
         Pass& ps = passes[j];
@@ -311,7 +311,6 @@ void Sculptor::flushBatch(Mesh& mesh, BVH& bvh) {
     }
     if (curvatureStamp_.size() != mesh.vertexCount()) curvatureStamp_.assign(mesh.vertexCount(), 0);
     const uint32_t stamp = uint32_t(strokeId_);
-    lastLazyLeaves_.clear();
     for (Group& g : groups) {
         const size_t n = g.verts.size();
         scratch_.resize(n);
@@ -333,7 +332,7 @@ void Sculptor::flushBatch(Mesh& mesh, BVH& bvh) {
                         if (glm::dot(o, o) >= k->r * k->r) continue;
                         if (curvatureStamp_[v] != stamp) {
                             curvatureStamp_[v] = stamp;
-                            curvature_[v] = mesh.curvatureAt(v);
+                            curvature_[v] = kKeepCurvature;
                         }
                         PlaneKernel::tangents(normals[v], t1, t2);
                         reached = true;
