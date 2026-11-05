@@ -12,6 +12,7 @@
 #include "render/Camera.h"
 #include "render/GL.h"
 #include "render/Renderer.h"
+#include "render/ScreenStroke.h"
 
 #include <SDL3/SDL.h>
 #include <glm/gtc/matrix_transform.hpp>
@@ -36,131 +37,26 @@ constexpr GLenum kDepthComponent = 0x1902;
 constexpr int kW = 1920, kH = 1080;
 constexpr int kMaxDabs = 64; // the pass's uniform arrays
 
-// One pass over a dab's screen rectangle: every dab of the stroke so far displaces the canvas's surface point along
-// its area normal by the Standard kernel (core/Sculpt.cpp, as render/Ghost.cpp's ghostMove), the normal bends by the
-// kernels' gradients, and the colour is re-shaded by the ratio of the Lit Sphere lookups (the mesh shader's, view
-// space) at the bent and the original normal, so cavity, material and paint stay as drawn.
-const char* kVS = R"(#version 330 core
-void main() {
-    vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
-    gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
-}
-)";
-const char* kFS = R"(#version 330 core
-uniform sampler2D uColor, uDepth, uLitSphereTex;
-uniform mat4 uInvProj, uProj;
-uniform vec2 uProjScale, uSize;
-uniform int uCount;
-uniform vec4 uDabC[64]; // view-space centre, radius
-uniform vec4 uDabN[64]; // view-space area normal, amplitude (strength x radius x 0.06)
-out vec4 fragColor;
-bool surface(ivec2 p) { return texelFetch(uDepth, clamp(p, ivec2(0), ivec2(uSize) - 1), 0).r < 1.0; }
-vec3 viewPos(ivec2 p) {
-    p = clamp(p, ivec2(0), ivec2(uSize) - 1);
-    float d = texelFetch(uDepth, p, 0).r;
-    vec4 q = uInvProj * vec4((vec2(p) + 0.5) / uSize * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
-    return q.xyz / q.w;
-}
-vec3 lit(vec3 n, vec3 v) {
-    vec3 bx = normalize(vec3(v.z, 0.0, -v.x));
-    vec3 by = cross(v, bx);
-    vec2 uv = vec2(dot(bx, n), dot(by, n)) * 0.495 + 0.5;
-    return pow(texture(uLitSphereTex, uv).rgb, vec3(2.2));
-}
-// The displacement of the surface point P by every dab (the Standard kernel along each area normal), and the
-// tangential gradient that bends a normal n.
-vec3 displace(vec3 P, vec3 n, out vec3 g) {
-    vec3 m = vec3(0.0);
-    g = vec3(0.0);
-    for (int i = 0; i < uCount; ++i) {
-        vec3 o = P - uDabC[i].xyz;
-        float dist = length(o), rad = uDabC[i].w;
-        if (dist >= rad || dist < 1e-9) continue;
-        float t = 1.0 - dist / rad;
-        m += uDabN[i].xyz * (uDabN[i].w * t * t * (3.0 - 2.0 * t));
-        vec3 grad = uDabN[i].w * (-(6.0 * t - 6.0 * t * t) / rad) * o / dist;
-        g += (grad - n * dot(grad, n)) * dot(uDabN[i].xyz, n);
+// GL_TIME_ELAPSED queries (3.3 core; not in the app's loader, loaded here like app/Calibration.cpp does).
+constexpr GLenum kTimeElapsed = 0x88BF, kQueryResult = 0x8866;
+struct Timer {
+    void(SF_GLAPI* gen)(GLsizei, GLuint*) = nullptr;
+    void(SF_GLAPI* del)(GLsizei, const GLuint*) = nullptr;
+    void(SF_GLAPI* begin)(GLenum, GLuint) = nullptr;
+    void(SF_GLAPI* end)(GLenum) = nullptr;
+    void(SF_GLAPI* result)(GLuint, GLenum, GLuint64*) = nullptr;
+    GLuint q = 0;
+    bool load() {
+        gen = reinterpret_cast<decltype(gen)>(SDL_GL_GetProcAddress("glGenQueries"));
+        del = reinterpret_cast<decltype(del)>(SDL_GL_GetProcAddress("glDeleteQueries"));
+        begin = reinterpret_cast<decltype(begin)>(SDL_GL_GetProcAddress("glBeginQuery"));
+        end = reinterpret_cast<decltype(end)>(SDL_GL_GetProcAddress("glEndQuery"));
+        result = reinterpret_cast<decltype(result)>(SDL_GL_GetProcAddress("glGetQueryObjectui64v"));
+        if (!(gen && del && begin && end && result)) return false;
+        gen(1, &q);
+        return true;
     }
-    return m;
-}
-// The surface normal from depth, smoothed: central differences over baselines of 1-3 pixels summed (the canvas holds
-// the mesh's facets, the mesh shader interpolates vertex normals), each pair skipped across a depth jump.
-vec3 normalAt(ivec2 p) {
-    vec3 P = viewPos(p), sum = vec3(0.0);
-    for (int k = 1; k <= 3; ++k) {
-        vec3 l = viewPos(p - ivec2(k, 0)), r = viewPos(p + ivec2(k, 0)), d = viewPos(p - ivec2(0, k)), u = viewPos(p + ivec2(0, k));
-        float jump = 0.05 * abs(P.z);
-        if (abs(r.z - l.z) > jump || abs(u.z - d.z) > jump) continue;
-        sum += cross(r - l, u - d);
-    }
-    if (dot(sum, sum) < 1e-30) { // (at an edge: the one-pixel step on the smaller side)
-        vec3 l = viewPos(p - ivec2(1, 0)), r = viewPos(p + ivec2(1, 0)), d = viewPos(p - ivec2(0, 1)), u = viewPos(p + ivec2(0, 1));
-        sum = cross(abs(r.z - P.z) < abs(P.z - l.z) ? r - P : P - l, abs(u.z - P.z) < abs(P.z - d.z) ? u - P : P - d);
-    }
-    vec3 n = normalize(sum);
-    return dot(n, P) > 0.0 ? -n : n;
-}
-vec2 toPixel(vec3 P) {
-    vec4 c = uProj * vec4(P, 1.0);
-    return (c.xy / c.w * 0.5 + 0.5) * uSize - 0.5;
-}
-void main() {
-    vec2 p = gl_FragCoord.xy - 0.5;
-    // Inverse warp: the canvas pixel q whose displaced surface point lands on p (fixed point q = p - offset(q)),
-    // from p and, for pixels the surface may grow over, from points towards the nearest dab.
-    vec2 best = vec2(-1.0);
-    vec2 toward = vec2(0.0);
-    float near = 1e30;
-    for (int i = 0; i < uCount; ++i) {
-        vec2 c = toPixel(uDabC[i].xyz);
-        if (distance(c, p) < near) near = distance(c, p), toward = c - p;
-    }
-    float bestErr = 4.0; // (accept a landing within 2 px; the closest one found)
-    for (int s = 0; s < 4 && bestErr > 0.04; ++s) {
-        vec2 q = p + toward * (0.12 * float(s));
-        for (int k = 0; k < 16; ++k) {
-            ivec2 iq = ivec2(floor(q + 0.5));
-            if (!surface(iq)) break;
-            vec3 g;
-            vec3 P = viewPos(iq);
-            vec2 err = toPixel(P + displace(P, vec3(0.0), g)) - p; // (the bend isn't needed here)
-            float e = dot(err, err);
-            if (e < bestErr) bestErr = e, best = q - err;
-            if (e < 0.04) break;
-            q -= err * (k < 8 ? 1.0 : 0.5); // (damped later: where the warp folds, a full step can oscillate)
-        }
-    }
-    ivec2 ip = ivec2(p);
-    if (best.x < 0.0) {
-        if (!surface(ip)) { fragColor = texelFetch(uColor, ip, 0); return; } // background stays
-        best = p; // (no landing point found: shade in place)
-    }
-    ivec2 iq = ivec2(floor(best + 0.5));
-    vec3 n0 = normalAt(iq);
-    vec3 g;
-    displace(viewPos(iq), n0, g);
-    vec3 n1 = normalize(n0 - g);
-    vec2 ndc = (gl_FragCoord.xy / uSize) * 2.0 - 1.0;
-    vec3 v = normalize(vec3(-ndc / uProjScale, 1.0)); // the mesh shader's viewRay
-    vec3 ratio = lit(n1, v) / max(lit(n0, v), vec3(1e-3));
-    vec4 c = texture(uColor, (best + 0.5) / uSize); // (bilinear at the landing point: no stair-steps where it stretches)
-    fragColor = vec4(pow(pow(c.rgb, vec3(2.2)) * ratio, vec3(1.0 / 2.2)), c.a);
-}
-)";
-
-GLuint compile(GLenum type, const char* src, std::string& error) {
-    GLuint s = gl::CreateShader(type);
-    gl::ShaderSource(s, 1, &src, nullptr);
-    gl::CompileShader(s);
-    GLint ok = 0;
-    gl::GetShaderiv(s, GL_COMPILE_STATUS, &ok);
-    if (!ok) {
-        char log[2048] = {};
-        gl::GetShaderInfoLog(s, sizeof log, nullptr, log);
-        error = log;
-    }
-    return s;
-}
+};
 
 struct Target {
     GLuint fbo = 0, color = 0, depth = 0;
@@ -294,27 +190,13 @@ int runOptimisticBench(const OptimisticBenchOptions& o) {
         std::fprintf(stderr, "%s\n", error.c_str());
         code = 1;
     }
-    GLuint prog = 0, vao = 0;
-    if (code == 0) {
-        GLuint vs = compile(GL_VERTEX_SHADER, kVS, error), fs = compile(GL_FRAGMENT_SHADER, kFS, error);
-        prog = gl::CreateProgram();
-        gl::AttachShader(prog, vs);
-        gl::AttachShader(prog, fs);
-        gl::LinkProgram(prog);
-        GLint ok = 0;
-        gl::GetProgramiv(prog, GL_LINK_STATUS, &ok);
-        gl::DeleteShader(vs);
-        gl::DeleteShader(fs);
-        if (!ok) {
-            std::fprintf(stderr, "optimistic pass: %s\n", error.c_str());
-            code = 1;
-        }
-        gl::GenVertexArrays(1, &vao);
-    }
+    ScreenStroke pass; // the live pass (render/ScreenStroke.h)
+    Timer timer;
+    const bool gpuTimer = code == 0 && timer.load();
     std::ostringstream md;
     md << "## Optimistic screen-space strokes (N1), " << reinterpret_cast<const char*>(gl::GetString(GL_RENDERER)) << "\n\n"
        << "Canvas " << kW << "x" << kH << ", Standard, " << o.dabs << " dabs of " << o.radiusPx << " px, strength 0.5.\n\n"
-       << "| Mesh | pass per dab (GPU, median / max) | whole stroke on the canvas | mesh: Standard dabs (CPU) + upload | "
+       << "| Mesh | pass per dab: GPU median / max (wall median) [GPU busy, median; last 8 dabs] | whole stroke on the canvas | mesh: Standard dabs (CPU) + upload | "
           "interior pop: optimistic vs truth (mean / p99 levels, > 8) | interior, doing nothing vs truth | pixels | "
           "outline (coverage changed): pixels, pop vs doing nothing (mean) |\n"
        << "|---|---:|---:|---:|---:|---:|---:|---:|\n";
@@ -376,67 +258,76 @@ int runOptimisticBench(const OptimisticBenchOptions& o) {
             if (glm::dot(n, c) > 0) n = -n;
             dabs.push_back({c, n, radius});
         }
-        // Optimistic: each dab one pass over its rectangle (all dabs so far evaluated), timed GPU-side by Finish.
+        // Optimistic: each dab one live pass (render/ScreenStroke) over its rectangle, the dabs so far that reach it
+        // evaluated, reading the drawn canvas and writing the output; GPU time from a timer query, wall time around
+        // glFinish (an upper bound, as before).
         gl::BindFramebuffer(GL_READ_FRAMEBUFFER, canvas.fbo);
         gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, out.fbo);
         gl::BlitFramebuffer(0, 0, kW, kH, 0, 0, kW, kH, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-        gl::UseProgram(prog);
-        gl::BindVertexArray(vao);
-        gl::Uniform1i(gl::GetUniformLocation(prog, "uColor"), 0);
-        gl::Uniform1i(gl::GetUniformLocation(prog, "uDepth"), 1);
-        gl::Uniform1i(gl::GetUniformLocation(prog, "uLitSphereTex"), 2);
-        gl::UniformMatrix4fv(gl::GetUniformLocation(prog, "uInvProj"), 1, GL_FALSE, glm::value_ptr(invProj));
-        gl::UniformMatrix4fv(gl::GetUniformLocation(prog, "uProj"), 1, GL_FALSE, glm::value_ptr(proj));
-        gl::Uniform2f(gl::GetUniformLocation(prog, "uProjScale"), proj[0][0], proj[1][1]);
-        gl::Uniform2f(gl::GetUniformLocation(prog, "uSize"), float(kW), float(kH));
-        gl::ActiveTexture(GL_TEXTURE0 + 1);
-        gl::BindTexture(GL_TEXTURE_2D, canvas.depth);
-        gl::ActiveTexture(GL_TEXTURE0 + 2);
-        gl::BindTexture(GL_TEXTURE_2D, renderer.litsphereTexture(rs.litsphere));
-        gl::ActiveTexture(GL_TEXTURE0);
-        gl::BindTexture(GL_TEXTURE_2D, canvas.color); // (each pass re-shades its rectangle from the drawn canvas, all dabs so far)
-        gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GLint(GL_LINEAR));
-        gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GLint(GL_LINEAR));
-        std::vector<glm::vec4> uc, un;
-        std::vector<double> passMs;
+        GhostStroke stroke;
+        stroke.kind = GhostKind::Standard;
+        const GLuint litsphere = renderer.litsphereTexture(rs.litsphere);
+        const glm::mat3 lightRot = lightRotation(rs.lightYaw, rs.lightPitch);
+        std::vector<double> passMs, gpuMs, warmMs;
         const auto all0 = Clock::now();
-        gl::Enable(GL_SCISSOR_TEST);
         for (size_t i = 0; i < dabs.size(); ++i) {
-            uc.push_back(glm::vec4(dabs[i].cView, dabs[i].radius));
-            un.push_back(glm::vec4(dabs[i].nView, 0.5f * dabs[i].radius * 0.06f));
-            gl::Finish();
-            const auto t = Clock::now();
-            gl::Uniform1i(gl::GetUniformLocation(prog, "uCount"), GLint(uc.size()));
-            gl::Uniform4fv(gl::GetUniformLocation(prog, "uDabC"), GLsizei(uc.size()), glm::value_ptr(uc[0]));
-            gl::Uniform4fv(gl::GetUniformLocation(prog, "uDabN"), GLsizei(un.size()), glm::value_ptr(un[0]));
+            GhostDab g;
+            g.center = glm::vec3(invView * glm::vec4(dabs[i].cView, 1.0f));
+            g.normal = glm::normalize(glm::vec3(invView * glm::vec4(dabs[i].nView, 0.0f)));
+            g.areaCenter = g.center;
+            g.radius = dabs[i].radius;
+            g.strength = 0.5f;
+            stroke.dabs.push_back(g);
             // The dab's screen rectangle (its radius projected at its depth, plus a margin).
             const glm::vec4 cc = proj * glm::vec4(dabs[i].cView, 1.0f);
             const float sx = (cc.x / cc.w * 0.5f + 0.5f) * kW, sy = (cc.y / cc.w * 0.5f + 0.5f) * kH;
-            const int rp = int(std::ceil(o.radiusPx * 1.5f)) + 2; // (the surface may grow past the radius)
-            gl::BindFramebuffer(GL_FRAMEBUFFER, out.fbo);
-            gl::Viewport(0, 0, kW, kH);
-            gl::Scissor(int(sx) - rp, int(sy) - rp, 2 * rp, 2 * rp);
-            gl::DrawArrays(GL_TRIANGLES, 0, 3);
+            const int rp = int(std::ceil(o.radiusPx * kReach)) + 2; // (the surface may grow past the radius)
+            const glm::ivec4 rect(int(sx) - rp, int(sy) - rp, int(sx) + rp, int(sy) + rp);
+            gl::Finish();
+            const auto t = Clock::now();
+            if (gpuTimer) timer.begin(kTimeElapsed, timer.q);
+            if (!pass.apply(stroke, canvas.fbo, canvas.fbo, out.fbo, kW, kH, view, proj, glm::vec4(0, 0, kW, kH), litsphere, lightRot, &rect))
+                std::fprintf(stderr, "core-200m N1: dab %zu not drawn (litsphere %u)\n", i, litsphere);
+            if (gpuTimer) timer.end(kTimeElapsed);
             gl::Finish();
             passMs.push_back(msSince(t));
+            if (gpuTimer) {
+                GLuint64 ns = 0;
+                timer.result(timer.q, kQueryResult, &ns);
+                gpuMs.push_back(double(ns) / 1e6);
+                // Warm: the same pass 5 times back to back (the GPU busy, as inside a frame), per pass.
+                timer.begin(kTimeElapsed, timer.q);
+                for (int k = 0; k < 5; ++k)
+                    pass.apply(stroke, canvas.fbo, canvas.fbo, out.fbo, kW, kH, view, proj, glm::vec4(0, 0, kW, kH), litsphere, lightRot, &rect);
+                timer.end(kTimeElapsed);
+                timer.result(timer.q, kQueryResult, &ns);
+                warmMs.push_back(double(ns) / 5e6);
+            }
         }
-        gl::Disable(GL_SCISSOR_TEST);
         const double allMs = msSince(all0);
-        gl::UseProgram(0);
         const std::vector<uint8_t> optimistic = readColor(out);
+        // Live, the pass draws only the dabs the solver hasn't placed yet: the same passes with the last 8 dabs
+        // (after the image is read: they draw over it).
+        std::vector<double> windowMs;
+        if (gpuTimer)
+            for (size_t i = 0; i < stroke.dabs.size(); ++i) {
+                GhostStroke w = stroke;
+                w.dabs.assign(stroke.dabs.begin() + std::ptrdiff_t(i + 1 > 8 ? i + 1 - 8 : 0), stroke.dabs.begin() + std::ptrdiff_t(i + 1));
+                const glm::vec4 cc = proj * glm::vec4(dabs[i].cView, 1.0f);
+                const float sx = (cc.x / cc.w * 0.5f + 0.5f) * kW, sy = (cc.y / cc.w * 0.5f + 0.5f) * kH;
+                const int rp = int(std::ceil(o.radiusPx * kReach)) + 2;
+                const glm::ivec4 rect(int(sx) - rp, int(sy) - rp, int(sx) + rp, int(sy) + rp);
+                GLuint64 ns = 0;
+                timer.begin(kTimeElapsed, timer.q);
+                for (int k = 0; k < 5; ++k)
+                    pass.apply(w, canvas.fbo, canvas.fbo, out.fbo, kW, kH, view, proj, glm::vec4(0, 0, kW, kH), litsphere, lightRot, &rect);
+                timer.end(kTimeElapsed);
+                timer.result(timer.q, kQueryResult, &ns);
+                windowMs.push_back(double(ns) / 5e6);
+            }
         // The geometry preview (render/Ghost.h, Background Preview): the same dabs moved in the vertex shader. Its
         // cost is the frame with it less the frame without (median of 5 each).
-        GhostStroke ghost;
-        ghost.kind = GhostKind::Standard;
-        for (const Dab& d : dabs) {
-            GhostDab g;
-            g.center = glm::vec3(invView * glm::vec4(d.cView, 1.0f));
-            g.normal = glm::normalize(glm::vec3(invView * glm::vec4(d.nView, 0.0f)));
-            g.areaCenter = g.center;
-            g.radius = d.radius;
-            g.strength = 0.5f;
-            ghost.dabs.push_back(g);
-        }
+        const GhostStroke& ghost = stroke;
         auto frameMs = [&](int repeats) {
             std::vector<double> t;
             for (int k = 0; k < repeats; ++k) {
@@ -492,9 +383,10 @@ int runOptimisticBench(const OptimisticBenchOptions& o) {
         const Diff pop = diff(optimistic, truth, before, &interior), none = diff(before, truth, before, &interior);
         const Diff popEdge = diff(optimistic, truth, before, &outline), noneEdge = diff(before, truth, before, &outline);
         const Diff ghostPop = diff(ghostImage, truth, before, &interior), ghostEdge = diff(ghostImage, truth, before, &outline);
-        char row[512];
-        std::snprintf(row, sizeof row, "| %.1fM | %.2f / %.2f ms | %.1f ms | %.0f ms | %.1f / %.0f, %.1f%% | %.1f / %.0f, %.1f%% | %zu | %zu: %.1f vs %.1f |\n",
-                      double(m.triangleCount()) / 1e6, median(passMs), *std::max_element(passMs.begin(), passMs.end()), allMs,
+        char row[640];
+        std::snprintf(row, sizeof row, "| %.1fM | %.2f / %.2f ms (%.2f) [%.2f; %.2f] | %.1f ms | %.0f ms | %.1f / %.0f, %.1f%% | %.1f / %.0f, %.1f%% | %zu | %zu: %.1f vs %.1f |\n",
+                      double(m.triangleCount()) / 1e6, median(gpuMs), gpuMs.empty() ? 0.0 : *std::max_element(gpuMs.begin(), gpuMs.end()),
+                      median(passMs), median(warmMs), median(windowMs), allMs,
                       solveMs, pop.mean, pop.p99, pop.over8 * 100, none.mean, none.p99, none.over8 * 100, none.pixels, popEdge.pixels, popEdge.mean, noneEdge.mean);
         md << row;
         std::fprintf(stderr, "%s", row);
@@ -527,11 +419,11 @@ int runOptimisticBench(const OptimisticBenchOptions& o) {
     md << "\nThe geometry preview (Background Preview's ghost) on the same 30 dabs:\n\n| Mesh | extra cost on a frame "
           "(frame with / without) | interior pop vs truth (mean / p99, > 8) | outline pop (mean) |\n|---|---:|---:|---:|\n"
        << ghostRows;
-    md << "\nPass: one GPU pass over the dab's rectangle evaluating every dab so far (its cost is the brush's pixels, not "
-          "the mesh). Mesh: the Standard brush on the CPU plus the upload, i.e. what the optimistic canvas hides. Pop: "
+    md << "\nPass: the live pass (render/ScreenStroke: field, then warp) over the dab's rectangle with the dabs so far "
+          "that reach it (its cost is the brush's pixels, not the mesh). Mesh: the Standard brush on the CPU plus the upload, i.e. what the optimistic canvas hides. Pop: "
           "per-pixel max channel difference over the pixels the stroke changed in either image.\n";
-    if (prog) gl::DeleteProgram(prog);
-    if (vao) gl::DeleteVertexArrays(1, &vao);
+    pass.release();
+    if (gpuTimer) timer.del(1, &timer.q);
     renderer.shutdown();
     SDL_GL_DestroyContext(context);
     SDL_DestroyWindow(window);

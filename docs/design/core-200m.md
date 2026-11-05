@@ -237,10 +237,17 @@ showing nothing until the mesh catches up.
 - **Looked at** (screenshots before / optimistic / truth / pop map at 5M and 33M): smooth, the features in the right
   places; the visible residuals are a slightly stair-stepped outline where the surface grows over the background, and
   shading differences where the solver's per-dab area normals drift from the canvas's estimate.
-- **Not yet < 1 ms.** The prototype re-evaluates every dab of the stroke in every pass (30 here). Live, only the dabs
-  the solver hasn't committed are evaluated (its backlog, a few to a dozen), and accumulating into the canvas (displaced
-  depth and normal written back) makes it one dab per pass; both are the next step. Timing is CPU-side around
-  `glFinish` (an upper bound; the Windows spread 1.3-6.7 ms is that).
+- **Under 1 ms (11-04):** the pass is now two passes over the dab's rectangle. A field pass evaluates each dab once
+  per pixel with its gradient in closed form (no finite differences), only for the dabs that reach the rectangle, and
+  skips pixels no dab reaches. A warp pass then iterates over that field, interpolated so it converges below a pixel
+  (before, rounding to whole pixels kept most moved pixels at the 64-step cap). Laptop, GPU time (timer query) per
+  dab at 240 px, every dab of the stroke evaluated: 0.58-0.73 ms median at 5-33M (was 4.2-4.8 ms by wall clock);
+  with the live window (the last 8 dabs, what the solver hasn't placed) 0.54-0.62 ms. Pop unchanged (interior
+  4.4 / p99 19-21; outline 38-39, was 41). The bench now times the live pass itself (render/ScreenStroke), not a copy.
+- **Live, floor profile, 15M (Background Preview vs N1, GPU ms p50 / p99):** 240 px 8.3 / 13.2 vs 9.6 / 17.8 (was
+  15.6 for N1); 120 px 7.4 / 11.8 vs 7.5 / 11.9; 25 px 6.6 / 12.7 vs 6.8 / 13.0. Preview lag 5.6 vs 7.9 px at 240 px.
+  N1 now costs about what the ghost costs; the decision stands (the ghost stays the default, N1 is for micro levels
+  and 30M+ where the ghost's vertex pass grows with the mesh).
 - **Next:** wire it into the live frame (the canvas cache of perf-moonshots §7 A as its storage), the backlog-only
   evaluation, then Clay / Inflate / Flatten kernels (Flatten reads the canvas plane), then pen prediction (N4) on top.
 

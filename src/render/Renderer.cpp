@@ -2662,7 +2662,7 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
     gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, viewResolveFbo_);
     gl::BlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
     if (screen)
-        screenStrokeDrawn_ = screenPass_.apply(screenStroke_, viewFbo_, viewResolveFbo_, width, height, frameView_, frameProj_,
+        screenStrokeDrawn_ = screenPass_.apply(screenStroke_, viewFbo_, viewResolveFbo_, viewResolveFbo_, width, height, frameView_, frameProj_,
                                                frameViewport_, litsphereTexture(settings.litsphere),
                                                lightRotation(settings.lightYaw, settings.lightPitch));
     gl::BindFramebuffer(GL_READ_FRAMEBUFFER, viewResolveFbo_); // single-sample blit: may convert to the window's format
