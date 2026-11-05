@@ -123,20 +123,20 @@ TEST(maya_bridge_round_trip) {
 
     // Off until a folder is given; a folder that isn't there is refused.
     Document doc = makeDoc(makeCube(3)); // quads
-    doc.subtools[0].name = "Body Hi";
+    doc.parts[0].name = "Body Hi";
     doc.mesh.uvs.assign(doc.mesh.triangleCount() * 3, glm::vec2(0.25f, 0.75f));
-    doc.mesh.ensurePolygroups();
+    doc.mesh.ensureFaceGroups();
     for (uint32_t t = 0; t < doc.mesh.triangleCount(); ++t) { // one group per cube side (quads stay whole)
         const auto& tri = doc.mesh.triangles[t];
         const glm::vec3 n = glm::abs(glm::cross(doc.mesh.positions[tri[1]] - doc.mesh.positions[tri[0]],
                                                 doc.mesh.positions[tri[2]] - doc.mesh.positions[tri[0]]));
-        doc.mesh.polygroups[t] = n.x > n.y && n.x > n.z ? 1 : n.y > n.z ? 2 : 3;
+        doc.mesh.facegroups[t] = n.x > n.y && n.x > n.z ? 1 : n.y > n.z ? 2 : 3;
     }
     CHECK(!reg.execute(doc, "maya_send", {{"folder", std::string()}}).ok);
     CHECK(!reg.execute(doc, "maya_send", {{"folder", (root / "missing").string()}}).ok);
     CHECK(!fs::exists(root / "missing"));
 
-    // Send: OBJ with quads and UVs (polygroups stay home), a Maya-safe name, the manifest.
+    // Send: OBJ with quads and UVs (face groups stay home), a Maya-safe name, the manifest.
     const size_t quads = doc.mesh.quadCount();
     const size_t triangles = doc.mesh.triangleCount();
     CHECK(quads > 0);
@@ -145,10 +145,10 @@ TEST(maya_bridge_round_trip) {
     MayaManifest sent;
     CHECK(readMayaManifest(mayaManifestPath(mayaOutbox(folder)), sent, err));
     CHECK(sent.revision == 1 && sent.sender == "sculptforge" && sent.objects.size() == 1);
-    CHECK(sent.objects[0].name == "Body_Hi" && doc.gozName == "Body_Hi");
+    CHECK(sent.objects[0].name == "Body_Hi" && doc.bridgeName == "Body_Hi");
     Mesh obj;
     CHECK(loadObj((root / "sculptforge_to_maya" / sent.objects[0].file).string(), obj, err));
-    CHECK(obj.triangleCount() == triangles && obj.quadCount() == quads && obj.hasUvs() && !obj.hasPolygroups());
+    CHECK(obj.triangleCount() == triangles && obj.quadCount() == quads && obj.hasUvs() && !obj.hasFaceGroups());
 
     // "Maya" sends it back changed (here: the file SculptForge wrote, moved up), plus a new object.
     const fs::path inbox = root / "maya_to_sculptforge";
@@ -163,10 +163,10 @@ TEST(maya_bridge_round_trip) {
     r = reg.execute(doc, "maya_receive", {{"folder", folder}});
     CHECK(r.ok && r.message.find("Received 2 objects from Maya") != std::string::npos);
     // Replaced by name (undoably), the new one added.
-    CHECK(doc.subtoolCount() == 2 && doc.activeSubtool == 0 && doc.subtools[0].name == "Body Hi");
+    CHECK(doc.partCount() == 2 && doc.activePart == 0 && doc.parts[0].name == "Body Hi");
     CHECK(doc.mesh.quadCount() == quads && doc.mesh.hasUvs() && doc.undo.canUndo());
     CHECK(std::abs(doc.mesh.positions[0].y - obj.positions[0].y) < 1e-5f);
-    CHECK(doc.subtools[1].name == "pSphere1" && doc.subtools[1].gozName == "pSphere1");
+    CHECK(doc.parts[1].name == "pSphere1" && doc.parts[1].bridgeName == "pSphere1");
 
     // A second send: the next revision, the first send's files removed, others in the folder left alone.
     writeText(root / "sculptforge_to_maya" / "notes.txt", "mine");
@@ -196,9 +196,9 @@ TEST(maya_bridge_round_trip) {
     writeText(root / "outside.obj", "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
     writeText(inbox / "manifest.json", R"({"format": "sculptforge-maya", "version": 1, "revision": 6,
         "objects": [{"name": "x", "file": "../outside.obj"}]})");
-    const int before = doc.subtoolCount();
+    const int before = doc.partCount();
     r = reg.execute(doc, "maya_receive", {{"folder", folder}});
-    CHECK(!r.ok && doc.subtoolCount() == before);
+    CHECK(!r.ok && doc.partCount() == before);
 #ifndef _WIN32
     // A link inside the folder that points out of it is not a plain file: refused.
     std::error_code ec;
@@ -207,7 +207,7 @@ TEST(maya_bridge_round_trip) {
         writeText(inbox / "manifest.json", R"({"format": "sculptforge-maya", "version": 1, "revision": 7,
             "objects": [{"name": "x", "file": "link.obj"}]})");
         r = reg.execute(doc, "maya_receive", {{"folder", folder}});
-        CHECK(!r.ok && r.message.find("plain file") != std::string::npos && doc.subtoolCount() == before);
+        CHECK(!r.ok && r.message.find("plain file") != std::string::npos && doc.partCount() == before);
     }
 #endif
     // A missing file says which.

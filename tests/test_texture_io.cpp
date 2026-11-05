@@ -2,20 +2,21 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // UVs and textures in the model formats: per-corner UVs survive OBJ, FBX, USD,
-// glTF and GoZ round trips (triangles, kept quads, quads cut by UV seams), and
-// a textured SubTool exports its PNG with the reference each format uses
-// (OBJ .mtl map_Kd, FBX Texture, USD UsdUVTexture, embedded glTF image, GoZ
+// glTF and Bridge round trips (triangles, kept quads, quads cut by UV seams), and
+// a textured Part exports its PNG with the reference each format uses
+// (OBJ .mtl map_Kd, FBX Texture, USD UsdUVTexture, embedded glTF image, Bridge
 // diffuse map). Meshes without UVs export without any of it.
 #include "TestHarness.h"
 
 #include "core/Commands.h"
 #include "core/Image.h"
 #include "core/Primitives.h"
-#include "core/SubTools.h"
+#include "core/Parts.h"
 #include "core/Texture.h"
 #include "io/FbxIO.h"
 #include "io/GltfIO.h"
-#include "io/GozIO.h"
+#include "io/BridgeIO.h"
+#include "io/BridgeProtocol.h"
 #include "io/ObjIO.h"
 #include "io/TextureExport.h"
 #include "io/UsdIO.h"
@@ -162,8 +163,8 @@ std::vector<Format> formats() {
          }},
         {".glb", [](const std::string& p, const Mesh& m, std::string& e) { return saveGlb(p, m, "Sculpt", e); },
          [](const std::string& p, Mesh& m, std::string& e) { return loadGltf(p, m, e); }},
-        {".GoZ", [](const std::string& p, const Mesh& m, std::string& e) { return saveGoz(p, m, "Sculpt", e); },
-         [](const std::string& p, Mesh& m, std::string& e) { return loadGoz(p, m, e); }},
+        {bridgefile::kExt, [](const std::string& p, const Mesh& m, std::string& e) { return saveBridge(p, m, "Sculpt", e); },
+         [](const std::string& p, Mesh& m, std::string& e) { return loadBridge(p, m, e); }},
     };
 }
 
@@ -313,7 +314,7 @@ TEST(texture_io_sidecar_names_without_spaces) {
     fs::remove_all(dir);
 }
 
-TEST(texture_io_fbx_usd_glb_goz_reference_texture) {
+TEST(texture_io_fbx_usd_glb_bridge_reference_texture) {
     const fs::path dir = testDir("sf_texture_io_refs");
     std::string err;
     Mesh m = seamSphere();
@@ -359,11 +360,11 @@ TEST(texture_io_fbx_usd_glb_goz_reference_texture) {
     Mesh back;
     CHECK(loadGltf(str(dir / "model.glb"), back, err) && sameUvs(m, back));
 
-    // GoZ: the PNG beside the file, recorded as the diffuse map.
-    CHECK(saveGoz(str(dir / "model.GoZ"), m, "Sculpt", err));
+    // Bridge: the PNG beside the file, recorded as the diffuse map.
+    CHECK(saveBridge(str(dir / (std::string("model") + bridgefile::kExt)), m, "Sculpt", err));
     CHECK(checkPng(dir / "model_color.png"));
-    GozInfo info;
-    CHECK(loadGoz(str(dir / "model.GoZ"), back, err, &info));
+    BridgeInfo info;
+    CHECK(loadBridge(str(dir / (std::string("model") + bridgefile::kExt)), back, err, &info));
     CHECK(info.diffuseMap.ends_with("model_color.png"));
     fs::remove_all(dir);
 }
@@ -377,7 +378,7 @@ TEST(texture_io_export_commands_write_textures) {
     eye.recomputeAllNormals();
     Document doc;
     doc.setMesh(std::move(body), "Body");
-    doc.addSubtool(std::move(eye), "Eye", false);
+    doc.addPart(std::move(eye), "Eye", false);
     // Merging keeps the UVs (meshes without get zeros).
     const Mesh merged = mergedVisibleMesh(doc);
     CHECK(merged.uvs.size() == merged.triangleCount() * 3);
@@ -389,12 +390,12 @@ TEST(texture_io_export_commands_write_textures) {
     std::vector<MeshObject> objects;
     std::string err;
     CHECK(loadFbx(str(dir / "scene.fbx"), objects, err) && objects.size() == 2);
-    if (objects.size() == 2) CHECK(sameCornerUvs(doc.subtoolMesh(0), objects[0].mesh) && !objects[1].mesh.hasUvs());
+    if (objects.size() == 2) CHECK(sameCornerUvs(doc.partMesh(0), objects[0].mesh) && !objects[1].mesh.hasUvs());
     CHECK(reg.execute(doc, "export_usd", {{"path", str(dir / "scene.usdz")}}).ok);
     CHECK(reg.execute(doc, "export_lods", {{"path", str(dir / "rock.glb")}, {"levels", 2.0}}).ok);
     // Every LOD level embeds the texture.
     CHECK(readText(dir / "rock_LOD1.glb").find("image/png") != std::string::npos);
-    CHECK(reg.execute(doc, "goz_export", {{"path", str(dir / "out.GoZ")}}).ok);
+    CHECK(reg.execute(doc, "bridge_export", {{"path", str(dir / (std::string("out") + bridgefile::kExt))}}).ok);
     CHECK(checkPng(dir / "out_Body_color.png"));
     fs::remove_all(dir);
 }

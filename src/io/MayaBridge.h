@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // The Maya bridge (#42): SculptForge and the SculptForge shelf script for Maya (integrations/maya) exchange
-// meshes through ONE folder the user picks on both sides, the way GoZ apps do with ZBrush. Nothing else is
+// meshes through ONE folder the user picks on both sides, the way Bridge apps do . Nothing else is
 // shared: no sockets, ports or other IPC, and nothing in the folder is ever run. Meshes travel as OBJ (quads,
 // UVs; one object per file, world space, Maya's Y-up and units as they are); a small JSON manifest per
 // direction lists the objects, their Maya names and a revision number so each side sees what is new.
@@ -32,7 +32,7 @@ inline constexpr size_t kMayaMaxFileNameBytes = 64;
 inline constexpr unsigned long long kMayaMaxObjBytes = 8ull << 30; // 8 GiB: a 30M-triangle OBJ with UVs fits
 
 struct MayaObject {
-    std::string name; // the Maya transform's short name (Maya characters only): the SubTool's gozName
+    std::string name; // the Maya transform's short name (Maya characters only): the Part's bridgeName
     std::string file; // OBJ file name inside the manifest's folder
 };
 

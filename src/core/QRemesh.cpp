@@ -276,7 +276,7 @@ struct Level {
     std::vector<uint8_t> ctype;
     std::vector<vec3> cdir, cpos;
     std::vector<uint8_t> boundary;  // on an open edge of the mesh
-    std::vector<vec3> color;        // polypaint (usePolypaint only)
+    std::vector<vec3> color;        // vertex paint (useVertex paint only)
     // QRemesh Guides: how strongly (0..1) the orientation turns to the nearest curve's direction gdir (empty
     // without guides).
     std::vector<float> gw;
@@ -329,7 +329,7 @@ void computeMeanEdge(Level& l) {
 }
 
 // Level 0 from the working mesh: vertex graph, area-weighted normals, constraints on open edges and (with
-// keepGroups) polygroup borders.
+// keepGroups) face group borders.
 Level buildFinest(const WorkMesh& m, bool keepGroups, float sharpCos, std::vector<std::pair<vec3, vec3>>& boundarySegs,
                   std::vector<uint8_t>& boundarySegIsCut, std::vector<std::pair<vec3, vec3>>& borderSegs, int symAxis) {
     Level l;
@@ -424,7 +424,7 @@ Level buildFinest(const WorkMesh& m, bool keepGroups, float sharpCos, std::vecto
         }
     }
 
-    // Feature edges: open edges and polygroup borders.
+    // Feature edges: open edges and face group borders.
     l.ctype.assign(nv, kFree);
     l.cdir.assign(nv, vec3(0.0f));
     l.cpos = l.V;
@@ -1270,14 +1270,14 @@ void removeDoublets(QuadMesh& q) {
 struct Snapper {
     const TriangleBVH* surface = nullptr;
     const SegmentBVH* boundary = nullptr; // open edges of the source (incl. the symmetry cut)
-    const SegmentBVH* borders = nullptr;  // polygroup borders (Keep Groups) and hard edges
+    const SegmentBVH* borders = nullptr;  // face group borders (Keep Groups) and hard edges
     const SegmentBVH* corners = nullptr;  // where several of those meet (as zero-length segments)
     float reach = 1.0f;
     const SegmentBVH* guides = nullptr;   // QRemesh Guides: only the loops' own vertices snap to them
 };
 
 // Tangential relaxation on the source surface; vertices on open edges stay on the source's open edges, those
-// on polygroup borders on the borders.
+// on face group borders on the borders.
 void relax(QuadMesh& q, const Snapper& snap, int iterations, float edge, const QRemeshProgress& progress, float p0,
            float p1, bool& cancelled) {
     const size_t nv = q.P.size();
@@ -1291,7 +1291,7 @@ void relax(QuadMesh& q, const Snapper& snap, int iterations, float edge, const Q
         const uint32_t a = uint32_t(key >> 32), b = uint32_t(key & 0xffffffffu);
         nb[a].push_back(b);
         nb[b].push_back(a);
-        if (uses == 1) open[a] = open[b] = 2; // 2 = open-edge vertex, 1 = polygroup border vertex
+        if (uses == 1) open[a] = open[b] = 2; // 2 = open-edge vertex, 1 = face group border vertex
     }
     std::vector<std::vector<uint32_t>> openNb(nv);
     for (auto [key, uses] : edgeUse) {
@@ -1326,7 +1326,7 @@ void relax(QuadMesh& q, const Snapper& snap, int iterations, float edge, const Q
     parallelFor(nv, [&](size_t b, size_t e) {
         for (size_t v = b; v < e; ++v) q.P[v] = project(uint32_t(v), q.P[v], normal[v]);
     });
-    // Polygroup-border vertices: within a fifth of an edge of a border.
+    // Face group-border vertices: within a fifth of an edge of a border.
     // Vertices on a guide's loop are the ones extracted on it (features): a vertex merely near a guide stays free.
     if (snap.borders || snap.guides)
         for (uint32_t v = 0; v < nv; ++v) {
@@ -1604,7 +1604,7 @@ bool remeshPiece(WorkMesh work, int axis, double wantQuads, const QRemeshOptions
         if (!report(0.20f + 0.20f * float(levels.size() - li) / float(levels.size() - base))) return false;
     }
 
-    // Scale field on the base level: curvature (Adaptive Size) and polypaint density, then normalised to the
+    // Scale field on the base level: curvature (Adaptive Size) and vertex paint density, then normalised to the
     // wanted number of faces and passed up the hierarchy.
     Level& L = levels[base];
     std::vector<float> rel(L.size(), 1.0f); // relative edge length
@@ -1805,8 +1805,8 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
     work.P = source.positions;
     work.T = source.triangles;
     work.group.resize(work.T.size());
-    for (uint32_t t = 0; t < work.T.size(); ++t) work.group[t] = source.polygroupAt(t);
-    if (opt.usePolypaint && source.hasColors()) work.color = source.colors;
+    for (uint32_t t = 0; t < work.T.size(); ++t) work.group[t] = source.facegroupAt(t);
+    if (opt.useVertexPaint && source.hasColors()) work.color = source.colors;
     const AABB box = source.bounds();
     const float diag = glm::length(box.extent());
     if (!(diag > 0.0f)) {
@@ -1869,7 +1869,7 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
 
     // QRemesh Guides in the working frame: snapped onto the sculpt as it is now (it may have changed since they
     // were drawn) and, with symmetry, mirrored, so a curve drawn on either side guides both.
-    // A guide mostly off the surface (the SubTool was moved after it was drawn) is left out.
+    // A guide mostly off the surface (the Part was moved after it was drawn) is left out.
     std::vector<QRemeshGuide> guides;
     if (!opt.guides.empty()) buildFull();
     for (const QRemeshGuide& g : opt.guides) {
@@ -2173,23 +2173,23 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
                 }
             });
         }
-        if (opt.keepGroups && source.hasPolygroups()) {
-            m.ensurePolygroups();
+        if (opt.keepGroups && source.hasFaceGroups()) {
+            m.ensureFaceGroups();
             const size_t nq = qm.quads.size();
             parallelFor(nq, [&](size_t b, size_t e) {
                 for (size_t q = b; q < e; ++q) {
                     const glm::uvec3 t0 = m.triangles[2 * q], t1 = m.triangles[2 * q + 1];
                     const vec3 c = 0.25f * (m.positions[t0.x] + m.positions[t0.y] + m.positions[t0.z] + m.positions[t1.z]);
                     SurfaceHit hit;
-                    const uint32_t g = full.closestPoint(c, reach, hit) ? source.polygroupAt(hit.prim) : 0u;
-                    m.polygroups[2 * q] = m.polygroups[2 * q + 1] = g;
+                    const uint32_t g = full.closestPoint(c, reach, hit) ? source.facegroupAt(hit.prim) : 0u;
+                    m.facegroups[2 * q] = m.facegroups[2 * q + 1] = g;
                 }
             });
             for (size_t t = 2 * nq; t < m.triangles.size(); ++t) {
                 const glm::uvec3 tri = m.triangles[t];
                 SurfaceHit hit;
                 const vec3 c = (m.positions[tri.x] + m.positions[tri.y] + m.positions[tri.z]) / 3.0f;
-                m.polygroups[t] = full.closestPoint(c, reach, hit) ? source.polygroupAt(hit.prim) : 0u;
+                m.facegroups[t] = full.closestPoint(c, reach, hit) ? source.facegroupAt(hit.prim) : 0u;
             }
         }
     }

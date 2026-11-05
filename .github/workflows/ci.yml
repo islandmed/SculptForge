@@ -82,6 +82,15 @@ jobs:
           echo "code=$code" | tee -a "$GITHUB_OUTPUT"
 
 
+  # Trademark gate (docs/legal/trademarks.md): every tracked file and path, on every push and pull request, docs-only
+  # ones too. Seconds; no build.
+  marks:
+    name: Trademarks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - run: python3 tools/check_marks.py --self-test && python3 tools/check_marks.py
+
   build:
     name: ${{ matrix.name }} (${{ matrix.shard }}/${{ matrix.shards }})
     needs: changes
@@ -352,7 +361,7 @@ jobs:
   # (a website-only change); a failure anywhere fails them all, and the run shows which job failed.
   result:
     name: ${{ matrix.check }}
-    needs: [changes, build, blender-addon, vfx-platform]
+    needs: [changes, marks, build, blender-addon, vfx-platform]
     if: always()
     runs-on: ubuntu-24.04
     strategy:
@@ -367,7 +376,7 @@ jobs:
           - VFX Reference Platform CY2027 (rockylinux:9)
     steps:
       - env:
-          RESULTS: ${{ needs.changes.result }} ${{ needs.build.result }} ${{ needs.blender-addon.result }} ${{ needs.vfx-platform.result }}
+          RESULTS: ${{ needs.changes.result }} ${{ needs.marks.result }} ${{ needs.build.result }} ${{ needs.blender-addon.result }} ${{ needs.vfx-platform.result }}
         run: |
-          echo "changes, build, blender-addon, vfx-platform: $RESULTS"
+          echo "changes, marks, build, blender-addon, vfx-platform: $RESULTS"
           for r in $RESULTS; do case $r in success|skipped) ;; *) exit 1 ;; esac; done

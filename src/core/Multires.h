@@ -1,10 +1,10 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Multiresolution subdivision levels, ZBrush style (Tool > Geometry: Divide, Lower Res / Higher Res, SDiv,
+// Multiresolution subdivision levels, classic (Tool > Geometry: Divide, Lower Res / Higher Res, SDiv,
 // Del Lower / Del Higher, Reconstruct Subdiv, Smt).
 //
-// A SubTool's mesh may carry a stack of levels (Mesh::multires). Level 0 is the base cage; each higher level
+// A Part's mesh may carry a stack of levels (Mesh::multires). Level 0 is the base cage; each higher level
 // is the one below subdivided (Catmull-Clark when the mesh has quads, so quads stay quads; Loop on pure
 // triangle meshes; or flat when Smt was off) plus a detail displacement per vertex, stored in the local frame
 // (tangent, bitangent, normal) of the subdivided surface:
@@ -19,12 +19,12 @@
 //    change at its own and its neighbouring fine vertices), the details of the levels in between are
 //    re-fitted so the current level stays exactly as sculpted, and higher levels are re-evaluated from their
 //    unchanged details on the way up;
-//  - mask, polypaint and paint layers (per vertex), polygroups and hidden faces (per triangle) and UVs (per
+//  - mask, vertex paint and paint layers (per vertex), face groups and hidden faces (per triangle) and UVs (per
 //    corner) are copied down to the parent elements and interpolated / inherited up, only where they changed,
 //    so detail painted at a high level survives an edit somewhere else at a low level;
 //  - sculpt layers are their own displacement channels, subdivided with the same stencils; their per-level
 //    detail is stored in the same local frame as the shape's, so a sculpt layer's fine offsets turn and bend
-//    with a low level that is rotated (Gizmo 3D) or reshaped (project format 5; older files are converted);
+//    with a low level that is rotated (Transform gizmo) or reshaped (project format 5; older files are converted);
 //  - the painted texture lives in UV space and is shared by every level.
 // Stepping between levels that weren't edited copies the stored level back, so up / down round trips are
 // bit-for-bit.
@@ -132,7 +132,7 @@ struct SubdivLevel {
 
 // Working meshes (with topology and normals) and BVHs of the levels most recently left, so stepping back to
 // one is a move instead of a rebuild. Keyed by the level's data, so any change to the level misses. Only the
-// active SubTool keeps one: Document::selectSubtool frees the cache of the SubTool it leaves (subdivReleaseCache).
+// active Part keeps one: Document::selectPart frees the cache of the Part it leaves (subdivReleaseCache).
 struct SubdivLevelCache;
 
 struct MultiresStack {
@@ -144,7 +144,7 @@ struct MultiresStack {
 // --- Queries (0 levels = a plain mesh) ---
 int subdivLevelCount(const Mesh& mesh);
 int subdivCurrentLevel(const Mesh& mesh); // 0-based; 0 without levels
-// "SDiv 3/5" (1-based, as ZBrush shows it), or "" without levels.
+// "SDiv 3/5" (1-based shows it), or "" without levels.
 std::string subdivLevelText(const Mesh& mesh);
 // Triangle count of level `level`.
 size_t subdivLevelTriangles(const Mesh& mesh, int level);
@@ -155,19 +155,19 @@ bool subdivMatches(const Mesh& mesh);
 size_t subdivBytes(const Mesh& mesh);
 // Bytes the level cache holds (cached working meshes and their BVHs; approximate).
 size_t subdivCacheBytes(const Mesh& mesh);
-// Frees the level cache (the next step to another level rebuilds it): for SubTools that aren't active and
+// Frees the level cache (the next step to another level rebuilds it): for Parts that aren't active and
 // meshes kept by undo steps.
 void subdivReleaseCache(Mesh& mesh);
 
 // --- Tools that rebuild the mesh (voxel remesh, decimate, QRemesh, Subdivide, Delete Hidden, merging and
-// splitting SubTools) work on the current level, pending edits included, and leave a plain mesh: the levels
+// splitting Parts) work on the current level, pending edits included, and leave a plain mesh: the levels
 // are dropped and the current level becomes the new base. ---
 // The status-line note for dropping `mesh`'s levels: "Subdivision levels removed: SDiv 3 of 5 kept as the new
-// base". "" when the mesh has no levels. `name` (a SubTool name, optional) prefixes the level.
+// base". "" when the mesh has no levels. `name` (a Part name, optional) prefixes the level.
 std::string subdivDroppedNote(const Mesh& mesh, const std::string& name = {});
-// Adds the note for SubTool `index` (named) to doc.notice, for operations that aren't undoable (merging and
-// splitting SubTools). Nothing when it has no levels.
-void noteSubtoolLevelsDropped(Document& doc, int index);
+// Adds the note for Part `index` (named) to doc.notice, for operations that aren't undoable (merging and
+// splitting Parts). Nothing when it has no levels.
+void notePartLevelsDropped(Document& doc, int index);
 
 // --- Operations on the mesh (no undo; see the commands / Document helpers below) ---
 // Each returns false with `error` set when it can't run. All of them reconcile pending edits first.

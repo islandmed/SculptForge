@@ -37,7 +37,7 @@ private:
     float residual_ = 0.0f;
 };
 
-// ZBrush-style lazy mouse: the brush point trails the cursor by `radius`
+// classic lazy mouse: the brush point trails the cursor by `radius`
 // pixels and only moves once the string is taut, filtering out hand jitter.
 struct LazyMouse {
     float radius = 40.0f;

@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Dynamic topology (ZBrush's Sculptris Pro, Blender's Dyntopo): with it on, every brush dab first remeshes the
+// Dynamic topology (dynamic topology, Blender's Dyntopo): with it on, every brush dab first remeshes the
 // surface under the brush towards one edge length, so a sphere can be pulled into horns or fingers without
 // stretching its triangles, and a blockout needs no remeshing.
 //
@@ -9,12 +9,12 @@
 // (longest first), edges shorter than 3/5 of it are collapsed (shortest first, where that keeps the surface
 // manifold, turns no triangle over, makes no long edge and leaves no vertex with fewer than three neighbours),
 // edges are flipped where that evens out the valences, and the vertices that changed are relaxed along the
-// surface. Boundaries, polygroup borders and the symmetry plane are kept: their vertices only slide along them.
+// surface. Boundaries, face group borders and the symmetry plane are kept: their vertices only slide along them.
 // Masked and hidden parts are left alone. With symmetry on, every operation is done on its mirror images at the
 // same time, so mirrored dabs make mirrored topology.
 //
 // Quads under the brush become triangles; UVs are dropped (a remeshed surface has none) and come back on undo.
-// Meshes with subdivision levels can't be remeshed (as in ZBrush, delete the levels first).
+// Meshes with subdivision levels can't be remeshed (as , delete the levels first).
 //
 // The mesh stays valid after every dab (no dead entries): elements a dab removed are filled from the end of
 // the arrays. The BVH and the renderer follow incrementally (BVH::insertTriangle..., Mesh::changedTriangles), and
@@ -39,7 +39,7 @@ namespace sf {
 
 struct DyntopoSettings {
     bool enabled = false;
-    // false: the detail follows the brush size (Sculptris Pro: zoom in or shrink the brush for finer triangles);
+    // false: the detail follows the brush size (dynamic topology: zoom in or shrink the brush for finer triangles);
     // true: one detail size for the whole mesh, relative to its size.
     bool constantDetail = false;
     float detail = 0.5f; // 0 (coarse) .. 1 (fine)
@@ -76,7 +76,7 @@ struct TopologyVertexValues {
 };
 struct TopologyTriangleValues {
     std::vector<glm::uvec3> triangles;
-    std::vector<uint32_t> polygroups, quadPartners;
+    std::vector<uint32_t> facegroups, quadPartners;
     std::vector<uint8_t> hidden;
     size_t bytes() const;
 };

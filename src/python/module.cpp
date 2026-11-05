@@ -9,7 +9,7 @@
 //   sf.run(doc, "new_sphere", subdivisions=5)
 //   sf.run(doc, "export_usd", path="/tmp/head.usdz")
 //   verts, tris = doc.vertices, doc.triangles      # (N, 3) float32, (M, 3) uint32
-//   doc.mask, doc.colors, doc.polygroups           # optional attributes, None when absent
+//   doc.mask, doc.colors, doc.face groups           # optional attributes, None when absent
 //   doc.set_selection_set("Eyes", mask=m)          # push a selection set; doc.selection_set("Eyes") pulls it
 #include "ai/AiCommands.h"
 #include "ai/AiPolicy.h"
@@ -163,9 +163,9 @@ PYBIND11_MODULE(sculptforge, m) {
             },
             "Per-vertex paint colours, (N, 3) float32 linear RGB in 0..1; None if unpainted.")
         .def_property(
-            "polygroups", [](const Document& d) { return attributeArray(d.mesh.polygroups); },
+            "facegroups", [](const Document& d) { return attributeArray(d.mesh.facegroups); },
             [](Document& d, const py::object& v) {
-                setAttribute(d.mesh.polygroups, v, d.mesh.triangleCount(), "polygroups");
+                setAttribute(d.mesh.facegroups, v, d.mesh.triangleCount(), "facegroups");
                 d.mesh.facesDirty = true;
                 d.modified = true;
             },
@@ -218,29 +218,29 @@ PYBIND11_MODULE(sculptforge, m) {
             },
             py::arg("vertices"), py::arg("triangles"), "Replace the sculpt with your own mesh (clears undo).")
         .def_property_readonly("splat_count", [](const Document& d) { return d.splats.size(); })
-        // SubTools: the mesh properties above are the active SubTool's.
-        .def_property_readonly("subtools",
+        // Parts: the mesh properties above are the active Part's.
+        .def_property_readonly("parts",
                                [](const Document& d) {
                                    py::list out;
-                                   for (int i = 0; i < d.subtoolCount(); ++i)
-                                       out.append(py::dict(py::arg("name") = d.subtools[size_t(i)].name,
-                                                           py::arg("visible") = d.subtools[size_t(i)].visible,
-                                                           py::arg("triangles") = d.subtoolMesh(i).triangleCount()));
+                                   for (int i = 0; i < d.partCount(); ++i)
+                                       out.append(py::dict(py::arg("name") = d.parts[size_t(i)].name,
+                                                           py::arg("visible") = d.parts[size_t(i)].visible,
+                                                           py::arg("triangles") = d.partMesh(i).triangleCount()));
                                    return out;
                                },
                                "The Parts (separate meshes) in list order, as dicts with name, visible and triangles.")
         .def_property(
-            "active_subtool", [](const Document& d) { return d.activeSubtool; },
+            "active_part", [](const Document& d) { return d.activePart; },
             [](Document& d, const py::object& v) {
                 int index = -1;
-                if (py::isinstance<py::str>(v)) index = d.findSubtool(v.cast<std::string>());
+                if (py::isinstance<py::str>(v)) index = d.findPart(v.cast<std::string>());
                 else index = v.cast<int>();
-                if (index < 0 || index >= d.subtoolCount()) throw py::index_error("no such Part");
-                d.selectSubtool(index);
+                if (index < 0 || index >= d.partCount()) throw py::index_error("no such Part");
+                d.selectPart(index);
             },
             "Index of the Part that vertices, mask, layers... and editing commands refer to. Set it to an "
             "index or a Part name to select another one.")
-        // Selection Sets (core/SelectionSets.h) of the active Part (SubTool): push and pull them as arrays.
+        // Selection Sets (core/SelectionSets.h) of the active Part (Part): push and pull them as arrays.
         .def_property_readonly(
             "selection_sets",
             [](const Document& d) {
@@ -249,7 +249,7 @@ PYBIND11_MODULE(sculptforge, m) {
                 if (list)
                     for (const auto& s : list->sets) {
                         py::list channels;
-                        for (const char* c : {"mask", "polygroups", "paint", "visibility", "uvs", "morph"}) {
+                        for (const char* c : {"mask", "facegroups", "paint", "visibility", "uvs", "morph"}) {
                             uint32_t bit = 0;
                             std::string err;
                             if (parseSetChannels(c, bit, err) && s->has(bit)) channels.append(c);
@@ -275,7 +275,7 @@ PYBIND11_MODULE(sculptforge, m) {
                 if (!selectionSetAt(d.mesh, *list->sets[size_t(i)], kSetAllChannels, data, err)) throw CommandError(err);
                 py::dict out;
                 if (data.channels & kSetMask) out["mask"] = floatRows(data.mask, 1);
-                if (data.channels & kSetPolygroups) out["polygroups"] = attributeArray(data.polygroups);
+                if (data.channels & kSetFaceGroups) out["facegroups"] = attributeArray(data.facegroups);
                 if (data.channels & kSetPaint) out["colors"] = floatRows(data.colors, 3);
                 if (data.channels & kSetVisibility) out["hidden"] = attributeArray(data.hidden);
                 if (data.channels & kSetUvs) out["uvs"] = floatRows(data.uvs, 2);
@@ -283,18 +283,18 @@ PYBIND11_MODULE(sculptforge, m) {
                 return out;
             },
             py::arg("name"),
-            "A selection set's channels at the current subdivision level, as a dict of NumPy arrays (mask, polygroups, " // marks-pending
+            "A selection set's channels at the current subdivision level, as a dict of NumPy arrays (mask, facegroups, "
             "colors, hidden, uvs (per triangle corner), positions), only those the set holds.")
         .def(
             "set_selection_set",
-            [](Document& d, const std::string& name, const py::object& mask, const py::object& polygroups,
+            [](Document& d, const std::string& name, const py::object& mask, const py::object& facegroups,
                const py::object& colors, const py::object& hidden, const py::object& uvs, const py::object& positions) {
                 const size_t nv = d.mesh.vertexCount(), nt = d.mesh.triangleCount();
                 SelectionSetData data;
                 if (!mask.is_none()) data.mask = rows<float>(mask, nv, 1, "mask"), data.channels |= kSetMask;
-                if (!polygroups.is_none()) {
-                    setAttribute(data.polygroups, polygroups, nt, "polygroups");
-                    data.channels |= kSetPolygroups;
+                if (!facegroups.is_none()) {
+                    setAttribute(data.facegroups, facegroups, nt, "facegroups");
+                    data.channels |= kSetFaceGroups;
                 }
                 if (!colors.is_none()) data.colors = rows<glm::vec3>(colors, nv, 3, "colors"), data.channels |= kSetPaint;
                 if (!hidden.is_none()) {
@@ -303,7 +303,7 @@ PYBIND11_MODULE(sculptforge, m) {
                 }
                 if (!uvs.is_none()) data.uvs = rows<glm::vec2>(uvs, nt * 3, 2, "uvs"), data.channels |= kSetUvs;
                 if (!positions.is_none()) data.positions = rows<glm::vec3>(positions, nv, 3, "positions"), data.channels |= kSetMorph;
-                if (!data.channels) throw py::value_error("give at least one of mask, polygroups, colors, hidden, uvs, positions"); // marks-pending
+                if (!data.channels) throw py::value_error("give at least one of mask, facegroups, colors, hidden, uvs, positions");
                 SelectionSet set;
                 std::string msg;
                 if (!makeSelectionSet(name, data, uint32_t(nv), uint32_t(nt), subdivCurrentLevel(d.mesh), set, msg) ||
@@ -311,7 +311,7 @@ PYBIND11_MODULE(sculptforge, m) {
                     throw CommandError(msg);
                 return msg;
             },
-            py::arg("name"), py::kw_only(), py::arg("mask") = py::none(), py::arg("polygroups") = py::none(),
+            py::arg("name"), py::kw_only(), py::arg("mask") = py::none(), py::arg("facegroups") = py::none(),
             py::arg("colors") = py::none(), py::arg("hidden") = py::none(), py::arg("uvs") = py::none(),
             py::arg("positions") = py::none(),
             "Store (or replace) a selection set on the active Part from arrays laid out for the current level "

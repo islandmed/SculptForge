@@ -87,9 +87,9 @@ std::vector<glm::vec3>& Mesh::ensureColors(const glm::vec3& fill) {
     return colors;
 }
 
-std::vector<uint32_t>& Mesh::ensurePolygroups(uint32_t fill) {
-    if (polygroups.size() != triangles.size()) polygroups.assign(triangles.size(), fill);
-    return polygroups;
+std::vector<uint32_t>& Mesh::ensureFaceGroups(uint32_t fill) {
+    if (facegroups.size() != triangles.size()) facegroups.assign(triangles.size(), fill);
+    return facegroups;
 }
 
 std::vector<uint8_t>& Mesh::ensureHidden() {
@@ -152,7 +152,7 @@ size_t Mesh::quadCount() const {
 void Mesh::sanitizeAttributes() {
     if (!mask.empty() && mask.size() != positions.size()) clearMask();
     if (!colors.empty() && colors.size() != positions.size()) clearColors();
-    if (!polygroups.empty() && polygroups.size() != triangles.size()) clearPolygroups();
+    if (!facegroups.empty() && facegroups.size() != triangles.size()) clearFaceGroups();
     if (!hidden.empty() && hidden.size() != triangles.size()) clearHidden();
     if (!uvs.empty() && uvs.size() != triangles.size() * 3) std::vector<glm::vec2>().swap(uvs);
     if (!uvFlags.empty() && uvFlags.size() != triangles.size() * 3) std::vector<uint8_t>().swap(uvFlags);
@@ -821,7 +821,7 @@ AABB Mesh::bounds() const {
 
 size_t Mesh::memoryBytes() const {
     auto bytes = [](const auto& v) { return v.capacity() * sizeof(v[0]); };
-    size_t n = bytes(positions) + bytes(normals) + bytes(triangles) + bytes(mask) + bytes(colors) + bytes(polygroups) +
+    size_t n = bytes(positions) + bytes(normals) + bytes(triangles) + bytes(mask) + bytes(colors) + bytes(facegroups) +
                bytes(hidden) + bytes(uvs) + bytes(uvFlags) + bytes(quadPartners) + bytes(base) + bytes(paintBase) + bytes(adjOffsets_) +
                bytes(adjList_) + bytes(vtOffsets_) + bytes(vtList_) + bytes(adjEnds_) + bytes(adjCaps_) + bytes(vtEnds_) + bytes(vtCaps_) + normalBits_.memoryBytes() + bytes(scratchVerts_) + bytes(dirtyBlocks) + bytes(dirtyBits);
     for (const auto& l : layers) n += bytes(l.delta);
@@ -889,7 +889,7 @@ Mesh weldImported(const Mesh& m, const std::vector<SculptLayer>& layers) {
         if (vColors) welded.colors.push_back(m.colors[v]);
     }
     const size_t nt = m.triangles.size();
-    const bool tGroups = m.polygroups.size() == nt, tHidden = m.hidden.size() == nt, tUvs = m.uvs.size() == nt * 3;
+    const bool tGroups = m.facegroups.size() == nt, tHidden = m.hidden.size() == nt, tUvs = m.uvs.size() == nt * 3;
     std::vector<uint32_t> newTriangle(m.hasQuads() ? nt : 0, Mesh::kNoQuad);
     for (size_t ti = 0; ti < nt; ++ti) {
         const auto& t = m.triangles[ti];
@@ -897,7 +897,7 @@ Mesh weldImported(const Mesh& m, const std::vector<SculptLayer>& layers) {
         if (nt3.x == nt3.y || nt3.y == nt3.z || nt3.x == nt3.z) continue;
         if (!newTriangle.empty()) newTriangle[ti] = uint32_t(welded.triangles.size());
         welded.triangles.push_back(nt3);
-        if (tGroups) welded.polygroups.push_back(m.polygroups[ti]);
+        if (tGroups) welded.facegroups.push_back(m.facegroups[ti]);
         if (tHidden) welded.hidden.push_back(m.hidden[ti]);
         if (tUvs) welded.uvs.insert(welded.uvs.end(), m.uvs.begin() + std::ptrdiff_t(ti * 3), m.uvs.begin() + std::ptrdiff_t(ti * 3 + 3));
     }

@@ -6,7 +6,7 @@
 
 #include "core/Commands.h"
 #include "core/ExtractMirror.h"
-#include "core/Polygroups.h"
+#include "core/FaceGroups.h"
 #include "core/Primitives.h"
 
 #include <algorithm>
@@ -41,7 +41,7 @@ double signedVolume(const Mesh& m) {
 
 std::set<uint32_t> groups(const Mesh& m) {
     std::set<uint32_t> ids;
-    for (uint32_t t = 0; t < m.triangleCount(); ++t) ids.insert(m.polygroupAt(t));
+    for (uint32_t t = 0; t < m.triangleCount(); ++t) ids.insert(m.facegroupAt(t));
     return ids;
 }
 
@@ -64,18 +64,18 @@ TEST(extract_shell_preview_accept_undo) {
     CommandRegistry reg;
     CHECK(reg.execute(doc, "new_sphere", {{"subdivisions", 3.0}}).ok);
     CHECK(!reg.execute(doc, "extract").ok); // nothing masked
-    CHECK(doc.subtoolCount() == 1);
+    CHECK(doc.partCount() == 1);
 
     maskedSphere(doc, reg);
     const float radius = glm::length(doc.mesh.positions[0]);
     const CommandResult r = reg.execute(doc, "extract");
     CHECK(r.ok);
     CHECK(r.message.find("preview") != std::string::npos);
-    CHECK(doc.subtoolCount() == 2 && doc.activeSubtool == 0); // the preview sits below; the source stays active
+    CHECK(doc.partCount() == 2 && doc.activePart == 0); // the preview sits below; the source stays active
     CHECK(doc.extractPreview.id != 0 && doc.extractPreviewCurrent());
     CHECK(!doc.undo.canUndo()); // a preview isn't a step yet
-    const Mesh& shell = doc.subtoolMesh(1);
-    CHECK(doc.subtools[1].name == "Extract");
+    const Mesh& shell = doc.partMesh(1);
+    CHECK(doc.parts[1].name == "Extract");
     CHECK(watertight(shell));
     CHECK(signedVolume(shell) > 0.0);
     CHECK((groups(shell) == std::set<uint32_t>{1, 2, 3})); // outer, inner, rim
@@ -89,32 +89,32 @@ TEST(extract_shell_preview_accept_undo) {
     }
     CHECK(std::abs(rmax - radius * (1.0f + 0.03f)) < radius * 0.01f);
     CHECK(rmin > radius * 0.97f); // (E Smt pulls the edge in a little)
-    // Polypaint comes along.
+    // Vertex paint comes along.
     CHECK(shell.hasColors() && shell.colors[0] == glm::vec3(1, 0, 0));
 
     // Extract again with other settings: the preview is replaced, not added to.
     const uint32_t previewId = doc.extractPreview.id;
     CHECK(reg.execute(doc, "extract", {{"thickness", 0.05}, {"double", true}, {"smooth", 0.0}}).ok);
-    CHECK(doc.subtoolCount() == 2 && doc.extractPreview.id == previewId);
+    CHECK(doc.partCount() == 2 && doc.extractPreview.id == previewId);
     rmin = 1e9f;
-    for (const auto& p : doc.subtoolMesh(1).positions) rmin = std::min(rmin, glm::length(p));
+    for (const auto& p : doc.partMesh(1).positions) rmin = std::min(rmin, glm::length(p));
     CHECK(rmin < radius * 0.95f); // Double grows inward too
 
-    // Accept: one undo step on the source that takes the SubTool away and redo brings it back.
+    // Accept: one undo step on the source that takes the Part away and redo brings it back.
     CHECK(reg.execute(doc, "extract_accept").ok);
-    CHECK(doc.extractPreview.id == 0 && doc.subtoolCount() == 2);
+    CHECK(doc.extractPreview.id == 0 && doc.partCount() == 2);
     CHECK(doc.undo.canUndo() && doc.undo.undoLabel() == "Extract");
     CHECK(!reg.execute(doc, "extract_accept").ok);
     CHECK(reg.execute(doc, "undo").ok);
-    CHECK(doc.subtoolCount() == 1 && doc.activeSubtool == 0);
+    CHECK(doc.partCount() == 1 && doc.activePart == 0);
     CHECK(reg.execute(doc, "redo").ok);
-    CHECK(doc.subtoolCount() == 2 && doc.subtools[1].id == previewId && doc.subtoolMesh(1).triangleCount() > 0);
+    CHECK(doc.partCount() == 2 && doc.parts[1].id == previewId && doc.partMesh(1).triangleCount() > 0);
     CHECK(doc.dirty());
 
     // A single-sided surface: Thick 0.
     CHECK(reg.execute(doc, "extract", {{"thickness", 0.0}, {"accept", true}}).ok);
-    CHECK(doc.subtoolCount() == 3);
-    const Mesh& surface = doc.subtoolMesh(1); // right below the source
+    CHECK(doc.partCount() == 3);
+    const Mesh& surface = doc.partMesh(1); // right below the source
     CHECK(!watertight(surface) && groups(surface) == std::set<uint32_t>{1});
 }
 
@@ -122,25 +122,25 @@ TEST(extract_preview_goes_when_the_scene_changes) {
     Document doc;
     CommandRegistry reg;
     maskedSphere(doc, reg);
-    CHECK(reg.execute(doc, "extract").ok && doc.subtoolCount() == 2);
-    CHECK(reg.execute(doc, "subtool_list").ok); // reading the scene leaves it
-    CHECK(doc.subtoolCount() == 2);
+    CHECK(reg.execute(doc, "extract").ok && doc.partCount() == 2);
+    CHECK(reg.execute(doc, "part_list").ok); // reading the scene leaves it
+    CHECK(doc.partCount() == 2);
     CHECK(reg.execute(doc, "extract_cancel").ok);
-    CHECK(doc.subtoolCount() == 1 && doc.extractPreview.id == 0);
+    CHECK(doc.partCount() == 1 && doc.extractPreview.id == 0);
 
     CHECK(reg.execute(doc, "extract").ok);
     CHECK(reg.execute(doc, "mask_invert").ok); // an edit of the source: the preview no longer matches
-    CHECK(reg.execute(doc, "subtool_list").ok);
-    CHECK(doc.subtoolCount() == 1 && doc.extractPreview.id == 0);
+    CHECK(reg.execute(doc, "part_list").ok);
+    CHECK(doc.partCount() == 1 && doc.extractPreview.id == 0);
 
     // Saving never writes a preview.
-    CHECK(reg.execute(doc, "extract").ok && doc.subtoolCount() == 2);
+    CHECK(reg.execute(doc, "extract").ok && doc.partCount() == 2);
     const std::string path = tempPath("sf_extract_preview.sfproj");
     CHECK(reg.execute(doc, "save_project", {{"path", path}}).ok);
-    CHECK(doc.subtoolCount() == 1);
+    CHECK(doc.partCount() == 1);
     Document back;
     CHECK(reg.execute(back, "open", {{"path", path}}).ok);
-    CHECK(back.subtoolCount() == 1);
+    CHECK(back.partCount() == 1);
 }
 
 TEST(mirror_and_weld_sphere) {
@@ -149,9 +149,9 @@ TEST(mirror_and_weld_sphere) {
     maskedSphere(doc, reg);
     // Off-centre, so the plane cuts triangles; groups 7 on +x, 9 elsewhere.
     for (auto& p : doc.mesh.positions) p.x += 0.3f;
-    doc.mesh.ensurePolygroups(9);
+    doc.mesh.ensureFaceGroups(9);
     for (uint32_t t = 0; t < doc.mesh.triangleCount(); ++t)
-        if (doc.mesh.positions[doc.mesh.triangles[t].x].x > 0.8f) doc.mesh.polygroups[t] = 7;
+        if (doc.mesh.positions[doc.mesh.triangles[t].x].x > 0.8f) doc.mesh.facegroups[t] = 7;
     doc.mesh.recomputeAllNormals();
     const size_t before = doc.mesh.triangleCount();
 
@@ -260,7 +260,7 @@ TEST(extract_tcorne_tborder) {
     auto rimQuads = [](const Mesh& m) {
         size_t n = 0;
         for (uint32_t t = 0; t < m.triangleCount(); ++t)
-            n += m.polygroupAt(t) == 3 && m.quadPartnerAt(t) != Mesh::kNoQuad;
+            n += m.facegroupAt(t) == 3 && m.quadPartnerAt(t) != Mesh::kNoQuad;
         return n / 2;
     };
     std::string error;

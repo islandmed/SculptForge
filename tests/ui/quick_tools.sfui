@@ -1,5 +1,5 @@
 # #43: the axis gizmo snaps to side views, Undo / Redo on the right shelf, Continuous in the left shelf's
-# stroke picker, the mask shown and hidden without clearing it, Insert mirrored by symmetry, SubTool thumbnails.
+# stroke picker, the mask shown and hidden without clearing it, Insert mirrored by symmetry, Part thumbnails.
 run new_sphere subdivisions=4
 key f
 
@@ -74,9 +74,9 @@ key ctrl+z
 expect_value triangles == $base
 key escape
 
-# SubTool thumbnails: each row shows its SubTool, rendered from the GPU mesh.
+# Part thumbnails: each row shows its Part, rendered from the GPU mesh.
 click "Parts/Append"
 click "Cube"
-expect_value subtools == 2
-wait_value subtool_thumbnails == 2 10
-shot subtool_thumbnails
+expect_value parts == 2
+wait_value part_thumbnails == 2 10
+shot part_thumbnails

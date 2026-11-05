@@ -1,6 +1,6 @@
 # The view's background (#21): Gradient (the default) or Flat Colour with a colour picker, in Preferences > Display
 # and the Render palette; kept by Store Config and in projects, and scriptable (set_background).
-run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_head
 camera 20 5
 key f

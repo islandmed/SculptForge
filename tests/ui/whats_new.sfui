@@ -5,7 +5,7 @@
 # chapter below is pinned to 0.11.0 (SF_GUIDE_VERSION), so it checks 0.11.0's section before and after the release.
 env SF_WHATS_NEW_VERSION 0.10.7
 env SF_GUIDE_VERSION 0.11.0
-run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=3
 click "Help##palette.help"
 click "What's New##help.whats_new"
@@ -52,7 +52,7 @@ expect_value look == 1
 expect_value shell_layout == 1
 
 # The same window in Forge Terminal (the look's colours), then Full release notes: the guide chapter.
-run ui_look look=forge scheme=tokyo_night layout=zbrush   # Forge Terminal's colours, with the palette bar for the clicks
+run ui_look look=forge scheme=tokyo_night layout=classic   # Forge Terminal's colours, with the palette bar for the clicks
 click "Help##palette.help"
 click "What's New##help.whats_new"
 wait 0.5
@@ -63,7 +63,7 @@ expect_value whats_new_open == 0
 expect_value guide_open == 1
 expect_guide whats-new.md
 expect_text "Version 0.11.0"
-expect_text "A quick tour for experienced sculptors, a command search that knows plain sculpting words, and three experimental options for very dense meshes."
+expect_text "Sixty new brushes in six packs, a Masking panel, a quick tour for experienced sculptors, and experimental options for very dense meshes."
 expect_text "Version 0.10.11"
 expect_text "Voxel Remesh 3-4x faster, high-DPI laptops that fit the screen, the right tray in every look, and a Preview channel for betas."
 expect_text "Version 0.10.10"

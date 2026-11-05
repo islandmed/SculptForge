@@ -19,7 +19,7 @@ LICENSE.txt                    the license text (optional; LICENSE or LICENSE.md
 preview.png                    a preview image (optional; or preview.jpg; must be named in pack.json)
 brushes/<name>.sfbrush         brush recipes (core/BrushLibrary.h)
 alphas/<name>.png|.jpg|.jpeg   brush alphas
-matcaps/<name>.png|.jpg|.jpeg  Lit Sphere images
+litspheres/<name>.png|.jpg|.jpeg  Lit Sphere images
 materials/<name>.sfmaterial    Material Recipes (core/MaterialRecipe.h)
 vdms/<name>.sfvdm              vector displacement maps (core/Vdm.h)
 keymaps/<name>.json            keymaps (below)
@@ -66,7 +66,7 @@ in its type's folder, with its type's extension. Anything else is refused.
 | `minAppVersion` | no | The oldest SculptForge that may install it; newer than the running app: refused. |
 | `preview` | no | `preview.png` or `preview.jpg`, which must be in the archive. |
 | `channel` | no | Lower-case letters, digits and `-`. `"insider"` marks the monthly pack or an Insider drop (shown as **Member pack**). **Display only**: it changes a label, nothing else; there is no DRM and anyone can install the file. |
-| `contents` | yes | A list of `{"type", "path"}`. Types: `brush`, `alpha`, `matcap`, `material`, `vdm`, `keymap`, `piemenu`, `macro`. |
+| `contents` | yes | A list of `{"type", "path"}`. Types: `brush`, `alpha`, `litsphere`, `material`, `vdm`, `keymap`, `piemenu`, `macro`. |
 
 Text values must be valid UTF-8 without control characters. The JSON is parsed strictly: a key given twice,
 an unknown key, a number JSON doesn't allow or trailing text is an error.

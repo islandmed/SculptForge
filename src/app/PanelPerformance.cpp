@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Preferences > Performance (ZBrush: Preferences > Performance and Mem): how the 3D view draws (Antialiasing,
+// Preferences > Performance (Preferences > Performance and Mem): how the 3D view draws (Antialiasing,
 // Fast Navigation), Multithreading, what the last stroke cost per dab, and the memory the scene holds. The
 // numbers come from the same instruments as the benchmark (core/Benchmark.h, docs/performance.md).
 #include "app/App.h"
@@ -138,6 +138,17 @@ void App::registerPerformanceUiActions() {
         "Lighter on laptops and on battery: the hardware profile turns it on there by itself (its Draft brushes "
         "setting); this turns it on everywhere. Brushes that follow the surface's direction (Inflate, the plane "
         "brushes) use its direction from the stroke's start, so the result can differ slightly from a full stroke.");
+    add("perf.fast_big_brushes", "Fast Big Brushes (Experimental)",
+        [this] {
+            uiPrefs_.fastBigBrushes = !uiPrefs_.fastBigBrushes;
+            status_ = uiPrefs_.fastBigBrushes ? "Fast big brushes on" : "Fast big brushes off";
+        },
+        [this] { return uiPrefs_.fastBigBrushes; },
+        "Experimental. Big brushes on dense meshes: a dab that reaches more than 150,000 vertices finds its plane "
+        "from a sample of them and turns the shading along with the move it makes, and the dabs waiting for a frame "
+        "are placed together in one pass. Every vertex still moves by the brush itself; the exact shading follows "
+        "behind the brush and when you lift the pen. Small brushes, Smooth, Layer, Inflate, Nudge, Clay Block, "
+        "alphas and masked areas are placed dab by dab as before. Try it on a heavy mesh and tell us how it feels.");
     registerPerformanceProfileUiActions(); // Re-calibrate, the frame governor (PanelPerformanceProfile.cpp)
 }
 
@@ -155,8 +166,8 @@ int App::viewSamples() {
     }
     const bool moving = drag_ == Drag::Orbit || drag_ == Drag::Pan || drag_ == Drag::Zoom || perf_.framesStill < 8;
     size_t triangles = 0;
-    for (int i = 0; i < doc_.subtoolCount(); ++i)
-        if (doc_.subtools[size_t(i)].visible) triangles += doc_.subtoolMesh(i).triangleCount();
+    for (int i = 0; i < doc_.partCount(); ++i)
+        if (doc_.parts[size_t(i)].visible) triangles += doc_.partMesh(i).triangleCount();
     perf_.movingNow = moving;
     perf_.sceneTriangles = triangles;
     perf_.proxyNow = uiPrefs_.fastNavigation && moving && triangles >= fastNavigationTriangles(hardwareProfileGoverns());
@@ -170,9 +181,9 @@ void App::notePerformanceFrame(double syncMs) {
         perf_.strokeSyncMs += syncMs;
         ++perf_.strokeFrames;
     }
-    // A SubTool too big for the GPU's memory isn't drawn: say so once.
+    // A Part too big for the GPU's memory isn't drawn: say so once.
     bool oom = false;
-    for (const SubTool& s : doc_.subtools) oom = oom || (s.visible && renderer_.outOfMemory(s.id));
+    for (const Part& s : doc_.parts) oom = oom || (s.visible && renderer_.outOfMemory(s.id));
     if (oom && !perf_.gpuOutOfMemory)
         status_ = "Not enough GPU memory to show every Part: hide some, or step down a subdivision level "
                   "(Preferences > Performance)";
@@ -214,6 +225,9 @@ void App::drawPerformanceSection() {
     bool fastUpload = uiPrefs_.fastUpload;
     if (ImGui::Checkbox(tr("Fast Upload (Experimental)"), &fastUpload)) actions_.find("perf.fast_upload")->run();
     ui::HelpAction(*this, "perf.fast_upload");
+    bool fastBig = uiPrefs_.fastBigBrushes;
+    if (ImGui::Checkbox(tr("Fast Big Brushes (Experimental)"), &fastBig)) actions_.find("perf.fast_big_brushes")->run();
+    ui::HelpAction(*this, "perf.fast_big_brushes");
 
     // --- Threads ---
     bool threads = !ThreadPool::shared().serial();

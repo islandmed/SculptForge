@@ -1,7 +1,7 @@
 # Material channels (PBR texture painting): Texture Map turns channels on, the Color palette's Material section
 # sets what the brush paints per channel, Paint Layers rows get channel chips, C picks every channel, and the
 # view can show one channel on its own.
-run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=4
 run uv_auto resolution=1024
 run texture_create size=1024

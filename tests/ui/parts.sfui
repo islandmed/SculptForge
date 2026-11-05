@@ -1,0 +1,176 @@
+# Parts: the panel, Alt+click in the viewport, sculpting and undo per Part,
+# visibility, rename, duplicate, delete, merge and split.
+run new_sphere subdivisions=4 ; part_rename to=Body
+expect "Parts/Append"
+expect_value parts == 1
+expect "Parts/Body"
+shot one-part
+
+# Append from the panel's menu: each new Part becomes the active one.
+click "Parts/Append"
+click "Sphere"
+expect_status Appended Part Sphere
+expect_value parts == 2
+expect_value active_part == 1
+click "Parts/Append"
+click "Cube"
+expect_value parts == 3
+expect_value active_part == 2
+key f
+shot appended
+
+# Click rows to select.
+click "Parts/Body"
+expect_value active_part == 0
+expect_status Active Part: Body
+click "Parts/Sphere"
+expect_value active_part == 1
+
+# Alt+click in the viewport selects another Part without sculpting anything.
+hold alt
+click_part Cube
+hold none
+expect_value active_part == 2
+expect_status Active Part: Cube
+hold alt
+click_part Body
+hold none
+expect_value active_part == 0
+expect_value edited_parts == 0
+shot alt-click
+
+# Shift+Alt+click selects a Part and frames it: the camera moves in on the Cube.
+remember camera_distance far
+hold shift+alt
+click_part Cube
+hold none
+expect_value active_part == 2
+expect_value camera_distance < $far
+expect_value edited_parts == 0
+shot shift-alt-frame
+key f
+hold alt
+click_part Body
+hold none
+expect_value active_part == 0
+
+# A stroke changes only the active Part; undo history is per Part.
+click "Clay##brush.clay"
+stroke 0.3 0.4 0.6 0.6
+expect_value can_undo == 1
+expect_value edited_parts == 1
+# Alt+drag on the active Part is still an inverted stroke, not a selection.
+hold alt
+stroke 0.4 0.3 0.5 0.7
+hold none
+expect_value active_part == 0
+expect_value edited_parts == 1
+shot sculpted
+click "Parts/Cube"
+expect_value can_undo == 0
+key ctrl+z
+expect_value edited_parts == 1
+click "Parts/Body"
+expect_value can_undo == 1
+key ctrl+z
+key ctrl+z
+expect_value can_undo == 0
+expect_value edited_parts == 0
+key ctrl+shift+z
+expect_value edited_parts == 1
+
+# Eye toggles, Solo and Unhide all.
+click "Parts/##eye Sphere"
+expect_value visible_parts == 2
+expect_status Sphere hidden
+shot hidden
+click "Parts/Solo"
+expect_value visible_parts == 1
+expect_status Solo: Body
+shot solo
+click "Parts/Solo"
+expect_value visible_parts == 3
+click "Parts/##eye Cube"
+expect_value visible_parts == 2
+click "Parts/Unhide all"
+expect_value visible_parts == 3
+
+# Rename: double-click the row and type.
+double_click "Parts/Cube"
+type "Parts/##rename" Helmet
+key enter
+expect_status Renamed to Helmet
+expect "Parts/Helmet"
+expect_not "Parts/Cube"
+
+# Duplicate, then delete through the confirmation (Cancel first).
+click "Parts/Helmet"
+click "Parts/Duplicate"
+expect_value parts == 4
+expect_value active_part == 3
+expect "Parts/Helmet copy"
+click "Parts/Delete..."
+expect_text This can't be undone
+shot confirm-delete
+click "Delete Part?/Cancel"
+expect_value parts == 4
+click "Parts/Delete..."
+click "Delete Part?/Delete"
+expect_value parts == 3
+expect_status Deleted Part Helmet copy
+expect_not "Parts/Helmet copy"
+
+# Move the active Part up and down the list.
+click "Parts/Sphere"
+click "Parts/##up"
+expect_value active_part == 0
+click "Parts/##down"
+expect_value active_part == 1
+
+# Merge down keeps face groups apart, so Split groups separates the pieces again.
+click "Parts/Body"
+click "Parts/Merge down..."
+click "Merge Down?/Merge"
+expect_value parts == 2
+expect_status Merged Sphere into Body
+expect_value can_undo == 0
+click "Parts/Split groups"
+expect_value parts == 3
+expect_status Split into 2 Parts
+shot split-groups
+click "Parts/Merge visible..."
+click "Merge Visible?/Merge"
+expect_value parts == 1
+expect "Parts/Merged"
+click "Parts/Split parts"
+expect_value parts == 3
+expect_status Split into 3 Parts
+shot split-parts
+
+# The Tool palette's Part sub-palette closes and opens.
+click "Parts##tool.part"
+expect_not "Parts/Append"
+click "Parts##tool.part"
+expect "Parts/Append"
+
+# Wireframe, face group colours and the LOD preview are for the active Part only.
+key shift+f
+expect_value wireframe == 1
+click "Face Groups"
+click "Show face groups"
+shot active-overlays
+click "Show face groups"
+key shift+f
+click "Export"
+click "Generate LOD chain"
+shot lod-preview
+click "Game Ready/Sculpt"
+click "Parts##tool.part"
+
+# Past six Parts the list scrolls; clicks scroll it like a person would.
+run part_append ; part_append ; part_append ; part_append
+expect_value parts == 7
+expect_value active_part == 6
+shot many
+click "Parts/Merged 1"
+expect_value active_part == 0

@@ -147,7 +147,7 @@ SculptForge's VDM brushes and Blender's use the same maps (see
 
 The two programs share a folder in your user data: `~/.local/share/SculptForge/SculptForge/blender` on Linux,
 `%APPDATA%\SculptForge\SculptForge\blender` on Windows, `~/Library/Application Support/SculptForge/SculptForge/blender`
-on macOS. Each side writes its meshes there as `.GoZ` files with a
+on macOS. Each side writes its meshes there as Bridge files with a
 small list of the objects, and checks the other side's list once a second. Nothing goes over the network.
 
 To use another folder, set it in the add-on's preferences and start SculptForge with the environment variable

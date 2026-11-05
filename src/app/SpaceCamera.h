@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Hold Space and drag to move the camera (#43; Preferences > Input, off by default since ZBrush's Space opens
+// Hold Space and drag to move the camera (#43; Preferences > Input, off by default since the classic Space opens
 // the QuickMenu): what a press does while Space is held.
 #pragma once
 

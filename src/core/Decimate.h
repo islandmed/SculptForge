@@ -13,7 +13,7 @@ namespace sf {
 // boundary preservation, normal-flip and manifold (link condition) checks.
 // Collapses keep one endpoint, so output vertices are a subset of the input's
 // and sculpt layers / blend shapes, mask and colours carry over exactly;
-// surviving triangles keep their polygroup and hidden flag, and corner UVs
+// surviving triangles keep their face group and hidden flag, and corner UVs
 // follow the kept vertex. A decimated result is all triangles (quad pairs are
 // dropped). keepMasked: masked vertices (mask >= kKeepMaskedThreshold) are never collapsed, so they and the
 // triangles between them come through unchanged (#43).

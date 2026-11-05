@@ -62,11 +62,11 @@ void applyUvs(ObjObject& o, Mesh& m) {
     if (o.hasUvs) m.uvs = std::move(o.uvs);
 }
 
-// Polygroups from `g` names: only when the object uses two or more (ids 1, 2, ... in order of first use).
+// Face groups from `g` names: only when the object uses two or more (ids 1, 2, ... in order of first use).
 void applyGroups(const ObjObject& o, Mesh& m) {
     if (o.groupNames.size() < 2) return;
-    m.polygroups.resize(o.groups.size());
-    for (size_t t = 0; t < o.groups.size(); ++t) m.polygroups[t] = o.groups[t] + 1;
+    m.facegroups.resize(o.groups.size());
+    for (size_t t = 0; t < o.groups.size(); ++t) m.facegroups[t] = o.groups[t] + 1;
 }
 
 bool parseObj(const std::string& path, bool splitObjects, std::vector<MeshObject>& out, std::string& error) {
@@ -381,17 +381,17 @@ bool saveObj(const std::string& path, const std::vector<MeshObjectRef>& objects,
                 buf.append(line, n);
             }
         if (textured) buf += "usemtl " + materials[oi] + "\n";
-        // Polygroups as `g` groups (ZBrush's OBJ convention), when there is more than one.
+        // Face groups as `g` groups (OBJ convention), when there is more than one.
         bool groups = false;
-        for (uint32_t t = 1; t < mesh.triangleCount() && !groups; ++t) groups = mesh.polygroupAt(t) != mesh.polygroupAt(0);
+        for (uint32_t t = 1; t < mesh.triangleCount() && !groups; ++t) groups = mesh.facegroupAt(t) != mesh.facegroupAt(0);
         uint32_t written = 0; // group of the last face written
         for (uint32_t t = 0; t < mesh.triangleCount(); ++t) {
             glm::uvec4 f;
             glm::vec2 fuv[4];
             const int corners = exportFaceUv(mesh, t, f, fuv); // quads as quads, the second half of one as nothing
             if (corners == 0) continue;
-            if (groups && (t == 0 || mesh.polygroupAt(t) != written)) {
-                written = mesh.polygroupAt(t);
+            if (groups && (t == 0 || mesh.facegroupAt(t) != written)) {
+                written = mesh.facegroupAt(t);
                 const int n = std::snprintf(line, sizeof line, "g group%u\n", written);
                 buf.append(line, n);
             }

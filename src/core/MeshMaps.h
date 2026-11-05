@@ -3,7 +3,7 @@
 //
 // Mesh Maps: texture-space maps of a Part's own surface, baked on its UVs at the texture's size and kept with its
 // texture (PaintTexture::meshMaps), for Fill layers to read (core/LayerStack.h): ambient occlusion, curvature,
-// thickness, position, world normal and ID (polygroups). Files for other programs come from the bake command
+// thickness, position, world normal and ID (face groups). Files for other programs come from the bake command
 // (core/Bake.h), which also bakes from other Parts, subdivision levels and micro levels, and to UDIM tiles.
 //
 // Maps are TileImages (64 x 64 tiles, the texture's tiles) and are baked tile by tile on every core:
@@ -14,7 +14,7 @@
 //   - curvature: the mean curvature of the surface (meshMeanCurvature) times curvatureRadius: 0.5 is flat, brighter
 //     is convex (edges, ridges), darker concave (creases);
 //   - position: the point in the Part's bounding box (16-bit RGB); world normal: the smooth normal (RGB);
-//   - ID: a flat colour per polygroup.
+//   - ID: a flat colour per face group.
 //
 // Live updates (the app, App::updateMeshMaps): the set remembers the positions it was baked from. When the Part is
 // sculpted, the changed region is found by comparing them (changedRegion), and only the tiles whose texels lie
@@ -90,7 +90,7 @@ struct MeshMapSet {
 // Per-vertex mean curvature in 1 / length (> 0 convex): 2 (p - mean of the one-ring) . n over the ring's mean squared
 // edge length, so a sphere of radius R gives 1 / R at any density; smoothed once over the ring.
 std::vector<float> meshMeanCurvature(const Mesh& mesh);
-// The ID map's colour for a key (a polygroup, a Part): bright, well spread hues (sRGB 0..1).
+// The ID map's colour for a key (a face group, a Part): bright, well spread hues (sRGB 0..1).
 glm::vec3 idMapColor(uint32_t key);
 
 // Bakes `kinds` of `mesh` (its UVs) at width x height into `out` (every tile). False + error when the mesh has no
@@ -107,7 +107,7 @@ AABB changedRegion(const MeshMapSet& set, const Mesh& mesh, std::vector<uint32_t
 struct MeshMapUpdate {
     std::vector<uint32_t> tiles;      // tiles to bake again
     std::vector<TexelTile> texels;    // per tile: texel -> local triangle (kNoTexelTriangle: keep the old value)
-    Mesh local;                       // the triangles near the change (positions, normals, UVs, polygroups)
+    Mesh local;                       // the triangles near the change (positions, normals, UVs, face groups)
     std::vector<uint32_t> movedVertices;      // mesh vertices that moved, and where they are now
     std::vector<glm::vec3> movedPositions;
     std::shared_ptr<const MeshMapSet> base;   // the set it updates

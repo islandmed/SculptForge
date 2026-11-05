@@ -23,7 +23,7 @@ void App::openFocusDetail(const std::string& path) {
     }
     const size_t tris = microTriangleCount(m);
     doc_.setMesh(std::move(m), std::filesystem::path(path).stem().string());
-    frameActiveSubtool();
+    frameActivePart();
     char buf[160];
     std::snprintf(buf, sizeof buf, "Focus Detail (experimental): %.2f billion micro triangles; detail streams in where you look and sculpt",
                   double(tris) / 1e9);

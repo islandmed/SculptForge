@@ -195,9 +195,9 @@ void App::handlePhoneCapture(const link::PhoneEvent& e) {
             status_ = "Splat received (" + where + "): .spz isn't supported yet; export .ply from the scanning app";
             return;
         }
-        // Splats load next to the sculpt; a mesh .ply becomes a new SubTool (never replacing the work).
+        // Splats load next to the sculpt; a mesh .ply becomes a new Part (never replacing the work).
         if (ext == ".splat" || plyHasSplats(file)) runCommand("open", {{"path", file}});
-        else runCommand("subtool_append", {{"path", file}});
+        else runCommand("part_append", {{"path", file}});
         if (lastCommandOk_) camera_.frame(sceneBounds());
         return;
     }
@@ -210,8 +210,8 @@ void App::startPhoneArExport() {
     // Snapshot on this thread (the worker must not see the document change under it).
     std::vector<Mesh> parts;
     if (phoneArScene_) {
-        for (int i = 0; i < doc_.subtoolCount(); ++i)
-            if (doc_.subtools[size_t(i)].visible) parts.push_back(doc_.subtoolMesh(i));
+        for (int i = 0; i < doc_.partCount(); ++i)
+            if (doc_.parts[size_t(i)].visible) parts.push_back(doc_.partMesh(i));
         if (parts.empty()) parts.push_back(doc_.mesh);
     } else {
         parts.push_back(doc_.mesh);
@@ -279,8 +279,8 @@ void App::pollPhone() {
         if (job.ok) phone_->publishArModel(std::move(job.result.glb), std::move(job.result.usdz), job.result.summary);
         else phone_->setArError(job.error);
     }
-    const uint64_t signature = doc_.undo.revision() * 1000003ull + uint64_t(doc_.activeSubtool) * 7919ull +
-                               uint64_t(doc_.subtoolCount()) + (doc_.modified ? 1ull << 62 : 0ull) + 1;
+    const uint64_t signature = doc_.undo.revision() * 1000003ull + uint64_t(doc_.activePart) * 7919ull +
+                               uint64_t(doc_.partCount()) + (doc_.modified ? 1ull << 62 : 0ull) + 1;
     const double viewed = phone_->secondsSinceArViewed();
     if (phoneArRequested_ && phoneLiveAr_ && !phoneBusy() && !doc_.sculptor.strokeActive() && viewed >= 0 &&
         viewed < 600 && ImGui::GetTime() - phoneArStartedAt_ > 2.5) {

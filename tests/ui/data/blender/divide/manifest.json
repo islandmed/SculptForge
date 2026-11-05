@@ -5,7 +5,7 @@
   "sender": "blender",
   "sender_version": "4.2.0",
   "objects": [
-    {"name": "Cylinder", "file": "r1_000.GoZ"},
-    {"name": "Sphere", "file": "r1_001.GoZ"}
+    {"name": "Cylinder", "file": "r1_000.Bridge"},
+    {"name": "Sphere", "file": "r1_001.Bridge"}
   ]
 }

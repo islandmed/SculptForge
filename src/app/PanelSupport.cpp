@@ -94,7 +94,7 @@ void App::chooseNewLook(bool tryIt) {
 }
 
 // The first-run look picker (the welcome): Neutral (the default), Forge Terminal with Tokyo Night (0.10.7's
-// default), or the Classic look with the ZBrush-style layout. A click applies it at once and remembers it.
+// default), or the Classic look with the Classic layout. A click applies it at once and remembers it.
 void App::drawLookPicker() {
     struct Choice {
         const char* label;
@@ -109,7 +109,7 @@ void App::drawLookPicker() {
          "Neutral grey panels, so your model's colours read true, with one orange accent. The SculptForge layout."},
         {"##welcome.look.forge", "Forge Terminal", int(looks::LookId::ForgeTerminal), "tokyo_night", 1,
          "Terminal-style tiles in the Tokyo Night colours (blue-grey). Preferences > Interface > Look has more schemes."},
-        {"##welcome.look.zbrush", "Classic layout", int(looks::LookId::Classic), "neutral", 0,
+        {"##welcome.look.classic", "Classic layout", int(looks::LookId::Classic), "neutral", 0,
          "The Classic grey look with the alphabetical palette bar and the two-row top shelf, for experienced sculptors."},
     };
     const float s = uiScale_, spacing = ImGui::GetStyle().ItemSpacing.x;

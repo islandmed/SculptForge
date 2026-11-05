@@ -15,7 +15,7 @@
 
 #include "core/MapExport.h"
 #include "core/MeshMaps.h"
-#include "core/Polypaint.h"
+#include "core/VertexPaint.h"
 #include "core/Texture.h"
 #include "core/TextureChannels.h"
 
@@ -395,7 +395,7 @@ double App::pbrTestValue(const std::string& name) const {
     if (name == "view_pbr") return renderSettings_.pbr() ? 1.0 : 0.0;
     if (name == "environment") return double(renderSettings_.environment);
     if (name == "environment_pending") return renderer_.environmentPending() ? 1.0 : 0.0;
-    if (name == "pbr_planes") return double(renderer_.pbrPlanes(doc_.activeSubtoolInfo().id));
+    if (name == "pbr_planes") return double(renderer_.pbrPlanes(doc_.activePartInfo().id));
     if (name == "brush_channels") return double(doc_.paintMaterial.channels);
     if (name == "roughness_painted") {
         if (!tex || !channelEnabled(*m.texture, Channel::Roughness)) return 0.0;

@@ -3,7 +3,7 @@
 //
 // Divide on meshes with high-valence vertices (#16): Blender's cylinder with Triangle Fan caps (the fan centre has
 // one edge per side) and its UV sphere (poles with one edge per segment) crashed Divide from 22 sides up. Built
-// here as Blender builds them, through OBJ and through the Blender Bridge (.GoZ + manifest), then divided three
+// here as Blender builds them, through OBJ and through the Blender Bridge (Bridge + manifest), then divided three
 // times; the levels' adjacency must match a plain rebuild and stepping down and up must keep the shape.
 #include "TestHarness.h"
 
@@ -11,7 +11,7 @@
 #include "core/Multires.h"
 #include "core/Primitives.h"
 #include "io/BlenderBridge.h"
-#include "io/GozIO.h"
+#include "io/BridgeIO.h"
 #include "io/ObjIO.h"
 
 #include <algorithm>
@@ -172,7 +172,7 @@ TEST(divide_uv_sphere) {
 }
 
 TEST(divide_after_blender_bridge) {
-    // The issue's path: Blender sends the mesh through the bridge (a .GoZ and a manifest), then Ctrl+D.
+    // The issue's path: Blender sends the mesh through the bridge (a Bridge and a manifest), then Ctrl+D.
     const fs::path root = fs::temp_directory_path() / "sf_divide_bridge";
     fs::remove_all(root);
     const fs::path inbox = root / "to_sculptforge";
@@ -180,17 +180,17 @@ TEST(divide_after_blender_bridge) {
     std::string err;
     Mesh cylinder, sphere;
     CHECK(loadObjText(cylinderObj(22, true), cylinder));
-    CHECK(saveGoz((inbox / "r1_000.GoZ").string(), cylinder, "Cylinder", err));
+    CHECK(saveBridge((inbox / "r1_000.Bridge").string(), cylinder, "Cylinder", err));
     CHECK(loadObjText(uvSphereObj(32, 16), sphere));
-    CHECK(saveGoz((inbox / "r1_001.GoZ").string(), sphere, "Sphere", err));
+    CHECK(saveBridge((inbox / "r1_001.Bridge").string(), sphere, "Sphere", err));
     std::ofstream(inbox / "manifest.json") << R"({"format": "sculptforge-bridge", "version": 1, "revision": 1,
-        "sender": "blender", "objects": [{"name": "Cylinder", "file": "r1_000.GoZ"},
-        {"name": "Sphere", "file": "r1_001.GoZ"}]})";
+        "sender": "blender", "objects": [{"name": "Cylinder", "file": "r1_000.Bridge"},
+        {"name": "Sphere", "file": "r1_001.Bridge"}]})";
     Document d = makeDoc(makeCube(2));
     CHECK(registry().execute(d, "blender_receive", {{"folder", root.string()}}).ok);
-    CHECK(d.subtoolCount() == 2);
+    CHECK(d.partCount() == 2);
     CHECK(divideThrice(d, "bridge cylinder 22"));
-    d.selectSubtool(1);
+    d.selectPart(1);
     CHECK(divideThrice(d, "bridge uv sphere"));
     fs::remove_all(root);
 }

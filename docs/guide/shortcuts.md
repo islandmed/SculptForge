@@ -103,6 +103,12 @@ generated from SculptForge's action registry, the same source as the Controls wi
 |---|---|---|
 | Material picker | <kbd>M</kbd> | Pop up the materials under the cursor. Hover one to preview it on the model; click to keep it. |
 
+### Palettes
+
+| Action | Keys | What it does |
+|---|---|---|
+| Preferences | <kbd>Ctrl</kbd>+<kbd>,</kbd> | Open the Preferences palette (click its tray icon to keep it in a tray). |
+
 ### Preferences
 
 | Action | Keys | What it does |
@@ -364,7 +370,7 @@ differ even then, because the feature works differently or doesn't exist yet:
 |---|---|
 | <kbd>P</kbd> (perspective) | <kbd>P</kbd> is the Paint brush; <kbd>Numpad 5</kbd> switches to an orthographic view |
 | <kbd>T</kbd> (Edit mode) | Always in Edit mode: there is no 2.5D canvas |
-| <kbd>W</kbd> / <kbd>E</kbd> / <kbd>R</kbd> (Transpose line) | The Gizmo (see [Gizmo](gizmo.md)) |
+| <kbd>W</kbd> / <kbd>E</kbd> / <kbd>R</kbd> (move, scale and rotate line) | The Gizmo (see [Gizmo](gizmo.md)) |
 | <kbd>1</kbd>, <kbd>2</kbd>, <kbd>3</kbd> (replay and record strokes) | Not yet |
 | <kbd>N</kbd> (list the Parts) | **Tool > Parts** in the right tray |
 | <kbd>F1</kbd> to <kbd>F6</kbd> (pop-ups) | <kbd>F1</kbd> is the Controls window, <kbd>F3</kbd> the command palette; <kbd>B</kbd>, <kbd>M</kbd> and the left-shelf tiles pop up brushes, strokes, alphas and materials |

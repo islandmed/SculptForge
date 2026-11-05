@@ -21,7 +21,7 @@ hold none
 wait 0.2
 expect_no_text "subdivision level"
 
-# ZBrush-style shortcut assignment: double-click a row (or Ctrl+Alt+click a button), press the key.
+# classic shortcut assignment: double-click a row (or Ctrl+Alt+click a button), press the key.
 type Controls/##controls_filter wire
 double_click Controls/Wireframe
 expect_status "Press a key for 'Wireframe'"

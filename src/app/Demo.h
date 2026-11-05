@@ -164,7 +164,7 @@ private:
     std::vector<uint8_t> lastShot_;
     int lastShotW_ = 0, lastShotH_ = 0;
     std::string scriptDir_; // the .sfui script's folder: relative `drop` paths, $SCRIPT_DIR in env steps
-    std::string expandLibrary(std::string text) const; // $LIBRARY -> the LightBox library folder (UiTest.cpp)
+    std::string expandLibrary(std::string text) const; // $LIBRARY -> the Library library folder (UiTest.cpp)
     SDL_Keymod held_ = SDL_KMOD_NONE; // modifiers held by `hold` (Ctrl to mask, Ctrl+Shift to hide...)
     // Simulated pen (pen_* steps).
     SDL_PenID testPen_ = 1;        // tablet_plug gives the next pen a new id, as SDL does

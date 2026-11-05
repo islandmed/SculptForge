@@ -17,7 +17,7 @@ namespace sf {
 // A modifier kept on until it is picked again (or another brush is picked): strokes act as if its keys were held.
 enum class StrokeLatch { None, Smooth, Mask, Select };
 const char* strokeLatchName(StrokeLatch latch); // "Smooth", "Mask", "Select"; "" for None
-// The keys a latch stands for (the ZBrush meanings the sculpting code reads): Smooth = Shift, Mask = Ctrl,
+// The keys a latch stands for (the classic meanings the sculpting code reads): Smooth = Shift, Mask = Ctrl,
 // Select = Ctrl+Shift.
 struct StrokeLatchKeys {
     bool shift = false, ctrl = false;

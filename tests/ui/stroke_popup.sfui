@@ -169,8 +169,8 @@ stroke_popup_item dots click
 expect_value stroke_popup_open == 0
 expect_value stroke_type == 0
 
-# The ZBrush style: G too. The Blender style: Z (its G is the Move brush, J the Strokes radial menu).
-input_style zbrush
+# The classic: G too. The Blender style: Z (its G is the Move brush, J the Strokes radial menu).
+input_style classic
 expect_shortcut stroke.popup G
 expect_value shortcut_conflicts == 0
 input_style blender

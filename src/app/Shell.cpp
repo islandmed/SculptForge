@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The ZBrush-style shell (docs/ui-design.md §2, §3, §9): title strip, the
+// The classic shell (docs/ui-design.md §2, §3, §9): title strip, the
 // alphabetical palette bar with its drop-downs, the four shelves around the
 // canvas, the left and right trays with their dividers, customize-mode drag
 // and drop, layout presets, and the actions behind all of it.
@@ -14,8 +14,8 @@
 #include "app/LookSchemes.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
-#include "core/Matcap.h"
-#include "core/Polypaint.h"
+#include "core/LitSphere.h"
+#include "core/VertexPaint.h"
 #include "core/Texture.h"
 
 #include <IconsLucide.h>
@@ -154,7 +154,7 @@ void drawBrushIcon(ImDrawList* dl, ImVec2 c, float r, int type) {
     const float w = std::max(1.5f, r * 0.11f);
     switch (BrushType(type)) {
     case BrushType::Crease:
-    case BrushType::DamStandard: // a groove: dark line with a lit lower lip
+    case BrushType::SharpCrease: // a groove: dark line with a lit lower lip
         curve(0.0f, lo, w);
         curve(w * 0.9f, hi, w * 0.5f);
         break;
@@ -241,7 +241,7 @@ bool segmentPair(const std::string& a, const std::string& b) {
     auto group = [](const std::string& id) {
         if (id == "draw.sculpt" || id == "draw.paint") return 1;
         if (id == "tool.draw" || id == "tool.move" || id == "tool.scale" || id == "tool.rotate") return 5;
-        if (id == "draw.zadd" || id == "draw.zsub") return 2;
+        if (id == "draw.raise" || id == "draw.lower") return 2;
         if (id.rfind("transform.symmetry_", 0) == 0) return 3;
         if (id.rfind("draw.pressure_", 0) == 0) return 4;
         return 0;
@@ -280,7 +280,7 @@ bool drawShelfTile(App& app, const Action& a, ImVec2 size) {
     ImFont* caption = look == int(ui::Look::IconLabel) ? app.fontTiny_ : app.fontSmall_;
     const float capH = caption ? caption->FontSize + 2.0f * s : 14.0f * s;
     if (look == int(ui::Look::IconLabel)) {
-        // Right-shelf toggles are options (Mask, Paint, PolyF): on is a raised grey with an accent bar down the
+        // Right-shelf toggles are options (Mask, Paint, Wire): on is a raised grey with an accent bar down the
         // side that faces the canvas, off is quiet; only a mode action gets the accent fill.
         const bool mode = ui::IsModeAction(a.id);
         // Off: the fill eases into the accent-tinted hover (ui::DrawHover adds the look's ring).
@@ -321,7 +321,7 @@ bool drawShelfTile(App& app, const Action& a, ImVec2 size) {
         centredText(dl, app.fontIcons_, q0, q1, theme::u32(on ? theme::accent : theme::text, alpha), a.icon ? a.icon : "?");
     }
     if (on) dl->AddRect(p0, p1, theme::u32(theme::accent), theme::rounding(4.0f * s), 0, 2.0f * s);
-    // The hotkey digit (1-9, 0) in the corner, as ZBrush shows brush shortcuts.
+    // The hotkey digit (1-9, 0) in the corner shows brush shortcuts.
     const std::string key = app.actions().shortcutText(a.id);
     if (key.size() == 1 && caption)
         dl->AddText(caption, caption->FontSize, ImVec2(p0.x + 3 * s, p0.y + 1 * s), theme::u32(theme::textDim), key.c_str());
@@ -402,9 +402,9 @@ void App::registerShellActions() {
     add({"draw.paint", "Paint", ICON_LC_PAINTBRUSH,
          "Paint colour without sculpting. Alt paints back to white, Shift still smooths.",
          "Draw", "P", "", [this] { paintMode_ = !paintMode_; }, [this] { return paintMode_; }, nullptr});
-    add({"draw.zadd", "Add", nullptr, "Brushes add to the surface. Hold Alt to subtract for one stroke.", "Draw", "", "",
+    add({"draw.raise", "Add", nullptr, "Brushes add to the surface. Hold Alt to subtract for one stroke.", "Draw", "", "",
          [this] { invertToggle_ = false; }, [this] { return !invertToggle_; }, nullptr});
-    add({"draw.zsub", "Sub", nullptr, "Brushes subtract from the surface. Hold Alt to add for one stroke.", "Draw", "", "",
+    add({"draw.lower", "Sub", nullptr, "Brushes subtract from the surface. Hold Alt to add for one stroke.", "Draw", "", "",
          [this] { invertToggle_ = true; }, [this] { return invertToggle_; }, nullptr});
     flag("draw.rgb", "Rgb", nullptr, "Draw", "", &paintRgb_, "Sculpt brushes also paint the colour.");
     flag("draw.front_faces", "Front", nullptr, "Brush", "", &frontFacesOnly_,
@@ -424,7 +424,7 @@ void App::registerShellActions() {
          "under the brush become triangles and UVs are dropped (Undo brings them back).",
          "Draw", "", "dyntopo", [this] { setDynamic(!doc_.sculptor.dyntopo.enabled); },
          [this] { return doc_.sculptor.dyntopo.enabled; }, nullptr});
-    // Masking and visibility selection shapes (Tool > Masking, Tool > Visibility), named as in ZBrush.
+    // Masking and visibility selection shapes (Tool > Masking, Tool > Visibility), named.
     auto shape = [this](std::string id, std::string label, std::string palette, SelectShape* target, SelectShape value,
                         std::string description) {
         actions_.add({std::move(id), std::move(label), nullptr, std::move(description), std::move(palette), "", "",
@@ -493,9 +493,9 @@ void App::registerShellActions() {
     // View (right shelf, Render palette). Frame keeps F; its short label fits the right shelf.
     add({"view.frame", "Frame", ICON_LC_SCAN, "Fit the whole model in the view.", "Transform", "F", "",
          [this] { camera_.frame(sceneBounds()); }, nullptr, nullptr});
-        flag("view.polyf", "Wire", ICON_LC_GRID_3X3, "Render", "", &renderSettings_.wireframe,
+        flag("view.wire", "Wire", ICON_LC_GRID_3X3, "Render", "", &renderSettings_.wireframe,
          "Wireframe: show the polygons of the active Part (Shift+F).");
-    flag("view.polygroups", "Groups", ICON_LC_SHAPES, "Render", "", &renderSettings_.showPolygroups,
+    flag("view.facegroups", "Groups", ICON_LC_SHAPES, "Render", "", &renderSettings_.showFaceGroups,
          "Colour each face group of the active Part.");
     flag("view.mask", "Mask", ICON_LC_DROPLET, "Render", "", &renderSettings_.showMask,
          "Show or hide the mask (masked areas drawn darker). Hiding it keeps the mask: masked areas stay protected "
@@ -508,9 +508,9 @@ void App::registerShellActions() {
         };
         actions_.add(std::move(a));
     }
-    flag("view.polypaint", "Paint", ICON_LC_PALETTE, "Render", "", &renderSettings_.showPolypaint,
+    flag("view.vertexpaint", "Paint", ICON_LC_PALETTE, "Render", "", &renderSettings_.showVertexPaint,
          "Show vertex paint colours (off: plain material).");
-    // Shading (Material palette, Tool > Display): the scene's, and the active SubTool's own.
+    // Shading (Material palette, Tool > Display): the scene's, and the active Part's own.
     // Viewport shading (Material > Viewport Shading): Lit Sphere or PBR.
     add({"view.shading_lit_sphere", "Lit Sphere", nullptr,
          "Lit Sphere shading (the default): the chosen material sphere or the studio lights, made for reading forms "
@@ -545,16 +545,16 @@ void App::registerShellActions() {
          "Preferences > Display", "", "set_background",
          [this] { runCommand("set_background", {{"mode", std::string("flat")}}); },
          [this] { return !renderSettings_.gradientBackground; }, nullptr});
-    auto subtoolShading = [this, &add](const char* id, const char* label, Shading mode, const char* description) {
-        add({id, label, nullptr, description, "Material > This Part", "", "subtool_shading",
-             [this, mode] { runCommand("subtool_shading", {{"mode", std::string(shadingName(mode))}}); },
-             [this, mode] { return doc_.activeSubtoolInfo().shading == mode; }, nullptr});
+    auto partShading = [this, &add](const char* id, const char* label, Shading mode, const char* description) {
+        add({id, label, nullptr, description, "Material > This Part", "", "part_shading",
+             [this, mode] { runCommand("part_shading", {{"mode", std::string(shadingName(mode))}}); },
+             [this, mode] { return doc_.activePartInfo().shading == mode; }, nullptr});
     };
-    subtoolShading("subtool.shading_default", "Scene", Shading::Default,
+    partShading("part.shading_default", "Scene", Shading::Default,
                    "The active Part follows the scene's shading (Smooth | Flat above).");
-    subtoolShading("subtool.shading_smooth", "Smooth", Shading::Smooth,
+    partShading("part.shading_smooth", "Smooth", Shading::Smooth,
                    "The active Part always shades smooth, whatever the scene's shading. Saved in the project.");
-    subtoolShading("subtool.shading_flat", "Flat", Shading::Flat,
+    partShading("part.shading_flat", "Flat", Shading::Flat,
                    "The active Part always shades flat (faceted), whatever the scene's shading. Saved in the project.");
     flag("view.mesh", "Show Mesh", ICON_LC_BOX, "Render", "", &renderSettings_.showMesh, "Draw the sculpt.");
     add({"view.fullscreen", "Fullscreen", ICON_LC_MAXIMIZE, "Fill the screen with SculptForge (again: back to a window).",
@@ -564,14 +564,14 @@ void App::registerShellActions() {
     add({"view.splats", "Splats", ICON_LC_SPARKLE, "Show the Gaussian splat capture.", "Render", "", "",
          [this] { renderSettings_.showSplats = !renderSettings_.showSplats; },
          [this] { return renderSettings_.showSplats; }, [this] { return !doc_.splats.empty(); }});
-    add({"subtool.solo", "Solo", ICON_LC_SCAN_EYE, "Show only the active Part (again: show the others).",
-         "Tool > Parts", "", "subtool_solo", [this] { runCommand("subtool_solo"); },
+    add({"part.solo", "Solo", ICON_LC_SCAN_EYE, "Show only the active Part (again: show the others).",
+         "Tool > Parts", "", "part_solo", [this] { runCommand("part_solo"); },
          [this] {
              int visible = 0;
-             for (const auto& s : doc_.subtools) visible += s.visible ? 1 : 0;
-             return doc_.subtoolCount() > 1 && visible == 1 && doc_.activeSubtoolInfo().visible;
+             for (const auto& s : doc_.parts) visible += s.visible ? 1 : 0;
+             return doc_.partCount() > 1 && visible == 1 && doc_.activePartInfo().visible;
          },
-         [this] { return doc_.subtoolCount() > 1; }});
+         [this] { return doc_.partCount() > 1; }});
     add({"nav.move", "Move", ICON_LC_HAND, "Drag on this button to pan the view (or Alt+drag the background).",
          "Transform", "", "", nullptr, nullptr, nullptr});
     add({"nav.zoom", "Zoom", ICON_LC_ZOOM_IN, "Drag up and down on this button to zoom (or use the mouse wheel).",
@@ -586,7 +586,7 @@ void App::registerShellActions() {
                  {"Models", "obj;fbx;glb;gltf;ply;stl;" SF_BRIDGE_MESH_EXTS ";usda;usd;usdz"}, {"All files", "*"}};
              SDL_ShowOpenFileDialog(
                  [](void* user, const char* const* files, int) {
-                     if (files && files[0]) static_cast<App*>(user)->queueFile(FileAction::AppendSubtool, files[0]);
+                     if (files && files[0]) static_cast<App*>(user)->queueFile(FileAction::AppendPart, files[0]);
                  },
                  this, window_, filters, 2, nullptr, false);
          },
@@ -665,7 +665,7 @@ void App::registerShellActions() {
          "Menus by task (File, Edit, Sculpt, Paint, Mesh, View, Render, Help), a status bar and a one-row tool shelf.",
          "Preferences > Interface > Look", "", "", [this] { setShellLayout(1); lookDirty_ = true; },
          [this] { return uiPrefs_.shellLayout == 1; }, nullptr});
-    add({"ui.layout.zbrush", "Classic layout", ICON_LC_LAYOUT_TEMPLATE,
+    add({"ui.layout.classic", "Classic layout", ICON_LC_LAYOUT_TEMPLATE,
          "The alphabetical palette bar and the two-row top shelf, as experienced sculptors expect.", "Preferences > Interface > Look", "",
          "", [this] { setShellLayout(0); lookDirty_ = true; }, [this] { return uiPrefs_.shellLayout == 0; }, nullptr});
     commands_.add({"ui_look",
@@ -708,7 +708,7 @@ void App::registerShellActions() {
                            l.outlineOpacity = std::clamp(float(argNumber(a, "outline_opacity", 100.0)) / 100.0f, 0.0f, 1.0f);
                        if (a.contains("layout")) {
                            const std::string k = argString(a, "layout");
-                           if (k != "sculptforge" && k != "classic" && k != "zbrush") return {false, "layout must be sculptforge or classic"};
+                           if (k != "sculptforge" && k != "classic") return {false, "layout must be sculptforge or classic"};
                            layoutKind = k == "sculptforge" ? 1 : 0;
                        }
                        setShellLayout(layoutKind);
@@ -723,7 +723,8 @@ void App::registerShellActions() {
     for (int i = 0; i < count; ++i) {
         const std::string id = list[i].id;
         add({"ui.palette." + id, list[i].name, list[i].icon,
-             std::string("Open the ") + list[i].name + " palette (click its tray icon to keep it in a tray).", "Palettes", "",
+             std::string("Open the ") + list[i].name + " palette (click its tray icon to keep it in a tray).", "Palettes",
+             id == "preferences" ? "Ctrl+," : "", // (Cmd+, on macOS, where apps keep their settings, #111)
              "",
              [this, id] {
                  if (std::count(layout_.leftTray.begin(), layout_.leftTray.end(), id) +
@@ -833,10 +834,10 @@ void App::applyPreset(int preset) {
     l.customize = layout_.customize;
     l.consoleOpen = layout_.consoleOpen;
     l.consoleHeight = layout_.consoleHeight;
-    l.lightboxOpen = layout_.lightboxOpen;
-    l.lightboxRows = layout_.lightboxRows;
-    l.lightboxTab = layout_.lightboxTab;
-    l.lightboxBottom = layout_.lightboxBottom;
+    l.libraryOpen = layout_.libraryOpen;
+    l.libraryRows = layout_.libraryRows;
+    l.libraryTab = layout_.libraryTab;
+    l.libraryBottom = layout_.libraryBottom;
     l.leftHanded = layout_.leftHanded;
     static const char* const kNames[] = {"Standard", "Sculpt", "Wide"};
     if (preset == 1) {
@@ -986,7 +987,7 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     auto buttonW = [&](const char* label) { return ImGui::CalcTextSize(label, nullptr, true).x + st.FramePadding.x * 2.0f; };
     const bool quickSave = actions_.find("file.quicksave") != nullptr;
     const float searchW = 150.0f * s;
-    const float windowButtonW = buttonH + 6.0f * s; // minimise and close, at the far right like ZBrush's
+    const float windowButtonW = buttonH + 6.0f * s; // minimise and close, at the far right 
     float rightW = searchW + buttonW(tr(ICON_LC_MENU " Menus")) + 3.0f * (buttonH + 2.0f * s) + 18.0f * s +
                    10.0f * s + 2.0f * windowButtonW + 2.0f * s;
     if (quickSave) rightW += buttonW(tr("Save Snapshot")) + 8.0f * s;
@@ -998,14 +999,14 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     if (fontSmall_) ImGui::PushFont(fontSmall_);
     ImGui::SetCursorPosY(std::floor((h - ImGui::GetTextLineHeight()) * 0.5f));
     size_t tris = 0, verts = 0;
-    for (int i = 0; i < doc_.subtoolCount(); ++i) {
-        tris += doc_.subtoolMesh(i).triangleCount();
-        verts += doc_.subtoolMesh(i).vertexCount();
+    for (int i = 0; i < doc_.partCount(); ++i) {
+        tris += doc_.partMesh(i).triangleCount();
+        verts += doc_.partMesh(i).vertexCount();
     }
     char info[256];
     std::snprintf(info, sizeof info, tr("Verts %s   Tris %s   Part %s (%d/%d)   Layer %s%s%s"),
-                  shortCount(verts).c_str(), shortCount(tris).c_str(), doc_.activeSubtoolInfo().name.c_str(),
-                  doc_.activeSubtool + 1, doc_.subtoolCount(),
+                  shortCount(verts).c_str(), shortCount(tris).c_str(), doc_.activePartInfo().name.c_str(),
+                  doc_.activePart + 1, doc_.partCount(),
                   doc_.activeLayer >= 0 && doc_.activeLayer < int(doc_.mesh.layers.size())
                       ? doc_.mesh.layers[size_t(doc_.activeLayer)].name.c_str()
                       : tr("Base"),
@@ -1123,7 +1124,7 @@ void App::drawPaletteBar(const ShellGeometry& g) {
     int count = 0;
     const PaletteDef* list = palettes(count);
     // File and Edit first and Help last, where every other desktop app has them, the rest A to Z in between.
-    // ZBrush purists can switch to strict alphabetical order in Preferences > Interface.
+    // classic purists can switch to strict alphabetical order in Preferences > Interface.
     std::vector<int> order;
     if (!uiPrefs_.alphabeticalPalettes)
         for (const char* first : {"file", "edit"})
@@ -1200,10 +1201,10 @@ void App::setShellLayout(int layoutKind) {
     l.openSubpalettes = layout_.openSubpalettes;
     l.consoleOpen = layout_.consoleOpen;
     l.consoleHeight = layout_.consoleHeight;
-    l.lightboxOpen = layout_.lightboxOpen;
-    l.lightboxRows = layout_.lightboxRows;
-    l.lightboxTab = layout_.lightboxTab;
-    l.lightboxBottom = layout_.lightboxBottom;
+    l.libraryOpen = layout_.libraryOpen;
+    l.libraryRows = layout_.libraryRows;
+    l.libraryTab = layout_.libraryTab;
+    l.libraryBottom = layout_.libraryBottom;
     l.leftHanded = layout_.leftHanded;
     l.shelfTiles = layout_.shelfTiles;
     layout_ = std::move(l);
@@ -1437,7 +1438,7 @@ void App::drawStatusBar(const ShellGeometry& g) {
         if (doc_.dirty()) name += " *";
         mods.push_back({ICON_LC_FILE, "file", name});
         size_t tris = 0;
-        for (int i = 0; i < doc_.subtoolCount(); ++i) tris += doc_.subtoolMesh(i).triangleCount();
+        for (int i = 0; i < doc_.partCount(); ++i) tris += doc_.partMesh(i).triangleCount();
         mods.push_back({ICON_LC_TRIANGLE, "tris", shortCount(tris)});
         if (ImGui::GetTime() - fpsShownAt_ > 0.5 || fpsShown_ < 0.0f) {
             fpsShown_ = ImGui::GetIO().Framerate;
@@ -1542,7 +1543,7 @@ void App::drawStatusBar(const ShellGeometry& g) {
         ui::HelpAction(*this, id.c_str());
     }
 
-    // Search: opens the command palette (F3), which also finds every palette of the ZBrush-style layout.
+    // Search: opens the command palette (F3), which also finds every palette of the Classic layout.
     {
         ImGui::SetCursorScreenPos(ImVec2(searchX, o.y + (h - buttonH) * 0.5f));
         const bool clicked = ImGui::InvisibleButton("##search", ImVec2(searchW, buttonH));
@@ -2095,18 +2096,18 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         ImGui::PopStyleVar();
     } else if (item == "widget.points") {
         size_t total = 0;
-        uint64_t key = doc_.undo.revision() * 0x9E3779B97F4A7C15ull ^ uint64_t(doc_.activeSubtool) ^
+        uint64_t key = doc_.undo.revision() * 0x9E3779B97F4A7C15ull ^ uint64_t(doc_.activePart) ^
                        (uint64_t(reinterpret_cast<uintptr_t>(doc_.mesh.hidden.data())) << 1);
-        for (int i = 0; i < doc_.subtoolCount(); ++i) {
-            total += doc_.subtoolMesh(i).triangleCount();
-            key = key * 31 + doc_.subtoolMesh(i).triangleCount() * 2 + (doc_.subtools[size_t(i)].visible ? 1 : 0);
+        for (int i = 0; i < doc_.partCount(); ++i) {
+            total += doc_.partMesh(i).triangleCount();
+            key = key * 31 + doc_.partMesh(i).triangleCount() * 2 + (doc_.parts[size_t(i)].visible ? 1 : 0);
         }
         if (key != activeTrisKey_) { // hidden triangles only change through commands and undo
             activeTrisKey_ = key;
             activeTris_ = 0;
-            for (int i = 0; i < doc_.subtoolCount(); ++i) {
-                if (!doc_.subtools[size_t(i)].visible) continue;
-                const Mesh& m = doc_.subtoolMesh(i);
+            for (int i = 0; i < doc_.partCount(); ++i) {
+                if (!doc_.parts[size_t(i)].visible) continue;
+                const Mesh& m = doc_.partMesh(i);
                 const size_t hidden = size_t(std::count_if(m.hidden.begin(), m.hidden.end(), [](uint8_t h) { return h != 0; }));
                 activeTris_ += m.triangleCount() - std::min(hidden, m.triangleCount());
             }
@@ -2212,9 +2213,9 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         centre(size.x);
         // Top shelf hierarchy, by meaning (docs/ui-design.md §10). Every item is the full row height in the same
         // font, so both rows share one baseline. Mode groups (Draw | Move | Scale | Rotate, Sculpt | Paint) and
-        // choices (Zadd | Zsub) are segments a step above the shelf: the current mode in the accent, the chosen
+        // choices (Raise | Lower) are segments a step above the shelf: the current mode in the accent, the chosen
         // side of a choice a raised grey. Options (X, Rgb, Pressure...) are separate dark chips with a readable
-        // label, raised with an accent underline when on. The rest (LightBox, AI Brush) are plain buttons.
+        // label, raised with an accent underline when on. The rest (Library, AI Brush) are plain buttons.
         const bool segment = ui::IsModeAction(a->id) || ui::IsChoiceAction(a->id);
         const bool option = !segment && a->checked && a->id.rfind("ui.", 0) != 0;
         int colors = 0;
@@ -2299,7 +2300,7 @@ void App::finishShelfDrag() {
         return;
     }
     if (!shelfDrag_.active) return;
-    // The drag ended: dropped outside every shelf, an item that came from a shelf is removed (ZBrush).
+    // The drag ended: dropped outside every shelf, an item that came from a shelf is removed.
     if (!shelfDrag_.accepted && shelfDrag_.shelf >= 0 && shelfDrag_.shelf < kShelfCount) {
         auto& list = shelfDrag_.shelf == kShelfTop    ? layout_.topShelf
                      : shelfDrag_.shelf == kShelfLeft  ? layout_.leftShelf
@@ -2314,7 +2315,7 @@ void App::finishShelfDrag() {
     shelfDrag_ = {};
 }
 
-// Right-shelf Move / Zoom / Rotate: drag on the button to navigate, as in ZBrush.
+// Right-shelf Move / Zoom / Rotate: drag on the button to navigate.
 bool App::canvasNavButton(const char* id, const char* icon, const char* englishLabel, int mode) {
     const char* label = tr(englishLabel);
     const float s = uiScale_;
@@ -2395,7 +2396,7 @@ void App::drawHeldBrushIcon(ImDrawList* dl, ImVec2 a, ImVec2 b, const char* icon
 
 void App::drawBrushTile(const char* id, ImVec2 size) {
     const float s = uiScale_;
-    // ZBrush: Ctrl held shows the mask brush, Ctrl+Shift the selection brush; a click picks among those.
+    // Ctrl held shows the mask brush, Ctrl+Shift the selection brush; a click picks among those.
     if (const HeldBrushItem* held = heldBrushCurrent(heldBrush())) {
         ImVec2 a, b;
         ui::TileLiftScope lift;
@@ -2441,7 +2442,7 @@ void App::drawStrokeIcon(ImDrawList* dl, ImVec2 a, ImVec2 b, StrokeType type) {
     const float w = b.x - a.x, h = b.y - a.y;
     auto at = [&](float u, float v) { return ImVec2(a.x + w * u, a.y + h * v); };
     switch (type) {
-    case StrokeType::Dots: // ZBrush's dotted arc
+    case StrokeType::Dots: // the classic dotted arc
         for (int i = 0; i < 7; ++i) {
             const float u = float(i) / 6.0f;
             dl->AddCircleFilled(at(0.18f + 0.64f * u, 0.30f + 0.42f * std::sin(u * 2.4f) * (1.0f - u * 0.35f)), 3.2f * s, col);
@@ -2509,7 +2510,7 @@ void App::drawStrokeTile(const char* id, ImVec2 size) {
 void App::drawAlphaTile(const char* id, ImVec2 size) {
     const float s = uiScale_;
     ImVec2 a, b;
-    if (vdmBrushActive() && doc_.brushVdm) { // the VDM brush's 3D alpha (ZBrush shows VDMs in the alpha slot)
+    if (vdmBrushActive() && doc_.brushVdm) { // the VDM brush's 3D alpha (shows VDMs in the alpha slot)
         ui::TileLiftScope lift;
         const bool clicked = tileFrame(id, size, lift.lift, fontSmall_, doc_.brushVdm->name, s, a, b);
         if (ImTextureID tex = thumbs_.vdm(doc_.brushVdm)) {
@@ -2550,10 +2551,10 @@ void App::drawAlphaTile(const char* id, ImVec2 size) {
 
 void App::drawMaterialTile(const char* id, ImVec2 size) {
     const float s = uiScale_;
-    const int m = renderSettings_.matcap;
+    const int m = renderSettings_.litsphere;
     ImVec2 a, b;
     ui::TileLiftScope lift;
-    const bool clicked = tileFrame(id, size, lift.lift, fontSmall_, m < 0 ? std::string("Studio") : std::string(matcapName(m)), s, a, b);
+    const bool clicked = tileFrame(id, size, lift.lift, fontSmall_, m < 0 ? std::string("Studio") : std::string(litsphereName(m)), s, a, b);
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const ImVec2 c((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
     const float r = (b.x - a.x) * 0.4f;
@@ -2561,8 +2562,8 @@ void App::drawMaterialTile(const char* id, ImVec2 size) {
         ImVec2 p0 = a, p1 = b;
         squareIn(p0, p1, 2.0f * s);
         dl->AddImage(thumb, p0, p1);
-    } else if (const GLuint t = m >= 0 ? renderer_.matcapTexture(m) : 0) {
-        // Until then the raw matcap (a sphere picture already; stored bottom-up).
+    } else if (const GLuint t = m >= 0 ? renderer_.litsphereTexture(m) : 0) {
+        // Until then the raw lit sphere (a sphere picture already; stored bottom-up).
         dl->AddImageRounded(ImTextureID(uintptr_t(t)), ImVec2(c.x - r, c.y - r), ImVec2(c.x + r, c.y + r), ImVec2(0, 1),
                             ImVec2(1, 0), IM_COL32_WHITE, r);
     } else {

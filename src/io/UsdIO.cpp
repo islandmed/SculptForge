@@ -125,13 +125,13 @@ void writeExtent(Writer& w, const AABB& b) {
 // Selection Sets (core/SelectionSets.h) of the mesh, inside its Mesh prim: their names and channels as
 // `sculptforge:selectionSets` / `sculptforge:selectionSetChannels`, the mask and vertex paint of set k as vertex
 // primvars `sculptforge_set<k>_mask` / `_color`, its shown faces as the GeomSubset `sculptforge_set<k>_visible` and
-// its polygroups as a partition of GeomSubsets `sculptforge_set<k>_group<id>`. UVs and shapes aren't written (they
+// its face groups as a partition of GeomSubsets `sculptforge_set<k>_group<id>`. UVs and shapes aren't written (they
 // travel in projects and .sfsets files). `triFace`: the face each triangle was written in.
 void writeSelectionSets(Writer& w, const Mesh& mesh, std::vector<uint32_t> triFace, size_t faceCount) {
     if (!mesh.selectionSets || mesh.selectionSets->sets.empty()) return;
     for (uint32_t t = 0; t < triFace.size(); ++t) // the second half of a quad is in its partner's face
         if (triFace[t] == ~0u && mesh.quadPartnerAt(t) != Mesh::kNoQuad) triFace[t] = triFace[mesh.quadPartnerAt(t)];
-    constexpr uint32_t kChannels = kSetMask | kSetPaint | kSetVisibility | kSetPolygroups;
+    constexpr uint32_t kChannels = kSetMask | kSetPaint | kSetVisibility | kSetFaceGroups;
     std::vector<std::string> names, channels;
     std::vector<SelectionSetData> data;
     for (const auto& set : mesh.selectionSets->sets) {
@@ -184,13 +184,13 @@ void writeSelectionSets(Writer& w, const Mesh& mesh, std::vector<uint32_t> triFa
         if (!d.hidden.empty())
             faceSubset(base + "_visible", "sculptforge:set" + std::to_string(k) + ":visibility",
                        [&](uint32_t t) { return d.hidden[t] == 0; }, false);
-        if (!d.polygroups.empty()) {
-            std::vector<uint32_t> ids = d.polygroups;
+        if (!d.facegroups.empty()) {
+            std::vector<uint32_t> ids = d.facegroups;
             std::sort(ids.begin(), ids.end());
             ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
             for (uint32_t id : ids)
-                faceSubset(base + "_group" + std::to_string(id), "sculptforge:set" + std::to_string(k) + ":polygroups",
-                           [&](uint32_t t) { return d.polygroups[t] == id; }, true);
+                faceSubset(base + "_group" + std::to_string(id), "sculptforge:set" + std::to_string(k) + ":facegroups",
+                           [&](uint32_t t) { return d.facegroups[t] == id; }, true);
         }
     }
 }
@@ -263,7 +263,7 @@ void writeMesh(Writer& w, const Mesh& mesh, const std::string& root, const std::
         w.line(")");
     }
     if (mesh.hasColors() && mesh.colors.size() == mesh.vertexCount()) {
-        // Polypaint (linear, as USD expects); the material reads it through a primvar reader.
+        // Vertex paint (linear, as USD expects); the material reads it through a primvar reader.
         w.array("color3f[] primvars:displayColor", mesh.colors, [&](const glm::vec3& c) { w.vec3(c); });
         w.s.pop_back();
         w.s += " (\n";
@@ -369,7 +369,7 @@ void writeSplats(Writer& w, const SplatCloud& c) {
     w.close();
 }
 
-// A UsdPreviewSurface clay material; `painted` reads the polypaint primvar for its colour.
+// A UsdPreviewSurface clay material; `painted` reads the vertex paint primvar for its colour.
 void writeMaterial(Writer& w, const std::string& path, const std::string& name, bool painted) {
     w.open("def Material " + quoted(name));
     w.line("token outputs:surface.connect = <" + path + "/PreviewSurface.outputs:surface>");
@@ -468,7 +468,7 @@ std::string buildUsda(const std::vector<MeshObjectRef>& meshes, const std::vecto
                       const SplatCloud* splats, const std::string& name, const MorphAnimation* animation,
                       const std::vector<std::vector<std::pair<std::string, std::string>>>& pbr) {
     const std::string root = usdIdentifier(name.empty() ? "Sculpt" : name);
-    // Textured meshes bind a material of their own. Of the others, polypainted ones bind a material that
+    // Textured meshes bind a material of their own. Of the others, vertex painted ones bind a material that
     // reads their colours; with a mix, plain ones bind "Clay".
     size_t painted = 0, plain = 0;
     for (size_t i = 0; i < meshes.size(); ++i) {
@@ -877,7 +877,7 @@ void readSelectionSets(const std::vector<Prim>& prims, size_t mesh, size_t verti
         uint32_t channels = 0;
         std::string error;
         if (!parseSetChannels(channelList->strs[k], channels, error)) continue;
-        channels &= kSetMask | kSetPaint | kSetVisibility | kSetPolygroups;
+        channels &= kSetMask | kSetPaint | kSetVisibility | kSetFaceGroups;
         const std::string base = "sculptforge_set" + std::to_string(k);
         SelectionSetData d;
         d.channels = channels;
@@ -894,7 +894,7 @@ void readSelectionSets(const std::vector<Prim>& prims, size_t mesh, size_t verti
                 d.colors[i] = glm::vec3(float(v->nums[i * 3]), float(v->nums[i * 3 + 1]), float(v->nums[i * 3 + 2]));
         }
         if (channels & kSetVisibility) d.hidden.assign(triangles, 1);
-        if (channels & kSetPolygroups) d.polygroups.assign(triangles, 0u);
+        if (channels & kSetFaceGroups) d.facegroups.assign(triangles, 0u);
         bool visibleFound = false;
         for (const Prim& c : prims) {
             if (c.parent != int(mesh) || c.type != "GeomSubset") continue;
@@ -904,7 +904,7 @@ void readSelectionSets(const std::vector<Prim>& prims, size_t mesh, size_t verti
             const bool visible = rest == "visible";
             const bool group = rest.rfind("group", 0) == 0 && rest.size() > 5 && rest.size() < 16 &&
                                std::all_of(rest.begin() + 5, rest.end(), [](char ch) { return ch >= '0' && ch <= '9'; });
-            if ((!visible || !(channels & kSetVisibility)) && (!group || !(channels & kSetPolygroups))) continue;
+            if ((!visible || !(channels & kSetVisibility)) && (!group || !(channels & kSetFaceGroups))) continue;
             const uint32_t id = group ? uint32_t(std::min<unsigned long long>(std::stoull(rest.substr(5)), 0xFFFFFFFFull)) : 0u;
             visibleFound |= visible;
             if (const Value* idx = c.get("indices"))
@@ -913,7 +913,7 @@ void readSelectionSets(const std::vector<Prim>& prims, size_t mesh, size_t verti
                     const glm::uvec2 ft = faceTris[size_t(f)];
                     for (uint32_t t = ft.x; t < ft.x + ft.y && t < triangles; ++t) {
                         if (visible) d.hidden[t] = 0;
-                        else d.polygroups[t] = id;
+                        else d.facegroups[t] = id;
                     }
                 }
         }

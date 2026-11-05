@@ -16,8 +16,8 @@
 //     the sculpt's proportions instead of the template's.
 //  4. Bind: every sculpt vertex near the face takes the offsets of its closest point on the fitted template (with
 //     a falloff), so the sculpt's own detail rides along. Symmetric sculpts get mirrored Left / Right pairs.
-//  5. SubTools: eyes (named "eye...") rotate for the eyeLook shapes, teeth and tongue ("teeth", "tooth", "gum",
-//     "jaw", "tongue") follow the lower jaw's motion below the bite, and other SubTools on the face (brows,
+//  5. Parts: eyes (named "eye...") rotate for the eyeLook shapes, teeth and tongue ("teeth", "tooth", "gum",
+//     "jaw", "tongue") follow the lower jaw's motion below the bite, and other Parts on the face (brows,
 //     lashes, beard) follow the skin.
 // Multires: the shapes are made at the lowest level with enough vertices for a face (kFaceMinVertices) and the
 // subdivision levels carry them up, so higher-level detail is kept.
@@ -120,7 +120,7 @@ constexpr size_t kFaceMinVertices = 20000;
 struct FaceShapesOptions {
     FaceFitLandmarks landmarks;  // none set = automatic
     int symmetry = -1;        // -1 = when the sculpt is symmetric about X = 0, 0 = off, 1 = on
-    bool subtools = true;     // eyes, teeth, tongue and SubTools on the face get the shapes too
+    bool parts = true;     // eyes, teeth, tongue and Parts on the face get the shapes too
     int level = -1;           // subdivision level to make them on (-1 = the lowest with kFaceMinVertices)
 };
 struct FaceShapesReport {
@@ -128,10 +128,10 @@ struct FaceShapesReport {
     int level = 0;          // the subdivision level the shapes were made on
     bool symmetric = false; // Left / Right were mirrored
     size_t movedVertices = 0;
-    std::vector<std::string> subtools; // "Eyes: eye rotations", ...
+    std::vector<std::string> parts; // "Eyes: eye rotations", ...
 };
-// Gives the active SubTool (and, with options.subtools, the others) the 52 shapes as sculpt layers at weight 0,
-// replacing layers with those names; one undo step per SubTool (active one: "Generate Facial Shapes").
+// Gives the active Part (and, with options.parts, the others) the 52 shapes as sculpt layers at weight 0,
+// replacing layers with those names; one undo step per Part (active one: "Generate Facial Shapes").
 bool generateFaceShapes(Document& doc, const FaceShapesOptions& options, FaceShapesReport& report, std::string& error);
 
 // --- Live weights (face_weights) ---
@@ -139,11 +139,11 @@ bool generateFaceShapes(Document& doc, const FaceShapesOptions& options, FaceSha
 bool parseFaceWeights(const std::string& json, std::vector<std::pair<std::string, float>>& out, std::string& error);
 struct FaceWeightsStats {
     int layers = 0;         // layers whose weight changed
-    size_t vertices = 0;    // vertices re-evaluated (all SubTools)
-    int matched = 0;        // names that matched a layer on some SubTool
-    std::vector<std::string> unknown; // names no SubTool has
+    size_t vertices = 0;    // vertices re-evaluated (all Parts)
+    int matched = 0;        // names that matched a layer on some Part
+    std::vector<std::string> unknown; // names no Part has
 };
-// Sets the weights of the layers with these names on every SubTool. Only the vertices those layers move are
+// Sets the weights of the layers with these names on every Part. Only the vertices those layers move are
 // re-evaluated (positions, normals, dirty range for the GPU); no undo step, the document isn't marked modified.
 FaceWeightsStats applyFaceWeights(Document& doc, const std::vector<std::pair<std::string, float>>& weights);
 

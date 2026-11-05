@@ -325,10 +325,10 @@ bool mayaSend(const std::vector<MeshObjectRef>& objects, const std::string& fold
         std::string err;
         const Mesh& mesh = *objects[k].mesh;
         bool ok;
-        if (mesh.hasPolygroups()) {
-            // Polygroups would be OBJ groups, which Maya's importer turns into separate objects or sets.
+        if (mesh.hasFaceGroups()) {
+            // Face groups would be OBJ groups, which Maya's importer turns into separate objects or sets.
             Mesh plain = mesh;
-            plain.polygroups.clear();
+            plain.facegroups.clear();
             ok = saveObj(pathUtf8(outbox / utf8Path(b.file)), plain, err);
         } else {
             ok = saveObj(pathUtf8(outbox / utf8Path(b.file)), mesh, err);

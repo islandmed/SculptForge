@@ -37,7 +37,7 @@ void App::pollAlphaFile() {
     if (!alphaPath.empty()) runCommand("brush_set_alpha", {{"path", alphaPath}, {"invert", alphaInvert_}});
 }
 
-// Alpha palette: the stamp that shapes the brush (ZBrush alpha).
+// Alpha palette: the stamp that shapes the brush (alpha).
 void App::drawAlphaSection() {
     const BrushAlpha& alpha = doc_.brushAlpha;
     const float s = uiScale_;

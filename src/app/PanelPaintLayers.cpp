@@ -2,21 +2,21 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Paint Layers sub-palette (Tool palette, next to the sculpt Layers): a
-// Photoshop-style stack of polypaint layers for the active SubTool. Rows list
+// Photoshop-style stack of vertex paint layers for the active Part. Rows list
 // the layers top first with Base at the bottom; click selects the layer the
 // Paint brush writes into, double-click renames, the eye and lock toggle.
 // Below: blend mode and opacity of the active layer, then New / Duplicate /
 // Delete, Up / Down / Merge down / Flatten and Clear. Every change goes through
 // the paint_layer_* commands (core/PaintLayer.cpp), so it is undoable and
 // scriptable; the opacity slider previews live and commits on release. When
-// the SubTool paints into its texture (Tool > Texture Map) the same palette
+// the Part paints into its texture (Tool > Texture Map) the same palette
 // shows and edits the texture's layers (the commands hand over to it).
 #include "app/App.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
 
 #include "core/PaintLayer.h"
-#include "core/Polypaint.h"
+#include "core/VertexPaint.h"
 #include "core/Texture.h"
 
 #include <IconsLucide.h>
@@ -68,7 +68,7 @@ bool iconToggle(const char* id, const char* icon, bool on, const char* tip) {
 
 namespace {
 
-// One row of the palette: a polypaint layer or a texture layer.
+// One row of the palette: a vertex paint layer or a texture layer.
 struct LayerRow {
     std::string name;
     BlendMode blend = BlendMode::Normal;
@@ -76,7 +76,7 @@ struct LayerRow {
     bool visible = true, locked = false;
 };
 
-// The stack the palette shows: the texture's layers when painting goes into the texture, else polypaint's.
+// The stack the palette shows: the texture's layers when painting goes into the texture, else vertex paint's.
 std::vector<LayerRow> layerRows(const Mesh& m, bool texture, int& active) {
     std::vector<LayerRow> rows;
     if (texture) {

@@ -74,9 +74,9 @@ std::vector<RadialMenu> App::defaultRadialMenus() {
     RadialMenu masking;
     masking.name = "Masking";
     for (const char* id : {"mask.invert", "mask.lasso", "mask.clear", "mask.rect", "mask.all", "mask.pen",
-                           "view.mask", "polygroup.group_masked"})
+                           "view.mask", "facegroup.group_masked"})
         masking.slots.push_back({id, std::string_view(id) == "view.mask" ? "View Mask" : "", ""}); // (its own: "Mask")
-    // The stroke types on one ring (U13, as 3D-Coat's stroke pop-up; single ring, as every radial menu here).
+    // The stroke types on one ring (U13; single ring, as every radial menu here).
     RadialMenu strokes;
     strokes.name = "Strokes";
     for (const char* id : {"stroke.type.dots", "stroke.type.drag_stamp", "stroke.type.slide_stamp", "stroke.type.spray",

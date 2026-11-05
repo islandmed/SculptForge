@@ -36,7 +36,7 @@ expect_value texture_painted == $painted
 key ctrl+shift+z
 expect_value texture_layers == 1
 
-# Voxel Remesh with Keep Texture (shown because the SubTool has a texture), in the background.
+# Voxel Remesh with Keep Texture (shown because the Part has a texture), in the background.
 click "Remesh##tool.remesh"
 expect "Keep Texture##remesh"
 hold ctrl
@@ -63,9 +63,9 @@ wait_idle 300
 expect_status "texture kept"
 expect_value quad_percent == 100
 expect_value texture_size == 1024
-click "Wire##view.polyf"
+click "Wire##view.wire"
 shot qremeshed
-click "Wire##view.polyf"
+click "Wire##view.wire"
 key ctrl+z
 expect_value triangles == $before_remesh
 click "QRemesh/Keep Texture##qremesh"

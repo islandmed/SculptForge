@@ -173,8 +173,8 @@ shot user-guide
 key shift+f1
 
 # Parts: append a sphere and a cube.
-run subtool_append type=sphere name=Eye
-run subtool_append type=cube name=Crate size=0.3
+run part_append type=sphere name=Eye
+run part_append type=cube name=Crate size=0.3
 key f
 click "Tool/Parts"
 wait 0.3
@@ -182,26 +182,26 @@ shot parts
 
 # Face Groups on a cube.
 run new_cube
-run polygroup_auto_by_normals
-click "Groups##view.polygroups"
+run facegroup_auto_by_normals
+click "Groups##view.facegroups"
 click "Tool/Face Groups"
 key f
 drag_item "Rotate##nav.rotate" -160 60
 wait 0.3
 shot face-groups
-click "Groups##view.polygroups"
+click "Groups##view.facegroups"
 
 # Remesh: an uneven mesh, then voxel remeshed.
 run new_sphere subdivisions=4
 run decimate ratio=0.08
-click "Wire##view.polyf"
+click "Wire##view.wire"
 key f
 wait 0.2
 shot remesh-before
 run remesh resolution=26
 wait 0.2
 shot remesh-after
-click "Wire##view.polyf"
+click "Wire##view.wire"
 
 # Gaussian splats made from the lion.
 run open path=assets/demo/lion-head.glb
@@ -218,8 +218,8 @@ key escape
 
 # Subdivision levels: a cube cage divided five times, sculpted at a low and the top level.
 run new_sphere subdivisions=1
-run subtool_append type=cube name=Box
-run subtool_delete index=0
+run part_append type=cube name=Box
+run part_delete index=0
 run subdiv_reconstruct; subdiv_reconstruct; subdiv_reconstruct; subdiv_reconstruct; subdiv_delete_higher
 run subdiv_divide; subdiv_divide; subdiv_divide; subdiv_divide; subdiv_divide
 orbit 140 -70
@@ -250,13 +250,13 @@ stroke 0.2 0.45 0.8 0.5 1.0
 stroke 0.25 0.58 0.75 0.62 1.0
 stroke 0.3 0.7 0.7 0.74 1.0
 run subdiv_level level=1
-click "Wire##view.polyf"
+click "Wire##view.wire"
 wait 0.2
 shot sdiv-1
 run subdiv_level level=3
 wait 0.2
 shot sdiv-3
-click "Wire##view.polyf"
+click "Wire##view.wire"
 run subdiv_level level=6
 click "Tool/Geometry"
 wait 0.2
@@ -274,10 +274,10 @@ stroke 0.3 0.65 0.7 0.65 1.0
 key f
 orbit 60 -25
 wait 0.2
-click "Wire##view.polyf"
+click "Wire##view.wire"
 wait 0.2
 shot dyntopo-wire
-click "Wire##view.polyf"
+click "Wire##view.wire"
 wait 0.2
 shot dyntopo-shaded
 click "Dynamic##draw.dynamic"
@@ -297,12 +297,12 @@ run stroke points="-0.3,-0.42,2 0,-0.46,2 0.3,-0.42,2" brush=SharpCrease radius=
 run stroke points="-0.25,-0.36,2 0,-0.38,2 0.25,-0.36,2" brush=Standard radius=0.08 strength=0.6
 run stroke points="-0.25,-0.5,2 0,-0.53,2 0.25,-0.5,2" brush=Standard radius=0.08 strength=0.6
 run qremesh target=1500 symmetry=x keep_original=true
-click "Wire##view.polyf"
+click "Wire##view.wire"
 wait 0.2
 shot guides-without
 key ctrl+z
-run subtool_delete index=1
-click "Wire##view.polyf"
+run part_delete index=1
+click "Wire##view.wire"
 click "QRemesh/Quad Remesh Guides"
 drag_path 0.780 0.375 0.779 0.388 0.776 0.401 0.772 0.413 0.766 0.425 0.758 0.436 0.749 0.446 0.739 0.454 0.728 0.462 0.715 0.467 0.702 0.472 0.689 0.474 0.675 0.475 0.661 0.474 0.648 0.472 0.635 0.467 0.623 0.462 0.611 0.454 0.601 0.446 0.592 0.436 0.584 0.425 0.578 0.413 0.574 0.401 0.571 0.388 0.570 0.375 0.571 0.362 0.574 0.349 0.578 0.337 0.584 0.325 0.592 0.314 0.601 0.304 0.611 0.296 0.623 0.288 0.635 0.283 0.648 0.278 0.661 0.276 0.675 0.275 0.689 0.276 0.702 0.278 0.715 0.283 0.728 0.288 0.739 0.296 0.749 0.304 0.758 0.314 0.766 0.325 0.772 0.337 0.776 0.349 0.779 0.362 0.780 0.375
 drag_path 0.700 0.720 0.698 0.731 0.693 0.742 0.685 0.753 0.673 0.762 0.659 0.772 0.641 0.780 0.622 0.787 0.600 0.794 0.577 0.799 0.552 0.802 0.526 0.804 0.500 0.805 0.474 0.804 0.448 0.802 0.423 0.799 0.400 0.794 0.378 0.787 0.359 0.780 0.341 0.772 0.327 0.762 0.315 0.753 0.307 0.742 0.302 0.731 0.300 0.720 0.302 0.709 0.307 0.698 0.315 0.687 0.327 0.677 0.341 0.668 0.359 0.660 0.378 0.653 0.400 0.646 0.423 0.641 0.448 0.638 0.474 0.636 0.500 0.635 0.526 0.636 0.552 0.638 0.577 0.641 0.600 0.646 0.622 0.653 0.641 0.660 0.659 0.668 0.673 0.677 0.685 0.687 0.693 0.698 0.698 0.709 0.700 0.720
@@ -310,10 +310,10 @@ wait 0.2
 shot guides-drawn
 run qremesh target=1500 symmetry=x
 click "Clay##brush.clay"
-click "Wire##view.polyf"
+click "Wire##view.wire"
 wait 0.2
 shot guides-with
-click "Wire##view.polyf"
+click "Wire##view.wire"
 
 # Make sculptable (scan-to-sculptable.md): the built-in test head capture, the review with its face landmarks and
 # loops, and the finished quads with the capture's colours.
@@ -336,10 +336,10 @@ shot sculptable-review
 click "Make sculptable/Finish"
 wait_idle 120
 camera 0 0
-click "Wire##view.polyf"
+click "Wire##view.wire"
 wait 0.2
 shot sculptable-result
-click "Wire##view.polyf"
+click "Wire##view.wire"
 click "Make sculptable/Review##sculptable"
 run splat_clear
 
@@ -352,7 +352,7 @@ shot shading-smooth
 click "Render##menu.render"
 click "Materials##section.material"
 click "Flat##material.flat"
-run subtool_shading name=Eyes mode=smooth
+run part_shading name=Eyes mode=smooth
 wait 0.2
 shot shading-palette
 key escape
@@ -363,7 +363,7 @@ run set_shading mode=smooth
 
 # Your own Lit Spheres (vertex-paint.md): one loaded from an image, in the Material palette.
 run new_sphere subdivisions=5
-run load_matcap path=tests/ui/data/Gold.png
+run load_litsphere path=tests/ui/data/Gold.png
 camera 20 10
 click "Render##menu.render"
 click "Materials##section.material"
@@ -379,10 +379,10 @@ run mask_rect y0=0.3
 run extract thickness=0.04 smooth=8 accept=true
 run mask_clear
 camera 30 25
-click "Groups##view.polygroups"
+click "Groups##view.facegroups"
 wait 0.2
 shot extract
-click "Groups##view.polygroups"
+click "Groups##view.facegroups"
 
 # Mirror And Weld (geometry.md): a head sculpted on one side, then mirrored and welded.
 run new_head
@@ -401,8 +401,8 @@ run open path=assets/demo/lion-head.glb
 wait_idle 20
 run qremesh target=5000 keep_original=true
 wait_idle 60
-click "Wire##view.polyf"
+click "Wire##view.wire"
 click "Geometry##tool.geometry"
 wait 0.3
 shot qremesh
-click "Wire##view.polyf"
+click "Wire##view.wire"

@@ -1,7 +1,7 @@
 # Help > Check for updates: a newer version shows the banner (Skip this version hides it), the same or an older one
 # says SculptForge is up to date, and a feed that can't be read says so. The feed is a local file here
 # (SF_UPDATE_FEED); UI tests never check automatically.
-run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=3
 env SF_UPDATE_FEED $SCRIPT_DIR/data/update_newer.json
 click "Help##palette.help"
@@ -31,14 +31,15 @@ expect_status "Couldn't check for updates"
 
 # The Preview channel (Preferences > Updates > Update channel) is offered the feed's channels.preview beta; Stable
 # isn't. Back to Stable at the end (the choice is saved in the preferences).
+# (A beta build starts on Preview, so pick Stable first.)
 env SF_UPDATE_FEED $SCRIPT_DIR/data/update_preview.json
-click "Help##palette.help"
-click "Check for updates##help.check_updates"
-wait_idle 20
-expect_status "is the newest version"
 click "Preferences##palette.preferences"
 click "Updates##preferences.updates"
 expect_text "Update channel"
+click "Stable##prefs.update_stable"
+click "Check for updates##help.check_updates"
+wait_idle 20
+expect_status "is the newest version"
 click "Preview (betas)##prefs.update_preview"
 shot update-channel
 click "Check for updates##help.check_updates"

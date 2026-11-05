@@ -9,7 +9,7 @@
 #include "core/Commands.h"
 #include "core/Primitives.h"
 #include "io/BlenderBridge.h"
-#include "io/GozIO.h"
+#include "io/BridgeIO.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -66,9 +66,9 @@ TEST(blender_manifest_parse_and_write) {
     std::string err;
     const std::string text = R"({"format": "sculptforge-bridge", "version": 1, "revision": 7, "sender": "blender",
         "sender_version": "4.2.3", "objects": [
-          {"name": "Suzanne.001 ü", "file": "r7_000.GoZ",
+          {"name": "Suzanne.001 ü", "file": "r7_000.Bridge",
            "matrix_world": [[1, 0, 0, 5], [0, 0, -1, 6], [0, 1, 0, 7], [0, 0, 0, 1]]},
-          {"name": "Plain", "file": "r7_001.GoZ"}]})";
+          {"name": "Plain", "file": "r7_001.Bridge"}]})";
     CHECK(parseBridgeManifest(text, m, err));
     CHECK(m.revision == 7 && m.sender == "blender" && m.senderVersion == "4.2.3" && m.objects.size() == 2);
     CHECK(m.objects[0].name == "Suzanne.001 ü" && m.objects[0].hasMatrix && !m.objects[1].hasMatrix);
@@ -81,7 +81,7 @@ TEST(blender_manifest_parse_and_write) {
     BridgeManifest back;
     CHECK(parseBridgeManifest(writeBridgeManifest(m), back, err));
     CHECK(back.revision == 7 && back.objects.size() == 2 && back.objects[0].name == m.objects[0].name);
-    CHECK(back.objects[0].matrix == m.objects[0].matrix && back.objects[1].file == "r7_001.GoZ");
+    CHECK(back.objects[0].matrix == m.objects[0].matrix && back.objects[1].file == "r7_001.Bridge");
 
     // Refused: other JSON, newer versions, files outside the folder, broken matrices.
     CHECK(!parseBridgeManifest("{\"format\": \"other\"}", back, err));
@@ -91,12 +91,12 @@ TEST(blender_manifest_parse_and_write) {
     CHECK(!parseBridgeManifest(newer, back, err));
     CHECK(err.find("newer") != std::string::npos);
     const std::string badStart = R"({"format": "sculptforge-bridge", "objects": [{"name": "x", "file": ")";
-    for (const char* bad : {"../x.GoZ", "a/b.GoZ", "c:\\\\x.GoZ", ".."}) {
+    for (const char* bad : {"../x.Bridge", "a/b.Bridge", "c:\\\\x.Bridge", ".."}) {
         const std::string text = badStart + bad + "\"}]}";
         CHECK(!parseBridgeManifest(text, back, err));
     }
     const std::string badMatrix =
-        R"({"format": "sculptforge-bridge", "objects": [{"name": "x", "file": "a.GoZ", "matrix_world": [[1, 0, 0]]}]})";
+        R"({"format": "sculptforge-bridge", "objects": [{"name": "x", "file": "a.Bridge", "matrix_world": [[1, 0, 0]]}]})";
     CHECK(!parseBridgeManifest(badMatrix, back, err));
 }
 
@@ -122,33 +122,33 @@ TEST(blender_bridge_round_trip) {
     CommandRegistry reg;
     std::string err;
 
-    // What the add-on writes: object-space meshes as .GoZ (here written by SculptForge's own writer, whose
+    // What the add-on writes: object-space meshes as Bridge (here written by SculptForge's own writer, whose
     // file holds Blender local coordinates for a mesh given in SculptForge axes) and each matrix_world.
     Mesh cube = makeCube(3); // quads
     Mesh ball = makeIcosphere(2);
-    ball.ensurePolygroups();
-    for (uint32_t t = 0; t < ball.triangleCount(); ++t) ball.polygroups[t] = t % 3;
+    ball.ensureFaceGroups();
+    for (uint32_t t = 0; t < ball.triangleCount(); ++t) ball.facegroups[t] = t % 3;
     ball.uvs.assign(ball.triangleCount() * 3, glm::vec2(0.25f, 0.75f));
     const fs::path inbox = root / "to_sculptforge";
     fs::create_directories(inbox);
-    CHECK(saveGoz((inbox / "r3_000.GoZ").string(), cube, "Cube", err));
-    CHECK(saveGoz((inbox / "r3_001.GoZ").string(), ball, "Ball", err));
+    CHECK(saveBridge((inbox / "r3_000.Bridge").string(), cube, "Cube", err));
+    CHECK(saveBridge((inbox / "r3_001.Bridge").string(), ball, "Ball", err));
     const glm::dmat4 mCube = blenderMatrix(1.0), mBall = blenderMatrix(-1.0); // the ball is mirrored
     writeText(inbox / "manifest.json",
               R"({"format": "sculptforge-bridge", "version": 1, "revision": 3, "sender": "blender", "objects": [
-                 {"name": "Cube", "file": "r3_000.GoZ", "matrix_world": )" + matrixJson(mCube) + R"(},
-                 {"name": "Ball ü", "file": "r3_001.GoZ", "matrix_world": )" + matrixJson(mBall) + "}]}");
+                 {"name": "Cube", "file": "r3_000.Bridge", "matrix_world": )" + matrixJson(mCube) + R"(},
+                 {"name": "Ball ü", "file": "r3_001.Bridge", "matrix_world": )" + matrixJson(mBall) + "}]}");
     CHECK(bridgeRevision(inbox.string()) == 3);
 
     // Into a fresh scene: the cube replaces it (renamed after the object), the ball is added.
     Document doc = makeDoc(makeIcosphere(1));
     CommandResult r = reg.execute(doc, "blender_receive", {{"folder", folder}});
     CHECK(r.ok && r.message.find("Received 2 objects") != std::string::npos);
-    CHECK(doc.subtoolCount() == 2 && doc.activeSubtool == 0);
-    CHECK(doc.subtools[0].name == "Cube" && doc.gozName == "Cube");
-    CHECK(doc.subtools[1].name == "Ball ü" && doc.subtools[1].gozName == "Ball ü");
+    CHECK(doc.partCount() == 2 && doc.activePart == 0);
+    CHECK(doc.parts[0].name == "Cube" && doc.bridgeName == "Cube");
+    CHECK(doc.parts[1].name == "Ball ü" && doc.parts[1].bridgeName == "Ball ü");
     CHECK(doc.mesh.quadCount() == cube.quadCount() && doc.mesh.quadCount() > 0);
-    CHECK(doc.subtoolMesh(1).polygroups.size() == ball.triangleCount() && doc.subtoolMesh(1).hasUvs());
+    CHECK(doc.partMesh(1).facegroups.size() == ball.triangleCount() && doc.partMesh(1).hasUvs());
     // Placed as in Blender's scene: p_sf = A * M_blender * A^-1 * p.
     const glm::dmat4 placed = blenderMatrixToSculptForge(mCube);
     std::vector<glm::vec3> expect;
@@ -164,23 +164,23 @@ TEST(blender_bridge_round_trip) {
     CHECK(sent.revision == 1 && sent.sender == "sculptforge" && sent.objects.size() == 2);
     CHECK(sent.objects[0].name == "Cube" && sent.objects[1].name == "Ball ü" && !sent.objects[0].hasMatrix);
     Mesh cubeBack, ballBack;
-    CHECK(loadGoz((root / "to_blender" / sent.objects[0].file).string(), cubeBack, err));
-    CHECK(loadGoz((root / "to_blender" / sent.objects[1].file).string(), ballBack, err));
+    CHECK(loadBridge((root / "to_blender" / sent.objects[0].file).string(), cubeBack, err));
+    CHECK(loadBridge((root / "to_blender" / sent.objects[1].file).string(), ballBack, err));
     CHECK(maxDistance(cubeBack.positions, doc.mesh.positions) < 1e-6f);
-    // (GoZ quads come in split as (a,b,c) + (a,c,d): compare with the SubTool as it was received.)
+    // (Bridge quads come in split as (a,b,c) + (a,c,d): compare with the Part as it was received.)
     CHECK(cubeBack.triangles == doc.mesh.triangles && cubeBack.quadCount() == cube.quadCount());
-    CHECK(ballBack.triangles == ball.triangles && ballBack.polygroups == ball.polygroups && ballBack.uvs == ball.uvs);
+    CHECK(ballBack.triangles == ball.triangles && ballBack.facegroups == ball.facegroups && ballBack.uvs == ball.uvs);
     // Undoing the placement gives the object-space mesh back (what the add-on does with matrix_world).
     const glm::dmat4 unplace = glm::inverse(blenderMatrixToSculptForge(mBall));
     std::vector<glm::vec3> local;
     for (const glm::vec3& p : ballBack.positions) local.push_back(glm::vec3(unplace * glm::dvec4(glm::dvec3(p), 1.0)));
     CHECK(maxDistance(local, ball.positions) < 1e-5f);
 
-    // Blender sends the cube again: it updates its SubTool (undoably) instead of adding one.
+    // Blender sends the cube again: it updates its Part (undoably) instead of adding one.
     writeText(inbox / "manifest.json", R"({"format": "sculptforge-bridge", "revision": 4, "objects": [
-                 {"name": "Cube", "file": "r3_000.GoZ"}]})");
+                 {"name": "Cube", "file": "r3_000.Bridge"}]})");
     r = reg.execute(doc, "blender_receive", {{"folder", folder}});
-    CHECK(r.ok && doc.subtoolCount() == 2 && doc.activeSubtool == 0);
+    CHECK(r.ok && doc.partCount() == 2 && doc.activePart == 0);
     CHECK(maxDistance(doc.mesh.positions, cube.positions) < 1e-6f); // no matrix: as stored
     CHECK(doc.undo.canUndo());
 
@@ -194,7 +194,7 @@ TEST(blender_bridge_round_trip) {
     fs::remove_all(root);
     r = reg.execute(doc, "blender_receive", {{"folder", folder}});
     CHECK(!r.ok && r.message.find("Nothing has been sent from Blender") != std::string::npos);
-    writeText(inbox / "manifest.json", R"({"format": "sculptforge-bridge", "objects": [{"name": "Gone", "file": "r1_000.GoZ"}]})");
+    writeText(inbox / "manifest.json", R"({"format": "sculptforge-bridge", "objects": [{"name": "Gone", "file": "r1_000.Bridge"}]})");
     r = reg.execute(doc, "blender_receive", {{"folder", folder}});
     CHECK(!r.ok && r.message.find("Gone") != std::string::npos);
     fs::remove_all(root);

@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The `transform` command (core/MeshTransform.h): what a Gizmo 3D drag does, for scripts, the console and AI.
+// The `transform` command (core/MeshTransform.h): what a Transform gizmo drag does, for scripts, the console and AI.
 #include "core/Commands.h"
 #include "core/MeshTransform.h"
 #include "core/PathStroke.h"
@@ -74,8 +74,8 @@ CommandResult runTransform(Document& doc, const Args& a) {
     }
 
     std::vector<int> targets;
-    for (int i = 0; i < doc.subtoolCount(); ++i)
-        if (all ? doc.subtools[size_t(i)].visible || i == doc.activeSubtool : i == doc.activeSubtool) targets.push_back(i);
+    for (int i = 0; i < doc.partCount(); ++i)
+        if (all ? doc.parts[size_t(i)].visible || i == doc.activePart : i == doc.activePart) targets.push_back(i);
 
     MeshTransform t;
     t.translate = translate;
@@ -86,7 +86,7 @@ CommandResult runTransform(Document& doc, const Args& a) {
     if (pivot == "center" || pivot == "centre") {
         AABB box;
         for (int i : targets) {
-            const Mesh& m = doc.subtoolMesh(i);
+            const Mesh& m = doc.partMesh(i);
             if (m.vertexCount() == 0) continue;
             const AABB b = transformBounds(m, transformWeights(m, useMask, falloff));
             if (b.valid()) box.expand(b);
@@ -100,7 +100,7 @@ CommandResult runTransform(Document& doc, const Args& a) {
     if (t.identity()) return {true, "Nothing to do: the transform changes nothing"};
 
     size_t moved = 0;
-    for (int i : targets) moved += transformSubtool(doc, i, t, useMask, falloff, sym, "Transform");
+    for (int i : targets) moved += transformPart(doc, i, t, useMask, falloff, sym, "Transform");
     if (moved == 0)
         return {false, useMask && doc.mesh.hasMask() ? "Nothing moved: everything is masked (masked=0 ignores the mask)"
                                                     : "Nothing moved: the Part is empty or hidden"};

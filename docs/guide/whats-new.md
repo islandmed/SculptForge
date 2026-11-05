@@ -9,8 +9,36 @@ three versions in full, then the older ones in groups. Every detail is in the
 
 ```features
 date: unreleased
-tagline: A quick tour for experienced sculptors, a command search that knows plain sculpting words, and three experimental options for very dense meshes.
+tagline: Sixty new brushes in six packs, a Masking panel, a quick tour for experienced sculptors, and experimental options for very dense meshes.
+highlight: Sixty new brushes in six built-in packs
+highlight: Mask by peaks, colour and facing in a new Masking panel
+highlight: A quick tour for experienced sculptors
+highlight: Experimental: Live Move and Background Preview for very dense meshes
 ```
+
+- **Fast Big Brushes (Experimental)**: a new way to place big brushes on dense meshes, off by default. Try it on a
+  heavy model with a big Clay or Standard brush and tell us how it feels: **Preferences > Performance > Fast Big
+  Brushes (Experimental)**.
+- **Brush packs**: sixty new built-in brushes in six packs (Clay & Form, Hard Surface, Organic & Skin, Cloth & Folds,
+  Damage & Wear, Ornament), each with its own alpha and a one-line description; see [Brush packs](brush-packs.md).
+- **A-Z everywhere**: brushes, alphas, materials and the Library list A-Z; **Sort** switches to the most recently used
+  first or (brushes, alphas) by pack. Alphas get a filter field.
+- **Masking panel**: **Tool > Masking** is one panel of buttons with pictures: the Shapes, **Mask by** (cavity, peaks,
+  face group, colour, facing, border) and **Adjust** (grow, shrink, sharpen, blur, invert, clear, all).
+- **Quick tour**: **Help > Quick tour** (or **Sculpted before? Take the quick tour** in the welcome) shows in ten
+  short slides where remeshing, dynamic topology, quad retopology, levels, masking, cut, brushes and baking are, each
+  with a **Show me** button that opens the panel. The guide has it too: Quick tour for experienced sculptors.
+- **Live Move (experimental)**: **Preferences > Performance > Live Move**. The graphics card draws the Move brush's
+  drag from where the surface started, so it keeps up with the pen on any mesh size, and the move is applied once,
+  exactly, when you lift the pen ([Performance](performance.md)).
+- **Background Preview (experimental)**: **Preferences > Performance > Background Preview**. On dense meshes, the dabs
+  a big brush is still working out show as a preview under the pen, so the stroke no longer trails behind it. The
+  finished sculpt is the same either way.
+- **Fast Upload (experimental)**: **Preferences > Performance > Fast Upload**. Sculpted changes reach the graphics
+  card through shared memory and a copy on the card, instead of a copy by the driver during the frame.
+- **Pattern brushes on micro levels**: Dragon Scales, Skin Pores, Stone Chisel and the other pattern brushes keep
+  their pattern on a micro level, and carving ones (Wrinkle) carve.
+- **Cmd+, opens Preferences** (Ctrl+, on Windows and Linux).
 
 ## Version 0.10.11
 
@@ -846,9 +874,8 @@ texture, so the next stroke paints texels. Big brushes on 4K textures paint four
 
 ### Bring a library over
 
-Another app's library files are proprietary, but a free export plug-in now converts them once, and then
-SculptForge opens the library file itself, every Part with its face groups, vertex paint, mask and UVs. See
-the [Bridge setup page](https://github.com/islandmed/SculptForge/blob/main/integrations/bridge-plugin/README.md).
+A folder of numbered Bridge files opens as one scene, every Part with its face groups, vertex paint, mask and
+UVs.
 
 ## Version 0.8
 
@@ -1036,7 +1063,7 @@ See [Subdivision levels](subdivision-levels.md).
 
 ### Gizmo: move, scale, rotate and pose
 
-Gizmo 3D, with the same keys: <kbd>W</kbd> Move, <kbd>E</kbd> Scale, <kbd>R</kbd> Rotate, <kbd>Q</kbd>
+Transform gizmo, with the same keys: <kbd>W</kbd> Move, <kbd>E</kbd> Scale, <kbd>R</kbd> Rotate, <kbd>Q</kbd>
 back to Draw (also on the top shelf and in the **Transform** palette).
 
 - **Handles over the model.** Arrows, plane squares and a free-move centre; axis rings and a view ring; axis
@@ -1045,7 +1072,7 @@ back to Draw (also on the top shelf and in the **Transform** palette).
   pivot there, raise **Falloff** for a soft joint, turn the arm. With X symmetry both arms move together.
 - **Pivot tools**: <kbd>Alt</kbd>+drag the gizmo to move it alone, **Reset**, **To Surface**, World or Surface
   axes.
-- **Numeric entry** in the Gizmo panel, **All Parts** (Transpose All), one undo step per drag, sculpt
+- **Numeric entry** in the Gizmo panel, **All Parts** (move, rotate and scale all Parts together), one undo step per drag, sculpt
   layers move with the surface, and the `transform` command for scripts.
 - Fast on big models: a drag frame on 1.3 million triangles takes about 10 ms.
 

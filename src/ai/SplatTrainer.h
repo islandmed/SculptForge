@@ -38,7 +38,7 @@ struct SplatTrainSettings {
     std::string colmapPath;
     std::string ffmpegPath;
     std::string preset = "fast";
-    bool copyToLibrary = true; // also put the result in the LightBox Splats tab
+    bool copyToLibrary = true; // also put the result in the Library Splats tab
 
     static SplatTrainSettings load(const std::string& path);
     bool save(const std::string& path) const;

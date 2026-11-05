@@ -1,11 +1,11 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Geometry > QRemesh and SubTool > Project: ZBrush's ZRemesher and ProjectAll. QRemesh (core/QRemesh.h) runs
-// on a worker thread with a progress bar and Cancel, then replaces the SubTool as one undo step (optionally
-// keeping the original as a hidden SubTool below it). ProjectAll (core/Projection.h) is quick, so it runs
-// as the project_all command. The console shows both as script lines. The QRemesh Guides brush (ZBrush's
-// ZRemesher Guides, core/QRemeshGuides.h) draws the curves QRemesh follows.
+// Geometry > QRemesh and Part > Project: the classic QRemesh and ProjectAll. QRemesh (core/QRemesh.h) runs
+// on a worker thread with a progress bar and Cancel, then replaces the Part as one undo step (optionally
+// keeping the original as a hidden Part below it). ProjectAll (core/Projection.h) is quick, so it runs
+// as the project_all command. The console shows both as script lines. The QRemesh Guides brush (the classic
+// QRemesh Guides, core/QRemeshGuides.h) draws the curves QRemesh follows.
 #include "app/App.h"
 #include "app/Demo.h"
 #include "app/Palettes.h"
@@ -85,14 +85,14 @@ void App::registerRetopoUiActions() {
     add("geometry.qremesh_guides_clear", "Clear", kQRemeshPath, [this] { runCommand("qremesh_guides_clear"); },
         [this] { return !doc_.qremeshGuides.empty(); }, "Delete every Quad Remesh guide curve of this Part.",
         "qremesh_guides_clear");
-    add("subtool.project_all", "Project All", kProjectPath, [this] {
+    add("part.project_all", "Project All", kProjectPath, [this] {
             runCommand("project_all", {{"distance", double(retopo_.projectDist)}, {"mean", retopo_.projectMean},
                                        {"blur", double(retopo_.projectBlur)}, {"geometry", retopo_.projectGeometry},
-                                       {"polypaint", retopo_.projectPolypaint}});
+                                       {"vertexpaint", retopo_.projectVertexPaint}});
         },
         [this] {
-            for (int i = 0; i < doc_.subtoolCount(); ++i)
-                if (i != doc_.activeSubtool && doc_.subtools[size_t(i)].visible) return true;
+            for (int i = 0; i < doc_.partCount(); ++i)
+                if (i != doc_.activePart && doc_.parts[size_t(i)].visible) return true;
             return false;
         },
         "Project the shape and vertex paint of every other visible Part onto this one: each vertex moves along its "
@@ -130,7 +130,7 @@ void App::startQRemesh() {
     o.adaptive = retopo_.adaptive;
     o.keepGroups = retopo_.keepGroups;
     o.detectEdges = retopo_.detectEdges;
-    o.usePolypaint = retopo_.usePolypaint;
+    o.useVertexPaint = retopo_.useVertexPaint;
     o.symmetryAxis = retopo_.symmetry ? symmetryAxis(symmetry_) : -1;
     o.guides = doc_.qremeshGuides;
     o.guideStrength = std::clamp(curvesStrength_, 0.0f, 100.0f) / 100.0f;
@@ -141,14 +141,14 @@ void App::startQRemesh() {
     job->result = std::make_shared<Mesh>();
     job->stats = std::make_shared<QRemeshStats>();
     job->error = std::make_shared<std::string>();
-    job->subtool = doc_.activeSubtoolInfo().id;
+    job->part = doc_.activePartInfo().id;
     job->triangles = doc_.mesh.triangleCount();
     job->keepOriginal = retopo_.keepOriginal;
     job->args = {{"target", double(o.targetQuads)}, {"adaptive", double(o.adaptive)}};
     if (o.method == QRemeshMethod::Legacy) job->args["method"] = std::string("legacy");
     if (o.keepGroups) job->args["keep_groups"] = true;
     if (!o.detectEdges) job->args["detect_edges"] = false;
-    if (o.usePolypaint) job->args["use_polypaint"] = true;
+    if (o.useVertexPaint) job->args["use_vertexpaint"] = true;
     if (o.symmetryAxis >= 0) job->args["symmetry"] = std::string(1, char('x' + o.symmetryAxis));
     if (job->keepOriginal) job->args["keep_original"] = true;
     if (!keep.empty()) job->args["keep_masked"] = true;
@@ -204,7 +204,7 @@ void App::startVoxelRemesh() {
     job->result = std::make_shared<Mesh>();
     job->error = std::make_shared<std::string>();
     job->note = std::make_shared<std::string>();
-    job->subtool = doc_.activeSubtoolInfo().id;
+    job->part = doc_.activePartInfo().id;
     job->triangles = doc_.mesh.triangleCount();
     job->resolution = std::clamp(voxelResolution_, 32, 512);
     bool allMasked = false;
@@ -264,9 +264,9 @@ void App::pollVoxelRemesh() {
         return;
     }
     int index = -1;
-    for (int i = 0; i < doc_.subtoolCount(); ++i)
-        if (doc_.subtools[size_t(i)].id == job->subtool) index = i;
-    if (index < 0 || doc_.subtoolMesh(index).triangleCount() != job->triangles) {
+    for (int i = 0; i < doc_.partCount(); ++i)
+        if (doc_.parts[size_t(i)].id == job->part) index = i;
+    if (index < 0 || doc_.partMesh(index).triangleCount() != job->triangles) {
         status_ = "Voxel Remesh skipped: the Part changed while it was being remeshed";
         return;
     }
@@ -299,11 +299,11 @@ void App::pollQRemesh() {
         status_ = *job->error;
         return;
     }
-    // The SubTool may be inactive now, or changed topology meanwhile.
+    // The Part may be inactive now, or changed topology meanwhile.
     int index = -1;
-    for (int i = 0; i < doc_.subtoolCount(); ++i)
-        if (doc_.subtools[size_t(i)].id == job->subtool) index = i;
-    if (index < 0 || doc_.subtoolMesh(index).triangleCount() != job->triangles) {
+    for (int i = 0; i < doc_.partCount(); ++i)
+        if (doc_.parts[size_t(i)].id == job->part) index = i;
+    if (index < 0 || doc_.partMesh(index).triangleCount() != job->triangles) {
         status_ = "Quad Remesh skipped: the Part changed while it was being remeshed";
         return;
     }
@@ -311,7 +311,7 @@ void App::pollQRemesh() {
     lastQRemeshStats_ = *job->stats;
     haveQRemeshStats_ = true;
     CommandResult r{true, applyQRemesh(doc_, std::move(*job->result), job->keepOriginal, *job->stats) + *job->textureNote};
-    lastQRemeshSubtool_ = doc_.activeSubtoolInfo().id;
+    lastQRemeshPart_ = doc_.activePartInfo().id;
     if (const std::string notice = doc_.takeNotice(); !notice.empty()) r.message += ". " + notice; // levels dropped
     status_ = r.message;
     lastCommandOk_ = true;
@@ -388,7 +388,7 @@ void App::drawQRemeshContents() {
     ImGui::Checkbox(tr("Detect Edges"), &retopo_.detectEdges);
     ui::HelpText("Detect Edges", nullptr, "Hard edges get an edge loop, so they stay sharp (Quad Remesh 2: faces meeting at more than about 60 degrees along a line at least a few quads long; legacy: more than 50 degrees).",
                  kQRemeshPath);
-    ImGui::Checkbox(tr("Use Vertex Paint"), &retopo_.usePolypaint);
+    ImGui::Checkbox(tr("Use Vertex Paint"), &retopo_.useVertexPaint);
     ui::HelpText("Use Vertex Paint", nullptr,
                  "Paint where you want density: red areas get up to 4 times the quads, blue areas down to a quarter, "
                  "white is unchanged.",
@@ -411,14 +411,14 @@ void App::drawQRemeshContents() {
     ImGui::SetCursorPosX(x0 + half + style.ItemSpacing.x); // the right column, inside the section indent
     ImGui::Checkbox(tr("Keep Masked##qremesh"), &retopo_.keepMasked);
     ui::HelpText("Keep Masked", nullptr, kKeepMaskedHelp, kQRemeshPath);
-    if (hasTexture(doc_.mesh)) // only matters for a painted SubTool
+    if (hasTexture(doc_.mesh)) // only matters for a painted Part
         drawKeepTextureCheckbox("Keep Texture##qremesh", kQRemeshPath);
     drawQRemeshGuideControls();
     drawQRemeshReport();
 }
 
 void App::drawQRemeshReport() {
-    if (!haveQRemeshStats_ || lastQRemeshSubtool_ != doc_.activeSubtoolInfo().id) return;
+    if (!haveQRemeshStats_ || lastQRemeshPart_ != doc_.activePartInfo().id) return;
     const QRemeshStats& st = lastQRemeshStats_;
     const QuadQuality& q = st.quality;
     if (q.quads == 0) return;
@@ -481,7 +481,7 @@ void App::setGuidesMode(bool on) {
 }
 
 void App::syncGuidesMode() {
-    // Picking a brush (picker, shelf, keys, LightBox), Paint or the Gizmo leaves the guides brush.
+    // Picking a brush (picker, shelf, keys, Library), Paint or the Gizmo leaves the guides brush.
     if (guidesMode_ && drag_ != Drag::Guide &&
         (brush_ != guidesFrom_.brush || doc_.activeBrush != guidesFrom_.recipe || paintMode_ != guidesFrom_.paint ||
          gizmoActive()))
@@ -563,7 +563,7 @@ void App::guideRelease() {
 void App::drawQRemeshGuides() {
     syncGuidesMode();
     const std::vector<QRemeshGuide>& guides = doc_.qremeshGuides;
-    if ((guides.empty() && guidePath_.empty()) || !doc_.activeSubtoolInfo().visible) return;
+    if ((guides.empty() && guidePath_.empty()) || !doc_.activePartInfo().visible) return;
     ImDrawList* dl = ImGui::GetBackgroundDrawList(); // under the panels, over the model
     const CanvasRect cr = canvasRect();
     dl->PushClipRect(ImVec2(cr.x, cr.y), ImVec2(cr.x + cr.w, cr.y + cr.h), true);
@@ -580,7 +580,7 @@ void App::drawQRemeshGuides() {
         };
         mix(&vp, sizeof vp);
         mix(&cr, sizeof cr);
-        const uint64_t rev = doc_.undo.revision(), sub = doc_.activeSubtoolInfo().id;
+        const uint64_t rev = doc_.undo.revision(), sub = doc_.activePartInfo().id;
         mix(&rev, sizeof rev);
         mix(&sub, sizeof sub);
         size_t points = 0;
@@ -672,7 +672,7 @@ void App::drawProjectContents() {
     const float x0 = ImGui::GetCursorPosX(); // line start, inside the section indent
     tray::GroupLabel(*this, "Project");
     const float half = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) * 0.5f;
-    ui::ActionButton(*this, "subtool.project_all", ImVec2(half, 0));
+    ui::ActionButton(*this, "part.project_all", ImVec2(half, 0));
     ImGui::SameLine();
     ImGui::SetNextItemWidth(-1);
     ui::SliderInside("##pdist", &retopo_.projectDist, 0.001f, 0.2f, "Dist %.3f", ImGuiSliderFlags_Logarithmic);
@@ -693,7 +693,7 @@ void App::drawProjectContents() {
     ui::HelpText("Geometry", nullptr, "Project the shape (into the active sculpt layer).", kProjectPath);
     ImGui::SameLine();
     ImGui::SetCursorPosX(x0 + half + style.ItemSpacing.x); // the right column, inside the section indent
-    ImGui::Checkbox(tr("Vertex Paint"), &retopo_.projectPolypaint);
+    ImGui::Checkbox(tr("Vertex Paint"), &retopo_.projectVertexPaint);
     ui::HelpText("Vertex Paint", nullptr, "Project the vertex paint (into the active paint layer) when a source has any.",
                  kProjectPath);
 }

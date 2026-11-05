@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.24)
-project(SculptForge VERSION 0.10.11 LANGUAGES C CXX)
+project(SculptForge VERSION 0.11.0 LANGUAGES C CXX)
 # "beta.1" while this is a beta of that version (title bar and About: "0.11.0 Beta 1"), "" for a stable release.
 # scripts/release.sh sets it; release.yml checks the tag against both (v0.11.0-beta.1).
-set(SCULPTFORGE_PRERELEASE "")
+set(SCULPTFORGE_PRERELEASE "beta.2")
 include(GNUInstallDirs)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -41,6 +41,7 @@ add_library(sculptforge_core STATIC
   src/core/TierConfig.cpp
   src/core/MemoryGuard.cpp
   src/core/Sculpt.cpp
+  src/core/SculptBatch.cpp
   src/core/Dyntopo.cpp
   src/core/DyntopoCommands.cpp
   src/core/Undo.cpp
@@ -48,10 +49,10 @@ add_library(sculptforge_core STATIC
   src/core/Primitives.cpp
   src/core/Document.cpp
   src/core/Commands.cpp
-  src/core/Polygroups.cpp
+  src/core/FaceGroups.cpp
   src/core/SelectionSets.cpp
   src/core/ScreenSelect.cpp
-  src/core/SubTools.cpp
+  src/core/Parts.cpp
   src/core/ExtractMirror.cpp
   src/core/MeshTransform.cpp
   src/core/Deform.cpp
@@ -62,6 +63,7 @@ add_library(sculptforge_core STATIC
   src/core/Pack.cpp
   src/core/Json.cpp
   src/core/BrushRecipe.cpp
+  src/core/BrushPacks.cpp
   src/core/BrushSettings.cpp
   src/core/AlphaOptions.cpp
   src/core/BrushLibrary.cpp
@@ -81,7 +83,7 @@ add_library(sculptforge_core STATIC
   src/core/PathStroke.cpp
   src/core/Sha256.cpp
   src/core/BrushGallery.cpp
-  src/core/Polypaint.cpp
+  src/core/VertexPaint.cpp
   src/core/PaintLayer.cpp
   src/core/Texture.cpp
   src/core/TextureCommands.cpp
@@ -118,7 +120,7 @@ add_library(sculptforge_core STATIC
   src/core/QRemesh2Field.cpp
   src/core/QRemesh2Param.cpp
   src/core/QuadQuality.cpp
-  src/core/ZSpheres.cpp
+  src/core/ForgeSpheres.cpp
   src/core/Projection.cpp
   src/core/RetopoCommands.cpp
   third_party/xatlas/xatlas.cpp
@@ -131,7 +133,7 @@ add_library(sculptforge_core STATIC
   src/core/KeepMasked.cpp
   src/core/ViewCapture.cpp
   third_party/tinyexr/tinyexr_impl.cpp
-  src/core/Matcap.cpp
+  src/core/LitSphere.cpp
   src/core/Trash.cpp
   src/core/Project.cpp
   src/core/Guide.cpp
@@ -148,8 +150,8 @@ add_library(sculptforge_core STATIC
   src/io/PlyIO.cpp
   src/io/UsdIO.cpp
   src/io/Zip.cpp
-  src/io/GozIO.cpp
-  src/io/GozCommands.cpp
+  src/io/BridgeIO.cpp
+  src/io/BridgeCommands.cpp
   src/io/BlenderBridge.cpp
   src/io/BlenderCommands.cpp
   src/io/MayaBridge.cpp
@@ -325,7 +327,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/CommandPalette.cpp
     src/app/Console.cpp
     src/app/Config.cpp
-    src/app/LightBox.cpp
+    src/app/LibraryBrowser.cpp
     src/app/BrushPreview.cpp
     src/app/Thumbnails.cpp
     src/app/Pickers.cpp
@@ -334,7 +336,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelMasking.cpp
     src/app/PanelCut.cpp
     src/app/PanelView.cpp
-    src/app/PanelPolygroups.cpp
+    src/app/PanelFaceGroups.cpp
     src/app/PanelSelectionSets.cpp
     src/app/Selection.cpp
     src/app/PanelBrushes.cpp
@@ -344,7 +346,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelFace.cpp
     src/app/PanelBrushLibrary.cpp
     src/app/PanelBrushGallery.cpp
-    src/app/PanelPolypaint.cpp
+    src/app/PanelVertexPaint.cpp
     src/app/PanelPacks.cpp
     src/app/MemoryConfirm.cpp
     src/app/PanelPaintLayers.cpp
@@ -357,16 +359,16 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelBake.cpp
     src/app/FocusDetailApp.cpp
     src/app/PanelRetopo.cpp
-    src/app/PanelZSpheres.cpp
+    src/app/PanelForgeSpheres.cpp
     src/app/PanelSplatTrain.cpp
     src/app/PanelSculptable.cpp
     src/app/PanelPerformance.cpp
-    src/app/PanelGoz.cpp
+    src/app/PanelBridge.cpp
     src/app/PanelBlender.cpp
     src/app/PanelMaya.cpp
     src/app/PanelPhone.cpp
     src/app/PanelProject.cpp
-    src/app/PanelSubTools.cpp
+    src/app/PanelParts.cpp
     src/app/PanelSupport.cpp
     src/app/QuickTour.cpp
     src/app/PanelAi.cpp
@@ -478,6 +480,13 @@ elseif(WIN32)
   set(SF_DOC_DIR doc)
 else()
   set(SF_DOC_DIR ${CMAKE_INSTALL_DOCDIR})
+endif()
+# Windows: the Visual C++ runtime (msvcp140, vcruntime140, vcruntime140_1) goes next to the exe, so the portable zip
+# and the installer start on a PC without the Visual C++ Redistributable (#109: nothing happened at all).
+if(MSVC)
+  set(CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION ${CMAKE_INSTALL_BINDIR})
+  set(CMAKE_INSTALL_UCRT_LIBRARIES OFF) # the Universal CRT is part of Windows 10 and 11
+  include(InstallRequiredSystemLibraries)
 endif()
 install(FILES LICENSE THIRD_PARTY_NOTICES.md README.md CHANGELOG.md DESTINATION ${SF_DOC_DIR})
 install(FILES docs/ai-services.md docs/unreal.md docs/generators.md docs/comfyui.md DESTINATION ${SF_DOC_DIR}/docs)

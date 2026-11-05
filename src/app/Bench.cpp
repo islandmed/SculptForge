@@ -10,6 +10,7 @@
 #include "render/Renderer.h"
 
 #include "core/Image.h"
+#include "core/TierConfig.h"
 
 #include <SDL3/SDL.h>
 
@@ -62,6 +63,13 @@ int runAppBenchmark(BenchCommandLine cl) {
     } else if (!renderer.init(error)) {
         std::fprintf(stderr, "%s\n", error.c_str());
     } else {
+        // SF_BENCH_STROKE_SHADE_MS=N: a micro stroke's shading per frame held to N ms (TierConfig::strokeShadeMs; 0 = the
+        // points budget only, as before 11-04).
+        if (const char* e = std::getenv("SF_BENCH_STROKE_SHADE_MS")) {
+            TierConfig t = currentTierConfig();
+            t.strokeShadeMs = std::atof(e);
+            setCurrentTierConfig(t);
+        }
         BenchGpu gpu;
         gpu.description = std::string(reinterpret_cast<const char*>(gl::GetString(GL_RENDERER))) + ", OpenGL " +
                           reinterpret_cast<const char*>(gl::GetString(GL_VERSION));

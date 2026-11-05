@@ -60,7 +60,7 @@ is written.
 Tick **Member pack (insider channel)** for the monthly pack or an Insider drop. It only changes the label shown in the
 review and the pack list; anyone can install the file.
 
-To build a pack from a folder in a script, lay the folder out like a pack (`brushes/`, `alphas/`, `matcaps/`,
+To build a pack from a folder in a script, lay the folder out like a pack (`brushes/`, `alphas/`, `litspheres/`,
 `materials/`, `vdms/`, `keymaps/`, `piemenus/`, `macros/`, plus `LICENSE.txt` and `preview.png`) and run:
 
 ```

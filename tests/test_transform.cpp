@@ -1,15 +1,15 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Transforms (core/MeshTransform.h, the Gizmo 3D and the `transform` command): exact results, masked parts with a
-// smooth falloff, sculpt layers, symmetry, All SubTools, attributes left alone and bit-for-bit undo.
+// Transforms (core/MeshTransform.h, the Transform gizmo and the `transform` command): exact results, masked parts with a
+// smooth falloff, sculpt layers, symmetry, All Parts, attributes left alone and bit-for-bit undo.
 #include "TestHarness.h"
 
 #include "core/Commands.h"
 #include "core/MeshTransform.h"
 #include "core/Primitives.h"
 #include "core/Project.h"
-#include "core/SubTools.h"
+#include "core/Parts.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -246,14 +246,14 @@ TEST(transform_leaves_topology_and_attributes) {
     const auto tris = m.triangles;
     const auto uvs = m.uvs;
     const auto quads = m.quadPartners;
-    const auto groups = m.polygroups;
+    const auto groups = m.facegroups;
     const auto colors = m.colors;
     CHECK(m.quadCount() > 0);
     CHECK(run(d, "transform", {{"rotate", std::string("15,25,35")}, {"scale", 1.3}}).ok);
     CHECK(m.triangles == tris);
     CHECK(sameBits(m.uvs, uvs));
     CHECK(m.quadPartners == quads);
-    CHECK(m.polygroups == groups);
+    CHECK(m.facegroups == groups);
     CHECK(sameBits(m.colors, colors));
 }
 
@@ -286,22 +286,22 @@ TEST(transform_symmetry_mirrors_a_masked_pose) {
     CHECK(d.mesh.bounds().max.y > bar.bounds().max.y + 0.2f);
 }
 
-TEST(transform_all_subtools) {
+TEST(transform_all_parts) {
     Document d = makeDoc(makeIcosphere(2));
-    d.addSubtool(makeCube(4), "Box", false);
-    const auto a = d.subtoolMesh(0).positions, b = d.subtoolMesh(1).positions;
+    d.addPart(makeCube(4), "Box", false);
+    const auto a = d.partMesh(0).positions, b = d.partMesh(1).positions;
     CHECK(run(d, "transform", {{"translate", std::string("0,2,0")}, {"all", true}}).ok);
-    CHECK(d.subtoolMesh(0).positions[0] == a[0] + glm::vec3(0, 2, 0));
-    CHECK(d.subtoolMesh(1).positions[0] == b[0] + glm::vec3(0, 2, 0));
-    // One undo step in each SubTool.
+    CHECK(d.partMesh(0).positions[0] == a[0] + glm::vec3(0, 2, 0));
+    CHECK(d.partMesh(1).positions[0] == b[0] + glm::vec3(0, 2, 0));
+    // One undo step in each Part.
     CHECK(d.undo.canUndo());
-    CHECK(d.subtools[1].undo.canUndo());
-    d.selectSubtool(1);
+    CHECK(d.parts[1].undo.canUndo());
+    d.selectPart(1);
     CHECK(run(d, "undo").ok);
     CHECK(sameBits(d.mesh.positions, b));
     // Without all=1 only the active one moves.
     CHECK(run(d, "transform", {{"translate", std::string("1,0,0")}}).ok);
-    CHECK(d.subtoolMesh(0).positions[0] == a[0] + glm::vec3(0, 2, 0));
+    CHECK(d.partMesh(0).positions[0] == a[0] + glm::vec3(0, 2, 0));
 }
 
 TEST(transform_session_never_accumulates) {
@@ -320,7 +320,7 @@ TEST(transform_session_never_accumulates) {
         s.apply(a.mesh, t);
     }
     a.undo.push(s.finish(a.mesh, a.bvh, "Rotate"));
-    CHECK(transformSubtool(b, 0, t, true, 0.1f, Symmetry{false, false, false}, "Rotate") > 0);
+    CHECK(transformPart(b, 0, t, true, 0.1f, Symmetry{false, false, false}, "Rotate") > 0);
     CHECK(sameBits(a.mesh.positions, b.mesh.positions));
     CHECK(maxDistance(a.mesh.normals, b.mesh.normals) < 1e-5f);
     // An identity drag (click without moving) leaves no undo step and no change.
@@ -362,7 +362,7 @@ TEST(transform_euler_round_trip) {
 }
 
 TEST(transform_perf_million_triangles) {
-    // 1.3M triangles: a whole-SubTool drag frame and a masked (posing) drag frame, plus begin / finish.
+    // 1.3M triangles: a whole-Part drag frame and a masked (posing) drag frame, plus begin / finish.
     Mesh m = makeIcosphere(8);
     maskBelowX(m, 0.3f);
     Document d = makeDoc(std::move(m));
@@ -391,13 +391,13 @@ TEST(transform_perf_million_triangles) {
         CHECK(run(d, "undo").ok);
         const double undo = ms(t0);
         std::printf("  %zu tris, %s: begin %.1f ms, %.1f ms per drag frame (%zu verts), finish %.1f ms, undo %.1f ms\n",
-                    d.mesh.triangleCount(), masked ? "masked + falloff 0.1" : "whole SubTool", begin, frame,
+                    d.mesh.triangleCount(), masked ? "masked + falloff 0.1" : "whole Part", begin, frame,
                     moving, finish, undo);
     }
 }
 
 TEST(transform_saved_in_projects) {
-    // A posed SubTool with a sculpt layer and quads saves and opens as it is.
+    // A posed Part with a sculpt layer and quads saves and opens as it is.
     Document d = makeDoc(makeCube(6));
     d.mesh.addLayer("Detail");
     for (uint32_t v = 0; v < d.mesh.vertexCount(); ++v) d.mesh.layers[0].delta[v] = d.mesh.normals[v] * 0.05f;

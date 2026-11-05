@@ -1,6 +1,6 @@
 # Supporting SculptForge: Help > Support SculptForge..., the first-run welcome and the supporters in Help > About.
 # Every one only asks for sculptforge.app/support.html (UI tests never start a browser); nothing else changes.
-run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=3
 expect_value welcome_open == 0
 expect_value support_requests == 0

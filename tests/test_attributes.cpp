@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Optional mesh attributes (mask, polypaint, polygroups, hidden, UVs): helpers,
+// Optional mesh attributes (mask, vertex paint, face groups, hidden, UVs): helpers,
 // preservation through topology changes and undo, brush hooks and IO.
 #include "TestHarness.h"
 
@@ -21,7 +21,7 @@ using namespace sf;
 
 namespace {
 
-// Mask = 1 on the upper half (y > 0), red paint on the +x half, polygroup 1 on
+// Mask = 1 on the upper half (y > 0), red paint on the +x half, face group 1 on
 // triangles whose centre has z > 0, the lowest triangle hidden.
 void paintTestAttributes(Mesh& m) {
     m.ensureMask();
@@ -30,12 +30,12 @@ void paintTestAttributes(Mesh& m) {
         m.mask[v] = m.positions[v].y > 0.0f ? 1.0f : 0.0f;
         m.colors[v] = m.positions[v].x > 0.0f ? glm::vec3(1, 0, 0) : glm::vec3(1);
     }
-    m.ensurePolygroups();
+    m.ensureFaceGroups();
     m.ensureHidden();
     for (uint32_t t = 0; t < m.triangleCount(); ++t) {
         const auto& tri = m.triangles[t];
         glm::vec3 c = (m.positions[tri.x] + m.positions[tri.y] + m.positions[tri.z]) / 3.0f;
-        m.polygroups[t] = c.z > 0.0f ? 1u : 0u;
+        m.facegroups[t] = c.z > 0.0f ? 1u : 0u;
         m.hidden[t] = c.y < -0.97f ? 1 : 0;
     }
     m.uvs.resize(m.triangleCount() * 3);
@@ -53,8 +53,8 @@ bool allIn(const std::vector<float>& v, float lo, float hi) {
 
 TEST(attribute_helpers_default_empty) {
     Mesh m = makeIcosphere(2);
-    CHECK(!m.hasMask() && !m.hasColors() && !m.hasPolygroups() && !m.hasHidden() && !m.hasUvs());
-    CHECK(m.maskAt(3) == 0.0f && m.polygroupAt(5) == 0u && !m.triangleHidden(5) && !m.vertexHidden(0));
+    CHECK(!m.hasMask() && !m.hasColors() && !m.hasFaceGroups() && !m.hasHidden() && !m.hasUvs());
+    CHECK(m.maskAt(3) == 0.0f && m.facegroupAt(5) == 0u && !m.triangleHidden(5) && !m.vertexHidden(0));
     CHECK(m.colorAt(0, glm::vec3(0.5f)) == glm::vec3(0.5f));
     m.ensureMask(0.25f);
     CHECK(m.mask.size() == m.vertexCount() && m.maskAt(7) == 0.25f);
@@ -79,13 +79,13 @@ TEST(attributes_survive_subdivision) {
     paintTestAttributes(m);
     Mesh s = loopSubdivide(m);
     CHECK(s.mask.size() == s.vertexCount() && s.colors.size() == s.vertexCount());
-    CHECK(s.polygroups.size() == s.triangleCount() && s.hidden.size() == s.triangleCount());
+    CHECK(s.facegroups.size() == s.triangleCount() && s.hidden.size() == s.triangleCount());
     CHECK(s.uvs.size() == s.triangleCount() * 3);
     for (uint32_t v = 0; v < m.vertexCount(); ++v) CHECK(s.mask[v] == m.mask[v] && s.colors[v] == m.colors[v]);
     CHECK(allIn(s.mask, 0.0f, 1.0f));
     for (uint32_t t = 0; t < m.triangleCount(); ++t)
         for (int k = 0; k < 4; ++k) {
-            CHECK(s.polygroups[t * 4 + k] == m.polygroups[t]);
+            CHECK(s.facegroups[t * 4 + k] == m.facegroups[t]);
             CHECK(s.hidden[t * 4 + k] == m.hidden[t]);
         }
     // The first child keeps the parent's first corner UV; midpoints average.
@@ -96,7 +96,7 @@ TEST(attributes_survive_subdivision) {
     paintTestAttributes(d.mesh);
     CommandRegistry reg;
     CHECK(reg.execute(d, "subdivide", {{"levels", 2.0}}).ok);
-    CHECK(d.mesh.mask.size() == d.mesh.vertexCount() && d.mesh.polygroups.size() == d.mesh.triangleCount());
+    CHECK(d.mesh.mask.size() == d.mesh.vertexCount() && d.mesh.facegroups.size() == d.mesh.triangleCount());
 }
 
 TEST(attributes_survive_decimation) {
@@ -105,7 +105,7 @@ TEST(attributes_survive_decimation) {
     Mesh dm = decimate(m, m.triangleCount() / 4);
     CHECK(dm.triangleCount() < m.triangleCount() / 2);
     CHECK(dm.mask.size() == dm.vertexCount() && dm.colors.size() == dm.vertexCount());
-    CHECK(dm.polygroups.size() == dm.triangleCount() && dm.hidden.size() == dm.triangleCount());
+    CHECK(dm.facegroups.size() == dm.triangleCount() && dm.hidden.size() == dm.triangleCount());
     CHECK(dm.uvs.size() == dm.triangleCount() * 3);
     // Kept vertices carry their exact values (vertices are a subset of the input).
     int mismatches = 0;
@@ -117,7 +117,7 @@ TEST(attributes_survive_decimation) {
     CHECK(mismatches == 0);
     std::vector<Mesh> lods = generateLods(m, 3, 0.5f);
     CHECK(lods.size() == 3 && lods[2].mask.size() == lods[2].vertexCount() &&
-          lods[2].polygroups.size() == lods[2].triangleCount());
+          lods[2].facegroups.size() == lods[2].triangleCount());
 }
 
 TEST(attributes_transfer_through_remesh) {
@@ -127,7 +127,7 @@ TEST(attributes_transfer_through_remesh) {
     Mesh r = voxelRemesh(m, 48, &err);
     CHECK(r.triangleCount() > 0);
     CHECK(r.mask.size() == r.vertexCount() && r.colors.size() == r.vertexCount());
-    CHECK(!r.hasPolygroups() && !r.hasHidden() && !r.hasUvs()); // documented reset
+    CHECK(!r.hasFaceGroups() && !r.hasHidden() && !r.hasUvs()); // documented reset
     int wrong = 0, checked = 0;
     for (uint32_t v = 0; v < r.vertexCount(); ++v) {
         const glm::vec3& p = r.positions[v];
@@ -146,11 +146,11 @@ TEST(attributes_carried_by_weld_and_snapshot_undo) {
     raw.positions = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}};
     raw.triangles = {{0, 1, 2}, {3, 4, 5}};
     raw.colors = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {1, 1, 0}, {1, 1, 1}, {0, 1, 1}};
-    raw.polygroups = {4, 9};
+    raw.facegroups = {4, 9};
     raw.uvs = {{0, 0}, {1, 0}, {0, 1}, {0.5f, 0}, {1, 1}, {0, 0.5f}};
     Mesh w = weldImported(raw);
     CHECK(w.vertexCount() == 4 && w.colors.size() == 4 && w.colors[1] == glm::vec3(0, 1, 0));
-    CHECK(w.polygroups == std::vector<uint32_t>({4, 9}) && w.uvs.size() == 6 && w.uvs[3] == glm::vec2(0.5f, 0));
+    CHECK(w.facegroups == std::vector<uint32_t>({4, 9}) && w.uvs.size() == 6 && w.uvs[3] == glm::vec2(0.5f, 0));
 
     Document d = makeDoc(makeIcosphere(2));
     paintTestAttributes(d.mesh);
@@ -158,7 +158,7 @@ TEST(attributes_carried_by_weld_and_snapshot_undo) {
     CommandRegistry reg;
     CHECK(reg.execute(d, "remesh", {{"resolution", 40.0}}).ok);
     CHECK(d.undo.undo(d.mesh, d.bvh));
-    CHECK(d.mesh.mask == before.mask && d.mesh.colors == before.colors && d.mesh.polygroups == before.polygroups &&
+    CHECK(d.mesh.mask == before.mask && d.mesh.colors == before.colors && d.mesh.facegroups == before.facegroups &&
           d.mesh.hidden == before.hidden && d.mesh.uvs == before.uvs);
     CHECK(d.undo.redo(d.mesh, d.bvh));
     CHECK(d.mesh.vertexCount() != before.vertexCount() && d.mesh.mask.size() == d.mesh.vertexCount());
@@ -191,9 +191,9 @@ TEST(mask_and_color_stroke_undo) {
     d.mesh.clearMask();
     d.undo.push(UndoRecord::captureHidden(d.mesh, "Hide"));
     d.mesh.ensureHidden()[0] = 1;
-    d.undo.push(UndoRecord::capturePolygroups(d.mesh, "Group", std::vector<uint32_t>{2}));
-    d.mesh.ensurePolygroups()[2] = 7;
-    CHECK(d.undo.undo(d.mesh, d.bvh) && d.mesh.polygroupAt(2) == 0u);
+    d.undo.push(UndoRecord::captureFaceGroups(d.mesh, "Group", std::vector<uint32_t>{2}));
+    d.mesh.ensureFaceGroups()[2] = 7;
+    CHECK(d.undo.undo(d.mesh, d.bvh) && d.mesh.facegroupAt(2) == 0u);
     CHECK(d.undo.undo(d.mesh, d.bvh) && !d.mesh.triangleHidden(0));
     CHECK(d.undo.undo(d.mesh, d.bvh) && d.mesh.maskAt(3) == 1.0f);
     CHECK(d.undo.redo(d.mesh, d.bvh) && d.mesh.maskAt(3) == 0.0f);

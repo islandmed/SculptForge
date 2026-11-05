@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Pop-up pickers (ZBrush's brush, stroke, alpha and material pop-ups), the
+// Pop-up pickers (brush, stroke, alpha and material pop-ups), the
 // Draw Size / Strength sliders at the cursor, and the thumbnail tile.
 #include "app/Theme.h"
 #include "app/Pickers.h"
@@ -10,7 +10,9 @@
 #include "app/AssetLibrary.h"
 #include "app/Ui.h"
 #include "core/BrushLibrary.h"
-#include "core/Matcap.h"
+#include "core/BrushPacks.h"
+#include "core/ListSort.h"
+#include "core/LitSphere.h"
 
 #include <IconsLucide.h>
 
@@ -18,6 +20,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <functional>
 #include <array>
 #include <cctype>
 #include <cmath>
@@ -90,12 +93,12 @@ struct State {
     int openedFrame = -1, closedFrame = -1;
     int keysFrom = 0; // frame from which typed keys count (not the key that opened it)
     bool addToShelf = false;
-    // Opened with Ctrl (mask brushes) or Ctrl+Shift (selection brushes) held, as in ZBrush: App::HeldBrush.
+    // Opened with Ctrl (mask brushes) or Ctrl+Shift (selection brushes) held: App::HeldBrush.
     int held = 0;
     std::string typed; // brush picker: letters typed so far
     // Material hover preview: the material to go back to.
     bool previewing = false;
-    int savedMatcap = -1;
+    int savedLitSphere = -1;
     // Draw Size / Z Intensity / RGB Intensity / Focal Shift at the cursor.
     int slider = -1; // PickerUi::Slider, -1 = closed
     bool sliderSmooth = false; // Z Intensity of the Smooth brush (Shift was held)
@@ -109,7 +112,25 @@ struct State {
     // Recently used brushes (ids, newest first).
     std::vector<std::string> recent;
     std::string lastActive;
+    // The same for alphas (names) and materials (lit sphere indices as text), for the lists' Recent order.
+    std::vector<std::string> recentAlphas, recentMaterials;
+    std::string lastAlpha, lastMaterial;
 };
+
+void touchRecent(std::vector<std::string>& list, std::string& last, const std::string& id) {
+    if (id == last) return;
+    if (!last.empty()) {
+        list.erase(std::remove(list.begin(), list.end(), id), list.end());
+        list.insert(list.begin(), id);
+        if (list.size() > 12) list.resize(12);
+    }
+    last = id;
+}
+int recentRank(const std::vector<std::string>& list, const std::string& id) {
+    const auto it = std::find(list.begin(), list.end(), id);
+    return it == list.end() ? -1 : int(it - list.begin());
+}
+
 State& st() {
     static State s;
     return s;
@@ -142,7 +163,7 @@ void sectionHeader(const char* text) {
     ImGui::PopStyleColor();
 }
 
-// Hover "Quick Info": a large thumbnail and the description, as ZBrush shows for palette items.
+// Hover "Quick Info": a large thumbnail and the description shows for palette items.
 void quickInfo(ImTextureID tex, const char* glyph, const std::string& title, const std::string& text,
                const std::string& footer = {}) {
     if (!ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort | ImGuiHoveredFlags_NoSharedDelay) ||
@@ -300,11 +321,48 @@ bool AssetTile(const char* id, ImTextureID texture, const char* glyph, const std
     return clicked;
 }
 
+float SortMenuWidth() { // the widest Sort button and the gap before it
+    const ImGuiStyle& st = ImGui::GetStyle();
+    return ImGui::CalcTextSize("Sort: Recent").x + st.FramePadding.x * 2.0f + st.ItemSpacing.x + 2.0f;
+}
+
+int brushRecentRank(const std::string& id) { return recentRank(st().recent, id); }
+
+int builtinBrushPackRank(const std::string& pack) {
+    const auto& packs = builtinBrushPacks();
+    const auto it = std::find(packs.begin(), packs.end(), pack);
+    return it == packs.end() ? -1 : int(it - packs.begin());
+}
+
+bool SortMenu(const char* id, std::string& pref, bool packs) {
+    const ListSort cur = listSortFromId(pref);
+    char label[64];
+    std::snprintf(label, sizeof label, "Sort: %s##%s", listSortLabel(cur), id);
+    if (ImGui::SmallButton(label)) ImGui::OpenPopup(id);
+    ui::HelpText("Sort", nullptr,
+                 packs ? "The order of this list: A-Z (the default), the most recently used first, or grouped by pack."
+                       : "The order of this list: A-Z (the default) or the most recently changed first.",
+                 nullptr);
+    bool changed = false;
+    if (ImGui::BeginPopup(id)) {
+        for (int i = 0; i < int(ListSort::Count); ++i) {
+            const ListSort m = ListSort(i);
+            if (m == ListSort::Pack && !packs) continue;
+            if (ImGui::MenuItem((std::string(listSortLabel(m)) + "##" + id).c_str(), nullptr, m == cur) && m != cur) {
+                pref = listSortId(m);
+                changed = true;
+            }
+        }
+        ImGui::EndPopup();
+    }
+    return changed;
+}
+
 void AssetTileHoverGlow() {
     Glow& g = glow();
     if (g.frame != ImGui::GetFrameCount() || !g.tex || ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId)) return;
     if (ImGui::IsMouseDragging(ImGuiMouseButton_Left)) return;
-    // ZBrush's thumbnail glow: the hovered thumbnail pops out at 1.5x.
+    // the classic thumbnail glow: the hovered thumbnail pops out at 1.5x.
     const float s = g.rect.GetWidth() * 1.5f;
     const ImVec2 c = g.rect.GetCenter();
     const ImGuiViewport* vp = ImGui::GetMainViewport();
@@ -382,9 +440,9 @@ const char* brushTypeDescription(int type) {
         return "Presses the surface onto a plane, levelling hills and valleys.";
     case BrushType::Pinch:
         return "Pulls the surface toward the stroke, sharpening edges and creases.";
-    case BrushType::DamStandard:
+    case BrushType::SharpCrease:
         return "A sharp V-shaped crease with the sides pinched in, for wrinkles and folds.";
-    case BrushType::ClayBuildup:
+    case BrushType::ClayBlock:
         return "Square, flat-topped clay strokes that stack up quickly, for bold blocking.";
     case BrushType::SnakeHook:
         return "Pulls the surface out along the stroke into horns, tentacles and spikes.";
@@ -447,6 +505,7 @@ std::vector<BrushItem> PickerUi::brushItems(App& app, bool libraryFiles) {
         b.name = r.name;
         b.path = r.origin.path;
         b.description = r.description;
+        b.pack = r.origin.pack;
         switch (r.origin.source) {
         case BrushSource::Studio:
             b.tag = "studio";
@@ -469,7 +528,7 @@ std::vector<BrushItem> PickerUi::brushItems(App& app, bool libraryFiles) {
         items.push_back(std::move(b));
     }
     if (libraryFiles && !app.library_.user.empty()) {
-        // .sfbrush files in the LightBox library that aren't loaded yet.
+        // .sfbrush files in the Library library that aren't loaded yet.
         const std::string dir = app.library_.user + "/Brushes";
         if (const auto* files = app.libraryScanner_.get(dir, "brush", [](const std::string& p) {
                 return isBrushFile(p) ? AssetKind::BrushFile : AssetKind::Folder;
@@ -562,16 +621,28 @@ void drawBrushGrid(App& app, GridMode mode) {
 
     static char paletteFilter[64] = "";
     if (!popup) {
-        ImGui::SetNextItemWidth(-1);
+        ImGui::SetNextItemWidth(-SortMenuWidth());
         ImGui::InputTextWithHint("##brushfilter", ICON_LC_SEARCH "  Filter brushes", paletteFilter,
                                  sizeof paletteFilter);
+        ImGui::SameLine();
+        SortMenu("brushsort", app.uiPrefs_.brushSort);
     }
     const std::string typed = popup ? s.typed : typedName(paletteFilter);
     std::vector<std::string> names;
     for (const auto& it : items)
         names.push_back(it.name);
     bool substring = false;
-    const std::vector<size_t> shown = filterByTyped(names, typed, &substring);
+    std::vector<size_t> shown = filterByTyped(names, typed, &substring);
+    // The chosen order (A-Z by default): the letter badges and Enter follow it.
+    const ListSort sort = listSortFromId(app.uiPrefs_.brushSort);
+    {
+        std::vector<ListSortKey> keys;
+        for (size_t i : shown)
+            keys.push_back({items[i].name, items[i].pack, recentRank(s.recent, items[i].id()), builtinBrushPackRank(items[i].pack)});
+        std::vector<size_t> sorted;
+        for (size_t k : listSortOrder(keys, sort)) sorted.push_back(shown[k]);
+        shown = std::move(sorted);
+    }
     const auto badges = popup ? letterBadges(names, shown, typed) : std::vector<std::pair<char, size_t>>{};
 
     // Letter keys (pop-up only; the palette has a filter field instead).
@@ -602,6 +673,8 @@ void drawBrushGrid(App& app, GridMode mode) {
         // What was typed, or how to type.
         if (typed.empty()) {
             ImGui::TextDisabled("Type a letter to narrow the brushes, then press its orange key");
+            ImGui::SameLine();
+            SortMenu("brushsortpop", app.uiPrefs_.brushSort);
         } else {
             std::string shownTyped = typed;
             for (auto& c : shownTyped)
@@ -729,18 +802,31 @@ void drawBrushGrid(App& app, GridMode mode) {
                     break;
                 }
     }
+    // Sections: the built-in brushes, your own and other custom brushes, then the brush packs (one section per
+    // pack when sorted by pack), then library files not loaded yet.
     struct Section {
-        const char* title;
-        bool (*match)(const BrushItem&);
+        std::string title;
+        std::function<bool(const BrushItem&)> match;
     };
-    const Section sections[] = {
+    std::vector<Section> sections = {
         {"Built-in",
          [](const BrushItem& b) {
              return b.kind == BrushItem::Kind::Type || b.kind == BrushItem::Kind::Paint || b.kind == BrushItem::Kind::Guides;
          }},
-        {"Custom", [](const BrushItem& b) { return b.kind == BrushItem::Kind::Recipe; }},
-        {"Library", [](const BrushItem& b) { return b.kind == BrushItem::Kind::File; }},
+        {"Custom", [](const BrushItem& b) { return b.kind == BrushItem::Kind::Recipe && b.pack.empty(); }},
     };
+    if (sort == ListSort::Pack) {
+        std::vector<std::string> packs;
+        for (size_t i : shown)
+            if (items[i].kind == BrushItem::Kind::Recipe && !items[i].pack.empty() &&
+                std::find(packs.begin(), packs.end(), items[i].pack) == packs.end())
+                packs.push_back(items[i].pack);
+        for (const std::string& p : packs)
+            sections.push_back({p, [p](const BrushItem& b) { return b.kind == BrushItem::Kind::Recipe && b.pack == p; }});
+    } else {
+        sections.push_back({"Brush packs", [](const BrushItem& b) { return b.kind == BrushItem::Kind::Recipe && !b.pack.empty(); }});
+    }
+    sections.push_back({"Library", [](const BrushItem& b) { return b.kind == BrushItem::Kind::File; }});
     if (popup) {
         // The grid scrolls inside the pop-up when there are many custom brushes.
         const float rowH = tile + ImGui::GetFontSize() + 4.0f + ImGui::GetStyle().ItemSpacing.y;
@@ -754,10 +840,12 @@ void drawBrushGrid(App& app, GridMode mode) {
         for (size_t i : shown)
             if (sec.match(items[i])) in.push_back(i);
         if (in.empty()) continue;
-        sectionHeader(sec.title);
+        sectionHeader(sec.title.c_str());
+        if (const std::string help = builtinBrushPackHelp(sec.title); !help.empty())
+            ui::HelpText(sec.title.c_str(), nullptr, help.c_str(), "Brush packs");
         int column = 0;
         for (size_t i : in)
-            drawItem(i, column, sec.title);
+            drawItem(i, column, sec.title.c_str());
     }
     if (shown.empty()) ImGui::TextDisabled("No brush matches \"%s\"", typed.c_str());
     if (popup) ImGui::EndChild();
@@ -839,63 +927,103 @@ void drawAlphaGrid(App& app, GridMode mode) {
         drawVdmGrid(app, mode);
         ImGui::Dummy(ImVec2(0, 4));
     }
+    State& s = st();
     const float tile = 64.0f * app.uiScale_;
-    const int columns = columnsFor(tile, mode);
     const BrushAlpha& current = app.doc_.brushAlpha;
-    sectionHeader("Built-in");
-    int column = 0;
+    static char filter[64] = "";
+    ImGui::SetNextItemWidth(mode == GridMode::Popup ? 200.0f * app.uiScale_ : -SortMenuWidth());
+    ImGui::InputTextWithHint("##alphafilter", ICON_LC_SEARCH "  Filter alphas", filter, sizeof filter);
+    ImGui::SameLine();
+    SortMenu("alphasort", app.uiPrefs_.alphaSort);
+    const int columns = columnsFor(tile, mode);
+
+    // Every alpha in one list: the built-ins, the loaded image, the library's Alphas folder and the packs'.
+    struct Entry {
+        enum class Kind { Builtin, Current, File, Pack } kind;
+        std::string name, help, path, pack, group;
+        int builtin = -1;
+    };
+    std::vector<Entry> entries;
     for (int i = 0; i < int(BrushAlpha::builtins().size()); ++i) {
-        tileGrid(column, columns);
         const std::string& name = builtinAlpha(i).name;
-        const std::string help = BrushAlpha::builtinHelp(name);
-        const bool on = lower(current.name) == lower(name) || (i == 0 && current.empty());
-        const ImTextureID tex = app.thumbs_.alpha(builtinAlpha(i));
-        if (AssetTile((name + "##alpha").c_str(), tex, ICON_LC_CIRCLE_DASHED, name.c_str(), tile, on))
-            app.runCommand("brush_set_alpha", {{"name", name}});
-        quickInfo(tex, ICON_LC_CIRCLE_DASHED, name.c_str(), help.c_str());
-        ui::HelpText(name.c_str(), nullptr, help.c_str(), "Alpha");
+        entries.push_back({Entry::Kind::Builtin, name, BrushAlpha::builtinHelp(name), "", "", "Built-in", i});
     }
-    // The loaded image alpha, then images in the library's Alphas folder.
-    const bool custom = !current.empty() && lower(current.name) != "square" && lower(current.name) != "noise";
-    std::vector<AssetEntry> files;
+    const bool custom = !current.empty() && !current.path.empty();
+    if (custom)
+        entries.push_back({Entry::Kind::Current, current.name, "The loaded image alpha (white = full effect).",
+                           current.path, "", "Images"});
     if (!app.library_.user.empty()) {
         const std::string dir = app.library_.user + "/Alphas";
         if (const auto* list = app.libraryScanner_.get(dir, "alpha", [](const std::string& p) {
                 return isImageFile(p) ? AssetKind::AlphaFile : AssetKind::Folder;
             }))
             for (const auto& e : *list)
-                if (e.kind == AssetKind::AlphaFile) files.push_back(e);
+                if (e.kind == AssetKind::AlphaFile && !(custom && lower(e.name) == lower(current.name)))
+                    entries.push_back({Entry::Kind::File, e.name, "Image in your library's Alphas folder.", e.path, "",
+                                       "Images"});
     }
-    if (custom || !files.empty()) {
-        sectionHeader("Images");
-        column = 0;
-        if (custom) {
-            tileGrid(column, columns);
-            const ImTextureID tex = app.thumbs_.alpha(current);
-            AssetTile((current.name + "##alphacur").c_str(), tex, ICON_LC_CIRCLE_DASHED, current.name, tile, true);
-            quickInfo(tex, ICON_LC_CIRCLE_DASHED, current.name, "The loaded image alpha (white = full effect).");
+    for (const PackContentItem& it : app.packAlphas()) // tagged with the pack's name
+        entries.push_back({Entry::Kind::Pack, it.label(), "From the pack " + it.packName + ".", it.file, it.packName,
+                           it.packName});
+
+    const std::string f = lower(filter);
+    std::vector<ListSortKey> keys;
+    std::vector<size_t> kept;
+    for (size_t i = 0; i < entries.size(); ++i) {
+        if (!f.empty() && lower(entries[i].name).find(f) == std::string::npos) continue;
+        kept.push_back(i);
+        // Round is "no alpha": it stays first in every order (the pack order puts it with the built-ins).
+        const Entry& e = entries[i];
+        ListSortKey k{e.name, e.kind == Entry::Kind::Builtin ? std::string() : "\x01" + e.group,
+                      recentRank(s.recentAlphas, lower(e.name))};
+        if (e.builtin == 0) k.name = std::string(1, '\0');
+        keys.push_back(std::move(k));
+    }
+    const ListSort sort = listSortFromId(app.uiPrefs_.alphaSort);
+    std::vector<size_t> order;
+    for (size_t k : listSortOrder(keys, sort)) order.push_back(kept[k]);
+    if (sort == ListSort::Recent) { // Round first, then the recent ones
+        const auto round = std::find_if(order.begin(), order.end(), [&](size_t i) { return entries[i].builtin == 0; });
+        if (round != order.end()) std::rotate(order.begin(), round, round + 1);
+    }
+
+    int column = 0;
+    std::string group = "\x02";
+    if (sort != ListSort::Pack) sectionHeader("Alphas");
+    for (size_t i : order) {
+        const Entry& e = entries[i];
+        if (sort == ListSort::Pack && e.group != group) {
+            group = e.group;
+            sectionHeader(group.c_str());
+            column = 0;
         }
-        for (const auto& e : files) {
-            if (custom && lower(e.name) == lower(current.name)) continue;
-            tileGrid(column, columns);
-            const ImTextureID tex = app.thumbs_.file(e.path);
-            if (AssetTile((e.name + "##alphafile").c_str(), tex, ICON_LC_IMAGE, e.name, tile, false))
+        tileGrid(column, columns);
+        bool on = false;
+        ImTextureID tex = ImTextureID(0);
+        const char* glyph = ICON_LC_IMAGE;
+        switch (e.kind) {
+        case Entry::Kind::Builtin:
+            on = (current.path.empty() && lower(current.name) == lower(e.name)) || (e.builtin == 0 && current.empty());
+            tex = app.thumbs_.alpha(builtinAlpha(e.builtin));
+            glyph = ICON_LC_CIRCLE_DASHED;
+            break;
+        case Entry::Kind::Current:
+            on = true;
+            tex = app.thumbs_.alpha(current);
+            glyph = ICON_LC_CIRCLE_DASHED;
+            break;
+        default: tex = app.thumbs_.file(e.path); break;
+        }
+        const std::string id = e.name + "##alpha" + std::to_string(int(e.kind)) + e.path;
+        if (AssetTile(id.c_str(), tex, glyph, e.name, tile, on)) {
+            if (e.kind == Entry::Kind::Builtin) app.runCommand("brush_set_alpha", {{"name", e.name}});
+            else if (e.kind != Entry::Kind::Current)
                 app.runCommand("brush_set_alpha", {{"path", e.path}, {"invert", app.alphaInvert_}});
-            quickInfo(tex, ICON_LC_IMAGE, e.name, "Image in your library's Alphas folder.", e.path);
         }
+        quickInfo(tex, glyph, e.name, e.help, e.path);
+        ui::HelpText(e.name.c_str(), nullptr, e.help.c_str(), "Alpha");
     }
-    if (!app.packAlphas().empty()) { // alphas from installed packs, tagged with the pack's name
-        sectionHeader("Packs");
-        column = 0;
-        for (const PackContentItem& it : app.packAlphas()) {
-            tileGrid(column, columns);
-            const std::string label = it.label();
-            const ImTextureID tex = app.thumbs_.file(it.file);
-            if (AssetTile((label + "##alphapack" + it.file).c_str(), tex, ICON_LC_IMAGE, label, tile, false))
-                app.runCommand("brush_set_alpha", {{"path", it.file}, {"invert", app.alphaInvert_}});
-            quickInfo(tex, ICON_LC_IMAGE, label, ("From the pack " + it.packName + ".").c_str(), it.file);
-        }
-    }
+    if (order.empty()) ImGui::TextDisabled("No alpha matches \"%s\"", filter);
     ImGui::Dummy(ImVec2(0, 2));
     if (ImGui::Button(ICON_LC_FOLDER_OPEN "  Load image...", ImVec2(mode == GridMode::Popup ? 0.0f : -1.0f, 0)))
         SDL_ShowOpenFileDialog(App::onAlphaChosen, &app, app.window_, kAlphaFilters, 2, nullptr, false);
@@ -914,57 +1042,65 @@ void drawMaterialGrid(App& app, GridMode mode) {
     const int columns = columnsFor(tile, mode);
     int column = 0;
     int hovered = -2;
-    const int active = s.previewing ? s.savedMatcap : app.renderSettings_.matcap;
-    app.materialListShown(); // just opened: pick up images added to the MatCaps folder meanwhile
-    for (int k = 0; k <= matcapCount(); ++k) {
-        const int i = k < matcapCount() ? matcapInListOrder(k) : -1; // the MatCaps (the default first), then Studio
-        if (i >= 0 && !isMatcapListed(i)) continue; // removed
+    const int active = s.previewing ? s.savedLitSphere : app.renderSettings_.litsphere;
+    app.materialListShown(); // just opened: pick up images added to the Lit Spheres folder meanwhile
+    SortMenu("materialsort", app.uiPrefs_.materialSort, false);
+    std::vector<int> list; // the Lit Spheres and Studio (-1), in the chosen order (A-Z by default)
+    std::vector<ListSortKey> keys;
+    for (int k = 0; k <= litsphereCount(); ++k) {
+        const int i = k < litsphereCount() ? litsphereInListOrder(k) : -1;
+        if (i >= 0 && !isLitSphereListed(i)) continue; // removed
+        list.push_back(i);
+        keys.push_back({i < 0 ? "Studio" : litsphereName(i), "", recentRank(s.recentMaterials, std::to_string(i))});
+    }
+    for (size_t o : listSortOrder(keys, listSortFromId(app.uiPrefs_.materialSort))) {
+        const int i = list[o];
         tileGrid(column, columns);
-        const char* name = i < 0 ? "Studio" : matcapName(i);
+        const char* name = i < 0 ? "Studio" : litsphereName(i);
         const ImTextureID tex = app.thumbs_.material(i);
         if (AssetTile((std::string(name) + "##mat").c_str(), tex, ICON_LC_SUN, name, tile, active == i)) {
             s.previewing = false;
-            app.renderSettings_.matcap = s.savedMatcap = i; // runCommand below echoes it for scripts
+            app.renderSettings_.litsphere = s.savedLitSphere = i; // runCommand below echoes it for scripts
             app.runCommand("set_material", {{"name", std::string(i < 0 ? "studio" : name)}});
             if (popup) closePicker();
         }
         if (ImGui::IsItemHovered()) hovered = i;
         ui::HelpText(name, nullptr,
                      i < 0                ? "Soft studio lighting with cavity shading, in the Base colour."
-                     : i == defaultMatcap() ? "The default: a matte warm clay with a clear key light and a soft "
+                     : i == defaultLitSphere() ? "The default: a matte warm clay with a clear key light and a soft "
                                               "rim, so strokes read without glare."
                      : i == 0 ? "Made for sculpting: a strong key light, crisp highlights and deep cavities so "
                                 "every stroke reads."
-                     : isCustomMatcap(i) ? "Your own Lit Sphere. Right-click to remove it."
+                     : isCustomLitSphere(i) ? "Your own Lit Sphere. Right-click to remove it."
                               : "Lit Sphere material: the whole lit look in one image.",
                      "Material");
-        if (isCustomMatcap(i) && ImGui::BeginPopupContextItem()) {
+        if (isCustomLitSphere(i) && ImGui::BeginPopupContextItem()) {
             ImGui::TextDisabled("%s", name);
-            if (const CustomMatcap* c = customMatcap(i); c && !c->path.empty()) { // the file name; the folder is long
+            if (const CustomLitSphere* c = customLitSphere(i); c && !c->path.empty()) { // the file name; the folder is long
                 const std::u8string file = std::filesystem::path(std::u8string(c->path.begin(), c->path.end())).filename().u8string();
                 ImGui::TextDisabled("%s", reinterpret_cast<const char*>(file.c_str()));
             }
             ImGui::Separator();
-            if (ImGui::MenuItem("Remove##matcap")) {
+            if (ImGui::MenuItem("Remove##litsphere")) {
                 if (popup && s.previewing) { // put the real material back before it can go
-                    app.renderSettings_.matcap = s.savedMatcap;
+                    app.renderSettings_.litsphere = s.savedLitSphere;
                     s.previewing = false;
                 }
-                app.runCommand("remove_matcap", {{"name", std::string(name)}});
+                app.runCommand("remove_litsphere", {{"name", std::string(name)}});
             }
             ImGui::EndPopup();
         }
     }
-    // ZBrush's "Preview Material On Mesh": hovering a material shows it on the model until the pointer leaves.
+    // the classic "Preview Material On Mesh": hovering a material shows it on the model until the pointer leaves.
     if (popup && st().open) {
         if (hovered >= -1) {
             if (!s.previewing) {
                 s.previewing = true;
-                s.savedMatcap = app.renderSettings_.matcap;
+                s.savedLitSphere = app.renderSettings_.litsphere;
             }
-            app.renderSettings_.matcap = hovered;
+            app.renderSettings_.litsphere = hovered;
         } else if (s.previewing) {
-            app.renderSettings_.matcap = s.savedMatcap;
+            app.renderSettings_.litsphere = s.savedLitSphere;
             s.previewing = false;
         }
     }
@@ -1008,7 +1144,7 @@ bool pickerOpen() { return st().open || st().slider >= 0; }
 void PickerUi::sizePopup(App& app, Slider which) {
     State& s = st();
     s.slider = int(which);
-    // Smooth's own Intensity when Smooth is the brush or (ZBrush) Shift is held. Not Shift in the Blender style:
+    // Smooth's own Intensity when Smooth is the brush or Shift is held. Not Shift in the Blender style:
     // there Shift+F is the brush's Strength, as in Blender, and Shift has no smoothing meaning for a key.
     s.sliderSmooth = app.blenderStyle() ? app.brush_ == BrushType::Smooth : app.activeBrush() == BrushType::Smooth;
     // The brush cursor's own position (SDL's window coordinates, the brush ring's centre) rather than ImGui's
@@ -1047,6 +1183,9 @@ void drawPickers(App& app) {
             s.lastActive = id;
         }
     }
+
+    touchRecent(s.recentAlphas, s.lastAlpha, lower(app.doc_.brushAlpha.empty() ? std::string("round") : app.doc_.brushAlpha.name));
+    if (!s.previewing) touchRecent(s.recentMaterials, s.lastMaterial, std::to_string(app.renderSettings_.litsphere));
 
     if (s.open) {
         // Pickers own the keyboard while open (letters choose brushes; Esc closes).
@@ -1108,7 +1247,7 @@ void drawPickers(App& app) {
         }
     }
     if (!s.open && s.previewing) { // closed without picking: put the material back
-        app.renderSettings_.matcap = s.savedMatcap;
+        app.renderSettings_.litsphere = s.savedLitSphere;
         s.previewing = false;
     }
 
@@ -1116,7 +1255,7 @@ void drawPickers(App& app) {
     if (s.slider >= 0) {
         ImGui::SetNextFrameWantCaptureKeyboard(true);
         const auto which = PickerUi::Slider(s.slider);
-        // The value as shown: Draw Size in pixels, the intensities 0-100 and Focal Shift -100..100, as in ZBrush.
+        // The value as shown: Draw Size in pixels, the intensities 0-100 and Focal Shift -100..100.
         struct Def {
             const char* name;
             const char* key;
@@ -1147,7 +1286,7 @@ void drawPickers(App& app) {
                                 "inner ring of the cursor shows it.",
                                 &app.focalShift_, -1.0f, 1.0f, 100.0f};
         const float w = 200.0f * app.uiScale_;
-        // As in ZBrush the knob (the current value) opens right under the cursor, so pressing there drags it. The
+        // As  the knob (the current value) opens right under the cursor, so pressing there drags it. The
         // first frame (hidden while the window sizes itself) measures where the knob is; the window then stays put.
         if (!s.sliderPlaced) s.sliderPos = ImVec2(s.sliderAt.x - w * 0.5f, s.sliderAt.y - ImGui::GetFrameHeight() * 0.5f);
         ImGui::SetNextWindowPos(s.sliderPos, ImGuiCond_Always);
@@ -1175,7 +1314,7 @@ void drawPickers(App& app) {
                 if (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter)) {
                     if (!s.sliderTyped.empty()) {
                         float v = std::strtof(s.sliderTyped.c_str(), nullptr);
-                        // Intensities: 0-100 as in ZBrush (a fraction up to 1 still works).
+                        // Intensities: 0-100 (a fraction up to 1 still works).
                         if (which == PickerUi::Slider::ZIntensity || which == PickerUi::Slider::RgbIntensity)
                             v = v > 1.0f ? v / 100.0f : v;
                         else if (which == PickerUi::Slider::FocalShift)
@@ -1222,7 +1361,7 @@ void drawPickers(App& app) {
             if (dragging)
                 s.sliderWasActive = true;
             else if (s.sliderWasActive)
-                close = true; // closes on release, as in ZBrush
+                close = true; // closes on release, as 
             // A click elsewhere closes it. (The press that grabs the knob is not one: ImGui reports the window as not
             // hovered while its own slider is active, and that used to close the slider as soon as it was dragged, #9.)
             const bool clicked =
@@ -1371,7 +1510,7 @@ void App::drawColorWidget(float width) {
     ImGui::EndGroup();
     ui::HelpText("Colour", "C", "The vertex paint colour (C over the model picks one).", "Left shelf");
 
-    // Two swatches, like ZBrush's main and secondary colour: clicking either swaps them ("Alternate"). Equal halves of
+    // Two swatches main and secondary colour: clicking either swaps them ("Alternate"). Equal halves of
     // the column, main on the left, the same gap as between the square and the strip.
     const float swH = kSwatchH * s;
     const float mainW = std::floor((width - gap) * 0.5f), secondW = width - gap - mainW;

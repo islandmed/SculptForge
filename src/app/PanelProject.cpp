@@ -9,13 +9,14 @@
 #include "app/Support.h"
 #include "app/LookSchemes.h"
 #include "app/CrashLog.h"
+#include "core/LegacyNames.h"
 #include "core/SplatCapture.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
 
 #include "ai/Http.h"
 
-#include "core/Matcap.h"
+#include "core/LitSphere.h"
 #include "core/Project.h"
 
 #include <imgui.h>
@@ -64,11 +65,11 @@ void readBool(const Json& j, const char* key, bool& v) { v = j[key].asBool(v); }
 
 // Save As dialog: a cancelled dialog is reported as an empty path so a pending
 // "save, then quit/open/new" is dropped instead of firing on a later save.
-// "matcaps/<name>.png" with the characters project attachment names allow.
-std::string matcapAttachmentName(const std::string& name) {
+// "lit spheres/<name>.png" with the characters project attachment names allow.
+std::string litsphereAttachmentName(const std::string& name) {
     std::string safe;
     for (unsigned char c : name) safe += std::isalnum(c) || c == ' ' || c == '_' || c == '-' || c >= 0x80 ? char(c) : '_';
-    return "matcaps/" + (safe.empty() ? std::string("LitSphere") : safe) + ".png";
+    return "litspheres/" + (safe.empty() ? std::string("LitSphere") : safe) + ".png";
 }
 
 void SDLCALL onProjectChosen(void* userdata, const char* const* files, int) {
@@ -94,13 +95,13 @@ void App::initProject() {
     const bool hadPrefs = f && Json::parse(std::string(std::istreambuf_iterator<char>(f), {}), prefs, err);
     if (hadPrefs) {
         // An install from before SculptForge-style keys were the default, that never stored its key style: it had
-        // the ZBrush-style keys, and keeps them (initActions applies the style).
+        // the Classic sculpting keys, and keeps them (initActions applies the style).
         if (prefs["input_style"].isNumber()) startInputStyle_ = std::clamp(int(prefs["input_style"].asNumber(1)), 0, 3);
         if (!uiPrefs_.inputStyleSaved && !uiConfigDeterministic_) uiPrefs_.inputStyle = startInputStyle_ >= 0 ? startInputStyle_ : 0;
         for (const auto& p : prefs["recent_files"].items())
             if (p.isString()) recentFiles_.push_back(p.asString());
         autosaveMinutes_ = std::clamp(int(prefs["autosave_minutes"].asNumber(autosaveMinutes_)), 0, 120);
-        // Updated since the last start (a new install has no prefs yet and gets the LightBox instead).
+        // Updated since the last start (a new install has no prefs yet and gets the Library instead).
         const std::string lastSeen = prefs["last_seen_version"].isString() ? prefs["last_seen_version"].asString() : "";
         showWhatsNew_ = lastSeen != SCULPTFORGE_VERSION;
         checkUpdates_ = prefs["check_updates"].asBool(checkUpdates_);
@@ -116,7 +117,7 @@ void App::initProject() {
         supportCardPrefs_.laterAt = int64_t(prefs["support_card_later_at"].asNumber(0));
         if (prefs["support_card_version"].isString()) supportCardPrefs_.shownVersion = prefs["support_card_version"].asString();
         // The look (0.10.7): what the last session used, unless ui.json names one. An install from before 0.10.7
-        // remembers neither and keeps the Classic look with the ZBrush-style layout; the new-look card offers the
+        // remembers neither and keeps the Classic look with the Classic layout; the new-look card offers the
         // new default once (PanelSupport.cpp).
         newLookCardDone_ = prefs["new_look_card_done"].asBool(false);
         quickTourDone_ = prefs["quick_tour_done"].asBool(false);
@@ -289,10 +290,10 @@ void App::storeProjectSettings() {
     Json render = Json::object();
     render.set("wireframe", renderSettings_.wireframe);
     render.set("base_color", vec3Json(renderSettings_.baseColor));
-    render.set("show_polypaint", renderSettings_.showPolypaint);
+    render.set("show_vertexpaint", renderSettings_.showVertexPaint);
     render.set("color_tints_material", renderSettings_.colorTintsMaterial);
     render.set("show_mask", renderSettings_.showMask);
-    render.set("show_polygroups", renderSettings_.showPolygroups);
+    render.set("show_facegroups", renderSettings_.showFaceGroups);
     render.set("show_mesh", renderSettings_.showMesh);
     render.set("show_splats", renderSettings_.showSplats);
     render.set("splat_opacity", double(renderSettings_.splatOpacity));
@@ -308,7 +309,7 @@ void App::storeProjectSettings() {
         light.set("ambient", double(renderSettings_.lightAmbient));
         render.set("light", light);
     }
-    render.set("matcap", renderSettings_.matcap < 0 ? std::string() : std::string(matcapName(renderSettings_.matcap)));
+    render.set("litsphere", renderSettings_.litsphere < 0 ? std::string() : std::string(litsphereName(renderSettings_.litsphere)));
     // Viewport shading (Material > Viewport Shading): Lit Sphere or PBR with its environment.
     {
         const RenderSettings& v = renderSettings_;
@@ -325,13 +326,13 @@ void App::storeProjectSettings() {
         pbr.set("cavity", double(v.pbrCavity));
         render.set("viewport", std::move(pbr));
     }
-    // A custom MatCap travels inside the project (a PNG attachment), so the project opens with it on any machine.
+    // A custom Lit Sphere travels inside the project (a PNG attachment), so the project opens with it on any machine.
     for (auto it = doc_.projectFiles.begin(); it != doc_.projectFiles.end();)
-        it = it->first.rfind("matcaps/", 0) == 0 ? doc_.projectFiles.erase(it) : std::next(it);
-    if (std::vector<uint8_t> png; isCustomMatcap(renderSettings_.matcap) && encodeMatcapPng(renderSettings_.matcap, png)) {
-        const std::string file = matcapAttachmentName(matcapName(renderSettings_.matcap));
+        it = it->first.rfind("litspheres/", 0) == 0 ? doc_.projectFiles.erase(it) : std::next(it);
+    if (std::vector<uint8_t> png; isCustomLitSphere(renderSettings_.litsphere) && encodeLitSpherePng(renderSettings_.litsphere, png)) {
+        const std::string file = litsphereAttachmentName(litsphereName(renderSettings_.litsphere));
         doc_.projectFiles[file] = std::move(png);
-        render.set("matcap_file", file);
+        render.set("litsphere_file", file);
     }
     s.set("render", std::move(render));
 
@@ -367,14 +368,14 @@ void App::storeProjectSettings() {
     sym.set("local", symmetry_.local); // around the active Part's centre
     s.set("symmetry", std::move(sym));
 
-    Json gizmo = Json::object(); // Gizmo 3D (Gizmo.cpp): where the pivot is and the options
+    Json gizmo = Json::object(); // Transform gizmo (Gizmo.cpp): where the pivot is and the options
     gizmo.set("pivot", vec3Json(gizmo_.pivot));
     gizmo.set("pivot_placed", gizmo_.pivotPlaced);
     gizmo.set("orient_surface", gizmo_.orientSurface);
     gizmo.set("axis_x", vec3Json(gizmo_.frame[0]));
     gizmo.set("axis_y", vec3Json(gizmo_.frame[1]));
     gizmo.set("use_mask", gizmo_.useMask);
-    gizmo.set("all_subtools", gizmo_.all);
+    gizmo.set("all_parts", gizmo_.all);
     gizmo.set("falloff", double(gizmo_.falloff));
     s.set("gizmo", std::move(gizmo));
 }
@@ -396,10 +397,10 @@ void App::applyProjectSettings() {
     if (const Json& r = s["render"]; r.isObject()) {
         readBool(r, "wireframe", renderSettings_.wireframe);
         readVec3(r["base_color"], renderSettings_.baseColor);
-        readBool(r, "show_polypaint", renderSettings_.showPolypaint);
+        readBool(r, "show_vertexpaint", renderSettings_.showVertexPaint);
         readBool(r, "color_tints_material", renderSettings_.colorTintsMaterial);
         readBool(r, "show_mask", renderSettings_.showMask);
-        readBool(r, "show_polygroups", renderSettings_.showPolygroups);
+        readBool(r, "show_facegroups", renderSettings_.showFaceGroups);
         readBool(r, "show_mesh", renderSettings_.showMesh);
         readBool(r, "show_splats", renderSettings_.showSplats);
         readFloat(r, "splat_opacity", renderSettings_.splatOpacity);
@@ -448,25 +449,25 @@ void App::applyProjectSettings() {
         renderSettings_.backgroundColor = uiPrefs_.backgroundColor;
         readVec3(r["background_color"], renderSettings_.backgroundColor);
         renderSettings_.backgroundColor = glm::clamp(renderSettings_.backgroundColor, 0.0f, 1.0f);
-        // Unknown, empty or missing (projects from before MatCaps): studio lighting, as they were saved.
-        renderSettings_.matcap = -1;
-        const std::string name = r["matcap"].isString() ? r["matcap"].asString() : std::string();
-        for (int i = 0; i < matcapCount(); ++i)
-            if (!name.empty() && name == matcapName(i)) renderSettings_.matcap = i;
-        // A custom MatCap the project carries: the one with the same pixels if this machine has it, else added for
-        // the session (renamed when a different MatCap here already has its name).
-        const auto file = r["matcap_file"].isString() ? doc_.projectFiles.find(r["matcap_file"].asString())
+        // Unknown, empty or missing (projects from before Lit Spheres): studio lighting, as they were saved.
+        renderSettings_.litsphere = -1;
+        const std::string name = r["litsphere"].isString() ? r["litsphere"].asString() : std::string();
+        for (int i = 0; i < litsphereCount(); ++i)
+            if (!name.empty() && name == litsphereName(i)) renderSettings_.litsphere = i;
+        // A custom Lit Sphere the project carries: the one with the same pixels if this machine has it, else added for
+        // the session (renamed when a different Lit Sphere here already has its name).
+        const auto file = r["litsphere_file"].isString() ? doc_.projectFiles.find(legacy::modernize(r["litsphere_file"].asString()))
                                                       : doc_.projectFiles.end();
-        CustomMatcap m;
+        CustomLitSphere m;
         std::string err;
-        if (file != doc_.projectFiles.end() && decodeMatcapImage(file->second.data(), file->second.size(), m, err)) {
-            int index = findMatcapByHash(m.hash);
+        if (file != doc_.projectFiles.end() && decodeLitSphereImage(file->second.data(), file->second.size(), m, err)) {
+            int index = findLitSphereByHash(m.hash);
             if (index < 0) {
                 m.name = name.empty() ? std::string("Lit Sphere") : name;
-                for (int n = 2; findMatcap(m.name) >= 0; ++n) m.name = name + " " + std::to_string(n);
-                index = addCustomMatcap(std::move(m));
+                for (int n = 2; findLitSphere(m.name) >= 0; ++n) m.name = name + " " + std::to_string(n);
+                index = addCustomLitSphere(std::move(m));
             }
-            renderSettings_.matcap = index;
+            renderSettings_.litsphere = index;
         }
     }
     if (const Json& b = s["brush"]; b.isObject()) {
@@ -530,7 +531,7 @@ void App::applyProjectSettings() {
             gizmo_.frame = glm::mat3(x, glm::cross(z, x), z);
         }
         readBool(g, "use_mask", gizmo_.useMask);
-        readBool(g, "all_subtools", gizmo_.all);
+        readBool(g, "all_parts", gizmo_.all);
         readFloat(g, "falloff", gizmo_.falloff);
         gizmo_.falloff = std::clamp(gizmo_.falloff, 0.0f, 1.0f);
         if (!gizmo_.pivotPlaced) updateGizmoPivot();

@@ -6,7 +6,7 @@
 #include "app/BrushPreview.h"
 #include "core/Commands.h"
 #include "core/Document.h"
-#include "core/Matcap.h"
+#include "core/LitSphere.h"
 #include "core/PathStroke.h"
 #include "core/Primitives.h"
 #include "core/Project.h"
@@ -139,7 +139,7 @@ ImTextureID ThumbnailCache::brush(int brushType) {
             r.yaw = 0.0f;
             r.pitch = kBallPitch;
             r.distance = ballDistance();
-            r.polypaint = brushType == kPaintBrush;
+            r.vertexpaint = brushType == kPaintBrush;
             return r;
         },
         true);
@@ -228,16 +228,16 @@ ImTextureID ThumbnailCache::alpha(const BrushAlpha& alpha) {
         false);
 }
 
-ImTextureID ThumbnailCache::material(int matcap) {
+ImTextureID ThumbnailCache::material(int litsphere) {
     // By name: the built-in list can grow or change order between versions.
     const std::string key =
-        "material|" + (matcap < 0 ? std::string("Studio") : matcapKey(matcap)) + "|" + std::to_string(kThumbnailVersion);
+        "material|" + (litsphere < 0 ? std::string("Studio") : litsphereKey(litsphere)) + "|" + std::to_string(kThumbnailVersion);
     return request(
         hex64(fnv1a64(key)),
-        [matcap] {
+        [litsphere] {
             Result r;
             r.mesh = std::make_unique<Mesh>(makeIcosphere(5, kBallRadius));
-            r.matcap = matcap;
+            r.litsphere = litsphere;
             r.yaw = 0.0f;
             r.pitch = 0.0f;
             r.distance = ballDistance(); // the same ball, framed as the brush previews are
@@ -297,7 +297,7 @@ ImTextureID ThumbnailCache::file(const std::string& path) {
             // Meshes (and projects saved without a thumbnail): load on this worker, render on the main thread.
             Document scratch;
             if (CommandRegistry().execute(scratch, "open", {{"path", path}}).ok) r.mesh = sceneMesh(scratch);
-            r.polypaint = true;
+            r.vertexpaint = true;
             return r;
         },
         true);
@@ -408,9 +408,9 @@ void ThumbnailCache::pump(Renderer& renderer) {
             cam.distance = r.distance;
         }
         RenderSettings settings;
-        settings.matcap = r.matcap;
-        settings.showPolypaint = r.polypaint;
-        settings.showMask = settings.showPolygroups = false;
+        settings.litsphere = r.litsphere;
+        settings.showVertexPaint = r.vertexpaint;
+        settings.showMask = settings.showFaceGroups = false;
         settings.dimInactive = false;
         Image img;
         img.width = img.height = kPixels;

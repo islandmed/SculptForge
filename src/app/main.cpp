@@ -39,7 +39,7 @@ void usage() {
         "  --view YAW,PITCH         Camera angles in degrees (default -30,-15)\n"
         "  --zoom F                 Move the camera F times closer than the framed view (default 1)\n"
         "  --wireframe              Render with wireframe overlay\n"
-        "  --polygroups             Render with face group colours\n" // marks-pending
+        "  --facegroups             Render with face group colours\n"
         "  --hide-mesh              Render only the Gaussian splats\n"
         "  --demo NAME              Play a scripted demo (sculpt, image-to-3d, brush-lab, game-ready, splats)\n"
         "  --record out.mp4         Record the demo offscreen to a video (needs ffmpeg) and exit\n"
@@ -178,7 +178,7 @@ int main(int argc, char** argv) {
         else if (a == "--view") std::sscanf(next().c_str(), "%f,%f", &options.yawDegrees, &options.pitchDegrees);
         else if (a == "--zoom") options.zoom = std::max(0.05f, float(std::atof(next().c_str())));
         else if (a == "--wireframe") options.wireframe = true;
-        else if (a == "--polygroups") options.polygroups = true;
+        else if (a == "--facegroups") options.facegroups = true;
         else if (a == "--hide-mesh") options.hideMesh = true;
         else if (a == "--demo") options.demo = next();
         else if (a == "--record") options.recordPath = next();
@@ -271,6 +271,18 @@ int main(int argc, char** argv) {
     if (!crashTest.empty()) crashOnPurpose(crashTest);
     sf::App app;
     if (!app.init(options)) {
+        // A double-clicked app that can't start says why (#109: on a laptop it just vanished, not even in the
+        // Task Manager). Tests, renders and benchmarks keep failing quietly with their log.
+        const bool interactive = options.renderPath.empty() && options.recordPath.empty() && options.uiTest.empty() &&
+                                 options.timelapsePath.empty() && !options.benchmark && options.demo.empty() &&
+                                 !automatedRun();
+        if (interactive) {
+            std::string text = "SculptForge could not start.\n\n" +
+                               (app.startError().empty() ? std::string("See the log for details.") : app.startError()) +
+                               "\n\nUpdating the graphics driver (from the PC or GPU maker) usually fixes this.";
+            if (!sf::crashlog::path().empty()) text += "\n\nLog: " + sf::crashlog::path();
+            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "SculptForge", text.c_str(), nullptr);
+        }
         app.shutdown();
         sf::crashlog::stop();
         return 1;

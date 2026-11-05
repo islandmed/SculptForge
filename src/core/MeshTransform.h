@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Moving, rotating and scaling a SubTool, or only its unmasked part (ZBrush Gizmo 3D / Transpose): the core
+// Moving, rotating and scaling a Part, or only its unmasked part (Transform gizmo): the core
 // of the app's Gizmo mode (W Move, E Scale, R Rotate) and of the `transform` command.
 //
 // A transform is a translation, a rotation and a per-axis scale about a pivot, with the rotation and scale
@@ -13,7 +13,7 @@
 //
 // Sculpt layers move with the surface: the base takes the whole transform and every layer's offsets the
 // linear part, so positions == base + sum(weight * offset) still holds and the layers keep working.
-// Topology, UVs, quads, polygroups, polypaint and textures are left as they are.
+// Topology, UVs, quads, face groups, vertex paint and textures are left as they are.
 #pragma once
 
 #include "core/BVH.h"
@@ -106,9 +106,9 @@ public:
     static constexpr int kLevels = 4096;
 };
 
-// Transforms SubTool `index` of `doc` (active or not) as one undoable step on that SubTool. Returns the number
+// Transforms Part `index` of `doc` (active or not) as one undoable step on that Part. Returns the number
 // of vertices that moved.
-size_t transformSubtool(Document& doc, int index, const MeshTransform& t, bool useMask, float falloff, Symmetry mirror,
+size_t transformPart(Document& doc, int index, const MeshTransform& t, bool useMask, float falloff, Symmetry mirror,
                         const std::string& label);
 
 // transform (translate, rotate, scale, pivot, orient, masked, falloff, symmetry, all).

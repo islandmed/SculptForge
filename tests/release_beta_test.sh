@@ -4,8 +4,8 @@
 #
 # scripts/release.sh's beta path, run for real in a sandbox (ctest release_script_beta): a shared clone of this
 # checkout (with its uncommitted changes), a bare repository as origin, and stand-ins for gh, curl, cmake and ctest,
-# so nothing reaches GitHub, the website or the build. It releases 0.11.0-beta.1 (steps bump check preview status),
-# then promotes it to 0.11.0 (bump check site) with the beta tag present, and checks what each one may and may not
+# so nothing reaches GitHub, the website or the build. It releases 9.0.0-beta.1 (steps bump check preview status),
+# then promotes it to 9.0.0 (bump check site) with the beta tag present, and checks what each one may and may not
 # touch (docs/releasing.md, "Betas").
 set -euo pipefail
 
@@ -42,7 +42,7 @@ testers:
   - Windows, 150% scaling: open the beta test feature and try it.
 ---
 EOF
-echo '# expect_text "Version 0.11.0"' >> tests/ui/whats_new.sfui # words_ok wants the UI test to check the version
+echo '# expect_text "Version 9.0.0"' >> tests/ui/whats_new.sfui # words_ok wants the UI test to check the version
 git add -A . && git commit -q -m "sandbox"
 git init -q --bare "$S/origin.git"
 git remote set-url origin "$S/origin.git"
@@ -85,72 +85,72 @@ before() { git show "$1:$2"; }
 stable_files="CITATION.cff packaging/rez/package.py packaging/linux/org.sculptforge.SculptForge.metainfo.xml website/index.html packaging/arch/PKGBUILD"
 
 # --- usage ---------------------------------------------------------------------------------------------------------
-for bad in 0.11.0-beta 0.11.0-beta.x 0.11.0-alpha.1 v0.11.0-beta.1 0.11; do
+for bad in 9.0.0-beta 9.0.0-beta.x 9.0.0-alpha.1 v9.0.0-beta.1 9.0; do
     if scripts/release.sh "$bad" --only status >/dev/null 2>&1; then fail "release.sh accepted '$bad'"; fi
 done
 
 # --- the beta ------------------------------------------------------------------------------------------------------
 start=$(git rev-parse HEAD)
-quiet scripts/release.sh 0.11.0-beta.1 --only bump
-grep -q '^project(SculptForge VERSION 0.11.0 ' CMakeLists.txt || fail "beta bump: CMakeLists.txt is not at 0.11.0"
+quiet scripts/release.sh 9.0.0-beta.1 --only bump
+grep -q '^project(SculptForge VERSION 9.0.0 ' CMakeLists.txt || fail "beta bump: CMakeLists.txt is not at 9.0.0"
 grep -qx 'set(SCULPTFORGE_PRERELEASE "beta.1")' CMakeLists.txt || fail "beta bump: no prerelease beta.1"
 for f in $stable_files; do
     [ "$(before "$start" "$f")" = "$(cat "$f")" ] || fail "beta bump changed $f (a beta leaves it to the stable release)"
 done
-grep -q '^## \[0.11.0\]' CHANGELOG.md && fail "beta bump made a CHANGELOG [0.11.0] section"
+grep -q '^## \[9.0.0\]' CHANGELOG.md && fail "beta bump made a CHANGELOG [9.0.0] section"
 grep -q 'Beta test feature' CHANGELOG.md || fail "beta bump: the fragment's entry is not in CHANGELOG [Unreleased]"
-grep -q '^## Version 0.11.0$' docs/guide/whats-new.md || fail "beta bump: no What's New 0.11.0"
+grep -q '^## Version 9.0.0$' docs/guide/whats-new.md || fail "beta bump: no What's New 9.0.0"
 [ ! -e changes/beta-test.md ] || fail "beta bump: the fragment is still there"
-grep -q 'open the beta test feature' release-testers-0.11.0-beta.1.md || fail "beta bump: no testers checklist"
+grep -q 'open the beta test feature' release-testers-9.0.0-beta.1.md || fail "beta bump: no testers checklist"
 [ "$(git rev-parse HEAD)" = "$(git -C "$S/origin.git" rev-parse main)" ] || fail "beta bump: main not pushed"
 
-quiet scripts/release.sh 0.11.0-beta.1 --only check
-grep -q 'CMakeLists.txt says 0.11.0 beta.1' "$S/out.log" || fail "beta check: $(cat "$S/out.log")"
-quiet scripts/release.sh 0.11.0-beta.1 --only bump # again: nothing left to do
+quiet scripts/release.sh 9.0.0-beta.1 --only check
+grep -q 'CMakeLists.txt says 9.0.0 beta.1' "$S/out.log" || fail "beta check: $(cat "$S/out.log")"
+quiet scripts/release.sh 9.0.0-beta.1 --only bump # again: nothing left to do
 grep -q 'already says' "$S/out.log" || fail "beta bump is not idempotent: $(cat "$S/out.log")"
 
 # A beta needs highlights for its feed entry: in What's New's block now (the fragment's went there).
-quiet scripts/release.sh 0.11.0-beta.1 --only preview
+quiet scripts/release.sh 9.0.0-beta.1 --only preview
 python3 - <<'EOF' || fail "beta preview: wrong feed"
 import json, subprocess
 feed = json.loads(subprocess.run(["git", "show", "HEAD:website/latest.json"], capture_output=True, text=True).stdout)
 old = json.loads(subprocess.run(["git", "show", "HEAD~1:website/latest.json"], capture_output=True, text=True).stdout)
 p = feed["channels"]["preview"]
-assert p["version"] == "0.11.0-beta.1", p
-assert p["download"].endswith("/releases/tag/v0.11.0-beta.1"), p
+assert p["version"] == "9.0.0-beta.1", p
+assert p["download"].endswith("/releases/tag/v9.0.0-beta.1"), p
 assert p["highlights"][0] == "First highlight of the beta", p
 assert feed["version"] == old["version"] and feed["highlights"] == old["highlights"], "the stable top level changed"
 EOF
 git diff --quiet HEAD~1 HEAD -- website/index.html || fail "beta preview touched the home page"
-quiet scripts/release.sh 0.11.0-beta.1 --only status
-grep -q 'release-testers-0.11.0-beta.1.md' "$S/out.log" || fail "beta status names no testers checklist"
-grep -q 'scripts/release.sh 0.11.0 --yes' "$S/out.log" || fail "beta status doesn't say how to promote"
-git tag v0.11.0-beta.1 "$(git rev-parse HEAD~1)" # what step tag would have pushed
+quiet scripts/release.sh 9.0.0-beta.1 --only status
+grep -q 'release-testers-9.0.0-beta.1.md' "$S/out.log" || fail "beta status names no testers checklist"
+grep -q 'scripts/release.sh 9.0.0 --yes' "$S/out.log" || fail "beta status doesn't say how to promote"
+git tag v9.0.0-beta.1 "$(git rev-parse HEAD~1)" # what step tag would have pushed
 
-# --- promoting it: the stable 0.11.0 with the beta tag present ------------------------------------------------------
+# --- promoting it: the stable 9.0.0 with the beta tag present ------------------------------------------------------
 # People give the version its tagline before the stable release (the home page card needs it).
 python3 - <<'EOF'
 p = "docs/guide/whats-new.md"
 t = open(p, encoding="utf-8").read()
-head = "## Version 0.11.0\n\n```features\ndate: unreleased\n"
-assert head in t, "no 0.11.0 features block"
+head = "## Version 9.0.0\n\n```features\ndate: unreleased\n"
+assert head in t, "no 9.0.0 features block"
 open(p, "w", encoding="utf-8").write(t.replace(head, head + "tagline: The beta, finished.\n", 1))
 EOF
 grep -q '^tagline: The beta, finished.$' docs/guide/whats-new.md || fail "test setup: couldn't add the tagline"
-git commit -q -am "What's New 0.11.0 tagline" && git push -q origin main
-quiet scripts/release.sh 0.11.0 --only bump
+git commit -q -am "What's New 9.0.0 tagline" && git push -q origin main
+quiet scripts/release.sh 9.0.0 --only bump
 grep -qx 'set(SCULPTFORGE_PRERELEASE "")' CMakeLists.txt || fail "stable bump didn't clear the prerelease"
-grep -q '^## \[0.11.0\] - ' CHANGELOG.md || fail "stable bump: no CHANGELOG [0.11.0]"
-grep -qx 'version: 0.11.0' CITATION.cff || fail "stable bump: CITATION.cff not at 0.11.0"
-grep -qF '<small>new in 0.11.0</small>' website/index.html || fail "stable bump: no home page card"
-quiet scripts/release.sh 0.11.0 --only check
-grep -q 'say 0.11.0 at' "$S/out.log" || fail "stable check after a beta: $(cat "$S/out.log")"
+grep -q '^## \[9.0.0\] - ' CHANGELOG.md || fail "stable bump: no CHANGELOG [9.0.0]"
+grep -qx 'version: 9.0.0' CITATION.cff || fail "stable bump: CITATION.cff not at 9.0.0"
+grep -qF '<small>new in 9.0.0</small>' website/index.html || fail "stable bump: no home page card"
+quiet scripts/release.sh 9.0.0 --only check
+grep -q 'say 9.0.0 at' "$S/out.log" || fail "stable check after a beta: $(cat "$S/out.log")"
 printf 'One\nTwo\nThree\n' >"$S/highlights.txt"
-HIGHLIGHTS=$S/highlights.txt quiet scripts/release.sh 0.11.0 --only site
+HIGHLIGHTS=$S/highlights.txt quiet scripts/release.sh 9.0.0 --only site
 python3 - <<'EOF' || fail "stable site: wrong feed"
 import json
 feed = json.load(open("website/latest.json"))
-assert feed["version"] == "0.11.0" and feed["highlights"] == ["One", "Two", "Three"], feed
+assert feed["version"] == "9.0.0" and feed["highlights"] == ["One", "Two", "Three"], feed
 assert "preview" not in feed.get("channels", {}), "the passed beta is still on the Preview channel"
 EOF
 echo "release.sh beta and promotion: ok"

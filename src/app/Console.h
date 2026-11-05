@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The script console (the ZBrush "script window", backtick key): every command
+// The script console (the classic "script window", backtick key): every command
 // the app runs is echoed as a script line with its result, and the input line
 // runs script statements (see core/Script.h) with Tab completion and history.
 #pragma once

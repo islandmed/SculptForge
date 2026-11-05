@@ -3,7 +3,7 @@
 //
 // Micro-displacement levels: hundreds of millions of sculptable triangles without a mesh that size.
 //
-// Above the top subdivision level a SubTool can carry a micro level (Mesh::micro). The surface is then
+// Above the top subdivision level a Part can carry a micro level (Mesh::micro). The surface is then
 //
 //     micro point = S(t, i, j) + d(t, i, j) * N(t, i, j)
 //
@@ -114,7 +114,7 @@ struct MicroMesh {
 };
 
 // --- The two-tier engine's vocabulary ---
-// BaseCage: the coarse surface the brushes for big forms (Move, transforms) deform: the SubTool's mesh, its highest
+// BaseCage: the coarse surface the brushes for big forms (Move, transforms) deform: the Part's mesh, its highest
 // subdivision level. Its polygons are triangles (a quad of the cage is a triangle pair, one patch each).
 using BaseCage = Mesh;
 // MicroPatch: one base triangle's regular grid of scalar heights (n + 1)(n + 2) / 2, implicit topology (no index
@@ -193,7 +193,7 @@ void microDelete(Mesh& m);
 // (`mask` that many or none). Works out the derived data (ranges, bulge, edge neighbours).
 bool microAttach(Mesh& m, int level, float step, MicroStore disp, std::vector<uint8_t> mask, std::string& error);
 // A regular mesh of the micro surface at micro level `level` (<= the micro level): shared points welded, the base
-// triangles' UVs, polygroups and hidden flags carried to their micro triangles, mask from the micro mask. Fails
+// triangles' UVs, face groups and hidden flags carried to their micro triangles, mask from the micro mask. Fails
 // when it would exceed `maxTriangles` (0 = what subdivision Divide allows on this computer).
 bool microBakeMesh(const Mesh& m, int level, Mesh& out, std::string& error, size_t maxTriangles = 0);
 // Displacement maps over the base UVs (needs UVs): `vector` = object-space offset of the micro surface from the
@@ -238,7 +238,7 @@ private:
 
 // --- Brushes (driven by Sculptor, which calls these when the mesh has a micro level) ---
 
-// Whether a brush works on micro levels: 2 = as on a mesh, 1 = approximated (Pinch, Crease and Dam Standard
+// Whether a brush works on micro levels: 2 = as on a mesh, 1 = approximated (Pinch, Crease and Sharp Crease
 // sharpen instead of pulling sideways; Move moves along the normal), 0 = not at all.
 int microBrushSupport(BrushType type);
 
@@ -252,7 +252,8 @@ public:
     // toward `alphaUp` (#92).
     void dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& center, const glm::vec3& viewDir, float radius,
              float strength, bool invert, float focal, const glm::vec3& alphaUp, bool maskBrush, float maskStrength,
-             const BrushAlpha* alpha = nullptr);
+             const BrushAlpha* alpha = nullptr, const std::function<float(const glm::vec3&)>& texture = {});
+    // (texture: a brush recipe's surface pattern, 0..1 at a surface point, times the tip; #120)
     // Move: captures the points within the dab (with each mirror's signs), then moves them along their normals.
     void beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, float radius, float focal, const glm::mat3& mirror);
     void grab(Mesh& m, const glm::vec3& delta);

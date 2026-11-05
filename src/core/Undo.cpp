@@ -10,7 +10,7 @@ namespace sf {
 
 size_t UndoRecord::approxBytes() const {
     size_t bytes = positions.bytes() + mask.bytes() + colors.bytes() + paintAlpha.bytes() + hidden.bytes() +
-                   polygroups.bytes() + (paint ? paint->bytes() : 0) +
+                   facegroups.bytes() + (paint ? paint->bytes() : 0) +
                    (textureTiles ? textureTiles->bytes() : 0) + (texture ? texture->bytes() : 0) +
                    (subdiv ? subdiv->bytes() : 0) + (topology ? topology->bytes() : 0) +
                    (micro ? micro->bytes() : 0) + uvs.bytes() + (sets ? sets->bytes() : 0) + (uv ? uv->bytes() : 0);
@@ -20,7 +20,7 @@ size_t UndoRecord::approxBytes() const {
                                         8 * sizeof(uint32_t)) +
                  mesh->triangleCount() * (sizeof(glm::uvec3) + sizeof(glm::vec3) + 4 * sizeof(uint32_t)) +
                  mesh->mask.size() * sizeof(float) + mesh->colors.size() * sizeof(glm::vec3) +
-                 mesh->polygroups.size() * sizeof(uint32_t) + mesh->hidden.size() + mesh->uvs.size() * sizeof(glm::vec2) +
+                 mesh->facegroups.size() * sizeof(uint32_t) + mesh->hidden.size() + mesh->uvs.size() * sizeof(glm::vec2) +
                  mesh->quadPartners.size() * sizeof(uint32_t);
     if (mesh) {
         bytes += mesh->paintBase.size() * sizeof(glm::vec3);
@@ -134,10 +134,10 @@ UndoRecord UndoRecord::captureHidden(const Mesh& mesh, std::string label, std::s
     return r;
 }
 
-UndoRecord UndoRecord::capturePolygroups(const Mesh& mesh, std::string label, std::span<const uint32_t> tris) {
+UndoRecord UndoRecord::captureFaceGroups(const Mesh& mesh, std::string label, std::span<const uint32_t> tris) {
     UndoRecord r;
     r.label = std::move(label);
-    captureChannel(r.polygroups, mesh.triangleCount(), tris, [&](uint32_t t) { return mesh.polygroupAt(t); });
+    captureChannel(r.facegroups, mesh.triangleCount(), tris, [&](uint32_t t) { return mesh.facegroupAt(t); });
     return r;
 }
 
@@ -212,8 +212,8 @@ void UndoStack::apply(UndoRecord& r, Mesh& mesh, BVH& bvh) {
         r.hidden.swapWith(mesh.ensureHidden());
         mesh.facesDirty = true;
     }
-    if (!r.polygroups.empty()) {
-        r.polygroups.swapWith(mesh.ensurePolygroups());
+    if (!r.facegroups.empty()) {
+        r.facegroups.swapWith(mesh.ensureFaceGroups());
         mesh.facesDirty = true;
     }
     if (!r.uvs.empty()) {

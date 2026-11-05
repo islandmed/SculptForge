@@ -3,8 +3,8 @@
 #
 # Send the selected meshes to SculptForge, sculpt them there, send them back: the objects update in
 # place (transform, materials and modifiers kept), the way Bridge files work between sculpting apps. Ideas and the
-# .GoZ conventions come from GoB (github.com/JoseConseco/GoB, GPL) by Daniel Grauer, JoseConseco and
-# contributors. The exchange itself (folder, manifest, .GoZ reading and writing) is in exchange.py.
+# Bridge conventions come from GoB (github.com/JoseConseco/GoB, GPL) by Daniel Grauer, JoseConseco and
+# contributors. The exchange itself (folder, manifest, Bridge reading and writing) is in exchange.py.
 #
 # What travels: positions (object space, with each object's matrix_world in the manifest), triangles
 # and quads (n-gons as triangle fans), the active UV map, the active colour attribute (vertex paint),
@@ -83,7 +83,7 @@ def mesh_topology(me, mirrored=False):
 
 
 def mesh_arrays(me, mirrored):
-    """Everything write_goz takes, from a Blender mesh (object space)."""
+    """Everything write_bridge takes, from a Blender mesh (object space)."""
     nv = len(me.vertices)
     loops, face_poly, faces, loop_vert = mesh_topology(me, mirrored)
     out = {"positions": _get(me.vertices, "co", nv, np.float32, 3), "faces": faces}
@@ -319,8 +319,8 @@ def _write_objects(context, objects, folder, prefix, apply):
                 del obj[APPLIED_KEY]
         if len(arrays["faces"]) == 0:
             continue
-        file = "%s%03d.GoZ" % (prefix, k)
-        exchange.write_goz(os.path.join(folder, file), obj.name, **arrays)
+        file = "%s%03d%s" % (prefix, k, exchange.EXT)
+        exchange.write_bridge(os.path.join(folder, file), obj.name, **arrays)
         entries.append({"name": obj.name, "file": file, "matrix_world": [list(row) for row in obj.matrix_world]})
     return entries
 
@@ -381,7 +381,7 @@ def receive(context):
     meshes = []
     for entry in entries:
         try:
-            meshes.append((entry.get("name") or "Object", exchange.read_goz(os.path.join(folder, entry["file"])),
+            meshes.append((entry.get("name") or "Object", exchange.read_bridge(os.path.join(folder, entry["file"])),
                            os.path.join(folder, entry["shapes"]) if entry.get("shapes") else None))
         except (OSError, ValueError) as e:
             return "ERROR", "Cannot read %s from SculptForge: %s" % (entry.get("name", "?"), e)

@@ -679,7 +679,7 @@ Two toggles decide what pressure does. They are on the top shelf and in **Sculpt
 | Toggle | Default | Effect |
 |---|---|---|
 | **Pressure > Strength** | On | Pen pressure scales the brush strength. |
-| **Pressure > Size** | Off | Pen pressure scales the brush size (down to 5% at the lightest touch). |
+| **Pressure > Size** | Off | Pen pressure scales the brush size (down to 5% at the lightest touch). Move, KelvinGrab, KelvinTwist and KelvinScale always grab with the full size. |
 
 Pressure applies only to strokes made with the pen; mouse strokes always use full pressure. Custom brushes
 also have a **Pressure curve** setting that makes them respond to a light or a firm touch (see

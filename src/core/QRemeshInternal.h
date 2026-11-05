@@ -28,7 +28,7 @@ struct WorkMesh {
     std::vector<glm::vec3> P;
     std::vector<glm::uvec3> T;
     std::vector<uint32_t> group;  // per triangle
-    std::vector<glm::vec3> color; // per vertex (only with usePolypaint)
+    std::vector<glm::vec3> color; // per vertex (only with useVertex paint)
     std::vector<uint8_t> cutEdge; // filled later: per boundary segment, 1 = made by the symmetry cut
 };
 

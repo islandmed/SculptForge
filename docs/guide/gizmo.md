@@ -130,7 +130,7 @@ transform scale=2 all=true
 | `masked` | `true` (default) leaves masked parts; `false` moves everything |
 | `falloff` | Soft joint width as a share of the size, 0-1 (default 0) |
 | `symmetry` | Mirror a masked transform across these planes, e.g. `x` |
-| `all` | Every visible Part (Transpose All) |
+| `all` | Every visible Part, moved, rotated and scaled together |
 
 ## Speed
 

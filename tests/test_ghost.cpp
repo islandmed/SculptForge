@@ -84,7 +84,7 @@ TEST(ghost_follows_other_kernels_on_a_plane) {
     // Kernels that use only the area frame and the falloff match on a plane up to float noise; Clay and Flatten
     // pull towards a plane through the area centre, which the frame carries.
     Mesh plane = makePlane(120);
-    for (BrushType t : {BrushType::Inflate, BrushType::Crease, BrushType::Pinch, BrushType::DamStandard, BrushType::Clay,
+    for (BrushType t : {BrushType::Inflate, BrushType::Crease, BrushType::Pinch, BrushType::SharpCrease, BrushType::Clay,
                         BrushType::Flatten, BrushType::Trim}) {
         DabParams p;
         p.center = glm::vec3(0.05f, 0.0f, 0.0f);
@@ -114,7 +114,7 @@ TEST(ghost_estimates_a_curved_surface_closely) {
 TEST(ghost_kinds_cover_the_displacement_brushes) {
     CHECK(ghostKindForBrush(int(BrushType::Standard)) == GhostKind::Standard);
     CHECK(ghostKindForBrush(int(BrushType::Clay)) == GhostKind::Clay);
-    CHECK(ghostKindForBrush(int(BrushType::ClayBuildup)) == GhostKind::ClayBuildup);
+    CHECK(ghostKindForBrush(int(BrushType::ClayBlock)) == GhostKind::ClayBlock);
     CHECK(ghostKindForBrush(int(BrushType::Trim)) == GhostKind::Trim);
     CHECK(ghostKindForBrush(int(BrushType::Smooth)) == GhostKind::None);
     CHECK(ghostKindForBrush(int(BrushType::Layer)) == GhostKind::None);

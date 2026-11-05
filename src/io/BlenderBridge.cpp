@@ -4,7 +4,8 @@
 
 #include "core/BrushLibrary.h"
 #include "core/Json.h"
-#include "io/GozIO.h"
+#include "io/BridgeProtocol.h"
+#include "io/BridgeIO.h"
 
 #include <algorithm>
 #include <chrono>
@@ -341,7 +342,7 @@ bool blenderReceive(const std::string& root, std::vector<MeshObject>& out, Bridg
         MeshObject obj;
         obj.name = b.name.empty() ? "Object" : b.name;
         std::string err;
-        if (!loadGoz(pathUtf8(utf8Path(inbox) / utf8Path(b.file)), obj.mesh, err)) {
+        if (!loadBridge(pathUtf8(utf8Path(inbox) / utf8Path(b.file)), obj.mesh, err)) {
             message = "Cannot load \"" + obj.name + "\" from Blender: " + err;
             return false;
         }
@@ -399,25 +400,25 @@ bool blenderSend(const std::vector<MeshObjectRef>& objects, const std::string& r
         }
         names.push_back(name);
         char file[48];
-        std::snprintf(file, sizeof file, "%03zu.GoZ", k);
+        std::snprintf(file, sizeof file, "%03zu%s", k, bridgefile::kExt);
         BridgeObject b;
         b.name = name;
         b.file = prefix + file;
-        GozWriteOptions o;
+        BridgeWriteOptions o;
         o.quads = objects[k].mesh->hasQuads(); // only kept quads: triangles of n-gons must stay triangles
         std::string err;
         const Mesh& sent = *objects[k].mesh;
         bool ok;
         if (sent.layers.empty()) {
-            ok = saveGoz(pathUtf8(outbox / utf8Path(b.file)), sent, name, err, o);
+            ok = saveBridge(pathUtf8(outbox / utf8Path(b.file)), sent, name, err, o);
         } else {
-            // Sculpt layers go as shape keys: the .GoZ holds the base shape, the shapes file the offsets.
+            // Sculpt layers go as shape keys: the Bridge holds the base shape, the shapes file the offsets.
             Mesh neutral = sent;
             neutral.positions = sent.base;
             neutral.layers.clear();
             neutral.base.clear();
             b.shapes = prefix + std::string(file, std::strlen(file) - 4) + ".shapes";
-            ok = saveGoz(pathUtf8(outbox / utf8Path(b.file)), neutral, name, err, o) &&
+            ok = saveBridge(pathUtf8(outbox / utf8Path(b.file)), neutral, name, err, o) &&
                  writeBridgeShapes(pathUtf8(outbox / utf8Path(b.shapes)), sent, err);
         }
         if (!ok) {

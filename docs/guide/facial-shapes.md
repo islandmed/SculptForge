@@ -182,7 +182,7 @@ the jaw's). Apple's ARKit, Unreal's Live Link Face and most face-capture tools d
 
 | Command | What it does |
 |---|---|
-| `face_shapes_generate [landmarks=<json>] [symmetry=auto/on/off] [subtools=true] [level=N]` | Generate Facial Shapes on the active Part |
+| `face_shapes_generate [landmarks=<json>] [symmetry=auto/on/off] [parts=true] [level=N]` | Generate Facial Shapes on the active Part |
 | `face_landmarks_detect` | the automatic landmarks, as the JSON `landmarks=` takes |
 | `face_weights json=<json>` | set shape weights (live) |
 | `face_preset name=Smile [amount=1]` | show a preset |

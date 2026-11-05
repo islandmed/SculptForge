@@ -99,7 +99,7 @@ Ranked by what sculptors cite most on sculpting forums:
 - ✅ Normal / displacement / AO / cavity / colour map baking with MikkTSpace tangents and a viewport preview (v0.5)
 - ✅ Performance at 20-100M polygons, multithreaded brushes, fast undo (benchmark, partial GPU uploads, Fast
   Navigation; v0.5)
-- ✅ Gizmo for moving, scaling, rotating and posing parts (W / E / R, masked falloff, Transpose All) (v0.5)
+- ✅ Gizmo for moving, scaling, rotating and posing parts (W / E / R, masked falloff, all Parts together) (v0.5)
 
 ## Done in v0.6 — performance
 

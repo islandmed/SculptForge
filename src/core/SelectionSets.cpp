@@ -32,7 +32,7 @@ struct ChannelName {
     uint32_t bit;
     const char* name;
 };
-constexpr ChannelName kChannelNames[] = {{kSetMask, "mask"},       {kSetPolygroups, "polygroups"}, {kSetPaint, "paint"},
+constexpr ChannelName kChannelNames[] = {{kSetMask, "mask"},       {kSetFaceGroups, "facegroups"}, {kSetPaint, "paint"},
                                          {kSetVisibility, "visibility"}, {kSetUvs, "uvs"},        {kSetMorph, "morph"}};
 
 // --- Little-endian bytes ---
@@ -146,7 +146,7 @@ void encodeChannels(SelectionSet& s, const float* mask, const uint32_t* groups, 
         if (!ones)
             for (const SetRun& r : s.maskRuns) s.maskValues.insert(s.maskValues.end(), mask + r.start, mask + r.start + r.length);
     }
-    if (s.has(kSetPolygroups)) {
+    if (s.has(kSetFaceGroups)) {
         for (size_t t = 0; t < nt;) {
             const uint32_t id = groups ? groups[t] : 0u;
             size_t u = t + 1;
@@ -280,13 +280,13 @@ bool parseSetChannels(const std::string& text, uint32_t& out, std::string& error
         word.clear();
         if (w == "all") out |= kSetAllChannels;
         else if (w == "mask") out |= kSetMask;
-        else if (w == "polygroups" || w == "groups" || w == "polygroup" || w == "face_groups" || w == "facegroups") out |= kSetPolygroups;
-        else if (w == "paint" || w == "colors" || w == "colours" || w == "polypaint" || w == "vertex_paint") out |= kSetPaint;
+        else if (w == "facegroups" || w == "groups" || w == "facegroup" || w == "face_groups") out |= kSetFaceGroups;
+        else if (w == "paint" || w == "colors" || w == "colours" || w == "vertexpaint" || w == "vertex_paint") out |= kSetPaint;
         else if (w == "visibility" || w == "hidden" || w == "visible") out |= kSetVisibility;
         else if (w == "uvs" || w == "uv") out |= kSetUvs;
         else if (w == "morph" || w == "shape" || w == "positions") out |= kSetMorph;
         else {
-            error = "Unknown channel '" + w + "' (use mask, polygroups, paint, visibility, uvs, morph or all)"; // marks-pending
+            error = "Unknown channel '" + w + "' (use mask, facegroups, paint, visibility, uvs, morph or all)";
             return false;
         }
         return true;
@@ -385,7 +385,7 @@ SelectionSet captureSelectionSet(const Mesh& mesh, std::string name, uint32_t ch
     s.level = subdivCurrentLevel(mesh);
     s.vertexCount = uint32_t(mesh.vertexCount());
     s.triangleCount = uint32_t(mesh.triangleCount());
-    encodeChannels(s, mesh.hasMask() ? mesh.mask.data() : nullptr, mesh.hasPolygroups() ? mesh.polygroups.data() : nullptr,
+    encodeChannels(s, mesh.hasMask() ? mesh.mask.data() : nullptr, mesh.hasFaceGroups() ? mesh.facegroups.data() : nullptr,
                    mesh.hasColors() ? mesh.colors.data() : nullptr, mesh.hasHidden() ? mesh.hidden.data() : nullptr,
                    &mesh.uvs, &mesh.positions);
     return s;
@@ -400,7 +400,7 @@ bool makeSelectionSet(std::string name, const SelectionSetData& d, uint32_t vert
         return false;
     };
     if (!check(kSetMask, d.mask.size(), vertexCount, "mask") ||
-        !check(kSetPolygroups, d.polygroups.size(), triangleCount, "polygroups") ||
+        !check(kSetFaceGroups, d.facegroups.size(), triangleCount, "facegroups") ||
         !check(kSetPaint, d.colors.size(), vertexCount, "paint") ||
         !check(kSetVisibility, d.hidden.size(), triangleCount, "hidden") ||
         !check(kSetUvs, d.uvs.size(), size_t(triangleCount) * 3, "uvs") ||
@@ -412,7 +412,7 @@ bool makeSelectionSet(std::string name, const SelectionSetData& d, uint32_t vert
     out.level = level;
     out.vertexCount = vertexCount;
     out.triangleCount = triangleCount;
-    encodeChannels(out, d.mask.empty() ? nullptr : d.mask.data(), d.polygroups.empty() ? nullptr : d.polygroups.data(),
+    encodeChannels(out, d.mask.empty() ? nullptr : d.mask.data(), d.facegroups.empty() ? nullptr : d.facegroups.data(),
                    d.colors.empty() ? nullptr : d.colors.data(), d.hidden.empty() ? nullptr : d.hidden.data(), &d.uvs,
                    &d.positions);
     return true;
@@ -427,10 +427,10 @@ void decodeSelectionSet(const SelectionSet& s, uint32_t channels, SelectionSetDa
         for (const SetRun& r : s.maskRuns)
             for (uint32_t i = 0; i < r.length; ++i) out.mask[r.start + i] = s.maskValues.empty() ? 1.0f : s.maskValues[k++];
     }
-    if (out.channels & kSetPolygroups) {
-        out.polygroups.reserve(s.triangleCount);
-        for (const SetRun& r : s.groupRuns) out.polygroups.insert(out.polygroups.end(), r.length, r.start);
-        out.polygroups.resize(s.triangleCount, 0u);
+    if (out.channels & kSetFaceGroups) {
+        out.facegroups.reserve(s.triangleCount);
+        for (const SetRun& r : s.groupRuns) out.facegroups.insert(out.facegroups.end(), r.length, r.start);
+        out.facegroups.resize(s.triangleCount, 0u);
     }
     if (out.channels & kSetPaint) {
         out.colors.assign(s.vertexCount, kWhite);
@@ -462,7 +462,7 @@ bool selectionSetAt(const Mesh& mesh, const SelectionSet& s, uint32_t channels, 
     bool ok = true;
     if (!out.mask.empty()) ok &= subdivMapVertices(mesh, from, to, out.mask);
     if (!out.colors.empty()) ok &= subdivMapVertices(mesh, from, to, out.colors, kWhite, false);
-    if (!out.polygroups.empty()) ok &= subdivMapTriangles(mesh, from, to, out.polygroups);
+    if (!out.facegroups.empty()) ok &= subdivMapTriangles(mesh, from, to, out.facegroups);
     if (!out.hidden.empty()) ok &= subdivMapTriangles(mesh, from, to, out.hidden);
     if (!out.uvs.empty()) ok &= subdivMapCorners(mesh, from, to, out.uvs);
     if (!out.positions.empty()) {
@@ -506,10 +506,10 @@ std::vector<uint8_t> packSelectionSet(const SelectionSet& s) {
         p.words(s.maskValues.data(), s.maskValues.size());
         o.section(kSetMask, p);
     }
-    if (s.has(kSetPolygroups)) {
+    if (s.has(kSetFaceGroups)) {
         Out p;
         p.runs(s.groupRuns);
-        o.section(kSetPolygroups, p);
+        o.section(kSetFaceGroups, p);
     }
     if (s.has(kSetPaint)) {
         Out p;
@@ -580,11 +580,11 @@ bool unpackSelectionSet(const uint8_t* data, size_t size, SelectionSet& out, std
             if (!p.runs(s.maskRuns) || !runsValid(s.maskRuns, nv, covered) || !p.u32(ones) ||
                 (!ones && !p.words(covered, 1, s.maskValues)))
                 return bad("mask");
-        } else if (tag == kSetPolygroups) {
-            if (!p.runs(s.groupRuns)) return bad("polygroups");
+        } else if (tag == kSetFaceGroups) {
+            if (!p.runs(s.groupRuns)) return bad("facegroups");
             uint64_t total = 0;
             for (const SetRun& r : s.groupRuns) total += r.length;
-            if (total != nt) return bad("polygroups");
+            if (total != nt) return bad("facegroups");
         } else if (tag == kSetPaint) {
             if (!p.runs(s.paintRuns) || !runsValid(s.paintRuns, nv, covered) || !p.words(covered, 3, s.paintValues))
                 return bad("paint");
@@ -765,12 +765,12 @@ bool restoreSelectionSet(Document& doc, const std::string& name, uint32_t channe
             m.facesDirty = true;
         }
     }
-    if (use & kSetPolygroups) {
+    if (use & kSetFaceGroups) {
         for (uint32_t t = 0; t < m.triangleCount(); ++t)
-            if (m.polygroupAt(t) != d.polygroups[t]) r.polygroups.add(t, m.polygroupAt(t));
-        if (!r.polygroups.empty()) {
-            std::vector<uint32_t>& groups = m.ensurePolygroups();
-            for (uint32_t t : r.polygroups.indices) groups[t] = d.polygroups[t];
+            if (m.facegroupAt(t) != d.facegroups[t]) r.facegroups.add(t, m.facegroupAt(t));
+        if (!r.facegroups.empty()) {
+            std::vector<uint32_t>& groups = m.ensureFaceGroups();
+            for (uint32_t t : r.facegroups.indices) groups[t] = d.facegroups[t];
             m.facesDirty = true;
         }
     }
@@ -988,7 +988,7 @@ CommandResult result(bool ok, std::string message) { return {ok, std::move(messa
 } // namespace
 
 void registerSelectionSetCommands(CommandRegistry& reg) {
-    const std::string channelHelp = "Comma-separated channels: mask, polygroups, paint (vertex paint), visibility (hidden " // marks-pending
+    const std::string channelHelp = "Comma-separated channels: mask, facegroups, paint (vertex paint), visibility (hidden "
                                     "faces), uvs, morph (the shape), or all";
     reg.add({"selection_set_store",
              "Store a named selection set on the active Part: a snapshot of the channels you choose. Storing again with "

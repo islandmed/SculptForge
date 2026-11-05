@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The orbit camera: turntable and free (ZBrush) rotation, snapping to axis views.
+// The orbit camera: turntable and free rotation, snapping to axis views.
 #include "TestHarness.h"
 
 #include "render/Camera.h"

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Brush packs - SculptForge User Guide</title>
+  <meta name="description" content="SculptForge comes with sixty ready-tuned brushes in six packs, on top of the built-in brushes. Each one is a brush recipe (see Brush Lab) with its own alpha where it needs one, so you can use them as they are, or open one in Brush Lab and make your own version. Every brush, alpha and preview here is">
+  <meta name="theme-color" content="#111114">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" type="image/svg+xml" href="../img/favicon.svg?v=2">
+  <link rel="icon" type="image/png" href="../img/favicon-64.png?v=2">
+  <link rel="apple-touch-icon" href="../img/icon-256.png?v=2">
+  <link rel="canonical" href="https://sculptforge.app/guide/brush-packs.html">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Brush packs - SculptForge User Guide">
+  <meta property="og:description" content="SculptForge comes with sixty ready-tuned brushes in six packs, on top of the built-in brushes. Each one is a brush recipe (see Brush Lab) with its own alpha where it needs one, so you can use them as they are, or open one in Brush Lab and make your own version. Every brush, alpha and preview here is">
+  <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=4">
+  <meta property="og:url" content="https://sculptforge.app/guide/brush-packs.html">
+  <link rel="stylesheet" href="../style.css?v=19">
+  <script src="../motion.js?v=11" defer></script>
+  <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+  <script src="search-index.js?v=48" defer></script>
+</head>
+<body class="guide-page" data-prev="brush-lab.html" data-next="masking.html">
+  <div class="scroll-progress" aria-hidden="true"></div>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="../index.html"><img src="../img/logo.svg?v=2" alt="" width="34" height="34"><span>SculptForge</span></a>
+      <nav aria-label="Main">
+        <a href="../index.html#features">Features</a>
+        <a href="../index.html#demos">Demos</a>
+        <a href="../brushes.html">Brushes</a>
+        <a href="index.html" aria-current="page">Guide</a>
+        <a class="nav-dl" href="../index.html#download">Download</a>
+        <a class="gh" href="https://discord.gg/gWrYkEmQhH">Discord</a>
+        <a class="gh" href="https://github.com/islandmed/SculptForge">GitHub</a>
+      </nav>
+    </div>
+  </header>
+  <div class="wrap guide-layout">
+    <div class="guide-side">
+      <button class="toc-toggle" type="button" aria-expanded="false" aria-controls="guide-toc">
+        <span>Contents</span><span class="toc-current">Brush packs</span></button>
+      <div id="guide-toc" class="toc-panel">
+        <div class="guide-search" role="search">
+          <input type="search" id="guide-q" placeholder="Search the guide" aria-label="Search the guide" autocomplete="off">
+          <div class="search-results" id="guide-results" hidden></div>
+        </div>
+        <nav class="toc" aria-label="User guide"><a class="toc-home" href="index.html">Contents</a><p class="toc-group">Getting started</p><ul><li><a href="welcome.html">Welcome to SculptForge</a></li><li><a href="first-sculpt.html">Your first sculpt in 10 minutes</a></li><li><a href="whats-new.html">What&#x27;s new</a></li><li><a href="quick-tour.html">Quick tour for experienced sculptors</a></li><li><a href="installing.html">Install SculptForge on Windows, macOS and Linux</a></li><li><a href="interface.html">The interface</a></li><li><a href="navigation.html">Navigating the view</a></li></ul><p class="toc-group">Sculpting</p><ul><li><a href="sculpting.html">Sculpting and brushes</a></li><li><a href="brush-lab.html">Brush Lab and sharing brushes</a></li><li><a href="brush-packs.html" class="current" aria-current="page">Brush packs</a><ul class="toc-sections"><li><a href="#find-and-pick-a-pack-brush">Find and pick a pack brush</a></li><li><a href="#clay--form">Clay &amp; Form</a></li><li><a href="#hard-surface">Hard Surface</a></li><li><a href="#organic--skin">Organic &amp; Skin</a></li><li><a href="#cloth--folds">Cloth &amp; Folds</a></li><li><a href="#damage--wear">Damage &amp; Wear</a></li><li><a href="#ornament">Ornament</a></li><li><a href="#new-alphas">New alphas</a></li></ul></li><li><a href="masking.html">Masking</a></li><li><a href="face-groups.html">Face Groups and visibility</a></li><li><a href="selection-sets.html">Selection sets and morph targets</a></li><li><a href="parts.html">Parts</a></li><li><a href="forge-spheres.html">Forge Spheres</a></li><li><a href="vertex-paint.html">Vertex Paint and materials</a></li><li><a href="texture-painting.html">Texture painting</a></li><li><a href="uv-editor.html">UV Editor</a></li><li><a href="pbr-painting.html">Material painting (PBR)</a></li><li><a href="fill-layers.html">Fill layers, Mesh Maps and Material Recipes</a></li><li><a href="layers.html">Sculpt layers and blend shapes</a></li><li><a href="facial-shapes.html">Facial shapes and live face</a></li><li><a href="subdivision-levels.html">Subdivision levels</a></li><li><a href="micro-levels.html">Micro levels: hundreds of millions of polygons</a></li><li><a href="dynamic-topology.html">Dynamic topology</a></li><li><a href="timeline.html">Sculpt Timeline and timelapse</a></li><li><a href="gizmo.html">Moving, rotating and posing (Gizmo)</a></li><li><a href="geometry.html">Subdivide, remesh, decimate and LODs</a></li><li><a href="cut.html">Cut: line, lasso, rectangle and polyline</a></li><li><a href="retopology.html">Quad retopology and detail projection</a></li></ul><p class="toc-group">AI and capture</p><ul><li><a href="generate-3d.html">Image and text to 3D</a></li><li><a href="splats.html">Gaussian splats</a></li><li><a href="scan-to-splat.html">Scan an object into a splat</a></li><li><a href="scan-to-sculptable.html">From scan to sculptable mesh</a></li><li><a href="phone-capture.html">Phone capture and AR</a></li></ul><p class="toc-group">Files and pipelines</p><ul><li><a href="baking.html">Baking normal and displacement maps</a></li><li><a href="exporting.html">Exporting, Unreal and Bridge</a></li><li><a href="export-presets.html">Export presets</a></li><li><a href="blender.html">Working with Blender</a></li><li><a href="maya.html">Working with Maya</a></li><li><a href="projects.html">Projects, autosave and snapshots</a></li><li><a href="scripting.html">Scripting and automation</a></li><li><a href="packs-and-macros.html">Packs and macros</a></li><li><a href="studios.html">SculptForge for studios</a></li></ul><p class="toc-group">Reference</p><ul><li><a href="shortcuts.html">Keyboard and mouse</a></li><li><a href="performance.html">Performance and big meshes</a></li><li><a href="troubleshooting.html">Troubleshooting: tablets, display, crashes and FAQ</a></li><li><a href="glossary.html">Glossary</a></li></ul></nav>
+      </div>
+    </div>
+    <main class="guide-main" id="top">
+      <article class="guide-article">
+<h1 id="brush-packs">Brush packs</h1>
+<p>SculptForge comes with sixty ready-tuned brushes in six packs, on top of the built-in brushes. Each one is a brush recipe (see <a href="brush-lab.html">Brush Lab</a>) with its own alpha where it needs one, so you can use them as they are, or open one in Brush Lab and make your own version. Every brush, alpha and preview here is made by SculptForge itself: the recipe engine, procedural alphas and the same clay-ball thumbnails as the brush picker.</p>
+<h2 id="find-and-pick-a-pack-brush">Find and pick a pack brush<a class="anchor" href="#find-and-pick-a-pack-brush" aria-label="Link to this section">#</a></h2>
+<ul>
+<li>
+<strong>Sculpt &gt; Brush</strong>: the grid shows <strong>Built-in</strong>, <strong>Custom</strong>, then <strong>Brush packs</strong>. <strong>Sort: A-Z &gt; Pack</strong> shows one section per pack. The filter field finds a brush by name.
+</li>
+<li>
+<strong>B</strong> opens the brush picker: type the first letters of the name, then the orange key.
+</li>
+<li>
+<strong>Custom brushes</strong> in <strong>Sculpt &gt; Brush</strong> lists every pack brush with its pack&#x27;s name beside it.
+</li>
+<li>
+Scripts and macros: <code>brush_use name=&quot;Rivet Row&quot;</code>; <code>brush_list</code> shows every brush with its pack.
+</li>
+</ul>
+<p>The first time you pick a pack brush it brings its own alpha (Rivet Row brings <strong>Rivets</strong>, turned along the stroke); brushes without one go back to the plain round tip. From then on the brush keeps whatever you change, as every brush does (<strong>Sculpt &gt; Brush &gt; Save Brush Settings</strong> keeps it for good, <strong>Reset Brush to Default</strong> brings back the pack&#x27;s).</p>
+<p>Pack brushes are read-only like the other built-ins: changing one in Brush Lab saves your own copy, which replaces it in the lists until you delete it.</p>
+<p>Textures (pores, stitches, weave, rivets) need enough polygons to show: subdivide, or turn on <a href="dynamic-topology.html">Dynamic topology</a>, until the brush&#x27;s detail is several polygons wide.</p>
+<h2 id="clay--form">Clay &amp; Form<a class="anchor" href="#clay--form" aria-label="Link to this section">#</a></h2>
+<p>Block in, build up and refine big forms: clay strokes, planes, and smooth blends.</p>
+<figure class="shot"><a href="images/brush-packs/clay-form.jpg" class="zoom"><img src="images/brush-packs/clay-form.jpg" alt="The Clay &amp; Form brushes" width="766" height="360" loading="lazy" decoding="async"></a><figcaption>The Clay &amp; Form brushes</figcaption></figure>
+<div class="table-wrap"><table><thead><tr><th>Brush</th><th>What it does</th><th>Alpha</th></tr></thead><tbody><tr><td><strong>Block Former</strong></td><td>Big, flat-topped clay strokes that stack fast, for blocking in primary forms.</td><td>Square</td></tr><tr><td><strong>Soft Clay</strong></td><td>Gentle round clay that builds in thin layers and blends into the surface.</td><td></td></tr><tr><td><strong>Clay Strip</strong></td><td>Narrow, crisp strips of clay with a hard edge, for muscle fibres and planes.</td><td>Square</td></tr><tr><td><strong>Plane Cutter</strong></td><td>Shaves the surface down to flat planes, for stylised forms and stone.</td><td></td></tr><tr><td><strong>Volume Fill</strong></td><td>Fills low areas up to the stroke&#x27;s plane and leaves the high points alone.</td><td></td></tr><tr><td><strong>Level Out</strong></td><td>Presses hills and valleys onto one plane and softens the result, to calm busy areas.</td><td></td></tr><tr><td><strong>Swell</strong></td><td>Puffs the surface out along its own normals, for cheeks, bellies and soft volumes.</td><td></td></tr><tr><td><strong>Form Smoother</strong></td><td>Relaxes lumps while keeping the big shape, for a clean pass after blocking.</td><td></td></tr><tr><td><strong>Clay Drag</strong></td><td>Smears soft clay along the stroke like a thumb pushing it, for blending transitions.</td><td></td></tr><tr><td><strong>Edge Definer</strong></td><td>Pinches a crisp edge into the surface where two planes meet.</td><td></td></tr></tbody></table></div>
+<h2 id="hard-surface">Hard Surface<a class="anchor" href="#hard-surface" aria-label="Link to this section">#</a></h2>
+<p>Crisp planes, panel lines, bevels, rivets and bolts for props, armour and machines.</p>
+<figure class="shot"><a href="images/brush-packs/hard-surface.jpg" class="zoom"><img src="images/brush-packs/hard-surface.jpg" alt="The Hard Surface brushes" width="766" height="360" loading="lazy" decoding="async"></a><figcaption>The Hard Surface brushes</figcaption></figure>
+<div class="table-wrap"><table><thead><tr><th>Brush</th><th>What it does</th><th>Alpha</th></tr></thead><tbody><tr><td><strong>Panel Groove</strong></td><td>Cuts a clean, narrow groove for panel gaps and seams.</td><td></td></tr><tr><td><strong>Flat Plane</strong></td><td>Presses a perfectly flat face with a hard edge, for machined surfaces.</td><td>Square</td></tr><tr><td><strong>Bevel Scrape</strong></td><td>Scrapes high points into a bevel along an edge, for chamfers.</td><td></td></tr><tr><td><strong>Raised Plate</strong></td><td>Builds a flat, square-edged plate on the surface, for armour and hull panels.</td><td>Square</td></tr><tr><td><strong>Rivet Row</strong></td><td>Stamps rows of round rivet heads along the stroke.</td><td>Rivets</td></tr><tr><td><strong>Bolt Head</strong></td><td>Stamps a hexagonal bolt on a washer; space the dabs out or click once.</td><td>Bolt</td></tr><tr><td><strong>Hex Armour</strong></td><td>Raises a honeycomb of hexagonal plates, for sci-fi armour and shells.</td><td>Hex Plates</td></tr><tr><td><strong>Vent Slots</strong></td><td>Cuts parallel slots like a vent grille; drag across the slots.</td><td>Wrinkles</td></tr><tr><td><strong>Grid Studs</strong></td><td>An even grid of small studs, for grip textures and tread plates.</td><td>Dot Grid</td></tr><tr><td><strong>Hard Cut</strong></td><td>Cuts the surface flat below the stroke, for sharp silhouettes and clean cuts.</td><td>Square</td></tr></tbody></table></div>
+<h2 id="organic--skin">Organic &amp; Skin<a class="anchor" href="#organic--skin" aria-label="Link to this section">#</a></h2>
+<p>Pores, wrinkles, folds, veins and scales for creatures and portraits.</p>
+<figure class="shot"><a href="images/brush-packs/organic-skin.jpg" class="zoom"><img src="images/brush-packs/organic-skin.jpg" alt="The Organic &amp; Skin brushes" width="766" height="360" loading="lazy" decoding="async"></a><figcaption>The Organic &amp; Skin brushes</figcaption></figure>
+<div class="table-wrap"><table><thead><tr><th>Brush</th><th>What it does</th><th>Alpha</th></tr></thead><tbody><tr><td><strong>Fine Pores</strong></td><td>Small, evenly scattered pores for faces and close-ups.</td><td>Pores</td></tr><tr><td><strong>Deep Pores</strong></td><td>Bigger, deeper pores for noses, cheeks and rough skin.</td><td>Pores</td></tr><tr><td><strong>Crow&#x27;s Feet</strong></td><td>Fine fanned wrinkle lines, for eye corners and knuckles.</td><td>Wrinkles</td></tr><tr><td><strong>Skin Fold</strong></td><td>Soft rolls of heavy skin, for necks, bellies and brows.</td><td>Skin Folds</td></tr><tr><td><strong>Crease Line</strong></td><td>A sharp, deep crease with pinched sides, for eyelids, lips and nasal folds.</td><td></td></tr><tr><td><strong>Vein</strong></td><td>Raises thin, soft-edged veins along the stroke.</td><td></td></tr><tr><td><strong>Reptile Scales</strong></td><td>Overlapping rows of rounded scales, for lizards, dragons and fish.</td><td>Scales</td></tr><tr><td><strong>Leather Hide</strong></td><td>Pebbled grain with fine creases, for leather, elephant and rhino skin.</td><td>Leather Grain</td></tr><tr><td><strong>Muscle Fibre</strong></td><td>Long soft ridges along the stroke, for muscle striation and sinew.</td><td>Hair Strands</td></tr><tr><td><strong>Flesh Pinch</strong></td><td>Pulls soft flesh together into a ridge, for lips, knuckles and wrinkles that bunch.</td><td></td></tr></tbody></table></div>
+<h2 id="cloth--folds">Cloth &amp; Folds<a class="anchor" href="#cloth--folds" aria-label="Link to this section">#</a></h2>
+<p>Folds, seams, stitches, weave and knit for clothing and soft goods.</p>
+<figure class="shot"><a href="images/brush-packs/cloth-folds.jpg" class="zoom"><img src="images/brush-packs/cloth-folds.jpg" alt="The Cloth &amp; Folds brushes" width="766" height="360" loading="lazy" decoding="async"></a><figcaption>The Cloth &amp; Folds brushes</figcaption></figure>
+<div class="table-wrap"><table><thead><tr><th>Brush</th><th>What it does</th><th>Alpha</th></tr></thead><tbody><tr><td><strong>Fold Ridge</strong></td><td>Raises a rounded fold of cloth with soft sides.</td><td></td></tr><tr><td><strong>Fold Valley</strong></td><td>Carves the soft valley between two folds.</td><td></td></tr><tr><td><strong>Tension Crease</strong></td><td>A sharp crease where cloth pulls tight, for armpits, elbows and seams under strain.</td><td></td></tr><tr><td><strong>Seam Stitch</strong></td><td>A sewn seam with cross stitches; drag along the seam.</td><td>Stitches</td></tr><tr><td><strong>Woven Cloth</strong></td><td>Threads woven over and under, for canvas, denim and sacking.</td><td>Fabric Weave</td></tr><tr><td><strong>Knitted Wool</strong></td><td>Rows of V-shaped loops, for jumpers, scarves and chunky knits.</td><td>Knit</td></tr><tr><td><strong>Hem Edge</strong></td><td>A flat, square-edged band along the stroke, for hems, cuffs and straps.</td><td>Square</td></tr><tr><td><strong>Cloth Drape</strong></td><td>Drags the surface along the stroke so folds flow and hang, for drapery.</td><td></td></tr><tr><td><strong>Wrinkle Bunch</strong></td><td>Small compressed wrinkles where cloth gathers, at waists and wrists.</td><td></td></tr><tr><td><strong>Padded Quilt</strong></td><td>Puffs soft panels up between the stroke&#x27;s edges, for quilting and padding.</td><td>Square</td></tr></tbody></table></div>
+<h2 id="damage--wear">Damage &amp; Wear<a class="anchor" href="#damage--wear" aria-label="Link to this section">#</a></h2>
+<p>Cracks, chips, dents, scratches and erosion for weathered stone, wood and metal.</p>
+<figure class="shot"><a href="images/brush-packs/damage-wear.jpg" class="zoom"><img src="images/brush-packs/damage-wear.jpg" alt="The Damage &amp; Wear brushes" width="766" height="360" loading="lazy" decoding="async"></a><figcaption>The Damage &amp; Wear brushes</figcaption></figure>
+<div class="table-wrap"><table><thead><tr><th>Brush</th><th>What it does</th><th>Alpha</th></tr></thead><tbody><tr><td><strong>Dry Cracks</strong></td><td>A web of thin cracks, for dry earth, old paint and stone.</td><td>Cracks</td></tr><tr><td><strong>Deep Fissure</strong></td><td>One deep, jagged split, for broken rock and ice.</td><td></td></tr><tr><td><strong>Edge Chips</strong></td><td>Knocks angular chips out of edges only; flat areas stay whole.</td><td>Chips</td></tr><tr><td><strong>Dents</strong></td><td>Soft, scattered dents, for beaten metal and hammered surfaces.</td><td></td></tr><tr><td><strong>Scratches</strong></td><td>Thin, sharp scratches along the stroke, for scuffed metal and wood.</td><td></td></tr><tr><td><strong>Eroded Stone</strong></td><td>Breaks the surface up with noise, for weathered rock and sandstone.</td><td></td></tr><tr><td><strong>Rock Layers</strong></td><td>Stepped, broken strata, for cliffs and layered stone.</td><td>Rock Strata</td></tr><tr><td><strong>Cobbles</strong></td><td>Packed rounded stones with grooves between, for paths and old walls.</td><td>Cobblestone</td></tr><tr><td><strong>Wood Grain</strong></td><td>Rough furrows and ridges, for bark and weathered planks; drag along the grain.</td><td>Bark</td></tr><tr><td><strong>Worn Edges</strong></td><td>Softens and rounds only the sharp ridges, as years of handling do.</td><td></td></tr></tbody></table></div>
+<h2 id="ornament">Ornament<a class="anchor" href="#ornament" aria-label="Link to this section">#</a></h2>
+<p>Beads, ropes, filigree, studs and carved patterns for jewellery, trims and decoration.</p>
+<figure class="shot"><a href="images/brush-packs/ornament.jpg" class="zoom"><img src="images/brush-packs/ornament.jpg" alt="The Ornament brushes" width="766" height="360" loading="lazy" decoding="async"></a><figcaption>The Ornament brushes</figcaption></figure>
+<div class="table-wrap"><table><thead><tr><th>Brush</th><th>What it does</th><th>Alpha</th></tr></thead><tbody><tr><td><strong>Bead Chain</strong></td><td>A row of round beads along the stroke, for jewellery and trims.</td><td></td></tr><tr><td><strong>Rope Twist</strong></td><td>A twisted rope or cord, for borders and rigging.</td><td>Hair Strands</td></tr><tr><td><strong>Filigree Line</strong></td><td>A thin, raised wire line, for filigree and engraved borders.</td><td></td></tr><tr><td><strong>Engrave</strong></td><td>Cuts a fine, crisp line, for engraving, runes and lettering.</td><td></td></tr><tr><td><strong>Stud Row</strong></td><td>Rounded studs spaced along the stroke, for belts, doors and armour trims.</td><td></td></tr><tr><td><strong>Raised Band</strong></td><td>A flat, raised band with clean edges, for bezels, rims and mouldings.</td><td></td></tr><tr><td><strong>Scroll Relief</strong></td><td>Soft, rounded relief that builds up slowly, for carved scrolls and leaves.</td><td></td></tr><tr><td><strong>Scale Mail</strong></td><td>Rows of small scales, for armour, roof tiles and feathers.</td><td></td></tr><tr><td><strong>Gem Setting</strong></td><td>A raised round setting with a crisp rim, for cabochons and gem seats.</td><td></td></tr><tr><td><strong>Dot Texture</strong></td><td>Fine even dots, for stippling, punched leather and decorative fields.</td><td>Dot Grid</td></tr></tbody></table></div>
+<h2 id="new-alphas">New alphas<a class="anchor" href="#new-alphas" aria-label="Link to this section">#</a></h2>
+<p>Six procedural alphas came with the packs and work with any brush (<strong>Sculpt &gt; Alpha</strong>): <strong>Cobblestone</strong>, <strong>Leather Grain</strong>, <strong>Hex Plates</strong>, <strong>Knit</strong>, <strong>Bolt</strong> and <strong>Chips</strong>. <strong>Sculpt &gt; Alpha</strong> lists every alpha A-Z (Round, the plain tip, first), has a filter field, and <strong>Sort</strong> for the most recently used first or by pack.</p>
+      </article>
+      <nav class="pager" aria-label="Previous and next chapter"><a class="prev" rel="prev" href="brush-lab.html"><span>Previous</span>Brush Lab and sharing brushes</a><a class="next" rel="next" href="masking.html"><span>Next</span>Masking</a></nav>
+      <p class="guide-meta fine">Also in the app: <strong>Help &gt; User Guide</strong> (<kbd>Shift</kbd>+<kbd>F1</kbd>).
+        Found a mistake? <a href="https://github.com/islandmed/SculptForge/edit/main/docs/guide/brush-packs.md">Edit this page on GitHub</a>.</p>
+    </main>
+    <aside class="on-page" aria-label="On this page"><p>On this page</p><ul><li><a href="#find-and-pick-a-pack-brush">Find and pick a pack brush</a></li><li><a href="#clay--form">Clay &amp; Form</a></li><li><a href="#hard-surface">Hard Surface</a></li><li><a href="#organic--skin">Organic &amp; Skin</a></li><li><a href="#cloth--folds">Cloth &amp; Folds</a></li><li><a href="#damage--wear">Damage &amp; Wear</a></li><li><a href="#ornament">Ornament</a></li><li><a href="#new-alphas">New alphas</a></li></ul></aside>
+  </div>
+  <footer class="footer">
+    <div class="wrap footer-grid">
+      <div>
+        <a class="brand" href="../index.html"><img src="../img/logo.svg?v=2" alt="" width="28" height="28"><span>SculptForge</span></a>
+        <p class="fine">Copyright © 2026 The SculptForge contributors.<br>The SculptForge User Guide is part of
+          SculptForge, licensed under the <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
+      </div>
+      <div class="links">
+        <a href="index.html">User guide</a>
+        <a href="../supporters.html">Supporters</a>
+        <a href="https://github.com/islandmed/SculptForge">Source code</a>
+        <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
+        <a href="https://github.com/islandmed/SculptForge/issues">Report a problem</a>
+        <a href="https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md">AI services &amp; privacy</a>
+      </div>
+      <p class="fine trademarks">SculptForge is an independent project. Product names are trademarks of their respective owners.</p>
+    </div>
+  </footer>
+</body>
+</html>

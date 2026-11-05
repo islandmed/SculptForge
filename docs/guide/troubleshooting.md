@@ -252,9 +252,8 @@ work?". **Restore** opens it as unsaved work (save it under a name); **Discard**
 ## Frequently asked questions
 
 **Can SculptForge open another sculpting app's own project files?**
-Not directly: those formats are proprietary and undocumented. Export OBJ or FBX from that app, use the
-[Bridge](exporting.md#exchange-models-through-the-bridge), or convert a whole library once with the free Bridge
-export plug-in (see the [Bridge setup page](https://github.com/islandmed/SculptForge/blob/main/integrations/bridge-plugin/README.md)).
+Not directly: those formats are proprietary and undocumented. Export OBJ or FBX from that app, or use the
+[Bridge](exporting.md#exchange-models-through-the-bridge).
 
 **Does it have subdivision levels, voxel remesh, quad remesh or UVs?**
 Yes: **Voxel Remesh**, **Quad Remesh** (with **Project All** to bring the detail back; see

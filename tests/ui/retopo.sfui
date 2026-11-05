@@ -1,7 +1,7 @@
-# Quad retopology and detail projection: Geometry > QRemesh (ZBrush's ZRemesher) rebuilds a sculpted sphere as
-# clean quads in the background, keeping the original as a hidden SubTool; after dividing the retopo twice,
-# SubTool > Project > ProjectAll brings the sculpted detail back.
-run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+# Quad retopology and detail projection: Geometry > QRemesh (QRemesh) rebuilds a sculpted sphere as
+# clean quads in the background, keeping the original as a hidden Part; after dividing the retopo twice,
+# Part > Project > ProjectAll brings the sculpted detail back.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=6
 run stroke points="-0.6,0.35,2 0,0.55,2 0.6,0.35,2" brush=Standard radius=0.16 strength=1
 run stroke points="-0.55,-0.35,2 0.55,-0.4,2" brush=Crease radius=0.12 strength=1
@@ -36,11 +36,11 @@ expect_status "100% quads"
 expect_value quad_percent == 100
 expect_value quads > 2400
 expect_value quads < 4400
-expect_value subtools == 2
-expect_value visible_subtools == 1
-click "Wire##view.polyf"
-shot qremesh-polyf
-click "Wire##view.polyf"
+expect_value parts == 2
+expect_value visible_parts == 1
+click "Wire##view.wire"
+shot qremesh-wire
+click "Wire##view.wire"
 
 # One undo step; redo brings the quads back.
 key ctrl+z
@@ -57,8 +57,8 @@ expect_no_text "Target Polygons 3"
 
 # Divide twice, show the original and project its detail back.
 run subdivide levels=2
-run subtool_visibility index=1 visible=true
-click "Parts##tool.subtool"
+run part_visibility index=1 visible=true
+click "Parts##tool.part"
 expect "Project/Project All"
 hold ctrl
 hover "Project/Project All"
@@ -70,17 +70,17 @@ snapshot
 click "Project/Project All"
 expect_status "vertices projected"
 expect_value moved > 20000
-run subtool_visibility index=1 visible=false
-click "Wire##view.polyf"
-shot projected-polyf
-click "Wire##view.polyf"
+run part_visibility index=1 visible=false
+click "Wire##view.wire"
+shot projected-wire
+click "Wire##view.wire"
 shot projected
 key ctrl+z
 expect_value moved == 0
 
 # Cancel: a big target on the sculpt stops part way and leaves it as it was.
-run subtool_select index=1
-run subtool_visibility index=1 visible=true
+run part_select index=1
+run part_visibility index=1 visible=true
 click "Geometry##tool.geometry"
 click "QRemesh/Keep Original"
 click "QRemesh/Same"
@@ -103,5 +103,5 @@ click "QRemesh/Quad Remesh"
 wait_idle 120
 expect_status "100% quads"
 expect_value quad_percent == 100
-click "Wire##view.polyf"
-shot lion-qremesh-polyf
+click "Wire##view.wire"
+shot lion-qremesh-wire

@@ -1,10 +1,10 @@
 # Radial (pie) menus (#45). Three built in: Brushes on T, Masking on Y and Strokes on J (U13: the stroke types on
-# one ring, as 3D-Coat's stroke pop-up), keys no other action has in any input style. Hold the key, flick toward an item, let go: it runs. Let go in the middle after a moment: nothing. Tap
+# one ring), keys no other action has in any input style. Hold the key, flick toward an item, let go: it runs. Let go in the middle after a moment: nothing. Tap
 # the key: the pie stays open; a click on an item runs it, a click in the middle or Esc closes it, and the click
 # never reaches the model. A pen or mouse button set on a menu does the same as its key. Preferences > Input >
 # Radial Menus: a new menu, an item picked with the palette's search, a key; import and export of one menu (only
 # known actions are kept).
-run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=3
 camera 0 0
 expect_value radial_menus == 3
@@ -184,7 +184,7 @@ click "Blender##input.style_blender"
 expect_value shortcut_conflicts == 0
 click "Maya##input.style_maya"
 expect_value shortcut_conflicts == 0
-click "Classic sculpting keys##input.style_zbrush"
+click "Classic sculpting keys##input.style_classic"
 expect_value shortcut_conflicts == 0
 key escape
 

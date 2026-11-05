@@ -1,5 +1,5 @@
 # #62: Preferences > Input > Start strokes off the model (off by default: a drag on the background turns the view).
-run ui_look look=classic layout=zbrush        # written for the Classic look and the ZBrush-style palette bar and shelves
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=4
 key f
 camera 0 0

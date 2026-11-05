@@ -1,8 +1,8 @@
 # View controls (#80, #91, #102, #103): X-Ray next to Solo, the view's resolution, the light, Save Render's size
 # and shape, Cut's Clip mode and Tool > Geometry > Close Holes.
 run new_sphere subdivisions=4
-run subtool_append type=cube name=Box
-run subtool_select index=0
+run part_append type=cube name=Box
+run part_select index=0
 camera -30 -10
 key f
 wait_idle 30
@@ -13,15 +13,15 @@ click "X-Ray"
 expect_value xray == 1
 wait 0.2
 shot xray-parts-panel
-run subtool_select index=1
+run part_select index=1
 wait 0.2
 shot xray-box-active
-run subtool_select index=0
+run part_select index=0
 # The lone Part is see-through itself.
-run subtool_solo
+run part_solo
 wait 0.2
 shot xray-solo
-run subtool_solo
+run part_solo
 click "X-Ray"
 expect_value xray == 0
 
@@ -71,7 +71,7 @@ key escape
 
 # Clip (#102): Tool > Cut > Clip, a line across the sphere presses its right side flat; nothing is removed. (X turns
 # the symmetry off for it, and on again after.)
-run subtool_delete index=1
+run part_delete index=1
 camera 0 0
 key f
 remember triangles full

@@ -1,4 +1,4 @@
-# QRemesh Guides (ZBrush's ZRemesher Guides brush): draw a loop round an "eye" on a sphere with X symmetry (it is
+# QRemesh Guides (QRemesh Guides brush): draw a loop round an "eye" on a sphere with X symmetry (it is
 # mirrored), an open curve across the middle (its own mirror image, so kept once), Delete Last, Alt+click a curve to
 # delete it, then QRemesh follows the loops: an edge loop round each eye. Guides are saved with the project.
 run new_sphere subdivisions=6
@@ -40,7 +40,7 @@ expect_value qremesh_guides == 2
 
 # Alt+click on a curve deletes it with its mirror; the background still navigates.
 hold alt
-click_subtool Sphere 0.79 0.38
+click_part Sphere 0.79 0.38
 hold none
 expect_value qremesh_guides == 0
 expect_status "deleted"
@@ -63,9 +63,9 @@ key ctrl+z
 expect_value quads == 0
 key ctrl+shift+z
 orbit -60 0
-click "Wire##view.polyf"
-shot guides-qremesh-polyf
-click "Wire##view.polyf"
+click "Wire##view.wire"
+shot guides-qremesh-wire
+click "Wire##view.wire"
 
 # Picking a brush leaves the guides brush; the guides stay (shown fainter).
 click "Clay##brush.clay"

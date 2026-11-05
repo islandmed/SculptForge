@@ -768,7 +768,7 @@ std::string lower(std::string s) {
 
 enum class PartKind { Skin, Eyes, Teeth, Tongue, Other };
 
-PartKind classifySubtool(const std::string& name) {
+PartKind classifyPart(const std::string& name) {
     const std::string n = lower(name);
     auto has = [&](const char* w) { return n.find(w) != std::string::npos; };
     if (has("tongue")) return PartKind::Tongue;
@@ -878,13 +878,13 @@ glm::vec3 moveRigid(const Similarity& align, const glm::mat3& R, const glm::vec3
     return align.apply(R * (x - shift) + tr + shift);
 }
 
-// Undoable mesh replacement for SubTool `i` (the active one through Document::replaceMeshUndoable).
-void replaceSubtoolMesh(Document& doc, int i, Mesh m, const std::string& label) {
-    if (i == doc.activeSubtool) {
+// Undoable mesh replacement for Part `i` (the active one through Document::replaceMeshUndoable).
+void replacePartMesh(Document& doc, int i, Mesh m, const std::string& label) {
+    if (i == doc.activePart) {
         doc.replaceMeshUndoable(std::move(m), label);
         return;
     }
-    SubTool& s = doc.subtools[size_t(i)];
+    Part& s = doc.parts[size_t(i)];
     UndoRecord r;
     r.label = label;
     r.mesh = std::make_unique<Mesh>(std::move(s.mesh));
@@ -976,7 +976,7 @@ bool generateFaceShapes(Document& doc, const FaceShapesOptions& options, FaceSha
         for (auto& v : d)
             if (glm::length(v) < cutoff) v = glm::vec3(0.0f);
 
-    // --- Into the active SubTool's layers ---
+    // --- Into the active Part's layers ---
     for (size_t k = 0; k < names.size(); ++k) {
         report.movedVertices = std::max(report.movedVertices,
                                         size_t(std::count_if(deltas[k].begin(), deltas[k].end(),
@@ -986,22 +986,22 @@ bool generateFaceShapes(Document& doc, const FaceShapesOptions& options, FaceSha
     m.evaluateAll();
     m.recomputeAllNormals();
     if (level != originalLevel && !subdivSetLevel(m, originalLevel, error)) return false;
-    replaceSubtoolMesh(doc, doc.activeSubtool, std::move(m), "Generate Facial Shapes");
+    replacePartMesh(doc, doc.activePart, std::move(m), "Generate Facial Shapes");
 
-    if (!options.subtools) return true;
+    if (!options.parts) return true;
 
-    // --- The other SubTools ---
+    // --- The other Parts ---
     const glm::vec3 mouthCenter = 0.5f * (fit.align.inverse(fit.landmarks.position[kMouthLeft]) +
                                           fit.align.inverse(fit.landmarks.position[kMouthRight]));
     const glm::vec3 templMouth = 0.5f * (t.neutral[kLandmarks[kMouthLeft].vertex] + t.neutral[kLandmarks[kMouthRight].vertex]);
     const glm::vec3 shift = mouthCenter - templMouth; // where the sculpt's mouth sits relative to the template's
     const float biteY = 0.5f * (t.upperTeethY + t.lowerTeethCentroid.y) + shift.y;
-    for (int i = 0; i < doc.subtoolCount(); ++i) {
-        if (i == doc.activeSubtool || !doc.subtools[size_t(i)].visible) continue;
-        const std::string& name = doc.subtools[size_t(i)].name;
-        const PartKind kind = classifySubtool(name);
-        subdivCommit(doc.subtoolMesh(i));
-        Mesh sm = doc.subtoolMesh(i);
+    for (int i = 0; i < doc.partCount(); ++i) {
+        if (i == doc.activePart || !doc.parts[size_t(i)].visible) continue;
+        const std::string& name = doc.parts[size_t(i)].name;
+        const PartKind kind = classifyPart(name);
+        subdivCommit(doc.partMesh(i));
+        Mesh sm = doc.partMesh(i);
         if (sm.triangleCount() == 0) continue;
         const int orig = subdivCurrentLevel(sm), lvl = faceLevel(sm, options.level);
         if (lvl != orig && !subdivSetLevel(sm, lvl, error)) return false;
@@ -1075,8 +1075,8 @@ bool generateFaceShapes(Document& doc, const FaceShapesOptions& options, FaceSha
         sm.evaluateAll();
         sm.recomputeAllNormals();
         if (lvl != orig && !subdivSetLevel(sm, orig, error)) return false;
-        replaceSubtoolMesh(doc, i, std::move(sm), "Generate Facial Shapes");
-        report.subtools.push_back(name + ": " + what);
+        replacePartMesh(doc, i, std::move(sm), "Generate Facial Shapes");
+        report.parts.push_back(name + ": " + what);
     }
     return true;
 }
@@ -1111,7 +1111,7 @@ bool parseFaceWeights(const std::string& text, std::vector<std::pair<std::string
 namespace {
 
 // The vertices each layer moves, found once per layer and kept while its offsets stay the same: keyed by the
-// offsets' address and checked against their size, the SubTool's undo revision (strokes into a layer push an
+// offsets' address and checked against their size, the Part's undo revision (strokes into a layer push an
 // undo step) and a few sampled values.
 struct SupportEntry {
     size_t size = 0;
@@ -1154,10 +1154,10 @@ FaceWeightsStats applyFaceWeights(Document& doc, const std::vector<std::pair<std
     std::vector<uint8_t> matched(weights.size(), 0);
     std::lock_guard lock(gSupportMutex);
     if (gSupport.size() > 8192) gSupport.clear();
-    for (int si = 0; si < doc.subtoolCount(); ++si) {
-        Mesh& m = doc.subtoolMesh(si);
+    for (int si = 0; si < doc.partCount(); ++si) {
+        Mesh& m = doc.partMesh(si);
         if (m.layers.empty() || m.base.size() != m.positions.size()) continue;
-        const uint64_t revision = si == doc.activeSubtool ? doc.undo.revision() : doc.subtools[size_t(si)].undo.revision();
+        const uint64_t revision = si == doc.activePart ? doc.undo.revision() : doc.parts[size_t(si)].undo.revision();
         std::vector<uint32_t> changed;
         for (size_t w = 0; w < weights.size(); ++w)
             for (size_t li = 0; li < m.layers.size(); ++li)
@@ -1210,8 +1210,8 @@ FaceWeightsStats applyFaceWeights(Document& doc, const std::vector<std::pair<std
         if (verts.empty()) continue;
         m.updateNormals(verts); // (also marks them, and their neighbours, for the GPU)
         stats.vertices += verts.size();
-        if (si == doc.activeSubtool) doc.bvhDirty = true;
-        else doc.subtools[size_t(si)].bvhDirty = true;
+        if (si == doc.activePart) doc.bvhDirty = true;
+        else doc.parts[size_t(si)].bvhDirty = true;
     }
     for (size_t w = 0; w < weights.size(); ++w) {
         if (matched[w]) ++stats.matched;

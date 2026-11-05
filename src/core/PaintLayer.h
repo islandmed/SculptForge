@@ -1,9 +1,9 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Paint layers: a Photoshop-style stack of polypaint layers per mesh (SubTool).
+// Paint layers: a Photoshop-style stack of vertex paint layers per mesh (Part).
 //
-// Without paint layers Mesh::colors is the polypaint, as it always was. Once a
+// Without paint layers Mesh::colors is the vertex paint, as it always was. Once a
 // layer is added, Mesh::paintBase holds the bottom ("Base") layer, every
 // PaintLayer holds its own colour plus per-vertex coverage (alpha), and
 // Mesh::colors is the composited result that the viewport, exporters and
@@ -71,7 +71,7 @@ struct PaintLayer {
 
 // --- Stack queries ---
 bool hasPaintLayers(const Mesh& mesh);
-int paintLayerCount(const Mesh& mesh); // layers above Base (0 = plain polypaint)
+int paintLayerCount(const Mesh& mesh); // layers above Base (0 = plain vertex paint)
 // The composited colour of vertex `v` (linear RGB) from Base and the visible layers.
 glm::vec3 compositePaintVertex(const Mesh& mesh, uint32_t v);
 // Recomposites Mesh::colors for `verts` (and marks them dirty), or for every vertex.
@@ -91,11 +91,11 @@ void paintVertex(Mesh& mesh, uint32_t v, const glm::vec3& color, float w, bool e
 
 // --- Stack edits (callers push undo records; see Undo.h PaintStackUndo) ---
 // Inserts a transparent layer above `above` (-1 = Base; default: the top) and makes it active.
-// Creates the stack (Base = today's polypaint, or white) when the mesh has none. Returns its index.
+// Creates the stack (Base = today's vertex paint, or white) when the mesh has none. Returns its index.
 int addPaintLayer(Mesh& mesh, std::string name, int above = -2);
 // Copies layer `layer` (-1 = Base, as an opaque layer) to a new layer above it; returns its index.
 int duplicatePaintLayer(Mesh& mesh, int layer);
-// Deletes a layer (not Base); with the last one gone the mesh is plain polypaint again.
+// Deletes a layer (not Base); with the last one gone the mesh is plain vertex paint again.
 bool removePaintLayer(Mesh& mesh, int layer);
 // Moves a layer one place up (+1) or down (-1); Base stays at the bottom.
 bool movePaintLayer(Mesh& mesh, int layer, int direction);

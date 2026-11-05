@@ -800,7 +800,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             break;
         }
         if (p.sizeIndex == 0 && p.results.empty()) {
-            if (lightbox_.open()) lightbox_.toggle(); // the canvas clear (it opens at start-up)
+            if (libraryBrowser_.open()) libraryBrowser_.toggle(); // the canvas clear (it opens at start-up)
             if (!p.vsync) SDL_GL_SetSwapInterval(0);
             p.gpu = std::string(reinterpret_cast<const char*>(gl::GetString(GL_RENDERER))) + ", OpenGL " +
                     reinterpret_cast<const char*>(gl::GetString(GL_VERSION));

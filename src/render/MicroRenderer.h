@@ -88,6 +88,7 @@ private:
     size_t bytes_ = 0;
     MicroShader shader_;
     std::vector<uint64_t> pending_; // per base triangle: shading out of date
+    double shadeNsPerPoint_ = 0.0;  // what shading a grid point (and sending it) took lately (TierConfig::strokeShadeMs)
     size_t pendingCount_ = 0;
     std::vector<uint32_t> scratch_, written_, stageIndex_;
     std::vector<uint8_t> staging_;
