@@ -47,6 +47,7 @@ public:
     size_t gpuBytes() const;
     bool closed() const { return closed_; }
     // Grid points whose shading still waits for a frame (budget), for tests and the benchmark.
+    bool firstShadingPending() const { return initialSlot_ < baseTriangles_; } // (clusters draw unshaded: Renderer's variant)
     size_t pendingShading() const { return pendingCount_ + size_t(baseTriangles_ - initialSlot_) * samples_; }
     // Grid points of shading recomputed per sync at most (0 = no limit).
     size_t shadeBudget = size_t(3) << 20;
@@ -108,6 +109,7 @@ private:
     MicroShader shader_;
     std::vector<uint64_t> pending_; // per base triangle: shading out of date
     double shadeNsPerPoint_ = 0.0;  // what shading a grid point (and sending it) took lately (TierConfig::strokeShadeMs)
+    double initialNsPerPoint_ = 0.0; // the same for the first shading (no ring, mapped: cheaper; kept out of a stroke's budget)
     size_t pendingCount_ = 0;
     uint32_t initialSlot_ = 0; // slots below this have had their first shading (the clusters past it draw unshaded)
     std::vector<uint8_t> initialStage_;

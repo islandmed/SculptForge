@@ -484,14 +484,14 @@ void MicroRenderer::shadeInitial(const Mesh& mesh) {
     if (initialSlot_ >= baseTriangles_) return;
     const size_t S = samples_;
     // Points this frame: initialShadeMs at the measured cost (the ring around a run adds a little), whole clusters.
-    const double ns = shadeNsPerPoint_ > 0.0 ? shadeNsPerPoint_ : 25.0;
+    const double ns = initialNsPerPoint_ > 0.0 ? initialNsPerPoint_ : 25.0;
     const double ms = viewMoving ? std::min(initialShadeMs, initialShadeMovingMs) : initialShadeMs;
     const size_t points = size_t(std::max(1.0, ms * 1e6 / ns));
     const uint32_t size = 1u << clusterShift_;
     uint32_t slots = uint32_t(std::clamp<size_t>(points / S, size, size_t(1) << 22)) & ~(size - 1);
     // Once the cost is measured: the rest at once if it takes under 2.5 s (a smaller level then costs one extra
     // frame in all, not many frames' overhead, even on a busy CPU), else in frame-sized runs (a dense scan).
-    if (shadeNsPerPoint_ > 0.0 && !viewMoving && double(baseTriangles_ - initialSlot_) * double(S) * ns < 2.5e9)
+    if (initialNsPerPoint_ > 0.0 && !viewMoving && double(baseTriangles_ - initialSlot_) * double(S) * ns < 2.5e9)
         slots = baseTriangles_ - initialSlot_;
     const uint32_t end = std::min(baseTriangles_, initialSlot_ + std::max(slots, size));
     if (!initialSorted_.empty()) sendStaged(initialStage_, initialSorted_);
@@ -535,7 +535,7 @@ void MicroRenderer::shadeInitial(const Mesh& mesh) {
         if (shaded) {
             const double ns = std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - started).count() /
                               double(shaded * S);
-            shadeNsPerPoint_ = shadeNsPerPoint_ > 0.0 ? shadeNsPerPoint_ * 0.7 + ns * 0.3 : ns;
+            initialNsPerPoint_ = initialNsPerPoint_ > 0.0 ? initialNsPerPoint_ * 0.7 + ns * 0.3 : ns;
             if (std::getenv("SF_OPEN_PROFILE"))
                 std::fprintf(stderr, "first shading: %u slots, %.1f ns a point, %.0f ms\n", end - initialSlot_, ns,
                              ns * double(shaded * S) * 1e-6);
@@ -829,7 +829,7 @@ size_t MicroRenderer::draw(GLuint program, const CullView& cullIn, const glm::ma
     int boundChunk = -1;
     int unrolledLevel = -2; // the patch uCorners holds (-1: instanced draws)
     // Clusters at or past initialSlot_ wait for their first shading (runs split there).
-    const uint32_t firstUnshaded = initialSlot_ >> clusterShift_;
+    const uint32_t firstUnshaded = initialSlot_ < baseTriangles_ ? initialSlot_ >> clusterShift_ : clusters; // (a partial last one is shaded)
     int unshadedOn = -1;
     for (uint32_t c = 0; c < clusters;) {
         if (!visible[c]) {

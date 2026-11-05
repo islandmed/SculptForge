@@ -489,6 +489,7 @@ private:
     };
     static constexpr int kPaint = 1, kPrim = 2, kTextured = 4, kNormalMap = 8, kFlat = 16, kMicro = 32, kGhost = 64,
                          kPbr = 128;
+    static constexpr int kMicroUnshaded = kGhost; // (micro only, never ghosted: its first-shading variant)
     MeshProgram programs_[256];
     void drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings);
     std::string programError_;
