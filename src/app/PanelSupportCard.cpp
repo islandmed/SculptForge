@@ -572,14 +572,14 @@ void App::verifyMember() {
     }
     memberVerifying_ = true;
     memberMomentPending_ = MemberMoment::None;
-    startMemberSignIn(); // (PanelUpdate.cpp; a sign-in already running is kept)
+    startMemberSignIn([this](bool member) { memberSignInFinished(member); }); // (PanelUpdate.cpp: the one sign-in)
     redrawIn(0.0);
 }
 
-void App::memberSignInFinished(bool ok) {
-    if (ok) memberCardChoice(MemberCardChoice::SignedIn); // gone for good (and member builds are on)
-    else if (memberVerifying_) memberCardChoice(MemberCardChoice::NoSignIn);
+void App::memberSignInFinished(bool member) {
     memberVerifying_ = false;
+    // A member: gone for good (and member builds are on). Not signed in (cancelled, declined, no access): 3 months.
+    memberCardChoice(member ? MemberCardChoice::SignedIn : MemberCardChoice::NoSignIn);
 }
 
 void App::drawMemberCard() {
@@ -605,7 +605,7 @@ void App::drawMemberCard() {
             ImGui::TextDisabled("%s", "It can only read the member builds; Preferences > Updates signs out.");
             ImGui::Spacing();
             if (memberSignIn_) drawMemberSignInSteps(); // (PanelUpdate.cpp)
-            else memberSignInFinished(memberSignedIn()); // (a sign-in that ended before it drew)
+            else memberSignInFinished(memberSignedIn()); // (gone without an answer: Sign out in Preferences meanwhile)
         } else {
             std::string line;
             switch (memberCard_) {
