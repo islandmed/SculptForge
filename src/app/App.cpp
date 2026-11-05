@@ -1948,14 +1948,15 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     haveLastDab_ = false;
     doc_.sculptor.draftStrokes = draftStrokes() && asyncStrokeAllowed(); // (AsyncStroke.cpp)
     doc_.sculptor.adaptiveDabs = fastBigBrushes();
-    // Where the CPU has room: the exact normals the analytic ones defer land at the pen-up, which on a 4-core floor
-    // machine cost more than they saved (E-core floor, 120 px release 0.5 -> 1.3 s); 6+ threads won (laptop 240 px
-    // p50 247 -> 156 ms). SF_ANALYTIC_NORMALS=0/1 forces it (A/B).
-    static const bool analyticNormals = [] {
-        if (const char* e = std::getenv("SF_ANALYTIC_NORMALS")) return e[0] != '0';
-        return !simulatedFloorTier() && std::thread::hardware_concurrency() >= 6;
+    // Big brushes where the CPU has room: the exact normals the analytic ones defer land at the pen-up. On a 4-core
+    // floor machine that cost more than it saved (E-core floor, 120 px release 0.5 -> 1.3 s), and at 120 px even on
+    // the 3060 (release +190 ms for -45 ms lag); from 160 px on 6+ threads it wins (3060 240 px p50 428 -> 283 ms,
+    // release +50). SF_ANALYTIC_NORMALS=0/1 forces it (A/B).
+    static const int analyticNormals = [] {
+        if (const char* e = std::getenv("SF_ANALYTIC_NORMALS")) return e[0] != '0' ? 1 : 0;
+        return !simulatedFloorTier() && std::thread::hardware_concurrency() >= 6 ? -1 : 0; // -1: by brush size
     }();
-    doc_.sculptor.analyticNormals = analyticNormals;
+    doc_.sculptor.analyticNormals = analyticNormals == 1 || (analyticNormals == -1 && radiusPx_ >= 160.0f);
     if (!doc_.sculptor.beginStroke(doc_.mesh,
                                    !strokeSculpt_ ? std::string("Paint") : recipe ? recipe->name : brushLabel(strokeBrush_),
                                    strokeSculpt_ ? doc_.activeLayer : -1)) {
