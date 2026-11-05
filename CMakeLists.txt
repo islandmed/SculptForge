@@ -833,6 +833,8 @@ if(SCULPTFORGE_BUILD_TESTS)
       set_tests_properties(ui_hardware_profile PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1")
     endif()
     # The shell layout again on a 1920x1080 window (docs/ui-design.md §2.3).
+    # Studio mode: About shows the studio (tests/data/studio; core/StudioProfile.h).
+    sculptforge_ui_test(studio_mode studio/studio_mode --studio ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/studio/studio.json)
     sculptforge_ui_test(shell_layout_1080 shell_layout --size 1920x1080)
     sculptforge_ui_test(help_console_1080 help_console --size 1920x1080)
     # The S / U / I / O slider on a UI scaled 1.5x (Windows at 150%, #9): it must still open under the cursor.
