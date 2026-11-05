@@ -14,8 +14,6 @@ highlight: Dense scans keep up: orbit after a big stroke on a 112M scan, 0.7 to 
 title: Dense scans, fast
 line: Lucy 112M on an RTX 3060: orbit right after a big stroke, 0.7 to 51 frames a second.
 image: images/wn-0111-lucy.jpg
-clip: images/wn-0111-lucy.mp4
-frames: images/wn-0111-lucy-frames.jpg 8x10 8
 action: guide:performance.md#working-with-big-meshes
 ```
 
