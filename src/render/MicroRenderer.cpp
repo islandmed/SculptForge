@@ -792,12 +792,14 @@ size_t MicroRenderer::draw(GLuint program, const CullView& cullIn, const glm::ma
         u_.unrolled = at("uUnrolled");
         u_.corners = at("uCorners");
         u_.unshaded = at("uUnshaded");
+        u_.projInv = at("uProjInv");
         gl::Uniform1i(at("uTris"), 8);
         gl::Uniform1i(at("uBase"), 9);
         gl::Uniform1i(at("uDisp"), 10);
         gl::Uniform1i(at("uLevels"), 11);
         gl::Uniform1i(at("uShade"), 12);
     }
+    if (initialSlot_ < baseTriangles_) gl::UniformMatrix4fv(u_.projInv, 1, GL_FALSE, glm::value_ptr(glm::inverse(proj)));
     gl::Uniform1i(u_.n, int(n_));
     gl::Uniform1i(u_.samples, int(samples_));
     gl::Uniform1f(u_.step, step_);

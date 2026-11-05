@@ -321,7 +321,7 @@ flat in int vPrimBase;
 flat in int vSlot;
 in vec2 vIJ;
 uniform int uUnshaded; // 1: the cluster's shading isn't there yet (just opened): the drawn facets light it
-uniform mat4 uProj;
+uniform mat4 uProjInv;  // the inverse projection (the unshaded clusters' facets)
 uniform vec4 uViewport; // the view's rectangle in window pixels
 uniform samplerBuffer uShade;
 uniform int uN;
@@ -343,7 +343,7 @@ void microFetch() {
         // The pixel's view-space point from its depth (no extra vertex outputs: they'd slow every frame), and the
         // facet's normal from that point's screen-space slopes, turned towards the viewer.
         vec4 ndc = vec4((gl_FragCoord.xy - uViewport.xy) / uViewport.zw * 2.0 - 1.0, gl_FragCoord.z * 2.0 - 1.0, 1.0);
-        vec4 q = inverse(uProj) * ndc;
+        vec4 q = uProjInv * ndc;
         vec3 v = q.xyz / q.w;
         vec3 f = cross(dFdx(v), dFdy(v));
         f = dot(f, f) > 1e-30 ? normalize(f) : vec3(0.0, 0.0, 1.0);

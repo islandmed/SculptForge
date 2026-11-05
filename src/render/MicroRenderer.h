@@ -121,7 +121,7 @@ private:
     struct Uniforms {
         GLuint program = 0;
         GLint slotBase = -1, chunkSlot = -1, level = -1, n = -1, samples = -1, clusterShift = -1, step = -1, unrolled = -1,
-              corners = -1, unshaded = -1;
+              corners = -1, unshaded = -1, projInv = -1;
     } u_;
 };
 
