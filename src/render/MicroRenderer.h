@@ -97,7 +97,7 @@ private:
     size_t pendingCount_ = 0;
     std::vector<uint32_t> scratch_, written_, stageIndex_;
     std::vector<uint8_t> clusterSeen_;
-    std::vector<uint64_t> slotBits_;
+    std::vector<uint64_t> slotBits_, baseBits_;
     std::vector<uint8_t> staging_;
     std::vector<uint32_t> levels_;
     std::vector<int8_t> want_;

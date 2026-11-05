@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <atomic>
 #include <bit>
 #include <cmath>
 #include <cstring>
@@ -536,45 +537,50 @@ bool MicroRenderer::sync(Mesh& mesh) {
         uploadDispTiles(mesh, scratch_, true);
         shadePending(mesh, true);
     } else {
-        // The base cage moved (dual-scale Move, a transform, undo of either): the detail rides along on the GPU (it
-        // is relative to the base); what changes is the base, the bounds and the shading around moved vertices.
+        // The base cage moved (dual-scale Move, big brushes on a dense base, a transform, undo of any): the detail
+        // rides along on the GPU (it is relative to the base); what changes is the base, the bounds and the shading
+        // around moved vertices. Their triangles in a bitset (millions on a scan: no lists to sort).
         bool baseEverywhere = false;
-        std::vector<uint32_t> baseTris;
+        const size_t words = mm.dirtyBits.size();
+        baseBits_.assign(words, 0);
+        bool anyBase = false;
         if (baseMoved) {
-            size_t moved = 0;
             const uint32_t b0 = mesh.dirtyBegin, b1 = std::min<uint32_t>(mesh.dirtyEnd, uint32_t(mesh.vertexCount()));
-            for (uint32_t v = b0; v < b1; ++v)
-                if (mesh.vertexDirty(v)) ++moved;
-            baseEverywhere = moved * 4 > mesh.vertexCount();
+            std::atomic<size_t> moved{0};
+            poolFor(size_t(b1 - b0), [&](size_t b, size_t e) {
+                size_t count = 0;
+                for (size_t i = b; i < e; ++i) {
+                    const uint32_t v = b0 + uint32_t(i);
+                    if (!mesh.vertexDirty(v)) continue;
+                    ++count;
+                    for (uint32_t t : mesh.vertexTriangles(v))
+                        std::atomic_ref<uint64_t>(baseBits_[t >> 6]).fetch_or(uint64_t(1) << (t & 63), std::memory_order_relaxed);
+                }
+                moved.fetch_add(count, std::memory_order_relaxed);
+            }, 1 << 14);
+            anyBase = moved.load() > 0;
+            baseEverywhere = moved.load() * 4 > mesh.vertexCount();
             if (baseEverywhere) {
                 uploadBase(mesh);
                 bytes_ -= mesh.vertexCount() * 2 * sizeof(glm::vec4);
-                std::vector<uint32_t> all(bounds_.size());
-                for (uint32_t c = 0; c < all.size(); ++c) all[c] = c;
-                updateClusterBounds(mesh, all);
-            } else {
+            } else if (anyBase) {
                 std::vector<glm::vec4> part(size_t(b1 - b0) * 2);
-                for (uint32_t v = b0; v < b1; ++v) {
-                    part[size_t(v - b0) * 2] = glm::vec4(mesh.positions[v], 1.0f);
-                    part[size_t(v - b0) * 2 + 1] = glm::vec4(mesh.normals[v], 0.0f);
-                    if (mesh.vertexDirty(v))
-                        for (uint32_t t : mesh.vertexTriangles(v)) baseTris.push_back(t);
-                }
+                poolFor(size_t(b1 - b0), [&](size_t b, size_t e) {
+                    for (size_t i = b; i < e; ++i) {
+                        part[i * 2] = glm::vec4(mesh.positions[b0 + i], 1.0f);
+                        part[i * 2 + 1] = glm::vec4(mesh.normals[b0 + i], 0.0f);
+                    }
+                }, 1 << 16);
                 gl::BindBuffer(GL_TEXTURE_BUFFER, baseData_);
                 gl::BufferSubData(GL_TEXTURE_BUFFER, GLintptr(size_t(b0) * 2 * sizeof(glm::vec4)), GLsizeiptr(part.size() * sizeof(glm::vec4)),
                                   part.data());
                 gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
             }
         }
-        // This sync's dirty triangles.
+        // This sync's triangles whose heights changed: their tiles go to the GPU (a moved base sends no heights).
         scratch_.clear();
-        for (size_t w = 0; w < mm.dirtyBits.size(); ++w)
+        for (size_t w = 0; w < words; ++w)
             for (uint64_t bits = mm.dirtyBits[w]; bits; bits &= bits - 1) scratch_.push_back(uint32_t(w * 64 + size_t(std::countr_zero(bits))));
-        if (!baseTris.empty()) {
-            scratch_.insert(scratch_.end(), baseTris.begin(), baseTris.end());
-            std::sort(scratch_.begin(), scratch_.end());
-            scratch_.erase(std::unique(scratch_.begin(), scratch_.end()), scratch_.end());
-        }
         if (mm.allDirty || mm.rescaled) {
             uploadDispTiles(mesh, scratch_, true);
         } else if (!scratch_.empty()) {
@@ -582,17 +588,31 @@ bool MicroRenderer::sync(Mesh& mesh) {
             for (size_t i = 0; i < scratch_.size(); ++i) slots[i] = slotOf_[scratch_[i]];
             uploadDispTiles(mesh, slots, false);
         }
-        if (!scratch_.empty()) { // their clusters may reach further now
-            std::vector<uint32_t> cl;
+        // Bounds: the clusters whose base moved in full, those whose heights alone changed by their range.
+        if (!scratch_.empty() || anyBase) {
+            std::vector<uint32_t> moved, heights;
             clusterSeen_.assign(bounds_.size(), 0);
+            for (size_t w = 0; w < words; ++w)
+                for (uint64_t bits = baseBits_[w]; bits; bits &= bits - 1) {
+                    const uint32_t c = slotOf_[uint32_t(w * 64 + size_t(std::countr_zero(bits)))] >> clusterShift_;
+                    if (clusterSeen_[c] != 1) clusterSeen_[c] = 1, moved.push_back(c);
+                }
             for (uint32_t t : scratch_) {
                 const uint32_t c = slotOf_[t] >> clusterShift_;
-                if (!clusterSeen_[c]) clusterSeen_[c] = 1, cl.push_back(c);
+                if (!clusterSeen_[c]) clusterSeen_[c] = 2, heights.push_back(c);
             }
-            if (baseTris.empty() && !baseEverywhere) updateClusterRanges(mesh, cl); // (only the displacement changed)
-            else updateClusterBounds(mesh, cl);
+            if (!moved.empty()) updateClusterBounds(mesh, moved);
+            if (!heights.empty()) updateClusterRanges(mesh, heights);
         }
-        if (mm.allDirty || baseEverywhere) {
+        // Their shading follows within the frame's budget (moved base included: a stroke that moves a quarter of a
+        // scan's base no longer re-shades all of it at once).
+        if (anyBase)
+            for (size_t w = 0; w < words; ++w)
+                if (const uint64_t add = baseBits_[w] & ~pending_[w]) {
+                    pending_[w] |= add;
+                    pendingCount_ += size_t(std::popcount(add));
+                }
+        if (mm.allDirty) {
             shadePending(mesh, true);
         } else {
             for (uint32_t t : scratch_) {
