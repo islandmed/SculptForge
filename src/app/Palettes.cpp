@@ -834,6 +834,7 @@ void App::drawPalette_Tool() {
                 drawKeepTextureCheckbox("Keep Texture##remesh", "Tool > Remesh"); // only for a painted Part
             }
         }
+        drawQuickRemeshContents(); // Quick Remesh, Remesh after each stroke (#121, PanelRetopo.cpp)
     }
     if (subpalette("tool.deformation", "Deformation")) {
         tray::Section section;

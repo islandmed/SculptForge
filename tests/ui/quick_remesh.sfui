@@ -1,0 +1,125 @@
+# #121: Tool > Remesh > Quick Remesh (Shift+R, or N held while clicking or dragging on the background) and Remesh
+# after each stroke. Both remesh the active Part at the Voxel Remesh resolution in the background, one undo step each.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run new_sphere subdivisions=4
+key f
+camera 0 0
+remember triangles before
+
+# Off by default: Shift+R only says where to turn it on.
+click "Remesh##tool.remesh"
+expect_value quick_remesh == 0
+expect_value remesh_after_stroke == 0
+key shift+r
+expect_status Quick Remesh is off
+expect_value voxel_remesh_running == 0
+hold ctrl
+hover "Quick Remesh##remesh.quick"
+expect_help "Shift+R"
+hover "Remesh after each stroke##remesh.after_stroke"
+expect_help "stretched"
+hold none
+
+# On: Shift+R remeshes in the background; one undo step.
+click "Quick Remesh##remesh.quick"
+expect_value quick_remesh == 1
+key shift+r
+expect_value voxel_remesh_running == 1
+wait_idle 120
+expect_status Quick Remesh: remeshed
+expect_value triangles != $before
+shot quick_remesh_panel
+key ctrl+z
+expect_value triangles == $before
+
+# N held and a drag on the background: remeshes, and the view stays put.
+remember camera_yaw yaw0
+key_down n
+drag_path 0.03 0.03 0.1 0.05
+key_up n
+expect_value camera_yaw == $yaw0
+wait_idle 120
+expect_status Quick Remesh: remeshed
+expect_value triangles != $before
+key ctrl+z
+expect_value triangles == $before
+# Without N the same drag turns the view, as before.
+drag_path 0.03 0.03 0.1 0.05
+expect_value camera_yaw != $yaw0
+expect_value voxel_remesh_running == 0
+camera 0 0
+# N held on the model: still a brush stroke.
+key_down n
+stroke 0.4 0.5 0.6 0.5
+key_up n
+expect_value can_undo == 1
+expect_value voxel_remesh_running == 0
+expect_value triangles == $before
+key ctrl+z
+
+# Remesh after each stroke: a gentle stroke leaves the mesh alone; a long Move pull remeshes it after pen-up.
+click "Remesh after each stroke##remesh.after_stroke"
+expect_value remesh_after_stroke == 1
+stroke 0.4 0.5 0.6 0.5
+expect_value can_undo == 1
+wait_idle 30
+expect_value voxel_remesh_running == 0
+expect_value triangles == $before
+key ctrl+z
+click "Move##brush.move"
+snapshot
+stroke 0.86 0.5 0.98 0.38
+expect_value moved > 0
+expect_value stroke_stretched >= 6
+wait_idle 120
+expect_status Remeshed after the stroke
+expect_value triangles != $before
+shot remesh_after_stroke
+# One undo step for the remesh: the pulled surface comes back with its old triangles; one more undoes the pull.
+key ctrl+z
+expect_value triangles == $before
+expect_value can_undo == 1
+key ctrl+z
+expect_value can_undo == 0
+click "Remesh after each stroke##remesh.after_stroke"
+click "Standard##brush.standard"
+
+# Neither key is taken in any input style, and the drag works with each style's empty-canvas drags.
+input_style classic
+expect_shortcut geometry.quick_remesh Shift+R
+expect_shortcut geometry.quick_remesh_drag N
+expect_value shortcut_conflicts == 0
+input_style blender
+expect_shortcut geometry.quick_remesh Shift+R
+expect_shortcut geometry.quick_remesh_drag N
+expect_value shortcut_conflicts == 0
+camera 0 0
+remember camera_yaw yaw1
+key_down n
+drag_path 0.03 0.03 0.1 0.05
+key_up n
+expect_value camera_yaw == $yaw1
+wait_idle 120
+expect_status Quick Remesh: remeshed
+key ctrl+z
+expect_value triangles == $before
+input_style maya
+expect_shortcut geometry.quick_remesh Shift+R
+expect_shortcut geometry.quick_remesh_drag N
+expect_value shortcut_conflicts == 0
+input_style sculptforge
+expect_shortcut geometry.quick_remesh Shift+R
+expect_shortcut geometry.quick_remesh_drag N
+expect_value shortcut_conflicts == 0
+input_style classic
+
+# Off again: the held key does nothing special (the drag turns the view).
+click "Quick Remesh##remesh.quick"
+expect_value quick_remesh == 0
+camera 0 0
+key_down n
+drag_path 0.03 0.03 0.1 0.05
+key_up n
+expect_value camera_yaw != $yaw1
+expect_value voxel_remesh_running == 0
+camera 0 0

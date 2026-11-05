@@ -94,6 +94,30 @@ What happens to your data:
 To remesh several Parts into one, first combine them with **Merge visible...** or **Merge down...** in
 [Parts](parts.md#merge-parts).
 
+### Quick Remesh
+
+Remesh as you sculpt, without going to the palette (#121). Turn on **Tool > Remesh > Quick Remesh**, then:
+
+- press <kbd>Shift</kbd>+<kbd>R</kbd>, or
+- hold <kbd>N</kbd> and click or drag on the background (anywhere off the model; on the model it stays a brush
+  stroke).
+
+Either one remeshes the active Part at the **Resolution** above, with **Keep Masked** and **Keep Texture** as set
+there. It runs in the background with the same progress bar and **Cancel**, so you can keep sculpting; the status
+bar says when it's done and how many triangles the Part has now. Each remesh is one undo step. If you sculpt or
+undo while it runs, it doesn't throw that work away: it remeshes the Part again as it is now.
+
+Both keys change in **Edit > Preferences > Hotkeys** (*Quick Remesh* and *Quick Remesh (hold and drag)*). Neither
+<kbd>Shift</kbd>+<kbd>R</kbd> nor <kbd>N</kbd> is used by any key style, and holding <kbd>N</kbd> changes no other
+drag on the background: without it, a drag there turns, pans or zooms the view, or draws the mask and hide shapes,
+exactly as your key style says. With Quick Remesh off, the keys only tell you where to turn it on.
+
+**Remesh after each stroke** (off by default) does it for you: when you lift the pen after a stroke that stretched
+the surface (edges pulled to more than 1.6 times their length, as a long Move or Snake Hook pull does), the active
+Part is remeshed in the background. Strokes that don't stretch anything, and masking or painting, never remesh.
+Sculpting never waits for it. It skips Parts with subdivision levels, sculpt layers or a painted texture (Keep
+Texture), where a remesh would bake or drop them; use the button or <kbd>Shift</kbd>+<kbd>R</kbd> there.
+
 ## Quad Remesh
 
 **Tool > Geometry > Quad Remesh** is automatic quad retopology: it rebuilds the Part as

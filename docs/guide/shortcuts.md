@@ -155,6 +155,8 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Lower Res | <kbd>Shift</kbd>+<kbd>D</kbd> | Step one subdivision level down (fewer polygons, for big forms). The detail of the higher levels is kept. |
 | Mask All | <kbd>Ctrl</kbd>+<kbd>A</kbd> | Mask the whole visible Part. |
 | Preview | <kbd>A</kbd> | Show the skin Make Mesh would build instead of the spheres. Turn it off to edit the spheres again. |
+| Quick Remesh | <kbd>Shift</kbd>+<kbd>R</kbd> | With Tool > Remesh > Quick Remesh on: remesh the active Part at the Voxel Remesh resolution, in the background. |
+| Quick Remesh (hold and drag) | <kbd>N</kbd> | With Tool > Remesh > Quick Remesh on: hold this key and click or drag on the background (not on the model) to remesh the active Part. |
 
 ### Transform
 

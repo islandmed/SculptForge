@@ -157,7 +157,7 @@ public:
 
 private:
     enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, PartClick, Select, Gizmo, Guide, Sculptable, ForgeSphere, Insert, Capture,
-                      AirStroke, UvTool, SizeScrub }; // AirStroke: a stroke begun off the model, waiting to reach it (#62)
+                      AirStroke, UvTool, SizeScrub, QuickRemesh }; // AirStroke: a stroke begun off the model, waiting to reach it (#62)
 
     void handleEvent(const SDL_Event& e); // the pen's mouse events first (penMouseEvents), then dispatchEvent
     void dispatchEvent(const SDL_Event& e);
@@ -1063,9 +1063,22 @@ private:
     void drawKeepTextureCheckbox(const char* id, const char* path); // Keep Texture under Remesh and QRemesh (PanelTexture.cpp)
     // Voxel Remesh of a painted Part with Keep Texture: the remesh, Auto UV and texture transfer run on a
     // worker thread (PanelRetopo.cpp); otherwise Voxel Remesh is the plain remesh command.
-    void startVoxelRemesh();
+    // Who asked (#121): the button, Quick Remesh (its key or the held-key drag on the background) or Remesh after
+    // each stroke. The quick ones never land over strokes made while they ran: they remesh again instead.
+    enum class RemeshTrigger { Button, Quick, AfterStroke };
+    void startVoxelRemesh(RemeshTrigger trigger = RemeshTrigger::Button);
     void pollVoxelRemesh();
+    void quickRemesh(RemeshTrigger trigger); // Quick Remesh / Remesh after each stroke: checks, then startVoxelRemesh
+    void drawQuickRemeshContents();          // their checkboxes under Tool > Remesh (PanelRetopo.cpp)
+    void strokeEndedForRemesh(const UndoRecord& stroke); // Remesh after each stroke: did it stretch the surface?
+    bool quickRemeshDragDown(float x, float y);          // a press on the background with the drag key held
+    void quickRemeshKey(SDL_Keycode key, SDL_Keymod mods, bool down); // tracks the held drag key
+    SDL_Keycode quickRemeshDragKey_ = SDLK_UNKNOWN; // the "hold and drag" key while it is down
+    bool autoRemeshDue_ = false;                    // a stroke stretched the surface: remesh once nothing waits
+    size_t lastStrokeStretched_ = 0;                // the last stroke's stretched edges (UI tests: stroke_stretched)
     struct VoxelRemeshJob {
+        RemeshTrigger trigger = RemeshTrigger::Button;
+        uint64_t revision = 0; // doc_.undo.revision() when it began (the quick ones land only on that state)
         std::future<bool> done;
         std::shared_ptr<std::atomic<float>> progress;
         std::shared_ptr<std::atomic<bool>> cancel;

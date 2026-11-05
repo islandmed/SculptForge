@@ -53,6 +53,9 @@ struct UiPrefs {
     // vertical as the other styles. invertZoom turns every zoom drag around.
     bool mayaZoomHorizontal = true;
     bool invertZoom = false;
+    // Tool > Remesh (#121): Quick Remesh (Shift+R, or hold N and drag on the background, remeshes the active Part at
+    // the Voxel Resolution) and Remesh after each stroke (a stroke that stretched the surface remeshes it).
+    bool quickRemesh = false, remeshAfterStroke = false;
     // Along the normal (from the discussions): 0 = with the invert key (Alt; Ctrl in the Blender and Maya styles),
     // 1 = always, 2 = never. For Move, Tendril, Elastic Tendril and KelvinGrab.
     int alongNormal = 0;
