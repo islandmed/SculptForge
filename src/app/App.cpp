@@ -2688,7 +2688,10 @@ void App::drawUi() {
                 if (!p.logo.empty())
                     if (const ImTextureID logo = thumbs_.file(p.logo)) ImGui::Image(logo, ImVec2(96 * uiScale_, 96 * uiScale_));
                 ImGui::TextWrapped("%s", p.name.empty() ? "Studio mode" : ("Studio build for " + p.name).c_str());
-                ImGui::TextDisabled("Offline: no outside connections. Updates come only from your studio's channel.");
+                ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+                ImGui::TextWrapped("Offline: no outside connections. Updates come only from your studio's channel.");
+                ImGui::PopStyleColor();
+                ImGui::Spacing();
             }
             ImGui::TextWrapped("Free and open-source digital sculpting.");
             ImGui::Spacing();
