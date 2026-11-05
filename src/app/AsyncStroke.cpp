@@ -12,6 +12,7 @@
 #include "app/AsyncStroke.h"
 
 #include "core/Micro.h"
+#include "core/PerfTrace.h"
 #include "core/Sculpt.h"
 #include "core/TierConfig.h"
 
@@ -385,7 +386,8 @@ void App::finishStrokeNow() {
     strokeMask_ = false;
     maskClickPending_ = false;
     firstDabPending_ = false;
-    // Preferences > Performance shows what the stroke cost.
+    // Preferences > Performance shows what the stroke cost (and Help > Record a performance trace writes it).
+    const bool traceStroke = doc_.sculptor.timings.dabs > 0 && perftrace::on();
     if (doc_.sculptor.timings.dabs > 0) {
         perf_.lastStroke = doc_.sculptor.timings;
         perf_.lastStrokeSyncMs = perf_.strokeSyncMs;
@@ -395,6 +397,7 @@ void App::finishStrokeNow() {
     perf_.strokeSyncMs = 0.0;
     perf_.strokeFrames = 0;
     UndoRecord r = doc_.sculptor.endStroke();
+    if (traceStroke) tracePerfStroke(r.label);
     finishPaintStroke(r);
     if (r.topology && !r.topology->uvs.empty())
         status_ = "Dynamic topology removed the UVs of the remeshed Part (Undo brings them back)";

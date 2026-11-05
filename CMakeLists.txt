@@ -47,6 +47,7 @@ add_library(sculptforge_core STATIC
   src/core/Benchmark.cpp
   src/core/HardwareProfile.cpp
   src/core/FrameGovernor.cpp
+  src/core/PerfTrace.cpp
   src/core/TierConfig.cpp
   src/core/MemoryGuard.cpp
   src/core/Sculpt.cpp

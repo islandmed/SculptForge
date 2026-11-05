@@ -11,6 +11,7 @@
 #include "app/App.h"
 #include "app/UiServe.h"
 #include "app/CrashLog.h"
+#include "core/PerfTrace.h"
 #include "app/LookSchemes.h"
 #include "app/Palettes.h"
 #include "app/Ui.h"
@@ -671,6 +672,12 @@ void App::initActions() {
         ICON_LC_FILE_TEXT, nullptr, nullptr, nullptr,
         "Open the folder with sculptforge.log: what SculptForge did and, after a crash, what crashed. "
         "sculptforge-previous.log beside it is the last session's. Attach both to a problem report.");
+    add("help.perf_trace", "Record a performance trace", "Help", nullptr, [this] { togglePerfTrace(); }, ICON_LC_ACTIVITY,
+        nullptr, [] { return perftrace::on(); }, nullptr,
+        "While on, sculptforge-trace.log in the log folder records what makes SculptForge slow: every frame over 33 ms "
+        "with where its time went, strokes, uploads to the GPU, remeshes and other background jobs, the mesh size and "
+        "levels, and the GPU and driver. Turn it on, do what is slow, turn it off and attach the file to your report. "
+        "A small file on this computer only; off by default and costs nothing when off.");
     add("help.feedback", "Fixes & suggestions", "Help", nullptr,
         [] { SDL_OpenURL("https://github.com/islandmed/SculptForge/issues/new/choose"); }, ICON_LC_MESSAGE_SQUARE_PLUS,
         nullptr, nullptr, nullptr,

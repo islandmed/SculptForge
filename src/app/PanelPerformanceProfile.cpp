@@ -13,10 +13,14 @@
 // machine), and keep the fixed 10 million triangle Fast Navigation threshold.
 #include "app/App.h"
 #include "app/Calibration.h"
+#include "app/CrashLog.h"
 #include "app/Ui.h"
 
 #include "core/FrameGovernor.h"
 #include "core/HardwareProfile.h"
+#include "core/Micro.h"
+#include "core/Multires.h"
+#include "core/PerfTrace.h"
 #include "core/ThreadPool.h"
 #include "core/TierConfig.h"
 
@@ -27,6 +31,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <deque>
+#include <future>
 
 namespace sf {
 
@@ -532,6 +537,133 @@ void App::drawPerformanceProfileSection() {
     }
     ImGui::Separator();
     ImGui::Spacing();
+}
+
+} // namespace sf
+
+// --- Help > Record a performance trace (core/PerfTrace.h, #127) ---
+
+namespace sf {
+
+namespace {
+
+std::string millions(size_t n) { return n < 1000000 ? std::to_string(n) : fmt("%.2fM", double(n) * 1e-6); }
+
+} // namespace
+
+void App::togglePerfTrace() {
+    if (perftrace::on()) {
+        perftrace::stop();
+        status_ = "Performance trace stopped: sculptforge-trace.log is in the log folder (Help > Open log folder)";
+        return;
+    }
+    std::string folder = crashlog::path();
+    if (const size_t slash = folder.find_last_of("/\\"); slash != std::string::npos) folder.resize(slash + 1);
+    else folder.clear();
+    if (folder.empty()) {
+        if (char* pref = SDL_GetPrefPath("SculptForge", "SculptForge")) {
+            folder = pref;
+            SDL_free(pref);
+        }
+    }
+    HardwareInfo hw;
+    if (hwProfile_) hw = hwProfile_->profile.hardware;
+    else probeHardware(hw);
+    std::string header = std::string("SculptForge ") + SCULPTFORGE_VERSION + " performance trace | GPU " + hw.glRenderer +
+                         " (" + hw.glVendor + ", " + gpuKindName(hw.gpuKind) + ", " + std::to_string(hw.vramMB) +
+                         " MB) | OpenGL " + hw.glVersion + " | " + hw.cpu + ", " + std::to_string(hw.cpuThreads) +
+                         " threads, " + std::to_string(hw.ramMB) + " MB RAM, " + hw.simdBuild + " | " + hw.os;
+    if (hwProfile_)
+        header += std::string(" | profile ") + tierName(hwProfile_->profile.tier) + ", " +
+                  std::to_string(hwProfile_->tier.targetHz) + " Hz target, display " + std::to_string(hwProfile_->displayHz) + " Hz";
+    perf_.traceLongMs = perftrace::kLongFrameMs;
+    if (const char* ms = std::getenv("SF_PERF_TRACE_MS"); ms && *ms) perf_.traceLongMs = std::atof(ms);
+    header += fmt(" | frames over %.0f ms are written", perf_.traceLongMs);
+    if (folder.empty() || !perftrace::start(folder, header)) {
+        status_ = "Couldn't write the performance trace (the user data folder couldn't be written)";
+        return;
+    }
+    perf_.traceJobs = perfTraceJobs();
+    perf_.traceJobsSince = double(SDL_GetTicksNS()) * 1e-9;
+    perftrace::line("recording | " + perfTraceScene() + (perf_.traceJobs.empty() ? "" : " | running: " + perf_.traceJobs));
+    status_ = "Recording a performance trace: do what is slow, then Help > Record a performance trace again to stop";
+}
+
+std::string App::perfTraceScene() const {
+    const Mesh& m = doc_.mesh;
+    std::string s = "Part " + std::to_string(doc_.activePart + 1) + "/" + std::to_string(doc_.partCount()) + " " +
+                    millions(m.triangleCount()) + " tris " + millions(m.vertexCount()) + " verts";
+    if (const int levels = subdivLevelCount(m); levels > 0)
+        s += ", level " + std::to_string(subdivCurrentLevel(m) + 1) + "/" + std::to_string(levels);
+    if (m.micro) s += ", micro level " + std::to_string(m.micro->level) + " (" + millions(m.micro->microTriangles()) + " tris)";
+    s += " | scene " + millions(perf_.sceneTriangles) + " tris, drawn " + millions(renderer_.lastDrawnTriangles());
+    s += ", AA " + std::to_string(perf_.samplesUsed) + fmt(", view %.0f%%", double(uiPrefs_.viewResolution));
+    if (perf_.movingNow) s += ", moving";
+    if (perf_.proxyNow) s += ", proxy";
+    if (doc_.sculptor.strokeActive()) s += ", stroke";
+    if (perf_.gpuOutOfMemory) s += ", GPU out of memory";
+    return s;
+}
+
+std::string App::perfTraceJobs() const {
+    auto running = [](const auto& f) { return f.valid() && f.wait_for(std::chrono::seconds(0)) != std::future_status::ready; };
+    std::string s;
+    auto add = [&](bool busy, const char* name) {
+        if (!busy) return;
+        if (!s.empty()) s += ", ";
+        s += name;
+    };
+    add(bool(voxelRemesh_), "remesh");
+    add(bool(qremesh_), "QRemesh");
+    add(bool(autoUv_), "Auto UV");
+    add(bakeBusy(), "bake");
+    add(meshMapsBusy(), "mesh maps");
+    add(uvEditorBusy(), "UV editor");
+    add(thumbs_.busy(), "thumbnails");
+    add(libraryScanner_.busy(), "library scan");
+    add(galleryBusy(), "brush gallery");
+    add(renderer_.environmentPending(), "environment");
+    add(splatTrainBusy(), "splat training");
+    add(sculptableBusy(), "make sculptable");
+    add(phoneBusy(), "phone");
+    add(bool(updateJob_), "update check");
+    add(running(pendingBrush_) || running(pendingGenerator_) || running(pendingModels_) || running(pendingUnreal_) ||
+            running(pendingComfyCheck_),
+        "AI / bridge request");
+    add(solverBusy(), "stroke solver");
+    return s;
+}
+
+void App::tracePerfFrame(const double* phase) {
+    // Background jobs that started or ended since the last frame.
+    const double now = double(SDL_GetTicksNS()) * 1e-9;
+    if (std::string jobs = perfTraceJobs(); jobs != perf_.traceJobs) {
+        perftrace::line(fmt("jobs after %.2f s: ", now - perf_.traceJobsSince) + (perf_.traceJobs.empty() ? "none" : perf_.traceJobs) +
+                        " -> " + (jobs.empty() ? "none" : jobs));
+        perf_.traceJobs = std::move(jobs);
+        perf_.traceJobsSince = now;
+    }
+    const double total = phase[6] - phase[0];
+    if (total <= perf_.traceLongMs) return;
+    char buf[320];
+    std::snprintf(buf, sizeof buf,
+                  "long frame %.1f ms: events %.1f, dabs %.1f, UI %.1f, ghost + sync %.1f (uploads %.1f), draw %.1f, "
+                  "UI draw + swap %.1f | GPU %s ms (a frame before) | ",
+                  total, phase[1] - phase[0], phase[2] - phase[1], phase[3] - phase[2], phase[4] - phase[3], perf_.lastSyncMs,
+                  phase[5] - phase[4], phase[6] - phase[5],
+                  hwProfile_ && hwProfile_->lastGpuMs >= 0.0 ? fmt("%.1f", hwProfile_->lastGpuMs).c_str() : "?");
+    perftrace::line(buf + perfTraceScene() + (perf_.traceJobs.empty() ? "" : " | running: " + perf_.traceJobs));
+}
+
+void App::tracePerfStroke(const std::string& label) {
+    const SculptTimings& t = perf_.lastStroke;
+    char buf[256];
+    std::snprintf(buf, sizeof buf,
+                  "stroke %s: %llu dabs, %s verts moved, kernel %.1f ms, normals %.1f, BVH %.1f, dynamic topology %.1f, "
+                  "uploads %.1f over %d frames | ",
+                  label.c_str(), (unsigned long long)t.dabs, millions(size_t(t.vertices)).c_str(), t.kernelMs, t.normalsMs,
+                  t.bvhMs, t.remeshMs, perf_.lastStrokeSyncMs, perf_.lastStrokeFrames);
+    perftrace::line(buf + perfTraceScene());
 }
 
 } // namespace sf
