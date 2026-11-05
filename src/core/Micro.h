@@ -41,6 +41,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <span>
 #include <string>
 #include <vector>
@@ -75,6 +76,26 @@ struct MicroMesh {
     // neighbouring triangle (tri << 2 | its edge), or kNone on a boundary.
     std::vector<uint32_t> edgeNeighbor;
 
+    // Picks and brushes find the base triangles a displaced surface may reach through the BVH, each node grown by the
+    // largest displacement under it (not the level's largest everywhere: one tall stroke made every query on a
+    // dense base visit millions of triangles). Derived, per BVH: microQueryTriangles / microRayTriangles keep it.
+    struct Reach {
+        std::mutex lock;
+        const void* bvh = nullptr;
+        uint64_t structure = 0;
+        float step = 0.0f;
+        std::vector<float> pad;     // per BVH node, world units (upper bounds: they only shrink on a full pass)
+        std::vector<uint64_t> bits; // base triangles changed since (markDirty)
+        bool all = true;            // everything (markAllDirty, a rescale, a new level)
+        Reach() = default;
+        Reach(const Reach&) {} // (a copy starts over: it may be checked against another BVH)
+        Reach& operator=(const Reach&) {
+            all = true, bvh = nullptr;
+            return *this;
+        }
+    };
+    mutable Reach reach;
+
     // What changed since the renderer last looked: per base triangle a bit, or everything.
     std::vector<uint64_t> dirtyBits;
     bool allDirty = true;
@@ -103,11 +124,14 @@ struct MicroMesh {
         else if (e == 1) i = n - k, j = k;
         else i = 0, j = n - k;
     }
-    void markDirty(uint32_t tri) { dirtyBits[tri >> 6] |= uint64_t(1) << (tri & 63); }
+    void markDirty(uint32_t tri) {
+        dirtyBits[tri >> 6] |= uint64_t(1) << (tri & 63);
+        if (!reach.bits.empty()) reach.bits[tri >> 6] |= uint64_t(1) << (tri & 63);
+    }
     // Grows `step` (by powers of two, at least 4x) until +/-`need` world units fit, rescaling every value (each
     // loses its lowest bits). Returns the divisor applied (1 = it fitted already).
     int widen(float need);
-    void markAllDirty() { allDirty = true; }
+    void markAllDirty() { allDirty = true, reach.all = true; }
     void clearDirty();
     // Builds edgeNeighbor for `base` (if it doesn't fit already).
     void ensureTopology(const Mesh& base);
@@ -209,6 +233,11 @@ void microNoise(Mesh& m, float amplitude, float frequency, uint32_t seed = 1);
 // Ray against the micro surface: the base triangle hit (BVH) and its neighbourhood within the displacement range,
 // at full micro resolution. hit.triangle is the base triangle; hit.position / normal are on the micro surface.
 bool microRaycast(const Mesh& m, const BVH& bvh, const glm::vec3& origin, const glm::vec3& dir, RayHit& hit);
+// The base triangles whose displaced surface may come within `radius` of `center` (each BVH node grown by the
+// largest displacement and bulge under it, MicroMesh::Reach), for the caller's exact test per triangle.
+void microQueryTriangles(const Mesh& m, const BVH& bvh, const glm::vec3& center, float radius, std::vector<uint32_t>& out);
+// ... and those whose displaced surface the ray may cross.
+void microRayTriangles(const Mesh& m, const BVH& bvh, const glm::vec3& origin, const glm::vec3& dir, std::vector<uint32_t>& out);
 // bvh.raycast, or microRaycast on a mesh with a micro level: what brushes and the cursor pick.
 bool surfaceRaycast(const Mesh& m, const BVH& bvh, const glm::vec3& origin, const glm::vec3& dir, RayHit& hit);
 
