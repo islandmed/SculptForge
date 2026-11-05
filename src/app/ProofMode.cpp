@@ -101,6 +101,21 @@ std::vector<ProofMeshSize> proofStandardScene(const std::string& name) {
                                 }, 5};
         return {s1b};
     }
+    if (name.rfind("file:", 0) == 0) { // --benchmark-file: a project from disk (a scan, a real sculpt), the scoreboard's strokes
+        const std::string path = name.substr(5);
+        std::error_code ec;
+        const double bytes = double(std::filesystem::file_size(std::filesystem::path(std::u8string(path.begin(), path.end())), ec));
+        const ProofMeshSize s{ec ? 1.0 : bytes / 20e6, std::filesystem::path(path).stem().string(), [path](size_t) {
+                                  std::string err;
+                                  Document d;
+                                  if (!loadProject(path, d, err)) {
+                                      std::fprintf(stderr, "benchmark file %s: %s\n", path.c_str(), err.c_str());
+                                      return makeBenchHead(size_t(1) << 20);
+                                  }
+                                  return std::move(d.mesh);
+                              }, 150}; // (the file's size in 20-byte triangles, at the spheres' 150 bytes each: the memory check)
+        return {s};
+    }
     if (name == "core-200m" || name == "core-100m") { // research (docs/design/core-200m.md): micro triangles in memory, opened from a project
         const int millions = name == "core-100m" ? 100 : 200;
         const ProofMeshSize s{double(millions), std::to_string(millions) + "M micro", [millions](size_t) {
@@ -520,7 +535,7 @@ void App::startProofMode() {
     };
     p->jsonPath = !options_.benchmarkOut.empty() ? options_.benchmarkOut : u8(dir / ("sculptforge-benchmark-" + stamp + ".json"));
     p->videoPath = !options_.benchmarkVideo.empty() ? options_.benchmarkVideo : u8(dir / ("sculptforge-benchmark-" + stamp + ".mp4"));
-    if (p->scene.rfind("core-", 0) == 0) // the perf scoreboard (docs/design/perf-scoreboard.md): its three brush sizes, then orbit
+    if (p->scene.rfind("core-", 0) == 0 || p->scene.rfind("file:", 0) == 0) // the perf scoreboard (docs/design/perf-scoreboard.md): its three brush sizes, then orbit
         p->phases = {{"clay small", 25.0f, p->strokeSeconds, BrushType::Clay, 0.35f},
                      {"clay large", 120.0f, p->strokeSeconds, BrushType::Clay, 0.35f},
                      {"240 px brush", 240.0f, p->strokeSeconds, BrushType::Clay, 0.35f},
