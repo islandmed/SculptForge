@@ -5,6 +5,18 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.11.1
+
+```features
+date: unreleased
+tagline: Dense scans with micro levels keep up with the pen, and one-click updates on Windows and Linux.
+highlight: Dense scans keep up: orbit after a big stroke on a 112M scan, 0.7 to 51 fps
+title: Dense scans, fast
+line: Lucy 112M on an RTX 3060: orbit right after a big stroke, 0.7 to 51 frames a second.
+image: images/wn-0111-lucy.jpg
+action: guide:performance.md#working-with-big-meshes
+```
+
 ## Version 0.11.0
 
 ```features

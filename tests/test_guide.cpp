@@ -207,6 +207,19 @@ TEST(guide_whats_new_features) {
     CHECK(!whatsnew::parseFeatures("line: before any title\n", bad, err) && err.find("title") != std::string::npos);
     CHECK(!whatsnew::parseFeatures("colour: red\n", bad, err) && err.find("unknown key") != std::string::npos);
     CHECK(!whatsnew::parseFeatures("title: No action\nline: x\n", bad, err));
+    // A clip: the website's video and the app's frame sheet (COLSxROWS frames at FPS).
+    whatsnew::Version clip;
+    CHECK(whatsnew::parseFeatures("title: Faster\nline: x\nimage: images/a.jpg\naction: help.benchmark\n"
+                                  "clip: images/a.mp4\nframes: images/a-frames.jpg 8x6 5\n",
+                                  clip, err));
+    CHECK(clip.cards.size() == 1 && clip.cards[0].clip == "images/a.mp4" && clip.cards[0].frames == "images/a-frames.jpg");
+    CHECK(clip.cards.size() == 1 && clip.cards[0].frameCols == 8 && clip.cards[0].frameRows == 6 && clip.cards[0].frameFps == 5);
+    for (const char* f : {"frames: a.jpg\n", "frames: a.jpg 8x6\n", "frames: a.jpg 1x1 5\n", "frames: a.jpg 8x6 0\n",
+                          "frames: a.jpg 8by6 5\n", "frames: a.jpg 8x6 5 extra\n"}) {
+        whatsnew::Version w;
+        CHECK(!whatsnew::parseFeatures(std::string("title: T\nline: x\naction: a\n") + f, w, err));
+    }
+    CHECK(!whatsnew::parseFeatures("clip: before.mp4\n", bad, err) && err.find("title") != std::string::npos);
     CHECK(whatsnew::splitHighlight("Micro levels: a billion triangles") == std::make_pair(std::string("Micro levels"), std::string("a billion triangles")));
     CHECK(whatsnew::compareVersions("0.9.7", "0.10.0") < 0 && whatsnew::compareVersions("0.8", "0.8.0") == 0);
 }

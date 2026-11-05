@@ -1,0 +1,16 @@
+# What's New 0.11.1: the dense-scan card (Lucy, the RTX 3060 numbers). Pinned to 0.11.1, so it stays valid after
+# later releases.
+env SF_WHATS_NEW_VERSION 0.11.1
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+click "Help##palette.help"
+click "What's New##help.whats_new"
+wait 0.6
+expect_value whats_new_open == 1
+expect_value whats_new_cards >= 1
+expect_text "Dense scans, fast"
+expect_text "RTX 3060"
+shot whats_new_0111
+key escape
+wait 0.5
+expect_value whats_new_open == 0

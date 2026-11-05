@@ -307,7 +307,28 @@ void App::drawWhatsNew() {
     };
     auto picture = [&](const whatsnew::Card& c, ImVec2 p0, ImVec2 p1, ImDrawFlags corners, float appear) {
         ImVec2 texSize;
-        const ImTextureID tex = c.image.empty() ? ImTextureID(0) : guide_.image(c.image, &texSize);
+        // A clip (frames:): one picture of COLS x ROWS frames, played in a loop while the window is open.
+        ImTextureID tex = c.frames.empty() ? ImTextureID(0) : guide_.image(c.frames, &texSize);
+        if (tex) {
+            const int count = c.frameCols * c.frameRows;
+            const int frame = int((nowSeconds() - pop.openedAt) * c.frameFps) % count;
+            const ImVec2 cell(1.0f / float(c.frameCols), 1.0f / float(c.frameRows));
+            const ImVec2 f0(float(frame % c.frameCols) * cell.x, float(frame / c.frameCols) * cell.y);
+            const ImVec2 f1(f0.x + cell.x, f0.y + cell.y);
+            // Fitted, not cropped (a clip's labels sit at its edges): letterboxed on the clips' own dark grey.
+            const float aspect = texSize.x * cell.x / std::max(1.0f, texSize.y * cell.y);
+            const float bw = p1.x - p0.x, bh = p1.y - p0.y;
+            const float w = std::min(bw, bh * aspect), h = w / aspect;
+            const ImVec2 q0(std::floor(p0.x + (bw - w) * 0.5f), std::floor(p0.y + (bh - h) * 0.5f));
+            dl->AddRectFilled(p0, p1, col(0x2e2e2e, appear), 12.0f * k, corners);
+            if (w >= bw - 1.0f && h >= bh - 1.0f)
+                dl->AddImageRounded(tex, p0, p1, f0, f1, col(0xffffff, appear), 12.0f * k, corners);
+            else
+                dl->AddImage(tex, q0, ImVec2(q0.x + w, q0.y + h), f0, f1, col(0xffffff, appear));
+            redrawIn(1.0 / double(c.frameFps));
+            return;
+        }
+        tex = c.image.empty() ? ImTextureID(0) : guide_.image(c.image, &texSize);
         if (!tex) { // no picture: a quiet tile with the cube mark
             dl->AddRectFilled(p0, p1, tc(raised, appear), 12.0f * k, corners);
             const float m = std::min(p1.x - p0.x, p1.y - p0.y) * 0.3f;

@@ -7,6 +7,7 @@
 // sessions; --render, --record and demos run straight through.
 #include "app/App.h"
 #include "app/Support.h"
+#include "app/BigMeshTip.h"
 #include "app/LookSchemes.h"
 #include "app/CrashLog.h"
 #include "core/LegacyNames.h"
@@ -117,6 +118,7 @@ void App::initProject() {
         // The membership cards (Support.h). ("support_card": false, the old switch, and "supporter" from before
         // 0.11.1 are honoured as they were: a member said so.)
         supportCardPrefs_.supporter = prefs["supporter"].asBool(false) || !prefs["support_card"].asBool(true);
+        bigMeshTipDone_ = prefs["big_mesh_tip_done"].asBool(false);
         supportCardPrefs_.shownAt = int64_t(prefs["support_card_shown_at"].asNumber(0));
         supportCardPrefs_.hiddenUntil = int64_t(prefs["member_card_hidden_until"].asNumber(0));
         if (prefs["member_card_challenge"].isString())
@@ -198,6 +200,7 @@ void App::saveProjectPrefs() {
     prefs.set("member_builds", memberBuilds_ && !memberSessionOnly_);
     if (memberBuilds_ && !memberSessionOnly_ && !memberLogin_.empty()) prefs.set("member_login", memberLogin_);
     prefs.set("supporter", supportCardPrefs_.supporter); // the membership cards (Support.h)
+    prefs.set("big_mesh_tip_done", bigMeshTipDone_); // the one big-mesh tip (BigMeshTip.h)
     prefs.set("support_card_shown_at", double(supportCardPrefs_.shownAt));
     prefs.set("member_card_hidden_until", double(supportCardPrefs_.hiddenUntil));
     if (!supportCardPrefs_.challengeSeen.empty()) prefs.set("member_card_challenge", supportCardPrefs_.challengeSeen);
@@ -223,6 +226,25 @@ void App::rememberRecent(const std::string& path) {
     if (full == utf8(fsPath(autosavePath(prefDir_)).lexically_normal())) return;
     recentFiles_ = addRecentFile(std::move(recentFiles_), full);
     saveProjectPrefs();
+}
+
+void App::tickBigMeshTip() {
+    // Not in renders, recordings, demos or benchmarks; UI tests (a demo script) only when they set the threshold
+    // (tests/ui/big_mesh_tip.sfui), so it never sits over another test's clicks.
+    const char* testThreshold = std::getenv("SF_BIG_MESH_TIP_TRIANGLES");
+    const bool uiTest = !options_.uiTest.empty();
+    if (!options_.renderPath.empty() || !options_.recordPath.empty() || (demo_ && !uiTest) ||
+        (uiTest && !(testThreshold && *testThreshold)) || options_.benchmark || proof_)
+        return;
+    // It waits for a quiet moment (no stroke, no card or tour), then shows once.
+    const bool busy = doc_.sculptor.strokeActive() || showWelcome_ || showWhatsNew_ || whatsNewOpen() || supportCardOpen() ||
+                      quickTourOpen_;
+    if (bigMeshTipDue(sceneTrianglesWithMicro(), bigMeshTipTriangles(), bigMeshTipDone_, busy)) {
+        bigMeshTipDone_ = true; // once only, written now: a crash or a forced quit doesn't bring it back
+        bigMeshTipOpen_ = true;
+        saveProjectPrefs();
+        redrawAt_ = double(SDL_GetTicksNS()) * 1e-9; // (a frame to show it, asleep or not)
+    }
 }
 
 void App::tickProject(float dt) {

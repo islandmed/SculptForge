@@ -415,7 +415,7 @@ def image_size(path: pathlib.Path):
 
 WHATS_NEW = "whats-new.md"
 WN_DETAILED, WN_SERIES_GROUPS, WN_MAX_HIGHLIGHTS = 3, 2, 6
-WN_KEYS = {"date", "tagline", "highlight", "title", "line", "image", "action", "link"}
+WN_KEYS = {"date", "tagline", "highlight", "title", "line", "image", "action", "link", "clip", "frames"}
 
 
 def version_parts(v: str) -> list:
@@ -457,10 +457,12 @@ def parse_features(text: str) -> dict:
         if not sep or key not in WN_KEYS:
             raise ValueError(f"line {k}: " + (f"unknown key '{key}'" if sep else "expected 'key: value'"))
         if key == "title":
-            v["cards"].append({"title": value, "line": "", "image": "", "action": "", "link": ""})
-        elif key in ("line", "image", "action", "link"):
+            v["cards"].append({"title": value, "line": "", "image": "", "action": "", "link": "", "clip": "", "frames": ""})
+        elif key in ("line", "image", "action", "link", "clip", "frames"):
             if not v["cards"]:
                 raise ValueError(f"line {k}: '{key}' before the card's 'title'")
+            if key == "frames" and not re.fullmatch(r"\S+ \d{1,2}x\d{1,2} \d{1,2}", value):
+                raise ValueError(f"line {k}: frames wants 'path COLSxROWS FPS'")
             v["cards"][-1][key] = value
         elif key == "highlight":
             v["highlights"].append(value)
@@ -560,7 +562,9 @@ class WhatsNewPage(Page):
         super().__init__(name, plain)
         self.chars = text
         # Every card picture, also those of a version not released yet (it ships with the next one).
+        # Clips too: the video the website plays, and the frame sheet the app plays (shipped with the guide).
         self.images += [src for src in re.findall(r"^image:\s*(\S+)\s*$", text, re.M) if src not in self.images]
+        self.images += [src for src in re.findall(r"^(?:clip|frames):\s*(\S+)", text, re.M) if src not in self.images]
         for v in self.versions:
             for c in v["cards"]:
                 if c.get("link"):
@@ -584,6 +588,9 @@ class WhatsNewPage(Page):
                     size = image_size(SRC / c["image"])
                     dims = f' width="{size[0]}" height="{size[1]}"' if size else ""
                     img = (f'<img src="{html.escape(c["image"])}" alt=""{dims} loading="lazy" decoding="async">')
+                    if c.get("clip"):  # the clip plays in place of the picture, which stays as its poster
+                        img = (f'<video src="{html.escape(c["clip"])}" poster="{html.escape(c["image"])}"{dims} muted '
+                               f'loop playsinline autoplay preload="none"></video>')
                 href = card_link(c)
                 more = (f'<a class="wn-more" href="{html.escape(href)}">'
                         f'{"Read more" if c["action"].startswith("guide:") else "How it works"}'
@@ -649,10 +656,14 @@ def home_whats_new(page: "WhatsNewPage") -> str:
     out.append('        <div class="wn-home">')
     for v in vs:
         titles = [split_highlight(h)[0] for h in v["highlights"] if split_highlight(h)[0]] or [c["title"] for c in v["cards"]]
-        pic = next((c["image"] for c in v["cards"] if c["image"]), "")
+        first = next((c for c in v["cards"] if c["image"]), None)
+        pic, clip = (first["image"], first.get("clip", "")) if first else ("", "")
         img = (f'<div class="wn-pic"><img src="guide/{html.escape(pic)}" alt="" width="600" height="340" loading="lazy" '
                f'decoding="async"></div>') if pic else \
             '<div class="wn-pic wn-pic-mark"><img src="img/logo.svg?v=2" alt="" width="64" height="64"></div>'
+        if clip:  # the first card's clip plays on the home page too, its picture as the poster
+            img = (f'<div class="wn-pic"><video src="guide/{html.escape(clip)}" poster="guide/{html.escape(pic)}" width="600" '
+                   f'height="340" muted loop playsinline autoplay></video></div>')
         items = "".join(f"<li>{inline(c['title'], [])}</li>" for c in v["cards"]) or \
             "".join(f"<li>{inline(r[:1].upper() + r[1:], [])}</li>" for _, r in map(split_highlight, v["highlights"]))
         out.append(f'          <article class="wn-home-card"><a href="guide/whats-new.html#{v["anchor"]}">{img}'

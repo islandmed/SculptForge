@@ -454,6 +454,12 @@ private:
     bool quickTourOffersInTests_ = false; // UI tests: the offer only after the script's quick_tour_offers
     std::string flashSubpalette_; // a Tool sub-palette "Show me" opened: scrolled to and flashed (Palettes.cpp)
     double flashSubpaletteStart_ = 0.0;
+    // The one big-mesh tip (BigMeshTip.h): the first scene over ~20M triangles; shown once, never again (project.json).
+    bool bigMeshTipDone_ = false;
+    bool bigMeshTipOpen_ = false;
+    size_t sceneTrianglesWithMicro() const; // visible base triangles, micro levels counted in full
+    void openPerformancePrefs();            // Preferences > Performance, opened and flashed
+    void tickBigMeshTip();                  // every frame (drawSupportUi): shows the tip when due
     int discordRequests_ = 0;           // UI tests: how often the Discord invite was asked for
     int supportPageRequests_ = 0;       // UI tests: how often the page was asked for (only opened when interactive)
     // The membership cards (Support.h, PanelSupportCard.cpp): the full card on the first start (and from Help >
