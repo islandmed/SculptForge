@@ -23,6 +23,11 @@ size_t strokeShadeBudget(size_t points, double ms, double nsPerPoint, size_t min
     return points ? std::min(points, timed) : timed;
 }
 
+size_t microShadeBudget(const TierConfig& tier, bool stroking, bool viewMoving, double nsPerPoint, size_t minPoints) {
+    const size_t points = size_t(tier.shadeBudgetPoints) / (stroking && tier.draftBrushMode ? 4 : 1);
+    return stroking || viewMoving ? strokeShadeBudget(points, tier.strokeShadeMs, nsPerPoint, minPoints) : points;
+}
+
 int targetHzForDisplay(int hz) {
     if (hz >= 143) return 144;
     if (hz >= 119) return 120;

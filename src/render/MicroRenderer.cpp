@@ -640,13 +640,10 @@ bool MicroRenderer::sync(Mesh& mesh) {
                 const uint64_t bit = uint64_t(1) << (t & 63);
                 if (!(w & bit)) w |= bit, ++pendingCount_;
             }
-            // TierConfig: continuous normals shade up to the budget every sync; draft ones a quarter of it while a
-            // stroke runs (the rest follows when it ends).
-            const TierConfig tier = currentTierConfig();
-            shadeBudget = size_t(tier.shadeBudgetPoints) / (mm.stroking && tier.draftBrushMode ? 4 : 1);
-            // While a stroke runs, also no more than strokeShadeMs of it (at least one patch and its ring), so a
-            // slower CPU doesn't spend the frame the dabs need on shading; the rest follows as before.
-            if (mm.stroking) shadeBudget = strokeShadeBudget(shadeBudget, tier.strokeShadeMs, shadeNsPerPoint_, size_t(mm.samples) * 3);
+            // TierConfig (microShadeBudget): the budget every sync, a quarter of it while a draft stroke runs; while a
+            // stroke runs or the view moves, no more than strokeShadeMs of it (at least one patch and its ring), so a
+            // slower CPU doesn't spend the frame the dabs or the orbit need on shading; the rest follows.
+            shadeBudget = microShadeBudget(currentTierConfig(), mm.stroking, viewMoving, shadeNsPerPoint_, size_t(mm.samples) * 3);
             if (pendingCount_) shadePending(mesh, false);
         }
     }

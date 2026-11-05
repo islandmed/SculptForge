@@ -42,8 +42,8 @@ struct TierConfig {
     // frame at most (a quarter of it while a stroke runs in draft mode; the rest follows), and the size in grid
     // points above which a level is kept out of core (MicroStore; 0 = when it would take a quarter of RAM).
     uint64_t shadeBudgetPoints = 3u << 20;
-    // ... and while a stroke runs, at most this long a frame (ms; the points from the measured cost per point, so a
-    // slower CPU shades fewer and the dabs keep up; 0 = the points budget only).
+    // ... and while a stroke runs or the view moves, at most this long a frame (ms; the points from the measured cost
+    // per point, so a slower CPU shades fewer and the dabs and the orbit keep up; 0 = the points budget only).
     double strokeShadeMs = 10.0;
     uint64_t outOfCorePoints = 0;
     bool onBattery() const { return power == PowerSource::Battery; }
@@ -52,6 +52,10 @@ struct TierConfig {
 // The shading budget (grid points) for a frame while a micro stroke runs: `points` (0 = no limit), and no more than
 // `ms` at `nsPerPoint` (the renderer's measured cost; 0 = not known yet: `points`), at least `minPoints`.
 size_t strokeShadeBudget(size_t points, double ms, double nsPerPoint, size_t minPoints);
+// A micro level's shading budget for one frame: the tier's points (a quarter while a draft stroke runs); while a
+// stroke runs or the view moves, also no more than strokeShadeMs of it (the catch-up after big strokes ran ~30 ms a
+// frame through the orbit on the floor tier); still frames get all of the points, as nothing waits for them.
+size_t microShadeBudget(const TierConfig& tier, bool stroking, bool viewMoving, double nsPerPoint, size_t minPoints);
 
 // 144 for displays of 143 Hz and up, 120 from 119 Hz, else 60 (also when unknown: 0).
 int targetHzForDisplay(int displayHz);
