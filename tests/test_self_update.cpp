@@ -343,6 +343,7 @@ TEST(self_update_downloads_and_installs) {
     CHECK(d.ok && d.error.empty() && d.sha256 == kPackageSha && d.received == package().size());
     CHECK(f.asked.size() == 3 && f.asked[2] == releaseFileUrl("99.0.0", "SculptForge-99.0.0-x86_64.AppImage"));
     CHECK(fs::path(d.staged).parent_path() == fs::path(s.install.target).parent_path()); // next to it: one rename
+    CHECK(fs::path(d.staged).filename() == ".download-99.0.0-SculptForge-linux-x86_64.AppImage"); // (extension last)
     CHECK(readAll(s.install.target) == "old version"); // nothing in place yet
     std::string error;
     CHECK(installAppImage(s.install, d, "99.0.0", "1.0.0", s.note, error));

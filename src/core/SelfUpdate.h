@@ -122,7 +122,8 @@ struct Download {
 void downloadUpdate(const std::string& version, const Install& install, const uint8_t key[32], const Fetch& fetch,
                     Download& out, const std::map<std::string, std::string>& memberFiles = {});
 
-// The temporary file a package is downloaded to (dot-file next to the target, or inside the target folder).
+// The temporary file a package is downloaded to: ".download-<version>-<asset>" (the asset's extension last) next to
+// the target, inside the portable folder, or in the installer's staging folder.
 std::string stagingPath(const Install& install, const std::string& version);
 
 // --- Installing, the first start, rolling back ---

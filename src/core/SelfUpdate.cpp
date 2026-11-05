@@ -264,7 +264,9 @@ Install detectInstall(const InstallProbe& probe) {
 // --- The download ---
 
 std::string stagingPath(const Install& install, const std::string& version) {
-    const std::string name = "." + install.asset + ".download-" + version;
+    // The asset's own extension stays last: Windows opens the installer by it (Start-Process), and Windows
+    // PowerShell's Expand-Archive takes only names ending in .zip.
+    const std::string name = ".download-" + version + "-" + install.asset;
     if (!install.stagingDir.empty()) return pathString(fsPath(install.stagingDir) / name);
     if (install.kind == InstallKind::WindowsPortable) return pathString(fsPath(install.target) / name);
     return pathString(fsPath(install.target).parent_path() / name); // next to the AppImage: one rename away
