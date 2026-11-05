@@ -310,7 +310,7 @@ void App::drawSupportCard() {
         ImGui::SetCursorScreenPos(c0);
         ImGui::InvisibleButton("Close##card.close", ImVec2(d, d));
         const bool hot = ImGui::IsItemHovered();
-        if (ImGui::IsItemClicked()) closeSupportCard(false);
+        if (ImGui::IsItemClicked()) closeSupportCard();
         const ImVec2 c(c0.x + d * 0.5f, c0.y + d * 0.5f);
         dl->AddCircleFilled(c, d * 0.5f, tc(hot ? raised : bg, 0.85f * A));
         dl->AddCircle(c, d * 0.5f, tc(line, (hot ? 0.40f : 0.20f) * A), 0, hair);

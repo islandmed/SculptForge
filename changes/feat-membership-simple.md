@@ -1,6 +1,6 @@
 ---
 whats_new: **Membership, simplified**: two memberships instead of four. **Member** ($5 a month or $48 a year) gets
-  betas and early builds, the monthly feature vote, a brush and alpha pack every month, #members and a name in the
+  betas and early builds, the monthly feature vote, Member Requests, #members and a name in the
   credits; **Studio** ($150 a month) covers up to 10 artists, with priority support and a private channel. Help >
   Support SculptForge... shows both. Every release stays free for everyone.
 changed: Memberships: Member ($5 / month or $48 / year) and Studio ($150 / month, up to 10 artists) replace
