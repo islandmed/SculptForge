@@ -36,7 +36,7 @@ TEST(perf_trace_off_writes_nothing_on_writes_lines) {
     CHECK(!fs::exists(dir / "sculptforge-trace.log"));
     CHECK(perftrace::start(dir.string(), "HEADER gpu"));
     CHECK(perftrace::on());
-    CHECK(perftrace::path() == (dir / "sculptforge-trace.log").string());
+    CHECK(fs::path(perftrace::path()) == dir / "sculptforge-trace.log"); // compared as paths: Windows joins with a backslash
     perftrace::line("long frame 48.0 ms");
     perftrace::stop();
     CHECK(!perftrace::on());
