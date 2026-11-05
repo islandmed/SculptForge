@@ -2,9 +2,9 @@
 # block); Esc closes it, Try it opens the feature, Full release notes opens the guide chapter, which shows the last
 # three versions in full and folds the older ones into groups.
 # The window is pinned to 0.10.7's five cards (SF_WHATS_NEW_VERSION), so this stays valid after each release; the guide
-# chapter below is pinned to 0.11.1 (SF_GUIDE_VERSION), so it checks 0.11.1's section before and after the release.
+# chapter below is pinned to 0.11.2 (SF_GUIDE_VERSION), so it checks 0.11.2's section before and after the release.
 env SF_WHATS_NEW_VERSION 0.10.7
-env SF_GUIDE_VERSION 0.11.1
+env SF_GUIDE_VERSION 0.11.2
 run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=3
 click "Help##palette.help"
@@ -62,12 +62,12 @@ wait 0.3
 expect_value whats_new_open == 0
 expect_value guide_open == 1
 expect_guide whats-new.md
+expect_text "Version 0.11.2"
+expect_text "Faster pen-up on dense scans, clean creases on micro levels, moves that go into sculpt layers, Maya style view keys and a UDIM grid."
 expect_text "Version 0.11.1"
 expect_text "Dense scans with micro levels keep up with the pen, and one-click updates on Windows and Linux."
 expect_text "Version 0.11.0"
 expect_text "Sixty new brushes in six packs, a Masking panel, a quick tour for experienced sculptors, and experimental options for very dense meshes."
-expect_text "Version 0.10.11"
-expect_text "Voxel Remesh 3-4x faster, high-DPI laptops that fit the screen, the right tray in every look, and a Preview channel for betas."
 expect_value whats_new_contents == 6
 expect_value whats_new_expanded == 1
 shot whats-new-guide
