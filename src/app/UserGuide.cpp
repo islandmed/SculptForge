@@ -3,6 +3,7 @@
 #include "app/UserGuide.h"
 
 #include "app/App.h"
+#include "app/I18n.h"
 #include "app/Theme.h"
 #include "app/Ui.h"
 #include "core/Image.h"

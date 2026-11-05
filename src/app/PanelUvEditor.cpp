@@ -17,6 +17,7 @@
 // Every operation goes through the uv_* commands (core/UvCommands.cpp) or one UvEditStep (core/UvEdit.h), so it
 // is one undo step and scriptable; big unwraps run in the background.
 #include "app/App.h"
+#include "app/I18n.h"
 #include "app/Theme.h"
 #include "app/Ui.h"
 

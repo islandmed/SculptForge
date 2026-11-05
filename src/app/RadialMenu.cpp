@@ -8,6 +8,7 @@
 // geometry and the strict JSON reading are in core/RadialMenu.h.
 #include "app/App.h"
 #include "app/CommandPalette.h"
+#include "app/I18n.h"
 #include "app/Ui.h"
 
 #include <IconsLucide.h>
