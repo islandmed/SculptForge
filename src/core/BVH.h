@@ -95,6 +95,13 @@ public:
     void rayTrianglesPadded(const Mesh& mesh, const glm::vec3& origin, const glm::vec3& dir, std::span<const float> pad, float extra,
                             std::vector<uint32_t>& out) const;
     size_t memoryBytes() const;
+    // The structure alone, compacted (core/OpenCache.h saves it): per node (first, count) as build() lays them out
+    // (leaves: a range of `tris`, inner: the left child, the right one after it), and the triangles in leaf order.
+    void exportStructure(std::vector<uint32_t>& nodes, std::vector<uint32_t>& tris) const;
+    // Takes a saved structure for `mesh` after checking it (a tree from node 0, children after their parent, every
+    // triangle in exactly one leaf); the boxes are recomputed from the mesh, so a structure from other positions is
+    // only slower, never wrong. False (and nothing changed) if it doesn't hold.
+    bool adoptStructure(const Mesh& mesh, std::span<const uint32_t> nodes, std::vector<uint32_t> tris);
 
 private:
     struct Node {

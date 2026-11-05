@@ -228,7 +228,9 @@ bool microWantsOutOfCore(size_t points);
 void microDelete(Mesh& m);
 // Gives a loaded mesh (with normals) a micro level from saved data: `disp` holds baseTriangles * samples values
 // (`mask` that many or none). Works out the derived data (ranges, bulge, edge neighbours).
-bool microAttach(Mesh& m, int level, float step, MicroStore disp, std::vector<uint8_t> mask, std::string& error);
+// `edgeNeighbors`: saved ones (core/OpenCache.h), taken (left empty) if they check out, else built.
+bool microAttach(Mesh& m, int level, float step, MicroStore disp, std::vector<uint8_t> mask, std::string& error,
+                 std::vector<uint32_t>* edgeNeighbors = nullptr);
 // A regular mesh of the micro surface at micro level `level` (<= the micro level): shared points welded, the base
 // triangles' UVs, face groups and hidden flags carried to their micro triangles, mask from the micro mask. Fails
 // when it would exceed `maxTriangles` (0 = what subdivision Divide allows on this computer).

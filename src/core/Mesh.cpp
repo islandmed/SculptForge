@@ -316,6 +316,69 @@ void Mesh::removeLastVertexSlot() {
     }
 }
 
+bool Mesh::adoptTopology(std::vector<uint32_t> vtOffsets, std::vector<uint32_t> vtList, std::vector<uint32_t> adjOffsets,
+                         std::vector<uint32_t> adjList) {
+    const size_t nv = positions.size(), nt = triangles.size();
+    if (multires || nv == 0 || vtOffsets.size() != nv + 1 || adjOffsets.size() != nv + 1 || vtOffsets[0] != 0 ||
+        adjOffsets[0] != 0 || vtOffsets[nv] != vtList.size() || vtList.size() != nt * 3 || adjOffsets[nv] != adjList.size())
+        return false;
+    for (const glm::uvec3& t : triangles)
+        if (t.x >= nv || t.y >= nv || t.z >= nv) return false;
+    // Per vertex: offsets that don't go back; its triangles ascending, each listed as many times as it has v as a
+    // corner (with 3 * nt entries in all, that is exactly what rebuildTopology lists); its ring ascending, unique,
+    // in range and without v.
+    std::atomic<bool> ok = true;
+    poolFor(nv, [&](size_t b, size_t e) {
+        for (size_t v = b; v < e && ok.load(std::memory_order_relaxed); ++v) {
+            const uint32_t t0 = vtOffsets[v], t1 = vtOffsets[v + 1], a0 = adjOffsets[v], a1 = adjOffsets[v + 1];
+            if (t1 < t0 || t1 > vtList.size() || a1 < a0 || a1 > adjList.size()) {
+                ok = false;
+                break;
+            }
+            for (uint32_t i = t0; i < t1;) {
+                const uint32_t t = vtList[i];
+                if (t >= nt || (i > t0 && t <= vtList[i - 1])) {
+                    ok = false;
+                    break;
+                }
+                const glm::uvec3 tr = triangles[t];
+                const uint32_t corners = uint32_t(tr.x == v) + uint32_t(tr.y == v) + uint32_t(tr.z == v);
+                uint32_t k = i + 1;
+                while (k < t1 && vtList[k] == t) ++k;
+                if (corners == 0 || k - i != corners) {
+                    ok = false;
+                    break;
+                }
+                i = k;
+            }
+            for (uint32_t i = a0; i < a1; ++i)
+                if (adjList[i] >= nv || adjList[i] == v || (i > a0 && adjList[i] <= adjList[i - 1])) {
+                    ok = false;
+                    break;
+                }
+        }
+    }, 1 << 14);
+    if (!ok) return false;
+    sanitizeAttributes();
+    for (auto* v : {&adjEnds_, &adjCaps_, &vtEnds_, &vtCaps_}) std::vector<uint32_t>().swap(*v);
+    finishTopology();
+    implicit_.reset();
+    vtOffsets_ = std::move(vtOffsets);
+    vtList_ = std::move(vtList);
+    adjOffsets_ = std::move(adjOffsets);
+    adjList_ = std::move(adjList);
+    return true;
+}
+
+bool Mesh::topologyTables(const std::vector<uint32_t>*& vtOffsets, const std::vector<uint32_t>*& vtList,
+                          const std::vector<uint32_t>*& adjOffsets, const std::vector<uint32_t>*& adjList) const {
+    if (implicit_ || dynamicAdjacency() || vtOffsets_.size() != positions.size() + 1 || adjOffsets_.size() != positions.size() + 1 ||
+        vtList_.size() != triangles.size() * 3)
+        return false;
+    vtOffsets = &vtOffsets_, vtList = &vtList_, adjOffsets = &adjOffsets_, adjList = &adjList_;
+    return true;
+}
+
 void Mesh::finishTopology() {
     const size_t nv = positions.size();
     normalBits_.resize(nv);

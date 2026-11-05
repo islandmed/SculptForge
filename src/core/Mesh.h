@@ -220,6 +220,14 @@ public:
     // Must be called after the triangle list or vertex count changes. A mesh that is the current level of its
     // subdivision stack, made by Divide, gets implicit adjacency (implicitAdjacency).
     void rebuildTopology();
+    // rebuildTopology() from saved tables (core/OpenCache.h: what rebuildTopology builds, as topologyTables() gives
+    // them). Checked first: every index in range, the offsets consistent, and the vertex-triangle lists exactly
+    // the triangles' corners; false (and nothing changed) if not. Not for a subdivision level (implicit adjacency).
+    bool adoptTopology(std::vector<uint32_t> vtOffsets, std::vector<uint32_t> vtList, std::vector<uint32_t> adjOffsets,
+                       std::vector<uint32_t> adjList);
+    // The tables to save: false when there are none (implicit or dynamic adjacency).
+    bool topologyTables(const std::vector<uint32_t>*& vtOffsets, const std::vector<uint32_t>*& vtList,
+                        const std::vector<uint32_t>*& adjOffsets, const std::vector<uint32_t>*& adjList) const;
     void recomputeAllNormals();
     // Recompute normals of the faces around `verts` and of every vertex they touch. With `curvature` (indexed
     // by vertex), also each of those vertices' curvatureAt, from the same triangles (a brush stroke hands it to

@@ -3,6 +3,7 @@
 #include "core/Project.h"
 #include "core/LegacyNames.h"
 #include "core/Micro.h"
+#include "core/OpenCache.h"
 #include "core/Timeline.h"
 
 #include "core/Multires.h"
@@ -629,6 +630,96 @@ bool readTexture(Reader& r, const Json& tj, Mesh& m, std::string& error) {
 // twice ("same_as_mesh"). Format 6: a generated level (made by Divide, SubdivTopology::generated) has no
 // triangles and no child maps ("generated"), and a level without "detail" that isn't stale takes the detail that
 // fits its positions (SubdivLevel::detail).
+// --- The open cache (core/OpenCache.h): optional, ignored by builds that don't know it ---
+
+std::string hex64(uint64_t v) {
+    char buf[20];
+    std::snprintf(buf, sizeof buf, "%016llx", static_cast<unsigned long long>(v));
+    return buf;
+}
+
+uint64_t parseHex64(const Json& j, bool& ok) {
+    const std::string s = j.asString();
+    ok = s.size() == 16 && s.find_first_not_of("0123456789abcdef") == std::string::npos;
+    return ok ? std::strtoull(s.c_str(), nullptr, 16) : 0;
+}
+
+// `bvh`: the mesh's, if it is up to date (null: none saved).
+Json writeOpenCache(Writer& w, const std::string& prefix, const Mesh& m, const BVH* bvh) {
+    if constexpr (std::endian::native != std::endian::little) return Json(); // (the hashes are of little-endian bytes)
+    if (m.triangleCount() < openCacheMinTriangles) return Json();
+    Json j = Json::object();
+    j.set("version", kOpenCacheVersion);
+    j.set("key", hex64(openCacheKey(m)));
+    bool any = false;
+    auto put = [&](const char* name, const std::vector<uint32_t>& v, bool owned) {
+        any = true;
+        Json d = owned ? w.ownedUints(prefix + name + ".bin", v) : w.uints(prefix + name + ".bin", v.data(), v.size(), 1);
+        d.set("hash", hex64(openCacheHash(v)));
+        j.set(name, std::move(d));
+    };
+    // (a subdivision level's adjacency is implicit: nothing to save, nothing to rebuild)
+    if (const std::vector<uint32_t>*vo = nullptr, *vl = nullptr, *ao = nullptr, *al = nullptr; m.topologyTables(vo, vl, ao, al)) {
+        put("vt_offsets", *vo, false);
+        put("vt_list", *vl, false);
+        put("adj_offsets", *ao, false);
+        put("adj_list", *al, false);
+    }
+    if (bvh && bvh->nodeCount() && bvh->leafOf(0) != ~0u) {
+        std::vector<uint32_t> nodes, tris;
+        bvh->exportStructure(nodes, tris);
+        if (tris.size() == m.triangleCount()) {
+            put("bvh_nodes", nodes, true);
+            put("bvh_tris", tris, true);
+        }
+    }
+    if (m.micro && microMatches(m) && m.micro->edgeNeighbor.size() == m.triangleCount() * 3)
+        put("micro_edges", m.micro->edgeNeighbor, false);
+    return any ? j : Json();
+}
+
+struct OpenCacheData {
+    std::vector<uint32_t> vtOffsets, vtList, adjOffsets, adjList, bvhNodes, bvhTris, microEdges;
+    bool topology = false;
+};
+
+// Reads `oc` for `m` (already read: its triangles are the key's): false (nothing to use) if it is missing, of
+// another version or mesh, or any array's bytes don't match their hash. A bad cache is never an error.
+bool readOpenCache(Reader& r, const Json& oc, const Mesh& m, OpenCacheData& out) {
+    if constexpr (std::endian::native != std::endian::little) return false;
+    if (!oc.isObject() || int(oc["version"].asNumber(0)) != kOpenCacheVersion) return false;
+    bool ok = false;
+    if (parseHex64(oc["key"], ok) != openCacheKey(m) || !ok) return false;
+    const size_t nv = m.vertexCount(), nt = m.triangleCount();
+    // (sizes from the descriptor, bounded: the checks after reading decide the rest)
+    auto get = [&](const char* name, std::vector<uint32_t>& v, size_t expect, size_t limit) {
+        const Json& d = oc[name];
+        if (!d.isObject()) return false;
+        const double c = d["count"].asNumber(-1);
+        if (!(c >= 0) || c > double(limit) || (expect != size_t(-1) && c != double(expect))) return false;
+        v.resize(size_t(c));
+        const std::string saved = r.error;
+        if (!r.uints(d, name, v.size(), 1, v.data())) {
+            r.error = saved;
+            v.clear();
+            return false;
+        }
+        bool hok = false;
+        if (parseHex64(d["hash"], hok) != openCacheHash(v) || !hok) {
+            v.clear();
+            return false;
+        }
+        return true;
+    };
+    const size_t big = std::max<size_t>(nt * 12, 1); // (a ring holds at most every other vertex; this bounds a crafted count)
+    out.topology = get("vt_offsets", out.vtOffsets, nv + 1, nv + 1) && get("vt_list", out.vtList, nt * 3, nt * 3) &&
+                   get("adj_offsets", out.adjOffsets, nv + 1, nv + 1) && get("adj_list", out.adjList, size_t(-1), big);
+    if (!out.topology) out.vtOffsets.clear(), out.vtList.clear(), out.adjOffsets.clear(), out.adjList.clear();
+    if (!(get("bvh_nodes", out.bvhNodes, size_t(-1), nt * 4) && get("bvh_tris", out.bvhTris, nt, nt))) out.bvhNodes.clear(), out.bvhTris.clear();
+    if (!get("micro_edges", out.microEdges, nt * 3, nt * 3)) out.microEdges.clear();
+    return true;
+}
+
 Json writeSubdiv(Writer& w, const std::string& prefix, const Mesh& m) {
     Json out = Json::object();
     out.set("current", subdivCurrentLevel(m));
@@ -923,6 +1014,10 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
             st.set("micro", std::move(mj));
             version.need(7);
         }
+        // Big meshes: what opening would rebuild (no format change: older builds skip the key).
+        if (Json oc = writeOpenCache(w, "parts/" + std::to_string(i) + "/cache/", doc.partMesh(i), active && !doc.bvhDirty ? &doc.bvh : nullptr);
+            oc.isObject())
+            st.set("open_cache", std::move(oc));
         const std::string& bridgeName = active ? doc.bridgeName : s.bridgeName;
         if (!bridgeName.empty()) st.set("bridge_name", bridgeName);
         const std::vector<QRemeshGuide>& guides = active ? doc.qremeshGuides : s.qremeshGuides;
@@ -1062,15 +1157,29 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
             s.mesh.forgespheres = forgespheresFromJson(sj["forgespheres"]);
             s.mesh.forgespherePreview = !s.mesh.forgespheres.empty() && sj["forgesphere_preview"].asBool(false);
             readSelectionSets(r, sj["selection_sets"], s.mesh, skippedSets);
+            // The open cache (core/OpenCache.h), when it is this mesh's and intact: the BVH's structure and the
+            // topology are taken from it (after their checks) instead of rebuilt.
+            OpenCacheData cache;
+            readOpenCache(r, sj["open_cache"], s.mesh, cache);
+            OpenCacheUse& used = lastOpenCacheUse;
+            if (&s == &parts.front()) used = {};
+            openStage("open cache read");
+            if (!cache.bvhNodes.empty() && s.bvh.adoptStructure(s.mesh, cache.bvhNodes, std::move(cache.bvhTris))) s.built = used.bvh = true;
+            std::vector<uint32_t>().swap(cache.bvhNodes);
+            openStage("open cache BVH");
             // The BVH builds (on the pool) while the levels and topology load (off it), then the normals.
-            s.startBvh();
+            if (!s.built) s.startBvh();
             r.parallelReads = !s.bvhBuilder.joinable();
             if (!readPaintLayers(r, sj["paint_layers"], s.mesh, error)) return false;
             if (!readTexture(r, sj["texture"], s.mesh, error)) return false;
             if (!readSubdiv(r, sj["subdiv"], s.mesh, error, version < 5)) return false;
             openStage("paint/texture/subdiv");
-            s.mesh.rebuildTopology();
-            openStage("rebuildTopology");
+            if (cache.topology && s.mesh.adoptTopology(std::move(cache.vtOffsets), std::move(cache.vtList), std::move(cache.adjOffsets),
+                                                       std::move(cache.adjList)))
+                used.topology = true;
+            else
+                s.mesh.rebuildTopology();
+            openStage("topology");
             s.mesh.recomputeAllNormals();
             openStage("normals");
             if (const Json& mj = sj["micro"]; mj.isObject() && version >= 7) {
@@ -1111,7 +1220,11 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
                     return false;
                 }
                 openStage("micro read+unpack");
-                if (!microAttach(s.mesh, level, float(mj["step"].asNumber(0)), std::move(disp), std::move(mask), error)) return false;
+                const bool savedEdges = !cache.microEdges.empty();
+                if (!microAttach(s.mesh, level, float(mj["step"].asNumber(0)), std::move(disp), std::move(mask), error,
+                                 cache.microEdges.empty() ? nullptr : &cache.microEdges))
+                    return false;
+                used.microEdges = savedEdges && cache.microEdges.empty(); // (left empty: taken)
                 openStage("microAttach");
             }
             // (the micro level reads and attaches while the BVH builds: both only read the mesh)

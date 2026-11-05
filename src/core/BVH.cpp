@@ -168,6 +168,92 @@ void BVH::build(const Mesh& mesh) {
     leafBits_.resize(nodes_.size());
 }
 
+void BVH::exportStructure(std::vector<uint32_t>& nodes, std::vector<uint32_t>& tris) const {
+    nodes.resize(nodes_.size() * 2);
+    tris.clear();
+    tris.reserve(triLeaf_.size());
+    for (size_t i = 0; i < nodes_.size(); ++i) {
+        const Node& n = nodes_[i];
+        if (n.count > 0) {
+            nodes[i * 2] = uint32_t(tris.size());
+            tris.insert(tris.end(), triIndices_.begin() + n.first, triIndices_.begin() + n.first + n.count);
+        } else {
+            nodes[i * 2] = n.first;
+        }
+        nodes[i * 2 + 1] = n.count;
+    }
+}
+
+bool BVH::adoptStructure(const Mesh& mesh, std::span<const uint32_t> nodes, std::vector<uint32_t> tris) {
+    const size_t nt = mesh.triangleCount(), nn = nodes.size() / 2;
+    if (nt == 0 || nn == 0 || nodes.size() % 2 || tris.size() != nt || nn > 2 * nt) return false;
+    // Every triangle once (a permutation), leaves tiling `tris` without overlap, a tree from node 0 whose children
+    // come after their parent (so a walk from the root reaches each node once).
+    std::vector<uint8_t> seen(nt, 0), reached(nn, 0);
+    for (uint32_t t : tris) {
+        if (t >= nt || seen[t]) return false;
+        seen[t] = 1;
+    }
+    std::vector<uint8_t>().swap(seen);
+    std::vector<uint32_t> parent(nn, 0);
+    size_t covered = 0, visited = 0;
+    std::vector<uint32_t> stack{0};
+    while (!stack.empty()) {
+        const uint32_t i = stack.back();
+        stack.pop_back();
+        if (reached[i]) return false;
+        reached[i] = 1;
+        ++visited;
+        const uint32_t first = nodes[size_t(i) * 2], count = nodes[size_t(i) * 2 + 1];
+        if (count > 0) {
+            if (first > nt || count > nt - first) return false;
+            covered += count;
+        } else {
+            if (first <= i || first + 1 >= nn) return false;
+            parent[first] = parent[first + 1] = i;
+            stack.push_back(first);
+            stack.push_back(first + 1);
+        }
+    }
+    if (visited != nn || covered != nt) return false;
+    // (leaves cover nt entries in all and each lies inside [0, nt): disjoint iff their ranges don't overlap)
+    std::vector<std::pair<uint32_t, uint32_t>> ranges;
+    for (size_t i = 0; i < nn; ++i)
+        if (nodes[i * 2 + 1] > 0) ranges.emplace_back(nodes[i * 2], nodes[i * 2 + 1]);
+    std::sort(ranges.begin(), ranges.end());
+    for (size_t k = 1; k < ranges.size(); ++k)
+        if (ranges[k - 1].first + ranges[k - 1].second > ranges[k].first) return false;
+
+    ++structure_;
+    std::vector<uint32_t>().swap(leafCap_);
+    editedLeaves_.clear();
+    leafEdited_.clear();
+    unusedEntries_ = editsSinceBuild_ = 0;
+    triIndices_ = std::move(tris);
+    triLeaf_.assign(nt, 0);
+    vertBits_.resize(mesh.vertexCount());
+    queryLeaves_.clear();
+    nodes_.assign(nn, Node());
+    for (size_t i = 0; i < nn; ++i) {
+        nodes_[i].first = nodes[i * 2];
+        nodes_[i].count = nodes[i * 2 + 1];
+        nodes_[i].parent = parent[i];
+    }
+    poolFor(nodes_.size(), [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i)
+            if (nodes_[i].count > 0) recomputeLeaf(mesh, nodes_[i]);
+    }, 1 << 12);
+    for (size_t i = nodes_.size(); i-- > 0;) {
+        Node& n = nodes_[i];
+        if (n.count == 0) {
+            n.box = nodes_[n.first].box;
+            n.box.expand(nodes_[n.first + 1].box);
+        }
+    }
+    leafBits_.resize(nodes_.size());
+    return true;
+}
+
 AABB BVH::leafBox(const Mesh& mesh, const Node& n) const {
     AABB box;
     for (uint32_t i = n.first; i < n.first + n.count; ++i) {

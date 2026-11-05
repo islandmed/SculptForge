@@ -5,6 +5,7 @@
 // shading, baking down and displacement maps. The brushes are in MicroSculpt.cpp, the commands in
 // MicroCommands.cpp.
 #include "core/Micro.h"
+#include "core/OpenCache.h"
 #include "core/FocusDetail.h"
 
 #include "core/BakeImage.h"
@@ -412,7 +413,8 @@ bool microDivide(Mesh& m, int level, std::string& error, int outOfCore) {
     return true;
 }
 
-bool microAttach(Mesh& m, int level, float step, MicroStore disp, std::vector<uint8_t> mask, std::string& error) {
+bool microAttach(Mesh& m, int level, float step, MicroStore disp, std::vector<uint8_t> mask, std::string& error,
+                 std::vector<uint32_t>* edgeNeighbors) {
     if (level < 1 || level > MicroMesh::kMaxLevel || !(step > 0.0f) || !std::isfinite(step)) {
         error = "Project micro level is invalid";
         return false;
@@ -467,6 +469,7 @@ bool microAttach(Mesh& m, int level, float step, MicroStore disp, std::vector<ui
         mm->baseEdge = float(e / double(std::max<size_t>(nt * 3, 1)));
     }
     for (uint16_t r : mm->triRange) mm->rangeMax = std::max(mm->rangeMax, r);
+    if (edgeNeighbors) microAdoptEdgeNeighbors(m, mm->edgeNeighbor, *edgeNeighbors);
     mm->ensureTopology(m);
     mm->serial = MicroMesh::newSerial();
     mm->markAllDirty();
