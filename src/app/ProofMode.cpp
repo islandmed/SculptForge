@@ -991,6 +991,13 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                 ph.seconds = now - p.stageStart;
                 p.releasing = true; // (the phase ends when the stroke has: see the top of this stage)
                 p.releaseAt = up;
+                // SF_ORBIT_AT_PENUP=1 (claims check, bench branch only): the orbit starts at pen-up, while the stroke's last dabs land.
+                if (const char* e = std::getenv("SF_ORBIT_AT_PENUP"); e && *e != '0' && p.phaseIndex + 1 < p.phases.size() &&
+                                                                      p.phases[p.phaseIndex + 1].radiusPx <= 0) {
+                    p.releasing = false;
+                    ph.dabs = p.dabs.size();
+                    nextPhase();
+                }
                 break;
             }
         } else {
