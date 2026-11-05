@@ -189,7 +189,8 @@ void App::registerInputActions() {
         [this] { setInputStyle(2); }, [this] { return uiPrefs_.inputStyle == 2; });
     add("input.style_maya", "Maya", nullptr, "Preferences > Input", "",
         "Maya's view controls: Alt+left-drag orbits, Alt+middle-drag pans, Alt+right-drag zooms, anywhere on the "
-        "canvas. Ctrl inverts a stroke, Ctrl+Alt masks (Ctrl+Alt+drag on the background clears the mask), Shift "
+        "canvas; hold Alt, then add Ctrl, and a left drag rolls the view. Alt+F frames the Part, Alt+H resets the "
+        "view, the wheel zooms toward the pointer. Ctrl inverts a stroke, Ctrl+Alt masks (Ctrl+Alt+drag on the background clears the mask), Shift "
         "smooths, Ctrl+Shift hides and shows. The Classic sculpting keys stay for everything else.",
         [this] { setInputStyle(3); }, [this] { return uiPrefs_.inputStyle == 3; });
     add("input.emulate_numpad", "Emulate Numpad", nullptr, "Preferences > Input", "",
@@ -332,12 +333,15 @@ void App::registerViewActions() {
     });
     add("view.zoom_in", "Zoom in", "Numpad Plus", "Move the view closer.", [this] { camera_.zoom(1.0f); });
     add("view.zoom_out", "Zoom out", "Numpad Minus", "Move the view back.", [this] { camera_.zoom(-1.0f); });
-    add("view.frame_selected", "Frame Part", "Numpad .", "Fit the active Part in the view (Blender: View Selected).",
-        [this] { frameActivePart(); });
+    add("view.frame_selected", "Frame Part", "Numpad .", "Fit the active Part in the view (Blender: View Selected; "
+        "Maya keys: Alt+F).", [this] { frameActivePart(); });
+    add("view.reset", "Reset view", "", "Back to the view a new model opens with: from the front, in perspective, "
+        "the whole model in view (Maya keys: Alt+H).", [this] { resetView(); });
 }
 
 void App::setInputStyle(int style) {
     uiPrefs_.inputStyle = std::clamp(style, 0, 3);
+    uiPrefs_.wheelZoomToPointer = mayaStyle(); // Maya's wheel zooms toward the pointer; the others to the centre (#134)
     if (blenderStyle()) uiPrefs_.turntable = true; // Blender orbits as a turntable; Preferences > Input changes it
     maskBrush_.on = false;
     applyInputStyle();
@@ -376,6 +380,9 @@ void App::applyInputStyle() {
         {"visibility.show_all", {"", "", "Alt+H"}},
     };
     for (const Keys& k : kKeys) actions_.setDefaultShortcut(k.id, k.keys[style]);
+    // Maya's own view keys on top of the Classic sculpting keys (#134): Alt+F frames the Part, Alt+H resets the view.
+    actions_.setDefaultShortcut("view.frame_selected", mayaStyle() ? "Alt+F / Numpad ." : "Numpad .");
+    actions_.setDefaultShortcut("view.reset", mayaStyle() ? "Alt+H" : "");
     // Brushes: 1-9 and 0 in the SculptForge style; Blender's sculpt-mode letters in the Blender style.
     static const std::pair<BrushType, const char*> kBlenderBrushes[] = {
         {BrushType::Standard, "V"}, {BrushType::Smooth, "S"},        {BrushType::Pinch, "P"},
@@ -545,6 +552,11 @@ void App::drawInputSection() {
     }
     ui::Checkbox("Invert zoom##input.invert_zoom", &uiPrefs_.invertZoom);
     ui::HelpText("Invert zoom", nullptr, "Turn zoom drags around (the mouse wheel stays as it is).", "Preferences > Input");
+    ui::Checkbox("Wheel zooms toward the pointer##input.wheel_to_pointer", &uiPrefs_.wheelZoomToPointer);
+    ui::HelpText("Wheel zooms toward the pointer", nullptr,
+                 "The mouse wheel zooms toward the point of the model under the pointer, which stays under it, instead "
+                 "of the middle of the view. On with Maya keys (choosing a style sets it), off with the others.",
+                 "Preferences > Input");
     {
         ImGui::TextDisabled("%s", tr("Along the normal"));
         ImGui::SameLine();

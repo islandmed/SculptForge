@@ -52,6 +52,9 @@ struct UiPrefs {
     // vertical as the other styles. invertZoom turns every zoom drag around.
     bool mayaZoomHorizontal = true;
     bool invertZoom = false;
+    // The mouse wheel zooms toward the surface point under the pointer (#134) instead of the view's centre. On for
+    // the Maya style (set with the style, and the default when ui.json doesn't say); the other styles keep the centre.
+    bool wheelZoomToPointer = false;
     // Tool > Remesh (#121): Quick Remesh (Shift+R, or hold N and drag on the background, remeshes the active Part at
     // the Voxel Resolution) and Remesh after each stroke (a stroke that stretched the surface remeshes it).
     bool quickRemesh = false, remeshAfterStroke = false;

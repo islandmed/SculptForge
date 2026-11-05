@@ -235,6 +235,7 @@
 //                            (another screen); values: focus_frames (1 while focus keeps it drawing), wants_frames (1
 //                            while anything keeps the idle loop drawing: input, a job, an animation),
 //                            pen_mouse_down, ui_left_down (the panels hold the left button), soft_cursor
+//   wheel U V STEPS          the mouse wheel over the model point U V, STEPS notches (positive zooms in)
 //   mouse_move U V           a plain mouse (not the pen) moves to a point on the model, e.g. the stray mouse
 //                            events Windows Ink sends beside the pen's
 //
@@ -523,6 +524,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "smooth_remesh") return std::round(app_.doc_.sculptor.dyntopo.smoothRemesh * 100.0f);
     if (name == "invert_zoom") return app_.uiPrefs_.invertZoom ? 1.0 : 0.0;
     if (name == "maya_zoom_horizontal") return app_.uiPrefs_.mayaZoomHorizontal ? 1.0 : 0.0;
+    if (name == "wheel_to_pointer") return app_.uiPrefs_.wheelZoomToPointer ? 1.0 : 0.0;
     if (name == "along_normal") return double(app_.uiPrefs_.alongNormal);
     if (name == "stroke_along_normal") return app_.strokeAlongNormal_ ? 1.0 : 0.0;
     if (name.rfind("forgesphere_x", 0) == 0 || name.rfind("forgesphere_r", 0) == 0) { // forgesphere_x2, forgesphere_r2: sphere 2's x / radius
@@ -2276,6 +2278,25 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             SDL_Event e{};
             e.type = SDL_EVENT_WINDOW_MOUSE_LEAVE;
             e.window.windowID = SDL_GetWindowID(app_.window_);
+            app_.handleEvent(e);
+        });
+        wait(0.05f);
+    } else if (verb == "wheel") { // wheel U V STEPS: the mouse wheel over the model point U V (+ zooms in)
+        if (!need(3)) return false;
+        auto at = std::make_shared<ImVec2>();
+        run([this, at, u = num(1, 0.5f), v = num(2, 0.5f)] {
+            *at = onModel(u, v);
+            mouseMotion(at->x, at->y);
+        });
+        wait(0.05f); // (the panels let go of the mouse first: ImGui's WantCaptureMouse is a frame behind)
+        run([this, at, steps = num(3, 1.0f)] {
+            const ImVec2 p = *at;
+            SDL_Event e{};
+            e.type = SDL_EVENT_MOUSE_WHEEL;
+            e.wheel.windowID = SDL_GetWindowID(app_.window_);
+            e.wheel.y = steps;
+            e.wheel.mouse_x = p.x;
+            e.wheel.mouse_y = p.y;
             app_.handleEvent(e);
         });
         wait(0.05f);

@@ -310,6 +310,8 @@ constexpr Entry kSpanish[] = {
     {"Colour of the Studio material (the clay colour).", "Color del material Studio (el color de la arcilla)."},
     {"Frame model", "Encuadrar modelo"},
     {"Frame Part", "Encuadrar pieza"},
+    {"Reset view", "Restablecer vista"},
+    {"Wheel zooms toward the pointer", "La rueda acerca hacia el puntero"},
     {"Fullscreen", "Pantalla completa"},
     {"Gradient", "Degradado"},
     {"Flat Colour", "Color plano"},
