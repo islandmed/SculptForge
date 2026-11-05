@@ -693,6 +693,7 @@ TEST(hw_micro_shade_budget) {
     // A micro level's shading per frame: still frames all of the points; strokes and a moving view 10 ms of them.
     TierConfig t;
     t.shadeBudgetPoints = 1u << 20;
+    t.draftBrushMode = false; // continuous normals
     CHECK(microShadeBudget(t, false, false, 30.0, 300) == (1u << 20)); // still: the points (nothing waits)
     CHECK(microShadeBudget(t, false, true, 30.0, 300) == 333333);      // orbit: 10 ms at 30 ns a point
     CHECK(microShadeBudget(t, true, false, 30.0, 300) == 333333);      // stroke: the same
