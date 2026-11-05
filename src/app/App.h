@@ -789,8 +789,12 @@ private:
     AlphaOptions alphaOptions_;
     AlphaRake alphaRake_;
     uint32_t alphaSeed_ = 1;
+    // Drag Stamp / Slide Stamp (#136): Angle jitter's turn for this stroke's one stamp, from a seed that carries on
+    // from stroke to stroke (each stamp gets its own turn).
+    float stampJitter_ = 0.0f;
+    uint32_t stampSeed_ = 0x2545f491u;
     float lastDabAngle_ = 0.0f; // radians (UI tests: last_dab_angle)
-    void drawAlphaOptions();
+    void drawAlphaOptions(bool vdm = false); // vdm: Brush > Vector Displacement's rows (no Tile, #136)
     std::mutex alphaMutex_;
     std::string pendingAlphaPath_; // set by the file dialog thread
     // Vector displacement brushes (PanelVdm.cpp, core/Vdm.h): the Brush palette's Vector Displacement section,

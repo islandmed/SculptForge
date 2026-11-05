@@ -7,6 +7,7 @@
 
 #include "core/BrushRecipe.h"
 #include "core/BrushSettings.h"
+#include "core/Sculpt.h"
 
 #include <cstdio>
 #include <filesystem>
@@ -86,7 +87,28 @@ TEST(brush_settings_save_load_reset) {
     const BrushToolSettings def = loaded.reset("custom:Clay Slab");
     CHECK(def == BrushToolSettings{});
     CHECK(!loaded.hasSaved("custom:Clay Slab"));
-    CHECK(BrushSettingsStore::shipped("builtin:Vdm").stroke == StrokeType::DragRect);
+    // The VDM brush (by its real key: the brush is named "VDM") ships with Drag Stamp, turned by the drag (#136).
+    const std::string vdmKey = brushSettingsKey(brushName(BrushType::Vdm));
+    CHECK(BrushSettingsStore::shipped(vdmKey).stroke == StrokeType::DragRect);
+    CHECK(BrushSettingsStore::shipped(vdmKey).alphaOptions.followStroke);
+    {
+        // ...also on first use after a brush with it off, and in files saved before the VDM had the option.
+        BrushSettingsStore fresh;
+        BrushToolSettings clay;
+        CHECK(fresh.switchBrush("builtin:Clay", vdmKey, clay).alphaOptions.followStroke);
+        Json old;
+        std::string e;
+        CHECK(Json::parse(R"({"brushes": {"builtin:VDM": {"stroke": "drag_dot"}}})", old, e));
+        fresh.applyJson(old);
+        BrushToolSettings got;
+        CHECK(fresh.savedFor(vdmKey, got) && got.alphaOptions.followStroke && got.stroke == StrokeType::DragDot);
+        // Turned off and saved, it stays off.
+        got.alphaOptions.followStroke = false;
+        fresh.store(vdmKey, got);
+        BrushSettingsStore again;
+        again.applyJson(fresh.toJson());
+        CHECK(again.savedFor(vdmKey, got) && !got.alphaOptions.followStroke);
+    }
     // After the reset the session doesn't bring back the old values either.
     BrushToolSettings live;
     live.radiusPx = 99.0f;

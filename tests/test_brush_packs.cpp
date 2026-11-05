@@ -56,6 +56,17 @@ TEST(brush_recipe_alpha_keys_round_trip) {
     r.alphaFollow = true;
     const BrushRecipe back = BrushRecipe::fromJson(r.toJson());
     CHECK(back.alpha == "Stitches" && back.alphaFollow);
+    // Angle and Angle jitter too (#136), clamped as the Alpha palette's sliders are.
+    r.alphaAngle = 42.5f;
+    r.alphaJitter = 20.0f;
+    const BrushRecipe turned = BrushRecipe::fromJson(r.toJson());
+    CHECK(turned.alphaAngle == 42.5f && turned.alphaJitter == 20.0f);
+    Json wild = r.toJson();
+    wild.set("alphaAngle", 900.0);
+    wild.set("alphaAngleJitter", -4.0);
+    const BrushRecipe clamped = BrushRecipe::fromJson(wild);
+    CHECK(clamped.alphaAngle == 180.0f && clamped.alphaJitter == 0.0f);
+    r.alphaAngle = r.alphaJitter = 0.0f;
     // Lenient names, as brush_set_alpha takes them; unknown names are dropped.
     Json j = r.toJson();
     j.set("alpha", "fabric_weave");

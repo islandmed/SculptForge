@@ -79,6 +79,8 @@ struct BrushRecipe {
     // alpha is on. Written to the JSON only when set. An unknown name is dropped.
     std::string alpha;
     bool alphaFollow = false; // the alpha turns along the stroke (Alpha > Follow stroke direction) on that first pick
+    float alphaAngle = 0.0f;  // Alpha > Angle (degrees, -180..180) and Angle jitter (0..180) on that first pick (#136);
+    float alphaJitter = 0.0f; // written only when not 0. Save Brush Settings writes all three from the brush's live ones
     // Pen pressure > Size / Strength for this brush (#122, core/PenPressure.h): what it starts with, and what Brush
     // Lab sets. Written to the JSON only when not Use global.
     PenPressure pressureSize = PenPressure::Global;

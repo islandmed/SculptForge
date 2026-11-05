@@ -565,6 +565,13 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "share_brush_size") return app_.brushSettingsStore().shareSizeIntensity ? 1.0 : 0.0;
     if (name == "alpha_follow") return app_.alphaOptions_.followStroke ? 1.0 : 0.0; // alpha options (#76)
     if (name == "alpha_angle") return std::round(app_.alphaOptions_.angle);
+    if (name == "alpha_jitter") return std::round(app_.alphaOptions_.jitter);
+    if (name == "recipe_alpha_angle" || name == "recipe_alpha_jitter" || name == "recipe_alpha_follow") { // its .sfbrush's (#136)
+        const BrushRecipe* r = app_.activeRecipe();
+        if (!r) return -999.0;
+        if (name == "recipe_alpha_follow") return r->alphaFollow ? 1.0 : 0.0;
+        return std::round(name == "recipe_alpha_angle" ? r->alphaAngle : r->alphaJitter);
+    }
     if (name == "brush_sort") return double(int(listSortFromId(app_.uiPrefs_.brushSort))); // 0 A-Z, 1 Recent, 2 Pack
     if (name == "alpha_sort") return double(int(listSortFromId(app_.uiPrefs_.alphaSort)));
     if (name == "material_sort") return double(int(listSortFromId(app_.uiPrefs_.materialSort)));
