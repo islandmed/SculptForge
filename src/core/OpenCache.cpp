@@ -55,7 +55,70 @@ uint64_t hashBlock(const uint8_t* p, size_t n, uint64_t seed) {
     return mix(r ^ n);
 }
 
+
+uint32_t spread10(uint32_t x) {
+    x &= 0x3FF;
+    x = (x | (x << 16)) & 0x030000FF;
+    x = (x | (x << 8)) & 0x0300F00F;
+    x = (x | (x << 4)) & 0x030C30C3;
+    x = (x | (x << 2)) & 0x09249249;
+    return x;
+}
+
+// Sorts (Morton code << 32 | triangle) keys made in triangle order: a parallel LSD radix sort on the 30 code bits
+// (two 15-bit digits, stable, so equal codes keep triangle order: the same order as sorting the whole keys).
+void sortMortonKeys(std::vector<uint64_t>& keys) {
+    const size_t n = keys.size();
+    constexpr uint32_t kDigits = 1u << 15;
+    const size_t blocks = std::clamp<size_t>(n >> 16, 1, 64), per = (n + blocks - 1) / blocks;
+    std::vector<uint64_t> tmp(n);
+    std::vector<uint32_t> hist(blocks * kDigits);
+    for (const int shift : {32, 47}) {
+        poolFor(blocks, [&](size_t b, size_t e) {
+            for (size_t k = b; k < e; ++k) {
+                uint32_t* h = hist.data() + k * kDigits;
+                std::fill(h, h + kDigits, 0u);
+                for (size_t i = k * per, end = std::min(n, (k + 1) * per); i < end; ++i) ++h[(keys[i] >> shift) & (kDigits - 1)];
+            }
+        }, 1);
+        uint32_t sum = 0;
+        for (uint32_t d = 0; d < kDigits; ++d)
+            for (size_t k = 0; k < blocks; ++k) {
+                const uint32_t c = hist[k * kDigits + d];
+                hist[k * kDigits + d] = sum;
+                sum += c;
+            }
+        poolFor(blocks, [&](size_t b, size_t e) {
+            for (size_t k = b; k < e; ++k) {
+                uint32_t* h = hist.data() + k * kDigits;
+                for (size_t i = k * per, end = std::min(n, (k + 1) * per); i < end; ++i) tmp[h[(keys[i] >> shift) & (kDigits - 1)]++] = keys[i];
+            }
+        }, 1);
+        keys.swap(tmp);
+    }
+}
+
 } // namespace
+
+std::vector<uint32_t> microSlotOrder(const Mesh& mesh) {
+    const size_t nt = mesh.triangleCount();
+    AABB box;
+    for (const glm::vec3& p : mesh.positions) box.expand(p);
+    const glm::vec3 lo = box.min, ext = glm::max(box.extent(), glm::vec3(1e-20f));
+    std::vector<uint64_t> keys(nt);
+    poolFor(nt, [&](size_t b, size_t e) {
+        for (size_t t = b; t < e; ++t) {
+            const glm::uvec3 tr = mesh.triangles[t];
+            const glm::vec3 c = ((mesh.positions[tr.x] + mesh.positions[tr.y] + mesh.positions[tr.z]) / 3.0f - lo) / ext;
+            const glm::uvec3 q = glm::uvec3(glm::clamp(c, 0.0f, 1.0f) * 1023.0f);
+            keys[t] = uint64_t(spread10(q.x) | spread10(q.y) << 1 | spread10(q.z) << 2) << 32 | t;
+        }
+    }, 1 << 14);
+    sortMortonKeys(keys);
+    std::vector<uint32_t> order(nt);
+    for (size_t s = 0; s < nt; ++s) order[s] = uint32_t(keys[s]);
+    return order;
+}
 
 uint64_t openCacheHash(const void* data, size_t bytes) {
     constexpr size_t kBlock = size_t(1) << 20;
@@ -151,6 +214,10 @@ bool openCacheUnpack(const uint8_t* data, size_t n, size_t count, std::vector<ui
 
 uint64_t openCacheKey(const Mesh& mesh) {
     return mix(openCacheHash(mesh.triangles.data(), mesh.triangles.size() * sizeof(glm::uvec3)) ^ (uint64_t(mesh.vertexCount()) * kMul));
+}
+
+uint64_t openCacheGeometryKey(const Mesh& mesh, uint64_t key) {
+    return (key ? key : openCacheKey(mesh)) ^ (openCacheHash(mesh.positions.data(), mesh.positions.size() * sizeof(glm::vec3)) * kMul);
 }
 
 bool microAdoptEdgeNeighbors(const Mesh& mesh, std::vector<uint32_t>& out, std::vector<uint32_t>& saved) {

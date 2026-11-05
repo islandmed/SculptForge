@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "render/MicroRenderer.h"
 
+#include "core/OpenCache.h"
 #include "core/ThreadPool.h"
 #include "core/TierConfig.h"
 
@@ -143,48 +144,6 @@ void main() {
 }
 )";
 
-uint32_t spread10(uint32_t x) {
-    x &= 0x3FF;
-    x = (x | (x << 16)) & 0x030000FF;
-    x = (x | (x << 8)) & 0x0300F00F;
-    x = (x | (x << 4)) & 0x030C30C3;
-    x = (x | (x << 2)) & 0x09249249;
-    return x;
-}
-
-// Sorts (Morton code << 32 | triangle) keys made in triangle order: a parallel LSD radix sort on the 30 code bits
-// (two 15-bit digits, stable, so equal codes keep triangle order: the same order as sorting the whole keys).
-void sortMortonKeys(std::vector<uint64_t>& keys) {
-    const size_t n = keys.size();
-    constexpr uint32_t kDigits = 1u << 15;
-    const size_t blocks = std::clamp<size_t>(n >> 16, 1, 64), per = (n + blocks - 1) / blocks;
-    std::vector<uint64_t> tmp(n);
-    std::vector<uint32_t> hist(blocks * kDigits);
-    for (const int shift : {32, 47}) {
-        poolFor(blocks, [&](size_t b, size_t e) {
-            for (size_t k = b; k < e; ++k) {
-                uint32_t* h = hist.data() + k * kDigits;
-                std::fill(h, h + kDigits, 0u);
-                for (size_t i = k * per, end = std::min(n, (k + 1) * per); i < end; ++i) ++h[(keys[i] >> shift) & (kDigits - 1)];
-            }
-        }, 1);
-        uint32_t sum = 0;
-        for (uint32_t d = 0; d < kDigits; ++d)
-            for (size_t k = 0; k < blocks; ++k) {
-                const uint32_t c = hist[k * kDigits + d];
-                hist[k * kDigits + d] = sum;
-                sum += c;
-            }
-        poolFor(blocks, [&](size_t b, size_t e) {
-            for (size_t k = b; k < e; ++k) {
-                uint32_t* h = hist.data() + k * kDigits;
-                for (size_t i = k * per, end = std::min(n, (k + 1) * per); i < end; ++i) tmp[h[(keys[i] >> shift) & (kDigits - 1)]++] = keys[i];
-            }
-        }, 1);
-        keys.swap(tmp);
-    }
-}
-
 } // namespace
 
 const char* microVertexShaderSource() { return kMicroVS; }
@@ -256,25 +215,26 @@ void MicroRenderer::buildLayout(const Mesh& mesh) {
     // Slots in Morton order of the triangle centres: clusters of consecutive slots are compact.
     box_ = AABB();
     for (const glm::vec3& p : mesh.positions) box_.expand(p);
-    const glm::vec3 lo = box_.min, ext = glm::max(box_.extent(), glm::vec3(1e-20f));
-    std::vector<uint64_t> keys(nt);
-    poolFor(nt, [&](size_t b, size_t e) {
-        for (size_t t = b; t < e; ++t) {
-            const glm::uvec3 tr = mesh.triangles[t];
-            const glm::vec3 c = ((mesh.positions[tr.x] + mesh.positions[tr.y] + mesh.positions[tr.z]) / 3.0f - lo) / ext;
-            const glm::uvec3 q = glm::uvec3(glm::clamp(c, 0.0f, 1.0f) * 1023.0f);
-            keys[t] = uint64_t(spread10(q.x) | spread10(q.y) << 1 | spread10(q.z) << 2) << 32 | t;
+    // A saved order (core/OpenCache.h, this base's) if it is a permutation, else the Morton sort (kept for saving).
+    bool reused = false;
+    if (const auto saved = mm.slotOrder; saved && saved->size() == nt) {
+        slotOf_.assign(nt, 0xFFFFFFFFu);
+        reused = true;
+        for (uint32_t s = 0; s < nt && reused; ++s) {
+            const uint32_t t = (*saved)[s];
+            if (t >= nt || slotOf_[t] != 0xFFFFFFFFu) reused = false;
+            else slotOf_[t] = s;
         }
-    }, 1 << 14);
-    sortMortonKeys(keys);
-    openStage("layout: morton sort");
-    order_.resize(nt);
-    slotOf_.resize(nt);
-    for (uint32_t s = 0; s < nt; ++s) {
-        order_[s] = uint32_t(keys[s]);
-        slotOf_[order_[s]] = s;
+        if (reused) order_ = *saved;
     }
-    std::vector<uint64_t>().swap(keys);
+    if (!reused) {
+        order_ = microSlotOrder(mesh);
+        slotOf_.resize(nt);
+        for (uint32_t s = 0; s < nt; ++s) slotOf_[order_[s]] = s;
+        mesh.micro->slotOrder = std::make_shared<const std::vector<uint32_t>>(order_);
+        mesh.micro->slotOrderKey = openCacheGeometryKey(mesh);
+    }
+    openStage(reused ? "layout: saved slot order" : "layout: morton sort");
     const uint32_t clusterSize = std::clamp(65536u >> (2 * mm.level), 16u, 1024u);
     clusterShift_ = uint32_t(std::countr_zero(clusterSize));
     chunkSlots_ = std::max(clusterSize, (kChunkTexels / mm.samples) & ~(clusterSize - 1));

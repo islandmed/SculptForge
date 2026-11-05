@@ -672,10 +672,7 @@ std::vector<uint32_t> microEdgesFromSlots(const Mesh& m, const std::vector<uint3
     return out;
 }
 
-// Positions and triangles (a micro level's base shape: MicroMesh::bulgeMax, baseEdge follow from them).
-uint64_t geometryKey(const Mesh& m) {
-    return openCacheKey(m) ^ (openCacheHash(m.positions.data(), m.positions.size() * sizeof(glm::vec3)) * 0x9E3779B97F4A7C15ull);
-}
+uint64_t geometryKey(const Mesh& m) { return openCacheGeometryKey(m); }
 
 // `bvh`: the mesh's, if it is up to date (null: none saved).
 Json writeOpenCache(Writer& w, const std::string& prefix, const Mesh& m, const BVH* bvh) {
@@ -731,19 +728,27 @@ Json writeOpenCache(Writer& w, const std::string& prefix, const Mesh& m, const B
     if (m.micro && microMatches(m)) { // (exact float bits)
         any = true;
         Json shape = Json::object();
-        shape.set("key", hex64(geometryKey(m)));
+        const uint64_t key = geometryKey(m);
+        shape.set("key", hex64(key));
         // (from the shape as saved, as attaching it would: the level's own values date from its Divide)
         shape.set("bulge", hex64(std::bit_cast<uint32_t>(microBulgeMax(m, m.micro->n))));
         shape.set("base_edge", hex64(std::bit_cast<uint32_t>(microBaseEdge(m))));
         j.set("micro_shape", std::move(shape));
+        // The renderer's slot order, if it was made from these positions (it is kept while the base moves), else
+        // made now (the same function).
+        if (m.micro->slotOrder && m.micro->slotOrderKey == key && m.micro->slotOrder->size() == m.triangleCount())
+            put("micro_slot_order", *m.micro->slotOrder, true);
+        else
+            put("micro_slot_order", microSlotOrder(m), true);
     }
     return any ? j : Json();
 }
 
 struct OpenCacheData {
-    std::vector<uint32_t> vtOffsets, vtList, adjOffsets, adjList, bvhNodes, bvhTris, microEdges;
+    std::vector<uint32_t> vtOffsets, vtList, adjOffsets, adjList, bvhNodes, bvhTris, microEdges, slotOrder;
     bool topology = false;
     float microBulge = -1.0f, microBaseEdge = -1.0f; // (MicroAttachHint) for these positions, or < 0
+    uint64_t geometryKey = 0;                           // (when micro_shape matched)
 };
 
 
@@ -753,7 +758,8 @@ bool readOpenCache(Reader& r, const Json& oc, const Mesh& m, OpenCacheData& out)
     if constexpr (std::endian::native != std::endian::little) return false;
     if (!oc.isObject() || int(oc["version"].asNumber(0)) != kOpenCacheVersion || !openCacheEnabled()) return false;
     bool ok = false;
-    if (parseHex64(oc["key"], ok) != openCacheKey(m) || !ok) return false;
+    const uint64_t meshKey = openCacheKey(m);
+    if (parseHex64(oc["key"], ok) != meshKey || !ok) return false;
     const size_t nv = m.vertexCount(), nt = m.triangleCount();
     // (sizes from the descriptor, bounded: the checks after reading decide the rest)
     auto get = [&](const char* name, std::vector<uint32_t>& v, size_t expect, size_t limit) {
@@ -785,9 +791,11 @@ bool readOpenCache(Reader& r, const Json& oc, const Mesh& m, OpenCacheData& out)
     if (const Json& shape = oc["micro_shape"]; shape.isObject()) {
         bool k = false, b = false, e = false;
         const uint64_t key = parseHex64(shape["key"], k), bulge = parseHex64(shape["bulge"], b), edge = parseHex64(shape["base_edge"], e);
-        if (k && b && e && bulge <= 0xFFFFFFFFu && edge <= 0xFFFFFFFFu && key == geometryKey(m)) {
+        if (k && b && e && bulge <= 0xFFFFFFFFu && edge <= 0xFFFFFFFFu && key == openCacheGeometryKey(m, meshKey)) {
+            out.geometryKey = key;
             out.microBulge = std::bit_cast<float>(uint32_t(bulge));
             out.microBaseEdge = std::bit_cast<float>(uint32_t(edge));
+            if (!get("micro_slot_order", out.slotOrder, nt, nt)) out.slotOrder.clear(); // (the renderer checks it's a permutation)
         }
     }
     return true;
@@ -1302,6 +1310,10 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
                 if (!microAttach(s.mesh, level, float(mj["step"].asNumber(0)), std::move(disp), std::move(mask), error, &hint))
                     return false;
                 used.microEdges = savedEdges && hint.edgeNeighbors.empty(); // (left empty: taken)
+                if (!cache.slotOrder.empty()) { // (keyed with micro_shape: these positions)
+                    s.mesh.micro->slotOrder = std::make_shared<const std::vector<uint32_t>>(std::move(cache.slotOrder));
+                    s.mesh.micro->slotOrderKey = cache.geometryKey;
+                }
                 openStage("microAttach");
             }
             // (the micro level reads and attaches while the BVH builds: both only read the mesh)

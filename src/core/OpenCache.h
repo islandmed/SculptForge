@@ -51,6 +51,14 @@ bool openCacheUnpack(const uint8_t* data, size_t n, size_t count, std::vector<ui
 // The key a cache is made for: the triangles and the vertex count.
 uint64_t openCacheKey(const Mesh& mesh);
 
+// The key of positions and triangles (what a micro level's base shape and slot order follow from).
+// `key`: openCacheKey(mesh) if already known (0: worked out).
+uint64_t openCacheGeometryKey(const Mesh& mesh, uint64_t key = 0);
+
+// A micro level's slot order (render/MicroRenderer.h): its base triangles in Morton order of their centres within
+// the base's box (a parallel radix sort; equal codes keep triangle order).
+std::vector<uint32_t> microSlotOrder(const Mesh& mesh);
+
 // Takes saved edge neighbours for a micro level of `mesh` into `out` (MicroMesh::edgeNeighbor; `saved` is left
 // empty) if each one is in range and really shares that edge; false and nothing changed otherwise.
 bool microAdoptEdgeNeighbors(const Mesh& mesh, std::vector<uint32_t>& out, std::vector<uint32_t>& saved);

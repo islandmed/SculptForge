@@ -227,3 +227,26 @@ TEST(open_cache_packing_round_trips_and_rejects_bad_bytes) {
     std::vector<uint8_t> empty = openCachePack({});
     CHECK(openCacheUnpack(empty.data(), empty.size(), 0, back) && back.empty());
 }
+
+TEST(open_cache_slot_order_follows_its_positions) {
+    SmallCacheThreshold small;
+    Document doc = cachedDoc();
+    const size_t nt = doc.mesh.triangleCount();
+    auto order = std::make_shared<std::vector<uint32_t>>(nt);
+    for (uint32_t t = 0; t < nt; ++t) (*order)[t] = uint32_t(nt - 1 - t); // (any permutation: the renderer's stand-in)
+    doc.mesh.micro->slotOrder = order;
+    doc.mesh.micro->slotOrderKey = openCacheGeometryKey(doc.mesh);
+    const std::string path = tempPath("sf_open_cache_order.sfproj");
+    std::string err;
+    CHECK(saveProject(path, doc, err));
+    Document loaded;
+    CHECK(loadProject(path, loaded, err));
+    CHECK(loaded.mesh.micro && loaded.mesh.micro->slotOrder && *loaded.mesh.micro->slotOrder == *order);
+    // Made from other positions (the base moved since): the saved one is made again from these.
+    doc.mesh.positions[0] += glm::vec3(0.01f);
+    CHECK(saveProject(path, doc, err));
+    Document moved;
+    CHECK(loadProject(path, moved, err));
+    CHECK(moved.mesh.micro && moved.mesh.micro->slotOrder && *moved.mesh.micro->slotOrder == microSlotOrder(doc.mesh));
+    std::filesystem::remove(path);
+}

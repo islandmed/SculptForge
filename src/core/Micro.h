@@ -88,6 +88,10 @@ struct MicroMesh {
     // Base topology this level needs (derived, not saved; rebuilt when the base changes): per triangle edge the
     // neighbouring triangle (tri << 2 | its edge), or kNone on a boundary.
     std::vector<uint32_t> edgeNeighbor;
+    // The renderer's slot order (render/MicroRenderer.h: base triangles in Morton order of their centres), derived
+    // and kept so a project can save it (core/OpenCache.h), with openCacheGeometryKey of the base it was made from.
+    std::shared_ptr<const std::vector<uint32_t>> slotOrder;
+    uint64_t slotOrderKey = 0;
 
     // Picks and brushes find the base triangles a displaced surface may reach through the BVH, each node grown by the
     // largest displacement under it (not the level's largest everywhere: one tall stroke made every query on a
