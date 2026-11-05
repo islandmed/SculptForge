@@ -10,6 +10,7 @@
 #include "app/AsyncStroke.h"
 #include "app/Calibration.h"
 #include "app/CrashLog.h"
+#include "core/PerfTrace.h"
 
 #include "ai/AiCommands.h"
 #include "app/Demo.h"
@@ -432,6 +433,10 @@ int App::runUiTest(int w, int h, int fps) {
         touchTick(); // a finger's press that waited for a second finger long enough goes through
 
         hardwareProfileFrameBegin(); // (only with SF_HW_PROFILE_IN_TESTS=1: tests use fixed settings)
+        // Help > Record a performance trace: run()'s phases, roughly (no events, dabs or 3D view drawn here).
+        double tracePhase[7] = {};
+        const bool tracing = perftrace::on();
+        if (tracing) tracePhase[0] = tracePhase[1] = tracePhase[2] = double(SDL_GetTicksNS()) * 1e-6;
         Demo::beginFrame();
         if (uiScaleDirty_) applyUiScale(); // (Preferences, a display-scale change: #87)
         lap(frameMs[0]);
@@ -451,6 +456,7 @@ int App::runUiTest(int w, int h, int fps) {
         ImGui::LogFinish();
         ImGui::Render();
         lap(frameMs[2]);
+        if (tracing) tracePhase[3] = double(SDL_GetTicksNS()) * 1e-6;
         updateMouseCursor();
         buildGhost(); // (the stroke preview, as run() draws it)
 
@@ -461,6 +467,10 @@ int App::runUiTest(int w, int h, int fps) {
         notePerformanceFrame(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - syncStart).count());
         viewSamples(); // keeps Fast Navigation's view of the camera current (UI tests read view_samples)
         hardwareProfileFrameEnd();
+        if (tracing) {
+            tracePhase[4] = tracePhase[5] = tracePhase[6] = double(SDL_GetTicksNS()) * 1e-6;
+            tracePerfFrame(tracePhase);
+        }
         ++frames;
         const std::string shot = demo_->takeShotRequest();
         if (shot.empty()) continue;
@@ -754,7 +764,7 @@ int App::run() {
     double phase[10] = {};
     int phases = 0;
     const auto mark = [&] {
-        if ((frameLogMs >= 0.0 || proof_) && phases < 10) phase[phases++] = double(SDL_GetTicksNS()) * 1e-6;
+        if ((frameLogMs >= 0.0 || proof_ || perftrace::on()) && phases < 10) phase[phases++] = double(SDL_GetTicksNS()) * 1e-6;
     };
     auto seconds = [] { return double(SDL_GetTicksNS()) * 1e-9; };
     // --measure-idle: let start-up settle (first frames, the Library's thumbnails), then count.
@@ -1116,6 +1126,7 @@ int App::run() {
             SDL_Log("frame %.1f ms: events %.1f, dabs %.1f, UI %.1f, ghost + sync %.1f, draw %.1f, UI draw + swap %.1f",
                     phase[6] - phase[0], phase[1] - phase[0], phase[2] - phase[1], phase[3] - phase[2], phase[4] - phase[3],
                     phase[5] - phase[4], phase[6] - phase[5]);
+        if (phases == 7 && perftrace::on()) tracePerfFrame(phase); // Help > Record a performance trace
         ++framesDrawn;
         {
             const double frameNow = seconds();
@@ -2365,7 +2376,16 @@ void App::runCommand(const std::string& name, const Args& args) {
     if (name == "save_project") storeProjectSettings();
     flushBrushEdits(); // commands may replace brushes: save edits first, then watch what's there afterwards
     crashlog::action(name); // (failures reach the log through SDL_Log below)
+    const auto commandStart = std::chrono::steady_clock::now();
     CommandResult r = commands_.execute(doc_, name, args);
+    if (perftrace::on()) { // a command that held up the frames (remesh, Divide, micro, open...)
+        const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - commandStart).count();
+        if (ms > perf_.traceLongMs) {
+            char took[48];
+            std::snprintf(took, sizeof took, " took %.1f ms%s | ", ms, r.ok ? "" : " (failed)");
+            perftrace::line("command " + name + took + perfTraceScene());
+        }
+    }
     status_ = r.message;
     if (name.rfind("uv_", 0) == 0 || name == "texture_create" || name == "texture_delete") uvEditorChanged();
     lastCommandOk_ = r.ok;

@@ -270,6 +270,7 @@ constexpr Entry kSpanish[] = {
     {"Join the community on Discord", "Únete a la comunidad en Discord"},
     {"Report a problem", "Informar de un problema"},
     {"Open log folder", "Abrir la carpeta de registros"},
+    {"Record a performance trace", "Grabar una traza de rendimiento"},
     {"Fixes & suggestions", "Correcciones y sugerencias"},
     {"Benchmark (proof mode)", "Prueba de rendimiento (modo prueba)"},
     {"Support SculptForge", "Apoya a SculptForge"},

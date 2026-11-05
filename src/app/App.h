@@ -1045,7 +1045,18 @@ private:
         double lastStrokeSyncMs = 0.0;
         int lastStrokeFrames = 0;
         bool gpuOutOfMemory = false;
+        double lastSyncMs = 0.0;      // the last frame's scene sync (GPU uploads)
+        std::string traceJobs;        // the background jobs running at the last traced frame
+        double traceJobsSince = 0.0;  // (seconds) when they last changed
+        double traceLongMs = 33.0;    // perftrace::kLongFrameMs (SF_PERF_TRACE_MS: UI tests write every frame)
     } perf_;
+    // Help > Record a performance trace (core/PerfTrace.h, #127; PanelPerformanceProfile.cpp): the toggle, and the
+    // lines it writes: long frames (with the loop's phase times), strokes, long commands, background jobs.
+    void togglePerfTrace();
+    void tracePerfFrame(const double* phase); // phase[0..6]: the main loop's marks (App::run)
+    void tracePerfStroke(const std::string& label);
+    std::string perfTraceScene() const;       // mesh size, levels, view state
+    std::string perfTraceJobs() const;        // the background jobs running now, by name
     // Hardware profile (PanelPerformanceProfile.cpp; app/Calibration.h, core/HardwareProfile.h, core/FrameGovernor.h):
     // calibrates on first launch and when the GPU, driver or version changes; the profile section of Preferences >
     // Performance; the adaptive frame governor, fed every frame between FrameBegin and FrameEnd.

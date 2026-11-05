@@ -273,6 +273,7 @@
 #include "core/ListSort.h"
 #include "core/LitSphere.h"
 #include "core/Multires.h"
+#include "core/PerfTrace.h"
 #include "core/Script.h"
 #include "core/SelectionSets.h"
 #include "core/ThreadPool.h"
@@ -913,6 +914,15 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "brush_pressure") return app_.strokePressure();
     if (name == "stroking") return app_.drag_ == App::Drag::Stroke ? 1.0 : 0.0;
     if (name == "tablet_mouse_mode") return app_.uiPrefs_.tablet.mouseMode ? 1.0 : 0.0;
+    if (name == "perf_trace") return perftrace::on() ? 1.0 : 0.0; // Help > Record a performance trace
+    if (name == "perf_trace_long_frames" || name == "perf_trace_strokes" || name == "perf_trace_commands") {
+        std::ifstream in(std::filesystem::path(std::u8string(reinterpret_cast<const char8_t*>(perftrace::path().data()),
+                                                             perftrace::path().size())));
+        const std::string what = name == "perf_trace_long_frames" ? "  long frame " : name == "perf_trace_strokes" ? "  stroke " : "  command ";
+        double n = 0.0;
+        for (std::string row; std::getline(in, row);) n += row.find(what) != std::string::npos ? 1.0 : 0.0;
+        return n;
+    }
     if (name == "backface_culling") return app_.renderSettings_.backfaceCulling ? 1.0 : 0.0;
     if (name == "xray") return app_.renderSettings_.xray ? 1.0 : 0.0;
     if (name == "view_resolution") return double(app_.uiPrefs_.viewResolution);
