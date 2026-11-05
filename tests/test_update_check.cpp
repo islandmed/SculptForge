@@ -121,8 +121,9 @@ TEST(update_feed_challenge_results) {
     // A long title is cut to 48 bytes, never inside a character.
     std::string title;
     for (int i = 0; i < 40; ++i) title += "\xc3\xa9";
-    CHECK(parseUpdateFeed(R"({"version":"0.6.0","download":"https://example.org/dl","challenge":{"id":"x","title":")" + title +
-                              "\"}}",
-                          u, err));
+    // (Built outside CHECK: MSVC's preprocessor misreads a raw string ending in a quote inside a macro argument.)
+    const std::string feed =
+        std::string(R"({"version":"0.6.0","download":"https://example.org/dl","challenge":{"id":"x","title":")") + title + "\"}}";
+    CHECK(parseUpdateFeed(feed, u, err));
     CHECK(u.challengeTitle.size() == 48 && u.challengeTitle == title.substr(0, 48));
 }
