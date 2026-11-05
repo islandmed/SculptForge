@@ -209,7 +209,7 @@
           <article class="tier featured" style="--i: 0">
             <h2>Member</h2>
             <p class="price"><span data-price class="now">$5</span><span data-per>/ month</span></p>
-            <p class="per-year" data-alt>or $48 a year</p>
+            <p class="per-year" data-alt hidden>or $48 a year</p>
             <ul class="perks">
               <li><strong>Betas and early builds</strong>: the next version before everyone else (from SculptForge
                 1.0, each release about two weeks early)</li>
@@ -232,8 +232,7 @@
             <p class="cta"><a class="btn" href="https://buy.stripe.com/3cI00j12v5H4g1dgWZ4F204" rel="noopener">Studio membership</a></p>
           </article>
         </div>
-        <p class="fine support-fine">Every release stays free for everyone; bug-fix and security releases go out to everyone the same day.
-          Betas and early builds come from a private GitHub repository: give your GitHub username at checkout and
+        <p class="fine support-fine">Betas and early builds come from a private GitHub repository: give your GitHub username at checkout and
           you'll get an invite. Join the <a href="https://discord.gg/gWrYkEmQhH" rel="noopener">SculptForge Discord</a>
           and tell us your membership for #members. <a href="studios.html">For studios</a>.</p>
         <p class="fine support-fine">Payments are handled by Stripe (cards, Apple Pay, Google Pay); SculptForge never sees your
@@ -296,6 +295,7 @@
       const monthly = link.href, price = document.querySelector('[data-price]'), per = document.querySelector('[data-per]'),
             alt = document.querySelector('[data-alt]');
       billing.hidden = false;
+      alt.hidden = false;
       billing.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
         const year = b.dataset.billing === 'year';
         billing.querySelectorAll('button').forEach((o) => o.setAttribute('aria-pressed', String(o === b)));

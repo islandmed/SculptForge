@@ -10,8 +10,8 @@
 #   scripts/release.sh X.Y.Z --only bump --staged        the bump commit only, not pushed: the merger puts it on top of
 #                     the release batch (RELEASE=X.Y.Z ~/Work/.sf/merge-batch.sh), so `staging` builds the packages of
 #                     the exact commit to tag while CI runs, and the release later only smoke-tests and publishes them
-#   HIGHLIGHTS=f scripts/release.sh X.Y.Z-beta.N --yes  a beta (also -rc.N): a GitHub pre-release for testers, offered
-#                     only to apps on the Preview update channel (see "Betas" below and docs/releasing.md)
+#   scripts/release.sh X.Y.Z-beta.N --yes  a beta (also -rc.N): a members-only pre-release in the private repository
+#                     islandmed/sculptforge-insiders, announced in #members (see "Betas" below and docs/releasing.md)
 #   HIGHLIGHTS=file   the update feed's 3-5 highlight lines, one per line (default: the version's highlight: lines in
 #                     What's New and the note fragments, tools/release/assemble_notes.py X.Y.Z --highlights)
 #   (the home page's What's New area is written by tools/guide/build_site.py from docs/guide/whats-new.md: the
@@ -23,17 +23,19 @@
 # Each step looks at the live state first and skips what is already done, so running it again is always safe.
 # When something is wrong it stops and prints the fix; fix it, then run again with --from <that step>.
 # It never posts issue replies: it writes drafts for a person to read and post.
-# Betas: steps bump check ci tag release preview status. bump sets CMakeLists.txt to X.Y.Z with
+# Betas (a member perk): steps bump check ci tag release status. bump sets CMakeLists.txt to X.Y.Z with
 # SCULPTFORGE_PRERELEASE "beta.N" (the app says "X.Y.Z Beta N"; CHANGELOG, CITATION, metainfo and the home page stay
-# at the stable release); preview writes channels.preview in website/latest.json (the stable top level is untouched);
-# the Discord announcement workflow posts the beta once the feed names it. No site, AUR, Homebrew, Omarchy, winget or
-# issue replies. The stable release later is plain scripts/release.sh X.Y.Z, which clears the prerelease.
+# at the stable release). release.yml publishes the beta in the private repository $INSIDERS_REPO (members are
+# invited by hand) and posts it in #members; nothing public: no GitHub pre-release here, no update feed entry, no
+# site, AUR, Homebrew, Omarchy, winget or issue replies. The stable release later is plain scripts/release.sh X.Y.Z,
+# which clears the prerelease.
 # Needs: gh logged in as islandmed (gh auth status), git, curl, python3, sha256sum (or shasum); run it from a clean
 # checkout of main. Pushes to main and the tag are made here, so only the release coordinator runs it, after
 # the owner's "ship it" for this version.
 set -euo pipefail
 
 REPO=islandmed/SculptForge
+INSIDERS_REPO=islandmed/sculptforge-insiders # members' betas (release.yml publishes there with INSIDERS_REPO_TOKEN)
 AUTHOR_NAME=islandmed
 AUTHOR_EMAIL=232726012+islandmed@users.noreply.github.com # never a personal address in outside repos
 OMARCHY_PR=1800
@@ -62,7 +64,8 @@ V=${1:-}
 [[ "$V" =~ ^([0-9]+\.[0-9]+\.[0-9]+)(-((beta|rc)\.[0-9]+))?$ ]] ||
     { echo "usage: scripts/release.sh X.Y.Z[-beta.N|-rc.N] [--from STEP | --only STEP] [--yes] [--staged]"; exit 2; }
 BASE=${BASH_REMATCH[1]} PRE=${BASH_REMATCH[3]} # 0.11.0-beta.1: BASE 0.11.0, PRE beta.1; a stable release: PRE ""
-[ -z "$PRE" ] || STEPS=(bump check ci tag release preview status)
+[ -z "$PRE" ] || STEPS=(bump check ci tag release status)
+RELEASE_REPO=$REPO; [ -z "$PRE" ] || RELEASE_REPO=$INSIDERS_REPO # where release.yml publishes this version
 shift
 FROM=bump ONLY= STAGED=
 while [ $# -gt 0 ]; do
@@ -74,6 +77,7 @@ while [ $# -gt 0 ]; do
         *) echo "unknown argument $1"; exit 2 ;;
     esac
 done
+[[ " ${STEPS[*]} " == *" ${ONLY:-$FROM} "* ]] || { echo "unknown step ${ONLY:-$FROM}; steps: ${STEPS[*]}"; exit 2; }
 [ -z "$STAGED" ] || [ "$ONLY" = bump ] || { echo "--staged goes with --only bump (the later steps run on main after it lands)"; exit 2; }
 T=v$V
 TODAY=$(date +%F)
@@ -96,7 +100,7 @@ push_main() {
     gitp push -q origin HEAD:main || die "push to main refused" "git pull --rebase origin main, check the result, run again"
 }
 release_ready() {
-    gh release view "$T" -R "$REPO" --json assets -q '.assets[].name' > "$work/assets" 2>/dev/null ||
+    gh release view "$T" -R "$RELEASE_REPO" --json assets -q '.assets[].name' > "$work/assets" 2>/dev/null ||
         die "no GitHub release $T yet" "run the earlier steps: scripts/release.sh $V --from tag"
     grep -qx SHA256SUMS.txt "$work/assets" || die "release $T has no SHA256SUMS.txt (unfinished)" "re-run the Release workflow: gh workflow run release.yml -R $REPO -f tag=$T"
 }
@@ -175,9 +179,7 @@ gh_file() { gh api "repos/$1/contents/$2${3:+?ref=$3}" -q .content 2>/dev/null |
 card_ok() { grep -qF "<small>new in $V</small>" website/index.html && grep -qF "class=\"section-lede\">New in $V:" website/index.html; }
 features_ok() { awk -v v="## Version $BASE" '$0==v{f=1;next} f&&/^## /{exit} f' docs/guide/whats-new.md | grep -q '^tagline: .'; }
 card_fix="give '## Version $V' in docs/guide/whats-new.md a \`\`\`features block (date: unreleased, tagline: ..., highlight: ..., cards), commit, push main, run again"
-feed_done() { grep -qF "\"version\": \"$V\"" website/latest.json; } # (a beta's is in channels.preview)
-# A beta's entry in the update feed: channels.preview (old apps and the Stable channel read only the top level).
-preview_done() { python3 -c 'import json, sys; sys.exit(json.load(open("website/latest.json")).get("channels", {}).get("preview", {}).get("version") != sys.argv[1])' "$V" 2>/dev/null; }
+feed_done() { grep -qF "\"version\": \"$V\"" website/latest.json; }
 prerelease_is() { grep -qx "set(SCULPTFORGE_PRERELEASE \"$1\")" CMakeLists.txt; }
 # HIGHLIGHTS names a file of 3-5 non-empty lines.
 highlights_ok() {
@@ -234,16 +236,12 @@ preflight() {
     grep -q '^set(SCULPTFORGE_PRERELEASE "[a-z0-9.]*")$' CMakeLists.txt ||
         die "CMakeLists.txt lost its set(SCULPTFORGE_PRERELEASE \"\") line that step bump sets" "restore it under project() (git log -p CMakeLists.txt), commit"
     python3 -c 'import json, sys; json.load(open(sys.argv[1]))' website/latest.json 2>/dev/null || die "website/latest.json is not valid JSON" "fix it, commit"
-    if [ -n "$PRE" ]; then # a beta: the update feed's channels.preview, nothing else of the site, no packages
-        if ! preview_done; then
-            if [ -z "${HIGHLIGHTS:-}" ]; then
-                HIGHLIGHTS=$(mktemp)
-                python3 tools/release/assemble_notes.py "$BASE" --highlights >"$HIGHLIGHTS"
-                highlights_ok || HIGHLIGHTS=
-            fi
-            highlights_ok || die "HIGHLIGHTS must name a file with 3-5 highlight lines for the beta's feed entry (now: '${HIGHLIGHTS:-unset}')" "$highlights_fix"
-        fi
-        ok "What's New $BASE and the highlights are ready for the beta (a beta has no site, package or reply steps)"
+    if [ -n "$PRE" ]; then # a beta: members only, through the private repository; nothing of the site, no packages
+        gh secret list -R "$REPO" 2>/dev/null | grep -q '^INSIDERS_REPO_TOKEN\b' ||
+            die "the repository has no INSIDERS_REPO_TOKEN secret, so release.yml can't publish the beta to $INSIDERS_REPO" \
+                "the owner creates it (fine-grained token, only $INSIDERS_REPO, Contents: read and write): gh secret set INSIDERS_REPO_TOKEN -R $REPO"
+        gh repo view "$INSIDERS_REPO" >/dev/null 2>&1 || die "can't see $INSIDERS_REPO" "gh auth status: log in as the owner of $INSIDERS_REPO"
+        ok "What's New $BASE is ready and $INSIDERS_REPO takes the beta (a beta has no site, package or reply steps)"
         return
     fi
     # site (bump writes the home page's card from the features block)
@@ -446,7 +444,7 @@ step_tag() {
     if gh api "repos/$REPO/git/ref/tags/$T" >/dev/null 2>&1; then ok "$T is already pushed"; return; fi
     local sha
     sha=$(git rev-parse HEAD)
-    confirm "Tag $T at $(git log -1 --format='%h %s' "$sha") and push it? This publishes SculptForge $V${PRE:+ as a GitHub pre-release for testers}." ||
+    confirm "Tag $T at $(git log -1 --format='%h %s' "$sha") and push it? This publishes SculptForge $V${PRE:+ for members, in $INSIDERS_REPO}." ||
         die "not confirmed" "run again and answer y (or YES=1) once the owner has said ship it for $V"
     git rev-parse -q --verify "refs/tags/$T" >/dev/null || git tag "$T" "$sha"
     gitp push -q origin "$T" || die "pushing $T failed" "git push origin $T (check gh auth status)"
@@ -455,7 +453,7 @@ step_tag() {
 
 step_release() {
     local assets
-    assets=$(gh release view "$T" -R "$REPO" --json assets -q '.assets[].name' 2>/dev/null || true)
+    assets=$(gh release view "$T" -R "$RELEASE_REPO" --json assets -q '.assets[].name' 2>/dev/null || true)
     if grep -qx SHA256SUMS.txt <<<"$assets"; then
         ok "release $T is published"
     else
@@ -621,48 +619,14 @@ step_replies() {
     ok "drafts for $(echo "$issues" | wc -w) issues in $out: read them, then post with gh issue comment / close"
 }
 
-step_preview() {
-    release_ready
-    on_main
-    if preview_done; then
-        ok "website/latest.json's channels.preview already says $V"
-    else
-        if [ -z "${HIGHLIGHTS:-}" ]; then # (a run that started here) What's New's highlight lines for the version
-            HIGHLIGHTS=$work/highlights
-            python3 tools/release/assemble_notes.py "$BASE" --highlights >"$HIGHLIGHTS"
-        fi
-        highlights_ok || die "the feed's preview entry needs this beta's highlights" "$highlights_fix --from preview"
-        python3 - "$V" "$HIGHLIGHTS" "https://github.com/$REPO/releases/tag/$T" <<'PY'
-import json, sys
-v, notes, url = sys.argv[1:]
-lines = [l.strip() for l in open(notes, encoding="utf-8") if l.strip()]
-if not 3 <= len(lines) <= 5:
-    sys.exit(f"{notes}: want 3-5 highlight lines, found {len(lines)}")
-with open("website/latest.json", encoding="utf-8") as f:
-    feed = json.load(f)
-feed.setdefault("channels", {})["preview"] = {
-    "version": v, "download": url, "notes": "https://sculptforge.app/guide/whats-new.html", "highlights": lines}
-with open("website/latest.json", "w", encoding="utf-8") as f:
-    json.dump(feed, f, indent=2, ensure_ascii=False)
-    f.write("\n")
-PY
-        git add website/latest.json
-        commit -m "Update feed: $V on the Preview channel"
-        push_main
-        ok "pushed channels.preview (the stable top level is unchanged)"
-    fi
-    wait_live https://sculptforge.app/latest.json "\"version\": \"$V\"" 600 ||
-        die "sculptforge.app still serves the old feed after 10 minutes" "check the Website workflow: gh run list -R $REPO -w pages.yml -L 3; re-run it if it failed"
-    ok "sculptforge.app/latest.json offers $V on the Preview channel"
-}
-
 step_status() {
     if [ -n "$PRE" ]; then
-        echo "   Beta:     https://github.com/$REPO/releases/tag/$T (a pre-release: releases/latest stays on stable)"
-        echo "   Discord:  the Discord announcement workflow posts it in #announcements with how to send feedback"
-        echo "             (gh run list -R $REPO -w discord-announce.yml -L 1)"
+        echo "   Beta:     https://github.com/$INSIDERS_REPO/releases/tag/$T (members only; nothing public)"
+        echo "   Discord:  release.yml posted it in #members (DISCORD_MEMBERS_WEBHOOK)"
+        echo "   Members:  invite new members' GitHub usernames (from the Stripe checkout) by hand:"
+        echo "             gh api -X PUT repos/$INSIDERS_REPO/collaborators/USERNAME -f permission=pull"
         if [ -f "release-testers-$V.md" ]; then
-            echo "   Testers:  $PWD/release-testers-$V.md (read it, then post it in #testers)"
+            echo "   Testers:  $PWD/release-testers-$V.md (read it, then post it in #members)"
         else
             echo "   Testers:  no checklist (the note fragments had no testers: lines)"
         fi
