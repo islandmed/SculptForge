@@ -471,7 +471,10 @@ Under the preview in **Sculpt > Alpha**:
 | **Tile across** / **Tile down** | Repeats the alpha 1 to 8 times across and down inside the brush; the preview shows the result. |
 
 They work with every brush, custom and Community brushes included, and each brush keeps its own (see
-[Each brush keeps its own settings](#each-brush-keeps-its-own-settings)). From a script:
+[Each brush keeps its own settings](#each-brush-keeps-its-own-settings)). **Save Brush Settings** on a custom brush
+also writes Follow stroke direction, Angle and Angle jitter into its brush file, so a brush you share (a brush code,
+a .sfpack) turns its alpha the same way for everyone. Vector displacement stamps have the same options: see
+[Stamp rotation](#stamp-rotation). From a script:
 `brush_alpha_options follow_stroke=true angle=30 angle_jitter=10 tile_x=2 tile_y=2`.
 
 ## Vector displacement brushes
@@ -502,6 +505,21 @@ overhang, as nothing made with a height ever can.
 - **Symmetry** mirrors the stamp exactly (the mirrored horn leans the mirrored way), the **mask** holds it back,
   and each stamp is one undo step. Sculpt layers record it like any stroke.
 - The **Dots** stroke works too: each dab adds the shape again, for rows of studs or scales.
+
+#### Stamp rotation
+
+While the VDM brush is the brush, **Stamp rotation** sits under the map's preview, with the same three options as
+[Alpha options](#alpha-options):
+
+| Option | What it does |
+|---|---|
+| **Follow stroke direction** | On (the default): Drag Stamp turns the stamp with the drag, and a Dots stroke turns it along the stroke. Off: the drag only sets the size, and every stamp keeps Angle's turn (horns that all stand the same way however you drag). |
+| **Angle** | A fixed turn, -180 to 180 degrees counter-clockwise, on its own or on top of the drag's direction. Slide Stamp takes it too (it slides the stamp without turning it). |
+| **Angle jitter** | Each stamp turns by a random angle, up to this many degrees either way: scattered horns, rivets or scales that don't all face the same way. |
+
+The VDM brush keeps its own, separate from the alpha brushes'; **Save Brush Settings** keeps them for next time,
+and a custom brush saves them in its brush file, so they travel in brush codes and [packs](packs-and-macros.md). From a
+script: `brush_alpha_options follow_stroke=false angle=45 angle_jitter=20`.
 
 > **Tip:** a VDM moves points sideways, so it needs points to move: on a coarse mesh the shape breaks up into
 > spikes. Divide first (the model above has 330 000 triangles), and stamp at the highest

@@ -15,6 +15,11 @@ All notable changes to SculptForge are listed here. The format follows
   that layer, masked or not, like a stroke (#133, thanks Devon0209): the base mesh stays, the layer's weight dials
   the move in and out, undo works. With Base mesh active they move the base and every layer, as before.
 ### Added
+- **Rotation for vector displacement stamps** (#136, thanks DonnieAlex): with the VDM brush, **Sculpt > Brush > Vector
+  Displacement > Stamp rotation** has Follow stroke direction (Drag Stamp turns with the drag; off, the drag only
+  sizes the stamp), Angle and Angle jitter (a random turn per stamp), kept per brush like the alpha options.
+- Brush files keep the alpha's **Angle** and **Angle jitter** as well as Follow stroke direction: Save Brush Settings
+  on a custom brush writes all three into it, so shared brushes (brush codes, .sfpack) turn their alpha the same way.
 - **Maya style view keys** (#134, thanks RodTDai): hold Alt, then add Ctrl, and a left drag rolls the view (left /
   right); Alt+F frames the active Part; Alt+H resets the view (front, upright, perspective, everything in view). Ctrl
   first (or both together) still masks with Ctrl+Alt, on the model and beside it.

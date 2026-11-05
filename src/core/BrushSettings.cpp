@@ -49,7 +49,7 @@ Json BrushToolSettings::toJson() const {
     if (!alphaPath.empty()) j.set("alpha_path", alphaPath);
     if (alphaInvert) j.set("alpha_invert", true);
     const AlphaOptions& a = alphaOptions;
-    if (a.followStroke) j.set("alpha_follow_stroke", true);
+    j.set("alpha_follow_stroke", a.followStroke); // (always: the VDM brush's default is on)
     if (a.angle != 0.0f) j.set("alpha_angle", double(a.angle));
     if (a.jitter != 0.0f) j.set("alpha_angle_jitter", double(a.jitter));
     if (a.tileX != 1 || a.tileY != 1) {
@@ -101,6 +101,7 @@ BrushToolSettings BrushSettingsStore::switchBrush(const std::string& from, const
         const BrushToolSettings own = shipped(to); // ...except pen pressure, the brush's own (a grab brush's Size off)
         next.pressureSize = own.pressureSize;
         next.pressureStrength = own.pressureStrength;
+        if (to == brushSettingsKey(brushName(BrushType::Vdm))) next.alphaOptions = own.alphaOptions; // (turns with the drag)
     }
     if (shareSizeIntensity) {
         next.radiusPx = current.radiusPx;
@@ -129,7 +130,10 @@ BrushToolSettings BrushSettingsStore::reset(const std::string& key) {
 
 BrushToolSettings BrushSettingsStore::shipped(const std::string& key) {
     BrushToolSettings s;
-    if (key == "builtin:Vdm") s.stroke = StrokeType::DragRect; // stamps a VDM where you drag (PanelVdm.cpp)
+    if (key == brushSettingsKey(brushName(BrushType::Vdm))) {
+        s.stroke = StrokeType::DragRect;     // stamps a VDM where you drag (PanelVdm.cpp)
+        s.alphaOptions.followStroke = true; // ...turned by the drag, as before the VDM's own Angle options (#136)
+    }
     for (BrushType t : {BrushType::Move, BrushType::KelvinGrab, BrushType::KelvinTwist, BrushType::KelvinScale,
                         BrushType::SnakeHook, BrushType::KelvinSnake})
         if (key == brushSettingsKey(brushName(t))) s.pressureSize = PenPressure::Off;

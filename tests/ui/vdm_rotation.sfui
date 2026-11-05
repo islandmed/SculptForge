@@ -1,0 +1,93 @@
+# #136: rotation for VDM stamps. With the VDM brush, Brush > Vector Displacement shows Follow stroke direction,
+# Angle and Angle jitter (the Alpha palette's options, kept per brush): Drag Stamp turns with the drag only while
+# Follow is on (the VDM brush ships with it on), Angle adds a fixed turn, jitter a random one per stamp; Slide Stamp
+# takes Angle and jitter. A custom brush's Save Brush Settings writes the three into its .sfbrush (packs, codes).
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run new_sphere subdivisions=6
+click "Brush##palette.brush"
+click "Brush/##totray"
+wait 0.3
+click "Vector Displacement##brush.vdm"
+expect_not "Follow stroke direction##vdm.follow_stroke"   # (only while the VDM brush is the brush)
+click "Horn##vdm0"
+expect_value brush_type == 14
+expect_value stroke_type == 1
+expect "Follow stroke direction##vdm.follow_stroke"
+expect_value alpha_follow == 1
+hold ctrl
+hover "Follow stroke direction##vdm.follow_stroke"
+expect_help Drag Stamp
+hold none
+wait_idle 30
+shot rows
+
+# Drag Stamp, dragged right: the Horn's top points right (-90), as before.
+stroke 0.5 0.5 0.62 0.5
+expect_value last_dab_angle >= -91
+expect_value last_dab_angle <= -89
+key ctrl+z
+
+# Follow off: the drag only sizes it; Angle turns it. Follow on: Angle on top of the drag.
+click "Follow stroke direction##vdm.follow_stroke"
+expect_value alpha_follow == 0
+run brush_alpha_options angle=30
+snapshot
+stroke 0.5 0.5 0.62 0.5
+expect_value moved > 100
+expect_value last_dab_angle == 30
+wait_idle 30
+shot fixed-angle
+key ctrl+z
+run brush_alpha_options follow_stroke=true
+stroke 0.5 0.5 0.62 0.5
+expect_value last_dab_angle == -60
+key ctrl+z
+
+# Angle jitter: each stamp its own turn, within the range around Angle.
+run brush_alpha_options follow_stroke=false angle=0 angle_jitter=90
+stroke 0.5 0.5 0.62 0.5
+remember last_dab_angle first
+expect_value last_dab_angle >= -90
+expect_value last_dab_angle <= 90
+stroke 0.3 0.4 0.42 0.4
+expect_value last_dab_angle != $first
+expect_value last_dab_angle >= -90
+expect_value last_dab_angle <= 90
+wait_idle 30
+shot jitter
+key ctrl+z
+key ctrl+z
+
+# Slide Stamp: Angle (and jitter) turn it; sliding moves it without turning it.
+run brush_alpha_options angle=45 angle_jitter=0
+click "Stroke##palette.stroke"
+click "Slide Stamp##stroke"
+key escape
+expect_value stroke_type == 2
+stroke 0.4 0.4 0.6 0.55
+expect_value last_dab_angle == 45
+key ctrl+z
+
+# The VDM brush keeps its own; another brush keeps its own.
+click "Clay##brush.clay"
+wait 0.1
+run brush_alpha_options angle=0
+click "Horn##vdm0"
+wait 0.1
+expect_value alpha_angle == 45
+expect_value alpha_follow == 0
+click "Clay##brush.clay"
+wait 0.1
+expect_value alpha_angle == 0
+
+# A custom brush: Save Brush Settings writes Follow, Angle and Angle jitter into its brush file.
+run brush_create name="Turn Test" depth=0.4
+wait 0.1
+run brush_alpha_options follow_stroke=true angle=-20 angle_jitter=15
+expect_value recipe_alpha_angle == 0
+click "Brush##palette.brush"
+click "Save Brush Settings##brush.save_settings"
+expect_value recipe_alpha_follow == 1
+expect_value recipe_alpha_angle == -20
+expect_value recipe_alpha_jitter == 15
+expect_value library_files >= 1
