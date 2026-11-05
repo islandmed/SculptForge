@@ -480,7 +480,7 @@ void MicroRenderer::shadePending(const Mesh& mesh, bool all) {
     sendStaged(staging_, sorted_);
 }
 
-void MicroRenderer::shadeInitial(const Mesh& mesh, bool send) {
+void MicroRenderer::shadeInitial(const Mesh& mesh) {
     if (initialSlot_ >= baseTriangles_) return;
     const size_t S = samples_;
     // Points this frame: initialShadeMs at the measured cost (the ring around a run adds a little), whole clusters.
@@ -494,11 +494,16 @@ void MicroRenderer::shadeInitial(const Mesh& mesh, bool send) {
     if (shadeNsPerPoint_ > 0.0 && !viewMoving && double(baseTriangles_ - initialSlot_) * double(S) * ns < 2.5e9)
         slots = baseTriangles_ - initialSlot_;
     const uint32_t end = std::min(baseTriangles_, initialSlot_ + std::max(slots, size));
-    std::vector<uint32_t>& seeds = scratch_;
-    seeds.resize(end - initialSlot_);
-    for (uint32_t s = initialSlot_; s < end; ++s) seeds[s - initialSlot_] = order_[s];
-    std::sort(seeds.begin(), seeds.end());
     if (!initialSorted_.empty()) sendStaged(initialStage_, initialSorted_);
+    // In runs of kRun slots, each shaded alone (MicroShader's working memory follows a run: one call for a whole
+    // dense level held gigabytes after it was done).
+    constexpr uint32_t kRun = 1u << 16;
+    std::vector<uint32_t>& seeds = scratch_;
+    auto runSeeds = [&](uint32_t r0, uint32_t r1) {
+        seeds.resize(r1 - r0);
+        for (uint32_t s = r0; s < r1; ++s) seeds[s - r0] = order_[s];
+        std::sort(seeds.begin(), seeds.end());
+    };
     // Straight into the GPU copy: these slots draw unshaded until the run is done (no shading fetched there), so
     // their range is mapped without waiting for the GPU (and without a staging copy, which cost as much as the
     // shading on a small level).
@@ -518,17 +523,22 @@ void MicroRenderer::shadeInitial(const Mesh& mesh, bool send) {
     }
     if (ok) {
         const auto started = std::chrono::steady_clock::now();
-        shader_.shade(mesh, seeds, false, written_, [&](uint32_t t) -> uint32_t* {
-            const uint32_t s = slotOf_[t], c = s / chunkSlots_ - c0;
-            return mapped[c] + size_t(s - from[c]) * S;
-        }, {}, false); // (runs in slot order: each triangle once)
-        if (!written_.empty()) {
+        size_t shaded = 0;
+        for (uint32_t r0 = initialSlot_; r0 < end; r0 += kRun) {
+            runSeeds(r0, std::min(end, r0 + kRun));
+            shader_.shade(mesh, seeds, false, written_, [&](uint32_t t) -> uint32_t* {
+                const uint32_t s = slotOf_[t], c = s / chunkSlots_ - c0;
+                return mapped[c] + size_t(s - from[c]) * S;
+            }, {}, false); // (runs in slot order: each triangle once)
+            shaded += written_.size();
+        }
+        if (shaded) {
             const double ns = std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - started).count() /
-                              double(written_.size() * S);
+                              double(shaded * S);
             shadeNsPerPoint_ = shadeNsPerPoint_ > 0.0 ? shadeNsPerPoint_ * 0.7 + ns * 0.3 : ns;
             if (std::getenv("SF_OPEN_PROFILE"))
                 std::fprintf(stderr, "first shading: %u slots, %.1f ns a point, %.0f ms\n", end - initialSlot_, ns,
-                             ns * double(written_.size() * S) * 1e-6);
+                             ns * double(shaded * S) * 1e-6);
         }
     }
     for (uint32_t c = c0; c <= c1; ++c) {
@@ -536,10 +546,12 @@ void MicroRenderer::shadeInitial(const Mesh& mesh, bool send) {
         if (mapped[c - c0]) gl::UnmapBuffer(GL_TEXTURE_BUFFER);
     }
     gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
-    if (!ok) { // (mapping failed: through a staging copy)
-        shadeSeeds(mesh, seeds, initialStage_, initialSorted_, false);
-        if (send) sendStaged(initialStage_, initialSorted_);
-    }
+    if (!ok) // (mapping failed: through a staging copy, sent at once)
+        for (uint32_t r0 = initialSlot_; r0 < end; r0 += kRun) {
+            runSeeds(r0, std::min(end, r0 + kRun));
+            shadeSeeds(mesh, seeds, initialStage_, initialSorted_, false);
+            sendStaged(initialStage_, initialSorted_);
+        }
     initialSlot_ = end;
 }
 
@@ -723,7 +735,7 @@ bool MicroRenderer::sync(Mesh& mesh) {
             if (mm.stroking) shadeBudget = strokeShadeBudget(shadeBudget, tier.strokeShadeMs, shadeNsPerPoint_, size_t(mm.samples) * 3);
             if (pendingCount_) shadePending(mesh, false);
             // (draw() didn't run since the last sync: the first shading goes on here)
-            if (!mm.stroking && synced_ == &mesh && initialSlot_ < baseTriangles_) shadeInitial(mesh, true);
+            if (!mm.stroking && synced_ == &mesh && initialSlot_ < baseTriangles_) shadeInitial(mesh);
         }
     }
     step_ = mm.step;
@@ -868,7 +880,7 @@ size_t MicroRenderer::draw(GLuint program, const CullView& cullIn, const glm::ma
     // The first shading after opening goes on while the GPU draws this frame (sent with the next sync).
     if (synced_ && !stroking_ && initialSlot_ < baseTriangles_) {
         gl::Flush();
-        shadeInitial(*synced_, false);
+        shadeInitial(*synced_);
     }
     synced_ = nullptr;
     return drawn;

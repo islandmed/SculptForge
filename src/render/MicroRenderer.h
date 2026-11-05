@@ -71,8 +71,8 @@ private:
                     bool grow = true);
     // Sends what shadeSeeds staged (and clears `sorted`).
     void sendStaged(const std::vector<uint8_t>& stage, std::vector<uint32_t>& sorted);
-    // The first shading after opening: the next slots in order, within initialShadeMs (sent now, or by the next sync).
-    void shadeInitial(const Mesh& mesh, bool send);
+    // The first shading after opening: the next slots in order, within initialShadeMs, written to the GPU copy.
+    void shadeInitial(const Mesh& mesh);
 
     uint64_t serial_ = 0;
     uint32_t baseTriangles_ = 0, baseVertices_ = 0;
