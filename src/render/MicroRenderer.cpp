@@ -38,9 +38,10 @@ uniform int uSlotBase, uChunkSlot, uLevel, uN, uSamples;
 uniform int uUnrolled;
 uniform int uCorners[48];
 uniform float uStep;
-uniform int uUnshaded; // 1: the cluster's shading isn't there yet: the base normal (vBaseNormal) lights it
+uniform int uUnshaded; // 1: the cluster's shading isn't there yet: the drawn triangles' own facets light it
 flat out int vSlot;
 out vec3 vBaseNormal;
+out vec3 vMicroView;
 out vec2 vIJ;
 #ifdef FLAT
 out vec3 vViewPos;
@@ -143,6 +144,7 @@ void main() {
     }
     vIJ = vec2(float(i * sc), float(j * sc));
     vec4 p = uView * vec4(pos, 1.0);
+    vMicroView = p.xyz;
 #ifdef FLAT
     vViewPos = p.xyz;
 #endif

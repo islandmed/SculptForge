@@ -321,7 +321,9 @@ flat in int vPrimBase;
 flat in int vSlot;
 in vec2 vIJ;
 in vec3 vBaseNormal;
+in vec3 vMicroView;
 uniform int uUnshaded;
+vec3 viewRay();
 uniform samplerBuffer uShade;
 uniform int uN;
 uniform int uSamples;
@@ -338,8 +340,11 @@ vec3 octNormal(vec2 v) {
     return normalize(n);
 }
 void microFetch() {
-    if (uUnshaded == 1) { // (just opened: this cluster's shading follows in a few frames)
-        gNC = vec4(mat3(uView) * normalize(vBaseNormal), 0.0);
+    if (uUnshaded == 1) { // (just opened: this cluster's shading follows in a few frames) the drawn facet's normal
+        vec3 f = cross(dFdx(vMicroView), dFdy(vMicroView));
+        f = dot(f, f) > 1e-30 ? normalize(f) : mat3(uView) * normalize(vBaseNormal);
+        if (dot(f, viewRay()) < 0.0) f = -f;
+        gNC = vec4(f, 0.0);
         gMask = 0.0;
         return;
     }

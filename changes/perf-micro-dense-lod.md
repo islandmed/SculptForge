@@ -4,10 +4,10 @@ changed: Micro levels on dense models open several times faster. The view shows 
   triangle scan at micro level 1 / 2, 112M / 448M micro triangles, laptop: first frame 10.8 -> 2.8 s and 11.1 -> 3.3 s).
 testers:
   - Open a large project with a micro level (Tool > Geometry > Divide to Micro, saved and reopened): the model shows
-    quickly, at first with smooth lighting; within a few seconds the fine detail appears. Report anything that stays
-    smooth, flickers or looks patchy after that.
+    quickly, at first with slightly coarser lighting; within a few seconds the fine detail appears. Report anything that stays
+    coarse, flickers or looks patchy after that.
 ---
-Clusters not shaded yet are lit by the interpolated base normal; the shading runs in slot order while the GPU draws
+Clusters not shaded yet are lit by the drawn micro triangles' own facet normals (screen-space slopes); the shading runs in slot order while the GPU draws
 each frame (MicroRenderer::initialShadeMs, interactive loop only). Also: the Morton sort is a parallel radix sort, the
 micro level attaches while the BVH builds, --benchmark-file no longer builds the BVH twice, and the app keeps drawing
 while micro shading is pending. SF_OPEN_PROFILE=1 prints the open steps' times.
