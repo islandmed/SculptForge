@@ -523,6 +523,7 @@ TEST(face_link_over_webrtc) {
         CHECK(err.find("without WebRTC") != std::string::npos);
         return;
     }
+    if (sf::test::networkTestsOff()) return;
     // base64url and AES-GCM as the face page uses them.
     CHECK(base64UrlEncode("\xff\xfe") == "__4");
     std::string bytes;
@@ -580,7 +581,7 @@ TEST(face_link_over_webrtc) {
 // Android AR: Scene Viewer can't load a model from the desktop's plain-HTTP address, so the website's AR page gets
 // it over the WebRTC link (reliable channel): the page asks, the app exports, the GLB arrives in chunks, intact.
 TEST(ar_link_sends_the_model_over_webrtc) {
-    if (!webrtcAvailable()) return;
+    if (!webrtcAvailable() || sf::test::networkTestsOff()) return;
     const fs::path inbox = freshDir("sf_phone_ar_rtc");
     PhoneLink link;
     std::string err;
@@ -657,7 +658,7 @@ TEST(ar_link_sends_the_model_over_webrtc) {
 // Android Chrome may not reach the computer at all: the AR link also carries a relay URL, and each model goes
 // there encrypted with the link's key (only the page can read it).
 TEST(ar_link_uploads_the_model_encrypted_to_the_relay) {
-    if (!webrtcAvailable()) return;
+    if (!webrtcAvailable() || sf::test::networkTestsOff()) return;
     std::mutex m;
     std::vector<std::pair<std::string, std::string>> posted; // query, body
     HttpServer relay;
@@ -709,7 +710,7 @@ TEST(ar_link_uploads_the_model_encrypted_to_the_relay) {
 // The phone's answer through the relays (services/link-worker's protocol, which ntfy.sh also speaks): the first
 // relay is down, the second, a fake one here, carries the message; the desktop polls both and connects.
 TEST(face_link_answer_through_the_relays) {
-    if (!webrtcAvailable()) return;
+    if (!webrtcAvailable() || sf::test::networkTestsOff()) return;
     std::mutex relayMutex;
     std::vector<std::pair<std::string, std::string>> posted; // topic, message
     HttpServer relay;

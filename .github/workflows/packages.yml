@@ -50,6 +50,9 @@ env:
   CCACHE_DEPEND: 'true'
   # Saved by branch runs only: never a tag, never a pull request.
   SAVE_CACHE: ${{ !startsWith(github.ref, 'refs/tags/') && github.event_name != 'pull_request' }}
+  # Tests that open real network connections return early here (tests/TestHarness.h networkTestsOff): a runner's
+  # network stalled ar_link_sends_the_model_over_webrtc on Windows. CI (ci.yml) still runs them.
+  SF_TEST_NO_NETWORK: '1'
 
 jobs:
   linux:
@@ -261,7 +264,15 @@ jobs:
         # UI tests need a display; they run under Xvfb in the Linux jobs above and in CI.
         run: ctest --test-dir build --output-on-failure -LE ui -j 4
       - name: Package (signed ad-hoc inside CPack, see cmake/MacSign.cmake)
-        run: cd build && cpack -G DragNDrop
+        # hdiutil sometimes fails with "Resource busy" on the runner (a disk image still attached): up to 3 tries.
+        run: |
+          cd build
+          for attempt in 1 2 3; do
+            if cpack -G DragNDrop 2>&1 | tee cpack.log; [ "${PIPESTATUS[0]}" = 0 ]; then exit 0; fi
+            grep -q "Resource busy" cpack.log || exit 1
+            echo "hdiutil: Resource busy (try $attempt of 3)"; sleep 15
+          done
+          exit 1
       - uses: actions/upload-artifact@v7
         with:
           name: macos

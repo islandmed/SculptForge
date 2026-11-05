@@ -62,6 +62,14 @@ inline double timeLimit(double local) {
     return std::getenv("CI") || std::getenv("GITHUB_ACTIONS") ? local * 4.0 : local;
 }
 
+// Tests that open real network connections (WebRTC peers over the machine's interfaces) return early with
+// SF_TEST_NO_NETWORK=1: the release package jobs (.github/workflows/packages.yml) set it, because a runner's network
+// can stall them (ar_link_sends_the_model_over_webrtc timed out on the Windows runner); CI and local runs keep them.
+inline bool networkTestsOff() {
+    const char* off = std::getenv("SF_TEST_NO_NETWORK");
+    return off && std::string(off) == "1";
+}
+
 inline std::string tempPath(const char* name) { return (std::filesystem::temp_directory_path() / name).string(); }
 
 } // namespace sf::test
