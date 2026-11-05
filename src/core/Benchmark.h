@@ -84,8 +84,9 @@ Mesh makeBenchHead(size_t triangles);
 // The core-200m research scene (docs/design/core-200m.md, phase 1; --benchmark core-200m, off by default): the
 // bench head at micro level 5 with procedural detail, about 200 million micro triangles, held in memory. Written
 // once as a project in the swap folder (a few seconds) so the benchmark measures opening it; returns its path,
-// or "" with `error`.
-std::string core200mScenePath(std::string& error, const std::function<void(const std::string&)>& log = {});
+// or "" with `error`. `millions` picks the size (core-100m: 100, the same head with half the base triangles).
+std::string core200mScenePath(std::string& error, const std::function<void(const std::string&)>& log = {},
+                              int millions = 200);
 // The scene itself, built in memory (what core200mScenePath saves): `baseTriangles` base triangles at `level`.
 Mesh makeCore200mMesh(size_t baseTriangles = 195313, int level = 5);
 

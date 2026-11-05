@@ -29,9 +29,9 @@ public:
     }
     // Applies `g` to the resolved view `resolveFbo` (single-sample colour) using the depth of `drawFbo` (the view's
     // target, any sample count), both `width` x `height`. `view`, `proj`, `viewport` as the frame drew them;
-    // `matcap` the Lit Sphere texture, `lightRot` the shader's uLightRot. False when it couldn't (nothing drawn).
+    // `lit sphere` the Lit Sphere texture, `lightRot` the shader's uLightRot. False when it couldn't (nothing drawn).
     bool apply(const GhostStroke& g, GLuint drawFbo, GLuint resolveFbo, int width, int height, const glm::mat4& view,
-               const glm::mat4& proj, const glm::vec4& viewport, GLuint matcap, const glm::mat3& lightRot);
+               const glm::mat4& proj, const glm::vec4& viewport, GLuint litsphere, const glm::mat3& lightRot);
 
 private:
     bool ensure(int width, int height);

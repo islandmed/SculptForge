@@ -101,18 +101,19 @@ std::vector<ProofMeshSize> proofStandardScene(const std::string& name) {
                                 }, 5};
         return {s1b};
     }
-    if (name == "core-200m") { // research (docs/design/core-200m.md, phase 1): ~200M micro triangles in memory, opened from a project
-        const ProofMeshSize s200{200, "200M micro", [](size_t) {
-                                     std::string err;
-                                     const std::string path = core200mScenePath(err); // (main wrote it first)
-                                     Document d;
-                                     if (path.empty() || !loadProject(path, d, err)) {
-                                         std::fprintf(stderr, "core-200m: %s\n", err.c_str());
-                                         return makeBenchHead(size_t(1) << 20);
-                                     }
-                                     return std::move(d.mesh);
-                                 }, 8};
-        return {s200};
+    if (name == "core-200m" || name == "core-100m") { // research (docs/design/core-200m.md): micro triangles in memory, opened from a project
+        const int millions = name == "core-100m" ? 100 : 200;
+        const ProofMeshSize s{double(millions), std::to_string(millions) + "M micro", [millions](size_t) {
+                                  std::string err;
+                                  const std::string path = core200mScenePath(err, {}, millions); // (main wrote it first)
+                                  Document d;
+                                  if (path.empty() || !loadProject(path, d, err)) {
+                                      std::fprintf(stderr, "core-%dm: %s\n", millions, err.c_str());
+                                      return makeBenchHead(size_t(1) << 20);
+                                  }
+                                  return std::move(d.mesh);
+                              }, 8};
+        return {s};
     }
     return {};
 }
@@ -519,7 +520,11 @@ void App::startProofMode() {
     };
     p->jsonPath = !options_.benchmarkOut.empty() ? options_.benchmarkOut : u8(dir / ("sculptforge-benchmark-" + stamp + ".json"));
     p->videoPath = !options_.benchmarkVideo.empty() ? options_.benchmarkVideo : u8(dir / ("sculptforge-benchmark-" + stamp + ".mp4"));
-    if (p->scene == "core-200m") p->phases = {{"orbit", 0.0f, 10.0}, {"orbit again", 0.0f, 10.0}}; // phase 1: loads and orbits
+    if (p->scene.rfind("core-", 0) == 0) // the perf scoreboard (docs/design/perf-scoreboard.md): its three brush sizes, then orbit
+        p->phases = {{"clay small", 25.0f, p->strokeSeconds, BrushType::Clay, 0.35f},
+                     {"clay large", 120.0f, p->strokeSeconds, BrushType::Clay, 0.35f},
+                     {"240 px brush", 240.0f, p->strokeSeconds, BrushType::Clay, 0.35f},
+                     {"orbit", 0.0f, 10.0}};
     else if (!p->scene.empty()) p->phases = standardPhases(p->strokeSeconds);
     else p->phases = {{"stroke", 60.0f, p->strokeSeconds}, {"large brush stroke", 240.0f, p->strokeSeconds}, {"orbit", 0.0f, 3.0}};
     p->stage = p->cli ? ProofState::Stage::Announce : ProofState::Stage::Intro;

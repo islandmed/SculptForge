@@ -251,18 +251,19 @@ Mesh makeCore200mMesh(size_t baseTriangles, int level) {
     return m;
 }
 
-std::string core200mScenePath(std::string& error, const std::function<void(const std::string&)>& log) {
+std::string core200mScenePath(std::string& error, const std::function<void(const std::string&)>& log, int millions) {
     namespace fs = std::filesystem;
     const fs::path dir = MicroStore::swapFolder();
     std::error_code ec;
     fs::create_directories(dir, ec);
-    const fs::path path = dir / "core-200m-v1.sfproj";
+    const std::string name = "core-" + std::to_string(millions) + "m";
+    const fs::path path = dir / (name + "-v1.sfproj");
     if (fs::exists(path, ec)) return path.string(); // (renamed into place when whole)
-    if (log) log("Writing the core-200m scene (once): " + path.string());
+    if (log) log("Writing the " + name + " scene (once): " + path.string());
     Document doc;
-    doc.mesh = makeCore200mMesh();
+    doc.mesh = makeCore200mMesh(size_t(millions) * 1000000 / 1024); // micro level 5: 1,024 micro triangles a base one
     if (!doc.mesh.micro) {
-        error = "core-200m: couldn't divide to micro level 5";
+        error = name + ": couldn't divide to micro level 5";
         return {};
     }
     const fs::path tmp = fs::path(path.string() + ".tmp.sfproj");

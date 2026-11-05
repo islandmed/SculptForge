@@ -2648,7 +2648,7 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
     while (samples > 1 && !viewTarget(width, height, samples)) samples /= 2;
     screenStrokeDrawn_ = false;
     // A screen stroke needs the view in a target it can read back: through the single-sample one when no AA.
-    const bool screen = !screenStroke_.dabs.empty() && settings.matcap >= 0 && !settings.pbr();
+    const bool screen = !screenStroke_.dabs.empty() && settings.litsphere >= 0 && !settings.pbr();
     if (samples <= 1 && !(screen && viewTarget(width, height, 1))) {
         gl::BindFramebuffer(GL_FRAMEBUFFER, 0);
         draw(camera, width, height, settings, viewport);
@@ -2663,7 +2663,7 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
     gl::BlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
     if (screen)
         screenStrokeDrawn_ = screenPass_.apply(screenStroke_, viewFbo_, viewResolveFbo_, width, height, frameView_, frameProj_,
-                                               frameViewport_, matcapTexture(settings.matcap),
+                                               frameViewport_, litsphereTexture(settings.litsphere),
                                                lightRotation(settings.lightYaw, settings.lightPitch));
     gl::BindFramebuffer(GL_READ_FRAMEBUFFER, viewResolveFbo_); // single-sample blit: may convert to the window's format
     gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);

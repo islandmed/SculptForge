@@ -26,7 +26,7 @@ void main() {
 // Keep the kernel in step with ghostMove (render/Ghost.cpp, Standard) and the shading with the mesh shader's Lit
 // Sphere branch (Renderer.cpp); tools/optimistic bench: app/OptimisticBench.cpp.
 const char* kFS = R"(#version 330 core
-uniform sampler2D uColor, uDepth, uMatcapTex;
+uniform sampler2D uColor, uDepth, uLitSphereTex;
 uniform mat4 uInvProj, uProj;
 uniform mat3 uLightRot;
 uniform vec4 uViewport; // x, y, w, h in target pixels
@@ -103,7 +103,7 @@ vec3 lit(vec3 n, vec3 v) {
     vec3 by = cross(v, bx);
     vec3 ln = transpose(uLightRot) * n;
     vec2 uv = vec2(dot(bx, ln), dot(by, ln)) * 0.495 + 0.5;
-    return pow(texture(uMatcapTex, uv).rgb, vec3(2.2));
+    return pow(texture(uLitSphereTex, uv).rgb, vec3(2.2));
 }
 void main() {
     vec2 p = gl_FragCoord.xy - 0.5;
@@ -217,8 +217,8 @@ bool ScreenStroke::ensure(int width, int height) {
 }
 
 bool ScreenStroke::apply(const GhostStroke& g, GLuint drawFbo, GLuint resolveFbo, int width, int height, const glm::mat4& view,
-                         const glm::mat4& proj, const glm::vec4& viewport, GLuint matcap, const glm::mat3& lightRot) {
-    if (!supports(g) || !matcap || !ensure(width, height)) return false;
+                         const glm::mat4& proj, const glm::vec4& viewport, GLuint litsphere, const glm::mat3& lightRot) {
+    if (!supports(g) || !litsphere || !ensure(width, height)) return false;
     // The pass's inputs: the resolved colour and the view's depth (a multisample depth resolves by nearest sample).
     gl::BindFramebuffer(GL_READ_FRAMEBUFFER, resolveFbo);
     gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo_);
@@ -253,7 +253,7 @@ bool ScreenStroke::apply(const GhostStroke& g, GLuint drawFbo, GLuint resolveFbo
     auto at = [&](const char* name) { return gl::GetUniformLocation(prog_, name); };
     gl::Uniform1i(at("uColor"), 0);
     gl::Uniform1i(at("uDepth"), 1);
-    gl::Uniform1i(at("uMatcapTex"), 2);
+    gl::Uniform1i(at("uLitSphereTex"), 2);
     const glm::mat4 invProj = glm::inverse(proj);
     gl::UniformMatrix4fv(at("uInvProj"), 1, GL_FALSE, glm::value_ptr(invProj));
     gl::UniformMatrix4fv(at("uProj"), 1, GL_FALSE, glm::value_ptr(proj));
@@ -268,7 +268,7 @@ bool ScreenStroke::apply(const GhostStroke& g, GLuint drawFbo, GLuint resolveFbo
     gl::Uniform4fv(at("uDabA"), GLsizei(a.size()), glm::value_ptr(a[0]));
     gl::Uniform1i(at("uKind"), g.kind == GhostKind::Clay ? 2 : 1);
     gl::ActiveTexture(GL_TEXTURE0 + 2);
-    gl::BindTexture(GL_TEXTURE_2D, matcap);
+    gl::BindTexture(GL_TEXTURE_2D, litsphere);
     gl::ActiveTexture(GL_TEXTURE0 + 1);
     gl::BindTexture(GL_TEXTURE_2D, depth_);
     gl::ActiveTexture(GL_TEXTURE0);

@@ -575,7 +575,7 @@ void App::buildGhost() {
         const char* v = std::getenv("SF_SCREEN_STROKE");
         return v && *v == '1';
     }();
-    if (screenStroke && ScreenStroke::supports(g) && renderSettings_.matcap >= 0 && !renderSettings_.pbr()) {
+    if (screenStroke && ScreenStroke::supports(g) && renderSettings_.litsphere >= 0 && !renderSettings_.pbr()) {
         renderer_.setScreenStroke(g);
         renderer_.setGhost(id, GhostStroke());
         return;
