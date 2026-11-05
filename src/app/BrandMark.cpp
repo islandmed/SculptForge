@@ -50,7 +50,7 @@ unsigned texture(MarkTexture& t, const unsigned char* bytes, unsigned long long 
 
 void mark(ImDrawList* dl, ImVec2 at, float size, float alpha) {
     static MarkTexture detailed, small;
-    const unsigned tex = size >= 48.0f ? texture(detailed, assets::appIcon, assets::appIcon_size)
+    const unsigned tex = size >= 40.0f ? texture(detailed, assets::appIcon, assets::appIcon_size)
                                        : texture(small, assets::appIconSmall, assets::appIconSmall_size);
     if (!tex) return;
     dl->AddImage(ImTextureID(uintptr_t(tex)), at, ImVec2(at.x + size, at.y + size), ImVec2(0, 0), ImVec2(1, 1),

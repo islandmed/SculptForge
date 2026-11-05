@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // The app's mark (assets/branding, made by tools/brand/make_icons.py) drawn in the UI: the detailed tile from
-// 48 px up, the simplified small-size mark below.
+// 40 px up (the cards' headers shrink to about 44 px in small windows; the detailed tile still reads there), the
+// simplified small-size mark below (title bars).
 #pragma once
 
 #include <imgui.h>
