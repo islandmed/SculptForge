@@ -539,7 +539,7 @@ void App::drawQRemeshReport() {
     ui::HelpText("Quality Report", nullptr,
                  "How clean the new topology is: poles are vertices with other than four edges (fewer is cleaner), "
                  "corners off square measure how far quad corners are from 90 degrees, and the distance is how far the "
-                 "new surface strays from the sculpt (in % of its size; Project Detail brings fine detail back).",
+                 "new surface strays from the sculpt (as a percentage of its size; Project Detail brings fine detail back).",
                  kQRemeshPath);
 }
 

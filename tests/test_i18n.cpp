@@ -28,11 +28,13 @@ struct LanguageScope {
     ~LanguageScope() { setLanguage(saved); }
 };
 
-// The printf conversions of a format string, in order ("%d", "%.1f", "%%" ...).
+// The printf conversions of a format string, in order ("%d", "%.1f", "%%" ...). A '%' right after a digit ("10% smaller",
+// in help text no one hands to printf) is a plain percent sign; "50%%" is still a conversion.
 std::vector<std::string> conversions(std::string_view s) {
     std::vector<std::string> out;
     for (size_t i = 0; i < s.size(); ++i) {
         if (s[i] != '%') continue;
+        if (i > 0 && s[i - 1] >= '0' && s[i - 1] <= '9' && (i + 1 >= s.size() || s[i + 1] != '%')) continue;
         size_t j = i + 1;
         while (j < s.size() && std::string_view("-+ #0123456789.*hlzjt").find(s[j]) != std::string_view::npos) ++j;
         if (j < s.size()) out.emplace_back(s.substr(i, j - i + 1));
