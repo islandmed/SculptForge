@@ -1756,13 +1756,13 @@ bool App::paletteHeader(const char* id, bool inTray, bool right) {
     const bool iconHovered = ImGui::IsItemHovered();
     if (!inTray && ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoDisableHover)) {
         ImGui::SetDragDropPayload("SF_PALETTE", id, std::strlen(id) + 1);
-        ImGui::Text(ICON_LC_PANEL_RIGHT "  %s", tr(def->name));
+        ImGui::Text(ICON_LC_PANEL_RIGHT "  %s", tr(paletteTitle(*def)));
         ImGui::EndDragDropSource();
     }
-    if (inTray) ui::HelpText("Back to the palette bar", nullptr, "Take this palette out of the tray.", tr(def->name));
+    if (inTray) ui::HelpText("Back to the palette bar", nullptr, "Take this palette out of the tray.", tr(paletteTitle(*def)));
     else
         ui::HelpText("Move to the tray", nullptr,
-                     "Keep this palette in the right tray (Shift+click: left tray), or drag the icon onto a tray.", tr(def->name));
+                     "Keep this palette in the right tray (Shift+click: left tray), or drag the icon onto a tray.", tr(paletteTitle(*def)));
     centredText(dl, nullptr, p, ImVec2(p.x + h, p.y + h), theme::u32(iconHovered ? theme::accentHover : theme::textDim),
                 inTray ? (right ? ICON_LC_PANEL_RIGHT : ICON_LC_PANEL_LEFT) : ICON_LC_PANEL_RIGHT);
     ImGui::SameLine();
@@ -1770,7 +1770,7 @@ bool App::paletteHeader(const char* id, bool inTray, bool right) {
     const bool titleHovered = ImGui::IsItemHovered();
     if (fontBold_) ImGui::PushFont(fontBold_);
     {
-        std::string title = tr(def->name);
+        std::string title = tr(paletteTitle(*def));
         if (theme::look.upperHeaders)
             for (auto& c : title) c = char(std::toupper(static_cast<unsigned char>(c)));
         if (headers == Headers::Ascii) title = "[ " + title + " ]";
@@ -1786,7 +1786,7 @@ bool App::paletteHeader(const char* id, bool inTray, bool right) {
             dl->AddText(ImVec2(x0, tp.y), theme::u32(theme::accent, 0.55f), run.c_str());
         }
     }
-    ImGui::LogText("%s", tr(def->name));
+    ImGui::LogText("%s", tr(paletteTitle(*def)));
     if (fontBold_) ImGui::PopFont();
     ImGui::SameLine();
     const bool endClicked = ImGui::InvisibleButton(inTray ? "##collapse" : "##close", ImVec2(h, h));

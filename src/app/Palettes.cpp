@@ -87,6 +87,10 @@ int taskMenuOf(std::string_view paletteId) {
     return -1;
 }
 
+const char* paletteTitle(const PaletteDef& p) {
+    return std::string_view(p.id) == "generate" && !ai::aiEnabled() ? "From Image" : p.name;
+}
+
 const char* taskSectionTitle(const TaskMenuDef& menu, int k) {
     if (std::string_view(menu.sections[k]) == "generate" && !ai::aiEnabled()) return "From Image";
     if (menu.titles[k]) return menu.titles[k];

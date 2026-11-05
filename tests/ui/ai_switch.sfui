@@ -33,6 +33,8 @@ wait 0.2
 click "Mesh##menu.mesh"
 expect "From Image##section.generate"
 expect_not "Generate 3D##section.generate"
+# The panel's title too, not Generate.
+expect_text "From Image"
 expect_not "Generate 3D##ui.generate3d"
 shot ai-mesh-menu-off
 key escape

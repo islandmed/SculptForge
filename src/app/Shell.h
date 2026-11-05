@@ -27,6 +27,8 @@ struct PaletteDef {
 };
 const PaletteDef* palettes(int& count); // alphabetical
 const PaletteDef* findPalette(std::string_view id);
+// A palette's name on its panel: Generate is "From Image" while Preferences > AI is off (Relief, Inflate, Stamp).
+const char* paletteTitle(const PaletteDef& p);
 
 // The SculptForge layout's menus, grouped by task (File, Edit, Sculpt, Paint, Mesh, View, Render, Help). Each holds
 // whole palettes as its sections, so every palette (and so every item) has exactly one menu.
