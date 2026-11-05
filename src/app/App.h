@@ -989,6 +989,7 @@ private:
         glm::mat4 lastView{0.0f};
         int framesStill = 0;          // frames since the view last moved
         bool fastNow = false;         // this frame draws without antialiasing (fast navigation)
+        bool proxyPrebuild = false;   // still frames build stale motion proxies (Renderer::setProxyPrebuild)
         bool proxyNow = false;        // this frame draws big meshes' motion proxy (fast navigation)
         bool movingNow = false;       // the view moved in the last few frames (the frame governor counts these)
         size_t sceneTriangles = 0;    // visible triangles in full detail, last frame
