@@ -25,7 +25,7 @@ key f3
 type "##Command palette" "welcome"
 key enter
 expect_value welcome_open == 1
-expect_text "SculptForge is free. Memberships add credits, a monthly pack, a vote on what we build next and, for Insiders, daily drops and preview builds."
+expect_text "SculptForge is free. A membership adds betas and early builds, a vote on what we build next, a monthly pack and your name in the credits."
 shot welcome
 # Its Support button shows the membership card (each tier a click from its checkout) over the welcome.
 click "Support SculptForge##welcome"

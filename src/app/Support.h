@@ -21,11 +21,10 @@ inline constexpr const char* kSupportUrl = "https://sculptforge.app/support.html
 // The official community Discord (a permanent invite; the same link as on the website and in the README).
 inline constexpr const char* kDiscordUrl = "https://discord.gg/gWrYkEmQhH";
 // Two memberships: Member ($5 / month or $48 / year) and Studio ($150 / month, up to 10 seats). The same Stripe
-// checkout links as website/support.html (tests/test_support.cpp checks they match). Until the Member and Studio
-// products exist in Stripe, Member monthly and Studio are the older $5 and $150 checkouts (same prices), and the yearly
-// link is empty: the yearly choice stays hidden in the app and on the site until it is filled in.
+// checkout links as website/support.html and studios.html (tests/test_support.cpp checks they match). An empty yearly
+// link hides the yearly choice in the app and on the site.
 inline constexpr const char* kSupportUrlMember = "https://buy.stripe.com/aFacN5h1t6L8cP14ad4F201";   // $5 / month
-inline constexpr const char* kSupportUrlMemberYearly = "";                                           // $48 / year
+inline constexpr const char* kSupportUrlMemberYearly = "https://buy.stripe.com/aFa5kD4eHfhE2an6il4F206"; // $48 / year
 inline constexpr const char* kSupportUrlStudio = "https://buy.stripe.com/3cI00j12v5H4g1dgWZ4F204";   // $150 / month
 // The promise next to members' early builds. Worded the same in the app, on the membership page and in the guide
 // (tests/test_support.cpp checks the membership page).
